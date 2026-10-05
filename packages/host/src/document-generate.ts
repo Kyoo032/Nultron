@@ -3,6 +3,7 @@ import {
   gatewayRequiredMessage,
   harnessSpecFor,
   hasLiveProvider,
+  holdDraftToSource,
   modeMessage,
   resolveChatModel,
   resolveRuntimeMode,
@@ -10,6 +11,7 @@ import {
   type AppLocale,
   type TenantContext,
 } from "@agentforge/core";
+import type { CheckVerdict } from "@agentforge/core/harness";
 import { loadSettings } from "./settings-store";
 import { modeDefaultsFor, listSelectableModels } from "./selectable-models";
 import {
@@ -151,6 +153,19 @@ async function collectAssistantRun(
   });
 }
 
+/** Mirrors `harness.sourceGap` in `apps/web/locales/{en,id}/documents.json`. The model does not write this line. */
+export function documentSourceGap(locale: AppLocale = localeForRun()): string {
+  return locale === "id" ? "Tidak ada di sumber." : "Not in the source.";
+}
+
+/** Skill: check the draft against the source. Code deletes. No second model call. */
+export function holdDocumentSource(draft: DocumentDraft, sourceText: string, onlySection?: number): DocumentDraft {
+  if (!sourceText.trim()) {
+    return draft;
+  }
+  return holdDraftToSource(draft, sourceText, documentSourceGap(), onlySection);
+}
+
 function requireLiveDocumentRuntime(tenant: TenantContext): ReturnType<typeof loadSettings> {
   const settings = loadSettings(tenant);
   const mode = resolveRuntimeMode({
@@ -225,6 +240,22 @@ function readAttempt(run: JobAssistantRun): DraftAttempt {
   }
 }
 
+/** The same checks on a draft the source hold has edited: one look, no repair, no model call. */
+async function recheckDraft(
+  attempt: DraftAttempt,
+  draft: DocumentDraft,
+  prompt: string,
+  sourceText: string,
+): Promise<CheckVerdict[]> {
+  const edited: DraftAttempt = { ...attempt, draft, parseError: null };
+  const result = await runChecked<DraftAttempt>({
+    produce: async () => edited,
+    checks: documentChecks(prompt, sourceText),
+    repairRounds: 0,
+  });
+  return result.verdicts;
+}
+
 export async function generateDocumentDraft(
   tenant: TenantContext,
   body: unknown,
@@ -287,11 +318,16 @@ export async function generateDocumentDraft(
   throwIfJobAborted(abortSignal);
 
   const final = result.output;
-  const draft = final.draft;
-  if (!draft) {
+  const parsed = final.draft;
+  if (!parsed) {
     throw final.failure ?? new ApiError("invalid_document", "Model returned no usable document draft", 502);
   }
-  const report = buildChecksReport(result.verdicts, result.rounds, draft, source.text);
+  // After the repair round, code deletes what the source still does not support. No model call here:
+  // a retry would invent the replacement. Finance on this route keeps its own number guard.
+  const draft = finance ? parsed : holdDocumentSource(parsed, source.text);
+  // The checks speak for the draft the person gets, so a hold that changed it is checked again.
+  const verdicts = draft === parsed ? result.verdicts : await recheckDraft(final, draft, prompt, source.text);
+  const report = buildChecksReport(verdicts, result.rounds, draft, source.text);
   const markdown = documentDraftMarkdown(draft);
   // Record the model that wrote the draft. After a fallback the requested id is the one model that did not.
   const answeredBy = final.run.model;
@@ -385,5 +421,5 @@ export async function regenerateDocumentSection(
   if (!raw.trim()) {
     throw new ApiError("generation_failed", modeMessage("emptyDocumentSection", localeForRun()), 502);
   }
-  return mergeDocumentSection(draft, index, parseDocumentSection(raw));
+  return holdDocumentSource(mergeDocumentSection(draft, index, parseDocumentSection(raw)), sourceText, index);
 }

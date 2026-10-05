@@ -4,7 +4,9 @@ import type { ModeHarnessSpec } from "../spec";
 /**
  * One draft call, then single-section rewrites (`document-generate.ts`); no tools bound. The draft
  * passes a structure check and, when it has source material, a grounding check
- * (`host/src/documents-checks.ts`); a failure gets one repair round and then ships flagged.
+ * (`host/src/documents-checks.ts`); a failure gets one repair round and then ships flagged. With
+ * source material, code then deletes any sentence the source still does not support
+ * (`documents/source-hold.ts`); that step calls no model and the checks run again on its result.
  */
 export const documentsHarnessSpec: ModeHarnessSpec = {
   mode: "documents",

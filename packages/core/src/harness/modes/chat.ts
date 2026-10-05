@@ -18,6 +18,11 @@ import type { ModeHarnessSpec } from "../spec";
  *   tour and no more.
  * - `run_code` 6: a run, a fix and a re-run for each of about two computations. A run is stopped at 30 s
  *   and a Personal desk runs one at a time, so a model that keeps retrying a broken program stops early.
+ *
+ * `repairRounds` is 0 because Chat never asks the model again. What it does have is a check in code
+ * on the saved reply (`settleChatTurn`, `agents/chat-turn.ts`): it drops `[n]` source numbers the desk
+ * did not offer and turns a calculator, datetime or past-sessions result that the model left unsaid
+ * into one sentence. No second model call, so no round in the budget.
  */
 export const chatHarnessSpec: ModeHarnessSpec = {
   mode: "chat",
@@ -30,10 +35,10 @@ export const chatHarnessSpec: ModeHarnessSpec = {
   },
   repairRounds: 0,
   skills: [
-    { id: "reply-on-a-thread", name: "Reply on a thread", status: "has" },
-    { id: "use-desk-knowledge", name: "Use the desk's knowledge", status: "has" },
-    { id: "call-bound-tools", name: "Call the bound tools, then stop", status: "has" },
-    { id: "refuse-wrong-attachment", name: "Refuse the wrong attachment", status: "has" },
-    { id: "keep-the-session", name: "Keep the session", status: "has" },
+    { id: "answer-this-turn", name: "Answer this turn", status: "has" },
+    { id: "ground-in-desk", name: "Use the desk, and only sources it offered", status: "new" },
+    { id: "say-the-result", name: "Do the small job and say the result", status: "new" },
+    { id: "look-not-make", name: "Look at an attachment, and refuse the wrong kind", status: "new" },
+    { id: "keep-the-turn", name: "Leave the turn where they can find it", status: "has" },
   ],
 };

@@ -7,6 +7,7 @@ import {
   assertAllowedEndpointUrl,
   htmlToText,
   isHtmlContent,
+  knowledgeMissBlock,
   plainToText,
   scanInjection,
   type KnowledgeModels,
@@ -21,6 +22,8 @@ import { deleteThroughBackend, indexThroughBackend, retrieveThroughBackend } fro
 import type { KnowledgeBackendId, RetrievedChunk, RetrieveResult } from "./knowledge/backend";
 import { expandRetrievedChunks } from "./knowledge-expand";
 import { removeGraphForSource, sweepOrphanGraph } from "./knowledge-graph-prune";
+import { forgetSourcesOnMap } from "./knowledge-map-honesty";
+import { localeForRun } from "./run-context";
 import { defaultSoul, isLegacyDefaultSoul, type KnowledgeSoul } from "./knowledge-soul";
 import { modeDefaultsFor } from "./selectable-models";
 import { loadSettings } from "./settings-store";
@@ -675,6 +678,8 @@ export function deleteSource(tenant: TenantContext, id: string): boolean {
     forgetInBackend(tenant, id, externalId);
     // And the raw upload, if this source was a file. Nothing else ever reads it once the row is gone.
     removeStoredUpload(tenant, id);
+    // The saved map is a coverage claim. The id has to leave it in the same delete.
+    forgetSourcesOnMap(tenant, [id]);
   }
   return removed;
 }
@@ -744,6 +749,10 @@ export function sweepOrphanSources(tenant: TenantContext): number {
     forgetInBackend(tenant, row.id, row.external_id);
     removeStoredUpload(tenant, row.id);
   }
+  forgetSourcesOnMap(
+    tenant,
+    removed.map((row) => row.id),
+  );
   // Rows written before the cascade existed have no source row left to sweep — only a node, an edge
   // or a retrieval. The owner's desk carried 18 graph nodes against one live source; this is the
   // repair pass that makes the loop chart describe the knowledge base that actually exists.
@@ -935,7 +944,8 @@ export async function knowledgeInjection(
 ): Promise<KnowledgeInjection> {
   const soul = getSoul(tenant);
   const memories = listMemories(tenant).filter((item) => item.pinned);
-  const retrieved: RetrieveResult = query
+  const asked = query.trim().length > 0;
+  const retrieved: RetrieveResult = asked
     ? await retrieveChunks(tenant, query, 4, { excludeSourceIds: excludedSourceIds(tenant, options) })
     : { chunks: [], mode: "none", backend: "builtin", vectorModel: null };
   const soulBlock = [
@@ -947,7 +957,12 @@ export async function knowledgeInjection(
     .filter(Boolean)
     .join("\n");
   const memoryBlock = memories.map((item) => `- ${item.text}`).join("\n");
-  const retrievedBlock = renderRetrievedBlock(retrieved.chunks);
+  // A question that found nothing says so, instead of leaving the model an empty section to fill.
+  const retrievedBlock = retrieved.chunks.length
+    ? renderRetrievedBlock(retrieved.chunks)
+    : asked
+      ? knowledgeMissBlock(localeForRun())
+      : "";
   const sections = [
     soulBlock ? `## Soul\n${soulBlock}` : "",
     memoryBlock ? `## Pinned memories\n${memoryBlock}` : "",
@@ -960,7 +975,8 @@ export async function knowledgeInjection(
     parts: [
       { label: "Soul", detail: soul.name, tokens: est(soulBlock) },
       { label: "Memories", detail: `${memories.length} pinned`, tokens: est(memoryBlock) },
-      sourcesPart(retrieved),
+      // `sourcesPart` counts the chunks only; the miss line is in the prompt too, so count what was sent.
+      { ...sourcesPart(retrieved), tokens: est(retrievedBlock) },
     ],
     chunks: retrieved.chunks,
     backend: retrieved.backend,

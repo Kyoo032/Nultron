@@ -41,7 +41,7 @@ describe("chat harness spec", () => {
     }
   });
 
-  it("does not repair: Chat has no output check", () => {
+  it("never asks the model again: the turn check settles the saved reply in code", () => {
     expect(chatHarnessSpec.repairRounds).toBe(0);
   });
 });

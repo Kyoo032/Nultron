@@ -499,6 +499,7 @@ export {
   knowledgeVerifierPrompt,
 } from "./knowledge/rag";
 export type { KnowledgeMap, KnowledgeMapTopic, KnowledgeModels } from "./knowledge/rag";
+export { dropSourceIds, groundKnowledgeMap, knowledgeMissBlock } from "./knowledge/harness";
 export {
   pickPreferredJobModel,
   resolveModeDefaults,
@@ -647,6 +648,19 @@ export {
 } from "./models/audio-capabilities";
 export type { MusicCapabilities, MusicMode, SpeechUnavailableReason } from "./models/audio-capabilities";
 export {
+  MUSIC_HARNESS_ATTEMPTS,
+  MUSIC_HARNESS_SKILLS,
+  lyricsAreSingable,
+  preferLyricDraft,
+  resolveSongTitle,
+  shouldRetryLyrics,
+  shouldRetryMusicJob,
+  singableLines,
+  songTitleFromBrief,
+  stripMusicLanguageRule,
+} from "./music/harness";
+export type { MusicHarnessSkillId } from "./music/harness";
+export {
   formatVideoGatewayFailure,
   httpStatusForGatewayFailure,
   studioVideoFailureStatus,
@@ -746,6 +760,7 @@ export { MODE_HARNESS_SPECS, harnessSpecFor } from "./harness/specs";
 export type { HarnessSkill, HarnessSkillStatus, ModeHarness } from "./harness/mode-skills";
 export { checkDraftAgainstSource } from "./documents/source-check";
 export type { CheckableDraft, SourceCheck, SourceCheckItem } from "./documents/source-check";
+export { holdDraftToSource } from "./documents/source-hold";
 export {
   SLIDE_CROWD_REASONS,
   SLIDE_DESIGN_LIMITS,
@@ -776,8 +791,23 @@ export {
   stubChatCopy,
   stubChatEnhanceSuffix,
   wantsStubClock,
+  wantsStubPastChat,
+  wantsStubDeskSource,
+  chatTurnCopy,
+  fillChatTurn,
 } from "./agents/chat-locale";
-export type { StubChatCopy } from "./agents/chat-locale";
+export type { StubChatCopy, ChatTurnCopy } from "./agents/chat-locale";
+export {
+  CHAT_UNDERSTAND_HIDDEN_TOOLS,
+  bindingsForChatModality,
+  sentenceFromCalculator,
+  sentenceFromDatetime,
+  sentenceFromPastSessions,
+  sentenceFromTool,
+  repairUnresolvedCites,
+  settleChatTurn,
+} from "./agents/chat-turn";
+export type { SettledTool, SettledChatTurn } from "./agents/chat-turn";
 export {
   ENHANCE_SURFACES,
   isEnhanceSurface,

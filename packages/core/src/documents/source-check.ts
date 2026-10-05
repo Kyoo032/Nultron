@@ -20,11 +20,25 @@ export type CheckableDraft = {
   sections: Array<{ heading: string; body: string }>;
 };
 
-function sentences(text: string): string[] {
+function numberTokens(text: string): string[] {
+  return text.match(/\d+(?:[.,]\d+)*/g) ?? [];
+}
+
+/** A number counts only as itself: "8" is not inside "18". */
+function sourceHasNumber(source: string, token: string): boolean {
+  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?<![\\d])${escaped}(?![\\d])`).test(source);
+}
+
+/**
+ * `numbered` also keeps a short part that states a number, so "Revenue grew 14%." is checked.
+ * A title or heading is a label ("Heading 1", "2. Risks"), so it keeps only the six-word rule.
+ */
+function sentences(text: string, numbered: boolean): string[] {
   return text
     .split(/\n+|(?<=[.!?])\s+/)
     .map((part) => part.trim())
-    .filter((part) => part.split(/\s+/).length >= 6);
+    .filter((part) => part.split(/\s+/).length >= 6 || (numbered && numberTokens(part).length > 0));
 }
 
 function words(text: string): string[] {
@@ -36,6 +50,10 @@ function words(text: string): string[] {
 }
 
 function sentenceSupported(sentence: string, sourceNorm: string, sourceWords: Set<string>): boolean {
+  const nums = numberTokens(sentence);
+  if (nums.some((token) => !sourceHasNumber(sourceNorm, token))) {
+    return false;
+  }
   const norm = sentence.toLowerCase().replace(/\s+/g, " ").trim();
   if (norm.length >= 12 && sourceNorm.includes(norm)) {
     return true;
@@ -56,8 +74,8 @@ export function checkDraftAgainstSource(draft: CheckableDraft, sourceText: strin
   const sourceNorm = source.toLowerCase().replace(/\s+/g, " ");
   const sourceWords = new Set(words(source));
   const items: SourceCheckItem[] = [];
-  const consider = (sectionIndex: number, text: string) => {
-    for (const sentence of sentences(text)) {
+  const consider = (sectionIndex: number, text: string, numbered: boolean) => {
+    for (const sentence of sentences(text, numbered)) {
       items.push({
         sectionIndex,
         sentence,
@@ -65,9 +83,10 @@ export function checkDraftAgainstSource(draft: CheckableDraft, sourceText: strin
       });
     }
   };
-  consider(-1, draft.title);
+  consider(-1, draft.title, false);
   draft.sections.forEach((section, index) => {
-    consider(index, `${section.heading}. ${section.body}`);
+    consider(index, `${section.heading}.`, false);
+    consider(index, section.body, true);
   });
   return { checked: true, items };
 }
