@@ -614,6 +614,12 @@ Host and renderer, both products. Nothing packed.
 - **Shape toolbar clicks keep the selection.** On the simple Presentation stage (starter and Education lesson), a pointerdown on Duplicate, Fill, Stroke, the shape text, or Remove used to clear the selection because the toolbar is drawn inside the stage. The stage now ignores that toolbar, so the click runs. Open Slide is unchanged.
 - **Edit transport and the timeline hint follow the desk language.** `edit-play` and the timeline zoom, hint, and trim names read the `edit` catalog (`Putar` / `snap: bingkai…` on `id`). The rest of the Edit chrome below the header is still literal English.
 
+## Meeting harness, 2026-09-28 (not packed)
+
+Both products share the pipeline. Nothing packed. No new control on the Meeting screen.
+
+- **Meeting drops a date or a figure the transcript never said, and asks once more for a translation that is not the same sheet.** The minutes call keeps its checks and its one repair round (`packages/host/src/meeting/minutes-checks.ts`); a prose answer is the `minutes-shape` check's repair, so there is no second retry on top. After it the code settles the sheet with no further model call (`settleParsedMinutes`, `packages/core/src/meeting/sheet.ts`): names, then a `heldOn` or due date the transcript never says is cleared, and a number it never says becomes `[figure not said]`. A decision that quotes a date the repair did not fix is therefore saved with that marker in place of the number; the verdicts on the artifact still say the check failed. The translation is read the same way and compared with the sheet (counts, owners, dates, provisional marks, figures, `minutesAgree`); a miss is asked once more, and a second miss is `translation_disagreed` (502, desk-language message): the minutes stay, no translation is saved. Progress labels, including the repair step, follow the desk language (`meetingPhaseLabel`, `packages/core/src/meeting/copy.ts`), and a `grounding` phase sits between writing and saving. Stub runtime still refuses the run before any of that.
+
 ## Knowledge harness, 2026-09-28 (not packed)
 
 Host and core, both products. Nothing packed. No new control on `/knowledge`.
@@ -627,6 +633,13 @@ Host and core, both products. Nothing packed. No new control on `/knowledge`.
 Host and core only. Both products share the run. Nothing packed. No new control on the matter screen.
 
 - **Legal stands in a method when the person brings none.** One readable file still untagged after classify is the counterparty draft. A matter with no playbook takes a built-in position (borrower or lender: credit agreement; an NDA in the file name or preview: receiving-party NDA; otherwise the general commercial playbook). Each clause is read with its defined terms and the instruction lines that share its words. A quote that is not verbatim is asked once, then dropped. The rest of the run is unchanged: unmarked diff, missing provisions, interactions, then verify and edit up to three rounds.
+
+## Videos harness, 2026-09-28 (not packed)
+
+Host and renderer, both products. Nothing packed. The Videos screen gains no control.
+
+- **Videos writes a shot, retries a dead render once, and keeps only a billed clip.** A bare sentence becomes a shot that still contains that sentence. A prompt that already names a camera and a motion is left as written. The model list stays the key refresh, and the length snap stays. One retry covers a timeout, a 502/503/504, a dropped connection, or a result that is not a video. A missing key, a model the refresh did not list, a still the model cannot take, and a prepaid-price refusal do not retry. The gallery caption and the Knowledge card record the shot and the snapped length.
+- **Merged with main's harness specs (2026-10-05).** The Videos spec (`packages/core/src/harness/modes/videos.ts`) reads its five skills from `packages/core/src/videos/harness.ts`, as Music does. `write-shot`, `render-retry` and `keep-clip` are `new`; `start-from-still` and `estimate-and-tighten` stay `has`. `keep-clip` replaces the catalog entries `generate-clip`, `bill-snapped-length` and `keep-gallery`, which named what the harness now does as one step. `repairRounds` stays 0: the one retry runs inline in `runVideoHarness`, not through `runChecked`, and announces no `job.round`. `mode-skills.test.ts` lists the three new skills.
 
 ## Rebrand to Nultron, 2026-09-29 (not packed, not driven)
 
