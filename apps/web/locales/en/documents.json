@@ -165,5 +165,8 @@
     "groundingHint": "The draft is saved. Press “{action}” to see which sentences are not in the source, or rewrite those sections.",
     "structure": "Some sections may be missing or too short",
     "structureHint": "The draft is saved. Generate it again, or rewrite the thin sections."
+  },
+  "harness": {
+    "sourceGap": "Not in the source."
   }
 }

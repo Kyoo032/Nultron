@@ -165,5 +165,8 @@
     "groundingHint": "Draf tersimpan. Tekan “{action}” untuk melihat kalimat mana yang tidak ada di sumber, atau tulis ulang bagian itu.",
     "structure": "Beberapa bagian mungkin hilang atau terlalu singkat",
     "structureHint": "Draf tersimpan. Buat ulang, atau tulis ulang bagian yang tipis."
+  },
+  "harness": {
+    "sourceGap": "Tidak ada di sumber."
   }
 }

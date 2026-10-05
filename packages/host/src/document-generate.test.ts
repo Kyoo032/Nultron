@@ -5,6 +5,7 @@ import type { DeskPath, FileAuthor, FileRoot } from "@agentforge/core/tools/file
 import { ensureSchema } from "@agentforge/db/ensure-schema";
 import { createDeskFileStore, type DeskFileStore } from "./desk-files/file-store";
 import { SOURCE_MATERIAL_RULE } from "./job-source";
+import { withRequestLocale } from "./run-context";
 import type { WorkCard } from "./work-cards";
 
 /**
@@ -100,9 +101,8 @@ vi.mock("./selectable-models", async (importOriginal) => {
   };
 });
 
-const { documentJobSystemPrompt, generateDocumentDraft, isFinanceJob, regenerateDocumentSection } = await import(
-  "./document-generate"
-);
+const { documentJobSystemPrompt, generateDocumentDraft, holdDocumentSource, isFinanceJob, regenerateDocumentSection } =
+  await import("./document-generate");
 
 const tenant: TenantContext = {
   tenantId: "local-tenant",
@@ -189,6 +189,130 @@ describe("the model a Documents job uses and records", () => {
     answer = { text: JSON.stringify(DRAFT.sections[0]), model: "deepseek-v4-flash" };
     await regenerateDocumentSection(tenant, { draft: DRAFT, sectionIndex: 0, model: "deepseek-v4-flash" });
     expect(asked[0]?.modelExplicit).toBe(false);
+  });
+
+  it("drops a source sentence the attachment does not support, in one model call", async () => {
+    const source = "The new vendor takes over billing.";
+    answer = {
+      text: JSON.stringify({
+        title: "Vendor switch memo",
+        sections: [
+          {
+            heading: "What changes on Monday",
+            body: "The new vendor takes over billing. The installer was last built in August.",
+          },
+        ],
+      }),
+      model: "deepseek-v4-flash",
+    };
+    const draft = await withRequestLocale(
+      () => "en",
+      () =>
+        generateDocumentDraft(tenant, {
+          prompt: "Write the vendor memo",
+          model: "deepseek-v4-flash",
+          sourceText: source,
+        }),
+    );
+    expect(asked).toHaveLength(1);
+    expect(draft.sections[0]?.body).toBe("The new vendor takes over billing.");
+    expect(created[0]).toMatchObject({ body: expect.stringContaining("The new vendor takes over billing.") });
+    expect(JSON.stringify(created[0])).not.toMatch(/August/);
+  });
+
+  it("replaces an emptied section with the Indonesian line when that is the desk locale", async () => {
+    answer = {
+      text: JSON.stringify({
+        title: "Vendor switch memo",
+        sections: [{ heading: "What changes on Monday", body: "The installer was last built in August." }],
+      }),
+      model: "deepseek-v4-flash",
+    };
+    const draft = await withRequestLocale(
+      () => "id",
+      () =>
+        generateDocumentDraft(tenant, {
+          prompt: "Write the vendor memo",
+          model: "deepseek-v4-flash",
+          sourceText: "The new vendor takes over billing on Monday morning.",
+        }),
+    );
+    expect(draft.sections[0]?.body).toBe("Tidak ada di sumber.");
+  });
+
+  it("does not hold a finance-flagged draft on this route", async () => {
+    const source = "The new vendor takes over billing.";
+    answer = {
+      text: JSON.stringify({
+        title: "Vendor switch memo",
+        sections: [
+          {
+            heading: "What changes on Monday",
+            body: "The new vendor takes over billing. The installer was last built in August.",
+          },
+        ],
+      }),
+      model: "deepseek-v4-flash",
+    };
+    const draft = await generateDocumentDraft(tenant, {
+      job: "finance",
+      prompt: "Write the vendor memo",
+      model: "deepseek-v4-flash",
+      sourceText: source,
+    });
+    expect(draft.sections[0]?.body).toMatch(/August/);
+  });
+
+  it("holds only the rewritten section when source text is attached", async () => {
+    answer = {
+      text: JSON.stringify({
+        heading: "What changes on Monday",
+        body: "The new vendor takes over billing. A second warehouse opens in August.",
+      }),
+      model: "deepseek-v4-flash",
+    };
+    const draft = await regenerateDocumentSection(tenant, {
+      draft: DRAFT,
+      sectionIndex: 0,
+      prompt: "Write the vendor memo",
+      model: "deepseek-v4-flash",
+      sourceText: "The new vendor takes over billing.",
+    });
+    expect(asked).toHaveLength(1);
+    expect(draft.sections[0]?.body).toBe("The new vendor takes over billing.");
+    expect(draft.sections[1]).toEqual(DRAFT.sections[1]);
+  });
+});
+
+describe("source hold skill on a stub desk", () => {
+  beforeEach(() => {
+    asked.length = 0;
+    vi.stubEnv("AGENTFORGE_RUNTIME", "stub");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("runs without a model call", async () => {
+    const held = await withRequestLocale(
+      () => "en",
+      async () =>
+        holdDocumentSource(
+          {
+            title: "Field note",
+            sections: [
+              {
+                heading: "What shipped",
+                body: "The rail on this desk already shows every work mode. The installer was last built in August.",
+              },
+            ],
+          },
+          "The rail on this desk already shows every work mode.",
+        ),
+    );
+    expect(asked).toHaveLength(0);
+    expect(held.sections[0]?.body).toBe("The rail on this desk already shows every work mode.");
   });
 });
 
@@ -459,17 +583,72 @@ describe("Documents checks and the repair round", () => {
     expect(ingested).toHaveLength(1);
   });
 
-  it("names the flagged sections when the draft still does not follow the source after the repair", async () => {
+  it("cuts what the source still does not support after the repair, and the checks speak for the held draft", async () => {
     queue.push(reply(INVENTED), reply(INVENTED));
     const draft = await generateDocumentDraft(tenant, {
       prompt: "Write the vendor memo",
       model: MODEL,
       sourceText: SOURCE,
     });
+    // The repair round still runs first; only then does code delete. The hold itself adds no call.
     expect(asked).toHaveLength(2);
-    expect(draft.checks?.passed).toBe(false);
-    expect(draft.checks?.failures.map((failure) => [failure.check, failure.sections])).toEqual([["grounding", [0]]]);
+    expect(draft.sections[0]?.body).toBe("Not in the source.");
+    expect(draft.sections[1]).toEqual(INVENTED.sections[1]);
+    // Nothing is left for a grounding note to point at, so the answer is a plain draft and the artifact
+    // keeps only the spent repair.
+    expect(draft.checks).toBeUndefined();
+    expect(created[0]?.meta?.checks).toEqual({ passed: true, rounds: 1, failures: [] });
+    expect(JSON.stringify(created[0])).not.toMatch(/Jakarta/);
+    // The Knowledge Base card is built from the held draft too.
+    expect(ingested).toHaveLength(1);
+    expect(ingested[0]?.body ?? "").not.toMatch(/Jakarta/);
+  });
+
+  it("reports a section the hold left too thin, from the held draft and not from the model's reply", async () => {
+    queue.push(
+      reply({
+        title: "Vendor switch memo",
+        sections: [
+          {
+            heading: "What changes on Monday",
+            body: "Billing moves now. The company will open three new stores in Jakarta next year.",
+          },
+          GROUNDED.sections[1],
+        ],
+      }),
+    );
+    const draft = await generateDocumentDraft(tenant, {
+      prompt: "Write the vendor memo",
+      model: MODEL,
+      sourceText: SOURCE,
+    });
+    // The reply passed both checks (one unsupported sentence is below the grounding bar), so no repair.
+    expect(asked).toHaveLength(1);
+    expect(draft.sections[0]?.body).toBe("Billing moves now.");
+    expect(draft.checks).toEqual({
+      passed: false,
+      rounds: 0,
+      failures: [
+        {
+          check: "structure",
+          error: 'Section 1 ("What changes on Monday") is only 3 words, which is a label and not finished writing.',
+          sections: [],
+        },
+      ],
+    });
     expect(created[0]?.meta?.checks).toEqual(draft.checks);
+  });
+
+  it("leaves a draft that follows the source exactly as the model wrote it", async () => {
+    queue.push(reply(GROUNDED));
+    const draft = await generateDocumentDraft(tenant, {
+      prompt: "Write the vendor memo",
+      model: MODEL,
+      sourceText: SOURCE,
+    });
+    expect(asked).toHaveLength(1);
+    expect(draft).toEqual(GROUNDED);
+    expect(created[0]?.meta).toEqual({ question: "Write the vendor memo", model: MODEL, finance: false });
   });
 
   it("repairs a reply that was not JSON, quoting it back, and saves the second", async () => {
