@@ -6,6 +6,7 @@ const {
   updatesEnabled,
   unsupportedMessage,
   describeUpdateError,
+  isRetryableUpdateError,
   createUpdateLogger,
   resolveUpdateLogPath,
   registerAutoUpdate,
@@ -104,32 +105,33 @@ function setup(options = {}) {
     app: makeApp(options.app),
     ipcMain,
     BrowserWindow: windows.BrowserWindow,
-    productName: options.productName ?? "DPSBuddy",
+    productName: options.productName ?? "Nultron",
     platform: options.platform ?? "win32",
     autoUpdaterOverride: autoUpdater,
     getMainWindow: () => windows.win,
     onInstallStart: () => installs.push(autoUpdater.calls.length),
+    retryDelayMs: options.retryDelayMs ?? 0,
   });
   return { ipcMain, windows, autoUpdater, installs, result };
 }
 
 // ---------- updatesEnabled ----------
 
-assert.equal(updatesEnabled("DPSBuddy", true, "win32"), true);
-assert.equal(updatesEnabled("DPSBuddy", true, "linux"), true);
-assert.equal(updatesEnabled("DPSBuddy", false, "win32"), false);
+assert.equal(updatesEnabled("Nultron", true, "win32"), true);
+assert.equal(updatesEnabled("Nultron", true, "linux"), true);
+assert.equal(updatesEnabled("Nultron", false, "win32"), false);
 assert.equal(updatesEnabled("Kemenkeu AI", true, "win32"), false);
 assert.equal(updatesEnabled("AIHub Metranet", true, "win32"), false);
 assert.equal(updatesEnabled(undefined, true, "win32"), false);
-assert.equal(updatesEnabled("DPSBuddy", true, "darwin"), false, "unsigned mac build never offers an install");
+assert.equal(updatesEnabled("Nultron", true, "darwin"), false, "unsigned mac build never offers an install");
 
 // ---------- unsupportedMessage ----------
 
 const MAC_MANUAL = "Updates on macOS are manual for now. Download the new .dmg from GitHub Releases.";
-assert.equal(unsupportedMessage("DPSBuddy", true, "darwin"), MAC_MANUAL);
-assert.equal(unsupportedMessage("DPSBuddy", false, "darwin"), undefined, "dev build keeps the generic line");
+assert.equal(unsupportedMessage("Nultron", true, "darwin"), MAC_MANUAL);
+assert.equal(unsupportedMessage("Nultron", false, "darwin"), undefined, "dev build keeps the generic line");
 assert.equal(unsupportedMessage("Kemenkeu AI", true, "darwin"), undefined, "flavors never mention releases");
-assert.equal(unsupportedMessage("DPSBuddy", true, "win32"), undefined);
+assert.equal(unsupportedMessage("Nultron", true, "win32"), undefined);
 
 // ---------- describeUpdateError ----------
 
@@ -140,6 +142,22 @@ assert.equal(describeUpdateError(new Error("404 Not Found\nHeaders: {}")), NOT_F
 assert.equal(describeUpdateError(httpError(403)), "GitHub returned 403 while checking for updates.");
 assert.equal(describeUpdateError(httpError(500)), "GitHub returned 500 while checking for updates.");
 assert.equal(describeUpdateError(httpError(429)), "GitHub returned 429 while checking for updates.");
+assert.equal(
+  describeUpdateError(new Error("Request has been aborted by the server")),
+  "The connection to GitHub was interrupted. Try again.",
+);
+assert.equal(
+  describeUpdateError(new Error("net::ERR_CONNECTION_RESET")),
+  "The connection to GitHub was interrupted. Try again.",
+);
+assert.equal(isRetryableUpdateError(codedError("ECONNRESET", "socket hang up")), true);
+assert.equal(isRetryableUpdateError(new Error("Request has been aborted by the server")), true);
+assert.equal(isRetryableUpdateError(httpError(404, HEADER_DUMP)), false);
+assert.equal(isRetryableUpdateError(httpError(500)), true);
+assert.equal(
+  isRetryableUpdateError(codedError("ERR_UPDATER_CHANNEL_FILE_NOT_FOUND", "Cannot find channel latest.yml")),
+  false,
+);
 
 for (const code of ["ENOTFOUND", "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT", "EAI_AGAIN"]) {
   const text = describeUpdateError(codedError(code, `getaddrinfo ${code} github.com`));
@@ -200,7 +218,7 @@ async function main() {
     assert.equal(state.currentVersion, CURRENT);
     assert.equal(ipcMain.invoke("updates:check"), state);
     assert.equal(ipcMain.invoke("updates:download"), state);
-    assert.throws(() => ipcMain.invoke("updates:install"), /installed DPSBuddy app/);
+    assert.throws(() => ipcMain.invoke("updates:install"), /installed Nultron app/);
     assert.deepEqual(autoUpdater.calls, [], "flavor never touches the updater");
   }
 
@@ -211,7 +229,7 @@ async function main() {
     const state = ipcMain.invoke("updates:state");
     assert.equal(state.status, "unavailable");
     assert.equal(state.message, undefined, "dev build carries no platform reason");
-    assert.throws(() => ipcMain.invoke("updates:install"), /installed DPSBuddy app/);
+    assert.throws(() => ipcMain.invoke("updates:install"), /installed Nultron app/);
     assert.deepEqual(autoUpdater.calls, []);
   }
 
@@ -403,7 +421,7 @@ async function main() {
       supported: false,
       status: "unavailable",
     });
-    assert.throws(() => ipcMain.invoke("updates:install"), /installed DPSBuddy app/, "the main frame still sees why");
+    assert.throws(() => ipcMain.invoke("updates:install"), /installed Nultron app/, "the main frame still sees why");
   }
 
   {
@@ -414,12 +432,63 @@ async function main() {
       app: makeApp(),
       ipcMain,
       BrowserWindow: windows.BrowserWindow,
-      productName: "DPSBuddy",
+      productName: "Nultron",
       platform: "win32",
       autoUpdaterOverride: makeAutoUpdater(),
       getMainWindow: () => null,
     });
     assert.deepEqual(ipcMain.invoke("updates:state"), { supported: false, status: "unavailable" });
+  }
+
+  {
+    // A dropped GitHub connection is retried. The panel stays on the successful result.
+    const { ipcMain, autoUpdater } = setup({
+      updater: { checkResult: { isUpdateAvailable: false, updateInfo: { version: CURRENT } } },
+    });
+    await settle();
+    const callsBefore = autoUpdater.calls.length;
+    const script = [
+      codedError("ECONNRESET", "socket hang up"),
+      new Error("Request has been aborted by the server"),
+      { isUpdateAvailable: true, updateInfo: { version: "0.15.1" } },
+    ];
+    autoUpdater.checkForUpdates = async () => {
+      autoUpdater.calls.push("checkForUpdates");
+      const next = script.shift();
+      if (next instanceof Error) {
+        autoUpdater.emit("error", next);
+        throw next;
+      }
+      return next;
+    };
+    const state = await ipcMain.invoke("updates:check");
+    assert.equal(state.status, "available");
+    assert.equal(state.version, "0.15.1");
+    assert.equal(state.message, undefined, "a recovered check does not keep the connection error");
+    assert.equal(autoUpdater.calls.length - callsBefore, 3, "two failures then the successful check");
+    assert.equal(ipcMain.invoke("updates:state").status, "available");
+  }
+
+  {
+    // Three dropped connections in a row still surface the short line, not the raw abort.
+    const { ipcMain, autoUpdater } = setup({
+      updater: { checkResult: { isUpdateAvailable: false, updateInfo: { version: CURRENT } } },
+    });
+    await settle();
+    autoUpdater.checkForUpdates = async () => {
+      autoUpdater.calls.push("checkForUpdates");
+      const error = new Error("net::ERR_CONNECTION_RESET");
+      autoUpdater.emit("error", error);
+      throw error;
+    };
+    const state = await ipcMain.invoke("updates:check");
+    assert.equal(state.status, "error");
+    assert.equal(state.message, "The connection to GitHub was interrupted. Try again.");
+    assert.equal(
+      autoUpdater.calls.filter((call) => call === "checkForUpdates").length,
+      4,
+      "startup check plus three attempts",
+    );
   }
 
   console.log("auto-update.test.cjs: ok");

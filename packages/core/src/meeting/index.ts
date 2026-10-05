@@ -23,7 +23,6 @@ export {
   emptyMinutesMessage,
   invalidMinutesMessage,
   meetingPhaseLabel,
-  minutesShapeRetryNote,
   translationDisagreedMessage,
   translationRetryNote,
 } from "./copy";
@@ -34,8 +33,8 @@ export {
   MeetingTranslationError,
   parseMeetingMinutes,
   settleMinutes,
+  settleParsedMinutes,
   translateMeetingSheet,
-  writeMeetingSheet,
 } from "./sheet";
 export type { SettledMinutes } from "./sheet";
 

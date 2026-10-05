@@ -11,10 +11,17 @@ import { FormattedText } from "@/components/formatted-text";
 import { JobProgressList } from "@/components/job-progress";
 import { ModeHeader } from "@/components/mode-header";
 import { ModelSelect } from "@/components/model-select";
+import { isGatewayBlockedText } from "@/lib/gateway-blocked";
+import { NeedsKeyNote } from "@/components/needs-key-note";
+import { StudioEmptyDesk } from "@/components/studio-empty-desk";
 import { WorkingStatus } from "@/components/working-status";
+import { ResearchChecksNote } from "@/components/research-checks-note";
 import { ResearchPreview } from "@/components/research-preview";
 import { t } from "@/lib/i18n";
+import { PROMPT_ACTIONS, PROMPT_INPUT, PROMPT_ROW } from "@/lib/prompt-row";
+import { researchChecksNote, type ResearchChecksNoteModel } from "@/lib/research-checks-view";
 import { researchNotesToMarkdown, type ResearchNotes } from "@/lib/research-notes";
+import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import { useJobModel } from "@/lib/use-job-model";
 import { modelPickBody, studioModelPick } from "@/lib/model-choice";
 import { useJobStream } from "@/lib/use-job-stream";
@@ -23,12 +30,23 @@ type ResearchResult = ResearchNotes & {
   artifactId: string | null;
   dossierId?: string | null;
   dossier?: { title: string; markdown: string };
+  /** The host's checks report. Read only through `researchChecksNote`, which accepts any shape. */
+  checks?: unknown;
 };
 
-/** What the studio shows: a fresh run (notes + dossier), or a reopened saved dossier (Markdown only). */
+/**
+ * What the studio shows: a fresh run (notes + dossier), or a reopened saved dossier (Markdown only).
+ * Both carry what the checks still found, so a reopened dossier says it too.
+ */
 type Shown =
-  | { kind: "run"; notes: ResearchNotes; dossierMarkdown: string; artifactId: string | null }
-  | { kind: "saved"; title: string; markdown: string; artifactId: string };
+  | {
+      kind: "run";
+      notes: ResearchNotes;
+      dossierMarkdown: string;
+      artifactId: string | null;
+      checks: ResearchChecksNoteModel | null;
+    }
+  | { kind: "saved"; title: string; markdown: string; artifactId: string; checks: ResearchChecksNoteModel | null };
 
 type Tab = "notes" | "dossier";
 
@@ -43,6 +61,8 @@ function tabClass(active: boolean): string {
 }
 
 export function ResearchStudio() {
+  // Nultron Enterprise: a signed-in tenant may open the desk before adding a key. Hosted only; false elsewhere.
+  const needsKey = useHostedNeedsKey();
   const { models, model, pinned: modelPinned, setModel } = useJobModel("research");
   const job = useJobStream<ResearchResult>();
   const [prompt, setPrompt] = useState("");
@@ -54,7 +74,7 @@ export function ResearchStudio() {
   async function onGenerate(event: FormEvent) {
     event.preventDefault();
     const topic = prompt.trim();
-    if (!topic || job.busy) {
+    if (!topic || job.busy || needsKey) {
       return;
     }
     // Only a deliberate pick travels as pinned: a seeded default stays rescuable by the host's fallback.
@@ -63,12 +83,13 @@ export function ResearchStudio() {
       ...modelPickBody(studioModelPick(model, modelPinned)),
     });
     if (result) {
-      const { artifactId, dossierId, dossier, ...notes } = result;
+      const { artifactId, dossierId, dossier, checks, ...notes } = result;
       setShown({
         kind: "run",
         notes,
         dossierMarkdown: dossier?.markdown ?? researchNotesToMarkdown(notes),
         artifactId: dossierId ?? artifactId,
+        checks: researchChecksNote(checks),
       });
       setLanded((count) => count + 1);
       setTab("notes");
@@ -95,14 +116,20 @@ export function ResearchStudio() {
             disabled={job.busy}
             testId="research-saved"
             onPick={(artifact) => {
-              setShown({ kind: "saved", title: artifact.title, markdown: artifact.body, artifactId: artifact.id });
+              setShown({
+                kind: "saved",
+                title: artifact.title,
+                markdown: artifact.body,
+                artifactId: artifact.id,
+                checks: researchChecksNote(artifact.meta.checks),
+              });
               setTab("dossier");
             }}
           />
         }
       />
 
-      {error ? (
+      {error && !isGatewayBlockedText(error) ? (
         <div
           className="mt-6 rounded-lg border border-[var(--line)] px-4 py-3 text-sm text-[var(--danger)]"
           role="alert"
@@ -133,9 +160,9 @@ export function ResearchStudio() {
           onChange={setModel}
           disabled={job.busy || models.length === 0}
           testId="research-studio-model"
-          className="h-8 w-full rounded-lg border border-[var(--line)] bg-transparent px-2 text-xs text-[var(--text-2)] wash"
+          className="select-field w-full"
         />
-        <div className="flex gap-2">
+        <div className={PROMPT_ROW}>
           <EnhancePromptButton
             text={prompt}
             surface="research"
@@ -148,31 +175,34 @@ export function ResearchStudio() {
             type="text"
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
-            className="text-field min-w-0 flex-1 outline-none placeholder:text-[var(--text-3)]"
+            className={PROMPT_INPUT}
             placeholder={t("research.promptPlaceholder")}
             disabled={job.busy}
             data-testid="research-prompt"
             aria-label={t("research.promptAria")}
           />
-          {job.busy ? (
+          <div className={PROMPT_ACTIONS}>
+            {job.busy ? (
+              <button
+                type="button"
+                className="wash inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-[var(--line)] bg-transparent px-3 text-xs text-[var(--text)] hover:bg-[var(--accent-soft)] disabled:opacity-45"
+                onClick={job.cancel}
+                data-testid="research-cancel"
+              >
+                {t("research.cancel")}
+              </button>
+            ) : null}
             <button
-              type="button"
-              className="wash inline-flex h-8 shrink-0 items-center rounded-lg border border-[var(--line)] bg-transparent px-3 text-xs text-[var(--text)] hover:bg-[var(--accent-soft)] disabled:opacity-45"
-              onClick={job.cancel}
-              data-testid="research-cancel"
+              type="submit"
+              className="btn btn-primary h-8 shrink-0 rounded-pill px-4"
+              disabled={job.busy || !prompt.trim() || needsKey}
+              data-testid="research-generate"
             >
-              {t("research.cancel")}
+              {job.busy ? <WorkingStatus label={t("research.working")} /> : t("research.generate")}
             </button>
-          ) : null}
-          <button
-            type="submit"
-            className="btn btn-primary h-8 shrink-0 rounded-pill px-4"
-            disabled={job.busy || !prompt.trim()}
-            data-testid="research-generate"
-          >
-            {job.busy ? <WorkingStatus label={t("research.working")} /> : t("research.generate")}
-          </button>
+          </div>
         </div>
+        {needsKey ? <NeedsKeyNote testId="research-needs-key" /> : null}
       </form>
 
       {job.busy || (job.progress.phases.length > 0 && !shown) ? (
@@ -180,6 +210,8 @@ export function ResearchStudio() {
           <JobProgressList progress={job.progress} busy={job.busy} mode="research" testId="research-progress" />
         </div>
       ) : null}
+
+      {shown || job.busy || job.progress.phases.length > 0 ? null : <StudioEmptyDesk mode="research" />}
 
       {shown ? (
         <div className="mt-8">
@@ -193,6 +225,7 @@ export function ResearchStudio() {
               disabled={job.busy}
               testIdPrefix="research"
             />
+            <ResearchChecksNote note={shown.checks} />
             {shown.kind === "run" ? (
               <div className="flex gap-2" role="tablist" data-testid="research-tabs">
                 <button

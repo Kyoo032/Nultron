@@ -41,14 +41,19 @@
  *    The answer is the same token body `/auth/device/token` returns, read by `toTokens` below.
  *
  * 3. **Refresh and logout are unchanged**, and so are the response and error bodies: `toTokens`
- *    and `mapPortalError` are exactly what they were before Phase 9.
+ *    and `mapPortalError` are exactly what they were before Phase 9 — plus one field. Since
+ *    2026-10-01 every token body (both grants of `/auth/token`, and `/auth/device/token`) carries
+ *    `role`: `owner` | `admin` | `member`, read from the member's row at each mint and refresh, so a
+ *    changed role arrives with the next token. `toTokens` reads that body field, never the JWT's own
+ *    claim, and anything else — absent, another string, another type — is `role: null`, which is
+ *    no rights (SR-65).
  *
  * Rules that are not negotiable here: 5 s timeout on every call, the base URL comes from
  * `AGENTFORGE_PORTAL_URL` (never from user input), and no token, code, state or client secret is
  * ever logged or put in an error message.
  */
-import { assertAllowedEndpointUrl } from "@agentforge/core";
-import type { EnvLike } from "@agentforge/core";
+import { assertAllowedEndpointUrl, parsePortalRole } from "@agentforge/core";
+import type { EnvLike, PortalRole } from "@agentforge/core";
 import { isAuthReason, type AuthReason } from "./session";
 
 export const PORTAL_TIMEOUT_MS = 5000;
@@ -76,6 +81,15 @@ export type PortalTokens = {
   readonly userId: string;
   readonly orgId: string;
   readonly tenantId: string;
+  /**
+   * The person's role, from the BODY field `role` beside `tenant_id` — `owner`, `admin` or `member`
+   * exactly (`parsePortalRole`) — read from their member row at every mint and every refresh. `null`
+   * when the body carries none or an unrecognised one: a token minted before the claim existed, or a
+   * portal that is not the one this was written against. `null` is **no role**, which the host reads
+   * as the least privilege (`member`) and never as an owner (SR-65). The access token's own `role`
+   * claim is deliberately not read: the body is the portal's answer to this call.
+   */
+  readonly role: PortalRole | null;
 };
 
 /**
@@ -268,6 +282,8 @@ function toTokens(body: unknown): PortalTokens {
     userId,
     orgId,
     tenantId,
+    // Exact match against the three values; anything else, or nothing, is no role.
+    role: parsePortalRole(record.role),
   };
 }
 
@@ -376,6 +392,9 @@ const FAKE_TOKENS: PortalTokens = {
   userId: "usr_fake",
   orgId: "org_fake",
   tenantId: "tnt_fake",
+  // The least privilege, like every default in this repo's hosted path. A case that needs an owner or
+  // an admin says so (`createFakePortalClient({ tokens: { role: "owner" } })`).
+  role: "member",
 };
 
 /**

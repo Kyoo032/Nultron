@@ -1,0 +1,8 @@
+# Where the certificate comes from. This default is ACME: Caddy obtains and renews it for the site
+# names, which needs the names to resolve to this cluster's public load balancer and the ACME
+# challenge to reach the pod (CLB 443 -> 8443, 80 -> 8080). Overlays replace this file.
+(site_tls) {
+	tls {
+		protocols tls1.2 tls1.3
+	}
+}

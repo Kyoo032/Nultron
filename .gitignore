@@ -51,6 +51,7 @@ __pycache__/
 # untracked one is a `git add -A` away from a committed wrap key. `.webdev-data*` also covers the
 # dated backups (`.webdev-data.bak-20260921/`). See docs/internal/security-register.md, SR-02.
 .webdev-data*/
+.nultron-review/
 .dpsbuddy-review/
 
 # Review-harness secrets and TLS material. `scripts/review-instance.ps1` writes review.env under
@@ -61,3 +62,30 @@ review.env
 
 # Local CI logs (scripts/ci-local.mjs). Per-run step logs and summary.md; never committed.
 .ci-local/
+
+# tools/nultron-3d is outside the pnpm workspace: its own npm install, the render output, and scratch (previews, logs, look renders).
+tools/nultron-3d/node_modules/
+tools/nultron-3d/out/
+tools/nultron-3d/work/
+
+# Nultron working files (marketing videos, brand art, IP filings, deploy decks). Local only, never committed.
+nultron-files/
+
+# Kubernetes rehearsal (webapp-deploy/k8s). The local overlay's secrets.env holds generated wrap, signing,
+# database and backup keys, and pki/ holds the private keys of a throwaway CA; .local/ holds the generated
+# overlay, the build snapshot and the port-forward state. None of it is ever committed.
+webapp-deploy/k8s/overlays/*/secrets.env
+webapp-deploy/k8s/overlays/*/pki/
+webapp-deploy/k8s/.local/
+# Compose rehearsal (webapp-deploy/pilot-local.mjs): generated env files, a throwaway CA's private keys and
+# the transformed Caddyfile. Never committed; also excluded from every Docker build context.
+webapp-deploy/.pilot-local/
+# The pilot stack's real env files on a server checkout. The app's .env is covered by `.env*` above.
+webapp-deploy/portal.env
+
+# Code-sandbox runtime (scripts/build-sandbox-runtime.mjs): the built Pyodide + QuickJS folder that ships as
+# resources/sandbox in the installer and /app/sandbox in the image, and the download cache for its pinned wheels.
+# Rebuilt from scripts/sandbox-runtime.lock.json; never committed.
+vendor/sandbox-runtime/
+vendor/sandbox-runtime.tmp-*/
+vendor/.sandbox-cache/

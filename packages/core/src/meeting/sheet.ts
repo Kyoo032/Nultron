@@ -1,10 +1,10 @@
 import { parseAppLocale, type AppLocale } from "../locale";
 import { minutesAgree } from "./agree";
-import { emptyMinutesMessage, invalidMinutesMessage, minutesShapeRetryNote, translationRetryNote } from "./copy";
+import { emptyMinutesMessage, invalidMinutesMessage, translationRetryNote } from "./copy";
 import { guardMinutesGrounding } from "./ground";
 import { guardMinutesNames } from "./guard";
 import { meetingMinutesSchema, type MeetingMinutes } from "./minutes";
-import { minutesPrompt, translatePrompt } from "./prompts";
+import { translatePrompt } from "./prompts";
 
 export class MeetingSheetError extends Error {
   readonly code: "invalid_minutes" | "generation_failed";
@@ -73,9 +73,13 @@ export function parseMeetingMinutes(raw: string, locale: AppLocale): MeetingMinu
   return result.data;
 }
 
-/** Names, then dates and figures. Both guards are code. Neither calls the model. */
-export function settleMinutes(raw: string, transcript: string, locale: AppLocale): SettledMinutes {
-  const named = guardMinutesNames(parseMeetingMinutes(raw, locale), transcript);
+/**
+ * Names, then dates and figures, over minutes that already parsed. Both guards are code. Neither
+ * calls the model. The minutes call runs its checks and repair first (`host/src/meeting/run.ts`);
+ * this is the last word on what the transcript does not support.
+ */
+export function settleParsedMinutes(minutes: MeetingMinutes, transcript: string): SettledMinutes {
+  const named = guardMinutesNames(minutes, transcript);
   const grounded = guardMinutesGrounding(named.minutes, transcript);
   return {
     minutes: grounded.minutes,
@@ -84,6 +88,11 @@ export function settleMinutes(raw: string, transcript: string, locale: AppLocale
     clearedDates: grounded.clearedDates,
     replacedFigures: grounded.replacedFigures,
   };
+}
+
+/** One model answer parsed into the sheet, then settled. A prose answer or the wrong shape throws. */
+export function settleMinutes(raw: string, transcript: string, locale: AppLocale): SettledMinutes {
+  return settleParsedMinutes(parseMeetingMinutes(raw, locale), transcript);
 }
 
 function acceptTranslation(
@@ -104,35 +113,6 @@ function acceptTranslation(
   if (!minutesAgree(source, settled.minutes).ok) {
     return null;
   }
-  return settled;
-}
-
-/**
- * One write of the minutes sheet, and a second only when the first answer is not that sheet.
- * The name guard and the date/figure guard run on the answer that parsed. They do not retry.
- */
-export async function writeMeetingSheet(input: {
-  transcript: string;
-  title: string;
-  locale: AppLocale;
-  ask: (prompt: string) => Promise<string>;
-  onAttempt?: (attempt: 1 | 2) => void;
-  onGrounded?: (settled: SettledMinutes) => void;
-}): Promise<SettledMinutes> {
-  const locale = parseAppLocale(input.locale);
-  const prompt = minutesPrompt(input.transcript, { title: input.title });
-  input.onAttempt?.(1);
-  let settled: SettledMinutes;
-  try {
-    settled = settleMinutes(await input.ask(prompt), input.transcript, locale);
-  } catch (error) {
-    if (!(error instanceof MeetingSheetError)) {
-      throw error;
-    }
-    input.onAttempt?.(2);
-    settled = settleMinutes(await input.ask(`${prompt}\n\n${minutesShapeRetryNote(locale)}`), input.transcript, locale);
-  }
-  input.onGrounded?.(settled);
   return settled;
 }
 

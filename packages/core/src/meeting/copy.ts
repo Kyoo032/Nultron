@@ -1,16 +1,14 @@
 import { parseAppLocale, type AppLocale } from "../locale";
 
-export type MeetingPhaseLabel =
-  | "writing"
-  | "writing-again"
-  | "grounding"
-  | "saving"
-  | "translating"
-  | "translating-again";
+export type MeetingPhaseLabel = "writing" | "fixing" | "grounding" | "saving" | "translating" | "translating-again";
 
 const PHASE: Record<MeetingPhaseLabel, Record<AppLocale, string>> = {
   writing: { en: "Writing the minutes", id: "Menulis notulen" },
-  "writing-again": { en: "Writing the minutes again", id: "Menulis notulen sekali lagi" },
+  // The one repair round the minutes checks spend (`host/src/meeting/run.ts`, `onRound`).
+  fixing: {
+    en: "Fixing what the checks found in the minutes",
+    id: "Memperbaiki temuan pemeriksaan pada notulen",
+  },
   grounding: {
     en: "Checking names, dates, and figures",
     id: "Memeriksa nama, tanggal, dan angka",
@@ -23,15 +21,6 @@ const PHASE: Record<MeetingPhaseLabel, Record<AppLocale, string>> = {
 /** Progress label for the desk. Follows the desk locale, not the language the minutes are written in. */
 export function meetingPhaseLabel(phase: MeetingPhaseLabel, locale: AppLocale): string {
   return PHASE[phase][parseAppLocale(locale)];
-}
-
-/** Told to the model when the first answer was not the minutes sheet. Follows the minutes language. */
-export function minutesShapeRetryNote(locale: AppLocale): string {
-  const copy: Record<AppLocale, string> = {
-    en: "The previous answer was not the minutes JSON. Return only the JSON object in the requested shape.",
-    id: "Jawaban sebelumnya bukan JSON notulen. Kembalikan hanya objek JSON dengan bentuk yang diminta.",
-  };
-  return copy[parseAppLocale(locale)];
 }
 
 /** Told to the model when the first translation changed the sheet. Follows the target language. */

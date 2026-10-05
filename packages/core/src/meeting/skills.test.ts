@@ -8,7 +8,7 @@ import { minutesAgree } from "./agree";
 import { meetingPhaseLabel } from "./copy";
 import { FIGURE_NOT_SAID, figureSaid, guardMinutesGrounding } from "./ground";
 import { meetingMinutesSchema, type MeetingMinutes } from "./minutes";
-import { MeetingTranslationError, translateMeetingSheet, writeMeetingSheet } from "./sheet";
+import { MeetingSheetError, MeetingTranslationError, settleMinutes, translateMeetingSheet } from "./sheet";
 
 const TRANSCRIPT = "Rina: the error budget is at 2.1 percent. We ship on Friday.";
 
@@ -35,43 +35,33 @@ afterEach(() => {
 });
 
 describe("stub runtime runs each new meeting skill", () => {
-  it("writes the sheet again when the first answer is not minutes", async () => {
+  it("tells a prose answer from the sheet, so the minutes call can be asked once more", () => {
     expect(process.env.AGENTFORGE_RUNTIME).toBe("stub");
-    const prompts: string[] = [];
-    const settled = await writeMeetingSheet({
-      transcript: TRANSCRIPT,
-      title: "Checkout weekly",
-      locale: "en",
-      ask: async (prompt) => {
-        prompts.push(prompt);
-        if (prompts.length === 1) {
-          return "Here are your minutes, in prose.";
-        }
-        return JSON.stringify(sheet());
-      },
-    });
-    expect(prompts).toHaveLength(2);
-    expect(prompts[1]).toContain("previous answer was not the minutes JSON");
+    // The retry itself is the minutes call's repair round (`host/src/meeting/run.test.ts`); this is the
+    // translation's reader, which refuses a prose answer in the desk language.
+    expect(() => settleMinutes("Here are your minutes, in prose.", TRANSCRIPT, "en")).toThrow(MeetingSheetError);
+    expect(() => settleMinutes("Berikut notulennya.", TRANSCRIPT, "id")).toThrow(
+      "Model mengembalikan notulen yang bukan lembar itu.",
+    );
+    const settled = settleMinutes(`\`\`\`json\n${JSON.stringify(sheet())}\n\`\`\``, TRANSCRIPT, "en");
     expect(settled.minutes.summary).toContain("2.1");
     expect(settled.minutes.heldOn).toBe("Friday");
     expect(settled.replacedFigures).toBe(0);
     expect(settled.clearedDates).toBe(0);
   });
 
-  it("drops a date and a figure the transcript never said, and keeps the ones it did", async () => {
-    const settled = await writeMeetingSheet({
-      transcript: TRANSCRIPT,
-      title: "Checkout weekly",
-      locale: "en",
-      ask: async () =>
-        JSON.stringify(
-          sheet({
-            heldOn: "Monday",
-            summary: "The error budget is at 2.1 percent, and latency hit 99 ms.",
-            actionItems: [{ task: "Ship the fix", owner: "Rina", due: "next year", firstStep: "" }],
-          }),
-        ),
-    });
+  it("drops a date and a figure the transcript never said, and keeps the ones it did", () => {
+    const settled = settleMinutes(
+      JSON.stringify(
+        sheet({
+          heldOn: "Monday",
+          summary: "The error budget is at 2.1 percent, and latency hit 99 ms.",
+          actionItems: [{ task: "Ship the fix", owner: "Rina", due: "next year", firstStep: "" }],
+        }),
+      ),
+      TRANSCRIPT,
+      "en",
+    );
     expect(settled.minutes.heldOn).toBe("");
     expect(settled.minutes.actionItems[0]?.due).toBe("");
     expect(settled.clearedDates).toBe(2);
@@ -125,13 +115,13 @@ describe("stub runtime runs each new meeting skill", () => {
     expect(calls).toBe(2);
   });
 
-  it("does not ask again when the model call itself fails", async () => {
+  it("does not ask again when the translation call itself fails", async () => {
     let calls = 0;
     await expect(
-      writeMeetingSheet({
+      translateMeetingSheet({
         transcript: TRANSCRIPT,
-        title: "Checkout weekly",
-        locale: "en",
+        source: sheet(),
+        locale: "id",
         ask: async () => {
           calls += 1;
           throw new Error("gateway down");
@@ -141,21 +131,19 @@ describe("stub runtime runs each new meeting skill", () => {
     expect(calls).toBe(1);
   });
 
-  it("still drops a person the room never named", async () => {
-    const settled = await writeMeetingSheet({
-      transcript: TRANSCRIPT,
-      title: "Checkout weekly",
-      locale: "en",
-      ask: async () =>
-        JSON.stringify(
-          sheet({
-            attendees: [
-              { name: "Rina", role: "" },
-              { name: "Ghost Person", role: "" },
-            ],
-          }),
-        ),
-    });
+  it("still drops a person the room never named", () => {
+    const settled = settleMinutes(
+      JSON.stringify(
+        sheet({
+          attendees: [
+            { name: "Rina", role: "" },
+            { name: "Ghost Person", role: "" },
+          ],
+        }),
+      ),
+      TRANSCRIPT,
+      "en",
+    );
     expect(settled.minutes.attendees.map((attendee) => attendee.name)).toEqual(["Rina"]);
     expect(settled.replacedNames).toBe(1);
     expect(settled.unverifiedNames).toEqual(["Ghost Person"]);
@@ -164,6 +152,7 @@ describe("stub runtime runs each new meeting skill", () => {
   it("names the check in the desk language", () => {
     expect(meetingPhaseLabel("grounding", "en")).toBe("Checking names, dates, and figures");
     expect(meetingPhaseLabel("grounding", "id")).toBe("Memeriksa nama, tanggal, dan angka");
-    expect(meetingPhaseLabel("writing-again", "id")).toBe("Menulis notulen sekali lagi");
+    expect(meetingPhaseLabel("fixing", "en")).toBe("Fixing what the checks found in the minutes");
+    expect(meetingPhaseLabel("fixing", "id")).toBe("Memperbaiki temuan pemeriksaan pada notulen");
   });
 });

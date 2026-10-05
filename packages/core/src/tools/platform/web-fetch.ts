@@ -54,6 +54,7 @@ export const webFetchTool = defineTool({
   key: "web_fetch",
   name: "Web fetch",
   description: "Read a public HTTPS web page as plain text (title + body, capped). No local or private addresses.",
+  trust: "network",
   schema: z.object({
     url: z.string().min(1).describe("Absolute https:// URL"),
     maxChars: z

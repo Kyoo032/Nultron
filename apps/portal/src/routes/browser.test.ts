@@ -32,7 +32,7 @@ async function registerClient(tenantId: string): Promise<string> {
     ops.oauthClients.create({
       clientId: CLIENT_ID,
       tenantId,
-      name: "DPSBuddy",
+      name: "Nultron",
       secret,
       redirectUris: [REDIRECT],
     }),
@@ -61,7 +61,7 @@ function authorizeUrl(state: string, overrides: Record<string, string> = {}): st
 let userSeq = 0;
 async function freshEmail(): Promise<string> {
   userSeq += 1;
-  const email = `user${userSeq}@dpsbuddy.test`;
+  const email = `user${userSeq}@nultron.test`;
   await addUser(portal.store.store, fixture, email);
   return email;
 }
@@ -100,7 +100,7 @@ async function submitCode(agent: Agent, page: string, state: string, code: strin
 
 beforeAll(async () => {
   portal = await startTestPortal();
-  fixture = await seedFixture(portal.store.store, { slug: "dpsbuddy", email: "owner@dpsbuddy.test" });
+  fixture = await seedFixture(portal.store.store, { slug: "nultron", email: "owner@nultron.test" });
   clientSecret = await registerClient(fixture.tenant.id);
 }, 180_000);
 
@@ -225,12 +225,13 @@ describe("GET /authorize", () => {
 });
 
 describe("the sign-in hops", () => {
-  it("sends a code and lands on the neutral page", async () => {
+  it("sends a code and tells the member where it went", async () => {
     const email = await freshEmail();
     const agent = createAgent(portal.origin);
     const { page, code } = await signIn(agent, "state-5", email);
 
     expect(page).toContain("Check your e-mail");
+    expect(page).toContain(`We sent a sign-in code to ${email}.`);
     expect(code).toMatch(/^\d{6}$/);
     expect(portal.mailer.newest()?.to).toBe(email);
   });
@@ -244,7 +245,7 @@ describe("the sign-in hops", () => {
     await signIn(createAgent(portal.origin), "state-mail", email);
 
     const subject = portal.mailer.newest()?.subject ?? "";
-    expect(subject).toContain("DPSBuddy");
+    expect(subject).toContain("Nultron");
     // The fixture tenant's name is its slug (`testing/fixtures.ts`), which is the seed's
     // placeholder, not a display name -- so the slug must not reach the subject either.
     expect(subject).not.toContain(fixture.tenant.slug);
@@ -267,25 +268,31 @@ describe("the sign-in hops", () => {
     }
   });
 
-  it("renders the identical page for an unknown address, and sends nothing", async () => {
-    const agent = createAgent(portal.origin);
-    const known = await signIn(agent, "state-6", await freshEmail());
+  /**
+   * The owner's 2026-10-01 decision (SR-30): the e-mail step tells a person which situation they are
+   * in. A member is told where their code went; an address with no access is told so, and nothing is
+   * sent. What stands in for the neutral page is the limits in `routes/sign-in-limits.test.ts`.
+   */
+  it("tells an unknown address it has no access, and sends nothing; a member is told where the code went", async () => {
+    const member = await signIn(createAgent(portal.origin), "state-6", await freshEmail());
     portal.mailer.clear();
 
     const unknown = await signIn(createAgent(portal.origin), "state-6", "nobody@nowhere.test");
 
     expect(portal.mailer.sent).toHaveLength(0);
-    // Byte-identical but for the CSRF token and the echoed e-mail, both of which the browser
-    // already knows. The sentence a user reads is the same.
-    expect(unknown.page).toContain("If that address has an account");
-    expect(known.page).toContain("If that address has an account");
+    expect(unknown.page).toContain("This e-mail does not have access yet. Ask your company admin to invite you.");
+    expect(unknown.page).not.toContain('name="code"');
+    expect(member.page).toContain("We sent a sign-in code to");
+    expect(member.page).toContain('name="code"');
   });
 
-  it("renders the same page when the transport refuses the message", async () => {
+  it("says so, and offers another code, when the transport refuses the message", async () => {
     portal.mailer.failNext();
     const { page } = await signIn(createAgent(portal.origin), "state-7", await freshEmail());
 
     expect(page).toContain("Check your e-mail");
+    expect(page).toContain("We could not send a sign-in code to");
+    expect(page).toContain("Send a new code");
     expect(portal.mailer.sent).toHaveLength(0);
     const failures = await portal.store.store.tx(fixture.tenant.id, (ops) =>
       ops.audit.list({ tenantId: fixture.tenant.id, action: "otp.send_failed" }),
@@ -392,19 +399,78 @@ describe("the code form", () => {
     expect(replay.status).not.toBe(302);
   });
 
-  it("stops after three sends inside the window and still says nothing", async () => {
-    const email = "burst@dpsbuddy.test";
+  it("makes one code of the same post sent three times in a second, and spends one send on it", async () => {
+    const email = "burst@nultron.test";
     await addUser(portal.store.store, fixture, email);
     const agent = createAgent(portal.origin);
 
     for (let i = 0; i < 3; i += 1) {
       await signIn(agent, `state-15-${i}`, email);
     }
-    expect(portal.mailer.sent).toHaveLength(3);
 
-    const fourth = await signIn(agent, "state-15-3", email);
-    expect(portal.mailer.sent).toHaveLength(3);
-    expect(fourth.page).toContain("Check your e-mail");
+    // A double click, a reload and a re-post are one request (M2): one code went, and the budget
+    // of three sends a quarter hour is still whole. The budget itself is pinned just below.
+    expect(portal.mailer.sent).toHaveLength(1);
+  });
+});
+
+/**
+ * Three sends per address per quarter hour, over the wire. Its own portal, because the requests
+ * have to be told apart from a repeat of one request (which the portal answers with the code it
+ * already sent, 15 seconds' worth), and only a clock the test moves can do that in a test's time.
+ */
+describe("the send budget", () => {
+  const clock = fixedClock();
+  let sendPortal: PortalHarness;
+  let sendFixture: Fixture;
+
+  beforeAll(async () => {
+    sendPortal = await startTestPortal({ clock });
+    sendFixture = await seedFixture(sendPortal.store.store, { slug: "sendbudget", email: "owner@sendbudget.test" });
+    await sendPortal.store.store.tx(sendFixture.tenant.id, (ops) =>
+      ops.oauthClients.create({
+        clientId: CLIENT_ID,
+        tenantId: sendFixture.tenant.id,
+        name: "Nultron",
+        secret: randomToken(),
+        redirectUris: [REDIRECT],
+      }),
+    );
+  }, 180_000);
+
+  afterAll(async () => {
+    await sendPortal?.close();
+  });
+
+  it("stops after three sends inside the window, and says a code already went", async () => {
+    clock.set(new Date());
+    const email = "burst@sendbudget.test";
+    await addUser(sendPortal.store.store, sendFixture, email);
+    const agent = createAgent(sendPortal.origin);
+    const post = async (state: string) => {
+      const start = await agent.get(authorizeUrl(state));
+      return agent.postForm("/authorize/email", {
+        csrf_token: hiddenValue(start.text, "csrf_token") as string,
+        response_type: "code",
+        client_id: CLIENT_ID,
+        redirect_uri: REDIRECT,
+        state,
+        email,
+      });
+    };
+
+    // Each a real request: further apart than a repeat of one.
+    for (let i = 0; i < 3; i += 1) {
+      await post(`state-15-${i}`);
+      clock.advance(30 * 1000);
+    }
+    expect(sendPortal.mailer.sent).toHaveLength(3);
+
+    const fourth = await post("state-15-3");
+    expect(sendPortal.mailer.sent).toHaveLength(3);
+    expect(fourth.text).toContain("Check your e-mail");
+    expect(fourth.text).toContain("We already sent a sign-in code to");
+    expect(fourth.text).toContain("Several codes were sent recently");
   });
 });
 
@@ -426,7 +492,7 @@ describe("the daily guess budget", () => {
       ops.oauthClients.create({
         clientId: CLIENT_ID,
         tenantId: dayFixture.tenant.id,
-        name: "DPSBuddy",
+        name: "Nultron",
         secret: randomToken(),
         redirectUris: [REDIRECT],
       }),
@@ -468,27 +534,44 @@ describe("the daily guess budget", () => {
     const agent = createAgent(dayPortal.origin);
 
     // Four codes, five wrong guesses each: no code's own limit is what stops anything below.
+    let lastPage = "";
     for (let n = 0; n < 4; n += 1) {
       if (n === 3) {
         // Three sends per 15 minutes; the fourth waits the window out.
         clock.set(new Date(Date.now() + 16 * 60 * 1000));
       }
       const { page, code } = await sendCode(agent, `state-day-${n}`, email);
+      lastPage = page;
       const wrong = code === "999999" ? "000000" : "999999";
       for (let attempt = 0; attempt < 5; attempt += 1) {
         expect((await guess(agent, page, `state-day-${n}`, email, wrong)).status).toBe(400);
       }
     }
 
-    const { page, code } = await sendCode(agent, "state-day-4", email);
-    expect(code).toMatch(/^\d{6}$/);
+    // The e-mail step now says so up front, instead of mailing a code that could not be used.
+    const mailsBefore = dayPortal.mailer.sent.length;
+    const start = await agent.get(authorizeUrl("state-day-4"));
+    const locked = await agent.postForm("/authorize/email", {
+      csrf_token: hiddenValue(start.text, "csrf_token") as string,
+      response_type: "code",
+      client_id: CLIENT_ID,
+      redirect_uri: REDIRECT,
+      state: "state-day-4",
+      email,
+    });
+    expect(locked.status).toBe(429);
+    // The first code is 16 minutes old (the clock moved to let the fourth send through), so the day
+    // has 23 h 44 min left, which the page rounds up.
+    expect(locked.text).toContain("Too many attempts for this e-mail. Try again in 24 h or ask your admin.");
+    expect(dayPortal.mailer.sent).toHaveLength(mailsBefore);
 
-    const refused = await guess(agent, page, "state-day-4", email, code);
+    // And a code that was already in the member's hands is refused all the same, in both languages.
+    const refused = await guess(agent, lastPage, "state-day-3", email, "123456");
     expect(refused.status).toBe(400);
     expect(refused.location).toBeNull();
-    expect(refused.text).toContain("Try again in 24 hours");
+    expect(refused.text).toContain("Try again in 24 h");
 
-    const refusedId = await guess(agent, refused.text, "state-day-4", email, code, "/authorize/verify?lang=id");
+    const refusedId = await guess(agent, refused.text, "state-day-3", email, "123456", "/authorize/verify?lang=id");
     expect(refusedId.status).toBe(400);
     expect(refusedId.text).toContain("Coba lagi dalam 24 jam");
 
@@ -497,6 +580,10 @@ describe("the daily guess budget", () => {
     );
     expect(audit).toHaveLength(2);
     expect(audit.every((row) => row.reasonCode === "locked")).toBe(true);
+    const withheld = await dayPortal.store.store.tx(dayFixture.tenant.id, (ops) =>
+      ops.audit.list({ tenantId: dayFixture.tenant.id, action: "otp.withheld" }),
+    );
+    expect(withheld.some((row) => row.reasonCode === "otp_locked")).toBe(true);
   });
 });
 
@@ -511,26 +598,6 @@ describe("the login gate", () => {
         name: "capped",
         secret,
         redirectUris: [REDIRECT],
-      }),
-    );
-    // One seat, and the first user already holds it with a live session.
-    const device = await portal.store.store.tx(capped.tenant.id, async (ops) => {
-      const upserted = await ops.devices.upsert({
-        tenantId: capped.tenant.id,
-        orgId: capped.org.id,
-        userId: capped.user.id,
-        installId: "install-capped-1",
-        platform: "windows",
-      });
-      if (!upserted.ok) throw new Error("device revoked");
-      return upserted.device;
-    });
-    await portal.store.store.tx(capped.tenant.id, (ops) =>
-      ops.sessions.create({
-        tenantId: capped.tenant.id,
-        orgId: capped.org.id,
-        userId: capped.user.id,
-        deviceId: device.id,
       }),
     );
     const second = await addUser(portal.store.store, capped, "b@capped.test");
@@ -552,6 +619,30 @@ describe("the login gate", () => {
       state: "state-16",
       email: second.email,
     });
+    // The page let the second user through because a seat was free. Between that page and the
+    // exchange the first user takes the one seat with a live session, which is the race the
+    // exchange's own check exists for. (The sign-in pages ask earlier, and refuse earlier:
+    // `sign-in-seats.test.ts`.)
+    expect(portal.mailer.newest()?.code).toBeTruthy();
+    const device = await portal.store.store.tx(capped.tenant.id, async (ops) => {
+      const upserted = await ops.devices.upsert({
+        tenantId: capped.tenant.id,
+        orgId: capped.org.id,
+        userId: capped.user.id,
+        installId: "install-capped-1",
+        platform: "windows",
+      });
+      if (!upserted.ok) throw new Error("device revoked");
+      return upserted.device;
+    });
+    await portal.store.store.tx(capped.tenant.id, (ops) =>
+      ops.sessions.create({
+        tenantId: capped.tenant.id,
+        orgId: capped.org.id,
+        userId: capped.user.id,
+        deviceId: device.id,
+      }),
+    );
     const done = await agent.postForm("/authorize/verify", {
       csrf_token: hiddenValue(sent.text, "csrf_token") as string,
       response_type: "code",

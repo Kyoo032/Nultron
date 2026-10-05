@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { fetchEditDoctor, type EditDoctor, type FfmpegSetup } from "@/lib/edit-client";
+import { isHostedBuild } from "@/lib/hosted-build";
+import { t } from "@/lib/i18n";
 
 type Props = {
   doctor: EditDoctor;
@@ -14,6 +16,9 @@ const PLATFORM_LABEL: Record<FfmpegSetup["platform"], string> = {
   linux: "Linux",
 };
 
+const NOTICE_CLASS =
+  "border-b border-[var(--line)] bg-[color-mix(in_srgb,var(--color-accent)_8%,transparent)] px-4 py-2 text-xs text-[var(--text-2)]";
+
 async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
@@ -26,6 +31,9 @@ async function copyText(text: string): Promise<boolean> {
 /**
  * Guides the owner through installing ffmpeg for their OS and re-probes without a restart.
  * Renders nothing when ffmpeg is already usable.
+ *
+ * On the hosted build the machine is the server and a tenant cannot install anything on it, so the guide
+ * (a Linux command to copy, a re-check, an install link) is replaced by one calm line with none of those.
  */
 export function FfmpegSetupNotice({ doctor, onDoctor, variant = "compact" }: Props) {
   const [checking, setChecking] = useState(false);
@@ -34,6 +42,13 @@ export function FfmpegSetupNotice({ doctor, onDoctor, variant = "compact" }: Pro
   const ffmpeg = doctor.ffmpeg;
   if (!ffmpeg || ffmpeg.found !== false) {
     return null;
+  }
+  if (isHostedBuild()) {
+    return (
+      <div className={NOTICE_CLASS} data-testid="edit-needs-ffmpeg" role="status">
+        {t("edit.ffmpeg.hostedUnavailable")}
+      </div>
+    );
   }
   const setup = ffmpeg.setup;
   const command = setup?.installCommand ?? "install ffmpeg 6 or newer";
@@ -60,11 +75,7 @@ export function FfmpegSetupNotice({ doctor, onDoctor, variant = "compact" }: Pro
   }
 
   return (
-    <div
-      className="border-b border-[var(--line)] bg-[color-mix(in_srgb,var(--color-accent)_8%,transparent)] px-4 py-2 text-xs text-[var(--text-2)]"
-      data-testid="edit-needs-ffmpeg"
-      role="status"
-    >
+    <div className={NOTICE_CLASS} data-testid="edit-needs-ffmpeg" role="status">
       <div className="flex flex-wrap items-center gap-2">
         <span>
           <strong>{setup ? `${PLATFORM_LABEL[setup.platform]} setup:` : "Setup:"}</strong> {summary}

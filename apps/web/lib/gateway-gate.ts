@@ -88,16 +88,43 @@ export function parseGatewayGate(value: unknown): GatewayGatePayload | null {
  *     that is merely in flight has never been a reason to lock the app.
  *
  * `hosted` is a fact the *server* stamped into the page (`hosted-build.ts`), and
- * it can only make this stricter — there is no value of it that opens a gate the
- * host closed.
+ * it can only make a *missing* gate stricter.
+ *
+ * The one thing that can open a gate the host reported closed is the hosted deferral (Nultron
+ * Enterprise, owner decision 2026-10-01): a signed-in hosted person who chose "Add it later" on the
+ * onboarding key step. It needs all three of: the hosted build, a live session, and the host's own
+ * record of the choice. It never applies to a gate nobody reported, and it never applies on the
+ * Personal app, where a closed gate is the key step and nothing else. It changes what the screen
+ * shows and nothing about what the host allows: every gateway-calling route still answers
+ * `403 gateway_blocked`.
  */
-export function resolveGate(payload: unknown, isElectron: boolean, hosted: boolean = isHostedBuild()): GateView {
+export function resolveGate(
+  payload: unknown,
+  isElectron: boolean,
+  hosted: boolean = isHostedBuild(),
+  deferral: KeyDeferral = NO_KEY_DEFERRAL,
+): GateView {
   const gate = parseGatewayGate(payload);
   if (!gate) {
     return hosted || isElectron ? "onboarding" : "app";
   }
-  return gate.allowed ? "app" : "onboarding";
+  if (gate.allowed) {
+    return "app";
+  }
+  return hosted && deferral.hasSession && deferral.later ? "app" : "onboarding";
 }
+
+/**
+ * What the app knows about this person beyond the host's gate, hosted only: whether they hold a live
+ * session, and whether the host says they chose to add a gateway key later (`key-later.ts`).
+ */
+export type KeyDeferral = {
+  readonly hasSession: boolean;
+  readonly later: boolean;
+};
+
+/** Nobody has deferred anything: what every Personal path, and every call that never heard of it, means. */
+export const NO_KEY_DEFERRAL: KeyDeferral = Object.freeze({ hasSession: false, later: false });
 
 /**
  * Window event the renderer uses to push a fresh host gate into the app shell.

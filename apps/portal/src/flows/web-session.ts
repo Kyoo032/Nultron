@@ -12,7 +12,7 @@
  */
 import { serialiseCookie } from "../security/cookies";
 import { WEB_SESSION_TTL_MS, mintWebSession, type WebSession } from "../security/web-session";
-import type { PortalOps } from "../store/types";
+import type { PortalOps, User } from "../store/types";
 import type { PortalRuntime } from "./context";
 
 export interface NewWebSession {
@@ -70,6 +70,36 @@ export async function webSessionIsLive(
     return await runtime.store.tx(session.tenantId, (ops) => versionIsLive(ops, session));
   } catch {
     return false;
+  }
+}
+
+/**
+ * The member a cookie speaks for, when the cookie is still good: its version is current (SR-21)
+ * AND that member still exists and is `active`.
+ *
+ * The second half is the one `webSessionIsLive` does not make. A member who was removed -- or whose
+ * company was erased, which cascades the row away -- or disabled still holds a cookie that verifies,
+ * and a screen that greets them by address, or lets them approve a device, must not treat them as
+ * signed in. Null reads as "not signed in": the caller shows the sign-in form, and the e-mail step
+ * then tells that address what it tells any stranger.
+ */
+export async function liveWebSessionUser(
+  runtime: PortalRuntime,
+  session: WebSession | null,
+): Promise<User | null> {
+  if (!session) {
+    return null;
+  }
+  try {
+    return await runtime.store.tx(session.tenantId, async (ops) => {
+      if (!(await versionIsLive(ops, session))) {
+        return null;
+      }
+      const user = await ops.users.findById(session.userId);
+      return user?.status === "active" ? user : null;
+    });
+  } catch {
+    return null;
   }
 }
 

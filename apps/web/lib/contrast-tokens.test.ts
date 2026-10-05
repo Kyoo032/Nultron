@@ -282,6 +282,60 @@ const UI_AFFORDANCES: readonly Pair[] = [
   })),
 ];
 
+/**
+ * Mode icons (`--mode-*`), WCAG 1.4.11. A rail row's glyph sits on a tile that is its own colour at 14%
+ * over the rail (`RailItem`), a card's on the same 14% over the surface (`.icon-orb`), and the current
+ * row / `.icon-orb-solid` flips to a solid fill that carries `--on-mode`. Held on both desks: the dark
+ * audit found Legal, Research, Education and Channels at 1.9-2.7:1 (dark-on-dark), and the light one
+ * (2026-10-01) Documents, Presentation, Edit, Finance, Market and Data at 2.3-3.0:1 on the light rail.
+ *
+ * Grounds: the rail and the card are the two a tile is drawn on; the hover row (`--rail-hover`) and an
+ * inset panel (`--surface-2`) are where the same tile lands when a row is hovered or a card sits in a
+ * well, so they are held to the 3:1 floor too.
+ */
+const MODE_TOKENS = [...rootTokens.keys()].filter((name) => /^--mode-[a-z]+$/.test(name));
+const tileOn = (mode: string, ground: string, where: string): Pair => ({
+  fg: v(mode),
+  bg: `color-mix(in srgb, ${v(mode)} 14%, ${v(ground)})`,
+  where: `${mode} on its ${where} tile`,
+});
+/** The two tiles the design tuned the light set to: a rail row's and a card's. */
+const MODE_ICONS: readonly Pair[] = MODE_TOKENS.flatMap((mode) => [
+  tileOn(mode, "--rail", "rail"),
+  tileOn(mode, "--surface", "card"),
+]);
+/** Where the same tile lands on a hovered rail row and in an inset panel. */
+const MODE_ICONS_RAISED: readonly Pair[] = MODE_TOKENS.flatMap((mode) => [
+  tileOn(mode, "--rail-hover", "hovered rail"),
+  tileOn(mode, "--surface-2", "inset"),
+]);
+/** The light set is tuned above the WCAG floor so a browser's rounding of `color-mix` cannot take it under. */
+const LIGHT_MODE_ICON_FLOOR = 3.5;
+const MODE_ON_FILL: readonly Pair[] = MODE_TOKENS.map((mode) => ({
+  fg: v("--on-mode"),
+  bg: v(mode),
+  where: `${mode} solid tile`,
+}));
+
+/**
+ * The Nultron wordmark (`.wordmark-nultron`, the name beside the rail mark, 15px bold): a gradient from
+ * `--nultron-blue-text` to `--nultron-cyan-text`. It is small text, so both stops are held to 4.5:1 on
+ * the rail where it is drawn and on the page and panel grounds where a name may land next.
+ */
+const WORDMARK_STOPS = ["--nultron-blue-text", "--nultron-cyan-text"] as const;
+const WORDMARK: readonly Pair[] = WORDMARK_STOPS.flatMap((stop) =>
+  ["--rail", "--bg", "--surface"].map((ground) => ({ fg: v(stop), bg: v(ground), where: `wordmark ${stop}` })),
+);
+
+/** Hue in degrees (0-360) of an opaque colour; the IP colours are judged by hue, since lightness moves with the theme. */
+function hueOf([r, g, b]: Rgb): number {
+  const max = Math.max(r, g, b);
+  const d = max - Math.min(r, g, b);
+  if (d === 0) return 0;
+  const sector = max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return sector * 60;
+}
+
 // --- Assertions -------------------------------------------------------------
 
 describe("palette contrast (WCAG 2.1)", () => {
@@ -324,6 +378,73 @@ describe("palette contrast (WCAG 2.1)", () => {
     const failures = check(UI_AFFORDANCES, tokens, 3);
     expect(failures, `below 3:1:\n  ${failures.join("\n  ")}`).toEqual([]);
   });
+
+  it.each(themes)("$name: every mode icon clears 3:1 on its rail, card, hovered-row and inset tile", ({ tokens }) => {
+    expect(MODE_TOKENS.length).toBeGreaterThanOrEqual(19);
+    const icons = check([...MODE_ICONS, ...MODE_ICONS_RAISED], tokens, 3);
+    expect(icons, `below 3:1:\n  ${icons.join("\n  ")}`).toEqual([]);
+  });
+
+  it("light: every mode icon clears 3.5:1 on its rail and card tile", () => {
+    const icons = check(MODE_ICONS, lightTokens, LIGHT_MODE_ICON_FLOOR);
+    expect(icons, `below ${LIGHT_MODE_ICON_FLOOR}:1:\n  ${icons.join("\n  ")}`).toEqual([]);
+  });
+
+  it.each(themes)(
+    "$name: the ink on a solid mode tile (the current rail row, `.icon-orb-solid`) clears 4.5:1",
+    ({ tokens }) => {
+      const ink = check(MODE_ON_FILL, tokens, 4.5);
+      expect(ink, `below 4.5:1:\n  ${ink.join("\n  ")}`).toEqual([]);
+    },
+  );
+
+  it.each(themes)("$name: both stops of the Nultron wordmark clear 4.5:1 on the rail and the page", ({ tokens }) => {
+    const failures = check(WORDMARK, tokens, 4.5);
+    expect(failures, `below 4.5:1:\n  ${failures.join("\n  ")}`).toEqual([]);
+  });
+});
+
+describe("Nultron IP colours", () => {
+  // Sampled 2026-10-01 from the art: a k-means pass over the opaque pixels of
+  // `apps/desktop/branding/agentforge/source/app-logo.webp` and of `components/nultron/images/full/*.webp`.
+  // Changing one is a change to the brand, so it is made here, in the same commit as the token.
+  const SAMPLED = {
+    "--nultron-blue": "#1277c8",
+    "--nultron-cyan": "#19bddc",
+    "--nultron-cream": "#e4d9cd",
+    "--nultron-ink": "#131617",
+  } as const;
+
+  it("the four fills are the sampled art colours, in both themes (they do not follow the theme)", () => {
+    for (const { name, tokens } of themes) {
+      for (const [token, hex] of Object.entries(SAMPLED)) {
+        expect(tokens.get(token), `${token} in ${name}`).toBe(hex);
+      }
+    }
+  });
+
+  it.each(themes)("$name: each wordmark stop keeps the hue of its IP colour, within 10 degrees", ({ tokens }) => {
+    const pairs = [
+      ["--nultron-blue-text", "--nultron-blue"],
+      ["--nultron-cyan-text", "--nultron-cyan"],
+    ] as const;
+    for (const [text, fill] of pairs) {
+      const drift = Math.abs(hueOf(resolve(v(text), tokens)) - hueOf(resolve(v(fill), tokens)));
+      expect(Math.min(drift, 360 - drift), `${text} against ${fill}`).toBeLessThanOrEqual(10);
+    }
+  });
+
+  it("the wordmark paints only those two stop tokens, and flavors never get the class", () => {
+    const body = rule(".wordmark-nultron");
+    for (const stop of WORDMARK_STOPS) expect(body).toContain(`var(${stop})`);
+    expect(body, "a raw hex in the wordmark would sidestep the contrast check").not.toMatch(/#[0-9a-f]{3,6}\b/i);
+    const rail = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), "..", "components", "app-rail.tsx"),
+      "utf8",
+    );
+    expect(rail).toMatch(/usesNultronWordmark\(brand\)/);
+    expect(rail).toMatch(/nultronWordmark \? "wordmark-nultron"/);
+  });
 });
 
 describe("palette parser", () => {
@@ -357,6 +478,10 @@ describe("palette parser", () => {
       ...COMPOSER_TEXT,
       ...RAIL_TEXT,
       ...UI_AFFORDANCES,
+      ...MODE_ICONS,
+      ...MODE_ICONS_RAISED,
+      ...MODE_ON_FILL,
+      ...WORDMARK,
     ];
     for (const { name, tokens } of themes) {
       for (const { fg, bg } of all) {

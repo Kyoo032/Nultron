@@ -1,5 +1,6 @@
 import { mediaKind, resolveProviderKeys, resolvedGatewayBaseUrl } from "@agentforge/core";
-import { loadModelCache } from "../model-cache";
+import { loadModelCache, modelCacheScopeOf, type ModelCacheScope } from "../model-cache";
+import { warmHostedModelCache } from "../selectable-models";
 import { loadSettings, type SettingsScope } from "../settings-store";
 
 /**
@@ -44,12 +45,14 @@ export type AsrCapability = {
   model: string | null;
 };
 
-export function resolveAsrCapability(): AsrCapability {
+export function resolveAsrCapability(scope?: ModelCacheScope): AsrCapability {
   const envModel = process.env.AGENTFORGE_EDIT_ASR_MODEL?.trim();
   if (envModel) {
     return { available: true, backend: "gateway", model: envModel };
   }
-  const cache = loadModelCache();
+  // Hosted only: a tenant that upgraded with a key and no cached catalogue gets one background refill.
+  warmHostedModelCache(scope);
+  const cache = loadModelCache(scope);
   const ids = [
     ...(cache.openai ?? []),
     ...(cache.anthropic ?? []),
@@ -72,7 +75,7 @@ export async function transcribeAudioChunks(
   /** Tenant and desk whose gateway key pays for the transcription. */
   scope?: SettingsScope,
 ): Promise<{ text: string }> {
-  const cap = resolveAsrCapability();
+  const cap = resolveAsrCapability(modelCacheScopeOf(scope));
   if (!cap.available || !cap.model) {
     return { text: "" };
   }
