@@ -1,9 +1,9 @@
 /**
- * The portal calls the product DPSBuddy, on every screen and in every e-mail.
+ * The portal calls the product Nultron, on every screen and in every e-mail.
  *
- * Owner ruling, 2026-09-21: the product NAME in text is DPSBuddy everywhere, and the LOGO stays the
- * chevron lockup -- `assets/logo.png`, served by `routes/assets.ts` and shown in the page shell.
- * The names below are the ones the ruling retired; this file is the only place they may appear.
+ * Owner ruling, 2026-09-29: the product NAME in text is Nultron everywhere. The LOGO is a separate
+ * matter -- `assets/logo.png`, served by `routes/assets.ts` and shown in the page shell.
+ * The names below are the ones the rulings retired; this file is the only place they may appear.
  *
  * This is a guard, not a rename receipt. The portal has had two names for one flow before: the OTP
  * subject said one thing while the page under it said another (`otp/product-name.ts` is the fix and
@@ -21,12 +21,12 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { otpMessage } from "../mail/templates";
 import { catalogFor, PORTAL_LOCALES, translator, type PortalLocale } from "./i18n";
-import { approvePage, enterCodePage, errorPage, outcomePage, signInPage, userCodePage } from "./pages";
+import { approvePage, enterCodePage, errorPage, outcomePage, signInPage, userCodePage, inviteCodePage, statePage } from "./pages";
 
-const PRODUCT_NAME = "DPSBuddy";
+const PRODUCT_NAME = "Nultron";
 
 /** Every name the product has ever been called that is not its name. Matched case-insensitively. */
-const FORBIDDEN = Object.freeze(["DPS Cloud", "DPSCloud", "Toko Token AI"]);
+const FORBIDDEN = Object.freeze(["DPS Cloud", "DPSCloud", "DPSBuddy", "DPS Buddy", "Toko Token AI"]);
 
 const appDir = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const localesDir = join(appDir, "locales");
@@ -57,9 +57,35 @@ function everyScreen(locale: PortalLocale): Array<{ label: string; html: string 
       html: enterCodePage({
         ...base,
         action: "/authorize/verify",
+        resendAction: "/authorize/email",
+        restartAction: "/authorize/email",
         csrfToken: "tok",
         hidden: { state: "s" },
-        expiresInMinutes: 10,
+        email: "tester@example.test",
+        lead: t("sent.body", { email: "tester@example.test", minutes: 10 }),
+      }),
+    },
+    {
+      label: `inviteCode(${locale})`,
+      html: inviteCodePage({
+        ...base,
+        action: "/authorize/invite",
+        resendAction: "/authorize/invite/resend",
+        restartAction: "/authorize/email",
+        csrfToken: "tok",
+        hidden: { state: "s" },
+        email: "tester@example.test",
+      }),
+    },
+    {
+      label: `state(${locale})`,
+      html: statePage({
+        ...base,
+        title: t("state.noAccess.title"),
+        message: t("state.noAccess.body"),
+        restartAction: "/authorize/email",
+        csrfToken: "tok",
+        hidden: { state: "s" },
       }),
     },
     {
@@ -86,7 +112,7 @@ function everyScreen(locale: PortalLocale): Array<{ label: string; html: string 
 }
 
 describe("the portal's product name", () => {
-  it("is DPSBuddy in both shipped catalogs", () => {
+  it("is Nultron in both shipped catalogs", () => {
     for (const locale of PORTAL_LOCALES) {
       expect(translator(locale)("product"), locale).toBe(PRODUCT_NAME);
       expect((catalogFor(locale) as Record<string, unknown>).product, locale).toBe(PRODUCT_NAME);

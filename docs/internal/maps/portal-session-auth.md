@@ -1,5 +1,18 @@
 # Map — Portal browser session (hosted server)
 
+Re-checked 2026-10-01 at 0b61a29 + working tree, a second time that day, for **the role**: the portal now
+sends `role` (`owner` | `admin` | `member`) in every token body, and the host writes that membership role at
+sign-in and re-applies it at every refresh (SR-65, second hole). The new section is **The role (2026-10-01)**
+below; the lines that changed with it are step 3 and step 5 of sign-in, the portal re-check's "Rotated" bullet,
+the "Status" section, the assumed-contract table, **Where things live**, **Gotchas** and **Verify**. Unit- and
+router-tested against a scripted portal and driven on the local Kubernetes rehearsal (see Verify); not driven
+against the hosted deployment.
+
+Re-checked 2026-10-01 at 0b61a29 + working tree, for one paragraph only: what the hosted Erase account does to
+sessions and stored refresh tokens (the "Removed" bullet under the token at rest and the matching Gotcha) —
+owner decision 2026-10-01 on SR-65, detail in [hosted-surfaces-and-reset.md](hosted-surfaces-and-reset.md) § 2.
+Every other line is as verified next.
+
 Last verified: 2026-09-23 at d4561b8 + working tree, in two passes the same day. The first: the
 gate's portal re-check, digest session ids, refresh-first sign-out. The second: the refresh token
 kept sealed at rest so a restart signs nobody out, and every refresh authenticated as the
@@ -42,14 +55,19 @@ Routed at `packages/host/src/router.ts:245` to `handleLogin`
    (`packages/host/src/auth/portal-client.ts:85-92`, `packages/core/src/security/tls.ts:9-32`). It
    **throws** when the variable is absent, which is why every portal dependency in this module is
    constructed lazily (`packages/host/src/auth/index.ts:64-76`).
-3. `toTokens` (`packages/host/src/auth/portal-client.ts:200-224`) requires `access_token`,
+3. `toTokens` (`packages/host/src/auth/portal-client.ts`, grep `function toTokens`) requires `access_token`,
    `refresh_token`, `session_id`, `user_id`, `org_id` and `tenant_id`. A 200 missing any of them is
-   `portal_unavailable` at 502: the portal misbehaving, not the user's fault.
+   `portal_unavailable` at 502: the portal misbehaving, not the user's fault. It also reads the body field
+   `role` through `parsePortalRole` (`packages/core/src/tenancy/types.ts`): exactly `owner`, `admin` or
+   `member`, else `null` — and `null` never refuses the sign-in (see **The role (2026-10-01)**).
 4. `createSession` (`packages/host/src/auth/session.ts:129`) mints 32 random bytes as base64url
    and stamps `createdAt = lastSeenAt = now`, `expiresAt = now + 12 h`,
    `absoluteExpiresAt = now + 30 days`, `revokedAt = null` and, since 2026-09-23,
    `portalCheckedAt = now`: signing in is the portal vouching, so the first re-check is ten minutes
    out.
+4a. Before the session exists, `deps.provision({ ...identity, role: tokens.role })` writes the host's rows
+   for the person (`ensurePortalOwner`, `packages/db/src/portal-owner.ts`) with the portal's role. The seat
+   claim after it gets the three ids and no role.
 5. The row goes to the store under the SHA-256 of the id, never the id itself (migration 0021), in
    the same insert as the refresh token and `device_id` sealed for it (see **The refresh token at
    rest**); the portal's access and refresh tokens and `device_id` also go to the in-memory vault
@@ -161,7 +179,13 @@ and refuses with the reason, so the check **is** a refresh-token rotation.
 - **Rotated** → the pair goes to the vault exactly as sign-in puts it there (the device id held is
   kept when an answer omits one), and `recordRotation` writes the new sealed refresh token and the
   `portalCheckedAt` stamp in one `UPDATE` (`run`, `:286`; `sealRotated`, `:277`). A token that
-  cannot be sealed clears the stored one rather than leave the spent token behind.
+  cannot be sealed clears the stored one rather than leave the spent token behind. Then **the role the
+  answer carried is applied** to the person's membership (`reconcileRole` → `options.applyRole`,
+  `hostApplyRole` in `packages/host/src/auth/index.ts` → `syncPortalRole`, `packages/db/src/portal-owner.ts`):
+  inside the same refresh, so the request the gate is holding sees it when the portal answered within the 2 s
+  wait. A failed write is logged as `portal_role_not_recorded` (name and SQLite code only) and neither ends the
+  session nor undoes the rotation. Only a rotation that landed applies a role: a terminal answer, an outage or
+  nothing to present changes no role.
 - **Terminal** — `TERMINAL_PORTAL_REASONS` (`:77`): `tenant_inactive`, `org_inactive`,
   `org_past_due`, `user_inactive`, `seat_cap_reached`, `device_revoked`, `session_revoked`,
   `refresh_reused`, `refresh_expired`, `invalid_grant` → the session is revoked here, its tokens
@@ -239,9 +263,55 @@ clears a revocation (see **The table**).
 ### Status — `GET /api/v1/auth/session`
 
 `handleSession` (`packages/host/src/auth/routes.ts:428-435`) always answers 200. A live session
-returns the summary. A visitor who never signed in is not an error and gets `{ signedIn: false }`
+returns the summary **plus `role`** — the membership row's role, read per request through the injected
+`readRole` (`roleForAnswer`; the hosted wiring is `hostAuthRoutes` in `packages/host/src/auth/index.ts`, which
+resolves the tenant exactly as every request does) — so the renderer can hide the Erase account button from
+anybody who is not an owner. `role` is omitted, and the answer is still 200, when there is no reader, no
+membership or the read throws (`session_role_not_read`). The sign-in and refresh answers carry no role. A
+visitor who never signed in is not an error and gets `{ signedIn: false }`
 with **no** reason to render; a visitor who presented a cookie that failed gets
 `{ signedIn: false, reason }`.
+
+### The role (2026-10-01, SR-65)
+
+**The hole it closed.** `ensurePortalOwner` used to write an `owner` membership for every person it
+provisioned who had no row in the org, because the portal sent no role. "Owner" on the host meant "signed
+in", and the hosted Erase account — owner-only — could be pressed by any colleague who had signed in once.
+
+**What the portal sends.** `apps/portal/src/flows/token.ts` (`mintSession`, `roleOf`) puts `role` in the JSON
+body of `POST /auth/token` (both grants) and `POST /auth/device/token`, beside `tenant_id`, read from the
+member's row at every mint and every refresh; an unreadable member gets `member`, never `owner`. It is also a
+claim in the access token and `user.role` in `GET /auth/session`. **The host reads the BODY field only** (`toTokens`,
+`parsePortalRole`): a JWT minted before the claim existed has none, and the host never decodes the token.
+
+**What the host does with it.**
+
+| Step | Where | Rule |
+|---|---|---|
+| Parse | `parsePortalRole`, `packages/core/src/tenancy/types.ts` | exact `owner` / `admin` / `member`, else `null` ("no role"): `"Owner"`, `" owner"`, `"builder"`, a number or an array are all `null` |
+| Sign-in | `ensurePortalOwner(db, { …ids, role })`, `packages/db/src/portal-owner.ts` | writes the org and desk membership with `membershipRoleForPortal(role)`: the portal's role, **or `member` for `null` — there is no default of the host's own**. An existing membership is moved to the portal's role, in either direction. The first person in a brand-new org is an owner only if the portal says so |
+| Refresh | `syncPortalRole`, applied by `portal-check.ts` `reconcileRole` | UPDATE only, never an INSERT; org pinned to the session's tenant; the local tenant id is refused; `null` is `member`, so an old `owner` row loses its rights the moment the portal says anything else |
+| Read | `resolvePortalTenant` → `storedRole` | the membership row, per request; a value outside `MEMBERSHIP_ROLES` reads as `member` |
+| Use | `resetTenant` (`packages/host/src/tenant-reset.ts`) | `tenant.role !== "owner"` → 403 `tenant_reset_forbidden`; `canAdminister` (owner or admin) is what the Build agent service reads |
+
+**How fast a change arrives.** A role changed at the portal reaches the host with the next token. The host asks
+the portal on a session's first request once `PORTAL_CHECK_INTERVAL_MS` (ten minutes) has passed since its last
+check — there is no timer, so a session nobody is using is not asked. So a session in use applies the portal's
+role at most ten minutes (and the 2 s wait) after the portal changed it; an idle one at its first request after
+that; and every sign-in applies it at once. A session created before this fix holds an `owner` row for a person
+the portal calls `member`; the first request after its last check is ten minutes old downgrades it (at once, for a
+session idle that long), and a sign-in does immediately. Until then that person can still erase: the erase does
+not ask the portal again. A portal that is down leaves the last known role standing (no answer changes
+nothing).
+
+**What "no role" costs.** The host takes the least privilege when the portal says nothing it recognises, so a
+host deployed before the portal that sends roles would take `owner` off every owner at their next refresh (they
+become members, not locked out). Deploy the portal first, or together.
+
+**What it does not do.** It does not store a role on the session row (the row is read per request); it does not
+ask the portal at the moment of an erase; it does not remove a member who left the portal (the portal has no
+call for it, SR-65); and the host's `builder` role exists nowhere in the hosted path, so a portal role always
+overwrites it.
 
 ### The cookie
 
@@ -377,11 +447,12 @@ not, and never is (it lives an hour, and a cold start simply refreshes).
   does not open — another wrap key, corruption, a foreign row's blob — ends the session cleanly as
   `refresh_expired`, never a crash; a wrap key that cannot be read at all is no answer instead.
 - **Removed** with the session: sign-out and every revocation (`save`), an idled-out session and the
-  absolute expiry (`purgeExpired`), and Start over on a desk, which deletes the database file. **The
-  hosted per-tenant reset keeps it**, because that reset keeps the tenant's sessions on purpose
-  (`packages/db/src/tenant-purge.ts`, `auth_sessions` in the kept bucket; `tenant-reset.ts` step 6
-  re-provisions the org so they keep working). A stored token without its session, or a session
-  without its token, would be the one inconsistent state. Recorded as an owner question in Gotchas.
+  absolute expiry (`purgeExpired`), Start over on a desk, which deletes the database file, and — since
+  2026-10-01 (owner decision, SR-65) — **the hosted Erase account, which deletes every `auth_sessions` row of
+  the tenant** and the sealed token with it (`TENANT_SCOPED_TABLES` in `packages/db/src/tenant-purge.ts`;
+  `tenant-reset.ts` re-provisions nothing). It reads the tokens first (`tenantSessionSeals`) to sign each
+  person out of the portal on a best-effort basis (`auth/portal-sign-out.ts`). A stored token without its
+  session, or a session without its token, would be the one inconsistent state.
 - **Rotated with the wrap key.** `rotateWrapKey` (`packages/host/src/wrap-key-rotation.ts:171`)
   re-seals every live session's token in the same two phases as the tenant settings: all opened with
   the old key before anything is written, one that will not open refuses the whole run, each written
@@ -467,6 +538,7 @@ below is "matches the design document".
 | `POST /auth/token` with `grant_type=authorization_code` and `{ code }`, answering with the device-code token body | **Assumed.** The doc describes only the Electron device-code flow and says the web needs a browser-session variant of it; that is open decision 2 (`docs/internal/portal/device-code-login.md:3-6`, `docs/internal/web-pivot-2026-09-18.md:37`). The assumption is written down at the point it is made (`packages/host/src/auth/portal-client.ts:14-23`) and isolated in one function (`packages/host/src/auth/portal-client.ts:212-214`). |
 | `POST /auth/token` with `grant_type=refresh_token`, carrying the server-side `device_id` rather than the client `install_id` | Matches the doc (`docs/internal/portal/device-code-login.md:196-200`), which is itself unimplemented. |
 | `POST /auth/logout`, Bearer token, `{ all_devices: false }`, idempotent | Matches the doc (`docs/internal/portal/device-code-login.md:228-230`). Since 2026-09-23 the host refreshes first so the token is live, the client rejects on any non-2xx answer, and the route logs the reason and signs out locally regardless. |
+| `role` in every token body (`owner` / `admin` / `member`) | **New, 2026-10-01.** Built and tested on the portal's side the same day (`apps/portal/src/flows/token.ts`); the host's reading of it is tested against a scripted portal and driven on the local Kubernetes rehearsal against the stand-in. The doc (`docs/internal/portal/device-code-login.md`) predates it, so the field is assumed from the stand-in's source. |
 | The error body `{ error, reason, message_en, message_id, retry_after }` | Matches the doc (`docs/internal/portal/device-code-login.md:85-94`). `retry_after` is parsed onto `PortalError` (`packages/host/src/auth/portal-client.ts:65`, `packages/host/src/auth/portal-client.ts:117-121`) and then **never read** by any route. |
 | The reason codes and their English copy | Matches the doc's table (`docs/internal/portal/device-code-login.md:407-425`). |
 | The portal's own `GET /auth/session` (`docs/internal/portal/device-code-login.md:232-234`) | **Not implemented.** `PortalClient` has three methods (`packages/host/src/auth/portal-client.ts:49-56`); the host answers `/api/v1/auth/session` from its own row and never asks the portal for status. |
@@ -638,8 +710,10 @@ an owner decision in [`worklog-2026-09-21.md`](../worklog-2026-09-21.md) §6, no
 | `packages/host/src/auth/session.ts` | Pure session logic: cookie names, mint, the stored digest (`hashSessionId`), verify, slide, revoke, the portal-check interval (`portalCheckDue`), summary, `Max-Age`, cookie parsing, the reason vocabulary |
 | `packages/host/src/auth/session-store.ts` | The `SessionStore` interface (digest keys, a `save` that never un-revokes and wipes a revoked row's token, `recordRotation`, `readRefreshSealed`), the SQLite and in-memory implementations, and the process-memory token vault |
 | `packages/host/src/auth/session-secrets.ts` | The refresh token at rest: the HKDF-derived sealing key, seal and open bound to the row's id digest, `createSessionSecrets` |
-| `packages/host/src/auth/portal-check.ts` | The gate's portal re-check: single-flight refresh per session, the cold-vault read of the sealed token, the rotation write-back, the bounded wait, terminal vs. unanswered reasons, back-off, the confidential client on every refresh, `faultOf` |
-| `packages/host/src/auth/portal-client.ts` | The portal contract in full, authorize hop included: `buildAuthorizeUrl`, exchange, refresh (client-authenticated when given the pair), logout (rejects on a non-2xx), error → reason mapping including `invalid_client`, the test double |
+| `packages/host/src/auth/portal-check.ts` | The gate's portal re-check: single-flight refresh per session, the cold-vault read of the sealed token, the rotation write-back, the bounded wait, terminal vs. unanswered reasons, back-off, the confidential client on every refresh, `applyRole` (the portal's role, applied after a rotation), `faultOf` |
+| `packages/host/src/auth/portal-client.ts` | The portal contract in full, authorize hop included: `buildAuthorizeUrl`, exchange, refresh (client-authenticated when given the pair), logout (rejects on a non-2xx), error → reason mapping including `invalid_client`, `role` read from the body (`toTokens`), the test double |
+| `packages/db/src/portal-owner.ts` | Provisioning and resolution of a portal identity: `ensurePortalOwner` (writes the membership with the portal's role; no default), `syncPortalRole` (a refresh's reconciliation), `resolvePortalTenant` (reads the role per request) |
+| `packages/core/src/tenancy/types.ts` | `PORTAL_ROLES`, `parsePortalRole`, `membershipRoleForPortal` (no role is `member`) |
 | `packages/host/src/wrap-key-rotation.ts` | The wrap-key drill, which re-seals the session tokens on `auth_sessions` along with the tenant settings |
 | `packages/host/src/auth/login-state.ts` | The login-CSRF `state`: its two cookie names, the mint, the reader, the constant-time compare |
 | `packages/host/src/auth/portal-config.ts` | The three login environment variables and the one `login_not_configured` refusal; the public base and the `redirect_uri` |
@@ -683,14 +757,26 @@ an owner decision in [`worklog-2026-09-21.md`](../worklog-2026-09-21.md) §6, no
   could not be sealed, which is logged as `session_refresh_not_sealed`), and every session when
   `AGENTFORGE_SECRETS_KEY` changed without `scripts/rotate-wrap-key.ts`, since no stored token
   opens under the new key.
-- **The hosted per-tenant reset keeps the stored tokens — an owner question.** The coordinator's
-  brief asked for the reset to delete them too. It keeps `auth_sessions` on purpose ("a reset
-  empties an account, it does not sign its people out", `packages/db/src/tenant-purge.ts:124`), and
-  `tenant-reset.ts` step 6 re-provisions the org so those sessions keep working. Deleting the token
-  alone would be re-written by the next rotation within ten minutes, or would sign the person out at
-  the next restart if they were idle; deleting it with the sessions would sign the whole tenant out.
-  Neither was done. Signing people out is the portal's job, and since the re-check a portal-side
-  revocation reaches this host within ten minutes.
+- **The hosted Erase account deletes the sessions and the stored tokens — decided 2026-10-01.** This was an
+  owner question (SR-65): the reset used to keep `auth_sessions` on purpose and re-provision the org so those
+  sessions kept working. The owner's answer: erasing the company account deletes every person in it, so every
+  session goes with it, in the same transaction as the data (`tenant-purge.ts` `TENANT_SCOPED_TABLES`). The next
+  request from any of those browsers finds no row and is `401 session_required`; the caller's own browser is
+  signed out the same way, and the renderer follows with the ordinary sign-out for the portal hop. **The portal
+  side is best effort and incomplete by construction:** `apps/portal` has no call that removes a member, so the
+  host signs out (`POST /auth/logout { all_devices: true }`) only the people who had a live host session with a
+  sealed token; anyone else keeps their identity and portal sessions at the portal, and the tenant row stays
+  `active`, so a person the portal still vouches for can sign in again to an empty org.
+- **There is no default role, and "no role" is `member`.** A body without `role`, with an unknown string or with a
+  non-string reads as `null`, and `null` is written as `member` at sign-in and at every refresh — including over an
+  existing `owner`/`admin` row. The portal's own rule is the same (an unreadable member is `member`). So a portal
+  that stops sending roles demotes everyone at their next refresh rather than keeping their old rights. Test files
+  that need an owner pass `role: "owner"` explicitly; `ensurePortalOwner` has no call form without a role.
+- **The role is read per request from the membership row, not carried on the session.** `request.session` has no
+  role, `GET /auth/session` reads it for the renderer only, and a changed row is the next request's role. The
+  place a role can be stale is the host's row between two portal checks (up to ten minutes of activity).
+- **The access token's `role` claim is ignored.** The host never decodes the JWT, and the body field is the
+  portal's answer to that call; a token minted before the claim existed cannot make anybody an owner.
 - **The logger drops any field whose name contains `token` or `session`** (`packages/host/src/log.ts`).
   Counts of session tokens are logged under other names (`resealedSignIns`, `changedSignIns` in the
   wrap-key drill); a field called `sessionTokens` arrives as `[dropped]`.
@@ -743,6 +829,14 @@ seeded tenant and a **real browser** — the suites below cannot prove CSP, `__H
 acceptance, `SameSite` or mixed-content blocking, because a non-browser client does not implement
 any of them.
 
+**The role was also driven on the local Kubernetes rehearsal on 2026-10-01** (stand-in portal, Mailpit, headless
+Chromium, the real invite + e-mailed-code sign-in): a fresh member and a fresh admin got `role` `member` / `admin` from
+`GET /api/v1/auth/session` and the owner `owner`; a member who had signed in on the pre-fix build held an `owner` row
+(and so did five earlier test users: every sign-in had become an owner) and was `member` after the first request that
+followed the upgrade once the 10-minute check was due, on a session that survived the pod replacement; and roles
+changed at the portal arrived on the next due check, promotion and demotion. The log line is `portal_role_applied`.
+The five earlier owners are still `owner` rows: nothing reconciles a person until they make a request or sign in.
+
 What proves the host's half is unit tests. The rows touched by the two 2026-09-23 passes were
 **run** after the second, on this Windows desk: `packages/host/src/auth/` 10 files / 362 tests and
 `wrap-key-rotation.test.ts` 19 green, the migration suites green (with the drizzle-kit drift check
@@ -759,6 +853,8 @@ old key as `--from` refused with exit 1.
 | `packages/host/src/auth/portal-check.test.ts` | The re-check: nothing asked inside the interval; rotate, keep the pair (and the held device id) and stamp; each of the ten terminal reasons ending the session with the portal's copy; no tokens → `refresh_expired`; unreachable, rate-limited, malformed and unbuildable portals all keeping the session with a 60 s / `retry_after` back-off; one rotation shared by five concurrent requests and by the gate plus a sign-out; a late answer, rotated or terminal, still applied; the host's own storage failing without signing anyone out wrongly — and after a restart: the sealed token opened and refreshed, the rotated one written back sealed with the stamp, a second restart reading the newer token, a token that will not open ending the session cleanly with no portal call, an unreadable wrap key ending nobody, an unsealable rotation clearing the spent token; the confidential client presented on every refresh, left off when none is configured or its source throws, and `invalid_client` keeping every session; storage failures logged by name and SQLite code, never their parameters |
 | `packages/host/src/auth/portal-client.test.ts` | `AGENTFORGE_PORTAL_URL` handling including the plain-HTTP refusal; the timeout signal on every call; reason mapping including unknown-reason → `invalid_grant`, 5xx, malformed body, a non-portal 4xx and `invalid_client` → `portal_unavailable`, with the RFC `error` kept as `rfcError`; the refresh grant with and without `device_id`, with `client_id` and `client_secret` both or neither; logout rejecting with the portal's reason, or `portal_unavailable`, on a failed sign-out; the fake recording the client id and never the secret; and that no token or secret reaches the console or an error message |
 | `packages/host/src/auth/routes.test.ts` | All five routes end to end against fakes, the exemption table, `requireSessionFor`, the cookie's attributes per mode including the cleared cookie; lane F's additions: `/auth/start`'s cookie-equals-URL binding and its 404 off server mode, the five ways a state is refused with no portal call, the state cleared on success and on failure alike, and the 503 when the client credentials are absent; the 2026-09-23 sign-out: refresh first and log out with the returned token, no portal logout after a terminal refresh, the held token tried when the portal is silent, the local sign-out surviving a refused or throwing portal logout, and one rotation shared with a gate check in flight; and the refresh token at rest: sealed onto the row at sign-in (never the access token), sign-in surviving a token that cannot be sealed, sign-out removing it, and `/auth/refresh` and sign-out both working after a restart from the stored token alone, with `/auth/refresh` and a sign-out's refresh presenting the configured client |
+| `packages/core/src/tenancy/types.test.ts`, `packages/db/src/portal-owner.test.ts`, `packages/db/src/ensure-local-owner.test.ts`, role cases in `portal-client.test.ts`, `portal-check.test.ts`, `routes.test.ts` | The unit halves of the role: exact-match `parsePortalRole` and no role → `member`; the membership written as owner / admin / member / none, promoted and demoted by a later sign-in, an `owner` row from before the claim downgraded, `syncPortalRole` never creating, never touching another org or another member, and refusing the local tenant; the local owner still an owner on every boot; `toTokens` reading the body field from both grants and not the JWT; `applyRole` called once per rotation with the session's own ids (and not on a terminal answer, an outage, nothing to present, or inside the interval), a failing write kept off the rotation; `provision` handed the portal's role and the seat claim none; `GET /auth/session` adding the row's role |
+| `packages/host/src/portal-roles.test.ts` | **The role, end to end (SR-65, 2026-10-01).** A scripted portal answers the REAL portal client's `fetch`; sign-in is the real `createAuthRoutes`, the session the real `auth_sessions` table, the role written by the real `ensurePortalOwner` / `syncPortalRole`, the erase the real route through `dispatch`. An owner passes the owner check; a member who signs in after the owner, an admin, a member who is first in a brand-new org, a body with no role, and eleven unknown role values (`"superuser"`, `"Owner"`, `" owner"`, `"builder"`, `1`, `true`, `null`, `["owner"]`, …) are all refused `403 tenant_reset_forbidden` with the company intact; a promotion and a demotion at the portal reach the row on the first request after the check is due and not before (the ten-minute window pinned at `INTERVAL - 1` and `INTERVAL`); an unknown or absent role at a refresh demotes; one person's refresh touches nobody else; a pre-existing `owner` row for a portal `member` is downgraded by a refresh from a cold vault (the sealed token) and by the next sign-in; `GET /auth/session` reports the row's role; Personal's local owner is still an owner with no session and the hosted erase is still refused on a desk |
 | `packages/host/src/auth/login-state.test.ts` | The mint's width and uniqueness, the `__Host-` name split, an undecodable cookie read as absent, and `statesMatch` refusing an empty, absent or differently-sized pair |
 | `packages/host/src/auth/portal-config.test.ts` | The public base: explicit over the trusted origin, normalised to an origin, http allowed on loopback and refused off it, and the named refusal when nothing is configured or a credential is missing; and `configuredClientCredentials` reading the same pair, or null rather than a refusal when either half is missing |
 | `packages/host/src/auth/session-gate.test.ts` | The gate itself: off server mode it never runs; on, it 401s a POST, a HEAD and a DELETE alike, 401s before deciding whether the route exists, 401s a malformed cookie rather than 500ing, lets ping / components / the auth routes through, still gates the component install, slides through the gate, reads `isServerMode()` per request, and attaches `request.session` while dropping any the caller invented — and, since 2026-09-23, refuses a due session the portal has ended with its reason before any handler runs, lets a rotated or unanswered one through, ends one with no tokens, and never asks inside the interval or off server mode, and lets a due session through after a restart on the token sealed on its row |

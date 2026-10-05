@@ -87,7 +87,9 @@ describe("rail finance tasks block", () => {
 describe("app rail finance block", () => {
   it("hangs the tasks off the Finance row inside one h-8 row", () => {
     expect(appRail).toContain('<div key={mode.href} className="shrink-0" data-testid="rail-finance-mode">');
-    expect(appRail).toContain('<div className="flex h-8 items-center gap-0.5">');
+    // The chevron rides in the row's own `trailing` slot, so the current-row card spans it.
+    expect(/<RailItem\s+\{\.\.\.itemProps\}\s+trailing=\{\s*<RailFinanceTasksToggle/.test(appRail)).toBe(true);
+    expect(appRail).not.toContain('<div className="flex h-8 items-center gap-0.5">');
     expect(appRail).toContain("{financeTasks.open ? <RailFinanceTasks /> : null}");
     expect(appRail).toContain("enabled={financeTasks.enabled}");
   });

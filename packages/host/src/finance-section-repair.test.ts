@@ -103,6 +103,41 @@ describe("repairUnverifiedSections", () => {
     expect(result.guard.flagged).toEqual([{ section: 0, text: "4,5%" }]);
   });
 
+  it("hands the job's cancel to the rewrite call", async () => {
+    asked.length = 0;
+    answers.length = 0;
+    answers.push(JSON.stringify({ heading: "Kinerja", body: "Marjin kotor 41,6%.", metrics: [] }));
+    const controller = new AbortController();
+    await repairUnverifiedSections(brief(`Marjin kotor ${UNVERIFIED_MARKER}.`), computed, {
+      ...prompt,
+      signal: controller.signal,
+    });
+    expect(asked[0]?.signal).toBe(controller.signal);
+  });
+
+  it("stops the repair on a cancel instead of treating it as a retry that failed", async () => {
+    asked.length = 0;
+    answers.length = 0;
+    const controller = new AbortController();
+    controller.abort(new Error("client left"));
+    // The stubbed gateway call answers with an empty reply, which `parseBriefSection` refuses: without
+    // the cancel check that is swallowed and the repair goes on to the next section.
+    await expect(
+      repairUnverifiedSections(
+        {
+          ...brief(`Marjin kotor ${UNVERIFIED_MARKER}.`),
+          sections: [
+            { heading: "Kinerja", body: `Marjin kotor ${UNVERIFIED_MARKER}.`, tables: [], metrics: [] },
+            { heading: "Arus kas", body: `Kas ${UNVERIFIED_MARKER}.`, tables: [], metrics: [] },
+          ],
+        },
+        computed,
+        { ...prompt, signal: controller.signal },
+      ),
+    ).rejects.toMatchObject({ code: "aborted", status: 499 });
+    expect(asked).toHaveLength(1);
+  });
+
   it("still strips the marker when the retry itself fails", async () => {
     asked.length = 0;
     answers.length = 0;

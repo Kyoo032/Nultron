@@ -68,6 +68,14 @@
       "empty_recording": "Tidak ada suara yang terekam. Pastikan mikrofon yang benar dipilih, lalu coba lagi."
     }
   },
+  "checks": {
+    "title": "Notulen ini mungkin perlu diperiksa lagi",
+    "owners": "Ada item tindakan tanpa tugas, atau dengan penanggung jawab yang tidak pernah disebut dalam transkrip.",
+    "dates": "Notulen mengutip tanggal atau jam yang tidak pernah disebut dalam transkrip.",
+    "summary": "Ringkasannya kosong.",
+    "shape": "Notulen tidak kembali dalam bentuk yang seharusnya.",
+    "hint": "Notulen tersimpan. Periksa dengan transkrip, atau tekan “{action}” untuk menulisnya ulang."
+  },
   "minutes": {
     "attendees": "Peserta",
     "decisions": "Keputusan",

@@ -54,6 +54,43 @@ describe("settings surface locales", () => {
     }
   });
 
+  it("ships every Erase company account key in both locales (owner decision 2026-10-01, SR-65)", () => {
+    const expected = [
+      "reset.eraseAccount",
+      "reset.eraseAccountContract",
+      "reset.eraseAccountDone",
+      "reset.eraseAccountForbidden",
+      "reset.eraseAccountHelp",
+      "reset.eraseAccountInputLabel",
+      "reset.eraseAccountOpen",
+      "reset.eraseAccountPanelTitle",
+      "reset.eraseAccountSubmit",
+      "reset.eraseAccountTypeToConfirm",
+      "reset.eraseAccountWarning",
+      "reset.eraseAccountWarningFinal",
+      "reset.eraseAccountWarningPeople",
+      "reset.eraseAccountWorking",
+    ];
+    for (const locale of ["en", "id"] as const) {
+      const catalog = load(locale, "settings") as Record<string, string>;
+      for (const key of expected) {
+        expect(catalog[key], `${locale} ${key}`).toBeTruthy();
+      }
+    }
+  });
+
+  it("takes the erase phrase as a variable in both locales, so the copy can never drift from the check", () => {
+    for (const locale of ["en", "id"] as const) {
+      const catalog = load(locale, "settings") as Record<string, string>;
+      expect(catalog["reset.eraseAccountInputLabel"]).toContain("{phrase}");
+      expect(catalog["reset.eraseAccountTypeToConfirm"]).toContain("{phrase}");
+      // And neither language bakes the old desk word into the company erase.
+      for (const key of Object.keys(catalog).filter((name) => name.startsWith("reset.eraseAccount"))) {
+        expect(catalog[key], `${locale} ${key}`).not.toContain("RESET");
+      }
+    }
+  });
+
   it("keeps the literal RESET word untranslated", () => {
     for (const locale of ["en", "id"] as const) {
       const catalog = load(locale, "settings") as Record<string, string>;

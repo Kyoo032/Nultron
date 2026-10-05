@@ -26,6 +26,7 @@ import {
   TENANT_SCOPED_TABLES,
   WORKSPACE_SCOPED_TABLES,
   purgeTenantRows,
+  tenantSessionSeals,
   tenantWorkspaceIds,
 } from "./tenant-purge";
 
@@ -63,7 +64,9 @@ function seedTenant(sqlite: Database.Database, id: string): Seeded {
     .prepare("INSERT INTO tenants (id, slug, name, status, created_at) VALUES (?, ?, ?, 'active', ?)")
     .run(id, id, id, now);
   sqlite
-    .prepare("INSERT INTO organizations (id, tenant_id, name, slug, industry_pack, created_at) VALUES (?, ?, ?, ?, 'generic', ?)")
+    .prepare(
+      "INSERT INTO organizations (id, tenant_id, name, slug, industry_pack, created_at) VALUES (?, ?, ?, ?, 'generic', ?)",
+    )
     .run(orgId, id, orgId, orgId, now);
   sqlite
     .prepare("INSERT INTO user (id, name, email, email_verified, created_at, updated_at) VALUES (?, ?, ?, 0, ?, ?)")
@@ -112,6 +115,21 @@ function seedTenant(sqlite: Database.Database, id: string): Seeded {
       "INSERT INTO datasets (id, workspace_id, name, filename, rows, cols, columns, storage_path, size_bytes, created_at) VALUES (?, ?, 'd', 'd.csv', 1, 1, '[]', ?, 1, ?)",
     )
     .run(`${id}-dataset`, workspaceId, `datasets/tenants/${id}/d.csv`, now);
+  sqlite
+    .prepare(
+      "INSERT INTO desk_files (id, workspace_id, path, head_version, bytes, mime, sha256, created_at, updated_at) VALUES (?, ?, 'notes/plan.md', 1, 4, 'text/markdown', 'abc', ?, ?)",
+    )
+    .run(`${id}-deskfile`, workspaceId, now, now);
+  sqlite
+    .prepare(
+      "INSERT INTO desk_file_versions (file_id, version, object_key, bytes, sha256, author_kind, author_id, created_at) VALUES (?, 1, ?, 4, 'abc', 'user', ?, ?)",
+    )
+    .run(`${id}-deskfile`, `tenants/${id}/desk-files/${id}-deskfile/1`, userId, now);
+  sqlite
+    .prepare(
+      "INSERT INTO file_proposals (id, workspace_id, run_id, path, kind, status, created_at) VALUES (?, ?, 'run-1', 'a.txt', 'write', 'pending', ?)",
+    )
+    .run(`${id}-proposal`, workspaceId, now);
 
   // Tenant-keyed: two that go, five that stay.
   sqlite
@@ -140,9 +158,9 @@ function seedTenant(sqlite: Database.Database, id: string): Seeded {
     .run(`${id}-event`, id, now, now);
   sqlite
     .prepare(
-      "INSERT INTO auth_sessions (id, tenant_id, user_id, org_id, created_at, last_seen_at, expires_at, absolute_expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO auth_sessions (id, tenant_id, user_id, org_id, created_at, last_seen_at, expires_at, absolute_expires_at, refresh_sealed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
-    .run(`${id}-session`, id, userId, orgId, now, now, now + 1000, now + 2000);
+    .run(`${id}-session`, id, userId, orgId, now, now, now + 1000, now + 2000, `${id}-sealed`);
 
   return { tenantId: id, orgId, workspaceId, agentId, threadId };
 }
@@ -150,6 +168,34 @@ function seedTenant(sqlite: Database.Database, id: string): Seeded {
 function count(sqlite: Database.Database, table: string, column: string, value: string): number {
   const row = sqlite.prepare(`SELECT count(*) AS n FROM ${table} WHERE ${column} = ?`).get(value) as { n: number };
   return row.n;
+}
+
+function sealedOf(sqlite: Database.Database, sessionId: string): string | null {
+  const row = sqlite.prepare("SELECT refresh_sealed AS sealed FROM auth_sessions WHERE id = ?").get(sessionId) as
+    | { sealed: string | null }
+    | undefined;
+  return row?.sealed ?? null;
+}
+
+/** A second person in an org, with a session of their own, so "everyone" means more than the owner. */
+function addColleague(
+  sqlite: Database.Database,
+  seeded: Seeded,
+  userId: string,
+  sealed: string | null = `${userId}-sealed`,
+): void {
+  const now = Date.now();
+  sqlite
+    .prepare("INSERT INTO user (id, name, email, email_verified, created_at, updated_at) VALUES (?, ?, ?, 0, ?, ?)")
+    .run(userId, userId, `${userId}@portal.invalid`, now, now);
+  sqlite
+    .prepare("INSERT INTO organization_members (id, organization_id, user_id, role) VALUES (?, ?, ?, 'member')")
+    .run(`${userId}-member`, seeded.orgId, userId);
+  sqlite
+    .prepare(
+      "INSERT INTO auth_sessions (id, tenant_id, user_id, org_id, created_at, last_seen_at, expires_at, absolute_expires_at, refresh_sealed) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    )
+    .run(`${userId}-session`, seeded.tenantId, userId, seeded.orgId, now, now, now + 1000, now + 2000, sealed);
 }
 
 describe("the purge plan covers the whole schema", () => {
@@ -240,6 +286,10 @@ describe("purgeTenantRows", () => {
     expect(count(sqlite, "knowledge_chunks", "workspace_id", alpha.workspaceId)).toBe(0);
     expect(count(sqlite, "artifacts", "workspace_id", alpha.workspaceId)).toBe(0);
     expect(count(sqlite, "datasets", "workspace_id", alpha.workspaceId)).toBe(0);
+    expect(count(sqlite, "desk_files", "workspace_id", alpha.workspaceId)).toBe(0);
+    expect(count(sqlite, "file_proposals", "workspace_id", alpha.workspaceId)).toBe(0);
+    // Versions follow their file through the foreign key.
+    expect(count(sqlite, "desk_file_versions", "file_id", `${alpha.tenantId}-deskfile`)).toBe(0);
     // Tenant-keyed, and these two go.
     expect(count(sqlite, "tenant_state", "tenant_id", alpha.tenantId)).toBe(0);
     expect(count(sqlite, "tenant_storage", "tenant_id", alpha.tenantId)).toBe(0);
@@ -252,8 +302,6 @@ describe("purgeTenantRows", () => {
     expect(count(sqlite, "tenant_seat", "tenant_id", alpha.tenantId)).toBe(1);
     expect(count(sqlite, "tenant_usage", "tenant_id", alpha.tenantId)).toBe(1);
     expect(count(sqlite, "billing_events", "tenant_id", alpha.tenantId)).toBe(1);
-    // A reset empties an account; it does not sign its people out.
-    expect(count(sqlite, "auth_sessions", "tenant_id", alpha.tenantId)).toBe(1);
   });
 
   it("leaves every other tenant exactly as it was", () => {
@@ -267,8 +315,16 @@ describe("purgeTenantRows", () => {
     expect(count(sqlite, "knowledge_chunks", "workspace_id", beta.workspaceId)).toBe(1);
     expect(count(sqlite, "artifacts", "workspace_id", beta.workspaceId)).toBe(1);
     expect(count(sqlite, "datasets", "workspace_id", beta.workspaceId)).toBe(1);
+    expect(count(sqlite, "desk_files", "workspace_id", beta.workspaceId)).toBe(1);
+    expect(count(sqlite, "desk_file_versions", "file_id", `${beta.tenantId}-deskfile`)).toBe(1);
+    expect(count(sqlite, "file_proposals", "workspace_id", beta.workspaceId)).toBe(1);
     expect(count(sqlite, "tenant_state", "tenant_id", beta.tenantId)).toBe(1);
     expect(count(sqlite, "tenant_storage", "tenant_id", beta.tenantId)).toBe(1);
+    // Nor its people or their sessions, sealed refresh token included.
+    expect(count(sqlite, "user", "id", `${beta.tenantId}-user`)).toBe(1);
+    expect(count(sqlite, "organization_members", "organization_id", beta.orgId)).toBe(1);
+    expect(count(sqlite, "auth_sessions", "tenant_id", beta.tenantId)).toBe(1);
+    expect(sealedOf(sqlite, `${beta.tenantId}-session`)).toBe(`${beta.tenantId}-sealed`);
   });
 
   it("is idempotent: a second pass removes nothing and does not throw", () => {
@@ -295,5 +351,142 @@ describe("purgeTenantRows", () => {
     expect(count(sqlite, "organizations", "tenant_id", alpha.tenantId)).toBe(1);
     expect(count(sqlite, "knowledge_memories", "workspace_id", alpha.workspaceId)).toBe(1);
     expect(count(sqlite, "tenant_state", "tenant_id", alpha.tenantId)).toBe(1);
+  });
+});
+
+/**
+ * Owner decision 2026-10-01 (SR-65): erasing the company account deletes every person in it and ends
+ * every session, so nobody stays signed in on a refresh token the host is still holding.
+ */
+describe("purgeTenantRows ends the sessions and deletes the people", () => {
+  let sqlite: Database.Database;
+  let alpha: Seeded;
+  let beta: Seeded;
+
+  beforeEach(() => {
+    sqlite = new Database(":memory:");
+    ensureSchema(sqlite);
+    sqlite.pragma("foreign_keys = ON");
+    alpha = seedTenant(sqlite, "alpha");
+    beta = seedTenant(sqlite, "beta");
+    addColleague(sqlite, alpha, "alpha-colleague");
+    addColleague(sqlite, alpha, "alpha-second-colleague");
+  });
+
+  afterEach(() => {
+    sqlite.close();
+  });
+
+  it("deletes every session row of the tenant, so no sealed refresh token survives", () => {
+    expect(count(sqlite, "auth_sessions", "tenant_id", alpha.tenantId)).toBe(3);
+    const result = purgeTenantRows(sqlite, alpha.tenantId);
+    expect(count(sqlite, "auth_sessions", "tenant_id", alpha.tenantId)).toBe(0);
+    expect(result.sessionsDeleted).toBe(3);
+    const sealedLeft = sqlite
+      .prepare("SELECT count(*) AS n FROM auth_sessions WHERE refresh_sealed LIKE 'alpha%'")
+      .get() as { n: number };
+    expect(sealedLeft.n).toBe(0);
+  });
+
+  it("deletes revoked and idled-out rows as well: the row is the account's, not only the live ones", () => {
+    sqlite
+      .prepare("UPDATE auth_sessions SET revoked_at = ?, refresh_sealed = NULL WHERE id = ?")
+      .run(Date.now(), "alpha-colleague-session");
+    purgeTenantRows(sqlite, alpha.tenantId);
+    expect(count(sqlite, "auth_sessions", "tenant_id", alpha.tenantId)).toBe(0);
+  });
+
+  it("deletes the people of the tenant: their user rows and their memberships", () => {
+    const result = purgeTenantRows(sqlite, alpha.tenantId);
+    for (const userId of ["alpha-user", "alpha-colleague", "alpha-second-colleague"]) {
+      expect(count(sqlite, "user", "id", userId), userId).toBe(0);
+    }
+    expect(count(sqlite, "organization_members", "organization_id", alpha.orgId)).toBe(0);
+    expect(result.usersDeleted).toBe(3);
+  });
+
+  it("keeps a person who also belongs to another tenant, and that tenant's membership of them", () => {
+    // One portal identity in two companies: the erase removes them from this one and only this one.
+    const now = Date.now();
+    sqlite
+      .prepare("INSERT INTO user (id, name, email, email_verified, created_at, updated_at) VALUES (?, ?, ?, 0, ?, ?)")
+      .run("both-user", "both-user", "both-user@portal.invalid", now, now);
+    for (const seeded of [alpha, beta]) {
+      sqlite
+        .prepare("INSERT INTO organization_members (id, organization_id, user_id, role) VALUES (?, ?, ?, 'member')")
+        .run(`both-${seeded.tenantId}`, seeded.orgId, "both-user");
+    }
+    purgeTenantRows(sqlite, alpha.tenantId);
+    expect(count(sqlite, "user", "id", "both-user")).toBe(1);
+    expect(count(sqlite, "organization_members", "organization_id", beta.orgId)).toBe(2);
+    expect(count(sqlite, "organization_members", "organization_id", alpha.orgId)).toBe(0);
+  });
+
+  it("leaves every other tenant's sessions and people untouched", () => {
+    addColleague(sqlite, beta, "beta-colleague");
+    purgeTenantRows(sqlite, alpha.tenantId);
+    expect(count(sqlite, "auth_sessions", "tenant_id", beta.tenantId)).toBe(2);
+    expect(sealedOf(sqlite, "beta-colleague-session")).toBe("beta-colleague-sealed");
+    expect(count(sqlite, "user", "id", "beta-colleague")).toBe(1);
+    expect(count(sqlite, "user", "id", "beta-user")).toBe(1);
+  });
+
+  it("keeps what the contract has to keep, even though the people are gone", () => {
+    purgeTenantRows(sqlite, alpha.tenantId);
+    expect(count(sqlite, "tenants", "id", alpha.tenantId)).toBe(1);
+    expect(count(sqlite, "tenant_plan", "tenant_id", alpha.tenantId)).toBe(1);
+    expect(count(sqlite, "tenant_seat", "tenant_id", alpha.tenantId)).toBe(1);
+    expect(count(sqlite, "tenant_usage", "tenant_id", alpha.tenantId)).toBe(1);
+    expect(count(sqlite, "billing_events", "tenant_id", alpha.tenantId)).toBe(1);
+  });
+
+  it("is idempotent for sessions and people too", () => {
+    purgeTenantRows(sqlite, alpha.tenantId);
+    const second = purgeTenantRows(sqlite, alpha.tenantId);
+    expect(second.sessionsDeleted).toBe(0);
+    expect(second.usersDeleted).toBe(0);
+  });
+
+  it("rolls the sessions back with everything else when a statement fails", () => {
+    sqlite.exec("DROP TABLE artifacts");
+    expect(() => purgeTenantRows(sqlite, alpha.tenantId)).toThrow();
+    expect(count(sqlite, "auth_sessions", "tenant_id", alpha.tenantId)).toBe(3);
+    expect(count(sqlite, "user", "id", "alpha-colleague")).toBe(1);
+  });
+});
+
+describe("tenantSessionSeals", () => {
+  let sqlite: Database.Database;
+  let alpha: Seeded;
+  let beta: Seeded;
+
+  beforeEach(() => {
+    sqlite = new Database(":memory:");
+    ensureSchema(sqlite);
+    sqlite.pragma("foreign_keys = ON");
+    alpha = seedTenant(sqlite, "alpha");
+    beta = seedTenant(sqlite, "beta");
+  });
+
+  afterEach(() => {
+    sqlite.close();
+  });
+
+  it("reads the sealed token and the user of each live session, as the row's digest and nothing else", () => {
+    addColleague(sqlite, alpha, "alpha-colleague");
+    const seals = tenantSessionSeals(sqlite, alpha.tenantId);
+    expect(seals.map((seal) => seal.userId).sort()).toEqual(["alpha-colleague", "alpha-user"]);
+    const owner = seals.find((seal) => seal.userId === "alpha-user");
+    expect(owner).toEqual({ idHash: "alpha-session", userId: "alpha-user", refreshSealed: "alpha-sealed" });
+  });
+
+  it("skips a session that is revoked or holds no sealed token, and never reads another tenant's", () => {
+    addColleague(sqlite, alpha, "alpha-colleague", null);
+    addColleague(sqlite, alpha, "alpha-revoked");
+    sqlite.prepare("UPDATE auth_sessions SET revoked_at = ? WHERE id = ?").run(Date.now(), "alpha-revoked-session");
+    const seals = tenantSessionSeals(sqlite, alpha.tenantId);
+    expect(seals.map((seal) => seal.userId)).toEqual(["alpha-user"]);
+    expect(seals.some((seal) => seal.refreshSealed.startsWith("beta"))).toBe(false);
+    expect(beta.tenantId).toBe("beta");
   });
 });

@@ -26,6 +26,7 @@ import {
 import { getKnowledgeMap, mapKnowledge } from "../knowledge-map";
 import { backendPayload, parseBackendId, selectKnowledgeBackend } from "../knowledge/backend-api";
 import { countRetrievals } from "../knowledge-retrievals";
+import { knowledgeContextForThread } from "../knowledge-last-turn";
 import { getGraph, graphCounts } from "../knowledge-graph";
 import { reindexSource, reindexWorkspace } from "../knowledge-reindex";
 import { getKnowledgeVerify, runKnowledgeSelfCheck, type KnowledgeVerifyRecord } from "../knowledge-verify";
@@ -312,8 +313,13 @@ export async function handleGetKnowledgeContext(request: HostRequest): Promise<H
     const threadId = typeof request.query.threadId === "string" ? request.query.threadId.trim() : "";
     // Only the caller's own thread (workspace-scoped lookup) can be excluded from its Sources.
     const own = threadId ? await getThread(tenant, threadId) : null;
-    // `chunks` stays server-side (it is the retrieval record); the popover payload is unchanged.
-    const { prompt, parts } = await knowledgeInjection(tenant, query, own ? { excludeThreadId: own.id } : {});
+    // With a query this retrieves, and retrieving embeds the query through the gateway: it is what
+    // the harness asks for to see the text a turn would be handed. The Chat pane asks with the thread
+    // alone, which reads what the thread's last turn was handed from its record and costs nothing
+    // (`knowledge-last-turn.ts`). `chunks` stays server-side; the popover payload is unchanged.
+    const { prompt, parts } = query
+      ? await knowledgeInjection(tenant, query, own ? { excludeThreadId: own.id } : {})
+      : await knowledgeContextForThread(tenant, own ? own.id : null);
     return jsonOk({ prompt, parts });
   } catch (error) {
     return jsonError(error);

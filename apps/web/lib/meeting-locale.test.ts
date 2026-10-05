@@ -50,6 +50,19 @@ describe("meeting locale JSON", () => {
     }
   });
 
+  it("says what a failed check means in both languages, and names the button the hint points at", () => {
+    const placeholders = (value: string) => (value.match(/\{[a-zA-Z]+\}/g) ?? []).sort();
+    const en = (load("en") as { checks: Record<string, string> }).checks;
+    const id = (load("id") as { checks: Record<string, string> }).checks;
+    for (const key of ["title", "owners", "dates", "summary", "shape", "hint"]) {
+      expect(en[key], `en checks.${key}`).toBeTruthy();
+      expect(id[key], `id checks.${key}`).toBeTruthy();
+      expect(id[key], `id checks.${key} is still English`).not.toBe(en[key]);
+    }
+    expect(placeholders(en.hint ?? "")).toEqual(["{action}"]);
+    expect(placeholders(id.hint ?? "")).toEqual(["{action}"]);
+  });
+
   it("keeps brand names untranslated in id", () => {
     const raw = readFileSync(resolve(localesDir, "id", "meeting.json"), "utf8");
     expect(raw).not.toMatch(/TokenKu/);

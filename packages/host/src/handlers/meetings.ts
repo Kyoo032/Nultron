@@ -3,6 +3,7 @@ import { TRANSCRIPT_MAX_CHARS, meetingTranscriptSchema } from "@agentforge/core/
 import type { HostRequest, HostResult } from "../types";
 import { jsonError, jsonOk } from "../errors";
 import { requireGatewayAllowedFor } from "../gateway-gate";
+import { readModelPinned } from "../job-regen";
 import { streamJob } from "../job-stream";
 import { generateMinutes, runMeeting, saveTranscript, transcribeMeeting } from "../meeting/run";
 import { meetingStore, requireMeeting } from "../meeting/store";
@@ -139,10 +140,9 @@ export async function handlePostMeetingTranscribe(request: HostRequest): Promise
     requireGatewayAllowedFor(tenant);
     const meetingId = request.params.meetingId ?? "";
     const language = readOptionalString(body(request).language);
-    return streamJob(
-      (emit, abortSignal) => transcribeMeeting(tenant, meetingId, { emit, abortSignal, language }),
-      { abortSignal: request.abortSignal },
-    );
+    return streamJob((emit, abortSignal) => transcribeMeeting(tenant, meetingId, { emit, abortSignal, language }), {
+      abortSignal: request.abortSignal,
+    });
   } catch (error) {
     return jsonError(error);
   }
@@ -156,9 +156,10 @@ export async function handlePostMeetingMinutes(request: HostRequest): Promise<Ho
     const meetingId = request.params.meetingId ?? "";
     const input = body(request);
     const model = readOptionalString(input.model);
+    const modelExplicit = readModelPinned(input);
     const translate = input.translate !== false;
     return streamJob(
-      (emit, abortSignal) => generateMinutes(tenant, meetingId, { emit, abortSignal, model, translate }),
+      (emit, abortSignal) => generateMinutes(tenant, meetingId, { emit, abortSignal, model, modelExplicit, translate }),
       { abortSignal: request.abortSignal },
     );
   } catch (error) {
@@ -175,9 +176,10 @@ export async function handlePostMeetingRunStream(request: HostRequest): Promise<
     const meetingId = request.params.meetingId ?? "";
     const input = body(request);
     const model = readOptionalString(input.model);
+    const modelExplicit = readModelPinned(input);
     const translate = input.translate !== false;
     return streamJob(
-      (emit, abortSignal) => runMeeting(tenant, meetingId, { emit, abortSignal, model, translate }),
+      (emit, abortSignal) => runMeeting(tenant, meetingId, { emit, abortSignal, model, modelExplicit, translate }),
       { abortSignal: request.abortSignal },
     );
   } catch (error) {

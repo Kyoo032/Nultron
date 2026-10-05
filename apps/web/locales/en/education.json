@@ -34,6 +34,7 @@
   "examHint": "Type a topic, then press Create.",
   "bookHint": "Choose a picture or a PDF, then press Read.",
   "presenterHint": "Create a lesson first. Then you can show it.",
+  "presenterCreateLesson": "Create a lesson",
   "guide": {
     "lead": "What do you want to do?",
     "change": "Choose something else"

@@ -1,0 +1,74 @@
+# Docker Desktop rehearsal. Reachable on this machine only: kubectl port-forward on 127.0.0.1:8443.
+#
+# Run it with `node webapp-deploy/k8s/rehearse-local.mjs`, which builds the images, generates
+# secrets.env and pki/ (both gitignored) and applies a generated overlay that wraps this one and pins
+# the local image tags. See ../../README.md for every difference from production.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Every resource this overlay adds (Secrets, the CA ConfigMap, Mailpit, the StorageClass aside) belongs to the
+# same namespace as the base. The base's own `namespace:` does NOT reach resources declared here: without
+# this line they land in `default`, which is how the first rehearsal run leaked its generated Secrets.
+namespace: nultron
+
+resources:
+  - ../../base
+  - mailpit.yaml
+
+configMapGenerator:
+  - name: nultron-app-env
+    behavior: merge
+    literals:
+      - AGENTFORGE_TRUSTED_ORIGINS=https://nultron.localhost:8443
+      - AGENTFORGE_PUBLIC_URL=https://nultron.localhost:8443
+      - AGENTFORGE_PORTAL_URL=https://portal.nultron.localhost:8443
+      # The portal's certificate is signed by a throwaway CA (see pki/), so the app has to trust it.
+      - NODE_EXTRA_CA_CERTS=/etc/nultron/ca/ca.crt
+  - name: nultron-edge-env
+    behavior: merge
+    literals:
+      - NULTRON_DOMAIN=nultron.localhost
+      - PORTAL_DOMAIN=portal.nultron.localhost
+  - name: nultron-portal-env
+    behavior: merge
+    literals:
+      - PORTAL_PUBLIC_URL=https://portal.nultron.localhost:8443
+      - PORTAL_SMTP_HOST=mailpit
+      - PORTAL_SMTP_PORT=1025
+      - PORTAL_SMTP_FROM=Nultron local <no-reply@nultron.localhost>
+      # Mailpit's STARTTLS certificate is signed by the same throwaway CA.
+      - NODE_EXTRA_CA_CERTS=/etc/nultron/ca/ca.crt
+  - name: nultron-caddy
+    behavior: merge
+    files:
+      - site-tls.caddy=caddy/site-tls.caddy
+  - name: nultron-local-ca
+    files:
+      - ca.crt=pki/ca.crt
+
+# Stable names (no content hash): a changed Secret must not restart the database. The rehearsal
+# script restarts exactly the Deployment that needs it.
+secretGenerator:
+  - name: nultron-secrets
+    envs:
+      - secrets.env
+    options:
+      disableNameSuffixHash: true
+  - name: nultron-edge-tls
+    type: kubernetes.io/tls
+    files:
+      - tls.crt=pki/edge.crt
+      - tls.key=pki/edge.key
+    options:
+      disableNameSuffixHash: true
+  - name: nultron-mailpit-tls
+    type: kubernetes.io/tls
+    files:
+      - tls.crt=pki/mailpit.crt
+      - tls.key=pki/mailpit.key
+    options:
+      disableNameSuffixHash: true
+
+patches:
+  - path: app-local.yaml
+  - path: portal-local.yaml

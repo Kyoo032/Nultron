@@ -136,6 +136,54 @@ describe("secretMapFromSettings", () => {
   });
 });
 
+describe("secretMapFromSettings: the Ark endpoint", () => {
+  const STORED = { volcengineApiKey: "ark-test", volcengineBaseUrl: "https://evil.example/api/v3" };
+
+  it("never lets a stored Volcengine endpoint into a hosted tenant's tool scope", () => {
+    const map = secretMapFromSettings(STORED, { AGENTFORGE_SERVER: "1" } as NodeJS.ProcessEnv);
+    expect(map.ARK_API_KEY).toBe("ark-test");
+    expect(map.ARK_BASE_URL).toBeUndefined();
+  });
+
+  it("never lets a stored tool key override a chat provider's key or endpoint in a hosted tenant's scope", () => {
+    const map = secretMapFromSettings(
+      {
+        openaiApiKey: "sk-model",
+        anthropicApiKey: "sk-ant-own",
+        toolKeys: {
+          OPENAI_BASE_URL: "https://evil.example/v1",
+          ARK_BASE_URL: "https://evil.example/api/v3",
+          ANTHROPIC_API_KEY: "sk-ant-planted",
+          ANTHROPIC_BASE_URL: "https://evil.example/v1",
+          TAVILY_API_KEY: "tvly-kept",
+        },
+      },
+      { AGENTFORGE_SERVER: "1" } as NodeJS.ProcessEnv,
+    );
+    expect(map.OPENAI_BASE_URL).toBe(PINNED_GATEWAY_BASE_URL);
+    expect(map.ARK_BASE_URL).toBeUndefined();
+    expect(map.ANTHROPIC_API_KEY).toBe("sk-ant-own");
+    expect(map.ANTHROPIC_BASE_URL).toBeUndefined();
+    // A tool's own key still travels: only the chat providers' credentials and endpoints are off limits.
+    expect(map.TAVILY_API_KEY).toBe("tvly-kept");
+  });
+
+  it("Personal parity: off the hosted server a stored tool key still overrides, as it always did", () => {
+    const map = secretMapFromSettings(
+      { openaiApiKey: "sk-model", toolKeys: { OPENAI_BASE_URL: "https://proxy.example/v1", ANTHROPIC_API_KEY: "sk-ant-x" } },
+      {} as NodeJS.ProcessEnv,
+    );
+    expect(map.OPENAI_BASE_URL).toBe("https://proxy.example/v1");
+    expect(map.ANTHROPIC_API_KEY).toBe("sk-ant-x");
+  });
+
+  it("Personal parity: off the hosted server the stored endpoint still reaches the tools", () => {
+    const map = secretMapFromSettings(STORED, {} as NodeJS.ProcessEnv);
+    expect(map.ARK_API_KEY).toBe("ark-test");
+    expect(map.ARK_BASE_URL).toBe("https://evil.example/api/v3");
+  });
+});
+
 describe("buildToolSecretScope / getDisabledTools", () => {
   it("copies disabledTools into the ALS scope", () => {
     expect(getDisabledTools()).toEqual([]);

@@ -39,6 +39,8 @@ export type VerifyLoginOtpOutcome =
       readonly ok: false;
       readonly reason: "no_code" | "expired" | "too_many_attempts" | "invalid_code" | "locked";
       readonly attemptsRemaining: number;
+      /** With `locked`: whole seconds until the address can try again. */
+      readonly retryAfter?: number;
     };
 
 export async function verifyLoginOtp(

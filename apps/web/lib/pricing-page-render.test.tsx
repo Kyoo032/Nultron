@@ -23,7 +23,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { hostCapabilities, type HostCapabilities } from "@agentforge/core/capabilities";
 import { PLAN_TIERS, formatPlanPrice } from "@agentforge/core/plans";
-import { PricingPage, PricingView, shouldReadCurrentTier } from "@/components/pricing-page";
+import { PricingPage, PricingView, shouldReadCheckout, shouldReadCurrentTier } from "@/components/pricing-page";
 import { EVERYTHING_OFF, HostCapabilitiesFixture } from "./host-capabilities";
 import { applyLocale, resetLocaleForTests, t } from "./i18n";
 import type { CheckoutOffer } from "./plans-api";
@@ -275,6 +275,40 @@ describe("shouldReadCurrentTier", () => {
     // The desk and webdev: the route does not exist there, and a 404 is no more useful than a 401.
     for (const status of ["signed-in", "signed-out", "unknown", "unavailable"] as const) {
       expect(shouldReadCurrentTier(false, status), status).toBe(false);
+    }
+  });
+});
+
+/**
+ * The checkout probe is a POST to a session-gated route (`handlePostBillingTopUp` resolves the
+ * tenant first), so it has the same precondition as the tier read: a deployment that enforces plans
+ * *and* a tenant to ask about. It ran on the first half alone, and the signed-out visitor — who is
+ * who `/pricing` is for — paid for it with a `401` on every visit.
+ */
+describe("shouldReadCheckout", () => {
+  it("probes only when there is a tenant and a route to ask", () => {
+    expect(shouldReadCheckout(true, "signed-in")).toBe(true);
+  });
+
+  it("never probes while signed out, whatever the deployment says", () => {
+    expect(shouldReadCheckout(true, "signed-out")).toBe(false);
+  });
+
+  it("waits rather than guessing before the session has resolved", () => {
+    expect(shouldReadCheckout(true, "unknown")).toBe(false);
+  });
+
+  it("never probes on a deployment that enforces no plans", () => {
+    for (const status of ["signed-in", "signed-out", "unknown", "unavailable"] as const) {
+      expect(shouldReadCheckout(false, status), status).toBe(false);
+    }
+  });
+
+  it("agrees with the tier read for every pair, so the two cannot drift apart unnoticed", () => {
+    for (const plans of [true, false]) {
+      for (const status of ["signed-in", "signed-out", "unknown", "unavailable"] as const) {
+        expect(shouldReadCheckout(plans, status), `${plans} / ${status}`).toBe(shouldReadCurrentTier(plans, status));
+      }
     }
   });
 });

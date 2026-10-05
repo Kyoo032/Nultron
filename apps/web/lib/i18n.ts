@@ -8,6 +8,7 @@ import enDocuments from "../locales/en/documents.json";
 import enEdit from "../locales/en/edit.json";
 import enEducation from "../locales/en/education.json";
 import enFinance from "../locales/en/finance.json";
+import enGuide from "../locales/en/guide.json";
 import enImages from "../locales/en/images.json";
 import enKnowledge from "../locales/en/knowledge.json";
 import enLegal from "../locales/en/legal.json";
@@ -23,6 +24,8 @@ import enSettings from "../locales/en/settings.json";
 import enUsage from "../locales/en/usage.json";
 import enVideos from "../locales/en/videos.json";
 import enWorkspaces from "../locales/en/workspaces.json";
+import enFiles from "../locales/en/files.json";
+import enFolder from "../locales/en/folder.json";
 import idAuth from "../locales/id/auth.json";
 import idChannels from "../locales/id/channels.json";
 import idChat from "../locales/id/chat.json";
@@ -32,6 +35,7 @@ import idDocuments from "../locales/id/documents.json";
 import idEdit from "../locales/id/edit.json";
 import idEducation from "../locales/id/education.json";
 import idFinance from "../locales/id/finance.json";
+import idGuide from "../locales/id/guide.json";
 import idImages from "../locales/id/images.json";
 import idKnowledge from "../locales/id/knowledge.json";
 import idLegal from "../locales/id/legal.json";
@@ -47,6 +51,8 @@ import idSettings from "../locales/id/settings.json";
 import idUsage from "../locales/id/usage.json";
 import idVideos from "../locales/id/videos.json";
 import idWorkspaces from "../locales/id/workspaces.json";
+import idFiles from "../locales/id/files.json";
+import idFolder from "../locales/id/folder.json";
 
 const NAMESPACES = [
   "common",
@@ -63,6 +69,8 @@ const NAMESPACES = [
   "plans",
   "knowledge",
   "workspaces",
+  "files",
+  "folder",
   "usage",
   "channels",
   "market",
@@ -73,6 +81,7 @@ const NAMESPACES = [
   "education",
   "meeting",
   "auth",
+  "guide",
 ] as const;
 type Namespace = (typeof NAMESPACES)[number];
 type MessageTree = { [key: string]: string | MessageTree };
@@ -94,6 +103,8 @@ const catalogs: Record<AppLocale, Record<Namespace, MessageTree>> = {
     knowledge: enKnowledge,
     channels: enChannels,
     workspaces: enWorkspaces,
+    files: enFiles,
+    folder: enFolder,
     usage: enUsage,
     market: enMarket,
     data: enData,
@@ -103,6 +114,7 @@ const catalogs: Record<AppLocale, Record<Namespace, MessageTree>> = {
     education: enEducation,
     meeting: enMeeting,
     auth: enAuth,
+    guide: enGuide,
   },
   id: {
     common: idCommon,
@@ -120,6 +132,8 @@ const catalogs: Record<AppLocale, Record<Namespace, MessageTree>> = {
     knowledge: idKnowledge,
     channels: idChannels,
     workspaces: idWorkspaces,
+    files: idFiles,
+    folder: idFolder,
     usage: idUsage,
     market: idMarket,
     data: idData,
@@ -129,6 +143,7 @@ const catalogs: Record<AppLocale, Record<Namespace, MessageTree>> = {
     education: idEducation,
     meeting: idMeeting,
     auth: idAuth,
+    guide: idGuide,
   },
 };
 
