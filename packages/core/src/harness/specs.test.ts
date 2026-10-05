@@ -30,7 +30,7 @@ const REPAIR_ROUNDS: Record<ProductMode, number> = {
   documents: 1,
   research: 1,
   finance: 1,
-  data: 0,
+  data: 1,
   market: 0,
   legal: 3,
   meeting: 1,
