@@ -5,7 +5,7 @@ import type { ModeHarnessSpec } from "../spec";
 /**
  * A matter runs classify, review and draft stages, then verify and edit rounds, all in host code
  * (`legal/run.ts` `runLegalMatter`); no tools bound. `maxRounds` counts the verify passes, so the
- * first is not a repair: `legal/run.ts:788` edits at most `maxRounds - 1` times.
+ * first is not a repair: `legal/run.ts:876` edits at most `maxRounds - 1` times.
  */
 export const legalHarnessSpec: ModeHarnessSpec = {
   mode: "legal",

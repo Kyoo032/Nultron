@@ -603,6 +603,12 @@ Host and renderer, both products. Nothing packed.
 - **Shape toolbar clicks keep the selection.** On the simple Presentation stage (starter and Education lesson), a pointerdown on Duplicate, Fill, Stroke, the shape text, or Remove used to clear the selection because the toolbar is drawn inside the stage. The stage now ignores that toolbar, so the click runs. Open Slide is unchanged.
 - **Edit transport and the timeline hint follow the desk language.** `edit-play` and the timeline zoom, hint, and trim names read the `edit` catalog (`Putar` / `snap: bingkai…` on `id`). The rest of the Edit chrome below the header is still literal English.
 
+## Legal harness, 2026-09-28 (not packed)
+
+Host and core only. Both products share the run. Nothing packed. No new control on the matter screen.
+
+- **Legal stands in a method when the person brings none.** One readable file still untagged after classify is the counterparty draft. A matter with no playbook takes a built-in position (borrower or lender: credit agreement; an NDA in the file name or preview: receiving-party NDA; otherwise the general commercial playbook). Each clause is read with its defined terms and the instruction lines that share its words. A quote that is not verbatim is asked once, then dropped. The rest of the run is unchanged: unmarked diff, missing provisions, interactions, then verify and edit up to three rounds.
+
 ## Rebrand to Nultron, 2026-09-29 (not packed, not driven)
 
 Both products, code and docs. Owner decision 2026-09-29: the product is Nultron everywhere, not only in public copy. Nothing is packed, deployed or driven under the new names.

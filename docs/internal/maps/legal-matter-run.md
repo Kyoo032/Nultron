@@ -1,6 +1,6 @@
 # Map — Legal matter run
 
-Last verified: 2026-10-01 (working tree on top of 0b61a29) for the `legal-studio.tsx`, `legal-client.ts`, `legal-matter-panel.tsx`, `legal-matter-map.tsx`, `legal-file-list.tsx`, `App.tsx` and `app-rail.tsx` line citations (re-read against the files; they had drifted), and for the layout sentence at the end of § 1 (read from the code, not driven by this pass). Before that: 2026-09-23 at 775d16f (Legal intake sections §2, §5 and the Gotchas refreshed for the 0.15.0 finding-2 fix; the rest as of 6984d84)
+Last verified: 2026-10-05 at b58383d plus the Legal harness merge (§ 7 stages, § 8 deliverable and § 9 verify line citations, Failure modes and Gotchas re-read against the merged `packages/host/src/legal/run.ts`; Legal harness: one untagged file, a built-in position, one verbatim-quote retry, first verified 2026-09-28 at f20a90b). The `legal-studio.tsx`, `legal-client.ts`, `legal-matter-panel.tsx`, `legal-matter-map.tsx`, `legal-file-list.tsx`, `App.tsx` and `app-rail.tsx` line citations and the layout sentence at the end of § 1 are as of 2026-10-01 (working tree on top of 0b61a29). Intake sections §2, §5 and the Gotchas were refreshed 2026-09-23 at 775d16f for the 0.15.0 finding-2 fix.
 
 ## Overview
 
@@ -53,7 +53,7 @@ Roles are not cosmetic: `DOC_ROLE_PRIORITY` (`packages/core/src/legal/types.ts:2
 
 Transport is a POST that streams SSE, not `EventSource` and not polling: `runJobStream` (`apps/web/lib/job-stream.ts:47-56`) does `fetch(..., { method: "POST", signal })` and hand-reads `res.body.getReader()` through `consumeSse`; `useJobStream` (`apps/web/lib/use-job-stream.ts:23-77`) folds each `JobEvent` into `JobProgress`. **Cancel is a client-side `AbortController.abort()`** (`use-job-stream.ts:29-32`) wired to `legal-cancel` (`apps/web/components/legal-run-view.tsx:50`) — there is no cancel route.
 
-Host side: `handlePostLegalRunStream` (`packages/host/src/handlers/legal.ts:112-122`) calls `requireGatewayAllowedFor(tenant)` at `:115` — the only legal route that does — then wraps `generateLegalRun` in `streamJob` (`packages/host/src/job-stream.ts:29-58`).
+Host side: `handlePostLegalRunStream` (`packages/host/src/handlers/legal.ts:112-122`) calls `requireGatewayAllowedFor(tenant)` at `:114` — the only legal route that does — then wraps `generateLegalRun` in `streamJob` (`packages/host/src/job-stream.ts:29-58`).
 
 ### 6. `generateLegalRun` — the per-run host orchestrator
 
@@ -65,34 +65,35 @@ Host side: `handlePostLegalRunStream` (`packages/host/src/handlers/legal.ts:112-
 4. `runLegalMatter(...)` (`:220-247`) with `ask` bound to the model call, `emit` bound to the SSE queue, `maxRounds: LEGAL_CAPS.maxRounds` (`:227`) and the request's `abortSignal`.
 5. Persist: `persistDeliverable` (`:131-157`) maps `DeliverableKind → ArtifactKind` via `ARTIFACT_KIND` (`:43-49`) and writes each through `artifactStore().create`; `persistManifest` (`:159-178`) stores the manifest as a `kind: "matter"` artifact; `legalStore().saveRun` (`:267`) writes `runs/<runId>.json`; a memo/red-flags text is upserted as a Knowledge work source (`:270-273`).
 
-### 7. `runLegalMatter` — the nine stages
+### 7. `runLegalMatter` — the same stages, plus the three skills that were missing
 
-`packages/host/src/legal/run.ts:748-827`. `maxRounds = Math.max(1, input.maxRounds)` (`:749`); the preamble is built at `:759` and **rebuilt at `:762`** once classify has resolved real roles.
+`packages/host/src/legal/run.ts` `runLegalMatter`. `maxRounds = Math.max(1, input.maxRounds)`. The preamble is built before classify and rebuilt after the position is chosen, so later calls see the resolved roles and the playbook.
 
 | # | Stage | Function | Phase emitted | What it does |
 |---|---|---|---|---|
-| 1 | classify | `classify` (`run.ts:182-210`) | `classify` (`:183`) | Model assigns a `DocRole` to every doc still `context`; one `job.step` per doc (`:206-208`) |
-| 2 | diff | `diffStage` (`:212-231`) | `diff` (`:213`) | `diffDocuments(prior-turn, counterparty-draft)` → `unmarked-change` findings; missing either doc emits `noPriorTurn` and returns `[]` (`:219-222`) |
-| 3 | review | `reviewStage` (`:233-277`) | `review` (`:241`) | Emits `job.source` per read doc (`:244`); clauses from `splitClauses` (`:767`) mapped to playbook items (`mapChecklistToClauses`, `:768`); reviewed at concurrency `LEGAL_CAPS.reviewConcurrency` = 3 (`:755`), one `job.step` with `current/total` per clause (`:273`) |
-| 4 | missing | `missingStage` (`:279-311`) | `missing` | Unmapped playbook items confirmed absent by the model → `missing` findings (`:306-307`) |
-| 5 | interactions | `interactionStage` (`:313-366`) | `interactions` | Up to `LEGAL_CAPS.maxInteractions` = 10 high-severity findings (`:322`) checked for compounding → `interaction` findings |
-| — | reserved scan | `scanReserved`/`applyReserved` (`packages/host/src/legal/instructions.ts:39-73`, `:86-101`) | *(none)* | "reserve / hold / leave open" language in `matter.instructions` or an `instruction`-role doc blanks `proposedText` and sets `reservedFor` (`run.ts:772-782`) |
-| 6 | draft | `draftStage` (`:475-495`) | `draft` (`:485-487`) | One `job.step` per deliverable (`:438`); `draftOne` (`:429-473`) dispatches per kind — see §8 |
-| 7 | verify | `verifyStage` (`:533-606`) | `verify` (`:541`) + `job.round` (`:543-548`) | Eight code checks then the model grade — see §9 |
-| 8 | edit | `editStage` (`:608-708`) | `edit` (`:615`) | Auto-fix + model patches for the round's failures |
-| 9 | package | inline (`:813-818`) | `package` (`:813`) | One `job.step` per final deliverable |
+| 1 | classify | `classify` | `classify` | Model assigns a `DocRole` to every doc still `context`; one `job.step` per doc. Then `assumeSingleCounterpartyDraft` (`packages/core/src/legal/papers.ts`): if there is still no counterparty draft and exactly one readable file is `context`, that file becomes the draft and a step says so. Two or more untagged files are left alone. |
+| — | position | `resolveLegalPlaybook` (`packages/core/src/legal/position.ts`), called at `run.ts` | `position` | A playbook already on the run is kept. Otherwise borrower or lender takes `credit-agreement-borrower`, a file name or preview matching NDA / non-disclosure / confidentiality agreement takes `nda-receiving`, and every other matter takes `generic-contract`. The step label is `usingPlaybook`. This is code. It is not a new model stage and not a new button. |
+| 2 | diff | `diffStage` | `diff` | `diffDocuments(prior-turn, counterparty-draft)` → `unmarked-change` findings; missing either doc emits `noPriorTurn` and returns `[]` |
+| 3 | review | `reviewStage` | `review` | Emits `job.source` per read doc; clauses from `splitClauses` mapped to the resolved playbook (`mapChecklistToClauses`); reviewed at concurrency `LEGAL_CAPS.reviewConcurrency` = 3. Each call also receives defined terms the clause uses and instruction lines that share its words (`packages/core/src/legal/clause-reading.ts`). A quote `findQuote` cannot find is asked once (`settleQuote`, stage card `review-quote`) and dropped if the second quote is still not verbatim. The finding stays. |
+| 4 | missing | `missingStage` (`:345-377`) | `missing` | Unmapped playbook items confirmed absent by the model → `missing` findings |
+| 5 | interactions | `interactionStage` (`:379-440`) | `interactions` | Up to `LEGAL_CAPS.maxInteractions` = 10 high-severity findings checked for compounding → `interaction` findings. A non-verbatim interaction quote uses the same one-ask drop as review. |
+| — | reserved scan | `scanReserved`/`applyReserved` (`packages/host/src/legal/instructions.ts:39-73`, `:86-101`) | *(none)* | "reserve / hold / leave open" language in `matter.instructions` or an `instruction`-role doc blanks `proposedText` and sets `reservedFor` (`run.ts:869-870`) |
+| 6 | draft | `draftStage` (`:549-570`) | `draft` | One `job.step` per deliverable; `draftOne` (`:503-548`) dispatches per kind — see §8 |
+| 7 | verify | `verifyStage` (`:607-681`) | `verify` + `job.round` | Eight code checks then the model grade — see §9 |
+| 8 | edit | `editStage` (`:682-783`) | `edit` | Auto-fix + model patches for the round's failures |
+| 9 | package | inline (`:901-905`) | `package` | One `job.step` per final deliverable |
 
-`abort(ctx)` (`:148-150`) → `throwIfJobAborted` (`packages/host/src/job-stream.ts:19-23`) is called at the head of every stage and inside every per-item loop, so a cancel lands mid-phase rather than only between phases.
+`abort(ctx)` (`:155-157`) → `throwIfJobAborted` (`packages/host/src/job-stream.ts:19-23`) is called at the head of every stage and inside every per-item loop, so a cancel lands mid-phase rather than only between phases.
 
 ### 8. Deliverables — two are model-composed, three are pure code
 
 | Kind | Renderer | Format | Words from |
 |---|---|---|---|
-| `issues-memo` | `renderMemoDocx` (`packages/host/src/legal/render-memo.ts:146-166`) via `draftMemo` (`run.ts:368-398`) | `.docx` | Model `MemoOutline`, code expands `{{F<n>}}` tokens (`render-memo.ts:38-44`); `fallbackMemo` (`instructions.ts:272-295`) when the model call drops |
+| `issues-memo` | `renderMemoDocx` (`packages/host/src/legal/render-memo.ts:146-166`) via `draftMemo` (`run.ts:442-472`) | `.docx` | Model `MemoOutline`, code expands `{{F<n>}}` tokens (`render-memo.ts:38-44`); `fallbackMemo` (`instructions.ts:272-295`) when the model call drops |
 | `executive-summary` | same path, `kind="executive-summary"` | `.docx` | Model. **Rendered in the UI but disabled** — `available: false` (`apps/web/lib/legal-view.ts:83-94`) |
-| `redline` | `buildRedlinePatches` (`render-redline.ts:70-91`) + `applyRedline` from `@agentforge/core/docx`, then `validateDocx` (`run.ts:400-427`) | `.docx`, Word tracked changes | Pure code from findings |
+| `redline` | `buildRedlinePatches` (`render-redline.ts:70-91`) + `applyRedline` from `@agentforge/core/docx`, then `validateDocx` (`run.ts:474-501`) | `.docx`, Word tracked changes | Pure code from findings |
 | `deviation-report` | `renderDeviationXlsx` (`render-deviation.ts:83-94`) | `.xlsx`, Deviations + Summary sheets | Pure code |
-| `red-flags` | `renderRedFlagsMarkdown` (`render-redflags.ts:104-123`) | `.md` | Pure code; re-rendered once after the round loop (`run.ts:801-812`) |
+| `red-flags` | `renderRedFlagsMarkdown` (`render-redflags.ts:104-123`) | `.md` | Pure code; re-rendered once after the round loop (`run.ts:889-898`) |
 
 Filenames and mimes come from `FILENAME` / `MIME` (`packages/host/src/legal/instructions.ts:219-231`). The UI downloads them as `legal-download-<kind>` (`apps/web/components/legal-result-view.tsx:87`) through `GET /api/v1/artifacts/:id/file` (`legalArtifactFilePath`, `apps/web/lib/legal-client.ts:30-32`); on desktop that is a native save (`saveBlob`), so no browser download event fires.
 
@@ -111,19 +112,19 @@ Filenames and mimes come from `FILENAME` / `MIME` (`packages/host/src/legal/inst
 | 7 | `docx-valid` | `checkDocxValid` | `:211-227` | Redline validation clean, zero failed patches |
 | 8 | `coverage` | `checkCoverage` | `:233-238` | Every read doc cited, every skipped doc explained — **informational** |
 
-`verifyOk` (`:257-259`) is true iff every check **except `coverage`** has zero failures. `modelVerify` (`run.ts:497-531`) then adds two model calls per round: a checklist pass chunked by `LEGAL_CAPS.checklistChunk` = 10 (`:508-521`) and an opposing-counsel pass returning `Concession[]` with `disposition: "fix" | "market" | "reserved"` (`:523-529`). A round is `ok` iff code checks pass **and** every checklist verdict passes **and** no concession is `"fix"` (`:591-594`).
+`verifyOk` (`packages/core/src/legal/verify.ts:257-259`) is true iff every check **except `coverage`** has zero failures. `modelVerify` (`run.ts:571-605`) then adds two model calls per round: a checklist pass chunked by `LEGAL_CAPS.checklistChunk` = 10 (`:582-595`) and an opposing-counsel pass returning `Concession[]` with `disposition: "fix" | "market" | "reserved"` (`:597-604`). A round is `ok` iff code checks pass **and** every checklist verdict passes **and** no concession is `"fix"` (`run.ts:665-668`).
 
-The loop is `for (let round = 1; !verify.ok && round < maxRounds; round += 1)` (`run.ts:788`): edit → re-apply reserved → re-draft only `edited.touched` (`:698-706`) → merge by kind (`:792-796`) → verify again (`:798`). The label the user sees is the `job.round` event `{round, total, label}` (`:543-548`) using `roundOf: "Round {round} of {total}"` (`packages/core/src/legal/output-copy.ts:91`; id `"Putaran {round} dari {total}"`, `:185`).
+The loop is `for (let round = 1; !verify.ok && round < maxRounds; round += 1)` (`run.ts:876`): edit → re-apply reserved → re-draft only `edited.touched` (`:879`) → merge by kind (`:880-884`) → verify again (`:886`). The label the user sees is the `job.round` event `{round, total, label}` (`run.ts:618`) using `roundOf: "Round {round} of {total}"` (`packages/core/src/legal/output-copy.ts:97`; id `"Putaran {round} dari {total}"`, `:196`).
 
-Exhausting all three rounds is **not an error**: the run returns normally and `manifest.status` is `"complete-with-failures"` (`run.ts:819`).
+Exhausting all three rounds is **not an error**: the run returns normally and `manifest.status` is `"complete-with-failures"` (`run.ts:907`).
 
 ### Failure modes
 
 | Failure | Where | What the client gets |
 |---|---|---|
 | Gate closed (key saved but not allowed) | `requireGatewayAllowedFor`, `packages/host/src/handlers/legal.ts:114` | HTTP **403** `gateway_blocked`, no SSE stream |
-| Runtime resolves to stub (no key at all) | `requireLive`, `packages/host/src/legal-generate.ts:68-69` | HTTP **200** SSE carrying one `job.error` frame `{code:"runtime_stub", status:503}` → `legal-error` |
-| Zero documents on the matter | `packages/host/src/legal-generate.ts:125-127` | `invalid_request` 400 inside the stream |
+| Runtime resolves to stub (no key at all) | `requireLive`, `packages/host/src/legal-generate.ts:62` (called at `:241`) | HTTP **200** SSE carrying one `job.error` frame `{code:"runtime_stub", status:503}` → `legal-error` |
+| Zero documents on the matter | `packages/host/src/legal-generate.ts:155-157` | `invalid_request` 400 inside the stream |
 | Parsed JSON or bytes missing from the store | `packages/host/src/legal-generate.ts:149-151` | `internal_error` 500 inside the stream |
 | Client pressed `legal-cancel` / closed the tab | `throwIfJobAborted`, `packages/host/src/job-stream.ts:19-23` | `aborted` 499; partial deliverables discarded |
 | Matter id unknown | `packages/host/src/legal/store.ts:128-134`, `:317-323` | HTTP 404 on GET / PATCH / DELETE / run |
@@ -132,8 +133,9 @@ Exhausting all three rounds is **not an error**: the run returns normally and `m
 | File > 25 MB / matter > 100 MB / > 60 files | `assertFileCaps`, `store-files.ts:129-141` | HTTP 413 `invalid_request` |
 | Same sha256 already in the matter | `packages/host/src/legal/store.ts:183-190` | HTTP 409 `conflict` |
 | Stored `matter.json` / run JSON fails re-validation | `store.ts:121-124`, `:290-297` | HTTP 500 `internal_error` |
-| Model returns unparseable JSON | `askJson`, `run.ts:152-180` | one retry, then a `droppedOutput` step and `null` — the stage skips that item |
-| Three verify rounds still failing | `run.ts:788`, `:819` | HTTP 200, `manifest.status: "complete-with-failures"`, deliverables still returned |
+| Model returns unparseable JSON | `askJson`, `run.ts:202-230` | one retry, then a `droppedOutput` step and `null` — the stage skips that item |
+| Quote is not verbatim | `settleQuote`, `run.ts:172-200` | one more ask for the clause's own words; if that quote is still not in the clause, the quote is emptied and the finding stays |
+| Three verify rounds still failing | `run.ts:876`, `:907` | HTTP 200, `manifest.status: "complete-with-failures"`, deliverables still returned |
 
 ## Where things live
 
@@ -149,9 +151,12 @@ Exhausting all three rounds is **not an error**: the run returns normally and `m
 | `apps/web/lib/legal-view.ts` | `partiesReady` / `canUpload` / `canRun`, `legalValidationKey`, `nextDocRole`, `DELIVERABLE_OPTIONS`, `RESULT_TABS`, plan steps, streamed-findings extraction |
 | `apps/web/lib/job-stream.ts`, `apps/web/lib/use-job-stream.ts` | POST-based SSE reader and the progress reducer shared by every job mode |
 | `packages/host/src/router.ts:348-357` | The ten legal route registrations |
-| `packages/host/src/handlers/legal.ts` | Route handlers; the gateway gate at `:115` |
+| `packages/host/src/handlers/legal.ts` | Route handlers; the gateway gate at `:114` |
 | `packages/host/src/legal-generate.ts` | `generateLegalRun` — stub gate, doc loading, artifact/manifest/run persistence, Knowledge upsert |
-| `packages/host/src/legal/run.ts` | `runLegalMatter` — the nine stages and the round loop |
+| `packages/host/src/legal/run.ts` | `runLegalMatter` — classify, position, diff, review (with one quote retry), missing, interactions, draft, verify, edit, package |
+| `packages/core/src/legal/papers.ts` | One untagged readable file becomes the counterparty draft |
+| `packages/core/src/legal/position.ts` | Built-in playbook when the matter did not choose one |
+| `packages/core/src/legal/clause-reading.ts` | Defined terms and instruction lines for one clause |
 | `packages/host/src/legal/store.ts`, `store-files.ts`, `records.ts` | Matter CRUD on disk, path builders, caps, magic sniff, on-disk record schemas |
 | `packages/host/src/legal/instructions.ts` | Reserved-clause scan, finding builders, `FILENAME`/`MIME`, phase/step emit helpers |
 | `packages/host/src/legal/render-memo.ts`, `render-redline.ts`, `render-deviation.ts`, `render-redflags.ts`, `render-shared.ts` | The four deliverable renderers and their shared helpers |
@@ -167,17 +172,17 @@ Exhausting all three rounds is **not an error**: the run returns normally and `m
 
 - **The run's "503" is an HTTP 200.** `POST .../run/stream` answers `200 text/event-stream`; `runtime_stub` arrives as the single `job.error` frame, because `streamJob` turns a rejected `run()` into an event rather than a status (`packages/host/src/job-stream.ts:8-13`, `:58-60`). The unit test asserts exactly one chunk matching `^event: job\.error` with `status: 503` in the payload (`packages/host/src/handlers/legal.test.ts:188-199`). Observed on the owner's `:3000` on 2026-09-17: `POST /api/v1/legal/matters/<id>/run/stream -> 200`, `legal-error` populated, `legal-progress` count 0, `data-screen` still `"new"`.
 - **The Settings hint never renders on a stub run.** `legal-studio.tsx:357-360` appends `SettingsLinkHint` only when `needsSettingsHint(...) && !/settings/i.test(error)` — but the `runtime_stub` copy already contains the word "Settings" in both catalogs (`packages/core/src/legal/output-copy.ts:65` and the id copy at `:159`), so the test is always false and `legal.studio.openSettings` is dead on this path. The hint the user sees is the sentence, not a link.
-- **A refused upload no longer creates the matter (fixed 2026-09-23).** Until then `onFiles` called `ensureMatter()` before the `.docx` check, so a `.txt` drop POSTed `/api/v1/legal/matters` (201) and left an empty matter. Now `refusedUpload` runs first (`apps/web/components/legal-studio.tsx:133`). Driven on `:3000` on 2026-09-23 with both parties filled: a `notes.txt` showed `legal.errors.docxOnly` in `legal-error` and `GET /api/v1/legal/matters` stayed at 0.
+- **A refused upload no longer creates the matter (fixed 2026-09-23).** Until then `onFiles` called `ensureMatter()` before the `.docx` check, so a `.txt` drop POSTed `/api/v1/legal/matters` (201) and left an empty matter. Now `refusedUpload` runs first (`apps/web/components/legal-studio.tsx:138`). Driven on `:3000` on 2026-09-23 with both parties filled: a `notes.txt` showed `legal.errors.docxOnly` in `legal-error` and `GET /api/v1/legal/matters` stayed at 0.
 - **The docx-only refusal is hardcoded English.** `LEGAL_DOCX_ONLY_MESSAGE` (`apps/web/lib/legal-client.ts:17-18`) is a module constant, not a `t()` call, even though `legal.errors.docxOnly` is translated in both catalogs (`apps/web/locales/id/legal.json:32` = "Hanya berkas .docx yang diterima pada v1…"). On an `id` desk the whole studio is Indonesian and this one sentence is English. The id key has no reader — grep `errors.docxOnly` in `apps/web` returns only the JSON files.
 - **There is no delete-matter control.** `deleteLegalMatter` exists (`apps/web/lib/legal-client.ts:322-325`) and `DELETE /api/v1/legal/matters/:matterId` works (`packages/host/src/router.ts:325`, `handlers/legal.ts:78-85`, returns `{ ok: true }`), but no component calls it and no testid exists — the only references are in `apps/web/lib/legal-client.test.ts:17`, `:206`. Individual *files* can be removed (`legal-file-remove-<docId>`, `legal-file-list.tsx:105`); matters cannot.
 - **Delete removes the matter folder, not the workspace folder.** `store.remove()` is `rmSync(dirFor(tenant, id), { recursive: true, force: true })` (`packages/host/src/legal/store.ts:170`), so `<dataDir>/legal/<workspaceId>/` survives as an empty directory after the last matter goes. Verified on the drive: after the DELETE, `data/legal/<workspaceId>/` existed with zero files.
 - **Role cycling is a whole-matter PATCH.** There is no `/files/:docId` PATCH; the role tag sends `PATCH /api/v1/legal/matters/:matterId` with a `roles` array (`legal-studio.tsx:175`, handled at `packages/host/src/handlers/legal.ts:62-76`). A drive that waits on a per-file route will wait forever.
 - **`executive-summary` is a rendered-but-disabled deliverable.** `legal-deliverable-executive-summary` has count 1 and is `available: false` (`apps/web/lib/legal-view.ts:83-94`); the id label reads "belum tersedia pada versi ini". It is a real `DeliverableKind` in core (`packages/core/src/legal/types.ts:39`) that the UI will not let you pick.
 - **The per-file cap is 25 MB, not the 40 MB in `LEGAL_CAPS`.** `LEGAL_FILE_MAX_BYTES` (`packages/host/src/legal/store-files.ts:21`) is deliberately tighter than `LEGAL_CAPS.maxFileBytes` (`packages/core/src/legal/types.ts:238`) because it matches the desktop IPC bytes envelope. A 30 MB docx is refused even though core would allow it.
-- **The preamble is built twice.** Once before classify with placeholder `context` roles (`run.ts:759`) and again after (`:762`). Classify is the one stage whose system prompt does not know the final document roles.
+- **The preamble is built twice.** Once before classify (`run.ts:834`) and again after the position is chosen (`:848`). Classify is the one stage whose system prompt does not yet know the final document roles or the built-in playbook.
 - **`coverage` never blocks a round.** It is excluded from `verifyOk` (`packages/core/src/legal/verify.ts:257-258`); an uncited document only surfaces in `openForHuman` and the red-flags "documents skipped" section.
-- **`red-flags` is re-rendered after the loop** (`run.ts:801-812`) whether or not it was in `edited.touched`, so its verification section always reflects the settled report — the other deliverables may reflect the round in which they were last touched.
-- **`editStage` only ever patches findings.** Every patch it builds targets `"findings"` (`run.ts:642-646`, `:665`, `:686`) and `applyFindingEdits` drops anything else (`packages/core/src/legal/ledger.ts:58-63`), so the memo-section edit shape in `schemas.ts` is never exercised by this path.
+- **`red-flags` is re-rendered after the loop** (`run.ts:889-898`) whether or not it was in `edited.touched`, so its verification section always reflects the settled report — the other deliverables may reflect the round in which they were last touched.
+- **`editStage` only ever patches findings.** Every patch it builds targets `"findings"` (`run.ts:714-721`, `:739`, `:760`) and `applyFindingEdits` drops anything else (`packages/core/src/legal/ledger.ts:58-63`), so the memo-section edit shape in `schemas.ts` is never exercised by this path.
 - **Cancel is client-only.** `legal-cancel` aborts the fetch (`apps/web/lib/use-job-stream.ts:29-32`); the host notices through `request.abortSignal`. There is no cancel route to call from a script.
 
 ## Verify
