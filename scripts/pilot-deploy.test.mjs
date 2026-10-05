@@ -347,7 +347,13 @@ test("the Kubernetes rehearsal's narrow snapshot admits the same files the allow
 test("the app image's context cannot pick up local pki, secrets files or the deploy folders it never runs", () => {
   const rules = read("webapp-deploy", "Dockerfile.dockerignore");
   // nultron-files/ (4.5 GB of IP filings and brand work, git-ignored) is SR-131.
-  for (const line of ["webapp-deploy/k8s", "webapp-deploy/.env", "webapp-deploy/*.env", "webapp-deploy/.pilot-local", "nultron-files"]) {
+  for (const line of [
+    "webapp-deploy/k8s",
+    "webapp-deploy/.env",
+    "webapp-deploy/*.env",
+    "webapp-deploy/.pilot-local",
+    "nultron-files",
+  ]) {
     assert.ok(rules.split("\n").includes(line), `Dockerfile.dockerignore must exclude ${line}`);
   }
 });

@@ -10,7 +10,8 @@ import { MASCOT_STATES, STATE_MOTION } from "./mascot-states";
  * a running loop costs a full software-composited frame sixty times a second.
  *
  *  - `still` states have no animation. `once` states play one finite clip of 600-1200 ms.
- *    `loop-busy` states loop only under `[data-busy]`, stepped.
+ *    `loop-busy` states loop only under `[data-busy]`; the frame strips always step, and the small transform
+ *    loop on a head steps in the packaged desktop shell and is smooth in a browser (2026-10-05).
  *  - Keyframes touch transform and opacity only, start and end at the identity (a frame strip ends where
  *    the strip does), and take their times and easings from the tokens.
  *  - No filter anywhere. Reduced motion removes the movement and keeps the picture.
@@ -81,12 +82,15 @@ describe("nultron motion: what may animate", () => {
     }
   });
 
-  it("loops only under [data-busy], and steps every loop with --ease-busy", () => {
+  it("loops only under [data-busy]; a frame strip steps with --ease-busy, a transform loop with --ease-busy-move", () => {
     for (const rule of animated.filter(isLoop)) {
       for (const selector of rule.selectors) {
         expect(selector, "a loop outside [data-busy] would run on an idle desk").toContain("[data-busy]");
       }
-      expect(rule.body, label(rule)).toMatch(/var\(--ease-busy\)/);
+      // A picture moves one frame at a time in every shell. A transform loop on a head (no strip) takes the
+      // movement token: smooth in a browser, steps(4) in the packaged desktop shell (`lib/motion-shell.test.ts`).
+      const isStrip = rule.selectors.some((selector) => selector.includes(".nx-loop"));
+      expect(rule.body, label(rule)).toMatch(isStrip ? /var\(--ease-busy\)/ : /var\(--ease-busy-move\)/);
     }
   });
 

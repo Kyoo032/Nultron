@@ -77,7 +77,17 @@ exist on `main`. The same pass updated [SR-75](#sr-75), whose cancel fix now rea
 two, and added three lines to the Tencent checklist. The program's own fixes use the status `fixed in
 tree, unverified on a packed app`, defined below. Nothing from the program is packed, deployed or driven
 on `:3000` (the host needs a restart there). The packaged folder drive needs a Nultron installer that is
-not built, and the sandbox has never run on Linux, in Docker, on a Mac or in a packed installer.
+not built. The sandbox has not run on a Mac or in a packed installer; it first ran on Linux and in Docker
+on 2026-10-05 (next paragraph).
+
+Updated on 2026-10-05: [SR-113](#sr-113) is fixed in the tree (the hosted image installs production
+dependencies only), [SR-131](#sr-131) is new (the app image's ignore file did not exclude
+`nultron-files/`), and the sandbox ran inside the hardened production image. One Python run (pandas) and
+one JavaScript run returned results through `createSandboxRunner()` with the image's read-only root,
+`noexec` `/tmp`, `cap_drop ALL`, uid 1000, Node 22.23.3 and `AGENTFORGE_CODE_RUNS=on`, and a socket connect
+to 127.0.0.1 from the program was refused. That was a direct runner call, run by hand, and this register
+cites no log for it. It was not a hosted Chat drive, it was not the compose or Kubernetes stack, and it did
+not test an operating-system egress deny, so [SR-111](#sr-111) stays open.
 
 ## Summary
 
@@ -148,6 +158,7 @@ not built, and the sandbox has never run on Linux, in Docker, on a Mac or in a p
 | [SR-111](#sr-111) | Medium | `run_code` keeps the network out with deleted JavaScript globals and a code-generation flag, not with the operating system | Open | Blocks Tencent deploy |
 | [SR-112](#sr-112) | Medium | Chat holds file, Knowledge and sandbox tools together with a public web tool, so text in a file or page can try to carry other text out in a URL | Fixed in tree, unverified live | Owner decision made 2026-10-03; drive an injected file before testers outside the company and before the next Personal cut |
 | [SR-113](#sr-113) | Medium | `braces` has a HIGH advisory with no fixed release, and it reached the hosted image through `tailwindcss` | Fixed in tree (2026-10-05): the image installs production dependencies only; built, booted and checked in a local proof image | — |
+| [SR-131](#sr-131) | Medium | The app image's ignore file did not exclude `nultron-files/` (4.5 GB of IP filings and brand work), so a build straight from a working checkout would have sent it into the image | Fixed in tree (2026-10-05), test-pinned; the build context checked with a real `docker build`, no full image built | Blocks building from a checkout |
 | [SR-81](#sr-81) | Low | Keyless Research search sends the masked query to four pinned public APIs | Checked, not an issue (2026-09-26) | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
@@ -1458,7 +1469,7 @@ fixed, two were fixed on `main` afterwards, and four remain. All six re-read her
 | A01-1, cross-tenant discard of an Edit item | Fixed, confirmed | `packages/host/src/handlers/edit.ts:493` scopes on `projectId` as well as `id` |
 | A01-2, by-id routes not systematically scoped | Fixed, confirmed | `packages/host/src/tenancy-harness.test.ts` exists and drives the by-id routes as a second tenant |
 | A06-1, nothing runs the tests | **Moved to the local gate, 2026-09-24** | `.github/workflows/` is deleted. `scripts/ci-local.mjs` (`pnpm ci:local`) runs lint, tsc, every unit suite and `node scripts/audit-deployed.mjs --level high`. It runs only when someone runs it: [SR-80](#sr-80). See [SR-12](#sr-12) |
-| A06-2, the image ships devDependencies | **Open** | `webapp-deploy/Dockerfile:102-103` copies the whole `/app` tree with no `pnpm prune --prod`, because `tsx` is the production entrypoint |
+| A06-2, the image ships devDependencies | **Fixed, 2026-10-05** | The `prod` stage installs with `--prod` (`webapp-deploy/Dockerfile:113`) and the runtime copies that tree (`:167`); `tsx` moved to `dependencies` (`apps/web/package.json:20`). [SR-113](#sr-113) |
 | A08-1, actions pinned to mutable tags | **Closed by removal, 2026-09-24** | The three workflows and their 15 `@v4` `uses:` lines are deleted; the repo has no `.github/workflows/`. [SR-80](#sr-80) |
 | A10-6, DNS rebinding | **Open by nature** | `packages/core/src/security/safe-fetch.ts:102` states it: closing it needs a custom undici dispatcher with a pinned `lookup` |
 
@@ -2463,7 +2474,7 @@ Required action: pack, install and drive both builds. The public Nultron window 
 gateway through `doctor.mjs --desktop` (`gatewayBaseUrl` on the ping) with `AGENTFORGE_GATEWAY_URL` and
 `AGENTFORGE_TELEGRAM_API_URL` set in the environment that launches it, and a packed Kemenkeu AI or AIHub
 Metranet window must report `https://aihub.metranet.co.id/v1`. The hosted app is unchanged: it relies on
-`NODE_ENV=production` (`webapp-deploy/Dockerfile:93`, `webapp-deploy/compose.yml:29`) and never sets the
+`NODE_ENV=production` (`webapp-deploy/Dockerfile:157`, `webapp-deploy/compose.yml:29`) and never sets the
 packaged marker.
 
 Gate: **blocks the next Personal cut** until those two drives are done. A regression here is silent
@@ -2517,7 +2528,7 @@ proxy is the only thing that may reach it, [SR-18](#sr-18)). `docker compose res
 `up -d app` and `up -d --force-recreate app` each give the app a new namespace and leave Caddy
 attached to one that no longer exists: the edge answers nothing, and `docker compose ps` still shows
 `app` healthy, because its health check fetches `127.0.0.1:3000/healthz` from inside the app container
-(`webapp-deploy/Dockerfile:150-151`). `webapp-deploy/README.md:380-385`
+(`webapp-deploy/Dockerfile:220-221`). `webapp-deploy/README.md:380-385`
 records all three as driven on 2026-10-01.
 
 What goes wrong if ignored: an outage that the container health view does not show, started by the
@@ -2545,7 +2556,7 @@ repo root as context. A build whose context was `webapp-deploy/` itself would ha
 and copied the wrap key, sealed settings and SQLite files into an image layer.
 
 Fixed: the file is now a byte copy of `Dockerfile.dockerignore` (`cmp` identical, 2026-10-02), and its
-header says so (`webapp-deploy/.dockerignore:6-7`). `scripts/pilot-deploy.test.mjs:354-358` "stays a
+header says so (`webapp-deploy/.dockerignore:6-7`). `scripts/pilot-deploy.test.mjs:361-365` "stays a
 byte-for-byte copy" fails on drift; the review mutation-checked it. **Doc drift left behind:**
 `webapp-deploy/README.md:32` and `:64-66` still call the file "stale" and "not a byte-identical copy".
 Both sentences are now false and belong to whoever owns that README.
@@ -2677,8 +2688,11 @@ gateway, the portal and the mail host. This is the same gap as [SR-97](#sr-97). 
 equivalent and relies on the three layers above, so [SR-121](#sr-121) (re-run the escape matrix on every
 upgrade) is the control there. Default chosen 2026-10-03: on the hosted server `run_code` is off unless
 `AGENTFORGE_CODE_RUNS=on` (`codeRunsEnabled` in `packages/host/src/code-runner/`), so the pilot box ships
-without it until the deny exists and a Docker build has run the sandbox. Turning it on for the pilot is
-the owner's call.
+without it until the deny exists. A Docker build has since run the sandbox (2026-10-05: Python with pandas and
+JavaScript both returned results through `createSandboxRunner()` inside the hardened production image, with a
+read-only root, `noexec` `/tmp`, `cap_drop ALL`, uid 1000, Node 22.23.3 and `AGENTFORGE_CODE_RUNS=on`, and a
+socket connect to 127.0.0.1 from the program was refused). That run did not test an operating-system egress
+deny, so this row stays open and the default stands. Turning it on for the pilot is the owner's call.
 
 Gate: **blocks Tencent deploy.**
 
@@ -2807,7 +2821,7 @@ Image proof, 2026-10-05, on a local proof image built from a `git ls-files -co -
 snapshot (the k8s rehearsal's `local-lib.mjs`), never pushed, and removed afterwards. **A build straight
 from this checkout would have shipped `nultron-files/`** (4.5 GB of IP filings, decks and brand work):
 `Dockerfile.dockerignore` and its `.dockerignore` copy do not exclude it, and only the `git archive <sha>`
-release path keeps it out. That belongs to [SR-49](#sr-49) half 2 and is not fixed here. The build passed,
+release path keeps it out. That is [SR-131](#sr-131), fixed in the tree the same day. The build passed,
 including the components check and the load check, and a deliberate `import "vite"` in
 `packages/host/src/http-adapter.ts` made the build fail at the load check with `ERR_MODULE_NOT_FOUND`.
 The container ran under the compose hardening (non-root, read-only root, `noexec` `/tmp`, `cap_drop
@@ -2825,10 +2839,50 @@ renderer, and in the `build` stage of an image build, which is discarded. It has
 dependency of anything the server imports, the gate goes red again, which is the intent. Re-check when a
 patched `braces` or a `tailwindcss` that drops `micromatch` ships. The 7 moderate and low advisories still
 in the image (`esbuild`, `uuid`, `fast-uri`, `ip-address` twice, `ai`, `@ai-sdk/provider-utils`) are not
-triaged here. [SR-49](#sr-49) half 1 still says the image carries dev dependencies; that is no longer true,
+triaged here. [SR-49](#sr-49) half 1 used to say the image carries dev dependencies; it was corrected on 2026-10-05,
 and the source tree still ships.
 
 Gate: none now.
+
+### SR-131 {#sr-131}
+
+**The app image's ignore file did not exclude `nultron-files/`, so a build straight from a working
+checkout would have sent 4.5 GB of IP filings, decks and brand work into the build, and into the
+image.** Enterprise (the hosted image). Raised 2026-10-05, found while building the [SR-113](#sr-113) proof
+image from a snapshot instead of the checkout. **Fixed in the tree the same day**; checked with a real
+`docker build` context, not with a full image build.
+
+Evidence: `nultron-files/` is git-ignored (`.gitignore:72`), holds no tracked file (`git ls-files
+nultron-files` prints nothing) and was 4.5 GB on this desk on 2026-10-05. Its `README.md` indexes it: brand
+art, the deploy decks, the Lumina kit, marketing video, the IP (KI) filings, talks and the 2026-10-03
+handoff. `docker build -f webapp-deploy/Dockerfile .` reads `webapp-deploy/Dockerfile.dockerignore`
+([SR-94](#sr-94)), and that file had no line for the folder, nor did its byte copy
+`webapp-deploy/.dockerignore`. The `build` and `prod` stages both start with `COPY . .`
+(`webapp-deploy/Dockerfile:66`, `:108`) and the runtime stage copies the `prod` tree wholesale
+(`COPY --from=prod --chown=node:node /app /app`, `:167`), so the folder would have reached the shipped image,
+not only the daemon's context (read from the Dockerfile, not driven). The portal image is not affected: its
+ignore file is an allowlist that starts with `*` (`webapp-deploy/portal.Dockerfile.dockerignore:8`).
+
+What goes wrong if ignored: unreleased IP and brand work lands in an image layer that is pushed to a
+registry, where anyone who can pull the image can read it with `docker save`, and the 4.5 GB context makes
+the build slow. **It was never shipped.** `scripts/release-web.mjs` builds from `git archive <sha>`
+([SR-49](#sr-49)), which holds tracked files only, and this folder has none.
+
+Fixed (2026-10-05): `nultron-files` is a line in `webapp-deploy/Dockerfile.dockerignore:66` (comment
+`:63-65`) and, byte for byte, in `webapp-deploy/.dockerignore`. It has no `**/` prefix on purpose: the folder
+sits at the repo root. `scripts/pilot-deploy.test.mjs:347-359` now requires the line, and `:361-365` keeps the
+two files identical; all 29 tests in that file pass. A throwaway Dockerfile bind-mounted the real build context
+with the new ignore file and listed its root: `nultron-files` was absent, and 116 MB was sent in 16 s. The
+control (the same file without those lines) was still sending after 290 s, which is no result: I did not see
+the folder arrive.
+
+Residual: the app image's ignore file is a denylist, so any other git-ignored entry at the repo root still
+enters a checkout build. The same listing showed `.ci-local/` (94 MB of `ci:local` logs), `.obsidian/` and
+`_map/`. None was opened here. The durable fix is an allowlist like the portal image's, which is not done;
+the `git archive <sha>` release path is still the real guard.
+
+Gate: **blocks building from a checkout**, the same gate as [SR-49](#sr-49) half 2. It does not block a
+private-image deploy through `release-web.mjs`.
 
 ## Low
 
@@ -4265,7 +4319,7 @@ because compose cannot interpolate a second env file, so its entrypoint runs
 `env -u PORTAL_SIGNING_KEY -u PORTAL_SMTP_USER -u PORTAL_SMTP_PASS -u PORTAL_APP_DB_PASSWORD` before
 `docker-entrypoint.sh postgres`, because every child of Postgres inherits its environment
 (`:211-219`). The proxy gets exactly the two variables its Caddyfile reads ([SR-73](#sr-73)). Pinned by
-`scripts/pilot-deploy.test.mjs:372-380` (the portal's names are in `portal.env.example` and never in
+`scripts/pilot-deploy.test.mjs:379-387` (the portal's names are in `portal.env.example` and never in
 the app's `.env.example`). The compose rehearsal ran on the two generated files
 (`webapp-deploy/compose.local.yml:16`).
 
@@ -4405,8 +4459,8 @@ packaged app was launched from cannot point the sandbox at other files. The pack
 `resources/sandbox` (`:92-94`). `--allow-fs-read` takes a comma-separated list, so a ship path with a
 comma would grant a second directory. `verifyShip` refuses such a path and the sandbox answers
 `unavailable` (`:152-156`), which fails closed. On the hosted server the image sets
-`AGENTFORGE_SANDBOX_DIR=/app/sandbox` (`webapp-deploy/Dockerfile:109`), an operator-controlled
-variable, and the folder is root-owned and read-only (`:121-122`).
+`AGENTFORGE_SANDBOX_DIR=/app/sandbox` (`webapp-deploy/Dockerfile:161`), an operator-controlled
+variable, and the folder is root-owned and read-only (`:169-173`).
 
 Gate: none.
 
@@ -4590,7 +4644,10 @@ Added 2026-10-03:
 - [ ] A `docker build` of `webapp-deploy/Dockerfile` ran `scripts/build-sandbox-runtime.mjs`, and
   under the hardened compose (`read_only: true`, the `noexec` `/tmp` tmpfs, `cap_drop: ALL`,
   `no-new-privileges`) one Python run and one JavaScript run from `/app/sandbox` return results in
-  server mode. The sandbox has never run on Linux, in Docker or under those flags.
+  server mode. Done in part on 2026-10-05: one Python run (pandas) and one JavaScript run returned results
+  through `createSandboxRunner()` inside the hardened production image (read-only root, `noexec` `/tmp`,
+  `cap_drop ALL`, uid 1000, Node 22.23.3, `AGENTFORGE_CODE_RUNS=on`). Still owed: the same through a hosted
+  Chat run and under the compose and Kubernetes stacks.
   ([SR-111](#sr-111), [SR-129](#sr-129))
 - [ ] The host's resident memory with two busy Python children is measured against the pod and
   container limits, and `AGENTFORGE_MAX_CODE_RUNS` is unset or sized from it. ([SR-123](#sr-123))
@@ -4603,13 +4660,14 @@ the Enterprise deploy-bundle repo.
 
 Evidence, two halves:
 
-1. **Source in the runtime image, by design.** The build stage runs `COPY . .`
-   (`webapp-deploy/Dockerfile:53`) and the runtime stage copies that tree wholesale,
-   `COPY --from=build --chown=node:node /app /app` (`:103`), because every `@agentforge/*` package
-   exports TypeScript and the entrypoint is `tsx server.ts` (`:8-12`, `:100-102`, `:153`). So the
+1. **Source in the runtime image, by design.** The `prod` stage runs `COPY . .`
+   (`webapp-deploy/Dockerfile:108`) and the runtime stage copies that tree wholesale,
+   `COPY --from=prod --chown=node:node /app /app` (`:167`), because every `@agentforge/*` package
+   exports TypeScript and the entrypoint is `tsx server.ts` (`:8-12`, `:223`). So the
    final image holds every `.ts` file in `apps/` and `packages/`, `apps/portal`, the desktop shell
-   sources, `scripts/`, `packages/host/eval/`, the root `AGENTS.md` and `README.md`, and dev
-   dependencies. `docs/` is excluded (`webapp-deploy/Dockerfile.dockerignore:44`), so
+   sources, `scripts/`, `packages/host/eval/`, the root `AGENTS.md` and `README.md`. Since 2026-10-05 it no
+   longer holds dev dependencies: `node_modules` is a `--prod` install (`:113`, [SR-113](#sr-113)).
+   `docs/` is excluded (`webapp-deploy/Dockerfile.dockerignore:62`), so
    `docs/internal/` does not ship.
 2. **Untracked local state in the build context.** The ignore file's `.env`, `.env.local` and `data`
    (`Dockerfile.dockerignore:23-25`) match at the context root only. On this desk on 2026-09-23 a
@@ -4646,8 +4704,11 @@ Status: **mitigated for the release path, open for the Dockerfile.**
   none of this row's patterns: `.env`, `.env.local` and `data` matched at the context root only, and
   there was no eval line. The documented build (`-f webapp-deploy/Dockerfile` from the repo root)
   reads `Dockerfile.dockerignore`, so the stale file was dead; a build with `webapp-deploy/` as its
-  context would not have been. It is now a byte copy, and `scripts/pilot-deploy.test.mjs:354` fails if
+  context would not have been. It is now a byte copy, and `scripts/pilot-deploy.test.mjs:361` fails if
   the two differ. The "Fix" list below still holds: edit both together.
+- **Closed 2026-10-05, [SR-131](#sr-131):** the same file also lacked `nultron-files` (4.5 GB of IP filings
+  and brand work, git-ignored), which a build from a checkout would have sent into the image. The release
+  path never had it.
 
 Fix, not done here (the Dockerfile was deliberately left alone in this pass):
 - Anchor the ignore patterns everywhere: `**/.env`, `**/.env.*` with `!**/.env.example`,
@@ -4656,8 +4717,8 @@ Fix, not done here (the Dockerfile was deliberately left alone in this pass):
 - Make the runtime stage copy only `apps/web/dist`, a built host bundle, `packages/db/drizzle`, and
   the production `node_modules` its native modules need (`better-sqlite3`, `@firecrawl/anydoc`),
   the way `apps/desktop/scripts/stage-renderer.mjs:23-31` already esbuilds `host.cjs` for the
-  desktop. That drops the TypeScript source, `tsx` and the dev dependencies together, and closes the
-  migration-plan item behind "Dev dependencies ship in the image" in `webapp-deploy/README.md`.
+  desktop. That would drop the TypeScript source and `tsx`. The dev dependencies are already gone
+  ([SR-113](#sr-113), 2026-10-05), by a `--prod` install rather than a bundle.
 
 Gate: half 2 **blocks building any image from a developer checkout**. Half 1 **blocks making the
 ghcr image public**. Neither blocks a private-image deploy through `release-web.mjs`.

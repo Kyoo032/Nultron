@@ -5,6 +5,7 @@ import { App } from "./App";
 import { ProductBrandProvider } from "@/lib/product-brand";
 import { HostCapabilitiesProvider } from "@/lib/host-capabilities";
 import { isElectron } from "@/lib/api-client";
+import { applyDeskShell } from "@/lib/shell-motion";
 import "../app/globals.css";
 
 const themeInit = () => {
@@ -18,6 +19,10 @@ const themeInit = () => {
   }
 };
 themeInit();
+
+// The packaged app has no GPU, so its loops stay stepped; a browser's are smooth. Written before the first
+// render, so no loop ever starts under the wrong timing.
+applyDeskShell(document.documentElement, isElectron());
 
 const Router = isElectron() ? HashRouter : BrowserRouter;
 
