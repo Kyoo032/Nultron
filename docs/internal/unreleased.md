@@ -53,6 +53,7 @@ Nothing below is closed by 0.14.27. Carried forward as-is.
 
 ## Log
 
+- **2026-09-28** — Finance asks once more when a reading is not the sections, and rewrites once a sentence that quotes a computed figure while saying the opposite of its direction. Figures stay computed in core. The guided three-step screen is unchanged. A cancelled job gets no second ask and no direction rewrite, and is not saved. Not packed. Maps: [`maps/finance-tasks.md`](maps/finance-tasks.md), [`maps/finance-parse-and-generate.md`](maps/finance-parse-and-generate.md).
 - **2026-09-28** — Data chooses the cuts the columns allow, runs those queries, and retries the wording once when a sentence states a number the query did not return. A follow-up stays on the same sheet. The tool loop is unchanged (`run_sql`, `calculator`, `run_code`, with the program steps and the abort signal); the one retry is the Data spec's repair round (`repairRounds` 1, shown as `job.round` 1 of 1), and a saved analysis keeps `queries` as the SQL the model ran, with the host's cuts in the findings' evidence. Not packed. Map: [`maps/data-analysis.md`](maps/data-analysis.md).
 - **2026-09-28** — Research pulls claims from the question and any pasted text, searches each one on the sources it already uses, and keeps a passage only when it is on the page. Code builds the comparison: sources agree, sources contradict, or only one source says it. A claim with no kept passage is dropped. The model writes the reading and cannot add a source or a quote. Progress is the existing job phases, including comparing. No new control. English and Bahasa Indonesia via `localeForRun`. Not packed. Map: [`maps/research-dossier.md`](maps/research-dossier.md).
 - **2026-09-28** — Research drops a finding cite that does not name a page that was read and still has a verbatim passage. That miss rewrites the findings once, then the code removes whatever still does not resolve. An unreachable snippet stays in the source list and is not cited. No new control on the Research screen. Not packed. Map: [`maps/research-dossier.md`](maps/research-dossier.md).
@@ -449,7 +450,7 @@ with the changes; this entry does not claim a full run of any suite.
   `packages/core/src/finance/ratios/compute.ts:138`).
 - **Both — a brief whose repair emptied a section answered 500.** The section now keeps its heading
   and says, in the reader's language and without a figure, that its text was removed
-  (`EMPTIED_SECTION_BODY`, `packages/host/src/finance-generate.ts:74`).
+  (`EMPTIED_SECTION_BODY`, `packages/host/src/finance-generate.ts:77`).
 - **Both — a pin with no model held a Finance job to the host default.** Finance now uses the one
   `readModelPinned` every job shares, which is no pin without a model
   (`packages/host/src/job-regen.ts:43`, re-exported at `packages/host/src/finance-tasks/live.ts:45`).
