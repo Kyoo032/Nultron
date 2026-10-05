@@ -682,6 +682,10 @@ export async function handleNodeRequest(req: IncomingMessage, res: ServerRespons
       // read from the raw request inside the handler, so the handler stays adapter-agnostic and
       // the desktop IPC path — which never carries it — reads `undefined` and refuses.
       [BILLING_TOKEN_HEADER]: header(req, BILLING_TOKEN_HEADER),
+      // Hosted only: the browser's language, for a person who never chose one (`./locale-boot.ts`).
+      // Off server mode the request carries exactly the headers it always did, so the desk's boot
+      // locale is the only locale there is.
+      ...(context.serverMode ? { "accept-language": header(req, "accept-language") } : {}),
       "x-agentforge-transport": "http",
     },
     body,

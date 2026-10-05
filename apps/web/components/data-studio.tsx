@@ -10,6 +10,9 @@ import { EnhancePromptButton } from "@/components/enhance-prompt-button";
 import { JobProgressList } from "@/components/job-progress";
 import { ModeHeader } from "@/components/mode-header";
 import { ModelSelect } from "@/components/model-select";
+import { isGatewayBlockedText } from "@/lib/gateway-blocked";
+import { NeedsKeyNote } from "@/components/needs-key-note";
+import { StudioEmptyDesk } from "@/components/studio-empty-desk";
 import { WorkingStatus } from "@/components/working-status";
 import {
   DATASET_ACCEPT,
@@ -22,11 +25,13 @@ import {
   type DatasetPayload,
   type DatasetSummary,
 } from "@/lib/data-client";
+import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import { useJobModel } from "@/lib/use-job-model";
 import { modelPickBody, studioModelPick } from "@/lib/model-choice";
 import { useJobStream } from "@/lib/use-job-stream";
 import { useProductBrand } from "@/lib/product-brand";
 import { t } from "@/lib/i18n";
+import { PROMPT_ACTIONS, PROMPT_ROW } from "@/lib/prompt-row";
 import { labeled } from "@/lib/ui-copy";
 import { SettingsLinkHint } from "@/components/settings-link-hint";
 
@@ -61,6 +66,8 @@ function needsSettingsHint(message: string): boolean {
 
 export function DataStudio() {
   const { productName } = useProductBrand();
+  // Nultron Enterprise: a signed-in tenant may open the desk before adding a key. Hosted only; false elsewhere.
+  const needsKey = useHostedNeedsKey();
   const { models, model, pinned: modelPinned, setModel } = useJobModel("data");
   const job = useJobStream<DataAnalysisResult>();
   const fileInput = useRef<HTMLInputElement | null>(null);
@@ -152,7 +159,7 @@ export function DataStudio() {
   async function onGenerate(event: FormEvent) {
     event.preventDefault();
     const question = prompt.trim();
-    if (!question || busy) {
+    if (!question || busy || needsKey) {
       return;
     }
     if (!dataset) {
@@ -193,7 +200,7 @@ export function DataStudio() {
           {t("data.howItWorksBody", { productName })}
         </p>
       </details>
-      {error ? (
+      {error && !isGatewayBlockedText(error) ? (
         <p className="mb-4 text-sm text-[var(--danger)]" role="alert" data-testid="data-error">
           {error}
           {needsSettingsHint(error) && !/settings/i.test(error) ? (
@@ -348,7 +355,7 @@ export function DataStudio() {
         onSubmit={(event) => void onGenerate(event)}
         data-testid="data-studio-prompt-bar"
       >
-        <div className="mb-2 flex items-center gap-2">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
           <EnhancePromptButton
             text={prompt}
             surface="data"
@@ -357,14 +364,21 @@ export function DataStudio() {
             testId="data-enhance"
             onApply={setPrompt}
           />
-          <ModelSelect models={models} value={model} onChange={setModel} disabled={busy} testId="data-studio-model" />
+          <ModelSelect
+            models={models}
+            value={model}
+            onChange={setModel}
+            disabled={busy}
+            testId="data-studio-model"
+            className="select-field min-w-0 max-w-md flex-1 basis-48"
+          />
           {history.length > 0 ? (
             <span className="text-xs text-[var(--text-3)]" data-testid="data-history">
               {t("data.followUp", { n: history.length + 1 })}
             </span>
           ) : null}
         </div>
-        <div className="flex gap-2">
+        <div className={PROMPT_ROW}>
           <input
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
@@ -373,16 +387,25 @@ export function DataStudio() {
             disabled={busy}
             data-testid="data-prompt"
           />
-          {job.busy ? (
-            <button type="button" className="btn" onClick={job.cancel} data-testid="data-cancel">
-              {t("data.cancel")}
+          <div className={PROMPT_ACTIONS}>
+            {job.busy ? (
+              <button type="button" className="btn" onClick={job.cancel} data-testid="data-cancel">
+                {t("data.cancel")}
+              </button>
+            ) : null}
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={busy || !prompt.trim() || needsKey}
+              data-testid="data-generate"
+            >
+              {job.busy ? <WorkingStatus label={t("data.working")} /> : t("data.analyze")}
             </button>
-          ) : null}
-          <button type="submit" className="btn btn-primary" disabled={busy || !prompt.trim()} data-testid="data-generate">
-            {job.busy ? <WorkingStatus label={t("data.working")} /> : t("data.analyze")}
-          </button>
+          </div>
         </div>
+        {needsKey ? <NeedsKeyNote testId="data-needs-key" className="mt-2 text-xs text-[var(--text-3)]" /> : null}
       </form>
+      {dataset || shown || busy || job.progress.phases.length > 0 ? null : <StudioEmptyDesk mode="data" />}
     </main>
   );
 }

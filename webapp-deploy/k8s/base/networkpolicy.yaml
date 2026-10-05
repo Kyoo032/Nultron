@@ -1,0 +1,64 @@
+# Ingress rules, default deny. They bind only where the cluster's network plugin enforces
+# NetworkPolicy; on a plugin that does not, they are inert and nothing here proves otherwise.
+# EGRESS is not restricted: the app must reach api.tokotokenai.com and the portal's mail provider, and
+# a hostname allowlist needs a plugin feature (FQDN policy) that is not assumed here.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress"]
+---
+# The edge (Caddy in the app pod) takes traffic from anywhere on its two ports: it is the public
+# listener. The app container listens on loopback inside the pod and is not reachable from outside it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-edge
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: nultron-app
+  policyTypes: ["Ingress"]
+  ingress:
+    - ports:
+        - {protocol: TCP, port: 8443}
+        - {protocol: TCP, port: 8080}
+---
+# The portal answers the edge only (the app pod: Caddy proxies the portal host, and the app calls it
+# server to server through the same Caddy).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-portal-from-edge
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: nultron-portal
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: nultron-app
+      ports:
+        - {protocol: TCP, port: 4000}
+---
+# Postgres answers the portal pod only. The app never talks to it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-db-from-portal
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: nultron-portal-db
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: nultron-portal
+      ports:
+        - {protocol: TCP, port: 5432}

@@ -34,7 +34,12 @@ export type ManualOtpResult =
     }
   | {
       readonly ok: false;
-      readonly reason: "not_allowed" | "unknown_address" | "send_rate_limited";
+      /**
+       * `not_activated`: the address is an invited member who has not redeemed the invite. A code
+       * printed for it would verify and then lead nowhere (`login_precheck` answers
+       * `user_inactive`), so the operator is sent to `pnpm portal:invite`, the first sign-in's door.
+       */
+      readonly reason: "not_allowed" | "unknown_address" | "not_activated" | "send_rate_limited";
       readonly retryAfter?: number;
     };
 
@@ -67,6 +72,10 @@ export async function issueManualOtp(
 
   const code = randomOtpCode();
   return store.tx(tenantId, async (ops) => {
+    const member = await ops.users.findByEmail(tenantId, email);
+    if (member?.status === "invited") {
+      return { ok: false, reason: "not_activated" } as const;
+    }
     const sent = await ops.loginOtps.send({
       tenantId,
       email,
@@ -84,7 +93,7 @@ export async function issueManualOtp(
     if (!sent.ok) {
       return { ok: false, reason: "send_rate_limited", retryAfter: sent.retryAfter } as const;
     }
-    const user = await ops.users.findByEmail(tenantId, email);
+    const user = member;
     await ops.audit.append({
       tenantId,
       orgId: user?.orgId ?? null,

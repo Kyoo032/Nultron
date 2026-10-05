@@ -1,6 +1,6 @@
 # Map — The per-tenant state backend and the wrap-key rotation drill
 
-Last verified: 2026-09-20 at a053245 + the Phase 4 branch `feat/web-phase4-tenant-secrets-rcbu9c` (through e37b3a1)
+Last verified: 2026-10-01, working tree over 0b61a29, not committed, for one added paragraph on the `model_cache` key (a tenant with a key and no row is refilled in the background; read from `selectable-models.ts`, proven by unit tests and `dispatch`, not driven). Before that, the same day, for the third key (`model_cache`, Enterprise BYOK Phase A) and every `tenant-state-store.ts` citation on this page, which had drifted by about nine lines. Everything else was last verified 2026-09-20 at a053245 + the Phase 4 branch `feat/web-phase4-tenant-secrets-rcbu9c` (through e37b3a1).
 
 ## Overview
 
@@ -27,7 +27,7 @@ export function tenantStateBackend(): TenantStateBackend {
 }
 ```
 
-`tenantStateBackend` (`packages/host/src/tenant-state-store.ts:319-321`) is resolved **per call**, not once
+`tenantStateBackend` (`packages/host/src/tenant-state-store.ts:331-333`) is resolved **per call**, not once
 at import. The test suites and `apps/web` both flip `AGENTFORGE_SERVER` after the module graph is loaded, and
 a backend frozen at import time would answer for the mode the process started in rather than the one it is
 in.
@@ -35,20 +35,38 @@ in.
 Nothing above this function knows which store it is talking to. `settings-store.ts` and `gateway-gate.ts`
 name a tenant and a key; the backend decides what that means.
 
-### The two keys
+### The three keys
 
-`TENANT_STATE_KEYS = ["settings", "gateway_gate"]` (`packages/core/src/tenancy/state-keys.ts:14`). They are
+`TENANT_STATE_KEYS = ["settings", "gateway_gate", "model_cache"]` (`packages/core/src/tenancy/state-keys.ts:19`). They are
 payload names, deliberately not filenames: `settings.enc` is a desktop path that predates tenancy and has to
 stay exactly where it is, while `settings` is what the payload *is*. A column carrying the filename would
 make the row backend a description of the file layout rather than an alternative to it.
 
 The map from key to desktop filename lives in one place,
-`TENANT_STATE_FILENAMES` (`packages/host/src/tenant-state-store.ts:48-51`):
+`TENANT_STATE_FILENAMES` (`packages/host/src/tenant-state-store.ts:48-54`):
 
 | Key | Desktop file | Hosted row |
 |---|---|---|
 | `settings` | `settings.enc` | `tenant_state(tenant_id, 'settings')` |
 | `gateway_gate` | `gateway-gate.json` | `tenant_state(tenant_id, 'gateway_gate')` |
+| `model_cache` | `models-cache.json` (listed, never used for a desk's cache) | `tenant_state(tenant_id, 'model_cache')` |
+
+`model_cache` (2026-10-01, Enterprise BYOK Phase A) is **hosted only and bypasses the choice by mode**. It is the
+catalogue and probe result a tenant's own provider keys produced: plain JSON, no secret, so the wrap-key rotation
+drill (`SETTINGS_KEY` only) does not touch it. `packages/host/src/model-cache.ts` uses `dbTenantStateBackend`
+directly when `isServerMode()` and otherwise keeps the one machine file it always had, at `AGENTFORGE_MODELS_CACHE_PATH`
+or `<localDataDir()>/models-cache.json`, byte for byte (`saveModelCache`, `:151`). The file backend lists the key
+only so `TENANT_STATE_FILENAMES` stays total and "Start over" names the file: the path it would resolve to for
+`local-tenant` happens to be the desk's own cache path, and for any other tenant `tenants/<id>/models-cache.json`
+is never written. Why it is per tenant: before this, one shared file was written by whichever tenant saved a key
+or pressed Refresh and read back into every tenant's model list and Settings. **A missing row is not the end of the
+story on the hosted server (2026-10-01):** only a Settings save and the Refresh button write it, so a tenant that held
+a key before the upgrade has a `settings` row and no `model_cache` row. `loadModelCache` still answers `{}` for it
+(`model-cache.ts:133-145`, unchanged), and a catalogue read now starts one background `refreshModelCache` for that
+tenant, throttled to once in ten minutes and written only if the row is still absent
+(`warmHostedModelCache`, `packages/host/src/selectable-models.ts:505`; the rules are in
+[`settings-and-gateway-gate.md`](settings-and-gateway-gate.md)). A desk's file is never touched by it. See
+[`settings-and-gateway-gate.md`](settings-and-gateway-gate.md).
 
 `packages/host/src/tenant-state.test.ts` greps the host source for those two string literals and fails if
 anything outside this module spells them — `handlers/settings.ts` is the one exemption, because
@@ -57,7 +75,7 @@ list against `TENANT_STATE_FILENAMES` so a payload that gains a file cannot be l
 
 ### The interface
 
-`TenantStateBackend` (`packages/host/src/tenant-state-store.ts:65-78`) is seven members:
+`TenantStateBackend` (`packages/host/src/tenant-state-store.ts:68-81`) is seven members:
 
 | Member | Contract |
 |---|---|
@@ -75,7 +93,7 @@ The **stamp** is what lets `settings-store.ts` keep a decrypt cache without re-r
 
 ### The file backend — unchanged desktop behaviour
 
-`fileTenantStateBackend` (`packages/host/src/tenant-state-store.ts:90-170`) resolves a key to
+`fileTenantStateBackend` (`packages/host/src/tenant-state-store.ts:93-173`) resolves a key to
 `tenantDataDir(tenantId)/TENANT_STATE_FILENAMES[key]` (`statePath`, `:86-88`), which for `local-tenant` is
 the install root itself — lane D's one rule. An existing desktop data directory therefore opens with nothing
 moved, by construction rather than by a migration.
@@ -92,7 +110,7 @@ Three details worth knowing:
 
 ### The row backend — the hosted server
 
-`dbTenantStateBackend` (`packages/host/src/tenant-state-store.ts:263-312`) is four statements against
+`dbTenantStateBackend` (`packages/host/src/tenant-state-store.ts:275-324`) is four statements against
 `tenant_state`. The write is an upsert whose stamp is forced to move:
 
 ```sql
@@ -123,7 +141,7 @@ pulls it in, so every request that could reach a tenant's settings has installed
 there.
 
 **With nothing installed, server mode throws** — `tenant_state_backend_missing`, a 500 (`requireSql`,
-`packages/host/src/tenant-state-store.ts:251-261`). It never falls back to the files. A silent fall back to a
+`packages/host/src/tenant-state-store.ts:263-271`). It never falls back to the files. A silent fall back to a
 store nobody backs up is the failure this whole module exists to prevent.
 
 ### Adoption — a server upgrading into Phase 4
@@ -131,7 +149,7 @@ store nobody backs up is the failure this whole module exists to prevent.
 Phase 3 shipped hosted tenants writing `tenants/<id>/settings.enc`. A server that upgrades with those files
 on its data volume must not read back an empty key and send the tenant to onboarding.
 
-`adoptLegacyFile` (`packages/host/src/tenant-state-store.ts:192-219`) runs on the first read for a tenant
+`adoptLegacyFile` (`packages/host/src/tenant-state-store.ts:195-222`) runs on the first read for a tenant
 that has no row: it copies the file's bytes into the row **verbatim** — the envelope is unchanged, so there
 is nothing to re-encrypt — and renames the file to `settings.enc.adopted` (`ADOPTED_SUFFIX`, `:57`).
 

@@ -15,6 +15,18 @@ export const meetingRecordingSchema = z.object({
   durationSeconds: z.number().nonnegative().optional(),
 });
 
+/**
+ * What the minutes' checks made of them (`./minutes-checks.ts`): ids and pass/fail only, the same
+ * summary the artifact meta carries, so no minutes text rides along.
+ */
+export const minutesChecksRecordSchema = z.object({
+  /** True when every check passed, on the first draft or after the repair round. */
+  passed: z.boolean(),
+  /** Repair rounds spent; 0 when the first draft passed. */
+  rounds: z.number().int().nonnegative(),
+  verdicts: z.array(z.object({ check: z.string(), ok: z.boolean() })),
+});
+
 /** Minutes in one language, with the artifact they were saved as. */
 export const meetingMinutesRecordSchema = z.object({
   locale: z.enum(APP_LOCALES),
@@ -23,6 +35,11 @@ export const meetingMinutesRecordSchema = z.object({
   model: z.string().default(""),
   /** Names the writer asserted that the transcript never said; stamped out by the guard. */
   unverifiedNames: z.array(z.string()).default([]),
+  /**
+   * The checks the first-language minutes ran, so the studio can say what still failed after the repair
+   * round. Null for a translation (it is not checked) and for minutes saved before the checks existed.
+   */
+  checks: minutesChecksRecordSchema.nullable().default(null),
 });
 
 export const MEETING_STATUSES = ["new", "recorded", "transcribed", "minuted"] as const;
@@ -45,6 +62,7 @@ export const meetingRecordSchema = z.object({
 });
 
 export type MeetingRecording = z.infer<typeof meetingRecordingSchema>;
+export type MinutesChecksRecord = z.infer<typeof minutesChecksRecordSchema>;
 export type MeetingMinutesRecord = z.infer<typeof meetingMinutesRecordSchema>;
 export type MeetingRecord = z.infer<typeof meetingRecordSchema>;
 export type MeetingStatus = (typeof MEETING_STATUSES)[number];

@@ -24,7 +24,7 @@ import {
 import { LOGIN_CONFIG_ERROR } from "./portal-config";
 import { isAuthPath } from "../rate-limit";
 import type { EnvLike } from "@agentforge/core";
-import type { PortalIdentity } from "@agentforge/db";
+import type { PortalIdentity, PortalProvisioning } from "@agentforge/db";
 import type { HostCookie, HostJsonResult, HostRequest } from "../types";
 
 const T0 = Date.UTC(2026, 8, 18, 9, 0, 0);
@@ -52,7 +52,7 @@ type Harness = {
   portal: FakePortalClient;
   deps: AuthRouteDeps;
   /** Every identity `handleLogin` provisioned, in order. Lane C: first sign-in writes the tenant. */
-  provisioned: PortalIdentity[];
+  provisioned: PortalProvisioning[];
   /** Every identity `handleLogin` claimed a seat for, in order. Lane B: the seat cap at sign-in. */
   seated: PortalIdentity[];
 };
@@ -64,18 +64,19 @@ function harness(
     vault?: TokenVault;
     serverMode?: boolean;
     env?: EnvLike;
-    provision?: (identity: PortalIdentity) => Promise<unknown>;
+    provision?: (identity: PortalProvisioning) => Promise<unknown>;
     claimSeat?: (identity: PortalIdentity) => Promise<{ readonly ok: boolean }>;
     secrets?: SessionSecrets;
+    readRole?: AuthRouteDeps["readRole"];
   } = {},
 ): Harness {
   const store = options.store ?? createMemorySessionStore();
   const vault = options.vault ?? createMemoryTokenVault();
   const portal = options.portal ?? createFakePortalClient();
-  const provisioned: PortalIdentity[] = [];
+  const provisioned: PortalProvisioning[] = [];
   const provision =
     options.provision ??
-    (async (identity: PortalIdentity) => {
+    (async (identity: PortalProvisioning) => {
       provisioned.push(identity);
     });
   const seated: PortalIdentity[] = [];
@@ -97,6 +98,7 @@ function harness(
     env: options.env ?? PORTAL_ENV,
     now: () => T0,
     secrets: options.secrets ?? SECRETS,
+    readRole: options.readRole,
   };
   return { routes: createAuthRoutes(deps), store, vault, portal, deps, provisioned, seated };
 }
@@ -182,7 +184,33 @@ describe("POST /api/v1/auth/login", () => {
   it("provisions the tenant, org and user from the ids the portal returned", async () => {
     const h = harness();
     await signIn(h);
-    expect(h.provisioned).toEqual([{ tenantId: "tnt_fake", orgId: "org_fake", userId: "usr_fake" }]);
+    expect(h.provisioned).toEqual([
+      { tenantId: "tnt_fake", orgId: "org_fake", userId: "usr_fake", role: "member" },
+    ]);
+  });
+
+  // SR-65: "owner" on the host used to mean "signed in", because the host wrote an owner row for
+  // everybody it provisioned. The role the portal sent in the token body is now what is written.
+  it.each(["owner", "admin", "member", null] as const)(
+    "provisions with the role the portal sent: %s",
+    async (role) => {
+      const h = harness({ portal: createFakePortalClient({ tokens: { role } }) });
+      await signIn(h);
+      expect(h.provisioned.map((entry) => entry.role)).toEqual([role]);
+    },
+  );
+
+  it("never hands the seat claim a role: a seat is a person, not a privilege", async () => {
+    const h = harness({ portal: createFakePortalClient({ tokens: { role: "owner" } }) });
+    await signIn(h);
+    expect(h.seated).toEqual([{ tenantId: "tnt_fake", orgId: "org_fake", userId: "usr_fake" }]);
+  });
+
+  it("never puts the role in the response or the cookie: it is read from the row on each request", async () => {
+    const h = harness({ portal: createFakePortalClient({ tokens: { role: "owner" } }) });
+    const { result } = await signIn(h);
+    expect(JSON.stringify(result.body)).not.toContain("owner");
+    expect(JSON.stringify(result.cookies)).not.toContain("owner");
   });
 
   it("provisions before the session exists, so a refused sign-in leaves no session behind", async () => {
@@ -447,6 +475,59 @@ describe("GET /api/v1/auth/session", () => {
       tenantId: "tnt_fake",
       expiresAt: T0 + IDLE_TIMEOUT_MS,
     });
+  });
+
+  // The renderer hides the Erase account control from anybody who is not an owner (a courtesy; the host
+  // refuses the erase regardless). It learns the role here, from the membership row, per request.
+  it.each(["owner", "admin", "member"] as const)("adds the role the host holds for the person: %s", async (role) => {
+    const h = harness({ readRole: async () => role });
+    const { id } = await signIn(h);
+    const result = await json(h.routes.handleSession(withSession(id, { method: "GET" })));
+    expect(body(result)).toEqual({
+      signedIn: true,
+      userId: "usr_fake",
+      orgId: "org_fake",
+      tenantId: "tnt_fake",
+      expiresAt: T0 + IDLE_TIMEOUT_MS,
+      role,
+    });
+  });
+
+  it("reads the role for the session's own ids, never for anything the request sent", async () => {
+    const asked: Array<{ tenantId: string; orgId: string; userId: string }> = [];
+    const h = harness({
+      readRole: async (session) => {
+        asked.push({ tenantId: session.tenantId, orgId: session.orgId, userId: session.userId });
+        return "member";
+      },
+    });
+    const { id } = await signIn(h);
+    await json(h.routes.handleSession(withSession(id, { method: "GET", query: { role: "owner", userId: "x" } })));
+    expect(asked).toEqual([{ tenantId: "tnt_fake", orgId: "org_fake", userId: "usr_fake" }]);
+  });
+
+  it("leaves the role out, and still answers 200, when the host cannot read one", async () => {
+    for (const readRole of [async () => null, async () => Promise.reject(new Error("database is locked"))]) {
+      const h = harness({ readRole });
+      const { id } = await signIn(h);
+      const result = await json(h.routes.handleSession(withSession(id, { method: "GET" })));
+      expect(result.status).toBe(200);
+      expect(body(result)).not.toHaveProperty("role");
+      expect(body(result)).toMatchObject({ signedIn: true, userId: "usr_fake" });
+    }
+  });
+
+  it("never reports a role for a signed-out visitor, and never asks for one", async () => {
+    const asked: string[] = [];
+    const h = harness({
+      readRole: async () => {
+        asked.push("asked");
+        return "owner";
+      },
+    });
+    const result = await json(h.routes.handleSession(request({ method: "GET" })));
+    expect(body(result)).toEqual({ signedIn: false });
+    expect(asked).toEqual([]);
   });
 
   it("reports a signed-out visitor with no reason at all", async () => {
@@ -804,6 +885,7 @@ describe("POST /api/v1/auth/logout ends the portal session with a live token", (
       userId: "u",
       orgId: "o",
       tenantId: "t",
+      role: null,
     };
   }
 
@@ -1091,6 +1173,7 @@ describe("the refresh token at rest", () => {
           userId: "u",
           orgId: "o",
           tenantId: "t",
+          role: null,
         };
       },
       async logout({ accessToken }) {

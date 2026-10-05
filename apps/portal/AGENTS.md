@@ -1,7 +1,7 @@
 # apps/portal — agent rules
 
 **This is a stand-in for the backend team's portal** (`api.tokotokenai.com`), built so the hosted
-DPSBuddy web app has a real login to develop and review against before that service exists. It is
+Nultron web app has a real login to develop and review against before that service exists. It is
 wire-compatible with [`docs/internal/portal/`](../../docs/internal/portal/) — `device-code-login.md`
 for the flow, `schema.md` for the data model, `migrations/0001-0005` for the schema itself.
 
@@ -24,8 +24,9 @@ before working here. It is the plan of record and it names the lanes.
    `0007_tenant_resolvers.sql` (the `SECURITY DEFINER` tenant resolvers `schema.md` says are
    missing), `0008_oauth_client_scope.sql` (closing the pre-authentication window 0006 opened
    on `oauth_clients`, which nothing needed), `0009_web_session_revocation.sql` (the portal's own
-   browser session counter) and `0010_app_login_role.sql` (the server's login role, which 0001
-   describes and nobody had created). Same style: one transaction per file,
+   browser session counter), `0010_app_login_role.sql` (the server's login role, which 0001
+   describes and nobody had created) and `0011_invites.sql` (the invite that gates a first sign-in).
+   Same style: one transaction per file,
    `IF NOT EXISTS`, `DROP POLICY` before `CREATE POLICY`, and every new table placed explicitly
    into one of the three RLS shapes `0004_rls.sql` defines.
 
@@ -62,7 +63,7 @@ returns **at most a tenant id**, so none of them tells a caller whether a value 
 
 - Raw codes and tokens are **never** stored. Only `sha256(raw)`, in a `bytea` column with a
   `CHECK (octet_length(...) = 32)`. That covers refresh tokens, device codes, OTPs, authorization
-  codes and client secrets.
+  codes, invite codes and client secrets.
 - Comparisons of secret material use `hashEquals` (constant time), never `===`.
 - `user_code`, `device_code`, refresh tokens, JWTs, OTPs and client secrets are **never logged**.
   `src/log.ts` enforces that at the sink: any field whose name carries a credential word is
@@ -73,7 +74,36 @@ returns **at most a tenant id**, so none of them tells a caller whether a value 
   that has no `PORTAL_SMTP_HOST`.
 - `pnpm portal:otp <email>` **issues** a new code for an operator to read out (it cannot read a
   stored one back — only the hash exists). It needs `PORTAL_ALLOW_MANUAL_OTP=1`, is refused in
-  production, and writes `otp.issued_manually` to the audit log.
+  production, and writes `otp.issued_manually` to the audit log. It refuses an address that is
+  still `invited` (it has no session to give a code to): that address needs an invite.
+- **Nobody signs up, and the sign-in says which situation you are in.** A first sign-in needs an
+  invite an operator issued (`pnpm --filter @agentforge/portal invite -- --email <address> --role <role>`,
+  `src/invites/`) and the portal **e-mails** the code to that address; the CLI prints it only with
+  `--print`. The browser sign-in is a state machine in `src/flows/sign-in.ts`, rendered by
+  `routes/sign-in-flow.ts` for both doors (`/authorize/*` and `/activate/*`): e-mail first, then an
+  activated member gets the six-digit code, an invitee gets the invite screen (no code sent), a spent
+  invite or no access gets a dead-end page, a lock gets its own, and an org with no seat left says so
+  (`seat_cap_reached`, asked with `orgs.hasSeatFor` at the e-mail step and again before an invite is redeemed
+  or a code sent; the exchange still checks, because a seat can go in between). A valid invite activates the
+  member and then the e-mailed code still follows, because the invite does not prove the inbox on its own.
+  **A code is retired by its successor** (`store.loginOtps.send` marks the older unused codes used, and a
+  successful verify marks the rest) and **a repeat of one post is not a new request** (a code still live and
+  under `OTP_DUPLICATE_WINDOW_MS`, 15 s, answers it: nothing minted, mailed or counted). Keep both: without the
+  first a replaced code signs in again once the newer one is used, without the second a double click spends the
+  three sends a quarter hour allows and the person types the mail that no longer works.
+  **SR-30 was changed on purpose here (owner, 2026-10-01):** the e-mail step used to be one neutral
+  page for every address, and now it is an oracle for member / invitee / neither by design. What stands
+  in for the neutral page is the limits (`signInEmailIp`, `signInEmailAddress`, `inviteAttemptIp`, the
+  invite resend budget, the OTP limits) -- do not loosen them without re-reading that decision, and
+  remember they key on the caller's address, so they need `PORTAL_TRUST_PROXY=1` behind a proxy. Nothing
+  else may be revealed: no tenant, org, role or member list. Never log, audit or echo an invite code.
+- **Roles.** Every invite carries `owner | admin | member` (default `member`); redeeming copies it onto
+  the member; the portal sends it to the host as the access token's `role` claim and the token
+  response's `role` field, read from the member's row at every mint and refresh (a member it cannot read
+  gets `member`, never `owner`). A tenant always keeps an owner: the first invite for a tenant, and any
+  that would leave none, must be `owner`, and the last owner cannot be demoted. A role changes in one
+  place, `invites/role.ts` through the CLI, and there is no portal route for it. The host must not
+  default a missing role to `owner`.
 
 ## Lanes
 
@@ -116,6 +146,17 @@ Four rules that are easy to break here:
 
 - `PORTAL_TEST_DATABASE_URL` if it is set (point it at the compose service);
 - otherwise `embedded-postgres`, which ships real PG 16 binaries and needs no Docker.
+
+**On Windows, under an administrator token, `embedded-postgres` refuses to start** ("Execution of PostgreSQL by a
+user with administrative permissions is not permitted"). The run then **fails**: `test/global-setup.ts` throws an
+error that carries the server's own output and says what to do, and the command exits non-zero. (Until 2026-10-01 it
+printed "No test files found" and exited **0**, and so did a run with a failing test: importing `embedded-postgres`
+installs an `async-exit-hook` whose `beforeExit` handler calls `process.exit(0)` over vitest's `process.exitCode = 1`.
+`keepExitCode` in the global setup restores it. A suite you did not see print "Tests N passed" did not run.) Run
+the suite from a non-elevated shell, or drop the token for one command with `runas /trustlevel:0x20000 "cmd /c ..."`
+(`runas` returns at once: have the command write its log and exit code to files and wait for them). Pointing
+`PORTAL_TEST_DATABASE_URL` at a Docker Postgres works too, but Docker Desktop's VM clock can run seconds behind
+the host and fail the few tests that compare database time with the test's own clock.
 
 `test/global-setup.ts` starts one server per run and builds `portal_template` with every migration
 applied; each test file then takes a private database from that template. Two reasons, both worth

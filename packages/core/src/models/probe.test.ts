@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ApiError } from "../errors";
 import {
   DEFAULT_OPENAI_BASE_URL,
@@ -202,6 +202,68 @@ describe("Toko Token default endpoint", () => {
     expect(isDefaultOpenAIBaseUrl("https://api.tokotokenai.com/v1")).toBe(true);
     expect(isOfficialOpenAIBaseUrl(DEFAULT_OPENAI_BASE_URL)).toBe(false);
     expect(isOfficialOpenAIBaseUrl("https://api.openai.com/v1")).toBe(true);
+  });
+});
+
+describe("isOfficialOpenAIBaseUrl", () => {
+  /** What the function was before Enterprise BYOK Phase A, and still is off the hosted server. */
+  const legacy = (baseUrl?: string): boolean => /api\.openai\.com/i.test(baseUrl ?? "");
+  const SPOOFS = [
+    "https://api.openai.com.evil.example/v1",
+    "https://evil.example/api.openai.com/v1",
+    "https://evil.example/v1?u=api.openai.com",
+    "https://notapi.openai.com/v1",
+    "https://api.openai.com@evil.example/v1",
+  ];
+  let previousServerFlag: string | undefined;
+
+  beforeEach(() => {
+    previousServerFlag = process.env.AGENTFORGE_SERVER;
+  });
+
+  afterEach(() => {
+    if (previousServerFlag === undefined) {
+      delete process.env.AGENTFORGE_SERVER;
+    } else {
+      process.env.AGENTFORGE_SERVER = previousServerFlag;
+    }
+  });
+
+  it("compares the host exactly on the hosted server, so a lookalike is not OpenAI", () => {
+    process.env.AGENTFORGE_SERVER = "1";
+    for (const spoof of SPOOFS) {
+      expect(isOfficialOpenAIBaseUrl(spoof), spoof).toBe(false);
+    }
+    expect(isOfficialOpenAIBaseUrl("https://api.openai.com/v1")).toBe(true);
+    expect(isOfficialOpenAIBaseUrl(undefined)).toBe(false);
+    expect(isOfficialOpenAIBaseUrl("")).toBe(false);
+  });
+
+  it("is the unchanged substring search off the hosted server (Personal)", () => {
+    delete process.env.AGENTFORGE_SERVER;
+    for (const url of [...SPOOFS, "https://api.openai.com/v1", "", undefined]) {
+      expect(isOfficialOpenAIBaseUrl(url), String(url)).toBe(legacy(url));
+    }
+  });
+
+  it("answers as it always did for every URL a Personal build can hold, in either mode", () => {
+    // The pinned gateway, a brand gateway, the dev hooks, the official host in its usual spellings.
+    process.env.AGENTFORGE_SERVER = "1";
+    for (const url of [
+      DEFAULT_OPENAI_BASE_URL,
+      "https://aihub.metranet.co.id/v1",
+      "http://127.0.0.1:11434/v1",
+      "http://localhost:3000/v1",
+      "https://api.openai.com/v1",
+      "https://api.openai.com",
+      "https://api.openai.com/v1/",
+      "https://API.OPENAI.COM/v1",
+      "http://api.openai.com/v1",
+      "https://openrouter.ai/api/v1",
+      "https://api.anthropic.com/v1",
+    ]) {
+      expect(isOfficialOpenAIBaseUrl(url), url).toBe(legacy(url));
+    }
   });
 });
 

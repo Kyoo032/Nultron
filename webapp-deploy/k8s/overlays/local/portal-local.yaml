@@ -1,0 +1,19 @@
+# The portal pod, locally: trust the throwaway CA, for Mailpit's STARTTLS certificate.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nultron-portal
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: prepare-db
+          volumeMounts:
+            - {name: local-ca, mountPath: /etc/nultron/ca, readOnly: true}
+      containers:
+        - name: portal
+          volumeMounts:
+            - {name: local-ca, mountPath: /etc/nultron/ca, readOnly: true}
+      volumes:
+        - name: local-ca
+          configMap: {name: nultron-local-ca}

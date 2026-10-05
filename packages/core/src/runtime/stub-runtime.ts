@@ -2,6 +2,8 @@ import { getTool } from "../tools/registry";
 import { summarizeParts } from "../content/parse-run-input";
 import type { AgentRuntime, RuntimeEvent } from "./types";
 import { invokeToolGuarded } from "./invoke-guarded";
+import { createEgressGuard, userTextOf } from "./egress-guard";
+import { createToolBudget } from "./tool-budget";
 import { resolveRequestReasoningEffort } from "../models/reasoning-effort";
 import { MODEL_CONTACT_ATTEMPTS, formatContactProbe } from "./retry";
 import { parseAppLocale } from "../locale";
@@ -52,6 +54,8 @@ export class StubRuntime implements AgentRuntime {
       message: formatContactProbe(input.version.model, 1, MODEL_CONTACT_ATTEMPTS, locale),
     });
     const answers: string[] = [];
+    const toolBudget = createToolBudget(input.budget);
+    const egressGuard = createEgressGuard({ userText: userTextOf(input.history) });
 
     const wantsCalc = hasEnabledBinding(input.bindings, "calculator") && /\d+\s*[+\-*/]\s*\d+/.test(summary);
     const wantsPast = hasEnabledBinding(input.bindings, "past_sessions") && wantsStubPastChat(summary);
@@ -80,7 +84,7 @@ export class StubRuntime implements AgentRuntime {
         const match = summary.match(/(\d+\s*[+\-*/]\s*\d+)/);
         const expression = match?.[1] ?? "1+1";
         await input.onEvent({ type: "tool.started", toolKey: "calculator", input: { expression } });
-        const output = await invokeToolGuarded(tool, { expression }, input.tenant);
+        const output = await invokeToolGuarded(tool, { expression }, input.tenant, toolBudget, egressGuard);
         await input.onEvent({ type: "tool.completed", toolKey: "calculator", output });
         const result = sentenceFromCalculator(expression, output);
         answers.push(result ?? JSON.stringify(output));
@@ -91,7 +95,7 @@ export class StubRuntime implements AgentRuntime {
       const tool = getTool("datetime");
       if (tool) {
         await input.onEvent({ type: "tool.started", toolKey: "datetime", input: {} });
-        const output = await invokeToolGuarded(tool, {}, input.tenant);
+        const output = await invokeToolGuarded(tool, {}, input.tenant, toolBudget, egressGuard);
         await input.onEvent({ type: "tool.completed", toolKey: "datetime", output });
         const result = sentenceFromDatetime(output);
         answers.push(result ?? JSON.stringify(output));
@@ -102,7 +106,7 @@ export class StubRuntime implements AgentRuntime {
       const tool = getTool("past_sessions");
       if (tool) {
         await input.onEvent({ type: "tool.started", toolKey: "past_sessions", input: { action: "list" } });
-        const output = await invokeToolGuarded(tool, { action: "list" }, input.tenant);
+        const output = await invokeToolGuarded(tool, { action: "list" }, input.tenant, toolBudget, egressGuard);
         await input.onEvent({ type: "tool.completed", toolKey: "past_sessions", output });
         answers.push(sentenceFromPastSessions(output, locale));
       }

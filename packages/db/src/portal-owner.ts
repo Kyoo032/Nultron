@@ -7,25 +7,33 @@
  * minted, and the host's job is to hold a row for each so the tenant's desks have something to hang
  * off. Nothing here invents an identity — every id is the portal's own.
  *
- * Two entry points, deliberately split:
+ * Three entry points, deliberately split:
  *
  *   - `ensurePortalOwner` writes the rows. Called from the **sign-in path only**
  *     (`packages/host/src/auth/routes.ts`), because that is the one moment the host knows the
- *     portal just vouched for these ids.
+ *     portal just vouched for these ids. It writes the membership with the role the portal sent.
+ *   - `syncPortalRole` only updates an existing membership's role. Called when the portal answers a
+ *     refresh (`packages/host/src/auth/portal-check.ts`), so a role the portal changed arrives with
+ *     the next token and an old over-privileged row is brought down to what the portal says.
  *   - `resolvePortalTenant` only reads. It never creates anything, so a session presenting a tenant
- *     the host has never provisioned is refused rather than quietly given a desk.
+ *     the host has never provisioned is refused rather than quietly given a desk. The role it
+ *     returns is the membership row's, read per request, never anything the client sent.
  *
  * That split is the fail-closed rule from the lane C brief: the portal's browser-login grant is
  * undocumented (spec §8 q1), so a session that does not resolve is a 401/403 and never a fall back
  * to `local-tenant`.
  */
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import {
   HOME_WORKSPACE_NAME,
   HOME_WORKSPACE_SLUG,
+  HOSTED_FIRST_DESK_MODES,
+  LOCAL_TENANT_ID,
+  MEMBERSHIP_ROLES,
   PERSONAL_ORG_SLUG,
-  WORK_PRODUCT_MODES,
+  membershipRoleForPortal,
   type MembershipRole,
+  type PortalRole,
   type TenantContext,
 } from "@agentforge/core";
 import type { Database } from "./client";
@@ -38,6 +46,14 @@ export type PortalIdentity = {
   readonly orgId: string;
   readonly userId: string;
 };
+
+/**
+ * What a sign-in hands `ensurePortalOwner`: the ids plus the role the portal sent in the same token
+ * body (`parsePortalRole`), or `null` when it sent none the host recognises. Required, so a caller
+ * cannot forget it: the host has no default role of its own, and no role is a `member`, never an
+ * `owner`.
+ */
+export type PortalProvisioning = PortalIdentity & { readonly role: PortalRole | null };
 
 /**
  * Why a session could not be turned into a tenant. Each maps to an existing reason code in
@@ -83,10 +99,83 @@ function placeholderEmail(userId: string): string {
 }
 
 /**
+ * Make the person's membership of an org, and of its desks, say `role`. Returns whether the
+ * organization membership — the row every authorization check reads — had to change.
+ *
+ * Only ever an UPDATE of a row that exists: this never creates a membership, and it matches the org
+ * and the user together, so another org's row for the same user id, and another person in this org,
+ * are never touched. `ne(role, …)` keeps an already-correct row from being written at all.
+ */
+async function writeMembershipRole(
+  db: Database,
+  orgId: string,
+  userId: string,
+  role: MembershipRole,
+): Promise<boolean> {
+  const changed = await db
+    .update(organizationMembers)
+    .set({ role })
+    .where(
+      and(
+        eq(organizationMembers.organizationId, orgId),
+        eq(organizationMembers.userId, userId),
+        ne(organizationMembers.role, role),
+      ),
+    )
+    .returning({ id: organizationMembers.id });
+  await db
+    .update(workspaceMembers)
+    .set({ role })
+    .where(
+      and(
+        eq(workspaceMembers.organizationId, orgId),
+        eq(workspaceMembers.userId, userId),
+        ne(workspaceMembers.role, role),
+      ),
+    );
+  return changed.length > 0;
+}
+
+/**
+ * A refresh's reconciliation: bring an existing membership to the role the portal just sent.
+ *
+ * The portal reads the member's role at every mint and every refresh, so a role it changed arrives
+ * with the next token. A role the host does not recognise (`null`) is the least privilege, `member`,
+ * so an old `owner` row — every first-time sign-in before the portal sent a role wrote one — loses
+ * its rights the moment the portal says anything else. Reads and updates only: a person who was
+ * never provisioned (or whose rows an erase deleted) gets nothing created, and the org must belong
+ * to the tenant the session names. Returns whether anything changed.
+ */
+export async function syncPortalRole(db: Database, identity: PortalIdentity, role: PortalRole | null): Promise<boolean> {
+  if (identity.tenantId === LOCAL_TENANT_ID) {
+    // The desktop's and webdev's one local owner (`ensureLocalOwner`) has no portal to reconcile
+    // with. No session carries this tenant id, so this is a wall, not a code path.
+    return false;
+  }
+  const [org] = await db
+    .select({ id: organizations.id })
+    .from(organizations)
+    .where(and(eq(organizations.id, identity.orgId), eq(organizations.tenantId, identity.tenantId)))
+    .limit(1);
+  if (!org) {
+    return false;
+  }
+  return writeMembershipRole(db, org.id, identity.userId, membershipRoleForPortal(role));
+}
+
+/**
  * Write the host's rows for a portal identity, idempotently: tenant, org, user, the two memberships
  * and a home desk. Safe to call on every sign-in; the second call reads and returns.
+ *
+ * **The role is the portal's, and there is no default.** The membership is written with the role the
+ * portal sent, or `member` when it sent none the host recognises; a sign-in for a person who already
+ * has a membership moves it to what the portal says now, in either direction. The first person in a
+ * brand-new org is an `owner` only if the portal says so — the portal makes the first invite for a
+ * tenant an owner's. (Before this, every person provisioned here was an `owner`, so "owner" meant
+ * "signed in" and any colleague could erase the company: SR-65.)
  */
-export async function ensurePortalOwner(db: Database, identity: PortalIdentity): Promise<TenantContext> {
+export async function ensurePortalOwner(db: Database, identity: PortalProvisioning): Promise<TenantContext> {
+  const role = membershipRoleForPortal(identity.role);
   await ensureTenant(db, {
     id: identity.tenantId,
     slug: slugForId("tenant", identity.tenantId),
@@ -129,13 +218,13 @@ export async function ensurePortalOwner(db: Database, identity: PortalIdentity):
     .where(and(eq(organizationMembers.organizationId, org.id), eq(organizationMembers.userId, identity.userId)))
     .limit(1);
   if (!membership) {
-    // The portal has no role claim in the token body yet (open question in the lane C notes), so the
-    // first and every signed-in user owns their own org, which is what the desktop already assumes.
     await db.insert(organizationMembers).values({
       organizationId: org.id,
       userId: identity.userId,
-      role: "owner",
+      role,
     });
+  } else if (membership.role !== role) {
+    await writeMembershipRole(db, org.id, identity.userId, role);
   }
 
   let ownedWorkspaces = await db.select().from(workspaces).where(eq(workspaces.organizationId, org.id));
@@ -146,7 +235,9 @@ export async function ensurePortalOwner(db: Database, identity: PortalIdentity):
         organizationId: org.id,
         name: HOME_WORKSPACE_NAME,
         slug: HOME_WORKSPACE_SLUG,
-        productModes: [...WORK_PRODUCT_MODES],
+        // Enterprise: every mode, as it has always been. The Personal first-run list does not reach
+        // a hosted tenant; the owner has not decided this one.
+        productModes: [...HOSTED_FIRST_DESK_MODES],
       })
       .returning();
   }
@@ -162,8 +253,10 @@ export async function ensurePortalOwner(db: Database, identity: PortalIdentity):
       workspaceId: home.id,
       organizationId: org.id,
       userId: identity.userId,
-      role: "owner",
+      role,
     });
+  } else if (deskMembership.role !== role) {
+    await writeMembershipRole(db, org.id, identity.userId, role);
   }
 
   return {
@@ -171,7 +264,7 @@ export async function ensurePortalOwner(db: Database, identity: PortalIdentity):
     organizationId: org.id,
     workspaceId: home.id,
     userId: identity.userId,
-    role: "owner",
+    role,
   };
 }
 
@@ -230,7 +323,15 @@ export async function resolvePortalTenant(
       organizationId: org.id,
       workspaceId: preferred || home.id,
       userId: identity.userId,
-      role: membership.role as MembershipRole,
+      role: storedRole(membership.role),
     },
   };
+}
+
+/**
+ * The role a row holds, as a role the host knows. A value outside `MEMBERSHIP_ROLES` — a hand edit,
+ * a restore from another version — is a `member`, never itself and never an owner.
+ */
+function storedRole(value: string): MembershipRole {
+  return (MEMBERSHIP_ROLES as readonly string[]).includes(value) ? (value as MembershipRole) : "member";
 }
