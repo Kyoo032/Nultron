@@ -1,6 +1,6 @@
 # Map — Edit timeline and agent
 
-Last verified: 2026-10-02 (working tree on top of 0b61a29), a later pass that day, for § 5 (the echo and `foldApplied`), the `commitOps` / import / agent-stream passages in § 6, § 7 and § 8, the `applyOp` row of the failure table, and the first Gotchas entry: the renderer now folds each host frame once, by seq, outside any state updater, so the echoed op no longer unmounts the studio. Proven by `apps/web/lib/edit-client.test.ts` and by replaying frames captured from the live host on `:3000` (a throwaway project with an import and a split, in both arrival orders); not driven in a browser. Earlier the same day: the Edit agent's ffmpeg prompt line in § 2 (on the hosted server it no longer names the server's platform, install command or environment variable; the paragraph that listed it as the one uncovered reader of the hint is rewritten) and the `compactPrompt` / `editAgentModelId` citations in the live-path paragraph, which moved. Proven by unit tests with a Personal-parity case that was mutation-checked; not driven in a browser. Before that: 2026-10-01 (working tree on top of 0b61a29), a final pass that day, for the other hosted no-key doors in § 8 and the failure table (`Go` on a plan card, the recipe buttons and the Generate tab's submit are quiet and say why, and `sendAgent` refuses while the key is missing) and for the hosted doctor answer in § 1 and § 2 (it no longer carries `setup`). Proven by unit tests, each with a Personal-parity case that was mutation-checked; **not driven in a browser**. The citations in the passages that pass touched were re-anchored; every other `edit-studio.tsx` citation below `:450` was not re-read and may sit a few lines off after other lanes' edits. Before that, a later pass that day, for the Enterprise no-key states in § 1, § 8 and the failure table (the Agent pane's `edit-agent-needs-key` note and quiet `edit-composer-send`, the hosted one-line `edit-needs-ffmpeg`) and the testid citations into `edit-agent-panel.tsx` and `ffmpeg-setup-notice.tsx`, which moved. The hosted states are driven on `:3000` with the hosted marker and the host's answers faked in the browser (`page.route`, every non-GET aborted), not on a deployed hosted build. Before that, 2026-10-01 (working tree on top of 0b61a29) for § 1's empty-state paragraph, the Gotchas lines about it, and every `edit-studio.tsx` citation that points at or past the `!project` branch (`:715`) or that this pass re-read (the testid list at the foot included): the empty state moved out of `edit-studio.tsx` into `edit-empty-state.tsx`, so everything after it shifted up by 53 lines. Read against the files and driven read-only on `:3000` at 390, 768, 1024, 1100 and 1440 px (which element scrolls, below). Before that, 2026-09-29 for § 2 (doctor), in the working tree and not committed: the doctor route and the boot probe are
+Last verified: 2026-10-05, the #130 branch merged with `origin/main` at `7354a6b`, for § 8's harness paragraph and for every `agent-run.ts` citation on this page, which moved when the harness block went in front of the stub branch (+2 lines in the header, +23 in `runEditAgent`). The Edit spec now owns the five skills (`packages/core/src/harness/modes/edit.ts`, declared in `packages/core/src/edit/harness.ts`), and a cancelled turn makes no harness tool call. Read against the merged code and the unit tests (`harness-run.test.ts`); not driven in a browser. Before that, 2026-09-28 for the five method-free skills in § 8 (`packages/core/src/edit/harness.ts`, `packages/host/src/edit/harness-run.ts`). Before that, 2026-10-02 (working tree on top of 0b61a29), a later pass that day, for § 5 (the echo and `foldApplied`), the `commitOps` / import / agent-stream passages in § 6, § 7 and § 8, the `applyOp` row of the failure table, and the first Gotchas entry: the renderer now folds each host frame once, by seq, outside any state updater, so the echoed op no longer unmounts the studio. Proven by `apps/web/lib/edit-client.test.ts` and by replaying frames captured from the live host on `:3000` (a throwaway project with an import and a split, in both arrival orders); not driven in a browser. Earlier the same day: the Edit agent's ffmpeg prompt line in § 2 (on the hosted server it no longer names the server's platform, install command or environment variable; the paragraph that listed it as the one uncovered reader of the hint is rewritten) and the `compactPrompt` / `editAgentModelId` citations in the live-path paragraph, which moved. Proven by unit tests with a Personal-parity case that was mutation-checked; not driven in a browser. Before that: 2026-10-01 (working tree on top of 0b61a29), a final pass that day, for the other hosted no-key doors in § 8 and the failure table (`Go` on a plan card, the recipe buttons and the Generate tab's submit are quiet and say why, and `sendAgent` refuses while the key is missing) and for the hosted doctor answer in § 1 and § 2 (it no longer carries `setup`). Proven by unit tests, each with a Personal-parity case that was mutation-checked; **not driven in a browser**. The citations in the passages that pass touched were re-anchored; every other `edit-studio.tsx` citation below `:450` was not re-read and may sit a few lines off after other lanes' edits. Before that, a later pass that day, for the Enterprise no-key states in § 1, § 8 and the failure table (the Agent pane's `edit-agent-needs-key` note and quiet `edit-composer-send`, the hosted one-line `edit-needs-ffmpeg`) and the testid citations into `edit-agent-panel.tsx` and `ffmpeg-setup-notice.tsx`, which moved. The hosted states are driven on `:3000` with the hosted marker and the host's answers faked in the browser (`page.route`, every non-GET aborted), not on a deployed hosted build. Before that, 2026-10-01 (working tree on top of 0b61a29) for § 1's empty-state paragraph, the Gotchas lines about it, and every `edit-studio.tsx` citation that points at or past the `!project` branch (`:715`) or that this pass re-read (the testid list at the foot included): the empty state moved out of `edit-studio.tsx` into `edit-empty-state.tsx`, so everything after it shifted up by 53 lines. Read against the files and driven read-only on `:3000` at 390, 768, 1024, 1100 and 1440 px (which element scrolls, below). Before that, 2026-09-29 for § 2 (doctor), in the working tree and not committed: the doctor route and the boot probe are
 async and cached, and the packaged app no longer waits on the probe before the first paint. Before that, 2026-09-27 for the preview transport and the timeline hint, which read `edit.preview.*` and `edit.timeline.*`. Before that, 2026-09-27 for agent cards: `applyAgentOps` sets `status: "applied"` after `appendOps` succeeds, and the card offers Keep only while `proposed`. A new project name comes from `edit.defaultProjectName` (`Untitled edit` / `Suntingan baru`). Before that: 2026-09-26 for § 8 (live bindings, chat model, tool-result frames, title defaults, stub "says Hello"). Before that: 2026-09-23 at d4561b8 + uncommitted tree for § 2 (doctor), § 4 (the `appendOps` steps, desk and job
 scope), § 6 (keyboard guard, drag release), § 10 (review gate, and `render` refused on `/jobs`), § 11 (generate,
 the worker's tenant, the still check), § 12 (export, the desktop save dialog) and the gateway-gate failure row —
@@ -101,7 +101,7 @@ custom build, are dropped; `found`, `version` and `reason` stay. Nothing in `app
 and the hosted banner never reads the hint (§ 1): both described the operator's machine, which a tenant
 cannot act on. The desk still gets both (`doctor-hosted.test.ts` holds each half, and pins the desk's
 whole hint). The other reader of the hint is the Edit agent's prompt line (`ffmpegPromptLine`,
-`agent-run.ts:119-137`), which calls `getEditDoctor()` directly, not through `withoutBinaryPath`. Until 2026-10-02 it
+`agent-run.ts:122-140`), which calls `getEditDoctor()` directly, not through `withoutBinaryPath`. Until 2026-10-02 it
 still told the model the server's platform and install command (and to have the owner "run it in a terminal, then press
 Check again"), and the model could repeat that in chat. On the hosted server a missing ffmpeg is now one neutral
 sentence (the video tools are not set up on this server yet, an administrator turns them on, there is nothing to
@@ -317,21 +317,22 @@ because the note already says it.
 `settings.editTurnCapUsd` and picks a path:
 
 - **Live** (a key is saved): `createRuntime(settings).execute(...)` with a compact project prompt
-  (`compactPrompt`, `packages/host/src/edit/agent-run.ts:139-151`) that tells the model a title card
-  is an `add_title` call in this turn. The version model is `editAgentModelId()` (`:154-160`), the
+  (`compactPrompt`, `packages/host/src/edit/agent-run.ts:142-154`) that tells the model a title card
+  is an `add_title` call in this turn. The version model is `editAgentModelId()` (`:157-163`), the
   refreshed chat default — never the literal `"edit"`. `bindings` is `editAgentBindings`
   (`packages/core/src/tools/edit/bindings.ts:5-13`), every `EDIT_TOOLS` key enabled. An empty binding
   list is what left the timeline blank: the runtime only exposes tools from bindings
   (`packages/core/src/runtime/ai-sdk-runtime.ts:430-444`), so a model with `bindings: []` can only
   talk. `onEvent` forwards `tool.completed` output that carries `ops` / `card` / `job` as
-  `edit.ops` / `edit.card` / `edit.job` (`pushToolFrames`, `agent-run.ts:163-167`, called at `:226`).
+  `edit.ops` / `edit.card` / `edit.job` (`pushToolFrames`, `agent-run.ts:188-192`, called at `:276`).
+- **Harness** (a method-free sentence, live or stub): before either of those paths (`agent-run.ts:227-249`), `matchEditHarnessSkill` (`packages/core/src/edit/harness.ts`) picks one of five skills when the sentence is not already S1–S11, F1–F5, or a `generate image` / `generate video` line. The five are the Edit spec's skills: `editHarnessSpec` (`packages/core/src/harness/modes/edit.ts`) reads `EDIT_HARNESS_SKILLS`, declared beside the checks in `edit/harness.ts`, so `MODE_HARNESSES` lists them as `new` and the spec's `repairRounds` stays 0, because each retry below is inline and not a `runChecked` round. `runEditHarness` (`packages/host/src/edit/harness-run.ts`, called from `agent-run.ts`) runs only the phases that skill needs, and every tool call goes through its `invoke`, which first checks the request's abort signal: a cancelled turn makes no call, starts no job, and ends the stream without a `run.failed` (`runEditAgent`'s catch, `:287-292`), the same rule as the live path. Silence and scene probes call local ffmpeg when the clip has an asset and the runtime is live; the stub uses clip duration instead, and retries the probe once when the first pass is empty. Words are checked on the fold and retried once if they did not land. A made shot is charged against the turn cap (over cap proposes a plan and does not retry) and the prompt goes through `withOutputLanguage` on the `edit` surface. Handing back the file checks the review gate (closed stops, no retry) and queues `export` at `h264-1080p`, retrying the start once. Every mutation is still an append to the ops log. No new control on the Edit screen.
 - **Stub** (no key — the state on this desk): `runStub` matches the text against
   `STUB_EDIT_SCENARIOS` (`packages/core/src/runtime/stub-edit-scenarios.ts`), then a title-card
   fallback (`extractTitleCardText`, same file) so "Add a title card that says Hello" is `add_title`
   with `{ text: "Hello" }`, then the Fill and Generate scenario tables, and drives the **real tools**
   with canned arguments. It is scripted input, not a scripted result.
 
-`runStub`'s shape, in order (`agent-run.ts:248`):
+`runStub`'s shape, in order (`agent-run.ts:302`):
 
 1. No match → `assistant.delta` with the scripted help copy, `run.completed`. No card.
 2. `__undo__` (S10) → scripted undo copy only. **No card, no ops** — the owner still has to press
@@ -341,7 +342,7 @@ because the note already says it.
 5. A generation tool → estimate, `chargeTurnBudget`; over cap → a refusal plus an `edit.plan` card.
 6. Otherwise: fill in missing ids from the doc, emit `tool.started`, invoke the tool, and
    forward whatever it returned as `edit.ops` / `edit.card` / `edit.job` frames (`pushToolFrames`,
-   `packages/host/src/edit/agent-run.ts:400`). `add_title` no longer requires a full ASS style:
+   `packages/host/src/edit/agent-run.ts:453`). `add_title` no longer requires a full ASS style:
    `{ text }` lands a clip on `v1` at frame 0 for 90 frames (`packages/core/src/tools/edit/tools.ts:265-288`).
 
 The tool's writes go through `hostEditBackend.applyAgentOps`
@@ -351,7 +352,7 @@ and write a snapshot, then emit `card.updated`. The card's `verb` is mechanical 
 (`backend.ts:51-57`) is just `ops[0].type.replaceAll("_", " ")` with the first touched clip id as the
 object. That is why an S1 "Remove the silences" turn shows a card reading **`split clip · <clip id>`**
 and not "Remove 3 silences": `stubEditCardCopy` is only used for the `assistant.delta` line
-(`agent-run.ts:400-401`), never for the card.
+(`agent-run.ts:454-455`), never for the card.
 
 ### 9. Cards — Keep, Undo, Tweak, plan
 
@@ -531,7 +532,7 @@ A's `workerWorkspaceId`.
 ## Gotchas
 
 - **An agent turn leaves a usage row against its tenant.** `rememberJobUsage`
-  (`packages/host/src/edit/agent-run.ts:183`, and `:360` on the stub path) writes to
+  (`packages/host/src/edit/agent-run.ts:281` on the live path, `:245` on the harness path and `:457` on the stub path) writes to
   `tenant_usage` under mode `edit`. It used to append to one global untenanted
   `desk-usage.json`. See [`tenant-usage-ledger.md`](tenant-usage-ledger.md).
 
@@ -561,7 +562,7 @@ A's `workerWorkspaceId`.
 - **The card verb is the op type, not the scenario copy.** `verbFor`
   (`packages/host/src/edit/backend.ts:51-57`) prints `ops[0].type.replaceAll("_", " ")`, so S1 shows
   `split clip · <clip id>`. The friendly `stubEditCardCopy` string only reaches the `assistant.delta`
-  line (`agent-run.ts:355-356`), which the Edit UI does not render at all.
+  line (`agent-run.ts:454-455`), which the Edit UI does not render at all.
 - **A card can exist with zero ops.** `applyAgentOps` inserts the card as `proposed` before `appendOps`.
   When the ops land, the same row is updated to `applied` and the emitted card uses that status, so
   Keep is hidden. A stub scenario whose canned frames fall outside the clip (S1's 300–1395 on a short
@@ -599,10 +600,10 @@ A's `workerWorkspaceId`.
 - **`edit-generate-storyboard` exists** (the sub-tab button). `edit-storyboard-generate` and
   `edit-storyboard-animate-all` do not. `animate_storyboard` is backend-only
   (`packages/core/src/tools/edit/tools.ts`).
-- **`mutatingCount > 3` in the stub is dead code** (`packages/host/src/edit/agent-run.ts:245-257`):
+- **`mutatingCount > 3` in the stub is dead code** (`packages/host/src/edit/agent-run.ts:356-364`):
   the counter is incremented at most once per turn.
 - **The turn cap is per request, not cumulative.** `createTurnBudget` is rebuilt on every
-  `POST …/agent` (`agent-run.ts:145`), clamped to `[0.5, 50]`
+  `POST …/agent` (`agent-run.ts:215`), clamped to `[0.5, 50]`
   (`packages/host/src/edit/budget.ts:12-17`), and the stub charges it at most once.
 
 ## Verify

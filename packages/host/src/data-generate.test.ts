@@ -144,7 +144,11 @@ describe("the progress list of a Data job", () => {
     scriptedEvents = events;
     const seen: JobEvent[] = [];
     await analyzeDataset(tenant, { prompt: "Who spends most?", csv: CSV }, (event) => seen.push(event));
-    return seen.filter((event): event is Extract<JobEvent, { type: "job.step" }> => event.type === "job.step");
+    // The host's own cut queries are `cutting` steps; this list is what the model did while analyzing.
+    return seen.filter(
+      (event): event is Extract<JobEvent, { type: "job.step" }> =>
+        event.type === "job.step" && event.phase === "analyzing",
+    );
   }
 
   beforeEach(() => {
@@ -258,7 +262,7 @@ describe("the instruction a Data job runs under", () => {
     }
     expect(DATA_SYSTEM).toContain('"bar" | "line" | "scatter"');
     expect(DATA_SYSTEM).toContain("charts: 0 to 3");
-    expect(DATA_SYSTEM).toContain("3 to 6 findings");
+    expect(DATA_SYSTEM).toContain("One finding per cut you use");
   });
 
   it("tells the model that cell values and headers are data, never instructions", () => {

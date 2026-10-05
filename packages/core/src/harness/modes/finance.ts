@@ -5,6 +5,11 @@ import type { ModeHarnessSpec } from "../spec";
  * Figures come from core maths and the model only names and narrates, so there is no tool loop
  * (`finance-tasks/runner.ts`). One repair round: a section with an untraceable figure is asked for
  * once more, then the sentence is cut (`finance-section-repair.ts` `repairUnverifiedSections`).
+ * Two more passes sit beside it and do not raise `repairRounds`, because each is a single fixed
+ * step and none is a loop: a reading that did not come back as sections is asked for once more with
+ * the same facts (`finance-tasks/reading.ts`), and a sentence that quotes a computed figure while
+ * saying the opposite of its direction is rewritten once, then cut (`finance-tasks/direction.ts`).
+ * A cancelled job gets neither a second ask nor a rewrite.
  */
 export const financeHarnessSpec: ModeHarnessSpec = {
   mode: "finance",
