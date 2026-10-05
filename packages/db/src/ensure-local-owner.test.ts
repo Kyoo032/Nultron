@@ -6,11 +6,13 @@ import {
   HOME_WORKSPACE_NAME,
   HOME_WORKSPACE_SLUG,
   LEGACY_HOME_WORKSPACE_NAME,
+  LOCAL_OWNER_ID,
 } from "@agentforge/core";
 import { ensureSchema } from "./ensure-schema";
 import * as schema from "./schema";
-import { workspaces } from "./schema";
+import { organizationMembers, workspaceMembers, workspaces } from "./schema";
 import { createLocalWorkspace, deleteLocalWorkspace, ensureLocalOwner } from "./ensure-local-owner";
+import { syncPortalRole } from "./portal-owner";
 
 describe("ensureLocalOwner default desk name", () => {
   let sqlite: Database.Database;
@@ -45,6 +47,42 @@ describe("ensureLocalOwner default desk name", () => {
     await ensureLocalOwner(db);
     const [row] = await db.select().from(workspaces).where(eq(workspaces.slug, HOME_WORKSPACE_SLUG));
     expect(row?.name).toBe(HOME_WORKSPACE_NAME);
+  });
+
+  // Personal (desktop and webdev) has no portal: its one person is the local owner, and the hosted
+  // role rule (the portal's role claim; no role is a member) must never reach it. These pin that the
+  // desk behaves exactly as it always did, before and after the hosted fix.
+  it("the local owner stays an owner of the org and the desk, as it always was", async () => {
+    const tenant = await ensureLocalOwner(db);
+
+    expect(tenant.role).toBe("owner");
+    expect(tenant.userId).toBe(LOCAL_OWNER_ID);
+    const orgRows = await db.select().from(organizationMembers).where(eq(organizationMembers.userId, LOCAL_OWNER_ID));
+    expect(orgRows.map((row) => row.role)).toEqual(["owner"]);
+    const deskRows = await db.select().from(workspaceMembers).where(eq(workspaceMembers.userId, LOCAL_OWNER_ID));
+    expect(deskRows.map((row) => row.role)).toEqual(["owner"]);
+  });
+
+  it("reads the local owner back as an owner on every boot, with no role ever supplied", async () => {
+    await ensureLocalOwner(db);
+    const again = await ensureLocalOwner(db);
+
+    expect(again.role).toBe("owner");
+    expect(await db.select().from(organizationMembers)).toHaveLength(1);
+  });
+
+  it("a portal role reconciliation can never touch the local desk, even if handed its ids", async () => {
+    const tenant = await ensureLocalOwner(db);
+
+    const changed = await syncPortalRole(
+      db,
+      { tenantId: tenant.tenantId, orgId: tenant.organizationId, userId: LOCAL_OWNER_ID },
+      "member",
+    );
+
+    expect(changed).toBe(false);
+    const [row] = await db.select().from(organizationMembers).where(eq(organizationMembers.userId, LOCAL_OWNER_ID));
+    expect(row?.role).toBe("owner");
   });
 
   it("does not rename a custom name on the home slug", async () => {

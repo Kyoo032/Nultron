@@ -1,0 +1,177 @@
+# The hosted app: ONE pod holding the app container and the Caddy sidecar.
+#
+# Exactly one replica, and Recreate, because the app is a single process by design:
+#   - SQLite allows one writer and its file must sit on a block volume, never NFS/CFS;
+#   - the portal refresh is single-flight in memory (SR-66): two processes sign users out at random;
+#   - the rate limiters are in memory (SR-29): a second process doubles every limit;
+#   - a new process fails the previous process's running Edit jobs on boot.
+# Do not raise `replicas`, add an HPA, or switch to RollingUpdate until the data layer moves.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nultron-app
+  labels:
+    app.kubernetes.io/name: nultron-app
+    app.kubernetes.io/part-of: nultron
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nultron-app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nultron-app
+        app.kubernetes.io/part-of: nultron
+    spec:
+      # No API token in a pod that never talks to the API, and no per-Service environment variables:
+      # the portal's PORTAL_PORT parsing and the app's own names are not to be shadowed by them.
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: app
+          image: nultron-ent
+          imagePullPolicy: IfNotPresent
+          # The image's CMD: tsx server.ts, from /app/apps/web.
+          envFrom:
+            - configMapRef:
+                name: nultron-app-env
+          # Per-key, not envFrom: this container gets the four names it uses and no database password.
+          env:
+            - name: AGENTFORGE_SECRETS_KEY
+              valueFrom:
+                secretKeyRef: {name: nultron-secrets, key: AGENTFORGE_SECRETS_KEY}
+            - name: AGENTFORGE_BILLING_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef: {name: nultron-secrets, key: AGENTFORGE_BILLING_WEBHOOK_SECRET}
+            - name: AGENTFORGE_PORTAL_CLIENT_ID
+              valueFrom:
+                secretKeyRef: {name: nultron-secrets, key: AGENTFORGE_PORTAL_CLIENT_ID}
+            - name: AGENTFORGE_PORTAL_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef: {name: nultron-secrets, key: AGENTFORGE_PORTAL_CLIENT_SECRET}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: {cpu: 500m, memory: 1Gi, ephemeral-storage: 256Mi}
+            limits: {cpu: "4", memory: 3Gi, ephemeral-storage: 2Gi}
+          # The app binds 127.0.0.1 on purpose (the proxy shares the pod's loopback), and a kubelet
+          # httpGet probe goes to the pod IP, so it would fail. These exec probes do what the image's
+          # HEALTHCHECK does: GET /healthz on the loopback port, answered before routing, never
+          # opening the database, and outside the https-only refusal by construction.
+          startupProbe:
+            exec:
+              command:
+                - node
+                - -e
+                - "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            exec:
+              command:
+                - node
+                - -e
+                - "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command:
+                - node
+                - -e
+                - "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          volumeMounts:
+            - {name: data, mountPath: /data}
+            - {name: components, mountPath: /opt/agentforge/components}
+            - {name: app-tmp, mountPath: /tmp}
+        - name: caddy
+          image: caddy:2.11-alpine
+          imagePullPolicy: IfNotPresent
+          args: ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+          # Only what the Caddyfile reads. The app's secrets are never in this container (SR-73).
+          envFrom:
+            - configMapRef:
+                name: nultron-edge-env
+          ports:
+            - {name: https, containerPort: 8443}
+            - {name: http, containerPort: 8080}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+              # The official image's /usr/bin/caddy carries a file capability (cap_net_bind_service). With
+              # every capability dropped the kernel refuses to exec it at all ("exec /usr/bin/caddy:
+              # operation not permitted"), even though this Caddy listens on 8443 and never binds a
+              # privileged port. compose.yml adds the same one capability back for the same reason.
+              add: ["NET_BIND_SERVICE"]
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {cpu: "1", memory: 512Mi}
+          readinessProbe:
+            tcpSocket: {port: https}
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket: {port: https}
+            periodSeconds: 30
+            failureThreshold: 5
+          volumeMounts:
+            - {name: caddy-conf, mountPath: /etc/caddy, readOnly: true}
+            - {name: caddy-data, mountPath: /data}
+            - {name: caddy-config, mountPath: /config}
+            - {name: caddy-tmp, mountPath: /tmp}
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: nultron-data}
+        - name: components
+          persistentVolumeClaim: {claimName: nultron-components}
+        - name: app-tmp
+          emptyDir: {sizeLimit: 2Gi}
+        - name: caddy-conf
+          configMap: {name: nultron-caddy}
+        - name: caddy-data
+          emptyDir: {sizeLimit: 256Mi}
+        - name: caddy-config
+          emptyDir: {sizeLimit: 64Mi}
+        - name: caddy-tmp
+          emptyDir: {sizeLimit: 64Mi}
+---
+# The edge. ClusterIP in the base; the local overlay port-forwards to it and the production overlay
+# turns it into a TCP-passthrough load balancer. 443 -> 8443 and 80 -> 8080 because the container
+# listens on unprivileged ports.
+apiVersion: v1
+kind: Service
+metadata:
+  name: nultron-edge
+  labels:
+    app.kubernetes.io/name: nultron-app
+    app.kubernetes.io/part-of: nultron
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: nultron-app
+  ports:
+    - {name: https, port: 443, targetPort: https, protocol: TCP}
+    - {name: http, port: 80, targetPort: http, protocol: TCP}

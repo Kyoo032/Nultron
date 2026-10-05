@@ -13,6 +13,7 @@ const CLAIMS_INPUT = {
   deviceId: "dev-1",
   sessionId: "ses-1",
   scope: "v1.chat v1.models",
+  role: "member" as const,
 };
 
 function ring(byte = 1) {
@@ -28,7 +29,7 @@ describe("signAccessToken", () => {
     expect(header).toEqual({ alg: "EdDSA", typ: "JWT", kid: keys.current.kid });
   });
 
-  it("carries exactly the claims device-code-login.md names", () => {
+  it("carries exactly the claims device-code-login.md names, plus the member's role", () => {
     const token = signAccessToken(ring().current, { ...CLAIMS_INPUT, now: NOW });
     const claims = JSON.parse(Buffer.from(token.split(".")[1], "base64url").toString("utf8"));
 
@@ -40,6 +41,7 @@ describe("signAccessToken", () => {
       did: "dev-1",
       sid: "ses-1",
       scope: "v1.chat v1.models",
+      role: "member",
       iat: NOW / 1000,
       exp: NOW / 1000 + ACCESS_TOKEN_TTL_SECONDS,
     });

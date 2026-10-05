@@ -1,4 +1,5 @@
-import { index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
+import { check, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 function uuidPk(name = "id") {
   return text(name)
@@ -103,7 +104,7 @@ export const tenantState = sqliteTable(
     tenantId: text("tenant_id")
       .notNull()
       .references(() => tenants.id, { onDelete: "cascade" }),
-    /** `TenantStateKey` from @agentforge/core: settings | gateway_gate. */
+    /** `TenantStateKey` from @agentforge/core: settings | gateway_gate | model_cache. */
     key: text("key").notNull(),
     value: text("value").notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" })
@@ -938,5 +939,89 @@ export const authSessions = sqliteTable(
     // The Phase 5 seat counter reads "members with a live session in the last 30 days" off this.
     index("auth_sessions_user_seen_idx").on(table.userId, table.lastSeenAt),
     index("auth_sessions_expires_idx").on(table.expiresAt),
+  ],
+);
+
+/**
+ * Desk files (drizzle/0022_desk_files.sql): the versioned text files an agent and its owner share on
+ * a desk. One row per file; a delete sets `deleted_at` and a later write to the same path starts a
+ * new row, so the unique index is over live rows only. `workspace_id` is the desk and carries no
+ * foreign key, like `artifacts` and `datasets`: the tenant purge deletes these rows by desk before
+ * the organization cascade (`WORKSPACE_SCOPED_TABLES`). The body of each version is a sealed object
+ * in the tenant object store, never a column here.
+ */
+export const deskFiles = sqliteTable(
+  "desk_files",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id").notNull(),
+    path: text("path").notNull(),
+    headVersion: integer("head_version").notNull(),
+    bytes: integer("bytes").notNull(),
+    mime: text("mime").notNull(),
+    sha256: text("sha256").notNull(),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+    deletedAt: integer("deleted_at"),
+  },
+  (table) => [
+    uniqueIndex("desk_files_live_path_unique").on(table.workspaceId, table.path).where(sql`${table.deletedAt} IS NULL`),
+    index("desk_files_ws_idx").on(table.workspaceId),
+  ],
+);
+
+/**
+ * One row per saved version of a desk file. History only grows: a revert is a new version holding an
+ * old body. `bytes` and `sha256` describe the plain text; `object_key` names the sealed object, whose
+ * size is what the tenant quota counts. `author_id` is the user id or the run id, `mode` the product
+ * mode of an agent author.
+ */
+export const deskFileVersions = sqliteTable(
+  "desk_file_versions",
+  {
+    fileId: text("file_id")
+      .notNull()
+      .references(() => deskFiles.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    objectKey: text("object_key").notNull(),
+    bytes: integer("bytes").notNull(),
+    sha256: text("sha256").notNull(),
+    authorKind: text("author_kind").notNull().$type<"user" | "agent">(),
+    authorId: text("author_id").notNull(),
+    mode: text("mode"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.fileId, table.version] }),
+    check("desk_file_versions_author_kind_check", sql`${table.authorKind} IN ('user', 'agent')`),
+  ],
+);
+
+/**
+ * A write or delete an agent wants to make in a real folder the owner opened (Personal only). Nothing
+ * touches the folder until the owner approves; `before_sha256` is the hash the apply step re-checks,
+ * so a file changed since the proposal is `stale`, not overwritten. This lane only creates the table.
+ */
+export const fileProposals = sqliteTable(
+  "file_proposals",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id").notNull(),
+    runId: text("run_id").notNull(),
+    path: text("path").notNull(),
+    kind: text("kind").notNull().$type<"write" | "delete">(),
+    beforeSha256: text("before_sha256"),
+    afterBody: text("after_body"),
+    status: text("status").notNull().$type<"pending" | "approved" | "applied" | "rejected" | "stale" | "failed">(),
+    createdAt: integer("created_at").notNull(),
+    decidedAt: integer("decided_at"),
+  },
+  (table) => [
+    index("file_proposals_ws_status_idx").on(table.workspaceId, table.status),
+    check("file_proposals_kind_check", sql`${table.kind} IN ('write', 'delete')`),
+    check(
+      "file_proposals_status_check",
+      sql`${table.status} IN ('pending', 'approved', 'applied', 'rejected', 'stale', 'failed')`,
+    ),
   ],
 );

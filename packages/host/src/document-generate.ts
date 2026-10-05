@@ -1,6 +1,7 @@
 import {
   ApiError,
   gatewayRequiredMessage,
+  harnessSpecFor,
   hasLiveProvider,
   holdDraftToSource,
   modeMessage,
@@ -10,8 +11,9 @@ import {
   type AppLocale,
   type TenantContext,
 } from "@agentforge/core";
+import type { CheckVerdict } from "@agentforge/core/harness";
 import { loadSettings } from "./settings-store";
-import { modeCatalogPayload, listSelectableModels } from "./selectable-models";
+import { modeDefaultsFor, listSelectableModels } from "./selectable-models";
 import {
   mergeDocumentSection,
   parseDocumentDraft,
@@ -28,14 +30,23 @@ import {
   readOptionalInstruction,
   type JobAssistantRun,
 } from "./job-regen";
-import { readSourceText, withSourceMaterial, withSourceRule } from "./job-source";
+import { throwIfJobAborted } from "./job-stream";
+import { withSourceMaterial, withSourceRule } from "./job-source";
+import { runChecked } from "./harness/run-checked";
+import {
+  buildChecksReport,
+  documentChecks,
+  type DocumentCheckInput,
+  type DocumentChecksReport,
+} from "./documents-checks";
+import { assembleDeskSource } from "./desk-sources";
 import { localeForRun } from "./run-context";
 import { artifactStore } from "./artifacts";
 import { upsertWorkSource } from "./knowledge-ingest";
 import { artifactWorkCard, documentDraftMarkdown } from "./work-cards";
 import { log } from "./log";
 
-const FINANCE_SYSTEM = `You draft finished finance documents for DPSBuddy — not skeletons.
+const FINANCE_SYSTEM = `You draft finished finance documents for Nultron — not skeletons.
 Return ONLY valid JSON (no markdown fences, no commentary) with this exact shape:
 {
   "title": string,
@@ -50,7 +61,7 @@ Rules:
 - Headings are claims or jobs, not labels.
 - No campus / student / course nouns unless the topic itself requires them.`;
 
-const DOCUMENT_SYSTEM = `You draft finished professional documents for DPSBuddy — not skeletons.
+const DOCUMENT_SYSTEM = `You draft finished professional documents for Nultron — not skeletons.
 Return ONLY valid JSON (no markdown fences, no commentary) with this exact shape:
 {
   "title": string,
@@ -95,6 +106,27 @@ export function documentJobSystemPrompt(finance: boolean, locale: AppLocale = lo
   return withOutputLanguage(base, finance ? "finance" : "documents", locale);
 }
 
+/** What a repair call adds to the same prompt: the reply that failed, and the checks' note on it. */
+type RepairRound = { readonly previous: string; readonly note: string };
+
+/** A reply longer than this is cut when it is quoted back; the note says what to fix, not where. */
+const REPAIR_PREVIOUS_MAX_CHARS = 30_000;
+
+function withRepairRound(prompt: string, repair: RepairRound | undefined): string {
+  if (!repair) {
+    return prompt;
+  }
+  const previous = repair.previous.slice(0, REPAIR_PREVIOUS_MAX_CHARS);
+  return `${prompt}
+
+Your previous reply (correct it, do not repeat it):
+<<<
+${previous}
+>>>
+
+${repair.note}`;
+}
+
 /** One draft call. The run says which model answered, which is the one the artifact records. */
 async function collectAssistantRun(
   tenant: TenantContext,
@@ -103,6 +135,8 @@ async function collectAssistantRun(
   finance: boolean,
   sourceText: string,
   modelExplicit: boolean,
+  signal?: AbortSignal,
+  repair?: RepairRound,
 ): Promise<JobAssistantRun> {
   return collectJobAssistantRun({
     tenant,
@@ -114,7 +148,8 @@ async function collectAssistantRun(
     agentId: finance ? "finance" : "document",
     jobMode: finance ? "finance" : "documents",
     versionId: finance ? "finance-draft" : "document-draft",
-    prompt: withSourceMaterial(prompt, sourceText),
+    prompt: withRepairRound(withSourceMaterial(prompt, sourceText), repair),
+    ...(signal ? { signal } : {}),
   });
 }
 
@@ -143,9 +178,9 @@ function requireLiveDocumentRuntime(tenant: TenantContext): ReturnType<typeof lo
   return settings;
 }
 
-function resolveDocumentModel(body: unknown, settings: ReturnType<typeof loadSettings>): string {
-  const catalog = listSelectableModels();
-  const { defaults } = modeCatalogPayload();
+function resolveDocumentModel(body: unknown, settings: ReturnType<typeof loadSettings>, tenant: TenantContext): string {
+  const catalog = listSelectableModels(tenant);
+  const defaults = modeDefaultsFor(tenant);
   return resolveChatModel(
     readOptionalModel(body),
     settings.documentGenModel || (isFinanceJob(body) ? defaults.finance : defaults.documents),
@@ -176,26 +211,133 @@ function persistDraft(
   }
 }
 
-export async function generateDocumentDraft(tenant: TenantContext, body: unknown): Promise<DocumentDraft> {
+/** The draft as the response carries it: plain, unless a check still fails or a repair was spent. */
+export type DocumentDraftResult = DocumentDraft & { checks?: DocumentChecksReport };
+
+/** One model reply read as a draft, or the reason it was not one. */
+type DraftAttempt = DocumentCheckInput & {
+  readonly run: JobAssistantRun;
+  /** The error to answer with when no attempt ever produced a draft. */
+  readonly failure: ApiError | null;
+};
+
+/**
+ * A reply with no JSON object in it fails inside the shared outline reader as `invalid_outline`,
+ * worded for a presentation. A Documents reply that fails to read is `invalid_document` either way.
+ */
+function readAttempt(run: JobAssistantRun): DraftAttempt {
+  try {
+    return { run, draft: parseDocumentDraft(run.text), parseError: null, failure: null };
+  } catch (error) {
+    if (error instanceof ApiError && (error.code === "invalid_document" || error.code === "invalid_outline")) {
+      const failure =
+        error.code === "invalid_document"
+          ? error
+          : new ApiError("invalid_document", "Model did not return a JSON document draft", 502);
+      return { run, draft: null, parseError: failure.message, failure };
+    }
+    throw error;
+  }
+}
+
+/** The same checks on a draft the source hold has edited: one look, no repair, no model call. */
+async function recheckDraft(
+  attempt: DraftAttempt,
+  draft: DocumentDraft,
+  prompt: string,
+  sourceText: string,
+): Promise<CheckVerdict[]> {
+  const edited: DraftAttempt = { ...attempt, draft, parseError: null };
+  const result = await runChecked<DraftAttempt>({
+    produce: async () => edited,
+    checks: documentChecks(prompt, sourceText),
+    repairRounds: 0,
+  });
+  return result.verdicts;
+}
+
+export async function generateDocumentDraft(
+  tenant: TenantContext,
+  body: unknown,
+  abortSignal?: AbortSignal,
+): Promise<DocumentDraftResult> {
   const prompt = readPrompt(body);
   const settings = requireLiveDocumentRuntime(tenant);
-  const sourceText = readSourceText(body, { injectionGuardBypass: settings.injectionGuardBypass === true });
-  const model = resolveDocumentModel(body, settings);
+  const source = await assembleDeskSource(tenant, body, {
+    injectionGuardBypass: settings.injectionGuardBypass === true,
+  });
+  const model = resolveDocumentModel(body, settings, tenant);
   const finance = isFinanceJob(body);
-  const run = await collectAssistantRun(tenant, model, prompt, finance, sourceText, readModelPinned(body));
-  if (!run.text.trim()) {
-    throw new ApiError("generation_failed", modeMessage("emptyDocumentDraft", localeForRun()), 502);
+  const pinned = readModelPinned(body);
+
+  // Done is a check that passes, never the model's word. The finance draft keeps its single call.
+  // `held` is what the person already has: the last reply that read as a draft, or else the last
+  // reply there was. A repair that fails, comes back empty or comes back unreadable must not cost
+  // them that draft; only the first call may fail the request, as in Research and Meeting.
+  let held: DraftAttempt | null = null;
+  let lastText = "";
+  const result = await runChecked<DraftAttempt>({
+    produce: async (note) => {
+      let run: JobAssistantRun;
+      try {
+        run = await collectAssistantRun(
+          tenant,
+          model,
+          prompt,
+          finance,
+          source.text,
+          pinned,
+          abortSignal,
+          note === null ? undefined : { previous: lastText, note },
+        );
+      } catch (error) {
+        // A cancel is the one failure that still ends the job.
+        throwIfJobAborted(abortSignal);
+        if (!held) {
+          throw error;
+        }
+        log.warn("document_repair_failed", { code: error instanceof ApiError ? error.code : "internal_error" });
+        return held;
+      }
+      // A draft the person cancelled is not saved as an artifact or a work card.
+      throwIfJobAborted(abortSignal);
+      if (!run.text.trim()) {
+        if (held) {
+          return held;
+        }
+        throw new ApiError("generation_failed", modeMessage("emptyDocumentDraft", localeForRun()), 502);
+      }
+      lastText = run.text;
+      const attempt = readAttempt(run);
+      held = attempt.draft || !held?.draft ? attempt : held;
+      return held;
+    },
+    checks: finance ? [] : documentChecks(prompt, source.text),
+    repairRounds: finance ? 0 : harnessSpecFor("documents").repairRounds,
+  });
+  throwIfJobAborted(abortSignal);
+
+  const final = result.output;
+  const parsed = final.draft;
+  if (!parsed) {
+    throw final.failure ?? new ApiError("invalid_document", "Model returned no usable document draft", 502);
   }
-  const parsed = parseDocumentDraft(run.text);
-  // Finance on this route keeps its own number guard. Documents holds source facts here.
-  const draft = finance ? parsed : holdDocumentSource(parsed, sourceText);
+  // After the repair round, code deletes what the source still does not support. No model call here:
+  // a retry would invent the replacement. Finance on this route keeps its own number guard.
+  const draft = finance ? parsed : holdDocumentSource(parsed, source.text);
+  // The checks speak for the draft the person gets, so a hold that changed it is checked again.
+  const verdicts = draft === parsed ? result.verdicts : await recheckDraft(final, draft, prompt, source.text);
+  const report = buildChecksReport(verdicts, result.rounds, draft, source.text);
   const markdown = documentDraftMarkdown(draft);
   // Record the model that wrote the draft. After a fallback the requested id is the one model that did not.
-  const answeredBy = run.model;
+  const answeredBy = final.run.model;
   const artifactId = persistDraft(tenant, draft, markdown, {
     question: prompt,
     model: answeredBy,
     finance,
+    ...(source.files.length > 0 ? { sourceFiles: source.files.map((file) => file.path) } : {}),
+    // A pass on the first try is the normal case and adds nothing; a repair or a failure is kept.
+    ...(report.passed && report.rounds === 0 ? {} : { checks: report }),
   });
   if (artifactId) {
     await upsertWorkSource(
@@ -203,10 +345,10 @@ export async function generateDocumentDraft(tenant: TenantContext, body: unknown
       artifactWorkCard({ type: "Documents", artifactId, title: draft.title, prompt, markdown, model: answeredBy }),
     );
   }
-  return draft;
+  return report.passed ? draft : { ...draft, checks: report };
 }
 
-const SECTION_SYSTEM = `You rewrite one section of an DPSBuddy document.
+const SECTION_SYSTEM = `You rewrite one section of a Nultron document.
 Return ONLY valid JSON (no markdown fences, no commentary) with this exact shape:
 { "heading": string, "body": string }
 Rules:
@@ -225,7 +367,11 @@ function readSectionIndex(body: unknown, length: number): number {
   return index;
 }
 
-export async function regenerateDocumentSection(tenant: TenantContext, body: unknown): Promise<DocumentDraft> {
+export async function regenerateDocumentSection(
+  tenant: TenantContext,
+  body: unknown,
+  abortSignal?: AbortSignal,
+): Promise<DocumentDraft> {
   if (!body || typeof body !== "object") {
     throw new ApiError("invalid_request", "Request body must be a JSON object", 400);
   }
@@ -238,9 +384,11 @@ export async function regenerateDocumentSection(tenant: TenantContext, body: unk
     throw new ApiError("invalid_request", "sectionIndex is out of range", 400);
   }
   const settings = requireLiveDocumentRuntime(tenant);
-  const model = resolveDocumentModel(body, settings);
+  const model = resolveDocumentModel(body, settings, tenant);
   const attachments = readJobRegenAttachments(body);
-  const sourceText = readSourceText(body, { injectionGuardBypass: settings.injectionGuardBypass === true });
+  const sourceText = (
+    await assembleDeskSource(tenant, body, { injectionGuardBypass: settings.injectionGuardBypass === true })
+  ).text;
   const others = draft.sections
     .map((section, itemIndex) => (itemIndex === index ? null : `- ${section.heading}`))
     .filter(Boolean)
@@ -268,6 +416,7 @@ export async function regenerateDocumentSection(tenant: TenantContext, body: unk
     versionId: "document-section",
     prompt: withSourceMaterial(prompt, sourceText),
     attachments,
+    ...(abortSignal ? { signal: abortSignal } : {}),
   });
   if (!raw.trim()) {
     throw new ApiError("generation_failed", modeMessage("emptyDocumentSection", localeForRun()), 502);

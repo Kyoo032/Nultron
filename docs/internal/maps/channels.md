@@ -1,6 +1,6 @@
 # Channels (Telegram)
 
-Last verified: 2026-09-20 at a053245 + the Phase 4 branch `feat/web-phase4-tenant-secrets-rcbu9c` (through e37b3a1)
+Last verified: 2026-10-01, working tree on top of 0b61a29, for the first line below only (the rail row, the route and the page component: each cite re-read against the file). The rest as of 2026-09-20 at a053245 + the Phase 4 branch `feat/web-phase4-tenant-secrets-rcbu9c` (through e37b3a1)
 
 ## Overview
 
@@ -12,16 +12,16 @@ It is **not** a product mode (no rail mode, no `productModes` entry, no pack see
 
 ### Connect a bot
 
-Rail → Account → **Channels** (`apps/web/components/app-rail.tsx:394-401`) → `/channels` (`apps/web/src/App.tsx:170`) → `ChannelsPage` (`apps/web/components/channels-page.tsx:149`).
+Rail → Account → **Channels** (`apps/web/components/app-rail.tsx:408-416`, `testId="channels-link"` at `:414`; the second row of the Account group, which is pinned to the bottom of the rail's scrolling nav as `.rail-pinned`, `:396`) → `/channels` (`apps/web/src/App.tsx:399-406`) → `ChannelsPage` (`apps/web/components/channels-page.tsx:150`).
 
 `POST /api/v1/channels/telegram/bot` (`packages/host/src/router.ts:292`) → `handlePostTelegramBot` (`packages/host/src/handlers/channels.ts:82`):
 
 1. `assertBotTokenShape` (`packages/host/src/channels/telegram.ts:68`) rejects anything that is not `<digits>:<secret>` **before** the value can reach a URL.
 2. `TelegramClient.getMe` (`telegram.ts:206`) asks Telegram who the token belongs to. A token Telegram will not identify is never written — the failure lands at the paste, not at the first send.
-3. `saveSettings({ telegramBotToken })` (`handlers/channels.ts:88`) puts it in the desk's slice of `settings.enc`, through the same `KEY_FIELDS` path as the gateway key (`packages/core/src/secrets.ts:103-109`).
+3. `saveSettings({ telegramBotToken })` (`handlers/channels.ts:88`) puts it in the desk's slice of `settings.enc`, through the same `KEY_FIELDS` path as the gateway key (`packages/core/src/secrets.ts:104-110`).
 4. The bot's `@username` is cached in `channels/<workspaceId>/bot.json` (`packages/host/src/channels/store.ts:263-274`) so the page can name it without a network call.
 
-The renderer only ever sees `connected`, `username`, `connectedAt`, a `sha256:` fingerprint and `pinnedOrigin` (`handlers/channels.ts:57-70`). `GET /api/v1/settings` reports the same as `hasTelegramBot` / `telegramBotFingerprint` (`packages/core/src/secrets.ts:257,269`).
+The renderer only ever sees `connected`, `username`, `connectedAt`, a `sha256:` fingerprint and `pinnedOrigin` (`handlers/channels.ts:57-70`). `GET /api/v1/settings` reports the same as `hasTelegramBot` / `telegramBotFingerprint` (`packages/core/src/secrets.ts:264,269`).
 
 **Failure modes:** bad shape → 400 with no call made; Telegram rejects → `channel_forbidden`; no `AGENTFORGE_SECRETS_KEY` → the settings store's own failure, same as the gateway key.
 
@@ -47,7 +47,7 @@ Pull only. There is no webhook and no inbound route: the host binds loopback beh
 
 ### Egress
 
-`api.telegram.org` is pinned in `packages/core/src/channels/pinned.ts:14`, resolved through `resolvedTelegramApiOrigin()` which honours `AGENTFORGE_TELEGRAM_API_URL` only when `gatewayUrlOverrideAllowed()` — never packaged, never `NODE_ENV=production`, the same rule the model gateway's endpoint got in 0.14.26. Calls are `redirect: "manual"` (a 3xx is an error), 15 s timeout, 1 MB response cap, JSON only. The token rides in the URL path, so every message that can escape goes through `redactToken` (`telegram.ts:62`) first.
+`api.telegram.org` is pinned in `packages/core/src/channels/pinned.ts:14`, resolved through `resolvedTelegramApiOrigin()` which honours `AGENTFORGE_TELEGRAM_API_URL` only when `gatewayUrlOverrideAllowed()` — never packaged, never `NODE_ENV=production`, the same rule the model gateway's endpoint got in 0.14.26. The "never packaged" half held only from 2026-10-01: until then `main.cjs` did not set `AGENTFORGE_PACKAGED`, so a packaged build honoured the hook ([SR-85](../security-register.md#sr-85)); it is set in `apps/desktop/main.cjs` `bootstrapPackaged` now and not yet driven on an installed app. Calls are `redirect: "manual"` (a 3xx is an error), 15 s timeout, 1 MB response cap, JSON only. The token rides in the URL path, so every message that can escape goes through `redactToken` (`telegram.ts:62`) first.
 
 ## Where things live
 

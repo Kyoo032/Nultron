@@ -159,6 +159,13 @@
     "supported": "Didukung",
     "unsupported": "Tidak ada di sumber"
   },
+  "checks": {
+    "grounding": "{count} bagian mungkin tidak mengikuti sumber",
+    "groundingOne": "1 bagian mungkin tidak mengikuti sumber",
+    "groundingHint": "Draf tersimpan. Tekan “{action}” untuk melihat kalimat mana yang tidak ada di sumber, atau tulis ulang bagian itu.",
+    "structure": "Beberapa bagian mungkin hilang atau terlalu singkat",
+    "structureHint": "Draf tersimpan. Buat ulang, atau tulis ulang bagian yang tipis."
+  },
   "harness": {
     "sourceGap": "Tidak ada di sumber."
   }

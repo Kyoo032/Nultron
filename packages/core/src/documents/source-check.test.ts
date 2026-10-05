@@ -38,4 +38,31 @@ describe("checkDraftAgainstSource", () => {
     const result = checkDraftAgainstSource(numbered, "The rail on this desk already shows every work mode.");
     expect(result.items.some((item) => item.sentence.includes("14") && !item.supported)).toBe(true);
   });
+
+  it("does not hold a title or heading that carries a number to the source", () => {
+    const labelled = {
+      title: "Q3 field note",
+      sections: [
+        { heading: "Heading 1", body: "The rail on this desk already shows every work mode." },
+        { heading: "2. Risks", body: "The installer was last built in August." },
+      ],
+    };
+    const result = checkDraftAgainstSource(labelled, "The rail on this desk already shows every work mode.");
+    // Only the two body sentences are checked: the labels are not sentences.
+    expect(result.items.map((item) => [item.sectionIndex, item.supported])).toEqual([
+      [0, true],
+      [1, false],
+    ]);
+  });
+
+  it("still checks a heading of six words or more, number or not", () => {
+    const longHeading = {
+      title: "Field note",
+      sections: [{ heading: "Why the rail shows 14 modes on this desk", body: "Nothing else is said here." }],
+    };
+    const result = checkDraftAgainstSource(longHeading, "The rail on this desk already shows every work mode.");
+    expect(result.items).toEqual([
+      { sectionIndex: 0, sentence: "Why the rail shows 14 modes on this desk.", supported: false },
+    ]);
+  });
 });

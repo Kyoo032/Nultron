@@ -2,6 +2,8 @@ import { getTool } from "../tools/registry";
 import { summarizeParts } from "../content/parse-run-input";
 import type { AgentRuntime, RuntimeEvent } from "./types";
 import { invokeToolGuarded } from "./invoke-guarded";
+import { createEgressGuard, userTextOf } from "./egress-guard";
+import { createToolBudget } from "./tool-budget";
 import { resolveRequestReasoningEffort } from "../models/reasoning-effort";
 import { MODEL_CONTACT_ATTEMPTS, formatContactProbe } from "./retry";
 import { parseAppLocale } from "../locale";
@@ -60,6 +62,8 @@ export class StubRuntime implements AgentRuntime {
       message: formatContactProbe(input.version.model, 1, MODEL_CONTACT_ATTEMPTS, locale),
     });
     const answers: string[] = [];
+    const toolBudget = createToolBudget(input.budget);
+    const egressGuard = createEgressGuard({ userText: userTextOf(input.history) });
 
     const wantsCalc = hasEnabledBinding(input.bindings, "calculator") && /\d+\s*[+\-*/]\s*\d+/.test(summary);
     const wantsClock = hasEnabledBinding(input.bindings, "datetime") && wantsStubClock(summary);
@@ -75,7 +79,7 @@ export class StubRuntime implements AgentRuntime {
         const match = summary.match(/(\d+\s*[+\-*/]\s*\d+)/);
         const expression = match?.[1] ?? "1+1";
         await input.onEvent({ type: "tool.started", toolKey: "calculator", input: { expression } });
-        const output = await invokeToolGuarded(tool, { expression }, input.tenant);
+        const output = await invokeToolGuarded(tool, { expression }, input.tenant, toolBudget, egressGuard);
         await input.onEvent({ type: "tool.completed", toolKey: "calculator", output });
         const result = calculatorResult(output);
         answers.push(result ? `${expression} = ${result}` : JSON.stringify(output));
@@ -86,7 +90,7 @@ export class StubRuntime implements AgentRuntime {
       const tool = getTool("datetime");
       if (tool) {
         await input.onEvent({ type: "tool.started", toolKey: "datetime", input: {} });
-        const output = await invokeToolGuarded(tool, {}, input.tenant);
+        const output = await invokeToolGuarded(tool, {}, input.tenant, toolBudget, egressGuard);
         await input.onEvent({ type: "tool.completed", toolKey: "datetime", output });
         const result = datetimeResult(output);
         answers.push(result ? result : JSON.stringify(output));

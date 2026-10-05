@@ -30,11 +30,15 @@ function sourceHasNumber(source: string, token: string): boolean {
   return new RegExp(`(?<![\\d])${escaped}(?![\\d])`).test(source);
 }
 
-function sentences(text: string): string[] {
+/**
+ * `numbered` also keeps a short part that states a number, so "Revenue grew 14%." is checked.
+ * A title or heading is a label ("Heading 1", "2. Risks"), so it keeps only the six-word rule.
+ */
+function sentences(text: string, numbered: boolean): string[] {
   return text
     .split(/\n+|(?<=[.!?])\s+/)
     .map((part) => part.trim())
-    .filter((part) => part.split(/\s+/).length >= 6 || numberTokens(part).length > 0);
+    .filter((part) => part.split(/\s+/).length >= 6 || (numbered && numberTokens(part).length > 0));
 }
 
 function words(text: string): string[] {
@@ -70,8 +74,8 @@ export function checkDraftAgainstSource(draft: CheckableDraft, sourceText: strin
   const sourceNorm = source.toLowerCase().replace(/\s+/g, " ");
   const sourceWords = new Set(words(source));
   const items: SourceCheckItem[] = [];
-  const consider = (sectionIndex: number, text: string) => {
-    for (const sentence of sentences(text)) {
+  const consider = (sectionIndex: number, text: string, numbered: boolean) => {
+    for (const sentence of sentences(text, numbered)) {
       items.push({
         sectionIndex,
         sentence,
@@ -79,9 +83,10 @@ export function checkDraftAgainstSource(draft: CheckableDraft, sourceText: strin
       });
     }
   };
-  consider(-1, draft.title);
+  consider(-1, draft.title, false);
   draft.sections.forEach((section, index) => {
-    consider(index, `${section.heading}. ${section.body}`);
+    consider(index, `${section.heading}.`, false);
+    consider(index, section.body, true);
   });
   return { checked: true, items };
 }

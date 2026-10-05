@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Link } from "@/lib/nav";
-import { apiFetch, checkGateway } from "@/lib/api-client";
+import { checkGateway } from "@/lib/api-client";
+import { readSettings } from "@/lib/settings-read";
 import { t } from "@/lib/i18n";
 import { parseGatewayGate, type GatewayGatePayload } from "@/lib/gateway-gate";
 import { useProductBrand } from "@/lib/product-brand";
 import { useSession } from "@/lib/session";
+import { getGateState, subscribeGateState } from "@/lib/gate-state";
+import { isHostedBuild } from "@/lib/hosted-build";
 import { hostWithholdsLiveModel } from "@/lib/use-desk-needs-key";
 
 function formatChecked(iso: string | null): string {
@@ -28,7 +31,22 @@ const DOT: Record<Tone, string> = {
 export function ChatKeyStatus() {
   const session = useSession();
   const { gatewayName } = useProductBrand();
-  const [gate, setGate] = useState<GatewayGatePayload | null>(null);
+  const [ownGate, setGate] = useState<GatewayGatePayload | null>(null);
+  // Nultron Enterprise: the desk can open with no key ("Add it later") and Chat is kept alive, so the
+  // pill must hear the newest gate (a key saved in Settings, a refused call) and not only the one it
+  // read at mount. Hosted only: off the hosted build the store is never consulted and the pill reads
+  // exactly what it always did.
+  const hosted = isHostedBuild();
+  const shared = useSyncExternalStore(subscribeGateState, getGateState, getGateState);
+  const gate = hosted && shared.gate ? shared.gate : ownGate;
+  /*
+   * False until the first read of the host's gate has answered, whichever way it went. Before that
+   * `gate` is null, which is "unknown", not "no key": painting the needs-key copy and a Settings
+   * button for those first frames told a desk with a connected key to connect one, then took it
+   * back (seen on a fresh load at 375 px, 2026-09-29).
+   */
+  const [ownSettled, setSettled] = useState(false);
+  const settled = ownSettled || (hosted && shared.gate !== null);
   const [open, setOpen] = useState(false);
   const [checking, setChecking] = useState(false);
 
@@ -36,12 +54,14 @@ export function ChatKeyStatus() {
     let cancelled = false;
     void (async () => {
       try {
-        const res = await apiFetch("/api/v1/settings");
-        if (!res.ok) return;
-        const payload = (await res.json()) as { gateway?: unknown };
-        if (!cancelled) setGate(parseGatewayGate(payload.gateway));
+        // Shared with the shell's gate read and the other Chat readers: one round trip per load.
+        const answer = await readSettings();
+        if (!answer.ok) return;
+        if (!cancelled) setGate(parseGatewayGate(answer.body?.gateway));
       } catch {
         // status line stays on the needs-key copy
+      } finally {
+        if (!cancelled) setSettled(true);
       }
     })();
     return () => {
@@ -60,7 +80,11 @@ export function ChatKeyStatus() {
   let tone: Tone = "neutral";
   let settings = true;
   let recheck = false;
-  if (gate?.status === "ok") {
+  if (!settled) {
+    // Keeps the pill's height so the hero does not jump when the answer lands; it is not painted.
+    line = " ";
+    settings = false;
+  } else if (gate?.status === "ok") {
     line = t("chat.empty.statusConnected");
     tone = "ok";
     settings = false;
@@ -69,7 +93,9 @@ export function ChatKeyStatus() {
     line = date ? t("chat.empty.statusGrace", { date }) : t("chat.empty.statusConnected");
     tone = "ok";
     settings = false;
-  } else if (session.status === "signed-in") {
+  } else if (session.status === "signed-in" && !hostWithholdsLiveModel(gate)) {
+    // A live session with the gate OPEN. With it closed (a hosted tenant who has not added a key) the
+    // line below says what is true, a key is needed, instead of "Ready".
     line = `${t("chat.empty.statusSignedIn")} · ${t("chat.empty.statusReady")}`;
     tone = "ok";
     settings = false;
@@ -97,13 +123,18 @@ export function ChatKeyStatus() {
   }
 
   return (
-    <div className="mt-6 flex flex-col items-center gap-3" data-testid="chat-key-status">
+    <div
+      className="mt-[var(--hero-gap,1.5rem)] flex w-full min-w-0 flex-col items-center gap-[var(--hero-gap-tight,0.75rem)]"
+      data-testid="chat-key-status"
+    >
       <p
-        className="inline-flex items-center gap-2 rounded-pill border border-[var(--line)] bg-[var(--surface)] px-3 py-1.5 text-sm text-[var(--text-2)]"
+        className={`chat-status-pill inline-flex max-w-full items-center whitespace-nowrap rounded-pill border border-[var(--line)] bg-[var(--surface)] text-[var(--text-2)]${settled ? "" : " invisible"}`}
         data-tone={tone}
+        aria-hidden={settled ? undefined : true}
+        title={line}
       >
         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${DOT[tone]}`} aria-hidden="true" />
-        {line}
+        <span className="min-w-0 truncate">{line}</span>
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2">
         {settings ? (

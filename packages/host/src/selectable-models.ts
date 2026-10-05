@@ -5,7 +5,9 @@ import {
   applyCuration,
   chooseDefaultModel,
   detectCompatibleApi,
+  hasLiveProvider,
   isEmbeddingModelId,
+  isServerMode,
   isMusicModelId,
   isSpeechModelId,
   mediaKind,
@@ -13,6 +15,7 @@ import {
   probeAnthropicModels,
   probeGoogleModels,
   probeVolcengineModels,
+  providerBaseUrl,
   redactSecrets,
   resolveModeDefaults,
   RELAY_ONLY_MUSIC_MODEL_IDS,
@@ -28,7 +31,16 @@ import {
   type RoutedModels,
   type StoredSecrets,
 } from "@agentforge/core";
-import { loadModelCache, modelCacheStamp, saveModelCache, type ModelCache } from "./model-cache";
+import {
+  loadModelCache,
+  modelCacheSlot,
+  modelCacheStamp,
+  saveModelCache,
+  type ModelCache,
+  type ModelCacheScope,
+} from "./model-cache";
+import { log } from "./log";
+import { loadSettings } from "./settings-store";
 import { loadModelsDevRegistry, modelsDevCacheStamp, refreshModelsDevRegistry } from "./models-dev-cache";
 
 /** Catalog model with picker curation fields for API payloads. */
@@ -47,20 +59,41 @@ function liveModelIds(cache: ModelCache, kind?: "chat"): string[] {
   return ids;
 }
 
-let catalogMemo: { key: string; models: ChatModel[] } | null = null;
+/**
+ * One entry per slot: a desk has one (`modelCacheSlot` answers a constant, so this is the single memo it
+ * always was), and on the hosted server each tenant has its own, so two tenants alternating never
+ * rebuild each other's catalogue. Capped, oldest out, so a long-running server holds a bounded number.
+ */
+export const CATALOG_MEMO_CAP = 64;
+const catalogMemo = new Map<string, { key: string; models: ChatModel[] }>();
 
 /**
  * Merged catalog with context lengths. Building it costs ~230 ms of synchronous work (every model ×
  * the models.dev registry) and it was rebuilt on every Chat run and every knowledge lookup, which
  * serialised all requests. Memoized on the two cache files' mtime/size, so a probe or registry refresh
  * (both rewrite their file) invalidates it without any explicit hook.
+ *
+ * `scope` names the tenant whose cache is read; only the hosted server looks at it (`ModelCacheScope`).
  */
-export function listCatalogModels(): ChatModel[] {
-  const key = `${modelCacheStamp()}|${modelsDevCacheStamp()}`;
-  if (catalogMemo && catalogMemo.key === key) {
-    return catalogMemo.models;
+export function listCatalogModels(scope?: ModelCacheScope): ChatModel[] {
+  const models = memoizedCatalog(scope);
+  // After the read, so a per-tenant file that read adopted is not mistaken for a missing row. On a
+  // desk this returns at its first line: the hosted warm-up is not part of Personal.
+  warmHostedModelCache(scope);
+  return models;
+}
+
+function memoizedCatalog(scope?: ModelCacheScope): ChatModel[] {
+  const slot = modelCacheSlot(scope);
+  const key = `${modelCacheStamp(scope)}|${modelsDevCacheStamp()}`;
+  const hit = catalogMemo.get(slot);
+  if (hit && hit.key === key) {
+    // Read again, so it is the newest: the cap evicts the tenant used least recently, not the first built.
+    catalogMemo.delete(slot);
+    catalogMemo.set(slot, hit);
+    return hit.models;
   }
-  const cache = loadModelCache();
+  const cache = loadModelCache(scope);
   const models = withContextLengths(
     mergeChatCatalog({
       openai: cache.openai,
@@ -70,38 +103,55 @@ export function listCatalogModels(): ChatModel[] {
     }),
     loadModelsDevRegistry(),
   );
-  catalogMemo = { key, models };
+  catalogMemo.delete(slot);
+  catalogMemo.set(slot, { key, models });
+  while (catalogMemo.size > CATALOG_MEMO_CAP) {
+    const oldest = catalogMemo.keys().next().value;
+    if (oldest === undefined) {
+      break;
+    }
+    catalogMemo.delete(oldest);
+  }
   return models;
 }
 
 /** Test hook: drop the memoized catalog. */
 export function resetCatalogMemo(): void {
-  catalogMemo = null;
+  catalogMemo.clear();
 }
 
-export function listRoutedModels(models: ChatModel[] = listCatalogModels()): RoutedModels<ChatModel> {
-  return routeModelsByKind(models);
+export function listRoutedModels(models?: ChatModel[], scope?: ModelCacheScope): RoutedModels<ChatModel> {
+  return routeModelsByKind(models ?? listCatalogModels(scope));
 }
 
-export function listSelectableModels(): SelectableModel[] {
-  return applyCuration(listRoutedModels().chat);
+export function listSelectableModels(scope?: ModelCacheScope): SelectableModel[] {
+  return applyCuration(listRoutedModels(undefined, scope).chat);
 }
 
-export function listImageModels(): ChatModel[] {
-  return listRoutedModels().image;
+export function listImageModels(scope?: ModelCacheScope): ChatModel[] {
+  return listRoutedModels(undefined, scope).image;
 }
 
-export function listVideoModels(): ChatModel[] {
-  return listRoutedModels().video;
+export function listVideoModels(scope?: ModelCacheScope): ChatModel[] {
+  return listRoutedModels(undefined, scope).video;
 }
 
 /** Models the last refresh actually returned. No static catalog fill-in. */
-export function listProbedModels(cache: ModelCache = loadModelCache()): ChatModel[] {
-  return [...(cache.openai ?? []), ...(cache.anthropic ?? []), ...(cache.google ?? []), ...(cache.volcengine ?? [])];
+export function listProbedModels(cache?: ModelCache, scope?: ModelCacheScope): ChatModel[] {
+  const current = cache ?? loadModelCache(scope);
+  if (!cache) {
+    warmHostedModelCache(scope);
+  }
+  return [
+    ...(current.openai ?? []),
+    ...(current.anthropic ?? []),
+    ...(current.google ?? []),
+    ...(current.volcengine ?? []),
+  ];
 }
 
-export function listProbedVideoModels(cache?: ModelCache): ChatModel[] {
-  return listProbedModels(cache).filter((model) => mediaKind(model.id) === "video");
+export function listProbedVideoModels(cache?: ModelCache, scope?: ModelCacheScope): ChatModel[] {
+  return listProbedModels(cache, scope).filter((model) => mediaKind(model.id) === "video");
 }
 
 /**
@@ -109,8 +159,8 @@ export function listProbedVideoModels(cache?: ModelCache): ChatModel[] {
  * TTS and ASR into one `audio` bucket, which is the right shape for the picker but the wrong shape
  * for a studio: a song request sent to a transcriber bills the desk and returns nothing.
  */
-export function listAudioModels(): ChatModel[] {
-  return listRoutedModels().audio;
+export function listAudioModels(scope?: ModelCacheScope): ChatModel[] {
+  return listRoutedModels(undefined, scope).audio;
 }
 
 /** A picker row for an id the live catalog does not carry. Minimal on purpose: no price, no hints. */
@@ -147,18 +197,18 @@ export function withRelayMusicModels(
   return added.length === 0 ? [...models] : [...models, ...added];
 }
 
-export function listMusicModels(): ChatModel[] {
-  return withRelayMusicModels(listAudioModels().filter((model) => isMusicModelId(model.id)));
+export function listMusicModels(scope?: ModelCacheScope): ChatModel[] {
+  return withRelayMusicModels(listAudioModels(scope).filter((model) => isMusicModelId(model.id)));
 }
 
 /** Non-realtime text-to-speech only; empty on this gateway today. */
-export function listSpeechModels(): ChatModel[] {
-  return listAudioModels().filter((model) => isSpeechModelId(model.id));
+export function listSpeechModels(scope?: ModelCacheScope): ChatModel[] {
+  return listAudioModels(scope).filter((model) => isSpeechModelId(model.id));
 }
 
 /** Embedding ids are never curated — PICKER_HIDE strips them from chat. */
-export function listEmbeddingModels(models: ChatModel[] = listCatalogModels()): ChatModel[] {
-  const embeddings = models.filter((model) => isEmbeddingModelId(model.id));
+export function listEmbeddingModels(models?: ChatModel[], scope?: ModelCacheScope): ChatModel[] {
+  const embeddings = (models ?? listCatalogModels(scope)).filter((model) => isEmbeddingModelId(model.id));
   if (embeddings.length > 0) {
     return embeddings;
   }
@@ -172,8 +222,14 @@ export function listEmbeddingModels(models: ChatModel[] = listCatalogModels()): 
   ];
 }
 
-export function defaultSelectableModel(models: Array<{ id: string }> = listSelectableModels()): string {
-  return chooseDefaultModel(models, liveModelIds(loadModelCache(), "chat"), DEFAULT_CHAT_MODEL);
+export function defaultSelectableModel(models?: Array<{ id: string }>, scope?: ModelCacheScope): string {
+  const chosen = chooseDefaultModel(
+    models ?? listSelectableModels(scope),
+    liveModelIds(loadModelCache(scope), "chat"),
+    DEFAULT_CHAT_MODEL,
+  );
+  warmHostedModelCache(scope);
+  return chosen;
 }
 
 function curateRouted(routed: RoutedModels<ChatModel>): RoutedModels<SelectableModel> {
@@ -186,39 +242,36 @@ function curateRouted(routed: RoutedModels<ChatModel>): RoutedModels<SelectableM
   };
 }
 
-export function modeCatalogPayload(models: ChatModel[] = listCatalogModels()): {
-  modes: RoutedModels<SelectableModel> & {
-    documents: SelectableModel[];
-    research: SelectableModel[];
-    presentations: SelectableModel[];
-    finance: SelectableModel[];
-    data: SelectableModel[];
-    market: SelectableModel[];
-    legal: SelectableModel[];
-    meeting: SelectableModel[];
-    music: SelectableModel[];
-    embedding: ChatModel[];
-  };
+/**
+ * The catalogue, once per distinct list. `modes.chat` is the chat catalogue, and every mode in
+ * `CHAT_CATALOG_MODES` (documents, research, presentations, finance, data, market, legal, meeting)
+ * offers exactly that list, so none of them gets a copy here: the renderer resolves them through
+ * `modelsForMode` (`@agentforge/core/mode-catalog`). Eight identical copies of 126 rows were 232 KB
+ * of every `GET /api/v1/models` and `GET /api/v1/settings` answer.
+ */
+export type ModeCatalogModes = RoutedModels<SelectableModel> & {
+  music: SelectableModel[];
+  embedding: ChatModel[];
+};
+
+export function modeCatalogPayload(
+  models?: ChatModel[],
+  scope?: ModelCacheScope,
+): {
+  modes: ModeCatalogModes;
   defaults: ModeModelDefaults;
 } {
-  const routed = routeModelsByKind(models);
+  const all = models ?? listCatalogModels(scope);
+  const routed = routeModelsByKind(all);
   const curated = curateRouted(routed);
-  const embedding = listEmbeddingModels(models);
-  const chatDefault = defaultSelectableModel(curated.chat);
+  const embedding = listEmbeddingModels(all, scope);
+  const chatDefault = defaultSelectableModel(curated.chat, scope);
   // The relay music model is merged here too, so `/api/v1/models` cannot report a music mode whose
   // list is missing the very id `defaults.music` names.
   const music = applyCuration(withRelayMusicModels(curated.audio.filter((model) => isMusicModelId(model.id))));
   return {
     modes: {
       ...curated,
-      documents: curated.chat,
-      research: curated.chat,
-      presentations: curated.chat,
-      finance: curated.chat,
-      data: curated.chat,
-      market: curated.chat,
-      legal: curated.chat,
-      meeting: curated.chat,
       music,
       embedding,
     },
@@ -231,6 +284,36 @@ export function modeCatalogPayload(models: ChatModel[] = listCatalogModels()): {
       chatDefault,
     }),
   };
+}
+
+/** What `GET` and `POST /api/v1/models` answer with, before `probe` is added on a refresh. */
+export type ModelCatalogBody = {
+  /** The chat catalogue, once. Chat and every mode in `CHAT_CATALOG_MODES` pick from it. */
+  models: SelectableModel[];
+  defaultModel: string;
+  /** Only the lists that are not the chat catalogue: image, video, audio, other, music, embedding. */
+  modes: Omit<ModeCatalogModes, "chat">;
+  defaults: ModeModelDefaults;
+};
+
+/**
+ * The catalogue as it goes on the wire: each list once. `modes.chat` is the same rows as `models`, so
+ * it is left off; see `ModeCatalogModes`. A caller that wants a mode's models reads them through
+ * `modelsForMode` in `@agentforge/core/mode-catalog`, which knows which modes are the chat catalogue.
+ */
+export function modelCatalogBody(scope?: ModelCacheScope): ModelCatalogBody {
+  const models = listSelectableModels(scope);
+  const { modes, defaults } = modeCatalogPayload(undefined, scope);
+  const { chat: _chat, ...ownLists } = modes;
+  return { models, defaultModel: defaultSelectableModel(models, scope), modes: ownLists, defaults };
+}
+
+/**
+ * Just the per-mode default model ids, which is all most job runners want from the catalogue. They name
+ * the tenant whose cache the ids are chosen from; a desk ignores it.
+ */
+export function modeDefaultsFor(scope?: ModelCacheScope): ModeModelDefaults {
+  return modeCatalogPayload(undefined, scope).defaults;
 }
 
 function putModels(next: ModelCache, dialect: ModelProvider, models: ChatModel[], now: string): void {
@@ -256,6 +339,15 @@ function putModels(next: ModelCache, dialect: ModelProvider, models: ChatModel[]
 export type RefreshModelCacheOptions = {
   /** Re-download the models.dev registry even if the weekly cache is fresh (user pressed Refresh). */
   forceRegistry?: boolean;
+  /** Whose cache is read and rewritten. Only the hosted server looks at it (`ModelCacheScope`). */
+  scope?: ModelCacheScope;
+  /**
+   * Write the result only if nothing has written this cache since the call started. For a refresh
+   * nobody asked for (`warmHostedModelCache`): a Settings save or the Refresh button that lands while
+   * its probe is out wrote a newer answer, and an older one must not replace it. The check and the
+   * write have no `await` between them, so inside one process nothing can land in the gap.
+   */
+  onlyIfMissing?: boolean;
 };
 
 /**
@@ -271,7 +363,11 @@ export async function refreshModelCache(
   settings: StoredSecrets,
   options: RefreshModelCacheOptions = {},
 ): Promise<ModelCache> {
-  const current = loadModelCache();
+  const scope = options.scope;
+  // On the hosted server a provider's host is the registry's, never the stored settings': a key goes to
+  // the provider it belongs to, and a stored base URL with no key behind it probes nothing.
+  const hosted = isServerMode();
+  const current = loadModelCache(scope);
   const next: ModelCache = { ...current };
   const now = new Date().toISOString();
   const registryPromise = refreshModelsDevRegistry(fetch, { force: options.forceRegistry === true });
@@ -296,13 +392,13 @@ export async function refreshModelCache(
     delete next.detectedDialect;
   }
 
-  if (settings.anthropicApiKey || settings.anthropicBaseUrl) {
+  if (settings.anthropicApiKey || (!hosted && settings.anthropicBaseUrl)) {
     try {
       putModels(
         next,
         "anthropic",
         await probeAnthropicModels({
-          baseURL: settings.anthropicBaseUrl,
+          baseURL: hosted ? providerBaseUrl("anthropic") : settings.anthropicBaseUrl,
           apiKey: settings.anthropicApiKey,
         }),
         now,
@@ -318,7 +414,7 @@ export async function refreshModelCache(
         next,
         "google",
         await probeGoogleModels({
-          baseURL: settings.googleBaseUrl,
+          baseURL: hosted ? providerBaseUrl("google") : settings.googleBaseUrl,
           apiKey: settings.googleApiKey,
         }),
         now,
@@ -328,13 +424,14 @@ export async function refreshModelCache(
     }
   }
 
-  if (settings.volcengineApiKey || settings.volcengineBaseUrl) {
+  if (settings.volcengineApiKey || (!hosted && settings.volcengineBaseUrl)) {
     try {
       putModels(
         next,
         "volcengine",
         await probeVolcengineModels({
-          baseURL: settings.volcengineBaseUrl,
+          // Not a registry provider: on the hosted server the probe uses its own pinned Ark default.
+          baseURL: hosted ? undefined : settings.volcengineBaseUrl,
           apiKey: settings.volcengineApiKey,
         }),
         now,
@@ -351,5 +448,133 @@ export async function refreshModelCache(
     }
   }
 
-  return saveModelCache(next);
+  if (options.onlyIfMissing && modelCacheStamp(scope) !== "missing") {
+    return loadModelCache(scope);
+  }
+  return saveModelCache(next, scope);
+}
+
+// ---------------------------------------------------------------------------- hosted cache warm-up
+//
+// A hosted tenant's cache is a `tenant_state` row that only a Settings save and the Refresh button
+// write. A tenant that already held a key when the server upgraded into per-tenant caches has no row,
+// so every catalogue read answered the static ids (Images: none, Meeting: `no_model`) until somebody
+// saved Settings again.
+
+/** At most one warm-up per tenant per this window, per process. Same ten minutes as the gateway re-check. */
+export const HOSTED_CACHE_WARMUP_THROTTLE_MS = 600_000;
+
+/** When each tenant's last warm-up started, and which are running now. In this process only. */
+const warmupStartedAt = new Map<string, number>();
+const warmupInFlight = new Set<string>();
+
+/** Test seam: forget every warm-up so the next read may start one. */
+export function resetHostedModelCacheWarmups(): void {
+  warmupStartedAt.clear();
+  warmupInFlight.clear();
+}
+
+export type HostedWarmupDeps = {
+  /** Injected in tests: the refresh that is started and forgotten. */
+  refresh?: (settings: StoredSecrets, options: RefreshModelCacheOptions) => Promise<unknown>;
+  nowMs?: () => number;
+  throttleMs?: number;
+};
+
+/**
+ * Hosted only. On a catalogue read for a tenant that has no `model_cache` row and a saved provider
+ * key, start ONE background `refreshModelCache` for that tenant and return true. It is never awaited:
+ * the read that started it answers with what it has, and the next read after the probe lands is live.
+ *
+ * - **Per tenant.** The probe is named by tenant, so its result lands in that tenant's row whichever
+ *   request is in scope when it finishes, and a tenant with no key starts nothing.
+ * - **Throttled and deduplicated.** One at a time per tenant, and not again inside
+ *   `HOSTED_CACHE_WARMUP_THROTTLE_MS` of the last start. A probe that finishes writes a row, which
+ *   ends the matter; the throttle is for one that could not write (a locked database, a full disk).
+ *   A read that found no key starts nothing and spends nothing, so a key that arrives by a path that
+ *   did not refresh the cache is still picked up on the next read.
+ * - **Write-if-absent.** A Settings save or the Refresh button that lands while the probe is out
+ *   wrote a newer answer (for a newer key, perhaps); this one does not replace it.
+ * - **Never the read's problem.** An unreadable settings file, a failed probe or a refresh that throws
+ *   is one `model_cache_warmup_failed` line (tenant id and the redacted message; no key) and nothing
+ *   else. The desk and webdev return at the first line, so Personal behaves exactly as it did.
+ *
+ * Which desk's key: the one the caller's tenant context names when it has one (every handler passes
+ * its `TenantContext`), else the desk the request selected. The cache itself is per tenant, as it was.
+ */
+export function warmHostedModelCache(scope?: ModelCacheScope, deps: HostedWarmupDeps = {}): boolean {
+  if (!isServerMode()) {
+    return false;
+  }
+  let tenantId = "unknown";
+  try {
+    tenantId = modelCacheSlot(scope);
+    if (modelCacheStamp(scope) !== "missing" || warmupInFlight.has(tenantId)) {
+      return false;
+    }
+    const nowMs = (deps.nowMs ?? Date.now)();
+    const last = warmupStartedAt.get(tenantId);
+    if (last !== undefined && nowMs - last < (deps.throttleMs ?? HOSTED_CACHE_WARMUP_THROTTLE_MS)) {
+      return false;
+    }
+    const settings = loadSettings({ tenantId, workspaceId: workspaceIdOf(scope) });
+    if (!hasLiveProvider(settings)) {
+      return false;
+    }
+    warmupStartedAt.set(tenantId, nowMs);
+    warmupInFlight.add(tenantId);
+    const refresh = deps.refresh ?? refreshModelCache;
+    const named = tenantId;
+    void (async () => {
+      try {
+        const result = await refresh(settings, { scope: { tenantId: named }, onlyIfMissing: true });
+        const failure = probeFailureOf(result);
+        if (failure) {
+          logWarmupFailure(named, failure);
+        }
+      } catch (error) {
+        logWarmupFailure(named, error);
+      } finally {
+        warmupInFlight.delete(named);
+      }
+    })();
+    return true;
+  } catch (error) {
+    logWarmupFailure(tenantId, error);
+    return false;
+  }
+}
+
+/** The desk a tenant context names, or "" for none (`resolveSettingsWorkspaceId` then picks the selected one). */
+function workspaceIdOf(scope: ModelCacheScope): string {
+  const workspaceId = typeof scope === "object" && scope !== null ? (scope as { workspaceId?: unknown }).workspaceId : "";
+  return typeof workspaceId === "string" ? workspaceId : "";
+}
+
+/**
+ * `refreshModelCache` does not throw for a provider that would not answer: it records the error in the
+ * cache it returns. A refresh that came back with an error and not one model is a warm-up that got
+ * nothing, and the operator should be able to see that in the server log.
+ */
+function probeFailureOf(result: unknown): string | null {
+  if (typeof result !== "object" || result === null) {
+    return null;
+  }
+  const cache = result as ModelCache;
+  const listed = [cache.openai, cache.anthropic, cache.google, cache.volcengine].some(
+    (models) => Array.isArray(models) && models.length > 0,
+  );
+  if (listed) {
+    return null;
+  }
+  return cache.openaiError ?? cache.anthropicError ?? cache.googleError ?? cache.volcengineError ?? null;
+}
+
+function logWarmupFailure(tenantId: string, error: unknown): void {
+  // `detail` only: the logger drops any field whose name holds a credential word, and the message is
+  // redacted twice (here and in the logger) because a probe error can quote the key it was sent.
+  log.warn("model_cache_warmup_failed", {
+    tenantId,
+    detail: redactSecrets(error instanceof Error ? error.message : String(error)),
+  });
 }
