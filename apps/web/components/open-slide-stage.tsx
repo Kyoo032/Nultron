@@ -24,7 +24,7 @@ import {
   type OpenSlideDeck,
   type OpenSlidePage,
 } from "@agentforge/core/open-slide";
-import { assignSlideLayout } from "@agentforge/core";
+import { assignSlideLayout } from "@agentforge/core/slide-design";
 import { t } from "@/lib/i18n";
 
 function pageLayout(page: OpenSlidePage, index: number): string {
