@@ -9,6 +9,11 @@ import type { ModeHarnessSpec } from "../spec";
  * `run_code` 4: it is only for exploration the SQL cannot express (a regression, a distribution). It
  * cannot see the dataset, only desk files, and its output is never evidence, so four runs are a couple of
  * experiments with one fix each. Each run can take up to 30 s.
+ *
+ * `repairRounds` is 1: the host runs the cuts the columns allow first, then checks every sentence of the
+ * answer against the cut and evidence results. A sentence with a number no query returned sends the
+ * model back once (`runDataHarness`, `job.round` 1 of 1); after that the host strips what is still
+ * ungrounded and falls back to the cuts themselves, so the run never ends on an unchecked figure.
  */
 export const dataHarnessSpec: ModeHarnessSpec = {
   mode: "data",
@@ -19,7 +24,7 @@ export const dataHarnessSpec: ModeHarnessSpec = {
     maxToolCalls: DEFAULT_MAX_TOOL_CALLS,
     perTool: { run_sql: 8, run_code: 4 },
   },
-  repairRounds: 0,
+  repairRounds: 1,
   skills: [
     { id: "take-table", name: "Take the table in", status: "has" },
     { id: "private-database", name: "Load a private database", status: "has" },
