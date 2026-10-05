@@ -68,7 +68,7 @@ describe("buildPreamble", () => {
   it("renders the identity, matter, documents, priority, rules and language blocks in order", () => {
     const text = buildPreamble(INPUT);
     const headings = [
-      "You are the drafting and review engine inside DPSBuddy Legal",
+      "You are the drafting and review engine inside Nultron Legal",
       "MATTER",
       "DOCUMENTS (cite by id; you receive full text only for what a stage gives you)",
       "SOURCE PRIORITY when documents conflict: S2, S3 > S4 > PB > S1 > context.",
@@ -169,6 +169,11 @@ describe("buildStageCard", () => {
       input: { stage: "interaction", findingTitle: "Uncapped indemnity", clauseId: "§9.1" },
       stage: 4,
       fields: ["compounds", "clause", "why", "severity", "quote"],
+    },
+    {
+      input: { stage: "review-quote", clauseId: "§7.2(b)" },
+      stage: 4,
+      fields: ["quote", "§7.2(b)"],
     },
     {
       input: { stage: "draft", deliverable: "issues-memo", manual: "MANUAL-BODY" },

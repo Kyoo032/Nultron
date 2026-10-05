@@ -32,6 +32,9 @@ const TOKEN_BODY = {
   org_id: "org_1",
   user_id: "usr_1",
   tenant_id: "tnt_1",
+  // The portal sends the person's role beside `tenant_id` in every token body (both grants and the
+  // device grant): exactly `owner`, `admin` or `member`.
+  role: "member",
 };
 
 type Call = { url: string; init: RequestInit };
@@ -98,6 +101,7 @@ describe("exchangeCode", () => {
       userId: "usr_1",
       orgId: "org_1",
       tenantId: "tnt_1",
+      role: "member",
     });
   });
 
@@ -254,6 +258,51 @@ describe("refresh", () => {
       fetchImpl: recordingFetch(() => json({ error: "invalid_grant", reason: "refresh_reused" }, 401)).impl,
     });
     await expect(client.refresh({ refreshToken: "r" })).rejects.toMatchObject({ reason: "refresh_reused" });
+  });
+});
+
+describe("the role in the token body", () => {
+  async function roleFrom(body: Record<string, unknown>, grant: "code" | "refresh"): Promise<unknown> {
+    const { impl } = recordingFetch(() => json(body));
+    const client = createPortalClient({ baseUrl, fetchImpl: impl });
+    const tokens =
+      grant === "code"
+        ? await client.exchangeCode({ code: "c", ...EXCHANGE })
+        : await client.refresh({ refreshToken: "r", deviceId: "dev_1" });
+    return tokens.role;
+  }
+
+  it.each(["owner", "admin", "member"] as const)("reads %s from both grants", async (role) => {
+    expect(await roleFrom({ ...TOKEN_BODY, role }, "code")).toBe(role);
+    expect(await roleFrom({ ...TOKEN_BODY, role }, "refresh")).toBe(role);
+  });
+
+  it("reads a body with no role as no role, and does not refuse the sign-in", async () => {
+    const { role: _dropped, ...withoutRole } = TOKEN_BODY;
+    expect(await roleFrom(withoutRole, "code")).toBeNull();
+    expect(await roleFrom(withoutRole, "refresh")).toBeNull();
+  });
+
+  it("rejects an unknown role string: it is no role, never itself and never an owner", async () => {
+    for (const role of ["superuser", "Owner", " owner", "builder", "", "admin,owner"]) {
+      expect(await roleFrom({ ...TOKEN_BODY, role }, "code")).toBeNull();
+    }
+  });
+
+  it("reads a role that is not a string as no role", async () => {
+    for (const role of [1, true, null, ["owner"], { value: "owner" }]) {
+      expect(await roleFrom({ ...TOKEN_BODY, role }, "refresh")).toBeNull();
+    }
+  });
+
+  it("reads the body field, never the access token's own claim", async () => {
+    // A token minted before the claim existed carries none; one that carries `owner` while the body
+    // says `member` is still a member: the body is the portal's answer to this call.
+    const payload = Buffer.from(JSON.stringify({ role: "owner" })).toString("base64url");
+    const jwtLike = `e30.${payload}.sig`;
+    expect(await roleFrom({ ...TOKEN_BODY, access_token: jwtLike, role: "member" }, "code")).toBe("member");
+    const { role: _dropped, ...withoutRole } = TOKEN_BODY;
+    expect(await roleFrom({ ...withoutRole, access_token: jwtLike }, "code")).toBeNull();
   });
 });
 

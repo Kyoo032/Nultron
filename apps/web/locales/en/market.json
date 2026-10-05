@@ -12,6 +12,7 @@
     "machineNote": "{product} reads prices, charts, ratings, headlines, and market levels on this machine, then writes a briefing over them. Any figure it cannot trace back to that data is removed.",
     "empty": "Add a ticker above to see its price and chart.",
     "openSettings": "Open {settings}",
+    "needsKeyNote": "Quotes and charts work without a key. To write the briefing, add your key in {settings}.",
     "languageAria": "Briefing language",
     "specialistLabel": "Specialist",
     "specialistAria": "Market specialist",

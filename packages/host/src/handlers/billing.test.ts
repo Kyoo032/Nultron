@@ -10,7 +10,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const dataDir = mkdtempSync(join(tmpdir(), "agentforge-billing-"));
 process.env.AGENTFORGE_DATA_DIR = dataDir;
@@ -82,7 +82,7 @@ async function send(req: HostRequest): Promise<HostResult> {
 
 beforeAll(async () => {
   const { db, ensurePortalOwner } = await import("@agentforge/db");
-  await ensurePortalOwner(db, IDENTITY);
+  await ensurePortalOwner(db, { ...IDENTITY, role: "owner" });
   store = createMemorySessionStore();
   const session = createSession({ ...IDENTITY, now: T0 });
   await store.create(session);
@@ -90,6 +90,14 @@ beforeAll(async () => {
 });
 
 beforeEach(async () => {
+  // `dispatch({ now: () => T0 })` only reaches the session gate (router.ts). The billing handlers
+  // read the real clock themselves (`handlers/billing.ts`, `Date.now()`), and `currentPlanRecord`
+  // rolls a stored plan onto the period that clock is in. A plan saved with `calendarMonthPeriod(T0)`
+  // therefore stopped being "this month's" the day the calendar left September 2026, and the
+  // "unblocks a blocked tenant" case went red on 2026-10-01 with no code change. Only `Date` is
+  // faked: timers, I/O and the database keep running for real.
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(T0);
   process.env.AGENTFORGE_SERVER = "1";
   process.env[BILLING_SECRET_ENV] = SECRET;
   const { db } = await import("@agentforge/db");
@@ -99,6 +107,7 @@ beforeEach(async () => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   delete process.env.AGENTFORGE_SERVER;
   delete process.env[BILLING_SECRET_ENV];
   delete process.env.AGENTFORGE_BILLING_TOPUP_URL;
@@ -278,7 +287,7 @@ describe("applying a delivery", () => {
     expect(body(first)).toMatchObject({ outcome: "unknown_tenant" });
 
     const { db, ensurePortalOwner } = await import("@agentforge/db");
-    await ensurePortalOwner(db, late);
+    await ensurePortalOwner(db, { ...late, role: "owner" });
 
     const retry = await send(delivery({ eventId: "evt-presold", tenantId: late.tenantId }));
 

@@ -113,6 +113,69 @@ describe("resolveGate", () => {
   });
 });
 
+/**
+ * "Add the key later" (Nultron Enterprise, owner decision 2026-10-01).
+ *
+ * A signed-in hosted person who chose to wait for a key opens the desk on a gate the host still
+ * reports closed. Everything about it is hosted-only: on the Personal app (desktop, webdev) a closed
+ * gate is the onboarding key step with no way out but a key, whatever the deferral says.
+ */
+describe("resolveGate — the hosted deferral", () => {
+  const closed: GatewayGateStatus[] = ["needs_key", "invalid_key", "unreachable", "error"];
+  const chose = { hasSession: true, later: true };
+
+  it("opens the desk for a signed-in hosted person who chose to add the key later", () => {
+    for (const status of closed) {
+      expect(resolveGate(gate({ status, allowed: false }), false, true, chose), status).toBe("app");
+    }
+  });
+
+  it("keeps the welcome in front of them until they have chosen", () => {
+    expect(resolveGate(gate({ status: "needs_key", allowed: false }), false, true, { hasSession: true, later: false })).toBe(
+      "onboarding",
+    );
+  });
+
+  it("does not open for a hosted visitor with no session, whatever the record says", () => {
+    expect(resolveGate(gate({ status: "needs_key", allowed: false }), false, true, { hasSession: false, later: true })).toBe(
+      "onboarding",
+    );
+  });
+
+  it("does not turn a gate nobody reported into an open desk", () => {
+    for (const payload of [undefined, null, {}, { status: "ok" }, "ok"]) {
+      expect(resolveGate(payload, false, true, chose)).toBe("onboarding");
+    }
+  });
+
+  it("still opens on an allowed gate and still closes on nothing else", () => {
+    expect(resolveGate(gate({ status: "ok", allowed: true }), false, true, { hasSession: false, later: false })).toBe("app");
+  });
+
+  describe("on the Personal app nothing changes", () => {
+    it("ignores the deferral entirely: a closed gate is onboarding on webdev and on the packaged app", () => {
+      for (const isElectron of [true, false]) {
+        for (const status of closed) {
+          const reported = gate({ status, allowed: false });
+          expect(resolveGate(reported, isElectron, false, chose), `${status} electron=${isElectron}`).toBe("onboarding");
+          // Same answer as the call that never heard of a deferral, which is what Personal makes.
+          expect(resolveGate(reported, isElectron, false, chose)).toBe(resolveGate(reported, isElectron, false));
+        }
+      }
+    });
+
+    it("keeps webdev open on a missing gate, and the packaged app closed, exactly as before", () => {
+      expect(resolveGate(undefined, false, false, chose)).toBe("app");
+      expect(resolveGate(undefined, true, false, chose)).toBe("onboarding");
+    });
+
+    it("defaults to no deferral, so the two-argument call every Personal path makes is unchanged", () => {
+      expect(resolveGate(gate({ status: "needs_key", allowed: false }), true)).toBe("onboarding");
+      expect(resolveGate(gate({ status: "needs_key", allowed: false }), false)).toBe("onboarding");
+    });
+  });
+});
+
 describe("parseGatewayGate", () => {
   it("keeps the reported gate and pins endpointLocked", () => {
     const parsed = parseGatewayGate({

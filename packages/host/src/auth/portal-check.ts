@@ -13,6 +13,9 @@
  *
  *   - **rotated** → the new pair goes to the vault exactly as sign-in puts it there, and the new
  *     refresh token is sealed onto the row in the same write that moves `portalCheckedAt` forward;
+ *     then the role the portal sent with the answer is applied to the person's membership
+ *     (`applyRole`, SR-65), so a role changed at the portal — or an old over-privileged `owner` row —
+ *     is reconciled within one check;
  *   - **a terminal reason** (`TERMINAL_PORTAL_REASONS`) → the session ends here: revoked in the
  *     store, its tokens dropped (the sealed one with the revocation), and the request answered 401
  *     with the portal's own reason;
@@ -45,6 +48,8 @@
  * Tokens never leave this module except into the vault and back to the one caller that asked for
  * them (sign-out). No verdict, log line or error carries one.
  */
+import type { PortalRole } from "@agentforge/core";
+import type { PortalIdentity } from "@agentforge/db";
 import { getLocalVaultKey } from "@agentforge/db/vault-key";
 import { log } from "../log";
 import { PortalError, type PortalClient } from "./portal-client";
@@ -137,6 +142,17 @@ export type PortalSessionCheckOptions = {
    * null, the refresh goes without them, as it did before.
    */
   readonly clientCredentials?: () => PortalClientCredentials | null;
+  /**
+   * Brings the person's membership to the role the portal sent with this refresh (SR-65): the
+   * portal reads the member's role at every mint and refresh, so a role it changed — or an old
+   * `owner` row every first-time sign-in used to get — is reconciled with the next token. Called with
+   * the SESSION's own ids and the parsed role, `null` meaning the body carried none the host
+   * recognises (which the host reads as a `member`). Only a rotation that landed calls it; a
+   * refusal, an outage or nothing to present changes no role. A throw is logged by name and never
+   * ends the session or undoes the rotation. Absent, no role is touched: a desk, webdev or a test
+   * that wires no host. `hostPortalCheck` supplies the real one (`./index.ts`).
+   */
+  readonly applyRole?: (identity: PortalIdentity, role: PortalRole | null) => Promise<void>;
   readonly waitMs?: number;
   readonly retryMs?: number;
 };
@@ -296,6 +312,7 @@ export function createPortalSessionCheck(options: PortalSessionCheckOptions): Po
       return { kind: "no_tokens" };
     }
     let rotated: PortalTokenSet & { readonly accessToken: string };
+    let role: PortalRole | null;
     try {
       const client = clientCredentials();
       const answer = await options.portal.refresh({
@@ -303,6 +320,7 @@ export function createPortalSessionCheck(options: PortalSessionCheckOptions): Po
         deviceId: held.deviceId,
         ...(client ? { clientId: client.clientId, clientSecret: client.clientSecret } : {}),
       });
+      role = answer.role;
       rotated = {
         refreshToken: answer.refreshToken,
         accessToken: answer.accessToken,
@@ -349,7 +367,25 @@ export function createPortalSessionCheck(options: PortalSessionCheckOptions): Po
       // so a restart before the next rotation ends this session at the portal as a replay.
       log.error("portal_check_not_recorded", { tenantId: session.tenantId, fault: faultOf(error) });
     }
+    await reconcileRole(session, role);
     return { kind: "rotated", tokens: rotated };
+  }
+
+  /**
+   * After the pair is safe: bring the membership to the portal's role. It runs inside the refresh, so
+   * a request the gate is holding sees the new role if the portal answered within the wait, and the
+   * next request does otherwise. A failed write is logged by name and SQLite code only (a failed
+   * drizzle query quotes its parameters) and costs nothing but a stale role until the next refresh.
+   */
+  async function reconcileRole(session: SessionRecord, role: PortalRole | null): Promise<void> {
+    if (!options.applyRole) {
+      return;
+    }
+    try {
+      await options.applyRole({ tenantId: session.tenantId, orgId: session.orgId, userId: session.userId }, role);
+    } catch (error) {
+      log.error("portal_role_not_recorded", { tenantId: session.tenantId, fault: faultOf(error) });
+    }
   }
 
   function refresh(session: SessionRecord, context: PortalCheckContext): Promise<PortalRefreshOutcome> {

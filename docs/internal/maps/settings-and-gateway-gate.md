@@ -1,14 +1,16 @@
 # Map — Settings, the gateway gate, and Start over
 
-> **Two products, one repo.** **Personal** is the Mac/Windows DPSBuddy app (current cut `0.15.0`); **Enterprise** is the hosted web app.
+> **Two products, one repo.** **Personal** is the Mac/Windows Nultron app (current cut `0.15.0`); **Enterprise** is the hosted web app.
 > The host-decides/renderer-displays rule below is unchanged and applies to both; the Electron-only transport and wipe details are the Personal app's.
 > Decision record: [`web-pivot-2026-09-18.md`](../web-pivot-2026-09-18.md).
 
-Last verified: 2026-09-26 for the onboarding screen, restyled onto the current desk (gradient hello,
+Last verified: 2026-10-02, working tree over 0b61a29, not committed, for who may write the company's gateway key on the hosted server (M4; the "Who may press it" paragraph under Start over, the save-a-key row of the failure modes, the "What the owner can actually change" paragraph, and the key box, the reset card and the onboarding key step in the renderer): in server mode a non-blank provider key in `POST /api/v1/settings`, and `POST /api/v1/settings/reset` with `scope: "key"`, need an owner or an admin and answer a member or a builder `403 settings_key_forbidden`; the screens stop offering those controls to a member. Proven by unit tests (`settings-key-roles.test.ts` against real membership rows and `company-key-access.test.tsx` against a byte-for-byte golden of the Personal Settings page); **not driven in a browser, on the Kubernetes rehearsal or on a packed app**. Every other line of this page is as verified next. Before that: 2026-10-01, working tree over 0b61a29, not committed, a final pass that day, for the language the settings answer carries on the hosted server (the paragraph on the UI locale below, item `locale` / `savedLocale`): a person who never chose one is shown their browser's `Accept-Language`, with the stored choice first and nothing written (`settingsPayload` takes the request's header and the mode it was handed; see [`locale-boot-and-run-harness.md`](locale-boot-and-run-harness.md)). Proven by unit tests and by `dispatch` with real sessions, with a mutation-checked Personal-parity case; not driven in a browser. Before that, later that day, for Edit's Agent pane (its no-key note and quiet Send) and the hosted ffmpeg line, in the hosted needs-key paragraph below (item 5), driven with the hosted marker and the host's answers faked in the browser on `:3000`, not on a deployed hosted build. Before that, the same day, for two Enterprise-only fixes: a hosted tenant that holds a key and has no `model_cache` row (every tenant that upgraded into per-tenant caches) is refilled by one throttled background refresh that the first catalogue read starts (the paragraph after the `probe` / `defaults` one, the files table, the tests paragraph), and hosted prompt-enhance with no key answers `403 gateway_blocked` where it answered 200 stub text (the call-site list and the "Not every gated route checks the gate first" gotcha, whose line moved from `:49` to `:53`). Proven by unit tests and by `dispatch` on a real database with provisioned tenants, each with a Personal-parity case that was mutation-checked; **not driven in a browser, on the Kubernetes rehearsal or on a packed app**. Before that, the same day, for Enterprise "bring your own key" Phase A: the hosted model cache is now one row per tenant (`model_cache`) and the `probe` and `defaults` on this page's answer are the caller's own, a hosted tenant's stored Google, Anthropic and Volcengine base URLs are neither honoured nor echoed, and `refreshModelCache` probes the provider registry's hosts (paragraphs after `settingsPayload()` and after the save table, the state-keys and `model-cache.ts` rows, one Gotcha). Proven by unit tests, by `dispatch` with two provisioned tenants and by running the real router inside the local Kubernetes rehearsal's app container against its own database (Verify); **no browser sign-in** was completed on that cluster (the portal answered "No seats left in your organisation" to a new device), so Chat, Settings and the model list were not seen in a browser. The Personal app is unchanged by construction and by test, and was not driven on an installed app. Before that, the same day: the new "Add the key later (Enterprise only)" section, the Renderer paragraph (`resolveGate` takes a hosted deferral) and the "A closed gate hides Settings too" gotcha: a signed-in hosted tenant can start without a key, the host records the choice (`POST /api/v1/settings/key-later`, `keyLater` on the settings answer, server mode only) and the host's gate and every `403 gateway_blocked` are untouched. Proven by unit tests and by a drive on the local Kubernetes rehearsal (see that section); not driven on the Personal app, which is unchanged by construction and by test. Before that, the same day, for the endpoint-pinning paragraph and the "pinned three ways" paragraph: the packaged marker is now set by `main.cjs`, so "not packaged" in the override rule is true, and a brand flavor's gateway has its own variable ([SR-85](../security-register.md#sr-85)); the `migrateLegacyUserData` citation in the Start over section moved with that edit (`main.cjs:780-810`). Not driven on an installed app. Before that: 2026-09-30, working tree over bcf14f7, not committed (the second time that day), for the `defaults` sentence in the `settingsPayload()` paragraph: the per-mode default ids it carries resolve from the model lists of that day ([`model-policy.md`](model-policy.md) § 7), the Chat default is `gpt-6-luna` now. Before that, the same day, for "What a save does besides saving" and the sign-out paragraph under Start over: a save, a key reset and a tenant reset now call `resetModelReliabilityState`, which clears the learned Thinking-level limits along with the job-model breaker ([`model-policy.md`](model-policy.md) § 4); the citations in that table were re-read and re-anchored the same day. Every other line is as verified next. Before that: 2026-09-29, working tree, not committed, for the first-run guide's record (a `guide` field on `settingsPayload`, `POST /api/v1/settings/guide`, the record inside the sealed payload beside the language, erased by Start over): see "The first-run guide's record" below and [`first-run-desk-and-guide.md`](first-run-desk-and-guide.md); every other line of this page is as verified next. Also 2026-09-29, working tree, not committed, for `settingsPayload` (no `modes`; the range is re-anchored) and the shared settings read, both stated under "Settings per desk". Also 2026-09-29, for the reset wipe list (it gains `models-dev-cache.meta.json`) and every
+`apps/desktop/main.cjs` and `settings.test.ts` citation in this page's Start over section, re-anchored in the working
+tree, not committed, after the ffmpeg probe moved behind the first paint. Not driven. Before that: 2026-09-26 for the onboarding screen, restyled onto the current desk (gradient hello,
 `hero-aurora`, `card-live` example tiles). A fresh desk is a short hello, then the key, then four
 examples that open Chat. The screen does not show the gateway address. The host still decides:
 `allowed` is the only branch, and the examples render only after `resolveGate` says `"app"`. In-app name
-stays `{productName}` (DPSBuddy). Gate derivation, reset, and Settings are untouched.
+stays `{productName}` (Nultron). Gate derivation, reset, and Settings are untouched.
 
 Before that: 2026-09-23 at d4561b8 + uncommitted tree for Start over (a wipe that fails part-way is now
 retried, and the boot log line), the Settings page's load / save / language failures, and every
@@ -51,9 +53,9 @@ envelope holding `{ version: 2, locale, users, workspaces: { [workspaceId]: Stor
 "per tenant" is which payload.
 
 **Where that payload lives is decided by mode, never by tenant** — `tenantStateBackend()`
-(`packages/host/src/tenant-state-store.ts:281-283`). Off server mode it is lane D's file, at exactly lane D's
+(`packages/host/src/tenant-state-store.ts:331-333`). Off server mode it is lane D's file, at exactly lane D's
 path: `<localDataDir()>/settings.enc` for `local-tenant` and `<localDataDir()>/tenants/<tenantId>/settings.enc`
-for anyone else (`TENANT_STATE_FILENAMES`, `packages/host/src/tenant-state-store.ts:48-51`; see
+for anyone else (`TENANT_STATE_FILENAMES`, `packages/host/src/tenant-state-store.ts:48-54`; see
 [`tenant-storage.md`](tenant-storage.md) for why the local tenant keeps the bare path). In server mode it is a
 `tenant_state` row and no file is written at all. The whole of that story is
 [`tenant-secrets-backend.md`](tenant-secrets-backend.md); this page assumes it and carries on.
@@ -71,12 +73,18 @@ The two sentinels are string constants, not magic literals scattered around:
 The literal `"__default__"` appears exactly once in the repo, at `:30`.
 
 **The UI locale is not in a desk slice and is not the tenant's either.** Phase 4 made it per *user*:
-`loadUserLocale(scope)` / `saveUserLocale(scope, locale)` (`:582-592`, `:598-616`) take a `UserScope` —
+`loadUserLocale(scope)` / `saveUserLocale(scope, locale)` (`:594-600`, `:626-639`) take a `UserScope` —
 tenant, desk **and** user — and read or write `users[userId].locale` inside the same sealed payload.
+`loadUserLocaleChoice(scope)` (`:611-616`) reads only that field and answers `null` for a person who never
+chose, which `loadUserLocale` cannot (it falls through to the tenant's locale and then English); the hosted
+settings answer uses it to put a person's own choice ahead of their browser's language (`localePayload`,
+`locale-boot.ts:121-134`).
 `loadOwnerLocale` / `saveOwnerLocale` (`:564-566`, `:568-572`) remain the *install's* locale, which is what
 `getBootLocale()` freezes. See [`locale-boot-and-run-harness.md`](locale-boot-and-run-harness.md).
 
 **A new desk inherits the gateway key.** Keys stay per desk, but `handlePostWorkspaces` copies the creating desk's `openaiApiKey` into the new desk's slice before it selects the new desk (`packages/host/src/handlers/workspaces.ts:33-39`, `:99-100`). Without it, creating a desk on a keyed install selected an empty slice, the gate derived `needs_key` / `allowed: false`, and `App` replaced the shell with the key form everywhere (finding 1 of the 0.15.0 verify pass). No verdict is copied because none needs to be: the verdict is the tenant's and keyed by fingerprint. Only the gateway key moves — extras stay empty — and `clearGatewayKeyEverywhere` still clears the copy. Pinned by `packages/host/src/handlers/workspaces.test.ts`. The renderer's guard for desks that are still keyless: `OnboardingDesks` under the key form (`apps/web/components/onboarding-screen.tsx:297`), which selects another desk on the host and applies the gate the host reports for it (`apps/web/lib/onboarding-desks.ts:60-68`). The host still decides; the renderer only offers the desks. When that gate is allowed, the screen shows the examples step instead of opening the desk immediately.
+
+**The first-run guide's record rides in the same payload as the language (2026-09-29).** `UserPrefs` gained `guide` (`{ outcome: "finished" | "skipped" | "closed", at }`, `packages/host/src/settings-store.ts:188`), so it is per user inside a tenant's sealed `settings.enc`, machine-wide on a desk (one user, `local-owner`) and per person on the hosted app. `loadUserGuide` and `saveUserGuide` (`:627`, `:641`) read and write it; `settingsPayload` answers it as `guide: { seen, outcome, at }` (`packages/host/src/handlers/settings.ts:101`); `POST /api/v1/settings/guide` records an outcome (`handlePostGuide`, `packages/host/src/handlers/guide.ts:18`, route `packages/host/src/router.ts:290`) and is deliberately its own route, not a field of `POST /api/v1/settings`, because a settings save revokes the knowledge model row, clears three breakers and re-probes the gateway. It is not gated (`gateway_blocked` never applies to it). **"Start over" removes it for free:** `settings.enc` is the first entry of `HOST_RESET_ENTRIES`, and `packages/host/src/first-run-modes.test.ts` proves the record reads back unseen after a real Start over. "Sign out" (`scope: "key"`) leaves it alone.
 
 **`workspace-id.txt`** (`<localDataDir()>/workspace-id.txt`, `packages/host/src/workspace.ts:19-41`) is the
 stamp that stops a request from landing in the fallback slice. `getTenant(preferredWorkspaceId)`
@@ -92,15 +100,66 @@ and the desk reports stub. The defence is a **source-grep test**:
 `apps/desktop` or `apps/web/server.ts` calls `loadSettings` with `()`/`undefined`/`null`/`""`, outside two
 named exceptions (`studio-generate.ts`, `handlers/jobs.ts`, listed at `:22-23`).
 
-**`settingsPayload()`** (`packages/host/src/handlers/settings.ts:85-122`) is what the renderer sees. Keys are
-never in it: `maskSecrets` (`packages/core/src/secrets.ts:251-280`) emits booleans (`hasOpenai`, …) and
+**`settingsPayload()`** (`packages/host/src/handlers/settings.ts:88-128`) is what the renderer sees. **It does not
+carry the model catalogue** (2026-09-29): `modes` left it, and only `defaults` (the per-mode default ids, `:113`)
+stayed (they resolve from the lists in [`model-policy.md`](model-policy.md) § 7: on a catalogue that lists them, chat `gpt-6-luna`, documents, finance and market `hy3`, legal and meeting `gpt-6-sol`, presentations `glm-5.3-flash`). It used to spread `modeCatalogPayload()`, which put the chat list under nine mode names, 261 KB of a
+274 KB answer that the shell reads on every cold load; no reader of this route used a list. The catalogue is
+`GET /api/v1/models`, sent once (`modelCatalogBody`, `packages/host/src/selectable-models.ts:304-309`); the
+tests are `packages/host/src/handlers/models.test.ts`. On the renderer side the shell's gate read and the
+readers that only display the answer (the Chat key pill, the usage chip, the composer's needs-key hook, the
+job-mode model pickers) share one `readSettings` (`apps/web/lib/settings-read.ts`): at most 2 s old, dropped
+by any write this renderer makes (`subscribeToWrites`, `apps/web/lib/api-client.ts`), and never used for the
+Settings page itself, which asks the host afresh. A cold `/chat` made four reads of this route; it now makes
+one. Keys are never in the payload: `maskSecrets` (`packages/core/src/secrets.ts:257-287`) emits booleans (`hasOpenai`, …) and
 fingerprints (`sha256:` + the first 12 hex chars of SHA-256 over the trimmed secret,
 `packages/core/src/security/fingerprint.ts:9-15`). `openaiBaseUrl` in the payload is always
-`resolvedGatewayBaseUrl()`, never a stored value (`packages/core/src/secrets.ts:263-264`).
+`resolvedGatewayBaseUrl()`, never a stored value (`packages/core/src/secrets.ts:270-271`).
+
+**On the hosted server the payload is the caller's own where it used to be the machine's (Enterprise BYOK
+Phase A, 2026-10-01).** `probe` is `probeSummary(undefined, tenant)` and `defaults` is `modeDefaultsFor(tenant)`
+(`packages/host/src/handlers/settings.ts:121`, `:125`): both read the calling tenant's model cache, which on
+the hosted server is a `tenant_state` row (key `model_cache`) and not the one machine file `models-cache.json`
+every tenant's save or Refresh used to write and every tenant's Settings used to read back
+(`packages/host/src/model-cache.ts:35-46`, `:132`, `:151`). So tenant A's catalogue size, its probe errors and
+the default model the host would pick from A's models never reach B. A desk reads and writes the same file as
+before, and ignores the tenant it is handed. `maskSecrets` takes the environment as a second argument and, on the
+hosted server, reports `googleBaseUrl`, `anthropicBaseUrl` and `volcengineBaseUrl` as absent
+(`secrets.ts:257`): the host does not honour a stored one there (`resolveProviderKeys`, `secrets.ts:346`), and
+nothing writes one (the POST body never carried them), so echoing one would claim a setting that is not in force.
+The renderer's Settings page keeps three state fields for them, set from the answer and read nowhere
+(`apps/web/components/settings-page.tsx:138-140`, `:191-193`), and posts none.
+
+**A tenant with a key and no cache row is refilled in the background (2026-10-01, hosted only).** Only a Settings
+save (`handlers/settings.ts:272`) and Refresh (`handlers/models.ts:21`) write a tenant's `model_cache` row, so a
+tenant that already held a key when the server upgraded into per-tenant caches had none: Chat listed static ids,
+Images none, Meeting `no_model`, until somebody saved Settings again. `warmHostedModelCache`
+(`packages/host/src/selectable-models.ts:505`) closes that. It is called after every catalogue read that has a tenant
+in hand: `listCatalogModels` (`:78`, which every `list*Models`, `modeCatalogPayload`, `modelCatalogBody` and
+`modeDefaultsFor` go through, so `GET /api/v1/models`, `/chat` and the `defaults` on this page's answer all
+start it; the `probe` summary reads the cache directly and does not), `listProbedModels` with no cache argument (`:143`, the Videos studio's list) and `defaultSelectableModel`
+(`:231`). It returns at its first line off server mode, so a desk never reaches it. On the hosted server it does
+nothing unless the tenant's cache row is absent (`modelCacheStamp` is `"missing"`), then nothing if one is already
+running for the tenant or one started inside `HOSTED_CACHE_WARMUP_THROTTLE_MS` (ten minutes, `:465`), then nothing if
+`loadSettings` for the caller's desk holds no provider key (`hasLiveProvider`); a read that found no key spends no
+throttle. Past those it starts `refreshModelCache(settings, { scope: { tenantId }, onlyIfMissing: true })` and does not
+await it, so the read that started it answers at once with what it has and the next read after the probe lands is
+live (the memo's stamp moves from `"missing"` to the row's, `:86`). `onlyIfMissing` (`:350`, checked at `:451` with no
+`await` before the write) makes it write-if-absent: a Save or a Refresh that lands while the probe is out wrote a
+newer answer, and the older one does not replace it. A failure (unreadable settings, a refresh that throws or rejects,
+or a refresh that came back with a provider error and not one model, `probeFailureOf`, `:559`) is one
+`model_cache_warmup_failed` log line carrying the tenant id and the redacted message, and never the read's problem
+(`logWarmupFailure`, `:573`). **A probe that merely fails still writes a row** (with `openaiError` and no models,
+exactly as a failed Settings save does), which ends the warm-up for that tenant: it stays empty, with the error in the
+`probe` summary, until a save or Refresh, rather than retrying every ten minutes. Which desk's key: the one the caller's
+`TenantContext` names (`workspaceIdOf`, `:549`), else the desk the request selected. **Not covered:** `cachedModelIds` (Meeting, `meeting/transcribe.ts:47`) and `resolveAsrCapability`
+(Edit, `edit/asr.ts:52`) read `loadModelCache` directly and do not start it; in practice the shell's own
+`GET /api/v1/settings` has, because `settingsPayload` reads `defaults` through the catalogue.
 
 **What the owner can actually change on this page.** Two fields, and the POST body says so: the settings form
-submits exactly `{ openaiApiKey, editTurnCapUsd }` (`apps/web/components/settings-page.tsx:261-273`, with the
-comment "The endpoint is pinned by the host; never send it back"). The language `<select>` is a separate POST
+submits exactly `{ openaiApiKey, editTurnCapUsd }` (`apps/web/components/settings-page.tsx:279-293`, with the
+comment "The endpoint is pinned by the host; never send it back"). On the hosted server a person who is not an owner
+or an admin gets no key box (`settings-key-restricted` stands in for it) and the form submits `{ editTurnCapUsd }`
+alone (`mayChangeKey`, `:133`, `:287`); see "Who may press it" under Start over. The language `<select>` is a separate POST
 of `{ locale }` (`:302-312`) — see [`locale-boot-and-run-harness.md`](locale-boot-and-run-harness.md). The Edit
 turn cap (`settings-edit-turn-cap`, `:496`) is a number input clamped to 0.5–50 on the way in and again on the
 way out (`:214-215`, `:494`), default 2.
@@ -114,7 +173,7 @@ first load used to leave the page's defaults on screen as though they were this 
 leave the select on the new language as if it had been saved; it now reverts the select and shows
 `settings-locale-error` (`:416`), and the select is disabled while the change is in flight.
 
-**Key resolution.** `resolveProviderKeys(settings, env)` (`packages/core/src/secrets.ts:307-319` for the signature, the body through `:345`), today — where `env` is not the process environment directly but `providerEnv(env)` (`packages/core/src/server-mode.ts:43-45`, with the rule written out at `:22-42`), which is `env` unchanged on a desk and a **frozen empty object** in server mode. That is Phase 4's change, and it is shared: the same helper backs the tool secret scope (`packages/core/src/tools/credentials.ts:308-312`), the runtime's per-provider fallback (`packages/core/src/runtime/ai-sdk-runtime.ts:163-174`), the tool scope a run executes in (`getSecret`, `packages/core/src/tools/secret-scope.ts:36-44` — the fallback every platform tool uses when its scope lacks a key, and the one a named sweep cannot see because its index is a variable) and, indirectly, Edit's off-request transcription (`packages/host/src/edit/asr.ts:79-87`, which asks `resolveProviderKeys` rather than the environment). `packages/core/src/provider-env-sweep.test.ts` fails the build if any other shipped source reads one of these variables off `process.env`, indexes it dynamically without an allowlisted exception, or destructures a credential out of it:
+**Key resolution.** `resolveProviderKeys(settings, env)` (`packages/core/src/secrets.ts:319-331` for the signature, the body through `:345`), today — where `env` is not the process environment directly but `providerEnv(env)` (`packages/core/src/server-mode.ts:43-45`, with the rule written out at `:22-42`), which is `env` unchanged on a desk and a **frozen empty object** in server mode. That is Phase 4's change, and it is shared: the same helper backs the tool secret scope (`packages/core/src/tools/credentials.ts:308-312`), the runtime's per-provider fallback (`packages/core/src/runtime/ai-sdk-runtime.ts:165-176`), the tool scope a run executes in (`getSecret`, `packages/core/src/tools/secret-scope.ts:36-44` — the fallback every platform tool uses when its scope lacks a key, and the one a named sweep cannot see because its index is a variable) and, indirectly, Edit's off-request transcription (`packages/host/src/edit/asr.ts:79-87`, which asks `resolveProviderKeys` rather than the environment). `packages/core/src/provider-env-sweep.test.ts` fails the build if any other shipped source reads one of these variables off `process.env`, indexes it dynamically without an allowlisted exception, or destructures a credential out of it:
 
 ```
 openai        = settings.openaiApiKey || env.OPENAI_API_KEY
@@ -126,12 +185,15 @@ volcengine    = settings.volcengineApiKey || env.ARK_API_KEY || env.VOLCENGINE_A
 
 `reuseOpenAI(dialect)` hands the OpenAI-slot key to another provider's slot when `guessDialectFromKey` says it
 actually belongs there — i.e. someone pasted an Anthropic key into the one key field. Stub vs live is a separate
-call, `resolveRuntimeMode({ settingsHasKey, envRuntime })` (`packages/core/src/secrets.ts:293-298`).
+call, `resolveRuntimeMode({ settingsHasKey, envRuntime })` (`packages/core/src/secrets.ts:305-310`).
 
 **Endpoint pinning.** `PINNED_GATEWAY_BASE_URL = "https://api.tokotokenai.com/v1"`
 (`packages/core/src/gateway/pinned.ts:8`), with a SHA-256 of the literal checked by
-`packages/core/src/gateway/pinned.test.ts`. The `AGENTFORGE_GATEWAY_URL` override needs
-`gatewayUrlOverrideAllowed()` (`packages/core/src/gateway/pinned.ts:24-36`): not packaged **and**
+`packages/core/src/gateway/pinned.test.ts`. The gateway can move only through `gatewayUrlOverride()`
+(`packages/core/src/gateway/pinned.ts:72`). A packaged build (`AGENTFORGE_PACKAGED=1`, set by `main.cjs`
+`bootstrapPackaged`, `apps/desktop/main.cjs:653-667`) reads only the brand gateway `AGENTFORGE_BRAND_GATEWAY_URL`,
+which `main.cjs` assigns for a Kemenkeu AI or AIHub Metranet flavor and never for the public build. Anything else
+reads the dev hook `AGENTFORGE_GATEWAY_URL` only when `gatewayUrlOverrideAllowed()` (`:38`): not packaged **and**
 `NODE_ENV !== "production"`. The **gateway-pin test** (`packages/host/src/gateway-pin.test.ts`) enforces this by
 grep: the `ALLOWLIST` of permanent exceptions must stay empty; no file under `packages/host/src` or
 `packages/core/src` may read `settings.openaiBaseUrl` outside `secrets.ts`/`settings-store.ts`; and
@@ -160,18 +222,26 @@ from the renderer, together with the `settings.endpointLabel` / `settings.endpoi
 
 Host and core logic are unchanged. This is a fourth, presentation-only layer on top of the three real pins.
 
-**What a save does besides saving.** `handlePostSettings` (`packages/host/src/handlers/settings.ts:207-281`)
+**What a save does besides saving.** `handlePostSettings` (`packages/host/src/handlers/settings.ts:234`)
 runs `saveSettings(patch, tenant)` and then four side effects, in order, so a corrected key or URL
 takes effect on the next request instead of after a breaker expires:
 
 | Call | Why |
 |---|---|
-| `clearThisKeyCache()` (`:244`) | the per-key usage strip is keyed on the old credential |
-| `resetEmbedCircuit()` (`:247`) | the embeddings breaker holds a workspace down for five minutes |
-| `resetJobModelCircuit()` (`:248`) | **added 2026-09-17** — the job-model fallback breaker skips a model for the same five minutes (`JOB_MODEL_DOWN_MS`, `packages/host/src/job-model-fallback.ts:25`), so a save that fixes the key must clear it too or the desk keeps routing around a model that now works |
-| `revokeKnowledgeGatewayModel(...)` (`:252`) | the retrieval sidecar holds a *copy* of the key inside the model row it embeds with; a key changed here but left in that row has not been rotated |
+| `clearThisKeyCache()` (`:261`) | the per-key usage strip is keyed on the old credential |
+| `resetEmbedCircuit()` (`:265`) | the embeddings breaker holds a workspace down for five minutes |
+| `resetModelReliabilityState()` (`:266`) | **added 2026-09-17 as `resetJobModelCircuit()`, widened 2026-09-30** — the job-model fallback breaker skips a model for the same five minutes (`JOB_MODEL_DOWN_MS`, `packages/host/src/job-model-fallback.ts:27`), so a save that fixes the key must clear it too or the desk keeps routing around a model that now works. It also forgets the Thinking levels the runtime learned a model refuses (`resetLearnedEffortLimits`, `packages/core/src/runtime/effort-selfheal.ts:254`; they also expire on their own after 30 minutes and are kept per tenant): a new key or endpoint may sit in front of a different upstream, so nothing learned about a model holds (`resetModelReliabilityState`, `packages/host/src/job-model-fallback.ts:67`) |
+| `revokeKnowledgeGatewayModel(...)` (`:270`) | the retrieval sidecar holds a *copy* of the key inside the model row it embeds with; a key changed here but left in that row has not been rotated |
 
-`resetGatewayKey` runs the same two breaker resets on sign-out — see **Start over** below.
+After those, `refreshModelCache(saved, { scope: tenant })` (`packages/host/src/handlers/settings.ts:272`) lists
+the models the saved keys can see and writes **this tenant's** cache: a `tenant_state` row on the hosted server,
+the machine file on a desk (`packages/host/src/selectable-models.ts:336`; a failure is swallowed, airplane mode).
+On the hosted server it probes Anthropic and Google at the provider registry's hosts and only behind a key
+(`:343`), where a desk still probes the stored base URL, and a stored Volcengine URL with no key behind it probes
+nothing. `POST /api/v1/models` (Refresh) does the same with `forceRegistry`, scoped to the caller
+(`packages/host/src/handlers/models.ts:21`).
+
+`resetGatewayKey` runs the same two breaker resets (the embeddings one and the reliability state) on sign-out — see **Start over** below.
 
 ### The gateway gate
 
@@ -199,8 +269,8 @@ verdict is keyed by fingerprint; the key itself is never written**), and hands b
 
 - **The verdict moved behind a backend.** `statePath(tenantId)` is gone. `loadGateState`, `saveGateState`
   and `clearGateState` (`:157-187`, `:198-213`, `:215-221`) go through `tenantStateBackend()`
-  (`packages/host/src/tenant-state-store.ts:319-321`) under the key
-  `gateway_gate` (`packages/core/src/tenancy/state-keys.ts:14`). On a desk that resolves
+  (`packages/host/src/tenant-state-store.ts:331-333`) under the key
+  `gateway_gate` (`packages/core/src/tenancy/state-keys.ts:19`). On a desk that resolves
   to exactly lane D's file — `<dataDir>/gateway-gate.json` for `local-tenant`, under `tenants/<tenantId>/`
   otherwise, which is what stops two tenants overwriting each other's verdict — because the file backend
   maps the key back through `TENANT_STATE_FILENAMES` (`:48-51`), the one place in the host that may spell
@@ -209,7 +279,7 @@ verdict is keyed by fingerprint; the key itself is never written**), and hands b
 - **`keyFor` refuses the process environment in server mode** (`:395-405`). A saved key is still the key.
   But with none saved, an `OPENAI_API_KEY` in the host's own environment belongs to the **operator**, and
   handing it to a tenant who has saved nothing is residual A01-3. The gate now answers `needs_key` there,
-  which is what `resolveProviderKeys` does on the call path (`packages/core/src/secrets.ts:307-319`,
+  which is what `resolveProviderKeys` does on the call path (`packages/core/src/secrets.ts:319-331`,
   the fallback taken from `providerEnv` at `:306`), so the verdict and the call agree about
   whether this tenant has a key at all. Off server mode nothing moved: a
   desk running `AGENTFORGE_RUNTIME=ai` with a key in its environment still works exactly as before.
@@ -247,7 +317,8 @@ fires an un-awaited check at most once per key per 10 minutes from `handleGetSet
 `{error:{code,message}}` envelope, so `parseGatewayBlocked` can read it without unwrapping. Call sites, all
 verified at this sha: `handlers/runs.ts:30`; `handlers/jobs.ts:71, 109, 155, 166, 177, 188, 215, 226, 254, 266, 279, 291`;
 `handlers/knowledge.ts:174, 191, 207, 253, 288, 310, 370, 403`; `handlers/finance.ts:17, 32, 52, 64`;
-`handlers/market.ts:29, 41, 55`; `handlers/edit.ts:314, 542`; `handlers/enhance-prompt.ts:49`;
+`handlers/market.ts:29, 41, 55`; `handlers/edit.ts:314, 542`; `handlers/enhance-prompt.ts:53` (hosted: also for a tenant
+with no key, which no longer gets the local stub rewrite, `:49`);
 `handlers/legal.ts:114`; `handlers/meetings.ts:139, 155, 174`.
 
 **Phase 5 lane B: the plan is enforced in the same function, and first.** `requireGatewayAllowed`
@@ -283,9 +354,9 @@ has blocked can still read why and pay.
   `/api/v1/usage`, `/api/v1/models`.
 
 **Renderer.** `parseGatewayGate` (`apps/web/lib/gateway-gate.ts:56-75`) requires a known `status` and a boolean
-`allowed` or returns `null`; `MISSING_GATEWAY_GATE` fails closed. `resolveGate(payload, isElectron, hosted)` (`:94-100`)
+`allowed` or returns `null`; `MISSING_GATEWAY_GATE` fails closed. `resolveGate(payload, isElectron, hosted, deferral)` (`:101`)
 obeys a reported gate as-is, and on a missing or malformed one falls closed **under Electron and on a hosted build** — webdev and
-Playwright keep working before the host answers. `App.tsx` holds `gate` / `gateway` / `localeEpoch` state
+Playwright keep working before the host answers. The one exception to "obeys a reported gate as-is" is the hosted deferral: a closed gate opens the desk for a signed-in hosted person who chose "Add it later" (next section), and for nobody else. `App.tsx` holds `gate` / `gateway` / `localeEpoch` state
 (`apps/web/src/App.tsx:77-79`), listens for `GATE_EVENT = "agentforge-gate"`
 (`apps/web/lib/gateway-gate.ts:108`, listener at `App.tsx:89-97`), re-fetches settings and re-resolves on every
 locale epoch (`:99-122`), and renders `OnboardingScreen` when `gate === "onboarding"` (`:139-140`). Reason copy
@@ -293,17 +364,37 @@ maps through `REASON_KEYS` (`apps/web/lib/gateway-gate.ts:123-127`) to
 `onboarding.gate.invalidKey / unreachable / error`; the Settings status word maps through `gatewayStatusKey`
 (`:135-137`) to `settings.gateway.status.<status>`.
 
+### Add the key later (Enterprise only)
+
+Owner decision, Rizky 2026-10-01: on the hosted app, after a portal sign-in, "on the onboarding they can choose to put the API key later". Before it, a signed-in tenant with no key landed on the three-step welcome whose second step asks for a key, and every route showed the same screen (`webapp-deploy/k8s/README.md`, "Product behaviour the rehearsal ran into"). **The Personal app does not have this and must not get it.** The switch is the hosted marker the server stamps into the page (`isHostedBuild`, `apps/web/lib/hosted-build.ts`) on the renderer side and server mode on the host side; every piece below is inert without it.
+
+**What the host does.** Two small things, both server mode only, and **nothing in the gate**:
+
+- `POST /api/v1/settings/key-later` (`handlePostKeyLater`, `packages/host/src/handlers/key-later.ts`; route `packages/host/src/router.ts:293`) records `users[userId].keyLater = { at }` in the sealed settings payload beside the language and the guide's record (`saveUserKeyLater`, `packages/host/src/settings-store.ts:682`; `UserPrefs` and the `usersMap` sanitiser in the same file; the pure record is `packages/host/src/key-later.ts`). Its own route, for the guide's reason: a settings save revokes the knowledge model row and re-probes the gateway. The body is ignored and the time is the host's. Off server mode it answers `404 not_found`, the answer an unregistered path gets. It is not gated: choosing to wait for a key needs no key.
+- `settingsPayload` carries `keyLater: { chosen, at }` (`packages/host/src/handlers/settings.ts`, spread in only when `serverMode`; `handleGetSettings` and `handlePostSettings` take the injected `ServerModeDeps`). The Personal answer has no such field.
+- **It is a preference about the screen, never a decision about the host.** `deriveGatewayGate` and `requireGatewayAllowed` never read it. After it is written the gate still reads `needs_key` / `allowed: false` and every gateway-calling route still answers the flat `403 gateway_blocked`; `packages/host/src/handlers/key-later.test.ts` pins both. It is erased by Start over (`settings.enc` is the first wipe entry) and by the hosted tenant erase (the `tenant_state` row goes), and **not** by saving a key or signing out of the gateway: a key that later stops working must not bring the welcome back.
+
+**What the renderer does.**
+
+1. `resolveGate(payload, isElectron, hosted, deferral)` (`apps/web/lib/gateway-gate.ts:101-127`, with the `KeyDeferral` type and its default `NO_KEY_DEFERRAL` at the end of that range) gained a fourth argument, `{ hasSession, later }`. A gate the host reported **closed** opens the desk only for `hosted && hasSession && later`; an unreported gate is still closed on a hosted build, and an allowed gate is still open. With the default, or off the hosted build, the function is exactly what it was. Before the person has chosen, a signed-in tenant still sees the welcome once: that is where the choice lives. (AGENTS.md's older "the renderer gate becomes `allowed || hasSession`" is the design this refines: a session alone does not open a closed gate, a session plus the remembered choice does.)
+2. `AppRoutes` (`apps/web/src/App.tsx`) derives the deferral from the hosted marker, the session and the settings answer (`deskDeferral`, `apps/web/lib/key-later.ts:37`), keeps it in a ref for the gate-event listener (`deferralRef`, `:225`), and hands `OnboardingScreen` an `onLater` callback **only** when `canOfferKeyLater(hosted, session.status)` (`:223`, `:345`). The callback records the choice (`recordKeyLater`, fire-and-forget) and the screen then calls its own `onDone`, so Chat opens and the tour is offered the one way it always is.
+3. `OnboardingScreen` (`apps/web/components/onboarding-screen.tsx`) shows `onboarding-later` ("Add it later" / "Tambahkan nanti", a secondary button next to Check this key) and `onboarding-later-hint` on the **key step** when it was given `onLater`, and nothing otherwise.
+4. **A shared gate store** (`apps/web/lib/gate-state.ts`): the work-mode panes are kept alive, so a pane that read the gate once at mount would keep telling a tenant to add a key after they had saved one in Settings. Settings reads (`settings-read.ts`), the Settings page's own answers (`applyPayload`), a re-check (`checkGateway`) and the gate event publish the host's newest gate; `apps/web/lib/gateway-blocked.ts` (`noteGatewayResponse`, called beside `notePlanResponse` in `apiFetch`) flags any `403 gateway_blocked`. An open gate clears the flag, and a refusal also asks the host for its own gate again, at most once per `RECONCILE_MIN_GAP_MS` (`reconcileGate`), so a flag raised by a verdict that has since recovered cannot leave every pane quiet. A key accepted on the onboarding screen publishes its gate too (`applyGate`). **Both writers are no-ops off the hosted build**, and `useDeskNeedsKey` returns the store's answer only when hosted (`resolveNeedsKey`), its own mount-time read otherwise.
+5. **Every pane says it, calmly.** `NeedsKeyNote` (`apps/web/components/needs-key-note.tsx`, copy `common.needsKey.note`, link `<testid>-settings` to `/settings`) in Research, Data, Finance, Market, Legal, Meeting, Presentations and Knowledge (`useHostedNeedsKey`, which is `false` and request-free off the hosted build), with Send / Generate quiet; **only** the refused-for-no-key banner (`isGatewayBlockedText`, the catalog sentence a hosted 403 is mapped to by `messageUnlessBlocked`) gives way to the note, and every other error (an upload that failed, a gallery that did not load) shows as it always did; Chat, Documents, Images, Videos, Music and Edit's Generate tab already had a needs-key line and keep it (Chat's and Documents' gain the Settings link when hosted); Edit's Agent pane had none and gains `edit-agent-needs-key` (`apps/web/components/edit-agent-panel.tsx`, `needsKey` from `useHostedNeedsKey()` in `edit-studio.tsx`) with `edit-composer-send` quiet, and the studio hides the red banner when the error is the refused-for-no-key sentence. Hosted only too: the ffmpeg install guide is one calm line with no command, copy button, re-check or link (`ffmpeg-setup-notice.tsx`), and the onboarding key step does not offer it (`needsFfmpeg`, `onboarding-screen.tsx`). Education makes no gateway call (`packages/host/src/handlers/education.ts`) and has no note. A `403 gateway_blocked` in a job stream becomes a `gateway_blocked` `JobStreamError` with catalog copy on the hosted build (`errorFromJson`), and Chat's refused send, Documents, Presentations, Meeting, Images, Videos, Music, Knowledge and Edit's agent say the same sentence instead of "Request failed". A choice made this session survives a settings re-read that lands before the host has stored it (`choseLaterRef` in `App.tsx`).
+
+Tests: `apps/web/lib/gateway-gate.test.ts` ("the hosted deferral", including the Personal block), `gate-state.test.ts`, `gateway-blocked.test.ts`, `key-later.test.ts`, `onboarding-key-later.test.tsx`, `needs-key-states.test.tsx` (every pane, hosted against Personal), `key-later-wiring.test.ts`, `job-stream.test.ts`; host `handlers/key-later.test.ts`.
+
 ### Start over
 
 Card `settings-reset` (`apps/web/components/settings-reset-card.tsx:159`), mounted at
 `apps/web/components/settings-page.tsx:535`, fed by `resetPending` on the settings payload.
 
 **Sign out (`scope: "key"`)** — no typed confirmation, fully synchronous. `resetGatewayKey`
-(`packages/host/src/handlers/settings.ts:400-415`) calls `clearGatewayKeyEverywhere(tenant)`
+(`packages/host/src/handlers/settings.ts:410-425`) calls `clearGatewayKeyEverywhere(tenant)`
 (`packages/host/src/settings-store.ts:522-538` — **every desk of the caller's tenant**, because "a key left on
 a second desk would keep the gate open after 'forget my key'"; Phase 3 lane D narrowed it from the whole
 install), then `clearGateState(tenant)`, `clearThisKeyCache()`, `resetEmbedCircuit()` and — added 2026-09-17 —
-`resetJobModelCircuit()` (`:405-407`). Returns `relaunch: false`. Threads, desks and media are untouched. The
+`resetModelReliabilityState()` (`:417`; the job-model breaker and the learned Thinking-level limits). Returns `relaunch: false`. Threads, desks and media are untouched. The
 card navigates to `/chat` and calls `announceGate(result.gateway)`, which dispatches `GATE_EVENT` and drops the
 shell to onboarding.
 
@@ -312,10 +403,32 @@ shell to onboarding.
 lane D scoped `clearGatewayKeyEverywhere` and `clearGateState` to `tenant`, and the three cache resets are
 process-wide breakers that cost a re-check and nothing else. Refusing it also left a hosted tenant with **no**
 way to remove a saved key, because a blank `openaiApiKey` in a settings POST is dropped rather than applied
-(`keyFieldValue`, `:194-202`); both halves are pinned by `packages/host/src/handlers/settings.test.ts`
+(`keyFieldValue`, `packages/host/src/handlers/settings.ts:226-234`); both halves are pinned by `packages/host/src/handlers/settings.test.ts`
 ("allows scope key, because the key it forgets is the caller's own", and "is the only way a hosted tenant can
 clear its key"). `scope: "all"` stays refused (`resetEverything`, `:423-440`): that one really does wipe the
 shared data directory.
+
+**Who may press it (M4, 2026-10-02).** The key is the *company's*, so on the hosted server saving, replacing and forgetting it
+are owner-or-admin acts: `canAdminister(tenant.role)` (`assertMayChangeCompanyKey`,
+`packages/host/src/handlers/settings.ts:271`), the bar the agent service uses, and not the owner-only bar of the company
+erase (`tenant-reset.ts`). A member or a `builder` is answered `403 settings_key_forbidden`
+(`SETTINGS_KEY_FORBIDDEN_CODE`, `:252`). Before this a member could swap the company onto their own key or sign every
+person out of the gateway, and a live member `POST /api/v1/settings/reset { scope: "key" }` answered 200. Two entry
+points, both server mode only: `handlePostSettings` checks `requestsKeyWrite(body, serverMode)` (`:266`, `:290`) **before
+any write**, so a body that mixes a key with something a member may change (their language, the Edit cap) is refused
+whole; `handleResetApp` checks it for `scope: "key"` (`:574-579`). "A key write" is what `keyFieldValue` lets into the
+patch, a non-blank string in `openaiApiKey`, `googleApiKey`, `anthropicApiKey` or `volcengineApiKey`: the blank the
+Settings page echoes from an untouched box, and a non-string, are no-ops and stay allowed, so a member's ordinary save
+(language, spend cap) still works. `toolKeys`, `toolBackends` and `injectionGuardBypass` are refused for everybody by
+`requestsOperatorOnlySettings`, as before. Off server mode neither check runs and no role is read: a desk's person is
+its owner. The renderer hides what the host would refuse (`apps/web/lib/company-key-access.ts`, read from the session's
+`role`): the key box and Save's key field in Settings, the "Sign out of the gateway" row (the whole `settings-reset`
+card when nothing else is left in it) and the onboarding key step, where a member is told who can add the key and keeps
+Back, Check again and Add it later. Unknown is treated as a member. Pinned by `packages/host/src/handlers/settings-key-roles.test.ts` (member, builder, admin,
+owner, the mixed body, the blank echo, the Personal switch) and `apps/web/lib/company-key-access.test.tsx` (including a
+golden of the Personal page, `lib/__fixtures__/personal-settings-page.golden.json`). Not covered: a member can still raise
+the Edit turn cap (`editTurnCapUsd`), which is the company's spend ceiling, and can still re-check the gateway
+(`POST /api/v1/settings/gateway/check`, a read of the verdict).
 
 **Fresh install (`scope: "all"`)** — typed `RESET` required. The button is disabled until
 `typed.trim() === RESET_CONFIRM_WORD`, but what travels is **what the owner actually typed**
@@ -329,13 +442,13 @@ The marker is `reset-pending.json` (`RESET_MARKER_FILE`, `packages/db/src/reset.
 temp-file-then-`renameSync` so a crash cannot leave a half-written marker that parses.
 
 **The wipe list is named entries, never the directory** (`HOST_RESET_ENTRIES`,
-`packages/host/src/handlers/settings.ts:354-380`),
+`packages/host/src/handlers/settings.ts:356-384`),
 because in the packaged app that same folder is Electron's userData / Chromium profile:
 
 ```
 settings.enc  settings.json  .master-key  gateway-gate.json  media
 workspace-id.txt  desk-usage.json  tenants  datasets  edit  legal
-models-cache.json  models-dev-cache.json  components  logs
+models-cache.json  models-dev-cache.json  models-dev-cache.meta.json  components  logs
 ```
 
 plus, always, `SQLITE_ENTRIES` — `agentforge.sqlite`, `-wal`, `-shm` (`packages/db/src/reset.ts:29`), which
@@ -343,8 +456,8 @@ plus, always, `SQLITE_ENTRIES` — `agentforge.sqlite`, `-wal`, `-shm` (`package
 added by `applyPendingDataReset`, because `@agentforge/db` owns it",
 `packages/host/src/handlers/settings.ts:351-352`), and, when `DATABASE_URL` points out of tree, that trio by
 absolute path (`removeDatabaseElsewhere`, `packages/db/src/reset.ts:216-269`). Pinned exactly by
-`packages/host/src/handlers/settings.test.ts:450-471`, which also asserts `host-status.json` and anything
-containing "storage" never appear (`:473-474`), and again — against `TENANT_STATE_FILENAMES` rather than a
+`packages/host/src/handlers/settings.test.ts:451-473`, which also asserts `host-status.json` and anything
+containing "storage" never appear (`:475-476`), and again — against `TENANT_STATE_FILENAMES` rather than a
 literal — by `packages/host/src/tenant-state.test.ts`, so a payload that gains a file can never be left off
 the list. Preserved: `host-status.json`, `Local Storage/`, every other
 Chromium artifact, and `legacy-migrated.json`.
@@ -366,12 +479,12 @@ app opens a fresh database on this same boot, and a retry must not delete that o
 this change the marker was dropped whatever happened, so a locked `.master-key` or `settings.enc` simply stayed
 behind after the owner had confirmed the erase ([SR-77](../security-register.md#sr-77),
 [SR-78](../security-register.md#sr-78)). That env flag is set in exactly two places:
-`apps/web/server-env.ts:14` (webdev) and `apps/desktop/main.cjs:631` inside `bootstrapPackaged()`, before
+`apps/web/server-env.ts:14` (webdev) and `apps/desktop/main.cjs:652` inside `bootstrapPackaged()`, before
 `require("./host.cjs")` — so a test or script that imports `@agentforge/db` can never trigger a wipe as a side
 effect.
 
 **Relaunch.** `relaunchDesktopApp({reset:true})` → preload `relaunch` → `ipcMain.handle("app:relaunch", …)`
-(`apps/desktop/main.cjs:533`), which first checks `isTrustedSender(event, mainWindow)`
+(`apps/desktop/main.cjs:554`), which first checks `isTrustedSender(event, mainWindow)`
 (`apps/desktop/navigation.cjs:109`) and refuses a non-main-frame sender with `{ok:false, reason:"forbidden"}`.
 `relaunchApp(true)` (`apps/desktop/main.cjs:212-241`) consults `lifecycle.relaunchPlan()` (refuses while
 installing an update or already exiting), races `clearRendererState()` — `clearStorageData` + `clearCache` +
@@ -386,8 +499,9 @@ installing an update or already exiting), races `clearRendererState()` — `clea
 | Verdict cannot be written | `saveGateState` warns and returns `{persisted:false}` (`:198-213`, warn at `:210`); `runGatewayCheck` then answers `status:"error"` with `allowed` as derived (`:522-529`) — "an unwritable data dir must not close a desk" |
 | Live check throws / times out | mapped to `unreachable` (`:506-510`), never thrown |
 | Background re-check throws | swallowed (`:593-595`); the un-awaited promise also carries its own `.catch` (`:592`) |
-| Save with an empty key string | `clearGateState()` and no check at all (`packages/host/src/handlers/settings.ts:328-331`). On the hosted server the blank never reaches the store either (`keyFieldValue`, `packages/host/src/handlers/settings.ts:194-202`), so a key is dropped through `scope: "key"` rather than through a blank save |
-| Server mode, no database connection installed | `tenantStateBackend()` throws `tenant_state_backend_missing` (500) on the first read or write (`packages/host/src/tenant-state-store.ts:251-261`). Fail closed and loud, never a silent fall back to the desktop's files — see [`tenant-secrets-backend.md`](tenant-secrets-backend.md) |
+| Save with an empty key string | `clearGateState()` and no check at all (`packages/host/src/handlers/settings.ts:328-331`). On the hosted server the blank never reaches the store either (`keyFieldValue`, `packages/host/src/handlers/settings.ts:226-234`), so a key is dropped through `scope: "key"` rather than through a blank save. A hosted blank save from a member is not refused (it writes nothing) but, because it names `openaiApiKey`, it still clears the tenant's verdict (`refreshGatewayGateAfterSave`, `:398-409`), which the next read re-derives under the 7-day grace |
+| Save a key, or forget it, as a hosted member or builder | `403 settings_key_forbidden` before anything is written (`requestsKeyWrite`, `assertMayChangeCompanyKey`, `packages/host/src/handlers/settings.ts:266-275`, `:290`, `:574-579`); the stored key and verdict are untouched |
+| Server mode, no database connection installed | `tenantStateBackend()` throws `tenant_state_backend_missing` (500) on the first read or write (`packages/host/src/tenant-state-store.ts:263-271`). Fail closed and loud, never a silent fall back to the desktop's files — see [`tenant-secrets-backend.md`](tenant-secrets-backend.md) |
 | Sealed settings that will not open with the current wrap key | server mode refuses the request (`settings_unreadable`, 500) and leaves the payload untouched; a desk quarantines and starts fresh, exactly as before (`onUndecryptableSettings`, `packages/host/src/settings-store.ts:373-385`) |
 | Reset queued, app killed before reboot | `reset-pending.json` persists; the wipe applies on the next boot regardless of how the process died |
 | Reset while runs are in flight | only *tracked* ffmpeg/ffprobe children are signalled (`packages/host/src/child-processes.ts:42-55`); an in-flight chat turn or embed job is simply cut off at exit. No coverage |
@@ -402,7 +516,9 @@ installing an update or already exiting), races `clearRendererState()` — `clea
 | `packages/host/src/settings-store.ts` | The encrypted store, one payload per tenant; `SettingsScope`, `resolveSettingsScope`, `resolveSettingsWorkspaceId`, `sliceFor`, `clearGatewayKeyEverywhere`, `loadUserLocale` / `saveUserLocale`, `loadOwnerLocale` / `saveOwnerLocale` |
 | `packages/host/src/tenant-state-store.ts` | **Phase 4.** The backend the two payloads go through: `TenantStateBackend`, the file and row implementations, `TENANT_STATE_FILENAMES`, legacy-file adoption — see [`tenant-secrets-backend.md`](tenant-secrets-backend.md) |
 | `packages/host/src/tenant-state-db.ts` | Three lines; the only place the row backend is handed a connection, imported from `router.ts` |
-| `packages/core/src/tenancy/state-keys.ts` | `TENANT_STATE_KEYS` — `settings` and `gateway_gate`, the names both backends key on |
+| `packages/core/src/tenancy/state-keys.ts` | `TENANT_STATE_KEYS` — `settings`, `gateway_gate` and (hosted only, 2026-10-01) `model_cache`, the names both backends key on |
+| `packages/host/src/model-cache.ts` | The model cache: one machine file on a desk, one `tenant_state` row per tenant on the hosted server; `ModelCacheScope`, `modelCacheSlot`, `modelCacheScopeOf`, `loadModelCache`, `saveModelCache`, `probeSummary` |
+| `packages/host/src/selectable-models.ts` | The catalogue built from the cache (a memo per tenant slot), `refreshModelCache` (with `onlyIfMissing`), `warmHostedModelCache` (the hosted background refill, `:505`), `modelCatalogBody`, `modeDefaultsFor` |
 | `packages/host/src/wrap-key-rotation.ts`, `scripts/rotate-wrap-key.ts` | The wrap-key rotation drill and its CLI |
 | `packages/host/src/tenant-paths.ts` | The one place a tenant becomes a directory — see [`tenant-storage.md`](tenant-storage.md) |
 | `packages/host/src/workspace.ts` | `workspace-id.txt` read/write |
@@ -415,7 +531,9 @@ installing an update or already exiting), races `clearRendererState()` — `clea
 | `packages/core/src/security/fingerprint.ts` | `keyFingerprint` |
 | `packages/db/src/reset.ts` | Marker write/validate, boot-time apply, symlink-safe removal |
 | `packages/db/src/client.ts` | The one place the queued wipe is applied |
-| `apps/web/lib/gateway-gate.ts` | Parse, `resolveGate`, `GATE_EVENT`, reason and status keys, `parseGatewayBlocked`, `formatGateTimestamp` |
+| `apps/web/lib/gateway-gate.ts` | Parse, `resolveGate` (with the hosted `KeyDeferral`), `GATE_EVENT`, reason and status keys, `parseGatewayBlocked`, `formatGateTimestamp` |
+| `apps/web/lib/key-later.ts`, `gate-state.ts`, `gateway-blocked.ts`, `use-desk-needs-key.ts`, `components/needs-key-note.tsx` | **Enterprise only.** The deferral helpers and the host write, the shared gate store, the 403 reader, the pane hooks, the calm note |
+| `packages/host/src/key-later.ts`, `handlers/key-later.ts` | **Enterprise only.** The per-person "add the key later" record and its route (404 off server mode); never read by the gate |
 | `apps/web/lib/product-brand.tsx` | `gatewayHostLabel` — the pinned URL reduced to a host for display |
 | `apps/web/src/App.tsx` | Holds gate state, listens for `GATE_EVENT`, renders onboarding |
 | `apps/web/components/settings-page.tsx`, `settings-reset-card.tsx`, `onboarding-screen.tsx` | The surface |
@@ -423,6 +541,29 @@ installing an update or already exiting), races `clearRendererState()` — `clea
 
 ## Gotchas
 
+- **A hosted read of the model cache that cannot name its tenant is refused, not guessed (2026-10-01).**
+  `loadModelCache`, `saveModelCache` and `modelCacheStamp` take the tenant, fall back to the request's session
+  (`currentRequestSession`), and otherwise throw `tenant_required` (500) (`model-cache.ts:48`). The session
+  fallback does not reach a stream body (`startModalityRun`, the Edit event stream), which runs outside the
+  request's async scope, so every catalogue caller passes its tenant, and
+  `packages/host/src/model-catalog-tenancy-guard.test.ts` fails the suite for a call that does not name one.
+  The one diagnostic that can be asked with nobody behind it, the Edit doctor, answers "no speech-to-text
+  model" (`asrFor`, `packages/host/src/edit/doctor.ts:75`) rather than fail; the full host run found that one
+  (`edit/doctor-hosted.test.ts` calls it with no session).
+- **An upgraded hosted server may still hold the old shared `models-cache.json`.** Nothing reads it on the
+  hosted server any more, and nothing deletes it; it holds one tenant's catalogue and the probe errors that
+  tenant's key produced. The operator can delete it from the data volume. A desk's copy is the live cache and is
+  still on the "Start over" list (`HOST_RESET_ENTRIES`).
+- **A tenant's cache is empty until it saves a key or presses Refresh, and that includes every existing hosted
+  tenant on the day this ships.** Nothing refreshes it on sign-in or on first read, so a tenant that already
+  has a key and has not saved Settings or pressed Refresh since the deploy gets no Videos (the Videos list is the
+  probed list alone, `listProbedVideoModels`, with no static fill-in), no speech-to-text model for Meeting and
+  Edit, and the fallback Chat default. It heals on the first Save or Refresh. Either press Refresh once per
+  tenant after the deploy (an owner note for the Enterprise deploy), or add a throttled hosted-only refresh when
+  a tenant has a key and no row (the gate already does this for its verdict, `maybeRefreshGateway`); neither was
+  done. There is no shared catalogue to inherit, which is the point; the picker shows what a keyless desk always showed (the static list, 47 chat
+  models and `gemini-3.5-flash` as the default on the rehearsal's keyless tenant, a zeroed `probe`). On the
+  rehearsal's volume `models-cache.json` is a 3-byte `{}` written by the previous build and now unread.
 - **AGENTS.md's `resolveProviderKeys` precedence is Phase 1 design, not shipped code.** `AGENTS.md:77`
   describes "explicit workspace key (unless `allow_byo_key` is `false`) → live session access token → stub". At
   this sha there is no session token, no `StoredSession`, and no `allow_byo_key` anywhere in `packages/` or
@@ -446,17 +587,25 @@ installing an update or already exiting), races `clearRendererState()` — `clea
   field can populate the Anthropic, Google or Volcengine slot when the key *looks* like theirs.
 - **`requireGatewayAllowed` re-derives from disk on every gated request** — there is no cached in-process
   decision.
-- **Not every gated route checks the gate first.** `handlers/enhance-prompt.ts:49` validates the body before it
+- **Not every gated route checks the gate first.** `handlers/enhance-prompt.ts:53` validates the body before it
   calls `requireGatewayAllowed`, so an empty-body probe of that route answers `400 empty_input` even on a fully
   closed desk. Use a route that gates on entry (`finance/parse`, `runs/text`) when you want to prove the 403.
+  That route also **stubs on a desk and never on the hosted server** (2026-10-01): with no saved key and a runtime
+  that is not `ai` it answers `200 { text, source: "stub" }` on a desk (`:49`, the offline and test path, unchanged),
+  and `403 gateway_blocked` with `status: "needs_key"` on the hosted server, where it used to hand a tenant with no
+  key a "rewrite" no model had made. So proving the 403 on a webdev with a stub runtime (`isServerMode()` false) is
+  not possible on this route; it needs `AGENTFORGE_SERVER=1`.
 - **This checkout pins stub.** Both `.env` and `apps/web/.env.local` set `AGENTFORGE_RUNTIME=stub`, and the first
   branch of `deriveGatewayGate` short-circuits on it, so **no** locally started webdev can show a closed gate
   unless it is started with an explicit `AGENTFORGE_RUNTIME=ai` (and no key, for `needs_key`).
-- **A closed gate hides Settings too.** `App.tsx` swaps the whole router for `OnboardingScreen`, so there is no
+- **A closed gate hides Settings too, on the Personal app.** `App.tsx` swaps the whole router for `OnboardingScreen`, so there is no
   route to the key field, the reset card or the status row while `allowed` is false. Recovery is onboarding's
-  own key input, its Re-check, or deleting `gateway-gate.json`.
+  own key input, its Re-check, or deleting `gateway-gate.json`. **On the hosted app that is no longer so for a
+  signed-in person who chose "Add it later":** the desk opens on the closed gate, Settings is reachable and shows the
+  key form and the status row ("No key saved"), and every pane says a key is missing instead of failing. A signed-in
+  person who has not chosen yet still gets the welcome first.
 - **The legacy-migration marker must survive a reset.** `legacy-migrated.json` is not in `HOST_RESET_ENTRIES`
-  and this is load-bearing: `migrateLegacyUserData` (`apps/desktop/main.cjs:744-765`) treats "userData has no
+  and this is load-bearing: `migrateLegacyUserData` (`apps/desktop/main.cjs:780-810`) treats "userData has no
   `agentforge.sqlite`" as a signal to copy an older install forward — exactly the state a fresh-install reset
   produces. Without the marker, the boot after "reset to a fresh install" would silently restore the forgotten
   key, every thread and all media.
@@ -504,6 +653,30 @@ the retry never deletes the fresh database, and no path reaches the log); `apps/
 `packages/host/src/settings-desk-scope.test.ts`; `packages/host/src/tenant.test.ts`;
 `apps/web/lib/reset-app.test.ts`; `apps/web/lib/gateway-gate.test.ts`.
 
+For the per-tenant model cache (Enterprise BYOK Phase A, hosted only, each with a Personal-parity case):
+`packages/host/src/model-cache-tenancy.test.ts` (the store and the catalogue on an in-memory database: tenant A's
+probe and catalogue invisible to B, no machine file written, a read with no tenant refused, the memo per tenant,
+`refreshModelCache` scoped and probing the registry's hosts, speech-to-text discovery and the Edit doctor, and
+the desk's file kept byte for byte), `packages/host/src/model-cache-hosted-routes.test.ts` (`dispatch` with two
+provisioned tenants: `GET /api/v1/models`, `/chat` and `/settings` each tenant's own), and
+`packages/host/src/model-catalog-tenancy-guard.test.ts` (a source scan: every catalogue call names a tenant).
+For the background refill of a tenant with a key and no cache row: `packages/host/src/model-cache-warmup.test.ts`
+(the start rules with an injected refresh: one for the tenant with a key, none for the one without, none when a row
+exists, one at a time, the ten-minute throttle, a failure swallowed and logged without the key, an unreadable
+settings file costing the read nothing; every catalogue read filling the row through a stubbed gateway with exactly one
+probe; write-if-absent; and the Personal parity block, which spies `loadSettings` and fails if a desk read so much as
+looks at the settings, and was mutation-checked by deleting the `isServerMode()` guard: eight cases went red) and the
+last `describe` of `model-cache-hosted-routes.test.ts` (a tenant saves a key through `POST /api/v1/settings`, its row is
+deleted to look like the upgrade, and `GET /api/v1/models` is empty then live with no save in between; a tenant with no
+key starts nothing). For hosted prompt-enhance: `handlers/enhance-prompt.test.ts` (`dispatch` as a signed-in tenant with
+no key: 403 `gateway_blocked`, `needs_key`, runtime `stub`, unset and `ai`; and the desk cases, which assert the exact
+stub body and were mutation-checked by gating desks too: the unset-runtime case went to 403).
+On the local Kubernetes rehearsal the same router was run inside the app container (`kubectl exec`, `tsx`) as
+the hosted tenant's owner: `GET /api/v1/models`, `/chat`, `/settings` and `/edit/doctor` answered 200, a
+`model_cache` row written for the tenant was listed by `/models` and counted by `probe`, and the row was removed
+(`rowsAfter: 0`). (The tenant had no stored provider base URL, so that drive says nothing about the echo rule; the
+`secrets.test.ts` block does.) A browser sign-in to that cluster was not completed (seat cap); nothing here was driven in a browser.
+
 ## Why
 
 **Why the gate is advisory and every rule fails open.** `[Direct]` `AGENTS.md:72`, written in the same commit
@@ -534,8 +707,9 @@ wipe is queued for the next boot". `[Supported]` `packages/host/src/handlers/set
 list and asserts `host-status.json` is never in it. **Confidence: high.**
 
 **Why the endpoint is pinned three ways at once, and hidden as a fourth.** `[Supported]`
-`resolvedGatewayBaseUrl()` ignores stored settings and `OPENAI_BASE_URL`; `gatewayUrlOverrideAllowed()`
-additionally requires non-packaged and non-production (`packages/core/src/gateway/pinned.ts:24-36`);
+`resolvedGatewayBaseUrl()` ignores stored settings and `OPENAI_BASE_URL`; `gatewayUrlOverride()`
+additionally lets a packaged build move only to its brand gateway, and an unpackaged one only when it is not
+production (`packages/core/src/gateway/pinned.ts:38-81`);
 `packages/core/src/gateway/pinned.test.ts` recomputes a SHA-256 of the literal to catch tampering; and
 `packages/host/src/gateway-pin.test.ts` bans raw reads repo-wide. `[Inferred]` the layering reads as defence in
 depth against three different failure shapes — a user-edited setting, a packaged build with a leftover dev env

@@ -4,11 +4,14 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { cancelReset, relaunchDesktopApp, resetApp } from "@/lib/api-client";
 import { hasDesktopShell, useHostCapabilities } from "@/lib/host-capabilities";
+import { useMayChangeCompanyKey } from "@/lib/company-key-access";
 import { announceGate } from "@/lib/gateway-gate";
 import { t } from "@/lib/i18n";
 import { useProductBrand } from "@/lib/product-brand";
+import { useSession } from "@/lib/session";
 // The host owns the word (`@agentforge/core` once it exports it); this copy is the same literal.
 import { RESET_CONFIRM_WORD } from "@/lib/reset-app";
+import { SettingsEraseAccount } from "./settings-erase-account";
 
 /**
  * Start over — the two destructive doors out of a configured install.
@@ -22,8 +25,8 @@ import { RESET_CONFIRM_WORD } from "@/lib/reset-app";
  * which is the owner's last chance to call it off — hence the banner.
  */
 
-type Panel = "none" | "key" | "all" | "tenant";
-type Outcome = "none" | "restarting" | "restartNeeded" | "pendingCancelled" | "erased";
+type Panel = "none" | "key" | "all";
+type Outcome = "none" | "restarting" | "restartNeeded" | "pendingCancelled";
 
 export type SettingsResetCardProps = {
   /** From `GET /api/v1/settings`: a wipe is queued and will be applied by the next launch. */
@@ -51,6 +54,20 @@ export function SettingsResetCard({ resetPending = false }: SettingsResetCardPro
    * better than one that appears and then answers 403.
    */
   const capabilities = useHostCapabilities();
+  /*
+   * SR-65: the host refuses the account erase to anybody who is not an owner (403 `tenant_reset_forbidden`),
+   * so the screen does not offer it to them either. The role is what the host reports for the person
+   * (`GET /api/v1/auth/session`, the membership row); a person whose role is not known to be `owner` —
+   * an admin, a member, a host that sent none — does not see the red button. A courtesy only: the 403 is
+   * the control, and a stale role here costs a refused click, never an erase.
+   */
+  const isOwner = useSession().identity?.role === "owner";
+  /*
+   * M4: forgetting the key signs the whole company out of the gateway, so the host answers a member
+   * `403 settings_key_forbidden` (an owner or an admin may). The same courtesy as above: the row is not
+   * offered to somebody the host will refuse. A desk has no session and always passes.
+   */
+  const mayChangeKey = useMayChangeCompanyKey();
   const [panel, setPanel] = useState<Panel>("none");
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
@@ -140,43 +157,6 @@ export function SettingsResetCard({ resetPending = false }: SettingsResetCardPro
     }
   }
 
-  /**
-   * Phase 8 — erase this account, on the hosted service.
-   *
-   * The host has already deleted the rows, the objects and the secrets and re-provisioned a clean
-   * home desk by the time this answers, so there is nothing staged and nothing to restart: the
-   * only thing left for the renderer to do is stop showing the old account. Navigating to `/chat`
-   * before announcing the gate is the same order `onSignOut` uses, so the gate change does not
-   * unmount the settings route from under itself.
-   */
-  async function onEraseAccount() {
-    setError(null);
-    setBusy(true);
-    try {
-      // What the owner actually typed, as everywhere else here: the host compares it, and sending
-      // a constant would let a mismatched box through on the renderer's say-so instead of theirs.
-      const result = await resetApp("tenant", typed.trim());
-      if (!result.ok) {
-        setError(result.error ?? t("settings.reset.failed"));
-        return;
-      }
-      closePanel();
-      setPending(false);
-      setRestartReason(null);
-      setOutcome("erased");
-      void navigate("/chat");
-      announceGate(result.gateway);
-      // The desks, threads and artifacts every other screen is holding are gone. A shell refresh is
-      // how the rest of the app is told to re-read them, and it is the event App.tsx already listens
-      // for — this is the same thing a desk switch does, for the same reason.
-      window.dispatchEvent(new Event("agentforge-shell-refresh"));
-    } catch {
-      setError(t("settings.reset.failed"));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function onFreshInstall() {
     setError(null);
     setBusy(true);
@@ -201,6 +181,13 @@ export function SettingsResetCard({ resetPending = false }: SettingsResetCardPro
     } finally {
       setBusy(false);
     }
+  }
+
+  const showErase = capabilities.tenantReset && isOwner;
+  // Hosted member: no key row, no Start over (the hosted server has none), no erase. A card with a
+  // heading and nothing under it is not a courtesy, so it is not drawn.
+  if (!mayChangeKey && !capabilities.startOver && !showErase && !pending) {
+    return null;
   }
 
   return (
@@ -241,10 +228,12 @@ export function SettingsResetCard({ resetPending = false }: SettingsResetCardPro
         </div>
       ) : null}
 
+      {mayChangeKey || capabilities.startOver ? (
       <details className="space-y-3" data-testid="settings-reset-danger">
         <summary className="cursor-pointer text-sm font-medium text-[var(--text)]">
           {t("settings.reset.dangerSummary")}
         </summary>
+      {mayChangeKey ? (
       <div className="space-y-1">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-[var(--text)]">{t("settings.reset.signOut")}</p>
@@ -285,6 +274,7 @@ export function SettingsResetCard({ resetPending = false }: SettingsResetCardPro
           </div>
         ) : null}
       </div>
+      ) : null}
 
       {capabilities.startOver ? (
       <div className="space-y-1 border-t border-[var(--line)] pt-4">
@@ -338,59 +328,15 @@ export function SettingsResetCard({ resetPending = false }: SettingsResetCardPro
       </div>
       ) : null}
 
-      {/* Phase 8: the hosted account erase. Owner-only on the host; the flag is false on a desk. */}
-      {capabilities.tenantReset ? (
-        <div className="space-y-1 border-t border-[var(--line)] pt-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm text-[var(--text)]">{t("settings.reset.eraseAccount")}</p>
-            <button
-              type="button"
-              className={rowButtonClass}
-              data-testid="settings-reset-tenant"
-              disabled={busy}
-              onClick={() => openPanel("tenant")}
-            >
-              {t("settings.reset.eraseAccountSubmit")}
-            </button>
-          </div>
-          <p className="text-xs text-[var(--text-3)]">{t("settings.reset.eraseAccountHelp")}</p>
-          {panel === "tenant" ? (
-            <div className={panelClass} data-testid="settings-reset-tenant-confirm">
-              <p className="text-sm text-[var(--text)]">{t("settings.reset.eraseAccountWarning")}</p>
-              <p className="text-sm text-[var(--text-2)]">{t("settings.reset.freshInstallTypeToConfirm")}</p>
-              <input
-                className="w-full rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)]"
-                value={typed}
-                onChange={(event) => setTyped(event.target.value)}
-                placeholder={RESET_CONFIRM_WORD}
-                data-testid="settings-reset-tenant-confirm-name"
-                autoComplete="off"
-              />
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  className={dangerButtonClass}
-                  data-testid="settings-reset-tenant-submit"
-                  disabled={busy || typed.trim() !== RESET_CONFIRM_WORD}
-                  onClick={() => void onEraseAccount()}
-                >
-                  {t("settings.reset.eraseAccountSubmit")}
-                </button>
-                <button
-                  type="button"
-                  className={cancelButtonClass}
-                  data-testid="settings-reset-cancel"
-                  disabled={busy}
-                  onClick={closePanel}
-                >
-                  {t("settings.reset.cancel")}
-                </button>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
       </details>
+      ) : null}
+
+      {/*
+        The hosted company erase (owner decision 2026-10-01, SR-65): a bright red button with a second,
+        typed step, outside the disclosure above on purpose. Owner-only on the host; the flag is false on
+        a desk, where "Reset to a fresh install" is the one that works.
+      */}
+      {showErase ? <SettingsEraseAccount /> : null}
 
       {error ? (
         <p className="text-sm text-[var(--danger)]" data-testid="settings-reset-error">
@@ -407,11 +353,6 @@ export function SettingsResetCard({ resetPending = false }: SettingsResetCardPro
           {restartReason
             ? t("settings.reset.restartRefused", { productName, reason: restartReason })
             : t("settings.reset.restartNeeded", { productName })}
-        </p>
-      ) : null}
-      {outcome === "erased" ? (
-        <p className="text-sm text-[var(--text-2)]" data-testid="settings-reset-erased">
-          {t("settings.reset.eraseAccountDone")}
         </p>
       ) : null}
       {outcome === "pendingCancelled" ? (

@@ -58,7 +58,9 @@ describe("SignInScreen", () => {
     expect(markup).toContain('data-testid="auth-signin"');
     expect(markup).toContain('data-testid="auth-signin-start"');
     expect(markup).toContain("No password");
-    expect(markup).toContain("we email you a code");
+    // First sign-in is the emailed invite code, every later one an emailed sign-in code (owner, 2026-10-01).
+    expect(markup).toContain("invite code we emailed you");
+    expect(markup).toContain("we email you a sign-in code each time");
     // One primary action. A second door on this screen is a second thing to get wrong.
     expect(markup.match(/data-testid="auth-signin-start"/g)).toHaveLength(1);
   });
@@ -67,7 +69,7 @@ describe("SignInScreen", () => {
     const markup = render();
     expect(markup).not.toContain("{productName}");
     expect(markup).toContain(`Sign in to ${DEFAULT_PRODUCT_NAME}`);
-    expect(markup).toContain("Sign in to DPSBuddy");
+    expect(markup).toContain("Sign in to Nultron");
   });
 
   it("shows no banner when the visitor arrived with nothing to explain", () => {

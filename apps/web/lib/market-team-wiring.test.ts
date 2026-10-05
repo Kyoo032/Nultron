@@ -39,7 +39,11 @@ describe("market depth control wiring", () => {
 
   it("puts the control beside the language select and in the empty state too", () => {
     expect(studio.split("{depthControl}")).toHaveLength(3);
-    expect(studio).toMatch(/<\/select>\s*\{depthControl\}\s*\{specialistPicker\}/);
+    // The options toggle belongs to the buttons-and-select cluster, so it may stand between the select
+    // and the depth control.
+    expect(studio).toMatch(
+      /<\/select>\s*(?:<button[\s\S]*?data-testid="market-options-toggle"[\s\S]*?<\/button>\s*)?\{depthControl\}\s*\{specialistPicker\}/,
+    );
     expect(studio).toMatch(/\{specialistPicker\}\s*\{depthControl\}/);
   });
 

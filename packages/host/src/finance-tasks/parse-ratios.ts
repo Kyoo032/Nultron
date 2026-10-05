@@ -30,6 +30,7 @@ import {
 } from "@agentforge/core/finance";
 import { guardFinanceInput, mergeFinancePii, type FinancePiiSummary } from "../finance-privacy";
 import { collectJobAssistantText } from "../job-regen";
+import { throwIfJobAborted } from "../job-stream";
 import { extractJsonObject } from "../presentation-outline";
 import { localeForRun } from "../run-context";
 import { requireLive, resolveModel } from "./live";
@@ -152,21 +153,25 @@ async function askModelForBuckets(
   tenant: TenantContext,
   body: unknown,
   labels: readonly string[],
+  abortSignal: AbortSignal | undefined,
 ): Promise<{ overrides: readonly RatioBucketOverride[]; error: string | null }> {
   try {
     const settings = requireLive(tenant);
     const raw = await collectJobAssistantText({
       tenant,
-      model: resolveModel(body, settings),
+      model: resolveModel(body, settings, tenant),
       systemPrompt: BUCKET_SYSTEM,
       runPrefix: "finance-ratios-buckets",
       agentId: "finance",
       jobMode: "finance",
       versionId: "finance-ratios-buckets",
       prompt: `Labels:\n${labels.map((label) => `- ${label}`).join("\n")}`,
+      ...(abortSignal ? { signal: abortSignal } : {}),
     });
     return { overrides: assignmentsFrom(raw), error: null };
   } catch (error) {
+    // A cancel is not a model that could not place the labels: it ends the parse.
+    throwIfJobAborted(abortSignal);
     return { overrides: [], error: error instanceof ApiError ? error.code : "bucket_assist_failed" };
   }
 }
@@ -196,7 +201,11 @@ function classifiedRow(row: ClassifiedRatioRow, item: LineItem): RatioClassified
 }
 
 /** Figures text → classified statement rows the owner confirms. Nothing is computed here. */
-export async function parseRatiosFigures(tenant: TenantContext, body: unknown): Promise<ParsedRatios> {
+export async function parseRatiosFigures(
+  tenant: TenantContext,
+  body: unknown,
+  abortSignal?: AbortSignal,
+): Promise<ParsedRatios> {
   const guardedText = guardFinanceInput({ figuresText: readFiguresText(body) });
   const read = readRatioRows(guardedText.figuresText);
   if (read.rows.length === 0) {
@@ -204,7 +213,7 @@ export async function parseRatiosFigures(tenant: TenantContext, body: unknown): 
   }
   const first = classifyRatioRows(read.rows);
   const leftovers = [...new Set(unplacedRatioRows(first).map((row) => row.label))].slice(0, RATIO_MODEL_LABEL_MAX);
-  const assist = leftovers.length === 0 ? null : await askModelForBuckets(tenant, body, leftovers);
+  const assist = leftovers.length === 0 ? null : await askModelForBuckets(tenant, body, leftovers, abortSignal);
   const rows = assist === null ? first : classifyRatioRows(read.rows, assist.overrides);
   const guardedRows = guardFinanceInput({ lineItems: rows.map((row) => toLineItem(row, read.currency)) });
   return {
@@ -223,4 +232,5 @@ export async function parseRatiosFigures(tenant: TenantContext, body: unknown): 
   };
 }
 
-export const parseRatiosInput: FinanceTaskParser = async (tenant, body) => parseRatiosFigures(tenant, body);
+export const parseRatiosInput: FinanceTaskParser = async (tenant, body, abortSignal) =>
+  parseRatiosFigures(tenant, body, abortSignal);

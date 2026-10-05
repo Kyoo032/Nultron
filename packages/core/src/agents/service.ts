@@ -132,6 +132,18 @@ export function resolvePublishedVersion(
   return published;
 }
 
+/**
+ * The default chat's soul cannot be edited (`default_agent_soul`), so the code is its only source.
+ * A desk made before a prompt change still stores the old text in its version row; without this it
+ * would bind the new tools and never be told about them. Read-time only: the stored row is untouched.
+ */
+function withCurrentChatSoul(agent: AgentRecord, version: AgentVersionRecord): AgentVersionRecord {
+  if (!isDefaultChatAgent(agent) || version.systemPrompt === DEFAULT_CHAT_PROMPT) {
+    return version;
+  }
+  return { ...version, systemPrompt: DEFAULT_CHAT_PROMPT };
+}
+
 export class AgentService {
   constructor(
     private readonly repo: AgentRepository,
@@ -395,7 +407,7 @@ export class AgentService {
       throw new ApiError("not_found", "Agent not found", 404);
     }
     const versions = await this.repo.listVersions(tenant.organizationId, agentId);
-    const version = resolvePublishedVersion(agent, versions);
+    const version = withCurrentChatSoul(agent, resolvePublishedVersion(agent, versions));
     const bindings = await this.repo.listBindings(tenant.organizationId, version.id);
     return { agent, version, bindings };
   }
@@ -472,12 +484,19 @@ export class AgentService {
     return { agent, version, bindings };
   }
 
+  /**
+   * Backfills the default chat's published version with any `DEFAULT_CHAT_TOOLS` key it has no row
+   * for, so a tool added after a desk was made reaches it. Presence is by key, whatever `enabled` says:
+   * a row the owner switched off counts as present and stays off, and a second call adds nothing.
+   * Only `ensureDefaultChat` calls it, with the default chat's own bindings, so no other agent gains a tool.
+   */
   private async ensureStarterBindings(
     tenant: TenantContext,
     versionId: string,
     bindings: ToolBindingRecord[],
   ): Promise<ToolBindingRecord[]> {
     const have = new Set(bindings.map((binding) => binding.toolKey));
+    const added: ToolBindingRecord[] = [];
     for (const toolKey of DEFAULT_CHAT_TOOLS) {
       if (have.has(toolKey)) {
         continue;
@@ -491,9 +510,9 @@ export class AgentService {
         enabled: true,
       };
       await this.repo.insertBinding(binding);
-      bindings.push(binding);
+      added.push(binding);
     }
-    return bindings;
+    return added.length === 0 ? bindings : [...bindings, ...added];
   }
 
   private async requireOwned(tenant: TenantContext, agentId: string): Promise<AgentRecord> {

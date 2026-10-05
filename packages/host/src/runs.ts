@@ -3,6 +3,7 @@ import {
   assertModelSupportsModality,
   createRuntime,
   encodeSse,
+  harnessSpecFor,
   redactSecrets,
   abortErrorMessage,
   isDefaultChatAgent,
@@ -10,7 +11,7 @@ import {
   parseTextRunInput,
   parseVideoRunInput,
   readOptionalModel,
-  readOptionalReasoningEffort,
+  readReasoningEffortChoice,
   readOptionalChatWire,
   resolveChatModel,
   hasModelVisibleContent,
@@ -25,6 +26,9 @@ import {
   type ToolBindingRecord,
   type ToolCallPart,
   withChatOutputLanguage,
+  bindingsForChatModality,
+  chatTurnCopy,
+  settleChatTurn,
 } from "@agentforge/core";
 import { ApiError } from "@agentforge/core";
 import { agentService } from "./tenant";
@@ -51,7 +55,8 @@ import { defaultSelectableModel, listSelectableModels } from "./selectable-model
 import { collectToolMediaParts } from "./tool-media";
 import { inlineLocalMediaParts, shouldInlineLocalMediaForProvider } from "./inline-local-media";
 import { saveGeneratedImage, saveGeneratedVideo } from "./media";
-import { withRunContext } from "./run-context";
+import { getRunContext, hostedRequestLocale, localeForRun, withRunContext } from "./run-context";
+import { withToolRun } from "./tool-run-context";
 import { formatPastSessionsHint } from "./session-recall";
 import { log } from "./log";
 
@@ -133,7 +138,9 @@ export async function* startModalityRun(options: {
   const parsed = parsers[options.modality](options.body as { content?: unknown; stream?: unknown });
   const settings = loadSettings(options.tenant);
   const userParts = settings.injectionGuardBypass === true ? parsed.parts : redactAttachedParts(parsed.parts);
-  const reasoningEffort = readOptionalReasoningEffort(options.body);
+  // `explicit` is what lets the runtime send a model it has never seen no effort at all unless the
+  // person picked one; the level alone cannot say that.
+  const { effort: reasoningEffort, explicit: reasoningEffortExplicit } = readReasoningEffortChoice(options.body);
   const thinkingEnabled = reasoningEffort !== "none";
   const wire = readOptionalChatWire(options.body);
   const thread = await getThread(options.tenant, options.threadId);
@@ -141,8 +148,9 @@ export async function* startModalityRun(options: {
     throw new ApiError("not_found", "Thread not found", 404);
   }
   const published = await agentService.getPublishedForRun(options.tenant, thread.agentId);
-  const catalog = listSelectableModels();
-  const fallback = isDefaultChatAgent(published.agent) ? defaultSelectableModel(catalog) : published.version.model;
+  const catalog = listSelectableModels(options.tenant);
+  const defaultChat = isDefaultChatAgent(published.agent);
+  const fallback = defaultChat ? defaultSelectableModel(catalog, options.tenant) : published.version.model;
   const requestedModel = readOptionalModel(options.body);
   const model = resolveChatModel(requestedModel, fallback, catalog);
   const pastHint = await formatPastSessionsHint(options.tenant, thread.agentId, thread.id);
@@ -155,7 +163,11 @@ export async function* startModalityRun(options: {
   // in. On a desk they are the same value, because `saveUserLocale` writes both; on a hosted server
   // two people on one desk each get their own, and `withRunContext` below carries it through every
   // `localeForRun()` in the run.
-  const locale = loadUserLocale(options.tenant);
+  //
+  // Hosted, the request already knows it: the person's stored choice, or the browser's language for
+  // someone who never chose (`sessionLocale`), so Chat answers in the language the screen is in. Off
+  // server mode no request locale is set and this is `loadUserLocale`, exactly as before.
+  const locale = hostedRequestLocale() ?? loadUserLocale(options.tenant);
   const version = {
     ...published.version,
     model,
@@ -181,6 +193,9 @@ export async function* startModalityRun(options: {
   // model answer that arrives later is dropped instead of being persisted as a completed turn.
   let settled = false;
   let settledMessage = "";
+  // The model call's own cancel. The watchdog and a client that left both tell the person the run
+  // failed; this is what makes the request in flight stop, so a run nobody is waiting for stops billing.
+  const modelAbort = new AbortController();
   const settleRun = (message: string) => {
     settled = true;
     settledMessage = message;
@@ -203,6 +218,7 @@ export async function* startModalityRun(options: {
       send({ type: "run.completed", runId: runId ?? "unknown" });
       closeQueue();
       settleRun(message);
+      modelAbort.abort(new Error(message));
     },
   });
   const onClientAbort = () => {
@@ -214,6 +230,7 @@ export async function* startModalityRun(options: {
     send({ type: "run.completed", runId: runId ?? "unknown" });
     closeQueue();
     settleRun(message);
+    modelAbort.abort(options.abortSignal?.reason);
   };
   options.abortSignal?.addEventListener("abort", onClientAbort, { once: true });
 
@@ -225,7 +242,34 @@ export async function* startModalityRun(options: {
     const toolTrace: ToolCallPart[] = [];
     let persisted = false;
     let runUsage: Record<string, unknown> | null = null;
+    let settledRunMetered = false;
+    /**
+     * A run the watchdog or a client abort already finished as `failed` never reaches the
+     * `finishRun`-gated metering below, yet a call that completed at the gateway was billed. It joins
+     * the tenant ledger here, once, from whichever of the three exits sees the usage first.
+     */
+    const meterSettledRun = () => {
+      if (settledRunMetered || !runId || !runUsage) {
+        return;
+      }
+      settledRunMetered = true;
+      recordChatRunUsage(options.tenant, runId, true, runUsage);
+    };
     const persistAssistant = async () => {
+      if (persisted) {
+        return true;
+      }
+      const replyLocale = getRunContext() ? localeForRun() : locale;
+      const settled = settleChatTurn({
+        text: assistantText,
+        offeredSources: knowledge.chunks.length,
+        tools: toolTrace,
+        locale: replyLocale,
+      });
+      if (settled.appended) {
+        send({ type: "assistant.delta", text: settled.appended });
+      }
+      assistantText = settled.text;
       const assistantParts: ContentPart[] = [];
       if (thinkingText.trim()) {
         assistantParts.push({ type: "thinking", text: thinkingText.trim() });
@@ -237,9 +281,6 @@ export async function* startModalityRun(options: {
         assistantParts.push({ type: "text", text: assistantText.trim() });
       }
       assistantParts.push(...mediaParts);
-      if (persisted) {
-        return true;
-      }
       if (assistantParts.length === 0) {
         return false;
       }
@@ -282,18 +323,34 @@ export async function* startModalityRun(options: {
       const runtime = createRuntime(settings);
       send({ type: "run.started", runId: run.id });
 
-      await withRunContext({ threadId: thread.id, agentId: thread.agentId, locale }, async () => {
+      // `withRunContext` is thread-scoped; a tool that records an author (a file write) reads the
+      // tool-run context, so Chat sets it too, keyed by this turn's run. Without it the author of
+      // every file written in a conversation was the thread id.
+      const inChatRun = <T>(fn: () => Promise<T>): Promise<T> =>
+        withToolRun({ runId: run.id, mode: "chat" }, () =>
+          withRunContext({ threadId: thread.id, agentId: thread.agentId, locale }, fn),
+        );
+      await inChatRun(async () => {
+        if (options.modality !== "text" && thinkingEnabled) {
+          const line = `${chatTurnCopy(localeForRun()).lookingAttached}\n`;
+          thinkingText += line;
+          send({ type: "assistant.thinking", text: line });
+        }
         await runtime.execute({
           tenant: options.tenant,
           runId: run.id,
           modality: options.modality,
           version,
-          bindings: withPastSessionsBinding(published.bindings),
+          bindings: bindingsForChatModality(withPastSessionsBinding(published.bindings), options.modality),
+          // Chat's declared budget is the default agent's; an agent the owner built keeps the runtime's own.
+          ...(defaultChat ? { budget: harnessSpecFor("chat").budget } : {}),
           history,
           thinking: thinkingEnabled,
           reasoningEffort,
+          reasoningEffortExplicit,
           wire,
           locale,
+          signal: modelAbort.signal,
           onEvent: async (event) => {
             stall.touch();
             if (isRunOutputEvent(event)) {
@@ -307,6 +364,12 @@ export async function* startModalityRun(options: {
             if (event.type === "run.completed") {
               if (event.usage) {
                 runUsage = event.usage;
+              }
+              if (settled) {
+                // The person was already told this run failed. A call that finished just before the
+                // cancel keeps its bill, but its answer is not saved on a run marked `failed`.
+                meterSettledRun();
+                return;
               }
               await persistAssistant();
               send(event);
@@ -360,6 +423,8 @@ export async function* startModalityRun(options: {
         });
       });
       if (settled) {
+        // Covers a cancel that landed while the completed event was still being handled.
+        meterSettledRun();
         return;
       }
       await persistAssistant();
@@ -408,6 +473,7 @@ export async function* startModalityRun(options: {
       }
     } catch (error) {
       if (settled) {
+        meterSettledRun();
         return;
       }
       const message = redactSecrets(error instanceof Error ? error.message : "run_failed");

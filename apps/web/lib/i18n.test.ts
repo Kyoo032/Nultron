@@ -10,13 +10,13 @@ describe("t()", () => {
     expect(getLocale()).toBe("en");
     expect(t("settings.title")).toBe("Settings");
     expect(t("rail.settings")).toBe("Settings");
-    expect(t("common.restartApp")).toBe("Restart DPSBuddy");
+    expect(t("common.restartApp")).toBe("Restart Nultron");
     freezeLocale("id");
     expect(getLocale()).toBe("id");
     expect(t("settings.title")).toBe("Pengaturan");
     expect(t("rail.settings")).toBe("Pengaturan");
-    expect(t("onboarding.welcome", { productName: "DPSBuddy" })).toBe("Selamat datang di DPSBuddy");
-    expect(t("chat.empty.headline")).toBe("Kerja dimulai di sini.");
+    expect(t("onboarding.welcome", { productName: "Nultron" })).toBe("Selamat datang di Nultron");
+    expect(t("chat.empty.headline")).toBe("Hari ini kita kerjakan apa?");
     expect(t("chat.empty.pickModel")).toBe("Pilih model di bawah, lalu tulis.");
     expect(t("documents.title")).toBe("Dokumen");
     expect(t("research.title")).toBe("Riset");
@@ -37,7 +37,7 @@ describe("t()", () => {
     applyLocale("en");
     expect(getLocale()).toBe("en");
     expect(t("settings.title")).toBe("Settings");
-    expect(t("chat.empty.headline")).toBe("Work starts here.");
+    expect(t("chat.empty.headline")).toBe("What are we working on today?");
   });
 
   it("fails closed on a missing key", () => {

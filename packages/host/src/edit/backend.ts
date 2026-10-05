@@ -107,8 +107,8 @@ export const hostEditBackend: EditToolBackend = {
       args.threshold,
     );
   },
-  async asrAvailable() {
-    return resolveAsrCapability().available;
+  async asrAvailable(tenant) {
+    return resolveAsrCapability(tenant).available;
   },
   async reviewGateOpen(projectId) {
     // The tool contract passes only an id. The run's own context is the scope: a tool cannot ask

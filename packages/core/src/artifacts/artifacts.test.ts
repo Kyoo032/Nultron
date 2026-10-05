@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { artifactFilename, artifactSlug, isArtifactKind, isArtifactMode } from "./artifact-meta";
+import { artifactFilename, artifactMetaSchema, artifactSlug, isArtifactKind, isArtifactMode } from "./artifact-meta";
 import { dataAnalysisSchema, dataAnalysisToMarkdown } from "./data-analysis";
 import { DOSSIER_HEADINGS, citedSourceIds, dossierSchema, dossierToMarkdown } from "./dossier";
 import { financeBriefSchema, financeBriefToMarkdown, formatMetricValue } from "./finance-brief";
@@ -35,6 +35,41 @@ describe("artifact meta", () => {
     expect(isArtifactKind("redline")).toBe(true);
     expect(isArtifactKind("dossier")).toBe(true);
     expect(isArtifactKind("")).toBe(false);
+  });
+
+  it("keeps the provenance a writer sent, including a list of query strings", () => {
+    const meta = {
+      question: "Who spends most?",
+      model: "m",
+      models: ["m", "n"],
+      datasetId: "d1",
+      queries: ["SELECT 1", "SELECT 2"],
+      sourceCount: 3,
+      extra: "kept",
+    };
+    expect(artifactMetaSchema.parse(meta)).toEqual(meta);
+  });
+
+  it("drops one wrongly typed known field and keeps the rest of the provenance", () => {
+    // A count where the schema wants a list is the writer bug this guards: one bad field used to
+    // fail the whole object, and the store then saved `{}`, losing the question, model and dataset.
+    const parsed = artifactMetaSchema.parse({
+      question: "Who spends most?",
+      model: "m",
+      datasetId: "d1",
+      queries: 4,
+      sourceCount: -1,
+      extra: "kept",
+    });
+    expect(parsed).toEqual({ question: "Who spends most?", model: "m", datasetId: "d1", extra: "kept" });
+    expect(parsed.queries).toBeUndefined();
+    expect(parsed.sourceCount).toBeUndefined();
+  });
+
+  it("parses an empty or odd object to something safe", () => {
+    expect(artifactMetaSchema.parse({})).toEqual({});
+    expect(artifactMetaSchema.safeParse(null).success).toBe(false);
+    expect(artifactMetaSchema.safeParse([]).success).toBe(false);
   });
 });
 
@@ -94,6 +129,7 @@ describe("dossierToMarkdown", () => {
       DOSSIER_HEADINGS.sources,
       "### S1 — Report",
       DOSSIER_HEADINGS.findings,
+      DOSSIER_HEADINGS.comparison,
       DOSSIER_HEADINGS.contradictions,
       DOSSIER_HEADINGS.openQuestions,
     ];

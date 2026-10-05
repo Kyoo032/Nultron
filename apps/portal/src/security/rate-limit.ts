@@ -184,6 +184,33 @@ export interface PortalLimiters {
    * Putting it on the token bucket would let branding lookups spend the budget a sign-in needs.
    */
   readonly tenantConfigIp: RateLimiter;
+  /**
+   * 15 / 15 min per IP on the e-mail step of both sign-ins (and on "e-mail me my invite again").
+   *
+   * The e-mail step now tells a person which situation they are in -- member, invitee or neither --
+   * which makes it an oracle for "is this address one of ours" (owner decision 2026-10-01, SR-30).
+   * This is what keeps a sweep of addresses from being cheap: fifteen lookups a quarter hour from
+   * one address, about 1,400 a day, against the thirty-per-quarter-hour `otpSendIp` it replaces as
+   * the binding limit here. Deliberately tight: a pilot office behind one address types its own
+   * address once or twice, and a typo costs one. The number is a placeholder the owner may tune.
+   */
+  readonly signInEmailIp: RateLimiter;
+  /**
+   * 6 / 15 min per address (keyed on the tenant-or-client and the normalised address) on the same
+   * step. One address cannot be probed, or a member's inbox hammered, faster than that; the DB
+   * limits underneath (3 codes per 15 minutes, a cooldown on invites) are the ones that bind the
+   * mail itself. In process, so per process like every limiter here.
+   */
+  readonly signInEmailAddress: RateLimiter;
+  /**
+   * 10 / 15 min per IP on the invite step: every invite code TYPED, whether it redeems or not.
+   * Counted before the address is looked up, so a burst cannot slip past a check made after the work,
+   * and a flood of guesses is refused before it costs a query. Per address the limit is in the
+   * database: five wrong codes lock that address's invite (`store/postgres/invites.ts`), which no
+   * restart or second instance can reset. 10 is sized for a pilot office behind one address with a
+   * handful of testers typing a long code by hand.
+   */
+  readonly inviteAttemptIp: RateLimiter;
 }
 
 const TEN_MINUTES = 10 * 60 * 1000;
@@ -201,5 +228,8 @@ export function createPortalLimiters(clock: Clock): PortalLimiters {
     tokenClientAuthFailIp: createRateLimiter({ clock, windowMs: TEN_MINUTES, max: 20 }),
     deviceTokenIp: createRateLimiter({ clock, windowMs: TEN_MINUTES, max: 600 }),
     tenantConfigIp: createRateLimiter({ clock, windowMs: TEN_MINUTES, max: 300 }),
+    signInEmailIp: createRateLimiter({ clock, windowMs: FIFTEEN_MINUTES, max: 15 }),
+    signInEmailAddress: createRateLimiter({ clock, windowMs: FIFTEEN_MINUTES, max: 6 }),
+    inviteAttemptIp: createRateLimiter({ clock, windowMs: FIFTEEN_MINUTES, max: 10 }),
   });
 }

@@ -1,0 +1,72 @@
+# Nultron reverse proxy, Kubernetes shape. One Caddy container, in the SAME pod as the app, so
+# 127.0.0.1:3000 is the app exactly as in webapp-deploy/compose.yml (the app binds loopback and the
+# proxy is the only thing that may reach it; see webapp-deploy/README.md "The loopback bind").
+#
+# What differs from webapp-deploy/Caddyfile, and why:
+#   - it listens on 8443/8080, not 443/80, so the container needs no capability and runs as uid 1000;
+#     the Service maps 443 -> 8443 and 80 -> 8080. Override with CADDY_HTTPS_PORT / CADDY_HTTP_PORT.
+#   - two names, NULTRON_DOMAIN (the app) and PORTAL_DOMAIN (the portal stand-in), because the portal
+#     has to be reached by a browser over https and the app reaches it over https too (SR-26).
+#   - the certificate source is a snippet, site-tls.caddy, so an overlay swaps ACME for a file pair
+#     without touching this file.
+# The header values, the log filter and the proxy directives are the reviewed ones; security.caddy
+# is checked line for line against webapp-deploy/Caddyfile by k8s-rehearsal.test.mjs.
+# security.caddy only defines snippets, and a snippet is read after it is defined: it comes first
+# so the global block can use default_log (SR-72).
+import /etc/caddy/security.caddy
+
+{
+	admin off
+	http_port {$CADDY_HTTP_PORT:8080}
+	https_port {$CADDY_HTTPS_PORT:8443}
+	import default_log
+}
+
+import /etc/caddy/site-tls.caddy
+
+http://{$NULTRON_DOMAIN}, http://{$PORTAL_DOMAIN} {
+	redir https://{host}{uri} permanent
+}
+
+{$NULTRON_DOMAIN} {
+	import site_tls
+	import access_log
+	import nultron_headers
+
+	# SR-03: the billing webhook is blocked at the edge until a payment provider is bound (owner
+	# decision 2026-10-01). Same rule, same wording as webapp-deploy/Caddyfile.
+	@billing_webhook path /api/v1/billing/webhook*
+	respond @billing_webhook 404
+
+	# X-FORWARDED-FOR: this Caddy is the only hop in front of the app (SR-18). reverse_proxy replaces
+	# the header with the real peer for a client that is not a trusted proxy, and no trusted_proxies
+	# line is declared, so the app's last-hop rule reads the address Caddy saw. A cloud load balancer
+	# in front of this Caddy must be TCP passthrough (no extra X-Forwarded-For hop).
+	reverse_proxy 127.0.0.1:3000 {
+		# Host and Origin pass through unchanged: the app checks both against
+		# AGENTFORGE_TRUSTED_ORIGINS and rewriting either is the CSRF hole that check exists to close.
+		health_uri /healthz
+		health_interval 10s
+		health_timeout 5s
+		health_status 200
+
+		# job.step arrives as SSE; buffering would hold every step until the run ended.
+		flush_interval -1
+	}
+}
+
+{$PORTAL_DOMAIN} {
+	import site_tls
+	import access_log
+	import portal_headers
+
+	# The portal Service, one replica. PORTAL_TRUST_PROXY=1 on the portal makes it believe the
+	# X-Forwarded-For this Caddy writes; it is the same one-hop rule as for the app.
+	reverse_proxy nultron-portal:4000 {
+		health_uri /healthz
+		health_interval 10s
+		health_timeout 5s
+		health_status 200
+		flush_interval -1
+	}
+}

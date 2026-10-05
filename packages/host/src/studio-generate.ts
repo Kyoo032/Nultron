@@ -10,6 +10,11 @@ import {
   lyricsWriteTool,
   maskPii,
   mediaKind,
+  preferLyricDraft,
+  resolveSongTitle,
+  shouldRetryLyrics,
+  shouldRetryMusicJob,
+  stripMusicLanguageRule,
   modeMessage,
   musicCapabilities,
   musicGenerateTool,
@@ -38,6 +43,7 @@ import {
   type TenantContext,
 } from "@agentforge/core";
 import { loadSettings } from "./settings-store";
+import type { ModelCacheScope } from "./model-cache";
 import { listImageModels, listMusicModels, listProbedVideoModels, listSpeechModels } from "./selectable-models";
 import { mediaIdFromUrl } from "./media-id";
 import { getStudioMediaMeta, saveStudioMediaMeta, type StudioMediaMeta } from "./studio-media-meta";
@@ -115,6 +121,13 @@ export type StudioGalleryItem = {
   style?: string;
   instrumental?: boolean;
   durationSeconds?: number;
+  /**
+   * Present (and `true`) only when the row's file is gone from the desk's store, so `GET
+   * /api/v1/media/:id/file` would answer 404. The row is still listed: it is the owner's data and
+   * nothing here deletes it. The gallery shows a "file missing" tile instead of a player that cannot
+   * load. Absent means present, or not checked (the hosted object store is never probed per row).
+   */
+  fileMissing?: true;
 };
 
 export type StudioGenerateResult = {
@@ -142,28 +155,30 @@ export type StudioMusicResult = {
   instrumental: boolean;
 };
 
-export function listStudioImageModels(models: ChatModel[] = listImageModels()): ChatModel[] {
-  return models.filter((model) => mediaKind(model.id) === "image");
+// Every list below reads the catalogue of one tenant. `scope` names it (a `TenantContext` goes in as it
+// is); a desk has one catalogue and ignores it. See `ModelCacheScope`.
+export function listStudioImageModels(models?: ChatModel[], scope?: ModelCacheScope): ChatModel[] {
+  return (models ?? listImageModels(scope)).filter((model) => mediaKind(model.id) === "image");
 }
 
-export function listStudioVideoModels(models: ChatModel[] = listProbedVideoModels()): ChatModel[] {
-  return models.filter((model) => mediaKind(model.id) === "video");
+export function listStudioVideoModels(models?: ChatModel[], scope?: ModelCacheScope): ChatModel[] {
+  return (models ?? listProbedVideoModels(undefined, scope)).filter((model) => mediaKind(model.id) === "video");
 }
 
-export function defaultStudioImageModel(models: ChatModel[] = listStudioImageModels()): string {
-  return pickPreferredImageModel(models.map((model) => model.id));
+export function defaultStudioImageModel(models?: ChatModel[], scope?: ModelCacheScope): string {
+  return pickPreferredImageModel((models ?? listStudioImageModels(undefined, scope)).map((model) => model.id));
 }
 
-export function defaultStudioVideoModel(models: ChatModel[] = listStudioVideoModels()): string {
-  return availableVideoDefault(models.map((model) => model.id));
+export function defaultStudioVideoModel(models?: ChatModel[], scope?: ModelCacheScope): string {
+  return availableVideoDefault((models ?? listStudioVideoModels(undefined, scope)).map((model) => model.id));
 }
 
-export function listStudioMusicModels(models: ChatModel[] = listMusicModels()): ChatModel[] {
-  return models.filter((model) => isMusicModelId(model.id));
+export function listStudioMusicModels(models?: ChatModel[], scope?: ModelCacheScope): ChatModel[] {
+  return (models ?? listMusicModels(scope)).filter((model) => isMusicModelId(model.id));
 }
 
-export function defaultStudioMusicModel(models: ChatModel[] = listStudioMusicModels()): string {
-  return pickPreferredMusicModel(models.map((model) => model.id));
+export function defaultStudioMusicModel(models?: ChatModel[], scope?: ModelCacheScope): string {
+  return pickPreferredMusicModel((models ?? listStudioMusicModels(undefined, scope)).map((model) => model.id));
 }
 
 /**
@@ -173,12 +188,15 @@ export function defaultStudioMusicModel(models: ChatModel[] = listStudioMusicMod
  * endpoint label, so a job route cannot drive it. Reporting the reason is the whole point: the
  * studio says "this gateway serves no reachable speech model" instead of failing at submit.
  */
-export function studioSpeechUnavailable(models: ChatModel[] = listSpeechModels()): SpeechUnavailableReason | null {
-  return speechUnavailableReason(models.map((model) => model.id));
+export function studioSpeechUnavailable(
+  models?: ChatModel[],
+  scope?: ModelCacheScope,
+): SpeechUnavailableReason | null {
+  return speechUnavailableReason((models ?? listSpeechModels(scope)).map((model) => model.id));
 }
 
-export function listStudioSpeechModels(models: ChatModel[] = listSpeechModels()): ChatModel[] {
-  return models.filter((model) => isSpeechModelId(model.id));
+export function listStudioSpeechModels(models?: ChatModel[], scope?: ModelCacheScope): ChatModel[] {
+  return (models ?? listSpeechModels(scope)).filter((model) => isSpeechModelId(model.id));
 }
 
 export function parseImageGenerateBody(raw: unknown): ImageGenerateBody {
@@ -280,7 +298,7 @@ export async function generateStudioImage(
   const settings = loadSettings(tenant);
   const locale = localeForRun();
   const scope = buildToolSecretScope(settings);
-  const model = body.model || settings.imageGenModel || defaultStudioImageModel();
+  const model = body.model || settings.imageGenModel || defaultStudioImageModel(undefined, tenant);
   const output = await runWithToolSecrets(scope, () =>
     imageGenerateTool.execute(
       {
@@ -364,7 +382,7 @@ export async function generateStudioVideo(
   const settings = loadSettings(tenant);
   const scope = buildToolSecretScope(settings);
   const locale = localeForRun();
-  const availableIds = listStudioVideoModels().map((item) => item.id);
+  const availableIds = listStudioVideoModels(undefined, tenant).map((item) => item.id);
   const requested = (body.model || settings.videoGenModel || "").trim();
   const harness = await runVideoHarness(
     {
@@ -455,7 +473,7 @@ export async function generateStudioMusic(tenant: TenantContext, body: MusicGene
   const settings = loadSettings(tenant);
   const locale = localeForRun();
   const scope = buildToolSecretScope(settings);
-  const model = body.model || settings.musicGenModel || defaultStudioMusicModel();
+  const model = body.model || settings.musicGenModel || defaultStudioMusicModel(undefined, tenant);
   const caps = musicCapabilities(model);
   const mode = resolveMusicMode(model, body.mode);
   const prompt = musicPromptOf(body);
@@ -464,25 +482,40 @@ export async function generateStudioMusic(tenant: TenantContext, body: MusicGene
     throw new ApiError("invalid_content_part", modeMessage(key, locale), 400);
   }
   const style = caps.style ? body.style?.trim() || undefined : undefined;
-  const title = caps.title ? body.title?.trim() || undefined : undefined;
   const instrumental = caps.instrumental && body.instrumental === true;
-  const output = await runWithToolSecrets(scope, () =>
+  // A title they typed wins, then a title on the take, then the first sung line of the brief.
+  // The title can ride the custom-mode relay body, so it is masked like the words.
+  const songTitle = (takeTitle?: string) => {
+    const named = resolveSongTitle({ ownerTitle: body.title, takeTitle, brief: prompt });
+    return named ? maskPii(named).slice(0, MUSIC_TITLE_MAX).trim() || undefined : undefined;
+  };
+  const title = songTitle();
+  const sungLyrics = mode === "custom" ? maskPii(stripMusicLanguageRule(prompt)) : "";
+  if (mode === "custom" && !sungLyrics.trim()) {
+    throw new ApiError("invalid_content_part", modeMessage("musicLyricsRequired", locale), 400);
+  }
+  const execute = () =>
     musicGenerateTool.execute(
       {
         // The owner's own lyrics are sung word for word, so they go as written. The language rule
         // rides only a description, the one text the model writes the words from; never the style tags.
         ...(mode === "custom"
-          ? { lyrics: maskPii(prompt) }
+          ? { lyrics: sungLyrics }
           : { prompt: withOutputLanguage(maskPii(prompt), "music", locale) }),
         style,
-        title,
+        title: caps.title ? title : undefined,
         instrumental,
         model,
       },
       tenant,
-    ),
-  );
-  const tracks = toolTracks(output);
+    );
+  let output = await runWithToolSecrets(scope, execute);
+  let tracks = toolTracks(output);
+  // One more submit of the same brief when nothing comes back. Not a second model.
+  if (shouldRetryMusicJob(1, tracks.length)) {
+    output = await runWithToolSecrets(scope, execute);
+    tracks = toolTracks(output);
+  }
   if (tracks.length === 0) {
     throw new ApiError(
       "tool_failed",
@@ -491,8 +524,8 @@ export async function generateStudioMusic(tenant: TenantContext, body: MusicGene
     );
   }
   const usedModel = toolModel(output, model);
-  // One charge, however many takes come back — so the unit is `jobs` and the quantity is 1. Metered
-  // before the takes are stored, like the other studios: the gateway has already billed for them.
+  // One charge, however many takes come back — so the unit is `jobs` and the quantity is 1. A blank
+  // first try is the same song and does not add a row. Metered before the takes are stored.
   recordMusicUsage(tenant, { model: usedModel });
   const { saveGeneratedAudio } = await import("./media");
   const saved: StudioTrackResult[] = [];
@@ -507,7 +540,7 @@ export async function generateStudioMusic(tenant: TenantContext, body: MusicGene
         aspect: "",
         model: usedModel,
         createdAt: new Date().toISOString(),
-        title: track.title ?? title,
+        title: songTitle(track.title),
         style,
         instrumental,
         durationSeconds: track.durationSeconds,
@@ -520,16 +553,32 @@ export async function generateStudioMusic(tenant: TenantContext, body: MusicGene
           model: usedModel,
           url: stored,
           mode,
-          title: track.title ?? title,
+          title: songTitle(track.title),
           style,
           instrumental,
           durationSeconds: track.durationSeconds,
         }),
       );
     }
-    saved.push({ id, url: stored, title: track.title ?? title, durationSeconds: track.durationSeconds });
+    saved.push({
+      id,
+      url: stored,
+      title: songTitle(track.title),
+      durationSeconds: track.durationSeconds,
+    });
   }
   return { tracks: saved, prompt, mode, model: usedModel, style, instrumental };
+}
+
+function lyricDraftOf(output: unknown): { text: string; title?: string; model?: string } {
+  const record = output && typeof output === "object" ? (output as Record<string, unknown>) : {};
+  if (record.success !== true) {
+    return { text: "" };
+  }
+  const text = typeof record.text === "string" ? record.text.trim() : "";
+  const title = typeof record.title === "string" && record.title.trim() ? record.title.trim() : undefined;
+  const model = typeof record.model === "string" && record.model.trim() ? record.model.trim() : undefined;
+  return { text, title, model };
 }
 
 /** Draft lyrics only. Nothing is stored: the text goes straight back for the desk to edit. */
@@ -542,31 +591,50 @@ export async function writeStudioLyrics(
   }
   const settings = loadSettings(tenant);
   const locale = localeForRun();
-  const output = await runWithToolSecrets(buildToolSecretScope(settings), () =>
-    lyricsWriteTool.execute(
-      { prompt: withOutputLanguage(maskPii(body.prompt), "music", locale), model: body.model },
-      tenant,
-    ),
-  );
-  const record = output && typeof output === "object" ? (output as Record<string, unknown>) : {};
-  const text = typeof record.text === "string" ? record.text.trim() : "";
-  if (record.success !== true || !text) {
+  const scope = buildToolSecretScope(settings);
+  const asked = withOutputLanguage(maskPii(body.prompt), "music", locale);
+  const execute = () => lyricsWriteTool.execute({ prompt: asked, model: body.model }, tenant);
+  let output = await runWithToolSecrets(scope, execute);
+  let draft = lyricDraftOf(output);
+  // A one-line echo, or the language instruction sung back, is tried once more.
+  if (shouldRetryLyrics(1, draft.text)) {
+    const second = await runWithToolSecrets(scope, execute);
+    const next = lyricDraftOf(second);
+    const chosen = preferLyricDraft(draft.text, next.text);
+    if (chosen && chosen === stripMusicLanguageRule(next.text).trim()) {
+      output = second;
+      draft = { ...next, text: chosen };
+    } else {
+      draft = { ...draft, text: chosen };
+    }
+  } else {
+    draft = { ...draft, text: stripMusicLanguageRule(draft.text).trim() };
+  }
+  if (!draft.text) {
     throw new ApiError("tool_failed", toolFailureMessage(output, modeMessage("lyricsGenerateFailed", locale)), 400);
   }
   const usedModel = toolModel(output, body.model ?? "");
   // A lyrics draft is its own flat-rate gateway call, billed whether or not the desk goes on to
-  // generate a song from it.
+  // generate a song from it. A shape retry is the same draft from the desk's side, so one row.
   recordMusicUsage(tenant, { model: usedModel });
+  const relayTitle = draft.title ? stripMusicLanguageRule(draft.title).trim() : "";
+  const named = resolveSongTitle({ takeTitle: relayTitle || undefined, brief: body.prompt });
+  const title = named ? maskPii(named).slice(0, MUSIC_TITLE_MAX).trim() || undefined : undefined;
   return {
-    text,
-    title: typeof record.title === "string" && record.title.trim() ? record.title.trim() : undefined,
+    text: draft.text,
+    title,
     model: usedModel,
   };
 }
 
 export async function listStudioGallery(tenant: TenantContext, kind: StudioKind): Promise<StudioGalleryItem[]> {
   const { listMediaByKind } = await import("./media");
+  const { missingTenantObjects } = await import("./tenant-storage");
   const rows = await listMediaByKind(tenant, kind);
+  const missing = await missingTenantObjects(
+    tenant.tenantId,
+    rows.map((row) => row.storagePath),
+  );
   const items: StudioGalleryItem[] = [];
   for (const row of rows) {
     const meta = await getStudioMediaMeta(tenant.tenantId, row.id);
@@ -582,6 +650,7 @@ export async function listStudioGallery(tenant: TenantContext, kind: StudioKind)
       style: meta?.style,
       instrumental: meta?.instrumental,
       durationSeconds: meta?.durationSeconds,
+      ...(missing.has(row.storagePath) ? { fileMissing: true as const } : {}),
     });
   }
   return items;

@@ -7,12 +7,24 @@ import { withOutputLanguage } from "../output-language";
 import { maskPii } from "../security/pii";
 
 /**
- * Skills this harness adds. The model list and the length snap stay as they are;
- * a still the model cannot take still stops before any render.
+ * The five skills of the Videos mode, read by `harness/modes/videos.ts`. Three are wired here
+ * (`new`): write the shot, render once more, keep the clip. The model list, the length snap and a
+ * still the model cannot take stay as they were (`has`), and the cost line stays in the studio.
+ * `keep-clip` carries what "bill the snapped length" and "keep the gallery" used to name: the clip
+ * is kept, billed and captioned at the length and shot the harness asked for.
  */
-export const VIDEO_HARNESS_SKILLS = ["write-shot", "render-retry", "keep-clip"] as const;
+export const VIDEO_HARNESS_SKILLS = [
+  { id: "write-shot", name: "Write the shot", status: "new" },
+  { id: "start-from-still", name: "Start from a still", status: "has" },
+  { id: "estimate-and-tighten", name: "Estimate the cost and tighten the prompt", status: "has" },
+  { id: "render-retry", name: "Render once more when the job dies", status: "new" },
+  { id: "keep-clip", name: "Keep the clip at the billed length", status: "new" },
+] as const;
 
-export type VideoHarnessSkill = (typeof VIDEO_HARNESS_SKILLS)[number];
+export type VideoHarnessSkillId = (typeof VIDEO_HARNESS_SKILLS)[number]["id"];
+
+/** The skills a run exercised, in order. A run that never retried has no `render-retry`. */
+export type VideoHarnessSkill = "write-shot" | "render-retry" | "keep-clip";
 
 export type VideoRenderCall = {
   prompt: string;

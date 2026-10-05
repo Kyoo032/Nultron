@@ -185,3 +185,84 @@ describe("login_precheck", () => {
     expect(result.reason).toBe("device_revoked");
   });
 });
+
+/**
+ * `orgs.hasSeatFor` is the question a sign-in PAGE asks before it spends an invite or a code
+ * (L2, 2026-10-01): would a new session for this person fit the org's cap right now? It is the
+ * seat branch of `login_precheck` without its advisory lock, so these tests hold it to that
+ * function's own answer rather than to a second definition of a seat.
+ */
+describe("orgs.hasSeatFor", () => {
+  async function hasSeat(fixture: Fixture, user: User): Promise<boolean> {
+    return store.tx(fixture.tenant.id, (ops) => ops.orgs.hasSeatFor(fixture.org.id, user.id));
+  }
+
+  async function precheckSaysOk(fixture: Fixture, user: User): Promise<boolean> {
+    const device = await addDevice(store, fixture, user, randomUUID());
+    const reason = await store.tx(fixture.tenant.id, (ops) =>
+      ops.loginPrecheck({ userId: user.id, deviceId: device.id }),
+    );
+    return reason === "ok";
+  }
+
+  it("is true while the org has a free seat, for a member with no session and for an invitee", async () => {
+    const fixture = await seedFixture(store, { seatCap: 2 });
+    await signIn(fixture, fixture.user);
+    const invitee = await store.tx(fixture.tenant.id, (ops) =>
+      ops.users.create({ tenantId: fixture.tenant.id, orgId: fixture.org.id, email: "invitee@example.test", status: "invited" }),
+    );
+    const idle = await addUser(store, fixture, "idle@example.test");
+
+    expect(await hasSeat(fixture, invitee)).toBe(true);
+    expect(await hasSeat(fixture, idle)).toBe(true);
+  });
+
+  it("is false for a person with no live session once the cap is reached", async () => {
+    const fixture = await seedFixture(store, { seatCap: 1 });
+    await signIn(fixture, fixture.user);
+    const idle = await addUser(store, fixture, "idle2@example.test");
+    const invitee = await store.tx(fixture.tenant.id, (ops) =>
+      ops.users.create({ tenantId: fixture.tenant.id, orgId: fixture.org.id, email: "invitee2@example.test", status: "invited" }),
+    );
+
+    expect(await hasSeat(fixture, idle)).toBe(false);
+    expect(await hasSeat(fixture, invitee)).toBe(false);
+  });
+
+  it("is true for the person who already holds a seat: a second device is not a second seat", async () => {
+    const fixture = await seedFixture(store, { seatCap: 1 });
+    await signIn(fixture, fixture.user);
+
+    expect(await hasSeat(fixture, fixture.user)).toBe(true);
+  });
+
+  it("is false for a person whose last session aged out of the 30-day window, in a full org", async () => {
+    const fixture = await seedFixture(store, { seatCap: 1 });
+    await signIn(fixture, fixture.user);
+    const lapsed = await addUser(store, fixture, "lapsed@example.test");
+    await signIn(fixture, lapsed, { lastSeenAt: new Date(Date.now() - THIRTY_ONE_DAYS_MS) });
+
+    expect(await hasSeat(fixture, lapsed)).toBe(false);
+  });
+
+  it("is false even for a seated person when the org is over its cap, exactly as login_precheck is", async () => {
+    const fixture = await seedFixture(store, { seatCap: 2 });
+    await signIn(fixture, fixture.user);
+    const second = await addUser(store, fixture, "second2@example.test");
+    await signIn(fixture, second);
+    await store.tx(fixture.tenant.id, (ops) => ops.orgs.setSeatCap(fixture.org.id, 1));
+
+    expect(await hasSeat(fixture, fixture.user)).toBe(false);
+  });
+
+  it("agrees with login_precheck in every state above", async () => {
+    const fixture = await seedFixture(store, { seatCap: 1 });
+    await signIn(fixture, fixture.user);
+    const idle = await addUser(store, fixture, "agree@example.test");
+
+    expect(await hasSeat(fixture, fixture.user)).toBe(await precheckSaysOk(fixture, fixture.user));
+    expect(await hasSeat(fixture, idle)).toBe(await precheckSaysOk(fixture, idle));
+    await store.tx(fixture.tenant.id, (ops) => ops.orgs.setSeatCap(fixture.org.id, 2));
+    expect(await hasSeat(fixture, idle)).toBe(await precheckSaysOk(fixture, idle));
+  });
+});
