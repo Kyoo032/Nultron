@@ -24,7 +24,7 @@ die() { echo "mac-build: ERROR: $*" >&2; exit 1; }
 
 [ -d "$SRC/.git" ] || die "/src is not a git checkout"
 [ -d "$OUT" ] || die "/out is not mounted"
-mkdir -p /cache/keytar /cache/anydoc /cache/electron /cache/electron-builder
+mkdir -p /cache/keytar /cache/anydoc /cache/electron /cache/electron-builder /cache/sandbox
 
 # ---------- 1. fresh clone of the committed tree ----------
 log "cloning committed tree"
@@ -52,6 +52,18 @@ log "renderer build + stage"
 pnpm --filter @agentforge/web build >/tmp/web-build.log 2>&1 || { tail -40 /tmp/web-build.log; die "web build failed"; }
 node apps/desktop/scripts/stage-renderer.mjs
 node apps/desktop/scripts/pack-brand.mjs --restore-public
+
+# ---------- 3b. code-sandbox runtime ----------
+# Pyodide, QuickJS and the Python wheels are wasm, .mjs and zip files: nothing in them is per-OS or per-arch,
+# so this one folder serves both arches (it is not swapped like the native modules below). package.json
+# extraResources ships it as Contents/Resources/sandbox, outside the asar, because the sandbox child reads it
+# from disk. The script refuses any file whose sha256 differs from scripts/sandbox-runtime.lock.json; the five
+# wheels are the only download and are cached in the /cache volume.
+log "sandbox runtime"
+SANDBOX_RUNTIME_CACHE=/cache/sandbox node scripts/build-sandbox-runtime.mjs >/tmp/sandbox-build.log 2>&1 \
+  || { tail -40 /tmp/sandbox-build.log; die "sandbox runtime build failed"; }
+tail -n 2 /tmp/sandbox-build.log
+node scripts/build-sandbox-runtime.mjs --verify >/dev/null || die "sandbox runtime does not match its manifest"
 
 # ---------- 4. darwin native modules ----------
 SQLITE_DIR="$(realpath apps/desktop/node_modules/better-sqlite3)"
@@ -109,7 +121,7 @@ done
 # ---------- 5. per-arch: pack, sign, zip, dmg, verify ----------
 cd apps/desktop
 rm -rf dist/mac dist/mac-arm64 dist/mac-x64
-rm -f dist/DPSBuddy-"$VERSION"-mac-*.dmg dist/DPSBuddy-"$VERSION"-mac-*.zip
+rm -f dist/Nultron-"$VERSION"-mac-*.dmg dist/Nultron-"$VERSION"-mac-*.zip
 
 for arch in $ARCHES; do
   log "==== $arch ===="
@@ -134,23 +146,32 @@ for arch in $ARCHES; do
     >"/tmp/electron-builder-$arch.log" 2>&1 || { tail -60 "/tmp/electron-builder-$arch.log"; die "electron-builder failed for $arch"; }
   grep -iE "warn|error" "/tmp/electron-builder-$arch.log" | grep -v "skipped macOS" | head -20 || true
 
-  APP="$(find dist -maxdepth 2 -name DPSBuddy.app -type d | head -1)"
-  [ -n "$APP" ] || die "no DPSBuddy.app produced for $arch"
+  APP="$(find dist -maxdepth 2 -name Nultron.app -type d | head -1)"
+  [ -n "$APP" ] || die "no Nultron.app produced for $arch"
   log "app at $APP"
 
   log "ad-hoc signing with rcodesign"
   rcodesign sign "$APP" >"/tmp/rcodesign-$arch.log" 2>&1 || { tail -40 "/tmp/rcodesign-$arch.log"; die "rcodesign failed for $arch"; }
 
+  # The sandbox folder must sit in the signed bundle as the same real files the build produced (every file
+  # re-hashed against its manifest); a missing extraResources source is only a warning in electron-builder.
+  log "verifying the sandbox runtime inside the bundle"
+  node "$WORK/scripts/build-sandbox-runtime.mjs" --verify --out "$APP/Contents/Resources/sandbox" \
+    || die "Contents/Resources/sandbox is missing or does not match its manifest ($arch)"
+
   log "verifying bundle"
   python3 "$DOCKER_DIR/verify-bundle.py" --app "$APP" --arch "$arch" --version "$VERSION"
 
-  ZIP="dist/DPSBuddy-$VERSION-mac-$arch.zip"
-  DMG="dist/DPSBuddy-$VERSION-mac-$arch.dmg"
+  ZIP="dist/Nultron-$VERSION-mac-$arch.zip"
+  DMG="dist/Nultron-$VERSION-mac-$arch.dmg"
   log "zip -> $ZIP"
-  (cd "$(dirname "$APP")" && zip -q -r -y -X "../$(basename "$ZIP")" DPSBuddy.app)
+  (cd "$(dirname "$APP")" && zip -q -r -y -X "../$(basename "$ZIP")" Nultron.app)
+
+  unzip -p "$ZIP" "Nultron.app/Contents/Resources/sandbox/MANIFEST.json" | cmp -s - "$APP/Contents/Resources/sandbox/MANIFEST.json" \
+    || die "the zip does not carry the sandbox runtime ($arch)"
 
   log "dmg -> $DMG"
-  python3 "$DOCKER_DIR/make-dmg.py" --app "$APP" --out "$DMG" --volume "DPSBuddy $VERSION"
+  python3 "$DOCKER_DIR/make-dmg.py" --app "$APP" --out "$DMG" --volume "Nultron $VERSION"
 
   log "verifying dmg + zip round trip"
   python3 "$DOCKER_DIR/verify-bundle.py" --app "$APP" --arch "$arch" --version "$VERSION" --dmg "$DMG" --zip "$ZIP"
@@ -161,8 +182,8 @@ done
 
 # ---------- 6. hand over ----------
 log "copying artifacts to /out"
-for f in dist/DPSBuddy-"$VERSION"-mac-*.dmg dist/DPSBuddy-"$VERSION"-mac-*.zip; do
+for f in dist/Nultron-"$VERSION"-mac-*.dmg dist/Nultron-"$VERSION"-mac-*.zip; do
   cp "$f" "$OUT/"
 done
-(cd "$OUT" && sha256sum DPSBuddy-"$VERSION"-mac-*.dmg DPSBuddy-"$VERSION"-mac-*.zip | tee "mac-$VERSION.sha256")
-log "done: $(ls "$OUT" | grep -c "DPSBuddy-$VERSION-mac-") artifacts for $HEAD_SHA"
+(cd "$OUT" && sha256sum Nultron-"$VERSION"-mac-*.dmg Nultron-"$VERSION"-mac-*.zip | tee "mac-$VERSION.sha256")
+log "done: $(ls "$OUT" | grep -c "Nultron-$VERSION-mac-") artifacts for $HEAD_SHA"

@@ -5,6 +5,7 @@
   "untitled": "Untitled",
   "projects": "Projects",
   "newProject": "New project",
+  "projectNameLabel": "Project name",
   "openProjectHint": "Open a project to talk to the editor.",
   "phaseLater": "{label} (Phase 2+)",
   "jobs": "jobs {count}",
@@ -187,7 +188,8 @@
     "checkAgain": "Check again",
     "checking": "Checking…",
     "installGuide": "Install guide",
-    "recheckFailed": "Could not reach the local host to re-check. Try again in a moment."
+    "recheckFailed": "Could not reach the local host to re-check. Try again in a moment.",
+    "hostedUnavailable": "Video tools are not set up on this server yet, so probing, cutting, captions and export may not work. Ask your administrator to turn them on."
   },
   "errors": {
     "apply": "Could not apply edit",

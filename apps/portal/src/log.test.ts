@@ -35,13 +35,26 @@ describe("createLogger", () => {
       clientSecret: "shh",
       code: "654321",
       state: "nonce",
+      inviteCode: "ABCDE-FGHJK-LMNPQ-RSTUV",
+      invite_code: "ABCDE-FGHJK-LMNPQ-RSTUV",
     });
     const record = JSON.parse(lines[0]) as Record<string, unknown>;
-    for (const field of ["refreshToken", "otpCode", "user_code", "device_code", "clientSecret", "code", "state"]) {
+    for (const field of [
+      "refreshToken",
+      "otpCode",
+      "user_code",
+      "device_code",
+      "clientSecret",
+      "code",
+      "state",
+      "inviteCode",
+      "invite_code",
+    ]) {
       expect(record[field], field).toBe(DROPPED_MARKER);
     }
     expect(lines[0]).not.toContain("123456");
     expect(lines[0]).not.toContain("K7M4-PQ9T");
+    expect(lines[0]).not.toContain("ABCDE-FGHJK");
   });
 
   it("keeps the reason code, which is the whole point of the line", () => {

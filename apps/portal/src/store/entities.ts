@@ -195,6 +195,25 @@ export interface LoginOtp {
   readonly expiresAt: Iso;
 }
 
+/** `code_hash` is deliberately not mapped: it never leaves the store. */
+export interface Invite {
+  readonly id: string;
+  readonly tenantId: string;
+  readonly orgId: string;
+  /** The invited member, whose status moves from `invited` to `active` on redemption. */
+  readonly userId: string;
+  /** The role the member holds once the invite is redeemed. */
+  readonly role: UserRole;
+  /** The address the code is bound to, lower-cased. */
+  readonly email: string;
+  readonly failedAttempts: number;
+  readonly createdAt: Iso;
+  readonly expiresAt: Iso;
+  readonly redeemedAt: Iso | null;
+  /** Set when an operator replaced it. A revoked invite is never redeemable. */
+  readonly revokedAt: Iso | null;
+}
+
 export interface AuthCode {
   readonly id: string;
   readonly tenantId: string;

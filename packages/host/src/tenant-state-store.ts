@@ -48,6 +48,9 @@ import { log } from "./log";
 export const TENANT_STATE_FILENAMES: Record<TenantStateKey, string> = {
   settings: "settings.enc",
   gateway_gate: "gateway-gate.json",
+  // Never used for a desk's model cache: that is the machine file `model-cache.ts` owns, which
+  // `local-tenant`'s root happens to share. Listed so the map is total, and so "Start over" names it.
+  model_cache: "models-cache.json",
 };
 
 /**

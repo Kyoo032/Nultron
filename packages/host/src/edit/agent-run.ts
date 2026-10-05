@@ -6,8 +6,10 @@ import {
   editStubAssistantCopy,
   encodeSse,
   getTool,
+  harnessSpecFor,
   hasLiveProvider,
   invokeToolGuarded,
+  isServerMode,
   matchEditHarnessSkill,
   matchStubEditScenario,
   matchStubFillScenario,
@@ -20,13 +22,14 @@ import {
   type TenantContext,
 } from "@agentforge/core";
 import { rememberJobUsage } from "../job-usage";
+import type { ModelCacheScope } from "../model-cache";
 import { defaultSelectableModel } from "../selectable-models";
 import { loadSettings } from "../settings-store";
 import { localeForRun } from "../run-context";
 import { ensureToolsRegistered } from "../register-tools";
 import { withEditToolContext } from "./context";
 import { foldProject } from "./ops";
-import { getEditDoctor } from "./doctor";
+import { getEditDoctor, type EditDoctorReport } from "./doctor";
 import { encodeEditSse } from "./events";
 import { createTurnBudget, chargeTurnBudget, estimateEditJobUsd } from "./budget";
 import { hostEditBackend } from "./backend";
@@ -103,10 +106,30 @@ class StringQueue {
   }
 }
 
-function ffmpegPromptLine(): string {
-  const { ffmpeg } = getEditDoctor();
+/**
+ * What the model is told about ffmpeg this turn.
+ *
+ * On a desk the machine is the owner's, so a missing ffmpeg comes with the install hint and the model
+ * may pass it on. On the hosted service the machine is the operator's: the platform, the install
+ * command and the "run it in a terminal, then press Check again" advice describe a server the tenant
+ * cannot touch, and anything in the prompt can be repeated to them in chat. `doctor.ts` already drops
+ * `ffmpeg.setup` from the report on the hosted server for that reason, so the prompt follows the same
+ * rule: one neutral sentence that matches the banner (`edit.ffmpeg.hostedUnavailable`), no platform, no
+ * command, no variable name, no path.
+ *
+ * `report` is a seam for tests; the agent passes none and reads the cached probe.
+ */
+export function ffmpegPromptLine(report: Pick<EditDoctorReport, "ffmpeg"> = getEditDoctor()): string {
+  const { ffmpeg } = report;
   if (ffmpeg.found) {
     return `ffmpeg ${ffmpeg.version ?? ""} is installed. Export and ffmpeg are free. Never call ffmpeg yourself.`;
+  }
+  if (isServerMode()) {
+    return [
+      "The video tools (probe, cut, captions, export) are not set up on this server yet, so those jobs may not work.",
+      "If the owner asks for them, or asks why video tools fail, say that an administrator has to turn them on; there is nothing for them to install.",
+      "Do not queue ffmpeg jobs.",
+    ].join(" ");
   }
   const setup = ffmpeg.setup;
   return [
@@ -116,9 +139,9 @@ function ffmpegPromptLine(): string {
   ].join(" ");
 }
 
-function compactPrompt(doc: Awaited<ReturnType<typeof foldProject>>, budgetUsd: number): string {
+export function compactPrompt(doc: Awaited<ReturnType<typeof foldProject>>, budgetUsd: number): string {
   return [
-    "You are the DPSBuddy Edit agent. Share one ops log with the owner. Every mutation is a card.",
+    "You are the Nultron Edit agent. Share one ops log with the owner. Every mutation is a card.",
     `Project ${doc.name} ${doc.width}x${doc.height} @${doc.fps}fps seq=${doc.seq} review=${JSON.stringify(doc.review)}`,
     `Tracks: ${doc.tracks.map((track) => `${track.id}:${track.kind}`).join(", ")}`,
     `Clips: ${doc.clips.map((clip) => `${clip.id}@${clip.trackId}:${clip.timelineStartFrame}+${clip.durationFrames}`).join("; ") || "(none)"}`,
@@ -131,8 +154,8 @@ function compactPrompt(doc: Awaited<ReturnType<typeof foldProject>>, budgetUsd: 
 }
 
 /** The refreshed chat default. "edit" is not a gateway model id. */
-export function editAgentModelId(preferred = defaultSelectableModel()): string {
-  const picked = preferred.trim();
+export function editAgentModelId(preferred?: string, scope?: ModelCacheScope): string {
+  const picked = (preferred ?? defaultSelectableModel(undefined, scope)).trim();
   if (picked && picked.toLowerCase() !== "edit") {
     return picked;
   }
@@ -216,6 +239,7 @@ export async function runEditAgent(input: {
             budget,
             doc,
             push: (frame) => queue.push(frame),
+            ...(input.abortSignal ? { signal: input.abortSignal } : {}),
           });
           const completed: RuntimeEvent = { type: "run.completed", runId };
           rememberJobUsage(completed, { tenant: input.tenant, mode: "edit", runId });
@@ -237,13 +261,15 @@ export async function runEditAgent(input: {
               organizationId: input.tenant.organizationId,
               version: 1,
               systemPrompt: withOutputLanguage(compactPrompt(doc, budget.turnBudget), "edit", localeForRun()),
-              model: editAgentModelId(),
+              model: editAgentModelId(undefined, input.tenant),
               inputModalities: ["text"],
               config: {},
               createdAt: new Date(),
             },
             bindings: editAgentBindings(input.tenant.organizationId),
+            budget: harnessSpecFor("edit").budget,
             history: [{ role: "user", parts: [{ type: "text", text: input.text }] }],
+            ...(input.abortSignal ? { signal: input.abortSignal } : {}),
             onEvent: async (event: RuntimeEvent) => {
               queue.push(encodeSse(event));
               if (event.type === "tool.completed") {
@@ -259,6 +285,10 @@ export async function runEditAgent(input: {
         }
       });
     } catch (error) {
+      // A cancel is the person's own, and the stream they cancelled is gone: not an Edit failure to report.
+      if (input.abortSignal?.aborted) {
+        return;
+      }
       const message = error instanceof ApiError ? error.message : modeMessage("editAgentFailed", localeForRun());
       queue.push(encodeSse({ type: "run.failed", message }));
     } finally {

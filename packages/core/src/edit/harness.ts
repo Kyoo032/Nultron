@@ -6,15 +6,22 @@
  * not skills here. Those stay on the scripted tool path.
  */
 
+/**
+ * The mode's skills, declared beside their checks like Music's (`music/harness.ts`); the Edit spec
+ * (`harness/modes/edit.ts`) reads this list. All five are new: a sentence with no method in it is
+ * matched here and run by the host (`host/src/edit/harness-run.ts`) before the model loop is asked.
+ * The probe and start retries are inline (one more try with a looser probe, or a second start), not
+ * `runChecked` rounds, so the spec's `repairRounds` stays 0.
+ */
 export const EDIT_HARNESS_SKILLS = [
-  "lift-dead-air",
-  "cut-on-shots",
-  "words-on-picture",
-  "place-made-shot",
-  "hand-back-file",
+  { id: "lift-dead-air", name: "Lift the dead air", status: "new" },
+  { id: "cut-on-shots", name: "Cut where the picture changes", status: "new" },
+  { id: "words-on-picture", name: "Put the words on the picture", status: "new" },
+  { id: "place-made-shot", name: "Place a made shot", status: "new" },
+  { id: "hand-back-file", name: "Hand back the file", status: "new" },
 ] as const;
 
-export type EditHarnessSkill = (typeof EDIT_HARNESS_SKILLS)[number];
+export type EditHarnessSkill = (typeof EDIT_HARNESS_SKILLS)[number]["id"];
 
 export type HarnessClipSpan = {
   timelineStartFrame: number;

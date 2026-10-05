@@ -16,6 +16,7 @@ import { hostCapabilities, parseCapabilities } from "@agentforge/core/capabiliti
 import { EVERYTHING_OFF, hasDesktopShell, hasNativeFilePicker, HostCapabilitiesFixture } from "./host-capabilities";
 import { pingOnce, resetPingForTests } from "./host-ping";
 import { applyLocale, resetLocaleForTests } from "./i18n";
+import { SESSIONS_OFF, SessionFixture, type SessionRole, type SessionSnapshot } from "./session";
 
 const HOSTED = hostCapabilities({ AGENTFORGE_SERVER: "1" });
 const DESK = hostCapabilities({});
@@ -102,19 +103,66 @@ describe("pingOnce", () => {
   });
 });
 
+/** A signed-in hosted browser, as `GET /api/v1/auth/session` reports it. */
+function signedIn(role?: SessionRole): SessionSnapshot {
+  return {
+    status: "signed-in",
+    identity: { userId: "usr_1", orgId: "org_1", tenantId: "tnt_1", expiresAt: 0, ...(role ? { role } : {}) },
+    reason: null,
+  };
+}
+
 describe("SettingsResetCard", () => {
-  async function render(capabilities = HOSTED): Promise<string> {
+  async function render(capabilities = HOSTED, session: SessionSnapshot = signedIn("owner")): Promise<string> {
     const { SettingsResetCard } = await import("@/components/settings-reset-card");
     // The card navigates after an erase, so it needs a router around it; nothing here follows a
     // route, the memory router is only what `useNavigate` requires to exist.
     return renderToStaticMarkup(
       <MemoryRouter>
-        <HostCapabilitiesFixture capabilities={capabilities}>
-          <SettingsResetCard />
-        </HostCapabilitiesFixture>
+        <SessionFixture value={session}>
+          <HostCapabilitiesFixture capabilities={capabilities}>
+            <SettingsResetCard />
+          </HostCapabilitiesFixture>
+        </SessionFixture>
       </MemoryRouter>,
     );
   }
+
+  // SR-65: the host refuses the erase for anybody who is not an owner (403), and the screen does not
+  // dangle a red button at them either. The button is a courtesy; the refusal is the control.
+  it("shows the account erase to an owner only, on the hosted server", async () => {
+    expect(await render(HOSTED, signedIn("owner"))).toContain("settings-reset-tenant");
+    for (const session of [
+      signedIn("admin"),
+      signedIn("member"),
+      // Unknown is never an owner: a host that sent no role, or one this screen cannot read.
+      signedIn(),
+      { status: "signed-out", identity: null, reason: null } as SessionSnapshot,
+    ]) {
+      const markup = await render(HOSTED, session);
+      expect(markup).not.toContain("settings-reset-tenant");
+    }
+  });
+
+  // M4: forgetting the key is the company's, so the host answers a member 403 (`settings_key_forbidden`)
+  // and the screen stops offering it to them. An admin keeps it (the bar is canAdminister, not owner).
+  // Unknown is never an administrator, so a signed-in person with no readable role loses the row too.
+  it("shows Forget the key to an owner and an admin, and not to a member", async () => {
+    for (const session of [signedIn("owner"), signedIn("admin"), { status: "signed-out", identity: null, reason: null } as SessionSnapshot]) {
+      expect(await render(HOSTED, session)).toContain("settings-reset-key");
+    }
+    for (const session of [signedIn("member"), signedIn()]) {
+      expect(await render(HOSTED, session)).not.toContain("settings-reset-key");
+    }
+  });
+
+  it("never changes what a desk shows, whoever the (absent) session says it is", async () => {
+    const desk = await render(DESK, SESSIONS_OFF);
+    expect(await render(DESK, signedIn("member"))).toBe(desk);
+    expect(await render(DESK, signedIn("owner"))).toBe(desk);
+    expect(desk).toContain("settings-reset-all");
+    expect(desk).not.toContain("settings-reset-tenant");
+  });
 
   it("offers Start over on a desk and not on the hosted server", async () => {
     expect(await render(DESK)).toContain("settings-reset-all");

@@ -12,7 +12,13 @@ describe("mode harnesses", () => {
 
   it("wires only the skills the list marked new", () => {
     expect(wiredSkillIds()).toEqual([
+      "chat:ground-in-desk",
+      "chat:say-the-result",
+      "chat:look-not-make",
       "documents:check-against-source",
+      "music:shape-lyric",
+      "music:name-song",
+      "music:both-takes",
       "edit:lift-dead-air",
       "edit:cut-on-shots",
       "edit:words-on-picture",
@@ -26,8 +32,15 @@ describe("mode harnesses", () => {
       "education:book-reader",
       "education:video-presenter",
     ]);
-    expect(harnessFor("music")?.skills.find((skill) => skill.id === "speak-text")?.status).toBe("off");
-    expect(harnessFor("chat")?.skills.every((skill) => skill.status === "has")).toBe(true);
+    expect(harnessFor("music")?.skills.map((skill) => skill.id)).toEqual([
+      "hear-sentence",
+      "desk-language",
+      "shape-lyric",
+      "name-song",
+      "both-takes",
+    ]);
+    expect(harnessFor("music")?.skills.some((skill) => skill.id === "speak-text")).toBe(false);
+    expect(harnessFor("chat")?.skills.map((skill) => skill.status)).toEqual(["has", "new", "new", "new", "has"]);
   });
 
   it("keeps campus nouns out of the catalog", () => {

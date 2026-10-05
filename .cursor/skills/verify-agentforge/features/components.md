@@ -6,15 +6,15 @@ Native dependencies the app installs by itself: today only `anydoc`, the local d
 
 - `components-status` `GET /api/v1/components` → one row per component: `state` (`ready | missing | installing | failed | unsupported`), `source` (`bundled | downloaded | null`), `auto`, `managed`, `bytes`.
 - `components-install` `POST /api/v1/components/install/stream` with `{ "id": "anydoc" }` → `job.phase` per stage (`check, download, verify, unpack, probe, marker`), `job.step` download bytes, `job.done` / `job.error`.
-- `components-onboarding` the panel `component-setup` inside `onboarding-setup-check`, on the key step, above the key form, started without a click. It is not on the hello. The step walk is [onboarding.md](./onboarding.md).
-- `components-silent` the same run with no UI on a desk that is already past onboarding.
+- `components-onboarding` the panel `component-setup` inside `onboarding-setup-check`, on the key step, above the key form. `useComponentSetup()` is called at `OnboardingScreen` level (`apps/web/components/onboarding-screen.tsx:118`), so the install starts without a click as soon as the screen mounts, hello step included, and only the panel waits for the key step. `onboarding-setup-check` also renders when ffmpeg is missing (condition `:293`, testid at `:296`), so it can be present while `component-setup` is absent. The step walk is [onboarding.md](./onboarding.md).
+- `components-silent` the same run with no UI on a desk that is already past onboarding. The hook also publishes a desk-buddy claim (`apps/web/lib/use-component-setup.ts:123-124`), so the buddy charges while the install runs, celebrates when it is done and shows the error face when it fails, with no panel on screen. In the panel the inline head is drawn only when the buddy is not the status character (`apps/web/components/component-setup.tsx:82-84`, the `face && !takesStatus` guard); onboarding has no rail and its 96 px hero is a full body, so there the head still shows.
 - `components-server` the hosted deployment, where none of the above is a user action: `managed: true`, `auto: false`, no panel anywhere, the install route `403 install_disabled`, and the operator drives `webapp-deploy/scripts/components.sh` instead.
 
 ## How to get to it (user POV)
 
-Install the app and open it. On the key step, above the key form, **Setting up DPSBuddy** lists six steps with a progress bar, finishes with a ready line and folds away. The owner presses nothing. If the machine is offline the panel says so, offers **Try again**, and says the app works without it; the key form stays usable throughout. On a machine where the reader shipped inside the app, the panel never appears.
+Install the app and open it. On the key step, above the key form, **Setting up Nultron** lists six steps with a progress bar, finishes with a ready line and folds away. The owner presses nothing. If the machine is offline the panel says so, offers **Try again**, and says the app works without it; the key form stays usable throughout. On a machine where the reader shipped inside the app, the panel never appears.
 
-## Driving it with the DPSBuddy harness
+## Driving it with the Nultron harness
 
 1. Doctor the instance. `curl -s http://127.0.0.1:3000/api/v1/components` — expect 200 and one `anydoc` row. A 404 means `:3000` predates the route: report “restart :3000”, do not start another server.
 2. `state: "ready", source: "bundled"` is the normal answer on webdev and on a packed Windows build; then `component-setup` must be **absent** from onboarding. Record that as the result.
@@ -40,4 +40,5 @@ Only on a server (`AGENTFORGE_SERVER=1`); on a desk every step below is inapplic
 - `component-setup-error` with `integrity_mismatch` is never retried silently — treat it as a finding, not a flake.
 - `busy` means another tab or the silent mount is already installing; the panel says so and re-polls.
 - Start over (`settings-reset-all-submit`) deletes the downloaded copy; the next onboarding fetches it again. Drive that only on a throwaway data dir.
-- ffmpeg is **not** a component yet; `ffmpeg-setup-notice` is still the manual path and is tracked as the next manifest entry.
+- ffmpeg is **not** a component yet; the manual path is the `FfmpegSetupNotice` component (`apps/web/components/ffmpeg-setup-notice.tsx`), which renders `edit-needs-ffmpeg` (`:48` in the short variant, `:78` in the full one), `ffmpeg-install-command` (`:85`), `ffmpeg-recheck` (`:97`) and, in the full variant, `ffmpeg-setup-steps` (`:109`). It is tracked as the next manifest entry.
+- **Known bug, not fixed: an empty heading box stays after a successful download.** The panel folds to nothing about 4 s after `done` (`window.setTimeout(…, 4000)`, `apps/web/components/component-setup.tsx:62`, `return null` at `:66`), but its wrapper `onboarding-setup-check` stays drawn while `componentSetup.visible` is true (`apps/web/components/onboarding-screen.tsx:293`; `visible: component !== null`, `apps/web/lib/use-component-setup.ts:126`), so the key step keeps a bordered box with only its heading above the key form. Record it as this finding, not as a miss on `component-setup-done`.

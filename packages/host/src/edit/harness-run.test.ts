@@ -120,4 +120,26 @@ describe("edit harness skills", () => {
     expect(body).toContain("h264-1080p");
     await settleJobs(doc.id);
   }, 60_000);
+
+  it("makes no call for a turn that was cancelled, and does not report it as a failure", async () => {
+    const { eq } = await import("drizzle-orm");
+    const { db, editJobs } = await import("@agentforge/db");
+    const { createEditProject } = await import("./projects");
+    const { getTenant } = await import("../tenant");
+    const { runEditAgent } = await import("./agent-run");
+    const { foldProject } = await import("./ops");
+    const tenant = await getTenant();
+    const doc = await createEditProject(tenant, { name: "Gone", aspect: "16:9", fps: 30 });
+    const client = new AbortController();
+    client.abort(new Error("client left"));
+    for (const text of ["Make a still of a harbour", "Hand me the file", "Put words on the picture: Hello"]) {
+      const body = await framesOf(await runEditAgent({ tenant, projectId: doc.id, text, abortSignal: client.signal }));
+      expect(body).not.toContain("run.failed");
+      expect(body).not.toContain("tool.started");
+      expect(body).not.toContain("run.completed");
+    }
+    const after = await foldProject(doc.id, tenant.workspaceId);
+    expect(after.clips).toHaveLength(0);
+    expect(await db.select().from(editJobs).where(eq(editJobs.projectId, doc.id))).toHaveLength(0);
+  }, 60_000);
 });

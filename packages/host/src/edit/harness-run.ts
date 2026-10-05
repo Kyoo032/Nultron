@@ -51,12 +51,18 @@ function pushTool(push: Push, output: unknown): void {
   }
 }
 
+/**
+ * Every tool call goes through here, and a cancelled turn makes none: the person who cancelled is not
+ * waiting, and a made shot or an export start is spend or a job nobody asked to keep. `runEditAgent`
+ * reads the abort and closes the stream without reporting a failure.
+ */
 async function invoke(
-  push: Push,
-  tenant: TenantContext,
+  ctx: { push: Push; tenant: TenantContext; signal?: AbortSignal },
   toolKey: string,
   args: Record<string, unknown>,
 ): Promise<unknown> {
+  ctx.signal?.throwIfAborted();
+  const { push, tenant } = ctx;
   const touching = typeof args.clipId === "string" ? [args.clipId] : [];
   push(encodeEditSse({ type: "tool.started", toolKey, touching }));
   const tool = getTool(toolKey);
@@ -64,6 +70,13 @@ async function invoke(
   push(encodeSse({ type: "tool.completed", toolKey, output }));
   pushTool(push, output);
   return output;
+}
+
+/** A start that failed is retried or reported; a start that was cancelled is neither. */
+function rethrowCancel(signal: AbortSignal | undefined, error: unknown): void {
+  if (signal?.aborted) {
+    throw error;
+  }
 }
 
 function jobAccepted(output: unknown): boolean {
@@ -138,7 +151,7 @@ async function liftDeadAir(input: RunInput): Promise<void> {
     say(input.push, "liftDeadAirEmpty");
     return;
   }
-  await invoke(input.push, input.tenant, "remove_silence", { clipId: clip.id, ranges });
+  await invoke(input, "remove_silence", { clipId: clip.id, ranges });
   say(input.push, "liftDeadAirRan");
 }
 
@@ -156,7 +169,7 @@ async function cutOnShots(input: RunInput): Promise<void> {
     say(input.push, "cutOnShotsEmpty");
     return;
   }
-  await invoke(input.push, input.tenant, "split_at_scenes", { clipId: clip.id, frames });
+  await invoke(input, "split_at_scenes", { clipId: clip.id, frames });
   say(input.push, "cutOnShotsRan");
 }
 
@@ -170,7 +183,7 @@ async function wordsOnPicture(input: RunInput): Promise<void> {
   const toolKey = captions ? "add_caption" : "add_title";
   const args = captions ? { source: "script", text: words } : { text: words };
   for (let attempt = 0; attempt < PROBE_ATTEMPTS; attempt += 1) {
-    await invoke(input.push, input.tenant, toolKey, args);
+    await invoke(input, toolKey, args);
     const folded = await foldProject(input.projectId, input.tenant.workspaceId);
     if (wordsLanded(folded.clips, words, captions ? "caption" : "title")) {
       say(input.push, "wordsOnPictureRan");
@@ -197,7 +210,7 @@ async function placeMadeShot(input: RunInput): Promise<void> {
     args.seconds = seconds;
   }
   if (!charged.ok) {
-    const output = await invoke(input.push, input.tenant, "propose_plan", {
+    const output = await invoke(input, "propose_plan", {
       steps: [{ tool: toolKey, args, estimateUsd: estimate ?? undefined }],
       totalUsd: estimate ?? 0,
     });
@@ -207,9 +220,9 @@ async function placeMadeShot(input: RunInput): Promise<void> {
     say(input.push, "placeMadeShotBlocked");
     return;
   }
-  let output = await invoke(input.push, input.tenant, toolKey, args);
+  let output = await invoke(input, toolKey, args);
   if (!jobAccepted(output) && !spendRefusal(output)) {
-    output = await invoke(input.push, input.tenant, toolKey, args);
+    output = await invoke(input, toolKey, args);
   }
   if (spendRefusal(output)) {
     say(input.push, "placeMadeShotBlocked");
@@ -231,14 +244,16 @@ async function handBackFile(input: RunInput): Promise<void> {
   const args = { preset: "h264-1080p" };
   let output: unknown;
   try {
-    output = await invoke(input.push, input.tenant, "export", args);
-  } catch {
+    output = await invoke(input, "export", args);
+  } catch (error) {
+    rethrowCancel(input.signal, error);
     output = null;
   }
   if (!jobAccepted(output)) {
     try {
-      output = await invoke(input.push, input.tenant, "export", args);
-    } catch {
+      output = await invoke(input, "export", args);
+    } catch (error) {
+      rethrowCancel(input.signal, error);
       output = null;
     }
   }
@@ -258,6 +273,7 @@ type RunInput = {
   budget: TurnBudget;
   doc: EditProject;
   push: Push;
+  signal?: AbortSignal;
 };
 
 const RUNNERS: Record<EditHarnessSkill, (input: RunInput) => Promise<void>> = {
@@ -269,5 +285,6 @@ const RUNNERS: Record<EditHarnessSkill, (input: RunInput) => Promise<void>> = {
 };
 
 export async function runEditHarness(input: RunInput): Promise<void> {
+  input.signal?.throwIfAborted();
   await RUNNERS[input.skill](input);
 }

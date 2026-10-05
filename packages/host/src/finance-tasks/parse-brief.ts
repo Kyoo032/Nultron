@@ -7,4 +7,5 @@
 import type { FinanceTaskParser } from "./types";
 import { parseFinanceFigures } from "../finance-generate";
 
-export const parseBriefInput: FinanceTaskParser = async (tenant, body) => parseFinanceFigures(tenant, body);
+export const parseBriefInput: FinanceTaskParser = async (tenant, body, abortSignal) =>
+  parseFinanceFigures(tenant, body, abortSignal);

@@ -1,7 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { applyJobThinking, type AgentRuntime, type TenantContext } from "@agentforge/core";
+import { z } from "zod";
+import {
+  applyJobThinking,
+  createToolBudget,
+  defineTool,
+  harnessSpecFor,
+  invokeToolGuarded,
+  type AgentRuntime,
+  type JobMode,
+  type TenantContext,
+} from "@agentforge/core";
 import { resetJobModelCircuit } from "./job-model-fallback";
+import { log } from "./log";
 import { withRunContext } from "./run-context";
+import { currentToolRun, type ToolRun } from "./tool-run-context";
 import {
   appendRegenInstruction,
   collectJobAssistantRun,
@@ -20,6 +32,34 @@ const unreachable = new Set<string>();
 const inFlight = new Set<string>();
 /** What each in-flight call saw on its signal when it woke. */
 const observedAborted: boolean[] = [];
+/** Models whose call ends with the usage the gateway reported, as a finished call does. */
+const reportsUsage = new Set<string>();
+/** Every event the job runner handed to the tenant's usage ledger. */
+const metered: string[] = [];
+/** The tool-run context in force when each runtime call started. */
+const toolRunAtStart: Array<ToolRun | undefined> = [];
+/** What a tool saw when the fake runtime called it: the context a file write would read its author from. */
+const toolRunSeenByTool: Array<ToolRun | undefined> = [];
+/** When set, the fake runtime calls this tool after it starts, as a model loop would. */
+let callProbeTool = false;
+
+const probeTool = defineTool({
+  key: "probe_author",
+  name: "Probe author",
+  description: "Reads the tool-run context the way a file write reads its author.",
+  schema: z.object({}),
+  execute: async () => {
+    await Promise.resolve();
+    toolRunSeenByTool.push(currentToolRun());
+    return { ok: true };
+  },
+});
+
+vi.mock("./job-usage", () => ({
+  rememberJobUsage: (event: { type: string }) => {
+    metered.push(event.type);
+  },
+}));
 
 vi.mock("@agentforge/core", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@agentforge/core")>();
@@ -28,6 +68,10 @@ vi.mock("@agentforge/core", async (importOriginal) => {
     createRuntime: (): AgentRuntime => ({
       async execute(input) {
         executed.push(input);
+        toolRunAtStart.push(currentToolRun());
+        if (callProbeTool) {
+          await invokeToolGuarded(probeTool, {}, input.tenant, createToolBudget(input.budget));
+        }
         const model = input.version.model;
         if (inFlight.has(model)) {
           // Like the real runtime: the call ends when the caller's signal fires, with its reason.
@@ -45,6 +89,13 @@ vi.mock("@agentforge/core", async (importOriginal) => {
           return;
         }
         await input.onEvent({ type: "assistant.delta", text: "hello" });
+        if (reportsUsage.has(model)) {
+          await input.onEvent({
+            type: "run.completed",
+            runId: input.runId,
+            usage: { model, inputTokens: 12, outputTokens: 3 },
+          });
+        }
       },
     }),
   };
@@ -52,7 +103,13 @@ vi.mock("@agentforge/core", async (importOriginal) => {
 
 vi.mock("./settings-store", () => ({ loadSettings: () => ({}), loadOwnerLocale: () => "en" }));
 
-const tenant: TenantContext = { tenantId: "local-tenant", organizationId: "org", workspaceId: "ws-1", userId: "local", role: "owner" };
+const tenant: TenantContext = {
+  tenantId: "local-tenant",
+  organizationId: "org",
+  workspaceId: "ws-1",
+  userId: "local",
+  role: "owner",
+};
 
 describe("collectJobAssistantText", () => {
   beforeEach(() => {
@@ -97,9 +154,7 @@ describe("collectJobAssistantText", () => {
   });
 
   it("runs in the locale of the run context so job timeouts are not English on an id desk", async () => {
-    await withRunContext({ threadId: "t1", agentId: "finance", locale: "id" }, () =>
-      collectJobAssistantText(base),
-    );
+    await withRunContext({ threadId: "t1", agentId: "finance", locale: "id" }, () => collectJobAssistantText(base));
     expect(executed[0]?.locale).toBe("id");
     await collectJobAssistantText(base);
     expect(executed[1]?.locale).toBe("en");
@@ -194,8 +249,10 @@ describe("collectJobAssistantRun and the job's signal", () => {
   beforeEach(() => {
     executed.length = 0;
     observedAborted.length = 0;
+    metered.length = 0;
     unreachable.clear();
     inFlight.clear();
+    reportsUsage.clear();
     resetJobModelCircuit();
   });
 
@@ -225,8 +282,9 @@ describe("collectJobAssistantRun and the job's signal", () => {
       new Promise((resolve) => setTimeout(() => resolve("still running"), 1_000)),
     ]);
 
-    expect(outcome).toBeInstanceOf(Error);
-    expect((outcome as Error).message).toBe("client left");
+    // The job's own 499, not the signal's raw reason: a caller that swallows a failed call can tell
+    // a cancel from a model that could not answer, and the stream reports it as `aborted`.
+    expect(outcome).toMatchObject({ code: "aborted", status: 499, message: "Job cancelled" });
     expect(observedAborted).toEqual([true]);
     // No stand-in was started for a cancel.
     expect(executed.map((input) => input.version.model)).toEqual(["deepseek-v4-flash"]);
@@ -240,7 +298,10 @@ describe("collectJobAssistantRun and the job's signal", () => {
   it("starts no call once the caller has already left", async () => {
     const controller = new AbortController();
     controller.abort(new Error("client left"));
-    await expect(collectJobAssistantRun({ ...run, signal: controller.signal })).rejects.toThrow("client left");
+    await expect(collectJobAssistantRun({ ...run, signal: controller.signal })).rejects.toMatchObject({
+      code: "aborted",
+      status: 499,
+    });
     expect(executed).toEqual([]);
   });
 
@@ -256,8 +317,145 @@ describe("collectJobAssistantRun and the job's signal", () => {
         }
       },
     });
-    await expect(pending).rejects.toThrow("client left");
+    await expect(pending).rejects.toMatchObject({ code: "aborted", status: 499 });
     expect(executed.map((input) => input.version.model)).toEqual(["deepseek-v4-flash"]);
+  });
+
+  it("still records the usage of a call the gateway finished as the cancel landed", async () => {
+    reportsUsage.add("deepseek-v4-flash");
+    const controller = new AbortController();
+    const result = await collectJobAssistantRun({
+      ...run,
+      signal: controller.signal,
+      onEvent: (event) => {
+        if (event.type === "assistant.delta") {
+          controller.abort(new Error("client left"));
+        }
+      },
+    });
+    // The call finished first, so it is a completed run: its text comes back and its usage is metered.
+    expect(result).toMatchObject({ text: "hello", model: "deepseek-v4-flash" });
+    expect(metered).toEqual(["assistant.delta", "run.completed"]);
+  });
+});
+
+/**
+ * A job run obeys the harness its mode declares (docs/internal/mode-harness-tools-plan.md, H1): the
+ * tools it may bind, the budget it may spend, and the author its file writes are recorded under. One
+ * entry point, so no job call site has to remember any of it.
+ */
+describe("collectJobAssistantRun and the mode's declared harness", () => {
+  const base = {
+    tenant,
+    model: "deepseek-v4-flash",
+    systemPrompt: "system",
+    runPrefix: "data",
+    agentId: "data",
+    versionId: "data-analysis",
+    prompt: "question",
+  };
+
+  beforeEach(() => {
+    executed.length = 0;
+    toolRunAtStart.length = 0;
+    toolRunSeenByTool.length = 0;
+    callProbeTool = false;
+    unreachable.clear();
+    inFlight.clear();
+    reportsUsage.clear();
+    resetJobModelCircuit();
+    vi.restoreAllMocks();
+  });
+
+  const boundKeys = () => (executed[0]?.bindings ?? []).map((binding) => binding.toolKey);
+
+  it("binds the tools the mode declares and drops the ones it does not, naming each in the log", async () => {
+    const warn = vi.spyOn(log, "warn").mockImplementation(() => undefined);
+    await collectJobAssistantText({
+      ...base,
+      jobMode: "data",
+      toolKeys: ["run_sql", "image_generate", "calculator", "video_generate"],
+    });
+    expect(boundKeys()).toEqual(["run_sql", "calculator"]);
+    expect(warn.mock.calls).toEqual([
+      ["job_tool_outside_spec", { mode: "data", tool: "image_generate" }],
+      ["job_tool_outside_spec", { mode: "data", tool: "video_generate" }],
+    ]);
+  });
+
+  it("binds nothing to a mode whose spec declares no tools, whatever the call asks for", async () => {
+    const warn = vi.spyOn(log, "warn").mockImplementation(() => undefined);
+    await collectJobAssistantText({ ...base, runPrefix: "legal", jobMode: "legal", toolKeys: ["run_sql"] });
+    expect(boundKeys()).toEqual([]);
+    expect(warn).toHaveBeenCalledWith("job_tool_outside_spec", { mode: "legal", tool: "run_sql" });
+  });
+
+  it("is quiet when every tool asked for is declared", async () => {
+    const warn = vi.spyOn(log, "warn").mockImplementation(() => undefined);
+    await collectJobAssistantText({ ...base, jobMode: "data", toolKeys: ["run_sql", "calculator"] });
+    expect(boundKeys()).toEqual(["run_sql", "calculator"]);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("leaves the bindings alone for a call that names no studio", async () => {
+    await collectJobAssistantText({ ...base, toolKeys: ["run_sql", "image_generate"] });
+    expect(boundKeys()).toEqual(["run_sql", "image_generate"]);
+    expect(executed[0]).not.toHaveProperty("budget");
+  });
+
+  it.each<JobMode>(["documents", "research", "presentations", "finance", "data", "market", "legal", "meeting"])(
+    "hands the %s run the budget its spec declares",
+    async (jobMode) => {
+      await collectJobAssistantText({ ...base, runPrefix: jobMode, jobMode });
+      expect(executed[0]?.budget).toBe(harnessSpecFor(jobMode).budget);
+    },
+  );
+
+  it("keeps the declared budget on the stand-in call after a fallback", async () => {
+    unreachable.add("deepseek-v4-flash");
+    await collectJobAssistantRun({
+      ...base,
+      jobMode: "data",
+      availableModelIds: ["deepseek-v4-flash", "gpt-5.6-luna", "gpt-5.6-terra"],
+    });
+    expect(executed).toHaveLength(2);
+    expect(executed[0]?.budget).toBe(harnessSpecFor("data").budget);
+    expect(executed[1]?.budget).toBe(harnessSpecFor("data").budget);
+  });
+
+  it("runs the model call, and the tools it makes, inside the job's tool-run context", async () => {
+    callProbeTool = true;
+    await collectJobAssistantText({ ...base, jobMode: "data" });
+    const runId = executed[0]?.runId ?? "";
+    expect(runId).toMatch(/^data-[0-9]+$/);
+    expect(toolRunAtStart).toEqual([{ runId, mode: "data" }]);
+    expect(toolRunSeenByTool).toEqual([{ runId, mode: "data" }]);
+    // The context is scoped to the run: nothing leaks to the caller's own turn.
+    expect(currentToolRun()).toBeUndefined();
+  });
+
+  it("names the parent mode for a sub-task and the metering label for a call that names no studio", async () => {
+    await collectJobAssistantText({
+      ...base,
+      runPrefix: "document-section",
+      versionId: "document-section",
+      jobMode: "documents",
+    });
+    await collectJobAssistantText({ ...base, runPrefix: "knowledge-brain", versionId: "knowledge-brain" });
+    expect(toolRunAtStart).toEqual([
+      { runId: executed[0]?.runId, mode: "documents" },
+      { runId: executed[1]?.runId, mode: "knowledge" },
+    ]);
+  });
+
+  it("keeps the tool-run context on the stand-in call after a fallback", async () => {
+    unreachable.add("deepseek-v4-flash");
+    await collectJobAssistantRun({
+      ...base,
+      jobMode: "data",
+      availableModelIds: ["deepseek-v4-flash", "gpt-5.6-luna", "gpt-5.6-terra"],
+    });
+    expect(toolRunAtStart.map((run) => run?.mode)).toEqual(["data", "data"]);
   });
 });
 

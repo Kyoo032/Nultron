@@ -14,10 +14,10 @@ export { DrizzleAgentRepository } from "./repos/drizzle-agent-repository";
 export { ensureTenant, getTenantById, getLocalTenant } from "./tenants";
 export type { TenantRow, ProvisionTenantInput } from "./tenants";
 // Phase 8: erase one tenant's content, and nobody else's.
-export { purgeTenantRows, tenantWorkspaceIds, CASCADE_ROOT_TABLE, CASCADED_TABLES, KEPT_TENANT_TABLES, SHARED_TABLES, TENANT_SCOPED_TABLES, WORKSPACE_SCOPED_TABLES } from "./tenant-purge";
-export type { PurgeSql, TenantPurgeResult } from "./tenant-purge";
-export { ensurePortalOwner, resolvePortalTenant, PortalProvisionError } from "./portal-owner";
-export type { PortalIdentity, PortalResolution, PortalResolveFailure } from "./portal-owner";
+export { purgeTenantRows, tenantSessionSeals, tenantWorkspaceIds, CASCADE_ROOT_TABLE, CASCADED_TABLES, KEPT_TENANT_TABLES, SHARED_TABLES, TENANT_SCOPED_TABLES, WORKSPACE_SCOPED_TABLES } from "./tenant-purge";
+export type { PurgeSql, TenantPurgeResult, TenantSessionSeal } from "./tenant-purge";
+export { ensurePortalOwner, resolvePortalTenant, syncPortalRole, PortalProvisionError } from "./portal-owner";
+export type { PortalIdentity, PortalProvisioning, PortalResolution, PortalResolveFailure } from "./portal-owner";
 export {
   ensureLocalOwner,
   listLocalWorkspaces,

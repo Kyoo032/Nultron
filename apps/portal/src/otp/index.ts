@@ -1,9 +1,10 @@
 export {
-  sendLoginOtp,
+  deliverLoginOtp,
+  OTP_RESEND_COOLDOWN_MS,
   OTP_TTL_MINUTES,
+  type DeliverOtpInput,
+  type DeliverOtpResult,
   type OtpDeps,
-  type SendLoginOtpInput,
-  type SendLoginOtpOutcome,
 } from "./send";
 export {
   verifyLoginOtp,

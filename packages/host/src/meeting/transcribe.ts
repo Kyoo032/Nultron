@@ -24,7 +24,8 @@ import {
   type TranscriptionWire,
 } from "@agentforge/core/meeting";
 import type { MeetingTranscript, TranscriptSegment } from "@agentforge/core/meeting";
-import { loadModelCache } from "../model-cache";
+import { loadModelCache, modelCacheScopeOf, type ModelCacheScope } from "../model-cache";
+import { warmHostedModelCache } from "../selectable-models";
 import { loadSettings, type SettingsScope } from "../settings-store";
 import { log } from "../log";
 import { transcribeChunkWith } from "./transcribe-request";
@@ -43,8 +44,10 @@ const NO_MODEL_MESSAGE = "This gateway key lists no speech-to-text model. Paste 
 const NO_KEY_MESSAGE = "Save a gateway key in Settings before transcribing.";
 
 /** Every id the desk has seen from the gateway, across provider dialects. */
-export function cachedModelIds(): string[] {
-  const cache = loadModelCache();
+export function cachedModelIds(scope?: ModelCacheScope): string[] {
+  // Hosted only: a tenant that upgraded with a key and no cached catalogue gets one background refill.
+  warmHostedModelCache(scope);
+  const cache = loadModelCache(scope);
   return [
     ...(cache.openai ?? []),
     ...(cache.anthropic ?? []),
@@ -59,15 +62,15 @@ export function cachedModelIds(): string[] {
  * A pin means exactly that: one model, no fallback, so a deliberate choice is never silently
  * replaced by ours.
  */
-function candidateModels(): string[] {
+function candidateModels(scope?: ModelCacheScope): string[] {
   const pinned = process.env.AGENTFORGE_MEETING_ASR_MODEL?.trim();
-  return pinned ? [pinned] : transcriptionCandidates(cachedModelIds());
+  return pinned ? [pinned] : transcriptionCandidates(cachedModelIds(scope));
 }
 
 /** Which recognisers this desk can use, best first. */
 export function resolveMeetingAsr(tenant?: SettingsScope): MeetingAsrCapability {
   const key = resolveProviderKeys(loadSettings(tenant)).openai;
-  const candidates = candidateModels();
+  const candidates = candidateModels(modelCacheScopeOf(tenant));
   const model = candidates[0] ?? null;
   if (!model) {
     return { available: false, model: null, wire: null, candidates: [], reason: "no_model" };
