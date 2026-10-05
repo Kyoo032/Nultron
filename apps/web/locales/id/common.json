@@ -65,9 +65,19 @@
     "charging": "Sedang mengisi daya",
     "lets-go": "Ayo berangkat"
   },
+  "buddy": {
+    "tap": "Sapa Nultron",
+    "minimise": "Kecilkan Nultron",
+    "restore": "Tampilkan Nultron lagi",
+    "region": "Nultron, teman di meja Anda"
+  },
   "modeHandoff": {
     "fallbackSubject": "materi sumber",
     "presentation": "Ubah \"{subject}\" menjadi presentasi untuk pengambil keputusan. Gunakan hanya materi sumber.",
     "document": "Tulis memo dari \"{subject}\". Gunakan hanya materi sumber dan kutip sumber-sumbernya."
+  },
+  "needsKey": {
+    "note": "Tambahkan kunci {gateway} Anda di {settings} untuk memakai ini.",
+    "blocked": "Tambahkan kunci Anda di {settings} untuk memakai ini."
   }
 }

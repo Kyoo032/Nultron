@@ -33,6 +33,15 @@
         font-weight: 650;
         letter-spacing: 0.01em;
       }
+      h1.wordmark {
+        width: fit-content;
+        margin: 0 auto 0.75rem;
+        color: #5fb0f1;
+        background: linear-gradient(100deg, #5fb0f1 0%, #5fb0f1 38%, #44e3eb 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
       p {
         color: #8aa0b8;
         line-height: 1.5;
@@ -43,7 +52,7 @@
   <body>
     <main>
       <img class="logo" src="./logo.png" alt="" width="144" height="144" />
-      <h1>Nultron</h1>
+      <h1 class="wordmark">Nultron</h1>
       <p>Starting the local app. Paste your Toko Token gateway key in Settings, then Chat is ready.</p>
     </main>
   </body>

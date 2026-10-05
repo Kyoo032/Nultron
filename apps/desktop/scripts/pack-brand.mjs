@@ -51,9 +51,24 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;");
 }
 
+// The public name draws its wordmark in the Nultron IP colours: the helmet's blue into the gem's cyan,
+// the dark-desk values of `--nultron-blue-text` / `--nultron-cyan-text` in apps/web/app/globals.css.
+// Decided by the name, as in the renderer (`usesNultronWordmark`): a flavor keeps a plain white title.
+const NULTRON_WORDMARK_CSS = `      h1.wordmark {
+        width: fit-content;
+        margin: 0 auto 0.75rem;
+        color: #5fb0f1;
+        background: linear-gradient(100deg, #5fb0f1 0%, #5fb0f1 38%, #44e3eb 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+`;
+
 function writeSplash(config) {
   const title = escapeHtml(config.productName);
   const blurb = escapeHtml(config.splashBlurb);
+  const nultron = config.productName === "Nultron";
   writeFileSync(
     join(splashDir, "index.html"),
     `<!doctype html>
@@ -91,7 +106,7 @@ function writeSplash(config) {
         font-weight: 650;
         letter-spacing: 0.01em;
       }
-      p {
+${nultron ? NULTRON_WORDMARK_CSS : ""}      p {
         color: #8aa0b8;
         line-height: 1.5;
         margin: 0;
@@ -101,7 +116,7 @@ function writeSplash(config) {
   <body>
     <main>
       <img class="logo" src="./logo.png" alt="" width="144" height="144" />
-      <h1>${title}</h1>
+      <h1${nultron ? ' class="wordmark"' : ""}>${title}</h1>
       <p>${blurb}</p>
     </main>
   </body>

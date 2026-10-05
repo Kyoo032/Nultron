@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { messageUnlessBlocked } from "@/lib/gateway-blocked";
 import type { MediaPrice } from "@agentforge/core/media-pricing";
 import { allowedVideoSeconds, snapVideoSeconds, videoCapabilities } from "@agentforge/core/video-capabilities";
 import type { PromptTemplate } from "@agentforge/core/edit";
@@ -13,9 +14,13 @@ import { Confetti } from "@/components/confetti";
 import { ModeHeader } from "@/components/mode-header";
 import { MascotSlot } from "@/components/mascot-slot";
 import { ModelSelect } from "@/components/model-select";
+import { StudioEmptyDesk } from "@/components/studio-empty-desk";
 import { WorkingStatus } from "@/components/working-status";
 import { SettingsLinkHint } from "@/components/settings-link-hint";
+import { isGatewayBlockedText } from "@/lib/gateway-blocked";
+import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import { t } from "@/lib/i18n";
+import { PROMPT_INPUT, PROMPT_ROW, PROMPT_SUBMIT } from "@/lib/prompt-row";
 import { mediaPriceHints, videoEstimateView } from "@/lib/media-estimate";
 import { keepModelChoice } from "@/lib/model-choice";
 import { apiFetch, mediaSrc } from "@/lib/api-client";
@@ -106,6 +111,19 @@ export function VideosStudio() {
     void load();
   }, [load]);
 
+  // Nultron Enterprise: a signed-in tenant may open the desk before adding a key (hosted only; false
+  // elsewhere). `ready` above is what the gallery read said at mount, so when a key is saved in Settings
+  // the studio asks again instead of staying quiet until a reload.
+  const keyMissing = useHostedNeedsKey();
+  const wasMissing = useRef(false);
+  useEffect(() => {
+    if (wasMissing.current && !keyMissing) {
+      void load();
+    }
+    wasMissing.current = keyMissing;
+  }, [keyMissing, load]);
+  const keyReady = ready && !keyMissing;
+
   const caps = videoCapabilities(model);
   const imageToVideo = caps.imageToVideo;
 
@@ -149,7 +167,7 @@ export function VideosStudio() {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!prompt.trim() || generating || !ready) {
+    if (!prompt.trim() || generating || !keyReady) {
       return;
     }
     setGenerating(true);
@@ -184,7 +202,7 @@ export function VideosStudio() {
             ? suggestion
               ? t("videos.modelNotOnKey", { model: rejected, suggestion })
               : t("videos.modelNotOnKeyNoAlt", { model: rejected })
-            : (data.error?.message ?? t("videos.generateError"));
+            : messageUnlessBlocked(data, () => data.error?.message ?? t("videos.generateError"));
         setError(message);
         return;
       }
@@ -207,7 +225,7 @@ export function VideosStudio() {
     >
       <ModeHeader icon="videos" title={t("videos.title")} outcome={t("videos.expectedInputs")} />
 
-      {error ? (
+      {error && !isGatewayBlockedText(error) ? (
         <div
           className="mt-4 rounded-xl border border-[var(--line)] px-4 py-3 text-sm text-[var(--danger)]"
           role="alert"
@@ -307,7 +325,7 @@ export function VideosStudio() {
             ) : null}
           </div>
         </details>
-        <div className="flex flex-wrap gap-2">
+        <div className={PROMPT_ROW}>
           <EnhancePromptButton
             text={prompt}
             surface="videos"
@@ -318,7 +336,7 @@ export function VideosStudio() {
           />
           <input
             type="text"
-            className="text-field min-w-0 flex-1 outline-none placeholder:text-[var(--text-3)]"
+            className={PROMPT_INPUT}
             placeholder={t("videos.promptPlaceholder")}
             value={prompt}
             onChange={(event) => changePrompt(event.target.value)}
@@ -328,18 +346,18 @@ export function VideosStudio() {
           {generating ? <MascotSlot mode="videos" placement="beside" busy decorative /> : null}
           <button
             type="submit"
-            className={
-              ready
+            className={`${PROMPT_SUBMIT} ${
+              keyReady
                 ? "btn btn-primary h-8 shrink-0 rounded-pill px-4"
-                : "inline-flex h-8 shrink-0 items-center rounded-pill bg-[var(--line)] px-4 text-sm text-[var(--text-3)]"
-            }
-            disabled={generating || !ready || !prompt.trim()}
-            title={ready ? undefined : t("videos.needsKey", { gateway: gatewayName, settings: t("rail.settings") })}
+                : "inline-flex h-8 shrink-0 items-center justify-center rounded-pill bg-[var(--line)] px-4 text-sm text-[var(--text-3)]"
+            }`}
+            disabled={generating || !keyReady || !prompt.trim()}
+            title={keyReady ? undefined : t("videos.needsKey", { gateway: gatewayName, settings: t("rail.settings") })}
             data-testid="videos-studio-submit"
           >
             {generating ? <WorkingStatus label={t("videos.generating")} /> : t("videos.generate")}
           </button>
-          {!ready && !loading ? (
+          {keyMissing || (!ready && !loading) ? (
             <p className="basis-full text-xs text-[var(--text-3)]" data-testid="videos-studio-needs-key">
               <SettingsLinkHint i18nKey="videos.needsKey" vars={{ gateway: gatewayName }} />
             </p>
@@ -352,7 +370,11 @@ export function VideosStudio() {
         {landed > 0 ? <Confetti key={landed} /> : null}
         {loading ? (
           <p className="text-sm text-[var(--text-3)]">{t("videos.loadingGallery")}</p>
-        ) : items.length === 0 ? null : (
+        ) : items.length === 0 ? (
+          generating ? null : (
+            <StudioEmptyDesk mode="videos" flush />
+          )
+        ) : (
           <ul className="grid gap-4 sm:grid-cols-2 min-[1600px]:grid-cols-3 min-[2400px]:grid-cols-4">
             {items.map((item, index) => (
               <li

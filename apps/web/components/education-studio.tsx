@@ -107,6 +107,28 @@ function PresenterStage({
   );
 }
 
+/**
+ * Show works on a lesson, and a desk with none has nothing else on this task: no field, no button.
+ * So it says so and links to the one place a lesson comes from.
+ */
+function PresenterNeedsLesson() {
+  return (
+    <div
+      className="mx-auto flex max-w-xl flex-col items-center gap-4 px-4 py-10 text-center"
+      data-testid="education-presenter-needs-lesson"
+    >
+      <p className="text-base text-[var(--text-2)]">{t("education.presenterHint")}</p>
+      <Link
+        href={educationTaskHref("lesson")}
+        className="btn btn-primary h-10 rounded-pill px-5"
+        data-testid="education-presenter-create-lesson"
+      >
+        {t("education.presenterCreateLesson")}
+      </Link>
+    </div>
+  );
+}
+
 export function EducationStudio() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -313,6 +335,15 @@ export function EducationStudio() {
       ? t("education.expectedInputs")
       : t(`education.tasks.${task}.hint`);
   const settled = (task === "lesson" && outline) || (task === "quiz" && exam) || (task === "show" && presenter);
+  // More holds Save and the shape tools (a lesson), the quiz's Create once it is written, and the
+  // presenter's line picks and script. Before any of those exist it would open onto nothing.
+  const hasMore = Boolean(outline) || (task === "quiz" && Boolean(exam)) || (task === "show" && Boolean(presenter));
+  const hasPromptBar =
+    hasMore ||
+    (task === "lesson" && !outline) ||
+    (task === "quiz" && !exam) ||
+    task === "page" ||
+    (task === "show" && Boolean(outline) && !presenter);
 
   return (
     <main
@@ -458,110 +489,116 @@ export function EducationStudio() {
                   cueIndex={cueIndex}
                   heading={outline?.slides[presenter.cues[cueIndex]?.slideIndex ?? 0]?.heading}
                 />
-              ) : null
+              ) : outline ? null : (
+                <PresenterNeedsLesson />
+              )
             ) : null}
           </div>
 
-          <div
-            className={
-              settled
-                ? "mt-4"
-                : "sticky top-0 z-20 -mx-6 mt-4 space-y-3 border-b border-[var(--line)] bg-[var(--bg)] px-6 py-3"
-            }
-          >
-            {task === "lesson" && !outline ? lessonFields : null}
-            {task === "quiz" && !exam ? examFields : null}
-            {task === "page" ? (
-              <form className="flex flex-wrap items-center gap-2" onSubmit={(event) => void onBook(event)}>
-                <input
-                  type="file"
-                  accept="image/png,application/pdf,.png,.pdf"
-                  data-testid="education-book-file"
-                  aria-label={t("education.bookHint")}
-                  onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-                />
+          {hasPromptBar ? (
+            <div
+              className={
+                settled
+                  ? "mt-4"
+                  : "sticky top-0 z-20 -mx-6 mt-4 space-y-3 border-b border-[var(--line)] bg-[var(--bg)] px-6 py-3"
+              }
+            >
+              {task === "lesson" && !outline ? lessonFields : null}
+              {task === "quiz" && !exam ? examFields : null}
+              {task === "page" ? (
+                <form className="flex flex-wrap items-center gap-2" onSubmit={(event) => void onBook(event)}>
+                  <input
+                    type="file"
+                    accept="image/png,application/pdf,.png,.pdf"
+                    data-testid="education-book-file"
+                    aria-label={t("education.bookHint")}
+                    onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                  />
+                  <button
+                    type="submit"
+                    className="btn btn-primary h-10 shrink-0 rounded-pill px-5"
+                    disabled={busy !== null || !file}
+                    data-testid="education-book-read"
+                  >
+                    {busy === "book" ? t("education.reading") : t("education.readBook")}
+                  </button>
+                </form>
+              ) : null}
+              {task === "show" && outline && !presenter ? (
                 <button
-                  type="submit"
-                  className="btn btn-primary h-10 shrink-0 rounded-pill px-5"
-                  disabled={busy !== null || !file}
-                  data-testid="education-book-read"
+                  type="button"
+                  className="btn btn-primary h-10 rounded-pill px-5"
+                  disabled={busy !== null}
+                  data-testid="education-presenter-build"
+                  onClick={() => void onPresenter()}
                 >
-                  {busy === "book" ? t("education.reading") : t("education.readBook")}
+                  {busy === "presenter" ? t("education.drafting") : t("education.buildPresenter")}
                 </button>
-              </form>
-            ) : null}
-            {task === "show" && outline && !presenter ? (
-              <button
-                type="button"
-                className="btn btn-primary h-10 rounded-pill px-5"
-                disabled={busy !== null}
-                data-testid="education-presenter-build"
-                onClick={() => void onPresenter()}
-              >
-                {busy === "presenter" ? t("education.drafting") : t("education.buildPresenter")}
-              </button>
-            ) : null}
+              ) : null}
 
-            <details className="min-w-0" data-testid="education-more-details">
-              <summary className="cursor-pointer text-sm text-[var(--text-3)]" data-testid="education-more">
-                {t("education.more")}
-              </summary>
-              <div className="mt-3 space-y-3">
-                {task === "lesson" && outline ? lessonFields : null}
-                {task === "quiz" && exam ? examFields : null}
-                {outline ? (
-                  <button
-                    type="button"
-                    className="btn btn-ghost h-8 rounded-lg px-3 text-xs"
-                    data-testid="education-save-deck"
-                    disabled={busy !== null}
-                    onClick={() => void onSave()}
-                  >
-                    {t("education.saveDeck")}
-                  </button>
-                ) : null}
-                {saved ? <p className="text-sm text-[var(--text-2)]">{t("education.deckSaved")}</p> : null}
-                {outline && task === "show" && presenter ? (
-                  <button
-                    type="button"
-                    className="btn btn-ghost h-8 rounded-lg px-3 text-xs"
-                    disabled={busy !== null}
-                    data-testid="education-presenter-build"
-                    onClick={() => void onPresenter()}
-                  >
-                    {busy === "presenter" ? t("education.drafting") : t("education.buildPresenter")}
-                  </button>
-                ) : null}
-                {presenter && task === "show" ? (
-                  <>
-                    <div className="flex flex-wrap gap-2">
-                      {presenter.cues.map((item, index) => (
-                        <button
-                          key={`${item.slideIndex}-${item.startMs}`}
-                          type="button"
-                          className="btn btn-ghost h-8 rounded-lg px-2 text-xs"
-                          aria-pressed={index === cueIndex}
-                          data-testid="education-presenter-cue-pick"
-                          onClick={() => setCueIndex(index)}
-                        >
-                          {index + 1}
-                        </button>
-                      ))}
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium">{t("education.dubHeading")}</h3>
-                      <div className="mt-3 space-y-3 text-sm leading-relaxed" data-testid="education-presenter-dub">
-                        {presenter.dubScript.split("\n").map((line, index) => (
-                          <p key={`${index}-${line.slice(0, 48)}`}>{line}</p>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                ) : null}
-                <div ref={setToolsHost} />
-              </div>
-            </details>
-          </div>
+              {hasMore ? (
+                <details className="min-w-0" data-testid="education-more-details">
+                  <summary className="cursor-pointer text-sm text-[var(--text-3)]" data-testid="education-more">
+                    {t("education.more")}
+                  </summary>
+                  <div className="mt-3 space-y-3">
+                    {task === "lesson" && outline ? lessonFields : null}
+                    {task === "quiz" && exam ? examFields : null}
+                    {outline ? (
+                      <button
+                        type="button"
+                        className="btn btn-ghost h-8 rounded-lg px-3 text-xs"
+                        data-testid="education-save-deck"
+                        disabled={busy !== null}
+                        onClick={() => void onSave()}
+                      >
+                        {t("education.saveDeck")}
+                      </button>
+                    ) : null}
+                    {saved ? <p className="text-sm text-[var(--text-2)]">{t("education.deckSaved")}</p> : null}
+                    {outline && task === "show" && presenter ? (
+                      <button
+                        type="button"
+                        className="btn btn-ghost h-8 rounded-lg px-3 text-xs"
+                        disabled={busy !== null}
+                        data-testid="education-presenter-build"
+                        onClick={() => void onPresenter()}
+                      >
+                        {busy === "presenter" ? t("education.drafting") : t("education.buildPresenter")}
+                      </button>
+                    ) : null}
+                    {presenter && task === "show" ? (
+                      <>
+                        <div className="flex flex-wrap gap-2">
+                          {presenter.cues.map((item, index) => (
+                            <button
+                              key={`${item.slideIndex}-${item.startMs}`}
+                              type="button"
+                              className="btn btn-ghost h-8 rounded-lg px-2 text-xs"
+                              aria-pressed={index === cueIndex}
+                              data-testid="education-presenter-cue-pick"
+                              onClick={() => setCueIndex(index)}
+                            >
+                              {index + 1}
+                            </button>
+                          ))}
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-medium">{t("education.dubHeading")}</h3>
+                          <div className="mt-3 space-y-3 text-sm leading-relaxed" data-testid="education-presenter-dub">
+                            {presenter.dubScript.split("\n").map((line, index) => (
+                              <p key={`${index}-${line.slice(0, 48)}`}>{line}</p>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    ) : null}
+                    <div ref={setToolsHost} />
+                  </div>
+                </details>
+              ) : null}
+            </div>
+          ) : null}
         </>
       )}
     </main>

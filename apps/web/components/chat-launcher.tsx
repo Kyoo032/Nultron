@@ -107,7 +107,7 @@ export function ChatLauncher({ onSuggest }: { onSuggest?: (text: string) => void
           <button
             key={id}
             type="button"
-            className="card-live enter-rise group flex items-start gap-3 px-4 py-4 text-left"
+            className="card-live chat-reply enter-rise group flex items-start gap-3 px-4 py-3.5 text-left"
             style={{ "--i": index + 4 } as CSSProperties}
             onClick={() => onSuggest?.(t(`chat.empty.ideas.${id}.prompt`))}
             data-testid="chat-suggestion"

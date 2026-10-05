@@ -48,6 +48,8 @@ import {
 import { specialistSourcesLine } from "@/lib/market-specialist";
 import { loadWatchlist, saveWatchlist } from "@/lib/market-watchlists";
 import { useWorkspaceScope } from "@/lib/workspace-scope";
+import { isGatewayBlockedText } from "@/lib/gateway-blocked";
+import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import { useJobModel } from "@/lib/use-job-model";
 import { modelPickBody, regenModelPick, studioModelPick } from "@/lib/model-choice";
 import { useJobStream } from "@/lib/use-job-stream";
@@ -109,6 +111,9 @@ export function MarketStudio() {
   const scopeKey = `${workspaceId ?? ""}|${specialist}`;
   const lastScopeRef = useRef(scopeKey);
 
+  // Nultron Enterprise: a signed-in tenant may open the desk before adding a key. Hosted only; false elsewhere.
+  // (Not `needsKey`: that name is the market client's text matcher, imported above.)
+  const keyMissing = useHostedNeedsKey();
   const rawError = errorStale ? null : (localError ?? job.error?.message ?? null);
   const error = rawError ? friendlyMarketError(rawError) : null;
   const locked = job.busy || busy !== null;
@@ -174,7 +179,7 @@ export function MarketStudio() {
 
   async function onGenerate(event: FormEvent) {
     event.preventDefault();
-    if (locked || tickers.length === 0) {
+    if (locked || tickers.length === 0 || keyMissing) {
       return;
     }
     setLocalError(null);
@@ -198,7 +203,7 @@ export function MarketStudio() {
   }
 
   async function onRegenerate(index: number, payload: JobRegenSubmit) {
-    if (!result || locked) {
+    if (!result || locked || keyMissing) {
       return;
     }
     setBusy("regen");
@@ -357,7 +362,7 @@ export function MarketStudio() {
         />
       </div>
 
-      {error && tickers.length === 0 ? (
+      {error && tickers.length === 0 && !isGatewayBlockedText(error) ? (
         <p className="mb-4 text-sm text-[var(--danger)]" role="alert" data-testid="market-error">
           {error}
           {needsKey(rawError ?? "") ? (
@@ -366,6 +371,13 @@ export function MarketStudio() {
               <SettingsLinkHint i18nKey="market.studio.openSettings" testId="market-error-settings" />
             </>
           ) : null}
+        </p>
+      ) : null}
+
+      {keyMissing ? (
+        // Quotes, charts and technicals need no key, so the line says what still works and what does not.
+        <p className="mb-4 text-xs text-[var(--text-3)]" role="status" data-testid="market-needs-key">
+          <SettingsLinkHint i18nKey="market.studio.needsKeyNote" testId="market-needs-key-settings" />
         </p>
       ) : null}
 
@@ -417,7 +429,7 @@ export function MarketStudio() {
 
         {tickers.length > 0 ? (
           <div className="space-y-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4">
-            {error ? (
+            {error && !isGatewayBlockedText(error) ? (
               <p className="text-sm text-[var(--danger)]" role="alert" data-testid="market-error">
                 {error}
                 {needsKey(rawError ?? "") ? (
@@ -432,7 +444,7 @@ export function MarketStudio() {
               <button
                 type="submit"
                 className="btn btn-primary"
-                disabled={locked || !ready}
+                disabled={locked || !ready || keyMissing}
                 data-testid="market-generate"
               >
                 {job.busy ? <WorkingStatus label={t("market.studio.writing")} /> : t("market.studio.writeBriefing")}
@@ -454,8 +466,6 @@ export function MarketStudio() {
                 <option value="id">{t("common.bahasa")}</option>
                 <option value="en">{t("common.english")}</option>
               </select>
-              {depthControl}
-              {specialistPicker}
               <button
                 type="button"
                 className="text-xs text-[var(--text-2)] underline"
@@ -465,6 +475,8 @@ export function MarketStudio() {
               >
                 {showOptions ? t("market.studio.hideOptions") : t("market.studio.options")}
               </button>
+              {depthControl}
+              {specialistPicker}
             </div>
             <p className="text-xs text-[var(--text-3)]">{t("market.studio.machineNote", { product: productName })}</p>
 

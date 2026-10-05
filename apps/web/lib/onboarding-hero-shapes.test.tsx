@@ -32,9 +32,10 @@ type Placed = { tier: 1 | 2 | 3; size: number; topPx: number | null; side: "left
 
 function shapes(): Placed[] {
   const html = renderToStaticMarkup(<FloatingShapes layout="hero" />);
-  return [...html.matchAll(/<svg\b[^>]*>/g)].map(([tag]) => {
+  // A shape is a box (`span.float-shape`) around the <svg>: the box is what animates and carries the size and place.
+  return [...html.matchAll(/<span\b[^>]*class="float-shape(?: float-shape-spin)?"[^>]*>/g)].map(([tag]) => {
     const tier = Number(/data-tier="(\d)"/.exec(tag)?.[1]) as 1 | 2 | 3;
-    const size = Number(/\bwidth="(\d+)"/.exec(tag)?.[1]);
+    const size = Number(/--s:(\d+)/.exec(tag)?.[1]);
     const top = /top:([\d.]+)rem/.exec(tag)?.[1];
     const side = /(left|right):([\d.]+)%/.exec(tag);
     return {

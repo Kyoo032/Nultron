@@ -205,7 +205,13 @@ export function WorkspacesPage() {
 
   return (
     <main className="mx-auto max-w-[var(--content-narrow)] px-6 py-8 text-[var(--text)]">
-      <ModeHeader icon="workspaces" title={t("workspaces.title")} outcomeTestId="workspaces-lede" outcome={t("workspaces.lede")} />
+      <ModeHeader
+        icon="workspaces"
+        title={t("workspaces.title")}
+        shapes={false}
+        outcomeTestId="workspaces-lede"
+        outcome={t("workspaces.lede")}
+      />
       {creating ? (
         <form
           onSubmit={(event) => void createWorkspace(event)}

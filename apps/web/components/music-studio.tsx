@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import type { MediaPrice } from "@agentforge/core/media-pricing";
 import {
   musicCapabilities,
@@ -13,9 +13,13 @@ import { GalleryAudio } from "@/components/gallery-media";
 import { ModeHeader } from "@/components/mode-header";
 import { MascotSlot } from "@/components/mascot-slot";
 import { ModelSelect } from "@/components/model-select";
+import { StudioEmptyDesk } from "@/components/studio-empty-desk";
 import { WorkingStatus } from "@/components/working-status";
 import { SettingsLinkHint } from "@/components/settings-link-hint";
+import { isGatewayBlockedText } from "@/lib/gateway-blocked";
+import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import { t } from "@/lib/i18n";
+import { PROMPT_INPUT, PROMPT_ROW, PROMPT_SUBMIT } from "@/lib/prompt-row";
 import { mediaPriceHints, musicEstimateView } from "@/lib/media-estimate";
 import { keepModelChoice } from "@/lib/model-choice";
 import { musicPickerEmpty, readApiErrorMessage } from "@/lib/music-models";
@@ -113,6 +117,19 @@ export function MusicStudio() {
     void load();
   }, [load]);
 
+  // Nultron Enterprise: a signed-in tenant may open the desk before adding a key (hosted only; false
+  // elsewhere). `ready` above is what the gallery read said at mount, so when a key is saved in Settings
+  // the studio asks again instead of staying quiet until a reload.
+  const keyMissing = useHostedNeedsKey();
+  const wasMissing = useRef(false);
+  useEffect(() => {
+    if (wasMissing.current && !keyMissing) {
+      void load();
+    }
+    wasMissing.current = keyMissing;
+  }, [keyMissing, load]);
+  const keyReady = ready && !keyMissing;
+
   const caps = musicCapabilities(model);
 
   // A model with no lyrics field only ever describes, so a stale "custom" pick is corrected here
@@ -165,7 +182,7 @@ export function MusicStudio() {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!brief.trim() || busy || !ready) {
+    if (!brief.trim() || busy || !keyReady) {
       return;
     }
     setGenerating(true);
@@ -207,7 +224,7 @@ export function MusicStudio() {
     >
       <ModeHeader icon="music" title={t("music.title")} outcome={t("music.expectedInputs")} />
 
-      {error ? (
+      {error && !isGatewayBlockedText(error) ? (
         <div
           className="mt-4 rounded-xl border border-[var(--line)] px-4 py-3 text-sm text-[var(--danger)]"
           role="alert"
@@ -301,7 +318,7 @@ export function MusicStudio() {
                   {caps.style ? (
                     <input
                       type="text"
-                      className="text-field min-w-0 flex-1 outline-none placeholder:text-[var(--text-3)]"
+                      className="text-field min-w-[10rem] flex-1 outline-none placeholder:text-[var(--text-3)]"
                       placeholder={t("music.stylePlaceholder")}
                       maxLength={MUSIC_STYLE_MAX}
                       value={style}
@@ -313,7 +330,7 @@ export function MusicStudio() {
                   {caps.title ? (
                     <input
                       type="text"
-                      className="text-field min-w-0 flex-1 outline-none placeholder:text-[var(--text-3)]"
+                      className="text-field min-w-[10rem] flex-1 outline-none placeholder:text-[var(--text-3)]"
                       placeholder={t("music.titlePlaceholder")}
                       maxLength={MUSIC_TITLE_MAX}
                       value={title}
@@ -341,13 +358,13 @@ export function MusicStudio() {
           </details>
         ) : null}
 
-        <div className="flex flex-wrap gap-2">
+        <div className={PROMPT_ROW}>
           {caps.lyrics ? (
             <button
               type="button"
-              className="shrink-0 wash inline-flex h-8 items-center rounded-pill border border-[var(--line)] px-3 py-2 text-sm text-[var(--text-2)] disabled:opacity-45"
+              className={`${PROMPT_SUBMIT} shrink-0 wash inline-flex h-8 items-center justify-center rounded-pill border border-[var(--line)] px-3 py-2 text-sm text-[var(--text-2)] disabled:opacity-45`}
               onClick={() => void draftLyrics()}
-              disabled={busy || !ready || noModels || !prompt.trim()}
+              disabled={busy || !keyReady || noModels || !prompt.trim()}
               data-testid="music-studio-draft-lyrics"
             >
               {drafting ? <WorkingStatus label={t("music.writingLyrics")} /> : t("music.writeLyrics")}
@@ -355,7 +372,7 @@ export function MusicStudio() {
           ) : null}
           <input
             type="text"
-            className="text-field min-w-0 flex-1 outline-none placeholder:text-[var(--text-3)]"
+            className={PROMPT_INPUT}
             placeholder={t("music.promptPlaceholder")}
             maxLength={MUSIC_PROMPT_MAX}
             value={prompt}
@@ -366,18 +383,18 @@ export function MusicStudio() {
           {generating ? <MascotSlot mode="music" placement="beside" busy decorative /> : null}
           <button
             type="submit"
-            className={
-              ready
+            className={`${PROMPT_SUBMIT} ${
+              keyReady
                 ? "btn btn-primary h-8 shrink-0 rounded-pill px-4"
-                : "inline-flex h-8 shrink-0 items-center rounded-pill bg-[var(--line)] px-4 text-sm text-[var(--text-3)]"
-            }
-            disabled={busy || !ready || noModels || !brief.trim()}
-            title={ready ? undefined : t("music.needsKey", { gateway: gatewayName, settings: t("rail.settings") })}
+                : "inline-flex h-8 shrink-0 items-center justify-center rounded-pill bg-[var(--line)] px-4 text-sm text-[var(--text-3)]"
+            }`}
+            disabled={busy || !keyReady || noModels || !brief.trim()}
+            title={keyReady ? undefined : t("music.needsKey", { gateway: gatewayName, settings: t("rail.settings") })}
             data-testid="music-studio-submit"
           >
             {generating ? <WorkingStatus label={t("music.generating")} /> : t("music.generate")}
           </button>
-          {!ready && !loading ? (
+          {keyMissing || (!ready && !loading) ? (
             <p className="basis-full text-xs text-[var(--text-3)]" data-testid="music-studio-needs-key">
               <SettingsLinkHint i18nKey="music.needsKey" vars={{ gateway: gatewayName }} />
             </p>
@@ -409,7 +426,11 @@ export function MusicStudio() {
       <section className="mt-8" data-testid="music-studio-library">
         {loading ? (
           <p className="text-sm text-[var(--text-3)]">{t("music.loadingLibrary")}</p>
-        ) : items.length === 0 ? null : (
+        ) : items.length === 0 ? (
+          busy ? null : (
+            <StudioEmptyDesk mode="music" flush />
+          )
+        ) : (
           <ul className="space-y-3">
             {items.map((item, index) => (
               <li

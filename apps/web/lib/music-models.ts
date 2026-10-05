@@ -26,6 +26,8 @@ function trimmed(value: unknown): string | null {
   return text.length > 0 ? text : null;
 }
 
+import { messageUnlessBlocked } from "./gateway-blocked";
+
 /**
  * The message inside a host error body, whichever of the two shapes it came in.
  *
@@ -37,6 +39,11 @@ function trimmed(value: unknown): string | null {
  * failure this exists to stop.
  */
 export function readApiErrorMessage(body: unknown, fallback: string): string {
+  // Hosted only: the flat 403 reads as the catalog sentence rather than the host's English.
+  const blocked = messageUnlessBlocked(body, () => "");
+  if (blocked) {
+    return blocked;
+  }
   if (!body || typeof body !== "object") {
     return fallback;
   }

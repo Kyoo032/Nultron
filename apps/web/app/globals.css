@@ -75,6 +75,8 @@
 
   --font: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-heading: var(--font);
+  /* Nultron's own voice: what the character says on screen (the Chat greeting) is set in the serif. */
+  --font-display: "Source Serif 4", "Iowan Old Style", Georgia, serif;
   --fs-12: 13px;
   --fs-13: 15px;
   --fs-14: 16px;
@@ -109,25 +111,34 @@
   --lip-hover: 0 5px 0 var(--line);
   --lip-press: 0 1px 0 var(--line);
 
+  /* Mode colours on the light desk. Nine of them were darkened on 2026-10-01 (same hue and
+     saturation, lower lightness; the first six were under 3:1 against their own 14% tile on the
+     light rail, documents 2.27, presentations 2.43, edit 2.60, finance 2.67, market 2.84, data
+     2.96, and knowledge, usage and workspaces sat at the edge: 3.00, 3.00 and white ink 4.47).
+     Every mode now clears 3.5:1 on its rail and card tile, 3:1 on the hover and inset grounds,
+     and its white solid-tile ink clears 4.5:1. `lib/contrast-tokens.test.ts` holds that. */
   --mode-chat: #0e58f0;
-  --mode-documents: #0ea5e9;
+  --mode-documents: #0b7cb0;
   --mode-research: #7c3aed;
-  --mode-finance: #16a34a;
-  --mode-data: #0891b2;
-  --mode-market: #ea580c;
+  --mode-finance: #12873d;
+  --mode-data: #077f9c;
+  --mode-market: #ca4c0a;
   --mode-legal: #4f46e5;
   --mode-meeting: #db2777;
   --mode-images: #e11d48;
   --mode-videos: #dc2626;
   --mode-music: #c026d3;
-  --mode-edit: #d97706;
-  --mode-presentations: #ca8a04;
+  --mode-edit: #b06105;
+  --mode-presentations: #9d6b03;
   --mode-education: #0f766e;
-  --mode-knowledge: #0d9488;
+  --mode-knowledge: #0c8378;
   --mode-channels: #2563eb;
-  --mode-workspaces: #6366f1;
-  --mode-usage: #059669;
+  --mode-workspaces: #6063f1;
+  --mode-usage: #04855d;
   --mode-settings: #64748b;
+  /* The ink on a solid `--mode` fill (the active rail tile, `.icon-orb-solid`). `.dark` lifts the
+     mode colours and flips this to dark ink: white is 2.2:1 on the lifted tones. */
+  --on-mode: #ffffff;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -168,6 +179,23 @@
   --rail-active-text: #0b1020;
   --rail-accent: #0e58f0;
 
+  /* The Nultron IP colours (2026-10-01), sampled from the art rather than guessed. A k-means pass over
+     the opaque pixels of the logo master (`apps/desktop/branding/agentforge/source/app-logo.webp`, the
+     painted head that is `public/brand/logo.png`) and over the 3D renders in
+     `components/nultron/images/full/` gives: blue, the helmet and the logo tile (#1277c8; the render's
+     shaded helmet reads #1f69a8 to #397dbb); cyan, the swirl gem's body (#19bddc, its glow runs to
+     #44e3eb); cream, the face and belly (#e4d9cd); ink, the ball joints and pupils (#131617). These four
+     are the art's own colours and do not change with the theme. They are fills. Small text takes the
+     two `-text` tokens, which keep the hue and move the lightness until each clears 4.5:1 on the rail and
+     the page (`lib/contrast-tokens.test.ts`). Only the public Nultron brand paints them
+     (`.wordmark-nultron`, `usesNultronWordmark`); a flavor keeps its own name, unstyled. */
+  --nultron-blue: #1277c8;
+  --nultron-cyan: #19bddc;
+  --nultron-cream: #e4d9cd;
+  --nultron-ink: #131617;
+  --nultron-blue-text: #116eb8;
+  --nultron-cyan-text: #107589;
+
   /* One motion scale. Four durations and two curves; nothing in the app writes a raw ms value
      or its own cubic-bezier, so the desk moves at one tempo (`lib/motion-tokens.test.ts`).
      1: a colour or opacity swap (hover, press, focus).
@@ -186,8 +214,9 @@
   --motion-stagger: 55ms;
   /* The one loop that stays: the working dots. Status, not decoration (see the ambient block). */
   --motion-pulse: 1400ms;
-  /* Playful desk: a longer spring entrance and the wiggle. Decoration plays once and rests;
-     `lib/motion-tokens.test.ts` fails on any other `infinite` animation. */
+  /* Playful desk: a longer spring entrance and the wiggle. Decoration arrives once; the only loops are
+     the stepped ambient set below and the busy ones, and `lib/motion-tokens.test.ts` fails on any other
+     `infinite` animation. */
   --motion-5: 560ms;
   --motion-wiggle: 560ms;
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -195,6 +224,16 @@
      interval, so about 8 to 12 frames a second instead of a full 60. Without the GPU every extra
      frame is a whole software-composited frame; the motion is a few pixels and reads the same. */
   --ease-busy: steps(4);
+  /* The ambient loops (owner, 2026-10-01: "reacts + a gentle loop"): the shapes' bob and turn and the dot
+     grid's drift. Stepped, so they cost a few tenths of a percent of the machine without the GPU, and on one
+     400ms grid: a bob is 16 ticks (8 steps in each of its two keyframe intervals), a turn 32, the drift 48
+     (a 1px step every second tick). Their steps land on the same frames, so the desk repaints about 2.5 times
+     a second, not once per loop. They pause with the desk (`html[data-ambient="paused"]`) and are switched
+     off by name under reduced motion; `lib/motion-tokens.test.ts` holds the grid and both of those. */
+  --motion-tick: 400ms;
+  --motion-ambient: calc(var(--motion-tick) * 16);
+  --motion-drift: calc(var(--motion-tick) * 48);
+  --ease-ambient: steps(8);
   --motion-confetti: 1100ms;
 
   /* The compound aliases the rules below read. All four stay on step 1, the 120ms the warm desk
@@ -330,6 +369,37 @@
   --rail-active: #232734;
   --rail-active-text: #ffffff;
   --rail-accent: #8cb6ff;
+  /* Mode colours on the dark desk. The light set sits at 1.9-3.4:1 against its own 14% tile on the
+     dark rail (#2a3144), so the Legal, Research, Education and Channels icons read dark-on-dark.
+     Each hue is lifted only as far as it takes to clear 3.6:1 (WCAG 1.4.11 asks 3:1 for a glyph),
+     same hue and saturation. Documents and Presentation already cleared it and keep their old
+     light-desk value here, because the light set above was darkened and `:root` would otherwise
+     hand them the darker one. `lib/contrast-tokens.test.ts` ("mode icons") holds every mode to 3:1
+     on the rail and the cards. */
+  --mode-chat: #6997f6;
+  --mode-documents: #0ea5e9;
+  --mode-research: #ae85f4;
+  --mode-finance: #18b050;
+  --mode-data: #09a5ca;
+  --mode-market: #f46c26;
+  --mode-legal: #938eef;
+  --mode-meeting: #e76da3;
+  --mode-images: #ec6e89;
+  --mode-videos: #e97575;
+  --mode-music: #d76be4;
+  --mode-edit: #e37c06;
+  --mode-presentations: #ca8a04;
+  --mode-education: #16aca1;
+  --mode-knowledge: #0fab9e;
+  --mode-channels: #7098f2;
+  --mode-workspaces: #8d8ff5;
+  --mode-usage: #06af7a;
+  --mode-settings: #8e9bae;
+  --on-mode: var(--bg);
+  /* The wordmark's two stops on the dark rail (#2a3144): the helmet blue lifted to 5.5:1, and the gem's
+     own glow, which already clears 8:1. The four fills in `:root` are the art's colours and stay. */
+  --nultron-blue-text: #5fb0f1;
+  --nultron-cyan-text: #44e3eb;
 }
 
 /* Firefox has no ::-webkit-scrollbar; Chromium drops the pseudo-elements as soon as
@@ -568,6 +638,60 @@ h6 {
   color: var(--rail-active-text);
 }
 
+/* The rail's Account group, pinned to the bottom edge of the scrolling nav (`AppRail`). The full rail
+   is about 830px of rows and a laptop window is 700 to 900px, so the group that sat last was the one
+   that fell out of reach: all five rows below the fold at 1366x768, Settings half under the footer at
+   900px. Opaque, so the job modes scroll behind it. The fade above it shows only while rows are
+   hidden below (`data-more`, from `useMoreBelow`), together with a hairline, so a pinned group never
+   looks like the end of the list. */
+.rail-pinned {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  background: var(--rail);
+}
+
+.rail-pinned::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 100%;
+  height: 20px;
+  background: linear-gradient(to top, var(--rail), transparent);
+  pointer-events: none;
+  opacity: 0;
+}
+
+.rail-pinned[data-more="true"] {
+  box-shadow: 0 -1px 0 var(--rail-line);
+}
+
+.rail-pinned[data-more="true"]::before {
+  opacity: 1;
+}
+
+/* Short windows. Under 940px the rail's rows step down from 32px to 28px (the height the session and
+   sub-list rows already are), the mode tile with them, and the group labels lose a third of their
+   air, so a 768 or 800px window shows nearly every mode beside the pinned Account group instead of
+   scrolling it. Selectors beat the `h-8` / `pt-4` utilities by specificity and source order. */
+@media (max-height: 940px) {
+  [data-rail-row] {
+    height: 28px;
+  }
+
+  [data-rail-row] [data-tile] {
+    width: 22px;
+    height: 22px;
+    border-radius: 8px;
+  }
+
+  [data-tour="rail-modes"] > p,
+  [data-tour="rail-modes"] .rail-pinned > p {
+    padding-top: 10px;
+    padding-bottom: 4px;
+  }
+}
+
 .tag {
   display: inline-flex;
   align-items: center;
@@ -619,6 +743,17 @@ h6 {
 .field input:focus {
   outline: none;
   border-color: var(--color-accent);
+}
+
+/* A `.input` that is only the frame around a bare <input> (the Market watchlist: ticker chips, then a
+   text box). The frame is the field the eye sees, so it draws the focus and the inner control draws
+   none (`focus-visible:outline-none` on it). The global `:focus-visible` outline used to land on the
+   inner box instead: a sharp square flush to the text inside the rounded frame. The 1px ring doubles
+   the 1px accent border, so keyboard focus stays two cues (colour and weight), and it clears 3:1 on
+   every desk surface (`lib/contrast-tokens.test.ts`, "focus"). */
+.input-shell:has(input:focus-visible) {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
 }
 
 .seg {
@@ -1072,60 +1207,145 @@ h6 {
   position: relative;
   isolation: isolate;
   background-color: var(--surface);
+  background-image: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--page-mode, var(--accent)) 11%, var(--surface)) 0,
+    var(--surface) 360px
+  );
   box-shadow: var(--shadow-float);
   border-radius: var(--r-card);
   margin: 8px;
 }
 
-/* The desk's backdrop takes the colour of the mode on screen: a wash at the top and a dot grid
-   that fades out down the page. Both sit behind the content. The grid stands still: it used to
-   drift 24px in 16s, which nobody could see and which kept a full-desk masked layer repainting. */
-.desk-canvas:has(main[data-mode="chat"]) { --page-mode: var(--mode-chat); }
-.desk-canvas:has(main[data-mode="documents"]) { --page-mode: var(--mode-documents); }
-.desk-canvas:has(main[data-mode="research"]) { --page-mode: var(--mode-research); }
-.desk-canvas:has(main[data-mode="finance"]) { --page-mode: var(--mode-finance); }
-.desk-canvas:has(main[data-mode="data"]) { --page-mode: var(--mode-data); }
-.desk-canvas:has(main[data-mode="market"]) { --page-mode: var(--mode-market); }
-.desk-canvas:has(main[data-mode="legal"]) { --page-mode: var(--mode-legal); }
-.desk-canvas:has(main[data-mode="meeting"]) { --page-mode: var(--mode-meeting); }
-.desk-canvas:has(main[data-mode="images"]) { --page-mode: var(--mode-images); }
-.desk-canvas:has(main[data-mode="videos"]) { --page-mode: var(--mode-videos); }
-.desk-canvas:has(main[data-mode="music"]) { --page-mode: var(--mode-music); }
-.desk-canvas:has(main[data-mode="edit"]) { --page-mode: var(--mode-edit); }
-.desk-canvas:has(main[data-mode="presentations"]) { --page-mode: var(--mode-presentations); }
-.desk-canvas:has(main[data-mode="education"]) { --page-mode: var(--mode-education); }
-.desk-canvas:has(main[data-mode="knowledge"]) { --page-mode: var(--mode-knowledge); }
-.desk-canvas:has(main[data-mode="channels"]) { --page-mode: var(--mode-channels); }
-.desk-canvas:has(main[data-mode="workspaces"]) { --page-mode: var(--mode-workspaces); }
-.desk-canvas:has(main[data-mode="usage"]) { --page-mode: var(--mode-usage); }
-.desk-canvas:has(main[data-mode="settings"]) { --page-mode: var(--mode-settings); }
-
-.desk-canvas::before,
-.desk-canvas::after {
-  content: "";
-  position: absolute;
-  z-index: -1;
-  pointer-events: none;
-}
-
-.desk-canvas::after {
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--page-mode, var(--accent)) 11%, var(--surface)) 0, var(--surface) 360px);
-}
-
-.desk-canvas::before {
-  z-index: 0;
-  inset: -24px 0 0;
-  background-image: radial-gradient(circle, color-mix(in srgb, var(--page-mode, var(--accent)) 30%, transparent) 1.3px, transparent 1.8px);
-  background-size: 24px 24px;
-  -webkit-mask-image: linear-gradient(180deg, #000 0, transparent 460px);
-  mask-image: linear-gradient(180deg, #000 0, transparent 460px);
-}
+/* The desk's backdrop takes the colour of the mode on screen: a wash at the top (the canvas' own
+   background, above) and a dot grid that fades out down the page (`.desk-backdrop`, below). Both sit
+   behind the content. They answer the pointer and drift one tile in 19 s, stepped; see `attachDeskMotion`
+   and the ambient tokens. */
+.desk-canvas:has(main[data-mode="chat"]:not([hidden] *)) { --page-mode: var(--mode-chat); }
+.desk-canvas:has(main[data-mode="documents"]:not([hidden] *)) { --page-mode: var(--mode-documents); }
+.desk-canvas:has(main[data-mode="research"]:not([hidden] *)) { --page-mode: var(--mode-research); }
+.desk-canvas:has(main[data-mode="finance"]:not([hidden] *)) { --page-mode: var(--mode-finance); }
+.desk-canvas:has(main[data-mode="data"]:not([hidden] *)) { --page-mode: var(--mode-data); }
+.desk-canvas:has(main[data-mode="market"]:not([hidden] *)) { --page-mode: var(--mode-market); }
+.desk-canvas:has(main[data-mode="legal"]:not([hidden] *)) { --page-mode: var(--mode-legal); }
+.desk-canvas:has(main[data-mode="meeting"]:not([hidden] *)) { --page-mode: var(--mode-meeting); }
+.desk-canvas:has(main[data-mode="images"]:not([hidden] *)) { --page-mode: var(--mode-images); }
+.desk-canvas:has(main[data-mode="videos"]:not([hidden] *)) { --page-mode: var(--mode-videos); }
+.desk-canvas:has(main[data-mode="music"]:not([hidden] *)) { --page-mode: var(--mode-music); }
+.desk-canvas:has(main[data-mode="edit"]:not([hidden] *)) { --page-mode: var(--mode-edit); }
+.desk-canvas:has(main[data-mode="presentations"]:not([hidden] *)) { --page-mode: var(--mode-presentations); }
+.desk-canvas:has(main[data-mode="education"]:not([hidden] *)) { --page-mode: var(--mode-education); }
+.desk-canvas:has(main[data-mode="knowledge"]:not([hidden] *)) { --page-mode: var(--mode-knowledge); }
+.desk-canvas:has(main[data-mode="channels"]:not([hidden] *)) { --page-mode: var(--mode-channels); }
+.desk-canvas:has(main[data-mode="workspaces"]:not([hidden] *)) { --page-mode: var(--mode-workspaces); }
+.desk-canvas:has(main[data-mode="usage"]:not([hidden] *)) { --page-mode: var(--mode-usage); }
+.desk-canvas:has(main[data-mode="settings"]:not([hidden] *)) { --page-mode: var(--mode-settings); }
 
 .desk-canvas > * {
   position: relative;
   z-index: 1;
+}
+
+/* Chat has its own sky instead of the desk's dot grid: the helmet's blue at the top thinning into the
+   page, a cyan glow off the top right like light off the gem, and a faint blue floor where the composer
+   sits. Static paint; the pointer's light still travels over it. Each stop stays at or under 12% so the
+   muted text keeps 4.5:1. */
+.desk-canvas:has([data-testid="chat-home"]:not([hidden] *)) {
+  background-image:
+    radial-gradient(55% 38% at 92% -4%, color-mix(in srgb, var(--nultron-cyan) 12%, transparent), transparent 72%),
+    radial-gradient(60% 30% at 8% 104%, color-mix(in srgb, var(--nultron-blue) 8%, transparent), transparent 70%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--nultron-blue) 10%, var(--surface)) 0,
+      color-mix(in srgb, var(--nultron-cyan) 5%, var(--surface)) 46%,
+      var(--surface) 80%
+    );
+}
+
+.desk-canvas:has([data-testid="chat-home"]:not([hidden] *)) .desk-grid {
+  display: none;
+}
+
+/* The backdrop layer (`DeskBackdrop`, `components/desk-backdrop.tsx`) is a real element and not a pair of
+   pseudo-elements, because the pointer writes custom properties to it and a custom property is inherited:
+   written on the canvas it restyled every element on the page (8.6 ms a frame on an empty Chat, 128 ms on
+   /edit, against 0.13 ms on a leaf). Everything under it is decoration, behind the content (`z-index: 0` under
+   the content's 1) and out of the pointer's way. It follows `.desk-canvas > *` so it can take that rule's
+   `position` and `z-index` back. Nothing here sets `overflow`: the canvas is `overflow: hidden` with the rounded
+   corners and clips what the layers hold past its edge (the light travels with the pointer, the dots layer is
+   bigger than its strip), and a layer that clipped for itself would report that overhang as its own scroll
+   width, which reads as a hidden horizontal scroller on every page. */
+.desk-backdrop {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* A soft light in the mode's colour under a fine pointer. `--pointer-x` and `--pointer-y` (whole px, written at
+   30 Hz) exist once the pointer has moved; `data-pointer="in"` fades it in, and it goes out when the pointer
+   leaves. Only the fade has a transition: a position that glided between writes would keep the layer moving
+   on every frame, and every moving frame is composited in software. It sits under the dots and under every
+   card. It is 8% so that the wash (11%), the light and a click's ring stacked still leave the muted text
+   (`--text-3`) at 4.5:1 or better in both themes (`lib/desk-backdrop-contrast.test.ts`). */
+.desk-spot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 24rem;
+  height: 24rem;
+  margin: -12rem 0 0 -12rem;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--page-mode, var(--accent)) 8%, transparent), transparent);
+  opacity: 0;
+  transform: translate(var(--pointer-x, 0px), var(--pointer-y, 0px));
+  transition: opacity var(--motion-4) var(--ease-out);
+  will-change: transform, opacity;
+}
+
+.desk-backdrop[data-pointer="in"] .desk-spot {
+  opacity: 1;
+}
+
+/* The dot grid fades out down the page. The fade is a mask on `.desk-grid`, which never moves, and a mask clips
+   its element to the border box, so the dots below the strip are cut too; the dots inside it move, so the
+   fade does not slide with them. The dots are the strip's own `::before`, not an element, so the 30px they
+   hold past the strip are clipped by the canvas and are nobody's scroll width. The dots drift one 24px tile along the diagonal in 19 s
+   and start over unseen (`nx-grid-drift`, stepped, a pixel every second tick), and shift up to 6px against the
+   pointer (`--grid-x` / `--grid-y`, whole px from `attachDeskMotion`, which slews them a pixel per write, so
+   there is no transition: the layer changes only while it is really moving). The layer is bigger than the
+   strip by the most that either can move it (30px up and left, 6px down and right), so no edge ever shows. */
+.desk-grid {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 460px;
+  -webkit-mask-image: linear-gradient(180deg, #000 0, transparent 100%);
+  mask-image: linear-gradient(180deg, #000 0, transparent 100%);
+}
+
+.desk-grid::before {
+  content: "";
+  position: absolute;
+  inset: -30px -6px -6px -30px;
+  background-image: radial-gradient(circle, color-mix(in srgb, var(--page-mode, var(--accent)) 30%, transparent) 1.3px, transparent 1.8px);
+  background-size: 24px 24px;
+  animation: nx-grid-drift var(--motion-drift) var(--ease-ambient) infinite;
+  transform: translate(calc(var(--grid-x, 0) * -1px), calc(var(--grid-y, 0) * -1px));
+  will-change: transform;
+}
+
+/* A ring from a click on the empty desk (`lib/desk-ripple.ts` adds it to the backdrop, plays one Web
+   Animation of `scale` and `opacity`, and removes it). A line, not a blob. */
+.desk-ripple {
+  position: absolute;
+  width: 18rem;
+  height: 18rem;
+  margin: -9rem 0 0 -9rem;
+  border: 2px solid color-mix(in srgb, var(--page-mode, var(--accent)) 38%, transparent);
+  border-radius: 50%;
+  background: radial-gradient(closest-side, transparent 72%, color-mix(in srgb, var(--page-mode, var(--accent)) 4%, transparent));
+  opacity: 0;
+  pointer-events: none;
 }
 
 [data-testid="product-brand"] {
@@ -1371,6 +1591,57 @@ aside nav > p {
   }
 }
 
+/* The ambient loops (`--ease-ambient`, stepped). Each begins at rest, so it can start at any moment without
+   a jump. The bob is two keyframe intervals, the turn four and the drift three, so that with 8 steps an
+   interval every step is a whole number of 400ms ticks (`lib/motion-tokens.test.ts`). */
+@keyframes nx-bob {
+  0% {
+    translate: 0 0;
+    rotate: 0deg;
+  }
+  50% {
+    translate: 0 -7px;
+    rotate: 8deg;
+  }
+  100% {
+    translate: 0 0;
+    rotate: 0deg;
+  }
+}
+
+@keyframes nx-turn {
+  0% {
+    rotate: 0deg;
+  }
+  25% {
+    rotate: 90deg;
+  }
+  50% {
+    rotate: 180deg;
+  }
+  75% {
+    rotate: 270deg;
+  }
+  100% {
+    rotate: 360deg;
+  }
+}
+
+@keyframes nx-grid-drift {
+  0% {
+    translate: 0 0;
+  }
+  33.333% {
+    translate: 8px 8px;
+  }
+  66.667% {
+    translate: 16px 16px;
+  }
+  100% {
+    translate: 24px 24px;
+  }
+}
+
 @keyframes nx-wiggle {
   0% {
     rotate: 0deg;
@@ -1449,14 +1720,15 @@ aside nav > p {
    pair are the tightest tiers. The steps sit above the 900px block because that one narrows the hero's
    padding, and a window just over it has the narrower hero's room no longer. */
 @media (max-height: 1040px) {
-  .chat-empty-fit .chat-hero-orb {
-    --orb: clamp(4.5rem, 20cqi, 6rem);
+  .chat-empty-fit .chat-hero {
+    --orb-col: clamp(7rem, 26cqi, 12rem);
   }
 }
 
 @media (max-height: 960px) {
-  .chat-empty-fit .chat-hero-orb {
-    --orb: clamp(3.75rem, 13cqi, 4.25rem);
+  .chat-empty-fit .chat-hero {
+    --orb-col: clamp(6.5rem, 24cqi, 10rem);
+    --hero-pad-y: clamp(var(--space-2), 3cqi, var(--space-4));
   }
 }
 
@@ -1472,8 +1744,8 @@ aside nav > p {
     --hero-gap: clamp(var(--space-2), 2cqi, var(--space-3));
   }
 
-  .chat-empty-fit .chat-hero-orb {
-    --orb: clamp(4.5rem, 20cqi, 6rem);
+  .chat-empty-fit .chat-hero {
+    --orb-col: clamp(6.5rem, 24cqi, 10.5rem);
   }
 }
 
@@ -1490,14 +1762,45 @@ aside nav > p {
     --hero-gap: var(--space-2);
   }
 
-  /* An 800px window has almost no room, so the hero takes no more of the column than the old orb (3.5rem)
-     did: a 68px box gives back 8% at each end and lays out 57px tall. */
-  .chat-empty-fit .chat-hero-orb {
-    --orb: clamp(3.75rem, 13cqi, 4.25rem);
+  /* An 800px window has the least room, so the character's column takes its smallest step here (at most
+     8.5rem). The character stands beside the bubble, so the hero's height is the taller of the two. */
+  .chat-empty-fit .chat-hero {
+    --orb-col: clamp(6rem, 20cqi, 8.5rem);
   }
 
   .chat-empty-fit > p {
     margin-top: 0.75rem;
+  }
+}
+
+/* Under 800px of window the bubble, not the character, sets the hero's height, so the bubble and the idea
+   cards tighten too: an empty Chat at 1280 x 720 to 800 fits without a scroll. */
+@media (max-height: 800px) {
+  .chat-empty-fit .chat-hero {
+    --hero-pad-y: 0px;
+    --orb-col: clamp(5.5rem, 16cqi, 7rem);
+  }
+
+  .chat-empty-fit .chat-bubble {
+    padding-block: var(--space-2);
+  }
+
+  .chat-empty-fit .chat-bubble .chat-hero-title {
+    font-size: clamp(1.25rem, 0.9rem + 2.2cqi, 1.75rem);
+  }
+
+  .chat-empty-fit .card-live.chat-reply {
+    padding-block: var(--space-2);
+  }
+
+  /* The character fills its column's height here, so only the two corner shapes have room. */
+  .chat-empty-fit .chat-hero .float-shape[data-tier="2"],
+  .chat-empty-fit .chat-hero .float-shape[data-tier="3"] {
+    display: none;
+  }
+
+  .chat-empty-fit > p {
+    margin-top: var(--space-2);
   }
 }
 
@@ -1518,12 +1821,14 @@ aside nav > p {
   animation: nx-bounce-in var(--motion-5) var(--ease-spring);
 }
 
-/* Decorative shapes around heroes and headers (`FloatingShapes`). They rest at their designed
-   positions and move only on events: one settle when they arrive, the hero's pointer parallax
-   (`.float-shapes-live`, below) and a tap. They used to bob and spin for ever; without the GPU each
-   of those loops cost a software-composited frame sixty times a second whenever the desk was in use.
-   Do not add one back: `lib/motion-tokens.test.ts` fails any `infinite` animation outside the busy
-   allowlist (the working dots and a mascot at a job). */
+/* Decorative shapes around heroes and headers (`FloatingShapes`). One settle when they arrive, then a gentle
+   bob (a spinner turns instead), stepped on the desk's 400ms grid (`--ease-ambient`), and they answer the
+   pointer: the hero's parallax and a push away from a pointer that comes close (`.float-shapes-live`,
+   below), and a pop when tapped. The shape is two boxes: `.float-shape` settles in, takes the pointer and pops,
+   and `.float-shape-body` inside it only loops, so the loop can run on the compositor. They used to bob and
+   spin smoothly for ever, which cost a software-composited frame sixty times a second without the GPU
+   (2026-09-29); stepped they cost a few tenths of a percent. `lib/motion-tokens.test.ts` holds the contract,
+   and a new `infinite` animation outside the busy and ambient sets fails it. */
 .float-shapes {
   position: absolute;
   inset: 0;
@@ -1535,12 +1840,201 @@ aside nav > p {
 .float-shape {
   --i: 0;
   position: absolute;
+  width: calc(var(--s) * 1px);
+  height: calc(var(--s) * 1px);
   animation: nx-settle var(--motion-5) var(--ease-spring) backwards;
   animation-delay: calc(var(--i) * var(--motion-stagger) + var(--motion-3));
 }
 
 .float-shape-spin {
   animation-name: nx-settle-spin;
+}
+
+/* The loop is on a box of its own inside the shape, never on the shape or on its <svg>: an animation on an
+   <svg> root runs on the main thread, and so does one on an element that carries a second animation, even a
+   finished one. Either costs a style recalculation on every frame, 60 a second, for as long as it loops
+   (measured on an empty Chat: 481 in 8 s, against 12 with the loop alone on a box). It starts `i` ticks in, so
+   the shapes bob a tick apart, and always on the grid. A spinner turns in eleven-degree steps, one
+   revolution in two bob cycles, instead of bobbing. */
+.float-shape-body {
+  display: block;
+  width: 100%;
+  height: 100%;
+  animation: nx-bob var(--motion-ambient) var(--ease-ambient) infinite;
+  animation-delay: calc(var(--motion-tick) * var(--i));
+}
+
+.float-shape-spin > .float-shape-body {
+  animation-name: nx-turn;
+  animation-duration: calc(var(--motion-ambient) * 2);
+}
+
+.float-shape-body > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* The art at the end of a mode header (`ModeHeader`). It is a column of its own, in the header's flow,
+   so it cannot lie on the title, the outcome line or the actions, and it shows only when the header is
+   wide enough to keep them beside it. The header is the size container, so the query reads the header's
+   own width (the desk's, less the rail and the page's margins), not the window's; it is unnamed, like the
+   Chat hero's (a named container is the composer's alone). At that width the title may also give up
+   width to the outcome's wrapping before the actions drop under it. A size container is also a stacking
+   context, so the header takes the lowest positive layer: a dropdown in its actions (the saved-dossier
+   list) still paints over the page body below, as it did when the header had no context of its own. */
+.mode-header {
+  container-type: inline-size;
+  z-index: 1;
+}
+
+.mode-header-art {
+  display: none;
+  position: relative;
+  isolation: isolate;
+  flex: none;
+  width: 12rem;
+  margin-block: -0.75rem -0.5rem;
+}
+
+/* Nultron hosts the page from the art column: a disc of the mode's colour with the gem's rings in it, the
+   character standing on it, and the shapes floating around. The disc and rings are one static paint. */
+.mode-header-art::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  bottom: 0;
+  width: 9rem;
+  aspect-ratio: 1;
+  translate: -50% 12%;
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(circle, transparent 0 13px, color-mix(in srgb, var(--nultron-cyan) 26%, transparent) 13px 14.5px),
+    radial-gradient(closest-side, color-mix(in srgb, var(--page-mode, var(--accent)) 20%, transparent), color-mix(in srgb, var(--page-mode, var(--accent)) 6%, transparent) 70%, transparent);
+  -webkit-mask-image: radial-gradient(closest-side, #000 55%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 55%, transparent 100%);
+  pointer-events: none;
+}
+
+.mode-header-art-shapes {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.mode-header-art .buddy-stage {
+  margin-inline: auto;
+}
+
+/* The art column does not clip its shapes: a shape the pointer pushes toward the column's edge (up to 14px,
+   `SHAPE_PUSH_PX`) would otherwise lose half of itself to the clip, and the page's padding has room for it. */
+.mode-header-art .float-shapes {
+  overflow: visible;
+}
+
+@container (min-width: 60rem) {
+  .mode-header-art {
+    display: flex;
+    align-items: flex-end;
+  }
+
+  .mode-header-title {
+    flex: 1 1 36rem;
+  }
+}
+
+/* A page stage for the desk buddy (`BuddyStage`): the box the character stands in, a soft shadow on the
+   floor under its feet, and a tap that springs. `--stage-size` is set inline from the caller's size. */
+.buddy-stage {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  width: var(--stage-size);
+  height: var(--stage-size);
+}
+
+.buddy-stage::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  bottom: 8%;
+  width: 44%;
+  height: 7%;
+  translate: -50% 0;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--text) 24%, transparent), transparent);
+  pointer-events: none;
+}
+
+.buddy-stage-tap {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+  transition: transform var(--motion-3) var(--ease-spring);
+}
+
+.buddy-stage-tap .chat-mascot.nx-root {
+  width: 100%;
+  height: 100%;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .buddy-stage-tap:hover {
+    transform: translateY(-3px) rotate(-3deg);
+  }
+}
+
+.buddy-stage-tap:active {
+  transform: translateY(1px) scale(0.95);
+}
+
+.buddy-stage-tap:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--page-mode, var(--accent)) 45%, transparent);
+  outline-offset: 2px;
+}
+
+/* In a chat thread Nultron stands on the composer: its feet on the composer's top edge, just inside its
+   left corner, as if waiting for what you type next. The composer has `--ledge-gap` of air above it in
+   the ledge (its own top margin), and the render keeps about 9% of transparent canvas under the feet. The
+   message list keeps the character's height free at its end (`chat-thread-ledge`), so the last message
+   never sits behind it. */
+.chat-composer-ledge {
+  --ledge-gap: var(--space-5);
+  position: relative;
+}
+
+/* The composer's top margin is smaller on a phone (`.composer-shell` under 640px), so the feet follow it. */
+@media (max-width: 639px) {
+  .chat-composer-ledge {
+    --ledge-gap: var(--space-2);
+  }
+}
+
+.chat-composer-ledge > .buddy-stage {
+  position: absolute;
+  z-index: 0;
+  left: calc(var(--chat-gutter, 1rem) + 1.25rem);
+  bottom: calc(100% - var(--ledge-gap) - var(--stage-size) * 0.09);
+}
+
+.chat-composer-ledge > .buddy-stage::after {
+  bottom: 6%;
+}
+
+.chat-composer-ledge > :not(.buddy-stage) {
+  position: relative;
+  z-index: 1;
+}
+
+.chat-thread-ledge {
+  padding-bottom: 6.5rem;
 }
 
 /* A light sweep across primary buttons on hover. */
@@ -1715,6 +2209,16 @@ aside nav > p {
   translate: none;
 }
 
+/* Chat's starting ideas are answers to Nultron's question: reply bubbles tinted with the intent's colour,
+   the tail corner at the bottom right like a message you send. */
+.card-live.chat-reply {
+  border-width: 1.5px;
+  border-color: color-mix(in srgb, var(--mode, var(--accent)) 24%, var(--line));
+  border-radius: 20px 20px 6px 20px;
+  background: color-mix(in srgb, var(--mode, var(--accent)) 6%, var(--surface));
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--mode, var(--accent)) 18%, var(--line));
+}
+
 /* A solid icon tile in the mode's colour; `-soft` is the tinted variant for dense lists. */
 .icon-orb {
   display: inline-flex;
@@ -1736,7 +2240,7 @@ aside nav > p {
 
 .icon-orb-solid {
   background: var(--mode, var(--accent));
-  color: #ffffff;
+  color: var(--on-mode);
   box-shadow: 0 3px 0 color-mix(in srgb, var(--mode, var(--accent)) 70%, #000000);
 }
 
@@ -1745,6 +2249,30 @@ aside nav > p {
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+/* The public brand's wordmark (the rail header's "Nultron"): the helmet's blue running into the gem's
+   cyan, in the two `-text` tokens so each stop clears 4.5:1 on the rail in both themes. The block is
+   as wide as the word (`fit-content`), so the gradient spans the letters and not the whole header
+   column. `color` is what a browser without `background-clip: text` paints, and what a forced-colors
+   desk gets. Flavors never carry this class (`usesNultronWordmark`). */
+.wordmark-nultron {
+  width: fit-content;
+  max-width: 100%;
+  font-weight: 700;
+  color: var(--nultron-blue-text);
+  background: linear-gradient(100deg, var(--nultron-blue-text) 0%, var(--nultron-blue-text) 38%, var(--nultron-cyan-text) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@media (forced-colors: active) {
+  .wordmark-nultron {
+    background: none;
+    color: LinkText;
+    -webkit-text-fill-color: currentColor;
+  }
 }
 
 /* A hero panel: a flat tint in the mode's colour with a thick edge. No moving glow. */
@@ -1761,31 +2289,144 @@ aside nav > p {
    The pointer variables `--px` / `--py` (-1..1) come from `attachHeroMotion` and are absent, so 0,
    on touch and under reduced motion. */
 .chat-hero {
+  --orb-col: clamp(6.5rem, 30cqi, 13rem);
   --hero-pad-x: clamp(var(--space-2), 5cqi, var(--space-6));
   --hero-pad-y: clamp(var(--space-3), 6cqi, var(--space-6));
   --hero-gap: clamp(var(--space-2), 3.2cqi, var(--space-4));
   --hero-gap-tight: clamp(var(--space-2), 2cqi, var(--space-3));
 }
 
+/* No card: the scene stands on Chat's own sky. Character and speech bubble side by side, the bubble's tail
+   pointing at Nultron; under 34rem of column the two stack and the tail points up. */
 .chat-hero-panel {
   isolation: isolate;
-  overflow: hidden;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: clamp(var(--space-3), 4cqi, var(--space-6));
+  row-gap: var(--hero-gap);
+  max-width: 50rem;
+  margin-inline: auto;
   padding: var(--hero-pad-y) var(--hero-pad-x);
 }
 
-/* A resting halo behind the mascot, painted once. */
+@container (max-width: 34rem) {
+  .chat-hero-panel {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    text-align: center;
+  }
+}
+
+/* The hero's shapes keep to Nultron's column (the padding plus the character), so none sits behind the
+   speech bubble; stacked, the column is the whole panel and they frame the character from the sides. */
+.chat-hero .float-shapes {
+  right: auto;
+  width: calc(var(--hero-pad-x) + var(--orb-col));
+}
+
+@container (max-width: 34rem) {
+  .chat-hero .float-shapes {
+    right: 0;
+    width: auto;
+  }
+}
+
+/* The gem's rings behind the character: Nultron's forehead swirl, drawn large and faint. One static paint. */
 .chat-hero-panel::before {
   content: "";
   position: absolute;
   z-index: -1;
-  top: 0;
-  left: 50%;
-  width: min(140%, 36rem);
-  aspect-ratio: 2;
-  translate: -50% -38%;
+  top: 50%;
+  left: calc(var(--hero-pad-x) + var(--orb-col, 5rem) / 2);
+  width: min(30rem, 140cqi);
+  aspect-ratio: 1;
+  translate: -50% -50%;
   border-radius: 50%;
-  background: radial-gradient(closest-side, color-mix(in srgb, var(--mode, var(--accent)) 20%, transparent), transparent);
+  background:
+    repeating-radial-gradient(circle, transparent 0 22px, color-mix(in srgb, var(--nultron-cyan) 22%, transparent) 22px 23.5px),
+    radial-gradient(closest-side, color-mix(in srgb, var(--nultron-blue) 14%, transparent), transparent 75%);
+  -webkit-mask-image: radial-gradient(closest-side, #000 40%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 40%, transparent 100%);
   pointer-events: none;
+}
+
+@container (max-width: 34rem) {
+  .chat-hero-panel::before {
+    top: calc(var(--hero-pad-y) + var(--orb-col, 5rem) / 2);
+    left: 50%;
+  }
+}
+
+/* What Nultron says. A bubble on the page's surface with a tail toward the character. */
+.chat-bubble {
+  position: relative;
+  min-width: 0;
+  padding: clamp(var(--space-3), 3.4cqi, var(--space-5)) clamp(var(--space-3), 4cqi, var(--space-6));
+  border: 1.5px solid color-mix(in srgb, var(--nultron-blue) 24%, var(--line));
+  border-radius: 24px 24px 24px 8px;
+  background: var(--surface);
+  box-shadow: 0 22px 44px -28px color-mix(in srgb, var(--nultron-blue) 55%, transparent);
+}
+
+.chat-bubble::before {
+  content: "";
+  position: absolute;
+  left: -9px;
+  bottom: calc(50% - 8px);
+  width: 16px;
+  height: 16px;
+  border-left: 1.5px solid color-mix(in srgb, var(--nultron-blue) 24%, var(--line));
+  border-bottom: 1.5px solid color-mix(in srgb, var(--nultron-blue) 24%, var(--line));
+  border-bottom-left-radius: 4px;
+  background: var(--surface);
+  rotate: 45deg;
+}
+
+@container (max-width: 34rem) {
+  .chat-bubble {
+    border-radius: 24px;
+  }
+
+  .chat-bubble::before {
+    top: -9px;
+    bottom: auto;
+    left: 50%;
+    translate: -50% 0;
+    rotate: 135deg;
+  }
+}
+
+.chat-bubble-hello {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: clamp(0.9375rem, 0.82rem + 1cqi, 1.1875rem);
+  color: var(--nultron-blue-text);
+}
+
+/* The key status rides in the bubble's last line: pill and "What is this?" on one row. */
+.chat-bubble [data-testid="chat-key-status"] {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: var(--hero-gap-tight);
+}
+
+@container (min-width: 34rem) {
+  .chat-bubble [data-testid="chat-key-status"],
+  .chat-bubble [data-testid="chat-key-status"] > div {
+    justify-content: flex-start;
+  }
+}
+
+@container (max-width: 34rem) {
+  .chat-bubble [data-testid="chat-key-status"] {
+    justify-content: center;
+  }
+}
+
+.chat-bubble [data-testid="chat-whats-this-body"] {
+  flex-basis: 100%;
 }
 
 /* A soft spot that trails a fine pointer across the panel. Off until the pointer is over it. */
@@ -1830,7 +2471,9 @@ aside nav > p {
    much less room in the column than its size says, and only transparent pixels sit outside the layout.
    The picture fills the button (components/nultron/nultron.css) and drifts with the pointer there. */
 .chat-hero-orb {
-  --orb: clamp(5rem, 26cqi, 10rem);
+  --orb: var(--orb-col, clamp(6.5rem, 30cqi, 13rem));
+  position: relative;
+  z-index: 1;
   width: var(--orb);
   height: var(--orb);
   margin-block: calc(var(--orb) * -0.08);
@@ -1860,16 +2503,13 @@ aside nav > p {
 
 .chat-hero-title {
   max-width: 100%;
-  margin-top: var(--hero-gap);
-  font-size: clamp(1.25rem, 0.8rem + 4.4cqi, 2.5rem);
-  line-height: var(--lh-tight);
+  margin-top: 0.15em;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: clamp(1.375rem, 0.9rem + 3.4cqi, 2.375rem);
+  line-height: 1.12;
+  letter-spacing: -0.012em;
   text-wrap: balance;
-}
-
-/* Each wrapped line takes the whole gradient instead of a slice of one long line. */
-.chat-hero-title .text-gradient {
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
 }
 
 .chat-status-pill {
@@ -1933,10 +2573,18 @@ aside nav > p {
   }
 }
 
+/* Live shapes (the hero's and the headers') take the pointer: the hero's parallax (`--px` and `--py` from
+   `attachHeroMotion`, scaled by the shape's own `--depth`; a header's shapes have no depth) plus the push
+   away from the pointer (`--rx` and `--ry`, px, from `attachDeskMotion`, only while it is close), and a tap
+   pops them (`pokeShape`). Both variables are written on the shape or the hero, never on an ancestor of the
+   page. */
 .float-shapes-live .float-shape {
   pointer-events: auto;
   cursor: pointer;
-  transform: translate(calc(var(--px, 0) * var(--depth, 0) * 1px), calc(var(--py, 0) * var(--depth, 0) * 1px));
+  transform: translate(
+    calc(var(--px, 0) * var(--depth, 0) * 1px + var(--rx, 0) * 1px),
+    calc(var(--py, 0) * var(--depth, 0) * 1px + var(--ry, 0) * 1px)
+  );
   transition: transform var(--motion-4) var(--ease-out);
 }
 
@@ -2027,21 +2675,21 @@ aside nav > p {
    window is hidden, blurred, or has had no input for 12 seconds, and names which one in
    `data-ambient-reason` (idle | blurred | hidden).
 
-   Decoration no longer loops (2026-09-29): the shapes settle once on arrival and rest, and an
-   empty-state scene only pops in, so the only `infinite` animations left are status, the working
-   dots and a mascot at a job, and `lib/motion-tokens.test.ts` fails on any other. Without the GPU
-   one loop costs a full software-composited frame sixty times a second, and a pause that waits for
-   12 quiet seconds cannot help a desk somebody is using: with ten decorative loops running, an
-   active /chat held 11% of the machine.
+   Decoration loops only stepped (2026-10-01, after 2026-09-29 had removed every loop): the shapes' bob
+   and turn and the dot grid's drift, on one 400ms grid, and `lib/motion-tokens.test.ts` fails on any
+   other `infinite` animation that is not status (the working dots, a mascot at a job). Without the GPU
+   a smooth loop costs a full software-composited frame sixty times a second, and a pause that waits for
+   12 quiet seconds cannot help a desk somebody is touching: with ten smooth loops running, an active
+   /chat held 11% of the machine. Stepped and aligned, the ambient set costs a few tenths of a percent
+   while the desk is in use and nothing once it is paused.
 
    `!important` keeps this independent of specificity: the mascot's `animation` shorthands reset
    `animation-play-state`, and one of them tied a plain pause. Only loops are listed. An entrance is
    finite, and pausing one leaves its element stuck at the invisible first keyframe.
    =========================================================================== */
 
-/* A mascot that is not at a running job stands still in every state but active. (Decoration proper
-   has no rule here any more: it does not loop. The shapes settle once on arrival and rest.) A mascot
-   at a job is status and is handled below (`data-busy`, from `isMascotBusy`). */
+/* A mascot that is not at a running job stands still in every state but active. A mascot at a job is
+   status and is handled below (`data-busy`, from `isMascotBusy`). */
 html[data-ambient="paused"] :is(.chat-mascot:not([data-busy]), .chat-mascot:not([data-busy]) *) {
   animation-play-state: paused !important;
 }
@@ -2052,6 +2700,19 @@ html[data-ambient="paused"] :is(.chat-mascot:not([data-busy]), .chat-mascot:not(
    so they are cheap, and they stop only when the window is not visible at all. */
 html[data-ambient="paused"][data-ambient-reason="hidden"]
   :is(.pulse-dots > span, .chat-mascot[data-busy], .chat-mascot[data-busy] *) {
+  animation-play-state: paused !important;
+}
+
+/* The stepped decoration stands still in every state but active, so a desk nobody is touching costs
+   nothing: the shapes' bob and turn (`.float-shape-body`), and the dot grid's drift. A shape's settle is on
+   the box outside, which is not listed: pausing it would leave a shape that arrives in a window that has
+   just lost focus at its invisible first keyframe. */
+html[data-ambient="paused"] :is(.float-shape-body) {
+  animation-play-state: paused !important;
+}
+
+/* A pseudo-element cannot sit inside `:is()`, so the grid's drift has its own rule. */
+html[data-ambient="paused"] .desk-grid::before {
   animation-play-state: paused !important;
 }
 
@@ -2082,13 +2743,31 @@ html[data-ambient="paused"][data-ambient-reason="hidden"]
     animation: none !important;
   }
 
+  /* The ambient loops, by name: an `infinite` animation has no still frame, so the reset above would park
+     it on its first keyframe. */
+  .float-shape-body,
+  .desk-grid::before {
+    animation: none !important;
+  }
+
+  .desk-grid::before {
+    transform: none !important;
+  }
+
+  .desk-spot,
+  .desk-ripple {
+    display: none;
+  }
+
   .confetti {
     display: none;
   }
 
   .float-shapes-live .float-shape,
   .chat-hero-orb:hover,
-  .chat-hero-orb:active {
+  .chat-hero-orb:active,
+  .buddy-stage-tap:hover,
+  .buddy-stage-tap:active {
     transform: none !important;
   }
 

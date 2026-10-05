@@ -28,7 +28,7 @@ afterEach(() => resetLocaleForTests());
 describe("the empty Meeting desk", () => {
   it("draws the character once, in the main pane", () => {
     const html = emptyDesk();
-    expect(count(html, 'data-testid="chat-mascot"')).toBe(1);
+    expect(count(html, 'data-placement="empty"')).toBe(1);
     const list = html.slice(html.indexOf('data-testid="meeting-list"'));
     const pane = list.slice(list.indexOf("</aside>"));
     expect(list.slice(0, list.indexOf("</aside>"))).not.toContain("chat-mascot");
@@ -46,7 +46,7 @@ describe("the empty Meeting desk", () => {
   it("does the same in Bahasa Indonesia", () => {
     applyLocale("id");
     const html = emptyDesk();
-    expect(count(html, 'data-testid="chat-mascot"')).toBe(1);
+    expect(count(html, 'data-placement="empty"')).toBe(1);
     expect(count(html, "Buat satu, tambahkan rekamannya, dan notulen menyusul.")).toBe(1);
     expect(html).toContain("Belum ada rapat.");
   });

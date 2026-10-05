@@ -1,10 +1,13 @@
 /**
  * One switch for whatever may still loop on the desk, kept out of React so a node test can drive it.
  *
- * Since 2026-09-29 decoration does not loop at all (`lib/motion-tokens.test.ts` fails on an `infinite`
- * animation outside the busy allowlist), so this is the second line of defence, not the first. It is not
- * a licence to add a decorative loop: a pause that waits 12 quiet seconds cannot help a desk somebody is
- * using, and that is where an active /chat spent 9 to 11% of the machine before the loops were removed.
+ * What may loop is short and stepped (`lib/motion-tokens.test.ts` fails on any other `infinite` animation):
+ * status (the working dots, a mascot at a job) and, since 2026-10-01, the ambient decoration (the shapes'
+ * bob and turn, the dot grid's drift, `--ease-ambient`). So this is the second line of defence, not the
+ * first. It is not a licence to add a smooth decorative loop: a pause that waits 12 quiet seconds cannot
+ * help a desk somebody is using, and that is where an active /chat spent 9 to 11% of the machine before the
+ * smooth loops were removed on 2026-09-29. The ambient set costs a few tenths of a percent while the desk
+ * is in use and nothing once this switch pauses it.
  *
  * Why it exists: the Windows shell runs Chromium without the GPU (`app.disableHardwareAcceleration()`),
  * and every infinite CSS loop then costs a full software-composited frame, sixty times a second, on a

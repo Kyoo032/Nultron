@@ -1,10 +1,11 @@
 "use client";
 
-import { type CSSProperties, useEffect } from "react";
+import { type CSSProperties, useEffect, useRef } from "react";
 import { NxImageRig } from "@/components/nultron/nx-image-rig";
 import { hasClip, hasLoop } from "@/components/nultron/nx-picture";
 import { warmMascotAtIdle } from "@/components/nultron/nx-warm";
 import { t } from "@/lib/i18n";
+import { useFullBodyPresence } from "@/lib/use-full-body-presence";
 import {
   isMascotBusy,
   type MascotPlacement,
@@ -74,6 +75,9 @@ export function NultronMascot({
   const box = size ?? (variant ? undefined : placement === "empty" ? NX_SIZE_EMPTY : NX_SIZE_BESIDE);
   const rig = variant ?? variantForSize(box ?? NX_SIZE_BESIDE);
   const running = busy && isMascotBusy(state, placement);
+  const rootRef = useRef<HTMLSpanElement>(null);
+  // Any full body but the buddy's own tells the buddy to stand down: one character on screen.
+  useFullBodyPresence(rootRef, rig === "full" && placement !== "buddy");
   const label = t(mascotLabelKey(state));
   const vars: Record<string, string | number> = {};
   if (box) {
@@ -87,6 +91,7 @@ export function NultronMascot({
 
   return (
     <span
+      ref={rootRef}
       className={className ? `chat-mascot nx-root ${className}` : "chat-mascot nx-root"}
       data-testid="chat-mascot"
       data-mascot="nultron"

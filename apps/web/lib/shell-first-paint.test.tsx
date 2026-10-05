@@ -72,7 +72,8 @@ describe("the rail draws a skeleton, not a guess", () => {
 
   it("swaps real rows in where the skeleton stood, without an entrance that would blank the group", () => {
     expect(rail).toContain("const [startedPending] = useState(modesPending);");
-    expect(rail).toContain("enter={!startedPending}");
+    // Every job-mode row, with or without a trailing control, gets its props from `itemProps`.
+    expect(rail).toContain("enter: !startedPending,");
     expect(rail).toMatch(/\$\{enter \? "enter-slide " : ""\}hover-wiggle/);
     expect(rail).toContain("enter = true,");
   });
