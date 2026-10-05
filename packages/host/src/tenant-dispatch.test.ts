@@ -70,8 +70,8 @@ function asSession(id: string): Partial<HostRequest> {
 describe("dispatch scopes a handler to the request's session", () => {
   beforeAll(async () => {
     const { db, ensurePortalOwner } = await import("@agentforge/db");
-    deskA = (await ensurePortalOwner(db, TENANT_A)).workspaceId;
-    deskB = (await ensurePortalOwner(db, TENANT_B)).workspaceId;
+    deskA = (await ensurePortalOwner(db, { ...TENANT_A, role: "owner" })).workspaceId;
+    deskB = (await ensurePortalOwner(db, { ...TENANT_B, role: "owner" })).workspaceId;
     store = createMemorySessionStore();
     sessionA = createSession({ ...TENANT_A, now: T0 });
     sessionB = createSession({ ...TENANT_B, now: T0 });

@@ -56,8 +56,8 @@ const golden = JSON.parse(
 const WIRES = ["chat_completions", "responses", "anthropic_messages", "google_generate_content"] as const;
 
 /**
- * The only places today's answer differs from the recording, all on purpose, all of 2026-09-30, all in
- * `curate` and nowhere on the wire: the wire, the levels, the snaps, the Off coercion and the job knob
+ * The only places today's answer differs from the recording, all on purpose, all of 2026-09-30 but the
+ * last bullet, all in `curate` and nowhere on the wire: the wire, the levels, the snaps, the Off coercion and the job knob
  * of every recorded id are byte for byte the recording's.
  *
  * - The Recommended group changed (owner, 2026-09-30): `gpt-5.6-luna`, `gpt-5.6-terra`, `claude-sonnet-5`
@@ -65,10 +65,13 @@ const WIRES = ["chat_completions", "responses", "anthropic_messages", "google_ge
  *   so their tier is advanced now.
  * - `claude-opus-5-5` gained its best-for word (Deep reasoning); `deepseek-v4-1-flash` joined the
  *   Recommended group with Fast drafts.
+ * - The label casing fix (2026-10-02, `friendlyModelLabel`): the recording has "Glm 5.3 Flash" and
+ *   "DeepSeek V4 1 Flash". Acronyms (GLM, MT, VL, OCR) and parameter counts (27B, A3B) keep their
+ *   capitals and a dashed version is one dotted number. Labels only: no tier, role or wire moved.
  *
  * A stale line fails: each one must still differ from the recording, so it cannot outlive its cause.
  */
-const CHANGED_ON_PURPOSE: Record<string, Partial<{ bestFor: string; tier: string }>> = {
+const CHANGED_ON_PURPOSE: Record<string, Partial<{ bestFor: string; tier: string; friendlyLabel: string }>> = {
   "gpt-5.6-luna": { tier: "advanced" },
   "gpt-5.6-terra": { tier: "advanced" },
   "claude-sonnet-5": { tier: "advanced" },
@@ -78,7 +81,26 @@ const CHANGED_ON_PURPOSE: Record<string, Partial<{ bestFor: string; tier: string
   "minimax-m3": { tier: "advanced" },
   "doubao-seed-2-1-turbo-260628": { tier: "advanced" },
   "claude-opus-5-5": { bestFor: "Deep reasoning" },
-  "deepseek-v4-1-flash": { bestFor: "Fast drafts", tier: "everyday" },
+  "deepseek-v4-1-flash": { bestFor: "Fast drafts", tier: "everyday", friendlyLabel: "DeepSeek V4.1 Flash" },
+  "glm-5": { friendlyLabel: "GLM 5" },
+  "glm-5.2": { friendlyLabel: "GLM 5.2" },
+  "glm-5.2-fast-preview": { friendlyLabel: "GLM 5.2 Fast" },
+  "glm-5.3": { friendlyLabel: "GLM 5.3" },
+  "glm-5.3-flash": { friendlyLabel: "GLM 5.3 Flash" },
+  "gpt-oss-120b": { friendlyLabel: "GPT Oss 120B" },
+  "qwen-mt-flash": { friendlyLabel: "Qwen MT Flash" },
+  "qwen-mt-lite": { friendlyLabel: "Qwen MT Lite" },
+  "qwen-mt-plus": { friendlyLabel: "Qwen MT Plus" },
+  "qwen-mt-turbo": { friendlyLabel: "Qwen MT Turbo" },
+  "qwen3-vl-embedding": { friendlyLabel: "Qwen3 VL Embedding" },
+  "qwen3-vl-rerank": { friendlyLabel: "Qwen3 VL Rerank" },
+  "qwen3.5-122b-a10b": { friendlyLabel: "Qwen3.5 122B A10B" },
+  "qwen3.5-27b": { friendlyLabel: "Qwen3.5 27B" },
+  "qwen3.5-35b-a3b": { friendlyLabel: "Qwen3.5 35B A3B" },
+  "qwen3.5-397b-a17b": { friendlyLabel: "Qwen3.5 397B A17B" },
+  "qwen3.5-ocr": { friendlyLabel: "Qwen3.5 OCR" },
+  "qwen3.6-27b": { friendlyLabel: "Qwen3.6 27B" },
+  "qwen3.6-35b-a3b": { friendlyLabel: "Qwen3.6 35B A3B" },
 };
 
 /** Roles that are not chat: the golden file lists them because `mediaKind` misfiles a few of them as chat. */

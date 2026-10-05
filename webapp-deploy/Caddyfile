@@ -1,16 +1,90 @@
-# Nultron reverse proxy. Caddy obtains and renews TLS automatically for
-# {$NULTRON_DOMAIN} as long as ports 80 and 443 reach this host from the internet.
+# Nultron reverse proxy. Caddy obtains and renews TLS automatically for the two names it
+# serves, {$NULTRON_DOMAIN} (the app) and {$PORTAL_DOMAIN} (the portal stand-in, apps/portal),
+# as long as ports 80 and 443 reach this host from the internet.
 #
-# Caddy runs in the app container's network namespace, so 127.0.0.1:3000 IS the app.
+# Caddy runs in the app container's network namespace, so 127.0.0.1:3000 IS the app. The
+# portal is a separate container on the stack's default network, reached by its service name
+# (portal:4000); the app reaches it THROUGH this proxy, over https (SR-26) - see extra_hosts
+# on the app service in compose.yml.
 #
 # Covers security spec N3 (TLS 1.2+, HSTS, HTTP->HTTPS), A3 (security headers) and L2
 # (access log). A4 (rate limiting) and the HTTP request filter live in the app -
 # packages/host/src/rate-limit.ts and packages/host/src/local-request.ts; see the note
 # above reverse_proxy for what this file has to keep forwarding for them to work.
+#
+# The two variables above are the ONLY ones this file reads (SR-73): the proxy container
+# gets nothing else from .env.
+
+# The fields every log line has to lose before it is written (L1, SR-72). One list, imported
+# by the default logger and by the access log below, so the two streams cannot drift. It sits
+# above the options block because Caddy reads a snippet only after it is defined.
+# Cookie, Authorization and Set-Cookie are dropped outright. `code` and `state` are
+# deleted from every place the sign-in can leave them:
+#   - request>uri: the portal sends the browser to /auth/callback?code=...&state=..., so
+#     without this the one-time code and its login state sit in `uri` for 30 days.
+#   - request>headers>Referer: /auth/callback is the SPA shell, and every asset it requests
+#     before its script strips the query carries the full callback URL as Referer
+#     (Referrer-Policy same-origin sends the whole URL to this origin).
+#   - resp_headers>Location: the portal is behind THIS proxy, and it answers /authorize with
+#     a 302 whose Location is https://<app>/auth/callback?code=...&state=... - the one-time
+#     code, in the RESPONSE header of the access line. Caddy redacts Set-Cookie itself; it does
+#     not redact Location. Found on 2026-10-01 by the Kubernetes rehearsal.
+# A header is filtered value by value from Caddy 2.8 on; on 2.7 the header lines are a
+# silent no-op and only `uri` is cleaned. compose.yml pins caddy:2.11-alpine for that reason.
+(sign_in_filters) {
+	request>headers>Cookie delete
+	request>headers>Authorization delete
+	request>headers>Set-Cookie delete
+	request>uri query {
+		delete code
+		delete state
+	}
+	request>headers>Referer query {
+		delete code
+		delete state
+	}
+	resp_headers>Location query {
+		delete code
+		delete state
+	}
+}
+
 {
 	# Uncomment and set an address to get Let's Encrypt expiry notices:
 	# email you@example.com
 	admin off
+
+	# SR-72. Caddy's DEFAULT logger is where everything that is not an access line goes -
+	# above all the error line for a request whose upstream failed, which names the request
+	# with its full URI. The site `log` blocks below filter their own access lines; this one
+	# is the other stream, and it gets the same filter. Without it a failed
+	# /auth/callback?code=...&state=... leaves the one-time code and the login state in
+	# stderr for as long as the container logs are kept. stdout is the access log, stderr
+	# is this one; the log collector ships both.
+	log default {
+		output stderr
+		format filter {
+			wrap json
+			fields {
+				import sign_in_filters
+			}
+		}
+	}
+}
+
+# L2: one JSON object per request on stdout - IP, path, status, latency. The log
+# collector ships it to CLS with 30-day retention. L1: the fields above are dropped
+# before the line is written; Caddy never sees request bodies.
+(access_log) {
+	log {
+		output stdout
+		format filter {
+			wrap json
+			fields {
+				import sign_in_filters
+			}
+		}
+	}
 }
 
 # HTTP -> HTTPS. Caddy does this by default for any site with a hostname, but the
@@ -18,7 +92,7 @@
 # lost in a future edit. There is no site body on :80 other than this: nothing is
 # served, nothing is proxied, and the ACME HTTP-01 challenge is still answered by
 # Caddy itself ahead of this route.
-http://{$NULTRON_DOMAIN} {
+http://{$NULTRON_DOMAIN}, http://{$PORTAL_DOMAIN} {
 	redir https://{host}{uri} permanent
 }
 
@@ -74,36 +148,19 @@ http://{$NULTRON_DOMAIN} {
 		-X-Powered-By
 	}
 
-	# L2: one JSON object per request on stdout - IP, path, status, latency. The log
-	# collector ships it to CLS with 30-day retention. L1: Cookie and Authorization are
-	# dropped before the line is written; Caddy never sees request bodies.
-	#
-	# The two query filters keep sign-in out of that log. The portal sends the browser to
-	# /auth/callback?code=...&state=..., so without them the one-time code and its login
-	# state sit in `uri` for 30 days. Referer needs the same filter: /auth/callback is the
-	# SPA shell, and every asset it requests before its script strips the query carries
-	# the full callback URL as Referer (Referrer-Policy same-origin sends the whole URL to
-	# this origin). A header is filtered value by value from Caddy 2.8 on; on 2.7 the
-	# Referer line is a silent no-op and only `uri` is cleaned.
-	log {
-		output stdout
-		format filter {
-			wrap json
-			fields {
-				request>headers>Cookie delete
-				request>headers>Authorization delete
-				request>headers>Set-Cookie delete
-				request>uri query {
-					delete code
-					delete state
-				}
-				request>headers>Referer query {
-					delete code
-					delete state
-				}
-			}
-		}
-	}
+	# L2 + SR-72: the access log, with the sign-in filters. See (access_log) above.
+	import access_log
+
+	# SR-03. The billing webhook is the only writer of a tenant's plan, and it authenticates
+	# on one shared header secret (security-register SR-03). No payment provider is bound
+	# until the owner chooses one (owner decision 2026-10-01), so nothing legitimate calls
+	# it: the edge answers 404 itself and the request never reaches the app. The pattern ends
+	# in `*` so /webhook/, /webhookX and a double slash are caught as well as the exact path,
+	# and Caddy's path matcher is case-insensitive and decodes %XX before it compares.
+	# Remove this rule - and only then - when a provider is bound and its signature check
+	# replaces the header secret.
+	@billing_webhook path /api/v1/billing/webhook*
+	respond @billing_webhook 404
 
 	# Incident response (spec L5). Uncomment these two lines and `docker compose restart
 	# proxy` to take the site read-only in about a second; comment them back out to
@@ -190,4 +247,40 @@ http://{$NULTRON_DOMAIN} {
 	#   X-Forwarded-Proto - the app refuses any request that is not marked https
 	#     (403 https_required), which is what stops a direct hit on 127.0.0.1:3000.
 	# In front of all of it sits Anti-DDoS Basic (spec N4).
+}
+
+# The portal stand-in (apps/portal): the browser sign-in screens and the token exchange. A
+# second name on the same box, because the browser has to reach it over https and so does the
+# app (SR-26). Same TLS floor and the same access log as the app; its own security headers.
+{$PORTAL_DOMAIN} {
+	tls {
+		protocols tls1.2 tls1.3
+	}
+
+	encode zstd gzip
+
+	header {
+		# The portal sets its own Content-Security-Policy and framing headers on its pages
+		# (apps/portal/src/security); the app's policy above must not replace them. Transport
+		# and identity headers only.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		-Server
+		-X-Powered-By
+	}
+
+	import access_log
+
+	# One portal process (SR-29: its rate-limit windows live in memory, so a second replica
+	# would double every ceiling). PORTAL_TRUST_PROXY=1 on the portal makes it believe the
+	# X-Forwarded-For this Caddy writes; it is the same one-hop rule as for the app (SR-18),
+	# and nothing but this proxy can reach portal:4000 - the port is not published.
+	# Host passes through unchanged here too.
+	reverse_proxy portal:4000 {
+		health_uri /healthz
+		health_interval 10s
+		health_timeout 5s
+		health_status 200
+		flush_interval -1
+	}
 }

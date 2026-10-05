@@ -2,7 +2,8 @@ import { guessDialectFromKey } from "./models/probe";
 import { resolvedGatewayBaseUrl } from "./gateway";
 import { keyFingerprintOrNull } from "./security/fingerprint";
 import { maskToolKeys } from "./tools/credentials";
-import { providerEnv } from "./server-mode";
+import { providerBaseUrl } from "./providers/registry";
+import { isServerMode, providerEnv, type EnvLike } from "./server-mode";
 
 export type StoredSecrets = {
   openaiApiKey?: string;
@@ -248,7 +249,13 @@ export function mergeSecrets(current: StoredSecrets, patch: SecretPatch): Stored
   return next;
 }
 
-export function maskSecrets(current: StoredSecrets): MaskedSecrets {
+/**
+ * What the renderer may be told about the saved settings. The provider base URLs (Google, Anthropic,
+ * Volcengine) are reported only off the hosted server: on it they are never honoured (see
+ * `resolveProviderKeys`), so a stored value from an older build is not echoed as if it were in force.
+ */
+export function maskSecrets(current: StoredSecrets, env: EnvLike = process.env): MaskedSecrets {
+  const honoursBaseUrls = !isServerMode(env);
   return {
     hasOpenai: Boolean(current.openaiApiKey),
     hasGoogle: Boolean(current.googleApiKey),
@@ -262,9 +269,9 @@ export function maskSecrets(current: StoredSecrets): MaskedSecrets {
     telegramBotFingerprint: keyFingerprintOrNull(current.telegramBotToken),
     // Pinned: a value stored by an older build is tolerated on read but never reported back.
     openaiBaseUrl: resolvedGatewayBaseUrl(),
-    googleBaseUrl: current.googleBaseUrl,
-    anthropicBaseUrl: current.anthropicBaseUrl,
-    volcengineBaseUrl: current.volcengineBaseUrl,
+    googleBaseUrl: honoursBaseUrls ? current.googleBaseUrl : undefined,
+    anthropicBaseUrl: honoursBaseUrls ? current.anthropicBaseUrl : undefined,
+    volcengineBaseUrl: honoursBaseUrls ? current.volcengineBaseUrl : undefined,
     hasToolKeys: maskToolKeys(current),
     toolBackends: current.toolBackends ?? {},
     imageGenModel: current.imageGenModel,
@@ -279,14 +286,19 @@ export function maskSecrets(current: StoredSecrets): MaskedSecrets {
   };
 }
 
-export function hasLiveProvider(settings: StoredSecrets): boolean {
+/**
+ * Whether the settings name a live provider. A stored Anthropic or Volcengine base URL with no key is
+ * a local server (Ollama, a proxy) and counts off the hosted server. On it a base URL is never
+ * honoured (`resolveProviderKeys`), so it cannot make a keyless tenant live; only a key does.
+ */
+export function hasLiveProvider(settings: StoredSecrets, env: EnvLike = process.env): boolean {
+  const honoursBaseUrls = !isServerMode(env);
   return Boolean(
     settings.openaiApiKey ||
       settings.googleApiKey ||
       settings.anthropicApiKey ||
       settings.volcengineApiKey ||
-      settings.anthropicBaseUrl ||
-      settings.volcengineBaseUrl,
+      (honoursBaseUrls && (settings.anthropicBaseUrl || settings.volcengineBaseUrl)),
   );
 }
 
@@ -326,15 +338,33 @@ export function resolveProviderKeys(
   const reuseOpenAI = (dialect: "anthropic" | "google" | "volcengine") =>
     openaiKeyDialect === dialect ? openai : undefined;
 
+  const google = settings.googleApiKey || fallback.GOOGLE_GENERATIVE_AI_API_KEY || reuseOpenAI("google");
+  const anthropic = settings.anthropicApiKey || fallback.ANTHROPIC_API_KEY || reuseOpenAI("anthropic");
+  const volcengine =
+    settings.volcengineApiKey || fallback.ARK_API_KEY || fallback.VOLCENGINE_API_KEY || reuseOpenAI("volcengine");
+
+  if (isServerMode(env)) {
+    // Enterprise: a provider's host is a literal in the provider registry and nowhere else. Neither a
+    // stored value (an older build, a hand-edited payload) nor a request can name one, so a tenant's
+    // key can only travel to the provider it belongs to. The base URL follows the key: no key, no
+    // endpoint. Volcengine is not a registry provider; the runtime uses its own pinned Ark constant.
+    return {
+      openai,
+      google,
+      anthropic,
+      volcengine,
+      openaiBaseUrl,
+      googleBaseUrl: google ? providerBaseUrl("google") : undefined,
+      anthropicBaseUrl: anthropic ? providerBaseUrl("anthropic") : undefined,
+      volcengineBaseUrl: undefined,
+    };
+  }
+
   return {
     openai,
-    google: settings.googleApiKey || fallback.GOOGLE_GENERATIVE_AI_API_KEY || reuseOpenAI("google"),
-    anthropic: settings.anthropicApiKey || fallback.ANTHROPIC_API_KEY || reuseOpenAI("anthropic"),
-    volcengine:
-      settings.volcengineApiKey ||
-      fallback.ARK_API_KEY ||
-      fallback.VOLCENGINE_API_KEY ||
-      reuseOpenAI("volcengine"),
+    google,
+    anthropic,
+    volcengine,
     openaiBaseUrl,
     // The base URLs follow the keys. An operator endpoint with no operator key behind it would
     // point a tenant's own key at a host that tenant never chose.

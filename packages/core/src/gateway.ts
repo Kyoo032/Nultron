@@ -1,4 +1,4 @@
-import { gatewayUrlOverrideAllowed, PINNED_GATEWAY_BASE_URL } from "./gateway/pinned";
+import { gatewayUrlOverride, PINNED_GATEWAY_BASE_URL } from "./gateway/pinned";
 import { assertAllowedEndpointUrl } from "./security/tls";
 
 /** Toko Token OpenAI-compatible gateway. Public Nultron’s home inference path. */
@@ -27,15 +27,15 @@ export function resolvedGatewayName(): string {
 }
 
 /**
- * Always the pinned gateway. `AGENTFORGE_GATEWAY_URL` is a **dev/test hook only** (branded flavors,
- * a local mock): it is ignored in a packaged build and in production — see `gateway/pinned.ts`.
+ * The pinned gateway, unless a channel that is allowed to move it says otherwise.
+ *
+ * A packaged build moves only for a brand flavor (Kemenkeu AI, AIHub Metranet), through
+ * `AGENTFORGE_BRAND_GATEWAY_URL`, which `main.cjs` assigns from the installed `brand.json`.
+ * `AGENTFORGE_GATEWAY_URL` is a **dev/test hook only**: ignored in a packaged build and in production.
+ * The rule is `gatewayUrlOverride()` in `gateway/pinned.ts`.
  */
 export function resolvedGatewayBaseUrl(): string {
-  if (!gatewayUrlOverrideAllowed()) {
-    return PINNED_GATEWAY_BASE_URL;
-  }
-  const fromEnv = envTrim("AGENTFORGE_GATEWAY_URL");
-  return fromEnv ? stripTrailingSlash(fromEnv) : PINNED_GATEWAY_BASE_URL;
+  return gatewayUrlOverride() ?? PINNED_GATEWAY_BASE_URL;
 }
 
 export function resolvedGatewayHost(): string {

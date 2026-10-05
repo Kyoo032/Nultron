@@ -109,7 +109,10 @@ async function saveEditFile(
 
 export async function handleGetEditDoctor(request?: HostRequest): Promise<HostResult> {
   const recheck = request?.query.recheck === "1" || request?.query.recheck === "true";
-  const report = await getEditDoctorAsync({ recheck });
+  // Hosted: the speech-to-text model it names comes from the caller's own catalogue, so the session's
+  // tenant goes along. A desk has one catalogue and is not asked who it is, exactly as before.
+  const scope = isServerMode() && request?.session ? { tenantId: request.session.tenantId } : undefined;
+  const report = await getEditDoctorAsync({ recheck, ...(scope ? { scope } : {}) });
   // Hosted: the binary's absolute path is the operator's filesystem, not the tenant's business.
   return jsonOk(isServerMode() ? withoutBinaryPath(report) : report);
 }

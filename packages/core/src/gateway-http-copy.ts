@@ -66,6 +66,28 @@ export function gatewayErrorKind(code: number): GatewayErrorKind | null {
 }
 
 /**
+ * Why a redirect was refused (hosted server only; `runtime/key-redirect.ts`). It has to be a sentence
+ * the person can act on, and it must not read as a transient fault: `isRetryableModelFailure` would
+ * otherwise spend three contact attempts re-asking a host that will answer the same way.
+ */
+const REDIRECT_REFUSED_COPY: Record<AppLocale, (status: number) => string> = {
+  en: (status) =>
+    `The provider answered with a redirect (status_code=${status}). The redirect was not followed because this request carries your API key.`,
+  id: (status) =>
+    `Penyedia membalas dengan pengalihan (status_code=${status}). Pengalihan tidak diikuti karena permintaan ini membawa API key.`,
+};
+
+/** Any 3xx: a request made with `redirect: "manual"` hands the redirect back instead of following it. */
+export function isRedirectStatus(status: number): boolean {
+  return status >= 300 && status < 400;
+}
+
+/** The failure for a key-bearing request whose answer was a redirect. Its body is empty on purpose. */
+export function redirectRefusedFailure(status: number, locale: AppLocale = "en"): GatewayHttpError {
+  return new GatewayHttpError(REDIRECT_REFUSED_COPY[parseAppLocale(locale)](status), status, "");
+}
+
+/**
  * A gateway HTTP failure as it travels through the AI SDK. The message is the sentence for the person
  * (`gatewayHttpFailure`); the status and the raw upstream body ride along so the runtime can tell what
  * the gateway refused. The body is a non-enumerable property: it never reaches a log line or a

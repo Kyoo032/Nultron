@@ -1,0 +1,40 @@
+# The build-context allowlist for webapp-deploy/portal.Dockerfile. BuildKit reads
+# `<dockerfile>.dockerignore` before `<context>/.dockerignore`, so this file, and not the app image's
+# Dockerfile.dockerignore, decides what the portal image can see. Everything is excluded first; the
+# lines that follow name what comes back (the last matching line wins).
+#
+# Keep it in step with portalContextFiles() in webapp-deploy/k8s/local-lib.mjs, which builds the
+# narrow snapshot the Kubernetes rehearsal uses; webapp-deploy/release-edge.test.mjs checks both.
+*
+
+# What `pnpm install --frozen-lockfile --filter "@agentforge/portal..."` reads: the workspace
+# manifests and the lockfile.
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!.npmrc
+!patches
+!apps/*/package.json
+!packages/*/package.json
+
+# What the portal runs, and the SQL it applies by path at boot (docs/internal/portal/migrations,
+# the backend team's files; the rest of docs/ stays out).
+!apps/portal
+!docs/internal/portal/migrations
+
+# The two operational scripts the stack runs INSIDE this image: the DSN wrapper (entrypoint of the
+# portal and of portal-prepare) and the one-shot that migrates as the schema owner and sets the app
+# login's password (the Kubernetes rehearsal's, unchanged). Baked in, so they always match the image's
+# sha and the release bundle needs no extra file.
+!webapp-deploy/portal-entry.sh
+!webapp-deploy/k8s/base/scripts/prepare-db.mjs
+
+# Never, even inside the folders above: dependencies and local state.
+**/node_modules
+**/.env
+**/.env.*
+**/*.enc
+**/.master-key
+**/*.sqlite
+**/*.sqlite-*
+**/*.log

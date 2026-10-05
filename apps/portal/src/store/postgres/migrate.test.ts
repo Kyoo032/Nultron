@@ -60,6 +60,7 @@ describe("runMigrations", () => {
     expect(first.applied).toContain("0002_core_tables.sql");
     expect(first.applied).toContain("0006_browser_login.sql");
     expect(first.applied).toContain("0007_tenant_resolvers.sql");
+    expect(first.applied).toContain("0011_invites.sql");
     expect(first.skipped).toHaveLength(0);
 
     const second = await migrate();
@@ -84,6 +85,7 @@ describe("runMigrations", () => {
       "audit_log",
       "oauth_clients",
       "auth_codes",
+      "invites",
     ]) {
       expect(await tableExists(table), table).toBe(true);
     }

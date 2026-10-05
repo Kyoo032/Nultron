@@ -21,7 +21,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { otpMessage } from "../mail/templates";
 import { catalogFor, PORTAL_LOCALES, translator, type PortalLocale } from "./i18n";
-import { approvePage, enterCodePage, errorPage, outcomePage, signInPage, userCodePage } from "./pages";
+import { approvePage, enterCodePage, errorPage, outcomePage, signInPage, userCodePage, inviteCodePage, statePage } from "./pages";
 
 const PRODUCT_NAME = "Nultron";
 
@@ -57,9 +57,35 @@ function everyScreen(locale: PortalLocale): Array<{ label: string; html: string 
       html: enterCodePage({
         ...base,
         action: "/authorize/verify",
+        resendAction: "/authorize/email",
+        restartAction: "/authorize/email",
         csrfToken: "tok",
         hidden: { state: "s" },
-        expiresInMinutes: 10,
+        email: "tester@example.test",
+        lead: t("sent.body", { email: "tester@example.test", minutes: 10 }),
+      }),
+    },
+    {
+      label: `inviteCode(${locale})`,
+      html: inviteCodePage({
+        ...base,
+        action: "/authorize/invite",
+        resendAction: "/authorize/invite/resend",
+        restartAction: "/authorize/email",
+        csrfToken: "tok",
+        hidden: { state: "s" },
+        email: "tester@example.test",
+      }),
+    },
+    {
+      label: `state(${locale})`,
+      html: statePage({
+        ...base,
+        title: t("state.noAccess.title"),
+        message: t("state.noAccess.body"),
+        restartAction: "/authorize/email",
+        csrfToken: "tok",
+        hidden: { state: "s" },
       }),
     },
     {

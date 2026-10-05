@@ -22,6 +22,7 @@ import {
   PORTAL_CHECK_WAIT_MS,
   TERMINAL_PORTAL_REASONS,
   createPortalSessionCheck,
+  type PortalSessionCheckOptions,
 } from "./portal-check";
 import { PORTAL_CHECK_INTERVAL_MS, createSession, verifySession, type AuthReason, type SessionRecord } from "./session";
 import { createSessionSecrets, type SessionSecrets } from "./session-secrets";
@@ -44,6 +45,7 @@ function tokens(generation: number): PortalTokens {
     userId: "usr_1",
     orgId: "org_1",
     tenantId: "tnt_1",
+    role: "member",
   };
 }
 
@@ -95,7 +97,12 @@ type Harness = {
 };
 
 async function harness(
-  options: { withTokens?: boolean; waitMs?: number; secrets?: SessionSecrets } = {},
+  options: {
+    withTokens?: boolean;
+    waitMs?: number;
+    secrets?: SessionSecrets;
+    applyRole?: PortalSessionCheckOptions["applyRole"];
+  } = {},
 ): Promise<Harness> {
   const store = createMemorySessionStore();
   const vault = createMemoryTokenVault();
@@ -107,7 +114,13 @@ async function harness(
   }
   const clock = { now: DUE };
   const secrets = options.secrets ?? createSessionSecrets(() => WRAP);
-  const check = createPortalSessionCheck({ vault, portal: portal.client, waitMs: options.waitMs, secrets });
+  const check = createPortalSessionCheck({
+    vault,
+    portal: portal.client,
+    waitMs: options.waitMs,
+    secrets,
+    applyRole: options.applyRole,
+  });
   return { store, vault, portal, session, check, secrets, clock, context: { store, now: () => clock.now } };
 }
 
@@ -218,6 +231,127 @@ describe("the gate once the portal's last word is ten minutes old", () => {
     });
     const verdict = await h.check.gate(h.session, h.context);
     expect(JSON.stringify(verdict)).not.toMatch(/refresh-|access-/);
+  });
+});
+
+describe("the role the portal sends with a refresh", () => {
+  type Applied = { identity: { tenantId: string; orgId: string; userId: string }; role: string | null };
+
+  function recorder(): { applied: Applied[]; applyRole: NonNullable<PortalSessionCheckOptions["applyRole"]> } {
+    const applied: Applied[] = [];
+    return {
+      applied,
+      applyRole: async (identity, role) => {
+        applied.push({ identity, role });
+      },
+    };
+  }
+
+  it("hands the rotated role to the host with the session's own ids, before the gate answers", async () => {
+    const { applied, applyRole } = recorder();
+    const h = await harness({ applyRole });
+    h.portal.answerWith(async () => ({ ...tokens(2), role: "admin" }));
+
+    expect(await h.check.gate(h.session, h.context)).toEqual({ ok: true });
+
+    expect(applied).toEqual([{ identity: { tenantId: "tnt_1", orgId: "org_1", userId: "usr_1" }, role: "admin" }]);
+  });
+
+  it("applies a role the portal changed on the very next refresh", async () => {
+    const { applied, applyRole } = recorder();
+    const h = await harness({ applyRole });
+    h.portal.answerWith(async () => ({ ...tokens(2), role: "owner" }));
+    await h.check.gate(h.session, h.context);
+
+    h.portal.answerWith(async () => ({ ...tokens(3), role: "member" }));
+    h.clock.now = DUE + PORTAL_CHECK_INTERVAL_MS;
+    await h.check.gate(await reread(h), h.context);
+
+    expect(applied.map((entry) => entry.role)).toEqual(["owner", "member"]);
+  });
+
+  it("hands over no role as no role, for the host to read as a member", async () => {
+    const { applied, applyRole } = recorder();
+    const h = await harness({ applyRole });
+    h.portal.answerWith(async () => ({ ...tokens(2), role: null }));
+
+    await h.check.gate(h.session, h.context);
+
+    expect(applied.map((entry) => entry.role)).toEqual([null]);
+  });
+
+  it("applies it on a refresh the gate did not start, such as POST /auth/refresh and a sign-out", async () => {
+    const { applied, applyRole } = recorder();
+    const h = await harness({ applyRole });
+    h.portal.answerWith(async () => ({ ...tokens(2), role: "member" }));
+
+    const outcome = await h.check.refresh(h.session, h.context);
+
+    expect(outcome.kind).toBe("rotated");
+    expect(applied.map((entry) => entry.role)).toEqual(["member"]);
+  });
+
+  it("applies nothing when the portal ends the session, says nothing, or there is nothing to present", async () => {
+    const { applied, applyRole } = recorder();
+    const ended = await harness({ applyRole });
+    ended.portal.answerWith(async () => {
+      throw new PortalError("device_revoked", 403);
+    });
+    await ended.check.gate(ended.session, ended.context);
+
+    const silent = await harness({ applyRole });
+    silent.portal.answerWith(async () => {
+      throw new PortalError("portal_unavailable", 503);
+    });
+    await silent.check.gate(silent.session, silent.context);
+
+    const nothing = await harness({ applyRole, withTokens: false });
+    await nothing.check.gate(nothing.session, nothing.context);
+
+    expect(applied).toEqual([]);
+  });
+
+  it("does not apply a role inside the ten-minute interval, because nothing was asked", async () => {
+    const { applied, applyRole } = recorder();
+    const h = await harness({ applyRole });
+    h.clock.now = DUE - 1;
+
+    await h.check.gate(h.session, h.context);
+
+    expect(applied).toEqual([]);
+    expect(h.portal.refreshCalls).toEqual([]);
+  });
+
+  it("keeps the rotation and the session when the host cannot write the role, and says so by name only", async () => {
+    const error = vi.spyOn(log, "error");
+    const h = await harness({
+      applyRole: async () => {
+        throw Object.assign(new Error("Failed query: update organization_members set role = ? params: owner"), {
+          params: ["owner"],
+          cause: { code: "SQLITE_BUSY" },
+        });
+      },
+    });
+    h.portal.answerWith(async () => ({ ...tokens(2), role: "member" }));
+
+    expect(await h.check.gate(h.session, h.context)).toEqual({ ok: true });
+
+    // The pair the portal just issued is kept and the check is stamped: dropping it would make the
+    // next refresh a replay, which the portal reads as theft.
+    expect(await h.vault.get(h.session.id)).toMatchObject({ refreshToken: "refresh-2" });
+    expect((await reread(h)).portalCheckedAt).toBe(DUE);
+    expect((await reread(h)).revokedAt).toBeNull();
+    const line = error.mock.calls.find(([event]) => event === "portal_role_not_recorded");
+    expect(line?.[1]).toMatchObject({ tenantId: "tnt_1", fault: { name: "Error", code: "SQLITE_BUSY" } });
+    expect(JSON.stringify(error.mock.calls)).not.toContain("Failed query");
+    error.mockRestore();
+  });
+
+  it("does nothing about roles when no host is wired to apply them", async () => {
+    const h = await harness();
+    h.portal.answerWith(async () => ({ ...tokens(2), role: "owner" }));
+
+    expect(await h.check.gate(h.session, h.context)).toEqual({ ok: true });
   });
 });
 

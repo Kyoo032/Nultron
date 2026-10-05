@@ -13,6 +13,7 @@ import { createRuntime, type PortalRuntime } from "../flows/context";
 import { resolveKeyring } from "../jwt/keys";
 import type { MailMessage, Mailer, SentMail } from "../mail/types";
 import { registerPortalRoutes } from "../routes";
+import { createPortalLimiters, createRateLimiter, type PortalLimiters } from "../security/rate-limit";
 import { createPortalServer, type PortalServer } from "../server";
 import { createTestStore, type TestStore } from "./pg";
 import type { Clock } from "../store/types";
@@ -20,6 +21,8 @@ import type { Clock } from "../store/types";
 export interface CapturedMail extends MailMessage {
   /** The six digits, pulled out of the body so a test does not have to parse copy. */
   readonly code: string | null;
+  /** The invite code (`XXXXX-XXXXX-XXXXX-XXXXX`), when this is an invite e-mail. */
+  readonly inviteCode: string | null;
 }
 
 export interface TestMailer extends Mailer {
@@ -29,6 +32,8 @@ export interface TestMailer extends Mailer {
   newest(): CapturedMail | null;
   clear(): void;
 }
+
+const FIFTEEN_MINUTES = 15 * 60 * 1000;
 
 export function createTestMailer(): TestMailer {
   const sent: CapturedMail[] = [];
@@ -48,7 +53,11 @@ export function createTestMailer(): TestMailer {
         failing = false;
         throw new Error("transport refused the message");
       }
-      sent.push({ ...message, code: /\b(\d{6})\b/.exec(message.text)?.[1] ?? null });
+      sent.push({
+        ...message,
+        code: /\b(\d{6})\b/.exec(message.text)?.[1] ?? null,
+        inviteCode: /\b([A-HJ-NP-Z2-9]{5}(?:-[A-HJ-NP-Z2-9]{5}){3})\b/.exec(message.text)?.[1] ?? null,
+      });
       return { messageId: `test-${sent.length}`, accepted: [message.to] };
     },
     async close() {},
@@ -97,6 +106,12 @@ export interface PortalHarness {
 }
 
 export interface StartPortalOptions {
+  /**
+   * `production` keeps the e-mail step's two strict limits (15 per IP and 6 per address, each per
+   * 15 minutes) exactly as shipped. The default, `relaxed`, lifts them, because a suite that signs
+   * in thirty times from one address is not a suite about that limit -- and the one that is says so.
+   */
+  readonly emailStepLimits?: "production" | "relaxed";
   readonly clock?: Clock;
   readonly config?: Partial<PortalConfig>;
   readonly trustProxy?: boolean;
@@ -113,6 +128,16 @@ export async function startTestPortal(options: StartPortalOptions = {}): Promise
 
   const config = testConfig(options.config);
   const keys = resolveKeyring(config, log);
+  const limiterClock = options.clock ?? store.store.clock;
+  const shipped = createPortalLimiters(limiterClock);
+  const limiters: PortalLimiters =
+    options.emailStepLimits === "production"
+      ? shipped
+      : {
+          ...shipped,
+          signInEmailIp: createRateLimiter({ clock: limiterClock, windowMs: FIFTEEN_MINUTES, max: 1_000_000 }),
+          signInEmailAddress: createRateLimiter({ clock: limiterClock, windowMs: FIFTEEN_MINUTES, max: 1_000_000 }),
+        };
   const server = createPortalServer({ config, store: store.store, log, clock: options.clock });
 
   // Listen first: the issuer has to name the port the OS actually handed out, because it is both
@@ -129,6 +154,7 @@ export async function startTestPortal(options: StartPortalOptions = {}): Promise
     clock: options.clock,
     issuer: origin,
     trustProxy: options.trustProxy ?? false,
+    limiters,
   });
   registerPortalRoutes(server, runtime);
 
@@ -168,7 +194,16 @@ export interface Agent {
   cookieHeader(): string;
 }
 
-export function createAgent(origin: string): Agent {
+export interface AgentOptions {
+  /**
+   * Sent with every request. A suite that needs a browser at its own address sets
+   * `x-forwarded-for` here, on a portal started with `trustProxy: true`, so a per-IP budget one
+   * test spends is not the budget the next test finds.
+   */
+  readonly headers?: Readonly<Record<string, string>>;
+}
+
+export function createAgent(origin: string, options: AgentOptions = {}): Agent {
   const cookies = new Map<string, string>();
 
   const remember = (response: Response): void => {
@@ -191,7 +226,10 @@ export function createAgent(origin: string): Agent {
     [...cookies].map(([name, value]) => `${name}=${value}`).join("; ");
 
   const call = async (path: string, init: RequestInit): Promise<Reply> => {
-    const headers = new Headers(init.headers);
+    const headers = new Headers(options.headers);
+    for (const [name, value] of new Headers(init.headers)) {
+      headers.set(name, value);
+    }
     if (cookies.size > 0) {
       headers.set("cookie", cookieHeader());
     }

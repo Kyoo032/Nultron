@@ -31,6 +31,10 @@ main{background:var(--card);border:1px solid var(--line);border-radius:12px;padd
 h1{font-size:1.35rem;margin:0 0 .5rem}
 p{margin:0 0 1rem;color:var(--muted)}
 p.lead{color:var(--ink)}
+p.notice{border-left:3px solid var(--accent);padding-left:.75rem;color:var(--ink)}
+.account{border:1px solid var(--line);border-radius:8px;padding:.6rem .75rem;margin:0 0 1.25rem}
+.account p{margin:0 0 .4rem;font-size:.9rem}
+.account button.secondary{width:auto;margin:0;padding:.35rem .75rem;font-size:.9rem}
 label{display:block;font-weight:600;font-size:.9rem;margin-bottom:.35rem}
 input{width:100%;padding:.7rem .75rem;font:inherit;color:var(--ink);background:transparent;
  border:1px solid var(--line);border-radius:8px}

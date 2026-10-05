@@ -1,0 +1,44 @@
+# The app's two volumes, ReadWriteOnce. The class is NOT set here: the base uses the cluster default and
+# each overlay decides (local: Docker Desktop's hostpath class; production: CBS, zone-bound, with
+# WaitForFirstConsumer). A block volume only: SQLite on a network filesystem corrupts.
+#
+# nultron-data        everything a tenant's work writes: agentforge.sqlite, settings.enc, media, logs.
+# nultron-components  executable content, the operator's, empty on a healthy image (Phase 7). It is a
+#                     separate volume so /data can be mounted noexec, which a PVC cannot express: see
+#                     the README ("what is not done").
+# nultron-backups     encrypted archives written by the backup CronJob.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nultron-data
+  labels:
+    app.kubernetes.io/part-of: nultron
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nultron-components
+  labels:
+    app.kubernetes.io/part-of: nultron
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nultron-backups
+  labels:
+    app.kubernetes.io/part-of: nultron
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 5Gi
