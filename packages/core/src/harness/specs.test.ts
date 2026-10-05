@@ -39,7 +39,7 @@ const REPAIR_ROUNDS: Record<ProductMode, number> = {
   music: 0,
   edit: 0,
   presentations: 1,
-  education: 0,
+  education: 1,
 };
 
 describe("mode harness specs", () => {
