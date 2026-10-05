@@ -1,20 +1,27 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
+import { messageUnlessBlocked } from "@/lib/gateway-blocked";
 import type { AppLocale } from "@agentforge/core/locale";
 import type { MeetingMinutes, MeetingTranscript } from "@agentforge/core/meeting";
 import { Link } from "@/lib/nav";
 import { JobProgressList } from "@/components/job-progress";
+import { MeetingMinutesPanel } from "@/components/meeting-minutes-panel";
 import { MeetingMinutesView } from "@/components/meeting-minutes-view";
 import { MeetingOtherDeskClips, MeetingRecorderPanel } from "@/components/meeting-recorder";
 import { ModeHeader } from "@/components/mode-header";
 import { ModeIllustration } from "@/components/mode-illustration";
 import { ModelSelect } from "@/components/model-select";
+import { isGatewayBlockedText } from "@/lib/gateway-blocked";
+import { NeedsKeyNote } from "@/components/needs-key-note";
 import { WorkingStatus } from "@/components/working-status";
 import { apiFetch } from "@/lib/api-client";
 import { t } from "@/lib/i18n";
+import type { MeetingChecksWire } from "@/lib/meeting-checks";
 import type { RecordedClip } from "@/lib/meeting-recorder";
+import { modelPickBody, studioModelPick } from "@/lib/model-choice";
 import { postMeetingRecording, saveClipToDevice, type MeetingApiFetch, type UploadOutcome } from "@/lib/meeting-upload";
+import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import { useJobModel } from "@/lib/use-job-model";
 import { useJobStream } from "@/lib/use-job-stream";
 import { useMeetingRecorder } from "@/lib/use-meeting-recorder";
@@ -27,6 +34,8 @@ type MinutesRecord = {
   artifactId: string;
   model: string;
   unverifiedNames: string[];
+  /** What the checks made of the first-language minutes; null for a translation and for older records. */
+  checks?: MeetingChecksWire | null;
 };
 
 type Meeting = {
@@ -51,6 +60,11 @@ type Capability = {
 type Tab = "transcript" | "minutes" | "translation";
 
 function errorMessage(payload: unknown, fallback: string): string {
+  // Hosted only: a 403 gateway_blocked is "no usable key", said as the catalog sentence (`gateway-blocked.ts`).
+  const blocked = messageUnlessBlocked(payload, () => "");
+  if (blocked) {
+    return blocked;
+  }
   if (payload && typeof payload === "object") {
     const error = (payload as { error?: { message?: unknown } }).error;
     if (error && typeof error.message === "string" && error.message.trim()) {
@@ -263,7 +277,10 @@ export function MeetingListRow({
 }
 
 export function MeetingStudio() {
-  const { models, model, setModel } = useJobModel("meeting");
+  // Nultron Enterprise: a signed-in tenant may open the desk before adding a key. Hosted only; false elsewhere.
+  // Recording and uploading are local, so only the transcribe-and-minute run waits for a key.
+  const needsKey = useHostedNeedsKey();
+  const { models, model, pinned: modelPinned, setModel } = useJobModel("meeting");
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [capability, setCapability] = useState<Capability | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -565,7 +582,7 @@ export function MeetingStudio() {
   }
 
   async function onRun() {
-    if (!selected || job.busy) {
+    if (!selected || job.busy || needsKey) {
       return;
     }
     setError(null);
@@ -574,7 +591,9 @@ export function MeetingStudio() {
     const url = selected.transcript
       ? `/api/v1/meetings/${selected.id}/minutes/stream`
       : `/api/v1/meetings/${selected.id}/run/stream`;
-    const result = await job.run(url, { model, translate: true });
+    // `modelPinned` travels only for a model the person picked: the host then never swaps it for a
+    // stand-in when the gateway cannot reach it (`model-choice.ts`).
+    const result = await job.run(url, { ...modelPickBody(studioModelPick(model, modelPinned)), translate: true });
     if (result) {
       merge(result);
       setTab("minutes");
@@ -621,7 +640,8 @@ export function MeetingStudio() {
     >
       <ModeHeader icon="meeting" title={t("meeting.title")} outcome={t("meeting.subtitle")} />
 
-      {shown ? (
+      {needsKey ? <NeedsKeyNote testId="meeting-needs-key" className="mt-6 text-sm text-[var(--text-2)]" /> : null}
+      {shown && !isGatewayBlockedText(shown) ? (
         <div
           className="mt-6 rounded-lg border border-[var(--line)] px-4 py-3 text-sm text-[var(--danger)]"
           role="alert"
@@ -696,7 +716,7 @@ export function MeetingStudio() {
         <button
           type="submit"
           disabled={busy !== null || recording || !title.trim()}
-          className="btn btn-primary rounded-pill px-4"
+          className="btn btn-primary h-9 rounded-pill px-4"
           data-testid="meeting-create"
         >
           {t("meeting.create")}
@@ -774,7 +794,7 @@ export function MeetingStudio() {
                 <button
                   type="button"
                   onClick={() => void onRun()}
-                  disabled={job.busy || busy !== null || (!selected.recording && !selected.transcript)}
+                  disabled={job.busy || busy !== null || needsKey || (!selected.recording && !selected.transcript)}
                   className="btn btn-primary rounded-pill px-4"
                   data-testid="meeting-run"
                 >
@@ -882,16 +902,7 @@ export function MeetingStudio() {
                     {selected.transcript.text}
                   </pre>
                 ) : null}
-                {tab === "minutes" && selected.minutes ? (
-                  <div className="enter-rise">
-                    {selected.minutes.unverifiedNames.length > 0 ? (
-                      <p className="mb-3 text-xs text-[var(--text-3)]" data-testid="meeting-unverified">
-                        {t("meeting.unverified", { count: String(selected.minutes.unverifiedNames.length) })}
-                      </p>
-                    ) : null}
-                    <MeetingMinutesView minutes={selected.minutes.minutes} testId="meeting-minutes" />
-                  </div>
-                ) : null}
+                {tab === "minutes" && selected.minutes ? <MeetingMinutesPanel record={selected.minutes} /> : null}
                 {tab === "translation" && selected.translation ? (
                   <div className="enter-rise">
                     <MeetingMinutesView minutes={selected.translation.minutes} testId="meeting-translation" />

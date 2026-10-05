@@ -5,6 +5,7 @@ import { NultronMascot } from "@/components/nultron/nultron-mascot";
 import {
   classifyStandaloneHref,
   jobEmbedsFromOutput,
+  jobEmbedsFromTools,
   presentStandaloneLink,
   splitUserFileBlocks,
 } from "./message-embeds";
@@ -90,6 +91,14 @@ describe("file blocks and job results", () => {
   it("reads a titled job payload", () => {
     expect(jobEmbedsFromOutput({ title: "Brief", summary: "Cash lasts nine weeks." })).toEqual([
       { title: "Brief", detail: "Cash lasts nine weeks.", href: undefined },
+    ]);
+  });
+
+  it("keeps knowledge excerpts on their tool row, not as result cards", () => {
+    const output = { results: [{ title: "Q3 plan", snippet: "Hire two analysts.", source_id: "s1" }] };
+    expect(jobEmbedsFromTools([{ key: "knowledge_search", status: "completed", output }])).toEqual([]);
+    expect(jobEmbedsFromTools([{ key: "web_search", status: "completed", output }])).toEqual([
+      { title: "Q3 plan", detail: "Hire two analysts.", href: undefined },
     ]);
   });
 });

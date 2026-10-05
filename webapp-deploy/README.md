@@ -3,8 +3,12 @@
 > Target host: **Tencent Cloud CVM, Jakarta**. Storage placement: [`docs/internal/web-data-placement-tencent.md`](../docs/internal/web-data-placement-tencent.md). Security requirements and the before-traffic acceptance list: [`docs/internal/web-security-spec.md`](../docs/internal/web-security-spec.md).
 
 The full structure for running Nultron as a hosted web app on Kyo's server: image,
-compose stack, reverse proxy, env template, and the scripts for build / deploy / backup
-/ restore / logs.
+compose stack (the app, its proxy, and the portal stand-in with its database), reverse
+proxy, env templates, and the scripts for build / deploy / backup / restore / logs.
+
+**Phase 0 (owner decision, 2026-10-01): a pilot for 10 internal testers on one Tencent
+Lighthouse box with this compose stack.** The way to run it is [Phase 0 pilot
+(compose)](#phase-0-pilot-compose); the rest of this file is the reference it leans on.
 
 This folder is **additive**. Nothing in `apps/`, `packages/`, the root `package.json`,
 `pnpm-workspace.yaml` or `turbo.json` is touched, so the Electron desktop app (frozen at
@@ -25,29 +29,44 @@ The step-by-step path from here to a safe public deployment is
 webapp-deploy/
 ├─ README.md                  this file
 ├─ Dockerfile                 multi-stage image (build context is the REPO ROOT)
-├─ .dockerignore              context excludes
-├─ Dockerfile.dockerignore    identical copy - the name BuildKit actually reads (see below)
-├─ compose.yml                app + proxy, read-only root, caps dropped, limits
-├─ Caddyfile                  TLS, CSP + security headers, JSON access log, reverse_proxy
-├─ .env.example               every env var the host reads, with one line each
+├─ .dockerignore              a byte copy of Dockerfile.dockerignore (see "Why three ignore files")
+├─ Dockerfile.dockerignore    the name BuildKit actually reads for Dockerfile
+├─ portal.Dockerfile          the portal stand-in's image (the app image cannot run it)
+├─ portal.Dockerfile.dockerignore  an ALLOWLIST: the only files the portal image can see
+├─ portal-entry.sh            builds the portal's two DSNs from its two passwords, then runs a command
+├─ compose.yml                app + proxy + portal + portal-db + portal-prepare, read-only roots, caps dropped, limits
+├─ compose.local.yml          LOCAL REHEARSAL ONLY: loopback ports, a throwaway CA, Mailpit
+├─ pilot-local.mjs            drives that rehearsal: up, drive (headless sign-in), down
+├─ Caddyfile                  TLS for two names, CSP + security headers, filtered logs, the billing block
+├─ .env.example               the APP's env: every var the host reads, with one line each
+├─ portal.env.example         the PORTAL's env: signing key, database passwords, Tencent SES login
 ├─ DEPLOY-LOG.md              date | sha | env | who | notes
+├─ k8s/                       the Kubernetes rehearsal (a second deploy path; its own README)
 └─ scripts/
    ├─ _common.sh              shared helpers (sourced, not run)
-   ├─ build.sh                build the image, print its size
+   ├─ build.sh                build the app and portal images, print their sizes
    ├─ deploy.sh               secrets from SSM, build, up -d, health, log the sha
    ├─ backup.sh               SQLite snapshot + encrypted tar of /data -> COS
    ├─ restore.sh              decrypt and restore an archive into the volume
+   ├─ portal.sh               run an apps/portal script (seed, invite, ...) in the running portal
    ├─ components.sh           status / check / install the server's native components
    └─ logs.sh                 health + follow logs
 ```
 
-### Why two ignore files
+### Why three ignore files
 
 BuildKit looks for `<dockerfile-path>.dockerignore` before it falls back to
-`<context>/.dockerignore`. The Dockerfile lives here but the build context is the repo
-root, so the file Docker actually reads is `webapp-deploy/Dockerfile.dockerignore`.
-`.dockerignore` is kept under the name people expect. **They are byte-identical — edit
-both together.** Without them the context is ~1.4 GB (`node_modules` plus `.git`).
+`<context>/.dockerignore`. The Dockerfiles live here but the build context is the repo
+root, so the files Docker actually reads are `webapp-deploy/Dockerfile.dockerignore` (the app
+image) and `webapp-deploy/portal.Dockerfile.dockerignore` (the portal image, an allowlist).
+Without them the context is ~1.4 GB (`node_modules` plus `.git`).
+
+`.dockerignore` is the third, and since 2026-10-01 a byte copy of `Dockerfile.dockerignore`
+(`scripts/pilot-deploy.test.mjs` fails if they drift, security-register SR-94). Nothing reads it for the
+documented builds; it is there so a build with `webapp-deploy/` as the context cannot re-open SR-49.
+`Dockerfile.dockerignore` also excludes `webapp-deploy/k8s`, `webapp-deploy/*.env` and
+`webapp-deploy/.pilot-local`, so a build from a checkout cannot pick up a throwaway CA's private key or
+the pilot's second env file. The release path never builds from a checkout anyway: it archives a sha.
 
 ## What the image contains
 
@@ -56,18 +75,27 @@ both together.** Without them the context is ~1.4 GB (`node_modules` plus `.git`
   `pnpm-lock.yaml` resolves `@firecrawl/anydoc` to the `-linux-x64-gnu` / `-linux-arm64-gnu`
   packages — musl would pick different ones and force a `better-sqlite3` rebuild.
 - pnpm `9.15.9` via corepack, matching the root `packageManager` field.
-- `pnpm install --frozen-lockfile --filter "@agentforge/web..."` — the web app and its
-  workspace dependencies only. `apps/desktop` (Electron, electron-builder, keytar) and
-  `apps/mobile` are never installed.
-- `pnpm --filter @agentforge/web build` → `vite build` → `apps/web/dist`, which
-  `server.ts` serves statically when `NODE_ENV=production`.
+- Two installs, in two build stages. The `build` stage runs
+  `pnpm install --frozen-lockfile --filter "@agentforge/web..."` (the web app and its
+  workspace dependencies only; `apps/desktop` — Electron, electron-builder, keytar — and
+  `apps/mobile` are never installed) and then `pnpm --filter @agentforge/web build` →
+  `vite build` → `apps/web/dist`, which `server.ts` serves statically when
+  `NODE_ENV=production`. The `prod` stage runs the same install with `--prod`, copies in
+  `apps/web/dist`, and is the tree the runtime stage copies. Nothing from the `build`
+  stage's `node_modules` reaches the image.
+- **Production dependencies only (SR-113, 2026-10-05).** `vite`, `tailwindcss`, `vitest`,
+  `typescript`, `biome` and the rest of the dev toolchain are not in the image
+  (`/app/node_modules` is about 265 packages and 298 MB, from about 452 and 586 MB).
+  That is what takes `braces`, which arrives only through `tailwindcss`, out of
+  `scripts/audit-deployed.mjs`. The price: server code may import only what a workspace
+  `package.json` lists under `dependencies`. `tsx` moved there for that reason, `vite` is a
+  dynamic import on the non-production branch of `apps/web/server.ts`, and the `prod` stage
+  loads `@agentforge/host/http` at build time, so a server import of a dev-only package
+  fails the build with `ERR_MODULE_NOT_FOUND` instead of the first start.
 - **The whole workspace source ships.** Every `@agentforge/*` package exports TypeScript
   directly (`packages/host/package.json` → `./src/index.ts`), and `apps/web`'s `start`
-  script is `NODE_ENV=production tsx server.ts`. Dev dependencies stay in the image
-  because `tsx` is one of them and it is the production entrypoint — `pnpm prune --prod`
-  would delete the thing that boots the app. Shrinking this (a compiled bundle, or
-  moving `tsx` to a dependency) is a migration-plan item, not something this folder
-  changes.
+  script is `NODE_ENV=production tsx server.ts`. Compiling that to a bundle is a
+  migration-plan item, not something this folder changes (SR-49).
 - Runs as the non-root `node` user. `/data` is owned by `node` and declared a volume.
 - `HEALTHCHECK` hits `GET /healthz` on `127.0.0.1:$PORT` with `node -e fetch` (there is
   still no curl in the image), **and sends no headers**. Phase 8 changed both halves of
@@ -140,7 +168,7 @@ there is no alternative any more. The proxy joins the app container's network na
 
 ```yaml
 proxy:
-  image: caddy:2-alpine
+  image: caddy:2.11-alpine
   network_mode: "service:app"
 ```
 
@@ -165,6 +193,274 @@ public origin with its scheme (`https://$NULTRON_DOMAIN`, comma-separated for mo
 one name); an empty list in server mode accepts no write at all. `Origin` must never be
 rewritten by the proxy - that is the CSRF hole the check exists to close.
 
+## Phase 0 pilot (compose)
+
+Owner decision, Rizky, 2026-10-01: Phase 0 is **10 internal testers on ONE Tencent Lighthouse box
+(4 vCPU / 8 GB, Jakarta) with docker compose**. Sign-in e-mail goes through **Tencent SES**. The
+billing webhook is **blocked at Caddy** until a payment provider is chosen. Exactly **one app and
+one portal process**. This section is the way to run that; nothing in it is Kubernetes (see
+[`k8s/README.md`](k8s/README.md) for that path).
+
+### What runs
+
+```
+ internet --80/443/udp443--> [ app container ]  tsx server.ts on 127.0.0.1:3000
+                               | shared network namespace
+                             [ proxy: Caddy 2.11 ]  443 --> NULTRON_DOMAIN -> 127.0.0.1:3000   (the app)
+                               |                          PORTAL_DOMAIN  -> portal:4000       (the portal)
+                               |                          POST /api/v1/billing/webhook* -> 404 right here
+        default network --------- [ portal ]  apps/portal, one process, NODE_ENV=production
+                                      |  (also on) portal-db network: internal, no way out
+                                  [ portal-db ] Postgres 16      [ portal-prepare ] one-shot, every `up`
+```
+
+- **One compose file, extended, not a second one.** `compose.yml` already was the stack, and the
+  hosted app cannot sign anybody in without a portal, so the portal and its database belong in it.
+  A separate `compose.pilot.yml` would have meant two files to keep in step with the same app and
+  proxy, and a third generated one in the release bundle. The released bundle's compose file
+  (`composeFile()` in `scripts/release-web.mjs`) carries the same five services; the test
+  `scripts/pilot-deploy.test.mjs` compares the two service by service.
+- **The portal has its own image**, `ghcr.io/kyoo032/nultron-portal:<tag>`, built from
+  [`portal.Dockerfile`](portal.Dockerfile). The app image cannot run it: it is installed with
+  `--filter "@agentforge/web..."`, so it carries the portal's source but not its `node_modules`
+  (`ERR_MODULE_NOT_FOUND: nodemailer`, found by the Kubernetes rehearsal). `release-web.mjs` builds
+  and pushes both from the same `git archive <sha>` and pins both in the released compose file.
+  Its build context is an allowlist ([`portal.Dockerfile.dockerignore`](portal.Dockerfile.dockerignore)):
+  the workspace manifests, `apps/portal`, the portal's SQL migrations and two small scripts.
+- **Two env files, because the app must not hold the portal's secrets.** `.env` is the app's (and what
+  compose interpolates). `portal.env` is loaded only by `portal`, `portal-prepare` and `portal-db`: the
+  signing key, the two database passwords, the SMTP login. An app container that held the signing key
+  could mint sign-in tokens, and one that held the SMTP password could send mail as Nultron. The proxy
+  gets no env file at all, only `NULTRON_DOMAIN` and `PORTAL_DOMAIN` (SR-73). `portal-db` shares
+  `portal.env`, so it can read its password; it is on an internal network with no route out.
+- **App to portal over https (SR-26).** In production the app refuses an `http://` portal URL. The app
+  container resolves `PORTAL_DOMAIN` to its **own loopback** (`extra_hosts`), where the proxy, which shares
+  its network namespace, listens on 443 with the portal's real certificate. The browser reaches the same
+  Caddy from outside, so the two paths meet at one place. It depends on no public DNS record, no NAT
+  reflection and no docker-proxy. `AGENTFORGE_PORTAL_URL` is the bare origin `https://<PORTAL_DOMAIN>`: this
+  portal serves `/auth/token` at its root, so the `/api` suffix an earlier template carried is wrong.
+- **One process each (SR-29, SR-66).** The portal's rate-limit windows, the app's limiters and the portal
+  refresh lock live in memory. Do not add replicas.
+- **Sizing.** The limits are ceilings: app 6 GB, database 1 GB, portal 768 MB, proxy 512 MB, which add up to
+  more than the 8 GB box. Idle, the four long-running containers used about 395 MiB together on the local
+  rehearsal (app 280, portal 58, database 40, proxy 16; `docker stats`, 2026-10-01), so 8 GB is comfortable for
+  ten testers. If a model-heavy job ever pushes the app to its ceiling, the kernel's OOM killer, not Docker,
+  chooses what dies: lower the app's `mem_limit` before adding testers rather than after. Not measured under
+  load.
+
+### The box
+
+1. **Image and Docker.** A current Ubuntu LTS image on the Lighthouse instance, Docker Engine and the
+   compose plugin from Docker's own apt repository. **Compose 2.24 or newer**: the stack uses `env_file`
+   with `required:` and `depends_on` conditions. Do not enable Docker's IPv6 (`"ipv6": true` in
+   `/etc/docker/daemon.json`). A deploy user in the `docker` group, SSH key-only, root login off,
+   `unattended-upgrades` on (security-spec H1, I4).
+2. **Firewall (Lighthouse console).** Inbound **TCP 80, TCP 443, UDP 443** from IPv4 anywhere; **TCP 22
+   from your own address only**; nothing else, and no rule for `::/0`. Port 80 is the ACME challenge and
+   the redirect, UDP 443 is HTTP/3. Outbound must reach TCP 443 (the gateway, the registry, Let's Encrypt)
+   and **TCP 465 to `sg-smtp.qcloudmail.com`** (SES); check it from the box with
+   `nc -vz sg-smtp.qcloudmail.com 465` rather than assuming the console's defaults.
+3. **IPv4 only (SR-79).** Every per-IP limit, on the app and on the portal, keys on the full IPv6
+   address, and one IPv6 client can mint a fresh bucket per request. So the pilot is reachable over IPv4
+   only, and `compose.yml` publishes `0.0.0.0:80`, `0.0.0.0:443` and `0.0.0.0:443/udp`, never a bare
+   `443:443` (which makes Docker bind `[::]:443` too). Publish **no AAAA record** for either name. Prove it
+   on the box and from outside, and write the result in `DEPLOY-LOG.md`:
+
+   ```sh
+   ip -6 addr show scope global                  # expect nothing: the instance has no public IPv6
+   docker compose ps                             # PORTS shows 0.0.0.0:443->443/tcp and NO [::]:443
+   sudo ss -ltnu | grep -E ':(80|443) '          # only 0.0.0.0:80 and 0.0.0.0:443, no [::]:...
+   dig +short AAAA <NULTRON_DOMAIN> <PORTAL_DOMAIN>   # expect nothing
+   curl -6 -m 8 -sI https://<NULTRON_DOMAIN>     # from another machine: expect it to fail
+   ```
+
+   If `ip -6 addr` does show a global address, either turn IPv6 off for the instance or fix SR-79 in
+   `rateLimitKey` and `clientIp` (key an IPv6 address by its /64) before taking testers.
+4. **DNS.** Two **A** records to the box's public IPv4: `NULTRON_DOMAIN` (the app) and `PORTAL_DOMAIN` (the
+   portal), for example `pilot.example.com` and `pilot-login.example.com`. Caddy obtains and renews a
+   certificate for each.
+5. **Secrets.** Generate each once; never commit them; keep a copy somewhere that is not this server.
+
+   ```sh
+   cd webapp-deploy
+   cp .env.example .env && cp portal.env.example portal.env && chmod 600 .env portal.env
+   openssl rand -hex 32     # AGENTFORGE_SECRETS_KEY       (the wrap key: a new one cannot read old data)
+   openssl rand -hex 32     # AGENTFORGE_BILLING_WEBHOOK_SECRET (required to boot; give it to nobody)
+   openssl rand -hex 32     # PORTAL_SIGNING_KEY           (set once: rotating it signs everyone out)
+   openssl rand -hex 24     # PORTAL_POSTGRES_PASSWORD
+   openssl rand -hex 24     # PORTAL_APP_DB_PASSWORD       (a different value)
+   ```
+
+   Hex keeps the passwords URL-safe, which matters because `portal-entry.sh` places them in a DSN and
+   refuses anything else. Set `NULTRON_DOMAIN`, `PORTAL_DOMAIN`, `AGENTFORGE_TRUSTED_ORIGINS=https://<NULTRON_DOMAIN>`
+   and `AGENTFORGE_PORTAL_URL=https://<PORTAL_DOMAIN>`; leave `AGENTFORGE_PORTAL_CLIENT_SECRET` empty for now.
+   On the CVM-style secret manager path, `USE_SSM=1` still applies to the wrap key and `BACKUP_KEY`
+   (`deploy.sh`); the portal's secrets have no SSM wiring yet, so they live in `portal.env` on the box.
+
+### Sign-in mail: Tencent SES
+
+SES offers SMTP, and the portal needs no code change for it. What the official documentation says, and
+what was checked:
+
+| Fact | Source |
+|---|---|
+| SMTP service addresses: `smtp.qcloudmail.com` (Hong Kong, China site), `gz-smtp.qcloudmail.com` (Guangzhou), **`sg-smtp.qcloudmail.com` (International site)** | [SMTP Service Address](https://www.tencentcloud.com/document/product/1084/44457) |
+| Port **465, SSL encryption**; "port 25 is currently disabled". No 587 and no STARTTLS in the service-address page | same page |
+| Every sample opens TLS first: Go `tls.Dial` ("for port 465 a TLS channel must be established first"), Python `SMTP_SSL`, PHP `ENCRYPTION_SMTPS`; PHP adds "use 587 if you set `ENCRYPTION_STARTTLS`" | [Go](https://www.tencentcloud.com/document/product/1084/44455), [PHP](https://www.tencentcloud.com/document/product/1084/49570), [attachments](https://www.tencentcloud.com/document/product/1084/44454) |
+| The SMTP user is the **sender address**; the password is a dedicated SMTP password set in the console ("not your Tencent Cloud login password and not the API key"); the sender domain must be verified first | [Go sample](https://www.tencentcloud.com/document/product/1084/44455), [SMTP guide](https://www.tencentcloud.com/document/product/1084/44458) |
+| One sender may send up to **10 e-mails an hour to the same recipient**; from 2026-03-02 new accounts under individual real-name verification can no longer send over SMTP | [SMTP guide](https://www.tencentcloud.com/document/product/1084/44458) |
+| Regions: the International API supports `ap-singapore` only (endpoint `ses.intl.tencentcloudapi.com`) and "`Region` only indicates the location of the server and does not affect the regions where emails are sent to". There is **no Jakarta SES region**; a Jakarta box sends through the Singapore/International endpoint | [SendEmail](https://www.tencentcloud.com/document/product/1084/39408), [FAQ](https://www.tencentcloud.com/document/product/1084/39656) |
+
+Observed on 2026-10-01, from a developer machine (not from the Lighthouse box): a TLS handshake to
+`sg-smtp.qcloudmail.com:465` succeeds immediately with TLS 1.3, a `*.qcloudmail.com` DigiCert
+certificate that verifies against a normal trust store, and the greeting `220 sg-smtp.qcloudmail.com ESMTP
+ready`. Port 587 accepted the TCP connection and sent no greeting in 8 seconds; port 25 did not connect.
+Nothing was sent and nobody was authenticated.
+
+**Portal support: nothing to change.** `apps/portal/src/config.ts` (`readSmtp`, `PORTAL_SMTP_SECURE`)
+has exactly two honest modes: implicit TLS from the first byte (`PORTAL_SMTP_SECURE=1`, port 465) and
+STARTTLS that must succeed (anything off loopback with it off). So SES is
+`PORTAL_SMTP_HOST=sg-smtp.qcloudmail.com`, `PORTAL_SMTP_PORT=465`, `PORTAL_SMTP_SECURE=1`; the SR-39
+refusals (no cleartext, no loopback sandbox in production) are satisfied. That path was exercised
+against a Mailpit that speaks implicit TLS in the compose rehearsal below.
+
+In the SES console, before the first code can be sent: verify the **sender domain** (add the SPF, DKIM and
+DMARC records it shows), create a **sender address** on it, and **set an SMTP password** for that address.
+Put the address in `PORTAL_SMTP_USER` and `PORTAL_SMTP_FROM`, and the password in `PORTAL_SMTP_PASS`. Two
+limits to plan around: the 10-an-hour-per-recipient ceiling is looser than the portal's own three
+sends per fifteen minutes per address, so SES will not be what stops a tester who keeps asking for codes; and
+SMTP being closed to new individually-verified accounts means the Tencent account that owns the sender
+must be an enterprise-verified one. Unverified: whether SES requires the `From` address to equal the SMTP
+user exactly (the docs only say the SMTP user is the sender address), and whether mail to Indonesian
+providers lands in the inbox rather than spam. Send a test code to each tester's provider before the pilot.
+
+### First bring-up on the box
+
+```sh
+docker login ghcr.io                    # a token that can read packages; both images are private
+cd webapp-deploy                        # (or the released bundle's folder: compose.yml is the same shape)
+docker compose pull                     # the released bundle; on a source checkout: sh scripts/build.sh
+docker compose up -d portal             # starts portal-db, runs portal-prepare, then the portal
+
+# Seed the first tenant, its org, and the first user, and register the app's OAuth client.
+# The client secret is printed ONCE: copy it into .env as AGENTFORGE_PORTAL_CLIENT_SECRET.
+sh scripts/portal.sh seed --email you@example.com --tenant nultron --org "Nultron pilot" \
+  --seat-cap 10 --redirect https://<NULTRON_DOMAIN>/auth/callback
+
+docker compose up -d                    # now the app and the proxy
+docker compose ps                       # app and portal "healthy"; portal-prepare "exited (0)"
+```
+
+(In the released bundle there is no `scripts/` folder; the seed is
+`docker compose exec -T portal sh /app/webapp-deploy/portal-entry.sh ./node_modules/.bin/tsx scripts/seed.ts ...`,
+which is what `portal.sh` runs.) `sh scripts/portal.sh <name> ...` runs `apps/portal/scripts/<name>.ts`
+inside the running portal with the same two database DSNs the portal itself uses, so no password is typed
+on the host. Testers are added with the portal's invite script when it lands (`sh scripts/portal.sh invite
+...`, see `apps/portal/README.md`); until then each tester is another `seed --email` for the same tenant, up
+to the seat cap. `portal.sh otp` is refused on purpose: manual one-time codes need
+`PORTAL_ALLOW_MANUAL_OTP=1`, which the production portal will not boot with (SR-10), and the owner decided
+mail goes through SES.
+
+Check it from outside, not from the box:
+
+```sh
+curl -sI https://<NULTRON_DOMAIN>/healthz | head -1            # 200
+curl -sI https://<NULTRON_DOMAIN> | grep -iE 'strict-transport|content-security|x-content-type'
+curl -si -X POST https://<NULTRON_DOMAIN>/api/v1/billing/webhook | head -1   # 404, from Caddy
+```
+
+then open `https://<NULTRON_DOMAIN>`, press sign in, receive the code on a real inbox, and land on the desk.
+
+### Things that are decided or owed here
+
+- **The billing webhook is blocked at the edge (SR-03).** `@billing_webhook path /api/v1/billing/webhook*`
+  answers 404 in the `Caddyfile` before the request reaches the app, in the app's site only, case-insensitively
+  and with `%XX` decoded. `AGENTFORGE_BILLING_WEBHOOK_SECRET` must still be set (the host refuses to boot in
+  production without it): make it a random value, tell nobody, and put an owner and a rotation date on it. When a
+  provider is chosen, the rule comes out and the header secret is replaced by a signature check.
+- **Rotating `PORTAL_SIGNING_KEY` signs everyone out (SR-24).** The portal publishes only the key held by its
+  own process, so the old public key leaves the JWKS the moment the container restarts. Treat the key as
+  set-once and tell the testers before changing it.
+- **The proxy's logs hold no sign-in code or state (SR-72).** A filter list shared by Caddy's access log and its
+  default (error) logger deletes `code` and `state` from the request URI, the `Referer` and the portal's
+  redirect `Location`. It needs Caddy 2.8 or later, which is why the image is `caddy:2.11-alpine` and not a
+  floating `2-alpine`. Check it again after any Caddyfile edit: `node webapp-deploy/pilot-local.mjs drive`
+  does so against real Caddy.
+- **Never restart or recreate `app` on its own.** `proxy` shares `app`'s network namespace, so after
+  `docker compose restart app`, `up -d app` or `up -d --force-recreate app` Caddy is attached to a namespace
+  that no longer exists: the site is down (the edge answers nothing) while the app reports healthy. Driven on
+  2026-10-01, all three. Use `docker compose restart app proxy`, or a full `docker compose up -d` with no
+  service names, which recreates the proxy when the app was recreated. The same holds for
+  `scripts/components.sh install`'s "restart the app" step.
+- **A release builds two images from one sha.** `node scripts/release-web.mjs --tag ent-YYYY.MM.DD --sha <sha>
+  --dry-run` first. The sha has to carry `portal.Dockerfile`, its ignore file, `portal-entry.sh` and
+  `k8s/base/scripts/prepare-db.mjs`, and the script refuses one that does not, before it builds anything: commit
+  those files before cutting the release. The released `compose.yml` pins both images to the tag.
+- **UDP 443 (HTTP/3) is published**; if the Lighthouse firewall blocks it, browsers fall back to HTTP/2 on
+  their own. HTTP/3 itself was not driven.
+
+### Backups and the restore drill
+
+Two things hold state: the app's SQLite and files in the `nultron-data` volume, and the portal's Postgres in
+`portal-pgdata`. `scripts/backup.sh` takes both in one run, each encrypted with `BACKUP_KEY` (AES-256-CBC,
+PBKDF2) before it leaves the box, and uploads both to the COS backup bucket:
+
+- `nultron-data-<stamp>.tar.gz.enc`: a consistent SQLite snapshot plus `/data`, as before.
+- `nultron-portal-<stamp>.dump.enc`: `pg_dump -Fc` of `tokotoken_portal`, taken as the schema owner over the
+  container's local socket. Skipped when there is no `portal-db` container (a managed Postgres backs itself up);
+  `BACKUP_PORTAL=0` skips it. Every run decrypts and lists what it wrote.
+
+Hourly, as the deploy user (`crontab -e`); the passphrase is fetched with the instance role at each run, as in
+[Hourly cron](#hourly-cron):
+
+```cron
+17 * * * * BACKUP_KEY="$(tccli ssm get-secret-value ...)" /bin/sh /srv/nultron/webapp-deploy/scripts/backup.sh >> /var/log/nultron-backup.log 2>&1
+```
+
+**Restore drill, monthly (and once before the first tester).** On a scratch box, never the pilot box:
+`restore.sh <data archive> --yes` as before, then `restore-portal.sh <portal dump> --scratch`, which restores the
+dump into a throwaway database beside the live one, prints the row count of every table in both, refuses a dump
+with no tenant row, and drops the copy. The destructive form, `restore-portal.sh <dump> --yes`, stops the
+portal, drops and recreates `tokotoken_portal`, restores as the schema owner (owners and the grants row-level
+security rests on come back as they were, SR-56) and starts the portal through its prepare step. Record each
+drill in [`DEPLOY-LOG.md`](DEPLOY-LOG.md): date, archive names, minutes to green, anything that went wrong. The
+cron job, the COS upload and a drill on a second machine have **not** been driven (see below).
+
+### Rehearsal on a developer machine
+
+```sh
+node webapp-deploy/pilot-local.mjs up       # a throwaway CA, generated env files, two local images, the stack
+node webapp-deploy/pilot-local.mjs drive    # headless Chromium: sign in with the e-mailed code, restart the app, search the logs
+node webapp-deploy/pilot-local.mjs down --purge
+```
+
+[`compose.local.yml`](compose.local.yml) is layered over `compose.yml` and adds only what a laptop needs:
+loopback-only ports (the 0.0.0.0 binds are replaced, not appended to), a throwaway CA, Mailpit speaking implicit
+TLS like SES, and local images built from a `git ls-files -co --exclude-standard` snapshot (never pushed, never
+from your checkout directly). It uses `https://nultron.localhost` and `https://portal.nultron.localhost` on
+127.0.0.1:80 and :443, so those two ports must be free. The scripts in `scripts/` can be pointed at that project
+with `DC_ARGS="-p nultron-pilot-local -f compose.local.yml --env-file .pilot-local/.env"`.
+
+### What was driven, and what was not
+
+Driven on 2026-10-01 on a Windows 11 machine with Docker Desktop (Compose 2.40), through the rehearsal above:
+the stack comes up from a cold start (two images built from a working-tree snapshot, the portal first, the seed,
+then everything); every container runs as its hardening says (read-only root, no capabilities, no new
+privileges, limits); the app holds none of the portal's secrets and the proxy only the two names; Postgres's
+process environment holds none of the portal's other secrets; a signed-out browser reaches the sign-in screen,
+signs in with a code e-mailed over **implicit TLS** to Mailpit (the SES-shaped path), and lands signed in with no
+`code` or `state` left in the address bar; `docker compose restart app proxy` and the same browser is still
+signed in; the billing webhook answers 404 from Caddy for its spellings and never reaches the app; with the
+portal stopped, a sign-in URL gets a 503 and Caddy's error line is written and holds no code or state; the
+backup, the scratch restore drill and the destructive restore of the portal database; and the full-tree build
+of the portal image holds only what the allowlist names.
+
+**Not driven:** the Lighthouse box itself; ACME certificates on public names; DNS, the firewall and the IPv6
+checks above on a real instance; a real SES send or the SES console steps; the `release-web.mjs` run (only its
+dry run and unit tests, and a rendered bundle validated with `docker compose config` and `caddy validate`:
+nothing was built through it, pushed or logged in to ghcr); the cron job and the COS upload; a restore on a
+second machine; the portal's invite script (another change is adding it); HTTP/3; any load.
+
 ## Build
 
 ```sh
@@ -179,20 +475,28 @@ sh webapp-deploy/scripts/build.sh
 
 ```sh
 cd webapp-deploy
-cp .env.example .env
-# edit .env: NULTRON_DOMAIN, AGENTFORGE_SECRETS_KEY
+cp .env.example .env && cp portal.env.example portal.env
+# edit both. .env: NULTRON_DOMAIN, PORTAL_DOMAIN, AGENTFORGE_SECRETS_KEY, the portal client
+# secret, ... portal.env: the signing key, the two database passwords, the SES login.
 openssl rand -hex 32          # -> AGENTFORGE_SECRETS_KEY, generate once, keep forever
 
+docker compose -f compose.yml up -d portal    # the portal first: the app needs the client secret it prints
+# seed (see Phase 0 pilot, step 5), put the secret in .env, then:
 docker compose -f compose.yml up -d
 ```
+
+The first bring-up is two steps because the app refuses to boot without the portal's client
+secret, and the portal only prints it once, after it exists. [Phase 0 pilot
+(compose)](#phase-0-pilot-compose) has the whole sequence.
 
 On the CVM, do not put `AGENTFORGE_SECRETS_KEY` in `.env` at all. Set `USE_SSM=1` and
 let [`scripts/deploy.sh`](scripts/deploy.sh) fetch it from Secrets Manager with the
 instance role (spec S2); it is exported for that one command and never written to
 disk. The `.env` file keeps the non-secret settings.
 
-Caddy obtains and renews TLS automatically for `$NULTRON_DOMAIN`, provided ports 80 and
-443 reach the server from the internet and the DNS A/AAAA record already points at it.
+Caddy obtains and renews TLS automatically for `$NULTRON_DOMAIN` and `$PORTAL_DOMAIN`,
+provided ports 80 and 443 reach the server from the internet and a DNS **A** record for each
+already points at it. Publish no AAAA record (SR-79, see the pilot section).
 
 **Never start this on `:3000` on a development machine.** `:3000` is the isolated webdev
 instance; the container publishes only 80/443 on the host, and `PORT` is the port
@@ -377,7 +681,12 @@ run `docker compose pull` in place of `build.sh`, and make sure the token used f
 sh webapp-deploy/scripts/logs.sh          # both services
 sh webapp-deploy/scripts/logs.sh app      # the host
 sh webapp-deploy/scripts/logs.sh proxy    # Caddy / TLS
+sh webapp-deploy/scripts/logs.sh portal   # sign-in (also: portal-prepare, portal-db)
 ```
+
+Caddy writes two streams: the access log on stdout and everything else, errors included, on stderr
+(`docker logs proxy 1>access.log 2>runtime.log` keeps them apart). Both are filtered: neither holds a
+sign-in `code` or `state` (SR-72).
 
 ## Security group rules
 
@@ -397,9 +706,10 @@ Spec N2, applied on the CVM's security group in the Jakarta console. The default
 
 | Destination | Protocol / port | Why |
 |---|---|---|
-| `0.0.0.0/0` | TCP 443 | `api.tokotokenai.com`, the portal, `registry.npmjs.org`, Tencent APIs (SSM, COS, CLS), Let's Encrypt |
+| `0.0.0.0/0` | TCP 443 | `api.tokotokenai.com`, the portal, `registry.npmjs.org`, Tencent APIs (SSM, COS, CLS), Let's Encrypt, ghcr.io |
+| the SES SMTP address, `sg-smtp.qcloudmail.com` | TCP 465 | The portal's sign-in mail, implicit TLS (owner decision 2026-10-01). Port 25 stays closed, and 587 is not used |
 | `0.0.0.0/0` | UDP 53 and TCP 53 | DNS |
-| anything else | - | **deny**. No plain HTTP out, no SMTP, no outbound SSH |
+| anything else | - | **deny**. No plain HTTP out, no cleartext SMTP, no outbound SSH |
 
 > **One conflict to settle before you close port 80 outbound.** `deploy.sh` builds the
 > image *on this server*, and the build stage runs `apt-get` against `deb.debian.org`
@@ -620,7 +930,7 @@ and this folder is deliberately additive - it does not edit `apps/` or `packages
 | **S1** | **Landed 2026-09-18.** With `AGENTFORGE_SERVER=1`, `getLocalVaultKey` throws `SERVER_VAULT_KEY_REQUIRED` when `AGENTFORGE_SECRETS_KEY` is unset and `SERVER_VAULT_KEY_TOO_WEAK` when it carries under 32 bytes of entropy; the `.master-key` fallback is unreachable on the server. The gate is server mode, not `NODE_ENV` | `packages/db/src/vault-key.ts:123-134` |
 | **L1** | No prompts, message bodies, keys or tokens in any log line, with tenant id and request id as fields. Caddy's access log is filtered here, but the application logger is the one that sees prompts | host logger |
 
-**A4** rate limiting has no Caddy module in the pinned `caddy:2-alpine` image, so it is
+**A4** rate limiting has no Caddy module in the pinned `caddy:2.11-alpine` image, so it is
 done in the app instead - per IP, per session and tighter on `/api/v1/auth/*`; see
 [Transport filtering](#transport-filtering). **L2**/**L3** produce the log lines but
 nothing ships them to CLS or raises an alarm yet.
@@ -633,6 +943,8 @@ matter:
 | Var | Meaning |
 |---|---|
 | `NULTRON_DOMAIN` | Public hostname Caddy serves and gets a certificate for |
+| `PORTAL_DOMAIN` | The portal's public hostname, the second name Caddy serves. Also the app's hairpin target and the portal's `PORTAL_PUBLIC_URL`. The only new variable the proxy gets (SR-73) |
+| `portal.env` (a second file) | The portal side's secrets and settings: `PORTAL_SIGNING_KEY`, `PORTAL_POSTGRES_PASSWORD`, `PORTAL_APP_DB_PASSWORD`, `PORTAL_SMTP_*`. See [`portal.env.example`](portal.env.example). Loaded only by `portal`, `portal-prepare` and `portal-db` |
 | `AGENTFORGE_SECRETS_KEY` | 32-byte hex wrap key for `settings.enc` and sealed prompts (`openssl rand -hex 32`). Generate once. Changing it makes the vault unreadable |
 | `AGENTFORGE_DATA_DIR` | `/data` — SQLite, settings, media, logs. On the volume |
 | `AGENTFORGE_COMPONENTS_DIR` | `/opt/agentforge/components` — native components, on their own volume. Must not be inside `AGENTFORGE_DATA_DIR`: a server refuses to load a module from there |
@@ -670,7 +982,9 @@ open decisions in [`docs/internal/web-pivot-2026-09-18.md`](../docs/internal/web
    pricing model are decided in principle; the host does not check a plan row yet.
 6. **Single SQLite file, single server.** Fine for the first deployment by the decision
    record. No replication, so the backup tarball is the only copy.
-7. **No image registry, no CI build.** `deploy.sh` builds on the server.
+7. **No CI build.** `scripts/release-web.mjs` builds the app and portal images from a sha and pushes them,
+   private, to ghcr, and the released bundle pulls them; `deploy.sh` still builds on the server from a checkout.
 8. **No log shipping, no metrics, no alerting.** `docker compose logs` is all there is.
 9. **ffmpeg / ffprobe absent**, so Edit export degrades.
-10. **Dev dependencies ship in the image** because `tsx` is the entrypoint.
+10. **The image runs the TypeScript source through `tsx`, not a compiled bundle.** Dev
+    dependencies no longer ship (SR-113); the source tree does (SR-49).

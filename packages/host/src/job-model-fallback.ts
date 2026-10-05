@@ -6,6 +6,7 @@ import {
   type JobMode,
   type JobModelFallbackNotice,
 } from "@agentforge/core";
+import type { ModelCacheScope } from "./model-cache";
 import { listSelectableModels } from "./selectable-models";
 
 /**
@@ -96,6 +97,13 @@ export type JobModelFallbackOptions = {
   modelExplicit?: boolean;
   /** Chat ids this workspace lists. Defaults to the live selectable catalog. */
   availableModelIds?: string[];
+  /** Whose catalogue that default is. Every job call carries its tenant; only the hosted server reads it. */
+  tenant?: ModelCacheScope;
+  /**
+   * The job's cancel. Once it has fired a failure is the caller's answer, not the model's: nothing is
+   * retried on a stand-in and the model is not marked down for it.
+   */
+  signal?: AbortSignal;
   now?: () => number;
 };
 
@@ -113,7 +121,7 @@ export function jobFailureMessage(error: unknown): string {
 }
 
 function availableIds(options: JobModelFallbackOptions): string[] {
-  return options.availableModelIds ?? listSelectableModels().map((model) => model.id);
+  return options.availableModelIds ?? listSelectableModels(options.tenant).map((model) => model.id);
 }
 
 function pickNext(options: JobModelFallbackOptions, current: string, now: number): string | undefined {
@@ -140,7 +148,7 @@ function maySwapModel(
   failure: { error: unknown; streamed: boolean },
   options: JobModelFallbackOptions,
 ): boolean {
-  if (options.modelExplicit === true || failure.streamed) {
+  if (options.modelExplicit === true || failure.streamed || options.signal?.aborted === true) {
     return false;
   }
   return isGatewayUnavailableFailure(jobFailureMessage(failure.error));

@@ -14,6 +14,10 @@ const created: Array<{ body?: string; meta?: Record<string, unknown> }> = [];
 const ingested: WorkCard[] = [];
 /** The model that answers each successive call; the last entry repeats. */
 let answers: string[] = [];
+/** What the mocked pipeline reports from the synthesis checks, and the label it was handed for a repair round. */
+const PASSED_CHECKS = { passed: true, rounds: 0, verdicts: [{ ok: true }, { ok: true }, { ok: true }] };
+let pipelineChecks: Record<string, unknown> = PASSED_CHECKS;
+let repairLabelSeen: string | undefined;
 
 vi.mock("@agentforge/core", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@agentforge/core")>();
@@ -28,8 +32,9 @@ vi.mock("./research-dossier", async (importOriginal) => {
     ...actual,
     runResearchDossier: async (
       input: { question: string; models: string[] },
-      deps: { ask: (system: string, prompt: string) => Promise<string> },
+      deps: { ask: (system: string, prompt: string) => Promise<string>; repairLabel?: string },
     ) => {
+      repairLabelSeen = deps.repairLabel;
       await deps.ask("plan the queries", input.question);
       await deps.ask("write the dossier", input.question);
       const dossier: Dossier = {
@@ -43,7 +48,11 @@ vi.mock("./research-dossier", async (importOriginal) => {
         contradictions: [],
         openQuestions: [],
       };
-      return { dossier, notes: { title: "Vendor landscape", summary: "", sections: [], sources: [] } };
+      return {
+        dossier,
+        notes: { title: "Vendor landscape", summary: "", sections: [], sources: [] },
+        checks: pipelineChecks,
+      };
     },
   };
 });
@@ -118,6 +127,8 @@ describe("the model a Research job uses and records", () => {
     created.length = 0;
     ingested.length = 0;
     answers = [];
+    pipelineChecks = PASSED_CHECKS;
+    repairLabelSeen = undefined;
     vi.stubEnv("AGENTFORGE_RUNTIME", "ai");
   });
 
@@ -163,5 +174,60 @@ describe("the model a Research job uses and records", () => {
     expect(created[0]?.meta?.model).toBe("deepseek-v4-flash");
     expect(created[0]?.meta?.models).toEqual(["deepseek-v4-flash"]);
     expect(result.dossier.markdown).toContain('models: ["deepseek-v4-flash"]');
+  });
+
+  it("hands the run's cancel to every model call, and leaves the calls without one when there is none", async () => {
+    const controller = new AbortController();
+    await generateResearchNotes(
+      tenant,
+      { prompt: "Who sells vendor billing?", model: "deepseek-v4-flash" },
+      () => {},
+      controller.signal,
+    );
+    expect(asked).toHaveLength(2);
+    for (const options of asked) {
+      expect(options.signal).toBe(controller.signal);
+    }
+
+    asked.length = 0;
+    await generateResearchNotes(tenant, { prompt: "Who sells vendor billing?", model: "deepseek-v4-flash" });
+    expect(asked).toHaveLength(2);
+    for (const options of asked) {
+      expect(options).not.toHaveProperty("signal");
+    }
+  });
+
+  it("saves the checks that passed in the artifact meta and returns them", async () => {
+    const result = await generateResearchNotes(tenant, {
+      prompt: "Who sells vendor billing?",
+      model: "deepseek-v4-flash",
+    });
+    expect(created[0]?.meta?.checks).toEqual(PASSED_CHECKS);
+    expect(result.checks).toEqual(PASSED_CHECKS);
+  });
+
+  it("still saves a dossier that fails the checks, with the verdicts beside it", async () => {
+    const verdict = {
+      ok: false,
+      check: "research-citations-resolve",
+      error: 'The answer cites source ids that do not exist: S99 in finding "Failures are rising".',
+      why: "Only the numbered sources in the prompt were read. A citation to any other id points at nothing, so the reader cannot check the claim.",
+      fix: 'Sections to fix: finding "Failures are rising". Replace each unknown id with an allowed id that supports the claim, or delete the claim. Allowed source ids: S1, S2.',
+    };
+    pipelineChecks = { passed: false, rounds: 1, verdicts: [verdict, { ok: true }, { ok: true }] };
+    const result = await generateResearchNotes(tenant, {
+      prompt: "Who sells vendor billing?",
+      model: "deepseek-v4-flash",
+    });
+    expect(created).toHaveLength(1);
+    expect(created[0]?.meta?.checks).toEqual(pipelineChecks);
+    expect(result.dossierId).toBe("artifact-1");
+    expect(result.checks).toEqual(pipelineChecks);
+    expect(ingested).toHaveLength(1);
+  });
+
+  it("hands the pipeline the repair-round label in the desk language", async () => {
+    await generateResearchNotes(tenant, { prompt: "Who sells vendor billing?", model: "deepseek-v4-flash" });
+    expect(repairLabelSeen).toBe("Repairing the findings");
   });
 });

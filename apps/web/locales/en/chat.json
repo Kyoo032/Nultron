@@ -8,7 +8,8 @@
   "deleteAria": "Delete {title}",
   "removeAttachment": "Remove {name}",
   "empty": {
-    "headline": "Work starts here.",
+    "hello": "Hi, I’m Nultron.",
+    "headline": "What are we working on today?",
     "settingsLink": "Settings",
     "statusConnected": "Model key connected",
     "statusSignedIn": "Signed in",
@@ -131,17 +132,109 @@
   "tool": {
     "working": "Working…",
     "searching": "Searching…",
+    "fetching": "Opening a page…",
+    "fetchFailed": "Could not open the page",
     "creatingImage": "Creating image…",
     "creatingVideo": "Creating video…",
     "pastChats": "Looking up past chats…",
     "calculating": "Calculating…",
     "clock": "Reading the clock…",
     "search": "Search",
+    "fetch": "Web page",
     "image": "Image",
     "video": "Video",
     "pastSessions": "Past chats",
     "calculator": "Calculator",
     "datetime": "Clock"
+  },
+  "tools": {
+    "name": {
+      "list_files": "List files",
+      "read_file": "Read file",
+      "write_file": "Write file",
+      "edit_file": "Edit file",
+      "search_files": "Search files",
+      "delete_file": "Delete file",
+      "knowledge_search": "Knowledge search",
+      "run_code": "Run code"
+    },
+    "doing": {
+      "list_files": "Listing files in {dir}…",
+      "list_files_top": "Listing your files…",
+      "read_file": "Reading {path}…",
+      "write_file": "Writing {path}…",
+      "edit_file": "Editing {path}…",
+      "search_files": "Searching files for “{query}”…",
+      "delete_file": "Deleting {path}…",
+      "knowledge_search": "Searching your knowledge for “{query}”…",
+      "run_code": "Running {language}…",
+      "web_fetch": "Opening {host}…"
+    },
+    "done": {
+      "list_files": "Listed files in {dir}",
+      "list_files_top": "Listed your files",
+      "read_file": "Read {path}",
+      "write_file": "Wrote {path}",
+      "edit_file": "Edited {path}",
+      "search_files": "Searched files for “{query}”",
+      "delete_file": "Deleted {path}",
+      "knowledge_search": "Searched your knowledge for “{query}”",
+      "run_code": "Ran {language}",
+      "web_fetch": "Opened {host}"
+    },
+    "failed": {
+      "list_files": "Could not list files",
+      "read_file": "Could not read {path}",
+      "write_file": "Could not write {path}",
+      "edit_file": "Could not edit {path}",
+      "search_files": "Could not search files for “{query}”",
+      "delete_file": "Could not delete {path}",
+      "knowledge_search": "Could not search your knowledge",
+      "run_code": "{language} run failed",
+      "web_fetch": "Could not open {host}"
+    },
+    "pending": {
+      "write_file": "Proposed writing a file",
+      "edit_file": "Proposed editing a file",
+      "delete_file": "Proposed deleting a file"
+    },
+    "detail": {
+      "none": "Nothing found",
+      "more": "more not shown",
+      "files": "{n} files",
+      "filesOne": "1 file",
+      "matches": "{n} matches",
+      "matchesOne": "1 match",
+      "excerpts": "{n} excerpts",
+      "excerptsOne": "1 excerpt",
+      "lineRange": "Lines {from}–{to} of {total}",
+      "version": "Version {n}"
+    },
+    "open": "Open",
+    "openAria": "Open {path} in the Knowledge Base",
+    "pendingTitle": "Waiting for your approval",
+    "review": "Review",
+    "reviewMissing": "Open the folder changes panel to review it.",
+    "budgetTitle": "Tool budget spent",
+    "code": {
+      "show": "Show code",
+      "heading": "Code",
+      "stdout": "Output",
+      "stderr": "Errors",
+      "noOutput": "It ran and printed nothing.",
+      "cut": "Shortened here.",
+      "filesWritten": "Files saved",
+      "reason": {
+        "timeout": "It ran too long and was stopped.",
+        "memory": "It needed more memory than it is allowed and was stopped.",
+        "syntax": "The code has a syntax error, so it did not run.",
+        "runtime": "The code stopped with an error while running.",
+        "too_large": "The code or its output was too large.",
+        "busy": "Another run is in progress. Try again in a moment.",
+        "unavailable": "Running code is not available right now.",
+        "other": "The run did not finish."
+      }
+    }
   },
   "error": {
     "loading": "Chat is still loading",

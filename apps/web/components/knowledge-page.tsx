@@ -1,18 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { messageUnlessBlocked } from "@/lib/gateway-blocked";
 import { FormattedText } from "@/components/formatted-text";
 import { MascotSlot } from "@/components/mascot-slot";
 import { KnowledgeGraphPanel } from "@/components/knowledge-graph-panel";
+import { DeskFiles } from "@/components/files/desk-files";
 import { KnowledgeLoop } from "@/components/knowledge-loop";
 import { ModeHeader } from "@/components/mode-header";
 import { ModelSelect } from "@/components/model-select";
+import { isGatewayBlockedText } from "@/lib/gateway-blocked";
+import { NeedsKeyNote } from "@/components/needs-key-note";
 import { modelsForMode, type ModelCatalogWire } from "@agentforge/core/mode-catalog";
 import { t } from "@/lib/i18n";
 import { labeled } from "@/lib/ui-copy";
 import { apiFetch } from "@/lib/api-client";
 import { KNOWLEDGE_UPLOAD_ACCEPT, KNOWLEDGE_UPLOAD_FORMATS } from "@/lib/knowledge-upload";
 import { useProductBrand } from "@/lib/product-brand";
+import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import { useWorkspaceScope } from "@/lib/workspace-scope";
 
 type KnowledgeTab = "sources" | "soul" | "memory" | "map";
@@ -146,7 +151,11 @@ export async function sendKnowledge(
   const data = await res.json().catch(() => null);
   if (!res.ok) {
     const message = (data as { error?: { message?: unknown } } | null)?.error?.message;
-    return { ok: false, message: typeof message === "string" && message.trim() ? message : fallback };
+    // Hosted only: a 403 gateway_blocked is "no usable key", said as the catalog sentence.
+    return {
+      ok: false,
+      message: messageUnlessBlocked(data, () => (typeof message === "string" && message.trim() ? message : fallback)),
+    };
   }
   return { ok: true, data };
 }
@@ -208,6 +217,10 @@ function verdictTagClass(verdict: KnowledgeMapTopic["verdict"]): string {
 export function KnowledgePage() {
   const { id: workspaceId, name: workspaceName } = useWorkspaceScope();
   const { productName } = useProductBrand();
+  // Nultron Enterprise: a signed-in tenant may open the desk before adding a key. Hosted only; false elsewhere.
+  // Reading, embedding and mapping sources all go through the gateway, so with no key the page says so
+  // once, calmly, in place of the generic failure each of them would otherwise print.
+  const needsKey = useHostedNeedsKey();
   const [tab, setTab] = useState<KnowledgeTab>("sources");
   const [sources, setSources] = useState<SourceRow[]>([]);
   // Placeholder only, until GET /api/v1/knowledge lands the desk's real Soul. It follows the brand
@@ -303,7 +316,7 @@ export function KnowledgePage() {
       const res = await apiFetch("/api/v1/knowledge/map", { method: "POST" });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        setError(data?.error?.message ?? t("knowledge.errors.map"));
+        setError(messageUnlessBlocked(data, () => data?.error?.message ?? t("knowledge.errors.map")));
         return;
       }
       setKnowledgeMap(data as KnowledgeMap);
@@ -452,7 +465,8 @@ export function KnowledgePage() {
           }
         />
       </div>
-      {error ? <p className="mb-4 text-sm text-red-700">{error}</p> : null}
+      {needsKey ? <NeedsKeyNote testId="knowledge-needs-key" className="mb-4 text-sm text-[var(--text-2)]" /> : null}
+      {error && !isGatewayBlockedText(error) ? <p className="mb-4 text-sm text-red-700">{error}</p> : null}
 
       <section
         className="mb-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4"
@@ -460,7 +474,7 @@ export function KnowledgePage() {
       >
         <p className="panel-label">{t("knowledge.models.label")}</p>
         <div className="mt-3 flex flex-wrap gap-3">
-          <label className="flex min-w-[180px] flex-1 flex-col gap-1">
+          <label className="flex min-w-[min(100%,18rem)] flex-1 flex-col gap-1">
             <span className="text-xs text-[var(--text-2)]">{t("knowledge.models.embedding")}</span>
             <ModelSelect
               models={embeddingModels}
@@ -472,7 +486,7 @@ export function KnowledgePage() {
               flat
             />
           </label>
-          <label className="flex min-w-[180px] flex-1 flex-col gap-1">
+          <label className="flex min-w-[min(100%,18rem)] flex-1 flex-col gap-1">
             <span className="text-xs text-[var(--text-2)]">{t("knowledge.models.brain")}</span>
             <ModelSelect
               models={chatModels}
@@ -483,7 +497,7 @@ export function KnowledgePage() {
               className="input"
             />
           </label>
-          <label className="flex min-w-[180px] flex-1 flex-col gap-1">
+          <label className="flex min-w-[min(100%,18rem)] flex-1 flex-col gap-1">
             <span className="text-xs text-[var(--text-2)]">{t("knowledge.models.verifier")}</span>
             <ModelSelect
               models={chatModels}
@@ -584,8 +598,12 @@ export function KnowledgePage() {
           </section>
           <ul className="divide-y divide-[var(--line)] rounded-xl border border-[var(--line)] bg-[var(--surface)]">
             {sources.map((row) => (
-              <li key={row.id} className="flex items-center gap-3 px-4 py-3" data-testid="knowledge-source-row">
-                <span className="min-w-0 flex-1 truncate">{row.name}</span>
+              <li
+                key={row.id}
+                className="flex flex-wrap items-center gap-x-2 gap-y-2 px-4 py-3 sm:gap-x-3"
+                data-testid="knowledge-source-row"
+              >
+                <span className="min-w-[8rem] flex-1 truncate">{row.name}</span>
                 <span className="tag tag-neutral" data-testid="knowledge-source-type">
                   {labeled(`knowledge.sourceType.${row.type}`, row.type)}
                 </span>
@@ -607,7 +625,7 @@ export function KnowledgePage() {
                 </span>
                 <button
                   type="button"
-                  className="btn btn-ghost text-xs"
+                  className="btn btn-ghost ml-auto text-xs"
                   onClick={() =>
                     void apiFetch(`/api/v1/knowledge/sources/${row.id}`, { method: "DELETE" }).then(() => reload())
                   }
@@ -617,6 +635,7 @@ export function KnowledgePage() {
               </li>
             ))}
           </ul>
+          <DeskFiles />
         </div>
       ) : null}
 
@@ -630,8 +649,11 @@ export function KnowledgePage() {
             data-testid="knowledge-soul-name"
           />
           <label className="panel-label">{t("knowledge.soul.role")}</label>
-          <input
-            className="input"
+          {/* A role is a sentence or three, so the field grows with it where the browser can
+              (`field-sizing`) and keeps three lines where it cannot. */}
+          <textarea
+            className="input min-h-[4.5rem] [field-sizing:content]"
+            rows={3}
             value={soul.role}
             onChange={(event) => setSoul({ ...soul, role: event.target.value })}
             data-testid="knowledge-soul-role"

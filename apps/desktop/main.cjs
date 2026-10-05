@@ -1,6 +1,6 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain, protocol, session, shell } = require("electron");
 const { registerAutoUpdate } = require("./auto-update.cjs");
-const { PUBLIC_PRODUCT_NAME } = require("./brand-read.cjs");
+const { PUBLIC_PRODUCT_NAME, brandGatewayOverride } = require("./brand-read.cjs");
 const { installApplicationMenu, attachContextMenu } = require("./edit-menu.cjs");
 const lifecycle = require("./lifecycle.cjs");
 const { RENDERER_CSP } = require("./renderer-csp.cjs");
@@ -83,7 +83,7 @@ const LEGACY_MIGRATION_MARKER = "legacy-migrated.json";
 
 process.env.AGENTFORGE_PRODUCT_NAME = brand.productName;
 process.env.AGENTFORGE_GATEWAY_NAME = brand.gatewayName;
-process.env.AGENTFORGE_GATEWAY_URL = brand.gatewayBaseUrl;
+// No gateway URL here: bootstrapPackaged() decides it (this block used to copy brand.json into a dev hook).
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -577,6 +577,19 @@ function registerIpc(host) {
     }
     return picked.filePaths ?? [];
   });
+  // The folder the agent's file tools may open (Personal only). The shell relays the owner's choice
+  // and does nothing else with it: no stat, no read, no list. Whether the path is usable is the
+  // in-process host's call. Parented to the window the trusted-sender check just proved the caller
+  // lives in, so the dialog cannot open behind the app.
+  ipcMain.handle("agentforge:pick-folder", async (event) => {
+    if (!isTrustedSender(event, mainWindow)) {
+      console.warn("folder picker refused: forbidden sender");
+      return { canceled: true };
+    }
+    const picked = await dialog.showOpenDialog(mainWindow, { properties: ["openDirectory"] });
+    const folder = picked.canceled ? undefined : picked.filePaths?.[0];
+    return folder ? { path: folder } : { canceled: true };
+  });
 }
 
 /**
@@ -650,6 +663,21 @@ async function bootstrapPackaged() {
   // files before SQLite opens, and only when this flag is "1", so no webdev run, test harness, or
   // stray import of the host can ever act on a wipe the user queued in the desktop app.
   process.env.AGENTFORGE_APPLY_PENDING_RESET = "1";
+  // The packaged marker, and the only place it is set. `packages/core/src/gateway/pinned.ts` ignores
+  // every dev/test endpoint hook (AGENTFORGE_GATEWAY_URL, AGENTFORGE_TELEGRAM_API_URL) once it reads
+  // "1", whatever the user's environment holds and whether or not NODE_ENV is set, so Nultron talks
+  // to the pinned gateway. A brand flavor (Kemenkeu AI, AIHub Metranet) is the one exception: its
+  // gateway is the one in the brand.json installed beside the app, handed over below as
+  // AGENTFORGE_BRAND_GATEWAY_URL. It is assigned or deleted here, never inherited, and the public
+  // build has none (`brandGatewayOverride`).
+  process.env.AGENTFORGE_PACKAGED = "1";
+  delete process.env.AGENTFORGE_GATEWAY_URL;
+  const brandGateway = brandGatewayOverride(brand);
+  if (brandGateway) {
+    process.env.AGENTFORGE_BRAND_GATEWAY_URL = brandGateway;
+  } else {
+    delete process.env.AGENTFORGE_BRAND_GATEWAY_URL;
+  }
 
   const host = require("./host.cjs");
   hostModule = host;

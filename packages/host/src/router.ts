@@ -42,6 +42,8 @@ import {
   handleGetArtifactFile,
   handleGetArtifacts,
 } from "./handlers/artifacts";
+import { DESK_FILE_ROUTES } from "./desk-files/routes";
+import { FOLDER_ROUTES } from "./folder-root";
 import {
   handleDeleteChannel,
   handleDeleteTelegramBot,
@@ -188,6 +190,7 @@ import {
 import { handleGetModels, handlePostModels } from "./handlers/models";
 import { handleRun } from "./handlers/runs";
 import { handlePostGuide } from "./handlers/guide";
+import { handlePostKeyLater } from "./handlers/key-later";
 import {
   handleApplyLocale,
   handleCancelReset,
@@ -288,6 +291,8 @@ const routes: Route[] = [
   compile("POST", "/api/v1/settings/apply-locale", handleApplyLocale),
   compile("POST", "/api/v1/settings/gateway/check", handleGatewayCheck),
   compile("POST", "/api/v1/settings/guide", handlePostGuide),
+  // Enterprise only: 404 off server mode. A preference about the screen, never a gate decision.
+  compile("POST", "/api/v1/settings/key-later", handlePostKeyLater),
   compile("POST", "/api/v1/settings/reset", handleResetApp),
   compile("DELETE", "/api/v1/settings/reset", handleCancelReset),
   compile("GET", "/api/v1/usage", handleGetUsage),
@@ -419,6 +424,8 @@ const routes: Route[] = [
   compile("GET", "/api/v1/artifacts/:artifactId", handleGetArtifact),
   compile("DELETE", "/api/v1/artifacts/:artifactId", handleDeleteArtifact),
   compile("GET", "/api/v1/artifacts/:artifactId/file", handleGetArtifactFile),
+  ...DESK_FILE_ROUTES.map(([method, path, handler]) => compile(method, path, handler)),
+  ...FOLDER_ROUTES.map(([method, path, handler]) => compile(method, path, handler)),
   compile("GET", "/api/v1/knowledge", handleGetKnowledge),
   compile("GET", "/api/v1/knowledge/context", handleGetKnowledgeContext),
   compile("GET", "/api/v1/knowledge/graph", handleGetKnowledgeGraph),
@@ -560,7 +567,9 @@ export async function dispatch(request: HostRequest, options: DispatchOptions = 
     const result = await withLogContext({ tenantId, route: route.path }, () =>
       withRequestSession(session, () =>
         withRequestLocale(
-          () => sessionLocale({ tenantId, userId }),
+          // The browser's own language joins the person's stored choice, for someone who never chose
+          // (`./locale-boot.ts`). Forwarded by the HTTP adapter on the hosted server only.
+          () => sessionLocale({ tenantId, userId }, request.headers["accept-language"]),
           () => route.handler(scoped),
         ),
       ),

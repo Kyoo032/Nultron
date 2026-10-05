@@ -110,6 +110,7 @@ async function narrate<I, C>(
     locale: ReportLocale;
     question: string;
     extra: string;
+    signal: AbortSignal | undefined;
   },
 ): Promise<JobAssistantRun> {
   const run = await collectJobAssistantRun({
@@ -133,6 +134,7 @@ async function narrate<I, C>(
     ]
       .filter(Boolean)
       .join("\n\n"),
+    ...(options.signal ? { signal: options.signal } : {}),
   });
   if (!run.text.trim()) {
     throw new ApiError("generation_failed", `The ${module.id} task came back empty`, 502);
@@ -149,6 +151,8 @@ type VerifyOptions = {
   readonly factsBlock: string;
   readonly emit: JobEmitter;
   readonly phase: FinancePhaseId;
+  /** The job's cancel, handed to the rewrite call. */
+  readonly signal: AbortSignal | undefined;
 };
 
 /**
@@ -175,6 +179,7 @@ async function verifyNarration(
     systemPrompt: withOutputLanguage(FINANCE_TASK_REPAIR_SYSTEM, "finance", options.locale),
     factsBlock: options.factsBlock,
     locale: options.locale,
+    signal: options.signal,
   });
   if (repair.repaired) {
     options.emit({
@@ -210,7 +215,7 @@ export async function runFinanceTask<I, C>(
   const { tenant, body, emit, abortSignal } = ctx;
   const question = readPrompt(body);
   const settings = requireLive(tenant);
-  const model = resolveModel(body, settings);
+  const model = resolveModel(body, settings, tenant);
   // Source material reaches the same prompt as the task's figures, so it is redacted on the same
   // terms. The task's OWN rows are redacted where they are read: see `parse-<task>.ts`.
   const source = guardFinanceInput({
@@ -240,6 +245,7 @@ export async function runFinanceTask<I, C>(
     locale,
     question,
     extra,
+    signal: abortSignal,
   });
 
   throwIfJobAborted(abortSignal);
@@ -250,7 +256,10 @@ export async function runFinanceTask<I, C>(
     factsBlock: module.promptFacts(computed, locale),
     emit,
     phase: phases.finish,
+    signal: abortSignal,
   });
+  // A cancelled run is not saved: the rewrite above may have been the call the cancel cut short.
+  throwIfJobAborted(abortSignal);
 
   // Swept once more after the builder has had the prose: a note or a caption it wrote itself is
   // held to the same rule, so no export can carry the marker.

@@ -4,6 +4,7 @@ import type { AgentVersionRecord, ToolBindingRecord } from "../agents/service";
 import type { AppLocale } from "../locale";
 import type { JobMode } from "../models/mode-defaults";
 import type { ReasoningEffort } from "../models/reasoning-effort";
+import type { RunBudget } from "../harness/spec";
 import type { ChatWire } from "./chat-wire";
 import type { StreamWatchdogLimits } from "./stream-watchdog";
 
@@ -70,6 +71,13 @@ export type AgentRuntime = {
      * still complete (so its usage is recorded). Omitted, the run behaves exactly as before.
      */
     signal?: AbortSignal;
+    /**
+     * Model steps and tool calls this run may spend. A tool call past `maxToolCalls`, or past that
+     * tool's `perTool` ceiling, returns a `{ ok: false, reason: "budget" }` refusal to the model instead
+     * of running, and a retry inside `execute` does not reset the count. Omitted, the run keeps 6 steps
+     * and no tool-call cap.
+     */
+    budget?: RunBudget;
     onEvent: (event: RuntimeEvent) => Promise<void> | void;
   }): Promise<void>;
 };
