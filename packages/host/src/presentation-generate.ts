@@ -8,6 +8,7 @@ import {
   type TenantContext,
 } from "@agentforge/core";
 import type { OutputCheck } from "@agentforge/core/harness";
+import type { JobEmitter } from "@agentforge/core/jobs";
 import { loadSettings } from "./settings-store";
 import { listSelectableModels, modeDefaultsFor } from "./selectable-models";
 import {
@@ -32,9 +33,18 @@ import { artifactStore } from "./artifacts";
 import { upsertWorkSource } from "./knowledge-ingest";
 import { artifactWorkCard, presentationOutlineMarkdown } from "./work-cards";
 import {
+  inspectNultronDesign,
+  mergeNultronDesignRetry,
+  repairNultronDesign,
+  repairNultronOutline,
+} from "./presentation-harness";
+import {
+  presentationDesignLabel,
   presentationGatewayMessage,
   presentationLanguageRule,
   presentationLocale,
+  presentationRepairLabel,
+  presentationSkillCopy,
   type PresentationLocale,
 } from "./presentation-locale";
 import { log } from "./log";
@@ -47,6 +57,8 @@ import {
   type PresentationCheckNote,
 } from "./presentation-checks";
 import { assembleDeskSource } from "./desk-sources";
+
+const NO_EMIT: JobEmitter = () => {};
 
 const OUTLINE_SYSTEM = `You write finished presentation outlines a stranger can present from. Return ONLY JSON (no markdown fences).
 Shape:
@@ -130,6 +142,8 @@ type OutlineCall = {
   modelExplicit: boolean;
   /** A repair round: the outline the model wrote before, and the note on what failed. */
   repair?: { previous: string; note: string };
+  /** The design pass asks for its own pages; its calls are told apart from the outline's in the run log. */
+  versionId?: "presentation-outline" | "presentation-design";
   signal?: AbortSignal;
 };
 
@@ -150,7 +164,7 @@ function collectAssistantRun(call: OutlineCall): Promise<JobAssistantRun> {
     runPrefix: "presentation",
     agentId: "presentation",
     jobMode: "presentations",
-    versionId: "presentation-outline",
+    versionId: call.versionId ?? "presentation-outline",
     prompt: call.repair ? repairPrompt(base, call.repair) : base,
     ...(call.signal ? { signal: call.signal } : {}),
   });
@@ -199,6 +213,29 @@ function persistOutline(
     log.warn("presentation_outline_not_saved", { code });
     return null;
   }
+}
+
+function designRetryPrompt(
+  prompt: string,
+  outline: PresentationOutline,
+  failures: ReturnType<typeof inspectNultronDesign>,
+): string {
+  const indexes = new Set(failures.map((failure) => failure.index));
+  const slides = outline.slides.flatMap((slide, index) =>
+    indexes.has(index + 1) ? [{ index: index + 1, ...slide }] : [],
+  );
+  const notes = failures
+    .map((failure) => `${failure.id}: ${failure.reasons.join(", ")} — layout ${failure.layout}`)
+    .join("\n");
+  return [
+    prompt,
+    presentationLanguageRule(presentationLocale()),
+    'Rewrite only these pages. Return JSON {"title"?: string, "slides":[{"index": number, ...slide}]}.',
+    "Do not add a slide. Do not remove a slide. Do not add a digit that is not already on the page or in the topic.",
+    "title is one short line. section holds at most two lines. split holds at most five. quote is one sentence. figure is one supplied figure.",
+    notes,
+    JSON.stringify({ title: indexes.has(0) ? outline.title : undefined, slides }),
+  ].join("\n");
 }
 
 /**
@@ -253,15 +290,73 @@ function outlineChecks(expected: number | null): OutputCheck<Attempt>[] {
   ];
 }
 
+type DesignPass = {
+  tenant: TenantContext;
+  model: string;
+  modelExplicit: boolean;
+  prompt: string;
+  sourceText: string;
+  locale: PresentationLocale;
+  emit: JobEmitter;
+  signal?: AbortSignal;
+};
+
+/**
+ * The Nultron design pass on an outline that already went through the structure checks: put back
+ * what the source and the request did not give, ask once for the crowded pages, then give every
+ * page a layout and cut what still does not fit. The slide count never changes.
+ */
+async function designOutline(outline: PresentationOutline, pass: DesignPass): Promise<PresentationOutline> {
+  const copy = presentationSkillCopy(pass.locale);
+  const fidelity = { prompt: pass.prompt, sourceText: pass.sourceText, note: copy.note, noFigure: copy.noFigure };
+  let next = repairNultronOutline(outline, fidelity);
+  pass.emit({ type: "job.phase", phase: "designing", label: presentationDesignLabel("designing", pass.locale) });
+  const failures = inspectNultronDesign(next);
+  if (failures.length > 0) {
+    pass.emit({ type: "job.phase", phase: "repairing", label: presentationDesignLabel("repairing", pass.locale) });
+    throwIfJobAborted(pass.signal);
+    try {
+      const retry = await collectAssistantRun({
+        tenant: pass.tenant,
+        model: pass.model,
+        prompt: designRetryPrompt(pass.prompt, next, failures),
+        sourceText: pass.sourceText,
+        locale: pass.locale,
+        modelExplicit: pass.modelExplicit,
+        versionId: "presentation-design",
+        ...(pass.signal ? { signal: pass.signal } : {}),
+      });
+      if (retry.text.trim()) {
+        next = repairNultronOutline(
+          mergeNultronDesignRetry(
+            next,
+            retry.text,
+            new Set(failures.map((failure) => failure.index)),
+            `${pass.prompt}\n${pass.sourceText}`,
+          ),
+          fidelity,
+        );
+      }
+    } catch {
+      // One ask for the failing pages. A crowded page is still repaired in code, but a cancel still ends the job.
+      throwIfJobAborted(pass.signal);
+    }
+  }
+  return repairNultronDesign(next);
+}
+
 /**
  * Generate a validated presentation outline via the same runtime path as chat. The outline is not
  * done when the model stops: it is done when it passes `presentationChecks`, with the spec's repair
- * rounds to get there. One that still fails comes back with `checks` naming what, so the studio can
- * say so. Only an outline with no slides at all is an error.
+ * rounds to get there. Then the Nultron design pass (`designOutline`) fixes what the source and the
+ * request did not give and gives each page a layout; its progress goes out on `emit`. One that still
+ * fails a check comes back with `checks` naming what, so the studio can say so. Only an outline with
+ * no slides at all is an error.
  */
 export async function generatePresentationOutline(
   tenant: TenantContext,
   body: unknown,
+  emit: JobEmitter = NO_EMIT,
   abortSignal?: AbortSignal,
 ): Promise<PresentationOutlineResult> {
   const prompt = readPrompt(body);
@@ -274,6 +369,7 @@ export async function generatePresentationOutline(
   const modelExplicit = readModelPinned(body);
   const asked = withSlideCount(prompt, slideCount);
   const expected = slideCount === null ? null : slideCount - 1;
+  const rounds = harnessSpecFor("presentations").repairRounds;
 
   // `held` is what the person already has: the last reply that read as an outline, or else the last
   // reply there was. A repair that fails, comes back empty or comes back unreadable must not cost
@@ -317,7 +413,10 @@ export async function generatePresentationOutline(
       return held;
     },
     checks: outlineChecks(expected),
-    repairRounds: harnessSpecFor("presentations").repairRounds,
+    repairRounds: rounds,
+    onRound: (round) => {
+      emit({ type: "job.round", round, total: rounds, label: presentationRepairLabel(locale) });
+    },
   });
 
   const final = checked.output;
@@ -325,8 +424,19 @@ export async function generatePresentationOutline(
   if (!final.outline) {
     throw final.failure;
   }
-  const { outline, model: answeredBy } = final;
-  const notes = checked.passed ? [] : presentationCheckNotes(outline, expected);
+  const answeredBy = final.model;
+  // The design pass is the last word on the pages, so the checks are read off what it returns.
+  const outline = await designOutline(final.outline, {
+    tenant,
+    model,
+    modelExplicit,
+    prompt,
+    sourceText: source.text,
+    locale,
+    emit,
+    ...(abortSignal ? { signal: abortSignal } : {}),
+  });
+  const notes = presentationCheckNotes(outline, expected);
   const markdown = presentationOutlineMarkdown(outline);
   // Record the model that wrote the outline. After a fallback the requested id is the one model that did not.
   const artifactId = persistOutline(tenant, outline, markdown, {
@@ -421,5 +531,22 @@ export async function regeneratePresentationSlide(
   if (!raw.trim()) {
     throw new ApiError("generation_failed", modeMessage("emptySlide", locale), 502);
   }
-  return mergePresentationSlide(outline, index, parsePresentationSlide(raw));
+  const copy = presentationSkillCopy(locale);
+  const repaired = repairNultronOutline(
+    mergePresentationSlide(outline, index, parsePresentationSlide(raw)),
+    {
+      prompt: topic,
+      sourceText: source.text,
+      note: copy.note,
+      noFigure: copy.noFigure,
+    },
+    index,
+  );
+  const designed = repairNultronDesign(repaired);
+  return {
+    ...repaired,
+    slides: repaired.slides.map((slide, slideIndex) =>
+      slideIndex === index ? (designed.slides[slideIndex] ?? slide) : slide,
+    ),
+  };
 }

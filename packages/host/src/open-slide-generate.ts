@@ -6,11 +6,17 @@ import {
   withOutputLanguage,
   type TenantContext,
 } from "@agentforge/core";
+import type { JobEmitter } from "@agentforge/core/jobs";
 import {
+  applyOpenSlideSkills,
   draftOpenSlideDeck,
+  inspectOpenSlideDesign,
+  mergeOpenSlideDesignRetry,
   OPEN_SLIDE_SYSTEM,
+  openSlidePageBracket,
   parseOpenSlideModelText,
   readOpenSlideChoices,
+  repairOpenSlideDesign,
   type OpenSlideDeck,
 } from "@agentforge/core/open-slide";
 import { artifactStore } from "./artifacts";
@@ -21,9 +27,11 @@ import { upsertWorkSource } from "./knowledge-ingest";
 import { log } from "./log";
 import { listSelectableModels, modeDefaultsFor } from "./selectable-models";
 import { loadSettings } from "./settings-store";
-import { presentationLocale } from "./presentation-locale";
+import { presentationDesignLabel, presentationLocale, presentationSkillCopy } from "./presentation-locale";
 import { assembleDeskSource } from "./desk-sources";
 import { artifactWorkCard } from "./work-cards";
+
+const NO_EMIT: JobEmitter = () => {};
 
 function readPrompt(body: unknown): string {
   if (!body || typeof body !== "object") {
@@ -44,14 +52,45 @@ function readOptionalModel(body: unknown): string | undefined {
   return typeof model === "string" && model.trim() ? model.trim() : undefined;
 }
 
-function userPrompt(prompt: string, choices: ReturnType<typeof readOpenSlideChoices>): string {
+function designRetryPrompt(
+  prompt: string,
+  deck: OpenSlideDeck,
+  failures: ReturnType<typeof inspectOpenSlideDesign>,
+): string {
+  const ids = new Set(failures.map((failure) => failure.id));
+  const pages = deck.pages.filter((page) => ids.has(page.id));
+  const notes = failures
+    .map((failure) => `${failure.id}: ${failure.reasons.join(", ")} — layout ${failure.layout}`)
+    .join("\n");
   return [
+    `Topic: ${prompt}`,
+    'Rewrite only these pages. Return JSON {"pages":[...]} in the Open Slide page shape, same ids.',
+    "Do not add a page. Do not remove a page. Do not add a digit that is not already on the page or in the topic.",
+    "title holds one short title. section holds at most two lines. split holds at most five. quote is one sentence. figure is one supplied figure.",
+    notes,
+    JSON.stringify({ pages }),
+  ].join("\n");
+}
+
+function userPrompt(
+  prompt: string,
+  choices: ReturnType<typeof readOpenSlideChoices>,
+  retry?: { pages: number },
+): string {
+  const bracket = openSlidePageBracket(choices.pageCount);
+  const lines = [
     `Topic: ${prompt}`,
     `Page count bracket: ${choices.pageCount}.`,
     `Text density: ${choices.density}.`,
     `Motion: ${choices.motion}. Record it on brief.motion. Pages stay static boxes.`,
     "Pick one aesthetic that fits the topic and write it on brief.aesthetic.",
-  ].join("\n");
+  ];
+  if (retry) {
+    lines.push(
+      `The deck has ${retry.pages} pages. This bracket needs at least ${bracket.min} and at most ${bracket.max}. Return the full JSON deck with enough pages. Do not invent a figure.`,
+    );
+  }
+  return lines.join("\n");
 }
 
 function emptyDeckMessage(locale: ReturnType<typeof presentationLocale>): string {
@@ -94,6 +133,8 @@ async function collectDeck(
   sourceText: string,
   choices: ReturnType<typeof readOpenSlideChoices>,
   modelExplicit: boolean,
+  retry?: { pages: number },
+  designPrompt?: string,
   signal?: AbortSignal,
 ): Promise<JobAssistantRun> {
   const locale = presentationLocale();
@@ -106,10 +147,28 @@ async function collectDeck(
     runPrefix: "presentation",
     agentId: "presentation",
     jobMode: "presentations",
-    versionId: "open-slide-deck",
-    prompt: withSourceMaterial(userPrompt(prompt, choices), sourceText),
+    versionId: designPrompt ? "open-slide-design" : "open-slide-deck",
+    prompt: withSourceMaterial(designPrompt ?? userPrompt(prompt, choices, retry), sourceText),
     ...(signal ? { signal } : {}),
   });
+}
+
+function finishDeck(deck: OpenSlideDeck, prompt: string, sourceText: string) {
+  return applyOpenSlideSkills(deck, {
+    prompt,
+    sourceText,
+    copy: presentationSkillCopy(presentationLocale()),
+  });
+}
+
+function designDeck(deck: OpenSlideDeck, emit?: JobEmitter): OpenSlideDeck {
+  const locale = presentationLocale();
+  emit?.({ type: "job.phase", phase: "designing", label: presentationDesignLabel("designing", locale) });
+  const failures = inspectOpenSlideDesign(deck);
+  if (failures.length > 0) {
+    emit?.({ type: "job.phase", phase: "repairing", label: presentationDesignLabel("repairing", locale) });
+  }
+  return repairOpenSlideDesign(deck);
 }
 
 async function persistDeck(
@@ -151,6 +210,7 @@ async function persistDeck(
 export async function generateOpenSlideDeck(
   tenant: TenantContext,
   body: unknown,
+  emit: JobEmitter = NO_EMIT,
   abortSignal?: AbortSignal,
 ): Promise<OpenSlideDeck> {
   const prompt = readPrompt(body);
@@ -164,17 +224,13 @@ export async function generateOpenSlideDeck(
     envRuntime: process.env.AGENTFORGE_RUNTIME,
   });
   if (mode === "stub") {
-    return draftOpenSlideDeck({ prompt, ...choices, locale });
+    throwIfJobAborted(abortSignal);
+    const drafted = finishDeck(draftOpenSlideDeck({ prompt, ...choices, locale }), prompt, source.text).deck;
+    return designDeck(drafted, emit);
   }
-  const run = await collectDeck(
-    tenant,
-    resolveModel(body, settings, tenant),
-    prompt,
-    source.text,
-    choices,
-    readModelPinned(body),
-    abortSignal,
-  );
+  const model = resolveModel(body, settings, tenant);
+  const pinned = readModelPinned(body);
+  const run = await collectDeck(tenant, model, prompt, source.text, choices, pinned, undefined, undefined, abortSignal);
   // A deck the person cancelled is not saved as an artifact or a work card.
   throwIfJobAborted(abortSignal);
   if (!run.text.trim()) {
@@ -186,6 +242,64 @@ export async function generateOpenSlideDeck(
   } catch {
     throw new ApiError("invalid_outline", invalidDeckMessage(locale), 502);
   }
+  let finished = finishDeck(deck, prompt, source.text);
+  if (finished.report.length === "short") {
+    try {
+      const retry = await collectDeck(
+        tenant,
+        model,
+        prompt,
+        source.text,
+        choices,
+        pinned,
+        {
+          pages: finished.deck.pages.length,
+        },
+        undefined,
+        abortSignal,
+      );
+      if (retry.text.trim()) {
+        finished = finishDeck(parseOpenSlideModelText(retry.text), prompt, source.text);
+      }
+    } catch {
+      // One retry. A short deck is still returned.
+    }
+  }
+  deck = finished.deck;
+  throwIfJobAborted(abortSignal);
+  emit?.({ type: "job.phase", phase: "designing", label: presentationDesignLabel("designing", locale) });
+  const failures = inspectOpenSlideDesign(deck);
+  if (failures.length > 0) {
+    emit?.({ type: "job.phase", phase: "repairing", label: presentationDesignLabel("repairing", locale) });
+    try {
+      const retry = await collectDeck(
+        tenant,
+        model,
+        prompt,
+        source.text,
+        choices,
+        pinned,
+        undefined,
+        designRetryPrompt(prompt, deck, failures),
+        abortSignal,
+      );
+      if (retry.text.trim()) {
+        const allowed = `${prompt}\n${source.text}`;
+        const merged = mergeOpenSlideDesignRetry(
+          deck,
+          retry.text,
+          new Set(failures.map((failure) => failure.id)),
+          allowed,
+        );
+        deck = finishDeck(merged, prompt, source.text).deck;
+      }
+    } catch {
+      // One ask for the failing pages. A crowded page is still repaired in code.
+    }
+  }
+  // A deck the person cancelled is not saved as an artifact or a work card.
+  throwIfJobAborted(abortSignal);
+  deck = repairOpenSlideDesign(deck);
   const markdown = openSlideMarkdown(deck);
   await persistDeck(tenant, deck, markdown, {
     question: prompt,

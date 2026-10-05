@@ -225,7 +225,21 @@ export async function handlePostPresentations(request: HostRequest): Promise<Hos
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    return jsonOk(await generatePresentationOutline(tenant, request.body ?? null, request.abortSignal));
+    return jsonOk(await generatePresentationOutline(tenant, request.body ?? null, undefined, request.abortSignal));
+  } catch (error) {
+    return jsonError(error);
+  }
+}
+
+/** Same outline as POST /api/v1/presentations, with job.phase progress. */
+export async function handlePostPresentationsStream(request: HostRequest): Promise<HostResult> {
+  try {
+    const tenant = await getTenant(request);
+    requireGatewayAllowedFor(tenant);
+    return streamJob(
+      (emit, abortSignal) => generatePresentationOutline(tenant, request.body ?? null, emit, abortSignal),
+      { abortSignal: request.abortSignal },
+    );
   } catch (error) {
     return jsonError(error);
   }

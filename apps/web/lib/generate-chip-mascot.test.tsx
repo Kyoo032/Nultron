@@ -27,18 +27,42 @@ const CHIPS: [MascotMode, string][] = [
   ["edit", "edit-studio.tsx"],
 ];
 
+/**
+ * Presentations streams its job phases, so its busy chip is the one `JobProgressList` mounts beside the
+ * phase list rather than a bare `MascotSlot` in the studio. The studio must mount that list for its mode,
+ * and the list's own chip must be decorative.
+ */
+const VIA_PROGRESS_LIST: MascotMode[] = ["presentations"];
+
 afterEach(() => resetLocaleForTests());
 
 describe("the busy chip beside a generate control", () => {
   it("is mounted decorative in every studio that has one", () => {
     for (const [mode, file] of CHIPS) {
-      const tags = [...read(file).matchAll(/<MascotSlot\b[^>]*\/>/g)]
+      const source = read(file);
+      if (VIA_PROGRESS_LIST.includes(mode)) {
+        expect(source, `${file} mounts the job progress list`).toMatch(
+          new RegExp(`<JobProgressList\\b[^>]*mode="${mode}"`),
+        );
+        continue;
+      }
+      const tags = [...source.matchAll(/<MascotSlot\b[^>]*\/>/g)]
         .map(([tag]) => tag)
         .filter((tag) => tag.includes('placement="beside"'));
       expect(tags.length, `${file} has a busy chip`).toBeGreaterThan(0);
       for (const tag of tags) {
         expect(tag, `${file} (${mode})`).toMatch(/\bdecorative\b/);
       }
+    }
+  });
+
+  it("is decorative inside the job progress list too", () => {
+    const tags = [...read("job-progress.tsx").matchAll(/<MascotSlot\b[\s\S]*?\/>/g)]
+      .map(([tag]) => tag)
+      .filter((tag) => tag.includes('placement="beside"'));
+    expect(tags.length, "job-progress.tsx has a busy chip").toBeGreaterThan(0);
+    for (const tag of tags) {
+      expect(tag).toMatch(/\bdecorative\b/);
     }
   });
 
