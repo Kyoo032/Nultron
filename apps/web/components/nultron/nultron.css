@@ -5,8 +5,10 @@
    Motion contract (perf budget, desktop first, no GPU on Windows):
      still      no animation. Idle and sleep hold their picture.
      once       one finite clip of 600-1200 ms when a state is entered, ending on the still.
-     loop-busy  loops only under [data-busy], stepped with --ease-busy. Without data-busy a working
-                state holds its still.
+     loop-busy  loops only under [data-busy]. Without data-busy a working state holds its still.
+                A frame strip steps with --ease-busy in every shell; the small transform motion on a
+                head or a state with no strip uses --ease-busy-move, which is smooth in a browser and
+                steps(4) in the packaged desktop shell (`html[data-shell="desktop"]`, app/globals.css).
    A clip or loop from the renders is a strip of frames moved with `transform` (`steps()`, so one distinct
    frame each; a clip lasts frames / fps, a loop cycles at the fps its manifest entry records). A state without one takes the small transform motion below, so the desk still moves when a
    render set has no strip for it. Keyframes touch transform, opacity and the individual `rotate` /
@@ -286,7 +288,7 @@
 
 .chat-mascot[data-busy]:not([data-loop])[data-state="thinking"] .nx-still,
 .chat-mascot[data-busy]:not([data-loop])[data-state="listening"] .nx-still {
-  animation: nxm-i-nod calc(var(--motion-4) * 3) var(--ease-busy) infinite;
+  animation: nxm-i-nod calc(var(--motion-4) * 3) var(--ease-busy-move) infinite;
 }
 
 .chat-mascot[data-busy]:not([data-loop])[data-state="writing"] .nx-still,
@@ -294,7 +296,7 @@
 .chat-mascot[data-busy]:not([data-loop])[data-state="calculating"] .nx-still,
 .chat-mascot[data-busy]:not([data-loop])[data-state="painting"] .nx-still,
 .chat-mascot[data-busy]:not([data-loop])[data-state="editing"] .nx-still {
-  animation: nxm-i-bob calc(var(--motion-4) * 2) var(--ease-busy) infinite;
+  animation: nxm-i-bob calc(var(--motion-4) * 2) var(--ease-busy-move) infinite;
 }
 
 .chat-mascot[data-busy]:not([data-loop])[data-state="searching"] .nx-still,
@@ -303,7 +305,7 @@
 .chat-mascot[data-busy]:not([data-loop])[data-state="presenting"] .nx-still,
 .chat-mascot[data-busy]:not([data-loop])[data-state="filming"] .nx-still,
 .chat-mascot[data-busy]:not([data-loop])[data-state="charging"] .nx-still {
-  animation: nxm-i-swell calc(var(--motion-4) * 3) var(--ease-busy) infinite;
+  animation: nxm-i-swell calc(var(--motion-4) * 3) var(--ease-busy-move) infinite;
 }
 
 /* ---- reduced motion: the pose stays, the movement goes ------------------------------------- */
