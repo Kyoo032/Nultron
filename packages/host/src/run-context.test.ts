@@ -13,7 +13,7 @@ const boot = vi.hoisted(() => ({ locale: "id" as AppLocale }));
 
 vi.mock("./locale-boot", () => ({ getBootLocale: () => boot.locale }));
 
-const { localeForRun, withRequestLocale, withRunContext } = await import("./run-context");
+const { hostedRequestLocale, localeForRun, withRequestLocale, withRunContext } = await import("./run-context");
 
 afterEach(() => {
   boot.locale = "id";
@@ -106,5 +106,31 @@ describe("withRequestLocale", () => {
       async () => [localeForRun(), localeForRun()],
     );
     expect(seen).toEqual(["en", "en"]);
+  });
+});
+
+describe("hostedRequestLocale", () => {
+  it("is undefined outside a request, even though localeForRun falls back to the boot locale there", async () => {
+    boot.locale = "id";
+    expect(hostedRequestLocale()).toBeUndefined();
+    expect(localeForRun()).toBe("id");
+  });
+
+  it("is the request's locale inside withRequestLocale, and ignores a Chat run's own context", async () => {
+    const seen = await withRequestLocale(
+      () => "en",
+      () => withRunContext({ ...RUN, locale: "id" }, async () => [hostedRequestLocale(), localeForRun()]),
+    );
+    expect(seen).toEqual(["en", "id"]);
+  });
+
+  it("answers English, like localeForRun, when the person's locale cannot be read", async () => {
+    const seen = await withRequestLocale(
+      () => {
+        throw new Error("settings payload unreadable");
+      },
+      async () => hostedRequestLocale(),
+    );
+    expect(seen).toBe("en");
   });
 });

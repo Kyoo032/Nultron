@@ -1,7 +1,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-const PUBLIC_PRODUCT_NAME = "DPSBuddy";
+const PUBLIC_PRODUCT_NAME = "Nultron";
 
 const DEFAULT_BRAND = {
   productName: PUBLIC_PRODUCT_NAME,
@@ -23,6 +23,25 @@ function parseBrand(parsed, fallback = DEFAULT_BRAND) {
       ? parsed.gatewayBaseUrl.trim().replace(/\/+$/, "")
       : fallback.gatewayBaseUrl;
   return { productName, gatewayName, gatewayBaseUrl };
+}
+
+/**
+ * The gateway a packaged build may use instead of the pinned one, or "" for the pinned one.
+ *
+ * Only a brand flavor (Kemenkeu AI, AIHub Metranet) has one: it is the `gatewayBaseUrl` of the
+ * `brand.json` installed beside it. The public Nultron build never does, whatever its `brand.json`
+ * says, so it always talks to the pinned gateway. `main.cjs` hands the result to the host as
+ * `AGENTFORGE_BRAND_GATEWAY_URL`; the host (`packages/core/src/gateway/pinned.ts`) still insists on https.
+ *
+ * @param {{ productName?: string, gatewayBaseUrl?: unknown } | null | undefined} brand a parsed brand
+ * @returns {string}
+ */
+function brandGatewayOverride(brand) {
+  if (!brand || brand.productName === PUBLIC_PRODUCT_NAME) {
+    return "";
+  }
+  const url = typeof brand.gatewayBaseUrl === "string" ? brand.gatewayBaseUrl.trim().replace(/\/+$/, "") : "";
+  return url === DEFAULT_BRAND.gatewayBaseUrl ? "" : url;
 }
 
 function loadBrandFromResources(resourcesPath, dirname) {
@@ -66,6 +85,7 @@ module.exports = {
   PUBLIC_PRODUCT_NAME,
   DEFAULT_BRAND,
   parseBrand,
+  brandGatewayOverride,
   loadBrandFromResources,
   loadBrandLogo,
 };

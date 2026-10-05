@@ -1,20 +1,13 @@
 "use client";
 
-import {
-  applyOp,
-  emptyProject,
-  STARTER_PROJECTS,
-  type ApplyableOp,
-  type EditOp,
-  type EditProject,
-} from "@agentforge/core/edit";
+import { emptyProject, STARTER_PROJECTS, type ApplyableOp, type EditOp, type EditProject } from "@agentforge/core/edit";
 import { formatUsd } from "@agentforge/core/gateway";
 import { EditAgentPanel } from "@/components/edit-agent-panel";
+import { EditEmptyState } from "@/components/edit-empty-state";
 import { EditGenerateTab } from "@/components/edit-generate-tab";
 import { FfmpegSetupNotice } from "@/components/ffmpeg-setup-notice";
 import { ModeHeader } from "@/components/mode-header";
 import { MascotSlot } from "@/components/mascot-slot";
-import { ModeIllustration } from "@/components/mode-illustration";
 import { WorkingStatus } from "@/components/working-status";
 import { imageClipAt } from "@/lib/edit-preview-media";
 import { EditRecipesPanel } from "@/components/edit-recipes-panel";
@@ -22,6 +15,9 @@ import { EditPreview } from "@/components/edit-preview";
 import { EditTimeline } from "@/components/edit-timeline";
 import { apiFetch, isElectron } from "@/lib/api-client";
 import { pickMedia } from "@/lib/desktop-bridge";
+import { gatewayBlockedMessage, hostedGatewayBlocked, isGatewayBlockedText } from "@/lib/gateway-blocked";
+import { isHostedBuild } from "@/lib/hosted-build";
+import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import { hasNativeFilePicker, useHostCapabilities } from "@/lib/host-capabilities";
 import {
   activeJobs,
@@ -48,7 +44,7 @@ import { useEmitLock } from "@/lib/use-emit-lock";
 import { useProductBrand } from "@/lib/product-brand";
 import { t } from "@/lib/i18n";
 import { Link } from "@/lib/nav";
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type ToolId = "upload" | "generate" | "ingredients" | "titles" | "captions" | "recipes" | "history";
 
@@ -77,6 +73,11 @@ export function EditStudio() {
 
   const [items, setItems] = useState<EditProjectRow[]>([]);
   const [project, setProject] = useState<EditProject | null>(null);
+  // The copy the next host frame folds onto. It is moved ahead of the render by `putProject`, so two
+  // frames that arrive in one tick (the project stream and the agent turn's stream carry the same
+  // ops) are folded one after the other and not both onto the copy the last render drew.
+  const projectRef = useRef<EditProject | null>(null);
+  projectRef.current = project;
   const [cards, setCards] = useState<OpCard[]>([]);
   const [jobs, setJobs] = useState<EditJob[]>([]);
   const [unplaced, setUnplaced] = useState<UnplacedItem[]>([]);
@@ -91,6 +92,10 @@ export function EditStudio() {
   const [starterId, setStarterId] = useState(STARTER_PROJECTS[0]?.id ?? "blank-16x9");
   const [tier, setTier] = useState("standard");
   const [hasKey, setHasKey] = useState(true);
+  // Nultron Enterprise: a signed-in tenant may open the desk before adding a key (hosted only; false
+  // elsewhere). `hasKey` is what two reads said at mount, so on the hosted build the shared gate
+  // decides instead, which also hears a key saved in Settings and a refused call.
+  const hostedNeedsKey = useHostedNeedsKey();
   const [doctor, setDoctor] = useState<EditDoctor | null>(null);
   const [spendCap, setSpendCap] = useState(2);
   const [models, setModels] = useState<StudioModel[]>([]);
@@ -111,16 +116,21 @@ export function EditStudio() {
     }
   }, []);
 
+  const putProject = useCallback((next: EditProject) => {
+    projectRef.current = next;
+    setProject(next);
+  }, []);
+
   const applyLoaded = useCallback(
     (loaded: { project: EditProject; cards: OpCard[]; jobs: EditJob[]; unplaced: UnplacedItem[]; seq: number }) => {
-      setProject(loaded.project);
+      putProject(loaded.project);
       setCards((current) => mergeCards(current, loaded.cards));
       setJobs(loaded.jobs);
       setUnplaced(loaded.unplaced.filter((item) => !item.discardedAt && !item.placedClipId));
       setClock(loaded.project.seq);
       lastAgentSeq.current = loaded.project.review.lastAgentSeq;
     },
-    [],
+    [putProject],
   );
 
   const reloadProject = useCallback(
@@ -131,6 +141,46 @@ export function EditStudio() {
       }
     },
     [applyLoaded],
+  );
+
+  // The copy fell behind the host (a frame skipped a seq, or an op did not fit): take the host's
+  // project instead. Only a reload that fails is the owner's business, and it is said inline; the
+  // studio stays up either way.
+  const resyncProject = useCallback(
+    async (id: string) => {
+      try {
+        const { loaded } = await fetchEditProject(id);
+        if (loaded) {
+          applyLoaded(loaded);
+          return;
+        }
+      } catch {
+        // fall through to the same message as a refused reload
+      }
+      setError(t("edit.errors.apply"));
+    },
+    [applyLoaded],
+  );
+
+  // Every frame the host pushes (the project stream's `ops.appended`, the agent turn's `edit.ops`, an
+  // import's `op`) goes through here. Applying one inside a state updater is what used to take the
+  // studio down: the same op arrives by more than one road, and a throw in an updater is a throw in
+  // render.
+  const foldFrame = useCallback(
+    (ops: EditOp[]) => {
+      const current = projectRef.current;
+      if (!current) {
+        return;
+      }
+      const folded = foldApplied(current, ops);
+      if (folded.project !== current) {
+        putProject(folded.project);
+      }
+      if (folded.diverged) {
+        void resyncProject(current.id);
+      }
+    },
+    [putProject, resyncProject],
   );
 
   useEffect(() => {
@@ -200,7 +250,7 @@ export function EditStudio() {
             if (type === "ops.appended" || type === "edit.ops") {
               const ops = (record.ops ?? record.applied) as EditOp[] | undefined;
               if (Array.isArray(ops) && ops.length > 0) {
-                setProject((current) => (current ? foldApplied(current, ops) : current));
+                foldFrame(ops);
                 const last = ops[ops.length - 1];
                 if (last) {
                   setParent(last.id);
@@ -237,7 +287,7 @@ export function EditStudio() {
       }
     })();
     return () => abort.abort();
-  }, [emitLock, project?.id]);
+  }, [emitLock, foldFrame, project?.id]);
 
   async function commitOps(ops: ApplyableOp[]) {
     if (!project) {
@@ -246,7 +296,7 @@ export function EditStudio() {
     setError(null);
     try {
       const result = await postEditOps({ project, parent, clock, opsPosted }, ops);
-      setProject(result.project);
+      putProject(result.project);
       setParent(result.parent);
       setClock(result.clock);
       setOpsPosted(result.opsPosted);
@@ -254,6 +304,9 @@ export function EditStudio() {
         setError(result.error);
         await reloadProject(project.id);
         return;
+      }
+      if (result.diverged) {
+        await resyncProject(project.id);
       }
       for (const cardId of [...new Set(result.keepCardIds)]) {
         await apiFetch(`/api/v1/edit/projects/${project.id}/cards/${cardId}/keep`, { method: "POST" }).catch(
@@ -276,7 +329,7 @@ export function EditStudio() {
           name,
           aspect: "16:9",
         });
-        setProject(local);
+        putProject(local);
         setCards([]);
         setJobs([]);
         setUnplaced([]);
@@ -289,7 +342,7 @@ export function EditStudio() {
     if (loaded) {
       applyLoaded(loaded);
     } else {
-      setProject(created.project);
+      putProject(created.project);
     }
     await loadList();
   }
@@ -307,7 +360,8 @@ export function EditStudio() {
       return;
     }
     if (payload.op) {
-      setProject((current) => (current ? applyOp(current, payload.op as ApplyableOp) : current));
+      // The project stream has usually carried this op (and the clip that follows it) already.
+      foldFrame([payload.op as EditOp]);
       setOpsPosted((count) => count + 1);
     }
     await reloadProject(project.id);
@@ -349,8 +403,6 @@ export function EditStudio() {
     fileRef.current?.click();
   }
 
-  const projectRef = useRef(project);
-  projectRef.current = project;
   const playheadRef = useRef(playhead);
   playheadRef.current = playhead;
   const selectedRef = useRef(selectedClipId);
@@ -441,7 +493,10 @@ export function EditStudio() {
   }
 
   async function sendAgent(text: string) {
-    if (!project) {
+    // Hosted with no usable key: every door to the agent (the composer, "Go", a recipe) is already
+    // quiet in the UI; this keeps a stale click or a door added later from making the refused call.
+    // `hostedNeedsKey` is false off the hosted build, so the Personal app never takes this branch.
+    if (!project || hostedNeedsKey) {
       return;
     }
     agentAbort.current?.abort();
@@ -458,7 +513,11 @@ export function EditStudio() {
       return;
     }
     if (!response.ok || !response.body) {
-      setError(errorMessage(await readJson(response), t("edit.errors.agentFailed")));
+      const failure = await readJson(response);
+      // Hosted only: a 403 gateway_blocked is "no usable key", said calmly, not a failed edit.
+      setError(
+        hostedGatewayBlocked(failure) ? gatewayBlockedMessage() : errorMessage(failure, t("edit.errors.agentFailed")),
+      );
       return;
     }
     const reader = response.body.getReader();
@@ -491,7 +550,7 @@ export function EditStudio() {
         if (event.type === "edit.ops" || event.type === "ops.appended") {
           const ops = (record.ops ?? record.applied) as EditOp[] | undefined;
           if (Array.isArray(ops)) {
-            setProject((current) => (current ? foldApplied(current, ops) : current));
+            foldFrame(ops);
           }
         }
         if (event.type === "edit.plan") {
@@ -692,7 +751,7 @@ export function EditStudio() {
       </div>
       {exporting || exportBusy ? (
         <p className="flex items-center gap-2 px-4" data-testid="edit-export-progress">
-          <MascotSlot mode="edit" placement="beside" busy />
+          <MascotSlot mode="edit" placement="beside" busy decorative />
           <WorkingStatus label={t("edit.exporting")} />
         </p>
       ) : null}
@@ -706,74 +765,22 @@ export function EditStudio() {
           {t("edit.downloadExport")}
         </button>
       ) : null}
-      {error ? (
+      {error && !isGatewayBlockedText(error) ? (
         <p className="px-4 py-1 text-xs text-red-700" role="alert">
           {error}
         </p>
       ) : null}
 
       {!project ? (
-        <div className="flex min-h-0 flex-1">
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-6" data-testid="edit-project-list">
-            <h2 className="font-heading text-xl">{t("edit.projects")}</h2>
-            <div className="mt-4 flex flex-col gap-2">
-              <select
-                className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm"
-                value={starterId}
-                onChange={(event) => setStarterId(event.target.value)}
-                data-testid="edit-starter"
-              >
-                {STARTER_PROJECTS.map((starter) => (
-                  <option key={starter.id} value={starter.id}>
-                    {starter.name}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-[var(--text-2)]" data-testid="edit-starter-description">
-                {STARTER_PROJECTS.find((starter) => starter.id === starterId)?.description ?? ""}
-              </p>
-              <div className="flex gap-2">
-                <input
-                  className="rounded-md border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm"
-                  value={projectName}
-                  onChange={(event) => setProjectName(event.target.value)}
-                  data-testid="edit-project-name"
-                />
-                <button
-                  type="button"
-                  className="btn btn-primary px-3 py-2 text-sm"
-                  data-testid="edit-new-project"
-                  onClick={() => void onNewProject()}
-                >
-                  {t("edit.newProject")}
-                </button>
-              </div>
-            </div>
-            <ul className="mt-4 space-y-2">
-              {items.map((item, index) => (
-                <li key={item.id} className="enter-rise" style={{ "--i": index } as CSSProperties}>
-                  <button
-                    type="button"
-                    className="card-live w-full px-3 py-2 text-left text-sm"
-                    onClick={() => void reloadProject(item.id)}
-                  >
-                    {item.name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="flex min-h-0 w-[320px] flex-col border-l border-[var(--line)]">
-            <div className="min-h-0 flex-1" data-testid="edit-preview" />
-            <div className="h-24 border-t border-[var(--line)]" data-testid="edit-timeline" />
-          </div>
-          <aside className="w-[280px] border-l border-[var(--line)]" data-testid="edit-agent-panel">
-            <div className="flex flex-col items-center px-4 py-8 text-center">
-              <ModeIllustration mode="edit" />
-              <p className="mt-4 text-xs text-[var(--text-3)]">{t("edit.openProjectHint")}</p>
-            </div>
-          </aside>
-        </div>
+        <EditEmptyState
+          items={items}
+          starterId={starterId}
+          projectName={projectName}
+          onStarter={setStarterId}
+          onProjectName={setProjectName}
+          onNewProject={() => void onNewProject()}
+          onOpen={(id) => void reloadProject(id)}
+        />
       ) : (
         <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
           <nav className="flex w-[112px] shrink-0 flex-col overflow-y-auto border-r border-[var(--line)] bg-[var(--surface)] py-2">
@@ -822,7 +829,7 @@ export function EditStudio() {
                   stillClip={imageClipAt(project, playhead)}
                   models={models}
                   imageModels={imageModels}
-                  needsKey={!hasKey}
+                  needsKey={isHostedBuild() ? hostedNeedsKey : !hasKey}
                   gatewayName={gatewayName}
                   tier={tier}
                   onTierChange={setTier}
@@ -830,7 +837,10 @@ export function EditStudio() {
                   onAgentPrompt={(text) => void sendAgent(text)}
                 />
               ) : tool === "recipes" ? (
-                <EditRecipesPanel onRun={(recipeId) => void sendAgent(`Run recipe ${recipeId}`)} />
+                <EditRecipesPanel
+                  onRun={(recipeId) => void sendAgent(`Run recipe ${recipeId}`)}
+                  needsKey={hostedNeedsKey}
+                />
               ) : (
                 <p className="p-3 text-xs text-[var(--text-3)]">
                   {tool === "captions" ? (
@@ -890,6 +900,7 @@ export function EditStudio() {
             onReviewOk={() => void onReviewOk()}
             onPlace={(id) => void onPlace(id)}
             onDiscard={(id) => void onDiscard(id)}
+            needsKey={hostedNeedsKey}
           />
         </div>
       )}

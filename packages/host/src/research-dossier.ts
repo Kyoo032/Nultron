@@ -8,9 +8,20 @@ import {
   type DossierSource,
   type ResearchNotes,
 } from "@agentforge/core/artifacts";
+import { harnessSpecFor } from "@agentforge/core/harness";
 import type { JobEmitter } from "@agentforge/core/jobs";
+import { runChecked } from "./harness/run-checked";
 import { throwIfJobAborted } from "./job-stream";
 import { extractJsonObject } from "./presentation-outline";
+import {
+  RESEARCH_SYNTHESIS_CHECKS,
+  excerptOf,
+  repairRoundLabel,
+  shortId,
+  type ResearchChecksReport,
+  type SectionRef,
+  type UnknownCitation,
+} from "./research-checks";
 
 /** Fixed caps for the closed beta ("fully detailed" never means unbounded). */
 export type ResearchCaps = {
@@ -74,11 +85,15 @@ export type DossierDeps = {
   caps?: Partial<ResearchCaps>;
   /** Desk locale for the citation-check labels. Model prose still goes through `withOutputLanguage`. */
   locale?: AppLocale;
+  /** Check-and-repair rounds for the synthesis. Defaults to the research harness spec's `repairRounds`. */
+  repairRounds?: number;
+  /** Label beside "Round n of m" while the synthesis is repaired. Defaults to English. */
+  repairLabel?: string;
 };
 
 export type DossierRunInput = { question: string; models: string[] };
 
-export type DossierRunResult = { dossier: Dossier; notes: ResearchNotes };
+export type DossierRunResult = { dossier: Dossier; notes: ResearchNotes; checks: ResearchChecksReport };
 
 export const PLAN_SYSTEM = `You plan web research. Given a question, return ONLY JSON: {"queries": string[]}.
 Rules: 3 to 5 distinct search queries that together cover the question (definitions, numbers, opposing views, recent developments). Short keyword queries, no quotes, no numbering. Same language as the question.`;
@@ -106,7 +121,7 @@ export const SYNTHESIS_SYSTEM = `You write the findings section of a research do
   "openQuestions": string[]
 }
 Rules:
-- Use only the passages and notes given. Every finding cites its sources as [S1], [S2] inside body AND lists the same ids in sources.
+- Use only the passages and notes given. Every finding cites its sources as [S1], [S2] inside body AND lists the same ids in sources. Cite only the ids numbered in Sources.
 - 4 to 8 findings. Each is one claim or cluster: evidence, disagreement or gap, and what it implies. Not a heading plus one sentence.
 - summary is the reading (8–12 lines) plus a confidence (high/med/low) and what evidence is thin. The comparison rows are already decided: do not add a row and do not change a verdict.
 - contradictions: where sources disagree, naming both ids. openQuestions: what the sources do not settle and the next measurement to take.
@@ -395,36 +410,71 @@ export type Synthesis = {
   findings: DossierFinding[];
   contradictions: string[];
   openQuestions: string[];
+  /** 1-based positions, in the model's findings list, of findings dropped for an empty heading or body. */
+  emptyFindings: number[];
+  /** Source ids the model cited that no source of this run carries. Counted here, judged by the checks. */
+  unknownCitations: UnknownCitation[];
+  /** Every id the model was shown, and so every id it may cite. */
+  sourceIds: string[];
 };
+
+function unknownIn(ids: readonly string[], known: ReadonlySet<string>, section: SectionRef): UnknownCitation[] {
+  return [...new Set(ids)].filter((id) => !known.has(id)).map((id) => ({ section, id: shortId(id) }));
+}
+
+function readFinding(item: unknown): { heading: string; body: string; listed: string[] } | null {
+  const record = (item ?? {}) as { heading?: unknown; body?: unknown; sources?: unknown };
+  const heading = typeof record.heading === "string" ? record.heading.trim() : "";
+  const body = typeof record.body === "string" ? record.body.trim() : "";
+  if (!heading || !body) {
+    return null;
+  }
+  // "[S1]" in the sources list is the same citation as "S1".
+  const listed = cleanList(record.sources, 20).map((id) => id.replace(/^\[|\]$/g, "").toUpperCase());
+  return { heading, body, listed };
+}
 
 export function parseSynthesis(raw: string, sourceIds: readonly string[]): Synthesis {
   const parsed = parseJson(raw, "research findings") as Record<string, unknown>;
   const known = new Set(sourceIds);
-  const findings = (Array.isArray(parsed.findings) ? parsed.findings : [])
-    .map((item): DossierFinding | null => {
-      const record = (item ?? {}) as { heading?: unknown; body?: unknown; sources?: unknown };
-      const heading = typeof record.heading === "string" ? record.heading.trim() : "";
-      const body = typeof record.body === "string" ? record.body.trim() : "";
-      if (!heading || !body) {
-        return null;
-      }
-      const listed = cleanList(record.sources, 20).map((id) => id.toUpperCase());
-      const cited = citedSourceIds(body);
-      const sources = [...new Set([...listed, ...cited])].filter((id) => known.has(id));
-      return { heading, body, sources };
-    })
-    .filter((item): item is DossierFinding => item !== null);
+  const findings: DossierFinding[] = [];
+  const emptyFindings: number[] = [];
+  const unknownCitations: UnknownCitation[] = [];
+  (Array.isArray(parsed.findings) ? parsed.findings : []).forEach((item, at) => {
+    const read = readFinding(item);
+    if (!read) {
+      emptyFindings.push(at + 1);
+      return;
+    }
+    const ids = [...new Set([...read.listed, ...citedSourceIds(read.body)])];
+    unknownCitations.push(...unknownIn(ids, known, { kind: "finding", excerpt: excerptOf(read.heading) }));
+    findings.push({ heading: read.heading, body: read.body, sources: ids.filter((id) => known.has(id)) });
+  });
   if (findings.length === 0) {
     throw new ApiError("invalid_research", "Model returned no findings", 502);
   }
   const title = typeof parsed.title === "string" && parsed.title.trim() ? parsed.title.trim() : "Research dossier";
   const summary = typeof parsed.summary === "string" && parsed.summary.trim() ? parsed.summary.trim() : "";
+  const contradictions = cleanList(parsed.contradictions, 20);
+  const openQuestions = cleanList(parsed.openQuestions, 20);
+  unknownCitations.push(
+    ...unknownIn(citedSourceIds(summary), known, { kind: "summary", excerpt: "" }),
+    ...contradictions.flatMap((text) =>
+      unknownIn(citedSourceIds(text), known, { kind: "contradiction", excerpt: excerptOf(text) }),
+    ),
+    ...openQuestions.flatMap((text) =>
+      unknownIn(citedSourceIds(text), known, { kind: "openQuestion", excerpt: excerptOf(text) }),
+    ),
+  );
   return {
     title,
     summary,
     findings,
-    contradictions: cleanList(parsed.contradictions, 20),
-    openQuestions: cleanList(parsed.openQuestions, 20),
+    contradictions,
+    openQuestions,
+    emptyFindings,
+    unknownCitations,
+    sourceIds: [...sourceIds],
   };
 }
 
@@ -503,7 +553,7 @@ function researchHostCopy(locale: AppLocale | undefined) {
   return RESEARCH_HOST_COPY[parseAppLocale(locale ?? "en")];
 }
 
-function repairPrompt(
+function citeRepairPrompt(
   question: string,
   sources: readonly DossierSource[],
   backed: ReadonlySet<string>,
@@ -634,6 +684,61 @@ async function readSource(
   }
 }
 
+const DEFAULT_REPAIR_LABEL = repairRoundLabel("en");
+
+function repairPrompt(prompt: string, previousRaw: string, note: string): string {
+  return `${prompt}\n\nYour previous answer:\n${previousRaw}\n\n${note}`;
+}
+
+/**
+ * The drafting stage, gated by the checks in `research-checks.ts`: a synthesis that cites a source
+ * it was never given, leaves a finding uncited or leaves a section empty goes back to the model once
+ * (the research spec's `repairRounds`) with the exact sections and the allowed ids. A repair call
+ * that fails or comes back unreadable keeps the earlier answer, so a usable first draft is never
+ * lost to a bad second one; the checks then still fail and say so. Only the first call may throw.
+ */
+async function synthesizeChecked(
+  prompt: string,
+  sourceIds: string[],
+  deps: DossierDeps,
+): Promise<{ synthesis: Synthesis; checks: ResearchChecksReport }> {
+  const repairRounds = deps.repairRounds ?? harnessSpecFor("research").repairRounds;
+  const emit = deps.emit ?? (() => {});
+  let previous: { raw: string; synthesis: Synthesis } | null = null;
+  let repairFailure: string | undefined;
+  const result = await runChecked<Synthesis>({
+    checks: RESEARCH_SYNTHESIS_CHECKS,
+    repairRounds,
+    onRound: (round) => {
+      emit({ type: "job.round", round, total: repairRounds, label: deps.repairLabel ?? DEFAULT_REPAIR_LABEL });
+    },
+    produce: async (note) => {
+      throwIfJobAborted(deps.abortSignal);
+      try {
+        const asked = note && previous ? repairPrompt(prompt, previous.raw, note) : prompt;
+        const raw = await deps.ask(SYNTHESIS_SYSTEM, asked);
+        const synthesis = parseSynthesis(raw, sourceIds);
+        previous = { raw, synthesis };
+        return synthesis;
+      } catch (error) {
+        throwIfJobAborted(deps.abortSignal);
+        if (!previous) {
+          throw error;
+        }
+        repairFailure = error instanceof ApiError ? error.code : "repair_failed";
+        return previous.synthesis;
+      }
+    },
+  });
+  const checks: ResearchChecksReport = {
+    passed: result.passed,
+    rounds: result.rounds,
+    verdicts: result.verdicts,
+    ...(repairFailure ? { repairFailure } : {}),
+  };
+  return { synthesis: result.output, checks };
+}
+
 /** Pull claims → search each one → read → keep on-page passages → compare in code → the model writes the reading. */
 export async function runResearchDossier(input: DossierRunInput, deps: DossierDeps): Promise<DossierRunResult> {
   const caps = { ...RESEARCH_CAPS, ...deps.caps };
@@ -721,15 +826,17 @@ export async function runResearchDossier(input: DossierRunInput, deps: DossierDe
     `Comparison (already decided in code; do not change a verdict or add a row):\n${comparisonPromptBlock(comparison)}`,
     `Sources:\n${sources.map(sourcePromptBlock).join("\n\n")}`,
   ].join("\n\n");
-  let synthesis = parseSynthesis(
-    await deps.ask(SYNTHESIS_SYSTEM, synthesisPrompt),
+  const checked = await synthesizeChecked(
+    synthesisPrompt,
     sources.map((source) => source.id),
+    deps,
   );
-  synthesis = {
-    ...synthesis,
-    summary: stripInventedQuotes(synthesis.summary, passages),
-    findings: stripFindingQuotes(synthesis.findings, passages),
-    contradictions: synthesis.contradictions.map((item) => stripInventedQuotes(item, passages)),
+  const checks = checked.checks;
+  let synthesis: Synthesis = {
+    ...checked.synthesis,
+    summary: stripInventedQuotes(checked.synthesis.summary, passages),
+    findings: stripFindingQuotes(checked.synthesis.findings, passages),
+    contradictions: checked.synthesis.contradictions.map((item) => stripInventedQuotes(item, passages)),
   };
 
   if (!synthesis.findings.every((finding) => findingCitesResolve(finding, backed))) {
@@ -737,7 +844,7 @@ export async function runResearchDossier(input: DossierRunInput, deps: DossierDe
     emit({ type: "job.phase", phase: "checking", label: copy.checking });
     try {
       const repaired = parseRepairFindings(
-        await deps.ask(CITE_REPAIR_SYSTEM, repairPrompt(question, sources, backed, synthesis.findings)),
+        await deps.ask(CITE_REPAIR_SYSTEM, citeRepairPrompt(question, sources, backed, synthesis.findings)),
       );
       if (repaired && repaired.length > 0) {
         synthesis = { ...synthesis, findings: stripFindingQuotes(repaired, passages) };
@@ -773,5 +880,5 @@ export async function runResearchDossier(input: DossierRunInput, deps: DossierDe
       20,
     ),
   });
-  return { dossier, notes: notesFromDossier(dossier, synthesis.summary) };
+  return { dossier, notes: notesFromDossier(dossier, synthesis.summary), checks };
 }

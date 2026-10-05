@@ -14,7 +14,7 @@
   },
   "list": {
     "label": "Kanal di meja ini",
-    "placeholder": "@namakanal atau -1001234567890",
+    "placeholder": "@username atau ID chat",
     "addAria": "ID chat atau @username",
     "add": "Tambah",
     "remove": "Hapus",

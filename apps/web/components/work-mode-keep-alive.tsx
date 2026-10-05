@@ -16,6 +16,7 @@ import { LegalStudio } from "@/components/legal-studio";
 import { MeetingStudio } from "@/components/meeting-studio";
 import { useWorkspaceScope } from "@/lib/workspace-scope";
 import { deskPaneClass, deskPaneInnerClass, FILL_DESK_PATHS } from "@/components/desk-pane";
+import { BOOT_DESK_KEY, nextDeskKey, type DeskKey } from "@/lib/desk-pane-key";
 
 const WORK_MODE_COMPONENTS: Record<string, ComponentType> = {
   "/chat": ChatPage,
@@ -48,12 +49,19 @@ const WORK_MODE_PATHS = Object.keys(WORK_MODE_COMPONENTS);
  */
 export function WorkModeKeepAlive() {
   const { id } = useWorkspaceScope();
-  // A desk switch remounts every pane on purpose: what each one lists belongs to the desk. Two
-  // things keep that from costing work that cannot be redone. The shell changes this id only when
+  const [desk, setDesk] = useState<DeskKey>(BOOT_DESK_KEY);
+  // A desk switch remounts every pane on purpose: what each one lists belongs to the desk. The
+  // first id of a cold load is not a switch, so it is adopted without a remount (`nextDeskKey`):
+  // keyed on the raw id, every pane mounted and was thrown away within a round trip. Two things
+  // keep a real switch from costing work that cannot be redone. The shell changes this id only when
   // the host names a desk, never on a failed read (`shellWorkspaceFrom`, `src/App.tsx`). And
   // Meeting hands a recording it still holds to its next mount (`stashRescuedClip`,
   // `meeting-studio.tsx`) instead of losing it with the pane.
-  return <WorkModePanes key={id ?? "boot"} />;
+  const next = nextDeskKey(desk, id);
+  if (next !== desk) {
+    setDesk(next);
+  }
+  return <WorkModePanes key={next.key} />;
 }
 
 function WorkModePanes() {

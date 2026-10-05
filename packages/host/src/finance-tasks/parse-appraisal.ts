@@ -94,7 +94,7 @@ function answer(
  * The grid path answers without a model at all; the fallback reuses the brief's parse, which is
  * still a read the owner confirms rather than a figure anyone computed.
  */
-export const parseAppraisalInput: FinanceTaskParser = async (tenant, body) => {
+export const parseAppraisalInput: FinanceTaskParser = async (tenant, body, abortSignal) => {
   const raw = readFigures(body);
   const guarded = guardFinanceInput({ figuresText: raw });
   const rate = discountRateFromText(`${readPromptText(body)}\n${guarded.figuresText}`);
@@ -110,7 +110,7 @@ export const parseAppraisalInput: FinanceTaskParser = async (tenant, body) => {
     const rows = guardFinanceInput({ lineItems: sentence });
     return answer(rows.lineItems, guarded.pii, rate, []);
   }
-  const parsed = await parseFinanceFigures(tenant, body);
+  const parsed = await parseFinanceFigures(tenant, body, abortSignal);
   const rows = guardFinanceInput({ lineItems: parsed.items });
   return answer(rows.lineItems, parsed.pii, rate, []);
 };

@@ -1,0 +1,13 @@
+# Caddy's ACME account and issued certificates.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nultron-caddy-data
+  labels:
+    app.kubernetes.io/part-of: nultron
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: nultron-cbs-ssd
+  resources:
+    requests:
+      storage: 20Gi

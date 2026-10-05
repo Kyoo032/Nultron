@@ -59,6 +59,16 @@ function readOrDefault(resolve: () => AppLocale): AppLocale {
   }
 }
 
+/**
+ * The hosted request's own locale, or `undefined` when nothing set one: a desk, webdev, or code running
+ * outside a request. For the one caller that needs the request's answer without the boot-locale
+ * fallback `localeForRun` adds. Chat keeps its own locale for a run (`./runs.ts`) and must take the
+ * same default every other mode gets, or a person's screen would be Indonesian and Chat's reply not.
+ */
+export function hostedRequestLocale(): AppLocale | undefined {
+  return requestLocale.getStore()?.();
+}
+
 /** Most specific first: a Chat run's own context, then the request's person, then the boot locale. */
 export function localeForRun(): AppLocale {
   return getRunContext()?.locale ?? requestLocale.getStore()?.() ?? getBootLocale();

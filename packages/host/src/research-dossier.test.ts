@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ApiError } from "@agentforge/core";
 import { DOSSIER_HEADINGS, dossierToMarkdown } from "@agentforge/core/artifacts";
 import type { JobEvent } from "@agentforge/core/jobs";
+import { formatRepairNote } from "./harness/run-checked";
 import {
   CITE_REPAIR_SYSTEM,
   CLAIMS_SYSTEM,
@@ -107,6 +108,35 @@ describe("parseSynthesis", () => {
     expect(out.findings).toEqual([{ heading: "H", body: "Thin margins [S1] and [S9].", sources: ["S2", "S1"] }]);
     expect(out.contradictions).toEqual(["S1 vs S2 on margins"]);
     expect(() => parseSynthesis(JSON.stringify({ findings: [] }), ["S1"])).toThrow(/no findings/);
+  });
+
+  it("counts what it drops instead of dropping it silently", () => {
+    const raw = JSON.stringify({
+      summary: "Overall [S1] and [S7].",
+      findings: [
+        { heading: "H", body: "Thin margins [S1] and [S9].", sources: ["[s2]", "S40", "nonsense"] },
+        { heading: "", body: "no heading" },
+        { heading: "Third", body: "Fine [S2].", sources: ["S2"] },
+        { heading: "Fourth", body: "", sources: ["S1"] },
+      ],
+      contradictions: ["Sources disagree [S1] [S8]"],
+      openQuestions: ["Next [S2]?", "Beyond [S6]?"],
+    });
+    const out = parseSynthesis(raw, ["S1", "S2"]);
+    expect(out.findings.map((finding) => [finding.heading, finding.sources])).toEqual([
+      ["H", ["S2", "S1"]],
+      ["Third", ["S2"]],
+    ]);
+    expect(out.emptyFindings).toEqual([2, 4]);
+    expect(out.unknownCitations).toEqual([
+      { section: { kind: "finding", excerpt: "H" }, id: "S40" },
+      { section: { kind: "finding", excerpt: "H" }, id: "NONSENSE" },
+      { section: { kind: "finding", excerpt: "H" }, id: "S9" },
+      { section: { kind: "summary", excerpt: "" }, id: "S7" },
+      { section: { kind: "contradiction", excerpt: "Sources disagree [S1] [S8]" }, id: "S8" },
+      { section: { kind: "openQuestion", excerpt: "Beyond [S6]?" }, id: "S6" },
+    ]);
+    expect(out.sourceIds).toEqual(["S1", "S2"]);
   });
 });
 
@@ -492,5 +522,184 @@ describe("claimed sources and comparison", () => {
       .filter((event) => event.type === "job.phase")
       .map((event) => (event as { phase: string }).phase);
     expect(phases).toEqual(["planning", "searching", "reading", "comparing", "drafting"]);
+  });
+});
+
+const SOURCE_IDS = "S1, S2, S3";
+
+function synthesisAnswer(overrides: Record<string, unknown> = {}): string {
+  return JSON.stringify({
+    title: "Lithium recycling economics",
+    summary: "Thin. Confidence: med.",
+    findings: [
+      { heading: "Margins are thin", body: "About 12% [S1].", sources: ["S1"] },
+      { heading: "Failures are rising", body: "Two bankruptcies [S2].", sources: ["S2"] },
+    ],
+    contradictions: [],
+    openQuestions: ["What happens to black mass prices?"],
+    ...overrides,
+  });
+}
+
+/** An answer whose second finding cites a source id that no source carries. */
+const UNKNOWN_ID_ANSWER = synthesisAnswer({
+  findings: [
+    { heading: "Margins are thin", body: "About 12% [S1].", sources: ["S1"] },
+    { heading: "Failures are rising", body: "Two bankruptcies [S99].", sources: ["S99"] },
+  ],
+});
+
+const UNKNOWN_ID_VERDICTS = [
+  {
+    ok: false,
+    check: "research-citations-resolve",
+    error: 'The answer cites source ids that do not exist: S99 in finding "Failures are rising".',
+    why: "Only the numbered sources in the prompt were read. A citation to any other id points at nothing, so the reader cannot check the claim.",
+    fix: `Sections to fix: finding "Failures are rising". Replace each unknown id with an allowed id that supports the claim, or delete the claim. Allowed source ids: ${SOURCE_IDS}.`,
+  },
+  {
+    ok: false,
+    check: "research-findings-cited",
+    error: '1 finding cites no source: finding "Failures are rising".',
+    why: "A finding states a fact. Without a source id the reader cannot tell where it came from.",
+    fix: `Sections to fix: finding "Failures are rising". Put [Sn] inside each body and list the same ids in "sources", using only ${SOURCE_IDS}. If no source supports a finding, remove it.`,
+  },
+] as const;
+
+/** fakeDeps whose synthesis call returns the scripted answers in order (the last repeats); records each synthesis prompt. */
+function scripted(answers: Array<string | Error>, overrides: Partial<DossierDeps> = {}) {
+  const prompts: string[] = [];
+  const base = fakeDeps();
+  const deps = fakeDeps({
+    ask: async (system, prompt) => {
+      if (system !== SYNTHESIS_SYSTEM) {
+        return base.ask(system, prompt);
+      }
+      prompts.push(prompt);
+      const answer = answers[Math.min(prompts.length - 1, answers.length - 1)] ?? "";
+      if (answer instanceof Error) {
+        throw answer;
+      }
+      return answer;
+    },
+    ...overrides,
+  });
+  return { deps, prompts };
+}
+
+function roundEvents(events: JobEvent[]) {
+  return events.filter((event) => event.type === "job.round");
+}
+
+describe("runResearchDossier synthesis checks", () => {
+  it("makes one synthesis call and no round event when the first answer passes", async () => {
+    const { deps, prompts } = scripted([synthesisAnswer()]);
+    const { checks } = await runResearchDossier({ question: QUESTION, models: [] }, deps);
+    expect(prompts).toHaveLength(1);
+    expect(roundEvents(deps.events)).toEqual([]);
+    expect(checks).toEqual({ passed: true, rounds: 0, verdicts: [{ ok: true }, { ok: true }, { ok: true }] });
+  });
+
+  it("fails a citation to an unknown source, repairs it once, and passes", async () => {
+    const { deps, prompts } = scripted([UNKNOWN_ID_ANSWER, synthesisAnswer()]);
+    const { dossier, checks } = await runResearchDossier({ question: QUESTION, models: [] }, deps);
+
+    expect(prompts).toHaveLength(2);
+    const note = formatRepairNote([...UNKNOWN_ID_VERDICTS]);
+    expect(prompts[1]).toBe(`${prompts[0]}\n\nYour previous answer:\n${UNKNOWN_ID_ANSWER}\n\n${note}`);
+
+    expect(dossier.findings.map((finding) => finding.sources)).toEqual([["S1"], ["S2"]]);
+    expect(checks).toEqual({ passed: true, rounds: 1, verdicts: [{ ok: true }, { ok: true }, { ok: true }] });
+  });
+
+  it("emits job.round once, when the repair starts, with the localized label when given", async () => {
+    const { deps } = scripted([UNKNOWN_ID_ANSWER, synthesisAnswer()], { repairLabel: "Memperbaiki temuan" });
+    await runResearchDossier({ question: QUESTION, models: [] }, deps);
+    expect(roundEvents(deps.events)).toEqual([{ type: "job.round", round: 1, total: 1, label: "Memperbaiki temuan" }]);
+    const types = deps.events.map((event) => event.type);
+    expect(types.indexOf("job.round")).toBeGreaterThan(types.lastIndexOf("job.step"));
+  });
+
+  it("defaults the round label to English", async () => {
+    const { deps } = scripted([UNKNOWN_ID_ANSWER, synthesisAnswer()]);
+    await runResearchDossier({ question: QUESTION, models: [] }, deps);
+    expect(roundEvents(deps.events)).toEqual([
+      { type: "job.round", round: 1, total: 1, label: "Repairing the findings" },
+    ]);
+  });
+
+  it("returns the dossier with the failing verdicts when the repair does not fix it", async () => {
+    const { deps, prompts } = scripted([UNKNOWN_ID_ANSWER]);
+    const { dossier, checks } = await runResearchDossier({ question: QUESTION, models: [] }, deps);
+
+    expect(prompts).toHaveLength(2);
+    expect(roundEvents(deps.events)).toHaveLength(1);
+    // A finding whose only citation is unknown is not kept as an uncited claim: the grounding step drops it,
+    // and the checks report still says the repair did not fix it.
+    expect(dossier.findings.map((finding) => finding.heading)).toEqual(["Margins are thin"]);
+    expect(checks).toEqual({ passed: false, rounds: 1, verdicts: [...UNKNOWN_ID_VERDICTS, { ok: true }] });
+  });
+
+  it("repairs an empty summary and an empty finding", async () => {
+    const empty = synthesisAnswer({
+      summary: "",
+      findings: [
+        { heading: "Margins are thin", body: "About 12% [S1].", sources: ["S1"] },
+        { heading: "Hollow", body: "" },
+      ],
+    });
+    const { deps, prompts } = scripted([empty, synthesisAnswer()]);
+    const { checks } = await runResearchDossier({ question: QUESTION, models: [] }, deps);
+    expect(prompts[1]).toContain("ERROR: the summary is empty; 1 finding has an empty heading or body.");
+    expect(prompts[1]).toContain("Sections to fix: the summary; finding 2 of your findings list.");
+    expect(checks.passed).toBe(true);
+    expect(checks.rounds).toBe(1);
+  });
+
+  it("does not repair when repairRounds is 0, and still reports the verdicts", async () => {
+    const { deps, prompts } = scripted([UNKNOWN_ID_ANSWER], { repairRounds: 0 });
+    const { checks } = await runResearchDossier({ question: QUESTION, models: [] }, deps);
+    expect(prompts).toHaveLength(1);
+    expect(roundEvents(deps.events)).toEqual([]);
+    expect(checks).toEqual({ passed: false, rounds: 0, verdicts: [...UNKNOWN_ID_VERDICTS, { ok: true }] });
+  });
+
+  it("keeps the first draft when the repair answer is not JSON, and says why", async () => {
+    const { deps } = scripted([UNKNOWN_ID_ANSWER, "sorry, here is prose"]);
+    const { dossier, checks } = await runResearchDossier({ question: QUESTION, models: [] }, deps);
+    expect(dossier.findings).toHaveLength(1);
+    expect(checks).toMatchObject({ passed: false, rounds: 1, repairFailure: "invalid_research" });
+  });
+
+  it("keeps the first draft when the repair call itself fails", async () => {
+    const { deps } = scripted([UNKNOWN_ID_ANSWER, new Error("gateway down")]);
+    const { dossier, checks } = await runResearchDossier({ question: QUESTION, models: [] }, deps);
+    expect(dossier.findings).toHaveLength(1);
+    expect(checks).toMatchObject({ passed: false, rounds: 1, repairFailure: "repair_failed" });
+  });
+
+  it("still fails the run when the first synthesis is not JSON", async () => {
+    const { deps, prompts } = scripted(["not json"]);
+    await expect(runResearchDossier({ question: QUESTION, models: [] }, deps)).rejects.toMatchObject({
+      code: "invalid_research",
+    });
+    expect(prompts).toHaveLength(1);
+  });
+
+  it("stops without a repair call when cancelled after the first synthesis", async () => {
+    const controller = new AbortController();
+    const { deps, prompts } = scripted([UNKNOWN_ID_ANSWER], { abortSignal: controller.signal });
+    const inner = deps.ask;
+    deps.ask = async (system, prompt) => {
+      const answer = await inner(system, prompt);
+      if (system === SYNTHESIS_SYSTEM) {
+        controller.abort();
+      }
+      return answer;
+    };
+    await expect(runResearchDossier({ question: QUESTION, models: [] }, deps)).rejects.toMatchObject({
+      code: "aborted",
+    });
+    expect(prompts).toHaveLength(1);
   });
 });

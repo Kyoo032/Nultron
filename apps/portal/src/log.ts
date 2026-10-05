@@ -44,6 +44,8 @@ const FORBIDDEN_SUBSTRINGS: readonly string[] = [
   "credential",
   "user_code",
   "usercode",
+  "invite_code",
+  "invitecode",
   "device_code",
   "devicecode",
   "client_secret",

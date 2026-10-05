@@ -1,0 +1,19 @@
+# The public listener: a Cloud Load Balancer in plain TCP passthrough, so Caddy sees the TLS handshake
+# itself and is the ONE proxy hop in front of the app (SR-18). Do not switch the CLB to layer-7 HTTPS
+# without reading the Caddyfile's X-Forwarded-For notes first: an extra appending hop moves the
+# client address away from the end of the header the app's rate limiter reads.
+#
+# externalTrafficPolicy: Local keeps the real client address as the TCP peer Caddy writes into
+# X-Forwarded-For. With Cluster, kube-proxy SNATs, every visitor shares one address and one bucket
+# (SR-29, SR-79). Whether TKE's CLB honours it for this node setup is NOT proven.
+#
+# TKE-specific annotations (billing mode, bandwidth cap, an existing CLB id via
+# service.kubernetes.io/tke-existed-lbid) are an operator decision and are deliberately not written
+# here: they were not read from the live console.
+apiVersion: v1
+kind: Service
+metadata:
+  name: nultron-edge
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local

@@ -47,7 +47,7 @@ export async function handleGetImages(request: HostRequest): Promise<HostResult>
     // Prices are always looked up against the pinned gateway, never an owner-supplied endpoint: a
     // custom base URL must not be able to decide what a model is quoted at.
     const models = attachMediaPrices(
-      listStudioImageModels(),
+      listStudioImageModels(undefined, tenant),
       "image",
       cachedPricingCatalog(resolvedGatewayBaseUrl()),
       resolvedGatewayBaseUrl(),
@@ -57,7 +57,7 @@ export async function handleGetImages(request: HostRequest): Promise<HostResult>
       kind: "image",
       sources,
       settingsModel: settings.imageGenModel,
-      catalogPreferred: defaultStudioImageModel(models),
+      catalogPreferred: defaultStudioImageModel(models, tenant),
     });
     return jsonOk({ items, models, defaultModel, ready: studioRouteReady("image_gen", tenant) });
   } catch (error) {
@@ -85,13 +85,13 @@ export async function handleGetVideos(request: HostRequest): Promise<HostResult>
     // Video list prices are per second, so the gateway's flat per-call rate is never substituted here.
     // Same as images: the pinned gateway, not whatever base URL the desk was pointed at.
     const models = attachMediaPrices(
-      listStudioVideoModels(),
+      listStudioVideoModels(undefined, tenant),
       "second",
       cachedPricingCatalog(resolvedGatewayBaseUrl()),
       resolvedGatewayBaseUrl(),
     );
     const sources = await agentService.listGenerateDefaultSources(tenant);
-    const preferred = defaultStudioVideoModel(models);
+    const preferred = defaultStudioVideoModel(models, tenant);
     const pinned = resolveStudioGenerateDefault({
       kind: "video",
       sources,
@@ -126,13 +126,13 @@ export async function handleGetMusic(request: HostRequest): Promise<HostResult> 
     const settings = loadSettings(tenant);
     // `listStudioMusicModels` already merges the relay-only ids the gateway never lists (see
     // `withRelayMusicModels`), so the picker is not empty on a desk whose /v1/models has no music.
-    const catalog = listStudioMusicModels();
+    const catalog = listStudioMusicModels(undefined, tenant);
     const sources = await agentService.listGenerateDefaultSources(tenant);
     const defaultModel = resolveStudioGenerateDefault({
       kind: "music",
       sources,
       settingsModel: settings.musicGenModel,
-      catalogPreferred: defaultStudioMusicModel(catalog),
+      catalogPreferred: defaultStudioMusicModel(catalog, tenant),
     });
     // An agent or Settings pin can name a relay id this build does not know, and `generateStudioMusic`
     // will happily use it. The picker has to be able to show what generate will send, so the resolved
@@ -153,7 +153,7 @@ export async function handleGetMusic(request: HostRequest): Promise<HostResult> 
       defaultModel,
       ready: studioRouteReady("music_gen", tenant),
       // Why the voice-over control is off, or null when a reachable TTS model exists.
-      speechUnavailable: studioSpeechUnavailable(),
+      speechUnavailable: studioSpeechUnavailable(undefined, tenant),
     });
   } catch (error) {
     return jsonError(error);
@@ -187,7 +187,7 @@ export async function handlePostDocuments(request: HostRequest): Promise<HostRes
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    return jsonOk(await generateDocumentDraft(tenant, request.body ?? null));
+    return jsonOk(await generateDocumentDraft(tenant, request.body ?? null, request.abortSignal));
   } catch (error) {
     return jsonError(error);
   }
@@ -198,7 +198,7 @@ export async function handlePostDocumentsRegen(request: HostRequest): Promise<Ho
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    return jsonOk(await regenerateDocumentSection(tenant, request.body ?? null));
+    return jsonOk(await regenerateDocumentSection(tenant, request.body ?? null, request.abortSignal));
   } catch (error) {
     return jsonError(error);
   }
@@ -225,7 +225,7 @@ export async function handlePostPresentations(request: HostRequest): Promise<Hos
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    return jsonOk(await generatePresentationOutline(tenant, request.body ?? null));
+    return jsonOk(await generatePresentationOutline(tenant, request.body ?? null, request.abortSignal));
   } catch (error) {
     return jsonError(error);
   }
@@ -236,7 +236,7 @@ export async function handlePostPresentationsRegen(request: HostRequest): Promis
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    return jsonOk(await regeneratePresentationSlide(tenant, request.body ?? null));
+    return jsonOk(await regeneratePresentationSlide(tenant, request.body ?? null, request.abortSignal));
   } catch (error) {
     return jsonError(error);
   }
@@ -264,7 +264,7 @@ export async function handlePostResearch(request: HostRequest): Promise<HostResu
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    return jsonOk(await generateResearchNotes(tenant, request.body ?? null));
+    return jsonOk(await generateResearchNotes(tenant, request.body ?? null, undefined, request.abortSignal));
   } catch (error) {
     return jsonError(error);
   }
@@ -289,7 +289,7 @@ export async function handlePostData(request: HostRequest): Promise<HostResult> 
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    return jsonOk(await analyzeDataset(tenant, request.body ?? null));
+    return jsonOk(await analyzeDataset(tenant, request.body ?? null, undefined, request.abortSignal));
   } catch (error) {
     return jsonError(error);
   }

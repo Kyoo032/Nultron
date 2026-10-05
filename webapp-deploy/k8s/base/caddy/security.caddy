@@ -1,0 +1,87 @@
+# Shared snippets. The header values in nultron_headers are copied from webapp-deploy/Caddyfile
+# (the file packages/host/src/security-headers.test.ts parses), and so are the log filters in
+# sign_in_filters and the shape of the two loggers below; k8s-rehearsal.test.mjs fails if they
+# drift. Change them there first.
+#
+# A snippet is read only after it is defined, so the Caddyfile imports this file BEFORE its
+# global options block (which uses default_log).
+
+# The fields every log line has to lose before it is written (L1, SR-72). Cookie, Authorization and
+# Set-Cookie are dropped, and the sign-in `code` and `state` are deleted from the URI, from the
+# Referer and from the portal's redirect Location, so a one-time code never sits in a log.
+# The Location rule is in webapp-deploy/Caddyfile too since 2026-10-01; it was found here first: the
+# portal sits behind this proxy, and it answers /authorize with a 302 whose Location is
+# https://<app>/auth/callback?code=...&state=..., which Caddy writes into the access line's
+# response headers. Caddy redacts Set-Cookie itself; it does not redact Location.
+(sign_in_filters) {
+	request>headers>Cookie delete
+	request>headers>Authorization delete
+	request>headers>Set-Cookie delete
+	request>uri query {
+		delete code
+		delete state
+	}
+	request>headers>Referer query {
+		delete code
+		delete state
+	}
+	resp_headers>Location query {
+		delete code
+		delete state
+	}
+}
+
+# L2: one JSON object per request on stdout, filtered.
+(access_log) {
+	encode zstd gzip
+	log {
+		output stdout
+		format filter {
+			wrap json
+			fields {
+				import sign_in_filters
+			}
+		}
+	}
+}
+
+# SR-72: Caddy's default logger, where the error line for a failed upstream request goes, with
+# the request's full URI. Imported inside the global options block. Same filter, on stderr.
+(default_log) {
+	log default {
+		output stderr
+		format filter {
+			wrap json
+			fields {
+				import sign_in_filters
+			}
+		}
+	}
+}
+
+(nultron_headers) {
+	header {
+		Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' https://api.tokotokenai.com; worker-src 'self' blob:; manifest-src 'self'"
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "same-origin"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
+		Permissions-Policy "accelerometer=(), autoplay=(), browsing-topics=(), camera=(), display-capture=(self), encrypted-media=(), geolocation=(), gyroscope=(), interest-cohort=(), magnetometer=(), microphone=(self), midi=(), payment=(), publickey-credentials-get=(), screen-wake-lock=(), serial=(), usb=(), xr-spatial-tracking=()"
+		-Server
+		-X-Powered-By
+	}
+}
+
+# The portal sets its own Content-Security-Policy and framing headers on its pages
+# (apps/portal/src/security); the app's policy must not replace them. Transport and identity headers
+# only.
+(portal_headers) {
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		-Server
+		-X-Powered-By
+	}
+}

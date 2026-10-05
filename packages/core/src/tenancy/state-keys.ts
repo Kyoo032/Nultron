@@ -7,11 +7,16 @@
  * file backend maps a key to a filename, the row backend maps it to the `key` column, and a
  * migration or a rotation drill that has to name them has one list to read.
  *
+ * `model_cache` (Enterprise BYOK, Phase A) is the third payload: the catalogue and probe result a
+ * tenant's own provider keys produced. It is plain JSON, no secret, and **hosted only**. A desk keeps
+ * its one machine file (`models-cache.json`, `packages/host/src/model-cache.ts`) exactly where it
+ * always was; the row backend is what stops one tenant's catalogue reaching another.
+ *
  * Deliberately NOT the filenames. `settings.enc` is a desktop path that predates tenancy and has to
  * stay exactly where it is; `settings` is what the payload IS. A column that carried the filename
  * would make the row backend a description of the file layout rather than an alternative to it.
  */
-export const TENANT_STATE_KEYS = ["settings", "gateway_gate"] as const;
+export const TENANT_STATE_KEYS = ["settings", "gateway_gate", "model_cache"] as const;
 
 export type TenantStateKey = (typeof TENANT_STATE_KEYS)[number];
 

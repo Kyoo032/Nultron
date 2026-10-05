@@ -66,8 +66,8 @@ function asSession(id: string): Partial<HostRequest> {
 describe("dispatch names the tenant on every log line a handler writes", () => {
   beforeAll(async () => {
     const { db, ensurePortalOwner } = await import("@agentforge/db");
-    await ensurePortalOwner(db, TENANT_A);
-    await ensurePortalOwner(db, TENANT_B);
+    await ensurePortalOwner(db, { ...TENANT_A, role: "owner" });
+    await ensurePortalOwner(db, { ...TENANT_B, role: "owner" });
     store = createMemorySessionStore();
     sessionA = createSession({ ...TENANT_A, now: T0 });
     sessionB = createSession({ ...TENANT_B, now: T0 });

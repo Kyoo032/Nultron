@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
+import { NultronMascot } from "@/components/nultron/nultron-mascot";
 import { isInstallAction, updateBadge, updateButtonTitle, updateCtaKind } from "@/lib/app-updates-copy";
+import { useBuddyTakesStatus } from "@/lib/desk-buddy-store";
+import { UPDATE_NEXT, updateMascot } from "@/lib/mascot-triggers";
+import { useBuddyStatus } from "@/lib/use-buddy-claim";
 import { useProductBrand } from "@/lib/product-brand";
 import { useAppUpdates } from "@/lib/use-app-updates";
 import { t } from "@/lib/i18n";
@@ -71,6 +75,11 @@ export function AppUpdatesButton({ collapsed = false }: { collapsed?: boolean })
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  // The desk buddy charges while a release downloads and is surprised once it is ready (even with this
+  // panel closed); with it on screen the panel draws no second Nultron.
+  const takesStatus = useBuddyTakesStatus();
+  const buddyFace = updates.visible ? updateMascot(updates.state.status) : null;
+  useBuddyStatus(buddyFace, buddyFace === "charging");
 
   useEffect(() => {
     if (!open) {
@@ -106,6 +115,7 @@ export function AppUpdatesButton({ collapsed = false }: { collapsed?: boolean })
 
   const { state, supported, busy, statusText } = updates;
   const badge = updateBadge(state);
+  const face = updateMascot(state.status);
   const cta = updateCtaKind(state);
   const install = isInstallAction(state);
   const title = updateButtonTitle(state, supported);
@@ -166,9 +176,12 @@ export function AppUpdatesButton({ collapsed = false }: { collapsed?: boolean })
               data-testid="app-updates-panel"
             >
               <p className="panel-label">{t("rail.updates.panel")}</p>
-              <p className="mt-2 break-words text-sm text-inkbase" data-testid="app-updates-status">
-                {statusText}
-              </p>
+              <div className="mt-2 flex items-center gap-3">
+                {face && !takesStatus ? <NultronMascot state={face} busy={face === "charging"} decorative next={UPDATE_NEXT} /> : null}
+                <p className="min-w-0 flex-1 break-words text-sm text-inkbase" data-testid="app-updates-status">
+                  {statusText}
+                </p>
+              </div>
               <div className="mt-3 flex flex-wrap gap-2">
                 {supported && install ? (
                   <button

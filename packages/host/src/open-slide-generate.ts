@@ -15,12 +15,14 @@ import {
 } from "@agentforge/core/open-slide";
 import { artifactStore } from "./artifacts";
 import { collectJobAssistantRun, readModelPinned, type JobAssistantRun } from "./job-regen";
-import { readSourceText, withSourceMaterial, withSourceRule } from "./job-source";
+import { throwIfJobAborted } from "./job-stream";
+import { withSourceMaterial, withSourceRule } from "./job-source";
 import { upsertWorkSource } from "./knowledge-ingest";
 import { log } from "./log";
-import { listSelectableModels, modeCatalogPayload } from "./selectable-models";
+import { listSelectableModels, modeDefaultsFor } from "./selectable-models";
 import { loadSettings } from "./settings-store";
 import { presentationLocale } from "./presentation-locale";
+import { assembleDeskSource } from "./desk-sources";
 import { artifactWorkCard } from "./work-cards";
 
 function readPrompt(body: unknown): string {
@@ -79,9 +81,9 @@ function openSlideMarkdown(deck: OpenSlideDeck): string {
   return lines.join("\n");
 }
 
-function resolveModel(body: unknown, settings: ReturnType<typeof loadSettings>): string {
-  const catalog = listSelectableModels();
-  const { defaults } = modeCatalogPayload();
+function resolveModel(body: unknown, settings: ReturnType<typeof loadSettings>, tenant: TenantContext): string {
+  const catalog = listSelectableModels(tenant);
+  const defaults = modeDefaultsFor(tenant);
   return resolveChatModel(readOptionalModel(body), settings.presentationGenModel || defaults.presentations, catalog);
 }
 
@@ -92,6 +94,7 @@ async function collectDeck(
   sourceText: string,
   choices: ReturnType<typeof readOpenSlideChoices>,
   modelExplicit: boolean,
+  signal?: AbortSignal,
 ): Promise<JobAssistantRun> {
   const locale = presentationLocale();
   const system = withOutputLanguage(OPEN_SLIDE_SYSTEM, "presentations", locale);
@@ -105,6 +108,7 @@ async function collectDeck(
     jobMode: "presentations",
     versionId: "open-slide-deck",
     prompt: withSourceMaterial(userPrompt(prompt, choices), sourceText),
+    ...(signal ? { signal } : {}),
   });
 }
 
@@ -144,11 +148,16 @@ async function persistDeck(
  * Stub runtime drafts on this machine. A live runtime asks the gateway with the
  * Open Slide harness. Neither path calls an Open Slide host.
  */
-export async function generateOpenSlideDeck(tenant: TenantContext, body: unknown): Promise<OpenSlideDeck> {
+export async function generateOpenSlideDeck(
+  tenant: TenantContext,
+  body: unknown,
+  abortSignal?: AbortSignal,
+): Promise<OpenSlideDeck> {
   const prompt = readPrompt(body);
   const choices = readOpenSlideChoices(body);
   const settings = loadSettings(tenant);
-  const sourceText = readSourceText(body, { injectionGuardBypass: settings.injectionGuardBypass === true });
+  const guard = { injectionGuardBypass: settings.injectionGuardBypass === true };
+  const source = await assembleDeskSource(tenant, body, guard);
   const locale = presentationLocale();
   const mode = resolveRuntimeMode({
     settingsHasKey: hasLiveProvider(settings),
@@ -159,12 +168,15 @@ export async function generateOpenSlideDeck(tenant: TenantContext, body: unknown
   }
   const run = await collectDeck(
     tenant,
-    resolveModel(body, settings),
+    resolveModel(body, settings, tenant),
     prompt,
-    sourceText,
+    source.text,
     choices,
     readModelPinned(body),
+    abortSignal,
   );
+  // A deck the person cancelled is not saved as an artifact or a work card.
+  throwIfJobAborted(abortSignal);
   if (!run.text.trim()) {
     throw new ApiError("generation_failed", emptyDeckMessage(locale), 502);
   }
@@ -180,6 +192,7 @@ export async function generateOpenSlideDeck(tenant: TenantContext, body: unknown
     model: run.model,
     pages: deck.pages.length,
     engine: "open-slide",
+    ...(source.files.length > 0 ? { sourceFiles: source.files.map((file) => file.path) } : {}),
   });
   return deck;
 }

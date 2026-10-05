@@ -78,7 +78,7 @@ function importWith(body: Record<string, unknown>, transport: string): Promise<H
 beforeAll(async () => {
   const { db, ensurePortalOwner } = await import("@agentforge/db");
   store = createMemorySessionStore();
-  await ensurePortalOwner(db, ALPHA);
+  await ensurePortalOwner(db, { ...ALPHA, role: "owner" });
   const session = createSession({ ...ALPHA, now: T0 });
   await store.create(session);
   cookie = `__Host-agentforge_session=${session.id}`;

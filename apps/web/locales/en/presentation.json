@@ -108,5 +108,18 @@
   "ask": "What's your presentation about?",
   "hint": "Type what it is about, then press Create. Click any words on a slide to change them.",
   "more": "More",
-  "shapeNote": "Keep it {length} and {style}."
+  "shapeNote": "Keep it {length} and {style}.",
+  "slideCount": {
+    "label": "Exact number of slides",
+    "placeholder": "Optional",
+    "hint": "A whole number from {min} to {max}, counting the title slide."
+  },
+  "checks": {
+    "intro": "Checked, and a few things are left for you:",
+    "slideCount": "You asked for {expected} slides; this deck has {found}.",
+    "tooMany": "This deck has {found} slides; {max} is the most.",
+    "content": "No heading or text on slides: {slides}",
+    "duplicate": "The same heading on slides: {slides}",
+    "fit": "May not fit the slide when downloaded: {slides}"
+  }
 }

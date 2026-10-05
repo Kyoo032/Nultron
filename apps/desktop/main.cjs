@@ -1,6 +1,6 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain, protocol, session, shell } = require("electron");
 const { registerAutoUpdate } = require("./auto-update.cjs");
-const { PUBLIC_PRODUCT_NAME } = require("./brand-read.cjs");
+const { PUBLIC_PRODUCT_NAME, brandGatewayOverride } = require("./brand-read.cjs");
 const { installApplicationMenu, attachContextMenu } = require("./edit-menu.cjs");
 const lifecycle = require("./lifecycle.cjs");
 const { RENDERER_CSP } = require("./renderer-csp.cjs");
@@ -26,7 +26,7 @@ if (app.isPackaged && lifecycle.hasDebugSwitch(process.argv)) {
 }
 
 const DEFAULT_BRAND = {
-  productName: "DPSBuddy",
+  productName: "Nultron",
   gatewayName: "Toko Token",
   gatewayBaseUrl: "https://api.tokotokenai.com/v1",
 };
@@ -55,7 +55,7 @@ function loadBrandConfig() {
         : DEFAULT_BRAND.gatewayBaseUrl;
     return { productName, gatewayName, gatewayBaseUrl };
   } catch (err) {
-    console.warn("brand.json unreadable, using DPSBuddy defaults:", err.message);
+    console.warn("brand.json unreadable, using Nultron defaults:", err.message);
     return DEFAULT_BRAND;
   }
 }
@@ -64,7 +64,12 @@ const brand = loadBrandConfig();
 const PRODUCT_NAME = brand.productName;
 const KEYCHAIN_SERVICE = PRODUCT_NAME;
 const KEYCHAIN_ACCOUNT = "wrap-key";
-/** Names the public build carried before the DPSBuddy rename. Read once and copied forward; never deleted here. */
+/**
+ * Names the public build carried before it became Nultron. Read once and copied forward; never deleted here.
+ * DPSBuddy is deliberately not listed (owner decision 2026-09-29): Nultron starts on a fresh desk, so the
+ * `%APPDATA%\DPSBuddy` folder and the `DPSBuddy` keychain entry are left alone here. Only the installer's
+ * real uninstall (build/installer.nsh) removes them.
+ */
 const LEGACY_PUBLIC_NAMES = PRODUCT_NAME === PUBLIC_PRODUCT_NAME ? ["Agentforge"] : [];
 const WEBDEV_URL = "http://127.0.0.1:3000";
 /** Longest a "Start over" restart waits on `clearRendererState()`; see it for what that covers. */
@@ -78,7 +83,7 @@ const LEGACY_MIGRATION_MARKER = "legacy-migrated.json";
 
 process.env.AGENTFORGE_PRODUCT_NAME = brand.productName;
 process.env.AGENTFORGE_GATEWAY_NAME = brand.gatewayName;
-process.env.AGENTFORGE_GATEWAY_URL = brand.gatewayBaseUrl;
+// No gateway URL here: bootstrapPackaged() decides it (this block used to copy brand.json into a dev hook).
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -150,7 +155,7 @@ function exitApp() {
     // quitAndInstall has already spawned the NSIS installer as a detached child of this process.
     // The taskkill /T tree walk below would take the installer down with us, so exit plainly here.
     // Leftover helpers are handled by build/installer.nsh: its customInit inserts killRunningApp,
-    // which taskkills any remaining app exe tree (DPSBuddy.exe, legacy Agentforge.exe) before setup overwrites files.
+    // which taskkills any remaining app exe tree (Nultron.exe, legacy DPSBuddy.exe / Agentforge.exe) before setup overwrites files.
     app.exit(0);
     return;
   }
@@ -309,7 +314,23 @@ function writeHostStatus(dataDir, extra) {
     gatewayBaseUrl: brand.gatewayBaseUrl,
     ...extra,
   };
-  fs.writeFileSync(path.join(dataDir, "host-status.json"), `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+  const file = path.join(dataDir, "host-status.json");
+  const body = `${JSON.stringify(payload, null, 2)}\n`;
+  // Written twice per boot now (the ffmpeg probe adds its block after the window loads), and
+  // `doctor --desktop` reads this file from another process at any moment. A rename swaps the whole
+  // file in one step, so a reader sees the old document or the new one, never half of either.
+  const staging = `${file}.${process.pid}.tmp`;
+  try {
+    fs.writeFileSync(staging, body, "utf8");
+    fs.renameSync(staging, file);
+  } catch {
+    try {
+      fs.rmSync(staging, { force: true });
+    } catch {
+      // nothing left to clean
+    }
+    fs.writeFileSync(file, body, "utf8");
+  }
 }
 
 /** The one document the window may hold, as `navigation.cjs` compares them. */
@@ -556,6 +577,19 @@ function registerIpc(host) {
     }
     return picked.filePaths ?? [];
   });
+  // The folder the agent's file tools may open (Personal only). The shell relays the owner's choice
+  // and does nothing else with it: no stat, no read, no list. Whether the path is usable is the
+  // in-process host's call. Parented to the window the trusted-sender check just proved the caller
+  // lives in, so the dialog cannot open behind the app.
+  ipcMain.handle("agentforge:pick-folder", async (event) => {
+    if (!isTrustedSender(event, mainWindow)) {
+      console.warn("folder picker refused: forbidden sender");
+      return { canceled: true };
+    }
+    const picked = await dialog.showOpenDialog(mainWindow, { properties: ["openDirectory"] });
+    const folder = picked.canceled ? undefined : picked.filePaths?.[0];
+    return folder ? { path: folder } : { canceled: true };
+  });
 }
 
 /**
@@ -629,6 +663,21 @@ async function bootstrapPackaged() {
   // files before SQLite opens, and only when this flag is "1", so no webdev run, test harness, or
   // stray import of the host can ever act on a wipe the user queued in the desktop app.
   process.env.AGENTFORGE_APPLY_PENDING_RESET = "1";
+  // The packaged marker, and the only place it is set. `packages/core/src/gateway/pinned.ts` ignores
+  // every dev/test endpoint hook (AGENTFORGE_GATEWAY_URL, AGENTFORGE_TELEGRAM_API_URL) once it reads
+  // "1", whatever the user's environment holds and whether or not NODE_ENV is set, so Nultron talks
+  // to the pinned gateway. A brand flavor (Kemenkeu AI, AIHub Metranet) is the one exception: its
+  // gateway is the one in the brand.json installed beside the app, handed over below as
+  // AGENTFORGE_BRAND_GATEWAY_URL. It is assigned or deleted here, never inherited, and the public
+  // build has none (`brandGatewayOverride`).
+  process.env.AGENTFORGE_PACKAGED = "1";
+  delete process.env.AGENTFORGE_GATEWAY_URL;
+  const brandGateway = brandGatewayOverride(brand);
+  if (brandGateway) {
+    process.env.AGENTFORGE_BRAND_GATEWAY_URL = brandGateway;
+  } else {
+    delete process.env.AGENTFORGE_BRAND_GATEWAY_URL;
+  }
 
   const host = require("./host.cjs");
   hostModule = host;
@@ -663,30 +712,42 @@ async function bootstrapPackaged() {
     // desk resolution is best effort; the read below still names whatever selection exists
   }
   const settings = host.loadSettings(host.readSelectedWorkspaceId() ?? undefined);
-  let editFfmpeg = null;
-  try {
-    const doctor = await host.dispatch({
-      method: "GET",
-      path: "/api/v1/edit/doctor",
-      query: {},
-      params: {},
-      headers: {},
-      workspaceId: host.readSelectedWorkspaceId() ?? null,
-    });
-    if (doctor?.type === "json" && doctor.body?.ffmpeg) {
-      editFfmpeg = doctor.body.ffmpeg;
-    }
-  } catch {
-    // edit doctor optional during boot
-  }
-  writeHostStatus(dataDir, {
-    ...lifecycle.hostStatusRuntime({
-      hasOpenai: Boolean(settings.openaiApiKey),
-      envRuntime: process.env.AGENTFORGE_RUNTIME,
-    }),
-    editFfmpeg,
+  const statusRuntime = lifecycle.hostStatusRuntime({
+    hasOpenai: Boolean(settings.openaiApiKey),
+    envRuntime: process.env.AGENTFORGE_RUNTIME,
   });
+  writeHostStatus(dataDir, statusRuntime);
   await navigateToUi();
+  // Off the critical path: the ffmpeg probe (PATH walk plus `ffmpeg -version`, ~270 ms measured)
+  // used to be awaited here, ahead of the first paint. It now runs once the window has loaded, warms
+  // the host's per-process ffmpeg cache for Edit, and adds `editFfmpeg` to the status file.
+  void recordEditFfmpeg(host, dataDir, statusRuntime);
+}
+
+/** Add the Edit doctor's ffmpeg block to `host-status.json` once the window is up. Never throws. */
+async function recordEditFfmpeg(host, dataDir, statusRuntime) {
+  if (exiting) {
+    return;
+  }
+  try {
+    const editFfmpeg = await lifecycle.readEditFfmpeg(() =>
+      host.dispatch({
+        method: "GET",
+        path: "/api/v1/edit/doctor",
+        query: {},
+        params: {},
+        headers: {},
+        workspaceId: host.readSelectedWorkspaceId() ?? null,
+      }),
+    );
+    // A quit or a Start-over relaunch can land while the probe runs; the next boot owns the file.
+    if (exiting) {
+      return;
+    }
+    writeHostStatus(dataDir, { ...statusRuntime, editFfmpeg });
+  } catch (err) {
+    console.warn("could not record the ffmpeg probe in host-status.json:", err.message);
+  }
 }
 
 async function waitForWebdev(attempts = 60) {

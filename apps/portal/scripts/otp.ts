@@ -50,6 +50,14 @@ async function main(): Promise<void> {
         );
         process.exit(4);
       }
+      if (result.reason === "not_activated") {
+        console.error(
+          "Refused: that address is an invited member who has not redeemed the invite yet, so a " +
+            "sign-in code could not get them in. Issue an invite instead:\n\n" +
+            "    pnpm --filter @agentforge/portal invite -- --email <address>",
+        );
+        process.exit(6);
+      }
       // Unknown, or an address that matches users in more than one tenant. Same answer for both.
       console.error("Refused: that address does not resolve to exactly one user.");
       process.exit(5);
