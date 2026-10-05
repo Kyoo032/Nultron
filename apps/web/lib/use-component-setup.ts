@@ -14,6 +14,8 @@ import {
   type SetupState,
 } from "./components-client";
 import { JobStreamError } from "./job-stream";
+import { componentSetupMascot } from "./mascot-triggers";
+import { useBuddyStatus } from "./use-buddy-claim";
 
 export type ComponentSetupView = {
   /** The component this panel speaks for, or `null` when there is nothing to show. */
@@ -117,6 +119,9 @@ export function useComponentSetup(): ComponentSetupView {
     setAlreadyRunning(false);
     setAttempt((count) => count + 1);
   }, []);
+
+  // The desk buddy charges while the install runs and cheers or flinches when it ends, with or without a panel.
+  useBuddyStatus(componentSetupMascot(setup.status), setup.status === "running");
 
   return { component, setup, alreadyRunning, visible: component !== null, retry };
 }

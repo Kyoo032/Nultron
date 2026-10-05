@@ -20,13 +20,26 @@ export {
   pinnedGatewayBaseUrl,
   pinnedGatewayOrigin,
   isPackagedRuntime,
+  gatewayUrlOverride,
   gatewayUrlOverrideAllowed,
 } from "./gateway/pinned";
 export type { GatewayGateStatus, GatewayGatePayload } from "./gateway/gate-types";
-export { RESET_CONFIRM_WORD } from "./gateway/reset-types";
+export { RESET_CONFIRM_WORD, TENANT_ERASE_CONFIRM_WORD } from "./gateway/reset-types";
 export type { ResetScope } from "./gateway/reset-types";
 export { GATEWAY_VALIDATE_TIMEOUT_MS, validateGatewayKey } from "./gateway/validate";
 export type { GatewayKeyValidation } from "./gateway/validate";
+// Enterprise BYOK: the frozen table of providers and the one place their base URLs live.
+export {
+  PROVIDER_IDS,
+  PROVIDERS,
+  availableProviders,
+  isProviderId,
+  providerBaseUrl,
+  providerEntry,
+  providerMediaBaseUrl,
+  urlIsProviderHost,
+} from "./providers/registry";
+export type { ProviderAuth, ProviderEntry, ProviderId, ProviderWire } from "./providers/registry";
 export {
   readLanguageModelUsage,
   asRunUsageRecord,
@@ -190,14 +203,24 @@ export {
 } from "./models/request-constraints";
 export {
   MEMBERSHIP_ROLES,
+  PORTAL_ROLES,
   INDUSTRY_PACKS,
   VISIBILITIES,
   INPUT_MODALITIES,
   requireTenant,
   canBuild,
   canAdminister,
+  membershipRoleForPortal,
+  parsePortalRole,
 } from "./tenancy/types";
-export type { MembershipRole, IndustryPack, Visibility, InputModality, TenantContext } from "./tenancy/types";
+export type {
+  MembershipRole,
+  PortalRole,
+  IndustryPack,
+  Visibility,
+  InputModality,
+  TenantContext,
+} from "./tenancy/types";
 export { TENANT_STATE_KEYS, isTenantStateKey } from "./tenancy/state-keys";
 export type { TenantStateKey } from "./tenancy/state-keys";
 export type {
@@ -248,6 +271,24 @@ export {
 } from "./models/video-capabilities";
 export type { VideoCapabilities, GatewayVideoResolution } from "./models/video-capabilities";
 export {
+  VIDEO_HARNESS_SKILLS,
+  acceptVideoShot,
+  clipIsVideoUrl,
+  composeVideoShot,
+  promptAlreadyShot,
+  runVideoHarness,
+  shotKeepsAsk,
+  videoRenderShouldRetry,
+} from "./videos/harness";
+export type {
+  VideoHarnessInput,
+  VideoHarnessResult,
+  VideoHarnessSkill,
+  VideoHarnessSkillId,
+  VideoRenderCall,
+  VideoRenderResult,
+} from "./videos/harness";
+export {
   MEDIA_PRICE_ENTRIES,
   costTier,
   estimateImageCost,
@@ -290,6 +331,19 @@ export {
   parseOpPayload,
   OP_TYPES,
   ASPECT_SIZE,
+  matchEditHarnessSkill,
+  silenceProbeArgs,
+  sceneProbeArgs,
+  rangesInsideClip,
+  assetFramesToTimeline,
+  framesInsideClip,
+  planSilenceRanges,
+  planSceneFrames,
+  extractPictureWords,
+  pictureWordsAreCaptions,
+  wordsLanded,
+  extractMadeShot,
+  harnessTargetClip,
 } from "./edit";
 export type {
   EditProject,
@@ -301,11 +355,14 @@ export type {
   AspectRatio,
   OpType,
   TitleLayout,
+  EditHarnessSkill,
+  SilenceRange,
 } from "./edit";
 export {
   registerEditTools,
   setEditToolBackend,
   getEditToolBackend,
+  requireEditToolBackend,
   editToolRefusal,
   EDIT_TOOLS,
   editAgentBindings,
@@ -344,12 +401,14 @@ export {
   THINKING_LABELS,
   isReasoningEffort,
   readOptionalReasoningEffort,
+  readReasoningEffortChoice,
+  isReasoningEffortExplicit,
   resolveRequestReasoningEffort,
   closestReasoningEffort,
   coerceReasoningEffortForModel,
   toWireReasoningEffort,
 } from "./models/reasoning-effort";
-export type { ReasoningEffort, ChatReasoningEffort } from "./models/reasoning-effort";
+export type { ReasoningEffort, ChatReasoningEffort, ReasoningEffortChoice } from "./models/reasoning-effort";
 export {
   CHAT_WIRES,
   CHAT_WIRE_LABELS,
@@ -380,7 +439,33 @@ export {
   GPT_6_EFFORTS,
   ANTHROPIC_MESSAGES_EFFORTS,
   GEMINI_EFFORTS,
+  TOKO_RESPONSES_EFFORTS,
+  UNKNOWN_MODEL_EFFORTS,
 } from "./runtime/effort-allowlist";
+export {
+  MODEL_POLICY_TABLE,
+  modelPolicy,
+  allowedEffortsFor,
+  offFormatFor,
+  floorEffort,
+} from "./models/model-policy";
+export type {
+  EffortSlot,
+  ModelPolicy,
+  ModelPolicyEntry,
+  ModelWirePreference,
+  OffFormat,
+  ReasoningDefault,
+} from "./models/model-policy";
+export { bareModelId } from "./models/request-constraints";
+export {
+  learnedEffortLimit,
+  rememberEffortLimit,
+  resetLearnedEffortLimits,
+  classifyEffortRejection,
+} from "./runtime/effort-selfheal";
+export type { LearnedEffort, LearnedEffortLimit, EffortRejection } from "./runtime/effort-selfheal";
+export { GatewayHttpError, gatewayFailureOf } from "./gateway-http-copy";
 export {
   DEFAULT_FALLBACK_CONTEXT,
   extractContextLength,
@@ -401,6 +486,7 @@ export {
   recommendedChatModels,
   sortChatModels,
 } from "./models/preferred";
+export type { PickerGroup, PickerGroupKind } from "./models/preferred";
 export { curateModel, applyCuration, isEverydayModel, isThinkingModel } from "./models/curation";
 export type { ModelTier, CuratedModelMeta } from "./models/curation";
 export {
@@ -423,8 +509,10 @@ export {
   DEFAULT_GATEWAY_MUSIC_MODEL,
   DEFAULT_GATEWAY_LYRICS_MODEL,
   DEFAULT_EMBEDDING_MODEL,
+  MEDIA_MODEL_PREFERENCES,
   RELAY_ONLY_MUSIC_MODEL_IDS,
 } from "./models/media-kind";
+export { EVERYDAY_MODEL_IDS } from "./models/gateway-roles";
 export type { AudioRole, MediaKind, RoutedModels } from "./models/media-kind";
 export {
   availableVideoDefault,
@@ -445,6 +533,7 @@ export {
   knowledgeVerifierPrompt,
 } from "./knowledge/rag";
 export type { KnowledgeMap, KnowledgeMapTopic, KnowledgeModels } from "./knowledge/rag";
+export { dropSourceIds, groundKnowledgeMap, knowledgeMissBlock } from "./knowledge/harness";
 export {
   pickPreferredJobModel,
   resolveModeDefaults,
@@ -509,12 +598,17 @@ export {
   DEFAULT_TEMPLATE_KEY,
 } from "./agents/default-template";
 export type { AgentPack, AgentTemplate } from "./agents/default-template";
+export { GUIDE_OUTCOMES, guidePayload, isGuideOutcome, parseGuideRecord } from "./guide";
+export type { GuideOutcome, GuidePayload, GuideRecord } from "./guide";
 export {
   PRODUCT_MODES,
   PRODUCT_MODE_IDS,
   WORK_PRODUCT_MODES,
   LEGACY_PRODUCT_MODES,
   FALLBACK_PRODUCT_MODES,
+  FIRST_RUN_MODES,
+  HOSTED_FIRST_DESK_MODES,
+  firstDeskModes,
   isProductMode,
   productModeHref,
   productModeLabel,
@@ -529,7 +623,28 @@ export {
 } from "./agents/product-modes";
 export type { ProductMode, ProductModeSource } from "./agents/product-modes";
 export { defineTool, invokeTool } from "./tools/define-tool";
-export type { ToolDefinition } from "./tools/define-tool";
+export type { ToolDefinition, ToolTrust } from "./tools/define-tool";
+export type {
+  BudgetRefusal,
+  CheckVerdict,
+  HarnessLoop,
+  ModeHarnessSpec,
+  OutputCheck,
+  RunBudget,
+} from "./harness/spec";
+export type {
+  DeskPath,
+  FileAuthor,
+  FileEntry,
+  FileRead,
+  FileRefusal,
+  FileRefusalCode,
+  FileRoot,
+  FileRootKind,
+  SearchHit,
+  WriteOutcome,
+} from "./tools/files/types";
+export type { CodeLanguage, CodeRunFailure, CodeRunInput, CodeRunResult } from "./tools/code/types";
 export { registerTool, getTool, listTools, listStudioTools, resetToolRegistry } from "./tools/registry";
 export { registerPlatformTools } from "./tools/platform/register";
 export { calculatorTool } from "./tools/platform/calculator";
@@ -567,6 +682,19 @@ export {
 } from "./models/audio-capabilities";
 export type { MusicCapabilities, MusicMode, SpeechUnavailableReason } from "./models/audio-capabilities";
 export {
+  MUSIC_HARNESS_ATTEMPTS,
+  MUSIC_HARNESS_SKILLS,
+  lyricsAreSingable,
+  preferLyricDraft,
+  resolveSongTitle,
+  shouldRetryLyrics,
+  shouldRetryMusicJob,
+  singableLines,
+  songTitleFromBrief,
+  stripMusicLanguageRule,
+} from "./music/harness";
+export type { MusicHarnessSkillId } from "./music/harness";
+export {
   formatVideoGatewayFailure,
   httpStatusForGatewayFailure,
   studioVideoFailureStatus,
@@ -601,6 +729,8 @@ export { createRuntime } from "./runtime/create-runtime";
 export { StubRuntime } from "./runtime/stub-runtime";
 export { AiSdkRuntime } from "./runtime/ai-sdk-runtime";
 export { invokeToolGuarded } from "./runtime/invoke-guarded";
+export { createToolBudget, resolveMaxSteps } from "./runtime/tool-budget";
+export type { ToolBudget } from "./runtime/tool-budget";
 export { runWithToolIoSink, reportToolIo, takeLastToolIo } from "./runtime/tool-io";
 export type { ToolIoRecord } from "./runtime/tool-io";
 export type { AgentRuntime, RuntimeEvent, RunUsage } from "./runtime/types";
@@ -617,6 +747,7 @@ export {
   formatContactProbe,
   formatContactProbeButton,
   formatModelContactError,
+  hasVisibleText,
   isRetryableModelFailure,
   shouldFailEmptyAssistant,
   shouldKeepToolTurn,
@@ -656,21 +787,24 @@ export {
   KNOWLEDGE_BACKEND_IDS,
 } from "./secrets";
 export type { StoredSecrets, SecretPatch, MaskedSecrets, KnowledgeBackendSetting } from "./secrets";
-export { APP_LOCALES, DEFAULT_APP_LOCALE, isAppLocale, parseAppLocale } from "./locale";
+export { APP_LOCALES, DEFAULT_APP_LOCALE, isAppLocale, localeFromAcceptLanguage, parseAppLocale } from "./locale";
 export type { AppLocale } from "./locale";
 export { MODE_HARNESSES, harnessFor, wiredSkillIds } from "./harness/mode-skills";
+export { MODE_HARNESS_SPECS, harnessSpecFor } from "./harness/specs";
 export type { HarnessSkill, HarnessSkillStatus, ModeHarness } from "./harness/mode-skills";
 export { checkDraftAgainstSource } from "./documents/source-check";
 export type { CheckableDraft, SourceCheck, SourceCheckItem } from "./documents/source-check";
+export { holdDraftToSource } from "./documents/source-hold";
 export {
   OUTPUT_LANGUAGE_SURFACES,
   outputLanguageRule,
   withOutputLanguage,
   editStubAssistantCopy,
+  editHarnessLine,
   GATEWAY_REQUIRED_SURFACES,
   gatewayRequiredMessage,
 } from "./output-language";
-export type { OutputLanguageSurface, GatewayRequiredSurface } from "./output-language";
+export type { OutputLanguageSurface, GatewayRequiredSurface, EditHarnessLineKey } from "./output-language";
 export { MODE_MESSAGE_KEYS, modeMessage } from "./mode-messages";
 export type { ModeMessageKey } from "./mode-messages";
 export {
@@ -678,8 +812,23 @@ export {
   stubChatCopy,
   stubChatEnhanceSuffix,
   wantsStubClock,
+  wantsStubPastChat,
+  wantsStubDeskSource,
+  chatTurnCopy,
+  fillChatTurn,
 } from "./agents/chat-locale";
-export type { StubChatCopy } from "./agents/chat-locale";
+export type { StubChatCopy, ChatTurnCopy } from "./agents/chat-locale";
+export {
+  CHAT_UNDERSTAND_HIDDEN_TOOLS,
+  bindingsForChatModality,
+  sentenceFromCalculator,
+  sentenceFromDatetime,
+  sentenceFromPastSessions,
+  sentenceFromTool,
+  repairUnresolvedCites,
+  settleChatTurn,
+} from "./agents/chat-turn";
+export type { SettledTool, SettledChatTurn } from "./agents/chat-turn";
 export {
   ENHANCE_SURFACES,
   isEnhanceSurface,

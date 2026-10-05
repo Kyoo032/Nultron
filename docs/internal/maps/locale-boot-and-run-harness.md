@@ -1,6 +1,13 @@
 # Map — App locale: boot freeze and the run harness
 
-Last verified: 2026-09-27 for the restart race: the banner can show while `POST /api/v1/settings` is in flight, and Restart stays disabled until that save resolves, then `onRestart` applies the locale that landed on disk. The onboarding reason sentence was last verified 2026-09-26 (`onboarding.gate.invalidKey` reads "That key
+Last verified: 2026-10-01 (working tree on top of 0b61a29) for the hosted first-sign-in default: a person who has
+never chosen a language is served the one their browser's `Accept-Language` asks for, in the Settings answer,
+in every job mode and in Chat (the Overview's last paragraph, step 3 below, level 2 of "The run harness", two
+Failure modes rows and the files table; the line numbers in those passages were re-read). Proven by unit
+tests and by `dispatch` with real sessions and a real sealed store, each with a Personal-parity case that was
+mutation-checked; **not driven in a browser or on a deployed hosted build**, and the host change needs the
+process restarted to be felt. The Personal app and webdev are unchanged by construction and by test. Before
+that, 2026-09-27 for the restart race: the banner can show while `POST /api/v1/settings` is in flight, and Restart stays disabled until that save resolves, then `onRestart` applies the locale that landed on disk. The onboarding reason sentence was last verified 2026-09-26 (`onboarding.gate.invalidKey` reads "That key
 didn't work. Check it at Toko Token and paste it again."). The rest of this page was last verified 2026-09-23
 at d4561b8 + uncommitted tree for the run harness (`localeForRun`, the new per-request locale on the hosted
 server, the Channel 2 line), the Failure modes row it adds, the gotchas that changed with it, and the `common`
@@ -21,15 +28,31 @@ switch would leave in-flight runs and server state split between two languages m
 **Phase 4 made the choice per user, and only the hosted server feels it.** A person's language is stored
 against their portal user id inside their tenant's settings payload, under `users` on `SettingsFileV2`
 (`packages/host/src/settings-store.ts:186-196`).
-`loadUserLocale` reads it (`packages/host/src/settings-store.ts:582-588`).
+`loadUserLocale` reads it (`packages/host/src/settings-store.ts:594-600`).
 On a desk nothing changed by construction: `saveUserLocale`
-(`packages/host/src/settings-store.ts:598-613`) also writes the install's `locale`, which is what
+(`packages/host/src/settings-store.ts:626-639`) also writes the install's `locale`, which is what
 `getBootLocale()` freezes, so the boot freeze and the Restart banner behave exactly as they did. In server
 mode it does not write the install's locale — one tenant's user must not set the language every other
 tenant's process boots in — and nothing is frozen per user, so a change applies on the next request and the
-Restart banner never appears (`localePayload`, `packages/host/src/locale-boot.ts:55-61`;
-`applySavedLocaleAsBoot` is a no-op there, `:34-40`). Since 2026-09-23 the hosted server also **runs** every
+Restart banner never appears (`localePayload`, `packages/host/src/locale-boot.ts:121-134`;
+`applySavedLocaleAsBoot` is a no-op there, `:40-46`). Since 2026-09-23 the hosted server also **runs** every
 mode in that person's language, not only Chat: each request carries it (see "The run harness" below).
+
+**A person who never chose gets their browser's language (2026-10-01, hosted only).** `loadUserLocale` cannot
+tell "chose English" from "never chose", so a first-time Indonesian user met an English welcome after the
+portal had already spoken Indonesian to them. The host now reads `Accept-Language` for exactly that person:
+`localeFromAcceptLanguage` (`packages/core/src/locale.ts:64-84`) takes the highest-weighted tag the app serves
+(`id`, `id-*` and the legacy `in` are Indonesian, `en` and `en-*` English; `q=0`, a malformed weight, `*` and
+every other language are skipped; only the first KiB is read) or answers `null`, "no opinion". `hostedLocale`
+(`packages/host/src/locale-boot.ts:65-71`) then answers the person's **stored choice**
+(`loadUserLocaleChoice`, `packages/host/src/settings-store.ts:611-616`: `users[userId].locale` and nothing
+else — not the tenant's fall-through) ahead of the browser's language, and with `null` (no header, or none
+it serves) falls back to `loadUserLocale` exactly as before, tenant-wide locale and then English. An explicit
+choice always wins; **nothing is written**, so the default is recomputed on every request and a later request
+from another browser is judged on its own header. The HTTP adapter forwards the header in server mode only
+(`packages/host/src/http-adapter.ts:685-688`); off server mode the request carries the headers it always
+did and no code reads one. Not covered: the anonymous `GET /api/v1/ping` (no person, so no language but the
+install's), and the sign-in screen, which is drawn before any settings read.
 
 ## How it works
 
@@ -47,12 +70,17 @@ not read on the boot path (`packages/host/src/locale-boot.ts:8-9`), asserted at
 
 1. The Settings select (`settings-locale`, `apps/web/components/settings-page.tsx:313`) validates with
    `isAppLocale`, sets `savedLocale` optimistically, and POSTs `/api/v1/settings { locale }` (`:219-229`).
-2. `handlePostSettings` (`packages/host/src/handlers/settings.ts:207-283`) validates the value with
+2. `handlePostSettings` (`packages/host/src/handlers/settings.ts:234-308`) validates the value with
    `isAppLocale` and calls `saveUserLocale(tenant, …)`
-   (`packages/host/src/handlers/settings.ts:215-222`) — and does **not** touch the frozen boot locale.
-3. Every settings response carries `...localePayload(tenant)` (`packages/host/src/locale-boot.ts:55-61`):
-   `{ locale: getBootLocale(), savedLocale: getSavedLocale() }`. `getBootLocale` is cached from the first read;
-   `getSavedLocale` always re-reads disk. Those two values differing is the entire signal.
+   (`packages/host/src/handlers/settings.ts:242-249`) — and does **not** touch the frozen boot locale.
+3. Every settings response carries `...localePayload(tenant, { serverMode, acceptLanguage })`
+   (`packages/host/src/locale-boot.ts:121-134`, called from `settingsPayload`,
+   `packages/host/src/handlers/settings.ts:92-106`): on a desk `{ locale: getBootLocale(), savedLocale:
+   <the person's saved locale> }` and the header is never read. `getBootLocale` is cached from the first read;
+   the saved value always re-reads disk. Those two values differing is the entire signal. On the hosted server
+   both fields are the one `hostedLocale` answer (the stored choice, else the browser's language, else the
+   tenant's fall-through and English), so the Settings select shows what the person is reading and the
+   Restart banner cannot appear for a difference that is only the browser's.
 4. The restart banner renders only while `savedLocale !== locale` (`settings-locale-restart`). The select
    sets `savedLocale` before the POST returns, so the banner can show while the save is still in flight.
    `settings-locale-restart-button` is `disabled` while `localeSaving` or `localeBusy`.
@@ -120,10 +148,15 @@ return getRunContext()?.locale ?? requestLocale.getStore()?.() ?? getBootLocale(
 1. **A Chat run's own context.** `RunContext` is an `AsyncLocalStorage` store that only Chat populates —
    `withRunContext({ threadId, agentId, locale }, …)` in `packages/host/src/runs.ts`.
 2. **The request's person — hosted only (2026-09-23).** `dispatch` wraps every request that passed the session
-   gate in `withRequestLocale(() => sessionLocale({ tenantId, userId }), …)` (`packages/host/src/router.ts:535-538`),
-   beside the session and the log context. `sessionLocale` (`packages/host/src/locale-boot.ts:64-70`) is
-   `loadUserLocale` for the verified session's tenant and user, with the settings fallback desk named rather
-   than the client's workspace cookie, because a person's language is per tenant and per user, never per desk.
+   gate in `withRequestLocale(() => sessionLocale({ tenantId, userId }, request.headers["accept-language"]), …)`
+   (`packages/host/src/router.ts:565-568`), beside the session and the log context. `sessionLocale`
+   (`packages/host/src/locale-boot.ts:86-98`) is `hostedLocale` for the verified session's tenant and user — the
+   stored choice, else the request's browser language, else `loadUserLocale` — with the settings fallback desk
+   named rather than the client's workspace cookie, because a person's language is per tenant and per user,
+   never per desk. **Chat reads the same answer**: it keeps its own locale for a run, but takes
+   `hostedRequestLocale() ?? loadUserLocale(tenant)` (`packages/host/src/runs.ts:166`,
+   `run-context.ts:68-70`), so a hosted person's screen and Chat's reply agree; off server mode no request
+   locale is set and it is `loadUserLocale`, as before.
    The store holds a reader, not a value (`requestLocale`, `run-context.ts:34`): the settings payload is read
    only when a handler asks, at most once per request (`withRequestLocale`, `:42-51`), and a reader that throws
    answers English and logs `request_locale_unreadable` rather than failing a request that only wanted copy
@@ -142,17 +175,17 @@ There are **two independent locale channels per job call**, and getting one righ
 |---|---|
 | documents / finance | `packages/host/src/document-generate.ts:94`, section regen `:247` |
 | data | `packages/host/src/data-generate.ts:255` |
-| finance | `packages/host/src/finance-generate.ts:209`, the repair `:237`, section regen `:358` and its repair `:373` |
+| finance | `packages/host/src/finance-generate.ts:216`, the repair `:256`, section regen `:395` and its repair `:411` |
 | research | `packages/host/src/research-generate.ts:146` |
 | knowledge | `packages/host/src/knowledge-map.ts:136` (brain), `:158` (verifier) |
-| edit | `packages/host/src/edit/agent-run.ts:172` |
-| videos | `packages/host/src/studio-generate.ts:344` |
-| music | a description only, `packages/host/src/studio-generate.ts:452`, and the lyrics draft `:523` — never custom lyrics, which are sung word for word (since 2026-09-23) |
+| edit | `packages/host/src/edit/agent-run.ts:173` |
+| videos | `packages/host/src/studio-generate.ts:350` |
+| music | a description only, `packages/host/src/studio-generate.ts:458`, and the lyrics draft `:523` — never custom lyrics, which are sung word for word (since 2026-09-23) |
 
 Five surfaces keep their own mechanism instead, and the shared table says so at
 `packages/core/src/output-language.ts:105-108`: **Chat** → `withChatOutputLanguage`
-(`packages/host/src/runs.ts:162`); **Images** → `withImageOutputLanguage`, which is about text *drawn on the
-image* (`packages/host/src/studio-generate.ts:279`); **Presentation** → `presentationLanguageRule` spliced into
+(`packages/host/src/runs.ts:164`); **Images** → `withImageOutputLanguage`, which is about text *drawn on the
+image* (`packages/host/src/studio-generate.ts:285`); **Presentation** → `presentationLanguageRule` spliced into
 the outline and slide templates (`packages/host/src/presentation-generate.ts:72-78`); **Legal** →
 `legalUserFacingLanguageInstruction` (defined at `packages/core/src/legal/locale.ts:21-34`, imported at
 `packages/core/src/legal/prompts.ts:7` and used at `:44`); **Market** → a `Write in ${language}` line in
@@ -182,8 +215,9 @@ while the screen reads "That key didn't work. Check it at Toko Token and paste i
 
 | Case | Behaviour |
 |---|---|
-| Unknown locale value posted | 400 `invalid_request` from `isAppLocale` (`packages/host/src/handlers/settings.ts:215-218`) |
-| Hosted user has never chosen a language | `loadUserLocale` falls through to the tenant's own stored locale, then to `en` — never to another tenant's payload (`packages/host/src/settings-store.ts:582-588`) |
+| Unknown locale value posted | 400 `invalid_request` from `isAppLocale` (`packages/host/src/handlers/settings.ts:242-246`) |
+| Hosted user has never chosen a language | the browser's language if `Accept-Language` names one the app serves (`hostedLocale`, `packages/host/src/locale-boot.ts:65-71`); otherwise `loadUserLocale` falls through to the tenant's own stored locale, then to `en` — never to another tenant's payload (`packages/host/src/settings-store.ts:594-600`). Nothing is stored |
+| Hosted user chose a language and the browser asks for another | the choice, always (`loadUserLocaleChoice` is read first) |
 | Hosted person's locale cannot be read (an unreadable payload, a wrap-key fault) | the request's locale is English and `request_locale_unreadable` is logged; the request itself still runs (`readOrDefault`, `packages/host/src/run-context.ts:53-60`) |
 | Unknown locale reaching `parseAppLocale` | silently `en` |
 | Missing catalog key | `id` → `en` → the raw key string; never a crash, never blank |
@@ -195,11 +229,11 @@ while the screen reads "That key didn't work. Check it at Toko Token and paste i
 
 | File | Role |
 |---|---|
-| `packages/core/src/locale.ts` | `AppLocale`, `parseAppLocale`, `isAppLocale` |
-| `packages/host/src/locale-boot.ts` | The host freeze: `getBootLocale`, `getSavedLocale`, `applySavedLocaleAsBoot`, `localePayload`; `sessionLocale`, a hosted request's person |
-| `packages/host/src/run-context.ts` | `RunContext`, `withRunContext`, `withRequestLocale`, `localeForRun` |
-| `packages/host/src/settings-store.ts:564-572` | `loadOwnerLocale` / `saveOwnerLocale` — the install's locale, still what the desk freezes |
-| `packages/host/src/settings-store.ts:582-613` | `loadUserLocale` / `saveUserLocale` — Phase 4, the person's own locale |
+| `packages/core/src/locale.ts` | `AppLocale`, `parseAppLocale`, `isAppLocale`, `localeFromAcceptLanguage` (the browser's language, hosted only) |
+| `packages/host/src/locale-boot.ts` | The host freeze: `getBootLocale`, `getSavedLocale`, `applySavedLocaleAsBoot`, `localePayload`; `hostedLocale` and `sessionLocale`, a hosted request's person |
+| `packages/host/src/run-context.ts` | `RunContext`, `withRunContext`, `withRequestLocale`, `hostedRequestLocale`, `localeForRun` |
+| `packages/host/src/settings-store.ts:576-584` | `loadOwnerLocale` / `saveOwnerLocale` — the install's locale, still what the desk freezes |
+| `packages/host/src/settings-store.ts:594-640` | `loadUserLocale` / `loadUserLocaleChoice` / `saveUserLocale` — Phase 4, the person's own locale, and "never chose" told apart from "chose English" |
 | `packages/host/src/handlers/settings.ts` | Save, and `handleApplyLocale` behind `POST /api/v1/settings/apply-locale` (`:206`) |
 | `apps/web/lib/i18n.ts` | Catalogs, `t()`, `freezeLocale` / `applyLocale`, `LOCALE_RESTART_EVENT` |
 | `apps/web/locales/{en,id}/*.json` | 22 namespaces, ~1,500 keys each |
@@ -209,7 +243,9 @@ while the screen reads "That key didn't work. Check it at Toko Token and paste i
 | `packages/core/src/agents/chat-locale.ts` | Chat's own rule and stub copy |
 | `packages/host/src/presentation-locale.ts`, `image-output-locale.ts`, `packages/core/src/legal/locale.ts` | The three surfaces that keep their own tables |
 | `packages/host/src/job-regen.ts:155` | Where `locale` joins `runtime.execute` for every job |
-| `packages/host/src/router.ts:535-538` | Where a hosted request's locale is set, beside its session |
+| `packages/host/src/router.ts:565-568` | Where a hosted request's locale is set, beside its session |
+| `packages/host/src/http-adapter.ts:685-688` | Forwards `Accept-Language` into the request, in server mode only |
+| `packages/host/src/hosted-locale-negotiation.test.ts`, `hosted-locale-chat-run.test.ts` | The hosted default over the real router, and Chat's run, each with the Personal-parity cases |
 
 ## Gotchas
 

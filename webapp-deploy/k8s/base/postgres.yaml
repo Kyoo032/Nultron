@@ -1,0 +1,104 @@
+# Postgres 16 for the portal (and for nothing else: the PRODUCT database is SQLite on the app's volume).
+# One replica. The superuser `portal` is the schema OWNER: it runs the migrations (PORTAL_MIGRATE_DATABASE_URL)
+# and nothing serves as it. The server logs in as `portal_app_login`, a plain member of portal_app that
+# migration 0010 creates and the portal pod's prepare-db step gives a password (SR-56). On a managed
+# Postgres (TencentDB) this whole file is replaced by two DSNs.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: nultron-portal-db
+  labels:
+    app.kubernetes.io/name: nultron-portal-db
+    app.kubernetes.io/part-of: nultron
+spec:
+  serviceName: nultron-portal-db
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nultron-portal-db
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nultron-portal-db
+        app.kubernetes.io/part-of: nultron
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: postgres:16
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: POSTGRES_USER, value: portal}
+            - {name: POSTGRES_DB, value: tokotoken_portal}
+            # Same as apps/portal/compose.yml: a deterministic collation, so an index built here behaves like one on TencentDB.
+            - {name: POSTGRES_INITDB_ARGS, value: "--encoding=UTF8 --locale=C"}
+            # A subdirectory of the volume: the mount root holds lost+found on a fresh ext4 disk.
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: nultron-secrets, key: PORTAL_POSTGRES_PASSWORD}
+          ports:
+            - {name: postgres, containerPort: 5432}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "2", memory: 1Gi}
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "portal", "-d", "tokotoken_portal"]
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "portal", "-d", "tokotoken_portal"]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          volumeMounts:
+            - {name: pgdata, mountPath: /var/lib/postgresql/data}
+            - {name: pg-run, mountPath: /var/run/postgresql}
+            - {name: pg-tmp, mountPath: /tmp}
+      volumes:
+        - name: pg-run
+          emptyDir: {}
+        - name: pg-tmp
+          emptyDir: {sizeLimit: 128Mi}
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+        labels:
+          app.kubernetes.io/name: nultron-portal-db
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nultron-portal-db
+  labels:
+    app.kubernetes.io/name: nultron-portal-db
+    app.kubernetes.io/part-of: nultron
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: nultron-portal-db
+  ports:
+    - {name: postgres, port: 5432, targetPort: postgres, protocol: TCP}

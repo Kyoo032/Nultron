@@ -1,0 +1,156 @@
+# The portal stand-in (apps/portal): browser sign-in with an e-mailed one-time code. One replica and
+# Recreate: its rate-limit windows live in memory (SR-29), so a second process would double them.
+#
+# It runs from its OWN image. The app image does not contain the portal's node_modules (the app is
+# installed with --filter @agentforge/web..., and the portal is not one of its dependencies), so
+# `tsx src/main.ts` cannot start there. webapp-deploy/portal.Dockerfile builds it.
+#
+# NODE_ENV=production is on purpose, so the production refusals are exercised: a real signing key, a
+# non-sandbox SMTP host over STARTTLS, an https public URL, two database roles, no manual OTP.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nultron-portal
+  labels:
+    app.kubernetes.io/name: nultron-portal
+    app.kubernetes.io/part-of: nultron
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nultron-portal
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nultron-portal
+        app.kubernetes.io/part-of: nultron
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Wait for Postgres, migrate as the schema owner, set portal_app_login's password.
+        - name: prepare-db
+          image: nultron-portal
+          imagePullPolicy: IfNotPresent
+          command: ["node", "/scripts/prepare-db.mjs"]
+          envFrom:
+            - configMapRef:
+                name: nultron-portal-env
+          env:
+            - name: PORTAL_SIGNING_KEY
+              valueFrom:
+                secretKeyRef: {name: nultron-secrets, key: PORTAL_SIGNING_KEY}
+            - name: PORTAL_SMTP_USER
+              valueFrom:
+                secretKeyRef: {name: nultron-secrets, key: PORTAL_SMTP_USER, optional: true}
+            - name: PORTAL_SMTP_PASS
+              valueFrom:
+                secretKeyRef: {name: nultron-secrets, key: PORTAL_SMTP_PASS, optional: true}
+            - name: PORTAL_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: nultron-secrets, key: PORTAL_POSTGRES_PASSWORD}
+            - name: PORTAL_APP_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: nultron-secrets, key: PORTAL_APP_DB_PASSWORD}
+            - name: PORTAL_MIGRATE_DATABASE_URL
+              value: postgres://$(PORTAL_DB_OWNER):$(PORTAL_POSTGRES_PASSWORD)@$(PORTAL_DB_HOST):$(PORTAL_DB_PORT)/tokotoken_portal
+            - name: PORTAL_DATABASE_URL
+              value: postgres://portal_app_login:$(PORTAL_APP_DB_PASSWORD)@$(PORTAL_DB_HOST):$(PORTAL_DB_PORT)/tokotoken_portal
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 768Mi}
+          volumeMounts:
+            - {name: scripts, mountPath: /scripts, readOnly: true}
+            - {name: portal-data, mountPath: /portal-data}
+            - {name: portal-tmp, mountPath: /tmp}
+      containers:
+        - name: portal
+          image: nultron-portal
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: nultron-portal-env
+          env:
+            - name: PORTAL_SIGNING_KEY
+              valueFrom:
+                secretKeyRef: {name: nultron-secrets, key: PORTAL_SIGNING_KEY}
+            - name: PORTAL_SMTP_USER
+              valueFrom:
+                secretKeyRef: {name: nultron-secrets, key: PORTAL_SMTP_USER, optional: true}
+            - name: PORTAL_SMTP_PASS
+              valueFrom:
+                secretKeyRef: {name: nultron-secrets, key: PORTAL_SMTP_PASS, optional: true}
+            - name: PORTAL_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: nultron-secrets, key: PORTAL_POSTGRES_PASSWORD}
+            - name: PORTAL_APP_DB_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: nultron-secrets, key: PORTAL_APP_DB_PASSWORD}
+            # Production refuses to boot without the owner's DSN: the portal migrates on every start
+            # (a no-op once prepare-db has run), and serves on portal_app_login only.
+            - name: PORTAL_MIGRATE_DATABASE_URL
+              value: postgres://$(PORTAL_DB_OWNER):$(PORTAL_POSTGRES_PASSWORD)@$(PORTAL_DB_HOST):$(PORTAL_DB_PORT)/tokotoken_portal
+            - name: PORTAL_DATABASE_URL
+              value: postgres://portal_app_login:$(PORTAL_APP_DB_PASSWORD)@$(PORTAL_DB_HOST):$(PORTAL_DB_PORT)/tokotoken_portal
+          ports:
+            - {name: http, containerPort: 4000}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 768Mi}
+          startupProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 5
+            failureThreshold: 36
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 30
+            failureThreshold: 5
+          volumeMounts:
+            - {name: portal-data, mountPath: /portal-data}
+            - {name: portal-tmp, mountPath: /tmp}
+      volumes:
+        - name: scripts
+          configMap: {name: nultron-portal-scripts}
+        - name: portal-data
+          emptyDir: {sizeLimit: 64Mi}
+        - name: portal-tmp
+          emptyDir: {sizeLimit: 128Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nultron-portal
+  labels:
+    app.kubernetes.io/name: nultron-portal
+    app.kubernetes.io/part-of: nultron
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: nultron-portal
+  ports:
+    - {name: http, port: 4000, targetPort: http, protocol: TCP}

@@ -1,6 +1,6 @@
 # Map — Per-tenant storage and state
 
-Last verified: 2026-09-23 at d4561b8 + uncommitted tree for "Requests, and work that outlives them" (the
+Last verified: 2026-10-01 (working tree over 0b61a29) for the locale bullet only (the hosted default from `Accept-Language`, and its citations); every other line is as verified next. Before that, 2026-09-23 at d4561b8 + uncommitted tree for "Requests, and work that outlives them" (the
 `ops.ts` citations, `workerTenant` and the per-tenant Edit metrics file) and the metrics row of the layout table.
 Everything else was last verified 2026-09-20 at a053245 + the Phase 4 branch
 `feat/web-phase4-tenant-secrets-rcbu9c`.
@@ -52,9 +52,9 @@ because the local tenant's relative paths are exactly the ones those rows alread
 
 **Phase 4: two of those rows are files only on a desk.** The secrets payload and the gateway verdict now go
 through a backend chosen by mode — the files above off server mode, `tenant_state` rows on the hosted server
-(`tenantStateBackend`, `packages/host/src/tenant-state-store.ts:319-321`). The desktop column is unchanged
+(`tenantStateBackend`, `packages/host/src/tenant-state-store.ts:331-333`). The desktop column is unchanged
 by construction: the file backend maps each payload back to exactly the filename in the table
-(`TENANT_STATE_FILENAMES`, `packages/host/src/tenant-state-store.ts:48-51`), so an existing data directory
+(`TENANT_STATE_FILENAMES`, `packages/host/src/tenant-state-store.ts:48-54`), so an existing data directory
 opens with nothing moved. Every other row on this table is still a path in both modes; moving media and job
 storage off the disk is Phase 6. See [`tenant-secrets-backend.md`](tenant-secrets-backend.md).
 
@@ -141,14 +141,16 @@ keeps `<dataDir>/edit/metrics.jsonl`) — see [`edit-timeline.md`](edit-timeline
   only new writes take a prefix. `mediaFilePath` still refuses a row whose path is not this tenant's.
 - **The locale is per user, not per tenant.** Phase 4 closed the lane-D gap, but not by making the locale
   a tenant thing: a person's language is stored against their portal user id inside their own tenant's
-  payload (`loadUserLocale` / `saveUserLocale`, `packages/host/src/settings-store.ts:582-613`), because two
+  payload (`loadUserLocale` / `saveUserLocale`, `packages/host/src/settings-store.ts:594-639`), because two
   people on one hosted tenant read different languages. The host still freezes one boot locale
-  (`getBootLocale`, `packages/host/src/locale-boot.ts:15-20`) and `loadOwnerLocale` / `saveOwnerLocale`
-  (`packages/host/src/settings-store.ts:564-572`) still name the install's, which is what a desk renders
+  (`getBootLocale`, `packages/host/src/locale-boot.ts:21-26`) and `loadOwnerLocale` / `saveOwnerLocale`
+  (`packages/host/src/settings-store.ts:576-584`) still name the install's, which is what a desk renders
   in; in server mode nothing is frozen per user and `localePayload` answers from the caller
-  (`packages/host/src/locale-boot.ts:55-61`). Threading it through `run-context.ts` for background work is
-  still open — a chat run takes it from the caller's tenant (`packages/host/src/runs.ts:159`), but a job
-  the edit runner picks up off-request has no user to read.
+  (`packages/host/src/locale-boot.ts:121-134`): the stored choice, else — since 2026-10-01 — the language the
+  request's `Accept-Language` asks for, else the tenant's locale and English. Threading it through
+  `run-context.ts` for background work is still open — a chat run takes the request's own locale
+  (`hostedRequestLocale() ?? loadUserLocale`, `packages/host/src/runs.ts:166`), but a job the edit runner
+  picks up off-request has no user to read.
 - **`desk-usage.json` is legacy and read-only.** The spec wants a `tenant_usage` row; Phase 5 built that
   table on migration `0016` (PR #74, [`tenant-usage-ledger.md`](tenant-usage-ledger.md)) and nothing writes
   the file any more. Lane D scoped what still *reads* it, so a hosted tenant does not inherit the install's

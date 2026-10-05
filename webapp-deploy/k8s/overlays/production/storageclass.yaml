@@ -1,0 +1,14 @@
+# CBS block storage, zone-bound, bound only when a pod is scheduled so the disk is created in the
+# node's zone. NOT VERIFIED against a live TKE cluster: the provisioner name and the diskType value
+# are from the Tencent CBS CSI documentation as remembered, not read from a running cluster.
+# `Retain`: deleting the claim must not delete the tenant data.
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nultron-cbs-ssd
+provisioner: com.tencent.cloud.csi.cbs
+parameters:
+  diskType: CLOUD_SSD
+reclaimPolicy: Retain
+allowVolumeExpansion: true
+volumeBindingMode: WaitForFirstConsumer

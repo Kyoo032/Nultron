@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type CSSProperties, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import type { MediaPrice } from "@agentforge/core/media-pricing";
 import {
   musicCapabilities,
@@ -9,12 +9,17 @@ import {
   MUSIC_STYLE_MAX,
   MUSIC_TITLE_MAX,
 } from "@agentforge/core/audio-capabilities";
+import { GalleryAudio } from "@/components/gallery-media";
 import { ModeHeader } from "@/components/mode-header";
 import { MascotSlot } from "@/components/mascot-slot";
 import { ModelSelect } from "@/components/model-select";
+import { StudioEmptyDesk } from "@/components/studio-empty-desk";
 import { WorkingStatus } from "@/components/working-status";
 import { SettingsLinkHint } from "@/components/settings-link-hint";
+import { isGatewayBlockedText } from "@/lib/gateway-blocked";
+import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import { t } from "@/lib/i18n";
+import { PROMPT_INPUT, PROMPT_ROW, PROMPT_SUBMIT } from "@/lib/prompt-row";
 import { mediaPriceHints, musicEstimateView } from "@/lib/media-estimate";
 import { keepModelChoice } from "@/lib/model-choice";
 import { musicPickerEmpty, readApiErrorMessage } from "@/lib/music-models";
@@ -42,6 +47,8 @@ type LibraryItem = {
   style?: string;
   instrumental?: boolean;
   durationSeconds?: number;
+  /** The host's word that the file is gone from the store: the row lists, the player does not load. */
+  fileMissing?: boolean;
 };
 
 /**
@@ -110,6 +117,19 @@ export function MusicStudio() {
     void load();
   }, [load]);
 
+  // Nultron Enterprise: a signed-in tenant may open the desk before adding a key (hosted only; false
+  // elsewhere). `ready` above is what the gallery read said at mount, so when a key is saved in Settings
+  // the studio asks again instead of staying quiet until a reload.
+  const keyMissing = useHostedNeedsKey();
+  const wasMissing = useRef(false);
+  useEffect(() => {
+    if (wasMissing.current && !keyMissing) {
+      void load();
+    }
+    wasMissing.current = keyMissing;
+  }, [keyMissing, load]);
+  const keyReady = ready && !keyMissing;
+
   const caps = musicCapabilities(model);
 
   // A model with no lyrics field only ever describes, so a stale "custom" pick is corrected here
@@ -162,7 +182,7 @@ export function MusicStudio() {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!brief.trim() || busy || !ready) {
+    if (!brief.trim() || busy || !keyReady) {
       return;
     }
     setGenerating(true);
@@ -204,7 +224,7 @@ export function MusicStudio() {
     >
       <ModeHeader icon="music" title={t("music.title")} outcome={t("music.expectedInputs")} />
 
-      {error ? (
+      {error && !isGatewayBlockedText(error) ? (
         <div
           className="mt-4 rounded-xl border border-[var(--line)] px-4 py-3 text-sm text-[var(--danger)]"
           role="alert"
@@ -298,7 +318,7 @@ export function MusicStudio() {
                   {caps.style ? (
                     <input
                       type="text"
-                      className="text-field min-w-0 flex-1 outline-none placeholder:text-[var(--text-3)]"
+                      className="text-field min-w-[10rem] flex-1 outline-none placeholder:text-[var(--text-3)]"
                       placeholder={t("music.stylePlaceholder")}
                       maxLength={MUSIC_STYLE_MAX}
                       value={style}
@@ -310,7 +330,7 @@ export function MusicStudio() {
                   {caps.title ? (
                     <input
                       type="text"
-                      className="text-field min-w-0 flex-1 outline-none placeholder:text-[var(--text-3)]"
+                      className="text-field min-w-[10rem] flex-1 outline-none placeholder:text-[var(--text-3)]"
                       placeholder={t("music.titlePlaceholder")}
                       maxLength={MUSIC_TITLE_MAX}
                       value={title}
@@ -338,13 +358,13 @@ export function MusicStudio() {
           </details>
         ) : null}
 
-        <div className="flex flex-wrap gap-2">
+        <div className={PROMPT_ROW}>
           {caps.lyrics ? (
             <button
               type="button"
-              className="shrink-0 wash inline-flex h-8 items-center rounded-pill border border-[var(--line)] px-3 py-2 text-sm text-[var(--text-2)] disabled:opacity-45"
+              className={`${PROMPT_SUBMIT} shrink-0 wash inline-flex h-8 items-center justify-center rounded-pill border border-[var(--line)] px-3 py-2 text-sm text-[var(--text-2)] disabled:opacity-45`}
               onClick={() => void draftLyrics()}
-              disabled={busy || !ready || noModels || !prompt.trim()}
+              disabled={busy || !keyReady || noModels || !prompt.trim()}
               data-testid="music-studio-draft-lyrics"
             >
               {drafting ? <WorkingStatus label={t("music.writingLyrics")} /> : t("music.writeLyrics")}
@@ -352,7 +372,7 @@ export function MusicStudio() {
           ) : null}
           <input
             type="text"
-            className="text-field min-w-0 flex-1 outline-none placeholder:text-[var(--text-3)]"
+            className={PROMPT_INPUT}
             placeholder={t("music.promptPlaceholder")}
             maxLength={MUSIC_PROMPT_MAX}
             value={prompt}
@@ -360,21 +380,21 @@ export function MusicStudio() {
             disabled={busy}
             data-testid="music-studio-prompt"
           />
-          {generating ? <MascotSlot mode="music" placement="beside" busy /> : null}
+          {generating ? <MascotSlot mode="music" placement="beside" busy decorative /> : null}
           <button
             type="submit"
-            className={
-              ready
+            className={`${PROMPT_SUBMIT} ${
+              keyReady
                 ? "btn btn-primary h-8 shrink-0 rounded-pill px-4"
-                : "inline-flex h-8 shrink-0 items-center rounded-pill bg-[var(--line)] px-4 text-sm text-[var(--text-3)]"
-            }
-            disabled={busy || !ready || noModels || !brief.trim()}
-            title={ready ? undefined : t("music.needsKey", { gateway: gatewayName, settings: t("rail.settings") })}
+                : "inline-flex h-8 shrink-0 items-center justify-center rounded-pill bg-[var(--line)] px-4 text-sm text-[var(--text-3)]"
+            }`}
+            disabled={busy || !keyReady || noModels || !brief.trim()}
+            title={keyReady ? undefined : t("music.needsKey", { gateway: gatewayName, settings: t("rail.settings") })}
             data-testid="music-studio-submit"
           >
             {generating ? <WorkingStatus label={t("music.generating")} /> : t("music.generate")}
           </button>
-          {!ready && !loading ? (
+          {keyMissing || (!ready && !loading) ? (
             <p className="basis-full text-xs text-[var(--text-3)]" data-testid="music-studio-needs-key">
               <SettingsLinkHint i18nKey="music.needsKey" vars={{ gateway: gatewayName }} />
             </p>
@@ -406,7 +426,11 @@ export function MusicStudio() {
       <section className="mt-8" data-testid="music-studio-library">
         {loading ? (
           <p className="text-sm text-[var(--text-3)]">{t("music.loadingLibrary")}</p>
-        ) : items.length === 0 ? null : (
+        ) : items.length === 0 ? (
+          busy ? null : (
+            <StudioEmptyDesk mode="music" flush />
+          )
+        ) : (
           <ul className="space-y-3">
             {items.map((item, index) => (
               <li
@@ -419,14 +443,16 @@ export function MusicStudio() {
                   <p className="min-w-0 truncate text-sm font-medium text-[var(--text)]">
                     {item.title?.trim() || t("music.untitled")}
                   </p>
-                  <a
-                    href={mediaSrc(item.url)}
-                    download={`agentforge-track-${item.id}.mp3`}
-                    className="shrink-0 text-xs underline text-[var(--text-2)]"
-                    data-testid="music-studio-download"
-                  >
-                    {t("music.download")}
-                  </a>
+                  {item.fileMissing ? null : (
+                    <a
+                      href={mediaSrc(item.url)}
+                      download={`agentforge-track-${item.id}.mp3`}
+                      className="shrink-0 text-xs underline text-[var(--text-2)]"
+                      data-testid="music-studio-download"
+                    >
+                      {t("music.download")}
+                    </a>
+                  )}
                 </div>
                 {item.style || item.durationSeconds ? (
                   <p className="mt-0.5 truncate text-xs text-[var(--text-3)]">
@@ -438,8 +464,7 @@ export function MusicStudio() {
                       .join(" · ")}
                   </p>
                 ) : null}
-                {/* eslint-disable-next-line jsx-a11y/media-has-caption -- a generated song has no transcript */}
-                <audio src={mediaSrc(item.url)} controls className="mt-2 w-full" />
+                <GalleryAudio src={mediaSrc(item.url)} missing={item.fileMissing === true} />
                 {item.prompt ? (
                   <p className="mt-2 line-clamp-3 whitespace-pre-line text-xs text-[var(--text-2)]">{item.prompt}</p>
                 ) : null}

@@ -101,7 +101,7 @@ export async function describeSession(
     return {
       ok: true as const,
       body: Object.freeze({
-        user: { id: user.id, email: user.email, name: user.displayName },
+        user: { id: user.id, email: user.email, name: user.displayName, role: user.role },
         org: {
           id: org.id,
           name: org.name,

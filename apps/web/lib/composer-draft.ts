@@ -1,11 +1,13 @@
 /**
  * Unsent Chat composer text and files.
  *
- * `WorkModeKeepAlive` mounts every desk under `key={workspaceId ?? "boot"}`. The shell
- * starts with no desk id, then `GET /workspaces` names one and remounts the pane. Composer
- * state dies with that remount, which is how an attachment made on a brand-new Chat
- * disappears before it is sent. This stash lives outside that key. A later desk id adopts
- * the boot draft; a switch to a different desk does not.
+ * `WorkModeKeepAlive` mounts every desk under a key that changes with the desk (`nextDeskKey`).
+ * The shell starts with no desk id, then `GET /workspaces` names one. Before 2026-10-02 that
+ * answer remounted the pane, and composer state died with the remount, which is how an
+ * attachment made on a brand-new Chat disappeared before it was sent. The first id no longer
+ * remounts anything; a switch to a different desk still does. This stash lives outside that
+ * key and stays the safety net for the switch: a later desk id adopts the boot draft; a switch
+ * to a different desk does not.
  */
 
 export type ComposerDraftFile = {

@@ -5,6 +5,7 @@
   "untitled": "Untitled",
   "projects": "Projects",
   "newProject": "New project",
+  "projectNameLabel": "Project name",
   "openProjectHint": "Open a project to talk to the editor.",
   "phaseLater": "{label} (Phase 2+)",
   "jobs": "jobs {count}",
@@ -187,7 +188,8 @@
     "checkAgain": "Check again",
     "checking": "Checking…",
     "installGuide": "Install guide",
-    "recheckFailed": "Could not reach the local host to re-check. Try again in a moment."
+    "recheckFailed": "Could not reach the local host to re-check. Try again in a moment.",
+    "hostedUnavailable": "Video tools are not set up on this server yet, so probing, cutting, captions and export may not work. Ask your administrator to turn them on."
   },
   "errors": {
     "apply": "Could not apply edit",
@@ -202,7 +204,21 @@
   "pipeline": {
     "languageInstruction": "Write user-facing Edit text (card verbs, titles, captions, assistant replies, and any on-image or on-video words) in English. Keep tool names and JSON keys in English.",
     "stubHelp": "I can help trim, split, caption, and title this timeline.",
-    "stubUndo": "Undo is available on the last card."
+    "stubUndo": "Undo is available on the last card.",
+    "harness": {
+      "liftDeadAirRan": "Lifted the dead air.",
+      "liftDeadAirEmpty": "No dead air to lift on this timeline.",
+      "cutOnShotsRan": "Cut where the picture changes.",
+      "cutOnShotsEmpty": "No shot change to cut on.",
+      "wordsOnPictureRan": "Put the words on the picture.",
+      "wordsOnPictureEmpty": "Say the words to put on the picture.",
+      "placeMadeShotRan": "Placed a made shot on the timeline.",
+      "placeMadeShotEmpty": "Say what still or clip to make.",
+      "placeMadeShotBlocked": "This shot waits on a plan. Nothing was generated.",
+      "handBackFileRan": "Handing back the file.",
+      "handBackFileBlocked": "Confirm the timeline before the file can be handed back.",
+      "handBackFileFailed": "The file could not be started."
+    }
   },
   "stubCards": {
     "S1": { "verb": "Remove 3 silences", "object": "v1" },

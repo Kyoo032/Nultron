@@ -1,23 +1,69 @@
 {
-  "product": "DPSBuddy",
+  "product": "Nultron",
   "signIn": {
     "title": "Masuk",
-    "intro": "Masukkan alamat e-mail kerja Anda. Kami akan mengirim kode enam digit.",
+    "intro": "Masukkan alamat e-mail Anda. Kami akan memberi tahu langkah berikutnya.",
     "emailLabel": "Alamat e-mail",
-    "submit": "Kirim kode"
+    "submit": "Lanjutkan",
+    "emailMissing": "Masukkan alamat e-mail Anda."
   },
   "sent": {
     "title": "Periksa e-mail Anda",
-    "body": "Jika alamat itu punya akun, kode enam digit sedang dikirim. Kode berlaku {minutes} menit.",
+    "body": "Kami mengirim kode masuk ke {email}. Kode berlaku {minutes} menit.",
+    "bodyAfterInvite": "Undangan diterima. Kami baru saja mengirim kode masuk ke {email} untuk memastikan itu kotak masuk Anda. Kode berlaku {minutes} menit.",
+    "bodyWait": "Kami sudah mengirim kode masuk ke {email}.",
+    "bodyFailed": "Kami tidak dapat mengirim kode masuk ke {email} saat ini.",
     "codeLabel": "Kode enam digit",
     "submit": "Lanjutkan",
-    "resend": "Belum menerimanya? Mulai lagi."
+    "resend": "Kirim kode baru",
+    "cooldown": "Kode baru saja dikirim. Periksa kotak masuk Anda, atau minta lagi dalam {minutes} menit.",
+    "limited": "Beberapa kode sudah dikirim baru-baru ini. Periksa kotak masuk Anda, atau coba lagi dalam {minutes} menit.",
+    "mailFailed": "E-mail tidak dapat dikirim. Coba lagi beberapa menit lagi."
+  },
+  "invite": {
+    "title": "Masukkan kode undangan Anda",
+    "lead": "Masukkan kode undangan yang kami kirim ke {email}.",
+    "label": "Kode undangan",
+    "submit": "Lanjutkan",
+    "resend": "Kirim ulang undangan ke e-mail saya",
+    "wrong": "Kode undangan itu tidak cocok. Sisa {attempts} percobaan.",
+    "missing": "Masukkan kode undangan dari e-mail.",
+    "resent": "Kami mengirim kode undangan baru ke e-mail Anda. Kode sebelumnya tidak berlaku lagi.",
+    "wait": "Undangan baru saja dikirim ke e-mail. Periksa kotak masuk Anda, atau minta lagi dalam {minutes} menit.",
+    "mailFailed": "E-mail tidak dapat dikirim. Coba lagi beberapa menit lagi."
+  },
+  "state": {
+    "restart": "Gunakan e-mail lain",
+    "expired": {
+      "title": "Undangan tidak berlaku lagi",
+      "body": "Undangan ini sudah kedaluwarsa atau sudah dipakai. Minta admin Anda untuk undangan baru."
+    },
+    "noAccess": {
+      "title": "Belum ada akses",
+      "body": "E-mail ini belum memiliki akses. Minta admin perusahaan Anda untuk mengundang Anda."
+    },
+    "inviteLocked": {
+      "title": "Terlalu banyak percobaan",
+      "body": "Terlalu banyak kode undangan yang salah untuk e-mail ini. Minta admin Anda untuk undangan baru."
+    },
+    "otpLocked": {
+      "title": "Terlalu banyak percobaan",
+      "body": "Terlalu banyak percobaan untuk e-mail ini. Coba lagi dalam {wait} atau hubungi admin Anda."
+    },
+    "seatCap": {
+      "title": "Tidak ada kursi tersisa",
+      "next": "Minta admin Anda untuk mengosongkan atau menambah kursi."
+    }
+  },
+  "account": {
+    "signedInAs": "Anda masuk sebagai {email}.",
+    "signOut": "Bukan Anda? Keluar"
   },
   "code": {
     "invalid": "Kode itu tidak cocok. Sisa {attempts} percobaan.",
     "expired": "Kode itu sudah kedaluwarsa. Mulai lagi.",
     "exhausted": "Terlalu banyak percobaan untuk kode itu. Mulai lagi.",
-    "locked": "Terlalu banyak percobaan masuk untuk alamat ini. Coba lagi dalam 24 jam.",
+    "locked": "Terlalu banyak percobaan untuk e-mail ini. Coba lagi dalam {wait} atau hubungi admin Anda.",
     "missing": "Masukkan enam digit dari e-mail."
   },
   "approve": {
@@ -83,6 +129,10 @@
     "invalid_request": "Permintaan itu tidak dikenali.",
     "invalid_grant": "Proses masuk itu tidak dapat diselesaikan. Mulai lagi.",
     "rate_limited": "Terlalu banyak percobaan. Coba lagi beberapa menit lagi."
+  },
+  "wait": {
+    "minutes": "{n} menit",
+    "hours": "{n} jam"
   },
   "footer": {
     "note": "Jangan pernah membagikan kode masuk kepada siapa pun."

@@ -1,15 +1,25 @@
 # syntax=docker/dockerfile:1.7
 #
-# DPSBuddy hosted web app.
+# Nultron hosted web app.
 #
 # Build context is the REPO ROOT, not this folder:
-#   docker build -f webapp-deploy/Dockerfile -t dpsbuddy-web:local .
+#   docker build -f webapp-deploy/Dockerfile -t nultron-web:local .
 #
-# Why the whole workspace ships in the image: every @agentforge/* package exports
+# Why the whole workspace SOURCE ships in the image: every @agentforge/* package exports
 # TypeScript source (packages/host/package.json "exports" -> ./src/index.ts), and
 # apps/web/package.json "start" is `NODE_ENV=production tsx server.ts`. So the runtime
 # needs the source tree, node_modules, and tsx. Only the renderer is compiled
 # (`pnpm --filter @agentforge/web build` -> apps/web/dist).
+#
+# Why node_modules holds PRODUCTION dependencies only (SR-113): the image used to carry the full
+# install, because tsx was a devDependency of @agentforge/web and is the entrypoint. tsx is a
+# dependency now, so three stages split the work:
+#   build    the full install (dev dependencies included): the renderer build and the sandbox folder
+#   prod     a second, fresh `pnpm install --prod`, plus the renderer the build stage made
+#   runtime  copies `prod`, so vite, tailwindcss, vitest, typescript and the rest of the dev
+#            toolchain are not in the image, and an advisory in them is not an advisory in it
+# `scripts/audit-deployed.mjs` audits the same production closure, so the audit gate and this image
+# measure the same thing.
 #
 # Debian (glibc) on purpose: @firecrawl/anydoc resolves to
 # @firecrawl/anydoc-linux-x64-gnu / -linux-arm64-gnu in pnpm-lock.yaml. Alpine/musl
@@ -38,7 +48,10 @@ RUN corepack enable \
  && find /opt/corepack -name '*.py' -exec chmod a+x {} +
 
 # ---------------------------------------------------------------------------
-# deps + build
+# build: the full install (dev dependencies included), the renderer, the sandbox folder
+#
+# Nothing from this stage's node_modules reaches the runtime image (see `prod` below); what leaves
+# it is apps/web/dist and /opt/sandbox-runtime.
 #
 # python3/make/g++ are here for better-sqlite3: it tries a prebuilt binary first
 # (prebuild-install) and falls back to node-gyp. Without them the fallback fails
@@ -55,11 +68,53 @@ COPY . .
 # Filtered install: @agentforge/web plus its workspace dependencies only.
 # The trailing "..." is pnpm's "and its dependencies" selector. This deliberately
 # skips apps/desktop (Electron, electron-builder, keytar) and apps/mobile, which
-# the hosted deployment never runs.
+# the hosted deployment never runs. It is the FULL install on purpose: `vite build`
+# below needs vite, tailwindcss and postcss, which are devDependencies.
 RUN pnpm install --frozen-lockfile --filter "@agentforge/web..."
 
 # Renderer -> apps/web/dist, which server.ts serves statically when NODE_ENV=production.
 RUN pnpm --filter @agentforge/web build
+
+# Code sandbox (H4): the Pyodide and QuickJS engines, the five Python wheels and the two child scripts,
+# assembled into ONE folder of real files that the host reads with `--allow-fs-read=<that folder>`.
+# Everything it carries is pinned by version, URL and sha256 in scripts/sandbox-runtime.lock.json, which
+# is a committed file, so the archive-from-sha build (SR-49) has it; the script refuses any file whose
+# hash differs and prints the folder's size. pyodide and quickjs come from the root devDependencies,
+# which the filtered install above includes (pnpm installs the workspace root with any --filter). The
+# five wheels are the only download. Both the folder and the download cache are built OUTSIDE /app, and
+# this stage's node_modules is never copied to the runtime image, so neither the folder's build inputs
+# nor pyodide's own copy in node_modules (about 14 MiB) ships; the runtime stage copies the folder itself.
+RUN node scripts/build-sandbox-runtime.mjs --out /opt/sandbox-runtime --cache /opt/sandbox-cache
+
+# ---------------------------------------------------------------------------
+# prod: the tree that ships - PRODUCTION dependencies only (SR-113)
+#
+# A second, fresh install rather than a prune of the build tree: it cannot leave a dev-only package
+# behind, it never touches the tree that built the renderer, and a reader can see in one line what
+# the image installs. The two installs run side by side under BuildKit. The toolchain is repeated
+# for better-sqlite3's node-gyp fallback (see the build stage).
+#
+# The trade this makes: `tsx server.ts` can import only what is declared in `dependencies`. A
+# server-side import of a devDependency used to resolve by luck, because the image carried them
+# all; now it fails the load check below at build time instead of at boot. That is how `vite`
+# became a dynamic import on the non-production branch of apps/web/server.ts.
+# ---------------------------------------------------------------------------
+FROM base AS prod
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3 make g++ ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY . .
+
+# Same filter as the build stage, plus --prod: dependencies and optionalDependencies of
+# @agentforge/web and its workspace packages, and nothing else. The root package's devDependencies
+# (biome, turbo, typescript, pyodide, quickjs) are skipped too.
+RUN pnpm install --frozen-lockfile --prod --filter "@agentforge/web..."
+
+# The renderer is the only build output the runtime serves. `**/dist` is in the ignore file, so the
+# COPY above did not bring a stale local one.
+COPY --from=build /app/apps/web/dist apps/web/dist
 
 # PHASE 7 - the image must CARRY every component this server needs, not download one on first
 # request. `anydoc` arrives through the install above (it is a dependency of @agentforge/host and
@@ -71,8 +126,8 @@ RUN pnpm --filter @agentforge/web build
 # So prove it here. The check loads each component in
 # packages/host/src/components/server.ts SERVER_COMPONENT_IDS the same way a request would -
 # createRequire on the real native binding - and exits non-zero if one does not load, which fails
-# the build. This runs in the build stage, on the same linux/glibc base the runtime stage uses, so
-# a binding that loads here loads there.
+# the build. This runs in the stage whose node_modules becomes the runtime's, on the same
+# linux/glibc base the runtime stage uses, so a binding that loads here loads there.
 #
 # The two variables are the runtime stage's, set here so the check runs under the rules the
 # container will run under and PRINTS what the container will print - `mode: server`, and
@@ -81,6 +136,15 @@ RUN pnpm --filter @agentforge/web build
 # way, and `check` never downloads.
 RUN AGENTFORGE_SERVER=1 AGENTFORGE_COMPONENTS_DIR=/opt/agentforge/components \
     apps/web/node_modules/.bin/tsx scripts/components.ts check
+
+# SR-113 - the same idea for every other import. Load the whole host (the HTTP adapter pulls in the
+# router, every handler, @agentforge/core and @agentforge/db) from apps/web, under the production
+# tree, so a server import that needs a package this tree does not carry fails the build with
+# ERR_MODULE_NOT_FOUND instead of failing the first container start. It opens SQLite, because
+# @agentforge/db does at import, so the data dir is a throwaway one that this layer discards.
+RUN cd apps/web \
+ && AGENTFORGE_DATA_DIR="$(mktemp -d)" ./node_modules/.bin/tsx -e \
+    "import('@agentforge/host/http').then((m) => { console.log('host loads from the production tree:', Object.keys(m).length, 'exports'); process.exit(0); }, (e) => { console.error(e); process.exit(1); })"
 
 # ---------------------------------------------------------------------------
 # runtime
@@ -93,14 +157,20 @@ FROM base AS runtime
 ENV NODE_ENV=production \
     PORT=3000 \
     AGENTFORGE_DATA_DIR=/data \
-    AGENTFORGE_COMPONENTS_DIR=/opt/agentforge/components
+    AGENTFORGE_COMPONENTS_DIR=/opt/agentforge/components \
+    AGENTFORGE_SANDBOX_DIR=/app/sandbox
 
 WORKDIR /app
 
-# Copy the built workspace wholesale. node_modules is kept (dev deps included) because
-# tsx is a devDependency of @agentforge/web and IS the production entrypoint;
-# `pnpm prune --prod` would delete it. Trimming that is a migration-plan item.
-COPY --from=build --chown=node:node /app /app
+# Copy the production tree wholesale: the workspace source, node_modules with production
+# dependencies only (tsx is one, and is the entrypoint), and the built renderer.
+COPY --from=prod --chown=node:node /app /app
+
+# Code sandbox runtime (see the build stage). Root-owned and not writable by anyone, so the `node` user
+# that runs the host can read it (the sandbox child gets --allow-fs-read=$AGENTFORGE_SANDBOX_DIR) but
+# cannot change a byte of it; compose also mounts the root filesystem read-only.
+COPY --from=build --chown=root:root /opt/sandbox-runtime /app/sandbox
+RUN chmod -R a-w /app/sandbox
 
 RUN mkdir -p /data && chown -R node:node /data
 VOLUME ["/data"]

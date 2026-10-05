@@ -7,6 +7,24 @@ import { mediaKind } from "../models/media-kind";
  * call never reached the gateway. Keeping the file stays in the host.
  */
 
+/**
+ * The five skills of the Images mode, read by `harness/modes/images.ts`. Three are wired here
+ * (`new`): the brief, the frame chosen from the sentence, and the one retry. Making the still (and
+ * keeping it in the gallery) and the cost line plus Enhance stay as they were (`has`). The retry
+ * runs inline in `runImageSkills`, not through `runChecked`, so the spec's `repairRounds` stays 0.
+ * `generate-still` carries what "keep the gallery" used to name: the picture is kept with the
+ * sentence they typed.
+ */
+export const IMAGES_HARNESS_SKILLS = [
+  { id: "write-brief", name: "Write the brief", status: "new" },
+  { id: "choose-frame", name: "Choose the frame", status: "new" },
+  { id: "generate-still", name: "Make one still and keep it", status: "has" },
+  { id: "retry-unsent", name: "Try once if the call never left", status: "new" },
+  { id: "estimate-and-tighten", name: "Estimate the cost and tighten the prompt", status: "has" },
+] as const;
+
+export type ImagesHarnessSkillId = (typeof IMAGES_HARNESS_SKILLS)[number]["id"];
+
 export type ImageAspect = "square" | "landscape" | "portrait";
 
 export type ImageSkillAttempt = {

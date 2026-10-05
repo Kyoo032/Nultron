@@ -1,0 +1,106 @@
+/* The desk buddy in the rail (`components/desk-buddy.tsx`).
+
+   The dock is the empty end of the rail's list: it takes only the room the last row leaves over and none
+   when the list scrolls (`flex: 1 1 0` with no minimum), so it can never push a row. What it holds is
+   clipped to the room it measured. The picture is the mascot's own (`components/nultron/nultron.css`);
+   this file places it, and leans it toward the pointer with the same transform the hero uses. */
+
+.desk-buddy-dock {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.desk-buddy {
+  position: relative;
+  flex: none;
+  pointer-events: auto;
+}
+
+.desk-buddy-tap {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 24px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.desk-buddy-tap:focus-visible,
+.desk-buddy-chip:focus-visible,
+.desk-buddy-min:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* `--px` / `--py` (-1..1) are written on the buddy by `useBuddyLean`: absent, so 0, on touch, under
+   reduced motion and while the window is paused. Transform only. */
+.desk-buddy .chat-mascot .nx-art {
+  translate: calc(var(--px, 0) * 3px) calc(var(--py, 0) * 2px);
+  transition: translate var(--motion-2) var(--ease-out);
+}
+
+/* A soft contact shadow under the feet: static, no filter, no animation. */
+.desk-buddy::after {
+  content: "";
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  bottom: 8%;
+  height: 7%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--rail-text) 16%, transparent), transparent);
+  pointer-events: none;
+}
+
+/* Make it smaller: a quiet control in the corner, there when the buddy is hovered or focused. */
+.desk-buddy-min {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--rail-line);
+  border-radius: 50%;
+  background: var(--rail);
+  color: var(--rail-text-2);
+  opacity: 0;
+  transition: opacity var(--motion-2) var(--ease-out);
+  cursor: pointer;
+}
+
+.desk-buddy:hover .desk-buddy-min,
+.desk-buddy:focus-within .desk-buddy-min {
+  opacity: 1;
+}
+
+.desk-buddy-min:hover {
+  background: var(--rail-hover);
+  color: var(--rail-active-text);
+}
+
+/* The footer chip: a head in the row of the other two controls, the same 32 px square. */
+.desk-buddy-chip {
+  overflow: hidden;
+  padding: 0;
+}
+
+.desk-buddy-chip .chat-mascot.nx-root {
+  width: 100%;
+  height: 100%;
+}
+
+@media (hover: none) {
+  .desk-buddy-min {
+    opacity: 1;
+  }
+}

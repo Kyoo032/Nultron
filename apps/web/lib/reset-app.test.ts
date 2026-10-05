@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { parseCancelResetResult, parseResetResult, RESET_CONFIRM_WORD, RESET_SCOPES } from "./reset-app";
+import { RESET_CONFIRM_WORD as CORE_RESET_WORD, TENANT_ERASE_CONFIRM_WORD } from "@agentforge/core";
+import {
+  ERASE_ACCOUNT_CONFIRM_WORD,
+  parseCancelResetResult,
+  parseResetResult,
+  RESET_CONFIRM_WORD,
+  RESET_SCOPES,
+} from "./reset-app";
 
 const gateway = {
   status: "needs_key",
@@ -89,6 +96,53 @@ describe("parseResetResult", () => {
     expect(parseResetResult(200, { ok: true, scope: "all", relaunch: true }, "all").resetPending).toBe(false);
     expect(parseResetResult(200, { ok: true, scope: "all", resetPending: "yes" }, "all").resetPending).toBe(false);
     expect(parseResetResult(500, { resetPending: true }, "all").resetPending).toBe(true);
+  });
+
+  it("reads the host's error code beside its message, so the card can use its own words for it", () => {
+    const refused = parseResetResult(
+      403,
+      { error: { code: "tenant_reset_forbidden", message: "Only an owner of this account can erase it." } },
+      "tenant",
+    );
+    expect(refused).toMatchObject({ ok: false, code: "tenant_reset_forbidden" });
+    expect(parseResetResult(403, { error: "nope" }, "tenant").code).toBeUndefined();
+  });
+
+  it("leaves a desk's refusal exactly the shape it always had: no code, whatever the host sent", () => {
+    // The company erase is the only reset with words of its own for a refusal (owner rule 2026-10-01:
+    // change the hosted version only), so Start over and Sign out of the gateway never see the field.
+    for (const scope of ["key", "all"] as const) {
+      const refused = parseResetResult(400, { error: { code: "invalid_request", message: "nope" } }, scope);
+      expect(refused).toEqual({
+        ok: false,
+        scope,
+        relaunch: false,
+        resetPending: false,
+        gateway: null,
+        error: "nope",
+      });
+      expect(refused).not.toHaveProperty("code");
+    }
+  });
+
+  it("reads a company erase that signed the caller out", () => {
+    const erased = parseResetResult(
+      200,
+      { ok: true, scope: "tenant", relaunch: false, resetPending: false, signedOut: true, bytesFreed: 512 },
+      "tenant",
+    );
+    expect(erased).toMatchObject({ ok: true, scope: "tenant", signedOut: true, bytesFreed: 512 });
+    // Anything but an explicit true is not a sign-out the renderer may act on.
+    expect(parseResetResult(200, { ok: true, scope: "tenant", signedOut: "yes" }, "tenant").signedOut).toBeUndefined();
+  });
+
+  it("keeps both confirm words in step with the host's", () => {
+    // The renderer keeps its own copies (the core barrel is Node-only), so this is the only thing
+    // that stops the box and the check drifting apart.
+    expect(RESET_CONFIRM_WORD).toBe(CORE_RESET_WORD);
+    expect(ERASE_ACCOUNT_CONFIRM_WORD).toBe(TENANT_ERASE_CONFIRM_WORD);
+    // And the company erase does not ask for the lighter word the desk uses.
+    expect(ERASE_ACCOUNT_CONFIRM_WORD).not.toBe(RESET_CONFIRM_WORD);
   });
 
   it("ships the literal confirm word and all three scopes", () => {

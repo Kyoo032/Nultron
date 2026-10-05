@@ -1,4 +1,5 @@
 import type { AppLocale } from "../locale";
+import { FIGURE_NOT_SAID } from "./ground";
 import { NEEDS_OWNER, type MeetingMinutes } from "./minutes";
 
 const SHAPE = `{
@@ -12,7 +13,7 @@ const SHAPE = `{
   "openQuestions": [string]
 }`;
 
-export const MEETING_MINUTES_SYSTEM = `You write minutes of meeting for DPSBuddy from a transcript.
+export const MEETING_MINUTES_SYSTEM = `You write minutes of meeting for Nultron from a transcript.
 Return ONLY valid JSON (no markdown fences, no commentary) with this exact shape:
 ${SHAPE}
 Rules:
@@ -26,13 +27,14 @@ Rules:
 - A transcript is speech: fix obvious mis-hearings of a word only when the meaning is unambiguous, and never "fix" a name or a figure.
 - No filler. No "the team will follow up". No campus / student / course nouns unless the meeting itself used them.`;
 
-export const MEETING_TRANSLATE_SYSTEM = `You translate minutes of meeting for DPSBuddy.
+export const MEETING_TRANSLATE_SYSTEM = `You translate minutes of meeting for Nultron.
 Return ONLY valid JSON (no markdown fences, no commentary) with the exact same shape you were given:
 ${SHAPE}
 Rules:
 - Translate every human-readable value. Keep the JSON keys in English, and keep the boolean as a boolean.
 - Keep people's names, company names, product names, figures, currencies, dates, and identifiers exactly as they are. Do not localise a name.
 - Keep "${NEEDS_OWNER}" exactly as it is — it is a marker, not a person.
+- Keep "${FIGURE_NOT_SAID}" exactly as it is — it is a marker, not a number.
 - Keep the same number of items in every list, in the same order. Do not merge, drop, add, or re-order.
 - Translate meaning, not word by word. The result must read as though it was written in the target language by the person who ran the meeting.`;
 

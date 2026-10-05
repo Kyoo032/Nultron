@@ -1,5 +1,7 @@
-// MUST stay first: it sets AGENTFORGE_APPLY_PENDING_RESET before @agentforge/host (and through it
-// @agentforge/db) is evaluated, which is when a queued "Start over" wipe is applied. See server-env.ts.
+// MUST stay first. It refuses a hosted process with a bad environment, and only then sets
+// AGENTFORGE_APPLY_PENDING_RESET, both before @agentforge/host (and through it @agentforge/db) is
+// evaluated — which is when the data dir is created, a queued "Start over" wipe is applied and
+// SQLite is opened and migrated. See server-env.ts and SR-25.
 import "./server-env";
 import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
@@ -8,7 +10,6 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isServerMode } from "@agentforge/core";
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import { handleNodeRequest } from "@agentforge/host/http";
 import { resolveBindHost } from "./lib/bind-host";
 import { assertHostedEnvComplete, assertHostedModeCoherent } from "./server/hosted-mode-guard";
@@ -47,6 +48,12 @@ function hostedShell(html: string): string {
 }
 
 async function main() {
+  // Both guards already ran from ./server-env, before the host and the database were imported, so a
+  // refused boot writes nothing (SR-25). They run again here for two reasons: `@agentforge/db` has
+  // loaded `.env` / `.env.local` by now, which ./server-env deliberately does not read, and this
+  // call is the one that prints the non-fatal warnings (./server-env mutes them so each appears
+  // once). On a correctly configured process this is a second, silent pass.
+  //
   // A production build with AGENTFORGE_SERVER off would serve every GET /api/v1/* without a
   // session while the health check still passed, so it refuses to boot instead. See
   // ./server/hosted-mode-guard.
@@ -101,6 +108,10 @@ async function main() {
       res.sendFile(indexFile);
     });
   } else {
+    // Loaded here and not at the top: `vite` is a devDependency and the hosted image installs
+    // production dependencies only (webapp-deploy/Dockerfile), so a static import would stop the
+    // production server from booting. Only webdev and the desktop dev run reach this branch.
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       configFile: path.join(dir, "vite.config.ts"),
       server: { middlewareMode: true, hmr: { server } },

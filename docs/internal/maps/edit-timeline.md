@@ -1,6 +1,7 @@
 # Map — Edit timeline and agent
 
-Last verified: 2026-09-27 for the preview transport and the timeline hint, which read `edit.preview.*` and `edit.timeline.*`. Before that, 2026-09-27 for agent cards: `applyAgentOps` sets `status: "applied"` after `appendOps` succeeds, and the card offers Keep only while `proposed`. A new project name comes from `edit.defaultProjectName` (`Untitled edit` / `Suntingan baru`). Before that: 2026-09-26 for § 8 (live bindings, chat model, tool-result frames, title defaults, stub "says Hello"). Before that: 2026-09-23 at d4561b8 + uncommitted tree for § 2 (doctor), § 4 (the `appendOps` steps, desk and job
+Last verified: 2026-10-05, the #130 branch merged with `origin/main` at `7354a6b`, for § 8's harness paragraph and for every `agent-run.ts` citation on this page, which moved when the harness block went in front of the stub branch (+2 lines in the header, +23 in `runEditAgent`). The Edit spec now owns the five skills (`packages/core/src/harness/modes/edit.ts`, declared in `packages/core/src/edit/harness.ts`), and a cancelled turn makes no harness tool call. Read against the merged code and the unit tests (`harness-run.test.ts`); not driven in a browser. Before that, 2026-09-28 for the five method-free skills in § 8 (`packages/core/src/edit/harness.ts`, `packages/host/src/edit/harness-run.ts`). Before that, 2026-10-02 (working tree on top of 0b61a29), a later pass that day, for § 5 (the echo and `foldApplied`), the `commitOps` / import / agent-stream passages in § 6, § 7 and § 8, the `applyOp` row of the failure table, and the first Gotchas entry: the renderer now folds each host frame once, by seq, outside any state updater, so the echoed op no longer unmounts the studio. Proven by `apps/web/lib/edit-client.test.ts` and by replaying frames captured from the live host on `:3000` (a throwaway project with an import and a split, in both arrival orders); not driven in a browser. Earlier the same day: the Edit agent's ffmpeg prompt line in § 2 (on the hosted server it no longer names the server's platform, install command or environment variable; the paragraph that listed it as the one uncovered reader of the hint is rewritten) and the `compactPrompt` / `editAgentModelId` citations in the live-path paragraph, which moved. Proven by unit tests with a Personal-parity case that was mutation-checked; not driven in a browser. Before that: 2026-10-01 (working tree on top of 0b61a29), a final pass that day, for the other hosted no-key doors in § 8 and the failure table (`Go` on a plan card, the recipe buttons and the Generate tab's submit are quiet and say why, and `sendAgent` refuses while the key is missing) and for the hosted doctor answer in § 1 and § 2 (it no longer carries `setup`). Proven by unit tests, each with a Personal-parity case that was mutation-checked; **not driven in a browser**. The citations in the passages that pass touched were re-anchored; every other `edit-studio.tsx` citation below `:450` was not re-read and may sit a few lines off after other lanes' edits. Before that, a later pass that day, for the Enterprise no-key states in § 1, § 8 and the failure table (the Agent pane's `edit-agent-needs-key` note and quiet `edit-composer-send`, the hosted one-line `edit-needs-ffmpeg`) and the testid citations into `edit-agent-panel.tsx` and `ffmpeg-setup-notice.tsx`, which moved. The hosted states are driven on `:3000` with the hosted marker and the host's answers faked in the browser (`page.route`, every non-GET aborted), not on a deployed hosted build. Before that, 2026-10-01 (working tree on top of 0b61a29) for § 1's empty-state paragraph, the Gotchas lines about it, and every `edit-studio.tsx` citation that points at or past the `!project` branch (`:715`) or that this pass re-read (the testid list at the foot included): the empty state moved out of `edit-studio.tsx` into `edit-empty-state.tsx`, so everything after it shifted up by 53 lines. Read against the files and driven read-only on `:3000` at 390, 768, 1024, 1100 and 1440 px (which element scrolls, below). Before that, 2026-09-29 for § 2 (doctor), in the working tree and not committed: the doctor route and the boot probe are
+async and cached, and the packaged app no longer waits on the probe before the first paint. Before that, 2026-09-27 for the preview transport and the timeline hint, which read `edit.preview.*` and `edit.timeline.*`. Before that, 2026-09-27 for agent cards: `applyAgentOps` sets `status: "applied"` after `appendOps` succeeds, and the card offers Keep only while `proposed`. A new project name comes from `edit.defaultProjectName` (`Untitled edit` / `Suntingan baru`). Before that: 2026-09-26 for § 8 (live bindings, chat model, tool-result frames, title defaults, stub "says Hello"). Before that: 2026-09-23 at d4561b8 + uncommitted tree for § 2 (doctor), § 4 (the `appendOps` steps, desk and job
 scope), § 6 (keyboard guard, drag release), § 10 (review gate, and `render` refused on `/jobs`), § 11 (generate,
 the worker's tenant, the still check), § 12 (export, the desktop save dialog) and the gateway-gate failure row —
 two passes that day, the Edit security fixes and the docs pass that reconciled them. Not driven. Everything else
@@ -17,7 +18,7 @@ key at all.
 
 Three things to hold onto. **The document is the fold, not the state** — `POST /ops` appends, the
 server folds and snapshots, and the renderer keeps its own optimistic copy. **The project event stream
-echoes your own ops back to you**, which is where the current crashes come from. And **the review gate
+echoes your own ops back to you**, which is why the renderer applies each op by seq and once (§ 5). And **the review gate
 is a pair of integers** (`lastAgentSeq` vs `ackSeq`) — nothing more — which is why it opens and closes
 in ways that look surprising.
 
@@ -26,8 +27,8 @@ in ways that look surprising.
 ### 1. Rail → `/edit` → shell
 
 `mode-edit` is an ordinary work-mode rail tab (`mode-${href.slice(1)}`), present on Default since
-0.14.22. The route renders `EditStudio` (`apps/web/components/edit-studio.tsx:62`), which mounts as
-`data-testid="edit-studio"` (`:630`).
+0.14.22. The route renders `EditStudio` (`apps/web/components/edit-studio.tsx:70`), which mounts as
+`data-testid="edit-studio"` (`:653`).
 
 On mount it fires four independent reads (`apps/web/components/edit-studio.tsx:129-163`):
 
@@ -38,30 +39,75 @@ On mount it fires four independent reads (`apps/web/components/edit-studio.tsx:1
 | `GET /api/v1/settings` | `hasOpenai` → `edit-needs-key`; `editTurnCapUsd` → the turn meter |
 | `GET /api/v1/videos` and `GET /api/v1/images` | the model catalogs for the Generate tab |
 
-With no project open the studio renders a **placeholder** layout: `edit-project-list` on the left, an
-empty `edit-preview` div and an empty `edit-timeline` div (`:735-736`), and an `edit-agent-panel`
-holding only `t("edit.openProjectHint")` (`:738-740`). `edit-composer`, `edit-import`,
+With no project open the studio renders `EditEmptyState` (`apps/web/components/edit-empty-state.tsx`,
+mounted at `edit-studio.tsx:715-724`): `edit-project-list` (`:46`), an empty `edit-preview` div (`:101`) and an
+empty `edit-timeline` div (`:106`), and an `edit-agent-panel` (`:112`) holding only
+`t("edit.openProjectHint")` (`:116`). The layout answers to the **pane's width, not the window's**: the
+state's root is a size container (`[container-type:inline-size]`, `:42`) and every testid is the same in
+all three layouts, count 1 each. Under 40rem (a pane under 640 px) it is one column in the order list,
+preview, timeline, agent, and the root is the scroller (`overflow-y-auto`, `:42`); `edit-project-list`
+is then as tall as its content and does not scroll by itself. From 40rem the row beside it is
+`min-h-0 flex-1` (`:43`), `edit-project-list` takes what is left (`min-w-0 flex-1`, `:45`) and is the
+scroller, and the other three stack in one 16rem column (`w-64`, `overflow-y-auto`, `:97`). From 64rem the
+right side is a row: a 20rem column (`w-80`, `:98`) with `edit-preview` over `edit-timeline`, then the
+17.5rem agent panel (`w-[280px]`, `:111`), and `edit-project-list` is the only scroller again. Measured
+on `:3000` with a long project list: pane 306 px (390 viewport) and 520 px (768): root scrolls; 776 px
+(1024), 852 px (1100) and 1192 px (1440): the list scrolls. `edit-composer`, `edit-import`,
 `edit-generate-tab` and `edit-ops-count` do **not** exist in this state. `edit-export` exists but is
-disabled, because `!project` is the first term of its `disabled` expression (`:659`).
+disabled, because `!project` is the first term of its `disabled` expression (`edit-studio.tsx:684`).
 
-`FfmpegSetupNotice` (`apps/web/components/ffmpeg-setup-notice.tsx:30`) renders **nothing** unless
-`doctor.ffmpeg.found === false` (`:35-37`); when it does render it is `edit-needs-ffmpeg` (`:65`)
+`FfmpegSetupNotice` (`apps/web/components/ffmpeg-setup-notice.tsx:38`) renders **nothing** unless
+`doctor.ffmpeg.found === false` (`:43`); when it does render it is `edit-needs-ffmpeg` (`:78`)
 with `ffmpeg-install-command` and a `ffmpeg-recheck` button that re-probes via
-`GET /api/v1/edit/doctor?recheck=1`.
+`GET /api/v1/edit/doctor?recheck=1`. **On the hosted build** (`isHostedBuild()`, `:46`) it is the same
+`edit-needs-ffmpeg` element holding one calm line (`edit.ffmpeg.hostedUnavailable`) and nothing else: no
+command, no Copy, no re-check, no install link, because a tenant cannot install anything on the server.
+The hosted host agrees with that screen: its doctor answer carries no `setup` hint at all (§ 2), so the
+notice has nothing to read there even if it wanted to. Where it does draw the guide it reads
+`setup?.installCommand` and `setup?.summary` with generic fallback words (`ffmpeg-setup-notice.tsx:53-55`),
+so a desk talking to a host that sent none (an older one) still renders and does not throw.
+The onboarding key step does not offer the guide on hosted either (`onboarding-screen.tsx:116`).
 
 ### 2. Doctor — ffmpeg and ASR
 
-`handleGetEditDoctor` (`packages/host/src/handlers/edit.ts:110-115`) → `getEditDoctor`
-(`packages/host/src/edit/doctor.ts:55-72`). It returns `{ ffmpeg, asr, fonts }`. `recheck=1` drops the
+`handleGetEditDoctor` (`packages/host/src/handlers/edit.ts:110-122`) → `getEditDoctorAsync`
+(`packages/host/src/edit/doctor.ts:90-96`). It returns `{ ffmpeg, asr, fonts }`. `recheck=1` drops the
 cached probe (`resetFfmpegBinaryCache`) but is throttled to one forced re-probe every
-`RECHECK_MIN_INTERVAL_MS = 2_000` (`doctor.ts:47, :56-59`), because each probe shells out to ffmpeg
-and the caller is a local web page. When ffmpeg is missing the report also carries a per-OS
-`setup` hint (`ffmpegSetupHint`, `doctor.ts:67`).
+`RECHECK_MIN_INTERVAL_MS = 2_000` (`doctor.ts:47, :55-60`), because each probe walks PATH and runs
+ffmpeg and the caller is a local web page. When ffmpeg is missing the report also carries a per-OS
+`setup` hint (`ffmpegSetupHint`, `doctor.ts:89`) — on a desk; the hosted answer drops it, below.
 
-On the hosted server the handler answers `withoutBinaryPath(report)` instead (`handlers/edit.ts:114`,
-`doctor.ts:36-39`): `ffmpeg.path`, the absolute path of the server's own binary, is dropped, and
-`found`, `version`, `reason` and `setup` stay. Nothing in `apps/web` reads the path; the desk still
-gets it.
+The probe itself is `resolveFfmpegAsync` (`packages/host/src/edit/ffmpeg-binary.ts:340`): `execFile`, so a
+cold PATH walk (`where.exe`, ~200 ms) plus `ffmpeg -version` no longer freezes the host for ~290 ms
+(measured 292 ms blocked before, ≤ 16 ms, one timer tick, after). Sync callers (`getEditDoctor`,
+`doctor.ts:81`, used by the Edit agent's prompt line; `run.ts`, `recipes.ts`, `starter-media.ts`,
+`meeting/audio.ts`) keep `resolveFfmpeg` (`:331`) and read the same cache. The cache is per process,
+keyed on the configured `AGENTFORGE_FFMPEG_PATH` / `AGENTFORGE_FFPROBE_PATH` (`:42-47`), shared by two
+callers that arrive during one walk (`resolveCachedAsync`, `:310`), and dropped by
+`resetFfmpegBinaryCache` (`:54`) — the Check-again route above is its one production caller; the
+component installer has no ffmpeg entry yet (`components/manifest.ts`).
+
+**Packaged boot.** `bootstrapPackaged` (`apps/desktop/main.cjs:641`) writes `host-status.json` without
+`editFfmpeg`, awaits `navigateToUi()`, and only then starts `recordEditFfmpeg` (`:700`), which asks this
+route once (warming the cache) and writes the file again with the block. Before 2026-09-29 the probe was
+awaited ahead of the first paint (269-302 ms of the ~290-320 ms between the host answering and the
+window loading the UI). An absent `editFfmpeg` key therefore means "not probed yet"; `null` means the
+host could not say. `doctor.mjs --desktop` waits up to 3 s for the key.
+
+On the hosted server the handler answers `withoutBinaryPath(report)` instead (`handlers/edit.ts:117`,
+`doctor.ts:42-45`): `ffmpeg.path`, the absolute path of the server's own binary, and `ffmpeg.setup`, the
+server's platform, the command that installs ffmpeg on it and the environment variable that points at a
+custom build, are dropped; `found`, `version` and `reason` stay. Nothing in `apps/web` reads the path,
+and the hosted banner never reads the hint (§ 1): both described the operator's machine, which a tenant
+cannot act on. The desk still gets both (`doctor-hosted.test.ts` holds each half, and pins the desk's
+whole hint). The other reader of the hint is the Edit agent's prompt line (`ffmpegPromptLine`,
+`agent-run.ts:122-140`), which calls `getEditDoctor()` directly, not through `withoutBinaryPath`. Until 2026-10-02 it
+still told the model the server's platform and install command (and to have the owner "run it in a terminal, then press
+Check again"), and the model could repeat that in chat. On the hosted server a missing ffmpeg is now one neutral
+sentence (the video tools are not set up on this server yet, an administrator turns them on, there is nothing to
+install; do not queue ffmpeg jobs), chosen by `isServerMode()`; with ffmpeg present the line is what it always was, and on
+a desk the whole hint is still in the prompt. Pinned by `packages/host/src/edit/agent-prompt-hosted.test.ts`, which also
+reads the prompt as the model gets it (`compactPrompt`, now exported).
 
 `.cursor/skills/verify-agentforge/scripts/doctor.mjs` folds this endpoint into its own JSON as `edit`. A missing endpoint is a note,
 not a doctor failure.
@@ -106,7 +152,7 @@ Everything that changes a project goes through `appendOps` (`packages/host/src/e
 
 `foldProject(projectId, workspaceId)` is also the **tenant check**: every handler calls it first, so a
 project id from another desk 404s before anything else runs (see the comments at
-`packages/host/src/handlers/edit.ts:184`, `:419`, `:460`).
+`packages/host/src/handlers/edit.ts:191`, `:419`, `:460`).
 
 Since Phase 3 lane A that is enforced rather than assumed. `workspaceId` is a **required** argument on
 `loadProjectRow` (`ops.ts:76`), `foldProject` (`:208`) and `appendOps` (via `AppendOpsOptions`, `:31`),
@@ -131,24 +177,32 @@ auditable; `edit-scope.test.ts` fails if a handler ever imports one.
 ### 5. The renderer's copy, and the echo
 
 `EditStudio` opens `GET /api/v1/edit/projects/:id/events` as an SSE stream whenever a project id is set
-(`apps/web/components/edit-studio.tsx:166-233`). The stream is a plain fan-out of the host event bus
+(`apps/web/components/edit-studio.tsx:223-290`). The stream is a plain fan-out of the host event bus
 filtered by project id (`packages/host/src/edit/events.ts:21-31`; handler at
-`packages/host/src/handlers/edit.ts:330-364`, which folds the project first so the desk check happens
+`packages/host/src/handlers/edit.ts:337-371`, which folds the project first so the desk check happens
 before the first frame).
 
-The renderer reacts to four frame families (`edit-studio.tsx:193-232`):
+The renderer reacts to four frame families (`edit-studio.tsx:248-285`):
 
 | Frame | Effect |
 |---|---|
-| `ops.appended` / `edit.ops` | `setProject((current) => foldApplied(current, ops))` |
+| `ops.appended` / `edit.ops` | `foldFrame(ops)` (`edit-studio.tsx:169`): `foldApplied(projectRef.current, ops)`, then `putProject`; a `diverged` answer reloads the project |
 | `card.updated` / `edit.card` | upsert into `cards`, release the emit lock |
 | `job.progress` / `job.done` / `edit.job` | replace the job row |
 | `tool.started` | arm the emit lock unless the tool is a job-backed one |
 
-**The host does not filter your own ops out of this stream**, and the renderer does not dedupe by op
-id. Every op therefore reaches the renderer twice: once from the request that caused it, once from the
-stream. Whether that is harmless depends entirely on *how* the second copy is applied — see
-`Failure modes` and `Gotchas`.
+**The host does not filter your own ops out of this stream.** Every op therefore reaches the renderer
+twice: once from the request that caused it (the `/ops` response's `applied`, an import's `op`, the agent
+turn's `edit.ops` frame), once from the stream. The renderer takes that as normal, by seq. `foldApplied`
+(`apps/web/lib/edit-client.ts:248`) skips any op at or below the copy's `seq` or from another project,
+requires the rest to follow `seq` with no gap, and folds them (`foldOps`, and without its whole-document
+validation if only that objects). It never throws. A frame that skips a seq, or holds an op that does not
+fit, comes back as `diverged: true` with the copy untouched (`FoldResult`, `:219`), and the studio answers by
+reloading the project from the host (`resyncProject`, `edit-studio.tsx:149`); only a failed reload shows
+`edit.errors.apply`. All of it runs in `foldFrame`, on `projectRef`, which `putProject` (`:119`) moves
+ahead of the render so two frames in one tick fold one after the other. Nothing applies an op inside a
+`setProject` updater any more: a throw there is a throw in render, and `apps/web` has no error boundary, so
+it used to unmount the whole tree.
 
 ### 6. Owner edits — keyboard, drag, `commitOps`
 
@@ -180,10 +234,13 @@ has no draft and sends nothing. **The ops are sent outside the state updater** (
 be posted from inside `setDrafts`, and React runs an updater twice under `<StrictMode>`
 (`apps/web/src/main.tsx`), so on webdev every drag posted its move or trim twice.
 
-All of them funnel into `commitOps` (`edit-studio.tsx:238-262`) → `postEditOps`
-(`apps/web/lib/edit-client.ts:238-293`), which posts `{ops, parent, clock}`, folds the server's
-`applied` into the project and bumps `opsPosted`. `opsPosted` is the number backing `edit-ops-count`
-(`edit-studio.tsx:857`) — it is a **session counter, not the ops log**, so it resets to `ops 0` on
+All of them funnel into `commitOps` (`edit-studio.tsx:292-319`) → `postEditOps`
+(`apps/web/lib/edit-client.ts:283`), which posts `{ops, parent, clock}`, folds the server's
+`applied` into the project (through `foldApplied`, so an op the stream already delivered is skipped) and bumps
+`opsPosted`. A response that does not fit the copy comes back with `diverged: true` and `commitOps` reloads
+the project; a refused op comes back with `error` (the host's 400 message), which is shown inline before the
+reload. `opsPosted` is the number backing `edit-ops-count`
+(`edit-studio.tsx:819`) — it is a **session counter, not the ops log**, so it resets to `ops 0` on
 every reload.
 
 `postEditOps` also auto-keeps any card whose clips the owner just touched
@@ -199,17 +256,19 @@ times React runs the drafts updater") and `apps/web/lib/shortcut-target.test.ts`
 
 ### 7. Import
 
-`edit-import` is the first nav button (`edit-studio.tsx:758-779`) and does two things: it selects the
-`upload` tool and calls `onImportClick` (`:309-333`).
+`edit-import` is the first nav button (`edit-studio.tsx:744-761`) and does two things: it selects the
+`upload` tool and calls `onImportClick` (`:316`).
 
 - **Packaged (Electron):** `pickMedia()` over IPC returns a path, and the renderer posts
   `{sourcePath}` as JSON. The host accepts `sourcePath` **only** when the transport header says `ipc`
-  (`packages/host/src/handlers/edit.ts:203-206`) — over HTTP it is a 400. Extension → mime is a fixed
+  (`packages/host/src/handlers/edit.ts:210-213`) — over HTTP it is a 400. Extension → mime is a fixed
   ladder at `:222-242`.
 - **Webdev:** `fileRef.current?.click()` opens the hidden `<input type="file">` (`:745-757`), and
-  `onImportFile` (`:290-307`) posts multipart to `POST /api/v1/edit/projects/:id/import`.
+  `onImportFile` (`edit-studio.tsx:350-368`) posts multipart to `POST /api/v1/edit/projects/:id/import`, then
+  folds the response's `op` through `foldFrame` (a no-op when the project stream already carried it, which is
+  the usual order: the stream's `[add_asset, add_clip]` frame arrives before the response) and reloads the project.
 
-Host side (`packages/host/src/handlers/edit.ts:194-309`):
+Host side (`packages/host/src/handlers/edit.ts:201-316`):
 
 1. `foldProject` (desk check), then `saveEditFile` (`:71-97`) — `assertEditUpload` enforces
    `EDIT_UPLOAD_MAX = 500 MB` and an allow-list of image/video/audio mimes (`:28-32`, `:600-607`),
@@ -224,30 +283,56 @@ Host side (`packages/host/src/handlers/edit.ts:194-309`):
 
 ### 8. The agent turn
 
-`edit-composer` → `edit-composer-send` → `sendAgent` (`edit-studio.tsx:426-492`) →
-`POST /api/v1/edit/projects/:id/agent` with `{text, tier}`, read as SSE. The handler
-(`packages/host/src/handlers/edit.ts:348-365`) calls `requireGatewayAllowed` **first** — a closed gate
-is a flat `403 gateway_blocked` with no stream, exactly like Chat.
+`edit-composer` → `edit-composer-send` → `sendAgent` (`edit-studio.tsx:495-568`) →
+`POST /api/v1/edit/projects/:id/agent` with `{text, tier}`, read as SSE. Its `edit.ops` / `ops.appended`
+frames go through `foldFrame` too (`:553`), after which the turn ends with a project reload. The handler
+(`packages/host/src/handlers/edit.ts:355-372`) calls `requireGatewayAllowed` **first** — a closed gate
+is a flat `403 gateway_blocked` with no stream, exactly like Chat. **On the hosted build with no usable key**
+the Agent pane says so before anything is sent: `edit-agent-needs-key` (the shared `NeedsKeyNote`,
+`edit-agent-panel.tsx:105-109`, carrying the id `edit-agent-needs-key-note`) sits above the composer and
+`edit-composer-send` is `disabled` (`:124`), from `useHostedNeedsKey()` (`edit-studio.tsx:100`) handed over
+as `needsKey` (`:856`). The hook is `false` off the hosted build, so the Personal pane renders byte for byte
+as before.
+
+**Every other door to the agent is quiet too, and `sendAgent` itself refuses.** Three more controls lead to
+the same refused call, and while `useHostedNeedsKey()` is true each is `disabled` with a `title` (the
+catalog sentence `common.needsKey.blocked`, in the desk's language, so no new copy) and an
+`aria-describedby` at the note that is on screen (`editKeyGuard`, `apps/web/lib/edit-key-guard.ts`):
+`edit-plan-go` (`edit-cards.tsx:93-95`, `needsKey` handed down by the panel, `edit-agent-panel.tsx:100`),
+every `edit-recipe-<id>` (`edit-recipes-panel.tsx:28-30`, dimmed too, `needsKey` from the studio,
+`edit-studio.tsx:793-795`), and the Generate tab's `edit-generate-submit` (`edit-generate-tab.tsx:289-291`),
+which was already disabled for a missing key on both products, so what hosted adds is the reason: the
+tab's own note `edit-needs-key` gets the id `edit-generate-needs-key-note` (`:205-206`) and the prompt box
+is described by it but stays editable, as the composer does. The Generate tab never touched the agent: its
+`onAgentPrompt` prop is declared and unused (`edit-studio.tsx:790` still passes it), and its submit posts
+`/generate`. As a backstop, `sendAgent` returns before the request when `hostedNeedsKey` is true
+(`edit-studio.tsx:454`), so a stale click or a door added later cannot make the call. Every one of these
+is `{}` / `false` off the hosted build (`useHostedNeedsKey`, `hostedKeyBlock`), and the Personal markup
+is pinned byte for byte in `apps/web/lib/edit-hosted-needs-key.test.tsx`. A turn that is refused anyway
+(a stale key flag on a verdict that has since changed) sets the catalog sentence
+`common.needsKey.blocked`, which the studio does not print as the red banner (`edit-studio.tsx:721`)
+because the note already says it.
 
 `runEditAgent` (`packages/host/src/edit/agent-run.ts`) builds a per-turn budget from
 `settings.editTurnCapUsd` and picks a path:
 
 - **Live** (a key is saved): `createRuntime(settings).execute(...)` with a compact project prompt
-  (`compactPrompt`, `packages/host/src/edit/agent-run.ts:116-128`) that tells the model a title card
-  is an `add_title` call in this turn. The version model is `editAgentModelId()` (`:132-138`), the
+  (`compactPrompt`, `packages/host/src/edit/agent-run.ts:142-154`) that tells the model a title card
+  is an `add_title` call in this turn. The version model is `editAgentModelId()` (`:157-163`), the
   refreshed chat default — never the literal `"edit"`. `bindings` is `editAgentBindings`
   (`packages/core/src/tools/edit/bindings.ts:5-13`), every `EDIT_TOOLS` key enabled. An empty binding
   list is what left the timeline blank: the runtime only exposes tools from bindings
-  (`packages/core/src/runtime/ai-sdk-runtime.ts:413-427`), so a model with `bindings: []` can only
+  (`packages/core/src/runtime/ai-sdk-runtime.ts:430-444`), so a model with `bindings: []` can only
   talk. `onEvent` forwards `tool.completed` output that carries `ops` / `card` / `job` as
-  `edit.ops` / `edit.card` / `edit.job` (`pushToolFrames`, `agent-run.ts:163-167`, called at `:226`).
+  `edit.ops` / `edit.card` / `edit.job` (`pushToolFrames`, `agent-run.ts:188-192`, called at `:276`).
+- **Harness** (a method-free sentence, live or stub): before either of those paths (`agent-run.ts:227-249`), `matchEditHarnessSkill` (`packages/core/src/edit/harness.ts`) picks one of five skills when the sentence is not already S1–S11, F1–F5, or a `generate image` / `generate video` line. The five are the Edit spec's skills: `editHarnessSpec` (`packages/core/src/harness/modes/edit.ts`) reads `EDIT_HARNESS_SKILLS`, declared beside the checks in `edit/harness.ts`, so `MODE_HARNESSES` lists them as `new` and the spec's `repairRounds` stays 0, because each retry below is inline and not a `runChecked` round. `runEditHarness` (`packages/host/src/edit/harness-run.ts`, called from `agent-run.ts`) runs only the phases that skill needs, and every tool call goes through its `invoke`, which first checks the request's abort signal: a cancelled turn makes no call, starts no job, and ends the stream without a `run.failed` (`runEditAgent`'s catch, `:287-292`), the same rule as the live path. Silence and scene probes call local ffmpeg when the clip has an asset and the runtime is live; the stub uses clip duration instead, and retries the probe once when the first pass is empty. Words are checked on the fold and retried once if they did not land. A made shot is charged against the turn cap (over cap proposes a plan and does not retry) and the prompt goes through `withOutputLanguage` on the `edit` surface. Handing back the file checks the review gate (closed stops, no retry) and queues `export` at `h264-1080p`, retrying the start once. Every mutation is still an append to the ops log. No new control on the Edit screen.
 - **Stub** (no key — the state on this desk): `runStub` matches the text against
   `STUB_EDIT_SCENARIOS` (`packages/core/src/runtime/stub-edit-scenarios.ts`), then a title-card
   fallback (`extractTitleCardText`, same file) so "Add a title card that says Hello" is `add_title`
   with `{ text: "Hello" }`, then the Fill and Generate scenario tables, and drives the **real tools**
   with canned arguments. It is scripted input, not a scripted result.
 
-`runStub`'s shape, in order (`agent-run.ts:248`):
+`runStub`'s shape, in order (`agent-run.ts:302`):
 
 1. No match → `assistant.delta` with the scripted help copy, `run.completed`. No card.
 2. `__undo__` (S10) → scripted undo copy only. **No card, no ops** — the owner still has to press
@@ -257,7 +342,7 @@ is a flat `403 gateway_blocked` with no stream, exactly like Chat.
 5. A generation tool → estimate, `chargeTurnBudget`; over cap → a refusal plus an `edit.plan` card.
 6. Otherwise: fill in missing ids from the doc, emit `tool.started`, invoke the tool, and
    forward whatever it returned as `edit.ops` / `edit.card` / `edit.job` frames (`pushToolFrames`,
-   `packages/host/src/edit/agent-run.ts:399`). `add_title` no longer requires a full ASS style:
+   `packages/host/src/edit/agent-run.ts:453`). `add_title` no longer requires a full ASS style:
    `{ text }` lands a clip on `v1` at frame 0 for 90 frames (`packages/core/src/tools/edit/tools.ts:265-288`).
 
 The tool's writes go through `hostEditBackend.applyAgentOps`
@@ -267,7 +352,7 @@ and write a snapshot, then emit `card.updated`. The card's `verb` is mechanical 
 (`backend.ts:51-57`) is just `ops[0].type.replaceAll("_", " ")` with the first touched clip id as the
 object. That is why an S1 "Remove the silences" turn shows a card reading **`split clip · <clip id>`**
 and not "Remove 3 silences": `stubEditCardCopy` is only used for the `assistant.delta` line
-(`agent-run.ts:400-401`), never for the card.
+(`agent-run.ts:454-455`), never for the card.
 
 ### 9. Cards — Keep, Undo, Tweak, plan
 
@@ -284,7 +369,7 @@ A card with a live job (`queued` / `running`) shows `edit-card-progress` + `edit
 | `edit-card-keep` | `POST …/cards/:cardId/keep` → `keepCard(projectId, cardId, workspaceId)` (`packages/host/src/edit/undo.ts:83-100`): strip the badge, re-snapshot, status `kept`. **No ops are written.** |
 | `edit-card-undo` | `POST …/undo {cardId}` → `undoCard(projectId, cardId, workspaceId)` (`undo.ts:41-80`): cancel the card's job if any, replay the ops log up to each of the card's ops, `computeInverse` for each, append the inverses as `actor: "owner"` with `undoOf`, status `undone` |
 | `edit-card-tweak` | client-only — serialises the card args into `edit-composer` (`edit-studio.tsx:514-517`) |
-| `edit-plan-go` | `sendAgent("Go")` (`:527-529`) |
+| `edit-plan-go` | `sendAgent("Go")` (`onPlanGo`, `edit-studio.tsx:556-558`). Hosted with no key: disabled and described by the Agent pane's note (§ 8) |
 
 Undo appends **forward** inverse ops; it never truncates the log. Because the inverses are `owner` ops,
 they do not move `lastAgentSeq`, so undoing a card does not by itself reopen the export gate.
@@ -301,9 +386,9 @@ Two integers on the project (`review: {lastAgentSeq, ackSeq}`) and one compariso
   `edit-review-ok` → `onReviewOk` (`edit-studio.tsx:544-549`), and `onScrubBucket` (`:423-437`) once
   every integer-second bucket of the timeline has been visited.
 - Closed gate → `EditCards` renders `edit-review-card` + `edit-review-ok`, and `edit-export` is
-  disabled (`edit-studio.tsx:680`).
+  disabled (`edit-studio.tsx:684`).
 - The host enforces it independently: `handlePostEditExport` answers `400 review_required` when
-  `reviewGateOpen` is false (`packages/host/src/handlers/edit.ts:519-521`).
+  `reviewGateOpen` is false (`packages/host/src/handlers/edit.ts:526-528`).
 - **The export has one door** (2026-09-23). `render` is the export's job kind, and `POST …/jobs` used to
   queue any kind it was sent, so a caller could queue a `render` there and skip both the review check
   and `/export`'s two presets. It now refuses `render` with a pointer to `/export`
@@ -313,7 +398,7 @@ Two integers on the project (`review: {lastAgentSeq, ackSeq}`) and one compariso
 
 ### 11. Generate
 
-`edit-generate-tab` opens `EditGenerateTab` (`apps/web/components/edit-generate-tab.tsx:47`), three
+`edit-generate-tab` opens `EditGenerateTab` (`apps/web/components/edit-generate-tab.tsx:49`), three
 sub-tabs: `edit-generate-image`, `edit-generate-video`, `edit-generate-storyboard`. Storyboard is a
 one-line placeholder (`:205-206`) — no prompt, no submit, no tier.
 
@@ -331,7 +416,7 @@ clears the selection (`changePrompt`, `:119-122`), which hides `edit-prompt-temp
 
 Submit posts `POST …/generate`; the handler gates on the gateway first, validates the model/still
 combination, and hands off to `startGenerateJob`
-(`packages/host/src/handlers/edit.ts:657-710` → `packages/host/src/edit/start-generate.ts:167`). A local
+(`packages/host/src/handlers/edit.ts:664-717` → `packages/host/src/edit/start-generate.ts:168`). A local
 still must be media of the caller's own organization (`assertStillAvailable`, `start-generate.ts:88-101`):
 another organization's media id is answered exactly like an unknown one, where it used to pass the check
 and so reveal that it existed ([SR-71](../security-register.md#sr-71)).
@@ -358,12 +443,12 @@ thing that populates the tray.
 
 `edit-needs-key` is driven purely by `hasOpenai` from `GET /api/v1/settings` (plus `ready === false`
 from `GET /api/v1/videos`) (`edit-studio.tsx:129-163`), and it disables `edit-generate-submit`
-(`edit-generate-tab.tsx:278`).
+(`edit-generate-tab.tsx:290`).
 
 ### 12. Export
 
 `edit-export` → `onExport` (`edit-studio.tsx:571-595`) posts `{preset: "h264-1080p"}`.
-`handlePostEditExport` (`packages/host/src/handlers/edit.ts:515-533`) checks the review gate, then enqueues
+`handlePostEditExport` (`packages/host/src/handlers/edit.ts:522-540`) checks the review gate, then enqueues
 a `render` job and answers **202** with the job row. The renderer stores the job id and watches the job
 list that arrives over the event stream; `edit-export-progress` shows while it is live and
 `edit-export-download` appears on `succeeded`, which then pulls `GET …/export/:jobId/file` and triggers a
@@ -388,13 +473,13 @@ A's `workerWorkspaceId`.
 
 | Failure | Where | What the user gets |
 |---|---|---|
-| ffmpeg missing | `resolveFfmpeg` via `getEditDoctor` | `edit-needs-ffmpeg` banner with an install command and `ffmpeg-recheck`; probe/cut/captions/export refuse |
-| No gateway key | `hasOpenai` false | `edit-needs-key` in the Generate tab, `edit-generate-submit` disabled; everything else still works |
+| ffmpeg missing | `resolveFfmpegAsync` via `getEditDoctorAsync` (sync: `resolveFfmpeg`) | `edit-needs-ffmpeg` banner with an install command and `ffmpeg-recheck`; probe/cut/captions/export refuse. Hosted: the same banner as one line with no command or button |
+| No gateway key | `hasOpenai` false | `edit-needs-key` in the Generate tab, `edit-generate-submit` disabled; everything else still works. Hosted: also `edit-agent-needs-key` in the Agent pane with `edit-composer-send`, `edit-plan-go` and every `edit-recipe-<id>` disabled and explained, and `sendAgent` refusing (§ 8) |
 | Gateway gate closed | `requireGatewayAllowedFor` on `/agent`, `/generate` and `asr` on `/jobs` (`handlers/edit.ts:401`, `:661`, `:479`); again in the generate worker (`packages/host/src/edit/jobs.ts:226`) | flat `403 gateway_blocked`, no stream; the composer surfaces `edit.errors.agentFailed`. A generate job that meets a closed gate in the worker fails with the gate's message and calls nothing |
 | Unsupported / oversized upload | `assertEditUpload` (`handlers/edit.ts:600-607`) | `400 invalid_request` / `unsupported_content_type` |
 | ffmpeg cannot read the upload | probe catch (`handlers/edit.ts:257-270`) | `400 unsupported_media`, the saved file is unlinked |
 | `sourcePath` over HTTP | `handlers/edit.ts:214-217` | `400` — IPC only |
-| Op invalid (duplicate id, split outside the clip) | `applyOp` (`packages/core/src/edit/ops.ts:342-551`) | server side: the append throws, `jsonError` → 400. **Renderer side: uncaught, the studio unmounts** — see Gotchas |
+| Op invalid (duplicate id, split outside the clip) | `applyOp` (`packages/core/src/edit/ops.ts:342-551`) | server side: the append throws, `jsonError` → 400, and `commitOps` shows the message in the red banner and reloads the project. An echoed op the copy already holds is skipped, and one that does not fit is a `diverged` reload (§ 5); the studio stays mounted |
 | Project id from another desk | `foldProject(projectId, workspaceId)` | 404 before any work |
 | Job id from another project | `jobInProject` (`handlers/edit.ts:171-177`) | 404 |
 | Export before review | `handlePostEditExport` (`:419-421`) | `400 review_required` (the button is already disabled) |
@@ -408,15 +493,16 @@ A's `workerWorkspaceId`.
 | File | Role |
 |---|---|
 | `apps/web/components/edit-studio.tsx` | The whole shell: loads, event stream, `commitOps`, import, agent, cards, export, keyboard |
+| `apps/web/components/edit-empty-state.tsx` | What `/edit` shows with no project open: the project list and three placeholders, laid out by the pane's width (one, two or three columns) |
 | `apps/web/components/edit-timeline.tsx` | Tracks, clips, playhead, drag / trim, `edit-zoom` |
 | `apps/web/components/edit-preview.tsx` | Stage, title/caption overlays, transport, the (untestid'd) scrubber |
-| `apps/web/components/edit-agent-panel.tsx` | Composer, spend meter, emit-lock line |
+| `apps/web/components/edit-agent-panel.tsx` | Composer, spend meter, emit-lock line, the hosted no-key note |
 | `apps/web/components/edit-cards.tsx` | `edit-review-card`, `edit-plan-card`, `edit-card`, the unplaced tray |
 | `apps/web/components/edit-generate-tab.tsx` | Image / Video / Storyboard, model routing, seconds snap, estimate |
 | `apps/web/components/edit-prompt-templates.tsx` | The 19 cited templates, category filter, `edit-prompt-guide` |
 | `apps/web/components/edit-recipes-panel.tsx` | `edit-recipe-<id>` buttons (no wrapper testid) |
 | `apps/web/components/ffmpeg-setup-notice.tsx` | `edit-needs-ffmpeg` banner and its re-probe |
-| `apps/web/lib/edit-client.ts` | `postEditOps`, `foldApplied`, `isReviewOpen`, `turnSpendUsd`, the API wrappers |
+| `apps/web/lib/edit-client.ts` | `postEditOps`, `foldApplied` (by seq, never throws, `FoldResult`), `isReviewOpen`, `turnSpendUsd`, the API wrappers |
 | `apps/web/lib/shortcut-target.ts` | `isInHiddenPane`, `isEditShortcutIgnored`: whether a window-level shortcut belongs to the page on screen and to the focused element |
 | `packages/host/src/edit/metrics.ts` | Per-tenant Edit metrics: `appendEditMetric` stamps tenant and organization off the project, `foldEditMetrics` reads back only the caller's |
 | `apps/web/lib/edit-badges.ts` | Which cards an owner touch auto-keeps |
@@ -446,35 +532,37 @@ A's `workerWorkspaceId`.
 ## Gotchas
 
 - **An agent turn leaves a usage row against its tenant.** `rememberJobUsage`
-  (`packages/host/src/edit/agent-run.ts:182`, and `:360` on the stub path) writes to
+  (`packages/host/src/edit/agent-run.ts:281` on the live path, `:245` on the harness path and `:457` on the stub path) writes to
   `tenant_usage` under mode `edit`. It used to append to one global untenanted
   `desk-usage.json`. See [`tenant-usage-ledger.md`](tenant-usage-ledger.md).
 
-- **The event stream echoes your own ops, and two call sites re-apply them.** `appendOps` emits
-  `ops.appended` unconditionally (`packages/host/src/edit/ops.ts:277`) and the renderer folds every
-  such frame (`apps/web/components/edit-studio.tsx:193-203`) with no dedupe. Import
-  (`:302-303`) and the agent stream (`:474-479`) then apply the *same* ops a second time, `applyOp`
-  throws a duplicate-id / invalid-split error out of the React state updater, and `EditStudio`
-  unmounts — the studio disappears until a reload. `commitOps` (`:235-259`) escapes this only because
-  it assigns a plain value instead of an updater. **Treat as a finding, not a design** (see
-  `unreleased.md`). `foldApplied`'s `catch` (`apps/web/lib/edit-client.ts:219-228`) does not save you:
-  its fallback loop calls `applyOp` again and rethrows.
-- **`edit-parity-check` has no `onClick`** (`apps/web/components/edit-studio.tsx:667-673`). The Parity
+- **The event stream echoes your own ops, so the renderer applies each op once, by seq.** `appendOps`
+  emits `ops.appended` unconditionally (`packages/host/src/edit/ops.ts:356`), including for the caller's
+  own ops, and import's response, the agent turn's `edit.ops` frame and `commitOps`'s response carry the
+  same ops again. Until 2026-10-02 the renderer applied each one inside a `setProject` updater with no
+  dedupe, so the second copy made `applyOp` throw `clip id already exists` / `asset id already exists`
+  from render and, with no error boundary in `apps/web`, the tree unmounted until a reload. Now every
+  frame goes through `foldFrame` → `foldApplied` (see § 5): ops at or below the copy's `seq` are skipped,
+  a gap or an unfit op reloads the project from the host. Do not add a path that calls `applyOp` on a host
+  frame, or that applies one inside an updater; `apps/web/lib/edit-client.test.ts` pins both. The host's
+  own invariants are unchanged: a duplicate id sent to `/ops` is still a 400 and the studio shows its
+  message inline.
+- **`edit-parity-check` has no `onClick`** (`apps/web/components/edit-studio.tsx:707-679`; the `edit-export` button under it has one, `:685`). The Parity
   button is inert; `POST …/parity` and `renderParityFrame` have no caller in `apps/web`.
 - **There is no `Ctrl+Z`.** The only keys the studio binds are Space/K, S, Delete/Backspace, J and L
   (`edit-studio.tsx:344-397`). Undo is `edit-card-undo`, and only on an agent card.
-- **`edit-ops-count` is a session counter.** It renders `opsPosted` (`:836-838`), which counts ops this
+- **`edit-ops-count` is a session counter.** It renders `opsPosted` (`:819-821`), which counts ops this
   tab posted, not `project.seq`. It reads `ops 0` after every reload and after every starter seed.
 - **The starter is seeded into the snapshot, not the log**, so a four-clip `promo-16x9` project starts
   at `ops 0` (`packages/host/src/edit/projects.ts:45-61`). Bundled files that are missing are skipped
   with a `log.warn`, never downloaded (`starter-media.ts:182-204`).
 - **`edit-export` is disabled with no project**, not only when the gate is closed
-  (`edit-studio.tsx:659`) — count it as three separate reasons: no project, gate closed, export in
+  (`edit-studio.tsx:684`) — count it as three separate reasons: no project, gate closed, export in
   flight.
 - **The card verb is the op type, not the scenario copy.** `verbFor`
   (`packages/host/src/edit/backend.ts:51-57`) prints `ops[0].type.replaceAll("_", " ")`, so S1 shows
   `split clip · <clip id>`. The friendly `stubEditCardCopy` string only reaches the `assistant.delta`
-  line (`agent-run.ts:355-356`), which the Edit UI does not render at all.
+  line (`agent-run.ts:454-455`), which the Edit UI does not render at all.
 - **A card can exist with zero ops.** `applyAgentOps` inserts the card as `proposed` before `appendOps`.
   When the ops land, the same row is updated to `applied` and the emitted card uses that status, so
   Keep is hidden. A stub scenario whose canned frames fall outside the clip (S1's 300–1395 on a short
@@ -499,8 +587,8 @@ A's `workerWorkspaceId`.
 - **An export failure is silent.** `onExport` only shows an error when the POST is not ok
   (`edit-studio.tsx:571-575`); a job that fails later just clears `exporting` (`:618-625`).
 - **There is no way back to the project list.** `edit-project-list` only renders in the `!project`
-  branch (`:687-741`); switching projects needs a reload.
-- **`sourcePath` import is IPC-only** (`packages/host/src/handlers/edit.ts:211-240`). Do not try the
+  branch (`:715-724`, drawn by `edit-empty-state.tsx:46`); switching projects needs a reload.
+- **`sourcePath` import is IPC-only** (`packages/host/src/handlers/edit.ts:218-247`). Do not try the
   packaged path against `:3000`.
 - **Most of the Edit UI below the header is still hardcoded English.** The preview transport
   (`edit-play`, frame steps, scrub) and the timeline hint, zoom label, and trim names read the
@@ -512,10 +600,10 @@ A's `workerWorkspaceId`.
 - **`edit-generate-storyboard` exists** (the sub-tab button). `edit-storyboard-generate` and
   `edit-storyboard-animate-all` do not. `animate_storyboard` is backend-only
   (`packages/core/src/tools/edit/tools.ts`).
-- **`mutatingCount > 3` in the stub is dead code** (`packages/host/src/edit/agent-run.ts:244-256`):
+- **`mutatingCount > 3` in the stub is dead code** (`packages/host/src/edit/agent-run.ts:356-364`):
   the counter is incremented at most once per turn.
 - **The turn cap is per request, not cumulative.** `createTurnBudget` is rebuilt on every
-  `POST …/agent` (`agent-run.ts:145`), clamped to `[0.5, 50]`
+  `POST …/agent` (`agent-run.ts:215`), clamped to `[0.5, 50]`
   (`packages/host/src/edit/budget.ts:12-17`), and the stub charges it at most once.
 
 ## Verify
@@ -524,18 +612,18 @@ A's `workerWorkspaceId`.
 `edit-cut`, `edit-cards`, `edit-review-gate`, `edit-titles`, `edit-generate`, `edit-keep-scenarios`,
 `edit-prompt-templates`, `edit-starter-media`.
 
-DOM testids that prove it (the `edit-studio.tsx`, `edit-timeline.tsx` and `settings-page.tsx` lines re-read 2026-09-23; the other files' lines are from 2026-09-20): `edit-studio` (`apps/web/components/edit-studio.tsx:648`),
+DOM testids that prove it (the `edit-studio.tsx` and `edit-empty-state.tsx` lines re-read 2026-10-01; the `edit-timeline.tsx` and `settings-page.tsx` lines 2026-09-23; the other files' lines are from 2026-09-20): `edit-studio` (`apps/web/components/edit-studio.tsx:653`),
 `edit-project-list` / `edit-starter` / `edit-starter-description` / `edit-project-name` /
-`edit-new-project` (`:710`, `:717`, `:725`, `:733`, `:738`), `edit-tier` / `edit-jobs` /
-`edit-parity-check` / `edit-export` (`:660`, `:666`, `:673`, `:679`),
-`edit-export-progress` / `edit-export-download` (`:688`, `:696`), `edit-ops-count` (`:857`),
-`edit-import` / `edit-generate-tab` (`:789`),
+`edit-new-project` (`apps/web/components/edit-empty-state.tsx:46`, `:54`, `:62`, `:71`, `:76`; with no project open `edit-preview`, `edit-timeline` and `edit-agent-panel` are drawn there too, `:101`, `:106`, `:112`), `edit-tier` / `edit-jobs` /
+`edit-parity-check` / `edit-export` (`edit-studio.tsx:667`, `:673`, `:677`, `:683`),
+`edit-export-progress` / `edit-export-download` (`:694`, `:703`), `edit-ops-count` (`:819`),
+`edit-import` / `edit-generate-tab` (`:751`, one nav button per tool),
 `edit-preview` / `edit-preview-video` / `edit-play` / `edit-time`
 (`apps/web/components/edit-preview.tsx:189`, `:216`, `:246`, `:257`),
 `edit-timeline` / `edit-zoom` / `edit-playhead` / `edit-track-<id>` / `edit-clip` / `edit-placeholder`
 (`apps/web/components/edit-timeline.tsx:176`, `:187`, `:197`, `:203`, `:227`),
-`edit-agent-panel` / `edit-spend-meter` / `edit-emit-lock` / `edit-composer` / `edit-composer-send`
-(`apps/web/components/edit-agent-panel.tsx:63`, `:66`, `:71`, `:96`, `:98`),
+`edit-agent-panel` / `edit-spend-meter` / `edit-emit-lock` / `edit-agent-needs-key` / `edit-composer` / `edit-composer-send`
+(`apps/web/components/edit-agent-panel.tsx:73`, `:77`, `:84`, `:103`, `:113`, `:119`),
 `edit-review-card` / `edit-review-ok` / `edit-plan-card` / `edit-plan-go` / `edit-card` /
 `edit-card-progress` / `edit-card-cancel` / `edit-card-keep` / `edit-card-undo` / `edit-card-tweak` /
 `edit-tray` / `edit-tray-item` / `edit-tray-place` / `edit-tray-discard`
@@ -552,7 +640,7 @@ DOM testids that prove it (the `edit-studio.tsx`, `edit-timeline.tsx` and `setti
 `:101`, `:114`, `:25`, `:54`),
 `edit-recipe-<id>` (`apps/web/components/edit-recipes-panel.tsx:19`),
 `edit-needs-ffmpeg` / `ffmpeg-install-command` / `ffmpeg-recheck` / `ffmpeg-setup-steps`
-(`apps/web/components/ffmpeg-setup-notice.tsx:65`, `:74`, `:86`, `:98`),
+(`apps/web/components/ffmpeg-setup-notice.tsx:78`, `:85`, `:97`, `:109`; the hosted line is `:48`),
 `settings-edit-turn-cap` (`apps/web/components/settings-page.tsx:496`).
 
 Unit proof for the 2026-09-23 fixes: `packages/host/src/edit/jobs-route.test.ts` (the kinds `POST …/jobs` accepts, refuses and gates), `generate-tenant.test.ts` and `wire-generate.test.ts` (the worker's tenant), `metrics-scope.test.ts` (per-tenant metrics), `still-scope.test.ts`, `doctor-hosted.test.ts`, and on the renderer `apps/web/lib/edit-timeline-drag.test.ts`, `shortcut-target.test.ts` and `desktop-download-wiring.test.ts`.
@@ -576,12 +664,12 @@ mechanism, medium for the motive.**
 (`packages/host/src/edit/review.ts:1-3`) is `ackSeq >= lastAgentSeq`, and `lastAgentSeq` is written
 only by `appendOps` when the actor is an agent (`ops.ts:206-208`). `[Direct]` the same rule is
 duplicated in the renderer (`apps/web/lib/edit-client.ts:78-83`) so the button state and the host's
-`400 review_required` (`packages/host/src/handlers/edit.ts:408-410`) cannot disagree. `[Inferred]` a
+`400 review_required` (`packages/host/src/handlers/edit.ts:415-417`) cannot disagree. `[Inferred]` a
 sequence comparison means *any* agent write since the last ack closes the gate, which is stricter and
 much cheaper than tracking per-card acknowledgement — but it is also why an owner-actor undo does not
 reopen it. **Confidence: high for the mechanism.**
 
-**Why `sourcePath` import is refused over HTTP.** `[Direct]` `packages/host/src/handlers/edit.ts:211-240`
+**Why `sourcePath` import is refused over HTTP.** `[Direct]` `packages/host/src/handlers/edit.ts:218-247`
 returns `400 "sourcePath is only valid over IPC"` when the transport header is not `ipc`. `[Inferred]`
 the handler would otherwise `readFile` an arbitrary absolute path on behalf of any page that can reach
 `:3000` — a local file read primitive. The IPC check is the boundary because in the packaged app the

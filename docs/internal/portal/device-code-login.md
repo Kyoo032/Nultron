@@ -135,7 +135,9 @@ This is the `login_otps` table (`0002_core_tables.sql`): `otp_hash = sha256(code
 
 SSO hook: if `tenant_config.feature_flags.sso_provider` is set for the resolved tenant, `/activate` redirects to that OIDC provider and skips the OTP form. Everything downstream is identical.
 
-audit_log: `activate.viewed`, `otp.sent`, `otp.verified`, `otp.failed`.
+**Stand-in addition: the invite-gated first sign-in (owner decision 2026-10-01; `apps/portal`, `migrations/0011_invites.sql`).** The backend team's design above signs in anyone who has a `users` row. The stand-in portal adds one gate and one screen flow, and the real portal should take the same shape. Nobody signs up: an operator invites an address (`users.status = 'invited'`, the status `0002` has always had) and the portal e-mails an **invite code** to it. A first sign-in is the address plus that code; redeeming it moves the member to `active` and gives them the invite's role; the e-mailed six-digit code then follows, because the invite does not prove the inbox. Every later sign-in is the address plus the e-mailed code. The e-mail step is a state machine that tells the person which situation they are in — an activated member ("we sent a code to <address>"), an invitee ("enter the invite code we e-mailed you", no code sent), a spent or expired invite ("ask your admin"), no access ("ask your company admin to invite you"), a lock — and that is a **deliberate change to the enumeration defence this section otherwise describes**: it is no longer one neutral page. It is limited instead (15 e-mail steps a quarter hour per IP, 6 per address, 10 typed invite codes a quarter hour per IP, one invite e-mail a minute and four an hour per address, plus the OTP limits above, and 5 wrong codes lock an invite). Tables: `invites` in `schema.md`.
+
+audit_log: `activate.viewed`, `otp.sent`, `otp.verified`, `otp.failed`, `otp.locked`, and the stand-in's `otp.withheld` (reason `invite_required | invite_unusable | invite_locked | user_disabled | otp_locked | seat_cap_reached`), `invite.issued`, `invite.mailed`, `invite.resent`, `invite.send_failed`, `invite.redeemed`, `invite.refused` (reason `seat_cap_reached` among others: since 2026-10-01 a full org is refused at the e-mail and invite steps, before an invite is redeemed or a code sent), `member.role_changed`.
 
 ---
 
@@ -175,7 +177,8 @@ Unauthenticated (the `device_code` *is* the credential). The app polls this.
 // 200  — device_id here is the server-side devices.id, the `did` claim; the client stores it
 { "access_token": "<jwt>", "token_type": "Bearer", "expires_in": 3600,
   "refresh_token": "<43-char base64url>", "refresh_expires_in": 2592000,
-  "session_id": "…", "device_id": "…", "org_id": "…", "user_id": "…", "tenant_id": "…" }
+  "session_id": "…", "device_id": "…", "org_id": "…", "user_id": "…", "tenant_id": "…",
+  "role": "member" }   // owner | admin | member — the member's role in their org; see "Token design"
 ```
 
 Pending responses are `400` with `reason: "authorization_pending"` (keep polling at `interval`) or `reason: "slow_down"` + `retry_after` (client adds 5 s to its interval, permanently for this attempt). Terminal: `410 device_code_expired`, `403 device_code_denied`, plus any login-gate reason if state changed between approve and poll.
@@ -231,7 +234,7 @@ Bearer access token. Body `{ "all_devices": false }`. Sets `sessions.revoked_at`
 
 ### `GET /auth/session`
 
-Bearer access token. Returns `{ user: {id,email,name}, org: {id,name,status,plan,seat_cap,seats_used}, tenant: {id,slug}, device: {id,label,last_seen_at}, session: {id,created_at} }`. This is the only endpoint that hits the DB for status on demand; the app calls it after login and on the Account screen, not per request. `200`, or `401` + reason. Rate limit 60 / h per session.
+Bearer access token. Returns `{ user: {id,email,name,role}, org: {id,name,status,plan,seat_cap,seats_used}, tenant: {id,slug}, device: {id,label,last_seen_at}, session: {id,created_at} }`. This is the only endpoint that hits the DB for status on demand; the app calls it after login and on the Account screen, not per request. `200`, or `401` + reason. Rate limit 60 / h per session.
 
 ### `GET /tenant/config`
 
@@ -377,8 +380,10 @@ sequenceDiagram
 // claims
 { "iss": "https://api.tokotokenai.com", "sub": "usr_01J…", "tid": "tnt_metranet",
   "oid": "org_01J…", "did": "dev_9c1e…", "sid": "ses_01J…",
-  "scope": "v1.chat v1.models v1.usage", "iat": 1789000000, "exp": 1789003600 }
+  "scope": "v1.chat v1.models v1.usage", "role": "member", "iat": 1789000000, "exp": 1789003600 }
 ```
+
+**`role` (added 2026-10-01).** The member's role in their org: exactly one of `owner`, `admin`, `member` (the `users.role` vocabulary). It is set by the invite the member redeemed (`invites.role`, default `member`) and read from the member's `users` row at every sign-in and every refresh, so a role an operator changes arrives with the next token. The same value is the `role` field of every token response body (`/auth/token` for both grants, `/auth/device/token`) and of `user` in `/auth/session`. It exists because the host provisions a first-time sign-in's membership from it: with no role in the token the host gave `owner` to everyone, so any colleague could erase the whole company. A token minted before the claim existed (still inside its hour) lacks it; a consumer must treat a missing role as *no role* — never as `owner` — and the portal itself falls back to `member` for a member it cannot read. The gateway ignores claims it does not know.
 
 `did` is `devices.id`, the server-side device id — never the client-minted `install_id`, which no token ever carries. No `aud` beyond `iss`-scoped use; the gateway and the portal are one origin. `scope` is coarse and is set from `tenant_config.feature_flags` at issue time.
 
