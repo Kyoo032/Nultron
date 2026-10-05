@@ -45,6 +45,7 @@ vi.mock("./research-dossier", async (importOriginal) => {
         queries: [],
         sources: [],
         findings: [],
+        comparison: [],
         contradictions: [],
         openQuestions: [],
       };

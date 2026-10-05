@@ -148,6 +148,7 @@ export async function generateResearchNotes(
       emit,
       abortSignal,
       caps: RESEARCH_CAPS,
+      locale: localeForRun(),
       repairLabel: repairRoundLabel(localeForRun()),
       ask: async (system, prompt) => {
         const run = await collectJobAssistantRun({
@@ -183,7 +184,7 @@ export async function generateResearchNotes(
   throwIfJobAborted(abortSignal);
   emit({ type: "job.phase", phase: "saving", label: "Saving dossier" });
   const dossier: Dossier = answered.length > 0 ? { ...planned, models: answered } : planned;
-  const markdown = dossierToMarkdown(dossier);
+  const markdown = dossierToMarkdown(dossier, localeForRun());
   const dossierId = persistDossier(tenant, dossier, markdown, writtenBy, checks);
   if (dossierId) {
     await upsertWorkSource(

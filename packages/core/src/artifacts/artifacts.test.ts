@@ -129,6 +129,7 @@ describe("dossierToMarkdown", () => {
       DOSSIER_HEADINGS.sources,
       "### S1 — Report",
       DOSSIER_HEADINGS.findings,
+      DOSSIER_HEADINGS.comparison,
       DOSSIER_HEADINGS.contradictions,
       DOSSIER_HEADINGS.openQuestions,
     ];
