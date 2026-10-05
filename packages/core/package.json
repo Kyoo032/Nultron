@@ -31,6 +31,7 @@
     "./stream-watchdog": "./src/runtime/stream-watchdog.ts",
     "./retry": "./src/runtime/retry.ts",
     "./tabular": "./src/tabular/index.ts",
+    "./data": "./src/data/index.ts",
     "./artifacts": "./src/artifacts/index.ts",
     "./tools/files": "./src/tools/files/index.ts",
     "./tools/code": "./src/tools/code/index.ts",

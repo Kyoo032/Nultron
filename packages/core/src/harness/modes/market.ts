@@ -7,6 +7,11 @@ import type { ModeHarnessSpec } from "../spec";
  * `MARKET_WEB_TOOL_BINDINGS` in the host. Which of them one desk gets is `toolKeysFor(specialist)`,
  * narrowed by the desk's `MARKET_HARNESS` row in `packages/core/src/market/harness.ts`; web research
  * is bound only when a search key is saved.
+ *
+ * `repairRounds` is 1: a draft that states a figure the packet does not carry is rewritten once from
+ * the packet with no tools (`repairFlaggedFigures`, `market-generate.ts`), announced as a `job.round`.
+ * It does not go through `runChecked`, because the number guard is the check and it already marks
+ * whatever the rewrite leaves. The quiet-source gather retry is not a repair round: no model is asked.
  */
 export const marketHarnessSpec: ModeHarnessSpec = {
   mode: "market",
@@ -22,7 +27,7 @@ export const marketHarnessSpec: ModeHarnessSpec = {
     "web_fetch",
   ],
   budget: DEFAULT_RUN_BUDGET,
-  repairRounds: 0,
+  repairRounds: 1,
   skills: [
     { id: "build-packet", name: "Build the packet", status: "has" },
     { id: "write-briefing", name: "Write one desk's briefing", status: "has" },
