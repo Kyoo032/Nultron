@@ -18,7 +18,11 @@
 # RESTART THE APP after an install that installed something. The running process memoised the load,
 # failure included, and this runs in another process:
 #
-#   docker compose -f webapp-deploy/compose.yml restart app
+#   docker compose -f webapp-deploy/compose.yml restart app proxy
+#
+# Both, always: the proxy shares the app's network namespace, so restarting `app` alone leaves Caddy
+# attached to a namespace that no longer exists and the site is down while the app reports healthy
+# (driven 2026-10-01; `up -d app` and `--force-recreate app` do the same, a full `up -d` does not).
 #
 # It downloads into /opt/agentforge/components, which is a volume of its own (compose.yml) and NOT
 # the tenant data volume: the app refuses to load a native module out of /data, which is what lets

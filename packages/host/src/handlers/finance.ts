@@ -18,7 +18,7 @@ export async function handlePostFinance(request: HostRequest): Promise<HostResul
     // `task` is validated before anything reaches the gateway: a task that ships
     // later is a 400 here, not a half-run pipeline.
     requireFinanceTask(request.body ?? null);
-    return jsonOk(await generateFinanceBrief(tenant, request.body ?? null));
+    return jsonOk(await generateFinanceBrief(tenant, request.body ?? null, undefined, request.abortSignal));
   } catch (error) {
     return jsonError(error);
   }
@@ -51,7 +51,7 @@ export async function handlePostFinanceParse(request: HostRequest): Promise<Host
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
     const task = requireFinanceTask(request.body ?? null);
-    return jsonOk(await financeTaskParser(task)(tenant, request.body ?? null));
+    return jsonOk(await financeTaskParser(task)(tenant, request.body ?? null, request.abortSignal));
   } catch (error) {
     return jsonError(error);
   }
@@ -63,7 +63,7 @@ export async function handlePostFinanceRegen(request: HostRequest): Promise<Host
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
     requireFinanceTask(request.body ?? null);
-    return jsonOk(await regenerateFinanceSection(tenant, request.body ?? null));
+    return jsonOk(await regenerateFinanceSection(tenant, request.body ?? null, request.abortSignal));
   } catch (error) {
     return jsonError(error);
   }

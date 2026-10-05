@@ -8,12 +8,13 @@
   "deleteAria": "Hapus {title}",
   "removeAttachment": "Hapus {name}",
   "empty": {
-    "headline": "Kerja dimulai di sini.",
+    "hello": "Hai, aku Nultron.",
+    "headline": "Hari ini kita kerjakan apa?",
     "settingsLink": "Pengaturan",
     "statusConnected": "Kunci model terhubung",
     "statusSignedIn": "Sudah masuk",
     "statusReady": "Siap bekerja",
-    "statusNeedsKey": "Hubungkan kunci untuk mulai langsung",
+    "statusNeedsKey": "Hubungkan kunci agar aktif",
     "statusGrace": "Kunci model terhubung (luring, terakhir dicek {date})",
     "whatsThis": "Apa ini?",
     "whatsThisBody": "Kunci gateway menghubungkan meja ini ke model di akun Anda. Tempel sekali di Pengaturan. Kunci tetap di meja ini dan tidak ditampilkan lagi.",
@@ -42,7 +43,11 @@
       },
       "fillsComposer": "Mengisi kotak dengan prompt awal."
     },
-    "recheck": "Periksa lagi"
+    "recheck": "Periksa lagi",
+    "mascotHello": "Sapa"
+  },
+  "header": {
+    "menu": "Detail obrolan"
   },
   "account": {
     "label": "Akun"
@@ -127,17 +132,109 @@
   "tool": {
     "working": "Bekerja…",
     "searching": "Mencari…",
+    "fetching": "Sedang membuka halaman…",
+    "fetchFailed": "Tidak dapat membuka halaman",
     "creatingImage": "Membuat gambar…",
     "creatingVideo": "Membuat video…",
     "pastChats": "Mencari chat sebelumnya…",
     "calculating": "Menghitung…",
     "clock": "Membaca jam…",
     "search": "Pencarian",
+    "fetch": "Halaman web",
     "image": "Gambar",
     "video": "Video",
     "pastSessions": "Chat sebelumnya",
     "calculator": "Kalkulator",
     "datetime": "Jam"
+  },
+  "tools": {
+    "name": {
+      "list_files": "Daftar berkas",
+      "read_file": "Baca berkas",
+      "write_file": "Tulis berkas",
+      "edit_file": "Ubah berkas",
+      "search_files": "Cari berkas",
+      "delete_file": "Hapus berkas",
+      "knowledge_search": "Pencarian pengetahuan",
+      "run_code": "Jalankan kode"
+    },
+    "doing": {
+      "list_files": "Menampilkan daftar berkas di {dir}…",
+      "list_files_top": "Menampilkan daftar berkas Anda…",
+      "read_file": "Sedang membaca {path}…",
+      "write_file": "Sedang menulis {path}…",
+      "edit_file": "Sedang mengubah {path}…",
+      "search_files": "Mencari “{query}” di berkas…",
+      "delete_file": "Sedang menghapus {path}…",
+      "knowledge_search": "Mencari “{query}” di basis pengetahuan Anda…",
+      "run_code": "Sedang menjalankan {language}…",
+      "web_fetch": "Sedang membuka {host}…"
+    },
+    "done": {
+      "list_files": "Daftar berkas di {dir}",
+      "list_files_top": "Daftar berkas Anda",
+      "read_file": "Membaca {path}",
+      "write_file": "Menulis {path}",
+      "edit_file": "Mengubah {path}",
+      "search_files": "Pencarian “{query}” di berkas",
+      "delete_file": "Menghapus {path}",
+      "knowledge_search": "Pencarian “{query}” di basis pengetahuan Anda",
+      "run_code": "Menjalankan {language}",
+      "web_fetch": "Membuka {host}"
+    },
+    "failed": {
+      "list_files": "Tidak dapat menampilkan daftar berkas",
+      "read_file": "Tidak dapat membaca {path}",
+      "write_file": "Tidak dapat menulis {path}",
+      "edit_file": "Tidak dapat mengubah {path}",
+      "search_files": "Tidak dapat mencari “{query}” di berkas",
+      "delete_file": "Tidak dapat menghapus {path}",
+      "knowledge_search": "Tidak dapat mencari di basis pengetahuan Anda",
+      "run_code": "Menjalankan {language} gagal",
+      "web_fetch": "Tidak dapat membuka {host}"
+    },
+    "pending": {
+      "write_file": "Mengusulkan penulisan berkas",
+      "edit_file": "Mengusulkan perubahan berkas",
+      "delete_file": "Mengusulkan penghapusan berkas"
+    },
+    "detail": {
+      "none": "Tidak ada hasil",
+      "more": "sisanya tidak ditampilkan",
+      "files": "{n} berkas",
+      "filesOne": "1 berkas",
+      "matches": "{n} kecocokan",
+      "matchesOne": "1 kecocokan",
+      "excerpts": "{n} kutipan",
+      "excerptsOne": "1 kutipan",
+      "lineRange": "Baris {from}–{to} dari {total}",
+      "version": "Versi {n}"
+    },
+    "open": "Buka",
+    "openAria": "Buka {path} di Basis Pengetahuan",
+    "pendingTitle": "Menunggu persetujuan Anda",
+    "review": "Tinjau",
+    "reviewMissing": "Buka panel perubahan folder untuk meninjaunya.",
+    "budgetTitle": "Jatah alat habis",
+    "code": {
+      "show": "Tampilkan kode",
+      "heading": "Kode",
+      "stdout": "Keluaran",
+      "stderr": "Kesalahan",
+      "noOutput": "Kode berjalan dan tidak mencetak apa pun.",
+      "cut": "Dipersingkat di sini.",
+      "filesWritten": "Berkas tersimpan",
+      "reason": {
+        "timeout": "Berjalan terlalu lama sehingga dihentikan.",
+        "memory": "Membutuhkan memori melebihi batas sehingga dihentikan.",
+        "syntax": "Kode memiliki kesalahan sintaks, jadi tidak dijalankan.",
+        "runtime": "Kode berhenti dengan kesalahan saat berjalan.",
+        "too_large": "Kode atau keluarannya terlalu besar.",
+        "busy": "Proses lain sedang berjalan. Coba lagi sebentar lagi.",
+        "unavailable": "Menjalankan kode belum tersedia saat ini.",
+        "other": "Proses tidak selesai."
+      }
+    }
   },
   "error": {
     "loading": "Chat masih dimuat",
@@ -164,9 +261,20 @@
     "think": "Nalar",
     "fallback": "Pilih model",
     "groups": {
-      "recommended": "Disarankan"
+      "recommended": "Disarankan",
+      "other": "Lainnya",
+      "embeddings": "Embedding"
     },
     "noMatch": "Tidak ada model yang cocok dengan “{query}”",
     "noMatchEmpty": "Tidak ada model yang cocok dengan pencarian Anda"
+  },
+  "harness": {
+    "thinkPast": "Saya akan meninjau percakapan sebelumnya, lalu menjawab dari yang saya temukan.",
+    "thinkDesk": "Saya akan menjawab dari catatan meja.",
+    "lookingAttached": "Melihat yang Anda lampirkan.",
+    "pastNone": "Tidak ada percakapan sebelumnya di meja ini yang cocok.",
+    "pastOne": "Percakapan sebelumnya berjudul \"{title}\".",
+    "pastMany": "Percakapan sebelumnya mencakup \"{title}\".",
+    "noSource": "Meja ini tidak punya sumber untuk itu."
   }
 }

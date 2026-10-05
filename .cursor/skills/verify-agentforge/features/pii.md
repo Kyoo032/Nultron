@@ -17,7 +17,7 @@ Chat (and other model runs) keep the prompt the owner typed. Before that text be
 - Type a prompt that includes an email (or phone). Send as usual.
 - Your bubble still has the email. The model only sees `[email]`. The stub assistant line does not show that token: with no calculator or clock in the prompt it is the need-key sentence ("I need a Toko Token gateway key in Settings to answer that."), which never quotes the prompt.
 
-## Driving it with the DPSBuddy harness
+## Driving it with the Nultron harness
 
 Preconditions:
 
@@ -41,3 +41,4 @@ Preconditions:
 - A name in free text with no column header above it is **not** detected, deliberately. Do not file it.
 - Do not paste real personal data into Cloud evidence. Use `example.com` addresses.
 - `scanPii("hello @ world")` is empty — no mask.
+- **`:3000` is the main checkout's webdev and may carry a real saved key.** Read `GET /api/v1/settings` first: `hasOpenai` and `gateway.status` tell you (doctor's `runtime` follows the same key). With a key saved, `composer-send` is a live, billed call, and the "stub need-key sentence" in the walk above never appears. The PII walk needs a keyless desk, so use a throwaway `AGENTFORGE_DATA_DIR` with `AGENTFORGE_RUNTIME=stub` (SKILL.md **Launch**) rather than sending on a live desk. The unit proof in `packages/core/src/security/pii.test.ts` does not need a send at all.

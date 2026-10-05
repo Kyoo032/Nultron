@@ -39,6 +39,7 @@ import {
 } from "@agentforge/core/finance";
 import type { FinancePiiSummary } from "./finance-privacy";
 import { collectJobAssistantRun } from "./job-regen";
+import { throwIfJobAborted } from "./job-stream";
 import { extractJsonObject } from "./presentation-outline";
 
 export const FIGURES_TEXT_MAX = 12_000;
@@ -97,7 +98,12 @@ export type ParsedFigures = {
 /** Everything the reader can answer on its own; the route adds what the privacy guard found. */
 export type ParsedFiguresDraft = Omit<ParsedFigures, "pii">;
 
-type ModelCall = { readonly tenant: TenantContext; readonly model: string };
+type ModelCall = {
+  readonly tenant: TenantContext;
+  readonly model: string;
+  /** The caller's cancel: it reaches the runtime, and a pass that would swallow a failure rethrows it. */
+  readonly signal?: AbortSignal;
+};
 
 type ModelMark = { model?: string; notice?: JobModelFallbackNotice };
 
@@ -141,6 +147,7 @@ async function ask(
     jobMode: "finance",
     versionId,
     prompt,
+    ...(call.signal ? { signal: call.signal } : {}),
   });
   return { text: run.text, model: run.model, ...(run.notice ? { notice: run.notice } : {}) };
 }
@@ -180,6 +187,8 @@ async function askForFactLabels(
     const named = stringMap(readJson(run.text, "stated facts"), "labels");
     return { facts: withFactLabels(facts, named), model: run.model, ...(run.notice ? { notice: run.notice } : {}) };
   } catch {
+    // A cancel is not a failed naming pass: it stops the parse instead of being swallowed with it.
+    throwIfJobAborted(call.signal);
     // A naming pass that fails costs the reader a nicer label, never a figure.
     return { facts: withFactLabels(facts, new Map()) };
   }

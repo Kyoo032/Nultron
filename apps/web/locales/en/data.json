@@ -99,6 +99,7 @@
     "cutting": "Choosing the cuts",
     "analyzing": "Querying with SQL",
     "repairing": "Rewriting a sentence the query does not support",
+    "repairRound": "Repairing the findings",
     "verifying": "Checking sentences against the queries",
     "cannotForecast": "This sheet cannot forecast. The figures are the cuts the columns support.",
     "cannotOtherTable": "This sheet is one table. The figures are the cuts its columns support.",

@@ -3,7 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
-import type { TenantContext } from "@agentforge/core";
+import { MODE_HARNESS_SPECS, type TenantContext } from "@agentforge/core";
+import type { JobEvent } from "@agentforge/core/jobs";
 import { ensureSchema } from "@agentforge/db/ensure-schema";
 import { datasetBrief } from "./data-generate";
 import { DATA_SKILL_IDS, runDataHarness } from "./data-harness";
@@ -57,6 +58,7 @@ describe("data harness skills on stub", () => {
     const sheet = store.create(tenant, { name: "Spend", filename: "spend.csv", bytes: Buffer.from(CSV) });
     dataset = sheet;
     const prompts: string[] = [];
+    const seenRounds: JobEvent[] = [];
     const result = await runDataHarness({
       dataset: sheet,
       question: "What is going on here?",
@@ -64,6 +66,7 @@ describe("data harness skills on stub", () => {
       extra: null,
       brief: datasetBrief(sheet).text,
       locale: "en",
+      emit: (event) => event.type === "job.round" && seenRounds.push(event),
       query: (sql) => sheet.runner.query(sql),
       answer: async (prompt) => {
         prompts.push(prompt);
@@ -71,6 +74,7 @@ describe("data harness skills on stub", () => {
       },
     });
 
+    expect(seenRounds).toEqual([]);
     expect(result.skills).toEqual([...DATA_SKILL_IDS]);
     expect(result.cuts.map((cut) => cut.kind)).toEqual(["compare", "over_time", "blanks"]);
     expect(result.retried).toBe(false);
@@ -89,6 +93,7 @@ describe("data harness skills on stub", () => {
     const sheet = store.create(tenant, { name: "Spend", filename: "spend.csv", bytes: Buffer.from(CSV) });
     dataset = sheet;
     const texts = [INVENTED, CLEAN];
+    const seen: JobEvent[] = [];
     const result = await runDataHarness({
       dataset: sheet,
       question: "What is going on here?",
@@ -96,10 +101,16 @@ describe("data harness skills on stub", () => {
       extra: null,
       brief: datasetBrief(sheet).text,
       locale: "en",
+      emit: (event) => seen.push(event),
       query: (sql) => sheet.runner.query(sql),
       answer: async () => ({ text: texts.shift() ?? CLEAN, model: "stub-model" }),
     });
     expect(result.retried).toBe(true);
+    // The retry is the one repair round the Data spec declares, shown as `job.round` 1 of 1.
+    expect(MODE_HARNESS_SPECS.data.repairRounds).toBe(1);
+    expect(seen.filter((event) => event.type === "job.round")).toEqual([
+      { type: "job.round", round: 1, total: 1, label: "Repairing the findings" },
+    ]);
     expect(result.skills).toContain("hold-sentence");
     expect(result.skills).toContain("run-cuts");
     expect(result.skills).toContain("pick-cuts");

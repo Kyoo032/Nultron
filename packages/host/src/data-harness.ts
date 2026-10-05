@@ -1,4 +1,4 @@
-import { ApiError, parseAppLocale, type AppLocale } from "@agentforge/core";
+import { ApiError, MODE_HARNESS_SPECS, parseAppLocale, type AppLocale } from "@agentforge/core";
 import { dataAnalysisSchema, type DataAnalysis, type DataChart, type DataFinding } from "@agentforge/core/artifacts";
 import {
   planDataCuts,
@@ -42,6 +42,9 @@ export type DataHarnessResult = {
 type HistoryItem = { question: string; summary: string };
 
 const NO_EMIT: JobEmitter = () => {};
+
+/** The one repair round the Data spec declares: the model is asked again once, with what failed. */
+const REPAIR_ROUNDS = MODE_HARNESS_SPECS.data.repairRounds;
 
 function identifierFor(dataset: LoadedDataset, name: string): string {
   const column = dataset.columns.find((item) => item.name === name);
@@ -310,6 +313,9 @@ export async function runDataHarness(input: {
 
   const ask = async (repair: string | null) => {
     throwIfJobAborted(input.abortSignal);
+    if (repair) {
+      emit({ type: "job.round", round: 1, total: REPAIR_ROUNDS, label: copy.repairRound });
+    }
     emit({ type: "job.phase", phase: "analyzing", label: repair ? copy.repairing : copy.analyzing });
     const answered = await input.answer(
       buildDataPrompt({

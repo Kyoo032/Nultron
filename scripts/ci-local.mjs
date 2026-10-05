@@ -15,6 +15,10 @@
  * 1 when any REQUIRED step failed; ADVISORY steps are reported and never fail the run. Full output
  * of each step lands in `.ci-local/<timestamp>/<step>.log`, plus `summary.md` for the PR.
  *
+ * A vitest step passes only when its log carries the `Tests  N passed` summary (N > 0), not merely
+ * exit code 0: vitest exits 0 after "No test files found" when a global setup dies, and an empty run
+ * is not a green one. `summary.md` lists the reason under every step that did not pass.
+ *
  * Children are spawned with shell:false through `process.execPath` and each tool's JS entry, because
  * the extensionless `node_modules/.bin` shims cannot be exec'd on Windows. pnpm is resolved to its
  * `pnpm.cjs` (npm_execpath, CI_LOCAL_PNPM, or the npx cache); only when none is found does the
@@ -27,7 +31,17 @@
  */
 
 import { spawn } from "node:child_process";
-import { createWriteStream, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import {
+  createWriteStream,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -36,6 +50,7 @@ const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".."
 const STEP_TIMEOUT_MS = 30 * 60 * 1000;
 /** Steps that only run when asked for, by flag or by `--only`. */
 const OPT_IN = { install: "--install", e2e: "--e2e" };
+const SANDBOX_NOT_BUILT = "sandbox runtime not built; run npx pnpm@9.15.9 sandbox:build";
 
 // ---------------------------------------------------------------------------------------------
 // Pure helpers (tested in ci-local.test.mjs)
@@ -86,12 +101,17 @@ export function formatDuration(ms) {
   return `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
 }
 
-/** A markdown table, so the same text reads in a terminal and pastes into a PR. */
+/**
+ * A markdown table, so the same text reads in a terminal and pastes into a PR. A step that did not
+ * pass says why in a short list under the table, so the paste is enough to tell "a test failed" from
+ * "no test ran".
+ */
 export function formatSummary(results) {
   const rows = results.map((r) => {
     const status = r.status === "pass" ? "pass" : r.required ? `FAIL` : `warn (advisory)`;
     return `| ${r.name} | ${status} | ${formatDuration(r.durationMs)} |`;
   });
+  const reasons = results.filter((r) => r.status !== "pass" && r.reason).map((r) => `- ${r.name}: ${r.reason}`);
   const failed = results.filter((r) => r.required && r.status !== "pass").length;
   const warned = results.filter((r) => !r.required && r.status !== "pass").length;
   const verdict = failed > 0 ? `FAIL: ${failed} required step(s) failed` : "OK: every required step passed";
@@ -100,8 +120,56 @@ export function formatSummary(results) {
     "| --- | --- | --- |",
     ...rows,
     "",
+    ...(reasons.length > 0 ? ["Reasons:", ...reasons, ""] : []),
     `${verdict}${warned > 0 ? `, ${warned} advisory warning(s)` : ""}.`,
   ].join("\n");
+}
+
+/**
+ * ANSI CSI sequences (colour, cursor). The ESC byte comes from `String.fromCharCode`: a raw control
+ * byte in the source would make git treat this file as binary, and biome refuses one in a regex literal.
+ */
+const ANSI_CSI = new RegExp(`${String.fromCharCode(27)}\\[[0-9;?]*[ -/]*[@-~]`, "g");
+
+export function stripAnsi(text) {
+  return text.replace(ANSI_CSI, "");
+}
+
+/**
+ * vitest's closing line, e.g. `Tests  2795 passed | 1 skipped (2796)` or `Tests  1 failed | 40 passed (41)`.
+ * Anchored to the start of a line so a test title that merely begins with the word cannot match, and
+ * `Test Files` (which prints even when every file was empty) is not it.
+ */
+const VITEST_SUMMARY = /^[ \t]*Tests[ \t]+(?:\d+[ \t]+[a-z]+[ \t]*\|[ \t]*)*(\d+)[ \t]+passed\b/m;
+
+const NO_TESTS_REASON =
+  "vitest printed no `Tests N passed` summary line, so no tests ran (it can exit 0 after finding no test files or dying in global setup)";
+
+/**
+ * Did this vitest log run a test? Exit code 0 only says the process ended: on 2026-10-01 the portal
+ * suite, run under an admin token, could not start its embedded Postgres, logged "No test files found"
+ * and "Unhandled Error", exited 0, and was reported as a pass. A passing run has to say so.
+ */
+export function checkVitestLog(logText) {
+  const match = VITEST_SUMMARY.exec(stripAnsi(logText ?? ""));
+  const passed = match ? Number(match[1]) : 0;
+  return passed > 0 ? { ok: true, passed } : { ok: false, passed: 0, reason: NO_TESTS_REASON };
+}
+
+/**
+ * The verdict for one step: `exitCodes` are its commands' exit codes in order, `logText` is its log.
+ * A step with no commands fails (its `note` says why, e.g. "vitest not installed"); a non-zero exit
+ * fails; and a `requireTestSummary` step that exited 0 still fails without a vitest summary line.
+ */
+export function judgeStep({ exitCodes, note, requireTestSummary = false, logText = "" }) {
+  if (exitCodes.length === 0) return { status: "fail", reason: note ?? "no command to run" };
+  const bad = exitCodes.find((code) => code !== 0);
+  if (bad !== undefined) return { status: "fail", reason: `exit code ${bad}` };
+  if (requireTestSummary) {
+    const verdict = checkVitestLog(logText);
+    if (!verdict.ok) return { status: "fail", reason: verdict.reason };
+  }
+  return { status: "pass" };
 }
 
 /** `packages: ["apps/*", "packages/*"]` → the directories under them that hold a package.json. */
@@ -145,7 +213,10 @@ function toolEntry(dir, relative) {
 
 function npxCacheDirs(env) {
   const roots = [env.npm_config_cache, path.join(env.LOCALAPPDATA ?? "", "npm-cache"), path.join(os.homedir(), ".npm")];
-  return roots.filter(Boolean).map((r) => path.join(r, "_npx")).filter((d) => existsSync(d));
+  return roots
+    .filter(Boolean)
+    .map((r) => path.join(r, "_npx"))
+    .filter((d) => existsSync(d));
 }
 
 /** The pnpm.cjs to run with process.execPath, or null. */
@@ -177,9 +248,16 @@ function buildSteps(ctx) {
   const pnpm = (args, opts = {}) =>
     ctx.pnpmEntry
       ? node([ctx.pnpmEntry, ...args], opts)
-      : { cmd: "npx", args: ["--yes", `pnpm@${ctx.pnpmVersion}`, ...args], shell: process.platform === "win32", cwd: repoRoot, ...opts };
+      : {
+          cmd: "npx",
+          args: ["--yes", `pnpm@${ctx.pnpmVersion}`, ...args],
+          shell: process.platform === "win32",
+          cwd: repoRoot,
+          ...opts,
+        };
   const steps = [];
-  const add = (group, name, required, commands, note) => steps.push({ group, name, required, commands, note });
+  const add = (group, name, required, commands, note, requireTestSummary = false) =>
+    steps.push({ group, name, required, commands, note, requireTestSummary });
 
   add("install", "install", true, [pnpm(["install", "--frozen-lockfile"])]);
 
@@ -190,18 +268,36 @@ function buildSteps(ctx) {
   for (const { dir } of ctx.workspaces) {
     if (!existsSync(path.join(repoRoot, dir, "tsconfig.json"))) continue;
     const tsc = toolEntry(dir, "typescript/bin/tsc");
-    add("tsc", `tsc:${dir}`, true, tsc ? [node([tsc, "--noEmit", "-p", "tsconfig.json"], { cwd: path.join(repoRoot, dir) })] : [], tsc ? undefined : "typescript not installed");
+    add(
+      "tsc",
+      `tsc:${dir}`,
+      true,
+      tsc ? [node([tsc, "--noEmit", "-p", "tsconfig.json"], { cwd: path.join(repoRoot, dir) })] : [],
+      tsc ? undefined : "typescript not installed",
+    );
   }
 
   // One package at a time, each with its own data dir: packages in parallel race one SQLite file.
   for (const { dir, pkg } of ctx.workspaces) {
     if (!/^vitest\b/.test(pkg.scripts?.test ?? "")) continue;
     const vitest = toolEntry(dir, "vitest/vitest.mjs");
-    add("test", `test:${dir}`, true, vitest ? [node([vitest, "run"], { cwd: path.join(repoRoot, dir), freshDataDir: true })] : [], vitest ? undefined : "vitest not installed");
+    // `requireTestSummary`: exit 0 is not enough, the log must show `Tests N passed` (see `checkVitestLog`).
+    add(
+      "test",
+      `test:${dir}`,
+      true,
+      vitest ? [node([vitest, "run"], { cwd: path.join(repoRoot, dir), freshDataDir: true })] : [],
+      vitest ? undefined : "vitest not installed",
+      true,
+    );
   }
 
-  const scriptTests = readdirSync(path.join(repoRoot, "scripts")).filter((f) => f.endsWith(".test.mjs")).sort();
-  add("node-test", "node-test:scripts", true, [node(["--test", ...scriptTests.map((f) => path.join("scripts", f))], { freshDataDir: true })]);
+  const scriptTests = readdirSync(path.join(repoRoot, "scripts"))
+    .filter((f) => f.endsWith(".test.mjs"))
+    .sort();
+  add("node-test", "node-test:scripts", true, [
+    node(["--test", ...scriptTests.map((f) => path.join("scripts", f))], { freshDataDir: true }),
+  ]);
 
   const desktop = ctx.workspaces.find((w) => w.pkg.name === "@agentforge/desktop");
   const desktopTest = desktop?.pkg.scripts?.test;
@@ -229,6 +325,39 @@ function buildSteps(ctx) {
   add("media", "edit:starters:check", false, [node(["scripts/edit-starters.mjs", "--check"])]);
   add("media", "videos:examples:check", false, [node(["scripts/video-examples.mjs", "--check"])]);
 
+  // The built code-sandbox folder (`pnpm sandbox:build`, gitignored): when it exists, every file in it must still
+  // hash to its MANIFEST.json. Advisory because the folder is built, never committed; absent means nothing to check.
+  add("sandbox", "sandbox:manifest", false, [node(["scripts/build-sandbox-runtime.mjs", "--verify", "--if-present"])]);
+
+  // The real engines. `sandbox:manifest` only proves the built folder is intact; `test:packages/host` skips
+  // sandbox.integration.test.ts without AGENTFORGE_SANDBOX_DIR, so on their own CI stays green while Pyodide and
+  // QuickJS never run. When the folder is built this step runs that file against it (Python, JavaScript, the escape
+  // battery, the memory cap and the wall-clock kill) and is REQUIRED; vitest must report passed tests, so an all-skipped
+  // file fails. When the folder is not built there is nothing to run, so it passes and says how to build it.
+  const sandboxDir = path.join(repoRoot, "vendor", "sandbox-runtime");
+  if (existsSync(path.join(sandboxDir, "MANIFEST.json"))) {
+    const hostVitest = toolEntry("packages/host", "vitest/vitest.mjs");
+    add(
+      "sandbox",
+      "sandbox:integration",
+      true,
+      hostVitest
+        ? [
+            node([hostVitest, "run", "src/code-runner/sandbox.integration.test.ts"], {
+              cwd: path.join(repoRoot, "packages/host"),
+              env: { AGENTFORGE_SANDBOX_DIR: sandboxDir },
+              freshDataDir: true,
+            }),
+          ]
+        : [],
+      hostVitest ? undefined : "vitest not installed",
+      true,
+    );
+  } else {
+    add("sandbox", "sandbox:integration", true, [node(["-e", `console.log(${JSON.stringify(SANDBOX_NOT_BUILT)})`])]);
+    steps[steps.length - 1].passNote = SANDBOX_NOT_BUILT;
+  }
+
   // e2e.yml. CI=1 turns off reuseExistingServer, so the suite never drives whatever answers on :3000
   // (on this desk that is Rizky's live webdev). A pnpm shim on PATH lets its `pnpm dev` resolve.
   const playwright = toolEntry("apps/web", "@playwright/test/cli.js");
@@ -236,7 +365,15 @@ function buildSteps(ctx) {
     "e2e",
     "e2e:playwright",
     true,
-    playwright ? [node([playwright, "test"], { cwd: path.join(repoRoot, "apps/web"), env: { AGENTFORGE_RUNTIME: "stub", CI: "1" }, pnpmShim: true })] : [],
+    playwright
+      ? [
+          node([playwright, "test"], {
+            cwd: path.join(repoRoot, "apps/web"),
+            env: { AGENTFORGE_RUNTIME: "stub", CI: "1" },
+            pnpmShim: true,
+          }),
+        ]
+      : [],
     playwright ? undefined : "@playwright/test not installed",
   );
   return steps;
@@ -267,9 +404,16 @@ function runCommand(command, log, ctx) {
       const key = Object.keys(env).find((k) => k.toLowerCase() === "path") ?? "PATH";
       env[key] = `${writePnpmShim(ctx)}${path.delimiter}${env[key] ?? ""}`;
     }
-    log.write(`\n$ ${[command.cmd, ...command.args].join(" ")}\n  cwd: ${command.cwd}${dataDir ? `\n  AGENTFORGE_DATA_DIR: ${dataDir}` : ""}\n\n`);
+    log.write(
+      `\n$ ${[command.cmd, ...command.args].join(" ")}\n  cwd: ${command.cwd}${dataDir ? `\n  AGENTFORGE_DATA_DIR: ${dataDir}` : ""}\n\n`,
+    );
     const out = command.stdoutFile ? createWriteStream(command.stdoutFile) : null;
-    const child = spawn(command.cmd, command.args, { cwd: command.cwd, env, shell: command.shell ?? false, windowsHide: true });
+    const child = spawn(command.cmd, command.args, {
+      cwd: command.cwd,
+      env,
+      shell: command.shell ?? false,
+      windowsHide: true,
+    });
     const timer = setTimeout(() => {
       log.write(`\n[ci-local] timed out after ${formatDuration(STEP_TIMEOUT_MS)}, killing\n`);
       child.kill();
@@ -301,13 +445,26 @@ async function runStep(step, ctx) {
   const logFile = path.join(ctx.logDir, `${step.name.replace(/[/:\\]/g, "_")}.log`);
   const log = createWriteStream(logFile);
   const started = Date.now();
-  let failed = step.commands.length === 0;
+  const exitCodes = [];
   if (step.note) log.write(`[ci-local] ${step.note}\n`);
   for (const command of step.commands) {
-    if ((await runCommand(command, log, ctx)) !== 0) failed = true;
+    exitCodes.push(await runCommand(command, log, ctx));
   }
   await new Promise((resolve) => log.end(resolve));
-  return { name: step.name, required: step.required, status: failed ? "fail" : "pass", durationMs: Date.now() - started, logFile };
+  const verdict = judgeStep({
+    exitCodes,
+    note: step.note,
+    requireTestSummary: step.requireTestSummary,
+    logText: step.requireTestSummary ? readFileSync(logFile, "utf8") : "",
+  });
+  return {
+    name: step.name,
+    required: step.required,
+    status: verdict.status,
+    reason: verdict.reason,
+    durationMs: Date.now() - started,
+    logFile,
+  };
 }
 
 async function main() {
@@ -320,7 +477,9 @@ async function main() {
   const all = buildSteps(ctx);
 
   if (args.help) {
-    console.log(`Steps (group → name):\n${all.map((s) => `  ${s.group.padEnd(10)} ${s.name}${s.required ? "" : "  (advisory)"}${OPT_IN[s.group] ? `  (only with ${OPT_IN[s.group]})` : ""}`).join("\n")}`);
+    console.log(
+      `Steps (group → name):\n${all.map((s) => `  ${s.group.padEnd(10)} ${s.name}${s.required ? "" : "  (advisory)"}${OPT_IN[s.group] ? `  (only with ${OPT_IN[s.group]})` : ""}`).join("\n")}`,
+    );
     return 0;
   }
   const selected = selectSteps(all, args);
@@ -337,7 +496,10 @@ async function main() {
     const result = await runStep(step, ctx);
     results.push(result);
     const mark = result.status === "pass" ? "pass" : result.required ? "FAIL" : "warn";
-    console.log(`${mark.padEnd(4)}  ${step.name.padEnd(34)} ${formatDuration(result.durationMs).padStart(9)}${result.status === "pass" ? "" : `  → ${path.relative(repoRoot, result.logFile)}`}`);
+    console.log(
+      `${mark.padEnd(4)}  ${step.name.padEnd(34)} ${formatDuration(result.durationMs).padStart(9)}${result.status === "pass" ? "" : `  → ${path.relative(repoRoot, result.logFile)}${result.reason ? ` (${result.reason})` : ""}`}`,
+    );
+    if (result.status === "pass" && step.passNote) console.log(`      note: ${step.passNote}`);
   }
 
   const summary = formatSummary(results);

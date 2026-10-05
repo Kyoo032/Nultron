@@ -99,6 +99,7 @@
     "cutting": "Memilih potongan",
     "analyzing": "Mengueri dengan SQL",
     "repairing": "Menulis ulang kalimat yang kuerinya tidak mendukung",
+    "repairRound": "Memperbaiki temuan",
     "verifying": "Mencocokkan kalimat dengan kueri",
     "cannotForecast": "Lembar ini tidak bisa meramalkan. Angka di bawah adalah potongan yang kolomnya mendukung.",
     "cannotOtherTable": "Lembar ini satu tabel. Angka di bawah adalah potongan yang kolomnya mendukung.",

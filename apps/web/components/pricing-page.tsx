@@ -215,14 +215,6 @@ export function PricingView({ currentTierId, checkout }: PricingViewProps) {
 }
 
 /**
- * The route: reads what the host will tell it, and renders the list either way.
- *
- * Both reads are best-effort and neither gates the render. The checkout probe is a POST to
- * `/api/v1/billing/top-up`, which raises nothing and writes nothing — it answers where a purchase
- * would happen — and it is made only where the host says plans exist, so a desk and a signed-out
- * visitor never post to a billing route at all.
- */
-/**
  * Whether asking the host which tier this tenant is on can produce an answer.
  *
  * Both halves are required. Off `plans` there is no such route (a desk 404s it). Signed out there
@@ -234,6 +226,29 @@ export function shouldReadCurrentTier(plansEnforced: boolean, status: SessionSta
   return plansEnforced && status === "signed-in";
 }
 
+/**
+ * Whether the checkout probe (`POST /api/v1/billing/top-up`) can produce an answer.
+ *
+ * The same two halves, for the same reason: the handler resolves the tenant before it does anything
+ * else, so a signed-out probe is a `401` and a desk's is a `404`. It ran on `plans` alone until
+ * 2026-10-01, which put a refusal in the hosted server's log for every signed-out visit to this
+ * public page — the case its own comment said could not happen. It is a POST, which is the reason
+ * to give it its own name rather than let a later edit loosen the tier read and widen this one by
+ * accident; today the two agree for every input (`pricing-page-render.test.tsx` holds that).
+ */
+export function shouldReadCheckout(plansEnforced: boolean, status: SessionStatus): boolean {
+  return shouldReadCurrentTier(plansEnforced, status);
+}
+
+/**
+ * The route: reads what the host will tell it, and renders the list either way.
+ *
+ * Both reads are best-effort and neither gates the render. Both are made only where the host says
+ * plans exist **and** there is a signed-in tenant to ask about (`shouldReadCurrentTier`,
+ * `shouldReadCheckout`), so a desk, a visitor who is signed out and a session that has not resolved
+ * yet never send a billing request at all. The checkout probe is a POST that raises nothing and
+ * writes nothing — it answers where a purchase would happen.
+ */
 export function PricingPage() {
   const capabilities = useHostCapabilities();
   const session = useSession();
@@ -266,8 +281,14 @@ export function PricingPage() {
     };
   }, [ask]);
 
+  /**
+   * Where a purchase would happen — asked under the same rule as the tier, for the same visitors.
+   * A signed-out visitor sees `checkout: undefined`, which the cards already read as "ask the
+   * operator", so the answer they do not get is one the page would not have used.
+   */
+  const probe = shouldReadCheckout(capabilities.plans, session.status);
   useEffect(() => {
-    if (!capabilities.plans) {
+    if (!probe) {
       return;
     }
     let live = true;
@@ -279,7 +300,7 @@ export function PricingPage() {
     return () => {
       live = false;
     };
-  }, [capabilities.plans]);
+  }, [probe]);
 
   // The owner's door onto the blocked screens, and it is dead in hosted mode by construction:
   // `singleOwner` is true only off server mode, and every capability is false until ping answers,

@@ -6,6 +6,7 @@ import {
   getDesktopUpdates,
   invokeDesktop,
   isElectron,
+  pickDesktopFolder,
   relaunchDesktopApp,
   saveDesktopBytes,
 } from "./desktop-bridge";
@@ -105,6 +106,54 @@ describe("desktop-bridge", () => {
     const relaunch = vi.fn(async () => ({ ok: false, reason: "  " }));
     vi.stubGlobal("window", { agentforge: { isElectron: true, relaunch } });
     await expect(relaunchDesktopApp()).resolves.toEqual({ ok: false, reason: "refused" });
+  });
+
+  it("has no folder picker on webdev or the hosted app", async () => {
+    await expect(pickDesktopFolder()).resolves.toBeNull();
+  });
+
+  it("has no folder picker when the shell is an older build without one", async () => {
+    vi.stubGlobal("window", { agentforge: { isElectron: true } });
+    await expect(pickDesktopFolder()).resolves.toBeNull();
+    vi.stubGlobal("window", { agentforge: { isElectron: true, pickFolder: "not a function" } });
+    await expect(pickDesktopFolder()).resolves.toBeNull();
+  });
+
+  it("does not call a picker on a bridge that is not the Electron shell", async () => {
+    const pickFolder = vi.fn(async () => ({ path: "C:\\Users\\rizky\\notes" }));
+    vi.stubGlobal("window", { agentforge: { isElectron: false, pickFolder } });
+    await expect(pickDesktopFolder()).resolves.toBeNull();
+    expect(pickFolder).not.toHaveBeenCalled();
+  });
+
+  it("hands back the folder the owner picked", async () => {
+    const pickFolder = vi.fn(async () => ({ path: "C:\\Users\\rizky\\notes" }));
+    vi.stubGlobal("window", { agentforge: { isElectron: true, pickFolder } });
+    await expect(pickDesktopFolder()).resolves.toEqual({ path: "C:\\Users\\rizky\\notes" });
+    expect(pickFolder).toHaveBeenCalledTimes(1);
+    expect(pickFolder).toHaveBeenCalledWith();
+  });
+
+  it("reports a closed dialog as canceled", async () => {
+    const pickFolder = vi.fn(async () => ({ canceled: true }));
+    vi.stubGlobal("window", { agentforge: { isElectron: true, pickFolder } });
+    await expect(pickDesktopFolder()).resolves.toEqual({ canceled: true });
+  });
+
+  it("reads an answer that is not a usable path as nothing chosen", async () => {
+    for (const answer of [undefined, null, "C:\\notes", {}, { path: "" }, { path: "   " }, { path: 7 }]) {
+      const pickFolder = vi.fn(async () => answer);
+      vi.stubGlobal("window", { agentforge: { isElectron: true, pickFolder } });
+      await expect(pickDesktopFolder()).resolves.toEqual({ canceled: true });
+    }
+  });
+
+  it("lets a shell failure surface instead of reading it as a cancel", async () => {
+    const pickFolder = vi.fn(async () => {
+      throw new Error("dialog failed");
+    });
+    vi.stubGlobal("window", { agentforge: { isElectron: true, pickFolder } });
+    await expect(pickDesktopFolder()).rejects.toThrow("dialog failed");
   });
 
   it("reports no relaunch on webdev, where the bridge has none", async () => {

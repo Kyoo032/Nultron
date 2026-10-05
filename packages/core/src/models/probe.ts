@@ -5,6 +5,8 @@ import { assertAllowedEndpointUrl } from "../security/tls";
 import { chatModelFromId, type ChatModel, type ModelProvider } from "./catalog";
 import { extractContextLength } from "./context-length";
 import { mediaKind } from "./media-kind";
+import { urlIsProviderHost } from "../providers/registry";
+import { isServerMode } from "../server-mode";
 
 export type ApiDialect = ModelProvider;
 
@@ -31,7 +33,18 @@ export function guessDialectFromKey(key: string): ApiDialect | undefined {
   return undefined;
 }
 
+/**
+ * Whether `baseUrl` is OpenAI's own API.
+ *
+ * On the hosted server (Enterprise BYOK) it compares the host exactly (`urlIsProviderHost`, from the
+ * provider registry); the substring search also accepted `api.openai.com.evil.example`, or a path
+ * that merely mentions it. Personal keeps the substring search untouched: its URL is pinned to the
+ * gateway, and Enterprise work lands there only when it is ported on purpose.
+ */
 export function isOfficialOpenAIBaseUrl(baseUrl?: string): boolean {
+  if (isServerMode()) {
+    return urlIsProviderHost("openai", baseUrl);
+  }
   return /api\.openai\.com/i.test(baseUrl ?? "");
 }
 

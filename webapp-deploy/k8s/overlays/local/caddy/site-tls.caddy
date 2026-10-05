@@ -1,0 +1,8 @@
+# LOCAL: a certificate pair signed by the throwaway CA that rehearse-local.mjs generates (pki/), not
+# ACME. Let's Encrypt cannot issue for a .localhost name, and the app has to trust the portal's
+# certificate under NODE_ENV=production, which a CA this cluster owns makes possible.
+(site_tls) {
+	tls /etc/nultron/tls/tls.crt /etc/nultron/tls/tls.key {
+		protocols tls1.2 tls1.3
+	}
+}

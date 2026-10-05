@@ -3,7 +3,39 @@ import type { TenantContext } from "../tenancy/types";
 import { MemoryAgentRepository } from "./memory-repo";
 import { AgentService, resolvePublishedVersion } from "./service";
 import { ApiError } from "../errors";
-import { DEFAULT_CHAT_MODEL } from "./default-chat";
+import { DEFAULT_CHAT_MODEL, DEFAULT_CHAT_PROMPT, DEFAULT_CHAT_TOOLS } from "./default-chat";
+
+/** Every starter tool, sorted: a literal, so a tool added or dropped by accident fails here. */
+const STARTER_TOOLS_SORTED = [
+  "calculator",
+  "datetime",
+  "delete_file",
+  "edit_file",
+  "image_generate",
+  "knowledge_search",
+  "list_files",
+  "past_sessions",
+  "read_file",
+  "run_code",
+  "search_files",
+  "video_generate",
+  "web_fetch",
+  "web_search",
+  "write_file",
+];
+
+/** What a desk made before the general-agent pass has bound. */
+const LEGACY_STARTER_TOOLS = [
+  "calculator",
+  "datetime",
+  "web_search",
+  "image_generate",
+  "video_generate",
+  "past_sessions",
+];
+
+const LEGACY_CHAT_PROMPT =
+  "You are a helpful assistant. Be clear and direct. Use tools when they make the answer better. When the user refers to an earlier chat, use past_sessions to look it up.";
 
 function tenant(overrides: Partial<TenantContext> = {}): TenantContext {
   return {
@@ -58,14 +90,10 @@ describe("ensureDefaultChat", () => {
     expect(created.version.inputModalities).toEqual(["text", "image", "video"]);
     expect(created.version.productModes).toEqual(["chat"]);
     expect(created.version.model).toBe(DEFAULT_CHAT_MODEL);
-    expect(created.bindings.map((binding) => binding.toolKey).sort()).toEqual([
-      "calculator",
-      "datetime",
-      "image_generate",
-      "past_sessions",
-      "video_generate",
-      "web_search",
-    ]);
+    expect(created.version.systemPrompt).toBe(DEFAULT_CHAT_PROMPT);
+    expect(created.bindings.map((binding) => binding.toolKey).sort()).toEqual(STARTER_TOOLS_SORTED);
+    expect(created.bindings.every((binding) => binding.enabled)).toBe(true);
+    expect([...DEFAULT_CHAT_TOOLS].sort()).toEqual(STARTER_TOOLS_SORTED);
   });
 
   it("adds new starter tools onto an existing default chat", async () => {
@@ -77,14 +105,103 @@ describe("ensureDefaultChat", () => {
     );
     const again = await service.ensureDefaultChat(tenant({ role: "member" }));
     expect(again.agent.id).toBe(created.agent.id);
-    expect(again.bindings.map((binding) => binding.toolKey).sort()).toEqual([
-      "calculator",
-      "datetime",
-      "image_generate",
-      "past_sessions",
-      "video_generate",
-      "web_search",
-    ]);
+    expect(again.bindings.map((binding) => binding.toolKey).sort()).toEqual(STARTER_TOOLS_SORTED);
+  });
+
+  it("backfills the general-agent tools onto a desk made before them, once", async () => {
+    const repo = new MemoryAgentRepository();
+    const service = new AgentService(repo);
+    const created = await service.ensureDefaultChat(tenant());
+    repo.bindings = repo.bindings.filter((binding) => LEGACY_STARTER_TOOLS.includes(binding.toolKey));
+    const legacyIds = new Set(repo.bindings.map((binding) => binding.id));
+    expect(repo.bindings).toHaveLength(LEGACY_STARTER_TOOLS.length);
+
+    const upgraded = await service.ensureDefaultChat(tenant());
+    expect(upgraded.bindings.map((binding) => binding.toolKey).sort()).toEqual(STARTER_TOOLS_SORTED);
+    expect(repo.bindings).toHaveLength(STARTER_TOOLS_SORTED.length);
+    for (const binding of upgraded.bindings) {
+      expect(binding.agentVersionId).toBe(created.version.id);
+      expect(binding.enabled).toBe(true);
+    }
+    // The rows the desk already had are kept as they were, not replaced.
+    const idsAfter = new Set(repo.bindings.map((binding) => binding.id));
+    for (const id of legacyIds) {
+      expect(idsAfter.has(id)).toBe(true);
+    }
+
+    const bindingIds = repo.bindings.map((binding) => binding.id);
+    const third = await service.ensureDefaultChat(tenant());
+    expect(repo.bindings.map((binding) => binding.id)).toEqual(bindingIds);
+    expect(third.bindings).toHaveLength(STARTER_TOOLS_SORTED.length);
+  });
+
+  it("leaves a binding the owner switched off switched off, and adds no duplicate", async () => {
+    const repo = new MemoryAgentRepository();
+    const service = new AgentService(repo);
+    await service.ensureDefaultChat(tenant());
+    repo.bindings = repo.bindings.map((binding) =>
+      binding.toolKey === "write_file" || binding.toolKey === "web_fetch" ? { ...binding, enabled: false } : binding,
+    );
+    repo.bindings = repo.bindings.filter((binding) => binding.toolKey !== "delete_file");
+
+    const again = await service.ensureDefaultChat(tenant());
+    const byKey = new Map<string, boolean[]>();
+    for (const binding of again.bindings) {
+      byKey.set(binding.toolKey, [...(byKey.get(binding.toolKey) ?? []), binding.enabled]);
+    }
+    expect(byKey.get("write_file")).toEqual([false]);
+    expect(byKey.get("web_fetch")).toEqual([false]);
+    expect(byKey.get("delete_file")).toEqual([true]);
+    expect(byKey.get("edit_file")).toEqual([true]);
+    expect(again.bindings).toHaveLength(STARTER_TOOLS_SORTED.length);
+
+    const stored = repo.bindings.filter((binding) => binding.toolKey === "write_file");
+    expect(stored).toHaveLength(1);
+    expect(stored[0]?.enabled).toBe(false);
+  });
+
+  it("backfills only the default chat, never another agent", async () => {
+    const repo = new MemoryAgentRepository();
+    const service = new AgentService(repo);
+    const other = await service.create(tenant(), {
+      name: "Tutor",
+      systemPrompt: "Help with writing",
+      model: "gpt-4o-mini",
+    });
+    await service.publish(tenant(), other.agent.id, other.version.id);
+    await service.bindTool(tenant(), other.agent.id, other.version.id, "calculator");
+
+    await service.ensureDefaultChat(tenant());
+    const otherBindings = await repo.listBindings("org-a", other.version.id);
+    expect(otherBindings.map((binding) => binding.toolKey)).toEqual(["calculator"]);
+  });
+
+  it("serves the current prompt for a desk that stored an older one, without rewriting the row", async () => {
+    const repo = new MemoryAgentRepository();
+    const service = new AgentService(repo);
+    const created = await service.ensureDefaultChat(tenant());
+    repo.versions = repo.versions.map((version) =>
+      version.id === created.version.id ? { ...version, systemPrompt: LEGACY_CHAT_PROMPT } : version,
+    );
+
+    const ensured = await service.ensureDefaultChat(tenant());
+    expect(ensured.version.systemPrompt).toBe(DEFAULT_CHAT_PROMPT);
+    const forRun = await service.getPublishedForRun(tenant(), created.agent.id);
+    expect(forRun.version.systemPrompt).toBe(DEFAULT_CHAT_PROMPT);
+    expect(repo.versions.find((version) => version.id === created.version.id)?.systemPrompt).toBe(LEGACY_CHAT_PROMPT);
+  });
+
+  it("never replaces another agent's prompt with the default chat's", async () => {
+    const repo = new MemoryAgentRepository();
+    const service = new AgentService(repo);
+    const other = await service.create(tenant(), {
+      name: "Tutor",
+      systemPrompt: "Help with writing",
+      model: "gpt-4o-mini",
+    });
+    await service.publish(tenant(), other.agent.id, other.version.id);
+    const forRun = await service.getPublishedForRun(tenant(), other.agent.id);
+    expect(forRun.version.systemPrompt).toBe("Help with writing");
   });
 
   it("returns the same agent on a second call", async () => {

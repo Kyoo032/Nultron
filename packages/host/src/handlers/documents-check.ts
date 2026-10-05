@@ -1,6 +1,8 @@
 import { checkDraftAgainstSource } from "@agentforge/core";
 import { jsonError, jsonOk } from "../errors";
 import { parseDocumentDraftBody } from "../document-outline";
+import { assembleDeskSource } from "../desk-sources";
+import { getTenant } from "../tenant";
 import type { HostRequest, HostResult } from "../types";
 
 /** Overlap check. No model call and no gateway gate. */
@@ -8,11 +10,17 @@ export async function handlePostDocumentsCheck(request: HostRequest): Promise<Ho
   try {
     const body =
       request.body && typeof request.body === "object"
-        ? (request.body as { draft?: unknown; sourceText?: unknown })
+        ? (request.body as { draft?: unknown; sourceText?: unknown; sourceFiles?: unknown })
         : {};
     const draft = parseDocumentDraftBody(body.draft);
-    const sourceText = typeof body.sourceText === "string" ? body.sourceText : "";
-    return jsonOk(checkDraftAgainstSource(draft, sourceText));
+    const tenant = await getTenant(request);
+    // No model reads this text, so the injection guard has nothing to protect here.
+    const source = await assembleDeskSource(
+      tenant,
+      { sourceText: typeof body.sourceText === "string" ? body.sourceText : undefined, sourceFiles: body.sourceFiles },
+      { injectionGuardBypass: true },
+    );
+    return jsonOk(checkDraftAgainstSource(draft, source.text));
   } catch (error) {
     return jsonError(error);
   }

@@ -1,0 +1,3 @@
+# Every run writes here: one JSON per run, with the model's own words in the row notes. It describes the
+# owner's gateway account and what the models answered, so it is local evidence and never belongs in git.
+results/

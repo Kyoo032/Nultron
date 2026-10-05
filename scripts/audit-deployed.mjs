@@ -12,16 +12,26 @@
  * Gating on that number means a red board nobody can turn green, which within a week means a board
  * nobody reads. Reporting it and gating on nothing is the same outcome by a slower road.
  *
- * So the gate is the closure that is actually deployed. `webapp-deploy/Dockerfile` runs
- * `pnpm install --frozen-lockfile --filter "@agentforge/web..."`, and this asks pnpm for exactly
- * that set. Everything outside it is still printed, so the desktop advisories stay visible without
- * being able to block a web deploy.
+ * So the gate is the closure that is actually deployed. The `prod` stage of `webapp-deploy/Dockerfile`
+ * runs `pnpm install --frozen-lockfile --prod --filter "@agentforge/web..."`, and the runtime stage
+ * copies that tree (`COPY --from=prod`), so this asks pnpm for exactly that set. Everything outside
+ * it is still printed, so the desktop and tooling advisories stay visible without being able to block
+ * a web deploy.
  *
- * DEV DEPENDENCIES ARE PART OF THAT CLOSURE, deliberately. The Dockerfile does NOT run
- * `pnpm prune --prod`, because `tsx` is a devDependency of `@agentforge/web` and is the production
- * entrypoint; pruning would delete the thing that boots the app. So the image ships the full
- * install, and the honest closure to audit is the full one, not `--prod`. (Trimming that is a
- * migration-plan item — see docs/internal/security-owasp-2026-09.md, finding A06-2.)
+ * DEV DEPENDENCIES ARE NOT PART OF THAT CLOSURE, because the image does not carry them (SR-113).
+ * Until 2026-10-05 they were, and this header said so: the image shipped the full install because
+ * `tsx` was a devDependency of `@agentforge/web` and is the production entrypoint. `tsx` is a
+ * dependency now, the Dockerfile installs `--prod` in its own stage, and the closure to audit is
+ * the production one. That is what took `braces` (GHSA-vfj7-8cjw-p6xm, no patched release) out of
+ * the gate: it arrives only through `tailwindcss`, a devDependency that builds the renderer and
+ * never runs in the container. It is still on developer machines and in the build stage.
+ *
+ * Two things keep this honest. `closureNames` reads only the `dependencies` and
+ * `optionalDependencies` groups, whatever flags produced the file it is handed, so a closure
+ * captured without `--prod` (scripts/ci-local.mjs captures one) cannot widen the gate back out to
+ * dev tooling. And the test next to this file fails if the Dockerfile's `prod` stage and this
+ * script stop selecting the same packages. A dev dependency that the server starts to import at
+ * runtime is caught at image build instead, by the load check in the Dockerfile's `prod` stage.
  */
 
 import { execFileSync } from "node:child_process";
@@ -32,7 +42,17 @@ const LEVELS = ["low", "moderate", "high", "critical"];
 const DEFAULT_LEVEL = "high";
 
 /** The workspace package whose install closure the Dockerfile builds. `...` means "and its deps". */
-const DEPLOYED_FILTER = "@agentforge/web...";
+export const DEPLOYED_FILTER = "@agentforge/web...";
+
+/**
+ * The groups of a `pnpm list --json` node that ship. `devDependencies` is absent on purpose: the
+ * runtime image installs with `--prod` (webapp-deploy/Dockerfile, `prod` stage), so a dev dependency
+ * and everything only it pulls in is not in the image.
+ */
+const SHIPPED_GROUPS = ["dependencies", "optionalDependencies"];
+
+/** What `main` asks pnpm for. `--prod` is the same flag the Dockerfile installs with. */
+export const LIST_ARGS = ["list", "--filter", DEPLOYED_FILTER, "--prod", "--depth", "Infinity", "--json"];
 
 function parseArgs(argv) {
   const args = { level: DEFAULT_LEVEL, audit: null, closure: null };
@@ -57,7 +77,8 @@ function parseArgs(argv) {
 }
 
 /**
- * Every `name` in the tree `pnpm list` prints, at any depth.
+ * Every `name` in the SHIPPED part of the tree `pnpm list` prints, at any depth. A root's
+ * `devDependencies` group, and everything reachable only through it, is not read.
  *
  * Names rather than name@version: an advisory's `module_name` is a name, and its
  * `vulnerable_versions` range has already been applied by the registry against what is installed —
@@ -72,11 +93,13 @@ export function closureNames(listJson) {
         continue;
       }
       names.add(key);
-      walk(node?.dependencies);
+      for (const group of SHIPPED_GROUPS) {
+        walk(node?.[group]);
+      }
     }
   };
   for (const root of listJson) {
-    for (const group of ["dependencies", "devDependencies", "optionalDependencies"]) {
+    for (const group of SHIPPED_GROUPS) {
       walk(root?.[group]);
     }
   }
@@ -125,7 +148,7 @@ function main() {
   const listJson = JSON.parse(
     args.closure
       ? readFileSync(args.closure, "utf8")
-      : run("pnpm", ["list", "--filter", DEPLOYED_FILTER, "--depth", "Infinity", "--json"]),
+      : run("pnpm", LIST_ARGS),
   );
   const auditJson = JSON.parse(
     args.audit ? readFileSync(args.audit, "utf8") : run("pnpm", ["audit", "--json"]),
@@ -135,12 +158,12 @@ function main() {
   const { inImage, elsewhere } = partition(auditJson, deployed);
   const blocking = atOrAbove(inImage, args.level);
 
-  console.log(`Deployed closure (${DEPLOYED_FILTER}): ${deployed.size} packages`);
+  console.log(`Deployed closure (${DEPLOYED_FILTER}, production dependencies only): ${deployed.size} packages`);
   console.log(`\nIn the hosted image: ${inImage.length} advisories`);
   for (const advisory of inImage) {
     console.log(describe(advisory));
   }
-  console.log(`\nNot in the hosted image (desktop or tooling only): ${elsewhere.length} advisories`);
+  console.log(`\nNot in the hosted image (desktop, portal or dev tooling only): ${elsewhere.length} advisories`);
   const counts = new Map();
   for (const advisory of elsewhere) {
     counts.set(advisory.module_name, (counts.get(advisory.module_name) ?? 0) + 1);

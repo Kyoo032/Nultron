@@ -53,6 +53,7 @@ import {
 } from "./tenant-storage";
 import { assertPurgeableTenant, isObjectKeyInsideTenant } from "./tenant-object-keys";
 import type { TenantObjectStore } from "./tenant-object-keys";
+import type { DeskPath } from "@agentforge/core/tools/files";
 import type { HostJsonResult, HostRequest, HostResult } from "./types";
 import type { SessionStore } from "./auth/session-store";
 
@@ -156,13 +157,114 @@ describe("every writer of media bytes goes through the object store", () => {
   });
 });
 
+/* ----------------------------------------------------------------------- 1b. desk file versions */
+
+describe("desk file versions are tenant bytes", () => {
+  const author = { kind: "user", userId: ALPHA.userId } as const;
+  const deskPath = (value: string) => value as DeskPath;
+
+  /** The bucket as a Map: only the verbs the desk store calls. */
+  function bucket(): TenantObjectStore & { keys: () => string[] } {
+    const objects = new Map<string, Uint8Array>();
+    const verbs: Pick<TenantObjectStore, "put" | "read" | "head" | "remove" | "measure"> = {
+      async put(_tenantId, key, bytes) {
+        objects.set(key, new Uint8Array(bytes));
+      },
+      async read(_tenantId, key) {
+        const found = objects.get(key);
+        if (!found) {
+          throw new ApiError("not_found", "No such object", 404);
+        }
+        return found;
+      },
+      async head(_tenantId, key) {
+        const found = objects.get(key);
+        return found ? { sizeBytes: found.byteLength } : null;
+      },
+      async remove(_tenantId, key) {
+        objects.delete(key);
+      },
+      async measure() {
+        let usedBytes = 0;
+        for (const value of objects.values()) {
+          usedBytes += value.byteLength;
+        }
+        return { usedBytes, objectCount: objects.size };
+      },
+    };
+    return { kind: "cos", keys: () => [...objects.keys()], ...verbs } as unknown as TenantObjectStore & {
+      keys: () => string[];
+    };
+  }
+
+  beforeEach(async () => {
+    process.env.AGENTFORGE_SERVER = "1";
+    const { db } = await import("@agentforge/db");
+    db.$client.prepare("DELETE FROM tenant_storage").run();
+    db.$client.prepare("DELETE FROM desk_file_versions").run();
+    db.$client.prepare("DELETE FROM desk_files").run();
+    rmSync(join(dataDir, "media"), { recursive: true, force: true });
+    resetObjectStoreForTests();
+    forgetTenantJobBytes();
+  });
+
+  afterEach(() => {
+    delete process.env.AGENTFORGE_SERVER;
+    delete process.env.AGENTFORGE_STORAGE;
+    delete process.env.AGENTFORGE_TENANT_STORAGE_BYTES;
+    setCosObjectStoreForTests(null);
+    resetObjectStoreForTests();
+  });
+
+  async function deskRoot() {
+    const { db, ensurePortalOwner } = await import("@agentforge/db");
+    const { createDeskRoot } = await import("./desk-files/store");
+    return createDeskRoot(await ensurePortalOwner(db, { ...ALPHA, role: "owner" }), author);
+  }
+
+  it("charges every version, and refuses a save over the ceiling without storing it", async () => {
+    process.env.AGENTFORGE_TENANT_STORAGE_BYTES = "3000";
+    const root = await deskRoot();
+
+    await root.write(deskPath("notes/a.md"), "first", author);
+    const afterOne = (await tenantStorageReport(ALPHA.tenantId)).objectBytes;
+    expect(afterOne).toBeGreaterThan(0);
+    await root.write(deskPath("notes/a.md"), "second", author);
+    const afterTwo = (await tenantStorageReport(ALPHA.tenantId)).objectBytes;
+    expect(afterTwo).toBeGreaterThan(afterOne);
+
+    await expect(root.write(deskPath("notes/b.md"), "x".repeat(4000), author)).rejects.toMatchObject({
+      code: "quota",
+    });
+    expect((await tenantStorageReport(ALPHA.tenantId)).objectBytes).toBe(afterTwo);
+    expect((await root.list(null)).map((entry) => entry.path)).toEqual(["notes/a.md"]);
+  });
+
+  it("puts the sealed bodies in the bucket, not on the disk, under the COS backend", async () => {
+    process.env.AGENTFORGE_STORAGE = "cos";
+    const cos = bucket();
+    setCosObjectStoreForTests(cos);
+    const root = await deskRoot();
+
+    await root.write(deskPath("notes/a.md"), "bucket text", author);
+    await root.write(deskPath("notes/a.md"), "bucket text, edited", author);
+
+    expect(cos.keys()).toHaveLength(2);
+    for (const key of cos.keys()) {
+      expect(key).toMatch(new RegExp(`^tenants/${ALPHA.tenantId}/desk-files/[0-9a-f-]{36}/[12]$`));
+      expect(() => statSync(join(mediaRoot(), key))).toThrow();
+    }
+    expect((await root.read(deskPath("notes/a.md"))).text).toBe("bucket text, edited");
+  });
+});
+
 /* ----------------------------------------------------------------------- 2. the Edit import route */
 
 describe("POST /api/v1/edit/projects/:projectId/import", () => {
   beforeAll(async () => {
     const { db, ensurePortalOwner } = await import("@agentforge/db");
     store = createMemorySessionStore();
-    await ensurePortalOwner(db, ALPHA);
+    await ensurePortalOwner(db, { ...ALPHA, role: "owner" });
     const session = createSession({ ...ALPHA, now: T0 });
     await store.create(session);
     cookie = `__Host-agentforge_session=${session.id}`;
