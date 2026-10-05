@@ -271,6 +271,24 @@ export {
 } from "./models/video-capabilities";
 export type { VideoCapabilities, GatewayVideoResolution } from "./models/video-capabilities";
 export {
+  VIDEO_HARNESS_SKILLS,
+  acceptVideoShot,
+  clipIsVideoUrl,
+  composeVideoShot,
+  promptAlreadyShot,
+  runVideoHarness,
+  shotKeepsAsk,
+  videoRenderShouldRetry,
+} from "./videos/harness";
+export type {
+  VideoHarnessInput,
+  VideoHarnessResult,
+  VideoHarnessSkill,
+  VideoHarnessSkillId,
+  VideoRenderCall,
+  VideoRenderResult,
+} from "./videos/harness";
+export {
   MEDIA_PRICE_ENTRIES,
   costTier,
   estimateImageCost,
