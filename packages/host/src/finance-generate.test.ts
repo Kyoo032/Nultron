@@ -129,6 +129,50 @@ describe("generateFinanceBrief", () => {
     expect(result.artifactId).toBeTruthy();
   });
 
+  it("hands the run's cancel to the draft and to the repair rewrite", async () => {
+    queued.push(
+      JSON.stringify({
+        title: "Margin story",
+        sections: [{ heading: "What to watch", body: "Margin hit 62.5%.", metrics: [] }],
+        assumptions: [],
+      }),
+      JSON.stringify({ heading: "What to watch", body: "COGS was 400 against revenue of 1000.", metrics: [] }),
+    );
+    const controller = new AbortController();
+    await generateFinanceBrief(
+      tenant,
+      { prompt: "Gross margin story", items: ITEMS, locale: "en" },
+      () => {},
+      controller.signal,
+    );
+    expect(asked).toHaveLength(2);
+    expect(asked[0]?.signal).toBe(controller.signal);
+    expect(asked[1]?.signal).toBe(controller.signal);
+  });
+
+  it("saves nothing when the cancel lands after the draft came back", async () => {
+    const controller = new AbortController();
+    queued.push(
+      JSON.stringify({
+        title: "Margin story",
+        sections: [{ heading: "Where the margin came from", body: "Revenue was 1000 and COGS was 400.", metrics: [] }],
+        assumptions: [],
+      }),
+    );
+    const outcome = generateFinanceBrief(
+      tenant,
+      { prompt: "Gross margin story", items: ITEMS, locale: "en" },
+      (event) => {
+        if (event.type === "job.phase" && event.phase === "verifying") {
+          controller.abort(new Error("client left"));
+        }
+      },
+      controller.signal,
+    );
+    await expect(outcome).rejects.toMatchObject({ code: "aborted", status: 499 });
+    expect(ingested).toEqual([]);
+  });
+
   it("keeps the brief when the repair emptied every section, in the reader's language", async () => {
     queued.push(
       JSON.stringify({
@@ -202,6 +246,23 @@ describe("regenerateFinanceSection", () => {
       prompt: "Gross margin story",
     });
     expect(ingested[0]?.body).toBe(result.markdown);
+  });
+
+  it("hands the cancel to the rewrite and to its repair, and leaves the calls without one when there is none", async () => {
+    queued.push(
+      JSON.stringify({ heading: "What to watch", body: "Margin hit 62.5%. COGS was 400.", metrics: [] }),
+      JSON.stringify({ heading: "What to watch", body: "COGS was 400 against revenue of 1000.", metrics: [] }),
+    );
+    const controller = new AbortController();
+    await regenerateFinanceSection(tenant, body(), controller.signal);
+    expect(asked).toHaveLength(2);
+    expect(asked[0]?.signal).toBe(controller.signal);
+    expect(asked[1]?.signal).toBe(controller.signal);
+
+    asked.length = 0;
+    await regenerateFinanceSection(tenant, body());
+    expect(asked).toHaveLength(1);
+    expect(asked[0]).not.toHaveProperty("signal");
   });
 
   it("indexes nothing and answers null when the caller sends no artifact", async () => {

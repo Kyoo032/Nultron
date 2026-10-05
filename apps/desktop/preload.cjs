@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld("agentforge", {
     }),
   saveBytes: (filename, bytes) => ipcRenderer.invoke("host:save-bytes", { filename, bytes }),
   pickMedia: () => ipcRenderer.invoke("agentforge:pick-media"),
+  pickFolder: () => ipcRenderer.invoke("agentforge:pick-folder"),
   /**
    * Restart the app. `{ reset: true }` (Settings -> Start over) also clears the renderer's Chromium
    * storage in the main process before exiting, so nothing from the old install leaks into the

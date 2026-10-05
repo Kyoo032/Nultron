@@ -187,6 +187,10 @@ describe("generateMarketBriefing", () => {
       label: "Checking every figure and sentence",
     });
     expect(events).toContainEqual({ type: "job.step", phase: "quotes", label: "quotes done" });
+    // The one figure rewrite is the Market spec's one repair round, announced like every mode's.
+    expect(events.filter((event) => event.type === "job.round")).toEqual([
+      { type: "job.round", round: 1, total: 1, label: "Rewriting a figure the packet does not have" },
+    ]);
 
     expect(built[0]?.request).toMatchObject({
       tickers: ["mu", "BBCA"],
@@ -463,6 +467,12 @@ describe("generateMarketBriefing", () => {
     expect(events).toContainEqual({
       type: "job.phase",
       phase: "repairing",
+      label: "Menulis ulang angka yang tidak ada di data",
+    });
+    expect(events).toContainEqual({
+      type: "job.round",
+      round: 1,
+      total: 1,
       label: "Menulis ulang angka yang tidak ada di data",
     });
   });

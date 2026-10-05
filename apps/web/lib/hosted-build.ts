@@ -6,9 +6,11 @@
  * itself — `apps/web/server.ts` stamps one marker into the `index.html` it serves when
  * `isServerMode()` — and this module is the only place that reads it.
  *
- * The marker is a capability statement from the server, never a permission: it can only make a
- * decision *stricter* (see `resolveGate`). A desk page that forges it locks itself out of its own
- * app, which is nobody's attack.
+ * The marker is a capability statement from the server, never a permission: on its own it can only
+ * make a decision *stricter* (see `resolveGate`). The one thing it also enables, the "Add it later"
+ * deferral, needs a live session and the host's own record of the choice as well, and changes only
+ * what the screen shows: the host still refuses every gateway-calling route. A desk page that forges
+ * the marker locks itself out of its own app, which is nobody's attack.
  */
 
 /** `name` of the marker meta tag. */

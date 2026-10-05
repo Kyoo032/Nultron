@@ -36,6 +36,7 @@ import type {
   ConsumeAuthCodeInput,
   ConsumeAuthCodeResult,
   CreateDeviceCodeInput,
+  CreateInviteInput,
   CreateOAuthClientInput,
   CreateOrgInput,
   CreateSessionInput,
@@ -45,13 +46,20 @@ import type {
   Device,
   DeviceCode,
   IssueAuthCodeInput,
+  Invite,
   IssueRefreshTokenInput,
+  InviteIssueHistory,
+  Iso,
+  LoginOtpStatus,
+  LoginOtpStatusInput,
   LoginPrecheckInput,
   OAuthClient,
   Org,
   OrgStatus,
   PollDeviceCodeResult,
   RedeemDeviceCodeInput,
+  RedeemInviteInput,
+  RedeemInviteResult,
   ReasonCode,
   RefreshToken,
   RotateRefreshTokenInput,
@@ -66,6 +74,7 @@ import type {
   UpsertDeviceResult,
   UpsertTenantConfigInput,
   User,
+  UserRole,
   UserStatus,
   VerifyLoginOtpInput,
   VerifyLoginOtpResult,
@@ -102,10 +111,19 @@ export interface PortalOps {
     create(input: CreateOrgInput): Promise<Org>;
     findById(id: string): Promise<Org | null>;
     findBySlug(tenantId: string, slug: string): Promise<Org | null>;
+    /** Every org of one tenant, oldest first: how the operator's tool picks a default. */
+    listForTenant(tenantId: string): Promise<readonly Org[]>;
     setStatus(id: string, status: OrgStatus): Promise<Org | null>;
     setSeatCap(id: string, seatCap: number): Promise<Org | null>;
     /** `count_active_users(uuid)` from 0005, called, not re-implemented. */
     countActiveUsers(orgId: string): Promise<number>;
+    /**
+     * Would a NEW session for this person fit the org's cap right now? The seat branch of
+     * `login_precheck` (0005) with the same arithmetic and without its advisory lock: an answer
+     * for a page that has not spent an invite or a code yet, not a gate. The gate is still
+     * `loginPrecheck` when the authorization code is exchanged, because a seat can go in between.
+     */
+    hasSeatFor(orgId: string, userId: string): Promise<boolean>;
   };
 
   readonly users: {
@@ -113,6 +131,14 @@ export interface PortalOps {
     findById(id: string): Promise<User | null>;
     findByEmail(tenantId: string, email: string): Promise<User | null>;
     setStatus(id: string, status: UserStatus): Promise<User | null>;
+    /** The one place a role changes after the member exists. Only the operator's tool calls it. */
+    setRole(id: string, role: UserRole): Promise<User | null>;
+    /**
+     * Members who hold `owner` and are not disabled, invited ones included: a tenant needs one.
+     * **Locks those rows** (`FOR UPDATE`) until the transaction ends, so two operators cannot each
+     * see two owners and each demote one: the second waits, re-reads, and finds one.
+     */
+    lockOwners(tenantId: string): Promise<number>;
   };
 
   readonly devices: {
@@ -157,10 +183,38 @@ export interface PortalOps {
   };
 
   readonly loginOtps: {
+    /**
+     * Mints a code and **retires every earlier unused code of the same address and purpose**: a
+     * second code replaces the first, and the first never works again, whether or not the second
+     * was used. Sends for one address are serialised, so two requests that arrive together cannot
+     * both pass the budget or the `dedupeWithinMs` check.
+     */
     send(input: SendLoginOtpInput): Promise<SendLoginOtpResult>;
+    /** Marks one code used without anyone having used it: a code whose e-mail never went. */
+    retire(id: string): Promise<void>;
     verify(input: VerifyLoginOtpInput): Promise<VerifyLoginOtpResult>;
+    /**
+     * Read-only, so a flow can tell a person the truth (locked, or a code was just sent) before it
+     * mints another one. The same counts `send` and `verify` use; nothing here writes or locks.
+     */
+    status(input: LoginOtpStatusInput): Promise<LoginOtpStatus>;
     /** `prune_login_otps()` from 0005: keeps 24 h so the send window stays countable. */
     prune(): Promise<number>;
+  };
+
+  /**
+   * The invite that gates a first sign-in (`apps/portal/migrations/0011_invites.sql`): one live
+   * code per address, bound to it, single use. Redeeming activates the `invited` member.
+   */
+  readonly invites: {
+    /** Retires any live invite for the address, then inserts. Only sha256 of the code is stored. */
+    create(input: CreateInviteInput): Promise<Invite>;
+    /** Checks, counts and consumes in the caller's transaction, and activates the member. */
+    redeem(input: RedeemInviteInput): Promise<RedeemInviteResult>;
+    /** The newest invite for the address that has not been replaced. Redeemed and expired ones count. */
+    latestForEmail(tenantId: string, email: string): Promise<Invite | null>;
+    /** Invites issued for the address since `since`, retired ones included: the resend budget. */
+    issuedSince(tenantId: string, email: string, since: Iso): Promise<InviteIssueHistory>;
   };
 
   readonly authCodes: {

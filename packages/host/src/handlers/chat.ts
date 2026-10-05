@@ -19,8 +19,8 @@ export async function handleGetChat(request: HostRequest): Promise<HostResult> {
     return jsonOk({
       agent: ready.agent,
       version: ready.version,
-      models: listSelectableModels(),
-      defaultModel: defaultSelectableModel(),
+      models: listSelectableModels(tenant),
+      defaultModel: defaultSelectableModel(undefined, tenant),
       specialists,
     });
   } catch (error) {

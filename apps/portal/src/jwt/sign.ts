@@ -6,6 +6,12 @@
  * and the gateway verifies it with nothing but the JWKS document, so any extra claim here is a
  * claim nobody reads and a byte of token nobody asked for.
  *
+ * One claim has been added since, on the owner's instruction (2026-10-01): `role`, the member's role
+ * in their org (`owner | admin | member`). The host provisions the person's own role from it instead
+ * of guessing one -- it used to give `owner` to every first-time sign-in, so any colleague could
+ * erase the company. The gateway ignores claims it does not know; the host reads it from the token
+ * response body, which carries the same value.
+ *
  * `did` is `devices.id`, the **server-side** device id. The client-minted `install_id` never
  * appears in a token; that distinction is the easiest bug to write in this whole flow.
  *
@@ -14,6 +20,7 @@
  * promises the gateway allows.
  */
 import { verify as verifySignature } from "node:crypto";
+import type { UserRole } from "../store/types";
 import type { Keyring, PortalKey } from "./keys";
 
 /** One hour. The client refreshes at T-5 min (`device-code-login.md`, "Token design"). */
@@ -29,6 +36,11 @@ export interface AccessClaims {
   readonly did: string;
   readonly sid: string;
   readonly scope: string;
+  /**
+   * The member's role. Always present on a token minted now; absent only on one minted before the
+   * claim existed and still inside its hour, which is why verification does not insist on it.
+   */
+  readonly role?: UserRole;
   readonly iat: number;
   readonly exp: number;
 }
@@ -41,6 +53,7 @@ export interface SignAccessTokenInput {
   readonly deviceId: string;
   readonly sessionId: string;
   readonly scope: string;
+  readonly role: UserRole;
   /** Epoch milliseconds. */
   readonly now: number;
   readonly ttlSeconds?: number;
@@ -60,6 +73,7 @@ export function signAccessToken(key: PortalKey, input: SignAccessTokenInput): st
     did: input.deviceId,
     sid: input.sessionId,
     scope: input.scope,
+    role: input.role,
     iat: issuedAt,
     exp: issuedAt + (input.ttlSeconds ?? ACCESS_TOKEN_TTL_SECONDS),
   };

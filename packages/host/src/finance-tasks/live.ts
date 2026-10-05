@@ -15,7 +15,7 @@ import {
   type TenantContext,
 } from "@agentforge/core";
 import { localeForRun } from "../run-context";
-import { listSelectableModels, modeCatalogPayload } from "../selectable-models";
+import { listSelectableModels, modeDefaultsFor } from "../selectable-models";
 import { loadSettings } from "../settings-store";
 
 export type FinanceSettings = ReturnType<typeof loadSettings>;
@@ -56,11 +56,11 @@ export function requireLive(tenant: TenantContext): FinanceSettings {
   return settings;
 }
 
-export function resolveModel(body: unknown, settings: FinanceSettings): string {
-  const { defaults } = modeCatalogPayload();
+export function resolveModel(body: unknown, settings: FinanceSettings, tenant: TenantContext): string {
+  const defaults = modeDefaultsFor(tenant);
   return resolveChatModel(
     readOptionalModel(body),
     settings.documentGenModel || defaults.finance,
-    listSelectableModels(),
+    listSelectableModels(tenant),
   );
 }

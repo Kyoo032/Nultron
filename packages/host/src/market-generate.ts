@@ -13,6 +13,7 @@ import type Database from "better-sqlite3";
 import {
   ApiError,
   gatewayRequiredMessage,
+  harnessSpecFor,
   hasLiveProvider,
   modeMessage,
   resolveChatModel,
@@ -68,7 +69,7 @@ import { buildMarketWatchPacket, type PacketClients, type PacketPhase } from "./
 import { guardTeamNotes, runTeamPipeline, type TeamAsk } from "./market-team";
 import { ensureToolsRegistered } from "./register-tools";
 import { localeForRun } from "./run-context";
-import { listSelectableModels, modeCatalogPayload } from "./selectable-models";
+import { listSelectableModels, modeDefaultsFor } from "./selectable-models";
 import { loadSettings } from "./settings-store";
 import { log } from "./log";
 
@@ -233,10 +234,14 @@ export function parseWatchRequest(body: unknown): MarketWatchRequest {
   return parsed.data;
 }
 
-function resolveModel(requested: string | undefined, settings: ReturnType<typeof loadSettings>): string {
+function resolveModel(
+  requested: string | undefined,
+  settings: ReturnType<typeof loadSettings>,
+  tenant: TenantContext,
+): string {
   const wanted = requested?.trim() ? requested.trim() : undefined;
-  const { defaults } = modeCatalogPayload();
-  return resolveChatModel(wanted, settings.documentGenModel || defaults.market, listSelectableModels());
+  const defaults = modeDefaultsFor(tenant);
+  return resolveChatModel(wanted, settings.documentGenModel || defaults.market, listSelectableModels(tenant));
 }
 
 /**
@@ -411,7 +416,7 @@ async function loadPacket(run: WatchRun): Promise<LoadedPacket> {
     const second = await gatherPacket(run);
     const chosen = chooseRetriedPacket(loaded, second);
     const filled = quietSourceGapCount(chosen) < quietSourceGapCount(loaded);
-    loaded = chosen;
+    loaded = { packet: chosen.packet, failures: [...chosen.failures] };
     emit({ type: "job.step", phase: "retrying", label: retryStepLabel(request.language, filled) });
   }
   const full = withTickerFailures(loaded);
@@ -557,7 +562,8 @@ function verifyBriefing(
  * No tools: the packet in the prompt is the only source of numbers. A rewrite
  * that does not parse is discarded and the guarded draft is what gets saved.
  * Directive language is not sent back to the model; the advice guard already
- * replaced it.
+ * replaced it. The Market spec's `repairRounds` is the ceiling (1), announced as a
+ * `job.round` like every other mode's repair; at 0 the guard marks and nothing is asked.
  */
 async function repairFlaggedFigures(
   run: WatchRun,
@@ -566,11 +572,14 @@ async function repairFlaggedFigures(
   packet: MarketWatchPacket,
   team: TeamOutcome,
 ): Promise<{ drafted: Drafted; verified: VerifiedBriefing; failure: string | null }> {
-  if (verified.guard.total === 0) {
+  const repairRounds = harnessSpecFor("market").repairRounds;
+  if (verified.guard.total === 0 || repairRounds < 1) {
     return { drafted, verified, failure: null };
   }
   const { tenant, request, model, modelExplicit, resolved, emit, abortSignal } = run;
-  emit({ type: "job.phase", phase: "repairing", label: skillPhaseLabel("repairing", request.language) });
+  const repairLabel = skillPhaseLabel("repairing", request.language);
+  emit({ type: "job.phase", phase: "repairing", label: repairLabel });
+  emit({ type: "job.round", round: 1, total: repairRounds, label: repairLabel });
   try {
     const reply = await withClientAbort(
       () =>
@@ -683,7 +692,7 @@ export async function generateMarketBriefing(
   const run: WatchRun = {
     tenant,
     request,
-    model: resolveModel(request.model, settings),
+    model: resolveModel(request.model, settings, tenant),
     modelExplicit: readModelPinned(request),
     resolved: resolveDeps(deps),
     emit,
@@ -754,7 +763,7 @@ export async function regenerateBriefingSection(
   const index = readSectionIndex(record, briefing.sections.length);
   const current = briefing.sections[index] as BriefingSection;
   const settings = requireLive(tenant);
-  const model = resolveModel(typeof record.model === "string" ? record.model : undefined, settings);
+  const model = resolveModel(typeof record.model === "string" ? record.model : undefined, settings, tenant);
   const resolved = resolveDeps(deps);
 
   const reply = await resolved.ask({

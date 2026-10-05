@@ -1,0 +1,14 @@
+export { folderRootAvailable } from "./availability";
+export { createFolderRoot } from "./folder-root";
+export { approveProposal, getProposalDiff, listProposals, rejectProposal } from "./decisions";
+export type { ApproveOutcome, ProposalDiff } from "./decisions";
+export { FOLDER_ROUTES, createFolderRoutes } from "./routes";
+export type { FolderRoute } from "./routes";
+export { folderStatus, mountFolder, unmountFolder } from "./mount-service";
+export type { FolderStatus } from "./mount-service";
+export { clearMount as forgetFolderMount } from "./mount-record";
+export { purgeFolderProposals } from "./purge";
+export { isFolderRefusal, refusalOf } from "./refusal";
+export { createProposalStore } from "./proposal-store";
+export type { ProposalKind, ProposalRecord, ProposalStatus, ProposalStore, ProposalSummary } from "./proposal-store";
+export type { FolderDeps } from "./deps";

@@ -1,8 +1,10 @@
 import { formatUsd } from "@agentforge/core/gateway";
 import type { EditJob, OpCard, UnplacedItem } from "@/lib/edit-client";
 import { turnSpendUsd } from "@/lib/edit-client";
+import { EDIT_NEEDS_KEY_NOTE_ID } from "@/lib/edit-key-guard";
 import type { EditProject } from "@agentforge/core/edit";
 import { EditCards, EditTray } from "@/components/edit-cards";
+import { NeedsKeyNote } from "@/components/needs-key-note";
 import { useState, type FormEvent } from "react";
 
 type Props = {
@@ -23,6 +25,12 @@ type Props = {
   onReviewOk: () => void;
   onPlace: (id: string) => void;
   onDiscard: (id: string) => void;
+  /**
+   * Hosted only: the tenant has no usable gateway key, so say so where the question would be asked and
+   * quiet Send. The studio passes `useHostedNeedsKey()`, which is false everywhere but the hosted build,
+   * so a pane that is not given it (the Personal app) renders exactly as it always did.
+   */
+  needsKey?: boolean;
 };
 
 export function EditAgentPanel({
@@ -43,6 +51,7 @@ export function EditAgentPanel({
   onReviewOk,
   onPlace,
   onDiscard,
+  needsKey = false,
 }: Props) {
   const [text, setText] = useState("");
   const spent = turnSpendUsd(cards, jobs);
@@ -51,7 +60,7 @@ export function EditAgentPanel({
   function onSubmit(event: FormEvent) {
     event.preventDefault();
     const next = value.trim();
-    if (!next) {
+    if (!next || needsKey) {
       return;
     }
     onSend(next);
@@ -88,9 +97,17 @@ export function EditAgentPanel({
         onCancel={onCancel}
         onPlanGo={onPlanGo}
         onReviewOk={onReviewOk}
+        needsKey={needsKey}
       />
       <EditTray items={unplaced} onPlace={onPlace} onDiscard={onDiscard} />
       <form className="border-t border-[var(--line)] p-2" onSubmit={onSubmit}>
+        {needsKey ? (
+          <NeedsKeyNote
+            testId="edit-agent-needs-key"
+            id={EDIT_NEEDS_KEY_NOTE_ID}
+            className="mb-1.5 text-xs text-[var(--text-3)]"
+          />
+        ) : null}
         <textarea
           className="h-20 w-full resize-none rounded-md border border-[var(--line)] bg-transparent px-2 py-1.5 text-sm outline-none"
           placeholder="Ask the editor…"
@@ -101,7 +118,12 @@ export function EditAgentPanel({
           }}
           data-testid="edit-composer"
         />
-        <button type="submit" className="btn btn-primary mt-1 w-full py-1.5 text-sm" data-testid="edit-composer-send">
+        <button
+          type="submit"
+          className="btn btn-primary mt-1 w-full py-1.5 text-sm"
+          disabled={needsKey}
+          data-testid="edit-composer-send"
+        >
           Send
         </button>
       </form>

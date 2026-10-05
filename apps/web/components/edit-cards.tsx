@@ -2,6 +2,7 @@ import { formatUsd } from "@agentforge/core/gateway";
 import type { EditJob, OpCard, UnplacedItem } from "@/lib/edit-client";
 import { isReviewOpen } from "@/lib/edit-client";
 import { editCardOffersKeep, editCardOffersRevert } from "@/lib/edit-card-actions";
+import { editKeyGuard } from "@/lib/edit-key-guard";
 import type { EditProject } from "@agentforge/core/edit";
 import { t } from "@/lib/i18n";
 
@@ -15,6 +16,12 @@ type Props = {
   onCancel: (jobId: string) => void;
   onPlanGo: (card: OpCard) => void;
   onReviewOk: () => void;
+  /**
+   * Hosted only: the tenant has no usable gateway key, so "Go" (which sends the word to the Edit agent)
+   * is quiet and says why. The pane passes `useHostedNeedsKey()`, false everywhere but the hosted build,
+   * so a caller that passes nothing renders exactly what it always did.
+   */
+  needsKey?: boolean;
 };
 
 function jobForCard(jobs: EditJob[], card: OpCard): EditJob | undefined {
@@ -28,7 +35,18 @@ function isPlanCard(card: OpCard): boolean {
   return card.toolKey === "propose_plan" || card.status === "plan" || Array.isArray(card.steps);
 }
 
-export function EditCards({ cards, jobs, project, onKeep, onUndo, onTweak, onCancel, onPlanGo, onReviewOk }: Props) {
+export function EditCards({
+  cards,
+  jobs,
+  project,
+  onKeep,
+  onUndo,
+  onTweak,
+  onCancel,
+  onPlanGo,
+  onReviewOk,
+  needsKey = false,
+}: Props) {
   const reviewNeeded = project ? !isReviewOpen(project) : false;
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
@@ -74,6 +92,7 @@ export function EditCards({ cards, jobs, project, onKeep, onUndo, onTweak, onCan
                 className="btn btn-primary mt-2 px-3 py-1 text-xs"
                 data-testid="edit-plan-go"
                 onClick={() => onPlanGo(card)}
+                {...editKeyGuard(needsKey)}
               >
                 {t("edit.cards.go")}
               </button>

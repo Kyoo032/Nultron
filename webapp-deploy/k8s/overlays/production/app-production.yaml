@@ -1,0 +1,22 @@
+# The app pod on a 16 GB / 8 vCPU node (the deck's SA5.2XLARGE16): bigger requests and limits than the
+# local ones, the private registry, and Caddy's ACME state on a volume (an emptyDir would re-issue the
+# certificate on every restart and spend the CA's rate limit).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nultron-app
+spec:
+  template:
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull
+      containers:
+        - name: app
+          resources:
+            requests: {cpu: "2", memory: 4Gi, ephemeral-storage: 1Gi}
+            limits: {cpu: "7", memory: 10Gi, ephemeral-storage: 8Gi}
+      volumes:
+        - name: caddy-data
+          emptyDir: null
+          persistentVolumeClaim:
+            claimName: nultron-caddy-data

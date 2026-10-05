@@ -49,7 +49,7 @@ export async function handleGetAgentCapabilities(request: HostRequest): Promise<
     return jsonOk({
       inputModalities: published?.version.inputModalities ?? ["text"],
       model: isDefaultChatAgent(agent)
-        ? defaultSelectableModel()
+        ? defaultSelectableModel(undefined, tenant)
         : (published?.version.model ?? DEFAULT_CHAT_MODEL),
       published: Boolean(agent.currentVersionId),
       runPaths: RUN_PATHS,
@@ -204,7 +204,7 @@ export async function handlePostWorkspaceAgents(request: HostRequest): Promise<H
               }
             : undefined,
       },
-      listSelectableModels(),
+      listSelectableModels(tenant),
     );
     return jsonOk(created, 201);
   } catch (error) {

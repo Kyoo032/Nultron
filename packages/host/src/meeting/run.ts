@@ -19,11 +19,11 @@ import {
   type AppLocale,
   type TenantContext,
 } from "@agentforge/core";
+import { harnessSpecFor } from "@agentforge/core/harness";
 import {
   MEETING_MINUTES_SYSTEM,
   MEETING_TRANSLATE_SYSTEM,
   guardMinutesNames,
-  meetingMinutesSchema,
   meetingMinutesToMarkdown,
   meetingTranscriptToMarkdown,
   minutesPrompt,
@@ -32,7 +32,7 @@ import {
   type MeetingMinutes,
   type MeetingTranscript,
 } from "@agentforge/core/meeting";
-import { extractJsonObject } from "../presentation-outline";
+import { runChecked, type RunCheckedResult } from "../harness/run-checked";
 import { artifactStore } from "../artifacts";
 import { collectJobAssistantRun } from "../job-regen";
 import type { JobEmitter } from "@agentforge/core/jobs";
@@ -40,14 +40,24 @@ import { throwIfJobAborted } from "../job-stream";
 import { artifactWorkCard } from "../work-cards";
 import { upsertWorkSource } from "../knowledge-ingest";
 import { loadSettings, type SettingsScope } from "../settings-store";
-import { listSelectableModels, modeCatalogPayload } from "../selectable-models";
+import { modelCacheScopeOf } from "../model-cache";
+import { listSelectableModels, modeDefaultsFor } from "../selectable-models";
 import { localeForRun } from "../run-context";
 import { log } from "../log";
 import { recordTranscriptionUsage } from "../usage-record";
 import { extractMeetingAudio, type ExtractedAudio } from "./audio";
+import {
+  buildMinutesChecks,
+  minutesParseError,
+  minutesRepairPrompt,
+  parseMinutesDraft,
+  summarizeMinutesChecks,
+  type MinutesChecksSummary,
+  type MinutesDraft,
+} from "./minutes-checks";
 import { meetingStore, requireMeeting, type MeetingRecord } from "./store";
 import { resolveMeetingAsr, transcribeChunks } from "./transcribe";
-import type { MeetingMinutesRecord } from "./records";
+import type { MeetingMinutesRecord, MinutesChecksRecord } from "./records";
 
 const NO_EMIT: JobEmitter = () => {};
 
@@ -69,29 +79,17 @@ function requireLiveMeetingRuntime(tenant: SettingsScope): void {
 
 export function resolveMeetingModel(explicit: string | undefined, tenant: SettingsScope): string {
   const settings = loadSettings(tenant);
-  const { defaults } = modeCatalogPayload();
-  return resolveChatModel(explicit, settings.documentGenModel || defaults.meeting, listSelectableModels());
+  const scope = modelCacheScopeOf(tenant);
+  const defaults = modeDefaultsFor(scope);
+  return resolveChatModel(explicit, settings.documentGenModel || defaults.meeting, listSelectableModels(scope));
 }
 
 function parseMinutes(raw: string): MeetingMinutes {
-  if (!raw.trim()) {
-    throw new ApiError("generation_failed", "The model returned no minutes", 502);
+  const parsed = parseMinutesDraft(raw);
+  if (!parsed.ok) {
+    throw minutesParseError(parsed);
   }
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(extractJsonObject(raw));
-  } catch {
-    throw new ApiError("invalid_minutes", "The model returned invalid JSON for the minutes", 502);
-  }
-  const result = meetingMinutesSchema.safeParse(parsed);
-  if (!result.success) {
-    throw new ApiError(
-      "invalid_minutes",
-      `Minutes failed validation: ${result.error.issues.map((issue) => issue.message).join("; ")}`,
-      502,
-    );
-  }
-  return result.data;
+  return parsed.minutes;
 }
 
 /** Saving an artifact never fails the run; the minutes are still returned to the caller. */
@@ -238,18 +236,15 @@ async function transcribeAndMeter(
 }
 
 /** Store a transcript — gateway-produced or pasted — and save it as an artifact. */
-export function saveTranscript(
-  tenant: TenantContext,
-  meetingId: string,
-  transcript: MeetingTranscript,
-): MeetingRecord {
+export function saveTranscript(tenant: TenantContext, meetingId: string, transcript: MeetingTranscript): MeetingRecord {
   const meeting = requireMeeting(tenant, meetingId);
   const markdown = meetingTranscriptToMarkdown(transcript, `${meeting.title} — transcript`);
   const artifactId = persist(tenant, {
     kind: "transcript",
     title: `${meeting.title} — transcript`,
     body: markdown,
-    meta: { model: transcript.model, source: transcript.source },
+    // `meetingId` ties the artifact to its meeting so deleting the meeting finds it (`./artifacts`).
+    meta: { model: transcript.model, source: transcript.source, meetingId: meeting.id },
   });
   return meetingStore().update(tenant, meetingId, {
     status: "transcribed",
@@ -258,34 +253,103 @@ export function saveTranscript(
   });
 }
 
+/** The minutes as written; `record.checks` holds what the checks made of them. */
+type WrittenMinutes = { record: MeetingMinutesRecord };
+
+/** The summary as the record keeps it: plain data, copied, so the record shares nothing with the run. */
+function checksRecordOf(summary: MinutesChecksSummary): MinutesChecksRecord {
+  return {
+    passed: summary.passed,
+    rounds: summary.rounds,
+    verdicts: summary.verdicts.map((verdict) => ({ check: verdict.check, ok: verdict.ok })),
+  };
+}
+
+/**
+ * The minutes call, run until its checks pass or the one repair round is spent. Minutes that still
+ * fail are kept, as they were before the checks existed: the person gets a draft to edit, and the
+ * verdicts travel with it (`checks` in the artifact meta). Only minutes that never parse are an error.
+ */
 async function writeMinutes(
   tenant: TenantContext,
   meeting: MeetingRecord,
   transcript: string,
   locale: AppLocale,
   model: string,
-): Promise<MeetingMinutesRecord> {
-  const run = await collectJobAssistantRun({
-    tenant,
-    model,
-    systemPrompt: withOutputLanguage(MEETING_MINUTES_SYSTEM, "meeting", locale),
-    runPrefix: "meeting-minutes",
-    agentId: "meeting",
-    jobMode: "meeting",
-    versionId: "meeting-minutes",
-    prompt: minutesPrompt(transcript, { title: meeting.title }),
-    locale,
-  });
-  const guarded = guardMinutesNames(parseMinutes(run.text), transcript);
+  options: { emit: JobEmitter; signal?: AbortSignal; modelExplicit: boolean },
+): Promise<WrittenMinutes> {
+  const { signal, modelExplicit } = options;
+  const basePrompt = minutesPrompt(transcript, { title: meeting.title });
+  const checks = buildMinutesChecks(transcript);
+  let last: MinutesDraft | null = null;
+
+  const produce = async (repairNote: string | null): Promise<MinutesDraft> => {
+    try {
+      const run = await collectJobAssistantRun({
+        tenant,
+        model,
+        modelExplicit,
+        systemPrompt: withOutputLanguage(MEETING_MINUTES_SYSTEM, "meeting", locale),
+        runPrefix: "meeting-minutes",
+        agentId: "meeting",
+        jobMode: "meeting",
+        versionId: "meeting-minutes",
+        prompt: last && repairNote ? minutesRepairPrompt(basePrompt, last.raw, repairNote) : basePrompt,
+        locale,
+        ...(signal ? { signal } : {}),
+      });
+      last = { raw: run.text, model: run.model, parsed: parseMinutesDraft(run.text) };
+      return last;
+    } catch (error) {
+      throwIfJobAborted(signal);
+      if (!last) {
+        throw error;
+      }
+      // A repair that could not be asked is not a reason to lose the draft already in hand.
+      log.warn("meeting_minutes_repair_failed", { code: error instanceof ApiError ? error.code : "internal_error" });
+      return last;
+    }
+  };
+
+  let result: RunCheckedResult<MinutesDraft>;
+  try {
+    result = await runChecked({
+      produce,
+      checks,
+      repairRounds: harnessSpecFor("meeting").repairRounds,
+      ...(signal ? { signal } : {}),
+      onRound: () =>
+        options.emit({ type: "job.step", phase: "minuting", label: "Fixing what the checks found in the minutes" }),
+    });
+  } catch (error) {
+    // runChecked rethrows the signal's own reason; the job's cancel is its 499 `aborted`.
+    throwIfJobAborted(signal);
+    throw error;
+  }
+  const summary = summarizeMinutesChecks(checks, result);
+  if (!summary.passed) {
+    log.warn("meeting_minutes_checks_failed", {
+      failed: summary.verdicts.filter((verdict) => !verdict.ok).map((verdict) => verdict.check),
+      rounds: summary.rounds,
+    });
+  }
+  const { parsed } = result.output;
+  if (!parsed.ok) {
+    throw minutesParseError(parsed);
+  }
+  const guarded = guardMinutesNames(parsed.minutes, transcript);
   if (guarded.replaced > 0) {
     log.warn("meeting_minutes_names_guarded", { replaced: guarded.replaced });
   }
   return {
-    locale,
-    minutes: guarded.minutes,
-    artifactId: "",
-    model: run.model,
-    unverifiedNames: guarded.unverified,
+    record: {
+      locale,
+      minutes: guarded.minutes,
+      artifactId: "",
+      model: result.output.model,
+      unverifiedNames: guarded.unverified,
+      checks: checksRecordOf(summary),
+    },
   };
 }
 
@@ -301,11 +365,31 @@ async function saveMinutesArtifact(
     kind: "minutes",
     title,
     body: markdown,
-    meta: { model: record.model, locale: record.locale, unverifiedNames: record.unverifiedNames },
+    meta: {
+      model: record.model,
+      locale: record.locale,
+      unverifiedNames: record.unverifiedNames,
+      meetingId: meeting.id,
+      // Ids and pass/fail only: the meta is not encrypted, so no minutes text goes into it.
+      ...(record.checks ? { checks: record.checks } : {}),
+    },
   });
   await fileWorkCard(tenant, { artifactId, title, markdown, model: record.model });
   return { ...record, artifactId };
 }
+
+type MinutesRunOptions = {
+  emit?: JobEmitter;
+  abortSignal?: AbortSignal;
+  model?: string;
+  /**
+   * The person picked `model` in the studio (`modelPinned` on the request, `readModelPinned`): the
+   * minutes call, its repair and the translation then all stay on it and a gateway outage is the
+   * run's error. Unset, `model` is the seeded default and the job model fallback may stand in for it.
+   */
+  modelExplicit?: boolean;
+  translate?: boolean;
+};
 
 /**
  * Transcript → minutes in the meeting's own language, then the same minutes in the other one.
@@ -315,9 +399,11 @@ async function saveMinutesArtifact(
 export async function generateMinutes(
   tenant: TenantContext,
   meetingId: string,
-  options: { emit?: JobEmitter; abortSignal?: AbortSignal; model?: string; translate?: boolean } = {},
+  options: MinutesRunOptions = {},
 ): Promise<MeetingRecord> {
   const emit = options.emit ?? NO_EMIT;
+  // The person picked `options.model` in the studio: a gateway outage is then the answer, never a stand-in.
+  const modelExplicit = options.modelExplicit === true;
   // Ownership before the runtime gate: a meeting that is not this tenant's is refused the same way
   // whether or not the desk has a key, so a keyless desk cannot be used to probe another tenant's
   // ids, and the tenancy harness reaches this check under the stub runtime.
@@ -335,9 +421,15 @@ export async function generateMinutes(
 
   throwIfJobAborted(options.abortSignal);
   emit({ type: "job.phase", phase: "minuting", label: "Writing the minutes" });
-  const written = await writeMinutes(tenant, meeting, transcript, locale, model);
+  const written = await writeMinutes(tenant, meeting, transcript, locale, model, {
+    emit,
+    signal: options.abortSignal,
+    modelExplicit,
+  });
+  // Minutes the person cancelled are not saved as an artifact or a work card.
+  throwIfJobAborted(options.abortSignal);
   emit({ type: "job.phase", phase: "saving", label: "Saving the minutes" });
-  const minutes = await saveMinutesArtifact(tenant, meeting, written, "minutes");
+  const minutes = await saveMinutesArtifact(tenant, meeting, written.record, "minutes");
   // On the meeting before the translation starts, so a translation that fails cannot take the
   // minutes with it. An earlier translation described earlier minutes, so it is cleared here.
   const minuted = meetingStore().update(tenant, meetingId, { status: "minuted", minutes, translation: null });
@@ -352,7 +444,15 @@ export async function generateMinutes(
     phase: "translating",
     label: `Translating to ${target === "id" ? "Indonesian" : "English"}`,
   });
-  const translation = await translateMinutes(tenant, meeting, minutes, target, model);
+  const translation = await translateMinutes(
+    tenant,
+    meeting,
+    minutes,
+    target,
+    model,
+    options.abortSignal,
+    modelExplicit,
+  );
   return meetingStore().update(tenant, meetingId, { translation });
 }
 
@@ -367,10 +467,13 @@ export async function translateMinutes(
   source: MeetingMinutesRecord,
   target: AppLocale,
   model: string,
+  signal?: AbortSignal,
+  modelExplicit = false,
 ): Promise<MeetingMinutesRecord> {
   const run = await collectJobAssistantRun({
     tenant,
     model,
+    modelExplicit,
     systemPrompt: withOutputLanguage(MEETING_TRANSLATE_SYSTEM, "meeting", target),
     runPrefix: "meeting-translate",
     agentId: "meeting",
@@ -378,7 +481,10 @@ export async function translateMinutes(
     versionId: "meeting-translate",
     prompt: translatePrompt(source.minutes, target),
     locale: target,
+    ...(signal ? { signal } : {}),
   });
+  // A translation the person cancelled is not saved as a second artifact.
+  throwIfJobAborted(signal);
   const transcript = meeting.transcript ? transcriptPlainText(meeting.transcript) : "";
   const guarded = guardMinutesNames(parseMinutes(run.text), transcript);
   return saveMinutesArtifact(
@@ -390,6 +496,8 @@ export async function translateMinutes(
       artifactId: "",
       model: run.model,
       unverifiedNames: guarded.unverified,
+      // The translation is not checked or repaired: it claims no verdicts.
+      checks: null,
     },
     target === "id" ? "notulen" : "minutes (English)",
   );
@@ -399,7 +507,7 @@ export async function translateMinutes(
 export async function runMeeting(
   tenant: TenantContext,
   meetingId: string,
-  options: { emit?: JobEmitter; abortSignal?: AbortSignal; model?: string; translate?: boolean } = {},
+  options: MinutesRunOptions = {},
 ): Promise<MeetingRecord> {
   // Ownership first, as in `generateMinutes` above.
   const meeting = requireMeeting(tenant, meetingId);

@@ -17,7 +17,7 @@
  */
 
 import { resolvedGatewayBaseUrl } from "../gateway";
-import { providerEnv } from "../server-mode";
+import { isServerMode, providerEnv } from "../server-mode";
 import { getSecret, getToolSelection, type ToolSecretScope } from "./secret-scope";
 
 export type ToolSecretStore = {
@@ -325,11 +325,21 @@ export function secretMapFromSettings(
   put("ANTHROPIC_API_KEY", settings.anthropicApiKey || env.ANTHROPIC_API_KEY);
   put("GOOGLE_GENERATIVE_AI_API_KEY", settings.googleApiKey || env.GOOGLE_GENERATIVE_AI_API_KEY);
   put("ARK_API_KEY", settings.volcengineApiKey || env.ARK_API_KEY || env.VOLCENGINE_API_KEY);
-  put("ARK_BASE_URL", settings.volcengineBaseUrl || env.ARK_BASE_URL || env.VOLCENGINE_BASE_URL);
+  // Enterprise: a stored Volcengine endpoint is never honoured on the hosted server, where the tool falls
+  // back to its pinned Ark constant (`video-generate.ts`). `env` is empty there already.
+  put(
+    "ARK_BASE_URL",
+    (isServerMode(rawEnv) ? undefined : settings.volcengineBaseUrl) || env.ARK_BASE_URL || env.VOLCENGINE_BASE_URL,
+  );
   put("IMAGE_GEN_MODEL", settings.imageGenModel || env.IMAGE_GEN_MODEL);
   put("VIDEO_GEN_MODEL", settings.videoGenModel || env.VIDEO_GEN_MODEL);
   put("MUSIC_GEN_MODEL", settings.musicGenModel || env.MUSIC_GEN_MODEL);
   for (const [name, value] of Object.entries(settings.toolKeys ?? {})) {
+    // Enterprise: a stored tool key never stands in for a chat provider's key or endpoint. Writing
+    // `toolKeys` is refused on the hosted server, so only a value stored by an older build can be here.
+    if (isServerMode(rawEnv) && CHAT_INFERENCE_ENV_VARS.has(name)) {
+      continue;
+    }
     put(name, value);
   }
   for (const capability of TOOL_CAPABILITIES) {

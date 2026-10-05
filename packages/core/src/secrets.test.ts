@@ -255,3 +255,100 @@ describe("hasLiveProvider", () => {
     expect(hasLiveProvider({ openaiApiKey: "sk-test" })).toBe(true);
   });
 });
+
+/**
+ * Enterprise BYOK, Phase A (2026-10-01): on the hosted server a provider's base URL comes from the
+ * provider registry and from nowhere else. A stored value from an older build, or one written
+ * through the file by hand, is never honoured, and neither is a process variable (the operator's own
+ * endpoints were already empty there). Off the hosted server nothing below changes.
+ */
+describe("provider base URLs in server mode", () => {
+  const SERVER = { AGENTFORGE_SERVER: "1" } as NodeJS.ProcessEnv;
+  const HOSTILE = {
+    googleApiKey: "AIza-test-google",
+    anthropicApiKey: "sk-ant-test-anthropic",
+    volcengineApiKey: "ark-test",
+    googleBaseUrl: "https://evil.example/v1beta",
+    anthropicBaseUrl: "https://evil.example/v1",
+    volcengineBaseUrl: "https://evil.example/api/v3",
+  };
+
+  it("takes the Google and Anthropic base URLs from the registry, not from the stored settings", () => {
+    const keys = resolveProviderKeys(HOSTILE, SERVER);
+    expect(keys.googleBaseUrl).toBe("https://generativelanguage.googleapis.com/v1beta");
+    expect(keys.anthropicBaseUrl).toBe("https://api.anthropic.com/v1");
+  });
+
+  it("gives Volcengine no base URL at all, so the runtime uses its own pinned constant", () => {
+    expect(resolveProviderKeys(HOSTILE, SERVER).volcengineBaseUrl).toBeUndefined();
+  });
+
+  it("offers a native base URL only behind a key for that provider", () => {
+    const keys = resolveProviderKeys({ googleBaseUrl: "https://evil.example/v1beta" }, SERVER);
+    expect(keys.googleBaseUrl).toBeUndefined();
+    expect(keys.anthropicBaseUrl).toBeUndefined();
+    expect(keys.volcengineBaseUrl).toBeUndefined();
+  });
+
+  it("keeps the gateway endpoint pinned, as before", () => {
+    expect(resolveProviderKeys({ openaiApiKey: "sk-test", openaiBaseUrl: "https://evil.example/v1" }, SERVER).openaiBaseUrl).toBe(
+      DEFAULT_OPENAI_BASE_URL,
+    );
+  });
+
+  it("does not let a stored base URL make a keyless tenant live", () => {
+    expect(hasLiveProvider({ anthropicBaseUrl: "https://evil.example/v1" }, SERVER)).toBe(false);
+    expect(hasLiveProvider({ volcengineBaseUrl: "https://evil.example/api/v3" }, SERVER)).toBe(false);
+    expect(hasLiveProvider({ anthropicApiKey: "sk-ant-test" }, SERVER)).toBe(true);
+    expect(hasLiveProvider({ openaiApiKey: "sk-test" }, SERVER)).toBe(true);
+  });
+
+  it("never reports a stored base URL back to the renderer", () => {
+    const masked = maskSecrets(HOSTILE, SERVER);
+    expect(masked.googleBaseUrl).toBeUndefined();
+    expect(masked.anthropicBaseUrl).toBeUndefined();
+    expect(masked.volcengineBaseUrl).toBeUndefined();
+    expect(masked.hasGoogle).toBe(true);
+    expect(masked.hasAnthropic).toBe(true);
+  });
+
+  describe("Personal parity: off the hosted server the answers are exactly what they were", () => {
+    const PERSONAL = {} as NodeJS.ProcessEnv;
+
+    it("still honours a stored base URL on the desktop and webdev", () => {
+      const keys = resolveProviderKeys(HOSTILE, PERSONAL);
+      expect(keys.googleBaseUrl).toBe("https://evil.example/v1beta");
+      expect(keys.anthropicBaseUrl).toBe("https://evil.example/v1");
+      expect(keys.volcengineBaseUrl).toBe("https://evil.example/api/v3");
+    });
+
+    it("still returns no base URL when none is stored", () => {
+      const keys = resolveProviderKeys({ googleApiKey: "AIza-test-google" }, PERSONAL);
+      expect(keys.googleBaseUrl).toBeUndefined();
+      expect(keys.anthropicBaseUrl).toBeUndefined();
+    });
+
+    it("still reads the operator's endpoint variables off the desktop", () => {
+      const keys = resolveProviderKeys({}, {
+        GOOGLE_GENERATIVE_AI_BASE_URL: "https://proxy.example/v1beta",
+        ANTHROPIC_BASE_URL: "https://proxy.example/v1",
+        ARK_BASE_URL: "https://proxy.example/api/v3",
+      } as NodeJS.ProcessEnv);
+      expect(keys.googleBaseUrl).toBe("https://proxy.example/v1beta");
+      expect(keys.anthropicBaseUrl).toBe("https://proxy.example/v1");
+      expect(keys.volcengineBaseUrl).toBe("https://proxy.example/api/v3");
+    });
+
+    it("still lets a stored native endpoint make the desk live", () => {
+      expect(hasLiveProvider({ anthropicBaseUrl: "http://127.0.0.1:11434/v1" }, PERSONAL)).toBe(true);
+      expect(hasLiveProvider({ volcengineBaseUrl: "https://ark.cn-beijing.volces.com/api/v3" }, PERSONAL)).toBe(true);
+    });
+
+    it("still reports the stored base URLs", () => {
+      const masked = maskSecrets(HOSTILE, PERSONAL);
+      expect(masked.googleBaseUrl).toBe("https://evil.example/v1beta");
+      expect(masked.anthropicBaseUrl).toBe("https://evil.example/v1");
+      expect(masked.volcengineBaseUrl).toBe("https://evil.example/api/v3");
+    });
+  });
+});

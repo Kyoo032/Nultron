@@ -5,6 +5,7 @@
   "untitled": "Tanpa judul",
   "projects": "Proyek",
   "newProject": "Proyek baru",
+  "projectNameLabel": "Nama proyek",
   "openProjectHint": "Buka proyek untuk berbicara dengan editor.",
   "phaseLater": "{label} (Tahap 2+)",
   "jobs": "pekerjaan {count}",
@@ -187,7 +188,8 @@
     "checkAgain": "Periksa lagi",
     "checking": "Memeriksa…",
     "installGuide": "Panduan instalasi",
-    "recheckFailed": "Tidak dapat menghubungi host lokal untuk memeriksa ulang. Coba lagi sebentar."
+    "recheckFailed": "Tidak dapat menghubungi host lokal untuk memeriksa ulang. Coba lagi sebentar.",
+    "hostedUnavailable": "Alat video belum disiapkan di server ini, jadi pemeriksaan, pemotongan, teks, dan ekspor mungkin belum berfungsi. Minta administrator Anda untuk mengaktifkannya."
   },
   "errors": {
     "apply": "Tidak dapat menerapkan suntingan",

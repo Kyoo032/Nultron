@@ -30,11 +30,14 @@ import {
   type LegalDraft,
   type PendingUpload,
 } from "@/lib/legal-view";
+import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import { useJobModel } from "@/lib/use-job-model";
 import { modelPickBody, studioModelPick } from "@/lib/model-choice";
 import { useJobStream } from "@/lib/use-job-stream";
 import { t } from "@/lib/i18n";
 import { ModeHeader } from "@/components/mode-header";
+import { isGatewayBlockedText } from "@/lib/gateway-blocked";
+import { NeedsKeyNote } from "@/components/needs-key-note";
 import { SettingsLinkHint } from "@/components/settings-link-hint";
 import { LegalMatterMap } from "@/components/legal-matter-map";
 import { LegalMatterPanel } from "@/components/legal-matter-panel";
@@ -78,6 +81,8 @@ export function LegalStudio() {
   const { models, model, pinned: modelPinned, setModel } = useJobModel("legal");
   const [verifierModel, setVerifierModel] = useState("");
   const job = useJobStream<unknown>();
+  // Nultron Enterprise: a signed-in tenant may open the desk before adding a key. Hosted only; false elsewhere.
+  const needsKey = useHostedNeedsKey();
   const [draft, setDraft] = useState<LegalDraft>(DEFAULT_LEGAL_DRAFT);
   const [matter, setMatter] = useState<LegalMatterRecord | null>(null);
   const [matters, setMatters] = useState<LegalMatterRecord[]>([]);
@@ -196,7 +201,7 @@ export function LegalStudio() {
   }
 
   async function onRun() {
-    if (!matter || !ready || locked) {
+    if (!matter || !ready || locked || needsKey) {
       return;
     }
     setBusy("save");
@@ -329,7 +334,7 @@ export function LegalStudio() {
                     type="button"
                     className="btn btn-primary"
                     onClick={() => void onRun()}
-                    disabled={!ready || locked}
+                    disabled={!ready || locked || needsKey}
                     title={ready ? undefined : t("legal.studio.runHint")}
                     data-testid="legal-run"
                   >
@@ -351,7 +356,8 @@ export function LegalStudio() {
             }
           />
         </div>
-        {error ? (
+        {needsKey ? <NeedsKeyNote testId="legal-needs-key" className="mb-4 text-sm text-[var(--text-2)]" /> : null}
+        {error && !isGatewayBlockedText(error) ? (
           <p className="mb-4 text-sm text-[var(--danger)]" role="alert" data-testid="legal-error">
             {error}
             {needsSettingsHint(error, job.error?.code, job.error?.status) && !/settings/i.test(error) ? (
@@ -388,7 +394,7 @@ export function LegalStudio() {
         ) : null}
 
         {screen === "new" ? (
-          <div className="grid items-start gap-5 lg:[grid-template-columns:minmax(0,1fr)_minmax(0,1fr)]">
+          <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
             <div className="lg:col-span-2">
               <MascotSlot mode="legal" placement="empty" />
             </div>

@@ -117,7 +117,7 @@ export function MarketWatchlistInput({ tickers, onChange, disabled = false, test
       </label>
       <div className="relative">
         <div
-          className="input mt-2 flex min-h-[46px] flex-wrap items-center gap-1.5 py-1.5"
+          className="input input-shell mt-2 flex min-h-[46px] flex-wrap items-center gap-1.5 py-1.5"
           data-testid={`${testIdPrefix}-watchlist-input`}
         >
           {tickers.map((ticker) => (
@@ -156,7 +156,7 @@ export function MarketWatchlistInput({ tickers, onChange, disabled = false, test
               event.preventDefault();
               commit(`${draft} ${event.clipboardData.getData("text")}`);
             }}
-            className="min-w-[8rem] flex-1 bg-transparent font-mono uppercase outline-none placeholder:normal-case"
+            className="min-w-[8rem] flex-1 bg-transparent px-0.5 font-mono uppercase focus-visible:outline-none placeholder:normal-case"
             placeholder={
               tickers.length === 0
                 ? t("market.watchlist.placeholder")

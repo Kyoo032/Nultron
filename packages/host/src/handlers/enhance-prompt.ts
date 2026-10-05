@@ -4,6 +4,7 @@ import {
   enhanceUserPrompt,
   hasLiveProvider,
   isEnhanceSurface,
+  isServerMode,
   resolveChatModel,
   resolveRuntimeMode,
   stubEnhancePrompt,
@@ -16,7 +17,7 @@ import { loadSettings } from "../settings-store";
 import { requireGatewayAllowed } from "../gateway-gate";
 import { getBootLocale } from "../locale-boot";
 import { collectJobAssistantText } from "../job-regen";
-import { listSelectableModels, modeCatalogPayload } from "../selectable-models";
+import { listSelectableModels, modeDefaultsFor } from "../selectable-models";
 
 function readText(body: unknown): string {
   if (!body || typeof body !== "object") {
@@ -42,13 +43,16 @@ export async function handlePostEnhancePrompt(request: HostRequest): Promise<Hos
       settingsHasKey: hasLiveProvider(settings),
       envRuntime: process.env.AGENTFORGE_RUNTIME,
     });
-    if (mode === "stub") {
+    // Stub text is for a desk running offline or under test. The hosted server never stubs: a tenant
+    // with no key is told so by the same gate as every other route (403 gateway_blocked, needs_key),
+    // not handed a "rewrite" no model made. On a desk this condition is exactly what it always was.
+    if (mode === "stub" && !isServerMode()) {
       return jsonOk({ text: stubEnhancePrompt(text, surface, locale), source: "stub" });
     }
     // Past the stub short-circuit this is a real model call, so the gate decides.
     requireGatewayAllowed(settings, { tenant });
-    const catalog = listSelectableModels();
-    const { defaults } = modeCatalogPayload();
+    const catalog = listSelectableModels(tenant);
+    const defaults = modeDefaultsFor(tenant);
     const requested =
       request.body &&
       typeof request.body === "object" &&
