@@ -611,6 +611,12 @@ Host and renderer, both products. Nothing packed.
 - **Shape toolbar clicks keep the selection.** On the simple Presentation stage (starter and Education lesson), a pointerdown on Duplicate, Fill, Stroke, the shape text, or Remove used to clear the selection because the toolbar is drawn inside the stage. The stage now ignores that toolbar, so the click runs. Open Slide is unchanged.
 - **Edit transport and the timeline hint follow the desk language.** `edit-play` and the timeline zoom, hint, and trim names read the `edit` catalog (`Putar` / `snap: bingkai…` on `id`). The rest of the Edit chrome below the header is still literal English.
 
+## Meeting harness, 2026-09-28 (not packed)
+
+Both products share the pipeline. Nothing packed. No new control on the Meeting screen.
+
+- **Meeting drops a date or a figure the transcript never said, and asks once more for a translation that is not the same sheet.** The minutes call keeps its checks and its one repair round (`packages/host/src/meeting/minutes-checks.ts`); a prose answer is the `minutes-shape` check's repair, so there is no second retry on top. After it the code settles the sheet with no further model call (`settleParsedMinutes`, `packages/core/src/meeting/sheet.ts`): names, then a `heldOn` or due date the transcript never says is cleared, and a number it never says becomes `[figure not said]`. A decision that quotes a date the repair did not fix is therefore saved with that marker in place of the number; the verdicts on the artifact still say the check failed. The translation is read the same way and compared with the sheet (counts, owners, dates, provisional marks, figures, `minutesAgree`); a miss is asked once more, and a second miss is `translation_disagreed` (502, desk-language message): the minutes stay, no translation is saved. Progress labels, including the repair step, follow the desk language (`meetingPhaseLabel`, `packages/core/src/meeting/copy.ts`), and a `grounding` phase sits between writing and saving. Stub runtime still refuses the run before any of that.
+
 ## Knowledge harness, 2026-09-28 (not packed)
 
 Host and core, both products. Nothing packed. No new control on `/knowledge`.

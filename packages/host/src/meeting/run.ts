@@ -1,10 +1,15 @@
 /**
- * Meeting mode — the run: recording → transcript → minutes → the other language.
+ * Meeting mode — the run: recording → transcript → minutes sheet → the same sheet in the other language.
  *
  * Every phase is resumable on its own, because they fail for different reasons and for different
  * lengths of time. Transcription costs a gateway call per ten minutes of audio and is the step
  * worth not repeating, so it is persisted before the minutes are written. A desk with no
  * recogniser on its key skips straight to the minutes over a pasted transcript.
+ *
+ * The minutes call runs its checks and one repair round (`./minutes-checks`). Names, dates, and
+ * figures the transcript does not support are then stripped in code, with no further model call.
+ * The translation is asked once more only when it is not that same sheet, and when it still
+ * disagrees the minutes stay and the translation is not saved.
  */
 
 import { rm } from "node:fs/promises";
@@ -23,13 +28,18 @@ import { harnessSpecFor } from "@agentforge/core/harness";
 import {
   MEETING_MINUTES_SYSTEM,
   MEETING_TRANSLATE_SYSTEM,
-  guardMinutesNames,
+  MeetingSheetError,
+  MeetingTranslationError,
+  emptyMinutesMessage,
+  invalidMinutesMessage,
   meetingMinutesToMarkdown,
+  meetingPhaseLabel,
   meetingTranscriptToMarkdown,
   minutesPrompt,
+  settleParsedMinutes,
   transcriptPlainText,
-  translatePrompt,
-  type MeetingMinutes,
+  translateMeetingSheet,
+  translationDisagreedMessage,
   type MeetingTranscript,
 } from "@agentforge/core/meeting";
 import { runChecked, type RunCheckedResult } from "../harness/run-checked";
@@ -84,12 +94,17 @@ export function resolveMeetingModel(explicit: string | undefined, tenant: Settin
   return resolveChatModel(explicit, settings.documentGenModel || defaults.meeting, listSelectableModels(scope));
 }
 
-function parseMinutes(raw: string): MeetingMinutes {
-  const parsed = parseMinutesDraft(raw);
-  if (!parsed.ok) {
-    throw minutesParseError(parsed);
+/** Desk-locale copy for a translation that was not the sheet. The model never sees these strings. */
+function meetingFailure(error: unknown): never {
+  if (error instanceof MeetingTranslationError) {
+    throw new ApiError("translation_disagreed", translationDisagreedMessage(localeForRun()), 502);
   }
-  return parsed.minutes;
+  if (error instanceof MeetingSheetError) {
+    const message =
+      error.code === "generation_failed" ? emptyMinutesMessage(localeForRun()) : invalidMinutesMessage(localeForRun());
+    throw new ApiError(error.code, message, 502);
+  }
+  throw error;
 }
 
 /** Saving an artifact never fails the run; the minutes are still returned to the caller. */
@@ -319,7 +334,7 @@ async function writeMinutes(
       repairRounds: harnessSpecFor("meeting").repairRounds,
       ...(signal ? { signal } : {}),
       onRound: () =>
-        options.emit({ type: "job.step", phase: "minuting", label: "Fixing what the checks found in the minutes" }),
+        options.emit({ type: "job.step", phase: "minuting", label: meetingPhaseLabel("fixing", localeForRun()) }),
     });
   } catch (error) {
     // runChecked rethrows the signal's own reason; the job's cancel is its 499 `aborted`.
@@ -337,17 +352,25 @@ async function writeMinutes(
   if (!parsed.ok) {
     throw minutesParseError(parsed);
   }
-  const guarded = guardMinutesNames(parsed.minutes, transcript);
-  if (guarded.replaced > 0) {
-    log.warn("meeting_minutes_names_guarded", { replaced: guarded.replaced });
+  // The checks and the repair asked the model; this is the code's last word on names, dates and figures.
+  const settled = settleParsedMinutes(parsed.minutes, transcript);
+  if (settled.replacedNames > 0) {
+    log.warn("meeting_minutes_names_guarded", { replaced: settled.replacedNames });
   }
+  if (settled.clearedDates > 0 || settled.replacedFigures > 0) {
+    log.warn("meeting_minutes_grounded", {
+      clearedDates: settled.clearedDates,
+      replacedFigures: settled.replacedFigures,
+    });
+  }
+  options.emit({ type: "job.phase", phase: "grounding", label: meetingPhaseLabel("grounding", localeForRun()) });
   return {
     record: {
       locale,
-      minutes: guarded.minutes,
+      minutes: settled.minutes,
       artifactId: "",
       model: result.output.model,
-      unverifiedNames: guarded.unverified,
+      unverifiedNames: settled.unverifiedNames,
       checks: checksRecordOf(summary),
     },
   };
@@ -394,7 +417,9 @@ type MinutesRunOptions = {
 /**
  * Transcript → minutes in the meeting's own language, then the same minutes in the other one.
  * Translation is a second model call over the finished JSON rather than a second reading of the
- * transcript, so the two languages cannot disagree about what was decided.
+ * transcript, so the two languages cannot disagree about what was decided. A translation that
+ * changes the sheet is asked once more; if it still disagrees, the minutes stay and the
+ * translation is not saved.
  */
 export async function generateMinutes(
   tenant: TenantContext,
@@ -420,7 +445,7 @@ export async function generateMinutes(
   const locale = parseAppLocale(meeting.locale);
 
   throwIfJobAborted(options.abortSignal);
-  emit({ type: "job.phase", phase: "minuting", label: "Writing the minutes" });
+  emit({ type: "job.phase", phase: "minuting", label: meetingPhaseLabel("writing", localeForRun()) });
   const written = await writeMinutes(tenant, meeting, transcript, locale, model, {
     emit,
     signal: options.abortSignal,
@@ -428,7 +453,7 @@ export async function generateMinutes(
   });
   // Minutes the person cancelled are not saved as an artifact or a work card.
   throwIfJobAborted(options.abortSignal);
-  emit({ type: "job.phase", phase: "saving", label: "Saving the minutes" });
+  emit({ type: "job.phase", phase: "saving", label: meetingPhaseLabel("saving", localeForRun()) });
   const minutes = await saveMinutesArtifact(tenant, meeting, written.record, "minutes");
   // On the meeting before the translation starts, so a translation that fails cannot take the
   // minutes with it. An earlier translation described earlier minutes, so it is cleared here.
@@ -439,11 +464,6 @@ export async function generateMinutes(
 
   throwIfJobAborted(options.abortSignal);
   const target = otherLocale(locale);
-  emit({
-    type: "job.phase",
-    phase: "translating",
-    label: `Translating to ${target === "id" ? "Indonesian" : "English"}`,
-  });
   const translation = await translateMinutes(
     tenant,
     meeting,
@@ -452,14 +472,22 @@ export async function generateMinutes(
     model,
     options.abortSignal,
     modelExplicit,
+    (attempt) =>
+      emit({
+        type: "job.phase",
+        phase: "translating",
+        label: meetingPhaseLabel(attempt === 1 ? "translating" : "translating-again", localeForRun()),
+      }),
   );
   return meetingStore().update(tenant, meetingId, { translation });
 }
 
 /**
- * The finished minutes in the other language. The guard runs again on the result: a translator
- * that hallucinates a name is exactly as wrong as a writer that does, and the transcript is still
- * the only evidence either of them has.
+ * The finished minutes in the other language. The guards run again on the result: a translator
+ * that hallucinates a name, a date or a figure is exactly as wrong as a writer that does, and the
+ * transcript is still the only evidence either of them has. A translation that is not the same
+ * sheet (counts, owners, dates, provisional marks, figures) is asked once more, and a second miss
+ * is `translation_disagreed`: nothing is saved.
  */
 export async function translateMinutes(
   tenant: TenantContext,
@@ -469,33 +497,51 @@ export async function translateMinutes(
   model: string,
   signal?: AbortSignal,
   modelExplicit = false,
+  onAttempt?: (attempt: 1 | 2) => void,
 ): Promise<MeetingMinutesRecord> {
-  const run = await collectJobAssistantRun({
-    tenant,
-    model,
-    modelExplicit,
-    systemPrompt: withOutputLanguage(MEETING_TRANSLATE_SYSTEM, "meeting", target),
-    runPrefix: "meeting-translate",
-    agentId: "meeting",
-    jobMode: "meeting",
-    versionId: "meeting-translate",
-    prompt: translatePrompt(source.minutes, target),
-    locale: target,
-    ...(signal ? { signal } : {}),
-  });
+  const transcript = meeting.transcript ? transcriptPlainText(meeting.transcript) : "";
+  let answered = model;
+  let settled: Awaited<ReturnType<typeof translateMeetingSheet>>;
+  try {
+    settled = await translateMeetingSheet({
+      transcript,
+      source: source.minutes,
+      locale: target,
+      ask: async (prompt) => {
+        const run = await collectJobAssistantRun({
+          tenant,
+          model,
+          modelExplicit,
+          systemPrompt: withOutputLanguage(MEETING_TRANSLATE_SYSTEM, "meeting", target),
+          runPrefix: "meeting-translate",
+          agentId: "meeting",
+          jobMode: "meeting",
+          versionId: "meeting-translate",
+          prompt,
+          locale: target,
+          ...(signal ? { signal } : {}),
+        });
+        answered = run.model;
+        return run.text;
+      },
+      onAttempt,
+    });
+  } catch (error) {
+    // A cancel is the job's 499 `aborted`, whatever the call it landed in threw.
+    throwIfJobAborted(signal);
+    return meetingFailure(error);
+  }
   // A translation the person cancelled is not saved as a second artifact.
   throwIfJobAborted(signal);
-  const transcript = meeting.transcript ? transcriptPlainText(meeting.transcript) : "";
-  const guarded = guardMinutesNames(parseMinutes(run.text), transcript);
   return saveMinutesArtifact(
     tenant,
     meeting,
     {
       locale: target,
-      minutes: guarded.minutes,
+      minutes: settled.minutes,
       artifactId: "",
-      model: run.model,
-      unverifiedNames: guarded.unverified,
+      model: answered,
+      unverifiedNames: settled.unverifiedNames,
       // The translation is not checked or repaired: it claims no verdicts.
       checks: null,
     },
