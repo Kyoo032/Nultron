@@ -21,7 +21,7 @@ The specs in the tree at the verified line:
 | `chat` (`modes/chat.ts`) | agent | `DEFAULT_CHAT_TOOLS`, 15 keys: calculator, datetime, web_search, image_generate, video_generate, past_sessions, web_fetch, knowledge_search, the six file tools, and run_code | 12 / 40 / write_file 20, edit_file 20, delete_file 10, web_fetch 8, run_code 6 | 0 |
 | `data` (`modes/data.ts`) | agent | run_sql, calculator, run_code | 6 / 60 / run_sql 8, run_code 4 | 0 |
 | `edit` (`modes/edit.ts`) | agent | every key in `EDIT_TOOLS` | 6 / 60 | 0 |
-| `market` (`modes/market.ts`) | pipeline | the union any desk binds: five market tools, calculator, web_search, web_fetch | 6 / 60 | 0 |
+| `market` (`modes/market.ts`) | pipeline | the union any desk binds: five market tools, calculator, web_search, web_fetch | 6 / 60 | 1. Not a `runChecked` round: a draft that states a figure the packet lacks is rewritten once from the packet with no tools and announced as `job.round`, then the number guard marks what is left (`repairFlaggedFigures`, `packages/host/src/market-generate.ts:568`, [`market-watch.md`](market-watch.md)). The quiet-source gather retry asks no model and is not a round. |
 | `documents`, `research`, `finance`, `meeting`, `presentations` | pipeline | none | 6 / 60 | 1 |
 | `legal` (`modes/legal.ts`) | pipeline | none | 6 / 60 | `LEGAL_CAPS.maxRounds`, which is 3 |
 | `images`, `videos`, `music` | media | none | 6 / 60 | 0 |
