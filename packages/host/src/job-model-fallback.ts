@@ -2,9 +2,11 @@ import {
   isGatewayUnavailableFailure,
   modelFallbackNotice,
   nextJobFallbackModel,
+  resetLearnedEffortLimits,
   type JobMode,
   type JobModelFallbackNotice,
 } from "@agentforge/core";
+import type { ModelCacheScope } from "./model-cache";
 import { listSelectableModels } from "./selectable-models";
 
 /**
@@ -50,9 +52,21 @@ export function isJobModelDown(model: string, now: number = Date.now()): boolean
   return true;
 }
 
-/** Test hook, and what Settings calls when the key or the gateway changes. */
+/** Test hook for the down circuit alone. Production code calls `resetModelReliabilityState`. */
 export function resetJobModelCircuit(): void {
   downUntil.clear();
+}
+
+/**
+ * Everything this process has learned about which models misbehave, forgotten: the models a job
+ * skips because they were unreachable, and the Thinking levels the runtime learned a model refuses
+ * (`resetLearnedEffortLimits`, core). Saving Settings, forgetting the key and resetting a tenant
+ * call this, because a new key or endpoint may sit in front of a different upstream and none of it
+ * is known to hold there.
+ */
+export function resetModelReliabilityState(): void {
+  resetJobModelCircuit();
+  resetLearnedEffortLimits();
 }
 
 /** One attempt's outcome. The original error is carried, never wrapped: its ApiError status matters. */
@@ -83,6 +97,13 @@ export type JobModelFallbackOptions = {
   modelExplicit?: boolean;
   /** Chat ids this workspace lists. Defaults to the live selectable catalog. */
   availableModelIds?: string[];
+  /** Whose catalogue that default is. Every job call carries its tenant; only the hosted server reads it. */
+  tenant?: ModelCacheScope;
+  /**
+   * The job's cancel. Once it has fired a failure is the caller's answer, not the model's: nothing is
+   * retried on a stand-in and the model is not marked down for it.
+   */
+  signal?: AbortSignal;
   now?: () => number;
 };
 
@@ -100,7 +121,7 @@ export function jobFailureMessage(error: unknown): string {
 }
 
 function availableIds(options: JobModelFallbackOptions): string[] {
-  return options.availableModelIds ?? listSelectableModels().map((model) => model.id);
+  return options.availableModelIds ?? listSelectableModels(options.tenant).map((model) => model.id);
 }
 
 function pickNext(options: JobModelFallbackOptions, current: string, now: number): string | undefined {
@@ -127,7 +148,7 @@ function maySwapModel(
   failure: { error: unknown; streamed: boolean },
   options: JobModelFallbackOptions,
 ): boolean {
-  if (options.modelExplicit === true || failure.streamed) {
+  if (options.modelExplicit === true || failure.streamed || options.signal?.aborted === true) {
     return false;
   }
   return isGatewayUnavailableFailure(jobFailureMessage(failure.error));

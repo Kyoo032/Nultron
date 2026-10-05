@@ -68,6 +68,7 @@ export const webSearchTool = defineTool({
   name: "Web search",
   description: "Search the public web. Returns titles, URLs, and snippets.",
   capability: "web",
+  trust: "network",
   schema: z.object({
     query: z.string().min(1).describe("Search query"),
   }),

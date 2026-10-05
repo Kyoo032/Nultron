@@ -1,0 +1,58 @@
+{
+  "control": {
+    "label": "Folder on this computer",
+    "open": "Open folder",
+    "opening": "Opening…",
+    "openHint": "Let Chat read the files in one folder and propose changes. Nothing is written until you approve it.",
+    "chip": "Folder: {name}",
+    "unnamed": "Folder",
+    "close": "Close folder",
+    "closeNamed": "Close folder {name}",
+    "closeWithPending": "Close folder {name}. Changes waiting for your approval will be dropped."
+  },
+  "proposals": {
+    "title": "Changes to approve",
+    "list": "Changes waiting for your approval",
+    "kind": {
+      "write": "Change",
+      "delete": "Delete"
+    },
+    "showDiff": "Show changes",
+    "hideDiff": "Hide changes",
+    "approve": "Approve",
+    "approving": "Applying…",
+    "approveNamed": "Approve the change to {path}",
+    "reject": "Reject",
+    "rejecting": "Rejecting…",
+    "rejectNamed": "Reject the change to {path}",
+    "dismiss": "Dismiss",
+    "dismissNamed": "Dismiss the note about {path}"
+  },
+  "diff": {
+    "loading": "Loading the changes…",
+    "added": "Added",
+    "removed": "Removed",
+    "gap": "{count} unchanged lines",
+    "staleNow": "This file has changed since the change was proposed. Approving it will not write anything.",
+    "noTextChange": "The text is the same. Only the line endings or the end of the file differ.",
+    "truncated": "Showing the first {max} lines of each side. The rest is not shown here, and approving still applies the whole change."
+  },
+  "outcome": {
+    "applied": "Applied. Your folder now has this change.",
+    "appliedDelete": "Applied. The file was deleted.",
+    "stale": "Not applied. The file changed after this was proposed, so nothing was written. Ask Chat for a fresh change.",
+    "failedDenied": "Not applied. That file is protected or outside the folder you opened.",
+    "failedIo": "Not applied. The file could not be written. Check that it is not open in another program or read-only.",
+    "rejected": "Rejected. Nothing was changed.",
+    "gone": "This change was already decided."
+  },
+  "error": {
+    "folder_unavailable": "Folders can only be opened in the desktop app, on your own computer.",
+    "folder_mount_ipc_only": "Pick the folder from the desktop app's window. It cannot be opened from here.",
+    "folder_mount_refused": "That folder cannot be opened. A whole drive, your whole home folder, system folders, and folders that hold keys or this app's own data are not allowed. Pick a different folder.",
+    "folder_not_mounted": "No folder is open. Open a folder first.",
+    "network": "Could not reach the app. Try again.",
+    "noPicker": "This version of the app cannot open a folder picker. Update the app and try again.",
+    "generic": "Something went wrong with the folder. Try again."
+  }
+}

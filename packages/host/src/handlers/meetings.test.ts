@@ -106,6 +106,30 @@ describe("meetings CRUD", () => {
     expect(await json("DELETE", `/api/v1/meetings/${id}`)).toMatchObject({ status: 200 });
     expect(await json("DELETE", `/api/v1/meetings/${id}`)).toMatchObject({ status: 404 });
   });
+
+  it("takes the pasted transcript's artifact with it, and leaves another meeting's alone", async () => {
+    // Finding (a), 2026-10-01: the delete panel says the transcript goes with the meeting, but
+    // `GET /api/v1/artifacts` kept listing "<title> — transcript" after the confirm.
+    const gone = await newMeeting("Delete me with my transcript");
+    const kept = await newMeeting("Keep my transcript");
+    await json("POST", `/api/v1/meetings/${gone}/transcript`, { text: "Rina: bye." });
+    await json("POST", `/api/v1/meetings/${kept}/transcript`, { text: "Sam: stay." });
+    // The route reads `request.query`, not the path, so ask the way the client does.
+    const list = async (): Promise<string[]> => {
+      const result = await dispatch(request("GET", "/api/v1/artifacts", { query: { mode: "meeting" } }));
+      return (result as { body: { items: Array<{ title: string }> } }).body.items.map((item) => item.title);
+    };
+    expect(await list()).toEqual(
+      expect.arrayContaining(["Delete me with my transcript — transcript", "Keep my transcript — transcript"]),
+    );
+
+    expect(await json("DELETE", `/api/v1/meetings/${gone}`)).toMatchObject({ status: 200 });
+
+    const after = await list();
+    expect(after).not.toContain("Delete me with my transcript — transcript");
+    expect(after).toContain("Keep my transcript — transcript");
+    expect(await json("GET", `/api/v1/meetings/${kept}`)).toMatchObject({ status: 200 });
+  });
 });
 
 describe("recording upload", () => {
@@ -182,6 +206,11 @@ describe("pasted transcript", () => {
     const items = (result as { body: { items: Array<{ mode: string; kind: string; title: string }> } }).body.items;
     expect(items.some((item) => item.mode === "meeting" && item.kind === "transcript")).toBe(true);
     expect(items.some((item) => item.title === "Artifact check — transcript")).toBe(true);
+    // The stamp that lets a meeting delete find its artifacts (`meeting/artifacts.ts`).
+    const saved = items.find((item) => item.title === "Artifact check — transcript") as {
+      meta?: { meetingId?: string };
+    };
+    expect(saved.meta?.meetingId).toBe(id);
   });
 
   it("refuses an empty transcript", async () => {

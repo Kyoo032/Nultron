@@ -45,4 +45,9 @@ export type FinanceTaskRunResult = {
  * `null` export means "reuse the brief's line-item parse", which is what every task starts out
  * doing; the answer must still be something the user confirms before anything is computed.
  */
-export type FinanceTaskParser = (tenant: TenantContext, body: unknown) => Promise<unknown>;
+export type FinanceTaskParser = (
+  tenant: TenantContext,
+  body: unknown,
+  /** The request's cancel. A parser that asks the model hands it on; the others ignore it. */
+  abortSignal?: AbortSignal,
+) => Promise<unknown>;

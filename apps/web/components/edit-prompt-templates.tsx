@@ -117,7 +117,7 @@ export function EditPromptTemplates({ onPick, selectedId }: Props) {
                 >
                   <span className="block truncate">{template.title}</span>
                   <span className="mt-0.5 flex items-center gap-1 text-xs text-[var(--text-3)]">
-                    <span className="rounded border border-[var(--line)] px-1 leading-4">{template.aspect}</span>
+                    <span className="tag">{template.aspect}</span>
                     <span>{template.seconds}s</span>
                     <span className="truncate">{template.source.site}</span>
                   </span>

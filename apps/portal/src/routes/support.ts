@@ -17,7 +17,7 @@ import { htmlResponse } from "../security/headers";
 import type { RateLimiter } from "../security/rate-limit";
 import { readWebSession, type WebSession, WEB_SESSION_TTL_MS } from "../security/web-session";
 import type { PortalRequest, PortalResponse } from "../server";
-import { negotiateLocale, translator, type PortalLocale, type Translate } from "../views/i18n";
+import { negotiateLocale, translator, waitText, type PortalLocale, type Translate } from "../views/i18n";
 import { errorPage } from "../views/pages";
 
 export interface RequestContext {
@@ -97,7 +97,7 @@ export function codeErrorMessage(
   switch (refused.reason) {
     case "locked":
       // The address, not the code: a fresh code is refused too, so "start again" would be wrong.
-      return context.t("code.locked");
+      return context.t("code.locked", { wait: waitText(context.t, refused.retryAfter ?? 24 * 60 * 60) });
     case "too_many_attempts":
       return context.t("code.exhausted");
     case "expired":

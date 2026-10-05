@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { RailRecentSkeleton } from "@/components/rail-recent-skeleton";
 import { Link, usePathname, useRouter, useSearchParams } from "@/lib/nav";
 import { t } from "@/lib/i18n";
+import { readRecentShape, shapeOfThreads, writeRecentShape } from "@/lib/rail-recent-shape";
+import { browserShellModesStore } from "@/lib/shell-modes";
 import { RAIL_RECENT_THREADS, takeRecentThreads } from "@/lib/thread-groups";
 import { useChatThreads, type ChatThread } from "@/lib/use-chat-threads";
 
@@ -27,8 +30,16 @@ export function RailRecentThreads({ collapsed = false }: { collapsed?: boolean }
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { threads, error, deletingId, removeThread } = useChatThreads({ scope: "chat" });
+  const { threads, error, deletingId, removeThread, loaded } = useChatThreads({ scope: "chat" });
   const [expanded, setExpanded] = useState(false);
+  // The Account group is pinned under the rows, so rows arriving after the first frame would slide it
+  // down. Until the list answers, the block holds the room the last load took (`lib/rail-recent-shape.ts`).
+  const [startShape] = useState(() => readRecentShape(browserShellModesStore()));
+  useEffect(() => {
+    if (loaded) {
+      writeRecentShape(browserShellModesStore(), shapeOfThreads(threads.length));
+    }
+  }, [loaded, threads.length]);
 
   const onChat = pathname === CHAT_PATH;
   const openThread = searchParams.get("thread");
@@ -74,6 +85,8 @@ export function RailRecentThreads({ collapsed = false }: { collapsed?: boolean }
           {error}
         </p>
       ) : null}
+
+      {loaded ? null : <RailRecentSkeleton rows={startShape.rows} more={startShape.more} />}
 
       {shown.map((thread) => {
         const active = activeThread === thread.id;

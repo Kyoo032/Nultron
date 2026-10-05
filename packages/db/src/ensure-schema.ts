@@ -84,7 +84,7 @@ export function migrationsFolder(): string {
   if (existsSync(fromRoot)) {
     return fromRoot;
   }
-  throw new Error(`DPSBuddy migrations folder not found. Tried:\n${tried.map((p) => `  - ${p}`).join("\n")}`);
+  throw new Error(`Nultron migrations folder not found. Tried:\n${tried.map((p) => `  - ${p}`).join("\n")}`);
 }
 
 function readMigrations(folder: string): Migration[] {
@@ -247,6 +247,7 @@ export function ensureSchema(sqlite: Database.Database): void {
   ensureTenantStateTable(sqlite);
   ensureTenantStorageTable(sqlite);
   ensureTenantResetAuditTable(sqlite);
+  ensureDeskFileTables(sqlite);
   ensureWorkspaceColumns(sqlite);
   assertKernelTables(sqlite);
 }
@@ -465,9 +466,7 @@ function ensureTenantTables(sqlite: Database.Database): void {
     return;
   }
   if (!have.has("tenant_id")) {
-    sqlite.exec(
-      "ALTER TABLE `organizations` ADD `tenant_id` text REFERENCES `tenants`(`id`) ON DELETE cascade",
-    );
+    sqlite.exec("ALTER TABLE `organizations` ADD `tenant_id` text REFERENCES `tenants`(`id`) ON DELETE cascade");
   }
   // Backfills the column this healer just added, and repairs any row a partial 0015 left null.
   sqlite.exec("UPDATE `organizations` SET `tenant_id` = 'local-tenant' WHERE `tenant_id` IS NULL");
@@ -518,9 +517,7 @@ function ensureTenantUsageTable(sqlite: Database.Database): void {
   if (usage.size > 0 && !usage.has("billing_period_start")) {
     sqlite.exec("ALTER TABLE `tenant_usage` ADD `billing_period_start` integer");
   }
-  sqlite.exec(
-    "CREATE INDEX IF NOT EXISTS tenant_usage_period_idx ON tenant_usage (tenant_id, billing_period_start)",
-  );
+  sqlite.exec("CREATE INDEX IF NOT EXISTS tenant_usage_period_idx ON tenant_usage (tenant_id, billing_period_start)");
 }
 
 /**
@@ -629,6 +626,57 @@ function ensureTenantResetAuditTable(sqlite: Database.Database): void {
       finished_at integer
     );
     CREATE INDEX IF NOT EXISTS tenant_reset_audit_tenant_idx ON tenant_reset_audit (tenant_id, started_at);
+  `);
+}
+
+/**
+ * Desk files and folder proposals, for a database stamped past 0022 without the tables.
+ * Mirrors drizzle/0022_desk_files.sql exactly.
+ */
+function ensureDeskFileTables(sqlite: Database.Database): void {
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS desk_files (
+      id text PRIMARY KEY NOT NULL,
+      workspace_id text NOT NULL,
+      path text NOT NULL,
+      head_version integer NOT NULL,
+      bytes integer NOT NULL,
+      mime text NOT NULL,
+      sha256 text NOT NULL,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL,
+      deleted_at integer
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS desk_files_live_path_unique ON desk_files (workspace_id, path) WHERE deleted_at IS NULL;
+    CREATE INDEX IF NOT EXISTS desk_files_ws_idx ON desk_files (workspace_id);
+    CREATE TABLE IF NOT EXISTS desk_file_versions (
+      file_id text NOT NULL REFERENCES desk_files(id) ON DELETE cascade,
+      version integer NOT NULL,
+      object_key text NOT NULL,
+      bytes integer NOT NULL,
+      sha256 text NOT NULL,
+      author_kind text NOT NULL,
+      author_id text NOT NULL,
+      mode text,
+      created_at integer NOT NULL,
+      PRIMARY KEY(file_id, version),
+      CONSTRAINT desk_file_versions_author_kind_check CHECK (author_kind IN ('user', 'agent'))
+    );
+    CREATE TABLE IF NOT EXISTS file_proposals (
+      id text PRIMARY KEY NOT NULL,
+      workspace_id text NOT NULL,
+      run_id text NOT NULL,
+      path text NOT NULL,
+      kind text NOT NULL,
+      before_sha256 text,
+      after_body text,
+      status text NOT NULL,
+      created_at integer NOT NULL,
+      decided_at integer,
+      CONSTRAINT file_proposals_kind_check CHECK (kind IN ('write', 'delete')),
+      CONSTRAINT file_proposals_status_check CHECK (status IN ('pending', 'approved', 'applied', 'rejected', 'stale', 'failed'))
+    );
+    CREATE INDEX IF NOT EXISTS file_proposals_ws_status_idx ON file_proposals (workspace_id, status);
   `);
 }
 

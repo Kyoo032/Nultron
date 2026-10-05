@@ -91,6 +91,8 @@ export type ChatThreadsState = {
   error: string | null;
   /** Id currently being deleted, for the busy affordance. */
   deletingId: string | null;
+  /** False until the first list read has answered, whichever way it went. The rail draws placeholders until then. */
+  loaded: boolean;
   /** Confirms, deletes, drops the row. Resolves `true` when the thread is gone. */
   removeThread: (thread: ChatThread) => Promise<boolean>;
 };
@@ -105,6 +107,7 @@ export function useChatThreads({ scope, agentId }: { scope: ChatThreadScope; age
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -116,12 +119,14 @@ export function useChatThreads({ scope, agentId }: { scope: ChatThreadScope; age
         }
         setThreads(rows);
         setError(null);
+        setLoaded(true);
       } catch (failure) {
         if (cancelled) {
           return;
         }
         // A transient failure keeps the last good list on screen; only the error line is new.
         setError(failure instanceof Error ? failure.message : t("chat.error.loadSessions"));
+        setLoaded(true);
       }
     }
     void load();
@@ -162,5 +167,5 @@ export function useChatThreads({ scope, agentId }: { scope: ChatThreadScope; age
     [deletingId],
   );
 
-  return { threads, error, deletingId, removeThread };
+  return { threads, error, deletingId, removeThread, loaded };
 }

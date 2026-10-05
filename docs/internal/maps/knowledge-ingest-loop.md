@@ -19,7 +19,7 @@ All in `packages/host/src/handlers/knowledge.ts`, registered at `packages/host/s
 | Method | Path | Handler | Gate |
 |---|---|---|---|
 | GET | `/api/v1/knowledge` | `handleGetKnowledge` `:125` | open |
-| GET | `/api/v1/knowledge/context` | `handleGetKnowledgeContext` `:312` | gated `:316` |
+| GET | `/api/v1/knowledge/context` | `handleGetKnowledgeContext` `:306` | gated `:311`; retrieves (and embeds) only when given a `query`, 2026-10-02 |
 | GET | `/api/v1/knowledge/graph` | `handleGetKnowledgeGraph` `:218` | open |
 | POST | `/api/v1/knowledge/sources` | `handlePostKnowledgeSource` `:372` | gated `:376` |
 | POST | `/api/v1/knowledge/sources/url` | `handlePostKnowledgeSourceUrl` `:405` | gated `:409` |
@@ -39,7 +39,7 @@ There is no separate list route; listing rides on `GET /api/v1/knowledge`. `POST
 
 **Manual.** `addFileSource` (`packages/host/src/knowledge.ts:499`) mints a `crypto.randomUUID()` and calls `extractText(filename, mime, bytes)` (`packages/host/src/knowledge-extract.ts:243`). **Changed on 2026-09-17:** every extraction failure is now a structured 4xx with no row at all — `pdf_*`, `docx_*`, `document_*` and `unsupported_content_type` alike — where a `pdf_*` / `docx_*` failure used to be recorded as a `Failed` row answered `201`. The injection scan also runs *before* the write now, so a tripped upload is `400 injection_blocked` with no row and no stored bytes. It also writes the raw bytes to `tenantMediaRoot(tenant.tenantId)/knowledge/${organizationId}/${id}-${filename}` — the tenant prefix is empty for `local-tenant`, so a desktop install keeps `mediaRoot()/knowledge/<organizationId>/…` (`uploadDir`, `packages/host/src/knowledge.ts:450-452`; see [`tenant-storage.md`](tenant-storage.md)). `addUrlSource` (`:523-540`) forces HTTPS via `assertAllowedEndpointUrl`, fetches through `fetchPublicHttps` (SSRF guards, per-hop revalidation, byte and time caps), then routes the body through `htmlToText` or `plainToText`. `addPastedSource` caps at 2,000,000 chars with a 413 (`:564`, `:583-584`).
 
-**Automatic — the loop.** Every finished Chat turn and every job mode (Research, Data, Finance, Documents, Presentation, Images, Videos, Edit) becomes one "work card" through `upsertWorkSource` (`packages/host/src/knowledge-ingest.ts:25-85`), fired and forgotten from `packages/host/src/runs.ts:393`. It is **idempotent per `(workspace, origin.kind, origin.id)`** via `findSourceByOrigin` (`packages/host/src/knowledge.ts:211-218`), so re-running a thread rewrites one row instead of piling up duplicates.
+**Automatic — the loop.** Every finished Chat turn and every job mode (Research, Data, Finance, Documents, Presentation, Images, Videos, Edit) becomes one "work card" through `upsertWorkSource` (`packages/host/src/knowledge-ingest.ts:25-85`), fired and forgotten from `packages/host/src/runs.ts:395`. It is **idempotent per `(workspace, origin.kind, origin.id)`** via `findSourceByOrigin` (`packages/host/src/knowledge.ts:211-218`), so re-running a thread rewrites one row instead of piling up duplicates.
 
 ### The injection guard
 
@@ -47,7 +47,7 @@ There is no separate list route; listing rides on `GET /api/v1/knowledge`. `POST
 
 On a hit it **does not strip or sanitize**. It refuses to index and writes a `Failed` source row whose `error` is `injection_blocked (rule: <rule>)` (`packages/host/src/knowledge.ts:440-443`, `packages/host/src/knowledge-ingest.ts:63-70`).
 
-**The bypass** is the `injectionGuardBypass` boolean on `StoredSecrets` (`packages/core/src/secrets.ts:33`, `:80`), set through `POST /api/v1/settings` (`requestsOperatorOnlySettings`, `packages/host/src/handlers/settings.ts:176-184`), persisted per workspace in the encrypted settings file, read back at `packages/host/src/knowledge.ts:408-414` and `knowledge-ingest.ts:94-100`. When true the scan is skipped outright — `bypass ? null : scanInjection(...)`.
+**The bypass** is the `injectionGuardBypass` boolean on `StoredSecrets` (`packages/core/src/secrets.ts:34`, `:80`), set through `POST /api/v1/settings` (`requestsOperatorOnlySettings`, `packages/host/src/handlers/settings.ts:176-184`), persisted per workspace in the encrypted settings file, read back at `packages/host/src/knowledge.ts:408-414` and `knowledge-ingest.ts:94-100`. When true the scan is skipped outright — `bypass ? null : scanInjection(...)`.
 
 Source **names** get the same treatment, deliberately: an upload filename or a remote `<title>` is attacker-controlled the same way body text is, so `sanitizeSourceName` runs at index time and again at render time (`packages/host/src/knowledge.ts:367`, `:860`).
 
@@ -57,15 +57,15 @@ Source **names** get the same treatment, deliberately: an upload filename or a r
 
 `replaceSourceRows` (`packages/host/src/knowledge.ts:271-334`) commits the source row and one `knowledge_chunks` FTS5 row per chunk in **one immediate transaction, before embedding**. That ordering is the reason keyword search always works even when the embedding call fails.
 
-Then `indexThroughBackend` → `indexSourceVectors` (`packages/host/src/knowledge-embed.ts:149`) → `embedTextsWithModel` (`:95`), which POSTs to `${pinnedBase}/embeddings` in batches of 16 (`EMBED_BATCH`, `:16`). The endpoint is pinned the same way chat is: `resolveProviderKeys(settings).openaiBaseUrl` always returns `resolvedGatewayBaseUrl()`, so an owner-edited endpoint is silently ignored for embeddings (`packages/host/src/knowledge-embed.ts:62-64`, `packages/core/src/secrets.ts:323-324`).
+Then `indexThroughBackend` → `indexSourceVectors` (`packages/host/src/knowledge-embed.ts:149`) → `embedTextsWithModel` (`:95`), which POSTs to `${pinnedBase}/embeddings` in batches of 16 (`EMBED_BATCH`, `:16`). The endpoint is pinned the same way chat is: `resolveProviderKeys(settings).openaiBaseUrl` always returns `resolvedGatewayBaseUrl()`, so an owner-edited endpoint is silently ignored for embeddings (`packages/host/src/knowledge-embed.ts:62-64`, `packages/core/src/secrets.ts:335-336`).
 
 Vectors go to `knowledge_vectors` with the embedding stored as a **JSON-stringified `number[]`** (`packages/host/src/knowledge-embed.ts:192`, `:319`) — no vector column type, no ANN index.
 
 ### Retrieve and inject
 
-`retrieveChunks` (`packages/host/src/knowledge.ts:783-797`) → `SqliteBuiltinBackend.retrieve` (`packages/host/src/knowledge/backends/builtin.ts:250-273`) runs FTS5 bm25 and a cosine scan in parallel and fuses them with Reciprocal Rank Fusion (`fuseRrf`, `:155-176`, `RRF_K = 60`). Default `limit` is 4 (`packages/host/src/knowledge.ts:786`), vector floor `MIN_COSINE = 0.12` (`packages/host/src/knowledge-embed.ts:260`).
+`retrieveChunks` (`packages/host/src/knowledge.ts:865-879`) → `SqliteBuiltinBackend.retrieve` (`packages/host/src/knowledge/backends/builtin.ts:250-273`) runs FTS5 bm25 and a cosine scan in parallel and fuses them with Reciprocal Rank Fusion (`fuseRrf`, `:155-176`, `RRF_K = 60`). Default `limit` is 4 (`packages/host/src/knowledge.ts:868`), vector floor `MIN_COSINE = 0.12` (`packages/host/src/knowledge-embed.ts:260`).
 
-`knowledgeInjection` (`packages/host/src/knowledge.ts`) renders hits as `[n] <name>\n<body>` inside a `## Retrieved sources` block. When the question is non-empty and no chunk comes back, that block is the miss line instead of being omitted. It is called from exactly one product path: `startModalityRun` (`packages/host/src/runs.ts`), appended to the agent's system prompt. The Knowledge context popover route is the only other caller. `mapKnowledge` asks once more when the model text is not a map (`takeKnowledgeMapText`) and drops source ids that are not indexed (`groundKnowledgeMap`) before it saves.
+`knowledgeInjection` (`packages/host/src/knowledge.ts:940`) renders the hits (`renderRetrievedBlock`, `:923`) as `[n] <name>\n<body>` inside a `## Retrieved sources` block. When the question is non-empty and no chunk comes back, that block is the desk-language miss line (`knowledgeMissBlock`, `packages/core/src/knowledge/harness.ts`) instead of being omitted, and the Sources tokens count it. It is called from exactly one product path: `startModalityRun` (`packages/host/src/runs.ts:155`), appended to the agent's system prompt at `:158`. The Knowledge context popover route is the only other caller. The on-demand `knowledge_search` tool (`packages/host/src/knowledge-search-tool.ts`) calls `retrieveChunks` itself and says its own miss in its result note, so the miss line above is injection-only. `mapKnowledge` asks once more when the model text is not a map (`takeKnowledgeMapText`) and drops source ids that are not indexed (`groundKnowledgeMap`) before it saves.
 
 Afterwards, on a *completed* run only: `recordRetrievals` (`packages/host/src/knowledge-retrievals.ts:39-72`) writes one row per served chunk and projects a `retrieved` graph edge, and `recordCites` parses `[n]` markers out of the reply (`packages/host/src/knowledge-cites.ts`, fenced code excluded) and bumps `cites` edge weights.
 

@@ -32,6 +32,7 @@ import {
   taskFromParam,
   type FinanceTask,
 } from "@/lib/finance-task";
+import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import { useJobModel } from "@/lib/use-job-model";
 import { regenModelPick } from "@/lib/model-choice";
 import { useJobStream } from "@/lib/use-job-stream";
@@ -46,6 +47,8 @@ function needsSettingsHint(message: string): boolean {
 
 export function FinanceStudio() {
   const { productName } = useProductBrand();
+  // Nultron Enterprise: a signed-in tenant may open the desk before adding a key. Hosted only; false elsewhere.
+  const needsKey = useHostedNeedsKey();
   const { models, model, pinned: modelPinned, setModel } = useJobModel("finance");
   const job = useJobStream<FinanceResult>();
   const pathname = usePathname();
@@ -160,7 +163,7 @@ export function FinanceStudio() {
   }
 
   async function onParse() {
-    if (!figures.trim() || locked) {
+    if (!figures.trim() || locked || needsKey) {
       return;
     }
     setBusy("parse");
@@ -207,7 +210,11 @@ export function FinanceStudio() {
       return;
     }
     if (customRead) {
+      // A task that reads its own table (ratios, budget) does it on this machine: no key involved.
       customRead.run();
+      return;
+    }
+    if (needsKey) {
       return;
     }
     if (!figures.trim() && briefLooksLikeFigures(prompt)) {
@@ -221,7 +228,7 @@ export function FinanceStudio() {
     event.preventDefault();
     const language = uiLocale === "id" ? "id" : "en";
     const brief = prompt.trim() || defaultFinancePrompt(task, language);
-    if (!brief || locked) {
+    if (!brief || locked || needsKey) {
       return;
     }
     if (!ready) {
@@ -248,7 +255,7 @@ export function FinanceStudio() {
   }
 
   async function onRegenerate(index: number, payload: JobRegenSubmit) {
-    if (!result || locked) {
+    if (!result || locked || needsKey) {
       return;
     }
     setBusy("regen");
@@ -290,6 +297,8 @@ export function FinanceStudio() {
         productName={productName}
         error={error}
         notice={notice}
+        needsKey={needsKey}
+        readNeedsKey={needsKey && !customRead}
         needsHint={error ? needsSettingsHint(error) : false}
         ready={ready}
         canRead={canRead}

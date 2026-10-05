@@ -1,0 +1,84 @@
+# Tencent Cloud TKE (Jakarta), TCP-passthrough CLB, Caddy doing ACME. NOT APPLIED, NOT PROVEN.
+#
+# Nothing in this overlay has been applied to a cluster. It was written beside the local rehearsal so
+# the two stay one design, and every line that is a guess about TKE is marked. Read ../../README.md,
+# "Production overlay: what is unproven", before using it, and the "Must be true before the Tencent
+# Cloud deploy" list in docs/internal/security-register.md before pointing a domain at it.
+#
+# Before it can be applied:
+#   1. replace every `replace-me` below with the real names (site names, trusted origin, SMTP);
+#   2. cp secrets.env.example secrets.env and fill it from the secret manager. NEVER generate the wrap
+#      key on a laptop for a real deploy and never reuse a rehearsal value;
+#   3. create the registry secret out of band (never in git):
+#        kubectl -n nultron create secret docker-registry ghcr-pull --docker-server=ghcr.io \
+#          --docker-username=<github user> --docker-password=<classic PAT, read:packages>
+#   4. decide the portal (deck decision 2): this overlay deploys the stand-in, whose image is NOT
+#      built or published by anything yet (see the images block).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Every resource this overlay adds (Secrets, the CA ConfigMap, Mailpit, the StorageClass aside) belongs to the
+# same namespace as the base. The base's own `namespace:` does NOT reach resources declared here: without
+# this line they land in `default`, which is how the first rehearsal run leaked its generated Secrets.
+namespace: nultron
+
+resources:
+  - ../../base
+  - storageclass.yaml
+  - caddy-data-pvc.yaml
+
+images:
+  - name: nultron-ent
+    newName: ghcr.io/kyoo032/nultron-ent
+    # The tag scripts/release-web.mjs pushed (ent-YYYY.MM.DD). Pin it; never `latest`.
+    newTag: ent-REPLACE-ME
+  - name: nultron-portal
+    # scripts/release-web.mjs builds this image from webapp-deploy/portal.Dockerfile and pushes it with the
+    # app image under the same tag; it must stay private for the same reason the app image is (SR-49).
+    newName: ghcr.io/kyoo032/nultron-portal
+    newTag: ent-REPLACE-ME
+
+configMapGenerator:
+  - name: nultron-app-env
+    behavior: merge
+    literals:
+      - AGENTFORGE_TRUSTED_ORIGINS=https://app.replace-me.invalid
+      - AGENTFORGE_PUBLIC_URL=https://app.replace-me.invalid
+      - AGENTFORGE_PORTAL_URL=https://portal.replace-me.invalid
+  - name: nultron-edge-env
+    behavior: merge
+    literals:
+      - NULTRON_DOMAIN=app.replace-me.invalid
+      - PORTAL_DOMAIN=portal.replace-me.invalid
+  - name: nultron-portal-env
+    behavior: merge
+    literals:
+      - PORTAL_PUBLIC_URL=https://portal.replace-me.invalid
+      # A real provider over STARTTLS (587) or implicit TLS (465 with PORTAL_SMTP_SECURE=1). The portal
+      # refuses a loopback sandbox and refuses to send a code in the clear (SR-39).
+      - PORTAL_SMTP_HOST=smtp.replace-me.invalid
+      - PORTAL_SMTP_PORT=587
+      - PORTAL_SMTP_FROM=Nultron <no-reply@replace-me.invalid>
+
+# The wrap key, the portal signing key, the database passwords, the backup key and the SMTP login.
+# Stable name, so a changed value restarts only what you restart. On TKE, prefer an external secret
+# manager (SSM) over a generated Secret once one is bound; the shape is the same either way.
+secretGenerator:
+  - name: nultron-secrets
+    envs:
+      - secrets.env
+    options:
+      disableNameSuffixHash: true
+
+patches:
+  - path: app-production.yaml
+  - path: portal-production.yaml
+  - path: edge-service.yaml
+  - path: storage-production.yaml
+  - target:
+      kind: StatefulSet
+      name: nultron-portal-db
+    patch: |-
+      - op: add
+        path: /spec/volumeClaimTemplates/0/spec/storageClassName
+        value: nultron-cbs-ssd

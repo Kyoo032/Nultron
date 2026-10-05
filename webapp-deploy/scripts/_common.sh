@@ -6,12 +6,20 @@ DEPLOY_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 REPO_ROOT="$(cd "$DEPLOY_DIR/.." && pwd)"
 COMPOSE_FILE="$DEPLOY_DIR/compose.yml"
 ENV_FILE="$DEPLOY_DIR/.env"
+PORTAL_ENV_FILE="$DEPLOY_DIR/portal.env"
 
 # docker compose (v2) with a fallback to the legacy binary.
+#
+# DC_ARGS adds arguments after `-f compose.yml`, and is empty on a real server. Its one user is the local
+# rehearsal (webapp-deploy/pilot-local.mjs prints the line): it points these scripts at that project instead
+# of the default one, so a backup or a restore can be rehearsed on a laptop without touching anything else.
+# Word-split on purpose; keep paths without spaces.
 if docker compose version >/dev/null 2>&1; then
-	dc() { docker compose -f "$COMPOSE_FILE" "$@"; }
+	# shellcheck disable=SC2086
+	dc() { docker compose -f "$COMPOSE_FILE" ${DC_ARGS:-} "$@"; }
 elif command -v docker-compose >/dev/null 2>&1; then
-	dc() { docker-compose -f "$COMPOSE_FILE" "$@"; }
+	# shellcheck disable=SC2086
+	dc() { docker-compose -f "$COMPOSE_FILE" ${DC_ARGS:-} "$@"; }
 else
 	echo "error: docker compose is not installed" >&2
 	exit 1
@@ -20,6 +28,14 @@ fi
 require_env_file() {
 	if [ ! -f "$ENV_FILE" ]; then
 		echo "error: $ENV_FILE is missing. Copy .env.example and fill it in." >&2
+		exit 1
+	fi
+}
+
+# The portal side's secrets live in a second file the app never loads (see compose.yml).
+require_portal_env_file() {
+	if [ ! -f "$PORTAL_ENV_FILE" ]; then
+		echo "error: $PORTAL_ENV_FILE is missing. Copy portal.env.example and fill it in." >&2
 		exit 1
 	fi
 }
@@ -52,6 +68,31 @@ setting() {
 	[ -n "$_v" ] || _v="$(dotenv_get "$_name")"
 	[ -n "$_v" ] || _v="$_default"
 	printf '%s' "$_v"
+}
+
+# Upload one finished backup file to the COS backup bucket: coscli, else tccli, else say loudly that it
+# stayed on this server. Used by backup.sh for both the app's data archive and the portal's database dump.
+cos_upload() {
+	_file="$1"
+	_bucket="$(setting COS_BACKUP_BUCKET)"
+	_prefix="$(setting COS_BACKUP_PREFIX hourly/)"
+	_region="$(setting TENCENT_REGION ap-jakarta)"
+	_key="$_prefix$(basename "$_file")"
+	if [ -z "$_bucket" ]; then
+		echo "warning: COS_BACKUP_BUCKET is unset - $(basename "$_file") stays on this server only." >&2
+		echo "         One disk failure loses it. Set the bucket in .env." >&2
+	elif command -v coscli >/dev/null 2>&1; then
+		echo "==> uploading to cos://$_bucket/$_key (coscli)"
+		coscli cp "$_file" "cos://$_bucket/$_key"
+	elif command -v tccli >/dev/null 2>&1; then
+		# coscli is the tested path; tccli's cos flags have moved between versions, so
+		# check the upload landed before trusting this branch.
+		echo "==> uploading to cos://$_bucket/$_key (tccli cos)"
+		tccli cos put-object --region "$_region" --bucket "$_bucket" --key "$_key" --path "$_file"
+	else
+		echo "warning: neither coscli nor tccli is installed - $(basename "$_file") stays on this" >&2
+		echo "         server only, in $(dirname "$_file"). Install coscli before taking traffic." >&2
+	fi
 }
 
 current_sha() {

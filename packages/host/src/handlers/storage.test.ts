@@ -85,7 +85,7 @@ beforeAll(async () => {
   const { db, ensurePortalOwner } = await import("@agentforge/db");
   store = createMemorySessionStore();
   for (const identity of [ALPHA, BETA]) {
-    await ensurePortalOwner(db, identity);
+    await ensurePortalOwner(db, { ...identity, role: "owner" });
     const session = createSession({ ...identity, now: T0 });
     await store.create(session);
     cookies.set(identity.tenantId, `__Host-agentforge_session=${session.id}`);

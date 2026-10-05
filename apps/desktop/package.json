@@ -1,24 +1,24 @@
 {
   "name": "@agentforge/desktop",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "private": true,
-  "description": "Electron shell for DPSBuddy. Packaged builds use IPC (no loopback HTTP server).",
+  "description": "Electron shell for Nultron. Packaged builds use IPC (no loopback HTTP server).",
   "main": "main.cjs",
   "scripts": {
     "desktop-dev": "electron .",
-    "desktop-build": "node ../../scripts/edit-starters.mjs --check && node ../../scripts/video-examples.mjs --check && pnpm --filter @agentforge/web build && node scripts/stage-renderer.mjs && node scripts/pack-brand.mjs",
-    "desktop-build-all": "node scripts/pack-all-brands.mjs",
-    "desktop-pack": "node scripts/pack-brand.mjs",
+    "desktop-build": "node ../../scripts/edit-starters.mjs --check && node ../../scripts/video-examples.mjs --check && pnpm --filter @agentforge/web build && node ../../scripts/build-sandbox-runtime.mjs && node scripts/stage-renderer.mjs && node scripts/pack-brand.mjs",
+    "desktop-build-all": "node ../../scripts/build-sandbox-runtime.mjs && node scripts/pack-all-brands.mjs",
+    "desktop-pack": "node ../../scripts/build-sandbox-runtime.mjs && node scripts/pack-brand.mjs",
     "desktop-release": "node scripts/release-desktop.mjs",
-    "desktop-build-dir": "pnpm --filter @agentforge/web build && node scripts/stage-renderer.mjs && electron-builder --win nsis --dir",
-    "desktop-build-mac": "pnpm --filter @agentforge/web build && node scripts/stage-renderer.mjs && node scripts/pack-brand.mjs --restore-public && electron-builder --mac",
-    "desktop-build-mac-dir": "pnpm --filter @agentforge/web build && node scripts/stage-renderer.mjs && node scripts/pack-brand.mjs --restore-public && electron-builder --mac --dir",
+    "desktop-build-dir": "pnpm --filter @agentforge/web build && node ../../scripts/build-sandbox-runtime.mjs && node scripts/stage-renderer.mjs && electron-builder --win nsis --dir",
+    "desktop-build-mac": "pnpm --filter @agentforge/web build && node ../../scripts/build-sandbox-runtime.mjs && node scripts/stage-renderer.mjs && node scripts/pack-brand.mjs --restore-public && electron-builder --mac",
+    "desktop-build-mac-dir": "pnpm --filter @agentforge/web build && node ../../scripts/build-sandbox-runtime.mjs && node scripts/stage-renderer.mjs && node scripts/pack-brand.mjs --restore-public && electron-builder --mac --dir",
     "desktop-build-mac-docker": "node scripts/mac-build-docker.mjs",
     "desktop-mac": "node scripts/macos-app.mjs",
-    "desktop-build-linux": "pnpm --filter @agentforge/web build && node scripts/stage-renderer.mjs && electron-builder --linux",
-    "desktop-build-linux-dir": "pnpm --filter @agentforge/web build && node scripts/stage-renderer.mjs && electron-builder --linux --dir",
+    "desktop-build-linux": "pnpm --filter @agentforge/web build && node ../../scripts/build-sandbox-runtime.mjs && node scripts/stage-renderer.mjs && electron-builder --linux",
+    "desktop-build-linux-dir": "pnpm --filter @agentforge/web build && node ../../scripts/build-sandbox-runtime.mjs && node scripts/stage-renderer.mjs && electron-builder --linux --dir",
     "rebuild-natives": "echo 'Run on the target OS, never Cloud (macOS: once per arch): npx @electron/rebuild -f -w better-sqlite3 -w keytar'",
-    "test": "node brand-read.test.cjs && node auto-update.test.cjs && node edit-menu.test.cjs && node lifecycle.test.cjs && node navigation.test.cjs && node renderer-csp.test.cjs && node scripts/release-artifacts.test.mjs"
+    "test": "node brand-read.test.cjs && node packaged-env.test.cjs && node brand-assets.test.cjs && node auto-update.test.cjs && node edit-menu.test.cjs && node lifecycle.test.cjs && node navigation.test.cjs && node renderer-csp.test.cjs && node scripts/release-artifacts.test.mjs"
   },
   "dependencies": {
     "@firecrawl/anydoc": "^0.2.4",
@@ -33,7 +33,7 @@
   },
   "build": {
     "appId": "com.tokotoken.agentforge",
-    "productName": "DPSBuddy",
+    "productName": "Nultron",
     "extraMetadata": {
       "name": "agentforge"
     },
@@ -41,7 +41,7 @@
       "output": "dist",
       "buildResources": "build"
     },
-    "artifactName": "DPSBuddy Setup ${version}.${ext}",
+    "artifactName": "Nultron Setup ${version}.${ext}",
     "compression": "maximum",
     "electronLanguages": [
       "en-US"
@@ -82,6 +82,10 @@
         "to": "ffmpeg"
       },
       {
+        "from": "../../vendor/sandbox-runtime",
+        "to": "sandbox"
+      },
+      {
         "from": "resources/starters",
         "to": "starters",
         "filter": [
@@ -118,9 +122,9 @@
     },
     "mac": {
       "identity": null,
-      "icon": "icon.png",
+      "icon": "icon.icns",
       "category": "public.app-category.productivity",
-      "artifactName": "DPSBuddy-${version}-mac-${arch}.${ext}",
+      "artifactName": "Nultron-${version}-mac-${arch}.${ext}",
       "target": [
         {
           "target": "dmg",
@@ -157,7 +161,7 @@
     "publish": {
       "provider": "github",
       "owner": "Kyoo032",
-      "repo": "DPSBuddy",
+      "repo": "Nultron",
       "releaseType": "release"
     },
     "nsis": {

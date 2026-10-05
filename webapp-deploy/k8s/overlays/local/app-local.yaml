@@ -1,0 +1,26 @@
+# The app pod, locally: the portal name resolves to the pod's own loopback (where Caddy listens on
+# 8443), because `*.localhost` does not resolve inside a pod; and both the app and Caddy get the files
+# the throwaway CA produced.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nultron-app
+spec:
+  template:
+    spec:
+      hostAliases:
+        - ip: 127.0.0.1
+          hostnames:
+            - portal.nultron.localhost
+      containers:
+        - name: app
+          volumeMounts:
+            - {name: local-ca, mountPath: /etc/nultron/ca, readOnly: true}
+        - name: caddy
+          volumeMounts:
+            - {name: edge-tls, mountPath: /etc/nultron/tls, readOnly: true}
+      volumes:
+        - name: local-ca
+          configMap: {name: nultron-local-ca}
+        - name: edge-tls
+          secret: {secretName: nultron-edge-tls}

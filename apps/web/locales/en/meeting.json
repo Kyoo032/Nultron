@@ -68,6 +68,14 @@
       "empty_recording": "Nothing was captured. Check that the right microphone is selected, then try again."
     }
   },
+  "checks": {
+    "title": "These minutes may need a second look",
+    "owners": "An action item has no task, or an owner the transcript never names.",
+    "dates": "The minutes quote a date or time the transcript never says.",
+    "summary": "The summary is empty.",
+    "shape": "The minutes did not come back in the shape they should have.",
+    "hint": "The minutes are saved. Check them against the transcript, or press “{action}” to write them again."
+  },
   "minutes": {
     "attendees": "Attendees",
     "decisions": "Decisions",

@@ -8,6 +8,7 @@ import type {
   AuthCode,
   Device,
   DeviceCode,
+  Invite,
   Iso,
   JsonObject,
   LoginOtp,
@@ -226,6 +227,23 @@ export function toLoginOtp(row: Row): LoginOtp {
     consumedAt: isoOrNull(row.consumed_at),
     createdAt: iso(row.created_at),
     expiresAt: iso(row.expires_at),
+  });
+}
+
+/** `code_hash` is deliberately not mapped. */
+export function toInvite(row: Row): Invite {
+  return freeze({
+    id: str(row.id),
+    tenantId: str(row.tenant_id),
+    orgId: str(row.org_id),
+    userId: str(row.user_id),
+    role: str(row.role) as Invite["role"],
+    email: str(row.email),
+    failedAttempts: int(row.failed_attempts),
+    createdAt: iso(row.created_at),
+    expiresAt: iso(row.expires_at),
+    redeemedAt: isoOrNull(row.redeemed_at),
+    revokedAt: isoOrNull(row.revoked_at),
   });
 }
 
