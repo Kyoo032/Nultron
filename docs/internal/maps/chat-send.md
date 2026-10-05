@@ -102,7 +102,7 @@ One rule, `streamWatchdogDeadline` (`packages/core/src/runtime/stream-watchdog.t
 | Instance | Scope | On fire |
 |---|---|---|
 | `AiSdkRuntime.consume` (`packages/core/src/runtime/ai-sdk-runtime.ts:645`, armed at `:677`) | one gateway call | aborts that call; the probe loop may retry it |
-| `armRunStallGuard` (`packages/host/src/run-stall.ts`, armed at `packages/host/src/runs.ts:207`) | the whole SSE run | `run.failed` + `run.completed`, stream closed, run marked failed, the model call aborted (§ 3a); never retried |
+| `armRunStallGuard` (`packages/host/src/run-stall.ts`, armed at `packages/host/src/runs.ts:210`) | the whole SSE run | `run.failed` + `run.completed`, stream closed, run marked failed, the model call aborted (§ 3a); never retried |
 | `apps/web/components/chat-composer.tsx:397` | the browser tab | aborts the fetch, shows the localised abort sentence (`fail(abortErrorMessage(...))`, `:508`) |
 
 Budgets (`packages/core/src/runtime/stream-watchdog.ts`): `STREAM_TTFB_MS = 120_000` / `STREAM_IDLE_MS = 60_000` for ordinary models; `STREAM_REASONING_TTFB_MS = 240_000` / `STREAM_REASONING_IDLE_MS = 180_000` for reasoning models. `isWatchdogReasoningModel` (`:43-49`) covers the Claude 4/5 families plus `QUIET_REASONING_FAMILY` — `^(deepseek-v4|glm-5\.3|kimi-k3|qwen3\.8-max)` (`:40`).
@@ -309,7 +309,7 @@ Proof: `lib/hero-motion.test.ts` (binding, throttling, pausing and teardown agai
 ## Gotchas
 
 - **A completed run now writes twice.** `runs.usage` still carries the per-run detail on the run
-  row; `recordChatRunUsage` (`packages/host/src/runs.ts:395`, and `:445` on the mid-stream error
+  row; `recordChatRunUsage` (`packages/host/src/runs.ts:435`, and `:486` on the mid-stream error
   path) also writes a `tenant_usage` row, gated on `finishRun`'s return so one run is exactly one
   row. Anything summing both double-counts chat. See [`tenant-usage-ledger.md`](tenant-usage-ledger.md).
 
@@ -333,6 +333,8 @@ Proof: `lib/hero-motion.test.ts` (binding, throttling, pausing and teardown agai
 DOM testids that prove it: `composer` / `composer-text` / `composer-send` / `composer-error` (`apps/web/components/chat-composer.tsx:520`, `:566`, `:746`, `:616`), `message-list` (`apps/web/components/chat-session.tsx:459`), `assistant-live` (`:468`), `message-thinking` / `thinking-placeholder` / `message-tools` / `message-tool` / `message-output` (`apps/web/components/chat-turn.tsx:108`, `:124`, `:131`, `:136`, `:154`), and for the rich tool rows `tool-row-file`, `tool-row-knowledge` and `tool-row-code` (`apps/web/components/tool-rows/file-row.tsx:29`, `knowledge-row.tsx:18`, `code-row.tsx:65`), each with `data-tool` and `data-state`, `chat-hero` / `chat-hero-mascot` / `chat-hero-bubble` (`apps/web/components/chat-hero.tsx:63`, `:76`, `:90`), `buddy-stage-composer` / `buddy-stage-composer-tap` (`apps/web/components/buddy-stage.tsx:72`, `:82`; in a thread only, absent on the empty Chat), `chat-mascot` with `data-mascot="nultron"` (`apps/web/components/nultron/nultron-mascot.tsx:96-97`; with the buddy on screen `assistant-live` holds no `[data-placement="beside"]` one), `message-embed` (`apps/web/components/message-embed.tsx:69`), `model-picker` / `model-picker-panel` (`apps/web/components/model-picker.tsx:424`, `:365`). Packaged proof needs `doctor.mjs --desktop` (`transport: "ipc"`), not `:3000`. A refused send shows `composer-error` and not `chat-error`.
 
 Unit proof for the 2026-10-03 changes, run that day with `npx vitest run <files>` from each package. `packages/core`: 13 files and 284 tests passed (`src/harness`, `src/agents/default-chat.test.ts`, `src/agents/service.test.ts`, `src/tools/files`, `src/runtime/tool-budget.test.ts`, `src/runtime/invoke-guarded.test.ts`). `packages/host`: 14 files, 188 tests passed and 27 skipped (the real-engine suite, which needs `AGENTFORGE_SANDBOX_DIR`) across `src/code-runner`, `src/runs-budget.test.ts`, `src/runs-cancel.test.ts`, `src/runs-tool-run.test.ts`, `src/desk-files` and `src/folder-root/purge.test.ts`. `apps/web`: 4 files and 97 tests passed (`lib/tool-labels.test.ts`, `lib/tool-rows.test.tsx`, `lib/message-embeds.test.tsx`, `lib/composer-layout.test.tsx`). The 27 real-engine tests also passed on their own (`sandbox.integration.test.ts`, 176 s). Not driven: a live Chat turn that calls these tools, and the tool rows in a browser. The rows are covered by the render tests only.
+
+Unit proof for the turn check (§ 3b), run on 2026-10-05 on the branch after `origin/main` (6b47935) was merged in, with `npx vitest run <files>` from each package: `packages/core` 15 files, 140 tests (`src/agents`, `src/harness`, `src/music`, `src/runtime/stub-runtime.test.ts`, `tool-budget.test.ts`, `invoke-guarded.test.ts`); `packages/host` 9 files, 118 tests (`chat-harness.test.ts` drives desk cite, earlier chat and an attached image through `startModalityRun` on the stub, beside `runs-budget`, `runs-cancel`, `runs-settled`, `runs-tool-run`, `runs-reasoning-effort`, `hosted-locale-chat-run`, `knowledge-context-route` and `tenancy-harness`); `apps/web` 26 files, 123 tests (every `*locale*` parity test, `composer-layout`, `i18n`). `tsc --noEmit` is clean in all three. Not driven: a live model through the check, or a browser.
 
 ## Why
 
