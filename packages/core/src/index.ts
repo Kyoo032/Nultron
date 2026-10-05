@@ -313,6 +313,19 @@ export {
   parseOpPayload,
   OP_TYPES,
   ASPECT_SIZE,
+  matchEditHarnessSkill,
+  silenceProbeArgs,
+  sceneProbeArgs,
+  rangesInsideClip,
+  assetFramesToTimeline,
+  framesInsideClip,
+  planSilenceRanges,
+  planSceneFrames,
+  extractPictureWords,
+  pictureWordsAreCaptions,
+  wordsLanded,
+  extractMadeShot,
+  harnessTargetClip,
 } from "./edit";
 export type {
   EditProject,
@@ -324,11 +337,14 @@ export type {
   AspectRatio,
   OpType,
   TitleLayout,
+  EditHarnessSkill,
+  SilenceRange,
 } from "./edit";
 export {
   registerEditTools,
   setEditToolBackend,
   getEditToolBackend,
+  requireEditToolBackend,
   editToolRefusal,
   EDIT_TOOLS,
   editAgentBindings,
@@ -780,10 +796,11 @@ export {
   outputLanguageRule,
   withOutputLanguage,
   editStubAssistantCopy,
+  editHarnessLine,
   GATEWAY_REQUIRED_SURFACES,
   gatewayRequiredMessage,
 } from "./output-language";
-export type { OutputLanguageSurface, GatewayRequiredSurface } from "./output-language";
+export type { OutputLanguageSurface, GatewayRequiredSurface, EditHarnessLineKey } from "./output-language";
 export { MODE_MESSAGE_KEYS, modeMessage } from "./mode-messages";
 export type { ModeMessageKey } from "./mode-messages";
 export {
