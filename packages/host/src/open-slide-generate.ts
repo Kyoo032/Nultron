@@ -230,17 +230,7 @@ export async function generateOpenSlideDeck(
   }
   const model = resolveModel(body, settings, tenant);
   const pinned = readModelPinned(body);
-  const run = await collectDeck(
-    tenant,
-    model,
-    prompt,
-    source.text,
-    choices,
-    pinned,
-    undefined,
-    undefined,
-    abortSignal,
-  );
+  const run = await collectDeck(tenant, model, prompt, source.text, choices, pinned, undefined, undefined, abortSignal);
   // A deck the person cancelled is not saved as an artifact or a work card.
   throwIfJobAborted(abortSignal);
   if (!run.text.trim()) {
