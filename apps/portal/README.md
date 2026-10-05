@@ -11,7 +11,11 @@ It is not part of the product. It never imports `@agentforge/db` or `@agentforge
 nothing in `apps/web`, `packages/host` or `packages/core` ever imports it — the product reaches it
 over HTTP through `AGENTFORGE_PORTAL_URL`, exactly as it will reach the real one.
 
-It serves the whole login: the browser flow (`/authorize` and its two form posts), the
+Nobody signs up. A first sign-in needs an **invite** an operator issued for that address, which the
+portal e-mails to it (see "Inviting a tester" below); every later sign-in needs only an e-mailed
+six-digit code. There is no password anywhere.
+
+It serves the whole login: the browser flow (`/authorize` and its form posts), the
 device-code flow (`/auth/device/code`, `/activate`, `/auth/device/approve`,
 `/auth/device/token`), `/auth/token` for both grants, `/auth/logout`, `/auth/session`,
 `/tenant/config`, `/.well-known/jwks.json` and `/healthz`. How each one behaves and which test
@@ -54,6 +58,67 @@ pnpm portal:seed -- --email you@example.com \
   --tenant nultron --org Kyo --seat-cap 20 \
   --redirect https://localhost:3443/auth/callback
 ```
+
+### Inviting a tester
+
+A person who is not already a member gets in through an invite. They give the team their e-mail
+address; the operator invites it:
+
+```sh
+pnpm --filter @agentforge/portal invite -- --email tester@example.com --tenant nultron --role member
+# optional: --org-slug kyo (only when the tenant has more than one org), --ttl-days 7 (1-30),
+#           --lang id (the language of the invite e-mail), --print (also print the code, once)
+```
+
+It creates the member in the `invited` state and **e-mails a one-time invite code to that address**
+through the portal's own mailer (the same `PORTAL_SMTP_*` as sign-in codes; Mailpit locally). The code
+(`XXXXX-XXXXX-XXXXX-XXXXX`, about 100 bits) is stored as a sha256 and nothing else, and is **not
+printed** unless you pass `--print`: it exists in the e-mail and nowhere else. If the mail cannot be
+sent the command says so and exits 7; re-run it (or run it with `--print`) and the new code replaces the
+unusable one. Running it again for an address replaces the earlier invite.
+
+**Roles.** Every invite carries a role: `owner`, `admin` or `member` (default `member`; nobody is made an
+owner by leaving a flag out). Redeeming the invite gives the member that role, and the portal then
+tells the host what it is: the access token's `role` claim and the token response's `role` field (see
+`docs/internal/portal/device-code-login.md`, "Token design"). A tenant must always have an owner, so the
+first invite for a tenant (and any invite that would leave it with none) has to be `--role owner`. For
+an address that is **already an active member**, `--role <role>` changes their role instead of inviting
+them: that is the only way a role changes, the portal has no route for it, and the last owner cannot be
+demoted. The new role reaches the host with the person's next token.
+
+What the tester sees. The sign-in is a state machine: **e-mail first, then the portal decides**.
+
+| The address is | The screen says | Sent |
+|---|---|---|
+| an activated member | "We sent a sign-in code to <address>", the six-digit code field, "Send a new code" (a minute apart) | the six-digit code |
+| invited, not yet activated | "Enter the invite code we e-mailed to <address>", the invite field, "E-mail me my invite again", "Use a different e-mail" | nothing yet |
+| invited, the invite expired or is gone | "This invite has expired or was already used. Ask your admin for a new one." | nothing |
+| not invited, unknown, disabled or removed | "This e-mail does not have access yet. Ask your company admin to invite you." | nothing |
+| a member or an invitee whose org has **no seat left** | "No seats left in your organisation. Ask your admin to free a seat or add one." (403; asked at the e-mail step and again before an invite is redeemed, so no invite is spent and no code is sent) | nothing |
+| locked out (20 wrong sign-in codes in a day, or 5 wrong invite codes) | "Too many attempts for this e-mail. Try again in 19 h or ask your admin." (the wait is when the oldest guesses leave the day, in minutes under an hour; five wrong invite codes say "Ask your admin for a new invite" instead) | nothing |
+
+A valid invite code activates the member and goes straight to the e-mailed six-digit code ("Invite
+accepted. We just sent a sign-in code to confirm it is your inbox"), because the invite does not prove the
+inbox on its own. A wrong invite code shows the attempts left; the **fifth** wrong one is itself the lock
+and shows the locked page, not a form with "0 attempts left". The same form posted twice (a double click,
+a reload) is one request: a code that went in the last 15 seconds answers it, nothing more is mailed and
+none of the three sends a quarter hour allows is spent. A newer code retires every older one, so a code
+that was replaced never signs anybody in, even after the newer one was used. The address is trimmed and lower-cased, so capitals and stray spaces bind to the same invite. A
+browser that already holds a live portal session skips all of it and goes back to the app, and the
+device-code screens greet a signed-in person by address with "Not you? Sign out".
+
+**This is a deliberate change to the enumeration defence** (owner decision 2026-10-01, SR-30): the
+e-mail step used to answer every address the same way, and now it tells a person which situation they
+are in. What stands in for the neutral page is rate limits on that step: 15 a quarter hour per IP and 6
+per address, ten typed invite codes a quarter hour per IP, a minute and four-an-hour between invite
+e-mails per address, and the OTP's existing 3 sends / 15 min and 20 wrong guesses / day. **They key on
+the caller's address, so they only mean anything with `PORTAL_TRUST_PROXY=1` behind the proxy**; without
+it every visitor shares one socket-address bucket.
+
+What the invite command will not do: invite an address that is already an active member without a
+`--role` (it needs no invite), bring a disabled member back, or add an address that already belongs to
+another tenant (an address in two tenants is sent no code at all). An invited member cannot be given a
+sign-in code by `portal:otp`; that needs an invite.
 
 While the team hands sign-in codes to users by hand, an operator can mint one:
 
@@ -147,12 +212,14 @@ src/seed/            what `pnpm portal:seed` does
 src/jwt/             Ed25519 keys, the access token, the JWKS document
 src/security/        cookies, the portal's own session, CSRF, rate limits, headers, body caps
 src/views/           one escaping helper, the locale catalogs, the five screens
-src/otp/             the enumeration-resistant send, and the audited verify
+src/otp/             mint-and-mail a six-digit code (limits, cooldown, lock), and the audited verify
+src/invites/         `pnpm … invite`: arguments, issuing, mailing the invite, changing a role
+src/flows/sign-in.ts the sign-in state machine: what the e-mail step decides, and the invite redemption
 src/flows/           the decisions: authorize, token, device, session, the reason table
 src/routes/          thin handlers over those flows; registerPortalRoutes is the whole surface
                      — including /logout, the way out of the portal's own browser session
 src/testing/         the portal_app_test role, and a real portal on an ephemeral port
-scripts/             the three CLIs
+scripts/             the four CLIs: migrate, seed, otp, invite
 ```
 
 Two things are worth knowing before reading the store:
@@ -183,6 +250,8 @@ is bound to `sha256(state)` — it is bound to the client and the `redirect_uri`
 binding is the host's own `__Host-` cookie check.
 `0010_app_login_role.sql` creates `portal_app_login`, the server's role that 0001 describes and
 nobody had created. It has no password, and an existing role is left alone (see "Database roles").
+`0011_invites.sql` adds `invites`: one live code per address (by a partial unique index), bound to it, carrying the role, single use, five wrong
+guesses, sha256 only, plain tenant-scoped RLS, nothing for `tenant_readonly`.
 
 ## Tests
 
@@ -192,7 +261,9 @@ pnpm --filter @agentforge/portal test
 
 Real PostgreSQL, never a fake: `PORTAL_TEST_DATABASE_URL` when it is set, otherwise
 `embedded-postgres` (real PG 16 binaries, no Docker needed). One server per run builds a template
-with every migration applied; each test file takes a private database from it.
+with every migration applied; each test file takes a private database from it. A run that cannot start
+its Postgres (on Windows, an administrator token) **fails**, exits non-zero and prints why, instead of
+the old "No test files found" and exit 0; a red test exits non-zero too (`test/global-setup.ts`).
 
 **The store connects as `portal_app_test`, a non-superuser member of `portal_app`** — not as the
 cluster superuser, which bypasses row-level security and would make every isolation assertion pass

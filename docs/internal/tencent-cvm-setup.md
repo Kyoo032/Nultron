@@ -841,7 +841,7 @@ failure — when it first tried to load the component, and only an in-process re
 until it restarts. The command says so when it actually installs something:
 
 ```sh
-docker compose -f webapp-deploy/compose.yml restart app
+docker compose -f webapp-deploy/compose.yml restart app proxy   # never `app` alone: the proxy shares its network namespace and is left answering nothing
 sh webapp-deploy/scripts/components.sh check     # expect `installed in the components root`
 ```
 

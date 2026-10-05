@@ -1,6 +1,6 @@
 # Map — Hosted security controls
 
-Last verified: 2026-09-23 at d4561b8 + working tree for sections 1-4 and every
+Last verified: 2026-10-02, working tree over 0b61a29, not committed, for one row (the operator-fields row of § 8, which now says who may write a provider key: M4, an owner or an admin, a member is answered `403 settings_key_forbidden`); nothing else on the page was re-read. Before that: 2026-10-01, working tree over 0b61a29, not committed, for two rows only: the `ci-local.mjs` row of the tests table (a vitest step now needs its `Tests N passed` summary, not just exit 0) and the per-tenant model cache bullet of § 10 (the background refill and its log line). Before that, the same day, for the new § 10 (where a tenant's provider key may go: Enterprise BYOK Phase A) and the corrected operator-keys row of § 8, whose "provider keys" claim was wrong before it (`requestsOperatorOnlySettings` lists `toolKeys`, `toolBackends` and `injectionGuardBypass` only). Nothing else on the page was re-read that day. Before that: 2026-09-23 at d4561b8 + working tree for sections 1-4 and every
 `http-adapter.ts` citation on this page (the auth pass: the production https rule for the portal
 URL, the malformed Host / request-target 400, the gate's portal re-check, digest session ids). The
 response headers, the ffmpeg failure detail and the top-up link keep their 2026-09-21 reading at
@@ -228,7 +228,7 @@ answer, so a public name pointing at `169.254.169.254` does not pass.
 
 | Route | Where | Why |
 |---|---|---|
-| `POST /api/v1/settings` — operator keys | `packages/host/src/handlers/settings.ts:168-201` | gateway key, provider keys, `toolKeys`, `toolBackends` and `injectionGuardBypass` are the operator's, not a tenant's |
+| `POST /api/v1/settings` — operator fields | `requestsOperatorOnlySettings`, `packages/host/src/handlers/settings.ts:193` | `toolKeys`, `toolBackends` and `injectionGuardBypass` are the operator's, not a tenant's. **The gateway and provider keys are not on this list:** since Phase 4 a key write reaches only the caller's own tenant, and a blank is dropped rather than forwarded (`keyFieldValue`, `packages/host/src/handlers/settings.ts:226`). Since 2026-10-02 (M4) a non-blank key write, and `POST /api/v1/settings/reset { scope: "key" }`, also need `canAdminister` (an owner or an admin): a member or builder gets `403 settings_key_forbidden` (`requestsKeyWrite`, `:266`; `assertMayChangeCompanyKey`, `:271`). Server mode only |
 | `POST /api/v1/settings/reset` scope `all`, and its cancel | `resetEverything`, `packages/host/src/handlers/settings.ts:423-440` | "Start over" deletes the data directory, which on a host is everyone's. Scope `key` is **allowed** on the server since Phase 4 — it only forgets the caller's own key (`resetGatewayKey`, `:400-415`) |
 | component install stream | `packages/host/src/handlers/components.ts:45-67` | the image bakes anydoc in; the download path has nothing to do, and turning it off is what unblocks `noexec` on `/data` |
 
@@ -238,6 +238,16 @@ answer, so a public name pointing at `169.254.169.254` does not pass.
 `nosuid,nodev,noexec` tmpfs, `no-new-privileges`, `cap_drop: ALL` (the app binds 3000, a high
 port, so it needs none back), `pids_limit`, `mem_limit`, and bounded rotated logs. Caddy shares the
 app's network namespace so `127.0.0.1:3000` *is* the app and nothing is exposed on a bridge.
+
+### 10. Where a tenant's provider key may go (Enterprise BYOK, Phase A, 2026-10-01)
+
+Not a request-admission control; what the host does with a key once it has one. Detail on the pages named; the point here is that each is a hosted-only control with a Personal-parity test.
+
+- **Pinned hosts.** The provider registry (`packages/core/src/providers/registry.ts:67`) is the only place a provider's base URL lives, digested at `:83`; `isOfficialOpenAIBaseUrl` compares hosts exactly (`packages/core/src/models/probe.ts:40`). [`model-policy.md`](model-policy.md) § 8.
+- **No stored endpoint is honoured** (`packages/core/src/secrets.ts:346`, `packages/host/src/selectable-models.ts:343`). [`pii-and-key-security.md`](pii-and-key-security.md) § 10.
+- **A key-bearing request does not follow a redirect** (`packages/core/src/runtime/key-redirect.ts:20`). Outbound calls to a *caller-supplied* URL are the SSRF guard of § 7 and are a different thing.
+- **The model cache is per tenant**, a `tenant_state` row, so one tenant's provider catalogue and probe errors are not another's (`packages/host/src/model-cache.ts`; [`settings-and-gateway-gate.md`](settings-and-gateway-gate.md)). A tenant that has a key and no row is refilled by one background probe named by tenant and written only if the row is still absent (`warmHostedModelCache`, `packages/host/src/selectable-models.ts:505`); its failure line, `model_cache_warmup_failed`, carries the tenant id and the redacted message and no key.
+- **Open on purpose.** Writing a key has no role check (Phase B, with personal keys), the job-model breaker is process-wide, and the media and transcription calls do not use the manual-redirect policy (they send Bearer tokens, which Node strips across origins).
 
 ## Where things live
 
@@ -257,6 +267,8 @@ app's network namespace so `127.0.0.1:3000` *is* the app and nothing is exposed 
 | `packages/host/src/content-disposition.ts` | Attachment headers for every download |
 | `packages/core/src/security/safe-fetch.ts` | Outbound URL guard, per-hop redirect check |
 | `packages/core/src/security/ip-range.ts` | CIDR membership for IPv4 and IPv6 |
+| `packages/core/src/providers/registry.ts`, `runtime/key-redirect.ts` | The provider hosts a tenant's key may go to, and the no-redirect rule (§ 10) |
+| `packages/host/src/model-cache.ts` | The per-tenant model cache (§ 10) |
 | `packages/db/src/vault-key.ts` | Wrap-key sourcing, length and randomness floors |
 | `webapp-deploy/compose.yml` | Container hardening, the pinned `AGENTFORGE_SERVER` |
 | `webapp-deploy/Caddyfile` | TLS, HSTS, the same header set, access log |
@@ -300,7 +312,7 @@ Automated, and these are what actually prove this page:
 | `packages/db/src/vault-key.test.ts` (26) | length and randomness floors, `.master-key` corruption |
 | `apps/web/server/hosted-mode-guard.test.ts` (13) | the production-build refusal, that compose still pins the flag, and that both boot guards run before `server.listen` |
 | `packages/host/src/hosted-env.test.ts` (48, run 2026-09-23) | one row per hosted variable, the aggregated message, that no value is printed, that local mode is untouched, and SR-26: a loopback http portal URL refused on `NODE_ENV=production` and kept everywhere else |
-| `scripts/ci-local.mjs` (`pnpm ci:local`) | runs all of the above, one package at a time. Since 2026-09-24 it is the only CI: `.github/workflows/` is deleted, and nothing runs these unless someone runs it (`../security-register.md`, SR-80) |
+| `scripts/ci-local.mjs` (`pnpm ci:local`) | runs all of the above, one package at a time. Since 2026-09-24 it is the only CI: `.github/workflows/` is deleted, and nothing runs these unless someone runs it (`../security-register.md`, SR-80). Since 2026-10-01 a vitest step passes only when its log carries a `Tests  N passed` line (N above zero), not merely exit 0: vitest exits 0 after "No test files found" when a global setup dies, which is how the portal suite under an admin token read as a pass (`checkVitestLog`, `judgeStep`; `summary.md` lists the reason under every step that did not pass; `scripts/ci-local.test.mjs`) |
 
 **There is no `verify-agentforge` feature file for this page, and that is a gap rather than a
 choice.** The existing `features/security.md` covers the key-fingerprint UI and

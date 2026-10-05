@@ -2,12 +2,21 @@
 
 Last verified: 2026-09-21 at 2d44f0f + the Phase 7 branch `claude/web-phase7-component-installer-7f5d5l`
 
+**Phase 0 pilot additions (2026-10-01, working tree on top of 0b61a29):** the sections marked
+*(pilot)* below were re-verified on that date, with the compose stack driven on a developer machine
+(`webapp-deploy/pilot-local.mjs`). The rest of the page keeps the date above, and its `file:line`
+citations into `compose.yml`, the `Caddyfile` and the scripts predate the pilot edits and the Phase 8
+`/healthz` probe: read them as pointers, not coordinates, until the page is next re-verified.
+
 ## Overview
 
 `webapp-deploy/` is how the repo becomes a running server: a Dockerfile that builds `apps/web` and its
-workspace dependencies into one image, a two-service compose stack, a Caddy reverse proxy that
-terminates TLS, and five shell scripts for build / deploy / backup / restore / logs. The target host
-is a Tencent Cloud CVM in Jakarta.
+workspace dependencies into one image, a five-service compose stack (the app, its Caddy proxy, and the
+portal stand-in with its Postgres and a one-shot prepare step; *pilot*), a Caddy reverse proxy that
+terminates TLS for two names, and eight shell scripts for build / deploy / backup / restore / logs /
+portal operations. A second image, `portal.Dockerfile`, builds the portal (*pilot*). The target host
+for the Phase 0 pilot is one Tencent Lighthouse box in Jakarta (owner decision, 2026-10-01); the
+design target is a Tencent Cloud CVM.
 
 It is **additive**. Nothing in `apps/`, `packages/`, the root `package.json`, `pnpm-workspace.yaml` or
 `turbo.json` is touched by it, which is what keeps the frozen Electron desktop (0.14.27) and the
@@ -82,9 +91,22 @@ restart before the running process uses it — the loader memoises its answer, f
 (`packages/host/src/file-extract/anydoc.ts:136-150`). Full picture:
 [`component-installer.md`](component-installer.md).
 
-### Run: two containers, one network namespace
+### Run: five services, one network namespace for two of them *(pilot)*
 
-`webapp-deploy/compose.yml` defines `app` and `proxy`.
+`webapp-deploy/compose.yml` defines `app`, `proxy`, `portal`, `portal-db` and `portal-prepare`. One of
+each: the app's and the portal's limiters and the portal refresh lock live in process memory (SR-29,
+SR-66). The portal side has its own image (`portal.Dockerfile`, allowlist context
+`portal.Dockerfile.dockerignore`), its own env file (`portal.env`, loaded only by those three services; the
+app's `.env` never holds the signing key, the database passwords or the SMTP login; the proxy has no env
+file at all and gets only `NULTRON_DOMAIN` and `PORTAL_DOMAIN`), and a database network (`portal-db`,
+`internal: true`) that the app is not on. `portal-entry.sh` builds the portal's two DSNs from the two
+passwords; `portal-prepare` runs the Kubernetes rehearsal's `prepare-db.mjs` from inside the image
+(migrate as the schema owner, set `portal_app_login`'s password, SR-56). The app reaches the portal over
+https through the proxy: `extra_hosts` resolves `PORTAL_DOMAIN` to the app's own loopback, where Caddy
+(same namespace) listens on 443 (SR-26). Only the app publishes ports, and only as `0.0.0.0:`, so Docker
+never binds `[::]` (SR-79).
+
+The older description of `app` and `proxy` follows.
 
 `app` builds from the repo root, runs with `read_only: true` and a `/tmp` tmpfs (`compose.yml:60-62`),
 `no-new-privileges` and `cap_drop: ALL` (`:88-91`), `init: true` to reap ffmpeg and SQL worker children
@@ -92,7 +114,8 @@ restart before the running process uses it — the loader memoises its answer, f
 `/data` for tenant work and `/opt/agentforge/components` for the operator's components
 (`:64-68`). Logs are json-file, 10 MB × 5.
 
-`proxy` is `caddy:2-alpine` with `network_mode: "service:app"` (`compose.yml:115-117`). It joins the app
+`proxy` is `caddy:2.11-alpine` (pinned to the minor, because the sign-in log filters need Caddy 2.8 or
+later) with `network_mode: "service:app"`. It joins the app
 container's network namespace rather than talking to it over a bridge, because the app binds
 `127.0.0.1` inside the container. A service sharing another's namespace cannot publish ports of its
 own, which is why `80`, `443` and `443/udp` are published on **`app`** (`compose.yml:109-112`). `proxy`
@@ -104,8 +127,21 @@ unless `AGENTFORGE_SERVER` is on. The stack does not set `BIND_HOST`, so the def
 
 ### Front: Caddy
 
-`webapp-deploy/Caddyfile` has two sites. `http://{$NULTRON_DOMAIN}` does nothing but a permanent
-redirect to HTTPS (`Caddyfile:21-23`). The HTTPS site sets TLS 1.2 as the floor (`:28-30`), compresses
+**(pilot)** The Caddyfile now serves two names and filters two log streams. A `(sign_in_filters)` snippet
+(defined above the global block, because a snippet is read only after it is defined) deletes `Cookie`,
+`Authorization` and `Set-Cookie`, and `code` and `state` from `request>uri`, from `request>headers>Referer`
+and from `resp_headers>Location` (the portal's 302 to `/auth/callback?code=...&state=...`, which Caddy logs in
+the response headers). It is imported by both the `(access_log)` snippet (stdout, one per site) and a global
+`log default` (stderr), where the error line for a failed upstream request, with the request's full URI, is
+written (SR-72; driven against real Caddy with a forced upstream error, 2026-10-01). The app's site has a
+`@billing_webhook path /api/v1/billing/webhook*` that answers `404` before `reverse_proxy` until a payment
+provider is bound (SR-03, owner decision 2026-10-01), and a second site, `{$PORTAL_DOMAIN}`, proxies to
+`portal:4000` with transport and identity headers only (the portal sets its own CSP).
+`k8s/base/caddy/security.caddy` carries a copy of the filter list and `scripts/pilot-deploy.test.mjs` fails if
+the two drift.
+
+What follows is the older description of the app's site. `http://{$NULTRON_DOMAIN}` does nothing but a
+permanent redirect to HTTPS (now `http://{$NULTRON_DOMAIN}, http://{$PORTAL_DOMAIN}`). The HTTPS site sets TLS 1.2 as the floor (`:28-30`), compresses
 (`:32`), and sends the security header block — CSP, HSTS, `X-Content-Type-Options`, `X-Frame-Options`,
 `Referrer-Policy`, the COOP/CORP pair and a fully-off `Permissions-Policy` (`:46-59`) — while stripping
 `Server` and `X-Powered-By` (`:65-66`). The access log is JSON on stdout with `Cookie`,
@@ -117,11 +153,16 @@ which stops Caddy buffering the SSE job stream.
 Two commented lines under *Incident response* (`Caddyfile:87-88`) take the site read-only on a proxy
 restart.
 
-### Operate: the six scripts
+### Operate: the scripts
 
 All of them source `scripts/_common.sh`, which resolves the folder and repo root, defines `dc()` as
-`docker compose -f compose.yml` with a legacy fallback, and reads `.env` values with `sed` rather than
-by sourcing the file — a stray backtick in a value would otherwise execute.
+`docker compose -f compose.yml` (plus `$DC_ARGS`, empty on a server, used by the local rehearsal) with a
+legacy fallback, and reads `.env` values with `sed` rather than by sourcing the file — a stray backtick in
+a value would otherwise execute. **(pilot)** Added: `portal.sh` (run `apps/portal/scripts/<name>.ts` inside the
+running portal through `portal-entry.sh`; `otp` is refused, SR-10), `restore-portal.sh` (`--scratch` drill, or
+the destructive restore of the portal database), `backup.sh` now also writes `nultron-portal-<stamp>.dump.enc`
+(`pg_dump -Fc`, same cipher) and rejects an archive with no entries, `build.sh` and `deploy.sh` build and wait
+for the portal as well, and `cos_upload` moved into `_common.sh`.
 
 | Script | What it does |
 |---|---|
@@ -142,11 +183,13 @@ a plaintext archive; `restore.sh` is destructive and prompts unless given `--yes
 |---|---|
 | `webapp-deploy/README.md` | The folder's own reference: image contents, the proxy arrangement, transport filtering, the security group, the before-traffic acceptance list, the incident runbook, the restore drill, and *What is not done yet* |
 | `webapp-deploy/Dockerfile` | The three-stage image. Build context is the repo root |
-| `webapp-deploy/.dockerignore` | Context excludes |
-| `webapp-deploy/Dockerfile.dockerignore` | A byte-identical copy — the name BuildKit actually reads, because the Dockerfile is not at the context root. **Edit both together** |
-| `webapp-deploy/compose.yml` | `app` + `proxy`, hardening, limits, published ports, named volumes |
-| `webapp-deploy/Caddyfile` | TLS, the security header block, the JSON access log, `reverse_proxy` |
-| `webapp-deploy/.env.example` | Every env var the host reads, one line of meaning each |
+| `webapp-deploy/.dockerignore` | Stale, not a copy of the next file, and not read by the documented builds (SR-49 open item) |
+| `webapp-deploy/Dockerfile.dockerignore` | The name BuildKit actually reads for `Dockerfile`, because the Dockerfile is not at the context root. Since 2026-10-01 it also excludes `webapp-deploy/k8s`, `*.env` and `.pilot-local` |
+| `webapp-deploy/portal.Dockerfile`, `portal.Dockerfile.dockerignore`, `portal-entry.sh` | *(pilot)* The portal image, its allowlist context, and the DSN wrapper baked into it |
+| `webapp-deploy/compose.yml` | `app`, `proxy`, `portal`, `portal-db`, `portal-prepare`; hardening, limits, published ports, named volumes. `scripts/release-web.mjs` `composeFile()` generates the released twin; `scripts/pilot-deploy.test.mjs` compares them |
+| `webapp-deploy/compose.local.yml`, `pilot-local.mjs` | *(pilot)* The local rehearsal: loopback ports, a throwaway CA, Mailpit with implicit TLS, `up` / `drive` / `down` |
+| `webapp-deploy/Caddyfile` | TLS for two names, the security header block, two filtered JSON log streams, the billing block, two `reverse_proxy`s |
+| `webapp-deploy/.env.example`, `portal.env.example` | The app's env (every var the host reads) and the portal's (signing key, database passwords, Tencent SES login) |
 | `webapp-deploy/DEPLOY-LOG.md` | date / sha / env / who / notes. Mirrors the log in `../web-pivot-2026-09-18.md`, which is the one of record |
 | `webapp-deploy/scripts/_common.sh` | Shared helpers. Sourced, not run |
 | `webapp-deploy/scripts/{build,deploy,backup,restore,logs,components}.sh` | As above |
@@ -156,11 +199,16 @@ a plaintext archive; `restore.sh` is destructive and prompts unless given `--yes
 
 ## Gotchas
 
-- **Two ignore files, byte-identical.** BuildKit looks for `<dockerfile-path>.dockerignore` before
-  `<context>/.dockerignore`. The Dockerfile lives in `webapp-deploy/` and the context is the repo root,
-  so the file Docker actually reads is `webapp-deploy/Dockerfile.dockerignore`. Editing only
-  `.dockerignore` silently does nothing, and the context goes from small to about 1.4 GB
-  (`webapp-deploy/README.md:46-52`).
+- **Three ignore files, and only two are read.** BuildKit looks for `<dockerfile-path>.dockerignore`
+  before `<context>/.dockerignore`. The Dockerfiles live in `webapp-deploy/` and the context is the repo
+  root, so the files Docker actually reads are `Dockerfile.dockerignore` (the app image) and
+  `portal.Dockerfile.dockerignore` (the portal image, an allowlist). `.dockerignore` is a stale leftover
+  that nothing reads, and it is not the byte-identical copy this page and the README used to claim
+  (SR-49). Editing only it silently does nothing, and the context goes from small to about 1.4 GB.
+- **Never restart or recreate `app` alone *(pilot)*.** `proxy` shares its network namespace, so after
+  `restart app`, `up -d app` or `up -d --force-recreate app` Caddy sits in a namespace that no longer
+  exists and the site is down while the app reports healthy. `restart app proxy`, or a full `up -d` with
+  no service names (which recreates the proxy), repairs it. Driven 2026-10-01.
 - **Dev dependencies ship on purpose.** `tsx` is a devDependency of `@agentforge/web` and **is** the
   production entrypoint, and every `@agentforge/*` package exports TypeScript source rather than a
   build. `pnpm prune --prod` would delete the thing that boots the app (`Dockerfile:100-103`).
@@ -174,7 +222,7 @@ a plaintext archive; `restore.sh` is destructive and prompts unless given `--yes
   holds only while this Caddy is the only thing in front of the app. Putting a CDN or load balancer
   ahead of it means declaring its ranges in `trusted_proxies` **and** revisiting the last-hop rule
   (`Caddyfile:91-113`).
-- **Rate limiting is not in this folder.** The official `caddy:2-alpine` image ships no rate-limit
+- **Rate limiting is not in this folder.** The official `caddy:2.11-alpine` image ships no rate-limit
   module, so the buckets live in the app (`packages/host/src/rate-limit.ts`). See
   [`hosted-server-mode.md`](hosted-server-mode.md).
 - **`noexec` on `/data` is correct since Phase 7, and was not before it.** The app used to install
@@ -184,12 +232,13 @@ a plaintext archive; `restore.sh` is destructive and prompts unless given `--yes
   `/opt/agentforge/components` volume, which must stay executable. The code side of spec `H3` is
   therefore closed; the mount flag itself is still an operator action on the CVM
   (`compose.yml:77-86`, `../tencent-cvm-setup.md` §4).
-- **The build runs on the production server.** There is no image registry and no CI build, so
-  `deploy.sh` builds in place — and the build stage's `apt-get` goes to `deb.debian.org` over plain
-  HTTP, which collides with the outbound-443-only security group rule
-  (`webapp-deploy/README.md`, *Security group rules*).
-- **Rolling code back is a rebuild at an older sha**, for the same reason. There is no
-  `docker pull <old-tag>` path.
+- **`deploy.sh` builds on the production server.** `scripts/release-web.mjs` now builds the app and
+  portal images from a sha and pushes them private to ghcr (*pilot*; dry run and unit tests only, never
+  run for real), and the released bundle pulls them; but `deploy.sh` still builds in place from a
+  checkout — and the build stage's `apt-get` goes to `deb.debian.org` over plain HTTP, which collides
+  with the outbound-443-only security group rule (`webapp-deploy/README.md`, *Security group rules*).
+- **Rolling code back is a rebuild at an older sha** on the source path; on the released bundle it is the
+  previous release tag's `compose.yml`.
 - **`caddy-data` is not the app's `/data`.** The proxy's `/data` volume holds the ACME account and the
   issued certificates; they are different volumes in different containers (`compose.yml:123-126`).
 - **`restore.sh` hands three capabilities back.** `cap_drop: ALL` takes `CHOWN` away even from root,
@@ -206,6 +255,13 @@ yet (`.cursor/skills/verify-agentforge/SKILL.md`, *Surfaces*). This folder is pr
 and walking the first-run checks in [`../tencent-cvm-setup.md`](../tencent-cvm-setup.md) §9, and then
 by the before-traffic acceptance list in `webapp-deploy/README.md`, signed in `DEPLOY-LOG.md` with the
 sha that passed.
+
+**(pilot)** What does drive this folder, on a developer machine: `node webapp-deploy/pilot-local.mjs up`
+then `drive` (headless Chromium signs in through the portal with the e-mailed code, restarts the app and
+proxy, forces an upstream error on a sign-in URL, and searches both Caddy log streams, the app's and the
+portal's for the code and state that really went through; 22 checks, 2026-10-01), `down --purge`. Static
+checks: `node --test scripts/pilot-deploy.test.mjs scripts/release-web.test.mjs`. It is a rehearsal, not a
+deploy: nothing on a Lighthouse box has been driven.
 
 The closest feature file for the app's own side of the hosted rules is
 `.cursor/skills/verify-agentforge/features/security.md`.
