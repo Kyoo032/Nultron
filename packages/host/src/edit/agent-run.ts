@@ -10,6 +10,7 @@ import {
   hasLiveProvider,
   invokeToolGuarded,
   isServerMode,
+  matchEditHarnessSkill,
   matchStubEditScenario,
   matchStubFillScenario,
   matchStubGenerateScenario,
@@ -34,6 +35,7 @@ import { createTurnBudget, chargeTurnBudget, estimateEditJobUsd } from "./budget
 import { hostEditBackend } from "./backend";
 import { undoCard } from "./undo";
 import { appendEditMetric } from "./metrics";
+import { runEditHarness } from "./harness-run";
 
 const MUTATING = new Set([
   "split_clip",
@@ -222,6 +224,29 @@ export async function runEditAgent(input: {
       await withEditToolContext({ tenant: input.tenant, projectId: input.projectId, runId }, async () => {
         const doc = await foldProject(input.projectId, input.tenant.workspaceId);
         queue.push(encodeSse({ type: "run.started", runId }));
+        const scripted =
+          matchStubEditScenario(input.text) ??
+          matchStubFillScenario(input.text) ??
+          matchStubGenerateScenario(input.text);
+        const skill = scripted ? null : matchEditHarnessSkill(input.text);
+        if (skill) {
+          await runEditHarness({
+            tenant: input.tenant,
+            projectId: input.projectId,
+            text: input.text,
+            skill,
+            stub,
+            budget,
+            doc,
+            push: (frame) => queue.push(frame),
+            ...(input.abortSignal ? { signal: input.abortSignal } : {}),
+          });
+          const completed: RuntimeEvent = { type: "run.completed", runId };
+          rememberJobUsage(completed, { tenant: input.tenant, mode: "edit", runId });
+          queue.push(encodeSse(completed));
+          await appendEditMetric({ projectId: input.projectId, runId, event: "agent.turn" });
+          return;
+        }
         if (stub) {
           await runStub(input, doc, runId, budget, queue);
         } else {
