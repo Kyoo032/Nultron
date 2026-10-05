@@ -20,7 +20,7 @@
  */
 import { randomToken } from "../crypto";
 import { ACCESS_TOKEN_TTL_SECONDS, signAccessToken } from "../jwt/sign";
-import type { Clock, PortalOps, TenantFeatureFlags } from "../store/types";
+import type { Clock, PortalOps, TenantFeatureFlags, UserRole } from "../store/types";
 import type { PortalRuntime } from "./context";
 import { runBrowserLoginGate, webInstallId, auditLoginDenied } from "./login";
 import type { PortalReason } from "./reasons";
@@ -36,6 +36,13 @@ export interface TokenResponseBody {
   readonly user_id: string;
   readonly org_id: string;
   readonly tenant_id: string;
+  /**
+   * The member's role in their org: `owner | admin | member`. The host provisions a first-time
+   * sign-in's membership from it and must not default to `owner` when it is absent. Read from the
+   * member's row at every mint and every refresh, so a role the operator changed arrives with the
+   * next token.
+   */
+  readonly role: UserRole;
 }
 
 export type TokenResult =
@@ -165,6 +172,7 @@ export async function mintSession(
 ): Promise<TokenResult> {
   const config = await ops.tenantConfig.get(input.tenantId);
   const scope = scopeFor(config?.featureFlags);
+  const role = await roleOf(ops, input.userId);
 
   const session = await ops.sessions.create({
     tenantId: input.tenantId,
@@ -200,6 +208,7 @@ export async function mintSession(
     deviceId: input.deviceId,
     sessionId: session.id,
     scope,
+    role,
     now: runtime.clock.now().getTime(),
   });
 
@@ -216,8 +225,17 @@ export async function mintSession(
       user_id: input.userId,
       org_id: input.orgId,
       tenant_id: input.tenantId,
+      role,
     }),
   };
+}
+
+/**
+ * The role a token carries: the member's own, read now. A member who cannot be read (removed
+ * between the check and the mint) gets the least privilege there is, never a default of `owner`.
+ */
+async function roleOf(ops: PortalOps, userId: string): Promise<UserRole> {
+  return (await ops.users.findById(userId))?.role ?? "member";
 }
 
 export interface ClientCredentials {
@@ -304,6 +322,7 @@ export async function exchangeRefreshToken(
   return runtime.store.tx(rotated.tenantId, async (ops) => {
     const config = await ops.tenantConfig.get(rotated.tenantId);
     const scope = scopeFor(config?.featureFlags);
+    const role = await roleOf(ops, rotated.userId);
 
     await ops.audit.append({
       tenantId: rotated.tenantId,
@@ -325,6 +344,7 @@ export async function exchangeRefreshToken(
       deviceId: rotated.deviceId,
       sessionId: rotated.sessionId,
       scope,
+      role,
       now: runtime.clock.now().getTime(),
     });
 
@@ -341,6 +361,7 @@ export async function exchangeRefreshToken(
         user_id: rotated.userId,
         org_id: rotated.orgId,
         tenant_id: rotated.tenantId,
+        role,
       }),
     };
   });

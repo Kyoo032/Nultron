@@ -76,9 +76,9 @@ async function readMetricsAs(who: keyof typeof cookies): Promise<string> {
 }
 
 beforeAll(async () => {
-  tenantA = await ensurePortalOwner(db, ALPHA);
-  tenantA2 = await ensurePortalOwner(db, ALPHA_SIBLING);
-  tenantB = await ensurePortalOwner(db, BETA);
+  tenantA = await ensurePortalOwner(db, { ...ALPHA, role: "owner" });
+  tenantA2 = await ensurePortalOwner(db, { ...ALPHA_SIBLING, role: "owner" });
+  tenantB = await ensurePortalOwner(db, { ...BETA, role: "owner" });
   for (const [key, identity] of [
     ["a", ALPHA],
     ["a2", ALPHA_SIBLING],

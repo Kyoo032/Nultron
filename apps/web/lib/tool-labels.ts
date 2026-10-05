@@ -1,3 +1,13 @@
+import {
+  asRecord,
+  classifyOutcome,
+  isRichTool,
+  readCodeResult,
+  readString,
+  type Rec,
+  type RichToolKey,
+  type ToolStatus,
+} from "@/components/tool-rows/results";
 import { t } from "@/lib/i18n";
 
 /** Fast tools still show a completed row; they skip the long "Working…" spinner. */
@@ -6,6 +16,7 @@ const COMPACT_TOOLS = new Set(["calculator", "datetime"]);
 
 const ACTIVITY_KEYS: Record<string, string> = {
   web_search: "chat.tool.searching",
+  web_fetch: "chat.tool.fetching",
   image_generate: "chat.tool.creatingImage",
   video_generate: "chat.tool.creatingVideo",
   past_sessions: "chat.tool.pastChats",
@@ -15,6 +26,7 @@ const ACTIVITY_KEYS: Record<string, string> = {
 
 const DONE_KEYS: Record<string, string> = {
   web_search: "chat.tool.search",
+  web_fetch: "chat.tool.fetch",
   image_generate: "chat.tool.image",
   video_generate: "chat.tool.video",
   past_sessions: "chat.tool.pastSessions",
@@ -30,11 +42,146 @@ export function showsToolSpinner(toolKey: string): boolean {
   return !COMPACT_TOOLS.has(toolKey);
 }
 
-export function toolActivityLabel(toolKey: string): string {
+/** The two engines `run_code` has. Proper names, the same in every language. */
+const CODE_LANGUAGE_NAMES: Readonly<Record<string, string>> = { python: "Python", javascript: "JavaScript" };
+
+/** A model-written query or pattern can be long; the row is one line and the full text is in its title. */
+const LABEL_ARG_MAX = 80;
+
+export function codeLanguageName(language: unknown): string | undefined {
+  return typeof language === "string" ? CODE_LANGUAGE_NAMES[language.trim().toLowerCase()] : undefined;
+}
+
+function capArg(text: string): string {
+  return text.length > LABEL_ARG_MAX ? `${text.slice(0, LABEL_ARG_MAX - 1).trimEnd()}…` : text;
+}
+
+/**
+ * The host a `web_fetch` call opened: only the host, never the path or query, which can carry a
+ * token and does not fit a one-line row. Null for a missing, malformed or non-web address.
+ */
+function fetchedHost(input: unknown): string | null {
+  const url = readString(asRecord(input), "url");
+  if (!url) {
+    return null;
+  }
+  try {
+    const parsed = new URL(url);
+    return (parsed.protocol === "https:" || parsed.protocol === "http:") && parsed.hostname
+      ? capArg(parsed.hostname)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** One sentence for a `web_fetch` call: "Opened example.com". Without a host it says it plainly. */
+function webFetchLabel(input: unknown, output: unknown, status: ToolStatus): string {
+  const host = fetchedHost(input);
+  const state = classifyOutcome("web_fetch", status, output).state;
+  if (state === "running") {
+    return host ? t("chat.tools.doing.web_fetch", { host }) : t("chat.tool.fetching");
+  }
+  if (state === "refused" || state === "budget") {
+    return host ? t("chat.tools.failed.web_fetch", { host }) : t("chat.tool.fetchFailed");
+  }
+  return host ? t("chat.tools.done.web_fetch", { host }) : t("chat.tool.fetch");
+}
+
+/**
+ * What a rich tool's label names, taken from its arguments. Null when a required argument is
+ * missing; `list_files` names nothing when it is asked for the top of the desk, so it gets `{}`.
+ */
+function labelVars(toolKey: RichToolKey, args: Rec | null): Record<string, string> | null {
+  switch (toolKey) {
+    case "read_file":
+    case "write_file":
+    case "edit_file":
+    case "delete_file": {
+      const path = readString(args, "path");
+      return path ? { path } : null;
+    }
+    case "list_files": {
+      const dir = readString(args, "dir");
+      return dir ? { dir } : {};
+    }
+    case "search_files": {
+      const pattern = readString(args, "pattern");
+      return pattern ? { query: capArg(pattern) } : null;
+    }
+    case "knowledge_search": {
+      const query = readString(args, "query");
+      return query ? { query: capArg(query) } : null;
+    }
+    case "run_code": {
+      const language = codeLanguageName(args?.language);
+      return language ? { language } : null;
+    }
+  }
+}
+
+type RowGroup = "doing" | "done" | "failed" | "pending";
+
+function rowGroup(toolKey: RichToolKey, status: ToolStatus, output: unknown): RowGroup {
+  const outcome = classifyOutcome(toolKey, status, output);
+  if (outcome.state === "running") {
+    return "doing";
+  }
+  if (outcome.state === "pending") {
+    return "pending";
+  }
+  if (outcome.state === "refused" || outcome.state === "budget") {
+    return "failed";
+  }
+  const run = toolKey === "run_code" ? readCodeResult(output) : null;
+  return run && !run.ok ? "failed" : "done";
+}
+
+/**
+ * One plain sentence for a file, Knowledge or code tool call, in the person's language: "Read
+ * notes/plan.md", "Searched files for “total”", "Ran Python". It follows the call's state, so a
+ * refused read says "Could not read …" and a folder change still waiting says it was proposed.
+ * Any other tool keeps `toolDoneLabel`.
+ */
+export function toolRowLabel(
+  toolKey: string,
+  input?: unknown,
+  output?: unknown,
+  status: ToolStatus = "completed",
+): string {
+  if (toolKey === "web_fetch") {
+    return webFetchLabel(input, output, status);
+  }
+  if (!isRichTool(toolKey)) {
+    return toolDoneLabel(toolKey);
+  }
+  const group = rowGroup(toolKey, status, output);
+  if (group === "pending") {
+    return t(`chat.tools.pending.${toolKey}`);
+  }
+  const vars = labelVars(toolKey, asRecord(input));
+  const optional = toolKey === "list_files" || (group === "failed" && toolKey === "knowledge_search");
+  if (!vars && !optional) {
+    return group === "doing" ? t("chat.tool.working") : t(`chat.tools.name.${toolKey}`);
+  }
+  const top = toolKey === "list_files" && group !== "failed" && !vars?.dir;
+  return t(`chat.tools.${group}.${top ? "list_files_top" : toolKey}`, vars ?? {});
+}
+
+export function toolActivityLabel(toolKey: string, input?: unknown): string {
+  if (toolKey === "web_fetch") {
+    return webFetchLabel(input, undefined, "started");
+  }
+  if (isRichTool(toolKey)) {
+    return toolRowLabel(toolKey, input, undefined, "started");
+  }
   return t(ACTIVITY_KEYS[toolKey] ?? "chat.tool.working");
 }
 
 export function toolDoneLabel(toolKey: string): string {
+  if (isRichTool(toolKey)) {
+    return t(`chat.tools.name.${toolKey}`);
+  }
   const key = DONE_KEYS[toolKey];
   return key ? t(key) : toolKey.replace(/_/g, " ");
 }
@@ -87,6 +234,12 @@ function gist(value: unknown): string {
 }
 
 export function toolCallSummary(toolKey: string, input?: unknown, output?: unknown): string {
+  if (toolKey === "web_fetch") {
+    return webFetchLabel(input, output, "completed");
+  }
+  if (isRichTool(toolKey)) {
+    return toolRowLabel(toolKey, input, output);
+  }
   const label = toolDoneLabel(toolKey);
   const out = gist(output);
   const inn = gist(input);

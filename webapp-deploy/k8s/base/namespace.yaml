@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nultron
+  labels:
+    app.kubernetes.io/part-of: nultron
+    # Every pod here runs non-root, with every capability dropped, a RuntimeDefault seccomp profile
+    # and no privilege escalation, so the strictest built-in profile is enforced.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

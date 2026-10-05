@@ -1,0 +1,31 @@
+# Sizes from the plan (data 200 GiB, components 20 GiB) and the CBS class. CBS Cloud SSD has a
+# 20 GiB floor. The local sizes are 10 / 1 / 5 GiB.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nultron-data
+spec:
+  storageClassName: nultron-cbs-ssd
+  resources:
+    requests:
+      storage: 200Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nultron-components
+spec:
+  storageClassName: nultron-cbs-ssd
+  resources:
+    requests:
+      storage: 20Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nultron-backups
+spec:
+  storageClassName: nultron-cbs-ssd
+  resources:
+    requests:
+      storage: 50Gi

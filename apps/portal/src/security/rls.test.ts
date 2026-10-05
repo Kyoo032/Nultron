@@ -11,18 +11,22 @@
  */
 import type { Client } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { randomToken } from "../crypto";
+import { randomInviteCode, randomToken } from "../crypto";
 import { addDevice, seedFixture, type Fixture } from "../testing/fixtures";
 import { APP_ROLE, appClientFor, createTestStore, type TestStore } from "../testing/pg";
 import type { PortalStore } from "../store/types";
 
-/** The five tables the brief names, plus the two with a deliberate pre-authentication window. */
-const TENANT_TABLES = ["users", "sessions", "refresh_tokens", "login_otps", "auth_codes"] as const;
+/** The five tables the brief names, the invites that gate a first sign-in, and the two with a deliberate pre-authentication window. */
+const TENANT_TABLES = ["users", "sessions", "refresh_tokens", "login_otps", "auth_codes", "invites"] as const;
 
 interface TenantData {
   readonly fixture: Fixture;
   readonly sessionId: string;
   readonly deviceId: string;
+  /** The `invited` member the tenant's invite is for, so "this tenant's users" has two names in it. */
+  readonly invitedUserId: string;
+  readonly invitedEmail: string;
+  readonly inviteCode: string;
   readonly clientId: string;
   readonly authCodeId: string;
 }
@@ -51,6 +55,20 @@ async function populate(store: PortalStore, slug: string): Promise<TenantData> {
       email: fixture.user.email,
       code: "123456",
     });
+    const invited = await ops.users.create({
+      tenantId: fixture.tenant.id,
+      orgId: fixture.org.id,
+      email: `invited@${slug}.test`,
+      status: "invited",
+    });
+    const inviteCode = randomInviteCode();
+    await ops.invites.create({
+      tenantId: fixture.tenant.id,
+      orgId: fixture.org.id,
+      userId: invited.id,
+      email: invited.email,
+      rawCode: inviteCode,
+    });
     await ops.oauthClients.create({
       clientId,
       tenantId: fixture.tenant.id,
@@ -67,7 +85,16 @@ async function populate(store: PortalStore, slug: string): Promise<TenantData> {
       redirectUri: `https://${slug}.test/auth/callback`,
       state: randomToken(),
     });
-    return { fixture, sessionId: session.id, deviceId: device.id, clientId, authCodeId: authCode.id };
+    return {
+      fixture,
+      sessionId: session.id,
+      deviceId: device.id,
+      invitedUserId: invited.id,
+      invitedEmail: invited.email,
+      inviteCode,
+      clientId,
+      authCodeId: authCode.id,
+    };
   });
 }
 
@@ -118,7 +145,7 @@ describe("the connection the suite actually uses", () => {
 
   it("reaches its own tenant's rows, so the isolation below is not just a broken connection", async () => {
     const rows = await scoped<{ id: string }>(alpha.fixture.tenant.id, `SELECT id FROM users`);
-    expect(rows.map((row) => row.id)).toEqual([alpha.fixture.user.id]);
+    expect(rows.map((row) => row.id).sort()).toEqual([alpha.fixture.user.id, alpha.invitedUserId].sort());
   });
 });
 
@@ -199,6 +226,25 @@ describe("a transaction scoped to one tenant", () => {
       [beta.authCodeId],
     );
     expect(rows).toEqual([]);
+  });
+
+  it("cannot redeem another tenant's invite through the store, and the invited member stays invited", async () => {
+    const result = await store.tx(alpha.fixture.tenant.id, (ops) =>
+      ops.invites.redeem({
+        tenantId: beta.fixture.tenant.id,
+        email: beta.invitedEmail,
+        rawCode: beta.inviteCode,
+      }),
+    );
+    // Not "wrong code": the right code, for a row this scope cannot see, finds no invite at all.
+    expect(result).toMatchObject({ ok: false, reason: "no_invite" });
+
+    const [member] = await scoped<{ status: string }>(
+      beta.fixture.tenant.id,
+      `SELECT status FROM users WHERE id = $1`,
+      [beta.invitedUserId],
+    );
+    expect(member.status).toBe("invited");
   });
 });
 

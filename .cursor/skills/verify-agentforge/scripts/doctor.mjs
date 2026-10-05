@@ -1,20 +1,21 @@
 #!/usr/bin/env node
 /**
- * Read-only: is this DPSBuddy instance worth driving?
+ * Read-only: is this Nultron instance worth driving?
  * Usage:
  *   node .cursor/skills/verify-agentforge/scripts/doctor.mjs
  *       → local webdev at http://127.0.0.1:3000
  *   node .cursor/skills/verify-agentforge/scripts/doctor.mjs --desktop
  *       → packaged IPC host from Electron userData host-status.json:
- *         Windows: %APPDATA%/DPSBuddy|Kemenkeu AI|AIHub Metranet/host-status.json
+ *         Windows: %APPDATA%/Nultron|Kemenkeu AI|AIHub Metranet/host-status.json
  *                  (legacy: %APPDATA%/@agentforge/desktop/host-status.json)
- *         Linux:   $XDG_CONFIG_HOME/DPSBuddy/host-status.json
- *                  or ~/.config/DPSBuddy/host-status.json
- *         macOS:   ~/Library/Application Support/DPSBuddy/host-status.json
+ *         Linux:   $XDG_CONFIG_HOME/Nultron|Kemenkeu AI|AIHub Metranet/host-status.json
+ *                  or ~/.config/<same>/host-status.json
+ *         macOS:   ~/Library/Application Support/Nultron|Kemenkeu AI|AIHub Metranet/host-status.json
  *   node …/doctor.mjs --base http://127.0.0.1:PORT
- *   AGENTFORGE_VERIFY_URL=http://127.0.0.1:PORT node …/doctor.mjs
  *   PORT=3200 node …/doctor.mjs
- *       → explicit loopback for **webdev only** (ignored with --desktop)
+ *   AGENTFORGE_VERIFY_URL=http://127.0.0.1:PORT node …/doctor.mjs
+ *       → explicit loopback for **webdev only** (ignored with --desktop).
+ *         Precedence: --base, then PORT, then AGENTFORGE_VERIFY_URL, then :3000.
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { desktopHostStatusCandidates, packagedSqliteHint } from "./desktop-app-url.mjs";
@@ -71,11 +72,40 @@ function desktopStatusPath() {
   return newest || candidates[0];
 }
 
+const EDIT_FFMPEG_WAIT_MS = 3000;
+
+/**
+ * The packaged app adds `editFfmpeg` to host-status.json a moment after its window loads: boot no
+ * longer waits on the ffmpeg probe (a PATH walk, ~300 ms), so `ready: true` can be on disk without
+ * it. A key that is absent is "not probed yet"; `null` is "the host could not say". Wait a bounded
+ * few seconds for the key rather than report the gap as if ffmpeg were unknown. An app that never
+ * writes it (an older build) costs the full wait once and reports `null`, as it always did.
+ */
+async function withEditFfmpeg(file, status) {
+  const deadline = Date.now() + EDIT_FFMPEG_WAIT_MS;
+  let current = status;
+  while (current.editFfmpeg === undefined && Date.now() < deadline) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    try {
+      const reread = JSON.parse(readFileSync(file, "utf8"));
+      if (reread.pid !== status.pid) {
+        // The app was relaunched while this waited; the new file describes a different process than
+        // the one just validated, so stop and report what was validated.
+        return status;
+      }
+      current = reread;
+    } catch {
+      // mid-write on a build that does not swap the file in one step; the next poll reads it whole
+    }
+  }
+  return current;
+}
+
 async function doctorDesktop() {
   const file = desktopStatusPath();
   if (!existsSync(file)) {
     fail(
-      `packaged host-status.json missing at ${file}. Launch the installed DPSBuddy once. Do not doctor :3000 as the desktop app — that is webdev only. Packaged DPSBuddy has no loopback HTTP server.`,
+      `packaged host-status.json missing at ${file}. Launch the installed Nultron once. Do not doctor :3000 as the desktop app — that is webdev only. Packaged Nultron has no loopback HTTP server.`,
     );
   }
   let status;
@@ -99,14 +129,14 @@ async function doctorDesktop() {
   if (!Number.isInteger(pid) || pid <= 0) {
     fail(`host-status.json pid is missing at ${file}`);
   }
-  // host-status.json outlives the app: a closed or crashed DPSBuddy leaves ready:true behind.
+  // host-status.json outlives the app: a closed or crashed Nultron leaves ready:true behind.
   // Signal 0 checks existence only; EPERM means the process exists under another account.
   try {
     process.kill(pid, 0);
   } catch (error) {
     if (error?.code !== "EPERM") {
       fail(
-        `host-status.json pid ${pid} is not running (stale status file at ${file}). Launch the installed DPSBuddy and doctor again; do not drive a closed app.`,
+        `host-status.json pid ${pid} is not running (stale status file at ${file}). Launch the installed Nultron and doctor again; do not drive a closed app.`,
       );
     }
   }
@@ -114,6 +144,7 @@ async function doctorDesktop() {
   if (!dataDir) {
     fail(`host-status.json dataDir is missing at ${file}`);
   }
+  status = await withEditFfmpeg(file, status);
   const runtime = status.runtime ?? "(missing)";
   const hasOpenai = Boolean(status.hasOpenai);
   const report = {
@@ -135,7 +166,8 @@ async function doctorDesktop() {
     dataDir,
     sqliteHint: packagedSqliteHint(),
     statusFile: file,
-    edit: { ffmpeg: status.editFfmpeg ?? null },
+    // `ffmpeg: null` with `ffmpegPending: false` is "the host could not say"; `ffmpegPending: true` is "the key never appeared".
+    edit: { ffmpeg: status.editFfmpeg ?? null, ffmpegPending: status.editFfmpeg === undefined },
   };
   console.log(JSON.stringify(report, null, 2));
   console.log("");
@@ -177,7 +209,7 @@ function baseFromArgv() {
 }
 
 async function doctorWebdev() {
-  // --base wins, then AGENTFORGE_VERIFY_URL, then PORT, then :3000.
+  // --base wins, then PORT (both resolved in baseFromArgv), then AGENTFORGE_VERIFY_URL, then :3000.
   const override = baseFromArgv() || process.env.AGENTFORGE_VERIFY_URL?.trim();
   const fromEnv = override;
   const BASE = (override || WEBDEV_URL).replace(/\/$/, "");
@@ -194,7 +226,7 @@ async function doctorWebdev() {
   try {
     chat = await get(BASE, "/chat");
   } catch (error) {
-    fail(`GET ${BASE}/chat did not connect. Start \`pnpm dev\` (local webdev on :3000).`, String(error));
+    fail(`GET ${BASE}/chat did not connect. Start \`npx pnpm@9.15.9 --filter @agentforge/web dev\` (local webdev on :3000; root \`pnpm dev\` also starts apps/portal, which exits without Postgres).`, String(error));
   }
 
   if (chat.status < 200 || chat.status >= 400) {
@@ -271,13 +303,13 @@ async function doctorWebdev() {
           asr: editPayload.asr ?? null,
         };
       } catch {
-        editNote = "verify-agentforge doctor: note — GET /api/v1/edit/doctor was not JSON (pre-Phase-1).";
+        editNote = "verify-agentforge doctor: note — GET /api/v1/edit/doctor was not JSON.";
       }
     } else {
-      editNote = `verify-agentforge doctor: note — GET /api/v1/edit/doctor returned ${editRes.status} (pre-Phase-1).`;
+      editNote = `verify-agentforge doctor: note — GET /api/v1/edit/doctor returned ${editRes.status}.`;
     }
   } catch {
-    editNote = "verify-agentforge doctor: note — GET /api/v1/edit/doctor did not connect (pre-Phase-1).";
+    editNote = "verify-agentforge doctor: note — GET /api/v1/edit/doctor did not connect.";
   }
 
   let knowledgeStatus = 0;
@@ -324,6 +356,16 @@ async function doctorWebdev() {
     knowledgeStatus = 0;
   }
 
+  // The host's gate verdict, trimmed to what a recipe asserts on. No endpoint, no message.
+  const gate = payload.gateway && typeof payload.gateway === "object" ? payload.gateway : null;
+  const gateway = gate
+    ? {
+        status: typeof gate.status === "string" ? gate.status : null,
+        allowed: typeof gate.allowed === "boolean" ? gate.allowed : null,
+        grace: typeof gate.grace === "boolean" ? gate.grace : null,
+      }
+    : null;
+
   const report = {
     ok: true,
     url: BASE,
@@ -331,6 +373,7 @@ async function doctorWebdev() {
     chatStatus: chat.status,
     runtime,
     hasOpenai,
+    gateway,
     keyFingerprint,
     modeKeys,
     chatCount,
@@ -356,9 +399,13 @@ async function doctorWebdev() {
   }
   if (runtime === "stub") {
     console.log("verify-agentforge doctor: OK — stub runtime. Safe for Chat send without a live gateway.");
-  } else if (runtime === "ai") {
+  } else if (runtime === "ai" && hasOpenai) {
     console.log(
       "verify-agentforge doctor: OK — live runtime (a provider key is saved). Do not treat Chat send or studio generate as stub proof. Settings view and needs-key checks are still valid only when those UI states actually appear.",
+    );
+  } else if (runtime === "ai") {
+    console.log(
+      "verify-agentforge doctor: OK — live runtime, but no key is saved, so the gateway gate is closed and the desk shows onboarding. Drive the gate and onboarding recipes, not Chat.",
     );
   } else {
     console.log(

@@ -63,7 +63,7 @@ import { buildMarketWatchPacket, type PacketClients, type PacketPhase } from "./
 import { guardTeamNotes, runTeamPipeline, type TeamAsk } from "./market-team";
 import { ensureToolsRegistered } from "./register-tools";
 import { localeForRun } from "./run-context";
-import { listSelectableModels, modeCatalogPayload } from "./selectable-models";
+import { listSelectableModels, modeDefaultsFor } from "./selectable-models";
 import { loadSettings } from "./settings-store";
 import { log } from "./log";
 
@@ -202,10 +202,14 @@ export function parseWatchRequest(body: unknown): MarketWatchRequest {
   return parsed.data;
 }
 
-function resolveModel(requested: string | undefined, settings: ReturnType<typeof loadSettings>): string {
+function resolveModel(
+  requested: string | undefined,
+  settings: ReturnType<typeof loadSettings>,
+  tenant: TenantContext,
+): string {
   const wanted = requested?.trim() ? requested.trim() : undefined;
-  const { defaults } = modeCatalogPayload();
-  return resolveChatModel(wanted, settings.documentGenModel || defaults.market, listSelectableModels());
+  const defaults = modeDefaultsFor(tenant);
+  return resolveChatModel(wanted, settings.documentGenModel || defaults.market, listSelectableModels(tenant));
 }
 
 /**
@@ -565,7 +569,7 @@ export async function generateMarketBriefing(
   const run: WatchRun = {
     tenant,
     request,
-    model: resolveModel(request.model, settings),
+    model: resolveModel(request.model, settings, tenant),
     modelExplicit: readModelPinned(request),
     resolved: resolveDeps(deps),
     emit,
@@ -634,7 +638,7 @@ export async function regenerateBriefingSection(
   const index = readSectionIndex(record, briefing.sections.length);
   const current = briefing.sections[index] as BriefingSection;
   const settings = requireLive(tenant);
-  const model = resolveModel(typeof record.model === "string" ? record.model : undefined, settings);
+  const model = resolveModel(typeof record.model === "string" ? record.model : undefined, settings, tenant);
   const resolved = resolveDeps(deps);
 
   const reply = await resolved.ask({

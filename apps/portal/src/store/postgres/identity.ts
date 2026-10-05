@@ -127,6 +127,13 @@ export function orgsOps(client: PoolClient): PortalOps["orgs"] {
       const row = first(rows);
       return row ? toOrg(row) : null;
     },
+    async listForTenant(tenantId) {
+      const { rows } = await client.query<Row>(
+        `SELECT * FROM orgs WHERE tenant_id = $1 ORDER BY created_at ASC, slug ASC`,
+        [tenantId],
+      );
+      return Object.freeze(rows.map(toOrg));
+    },
     async setStatus(id, status) {
       // orgs_past_due_chk ties past_due_since to the status, so both move together or neither does.
       const { rows } = await client.query<Row>(
@@ -154,6 +161,23 @@ export function orgsOps(client: PoolClient): PortalOps["orgs"] {
     async countActiveUsers(orgId) {
       const { rows } = await client.query<{ n: number }>(`SELECT count_active_users($1) AS n`, [orgId]);
       return Number(rows[0]?.n ?? 0);
+    },
+    async hasSeatFor(orgId, userId) {
+      // `login_precheck`'s new-session branch (0005), read without its advisory lock: seats in use,
+      // plus one when this person is not already inside the active set (a live session seen in the
+      // last 30 days), must not exceed the cap. Even a seated person fails when the org is over
+      // its cap, because that is what the function says at the exchange and a page must not
+      // promise more. An org that is not found has no cap to exceed: the exchange decides.
+      const { rows } = await client.query<{ fits: boolean }>(
+        `SELECT (count_active_users(o.id) + CASE WHEN EXISTS (
+                   SELECT 1 FROM sessions s
+                    WHERE s.user_id = $2 AND s.revoked_at IS NULL
+                      AND s.last_seen_at > now() - interval '30 days'
+                 ) THEN 0 ELSE 1 END) <= o.seat_cap AS fits
+           FROM orgs o WHERE o.id = $1`,
+        [orgId, userId],
+      );
+      return rows[0]?.fits ?? true;
     },
   };
 }
@@ -188,6 +212,26 @@ export function usersOps(client: PoolClient): PortalOps["users"] {
       );
       const row = first(rows);
       return row ? toUser(row) : null;
+    },
+    async setRole(id, role) {
+      const { rows } = await client.query<Row>(`UPDATE users SET role = $2::text WHERE id = $1 RETURNING *`, [id, role]);
+      const row = first(rows);
+      return row ? toUser(row) : null;
+    },
+    async lockOwners(tenantId) {
+      // FOR UPDATE cannot sit on an aggregate, so the rows are locked in a subquery. Under READ
+      // COMMITTED a waiter re-evaluates the WHERE once the lock frees, so a row another transaction
+      // just demoted no longer counts.
+      const { rows } = await client.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM (
+           SELECT id FROM users
+            WHERE tenant_id = $1 AND role = 'owner' AND status <> 'disabled'
+            ORDER BY id
+            FOR UPDATE
+         ) AS owners`,
+        [tenantId],
+      );
+      return Number(rows[0]?.n ?? 0);
     },
     async setStatus(id, status) {
       const { rows } = await client.query<Row>(

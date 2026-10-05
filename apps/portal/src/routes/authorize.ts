@@ -1,11 +1,15 @@
 /**
- * The browser login: `GET /authorize`, then two form posts.
+ * The browser login: `GET /authorize`, then the posts of the sign-in.
  *
- *   GET  /authorize          validate the client -> signed in? redirect with a code : sign-in form
- *   POST /authorize/email    send a code (or not), always the same page
- *   POST /authorize/verify   check the code -> login gate -> 302 with code+state, or ?error=
+ *   GET  /authorize                 validate the client -> signed in? redirect with a code : e-mail form
+ *   POST /authorize/email           the e-mail step: the portal decides what comes next
+ *   POST /authorize/invite          an invitee's invite code (a valid one leads to the e-mailed code)
+ *   POST /authorize/invite/resend   "e-mail me my invite again"
+ *   POST /authorize/verify          check the e-mailed code -> login gate -> 302 with code+state, or ?error=
  *
- * The client and the `redirect_uri` are re-validated on **every one of those three**, not just the
+ * What the e-mail step decides, and what it says, is `flows/sign-in.ts` and `sign-in-flow.ts`.
+ *
+ * The client and the `redirect_uri` are re-validated on **every one of those posts**, not just the
  * first. The values travel in hidden fields so they stay out of the URL bar and out of any
  * `Referer`, and a hidden field is a field the user edits -- so it is re-checked against the
  * registered allowlist each time, exactly as if it had just arrived in the query string.
@@ -22,19 +26,25 @@ import {
 import type { PortalRuntime } from "../flows/context";
 import { runBrowserLoginGate, webInstallId } from "../flows/login";
 import { redirectErrorReason } from "../flows/reasons";
-import { sendLoginOtp } from "../otp/send";
 import { verifyLoginOtp } from "../otp/verify";
 import { OTP_TTL_MINUTES } from "../otp/send";
+import { normaliseEmail } from "../crypto";
 import { versionIsLive, webSessionCookieFor } from "../flows/web-session";
 import { boundedField, stringField } from "../security/body";
-import { htmlResponse, redirectResponse } from "../security/headers";
+import { redirectResponse } from "../security/headers";
 import type { WebSession } from "../security/web-session";
 import type { PortalRequest, PortalResponse, PortalRoute } from "../server";
-import { enterCodePage, signInPage } from "../views/pages";
+import {
+  codeEntryResponse,
+  emailEntryResponse,
+  handleEmailStep,
+  handleInviteResend,
+  handleInviteStep,
+  type SignInSpec,
+} from "./sign-in-flow";
 import {
   codeErrorMessage,
   csrfOk,
-  ensureCsrf,
   htmlError,
   limit,
   readForm,
@@ -43,6 +53,8 @@ import {
 } from "./support";
 
 const EMAIL_PATH = "/authorize/email";
+const INVITE_PATH = "/authorize/invite";
+const INVITE_RESEND_PATH = "/authorize/invite/resend";
 const VERIFY_PATH = "/authorize/verify";
 
 const CLIENT_ERROR_COPY: Readonly<Record<string, string>> = Object.freeze({
@@ -51,14 +63,13 @@ const CLIENT_ERROR_COPY: Readonly<Record<string, string>> = Object.freeze({
   invalid_redirect: "error.invalidRedirect",
 });
 
-/** The three values that travel across the two posts. */
-function hiddenFor(params: AuthorizeParams, extra: Readonly<Record<string, string>> = {}) {
+/** The three values that travel across every post. An address and a code never ride here. */
+function hiddenFor(params: AuthorizeParams): Readonly<Record<string, string>> {
   return {
     response_type: "code",
     client_id: params.clientId ?? "",
     redirect_uri: params.redirectUri ?? "",
     state: params.state ?? "",
-    ...extra,
   };
 }
 
@@ -79,6 +90,17 @@ function clientFormAction(params: AuthorizeParams): readonly string[] {
   return params.redirectUri ? [params.redirectUri] : [];
 }
 
+/** Built only after `checkClient` has returned ok, for the reason `clientFormAction` gives. */
+function specFor(params: AuthorizeParams, tenantId: string): SignInSpec {
+  return {
+    purpose: "portal_login",
+    requiredTenantId: tenantId,
+    paths: { email: EMAIL_PATH, invite: INVITE_PATH, inviteResend: INVITE_RESEND_PATH, verify: VERIFY_PATH },
+    hidden: hiddenFor(params),
+    formActionOrigins: clientFormAction(params),
+  };
+}
+
 function paramsFromFields(fields: Readonly<Record<string, unknown>>): AuthorizeParams {
   return readAuthorizeParams({
     get: (name) => {
@@ -91,8 +113,22 @@ function paramsFromFields(fields: Readonly<Record<string, unknown>>): AuthorizeP
 export function authorizeRoutes(runtime: PortalRuntime): readonly PortalRoute[] {
   return [
     { method: "GET", path: "/authorize", handle: (request) => getAuthorize(runtime, request) },
-    { method: "POST", path: EMAIL_PATH, handle: (request) => postEmail(runtime, request) },
-    { method: "POST", path: VERIFY_PATH, handle: (request) => postVerify(runtime, request) },
+    {
+      method: "POST",
+      path: EMAIL_PATH,
+      handle: (request) => authorizePost(runtime, request, (flow) => handleEmailStep(runtime, flow.context, flow.spec, flow.fields)),
+    },
+    {
+      method: "POST",
+      path: INVITE_PATH,
+      handle: (request) => authorizePost(runtime, request, (flow) => handleInviteStep(runtime, flow.context, flow.spec, flow.fields)),
+    },
+    {
+      method: "POST",
+      path: INVITE_RESEND_PATH,
+      handle: (request) => authorizePost(runtime, request, (flow) => handleInviteResend(runtime, flow.context, flow.spec, flow.fields)),
+    },
+    { method: "POST", path: VERIFY_PATH, handle: (request) => authorizePost(runtime, request, (flow) => postVerify(runtime, flow)) },
   ];
 }
 
@@ -121,73 +157,31 @@ async function getAuthorize(runtime: PortalRuntime, request: PortalRequest): Pro
     if (done) {
       return done;
     }
-    // The session's user no longer exists, its cookie has been revoked, or it is for another
-    // tenant's user: fall through to the form rather than answering an error nobody can act on.
+    // The session's user no longer exists (removed, or the company erased), its cookie has been
+    // revoked, or it is for another tenant's user: fall through to the form rather than answering
+    // an error nobody can act on. A removed member is then told what any stranger is told.
   }
 
-  const csrf = ensureCsrf(runtime, context);
-  return htmlResponse(
-    signInPage({
-      locale: context.locale,
-      t: context.t,
-      action: EMAIL_PATH,
-      csrfToken: csrf.token,
-      hidden: hiddenFor(params),
-    }),
-    { cookie: csrf.cookie, formActionOrigins: clientFormAction(params) },
-  );
+  return emailEntryResponse(runtime, context, specFor(params, client.tenantId));
 }
 
-async function postEmail(runtime: PortalRuntime, request: PortalRequest): Promise<PortalResponse> {
-  const context = requestContext(runtime, request);
-  const body = readForm(request);
-  if (!body.ok) {
-    return htmlError(context, "error.badRequest", { status: body.reason === "too_large" ? 413 : 400 });
-  }
-  if (!csrfOk(runtime, context, body.fields)) {
-    return htmlError(context, "error.expiredForm", { status: 403 });
-  }
-  if (!limit([runtime.limiters.authorizeIp, context.ipKey], [runtime.limiters.otpSendIp, context.ipKey]).ok) {
-    return htmlError(context, "error.rateLimited", { status: 429 });
-  }
-
-  const params = paramsFromFields(body.fields);
-  const client = await checkClient(runtime, params);
-  if (!client.ok) {
-    return htmlError(context, CLIENT_ERROR_COPY[client.reason]);
-  }
-
-  const email = boundedField(body.fields, "email", MAX_EMAIL_LENGTH);
-  if (email) {
-    // The outcome is audited and never rendered: an unknown address, an address in two tenants,
-    // an address in another tenant and a real one all produce the page below.
-    await sendLoginOtp(
-      { store: runtime.store, mailer: runtime.mailer, log: runtime.log, clock: runtime.clock },
-      {
-        email,
-        requiredTenantId: client.tenantId,
-        purpose: "portal_login",
-        locale: context.locale,
-        ip: context.ip,
-      },
-    );
-  }
-
-  const csrf = ensureCsrf(runtime, context);
-  return htmlResponse(
-    enterCodePage({
-      locale: context.locale,
-      t: context.t,
-      action: VERIFY_PATH,
-      csrfToken: csrf.token,
-      hidden: hiddenFor(params, { email: email ?? "" }),
-      expiresInMinutes: OTP_TTL_MINUTES,
-    }),
-    { cookie: csrf.cookie, formActionOrigins: clientFormAction(params) },
-  );
+interface AuthorizeFlow {
+  readonly context: RequestContext;
+  readonly fields: Readonly<Record<string, unknown>>;
+  readonly params: AuthorizeParams;
+  readonly spec: SignInSpec;
 }
 
-async function postVerify(runtime: PortalRuntime, request: PortalRequest): Promise<PortalResponse> {
+/**
+ * What every post of this flow does first, in the order that is the security property: the body is
+ * parsed, the CSRF token must match, the per-IP page budget is spent, and the client and its
+ * `redirect_uri` are validated **again** from the hidden fields. Only then does a handler run.
+ */
+async function authorizePost(
+  runtime: PortalRuntime,
+  request: PortalRequest,
+  handle: (flow: AuthorizeFlow) => Promise<PortalResponse>,
+): Promise<PortalResponse> {
   const context = requestContext(runtime, request);
   const body = readForm(request);
   if (!body.ok) {
@@ -205,11 +199,19 @@ async function postVerify(runtime: PortalRuntime, request: PortalRequest): Promi
   if (!client.ok) {
     return htmlError(context, CLIENT_ERROR_COPY[client.reason]);
   }
+  return handle({ context, fields: body.fields, params, spec: specFor(params, client.tenantId) });
+}
 
-  const email = boundedField(body.fields, "email", MAX_EMAIL_LENGTH);
-  const code = stringField(body.fields, "code");
-  if (!email || !code) {
-    return retryCode(runtime, context, params, email, context.t("code.missing"));
+async function postVerify(runtime: PortalRuntime, flow: AuthorizeFlow): Promise<PortalResponse> {
+  const { context, fields, params, spec } = flow;
+  const typed = boundedField(fields, "email", MAX_EMAIL_LENGTH);
+  const email = typed === null ? null : normaliseEmail(typed);
+  const code = stringField(fields, "code");
+  if (!email) {
+    return emailEntryResponse(runtime, context, spec, { error: context.t("signIn.emailMissing"), status: 400 });
+  }
+  if (!code) {
+    return retryCode(runtime, context, spec, email, context.t("code.missing"));
   }
 
   const verified = await verifyLoginOtp(
@@ -217,39 +219,33 @@ async function postVerify(runtime: PortalRuntime, request: PortalRequest): Promi
     {
       email,
       code,
-      requiredTenantId: client.tenantId,
+      requiredTenantId: spec.requiredTenantId,
       purpose: "portal_login",
       ip: context.ip,
     },
   );
   if (!verified.ok) {
-    return retryCode(runtime, context, params, email, codeErrorMessage(context, verified));
+    return retryCode(runtime, context, spec, email, codeErrorMessage(context, verified));
   }
 
-  const done = await completeSignIn(runtime, context, params, client.tenantId, verified.user.id);
+  const done = await completeSignIn(runtime, context, params, verified.tenantId, verified.user.id);
   return done ?? htmlError(context, "error.generic", { status: 500 });
 }
 
+/** A refused code: the same screen, with the reason and the way to ask again. */
 function retryCode(
   runtime: PortalRuntime,
   context: RequestContext,
-  params: AuthorizeParams,
-  email: string | null,
+  spec: SignInSpec,
+  email: string,
   error: string,
 ): PortalResponse {
-  const csrf = ensureCsrf(runtime, context);
-  return htmlResponse(
-    enterCodePage({
-      locale: context.locale,
-      t: context.t,
-      action: VERIFY_PATH,
-      csrfToken: csrf.token,
-      hidden: hiddenFor(params, { email: email ?? "" }),
-      expiresInMinutes: OTP_TTL_MINUTES,
-      error,
-    }),
-    { status: 400, cookie: csrf.cookie, formActionOrigins: clientFormAction(params) },
-  );
+  return codeEntryResponse(runtime, context, spec, {
+    email,
+    lead: context.t("sent.body", { email, minutes: OTP_TTL_MINUTES }),
+    error,
+    status: 400,
+  });
 }
 
 /**

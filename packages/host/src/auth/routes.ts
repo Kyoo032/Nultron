@@ -21,8 +21,8 @@
  * raw (`http-adapter.ts:263`) alongside the cookies it parses for itself.
  */
 import { ApiError, isServerMode } from "@agentforge/core";
-import type { EnvLike } from "@agentforge/core";
-import type { PortalIdentity } from "@agentforge/db";
+import type { EnvLike, MembershipRole } from "@agentforge/core";
+import type { PortalIdentity, PortalProvisioning } from "@agentforge/db";
 import { jsonError, jsonOk } from "../errors";
 import type { HostCookie, HostJsonResult, HostRequest } from "../types";
 import { PortalError, buildAuthorizeUrl, type PortalTokens } from "./portal-client";
@@ -36,7 +36,12 @@ import {
 } from "./login-state";
 import { getLocalVaultKey } from "@agentforge/db/vault-key";
 import { log } from "../log";
-import { createPortalSessionCheck, faultOf, type PortalSessionCheck } from "./portal-check";
+import {
+  createPortalSessionCheck,
+  faultOf,
+  type PortalSessionCheck,
+  type PortalSessionCheckOptions,
+} from "./portal-check";
 import { createSessionSecrets, type SessionSecrets } from "./session-secrets";
 import {
   configuredClientCredentials,
@@ -91,8 +96,12 @@ export type AuthRouteDeps = {
   /**
    * Writes the host's rows for a portal identity on first sign-in (lane C). Injected so a test can
    * exercise the sign-in without a database, the same way `store` and `portal` already are.
+   *
+   * The identity carries the role the portal sent in the token body, or `null` for none. The host
+   * writes exactly that membership role and has no default of its own: no role is a `member`, never
+   * an `owner` (SR-65). A sign-in for a person who already has a membership moves it to this role.
    */
-  readonly provision: (identity: PortalIdentity) => Promise<unknown>;
+  readonly provision: (identity: PortalProvisioning) => Promise<unknown>;
   /**
    * Phase 5 lane B: take a seat for this person, or refuse the sign-in.
    *
@@ -120,6 +129,20 @@ export type AuthRouteDeps = {
    * `portal` above.
    */
   readonly portalCheck?: PortalSessionCheck;
+  /**
+   * Reconciles a membership's role with what the portal sent at a refresh (`./portal-check.ts`
+   * `applyRole`). Only used when `portalCheck` is absent and the check is built here; the hosted
+   * server's own check (`hostPortalCheck`) is wired with the real one.
+   */
+  readonly applyRole?: PortalSessionCheckOptions["applyRole"];
+  /**
+   * The role the host holds for the session's person — the membership row, which is what every
+   * authorization check reads — or `null` when there is none to read. Used only by
+   * `GET /auth/session`, so the renderer can hide controls the host would refuse anyway (the Erase
+   * account button for anybody who is not an owner). A courtesy: the host's refusal is the control.
+   * Absent, or answering null or throwing, the answer simply carries no `role`.
+   */
+  readonly readRole?: (session: SessionRecord) => Promise<MembershipRole | null>;
   /**
    * Seals the refresh token onto the session row at sign-in (`./session-secrets.ts`), so a restart
    * signs nobody out. Defaults to the wrap key this process runs under; the hosted server passes
@@ -374,6 +397,7 @@ export function createAuthRoutes(deps: AuthRouteDeps): AuthRoutes {
       secrets,
       // The same client the code exchange authenticates as, from the same environment.
       clientCredentials: () => configuredClientCredentials(env()),
+      applyRole: deps.applyRole,
     });
   const checkContext = { store: deps.store, now: deps.now };
 
@@ -479,7 +503,11 @@ export function createAuthRoutes(deps: AuthRouteDeps): AuthRoutes {
       userId: tokens.userId,
     };
     try {
-      await deps.provision(identity);
+      // The role is the portal's, read from the token body by `toTokens` (`null` when it sent none
+      // the host recognises). It rides only into provisioning: the seat claim below is about a
+      // person, not a privilege, and the session carries no role at all — it is read from the
+      // membership row on each request.
+      await deps.provision({ ...identity, role: tokens.role });
     } catch (error) {
       throw fromPortal(error);
     }
@@ -568,10 +596,24 @@ export function createAuthRoutes(deps: AuthRouteDeps): AuthRoutes {
     return jsonOk(signedOutBody(), 200, clearedCookie(deps));
   });
 
+  /** The membership role for the answer, or none. Never throws: a role we cannot read is no role, not a 500. */
+  async function roleForAnswer(session: SessionRecord): Promise<MembershipRole | null> {
+    if (!deps.readRole) {
+      return null;
+    }
+    try {
+      return await deps.readRole(session);
+    } catch (error) {
+      log.warn("session_role_not_read", { tenantId: session.tenantId, fault: faultOf(error) });
+      return null;
+    }
+  }
+
   const handleSession = guarded(async (request: HostRequest) => {
     const { id, verdict } = await loadSession(request, deps);
     if (verdict.ok) {
-      return jsonOk(sessionSummary(verdict.session));
+      const role = await roleForAnswer(verdict.session);
+      return jsonOk(role ? { ...sessionSummary(verdict.session), role } : sessionSummary(verdict.session));
     }
     // A visitor who never signed in is not an error and gets no reason to render.
     return jsonOk(id === null ? { signedIn: false } : { signedIn: false, reason: verdict.reason });

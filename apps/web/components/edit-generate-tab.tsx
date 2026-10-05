@@ -3,8 +3,10 @@ import { formatUsd } from "@agentforge/core/gateway";
 import { allowedVideoSeconds, snapVideoSeconds, videoCapabilities } from "@agentforge/core/video-capabilities";
 import { EditPromptTemplates } from "@/components/edit-prompt-templates";
 import { ModelSelect } from "@/components/model-select";
-import { Link } from "@/lib/nav";
+import { SettingsLinkHint } from "@/components/settings-link-hint";
 import { apiFetch } from "@/lib/api-client";
+import { EDIT_GENERATE_NEEDS_KEY_NOTE_ID, editKeyGuard, editKeyHint } from "@/lib/edit-key-guard";
+import { hostedKeyBlock } from "@/lib/use-desk-needs-key";
 import type { StillClip } from "@/lib/edit-preview-media";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 
@@ -57,6 +59,10 @@ export function EditGenerateTab({
   onSubmitted,
 }: Props) {
   const projectId = project?.id;
+  // Hosted only: the tab's own button was already quiet for a missing key (on both products), so the
+  // addition is the reason, said so a screen reader and a pointer can read it. Off the hosted build this
+  // is false and every helper below returns `{}`, so the Personal markup is what it was.
+  const hostedKeyMissing = hostedKeyBlock(needsKey);
   const [useClipStill, setUseClipStill] = useState(true);
   const clipStill = useClipStill ? stillClip : null;
   const [sub, setSub] = useState<"image" | "video" | "storyboard">("video");
@@ -194,12 +200,12 @@ export function EditGenerateTab({
         </button>
       </div>
       {needsKey ? (
-        <p className="rounded-md border border-[var(--line)] bg-[var(--line)]/30 px-2 py-2 text-xs text-[var(--text-2)]" data-testid="edit-needs-key">
-          Add a {gatewayName} gateway key in{" "}
-          <Link href="/settings" className="underline">
-            Settings
-          </Link>{" "}
-          to generate.
+        <p
+          className="rounded-md border border-[var(--line)] bg-[var(--line)]/30 px-2 py-2 text-xs text-[var(--text-2)]"
+          data-testid="edit-needs-key"
+          id={hostedKeyMissing ? EDIT_GENERATE_NEEDS_KEY_NOTE_ID : undefined}
+        >
+          <SettingsLinkHint i18nKey="edit.generate.needsKey" vars={{ gateway: gatewayName }} />
         </p>
       ) : null}
       {sub === "storyboard" ? (
@@ -266,6 +272,7 @@ export function EditGenerateTab({
             value={prompt}
             onChange={(event) => changePrompt(event.target.value)}
             data-testid="edit-generate-prompt"
+            {...editKeyHint(hostedKeyMissing, EDIT_GENERATE_NEEDS_KEY_NOTE_ID)}
           />
           {error ? (
             <p className="text-xs text-red-700" role="alert">
@@ -275,6 +282,7 @@ export function EditGenerateTab({
           <button
             type="submit"
             className="btn btn-primary w-full px-2 py-1.5 text-xs"
+            {...editKeyGuard(hostedKeyMissing, EDIT_GENERATE_NEEDS_KEY_NOTE_ID)}
             disabled={needsKey || submitting || !prompt.trim() || !projectId}
             data-testid="edit-generate-submit"
           >

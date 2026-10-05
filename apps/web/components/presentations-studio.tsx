@@ -1,8 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { messageUnlessBlocked } from "@/lib/gateway-blocked";
 import { Link } from "@/lib/nav";
 import { SourceMaterialField } from "@/components/source-material-field";
+import { DeskSourcePicker } from "@/components/desk-source-picker";
+import { PresentationChecksNote } from "@/components/presentation-checks-note";
+import {
+  MAX_SLIDE_COUNT,
+  MIN_SLIDE_COUNT,
+  readOutlineChecks,
+  readSlideCountInput,
+  type PresentationCheckNote,
+} from "@/lib/presentation-checks";
 import { subscribeModeHandoff } from "@/lib/mode-handoff";
 import { Confetti } from "@/components/confetti";
 import { EnhancePromptButton } from "@/components/enhance-prompt-button";
@@ -11,6 +21,9 @@ import { ModeHeader } from "@/components/mode-header";
 import { JobProgressList } from "@/components/job-progress";
 import { useJobStream } from "@/lib/use-job-stream";
 import { ModelSelect } from "@/components/model-select";
+import { isGatewayBlockedText } from "@/lib/gateway-blocked";
+import { NeedsKeyNote } from "@/components/needs-key-note";
+import { StudioEmptyDesk } from "@/components/studio-empty-desk";
 import { WorkingStatus } from "@/components/working-status";
 import type { JobRegenSubmit } from "@/components/job-regen-panel";
 import { PresentationPreview } from "@/components/presentation-preview";
@@ -26,11 +39,17 @@ import { getLocale, t } from "@/lib/i18n";
 import type { PresentationOutline, PresentationOutlineInput } from "@/lib/presentation-outline";
 import { parsePresentationOutlineBody } from "@/lib/presentation-outline";
 import { presentationStarters } from "@/lib/job-starters";
+import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import { useJobModel } from "@/lib/use-job-model";
 import { modelPickBody, regenModelPick, studioModelPick } from "@/lib/model-choice";
 import { apiFetch, isElectron } from "@/lib/api-client";
 
 function errorMessage(payload: unknown, fallback: string): string {
+  // Hosted only: a 403 gateway_blocked is "no usable key", said as the catalog sentence (`gateway-blocked.ts`).
+  const blocked = messageUnlessBlocked(payload, () => "");
+  if (blocked) {
+    return blocked;
+  }
   if (payload && typeof payload === "object") {
     const error = (payload as { error?: { message?: unknown } }).error;
     if (error && typeof error.message === "string" && error.message.trim()) {
@@ -41,11 +60,18 @@ function errorMessage(payload: unknown, fallback: string): string {
 }
 
 export function PresentationsStudio() {
+  // Nultron Enterprise: a signed-in tenant may open the desk before adding a key. Hosted only; false elsewhere.
+  const needsKey = useHostedNeedsKey();
   const { models, model, pinned: modelPinned, setModel } = useJobModel("presentations");
   const job = useJobStream<OpenSlideDeck | PresentationOutline>();
   const [prompt, setPrompt] = useState("");
   const [sourceText, setSourceText] = useState("");
   const [sourceTitle, setSourceTitle] = useState<string | null>(null);
+  const [sourceFiles, setSourceFiles] = useState<string[]>([]);
+  const [deskRefresh, setDeskRefresh] = useState(0);
+  const [slideCountText, setSlideCountText] = useState("");
+  const [checks, setChecks] = useState<PresentationCheckNote[]>([]);
+  const slideCount = readSlideCountInput(slideCountText);
   const [outline, setOutline] = useState<PresentationOutline | null>(null);
   const [deckId, setDeckId] = useState<string | null>(null);
   const [engine, setEngine] = useState<"nultron" | "open-slide">("open-slide");
@@ -66,12 +92,14 @@ export function PresentationsStudio() {
   function showStarter(next: PresentationOutlineInput) {
     setEngine("nultron");
     setOutline(parsePresentationOutlineBody(next));
+    setChecks([]);
     setDeckId(null);
     setSavedNote(false);
   }
 
-  function landOutline(next: PresentationOutline) {
+  function landOutline(next: PresentationOutline, notes: PresentationCheckNote[]) {
     setOutline(next);
+    setChecks(notes);
     setDeckId(null);
     setSavedNote(false);
     setLanded((count) => count + 1);
@@ -107,6 +135,7 @@ export function PresentationsStudio() {
     }
     setEngine("nultron");
     setOutline(parsePresentationOutlineBody(data.deck.outline));
+    setChecks([]);
     setDeckId(data.deck.id);
     setSavedNote(false);
     setError(null);
@@ -197,11 +226,12 @@ export function PresentationsStudio() {
   async function onGenerate(event: FormEvent) {
     event.preventDefault();
     const topic = prompt.trim();
-    if (!topic || busy) {
+    if (!topic || busy || needsKey) {
       return;
     }
     setBusy("generate");
     setError(null);
+    setChecks([]);
     try {
       if (engine === "open-slide") {
         const data = await job.run("/api/v1/presentations/open-slide/stream", {
@@ -209,6 +239,7 @@ export function PresentationsStudio() {
           brief: { pageCount, density, motion },
           ...modelPickBody(studioModelPick(model, modelPinned)),
           sourceText: sourceText.trim() || undefined,
+          sourceFiles: sourceFiles.length > 0 ? sourceFiles : undefined,
         });
         if (!data || !("pages" in data)) {
           setOpenDeck(null);
@@ -240,12 +271,14 @@ export function PresentationsStudio() {
         // Only a deliberate pick travels as pinned: a seeded default stays rescuable by the host's fallback.
         ...modelPickBody(studioModelPick(model, modelPinned)),
         sourceText: sourceText.trim() || undefined,
+        sourceFiles: sourceFiles.length > 0 ? sourceFiles : undefined,
+        slideCount: slideCount.value ?? undefined,
       });
       if (!data || !("slides" in data)) {
         setOutline(null);
         return;
       }
-      landOutline(parsePresentationOutlineBody(data));
+      landOutline(parsePresentationOutlineBody(data), readOutlineChecks(data));
     } catch (err) {
       if (engine === "open-slide") {
         setOpenDeck(null);
@@ -259,7 +292,7 @@ export function PresentationsStudio() {
   }
 
   async function onRegenerate(index: number, payload: JobRegenSubmit) {
-    if (!outline || busy) {
+    if (!outline || busy || needsKey) {
       return;
     }
     setBusy("regen");
@@ -277,6 +310,7 @@ export function PresentationsStudio() {
           ...modelPickBody(regenModelPick(payload.model, model, modelPinned)),
           attachments: payload.attachments.length > 0 ? payload.attachments : undefined,
           sourceText: sourceText.trim() || undefined,
+          sourceFiles: sourceFiles.length > 0 ? sourceFiles : undefined,
         }),
       });
       const data = await res.json().catch(() => null);
@@ -284,6 +318,7 @@ export function PresentationsStudio() {
         throw new Error(errorMessage(data, t("presentation.regenError")));
       }
       setOutline(parsePresentationOutlineBody(data));
+      setChecks([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("presentation.regenError"));
     } finally {
@@ -334,6 +369,8 @@ export function PresentationsStudio() {
     }
   }
 
+  // The local error (save, download, regenerate) and the stream's own error share one banner.
+  const shownError = error ?? job.error?.message ?? null;
   const showingOpenSlide = engine === "open-slide";
   const hasDeck = showingOpenSlide ? openDeck !== null : outline !== null;
 
@@ -425,15 +462,14 @@ export function PresentationsStudio() {
         }
       />
 
-      {error || job.error ? (
+      {shownError && !isGatewayBlockedText(shownError) ? (
         <div
           className="mt-6 rounded-lg border border-[var(--line)] px-4 py-3 text-sm text-[var(--danger)]"
           role="alert"
           data-testid="presentations-error"
         >
-          {error ?? job.error?.message}
-          {/gateway|api key|settings|runtime_stub|live gateway/i.test(error ?? job.error?.message ?? "") &&
-          !/settings/i.test(error ?? job.error?.message ?? "") ? (
+          {shownError}
+          {/gateway|api key|settings|runtime_stub|live gateway/i.test(shownError) && !/settings/i.test(shownError) ? (
             <>
               {" "}
               <Link href="/settings" className="underline">
@@ -450,6 +486,8 @@ export function PresentationsStudio() {
       <form
         className={hasDeck ? "mt-4" : "mt-6 space-y-3 rounded-xl border border-[var(--line)] bg-transparent p-3"}
         onSubmit={(event) => void onGenerate(event)}
+        // A file made in Chat since this pane mounted shows up the next time the form is used.
+        onFocusCapture={() => setDeskRefresh((count) => count + 1)}
         data-testid="presentations-studio-prompt-bar"
       >
         {hasDeck ? null : (
@@ -462,8 +500,23 @@ export function PresentationsStudio() {
             {styleChips}
           </div>
         )}
-        <div className="flex items-start justify-between gap-3">
-          <details className="min-w-0 flex-1" data-testid="presentations-more-details">
+        <div className="flex flex-col items-start gap-3">
+          {needsKey ? <NeedsKeyNote testId="presentations-needs-key" /> : null}
+          {hasDeck ? null : (
+            <button
+              type="submit"
+              className="btn btn-primary h-10 shrink-0 rounded-pill px-5"
+              disabled={busy !== null || job.busy || !prompt.trim() || needsKey}
+              data-testid="presentations-generate"
+            >
+              {busy === "generate" || job.busy ? (
+                <WorkingStatus label={t("presentation.generating")} />
+              ) : (
+                t("presentation.generate")
+              )}
+            </button>
+          )}
+          <details className="w-full min-w-0" data-testid="presentations-more-details">
             <summary className="cursor-pointer text-sm text-[var(--text-3)]" data-testid="presentations-more">
               {t("presentation.more")}
             </summary>
@@ -494,6 +547,29 @@ export function PresentationsStudio() {
                   <option value="open-slide">{t("presentation.engineOpenSlide")}</option>
                 </select>
               </label>
+              {engine === "nultron" ? (
+                <label className="flex flex-col gap-1 text-xs text-[var(--text-2)]">
+                  {t("presentation.slideCount.label")}
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={2}
+                    className="select-field w-full"
+                    value={slideCountText}
+                    disabled={busy !== null}
+                    placeholder={t("presentation.slideCount.placeholder")}
+                    aria-invalid={slideCount.invalid}
+                    data-testid="presentations-slide-count"
+                    onChange={(event) => setSlideCountText(event.target.value.replace(/\D/g, ""))}
+                  />
+                  <span
+                    className={slideCount.invalid ? "text-[var(--danger)]" : "text-[var(--text-3)]"}
+                    data-testid="presentations-slide-count-hint"
+                  >
+                    {t("presentation.slideCount.hint", { min: MIN_SLIDE_COUNT, max: MAX_SLIDE_COUNT })}
+                  </span>
+                </label>
+              ) : null}
               <label className="flex flex-col gap-1 text-xs text-[var(--text-2)]">
                 {t("presentation.openSlideMotion")}
                 <select
@@ -532,6 +608,13 @@ export function PresentationsStudio() {
                 onTitle={setSourceTitle}
                 disabled={busy !== null}
                 testIdPrefix="presentations"
+              />
+              <DeskSourcePicker
+                selected={sourceFiles}
+                onChange={setSourceFiles}
+                disabled={busy !== null}
+                pastedChars={sourceText.length}
+                refreshKey={deskRefresh}
               />
               <div className="flex flex-wrap gap-2">
                 {presentationStarters(getLocale()).map((starter) => (
@@ -607,7 +690,7 @@ export function PresentationsStudio() {
                 <button
                   type="submit"
                   className="btn btn-ghost h-8 rounded-lg px-3 text-xs"
-                  disabled={busy !== null || job.busy || !prompt.trim()}
+                  disabled={busy !== null || job.busy || !prompt.trim() || needsKey}
                   data-testid="presentations-generate"
                 >
                   {busy === "generate" || job.busy ? t("presentation.generating") : t("presentation.generate")}
@@ -616,20 +699,6 @@ export function PresentationsStudio() {
               <div ref={setToolsHost} />
             </div>
           </details>
-          {hasDeck ? null : (
-            <button
-              type="submit"
-              className="btn btn-primary h-10 shrink-0 rounded-pill px-5"
-              disabled={busy !== null || job.busy || !prompt.trim()}
-              data-testid="presentations-generate"
-            >
-              {busy === "generate" ? (
-                <WorkingStatus label={t("presentation.generating")} />
-              ) : (
-                t("presentation.generate")
-              )}
-            </button>
-          )}
         </div>
         {busy === "generate" || job.busy ? (
           <JobProgressList progress={job.progress} busy mode="presentations" testId="presentations-progress" />
@@ -652,6 +721,7 @@ export function PresentationsStudio() {
         ) : outline && !showingOpenSlide ? (
           <div className="enter-rise relative">
             {landed > 0 ? <Confetti key={landed} /> : null}
+            <PresentationChecksNote notes={checks} />
             <PresentationPreview
               outline={outline}
               models={models}
@@ -660,13 +730,16 @@ export function PresentationsStudio() {
               onRegenerate={(index, payload) => void onRegenerate(index, payload)}
               onOutlineChange={(next) => {
                 setOutline(next);
+                setChecks([]);
                 setSavedNote(false);
               }}
               variant="simple"
               toolsHost={toolsHost}
             />
           </div>
-        ) : null}
+        ) : hasDeck || busy !== null ? null : (
+          <StudioEmptyDesk mode="presentations" flush />
+        )}
       </div>
     </main>
   );

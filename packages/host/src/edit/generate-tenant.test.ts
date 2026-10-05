@@ -83,8 +83,8 @@ async function projectOfA(name: string) {
 }
 
 beforeAll(async () => {
-  tenantA = await ensurePortalOwner(db, ALPHA);
-  tenantB = await ensurePortalOwner(db, BETA);
+  tenantA = await ensurePortalOwner(db, { ...ALPHA, role: "owner" });
+  tenantB = await ensurePortalOwner(db, { ...BETA, role: "owner" });
 }, 60_000);
 
 afterEach(() => {

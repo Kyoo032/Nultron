@@ -82,6 +82,14 @@ describe("generateOpenSlideDeck", () => {
     expect(deck.pages[0]?.layout).toBe("title");
   });
 
+  it("refuses a bad or missing source file even on the stub runtime, before drafting", async () => {
+    for (const sourceFiles of [["../secret"], ["missing-on-this-desk.md"], "plan.md", ["a", "b", "c", "d", "e", "f"]]) {
+      await expect(
+        generateOpenSlideDeck(await tenant(), { prompt: "Saturday pickup", sourceFiles }),
+      ).rejects.toMatchObject({ status: 400 });
+    }
+  });
+
   it("refuses a blank prompt and a hostile source", async () => {
     await expect(generateOpenSlideDeck(await tenant(), { prompt: "  " })).rejects.toMatchObject({
       code: "invalid_request",

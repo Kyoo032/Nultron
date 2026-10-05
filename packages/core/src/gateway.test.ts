@@ -15,10 +15,18 @@ describe("gateway", () => {
   });
 
   it("reads packaged brand env for Kemenkeu AI / AIHub Metranet", () => {
-    const previousUrl = process.env.AGENTFORGE_GATEWAY_URL;
-    const previousName = process.env.AGENTFORGE_GATEWAY_NAME;
-    const previousProduct = process.env.AGENTFORGE_PRODUCT_NAME;
-    process.env.AGENTFORGE_GATEWAY_URL = "https://aihub.metranet.co.id/v1";
+    const keys = [
+      "AGENTFORGE_PACKAGED",
+      "AGENTFORGE_BRAND_GATEWAY_URL",
+      "AGENTFORGE_GATEWAY_URL",
+      "AGENTFORGE_GATEWAY_NAME",
+      "AGENTFORGE_PRODUCT_NAME",
+    ] as const;
+    const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+    // What `apps/desktop/main.cjs` bootstrapPackaged() leaves in the environment for a flavor build.
+    process.env.AGENTFORGE_PACKAGED = "1";
+    process.env.AGENTFORGE_BRAND_GATEWAY_URL = "https://aihub.metranet.co.id/v1";
+    delete process.env.AGENTFORGE_GATEWAY_URL;
     process.env.AGENTFORGE_GATEWAY_NAME = "AIHub";
     process.env.AGENTFORGE_PRODUCT_NAME = "Kemenkeu AI";
     try {
@@ -28,20 +36,13 @@ describe("gateway", () => {
       expect(isGatewayBaseUrl("https://aihub.metranet.co.id/v1")).toBe(true);
       expect(isGatewayBaseUrl("https://aihub.metranet.co.id")).toBe(true);
     } finally {
-      if (previousUrl === undefined) {
-        delete process.env.AGENTFORGE_GATEWAY_URL;
-      } else {
-        process.env.AGENTFORGE_GATEWAY_URL = previousUrl;
-      }
-      if (previousName === undefined) {
-        delete process.env.AGENTFORGE_GATEWAY_NAME;
-      } else {
-        process.env.AGENTFORGE_GATEWAY_NAME = previousName;
-      }
-      if (previousProduct === undefined) {
-        delete process.env.AGENTFORGE_PRODUCT_NAME;
-      } else {
-        process.env.AGENTFORGE_PRODUCT_NAME = previousProduct;
+      for (const key of keys) {
+        const value = previous[key];
+        if (value === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = value;
+        }
       }
     }
   });

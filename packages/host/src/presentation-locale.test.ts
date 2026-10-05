@@ -9,6 +9,7 @@ import {
   presentationKicker,
   presentationLanguageRule,
   presentationLocale,
+  presentationRepairLabel,
   presentationSkillCopy,
 } from "./presentation-locale";
 import { saveOwnerLocale } from "./settings-store";
@@ -66,6 +67,7 @@ describe("presentation language copy", () => {
     expect(presentationSkillCopy("id").noFigure).toBe("Tidak ada angka");
     expect(presentationDesignLabel("designing", "id")).toBe("Menyusun tata letak");
     expect(presentationDesignLabel("repairing", "id")).toBe("Menulis ulang halaman yang sesak");
+    expect(presentationRepairLabel("id")).toBe("Memperbaiki kerangka presentasi");
   });
 
   it("keeps English slide copy for en", () => {
@@ -76,5 +78,6 @@ describe("presentation language copy", () => {
     expect(presentationSkillCopy("en").noFigure).toBe("No figure supplied");
     expect(presentationDesignLabel("designing", "en")).toBe("Assigning a layout");
     expect(presentationDesignLabel("repairing", "en")).toBe("Rewriting the crowded pages");
+    expect(presentationRepairLabel("en")).toBe("Repairing the outline");
   });
 });

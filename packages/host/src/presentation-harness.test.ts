@@ -17,6 +17,7 @@ const outline: PresentationOutline = {
       bullets: ["Uptime reached 94% last week."],
       aside: "",
       notes: "",
+      shapes: [],
     },
     {
       kind: "close",
@@ -25,6 +26,7 @@ const outline: PresentationOutline = {
       bullets: [],
       aside: "",
       notes: "Ask for a yes or a no.",
+      shapes: [],
     },
   ],
 };
@@ -56,6 +58,7 @@ describe("repairNultronOutline", () => {
           bullets: ["The counter packed 12 bags.", "Two", "Three", "Four", "Five", "Six extra"],
           aside: "",
           notes: "Stay.",
+          shapes: [],
         },
       ],
     });

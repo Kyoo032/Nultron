@@ -110,5 +110,18 @@
   "ask": "Presentasi ini tentang apa?",
   "hint": "Tulis tentang apa presentasinya, lalu tekan Buat. Klik kata di slide untuk mengubahnya.",
   "more": "Lainnya",
-  "shapeNote": "Buat yang {length} dan {style}."
+  "shapeNote": "Buat yang {length} dan {style}.",
+  "slideCount": {
+    "label": "Jumlah slide tepat",
+    "placeholder": "Opsional",
+    "hint": "Bilangan bulat dari {min} sampai {max}, termasuk slide judul."
+  },
+  "checks": {
+    "intro": "Sudah diperiksa, dan ada beberapa hal untuk Anda:",
+    "slideCount": "Anda meminta {expected} slide; dek ini punya {found}.",
+    "tooMany": "Dek ini punya {found} slide; {max} adalah batasnya.",
+    "content": "Tidak ada tajuk atau teks pada slide: {slides}",
+    "duplicate": "Tajuk yang sama pada slide: {slides}",
+    "fit": "Mungkin tidak muat di slide saat diunduh: {slides}"
+  }
 }

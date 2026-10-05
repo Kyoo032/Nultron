@@ -88,6 +88,12 @@ export function useRailSubmenu(path: string): { open: boolean; toggle: () => voi
  * list must not navigate anywhere, so a row is never picked by accident. Off
  * the mode there is nothing to expand — the list belongs to that route — so the
  * chevron reports collapsed and sits inert rather than dead-clicking.
+ *
+ * It rides inside the row (`RailItem`'s `trailing` slot), so the current-row card and
+ * the hover wash cover the word and the chevron too. `px-2` and `h-6` keep the word off
+ * the card's edge (6px a side, up from 4, and it costs the row label only 4px of width
+ * at the narrowest rail), and the hover tint is its own mix because the row's hover fill is
+ * already `--rail-hover`.
  */
 export function RailSubmenuToggle({
   open,
@@ -108,7 +114,7 @@ export function RailSubmenuToggle({
   return (
     <button
       type="button"
-      className="wash flex h-8 shrink-0 items-center gap-0.5 rounded-md px-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--rail-text-2)] hover:bg-[var(--rail-hover)] hover:text-[var(--rail-active-text)] disabled:opacity-40 disabled:hover:bg-transparent"
+      className="wash mr-1 flex h-6 shrink-0 items-center gap-0.5 rounded-md px-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--rail-text-2)] hover:bg-[color-mix(in_srgb,var(--rail-text)_10%,transparent)] hover:text-[var(--rail-active-text)] disabled:opacity-40 disabled:hover:bg-transparent"
       onClick={onToggle}
       disabled={!enabled}
       aria-expanded={open}

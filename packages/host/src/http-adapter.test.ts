@@ -6,6 +6,7 @@ import { PassThrough } from "node:stream";
 import { WORKSPACE_COOKIE } from "@agentforge/core";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SESSION_COOKIE, SESSION_COOKIE_SECURE } from "./auth/session";
+import { BILLING_TOKEN_HEADER } from "./billing/authenticate";
 import { CSRF_COOKIE, CSRF_COOKIE_SECURE, CSRF_HEADER, csrfSetCookie, mintCsrfToken, mintCsrfTokenFor } from "./csrf";
 import { DEFAULT_AUTH_BURST, DEFAULT_IP_BURST, DEFAULT_SESSION_BURST, resetRateLimiters } from "./rate-limit";
 import type { HostRequest } from "./types";
@@ -178,8 +179,8 @@ const RESET_PATH = "/api/v1/settings/reset";
 const LOOPBACK_HOST = "127.0.0.1:3000";
 const TRANSPORT = { "x-agentforge-transport": "web" };
 
-const WEB_ORIGIN = "https://app.dpsbuddy.com";
-const WEB_HOST = "app.dpsbuddy.com";
+const WEB_ORIGIN = "https://app.nultron.com";
+const WEB_HOST = "app.nultron.com";
 const GATEWAY_CHECK_PATH = "/api/v1/settings/gateway/check";
 const SERVER_MODE_KEYS = ["AGENTFORGE_SERVER", "AGENTFORGE_TRUSTED_ORIGINS"] as const;
 const savedEnv = new Map<string, string | undefined>();
@@ -819,8 +820,8 @@ describe("handleNodeRequest path normalisation", () => {
 describe("handleNodeRequest behind a TLS-terminating proxy (server mode)", () => {
   // The deployment shape in webapp-deploy/Caddyfile: Caddy terminates TLS and forwards the ORIGINAL
   // Host. Rewriting it to 127.0.0.1 (what the old loopback rule needed) now fails the Host check.
-  const PUBLIC_ORIGIN = "https://dpsbuddy.example.com";
-  const PUBLIC_HOST = "dpsbuddy.example.com";
+  const PUBLIC_ORIGIN = "https://nultron.example.com";
+  const PUBLIC_HOST = "nultron.example.com";
   const token = mintCsrfToken();
   const proxied = {
     origin: PUBLIC_ORIGIN,
@@ -1929,5 +1930,60 @@ describe("handleNodeRequest malformed Host header or request target", () => {
     const { captured } = await send({ method: "GET", url: "/api/v1/ping" });
     expect(captured.status()).toBe(200);
     expect(dispatched).toHaveLength(1);
+  });
+});
+
+/**
+ * `Accept-Language` reaches the host on the hosted server only, so a person who has never chosen a
+ * language is greeted in the one their browser asks for (`localeFromAcceptLanguage`,
+ * `./locale-boot.ts`). Off server mode the adapter forwards exactly the headers it always did: the
+ * desktop and webdev freeze their locale at boot and never read this one.
+ */
+describe("handleNodeRequest Accept-Language forwarding", () => {
+  async function send(input: Parameters<typeof fakeRequest>[0]) {
+    const captured = fakeResponse();
+    await handleNodeRequest(fakeRequest(input), captured.res);
+    return { captured };
+  }
+
+  const ASKED = "id-ID,id;q=0.9,en;q=0.8";
+
+  it("forwards it to the router on the hosted server", async () => {
+    useServerMode();
+    const { captured } = await send({
+      method: "GET",
+      url: "/api/v1/ping",
+      headers: { host: WEB_HOST, "accept-language": ASKED },
+    });
+    expect(captured.status()).toBe(200);
+    expect(dispatched[0]?.headers["accept-language"]).toBe(ASKED);
+  });
+
+  it("forwards nothing when the browser sent none", async () => {
+    useServerMode();
+    await send({ method: "GET", url: "/api/v1/ping", headers: { host: WEB_HOST } });
+    expect(dispatched[0]?.headers["accept-language"]).toBeUndefined();
+  });
+
+  it("forwards the first value of a repeated header, like every other header here", async () => {
+    useServerMode();
+    await send({
+      method: "GET",
+      url: "/api/v1/ping",
+      headers: { host: WEB_HOST, "accept-language": ["id", "en"] as unknown as string },
+    });
+    expect(dispatched[0]?.headers["accept-language"]).toBe("id");
+  });
+
+  it("Personal parity: off server mode the header is not forwarded and the header set is what it was", async () => {
+    useLocalMode();
+    await send({
+      method: "GET",
+      url: "/api/v1/ping",
+      headers: { host: LOOPBACK_HOST, "accept-language": ASKED },
+    });
+    expect(Object.keys(dispatched[0]?.headers ?? {}).sort()).toEqual(
+      ["cookie", "content-type", "origin", "range", "referer", "x-agentforge-transport", BILLING_TOKEN_HEADER].sort(),
+    );
   });
 });

@@ -1,25 +1,39 @@
-# DPSBuddy hosted web app.
+# Nultron hosted web app: the app, its proxy, and the portal stand-in with its database.
 #
 # Run from THIS folder:  docker compose -f compose.yml up -d
 # (the build context is the repo root, one level up)
+#
+# Five services, ONE of each (SR-29 and SR-66: the app's and the portal's limiters and refresh
+# lock live in process memory, so a second replica of either would double every ceiling):
+#   app            the host (tsx server.ts), loopback only. Owns the published ports.
+#   proxy          Caddy, in the app's network namespace. TLS for NULTRON_DOMAIN and PORTAL_DOMAIN.
+#   portal         apps/portal: browser sign-in with an e-mailed one-time code. Not published.
+#   portal-db      Postgres 16 for the portal, on a network of its own with no way out. Not published.
+#   portal-prepare a one-shot: migrate as the schema owner, set portal_app_login's password (SR-56).
 #
 # Network shape: apps/web/server.ts binds 127.0.0.1 and nothing in this folder edits it.
 # So `proxy` joins `app`'s network namespace (network_mode: "service:app") instead of
 # talking to it over a bridge. Both containers then share one loopback, Caddy can reach
 # 127.0.0.1:3000, and the published ports live on `app` (a service that shares another
-# service's namespace may not publish ports of its own).
+# service's namespace may not publish ports of its own). The portal is on the default network, so
+# the same Caddy reaches it as portal:4000.
+#
+# TWO ENV FILES, on purpose. `.env` is what the APP may see (and what compose interpolates).
+# `portal.env` is what only the PORTAL side may see: its signing key, its database passwords and its
+# SMTP login. The app container is the largest attack surface on the box and has no use for any of
+# them, in the same way the proxy has no use for the wrap key (SR-73). Neither file is ever committed.
 #
 # Hardening here covers security spec H2 (read-only root, /data the only writable mount,
 # no-new-privileges, non-root user) and L2 (bounded, rotated logs).
 
-name: dpsbuddy-web
+name: nultron-web
 
 services:
   app:
     build:
       context: ..
       dockerfile: webapp-deploy/Dockerfile
-    image: dpsbuddy-web:local
+    image: nultron-web:local
     env_file:
       # Non-secret settings only. deploy.sh refuses to run without this file; it is
       # optional here so `docker compose config` parses on a fresh checkout.
@@ -42,6 +56,11 @@ services:
       # session while the health check below still reported healthy. apps/web/lib/hosted-mode-guard.ts
       # now refuses to boot in that state; this line is what keeps it from ever arising.
       AGENTFORGE_SERVER: "1"
+      # The code sandbox (run_code) is OFF on this server until you set this to "on": it has never been
+      # driven inside this image (read-only root, noexec /tmp, cap_drop ALL). "off" or unset keeps the tool
+      # out of every run; the model is never offered it. Turn it on only after sandbox.integration.test.ts
+      # (pnpm ci:local --only sandbox:integration) and a hosted drive have passed here.
+      # AGENTFORGE_CODE_RUNS: "on"
       # The root filesystem is read-only, so every tool that wants scratch space is
       # pointed at the tmpfs below. tsx (the production entrypoint) caches transformed
       # modules under os.tmpdir(); Node and corepack use the XDG/npm cache paths.
@@ -51,6 +70,17 @@ services:
       # Spec S2: the wrap key comes from Secrets Manager via deploy.sh, which exports it
       # into this process. The shell value wins; .env is the local/staging fallback.
       AGENTFORGE_SECRETS_KEY: ${AGENTFORGE_SECRETS_KEY:-}
+
+    # SR-26: the app reaches the portal over https, and in production it must (the host refuses an
+    # http AGENTFORGE_PORTAL_URL). The portal's public name therefore has to resolve, from inside
+    # this container, to something that answers TLS for it. It resolves to this container's OWN
+    # loopback, where the proxy (same network namespace) listens on 443 with the portal's real
+    # certificate. That is a hairpin that depends on no public DNS record, no NAT reflection and no
+    # docker-proxy; the browser reaches the same Caddy from outside and the two paths meet there.
+    # PORTAL_DOMAIN here must be the host of AGENTFORGE_PORTAL_URL in .env. Same pattern as the
+    # Kubernetes rehearsal's hostAliases (k8s/overlays/local/app-local.yaml).
+    extra_hosts:
+      - "${PORTAL_DOMAIN:-portal.invalid}:127.0.0.1"
 
     # H2: the image is immutable at runtime. Everything a TENANT's work writes - agentforge.sqlite,
     # settings.enc, media/, edit/, datasets/, legal/, logs/ - is under AGENTFORGE_DATA_DIR. Since
@@ -62,21 +92,21 @@ services:
       - /tmp:mode=1777,size=512m,nosuid,nodev,noexec
 
     volumes:
-      - dpsbuddy-data:/data
+      - nultron-data:/data
       # Executable content, so this one may never be mounted noexec - which is exactly why it is a
       # separate volume from the tenant data above rather than a directory inside it.
-      - dpsbuddy-components:/opt/agentforge/components
+      - nultron-components:/opt/agentforge/components
       # Production alternative (placement doc section 4): a dedicated 200 GB CBS Premium
       # SSD, separate from the system disk, mounted on the CVM and bind-mounted here.
       # Replace the named volume above with:
       #
       #   - type: bind
-      #     source: /srv/dpsbuddy-data
+      #     source: /srv/nultron-data
       #     target: /data
       #
       # and mount the disk on the host with nodev AND noexec, in /etc/fstab:
       #
-      #   /dev/vdb  /srv/dpsbuddy-data  ext4  defaults,nodev,noexec,noatime  0  2
+      #   /dev/vdb  /srv/nultron-data  ext4  defaults,nodev,noexec,noatime  0  2
       #
       # noexec is correct as of Phase 7 and was not before it. The app used to install native
       # modules into /data/components and load them from there; it now refuses to load one out of
@@ -105,27 +135,34 @@ services:
         max-size: "10m"
         max-file: "5"
 
-    # Published here, used by `proxy`, because proxy shares this namespace.
+    # Published here, used by `proxy`, because proxy shares this namespace. The explicit 0.0.0.0 is
+    # load-bearing (SR-79): a bare "443:443" makes Docker bind [::]:443 as well, and a box that has a
+    # public IPv6 address would then answer on it, where every per-IP limit keys on the whole address
+    # and gives one client a fresh bucket per request. 0.0.0.0 binds IPv4 only.
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp" # HTTP/3
+      - "0.0.0.0:80:80"
+      - "0.0.0.0:443:443"
+      - "0.0.0.0:443:443/udp" # HTTP/3
     restart: unless-stopped
 
   proxy:
-    image: caddy:2-alpine
+    # Pinned to the minor, not `2-alpine`: the sign-in filters in the Caddyfile (a header filtered
+    # value by value, `log default`) need Caddy 2.8 or later, and a floating major tag is whatever
+    # was pulled last (SR-72). Patch releases still arrive with a pull.
+    image: caddy:2.11-alpine
     network_mode: "service:app"
     depends_on:
       - app
-    # The Caddyfile reads one variable, {$DPSBUDDY_DOMAIN}, so that is the only one this container
-    # gets. No env_file: .env also holds the wrap key, the portal client secret and the billing
-    # webhook secret, and a proxy has no use for any of them. Compose still fills the value in from
-    # the .env next to this file. `:-` rather than `:?` because .env is optional above, so that
+    # The Caddyfile reads two variables, {$NULTRON_DOMAIN} and {$PORTAL_DOMAIN}, so those are the only
+    # ones this container gets. No env_file: .env also holds the wrap key, the portal client secret and
+    # the billing webhook secret, and a proxy has no use for any of them. Compose still fills the values
+    # in from the .env next to this file. `:-` rather than `:?` because .env is optional above, so that
     # `docker compose config` and scripts/build.sh keep working on a fresh checkout; with an empty
     # value Caddy refuses to start instead of serving anything. Keep this block in step with
     # composeFile() in scripts/release-web.mjs.
     environment:
-      DPSBUDDY_DOMAIN: ${DPSBUDDY_DOMAIN:-}
+      NULTRON_DOMAIN: ${NULTRON_DOMAIN:-}
+      PORTAL_DOMAIN: ${PORTAL_DOMAIN:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data # ACME account + issued certificates (separate container from app's /data)
@@ -156,8 +193,199 @@ services:
 
     restart: unless-stopped
 
+  portal-db:
+    # Postgres for the portal and for nothing else: the PRODUCT database is SQLite on the app's volume.
+    # On a managed Postgres (TencentDB) this service, portal-prepare's wait and the volume below go
+    # away and the two DSNs in the portal commands point at it instead.
+    image: postgres:16
+    # The image would start as root and drop to `postgres` itself, which needs CHOWN, SETUID and
+    # SETGID back. Starting as 999 (the image's postgres user) needs none of them, so the capability
+    # set stays empty. The named volume takes its ownership from the image on first use.
+    user: "999:999"
+    env_file:
+      - path: portal.env
+        required: false
+    environment:
+      POSTGRES_USER: portal
+      POSTGRES_DB: tokotoken_portal
+      # Same as apps/portal/compose.yml: a deterministic collation, so an index built here behaves like
+      # one on TencentDB.
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+      # A subdirectory of the volume: the mount root holds lost+found on a fresh ext4 disk.
+      PGDATA: /var/lib/postgresql/data/pgdata
+    # The image reads POSTGRES_PASSWORD; the rest of the stack (and apps/portal/compose.yml) names the
+    # same secret PORTAL_POSTGRES_PASSWORD, and an env_file cannot rename. This also starts postgres,
+    # because setting `entrypoint` drops the image's default command.
+    # `env -u` drops the portal's other secrets (it shares portal.env, because compose cannot interpolate
+    # a second env file) from the Postgres process's environment, which every child of Postgres inherits.
+    entrypoint:
+      - sh
+      - -c
+      - exec env -u PORTAL_SIGNING_KEY -u PORTAL_SMTP_USER -u PORTAL_SMTP_PASS -u PORTAL_APP_DB_PASSWORD POSTGRES_PASSWORD="$$PORTAL_POSTGRES_PASSWORD" docker-entrypoint.sh postgres
+    volumes:
+      - portal-pgdata:/var/lib/postgresql/data
+    read_only: true
+    tmpfs:
+      - /var/run/postgresql:mode=0755,uid=999,gid=999
+      - /tmp:mode=1777,size=128m,nosuid,nodev,noexec
+    networks:
+      - portal-db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U portal -d tokotoken_portal"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    init: true
+    pids_limit: 200
+    mem_limit: 1g
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    restart: unless-stopped
+
+  portal-prepare:
+    # The portal serves as portal_app_login, a plain member of portal_app, and refuses to boot as
+    # anything that can see past a row-level-security policy (SR-56). That role is created by a
+    # migration with no password, so something has to migrate as the schema owner first and set the
+    # password second. This is that something: it waits for Postgres, runs the migrations, then
+    # `ALTER ROLE ... PASSWORD` with a SCRAM verifier (the plaintext never reaches the server's
+    # statement log). It runs on every `up`, so rotating PORTAL_APP_DB_PASSWORD is "edit portal.env,
+    # up -d". The script is the Kubernetes rehearsal's, unchanged: webapp-deploy/k8s/base/scripts.
+    build:
+      context: ..
+      dockerfile: webapp-deploy/portal.Dockerfile
+    image: nultron-portal:local
+    env_file:
+      - path: portal.env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORTAL_DATA_DIR: /portal-data
+      PORTAL_PUBLIC_URL: https://${PORTAL_DOMAIN:-portal.invalid}
+      PORTAL_TRUST_PROXY: "1"
+      TMPDIR: /tmp
+      XDG_CACHE_HOME: /tmp/.cache
+    # Both are inside the image (portal.Dockerfile.dockerignore lets them in), so they match its sha.
+    entrypoint:
+      - sh
+      - /app/webapp-deploy/portal-entry.sh
+    command:
+      - node
+      - /app/webapp-deploy/k8s/base/scripts/prepare-db.mjs
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=128m,nosuid,nodev,noexec
+      - /portal-data:mode=0700,size=16m,uid=1000,gid=1000
+    networks:
+      - portal-db
+    depends_on:
+      portal-db:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    init: true
+    pids_limit: 128
+    mem_limit: 768m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    restart: "no"
+
+  portal:
+    build:
+      context: ..
+      dockerfile: webapp-deploy/portal.Dockerfile
+    image: nultron-portal:local
+    env_file:
+      - path: portal.env
+        required: false
+    environment:
+      # Production on purpose: it is what turns on every refusal that matters (a real signing key, a
+      # non-sandbox SMTP host over TLS, an https public URL, two database roles, no manual OTP).
+      NODE_ENV: production
+      PORTAL_HOST: 0.0.0.0
+      PORTAL_PORT: "4000"
+      PORTAL_DATA_DIR: /portal-data
+      # The origin a BROWSER reaches the portal on: the access token's `iss`, the device flow's
+      # verification_uri, and the Secure-cookie rule. It is derived from PORTAL_DOMAIN so that it can
+      # never disagree with the name Caddy serves and the app's hairpin resolves.
+      PORTAL_PUBLIC_URL: https://${PORTAL_DOMAIN:-portal.invalid}
+      # One proxy hop (Caddy) in front: believe the X-Forwarded-For it writes, the last entry only.
+      # Every portal rate-limit bucket keys on that address (SR-18, SR-79 for the IPv6 caveat).
+      PORTAL_TRUST_PROXY: "1"
+      # NOT SET, ON PURPOSE: PORTAL_ALLOW_MANUAL_OTP (SR-10: it hands a live sign-in code to whoever
+      # runs the CLI, and the portal refuses to boot with it in production) and PORTAL_DEV_OUTBOX.
+      TMPDIR: /tmp
+      XDG_CACHE_HOME: /tmp/.cache
+    # Both DSNs are built by the wrapper from the two passwords in portal.env, so there is one place to
+    # change a password and no way for a DSN and its password to disagree (passwords must be URL-safe;
+    # portal.env.example generates hex). Production refuses to boot without the owner's DSN: the portal
+    # migrates on every start (a no-op once portal-prepare has run) and serves as portal_app_login only.
+    entrypoint:
+      - sh
+      - /app/webapp-deploy/portal-entry.sh
+    command:
+      - ./node_modules/.bin/tsx
+      - src/main.ts
+    depends_on:
+      portal-prepare:
+        condition: service_completed_successfully
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777,size=128m,nosuid,nodev,noexec
+      # PORTAL_DATA_DIR is required to exist and be writable; the portal keeps nothing in it that
+      # must survive a restart.
+      - /portal-data:mode=0700,size=16m,uid=1000,gid=1000
+    # Default network (so the proxy reaches portal:4000, and the portal reaches its SMTP provider) plus
+    # the database network. Nothing is published: the browser and the app both arrive through Caddy.
+    networks:
+      - default
+      - portal-db
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:'+(process.env.PORTAL_PORT||4000)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    init: true
+    pids_limit: 256
+    mem_limit: 768m
+    mem_reservation: 128m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    restart: unless-stopped
+
+networks:
+  # The database's own network. `internal` means no route out of it: Postgres has no business on the
+  # internet, and only portal-prepare and portal are attached to it. The app is not.
+  portal-db:
+    internal: true
+
 volumes:
-  dpsbuddy-data:
-  dpsbuddy-components:
+  nultron-data:
+  nultron-components:
   caddy-data:
   caddy-config:
+  portal-pgdata:

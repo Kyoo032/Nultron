@@ -21,14 +21,17 @@ import {
 } from "@agentforge/core/open-slide";
 import { artifactStore } from "./artifacts";
 import { collectJobAssistantRun, readModelPinned, type JobAssistantRun } from "./job-regen";
-import { readSourceText, withSourceMaterial, withSourceRule } from "./job-source";
+import { throwIfJobAborted } from "./job-stream";
+import { withSourceMaterial, withSourceRule } from "./job-source";
 import { upsertWorkSource } from "./knowledge-ingest";
 import { log } from "./log";
-import { listSelectableModels, modeCatalogPayload } from "./selectable-models";
+import { listSelectableModels, modeDefaultsFor } from "./selectable-models";
 import { loadSettings } from "./settings-store";
-import { throwIfJobAborted } from "./job-stream";
 import { presentationDesignLabel, presentationLocale, presentationSkillCopy } from "./presentation-locale";
+import { assembleDeskSource } from "./desk-sources";
 import { artifactWorkCard } from "./work-cards";
+
+const NO_EMIT: JobEmitter = () => {};
 
 function readPrompt(body: unknown): string {
   if (!body || typeof body !== "object") {
@@ -117,9 +120,9 @@ function openSlideMarkdown(deck: OpenSlideDeck): string {
   return lines.join("\n");
 }
 
-function resolveModel(body: unknown, settings: ReturnType<typeof loadSettings>): string {
-  const catalog = listSelectableModels();
-  const { defaults } = modeCatalogPayload();
+function resolveModel(body: unknown, settings: ReturnType<typeof loadSettings>, tenant: TenantContext): string {
+  const catalog = listSelectableModels(tenant);
+  const defaults = modeDefaultsFor(tenant);
   return resolveChatModel(readOptionalModel(body), settings.presentationGenModel || defaults.presentations, catalog);
 }
 
@@ -145,8 +148,8 @@ async function collectDeck(
     agentId: "presentation",
     jobMode: "presentations",
     versionId: designPrompt ? "open-slide-design" : "open-slide-deck",
-    signal,
     prompt: withSourceMaterial(designPrompt ?? userPrompt(prompt, choices, retry), sourceText),
+    ...(signal ? { signal } : {}),
   });
 }
 
@@ -207,13 +210,14 @@ async function persistDeck(
 export async function generateOpenSlideDeck(
   tenant: TenantContext,
   body: unknown,
-  emit?: JobEmitter,
+  emit: JobEmitter = NO_EMIT,
   abortSignal?: AbortSignal,
 ): Promise<OpenSlideDeck> {
   const prompt = readPrompt(body);
   const choices = readOpenSlideChoices(body);
   const settings = loadSettings(tenant);
-  const sourceText = readSourceText(body, { injectionGuardBypass: settings.injectionGuardBypass === true });
+  const guard = { injectionGuardBypass: settings.injectionGuardBypass === true };
+  const source = await assembleDeskSource(tenant, body, guard);
   const locale = presentationLocale();
   const mode = resolveRuntimeMode({
     settingsHasKey: hasLiveProvider(settings),
@@ -221,12 +225,24 @@ export async function generateOpenSlideDeck(
   });
   if (mode === "stub") {
     throwIfJobAborted(abortSignal);
-    const drafted = finishDeck(draftOpenSlideDeck({ prompt, ...choices, locale }), prompt, sourceText).deck;
+    const drafted = finishDeck(draftOpenSlideDeck({ prompt, ...choices, locale }), prompt, source.text).deck;
     return designDeck(drafted, emit);
   }
-  const model = resolveModel(body, settings);
+  const model = resolveModel(body, settings, tenant);
   const pinned = readModelPinned(body);
-  const run = await collectDeck(tenant, model, prompt, sourceText, choices, pinned, undefined, undefined, abortSignal);
+  const run = await collectDeck(
+    tenant,
+    model,
+    prompt,
+    source.text,
+    choices,
+    pinned,
+    undefined,
+    undefined,
+    abortSignal,
+  );
+  // A deck the person cancelled is not saved as an artifact or a work card.
+  throwIfJobAborted(abortSignal);
   if (!run.text.trim()) {
     throw new ApiError("generation_failed", emptyDeckMessage(locale), 502);
   }
@@ -236,14 +252,14 @@ export async function generateOpenSlideDeck(
   } catch {
     throw new ApiError("invalid_outline", invalidDeckMessage(locale), 502);
   }
-  let finished = finishDeck(deck, prompt, sourceText);
+  let finished = finishDeck(deck, prompt, source.text);
   if (finished.report.length === "short") {
     try {
       const retry = await collectDeck(
         tenant,
         model,
         prompt,
-        sourceText,
+        source.text,
         choices,
         pinned,
         {
@@ -253,7 +269,7 @@ export async function generateOpenSlideDeck(
         abortSignal,
       );
       if (retry.text.trim()) {
-        finished = finishDeck(parseOpenSlideModelText(retry.text), prompt, sourceText);
+        finished = finishDeck(parseOpenSlideModelText(retry.text), prompt, source.text);
       }
     } catch {
       // One retry. A short deck is still returned.
@@ -270,7 +286,7 @@ export async function generateOpenSlideDeck(
         tenant,
         model,
         prompt,
-        sourceText,
+        source.text,
         choices,
         pinned,
         undefined,
@@ -278,19 +294,21 @@ export async function generateOpenSlideDeck(
         abortSignal,
       );
       if (retry.text.trim()) {
-        const allowed = `${prompt}\n${sourceText}`;
+        const allowed = `${prompt}\n${source.text}`;
         const merged = mergeOpenSlideDesignRetry(
           deck,
           retry.text,
           new Set(failures.map((failure) => failure.id)),
           allowed,
         );
-        deck = finishDeck(merged, prompt, sourceText).deck;
+        deck = finishDeck(merged, prompt, source.text).deck;
       }
     } catch {
       // One ask for the failing pages. A crowded page is still repaired in code.
     }
   }
+  // A deck the person cancelled is not saved as an artifact or a work card.
+  throwIfJobAborted(abortSignal);
   deck = repairOpenSlideDesign(deck);
   const markdown = openSlideMarkdown(deck);
   await persistDeck(tenant, deck, markdown, {
@@ -298,6 +316,7 @@ export async function generateOpenSlideDeck(
     model: run.model,
     pages: deck.pages.length,
     engine: "open-slide",
+    ...(source.files.length > 0 ? { sourceFiles: source.files.map((file) => file.path) } : {}),
   });
   return deck;
 }

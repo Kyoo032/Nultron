@@ -154,7 +154,7 @@ export function fitSlideText(text: string, maxChars: number, maxWords: number): 
 
 /** True when every digit run in `next` is a complete run already present in `allowed`. */
 export function textKeepsDigitRuns(next: string, allowed: string): boolean {
-  const pool = allowed.match(/\d+/g) ?? [];
+  const pool: string[] = allowed.match(/\d+/g) ?? [];
   for (const run of next.match(/\d+/g) ?? []) {
     const at = pool.indexOf(run);
     if (at < 0) {
