@@ -1,6 +1,6 @@
 # Map — Hosted security controls
 
-Last verified: 2026-10-02, working tree over 0b61a29, not committed, for one row (the operator-fields row of § 8, which now says who may write a provider key: M4, an owner or an admin, a member is answered `403 settings_key_forbidden`); nothing else on the page was re-read. Before that: 2026-10-01, working tree over 0b61a29, not committed, for two rows only: the `ci-local.mjs` row of the tests table (a vitest step now needs its `Tests N passed` summary, not just exit 0) and the per-tenant model cache bullet of § 10 (the background refill and its log line). Before that, the same day, for the new § 10 (where a tenant's provider key may go: Enterprise BYOK Phase A) and the corrected operator-keys row of § 8, whose "provider keys" claim was wrong before it (`requestsOperatorOnlySettings` lists `toolKeys`, `toolBackends` and `injectionGuardBypass` only). Nothing else on the page was re-read that day. Before that: 2026-09-23 at d4561b8 + working tree for sections 1-4 and every
+Last verified: 2026-10-05, working tree over 0b61a29, not committed, for two lines only (the `audit-deployed.mjs` row of the file table and the audit-gate gotcha, which now describe the production closure after SR-113); nothing else on the page was re-read. Before that: 2026-10-02, working tree over 0b61a29, not committed, for one row (the operator-fields row of § 8, which now says who may write a provider key: M4, an owner or an admin, a member is answered `403 settings_key_forbidden`); nothing else on the page was re-read. Before that: 2026-10-01, working tree over 0b61a29, not committed, for two rows only: the `ci-local.mjs` row of the tests table (a vitest step now needs its `Tests N passed` summary, not just exit 0) and the per-tenant model cache bullet of § 10 (the background refill and its log line). Before that, the same day, for the new § 10 (where a tenant's provider key may go: Enterprise BYOK Phase A) and the corrected operator-keys row of § 8, whose "provider keys" claim was wrong before it (`requestsOperatorOnlySettings` lists `toolKeys`, `toolBackends` and `injectionGuardBypass` only). Nothing else on the page was re-read that day. Before that: 2026-09-23 at d4561b8 + working tree for sections 1-4 and every
 `http-adapter.ts` citation on this page (the auth pass: the production https rule for the portal
 URL, the malformed Host / request-target 400, the gate's portal re-check, digest session ids). The
 response headers, the ffmpeg failure detail and the top-up link keep their 2026-09-21 reading at
@@ -272,7 +272,7 @@ Not a request-admission control; what the host does with a key once it has one. 
 | `packages/db/src/vault-key.ts` | Wrap-key sourcing, length and randomness floors |
 | `webapp-deploy/compose.yml` | Container hardening, the pinned `AGENTFORGE_SERVER` |
 | `webapp-deploy/Caddyfile` | TLS, HSTS, the same header set, access log |
-| `scripts/audit-deployed.mjs` | Advisory gate scoped to the closure the image installs |
+| `scripts/audit-deployed.mjs` | Advisory gate scoped to the production closure the image installs (`--prod`, `LIST_ARGS` `:55`) |
 
 ## Gotchas
 
@@ -330,7 +330,10 @@ Phase 0 deploy. Until then this page is proved by the suites above and not by a 
 - **Headers in two places.** `[Direct]` `packages/host/src/security-headers.ts:1-20` states the
   reasoning: the Caddyfile was the only copy, so any deployment behind a different proxy had no
   CSP at all.
-- **The audit gate is scoped to the deployed closure, not the workspace.** `[Direct]`
-  `scripts/audit-deployed.mjs:1-26` and `docs/internal/security-owasp-2026-09.md` A06-1: the
-  workspace's 1 critical and 19 high advisories are all reachable only from `apps/desktop`, which
-  `webapp-deploy/Dockerfile:59` never installs.
+- **The audit gate is scoped to the production closure the image installs, not the workspace.** `[Direct]`
+  `scripts/audit-deployed.mjs:1-35` and `docs/internal/security-owasp-2026-09.md` A06-1: the
+  workspace's 1 critical and 19 high advisories are all reachable only from `apps/desktop`, which the
+  `build` and `prod` stages never install (`webapp-deploy/Dockerfile:73`, `:113`). Since 2026-10-05 dev
+  dependencies are outside the closure too: the `prod` stage installs `--prod` (`:113`), the runtime copies
+  it (`:167`), and the script lists with the same flag (`LIST_ARGS`, `:55`), so `braces` (reached only
+  through `tailwindcss`, a devDependency) does not gate (SR-113).

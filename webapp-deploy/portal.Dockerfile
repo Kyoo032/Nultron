@@ -39,7 +39,8 @@ FROM base AS build
 WORKDIR /app
 COPY . .
 # The portal and the workspace packages it names. tsx is a devDependency of apps/portal and is the
-# entrypoint (same trade as the app image: see SR-49), so dev dependencies stay.
+# entrypoint, so this image still ships its dev dependencies. The app image no longer does (SR-113: its
+# `prod` stage installs --prod); this image is not part of that gate or of scripts/audit-deployed.mjs.
 RUN pnpm install --frozen-lockfile --filter "@agentforge/portal..."
 
 FROM base AS runtime
