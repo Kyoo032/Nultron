@@ -43,6 +43,7 @@ import {
   type TenantContext,
 } from "@agentforge/core";
 import { loadSettings } from "./settings-store";
+import type { ModelCacheScope } from "./model-cache";
 import { listImageModels, listMusicModels, listProbedVideoModels, listSpeechModels } from "./selectable-models";
 import { mediaIdFromUrl } from "./media-id";
 import { getStudioMediaMeta, saveStudioMediaMeta, type StudioMediaMeta } from "./studio-media-meta";
@@ -115,6 +116,13 @@ export type StudioGalleryItem = {
   style?: string;
   instrumental?: boolean;
   durationSeconds?: number;
+  /**
+   * Present (and `true`) only when the row's file is gone from the desk's store, so `GET
+   * /api/v1/media/:id/file` would answer 404. The row is still listed: it is the owner's data and
+   * nothing here deletes it. The gallery shows a "file missing" tile instead of a player that cannot
+   * load. Absent means present, or not checked (the hosted object store is never probed per row).
+   */
+  fileMissing?: true;
 };
 
 export type StudioGenerateResult = {
@@ -142,28 +150,30 @@ export type StudioMusicResult = {
   instrumental: boolean;
 };
 
-export function listStudioImageModels(models: ChatModel[] = listImageModels()): ChatModel[] {
-  return models.filter((model) => mediaKind(model.id) === "image");
+// Every list below reads the catalogue of one tenant. `scope` names it (a `TenantContext` goes in as it
+// is); a desk has one catalogue and ignores it. See `ModelCacheScope`.
+export function listStudioImageModels(models?: ChatModel[], scope?: ModelCacheScope): ChatModel[] {
+  return (models ?? listImageModels(scope)).filter((model) => mediaKind(model.id) === "image");
 }
 
-export function listStudioVideoModels(models: ChatModel[] = listProbedVideoModels()): ChatModel[] {
-  return models.filter((model) => mediaKind(model.id) === "video");
+export function listStudioVideoModels(models?: ChatModel[], scope?: ModelCacheScope): ChatModel[] {
+  return (models ?? listProbedVideoModels(undefined, scope)).filter((model) => mediaKind(model.id) === "video");
 }
 
-export function defaultStudioImageModel(models: ChatModel[] = listStudioImageModels()): string {
-  return pickPreferredImageModel(models.map((model) => model.id));
+export function defaultStudioImageModel(models?: ChatModel[], scope?: ModelCacheScope): string {
+  return pickPreferredImageModel((models ?? listStudioImageModels(undefined, scope)).map((model) => model.id));
 }
 
-export function defaultStudioVideoModel(models: ChatModel[] = listStudioVideoModels()): string {
-  return availableVideoDefault(models.map((model) => model.id));
+export function defaultStudioVideoModel(models?: ChatModel[], scope?: ModelCacheScope): string {
+  return availableVideoDefault((models ?? listStudioVideoModels(undefined, scope)).map((model) => model.id));
 }
 
-export function listStudioMusicModels(models: ChatModel[] = listMusicModels()): ChatModel[] {
-  return models.filter((model) => isMusicModelId(model.id));
+export function listStudioMusicModels(models?: ChatModel[], scope?: ModelCacheScope): ChatModel[] {
+  return (models ?? listMusicModels(scope)).filter((model) => isMusicModelId(model.id));
 }
 
-export function defaultStudioMusicModel(models: ChatModel[] = listStudioMusicModels()): string {
-  return pickPreferredMusicModel(models.map((model) => model.id));
+export function defaultStudioMusicModel(models?: ChatModel[], scope?: ModelCacheScope): string {
+  return pickPreferredMusicModel((models ?? listStudioMusicModels(undefined, scope)).map((model) => model.id));
 }
 
 /**
@@ -173,12 +183,15 @@ export function defaultStudioMusicModel(models: ChatModel[] = listStudioMusicMod
  * endpoint label, so a job route cannot drive it. Reporting the reason is the whole point: the
  * studio says "this gateway serves no reachable speech model" instead of failing at submit.
  */
-export function studioSpeechUnavailable(models: ChatModel[] = listSpeechModels()): SpeechUnavailableReason | null {
-  return speechUnavailableReason(models.map((model) => model.id));
+export function studioSpeechUnavailable(
+  models?: ChatModel[],
+  scope?: ModelCacheScope,
+): SpeechUnavailableReason | null {
+  return speechUnavailableReason((models ?? listSpeechModels(scope)).map((model) => model.id));
 }
 
-export function listStudioSpeechModels(models: ChatModel[] = listSpeechModels()): ChatModel[] {
-  return models.filter((model) => isSpeechModelId(model.id));
+export function listStudioSpeechModels(models?: ChatModel[], scope?: ModelCacheScope): ChatModel[] {
+  return (models ?? listSpeechModels(scope)).filter((model) => isSpeechModelId(model.id));
 }
 
 export function parseImageGenerateBody(raw: unknown): ImageGenerateBody {
@@ -280,7 +293,7 @@ export async function generateStudioImage(
   const settings = loadSettings(tenant);
   const locale = localeForRun();
   const scope = buildToolSecretScope(settings);
-  const model = body.model || settings.imageGenModel || defaultStudioImageModel();
+  const model = body.model || settings.imageGenModel || defaultStudioImageModel(undefined, tenant);
   const output = await runWithToolSecrets(scope, () =>
     imageGenerateTool.execute(
       {
@@ -340,7 +353,7 @@ export async function generateStudioVideo(
   const settings = loadSettings(tenant);
   const scope = buildToolSecretScope(settings);
   const locale = localeForRun();
-  const availableIds = listStudioVideoModels().map((item) => item.id);
+  const availableIds = listStudioVideoModels(undefined, tenant).map((item) => item.id);
   const requested = (body.model || settings.videoGenModel || "").trim();
   const choice = resolveVideoModelForKey({ requested, availableIds });
   if (!choice.ok) {
@@ -452,7 +465,7 @@ export async function generateStudioMusic(tenant: TenantContext, body: MusicGene
   const settings = loadSettings(tenant);
   const locale = localeForRun();
   const scope = buildToolSecretScope(settings);
-  const model = body.model || settings.musicGenModel || defaultStudioMusicModel();
+  const model = body.model || settings.musicGenModel || defaultStudioMusicModel(undefined, tenant);
   const caps = musicCapabilities(model);
   const mode = resolveMusicMode(model, body.mode);
   const prompt = musicPromptOf(body);
@@ -608,7 +621,12 @@ export async function writeStudioLyrics(
 
 export async function listStudioGallery(tenant: TenantContext, kind: StudioKind): Promise<StudioGalleryItem[]> {
   const { listMediaByKind } = await import("./media");
+  const { missingTenantObjects } = await import("./tenant-storage");
   const rows = await listMediaByKind(tenant, kind);
+  const missing = await missingTenantObjects(
+    tenant.tenantId,
+    rows.map((row) => row.storagePath),
+  );
   const items: StudioGalleryItem[] = [];
   for (const row of rows) {
     const meta = await getStudioMediaMeta(tenant.tenantId, row.id);
@@ -624,6 +642,7 @@ export async function listStudioGallery(tenant: TenantContext, kind: StudioKind)
       style: meta?.style,
       instrumental: meta?.instrumental,
       durationSeconds: meta?.durationSeconds,
+      ...(missing.has(row.storagePath) ? { fileMissing: true as const } : {}),
     });
   }
   return items;

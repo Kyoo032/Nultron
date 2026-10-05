@@ -132,6 +132,20 @@ describe("parseSessionPayload", () => {
     expect(parseSessionPayload({ body: SUMMARY }).status).toBe("signed-in");
   });
 
+  // The host adds the person's role (the membership row) to this answer so the screen can hide what the
+  // host would refuse — the Erase account button for anybody who is not an owner (SR-65). Display only.
+  it.each(["owner", "admin", "member"] as const)("reads the role %s the host reports", (role) => {
+    expect(parseSessionPayload({ ...SUMMARY, role }).identity?.role).toBe(role);
+  });
+
+  it("leaves the role unknown when the host sent none or one it does not recognise", () => {
+    for (const role of [undefined, null, "", "Owner", " owner", "superuser", "builder", 1, true, ["owner"]]) {
+      const identity = parseSessionPayload({ ...SUMMARY, role }).identity;
+      expect(identity?.role, String(role)).toBeUndefined();
+      expect(identity?.userId).toBe("usr_1");
+    }
+  });
+
   it("gives a visitor who never signed in no reason to read", () => {
     expect(parseSessionPayload({ signedIn: false })).toEqual({
       status: "signed-out",

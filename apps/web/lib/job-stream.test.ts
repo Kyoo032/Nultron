@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { JobEvent } from "@agentforge/core/jobs";
 import { errorFromJson, JobStreamError, parseJobEvents, settleJobEvents } from "./job-stream";
 import { PLAN_BLOCK_CODES, PLAN_BLOCK_EVENT, readPlanBlockEvent } from "./plan-block";
@@ -101,13 +101,42 @@ describe("errorFromJson", () => {
     });
   });
 
-  it("leaves a gateway_blocked body exactly as it was", () => {
+  it("leaves a gateway_blocked body exactly as it was on the Personal app", () => {
     withWindow((announced) => {
       // The other flat code. It has its own parser and its own screen, nothing reads it off a job
-      // stream, and a paywall in front of "your key was rejected" would be the wrong screen.
+      // stream there, and a paywall in front of "your key was rejected" would be the wrong screen.
       const error = errorFromJson({ error: "gateway_blocked", status: "invalid_key", message: "Key rejected" }, 403);
       expect(error).toMatchObject({ code: "request_failed", message: "Request failed", status: 403 });
       expect(announced).toEqual([]);
+    });
+  });
+
+  describe("on the hosted build (Nultron Enterprise, add the key later)", () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("reads gateway_blocked as its own code with the catalog sentence, never the host's English", () => {
+      vi.stubGlobal("__AGENTFORGE_SERVER__", "1");
+      withWindow((announced) => {
+        vi.stubGlobal("__AGENTFORGE_SERVER__", "1");
+        const error = errorFromJson(
+          { error: "gateway_blocked", status: "needs_key", message: "No gateway key is saved on this machine." },
+          403,
+        );
+        expect(error).toMatchObject({ code: "gateway_blocked", status: 403 });
+        expect(error.message).toMatch(/Settings/);
+        expect(error.message).not.toMatch(/machine/);
+        // Still not a paywall: nothing is announced.
+        expect(announced).toEqual([]);
+      });
+    });
+
+    it("keeps reading every other body the way it did", () => {
+      vi.stubGlobal("__AGENTFORGE_SERVER__", "1");
+      expect(errorFromJson({ error: { code: "tool_failed", message: "Add a Tavily key" } }, 503)).toMatchObject({
+        code: "tool_failed",
+        message: "Add a Tavily key",
+      });
+      expect(errorFromJson({ error: "nope" }, 500)).toMatchObject({ code: "request_failed" });
     });
   });
 

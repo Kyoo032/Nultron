@@ -216,7 +216,10 @@ describe("app rail market block", () => {
     // Closed, nothing renders below it: the branch, its margins and its border
     // all live inside the sub-list component, which is mounted only when open.
     expect(appRail).toContain('<div key={mode.href} className="shrink-0" data-testid="rail-market-mode">');
-    expect(appRail).toContain('<div className="flex h-8 items-center gap-0.5">');
+    // The chevron rides in the row's own `trailing` slot, so the current-row card spans it.
+    expect(/<RailItem\s+\{\.\.\.itemProps\}\s+trailing=\{\s*<RailMarketSpecialistsToggle/.test(appRail)).toBe(true);
+    expect(appRail).not.toContain('<div className="flex h-8 items-center gap-0.5">');
+    expect(appRail).toContain("flex h-8 shrink-0 items-center rounded-md ${rowTone}");
     expect(shared).toContain("<div className={BRANCH} data-testid={branchTestId}>");
     const branchInAppRail = appRail.includes("border-l border-[var(--line)]");
     expect(branchInAppRail).toBe(false);

@@ -1,0 +1,82 @@
+# LOCAL REHEARSAL ONLY. Layered on top of compose.yml by webapp-deploy/pilot-local.mjs:
+#
+#   docker compose -p nultron-pilot-local -f compose.yml -f compose.local.yml --env-file .pilot-local/.env ...
+#
+# It runs the pilot stack on THIS machine, reachable on loopback and nowhere else, with what a real server
+# has and a laptop does not replaced by throwaway equivalents:
+#   - ports: 127.0.0.1:80 and 127.0.0.1:443 (compose.yml's own list is REPLACED, not appended to, so the
+#     0.0.0.0 binds never exist here);
+#   - TLS: a certificate pair signed by a throwaway CA (.pilot-local/pki, gitignored), because Let's Encrypt
+#     cannot issue for a .localhost name. The Caddyfile is the real one with its `tls` blocks pointed at those
+#     files; nothing else about it is changed. The app and the portal trust that CA through
+#     NODE_EXTRA_CA_CERTS, which is how the app can reach the portal over https under NODE_ENV=production
+#     (SR-26) and the portal can reach Mailpit over TLS (SR-39);
+#   - mail: Mailpit, in this file only. It speaks implicit TLS from the first byte, which is what Tencent SES
+#     speaks on 465, so the portal is configured exactly as in production (PORTAL_SMTP_SECURE=1);
+#   - env files: .pilot-local/.env and .pilot-local/portal.env, generated, gitignored, never reused anywhere;
+#   - images: nultron-ent:pilot-local and nultron-portal:pilot-local, built from a `git ls-files -co
+#     --exclude-standard` snapshot and never pushed.
+# It is not a release artifact and it is not shipped in the bundle.
+
+services:
+  app:
+    image: nultron-ent:pilot-local
+    env_file: !override
+      - path: .pilot-local/.env
+        required: true
+    environment:
+      NODE_EXTRA_CA_CERTS: /etc/nultron/ca/ca.crt
+    volumes:
+      - ./.pilot-local/pki/ca.crt:/etc/nultron/ca/ca.crt:ro
+    ports: !override
+      - "127.0.0.1:80:80"
+      - "127.0.0.1:443:443"
+      - "127.0.0.1:443:443/udp"
+
+  proxy:
+    volumes: !override
+      - ./.pilot-local/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./.pilot-local/pki/edge.crt:/certs/edge.crt:ro
+      - ./.pilot-local/pki/edge.key:/certs/edge.key:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+  portal-db:
+    env_file: !override
+      - path: .pilot-local/portal.env
+        required: true
+
+  portal-prepare:
+    image: nultron-portal:pilot-local
+    env_file: !override
+      - path: .pilot-local/portal.env
+        required: true
+
+  portal:
+    image: nultron-portal:pilot-local
+    env_file: !override
+      - path: .pilot-local/portal.env
+        required: true
+    environment:
+      NODE_EXTRA_CA_CERTS: /etc/nultron/ca/ca.crt
+    volumes:
+      - ./.pilot-local/pki/ca.crt:/etc/nultron/ca/ca.crt:ro
+
+  mailpit:
+    image: axllent/mailpit:v1.31.2
+    environment:
+      MP_SMTP_BIND_ADDR: "0.0.0.0:1025"
+      MP_UI_BIND_ADDR: "0.0.0.0:8025"
+      MP_SMTP_TLS_CERT: /etc/mailpit/tls.crt
+      MP_SMTP_TLS_KEY: /etc/mailpit/tls.key
+      # SSL/TLS from the first byte (what SES speaks on 465), not STARTTLS.
+      MP_SMTP_REQUIRE_TLS: "true"
+      MP_MAX_MESSAGES: "100"
+    volumes:
+      - ./.pilot-local/pki/mailpit.crt:/etc/mailpit/tls.crt:ro
+      - ./.pilot-local/pki/mailpit.key:/etc/mailpit/tls.key:ro
+    ports:
+      # The inbox the drive reads the sign-in code from. Loopback only, and on 18025 so it can never
+      # collide with the Mailpit of apps/portal/compose.yml (8025).
+      - "127.0.0.1:18025:8025"
+    restart: "no"

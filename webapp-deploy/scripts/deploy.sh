@@ -11,6 +11,7 @@ set -eu
 . "$(dirname "$0")/_common.sh"
 
 require_env_file
+require_portal_env_file
 
 PULL=1
 for arg in "$@"; do
@@ -89,7 +90,7 @@ SHA="$(current_sha)"
 echo "==> deploying $SHA"
 
 echo "==> build"
-dc build app
+dc build app portal
 
 echo "==> up -d"
 dc up -d
@@ -125,6 +126,30 @@ if [ "${STATUS:-}" != "healthy" ]; then
 	dc logs --tail 80 app >&2
 	exit 1
 fi
+
+# The portal is the other half of sign-in: an app that is healthy while the portal is not can serve
+# the page and nobody can get past it. Its health check covers /healthz, which needs the database.
+echo "==> waiting for the portal healthcheck (up to 3 minutes)"
+PCID="$(dc ps -q portal)"
+if [ -z "$PCID" ]; then
+	echo "error: the portal container did not start" >&2
+	dc logs --tail 50 portal portal-prepare >&2
+	exit 1
+fi
+i=0
+PSTATUS=none
+while [ "$i" -lt 36 ]; do
+	PSTATUS="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$PCID")"
+	[ "$PSTATUS" = "healthy" ] && break
+	i=$((i + 1))
+	sleep 5
+done
+if [ "$PSTATUS" != "healthy" ]; then
+	echo "error: the portal did not go healthy (last status: $PSTATUS)" >&2
+	dc logs --tail 80 portal portal-prepare >&2
+	exit 1
+fi
+echo "==> portal healthy"
 
 # --- record ----------------------------------------------------------------
 # Spec H4: the running sha is recorded per deploy.

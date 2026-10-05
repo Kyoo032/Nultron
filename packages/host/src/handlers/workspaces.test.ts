@@ -144,6 +144,29 @@ describe("POST /api/v1/workspaces on an install with a gateway key", () => {
   });
 });
 
+describe("DELETE /api/v1/workspaces/:id and the folder proposals", () => {
+  it("removes the deleted desk's file proposals, sealed bodies included, and keeps another desk's", async () => {
+    const { sql } = await import("@agentforge/db");
+    const home = await homeDesk();
+    const desk = await createDesk("verify-desk-proposals");
+    const insert = sql.prepare(
+      `INSERT INTO file_proposals (id, workspace_id, run_id, path, kind, after_body, status, created_at)
+       VALUES (?, ?, 'run-1', 'a.txt', 'write', '{"sealed":true}', 'pending', 1)`,
+    );
+    insert.run("proposal-of-deleted-desk", desk.id);
+    insert.run("proposal-of-deleted-desk-2", desk.id);
+    insert.run("proposal-of-home-desk", home.id);
+    const ids = () =>
+      (sql.prepare("SELECT id FROM file_proposals ORDER BY id").all() as Array<{ id: string }>).map((row) => row.id);
+    expect(ids()).toEqual(["proposal-of-deleted-desk", "proposal-of-deleted-desk-2", "proposal-of-home-desk"]);
+
+    await deleteDesk(desk);
+
+    expect(ids()).toEqual(["proposal-of-home-desk"]);
+    sql.prepare("DELETE FROM file_proposals").run();
+  });
+});
+
 describe("POST /api/v1/workspaces on an install with no gateway key", () => {
   it("does not invent a key for the new desk", async () => {
     const desk = await createDesk("verify-desk-keyless");

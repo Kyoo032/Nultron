@@ -1,4 +1,7 @@
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const Module = require("node:module");
+const path = require("node:path");
 const {
   navigationDecision,
   rendererOrigin,
@@ -11,26 +14,26 @@ const {
 
 const packaged = rendererOrigin({
   packaged: true,
-  rendererIndex: "C:\\Program Files\\DPSBuddy\\resources\\renderer\\index.html",
+  rendererIndex: "C:\\Program Files\\Nultron\\resources\\renderer\\index.html",
 });
 
 assert.equal(
-  navigationDecision("file:///C:/Program%20Files/DPSBuddy/resources/renderer/index.html", packaged),
+  navigationDecision("file:///C:/Program%20Files/Nultron/resources/renderer/index.html", packaged),
   "allow",
   "packaged: reloading the renderer itself",
 );
 assert.equal(
-  navigationDecision("file:///C:/Program Files/DPSBuddy/resources/renderer/index.html#/chat", packaged),
+  navigationDecision("file:///C:/Program Files/Nultron/resources/renderer/index.html#/chat", packaged),
   "allow",
   "packaged: a HashRouter route is the same document",
 );
 assert.equal(
-  navigationDecision("file:///C:/Program Files/DPSBuddy/resources/renderer/index.html?x=1", packaged),
+  navigationDecision("file:///C:/Program Files/Nultron/resources/renderer/index.html?x=1", packaged),
   "allow",
   "packaged: a query string is the same document",
 );
 assert.equal(
-  navigationDecision("file:///C:/Users/rizky/AppData/Roaming/DPSBuddy/settings.enc", packaged),
+  navigationDecision("file:///C:/Users/rizky/AppData/Roaming/Nultron/settings.enc", packaged),
   "block",
   "packaged: never navigate to another local file",
 );
@@ -196,4 +199,174 @@ assert.equal(isMediaProtocolKey(undefined), false);
 assert.equal(isMediaProtocolKey(null), false);
 assert.equal(isMediaProtocolKey(123), false);
 
-console.log("navigation.test.cjs: ok");
+// ---------- agentforge:pick-folder: the folder dialog behind the preload bridge ----------
+//
+// main.cjs needs Electron, so its handler is checked the way packaged-env.test.cjs checks the
+// bootstrap: the real `registerIpc` source is lifted out of the file and run against fakes, with the
+// real `isTrustedSender` as its guard. This lives here, in a registered suite, because it is the
+// guard's consumer; a new test file would not run until package.json lists it.
+
+function registerIpcSource() {
+  const main = fs.readFileSync(path.join(__dirname, "main.cjs"), "utf8");
+  const start = main.indexOf("function registerIpc(host) {");
+  assert.ok(start >= 0, "main.cjs still defines registerIpc");
+  const close = /\r?\n\}\r?\n/.exec(main.slice(start));
+  assert.ok(close, "registerIpc still ends at a column-0 brace");
+  return main.slice(start, start + close.index + close[0].length);
+}
+
+/** Runs the real registerIpc against fakes and returns the handlers it registered, by channel. */
+function registerMainHandlers({ window, dialog }) {
+  const handlers = new Map();
+  const ipcMain = {
+    handle: (channel, handler) => handlers.set(channel, handler),
+    on: (channel, handler) => handlers.set(channel, handler),
+  };
+  const build = new Function(
+    "ipcMain",
+    "dialog",
+    "isTrustedSender",
+    "mainWindow",
+    `${registerIpcSource()}\nreturn registerIpc;`,
+  );
+  build(ipcMain, dialog, isTrustedSender, window)({});
+  return handlers;
+}
+
+function fakeDialog(answer) {
+  const calls = [];
+  return {
+    calls,
+    showOpenDialog: async (...args) => {
+      calls.push(args);
+      return answer;
+    },
+  };
+}
+
+/** Loads preload.cjs against a fake `electron` and returns what it exposed plus every `invoke` it made. */
+function loadPreload() {
+  const invoked = [];
+  let exposed;
+  const electron = {
+    contextBridge: {
+      exposeInMainWorld: (name, api) => {
+        exposed = { name, api };
+      },
+    },
+    ipcRenderer: {
+      invoke: async (...args) => {
+        invoked.push(args);
+        return { path: "from-the-shell" };
+      },
+      send() {},
+      on() {},
+      removeListener() {},
+    },
+  };
+  const realLoad = Module._load;
+  Module._load = function patchedLoad(request, ...rest) {
+    return request === "electron" ? electron : realLoad.call(this, request, ...rest);
+  };
+  const preload = require.resolve("./preload.cjs");
+  delete require.cache[preload];
+  try {
+    require(preload);
+  } finally {
+    Module._load = realLoad;
+    delete require.cache[preload];
+  }
+  return { exposed, invoked };
+}
+
+async function pickFolderTests() {
+  const window = fakeWindow();
+  const trusted = { senderFrame: window.webContents.mainFrame };
+  const subframe = { senderFrame: { id: "iframe" } };
+  const folder = "C:\\Users\\rizky\\notes";
+
+  // The renderer side: pickFolder reaches the same bridge object as pickMedia and forwards nothing.
+  const { exposed, invoked } = loadPreload();
+  assert.equal(exposed.name, "agentforge");
+  assert.equal(typeof exposed.api.pickFolder, "function", "preload exposes pickFolder");
+  assert.equal(typeof exposed.api.pickMedia, "function", "pickMedia is still there");
+  const answer = await exposed.api.pickFolder("C:\\Windows", { properties: ["openFile"] });
+  assert.deepEqual(answer, { path: "from-the-shell" });
+  assert.deepEqual(
+    invoked,
+    [["agentforge:pick-folder"]],
+    "one invoke on the folder channel, and no renderer-chosen argument crosses it",
+  );
+
+  // The main side.
+  const dialog = fakeDialog({ canceled: false, filePaths: [folder] });
+  const pick = registerMainHandlers({ window, dialog }).get("agentforge:pick-folder");
+  assert.equal(typeof pick, "function", "main.cjs registers agentforge:pick-folder");
+
+  const realWarn = console.warn;
+  const warnings = [];
+  console.warn = (message) => warnings.push(message);
+  try {
+    assert.deepEqual(await pick(subframe), { canceled: true }, "a subframe is refused with the canceled shape");
+    assert.deepEqual(await pick(undefined), { canceled: true }, "no event: refused");
+    assert.deepEqual(await pick({}), { canceled: true }, "no sender frame: refused");
+  } finally {
+    console.warn = realWarn;
+  }
+  assert.equal(warnings.length, 3, "each refusal is logged in the main process");
+  assert.equal(dialog.calls.length, 0, "a refused caller never sees a dialog");
+
+  assert.deepEqual(await pick(trusted), { path: folder }, "the main frame gets the folder it picked, as { path }");
+  assert.equal(dialog.calls.length, 1);
+  const [parent, options] = dialog.calls[0];
+  assert.equal(parent, window, "the dialog is parented to the window that called");
+  assert.deepEqual(options, { properties: ["openDirectory"] }, "folders only: no files, no multi-select");
+
+  const gone = fakeWindow({ destroyed: true });
+  const goneDialog = fakeDialog({ canceled: false, filePaths: [folder] });
+  const goneHandler = registerMainHandlers({ window: gone, dialog: goneDialog }).get("agentforge:pick-folder");
+  console.warn = () => {};
+  try {
+    assert.deepEqual(await goneHandler({ senderFrame: gone.webContents.mainFrame }), { canceled: true });
+  } finally {
+    console.warn = realWarn;
+  }
+  assert.equal(goneDialog.calls.length, 0, "a destroyed window trusts nobody, so no dialog");
+
+  for (const [label, answer] of [
+    ["the owner closes the dialog", { canceled: true, filePaths: [] }],
+    ["a cancel never carries a path through", { canceled: true, filePaths: [folder] }],
+    ["an empty selection", { canceled: false, filePaths: [] }],
+    ["no selection field", { canceled: false }],
+    ["an empty string path", { canceled: false, filePaths: [""] }],
+  ]) {
+    const handler = registerMainHandlers({ window, dialog: fakeDialog(answer) }).get("agentforge:pick-folder");
+    assert.deepEqual(await handler(trusted), { canceled: true }, label);
+  }
+  const several = registerMainHandlers({
+    window,
+    dialog: fakeDialog({ canceled: false, filePaths: [folder, "C:\\other"] }),
+  }).get("agentforge:pick-folder");
+  assert.deepEqual(await several(trusted), { path: folder }, "only the first folder is handed back");
+
+  // The shell relays the choice and touches nothing: the host validates, so no fs in this handler.
+  const source = registerIpcSource();
+  const start = source.indexOf('ipcMain.handle("agentforge:pick-folder"');
+  assert.ok(start >= 0, "the handler is in registerIpc");
+  const next = source.indexOf("ipcMain.handle(", start + 1);
+  const block = source.slice(start, next > start ? next : source.length);
+  assert.equal(/\bfs\.|\brequire\(|\.stat|readdir|realpath/.test(block), false, "no filesystem access in the shell");
+  assert.ok(block.indexOf("isTrustedSender(event, mainWindow)") > 0, "the handler is gated by isTrustedSender");
+  assert.ok(
+    block.indexOf("isTrustedSender") < block.indexOf("showOpenDialog"),
+    "the sender check comes before the dialog opens",
+  );
+}
+
+pickFolderTests().then(
+  () => console.log("navigation.test.cjs: ok"),
+  (error) => {
+    console.error(error);
+    process.exitCode = 1;
+  },
+);

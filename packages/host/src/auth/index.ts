@@ -8,6 +8,8 @@
  * when the variable is absent, which is correct on a server and wrong everywhere else.
  */
 import { isServerMode } from "@agentforge/core";
+import type { PortalRole } from "@agentforge/core";
+import type { PortalIdentity } from "@agentforge/db";
 import { getLocalVaultKey } from "@agentforge/db/vault-key";
 import { log } from "../log";
 import { createPortalSessionCheck, type PortalSessionCheck } from "./portal-check";
@@ -220,8 +222,24 @@ export function hostPortalCheck(): PortalSessionCheck {
     secrets: hostSessionSecrets(),
     // Read per refresh, like the portal URL: the same environment the code exchange reads.
     clientCredentials: () => configuredClientCredentials(),
+    // SR-65: the portal sends the person's role with every token, so a refresh is where a changed
+    // role — and an old `owner` row every first-time sign-in used to get — is brought to what the
+    // portal says. Dynamic for the same reason `provision` is: this module is imported by the
+    // desktop and webdev, which never sign in, and `@agentforge/db` opens SQLite at import.
+    applyRole: hostApplyRole,
   });
   return portalCheck;
+}
+
+/** The hosted server's `applyRole`: update the person's membership, never create one. */
+async function hostApplyRole(identity: PortalIdentity, role: PortalRole | null): Promise<void> {
+  const { db, syncPortalRole } = await import("@agentforge/db");
+  const changed = await syncPortalRole(db, identity, role);
+  if (changed) {
+    // Counts and ids only: the person's id is the portal's opaque one, and the role is one of three
+    // fixed words (or `none`, which the host applied as `member`).
+    log.info("portal_role_applied", { tenantId: identity.tenantId, role: role ?? "none" });
+  }
 }
 
 export function hostAuthRoutes(): AuthRoutes {
@@ -236,6 +254,7 @@ export function hostAuthRoutes(): AuthRoutes {
     // dynamic for the same reason `createHostSessionStore` makes its one dynamic: the desktop and
     // webdev import this module and never sign in, so `@agentforge/db` — which opens SQLite at
     // import — must not be pulled in statically from here.
+    // The identity carries the portal's role (`null` for none); `ensurePortalOwner` writes exactly it.
     provision: async (identity) => {
       const { db, ensurePortalOwner } = await import("@agentforge/db");
       return ensurePortalOwner(db, identity);
@@ -245,6 +264,17 @@ export function hostAuthRoutes(): AuthRoutes {
     // ever signing in. `currentPlanRecord` gives a tenant with no plan row a null cap, which
     // admits everybody — so a deployment the billing webhook has never spoken to signs people in
     // exactly as it did before this lane.
+    // The role the host holds for this person, read from the membership row (the same read every
+    // request's tenant resolution makes), so the renderer can hide what the host would refuse.
+    readRole: async (session) => {
+      const { db, resolvePortalTenant } = await import("@agentforge/db");
+      const resolution = await resolvePortalTenant(db, {
+        tenantId: session.tenantId,
+        orgId: session.orgId,
+        userId: session.userId,
+      });
+      return resolution.ok ? resolution.tenant.role : null;
+    },
     claimSeat: async (identity) => {
       await import("../entitlement-db");
       const { claimSeat, currentPlanRecord } = await import("../entitlement-store");

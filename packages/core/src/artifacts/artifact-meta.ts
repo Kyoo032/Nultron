@@ -51,16 +51,26 @@ export function isArtifactMime(value: unknown): value is ArtifactMime {
   return typeof value === "string" && (ARTIFACT_MIMES as readonly string[]).includes(value);
 }
 
+/**
+ * A known provenance field that fails its type is dropped on its own. Both the store's `create`
+ * and its row reader parse the whole object and fall back to `{}` on any failure, so one wrongly
+ * typed field (a count where a list belongs) used to erase the question, model and dataset too.
+ */
+function knownField<T extends z.ZodTypeAny>(schema: T) {
+  return schema.optional().catch(undefined);
+}
+
 /** Free-form provenance. Known keys are typed; extra keys are kept. */
 export const artifactMetaSchema = z
   .object({
-    model: z.string().optional(),
-    models: z.array(z.string()).optional(),
-    question: z.string().optional(),
-    queries: z.array(z.string()).optional(),
-    sourceCount: z.number().int().nonnegative().optional(),
-    parentArtifactId: z.string().optional(),
-    datasetId: z.string().optional(),
+    model: knownField(z.string()),
+    models: knownField(z.array(z.string())),
+    question: knownField(z.string()),
+    /** The queries a job ran, as text: search queries for Research, the SQL a Data job executed. */
+    queries: knownField(z.array(z.string())),
+    sourceCount: knownField(z.number().int().nonnegative()),
+    parentArtifactId: knownField(z.string()),
+    datasetId: knownField(z.string()),
   })
   .passthrough();
 

@@ -1,0 +1,72 @@
+# Nultron Enterprise on Kubernetes. The parts every overlay shares.
+#
+# Not applied on its own: it has no Secret (an overlay generates `nultron-secrets` from a gitignored
+# env file) and its site names are placeholders that refuse to resolve. Apply an overlay instead:
+#   overlays/local        Docker Desktop rehearsal, localhost only        (driven)
+#   overlays/production   Tencent TKE                                    (NOT applied, NOT proven)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: nultron
+
+resources:
+  - namespace.yaml
+  - storage.yaml
+  - app.yaml
+  - portal.yaml
+  - postgres.yaml
+  - backup-cronjob.yaml
+  - networkpolicy.yaml
+
+configMapGenerator:
+  # What compose.yml pins in `environment:` for the app. AGENTFORGE_SERVER is here, not in an optional
+  # file, so a missing secrets file can never start the hosted server with its controls off
+  # (apps/web/server/hosted-mode-guard.ts refuses that, and this keeps it from arising).
+  - name: nultron-app-env
+    literals:
+      - NODE_ENV=production
+      - PORT=3000
+      - AGENTFORGE_SERVER=1
+      - AGENTFORGE_DATA_DIR=/data
+      - AGENTFORGE_COMPONENTS_DIR=/opt/agentforge/components
+      # The code sandbox (run_code) is off on the hosted server until an overlay sets this to "on"; it has never
+      # been driven inside this image. Unset or "off" keeps the tool out of every run.
+      # - AGENTFORGE_CODE_RUNS=on
+      - TMPDIR=/tmp
+      - XDG_CACHE_HOME=/tmp/.cache
+      - NPM_CONFIG_CACHE=/tmp/.npm
+  # The Caddyfile reads these and nothing else (SR-73). The names are placeholders on purpose: an
+  # overlay sets the real ones, and Caddy refuses to start on a `.invalid` name instead of serving.
+  - name: nultron-edge-env
+    literals:
+      - NULTRON_DOMAIN=app.nultron.invalid
+      - PORTAL_DOMAIN=portal.nultron.invalid
+      - CADDY_HTTPS_PORT=8443
+      - CADDY_HTTP_PORT=8080
+  # The portal's non-secret settings. PORTAL_SMTP_HOST and PORTAL_PUBLIC_URL have no default in
+  # production (the portal refuses to boot without them), so an overlay supplies both.
+  - name: nultron-portal-env
+    literals:
+      - NODE_ENV=production
+      - PORTAL_HOST=0.0.0.0
+      - PORTAL_PORT=4000
+      - PORTAL_DATA_DIR=/portal-data
+      # Where the portal database is. A managed Postgres (TencentDB) is these three values and the two passwords,
+      # plus deleting postgres.yaml; PORTAL_DB_OWNER is the account that may create roles and extensions.
+      - PORTAL_DB_HOST=nultron-portal-db
+      - PORTAL_DB_PORT=5432
+      - PORTAL_DB_OWNER=portal
+      - PORTAL_TRUST_PROXY=1
+      - TMPDIR=/tmp
+  - name: nultron-caddy
+    files:
+      - Caddyfile=caddy/Caddyfile
+      - security.caddy=caddy/security.caddy
+      - site-tls.caddy=caddy/site-tls.caddy
+  - name: nultron-portal-scripts
+    files:
+      - prepare-db.mjs=scripts/prepare-db.mjs
+  - name: nultron-backup-scripts
+    files:
+      - snapshot.mjs=scripts/snapshot.mjs
+      - encrypt.sh=scripts/encrypt.sh
