@@ -2,19 +2,30 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "@/lib/nav";
+import { BuddyStage } from "@/components/buddy-stage";
 import { ChatAccountChip } from "@/components/chat-account-chip";
 import { ChatComposer } from "@/components/chat-composer";
+import { FolderSurface } from "@/components/folder/folder-surface";
 import { ChatContextChip } from "@/components/chat-context-chip";
 import { ChatHeader } from "@/components/chat-header";
 import { ChatLauncher } from "@/components/chat-launcher";
 import { ChatUsageChip } from "@/components/chat-usage-chip";
-import { estimateContextParts, estimateConversationTokens, textFromMessageContent } from "@/lib/estimate-tokens";
+import { estimateContextParts, estimateConversationTokens } from "@/lib/estimate-tokens";
+import {
+  knowledgeContextPath,
+  knowledgeContextWanted,
+  lastAssistantId,
+  parseContextParts,
+} from "@/lib/knowledge-context";
 import type { ContextPart } from "@/components/chat-context-chip";
 import { ChatTurn, messageHasDisplayableContent, type LiveTool } from "@/components/chat-turn";
 import { NultronMascot } from "@/components/nultron/nultron-mascot";
+import { useBuddyTakesStatus } from "@/lib/desk-buddy-store";
+import { useChatBuddyReactions } from "@/lib/use-chat-buddy-reactions";
 import { collectToolMediaParts } from "@/lib/tool-media";
 import { notifyThreadsChanged } from "@/lib/threads-events";
 import { apiFetch } from "@/lib/api-client";
+import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import {
   pickChatModel,
   readLastChatModel,
@@ -46,7 +57,13 @@ type Props = {
   initialThreadId?: string;
 };
 
+/** Nultron's box on the composer's ledge; about half of it shows above the edge. */
+const COMPOSER_BUDDY_SIZE = 112;
+
 export function ChatSession({ agentId, initialThreadId }: Props) {
+  // Nultron Enterprise: a signed-in tenant may open the desk before adding a key (hosted only; false and
+  // request-free elsewhere). The context estimate below embeds the query, so it goes through the gateway.
+  const keyMissing = useHostedNeedsKey();
   const router = useRouter();
   const [agentName, setAgentName] = useState(() => t("chat.title"));
   const [isDefaultChat, setIsDefaultChat] = useState(!agentId);
@@ -76,6 +93,10 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
   const [composerDraft, setComposerDraft] = useState<string | null>(null);
   const toolsRef = useRef(tools);
   toolsRef.current = tools;
+  // The desk buddy cheers when a reply lands and flinches when a send fails; with it on screen the error
+  // line below draws no second Nultron.
+  const buddyTakesStatus = useBuddyTakesStatus();
+  useChatBuddyReactions({ running, failed: sendFailed, error: Boolean(error) });
   const threadIdRef = useRef(threadId);
   threadIdRef.current = threadId;
   /** Last `initialThreadId` this pane saw, so leaving a thread (rail "+ New chat") empties it. */
@@ -368,39 +389,46 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
   const contextTokens = conversationTokens + knowledgeTokens;
   const contextParts = estimateContextParts({ conversation: conversationTokens, knowledge: knowledgeParts });
 
+  const newestReplyId = lastAssistantId(messages);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new reply is what makes the rows stale, so it re-runs the read without being read by it
   useEffect(() => {
-    const lastUser = [...messages].reverse().find((message) => message.role === "user");
-    const query = lastUser ? textFromMessageContent(lastUser.content) : "";
-    const params = new URLSearchParams();
-    if (query) {
-      params.set("query", query.slice(0, 400));
+    if (!knowledgeContextWanted({ keyMissing, hasReply, threadId })) {
+      // No chip to feed, no thread to describe, or a desk the host would refuse (`403 gateway_blocked`):
+      // the chip simply has no sources.
+      setKnowledgeParts((current) => (current.length === 0 ? current : []));
+      return;
     }
-    if (threadIdRef.current) {
-      // Same anti-loop rule as the host run: the thread's own card is not "Sources" for itself.
-      params.set("threadId", threadIdRef.current);
-    }
-    const search = params.toString();
-    const href = search ? `/api/v1/knowledge/context?${search}` : "/api/v1/knowledge/context";
-    void apiFetch(href)
+    let cancelled = false;
+    // The thread alone, never its last message: a query makes the host embed it through the gateway, a
+    // paid call, and the send already paid for the same retrieval once. The host answers from what the
+    // thread's last turn was handed (`packages/host/src/knowledge-last-turn.ts`). Asked again only
+    // when the newest reply changes, so opening a thread, and each reply, costs one free read.
+    void apiFetch(knowledgeContextPath(threadId as string))
       .then((res) => res.json())
       .then((payload) => {
-        const parts = Array.isArray(payload.parts) ? payload.parts : [];
-        setKnowledgeParts(
-          parts.filter((part: unknown): part is ContextPart => {
-            return Boolean(part && typeof part === "object" && typeof (part as ContextPart).label === "string");
-          }),
-        );
+        if (!cancelled) {
+          setKnowledgeParts(parseContextParts(payload));
+        }
       })
       .catch(() => {
-        setKnowledgeParts([]);
+        if (!cancelled) {
+          setKnowledgeParts([]);
+        }
       });
-  }, [messages]);
+    return () => {
+      cancelled = true;
+    };
+  }, [keyMissing, threadId, hasReply, newestReplyId]);
 
   return (
     <main className="flex h-full min-h-0 flex-col" data-testid="chat-home">
       <ChatHeader title={isDefaultChat ? t("chat.title") : agentName} compact={empty}>
         {hasReply ? (
-          <ChatContextChip usedTokens={contextTokens} contextLength={selectedModel?.contextLength} parts={contextParts} />
+          <ChatContextChip
+            usedTokens={contextTokens}
+            contextLength={selectedModel?.contextLength}
+            parts={contextParts}
+          />
         ) : null}
         {hasReply ? <ChatUsageChip /> : null}
         <ChatAccountChip />
@@ -408,7 +436,9 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
 
       {error ? (
         <div className="flex w-full items-start gap-3 px-[var(--chat-gutter)]">
-          {running || thinking || tools.length > 0 || streaming ? null : <NultronMascot state="error" decorative />}
+          {running || thinking || tools.length > 0 || streaming || buddyTakesStatus ? null : (
+            <NultronMascot state="error" decorative />
+          )}
           <p className="text-sm text-[var(--danger)]" data-testid="chat-error" role="alert">
             {error}
           </p>
@@ -425,7 +455,7 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
           }
           pinRef.current = isPinnedToEnd(el.scrollTop, el.scrollHeight, el.clientHeight);
         }}
-        className={`min-h-0 w-full flex-1 overflow-y-auto overscroll-y-contain px-[var(--chat-gutter)] ${empty ? "" : "space-y-4 py-4"}`}
+        className={`min-h-0 w-full flex-1 overflow-y-auto overscroll-y-contain px-[var(--chat-gutter)] ${empty ? "" : "chat-thread-ledge space-y-4 pt-4"}`}
         data-testid="message-list"
       >
         {empty && !error ? <ChatLauncher onSuggest={setComposerDraft} /> : null}
@@ -452,118 +482,124 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
         ) : null}
       </div>
       {agentIdReady ? (
-        <ChatComposer
-          threadId={threadId}
-          sessionKey={sessionKey}
-          onEnsureThread={ensureThread}
-          modalities={modalities.length > 0 ? modalities : ["text"]}
-          model={modelId}
-          models={models}
-          onModelChange={handleModelChange}
-          thinkingEnabled={thinkingEnabled}
-          reasoningEffort={reasoningEffort}
-          reasoningEffortChosen={reasoningChosen}
-          onReasoningEffortChange={setReasoningPref}
-          draft={composerDraft}
-          onDraftApplied={() => setComposerDraft(null)}
-          onUserSend={(payload) => {
-            pinRef.current = true;
-            setError(null);
-            setSendFailed(false);
-            setRunning(true);
-            rememberModel(modelId);
-            setThinking("");
-            setTools([]);
-            setStreaming("");
-            const content =
-              payload.parts && payload.parts.length > 0 ? payload.parts : [{ type: "text", text: payload.text }];
-            setMessages((current) => [...current, { id: `local-${Date.now()}`, role: "user", content }]);
-          }}
-          onStarted={() => setRunning(true)}
-          onDelta={(text) => setStreaming((current) => current + text)}
-          onThinking={(text) => setThinking((current) => current + text)}
-          onTool={(event) => {
-            setTools((current) => {
-              if (event.phase === "started") {
-                return [...current, { key: event.toolKey, status: "started", input: event.input }];
-              }
-              const next = [...current];
-              let index = -1;
-              for (let i = next.length - 1; i >= 0; i -= 1) {
-                if (next[i]?.key === event.toolKey && next[i]?.status === "started") {
-                  index = i;
-                  break;
+        <div className="chat-composer-ledge">
+          {/* In a thread Nultron peeks over the composer and is the one status character; the empty
+            Chat has the hero instead. */}
+          {empty ? null : <BuddyStage kind="composer" mode="chat" size={COMPOSER_BUDDY_SIZE} />}
+          <FolderSurface running={running} />
+          <ChatComposer
+            threadId={threadId}
+            sessionKey={sessionKey}
+            onEnsureThread={ensureThread}
+            modalities={modalities.length > 0 ? modalities : ["text"]}
+            model={modelId}
+            models={models}
+            onModelChange={handleModelChange}
+            thinkingEnabled={thinkingEnabled}
+            reasoningEffort={reasoningEffort}
+            reasoningEffortChosen={reasoningChosen}
+            onReasoningEffortChange={setReasoningPref}
+            draft={composerDraft}
+            onDraftApplied={() => setComposerDraft(null)}
+            onUserSend={(payload) => {
+              pinRef.current = true;
+              setError(null);
+              setSendFailed(false);
+              setRunning(true);
+              rememberModel(modelId);
+              setThinking("");
+              setTools([]);
+              setStreaming("");
+              const content =
+                payload.parts && payload.parts.length > 0 ? payload.parts : [{ type: "text", text: payload.text }];
+              setMessages((current) => [...current, { id: `local-${Date.now()}`, role: "user", content }]);
+            }}
+            onStarted={() => setRunning(true)}
+            onDelta={(text) => setStreaming((current) => current + text)}
+            onThinking={(text) => setThinking((current) => current + text)}
+            onTool={(event) => {
+              setTools((current) => {
+                if (event.phase === "started") {
+                  return [...current, { key: event.toolKey, status: "started", input: event.input }];
                 }
-              }
-              const completed = {
-                key: event.toolKey,
-                status: "completed" as const,
-                input: index >= 0 ? next[index]?.input : event.input,
-                output: event.output,
-              };
-              if (index >= 0) {
-                next[index] = completed;
-                return next;
-              }
-              return [...next, completed];
-            });
-          }}
-          onFailed={() => {
-            setSendFailed(true);
-            setRunning(false);
-          }}
-          onComplete={async (run) => {
-            notifyThreadsChanged();
-            if (!run.showing) {
-              // The owner opened another session while this run streamed, and the host saved the
-              // reply. Show it only if the pane has come back to that thread since.
-              if (run.threadId && run.threadId === threadIdRef.current) {
-                await refreshMessages(run.threadId).catch(() => undefined);
-              }
-              return;
-            }
-            const key = sessionEpochRef.current;
-            const liveMedia = toolsRef.current.flatMap((tool) => collectToolMediaParts(tool.output));
-            setStreaming("");
-            setThinking("");
-            setRunning(false);
-            if (threadIdRef.current) {
-              await refreshMessages(threadIdRef.current);
-            }
-            if (sessionEpochRef.current !== key) {
-              // The owner moved on while the messages reloaded; this run's media is not theirs now.
-              return;
-            }
-            setTools([]);
-            if (liveMedia.length > 0) {
-              setMessages((current) => {
-                const hasMedia = current.some(
-                  (message) =>
-                    message.role === "assistant" &&
-                    Array.isArray(message.content) &&
-                    message.content.some(
-                      (part) =>
-                        part &&
-                        typeof part === "object" &&
-                        ((part as { type?: unknown }).type === "image_url" ||
-                          (part as { type?: unknown }).type === "video_url"),
-                    ),
-                );
-                if (hasMedia) {
-                  return current;
+                const next = [...current];
+                let index = -1;
+                for (let i = next.length - 1; i >= 0; i -= 1) {
+                  if (next[i]?.key === event.toolKey && next[i]?.status === "started") {
+                    index = i;
+                    break;
+                  }
                 }
-                return [
-                  ...current,
-                  {
-                    id: `local-media-${Date.now()}`,
-                    role: "assistant",
-                    content: liveMedia,
-                  },
-                ];
+                const completed = {
+                  key: event.toolKey,
+                  status: "completed" as const,
+                  input: index >= 0 ? next[index]?.input : event.input,
+                  output: event.output,
+                };
+                if (index >= 0) {
+                  next[index] = completed;
+                  return next;
+                }
+                return [...next, completed];
               });
-            }
-          }}
-        />
+            }}
+            onFailed={() => {
+              setSendFailed(true);
+              setRunning(false);
+            }}
+            onComplete={async (run) => {
+              notifyThreadsChanged();
+              if (!run.showing) {
+                // The owner opened another session while this run streamed, and the host saved the
+                // reply. Show it only if the pane has come back to that thread since.
+                if (run.threadId && run.threadId === threadIdRef.current) {
+                  await refreshMessages(run.threadId).catch(() => undefined);
+                }
+                return;
+              }
+              const key = sessionEpochRef.current;
+              const liveMedia = toolsRef.current.flatMap((tool) => collectToolMediaParts(tool.output));
+              setStreaming("");
+              setThinking("");
+              setRunning(false);
+              if (threadIdRef.current) {
+                await refreshMessages(threadIdRef.current);
+              }
+              if (sessionEpochRef.current !== key) {
+                // The owner moved on while the messages reloaded; this run's media is not theirs now.
+                return;
+              }
+              setTools([]);
+              if (liveMedia.length > 0) {
+                setMessages((current) => {
+                  const hasMedia = current.some(
+                    (message) =>
+                      message.role === "assistant" &&
+                      Array.isArray(message.content) &&
+                      message.content.some(
+                        (part) =>
+                          part &&
+                          typeof part === "object" &&
+                          ((part as { type?: unknown }).type === "image_url" ||
+                            (part as { type?: unknown }).type === "video_url"),
+                      ),
+                  );
+                  if (hasMedia) {
+                    return current;
+                  }
+                  return [
+                    ...current,
+                    {
+                      id: `local-media-${Date.now()}`,
+                      role: "assistant",
+                      content: liveMedia,
+                    },
+                  ];
+                });
+              }
+            }}
+          />
+        </div>
       ) : error ? null : (
         <p className="mt-6 text-sm text-ink/50">{t("chat.starting")}</p>
       )}

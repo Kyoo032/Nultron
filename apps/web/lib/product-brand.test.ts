@@ -5,6 +5,7 @@ import {
   brandFromUnknown,
   mergePingBrand,
   usesBundledMark,
+  usesNultronWordmark,
 } from "./product-brand";
 
 describe("usesBundledMark", () => {
@@ -32,6 +33,33 @@ describe("usesBundledMark", () => {
       }),
     ).toBe(false);
     expect(usesBundledMark({ ...DEFAULT_PRODUCT_BRAND, productName: "Kemenkeu AI" })).toBe(false);
+  });
+});
+
+describe("usesNultronWordmark", () => {
+  it("takes the Nultron colours for the public name, whatever logo reached the renderer", () => {
+    expect(usesNultronWordmark(DEFAULT_PRODUCT_BRAND)).toBe(true);
+    expect(usesNultronWordmark({ ...DEFAULT_PRODUCT_BRAND, logoSrc: WEB_LOGO_SRC })).toBe(true);
+    expect(usesNultronWordmark({ ...DEFAULT_PRODUCT_BRAND, logoSrc: "data:image/png;base64,abc" })).toBe(true);
+  });
+
+  it("leaves a desktop flavor's name plain", () => {
+    for (const productName of ["Kemenkeu AI", "AIHub Metranet"]) {
+      expect(usesNultronWordmark({ ...DEFAULT_PRODUCT_BRAND, productName, logoSrc: "data:image/png;base64,abc" })).toBe(
+        false,
+      );
+    }
+  });
+
+  it("leaves a renamed hosted tenant plain even though it keeps the bundled mark", () => {
+    const tenant = { ...DEFAULT_PRODUCT_BRAND, productName: "AIHub Metranet", logoSrc: WEB_LOGO_SRC };
+    expect(usesBundledMark(tenant)).toBe(true);
+    expect(usesNultronWordmark(tenant)).toBe(false);
+  });
+
+  it("follows a flavor that arrives through the ping, not the preload's default", () => {
+    const merged = mergePingBrand(DEFAULT_PRODUCT_BRAND, { ok: true, productName: "Kemenkeu AI" });
+    expect(usesNultronWordmark(merged)).toBe(false);
   });
 });
 

@@ -17,13 +17,14 @@ import {
 import { dossierToMarkdown, type Dossier, type ResearchNotes } from "@agentforge/core/artifacts";
 import type { JobEmitter } from "@agentforge/core/jobs";
 import { loadSettings } from "./settings-store";
-import { listSelectableModels, modeCatalogPayload } from "./selectable-models";
+import { listSelectableModels, modeDefaultsFor } from "./selectable-models";
 import { ensureToolsRegistered } from "./register-tools";
 import { artifactStore } from "./artifacts";
 import { upsertWorkSource } from "./knowledge-ingest";
 import { artifactWorkCard } from "./work-cards";
 import { collectJobAssistantRun, readModelPinned } from "./job-regen";
 import { throwIfJobAborted } from "./job-stream";
+import { repairRoundLabel, type ResearchChecksReport } from "./research-checks";
 import { RESEARCH_CAPS, runResearchDossier, type SearchHit } from "./research-dossier";
 import { localeForRun } from "./run-context";
 import { log } from "./log";
@@ -33,6 +34,8 @@ export type ResearchResult = ResearchNotes & {
   artifactId: string | null;
   dossierId: string | null;
   dossier: { title: string; markdown: string };
+  /** The synthesis checks' outcome. A dossier that still fails them is saved and returned, with the verdicts. */
+  checks: ResearchChecksReport;
 };
 
 const NO_EMIT: JobEmitter = () => {};
@@ -81,7 +84,13 @@ function requireLiveResearch(settings: ReturnType<typeof loadSettings>): void {
   }
 }
 
-function persistDossier(tenant: TenantContext, dossier: Dossier, markdown: string, model: string): string | null {
+function persistDossier(
+  tenant: TenantContext,
+  dossier: Dossier,
+  markdown: string,
+  model: string,
+  checks: ResearchChecksReport,
+): string | null {
   try {
     return artifactStore().create(tenant, {
       mode: "research",
@@ -95,6 +104,8 @@ function persistDossier(tenant: TenantContext, dossier: Dossier, markdown: strin
         sourceCount: dossier.sources.length,
         model,
         models: dossier.models,
+        // The artifact meta schema passes unknown keys through, so the verdicts need no schema change.
+        checks,
       },
     }).id;
   } catch (error) {
@@ -115,8 +126,8 @@ export async function generateResearchNotes(
   const question = readPrompt(body);
   const settings = loadSettings(tenant);
   requireLiveResearch(settings);
-  const catalog = listSelectableModels();
-  const { defaults } = modeCatalogPayload();
+  const catalog = listSelectableModels(tenant);
+  const defaults = modeDefaultsFor(tenant);
   const model = resolveChatModel(readOptionalModel(body), settings.researchGenModel || defaults.research, catalog);
   // A model the person picked is never swapped by the fallback; a seeded default can be.
   const modelExplicit = readModelPinned(body);
@@ -127,12 +138,17 @@ export async function generateResearchNotes(
   let answered: string[] = [];
   let writtenBy = model;
 
-  const { dossier: planned, notes } = await runResearchDossier(
+  const {
+    dossier: planned,
+    notes,
+    checks,
+  } = await runResearchDossier(
     { question, models: [model] },
     {
       emit,
       abortSignal,
       caps: RESEARCH_CAPS,
+      repairLabel: repairRoundLabel(localeForRun()),
       ask: async (system, prompt) => {
         const run = await collectJobAssistantRun({
           tenant,
@@ -144,6 +160,7 @@ export async function generateResearchNotes(
           jobMode: "research",
           versionId: "research-dossier",
           prompt,
+          ...(abortSignal ? { signal: abortSignal } : {}),
         });
         answered = answered.includes(run.model) ? answered : [...answered, run.model];
         writtenBy = run.model;
@@ -167,7 +184,7 @@ export async function generateResearchNotes(
   emit({ type: "job.phase", phase: "saving", label: "Saving dossier" });
   const dossier: Dossier = answered.length > 0 ? { ...planned, models: answered } : planned;
   const markdown = dossierToMarkdown(dossier);
-  const dossierId = persistDossier(tenant, dossier, markdown, writtenBy);
+  const dossierId = persistDossier(tenant, dossier, markdown, writtenBy, checks);
   if (dossierId) {
     await upsertWorkSource(
       tenant,
@@ -181,5 +198,5 @@ export async function generateResearchNotes(
       }),
     );
   }
-  return { ...notes, artifactId: dossierId, dossierId, dossier: { title: dossier.title, markdown } };
+  return { ...notes, artifactId: dossierId, dossierId, dossier: { title: dossier.title, markdown }, checks };
 }

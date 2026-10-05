@@ -14,7 +14,7 @@
   },
   "list": {
     "label": "Channels on this desk",
-    "placeholder": "@channelname or -1001234567890",
+    "placeholder": "@username or chat id",
     "addAria": "Chat id or @username",
     "add": "Add",
     "remove": "Remove",

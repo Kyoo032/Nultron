@@ -1,11 +1,15 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { messageUnlessBlocked } from "@/lib/gateway-blocked";
 import { Link } from "@/lib/nav";
 import { Confetti } from "@/components/confetti";
+import { DocumentChecksNote } from "@/components/document-checks-note";
 import { DocumentPreview } from "@/components/document-preview";
+import { DeskSourcePicker } from "@/components/desk-source-picker";
 import { MascotSlot } from "@/components/mascot-slot";
 import { SourceMaterialField } from "@/components/source-material-field";
+import { StudioEmptyDesk } from "@/components/studio-empty-desk";
 import { WorkingStatus } from "@/components/working-status";
 import { subscribeModeHandoff } from "@/lib/mode-handoff";
 import { EnhancePromptButton } from "@/components/enhance-prompt-button";
@@ -14,14 +18,23 @@ import { ModelSelect } from "@/components/model-select";
 import { ModeHeader } from "@/components/mode-header";
 import type { JobRegenSubmit } from "@/components/job-regen-panel";
 import type { DocumentDraft } from "@/lib/document-outline";
+import { checksNote, sourceFilesBody, splitDraftResponse, type DocumentChecksView } from "@/lib/documents-desk-sources";
 import { documentStarters } from "@/lib/job-starters";
 import { t } from "@/lib/i18n";
+import { PROMPT_INPUT, PROMPT_ROW, PROMPT_SUBMIT } from "@/lib/prompt-row";
 import { useJobModel } from "@/lib/use-job-model";
 import { modelPickBody, regenModelPick, studioModelPick } from "@/lib/model-choice";
 import { apiFetch, isElectron } from "@/lib/api-client";
-import { useDeskNeedsKey } from "@/lib/use-desk-needs-key";
+import { isGatewayBlockedText } from "@/lib/gateway-blocked";
+import { NeedsKeyNote } from "@/components/needs-key-note";
+import { hostedKeyBlock, useDeskNeedsKey } from "@/lib/use-desk-needs-key";
 
 function errorMessage(payload: unknown, fallback: string): string {
+  // Hosted only: a 403 gateway_blocked is "no usable key", said as the catalog sentence (`gateway-blocked.ts`).
+  const blocked = messageUnlessBlocked(payload, () => "");
+  if (blocked) {
+    return blocked;
+  }
   if (payload && typeof payload === "object") {
     const error = (payload as { error?: { message?: unknown } }).error;
     if (error && typeof error.message === "string" && error.message.trim()) {
@@ -37,6 +50,10 @@ function needsSettingsHint(message: string): string {
 
 export function DocumentsStudio() {
   const needsKey = useDeskNeedsKey();
+  // Nultron Enterprise: the same fact, but only on the hosted build, where a signed-in tenant may open
+  // the desk before adding a key. It swaps the plain note below for one with a Settings link and
+  // replaces the generic error a refused call would print.
+  const keyBlocked = hostedKeyBlock(needsKey);
   const { models, model, pinned: modelPinned, setModel } = useJobModel("documents");
   const [prompt, setPrompt] = useState("");
   const [sourceText, setSourceText] = useState("");
@@ -51,15 +68,22 @@ export function DocumentsStudio() {
     reason?: string;
     items: Array<{ sentence: string; supported: boolean }>;
   } | null>(null);
+  // Desk files picked as sources: the host reads them when the request is sent.
+  const [deskSources, setDeskSources] = useState<string[]>([]);
+  const [deskRefresh, setDeskRefresh] = useState(0);
+  // What the host's checks still found after their repair round; null when they all passed.
+  const [checks, setChecks] = useState<DocumentChecksView | null>(null);
 
   function showStarter(next: DocumentDraft) {
     setDraft(next);
     setSourceCheck(null);
+    setChecks(null);
   }
 
-  function landDraft(next: DocumentDraft) {
+  function landDraft(next: DocumentDraft, nextChecks: DocumentChecksView | null) {
     setDraft(next);
     setSourceCheck(null);
+    setChecks(nextChecks);
     setLanded((count) => count + 1);
   }
 
@@ -91,15 +115,18 @@ export function DocumentsStudio() {
           // Only a deliberate pick travels as pinned: a seeded default stays rescuable by the host's fallback.
           ...modelPickBody(studioModelPick(model, modelPinned)),
           sourceText: sourceText.trim() || undefined,
+          ...sourceFilesBody(deskSources),
         }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         throw new Error(errorMessage(data, t("documents.errors.generate")));
       }
-      landDraft(data as DocumentDraft);
+      const landed = splitDraftResponse(data);
+      landDraft(landed.draft, landed.checks);
     } catch (err) {
       setDraft(null);
+      setChecks(null);
       setError(err instanceof Error ? err.message : t("documents.errors.generate"));
     } finally {
       setBusy(null);
@@ -125,6 +152,7 @@ export function DocumentsStudio() {
           ...modelPickBody(regenModelPick(payload.model, model, modelPinned)),
           attachments: payload.attachments.length > 0 ? payload.attachments : undefined,
           sourceText: sourceText.trim() || undefined,
+          ...sourceFilesBody(deskSources),
         }),
       });
       const data = await res.json().catch(() => null);
@@ -132,6 +160,8 @@ export function DocumentsStudio() {
         throw new Error(errorMessage(data, t("documents.errors.regen")));
       }
       setDraft(data as DocumentDraft);
+      // The flags named sections of the draft that was just changed.
+      setChecks(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("documents.errors.regen"));
     } finally {
@@ -189,7 +219,7 @@ export function DocumentsStudio() {
       const res = await apiFetch("/api/v1/documents/check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ draft, sourceText }),
+        body: JSON.stringify({ draft, sourceText, ...sourceFilesBody(deskSources) }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -241,7 +271,7 @@ export function DocumentsStudio() {
         }
       />
 
-      {error ? (
+      {error && !isGatewayBlockedText(error) ? (
         <div
           className="mt-6 rounded-lg border border-[var(--line)] px-4 py-3 text-sm text-[var(--danger)]"
           role="alert"
@@ -289,6 +319,8 @@ export function DocumentsStudio() {
         </div>
       ) : null}
 
+      {draft ? <DocumentChecksNote note={checksNote(checks, draft.sections)} /> : null}
+
       <ExampleGallery mode="documents" onSelect={(entry) => setPrompt(entry.prompt)} />
 
       {draft ? null : (
@@ -314,6 +346,8 @@ export function DocumentsStudio() {
       <form
         className="mt-6 space-y-2 rounded-xl border border-[var(--line)] bg-transparent p-3"
         onSubmit={(event) => void onGenerate(event)}
+        // A file made in Chat since this pane mounted shows up the next time the form is used.
+        onFocusCapture={() => setDeskRefresh((count) => count + 1)}
         data-testid="documents-studio-prompt-bar"
       >
         <SourceMaterialField
@@ -324,15 +358,22 @@ export function DocumentsStudio() {
           disabled={busy !== null}
           testIdPrefix="documents"
         />
+        <DeskSourcePicker
+          selected={deskSources}
+          onChange={setDeskSources}
+          disabled={busy !== null}
+          pastedChars={sourceText.length}
+          refreshKey={deskRefresh}
+        />
         <ModelSelect
           models={models}
           value={model}
           onChange={setModel}
           disabled={busy !== null || models.length === 0}
           testId="documents-studio-model"
-          className="h-8 w-full rounded-lg border border-[var(--line)] bg-transparent px-2 text-xs text-[var(--text-2)] wash"
+          className="select-field w-full"
         />
-        <div className="flex flex-wrap gap-2">
+        <div className={PROMPT_ROW}>
           <EnhancePromptButton
             text={prompt}
             surface="documents"
@@ -345,27 +386,31 @@ export function DocumentsStudio() {
             type="text"
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
-            className="text-field min-w-0 flex-1 outline-none placeholder:text-[var(--text-3)]"
+            className={PROMPT_INPUT}
             placeholder={t("documents.placeholder")}
             disabled={busy !== null}
             data-testid="documents-prompt"
             aria-label={t("documents.topicAria")}
           />
-          {busy === "generate" ? <MascotSlot mode="documents" placement="beside" busy phase="drafting" decorative /> : null}
+          {busy === "generate" ? (
+            <MascotSlot mode="documents" placement="beside" busy phase="drafting" decorative />
+          ) : null}
           <button
             type="submit"
-            className={
+            className={`${PROMPT_SUBMIT} ${
               needsKey
-                ? "inline-flex h-8 shrink-0 items-center rounded-pill bg-[var(--line)] px-4 text-sm text-[var(--text-3)]"
-                : "wash inline-flex h-8 shrink-0 items-center rounded-pill bg-[var(--accent)] px-4 text-sm font-medium text-[var(--surface)] disabled:opacity-45"
-            }
+                ? "inline-flex h-8 shrink-0 items-center justify-center rounded-pill bg-[var(--line)] px-4 text-sm text-[var(--text-3)]"
+                : "wash inline-flex h-8 shrink-0 items-center justify-center rounded-pill bg-[var(--accent)] px-4 text-sm font-medium text-[var(--surface)] disabled:opacity-45"
+            }`}
             disabled={busy !== null || !prompt.trim() || needsKey}
             title={needsKey ? t("documents.needsKeyQuiet") : undefined}
             data-testid="documents-generate"
           >
             {busy === "generate" ? <WorkingStatus label={t("documents.generating")} /> : t("documents.generate")}
           </button>
-          {needsKey ? (
+          {keyBlocked ? (
+            <NeedsKeyNote testId="documents-needs-key" />
+          ) : needsKey ? (
             <p className="basis-full text-xs text-[var(--text-3)]" data-testid="documents-needs-key">
               {t("documents.needsKeyQuiet")}
             </p>
@@ -373,17 +418,19 @@ export function DocumentsStudio() {
         </div>
       </form>
 
+      {draft || busy !== null ? null : <StudioEmptyDesk mode="documents" />}
+
       {draft ? (
-          <div className="relative mt-8">
-            {landed > 0 ? <Confetti key={landed} /> : null}
-            <DocumentPreview
-              draft={draft}
-              models={models}
-              defaultModel={model}
-              regeneratingIndex={regenIndex}
-              onRegenerate={(index, payload) => void onRegenerate(index, payload)}
-            />
-          </div>
+        <div className="relative mt-8">
+          {landed > 0 ? <Confetti key={landed} /> : null}
+          <DocumentPreview
+            draft={draft}
+            models={models}
+            defaultModel={model}
+            regeneratingIndex={regenIndex}
+            onRegenerate={(index, payload) => void onRegenerate(index, payload)}
+          />
+        </div>
       ) : null}
     </main>
   );

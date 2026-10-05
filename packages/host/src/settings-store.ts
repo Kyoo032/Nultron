@@ -18,6 +18,8 @@ import {
   parseGuideRecord,
 } from "@agentforge/core";
 import { getLocalVaultKey } from "@agentforge/db/vault-key";
+import { withCodeRunPolicy } from "./code-runner/enabled";
+import { parseKeyLaterRecord, type KeyLaterRecord } from "./key-later";
 import { readSelectedWorkspaceId } from "./workspace";
 import { assertTenantId, tenantDataDir } from "./tenant-paths";
 import { tenantStateBackend, type TenantStateBackend } from "./tenant-state-store";
@@ -176,8 +178,9 @@ function tryDeleteLegacyPlaintext(tenantId: string): void {
 }
 
 /**
- * Per-user state inside a tenant's sealed payload: the UI locale, and whether the person has been
- * through the first-run guide (`guide`, see `@agentforge/core` `guide.ts`).
+ * Per-user state inside a tenant's sealed payload: the UI locale, whether the person has been
+ * through the first-run guide (`guide`, see `@agentforge/core` `guide.ts`), and, on the hosted app
+ * only, whether they chose to add a gateway key later (`keyLater`, see `./key-later.ts`).
  *
  * It rides in the same envelope rather than in a table of its own because it is written by the
  * same save, read by the same read and thrown away by the same "start over" — and because a second
@@ -185,7 +188,7 @@ function tryDeleteLegacyPlaintext(tenantId: string): void {
  * local owner, so both are machine-wide there; the guide's record is why "Start over" shows the
  * tour again on a fresh install: `settings.enc` is the first entry it removes.
  */
-type UserPrefs = { locale?: AppLocale; guide?: GuideRecord };
+type UserPrefs = { locale?: AppLocale; guide?: GuideRecord; keyLater?: KeyLaterRecord };
 
 type SettingsFileV2 = {
   version: 2;
@@ -254,8 +257,13 @@ function usersMap(value: unknown): Record<string, UserPrefs> | undefined {
     }
     const locale = readLocaleField((prefs as UserPrefs).locale);
     const guide = parseGuideRecord((prefs as UserPrefs).guide);
-    if (locale || guide) {
-      next[userId] = { ...(locale ? { locale } : {}), ...(guide ? { guide } : {}) };
+    const keyLater = parseKeyLaterRecord((prefs as UserPrefs).keyLater);
+    if (locale || guide || keyLater) {
+      next[userId] = {
+        ...(locale ? { locale } : {}),
+        ...(guide ? { guide } : {}),
+        ...(keyLater ? { keyLater } : {}),
+      };
     }
   }
   return Object.keys(next).length > 0 ? next : undefined;
@@ -471,9 +479,16 @@ function loadSettingsFile(tenantId: string): SettingsFileV2 {
   return migrated;
 }
 
+/**
+ * The settings a run reads, and the one place a run's disabled-tools list is resolved: every Chat turn, job and
+ * Edit agent turn loads them here and hands them to `createRuntime`, whose `buildToolSecretScope` turns
+ * `disabledTools` into the set the model is never offered. `run_code` joins it while `AGENTFORGE_CODE_RUNS` is
+ * off (`code-runner/enabled.ts`). Applied on read only: `saveSettings` merges into the stored slice, so the
+ * file never records a tool the operator's switch turned off.
+ */
 export function loadSettings(scope?: SettingsScope): StoredSecrets {
   const { tenantId, workspaceId } = resolveSettingsScope(scope);
-  return withGatewayDefault(sliceFor(loadSettingsFile(tenantId), workspaceId));
+  return withCodeRunPolicy(withGatewayDefault(sliceFor(loadSettingsFile(tenantId), workspaceId)));
 }
 
 export function saveSettings(patch: SecretPatch, scope?: SettingsScope): StoredSecrets {
@@ -593,6 +608,22 @@ export function loadUserLocale(scope: UserScope): AppLocale {
 }
 
 /**
+ * The language this person chose themselves, or `null` when they never did.
+ *
+ * What `loadUserLocale` is not: that one answers a language for everyone, falling through to the
+ * tenant's own stored locale and then to English, so it cannot tell "chose English" from "never
+ * chose". This one reads only `users[userId].locale`, so a caller can offer a default (the browser's
+ * `Accept-Language`, on the hosted server) to a person who has made no choice, and never over one who
+ * has. A missing user id reads no one's choice.
+ */
+export function loadUserLocaleChoice(scope: UserScope): AppLocale | null {
+  const { tenantId } = resolveSettingsScope(scope);
+  const userId = scope.userId?.trim();
+  const own = userId ? loadSettingsFile(tenantId).users?.[userId]?.locale : undefined;
+  return isAppLocale(own) ? own : null;
+}
+
+/**
  * Save one person's locale.
  *
  * On a desk this also writes the install's locale, because `getBootLocale()` reads that and the
@@ -647,6 +678,40 @@ export function saveUserGuide(scope: UserScope, outcome: GuideOutcome, now: numb
   const record: GuideRecord = { outcome, at: now };
   const file = loadSettingsFile(tenantId);
   const users = { ...(file.users ?? {}), [userId]: { ...(file.users?.[userId] ?? {}), guide: record } };
+  persistEncrypted(tenantId, { ...file, version: 2, users });
+  return record;
+}
+
+/**
+ * Did this person choose to add a gateway key later? `null` is "no": a missing entry, an unreadable
+ * one, or a user this payload has never heard of. Never inherited from another user, for the same
+ * reason the guide's record is not.
+ */
+export function loadUserKeyLater(scope: UserScope): KeyLaterRecord | null {
+  const { tenantId } = resolveSettingsScope(scope);
+  const userId = scope.userId?.trim();
+  if (!userId) {
+    return null;
+  }
+  return loadSettingsFile(tenantId).users?.[userId]?.keyLater ?? null;
+}
+
+/**
+ * Record the choice. A preference about what the screen shows and nothing more: the gate and every
+ * gateway-calling route read only the key and the gateway's verdict on it, never this. Removed by
+ * "Start over" (`settings.enc` is the first entry the wipe deletes) and by the hosted tenant erase,
+ * which takes the whole `tenant_state` row; saving a key does not clear it, since a key that later
+ * stops working must not bring the welcome screen back.
+ */
+export function saveUserKeyLater(scope: UserScope, now: number = Date.now()): KeyLaterRecord {
+  const { tenantId } = resolveSettingsScope(scope);
+  const userId = scope.userId?.trim();
+  if (!userId) {
+    throw new ApiError("invalid_request", "Adding the key later needs a signed-in user.", 400);
+  }
+  const record: KeyLaterRecord = { at: now };
+  const file = loadSettingsFile(tenantId);
+  const users = { ...(file.users ?? {}), [userId]: { ...(file.users?.[userId] ?? {}), keyLater: record } };
   persistEncrypted(tenantId, { ...file, version: 2, users });
   return record;
 }

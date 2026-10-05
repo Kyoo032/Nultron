@@ -7,6 +7,8 @@ import {
   type IpcHostRequest,
   type IpcHostResponse,
 } from "./desktop-bridge";
+import { publishGate } from "./gate-state";
+import { noteGatewayResponse } from "./gateway-blocked";
 import { parseGatewayGate, type GatewayGatePayload } from "./gateway-gate";
 import {
   parseCancelResetResult,
@@ -178,6 +180,10 @@ async function transportFetch(input: string, init: RequestInit, method: string):
     // paywall could only be raised from a job stream, so the same blocked tenant saw a full-screen
     // explanation or a red banner depending on which button they happened to press (`plan-block`).
     notePlanResponse(response);
+    // ...and a 403 `gateway_blocked` is the host saying this tenant has no usable key. Hosted only
+    // and on a clone, like the two above: the hosted desk opens without a key now ("Add it later"),
+    // so every pane has to hear it and show the same calm state (`gateway-blocked`).
+    noteGatewayResponse(response);
     return response;
   }
   throwIfAborted(init.signal);
@@ -406,7 +412,11 @@ export function apiFetch(input: string, init: RequestInit = {}): Promise<Respons
 export async function checkGateway(signal?: AbortSignal): Promise<GatewayGatePayload | null> {
   const res = await apiFetch("/api/v1/settings/gateway/check", { method: "POST", signal });
   const body = (await res.json().catch(() => null)) as { gateway?: unknown } | null;
-  return parseGatewayGate(body?.gateway);
+  const gate = parseGatewayGate(body?.gateway);
+  // A re-check is a fresh verdict from the host: every pane that is showing "add your key" (or not)
+  // hears it. Hosted only inside; the Personal app is untouched.
+  publishGate(gate);
+  return gate;
 }
 
 /**

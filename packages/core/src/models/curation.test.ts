@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyCuration, curateModel, isEverydayModel } from "./curation";
+import { applyCuration, curateModel, friendlyModelLabel, isEverydayModel } from "./curation";
 
 describe("curateModel", () => {
   it("marks the Recommended set of 2026-09-30", () => {
@@ -94,6 +94,45 @@ describe("curateModel", () => {
     // 2025-12-01 is a date, not version 12.01.
     expect(curateModel("qwen3-omni-flash-2025-12-01").friendlyLabel).toBe("Qwen3 Omni Flash 2025 12 01");
     expect(curateModel("o3-mini-2025-01-31").friendlyLabel).toBe("O3 Mini 2025 01 31");
+  });
+
+  // Found driving webdev on 2026-10-01: the Recommended group read "Glm 5.3 Flash" and
+  // "DeepSeek V4 1 Flash". A label is the id read aloud, so brand and unit words keep their own case
+  // and a dashed version is one dotted number.
+  it.each([
+    // Acronyms keep their capitals.
+    ["glm-5.3-flash", "GLM 5.3 Flash"],
+    ["glm-5.2-fast-preview", "GLM 5.2 Fast"],
+    ["glm-5-turbo", "GLM 5 Turbo"],
+    ["gpt-4o-mini-tts", "GPT 4o Mini TTS"],
+    ["gpt-5.6-sol", "GPT 5.6 Sol"],
+    ["qwen-mt-turbo", "Qwen MT Turbo"],
+    ["qwen3-vl-embedding", "Qwen3 VL Embedding"],
+    ["qwen3.5-ocr", "Qwen3.5 OCR"],
+    ["acme-ai-chat", "Acme AI Chat"],
+    ["glm4-5", "GLM4.5"],
+    // Parameter counts are units.
+    ["qwen3.5-27b", "Qwen3.5 27B"],
+    ["qwen3.5-35b-a3b", "Qwen3.5 35B A3B"],
+    ["gpt-oss-120b", "GPT Oss 120B"],
+    ["gemma-4-31b-it", "Gemma 4 31B IT"],
+    // A version split by the dashes of an id is one dotted number, and a dotted one is left alone.
+    ["deepseek-v4-1-flash", "DeepSeek V4.1 Flash"],
+    ["deepseek-v4.1-flash", "DeepSeek V4.1 Flash"],
+    ["deepseek-v4-1-flash-260910", "DeepSeek V4.1 Flash 260910"],
+    ["deepseek-v4-flash", "DeepSeek V4 Flash"],
+    ["kimi-k2-6", "Kimi K2.6"],
+    ["kimi-k2.6", "Kimi K2.6"],
+    ["mistral-7b-instruct-v0-3", "Mistral 7B Instruct V0.3"],
+    // Not versions: a date, a lone letter-number name, a name that merely ends in a digit.
+    ["o3-mini-2025-01-31", "O3 Mini 2025 01 31"],
+    ["o3-mini", "O3 Mini"],
+    ["MiniMax-M3", "MiniMax M3"],
+    ["hy3", "Hy3"],
+    ["openai/gpt-6-luna", "GPT 6 Luna"],
+  ])("writes %s as %s", (id, label) => {
+    expect(friendlyModelLabel(id)).toBe(label);
+    expect(curateModel(id).friendlyLabel).toBe(label);
   });
 
   it("picks bestFor from the gateway catalog, not id keywords", () => {

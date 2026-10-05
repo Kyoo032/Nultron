@@ -39,6 +39,17 @@ export function usesBundledMark(brand: ProductBrand): boolean {
   return brand.logoSrc === WEB_LOGO_SRC || brand.productName === DEFAULT_PRODUCT_NAME;
 }
 
+/**
+ * True when the product still carries the public name, so its wordmark (the rail header's "Nultron")
+ * may take the Nultron IP colours (`.wordmark-nultron`, the `--nultron-*` tokens). The decision is the
+ * NAME and not the logo: a hosted tenant that renames the product keeps the bundled mark
+ * (`usesBundledMark`) but must not see its own name in another brand's colours, and a desktop flavor
+ * (`kemenkeu`, `metranet`) keeps its plain name and its own logo.
+ */
+export function usesNultronWordmark(brand: ProductBrand): boolean {
+  return brand.productName === DEFAULT_PRODUCT_NAME;
+}
+
 const BrandContext = createContext<ProductBrand>(DEFAULT_PRODUCT_BRAND);
 
 export function useProductBrand(): ProductBrand {

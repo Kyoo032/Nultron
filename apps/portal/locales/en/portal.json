@@ -2,22 +2,68 @@
   "product": "Nultron",
   "signIn": {
     "title": "Sign in",
-    "intro": "Enter your work e-mail address. We will send you a six-digit code.",
+    "intro": "Enter your e-mail address. We will tell you what to do next.",
     "emailLabel": "E-mail address",
-    "submit": "Send code"
+    "submit": "Continue",
+    "emailMissing": "Enter your e-mail address."
   },
   "sent": {
     "title": "Check your e-mail",
-    "body": "If that address has an account, a six-digit code is on its way. It expires in {minutes} minutes.",
+    "body": "We sent a sign-in code to {email}. It expires in {minutes} minutes.",
+    "bodyAfterInvite": "Invite accepted. We just sent a sign-in code to {email} to confirm it is your inbox. It expires in {minutes} minutes.",
+    "bodyWait": "We already sent a sign-in code to {email}.",
+    "bodyFailed": "We could not send a sign-in code to {email} just now.",
     "codeLabel": "Six-digit code",
     "submit": "Continue",
-    "resend": "Did not get it? Start again."
+    "resend": "Send a new code",
+    "cooldown": "A code was sent a moment ago. Check your inbox, or ask for another in {minutes} min.",
+    "limited": "Several codes were sent recently. Check your inbox, or try again in {minutes} min.",
+    "mailFailed": "The e-mail could not be sent. Try again in a few minutes."
+  },
+  "invite": {
+    "title": "Enter your invite code",
+    "lead": "Enter the invite code we e-mailed to {email}.",
+    "label": "Invite code",
+    "submit": "Continue",
+    "resend": "E-mail me my invite again",
+    "wrong": "That invite code is not right. {attempts} attempts left.",
+    "missing": "Enter the invite code from the e-mail.",
+    "resent": "We e-mailed you a new invite code. The earlier one no longer works.",
+    "wait": "An invite was e-mailed recently. Check your inbox, or ask again in {minutes} min.",
+    "mailFailed": "The e-mail could not be sent. Try again in a few minutes."
+  },
+  "state": {
+    "restart": "Use a different e-mail",
+    "expired": {
+      "title": "Invite no longer valid",
+      "body": "This invite has expired or was already used. Ask your admin for a new one."
+    },
+    "noAccess": {
+      "title": "No access yet",
+      "body": "This e-mail does not have access yet. Ask your company admin to invite you."
+    },
+    "inviteLocked": {
+      "title": "Too many attempts",
+      "body": "Too many wrong invite codes for this e-mail. Ask your admin for a new invite."
+    },
+    "otpLocked": {
+      "title": "Too many attempts",
+      "body": "Too many attempts for this e-mail. Try again in {wait} or ask your admin."
+    },
+    "seatCap": {
+      "title": "No seats left",
+      "next": "Ask your admin to free a seat or add one."
+    }
+  },
+  "account": {
+    "signedInAs": "You are signed in as {email}.",
+    "signOut": "Not you? Sign out"
   },
   "code": {
     "invalid": "That code is not right. {attempts} attempts left.",
     "expired": "That code has expired. Start again.",
     "exhausted": "Too many attempts on that code. Start again.",
-    "locked": "Too many sign-in attempts for this address. Try again in 24 hours.",
+    "locked": "Too many attempts for this e-mail. Try again in {wait} or ask your admin.",
     "missing": "Enter the six digits from the e-mail."
   },
   "approve": {
@@ -83,6 +129,10 @@
     "invalid_request": "That request was not understood.",
     "invalid_grant": "That sign-in could not be completed. Start again.",
     "rate_limited": "Too many attempts. Try again in a few minutes."
+  },
+  "wait": {
+    "minutes": "{n} min",
+    "hours": "{n} h"
   },
   "footer": {
     "note": "Never share a sign-in code with anyone."

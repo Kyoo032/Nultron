@@ -6,9 +6,10 @@
  *    write of two unitless custom properties (`--px`, `--py`, each -1..1). The CSS turns them into
  *    `transform` offsets, so nothing lays out or repaints. The hero's rect is read once per burst of
  *    movement, before the write, never per event.
- *  - Pause. Whatever still moves inside the hero (the shapes no longer loop; that is the mascot) stops
- *    while the hero is scrolled out of view or the tab is hidden (`data-paused="true"`, read by
- *    `.chat-hero[data-paused]` in globals.css).
+ *  - Pause. Whatever of the mascot still moves inside the hero stops while the hero is scrolled out of
+ *    view or the tab is hidden (`data-paused="true"`, read by `.chat-hero[data-paused]` in globals.css).
+ *    The shapes' stepped bob is not the hero's to pause: the desk-wide ambient switch does it
+ *    (`lib/ambient-motion.ts`), and `lib/desk-motion.ts` is the desk-wide counterpart of this file.
  *  - Gate. Nothing binds under `prefers-reduced-motion: reduce`, and pointer movement only counts on
  *    a fine, hover-capable pointer. A phone keeps tap reactions and drops the parallax.
  */
@@ -33,7 +34,7 @@ export function pointerToUnit(x: number, y: number, rect: Rect): { x: number; y:
   return { x: clampUnit(nx), y: clampUnit(ny) };
 }
 
-type MediaQueryLike = {
+export type MediaQueryLike = {
   matches: boolean;
   addEventListener(type: "change", listener: () => void): void;
   removeEventListener(type: "change", listener: () => void): void;
@@ -65,7 +66,7 @@ export type HeroTarget = {
 };
 
 export const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
-const FINE_POINTER_QUERY = "(hover: hover) and (pointer: fine)";
+export const FINE_POINTER_QUERY = "(hover: hover) and (pointer: fine)";
 /** A measured rect is trusted this long while the pointer keeps moving (the pane can scroll). */
 const RECT_TTL_MS = 250;
 

@@ -208,6 +208,40 @@ describe("runWithJobModelFallback", () => {
     expect(runtime.calls).toEqual(["deepseek-v4-flash"]);
   });
 
+  it("never swaps, and never marks the model down, once the job was cancelled", async () => {
+    const cancel = new AbortController();
+    const calls: string[] = [];
+    await expect(
+      runWithJobModelFallback(
+        { model: "deepseek-v4-flash", jobMode: "finance", availableModelIds: AVAILABLE, signal: cancel.signal, now },
+        async (model): Promise<JobModelOutcome<string>> => {
+          calls.push(model);
+          // The gateway-unavailable sentence a cut-short request can leave behind, as the cancel lands.
+          cancel.abort(new Error("client left"));
+          return { ok: false, error: new Error(GATEWAY_503), streamed: false };
+        },
+      ),
+    ).rejects.toThrow(GATEWAY_503);
+    expect(calls).toEqual(["deepseek-v4-flash"]);
+    expect(isJobModelDown("deepseek-v4-flash", NOW + 1)).toBe(false);
+  });
+
+  it("still swaps for a failure when the job's signal has not fired", async () => {
+    const runtime = fakeRuntime({ "deepseek-v4-flash": new Error(GATEWAY_503), "gpt-6-luna": "ok" });
+    const run = await runWithJobModelFallback(
+      {
+        model: "deepseek-v4-flash",
+        jobMode: "finance",
+        availableModelIds: AVAILABLE,
+        signal: new AbortController().signal,
+        now,
+      },
+      runtime.attempt,
+    );
+    expect(run.model).toBe("gpt-6-luna");
+    expect(runtime.calls).toEqual(["deepseek-v4-flash", "gpt-6-luna"]);
+  });
+
   it("preserves the original ApiError, status and all, when it gives up", async () => {
     const error = new ApiError("generation_failed", GATEWAY_503, 502);
     const runtime = fakeRuntime({ "deepseek-v4-flash": error });

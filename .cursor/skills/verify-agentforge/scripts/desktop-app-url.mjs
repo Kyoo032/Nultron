@@ -5,9 +5,12 @@ import { join } from "node:path";
  * Packaged Electron writes host-status.json under userData
  * (`app.setName("Nultron")` + `extraMetadata.name: "agentforge"`):
  *   Windows: %APPDATA%\Nultron\host-status.json
- *            (legacy fallback: %APPDATA%\@agentforge\desktop\host-status.json)
+ *            (brand flavors: %APPDATA%\Kemenkeu AI, %APPDATA%\AIHub Metranet;
+ *            legacy fallback: %APPDATA%\@agentforge\desktop\host-status.json)
  *   Linux:   $XDG_CONFIG_HOME/Nultron/host-status.json or ~/.config/Nultron/host-status.json
+ *            (brand flavors: the same parent with Kemenkeu AI / AIHub Metranet)
  *   macOS:   ~/Library/Application Support/Nultron/host-status.json
+ *            (brand flavors: the same parent with Kemenkeu AI / AIHub Metranet)
  *
  * Older installers wrote app-url.txt (HTTP child). Doctor --desktop must not require that file.
  *

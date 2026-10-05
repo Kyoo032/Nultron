@@ -43,6 +43,11 @@ export const LOGOUT_PATH = "/api/v1/auth/logout";
 
 export type SessionStatus = "unknown" | "signed-out" | "signed-in" | "unavailable";
 
+/** The role the host holds for the person (`GET /api/v1/auth/session`), the portal's three words. */
+export type SessionRole = "owner" | "admin" | "member";
+
+const SESSION_ROLES: readonly SessionRole[] = ["owner", "admin", "member"];
+
 /** Exactly what `sessionSummary` returns (`packages/host/src/auth/session.ts`). No token, ever. */
 export type SessionIdentity = {
   readonly userId: string;
@@ -50,6 +55,13 @@ export type SessionIdentity = {
   readonly tenantId: string;
   /** Epoch milliseconds, the host's idle expiry. `0` when the host sent nothing usable. */
   readonly expiresAt: number;
+  /**
+   * What the host says the person is, from their membership row. **Display only**: it hides a
+   * control the host would refuse anyway (the Erase account button is shown to an `owner` and to no
+   * one else), and every decision is still the host's. Absent means unknown — the host sent none, or
+   * one this screen does not recognise — and unknown is never treated as an owner.
+   */
+  readonly role?: SessionRole;
 };
 
 export type SessionSnapshot = {
@@ -110,7 +122,12 @@ export function parseSessionPayload(payload: unknown): SessionSnapshot {
     return SIGNED_OUT;
   }
   const expiresAt = typeof body.expiresAt === "number" && Number.isFinite(body.expiresAt) ? body.expiresAt : 0;
-  return { status: "signed-in", identity: { userId, orgId, tenantId, expiresAt }, reason: null };
+  const role = SESSION_ROLES.find((known) => known === body.role);
+  return {
+    status: "signed-in",
+    identity: { userId, orgId, tenantId, expiresAt, ...(role ? { role } : {}) },
+    reason: null,
+  };
 }
 
 /**

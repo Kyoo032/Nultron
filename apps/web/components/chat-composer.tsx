@@ -19,7 +19,9 @@ import { submitOnEnter } from "@/lib/composer-enter";
 import { getLocale, t } from "@/lib/i18n";
 import { readComposerDraft, writeComposerDraft } from "@/lib/composer-draft";
 import { useWorkspaceScope } from "@/lib/workspace-scope";
-import { useDeskNeedsKey } from "@/lib/use-desk-needs-key";
+import { NeedsKeyNote } from "@/components/needs-key-note";
+import { gatewayBlockedMessage, hostedGatewayBlocked } from "@/lib/gateway-blocked";
+import { hostedKeyBlock, useDeskNeedsKey } from "@/lib/use-desk-needs-key";
 
 export type ComposerUserSendPayload = {
   text: string;
@@ -238,6 +240,10 @@ export function ChatComposer({
   }, [workspaceId, text, files]);
 
   const needsKey = useDeskNeedsKey();
+  // Nultron Enterprise: the same fact, but only on the hosted build, where a signed-in tenant may open
+  // the desk before adding a key. It gives the note below a Settings link, and keeps the refused
+  // send's own sentence from printing next to it. Always false on the Personal app.
+  const keyBlocked = hostedKeyBlock(needsKey);
   const pickerModels = models ?? [];
   const showPicker = typeof onModelChange === "function";
   const sendEmpty = !text.trim() && files.length === 0;
@@ -418,7 +424,8 @@ export function ChatComposer({
           });
           if (!response.ok) {
             const payload = await response.json().catch(() => null);
-            fail(payload?.error?.message ?? t("chat.error.runFailed"));
+            // Hosted only: a 403 gateway_blocked is "no usable key", said calmly, not a failed run.
+            fail(hostedGatewayBlocked(payload) ? gatewayBlockedMessage() : (payload?.error?.message ?? t("chat.error.runFailed")));
             await finish();
             return;
           }
@@ -605,7 +612,7 @@ export function ChatComposer({
           ))}
         </ul>
       ) : null}
-      {error ? (
+      {error && !(keyBlocked && error === gatewayBlockedMessage()) ? (
         <p className="mt-2 text-sm text-[var(--danger)]" data-testid="composer-error" role="alert">
           {error}
         </p>
@@ -740,7 +747,9 @@ export function ChatComposer({
         >
           {busy ? t("chat.composer.sending") : t("chat.composer.send")}
         </button>
-        {needsKey ? (
+        {keyBlocked ? (
+          <NeedsKeyNote testId="composer-needs-key" className="composer-needs-key text-xs text-[var(--text-3)]" />
+        ) : needsKey ? (
           <p className="composer-needs-key text-xs text-[var(--text-3)]" data-testid="composer-needs-key">
             {t("chat.composer.needsKey")}
           </p>

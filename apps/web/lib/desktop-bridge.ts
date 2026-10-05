@@ -47,6 +47,13 @@ export type DesktopRelaunchResult = {
   reason?: string;
 };
 
+/**
+ * What the shell's folder dialog answered: the folder the owner chose, or nothing chosen (dialog
+ * closed, or the shell refused the caller). The path is the owner's pick and still unchecked; the
+ * host validates it.
+ */
+export type DesktopFolderPick = { path: string } | { canceled: true };
+
 export type DesktopUpdatesApi = {
   supported: boolean;
   state: () => Promise<DesktopUpdateSnapshot>;
@@ -65,6 +72,7 @@ type DesktopBridge = {
   abortStream?: (requestId: string) => void;
   saveBytes?: (filename: string, bytes: number[]) => Promise<void>;
   pickMedia?: () => Promise<string[]>;
+  pickFolder?: () => Promise<unknown>;
   updates?: DesktopUpdatesApi;
   relaunch?: (options?: DesktopRelaunchOptions) => unknown;
 };
@@ -134,6 +142,30 @@ export async function pickMedia(): Promise<string[]> {
     return [];
   }
   return pick();
+}
+
+/**
+ * Ask the shell to open its folder dialog. `null` means there is no folder picker at all (webdev,
+ * the hosted app, or an older shell whose preload lacks it), so the caller hides the control instead
+ * of showing one that does nothing. An answer that is not a non-empty path reads as "nothing chosen".
+ */
+/** Whether this shell can open the folder picker, asked without opening it. */
+export function hasDesktopFolderPicker(): boolean {
+  const bridge = desktopBridge();
+  return Boolean(bridge?.isElectron && typeof bridge.pickFolder === "function");
+}
+
+export async function pickDesktopFolder(): Promise<DesktopFolderPick | null> {
+  const bridge = desktopBridge();
+  if (!bridge?.isElectron || typeof bridge.pickFolder !== "function") {
+    return null;
+  }
+  const answer = await bridge.pickFolder();
+  const folder = (answer as { path?: unknown } | null | undefined)?.path;
+  if (typeof folder === "string" && folder.trim()) {
+    return { path: folder };
+  }
+  return { canceled: true };
 }
 
 /**

@@ -1,60 +1,85 @@
 /**
- * Phase 8 — the hosted "Start over": one tenant erases its own content and nobody else's.
+ * Phase 8 — the hosted "Erase account": one company erases its own account, its people and its
+ * content, and nobody else's.
+ *
+ * **Owner decision 2026-10-01 (SR-65): erasing the company account deletes every person in it and ends
+ * every session.** This used to be a *reset*: it emptied the account, kept everybody signed in and put
+ * the org and its memberships back so the account carried on. The owner's answer to "should Erase
+ * account revoke the tenant's sessions and refresh tokens, or keep them?" was: once the main company
+ * account is deleted, all the other users are deleted too, behind a bright red button that has to be
+ * clicked twice with something typed in. The contract is where that is promised; this file is where
+ * it is kept. So there is no re-provisioning step any more, and the answer carries `signedOut: true`.
  *
  * The desktop has had "Start over" since before any of this: it queues a wipe of the whole data
  * directory and applies it on the next boot (`@agentforge/db`'s `reset.ts`). On the hosted server
  * that directory is every tenant's work, so the route has been refused there since Phase 3 with
- * `reset_disabled` (security spec row T8). Refusing it was right and it was never the end state:
- * a hosted tenant who wants to start clean has had no way to, and "delete your desks one by one"
- * is not an answer when the thing they want gone is their uploads and their saved key.
+ * `reset_disabled` (security spec row T8). This is the hosted act, with its own scope.
  *
  * ## What it does, in order, and why that order
  *
  * 1. **The audit row, first.** `started`, written before anything is destroyed. A reset that dies
  *    half way must leave a trace, and after it runs there is nothing left to reconstruct one from
  *    — the threads, runs and media that would have told the story are exactly what went.
- * 2. **The database rows**, in one transaction (`@agentforge/db`'s `tenant-purge.ts`). Everything
- *    that is this tenant's content; never the tenant row, the plan, the seats, the usage ledger or
- *    the billing events — a tenant must not be able to erase what they owe by pressing a button in
- *    their own settings.
- * 3. **The object prefix**, through the Phase 6 store, so it is the bucket on a COS deployment and
+ * 2. **The sealed refresh tokens are read**, before the purge deletes the only copy of them: step 6
+ *    uses them to sign each person out of the portal.
+ * 3. **The database rows**, in one transaction (`@agentforge/db`'s `tenant-purge.ts`). Everything
+ *    that is this tenant's content, **every `auth_sessions` row with the refresh token sealed on it, and
+ *    the `user` rows nothing else refers to** — all in the same transaction, so there is no moment when
+ *    the data is gone and a session still answers. Never the tenant row, the plan, the seats, the usage
+ *    ledger or the billing events: a tenant must not be able to erase what they owe by pressing a button
+ *    in their own settings. After this commit the next request from any of those browsers finds no
+ *    session row and is a 401 `session_required`.
+ * 4. **The object prefix**, through the Phase 6 store, so it is the bucket on a COS deployment and
  *    the tree on a file one, with the same guard in front of both.
- * 4. **The job trees on local disk**, which are the bytes the object store does not hold: ffmpeg's
+ * 5. **The job trees on local disk**, which are the bytes the object store does not hold: ffmpeg's
  *    scratch, knowledge uploads, dataset files, meeting recordings, legal matter files, channel
  *    state — and the tenant's own settings envelope and gate verdict on a deployment that still
- *    keeps them as files.
- * 5. **The in-process caches**, because a key cached in this process would outlive the row it came
- *    from and the next request would read a secret the tenant has just erased.
- * 6. **Re-provision**, and this is the step that is easy to leave out and fatal to. Deleting the
- *    `organizations` row leaves every live session of this tenant resolving to `org_inactive`
- *    (`resolvePortalTenant` only ever reads — it provisions nothing), so without this the tenant
- *    is not reset, they are bricked until they sign out and back in. `ensurePortalOwner` writes
- *    the org back under the same id the session carries, with a fresh home desk — and then the
- *    memberships read in step 2 go back with the roles they had, because that call re-members only
- *    the caller and the org's other members would otherwise be locked out and return as owners.
+ *    keeps them as files. The in-process caches go with them, because a key cached in this process
+ *    would outlive the row it came from.
+ * 6. **The portal, best effort** (`./auth/portal-sign-out.ts`). The portal has no call that removes a
+ *    company or a member, so the host signs each signed-in person out of the portal everywhere with
+ *    the refresh token it held for them. It starts right after the purge and runs beside steps 4 and 5,
+ *    so a slow portal adds nothing and a failed storage step does not skip it. It can never fail the
+ *    erase: a shortfall is a count in the log and the audit row's `detail`.
  * 7. **The audit row again**, `completed`, with what actually went.
  *
  * ## Idempotent, and safe to retry after a partial failure
  *
- * Every step is a delete by id or an upsert, so running it twice removes what the first pass
- * missed and reports zero for what it already took. That matters because step 3 is not atomic —
- * a bucket can refuse half way through a prefix — and the honest answer to a partial storage
- * failure is "run it again", not a rollback that cannot restore the objects anyway. A `started`
- * row left behind by a killed process is a prompt to do exactly that; it is never a lock.
+ * Every step is a delete by id, so running it twice removes what the first pass missed and reports zero
+ * for what it already took. That matters because step 4 is not atomic — a bucket can refuse half way
+ * through a prefix — and the honest answer to a partial storage failure is "run it again", not a
+ * rollback that cannot restore the objects anyway. A `started` row left behind by a killed process is a
+ * prompt to do exactly that; it is never a lock. **After a failure past step 3 the browsers are already
+ * signed out**, so the retry is to sign in again — which provisions a fresh, empty org under the same
+ * ids, because the portal still vouches for the person — and press the button again.
  *
  * ## Who may call it
  *
  * Owner only, with the typed confirmation, in server mode only. The role comes from the resolved
  * `TenantContext` — the membership row, not anything the client sent — and the desk keeps its own
  * "Start over" untouched, which is why `scope: "all"` stays refused here and `scope: "tenant"` is
- * refused there. Neither mode can reach the other's button.
+ * refused there. Neither mode can reach the other's button. The mutating request is CSRF-checked by
+ * the HTTP adapter like every other POST under `/api` (`http-adapter.ts` `mutatingRejection`), and the
+ * confirmation is compared **here**, on the server, against the word the owner actually typed.
+ *
+ * **Who is an owner (SR-65, closed 2026-10-01).** The role on the resolved tenant is the membership row's,
+ * and the row is the portal's word: the portal sends `role` (`owner` | `admin` | `member`) in every token
+ * body, `ensurePortalOwner` writes it at sign-in, and every refresh re-applies it (`syncPortalRole` through
+ * `portal-check.ts`), in both directions. The host has no default of its own — a missing or unknown role is
+ * a `member` — so a colleague who signs in is never an owner by having signed in. Until 2026-10-01 the
+ * portal sent no role and every sign-in wrote an `owner` row, which made this check stop nobody. A role the
+ * portal changed reaches this check within one portal re-check (10 minutes of activity); the erase itself
+ * does not ask the portal again.
  */
 import { rm } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { ApiError, isServerMode, RESET_CONFIRM_WORD, type TenantContext } from "@agentforge/core";
-import { db, ensurePortalOwner, purgeTenantRows, sql } from "@agentforge/db";
-import { localDataDir } from "@agentforge/db/vault-key";
+import { ApiError, isServerMode, TENANT_ERASE_CONFIRM_WORD, type TenantContext } from "@agentforge/core";
+import { purgeTenantRows, sql, tenantSessionSeals } from "@agentforge/db";
+import { getLocalVaultKey, localDataDir } from "@agentforge/db/vault-key";
+import { configuredClientCredentials, hostPortalClient } from "./auth";
+import type { PortalClient } from "./auth/portal-client";
+import { endPortalSessionsBestEffort, type PortalSignOutReport } from "./auth/portal-sign-out";
 import { log } from "./log";
 import { clearGateState } from "./gateway-gate";
 import { clearGatewayKeyEverywhere } from "./settings-store";
@@ -66,15 +91,23 @@ import { resolveTenantPurgeRoot, tenantScopedRoot } from "./tenant-paths";
 import { forgetTenantJobBytes, tenantObjectStore } from "./tenant-storage";
 
 /**
- * The word the owner types — `RESET_CONFIRM_WORD`, the same literal the desk's "Start over" uses.
+ * The phrase the owner types — `TENANT_ERASE_CONFIRM_WORD` ("DELETE"), and **not** the desk's `RESET`.
  *
- * One word in one place rather than a second one here. The confirmation's job is to make somebody
- * stop and read the dialog they are in, and the two dialogs say plainly different things; a second
- * literal would only add a copy the renderer has to keep in step, which is how the box and the
- * check drift apart. The scope is what distinguishes the two acts on the wire, and each mode
- * refuses the other's scope outright.
+ * Owner decision 2026-10-01: this act deletes every person in the company and signs them all out, so
+ * it asks for its own word, and a client that still sends `RESET` is refused with a 400 instead of
+ * being let through on the lighter one. A fixed word rather than the company's name because the host
+ * holds no reliable name — the portal sends ids, and `ensurePortalOwner` writes the org id as its
+ * name. The scope still distinguishes the two acts on the wire, and each mode refuses the other's
+ * scope outright.
  */
-export const TENANT_RESET_CONFIRM_WORD = RESET_CONFIRM_WORD;
+export const TENANT_RESET_CONFIRM_WORD = TENANT_ERASE_CONFIRM_WORD;
+
+/**
+ * What the audit row's `detail` says when the best-effort portal sign-out fell short: a person the
+ * portal refused, a portal nobody could reach, a token that would not open, or a call still running
+ * when the budget ran out. A fixed phrase, like every other value in that column.
+ */
+export const PORTAL_SIGNOUT_INCOMPLETE_DETAIL = "portal_signout_incomplete";
 
 export const TENANT_RESET_DISABLED_CODE = "tenant_reset_disabled";
 export const TENANT_RESET_DISABLED_MESSAGE =
@@ -90,8 +123,18 @@ export type TenantResetOutcome = {
   readonly rowsDeleted: number;
   readonly objectsDeleted: number;
   readonly bytesFreed: number;
-  /** The home desk the tenant lands on afterwards, so the renderer can send them straight to it. */
-  readonly workspaceId: string;
+  /**
+   * Always true: the caller was one of the people erased, and their session row went with the rest.
+   * There is no home desk to land on any more, so the renderer signs out instead.
+   */
+  readonly signedOut: true;
+  /** What the best-effort portal sign-out reached. Counts only, never a token. */
+  readonly portalSignOut: PortalSignOutReport;
+};
+
+/** Seams for a test; the route passes none and gets the process's own portal client and wrap key. */
+export type TenantResetDeps = {
+  readonly portal?: PortalClient;
 };
 
 /**
@@ -158,49 +201,6 @@ async function removeTenantRoot(sharedRoot: string, tenantId: string): Promise<v
   await rm(target.path, { recursive: true, force: true });
 }
 
-/** One row of `organization_members`, kept across the purge so the account is not re-staffed. */
-type OrgMember = { readonly userId: string; readonly role: string };
-
-/**
- * Who belonged to this org, read before the purge takes the rows.
- *
- * `organization_members` is in `CASCADED_TABLES` — SQLite deletes it when the `organizations` row
- * goes — and nothing else records a role. Read it here or lose it.
- */
-function readOrgMembers(organizationId: string): OrgMember[] {
-  const rows = sql
-    .prepare("SELECT user_id AS userId, role FROM organization_members WHERE organization_id = ?")
-    .all(organizationId) as Array<{ userId: string; role: string }>;
-  return rows.map((row) => ({ userId: row.userId, role: row.role }));
-}
-
-/**
- * Put the memberships back after the re-provision, with the roles they had.
- *
- * The caller is skipped because `ensurePortalOwner` has already written their row, and it writes
- * `owner` — which is what they were, since only an owner reaches this code at all.
- *
- * `INSERT OR IGNORE` against the `(organization_id, user_id)` unique index rather than a plain
- * insert: this runs in the same retry-safe spirit as every other step, and a second pass over an
- * account that is already re-membered must be a no-op rather than a constraint error. A member
- * whose `user` row has since gone takes the foreign key with it, so the insert is per row and a
- * failure on one is logged rather than allowed to fail a reset that has already succeeded.
- */
-function restoreOrgMembers(organizationId: string, members: readonly OrgMember[], callerUserId: string): void {
-  const insert = sql.prepare(
-    "INSERT OR IGNORE INTO organization_members (id, organization_id, user_id, role) VALUES (?, ?, ?, ?)",
-  );
-  for (const member of members) {
-    if (member.userId === callerUserId) {
-      continue;
-    }
-    try {
-      insert.run(randomUUID(), organizationId, member.userId, member.role);
-    } catch (error) {
-      log.error("tenant_reset_membership_restore_failed", { organizationId, userId: member.userId, error });
-    }
-  }
-}
 
 type AuditRow = {
   readonly id: string;
@@ -255,20 +255,55 @@ function auditDetail(error: unknown): string {
   return "unexpected_error";
 }
 
+
+/** True when the best-effort sign-out left somebody at the portal who should not be there. */
+function portalSignOutFellShort(report: PortalSignOutReport): boolean {
+  return report.failed + report.unreachable + report.unfinished > 0;
+}
+
 /**
- * Erase this tenant's content. See the module comment for the order and the reasoning.
+ * Sign the people the erase just deleted out of the portal, with the refresh tokens read before the
+ * purge. Never rejects: `endPortalSessionsBestEffort` answers every failure as a count, and the
+ * construction below is the only code that could throw before it, so it is inside the same guard.
+ */
+function signOutAtPortal(
+  tenant: TenantContext,
+  seals: ReturnType<typeof tenantSessionSeals>,
+  deps: TenantResetDeps,
+): Promise<PortalSignOutReport> {
+  const people = new Set(seals.map((seal) => seal.userId)).size;
+  try {
+    return endPortalSessionsBestEffort(seals, {
+      portal: deps.portal ?? hostPortalClient(),
+      wrapKey: () => getLocalVaultKey(),
+      clientCredentials: () => configuredClientCredentials(),
+      tenantId: tenant.tenantId,
+    });
+  } catch (error) {
+    log.warn("tenant_erase_portal_signout_failed", { tenantId: tenant.tenantId, error });
+    return Promise.resolve({ people, signedOut: 0, failed: people, unreachable: 0, unfinished: 0 });
+  }
+}
+
+/**
+ * Erase this company account: its content, its people and every session. See the module comment for
+ * the order and the reasoning.
  *
  * `confirm` is what the owner actually typed, compared here rather than by the caller: a route that
  * trusted its own constant would let a mismatched confirmation box through on the renderer's say-so
  * instead of the owner's.
  */
-export async function resetTenant(tenant: TenantContext, confirm: string | undefined): Promise<TenantResetOutcome> {
+export async function resetTenant(
+  tenant: TenantContext,
+  confirm: string | undefined,
+  deps: TenantResetDeps = {},
+): Promise<TenantResetOutcome> {
   if (!isServerMode()) {
     throw new ApiError(TENANT_RESET_DISABLED_CODE, TENANT_RESET_DISABLED_MESSAGE, 403);
   }
   // Owner, not merely an administrator: this is the most destructive thing a session can do and it
   // is not reversible. `canAdminister` would also admit `admin`, which is the right bar for
-  // changing settings and the wrong one for erasing everybody in the org's work.
+  // changing settings and the wrong one for deleting every person in the company.
   if (tenant.role !== "owner") {
     throw new ApiError(TENANT_RESET_FORBIDDEN_CODE, TENANT_RESET_FORBIDDEN_MESSAGE, 403);
   }
@@ -286,56 +321,58 @@ export async function resetTenant(tenant: TenantContext, confirm: string | undef
   const audit = openAudit(tenant);
   const totals = { rowsDeleted: 0, objectsDeleted: 0, bytesFreed: 0 };
   try {
-    // 2. The rows, in one transaction. Nothing on disk has been touched yet, so a failure here
-    //    leaves the tenant exactly as they were. The memberships are read first, because the
-    //    cascade from `organizations` takes them and step 6 puts back only the caller.
-    const members = readOrgMembers(tenant.organizationId);
+    // 2. The sealed refresh tokens, while the rows that hold them still exist.
+    const seals = tenantSessionSeals(sql, tenant.tenantId);
+
+    // 3. The rows, the sessions and the people, in one transaction. Nothing on disk has been touched
+    //    yet, so a failure here leaves the tenant exactly as they were.
     const purged = purgeTenantRows(sql, tenant.tenantId);
     totals.rowsDeleted = purged.rowsDeleted;
 
-    // 3. The objects, through the store the deployment is configured for.
+    // 6. The portal, started now and awaited last: the tokens are in memory only from here, and the
+    //    call must happen even if a storage step below throws.
+    const portalSignOut = signOutAtPortal(tenant, seals, deps);
+
+    // 4. The objects, through the store the deployment is configured for.
     const removed = await tenantObjectStore().removePrefix(tenant.tenantId);
     totals.objectsDeleted = removed.objectCount;
     totals.bytesFreed = removed.usedBytes;
 
-
-    // 4. The bytes the store does not hold.
+    // 5. The bytes the store does not hold.
     for (const root of tenantPurgeSharedRoots()) {
       await removeTenantRoot(root, tenant.tenantId);
     }
     forgetTenantJobBytes(tenant.tenantId);
 
-    // 5. Anything this process is still holding about them. `clearGatewayKeyEverywhere` and
-    //    `clearGateState` are the same two calls "forget my key" makes, so a tenant who resets is
-    //    left in exactly the state a tenant who signed out of the gateway is.
+    // ...and anything this process is still holding about them. `clearGatewayKeyEverywhere` and
+    // `clearGateState` are the same two calls "forget my key" makes, so a tenant who erases is left in
+    // exactly the state a tenant who signed out of the gateway is.
     clearGatewayKeyEverywhere(tenant);
     clearGateState(tenant);
     clearThisKeyCache();
     resetEmbedCircuit();
     resetModelReliabilityState();
 
-    // 6. Put the account back. Without this the tenant's own live session resolves to
-    //    `org_inactive` on its very next request and there is no way back in from the UI.
-    const provisioned = await ensurePortalOwner(db, {
-      tenantId: tenant.tenantId,
-      orgId: tenant.organizationId,
-      userId: tenant.userId,
-    });
-    // ...and put everybody else back with the role they had. `ensurePortalOwner` re-members only
-    // the caller, so without this every colleague's live session answers `user_inactive` on its
-    // next request and — worse — the pre-Phase-3 rule that "the first signed-in user owns their
-    // own org" (`db/src/portal-owner.ts`) would hand each of them `owner` when they signed back
-    // in, which is a privilege escalation nobody asked for. Erasing an account empties it; it
-    // does not re-staff it.
-    restoreOrgMembers(tenant.organizationId, members, tenant.userId);
-
-    closeAudit(audit, "completed", totals, null);
+    const signedOutAtPortal = await portalSignOut;
+    closeAudit(
+      audit,
+      "completed",
+      totals,
+      portalSignOutFellShort(signedOutAtPortal) ? PORTAL_SIGNOUT_INCOMPLETE_DETAIL : null,
+    );
     log.warn("tenant_reset_completed", {
       tenantId: tenant.tenantId,
       auditId: audit.id,
       rowsDeleted: totals.rowsDeleted,
       objectsDeleted: totals.objectsDeleted,
       bytesFreed: totals.bytesFreed,
+      sessionsDeleted: purged.sessionsDeleted,
+      usersDeleted: purged.usersDeleted,
+      portalPeople: signedOutAtPortal.people,
+      portalSignedOut: signedOutAtPortal.signedOut,
+      portalFailed: signedOutAtPortal.failed,
+      portalUnreachable: signedOutAtPortal.unreachable,
+      portalUnfinished: signedOutAtPortal.unfinished,
     });
     return {
       ok: true,
@@ -343,7 +380,8 @@ export async function resetTenant(tenant: TenantContext, confirm: string | undef
       rowsDeleted: totals.rowsDeleted,
       objectsDeleted: totals.objectsDeleted,
       bytesFreed: totals.bytesFreed,
-      workspaceId: provisioned.workspaceId,
+      signedOut: true,
+      portalSignOut: signedOutAtPortal,
     };
   } catch (error) {
     // A backend that refused half way through the prefix carries out what it had already deleted,

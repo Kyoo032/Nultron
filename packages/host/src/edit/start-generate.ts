@@ -13,6 +13,7 @@ import {
   type TenantContext,
 } from "@agentforge/core";
 import { db, editCards, media } from "@agentforge/db";
+import type { ModelCacheScope } from "../model-cache";
 import { listImageModels, listVideoModels } from "../selectable-models";
 import { appendOps, foldProject, writeSnapshot } from "./ops";
 import { enqueueEditJob } from "./jobs";
@@ -51,21 +52,21 @@ function projectAspect(doc: EditProject): "16:9" | "9:16" | "1:1" {
   return doc.width > doc.height ? "16:9" : "9:16";
 }
 
-function liveModelIds(extra?: string): string[] {
-  const ids = [...listImageModels(), ...listVideoModels()].map((model) => model.id);
+function liveModelIds(scope: ModelCacheScope, extra?: string): string[] {
+  const ids = [...listImageModels(scope), ...listVideoModels(scope)].map((model) => model.id);
   if (extra && !ids.includes(extra)) {
     ids.push(extra);
   }
   return ids;
 }
 
-function routeModel(input: EditStartGenerateJobInput, requireImageToVideo: boolean): string {
+function routeModel(tenant: TenantContext, input: EditStartGenerateJobInput, requireImageToVideo: boolean): string {
   const kind = input.kind === "generate_image" ? "image" : "video";
   const tier = input.tier ?? "standard";
   const routed = routeEditModel({
     kind,
     tier,
-    liveModelIds: liveModelIds(input.model),
+    liveModelIds: liveModelIds(tenant, input.model),
     requireImageToVideo,
   });
   return routed ?? input.model ?? (kind === "image" ? "gpt-image-2" : "grok-imagine-video");
@@ -176,7 +177,7 @@ export async function startGenerateJob(
     throw STILL_NOT_FOUND;
   }
   const hasStill = still !== null;
-  const model = routeModel(input, input.kind === "generate_video" && hasStill);
+  const model = routeModel(tenant, input, input.kind === "generate_video" && hasStill);
   if (input.kind === "generate_video" && hasStill && !imageToVideoForModel(model)) {
     throw new ApiError("video_still_unsupported", "This model does not accept a still image", 400);
   }

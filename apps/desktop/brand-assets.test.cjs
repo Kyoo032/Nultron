@@ -120,4 +120,33 @@ function icnsEntries(bytes, label) {
   assert.ok(!/\.svg/.test(html), "the splash draws no SVG logo");
 }
 
+// ---------- the public wordmark follows the Nultron IP colours; a flavor's title stays plain ----------
+
+{
+  const html = fs.readFileSync(join(splashDir, "index.html"), "utf8");
+  const css = fs.readFileSync(join(__dirname, "..", "web", "app", "globals.css"), "utf8");
+  const dark = css.slice(css.indexOf("\n.dark {"));
+  const token = (name) => {
+    const match = new RegExp(`${name}:\\s*(#[0-9a-f]{6});`, "i").exec(dark);
+    assert.ok(match, `${name} is declared for the dark desk in globals.css`);
+    return match[1].toLowerCase();
+  };
+  // The splash is a dark page, so it paints the renderer's dark-desk wordmark stops.
+  const blue = token("--nultron-blue-text");
+  const cyan = token("--nultron-cyan-text");
+  assert.match(html, /<h1 class="wordmark">Nultron<\/h1>/);
+  assert.ok(html.includes(`linear-gradient(100deg, ${blue} 0%, ${blue} 38%, ${cyan} 100%)`), "wordmark gradient");
+  assert.ok(html.includes(`color: ${blue};`), "wordmark falls back to the helmet blue");
+
+  // The generator that rewrites this page for every flavor emits the wordmark for the public name only.
+  const packer = fs.readFileSync(join(__dirname, "scripts", "pack-brand.mjs"), "utf8");
+  assert.match(packer, /const nultron = config\.productName === "Nultron";/);
+  assert.match(packer, /\$\{nultron \? NULTRON_WORDMARK_CSS : ""\}/);
+  assert.match(packer, /<h1\$\{nultron \? ' class="wordmark"' : ""\}>/);
+  assert.ok(
+    packer.includes(`color: ${blue};`) && packer.includes(`${cyan} 100%)`),
+    "the generator carries the same stops",
+  );
+}
+
 console.log("brand-assets.test.cjs: ok");

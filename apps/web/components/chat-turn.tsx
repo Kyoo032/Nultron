@@ -5,10 +5,14 @@ import { mediaSrc } from "@/lib/api-client";
 import { FormattedText } from "@/components/formatted-text";
 import { MessageEmbed } from "@/components/message-embed";
 import { NultronMascot } from "@/components/nultron/nultron-mascot";
+import { BUDDY_PRIORITY } from "@/lib/desk-buddy-state";
+import { useBuddyTakesStatus } from "@/lib/desk-buddy-store";
 import { LETS_GO_MS, LIVE_TURN_NEXT, liveTurnMascot } from "@/lib/mascot-triggers";
+import { useBuddyClaim } from "@/lib/use-buddy-claim";
 import { useHoldOnMount } from "@/lib/use-hold-on-mount";
 import { jobEmbedsFromTools, splitUserFileBlocks } from "@/lib/message-embeds";
 import { collectToolMediaParts } from "@/lib/tool-media";
+import { ToolRowBody, isRichTool } from "@/components/tool-rows/tool-row";
 import { showsToolSpinner, toolActivityLabel, toolCallSummary } from "@/lib/tool-labels";
 import type { ContentPart, ToolCallPart } from "@agentforge/core/content";
 import { t } from "@/lib/i18n";
@@ -49,6 +53,18 @@ export function ChatTurn({ role, content, live }: Props) {
   const isUser = role === "user";
   // A new chat's first turn opens with the lets-go clip, then the working state takes over.
   const launching = useHoldOnMount(Boolean(live?.firstTurn), LETS_GO_MS);
+  // The desk buddy is the status character when it is on screen: the live turn tells it what the reply is
+  // doing and draws no second Nultron. Without one (no rail, a collapsed rail, another full body on
+  // screen) the chip beside the turn is drawn as before. A failure is a flash, set by the session.
+  const takesStatus = useBuddyTakesStatus();
+  const liveState = live
+    ? liveTurnMascot({ failed: live.failed, streaming: Boolean(live.streaming), launching })
+    : null;
+  useBuddyClaim(
+    live && !live.failed && liveState
+      ? { state: liveState, busy: Boolean(live.running), priority: BUDDY_PRIORITY.job }
+      : null,
+  );
   const thinking = live ? live.thinking : thinkingFromContent(content);
   const tools = live ? live.tools : toolsFromContent(content);
   const visibleTools = tools.filter((tool) => tool.status === "started" || tool.status === "completed");
@@ -82,78 +98,78 @@ export function ChatTurn({ role, content, live }: Props) {
         <MessageBody content={content} />
       ) : (
         <div className={live ? "flex items-start gap-3" : "space-y-2"}>
-          {live ? (
-            <NultronMascot
-              state={liveTurnMascot({ failed: live.failed, streaming: Boolean(live.streaming), launching })}
-              busy={Boolean(live.running)}
-              decorative
-              next={LIVE_TURN_NEXT}
-            />
+          {live && liveState && !takesStatus ? (
+            <NultronMascot state={liveState} busy={Boolean(live.running)} decorative next={LIVE_TURN_NEXT} />
           ) : null}
           <div className="min-w-0 flex-1 space-y-2">
-          {showDisclosure ? (
-            <details
-              className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2 shadow-elev-1"
-              data-testid="message-thinking"
-              open={Boolean(live)}
-            >
-              <summary className="flex cursor-pointer items-center gap-2 text-xs font-medium text-[var(--text-3)]">
-                {t("chat.turn.thinking")}
-                {live?.running && thinking ? <PulseDots /> : null}
-              </summary>
-              {thinking ? (
-                /* Markdown, not a raw `<pre>`: reasoning arrives with lists, emphasis and fenced
+            {showDisclosure ? (
+              <details
+                className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-2 shadow-elev-1"
+                data-testid="message-thinking"
+                open={Boolean(live)}
+              >
+                <summary className="flex cursor-pointer items-center gap-2 text-xs font-medium text-[var(--text-3)]">
+                  {t("chat.turn.thinking")}
+                  {live?.running && thinking ? <PulseDots /> : null}
+                </summary>
+                {thinking ? (
+                  /* Markdown, not a raw `<pre>`: reasoning arrives with lists, emphasis and fenced
                    code, and the block should embed them the way a message does. */
-                <div className="mt-2 max-h-72 overflow-auto" data-testid="thinking-text">
-                  <FormattedText text={thinking} className="text-xs" />
-                </div>
-              ) : (
-                <p
-                  className="mt-2 flex items-center gap-2 text-xs text-[var(--text-2)]"
-                  data-testid="thinking-placeholder"
-                >
-                  {live?.running ? <PulseDots /> : null}
-                  {t("chat.turn.thinkingPlaceholder")}
-                </p>
-              )}
-              {visibleTools.length > 0 ? (
-                <ul className="mt-2 space-y-1" data-testid="message-tools">
-                  {visibleTools.map((tool, index) => (
-                    <li
-                      key={`${tool.key}-${index}`}
-                      className="whitespace-pre-wrap break-words rounded-xl border border-[var(--line)] px-3 py-1.5 font-mono text-xs text-[var(--text-2)]"
-                      data-testid="message-tool"
-                    >
-                      {tool.status === "started" && showsToolSpinner(tool.key)
-                        ? toolActivityLabel(tool.key)
-                        : toolCallSummary(tool.key, tool.input, tool.output)}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </details>
-          ) : null}
-          {live?.streaming ? (
-            <div className="space-y-2">
-              <FormattedText text={live.streaming} className="text-sm" testId="message-output" />
-              {live.running && !showDisclosure ? <PulseDots /> : null}
-            </div>
-          ) : (
-            <>
-              <MessageBody content={content} outputOnly />
-              {live?.running && !showDisclosure ? <PulseDots /> : null}
-            </>
-          )}
-          {liveMedia.length > 0 ? <MediaParts parts={liveMedia} /> : null}
-          {jobs.map((job, index) => (
-            <MessageEmbed
-              key={`${job.title}-${index}`}
-              kind="job"
-              title={job.title}
-              detail={job.detail}
-              href={job.href}
-            />
-          ))}
+                  <div className="mt-2 max-h-72 overflow-auto" data-testid="thinking-text">
+                    <FormattedText text={thinking} className="text-xs" />
+                  </div>
+                ) : (
+                  <p
+                    className="mt-2 flex items-center gap-2 text-xs text-[var(--text-2)]"
+                    data-testid="thinking-placeholder"
+                  >
+                    {live?.running ? <PulseDots /> : null}
+                    {t("chat.turn.thinkingPlaceholder")}
+                  </p>
+                )}
+                {visibleTools.length > 0 ? (
+                  <ul className="mt-2 space-y-1" data-testid="message-tools">
+                    {visibleTools.map((tool, index) => (
+                      <li
+                        key={`${tool.key}-${index}`}
+                        className="whitespace-pre-wrap break-words rounded-xl border border-[var(--line)] px-3 py-1.5 font-mono text-xs text-[var(--text-2)]"
+                        data-testid="message-tool"
+                        data-tool={tool.key}
+                      >
+                        {isRichTool(tool.key) ? (
+                          <ToolRowBody tool={tool} />
+                        ) : tool.status === "started" && showsToolSpinner(tool.key) ? (
+                          toolActivityLabel(tool.key, tool.input)
+                        ) : (
+                          toolCallSummary(tool.key, tool.input, tool.output)
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </details>
+            ) : null}
+            {live?.streaming ? (
+              <div className="space-y-2">
+                <FormattedText text={live.streaming} className="text-sm" testId="message-output" />
+                {live.running && !showDisclosure ? <PulseDots /> : null}
+              </div>
+            ) : (
+              <>
+                <MessageBody content={content} outputOnly />
+                {live?.running && !showDisclosure ? <PulseDots /> : null}
+              </>
+            )}
+            {liveMedia.length > 0 ? <MediaParts parts={liveMedia} /> : null}
+            {jobs.map((job, index) => (
+              <MessageEmbed
+                key={`${job.title}-${index}`}
+                kind="job"
+                title={job.title}
+                detail={job.detail}
+                href={job.href}
+              />
+            ))}
           </div>
         </div>
       )}

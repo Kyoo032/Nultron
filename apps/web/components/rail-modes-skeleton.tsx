@@ -24,8 +24,9 @@ export function RailModesSkeleton({ collapsed, rows }: { collapsed: boolean; row
           key={key}
           className={`flex h-8 shrink-0 items-center gap-2 rounded-md px-2 ${collapsed ? "justify-center" : ""}`}
           data-testid="rail-modes-skeleton-row"
+          data-rail-row
         >
-          <span className={`inline-flex h-6 w-6 shrink-0 rounded-lg ${BLOCK}`} />
+          <span data-tile className={`inline-flex h-6 w-6 shrink-0 rounded-lg ${BLOCK}`} />
           {collapsed ? null : (
             <span
               className={`h-2.5 rounded-sm ${BLOCK}`}

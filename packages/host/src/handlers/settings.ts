@@ -1,5 +1,6 @@
 import {
   ApiError,
+  canAdminister,
   type GatewayGatePayload,
   guidePayload,
   hasLiveProvider,
@@ -24,6 +25,7 @@ import {
   clearGatewayKeyEverywhere,
   loadSettings,
   loadUserGuide,
+  loadUserKeyLater,
   localDataDir,
   saveUserLocale,
   saveSettings,
@@ -36,8 +38,9 @@ import {
   runGatewayCheck,
 } from "../gateway-gate";
 import { killTrackedChildren } from "../child-processes";
+import { keyLaterPayload } from "../key-later";
 import { applySavedLocaleAsBoot, localePayload } from "../locale-boot";
-import { refreshModelCache, modeCatalogPayload } from "../selectable-models";
+import { refreshModelCache, modeDefaultsFor } from "../selectable-models";
 import { clearThisKeyCache, loadAccountUsage } from "../account-usage";
 import { probeSummary } from "../model-cache";
 import { db, hasPendingDataReset, listLocalWorkspaces, pendingResetPath, requestDataReset } from "@agentforge/db";
@@ -90,15 +93,23 @@ function readOptionalNumber(value: unknown): number | undefined {
 async function settingsPayload(
   settings: ReturnType<typeof loadSettings>,
   tenant: Awaited<ReturnType<typeof getTenant>>,
+  serverMode: boolean = isServerMode(),
+  acceptLanguage?: string,
 ) {
   const rows = await listLocalWorkspaces(db, tenant.organizationId);
   const current = rows.find((row) => row.id === tenant.workspaceId);
   return {
     ...maskSecrets(settings),
-    ...localePayload(tenant),
+    // Hosted only: a person who never chose a language is shown the one their browser asks for, so the
+    // app and a model run agree (`./locale-boot.ts`). On a desk the header is never read.
+    ...localePayload(tenant, { serverMode, ...(acceptLanguage === undefined ? {} : { acceptLanguage }) }),
     // Whether this person has been through the first-run guide, so the renderer never re-offers it.
     // Stored beside the locale and erased by the same "Start over" (`settings-store.ts`).
     guide: guidePayload(loadUserGuide(tenant)),
+    // Enterprise only: whether this person chose to add the gateway key later. A preference about the
+    // screen; the gate below is the host's decision and never reads it. Absent off server mode, so
+    // the Personal app's answer is the one it always was.
+    ...(serverMode ? { keyLater: keyLaterPayload(loadUserKeyLater(tenant)) } : {}),
     workspaceId: tenant.workspaceId,
     workspaceName: current?.name ?? HOME_WORKSPACE_NAME,
     productName: resolvedProductName(),
@@ -111,11 +122,11 @@ async function settingsPayload(
     gateway: reportGatewayGate(settings, { tenant }),
     // True while a queued wipe is waiting for the next boot, so Settings can offer to call it off.
     resetPending: hasPendingDataReset(localDataDir()),
-    probe: probeSummary(),
+    probe: probeSummary(undefined, tenant),
     // Only the per-mode default ids. The model lists live on `GET /api/v1/models`, once: this answer
     // used to carry them too, nine identical copies of the chat catalogue, which was 261 KB of a
     // 274 KB read that the shell repeats on every cold load. No reader of this route used them.
-    defaults: modeCatalogPayload().defaults,
+    defaults: modeDefaultsFor(tenant),
     toolCatalog: listToolCapabilities().map((capability) => ({
       id: capability.id,
       label: capability.label,
@@ -132,7 +143,7 @@ async function settingsPayload(
   };
 }
 
-export async function handleGetSettings(request: HostRequest): Promise<HostResult> {
+export async function handleGetSettings(request: HostRequest, deps: ServerModeDeps = {}): Promise<HostResult> {
   try {
     const tenant = await getTenant(request);
     const settings = loadSettings(tenant);
@@ -140,7 +151,14 @@ export async function handleGetSettings(request: HostRequest): Promise<HostResul
     // day. Both are opened on trust, so this is where the gateway actually gets asked. Fire-and-
     // forget and throttled: the response never waits for it.
     maybeRefreshGateway(settings, { tenant });
-    return jsonOk(await settingsPayload(settings, tenant));
+    return jsonOk(
+      await settingsPayload(
+        settings,
+        tenant,
+        deps.isServerMode ? deps.isServerMode() : isServerMode(),
+        request.headers["accept-language"],
+      ),
+    );
   } catch (error) {
     return jsonError(error);
   }
@@ -175,6 +193,10 @@ export async function handleGetSettings(request: HostRequest): Promise<HostResul
  * and `mergeSecrets` DELETES the stored key on an empty string. Dropping the blank in server mode is
  * what stops a tenant's own Settings save from wiping their own key. Meaning it is "forget my key"
  * is `DELETE /api/v1/settings/reset` with `scope: "key"`, which Phase 4 opens on the server.
+ *
+ * Writing a key in server mode is itself gated by role (M4): see `requestsKeyWrite` and
+ * `SETTINGS_KEY_FORBIDDEN_CODE` below. It is not an operator-only field, because the company's own
+ * owner and admins must be able to supply it.
  */
 const OPERATOR_ONLY_CODE = "settings_operator_only";
 const OPERATOR_ONLY_MESSAGE =
@@ -211,6 +233,47 @@ export function keyFieldValue(raw: unknown, serverMode: boolean): string | undef
   return raw;
 }
 
+/**
+ * M4 (2026-10-01 abuse walk): on the hosted service the gateway key belongs to the COMPANY, not to
+ * whoever is looking at Settings. Every person who signs in to it spends through that one key, so
+ * writing it — saving, replacing or clearing — needs `canAdminister` (an owner or an admin). A member
+ * could do both before this (`POST /api/v1/settings { openaiApiKey }` and `POST /api/v1/settings/reset
+ * { scope: "key" }` each answered 200), which meant any colleague could swap the company onto their own
+ * key or sign the whole company out of the gateway.
+ *
+ * Server mode only. On a desk the person holding the machine is the owner of everything on it and the
+ * local tenant is always `owner`, so nothing here is evaluated and the Personal app answers exactly what
+ * it did (`settings-key-roles.test.ts` pins that with a member session and the switch off).
+ *
+ * The bar is `canAdminister`, the same one the agent service uses, and not the owner-only bar of the
+ * company erase (`tenant-reset.ts`): changing the key is routine administration and an admin is trusted
+ * with it; deleting every person in the company is not routine.
+ */
+export const SETTINGS_KEY_FORBIDDEN_CODE = "settings_key_forbidden";
+const SETTINGS_KEY_FORBIDDEN_MESSAGE =
+  "Only an owner or admin can change the company's gateway key. Ask one of them to do it.";
+
+/** The provider key fields `POST /api/v1/settings` accepts: each one is the company's credential. */
+const PROVIDER_KEY_FIELDS = ["openaiApiKey", "googleApiKey", "anthropicApiKey", "volcengineApiKey"] as const;
+
+/**
+ * True when the body writes a provider key, in server mode. "Writes" is exactly what `keyFieldValue`
+ * lets through to the patch: a non-blank string. A blank is dropped there, so the blank the Settings
+ * page echoes from an untouched input on every save is not a key write and a member's ordinary save
+ * is not refused for it; a non-string is ignored by the same function. Off server mode the answer is
+ * `false`, because nothing consults it there and a blank means "forget my key" on a desk.
+ */
+export function requestsKeyWrite(body: Record<string, unknown>, serverMode: boolean): boolean {
+  return serverMode && PROVIDER_KEY_FIELDS.some((field) => keyFieldValue(body[field], serverMode) !== undefined);
+}
+
+/** Throws the 403 for anyone who is not an owner or an admin. Called only in server mode. */
+function assertMayChangeCompanyKey(tenant: TenantContext): void {
+  if (!canAdminister(tenant.role)) {
+    throw new ApiError(SETTINGS_KEY_FORBIDDEN_CODE, SETTINGS_KEY_FORBIDDEN_MESSAGE, 403);
+  }
+}
+
 /** Injected like `ResetDeps` below, so a test can exercise hosted behaviour without the env flag. */
 export type ServerModeDeps = { isServerMode?: () => boolean };
 
@@ -221,6 +284,11 @@ export async function handlePostSettings(request: HostRequest, deps: ServerModeD
     const serverMode = deps.isServerMode ? deps.isServerMode() : isServerMode();
     if (serverMode && requestsOperatorOnlySettings(body)) {
       throw new ApiError(OPERATOR_ONLY_CODE, OPERATOR_ONLY_MESSAGE, 403);
+    }
+    // Before any write below, so a request that mixes a key with a setting the caller may change
+    // (their language, say) is refused whole: nothing in it is applied.
+    if (requestsKeyWrite(body, serverMode)) {
+      assertMayChangeCompanyKey(tenant);
     }
     if (body.locale !== undefined) {
       if (!isAppLocale(body.locale)) {
@@ -262,7 +330,7 @@ export async function handlePostSettings(request: HostRequest, deps: ServerModeD
     // is revoked; the next knowledge call mints a fresh one against the new credentials.
     await revokeKnowledgeGatewayModel(tenant);
     try {
-      await refreshModelCache(saved);
+      await refreshModelCache(saved, { scope: tenant });
     } catch {
       // Airplane mode: key stays on disk; probe happens on generate.
     }
@@ -280,7 +348,7 @@ export async function handlePostSettings(request: HostRequest, deps: ServerModeD
       const detail = error instanceof Error ? error.message : String(error);
       console.warn(`gateway verdict refresh failed after save: ${redactSecrets(detail)}`);
     }
-    const payload = await settingsPayload(saved, tenant);
+    const payload = await settingsPayload(saved, tenant, serverMode, request.headers["accept-language"]);
     return jsonOk({
       ...payload,
       gateway: gateVerdictFor(payload.gateway, freshGate, gateRefreshFailed),
@@ -294,7 +362,9 @@ export async function handleApplyLocale(request: HostRequest): Promise<HostResul
   try {
     const tenant = await getTenant(request);
     applySavedLocaleAsBoot();
-    return jsonOk(await settingsPayload(loadSettings(tenant), tenant));
+    return jsonOk(
+      await settingsPayload(loadSettings(tenant), tenant, isServerMode(), request.headers["accept-language"]),
+    );
   } catch (error) {
     return jsonError(error);
   }
@@ -405,6 +475,11 @@ const RESET_DISABLED_MESSAGE =
  * wrong key had no way to take it back, since `keyFieldValue` drops a blank in server mode by
  * design, and that is the whole of the route out.
  *
+ * Who may press it is a separate question from whose key it clears. It is the COMPANY's key, so on the
+ * hosted service `handleResetApp` admits an owner or an admin and answers a member
+ * `403 settings_key_forbidden` (M4, `SETTINGS_KEY_FORBIDDEN_CODE`). The caller can still be any
+ * person who holds that bar; what changed is that "any person" no longer means "any member".
+ *
  * "Start over" stays refused: that one really does still wipe the shared data directory.
  */
 function resetGatewayKey(tenant: TenantContext): HostResult {
@@ -450,8 +525,14 @@ function resetEverything(tenant: TenantContext, confirm: string | undefined, ser
 }
 
 /**
- * Phase 8 — "Start over" for a hosted tenant, which is a different act with a different blast
+ * Phase 8 — "Erase account" for a hosted tenant, which is a different act with a different blast
  * radius, so it is a different scope rather than a hosted branch inside `scope: "all"`.
+ *
+ * Since 2026-10-01 (owner decision, SR-65) it deletes every person in the company and ends every
+ * session, the caller's included, so the answer says `signedOut: true` and the renderer follows with
+ * the ordinary sign-out (`POST /api/v1/auth/logout`, which is idempotent for a session that no longer
+ * exists and still answers with the portal's own logout URL). Nothing here touches the cookie: it is
+ * dead the moment the transaction commits, and the logout answer clears it.
  *
  * Writing it as a third scope is what makes the two mutually unreachable: `all` is refused in
  * server mode and `tenant` is refused off it, both before the confirmation word is read, so no
@@ -473,7 +554,7 @@ async function resetThisTenant(tenant: TenantContext, confirm: string | undefine
     scope: "tenant",
     relaunch: false,
     resetPending: false,
-    workspaceId: outcome.workspaceId,
+    signedOut: outcome.signedOut,
     rowsDeleted: outcome.rowsDeleted,
     objectsDeleted: outcome.objectsDeleted,
     bytesFreed: outcome.bytesFreed,
@@ -491,6 +572,11 @@ export async function handleResetApp(request: HostRequest, deps: ResetDeps = {})
     const scope = readOptionalString(body.scope);
     const serverMode = deps.isServerMode ? deps.isServerMode() : isServerMode();
     if (scope === "key") {
+      // Hosted: forgetting the key signs the whole company out of the gateway, so it is the same
+      // owner-or-admin act as saving one. A desk has no roles to read.
+      if (serverMode) {
+        assertMayChangeCompanyKey(tenant);
+      }
       return resetGatewayKey(tenant);
     }
     if (scope === "all") {

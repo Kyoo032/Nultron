@@ -24,6 +24,8 @@ import enSettings from "../locales/en/settings.json";
 import enUsage from "../locales/en/usage.json";
 import enVideos from "../locales/en/videos.json";
 import enWorkspaces from "../locales/en/workspaces.json";
+import enFiles from "../locales/en/files.json";
+import enFolder from "../locales/en/folder.json";
 import idAuth from "../locales/id/auth.json";
 import idChannels from "../locales/id/channels.json";
 import idChat from "../locales/id/chat.json";
@@ -49,6 +51,8 @@ import idSettings from "../locales/id/settings.json";
 import idUsage from "../locales/id/usage.json";
 import idVideos from "../locales/id/videos.json";
 import idWorkspaces from "../locales/id/workspaces.json";
+import idFiles from "../locales/id/files.json";
+import idFolder from "../locales/id/folder.json";
 
 const NAMESPACES = [
   "common",
@@ -65,6 +69,8 @@ const NAMESPACES = [
   "plans",
   "knowledge",
   "workspaces",
+  "files",
+  "folder",
   "usage",
   "channels",
   "market",
@@ -97,6 +103,8 @@ const catalogs: Record<AppLocale, Record<Namespace, MessageTree>> = {
     knowledge: enKnowledge,
     channels: enChannels,
     workspaces: enWorkspaces,
+    files: enFiles,
+    folder: enFolder,
     usage: enUsage,
     market: enMarket,
     data: enData,
@@ -124,6 +132,8 @@ const catalogs: Record<AppLocale, Record<Namespace, MessageTree>> = {
     knowledge: idKnowledge,
     channels: idChannels,
     workspaces: idWorkspaces,
+    files: idFiles,
+    folder: idFolder,
     usage: idUsage,
     market: idMarket,
     data: idData,

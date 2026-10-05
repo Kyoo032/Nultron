@@ -16,7 +16,9 @@ const CHEER_MS = 1400;
 const CONFETTI_MS = 1600;
 
 /**
- * The empty Chat's hero: the mascot, one headline, the key status.
+ * The empty Chat's hero: Nultron standing in the gem's rings, greeting you in a speech bubble that holds
+ * the question and the key status. Side by side on a wide column, stacked (bubble under the character,
+ * its tail pointing up) on a narrow one.
  *
  * Everything is sized from the width of the column it sits in (`cqi`, see `.chat-hero` in
  * globals.css), not the viewport, because the desk is often narrower than the window: a phone,
@@ -64,7 +66,7 @@ export function ChatHero() {
       onPointerDown={warmClips}
       onFocus={warmClips}
     >
-      <div className="hero-aurora chat-hero-panel relative flex flex-col items-center text-center">
+      <div className="chat-hero-panel relative">
         <FloatingShapes layout="chat" interactive />
         <button
           type="button"
@@ -84,14 +86,13 @@ export function ChatHero() {
         >
           <NultronMascot state={state} variant="full" decorative next={HERO_NEXT} />
         </button>
-        <h2
-          className="chat-hero-title enter-rise relative font-heading font-bold tracking-[var(--track)] text-[var(--text)]"
-          style={{ "--i": 2 } as CSSProperties}
-        >
-          <span className="text-gradient">{t("chat.empty.headline")}</span>
-        </h2>
-        <div className="enter-fade relative w-full" style={{ "--i": 3 } as CSSProperties}>
-          <ChatKeyStatus />
+        {/* Nultron says hello in a speech bubble: the page opens on the character talking to you. */}
+        <div className="chat-bubble enter-rise relative" style={{ "--i": 2 } as CSSProperties} data-testid="chat-hero-bubble">
+          <p className="chat-bubble-hello">{t("chat.empty.hello")}</p>
+          <h2 className="chat-hero-title relative text-[var(--text)]">{t("chat.empty.headline")}</h2>
+          <div className="enter-fade relative w-full" style={{ "--i": 3 } as CSSProperties}>
+            <ChatKeyStatus />
+          </div>
         </div>
       </div>
       {burst > 0 ? (

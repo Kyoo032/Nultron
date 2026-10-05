@@ -65,9 +65,19 @@
     "charging": "Charging up",
     "lets-go": "Off we go"
   },
+  "buddy": {
+    "tap": "Say hi to Nultron",
+    "minimise": "Make Nultron smaller",
+    "restore": "Bring Nultron back",
+    "region": "Nultron, your desk buddy"
+  },
   "modeHandoff": {
     "fallbackSubject": "the source material",
     "presentation": "Turn \"{subject}\" into a presentation for a decision-maker. Use only the source material.",
     "document": "Write a memo from \"{subject}\". Use only the source material and cite its sources."
+  },
+  "needsKey": {
+    "note": "Add your {gateway} key in {settings} to use this.",
+    "blocked": "Add your key in {settings} to use this."
   }
 }

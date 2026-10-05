@@ -77,5 +77,10 @@
       "busy": "Another window is already setting this up.",
       "unknown": "Setting up the reader did not finish."
     }
-  }
+  },
+  "later": "Add it later",
+  "laterHint": "You can paste your key any time in Settings. Models stay off until you do.",
+  "keyTitleRestricted": "Your company's key isn't set up yet",
+  "keyHelpRestricted": "An owner or admin adds the company's key once, and everyone in the company uses it.",
+  "keyRestricted": "Only an owner or admin can add your company's {gatewayName} key. Ask one of them to add it, then press Check again. You can look around in the meantime."
 }

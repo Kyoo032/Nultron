@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { NultronMascot } from "@/components/nultron/nultron-mascot";
 import {
   isMascotMode,
@@ -11,6 +11,9 @@ import {
   type MascotState,
 } from "@/lib/mascot-states";
 import { slotNextStates } from "@/lib/mascot-triggers";
+import { BUDDY_PRIORITY } from "@/lib/desk-buddy-state";
+import { flashBuddy, useBuddyStaged, useBuddyTakesStatus } from "@/lib/desk-buddy-store";
+import { useBuddyClaim } from "@/lib/use-buddy-claim";
 
 /** How long an empty desk waves before settling into its home pose. */
 const WAVE_MS = 1400;
@@ -81,6 +84,31 @@ export function MascotSlot(context: MascotContext & { decorative?: boolean }) {
   }
 
   const previewBusy = Boolean(preview.state) && preview.busy;
+
+  // Beside a job the desk buddy is the status character when it is on screen: this slot tells it what the
+  // job is doing (a working pose while it runs, a cheer or a failure when it ends) and draws nothing of its
+  // own. Without a buddy (no rail, a collapsed rail, another full body on screen) the chip is drawn as ever.
+  const beside = context.placement === "beside" && !preview.state;
+  const takesStatus = useBuddyTakesStatus();
+  const staged = useBuddyStaged();
+  const working = beside && Boolean(context.busy) && !context.failed && !context.done;
+  useBuddyClaim(working ? { state, busy: true, priority: BUDDY_PRIORITY.job } : null);
+  const ended = beside ? (context.failed ? "error" : context.done ? "celebrating" : null) : null;
+  const previousEnded = useRef(ended);
+  useEffect(() => {
+    if (ended && ended !== previousEnded.current) {
+      flashBuddy(ended);
+    }
+    previousEnded.current = ended;
+  }, [ended]);
+  if (beside && takesStatus) {
+    return null;
+  }
+  // The page header already hosts Nultron (`BuddyStage` in `ModeHeader`): one character per screen, so the empty desk keeps only its scene.
+  if (context.placement === "empty" && staged && !preview.state) {
+    return null;
+  }
+
   return (
     <NultronMascot
       state={state}

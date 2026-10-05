@@ -10,6 +10,8 @@ import { SettingsResetCard } from "./settings-reset-card";
 import { SettingsStorageCard } from "./settings-storage-card";
 import { UsagePanel, type AccountUsage } from "./usage-panel";
 import { apiFetch, checkGateway, relaunchDesktopApp } from "@/lib/api-client";
+import { useMayChangeCompanyKey } from "@/lib/company-key-access";
+import { publishGate } from "@/lib/gate-state";
 import {
   formatGateTimestamp,
   gatewayReasonKey,
@@ -40,8 +42,12 @@ type Probe = {
 const fieldClass =
   "mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)]";
 
-function runtimeStatusLabel(mode: "ai" | "stub"): string {
-  return mode === "ai" ? t("settings.runtimeLive") : t("settings.runtimeStub");
+function runtimeStatusLabel(mode: "ai" | "stub", mayChangeKey: boolean): string {
+  if (mode === "ai") {
+    return t("settings.runtimeLive");
+  }
+  // "Paste one below" points at a field a member of a hosted company is not given.
+  return mayChangeKey ? t("settings.runtimeStub") : t("settings.runtimeStubRestricted");
 }
 
 /** What `/api/v1/settings` (and `apply-locale`) answer with. Every field is optional on the wire. */
@@ -122,6 +128,9 @@ export async function readSettingsAnswer(
 export function SettingsPage() {
   const { productName, gatewayName, gatewayBaseUrl } = useProductBrand();
   const { name: workspaceName } = useWorkspaceScope();
+  // Hosted only: the key is the company's, and the host refuses a member's write (M4). On a desk there
+  // is no session, so this is always true and nothing below changes.
+  const mayChangeKey = useMayChangeCompanyKey();
   const [hasOpenai, setHasOpenai] = useState(false);
   const [hasGoogle, setHasGoogle] = useState(false);
   const [hasAnthropic, setHasAnthropic] = useState(false);
@@ -182,7 +191,11 @@ export function SettingsPage() {
         : null,
     );
     setRuntime(payload.runtime === "ai" ? "ai" : "stub");
-    setGateway(parseGatewayGate(payload.gateway));
+    const reportedGate = parseGatewayGate(payload.gateway);
+    setGateway(reportedGate);
+    // The panes the person opened earlier are still mounted (kept alive): a key saved here has to
+    // unlock them, and a closed gate has to say so, without a reload. Hosted only; a no-op elsewhere.
+    publishGate(reportedGate);
     setGoogleBaseUrl(typeof payload.googleBaseUrl === "string" ? payload.googleBaseUrl : "");
     setAnthropicBaseUrl(typeof payload.anthropicBaseUrl === "string" ? payload.anthropicBaseUrl : "");
     setVolcengineBaseUrl(typeof payload.volcengineBaseUrl === "string" ? payload.volcengineBaseUrl : "");
@@ -269,7 +282,9 @@ export function SettingsPage() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              openaiApiKey,
+              // A member never types one; leaving the field out says so, and the host would drop a
+              // blank anyway.
+              ...(mayChangeKey ? { openaiApiKey } : {}),
               editTurnCapUsd,
             }),
           }),
@@ -391,15 +406,18 @@ export function SettingsPage() {
       <ModeHeader
         icon="settings"
         title={t("settings.title")}
+        shapes={false}
         outcomeTestId="settings-intro"
         outcome={
-          hasOpenai
-            ? t("settings.intro", {
-                workspaceName,
-                gatewayName,
-                gatewayHost: gatewayHostLabel(gatewayEndpoint),
-              })
-            : t("settings.introNeedsKey", { gatewayName })
+          !mayChangeKey
+            ? t("settings.introRestricted", { workspaceName, gatewayName })
+            : hasOpenai
+              ? t("settings.intro", {
+                  workspaceName,
+                  gatewayName,
+                  gatewayHost: gatewayHostLabel(gatewayEndpoint),
+                })
+              : t("settings.introNeedsKey", { gatewayName })
         }
       />
 
@@ -412,7 +430,7 @@ export function SettingsPage() {
       <p className="mt-3 text-sm text-[var(--text-3)]" data-testid="runtime-status">
         {t("settings.status", {
           details: [
-            runtimeStatusLabel(runtime),
+            runtimeStatusLabel(runtime, mayChangeKey),
             hasOpenai ? t("settings.keyGateway") : null,
             hasAnthropic ? t("settings.keyAnthropic") : null,
             hasGoogle ? t("settings.keyGoogle") : null,
@@ -467,7 +485,7 @@ export function SettingsPage() {
         <section className="space-y-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4">
           <div>
             <h2 className="font-medium text-[var(--text)]">{t("settings.gatewayHeading", { gatewayName })}</h2>
-            <p className="mt-1 text-xs text-[var(--text-3)]">{t("settings.gatewayHelp")}</p>
+            {mayChangeKey ? <p className="mt-1 text-xs text-[var(--text-3)]">{t("settings.gatewayHelp")}</p> : null}
           </div>
           <div
             className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-3)]"
@@ -495,18 +513,24 @@ export function SettingsPage() {
               {t(gatewayReason, { gatewayName })}
             </p>
           ) : null}
-          <label className="block text-sm text-[var(--text)]">
-            {t("settings.keyLabel")}
-            <input
-              className={fieldClass}
-              type="password"
-              autoComplete="off"
-              placeholder={hasOpenai ? t("settings.keyPlaceholderSaved") : t("settings.keyPlaceholderEmpty")}
-              value={openaiApiKey}
-              onChange={(event) => setOpenaiApiKey(event.target.value)}
-              data-testid="openai-key"
-            />
-          </label>
+          {mayChangeKey ? (
+            <label className="block text-sm text-[var(--text)]">
+              {t("settings.keyLabel")}
+              <input
+                className={fieldClass}
+                type="password"
+                autoComplete="off"
+                placeholder={hasOpenai ? t("settings.keyPlaceholderSaved") : t("settings.keyPlaceholderEmpty")}
+                value={openaiApiKey}
+                onChange={(event) => setOpenaiApiKey(event.target.value)}
+                data-testid="openai-key"
+              />
+            </label>
+          ) : (
+            <p className="text-sm text-[var(--text-2)]" data-testid="settings-key-restricted">
+              {t("settings.keyRestricted")}
+            </p>
+          )}
           {hasOpenai ? (
             <label className="block text-sm text-[var(--text)]">
               {t("settings.editCapLabel")}

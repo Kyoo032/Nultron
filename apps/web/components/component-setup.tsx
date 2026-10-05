@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { NultronMascot } from "@/components/nultron/nultron-mascot";
 import type { SetupStage } from "@/lib/components-client";
 import { t } from "@/lib/i18n";
+import { useBuddyTakesStatus } from "@/lib/desk-buddy-store";
 import { componentSetupMascot, SETUP_NEXT } from "@/lib/mascot-triggers";
+import { useBuddyStatus } from "@/lib/use-buddy-claim";
 import { useProductBrand } from "@/lib/product-brand";
 import { useComponentSetup, type ComponentSetupView } from "@/lib/use-component-setup";
 
@@ -51,6 +53,7 @@ export function ComponentSetupPanel({ view }: { view: ComponentSetupView }) {
   const [collapsed, setCollapsed] = useState(false);
   const { component, setup, alreadyRunning, retry, visible } = view;
   const finished = setup.status === "done";
+  const takesStatus = useBuddyTakesStatus();
 
   useEffect(() => {
     if (!finished) {
@@ -76,7 +79,9 @@ export function ComponentSetupPanel({ view }: { view: ComponentSetupView }) {
       aria-live="polite"
     >
       <div className="flex items-start gap-3">
-        {face ? <NultronMascot state={face} busy={setup.status === "running"} decorative next={SETUP_NEXT} /> : null}
+        {face && !takesStatus ? (
+          <NultronMascot state={face} busy={setup.status === "running"} decorative next={SETUP_NEXT} />
+        ) : null}
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-[var(--text)]">{t("onboarding.components.title", { productName })}</p>
           <p className="mt-1">

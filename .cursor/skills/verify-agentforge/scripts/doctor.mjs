@@ -8,13 +8,14 @@
  *       → packaged IPC host from Electron userData host-status.json:
  *         Windows: %APPDATA%/Nultron|Kemenkeu AI|AIHub Metranet/host-status.json
  *                  (legacy: %APPDATA%/@agentforge/desktop/host-status.json)
- *         Linux:   $XDG_CONFIG_HOME/Nultron/host-status.json
- *                  or ~/.config/Nultron/host-status.json
- *         macOS:   ~/Library/Application Support/Nultron/host-status.json
+ *         Linux:   $XDG_CONFIG_HOME/Nultron|Kemenkeu AI|AIHub Metranet/host-status.json
+ *                  or ~/.config/<same>/host-status.json
+ *         macOS:   ~/Library/Application Support/Nultron|Kemenkeu AI|AIHub Metranet/host-status.json
  *   node …/doctor.mjs --base http://127.0.0.1:PORT
- *   AGENTFORGE_VERIFY_URL=http://127.0.0.1:PORT node …/doctor.mjs
  *   PORT=3200 node …/doctor.mjs
- *       → explicit loopback for **webdev only** (ignored with --desktop)
+ *   AGENTFORGE_VERIFY_URL=http://127.0.0.1:PORT node …/doctor.mjs
+ *       → explicit loopback for **webdev only** (ignored with --desktop).
+ *         Precedence: --base, then PORT, then AGENTFORGE_VERIFY_URL, then :3000.
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { desktopHostStatusCandidates, packagedSqliteHint } from "./desktop-app-url.mjs";
@@ -208,7 +209,7 @@ function baseFromArgv() {
 }
 
 async function doctorWebdev() {
-  // --base wins, then AGENTFORGE_VERIFY_URL, then PORT, then :3000.
+  // --base wins, then PORT (both resolved in baseFromArgv), then AGENTFORGE_VERIFY_URL, then :3000.
   const override = baseFromArgv() || process.env.AGENTFORGE_VERIFY_URL?.trim();
   const fromEnv = override;
   const BASE = (override || WEBDEV_URL).replace(/\/$/, "");
@@ -225,7 +226,7 @@ async function doctorWebdev() {
   try {
     chat = await get(BASE, "/chat");
   } catch (error) {
-    fail(`GET ${BASE}/chat did not connect. Start \`pnpm dev\` (local webdev on :3000).`, String(error));
+    fail(`GET ${BASE}/chat did not connect. Start \`npx pnpm@9.15.9 --filter @agentforge/web dev\` (local webdev on :3000; root \`pnpm dev\` also starts apps/portal, which exits without Postgres).`, String(error));
   }
 
   if (chat.status < 200 || chat.status >= 400) {
@@ -302,13 +303,13 @@ async function doctorWebdev() {
           asr: editPayload.asr ?? null,
         };
       } catch {
-        editNote = "verify-agentforge doctor: note — GET /api/v1/edit/doctor was not JSON (pre-Phase-1).";
+        editNote = "verify-agentforge doctor: note — GET /api/v1/edit/doctor was not JSON.";
       }
     } else {
-      editNote = `verify-agentforge doctor: note — GET /api/v1/edit/doctor returned ${editRes.status} (pre-Phase-1).`;
+      editNote = `verify-agentforge doctor: note — GET /api/v1/edit/doctor returned ${editRes.status}.`;
     }
   } catch {
-    editNote = "verify-agentforge doctor: note — GET /api/v1/edit/doctor did not connect (pre-Phase-1).";
+    editNote = "verify-agentforge doctor: note — GET /api/v1/edit/doctor did not connect.";
   }
 
   let knowledgeStatus = 0;
@@ -355,6 +356,16 @@ async function doctorWebdev() {
     knowledgeStatus = 0;
   }
 
+  // The host's gate verdict, trimmed to what a recipe asserts on. No endpoint, no message.
+  const gate = payload.gateway && typeof payload.gateway === "object" ? payload.gateway : null;
+  const gateway = gate
+    ? {
+        status: typeof gate.status === "string" ? gate.status : null,
+        allowed: typeof gate.allowed === "boolean" ? gate.allowed : null,
+        grace: typeof gate.grace === "boolean" ? gate.grace : null,
+      }
+    : null;
+
   const report = {
     ok: true,
     url: BASE,
@@ -362,6 +373,7 @@ async function doctorWebdev() {
     chatStatus: chat.status,
     runtime,
     hasOpenai,
+    gateway,
     keyFingerprint,
     modeKeys,
     chatCount,
@@ -387,9 +399,13 @@ async function doctorWebdev() {
   }
   if (runtime === "stub") {
     console.log("verify-agentforge doctor: OK — stub runtime. Safe for Chat send without a live gateway.");
-  } else if (runtime === "ai") {
+  } else if (runtime === "ai" && hasOpenai) {
     console.log(
       "verify-agentforge doctor: OK — live runtime (a provider key is saved). Do not treat Chat send or studio generate as stub proof. Settings view and needs-key checks are still valid only when those UI states actually appear.",
+    );
+  } else if (runtime === "ai") {
+    console.log(
+      "verify-agentforge doctor: OK — live runtime, but no key is saved, so the gateway gate is closed and the desk shows onboarding. Drive the gate and onboarding recipes, not Chat.",
     );
   } else {
     console.log(

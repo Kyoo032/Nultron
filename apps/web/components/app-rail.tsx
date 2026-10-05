@@ -5,11 +5,13 @@ import { Link } from "@/lib/nav";
 import { usePathname } from "@/lib/nav";
 import { PRODUCT_MODES, firstVisibleHref, productModeMatches, type ProductMode } from "@agentforge/core/product-modes";
 import { AppUpdatesButton } from "@/components/app-updates";
+import { DeskBuddyChip, DeskBuddyDock } from "@/components/desk-buddy";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { WorkspaceSwitcher } from "@/components/workspace-switcher";
 import { getRailCollapsed, setRailCollapsed } from "@/lib/rail-prefs";
 import { RAIL_WIDTH, RAIL_WIDTH_KEY } from "@/lib/panel-width";
 import { usePanelWidth } from "@/lib/use-panel-width";
+import { useMoreBelow } from "@/lib/use-more-below";
 import { PanelResizeHandle } from "@/components/panel-resize-handle";
 import { RailRecentThreads } from "@/components/rail-recent-threads";
 import { RailEducationTasks, RailEducationTasksToggle, useRailEducationTasks } from "@/components/rail-education-tasks";
@@ -22,7 +24,7 @@ import {
 import { ModeIcon, isModeIconName, type ModeIconName } from "@/components/mode-icons";
 import { BrandMark } from "@/components/brand-mark";
 import { RailModesSkeleton } from "@/components/rail-modes-skeleton";
-import { useProductBrand, usesBundledMark } from "@/lib/product-brand";
+import { useProductBrand, usesBundledMark, usesNultronWordmark } from "@/lib/product-brand";
 import { t } from "@/lib/i18n";
 import { railModesPending, SKELETON_MODE_ROWS, type ShellModesSource } from "@/lib/shell-modes";
 import { productMonogram } from "@/components/app-shell";
@@ -48,6 +50,7 @@ function RailItem({
   testId,
   index,
   enter = true,
+  trailing,
 }: {
   href: string;
   label: string;
@@ -58,6 +61,8 @@ function RailItem({
   index: number;
   /** False for rows that take a skeleton's place: they appear where it was, not sliding in after it. */
   enter?: boolean;
+  /** A control that rides at the row's right edge (the Finance / Market / Education sub-list chevron). */
+  trailing?: ReactNode;
 }) {
   /*
    * `shrink-0`: the nav is a column flex box, so without it a rail that runs past
@@ -73,8 +78,49 @@ function RailItem({
     ? "select-row bg-[var(--rail-active)] font-semibold text-[var(--rail-active-text)] shadow-[var(--lip)]"
     : "wash text-[var(--rail-text-2)] hover:bg-[var(--rail-hover)] hover:text-[var(--rail-active-text)]";
   const tileTone = active
-    ? "bg-[var(--mode)] text-white"
+    ? "bg-[var(--mode)] text-[var(--on-mode)]"
     : "bg-[color-mix(in_srgb,var(--mode)_14%,transparent)] text-[var(--mode)]";
+
+  const content = (
+    <>
+      <span
+        data-tile
+        className={`transition-colors inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${tileTone}`}
+      >
+        <ModeIcon name={icon} strokeWidth={2} />
+      </span>
+      {collapsed ? null : <span className="truncate font-medium">{label}</span>}
+    </>
+  );
+
+  if (trailing) {
+    /*
+     * A row with a control at its right edge is one card, not a link and a chip side by side: the
+     * current-row fill, its lip and the hover wash sit on this wrapper, so they run the full width
+     * under the word and the chevron too. The link inside carries everything the tests and the
+     * harness read (`data-testid`, `aria-current`, `data-mode`).
+     */
+    return (
+      <div
+        className={`${enter ? "enter-slide " : ""}flex h-8 shrink-0 items-center rounded-md ${rowTone}`}
+        style={{ "--i": index } as CSSProperties}
+        data-rail-row
+      >
+        <Link
+          href={href}
+          className="hover-wiggle flex h-full min-w-0 flex-1 items-center gap-2 rounded-md pl-2 pr-1 text-sm tracking-[var(--track)]"
+          aria-current={active ? "page" : undefined}
+          aria-label={label}
+          title={label}
+          data-testid={testId}
+          data-mode={icon}
+        >
+          {content}
+        </Link>
+        {trailing}
+      </div>
+    );
+  }
 
   return (
     <Link
@@ -88,14 +134,9 @@ function RailItem({
       title={label}
       data-testid={testId}
       data-mode={icon}
+      data-rail-row
     >
-      <span
-        data-tile
-        className={`transition-colors inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg ${tileTone}`}
-      >
-        <ModeIcon name={icon} strokeWidth={2} />
-      </span>
-      {collapsed ? null : <span className="truncate font-medium">{label}</span>}
+      {content}
     </Link>
   );
 }
@@ -153,6 +194,8 @@ export function AppRail({ workspaceName, visibleModes, modesSource = "host" }: P
   const brand = useProductBrand();
   const { productName, logoSrc } = brand;
   const bundledMark = usesBundledMark(brand);
+  // The public name takes the Nultron colours; a flavor's or a renamed tenant's stays plain rail text.
+  const nultronWordmark = usesNultronWordmark(brand);
   const [collapsed, setCollapsed] = useState(false);
   const [railWidth, setRailWidth] = usePanelWidth(RAIL_WIDTH_KEY, RAIL_WIDTH.default, RAIL_WIDTH.min, RAIL_WIDTH.max);
   // Nothing cached and the host has not answered: `visibleModes` is only Chat, and the other rows are
@@ -168,6 +211,7 @@ export function AppRail({ workspaceName, visibleModes, modesSource = "host" }: P
   const marketSpecialists = useRailMarketSpecialists();
   const financeTasks = useRailFinanceTasks();
   const educationTasks = useRailEducationTasks();
+  const { ref: navRef, more: moreBelow } = useMoreBelow<HTMLElement>();
 
   useEffect(() => {
     const query = window.matchMedia("(max-width: 480px)");
@@ -216,8 +260,11 @@ export function AppRail({ workspaceName, visibleModes, modesSource = "host" }: P
             <div className="min-w-0 flex-1">
               <Link
                 href={homeHref}
-                className="block truncate text-sm font-medium tracking-[var(--track)] text-[var(--rail-text)]"
+                className={`block truncate text-sm tracking-[var(--track)] ${
+                  nultronWordmark ? "wordmark-nultron" : "font-medium text-[var(--rail-text)]"
+                }`}
                 data-testid="product-brand"
+                data-wordmark={nultronWordmark ? "nultron" : undefined}
               >
                 {productName}
               </Link>
@@ -233,7 +280,8 @@ export function AppRail({ workspaceName, visibleModes, modesSource = "host" }: P
           `rail-resize` strip occupies, so the handle is never stacked on top of
           this nav's scrollbar (owner report 2026-09-17). */}
       <nav
-        className="mr-2 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain px-2 pb-2"
+        ref={navRef}
+        className="mr-2 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain px-2"
         aria-label={t("rail.modesAria")}
         aria-busy={modesPending || undefined}
         data-tour="rail-modes"
@@ -264,19 +312,17 @@ export function AppRail({ workspaceName, visibleModes, modesSource = "host" }: P
         {jobModes.map((mode) => {
           const icon: ModeIconName = isModeIconName(mode.id) ? mode.id : "documents";
           const index = itemIndex++;
-          const item = (
-            <RailItem
-              key={mode.href}
-              href={mode.href}
-              label={t(`rail.${mode.id}`)}
-              icon={icon}
-              active={productModeMatches(mode.id, pathname)}
-              collapsed={collapsed}
-              testId={`mode-${mode.href.slice(1)}`}
-              index={index}
-              enter={!startedPending}
-            />
-          );
+          const itemProps = {
+            href: mode.href,
+            label: t(`rail.${mode.id}`),
+            icon,
+            active: productModeMatches(mode.id, pathname),
+            collapsed,
+            testId: `mode-${mode.href.slice(1)}`,
+            index,
+            enter: !startedPending,
+          };
+          const item = <RailItem key={mode.href} {...itemProps} />;
           /*
            * Market carries its agents the way Chat carries its sessions: the
            * chevron rides on the Market row and the desks render under it, each
@@ -291,14 +337,16 @@ export function AppRail({ workspaceName, visibleModes, modesSource = "host" }: P
                same chevron, same one `h-8`, same nothing-below-when-closed. */
             return (
               <div key={mode.href} className="shrink-0" data-testid="rail-finance-mode">
-                <div className="flex h-8 items-center gap-0.5">
-                  <div className="min-w-0 flex-1">{item}</div>
-                  <RailFinanceTasksToggle
-                    open={financeTasks.open}
-                    onToggle={financeTasks.toggle}
-                    enabled={financeTasks.enabled}
-                  />
-                </div>
+                <RailItem
+                  {...itemProps}
+                  trailing={
+                    <RailFinanceTasksToggle
+                      open={financeTasks.open}
+                      onToggle={financeTasks.toggle}
+                      enabled={financeTasks.enabled}
+                    />
+                  }
+                />
                 {financeTasks.open ? <RailFinanceTasks /> : null}
               </div>
             );
@@ -308,14 +356,16 @@ export function AppRail({ workspaceName, visibleModes, modesSource = "host" }: P
                same chevron, same one `h-8`, same nothing-below-when-closed. */
             return (
               <div key={mode.href} className="shrink-0" data-testid="rail-education-mode">
-                <div className="flex h-8 items-center gap-0.5">
-                  <div className="min-w-0 flex-1">{item}</div>
-                  <RailEducationTasksToggle
-                    open={educationTasks.open}
-                    onToggle={educationTasks.toggle}
-                    enabled={educationTasks.enabled}
-                  />
-                </div>
+                <RailItem
+                  {...itemProps}
+                  trailing={
+                    <RailEducationTasksToggle
+                      open={educationTasks.open}
+                      onToggle={educationTasks.toggle}
+                      enabled={educationTasks.enabled}
+                    />
+                  }
+                />
                 {educationTasks.open ? <RailEducationTasks /> : null}
               </div>
             );
@@ -324,65 +374,75 @@ export function AppRail({ workspaceName, visibleModes, modesSource = "host" }: P
             <div key={mode.href} className="shrink-0" data-testid="rail-market-mode">
               {/* Exactly one `h-8` row, like any other job mode: the chevron rides
                   inside it, and when the list is closed nothing renders below. */}
-              <div className="flex h-8 items-center gap-0.5">
-                <div className="min-w-0 flex-1">{item}</div>
-                <RailMarketSpecialistsToggle
-                  open={marketSpecialists.open}
-                  onToggle={marketSpecialists.toggle}
-                  enabled={marketSpecialists.enabled}
-                />
-              </div>
+              <RailItem
+                {...itemProps}
+                trailing={
+                  <RailMarketSpecialistsToggle
+                    open={marketSpecialists.open}
+                    onToggle={marketSpecialists.toggle}
+                    enabled={marketSpecialists.enabled}
+                  />
+                }
+              />
               {marketSpecialists.open ? <RailMarketSpecialists /> : null}
             </div>
           );
         })}
 
-        <RailGroupLabel collapsed={collapsed}>{t("rail.groupAccount")}</RailGroupLabel>
-        <RailItem
-          href="/knowledge"
-          label={t("rail.knowledge")}
-          icon="knowledge"
-          active={pathname.startsWith("/knowledge")}
-          collapsed={collapsed}
-          testId="mode-knowledge"
-          index={itemIndex++}
-        />
-        <RailItem
-          href="/channels"
-          label={t("rail.channels")}
-          icon="channels"
-          active={pathname.startsWith("/channels")}
-          collapsed={collapsed}
-          testId="channels-link"
-          index={itemIndex++}
-        />
-        <RailItem
-          href="/workspaces"
-          label={t("rail.workspaces")}
-          icon="workspaces"
-          active={pathname.startsWith("/workspaces")}
-          collapsed={collapsed}
-          testId="workspaces-link"
-          index={itemIndex++}
-        />
-        <RailItem
-          href="/usage"
-          label={t("rail.usage")}
-          icon="usage"
-          active={pathname.startsWith("/usage")}
-          collapsed={collapsed}
-          testId="usage-link"
-          index={itemIndex++}
-        />
-        <RailItem
-          href="/settings"
-          label={t("rail.settings")}
-          icon="settings"
-          active={pathname.startsWith("/settings")}
-          collapsed={collapsed}
-          testId="settings-link"
-          index={itemIndex++}
-        />
+        {/* The Account group is pinned to the bottom edge of the scrolling nav (`.rail-pinned`).
+            The rail is about 830px of rows, and a laptop window is 700 to 900px, so the group that
+            used to sit last fell out of reach: at 1366x768 all five rows were below the fold and at
+            900px Settings was half under the footer. Pinned, Settings is on screen at any height and
+            the job modes scroll behind it; the fade above it (`data-more`) says there are more. */}
+        <div className="rail-pinned shrink-0 pb-2" data-testid="rail-account-group" data-more={moreBelow}>
+          <RailGroupLabel collapsed={collapsed}>{t("rail.groupAccount")}</RailGroupLabel>
+          <RailItem
+            href="/knowledge"
+            label={t("rail.knowledge")}
+            icon="knowledge"
+            active={pathname.startsWith("/knowledge")}
+            collapsed={collapsed}
+            testId="mode-knowledge"
+            index={itemIndex++}
+          />
+          <RailItem
+            href="/channels"
+            label={t("rail.channels")}
+            icon="channels"
+            active={pathname.startsWith("/channels")}
+            collapsed={collapsed}
+            testId="channels-link"
+            index={itemIndex++}
+          />
+          <RailItem
+            href="/workspaces"
+            label={t("rail.workspaces")}
+            icon="workspaces"
+            active={pathname.startsWith("/workspaces")}
+            collapsed={collapsed}
+            testId="workspaces-link"
+            index={itemIndex++}
+          />
+          <RailItem
+            href="/usage"
+            label={t("rail.usage")}
+            icon="usage"
+            active={pathname.startsWith("/usage")}
+            collapsed={collapsed}
+            testId="usage-link"
+            index={itemIndex++}
+          />
+          <RailItem
+            href="/settings"
+            label={t("rail.settings")}
+            icon="settings"
+            active={pathname.startsWith("/settings")}
+            collapsed={collapsed}
+            testId="settings-link"
+            index={itemIndex++}
+          />
+        </div>
+        <DeskBuddyDock collapsed={collapsed} />
       </nav>
 
       <div
@@ -399,6 +459,7 @@ export function AppRail({ workspaceName, visibleModes, modesSource = "host" }: P
         data-testid="rail-footer"
       >
         <ThemeToggle />
+        <DeskBuddyChip />
         <div className={`flex items-center gap-2 ${collapsed ? "flex-col" : "min-w-0 flex-1 justify-end"}`}>
           <AppUpdatesButton collapsed={collapsed} />
           <button

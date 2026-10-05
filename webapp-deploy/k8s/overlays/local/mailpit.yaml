@@ -1,0 +1,107 @@
+# The SMTP sandbox (LOCAL ONLY). The portal sends real SMTP here; nobody reads a code from a log.
+# STARTTLS is required and the certificate is the throwaway CA's, because a production portal
+# refuses a cleartext loopback sandbox and sends to any other host only over STARTTLS (SR-39).
+# The web UI and API (8025) are not exposed outside the cluster: `kubectl port-forward` to read them.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mailpit
+  labels:
+    app.kubernetes.io/name: mailpit
+    app.kubernetes.io/part-of: nultron
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mailpit
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mailpit
+        app.kubernetes.io/part-of: nultron
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: mailpit
+          image: axllent/mailpit:v1.31.2
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: MP_SMTP_BIND_ADDR, value: "0.0.0.0:1025"}
+            - {name: MP_UI_BIND_ADDR, value: "0.0.0.0:8025"}
+            - {name: MP_SMTP_TLS_CERT, value: /etc/nultron/tls/tls.crt}
+            - {name: MP_SMTP_TLS_KEY, value: /etc/nultron/tls/tls.key}
+            - {name: MP_SMTP_REQUIRE_STARTTLS, value: "true"}
+            - {name: MP_MAX_MESSAGES, value: "500"}
+            - {name: MP_DATABASE, value: /data/mailpit.db}
+          ports:
+            - {name: smtp, containerPort: 1025}
+            - {name: http, containerPort: 8025}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: {cpu: 25m, memory: 32Mi}
+            limits: {cpu: 500m, memory: 128Mi}
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /livez, port: http}
+            periodSeconds: 30
+          volumeMounts:
+            - {name: tls, mountPath: /etc/nultron/tls, readOnly: true}
+            - {name: data, mountPath: /data}
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: tls
+          secret: {secretName: nultron-mailpit-tls}
+        - name: data
+          emptyDir: {sizeLimit: 128Mi}
+        - name: tmp
+          emptyDir: {sizeLimit: 32Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mailpit
+  labels:
+    app.kubernetes.io/name: mailpit
+    app.kubernetes.io/part-of: nultron
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: mailpit
+  ports:
+    - {name: smtp, port: 1025, targetPort: smtp, protocol: TCP}
+    - {name: http, port: 8025, targetPort: http, protocol: TCP}
+---
+# SMTP from the portal only. The UI port is closed to the other pods; the API server's service proxy
+# and kubectl port-forward are how a person reads the inbox.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-smtp-from-portal
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mailpit
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: nultron-portal
+      ports:
+        - {protocol: TCP, port: 1025}

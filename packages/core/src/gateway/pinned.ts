@@ -21,16 +21,61 @@ export function pinnedGatewayOrigin(): string {
   return `${parsed.protocol}//${parsed.host}`;
 }
 
-/** True inside the packaged Electron app: `main.cjs` sets this before `host.cjs` loads. */
+/**
+ * True inside the packaged Electron app. `apps/desktop/main.cjs` `bootstrapPackaged()` sets
+ * `AGENTFORGE_PACKAGED=1` immediately before it requires `host.cjs`; nothing else sets it, and
+ * `apps/desktop/packaged-env.test.cjs` holds that line.
+ */
 export function isPackagedRuntime(): boolean {
   return process.env.AGENTFORGE_PACKAGED?.trim() === "1";
 }
 
 /**
- * Dev/test hook only. `AGENTFORGE_GATEWAY_URL` may re-point the gateway on a developer machine
- * (branded flavors, a local mock) but never in a packaged build and never in production, so the
- * shipped product always resolves to `PINNED_GATEWAY_BASE_URL`.
+ * Whether the dev/test endpoint hooks (`AGENTFORGE_GATEWAY_URL`, `AGENTFORGE_TELEGRAM_API_URL`) may
+ * be read at all. They may on a developer machine and in a test, never in a packaged build and never
+ * in production, so the shipped product always resolves to the pinned endpoints.
  */
 export function gatewayUrlOverrideAllowed(): boolean {
   return !isPackagedRuntime() && process.env.NODE_ENV !== "production";
+}
+
+/**
+ * Read at each call site by its literal name, never through a variable index:
+ * `provider-env-sweep.test.ts` flags every dynamic `process.env[...]` read.
+ */
+function trimmedUrl(value: string | undefined): string {
+  return typeof value === "string" ? value.trim().replace(/\/+$/, "") : "";
+}
+
+function isHttpsUrlWithoutCredentials(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" && !parsed.username && !parsed.password;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The one gateway URL this process may use instead of `PINNED_GATEWAY_BASE_URL`, or `null` for the
+ * pinned one. Two channels, never mixed:
+ *
+ * - **Packaged:** only the brand gateway, `AGENTFORGE_BRAND_GATEWAY_URL`. `apps/desktop/main.cjs`
+ *   assigns it from the installed `brand.json` right before `host.cjs` loads, and only for a brand
+ *   flavor (Kemenkeu AI, AIHub Metranet): the public Nultron build never has one. It must be https
+ *   with no credentials; anything else is ignored. The dev hook is ignored, so a variable in the
+ *   user's environment cannot move a packaged build, and `NODE_ENV` does not matter (the packaged
+ *   bundle does not define it).
+ * - **Otherwise:** the dev/test hook `AGENTFORGE_GATEWAY_URL` (a local mock, a flavor tried out on
+ *   webdev), unless `NODE_ENV=production`, so the hosted app is always on the pinned gateway.
+ */
+export function gatewayUrlOverride(): string | null {
+  if (isPackagedRuntime()) {
+    const brand = trimmedUrl(process.env.AGENTFORGE_BRAND_GATEWAY_URL);
+    return brand && isHttpsUrlWithoutCredentials(brand) ? brand : null;
+  }
+  if (!gatewayUrlOverrideAllowed()) {
+    return null;
+  }
+  return trimmedUrl(process.env.AGENTFORGE_GATEWAY_URL) || null;
 }

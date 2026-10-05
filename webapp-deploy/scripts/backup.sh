@@ -16,7 +16,9 @@
 #   2. tar of /data EXCLUDING components/ (re-downloadable, and baked into the image)
 #      and logs/ (diagnostics, and spec L1 keeps them out of backups).
 #   3. openssl enc -aes-256-cbc -pbkdf2 with BACKUP_KEY from the environment.
-#   4. Upload to the COS backup bucket with coscli, or tccli cos, or - if neither is
+#   4. The portal's Postgres (accounts, sessions): pg_dump -Fc, encrypted the same way, as a second
+#      object beside the archive. Skipped when there is no portal-db container.
+#   5. Upload each to the COS backup bucket with coscli, or tccli cos, or - if neither is
 #      installed - leave it in the local dir and say so loudly.
 set -eu
 . "$(dirname "$0")/_common.sh"
@@ -97,48 +99,63 @@ echo "==> clearing the staging copy inside the container"
 dc exec -T app sh -c 'rm -rf "${AGENTFORGE_DATA_DIR:-/data}/.backup-staging"'
 
 # --- verify -----------------------------------------------------------------
-# A backup nobody can open is not a backup. Decrypt and list, into /dev/null.
+# A backup nobody can open is not a backup. Decrypt and list, into /dev/null. An archive with no entries
+# fails too: if `tar` died inside the container the stream is empty, an empty stream encrypts, decrypts and
+# lists without an error, and the size check above passes on the ~48 bytes of an empty ciphertext.
 
 if [ "$(setting BACKUP_VERIFY 1)" = "1" ]; then
 	echo "==> verifying (decrypt + list)"
 	openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:BACKUP_KEY -in "$OUT" |
-		tar -tzf - >/dev/null || {
+		tar -tzf - | grep -q . || {
 		echo "error: the encrypted archive did not decrypt and untar cleanly" >&2
 		exit 1
 	}
 fi
 
-# --- 4. upload ---------------------------------------------------------------
+# --- 4. the portal's database ------------------------------------------------
+# Accounts, sessions, devices and the audit log live in the portal's Postgres, a different volume from
+# /data. Losing it signs every tester out and loses the seeded tenant, so it goes in the same hourly run.
+# pg_dump in custom format (compressed, restorable table by table), encrypted with the same cipher and
+# passphrase as the archive above, before it leaves this host. The dump is taken as the schema owner over
+# the container's local socket, so no password is typed or exported here. Only when portal-db is running
+# (a deployment on a managed Postgres backs that up where it lives); BACKUP_PORTAL=0 skips it.
 
-BUCKET="$(setting COS_BACKUP_BUCKET)"
-PREFIX="$(setting COS_BACKUP_PREFIX hourly/)"
-REGION="$(setting TENCENT_REGION ap-jakarta)"
-KEY="$PREFIX$(basename "$OUT")"
-
-if [ -z "$BUCKET" ]; then
-	echo "warning: COS_BACKUP_BUCKET is unset - the backup stays on this server only." >&2
-	echo "         One disk failure loses it. Set the bucket in .env." >&2
-elif command -v coscli >/dev/null 2>&1; then
-	echo "==> uploading to cos://$BUCKET/$KEY (coscli)"
-	coscli cp "$OUT" "cos://$BUCKET/$KEY"
-elif command -v tccli >/dev/null 2>&1; then
-	# coscli is the tested path; tccli's cos flags have moved between versions, so
-	# check the upload landed before trusting this branch.
-	echo "==> uploading to cos://$BUCKET/$KEY (tccli cos)"
-	tccli cos put-object --region "$REGION" --bucket "$BUCKET" --key "$KEY" --path "$OUT"
-else
-	echo "warning: neither coscli nor tccli is installed - the backup stays on this" >&2
-	echo "         server only, in $OUT_DIR. Install coscli before taking traffic." >&2
+PORTAL_OUT=""
+if [ "$(setting BACKUP_PORTAL 1)" = "1" ] && [ -n "$(dc ps -q portal-db)" ]; then
+	PORTAL_OUT="$OUT_DIR/nultron-portal-$STAMP.dump.enc"
+	echo "==> portal database (pg_dump -Fc) and encrypting -> $PORTAL_OUT"
+	dc exec -T portal-db pg_dump -U portal -d tokotoken_portal -Fc |
+		openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:BACKUP_KEY -out "$PORTAL_OUT"
+	[ -s "$PORTAL_OUT" ] || {
+		echo "error: the encrypted portal dump is empty" >&2
+		rm -f "$PORTAL_OUT"
+		exit 1
+	}
+	if [ "$(setting BACKUP_VERIFY 1)" = "1" ]; then
+		echo "==> verifying the portal dump (decrypt + pg_restore --list)"
+		openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:BACKUP_KEY -in "$PORTAL_OUT" |
+			dc exec -T portal-db pg_restore --list >/dev/null || {
+			echo "error: the encrypted portal dump did not decrypt and list cleanly" >&2
+			exit 1
+		}
+	fi
 fi
+
+# --- 5. upload ---------------------------------------------------------------
+
+cos_upload "$OUT"
+[ -z "$PORTAL_OUT" ] || cos_upload "$PORTAL_OUT"
 
 # --- local retention ---------------------------------------------------------
 
 RETAIN="$(setting BACKUP_RETAIN_DAYS 7)"
 if [ "$RETAIN" -gt 0 ] 2>/dev/null; then
-	find "$OUT_DIR" -maxdepth 1 -name 'nultron-data-*.tar.gz.enc' -mtime "+$RETAIN" -delete 2>/dev/null || true
+	find "$OUT_DIR" -maxdepth 1 \( -name 'nultron-data-*.tar.gz.enc' -o -name 'nultron-portal-*.dump.enc' \) -mtime "+$RETAIN" -delete 2>/dev/null || true
 fi
 
 echo
 ls -lh "$OUT"
+[ -z "$PORTAL_OUT" ] || ls -lh "$PORTAL_OUT"
 echo "sha: $(current_sha)"
 echo "restore with: sh webapp-deploy/scripts/restore.sh $OUT"
+[ -z "$PORTAL_OUT" ] || echo "portal database: sh webapp-deploy/scripts/restore-portal.sh $PORTAL_OUT"

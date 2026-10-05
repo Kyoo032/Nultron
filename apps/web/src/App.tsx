@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { firstVisibleHref, WORK_PRODUCT_MODES, type ProductMode } from "@agentforge/core/product-modes";
 import { HOME_WORKSPACE_NAME } from "@agentforge/core/local-owner";
 import { AppShell } from "@/components/app-shell";
@@ -27,14 +27,19 @@ import { DeskPane } from "@/components/desk-pane";
 import { WorkModeKeepAlive } from "@/components/work-mode-keep-alive";
 import { OnboardingScreen } from "@/components/onboarding-screen";
 import { isElectron } from "@/lib/api-client";
+import { publishGate } from "@/lib/gate-state";
 import {
   GATE_EVENT,
+  NO_KEY_DEFERRAL,
   parseGatewayGate,
   readGateEvent,
   resolveGate,
   type GatewayGatePayload,
   type GateView,
+  type KeyDeferral,
 } from "@/lib/gateway-gate";
+import { isHostedBuild } from "@/lib/hosted-build";
+import { canOfferKeyLater, deskDeferral, recordKeyLater } from "@/lib/key-later";
 import { applyLocale, freezeLocale, LOCALE_RESTART_EVENT, t } from "@/lib/i18n";
 import { useAmbientMotion } from "@/lib/use-ambient-motion";
 import { useProductBrand } from "@/lib/product-brand";
@@ -211,6 +216,17 @@ export function AppRoutes() {
   const [gate, setGate] = useState<GateView | "loading">("loading");
   const [gateway, setGateway] = useState<GatewayGatePayload | null>(null);
   const [localeEpoch, setLocaleEpoch] = useState(0);
+  // Nultron Enterprise only: whether the host says this signed-in person chose "Add it later". Always
+  // false off the hosted build, so every Personal path resolves its gate exactly as it did.
+  const [keyLater, setKeyLater] = useState(false);
+  const hosted = isHostedBuild();
+  const canLater = canOfferKeyLater(hosted, session.status);
+  // The gate listener below outlives renders; it reads the newest deferral through this.
+  const deferralRef = useRef<KeyDeferral>(NO_KEY_DEFERRAL);
+  // "Add it later" is recorded fire-and-forget. A settings re-read (a language change, a session refresh)
+  // that lands before the host has stored it must not send the person back to the welcome they just left.
+  const choseLaterRef = useRef(false);
+  deferralRef.current = canLater ? { hasSession: true, later: keyLater } : NO_KEY_DEFERRAL;
 
   useEffect(() => {
     const onRestart = () => setLocaleEpoch((n) => n + 1);
@@ -224,7 +240,8 @@ export function AppRoutes() {
     const onGate = (event: Event) => {
       const reported = readGateEvent(event);
       setGateway(reported);
-      setGate(resolveGate(reported, isElectron()));
+      publishGate(reported);
+      setGate(resolveGate(reported, isElectron(), undefined, deferralRef.current));
     };
     window.addEventListener(GATE_EVENT, onGate);
     return () => window.removeEventListener(GATE_EVENT, onGate);
@@ -260,8 +277,13 @@ export function AppRoutes() {
         // Whether this person has already been through the first-run tour. The host keeps it beside
         // the language; the tour opens only after first-run setup, and only when this says "not yet".
         hydrateGuide(payload?.guide);
+        // Hosted only: the host's record of "Add it later" for this person. Empty off the hosted
+        // build and for anyone not signed in, whatever the answer carries (`deskDeferral`).
+        const read = deskDeferral(hosted, session.status, payload);
+        const deferral = read.hasSession && choseLaterRef.current ? { ...read, later: true } : read;
+        setKeyLater(deferral.later);
         setGateway(reported);
-        setGate(resolveGate(reported, isElectron()));
+        setGate(resolveGate(reported, isElectron(), undefined, deferral));
       })
       .catch(() => {
         if (localeEpoch === 0) {
@@ -272,7 +294,7 @@ export function AppRoutes() {
         setGateway(null);
         setGate("onboarding");
       });
-  }, [localeEpoch, view]);
+  }, [localeEpoch, view, hosted, session.status]);
 
   const path = normalisePath(location.pathname);
   if (PUBLIC_PATHS.has(path)) {
@@ -322,6 +344,20 @@ export function AppRoutes() {
             offerGuideAfterOnboarding();
             setGate("app");
           }}
+          // Enterprise only. A signed-in person on the hosted build may start without a key; nobody
+          // else is handed the callback, so the Personal key step has no way out but a key.
+          onLater={
+            canLater
+              ? () => {
+                  // Remembered by the host so the welcome does not come back every load. The screen then
+                  // calls onDone, so the desk opens and the tour is offered the one way it always is; the
+                  // host still refuses every model call until a key works.
+                  void recordKeyLater();
+                  choseLaterRef.current = true;
+                  setKeyLater(true);
+                }
+              : undefined
+          }
         />
       </PlanBlockBoundary>
     );

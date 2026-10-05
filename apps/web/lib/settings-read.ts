@@ -1,4 +1,6 @@
 import { apiFetch, subscribeToWrites } from "./api-client";
+import { publishGate } from "./gate-state";
+import { parseGatewayGate } from "./gateway-gate";
 
 /**
  * One shared read of `GET /api/v1/settings` for the parts of the shell that only display it.
@@ -56,6 +58,10 @@ async function fetchSettings(): Promise<SettingsRead> {
   const parsed: unknown = await response.json().catch(() => null);
   const body =
     parsed && typeof parsed === "object" && !Array.isArray(parsed) ? deepFreeze(parsed as SettingsBody) : null;
+  if (response.ok && body) {
+    // Every pane that shows "add your key" hears the host's newest gate (hosted only; a no-op elsewhere).
+    publishGate(parseGatewayGate(body.gateway));
+  }
   return { ok: response.ok, status: response.status, body };
 }
 

@@ -13,6 +13,10 @@ import { isMascotBusy, MASCOT_STATES } from "./mascot-states";
  *     covers the Tailwind utilities in components too, not only the hand-written CSS.
  *  2. `prefers-reduced-motion: reduce` is honoured in ONE block and nothing escapes it.
  *  3. Keyframes animate only `transform` and `opacity`, so the compositor does the work.
+ *
+ * And, since 2026-10-01, a fourth: the only decoration that loops is the stepped ambient set (the shapes'
+ * bob and turn, the dot grid's drift), and it pauses with the desk and switches off by name under reduced
+ * motion. Everything else that loops is status.
  */
 
 const webRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -287,12 +291,22 @@ function isMembers(selector: string): string[] {
   return members;
 }
 
-const listedLoops = new Set(ambientRules.flatMap(({ selector }) => isMembers(selector)));
+/**
+ * What an ambient rule pauses: the members of its `:is()` list, or the selector after the `html[...]` prefix
+ * when it has none (a pseudo-element cannot sit inside `:is()`, so the grid's rule is written bare).
+ */
+function pausedMembers(selector: string): string[] {
+  const listed = isMembers(selector);
+  return listed.length > 0 ? listed : [selector.replace(/^html\[data-ambient="paused"\]\s*/, "")];
+}
+
+const listedLoops = new Set(ambientRules.flatMap(({ selector }) => pausedMembers(selector)));
 
 describe("ambient pause", () => {
   it("finds the rules it audits (guards the checks below)", () => {
-    // Two rules: the mascot that is not at a job (every state but active) and status when hidden.
-    expect(ambientRules.length).toBeGreaterThanOrEqual(2);
+    // Three rules: the mascot that is not at a job (every state but active), status when hidden, and the
+    // stepped decoration (the shapes' bob and the dot grid's drift) in every state but active.
+    expect(ambientRules.length).toBeGreaterThanOrEqual(3);
     expect(infiniteRules.length).toBeGreaterThan(3);
     expect(isMembers("a :is(b, c:not([x]) *, d > e)")).toEqual(["b", "c:not([x]) *", "d > e"]);
     expect(listedLoops.has(".pulse-dots > span")).toBe(true);
@@ -335,7 +349,9 @@ describe("ambient pause", () => {
   it("does not let the everything-but-active rule reach a mascot at a job", () => {
     // The rule that pauses in `idle` and `blurred` as well as `hidden`. It names no decoration any
     // more (decoration does not loop); what it still holds is a mascot that is not at a job.
-    const notActive = ambientRules.find(({ selector }) => !selector.includes("data-ambient-reason"));
+    const notActive = ambientRules.find(
+      ({ selector }) => !selector.includes("data-ambient-reason") && selector.includes(".chat-mascot"),
+    );
     const members = isMembers(notActive?.selector ?? "");
     expect(members.length).toBeGreaterThan(0);
     for (const member of members) {
@@ -352,17 +368,45 @@ describe("ambient pause", () => {
     expect(ambientRules.some(({ body }) => /animation-name:\s*none\s*!important/.test(body))).toBe(false);
   });
 
-  it("leaves the desk's dot grid standing still", () => {
-    const grid = flatRules(outsideReduced).filter(({ selectors }) => selectors.includes(".desk-canvas::before"));
-    expect(grid.length, ".desk-canvas::before rule missing").toBeGreaterThan(0);
-    for (const { body } of grid) {
-      expect(body).not.toMatch(/animation/);
+  it("pauses the stepped decoration in every state but active, and leaves a shape's entrance running", () => {
+    const decoration = ambientRules.find(({ selector }) => pausedMembers(selector).includes(".float-shape-body"));
+    expect(decoration, "no ambient rule pauses .float-shape-body").toBeDefined();
+    expect(decoration?.selector, "idle, blurred and hidden alike").not.toContain("data-ambient-reason");
+    expect(decoration?.body).toMatch(/animation-play-state:\s*paused\s*!important/);
+    // The settle is on the box outside the loop (`.float-shape`): pausing it would leave a shape that arrives in
+    // a window that has just lost focus at its invisible first keyframe.
+    for (const { selector } of ambientRules) {
+      expect(pausedMembers(selector), selector).not.toContain(".float-shape");
+      expect(pausedMembers(selector), selector).not.toContain(".float-shape-spin");
     }
+
+    // The dot grid's drift is on a pseudo-element, which cannot be listed inside `:is()`: a rule of its own.
+    const grid = ambientRules.find(({ selector }) => pausedMembers(selector).includes(".desk-grid::before"));
+    expect(grid, "no ambient rule pauses the dot grid").toBeDefined();
+    expect(grid?.selector, "idle, blurred and hidden alike").not.toContain("data-ambient-reason");
+    expect(grid?.body).toMatch(/animation-play-state:\s*paused\s*!important/);
+  });
+
+  it("moves the desk's dot grid only with the pointer and the stepped ambient drift", () => {
+    const grid = flatRules(outsideReduced).filter(({ selectors }) => selectors.includes(".desk-grid::before"));
+    expect(grid.length, ".desk-grid::before rule missing").toBeGreaterThan(0);
+    const body = grid.map((rule) => rule.body).join("\n");
+    // The one loop: the stepped drift. Nothing smooth, and no other animation.
+    expect(body).toMatch(
+      /animation:\s*nx-grid-drift\s+var\(--motion-drift\)\s+var\(--ease-ambient\)\s+infinite\s*;/,
+    );
+    // The pointer: parallax through two whole-pixel variables that attachDeskMotion walks a pixel a write, on
+    // the compositor. No transition: a position that glided between writes would keep a desk-wide layer
+    // moving on every frame, and every moving frame is composited in software.
+    expect(body).toMatch(
+      /transform:\s*translate\(\s*calc\(var\(--grid-x,\s*0\)\s*\*\s*-1px\)\s*,\s*calc\(var\(--grid-y,\s*0\)\s*\*\s*-1px\)\s*\)/,
+    );
+    expect(body).not.toMatch(/transition/);
     expect(css).not.toContain("nx-dots");
   });
 });
 
-// --- No decoration loops ---------------------------------------------------------------------------
+// --- Decoration loops only stepped ------------------------------------------------------------------
 //
 // The packaged Windows app runs Chromium without the GPU (`app.disableHardwareAcceleration()`), so a
 // running CSS animation is composited in software on the CPU, a whole frame at a time. Measured in a
@@ -371,6 +415,11 @@ describe("ambient pause", () => {
 // 12 quiet seconds (`lib/ambient-motion.ts`) cannot help a desk that is in use, so the rule is one
 // level up: decoration does not loop. It plays once when it arrives, it moves while the pointer moves,
 // it reacts once to a hover or a tap. Only status may loop, and only stepped.
+//
+// Since 2026-10-01 there is one exception, by the owner's choice ("reacts + a gentle loop"): a short list
+// of ambient loops (`AMBIENT_LOOP_SELECTORS`) that are stepped so they land on a shared 400 ms grid, run on
+// the compositor, pause with the desk and switch off by name under reduced motion. Measured in a
+// GPU-less Chromium, they cost a few tenths of a percent of the machine while somebody is using the desk.
 
 /** Every stylesheet the renderer ships, comments stripped, by path under `apps/web`. */
 function stylesheets(): { file: string; css: string }[] {
@@ -400,6 +449,15 @@ const MASCOT_STYLESHEET = "components/nultron/nultron.css";
 const BUSY_LOOP_SELECTORS = new Set([".pulse-dots > span"]);
 const isBusyLoop = (selector: string) => BUSY_LOOP_SELECTORS.has(selector) || selector.includes("[data-busy]");
 
+/**
+ * The decoration that may loop (owner ruling 2026-10-01): the shapes' bob and turn (`.float-shape-body`, the
+ * box inside a shape; a spinner only renames the animation) and the dot grid's drift. Stepped with
+ * `--ease-ambient`, never smooth. Adding to this list is a product decision, never a styling one.
+ */
+const AMBIENT_LOOP_SELECTORS = new Set([".float-shape-body", ".desk-grid::before"]);
+const AMBIENT_KEYFRAMES = ["nx-bob", "nx-turn", "nx-grid-drift"] as const;
+const isAmbientLoop = (selector: string) => AMBIENT_LOOP_SELECTORS.has(selector);
+
 /** Every `infinite` animation declaration outside the mascot's stylesheet, with the rule it sits in. */
 function loopsOutsideTheMascot(sheets: { file: string; css: string }[]) {
   return sheets
@@ -411,7 +469,7 @@ function loopsOutsideTheMascot(sheets: { file: string; css: string }[]) {
     );
 }
 
-describe("decoration does not loop", () => {
+describe("decoration loops only stepped, and only the ambient set", () => {
   const sheets = stylesheets();
 
   it("reads the stylesheets it claims to scan (guards the checks below)", () => {
@@ -427,20 +485,81 @@ describe("decoration does not loop", () => {
     expect(spelled(".a { animation: nx-rise 1s var(--ease-out) 1; }")).toBe(0);
   });
 
-  it("allows an infinite animation only for status: the working dots and a pose under [data-busy]", () => {
+  it("allows an infinite animation only for status and for the ambient set", () => {
     const offenders = loopsOutsideTheMascot(sheets)
-      .filter(({ selector }) => !isBusyLoop(selector))
+      .filter(({ selector }) => !isBusyLoop(selector) && !isAmbientLoop(selector))
       .map(({ file, selector, body }) => `${file}: ${selector} { ${body.replace(/\s+/g, " ").trim()} }`);
     expect(
       offenders,
-      `decoration must not loop (it costs a software-composited frame sixty times a second on the desktop shell).\n` +
+      `decoration must not loop unless it is in the stepped ambient set (a smooth loop costs a software-composited frame sixty times a second on the desktop shell).\n` +
         `Play it once on arrival, or move it with the pointer, or react once to a hover or tap:\n  ${offenders.join("\n  ")}`,
     ).toEqual([]);
   });
 
-  it("steps every allowed loop, so it costs about a fifth of a smooth one", () => {
-    for (const { file, selector, body } of loopsOutsideTheMascot(sheets)) {
-      expect(body, `${file}: ${selector}`).toMatch(/var\(--ease-busy\)/);
+  it("steps every allowed loop, so it costs a fraction of a smooth one", () => {
+    const loops = loopsOutsideTheMascot(sheets);
+    expect(
+      loops.some(({ selector }) => isAmbientLoop(selector)),
+      "the ambient loops: the scan found none",
+    ).toBe(true);
+    for (const { file, selector, body } of loops) {
+      const token = isAmbientLoop(selector) ? /var\(--ease-ambient\)/ : /var\(--ease-busy\)/;
+      expect(body, `${file}: ${selector}`).toMatch(token);
+    }
+    expect(blockAfter(css, ":root")).toMatch(/--ease-ambient:\s*steps\(\d+\)/);
+  });
+
+  it("moves the ambient loops with transform properties and opacity only", () => {
+    const allowed = new Set(["translate", "rotate", "scale", "transform", "opacity"]);
+    for (const name of AMBIENT_KEYFRAMES) {
+      const properties = new Set<string>();
+      for (const match of blockAfter(css, `@keyframes ${name} {`).matchAll(/([a-z-]+)\s*:/g)) {
+        properties.add(match[1]);
+      }
+      expect(properties.size, `@keyframes ${name} declares nothing`).toBeGreaterThan(0);
+      for (const property of properties) {
+        expect(allowed.has(property), `@keyframes ${name} animates ${property}`).toBe(true);
+      }
+    }
+  });
+
+  it("lands every ambient step on the shared 400 ms grid, so the loops repaint the desk together", () => {
+    // About 2.5 frames a second repaint the whole desk, not one per loop, only while each loop's step is a
+    // whole number of ticks. Steps per interval x intervals per cycle must divide the cycle into those.
+    const root = blockAfter(css, ":root");
+    const tick = Number(/--motion-tick:\s*(\d+)ms/.exec(root)?.[1]);
+    const bobTicks = Number(/--motion-ambient:\s*calc\(var\(--motion-tick\)\s*\*\s*(\d+)\)/.exec(root)?.[1]);
+    const driftTicks = Number(/--motion-drift:\s*calc\(var\(--motion-tick\)\s*\*\s*(\d+)\)/.exec(root)?.[1]);
+    const steps = Number(/--ease-ambient:\s*steps\((\d+)\)/.exec(root)?.[1]);
+    for (const [label, value] of Object.entries({ tick, bobTicks, driftTicks, steps })) {
+      expect(Number.isFinite(value) && value > 0, `${label} missing from :root`).toBe(true);
+    }
+    const intervals = (name: string) =>
+      (blockAfter(css, `@keyframes ${name} {`).match(/^\s*[\d.]+%\s*\{/gm) ?? []).length - 1;
+    const stepMs = {
+      "nx-bob": (tick * bobTicks) / (steps * intervals("nx-bob")),
+      // The turn is two bob cycles long (`.float-shape-spin > .float-shape-body` sets `animation-duration`).
+      "nx-turn": (tick * bobTicks * 2) / (steps * intervals("nx-turn")),
+      "nx-grid-drift": (tick * driftTicks) / (steps * intervals("nx-grid-drift")),
+    };
+    for (const [name, ms] of Object.entries(stepMs)) {
+      expect(Number.isInteger(ms / tick) && ms >= tick, `${name} steps every ${ms}ms, off the ${tick}ms grid`).toBe(
+        true,
+      );
+    }
+    const spin = flatRules(outsideReduced).find(({ selectors }) =>
+      selectors.includes(".float-shape-spin > .float-shape-body"),
+    );
+    expect(spin?.body).toMatch(/animation-name:\s*nx-turn\s*;/);
+    expect(spin?.body).toMatch(/animation-duration:[^;]*calc\(var\(--motion-ambient\)\s*\*\s*2\)/);
+  });
+
+  it("switches every ambient loop off by name under reduced motion", () => {
+    const off = flatRules(reducedBlock)
+      .filter(({ body }) => /animation:\s*none\s*!important/.test(body))
+      .flatMap(({ selectors }) => selectors);
+    for (const selector of AMBIENT_LOOP_SELECTORS) {
+      expect(off, `${selector} must be animation: none under reduced motion`).toContain(selector);
     }
   });
 
@@ -471,12 +590,12 @@ describe("decoration does not loop", () => {
   });
 });
 
-describe("decorative shapes arrive once and rest", () => {
+describe("decorative shapes arrive once, then bob in steps", () => {
   const shapeRules = flatRules(outsideReduced).filter(({ selectors }) =>
     selectors.some((selector) => /^\.float-shape(-spin)?$/.test(selector)),
   );
 
-  it("settles each shape with a finite entrance that fills backwards", () => {
+  it("settles each shape with a finite entrance that fills backwards, and nothing else on that box", () => {
     expect(shapeRules.length, ".float-shape rules missing").toBeGreaterThan(1);
     const base = shapeRules.find(({ selectors }) => selectors.includes(".float-shape"));
     expect(base?.body).toMatch(/animation:\s*nx-settle\s+var\(--motion-5\)\s+var\(--ease-spring\)\s+backwards\s*;/);
@@ -484,8 +603,38 @@ describe("decorative shapes arrive once and rest", () => {
     const spin = shapeRules.find(({ selectors }) => selectors.includes(".float-shape-spin"));
     expect(spin?.body).toMatch(/animation-name:\s*nx-settle-spin\s*;/);
     for (const { selectors, body } of shapeRules) {
+      // A second animation on this box would take the loop off the compositor (see the next test).
       expect(body, selectors.join(", ")).not.toMatch(/\binfinite\b|animation-iteration-count/);
       expect(body, selectors.join(", ")).not.toMatch(/animation-fill-mode:\s*(both|forwards)/);
+      expect(body, selectors.join(", ")).not.toMatch(/nx-bob|nx-turn/);
+    }
+  });
+
+  it("puts the loop on a box of its own inside the shape, never on the shape or its <svg>", () => {
+    // An animation on an <svg> root runs on the main thread, and so does one on an element that carries a
+    // second animation (even a finished one): a style recalculation on every frame, 60 a second, for as long
+    // as it loops. Measured on an empty Chat, 481 in 8 s against 12 with the loop alone on a box.
+    const body = flatRules(outsideReduced).find(({ selectors }) => selectors.includes(".float-shape-body"));
+    expect(body?.body).toMatch(
+      /animation:\s*nx-bob\s+var\(--motion-ambient\)\s+var\(--ease-ambient\)\s+infinite\s*;/,
+    );
+    // Shape i starts i ticks in, so the shapes bob a tick apart and every step stays on the grid.
+    expect(body?.body).toMatch(/animation-delay:\s*calc\(var\(--motion-tick\)\s*\*\s*var\(--i\)\)\s*;/);
+    const svg = flatRules(outsideReduced).filter(({ selectors }) => selectors.includes(".float-shape-body > svg"));
+    expect(svg.length).toBeGreaterThan(0);
+    for (const { body: svgBody } of svg) {
+      expect(svgBody).not.toMatch(/animation/);
+    }
+    const source = readFileSync(join(webRoot, "components", "floating-shapes.tsx"), "utf8");
+    expect(source, "the <svg> is inside .float-shape-body, which is inside .float-shape").toMatch(
+      /className="float-shape-body"[\s\S]*<svg\b/,
+    );
+  });
+
+  it("starts every bob keyframe on the shape's rest pose, so the loop can start at any moment without a jump", () => {
+    for (const name of ["nx-bob", "nx-turn"]) {
+      const first = blockAfter(css, `@keyframes ${name} {`).split("100%")[0] ?? "";
+      expect(first, `${name} must start at rest`).toMatch(/0%\s*\{[^}]*(translate:\s*0 0|rotate:\s*0deg)/);
     }
   });
 
@@ -500,11 +649,14 @@ describe("decorative shapes arrive once and rest", () => {
     expect(last("nx-settle")).toMatch(/translate:\s*0 0/);
   });
 
-  it("moves shapes with the pointer only through the hero's coalesced custom properties", () => {
+  it("moves shapes with the pointer only through the coalesced custom properties: the hero's parallax and the desk's push", () => {
     const live = flatRules(outsideReduced).find(({ selectors }) =>
       selectors.includes(".float-shapes-live .float-shape"),
     );
     expect(live?.body).toMatch(/transform:\s*translate\(/);
+    expect(live?.body).toMatch(/var\(--px,\s*0\)\s*\*\s*var\(--depth,\s*0\)/);
+    expect(live?.body).toMatch(/var\(--rx,\s*0\)/);
+    expect(live?.body).toMatch(/var\(--ry,\s*0\)/);
     expect(live?.body).not.toMatch(/animation/);
     expect(live?.body).toMatch(/transition:\s*transform\s+var\(--motion-\d\)\s+var\(--ease-out\)/);
   });

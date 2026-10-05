@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { messageUnlessBlocked } from "@/lib/gateway-blocked";
 import type { MediaPrice } from "@agentforge/core/media-pricing";
 import { Confetti } from "@/components/confetti";
 import { EnhancePromptButton } from "@/components/enhance-prompt-button";
@@ -9,13 +10,16 @@ import { GalleryImage } from "@/components/gallery-media";
 import { ModeHeader } from "@/components/mode-header";
 import { MascotSlot } from "@/components/mascot-slot";
 import { ModelSelect } from "@/components/model-select";
+import { StudioEmptyDesk } from "@/components/studio-empty-desk";
 import { WorkingStatus } from "@/components/working-status";
 import { SettingsLinkHint } from "@/components/settings-link-hint";
 import { t } from "@/lib/i18n";
+import { PROMPT_INPUT, PROMPT_ROW, PROMPT_SUBMIT } from "@/lib/prompt-row";
 import { imageEstimateView, mediaPriceHints } from "@/lib/media-estimate";
 import { keepModelChoice } from "@/lib/model-choice";
 import { apiFetch, mediaSrc } from "@/lib/api-client";
 import { useProductBrand } from "@/lib/product-brand";
+import { isGatewayBlockedText } from "@/lib/gateway-blocked";
 import { useDeskNeedsKey } from "@/lib/use-desk-needs-key";
 
 type StudioModel = {
@@ -112,7 +116,7 @@ export function ImagesStudio() {
         error?: { message?: string };
       };
       if (!response.ok) {
-        setError(data.error?.message ?? t("images.generateError"));
+        setError(messageUnlessBlocked(data, () => data.error?.message ?? t("images.generateError")));
         return;
       }
       setLanded((count) => count + 1);
@@ -133,7 +137,7 @@ export function ImagesStudio() {
     >
       <ModeHeader icon="images" title={t("images.title")} outcome={t("images.expectedInputs")} />
 
-      {error ? (
+      {error && !isGatewayBlockedText(error) ? (
         <div
           className="mt-4 rounded-xl border border-[var(--line)] px-4 py-3 text-sm text-[var(--danger)]"
           role="alert"
@@ -185,7 +189,7 @@ export function ImagesStudio() {
             ) : null}
           </div>
         )}
-        <div className="flex flex-wrap gap-2">
+        <div className={PROMPT_ROW}>
           <EnhancePromptButton
             text={prompt}
             surface="images"
@@ -196,7 +200,7 @@ export function ImagesStudio() {
           />
           <input
             type="text"
-            className="text-field min-w-0 flex-1 outline-none placeholder:text-[var(--text-3)]"
+            className={PROMPT_INPUT}
             placeholder={t("images.promptPlaceholder")}
             value={prompt}
             onChange={(event) => setPrompt(event.target.value)}
@@ -206,11 +210,11 @@ export function ImagesStudio() {
           {generating ? <MascotSlot mode="images" placement="beside" busy decorative /> : null}
           <button
             type="submit"
-            className={
+            className={`${PROMPT_SUBMIT} ${
               needsKey
-                ? "inline-flex h-8 shrink-0 items-center rounded-pill bg-[var(--line)] px-4 text-sm text-[var(--text-3)]"
+                ? "inline-flex h-8 shrink-0 items-center justify-center rounded-pill bg-[var(--line)] px-4 text-sm text-[var(--text-3)]"
                 : "btn btn-primary h-8 shrink-0 rounded-pill px-4"
-            }
+            }`}
             disabled={generating || !prompt.trim() || needsKey}
             title={needsKey ? t("images.needsKey", { gateway: gatewayName, settings: t("rail.settings") }) : undefined}
             data-testid="images-studio-submit"
@@ -229,7 +233,11 @@ export function ImagesStudio() {
         {landed > 0 ? <Confetti key={landed} /> : null}
         {loading ? (
           <p className="text-sm text-[var(--text-3)]">{t("images.loadingGallery")}</p>
-        ) : items.length === 0 ? null : (
+        ) : items.length === 0 ? (
+          generating ? null : (
+            <StudioEmptyDesk mode="images" flush />
+          )
+        ) : (
           <ul className="grid gap-4 sm:grid-cols-2 min-[1600px]:grid-cols-3 min-[2400px]:grid-cols-4">
             {items.map((item) => (
               <li key={item.id} className="overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]">

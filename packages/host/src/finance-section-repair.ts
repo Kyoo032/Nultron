@@ -11,6 +11,7 @@ import { UNVERIFIED_MARKER, type ComputedFinance } from "@agentforge/core/financ
 import type { FinanceBrief, FinanceSection } from "@agentforge/core/artifacts";
 import type { AppLocale, TenantContext } from "@agentforge/core";
 import { collectJobAssistantRun } from "./job-regen";
+import { throwIfJobAborted } from "./job-stream";
 import { guardSection, parseBriefSection, type GuardReport } from "./finance-brief-build";
 
 /** Sentence boundaries that survive "Rp 1.250.000.000" — a full stop between digits is not one. */
@@ -22,6 +23,8 @@ export type RepairPrompt = {
   readonly systemPrompt: string;
   readonly factsBlock: string;
   readonly locale: AppLocale;
+  /** The job's cancel: it reaches the rewrite call, and a cancelled rewrite stops the repair. */
+  readonly signal?: AbortSignal;
 };
 
 /** Split on sentence ends only where a capital follows, so grouped figures stay whole. */
@@ -81,9 +84,12 @@ async function rewriteOnce(
         `The sentence that failed:\n${offending.join("\n")}`,
         `Rewrite this section only.\nHeading: ${section.heading}\nBody:\n${section.body}`,
       ].join("\n\n"),
+      ...(prompt.signal ? { signal: prompt.signal } : {}),
     });
     return { ...section, ...parseBriefSection(run.text) };
   } catch {
+    // A cancel is the caller's answer, not a model that could not answer: it ends the repair.
+    throwIfJobAborted(prompt.signal);
     // A model that cannot answer the retry is not a reason to lose the brief; the strip below stands.
     return null;
   }

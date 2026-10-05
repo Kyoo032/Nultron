@@ -104,12 +104,15 @@ describe("POST /auth/token, grant_type=authorization_code", () => {
       "org_id",
       "refresh_expires_in",
       "refresh_token",
+      "role",
       "session_id",
       "tenant_id",
       "token_type",
       "user_id",
     ]);
     expect(body.token_type).toBe("Bearer");
+    // The helper signs in a seeded MEMBER, and the role is the member's own row, never a default.
+    expect(body.role).toBe("member");
     expect(body.expires_in).toBe(3600);
     expect(body.tenant_id).toBe(fixture.tenant.id);
     expect(body.org_id).toBe(fixture.org.id);
@@ -516,6 +519,7 @@ describe("the Bearer endpoints", () => {
       deviceId: fixture.user.id,
       sessionId: fixture.user.id,
       scope: "v1.chat",
+      role: "owner",
       now: Date.now(),
     });
 

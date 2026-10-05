@@ -28,6 +28,7 @@ import {
   sha256Hex,
   writeJsonAtomic,
 } from "./store-files";
+import { removeMeetingArtifacts } from "./artifacts";
 import { meetingRecordSchema, type MeetingRecord, type MeetingStatus } from "./records";
 import type { PathAllowlist } from "../edit/ffmpeg/paths";
 import { tenantDeniedRoots } from "../tenant-paths";
@@ -172,6 +173,11 @@ export function createMeetingStore(rootDir: string = meetingsRoot()): MeetingSto
       if (!record || record.workspaceId !== tenant.workspaceId) {
         return false;
       }
+      // The transcript and the minutes are artifacts, and the minutes' Knowledge card hangs off
+      // one of them. First, in one transaction: if that throws the folder is still here and the
+      // owner can press Delete again. Removing the folder alone left "<title> — transcript" in
+      // the artifacts list and the minutes answering Chat for a meeting that no longer existed.
+      removeMeetingArtifacts(tenant, record);
       rmSync(dir, { recursive: true, force: true });
       return true;
     },

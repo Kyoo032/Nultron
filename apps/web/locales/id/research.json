@@ -77,5 +77,13 @@
   "stubSourceTitle": "Stub Nultron",
   "stubSourceNotes": "Sumber sintetis untuk demo luring. Bukan halaman yang dibaca.",
   "stubContradiction": "Tidak ada ketidaksepakatan sumber — pencarian tidak dijalankan.",
-  "stubOpenQuestion": "Apa yang berubah setelah kunci gateway disimpan?"
+  "stubOpenQuestion": "Apa yang berubah setelah kunci gateway disimpan?",
+  "checks": {
+    "title": "Beberapa bagian dosir ini belum sepenuhnya didukung sumber",
+    "uncited": "Beberapa temuan tidak mencantumkan sumber.",
+    "unknownSources": "Beberapa kutipan menunjuk ke sumber yang tidak dibaca dalam proses ini.",
+    "emptySections": "Beberapa bagian kosong.",
+    "hint": "Dosir sudah tersimpan. Buka sumbernya sebelum mengandalkan sebuah temuan, atau jalankan pertanyaannya lagi.",
+    "listAria": "Hasil pemeriksaan"
+  }
 }

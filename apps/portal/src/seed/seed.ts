@@ -115,7 +115,8 @@ export async function runSeed(store: PortalStore, args: SeedArgs): Promise<SeedR
         tenantId: tenant.id,
         orgId: seatedOrg.id,
         email,
-        // Seeded users are active: there is no invitation flow to move them out of `invited`.
+        // Seeded users are active, so the first user needs no invite. Everyone after them comes in
+        // through `pnpm portal:invite`, which creates the `invited` member this never does.
         status: "active",
         role: "owner",
       }));

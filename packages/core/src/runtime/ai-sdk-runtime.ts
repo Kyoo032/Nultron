@@ -11,6 +11,8 @@ import { isOpenRouterBaseUrl } from "../privacy/openrouter";
 import { getDisabledTools } from "../tools/secret-scope";
 import { mapStreamPart } from "./stream-parts";
 import { invokeToolGuarded } from "./invoke-guarded";
+import { createEgressGuard, userTextOf } from "./egress-guard";
+import { createToolBudget, resolveMaxSteps } from "./tool-budget";
 import {
   MODEL_CONTACT_ATTEMPTS,
   formatContactProbe,
@@ -47,7 +49,9 @@ import {
 } from "../models/reasoning-effort";
 import type { ReasoningEffort } from "../models/reasoning-effort";
 import { parseAppLocale } from "../locale";
-import { providerEnv } from "../server-mode";
+import { isServerMode, providerEnv } from "../server-mode";
+import { providerBaseUrl } from "../providers/registry";
+import { directProviderFetch, refuseKeyRedirect, withKeyRedirectPolicy } from "./key-redirect";
 import { redactSecrets } from "../security/redact";
 import { GatewayHttpError, gatewayFailureOf, gatewayHttpFailure } from "../gateway-http-copy";
 import { abortErrorMessage, armStreamWatchdog, watchAsyncIterable } from "./stream-watchdog";
@@ -78,9 +82,8 @@ export function mergeOpenRouterZdr(body: unknown, baseUrl: string): unknown {
     return body;
   }
   const b = body as Record<string, unknown>;
-  const existingProvider = typeof b["provider"] === "object" && b["provider"] !== null
-    ? (b["provider"] as Record<string, unknown>)
-    : {};
+  const existingProvider =
+    typeof b["provider"] === "object" && b["provider"] !== null ? (b["provider"] as Record<string, unknown>) : {};
   return { ...b, provider: { ...existingProvider, zdr: true } };
 }
 
@@ -130,7 +133,7 @@ async function fetchWithHeaderTimeout(url: string | URL | Request, init: Request
   try {
     // Only header arrival is bounded here; once the response resolves the timer is cleared and the
     // body stream stays under the runtime's own idle watchdog.
-    return await fetch(url, { ...init, signal });
+    return await fetch(url, { ...withKeyRedirectPolicy(init), signal });
   } finally {
     clearTimeout(timer);
   }
@@ -194,9 +197,16 @@ export class AiSdkRuntime implements AgentRuntime {
     const anthropicKey = this.keys.anthropic ?? env.ANTHROPIC_API_KEY;
     const volcengineKey = this.keys.volcengine ?? env.ARK_API_KEY;
     const openaiBaseUrl = this.keys.openaiBaseUrl ?? env.OPENAI_BASE_URL ?? DEFAULT_OPENAI_BASE_URL;
-    const googleBaseUrl = this.keys.googleBaseUrl ?? env.GOOGLE_GENERATIVE_AI_BASE_URL;
-    const anthropicBaseUrl = this.keys.anthropicBaseUrl ?? env.ANTHROPIC_BASE_URL;
-    const volcengineBaseUrl = this.keys.volcengineBaseUrl ?? env.ARK_BASE_URL;
+    // Enterprise: on the hosted server a provider's host is the provider registry's literal, whatever the
+    // caller resolved. Volcengine is not a registry provider, so it keeps the Ark constant below.
+    const hosted = isServerMode();
+    const googleBaseUrl = hosted
+      ? providerBaseUrl("google")
+      : (this.keys.googleBaseUrl ?? env.GOOGLE_GENERATIVE_AI_BASE_URL);
+    const anthropicBaseUrl = hosted
+      ? providerBaseUrl("anthropic")
+      : (this.keys.anthropicBaseUrl ?? env.ANTHROPIC_BASE_URL);
+    const volcengineBaseUrl = hosted ? undefined : (this.keys.volcengineBaseUrl ?? env.ARK_BASE_URL);
     const modelName = input.version.model;
     const runLocale = parseAppLocale(input.locale);
     // One place turns a gateway 4xx/5xx into words: app-locale headline, upstream text to the log.
@@ -210,6 +220,8 @@ export class AiSdkRuntime implements AgentRuntime {
       return new GatewayHttpError(failure.message, status, text);
     };
     const provider = resolveModelProvider(modelName);
+    // Direct provider paths build their own SDK client; on the hosted server it must not follow a redirect.
+    const directFetch = directProviderFetch(runLocale);
 
     const openaiLooksCustom = !isOfficialOpenAIBaseUrl(openaiBaseUrl);
     const officialOpenAI = isOfficialOpenAIBaseUrl(openaiBaseUrl);
@@ -232,30 +244,22 @@ export class AiSdkRuntime implements AgentRuntime {
     });
 
     // Parked extras Google (unexposed GTM). Gemini chat auto uses gateway generateContent.
-    if (
-      requestedWire === "auto" &&
-      resolvedWire !== "google_generate_content" &&
-      provider === "google" &&
-      googleKey
-    ) {
+    if (requestedWire === "auto" && resolvedWire !== "google_generate_content" && provider === "google" && googleKey) {
       const google = createGoogleGenerativeAI({
         apiKey: googleKey,
         ...(googleBaseUrl ? { baseURL: googleBaseUrl } : {}),
+        ...(directFetch ? { fetch: directFetch } : {}),
       });
       await this.stream(google(modelName), input, effort);
       return;
     }
 
     // Parked extras Anthropic (unexposed GTM). Claude 5 auto uses the gateway Messages path.
-    if (
-      requestedWire === "auto" &&
-      resolvedWire !== "anthropic_messages" &&
-      provider === "anthropic" &&
-      anthropicKey
-    ) {
+    if (requestedWire === "auto" && resolvedWire !== "anthropic_messages" && provider === "anthropic" && anthropicKey) {
       const anthropic = createAnthropic({
         apiKey: anthropicKey,
         ...(anthropicBaseUrl ? { baseURL: anthropicBaseUrl } : {}),
+        ...(directFetch ? { fetch: directFetch } : {}),
       });
       await this.stream(anthropic(modelName, { sendReasoning: true }), input, effort);
       return;
@@ -266,6 +270,7 @@ export class AiSdkRuntime implements AgentRuntime {
         apiKey: volcengineKey || "ark",
         baseURL: volcengineBaseUrl || "https://ark.cn-beijing.volces.com/api/v3",
         compatibility: "compatible",
+        ...(directFetch ? { fetch: directFetch } : {}),
       });
       await this.stream(ark(modelName), input, effort);
       return;
@@ -315,7 +320,7 @@ export class AiSdkRuntime implements AgentRuntime {
               : minimaxBody;
           const bodyModel =
             typeof (withEffort as { model?: unknown }).model === "string"
-              ? ((withEffort as { model: string }).model)
+              ? (withEffort as { model: string }).model
               : modelName;
           minimax = minimax || isMinimaxChatModel(bodyModel);
           // The rest of a job's knob (its level is already in the effort plan); Chat sends no mode here.
@@ -330,6 +335,7 @@ export class AiSdkRuntime implements AgentRuntime {
         }
       }
       const response = await fetchWithHeaderTimeout(url, outgoing);
+      refuseKeyRedirect(response, runLocale);
       if (!response.ok) {
         const text = await readHttpErrorBody(response);
         throw gatewayFailure(response.status, text);
@@ -362,7 +368,7 @@ export class AiSdkRuntime implements AgentRuntime {
             const withThinking = applyAnthropicMessagesBody(scrubbed, effort.level());
             const bodyModel =
               typeof (withThinking as { model?: unknown }).model === "string"
-                ? ((withThinking as { model: string }).model)
+                ? (withThinking as { model: string }).model
                 : modelName;
             const sanitized = sanitizeGatewayRequestBody(withThinking, bodyModel, url);
             outgoing = { ...init, body: JSON.stringify(sanitized) };
@@ -371,6 +377,7 @@ export class AiSdkRuntime implements AgentRuntime {
           }
         }
         const response = await fetchWithHeaderTimeout(url, outgoing);
+        refuseKeyRedirect(response, runLocale);
         if (!response.ok) {
           const text = await readHttpErrorBody(response);
           throw gatewayFailure(response.status, text);
@@ -398,7 +405,7 @@ export class AiSdkRuntime implements AgentRuntime {
               : scrubbed;
             const bodyModel =
               typeof (withThinking as { model?: unknown }).model === "string"
-                ? ((withThinking as { model: string }).model)
+                ? (withThinking as { model: string }).model
                 : modelName;
             const sanitized = sanitizeGatewayRequestBody(withThinking, bodyModel, url);
             outgoing = { ...init, body: JSON.stringify(sanitized) };
@@ -407,6 +414,7 @@ export class AiSdkRuntime implements AgentRuntime {
           }
         }
         const response = await fetchWithHeaderTimeout(url, outgoing);
+        refuseKeyRedirect(response, runLocale);
         if (!response.ok) {
           const text = await readHttpErrorBody(response);
           throw gatewayFailure(response.status, text);
@@ -437,6 +445,10 @@ export class AiSdkRuntime implements AgentRuntime {
     },
   ): Promise<void> {
     const disabled = new Set(getDisabledTools());
+    // One counter for the whole execute: every retry below shares the tools built here.
+    const toolBudget = createToolBudget(input.budget);
+    // Same lifetime as the budget: a private read in one attempt still limits the fetches of the next.
+    const egressGuard = createEgressGuard({ userText: userTextOf(input.history) });
     const tools: Record<string, any> = {};
     for (const binding of input.bindings.filter((item) => item.enabled)) {
       if (disabled.has(binding.toolKey)) {
@@ -450,7 +462,7 @@ export class AiSdkRuntime implements AgentRuntime {
         description: definition.description,
         parameters: definition.schema,
         execute: async (args: unknown) =>
-          invokeToolGuarded(definition, scrubUnreachableMediaArgs(args), input.tenant),
+          invokeToolGuarded(definition, scrubUnreachableMediaArgs(args), input.tenant, toolBudget, egressGuard),
       });
     }
 
@@ -494,12 +506,7 @@ export class AiSdkRuntime implements AgentRuntime {
         model: input.version.model,
         attempt,
         attempts: MODEL_CONTACT_ATTEMPTS,
-        message: formatContactProbe(
-          input.version.model,
-          attempt,
-          MODEL_CONTACT_ATTEMPTS,
-          parseAppLocale(input.locale),
-        ),
+        message: formatContactProbe(input.version.model, attempt, MODEL_CONTACT_ATTEMPTS, parseAppLocale(input.locale)),
       });
     };
 
@@ -507,16 +514,11 @@ export class AiSdkRuntime implements AgentRuntime {
     let first = await consumeOnce(activeModel, hasTools ? tools : undefined, {
       responses: wire === "responses",
       messages: wire === "anthropic_messages",
-        google: wire === "google_generate_content",
+      google: wire === "google_generate_content",
       forceReasoningNone: !wantsThinking(),
     });
 
-    if (
-      first.failed &&
-      openaiWire &&
-      wire !== "chat_completions" &&
-      isMissingWireEndpoint(first.failed)
-    ) {
+    if (first.failed && openaiWire && wire !== "chat_completions" && isMissingWireEndpoint(first.failed)) {
       activeModel = openaiWire.chatModel;
       wire = "chat_completions";
       first = await consumeOnce(activeModel, hasTools ? tools : undefined, {
@@ -550,20 +552,22 @@ export class AiSdkRuntime implements AgentRuntime {
       ? await consumeOnce(activeModel, undefined, {
           responses: wire === "responses",
           messages: wire === "anthropic_messages",
-        google: wire === "google_generate_content",
+          google: wire === "google_generate_content",
         })
       : first;
     let contactAttempts = 1;
     const retryTools = shouldRetryBare ? undefined : hasTools ? tools : undefined;
     while (
       shouldRetryModelContact({
-        failed: result.failed || (shouldFailEmptyAssistant({
-          text: result.text,
-          thinking: Boolean(result.thinking),
-          tooled: result.tooled,
-        })
-          ? "The model returned no text"
-          : ""),
+        failed:
+          result.failed ||
+          (shouldFailEmptyAssistant({
+            text: result.text,
+            thinking: Boolean(result.thinking),
+            tooled: result.tooled,
+          })
+            ? "The model returned no text"
+            : ""),
         text: result.text,
         tooled: result.tooled,
         attempts: contactAttempts,
@@ -665,9 +669,7 @@ export class AiSdkRuntime implements AgentRuntime {
       this.keys.openaiBaseUrl ?? providerEnv().OPENAI_BASE_URL ?? DEFAULT_OPENAI_BASE_URL,
     );
     const providerOptions =
-      options.messages || options.google
-        ? undefined
-        : openaiCompatProviderOptions({ ...options, officialOpenAI });
+      options.messages || options.google ? undefined : openaiCompatProviderOptions({ ...options, officialOpenAI });
     const abort = new AbortController();
     // The caller's cancel aborts this request and wakes the stream reader, like a watchdog timeout.
     const unlinkCallerAbort = linkCallerAbort(abort, input.signal);
@@ -679,7 +681,7 @@ export class AiSdkRuntime implements AgentRuntime {
       abortSignal: abort.signal,
       // The contact loop below already retries; SDK retries would triple every offline wait.
       maxRetries: 0,
-      ...(tools ? { tools, maxSteps: 6 } : {}),
+      ...(tools ? { tools, maxSteps: resolveMaxSteps(input.budget) } : {}),
       ...(providerOptions ? { providerOptions } : {}),
     });
     // True once readable text has streamed. Whitespace is not text (`hasVisibleText`): a model that

@@ -32,6 +32,8 @@
     "./retry": "./src/runtime/retry.ts",
     "./tabular": "./src/tabular/index.ts",
     "./artifacts": "./src/artifacts/index.ts",
+    "./tools/files": "./src/tools/files/index.ts",
+    "./tools/code": "./src/tools/code/index.ts",
     "./jobs": "./src/jobs/index.ts",
     "./finance": "./src/finance/index.ts",
     "./market": "./src/market/index.ts",
@@ -43,7 +45,7 @@
     "./meeting": "./src/meeting/index.ts",
     "./channels": "./src/channels/index.ts",
     "./channels/pinned": "./src/channels/pinned.ts",
-    "./harness": "./src/harness/mode-skills.ts",
+    "./harness": "./src/harness/index.ts",
     "./documents": "./src/documents/source-check.ts",
     "./open-slide": "./src/open-slide/index.ts"
   },

@@ -51,7 +51,11 @@ export const MASCOT_MODES = [
 
 export type MascotMode = (typeof MASCOT_MODES)[number];
 
-export type MascotPlacement = "empty" | "beside";
+/**
+ * Where a character stands. `empty` is an unused desk, `beside` is next to a running job, and `buddy` is
+ * the desk buddy in the rail (`components/desk-buddy.tsx`), the one status character when it is on screen.
+ */
+export type MascotPlacement = "empty" | "beside" | "buddy";
 
 /**
  * How a state moves. This is the performance contract (the packaged Windows app has no GPU, so one
@@ -152,7 +156,7 @@ export const PHASE_POSES: readonly MascotState[] = [...new Set(Object.values(PHA
  * stops only when the window is hidden (`app/globals.css`, "Ambient pause").
  */
 export function isMascotBusy(state: MascotState, placement: MascotPlacement): boolean {
-  return placement === "beside" && STATE_MOTION[state] === "loop-busy";
+  return placement !== "empty" && STATE_MOTION[state] === "loop-busy";
 }
 
 export function isMascotState(value: string | null | undefined): value is MascotState {

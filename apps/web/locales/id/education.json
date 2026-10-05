@@ -34,6 +34,7 @@
   "examHint": "Tulis topiknya, lalu tekan Buat.",
   "bookHint": "Pilih gambar atau PDF, lalu tekan Baca.",
   "presenterHint": "Buat pelajaran dulu. Setelah itu Anda bisa menampilkannya.",
+  "presenterCreateLesson": "Buat pelajaran",
   "guide": {
     "lead": "Anda ingin melakukan apa?",
     "change": "Pilih yang lain"

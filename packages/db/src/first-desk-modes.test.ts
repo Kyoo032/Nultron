@@ -114,7 +114,12 @@ describe("ensureLocalOwner: the first desk on a fresh Personal install", () => {
 
 describe("the hosted Enterprise app keeps every mode on a first desk", () => {
   it("ensurePortalOwner creates a tenant's Default desk with every mode", async () => {
-    const tenant = await ensurePortalOwner(db, { tenantId: "tnt_ent", orgId: "org_ent", userId: "usr_ent" });
+    const tenant = await ensurePortalOwner(db, {
+      tenantId: "tnt_ent",
+      orgId: "org_ent",
+      userId: "usr_ent",
+      role: "owner",
+    });
 
     const [row] = await db.select().from(workspaces).where(eq(workspaces.id, tenant.workspaceId));
     expect(row?.productModes).toEqual(EVERY_MODE);

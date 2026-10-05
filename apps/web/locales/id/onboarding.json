@@ -77,5 +77,10 @@
       "busy": "Jendela lain sedang menyiapkannya.",
       "unknown": "Penyiapan pembaca tidak selesai."
     }
-  }
+  },
+  "later": "Tambahkan nanti",
+  "laterHint": "Anda bisa menempelkan kunci kapan saja di Pengaturan. Model tetap nonaktif sampai saat itu.",
+  "keyTitleRestricted": "Kunci perusahaan Anda belum disiapkan",
+  "keyHelpRestricted": "Pemilik atau admin menambahkan kunci perusahaan satu kali, dan semua orang di perusahaan memakainya.",
+  "keyRestricted": "Hanya pemilik atau admin yang dapat menambahkan kunci {gatewayName} perusahaan Anda. Minta salah satunya menambahkannya, lalu tekan Periksa lagi. Sementara itu Anda bisa melihat-lihat."
 }

@@ -1,5 +1,7 @@
 import { isJobEvent, type JobEvent } from "@agentforge/core/jobs";
 import { apiFetch } from "./api-client";
+import { gatewayBlockedMessage, hostedGatewayBlocked } from "./gateway-blocked";
+import { GATEWAY_BLOCKED_ERROR } from "./gateway-gate";
 import { reportPlanBlocked } from "./plan-block";
 import { consumeSse } from "./sse-client";
 
@@ -41,8 +43,13 @@ function text(value: unknown): string | null {
  *
  * So the flat shape is read **only** for plan codes, and `reportPlanBlocked` is called first so the
  * boundary in `App.tsx` puts the right screen up whatever this error then does. `gateway_blocked`
- * is deliberately left as it was: it is the other flat code, nothing consumes it from a job stream
- * today, and it has its own parser and its own screen.
+ * is the other flat code, and on the Personal app it is still left exactly as it was: it has its own
+ * parser and its own screen there (onboarding), and a job stream never read it.
+ *
+ * On the hosted build it IS read (Nultron Enterprise, 2026-10-01): a signed-in tenant may open the desk
+ * before adding a key, so a refused job is "no usable key", not "Request failed". It becomes a
+ * `gateway_blocked` error carrying the catalog sentence, never the host's English message, and the
+ * studio draws its calm needs-key note (`needs-key-note.tsx`) in place of an error banner.
  */
 export function errorFromJson(payload: unknown, status: number): JobStreamError {
   // Before anything is narrowed: a plan refusal is a whole-app state, not this job's error.
@@ -50,6 +57,9 @@ export function errorFromJson(payload: unknown, status: number): JobStreamError 
   const record = payload && typeof payload === "object" && !Array.isArray(payload) ? (payload as Record<string, unknown>) : null;
   if (plan) {
     return new JobStreamError(plan, text(record?.message) ?? FALLBACK_MESSAGE, status);
+  }
+  if (hostedGatewayBlocked(payload)) {
+    return new JobStreamError(GATEWAY_BLOCKED_ERROR, gatewayBlockedMessage(), status);
   }
   const error =
     record?.error && typeof record.error === "object"

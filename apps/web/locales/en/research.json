@@ -77,5 +77,13 @@
   "stubSourceTitle": "Nultron stub",
   "stubSourceNotes": "Synthetic source for the offline demo. Not a page that was read.",
   "stubContradiction": "No source disagreement — search did not run.",
-  "stubOpenQuestion": "What changes after a gateway key is saved?"
+  "stubOpenQuestion": "What changes after a gateway key is saved?",
+  "checks": {
+    "title": "A few parts of this dossier are not fully backed up",
+    "uncited": "Some findings cite no source.",
+    "unknownSources": "Some citations point to sources this run did not read.",
+    "emptySections": "Some sections came back empty.",
+    "hint": "The dossier is saved. Open the sources before you rely on a finding, or run the question again.",
+    "listAria": "What the checks found"
+  }
 }

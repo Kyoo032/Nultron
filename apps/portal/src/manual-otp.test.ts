@@ -146,4 +146,26 @@ describe("issueManualOtp", () => {
     if (fourth.ok) return;
     expect(fourth.reason).toBe("send_rate_limited");
   });
+
+  /**
+   * An invited member has not redeemed its invite, so it cannot hold a session: the login gate
+   * answers `user_inactive`. A code printed for it would verify and then lead nowhere, so the
+   * operator is told to issue an invite instead -- the one door a first sign-in has.
+   */
+  it("refuses an invited address that has not redeemed its invite, rather than print a code that cannot sign it in", async () => {
+    await store.tx(fixture.tenant.id, (ops) =>
+      ops.users.create({
+        tenantId: fixture.tenant.id,
+        orgId: fixture.org.id,
+        email: "waiting@example.test",
+        status: "invited",
+      }),
+    );
+
+    const result = await issueManualOtp(allowed, store, { email: "waiting@example.test" });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.reason).toBe("not_activated");
+  });
 });

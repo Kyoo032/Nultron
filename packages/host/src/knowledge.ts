@@ -22,7 +22,7 @@ import type { KnowledgeBackendId, RetrievedChunk, RetrieveResult } from "./knowl
 import { expandRetrievedChunks } from "./knowledge-expand";
 import { removeGraphForSource, sweepOrphanGraph } from "./knowledge-graph-prune";
 import { defaultSoul, isLegacyDefaultSoul, type KnowledgeSoul } from "./knowledge-soul";
-import { modeCatalogPayload } from "./selectable-models";
+import { modeDefaultsFor } from "./selectable-models";
 import { loadSettings } from "./settings-store";
 import { escapeLikePattern, LIKE_ESCAPE } from "./sql-guard";
 
@@ -88,8 +88,8 @@ function workspaceId(tenant: TenantContext): string {
   return tenant.workspaceId;
 }
 
-function catalogKnowledgeDefaults(): KnowledgeModels {
-  const { defaults } = modeCatalogPayload();
+function catalogKnowledgeDefaults(tenant: TenantContext): KnowledgeModels {
+  const defaults = modeDefaultsFor(tenant);
   return {
     embeddingModel: defaults.embedding,
     brainModel: defaults.knowledgeBrain,
@@ -102,7 +102,7 @@ export function getKnowledgeModels(tenant: TenantContext): KnowledgeModels {
     .prepare("SELECT embedding_model, brain_model, verifier_model FROM knowledge_settings WHERE workspace_id = ?")
     .get(workspaceId(tenant)) as { embedding_model: string; brain_model: string; verifier_model: string } | undefined;
   if (!row) {
-    return catalogKnowledgeDefaults();
+    return catalogKnowledgeDefaults(tenant);
   }
   return {
     embeddingModel: row.embedding_model,
@@ -766,9 +766,47 @@ export function deleteSourceByOrigin(tenant: TenantContext, origin: SourceOrigin
 }
 
 /** Meta keys that tie an artifact to the record it was produced for. */
-export type ArtifactOwnerKey = "datasetId" | "matterId";
+export type ArtifactOwnerKey = "datasetId" | "matterId" | "meetingId";
 
 type SqlLike = Pick<typeof sql, "prepare">;
+
+/**
+ * Ids of the artifacts one dataset, matter or meeting produced, from the `meta` pair that ties them.
+ * Throws when the table cannot be read, so a caller that needs all-or-nothing can let it propagate;
+ * `deleteArtifactsByOwner` is the one that swallows.
+ *
+ * Matched on the `meta` JSON both ways: a `LIKE` on the serialized pair narrows the scan without
+ * needing JSON1, then the parsed value has to agree.
+ */
+export function artifactIdsOwnedBy(
+  tenant: TenantContext,
+  key: ArtifactOwnerKey,
+  ownerId: string,
+  db: SqlLike = sql,
+): string[] {
+  if (!ownerId) {
+    return [];
+  }
+  // `ownerId` is request text: a `%` or `_` in it is a LIKE wildcard, so the pattern is escaped
+  // and the statement names the escape character. Without both, an id of `%` shortlists every
+  // artifact in the workspace and the exact-meta check below is the only thing left guarding it.
+  const needle = escapeLikePattern(`${JSON.stringify(key)}:${JSON.stringify(ownerId)}`);
+  const rows = db
+    .prepare(`SELECT id, meta FROM artifacts WHERE workspace_id = ? AND meta LIKE ? ESCAPE '${LIKE_ESCAPE}'`)
+    .all(workspaceId(tenant), `%${needle}%`) as Array<{
+    id: string;
+    meta: string;
+  }>;
+  return rows
+    .filter((row) => {
+      try {
+        return (JSON.parse(row.meta) as Record<string, unknown>)[key] === ownerId;
+      } catch {
+        return false;
+      }
+    })
+    .map((row) => row.id);
+}
 
 /**
  * Delete every artifact one dataset or matter produced.
@@ -777,9 +815,6 @@ type SqlLike = Pick<typeof sql, "prepare">;
  * has to reach the artifacts first — otherwise the analysis keeps answering Chat about numbers that
  * are gone, and a matter the owner deleted keeps feeding its red flags into every later turn. The
  * caller runs `sweepOrphanSources` afterwards, which collects the cards these rows owned.
- *
- * Matched on the `meta` JSON both ways: a `LIKE` on the serialized pair narrows the scan without
- * needing JSON1, then the parsed value has to agree before anything is deleted.
  */
 export function deleteArtifactsByOwner(
   tenant: TenantContext,
@@ -791,26 +826,10 @@ export function deleteArtifactsByOwner(
     return 0;
   }
   try {
-    // `ownerId` is request text: a `%` or `_` in it is a LIKE wildcard, so the pattern is escaped
-    // and the statement names the escape character. Without both, an id of `%` shortlists every
-    // artifact in the workspace and the exact-meta check below is the only thing left guarding it.
-    const needle = escapeLikePattern(`${JSON.stringify(key)}:${JSON.stringify(ownerId)}`);
-    const rows = db
-      .prepare(`SELECT id, meta FROM artifacts WHERE workspace_id = ? AND meta LIKE ? ESCAPE '${LIKE_ESCAPE}'`)
-      .all(workspaceId(tenant), `%${needle}%`) as Array<{
-      id: string;
-      meta: string;
-    }>;
-    const owned = rows.filter((row) => {
-      try {
-        return (JSON.parse(row.meta) as Record<string, unknown>)[key] === ownerId;
-      } catch {
-        return false;
-      }
-    });
+    const owned = artifactIdsOwnedBy(tenant, key, ownerId, db);
     const statement = db.prepare("DELETE FROM artifacts WHERE workspace_id = ? AND id = ?");
-    for (const row of owned) {
-      statement.run(workspaceId(tenant), row.id);
+    for (const id of owned) {
+      statement.run(workspaceId(tenant), id);
     }
     return owned.length;
   } catch (error) {
@@ -886,6 +905,29 @@ export function sourcesDetail(result: RetrieveResult): string {
   return result.mode === "none" ? `${count} chunks` : `${count} chunks · ${result.mode}`;
 }
 
+/**
+ * The body of `## Retrieved sources`: `[n] <sourceName>` on its own line, then the chunk, in citation
+ * order. The default Soul rule asks for a citation, so the marker has to name the source, not just
+ * number it. Names are already normalized at index time; sanitizing again here keeps rows written by
+ * older builds (or by a future backend) from forging a line.
+ */
+export function renderRetrievedBlock(chunks: readonly RetrievedChunk[]): string {
+  return chunks
+    .map((chunk, index) => `[${index + 1}] ${sanitizeSourceName(chunk.sourceName) || chunk.sourceId}\n${chunk.body}`)
+    .join("\n\n");
+}
+
+const estimateInjectionTokens = (text: string) => Math.ceil(text.trim().length / 4);
+
+/** The Sources row of the context popover for one retrieval: its line and what it adds to the prompt. */
+export function sourcesPart(retrieved: RetrieveResult): KnowledgeInjection["parts"][number] {
+  return {
+    label: "Sources",
+    detail: sourcesDetail(retrieved),
+    tokens: estimateInjectionTokens(renderRetrievedBlock(retrieved.chunks)),
+  };
+}
+
 export async function knowledgeInjection(
   tenant: TenantContext,
   query = "",
@@ -905,25 +947,20 @@ export async function knowledgeInjection(
     .filter(Boolean)
     .join("\n");
   const memoryBlock = memories.map((item) => `- ${item.text}`).join("\n");
-  // `[n] <sourceName>` on its own line: the default Soul rule asks for a citation, so the marker has
-  // to name the source, not just number it. Names are already normalized at index time; sanitizing
-  // again here keeps rows written by older builds (or by a future backend) from forging a line.
-  const retrievedBlock = retrieved.chunks
-    .map((chunk, index) => `[${index + 1}] ${sanitizeSourceName(chunk.sourceName) || chunk.sourceId}\n${chunk.body}`)
-    .join("\n\n");
+  const retrievedBlock = renderRetrievedBlock(retrieved.chunks);
   const sections = [
     soulBlock ? `## Soul\n${soulBlock}` : "",
     memoryBlock ? `## Pinned memories\n${memoryBlock}` : "",
     retrievedBlock ? `## Retrieved sources\n${retrievedBlock}` : "",
   ].filter(Boolean);
   const prompt = sections.length ? `\n\n# Workspace knowledge\n${sections.join("\n\n")}` : "";
-  const est = (text: string) => Math.ceil(text.trim().length / 4);
+  const est = estimateInjectionTokens;
   return {
     prompt,
     parts: [
       { label: "Soul", detail: soul.name, tokens: est(soulBlock) },
       { label: "Memories", detail: `${memories.length} pinned`, tokens: est(memoryBlock) },
-      { label: "Sources", detail: sourcesDetail(retrieved), tokens: est(retrievedBlock) },
+      sourcesPart(retrieved),
     ],
     chunks: retrieved.chunks,
     backend: retrieved.backend,
