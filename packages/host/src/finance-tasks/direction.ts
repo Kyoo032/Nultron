@@ -18,6 +18,7 @@ import {
 import type { JobEmitter } from "@agentforge/core/jobs";
 import { stripMarkedSentences } from "../finance-section-repair";
 import { collectJobAssistantRun } from "../job-regen";
+import { throwIfJobAborted } from "../job-stream";
 import { extractJsonObject } from "../presentation-outline";
 import type { FinanceTaskRunContext } from "./types";
 
@@ -27,7 +28,7 @@ export const DIRECTION_EMPTY: Readonly<Record<ReportLocale, string>> = Object.fr
   id: "Teks bagian ini dihapus karena isinya berlawanan dengan angka yang sudah dihitung.",
 });
 
-const DIRECTION_SYSTEM = `You rewrite one section of a DPSBuddy finance report.
+const DIRECTION_SYSTEM = `You rewrite one section of a Nultron finance report.
 Return ONLY valid JSON (no markdown fences) with this exact shape: { "heading": string, "body": string }
 Rules:
 - Every number in the body must be one of the facts listed above, written with the same value. Add none.
@@ -49,6 +50,8 @@ export type DirectionHoldOptions = {
   readonly allowed: readonly number[];
   readonly emit: JobEmitter;
   readonly phase: string;
+  /** The job's cancel, handed to each rewrite call. */
+  readonly signal?: AbortSignal;
 };
 
 export type DirectionHoldResult<S extends DirectionSection> = {
@@ -101,6 +104,7 @@ export async function holdReadingDirection<S extends DirectionSection>(
       next.push(section);
       continue;
     }
+    throwIfJobAborted(options.signal);
     const run = await collectJobAssistantRun({
       tenant: options.tenant,
       model: options.model,
@@ -112,6 +116,7 @@ export async function holdReadingDirection<S extends DirectionSection>(
       prompt: [options.factsBlock, RETRY[options.locale], `Section:\n${section.heading}\n\n${section.body}`]
         .filter(Boolean)
         .join("\n\n"),
+      ...(options.signal ? { signal: options.signal } : {}),
     });
     const rewritten = readRewrite(run.text) ?? section.body;
     const guarded = guardNumbers(rewritten, options.allowed);

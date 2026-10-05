@@ -8,7 +8,15 @@ import {
   PORTAL_LOCALES,
   translator,
 } from "./i18n";
-import { approvePage, enterCodePage, errorPage, signInPage, userCodePage } from "./pages";
+import {
+  approvePage,
+  enterCodePage,
+  errorPage,
+  inviteCodePage,
+  signInPage,
+  statePage,
+  userCodePage,
+} from "./pages";
 
 const t = translator("en");
 const base = { locale: "en" as const, t };
@@ -111,8 +119,8 @@ describe("copy", () => {
     expect(t("nope.not.here")).toBe("nope.not.here");
   });
 
-  it("names the product DPSBuddy in both locales", () => {
-    expect(copyPair("product")).toEqual({ en: "DPSBuddy", id: "DPSBuddy" });
+  it("names the product Nultron in both locales", () => {
+    expect(copyPair("product")).toEqual({ en: "Nultron", id: "Nultron" });
   });
 });
 
@@ -129,7 +137,11 @@ describe("pages", () => {
     expect(page).toContain('name="csrf_token" value="tok-1"');
     expect(page).toContain('name="state" value="s1"');
     expect(page).toContain('name="redirect_uri" value="https://localhost:3443/auth/callback"');
-    expect(page).toContain("Send code");
+    // The first screen asks for an address and promises nothing: what follows is the portal's call.
+    expect(page).toContain(">Continue</button>");
+    expect(page).not.toContain("Send code");
+    expect(page).not.toContain("invite_code");
+    expect(page.toLowerCase()).not.toContain("password");
   });
 
   it("escapes an injected state, redirect_uri and e-mail on the sign-in form", () => {
@@ -143,22 +155,111 @@ describe("pages", () => {
       });
       expectNoInjectedMarkup(page, payload);
       // Escaped, not dropped: the form still renders and the value is still there, entity-encoded.
-      expect(page).toContain("Send code");
+      expect(page).toContain(">Continue</button>");
       expect(page).toMatch(/&(lt|quot|#39);/);
     }
   });
 
-  it("names no e-mail address on the code page, so a known and an unknown address look the same", () => {
-    const one = enterCodePage({
+  const screens = {
+    code: (email: string, lead = "We sent a code.") =>
+      enterCodePage({
+        ...base,
+        action: "/authorize/verify",
+        resendAction: "/authorize/email",
+        restartAction: "/authorize/email",
+        csrfToken: "tok",
+        hidden: { state: "s" },
+        email,
+        lead,
+      }),
+    invite: (email: string) =>
+      inviteCodePage({
+        ...base,
+        action: "/authorize/invite",
+        resendAction: "/authorize/invite/resend",
+        restartAction: "/authorize/email",
+        csrfToken: "tok",
+        hidden: { state: "s" },
+        email,
+      }),
+  };
+
+  it("names the address on the code page, carries it to the next post, and offers a new code or another address", () => {
+    const page = screens.code("tester@example.test", base.t("sent.body", { email: "tester@example.test", minutes: 10 }));
+
+    expect(page).toContain("We sent a sign-in code to tester@example.test.");
+    expect(page).toContain('name="email" value="tester@example.test"');
+    expect(page).toContain('name="resend" value="1"');
+    expect(page).toContain('name="restart" value="1"');
+    expect(page).toContain("Send a new code");
+    expect(page).toContain("Use a different e-mail");
+    expect(page.toLowerCase()).not.toContain("password");
+  });
+
+  it("asks an invitee for the invite code, names the address, never echoes a code, and has no password field", () => {
+    const page = screens.invite("tester@example.test");
+
+    expect(page).toContain("Enter the invite code we e-mailed to tester@example.test.");
+    expect(page).toContain('name="invite_code"');
+    expect(page).toMatch(/name="invite_code"[^>]*required/);
+    expect(page).not.toMatch(/name="invite_code"[^>]*value=/);
+    expect(page).not.toContain('name="code"');
+    expect(page).toContain("E-mail me my invite again");
+    expect(page).toContain('action="/authorize/invite/resend"');
+    expect(page.toLowerCase()).not.toContain("password");
+  });
+
+  it("escapes an injected address on the code, invite and state screens", () => {
+    for (const payload of INJECTIONS) {
+      expectNoInjectedMarkup(screens.code(payload, payload), payload);
+      expectNoInjectedMarkup(screens.invite(payload), payload);
+      expectNoInjectedMarkup(
+        statePage({
+          ...base,
+          title: payload,
+          message: payload,
+          restartAction: "/authorize/email",
+          csrfToken: "tok",
+          hidden: { state: payload },
+        }),
+        payload,
+      );
+    }
+  });
+
+  it("offers the one thing a dead end allows: another address", () => {
+    const page = statePage({
       ...base,
-      action: "/authorize/verify",
+      title: base.t("state.noAccess.title"),
+      message: base.t("state.noAccess.body"),
+      restartAction: "/authorize/email",
       csrfToken: "tok",
       hidden: { state: "s" },
-      expiresInMinutes: 10,
     });
-    expect(one).toContain("If that address has an account");
-    // No address anywhere in the document: the page cannot say whether the one typed exists.
-    expect(one).not.toMatch(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/i);
+
+    expect(page).toContain("This e-mail does not have access yet. Ask your company admin to invite you.");
+    expect(page).toContain('name="restart" value="1"');
+    expect(page).not.toContain('name="code"');
+  });
+
+  it("greets a signed-in person by address on the device screens, with a way out, and escapes it", () => {
+    for (const payload of INJECTIONS) {
+      const account = { email: payload, signOutAction: "/logout", csrfToken: "tok" };
+      const page = userCodePage({ ...base, action: "/activate", csrfToken: "tok", account });
+      expectNoInjectedMarkup(page, payload);
+      expect(page).toContain("Not you? Sign out");
+    }
+    const approve = approvePage({
+      ...base,
+      action: "/auth/device/approve",
+      csrfToken: "tok",
+      userCode: "K7M4-PQ9T",
+      platform: "Windows",
+      deviceLabel: null,
+      account: { email: "tester@example.test", signOutAction: "/logout", csrfToken: "tok" },
+    });
+    expect(approve).toContain("You are signed in as tester@example.test.");
+    expect(approve).toContain('action="/logout"');
   });
 
   it("escapes an injected user_code on the approve screen and shows the row's platform", () => {
@@ -201,8 +302,8 @@ describe("pages", () => {
     expect(page.startsWith("<!doctype html>")).toBe(true);
     expect(page).toContain('<html lang="id">');
     expect(page).toContain("Terjadi kesalahan");
-    expect(page).toContain("DPSBuddy");
+    expect(page).toContain("Nultron");
     // The mark rides in the shell, so every screen carries it, not only the sign-in one.
-    expect(page).toContain('<img src="/assets/logo.png" alt="DPSBuddy" width="24" height="24">');
+    expect(page).toContain('<img src="/assets/logo.png" alt="Nultron" width="24" height="24">');
   });
 });

@@ -5,6 +5,8 @@ import { executePastSessionsTool } from "./session-recall";
 
 export const pastSessionsTool = defineTool({
   key: "past_sessions",
+  // The owner's earlier chats: scanned like any other private text, and reading them taints the run (SR-112).
+  trust: "user_content",
   name: "Past chats",
   description:
     "List or read the user's earlier chat sessions with this agent. Use when they mention a previous conversation.",

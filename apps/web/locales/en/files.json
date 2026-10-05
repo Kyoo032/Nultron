@@ -1,0 +1,111 @@
+{
+  "title": "Files",
+  "intro": "Notes and documents your agents create on this desk. Every change is kept as a version, so you can look back and restore one.",
+  "count": "{count} files",
+  "countOne": "1 file",
+  "list": {
+    "aria": "Files on this desk",
+    "topLevel": "Top level",
+    "loading": "Loading files…",
+    "retry": "Try again",
+    "open": "Open {path}",
+    "version": "v{version}",
+    "updated": "Updated {when}"
+  },
+  "empty": {
+    "title": "No files yet",
+    "body": "Files your agents create land here, with every version kept. You can also add a text file yourself."
+  },
+  "new": {
+    "open": "New file",
+    "formAria": "New file",
+    "pathLabel": "File path",
+    "pathPlaceholder": "notes/plan.md",
+    "pathHint": "Use / between folders, like notes/plan.md.",
+    "contentLabel": "Text",
+    "contentPlaceholder": "Type or paste the text of the file…",
+    "save": "Save file",
+    "saving": "Saving…",
+    "cancel": "Cancel"
+  },
+  "upload": {
+    "button": "Upload text file",
+    "hint": "Text files only, up to {max}. Saved at the top level under the file's own name.",
+    "tooLarge": "{name} is larger than {max}, so it was not uploaded.",
+    "binary": "{name} is not a text file, so it was not uploaded.",
+    "readFailed": "{name} could not be read."
+  },
+  "viewer": {
+    "aria": "File viewer",
+    "close": "Close",
+    "loading": "Opening file…",
+    "textAria": "Text of {path}",
+    "empty": "This file is empty.",
+    "truncated": "Showing the first {shown} of {total} lines.",
+    "latest": "Latest version",
+    "oldVersion": "Version {version}, not the latest",
+    "viewing": "Viewing version {version} of {total}",
+    "missing": "That file is not on this desk, or it was deleted.",
+    "versionLoading": "Loading version {version}…"
+  },
+  "versions": {
+    "title": "Versions",
+    "aria": "Version history",
+    "version": "Version {version}",
+    "latest": "Latest"
+  },
+  "author": {
+    "you": "You",
+    "teammate": "A teammate",
+    "agent": "Agent",
+    "agentIn": "Agent in {mode}"
+  },
+  "restore": {
+    "button": "Restore this version",
+    "title": "Restore version {version}?",
+    "body": "This saves the text of version {version} as a new latest version. Nothing is lost: the versions after it stay in the history.",
+    "confirm": "Restore",
+    "working": "Restoring…",
+    "done": "Restored version {from} as version {to}."
+  },
+  "delete": {
+    "button": "Delete",
+    "title": "Delete {path}?",
+    "body": "The file leaves this list and agents can no longer read it. Deleting does not free storage space.",
+    "confirm": "Delete file",
+    "working": "Deleting…",
+    "done": "Deleted {path}."
+  },
+  "saved": "Saved {path} as version {version}.",
+  "cancel": "Cancel",
+  "errors": {
+    "generic": "Something went wrong with the files. Try again.",
+    "network": "The files could not be reached. Check the connection and try again.",
+    "notFound": "That file is not on this desk.",
+    "tooLarge": "That text is larger than 2 MB.",
+    "tooMany": "This desk already holds the most files it can. Delete some first.",
+    "denied": "Files hold plain text only. That content is not valid text.",
+    "badPath": "That file path is not allowed.",
+    "quota": "This account has no storage space left. Every saved version counts.",
+    "unavailable": "The file store is unavailable right now. Try again later.",
+    "badResponse": "The files answered in a way this app does not understand."
+  },
+  "pathErrors": {
+    "empty": "Give the file a path, like notes/plan.md.",
+    "absolute": "Start the path at the top, with no leading /.",
+    "backslash": "Use / between folders, not a backslash.",
+    "dots": "Parts named . or .. are not allowed.",
+    "emptyPart": "The path has an empty part (a doubled or trailing /).",
+    "tooLong": "The path is longer than 240 characters.",
+    "tooDeep": "The path has more than 8 parts (folders plus the file name)."
+  },
+  "deskSources": {
+    "add": "Add from desk files",
+    "limit": "Up to {max} files",
+    "full": "{max} files picked, the most that fit. Remove one to add another.",
+    "chips": "Desk files used as sources",
+    "listAria": "Desk files",
+    "remove": "Remove {name}",
+    "tooLarge": "These files and the pasted text are over the source limit, so only the first part is used."
+  }
+}

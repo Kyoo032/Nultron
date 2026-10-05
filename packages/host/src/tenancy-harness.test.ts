@@ -40,17 +40,13 @@ delete process.env.DATABASE_URL;
 delete process.env.AGENTFORGE_SERVER;
 
 import type { TenantContext } from "@agentforge/core";
+import type { DeskPath } from "@agentforge/core/tools/files";
 import { dispatch, isByIdRoute, routeRegistrations } from "./router";
+import { DESK_FILE_ROUTES } from "./desk-files/routes";
+import { createDeskRoot } from "./desk-files/store";
 import { createSession } from "./auth/session";
 import { createMemorySessionStore } from "./auth/session-store";
-import type {
-  HostBytesResult,
-  HostFile,
-  HostJsonResult,
-  HostRequest,
-  HostResult,
-  HostStreamResult,
-} from "./types";
+import type { HostBytesResult, HostFile, HostJsonResult, HostRequest, HostResult, HostStreamResult } from "./types";
 
 const T0 = Date.UTC(2026, 8, 20, 9, 0, 0);
 
@@ -127,7 +123,25 @@ type Seeds = {
   agentId: string;
   channelId: string;
   meetingId: string;
+  proposalId: string;
 };
+
+/**
+ * Shared by the three `/api/v1/folder/proposals/:proposalId` rows. On the hosted server the folder
+ * root does not exist, so the routes never get as far as the id.
+ */
+const FOLDER_PROPOSAL_WHY =
+  "The folder root is a Personal feature. Every folder route except `GET /api/v1/folder` runs " +
+  "`requireAvailable()` as the first statement of `guarded` (folder-root/routes.ts:46, defined " +
+  ":26-30) and answers 403 `folder_unavailable` when `folderRootAvailable()` is false, which is " +
+  "whenever `AGENTFORGE_SERVER` is on (folder-root/availability.ts:11-13). That runs before " +
+  "`request.params.proposalId` is read (routes.ts:87, :91, :95), so on a hosted server A's id and " +
+  "a ghost id take the same path and neither is looked up — a 404 is not available to these " +
+  "routes. This harness deletes `AGENTFORGE_SERVER` at the top of the file and passes server mode only as a " +
+  "dispatch option, so here the guard passes and the call reaches the desk-scoped lookup " +
+  "`store.get` (folder-root/proposal-store.ts:135-138, `WHERE workspace_id = ? AND id = ?`), " +
+  "which finds nothing for tenant B. The survivor check below proves A's proposal is still " +
+  "pending after approve and reject were both called with its id.";
 
 const BY_ID_ROUTES: readonly ByIdRoute[] = [
   // --- edit ---------------------------------------------------------------------------------
@@ -447,6 +461,31 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
       "read), and a meeting that does not exist takes exactly the same path. Same shape as " +
       "POST /api/v1/edit/projects/:projectId/agent above.",
   },
+
+  // --- folder (Personal only) -------------------------------------------------------------------
+  {
+    method: "GET",
+    path: "/api/v1/folder/proposals/:proposalId",
+    params: { proposalId: "proposalId" },
+    refusal: "indistinguishable",
+    why: FOLDER_PROPOSAL_WHY,
+  },
+  {
+    method: "POST",
+    path: "/api/v1/folder/proposals/:proposalId/approve",
+    params: { proposalId: "proposalId" },
+    body: {},
+    refusal: "indistinguishable",
+    why: FOLDER_PROPOSAL_WHY,
+  },
+  {
+    method: "POST",
+    path: "/api/v1/folder/proposals/:proposalId/reject",
+    params: { proposalId: "proposalId" },
+    body: {},
+    refusal: "indistinguishable",
+    why: FOLDER_PROPOSAL_WHY,
+  },
 ];
 
 let store: ReturnType<typeof createMemorySessionStore>;
@@ -481,8 +520,8 @@ async function seedTenantA(): Promise<Seeds> {
   const { db, createLocalWorkspace, editCards, editJobs, editUnplaced, ensurePortalOwner, resolvePortalTenant } =
     await import("@agentforge/db");
 
-  await ensurePortalOwner(db, IDENTITY_A);
-  await ensurePortalOwner(db, IDENTITY_B);
+  await ensurePortalOwner(db, { ...IDENTITY_A, role: "owner" });
+  await ensurePortalOwner(db, { ...IDENTITY_B, role: "owner" });
 
   const resolvedA = await resolvePortalTenant(db, IDENTITY_A);
   if (!resolvedA.ok) {
@@ -626,6 +665,21 @@ async function seedTenantA(): Promise<Seeds> {
   );
   const meeting = await step("meeting", () => meetingStore().create(tenantA, { title: LEAK_MARKER, locale: "en" }));
 
+  // Through the proposal store the folder routes themselves read (`defaultFolderDeps` is the cached
+  // one on the app database). A delete proposal has no proposed text to seal, and `pending` is the
+  // state the survivor check below expects approve and reject to have left alone.
+  const proposalId = await step("folder proposal", async () => {
+    const { defaultFolderDeps } = await import("./folder-root/deps");
+    const deps = await defaultFolderDeps();
+    return deps.store.propose(tenantA, {
+      runId: crypto.randomUUID(),
+      path: `${LEAK_MARKER}.md`,
+      kind: "delete",
+      beforeSha256: "0".repeat(64),
+      afterBody: null,
+    });
+  });
+
   const mediaRow = await step("media", () =>
     saveMedia(tenantA, new File([png], `${LEAK_MARKER}.png`, { type: "image/png" })),
   );
@@ -654,6 +708,7 @@ async function seedTenantA(): Promise<Seeds> {
     agentId: agent.agent.id,
     channelId: channel.id,
     meetingId: meeting.id,
+    proposalId,
   };
 }
 
@@ -856,6 +911,20 @@ describe("every by-id route refuses another tenant's id", () => {
     expect(listSources(tenantA).map((row) => row.id)).toContain(seeds.sourceId);
   });
 
+  it("leaves tenant A's folder proposal pending, though B called approve and reject with its id", async () => {
+    // The two folder routes that decide a proposal. `claim` and `reject` are both
+    // `UPDATE ... WHERE workspace_id = ? AND id = ? AND status = 'pending'` (folder-root/
+    // proposal-store.ts:178-202), so an unscoped one would have flipped A's row to approved or
+    // rejected and the routes' own answers could not have said so. Read the row back as A.
+    const { defaultFolderDeps } = await import("./folder-root/deps");
+    const { store: proposals } = await defaultFolderDeps();
+    const row = proposals.get(tenantA, seeds.proposalId);
+    expect(row, "tenant A's proposal is gone").not.toBeNull();
+    expect(row?.status, "tenant A's proposal was decided by somebody else").toBe("pending");
+    expect(row?.decidedAt).toBeNull();
+    expect(proposals.countPending(tenantA)).toBe(1);
+  });
+
   it("refuses the workspace-agents pair on the desk check, not on something upstream", async () => {
     // These two rows are the one pair whose refusal is NOT a tenant lookup. `handleGetWorkspaceAgents`
     // (`handlers/agents.ts:165`) compares the path id against `tenant.workspaceId` — the desk the
@@ -891,6 +960,64 @@ describe("every by-id route refuses another tenant's id", () => {
       { serverMode: true, sessionStore: store, now: () => T0 },
     );
     expect(onOtherOwnDesk.status, "the desk check should refuse A's other desk too").toBe(404);
+  });
+
+  /**
+   * The desk file routes carry the path in the query, so they are not by-id routes and the
+   * completeness assertion below does not list them. They are still a place a caller names another
+   * tenant's row, so the same three properties are held here, through `dispatch`: nothing of A's
+   * comes back, B cannot tell A's path from a path nobody wrote, and the answer is a 404.
+   */
+  describe("the desk file routes, which take the path in the query", () => {
+    const SECRET_PATH = "private/harness.md";
+
+    const asTenant = (session: { id: string }, method: string, path: string, over: Partial<HostRequest> = {}) =>
+      dispatch(
+        { method, path, query: {}, params: {}, headers: { cookie: `agentforge_session=${session.id}` }, ...over },
+        { serverMode: true, sessionStore: store, now: () => T0 },
+      );
+
+    beforeAll(async () => {
+      const root = createDeskRoot(tenantA, { kind: "user", userId: tenantA.userId });
+      await root.write(SECRET_PATH as DeskPath, `${LEAK_MARKER} desk file`, { kind: "user", userId: tenantA.userId });
+    });
+
+    it("are registered in the router", () => {
+      const registered = new Set(routeRegistrations().map((route) => `${route.method} ${route.path}`));
+      const missing = DESK_FILE_ROUTES.map(([method, path]) => `${method} ${path}`).filter(
+        (key) => !registered.has(key),
+      );
+      expect(missing, `DESK_FILE_ROUTES entries the router does not register: ${missing.join(", ")}`).toEqual([]);
+    });
+
+    it.each([
+      ["GET", "/api/v1/files/content", (path: string) => ({ query: { path } })],
+      ["GET", "/api/v1/files/versions", (path: string) => ({ query: { path } })],
+      ["GET", "/api/v1/files/version", (path: string) => ({ query: { path, version: "1" } })],
+      ["POST", "/api/v1/files/revert", (path: string) => ({ body: { path, version: 1 } })],
+      ["DELETE", "/api/v1/files", (path: string) => ({ query: { path } })],
+    ] as const)("%s %s refuses tenant A's path as it refuses a path nobody wrote", async (method, route, build) => {
+      const foreign = await asTenant(sessionB, method, route, build(SECRET_PATH));
+      const ghost = await asTenant(sessionB, method, route, build("private/never-written.md"));
+      const foreignText = await serialise(foreign);
+      expect(foreignText, `${method} ${route} returned tenant A's data`).not.toContain(LEAK_MARKER);
+      expect(foreign.status, `${method} ${route} did not 404`).toBe(404);
+      expect(shape(foreign, foreignText)).toBe(shape(ghost, await serialise(ghost)));
+    });
+
+    it("shows tenant B none of A's files, and leaves A's file as it was", async () => {
+      const listed = await asTenant(sessionB, "GET", "/api/v1/files");
+      expect(listed.status).toBe(200);
+      expect(await serialise(listed)).not.toContain(LEAK_MARKER);
+      expect((listed as HostJsonResult).body).toEqual({ items: [] });
+
+      const own = await asTenant(sessionA, "GET", "/api/v1/files/content", { query: { path: SECRET_PATH } });
+      expect(own.status).toBe(200);
+      expect(await serialise(own)).toContain(LEAK_MARKER);
+      expect((await asTenant(sessionA, "GET", "/api/v1/files/versions", { query: { path: SECRET_PATH } })).status).toBe(
+        200,
+      );
+    });
   });
 
   it("covers every by-id route the router registers", () => {

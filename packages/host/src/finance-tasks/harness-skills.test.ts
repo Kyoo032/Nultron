@@ -27,6 +27,8 @@ import { parseRatiosInput, type ParsedRatios } from "./parse-ratios";
  */
 const asked: Array<Record<string, unknown>> = [];
 const answers: string[] = [];
+/** Cancels the job as the nth model call is made, the way a closed tab does mid-run. */
+let cancelAt: { controller: AbortController; call: number } | null = null;
 
 vi.mock("../job-regen", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../job-regen")>();
@@ -34,6 +36,9 @@ vi.mock("../job-regen", async (importOriginal) => {
     ...actual,
     collectJobAssistantRun: async (options: Record<string, unknown>) => {
       asked.push(options);
+      if (cancelAt && asked.length === cancelAt.call) {
+        cancelAt.controller.abort();
+      }
       return { text: answers.shift() ?? "", model: "stub-model" };
     },
   };
@@ -167,6 +172,7 @@ describe("finance harness skills", () => {
     asked.length = 0;
     answers.length = 0;
     ingested.length = 0;
+    cancelAt = null;
   });
 
   it.each(TASKS.flatMap((task) => (["en", "id"] as const).map((locale) => [task, locale] as const)))(
@@ -214,4 +220,47 @@ describe("finance harness skills", () => {
       expect(readingOf(task, result)).toContain(withDirection);
     },
   );
+
+  describe("a cancelled job", () => {
+    async function runCancelled(task: "brief" | "cashflow", signal: AbortSignal): Promise<unknown> {
+      const body = await confirmed(task, "en");
+      const module = getFinanceTaskModule(task);
+      return task === "brief" || !module
+        ? generateFinanceBrief(tenant, body, () => {}, signal)
+        : runFinanceTask(module, { tenant, body, emit: () => {}, abortSignal: signal });
+    }
+
+    it.each(["brief", "cashflow"] as const)("gets no second ask for the reading (%s)", async (task) => {
+      const controller = new AbortController();
+      cancelAt = { controller, call: 1 };
+      answers.push("not json");
+      await expect(runCancelled(task, controller.signal)).rejects.toMatchObject({ code: "aborted", status: 499 });
+      expect(asked).toHaveLength(1);
+      expect(asked[0]?.signal).toBe(controller.signal);
+      expect(ingested).toHaveLength(0);
+    });
+
+    it.each(["brief", "cashflow"] as const)(
+      "is not saved when it was cancelled during the direction rewrite (%s)",
+      async (task) => {
+        const body = await confirmed(task, "en");
+        const claim = claimsFor(task, body)[0];
+        expect(claim, `${task} produced no direction claim`).toBeTruthy();
+        if (!claim) {
+          return;
+        }
+        const figure = quote(claim.amount);
+        const wrong = `The reading is ${phrase(claim.contradict, "en")} at ${figure}.`;
+        const right = `The reading is ${phrase(claim.agree, "en")} at ${figure}.`;
+        const controller = new AbortController();
+        cancelAt = { controller, call: 2 };
+        answers.push(narration(task, "en", wrong), JSON.stringify({ heading: "The result", body: right }));
+        await expect(runCancelled(task, controller.signal)).rejects.toMatchObject({ code: "aborted", status: 499 });
+        expect(asked).toHaveLength(2);
+        expect(asked[1]?.runPrefix).toBe("finance-direction");
+        expect(asked[1]?.signal).toBe(controller.signal);
+        expect(ingested).toHaveLength(0);
+      },
+    );
+  });
 });

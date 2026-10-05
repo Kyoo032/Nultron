@@ -3,6 +3,7 @@
 import { useCallback, useReducer, useRef, useState } from "react";
 import { EMPTY_JOB_PROGRESS, reduceJobProgress, type JobEvent, type JobProgress } from "@agentforge/core/jobs";
 import { JobStreamError, runJobStream } from "./job-stream";
+import { useBuddyRunEnd } from "./use-buddy-claim";
 
 type Action = { type: "event"; event: JobEvent } | { type: "reset" };
 
@@ -119,6 +120,9 @@ export function useJobStream<T>(): JobStreamState<T> {
     runnerRef.current = createJobRunner<T>({ dispatch, setBusy, setError });
   }
   const { run, cancel } = runnerRef.current;
+
+  // The desk buddy cheers when a run lands and flinches when it fails; a cancelled run is neither.
+  useBuddyRunEnd(busy, Boolean(error) || Boolean(progress.error), progress.done);
 
   const reset = useCallback(() => {
     dispatch({ type: "reset" });

@@ -158,5 +158,15 @@
     "empty": "Add source material first. There is nothing to check against.",
     "supported": "Supported",
     "unsupported": "Not in the source"
+  },
+  "checks": {
+    "grounding": "{count} sections may not follow the source",
+    "groundingOne": "1 section may not follow the source",
+    "groundingHint": "The draft is saved. Press “{action}” to see which sentences are not in the source, or rewrite those sections.",
+    "structure": "Some sections may be missing or too short",
+    "structureHint": "The draft is saved. Generate it again, or rewrite the thin sections."
+  },
+  "harness": {
+    "sourceGap": "Not in the source."
   }
 }

@@ -225,6 +225,34 @@ describe("runFinanceTask", () => {
     expect(asked.map((options) => options.modelExplicit)).toEqual([false, true]);
   });
 
+  it("hands the run's cancel to the narration and to the repair rewrite", async () => {
+    reset();
+    answers.push(narration("Cash was 900. Burn was 1234 a month."), rewrite("Cash was 900."));
+    const controller = new AbortController();
+    await runFinanceTask(taskModule, { tenant, body: body(), emit: () => {}, abortSignal: controller.signal });
+    expect(asked).toHaveLength(2);
+    expect(asked[0]?.signal).toBe(controller.signal);
+    expect(asked[1]?.signal).toBe(controller.signal);
+  });
+
+  it("saves no report when the cancel lands during the repair", async () => {
+    reset();
+    answers.push(narration("Cash was 900. Burn was 1234 a month."), rewrite("Cash was 900."));
+    const controller = new AbortController();
+    const outcome = runFinanceTask(taskModule, {
+      tenant,
+      body: body(),
+      emit: (event) => {
+        if (event.type === "job.step" && event.label.includes("unverified")) {
+          controller.abort(new Error("client left"));
+        }
+      },
+      abortSignal: controller.signal,
+    });
+    await expect(outcome).rejects.toMatchObject({ code: "aborted", status: 499 });
+    expect(ingested).toEqual([]);
+  });
+
   it("saves the task, the model and the locale beside the report, so an export by id is full fidelity", async () => {
     reset();
     answers.push(narration("Cash was 900."));

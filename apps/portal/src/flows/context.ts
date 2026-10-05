@@ -44,6 +44,8 @@ export interface CreateRuntimeOptions {
   /** Test seam only: the suites listen on an ephemeral port and know their origin after `listen`. */
   readonly issuer?: string;
   readonly trustProxy?: boolean;
+  /** Test seam only: a suite that is not about a limit loosens it here, and one that is leaves it. */
+  readonly limiters?: PortalLimiters;
 }
 
 /**
@@ -83,7 +85,7 @@ export function createRuntime(options: CreateRuntimeOptions): PortalRuntime {
     webSecret: webSessionSecret(options.keys.current),
     cookies: cookieNames(mode),
     secureCookies: cookiesAreSecure(mode),
-    limiters: createPortalLimiters(clock),
+    limiters: options.limiters ?? createPortalLimiters(clock),
     issuer,
     trustProxy: options.trustProxy ?? options.config.trustProxy,
   });

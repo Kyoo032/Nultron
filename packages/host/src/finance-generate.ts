@@ -48,7 +48,7 @@ import { log } from "./log";
 export { FIGURES_TEXT_MAX } from "./finance-parse-figures";
 export type { ParsedFigures } from "./finance-parse-figures";
 
-const BRIEF_SYSTEM = `You write a finished finance brief for DPSBuddy from line items and metrics that were computed in code.
+const BRIEF_SYSTEM = `You write a finished finance brief for Nultron from line items and metrics that were computed in code.
 Return ONLY valid JSON (no markdown fences) with this exact shape:
 {
   "title": string,
@@ -63,7 +63,7 @@ Rules:
 - assumptions: what the reader must accept for the brief to hold (periods, currency, what is excluded).
 - No campus / student / course nouns unless the topic itself requires them.`;
 
-const SECTION_SYSTEM = `You rewrite one section of an DPSBuddy finance brief.
+const SECTION_SYSTEM = `You rewrite one section of a Nultron finance brief.
 Return ONLY valid JSON: { "heading": string, "body": string, "metrics": [string] }
 Rules: same as the brief. Every number is copied from a "Write as" cell; metrics lists the keys used. Stay on the same topic as the rest of the brief.`;
 
@@ -107,20 +107,24 @@ const NO_EMIT: JobEmitter = () => {};
  * Figures text → line items. An imported table is read in code; only free prose reaches the model,
  * and even then only after the privacy guard has rewritten it.
  */
-export async function parseFinanceFigures(tenant: TenantContext, body: unknown): Promise<ParsedFigures> {
+export async function parseFinanceFigures(
+  tenant: TenantContext,
+  body: unknown,
+  abortSignal?: AbortSignal,
+): Promise<ParsedFigures> {
   const figures = (body as { figures?: unknown } | null)?.figures;
   if (typeof figures !== "string" || !figures.trim()) {
     throw new ApiError("invalid_request", "figures text is required", 400);
   }
   const settings = requireLive(tenant);
-  const model = resolveModel(body, settings);
+  const model = resolveModel(body, settings, tenant);
   const locale = readFinanceLocale(body);
   // Redacted first: the guard reads the owner's own text, and only the redacted copy ever leaves.
   const guarded = guardFinanceInput({ figuresText: figures.trim() });
   // A document's prose reaches the same reader, so it is redacted on the same terms first.
   const raw = (body as { proseText?: unknown } | null)?.proseText;
   const prose = typeof raw === "string" && raw.trim() ? guardFinanceInput({ figuresText: raw.trim() }) : null;
-  const parsed = await parseFiguresText({ tenant, model }, guarded.figuresText, locale, {
+  const parsed = await parseFiguresText({ tenant, model, signal: abortSignal }, guarded.figuresText, locale, {
     proseText: prose?.figuresText ?? "",
   });
   return { ...parsed, pii: prose ? mergeFinancePii(guarded.pii, prose.pii) : guarded.pii };
@@ -182,7 +186,7 @@ export async function generateFinanceBrief(
   }
   const question = readPrompt(body);
   const settings = requireLive(tenant);
-  const model = resolveModel(body, settings);
+  const model = resolveModel(body, settings, tenant);
   const locale = readFinanceLocale(body);
   // Source material reaches the same prompt as the line items, so it is redacted on the same terms.
   const source = guardFinanceInput({
@@ -227,6 +231,7 @@ export async function generateFinanceBrief(
         prompt: [factsBlock, extra ? `Extra context:\n${extra}` : null, `Brief requested:\n${question}`]
           .filter(Boolean)
           .join("\n\n"),
+        ...(abortSignal ? { signal: abortSignal } : {}),
       });
       if (!answered.text.trim()) {
         throw new ApiError("generation_failed", modeMessage("emptyFinanceBrief", locale), 502);
@@ -235,6 +240,8 @@ export async function generateFinanceBrief(
       return answered;
     },
     () => {
+      // A cancelled job does not get a second ask.
+      throwIfJobAborted(abortSignal);
       emit({ type: "job.step", phase: "drafting", label: "Asked once more for the reading" });
     },
   );
@@ -249,6 +256,7 @@ export async function generateFinanceBrief(
     systemPrompt: withOutputLanguage(SECTION_SYSTEM, "finance", locale),
     factsBlock,
     locale,
+    signal: abortSignal,
   });
   const held = await holdReadingDirection(repaired.brief.sections, briefTaskModule.directionClaims?.(computed) ?? [], {
     tenant,
@@ -258,6 +266,7 @@ export async function generateFinanceBrief(
     allowed: computed.allowed,
     emit,
     phase: "verifying",
+    signal: abortSignal,
   });
   const brief = financeBriefSchema.parse(
     withEmptiedSectionsNoted({ ...repaired.brief, sections: held.sections }, locale),
@@ -336,7 +345,11 @@ function readSectionIndex(body: unknown, length: number): number {
 }
 
 /** Rewrite one section with the same inputs, metrics, and guard. */
-export async function regenerateFinanceSection(tenant: TenantContext, body: unknown): Promise<FinanceResult> {
+export async function regenerateFinanceSection(
+  tenant: TenantContext,
+  body: unknown,
+  abortSignal?: AbortSignal,
+): Promise<FinanceResult> {
   if (!body || typeof body !== "object") {
     throw new ApiError("invalid_request", "Request body must be a JSON object", 400);
   }
@@ -351,7 +364,7 @@ export async function regenerateFinanceSection(tenant: TenantContext, body: unkn
     throw new ApiError("invalid_request", "sectionIndex is out of range", 400);
   }
   const settings = requireLive(tenant);
-  const model = resolveModel(body, settings);
+  const model = resolveModel(body, settings, tenant);
   const locale = readFinanceLocale(body);
   const supplied = resolveInputs(tenant, body, locale);
   const guarded = guardFinanceInput({ lineItems: supplied.items });
@@ -385,6 +398,7 @@ export async function regenerateFinanceSection(tenant: TenantContext, body: unkn
     jobMode: "finance",
     versionId: "finance-section",
     prompt,
+    ...(abortSignal ? { signal: abortSignal } : {}),
   });
   const knownKeys = new Set(computed.metrics.map((entry) => entry.key));
   const rewritten = guardSection(parseBriefSection(run.text), computed, knownKeys);
@@ -397,7 +411,9 @@ export async function regenerateFinanceSection(tenant: TenantContext, body: unkn
     systemPrompt: withOutputLanguage(SECTION_SYSTEM, "finance", locale),
     factsBlock,
     locale,
+    signal: abortSignal,
   });
+  throwIfJobAborted(abortSignal);
   const candidate = repaired.brief.sections[0];
   const replacement = candidate?.body ? candidate : current;
   const next = financeBriefSchema.parse({

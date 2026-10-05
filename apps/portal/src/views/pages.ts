@@ -1,11 +1,15 @@
 /**
- * The five screens.
+ * The screens.
  *
- *   sign-in (e-mail) -> enter code -> [approve a device] -> success | neutral error
+ *   sign-in (e-mail) -> enter code | enter invite code | no access / invite spent / too many attempts
+ *        -> [approve a device] -> success | error
+ *
+ * Which of those follows the e-mail step is the portal's decision (`flows/sign-in.ts`), and the
+ * page says so plainly: since 2026-10-01 the sign-in tells a person which situation they are in.
  *
  * Every screen is a `<form method="post">` with a hidden CSRF field and whatever the flow has to
  * carry forward. Nothing is stored in a URL that does not have to be: `state`, `client_id` and
- * `redirect_uri` ride in hidden fields across the two posts rather than in the query string, so
+ * `redirect_uri` ride in hidden fields across the posts rather than in the query string, so
  * they never reach a browser history entry or a `Referer` -- and they are **re-validated** on
  * every post regardless, because a hidden field is a field the user controls.
  *
@@ -33,6 +37,39 @@ function errorLine(message: string | undefined): SafeHtml | string {
   return message ? html`<p class="bad">${message}</p>` : "";
 }
 
+function noticeLine(message: string | undefined): SafeHtml | string {
+  return message ? html`<p class="notice">${message}</p>` : "";
+}
+
+// ---------------------------------------------------------------------------
+// Account banner: who the portal thinks is signed in on this browser
+// ---------------------------------------------------------------------------
+
+export interface AccountBanner {
+  readonly email: string;
+  readonly signOutAction: string;
+  readonly csrfToken: string;
+}
+
+/** "You are signed in as ..." and the way out if that is the wrong person on a shared browser. */
+function accountBanner(t: Translate, account: AccountBanner | undefined): SafeHtml | string {
+  if (!account) {
+    return "";
+  }
+  return html`<div class="account">
+<p>${t("account.signedInAs", { email: account.email })}</p>
+<form method="post" action="${account.signOutAction}">
+${hiddenFields({ csrf_token: account.csrfToken })}
+<button class="secondary" type="submit">${t("account.signOut")}</button>
+</form>
+</div>
+`;
+}
+
+// ---------------------------------------------------------------------------
+// The e-mail step
+// ---------------------------------------------------------------------------
+
 export interface SignInScreen extends ScreenBase {
   readonly action: string;
   readonly csrfToken: string;
@@ -41,6 +78,11 @@ export interface SignInScreen extends ScreenBase {
   readonly email?: string;
 }
 
+/**
+ * Step one: an e-mail address and nothing else. What happens next depends on who the address is --
+ * the portal decides -- so the button says "Continue", not "Send code": a person who needs the
+ * invite they were e-mailed must not be told a code is on its way.
+ */
 export function signInPage(screen: SignInScreen): string {
   const { t } = screen;
   return page({
@@ -61,18 +103,54 @@ ${hiddenFields({ ...screen.hidden, csrf_token: screen.csrfToken })}
   });
 }
 
-export interface EnterCodeScreen extends ScreenBase {
-  readonly action: string;
+// ---------------------------------------------------------------------------
+// The second steps: a sign-in code for a member, an invite code for an invitee
+// ---------------------------------------------------------------------------
+
+/** The two ways out every second-step screen offers: ask again, or start over with another address. */
+interface FollowUp {
   readonly csrfToken: string;
   readonly hidden: Readonly<Record<string, string>>;
-  readonly expiresInMinutes: number;
+  readonly email: string;
+  readonly resendAction: string;
+  readonly resendLabel: string;
+  /** Sent with the resend form, so the e-mail step can tell "send a new code" from a first request. */
+  readonly resendField?: Readonly<Record<string, string>>;
+  readonly restartAction: string;
+  readonly restartLabel: string;
+}
+
+function followUpForms(follow: FollowUp): SafeHtml {
+  const carried = { ...follow.hidden, csrf_token: follow.csrfToken };
+  return html`<form method="post" action="${follow.resendAction}">
+${hiddenFields({ ...carried, email: follow.email, ...(follow.resendField ?? {}) })}
+<button class="secondary" type="submit">${follow.resendLabel}</button>
+</form>
+<form method="post" action="${follow.restartAction}">
+${hiddenFields({ ...carried, restart: "1" })}
+<button class="secondary" type="submit">${follow.restartLabel}</button>
+</form>`;
+}
+
+export interface EnterCodeScreen extends ScreenBase {
+  /** `POST .../verify`. */
+  readonly action: string;
+  /** The e-mail step again; with `resend=1` it is "send me a new code". */
+  readonly resendAction: string;
+  readonly restartAction: string;
+  readonly csrfToken: string;
+  readonly hidden: Readonly<Record<string, string>>;
+  readonly email: string;
+  /** The sentence under the heading: where the code went, or why none did. Already translated. */
+  readonly lead: string;
   readonly error?: string;
+  readonly notice?: string;
 }
 
 /**
- * The same page whether or not a code was actually sent. The body never names the address: it says
- * "if that address has an account", which is what makes an unknown e-mail and a real one produce
- * byte-identical HTML.
+ * Step two for a member: the six-digit code. It names the address (the lead) now -- the sign-in
+ * tells a person which situation they are in, SR-30 -- and offers the two ways out: a new code, or
+ * another address.
  */
 export function enterCodePage(screen: EnterCodeScreen): string {
   const { t } = screen;
@@ -82,23 +160,114 @@ export function enterCodePage(screen: EnterCodeScreen): string {
     title: t("sent.title"),
     footer: t("footer.note"),
     body: html`<h1>${t("sent.title")}</h1>
-<p class="lead">${t("sent.body", { minutes: screen.expiresInMinutes })}</p>
+<p class="lead">${screen.lead}</p>
+${noticeLine(screen.notice)}
 ${errorLine(screen.error)}
 <form method="post" action="${screen.action}">
-${hiddenFields({ ...screen.hidden, csrf_token: screen.csrfToken })}
+${hiddenFields({ ...screen.hidden, csrf_token: screen.csrfToken, email: screen.email })}
 <label for="code">${t("sent.codeLabel")}</label>
 <input id="code" name="code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6"
  autocomplete="one-time-code" required autofocus>
 <button type="submit">${t("sent.submit")}</button>
+</form>
+${followUpForms({
+  csrfToken: screen.csrfToken,
+  hidden: screen.hidden,
+  email: screen.email,
+  resendAction: screen.resendAction,
+  resendLabel: t("sent.resend"),
+  resendField: { resend: "1" },
+  restartAction: screen.restartAction,
+  restartLabel: t("state.restart"),
+})}`,
+  });
+}
+
+export interface InviteCodeScreen extends ScreenBase {
+  /** `POST .../invite`. */
+  readonly action: string;
+  /** `POST .../invite/resend`. */
+  readonly resendAction: string;
+  readonly restartAction: string;
+  readonly csrfToken: string;
+  readonly hidden: Readonly<Record<string, string>>;
+  readonly email: string;
+  readonly error?: string;
+  readonly notice?: string;
+}
+
+/**
+ * Step two for an invitee: the invite code they were e-mailed. No sign-in code has been sent yet --
+ * that follows a valid invite, so the inbox is still proved. The code is never echoed back.
+ */
+export function inviteCodePage(screen: InviteCodeScreen): string {
+  const { t } = screen;
+  return page({
+    locale: screen.locale,
+    product: t("product"),
+    title: t("invite.title"),
+    footer: t("footer.note"),
+    body: html`<h1>${t("invite.title")}</h1>
+<p class="lead">${t("invite.lead", { email: screen.email })}</p>
+${noticeLine(screen.notice)}
+${errorLine(screen.error)}
+<form method="post" action="${screen.action}">
+${hiddenFields({ ...screen.hidden, csrf_token: screen.csrfToken, email: screen.email })}
+<label for="invite_code">${t("invite.label")}</label>
+<input id="invite_code" name="invite_code" type="text" autocomplete="off" autocapitalize="characters"
+ spellcheck="false" required autofocus maxlength="64">
+<button type="submit">${t("invite.submit")}</button>
+</form>
+${followUpForms({
+  csrfToken: screen.csrfToken,
+  hidden: screen.hidden,
+  email: screen.email,
+  resendAction: screen.resendAction,
+  resendLabel: t("invite.resend"),
+  restartAction: screen.restartAction,
+  restartLabel: t("state.restart"),
+})}`,
+  });
+}
+
+export interface StateScreen extends ScreenBase {
+  readonly title: string;
+  readonly message: string;
+  readonly restartAction: string;
+  readonly csrfToken: string;
+  readonly hidden: Readonly<Record<string, string>>;
+}
+
+/**
+ * The dead ends -- no access yet, the invite is spent, too many attempts. Each says what is true and
+ * who can change it, and offers the one thing the person can do alone: try another address.
+ */
+export function statePage(screen: StateScreen): string {
+  const { t } = screen;
+  return page({
+    locale: screen.locale,
+    product: t("product"),
+    title: screen.title,
+    footer: t("footer.note"),
+    body: html`<h1>${screen.title}</h1>
+<p class="lead">${screen.message}</p>
+<form method="post" action="${screen.restartAction}">
+${hiddenFields({ ...screen.hidden, csrf_token: screen.csrfToken, restart: "1" })}
+<button class="secondary" type="submit">${t("state.restart")}</button>
 </form>`,
   });
 }
+
+// ---------------------------------------------------------------------------
+// The device-code screens
+// ---------------------------------------------------------------------------
 
 export interface UserCodeScreen extends ScreenBase {
   readonly action: string;
   readonly csrfToken: string;
   readonly userCode?: string;
   readonly error?: string;
+  readonly account?: AccountBanner;
 }
 
 /** `GET /activate` with no usable `?code=`: ask for the code shown on the device. */
@@ -109,7 +278,7 @@ export function userCodePage(screen: UserCodeScreen): string {
     product: t("product"),
     title: t("approve.title"),
     footer: t("footer.note"),
-    body: html`<h1>${t("approve.title")}</h1>
+    body: html`${accountBanner(t, screen.account)}<h1>${t("approve.title")}</h1>
 <p class="lead">${t("approve.codeIntro")}</p>
 ${errorLine(screen.error)}
 <form method="post" action="${screen.action}">
@@ -130,6 +299,7 @@ export interface ApproveScreen extends ScreenBase {
   /** From the row's `platform` column, already mapped to a copy key. */
   readonly platform: string;
   readonly deviceLabel: string | null;
+  readonly account?: AccountBanner;
 }
 
 export function approvePage(screen: ApproveScreen): string {
@@ -139,7 +309,7 @@ export function approvePage(screen: ApproveScreen): string {
     product: t("product"),
     title: t("approve.title"),
     footer: t("footer.note"),
-    body: html`<h1>${t("approve.title")}</h1>
+    body: html`${accountBanner(t, screen.account)}<h1>${t("approve.title")}</h1>
 <p class="lead">${t("approve.intro")}</p>
 <dl>
 <dt>${t("approve.userCode")}</dt><dd class="code">${screen.userCode}</dd>

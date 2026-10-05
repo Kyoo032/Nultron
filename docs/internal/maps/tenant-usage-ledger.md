@@ -65,13 +65,13 @@ that keep their unit and quantity, which a later pass can price in place.
 
 | Mode | Where | Unit |
 |---|---|---|
-| chat | `recordChatRunUsage`, called from `packages/host/src/runs.ts:370` and `:417`, gated on `finishRun`'s return | tokens |
+| chat | `recordChatRunUsage`, called from `packages/host/src/runs.ts:372` and `:417`, gated on `finishRun`'s return | tokens |
 | documents, presentations, research, data, finance, market, legal, knowledge | `rememberJobUsage` in the shared job runtime callback, `packages/host/src/job-regen.ts:145` | tokens |
-| edit agent | `rememberJobUsage`, `packages/host/src/edit/agent-run.ts:185` (live) and `:363` (stub) | tokens |
-| images | `recordImageUsage`, `packages/host/src/studio-generate.ts:295` | images |
-| videos | `recordVideoUsage`, `packages/host/src/studio-generate.ts:363` | seconds |
-| music | `recordMusicUsage`, `packages/host/src/studio-generate.ts:471` (a song) and `:534` (a lyrics draft) | jobs |
-| meetings | `recordTranscriptionUsage`, `packages/host/src/meeting/run.ts:188` (the recording) — the minutes and the translation are token runs under the same mode | seconds |
+| edit agent | `rememberJobUsage`, `packages/host/src/edit/agent-run.ts:186` (live) and `:363` (stub) | tokens |
+| images | `recordImageUsage`, `packages/host/src/studio-generate.ts:301` | images |
+| videos | `recordVideoUsage`, `packages/host/src/studio-generate.ts:369` | seconds |
+| music | `recordMusicUsage`, `packages/host/src/studio-generate.ts:477` (a song) and `:534` (a lyrics draft) | jobs |
+| meetings | `recordTranscriptionUsage`, `packages/host/src/meeting/run.ts:190` (the recording) — the minutes and the translation are token runs under the same mode | seconds |
 
 **The mode label is derived, not passed.** `usageModeFromRunPrefix`
 (`packages/core/src/usage/metering.ts:141`) maps the `runPrefix` every job call site already carries
@@ -88,7 +88,7 @@ completion settles first gets `true`; the others get `false` and write nothing.
 image or clip by then, so a failure to save it must not be a call that vanishes from the ledger. The
 model recorded is the one that answered (`toolModel(output, model)`), not the one that was asked
 for, and a video's billable length is the snapped one
-(`snapVideoSeconds`, `packages/host/src/studio-generate.ts:340`) — a model that only does 5 s clips
+(`snapVideoSeconds`, `packages/host/src/studio-generate.ts:346`) — a model that only does 5 s clips
 bills 5 s for a 4 s request.
 
 **Failure modes**

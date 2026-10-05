@@ -3,7 +3,9 @@
 # IMPORTANT: BuildKit looks for `<dockerfile-path>.dockerignore` first and only then for
 # `<context>/.dockerignore`. Because the Dockerfile lives in webapp-deploy/ while the
 # context is the repo root, the file Docker actually reads is
-# webapp-deploy/Dockerfile.dockerignore. There is no root .dockerignore; this is the only one.
+# webapp-deploy/Dockerfile.dockerignore. There is no root .dockerignore.
+# webapp-deploy/.dockerignore is a byte-for-byte copy, for a build that ever uses webapp-deploy/
+# as its context; scripts/pilot-deploy.test.mjs fails if the two differ.
 
 .git
 .github
@@ -17,6 +19,10 @@
 **/playwright-report
 **/test-results
 **/*.tsbuildinfo
+
+# The sandbox runtime is rebuilt inside the image from the pinned lock; a local build would ship twice.
+vendor/sandbox-runtime
+vendor/.sandbox-cache
 
 # Local state and secrets - never in an image. Patterns without `**/` match only at
 # the repo root; apps/web/.env.local and .webdev-data-*/.master-key were both
@@ -54,4 +60,18 @@ apps/mobile/ios
 # Docs and scratch
 _ref
 docs
+# nultron-files/: IP filings, decks, brand work and marketing video (4.5 GB on this desk). It is git-ignored,
+# so only a build from a working checkout could send it to the daemon; the release path builds from
+# `git archive <sha>` and never has it (SR-131).
+nultron-files
+# tools/: the offline 3D mascot renderer (tools/nultron-3d, with its own node_modules and render scratch); it never runs in the hosted app
+tools
 webapp-deploy/.env
+# The pilot stack's second env file (the portal's signing key, database passwords and SMTP login). An
+# ordinary `.env` pattern does not match a file with this name.
+webapp-deploy/*.env
+# The Kubernetes rehearsal (manifests, and its local overlay's secrets.env and a throwaway CA's pki/) and
+# the compose rehearsal's local state. Neither belongs in the hosted app's image, and a build from a
+# checkout must not be able to pick up a private key from either (SR-49).
+webapp-deploy/k8s
+webapp-deploy/.pilot-local

@@ -69,6 +69,14 @@ type Props = {
 
 const MATTERS_SHOWN = 8;
 
+/**
+ * A model select that takes the rest of its label's line and drops under the label text when that line
+ * is under 12rem, so a long option ("GPT 6 Sol — Everyday chat") is not cut by its own box. `select-field`
+ * is a layered component class, so these utilities win; `.input` is not, and would have discarded the
+ * size and padding they set.
+ */
+const MODEL_SELECT = "select-field min-w-[12rem] flex-1 px-2 text-[12px]";
+
 /** Screen 1, right column: matter map, what will happen, previous matters. */
 export function LegalMatterMap({
   draft,
@@ -128,8 +136,8 @@ export function LegalMatterMap({
             </li>
           ))}
         </ol>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <label className={`flex items-center gap-2 text-xs ${DIM}`}>
+        <div className="mt-3 space-y-2">
+          <label className={`flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs ${DIM}`}>
             {t("legal.plan.model")}
             <ModelSelect
               models={models}
@@ -137,10 +145,10 @@ export function LegalMatterMap({
               onChange={onModel}
               disabled={locked}
               testId="legal-studio-model"
-              className="input w-auto px-2 py-1 text-[12px]"
+              className={MODEL_SELECT}
             />
           </label>
-          <label className={`flex items-center gap-2 text-xs ${DIM}`}>
+          <label className={`flex w-full min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs ${DIM}`}>
             {t("legal.plan.verifier")}
             <ModelSelect
               models={models}
@@ -148,7 +156,7 @@ export function LegalMatterMap({
               onChange={onVerifierModel}
               disabled={locked}
               testId="legal-studio-verifier-model"
-              className="input w-auto px-2 py-1 text-[12px]"
+              className={MODEL_SELECT}
             />
           </label>
         </div>

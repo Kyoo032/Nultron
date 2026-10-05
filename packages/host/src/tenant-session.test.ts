@@ -48,8 +48,8 @@ describe("getTenant resolves the tenant from the session", () => {
     const db = await import("@agentforge/db");
     ensurePortalOwner = db.ensurePortalOwner;
     database = db.db;
-    await ensurePortalOwner(database, TENANT_A);
-    await ensurePortalOwner(database, TENANT_B);
+    await ensurePortalOwner(database, { ...TENANT_A, role: "owner" });
+    await ensurePortalOwner(database, { ...TENANT_B, role: "owner" });
   }, 60_000);
 
   afterEach(() => {

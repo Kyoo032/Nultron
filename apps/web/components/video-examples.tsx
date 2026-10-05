@@ -120,7 +120,7 @@ export function VideoExamples({ onPick, selectedId }: Props) {
                   {exampleTitle(item)}
                 </p>
                 <p className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-[var(--text-3)]">
-                  <span className="rounded border border-[var(--line)] px-1 leading-4">{item.aspect}</span>
+                  <span className="tag">{item.aspect}</span>
                   <span>{formatSeconds(item)}</span>
                   {item.model ? <span className="truncate">{item.model}</span> : null}
                 </p>

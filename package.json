@@ -17,12 +17,15 @@
     "portal:dev": "pnpm --filter @agentforge/portal exec tsx src/main.ts",
     "portal:seed": "pnpm --filter @agentforge/portal exec tsx scripts/seed.ts",
     "portal:otp": "pnpm --filter @agentforge/portal exec tsx scripts/otp.ts",
+    "portal:invite": "pnpm --filter @agentforge/portal exec tsx scripts/invite.ts",
     "maps:check": "node scripts/map-rot.mjs",
     "maps:drift": "node scripts/map-drift.mjs",
     "edit:starters": "node scripts/edit-starters.mjs",
     "edit:starters:check": "node scripts/edit-starters.mjs --check",
     "videos:examples": "node scripts/video-examples.mjs",
     "videos:examples:check": "node scripts/video-examples.mjs --check",
+    "sandbox:build": "node scripts/build-sandbox-runtime.mjs",
+    "sandbox:verify": "node scripts/build-sandbox-runtime.mjs --verify",
     "desktop:dev": "pnpm --filter @agentforge/desktop desktop-dev",
     "desktop:build": "pnpm --filter @agentforge/desktop desktop-build",
     "desktop:release": "pnpm --filter @agentforge/desktop desktop-release",
@@ -36,11 +39,17 @@
   "pnpm": {
     "overrides": {
       "jsondiffpatch@<0.7.6": ">=0.7.6",
-      "image-size@<2.0.3": ">=2.0.3"
+      "image-size@<2.0.3": ">=2.0.3",
+      "brace-expansion@1": "1.1.21",
+      "brace-expansion@2": "2.1.7",
+      "brace-expansion@5": "5.0.12"
     }
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.12",
+    "@jitl/quickjs-wasmfile-release-sync": "0.32.0",
+    "pyodide": "314.0.7",
+    "quickjs-emscripten-core": "0.32.0",
     "turbo": "^2.5.4",
     "typescript": "^5.8.3"
   },

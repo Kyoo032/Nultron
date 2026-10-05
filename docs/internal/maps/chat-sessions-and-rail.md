@@ -1,6 +1,6 @@
 # Map — Chat sessions and the rail
 
-Last verified: 2026-09-27 for an unsent composer draft. `WorkModeKeepAlive` remounts when the shell id moves from boot (`null`) to the real desk id; the draft lives in `apps/web/lib/composer-draft.ts` outside that key, is adopted onto the resolved desk, and is cleared when the desk id actually changes. Earlier: 2026-09-26. Rail collapse is 480px, and context and usage chips wait for an assistant reply. § 11 cites `awaitingUrlThreadRef` and `urlAtEnsureRef` in `chat-session.tsx`: a new thread's own URL update does not bump the session epoch, so a live reply draws and Send returns. Earlier: 2026-09-23 at d4561b8 for the rest of this page. Not a full re-walk.
+Last verified: 2026-10-02, working tree on top of 0b61a29, not committed, for two paragraphs only: the `WorkModeKeepAlive` paragraph in § 11 (the first desk id no longer remounts the panes) and the new Gotcha about the recent-session placeholders (`rail-recent-skeleton.tsx`, `lib/rail-recent-shape.ts`, `useChatThreads`'s `loaded`). The citations and statements elsewhere on the page are as verified before. Before that: 2026-10-01, working tree on top of 0b61a29, for the `app-rail.tsx` citations (§ 1's `AppRail` block and mount, the collapsed-rail row of Failure modes, the file table, the DOM-testid paragraph) and the `rail-recent-threads.tsx` testid lines in that paragraph, each re-read against the file; the rest of the page is as verified before. Before that: 2026-09-27 for an unsent composer draft. `WorkModeKeepAlive` remounts when the shell id moves from boot (`null`) to the real desk id; the draft lives in `apps/web/lib/composer-draft.ts` outside that key, is adopted onto the resolved desk, and is cleared when the desk id actually changes. Earlier: 2026-09-26. Rail collapse is 480px, and context and usage chips wait for an assistant reply. § 11 cites `awaitingUrlThreadRef` and `urlAtEnsureRef` in `chat-session.tsx`: a new thread's own URL update does not bump the session epoch, so a live reply draws and Send returns. Earlier: 2026-09-23 at d4561b8 for the rest of this page. Not a full re-walk.
 
 Before that: 2026-09-23 at 0774681 + working tree (the 0.15.0 design pass). Changed there: the rail row reads from `--rail-*` tokens and follows the theme instead of being dark in both; the `New` badge mechanism (`NEW_BADGE_UNTIL`, `newBadgeOn`, the `badge` prop, `rail.badgeNew`) is deleted; `RailSubmenuToggle` shows a short word beside the chevron (the full phrase stays in `aria-label`) and the selected row's left accent stripe is gone. The session list, its store and the events are untouched. Supersedes the 2026-09-22 "dark desk overhaul" note, whose dark default this pass reversed.
 
@@ -18,7 +18,7 @@ It is **not** a global thread rail: only the `quick-chat` agent's threads, only 
 
 ### 1. The rail renders the block, unless it is collapsed
 
-`AppRail` (`apps/web/components/app-rail.tsx`) draws the Converse group, the `mode-chat` item, and then the sessions:
+`AppRail` (`apps/web/components/app-rail.tsx:192`) draws the Converse group, the `mode-chat` item, and then the sessions (the block is `:289-306`, the mount `:303-304`):
 
 ```tsx
 {/* Collapsed rail keeps New chat (icon + label) and hides session rows. */}
@@ -172,7 +172,7 @@ There is one New chat control, `new-chat-link`. The header button `data-testid="
 
 `handlePostThreads` (`packages/host/src/handlers/threads.ts:44-64`) validates that `agentId` and `title` are strings when present, 404s on an unknown agent, trims a supplied title to `THREAD_TITLE_MAX = 200` (`thread-title.ts:25`), and calls `createThread`, which defaults the title to `defaultThreadTitle(localeForRun())` (`packages/host/src/threads.ts:35-47`). That default is exactly the string the list filter throws away, so a thread created this way is **invisible in the rail until the first user message renames it**.
 
-The rename is `setThreadTitleFromParts` (`packages/host/src/threads.ts:243-256`), called once per run at `packages/host/src/runs.ts:252`. It takes the first text part, collapses whitespace and truncates to 48 characters with an ellipsis (`titleFromParts`, `thread-title.ts:29-49`) — and it **only writes when the current title is still a default** (`:249`). A caller-supplied title survives forever; there is no rename UI.
+The rename is `setThreadTitleFromParts` (`packages/host/src/threads.ts:243-256`), called once per run at `packages/host/src/runs.ts:254`. It takes the first text part, collapses whitespace and truncates to 48 characters with an ellipsis (`titleFromParts`, `thread-title.ts:29-49`) — and it **only writes when the current title is still a default** (`:249`). A caller-supplied title survives forever; there is no rename UI.
 
 ### 9. Deleting
 
@@ -190,7 +190,7 @@ removeGraphForThread(tenant, threadId);
 
 ### 10. Keep-alive
 
-`WorkModeKeepAlive` (`apps/web/components/work-mode-keep-alive.tsx`) keeps every visited work-mode page mounted and merely `hidden`, so leaving Chat for Documents does not unmount `ChatSession`, and drafts plus in-flight SSE survive. It is keyed on the workspace id, so a desk switch **does** blow all panes away — which is the correct pairing with the rail's workspace-scoped list. The first answer of `GET /api/v1/workspaces` also changes that key, from `"boot"` to the real id, and that remount used to drop an unsent attachment. The composer now keeps text and files in `apps/web/lib/composer-draft.ts`, outside the keep-alive key. A boot id of null adopts the stash onto the desk that just resolved; a different desk id clears it. New chat, once the desk id is stable, does not clear the composer. Since 2026-09-23 the shell changes that id only when `GET /api/v1/workspaces` answers and names a desk (`shellWorkspaceFrom`, `apps/web/src/App.tsx:54`): a lapsed session, a 5xx or a proxy page used to read as "no desks" and remount every pane.
+`WorkModeKeepAlive` (`apps/web/components/work-mode-keep-alive.tsx`) keeps every visited work-mode page mounted and merely `hidden`, so leaving Chat for Documents does not unmount `ChatSession`, and drafts plus in-flight SSE survive. It is keyed on the workspace id, so a desk switch **does** blow all panes away — which is the correct pairing with the rail's workspace-scoped list. The first answer of `GET /api/v1/workspaces` used to change that key too, from `"boot"` to the real id, and that remount dropped an unsent attachment, ran every pane's first reads twice and made Chat's key pill paint, vanish and paint again. **Since 2026-10-02 the first id is adopted without a remount**: the key comes from `nextDeskKey` (`apps/web/lib/desk-pane-key.ts`, used at `work-mode-keep-alive.tsx:60`), which keeps the `boot` key through the first id and changes it only when the desk moves from one real id to another. The composer still keeps text and files in `apps/web/lib/composer-draft.ts`, outside the keep-alive key, as the net for that real switch: a boot id of null adopts the stash onto the desk that just resolved; a different desk id clears it. New chat, once the desk id is stable, does not clear the composer. Since 2026-09-23 the shell changes that id only when `GET /api/v1/workspaces` answers and names a desk (`shellWorkspaceFrom`, `apps/web/src/App.tsx:54`): a lapsed session, a 5xx or a proxy page used to read as "no desks" and remount every pane.
 
 ### 11. A run belongs to the session it started in (2026-09-23)
 
@@ -217,7 +217,7 @@ Pinned by `apps/web/lib/chat-run-stream.test.ts` (`readRunStream`) and `apps/web
 | `?thread=` points at a missing / foreign thread | `chat-session.tsx:250-252` | `chat-error` with `chat.error.threadMissing`; the rail row is already gone |
 | More than 40 chat threads on the desk | `packages/host/src/threads.ts:90`, `:116` | `All sessions` shows the newest 40 and stops; nothing tells the user the list was cut |
 | Thread created but never messaged | `handlers/threads.ts:29` + `thread-title.ts:20-22` | never appears in the rail |
-| Rail collapsed | `app-rail.tsx:302` | no session rows at all; `mode-chat` icon only |
+| Rail collapsed | `app-rail.tsx:303-304`, `rail-recent-threads.tsx:38-52` | no session rows at all; `mode-chat` is an icon and the block draws only the `new-chat-link` icon |
 
 ## Where things live
 
@@ -228,10 +228,11 @@ Pinned by `apps/web/lib/chat-run-stream.test.ts` (`readRunStream`) and `apps/web
 | `apps/web/lib/thread-groups.ts` | `RAIL_RECENT_THREADS = 4` and `takeRecentThreads` |
 | `apps/web/lib/threads-events.ts` | `THREADS_CHANGED_EVENT` and `notifyThreadsChanged` |
 | `apps/web/lib/workspace-scope.tsx` | `WorkspaceScope` context; the desk id the hook depends on |
-| `apps/web/components/app-rail.tsx` | Where the block is mounted, and the collapse that unmounts it |
+| `apps/web/components/app-rail.tsx` | Where the block is mounted (`:303-304`), and the `collapsed` prop that cuts it to the New chat icon |
 | `apps/web/src/pages/chat-page.tsx` | Reads `?thread` and mounts the pane full width |
 | `apps/web/components/chat-session.tsx` | `ensureThread`, the `initialThreadId` load effect, the `leftThread` latch, the header `new-chat` |
-| `apps/web/components/work-mode-keep-alive.tsx` | Keeps `/chat` mounted across rail switches; remounts on a desk change |
+| `apps/web/components/work-mode-keep-alive.tsx`, `apps/web/lib/desk-pane-key.ts` | Keeps `/chat` mounted across rail switches; remounts when the desk moves from one real id to another, not when the first id arrives |
+| `apps/web/components/rail-recent-skeleton.tsx`, `apps/web/lib/rail-recent-shape.ts` | The placeholder rows and the remembered row count |
 | `apps/web/components/workspace-switcher.tsx` | Fires `THREADS_CHANGED_EVENT` after selecting a desk |
 | `packages/host/src/handlers/threads.ts` | `GET` / `POST` / `GET :id` / `DELETE` handlers; scope parsing; the default-title filter |
 | `packages/host/src/threads.ts` | `listWorkspaceThreads` (40-row cap, tenancy, `quick-chat` scope), `createThread`, `deleteThread`, `setThreadTitleFromParts` |
@@ -242,6 +243,7 @@ Pinned by `apps/web/lib/chat-run-stream.test.ts` (`readRunStream`) and `apps/web
 ## Gotchas
 
 - **`rail-thread-list` is the only session list left.** `apps/web/components/chat-thread-list.tsx` was deleted on 2026-09-17, and `apps/web/lib/rail-threads-wiring.test.ts:30-37` asserts that it stays deleted and that no file routes to `threads=all`. The only two occurrences of `thread-list` and `chat-wire` anywhere in `apps/web` are negative assertions (`rail-threads-wiring.test.ts:35`, `apps/web/tests/e2e/foundation.spec.ts:22`). A locator on `thread-list`, `thread-list-new-chat` or `thread-resize` is a stale recipe.
+- **The session rows have placeholders while the list loads (2026-10-02).** `RailRecentThreads` draws `rail-recent-skeleton` (still blocks, `aria-hidden`, `h-7` like a row) until `useChatThreads` reports `loaded`, so the pinned Account group does not slide down as the rows arrive. How many it draws is what the last load showed, kept in `localStorage` `agentforge-rail-recent` as `{rows, more}` (`apps/web/lib/rail-recent-shape.ts`); a browser with nothing stored draws none, so a returning desk still shifts once on its very first load, and a driver on a fresh browser profile will see that one shift. Do not count `rail-recent-skeleton-row` as sessions: only `thread-item` is a session. `loaded` is true after a failed read too, so an error line never sits under placeholders.
 - **`threads-see-all` only exists above four threads** (`rail-recent-threads.tsx:93`). With four or fewer, waiting for it is waiting forever — and with exactly five, deleting one makes it vanish.
 - **Expansion is not persisted.** `expanded` is `useState` in the component (`:31`); a reload, and any remount such as a desk switch, starts collapsed. Driven.
 - **`thread-delete` is `opacity-0`, not hidden** (`:78-80`). Playwright happily calls it visible and clicks it without a hover; a human must hover or tab into the row. Do not "fix" a driver by forcing `visible` — hover the parent row.
@@ -259,7 +261,7 @@ Pinned by `apps/web/lib/chat-run-stream.test.ts` (`readRunStream`) and `apps/web
 
 `.cursor/skills/verify-agentforge/features/chat.md` — sub-features `chat-rail-sessions`, `chat-threads-expand`, `chat-switch`, `chat-new`, `chat-rail`, `chat-keep-alive`.
 
-DOM testids that prove it: `rail-thread-list` (`apps/web/components/rail-recent-threads.tsx:47`), `new-chat-link` (`:51`), `thread-item` (`:70`) with `aria-current="true"` on the open row (`:71`), `thread-delete` (`:85`), `rail-thread-error` (`:57`), `threads-see-all` with `aria-expanded` (`:98-99`), `rail-collapse` / `rail-expand` (`apps/web/components/app-rail.tsx:439`), `mode-chat` (`:299`), and the pane's own `chat-empty` / `message-list` / `message-output`. Source-level contract in `apps/web/lib/rail-threads-wiring.test.ts`; the Playwright walk is `apps/web/tests/e2e/foundation.spec.ts`, retargeted to `rail-thread-list`.
+DOM testids that prove it: `rail-thread-list` (`apps/web/components/rail-recent-threads.tsx:63`), `new-chat-link` (`:67`; the collapsed rail's icon is `:43`), `thread-item` (`:86`) with `aria-current="true"` on the open row (`:87`), `thread-delete` (`:101`), `rail-thread-error` (`:73`), `threads-see-all` with `aria-expanded` (`:114-115`), `rail-collapse` / `rail-expand` (`apps/web/components/app-rail.tsx:469`), `mode-chat` (`:300`), and the pane's own `chat-empty` / `message-list` / `message-output`. Source-level contract in `apps/web/lib/rail-threads-wiring.test.ts`; the Playwright walk is `apps/web/tests/e2e/foundation.spec.ts`, retargeted to `rail-thread-list`.
 
 Driven on the owner's webdev (`http://127.0.0.1:3000`, doctor `runtime: stub`) on 2026-09-17 with six seeded threads: 4 rows → `Semua sesi` → 6 rows → `Lebih sedikit` → 4 rows, open a row (`aria-current`), `+ Chat baru` with a turn on screen (pane cleared, thread intact), `thread-delete` with the confirm accepted, collapsed rail empty, reload starts collapsed. Evidence under `.cursor/skills/verify-agentforge/evidence/chat/2026-09-17-cc-map/`.
 
