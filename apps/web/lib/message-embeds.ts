@@ -224,10 +224,16 @@ export function jobEmbedsFromOutput(output: unknown): JobEmbedModel[] {
   return single ? [single] : [];
 }
 
-export function jobEmbedsFromTools(tools: Array<{ status: string; output?: unknown }>): JobEmbedModel[] {
+/**
+ * Tools whose results are the owner's own material, already summarised on their tool row. A
+ * knowledge excerpt shaped like a search hit is not a web result to surface under the answer.
+ */
+const NO_EMBED_TOOLS = new Set(["knowledge_search"]);
+
+export function jobEmbedsFromTools(tools: Array<{ key?: string; status: string; output?: unknown }>): JobEmbedModel[] {
   const cards: JobEmbedModel[] = [];
   for (const tool of tools) {
-    if (tool.status !== "completed") {
+    if (tool.status !== "completed" || (tool.key && NO_EMBED_TOOLS.has(tool.key))) {
       continue;
     }
     for (const card of jobEmbedsFromOutput(tool.output)) {

@@ -5,8 +5,8 @@
  * Host-side because they read and refresh the local `market_cache` through
  * the same loaders the packet builder uses, so a tool call during drafting
  * serves the rows the packet was built from. Every output is scanned by
- * `assertNoAdvice` before it is returned, and all five keys are in core's
- * NETWORK_SOURCED_TOOLS so the runtime injection-scans them like web_search.
+ * `assertNoAdvice` before it is returned, and all five are `trust: "network"` so the
+ * runtime injection-scans their output like web_search.
  * Bad input (an unknown symbol) is a visible `{ success: false, error }`,
  * never a throw.
  */
@@ -126,6 +126,7 @@ export function createMarketTools(deps: MarketToolDeps) {
     key: "market_quotes",
     name: "Market quotes",
     description: `Current quotes for up to ${WATCHLIST_MAX} tickers from any market (price, day change, previous close, pre- and post-market price and change, volume, market cap, market state, currency, exchange), from the local cache when fresh (5 min) or Yahoo Finance otherwise. ${MARKET_TOOL_DISCLAIMER}`,
+    trust: "network",
     schema: z.object({ symbols: symbolsArg }),
     execute: async ({ symbols }) => {
       const ctx = await context();
@@ -146,6 +147,7 @@ export function createMarketTools(deps: MarketToolDeps) {
     key: "market_history",
     name: "Market price history",
     description: `Daily OHLCV bars for one ticker (default ${HISTORY_MONTHS_DEFAULT} months, up to ${HISTORY_MONTHS_MAX}) with the technical indicators computed from them (RSI14, SMA50/200, EMA200, MACD, 1d/5d/1m change, 52-week range when a year of bars is present). Cached for 6 hours. ${MARKET_TOOL_DISCLAIMER}`,
+    trust: "network",
     schema: z.object({
       symbol: symbolArg,
       months: z
@@ -185,6 +187,7 @@ export function createMarketTools(deps: MarketToolDeps) {
     key: "market_technical",
     name: "Market technicals",
     description: `Technical picture for up to ${WATCHLIST_MAX} tickers: TradingView technical rating (summary, moving averages, oscillators, vendor label) where the exchange is covered, plus RSI14, SMA50/200, EMA200, MACD and signal, 1d/5d/1m change, and the 52-week range, computed from Yahoo Finance bars when the vendor value is missing. Cached for 15 minutes. ${MARKET_TOOL_DISCLAIMER}`,
+    trust: "network",
     schema: z.object({ symbols: symbolsArg }),
     execute: async ({ symbols }) => {
       const ctx = await context();
@@ -217,6 +220,7 @@ export function createMarketTools(deps: MarketToolDeps) {
     key: "market_news",
     name: "Market news",
     description: `Recent headlines for one ticker (title, publisher, link, published time; never the article text) from the local cache (refreshed after 30 minutes) or Yahoo Finance, or a full-text search over every cached headline when a query is given instead of a symbol. ${MARKET_TOOL_DISCLAIMER}`,
+    trust: "network",
     schema: z
       .object({
         symbol: symbolArg.optional(),
@@ -261,6 +265,7 @@ export function createMarketTools(deps: MarketToolDeps) {
     key: "market_macro",
     name: "Market macro levels",
     description: `Macro snapshot: S&P 500 / Nasdaq 100 / Dow / Russell 2000 futures, VIX, US 10Y yield, WTI crude, US dollar index, IHSG, and USD/IDR with level and day change. Cached for 5 minutes. ${MARKET_TOOL_DISCLAIMER}`,
+    trust: "network",
     schema: z.object({}),
     execute: async () => {
       const ctx = await context();

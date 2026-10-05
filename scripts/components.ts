@@ -181,7 +181,7 @@ async function main(): Promise<void> {
      * using it yet.
      */
     console.log(
-      "Restart the app so it picks this up: docker compose -f webapp-deploy/compose.yml restart app " +
+      "Restart the app so it picks this up: docker compose -f webapp-deploy/compose.yml restart app proxy " +
         "(the running process cached its previous answer and will keep using the fallback reader).",
     );
   }

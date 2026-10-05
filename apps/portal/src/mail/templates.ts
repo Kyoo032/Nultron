@@ -82,3 +82,66 @@ export function otpMessage(input: OtpMessageInput): MailMessage {
 
   return Object.freeze({ to: input.to, subject, text: lines.join("\n"), html });
 }
+
+export interface InviteMessageInput {
+  readonly to: string;
+  /** The raw invite code, `XXXXX-XXXXX-XXXXX-XXXXX`. It exists in this message and nowhere else. */
+  readonly code: string;
+  /** When the invite stops working, as an ISO instant. Printed as a UTC date. */
+  readonly expiresAt: string;
+  readonly locale?: MailLocale;
+  readonly productName?: string;
+}
+
+const INVITE_COPY = {
+  en: (product: string, code: string, to: string, date: string) => ({
+    subject: `You are invited to ${product}`,
+    lines: [
+      `You have been invited to ${product}.`,
+      ``,
+      `Your invite code: ${code}`,
+      ``,
+      `It works for ${to} only, once, and stops working after ${date} (UTC).`,
+      `To sign in for the first time, open ${product}, enter this e-mail address, then this invite code.`,
+      `We will then e-mail you a six-digit code to confirm it is your inbox. Later sign-ins need only that e-mailed code.`,
+      `If you were not expecting this, ignore this message — the code is useless without your inbox.`,
+    ],
+  }),
+  id: (product: string, code: string, to: string, date: string) => ({
+    subject: `Anda diundang ke ${product}`,
+    lines: [
+      `Anda diundang ke ${product}.`,
+      ``,
+      `Kode undangan Anda: ${code}`,
+      ``,
+      `Kode ini hanya berlaku untuk ${to}, sekali pakai, dan tidak berlaku lagi setelah ${date} (UTC).`,
+      `Untuk masuk pertama kali, buka ${product}, masukkan alamat e-mail ini, lalu kode undangan ini.`,
+      `Kami lalu mengirim kode enam digit ke e-mail Anda untuk memastikan itu kotak masuk Anda. Masuk berikutnya cukup dengan kode e-mail itu.`,
+      `Jika Anda tidak mengharapkan pesan ini, abaikan saja — kode ini tidak berguna tanpa kotak masuk Anda.`,
+    ],
+  }),
+} as const;
+
+/**
+ * The invite e-mail: the code, whose address it is bound to, when it stops working, and what to do
+ * with it. No link, for the reason the OTP mail has none: a sign-in mail with a link is a phishing
+ * template, and the tester was told where the app is by the person who invited them.
+ */
+export function inviteMessage(input: InviteMessageInput): MailMessage {
+  const locale: MailLocale = input.locale === "id" ? "id" : "en";
+  const product = input.productName?.trim() || defaultProductName(locale);
+  const date = input.expiresAt.slice(0, 10);
+  const { subject, lines } = INVITE_COPY[locale](product, input.code, input.to, date);
+
+  const html = [
+    "<html><body style=\"font-family:system-ui,sans-serif;font-size:15px;line-height:1.5\">",
+    ...lines.map((line) =>
+      line === ""
+        ? "<p></p>"
+        : `<p>${escapeHtml(line).replace(escapeHtml(input.code), `<strong>${escapeHtml(input.code)}</strong>`)}</p>`,
+    ),
+    "</body></html>",
+  ].join("");
+
+  return Object.freeze({ to: input.to, subject, text: lines.join("\n"), html });
+}

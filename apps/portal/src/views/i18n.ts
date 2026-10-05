@@ -72,6 +72,16 @@ export function translator(locale: PortalLocale): Translate {
   };
 }
 
+/**
+ * A wait in the unit that reads best: minutes under an hour, otherwise whole hours rounded up (a
+ * person told "19 h" will not come back to a lock that is still on). The words are the catalog's
+ * (`wait.minutes`, `wait.hours`), so Indonesian says "jam".
+ */
+export function waitText(t: Translate, seconds: number): string {
+  const safe = Math.max(1, Math.ceil(seconds));
+  return safe < 3600 ? t("wait.minutes", { n: Math.ceil(safe / 60) }) : t("wait.hours", { n: Math.ceil(safe / 3600) });
+}
+
 /** Both locales at once -- the shape `message_en` / `message_id` need. */
 export function copyPair(key: string, vars?: Vars): { readonly en: string; readonly id: string } {
   return Object.freeze({ en: translator("en")(key, vars), id: translator("id")(key, vars) });

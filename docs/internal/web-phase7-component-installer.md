@@ -316,7 +316,7 @@ a result can be reported by number.
     `components.sh install`: it downloads into `/opt/agentforge/components`, verifies the sha512, and
     prints the restart line. **Before** the restart, confirm the app still uses the fallback (the
     loader memoised its failure); **after**
-    `docker compose -f webapp-deploy/compose.yml restart app`, confirm `status` reports
+    `docker compose -f webapp-deploy/compose.yml restart app proxy` (never `app` alone: the proxy shares its network namespace), confirm `status` reports
     `installed in the components root` and the same `.docx` converts properly. Then throw the
     container away — a box that needed this needs a rebuild.
 

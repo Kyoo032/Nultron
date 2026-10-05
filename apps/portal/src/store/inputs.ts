@@ -14,6 +14,7 @@ import type {
   Device,
   DeviceCode,
   DevicePlatform,
+  Invite,
   Iso,
   JsonObject,
   LoginOtp,
@@ -21,6 +22,7 @@ import type {
   OtpPurpose,
   TenantFeatureFlags,
   TenantStatus,
+  User,
   UserRole,
   UserStatus,
 } from "./entities";
@@ -200,12 +202,42 @@ export interface SendLoginOtpInput {
   readonly purpose?: OtpPurpose;
   readonly ttlMs?: number;
   readonly createdIp?: string | null;
+  /**
+   * Treat this as a repeat of the request that minted the live code, and mint nothing, when the
+   * address already has a code of this purpose that is live (not used, not out of guesses, not
+   * expired) and younger than this. A double click, a reload and a re-post of one form are one
+   * request; a caller that WANTS another code (the operator's one-off) leaves it unset.
+   */
+  readonly dedupeWithinMs?: number;
 }
 
 export type SendLoginOtpResult =
   | { readonly ok: true; readonly otp: LoginOtp }
   /** 3 sends per 15 minutes per address, counted from the rows themselves. */
-  | { readonly ok: false; readonly reason: "send_rate_limited"; readonly retryAfter: number };
+  | { readonly ok: false; readonly reason: "send_rate_limited"; readonly retryAfter: number }
+  /**
+   * `dedupeWithinMs` applied: a live code of this purpose is that young, so it already answers
+   * this request. Nothing was minted and none of the three sends was spent; `retryAfter` is the
+   * whole seconds until a request would no longer count as a repeat.
+   */
+  | { readonly ok: false; readonly reason: "duplicate"; readonly retryAfter: number };
+
+export interface LoginOtpStatusInput {
+  readonly tenantId: string;
+  readonly email: string;
+  /** Which flow's codes the newest-sent time is read from. The daily guess total is across both. */
+  readonly purpose?: OtpPurpose;
+}
+
+/** A read-only look at an address's codes, so a flow can say what is true before it sends one. */
+export interface LoginOtpStatus {
+  /** The address has spent its twenty guesses for the day: even the right code is refused. */
+  readonly locked: boolean;
+  /** When `locked`: whole seconds until enough of the day's guesses age out to lift it. */
+  readonly retryAfter?: number;
+  /** When the newest code of that purpose was minted, or null if none ever was. */
+  readonly newestSentAt: Iso | null;
+}
 
 export interface VerifyLoginOtpInput {
   readonly tenantId: string;
@@ -224,6 +256,49 @@ export type VerifyLoginOtpResult =
        * right code on a fresh code is refused until they age out.
        */
       readonly reason: "no_code" | "expired" | "too_many_attempts" | "invalid_code" | "locked";
+      readonly attemptsRemaining: number;
+      /** With `locked`: whole seconds until the address can try again (`otp-lock.ts`). */
+      readonly retryAfter?: number;
+    };
+
+export interface CreateInviteInput {
+  readonly tenantId: string;
+  readonly orgId: string;
+  /** An existing `invited` member: the invite activates this row, it does not create one. */
+  readonly userId: string;
+  readonly email: string;
+  /** The raw code. Normalised and hashed here; only the hash is stored. */
+  readonly rawCode: string;
+  /** Held once redeemed. Defaults to `member`: nobody is made an owner by omission. */
+  readonly role?: UserRole;
+  /** Defaults to 7 days. A negative value is a row already past its expiry, for a test. */
+  readonly ttlMs?: number;
+}
+
+export interface RedeemInviteInput {
+  readonly tenantId: string;
+  readonly email: string;
+  readonly rawCode: string;
+}
+
+/** How many invites an address has been issued lately, and when: the self-service resend's budget. */
+export interface InviteIssueHistory {
+  readonly count: number;
+  readonly oldestAt: Iso | null;
+  readonly newestAt: Iso | null;
+}
+
+export type RedeemInviteResult =
+  | { readonly ok: true; readonly invite: Invite; readonly user: User }
+  | {
+      readonly ok: false;
+      /**
+       * `no_invite`: nothing live for that address. `wrong_code`: it was live and the code was
+       * not it, and the guess was counted. `locked`: five guesses were spent, so even the right
+       * code is refused. `not_invitable`: the member is disabled, which an invite does not undo.
+       * None of them is shown to the person typing; they are for the audit row.
+       */
+      readonly reason: "no_invite" | "wrong_code" | "expired" | "already_used" | "locked" | "not_invitable";
       readonly attemptsRemaining: number;
     };
 

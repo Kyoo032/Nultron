@@ -1,15 +1,25 @@
 # Map — Portal service (`apps/portal`)
 
-Last verified: 2026-09-23 at d4561b8 + working tree, by the portal defect pass (request-target
-crash, `X-Forwarded-For`, limiter eviction, daily OTP budget, poll limit, refresh `device_id`,
-server DB role, per-client refresh bucket). Separately on 2026-09-23, the host auth pass
-re-anchored the one citation into `packages/host/src/auth/portal-client.ts` that it moved
-(`toTokens`); that pass changed nothing on the portal side.
+Last verified: 2026-10-01 at 0b61a29 + working tree, by the sign-in-codes pass (four fixes found by driving
+the pilot: a replaced code no longer signs in, one request is one code, the fifth wrong invite code is the
+lock, the seat cap is told at the first step; plus the test run's exit code). That pass rewrote section 3's
+state table and bullets, the OTP and sign-in rows of section 6, Where things live, three Gotchas and
+Verify, and re-anchored their citations (`flows/sign-in.ts`, `otp/send.ts`, `store/postgres/otps.ts`,
+`routes/sign-in-flow.ts` all moved) and re-anchored four older ones the map checker flagged
+(`toTokens`, `getAuthorize`, `exchangeAuthorizationCode`, `signAccessToken`). The pass before it, the invite / sign-in-states / roles pass (the
+invite-gated first sign-in, the e-mail step as a state machine, `portal:invite` and its e-mail, roles in
+the token), changed — the wire contract, section 3, the controls table, Where things
+live, Gotchas and Verify — were rewritten against the code and their citations re-anchored; everything
+else keeps its 2026-09-23 reading at d4561b8 (the portal defect pass; the host auth pass that day
+re-anchored the one citation into `packages/host/src/auth/portal-client.ts` it moved, `toTokens`). Grep
+for the identifier before trusting a line number in a section this pass did not touch. A second pass the same
+day added the lock's wait time (`otp-lock.ts`, `waitText`), re-anchored the citations that had drifted, and
+drove the whole flow on the local Kubernetes rehearsal (Verify, the sixth drive).
 
 ## Overview
 
 `apps/portal` is the stand-in for the Toko Token AI control plane at `api.tokotokenai.com` — the
-service that owns tenants, orgs, users, devices, sessions and seats, and that the hosted DPSBuddy
+service that owns tenants, orgs, users, devices, sessions and seats, and that the hosted Nultron
 web app signs in against. It exists so the product has a **real** login to build and review
 against before the backend team's service does, and it is wire-compatible with
 [`../portal/device-code-login.md`](../portal/device-code-login.md) and
@@ -31,19 +41,21 @@ This page is the portal side of the wire and nothing else.
 ### 1. The wire contract
 
 Frozen 2026-09-21 and documented from the other side in
-`packages/host/src/auth/portal-client.ts:15-48`. Sixteen routes, all static paths, registered
+`packages/host/src/auth/portal-client.ts:15-48`. Twenty routes, all static paths, registered
 onto the server through `registerPortalRoutes` (`apps/portal/src/routes/index.ts:28`). Two of
-them — `GET` and `POST /logout` — are fix pass X's and are **not** part of the frozen host
-contract: the host names the URL, the browser follows it, and nothing server-to-server calls it.
+them — `GET` and `POST /logout` — are fix pass X's, and the four `…/invite` and `…/invite/resend` posts are
+the invite pass's: none of the six is part of the frozen host contract, because the host names the
+`/authorize` URL, the browser follows it, and nothing server-to-server calls them.
 
 | Method | Path | Body in | Body out |
 |---|---|---|---|
 | GET | `/authorize` | `response_type=code&client_id&redirect_uri&state` | HTML, or `302 {redirect_uri}?code&state` |
-| POST | `/authorize/email` | form: `csrf_token`, the four authorize fields, `email` | HTML (always the same page) |
-| POST | `/authorize/verify` | the same + `code` | HTML on failure, `302` on success |
-| GET | `/activate` | `?code=<user_code>` | HTML |
-| POST | `/activate/email` | form: `csrf_token`, `user_code`, `email` | HTML |
-| POST | `/activate/verify` | the same + `code` | HTML (the approve screen) |
+| POST | `/authorize/email` | form: `csrf_token`, the four authorize fields, `email`; or `resend=1` ("send a new code"), or `restart=1` ("use a different e-mail") | HTML: which screen follows is the portal's decision (section 3) |
+| POST | `/authorize/invite` | the same fields + `email`, `invite_code` | HTML: the e-mailed-code screen after a valid invite, or the invite screen / a dead end |
+| POST | `/authorize/invite/resend` | the same + `email` | HTML: the invite screen with a notice |
+| POST | `/authorize/verify` | the same + `email`, `code` | HTML on failure, `302` on success |
+| GET | `/activate` | `?code=<user_code>` | HTML (the sign-in screen, or the device screens with "You are signed in as …") |
+| POST | `/activate/email`, `/activate/invite`, `/activate/invite/resend`, `/activate/verify` | the same four, with `user_code` in place of the OAuth fields | HTML (the approve screen after verify) |
 | POST | `/auth/device/approve` | form **or** JSON: `csrf_token`, `user_code`, `decision` | HTML, or `{status, device_label}` |
 | GET | `/logout` | `?client_id&post_logout_redirect_uri` (both optional) | HTML, or `302` to a registered origin — always clears the session cookie |
 | POST | `/logout` | form: `csrf_token`, the same two | the same |
@@ -55,10 +67,13 @@ contract: the host names the URL, the browser follows it, and nothing server-to-
 | GET | `/tenant/config` | Bearer, or `?tenant=<slug>` | branding (+ flags and allowlist for a Bearer) |
 | GET | `/.well-known/jwks.json` | — | `{keys:[{kty,crv,kid,x,use,alg}]}` |
 
-**The token body is read field-by-field by `toTokens`** (`packages/host/src/auth/portal-client.ts:249`):
+**The token body is read field-by-field by `toTokens`** (`packages/host/src/auth/portal-client.ts:263`):
 `access_token, refresh_token, session_id, user_id, org_id, tenant_id` are required and a missing
 one makes the host raise `portal_unavailable`; `expires_in`, `refresh_expires_in` and `device_id`
-are optional and all three are sent. Built once in `mintSession`
+are optional and all three are sent. Since 2026-10-01 the body also carries **`role`** (`owner`, `admin` or
+`member`, the member's role in their org), which `toTokens` does not read yet: the host provisions a
+first-time sign-in's membership from it once a host worker wires it, and must not default a missing one
+to `owner`. The same value is the access token's `role` claim and `/auth/session`'s `user.role`. Built once in `mintSession`
 (`apps/portal/src/flows/token.ts:161`), and the exact key set is pinned by
 `apps/portal/src/routes/api.test.ts`.
 
@@ -70,7 +85,7 @@ table rather than two that drift.
 
 ### 2. `/authorize` — validate, then render, then redirect
 
-`getAuthorize` (`apps/portal/src/routes/authorize.ts:99`), in this order and the order is the
+`getAuthorize` (`apps/portal/src/routes/authorize.ts:135`), in this order and the order is the
 security property:
 
 1. per-IP limiter (`limit`, `apps/portal/src/routes/support.ts:193`);
@@ -94,35 +109,123 @@ fields**, because a hidden field is a field the user edits.
 `302 {redirect_uri}?error=<reason>&state=<echo>`, so `seat_cap_reached` lands on the product's own
 sign-in screen next to the admin who can free a seat.
 
-### 3. OTP — the same page for every outcome
+### 3. The sign-in is a state machine: e-mail first, then the portal decides
 
-`sendLoginOtp` (`apps/portal/src/otp/send.ts:78`) reports an outcome for the audit log; the route
-renders the identical page for all four of them. Enumeration resistance is three things:
+Owner decision, 2026-10-01: **nobody signs up**, a first sign-in needs an **invite** the operator
+issued for that address and the portal e-mailed to it, every later sign-in needs only an e-mailed
+six-digit code, and **the page says which situation the person is in**. This replaced the one neutral
+page every address used to get (SR-30, changed on purpose, see the Gotchas).
 
-- every path mints a code and hashes it, so the work is the same (`attempt`, `:88`);
-- every path takes at least `minimumDurationMs` (150 ms default, `:44`) — a floor, not a
-  constant-time implementation, which is the honest claim;
-- a `MailDeliveryError` is caught, audited as `otp.send_failed` without the code, and still
-  answers the neutral page.
+The decisions are `flows/sign-in.ts`; the pages, statuses and budgets are `routes/sign-in-flow.ts`,
+which `/authorize/*` and `/activate/*` both call, so neither door is a way round the other.
 
-An address that is unknown, that matches users in **more than one** tenant, or that belongs to a
-tenant other than the client's, sends nothing. The 3-sends-per-15-minutes limit is not implemented
-here at all: it is counted from the `login_otps` rows by `store.loginOtps.send`
-(`apps/portal/src/store/postgres/otps.ts:42-47`), so there is one definition of it.
+| The address is | State (`SignInState`) | The person is told | Sent |
+|---|---|---|---|
+| an activated member | `code_sent` | "We sent a sign-in code to <address>", the code field, **Send a new code**, **Use a different e-mail** | the six-digit code |
+| invited, invite redeemable | `invite_required` | "Enter the invite code we e-mailed to <address>", the invite field, **E-mail me my invite again**, **Use a different e-mail** | nothing yet |
+| invited, invite expired, spent or never issued | `invite_unusable` | "This invite has expired or was already used. Ask your admin for a new one." | nothing |
+| not invited, unknown, **disabled**, removed, or in another tenant than the client's | `no_access` | "This e-mail does not have access yet. Ask your company admin to invite you." | nothing |
+| an activated member who spent 20 wrong codes today | `otp_locked` | "Too many attempts for this e-mail. Try again in {wait} or ask your admin." (429; `{wait}` is when the oldest guesses leave the day, in minutes under an hour and otherwise whole hours rounded up, e.g. "19 h") | nothing |
+| an invitee who spent 5 wrong invite codes | `invite_locked` | "Too many wrong invite codes for this e-mail. Ask your admin for a new invite." (429; **the fifth wrong code itself** lands here, with no form: it used to show "0 attempts left" and the form again) | nothing |
+| a wrong invite code, with attempts left | `invite_wrong` | "That invite code is not right. N attempts left." (400, N from 4 to 1) | nothing |
+| an activated member or a redeemable invitee whose org has **no seat** for them | `seat_cap_reached` | "No seats left in your organisation. Ask your admin to free a seat or add one." (403; the first sentence is the `reason.seat_cap_reached` copy the JSON errors use, the second is `state.seatCap.next`; both in `en` and `id`) | nothing, and **nothing is spent**: the invite stays unredeemed, no wrong guess is counted |
+| a valid invite code | `code_sent` with `afterInvite` | "Invite accepted. We just sent a sign-in code to <address> to confirm it is your inbox." | the six-digit code |
 
-`verifyLoginOtp` (`apps/portal/src/otp/verify.ts:44`) answers `no_code` for an unknown or
-wrong-tenant address — the same answer a real address with no live code gets.
+Where each decision is made:
 
-**Twenty guesses per address per 24 hours.** Five a code and three codes per 15 minutes allowed
-about 1,440 guesses a day at one address, roughly a 0.14% chance a day of hitting a six-digit code.
-`store.loginOtps.verify` now sums `attempts` over every row of the address from the last 24 hours,
-across both purposes, before anything else. At 20 it answers `locked`, even for the right digits
-on a fresh code (`otps.ts:26-27,73-84`). It takes those rows `FOR UPDATE` in a fixed order, so a
-guess at the other purpose's live code waits for an uncommitted twentieth and then sees it. The flow
-audits a lock as `otp.locked` rather than `otp.failed` (`otp/verify.ts:65`). Both code forms say
-"try again in 24 hours" in `en` and `id` (`code.locked`, through `codeErrorMessage`,
-`routes/support.ts:93`, which the two verify routes now share). `prune_login_otps()` keeps 24 hours
-of rows, which is exactly what keeps this window countable.
+- **`beginSignIn`** (`flows/sign-in.ts:192`) is the e-mail step. It resolves the tenant by address
+  (`resolve.byEmail`, `null` for unknown **and** for an address in two tenants), requires it to be the
+  client's tenant, reads the member, and branches on `users.status`: `disabled` is `no_access`;
+  `invited` goes to `inspectInvite` (`:140`: none, redeemed or past `expires_at` is unusable, five
+  failed attempts is locked, otherwise live with its attempts left), and a **live** invite is asked
+  `orgs.hasSeatFor` before the invite screen is shown (`:221`; a dead invite is its own dead end whatever
+  the seats are); `active` is asked the same (`:241`) and then goes to `deliverLoginOtp`. A refusal is
+  `seat_cap_reached` and an `otp.withheld` audit row with that reason. A browser that holds a live portal
+  session never gets here: `GET /authorize` redirects first (`routes/authorize.ts`, `completeSignIn`).
+- **`submitInvite`** (`:268`) asks `hasSeatFor` **before it touches the invite** (`:290`: no
+  redemption, no wrong-guess count, an `invite.refused` audit row with reason `seat_cap_reached`), then
+  redeems the typed code inside one transaction (`store.invites.redeem`, below) and **returns, never
+  throws**, so a wrong guess commits its count. A wrong guess that was the fifth (`attemptsRemaining`
+  `0`) is mapped to `invite_locked` here, not to `invite_wrong` (it is still audited as the
+  `wrong_code` it was). A valid code activates the member, writes `invite.redeemed`, and **then** mails
+  the six-digit code: the invite does not prove the inbox. A second post of the same code (a double
+  click) finds the member active and carries on to the code instead of reporting the invite spent. For
+  an **active** member the typed code is not checked at all (nothing to redeem) and a code is sent: see
+  the Gotchas for what bounds that.
+- **`resendInvite`** (`:383`): the invite is stored as a hash, so "e-mail me my invite again" is a
+  **re-issue**: a new code for the same address, the old one retired, **the same `expires_at`** (asking
+  again never extends an invite), the same role. Refused for a spent, expired or locked invite (the
+  admin's call), a minute after the previous invite e-mail, and when four invites for the address exist
+  inside an hour, counted from the `invites` rows, operator-issued ones included.
+- **`deliverLoginOtp`** (`otp/send.ts:91`) mints and mails the six-digit code and keeps the old limits:
+  3 sends / 15 min per address (`store.loginOtps.send`), a **cooldown on an explicit "send a new
+  code"** (`OTP_RESEND_COOLDOWN_MS`, one minute) and a **lock check before anything is minted**
+  (`store.loginOtps.status`, `otps.ts:212`: the same 20-guesses-a-day sum `verify` uses), so a code that
+  could not be used is not sent. A refused transport is `code_mail_failed` and the page says so; the code
+  row that never went is **retired** (`loginOtps.retire`) so the next post is not told "a code was sent".
+- Every public function runs under `withFloor` (`:107`, 150 ms): a floor, not a constant time, which is
+  the honest claim.
+
+**One live code, one request, one seat** (the sign-in-codes pass, 2026-10-01). Three rules, each
+found by driving the pilot, each pinned by a test that was red first:
+
+- **A code is retired by its successor.** `store.loginOtps.send` marks every earlier unused code of the same
+  address **and purpose** used before it inserts the new one (`retireOutstanding`, `otps.ts:49`, called at
+  `:119`), and a successful `verify` marks the rest (`:201`). The rows stay, so the 3-sends window and the
+  20-guesses day still count them. Before this, `verify` took the newest *unused* code and used only
+  that one: request A, request B, sign in with B, and **A signed in too** (`POST /authorize/verify` with A
+  answered 302 to `/auth/callback`). A device sign-in (`purpose = activate`) and a web one (`portal_login`)
+  do not retire each other. Both statements stamp `clock_timestamp()`, not `now()`: `now()` is the
+  transaction's start and a later-starting transaction can commit a row stamped after it, which
+  `login_otps_consumed_chk` (`consumed_at >= created_at`) refuses.
+- **A repeat of one request is not a new request.** `deliverLoginOtp` passes `dedupeWithinMs:
+  OTP_DUPLICATE_WINDOW_MS` (15 s, `otp/send.ts:46`); `loginOtps.send` then answers `duplicate` — no row, no
+  mail, none of the three sends spent, no audit row — when a code of that purpose is **live** (unused, under
+  5 guesses, unexpired) and younger than that, and the page is the code page again (`already_sent` →
+  `code_sent`). A code that was used, burnt, expired or never mailed does not count, so signing in and
+  starting again at once sends a code. The check and the insert share one `pg_advisory_xact_lock` per
+  address (`otps.ts:78`), so two posts that arrive together make one code. Before this, a double submit, a
+  reload or a re-post minted two or three codes and spent the budget, and only the newest worked, so the
+  person who typed the first e-mail's code burned a guess. An explicit "send a new code" keeps its minute
+  (`OTP_RESEND_COOLDOWN_MS`, checked first); the operator's `portal:otp` passes no `dedupeWithinMs` and is
+  always minted.
+- **The seat is asked before anything is spent.** `orgs.hasSeatFor(orgId, userId)`
+  (`store/postgres/identity.ts:165`) is the seat branch of `login_precheck` read without its advisory lock:
+  `count_active_users(org)`, plus one unless the person already holds a live session seen in the last 30
+  days, must not exceed `seat_cap` (so even a seated person fails in an org that is over its cap, exactly as
+  at the exchange). `beginSignIn` and `submitInvite` ask it; the **exchange still checks**
+  (`loginPrecheck`, `routes/authorize.ts` `completeSignIn`) because a seat can go between the page and
+  the exchange, and `routes/browser.test.ts` "the login gate" pins that half by taking the seat in between.
+  Before this the cap was checked only at the exchange: an invitee redeemed the invite, typed the code, and
+  landed on `/sign-in?reason=seat_cap_reached` with the invite already spent.
+
+**What stands in for the neutral page** is the limits, all counted whatever the outcome and none
+dependent on the address existing: `signInEmailIp` 15 / 15 min per IP and `signInEmailAddress` 6 / 15 min
+per address, both spent at `emailStepAllowed` (`routes/sign-in-flow.ts:285`) before anything is looked
+up; `inviteAttemptIp` 10 / 15 min per IP, **counted before the work** (`:368`) so a parallel burst cannot
+slip past a check made afterwards; five wrong codes per invite in the database; the invite resend budget
+above; and the OTP's own. A refusal by the first three is the same `429` page for a member and a
+stranger. **All the per-IP ones key on the caller's address, so behind a proxy they only mean something
+with `PORTAL_TRUST_PROXY=1`** (`webapp-deploy/compose.yml:267,321` and
+`webapp-deploy/k8s/base/kustomization.yaml:56` set it, and `scripts/review-instance.ps1:754` does when a proxy
+is in front; without it every visitor shares one socket-address bucket).
+
+`verifyLoginOtp` (`otp/verify.ts:46`) is unchanged: it answers `no_code` for an unknown or wrong-tenant
+address, and the `locked` outcome is audited `otp.locked`, shown with `code.locked` in both languages and
+the same `{wait}` as the e-mail step (`codeErrorMessage`, `routes/support.ts:93`).
+`POST /authorize/verify` still wipes nothing and mints the same session; the e-mailed code is the
+mailbox proof for **both** a member and a just-redeemed invitee.
+
+**Twenty guesses per address per 24 hours** (unchanged, SR-53). `store.loginOtps.verify` sums `attempts`
+over every row of the address from the last 24 hours, across both purposes, before anything else. At 20
+it answers `locked`, even for the right digits on a fresh code (`otps.ts:27-28`, the check at `:85-96`), taking those rows
+`FOR UPDATE` in a fixed order. The answer carries `retryAfter`: the lock is a **rolling** total, so it lifts
+as the oldest codes' guesses age out of the 24 hours, and `secondsUntilUnlocked`
+(`store/postgres/otp-lock.ts`) walks the rows oldest first until the total is under 20 and returns when that
+code leaves the window. `loginOtps.status` returns the same number, and the e-mail step and the code screen
+print it as `{wait}` (`waitText`, `views/i18n.ts`) instead of a flat "24 hours". `prune_login_otps()` keeps 24 hours of rows, which is exactly what keeps
+this window countable. **What changed is that the e-mail step now says so up front** instead of mailing a
+code that `verify` would refuse.
 
 ### 4. `/auth/token` — two grants
 
@@ -144,7 +247,7 @@ every refresh when they are configured (`packages/host/src/auth/portal-check.ts:
 so a hosted refresh lands in `tokenClient`. The refresh token remains the credential for the
 refresh itself; the client credentials only choose the bucket, and are not bound to the token.
 
-**`authorization_code`** → `exchangeAuthorizationCode` (`apps/portal/src/flows/token.ts:70`):
+**`authorization_code`** → `exchangeAuthorizationCode` (`apps/portal/src/flows/token.ts:77`):
 resolve the tenant from the code, **verify the client secret first** (so a wrong secret cannot
 burn a legitimate user's code), then `authCodes.consume`, which checks client, `redirect_uri`,
 single use and the 60-second window; then the login gate; then `mintSession`.
@@ -181,7 +284,7 @@ held without one now fails closed with `invalid_request`.
 ephemeral key and writes a `portal_signing_key_ephemeral` warning naming only the `kid`; in
 production with no key it **throws before anything listens** (`apps/portal/src/main.ts:27`).
 
-`signAccessToken` (`apps/portal/src/jwt/sign.ts:53`) writes exactly the claims the login doc
+`signAccessToken` (`apps/portal/src/jwt/sign.ts:66`) writes exactly the claims the login doc
 freezes — `iss sub tid oid did sid scope iat exp`, one hour. `did` is `devices.id`, never the
 client-minted `install_id`. `verifyAccessToken` (`:102`) checks the algorithm **before** the key
 lookup (so `alg: none` cannot reach a path that treats an empty signature as a match), then the
@@ -200,9 +303,21 @@ max-age=3600`.
 | refresh rotation + reuse detection | `rotate_refresh_token`, called at `flows/token.ts:279` | `routes/api.test.ts` "kills the whole chain when a spent generation is presented again" |
 | refresh requires a `device_id` shaped like `devices.id`, so the device binding in `rotate_refresh_token` always runs; anything else is `400 invalid_request` before any lookup | `routes/tokens.ts:37,139` | `routes/api.test.ts` "refuses a refresh with no device_id, in the invalid_request shape, without spending the token", "refuses a device_id that is not a devices.id, rather than failing inside the database" |
 | OTP: 6 digits, 10 min, 5 attempts, single use | `store/postgres/otps.ts` | `routes/browser.test.ts` "counts down the five attempts and refuses the sixth" |
-| OTP: 3 sends / 15 min per address | `store/postgres/otps.ts:42-47` | `routes/browser.test.ts` "stops after three sends inside the window" |
-| OTP: 20 guesses / 24 h per address, across every code and both purposes; the 21st is refused as `locked` even with the right digits, audited as `otp.locked`, and the page says to wait 24 h in `en` and `id` | `store/postgres/otps.ts:26-27,73-84`, `otp/verify.ts:65`, `codeErrorMessage` in `routes/support.ts:93` | `store/postgres/otps.test.ts` "the daily guess budget" (5 cases, one of them an uncommitted twentieth guess racing the other purpose's code), `routes/browser.test.ts` "refuses even the right code once twenty guesses were spent today, says why in both languages, and audits otp.locked" |
-| enumeration resistance (unknown / ambiguous address) | `otp/send.ts:88-101` | `routes/browser.test.ts` "renders the identical page for an unknown address" |
+| OTP: 3 sends / 15 min per address | `store/postgres/otps.ts:70-130` (the budget is read under the address's advisory lock) | `routes/browser.test.ts` "the send budget": "stops after three sends inside the window, and says a code already went" (its own portal and clock: the sends have to be told apart from a repeat) |
+| OTP: a code that a newer one replaced never signs anybody in, whether or not the newer one was used; a successful sign-in uses every other unused code of that address and purpose | `retireOutstanding`, `store/postgres/otps.ts:49,119,201` | `store/postgres/otps.test.ts` "a retired code stays retired" (4), `routes/sign-in-codes.test.ts` "M1: a code that was replaced stays dead" (2: the live repro, request A, request B, sign in with B, replay A from a second browser, answers 400) |
+| OTP: a repeat of one request (double click, reload, re-post, two posts together) is answered by the code that already went: one mail, no budget spent; an explicit resend keeps its minute | `OTP_DUPLICATE_WINDOW_MS`, `otp/send.ts:46,132`; `store/postgres/otps.ts:78-100` | `store/postgres/otps.test.ts` "a code that is already live answers a repeat of the same request" (8, one with two sends in parallel), `routes/sign-in-codes.test.ts` "M2: one request is one code" (9: sequential, parallel, the invite step, after the window, after a refused transport), `routes/sign-in-states.test.ts` "can ask for a new code, but not within the first minute" |
+| OTP: 20 guesses / 24 h per address, across every code and both purposes; the 21st is refused as `locked` even with the right digits, audited as `otp.locked`, and the page says how long to wait (`{wait}`: when the oldest guesses leave the day, `secondsUntilUnlocked` in `store/postgres/otp-lock.ts`) in `en` and `id` | `store/postgres/otps.ts:27-28,146-156`, `otp/verify.ts:67`, `codeErrorMessage` in `routes/support.ts:93` | `store/postgres/otps.test.ts` "the daily guess budget" (5 cases, one of them an uncommitted twentieth guess racing the other purpose's code) and "when a locked address can try again", `store/postgres/otp-lock.test.ts` (5, the rolling arithmetic), `routes/sign-in-states.test.ts` "6. locked out" (hours, minutes, the code screen), `routes/browser.test.ts` "refuses even the right code once twenty guesses were spent today, says why in both languages, and audits otp.locked" |
+| the sign-in tells a person which situation they are in (member, invitee, spent invite, no access, lock, no seat) and sends a code only to a member or a just-redeemed invitee; an invited member is never mailed a sign-in code | `flows/sign-in.ts:192,268`, `otp/send.ts:91`, `routes/sign-in-flow.ts:201` | `routes/sign-in-states.test.ts` (41: the nine states the owner listed, both doors, the fifth wrong invite code as the lock, no password field, no code in a log or audit row) |
+| the seat cap is told at the e-mail step and before an invite is redeemed, with the `seat_cap_reached` copy in both languages and nothing spent (no invite, no code, no wrong-guess count); the exchange re-checks | `orgs.hasSeatFor`, `store/postgres/identity.ts:165`; `flows/sign-in.ts:221,241,290`; `deadEndMessage`, `routes/sign-in-flow.ts:169` | `routes/sign-in-seats.test.ts` (8), `store/postgres/seats.test.ts` "orgs.hasSeatFor" (6, held to `login_precheck`'s own answer), `routes/browser.test.ts` "the login gate" |
+| an invite code: 20 characters of a 32-character alphabet (about 100 bits), sha256 only, bound to its address, 7 days, single use, one live per address (partial unique index) | `crypto.ts` `randomInviteCode`, `store/postgres/invites.ts:35,91`, `migrations/0011_invites.sql` | `store/postgres/invites.test.ts` (22), `crypto.test.ts` (4), `invites/issue.test.ts` (22) |
+| invite: 5 wrong guesses lock it, counted in the database under `FOR UPDATE` (8 parallel wrong guesses stop at 5 and never hit the CHECK; two parallel right codes let exactly one through) | `store/postgres/invites.ts:91-150` | `store/postgres/invites.test.ts` "wrong guesses that arrive together", `routes/sign-in-states.test.ts` "6. locked out" |
+| the e-mail step is limited per IP (15 / 15 min) and per address (6 / 15 min), the strict stand-in for the neutral page; the refusal is the same page for a member and a stranger | `signInEmailIp`, `signInEmailAddress`, `security/rate-limit.ts:197,204,231-232`; `emailStepAllowed`, `routes/sign-in-flow.ts:285` | `routes/sign-in-limits.test.ts` "the e-mail step, per IP", "per address" (on the limits as shipped; the other suites lift them through `startTestPortal({ emailStepLimits })`) |
+| typed invite codes: 10 / 15 min per IP, counted **before** the lookup, including a valid code | `inviteAttemptIp`, `routes/sign-in-flow.ts:368` | `routes/sign-in-limits.test.ts` "typed invite codes, per IP" |
+| "e-mail me my invite again" is a re-issue (new code, old retired, same expiry and role), a minute apart and four an hour per address, never for a spent or locked invite | `resendInvite`, `flows/sign-in.ts:383` | `routes/sign-in-states.test.ts` "can have the invite e-mailed again…", "never extends the invite…"; `routes/sign-in-limits.test.ts` "'e-mail me my invite again', per address" |
+| the invite e-mail carries the code, names the address it is bound to and the expiry, has no link and keeps the code out of the subject; it goes through the portal's own mailer, in the language the operator chose | `inviteMessage`, `mail/templates.ts`; `mailInvite`, `invites/deliver.ts` | `invites/deliver.test.ts` (7) |
+| a role rides every invite (`owner`, `admin` or `member`, default `member`), is copied onto the member at redemption, and is in the access token claim `role`, the token response `role` and `/auth/session` `user.role`, read at every mint and refresh; a tenant always keeps an owner and its last owner cannot be demoted (the owner rows are locked `FOR UPDATE`, so two operators cannot race past it); a role changes only through the operator CLI | `store/postgres/invites.ts:136`, `flows/token.ts:168,237`, `jwt/sign.ts:76`, `invites/issue.ts:142`, `invites/role.ts:44` | `routes/roles.test.ts` (8), `invites/role.test.ts` (7), `invites/issue.test.ts` "issueInvite and roles", `jwt/sign.test.ts`, `routes/api.test.ts` "answers exactly the fields the host's toTokens reads" |
+| a cookie is a session on the portal's own screens only while its member still exists and is `active`; a removed or disabled member's old cookie shows the sign-in form and cannot approve a device | `liveWebSessionUser`, `flows/web-session.ts:86`; `routes/activate.ts` | `routes/sign-in-states.test.ts` "9. a member who was removed" |
+| the device screens greet a signed-in person by address with "Not you? Sign out" (`POST /logout`) | `accountBanner`, `views/pages.ts`; `routes/activate.ts` | `routes/sign-in-states.test.ts` "5. already signed in", `views/views.test.ts` |
 | device code 5 / 10 min per install, 30 / 10 min per IP; approve 10 / 10 min per user; the poll (`/auth/device/token`) 600 / 10 min per IP, never under the 120 one device makes | `createPortalLimiters`, `security/rate-limit.ts:192`; the poll's check at `routes/tokens.ts:186` | `security/security.test.ts` "rate limiting", `routes/api.test.ts` "limits POST /auth/device/token per IP, at 600 per 10 minutes, and never trips one polling device" |
 | `/auth/token`: a refresh from a confidential client whose secret verified counts against its `client_id` (20,000 / 10 min), never the address; failed client authentications have a per-address budget (20 / 10 min) that is peeked before any lookup; every public grant keeps 300 / 10 min per address | `postConfidentialRefresh`, `routes/tokens.ts:105-125`; `authenticateClient`, `flows/token.ts:236`; `tokenClient` / `tokenClientAuthFailIp`, `security/rate-limit.ts:200-201` | `routes/api.test.ts` "counts an authenticated client's refreshes against the client, never the address, and keeps 300 for public ones", "keys the confidential bucket on client_id, whichever address the refresh comes from", "answers 429 once a client has spent its 20,000 refreshes in the window", "refuses a wrong client_secret as invalid_client, audits it, and stops looking after 20 from one address"; `security/security.test.ts` "gives a confidential client 20,000 refreshes per 10 minutes, keyed on its client_id" |
 | a limiter whose 20,000-key map is full evicts its oldest 1% of windows; it no longer refuses every new key, which let a flood of addresses lock everyone out | `makeRoom`, `security/rate-limit.ts:66-80` | `security/security.test.ts` "keeps a flood of new keys from locking a new caller out", "evicts the window that started first, even when an older key restarted its window later" |
@@ -274,9 +389,19 @@ listens, and a production process refuses to boot as anything that can see past 
 | `apps/portal/src/flows/reasons.ts` | reason → status → RFC family → copy; the host-vocabulary narrowing |
 | `apps/portal/src/jwt/keys.ts` | Ed25519 keys, `kid`, the JWKS document |
 | `apps/portal/src/jwt/sign.ts` | the access token, and its verification |
-| `apps/portal/src/otp/{send,verify}.ts` | the enumeration-resistant send, and the audited verify |
+| `apps/portal/src/flows/sign-in.ts` | the sign-in state machine: `beginSignIn`, `submitInvite`, `resendInvite`, `SignInState`, the invite resend budget |
+| `apps/portal/src/routes/sign-in-flow.ts` | one state, one page, one status; the e-mail step's limits; the three posts both doors share |
+| `apps/portal/src/otp/{send,verify}.ts` | `deliverLoginOtp` (mint and mail a six-digit code: limits, cooldown, lock, the 15-second repeat window, retire a code whose mail never went), and the audited verify |
+| `apps/portal/src/store/postgres/otps.ts` | `send` (the per-address advisory lock, the repeat check, the budget, retire the older codes, insert), `verify` (the daily total, the newest unused code, use it and the rest), `retire`, `status` |
+| `apps/portal/src/store/postgres/identity.ts` | `orgs.hasSeatFor`, the seat arithmetic of `login_precheck` without its lock, beside `countActiveUsers` |
+| `apps/portal/src/invites/` | `portal:invite`: `args.ts`, `issue.ts` (the store half, roles), `deliver.ts` (the invite e-mail), `role.ts` (change a member's role) |
+| `apps/portal/scripts/invite.ts` | the CLI shell: parse, migrate, issue, e-mail, print only with `--print`, exit codes |
+| `apps/portal/src/store/postgres/invites.ts` | create (retire, then insert), redeem (lock, count, activate, copy the role), `issuedSince` |
+| `apps/portal/migrations/0011_invites.sql` | `invites`: bound to an address, hash only, role, 5 attempts, one live per address, plain tenant RLS |
+| `apps/portal/src/testing/sign-in-kit.ts` | a pilot tenant, the operator's invite as the e-mail a tester reads, and the sign-in posts |
+| `apps/portal/test/global-setup.ts` | one real Postgres for the run: a free port from the OS, a start failure that throws and says why, and `keepExitCode` (see the Gotchas) |
 | `apps/portal/src/security/**` | cookies, the web session, CSRF, rate limits, headers, bodies, client IP |
-| `apps/portal/src/views/**` | the one escaping helper, the locale catalogs, the five screens |
+| `apps/portal/src/views/**` | the one escaping helper, the locale catalogs, the screens (sign-in, enter code, enter invite, dead end, approve, outcome) |
 | `apps/portal/locales/{en,id}/portal.json` | every user-facing string, including the reason table |
 | `apps/portal/migrations/0008_oauth_client_scope.sql` | closes the pre-auth window on `oauth_clients` |
 | `apps/portal/migrations/0009_web_session_revocation.sql` | `web_session_versions`, and the `state_hash` comment correction |
@@ -287,6 +412,87 @@ listens, and a production process refuses to boot as anything that can see past 
 
 ## Gotchas
 
+- **SR-30 was changed on purpose, by the owner (2026-10-01).** The e-mail step used to be one neutral
+  page and a timing floor, so nobody could tell a member from a stranger. It now tells them (section 3):
+  member, invitee, spent invite, no access and lock are different pages, which makes it an oracle for
+  "is this address a member, an invitee or neither" — exactly what the owner asked for. Nothing else is
+  revealed (no tenant, org, role or member list), the 150 ms floor stays, and the limits above replace
+  the neutral page. Anyone changing a limit, or adding a page that says more, re-reads that decision.
+- **The per-IP limits are only as good as the address they key on.** `signInEmailIp`, `inviteAttemptIp`
+  and the existing `otpSendIp` read `clientIp`, which believes `X-Forwarded-For` only behind
+  `PORTAL_TRUST_PROXY=1`. Without it every visitor shares the socket-address bucket and fifteen e-mail
+  steps in a quarter hour lock **everyone** out. The k8s base and the review instance set it; check any
+  other deployment. They are in-process, so a second portal instance halves them.
+- **The invite is not a second factor.** The portal e-mails it to the same address that later receives
+  the six-digit code, so anyone who controls the inbox gets both. What keeps a stranger out is that an
+  operator invited the address (the `invited` row), and what the invite adds is an explicit, bounded
+  activation: single use, bound to the address, 7 days, five guesses. The six-digit code is still
+  required after it. Redeeming activates the member **before** the mailbox is proved, so a person who
+  holds a code but not the inbox can activate the membership and nothing more.
+- **"E-mail me my invite again" is unauthenticated.** A third party who knows an invitee's address can
+  retire the code sitting in the tester's inbox and send them a new one, up to four an hour (a minute
+  apart); the e-mail only ever goes to that address, never to the requester. Likewise anyone who knows
+  the address can lock an invite with five wrong codes, and lock the replacement again after each
+  reissue — the same class as the OTP lockout (SR-53), and the operator's reissue is the remedy.
+- **Any send retires the pending code, and a send can be asked for by anyone who knows the address.** A
+  newer code replaces the older one (section 3), so a third party who posts the e-mail step for an
+  address, a quarter minute or more after the last code, makes the code already in that person's inbox
+  stop working and sends them another. The bound is the existing one — `signInEmailAddress` 6 / 15 min,
+  the DB's 3 sends / 15 min — and before this change the same post already made the older code fail (the
+  newest unused one is the one `verify` compares, so the old one was a wrong guess against the new one
+  and burnt its attempts). It is an availability limit of the same class as the OTP lockout, not a
+  sign-in bypass: nothing here lets the sender read, guess or reuse a code.
+- **An active member's invite step sends a code without looking at the invite code typed.** A post to
+  `/authorize/invite` for an address that is already `active` has nothing to redeem and falls through to
+  `deliverLoginOtp` (`submitInvite`, the `active` branch). What bounds it is `inviteAttemptIp` (10 / 15
+  min per IP, counted before the work) and the DB's 3 sends / 15 min per address, and the 15-second
+  repeat window now keeps a re-post from spending any of them. It reaches only the member's own
+  inbox, and the typed value is never compared, so it cannot be used to guess anything. The related
+  residue: anyone who knows an invitee's address can lock the invite with five junk codes, or rotate it
+  with "e-mail me my invite again" up to four times an hour (the existing item above); the operator's
+  re-issue is the remedy.
+- **The seat check at the first step is a courtesy, not a gate.** `orgs.hasSeatFor` takes no lock and
+  reads `count_active_users` as it is, so two invitees can both be told there is room for the last seat;
+  the second is turned away at the exchange (`login_precheck` takes the org's advisory lock there) with
+  `?error=seat_cap_reached`, after redeeming their invite. That is the old behaviour, now the narrow
+  one. Do not read a `true` from it as a reservation. A dead invite shows its own dead end, not the
+  seat page, and `resendInvite` does not ask (it sends an invite, not a sign-in code).
+- **A test run that does not print `Tests  N passed` did not run.** Importing `embedded-postgres` installs
+  an `async-exit-hook` whose `beforeExit` handler calls `process.exit(0)` over vitest's
+  `process.exitCode = 1`, so until 2026-10-01 the portal suite exited **0** after a failing test, and
+  after a start failure under an administrator token ("No test files found"). `test/global-setup.ts`
+  now records the code at `beforeExit` and restores it at `exit` (`keepExitCode`), throws a real error
+  with the server's output when postgres does not start, stops the server if the migrations fail, and
+  takes its port from the OS: the old `55000 + pid % 5000` landed in the Windows excluded range
+  (58702-59882 here) about one run in four and died with "Permission denied". `scripts/ci-local.mjs`
+  still demands the `Tests  N passed` line on top of the exit code. Removing the library's `beforeExit`
+  listener instead does not work: its `exit` listener then runs first and crashes with "done is not a
+  function". `runas /trustlevel:0x20000` returns at once, so write the log and the exit code to files and
+  wait for them.
+- **A member who has ever signed in cannot be `DELETE`d.** `audit_log.actor_user_id` is `ON DELETE SET
+  NULL`: an UPDATE the append-only trigger refuses, and with the trigger off the NULL it writes breaks
+  `audit_log_actor_shape_chk`. Removal today is `users.status = 'disabled'`, which the e-mail step treats
+  as no access; `routes/sign-in-states.test.ts` "9." has to delete the member's audit rows with the
+  trigger off to simulate a hard removal. Whoever builds account erasure meets this first.
+- **A disabled member is `no_access` at the e-mail step now.** It used to be mailed a code and refused
+  at the login gate with `user_inactive`. A disabled member who still holds a portal cookie is sent
+  back to the app by `GET /authorize` with `?error=user_inactive` (that gate is unchanged), and the
+  device screens refuse the cookie outright.
+- **`other_tenant` cannot see two tenants.** The CLI refuses an address that belongs to exactly one other
+  tenant, but `resolve_tenant_for_email` answers `null` for both "unknown" and "in two tenants", so an
+  address already in two other tenants can still be invited and then never signs in. And `portal:seed`
+  does not check either way: seeding an active user for an address that is invited elsewhere makes it
+  ambiguous.
+- **A role change is not instant.** It changes `users.role`; the new role is in the next access token
+  (the portal reads the member's row at every mint and every refresh), and a token already issued keeps
+  the role it was signed with for its hour. The host decides when it re-reads its own membership. The
+  host's `ensurePortalOwner` (`packages/db/src/portal-owner.ts`) gave `owner` to every first-time sign-in
+  until it reads the `role` this portal now sends; that file is not this lane's.
+- **The command is `pnpm --filter @agentforge/portal invite`.** The root `package.json` has `portal:seed`
+  and `portal:otp` aliases and no `portal:invite`; adding it is one line outside this directory.
+- **The suites lift the two strict e-mail limits by default** (`startTestPortal({ emailStepLimits })`),
+  because a suite that signs in thirty times from one address is not a suite about them.
+  `routes/sign-in-limits.test.ts` runs on the limits as shipped.
 - **One `Set-Cookie` per response, by construction.** `PortalResponse.headers` is
   `Record<string, string>` (`apps/portal/src/server.ts:33`), which another lane owns, so a second
   cookie has nowhere to go. `htmlResponse` / `redirectResponse` take a single `cookie`
@@ -369,21 +575,35 @@ listens, and a production process refuses to boot as anything that can see past 
 
 ## Verify
 
-Counts below were re-run in this worktree on 2026-09-23 after the portal defect pass —
-`pnpm --filter @agentforge/portal test`: **25 files, 378 tests, all passed**; `tsc --noEmit` clean.
+Counts below were re-run on 2026-10-01 after the sign-in-codes pass (the invite / sign-in-states / roles pass before it) —
+`pnpm --filter @agentforge/portal test`: **36 files, 551 tests, all passed** (it was 34 files, 512 tests before the
+sign-in-codes pass; 39 tests and two files added), exit code 0; `tsc --noEmit` clean. (On this Windows desk
+`embedded-postgres` refuses to start under an administrator token, and the run now fails with that
+explanation and a non-zero exit instead of "No test files found" and 0. The run that
+produced these counts was started through `runas /trustlevel:0x20000`, which drops the admin token so the
+embedded server starts as designed. A Docker Postgres through `PORTAL_TEST_DATABASE_URL` also works, but
+the Docker VM's clock ran about three seconds behind the host and failed four tests that compare database
+time with the host's, so prefer the embedded one.)
 
 | Suite | Proves |
 |---|---|
-| `apps/portal/src/routes/browser.test.ts` (23) | the three browser hops, the neutral page, five attempts, three sends, the daily guess budget over the wire, the seat-cap redirect, no secret in a log |
+| `apps/portal/src/routes/browser.test.ts` (24) | the browser hops for a member, five attempts, the send budget (its own portal and clock), the daily guess budget over the wire (now also at the e-mail step), the seat-cap redirect at the exchange (the seat is taken between the page and the exchange), no secret in a log |
+| `apps/portal/src/routes/sign-in-states.test.ts` (41) | the nine states the owner listed on `/authorize/*` and `/activate/*`, the double click, the resend, the fifth wrong invite code as the lock, no password field, no invite code in a log or audit row |
+| `apps/portal/src/routes/sign-in-codes.test.ts` (11) | a replaced code stays dead after the newer one signs in; one request is one code: sequential repeats, two posts together, a double-clicked invite, after the window, after a used code, after a refused transport, and the explicit resend still waits its minute |
+| `apps/portal/src/routes/sign-in-seats.test.ts` (8) | a one-seat org: the e-mail step says no seat to an invitee and an active member in both languages and on both doors, the seat holder still signs in, a page open before the seat went does not spend the invite or a wrong-guess count |
+| `apps/portal/src/routes/sign-in-limits.test.ts` (7) | the e-mail step per IP and per address, typed invite codes per IP, the invite resend budget, on the limits as shipped |
+| `apps/portal/src/routes/roles.test.ts` (8) | an invite's role from `issueInvite` through a real browser sign-in and the code exchange to the claim, the response and `/auth/session`, and through a refresh after the operator changes it |
+| `apps/portal/src/invites/*.test.ts` (36) | issuing (refusals, the owner rule, org choice, roles), the invite e-mail (both languages, no link, audit), changing a role (last owner, same role, not active), the CLI's arguments |
+| `apps/portal/src/store/postgres/invites.test.ts` (22) | hash only, bound to the address, 5 attempts under concurrency, expiry, single use, the role copied at redemption, one live invite by the index, the resend history |
 | `apps/portal/src/routes/api.test.ts` (34) | the exact token key set, replay, wrong secret, redirect mismatch, refresh reuse, refresh without a `device_id`, the full device flow, `slow_down`, the Bearer endpoints, and behind a proxy the right-most `X-Forwarded-For`, the poll limit, and the per-client refresh bucket |
 | `apps/portal/src/routes/logout.test.ts` (11) | the way out: the cookie cleared on every answer, the origin-exact `post_logout_redirect_uri`, the CSRF-protected post, the server-side revocation, the audit row |
-| `apps/portal/src/security/rls.test.ts` (17) | the connection is a non-superuser `portal_app` member; tenant A reads and writes none of tenant B's `users`, `sessions`, `refresh_tokens`, `login_otps`, `auth_codes`; the pre-auth window |
+| `apps/portal/src/security/rls.test.ts` (19) | the connection is a non-superuser `portal_app` member; tenant A reads and writes none of tenant B's `users`, `sessions`, `refresh_tokens`, `login_otps`, `auth_codes`, `invites` (and cannot redeem another tenant's invite); the pre-auth window |
 | `apps/portal/src/security/security.test.ts` (49) | cookie prefixes, the web session, CSRF, rate limits, their eviction and the refresh buckets, client IP from the last hop, headers, body caps, and `form-action` on an authorize page |
 | `apps/portal/src/boot.test.ts` (17) | the server role read from `pg_roles` for real roles (superuser, `BYPASSRLS`, `portal_admin` member, stranger); production refuses each; development warns; the app login's password set outside production only, for that role only |
 | `apps/portal/src/server.test.ts` (14) and `process-guards.test.ts` (6) | an unparseable request target is a 400 and a bad Host header is ignored, over a raw socket; the error path's own failure is contained; the process-level last resort logs and exits 1 |
-| `apps/portal/src/views/views.test.ts` (19) | escaping against four injection payloads on every screen, `en`/`id` key parity, locale negotiation |
+| `apps/portal/src/views/views.test.ts` (23) | escaping against four injection payloads on every screen (the new ones included), `en`/`id` key parity, locale negotiation, the invite screen never echoes a code |
 | `apps/portal/src/jwt/keys.test.ts` (11) and `sign.test.ts` (10) | key derivation, the claim set, tampering, `alg: none`, skew, the JWKS document |
-| `src/{config,log,manual-otp}.test.ts`, `src/{mail/mail,seed/seed,otp/product-name,routes/assets,views/brand}.test.ts` and `src/store/postgres/*.test.ts` | the remaining 167: the aggregated config refusal and the two DSNs, the log sink's credential scrubbing, the manual OTP, SMTP, the seed's once-only secret, the mail product name, the brand mark, and the six store suites (including the daily OTP budget and the 0010 role) |
+| `src/{config,log,crypto,manual-otp}.test.ts`, `src/{mail/mail,seed/seed,otp/product-name,routes/assets,views/brand}.test.ts` and the other `src/store/postgres/*.test.ts` | the remaining: the aggregated config refusal and the two DSNs, the log sink's credential scrubbing (invite codes too), the invite code's shape, the manual OTP (it refuses an invited member), SMTP, the seed's once-only secret, the mail product name, the brand mark, and the store suites (including the daily OTP budget, `loginOtps.status`, retired and repeated codes in `otps.test.ts` (32), `hasSeatFor` in `seats.test.ts` (19) and the 0010 role) |
 
 **Where to press:** [`features/login.md`](../../../.cursor/skills/verify-agentforge/features/login.md),
 added 2026-09-21. It is the browser half of this page, and it exists because the suites above cannot
@@ -391,7 +611,7 @@ prove the part that matters most: **a non-browser client does not implement CSP 
 how `form-action 'self'` blocked every human's sign-in while `routes/browser.test.ts` walked the same
 three hops green ([SR-20](../security-register.md#sr-20)).
 
-Three live drives are recorded. First, `curl` against the portal on `127.0.0.1:4000` with the compose
+Six live drives are recorded. First, `curl` against the portal on `127.0.0.1:4000` with the compose
 Postgres and Mailpit: `/authorize` → e-mail → the code read from Mailpit's HTTP API → the `302` →
 `/auth/token`, then the device-code flow, then the negatives (bad `redirect_uri`, unknown client,
 replayed code, wrong client secret, sixth OTP attempt, fourth send, refresh reuse). Second, the full
@@ -405,6 +625,47 @@ production on the superuser DSN exited 2 with the refusal. Production on `portal
 so the owner's connection had closed. Development on the one superuser DSN booted with
 `portal_db_role_bypasses_rls`. Development with two DSNs set the app role's password from
 `PORTAL_DATABASE_URL` and booted clean. The review instance itself was not driven.
+
+A fourth and fifth, 2026-10-01, against the real `src/main.ts` on a loopback port, a throwaway
+PostgreSQL 16 (the two-DSN setup, so the server ran as `portal_app_login`) and the compose Mailpit for
+SMTP. The invite was issued with the real CLI (`pnpm --filter @agentforge/portal invite`, no `--print`):
+the invite e-mail landed in Mailpit and the code was read **from that e-mail**. Then a headless Chromium,
+which enforces the CSP that `curl` does not (SR-20), signed in end to end: an unknown address got the
+no-access page; the invitee's address, typed in capitals with stray spaces, got the invite screen with no
+sign-in code sent; a wrong invite code showed "4 attempts left"; "E-mail me my invite again" inside the
+minute was refused with the wait notice; the right code (typed lower case, with spaces) went to "Invite
+accepted. We just sent a sign-in code…"; the e-mailed code ended in the `302` to the registered callback
+with `code` and `state`; and a later sign-in with the e-mail alone went straight to the code. No console
+or CSP error besides the expected 400 on the wrong code. Also: `--print` printed the code once; with the
+SMTP port pointing nowhere the CLI exited 7 with "Nobody has the code" and printed nothing; a second
+invite issued with `--lang id` arrived as "Anda diundang ke Nultron". Mailpit was emptied of the test
+messages and the portal stopped afterwards. **Not driven:** the compose Postgres and the review instance
+(neither was touched), and the host half of the `role` claim (no host reads it yet).
+
+A sixth, 2026-10-01, on the local Kubernetes rehearsal (`docker-desktop`, namespace `nultron`, rebuilt with
+`node webapp-deploy/k8s/rehearse-local.mjs --force-build`, so the portal ran as `portal_app_login` in
+production mode behind Caddy with `PORTAL_TRUST_PROXY=1`, mail over STARTTLS to Mailpit). The invites were
+issued with the CLI **inside the cluster** (`kubectl exec deploy/nultron-portal -c portal -- ./node_modules/.bin/tsx
+scripts/invite.ts --email … --tenant nultron --role member`, no `--print`: the output carried no code), and the
+codes were read from the captured mail. A headless Chromium (CSP enforced) went through the real app at
+`https://nultron.localhost:8443`: (1) invite → app sign-in → portal e-mail step with the address typed in capitals →
+"Enter the invite code we e-mailed to …" with **exactly one mail** to the address so far (the invite) → a wrong
+invite code, "4 attempts left" → the right one, "Invite accepted. We just sent a sign-in code to … to confirm
+it is your inbox" → a wrong six-digit code, "4 attempts left" → the e-mailed one → the app (`/chat`), and the
+portal row was `member active`; (2) with the app's cookies cleared and the portal's kept, the app's sign-in went
+**straight back to the app with no form**; (3) a fresh browser with the same address got "We sent a sign-in
+code to …" and no invite screen, and the e-mailed code signed in; (4) a stranger got "This e-mail does not have
+access yet" (English and Indonesian) and no mail; (5) an invite whose `expires_at` was set an hour back through
+`psql` got "This invite has expired or was already used" and no mail; (6) five wrong invite codes then the right
+one got "Too many wrong invite codes"; (7) "E-mail me my invite again" inside the minute got the wait notice, a
+minute later a new code, and the **old code was refused** while the new one was accepted. An `--role admin
+--lang id` invite arrived as "Anda diundang ke Nultron" and left an `invited` / `admin` row. No console or CSP
+error beyond the expected 400s, and the final `POST /authorize/verify` → `302` to the app origin worked in
+Chromium, so SR-20 still holds with the new pages. **Not driven there:** the 20-wrong-codes lock (covered by
+`sign-in-states.test.ts`), the e-mail-step rate limits (`sign-in-limits.test.ts`), and the `role` claim itself
+(`roles.test.ts` reads it from a real token; no host in the cluster reads it yet). Screenshots of every step are
+in this session's scratchpad, not in the repo. The test members (`*@example.test`) were left in the rehearsal's
+database; `teardown-local.mjs` removes it.
 
 ## Why
 

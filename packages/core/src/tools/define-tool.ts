@@ -2,6 +2,12 @@ import { z, type ZodTypeAny } from "zod";
 import { ApiError } from "../errors";
 import type { TenantContext } from "../tenancy/types";
 
+/**
+ * Where a tool's output comes from. `network` and `user_content` output is attacker-reachable text,
+ * so it is scanned for injection before the model sees it; `internal` output is host-computed.
+ */
+export type ToolTrust = "internal" | "network" | "user_content";
+
 export type ToolDefinition<TSchema extends ZodTypeAny = ZodTypeAny> = {
   key: string;
   name: string;
@@ -10,6 +16,7 @@ export type ToolDefinition<TSchema extends ZodTypeAny = ZodTypeAny> = {
   handlerKey: string;
   capability?: string;
   pack?: string;
+  trust: ToolTrust;
   execute: (args: z.infer<TSchema>, tenant: TenantContext) => Promise<unknown>;
 };
 
@@ -21,6 +28,7 @@ export function defineTool<TSchema extends ZodTypeAny>(config: {
   handlerKey?: string;
   capability?: string;
   pack?: string;
+  trust?: ToolTrust;
   execute: (args: z.infer<TSchema>, tenant: TenantContext) => Promise<unknown>;
 }): ToolDefinition<TSchema> {
   return {
@@ -31,6 +39,7 @@ export function defineTool<TSchema extends ZodTypeAny>(config: {
     handlerKey: config.handlerKey ?? config.key,
     capability: config.capability,
     pack: config.pack,
+    trust: config.trust ?? "internal",
     execute: config.execute,
   };
 }

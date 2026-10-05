@@ -485,7 +485,7 @@ async function draftRedline(
   }
   const { patches, inserts } = buildRedlinePatches(findings, draft, clauses, localeOf(ctx));
   const result = await applyRedline(original, patches, inserts, {
-    author: ctx.input.matter.author || "DPSBuddy Legal",
+    author: ctx.input.matter.author || "Nultron Legal",
     date: ctx.input.now().toISOString(),
   });
   const validation = await validateDocx(result.bytes);

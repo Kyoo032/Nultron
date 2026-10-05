@@ -2,12 +2,15 @@ import {
   ApiError,
   assertModelSupportsModality,
   createRuntime,
+  harnessSpecFor,
   type AgentVersionRecord,
   type AppLocale,
   type ContentPart,
   type ImageUrlPart,
   type JobMode,
   type JobModelFallbackNotice,
+  type ModeHarnessSpec,
+  type ProductMode,
   type RuntimeEvent,
   type StreamWatchdogLimits,
   type TenantContext,
@@ -16,10 +19,13 @@ import {
 } from "@agentforge/core";
 import { isRenderableImageUrl } from "./composer-attach";
 import { inlineLocalMediaParts } from "./inline-local-media";
+import { throwIfJobAborted } from "./job-stream";
 import { rememberJobUsage } from "./job-usage";
 import { runWithJobModelFallback, type JobModelOutcome } from "./job-model-fallback";
+import { log } from "./log";
 import { loadSettings } from "./settings-store";
 import { localeForRun } from "./run-context";
+import { withToolRun } from "./tool-run-context";
 
 export function readOptionalInstruction(body: unknown): string {
   if (!body || typeof body !== "object") {
@@ -85,6 +91,44 @@ export function readJobRegenAttachments(body: unknown): ImageUrlPart[] {
   return parts;
 }
 
+/**
+ * Which product mode's harness a job run answers to. Every `JobMode` is also a product mode id, so
+ * this is the identity, written out so a new job mode is a compile error until someone maps it. The
+ * sub-tasks (`document-section`, `finance-repair`, `finance-ratios-buckets`, `market-team`,
+ * `market-section`, `presentation-slide`, `meeting-translate`, `enhance`) carry their parent's
+ * `jobMode` at their call sites, and so run under the parent's spec. The knowledge brain and verifier
+ * call as `research`, the mode whose spec has no tools.
+ */
+const PRODUCT_MODE_OF_JOB_MODE: Readonly<Record<JobMode, ProductMode>> = {
+  documents: "documents",
+  research: "research",
+  presentations: "presentations",
+  finance: "finance",
+  data: "data",
+  market: "market",
+  legal: "legal",
+  meeting: "meeting",
+};
+
+/**
+ * The tools a job asked for, cut to what its mode's spec declares. A tool outside the spec is dropped
+ * and named in the log: the mode that forgot to declare it sees the tool missing, rather than the run
+ * quietly holding more than its harness says.
+ */
+function toolKeysWithinSpec(spec: ModeHarnessSpec, requested: readonly string[]): string[] {
+  const declared = new Set(spec.tools);
+  const kept: string[] = [];
+  for (const toolKey of requested) {
+    if (declared.has(toolKey)) {
+      kept.push(toolKey);
+    } else {
+      // `tool`, not `toolKey`: the logger drops any field whose name contains "key".
+      log.warn("job_tool_outside_spec", { mode: spec.mode, tool: toolKey });
+    }
+  }
+  return kept;
+}
+
 async function runJobAssistantOnce(options: {
   tenant: TenantContext;
   model: string;
@@ -135,7 +179,12 @@ async function runJobAssistantOnce(options: {
   let assistantText = "";
   let failedMessage = "";
   const parts: ContentPart[] = [{ type: "text", text: options.prompt }, ...imageParts];
-  const bindings: ToolBindingRecord[] = (options.toolKeys ?? []).map((toolKey) => ({
+  // The mode's declared harness: its tool set bounds the bindings and its budget bounds the run. A call
+  // that names no `jobMode` is not a studio run and keeps what it asked for.
+  const spec = options.jobMode ? harnessSpecFor(PRODUCT_MODE_OF_JOB_MODE[options.jobMode]) : undefined;
+  const requestedToolKeys = options.toolKeys ?? [];
+  const toolKeys = spec ? toolKeysWithinSpec(spec, requestedToolKeys) : requestedToolKeys;
+  const bindings: ToolBindingRecord[] = toolKeys.map((toolKey) => ({
     id: `${options.versionId}-${toolKey}`,
     agentVersionId: options.versionId,
     organizationId: options.tenant.organizationId,
@@ -144,29 +193,33 @@ async function runJobAssistantOnce(options: {
     enabled: true,
   }));
 
-  await runtime.execute({
-    tenant: options.tenant,
-    runId,
-    modality: "text",
-    version,
-    bindings,
-    history: [{ role: "user", parts }],
-    // Without this every job-side timeout and contact error is English on an Indonesian desk.
-    locale: options.locale ?? localeForRun(),
-    ...(options.streamWatchdog ? { streamWatchdog: options.streamWatchdog } : {}),
-    ...(options.jobMode ? { jobMode: options.jobMode } : {}),
-    ...(options.signal ? { signal: options.signal } : {}),
-    onEvent: (event) => {
-      if (event.type === "assistant.delta") {
-        assistantText += event.text;
-      }
-      if (event.type === "run.failed") {
-        failedMessage = event.message;
-      }
-      options.onEvent?.(event);
-      rememberJobUsage(event, { tenant: options.tenant, mode: usageMode, runId });
-    },
-  });
+  // File writes by a tool record who made them; a job has no thread, so the run is named here.
+  await withToolRun({ runId, mode: spec?.mode ?? usageMode }, () =>
+    runtime.execute({
+      tenant: options.tenant,
+      runId,
+      modality: "text",
+      version,
+      bindings,
+      history: [{ role: "user", parts }],
+      // Without this every job-side timeout and contact error is English on an Indonesian desk.
+      locale: options.locale ?? localeForRun(),
+      ...(spec ? { budget: spec.budget } : {}),
+      ...(options.streamWatchdog ? { streamWatchdog: options.streamWatchdog } : {}),
+      ...(options.jobMode ? { jobMode: options.jobMode } : {}),
+      ...(options.signal ? { signal: options.signal } : {}),
+      onEvent: (event) => {
+        if (event.type === "assistant.delta") {
+          assistantText += event.text;
+        }
+        if (event.type === "run.failed") {
+          failedMessage = event.message;
+        }
+        options.onEvent?.(event);
+        rememberJobUsage(event, { tenant: options.tenant, mode: usageMode, runId });
+      },
+    }),
+  );
 
   if (failedMessage) {
     throw new ApiError("generation_failed", failedMessage, 502);
@@ -199,7 +252,7 @@ export type JobAssistantOptions = Parameters<typeof runJobAssistantOnce>[0] & {
 export async function collectJobAssistantRun(options: JobAssistantOptions): Promise<JobAssistantRun> {
   const run = await runWithJobModelFallback(options, async (model): Promise<JobModelOutcome<string>> => {
     // A cancelled job starts no call: not the first, and not a stand-in after the first one failed.
-    options.signal?.throwIfAborted();
+    throwIfJobAborted(options.signal);
     let streamed = false;
     try {
       const text = await runJobAssistantOnce({
@@ -215,8 +268,10 @@ export async function collectJobAssistantRun(options: JobAssistantOptions): Prom
       return { ok: true, value: text };
     } catch (error) {
       // A cancel is the caller's answer, not the model's failure: thrown past the fallback, so no
-      // stand-in retries it and the circuit never marks the model down for it.
-      options.signal?.throwIfAborted();
+      // stand-in retries it and the circuit never marks the model down for it. It is the job's own
+      // 499 `aborted`, not the signal's raw reason, so a caller that swallows a failed call (a
+      // repair pass, a naming pass) can tell a cancel from a model that could not answer.
+      throwIfJobAborted(options.signal);
       return { ok: false, error, streamed };
     }
   });

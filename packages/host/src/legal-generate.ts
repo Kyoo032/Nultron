@@ -26,7 +26,7 @@ import type { LegalRunBody } from "./legal/input";
 import type { LegalMatterRecord, LegalRunArtifact, LegalRunRecord } from "./legal/records";
 import { runLegalMatter } from "./legal/run";
 import { legalStore, requireLegalMatter } from "./legal/store";
-import { listSelectableModels, modeCatalogPayload } from "./selectable-models";
+import { listSelectableModels, modeDefaultsFor } from "./selectable-models";
 import { loadSettings } from "./settings-store";
 import { localeForRun } from "./run-context";
 import { artifactWorkCard } from "./work-cards";
@@ -114,9 +114,9 @@ export function answeredLegalModels(models: LegalModels, answeredFor: Readonly<R
   };
 }
 
-function resolveModels(body: LegalRunBody): LegalModels {
-  const catalog = listSelectableModels();
-  const { defaults } = modeCatalogPayload();
+function resolveModels(body: LegalRunBody, tenant: TenantContext): LegalModels {
+  const catalog = listSelectableModels(tenant);
+  const defaults = modeDefaultsFor(tenant);
   return {
     drafting: resolveChatModel(body.model, defaults.legal, catalog),
     verifier: resolveChatModel(body.verifierModel, defaults.legalVerifier, catalog),
@@ -241,7 +241,7 @@ export async function generateLegalRun(
   requireLive(tenant);
   const matter = requireLegalMatter(tenant, matterId);
   const runBody = readRunBody(body);
-  const models = resolveModels(runBody);
+  const models = resolveModels(runBody, tenant);
   const pinned = pinnedLegalModels(body, models);
   let answeredFor: Readonly<Record<string, string>> = {};
   const { docs, bytes } = await loadDocMaps(tenant, matter);
@@ -273,6 +273,7 @@ export async function generateLegalRun(
           jobMode: "legal",
           versionId: runId,
           prompt,
+          ...(abortSignal ? { signal: abortSignal } : {}),
         });
         answeredFor = { ...answeredFor, [model]: run.model };
         return run.text;

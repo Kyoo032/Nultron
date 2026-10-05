@@ -24,7 +24,7 @@ export async function handlePostOpenSlide(request: HostRequest): Promise<HostRes
   try {
     const tenant = await getTenant(request);
     requireGatewayAllowedFor(tenant);
-    return jsonOk(await generateOpenSlideDeck(tenant, request.body ?? null));
+    return jsonOk(await generateOpenSlideDeck(tenant, request.body ?? null, request.abortSignal));
   } catch (error) {
     return jsonError(error);
   }

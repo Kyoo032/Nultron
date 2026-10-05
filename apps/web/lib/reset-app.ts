@@ -30,11 +30,31 @@ export type ResetScope = (typeof RESET_SCOPES)[number];
  */
 export const RESET_CONFIRM_WORD = "RESET";
 
+/**
+ * The phrase an owner types to erase a whole hosted company account. Never translated.
+ *
+ * Not `RESET`: erasing a company deletes every person in it and signs them all out (owner decision
+ * 2026-10-01, SR-65), so it asks for its own word, and the host refuses the desk's word for it. The
+ * same literal as `TENANT_ERASE_CONFIRM_WORD` in `@agentforge/core`, which this bundle cannot import
+ * for the reason above; `reset-app.test.ts` holds the two together. A fixed word rather than the
+ * company's name because the host holds no reliable name (the portal sends ids).
+ */
+export const ERASE_ACCOUNT_CONFIRM_WORD = "DELETE";
+
+/** Does what the owner typed unlock the final step? Trimmed, because the trimmed text is what is sent. */
+export function eraseAccountPhraseMatches(typed: string): boolean {
+  return typed.trim() === ERASE_ACCOUNT_CONFIRM_WORD;
+}
+
 export type ResetResult = {
   ok: boolean;
   scope: ResetScope;
-  /** Phase 8, `tenant` only: the home desk the account lands on once it has been erased. */
-  workspaceId?: string;
+  /**
+   * `tenant` only: the erase signed the caller out too (they were one of the people it deleted), so
+   * the renderer leaves through the ordinary sign-out instead of going to a desk. Only an explicit
+   * `true` from the host counts.
+   */
+  signedOut?: boolean;
   /** Phase 8, `tenant` only: object bytes the erase actually freed, for the confirmation line. */
   bytesFreed?: number;
   /** The host wipes on the next start, so the app has to restart to finish. */
@@ -44,6 +64,8 @@ export type ResetResult = {
   gateway: GatewayGatePayload | null;
   /** Host message for a refused reset. Absent when the host said nothing usable. */
   error?: string;
+  /** The host's error code (`tenant_reset_forbidden`, ...), so the UI can use its own words for it. */
+  code?: string;
 };
 
 /** `DELETE /api/v1/settings/reset` → was the queued wipe actually called off? */
@@ -78,6 +100,15 @@ function errorMessage(record: Record<string, unknown>): string | undefined {
   return trimmedOrUndefined((error as Record<string, unknown>).message);
 }
 
+/** `{ error: { code } }` from the host, or `undefined` for any other body. */
+function errorCode(record: Record<string, unknown>): string | undefined {
+  const error = record.error;
+  if (!error || typeof error !== "object") {
+    return undefined;
+  }
+  return trimmedOrUndefined((error as Record<string, unknown>).code);
+}
+
 /**
  * `POST /api/v1/settings/reset` response → typed result.
  *
@@ -94,7 +125,18 @@ export function parseResetResult(status: number, body: unknown, requested: Reset
   const resetPending = record.resetPending === true;
   if (status !== 200 || record.ok !== true) {
     const message = errorMessage(record);
-    return { ok: false, scope, relaunch: false, resetPending, gateway, ...(message ? { error: message } : {}) };
+    // Only the hosted company erase has words of its own for a refusal. A desk's result keeps exactly
+    // the shape it always had (the owner's rule, 2026-10-01: change the hosted version only).
+    const code = scope === "tenant" ? errorCode(record) : undefined;
+    return {
+      ok: false,
+      scope,
+      relaunch: false,
+      resetPending,
+      gateway,
+      ...(message ? { error: message } : {}),
+      ...(code ? { code } : {}),
+    };
   }
   return {
     ok: true,
@@ -102,7 +144,7 @@ export function parseResetResult(status: number, body: unknown, requested: Reset
     relaunch: record.relaunch === true,
     resetPending,
     gateway,
-    ...(typeof record.workspaceId === "string" ? { workspaceId: record.workspaceId } : {}),
+    ...(record.signedOut === true ? { signedOut: true } : {}),
     ...(typeof record.bytesFreed === "number" ? { bytesFreed: record.bytesFreed } : {}),
   };
 }

@@ -59,6 +59,10 @@ describe("generateLegalRun wiring", () => {
     expect(source).toContain("modelExplicit: pinned.has(model),");
   });
 
+  it("hands the run's cancel to every model call, so a cancelled matter stops paying", () => {
+    expect(source).toContain("...(abortSignal ? { signal: abortSignal } : {}),");
+  });
+
   it("records the models that answered, not the ones requested", () => {
     expect(source).toContain("const used = answeredLegalModels(models, answeredFor);");
     expect(source).toContain("const meta = { model: used.drafting, models: [used.drafting, used.verifier]");
