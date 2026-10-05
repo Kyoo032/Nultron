@@ -1,3 +1,4 @@
+import { MUSIC_HARNESS_SKILLS } from "../../music/harness";
 import { DEFAULT_RUN_BUDGET } from "../defaults";
 import type { ModeHarnessSpec } from "../spec";
 
@@ -5,6 +6,11 @@ import type { ModeHarnessSpec } from "../spec";
  * A relay call with no model loop (`studio-generate.ts` `musicGenerateTool.execute`). The lyrics
  * draft is its own flat-rate tool call from the host (`lyricsWriteTool.execute`), not a tool the
  * model chooses.
+ *
+ * The skills are declared beside their checks in `music/harness.ts`. Their one-retry rules
+ * (`shouldRetryLyrics`, `shouldRetryMusicJob`) run inline in `studio-generate.ts`, not through
+ * `runChecked`: a blank job or a one-line draft is submitted once more, with no repair note and no
+ * `job.round` event, so `repairRounds` stays 0.
  */
 export const musicHarnessSpec: ModeHarnessSpec = {
   mode: "music",
@@ -12,11 +18,5 @@ export const musicHarnessSpec: ModeHarnessSpec = {
   tools: [],
   budget: DEFAULT_RUN_BUDGET,
   repairRounds: 0,
-  skills: [
-    { id: "describe-song", name: "Describe a song", status: "has" },
-    { id: "desk-lyrics", name: "Use the desk's lyrics", status: "has" },
-    { id: "draft-lyrics", name: "Draft lyrics first", status: "has" },
-    { id: "keep-both-takes", name: "Keep both takes", status: "has" },
-    { id: "speak-text", name: "Speak the text", status: "off" },
-  ],
+  skills: MUSIC_HARNESS_SKILLS,
 };
