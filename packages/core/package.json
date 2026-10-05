@@ -49,7 +49,8 @@
     "./harness": "./src/harness/index.ts",
     "./images": "./src/images/harness.ts",
     "./documents": "./src/documents/source-check.ts",
-    "./open-slide": "./src/open-slide/index.ts"
+    "./open-slide": "./src/open-slide/index.ts",
+    "./slide-design": "./src/presentation/slide-design.ts"
   },
   "scripts": {
     "test": "vitest run",

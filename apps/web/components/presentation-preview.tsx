@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { JobRegenPanel, type JobRegenSubmit } from "@/components/job-regen-panel";
-import { assignSlideLayout } from "@agentforge/core";
+import { assignSlideLayout } from "@agentforge/core/slide-design";
 import type { PresentationOutline, PresentationShape, PresentationSlide } from "@/lib/presentation-outline";
 import { useProductBrand } from "@/lib/product-brand";
 import type { JobStudioModel } from "@/lib/use-job-model";
