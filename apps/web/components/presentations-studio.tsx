@@ -18,7 +18,8 @@ import { Confetti } from "@/components/confetti";
 import { EnhancePromptButton } from "@/components/enhance-prompt-button";
 import { ExampleGallery } from "@/components/example-gallery";
 import { ModeHeader } from "@/components/mode-header";
-import { MascotSlot } from "@/components/mascot-slot";
+import { JobProgressList } from "@/components/job-progress";
+import { useJobStream } from "@/lib/use-job-stream";
 import { ModelSelect } from "@/components/model-select";
 import { isGatewayBlockedText } from "@/lib/gateway-blocked";
 import { NeedsKeyNote } from "@/components/needs-key-note";
@@ -62,6 +63,7 @@ export function PresentationsStudio() {
   // Nultron Enterprise: a signed-in tenant may open the desk before adding a key. Hosted only; false elsewhere.
   const needsKey = useHostedNeedsKey();
   const { models, model, pinned: modelPinned, setModel } = useJobModel("presentations");
+  const job = useJobStream<OpenSlideDeck | PresentationOutline>();
   const [prompt, setPrompt] = useState("");
   const [sourceText, setSourceText] = useState("");
   const [sourceTitle, setSourceTitle] = useState<string | null>(null);
@@ -232,20 +234,16 @@ export function PresentationsStudio() {
     setChecks([]);
     try {
       if (engine === "open-slide") {
-        const res = await apiFetch("/api/v1/presentations/open-slide", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: topic,
-            brief: { pageCount, density, motion },
-            ...modelPickBody(studioModelPick(model, modelPinned)),
-            sourceText: sourceText.trim() || undefined,
-            sourceFiles: sourceFiles.length > 0 ? sourceFiles : undefined,
-          }),
+        const data = await job.run("/api/v1/presentations/open-slide/stream", {
+          prompt: topic,
+          brief: { pageCount, density, motion },
+          ...modelPickBody(studioModelPick(model, modelPinned)),
+          sourceText: sourceText.trim() || undefined,
+          sourceFiles: sourceFiles.length > 0 ? sourceFiles : undefined,
         });
-        const data = await res.json().catch(() => null);
-        if (!res.ok) {
-          throw new Error(errorMessage(data, t("presentation.generateError")));
+        if (!data || !("pages" in data)) {
+          setOpenDeck(null);
+          return;
         }
         setOpenDeck(parseOpenSlideDeck(data));
         setOpenDeckId(null);
@@ -253,36 +251,32 @@ export function PresentationsStudio() {
         setLanded((count) => count + 1);
         return;
       }
-      const res = await apiFetch("/api/v1/presentations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: `${topic}\n\n${t("presentation.shapeNote", {
-            length: t(
-              pageCount === "short"
-                ? "presentation.openSlidePagesShort"
-                : pageCount === "deep"
-                  ? "presentation.openSlidePagesDeep"
-                  : "presentation.openSlidePagesStandard",
-            ),
-            style: t(
-              density === "minimal"
-                ? "presentation.openSlideDensityMinimal"
-                : density === "standard" || density === "dense"
-                  ? "presentation.openSlideDensityStandard"
-                  : "presentation.openSlideDensityLight",
-            ),
-          })}`,
-          // Only a deliberate pick travels as pinned: a seeded default stays rescuable by the host's fallback.
-          ...modelPickBody(studioModelPick(model, modelPinned)),
-          sourceText: sourceText.trim() || undefined,
-          sourceFiles: sourceFiles.length > 0 ? sourceFiles : undefined,
-          slideCount: slideCount.value ?? undefined,
-        }),
+      const data = await job.run("/api/v1/presentations/stream", {
+        prompt: `${topic}\n\n${t("presentation.shapeNote", {
+          length: t(
+            pageCount === "short"
+              ? "presentation.openSlidePagesShort"
+              : pageCount === "deep"
+                ? "presentation.openSlidePagesDeep"
+                : "presentation.openSlidePagesStandard",
+          ),
+          style: t(
+            density === "minimal"
+              ? "presentation.openSlideDensityMinimal"
+              : density === "standard" || density === "dense"
+                ? "presentation.openSlideDensityStandard"
+                : "presentation.openSlideDensityLight",
+          ),
+        })}`,
+        // Only a deliberate pick travels as pinned: a seeded default stays rescuable by the host's fallback.
+        ...modelPickBody(studioModelPick(model, modelPinned)),
+        sourceText: sourceText.trim() || undefined,
+        sourceFiles: sourceFiles.length > 0 ? sourceFiles : undefined,
+        slideCount: slideCount.value ?? undefined,
       });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        throw new Error(errorMessage(data, t("presentation.generateError")));
+      if (!data || !("slides" in data)) {
+        setOutline(null);
+        return;
       }
       landOutline(parsePresentationOutlineBody(data), readOutlineChecks(data));
     } catch (err) {
@@ -375,6 +369,8 @@ export function PresentationsStudio() {
     }
   }
 
+  // The local error (save, download, regenerate) and the stream's own error share one banner.
+  const shownError = error ?? job.error?.message ?? null;
   const showingOpenSlide = engine === "open-slide";
   const hasDeck = showingOpenSlide ? openDeck !== null : outline !== null;
 
@@ -466,14 +462,14 @@ export function PresentationsStudio() {
         }
       />
 
-      {error && !isGatewayBlockedText(error) ? (
+      {shownError && !isGatewayBlockedText(shownError) ? (
         <div
           className="mt-6 rounded-lg border border-[var(--line)] px-4 py-3 text-sm text-[var(--danger)]"
           role="alert"
           data-testid="presentations-error"
         >
-          {error}
-          {/gateway|api key|settings|runtime_stub|live gateway/i.test(error) && !/settings/i.test(error) ? (
+          {shownError}
+          {/gateway|api key|settings|runtime_stub|live gateway/i.test(shownError) && !/settings/i.test(shownError) ? (
             <>
               {" "}
               <Link href="/settings" className="underline">
@@ -510,10 +506,10 @@ export function PresentationsStudio() {
             <button
               type="submit"
               className="btn btn-primary h-10 shrink-0 rounded-pill px-5"
-              disabled={busy !== null || !prompt.trim() || needsKey}
+              disabled={busy !== null || job.busy || !prompt.trim() || needsKey}
               data-testid="presentations-generate"
             >
-              {busy === "generate" ? (
+              {busy === "generate" || job.busy ? (
                 <WorkingStatus label={t("presentation.generating")} />
               ) : (
                 t("presentation.generate")
@@ -694,17 +690,19 @@ export function PresentationsStudio() {
                 <button
                   type="submit"
                   className="btn btn-ghost h-8 rounded-lg px-3 text-xs"
-                  disabled={busy !== null || !prompt.trim() || needsKey}
+                  disabled={busy !== null || job.busy || !prompt.trim() || needsKey}
                   data-testid="presentations-generate"
                 >
-                  {busy === "generate" ? t("presentation.generating") : t("presentation.generate")}
+                  {busy === "generate" || job.busy ? t("presentation.generating") : t("presentation.generate")}
                 </button>
               ) : null}
               <div ref={setToolsHost} />
             </div>
           </details>
         </div>
-        {busy === "generate" ? <MascotSlot mode="presentations" placement="beside" busy decorative /> : null}
+        {busy === "generate" || job.busy ? (
+          <JobProgressList progress={job.progress} busy mode="presentations" testId="presentations-progress" />
+        ) : null}
       </form>
 
       <div className="mt-8">
