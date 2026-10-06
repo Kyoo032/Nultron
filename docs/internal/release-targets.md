@@ -14,7 +14,7 @@ Last updated: 2026-10-05 (agentforge `main` at `be2c267`). The hex colours below
 
 | Target | Type | Company | Product name | Gateway users see | Status | Focus now |
 |---|---|---|---|---|---|---|
-| [`nultron-personal`](#nultron-personal) | Desktop app | Public | Nultron | Toko Token | Released v0.15.1; v0.16.0 cut 2026-10-06 | Publish 0.16.0 after the owed drives |
+| [`nultron-personal`](#nultron-personal) | Desktop app | Public | Nultron | Toko Token | Released v0.15.1; v0.16.0 packed 2026-10-06, not published | Publish 0.16.0 after the owed drives |
 | [`nultron-enterprise`](#nultron-enterprise) | Hosted web app | Nultron Enterprise customers (via DPS) | Nultron | Toko Token + BYOK | Pilot, not deployed | First Tencent deploy, Thu 8 Oct |
 | [`hyp-ai`](#hyp-ai) | White-label hosted | Hypernet (XLSMART) | HYP AI | TokenKu | Setting up | Rebrand the clone; plan approval |
 | [`kemenkeu-ai`](#kemenkeu-ai) | Desktop flavor | Kemenkeu (Ministry of Finance) | Kemenkeu AI | AIHub | Built locally | Later, after Nultron and HYP AI |

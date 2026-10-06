@@ -1,6 +1,6 @@
 # Unreleased changes (after the 0.16.0 cut)
 
-**Purpose:** what is on `main` or on a cut branch but not inside a published installer. **0.16.0 is cut, not published** (2026-10-06, branch `chore/release-0.16.0`). It is the first installer under the Nultron name. Until it ships, the installer in the wild is **v0.15.1** (`DPSBuddy Setup 0.15.1.exe`, published 2026-09-28 04:54 UTC from `43c1de3`). The ship list and the pack table are [`0.16.0-changelog.md`](0.16.0-changelog.md).
+**Purpose:** what is on `main` or on a cut branch but not inside a published installer. **0.16.0 is cut and packed, not published** (2026-10-06, branch `chore/release-0.16.0`; Windows from `4dd33fa`, mac from `e7a17c2`). It is the first installer under the Nultron name. Until it ships, the installer in the wild is **v0.15.1** (`DPSBuddy Setup 0.15.1.exe`, published 2026-09-28 04:54 UTC from `43c1de3`). The ship list and the pack table are [`0.16.0-changelog.md`](0.16.0-changelog.md).
 
 This file was started over at the 0.16.0 cut. The 0.15.1 cut never started it over, so the log it held ran from after 0.15.0 to 2026-10-05; that whole log is summarised in [`0.16.0-changelog.md`](0.16.0-changelog.md), and its full text is readable from git at `de95267` (`git show de95267:docs/internal/unreleased.md`). The pre-0.14.27 findings lists are readable at `e2e477e`.
 
