@@ -99,6 +99,9 @@ This adds **track B (bots)** to section 5 and moves two phases of track C: the r
 - **What a person cannot do.** Add a tool that is not in the registry, raise a budget above their plan's ceiling, switch off the approval step for a write, or switch off redaction. The host builds the run from the spec and refuses the rest, the same way it does for built-in bots.
 - **Judges.** A built-in bot has judges written in code for its output (figures computed in core for Finance, the slide checks for Presentation). A person's bot gets the generic checks only. Say so on screen, so nobody reads a hired bot's output as checked the way Finance's is.
 
+- **A bot has its own knowledge, and that is what a team shares** (Rizky, 2026-10-06). On Enterprise each person's Knowledge Base is private to them. A bot carries knowledge of its own: the sources its owner gives it. Sharing a bot with the team shares that knowledge with it, so teammates can use the bot and call it from their own conversations. A person's private knowledge never travels with a bot unless they put a source into the bot on purpose. The host checks on every retrieval which knowledge a run may read: the caller's own, plus the knowledge of the bot being run, and nothing else.
+- **When a person leaves** (Rizky, 2026-10-06): the business owner or an admin decides whether that person's knowledge, and the bots they made, are deleted or kept. Not stated: whether an owner or admin may read a person's private knowledge. Until he says, they may delete or keep it and may not read it.
+
 This is the parked custom-agent Build coming back, under a different shape. The published code keeps it parked (`AGENTS.md`); the tester code builds it in phase B5. The agent tables and Studio files that stayed in the tree for "a later show Build again pass" are where it starts.
 
 #### Free and paid (Rizky, 2026-10-06)
