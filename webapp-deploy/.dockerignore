@@ -32,6 +32,10 @@ vendor/.sandbox-cache
 **/.env.*
 !**/.env.example
 **/data
+# ...except packages/core/src/data, which is source (ground.ts, cuts.ts), not local state. Without it the
+# image's load check fails (found 2026-10-06). scripts/pilot-deploy.test.mjs keeps every tracked */src/data in.
+!packages/core/src/data
+!packages/core/src/data/**
 .webdev-data*
 **/*.enc
 **/.master-key
