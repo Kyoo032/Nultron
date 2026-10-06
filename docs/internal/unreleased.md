@@ -35,12 +35,12 @@ Nothing below is closed by 0.16.0. Carried forward from the old file's "Still op
 - [ ] **Chat card titles.** A Chat thread's title is never regenerated after turn 1 (`threads.ts` `setThreadTitleFromParts`).
 - [ ] **Housekeeping on the owner's desk:** 72 stub Videos rows in the dev `data/agentforge.sqlite`, 36 with no file (shown as "File missing" since 2026-09-29).
 
-### Findings from the verify-skill maintenance pass, 2026-10-05 (product bugs, not fixed at the 0.16.0 cut)
+### Findings from the verify-skill maintenance pass, 2026-10-05 (product bugs)
 
-Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-agentforge/evidence/<feature>/2026-10-05-maintain/`. The first two reach the Personal app in 0.16.0.
+Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-agentforge/evidence/<feature>/2026-10-05-maintain/`. The first two were fixed on the 0.16.0 cut branch (`f193ab2`, `a0683bd`; see [`0.16.0-changelog.md`](0.16.0-changelog.md), "Fixes made on the cut branch"). The rest are still open.
 
-- [ ] **A non-`ok` gate verdict never heals (both products, highest impact).** `needsGatewayRefresh` re-checks in the background only an `ok` verdict past its TTL (`packages/host/src/gateway-gate.ts:559-567`). An `unreachable` or `error` verdict stays on disk, and once `lastOkAt` is older than the 7-day grace, `deriveGatewayGate` closes the desk (`:327-330`) until a manual Re-check.
-- [ ] **Settings Save with a blank key field forgets the key (Personal and webdev).** The form posts `openaiApiKey` on every save (`apps/web/components/settings-page.tsx:284-289`); off server mode a blank is forwarded (`packages/host/src/handlers/settings.ts:226-234`) and `mergeSecrets` deletes the key (`packages/core/src/secrets.ts:137-139`). Traced in source; not driven.
+- [x] **Fixed at the 0.16.0 cut (`f193ab2`).** **A non-`ok` gate verdict never heals (both products, highest impact).** `needsGatewayRefresh` re-checks in the background only an `ok` verdict past its TTL (`packages/host/src/gateway-gate.ts:559-567`). An `unreachable` or `error` verdict stays on disk, and once `lastOkAt` is older than the 7-day grace, `deriveGatewayGate` closes the desk (`:327-330`) until a manual Re-check.
+- [x] **Fixed at the 0.16.0 cut (`a0683bd`).** **Settings Save with a blank key field forgets the key (Personal and webdev).** The form posts `openaiApiKey` on every save (`apps/web/components/settings-page.tsx:284-289`); off server mode a blank is forwarded (`packages/host/src/handlers/settings.ts:226-234`) and `mergeSecrets` deletes the key (`packages/core/src/secrets.ts:137-139`). Traced in source; not driven.
 - [ ] **Finance loses 1 px of scroll per rail detour.** Cause not found.
 - [ ] **Finance shows a vague error, or none, on a closed gate** (`packages/host/src/handlers/finance.ts:52`). Matters on hosted "Add it later".
 - [ ] **Empty box above the key form after a component install** (`apps/web/components/onboarding-screen.tsx:293`, `apps/web/lib/use-component-setup.ts:126`). Appears only where a real download runs, such as a packed mac build.
