@@ -113,9 +113,10 @@ describe("GET /api/v1/settings gateway gate", () => {
     expect(gateway.message).toBe("Not checked yet.");
 
     // The key was saved through the host, so it has to be cleared through the host: `saveSettings`
-    // in afterEach writes the default slice, not this tenant's.
+    // in afterEach writes the default slice, not this tenant's. A blank save keeps a key, so this is
+    // the explicit "forget my key".
     stubFetch(200);
-    await json("POST", "/api/v1/settings", { openaiApiKey: "" });
+    await json("POST", "/api/v1/settings/reset", { scope: "key" });
   });
 
   it("reports whether a wipe is queued", async () => {
@@ -283,18 +284,36 @@ describe("POST /api/v1/settings", () => {
 
     // Saved through the host, so it has to be cleared through the host.
     stubFetch(200);
-    await json("POST", "/api/v1/settings", { openaiApiKey: "" });
+    await json("POST", "/api/v1/settings/reset", { scope: "key" });
   });
 
-  it("clears the saved verdict when the key is cleared", async () => {
+  it("keeps the key and its verdict when Settings is saved with the key field blank", async () => {
     delete process.env.AGENTFORGE_RUNTIME;
     stubFetch(200);
     await json("POST", "/api/v1/settings", { openaiApiKey: KEY });
     expect(existsSync(GATE_FILE)).toBe(true);
 
-    const response = await json("POST", "/api/v1/settings", { openaiApiKey: "" });
+    // Exactly what the Settings page used to post when only the Edit turn cap changed.
+    const response = await json("POST", "/api/v1/settings", { openaiApiKey: "", editTurnCapUsd: 5 });
+    expect(response.status).toBe(200);
+    expect(response.body.hasOpenai).toBe(true);
+    expect(existsSync(GATE_FILE)).toBe(true);
+    expect(gatewayOf(response.body).status).toBe("ok");
+
+    await json("POST", "/api/v1/settings/reset", { scope: "key" });
+  });
+
+  it("clears the saved verdict when the key is forgotten through Start over", async () => {
+    delete process.env.AGENTFORGE_RUNTIME;
+    stubFetch(200);
+    await json("POST", "/api/v1/settings", { openaiApiKey: KEY });
+    expect(existsSync(GATE_FILE)).toBe(true);
+
+    expect((await json("POST", "/api/v1/settings/reset", { scope: "key" })).status).toBe(200);
     expect(existsSync(GATE_FILE)).toBe(false);
-    expect(gatewayOf(response.body).status).toBe("needs_key");
+    const after = await json("GET", "/api/v1/settings");
+    expect(after.body.hasOpenai).toBe(false);
+    expect(gatewayOf(after.body).status).toBe("needs_key");
   });
 });
 
@@ -354,10 +373,11 @@ describe("POST /api/v1/settings in server mode", () => {
     expect(response.body.hasOpenai).toBe(true);
   });
 
-  it("still lets a desk owner clear their own key off server mode", async () => {
+  it("keeps a desk owner's key on a blank save off server mode too", async () => {
     await save({ openaiApiKey: KEY }, DESK);
-    const response = await save({ openaiApiKey: "" }, DESK);
-    expect(response.body.hasOpenai).toBe(false);
+    // A blank field is "keep the current key" on both products; forgetting is `scope: "key"`.
+    expect((await save({ openaiApiKey: "" }, DESK)).body.hasOpenai).toBe(true);
+    expect((await save({ openaiApiKey: "   ", editTurnCapUsd: 5 }, DESK)).body.hasOpenai).toBe(true);
   });
 
   it("refuses tool credentials, tool backends and the injection-guard bypass", async () => {
