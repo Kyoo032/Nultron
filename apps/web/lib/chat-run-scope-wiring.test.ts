@@ -64,11 +64,13 @@ describe("chat composer", () => {
     const guard = "return; // Moved on before the run reached the host: nothing was sent, the draft stays.";
     expect(composer.split(guard).length - 1).toBe(4);
     // Anchored on each route's request body, which only its own POST carries.
-    const beforeText = composer.indexOf("content: outgoing,");
-    const beforeMedia = composer.indexOf("content: parts,");
+    const beforeText = composer.indexOf("buildChatRunBody(outgoing, tier)");
+    const beforeMedia = composer.indexOf("buildChatRunBody(parts, tier)");
     expect(beforeText).toBeGreaterThan(-1);
     expect(beforeMedia).toBeGreaterThan(-1);
-    expect(composer.lastIndexOf(guard, beforeText)).toBeGreaterThan(composer.lastIndexOf("await onEnsureThread()", beforeText));
+    expect(composer.lastIndexOf(guard, beforeText)).toBeGreaterThan(
+      composer.lastIndexOf("await onEnsureThread()", beforeText),
+    );
     expect(composer.lastIndexOf(guard, beforeMedia)).toBeGreaterThan(
       composer.lastIndexOf("await onEnsureThread()", beforeMedia),
     );

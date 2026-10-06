@@ -57,6 +57,7 @@ Each file: H1 + one paragraph, then exactly four H2s — `Sub-features`, `How to
 - [Usage](./usage.md) — bottom-rail `/usage` Day/Week/Month stacked spend, this-key strip, desk by-model. Not a product mode.
 - [Workspaces](./workspaces.md) — rail switcher + `/workspaces` create/edit, presets and mode checkboxes, open → Chat.
 - [Models](./models.md) — curated Chat picker (Recommended + brand groups), doctor modeKeys/chatCount/curation on webdev. No `model-picker-all`.
+- [Model tiers](./model-tiers.md) — tester code only: the Chat composer's three choices (`tier-picker`, `tier-option-daily|fast|reasoning`) replace the model picker and the reasoning-effort select, and a send posts `{ content, tier }`. The model-picker steps in `models.md` do not apply there.
 - [Templates](./templates.md) — example galleries on all five mode studios; click pre-fills the prompt.
 - [PII](./pii.md) — host masks outbound prompts (`[email]` / `[phone]` / …); the transcript keeps the typed text.
 - [Security](./security.md) — saved-key fingerprint on Settings (`key-fingerprint`); TLS note on `privacy-note`; at-rest envelope is existing work.

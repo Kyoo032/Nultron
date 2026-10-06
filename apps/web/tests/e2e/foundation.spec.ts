@@ -17,14 +17,13 @@ test("chat and workspaces work without an account", async ({ page }) => {
   const deskName = `Legal desk ${runId}`;
 
   await page.goto("/chat");
-  await expect(page.getByTestId("model-picker")).toBeVisible({ timeout: 30_000 });
+  // The tester code's composer offers three choices (Daily, Fastest, Reasoning) instead of a model list
+  // and a Thinking select. A person who never opens the picker is on Daily.
+  await expect(page.getByTestId("tier-picker")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("composer")).toBeVisible();
-  await expect(page.getByTestId("reasoning-effort")).toBeVisible();
-  await expect(page.getByTestId("reasoning-effort")).toHaveValue("medium");
-  await expect(page.getByTestId("reasoning-effort")).toContainText("Normal");
-  await expect(page.getByTestId("reasoning-effort").locator("option[value=xhigh]")).toHaveText("Extra");
-  await expect(page.getByTestId("reasoning-effort").locator("option[value=max]")).toHaveText("Max");
-  await expect(page.getByTestId("reasoning-effort").locator("option[value=ultra]")).toHaveText("Ultra");
+  await expect(page.getByTestId("tier-picker")).toContainText("Daily");
+  await expect(page.getByTestId("model-picker")).toHaveCount(0);
+  await expect(page.getByTestId("reasoning-effort")).toHaveCount(0);
   await expect(page.getByTestId("chat-wire")).toHaveCount(0);
   await expect(page.getByTestId("chat-empty")).toContainText("Work starts here");
   await expect(page.getByTestId("mode-chat")).toBeVisible();
@@ -79,9 +78,9 @@ test("chat and workspaces work without an account", async ({ page }) => {
   await expect(page).toHaveURL(/\/usage/, { timeout: 30_000 });
   await expect(page.getByTestId("usage-range")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("usage-this-key")).toContainText("Paste a gateway key");
-  await expect(
-    page.getByTestId("usage-range-empty").or(page.getByTestId("usage-range-chart")),
-  ).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("usage-range-empty").or(page.getByTestId("usage-range-chart"))).toBeVisible({
+    timeout: 15_000,
+  });
 
   await page.getByTestId("mode-images").click();
   await expect(page).toHaveURL(/\/images/, { timeout: 15_000 });

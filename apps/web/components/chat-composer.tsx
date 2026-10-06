@@ -9,12 +9,13 @@ import {
   routeDecision,
   type AttachmentKind,
 } from "@/lib/composer-attach";
-import { ModelPicker, type ChatModel } from "@/components/model-picker";
+import { TierPicker } from "@/components/tier-picker";
 import { EnhancePromptButton } from "@/components/enhance-prompt-button";
 import { apiFetch } from "@/lib/api-client";
 import { abortErrorMessage, armStreamWatchdog } from "@agentforge/core/stream-watchdog";
-import { REASONING_EFFORTS, type ReasoningEffort } from "@agentforge/core/reasoning-effort";
-import { thinkingRequestFields } from "@/lib/chat-thinking";
+import { DEFAULT_MODEL_TIER, type ModelTierId } from "@agentforge/core/tiers";
+import { buildChatRunBody, tierErrorMessage } from "@/lib/chat-tier-body";
+import { tierStreamLimits, type ChatTierInfo } from "@/lib/chat-tier-pref";
 import { submitOnEnter } from "@/lib/composer-enter";
 import { getLocale, t } from "@/lib/i18n";
 import { readComposerDraft, writeComposerDraft } from "@/lib/composer-draft";
@@ -32,10 +33,11 @@ type Props = {
   threadId: string | null;
   onEnsureThread?: () => Promise<string>;
   modalities: string[];
-  model?: string;
-  models?: ChatModel[];
-  onModelChange?: (id: string) => void;
-  modelDisabled?: boolean;
+  /** The choice a send carries: Daily, Fastest or Reasoning. The host turns it into a model; this never sees one. */
+  tier?: ModelTierId;
+  /** The three choices as the host reports them, for the picker. */
+  tiers?: readonly ChatTierInfo[];
+  onTierChange?: (tier: ModelTierId) => void;
   onUserSend?: (payload: ComposerUserSendPayload) => void;
   onStarted?: () => void;
   onDelta: (text: string) => void;
@@ -51,17 +53,6 @@ type Props = {
    * stream still runs to the end, so the host keeps the reply — and it no longer holds Send.
    */
   sessionKey?: string | number;
-  thinkingEnabled?: boolean;
-  onThinkingChange?: (enabled: boolean) => void;
-  /** The level the Thinking picker shows. */
-  reasoningEffort?: ReasoningEffort;
-  /**
-   * Did the person pick that level? Only a picked level is sent (`thinkingRequestFields`); an untouched
-   * picker sends none, so the host can tell a choice from a default. A parent that does not say is
-   * read as "yes", so a picker nobody wired this up for still sends what it shows.
-   */
-  reasoningEffortChosen?: boolean;
-  onReasoningEffortChange?: (effort: ReasoningEffort) => void;
   /** A prompt seeded from outside (the empty screen's suggestions). Applied once, then cleared. */
   draft?: string | null;
   onDraftApplied?: () => void;
@@ -186,10 +177,9 @@ export function ChatComposer({
   threadId,
   onEnsureThread,
   modalities,
-  model,
-  models,
-  onModelChange,
-  modelDisabled,
+  tier = DEFAULT_MODEL_TIER,
+  tiers,
+  onTierChange,
   onUserSend,
   onStarted,
   onDelta,
@@ -197,11 +187,6 @@ export function ChatComposer({
   onTool,
   onFailed,
   onComplete,
-  thinkingEnabled = true,
-  onThinkingChange,
-  reasoningEffort = "medium",
-  reasoningEffortChosen = true,
-  onReasoningEffortChange,
   draft,
   onDraftApplied,
   sessionKey,
@@ -244,8 +229,7 @@ export function ChatComposer({
   // the desk before adding a key. It gives the note below a Settings link, and keeps the refused
   // send's own sentence from printing next to it. Always false on the Personal app.
   const keyBlocked = hostedKeyBlock(needsKey);
-  const pickerModels = models ?? [];
-  const showPicker = typeof onModelChange === "function";
+  const showPicker = typeof onTierChange === "function";
   const sendEmpty = !text.trim() && files.length === 0;
   const sendDisabled = busy || enhancing || sendEmpty || needsKey;
 
@@ -394,7 +378,10 @@ export function ChatComposer({
       }
 
       const abort = new AbortController();
-      const dog = armStreamWatchdog(model ?? "this model", abort, undefined, Date.now, getLocale());
+      // A stall reads "No first token from Reasoning ...": the tier's label, because the renderer is
+      // never told which model answered. The budget is the tier's (`tierStreamLimits`), not a model's.
+      const tierLabel = t(`chat.tiers.${tier}.label`);
+      const dog = armStreamWatchdog(tierLabel, abort, tierStreamLimits(tier), Date.now, getLocale());
       try {
         if (decision.route === "text") {
           if (!showing()) {
@@ -415,17 +402,18 @@ export function ChatComposer({
           const response = await apiFetch(`/api/v1/threads/${id}/runs/text`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              content: outgoing,
-              model,
-              ...thinkingRequestFields(reasoningEffort, reasoningEffortChosen),
-            }),
+            body: JSON.stringify(buildChatRunBody(outgoing, tier)),
             signal: abort.signal,
           });
           if (!response.ok) {
             const payload = await response.json().catch(() => null);
-            // Hosted only: a 403 gateway_blocked is "no usable key", said calmly, not a failed run.
-            fail(hostedGatewayBlocked(payload) ? gatewayBlockedMessage() : (payload?.error?.message ?? t("chat.error.runFailed")));
+            // Hosted only: a 403 gateway_blocked is "no usable key", said calmly, not a failed run. A refused
+            // tier (503 tier_unavailable) is said in the catalog's words, never the host's, which can name a model.
+            fail(
+              hostedGatewayBlocked(payload)
+                ? gatewayBlockedMessage()
+                : (tierErrorMessage(payload) ?? payload?.error?.message ?? t("chat.error.runFailed")),
+            );
             await finish();
             return;
           }
@@ -482,16 +470,12 @@ export function ChatComposer({
         const response = await apiFetch(`/api/v1/threads/${id}/runs/${decision.route}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            content: parts,
-            model,
-            ...thinkingRequestFields(reasoningEffort, reasoningEffortChosen),
-          }),
+          body: JSON.stringify(buildChatRunBody(parts, tier)),
           signal: abort.signal,
         });
         if (!response.ok) {
           const payload = await response.json().catch(() => null);
-          fail(payload?.error?.message ?? t("chat.error.runFailed"));
+          fail(tierErrorMessage(payload) ?? payload?.error?.message ?? t("chat.error.runFailed"));
           await finish();
           return;
         }
@@ -649,85 +633,22 @@ export function ChatComposer({
           </svg>
         </button>
         <div className="composer-controls">
+          {/*
+            Three choices, not a model list: Daily, Fastest, Reasoning. The tier also sets how hard the
+            model thinks, so there is no separate Thinking control here any more.
+          */}
           {showPicker ? (
-            <ModelPicker
-              models={pickerModels}
-              value={model ?? ""}
-              onChange={onModelChange}
-              disabled={modelDisabled || busy}
+            <TierPicker
+              tiers={tiers ?? []}
+              value={tier}
+              onChange={onTierChange}
+              disabled={busy}
               returnFocusRef={textAreaRef}
             />
-          ) : null}
-          {/*
-            One bordered control, like the model picker beside it (owner ruling 2026-09-23).
-            The label and the value used to be two framed things — a bordered `label` wrapping
-            a bordered `select` — which read as a box inside a box however the padding was
-            tuned. It is a single select now, showing just the level ("Normal").
-          */}
-          {onReasoningEffortChange || onThinkingChange ? (
-            <label className="composer-thinking rounded-pill border border-[var(--line)] bg-transparent text-xs text-[var(--text)]">
-              {/* Narrow: the icon stands in for the word, which stays in the tree as the label. */}
-              <svg
-                className="composer-thinking-icon"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M9 18h6M10 21h4" />
-                <path d="M12 3a6 6 0 0 0-3.6 10.8c.6.5 1.1 1.2 1.1 2.2h5c0-1 .5-1.7 1.1-2.2A6 6 0 0 0 12 3Z" />
-              </svg>
-              <span className="composer-thinking-word" data-testid="reasoning-effort-label">
-                {t("chat.composer.thinkingPrefix")}
-              </span>
-              <select
-                className="cursor-pointer border-0 bg-transparent text-xs text-[var(--text)] outline-none disabled:cursor-not-allowed disabled:opacity-45"
-                data-testid="reasoning-effort"
-                aria-label={t("chat.composer.thinkingPrefix")}
-                value={reasoningEffort}
-                disabled={busy}
-                onChange={(event) => {
-                  const next = event.target.value as ReasoningEffort;
-                  onReasoningEffortChange?.(next);
-                  onThinkingChange?.(next !== "none");
-                }}
-              >
-                {REASONING_EFFORTS.map((effort) => (
-                  <option key={effort} value={effort}>
-                    {t(`chat.thinking.${effort}`)}
-                  </option>
-                ))}
-              </select>
-              {/*
-                The select's own arrow is off (`appearance: none`), because Chrome paints it at the
-                select's edge and ignores padding. This chevron replaces it, placed by the pill's
-                CSS and out of the click path, so a tap on it opens the select underneath.
-              */}
-              <svg
-                className="composer-thinking-chevron"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="m4 9 8 8 8-8" />
-              </svg>
-            </label>
           ) : null}
           <EnhancePromptButton
             text={text}
             surface="chat"
-            model={model}
             disabled={busy}
             pill
             onApply={setText}

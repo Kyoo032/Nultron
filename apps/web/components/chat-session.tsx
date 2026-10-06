@@ -26,31 +26,22 @@ import { collectToolMediaParts } from "@/lib/tool-media";
 import { notifyThreadsChanged } from "@/lib/threads-events";
 import { apiFetch } from "@/lib/api-client";
 import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
+import { DEFAULT_MODEL_TIER, type ModelTierId } from "@agentforge/core/tiers";
 import {
-  pickChatModel,
-  readLastChatModel,
-  readThreadChatModel,
-  writeLastChatModel,
-  writeThreadChatModel,
-} from "@/lib/chat-model-pref";
-import type { ReasoningEffort } from "@agentforge/core/reasoning-effort";
-import { DEFAULT_THINKING_PREF, readStoredThinkingPref, writeThinkingPref } from "@/lib/chat-thinking";
+  initialChatTier,
+  pickChatTier,
+  readLastChatTier,
+  readThreadChatTier,
+  readTierCatalog,
+  tierThinkingEnabled,
+  writeLastChatTier,
+  writeThreadChatTier,
+  type ChatTierInfo,
+} from "@/lib/chat-tier-pref";
 import { t } from "@/lib/i18n";
 import { isPinnedToEnd } from "@/lib/stick-to-bottom";
 
 type Message = { id: string; role: string; content: unknown };
-
-type ModelProvider = "openai" | "anthropic" | "google" | "volcengine";
-
-type ChatModel = {
-  id: string;
-  label: string;
-  friendlyLabel?: string;
-  bestFor?: string;
-  provider?: ModelProvider;
-  inputModalities: string[];
-  contextLength?: number;
-};
 
 type Props = {
   agentId?: string;
@@ -70,9 +61,10 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
   const [threadId, setThreadId] = useState<string | null>(null);
   const [agentIdReady, setAgentIdReady] = useState<string | null>(agentId ?? null);
   const [agentModalities, setAgentModalities] = useState<string[]>(["text"]);
-  const [models, setModels] = useState<ChatModel[]>([]);
-  const [modelId, setModelId] = useState("");
-  const [catalogDefault, setCatalogDefault] = useState("");
+  /** The three choices as the host reports them, and the one a send carries. The host picks the model. */
+  const [tiers, setTiers] = useState<readonly ChatTierInfo[]>([]);
+  const [tierId, setTierId] = useState<ModelTierId>(() => initialChatTier(initialThreadId));
+  const [defaultTier, setDefaultTier] = useState<ModelTierId>(DEFAULT_MODEL_TIER);
   const [messages, setMessages] = useState<Message[]>([]);
   const [streaming, setStreaming] = useState("");
   const [thinking, setThinking] = useState("");
@@ -81,13 +73,6 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
   const [error, setError] = useState<string | null>(null);
   /** A refused send. The sentence lives on `composer-error`; this only holds the error mascot. */
   const [sendFailed, setSendFailed] = useState(false);
-  const [thinkingEnabled, setThinkingEnabled] = useState(true);
-  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>(DEFAULT_THINKING_PREF.effort);
-  /**
-   * Did the person pick the level the picker shows? Until they do, a send carries no level and the host
-   * treats Thinking as defaulted, so a model the policy table does not know is not sent Normal.
-   */
-  const [reasoningChosen, setReasoningChosen] = useState(DEFAULT_THINKING_PREF.chosen);
   const [knowledgeParts, setKnowledgeParts] = useState<ContextPart[]>([]);
   /** A prompt picked from the empty screen's suggestions; handed down once, then cleared. */
   const [composerDraft, setComposerDraft] = useState<string | null>(null);
@@ -163,58 +148,30 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
   }
   const sessionKey = sessionEpochRef.current;
 
-  useEffect(() => {
-    // A stored level is a real pick (only the picker writes it), so it is sent from the first message.
-    let storage: Storage | undefined;
-    try {
-      storage = window.localStorage;
-    } catch {
-      storage = undefined; // private mode
-    }
-    const stored = readStoredThinkingPref(storage);
-    setReasoningEffort(stored.effort);
-    setThinkingEnabled(stored.effort !== "none");
-    setReasoningChosen(stored.chosen);
-  }, []);
-
-  function setReasoningPref(next: ReasoningEffort) {
-    setReasoningEffort(next);
-    setReasoningChosen(true);
-    setThinkingEnabled(next !== "none");
-    try {
-      writeThinkingPref(next, window.localStorage);
-    } catch {
-      // private mode
-    }
-  }
-
-  const selectedModel = models.find((model) => model.id === modelId);
+  // What the chosen tier can take in and how much it can hold, as the host reports it. Never a model.
+  const selectedTier = tiers.find((tier) => tier.id === tierId);
   const modalities = useMemo(() => {
-    const modelMods = selectedModel?.inputModalities ?? ["text"];
+    const tierMods: readonly string[] = selectedTier?.inputModalities ?? ["text"];
     return ["text", "image", "video"].filter(
-      (modality) => agentModalities.includes(modality) && modelMods.includes(modality),
+      (modality) => agentModalities.includes(modality) && tierMods.includes(modality),
     );
-  }, [agentModalities, selectedModel]);
+  }, [agentModalities, selectedTier]);
 
   function chatPath() {
     return agentId ? `/agents/${agentId}` : "/chat";
   }
 
-  function rememberModel(id: string, forThreadId?: string | null) {
-    const next = id.trim();
-    if (!next) {
-      return;
-    }
-    writeLastChatModel(next);
+  function rememberTier(tier: ModelTierId, forThreadId?: string | null) {
+    writeLastChatTier(tier);
     const thread = forThreadId ?? threadIdRef.current;
     if (thread) {
-      writeThreadChatModel(thread, next);
+      writeThreadChatTier(thread, tier);
     }
   }
 
-  function handleModelChange(id: string) {
-    setModelId(id);
-    rememberModel(id);
+  function handleTierChange(next: ModelTierId) {
+    setTierId(next);
+    rememberTier(next);
   }
 
   function resetLive() {
@@ -244,7 +201,7 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
       throw new Error(created.error.message ?? t("chat.error.start"));
     }
     const id = created.thread.id as string;
-    rememberModel(modelId, id);
+    rememberTier(tierId, id);
     notifyThreadsChanged();
     if (sessionEpochRef.current !== startedIn) {
       // The owner opened another session while this thread was being created. Leave the pane
@@ -286,12 +243,9 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
           setAgentName(agentPayload.agent?.name ?? t("chat.agent"));
           setIsDefaultChat(agentPayload.agent?.slug === "quick-chat");
           setAgentModalities(caps.inputModalities ?? ["text"]);
-          setModels(modelPayload.models ?? []);
-          setCatalogDefault(
-            agentPayload.agent?.slug === "quick-chat"
-              ? (modelPayload.defaultModel ?? caps.model ?? "")
-              : (caps.model ?? modelPayload.defaultModel ?? ""),
-          );
+          const catalog = readTierCatalog(modelPayload);
+          setTiers(catalog.tiers);
+          setDefaultTier(catalog.defaultTier);
           readyId = agentId;
           setAgentIdReady(agentId);
         } else {
@@ -305,8 +259,9 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
           setAgentName(home.agent?.name ?? t("chat.title"));
           setIsDefaultChat(true);
           setAgentModalities(home.version?.inputModalities ?? ["text", "image", "video"]);
-          setModels(home.models ?? []);
-          setCatalogDefault(home.defaultModel ?? home.version?.model ?? "");
+          const catalog = readTierCatalog(home);
+          setTiers(catalog.tiers);
+          setDefaultTier(catalog.defaultTier);
           readyId = home.agent.id;
           setAgentIdReady(home.agent.id);
         }
@@ -358,20 +313,20 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
   }, [agentId, initialThreadId, router]);
 
   useEffect(() => {
-    if (models.length === 0) {
+    if (tiers.length === 0) {
       return;
     }
     const threadKey = initialThreadId ?? threadId ?? "";
-    setModelId((current) =>
-      pickChatModel({
-        models,
+    setTierId((current) =>
+      pickChatTier({
+        tiers,
         current,
-        threadModel: threadKey ? readThreadChatModel(threadKey) : "",
-        lastModel: readLastChatModel(),
-        catalogDefault,
+        threadTier: threadKey ? readThreadChatTier(threadKey) : "",
+        lastTier: readLastChatTier(),
+        defaultTier,
       }),
     );
-  }, [models, catalogDefault, initialThreadId, threadId]);
+  }, [tiers, defaultTier, initialThreadId, threadId]);
 
   /** Reload a thread's messages — unless the pane has moved to another session while they loaded. */
   async function refreshMessages(id: string) {
@@ -426,7 +381,7 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
         {hasReply ? (
           <ChatContextChip
             usedTokens={contextTokens}
-            contextLength={selectedModel?.contextLength}
+            contextLength={selectedTier?.contextLength ?? undefined}
             parts={contextParts}
           />
         ) : null}
@@ -473,7 +428,7 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
                 tools,
                 streaming,
                 running,
-                thinkingEnabled,
+                thinkingEnabled: tierThinkingEnabled(tierId),
                 failed: sendFailed,
                 firstTurn: messages.every((message) => message.role !== "assistant"),
               }}
@@ -492,13 +447,9 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
             sessionKey={sessionKey}
             onEnsureThread={ensureThread}
             modalities={modalities.length > 0 ? modalities : ["text"]}
-            model={modelId}
-            models={models}
-            onModelChange={handleModelChange}
-            thinkingEnabled={thinkingEnabled}
-            reasoningEffort={reasoningEffort}
-            reasoningEffortChosen={reasoningChosen}
-            onReasoningEffortChange={setReasoningPref}
+            tier={tierId}
+            tiers={tiers}
+            onTierChange={handleTierChange}
             draft={composerDraft}
             onDraftApplied={() => setComposerDraft(null)}
             onUserSend={(payload) => {
@@ -506,7 +457,7 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
               setError(null);
               setSendFailed(false);
               setRunning(true);
-              rememberModel(modelId);
+              rememberTier(tierId);
               setThinking("");
               setTools([]);
               setStreaming("");

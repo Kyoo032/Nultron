@@ -268,6 +268,25 @@
     "noMatch": "No models matching “{query}”",
     "noMatchEmpty": "No models matching your search"
   },
+  "tiers": {
+    "aria": "Answer style",
+    "unavailable": "Unavailable",
+    "daily": {
+      "label": "Daily",
+      "hint": "Good answers at a sensible speed"
+    },
+    "fast": {
+      "label": "Fastest",
+      "hint": "Answers first, for short questions and drafts"
+    },
+    "reasoning": {
+      "label": "Reasoning",
+      "hint": "Thinks before it answers, for hard problems"
+    }
+  },
+  "errors": {
+    "tierUnavailable": "That choice is not available right now. Pick another one and send again."
+  },
   "harness": {
     "thinkPast": "I'll look through earlier chats, then answer from what I find.",
     "thinkDesk": "I'll answer from the desk note.",
