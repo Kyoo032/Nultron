@@ -54,6 +54,13 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Hosted image carries ffmpeg, 2026-10-06 (Enterprise image and the preview; the desktop bundle is still owed)
+
+- **Bug.** The image had no `ffmpeg` or `ffprobe` (`command -v` printed nothing in an image built from `6105c5c`), so every desk on it showed the "ffmpeg was not found" notice and Edit could not probe, cut or render. Rizky, 2026-10-06: ffmpeg is mandatory and nobody is asked to install anything.
+- **Fix.** `webapp-deploy/Dockerfile` gets an `ffmpeg` stage: BtbN's static build `n8.1.3-9-g29e619e767` (month-end release `autobuild-2026-09-30-13-08`, GPL variant because the render recipe uses `libx264`), pinned by URL and sha256 for amd64 and arm64. The runtime stage copies both programs to `/usr/local/bin` with the licence text, and the build fails if either does not run or lacks `libx264` or `libmp3lame`. Debian's own package is 5.1, below the host's minimum of 6.
+- **Proof.** The stage built on this PC and both programs ran (`ffmpeg version n8.1.3-9-g29e619e767-20260930`, both encoders listed). `scripts/{deploy-scripts,pilot-deploy,release-web}.test.mjs`: 70 tests green.
+- **Not done.** `apps/desktop/resources/ffmpeg/` still holds only its README, so the packaged Personal app ships without ffmpeg and shows the same notice on a machine that has none. Webdev still reads PATH. Licence and source pointer: `docs/internal/ffmpeg-attribution.md`; register SR-135.
+
 ## Hosted image: the ignore file dropped packages/core/src/data, 2026-10-06 (Enterprise image; fixed in the tree)
 
 - **Bug.** `**/data` in `webapp-deploy/Dockerfile.dockerignore` (and its byte copy `webapp-deploy/.dockerignore`) keeps local data dirs out of the image, and also dropped the source folder `packages/core/src/data` (`ground.ts`, `cuts.ts`). An image built from `main` at `de95267` with `git archive` failed its own load check. Found while preparing the app.nultron-ai.xyz preview.

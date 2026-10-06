@@ -212,6 +212,7 @@ not test an operating-system egress deny, so [SR-111](#sr-111) stays open.
 | [SR-125](#sr-125) | Low | Two `edit_file` calls on one file could overwrite each other without a word | Fixed in tree, tested; unverified on a packed app (2026-10-03) | None |
 | [SR-126](#sr-126) | Low | Personal: a deleted desk left the sealed text of its folder proposals on disk | Fixed in tree, tested; unverified on a packed app (2026-10-03) | None |
 | [SR-134](#sr-134) | Low | Enterprise: a CRITICAL `proxy-addr` advisory reaches the hosted image through `express`; the app never sets `trust proxy`, so the affected path is not used | Open (2026-10-06) | `audit:deployed` red; blocks Tencent deploy until the lock takes `proxy-addr` 2.0.8 |
+| [SR-135](#sr-135) | Low | Enterprise: the image now carries a third-party static ffmpeg (BtbN, GPL build), pinned by sha256; the pinned file is deleted upstream after about two years | Recorded (2026-10-06) | None; re-pin before the upstream release expires |
 | [SR-08](#sr-08) | Info | The portal token vault is process memory only | Superseded by [SR-64](#sr-64), 2026-09-23 | Dev only |
 | [SR-15](#sr-15) | Info | Music relay: checked, not a key-exfiltration issue. It does send a spoofed browser `User-Agent` | Checked, not an issue | Dev only |
 | [SR-18](#sr-18) | Info | `X-Forwarded-Proto` and `X-Forwarded-For` trust: checked, sound as deployed today | Checked, not an issue | Blocks Tencent deploy on any topology change |
@@ -4799,3 +4800,25 @@ Fix, not done here (the Dockerfile was deliberately left alone in this pass):
 
 Gate: half 2 **blocks building any image from a developer checkout**. Half 1 **blocks making the
 ghcr image public**. Neither blocks a private-image deploy through `release-web.mjs`.
+
+### SR-135 {#sr-135}
+
+**The hosted image carries a third-party static ffmpeg build.** Enterprise and the app preview. Raised when
+ffmpeg was baked into the image (2026-10-06). Low. Recorded.
+
+Evidence: `webapp-deploy/Dockerfile`, stages `ffmpeg-amd64`, `ffmpeg-arm64` and `ffmpeg`. The file is
+`ffmpeg-n8.1.3-9-g29e619e767-linux64-gpl-8.1.tar.xz` (arm64: `linuxarm64`) from the GitHub release
+`autobuild-2026-09-30-13-08` of `BtbN/FFmpeg-Builds`, the Linux build ffmpeg.org links to. `ADD --checksum`
+pins the sha256, so a changed file fails the build. The two programs are root-owned in `/usr/local/bin`,
+run as the unprivileged `node` user, and get the allowlisted environment every ffmpeg spawn already gets
+(`packages/host/src/edit/ffmpeg-binary.ts`).
+
+What is accepted: the binary is not built by us, and it parses files a tenant uploads. A parser bug in it
+runs inside the app container (read-only root, `cap_drop ALL`, no new privileges), next to the data volume.
+That was already true on any desk where ffmpeg was installed by hand; the image makes it the default.
+
+Two follow-ups. BtbN deletes month-end releases after about two years, so the pin must move to a newer
+release before then or the build fails on the download. It is the GPL variant (the render recipe needs
+`libx264`), so the licence text ships in `/usr/local/share/licenses/ffmpeg` and
+`docs/internal/ffmpeg-attribution.md` names the build and its source; an image handed to a customer to run
+themselves is a distribution and must keep both.
