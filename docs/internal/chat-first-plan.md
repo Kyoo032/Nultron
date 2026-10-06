@@ -67,6 +67,8 @@ Each has a default the plan assumes until he says otherwise.
 | D8 | The 0.16.0 installers were packed before two fixes that are now on `main`. Publish them, repack, or skip 0.16.0 for the chat-first release. | Not published. The next public Personal release is the chat-first one. |
 | D9 | "No new modes" (2026-10-01). Workers add tools, not modes, so the rule is kept as written. | Kept. |
 
+**Confirmed 2026-10-06.** Rizky said "go ahead, use the defaults". That settles D2 to D9 as written, approves the seed model lists in `packages/core/src/models/tiers.ts`, and lets the two K0 fixes to published behaviour (gaps G6 and G7) start on `main`. Still open, with no default: how a Personal user gets a cloud computer (C7), and the size and cost of the second Tencent server (C8).
+
 ## 5. Phases
 
 Three tracks. Track M (models) is small and independent, so it ships first. Track K (the orchestrator and its computer) makes the chat agent a generalist that can build things. Track C (chat workers) moves the modes behind the chat.
@@ -92,6 +94,8 @@ Full detail in [`chat-computer-spec.md`](chat-computer-spec.md). K0 comes before
 | K2 | SR-111 closed, then the computer on a second Tencent server, with a shell and files. Hosted desks only. | The agent builds and runs a small web app, and its own tests pass in the container. |
 | K3 | The headless browser, with screenshots the person can see. | The agent finds a layout fault in the app it built from a screenshot and fixes it. |
 | K4 | Scheduled tasks the person confirms, then a virtual screen if a real task needs it. | A daily task reports into its thread. |
+
+**K0 splits between the two codes.** Two of its items fix what the published version does today, so under the two-codes rule they are fixed on `main` first and merged down, never fixed by hand in both: a run that spends its steps on tools ends with no answer and no notice (gap G6), and tool inputs and outputs are not redacted for secrets (gap G7). The approval cards, the `plan` and `ask_user` tools, the time and cost ceilings and the decision record are new, so they are built in the tester code. Starting the published-code part needs Rizky's word, because `main` carries uncommitted edits and the repo rule is no commit unless asked.
 
 ### Track C: chat workers
 

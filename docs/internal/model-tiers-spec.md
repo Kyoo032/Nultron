@@ -27,12 +27,15 @@ export const MODEL_TIERS = ["daily", "fast", "reasoning"] as const;
 export type ModelTierId = (typeof MODEL_TIERS)[number];
 export const DEFAULT_MODEL_TIER: ModelTierId = "daily";
 
-type TierDefinition = {
-  /** Ordered. The first id that is live in the catalog and not on the breaker answers. */
-  readonly candidates: Readonly<Record<ProviderId, readonly string[]>>;
-  readonly thinking: "off" | "default" | "deep";
-};
+type TierDefinition = Readonly<{
+  id: ModelTierId;
+  thinking: "off" | "default" | "deep";
+  /** Ordered. The first id that is live in the catalog and not on the breaker answers. A provider with no list is skipped. */
+  candidates: Readonly<Partial<Record<ProviderId, readonly string[]>>>;
+}>;
 ```
+
+**Built 2026-10-06 (M0).** `packages/core/src/models/tiers.ts` and `tiers.test.ts`, 23 tests, additive: no existing file changed, and the file is not exported from `packages/core/src/index.ts` yet (M1 adds that, a few lines at the end). The seed lists are in the file with their provenance.
 
 Rules for a candidate list:
 
@@ -47,12 +50,17 @@ Seed lists, to be confirmed by a gateway probe and Rizky before M1:
 - `fast`: the ids whose hint is "Fast drafts" in `GATEWAY_BEST_FOR` (`packages/core/src/models/gateway-roles.ts:7`).
 - `reasoning`: the ids whose hint is "Deep reasoning" in the same table, restricted to those with effort levels.
 
-The existing `ModelTier = "everyday" | "advanced"` is a curation label, not a choice. It is renamed `CurationTier` in the same change so the two cannot be confused.
+The existing `ModelTier = "everyday" | "advanced"` is a curation label, not a choice. The earlier draft renamed it `CurationTier` in the same change. That rename is deferred to promotion: `ModelTier` is exported from a file the published code also edits, so renaming it in the tester code would conflict at every sync, and the published-wins rule says the tester code adapts. The new type is `ModelTierId`, and `tiers.ts` says why the two differ.
+
+Built differently from the draft: the `daily` list is imported from `CHAT_DEFAULT_PREFERENCES`, not copied, so a published change to the default list reaches Daily on the next sync. A guard test requires `fast` models to be able to run with Thinking off and `reasoning` models to accept a deep level.
 
 ## 3. Resolution
 
 ```ts
-resolveTier(tier, { catalog, providers, down }): { model: string; provider: ProviderId } | { error: "tier_unavailable" }
+resolveTier(tier, liveness, definitions = TIER_DEFINITIONS): TierResolution
+// liveness = { providers, isListed(provider, id), isDown(id) }, so the walk stays pure and the host supplies the catalog and the breaker
+// TierResolution = { ok: true, tier, provider, model, thinking, skipped } | { ok: false, tier, error: "tier_unavailable", skipped }
+// readRequestedTier(value): { ok: true, tier } | { ok: false, error: "unknown_tier" }   (absent gives daily, a typo never does)
 ```
 
 - Walk the tier's candidates for each provider the tenant may use, in provider order. Personal has one provider, the Toko Token gateway.
