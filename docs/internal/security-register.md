@@ -209,7 +209,7 @@ not test an operating-system egress deny, so [SR-111](#sr-111) stays open.
 | [SR-124](#sr-124) | Low | Personal: the sandbox's integrity check covers the child scripts and QuickJS only when the root `MANIFEST.json` ships, and no pack step checks it | Open (2026-10-03) | Blocks the next Personal cut |
 | [SR-125](#sr-125) | Low | Two `edit_file` calls on one file could overwrite each other without a word | Fixed in tree, tested; unverified on a packed app (2026-10-03) | None |
 | [SR-126](#sr-126) | Low | Personal: a deleted desk left the sealed text of its folder proposals on disk | Fixed in tree, tested; unverified on a packed app (2026-10-03) | None |
-| [SR-132](#sr-132) | Low | Enterprise: a CRITICAL `proxy-addr` advisory reaches the hosted image through `express`; the app never sets `trust proxy`, so the affected path is not used | Open (2026-10-06) | `audit:deployed` red; blocks Tencent deploy until the lock takes `proxy-addr` 2.0.8 |
+| [SR-134](#sr-134) | Low | Enterprise: a CRITICAL `proxy-addr` advisory reaches the hosted image through `express`; the app never sets `trust proxy`, so the affected path is not used | Open (2026-10-06) | `audit:deployed` red; blocks Tencent deploy until the lock takes `proxy-addr` 2.0.8 |
 | [SR-08](#sr-08) | Info | The portal token vault is process memory only | Superseded by [SR-64](#sr-64), 2026-09-23 | Dev only |
 | [SR-15](#sr-15) | Info | Music relay: checked, not a key-exfiltration issue. It does send a spoofed browser `User-Agent` | Checked, not an issue | Dev only |
 | [SR-18](#sr-18) | Info | `X-Forwarded-Proto` and `X-Forwarded-For` trust: checked, sound as deployed today | Checked, not an issue | Blocks Tencent deploy on any topology change |
@@ -4140,7 +4140,7 @@ between the two still leaves the rows, and no sweep removes them.
 
 Gate: none.
 
-### SR-132 {#sr-132}
+### SR-134 {#sr-134}
 
 **A CRITICAL `proxy-addr` advisory reaches the hosted image through `express`.** Enterprise. Raised by
 the `ci:local` run of the 0.16.0 cut (2026-10-06). Low. Open.
