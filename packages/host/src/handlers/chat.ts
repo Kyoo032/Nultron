@@ -3,6 +3,7 @@ import type { HostRequest, HostResult } from "../types";
 import { jsonError, jsonOk } from "../errors";
 import { agentService, getTenant } from "../tenant";
 import { defaultSelectableModel, listSelectableModels } from "../selectable-models";
+import { tierCatalogFields } from "../tier-resolve";
 
 export async function handleGetChat(request: HostRequest): Promise<HostResult> {
   try {
@@ -16,11 +17,13 @@ export async function handleGetChat(request: HostRequest): Promise<HostResult> {
         name: agent.name,
         description: agent.description,
       }));
+    const models = listSelectableModels(tenant);
     return jsonOk({
       agent: ready.agent,
       version: ready.version,
-      models: listSelectableModels(tenant),
+      models,
       defaultModel: defaultSelectableModel(undefined, tenant),
+      ...tierCatalogFields(models),
       specialists,
     });
   } catch (error) {

@@ -52,6 +52,7 @@ import { ensureToolsRegistered } from "./register-tools";
 import { recordChatRunUsage } from "./usage-record";
 import { loadSettings, loadUserLocale } from "./settings-store";
 import { defaultSelectableModel, listSelectableModels } from "./selectable-models";
+import { resolveTierRun } from "./tier-resolve";
 import { collectToolMediaParts } from "./tool-media";
 import { inlineLocalMediaParts, shouldInlineLocalMediaForProvider } from "./inline-local-media";
 import { saveGeneratedImage, saveGeneratedVideo } from "./media";
@@ -138,9 +139,13 @@ export async function* startModalityRun(options: {
   const parsed = parsers[options.modality](options.body as { content?: unknown; stream?: unknown });
   const settings = loadSettings(options.tenant);
   const userParts = settings.injectionGuardBypass === true ? parsed.parts : redactAttachedParts(parsed.parts);
+  // A body that names a `tier` gets its model and Thinking choice from the tier, and the body's own
+  // `thinking` and `reasoningEffort` are never read. A body that names none is `null` and runs as before.
+  const tierRun = resolveTierRun({ body: options.body, modality: options.modality, tenant: options.tenant });
   // `explicit` is what lets the runtime send a model it has never seen no effort at all unless the
   // person picked one; the level alone cannot say that.
-  const { effort: reasoningEffort, explicit: reasoningEffortExplicit } = readReasoningEffortChoice(options.body);
+  const { effort: reasoningEffort, explicit: reasoningEffortExplicit } =
+    tierRun?.reasoning ?? readReasoningEffortChoice(options.body);
   const thinkingEnabled = reasoningEffort !== "none";
   const wire = readOptionalChatWire(options.body);
   const thread = await getThread(options.tenant, options.threadId);
@@ -152,7 +157,7 @@ export async function* startModalityRun(options: {
   const defaultChat = isDefaultChatAgent(published.agent);
   const fallback = defaultChat ? defaultSelectableModel(catalog, options.tenant) : published.version.model;
   const requestedModel = readOptionalModel(options.body);
-  const model = resolveChatModel(requestedModel, fallback, catalog);
+  const model = tierRun?.model ?? resolveChatModel(requestedModel, fallback, catalog);
   const pastHint = await formatPastSessionsHint(options.tenant, thread.agentId, thread.id);
   const userText = userParts
     .map((part) => (part.type === "text" && typeof part.text === "string" ? part.text : ""))

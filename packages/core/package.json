@@ -15,6 +15,7 @@
     "./mode-catalog": "./src/models/mode-catalog.ts",
     "./preferred": "./src/models/preferred.ts",
     "./curation": "./src/models/curation.ts",
+    "./tiers": "./src/models/tiers.ts",
     "./templates": "./src/templates/library.ts",
     "./pii": "./src/security/pii.ts",
     "./product-modes": "./src/agents/product-modes.ts",
