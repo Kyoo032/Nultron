@@ -83,12 +83,41 @@ Not decided, each with the default this plan assumes:
 
 | # | Question | Default |
 |---|---|---|
-| B-D1 | Does a person design their own bot, or only use the built-in ones? Designing one means a harness editor, and custom-agent Build is parked by `AGENTS.md`. | Built-in bots first. A designer comes later and only on his word, because it lifts that rule. |
+| B-D1 | Does a person design their own bot, or only use the built-in ones? Designing one means a harness editor, and custom-agent Build is parked by `AGENTS.md`. | **Answered 2026-10-06:** "yes the people are able to hire their own bot". A person adds bots to their desk, built-in ones and ones they set up. That lifts the parked-Build rule in the tester code. See "Hiring a bot" below. |
 | B-D2 | Does the bot rail replace the first reference's icon-only rail, or sit inside it? | It replaces it: bots first, then the account pages. |
-| B-D3 | Which "Works on" choices we offer. | Off, Browser, Cloud on hosted. This computer on the Personal app. No local VM. Cloud is our Tencent machine (track K2), which costs money per bot, so it is off until a person turns it on. |
+| B-D3 | Which "Works on" choices we offer. | **Answered 2026-10-06:** the cloud computer (VPS) and the person's own computer are paid features. A free trial cannot use either, and what it does get is limited, with no graphical screen. See "Free and paid" below. No local VM. |
 | B-D4 | One conversation per bot, or many. | Many, as Chat has today, listed under the bot. |
 
 This adds **track B (bots)** to section 5 and moves two phases of track C: the result card and the worker contract stay, the "park the screens" phase (C4) becomes "each screen's controls become its bot's panel".
+
+#### Hiring a bot (Rizky, 2026-10-06: "yes the people are able to hire their own bot")
+
+"Hire" is the word on screen: a desk is a one-person company and a bot is a worker on it.
+
+- **Hire a built-in bot.** Pick it from the list. It arrives complete, because it is a harness we wrote. This replaces the Workspaces checkboxes.
+- **Hire your own bot.** The person answers a few questions in the thread, as the reference does (the job, when it runs, what it touches, where it works). The answers fill a **harness spec**, not a block of instructions: a prompt, a set of tools chosen from the registry, a budget, an output type, and checks picked from the ones that exist.
+- **What a person cannot do.** Add a tool that is not in the registry, raise a budget above their plan's ceiling, switch off the approval step for a write, or switch off redaction. The host builds the run from the spec and refuses the rest, the same way it does for built-in bots.
+- **Judges.** A built-in bot has judges written in code for its output (figures computed in core for Finance, the slide checks for Presentation). A person's bot gets the generic checks only. Say so on screen, so nobody reads a hired bot's output as checked the way Finance's is.
+
+This is the parked custom-agent Build coming back, under a different shape. The published code keeps it parked (`AGENTS.md`); the tester code builds it in phase B5. The agent tables and Studio files that stayed in the tree for "a later show Build again pass" are where it starts.
+
+#### Free and paid (Rizky, 2026-10-06)
+
+His words: "this vps and own computers is for the paid customer features, otherwise its not possible to use it on a free trial and the usage is limited such as no graphical interface".
+
+| | Free trial | Paid |
+|---|---|---|
+| Bots, conversations, result cards | Yes, within the trial's limits | Yes |
+| Built-in tools that run inside the app: web search and fetch, desk files, knowledge search, the code sandbox | Yes, within limits | Yes |
+| The cloud computer (a VPS the bot works on) | No | Yes |
+| The person's own computer ("This computer") | No | Yes |
+| A graphical screen: the live picture, Take control, a desktop | No | Yes, where the cloud computer or own computer is on |
+| Routines (scheduled runs) | Not decided | Not decided |
+
+Two rules follow from the repo's own:
+
+- **The host decides, the screen shows.** Whether a desk may start a computer comes from the plan the portal reports for that customer, checked by the host on every start. The renderer only greys the choice out and says why. A check in the renderer alone is not a check (`AGENTS.md`, "The gate is advisory").
+- **A paid computer has a size and a bill.** It is the only part of the product whose cost grows with each paying seat. The sizing and the 40% margin sums are in the vault note `40-Dev/nultron-hosting-map.md`; a dedicated 4 vCPU / 8 GB machine does not fit inside a 20 USD seat, so the paid computer is a capped share of a machine unless the plan is priced for a whole one.
 
 ## 4. Decisions needed from Rizky
 
@@ -159,6 +188,8 @@ Track B is the screen for what tracks K and C build. It starts after C0, because
 | B2 | The side panel: the bot's controls (the mode's "More" fields), bound to the same values the conversation sets. A value set in the panel shows in the thread as a short note, and the other way round. | Change a deck's slide count in the panel, then by asking; both paths give the same run input. |
 | B3 | The Computer tab: the screen picture, Take control, Sleep, and "Works on". Needs K2 and K3. | The Research bot opens a page in its browser; the person takes control, clicks, and hands it back. |
 | B4 | The Routines tab: schedules the person confirms. Needs K4. | A daily Market briefing lands in the Market bot's thread with the tab closed. |
+| B5 | Hire your own bot: the setup questions fill a harness spec, the host enforces it, and the bot joins the rail. Plan ceilings apply. | A person hires a bot that reads a folder of invoices and writes a weekly summary; a tool outside its spec is refused by the host, not by the prompt. |
+| B6 | Free and paid: the host reads the plan and refuses a computer start on a free desk; the choice is greyed with the reason. | A free desk gets `403` with a reason code on a computer start through the API, not only a greyed button. |
 
 The first-desk hard rule still decides what a fresh Personal desk shows: Chat (the generalist), Research, Images, Videos, Presentation. Bots replace rail entries one for one, so `FIRST_RUN_MODES` and its tests are not touched.
 
