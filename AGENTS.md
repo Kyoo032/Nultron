@@ -63,6 +63,16 @@ On **Enterprise** each tenant keeps its own workspaces on Rizky's server. On **P
 
 **Status: closed beta** (not prototype). Public entry point: [`README.md`](README.md).
 
+## Product direction (Rizky, 2026-10-06): Nultron + HYP AI, chat-first
+
+**Nultron and HYP AI are the products developed regularly.** Keep shipping and iterating on those two as the main build focus.
+
+**Archive / deprioritize mode-heavy complicated UI setup.** Do not invest in elaborate multi-mode UI configuration flows.
+
+**Focus: put everything inside chat and optimize in-chat UIs and flow.** Prefer chat-native surfaces over separate setup screens.
+
+**North star: like Dots and Muse, but multi-model.** Multi-model chat-first wins.
+
 ## Current focus (Rizky, 2026-10-01): fix, perfect, polish — no new modes
 
 Until Rizky lifts it, work is limited to three things, in this order:
