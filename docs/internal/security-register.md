@@ -209,6 +209,7 @@ not test an operating-system egress deny, so [SR-111](#sr-111) stays open.
 | [SR-124](#sr-124) | Low | Personal: the sandbox's integrity check covers the child scripts and QuickJS only when the root `MANIFEST.json` ships, and no pack step checks it | Open (2026-10-03) | Blocks the next Personal cut |
 | [SR-125](#sr-125) | Low | Two `edit_file` calls on one file could overwrite each other without a word | Fixed in tree, tested; unverified on a packed app (2026-10-03) | None |
 | [SR-126](#sr-126) | Low | Personal: a deleted desk left the sealed text of its folder proposals on disk | Fixed in tree, tested; unverified on a packed app (2026-10-03) | None |
+| [SR-132](#sr-132) | Low | Enterprise: a CRITICAL `proxy-addr` advisory reaches the hosted image through `express`; the app never sets `trust proxy`, so the affected path is not used | Open (2026-10-06) | `audit:deployed` red; blocks Tencent deploy until the lock takes `proxy-addr` 2.0.8 |
 | [SR-08](#sr-08) | Info | The portal token vault is process memory only | Superseded by [SR-64](#sr-64), 2026-09-23 | Dev only |
 | [SR-15](#sr-15) | Info | Music relay: checked, not a key-exfiltration issue. It does send a spoofed browser `User-Agent` | Checked, not an issue | Dev only |
 | [SR-18](#sr-18) | Info | `X-Forwarded-Proto` and `X-Forwarded-For` trust: checked, sound as deployed today | Checked, not an issue | Blocks Tencent deploy on any topology change |
@@ -4138,6 +4139,28 @@ Residual: the purge runs after the desk row is deleted (`workspaces.ts:179`, the
 between the two still leaves the rows, and no sweep removes them.
 
 Gate: none.
+
+### SR-132 {#sr-132}
+
+**A CRITICAL `proxy-addr` advisory reaches the hosted image through `express`.** Enterprise. Raised by
+the `ci:local` run of the 0.16.0 cut (2026-10-06). Low. Open.
+
+Evidence: `audit:deployed` failed on `de95267` plus the version bump with `CRITICAL proxy-addr — proxy-addr
+vulnerable to IP spoofing via IPv4-mapped IPv6 trust subnet (fixed in >=2.0.8)` in the hosted closure
+(`.ci-local/<run>/audit_deployed.log`, gitignored). The lock resolves `express@5.2.1` to `proxy-addr: 2.0.7`
+(`pnpm-lock.yaml:6125`), and `express` 5.2.1 asks for `^2.0.7`, so 2.0.8 satisfies it. `express` is a
+dependency of `apps/web` only (`apps/web/package.json:16`); neither `packages/host` nor `apps/desktop`
+imports it, so the packaged Personal app does not carry it.
+
+The advisory is about trusting a proxy subnet. No file in `apps/` or `packages/` sets Express's
+`trust proxy` (searched `trust proxy` and `"trust` on 2026-10-06), so Express keeps its default of
+trusting no proxy and never compiles a subnet for `proxy-addr`. That is why the severity here is Low.
+
+Required action: refresh the lock so `proxy-addr` resolves to 2.0.8 (or add a `pnpm.overrides` entry), then
+re-run `ci:local --only audit:deployed`. This was not done in the 0.16.0 cut, which is the Personal app
+only.
+
+Gate: `audit:deployed` stays red until then, which blocks the Tencent deploy.
 
 ## Info and checked-not-an-issue
 
