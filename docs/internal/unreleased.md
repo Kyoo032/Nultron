@@ -53,3 +53,9 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 ## Log
 
 Append below, newest first.
+
+## Hosted image: the ignore file dropped packages/core/src/data, 2026-10-06 (Enterprise image; fixed in the tree)
+
+- **Bug.** `**/data` in `webapp-deploy/Dockerfile.dockerignore` (and its byte copy `webapp-deploy/.dockerignore`) keeps local data dirs out of the image, and also dropped the source folder `packages/core/src/data` (`ground.ts`, `cuts.ts`). An image built from `main` at `de95267` with `git archive` failed its own load check. Found while preparing the app.nultron-ai.xyz preview.
+- **Fix.** Both files re-include `packages/core/src/data` and `packages/core/src/data/**`. `scripts/pilot-deploy.test.mjs` adds a test that every tracked `*/src/data` folder has its re-include (30 tests green).
+- **Proof.** `nultron-web:979bd797bdf0`, built on the Tencent Lighthouse box from `git archive 979bd79`, completed with the load check (895 MB). Not yet run as the Enterprise app; the preview runs it in single-desk mode (security register SR-133).

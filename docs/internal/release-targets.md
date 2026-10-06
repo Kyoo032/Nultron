@@ -14,8 +14,8 @@ Last updated: 2026-10-05 (agentforge `main` at `be2c267`). The hex colours below
 
 | Target | Type | Company | Product name | Gateway users see | Status | Focus now |
 |---|---|---|---|---|---|---|
-| [`nultron-personal`](#nultron-personal) | Desktop app | Public | Nultron | Toko Token | Released v0.15.1; v0.16.0 packed 2026-10-06, not published | Publish 0.16.0 after the owed drives |
-| [`nultron-enterprise`](#nultron-enterprise) | Hosted web app | Nultron Enterprise customers (via DPS) | Nultron | Toko Token + BYOK | Pilot, not deployed | First Tencent deploy, Thu 8 Oct |
+| [`nultron-personal`](#nultron-personal) | Desktop app | Public | Nultron | Toko Token | Released v0.15.1; v0.16.0 packed 2026-10-06, not published | Publish 0.16.0 after the owed drives; the public sites say "coming soon" and link no download |
+| [`nultron-enterprise`](#nultron-enterprise) | Hosted web app | Nultron Enterprise customers (via DPS) | Nultron | Toko Token + BYOK | Pilot, not deployed. A password-gated single-desk preview (one private desk per tester) runs at app.nultron-ai.xyz since 2026-10-06 | First Tencent Enterprise deploy, Thu 8 Oct; it replaces the preview |
 | [`hyp-ai`](#hyp-ai) | White-label hosted | Hypernet (XLSMART) | HYP AI | TokenKu | Setting up | Rebrand the clone; plan approval |
 | [`kemenkeu-ai`](#kemenkeu-ai) | Desktop flavor | Kemenkeu (Ministry of Finance) | Kemenkeu AI | AIHub | Built locally | Later, after Nultron and HYP AI |
 | [`aihub-metranet`](#aihub-metranet) | Desktop flavor | Metranet (Telkom Indonesia) | AIHub Metranet | AIHub | Built locally | Later, after Nultron and HYP AI |
@@ -130,6 +130,7 @@ The next milestone is to **simulate pushing one agentforge update into both bran
   | `portal-db` | Postgres 16 |
   | `portal-prepare` | one-shot migrations |
 
+- **Live on the box (2026-10-06):** dpscloud.co.id, tokotokenai.com and nultron-ai.xyz are live static sites. app.nultron-ai.xyz is the preview: off server mode, Basic Auth, 11 private desks (security register SR-133). Company mailboxes moved to Lark; SES stays for the sign-in codes. Runbook: `nultron-files/deploy/tencent/README.md`.
 - **Where it runs (updated 2026-10-05):** Phase 0 is one Tencent Lighthouse box in Jakarta that will also host dpscloud.co.id (the parent site) and tokotokenai.com. Nultron goes on **nultron-ai.xyz**, with sign-in on **portal.nultron-ai.xyz**. **Never point api.tokotokenai.com at it.** Email is Tencent SES only, for the sign-in codes: "Nultron <no-reply@mail.dpscloud.co.id>", no mailboxes. After a 1-month test, move to a bigger Tencent CVM by sharing a Lighthouse custom image to CVM (same region), restoring the newer data, and switching DNS. Multi-site build: branch `feat/multi-site-edge`. Guide: `nultron-files/deploy/hosting-guide.html`. Before that, Phase 0 was one Tencent Lighthouse box in Jakarta. Phase 1 is TKE; its manifests are in `webapp-deploy/k8s/`, not yet applied.
 - **Ships by:** `node scripts/release-web.mjs --tag <tag> --sha <sha>`, with `--dry-run` first. It pushes both images, plus a deploy bundle to `Kyoo032/NultronEnt`.
 - **Tag:** `ent-YYYY.MM.DD`. Every deploy is logged by sha.
