@@ -10,7 +10,7 @@ description: >-
 
 # Pack Nultron (this Windows PC)
 
-> **Two products, one repo.** **Personal** is the Mac/Windows Nultron app — current cut `0.15.1`, under active development again. `0.15.0` was published 2026-09-23.
+> **Two products, one repo.** **Personal** is the Mac/Windows Nultron app — current cut `0.16.0` (2026-10-06, the first Nultron-named installer), under active development. `0.15.1` was published 2026-09-28.
 > These pack and release routes serve the Personal app only; the Enterprise web app ships through the deploy route.
 > Decision record: [`web-pivot-2026-09-18.md`](../../../docs/internal/web-pivot-2026-09-18.md).
 >
@@ -164,7 +164,7 @@ Use `npx pnpm@9.15.9` (corepack EPERM on this box).
 ## 1. Prep (source stays on agentforge)
 
 1. `git fetch origin` and rebase the bump onto `origin/main`.
-2. Ship list: the current `docs/internal/<version>-changelog.md`. Versions are semver: **`0.15.0` is the current cut** (published 2026-09-23); the next maintenance cut would be `0.15.1`. Do not use `0.14.3+`. The old "never `0.15` unless Kyo says so" rule is spent — he said so on 2026-09-23 and 0.15.0 shipped.
+2. Ship list: the current `docs/internal/<version>-changelog.md`. Versions are semver: **`0.16.0` is the current cut** (2026-10-06; `0.15.1` was published 2026-09-28); the next maintenance cut would be `0.16.1`. Do not use `0.14.3+`. The old "never `0.15` unless Kyo says so" rule is spent — he said so on 2026-09-23 and 0.15.0 shipped.
 3. Bump only `apps/desktop/package.json` `version`.
 4. Write `docs/public/<version>-notes.md`. Mac notes use **Nultron** names, Gatekeeper, Keychain, **Cmd** shortcuts, manual updates.
 5. Point `AGENTS.md` ship list at that patch.

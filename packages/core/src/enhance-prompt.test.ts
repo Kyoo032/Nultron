@@ -15,6 +15,11 @@ describe("enhance-prompt", () => {
     expect(isEnhanceSurface("agents")).toBe(false);
   });
 
+  it("names exactly the product's own brands to keep in Bahasa", () => {
+    expect(enhanceSystemPrompt("chat", "id")).toContain("Keep brand names Nultron and Toko Token unchanged.");
+    expect(enhanceUserPrompt("buat ringkasan", "id")).toContain("2. Keep brand names Nultron and Toko Token unchanged.");
+  });
+
   it("strips wrapping quotes and labels", () => {
     expect(stripWrappingQuotes('"hello"')).toBe("hello");
     expect(stripWrappingQuotes("Enhanced prompt: do the thing")).toBe("do the thing");

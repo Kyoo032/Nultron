@@ -60,6 +60,7 @@ describe("presentationLocale", () => {
 describe("presentation language copy", () => {
   it("instructs Bahasa Indonesia slide copy for id", () => {
     expect(presentationLanguageRule("id")).toMatch(/Bahasa Indonesia/);
+    expect(presentationLanguageRule("id")).toContain("Keep brand names Nultron and Toko Token unchanged.");
     expect(presentationKicker("id")).toBe("PRESENTASI");
     expect(presentationGatewayMessage("id")).toMatch(/Pengaturan/);
     expect(presentationGatewayMessage("id")).toMatch(/Toko Token/);

@@ -14,7 +14,7 @@ Last updated: 2026-10-05 (agentforge `main` at `be2c267`). The hex colours below
 
 | Target | Type | Company | Product name | Gateway users see | Status | Focus now |
 |---|---|---|---|---|---|---|
-| [`nultron-personal`](#nultron-personal) | Desktop app | Public | Nultron | Toko Token | Released v0.15.1 | 0.16.0 cut in progress (2026-10-06, dry run first); the public sites say "coming soon" and link no download |
+| [`nultron-personal`](#nultron-personal) | Desktop app | Public | Nultron | Toko Token | Released v0.15.1; v0.16.0 packed 2026-10-06, not published | Publish 0.16.0 after the owed drives; the public sites say "coming soon" and link no download |
 | [`nultron-enterprise`](#nultron-enterprise) | Hosted web app | Nultron Enterprise customers (via DPS) | Nultron | Toko Token + BYOK | Pilot, not deployed. A password-gated single-desk preview (one private desk per tester) runs at app.nultron-ai.xyz since 2026-10-06 | First Tencent Enterprise deploy, Thu 8 Oct; it replaces the preview |
 | [`hyp-ai`](#hyp-ai) | White-label hosted | Hypernet (XLSMART) | HYP AI | TokenKu | Setting up | Rebrand the clone; plan approval |
 | [`kemenkeu-ai`](#kemenkeu-ai) | Desktop flavor | Kemenkeu (Ministry of Finance) | Kemenkeu AI | AIHub | Built locally | Later, after Nultron and HYP AI |
@@ -97,14 +97,14 @@ The next milestone is to **simulate pushing one agentforge update into both bran
   - macOS dmg/zip, still a preview: nobody has smoke-tested it on a Mac yet.
   - In-app updater reading `Kyoo032/Nultron`.
 - **Ships by:** the [pack skill](../../.cursor/skills/pack-nultron/SKILL.md), then `pnpm desktop:release` to the public repo `Kyoo032/Nultron`.
-- **Versions:** semver. Current `v0.15.1` (published 2026-09-28). Next: `0.15.2`.
+- **Versions:** semver. Published `v0.15.1` (2026-09-28). `0.16.0` cut on 2026-10-06 (branch `chore/release-0.16.0`, [`0.16.0-changelog.md`](0.16.0-changelog.md)), the first Nultron-named installer; not published.
 - **Focus now:**
-  1. Bump to 0.15.2 and write its notes.
-  2. Windows pack, then drive on the packed app: `doctor --desktop`, `run_code`, the folder flow, Start over.
-  3. mac pack via Docker.
+  1. Drive on the packed 0.16.0 app: `run_code`, the folder flow, Start over, and the DPSBuddy → Nultron upgrade on Windows ([`traps.md`](../../.cursor/skills/pack-nultron/traps.md), "First Nultron pack").
+  2. Drive SR-112's injected file before publishing.
+  3. Publish 0.16.0 with `release-desktop.mjs --require-mac` when Rizky confirms.
 - **Logs:**
-  - Pack table in [`unreleased.md`](unreleased.md).
-  - Changelogs: `0.15.x-changelog.md`.
+  - Pack table in the current changelog's `## Pack + publish`; published rows in [`unreleased.md`](unreleased.md).
+  - Changelogs: `0.15.x-changelog.md`, `0.16.0-changelog.md`.
   - Public notes: `docs/public/<v>-notes.md`.
 
 ## nultron-enterprise

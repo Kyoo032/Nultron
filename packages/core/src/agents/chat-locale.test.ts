@@ -19,6 +19,11 @@ describe("chat locale", () => {
     expect(withChatOutputLanguage(id, "id")).toBe(id);
   });
 
+  it("names exactly the product's own brands to keep", () => {
+    const id = withChatOutputLanguage("You are a helpful assistant.", "id");
+    expect(id).toContain("Keep brand names Nultron and Toko Token unchanged.");
+  });
+
   it("keeps stub copy professional Indonesian", () => {
     const copy = stubChatCopy("id");
     expect(copy.needKey).toMatch(/Toko Token/);

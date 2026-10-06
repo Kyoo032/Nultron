@@ -555,7 +555,13 @@ export function resetGatewayRefreshThrottle(): void {
   refreshedAt.clear();
 }
 
-/** (a) no verdict for this key, or (b) the `ok` verdict has aged past the TTL. */
+/**
+ * (a) no verdict for this key, (b) the `ok` verdict has aged past the TTL, or (c) the last check could
+ * not reach the gateway or got an error back. Without (c) one network blip stayed on disk until the
+ * grace window ran out and closed the desk, although the gateway had long since come back. A key the
+ * gateway rejected (`invalid_key`) is not asked again on its own: the owner saves a new key or presses
+ * Re-check.
+ */
 function needsGatewayRefresh(state: GateState | null, fingerprint: string | null, now: Date, okTtlMs: number): boolean {
   if (!state || state.fingerprint !== fingerprint) {
     return true;
@@ -563,14 +569,15 @@ function needsGatewayRefresh(state: GateState | null, fingerprint: string | null
   if (state.status === "ok") {
     return !withinOkTtl(state.checkedAt ?? state.lastOkAt, now, okTtlMs);
   }
-  return false;
+  return state.status === "unreachable" || state.status === "error";
 }
 
 /**
  * Fire-and-forget re-validation, called from `GET /api/v1/settings`.
  *
- * Existing installs carry a key no verdict was ever written for, and a verdict goes stale after a day;
- * both are opened on trust by `deriveGatewayGate`, so something has to actually ask the gateway. This
+ * Existing installs carry a key no verdict was ever written for, a verdict goes stale after a day, and
+ * an `unreachable` or `error` verdict only means the last attempt failed; all three need the gateway
+ * asked again (`needsGatewayRefresh`), so something has to actually ask it. This
  * is that something: it never blocks the response, never throws, and runs at most once every ten
  * minutes per key per process. Returns whether a check was started, which is what the tests assert.
  */
