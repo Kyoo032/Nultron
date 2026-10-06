@@ -51,6 +51,45 @@ Today Nultron is a rail of 14 mode screens, and Chat is one of them. After this 
 
 The reference also shows the assistant starting a message on its own, a scheduled check-in. That needs a scheduler and runs that keep going without an open tab. Both are in track K: runs that outlive the tab in K1, scheduled tasks in K4.
 
+### Second reference (Rizky, 2026-10-06 evening): bots that run on harnesses
+
+Kept at `nultron-files/chat-first/reference-2026-10-06-bots.png`: a screenshot of the OpenMausBot desktop app. His words: this "is how I envisioned the new chat modes". It "will also incorporate into the embedded modes tools with different harness on different agents". The difference from that product: "in our platform we have the capabilities to design a bot that is fully working on a harness instead of just skills and instructions". And "there will also be a UI interface in case you needed control and field to fill in".
+
+Ideas only, as with every `.ref/` source. No code, layout file or asset is taken from it.
+
+What the screenshot shows:
+
+- A rail of bots, one icon each. Picking one opens that bot's own conversation.
+- A header with the bot's name and a chip for the model behind it.
+- A side panel with three tabs: Computer, Routines, Browser.
+  - Computer: a live picture of the bot's screen, **Take control** and **Sleep**, and "Works on": Auto, Cloud (hosted desktop), Local VM, This computer, Browser (web pages only), Off.
+  - Cloud provider: managed, or a self-hosted VPS.
+  - Routines: the bot's schedules.
+- A new bot that asks four setup questions in the thread: the job, when it runs, which apps it touches, which folder it works in.
+
+What it means for this plan:
+
+| Was (first reference) | Now |
+|---|---|
+| One chat. The harnesses are workers the chat agent calls. No mode switch on screen (target 2). | **Several bots in the rail.** Each bot is one harness with its own conversation. The generalist stays as the first bot and can still hand work to the others. |
+| No split view and no side panel (target 3). | **A side panel per bot**, opened on demand: Computer, Routines, and the bot's own controls. Result cards in the thread stay. |
+| Files and questions replace every form (target 5). | Still the first way. **A bot may also show a control panel** with fields, for the cases where a form is faster than a conversation. It is the mode's existing "More" controls, moved beside the chat. |
+
+What sets ours apart, in his words and in the code: a bot here is a **harness spec**, not a prompt with skills. The spec (`packages/core/src/harness/modes/`) fixes the prompt, the tools the bot may call, its step and cost budget, the checks its output must pass and the judges that run in code. The host enforces it on every run (`packages/host/src/job-regen.ts`). A bot elsewhere is instructions the model may ignore.
+
+The built-in bots are the modes that exist: Research, Documents, Presentation, Finance, Data, Market, Legal, Meeting, Images, Videos, Music, Edit, Education. No new mode is added, so the 2026-10-01 rule holds.
+
+Not decided, each with the default this plan assumes:
+
+| # | Question | Default |
+|---|---|---|
+| B-D1 | Does a person design their own bot, or only use the built-in ones? Designing one means a harness editor, and custom-agent Build is parked by `AGENTS.md`. | Built-in bots first. A designer comes later and only on his word, because it lifts that rule. |
+| B-D2 | Does the bot rail replace the first reference's icon-only rail, or sit inside it? | It replaces it: bots first, then the account pages. |
+| B-D3 | Which "Works on" choices we offer. | Off, Browser, Cloud on hosted. This computer on the Personal app. No local VM. Cloud is our Tencent machine (track K2), which costs money per bot, so it is off until a person turns it on. |
+| B-D4 | One conversation per bot, or many. | Many, as Chat has today, listed under the bot. |
+
+This adds **track B (bots)** to section 5 and moves two phases of track C: the result card and the worker contract stay, the "park the screens" phase (C4) becomes "each screen's controls become its bot's panel".
+
 ## 4. Decisions needed from Rizky
 
 Each has a default the plan assumes until he says otherwise.
@@ -71,7 +110,7 @@ Each has a default the plan assumes until he says otherwise.
 
 ## 5. Phases
 
-Three tracks. Track M (models) is small and independent, so it ships first. Track K (the orchestrator and its computer) makes the chat agent a generalist that can build things. Track C (chat workers) moves the modes behind the chat.
+Four tracks. Track M (models) is small and independent, so it ships first. Track K (the orchestrator and its computer) makes the chat agent a generalist that can build things. Track C (chat workers) moves the modes behind the chat. Track B (bots), added on 2026-10-06, is the screen that shows each harness as a bot with its own conversation and side panel.
 
 ### Track M: model tiers
 
@@ -108,6 +147,20 @@ Full detail in [`chat-computer-spec.md`](chat-computer-spec.md). K0 comes before
 | C4 | Park the screens. Rail reduced. Onboarding and the guide rewritten for one screen. Maps and recipes refreshed. | `ci:local` green, verify pass on webdev, then a packed Windows build driven with `doctor --desktop`. |
 
 C0 is the phase that proves the design. If research does not feel right in the thread, stop and change the contract before building eleven more.
+
+### Track B: bots (added 2026-10-06, from the second reference)
+
+Track B is the screen for what tracks K and C build. It starts after C0, because a bot's conversation needs the worker contract and the result card.
+
+| Phase | Outcome | Proof |
+|---|---|---|
+| B0 | A bot registry read from the harness specs: name, icon, one line on what it does, its tools, its tier, its output type. No screen change. | A test that every mode with a harness spec yields exactly one bot, and that a bot can call no tool its spec does not list. |
+| B1 | The rail lists the bots. Each opens its own conversations. The generalist is first and can hand a task to another bot, which answers in its own thread with a link back. | Drive on `:3200`: ask the generalist for a deck; the Presentation bot's thread holds the result; the first-desk rule decides which bots a fresh Personal desk shows. |
+| B2 | The side panel: the bot's controls (the mode's "More" fields), bound to the same values the conversation sets. A value set in the panel shows in the thread as a short note, and the other way round. | Change a deck's slide count in the panel, then by asking; both paths give the same run input. |
+| B3 | The Computer tab: the screen picture, Take control, Sleep, and "Works on". Needs K2 and K3. | The Research bot opens a page in its browser; the person takes control, clicks, and hands it back. |
+| B4 | The Routines tab: schedules the person confirms. Needs K4. | A daily Market briefing lands in the Market bot's thread with the tab closed. |
+
+The first-desk hard rule still decides what a fresh Personal desk shows: Chat (the generalist), Research, Images, Videos, Presentation. Bots replace rail entries one for one, so `FIRST_RUN_MODES` and its tests are not touched.
 
 ## 6. What gets parked, and how
 
