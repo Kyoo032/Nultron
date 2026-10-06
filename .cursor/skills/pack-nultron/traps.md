@@ -49,6 +49,8 @@ ERROR: /Nultron.app/Contents/Frameworks: … ['Nultron Helper (GPU).app', …]
 
 (The 0.14.26 log that taught this said `DPSBuddy.app`; the parser rule is the same under the new name.) Doubling the HFS+ volume does **not** fix a parser bug. How-to: `apps/desktop/platform/macos/BUILD-DMG-ON-WINDOWS.md`.
 
+**Days 1 to 9 of a month (0.16.0, 2026-10-06).** libdmg-hfsplus pads a one-digit day with a space and prints the month zero-based: on 6 October a row reads `040755   0   0   0  9/ 6/2026 02:42 Contents`. The old whitespace split took `02:42 Contents` as the name, so a pack made on the 1st to the 9th failed with `/Nultron.app: … ['Contents']` after three doublings; every earlier cut happened to be packed on a day of 10 or more. `parse_hfs_ls_name` now matches the whole row with a regex, the same shape as `HFS_LS_LINE` in `verify-bundle.py`, which already allowed the space.
+
 ## Wrong cwd
 
 | You are in | Allowed | If you run the other command |

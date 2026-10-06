@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -38,16 +39,21 @@ class VolumeFullError(Exception):
     """hfsplus mkdir/add returned 0 but the catalog did not grow."""
 
 
+# mode, uid, gid, size, then the date, then the name (which may hold spaces).
+# libdmg-hfsplus pads a one-digit day with a space (` 9/ 6/2026 02:42` on the 6th), so a
+# whitespace split cannot find the name column on days 1 to 9. verify-bundle.py's HFS_LS_LINE
+# reads the same rows.
+_HFS_LS_NUMERIC = re.compile(r"^\s*\d+\s+\d+\s+\d+\s+\d+\s+\d{1,2}/\s?\d{1,2}/\d{4}\s+\d{1,2}:\d{2}\s+(.+)$")
+_HFS_LS_CTIME = re.compile(r"^\s*\d+\s+\d+\s+\d+\s+\d+\s+[A-Za-z]{3}\s+\d{1,2}\s+\d{4}\s+(.+)$")
+
+
 def parse_hfs_ls_name(line: str) -> str | None:
     """Return the entry name from one `hfsplus ls` row, or None for headers."""
-    parts = line.split()
-    if len(parts) < 5 or not parts[0].isdigit():
-        return None
-    if "/" in parts[4]:
-        fields = line.split(None, 6)
-        return fields[6] if len(fields) >= 7 else None
-    fields = line.split(None, 7)
-    return fields[7] if len(fields) >= 8 else None
+    for pattern in (_HFS_LS_NUMERIC, _HFS_LS_CTIME):
+        match = pattern.match(line)
+        if match:
+            return match.group(1)
+    return None
 
 
 def fail(message: str) -> "NoReturn":
@@ -98,8 +104,8 @@ class HfsImage:
     def names(self, dest: str) -> set[str]:
         """Entry names in a directory, parsed from `ls`.
 
-        libdmg-hfsplus prints either a ctime date (`Jan 01 1980`, name starts at
-        column 8) or a numeric date (`8/12/2026 12:17`, name starts at column 7).
+        libdmg-hfsplus prints either a ctime date (`Jan 01 1980`) or a numeric date
+        (`8/12/2026 12:17`, or ` 9/ 6/2026 02:42` with a space-padded day).
         Helper apps have spaces, so the name is the remainder of the line, not the
         last whitespace token.
         """
