@@ -159,6 +159,8 @@ not test an operating-system egress deny, so [SR-111](#sr-111) stays open.
 | [SR-112](#sr-112) | Medium | Chat holds file, Knowledge and sandbox tools together with a public web tool, so text in a file or page can try to carry other text out in a URL | Fixed in tree, unverified live | Owner decision made 2026-10-03; drive an injected file before testers outside the company and before the next Personal cut |
 | [SR-113](#sr-113) | Medium | `braces` has a HIGH advisory with no fixed release, and it reached the hosted image through `tailwindcss` | Fixed in tree (2026-10-05): the image installs production dependencies only; built, booted and checked in a local proof image | — |
 | [SR-131](#sr-131) | Medium | The app image's ignore file did not exclude `nultron-files/` (4.5 GB of IP filings and brand work), so a build straight from a working checkout would have sent it into the image | Fixed in tree (2026-10-05), test-pinned; the build context checked with a real `docker build`, no full image built | Blocks building from a checkout |
+| [SR-132](#sr-132) | Medium | The release Caddyfile's deferred header block may replace an artifact's `sandbox` CSP with the app CSP | Open: reasoned from Caddy's docs, not driven (2026-10-06) | Blocks Tencent deploy (Enterprise) |
+| [SR-133](#sr-133) | Medium | The app.nultron-ai.xyz preview runs production without server mode, behind Basic Auth and a Caddy Origin rule | Accepted by the owner (2026-10-06): password-gated shared desk | Preview only |
 | [SR-81](#sr-81) | Low | Keyless Research search sends the masked query to four pinned public APIs | Checked, not an issue (2026-09-26) | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
@@ -2883,6 +2885,58 @@ the `git archive <sha>` release path is still the real guard.
 
 Gate: **blocks building from a checkout**, the same gate as [SR-49](#sr-49) half 2. It does not block a
 private-image deploy through `release-web.mjs`.
+
+### SR-132 {#sr-132}
+
+**The release Caddyfile may replace an artifact's `sandbox` CSP with the app's CSP.** Enterprise (hosted).
+Raised 2026-10-06 while building the app preview's site file. Reasoned from Caddy's documentation, **not
+driven**.
+
+Evidence: the app site's `header` block in `webapp-deploy/Caddyfile` sets `Content-Security-Policy` (`:120`)
+and also deletes `Server` and `X-Powered-By` (`:147-148`). Per Caddy's `header` directive docs, a block that
+deletes a header is deferred until the response is written. A deferred set runs after `reverse_proxy` has
+copied the upstream headers, so it would overwrite whatever CSP the app sent. The host serves an artifact
+body under `Content-Security-Policy: sandbox` (`packages/host/src/handlers/artifacts.ts:72`, explained in
+the Caddyfile comment at `:135-137`). If the deferred set wins, an artifact (model- or user-made HTML) runs
+in the app's own origin under the app CSP instead of an opaque sandbox origin.
+
+Fix to drive before the Enterprise deploy:
+- Request an artifact through Caddy and read its response headers.
+- If the CSP is the app's, mark the set default-only (`?Content-Security-Policy`), as the app preview's site
+  file does, and update `packages/host/src/security-headers.test.ts`, which parses this file.
+
+Gate: **blocks Tencent deploy (Enterprise)** until driven.
+
+### SR-133 {#sr-133}
+
+**The app preview at app.nultron-ai.xyz runs production without server mode, behind a mounted entrypoint
+that skips `hosted-mode-guard`.** Preview only (not Personal, not Enterprise). Decision record, 2026-10-06.
+Rizky chose a password-gated single-desk preview on 2026-10-05, after its risks were explained: one shared
+desk, one key, and Start over for everyone with the password.
+
+Evidence: `assertHostedModeCoherent` refuses `NODE_ENV=production` without `AGENTFORGE_SERVER`
+(`apps/web/server/hosted-mode-guard.ts:72-75`, called from `apps/web/server.ts:60`). The preview therefore
+runs its own copy of the production branch of `server.ts`, without that guard. Off server mode the host
+trusts only loopback writes (`packages/host/src/http-adapter.ts:793`, `packages/host/src/local-request.ts:66,80`),
+and `AGENTFORGE_TRUSTED_ORIGINS` is read only in server mode (`http-adapter.ts:785`). The preview's Caddy
+therefore:
+- requires HTTP Basic Auth (bcrypt cost 10, a 24-character random password);
+- refuses any non-GET/HEAD/OPTIONS request whose `Origin` is not `https://<host>`;
+- rewrites `Host` to the loopback upstream, and strips `Origin` and `Authorization` before proxying.
+
+The entrypoint also refuses to start with any provider key, token, secret or base URL in its environment,
+or with `AGENTFORGE_SERVER`, `AGENTFORGE_GATEWAY_URL` or `BIND_HOST` set. The gateway stays pinned
+(`NODE_ENV=production`), and `run_code` is off. The config lives outside the repo, in
+`nultron-files/deploy/tencent/edge/` (`sites/app.caddy`, `app/preview-server.ts`).
+
+Residual, accepted by the owner:
+- everyone with the password shares the desk, the key's spending and Start over;
+- the app has no rate limits, so the bcrypt cost and the password length are the only brute-force cost.
+
+The clean fix is a supported single-desk production mode in the repo. Take the preview down when the
+Enterprise bundle serves `app.nultron-ai.xyz`.
+
+Gate: none for Personal or Enterprise. The preview stays password-only.
 
 ## Low
 

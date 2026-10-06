@@ -358,6 +358,25 @@ test("the app image's context cannot pick up local pki, secrets files or the dep
   }
 });
 
+test("the app image's context keeps every tracked source folder named data", () => {
+  // `**/data` keeps local data dirs out of the image, and also dropped packages/core/src/data (source), which
+  // broke the image's load check (2026-10-06). Every tracked `<pkg>/src/.../data` needs its `!` re-include.
+  const rules = read("webapp-deploy", "Dockerfile.dockerignore").split("\n");
+  assert.ok(rules.includes("**/data"), "the local data dirs stay excluded");
+  const listed = spawnSync("git", ["ls-files"], { cwd: join(dirname(fileURLToPath(import.meta.url)), ".."), encoding: "utf8" });
+  assert.equal(listed.status, 0, listed.stderr);
+  const sourceDataDirs = new Set(
+    listed.stdout
+      .split("\n")
+      .map((file) => /^(.*\/src\/(?:.*\/)?data)\//.exec(file)?.[1])
+      .filter(Boolean),
+  );
+  assert.ok(sourceDataDirs.has("packages/core/src/data"));
+  for (const dir of sourceDataDirs) {
+    assert.ok(rules.includes(`!${dir}`) && rules.includes(`!${dir}/**`), `Dockerfile.dockerignore must re-include ${dir}`);
+  }
+});
+
 test("webapp-deploy/.dockerignore stays a byte-for-byte copy of Dockerfile.dockerignore", () => {
   // It drifted once (2026-10-01): the copy lacked the *.enc, .master-key, sqlite, k8s and pki lines,
   // so a build with webapp-deploy/ as its context would have re-opened SR-49.
