@@ -86,7 +86,7 @@ beforeAll(async () => {
       anthropic: [model("claude-alpha-only", "anthropic")],
       anthropicProbedAt: "2026-10-01T00:00:00.000Z",
     },
-    { tenantId: IDENTITY_A.tenantId },
+    { tenantId: IDENTITY_A.tenantId, organizationId: IDENTITY_A.orgId },
   );
   saveModelCache(
     {
@@ -94,7 +94,7 @@ beforeAll(async () => {
       openaiProbedAt: "2026-10-01T00:00:01.000Z",
       openaiError: "beta probe failed",
     },
-    { tenantId: IDENTITY_B.tenantId },
+    { tenantId: IDENTITY_B.tenantId, organizationId: IDENTITY_B.orgId },
   );
 }, ROUTER_IMPORT_BUDGET_MS);
 
@@ -187,7 +187,7 @@ describe("a hosted tenant that upgraded with a key and no cache row", () => {
   const rowFor = async (tenantId: string): Promise<boolean> => {
     const { db } = await import("@agentforge/db");
     return Boolean(
-      db.$client.prepare("SELECT 1 FROM tenant_state WHERE tenant_id = ? AND key = ?").get(tenantId, "model_cache"),
+      db.$client.prepare("SELECT 1 FROM tenant_state WHERE tenant_id = ? AND key LIKE ?").get(tenantId, "model_cache%"),
     );
   };
 
@@ -228,7 +228,9 @@ describe("a hosted tenant that upgraded with a key and no cache row", () => {
     );
     expect((saved as HostJsonResult).status).toBe(200);
     // ...and then the server upgrades: the key is on disk and the per-tenant cache row is not.
-    db.$client.prepare("DELETE FROM tenant_state WHERE tenant_id = ? AND key = ?").run(IDENTITY_C.tenantId, "model_cache");
+    db.$client
+      .prepare("DELETE FROM tenant_state WHERE tenant_id = ? AND key = ?")
+      .run(IDENTITY_C.tenantId, `model_cache:${IDENTITY_C.orgId}`);
     probeCount = 0;
     listed = ["upgrade-live-chat"];
   }, ROUTER_IMPORT_BUDGET_MS);

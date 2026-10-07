@@ -477,8 +477,10 @@ describe("the desk is exempt by construction", () => {
     // The stub runtime is the desk's open gate (Cloud, Playwright, the unit suites), and it stays
     // open: nothing lane B added may close a desk, and reaching for a plan here would throw.
     expect(
-      gate.requireGatewayAllowedFor({ tenantId: "local-tenant", workspaceId: "desk-a" }, { envRuntime: "stub" })
-        .allowed,
+      gate.requireGatewayAllowedFor(
+        { tenantId: "local-tenant", organizationId: "org-desk", workspaceId: "desk-a" },
+        { envRuntime: "stub" },
+      ).allowed,
     ).toBe(true);
   });
 });

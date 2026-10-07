@@ -1,6 +1,6 @@
 # Map — The per-tenant state backend and the wrap-key rotation drill
 
-Last verified: 2026-10-01, working tree over 0b61a29, not committed, for one added paragraph on the `model_cache` key (a tenant with a key and no row is refilled in the background; read from `selectable-models.ts`, proven by unit tests and `dispatch`, not driven). Before that, the same day, for the third key (`model_cache`, Enterprise BYOK Phase A) and every `tenant-state-store.ts` citation on this page, which had drifted by about nine lines. Everything else was last verified 2026-09-20 at a053245 + the Phase 4 branch `feat/web-phase4-tenant-secrets-rcbu9c` (through e37b3a1).
+Last verified: 2026-10-07 (review round), same tree, not committed, for the `model_cache` slot per company, the partner-verdict adoption and the unchanged-id rule in the table and the paragraph under it (read from `model-cache.ts`, `gateway-gate.ts` and `tenant-state-store.ts`, proven by `model-cache-companies.test.ts` and `gateway-gate-companies.test.ts`, not driven; the paragraph on `model_cache` below it still says "per tenant" in places and means the company). Before that: 2026-10-07, working tree over `726f369`, not committed, for one added paragraph on the company-scoped `gateway_gate` slot (SR-163; read from `tenant-state-store.ts` and `gateway-gate.ts`, proven by unit tests and `dispatch`, not driven; the three `tenant-state-store.ts` cites that this change moved were re-anchored, the others on this page were not). Before that: 2026-10-01, working tree over 0b61a29, not committed, for one added paragraph on the `model_cache` key (a tenant with a key and no row is refilled in the background; read from `selectable-models.ts`, proven by unit tests and `dispatch`, not driven). Before that, the same day, for the third key (`model_cache`, Enterprise BYOK Phase A) and every `tenant-state-store.ts` citation on this page, which had drifted by about nine lines. Everything else was last verified 2026-09-20 at a053245 + the Phase 4 branch `feat/web-phase4-tenant-secrets-rcbu9c` (through e37b3a1).
 
 ## Overview
 
@@ -27,7 +27,7 @@ export function tenantStateBackend(): TenantStateBackend {
 }
 ```
 
-`tenantStateBackend` (`packages/host/src/tenant-state-store.ts:331-333`) is resolved **per call**, not once
+`tenantStateBackend` (`packages/host/src/tenant-state-store.ts:368-370`) is resolved **per call**, not once
 at import. The test suites and `apps/web` both flip `AGENTFORGE_SERVER` after the module graph is loaded, and
 a backend frozen at import time would answer for the mode the process started in rather than the one it is
 in.
@@ -49,7 +49,25 @@ The map from key to desktop filename lives in one place,
 |---|---|---|
 | `settings` | `settings.enc` | `tenant_state(tenant_id, 'settings')` |
 | `gateway_gate` | `gateway-gate.json` | `tenant_state(tenant_id, 'gateway_gate')` |
-| `model_cache` | `models-cache.json` (listed, never used for a desk's cache) | `tenant_state(tenant_id, 'model_cache')` |
+| `model_cache` | `models-cache.json` (listed, never used for a desk's cache) | `tenant_state(tenant_id, 'model_cache:<organisation id>')`, one per company (SR-163 review round) |
+
+**`gateway_gate` is per company on the hosted server (SR-163, 2026-10-07).** `tenantId` is the white-label partner
+and every company of a deployment is an organisation inside it, so one `tenant_state(tenant_id, 'gateway_gate')` row
+per partner let company B's verdict replace company A's. On the server the verdict is stored in a slot narrowed to the
+company, `tenant_state(partner id, 'gateway_gate:<organisation id>')` (`TenantStateSlot` and `companyStateKey`,
+`packages/host/src/tenant-state-store.ts:83-91`): the foreign key to `tenants` still holds, the hosted erase still
+deletes every row of the partner, and no table or column is added. The file backend refuses such a slot
+(`statePath`, `:119-125`), the row backend does not adopt a legacy file into one (`:320`), and a desk never builds one.
+The partner-level `gateway_gate` row older builds wrote is left in place; since the SR-163 review round it is read in
+one case only (`loadVerdictFor`, `gateway-gate.ts`): a company whose own slot is empty adopts it, `lastOkAt`
+included, when its fingerprint equals the fingerprint of the key the company holds now, never for any other key.
+`model_cache` was narrowed to the company the same way in that round (`model_cache:<organisation id>`,
+`companyStateKey`, `modelCacheOwner` in `model-cache.ts`); the partner-level `model_cache` row older builds wrote is
+never read, because a catalogue probed with another company's key must not be adopted. `companyStateKey` uses the
+organisation id exactly as it is (a blank one is refused; two ids that differ only by whitespace are two slots).
+`settings` is still one row per partner, holding a slice per desk, so a company's desks are found through its
+organisation (`listLocalWorkspaces`), not through the payload (`saveKeysToDesks` and `clearGatewayKeyEverywhere(..,
+{ workspaceIds })` take the list). Map: [`settings-and-gateway-gate.md`](settings-and-gateway-gate.md).
 
 `model_cache` (2026-10-01, Enterprise BYOK Phase A) is **hosted only and bypasses the choice by mode**. It is the
 catalogue and probe result a tenant's own provider keys produced: plain JSON, no secret, so the wrap-key rotation
@@ -75,7 +93,7 @@ list against `TENANT_STATE_FILENAMES` so a payload that gains a file cannot be l
 
 ### The interface
 
-`TenantStateBackend` (`packages/host/src/tenant-state-store.ts:68-81`) is seven members:
+`TenantStateBackend` (`packages/host/src/tenant-state-store.ts:98-111`) is seven members (its key argument is a `TenantStateSlot` since SR-163, a `TenantStateKey` or that key narrowed to one company):
 
 | Member | Contract |
 |---|---|
@@ -149,7 +167,7 @@ store nobody backs up is the failure this whole module exists to prevent.
 Phase 3 shipped hosted tenants writing `tenants/<id>/settings.enc`. A server that upgrades with those files
 on its data volume must not read back an empty key and send the tenant to onboarding.
 
-`adoptLegacyFile` (`packages/host/src/tenant-state-store.ts:195-222`) runs on the first read for a tenant
+`adoptLegacyFile` (`packages/host/src/tenant-state-store.ts:230-257`) runs on the first read for a tenant
 that has no row: it copies the file's bytes into the row **verbatim** — the envelope is unchanged, so there
 is nothing to re-encrypt — and renames the file to `settings.enc.adopted` (`ADOPTED_SUFFIX`, `:57`).
 

@@ -68,6 +68,7 @@
   "reset.eraseAccountSubmit": "Hapus permanen akun perusahaan",
   "reset.eraseAccountWorking": "Menghapus…",
   "reset.eraseAccountForbidden": "Hanya pemilik perusahaan ini yang dapat menghapusnya. Minta pemilik untuk melakukannya.",
+  "reset.eraseAccountShared": "Server ini menampung beberapa perusahaan dalam satu akun, sehingga penghapusan dari sini akan menghapus semuanya. Belum ada yang dihapus. Minta operator server ini untuk menghapus perusahaan Anda.",
   "reset.eraseAccountDone": "Akun perusahaan sudah dihapus. Anda sedang dikeluarkan.",
   "storage.heading": "Penyimpanan",
   "storage.help": "Berapa banyak ruang yang dipakai akun ini, dan apa yang memakainya.",

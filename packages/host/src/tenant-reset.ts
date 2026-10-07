@@ -117,6 +117,20 @@ export const TENANT_RESET_FORBIDDEN_CODE = "tenant_reset_forbidden";
 export const TENANT_RESET_FORBIDDEN_MESSAGE =
   "Only an owner of this account can erase it. Ask an owner to do it.";
 
+/**
+ * SR-163, review round. A hosted tenant is the white-label partner, and the erase below is written
+ * against the partner: it deletes every organisation under it, every person and every session, every
+ * company's files, and clears every desk's key. With one company per partner that is "my company". With
+ * several (every SME of HYP AI is a company under one partner) the owner of company B would erase
+ * company A. Until the purge is scoped to one organisation (an owner decision, and a bigger change),
+ * a partner that holds more than one is refused here, before an audit row is opened or a byte is touched.
+ * Scoping the erase to one company is still owed.
+ */
+export const TENANT_RESET_SHARED_PARTNER_CODE = "tenant_erase_shared_partner";
+export const TENANT_RESET_SHARED_PARTNER_MESSAGE =
+  "This server holds several companies under one account, so an erase from here would delete all of them. " +
+  "Nothing has been deleted. Ask the operator of this server to erase this company.";
+
 export type TenantResetOutcome = {
   readonly ok: true;
   readonly auditId: string;
@@ -201,6 +215,20 @@ async function removeTenantRoot(sharedRoot: string, tenantId: string): Promise<v
   await rm(target.path, { recursive: true, force: true });
 }
 
+
+/**
+ * Throws `409 tenant_erase_shared_partner` when more than one organisation sits under this partner.
+ * Zero or one passes: one is the company asking, and zero is a second pass over an erase that already
+ * finished (the function is idempotent by design).
+ */
+function assertSinglePartnerCompany(tenantId: string): void {
+  const row = sql.prepare("SELECT count(*) AS n FROM organizations WHERE tenant_id = ?").get(tenantId) as {
+    n: number;
+  };
+  if (Number(row.n) > 1) {
+    throw new ApiError(TENANT_RESET_SHARED_PARTNER_CODE, TENANT_RESET_SHARED_PARTNER_MESSAGE, 409);
+  }
+}
 
 type AuditRow = {
   readonly id: string;
@@ -317,6 +345,9 @@ export async function resetTenant(
   // The local tenant's prefix is the whole store (lane D), so a mis-resolved id must hit a wall
   // here — before the audit row, before the transaction — rather than an `rm -rf`.
   assertPurgeableTenant(tenant.tenantId);
+  // SR-163: the purge below is the whole partner's. Refused here, before the audit row and before any
+  // delete, when the partner holds a second company.
+  assertSinglePartnerCompany(tenant.tenantId);
 
   const audit = openAudit(tenant);
   const totals = { rowsDeleted: 0, objectsDeleted: 0, bytesFreed: 0 };

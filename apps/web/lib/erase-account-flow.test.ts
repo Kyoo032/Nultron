@@ -11,6 +11,7 @@ import {
   ERASE_ACCOUNT_IDLE,
   canSubmitErase,
   eraseAccountReducer,
+  eraseFailureReasonOf,
   isErasePanelOpen,
   type EraseAccountState,
 } from "./erase-account-flow";
@@ -119,5 +120,22 @@ describe("the answer", () => {
   it("ignores an answer nobody asked for", () => {
     expect(eraseAccountReducer(ERASE_ACCOUNT_IDLE, { type: "succeeded" })).toBe(ERASE_ACCOUNT_IDLE);
     expect(eraseAccountReducer(ERASE_ACCOUNT_IDLE, { type: "failed", reason: "generic" })).toBe(ERASE_ACCOUNT_IDLE);
+  });
+});
+
+describe("which host refusals have words of their own", () => {
+  it("maps the two codes the screen explains, and everything else to the generic line", () => {
+    expect(eraseFailureReasonOf("tenant_reset_forbidden")).toBe("forbidden");
+    // SR-163: a server that holds several companies under one account refuses the erase.
+    expect(eraseFailureReasonOf("tenant_erase_shared_partner")).toBe("shared");
+    expect(eraseFailureReasonOf("invalid_request")).toBe("generic");
+    expect(eraseFailureReasonOf(undefined)).toBe("generic");
+  });
+
+  it("keeps the panel open on a shared-account refusal, so the sentence can be read", () => {
+    const erasing = run({ type: "open" }, { type: "type", text: ERASE_ACCOUNT_CONFIRM_WORD }, { type: "submit" });
+    const failed = eraseAccountReducer(erasing, { type: "failed", reason: "shared" });
+    expect(failed).toMatchObject({ step: "failed", reason: "shared", typed: "DELETE" });
+    expect(isErasePanelOpen(failed)).toBe(true);
   });
 });
