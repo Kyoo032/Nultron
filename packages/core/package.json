@@ -46,6 +46,7 @@
     "./meeting": "./src/meeting/index.ts",
     "./channels": "./src/channels/index.ts",
     "./channels/pinned": "./src/channels/pinned.ts",
+    "./chat-documents": "./src/chat-documents/index.ts",
     "./harness": "./src/harness/index.ts",
     "./images": "./src/images/harness.ts",
     "./documents": "./src/documents/source-check.ts",

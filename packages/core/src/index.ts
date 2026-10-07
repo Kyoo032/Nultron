@@ -190,6 +190,8 @@ export {
   blockedInjectionOutput,
   redactAttachedText,
   redactAttachedParts,
+  attachmentsAsMentions,
+  typedTextOf,
 } from "./security/injection-guard";
 export type { InjectionHit, InjectionSeverity } from "./security/injection-guard";
 export { isOpenRouterBaseUrl, openRouterZdrBody } from "./privacy/openrouter";

@@ -10,7 +10,7 @@ import { useBuddyTakesStatus } from "@/lib/desk-buddy-store";
 import { LETS_GO_MS, LIVE_TURN_NEXT, liveTurnMascot } from "@/lib/mascot-triggers";
 import { useBuddyClaim } from "@/lib/use-buddy-claim";
 import { useHoldOnMount } from "@/lib/use-hold-on-mount";
-import { jobEmbedsFromTools, splitUserFileBlocks } from "@/lib/message-embeds";
+import { fileCardDetail, jobEmbedsFromTools, splitUserFileBlocks } from "@/lib/message-embeds";
 import { collectToolMediaParts } from "@/lib/tool-media";
 import { ToolRowBody, isRichTool } from "@/components/tool-rows/tool-row";
 import { showsToolSpinner, toolActivityLabel, toolCallSummary } from "@/lib/tool-labels";
@@ -314,7 +314,13 @@ function UserPlain({ text }: { text: string }) {
             {segment.text}
           </p>
         ) : (
-          <MessageEmbed key={index} kind="file" title={segment.name} body={segment.body} />
+          <MessageEmbed
+            key={index}
+            kind="file"
+            title={segment.name}
+            detail={fileCardDetail(segment.notes)}
+            body={segment.body}
+          />
         ),
       )}
     </div>

@@ -18,6 +18,7 @@ import {
   hasModelVisibleContent,
   modelHistoryParts,
   redactAttachedParts,
+  attachmentsAsMentions,
   takeLastToolIo,
   resolvedGatewayBaseUrl,
   resolveProviderKeys,
@@ -304,7 +305,12 @@ export async function* startModalityRun(options: {
     };
     try {
       await insertMessage(options.tenant, thread.id, "user", userParts);
-      await setThreadTitleFromParts(options.tenant, thread.id, userParts);
+      // The title names an attached file, never starts with its text or the host's notes about it.
+      await setThreadTitleFromParts(
+        options.tenant,
+        thread.id,
+        userParts.map((part) => (part.type === "text" ? { ...part, text: attachmentsAsMentions(part.text) } : part)),
+      );
       const run = await insertRun(options.tenant, thread.id, published.version.id, options.modality);
       runId = run.id;
       if (settled) {
@@ -483,7 +489,9 @@ export async function* startModalityRun(options: {
             chatWorkCard({
               threadId: thread.id,
               title: fresh?.title ?? "",
-              userText,
+              // An attached file is named in the card, not carried into it: its text is in the person's
+              // own private desk copy, and this card is read from the desk-wide Knowledge Base.
+              userText: attachmentsAsMentions(userText),
               assistantText,
               model,
             }),
