@@ -79,8 +79,10 @@ export async function webSessionIsLive(
  * the credential (made in the e-mailed-code mode, or before an operator attached a password to an
  * existing person) would otherwise get past the forced change that every other way in is held to.
  * `account create` and `reset-password` both end the person's sessions, so this is the second line,
- * for whatever path leaves a live cookie next to `must_change`. In the default mode nothing here reads
- * the credentials table.
+ * for whatever path leaves a live cookie next to `must_change`. It is also read at the end of a fresh
+ * password sign-in (`completeSignIn`, `signedInOnActivate`), because a `reset-password` that lands after
+ * the password was proved has already ended the sessions that existed. In the default mode nothing here
+ * reads the credentials table.
  */
 export async function mustChangePasswordFirst(
   runtime: PortalRuntime,

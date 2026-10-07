@@ -24,6 +24,7 @@ import {
   exchangeCode,
   gatedHasher,
   makePerson,
+  markMustChange,
   postChange,
   postPassword,
   redirectedWith,
@@ -32,6 +33,7 @@ import {
   startPage,
   startPasswordPilot,
   type CountingHasher,
+  type GatedHasher,
   type PasswordPilot,
 } from "../testing/password-kit";
 import { createAgent, hiddenValue, type Reply } from "../testing/server";
@@ -956,7 +958,7 @@ describe("a lock is not a way to keep a named person out", () => {
 });
 
 describe("the sources and budgets in front of the sign-in", () => {
-  it("counts an IPv6 /64 as one source, and two IPv4 neighbours as two", async () => {
+  it("counts an IPv6 /56 as one source, whichever /64 of it an address is in, and two IPv4 neighbours as two", async () => {
     const hasher = countingHasher();
     const limited = await startPasswordPilot({
       passwordStepLimits: "production",
@@ -964,11 +966,12 @@ describe("the sources and budgets in front of the sign-in", () => {
       slug: "sources",
     });
     try {
-      // Twenty-one different addresses of one /64, each asking once about somebody else: the twenty-first
-      // is refused before it costs a derivation. Keyed on the whole address, none of them ever would be.
+      // Twenty-one different addresses, each in a /64 of its own and all inside one /56, each asking once
+      // about somebody else: the twenty-first is refused before it costs a derivation. Keyed on the whole
+      // address (or on the /64) none of them ever would be.
       const answered: number[] = [];
       for (let index = 1; index <= 21; index += 1) {
-        const agent = browserAt(limited.portal, `2001:db8:aaaa:1:${index.toString(16)}::${index.toString(16)}`);
+        const agent = browserAt(limited.portal, `2001:db8:aaaa:${index.toString(16)}:${index.toString(16)}::${index.toString(16)}`);
         const page = await startPage(agent, "state-v6");
         const hashedBefore = hasher.calls.dummy + hasher.calls.verify;
         const reply = await postPassword(agent, page, "state-v6", `ghost.six.${index}`, WRONG);
@@ -981,8 +984,14 @@ describe("the sources and budgets in front of the sign-in", () => {
       expect(answered.slice(0, 20).every((status) => status === 400)).toBe(true);
       expect(answered[20]).toBe(429);
 
-      // Another /64 is another source, and is not affected.
-      const elsewhere = browserAt(limited.portal, "2001:db8:aaaa:2::1");
+      // A /64 nobody in the loop used, inside the same /56, is the same source and is refused too.
+      const inside = browserAt(limited.portal, "2001:db8:aaaa:ff::1");
+      const insidePage = await startPage(inside, "state-v6c");
+      const insideReply = await postPassword(inside, insidePage, "state-v6c", "ghost.inside", WRONG);
+      expect(insideReply.status).toBe(429);
+
+      // Another /56 is another source, and is not affected.
+      const elsewhere = browserAt(limited.portal, "2001:db8:aaaa:100::1");
       const elsewherePage = await startPage(elsewhere, "state-v6b");
       expect((await postPassword(elsewhere, elsewherePage, "state-v6b", "ghost.elsewhere", WRONG)).status).toBe(400);
 
@@ -1152,6 +1161,150 @@ describe("a cookie is not a way past the forced change", () => {
       await attach.portal.close();
     }
   }, 120_000);
+});
+
+describe("a person who is flagged to change their password after the password was checked", () => {
+  // A sign-in is held inside its password comparison, the credential is flagged while it is held, and the
+  // sign-in is let go. The flag lands after the sign-in read the credential and before it ends: the window
+  // an operator's `reset-password` lands in, which ends the person's sessions at that moment, so a sign-in
+  // that is already past the password check would otherwise issue a fresh one behind it. The hash is not
+  // touched, because a real reset changes it and `recordSuccess` already refuses that one (SR-165, L2).
+  let gated: GatedHasher;
+  let held: PasswordPilot;
+
+  beforeAll(async () => {
+    gated = gatedHasher(createPasswordHasher());
+    held = await startPasswordPilot({ passwords: gated, slug: "flagged" });
+  }, 180_000);
+
+  afterAll(async () => {
+    await held?.portal.close();
+  });
+
+  /** Holds the sign-in `start` begins inside its comparison, does `flag` meanwhile, then lets it go. */
+  async function letGoAfter(start: () => Promise<Reply>, flag: (() => Promise<void>) | null): Promise<Reply> {
+    const open = gated.hold();
+    const pending = start();
+    try {
+      await gated.whenInside(1);
+      await flag?.();
+    } finally {
+      open();
+    }
+    return seen(await pending);
+  }
+
+  const codesIssuedTo = async (userId: string) =>
+    (await auditActions(held, "auth_code.issued")).filter((row) => row.actorUserId === userId);
+
+  async function startDeviceFor(installId: string) {
+    const started = await createAgent(held.portal.origin).postJson("/auth/device/code", {
+      install_id: installId,
+      tenant_hint: held.fixture.tenant.slug,
+      platform: "win32",
+      app_version: "0.16.0",
+      label: "Windows device",
+    });
+    return started.json<{ user_code: string }>();
+  }
+
+  async function activateSignIn(agent: ReturnType<typeof browserAt>, userCode: string, identifier: string) {
+    const page = await agent.get(`/activate?code=${userCode}`);
+    return () =>
+      agent.postForm("/activate/password", {
+        csrf_token: hiddenValue(page.text, "csrf_token") as string,
+        user_code: userCode,
+        identifier,
+        password: CHOSEN,
+      });
+  }
+
+  describe("on /authorize", () => {
+    it("is shown the change form and is issued no code and no cookie", async () => {
+      const person = await makePerson(held, { chosen: CHOSEN });
+      const agent = browserAt(held.portal);
+      const reply = await letGoAfter(
+        () => signInFresh(agent, "state-flagged", person.username, CHOSEN),
+        () => markMustChange(held, person.userId),
+      );
+
+      expect(reply.status).toBe(200);
+      expect(reply.location).toBeNull();
+      expect(redirectedWith(reply)).toBeNull();
+      expect(reply.text).toContain('action="/authorize/password/change"');
+      expect(reply.text).toContain('name="current_password"');
+      expect(reply.text).not.toContain("code=");
+      expect(agent.cookies.has(held.portal.runtime.cookies.session)).toBe(false);
+      expect(await codesIssuedTo(person.userId)).toHaveLength(0);
+
+      // And the form works: the change is made, and only then is there a session.
+      const next = "a-fresh-fake-password-5";
+      typed.push(next);
+      const done = seen(
+        await postChange(agent, reply, "state-flagged", { identifier: person.username, current: CHOSEN, next }),
+      );
+      expect(redirectedWith(done)?.state).toBe("state-flagged");
+      expect(agent.cookies.has(held.portal.runtime.cookies.session)).toBe(true);
+      expect(await codesIssuedTo(person.userId)).toHaveLength(1);
+    }, 90_000);
+
+    it("is signed in as usual when nothing flagged them while the sign-in was held", async () => {
+      const person = await makePerson(held, { chosen: CHOSEN });
+      const agent = browserAt(held.portal);
+      const reply = await letGoAfter(() => signInFresh(agent, "state-plain", person.username, CHOSEN), null);
+
+      expect(redirectedWith(reply)?.state).toBe("state-plain");
+      expect(agent.cookies.has(held.portal.runtime.cookies.session)).toBe(true);
+      expect(await codesIssuedTo(person.userId)).toHaveLength(1);
+    }, 90_000);
+  });
+
+  describe("on /activate", () => {
+    it("is shown the change form and is issued no cookie, and no Approve", async () => {
+      const person = await makePerson(held, { chosen: CHOSEN });
+      const started = await startDeviceFor("install-flagged-0001");
+      const agent = browserAt(held.portal);
+      const post = await activateSignIn(agent, started.user_code, person.username);
+      const reply = await letGoAfter(post, () => markMustChange(held, person.userId));
+
+      expect(reply.status).toBe(200);
+      expect(reply.text).toContain('action="/activate/password/change"');
+      expect(reply.text).toContain('name="current_password"');
+      expect(hiddenValue(reply.text, "user_code")).toBe(started.user_code);
+      expect(reply.text).not.toContain("Approve this device?");
+      expect(reply.text).not.toContain(person.email);
+      expect(agent.cookies.has(held.portal.runtime.cookies.session)).toBe(false);
+
+      // And the form works: the change is made, and only then is there a session and an Approve.
+      const next = "a-fresh-fake-password-6";
+      typed.push(next);
+      const approve = seen(
+        await agent.postForm("/activate/password/change", {
+          csrf_token: hiddenValue(reply.text, "csrf_token") as string,
+          user_code: started.user_code,
+          identifier: person.username,
+          current_password: CHOSEN,
+          new_password: next,
+          confirm_password: next,
+        }),
+      );
+      expect(approve.text).toContain("Approve this device?");
+      expect(agent.cookies.has(held.portal.runtime.cookies.session)).toBe(true);
+    }, 90_000);
+
+    it("is signed in as usual when nothing flagged them while the sign-in was held", async () => {
+      const person = await makePerson(held, { chosen: CHOSEN });
+      const started = await startDeviceFor("install-flagged-0002");
+      const agent = browserAt(held.portal);
+      const post = await activateSignIn(agent, started.user_code, person.username);
+      const reply = await letGoAfter(post, null);
+
+      expect(reply.status).toBe(200);
+      expect(reply.text).toContain("Approve this device?");
+      expect(reply.text).toContain(person.email);
+      expect(agent.cookies.has(held.portal.runtime.cookies.session)).toBe(true);
+    }, 90_000);
+  });
 });
 
 describe("secrets", () => {

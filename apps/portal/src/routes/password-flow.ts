@@ -10,7 +10,7 @@
  * spent BEFORE the account is looked up, whatever the outcome, so a refusal says nothing about the
  * account: 20 posts per 15 minutes per source, 10 per identifier per source (a real account or not), on
  * top of the per-IP page budget the door has already spent. A source is an IPv4 address or an IPv6
- * /64 (`sourceBucket`), so a network that owns 2^64 addresses is one source. The identifier budget is
+ * /56 (`sourceBucket`), so a network that owns 2^72 addresses is one source. The identifier budget is
  * per source on purpose: shared by all sources it would let anyone spend a named person's budget.
  * Behind them, `503` when eight sign-ins are already deriving (`PasswordHasher.admit`).
  *
@@ -123,6 +123,24 @@ function changeEntryResponse(
   );
 }
 
+/**
+ * The change screen for a person who has just proved their password and then turned out to owe a new one:
+ * the credential was flagged (`reset-password`) after the password check and before the sign-in ended, so
+ * the end of the sign-in (`completeSignIn`, `signedInOnActivate`) found `must_change` and issued nothing.
+ * The same screen the forced change opens on, with the identifier typed back and no error: the person did
+ * nothing wrong.
+ */
+export function changeRequiredResponse(
+  runtime: PortalRuntime,
+  context: RequestContext,
+  spec: PasswordSpec,
+  fields: Fields,
+): PortalResponse {
+  return changeEntryResponse(runtime, context, spec, {
+    identifier: boundedField(fields, "identifier", MAX_EMAIL_LENGTH) ?? "",
+  });
+}
+
 function refusalCopy(context: RequestContext, reason: PasswordRefusal): string {
   return context.t(`change.refusal.${reason}`, { min: PASSWORD_MIN_LENGTH, max: PASSWORD_MAX_LENGTH });
 }
@@ -133,7 +151,7 @@ function refusalCopy(context: RequestContext, reason: PasswordRefusal): string {
 
 /**
  * Where a request comes from, for everything the password sign-in counts: an IPv4 address as it is, an
- * IPv6 address as its /64 (`sourceBucket`). The password routes only -- `context.ipKey`, which the
+ * IPv6 address as its /56 (`sourceBucket`). The password routes only -- `context.ipKey`, which the
  * e-mailed-code limits count, is still the whole address.
  */
 function sourceOf(context: RequestContext): string {

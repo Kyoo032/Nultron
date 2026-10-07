@@ -27,13 +27,14 @@ import { errorBody, statusFor } from "../flows/reasons";
 import { OTP_TTL_MINUTES } from "../otp/send";
 import { verifyLoginOtp } from "../otp/verify";
 import { MAX_EMAIL_LENGTH } from "../flows/authorize";
-import { liveWebSessionUser, webSessionCookieFor } from "../flows/web-session";
+import { liveWebSessionUser, mustChangePasswordFirst, webSessionCookieFor } from "../flows/web-session";
 import { boundedField, stringField } from "../security/body";
 import { htmlResponse } from "../security/headers";
 import type { PortalRequest, PortalResponse, PortalRoute } from "../server";
 import type { DeviceCode } from "../store/types";
 import { approvePage, outcomePage, userCodePage, type AccountBanner } from "../views/pages";
 import {
+  changeRequiredResponse,
   handleChangeStep,
   handlePasswordStep,
   passwordEntryResponse,
@@ -291,6 +292,12 @@ async function activatePost(
  * What follows a person who is in on the device-code page: the portal's own session cookie, then
  * Approve / Deny -- exactly what a verified e-mailed code leads to (`postVerify`). The seat and the
  * rest of the login gate are checked when the device is approved, as they are in the other mode.
+ *
+ * A person whose credential was flagged for a forced change after the password was proved (an operator's
+ * `reset-password` landed in between, and has already ended the sessions that existed) gets the change
+ * screen and no cookie: the one this would mint would outlive the reset. The read is the one the resumed
+ * cookie is held to (`mustChangePasswordFirst`), made in the transaction that mints the cookie, and in
+ * the other mode it reads nothing.
  */
 async function signedInOnActivate(
   runtime: PortalRuntime,
@@ -301,14 +308,20 @@ async function signedInOnActivate(
   // The session cookie is the response's one Set-Cookie, so the CSRF token already in the
   // browser is reused rather than reminted.
   const csrf = ensureCsrf(runtime, context);
-  const cookie = await runtime.store.tx(signedIn.tenantId, (ops) =>
-    webSessionCookieFor(runtime, ops, {
+  const cookie = await runtime.store.tx(signedIn.tenantId, async (ops) => {
+    if (await mustChangePasswordFirst(runtime, ops, signedIn.user.id)) {
+      return null;
+    }
+    return webSessionCookieFor(runtime, ops, {
       tenantId: signedIn.tenantId,
       userId: signedIn.user.id,
       orgId: signedIn.user.orgId,
       installId: `web-client-activate-${signedIn.user.id}`,
-    }),
-  );
+    });
+  });
+  if (cookie === null) {
+    return changeRequiredResponse(runtime, context, flow.password, flow.fields);
+  }
 
   const account = accountFor(signedIn.user.email, csrf.token);
   if (pending && pending.tenantId === signedIn.tenantId) {
