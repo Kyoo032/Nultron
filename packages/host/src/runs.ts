@@ -1,6 +1,6 @@
 import {
   assertAgentSupportsModality,
-  assertModelSupportsModality,
+  assertChatModelAcceptsModality,
   createRuntime,
   encodeSse,
   harnessSpecFor,
@@ -18,8 +18,6 @@ import {
   modelHistoryParts,
   redactAttachedParts,
   takeLastToolIo,
-  resolvedGatewayBaseUrl,
-  resolveProviderKeys,
   type ContentPart,
   type InputModality,
   type TenantContext,
@@ -53,7 +51,7 @@ import { recordChatRunUsage } from "./usage-record";
 import { loadSettings, loadUserLocale } from "./settings-store";
 import { defaultSelectableModel, listSelectableModels } from "./selectable-models";
 import { collectToolMediaParts } from "./tool-media";
-import { inlineLocalMediaParts, shouldInlineLocalMediaForProvider } from "./inline-local-media";
+import { assertChatImagesSendable, prepareChatImageHistory, type ChatTurn } from "./chat-image-history";
 import { saveGeneratedImage, saveGeneratedVideo } from "./media";
 import { getRunContext, hostedRequestLocale, localeForRun, withRunContext } from "./run-context";
 import { withToolRun } from "./tool-run-context";
@@ -174,7 +172,9 @@ export async function* startModalityRun(options: {
     systemPrompt: withChatOutputLanguage(published.version.systemPrompt + pastHint + knowledge.prompt, locale),
   };
   assertAgentSupportsModality(published.version.inputModalities, options.modality);
-  assertModelSupportsModality(version.model, options.modality);
+  // An image goes to any model not known to be text-only; a model we have no line for is tried, and
+  // refused by the gateway in words if it cannot (`chat-image-history.ts`, `image-input.ts`).
+  assertChatModelAcceptsModality(version.model, options.modality);
 
   const queue = new StringQueue();
   let queueClosed = false;
@@ -289,6 +289,9 @@ export async function* startModalityRun(options: {
       return true;
     };
     try {
+      // A picture that cannot be sent is refused before the message is stored, so the refusal does not
+      // leave a bubble with no answer. This reads each image's row, not its bytes; the run reads those.
+      await assertChatImagesSendable(options.tenant, userParts, { locale });
       await insertMessage(options.tenant, thread.id, "user", userParts);
       await setThreadTitleFromParts(options.tenant, thread.id, userParts);
       const run = await insertRun(options.tenant, thread.id, published.version.id, options.modality);
@@ -299,10 +302,7 @@ export async function* startModalityRun(options: {
         return;
       }
       const historyRows = await listMessages(options.tenant, thread.id);
-      const inlineLocal = shouldInlineLocalMediaForProvider(
-        resolveProviderKeys(settings).openaiBaseUrl || resolvedGatewayBaseUrl(),
-      );
-      const history: Array<{ role: "user" | "assistant"; parts: ContentPart[] }> = [];
+      const storedHistory: ChatTurn[] = [];
       for (const row of historyRows) {
         if (row.role !== "user" && row.role !== "assistant") {
           continue;
@@ -311,15 +311,11 @@ export async function* startModalityRun(options: {
         if (row.role === "assistant" && !hasModelVisibleContent(parts)) {
           continue;
         }
-        const historyParts = modelHistoryParts(parts);
-        history.push({
-          role: row.role as "user" | "assistant",
-          parts:
-            row.role === "user" && inlineLocal
-              ? await inlineLocalMediaParts(options.tenant, historyParts)
-              : historyParts,
-        });
+        storedHistory.push({ role: row.role as "user" | "assistant", parts: modelHistoryParts(parts) });
       }
+      // Images leave as bytes, within one budget, or the person is told why they cannot. A stored
+      // `/api/v1/media/...` reference is never handed on: no remote model can open it.
+      const history = await prepareChatImageHistory(options.tenant, storedHistory, { model, locale });
       const runtime = createRuntime(settings);
       send({ type: "run.started", runId: run.id });
 

@@ -62,7 +62,13 @@
     "sending": "Sending…",
     "thinking": "Thinking",
     "imageCaption": "What is in this image?",
-    "videoCaption": "Summarize this video."
+    "videoCaption": "Summarize this video.",
+    "imageNote": {
+      "no": "{model} can't read images. Switch to a model that can, or remove the image.",
+      "unknown": "We can't confirm that {model} reads images. The image is sent anyway. If {model} can't read it, you will see an error.",
+      "switch": "Use {model}"
+    },
+    "videoNote": "Models can't watch video in Chat yet. The video stays in this chat, but only your words go to the model."
   },
   "thinking": {
     "none": "Off",

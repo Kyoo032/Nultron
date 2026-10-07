@@ -13,6 +13,7 @@ import { createPortal } from "react-dom";
 import { formatContextLength, pickerGroups, type PickerGroup } from "@agentforge/core/preferred";
 import { isThinkingModel } from "@agentforge/core/curation";
 import { t } from "@/lib/i18n";
+import { inputTags } from "@/lib/composer-image-support";
 import { pickerGroupLabel } from "@/lib/picker-group-label";
 import { placePickerPanel, viewportBounds, type PickerPanelPos } from "@/lib/picker-panel";
 import { isInHiddenPane } from "@/lib/shortcut-target";
@@ -46,9 +47,8 @@ type FlatEntry = {
 /** A group as core sends it: a stable kind plus an English label. The words are `pickerGroupLabel`'s. */
 type DisplayGroup = PickerGroup<ChatModel>;
 
-function modalityTags(mods: string[]): string[] {
-  const extra = mods.filter((m) => m !== "text");
-  return extra.length > 0 ? extra : [];
+function modalityTags(model: ChatModel): string[] {
+  return inputTags(model);
 }
 
 function displayName(model: ChatModel): string {
@@ -297,7 +297,7 @@ export function ModelPicker({ models, value, onChange, disabled, returnFocusRef 
     const flatIndex = flat.findIndex((e) => e.model.id === model.id);
     const isActive = flatIndex === highlight;
     const isSelected = model.id === selectedId;
-    const tags = modalityTags(model.inputModalities);
+    const tags = modalityTags(model);
     const name = displayName(model);
     return (
       <li

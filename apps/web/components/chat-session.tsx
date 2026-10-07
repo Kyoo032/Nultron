@@ -26,6 +26,7 @@ import { collectToolMediaParts } from "@/lib/tool-media";
 import { notifyThreadsChanged } from "@/lib/threads-events";
 import { apiFetch } from "@/lib/api-client";
 import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
+import { chatModalities } from "@/lib/composer-image-support";
 import {
   pickChatModel,
   readLastChatModel,
@@ -189,12 +190,7 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
   }
 
   const selectedModel = models.find((model) => model.id === modelId);
-  const modalities = useMemo(() => {
-    const modelMods = selectedModel?.inputModalities ?? ["text"];
-    return ["text", "image", "video"].filter(
-      (modality) => agentModalities.includes(modality) && modelMods.includes(modality),
-    );
-  }, [agentModalities, selectedModel]);
+  const modalities = useMemo(() => chatModalities(agentModalities, selectedModel), [agentModalities, selectedModel]);
 
   function chatPath() {
     return agentId ? `/agents/${agentId}` : "/chat";

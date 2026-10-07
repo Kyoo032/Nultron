@@ -255,9 +255,18 @@ export {
 export {
   getModelModalities,
   assertModelSupportsModality,
+  assertChatModelAcceptsModality,
   assertAgentSupportsModality,
   RUN_PATHS,
 } from "./models/capabilities";
+export { modelImageInput, type ImageInputSupport } from "./models/image-input";
+export {
+  EARLIER_IMAGE_NOT_VISIBLE_NOTE,
+  VIDEO_NOT_VISIBLE_NOTE,
+  imageRemoteLinkMessage,
+  imageUnreadableMessage,
+  imagesTooLargeMessage,
+} from "./content/image-copy";
 export {
   usesSeedanceVideoWire,
   videoCapabilities,

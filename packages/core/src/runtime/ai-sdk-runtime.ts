@@ -48,7 +48,7 @@ import {
   withoutReasoningEffort,
 } from "../models/reasoning-effort";
 import type { ReasoningEffort } from "../models/reasoning-effort";
-import { parseAppLocale } from "../locale";
+import { parseAppLocale, type AppLocale } from "../locale";
 import { isServerMode, providerEnv } from "../server-mode";
 import { providerBaseUrl } from "../providers/registry";
 import { directProviderFetch, refuseKeyRedirect, withKeyRedirectPolicy } from "./key-redirect";
@@ -58,10 +58,12 @@ import { abortErrorMessage, armStreamWatchdog, watchAsyncIterable } from "./stre
 import { readLanguageModelUsage, addTokenUsage } from "../gateway/account";
 import type { AgentRuntime, RunUsage } from "./types";
 import {
+  historyHasImage,
   imagePartForProvider,
   rewriteUnreachableMediaInJson,
   scrubUnreachableMediaArgs,
 } from "../content/provider-media";
+import { VIDEO_NOT_VISIBLE_NOTE } from "../content/image-copy";
 import {
   applyZeroRetention,
   isResponsesRequestUrl,
@@ -90,6 +92,7 @@ export function mergeOpenRouterZdr(body: unknown, baseUrl: string): unknown {
 function toCoreMessages(
   systemPrompt: string,
   history: Array<{ role: "user" | "assistant"; parts: ContentPart[] }>,
+  locale: AppLocale,
 ): CoreMessage[] {
   const messages: CoreMessage[] = [{ role: "system", content: systemPrompt }];
   for (const item of history) {
@@ -106,12 +109,10 @@ function toCoreMessages(
         return { type: "text" as const, text: part.text };
       }
       if (part.type === "image_url") {
-        return imagePartForProvider(part.image_url.url);
+        return imagePartForProvider(part.image_url.url, locale);
       }
-      return {
-        type: "text" as const,
-        text: "[Video attached in the local app. It is already shown to the user.]",
-      };
+      // No wire here carries video. The model is told so, never that a video is "attached".
+      return { type: "text" as const, text: VIDEO_NOT_VISIBLE_NOTE };
     });
     messages.push({ role: "user", content });
   }
@@ -212,8 +213,9 @@ export class AiSdkRuntime implements AgentRuntime {
     // One place turns a gateway 4xx/5xx into words: app-locale headline, upstream text to the log.
     // The raw body rides on the error (never in its message) so the runtime can tell when the gateway
     // refused the Thinking parameter and retry with a safer one.
+    const carriesImage = historyHasImage(input.history);
     const gatewayFailure = (status: number, text: string): Error => {
-      const failure = gatewayHttpFailure(status, text, runLocale);
+      const failure = gatewayHttpFailure(status, text, runLocale, { carriesImage });
       if (failure.detail && failure.detail !== failure.message) {
         console.warn(`gateway: HTTP ${status} ${redactSecrets(failure.detail).slice(0, 300)}`);
       }
@@ -466,7 +468,7 @@ export class AiSdkRuntime implements AgentRuntime {
       });
     }
 
-    const messages = toCoreMessages(input.version.systemPrompt, input.history);
+    const messages = toCoreMessages(input.version.systemPrompt, input.history, parseAppLocale(input.locale));
     const hasTools = Object.keys(tools).length > 0;
     let activeModel = model;
     let wire = openaiWire?.wire;

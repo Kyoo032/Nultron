@@ -20,6 +20,8 @@ import { getLocale, t } from "@/lib/i18n";
 import { readComposerDraft, writeComposerDraft } from "@/lib/composer-draft";
 import { useWorkspaceScope } from "@/lib/workspace-scope";
 import { NeedsKeyNote } from "@/components/needs-key-note";
+import { ComposerAttachmentNotes } from "@/components/composer-attachment-notes";
+import { imageRefusalMessage } from "@/lib/composer-image-support";
 import { gatewayBlockedMessage, hostedGatewayBlocked } from "@/lib/gateway-blocked";
 import { hostedKeyBlock, useDeskNeedsKey } from "@/lib/use-desk-needs-key";
 
@@ -234,6 +236,13 @@ export function ChatComposer({
     setBusy(false);
     setError(null);
   }
+  const [shownModel, setShownModel] = useState(model);
+  if (shownModel !== model) {
+    // The sentence under the box may be the refusal written for the model that was picked ("cannot read
+    // images"). Choosing another, from the picker or the button under the attachment, makes it stale.
+    setShownModel(model);
+    setError(null);
+  }
 
   useEffect(() => {
     writeComposerDraft(workspaceId, { text, files });
@@ -365,7 +374,7 @@ export function ChatComposer({
       }
 
       if (decision.route === "image" && !modalities.includes("image")) {
-        setError(t("chat.error.noImageInput"));
+        setError(imageRefusalMessage(model, pickerModels));
         setBusy(false);
         return;
       }
@@ -612,6 +621,12 @@ export function ChatComposer({
           ))}
         </ul>
       ) : null}
+      <ComposerAttachmentNotes
+        kinds={files.map((item) => item.kind)}
+        model={model}
+        models={pickerModels}
+        onSwitch={showPicker ? onModelChange : undefined}
+      />
       {error && !(keyBlocked && error === gatewayBlockedMessage()) ? (
         <p className="mt-2 text-sm text-[var(--danger)]" data-testid="composer-error" role="alert">
           {error}
