@@ -35,7 +35,7 @@ The owner split the product, then still called DPSBuddy, into two products on 20
 | What it is | The Mac/Windows Nultron app | The hosted multi-user web app |
 | Shell | Electron (`apps/desktop`), packaged IPC, **no HTTP port** | Express (`apps/web/server.ts`) behind a reverse proxy |
 | Data | On the user's machine, SQLite in the user data dir | Per-tenant, on Rizky's server |
-| Account | A pasted gateway key is the floor | Portal sign-in (one-time code); the pasted key stays the floor for model calls |
+| Account | A pasted gateway key is the floor | Portal sign-in (one-time code; username and password on HYP AI only, since 2026-10-07); the pasted key stays the floor for model calls |
 | Ships by | `pnpm desktop:build` → installers on `Kyoo032/Nultron` | `node scripts/release-web.mjs` → a private image `ghcr.io/kyoo032/nultron-ent:<tag>` plus a deploy bundle (pinned `compose.yml`, `.env.example`, `DEPLOY.md`, `Caddyfile`) and a GitHub Release on `Kyoo032/NultronEnt`; each deploy is logged by commit sha |
 | Version | Semver — **0.16.0** is the current cut (the first Nultron-named installer) | No version number |
 | Entry point | the installer | the hosted URL |
@@ -179,9 +179,9 @@ Until Rizky lifts it, work is limited to three things, in this order:
 **Git.** `main` is local only and not pushed. Check `git log --oneline -15` for the merges. Full local CI was green on `0d829f0`.
 
 **In flight (see the lane notes).**
-- The per-company gateway key check: fixed in `C:\Users\rizky\agentforge-limits`, under independent review, not committed.
-- The portal's username and password sign-in for HYP AI: being built in `C:\Users\rizky\agentforge-chatdocs` on `feat/portal-password-signin`. It needs an independent security review before it is merged.
-- The HYP AI bundle rebuild in `C:\Users\rizky\hypey`. It needs one more pass after the two items above.
+- The per-company gateway key check: reviewed, fixed and merged into `main` as `24fb47c9` (evening). Not driven on a hosted server.
+- The portal's username and password sign-in for HYP AI: built in `C:\Users\rizky\agentforge-chatdocs` on `feat/portal-password-signin`, uncommitted. The independent security review said ship after named fixes (no critical or high). A worker was applying them in the evening; then commit by path and merge.
+- The HYP AI bundle in `C:\Users\rizky\hypey`: `out\hyp-2026.10.07.2` is the e-mail-code build and is NOT the one to install. The password-mode pass (tooling switch, sync, rebuild, three-person rehearsal) was started in the evening.
 
 **Ready to install HYP AI means:** both fixes merged, the bundle rebuilt in password mode with `check.mjs` passing, and the rehearsal exiting 0 with three people signing in by username and password. Then tell Rizky. On the server each step needs his go: the load test, the install, the three accounts.
 
@@ -438,7 +438,7 @@ Read this before any work on onboarding, Settings, `/api/v1/settings`, keys, or 
 
 **Decisions Rizky has not made — do not assume an answer in code or copy:** offline grace length (7 days is the draft), whether a pasted key beats a live session, seat reclamation after 30 idle days, where BYO-key spend is billed (schema open question 7 / login doc open question 9 — there is no per-user wallet), and a per-device keypair (v1.1, needs a shell change). Payment provider (Xendit / Paddle / Stripe) is still undecided, which is why the webhook is provider-neutral. **Answered on 2026-09-21, do not re-open in code:** every tier name, price, seat cap and number is a placeholder in one config file, and there is **no token allowance** — see Phase 9 below. The "20-seat free tier" above is a draft number of that kind, not a rule.
 
-Product rules for the client stay as before: no password, no Better Auth, no “join Harbor State”. Mail and sessions belong to the portal, not to a package inside `apps/web`. Everything local still works without the portal.
+Product rules for the client stay as before: no password, no Better Auth, no “join Harbor State”. (The portal's password mode for HYP AI, 2026-10-07, is a portal mode; the client still holds no password.) Mail and sessions belong to the portal, not to a package inside `apps/web`. Everything local still works without the portal.
 
 ## Phase 9 — portal login and pricing (in progress, 2026-09-21)
 
