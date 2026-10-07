@@ -6,6 +6,7 @@ import { extractText } from "./knowledge-extract";
 import { getKnowledgeModels, markSourceFailed, nextCreatedAt, type SourceOriginKind } from "./knowledge";
 import { embedTextsWithModel } from "./knowledge-embed";
 import { CHUNK_OVERLAP, chunkKnowledgeText, ftsSourceFilter } from "./knowledge-text";
+import { andVisibleSource } from "./knowledge-visibility";
 import { tenantMediaRoot } from "./media-root";
 import { tenantDataDir } from "./tenant-paths";
 import { log } from "./log";
@@ -82,12 +83,15 @@ function warn(what: string, error: unknown): void {
 
 function sourceRow(tenant: TenantContext, sourceId: string): ReindexRow | null {
   try {
+    // Hosted: a colleague's Chat card is not this person's to re-read, and the outcome of trying
+    // (its name, its type) would name it. It is answered as a source that is not there.
+    const visible = andVisibleSource(tenant);
     const row = sql
       .prepare(
         `SELECT id, name, type, status, origin_kind, origin_id
-         FROM knowledge_sources WHERE workspace_id = ? AND id = ?`,
+         FROM knowledge_sources WHERE workspace_id = ? AND id = ?${visible.sql}`,
       )
-      .get(tenant.workspaceId, sourceId) as ReindexRow | undefined;
+      .get(tenant.workspaceId, sourceId, ...visible.params) as ReindexRow | undefined;
     return row ?? null;
   } catch (error) {
     warn(`${sourceId} could not be read`, error);
@@ -322,12 +326,13 @@ export async function reindexSource(tenant: TenantContext, sourceId: string): Pr
 export async function reindexWorkspace(tenant: TenantContext): Promise<WorkspaceReindex> {
   let ids: string[] = [];
   try {
+    const visible = andVisibleSource(tenant);
     const rows = sql
       .prepare(
-        `SELECT id FROM knowledge_sources WHERE workspace_id = ? AND status = 'Indexed'
+        `SELECT id FROM knowledge_sources WHERE workspace_id = ? AND status = 'Indexed'${visible.sql}
          ORDER BY created_at ASC, id ASC`,
       )
-      .all(tenant.workspaceId) as Array<{ id: string }>;
+      .all(tenant.workspaceId, ...visible.params) as Array<{ id: string }>;
     ids = rows.map((row) => row.id);
   } catch (error) {
     warn("workspace sweep could not list sources", error);

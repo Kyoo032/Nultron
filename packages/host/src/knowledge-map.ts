@@ -15,9 +15,10 @@ import {
 } from "@agentforge/core";
 import { sql } from "@agentforge/db";
 import { collectJobAssistantText } from "./job-regen";
-import { getKnowledgeModels, listSources, putKnowledgeModels } from "./knowledge";
+import { getKnowledgeModels, listMappableSources, putKnowledgeModels } from "./knowledge";
 import { reembedWorkspaceChunks } from "./knowledge-embed";
 import { projectMapToGraph } from "./knowledge-graph";
+import { chatCardsArePrivate, MAP_SCOPE_KEY, SHARED_MAP_SCOPE } from "./knowledge-visibility";
 import { loadSettings } from "./settings-store";
 import { localeForRun } from "./run-context";
 import { log } from "./log";
@@ -34,6 +35,10 @@ function isSavedMap(value: unknown): value is KnowledgeMap {
 /**
  * The last map that finished. A row that is `Mapping` or `Failed` still carries it (see `markMap`),
  * so the desk keeps its map while a re-map runs and after one fails.
+ *
+ * Hosted, only a map saved with the shared-scope marker is read; one saved before the marker existed
+ * is "no map" until the desk maps again, because its topics and overview were written from every
+ * person's Chat (`knowledge-visibility.ts`). The marker is never returned to the renderer.
  */
 export function getKnowledgeMap(tenant: TenantContext): KnowledgeMap | null {
   const row = sql.prepare("SELECT payload FROM knowledge_maps WHERE workspace_id = ?").get(workspaceId(tenant)) as
@@ -44,13 +49,22 @@ export function getKnowledgeMap(tenant: TenantContext): KnowledgeMap | null {
   }
   try {
     const parsed: unknown = JSON.parse(row.payload);
-    return isSavedMap(parsed) ? parsed : null;
+    if (!isSavedMap(parsed)) {
+      return null;
+    }
+    if (!chatCardsArePrivate()) {
+      return parsed;
+    }
+    const { [MAP_SCOPE_KEY]: scope, ...map } = parsed as KnowledgeMap & { [MAP_SCOPE_KEY]?: unknown };
+    return scope === SHARED_MAP_SCOPE ? map : null;
   } catch {
     return null;
   }
 }
 
 function saveMap(tenant: TenantContext, map: KnowledgeMap): void {
+  // Hosted: stamped as built from shared sources only. Off server mode the blob is what it always was.
+  const stored = chatCardsArePrivate() ? { ...map, [MAP_SCOPE_KEY]: SHARED_MAP_SCOPE } : map;
   sql
     .prepare(
       `INSERT INTO knowledge_maps (workspace_id, payload, status, error, created_at)
@@ -61,7 +75,7 @@ function saveMap(tenant: TenantContext, map: KnowledgeMap): void {
          error = excluded.error,
          created_at = excluded.created_at`,
     )
-    .run(workspaceId(tenant), JSON.stringify(map), Date.now());
+    .run(workspaceId(tenant), JSON.stringify(stored), Date.now());
 }
 
 /**
@@ -96,11 +110,11 @@ export async function takeKnowledgeMapText(
 }
 
 function knownSourceIds(tenant: TenantContext): Set<string> {
-  return new Set(listSources(tenant).map((source) => source.id));
+  return new Set(listMappableSources(tenant).map((source) => source.id));
 }
 
 function sourceExcerpts(tenant: TenantContext): Array<{ id: string; name: string; excerpt: string }> {
-  const sources = listSources(tenant);
+  const sources = listMappableSources(tenant);
   return sources.map((source) => {
     const row = sql
       .prepare(
@@ -143,7 +157,7 @@ export async function mapKnowledge(
       envRuntime: process.env.AGENTFORGE_RUNTIME,
     });
 
-    const sources = listSources(tenant).map((source) => ({ id: source.id, name: source.name }));
+    const sources = listMappableSources(tenant).map((source) => ({ id: source.id, name: source.name }));
     let map: KnowledgeMap | null;
 
     const accept = (raw: string): KnowledgeMap | null => {

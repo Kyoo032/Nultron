@@ -98,6 +98,15 @@ Extended on 2026-10-06 with [SR-140](#sr-140): the desk-file download route and 
 by the change that lets Chat hand a person a real file. Read in the `agentforge-deck` worktree (uncommitted, on
 `6105c5c`); nothing in it is driven in a browser or on the hosted box.
 
+Extended on 2026-10-07 with [SR-155](#sr-155) … [SR-162](#sr-162) by the hosted team-privacy lane: what a
+company's people can see of, and do to, one another on the one desk they share on the hosted server. Two
+fixes are in the tree and tested ([SR-155](#sr-155), [SR-156](#sr-156)); one finding is open and needs the
+owner ([SR-157](#sr-157)); the rest record what was left alone, what was decided and what was checked.
+Every `file:line` was read in the working tree on top of `main` (`6105c5c`) on 2026-10-07, and the fixes
+are uncommitted. Nothing was driven on a running hosted server. The tests run the host's own handlers and
+queries over a throwaway database with three people of one company on one desk; the browser half of
+[SR-156](#sr-156) is a unit test over rendered markup, not a drive.
+
 ## Summary
 
 | ID | Severity | Title | Status | Gate |
@@ -121,6 +130,7 @@ by the change that lets Chat hand a person a real file. Read in the `agentforge-
 | [SR-67](#sr-67) | High | An Edit generate job ran as whatever tenant its stored request named | Fixed, not driven (2026-09-23) | Blocks Tencent deploy |
 | [SR-88](#sr-88) | High | Every first-time hosted sign-in became an owner, so any colleague could erase the company | Fixed, driven on local k8s (2026-10-01); not hosted | Blocks Tencent deploy until the role-sending portal is deployed first |
 | [SR-102](#sr-102) | High | `pnpm ci:local` reported the portal suite as a pass when its Postgres could not start and no test ran | Fixed (2026-10-01), tested | — |
+| [SR-155](#sr-155) | High | Hosted: on a desk shared by a company's people, any member could read every colleague's Chat through the Knowledge Base (Sources list, search, Chat's prompt, `knowledge_search`, graph, map, reindex), because sources were read by desk and not by person | Fixed in tree (2026-10-07), tested with three people of one company; not driven on a running hosted server | Blocks a multi-person hosted pilot until driven |
 | [SR-21](#sr-21) | Medium | The portal's 30-day browser session cannot be ended: signing out of the app leaves it, and the next sign-in skips the OTP entirely | Fixed-unverified, fix pass X | Blocks Tencent deploy |
 | [SR-48](#sr-48) | Medium | A failed ffmpeg run returned the full argv and raw stderr — absolute paths inside the data dir — to the client | Fixed-unverified, fix pass Y | Blocks Tencent deploy |
 | [SR-42](#sr-42) | Medium | `GET /tenant/config` had no rate limiter and told an anonymous caller which tenant slugs exist | Fixed-unverified, fix pass X | Blocks Tencent deploy |
@@ -171,6 +181,8 @@ by the change that lets Chat hand a person a real file. Read in the `agentforge-
 | [SR-132](#sr-132) | Medium | The release Caddyfile's deferred header block may replace an artifact's `sandbox` CSP with the app CSP | Open: reasoned from Caddy's docs, not driven (2026-10-06) | Blocks Tencent deploy (Enterprise) |
 | [SR-133](#sr-133) | Medium | The app.nultron-ai.xyz preview runs production without server mode, behind Basic Auth and a Caddy Origin rule | Accepted by the owner (2026-10-06): password-gated shared desk | Preview only |
 | [SR-138](#sr-138) | Medium | One signed-in account could hold any number of model runs open: the limiters count requests, nothing counted runs | Fixed in tree (2026-10-06), tested through the router and the HTTP adapter: every gateway-calling route holds a slot or is on a written list; in memory, per process; not driven on a hosted instance | Blocks Tencent deploy until driven there |
+| [SR-156](#sr-156) | Medium | Hosted: any signed-in member could delete a desk of the company, and with it every person's chats and the desk's Knowledge Base | Fixed in tree (2026-10-07), tested, renderer hides the button; not driven | Blocks a multi-person hosted pilot until driven |
+| [SR-157](#sr-157) | Medium | Hosted: stored media (pictures, clips, audio) is read, listed and deleted by company, not by person, so a colleague's picture can be fetched by its id, listed in the Images and Videos galleries, and sent to a model by a job | Open: nothing changed, because scoping by person breaks shared reads the product relies on; needs an owner decision (2026-10-07) | Blocks "Chat attachments are private to the person who attached them" |
 | [SR-81](#sr-81) | Low | Keyless Research search sends the masked query to four pinned public APIs | Checked, not an issue (2026-09-26) | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
@@ -227,6 +239,8 @@ by the change that lets Chat hand a person a real file. Read in the `agentforge-
 | [SR-140](#sr-140) | Low | Desk file download serves model- and person-written text from the app's origin, and Chat's `build_deck` stores a model-written Office file that the artifact route serves | Fixed in tree, tested, review fixes applied 2026-10-07 (schema no longer ends the turn, XML-illegal characters removed, saved artifacts counted in hosted storage, packaged save failure shown); not driven in a browser or behind the hosted proxy | Re-check on the hosted box with [SR-132](#sr-132) before the Tencent deploy |
 | [SR-145](#sr-145) | Low | A new upload route runs the native document reader on a file from the Chat composer (both products), and an attachment is untrusted text in a person's message | Fixed in tree, tested at unit level; not driven (2026-10-07; the two High review findings are fixed) | None; drive it before the next cut that carries it |
 | [SR-150](#sr-150) | Low | Chat now sends the pixels of an attached image to the gateway, and the personal-data masker cannot see inside a picture | Open, accepted for the beta (2026-10-06). Review 2026-10-07: link refusal and media-kind check fixed in tree; colleague media and job `https://` attachments recorded, open | None for the beta; colleague media belongs to the hosted team-privacy work |
+| [SR-158](#sr-158) | Low | Hosted: any member can create a desk, rename one and change its modes (the rail every person on the desk sees); only deleting is role-gated | Recorded, not changed (2026-10-07); pinned by a test | None until the owner decides |
+| [SR-159](#sr-159) | Low | Hosted: the Soul, the pinned memories and the retrieval count are the company's and any member can write the first two, so one person's words reach every colleague's Chat prompt | Open, accepted by today's design (2026-10-07) | None until the owner decides |
 | [SR-08](#sr-08) | Info | The portal token vault is process memory only | Superseded by [SR-64](#sr-64), 2026-09-23 | Dev only |
 | [SR-15](#sr-15) | Info | Music relay: checked, not a key-exfiltration issue. It does send a spoofed browser `User-Agent` | Checked, not an issue | Dev only |
 | [SR-18](#sr-18) | Info | `X-Forwarded-Proto` and `X-Forwarded-For` trust: checked, sound as deployed today | Checked, not an issue | Blocks Tencent deploy on any topology change |
@@ -243,6 +257,9 @@ by the change that lets Chat hand a person a real file. Read in the `agentforge-
 | [SR-128](#sr-128) | Info | A crash between a desk file's object write and its row commit leaves an object that counts toward the quota | Accepted (2026-10-03) | None |
 | [SR-129](#sr-129) | Info | `AGENTFORGE_SANDBOX_DIR` is ignored by the packaged app, and a comma in the sandbox path fails closed | Checked, not an issue (2026-10-03) | None |
 | [SR-130](#sr-130) | Info | What the mode harness and agent tools review read and found sound | Checked, not an issue | None |
+| [SR-160](#sr-160) | Info | Decision: a hosted desk's saved knowledge map is read only if it carries a shared-scope marker, so every hosted desk maps once more | Accepted (2026-10-07); cost: one re-map per hosted desk | None |
+| [SR-161](#sr-161) | Info | Design only, not being built this round (Rizky, 2026-10-06): a person's own Knowledge Base private by person, sharing through a bot, and what an owner or admin may do when a person leaves | Not built | Blocks nothing now; blocks promising any of it |
+| [SR-162](#sr-162) | Info | What the hosted team-privacy review opened and found sound | Checked, not an issue (2026-10-07) | None |
 
 Status values: `open`, `fix in progress — lane X`, `fixed-unverified` (the code is in the tree and
 its test passes, nothing has been driven), `fixed, not driven` (2026-09-23 rows: the code and its
@@ -1083,6 +1100,71 @@ tenant on the next call" went red on 2026-10-01 with no code change, because its
 for the file (`billing.test.ts:97-100`). Test-only; nothing in the product was wrong.
 
 Gate: none now. Was **blocks PR merge**: a CI table that can lie is not a gate.
+
+### SR-155 {#sr-155}
+
+**On a shared hosted desk, any member could read every colleague's Chat through the Knowledge Base.**
+Hosted (Enterprise). The rule is the owner's, 2026-10-06: what a person does in Chat is private to that
+person, even from the company's owner and admins. Raised and fixed 2026-10-07 by the hosted team-privacy
+lane. Fixed in the working tree, tested; **not driven on a running hosted server**.
+
+Evidence, as found:
+- A Chat thread is user-scoped (`getThread` filters on `threads.userId`, `packages/host/src/threads.ts:49-64`).
+  The card the thread leaves in the Knowledge Base is not. `chatWorkCard` writes
+  `origin: { kind: "thread", id }` (`packages/host/src/work-cards.ts:195-206`), and every read of
+  `knowledge_sources`, `knowledge_chunks` and `knowledge_vectors` filtered on `workspace_id` alone. Two
+  people of one company share the home desk (`ensurePortalOwner`, `packages/db/src/portal-owner.ts:177`, finds
+  or creates the organization's one home desk at `:230-244`), so they shared the cards.
+- What a colleague got from that: the card text and the thread title in their Sources list
+  (`listSources`), in search (`ftsRows`, `searchVectors`), in the `## Retrieved sources` block of their own
+  Chat prompt (`knowledgeInjection`), in `knowledge_search` results, in the graph (a thread node's label is
+  the thread title), in the context popover's record, and in the saved map (one row per desk, written from
+  every card). A company owner could read a member's Chat the same way. Reindex returned each card's name
+  and type, and a delete by id removed it.
+
+Fixed, all in `packages/host/src`:
+- **The rule**, in one file: `knowledge-visibility.ts`. A source with `origin_kind = 'thread'` is visible
+  only to the person who owns that thread. No role override. A card whose thread is gone is visible to
+  nobody. Hosted only: `chatCardsArePrivate` (`:46`) reads `isServerMode()` on every call, and off server
+  mode every fragment is empty, so the SQL is what it was.
+- **Where it is applied**, each as a SQL subselect over primary keys and not as a list of ids:
+  `listSources` (`knowledge.ts:213`), the full-text query (`ftsRows`, `knowledge/backends/builtin.ts:220`),
+  the vector query (`searchVectors`, `knowledge-embed.ts:326`, the filter at `:352`), the names on a hit
+  (`sourceNames`, `builtin.ts:55`), the context popover's record (`recordedChunksSql`,
+  `knowledge-last-turn.ts:31`), the graph and its counts (`getGraph`, `graphCounts`,
+  `knowledge-graph.ts:361`, `:387`; `visibleGraphNodes`, `knowledge-visibility.ts:159`), graph expansion
+  (`firstChunkOf`, `knowledge-expand.ts:137`), the map build (`listMappableSources`, `knowledge.ts:228`),
+  reindex (`sourceRow`, `knowledge-reindex.ts:84`; `reindexWorkspace`, `:326`) and delete by id
+  (`handleDeleteKnowledgeSource`, `handlers/knowledge.ts:426`). Chat injection, `knowledge_search` and
+  Education all retrieve through the full-text and vector queries, so one filter covers them.
+- **The map** is built from non-Chat sources only and stamped; see [SR-160](#sr-160).
+- **Cost.** `EXPLAIN QUERY PLAN` on a desk of 4,000 sources and four people shows lookups by primary key and
+  no scan of `threads` (`knowledge-visibility.test.ts` holds the plan); a full-text query for a word in 80
+  chunks went from 0.5 ms to 1.3 ms with the filter. No index was added. The first shape tried, a subselect
+  over every source, cost 94 ms against 4 ms on a 20,000-source desk and was replaced.
+
+Tests: `knowledge-team-privacy.test.ts` (27 cases, three people of one company on one desk: an owner and two
+members) and `knowledge-visibility.test.ts` (15 cases, the fragments and the plan). 21 of the 27 failed
+against the old code, for the reasons above; the six that passed are the controls (shared sources stay
+visible to everyone) and the four Personal-parity cases, which pass before and after. The full-text and
+vector halves are each proved with the other half's rows deleted.
+
+Personal: unchanged, and held by tests. With server mode off, the same reads return every card on the desk,
+the graph is whole, the map is built from every source and stamped with nothing, and reindex and delete act
+on any id, as before (`knowledge-team-privacy.test.ts`, "Personal parity"; `knowledge-visibility.test.ts`,
+"off server mode").
+
+Not covered:
+- A person's attachment in Chat and every other stored picture: [SR-157](#sr-157).
+- The Soul, the pinned memories and the other things that stay the company's: [SR-159](#sr-159).
+- The card text is stored in plaintext in SQLite, PII masked first (`knowledge-ingest.ts:26-28`), as it
+  always was. The host now refuses to hand it to anyone but the thread's owner; nothing encrypts it per
+  person, so someone with the database file or a backup can still read it.
+- Old data stays put: a card written before this change is hidden from everyone but its owner, an old map
+  is read as absent ([SR-160](#sr-160)), and a retrieval record an earlier build wrote is filtered when read.
+
+Gate: **blocks a multi-person hosted pilot** (the five testers on one company) until the two-person drive in
+`features/knowledge.md` has been done on the hosted compose rehearsal.
 
 ## Medium
 
@@ -3018,6 +3100,91 @@ a burst, then another tenant's).
 
 Gate: **blocks Tencent deploy** until driven there.
 
+### SR-156 {#sr-156}
+
+**Any signed-in member could delete a desk of the company.** Hosted (Enterprise). Raised in the 2026-10-06
+review of the desk controls and fixed 2026-10-07. Fixed in the working tree, tested; not driven on a hosted
+server.
+
+Evidence, as found: `handleDeleteWorkspace` looked the desk up in the caller's organization and, with the
+desk's name typed as `confirmName`, deleted it. It never read `tenant.role`. Deleting a desk removes
+everything on it: its threads cascade (`packages/db/src/schema.ts:430-432`), its Knowledge Base is wiped
+(`wipeKnowledgeForWorkspace`, `packages/db/src/ensure-local-owner.ts:219`, called at `:250`), and the
+handler purges its files, settings, channels, folder mount and proposals
+(`packages/host/src/handlers/workspaces.ts`). On the hosted server a member could therefore erase every
+colleague's chats on that desk, the chats [SR-155](#sr-155) makes private to their owners.
+
+Fixed: `handleDeleteWorkspace` (`handlers/workspaces.ts:183`) now requires `canAdminister(tenant.role)`, an
+owner or an admin, when the server is hosted (`:193-194`). The check comes after the desk is found and
+before `confirmName` is read, so a refused caller learns nothing from a wrong name. The refusal is
+`403 workspace_delete_forbidden` (`WORKSPACE_DELETE_FORBIDDEN_CODE`, `:166`). A builder, the host's own role,
+is refused too. Hosted mode is injectable (`WorkspaceDeleteDeps`), the same pattern as the company-key gate
+([SR-98](#sr-98)). The renderer hides what the host refuses: `DeskDeleteButton` and `DeskDeleteNote`
+(`apps/web/components/desk-delete-control.tsx`), through `useMayDeleteDesk`
+(`apps/web/lib/desk-delete-access.ts`), drop the button for a member and for a role the page cannot read,
+and say who can in one line, in `en` and `id` (`workspaces.deleteRestricted`, `workspaces.errors.deleteForbidden`).
+A refusal that still comes back is worded from the catalog. This is a courtesy and never the control.
+
+Tests: `packages/host/src/handlers/workspaces-delete-roles.test.ts` (12 cases, 4 of which failed against the
+old handler): a member and a builder get 403 and the desk stays; the refusal comes before the confirmation
+check; an admin and an owner delete; an owner is still asked for the name; an unknown desk is a 404 for a
+member; the Default desk stays undeletable. Personal parity, in the same file: with server mode off a member
+and a builder delete exactly as before, and with nothing injected the environment decides.
+`apps/web/lib/desk-delete-access.test.tsx` (14 cases): the role predicate, the button for owner, admin,
+member and an unknown role, the Personal button byte for byte, and the note and the refusal in both
+languages.
+
+Not changed, deliberately: create and rename stay open to a member ([SR-158](#sr-158)).
+
+Gate: **blocks a multi-person hosted pilot** until a member's Workspaces page and a hand-sent `DELETE` have
+been driven on the hosted compose rehearsal.
+
+### SR-157 {#sr-157}
+
+**Stored media is read, listed and deleted by company, not by person.** Hosted (Enterprise). Raised in the
+2026-10-06 review and confirmed in the code on 2026-10-07. **Open. Nothing was changed, on purpose.**
+
+Evidence:
+- The row records its owner and nothing else about its use. `media.user_id` is NOT NULL
+  (`packages/db/src/schema.ts:714`) and every writer sets it from the caller: `saveMedia`
+  (`packages/host/src/media.ts:99`), the Edit import (`packages/host/src/handlers/edit.ts:99`) and the starter
+  seed (`packages/host/src/edit/starter-media.ts:143`). It has no desk column and no field saying whether a row
+  is a Chat attachment, a studio picture or an Edit asset.
+- Every read looks the row up by organization and id: `readMediaDataUrl` (`media.ts:110-116`),
+  `handleGetMediaFile` (`handlers/media.ts:25-33`), `handleDeleteMedia` (`:82-97`); the lists go by
+  organization and kind (`listMediaByKind`, `media.ts:36-42`).
+- So a request with a colleague's id returns that person's picture (`GET /api/v1/media/:id/file`), and a job
+  can send it to a model: the job modes take `attachments` from the request body
+  (`readJobRegenAttachments`, `job-regen.ts:61-86`) and inline any local media id they name
+  (`job-regen.ts:160`; `inline-local-media.ts:35`). Chat's own history path inlines local media only when the
+  model server is on a loopback address (`runs.ts:302-320`; `inline-local-media.ts:10-18`), which the hosted
+  gateway is not; I did not check every way a base URL can be set.
+- The id is easy to get. The Images, Videos and Music galleries list the whole organization's media of that
+  kind (`handlers/jobs.ts:43`, `:83`, `:125`, to `listStudioGallery`, `studio-generate.ts:667`, to
+  `listMediaByKind`), and a Chat attachment uploaded through `POST /api/v1/media` (`handlers/media.ts:10-23`,
+  `saveMedia` with its default `image` and `video`) is the same kind of row, so a colleague's attached picture
+  is in that list.
+
+Why nothing was changed: requiring the row's user to be the caller, in server mode, in `readMediaDataUrl` and
+`handleGetMediaFile`, breaks reads the product relies on.
+- The galleries show colleagues' studio pictures through `/api/v1/media/<id>/file` URLs. Those images would
+  break unless the gallery lists were scoped too, and that makes all studio output private by person, which
+  nobody has decided.
+- The storage screen lists the organization's largest objects, and its own comment says every id on it is one
+  the caller may then delete (`handlers/storage.ts:38-52`); `handleDeleteMedia` is organization-wide on
+  purpose.
+- Edit checks a still by organization (`edit/start-generate.ts:94-96`), and its worker reads it through
+  `readMediaDataUrl` as the person who asked (`edit/jobs.ts:228`). I did not check whether an Edit project is
+  shared between the people of a desk. If it is, a person-scoped read breaks a colleague's generate on it.
+
+Options for the owner: (1) scope everything by person, galleries, storage list and delete included: the
+simplest rule, and studio output becomes private. (2) Add a column saying what a row is for, and scope only
+Chat attachments by person: this is what "a document attached in Chat is private to the person who attached
+it" needs, and it is the smallest change. (3) Leave media company-wide and record that a Chat attachment is
+shared inside a company. Option 2 is not built; the document-attach work is a separate lane.
+
+Gate: blocks the sentence "a Chat attachment is private to the person who attached it" until one is chosen.
+
 ## Low
 
 ### SR-01 {#sr-01}
@@ -4571,6 +4738,44 @@ Residual:
 Gate: none beyond [SR-132](#sr-132). Drive both downloads once on the hosted box and read the response headers
 there.
 
+### SR-158 {#sr-158}
+
+**Any member can create a desk, rename one and change its modes.** Hosted (Enterprise). Recorded 2026-10-07
+while fixing [SR-156](#sr-156); nothing was changed. Low.
+
+Evidence: `handlePostWorkspaces` (`packages/host/src/handlers/workspaces.ts:76`) and `handlePatchWorkspace`
+(`:130`) call `getTenant` and never read `tenant.role`. A member can rename the company's desk, or change
+which modes the rail shows to everyone on it. A desk a member creates starts with a copy of the creating
+desk's gateway key (`inheritGatewayKey`, `:38`, called at `:104`); the key is never shown to the member, but
+the new desk carries it. Neither route destroys anything, which is why only delete was gated. The current
+behaviour is pinned by `workspaces-delete-roles.test.ts` ("lets a member create a desk and rename it"), so a
+later change is a decision and not an accident.
+
+Gate: none until the owner decides.
+
+### SR-159 {#sr-159}
+
+**What is still the company's on a team desk, and what any member can write into it.** Hosted (Enterprise).
+Recorded 2026-10-07 from reading the Knowledge area for [SR-155](#sr-155); nothing was changed. Low. This is
+what was opened, not a map of the whole product (`AGENTS.md` says that map is still owed).
+
+- The Soul and the pinned memories are read by workspace alone (`getSoul`, `packages/host/src/knowledge.ts:139`;
+  `listMemories`, `:178`) and become the first blocks of every person's Chat prompt (`knowledgeInjection`).
+  Any member can write them: `handlePutKnowledgeSoul` (`handlers/knowledge.ts:330`),
+  `handlePostKnowledgeMemory` (`:350`) and `handleDeleteKnowledgeMemory` (`:363`) call `getTenant` and nothing
+  else. So one person's pinned memory is in a colleague's prompt. Neither `putSoul` (`knowledge.ts:160`) nor
+  `addMemory` (`:192`) runs the injection scan that sources and cards get.
+- `countRetrievals` counts the desk's retrievals (`knowledge-retrievals.ts:75`) and `GET /api/v1/knowledge`
+  shows it to everyone. A number, not a name.
+- The `artifact` and `media` cards (job outputs, generated pictures and clips) are the company's, as they were.
+  Whether a Research or Images result made by one member should be private to them is not decided.
+- `mapKnowledge` calls `reembedWorkspaceChunks` (`knowledge-map.ts:152`; `knowledge-embed.ts:265`), which
+  re-embeds every chunk on the desk, a person's Chat card included, whenever anyone presses Map or changes the
+  embedding model. Nobody is shown the text; it goes to the embedding model under the company key, as it did
+  when the card was indexed.
+
+Gate: none. Decide item by item when the per-person Knowledge Base is designed ([SR-161](#sr-161)).
+
 ## Info and checked-not-an-issue
 
 ### SR-08 {#sr-08}
@@ -4962,6 +5167,75 @@ the working tree on 2026-10-03. Nothing here was driven on a packed app, on Linu
   (`invokeToolGuarded`, `packages/core/src/runtime/invoke-guarded.ts:39`, `:50-53`). What this does not
   stop is [SR-112](#sr-112).
 
+### SR-160 {#sr-160}
+
+**Decision: a hosted desk's saved knowledge map is read only if it carries a shared-scope marker.**
+Recorded 2026-10-07. Made in the lane that built [SR-155](#sr-155) (the lead's call for the lane); the owner
+has not been asked.
+
+The saved map is one row per desk, shown to everyone (`knowledge_maps`). Before [SR-155](#sr-155) it was
+written from every card, so its topic titles and its overview text could name a colleague's Chat, and free
+text cannot be filtered after the fact. The two options were to strip the topics that cite Chat cards (the
+overview cannot be cleaned that way) or to treat an older map as absent. The second was chosen. Hosted,
+`saveMap` stamps `privacyScope: "shared-v1"` (`packages/host/src/knowledge-map.ts:65`), `getKnowledgeMap`
+(`:43`) returns only a stamped map and never returns the stamp, and a new map is built from non-Chat sources
+only (`listMappableSources`, `knowledge.ts:228`, so the person who presses Map does not put their own Chat on
+the company's map either). `forgetSourcesOnMap` spreads the map object, so deleting a source keeps the stamp
+(`knowledge-team-privacy.test.ts`, "keeps the stamp when a source is deleted").
+
+Cost: one re-map per hosted desk, which is a gateway call (live brain and verifier), and the old topics are
+lost with the old map. Accepted because no hosted desk held real customer data on 2026-10-07. Off server
+mode nothing is stamped or checked, and an old map reads as it always did. Revisit if a hosted desk with real
+data exists before this ships.
+
+Gate: none.
+
+### SR-161 {#sr-161}
+
+**Design only, not being built this round (Rizky, 2026-10-06).** What the owner said about teams on
+Enterprise, recorded so it is not lost and not mistaken for done (the root `AGENTS.md`, "Private by person on
+Enterprise"):
+- A company shares a desk, but each person's own Knowledge Base is private to that person, and a document a
+  person attaches in Chat is private to the person who attached it.
+- Sharing goes through a bot: a bot shared with the team brings its knowledge with it. There is no "share this
+  source with the company" switch on a person's own Knowledge Base.
+- When a person leaves, the company decides: the business owner or an admin chooses whether that person's
+  knowledge is deleted or kept.
+- Nobody else reads it, the owner and admins included. An owner or admin may delete or keep a person's
+  knowledge and may never open it. The host blocks it; legal terms come later and are not a substitute.
+- "Dont make it too complicated." Build only that a document attached in Chat is private to its person.
+
+What exists today is [SR-155](#sr-155) alone: the card a Chat thread leaves is private to its owner. Not built:
+a per-person Knowledge Base (every source a person adds is still the company's), sharing through a bot, and
+the leaver controls. Whether a person's own Soul and memories are theirs is part of the same design
+([SR-159](#sr-159)). The attachment half is blocked on [SR-157](#sr-157).
+
+Status: not built. Gate: blocks promising any of it to a customer.
+
+### SR-162 {#sr-162}
+
+**What the hosted team-privacy review opened and found sound.** Checked 2026-10-07, each by reading the code.
+Checked, not an issue.
+
+- **The context popover cannot be pointed at another person's thread.** The route handler
+  (`packages/host/src/handlers/knowledge.ts:308`) looks the thread up with the user-scoped `getThread`
+  (`packages/host/src/threads.ts:49`) before it reads the record (`handlers/knowledge.ts:316`), and it is the
+  only caller of `knowledgeContextForThread`. Another person's thread id gives `own = null` and an empty
+  Sources row. The record query is filtered as well ([SR-155](#sr-155)).
+- **`findSourceByOrigin` is left unfiltered because it is only called for the caller's own thread.**
+  `upsertWorkSource` (`knowledge-ingest.ts:45`) builds its card from the run's own thread; `excludedSourceIds`
+  (`knowledge.ts:912`) runs after the same `getThread`, and `knowledge-search-tool.ts:71` takes the thread
+  from the run context; `deleteSourceByOrigin` (`threads.ts:144`) runs after the user-scoped `getThread`.
+- **The self-check cannot return a card.** It plants an artifact-origin source (`SELF_CHECK_ORIGIN`,
+  `knowledge-verify.ts:23`) and reports whether its own token came back, in a detail line with no source text.
+- **"Send to Knowledge Base" writes no Chat card.** `sendArtifactToKnowledge` (`handlers/knowledge.ts:62`)
+  uses the artifact origin; paste, file and URL sources have no origin at all.
+- **The orphan sweep is desk-wide and only deletes.** `sweepOrphanSources` (`knowledge.ts:763`) removes cards
+  whose subject is gone; it runs before the list on `GET /api/v1/knowledge`, so a deleted thread's card never
+  lingers in anyone's list.
+- **Education reads through the filtered funnel.** `handlers/education.ts:43` calls `retrieveChunks`, so it is
+  behind the same two queries as Chat.
+
 ## Must be true before the Tencent Cloud deploy
 
 Each line names the row that owns it. A line that cannot be ticked is a reason not to hand out the
@@ -5102,6 +5376,19 @@ Added 2026-10-03:
   ([SR-111](#sr-111), [SR-129](#sr-129))
 - [ ] The host's resident memory with two busy Python children is measured against the pod and
   container limits, and `AGENTFORGE_MAX_CODE_RUNS` is unset or sized from it. ([SR-123](#sr-123))
+
+Added 2026-10-07:
+
+- [ ] Before any second person joins a company on the hosted server: two people of one company (an owner
+  and a member, a third as admin) each send a Chat turn, and neither the other's thread card, its words nor
+  its title shows in the other's Sources list, search, Chat prompt, `knowledge_search` result, graph or map;
+  an old map reads as no map until the desk is mapped again. ([SR-155](#sr-155), [SR-160](#sr-160)) — tested
+  over real queries with three people, not driven on the hosted stack.
+- [ ] On the same rehearsal, a member has no Delete button on the Workspaces page and a hand-sent
+  `DELETE /api/v1/workspaces/:id` from a member answers `403 workspace_delete_forbidden` with the desk
+  left. ([SR-156](#sr-156)) — tested, not driven.
+- [ ] The owner has chosen how stored media is scoped between the people of a company, before anyone says a
+  Chat attachment is private. ([SR-157](#sr-157))
 
 ### SR-49 {#sr-49}
 
