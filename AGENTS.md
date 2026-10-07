@@ -115,7 +115,8 @@ His words: "start small first with like 100-500 users", then "when there is dema
 **Who owns what (Rizky, same day).** His words: "this machine will be theirs anyway, im on the rnd and theyre on the production and the marketing sales". Rizky's side does research and development. Hypernet runs production, marketing and sales, and the server is theirs. Hypernet connects its own domain to the server: two names, one for the app and one for the sign-in page, each an A record to the Elastic IP, with no AAAA record and no proxy in front, because the server gets its own certificates.
 
 **Stage 1, now: one CVM.**
-- Tencent Cloud CVM in Jakarta, SA5 4 vCPU / 8 GB, Ubuntu 24.04, 50 GB system disk and 100 GB data disk. About 64 USD a month, inside the 100 USD October budget.
+- Tencent Cloud CVM in Jakarta. **What Rizky ordered on 2026-10-07:** SA9.LARGE8 (4 cores / 8 GiB), pay-as-you-go, Jakarta Zone 2, Ubuntu 24.04, one 200 GiB Balanced SSD system disk and no data disk, Default VPC, a public IP billed by traffic at 20 Mbps, no IPv6, SSH key login. The plan had been SA5 with a 50 GB system disk and a 100 GB data disk at about 64 USD a month; the SA9 price was not read, so the monthly cost of what he ordered is not confirmed.
+- With one disk, the customers' data sits on the system disk. A daily disk snapshot is the backup, and "Reinstall system" in the console would erase it.
 - Its own machine and its own address. Never the Lighthouse box that serves the DPS sites (NDA).
 - Bind an Elastic IP and give Hypernet that address. It stays the same through a resize or a rebuild.
 - Buy it inside a VPC, so it can join a scaling group later.
