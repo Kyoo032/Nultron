@@ -98,6 +98,13 @@ Extended on 2026-10-06 with [SR-140](#sr-140): the desk-file download route and 
 by the change that lets Chat hand a person a real file. Read in the `agentforge-deck` worktree (uncommitted, on
 `6105c5c`); nothing in it is driven in a browser or on the hosted box.
 
+Extended on 2026-10-07 with [SR-163](#sr-163) by the hosted run-limits lane: the hosted gateway verdict was one
+per white-label partner instead of one per company. Fixed in the working tree over `726f369` and tested through
+the real router; nothing was driven on a hosted server. A review the same day added the neighbours that follow
+from the same root: the hosted erase is now refused on a partner that holds more than one company (scoping it to
+one company is still owed and needs the owner's decision), a provider key reaches every desk of its company,
+and the usage ledger and the model-list cache are read by company. Details in the entry.
+
 Extended on 2026-10-07 with [SR-155](#sr-155) … [SR-162](#sr-162) by the hosted team-privacy lane: what a
 company's people can see of, and do to, one another on the one desk they share on the hosted server. Two
 fixes are in the tree and tested ([SR-155](#sr-155), [SR-156](#sr-156)); one finding is open and needs the
@@ -131,6 +138,7 @@ queries over a throwaway database with three people of one company on one desk; 
 | [SR-88](#sr-88) | High | Every first-time hosted sign-in became an owner, so any colleague could erase the company | Fixed, driven on local k8s (2026-10-01); not hosted | Blocks Tencent deploy until the role-sending portal is deployed first |
 | [SR-102](#sr-102) | High | `pnpm ci:local` reported the portal suite as a pass when its Postgres could not start and no test ran | Fixed (2026-10-01), tested | — |
 | [SR-155](#sr-155) | High | Hosted: on a desk shared by a company's people, any member could read every colleague's Chat through the Knowledge Base (Sources list, search, Chat's prompt, `knowledge_search`, graph, map, reindex), because sources were read by desk and not by person | Fixed in tree (2026-10-07), tested with three people of one company; not driven on a running hosted server | Blocks a multi-person hosted pilot until driven |
+| [SR-163](#sr-163) | High | Hosted: the gateway verdict was one row per white-label partner, not per company, so a second company's key check closed the first company's gate (`403 gateway_blocked`), and one company's "forget my key" cleared every company's key | Fixed in tree (2026-10-07), tested through the real router with two companies under one partner and mutation-checked; not driven on a hosted server. Review round the same day: the hosted erase is refused (409) on a partner with more than one company, a provider key reaches every desk of its company, the usage ledger and the model cache are read by company. **Still owed, owner's decision: scope the erase to one company** | Blocks a multi-company hosted server until driven; the erase scoping is open |
 | [SR-21](#sr-21) | Medium | The portal's 30-day browser session cannot be ended: signing out of the app leaves it, and the next sign-in skips the OTP entirely | Fixed-unverified, fix pass X | Blocks Tencent deploy |
 | [SR-48](#sr-48) | Medium | A failed ffmpeg run returned the full argv and raw stderr — absolute paths inside the data dir — to the client | Fixed-unverified, fix pass Y | Blocks Tencent deploy |
 | [SR-42](#sr-42) | Medium | `GET /tenant/config` had no rate limiter and told an anonymous caller which tenant slugs exist | Fixed-unverified, fix pass X | Blocks Tencent deploy |
@@ -5235,6 +5243,198 @@ Checked, not an issue.
   lingers in anyone's list.
 - **Education reads through the filtered funnel.** `handlers/education.ts:43` calls `retrieveChunks`, so it is
   behind the same two queries as Chat.
+
+### SR-163 {#sr-163}
+
+**Hosted: the gateway verdict belonged to the white-label partner, not to the company.** Found by the
+2026-10-07 load rig on the HYP AI build (`14f05d5`): after a second company saved a gateway key that differed
+from the first company's, the first company's next Chat turn answered `403 gateway_blocked`. Reproduced on
+`main` (`726f369`) as a failing test on 2026-10-07 and fixed in the working tree on `feat/hosted-run-limits`,
+uncommitted. **Not driven on a hosted server.** Severity High: on the first production server, every company
+after the first that pastes its own key locks the others out, and a company that signs out of the gateway
+removes everybody's key.
+
+The topology the bug depended on: `TenantContext.tenantId` is the white-label partner (HYP AI, Nultron
+Enterprise) and a company is an `organizationId` inside it (`packages/core/src/tenancy/types.ts:40-47`; the run
+cap says the same, `packages/host/src/run-limits.ts:150-161`). Every earlier test used one company per tenant id,
+which cannot show this. The test that does puts two organisations under one tenant id.
+
+Evidence, as found:
+- The verdict was one `tenant_state(tenant_id, 'gateway_gate')` row per partner: `loadGateState(tenantId)`,
+  `saveGateState(tenantId, state)` and `clearGateState(scope)` took only the tenant id
+  (`packages/host/src/gateway-gate.ts`, as of `726f369`). Keys are per desk (`settings-store.ts:202`, one slice per
+  workspace id) and a desk belongs to one organisation, so the keys were separate and the verdict was not.
+- What happened: B's key check wrote B's fingerprint over A's verdict. A's key no longer matched the verdict on
+  file, and the hosted gate treats "no verdict for this key" as closed (`deriveGatewayGate`, the `unverified`
+  payload, `error` / `allowed:false` in server mode). With B's key rejected the result was the same for A. The
+  single row also carried one `lastOkAt` for both, and `maybeRefreshGateway`'s throttle slot was
+  `<tenant>:<fingerprint>`, so two companies with the same key shared one background check.
+- Same root, second effect: `clearGatewayKeyEverywhere(tenant)` (`packages/host/src/settings-store.ts`) cleared the
+  key on every desk of the **partner**, and the hosted "forget my key" (`resetGatewayKey`,
+  `packages/host/src/handlers/settings.ts`) calls it. One company's owner pressing it signed every other company
+  out of the gateway.
+- Reproduction before the fix (`packages/host/src/gateway-gate-companies.test.ts`): seven hosted cases red, among
+  them "lets both companies chat after each has saved a different key the gateway accepts" (A's Chat turn answered
+  403 with B's key accepted) and "signing out of the gateway forgets that company's key and verdict, and no one
+  else's" (A's key was gone).
+
+Fixed, server mode only, no table and no migration:
+- **One verdict per company.** The `gateway_gate` key is narrowed to `gateway_gate:<organisation id>`, a row
+  under the partner's own `tenant_id` in the same table (`companyStateKey`,
+  `packages/host/src/tenant-state-store.ts:86`; `ownerOf`, `packages/host/src/gateway-gate.ts:169-188`;
+  `gateSlot`, `:190`). The foreign key to `tenants` still holds and the hosted erase still removes the row with
+  the partner. The slot follows the backend (`tenantStateBackend().kind`), so a desk, whose file backend refuses
+  a company slot (`statePath`, `tenant-state-store.ts:119-125`), cannot produce one.
+- **A hosted gate call with no organisation is refused**, `company_required` (500), from the read, the write,
+  the check and the clear. Never answered from the partner's row. `clearGateState` rethrows only that code, so its
+  old swallow of every other failure is unchanged.
+- **The legacy partner row is read in one case only (changed by the review round, below).** The row-backend
+  read does not adopt a legacy file into a company slot (`tenant-state-store.ts:320`). The first version of
+  this fix never read the old partner row at all; the review round lets a company whose slot is empty adopt it
+  when its fingerprint is exactly the fingerprint of the key the company holds now (see "Review round"). A call
+  that names no company never reads it, and a different key never adopts it (`tenant-secrets.test.ts`).
+- **One company's check cannot reveal another's.** A company with no key reads `needs_key` with null timestamps
+  whatever the others do (test: "tells a company with no key nothing about the others' keys or checks"); a
+  company's `checkedAt` and `lastOkAt` are its own (test: "keeps one company's lastOkAt out of the other's
+  payload"); the background re-check is handed the caller's own settings and tenant, and its throttle slot carries
+  the company on the server (`gateway-gate.ts:676-678`), so two companies holding the same key each get a check
+  (test: "gives two companies that hold the same key one background re-check each"). A key shared by two companies
+  still means the same verdict content for each, but each is written and read separately.
+- **"Forget my key" is the caller's company's.** On the server the handler passes the organisation's desks
+  (`listLocalWorkspaces(db, tenant.organizationId)`, `handlers/settings.ts:492`) as `within`
+  (`ClearKeyWithin`, `settings-store.ts:536`), and `clearGateState` drops that company's verdict. A desk calls
+  both with no `within`, as before. The hosted erase still calls `clearGatewayKeyEverywhere(tenant)` with no
+  `within` on purpose (see "Found, not changed").
+
+Personal parity: with server mode off, the verdict is `<dataDir>/gateway-gate.json` for the local tenant and
+`tenants/<id>/gateway-gate.json` for another, the bytes are the old payload (`version`, `fingerprint`, `status`,
+`checkedAt`, `lastOkAt`) with no company in it whichever organisation the scope names, and a missing file derives
+`ok` / `allowed:true` / `grace:true` / "Not checked yet." exactly as before. The desk's background-check slot is
+still `<tenant>:<fingerprint>`, so two desks with one key still share one throttle. Pinned in
+`gateway-gate-companies.test.ts` ("Personal: server mode off", four cases) and by the unchanged desk suites
+(`gateway-gate.test.ts`, `tenant-state.test.ts`). A mutation that let a desk scope itself by company turned those
+suites red.
+
+Mutation check: with `ownerOf` made to ignore the organisation (the old behaviour), the same seven of the thirteen
+cases in `gateway-gate-companies.test.ts` go red; the keyless-company case, the two-partner case and the four
+Personal cases stay green, as they should.
+
+What is not proven: nothing was driven on a hosted server, on the compose rehearsal or on the Kubernetes
+rehearsal. The tests use the real router and database with a stand-in gateway (`fetch`), not the live gateway,
+and a stand-in runtime. The first production-style check is: two organisations under one portal tenant, each
+saves a different key, both chat; press "forget my key" as one and confirm the other keeps its key.
+
+**Cost on deploy.** Every hosted company starts with no verdict of its own. Before the review round that meant
+`error` ("has not been verified") until its first Settings read started a check, and a check that found the
+gateway unreachable stored `unreachable` with no `lastOkAt`, so there was no grace either. The review round
+closes most of that window: a company whose own key has exactly the fingerprint the old partner row judged adopts
+that verdict, `lastOkAt` included. A company holding any other key still starts with no verdict, so one Chat turn
+sent before its first Settings read can answer `403 gateway_blocked` once; the renderer asks the host for the
+gate again after a refusal. The partner row older builds wrote stays in `tenant_state`; it is read only for that
+adoption, and removed when the partner is erased.
+
+### Review round, 2026-10-07 (an independent review of the diff above; same worktree, uncommitted)
+
+The reviewer found the first fix correct, isolated and parity-safe, and named what had to ship with it because
+the server it goes to holds several companies under one partner. Every item is server mode only, written
+test-first (red, then green), and each has a case proving the desk path is unchanged. **Not driven on a hosted
+server.**
+
+1. **Hosted erase refused on a shared partner (Critical, fixed as a refusal; scoping it is still owed).**
+   `resetTenant` (`packages/host/src/tenant-reset.ts`, `assertSinglePartnerCompany`, called after the owner,
+   confirmation and local-tenant checks and before `openAudit`) counts `organizations WHERE tenant_id = ?` and, when
+   there is more than one, answers `409 tenant_erase_shared_partner`: "This server holds several companies under
+   one account, so an erase from here would delete all of them. Nothing has been deleted. Ask the operator of this
+   server to erase this company." Nothing is read, deleted or audited before it. Zero or one organisation proceeds
+   exactly as before (zero is a second pass over an erase that finished). The renderer says it in both catalogues
+   (`settings.reset.eraseAccountShared`) through `eraseFailureReasonOf`. **Not done, and it is the owner's
+   decision: scope the purge to one organisation.** `purgeTenantRows`, the object prefix and local roots, and
+   `clearGatewayKeyEverywhere` are still partner-wide by design (SR-65), so on a single-company partner nothing
+   changed and on a shared one the act is simply unavailable until the operator does it. Proof:
+   `tenant-reset-companies.test.ts` (10 cases; the four refusal cases were red with the guard off).
+2. **A provider key reaches every desk of its company (High).** `saveSettings` writes one desk's slice and a new
+   desk copies the key once, so rotating K0 to K1 on desk 1 left desk 2 on K0: its fingerprint no longer matched
+   the company's verdict, it answered `403 gateway_blocked`, and a re-check from desk 2 could replace the verdict
+   and close desk 1. On the server `handlePostSettings` now follows a key save with `saveKeysToDesks`
+   (`settings-store.ts`), one write of the typed key fields (`openaiApiKey`, `googleApiKey`, `anthropicApiKey`,
+   `volcengineApiKey`) to the other desks of the caller's **organisation** (`listLocalWorkspaces(db,
+   tenant.organizationId)`, the mirror of "forget my key"'s `within`). Only the key fields travel; a desk's models
+   and caps stay its own, and a blank field is not a key write (`keyFieldValue`). Other companies' desks are not
+   in the list. Proof: `gateway-gate-companies.test.ts`, "two desks in one company" (six cases; five red before).
+3. **Usage ledger read by company (High).** `whereFor` in `tenant-usage.ts` now adds `organization_id = ?` when
+   `isServerMode()` (injectable as `createUsageStore(db, { isServerMode })`), for both `list` and `totals`, so
+   `GET /api/v1/usage` and the `usage` field of `GET /api/v1/settings` list the caller's company only. The legacy
+   `desk-usage.json` (one file per partner, rows name no company, nothing has written it since the ledger)
+   is not read on the server (`account-usage.ts`, `legacyDeskUsage`); a desk still reads it. `listRunUsage` was
+   already by organisation. The allowance counter is the partner's and is accrued by tenant id in `recordUsage`;
+   it never read these queries, so no cap moved. Proof: `usage-companies.test.ts` (9 cases; six red before).
+4. **Model-list cache and probe per company (Medium).** `ModelCacheScope` is `{ tenantId, organizationId? }` and
+   a hosted cache is `tenant_state` key `model_cache:<organisation id>` (`modelCacheOwner`, `companySlot` in
+   `model-cache.ts`; `companyStateKey`). What each caller does without a company: a scope that names one uses it;
+   a scope that names only the partner, inside a request whose session is the same partner's, takes the session's
+   company; anything else on the hosted server throws `company_required` (500), never the partner's row; the
+   warm-up (`warmHostedModelCache`) never throws, logs the refusal and starts nothing, and keeps its in-flight
+   set and throttle per company and passes `{ tenantId, organizationId }` to the refresh. `handlers/edit.ts`
+   (the Edit doctor) built a bare `{ tenantId }` and now passes the session's `orgId` too. Every other caller
+   passes a `TenantContext` and needed no change. The old partner-level `model_cache` row is never read (a
+   catalogue probed with another company's key must not be adopted); a company re-probes through the warm-up. A
+   desk has one file and ignores the organisation. Existing cases that built a bare `{ tenantId }` scope
+   (`model-cache-tenancy`, `model-cache-warmup`, `model-cache-hosted-routes`) were given an `organizationId`.
+   Proof: `model-cache-companies.test.ts` (17 cases; twelve red before) and, through the real Settings and Models
+   routes, `gateway-gate-companies.test.ts` "each Settings shows its own probe and models" (red with the slot
+   forced back to the partner's).
+5. **Deploy window (Medium).** `loadVerdictFor` (`gateway-gate.ts`) is what the report, the check and the
+   background re-check read: a company's own slot, and, only when that slot is empty and the company holds a key,
+   the partner row **if its fingerprint equals the fingerprint of that key**, copied into the company's slot with
+   its `lastOkAt`. Never on a mismatch. A rejected key's verdict is carried over too. The partner row is left
+   for other companies. A desk has no company, so it never reaches this. Proof: `gateway-gate-companies.test.ts`,
+   "the deploy window" (seven cases; five red before). One existing assertion that the old partner row is never
+   read (`tenant-secrets.test.ts`) was changed to the narrower rule.
+6. **Organisation id not trimmed (Low).** `companyStateKey` and `ownerOf` use the id as it is; a blank id is
+   still refused. Two ids that differ only by whitespace are two companies (two red cases before).
+7. **"Forget my key" (Low, report only, not changed).** `clearGatewayKeyEverywhere` clears `openaiApiKey` only
+   (`settings-store.ts`), the same field the button's copy names ("Forgets the saved key", the gateway key), and
+   writes no audit row. Clearing the other provider keys on the server is a few lines (loop the four key fields in
+   `mergeSecrets`) plus a case, but it is a product decision (a company that brought its own Anthropic key
+   would lose it by signing out of the gateway) and, on a desk, a behaviour change for Personal, so it is left.
+   An audit row for key changes would need a table (there is none for key writes: saves are not audited either),
+   which is a migration and not a few lines.
+
+Personal parity for each: erase is refused on a desk with `tenant_reset_disabled` before anything is counted;
+a desk-scoped key save stays desk-scoped (`gateway-gate-companies.test.ts`, "Personal: server mode off, a key saved
+on one desk stays on that desk", through the real routes); the ledger readers and the legacy file are partner-wide
+and read as before (`usage-companies.test.ts`, "Personal"); the model cache is the one file whichever company the
+scope names (`model-cache-companies.test.ts`, "Personal"); a desk never writes a company slot or reads the
+partner row (`gateway-gate-companies.test.ts`).
+
+**Found while checking neighbours, same root: a partner is treated as a company.** Listed with evidence so nobody
+chases them twice.
+- **Hosted erase takes every company of the partner (High, needs the owner).** Now refused where it would (item 1
+  above), not scoped. `purgeTenantRows(sql, tenant.tenantId)` deletes by tenant id
+  (`packages/host/src/tenant-reset.ts`; the cascade root is `organizations WHERE tenant_id = ?`,
+  `packages/db/src/tenant-purge.ts:291`), the object prefix and local roots are the partner's, and
+  `clearGatewayKeyEverywhere(tenant)` clears every desk's key. Scoping the purge to one organisation touches the
+  purge SQL, the object store prefix, the per-partner job trees and the portal sign-out, and the act is
+  owner-specified (SR-65). **Still owed.**
+- **Model-list cache was one row per partner (Medium).** Fixed, item 4.
+- **Usage ledger was read by partner (Medium).** Fixed, item 3.
+- **Plan row is per partner (Info, probably by design).** `requireEntitlementAllowed(tenantId)`
+  (`gateway-gate.ts:547`); `tenant_plan` is one row per tenant id. A partner-level `past_due` closes every
+  company. Left as it was.
+- **Learned Thinking-level limits are per partner (Low).** `scope: input.tenant.tenantId`
+  (`packages/core/src/runtime/ai-sdk-runtime.ts:252`, store `effort-selfheal.ts:190`). What one company's channel
+  refused is applied to the others for up to 30 minutes, then heals.
+- **Checked, not an issue:** the job-model breaker is process-wide by model id (`job-model-fallback.ts:29-47`) and
+  only records transport-class failures of the upstream, which is the same for every company; any company's save,
+  sign-out or erase clears it for everyone (`handlers/settings.ts:325`, `:500`; `tenant-reset.ts:354`), which costs a retry. The key
+  state cache `thisKeyCache` is one slot keyed by a hash of the key (`account-usage.ts:55`, `:65-72`), so it never
+  hands one company another's balance; companies only evict each other. `pricingCache` holds the public price
+  list, fetched with no key (`account-usage.ts:54`, `:154`). The run cap is already per company
+  (`runLimitKey`, `packages/host/src/run-limits.ts:160-162`).
+
+Status: fixed in tree, tested, not driven. Gate: blocks a multi-company hosted server until driven. The hosted erase
+is refused where a partner holds more than one company; **scoping it to one company is still owed and needs the
+owner's decision** before an operator-run erase of a single company can be offered.
 
 ## Must be true before the Tencent Cloud deploy
 

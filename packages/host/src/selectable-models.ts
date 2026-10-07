@@ -33,6 +33,7 @@ import {
 } from "@agentforge/core";
 import {
   loadModelCache,
+  modelCacheOwner,
   modelCacheSlot,
   modelCacheStamp,
   saveModelCache,
@@ -486,9 +487,11 @@ export type HostedWarmupDeps = {
  * key, start ONE background `refreshModelCache` for that tenant and return true. It is never awaited:
  * the read that started it answers with what it has, and the next read after the probe lands is live.
  *
- * - **Per tenant.** The probe is named by tenant, so its result lands in that tenant's row whichever
- *   request is in scope when it finishes, and a tenant with no key starts nothing.
- * - **Throttled and deduplicated.** One at a time per tenant, and not again inside
+ * - **Per company (SR-163).** The probe is named by partner and company, so its result lands in that
+ *   company's row whichever request is in scope when it finishes, and a company with no key starts
+ *   nothing. Two companies of one partner each get their own probe, throttle and in-flight slot. A scope
+ *   that cannot name its company starts nothing (the refusal is logged, never thrown).
+ * - **Throttled and deduplicated.** One at a time per company, and not again inside
  *   `HOSTED_CACHE_WARMUP_THROTTLE_MS` of the last start. A probe that finishes writes a row, which
  *   ends the matter; the throttle is for one that could not write (a locked database, a full disk).
  *   A read that found no key starts nothing and spends nothing, so a key that arrives by a path that
@@ -500,7 +503,7 @@ export type HostedWarmupDeps = {
  *   else. The desk and webdev return at the first line, so Personal behaves exactly as it did.
  *
  * Which desk's key: the one the caller's tenant context names when it has one (every handler passes
- * its `TenantContext`), else the desk the request selected. The cache itself is per tenant, as it was.
+ * its `TenantContext`), else the desk the request selected. The cache itself is per company.
  */
 export function warmHostedModelCache(scope?: ModelCacheScope, deps: HostedWarmupDeps = {}): boolean {
   if (!isServerMode()) {
@@ -508,12 +511,16 @@ export function warmHostedModelCache(scope?: ModelCacheScope, deps: HostedWarmup
   }
   let tenantId = "unknown";
   try {
-    tenantId = modelCacheSlot(scope);
-    if (modelCacheStamp(scope) !== "missing" || warmupInFlight.has(tenantId)) {
+    // SR-163: the cache, the throttle and the in-flight set are the company's, not the partner's. A scope
+    // that cannot name its company throws here and is logged below: the warm-up starts nothing for it.
+    const owner = modelCacheOwner(scope);
+    tenantId = owner.tenantId;
+    const slot = modelCacheSlot(scope);
+    if (modelCacheStamp(scope) !== "missing" || warmupInFlight.has(slot)) {
       return false;
     }
     const nowMs = (deps.nowMs ?? Date.now)();
-    const last = warmupStartedAt.get(tenantId);
+    const last = warmupStartedAt.get(slot);
     if (last !== undefined && nowMs - last < (deps.throttleMs ?? HOSTED_CACHE_WARMUP_THROTTLE_MS)) {
       return false;
     }
@@ -521,21 +528,21 @@ export function warmHostedModelCache(scope?: ModelCacheScope, deps: HostedWarmup
     if (!hasLiveProvider(settings)) {
       return false;
     }
-    warmupStartedAt.set(tenantId, nowMs);
-    warmupInFlight.add(tenantId);
+    warmupStartedAt.set(slot, nowMs);
+    warmupInFlight.add(slot);
     const refresh = deps.refresh ?? refreshModelCache;
-    const named = tenantId;
+    const named = { tenantId: owner.tenantId, organizationId: owner.companyId };
     void (async () => {
       try {
-        const result = await refresh(settings, { scope: { tenantId: named }, onlyIfMissing: true });
+        const result = await refresh(settings, { scope: named, onlyIfMissing: true });
         const failure = probeFailureOf(result);
         if (failure) {
-          logWarmupFailure(named, failure);
+          logWarmupFailure(named.tenantId, failure);
         }
       } catch (error) {
-        logWarmupFailure(named, error);
+        logWarmupFailure(named.tenantId, error);
       } finally {
-        warmupInFlight.delete(named);
+        warmupInFlight.delete(slot);
       }
     })();
     return true;

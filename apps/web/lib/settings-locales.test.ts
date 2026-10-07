@@ -64,6 +64,7 @@ describe("settings surface locales", () => {
       "reset.eraseAccountInputLabel",
       "reset.eraseAccountOpen",
       "reset.eraseAccountPanelTitle",
+      "reset.eraseAccountShared",
       "reset.eraseAccountSubmit",
       "reset.eraseAccountTypeToConfirm",
       "reset.eraseAccountWarning",
