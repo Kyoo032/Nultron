@@ -104,6 +104,95 @@ ${hiddenFields({ ...screen.hidden, csrf_token: screen.csrfToken })}
 }
 
 // ---------------------------------------------------------------------------
+// Password sign-in (PORTAL_SIGNIN_MODE=password): in place of the e-mail step and its second steps
+// ---------------------------------------------------------------------------
+
+/** A second and third field need air between them, which the shared one-field layout never did. */
+const MULTI_FIELD_STYLE = "label:not(:first-of-type){margin-top:1rem}p.hint{font-size:.85rem;margin:.5rem 0 0}";
+
+export interface PasswordSignInScreen extends ScreenBase {
+  /** `POST .../password`. */
+  readonly action: string;
+  readonly csrfToken: string;
+  readonly hidden: Readonly<Record<string, string>>;
+  /** Re-shown after a refusal so a typo costs one field, not two. The password never is. */
+  readonly identifier?: string;
+  readonly error?: string;
+}
+
+/**
+ * The one screen: a username (or the e-mail address on record) and a password. There is no "send me a
+ * code" and no "use a different e-mail": a refusal re-renders this page with one sentence, which is
+ * the same sentence whatever the reason. The password field is never given a `value`.
+ */
+export function passwordSignInPage(screen: PasswordSignInScreen): string {
+  const { t } = screen;
+  return page({
+    locale: screen.locale,
+    product: t("product"),
+    title: t("password.title"),
+    footer: t("footer.note"),
+    extraStyle: MULTI_FIELD_STYLE,
+    body: html`<h1>${t("password.title")}</h1>
+<p class="lead">${t("password.intro")}</p>
+${errorLine(screen.error)}
+<form method="post" action="${screen.action}">
+${hiddenFields({ ...screen.hidden, csrf_token: screen.csrfToken })}
+<label for="identifier">${t("password.identifierLabel")}</label>
+<input id="identifier" name="identifier" type="text" autocomplete="username" autocapitalize="none"
+ spellcheck="false" required autofocus maxlength="254" value="${screen.identifier ?? ""}">
+<label for="password">${t("password.passwordLabel")}</label>
+<input id="password" name="password" type="password" autocomplete="current-password" required
+ maxlength="200">
+<button type="submit">${t("password.submit")}</button>
+</form>`,
+  });
+}
+
+export interface ChangePasswordScreen extends ScreenBase {
+  /** `POST .../password/change`. */
+  readonly action: string;
+  readonly csrfToken: string;
+  readonly hidden: Readonly<Record<string, string>>;
+  /** Carried in a hidden field: the person is not asked for it twice. */
+  readonly identifier: string;
+  readonly minLength: number;
+  readonly error?: string;
+}
+
+/**
+ * The forced change. It asks for the current (temporary) password again, so the post stands on its own
+ * and nothing between the two screens needs to be trusted; none of the three values is ever echoed.
+ */
+export function changePasswordPage(screen: ChangePasswordScreen): string {
+  const { t } = screen;
+  return page({
+    locale: screen.locale,
+    product: t("product"),
+    title: t("change.title"),
+    footer: t("footer.note"),
+    extraStyle: MULTI_FIELD_STYLE,
+    body: html`<h1>${t("change.title")}</h1>
+<p class="lead">${t("change.lead")}</p>
+${errorLine(screen.error)}
+<form method="post" action="${screen.action}">
+${hiddenFields({ ...screen.hidden, csrf_token: screen.csrfToken, identifier: screen.identifier })}
+<label for="current_password">${t("change.currentLabel")}</label>
+<input id="current_password" name="current_password" type="password" autocomplete="current-password"
+ required autofocus maxlength="200">
+<label for="new_password">${t("change.newLabel")}</label>
+<input id="new_password" name="new_password" type="password" autocomplete="new-password" required
+ minlength="${screen.minLength}" maxlength="200">
+<label for="confirm_password">${t("change.confirmLabel")}</label>
+<input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" required
+ minlength="${screen.minLength}" maxlength="200">
+<p class="hint">${t("change.hint", { min: screen.minLength })}</p>
+<button type="submit">${t("change.submit")}</button>
+</form>`,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // The second steps: a sign-in code for a member, an invite code for an invitee
 // ---------------------------------------------------------------------------
 

@@ -69,6 +69,13 @@ export type SessionSnapshot = {
   readonly identity: SessionIdentity | null;
   /** Why the host says there is no session, when it said. Only ever one of its own codes. */
   readonly reason: AuthReason | null;
+  /**
+   * Present, and only ever "password", when the host says the portal signs people in with a username
+   * and a password (`GET /api/v1/auth/session`, from the portal's own word). Absent means the e-mailed
+   * code, which is what the screen has always said: a snapshot in the default mode is exactly what it
+   * was, and the renderer never guesses a mode the host did not tell it.
+   */
+  readonly signInMode?: "password";
 };
 
 export type SessionView = SessionSnapshot & {
@@ -111,9 +118,14 @@ export function parseSessionPayload(payload: unknown): SessionSnapshot {
     return SIGNED_OUT;
   }
   const body = record(outer.body) ?? outer;
+  // Only the one word the host sends. Anything else, in any type, is the default mode.
+  const mode = body.signInMode === "password" ? ({ signInMode: "password" } as const) : null;
   if (body.signedIn !== true) {
     const reason = body.reason;
-    return isAuthReason(reason) ? { status: "signed-out", identity: null, reason } : SIGNED_OUT;
+    const signedOut: SessionSnapshot = isAuthReason(reason)
+      ? { status: "signed-out", identity: null, reason }
+      : SIGNED_OUT;
+    return mode ? { ...signedOut, ...mode } : signedOut;
   }
   const userId = identifier(body.userId);
   const orgId = identifier(body.orgId);
@@ -127,6 +139,7 @@ export function parseSessionPayload(payload: unknown): SessionSnapshot {
     status: "signed-in",
     identity: { userId, orgId, tenantId, expiresAt, ...(role ? { role } : {}) },
     reason: null,
+    ...(mode ?? {}),
   };
 }
 
@@ -173,7 +186,13 @@ export function afterSessionLost(current: SessionSnapshot, code: unknown): Sessi
   if (current.status !== "signed-in" || !isAuthReason(code)) {
     return current;
   }
-  return { status: "signed-out", identity: null, reason: code };
+  // The mode outlives the session: the screen that follows has to say the same thing the last one did.
+  return {
+    status: "signed-out",
+    identity: null,
+    reason: code,
+    ...(current.signInMode ? { signInMode: current.signInMode } : {}),
+  };
 }
 
 /** What the shell shows. One function, so every screen and every boot fetch reads the same rule. */
@@ -246,7 +265,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       ...snapshot,
       signOut: async () => {
         await signOutNow();
-        setSnapshot(SIGNED_OUT);
+        setSnapshot((current) => (current.signInMode ? { ...SIGNED_OUT, signInMode: current.signInMode } : SIGNED_OUT));
       },
     }),
     [snapshot],

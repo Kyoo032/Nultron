@@ -13,7 +13,10 @@ over HTTP through `AGENTFORGE_PORTAL_URL`, exactly as it will reach the real one
 
 Nobody signs up. A first sign-in needs an **invite** an operator issued for that address, which the
 portal e-mails to it (see "Inviting a tester" below); every later sign-in needs only an e-mailed
-six-digit code. There is no password anywhere.
+six-digit code. There is no password anywhere, **unless the portal is started with
+`PORTAL_SIGNIN_MODE=password`** (owner decision 2026-10-07, for the HYP AI deployment): then there is no e-mail
+at all, a person signs in with a username (or the address on record) and a password an operator made for them
+with `pnpm portal:account`, and the rest of this section does not apply. See "Signing in with a password" below.
 
 It serves the whole login: the browser flow (`/authorize` and its form posts), the
 device-code flow (`/auth/device/code`, `/activate`, `/auth/device/approve`,
@@ -129,6 +132,35 @@ PORTAL_ALLOW_MANUAL_OTP=1 pnpm portal:otp -- you@example.com
 That issues a fresh code, prints it once, stores only its hash, and records `otp.issued_manually`
 in the audit log. It is refused in production. Codes that are *sent* land in Mailpit.
 
+## Signing in with a password
+
+`PORTAL_SIGNIN_MODE=password` swaps the whole e-mailed-code sign-in for a username and a password. It is read
+once at boot; unset means the e-mailed code, and the default is unchanged. In this mode SMTP is not needed to boot
+in production, no mail is ever sent, and the e-mail, invite and verify routes answer 404. Nobody signs themselves
+up. An operator makes each person:
+
+```sh
+pnpm portal:account -- create --username hyp.alice --email alice@example.test --role owner
+# username   hyp.alice
+# password   XXXX-XXXX-XXXX-XXXX-XXXX     <- shown once; only its scrypt hash is stored
+pnpm portal:account -- list
+pnpm portal:account -- reset-password --username hyp.alice
+pnpm portal:account -- disable --email alice@example.test      # ends every session they hold
+pnpm portal:account -- enable --username hyp.alice
+pnpm portal:account -- set-role --username hyp.alice --role admin
+```
+
+(On a deployment: `sh webapp-deploy/scripts/portal.sh account <command> ...`.) The generated password is
+temporary: the sign-in page asks the person for a new one of their own, at least 12 characters, before it
+issues a session. Five wrong passwords lock an account for 15 minutes, counted in the database; while it is
+locked, an address that has not itself failed against that person may still take three more attempts, so a person
+can get in from their own address while somebody else hammers theirs, and a window never compares more than eight
+passwords. Every failure reads the same, whatever the cause. `create` and `enable` refuse when the org has no seat left; `disable` refuses
+the last owner. For the owner that `seed` made, who has no password yet, `account create --email <that address>`
+attaches one. A second factor is being designed and is not built, and there is no self-service reset or change.
+`portal:invite` and `portal:otp` refuse to run here. The whole mode, with its routes, storage and residual
+risks, is in `docs/internal/portal/device-code-login.md` ("Password sign-in") and SR-165.
+
 ## Environment
 
 | Variable | Required | Default | Notes |
@@ -141,7 +173,8 @@ in the audit log. It is refused in production. Codes that are *sent* land in Mai
 | `PORTAL_SIGNING_KEY` | in production | — | Ed25519 seed: 32 bytes as base64url, base64 or hex. Without it, development mints an ephemeral key and warns loudly; production refuses to start. |
 | `PORTAL_PUBLIC_URL` | **in production** | `http://<host>:<port>` | The **origin** a browser reaches this portal on — https anywhere, http on loopback only, no path, no query, no credentials. It is the access token's `iss`, the device flow's `verification_uri`, and what decides whether the session cookie is `Secure`. A token minted with the wrong issuer verifies nowhere, so production refuses to start without it. |
 | `PORTAL_TRUST_PROXY` | no | off | `1` lets the portal believe `X-Forwarded-For`. Every rate-limit bucket is keyed on that address, so leave it off unless a proxy really is in front. Read through the same flag parser as every other flag: `ture` is a boot error, not a silent off. |
-| `PORTAL_SMTP_HOST` / `_PORT` / `_USER` / `_PASS` / `_FROM` | host required in production | Mailpit on `127.0.0.1:1025` | Production refuses to start on the sandbox default. See the TLS rule below. |
+| `PORTAL_SIGNIN_MODE` | no | `code` | `code` (the e-mailed one-time code) or `password` (a username and a password, made by `portal:account`). Exactly those words; anything else refuses to start. In `password` mode the SMTP settings below are not required and nothing is mailed. |
+| `PORTAL_SMTP_HOST` / `_PORT` / `_USER` / `_PASS` / `_FROM` | host required in production, **unless** `PORTAL_SIGNIN_MODE=password` | Mailpit on `127.0.0.1:1025` | Production refuses to start on the sandbox default. See the TLS rule below. |
 | `PORTAL_SMTP_SECURE` | no | off | `1` for implicit TLS from the first byte (port 465). Leave it off for STARTTLS on 587 — which is then **required**, not optional. |
 | `PORTAL_DEV_OUTBOX` | no | off | Development switch; refused in production. |
 | `PORTAL_ALLOW_MANUAL_OTP` | no | off | Lets `portal:otp` mint a code. Refused in production. |

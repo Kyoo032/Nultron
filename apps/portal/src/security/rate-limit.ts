@@ -211,6 +211,26 @@ export interface PortalLimiters {
    * handful of testers typing a long code by hand.
    */
   readonly inviteAttemptIp: RateLimiter;
+  /**
+   * 20 / 15 min per SOURCE on every password post of the password sign-in (the sign-in itself and the
+   * forced change), counted before the account is looked up, whatever the outcome. A source is an IPv4
+   * address or an IPv6 /64 (`sourceBucket`): keyed on the whole IPv6 address, one network is 2^64
+   * sources and the limit never fires. Sized for a small office behind one address where a person may
+   * mistype twice; the account-level bound is the lock in the database (5 counted attempts plus 3
+   * under the lock, 15 minutes), which no restart or second process can reset.
+   * `PORTAL_SIGNIN_MODE=password` only: in the default mode nothing reads it.
+   */
+  readonly passwordAttemptIp: RateLimiter;
+  /**
+   * 10 / 15 min per identifier AND source (the tenant, or the client's, plus the normalised username or
+   * address, plus the source), counted whether or not the identifier is a real account. It stops one
+   * source hammering one name. It is per source on purpose: a bucket every source shared would let
+   * anybody spend a named person's budget and answer their next try from their own address with "too
+   * many attempts". What bounds a spray of guessed usernames across sources is the per-source budget
+   * above and the eight-derivation gate (`PasswordHasher.admit`); what bounds guesses at one real
+   * account is the lock.
+   */
+  readonly passwordAttemptIdentifier: RateLimiter;
 }
 
 const TEN_MINUTES = 10 * 60 * 1000;
@@ -231,5 +251,7 @@ export function createPortalLimiters(clock: Clock): PortalLimiters {
     signInEmailIp: createRateLimiter({ clock, windowMs: FIFTEEN_MINUTES, max: 15 }),
     signInEmailAddress: createRateLimiter({ clock, windowMs: FIFTEEN_MINUTES, max: 6 }),
     inviteAttemptIp: createRateLimiter({ clock, windowMs: FIFTEEN_MINUTES, max: 10 }),
+    passwordAttemptIp: createRateLimiter({ clock, windowMs: FIFTEEN_MINUTES, max: 20 }),
+    passwordAttemptIdentifier: createRateLimiter({ clock, windowMs: FIFTEEN_MINUTES, max: 10 }),
   });
 }

@@ -113,6 +113,29 @@ export interface User {
   readonly deactivatedAt: Iso | null;
 }
 
+/**
+ * One person's password sign-in state (`apps/portal/migrations/0012_password_signin.sql`), as the
+ * store hands it back. **The hash, the salt and the cost parameters are deliberately not fields
+ * here**: they leave the store only as the `PasswordHash` a `reserveAttempt` gives the verifier, and
+ * nothing else can read them back.
+ */
+export interface Credential {
+  readonly userId: string;
+  readonly tenantId: string;
+  /** Lower case, unique per tenant, never containing `@`. */
+  readonly username: string;
+  /** An operator-issued password: the person must choose their own before a session is issued. */
+  readonly mustChange: boolean;
+  /** Attempts counted since the last success or the last lock expiry, 0 to 5. */
+  readonly failedAttempts: number;
+  /** In the future: the account is locked and no password is compared. Past or null: it is not. */
+  readonly lockedUntil: Iso | null;
+  readonly passwordChangedAt: Iso;
+  readonly lastSignInAt: Iso | null;
+  readonly createdAt: Iso;
+  readonly updatedAt: Iso;
+}
+
 export interface Device {
   readonly id: string;
   readonly tenantId: string;

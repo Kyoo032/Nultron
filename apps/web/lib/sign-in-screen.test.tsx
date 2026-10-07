@@ -13,6 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_PRODUCT_NAME } from "@agentforge/core/gateway";
 import { applyLocale, resetLocaleForTests } from "./i18n";
 import { ProductBrandProvider } from "./product-brand";
+import { SessionFixture } from "./session";
 import { safeAuthorizeUrl, SignInScreen, START_PATH, startSignIn } from "@/components/sign-in-screen";
 
 vi.mock("@/lib/api-client", () => ({
@@ -37,6 +38,19 @@ function render(url = "/sign-in"): string {
     <MemoryRouter initialEntries={[url]}>
       <ProductBrandProvider>
         <SignInScreen />
+      </ProductBrandProvider>
+    </MemoryRouter>,
+  );
+}
+
+/** The same screen where the host has said the portal signs people in with a password. */
+function renderPassword(url = "/sign-in"): string {
+  return renderToStaticMarkup(
+    <MemoryRouter initialEntries={[url]}>
+      <ProductBrandProvider>
+        <SessionFixture value={{ status: "signed-out", identity: null, reason: null, signInMode: "password" }}>
+          <SignInScreen />
+        </SessionFixture>
       </ProductBrandProvider>
     </MemoryRouter>,
   );
@@ -110,6 +124,55 @@ describe("SignInScreen", () => {
   it("asks the host for nothing while it is only being looked at", () => {
     render();
     expect(calls).toEqual([]);
+  });
+});
+
+// PORTAL_SIGNIN_MODE=password (2026-10-07). The host says the portal uses a password; the screen then
+// stops promising an e-mailed code. The button, the test ids and the one-button rule are unchanged.
+describe("SignInScreen when the portal signs people in with a password", () => {
+  it("says username and password, and nowhere promises an e-mail, an invite code or a sign-in code", () => {
+    const markup = renderPassword();
+    expect(markup).toContain("Use the username and password your company gave you.");
+    expect(markup).toContain("choose a new password of your own");
+    expect(markup).toContain("Continue to sign in");
+    expect(markup).not.toContain("Continue with email");
+    expect(markup).not.toContain("work email");
+    expect(markup).not.toContain("invite code");
+    expect(markup).not.toContain("sign-in code");
+    expect(markup).not.toContain("No password");
+    expect(markup).not.toContain("code");
+  });
+
+  it("keeps exactly one primary action with the same test ids", () => {
+    const markup = renderPassword();
+    expect(markup).toContain('data-testid="auth-signin"');
+    expect(markup.match(/data-testid="auth-signin-start"/g)).toHaveLength(1);
+  });
+
+  it("is in Indonesian too, with no key left showing", () => {
+    resetLocaleForTests();
+    applyLocale("id");
+    const markup = renderPassword();
+    expect(markup).toContain("Gunakan nama pengguna dan kata sandi yang diberikan perusahaan Anda.");
+    expect(markup).toContain("Lanjut ke halaman masuk");
+    expect(markup).not.toContain("Lanjut dengan email");
+    expect(markup).not.toContain("kode undangan");
+    expect([...markup.matchAll(/auth\.[\w.]+/g)].map((match) => match[0])).toEqual([]);
+  });
+
+  it("still names the product, and still explains a reason the host sent", () => {
+    const markup = renderPassword("/sign-in?reason=seat_cap_reached");
+    expect(markup).toContain("Sign in to Nultron");
+    expect(markup).toContain("No seats left in your organisation.");
+  });
+
+  it("changes nothing for the default mode: the same three sentences as before", () => {
+    const markup = render();
+    expect(markup).toContain("Use the work email your company invited.");
+    expect(markup).toContain("Continue with email");
+    expect(markup).toContain("we email you a sign-in code each time");
+    expect(markup).not.toContain("Continue to sign in");
+    expect(markup).not.toContain("username and password");
   });
 });
 

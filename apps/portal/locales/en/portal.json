@@ -7,6 +7,36 @@
     "submit": "Continue",
     "emailMissing": "Enter your e-mail address."
   },
+  "password": {
+    "title": "Sign in",
+    "intro": "Enter your username and your password.",
+    "identifierLabel": "Username or e-mail",
+    "passwordLabel": "Password",
+    "submit": "Sign in",
+    "missing": "Enter your username and your password.",
+    "invalid": "That username or password is not right. If you keep seeing this, ask your admin.",
+    "rateLimited": "Too many attempts. Try again in a few minutes.",
+    "busy": "Sign-in is busy right now. Wait a moment, then try again."
+  },
+  "change": {
+    "title": "Choose a new password",
+    "lead": "The password you were given is temporary. Choose your own to continue.",
+    "currentLabel": "Current password",
+    "newLabel": "New password",
+    "confirmLabel": "New password again",
+    "hint": "At least {min} characters, and not your username or e-mail.",
+    "submit": "Save and sign in",
+    "missing": "Fill in all three fields.",
+    "refusal": {
+      "too_short": "Use at least {min} characters.",
+      "too_long": "Use at most {max} characters.",
+      "control_characters": "Use only characters you can type on a keyboard: no line breaks or control characters.",
+      "mismatch": "The two new passwords are not the same.",
+      "same_as_username": "Choose a password that is not your username.",
+      "same_as_email": "Choose a password that is not your e-mail address.",
+      "same_as_current": "Choose a password different from the current one."
+    }
+  },
   "sent": {
     "title": "Check your e-mail",
     "body": "We sent a sign-in code to {email}. It expires in {minutes} minutes.",
@@ -94,7 +124,8 @@
   },
   "signedOut": {
     "title": "Signed out",
-    "body": "Your sign-in on this browser has ended. You will be asked for your e-mail and a code next time."
+    "body": "Your sign-in on this browser has ended. You will be asked for your e-mail and a code next time.",
+    "bodyPassword": "Your sign-in on this browser has ended. You will be asked for your username and password next time."
   },
   "error": {
     "title": "Cannot continue",
@@ -135,6 +166,7 @@
     "hours": "{n} h"
   },
   "footer": {
-    "note": "Never share a sign-in code with anyone."
+    "note": "Never share a sign-in code with anyone.",
+    "notePassword": "Never share your password with anyone."
   }
 }

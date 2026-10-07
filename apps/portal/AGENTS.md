@@ -25,7 +25,9 @@ before working here. It is the plan of record and it names the lanes.
    missing), `0008_oauth_client_scope.sql` (closing the pre-authentication window 0006 opened
    on `oauth_clients`, which nothing needed), `0009_web_session_revocation.sql` (the portal's own
    browser session counter), `0010_app_login_role.sql` (the server's login role, which 0001
-   describes and nobody had created) and `0011_invites.sql` (the invite that gates a first sign-in).
+   describes and nobody had created), `0011_invites.sql` (the invite that gates a first sign-in),
+   `0012_password_signin.sql` (the credentials of the password sign-in) and `0013_password_grace.sql` (the
+   attempts a source with no earlier failure may take under that sign-in's lock).
    Same style: one transaction per file,
    `IF NOT EXISTS`, `DROP POLICY` before `CREATE POLICY`, and every new table placed explicitly
    into one of the three RLS shapes `0004_rls.sql` defines.
@@ -104,6 +106,56 @@ returns **at most a tenant id**, so none of them tells a caller whether a value 
   that would leave none, must be `owner`, and the last owner cannot be demoted. A role changes in one
   place, `invites/role.ts` through the CLI, and there is no portal route for it. The host must not
   default a missing role to `owner`.
+
+## Password sign-in (`PORTAL_SIGNIN_MODE=password`)
+
+**What it is.** A second way in, for a deployment that does not want e-mailed codes (owner, 2026-10-07, for
+HYP AI): a username (or the address on record) and a password, no e-mail sent, SMTP not needed to boot.
+Everything after the person is proved is the code sign-in's own tail: the same login gate, the same
+authorization code, the same portal cookie and the same `role` claim. The decision record and every control
+is SR-165 in [`docs/internal/security-register.md`](../../docs/internal/security-register.md); the flow is in
+[`device-code-login.md`](../../docs/internal/portal/device-code-login.md), "Password sign-in".
+
+**The switch.** `PORTAL_SIGNIN_MODE` is read once, at boot, by `loadConfig`. Unset (or empty) is `code`, and
+in `code` mode **nothing changes**: `src/routes/code-mode-unchanged.test.ts` pins twenty-one routes and
+eighteen screens so the default cannot drift. Any other value than `code` and `password` refuses to start. In
+`password` mode the e-mail, invite and verify routes are not registered (they answer the server's own 404),
+`invite` and `otp` exit 3, the mailer refuses to send, and `GET /auth/signin-mode` answers
+`{"mode":"password"}` (it exists only in this mode, and the host believes only that word).
+
+**The operator command.** There is no sign-up and no self-service reset. `pnpm --filter @agentforge/portal
+account <command>`, or `sh webapp-deploy/scripts/portal.sh account <command>` on the box: `create`
+(a username, an address, a role; prints a generated initial password **once**), `reset-password`, `disable`,
+`enable`, `set-role`, `list`. An initial or reset password must be replaced before a session exists. The code
+is `src/accounts/`; the command refuses to run unless the portal is in password mode.
+
+**Where it lives.** `src/flows/password-sign-in.ts` holds the steps (identify, verify, change; a second
+factor goes between verify and change); `src/routes/password-flow.ts` is the two posts, shared by
+`/authorize/*` and `/activate/*`; `src/store/postgres/credentials.ts` is the table and the lock;
+`src/password/` is scrypt and the policy; `src/security/password-attempts.ts` is the in-process record of
+which sources have attempted whom.
+
+**Rules that are easy to break.**
+
+- **One refusal, one cost.** An unknown username, a wrong password, a locked account and a disabled person
+  get the same sentence and exactly one scrypt derivation. A new refusal that is cheaper or says something
+  different is an oracle.
+- **An attempt is counted before the password is compared**, in one transaction that holds the row, and the
+  hash goes only to a caller that won an increment. Five attempts lock the account for fifteen minutes; while
+  it is locked, a source that has not itself attempted that person in the window may take up to three more,
+  counted in the same row (`grace_attempts`), so the most passwords a window ever tries is **five plus
+  three**, whoever asks. Do not move the count after the comparison, and do not let the record of sources
+  raise that number: it only decides who may ask for a slot.
+- **A step takes a derivation permit before it counts or looks up anything** (`PasswordHasher.admit`, eight
+  at a time) and answers `503` when there is none, so a refusal for want of a place costs nobody an attempt.
+- **Sources are an IPv4 address or an IPv6 /64** (`sourceBucket`). The password routes only: the code
+  sign-in's limits still count the whole address.
+- **The audit rows an outsider can cause name the system as the actor and the person as the target.** None
+  is written for an unknown username or for an attempt that was not counted, so the table cannot be grown
+  without bound. Never put a password, a hash or a typed identifier in a row, a log line or a URL.
+- **Not built, on purpose:** a second factor (no column, no placeholder), self-service reset, a list of
+  breached passwords, a place to see an initial password again. The operator sees initial passwords; that is
+  a recorded residual, not an oversight.
 
 ## Lanes
 

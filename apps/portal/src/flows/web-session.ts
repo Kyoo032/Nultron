@@ -74,8 +74,29 @@ export async function webSessionIsLive(
 }
 
 /**
+ * `PORTAL_SIGNIN_MODE=password` only: does this person's credential still say "choose a new password
+ * first"? Then no cookie they hold is a session, however live its version is. A cookie that predates
+ * the credential (made in the e-mailed-code mode, or before an operator attached a password to an
+ * existing person) would otherwise get past the forced change that every other way in is held to.
+ * `account create` and `reset-password` both end the person's sessions, so this is the second line,
+ * for whatever path leaves a live cookie next to `must_change`. In the default mode nothing here reads
+ * the credentials table.
+ */
+export async function mustChangePasswordFirst(
+  runtime: PortalRuntime,
+  ops: PortalOps,
+  userId: string,
+): Promise<boolean> {
+  if (runtime.config.signInMode !== "password") {
+    return false;
+  }
+  return (await ops.credentials.findByUserId(userId))?.mustChange === true;
+}
+
+/**
  * The member a cookie speaks for, when the cookie is still good: its version is current (SR-21)
- * AND that member still exists and is `active`.
+ * AND that member still exists and is `active` (and, in the password mode, is not still owed a new
+ * password: `mustChangePasswordFirst`).
  *
  * The second half is the one `webSessionIsLive` does not make. A member who was removed -- or whose
  * company was erased, which cascades the row away -- or disabled still holds a cookie that verifies,
@@ -96,7 +117,10 @@ export async function liveWebSessionUser(
         return null;
       }
       const user = await ops.users.findById(session.userId);
-      return user?.status === "active" ? user : null;
+      if (user?.status !== "active") {
+        return null;
+      }
+      return (await mustChangePasswordFirst(runtime, ops, user.id)) ? null : user;
     });
   } catch {
     return null;
