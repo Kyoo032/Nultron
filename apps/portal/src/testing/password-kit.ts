@@ -308,6 +308,29 @@ export async function credentialRowIn(
   }
 }
 
+/**
+ * Flags a person's credential "choose a new password first" and changes nothing else: the hash, its cost
+ * and the password's own date stay as they were. That is what lets a sign-in held inside its comparison
+ * get past `recordSuccess`'s guard on the hash (a real reset changes the hash and is refused there) and
+ * reach the end of the sign-in with a credential that now says `must_change`.
+ */
+export async function markMustChange(pilot: PasswordPilot, userId: string): Promise<void> {
+  const client = await appClientFor(pilot.portal.store.database);
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [pilot.fixture.tenant.id]);
+    const { rowCount } = await client.query("UPDATE user_credentials SET must_change = true WHERE user_id = $1", [
+      userId,
+    ]);
+    await client.query("COMMIT");
+    if (rowCount !== 1) {
+      throw new Error(`expected to flag one credential, flagged ${rowCount}`);
+    }
+  } finally {
+    await client.end();
+  }
+}
+
 export function credentialRow(pilot: PasswordPilot, userId: string): Promise<CredentialRow> {
   return credentialRowIn(pilot.portal.store.database, pilot.fixture.tenant.id, userId);
 }

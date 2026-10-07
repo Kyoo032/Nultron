@@ -3236,7 +3236,7 @@ Controls, each with the test that holds it:
   in the same row (`grace_attempts`, migration 0013, capped by the schema), so the most passwords a window can try is
   **5 + 3 = 8**, whoever asks and from how many addresses (`flows/password-sign-in.test.ts`: forty addresses at once,
   eight comparisons; the same over HTTP with twenty-four). A source that has attempted and not got through is
-  refused outright. In process, 20 password posts per 15 minutes per source (an IPv4 address, or an IPv6 /64) and 10
+  refused outright. In process, 20 password posts per 15 minutes per source (an IPv4 address, or an IPv6 /56) and 10
   per identifier per source, counted before the account is looked up, and at most eight derivations in flight (a ninth
   is `503`, before anything is counted).
 - **Forced change.** An operator-issued password buys no session: the person must choose their own, proving the
@@ -3266,7 +3266,7 @@ each is one line here.
   made the person's own next try `429` from any address), and is per source now. A second lock within an hour writes
   `password.lock_repeated`, `account list` shows the locks of the last 24 hours, and `reset-password` clears the count,
   the slots and the lock and says so.
-- **M2, unauthenticated scrypt cost and IPv6.** The per-source budgets count an IPv6 /64 as one source (the password
+- **M2, unauthenticated scrypt cost and IPv6.** The per-source budgets count an IPv6 /64 as one source (a /56 since the second review below; the password
   routes only: the e-mailed-code limits key on the whole address as before), and a step takes one of eight derivation
   places before it looks anything up or counts anything, answering `503` when none is free. The refusal costs nobody an
   attempt and says nothing about any account.
@@ -3280,6 +3280,75 @@ each is one line here.
   their sessions, and a live cookie next to `must_change` no longer resumes at `/authorize` or `/activate`.
 - **N1, the length ceiling.** Measured after NFKC in the sign-in too, as the policy and the hash do.
 - **N2, the actor of the rows an outsider causes.** The system, with the person as the target.
+
+**Second independent review, 2026-10-07, and what was done.** A second reviewer asked for two changes. Both were
+applied test-first: a failing test, then the fix.
+
+- **A password reset now cuts off a sign-in that is already past the password check.** `must_change` was read only
+  when a cookie was resumed. A `reset-password` that landed after the password was proved and before the sign-in ended
+  had already ended the sessions that existed, and the sign-in then issued a new code and cookie behind it.
+  `completeSignIn` (`routes/authorize.ts`) and `signedInOnActivate` (`routes/activate.ts`) now read the flag in the
+  transaction that issues the code or the cookie. A person whose credential says `must_change` at that moment gets the
+  change page, with no code, no cookie and no Approve. Password mode only: in the default mode
+  `mustChangePasswordFirst` returns before it reads anything, and `code-mode-unchanged.test.ts` is unchanged and green.
+  Tests: `routes/password-sign-in.test.ts`, "a person who is flagged to change their password after the password was
+  checked", on `/authorize` and on `/activate`, each with a control that signs in as usual and a follow-through that
+  completes the change. Limit of the proof: the tests hold a sign-in inside its comparison and flag the credential
+  without changing the hash. A real reset changes the hash, and `recordSuccess` already refuses that case (L2 above),
+  so the tests show that the end of the sign-in re-reads the flag. They do not race a real `reset-password` against it.
+- **A source is an IPv6 /56 on the password routes, not a /64.** One routed /48 is 65,536 /64s, and each was a source
+  with the whole budget of 20 posts per 15 minutes, which is enough to hold every derivation permit and answer `503` to
+  everyone. The constant is `IPV6_SOURCE_PREFIX_BITS` (56) in `security/client-ip.ts`, and a /48 is now 256 sources.
+  IPv4 and IPv4-mapped IPv6 are as before, `rateLimitKey` (the e-mailed-code limits) is still the whole address, and
+  the lockout's record of sources takes the same value on purpose: one function says what a source is. Tests:
+  `security/security.test.ts` ("the password sign-in's source bucket": one source across the /64s of a /56, separate
+  sources across /56s, compressed, upper-case and leading-zero spellings, the 65,536 /64s of a /48 are 256 sources) and
+  `routes/password-sign-in.test.ts` ("counts an IPv6 /56 as one source", where the 21st post from one bucket is still
+  `429`).
+
+What this review leaves open, with the arithmetic. Each item is accepted by the owner: pending.
+
+- (a) **Four sources and eight posts keep a named person out.** The bound is 5 + 3 attempts per account per window, and
+  a source can take only one slot under the lock. Five posts from one source and one each from three more lock the
+  account and use up the slots: four source buckets (each an IPv4 address or an IPv6 /56) and eight posts every
+  15 minutes, 8 x 96 windows = 768 posts a day, keep one person signed out. The /56 makes a bucket larger, so a person
+  who shares a /56 with such a source (a home or office network, or, where a provider hands out /64s one by one, up to
+  256 subscribers) is counted as having attempted too.
+- (b) **768 password comparisons per account per day.** 5 + 3 = 8 per 15-minute window, 96 windows a day, which is
+  about 280,000 a year against one account (768 x 365). The defences are a 12-character minimum and the lock. There is
+  no deny-list of common or breached passwords, so a weak password of 12 characters is within reach of a patient
+  guesser.
+- (c) **A routed /48 still gives 256 buckets.** The per-source budget is 20 posts per 15 minutes
+  (`passwordAttemptIp` in `security/rate-limit.ts`, spent in `routes/password-flow.ts` before any work, whatever the
+  outcome). 256 x 20 = 5,120 posts per 15 minutes from one /48, which is 5.7 posts a second (341 a minute). A
+  derivation holds one of the eight places for about 150 ms (the measured median in `device-code-login.md`; about
+  100 ms at best), so the places supply 8 x 900 = 7,200 place-seconds a window. 5,120 posts use 5,120 x 0.15 = 768 of
+  them, 11 percent (7 percent at 100 ms). So one /48 can keep the places full for at most about 11 percent of the
+  time, and at most about one sign-in in nine is answered `503`. Holding them all the time takes 7,200 / 0.15 = 48,000
+  posts a window, which is 2,400 buckets, or about 9.4 routed /48s (72,000 posts, 3,600 buckets and about 14 /48s at
+  100 ms). At /64 the same /48 could send 65,536 x 20 = 1,310,720 posts a window, 1,456 a second, which is 18 to 27
+  times what holding them takes. The door's own per-address page budget keys on the whole address and does not narrow
+  this. The planned deployment publishes A records only and the server has no IPv6, so this applies only if that
+  changes. The same arithmetic applies to anyone with 2,400 to 3,600 IPv4 addresses, which only an edge rate limit
+  would stop. The cost of the /56 is shared fate: everyone inside one /56 shares one budget and one "has attempted"
+  mark.
+- (d) **`reset-password` is not a hard cut for someone who already holds the password.** It replaces the password and
+  ends the sessions that exist, and after this review a sign-in that was past the password check is turned back to the
+  change page. A reset that commits inside the one transaction that issues the code (a few milliseconds, between the
+  read of `must_change` and the commit) can still let that one sign-in through. Closing that needs a lock on the
+  credential row or a `must_change` check where the code is redeemed, and neither is built. `disable` is a hard cut:
+  the person is refused at the password step and at the login gate, and their sessions end. `enable` brings the old
+  password back, because `disable` keeps the hash. When somebody else may know a password, run `disable`, then
+  `reset-password`, then `enable`.
+- (e) **A few milliseconds separate an existing username from a missing one.** Both paths run one derivation. An
+  existing person also costs two more database transactions (the attempt is counted, the outcome is audited), a few
+  milliseconds against about 150. It was not measured to the millisecond: the test compares median times for a ratio
+  under 3. The budgets cap how many samples an observer gets.
+- (f) **Every in-memory control is per process, and the deployment pins one portal process.** The two budgets, the
+  eight derivation places and the record of sources live in the process. A second process would double the budgets and
+  the places, and a restart empties the record of sources. The account lock, its count and the three slots are in the
+  database and hold across both. The compose stack runs one portal and the Kubernetes manifests
+  (`webapp-deploy/k8s/base/portal.yaml`) run `replicas: 1` with `strategy: Recreate`.
 
 What stays open (the residual risks):
 
@@ -3299,16 +3368,16 @@ What stays open (the residual risks):
    person who mistypes five times from their own address, or who shares an address with whoever is hammering them,
    waits 15 minutes or asks for `reset-password`. And the whole bound is eight attempts per window (five, then three
    under the lock), so an attacker who spends them from four sources (five from one, one each from three more) keeps
-   the person out: four /64s where the first version needed one. The cost is eight posts every 15 minutes. What
+   the person out: four sources (each an IPv4 address or an IPv6 /56) where the first version needed one. The cost is eight posts every 15 minutes. What
    would close most of it is a durable list of the sources a person has signed in from, which is not built.
 5. **No common-password or breached-password check.** The policy is length and the three rules above. The bound of
    eight attempts per window, up from five, is what a weak password has to survive online: 768 guesses a day per account.
 6. **Scrypt is a cost an attacker can spend on us.** Each attempt is about 100 ms and 32 MiB on the libuv pool
-   (four threads by default), shared with other work. One source (an IPv4 address or an IPv6 /64) is bounded by its
+   (four threads by default), shared with other work. One source (an IPv4 address or an IPv6 /56) is bounded by its
    budget, and at most eight derivations are ever in flight, so the sign-in cannot take more of the pool than that.
    What a flood from very many sources can still do is keep all eight places taken, so that every sign-in
    (the person's included) is answered `503` while it lasts. Edge rate limiting is the control for that, and this
-   register does not claim it exists.
+   register does not claim it exists. Item (c) of the second review has the numbers for one routed IPv6 /48.
 7. **Timing is equalised, not constant.** The paths differ by a few database round trips against a derivation of
    about a hundred milliseconds; a patient observer with many samples could in principle tell them apart. The
    budgets cap the samples.

@@ -5,7 +5,7 @@ import { resolveKeyring } from "../jwt/keys";
 import { fixedClock } from "../testing/pg";
 import { boundedField, parseFormBody, parseJsonBody, stringField } from "./body";
 import { clearCookie, cookieNames, cookiesAreSecure, parseCookies, serialiseCookie } from "./cookies";
-import { clientIp, rateLimitKey, sourceBucket } from "./client-ip";
+import { clientIp, IPV6_SOURCE_PREFIX_BITS, rateLimitKey, sourceBucket } from "./client-ip";
 import { csrfMatches, mintCsrfToken } from "./csrf";
 import { formActionSource, htmlResponse, redirectResponse } from "./headers";
 import { createPortalLimiters, createRateLimiter } from "./rate-limit";
@@ -406,27 +406,52 @@ describe("the password sign-in's source bucket", () => {
     expect(sourceBucket("192.0.2.8")).not.toBe(sourceBucket("192.0.2.7"));
   });
 
-  it("is one source for a whole IPv6 /64, however the address is written", () => {
-    const bucket = sourceBucket("2001:db8:1:2::1");
+  it("counts an IPv6 address by its /56, named once so a docs sentence and a test cannot drift from the code", () => {
+    expect(IPV6_SOURCE_PREFIX_BITS).toBe(56);
+    expect(sourceBucket("2001:db8:1:200::1")).toMatch(/\/56$/);
+  });
+
+  it("is one source for a whole IPv6 /56, however the address is written", () => {
+    const bucket = sourceBucket("2001:db8:1:200::1");
     for (const same of [
-      "2001:db8:1:2:3:4:5:6",
-      "2001:DB8:1:2:ffff:ffff:ffff:ffff",
-      "2001:0db8:0001:0002::",
-      "2001:db8:1:2:0:0:0:99",
+      "2001:db8:1:200:3:4:5:6",
+      "2001:DB8:1:2FF:ffff:ffff:ffff:ffff",
+      "2001:0db8:0001:0200::",
+      "2001:db8:1:200:0:0:0:99",
+      // Different /64s of that /56: the fourth group's last byte is the 256 of them.
+      "2001:db8:1:201::1",
+      "2001:db8:1:2ab::5",
+      "2001:0db8:0001:02ff:0000:0000:0000:0001",
     ]) {
       expect(sourceBucket(same), same).toBe(bucket);
     }
-    // The next /64 is another source, and so is any other prefix.
-    expect(sourceBucket("2001:db8:1:3::1")).not.toBe(bucket);
-    expect(sourceBucket("2001:db8:2:2::1")).not.toBe(bucket);
-    expect(sourceBucket("2001:db9:1:2::1")).not.toBe(bucket);
+    // The next /56 is another source, and so is any other prefix, down to the last bit of the /56.
+    expect(sourceBucket("2001:db8:1:300::1")).not.toBe(bucket);
+    expect(sourceBucket("2001:db8:1:1ff::1")).not.toBe(bucket);
+    expect(sourceBucket("2001:db8:2:200::1")).not.toBe(bucket);
+    expect(sourceBucket("2001:db9:1:200::1")).not.toBe(bucket);
+  });
+
+  it("splits at the /56 boundary and not at the /64 one: the 65,536 /64s of one /48 are 256 sources", () => {
+    // One /64 apart is one source; 256 /64s apart is another.
+    expect(sourceBucket("2001:db8:1:0::1")).toBe(sourceBucket("2001:db8:1:ff::1"));
+    expect(sourceBucket("2001:db8:1:ff::1")).not.toBe(sourceBucket("2001:db8:1:100::1"));
+    // 65,536 /64s of one /48 are 256 sources, not 65,536.
+    const sources = new Set<string>();
+    for (let group = 0; group < 0x10000; group += 1) {
+      sources.add(sourceBucket(`2001:db8:1:${group.toString(16)}::1`));
+    }
+    expect(sources.size).toBe(256);
   });
 
   it("expands `::` wherever it stands", () => {
     expect(sourceBucket("::1")).toBe(sourceBucket("0:0:0:0:0:0:0:1"));
     expect(sourceBucket("2001:db8::")).toBe(sourceBucket("2001:db8:0:0:0:0:0:0"));
     expect(sourceBucket("2001::7:1")).toBe(sourceBucket("2001:0:0:0:0:0:7:1"));
-    expect(sourceBucket("2001::7:1")).not.toBe(sourceBucket("2001:0:0:1::7:1"));
+    // The fourth group is the first one the /56 cuts through: 0x100 is another source, 0x1 is not.
+    expect(sourceBucket("2001::7:1")).not.toBe(sourceBucket("2001:0:0:100::7:1"));
+    expect(sourceBucket("2001::7:1")).toBe(sourceBucket("2001:0:0:1::7:1"));
+    expect(sourceBucket("2001::7:1")).not.toBe(sourceBucket("2001:0:1::7:1"));
   });
 
   it("gives an IPv4-mapped IPv6 address the bucket of the IPv4 address, never the shared ::/64", () => {

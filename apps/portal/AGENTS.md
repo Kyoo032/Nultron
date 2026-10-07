@@ -110,7 +110,7 @@ returns **at most a tenant id**, so none of them tells a caller whether a value 
 ## Password sign-in (`PORTAL_SIGNIN_MODE=password`)
 
 **What it is.** A second way in, for a deployment that does not want e-mailed codes (owner, 2026-10-07, for
-HYP AI): a username (or the address on record) and a password, no e-mail sent, SMTP not needed to boot.
+one white-label deployment): a username (or the address on record) and a password, no e-mail sent, SMTP not needed to boot.
 Everything after the person is proved is the code sign-in's own tail: the same login gate, the same
 authorization code, the same portal cookie and the same `role` claim. The decision record and every control
 is SR-165 in [`docs/internal/security-register.md`](../../docs/internal/security-register.md); the flow is in
@@ -148,8 +148,14 @@ which sources have attempted whom.
   raise that number: it only decides who may ask for a slot.
 - **A step takes a derivation permit before it counts or looks up anything** (`PasswordHasher.admit`, eight
   at a time) and answers `503` when there is none, so a refusal for want of a place costs nobody an attempt.
-- **Sources are an IPv4 address or an IPv6 /64** (`sourceBucket`). The password routes only: the code
-  sign-in's limits still count the whole address.
+- **Sources are an IPv4 address or an IPv6 /56** (`sourceBucket`, `IPV6_SOURCE_PREFIX_BITS`). It is not a
+  /64 because one routed /48 is 65,536 of those, enough to hold every derivation permit; as a /56 it is 256.
+  The password routes only: the code sign-in's limits still count the whole address. The lockout's record of
+  sources is fed the same value: one function says what a source is.
+- **A fresh sign-in is held to the forced change at its end, as a resumed cookie is.** `completeSignIn` and
+  `signedInOnActivate` read `must_change` in the transaction that issues the code or the cookie
+  (`mustChangePasswordFirst`), so a `reset-password` that lands after the password check gets the change
+  page and nothing else. Keep that read in front of every place a session or a code is minted.
 - **The audit rows an outsider can cause name the system as the actor and the person as the target.** None
   is written for an unknown username or for an attempt that was not counted, so the table cannot be grown
   without bound. Never put a password, a hash or a typed identifier in a row, a log line or a URL.

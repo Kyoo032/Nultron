@@ -214,7 +214,7 @@ export interface PortalLimiters {
   /**
    * 20 / 15 min per SOURCE on every password post of the password sign-in (the sign-in itself and the
    * forced change), counted before the account is looked up, whatever the outcome. A source is an IPv4
-   * address or an IPv6 /64 (`sourceBucket`): keyed on the whole IPv6 address, one network is 2^64
+   * address or an IPv6 /56 (`sourceBucket`): keyed on the whole IPv6 address, one network is 2^72
    * sources and the limit never fires. Sized for a small office behind one address where a person may
    * mistype twice; the account-level bound is the lock in the database (5 counted attempts plus 3
    * under the lock, 15 minutes), which no restart or second process can reset.

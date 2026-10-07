@@ -34,7 +34,14 @@ import { boundedField, stringField } from "../security/body";
 import { redirectResponse } from "../security/headers";
 import type { WebSession } from "../security/web-session";
 import type { PortalRequest, PortalResponse, PortalRoute } from "../server";
-import { handleChangeStep, handlePasswordStep, passwordEntryResponse, type PasswordSpec } from "./password-flow";
+import {
+  changeRequiredResponse,
+  handleChangeStep,
+  handlePasswordStep,
+  passwordEntryResponse,
+  type PasswordSpec,
+  type PasswordStepResult,
+} from "./password-flow";
 import {
   codeEntryResponse,
   emailEntryResponse,
@@ -254,8 +261,7 @@ async function postPassword(runtime: PortalRuntime, flow: AuthorizeFlow): Promis
   if (step.kind === "response") {
     return step.response;
   }
-  const done = await completeSignIn(runtime, flow.context, flow.params, step.tenantId, step.user.id);
-  return done ?? htmlError(flow.context, "error.generic", { status: 500 });
+  return endPasswordSignIn(runtime, flow, step);
 }
 
 /** `POST /authorize/password/change`: the forced change, and the same tail once it holds. */
@@ -264,7 +270,22 @@ async function postPasswordChange(runtime: PortalRuntime, flow: AuthorizeFlow): 
   if (step.kind === "response") {
     return step.response;
   }
-  const done = await completeSignIn(runtime, flow.context, flow.params, step.tenantId, step.user.id);
+  return endPasswordSignIn(runtime, flow, step);
+}
+
+/**
+ * The tail of both password posts. A person who is in goes through `completeSignIn`; one whose credential
+ * was flagged for a forced change since the password was checked (an operator's `reset-password` landed
+ * in between) gets the change screen and nothing else, so no code and no cookie outlive the reset.
+ */
+async function endPasswordSignIn(
+  runtime: PortalRuntime,
+  flow: AuthorizeFlow,
+  step: Extract<PasswordStepResult, { readonly kind: "signed_in" }>,
+): Promise<PortalResponse> {
+  const done = await completeSignIn(runtime, flow.context, flow.params, step.tenantId, step.user.id, {
+    ifChangeRequired: () => changeRequiredResponse(runtime, flow.context, flow.password, flow.fields),
+  });
   return done ?? htmlError(flow.context, "error.generic", { status: 500 });
 }
 
@@ -321,6 +342,13 @@ function retryCode(
  * sign-in screen shows the copy -- which is where `seat_cap_reached` belongs, next to the admin
  * who can free a seat. `null` means the session's user has gone and the caller should render the
  * form instead.
+ *
+ * **A person still owed a new password gets no code and no cookie, however they got here** (password
+ * mode only; `mustChangePasswordFirst` is false in the other mode, without reading anything). That is
+ * checked on a fresh password sign-in as well as on a resumed cookie: an operator's `reset-password`
+ * can land after the password was proved and before this transaction, and it has already ended the
+ * sessions that existed, so the one this would issue would outlive it. A resumed cookie then falls
+ * through to the form (`null`); a fresh sign-in is answered with `ifChangeRequired`, the change screen.
  */
 async function completeSignIn(
   runtime: PortalRuntime,
@@ -328,7 +356,7 @@ async function completeSignIn(
   params: AuthorizeParams,
   tenantId: string,
   userId: string,
-  options: { readonly resume?: WebSession } = {},
+  options: { readonly resume?: WebSession; readonly ifChangeRequired?: () => PortalResponse } = {},
 ): Promise<PortalResponse | null> {
   const clientId = params.clientId as string;
   const redirectUri = params.redirectUri as string;
@@ -345,10 +373,9 @@ async function completeSignIn(
     if (!user) {
       return { kind: "unknown_user" as const };
     }
-    // A cookie is not a way past the forced change: a person still owed a new password is shown the
-    // form (password mode only; a sign-in that has just proved the password is never in this branch).
-    if (options.resume && (await mustChangePasswordFirst(runtime, ops, userId))) {
-      return { kind: "unknown_user" as const };
+    // Neither a cookie nor a password that was right a moment ago is a way past the forced change.
+    if (await mustChangePasswordFirst(runtime, ops, userId)) {
+      return { kind: "change_required" as const };
     }
     const gate = await runBrowserLoginGate(ops, { tenantId, user, installId });
     if (!gate.ok) {
@@ -387,6 +414,9 @@ async function completeSignIn(
 
   if (outcome.kind === "unknown_user") {
     return null;
+  }
+  if (outcome.kind === "change_required") {
+    return options.ifChangeRequired ? options.ifChangeRequired() : null;
   }
   if (outcome.kind === "denied") {
     return redirectResponse(redirectWithError(redirectUri, redirectErrorReason(outcome.reason), state));
