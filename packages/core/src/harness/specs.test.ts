@@ -91,6 +91,7 @@ describe("mode harness specs", () => {
       delete_file: 10,
       web_fetch: 8,
       run_code: 6,
+      self_check: 4,
     });
   });
 
@@ -127,6 +128,7 @@ describe("mode harness specs", () => {
       "search_files",
       "delete_file",
       "run_code",
+      "self_check",
     ]);
   });
 

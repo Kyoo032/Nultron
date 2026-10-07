@@ -22,6 +22,11 @@ export type RuntimeEvent =
   | { type: "tool.started"; toolKey: string; input: unknown }
   | { type: "tool.completed"; toolKey: string; output: unknown }
   | { type: "run.failed"; message: string }
+  /**
+   * The tool loop used all `steps` model calls it was allowed and the last one asked for tools, so no
+   * closing answer followed. Sent once, just before `run.completed`. A caller that does not care ignores it.
+   */
+  | { type: "run.step_limit"; steps: number }
   | { type: "run.completed"; runId: string; usage?: RunUsage };
 
 export type AgentRuntime = {

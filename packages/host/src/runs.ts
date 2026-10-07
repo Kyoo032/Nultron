@@ -5,6 +5,7 @@ import {
   encodeSse,
   harnessSpecFor,
   redactSecrets,
+  redactSecretsDeep,
   abortErrorMessage,
   isDefaultChatAgent,
   parseImageRunInput,
@@ -26,6 +27,7 @@ import {
   type ToolBindingRecord,
   type ToolCallPart,
   withChatOutputLanguage,
+  withoutDisabledToolSentences,
   bindingsForChatModality,
   chatTurnCopy,
   settleChatTurn,
@@ -48,6 +50,7 @@ import {
   listMessages,
   setThreadTitleFromParts,
 } from "./threads";
+import { redactToolEvent } from "./chat-tool-events";
 import { ensureToolsRegistered } from "./register-tools";
 import { recordChatRunUsage } from "./usage-record";
 import { loadSettings, loadUserLocale } from "./settings-store";
@@ -168,10 +171,13 @@ export async function* startModalityRun(options: {
   // someone who never chose (`sessionLocale`), so Chat answers in the language the screen is in. Off
   // server mode no request locale is set and this is `loadUserLocale`, exactly as before.
   const locale = hostedRequestLocale() ?? loadUserLocale(options.tenant);
+  // The model is only told about tools this run offers: a tool that is off (code runs on the hosted
+  // server, or turned off in Settings) loses its sentence in the prompt, so it is not invited to call it.
+  const agentPrompt = withoutDisabledToolSentences(published.version.systemPrompt, settings.disabledTools ?? []);
   const version = {
     ...published.version,
     model,
-    systemPrompt: withChatOutputLanguage(published.version.systemPrompt + pastHint + knowledge.prompt, locale),
+    systemPrompt: withChatOutputLanguage(agentPrompt + pastHint + knowledge.prompt, locale),
   };
   assertAgentSupportsModality(published.version.inputModalities, options.modality);
   assertModelSupportsModality(version.model, options.modality);
@@ -241,6 +247,8 @@ export async function* startModalityRun(options: {
     const mediaParts: ContentPart[] = [];
     const toolTrace: ToolCallPart[] = [];
     let persisted = false;
+    // Set when the runtime says the tool loop used every step and the last one was still working.
+    let stepLimitReached = false;
     let runUsage: Record<string, unknown> | null = null;
     let settledRunMetered = false;
     /**
@@ -265,6 +273,7 @@ export async function* startModalityRun(options: {
         offeredSources: knowledge.chunks.length,
         tools: toolTrace,
         locale: replyLocale,
+        stepLimit: stepLimitReached,
       });
       if (settled.appended) {
         send({ type: "assistant.delta", text: settled.appended });
@@ -375,41 +384,50 @@ export async function* startModalityRun(options: {
               send(event);
               return;
             }
-            send(event);
+            if (event.type === "run.step_limit") {
+              // Not a frame for the screen: it decides the closing sentence `persistAssistant` adds.
+              stepLimitReached = true;
+              return;
+            }
+            // What leaves the runtime (the screen, the thread, the tool rows) is the redacted copy of a
+            // tool's input and output. `event` stays the runtime's own: media is read from it below.
+            const safe = redactToolEvent(event);
+            send(safe);
             if (event.type === "assistant.delta") {
               assistantText += event.text;
             }
             if (event.type === "assistant.thinking") {
               thinkingText += event.text;
             }
-            if (event.type === "tool.started") {
+            if (safe.type === "tool.started") {
               toolTrace.push({
                 type: "tool_call",
-                toolKey: event.toolKey,
+                toolKey: safe.toolKey,
                 status: "started",
-                input: event.input,
+                input: safe.input,
               });
-              await insertToolInvocation(options.tenant, run.id, event.toolKey, event.input, null, "started");
+              await insertToolInvocation(options.tenant, run.id, safe.toolKey, safe.input, null, "started");
             }
-            if (event.type === "tool.completed") {
+            if (safe.type === "tool.completed" && event.type === "tool.completed") {
               const recorded = takeLastToolIo(event.toolKey);
-              const persistOutput = recorded?.full ?? event.output;
+              const fullOutput = recorded?.full ?? event.output;
+              const persistOutput = redactSecretsDeep(fullOutput);
               const last = [...toolTrace]
                 .reverse()
-                .find((item) => item.toolKey === event.toolKey && item.status === "started");
+                .find((item) => item.toolKey === safe.toolKey && item.status === "started");
               if (last) {
                 last.status = "completed";
-                last.output = event.output;
+                last.output = safe.output;
               } else {
                 toolTrace.push({
                   type: "tool_call",
-                  toolKey: event.toolKey,
+                  toolKey: safe.toolKey,
                   status: "completed",
-                  output: event.output,
+                  output: safe.output,
                 });
               }
-              await insertToolInvocation(options.tenant, run.id, event.toolKey, null, persistOutput, "completed");
-              for (const part of collectToolMediaParts(persistOutput)) {
+              await insertToolInvocation(options.tenant, run.id, safe.toolKey, null, persistOutput, "completed");
+              for (const part of collectToolMediaParts(fullOutput)) {
                 // Every generated URL is mirrored into the local store first: the renderer
                 // only loads host-served media, so a part we cannot mirror is dropped
                 // rather than persisted as a remote URL that would never display.

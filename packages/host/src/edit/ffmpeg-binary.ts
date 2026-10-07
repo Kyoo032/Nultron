@@ -349,3 +349,8 @@ export function resolveFfmpegAsync(): Promise<BinaryStatus> {
 export function resolveFfprobe(): BinaryStatus {
   return resolveCached("ffprobe");
 }
+
+/** `resolveFfprobe` without blocking the event loop, for a caller that runs on a request path. */
+export function resolveFfprobeAsync(): Promise<BinaryStatus> {
+  return resolveCachedAsync("ffprobe");
+}

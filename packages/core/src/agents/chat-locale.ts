@@ -62,6 +62,8 @@ export type ChatTurnCopy = {
   /** Stub only: a real marker plus one the desk did not offer, so the check has something to drop. */
   deskCite: string;
   noSource: string;
+  /** The run used every step it had and the last one was still working: what happened and what to do. */
+  stepLimit: string;
 };
 
 const CHAT_TURN_COPY: Record<AppLocale, ChatTurnCopy> = {
@@ -74,6 +76,8 @@ const CHAT_TURN_COPY: Record<AppLocale, ChatTurnCopy> = {
     pastMany: 'Earlier chats include "{title}".',
     deskCite: "From the desk [1] [99].",
     noSource: "This desk did not have a source for that.",
+    stepLimit:
+      "I ran out of steps before I could finish this. Ask me to continue and I will pick up from where I stopped.",
   },
   id: {
     thinkPast: "Saya akan meninjau percakapan sebelumnya, lalu menjawab dari yang saya temukan.",
@@ -84,6 +88,8 @@ const CHAT_TURN_COPY: Record<AppLocale, ChatTurnCopy> = {
     pastMany: 'Percakapan sebelumnya mencakup "{title}".',
     deskCite: "Dari meja [1] [99].",
     noSource: "Meja ini tidak punya sumber untuk itu.",
+    stepLimit:
+      "Langkah kerja saya habis sebelum ini selesai. Minta saya untuk melanjutkan, dan saya akan meneruskannya dari titik terakhir.",
   },
 };
 

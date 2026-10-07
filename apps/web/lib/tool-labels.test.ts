@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { classifyOutcome } from "@/components/tool-rows/results";
 import { applyLocale, resetLocaleForTests, t } from "./i18n";
 import {
   codeLanguageName,
@@ -32,6 +33,22 @@ describe("tool-labels", () => {
 
   it("summarizes calculator input and output", () => {
     expect(toolCallSummary("calculator", { expression: "2 + 3" }, { result: 5 })).toBe("Calculator · 2 + 3 → 5");
+  });
+
+  it("names the self check in plain words, in both languages", () => {
+    expect(toolActivityLabel("self_check")).toBe("Checking this desk…");
+    expect(toolDoneLabel("self_check")).toBe("Desk check");
+    applyLocale("id");
+    expect(toolActivityLabel("self_check")).toBe("Memeriksa meja ini…");
+    expect(toolDoneLabel("self_check")).toBe("Pemeriksaan meja");
+  });
+
+  it("shows a tool that threw as a refusal, with the words the model was given", () => {
+    const failed = { ok: false, reason: "tool_error", message: "The web_search tool failed: timed out." };
+    expect(classifyOutcome("web_search", "completed", failed)).toEqual({
+      state: "refused",
+      message: "The web_search tool failed: timed out.",
+    });
   });
 });
 
