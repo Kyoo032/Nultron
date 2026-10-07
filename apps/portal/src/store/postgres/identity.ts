@@ -179,6 +179,13 @@ export function orgsOps(client: PoolClient): PortalOps["orgs"] {
       );
       return rows[0]?.fits ?? true;
     },
+    async countProvisioned(orgId) {
+      const { rows } = await client.query<{ n: number }>(
+        `SELECT count(*)::int AS n FROM users WHERE org_id = $1 AND status <> 'disabled'`,
+        [orgId],
+      );
+      return Number(rows[0]?.n ?? 0);
+    },
   };
 }
 

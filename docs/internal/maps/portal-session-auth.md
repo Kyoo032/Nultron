@@ -1,5 +1,9 @@
 # Map — Portal browser session (hosted server)
 
+Re-checked 2026-10-07 at 9aba37e + working tree, for one paragraph only: **`signInMode`** under "Status" (the
+host learns from the portal whether it signs people in with a password, and the sign-in screen says so). Every
+other line is as verified next.
+
 Re-checked 2026-10-01 at 0b61a29 + working tree, a second time that day, for **the role**: the portal now
 sends `role` (`owner` | `admin` | `member`) in every token body, and the host writes that membership role at
 sign-in and re-applies it at every refresh (SR-65, second hole). The new section is **The role (2026-10-01)**
@@ -271,6 +275,20 @@ membership or the read throws (`session_role_not_read`). The sign-in and refresh
 visitor who never signed in is not an error and gets `{ signedIn: false }`
 with **no** reason to render; a visitor who presented a cookie that failed gets
 `{ signedIn: false, reason }`.
+
+**`signInMode` (2026-10-07).** When the portal is run with `PORTAL_SIGNIN_MODE=password` (a username and a
+password in place of the e-mailed code; owner decision for HYP AI, see [`portal-service.md`](portal-service.md)
+section 8), every answer of this route, signed in or not, carries `signInMode: "password"`, and in the default
+mode it carries no such field, so the answer is byte for byte what it was. The host learns it from the portal,
+never from the environment and never from the renderer: `createPortalModeReader`
+(`packages/host/src/auth/portal-mode.ts`) asks `GET {AGENTFORGE_PORTAL_URL}/auth/signin-mode`, believes only an
+affirmative `{"mode":"password"}`, reads a 404 (the default mode, or an older portal) as `code`, and treats
+anything else (a 5xx, a timeout, a redirect, a page from a proxy) as "unknown", shown as `code` and asked again
+after 15 s. The first read waits at most 1.5 s; after that a heard answer is returned at once and refreshed
+behind it, fresh for 5 minutes. `hostAuthRoutes` wires it only when `isServerMode()`, so a desk is given no
+reader and makes no request. The renderer keeps it on the snapshot (`SessionSnapshot.signInMode`,
+`apps/web/lib/session.tsx`), through a session lost mid-use, and `SignInScreen` swaps three sentences. Nothing else
+in this subsystem changes: the exchange, the state binding, the gate and the refresh are the same in both modes.
 
 ### The role (2026-10-01, SR-65)
 

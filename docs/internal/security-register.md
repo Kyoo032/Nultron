@@ -114,6 +114,13 @@ are uncommitted. Nothing was driven on a running hosted server. The tests run th
 queries over a throwaway database with three people of one company on one desk; the browser half of
 [SR-156](#sr-156) is a unit test over rendered markup, not a drive.
 
+Extended on 2026-10-07 with [SR-165](#sr-165): the owner's decision to give one hosted deployment (HYP AI) a
+username-and-password sign-in in place of the e-mailed code, which lifts the "no password" rule for that mode
+only. The mode, its controls and the risks it leaves are read from the working tree on top of `main`
+(`9aba37e`), uncommitted. Nothing in it was driven in a browser or on a server; the tests run the portal's own
+routes and queries over a real Postgres, and the default mode's screens and route table are pinned against
+`main`'s.
+
 ## Summary
 
 | ID | Severity | Title | Status | Gate |
@@ -191,6 +198,7 @@ queries over a throwaway database with three people of one company on one desk; 
 | [SR-138](#sr-138) | Medium | One signed-in account could hold any number of model runs open: the limiters count requests, nothing counted runs | Fixed in tree (2026-10-06), tested through the router and the HTTP adapter: every gateway-calling route holds a slot or is on a written list; in memory, per process; not driven on a hosted instance | Blocks Tencent deploy until driven there |
 | [SR-156](#sr-156) | Medium | Hosted: any signed-in member could delete a desk of the company, and with it every person's chats and the desk's Knowledge Base | Fixed in tree (2026-10-07), tested, renderer hides the button; not driven | Blocks a multi-person hosted pilot until driven |
 | [SR-157](#sr-157) | Medium | Hosted: stored media (pictures, clips, audio) is read, listed and deleted by company, not by person, so a colleague's picture can be fetched by its id, listed in the Images and Videos galleries, and sent to a model by a job | Open: nothing changed, because scoping by person breaks shared reads the product relies on; needs an owner decision (2026-10-07) | Blocks "Chat attachments are private to the person who attached them" |
+| [SR-165](#sr-165) | Medium | Hosted portal: `PORTAL_SIGNIN_MODE=password` gives one deployment (HYP AI) a username-and-password sign-in with no second factor, in place of the e-mailed code; the default sign-in is unchanged | Built in tree, tested over a real Postgres; not driven in a browser or on a server (2026-10-07). Independent review found no critical or high issue; its findings (M1, M2, L1 to L3, N1, N2) are fixed in the tree, uncommitted. The owner's decision; residual risks recorded | None for the pilot the owner asked for; open until the second factor (being designed) ships |
 | [SR-81](#sr-81) | Low | Keyless Research search sends the masked query to four pinned public APIs | Checked, not an issue (2026-09-26) | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
@@ -3193,6 +3201,138 @@ it" needs, and it is the smallest change. (3) Leave media company-wide and recor
 shared inside a company. Option 2 is not built; the document-attach work is a separate lane.
 
 Gate: blocks the sentence "a Chat attachment is private to the person who attached it" until one is chosen.
+
+### SR-165 {#sr-165}
+
+**Hosted portal: a username-and-password sign-in, selected by `PORTAL_SIGNIN_MODE=password`, with no second factor.**
+Raised 2026-10-07. Medium. Enterprise (the hosted app's portal), for the HYP AI white-label. Built in the tree and
+tested; not driven in a browser or on a server.
+
+The decision, and who made it: Rizky, 2026-10-07, for the HYP AI deployment: *"the login portal doesnt need email
+code, we will use username and [password] protection for now, with 2FA method being designed."* He chose the real
+multi-user portal (one company, one shared desk) with a username and a password in place of the e-mailed code.
+Until then the rule was "no password" (`device-code-login.md`, "Sign-in method", whose four reasons were that a
+password database is the worst asset to hold, that credential stuffing is the dominant attack on SME SaaS, that
+SSO is an easier path from OTP, and that the user is at a browser anyway). That rule is lifted **for this mode
+only**: the e-mailed code is the default, the other hosted product runs it, and the code mode's 21 routes and 18
+screens are pinned as unchanged (`apps/portal/src/routes/code-mode-unchanged.test.ts`).
+
+Controls, each with the test that holds it:
+
+- **Storage.** scrypt (N = 2^15, r = 8, p = 1, 32 MiB, about 100 to 150 ms; `node:crypto`, no dependency), a random
+  16-byte salt per password, the cost stored beside the hash so it can be raised (and a hash under older cost is
+  re-written at the next correct password), constant-time comparison, NFKC. The hash has no field in any type the
+  store returns, and `tenant_readonly` has no grant on the table (`credentials.test.ts`, `password.test.ts`).
+- **Policy.** 12 to 200 characters, not the username or the address, no control characters, a new password differs
+  from the old one. No password, hash or typed value is in any page, redirect, audit row or log line
+  (`password-sign-in.test.ts`, "secrets", over everything the suite sent and received).
+- **No enumeration.** An unknown username, a wrong password, a lock and a disabled person get the same status,
+  sentence and markup, and each runs exactly one scrypt derivation (a dummy where there is nothing to compare);
+  the test counts derivations per path and compares median times.
+- **Lockout.** Five counted attempts lock an account for 15 minutes, in the database (a restart does not reset it),
+  and an attempt is counted **before** the password is compared, so a parallel burst from one address gets exactly
+  five comparisons (12 over HTTP and 50 at the store). A correct password clears it. While an account is locked, a
+  source address that has not itself attempted that person in the window may take up to three more attempts, counted
+  in the same row (`grace_attempts`, migration 0013, capped by the schema), so the most passwords a window can try is
+  **5 + 3 = 8**, whoever asks and from how many addresses (`flows/password-sign-in.test.ts`: forty addresses at once,
+  eight comparisons; the same over HTTP with twenty-four). A source that has attempted and not got through is
+  refused outright. In process, 20 password posts per 15 minutes per source (an IPv4 address, or an IPv6 /64) and 10
+  per identifier per source, counted before the account is looked up, and at most eight derivations in flight (a ninth
+  is `503`, before anything is counted).
+- **Forced change.** An operator-issued password buys no session: the person must choose their own, proving the
+  temporary one again on that post (counted and locked like a sign-in), and a change ends every session they hold.
+- **No e-mail, no self-sign-up.** The mailer refuses to send; the e-mail, invite and verify routes are 404; the
+  portal has no sign-up route; accounts exist only because an operator ran `portal:account`, which enforces the seat
+  cap, refuses to disable or demote the last owner, and ends sessions on `disable` and `reset-password`.
+- **Same session as the code flow.** A person who is in goes through `completeSignIn`: the login gate (seat cap,
+  disabled, past due), the authorization code, the portal's own cookie. CSRF and the client and `redirect_uri` are
+  validated on both posts, and the pages carry the client's origin in `form-action` (SR-20).
+- **Audit.** `password.verified`, `password.failed`, `password.locked`, `password.lock_repeated`,
+  `password.withheld`, `password.changed`, `account.created`, `account.password_reset`, `account.disabled`,
+  `account.enabled`, and the existing `web_session.revoked` and `member.role_changed`, none carrying a secret. What an
+  outsider causes (`failed`, `locked`, `lock_repeated`, `withheld`) names the system as the actor and the person as the
+  target; only a person's own proof or change has them as the actor. Every such row follows a counted attempt, so what
+  an outsider can add per account per window is bounded (five rows of `withheld` for a person who is not active).
+
+**Independent review, 2026-10-07, and what was done.** A reviewer who was not told the author's conclusions found no
+critical or high issue and said to ship after named fixes. All were applied test-first (a failing test, then the fix;
+where the code came first, the test was shown to fail by undoing it). The tests are named where they are described above;
+each is one line here.
+
+- **M1, the lock was a free denial of service against a named person.** Mitigated, not removed: the three slots under
+  the lock and the in-process record of sources described under "Lockout". The bound on passwords compared is **8 per
+  account per window, up from the 5 the first version held**; that is the price of any scheme that lets a person in under
+  a lock. The identifier budget, which every source shared, was a second way to do the same thing (ten posts at a name
+  made the person's own next try `429` from any address), and is per source now. A second lock within an hour writes
+  `password.lock_repeated`, `account list` shows the locks of the last 24 hours, and `reset-password` clears the count,
+  the slots and the lock and says so.
+- **M2, unauthenticated scrypt cost and IPv6.** The per-source budgets count an IPv6 /64 as one source (the password
+  routes only: the e-mailed-code limits key on the whole address as before), and a step takes one of eight derivation
+  places before it looks anything up or counts anything, answering `503` when none is free. The refusal costs nobody an
+  attempt and says nothing about any account.
+- **L1, an unbounded audit row.** `password.withheld` is written only for an attempt that was counted, so the lock
+  bounds it; `enable` clears what attempts on a disabled person left.
+- **L2, a stale re-hash.** `recordSuccess` is guarded by the hash that was proved. A sign-in overtaken by a
+  `reset-password` writes nothing and is refused (`changed_during_sign_in`), which is one step further than ignoring
+  the write: otherwise it would still be issued a session after the reset ended them all. "Overtaken" means the
+  password's own date moved; a sign-in that only lost a race with another sign-in re-hashing the same password is let in.
+- **L3, a session that predates the credential.** `account create` that attaches a password to an existing person ends
+  their sessions, and a live cookie next to `must_change` no longer resumes at `/authorize` or `/activate`.
+- **N1, the length ceiling.** Measured after NFKC in the sign-in too, as the policy and the hash do.
+- **N2, the actor of the rows an outsider causes.** The system, with the person as the target.
+
+What stays open (the residual risks):
+
+1. **No second factor.** A password that is guessed, phished or reused from another service is a session. The
+   design for 2FA is not finished; the sign-in is shaped as explicit steps so one can be added as one more step
+   (`flows/password-sign-in.ts`), and there is deliberately no column for it. Until then the lock and the budgets
+   are what stand between a guesser and an account.
+2. **No self-service reset or change.** A forgotten password is an operator's `reset-password`, so the operator
+   decides who is who, out of band; the portal cannot help with that. The same post that does the forced change
+   would serve a voluntary one, and no page links to it.
+3. **The operator sees every initial and reset password**, on a terminal and in whatever that terminal's output is
+   kept in (an `exec -T` session, a CI log if the command is ever run through one). The arguments of the command
+   carry no password, so shell history does not. It is temporary and spent at first sign-in, and a first sign-in by
+   somebody else is visible: the real person's first attempt fails and a `password.changed` row names the other.
+4. **A lock still denies a source that has itself failed, and it is still a lever.** A source address that has
+   attempted a person in the window and not got through is refused until the window ends, whatever it types: a
+   person who mistypes five times from their own address, or who shares an address with whoever is hammering them,
+   waits 15 minutes or asks for `reset-password`. And the whole bound is eight attempts per window (five, then three
+   under the lock), so an attacker who spends them from four sources (five from one, one each from three more) keeps
+   the person out: four /64s where the first version needed one. The cost is eight posts every 15 minutes. What
+   would close most of it is a durable list of the sources a person has signed in from, which is not built.
+5. **No common-password or breached-password check.** The policy is length and the three rules above. The bound of
+   eight attempts per window, up from five, is what a weak password has to survive online: 768 guesses a day per account.
+6. **Scrypt is a cost an attacker can spend on us.** Each attempt is about 100 ms and 32 MiB on the libuv pool
+   (four threads by default), shared with other work. One source (an IPv4 address or an IPv6 /64) is bounded by its
+   budget, and at most eight derivations are ever in flight, so the sign-in cannot take more of the pool than that.
+   What a flood from very many sources can still do is keep all eight places taken, so that every sign-in
+   (the person's included) is answered `503` while it lasts. Edge rate limiting is the control for that, and this
+   register does not claim it exists.
+7. **Timing is equalised, not constant.** The paths differ by a few database round trips against a derivation of
+   about a hundred milliseconds; a patient observer with many samples could in principle tell them apart. The
+   budgets cap the samples.
+8. **What is not audited.** An attempt on a username that does not exist (the audit table is append-only and has
+   to name a tenant, so an unauthenticated caller must not be able to grow it), an attempt refused while an
+   account is locked (the lock's own row says so) and an attempt answered `503`.
+9. **The limits are per process, except the account lock.** The two budgets, the eight derivation places and the
+   record of which sources have attempted whom live in the portal process: a second process doubles the budgets and
+   the places, and a restart empties the record (so a source that was locked out is clean again, and takes one of
+   the three slots, which the database still counts). The lock, its count and the slots are in the database, so the
+   bound of eight passwords per account per window holds across processes and restarts.
+10. **The sign-in screen's wording is the host's, learned from the portal.** A portal answer the host cannot read
+    is shown as the default wording. Someone who could answer the host's request to the portal could change that
+    wording and nothing else: it changes no decision and no URL.
+11. **Not driven.** No browser has enforced the new pages' CSP, and nothing ran on a server.
+12. **Switching the mode back turns password accounts into code accounts.** `account create` makes a person who is
+    `active` with the address the operator typed. Set `PORTAL_SIGNIN_MODE` back to `code` (or unset it) and the
+    e-mail step treats that person like any member: whoever can read that inbox is let in with a code, and the
+    password is no longer asked for. The `user_credentials` rows stay, unread, and a switch to `password` again
+    brings those passwords back to life, including any an operator has since forgotten about. Nothing here blocks
+    the switch, and the operator who makes it should know which accounts it changes.
+
+Gate: none for the pilot the owner asked for. It stays open until the second factor ships; when password-only is
+no longer acceptable is the owner's call, and until then nothing should say the hosted app is two-factor.
 
 ## Low
 

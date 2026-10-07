@@ -14,6 +14,7 @@ import { getLocalVaultKey } from "@agentforge/db/vault-key";
 import { log } from "../log";
 import { createPortalSessionCheck, type PortalSessionCheck } from "./portal-check";
 import { createPortalClient, type PortalClient, type PortalClientOptions } from "./portal-client";
+import { createPortalModeReader, type PortalModeReader } from "./portal-mode";
 import { configuredClientCredentials } from "./portal-config";
 import { createSessionSecrets, type SessionSecrets } from "./session-secrets";
 import { createHostSessionStore, createMemoryTokenVault, type SessionStore, type TokenVault } from "./session-store";
@@ -114,6 +115,14 @@ export {
 } from "./portal-config";
 export type { PortalClientCredentials, PortalLoginConfig } from "./portal-config";
 export {
+  PORTAL_MODE_FRESH_MS,
+  PORTAL_MODE_RETRY_MS,
+  PORTAL_MODE_TIMEOUT_MS,
+  PORTAL_SIGNIN_MODE_PATH,
+  createPortalModeReader,
+} from "./portal-mode";
+export type { PortalModeOptions, PortalModeReader, SignInMode } from "./portal-mode";
+export {
   AUTH_ROUTE_PREFIX,
   UNGATED_GETS,
   authError,
@@ -173,6 +182,7 @@ let portal: PortalClient | null = null;
 let portalCheck: PortalSessionCheck | null = null;
 let secrets: SessionSecrets | null = null;
 let routes: AuthRoutes | null = null;
+let portalMode: PortalModeReader | null = null;
 let stopPurge: (() => void) | null = null;
 
 /** The server's session store: one per process, SQLite-backed, swept on a timer. */
@@ -242,6 +252,15 @@ async function hostApplyRole(identity: PortalIdentity, role: PortalRole | null):
   }
 }
 
+/**
+ * One reader per process: how the portal signs people in, asked of the portal and cached
+ * (`./portal-mode.ts`). Reads `AGENTFORGE_PORTAL_URL` on its first use, like the portal client.
+ */
+export function hostPortalMode(): PortalModeReader {
+  portalMode ??= createPortalModeReader();
+  return portalMode;
+}
+
 export function hostAuthRoutes(): AuthRoutes {
   routes ??= createAuthRoutes({
     store: hostSessionStore(),
@@ -250,6 +269,9 @@ export function hostAuthRoutes(): AuthRoutes {
     portalCheck: hostPortalCheck(),
     secrets: hostSessionSecrets(),
     serverMode: isServerMode(),
+    // Hosted only. A desk has no portal to ask, so it is given no reader at all and its session
+    // answer never carries the field: Personal and webdev are untouched by the password mode.
+    signInMode: isServerMode() ? () => hostPortalMode().read() : undefined,
     // Lane C: first sign-in writes the tenant, org, user, membership and home desk. The import is
     // dynamic for the same reason `createHostSessionStore` makes its one dynamic: the desktop and
     // webdev import this module and never sign in, so `@agentforge/db` — which opens SQLite at
@@ -300,4 +322,5 @@ export function resetHostAuthForTests(): void {
   portalCheck = null;
   secrets = null;
   routes = null;
+  portalMode = null;
 }

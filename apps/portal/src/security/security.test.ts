@@ -5,7 +5,7 @@ import { resolveKeyring } from "../jwt/keys";
 import { fixedClock } from "../testing/pg";
 import { boundedField, parseFormBody, parseJsonBody, stringField } from "./body";
 import { clearCookie, cookieNames, cookiesAreSecure, parseCookies, serialiseCookie } from "./cookies";
-import { clientIp, rateLimitKey } from "./client-ip";
+import { clientIp, rateLimitKey, sourceBucket } from "./client-ip";
 import { csrfMatches, mintCsrfToken } from "./csrf";
 import { formActionSource, htmlResponse, redirectResponse } from "./headers";
 import { createPortalLimiters, createRateLimiter } from "./rate-limit";
@@ -391,6 +391,62 @@ describe("client address", () => {
     const source = readFileSync(new URL("./client-ip.ts", import.meta.url), "utf8");
     expect(source).not.toContain("process.env");
     expect(source).not.toMatch(/env\[/);
+  });
+
+  it("keeps `rateLimitKey` the whole address, so the e-mailed-code limits count exactly what they did", () => {
+    expect(rateLimitKey("2001:db8:1:2:3:4:5:6")).toBe("2001:db8:1:2:3:4:5:6");
+    expect(rateLimitKey("2001:db8:1:2:ffff::1")).toBe("2001:db8:1:2:ffff::1");
+    expect(rateLimitKey("192.0.2.7")).toBe("192.0.2.7");
+  });
+});
+
+describe("the password sign-in's source bucket", () => {
+  it("leaves an IPv4 address as it is, so two addresses of one network are two sources", () => {
+    expect(sourceBucket("192.0.2.7")).toBe("192.0.2.7");
+    expect(sourceBucket("192.0.2.8")).not.toBe(sourceBucket("192.0.2.7"));
+  });
+
+  it("is one source for a whole IPv6 /64, however the address is written", () => {
+    const bucket = sourceBucket("2001:db8:1:2::1");
+    for (const same of [
+      "2001:db8:1:2:3:4:5:6",
+      "2001:DB8:1:2:ffff:ffff:ffff:ffff",
+      "2001:0db8:0001:0002::",
+      "2001:db8:1:2:0:0:0:99",
+    ]) {
+      expect(sourceBucket(same), same).toBe(bucket);
+    }
+    // The next /64 is another source, and so is any other prefix.
+    expect(sourceBucket("2001:db8:1:3::1")).not.toBe(bucket);
+    expect(sourceBucket("2001:db8:2:2::1")).not.toBe(bucket);
+    expect(sourceBucket("2001:db9:1:2::1")).not.toBe(bucket);
+  });
+
+  it("expands `::` wherever it stands", () => {
+    expect(sourceBucket("::1")).toBe(sourceBucket("0:0:0:0:0:0:0:1"));
+    expect(sourceBucket("2001:db8::")).toBe(sourceBucket("2001:db8:0:0:0:0:0:0"));
+    expect(sourceBucket("2001::7:1")).toBe(sourceBucket("2001:0:0:0:0:0:7:1"));
+    expect(sourceBucket("2001::7:1")).not.toBe(sourceBucket("2001:0:0:1::7:1"));
+  });
+
+  it("gives an IPv4-mapped IPv6 address the bucket of the IPv4 address, never the shared ::/64", () => {
+    expect(sourceBucket("::ffff:192.0.2.7")).toBe("192.0.2.7");
+    // The hex spelling of the same address.
+    expect(sourceBucket("::ffff:c000:207")).toBe("192.0.2.7");
+    expect(sourceBucket("0:0:0:0:0:ffff:c000:0207")).toBe("192.0.2.7");
+    expect(sourceBucket("::ffff:c000:208")).not.toBe(sourceBucket("::ffff:c000:207"));
+    // And through the same derivation the limiter uses.
+    expect(
+      sourceBucket(clientIp({ headers: {}, socketIp: "::ffff:192.0.2.7", trustProxy: false })),
+    ).toBe("192.0.2.7");
+  });
+
+  it("is one shared bucket for an address that is not known, and never throws on a malformed one", () => {
+    expect(sourceBucket(null)).toBe("unknown-ip");
+    for (const odd of [":::::", "1:2:3:4:5:6:7:8:9", "1::2::3", "gggg::1", "2001:db8:::1"]) {
+      expect(() => sourceBucket(odd), odd).not.toThrow();
+      expect(sourceBucket(odd), odd).toBeTruthy();
+    }
   });
 });
 
