@@ -220,7 +220,14 @@ Until Rizky lifts it, work is limited to three things, in this order:
 - Never "closed beta", "testers" or "invitations".
 
 **App preview: https://app.nultron-ai.xyz**
-- It runs the image `nultron-web:<sha>`, built on the box from `git archive` (needs the PR #139 dockerignore fix). The app runs off server mode through `edge/app/preview-server.ts`. Security register SR-133 holds the decision record.
+- It runs the image `nultron-web:<sha>`, built from `git archive`. The app runs off server mode through `edge/app/preview-server.ts`. Security register SR-133 holds the decision record.
+- **Since 2026-10-07 it runs `nultron-web:0d829f00bc81`** (`main` at `0d829f0`). The tag before it was `5bec53280e27`.
+- **Updating it (must follow).** The box also serves three websites through the same proxy, and Rizky asked for care. Use the runbook section "Update the app image only: the safe route" in `nultron-files/deploy/tencent/README.md`:
+  - Rizky says go in the chat for that deploy. If the permission system refuses a step, stop and hand him the commands.
+  - Build and test the image on the PC, send it with `docker save | ssh docker load`, and change only `app/app-image.env`.
+  - Recreate the desks one at a time with `--no-deps`, a tester desk first as a canary, the owner's desk last.
+  - Never recreate the proxy on its own: every desk lives in its network namespace and would answer 502.
+  - Do not run `edge/deploy.ps1` while the local `edge/` folder holds undeployed work.
 - Each login is HTTP Basic Auth and lands on a private desk:
   - `nultron` (Rizky) on port 3000;
   - `tester01`–`tester10` on 3001–3010, each with its own volume and its own key slot, created by `edge/app/add-testers.sh`.
