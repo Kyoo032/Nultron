@@ -54,6 +54,28 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Live drives on `:3000` and the load rig, 2026-10-07: what was proven and what was found
+
+Eight branches were merged into `main` on 2026-10-07 (`0d829f0`): chat resilience, hosted run limits, ffmpeg, Chat documents, the Chat image fix, the Chat deck tool, hosted team privacy and the silent-turn fix. The sections below describe each one and were written before the merge, so "not committed" in their titles is no longer true.
+
+**Driven on `:3000` with a real key, model GPT 6 Luna.** Evidence is under `.cursor/skills/verify-agentforge/evidence/chat/2026-10-07-*`.
+- `self_check` ran and Chat answered from it (`d2ed35d`).
+- A Word file attached in Chat was read, saved under `uploads/~local-owner/` and answered from correctly (`0d829f0`, the final build with its own timeouts).
+- A PNG attached in Chat reached the model: the total and the driver's name came back exact, and the model misread two characters of a 16-character code with Thinking off (`444cb3c`).
+- `build_deck` made a 4-slide deck; the card showed Open and Download and the downloaded file is a valid .pptx of 76,666 bytes (`41f8c3a`).
+- Not driven: the run cap and team privacy (both do nothing off server mode), the packaged app, any hosted server.
+
+**Findings, not fixed.**
+- **The gateway was slow and once empty for `gpt-6-luna` during the drive.** Response headers took 15 to 24 s on several calls where others took 3 to 5 s, and one turn got HTTP 200 with no text on two calls in a row. Chat showed "The model returned no text". This is the gateway's side; the app's part (the 10 s limit and the silent ending) is fixed in the section below.
+- **Hosted: one gateway check result per server, not per company.** Found by the load rig on the HYP AI build of `14f05d5`: after a second company saved a different key, the first company's next Chat turn answered `403 gateway_blocked`. Not yet reproduced on `main`. It matters as soon as two companies on one server use different keys.
+- **Hosted: the sign-in routes allow a burst of 10, then 30 a minute, per client address.** Five people signing in at once from one address: the fifth got `429 rate_limited`. An office behind one address would meet this at 9:00.
+- **Embeddings go through one queue per process.** A 23 KB .docx took 1.9 s to add to the Knowledge Base and a 203 KB one took 17.5 s, one observation each on a busy PC.
+- **A turn that fails after a tool still ends silently outside Chat.** Job modes that offer tools (Data, Market) read `run.failed` only (`packages/host/src/job-regen.ts:216`), and the Edit agent forwards the new `run.interrupted` frame to a renderer that ignores it (`packages/host/src/edit/agent-run.ts:284`).
+- **"continue" replays no tool result.** Only text, image and video parts go back to the model (`packages/core/src/content/transcript.ts:39`), so after either closing sentence the model reads the file again.
+- **Both closing sentences are indexed into the Chat card,** reason included (`packages/host/src/runs.ts`).
+- **The portal's simultaneous-invite test is timing-sensitive.** `apps/portal/src/store/postgres/invites.test.ts` ("lets exactly one of two simultaneous creates succeed") failed once in a full run on a loaded PC and passes alone. No lane touched `apps/portal`.
+- **Stored media is shared across a company on a hosted desk** (SR-157, open). The team-privacy lane found that the Images, Videos and Music lists, the storage screen and Edit all read media by company, so scoping every read by person would break them. The smaller change is to mark Chat attachments and scope only those.
+
 ## Chat: a turn that ended after a tool with no words, and a 10 s header limit that cut a slow gateway, 2026-10-07 (both products; in the tree on `feat/chat-resilience`, not committed, not driven on a live model since the fix)
 
 **Found by a live drive on 2026-10-07**, on `:3000` with a real key, model `gpt-6-luna`, Thinking Normal: a Word file attached in Chat and a question about it. The turn ended with a `read_file` row and no words and no error, three times; a plain `datetime` turn on the same build answered. Maps: [`maps/agent-tools-and-files.md`](maps/agent-tools-and-files.md) § 13 (two new paragraphs), [`maps/chat-send.md`](maps/chat-send.md) § 3b, § 4, § 5 and Failure modes. Recipe: `features/chat.md` (`chat-tool-turn-interrupted`, `chat-header-wait`). Two defects, each confirmed in the code before it was changed.
