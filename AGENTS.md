@@ -176,7 +176,7 @@ Until Rizky lifts it, work is limited to three things, in this order:
 - The Nultron preview runs `nultron-web:0d829f00bc81`, rolled desk by desk without touching the proxy.
 - The HYP AI server exists and has its base setup. No app is installed.
 
-**Git.** `main` is local only and not pushed. Check `git log --oneline -15` for the merges. Full local CI was green on `0d829f0`.
+**Git.** Everything up to the password sign-in is on GitHub: PR #142, merged into `main` as `079d325` in the evening at Rizky's word. Full local CI was green on `0d829f0`; after that only the suites named in the PR ran. A follow-up with two fixes from the second security review of the password sign-in is still local.
 
 **In flight (see the lane notes).**
 - The per-company gateway key check: reviewed, fixed and merged into `main` as `24fb47c9` (evening). Not driven on a hosted server.
