@@ -256,6 +256,93 @@ describe("a run that ends at its step limit", () => {
   });
 });
 
+describe("a run whose model call failed after a tool completed", () => {
+  const reason = "The gateway is unavailable right now. Send again in a moment.";
+  beforeEach(() => {
+    script = async (run) => {
+      await run.onEvent({ type: "tool.started", toolKey: "list_files", input: {} });
+      await run.onEvent({ type: "tool.completed", toolKey: "list_files", output: { ok: true, items: [] } });
+      await run.onEvent({ type: "run.interrupted", message: reason });
+      await run.onEvent({ type: "run.completed", runId: run.runId });
+    };
+  });
+
+  it("tells the person the tools ran and why the answer did not come, streams it and saves it with the turn", async () => {
+    const { frames } = await postTurn();
+    const sentence = chatTurnCopy("en").interrupted.replaceAll("{reason}", reason);
+    const deltas = frames.filter((frame) => frame.event === "assistant.delta").map((frame) => frame.data.text);
+    expect(deltas.join("")).toBe(sentence);
+    expect(deltas.join("")).toMatch(/tool steps above ran/i);
+    expect(deltas.join("")).toMatch(/continue/i);
+    // After the tool frames, before the run completes, and not as a failure: the tool turn is kept.
+    const order = frames.map((frame) => frame.event);
+    expect(order.lastIndexOf("tool.completed")).toBeLessThan(order.indexOf("assistant.delta"));
+    expect(order.indexOf("assistant.delta")).toBeLessThan(order.indexOf("run.completed"));
+    expect(order).not.toContain("run.failed");
+    expect(order).not.toContain("run.interrupted");
+    // Survives a reload: the saved message holds the tool row and the sentence, in that order.
+    const parts = await lastAssistantParts();
+    expect(parts.map((part) => part.type)).toEqual(["tool_call", "text"]);
+    expect(parts.find((part) => part.type === "text")).toMatchObject({ type: "text", text: sentence });
+  });
+
+  it("says it in Bahasa Indonesia when the desk's language is Indonesian", async () => {
+    const { saveUserLocale } = await import("./settings-store");
+    saveUserLocale(tenant, "id");
+    try {
+      const { frames } = await postTurn();
+      const deltas = frames.filter((frame) => frame.event === "assistant.delta").map((frame) => frame.data.text);
+      expect(deltas.join("")).toContain(chatTurnCopy("id").interrupted.split("{reason}")[0]);
+      expect(deltas.join("")).toContain(reason);
+      expect(deltas.join("")).not.toMatch(/tool steps above/i);
+      const text = (await lastAssistantParts()).find((part) => part.type === "text");
+      expect(text).toMatchObject({ type: "text", text: expect.stringMatching(/lanjutkan/) });
+    } finally {
+      saveUserLocale(tenant, "en");
+    }
+  });
+
+  it("keeps the words the model streamed before the failure and adds the sentence after them", async () => {
+    script = async (run) => {
+      await run.onEvent({ type: "assistant.delta", text: "Let me read it." });
+      await run.onEvent({ type: "tool.started", toolKey: "list_files", input: {} });
+      await run.onEvent({ type: "tool.completed", toolKey: "list_files", output: { ok: true, items: [] } });
+      await run.onEvent({ type: "run.interrupted", message: reason });
+      await run.onEvent({ type: "run.completed", runId: run.runId });
+    };
+    await postTurn();
+    const text = (await lastAssistantParts()).find((part) => part.type === "text");
+    expect(text).toMatchObject({
+      type: "text",
+      text: `Let me read it.\n\n${chatTurnCopy("en").interrupted.replaceAll("{reason}", reason)}`,
+    });
+  });
+
+  it("masks a secret that the failure's own text carries", async () => {
+    script = async (run) => {
+      await run.onEvent({ type: "tool.started", toolKey: "list_files", input: {} });
+      await run.onEvent({ type: "tool.completed", toolKey: "list_files", output: { ok: true } });
+      await run.onEvent({ type: "run.interrupted", message: `upstream refused ${KEY}` });
+      await run.onEvent({ type: "run.completed", runId: run.runId });
+    };
+    const { raw } = await postTurn();
+    expect(raw).not.toContain(KEY);
+    expect(JSON.stringify(await lastAssistantParts())).not.toContain(KEY);
+    expect(raw).toContain("[REDACTED]");
+  });
+
+  it("adds nothing to a turn that answered", async () => {
+    script = async (run) => {
+      await run.onEvent({ type: "tool.started", toolKey: "list_files", input: {} });
+      await run.onEvent({ type: "tool.completed", toolKey: "list_files", output: { ok: true } });
+      await run.onEvent({ type: "assistant.delta", text: "All done." });
+      await run.onEvent({ type: "run.completed", runId: run.runId });
+    };
+    const { raw } = await postTurn();
+    expect(raw).not.toMatch(/tool steps above/i);
+  });
+});
+
 describe("the Chat prompt and a tool the run does not offer", () => {
   it("names run_code and self_check on a desk where code runs are on", async () => {
     process.env.AGENTFORGE_CODE_RUNS = "on";

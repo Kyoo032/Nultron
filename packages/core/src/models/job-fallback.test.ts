@@ -6,6 +6,7 @@ import {
   jobFallbackChain,
   nextJobFallbackModel,
 } from "./job-fallback";
+import { HEADERS_TIMEOUT_MS, formatHeadersTimeoutError } from "../runtime/stream-watchdog";
 
 /** What the workspace actually offered on 2026-09-30, trimmed to the ids the tests care about. */
 const LIVE = [
@@ -46,6 +47,11 @@ describe("isGatewayUnavailableFailure", () => {
 
   it("matches the 10s response-header abort", () => {
     expect(isGatewayUnavailableFailure("Gateway unreachable: no response within 10s")).toBe(true);
+  });
+
+  it("matches the response-header limit's own sentence in both locales, so a job still tries the next model", () => {
+    expect(isGatewayUnavailableFailure(formatHeadersTimeoutError("gpt-6-luna", HEADERS_TIMEOUT_MS, "en"))).toBe(true);
+    expect(isGatewayUnavailableFailure(formatHeadersTimeoutError("gpt-6-luna", HEADERS_TIMEOUT_MS, "id"))).toBe(true);
   });
 
   it("matches the first-token watchdog in both locales", () => {

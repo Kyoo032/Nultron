@@ -62,6 +62,9 @@ import { withToolRun } from "./tool-run-context";
 import { formatPastSessionsHint } from "./session-recall";
 import { log } from "./log";
 
+/** The longest reason the closing sentence of an interrupted turn carries: a failure's headline, not a stack. */
+const INTERRUPTED_REASON_MAX = 400;
+
 const parsers = {
   text: parseTextRunInput,
   image: parseImageRunInput,
@@ -255,6 +258,8 @@ export async function* startModalityRun(options: {
     let persisted = false;
     // Set when the runtime says the tool loop used every step and the last one was still working.
     let stepLimitReached = false;
+    // Set when a model call failed after a tool had completed: the turn is kept, and this is the reason.
+    let interruptedReason = "";
     let runUsage: Record<string, unknown> | null = null;
     let settledRunMetered = false;
     /**
@@ -280,6 +285,7 @@ export async function* startModalityRun(options: {
         tools: toolTrace,
         locale: replyLocale,
         stepLimit: stepLimitReached,
+        interrupted: interruptedReason,
       });
       if (settled.appended) {
         send({ type: "assistant.delta", text: settled.appended });
@@ -394,6 +400,12 @@ export async function* startModalityRun(options: {
             if (event.type === "run.step_limit") {
               // Not a frame for the screen: it decides the closing sentence `persistAssistant` adds.
               stepLimitReached = true;
+              return;
+            }
+            if (event.type === "run.interrupted") {
+              // Same: not a frame, the closing sentence. The reason is a failure's text, so it is masked
+              // like `run.failed`'s, and held to one short paragraph.
+              interruptedReason = redactSecrets(event.message).trim().slice(0, INTERRUPTED_REASON_MAX);
               return;
             }
             // What leaves the runtime (the screen, the thread, the tool rows) is the redacted copy of a

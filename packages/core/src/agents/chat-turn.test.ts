@@ -116,6 +116,74 @@ describe("Chat turn check", () => {
     });
   });
 
+  describe("a run that ended because the model call failed after a tool completed", () => {
+    const reason = "The gateway is unavailable right now. Send again in a moment.";
+    const calculator = {
+      toolKey: "calculator",
+      status: "completed",
+      input: { expression: "2 + 3" },
+      output: { result: 5 },
+    } as const;
+
+    it("says the tools ran, why the answer did not come, and that the person can send continue", () => {
+      const settled = settleChatTurn({ text: "", offeredSources: 0, locale: "en", tools: [], interrupted: reason });
+      const note = chatTurnCopy("en").interrupted;
+      expect(note).toMatch(/tool steps above ran/i);
+      expect(note).toMatch(/continue/i);
+      expect(settled.text).toContain(reason);
+      expect(settled.text).toBe(note.replaceAll("{reason}", reason));
+      expect(settled.appended).toBe(settled.text);
+    });
+
+    it("says it in Bahasa Indonesia too, with the reason it was given", () => {
+      const idReason = "Gateway sedang tidak tersedia. Coba kirim lagi sebentar lagi.";
+      const settled = settleChatTurn({ text: "", offeredSources: 0, locale: "id", tools: [], interrupted: idReason });
+      expect(settled.text).toContain(idReason);
+      expect(settled.text).toMatch(/lanjutkan/);
+      expect(settled.text).toMatch(/Langkah alat di atas/);
+      expect(settled.text).not.toMatch(/tool steps above/i);
+    });
+
+    it("puts it after words the model wrote earlier in the run, and streams only the new part", () => {
+      const settled = settleChatTurn({
+        text: "Let me read the file.",
+        offeredSources: 0,
+        locale: "en",
+        tools: [],
+        interrupted: reason,
+      });
+      const note = chatTurnCopy("en").interrupted.replaceAll("{reason}", reason);
+      expect(settled.text).toBe(`Let me read the file.\n\n${note}`);
+      expect(settled.appended).toBe(`\n\n${note}`);
+    });
+
+    it("keeps the sentence a finished tool already earned, then adds the note", () => {
+      const settled = settleChatTurn({
+        text: "",
+        offeredSources: 0,
+        locale: "en",
+        tools: [calculator],
+        interrupted: reason,
+      });
+      expect(settled.text.startsWith("2 + 3 = 5\n\n")).toBe(true);
+      expect(settled.text).toContain(reason);
+    });
+
+    it("does not add it twice", () => {
+      const note = chatTurnCopy("en").interrupted.replaceAll("{reason}", reason);
+      const settled = settleChatTurn({ text: note, offeredSources: 0, locale: "en", tools: [], interrupted: reason });
+      expect(settled.text).toBe(note);
+      expect(settled.appended).toBe("");
+    });
+
+    it("adds nothing when the run was not interrupted", () => {
+      expect(settleChatTurn({ text: "Hi.", offeredSources: 0, locale: "en", tools: [] }).text).toBe("Hi.");
+      expect(settleChatTurn({ text: "Hi.", offeredSources: 0, locale: "en", tools: [], interrupted: "" }).text).toBe(
+        "Hi.",
+      );
+    });
+  });
+
   it("does not offer generate tools on an understand turn", () => {
     const bindings = [
       { toolKey: "calculator" },
