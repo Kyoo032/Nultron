@@ -1,14 +1,27 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { consumeSse } from "@/lib/sse-client";
 import {
   COMPOSER_FILE_ACCEPT,
   attachmentOverCap,
   classifyAttachment,
+  pastedFiles,
   routeDecision,
   type AttachmentKind,
 } from "@/lib/composer-attach";
+import { CHAT_DOCUMENTS_PER_MESSAGE } from "@agentforge/core/chat-documents";
+import { ComposerAttachmentChip } from "@/components/composer-attachment-chip";
+import {
+  ChatDocumentError,
+  documentErrorMessage,
+  documentsBlockSend,
+  documentsOverLimit,
+  inlineBlock,
+  restoreDocumentRead,
+  type DocumentRead,
+} from "@/lib/composer-documents";
+import { useDocumentReads } from "@/lib/use-document-reads";
 import { ModelPicker, type ChatModel } from "@/components/model-picker";
 import { EnhancePromptButton } from "@/components/enhance-prompt-button";
 import { apiFetch } from "@/lib/api-client";
@@ -71,6 +84,8 @@ type HeldFile = {
   id: string;
   file: File;
   kind: AttachmentKind;
+  /** A document's read state: the host reads it as soon as it is attached (`use-document-reads`). */
+  read?: DocumentRead;
 };
 
 async function uploadMedia(file: File): Promise<{ url: string }> {
@@ -84,10 +99,6 @@ async function uploadMedia(file: File): Promise<{ url: string }> {
     throw new Error(t("chat.error.upload"));
   }
   return { url: uploaded.url };
-}
-
-async function readTextFile(file: File): Promise<string> {
-  return file.text();
 }
 
 /** How far the prompt box grows before it scrolls. `.composer-text` carries the same 10rem in CSS. */
@@ -212,10 +223,18 @@ export function ChatComposer({
   const restored = readComposerDraft(workspaceId);
   const [text, setText] = useState(restored.text);
   const [files, setFiles] = useState<HeldFile[]>(
-    restored.files.filter(
-      (item): item is HeldFile => item.kind === "text" || item.kind === "image" || item.kind === "video",
-    ),
+    restored.files
+      .filter(
+        (item): item is HeldFile =>
+          item.kind === "text" || item.kind === "image" || item.kind === "video" || item.kind === "document",
+      )
+      // A read that was in flight when the pane went away starts again; a finished one is kept.
+      .map((item) => ({ ...item, read: restoreDocumentRead(item.read) })),
   );
+  const reportRead = useCallback((id: string, read: DocumentRead | undefined) => {
+    setFiles((current) => current.map((item) => (item.id === id ? { ...item, read } : item)));
+  }, []);
+  const { retry: retryRead } = useDocumentReads(files, reportRead);
   const [busy, setBusy] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -247,7 +266,9 @@ export function ChatComposer({
   const pickerModels = models ?? [];
   const showPicker = typeof onModelChange === "function";
   const sendEmpty = !text.trim() && files.length === 0;
-  const sendDisabled = busy || enhancing || sendEmpty || needsKey;
+  // A document still being read, or one that failed, holds Send: sending now would drop it silently.
+  const documentsHoldSend = documentsBlockSend(files);
+  const sendDisabled = busy || enhancing || sendEmpty || needsKey || documentsHoldSend;
 
   useEffect(() => {
     if (draft == null) {
@@ -282,21 +303,31 @@ export function ChatComposer({
     return () => observer.disconnect();
   }, []);
 
-  function addFiles(list: FileList | null) {
+  /**
+   * The one route every attachment takes: the file picker, a drop and a paste all end here, so a
+   * document is classified, counted and read the same way whichever door it came through.
+   */
+  function addFiles(list: ArrayLike<File> | null) {
     if (!list || list.length === 0) {
       return;
     }
     const next: HeldFile[] = [...files];
     let tooBig = false;
     let unsupported = false;
+    let tooMany = false;
     for (const file of Array.from(list)) {
       const kind = classifyAttachment(file);
       if (kind === "unsupported") {
         unsupported = true;
         continue;
       }
-      if (attachmentOverCap(kind, file.size)) {
+      // A document over the cap is still attached, as a chip that says so: the reason belongs on the file.
+      if (kind !== "document" && attachmentOverCap(kind, file.size)) {
         tooBig = true;
+        continue;
+      }
+      if (kind === "document" && documentsOverLimit(next, 1)) {
+        tooMany = true;
         continue;
       }
       next.push({
@@ -308,6 +339,7 @@ export function ChatComposer({
     setFiles(next);
     if (tooBig) setError(t("chat.error.fileTooLarge"));
     else if (unsupported) setError(t("chat.error.unsupportedFile"));
+    else if (tooMany) setError(t("chat.document.tooMany", { n: CHAT_DOCUMENTS_PER_MESSAGE }));
     else setError(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -320,6 +352,10 @@ export function ChatComposer({
 
   async function send() {
     if (needsKey) {
+      return;
+    }
+    if (documentsHoldSend) {
+      setError(t("chat.document.mustFinish"));
       return;
     }
     // The run belongs to the session on screen now. If the owner opens another before the run
@@ -375,14 +411,30 @@ export function ChatComposer({
         return;
       }
 
-      const textFiles = files.filter((item) => item.kind === "text");
+      // Text files and documents are both inlined as a `--- name ---` block, in the order attached, with
+      // the host's notes above the header. A document's text was read by the host when it was attached
+      // and is saved to the desk now; a text file is read here and cut to the same budget.
+      const inlineFiles = files.filter((item) => item.kind === "text" || item.kind === "document");
       const mediaFiles = files.filter((item) => item.kind === "image" || item.kind === "video");
 
       let composedText = text;
-      for (const held of textFiles) {
-        const body = await readTextFile(held.file);
-        const block = `--- ${held.file.name} ---\n${body}`;
-        composedText = composedText.trim().length > 0 ? `${composedText}\n\n${block}` : block;
+      try {
+        for (const held of inlineFiles) {
+          const block = await inlineBlock(held);
+          if (block === null) {
+            continue;
+          }
+          composedText = composedText.trim().length > 0 ? `${composedText}\n\n${block}` : block;
+        }
+      } catch (error) {
+        if (error instanceof ChatDocumentError) {
+          // A document that cannot be saved is a message that does not go: say why, keep the draft.
+          if (showing()) {
+            setError(documentErrorMessage(error.key));
+          }
+          return;
+        }
+        throw error;
       }
 
       const outgoing = composedText.trim();
@@ -425,7 +477,11 @@ export function ChatComposer({
           if (!response.ok) {
             const payload = await response.json().catch(() => null);
             // Hosted only: a 403 gateway_blocked is "no usable key", said calmly, not a failed run.
-            fail(hostedGatewayBlocked(payload) ? gatewayBlockedMessage() : (payload?.error?.message ?? t("chat.error.runFailed")));
+            fail(
+              hostedGatewayBlocked(payload)
+                ? gatewayBlockedMessage()
+                : (payload?.error?.message ?? t("chat.error.runFailed")),
+            );
             await finish();
             return;
           }
@@ -558,6 +614,15 @@ export function ChatComposer({
           onChange={(event) => {
             setText(event.target.value);
           }}
+          onPaste={(event) => {
+            // A file pasted on its own (copied in the file manager, a screenshot) is an attachment and
+            // takes the same route as the picker and a drop; a paste that carries text is left alone.
+            const pasted = pastedFiles(event.clipboardData);
+            if (pasted.length > 0) {
+              event.preventDefault();
+              addFiles(pasted);
+            }
+          }}
           onKeyDown={(event) => {
             submitOnEnter(event, () => {
               void send();
@@ -592,23 +657,7 @@ export function ChatComposer({
       {files.length > 0 ? (
         <ul className="mt-3 flex flex-wrap gap-2" data-testid="composer-attachments">
           {files.map((item) => (
-            <li
-              key={item.id}
-              className="flex max-w-full items-center gap-2 rounded-pill border border-[var(--line)] px-3 py-1 text-sm text-[var(--text)]"
-              data-testid="composer-attachment"
-            >
-              {/* min-w-0 and shrink-0: a long name gives up characters, not the remove button. At 320 px
-                  the chip ran 36 px past the composer and the × past the window edge. */}
-              <span className="min-w-0 max-w-[12rem] truncate">{item.file.name}</span>
-              <button
-                type="button"
-                className="shrink-0 text-[var(--text-3)] hover:text-[var(--text)]"
-                aria-label={t("chat.removeAttachment", { name: item.file.name })}
-                onClick={() => removeFile(item.id)}
-              >
-                ×
-              </button>
-            </li>
+            <ComposerAttachmentChip key={item.id} item={item} onRemove={removeFile} onRetry={retryRead} />
           ))}
         </ul>
       ) : null}

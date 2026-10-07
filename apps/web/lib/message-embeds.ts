@@ -1,7 +1,8 @@
+import { HOST_NOTE_PREFIXES, isHostNoteLine } from "@agentforge/core/chat-documents";
 import { safeLinkHref } from "./safe-link";
 
 /**
- * How a Chat turn turns a bare link, an attached text file, or a tool payload
+ * How a Chat turn turns a bare link, an attached file, or a tool payload
  * into a card. Inline links inside a sentence stay inline; only a paragraph
  * that is nothing but a link is a card.
  */
@@ -15,7 +16,10 @@ export type StandaloneLink = {
   href: string;
 };
 
-export type UserTextSegment = { type: "text"; text: string } | { type: "file"; name: string; body: string };
+export type UserTextSegment =
+  | { type: "text"; text: string }
+  /** `notes` are the host's bracketed lines that sat just above this file's header, when there were any. */
+  | { type: "file"; name: string; body: string; notes?: string[] };
 
 export type JobEmbedModel = {
   title: string;
@@ -104,34 +108,75 @@ export function presentStandaloneLink(href: string, label: string): StandaloneLi
   return { kind, title: text, detail: host, href: safe };
 }
 
+/** The file name in a `--- name ---` line, or "" when the line is not a header. */
+function headerName(line: string): string {
+  return FILE_HEADER.exec(line)?.[1]?.trim() ?? "";
+}
+
 /**
- * Text files the composer inlines as `--- name ---` followed by the body.
+ * The host's bracketed notes at the end of `lines` (ignoring blank lines after them), split from the
+ * rest. Nothing is mutated. When the lines end with no note, `notes` is empty and `rest` is `lines`.
+ */
+function splitTrailingNotes(lines: ReadonlyArray<string>): { rest: string[]; notes: string[] } {
+  let end = lines.length;
+  while (end > 0 && (lines[end - 1] ?? "").trim() === "") {
+    end -= 1;
+  }
+  let start = end;
+  while (start > 0 && isHostNoteLine(lines[start - 1] ?? "")) {
+    start -= 1;
+  }
+  return start === end
+    ? { rest: [...lines], notes: [] }
+    : { rest: lines.slice(0, start), notes: lines.slice(start, end) };
+}
+
+/**
+ * Attached files the composer inlines as `--- name ---` followed by the body.
  * A header has to be its own line, which is how the composer writes it.
+ *
+ * The host's notes about a file (what it is, where it is saved, how much was cut) sit just above that
+ * file's header, outside its block. They are lifted out of the text that came before, or out of the
+ * previous file's body, and carried on the file's own segment, so they show in its card and not as the
+ * person's words or the end of another file. A note-looking line anywhere else stays where it is.
  */
 export function splitUserFileBlocks(text: string): UserTextSegment[] {
   const lines = text.split("\n");
   const segments: UserTextSegment[] = [];
-  const textLines: string[] = [];
+  let textLines: string[] = [];
+  /** Notes found at the end of the previous file's body: they belong to the file whose header comes next. */
+  let carried: string[] = [];
   const flush = () => {
     const joined = textLines.join("\n").trim();
-    textLines.length = 0;
+    textLines = [];
     if (joined) {
       segments.push({ type: "text", text: joined });
     }
   };
   let index = 0;
   while (index < lines.length) {
-    const header = FILE_HEADER.exec(lines[index] ?? "");
-    const name = header?.[1]?.trim() ?? "";
-    if (header && name) {
+    const name = headerName(lines[index] ?? "");
+    if (name) {
+      const above = splitTrailingNotes(textLines);
+      textLines = above.rest;
+      const notes = carried.length > 0 ? carried : above.notes;
+      carried = [];
       flush();
       index += 1;
       const body: string[] = [];
-      while (index < lines.length && !FILE_HEADER.test(lines[index] ?? "")) {
+      while (index < lines.length && !headerName(lines[index] ?? "")) {
         body.push(lines[index] ?? "");
         index += 1;
       }
-      segments.push({ type: "file", name, body: body.join("\n").trim() });
+      // Another header follows: the notes just above it are its, not the end of this body.
+      const below = index < lines.length ? splitTrailingNotes(body) : { rest: body, notes: [] };
+      carried = below.notes;
+      segments.push({
+        type: "file",
+        name,
+        body: below.rest.join("\n").trim(),
+        ...(notes.length > 0 ? { notes } : {}),
+      });
       continue;
     }
     textLines.push(lines[index] ?? "");
@@ -142,6 +187,22 @@ export function splitUserFileBlocks(text: string): UserTextSegment[] {
     return [{ type: "text", text }];
   }
   return segments;
+}
+
+/**
+ * What a file card says about the host's notes: each note without its brackets, in one line. The line
+ * that only tells the model what the block below is (`[Attached file: ...]`) is the same on every file
+ * and says nothing about this one, so the card leaves it out; the rest (what the file is, where it is
+ * saved, how much was cut, a failed save) is shown, so nothing the model was told about the file is
+ * hidden from the person.
+ */
+export function fileCardDetail(notes: ReadonlyArray<string> | undefined): string | undefined {
+  const modelOnly = HOST_NOTE_PREFIXES[0];
+  const shown = (notes ?? [])
+    .filter((line) => !line.startsWith(modelOnly))
+    .map((line) => line.slice(1, line.lastIndexOf("]")).trim())
+    .filter((line) => line !== "");
+  return shown.length > 0 ? shown.join(" ") : undefined;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

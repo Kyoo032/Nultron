@@ -9,25 +9,15 @@
  * mimetype, so .docx / .xlsx / .pptx are told apart properly). The small local maps below exist only
  * for the fallback path, where there is no binding to ask.
  */
+import { DOCUMENT_FORMAT_BY_EXTENSION } from "@agentforge/core/chat-documents";
 import type { AnydocFormat, AnydocModule } from "./anydoc";
 import { FileExtractError } from "./errors";
 
-/** Extensions the fallback path can name without asking the converter. */
-const BY_EXTENSION: Readonly<Record<string, AnydocFormat>> = {
-  csv: "csv",
-  doc: "doc",
-  docx: "docx",
-  epub: "epub",
-  odp: "odp",
-  ods: "ods",
-  odt: "odt",
-  pdf: "pdf",
-  ppt: "ppt",
-  pptx: "pptx",
-  rtf: "rtf",
-  xls: "xlsx",
-  xlsx: "xlsx",
-} as const;
+/**
+ * Extensions the fallback path can name without asking the converter. The table is core's, the one
+ * the Chat composer builds its `accept` list from, so the two cannot drift apart.
+ */
+const BY_EXTENSION: Readonly<Record<string, AnydocFormat>> = DOCUMENT_FORMAT_BY_EXTENSION;
 
 /** What the first bytes are, coarsely. Enough to catch a lie about the extension. */
 type Container = "pdf" | "zip" | "ole" | "rtf" | null;
