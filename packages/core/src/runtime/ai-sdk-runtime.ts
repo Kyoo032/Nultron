@@ -54,7 +54,13 @@ import { providerBaseUrl } from "../providers/registry";
 import { directProviderFetch, refuseKeyRedirect, withKeyRedirectPolicy } from "./key-redirect";
 import { redactSecrets } from "../security/redact";
 import { GatewayHttpError, gatewayFailureOf, gatewayHttpFailure } from "../gateway-http-copy";
-import { abortErrorMessage, armStreamWatchdog, watchAsyncIterable } from "./stream-watchdog";
+import {
+  HEADERS_TIMEOUT_MS,
+  abortErrorMessage,
+  armStreamWatchdog,
+  formatHeadersTimeoutError,
+  watchAsyncIterable,
+} from "./stream-watchdog";
 import { readLanguageModelUsage, addTokenUsage } from "../gateway/account";
 import type { AgentRuntime, RunUsage } from "./types";
 import { historyHasImage, imagePartForProvider, rewriteUnreachableMediaInJson } from "../content/provider-media";
@@ -115,13 +121,19 @@ function toCoreMessages(
 }
 
 const USAGE_SETTLE_MS = 5_000;
-/** Response headers must arrive within this; a black-holed gateway otherwise sits until the 120 s watchdog. */
-const HEADERS_TIMEOUT_MS = 10_000;
-
-async function fetchWithHeaderTimeout(url: string | URL | Request, init: RequestInit): Promise<Response> {
+/**
+ * Response headers must arrive within `HEADERS_TIMEOUT_MS` (stream-watchdog.ts, where its number is
+ * explained); a black-holed gateway otherwise sits until the 120 s watchdog.
+ */
+async function fetchWithHeaderTimeout(
+  url: string | URL | Request,
+  init: RequestInit,
+  model: string,
+  locale: AppLocale,
+): Promise<Response> {
   const headers = new AbortController();
   const timer = setTimeout(
-    () => headers.abort(new Error(`Gateway unreachable: no response within ${HEADERS_TIMEOUT_MS / 1000}s`)),
+    () => headers.abort(new Error(formatHeadersTimeoutError(model, HEADERS_TIMEOUT_MS, locale))),
     HEADERS_TIMEOUT_MS,
   );
   const signals = [headers.signal, init.signal].filter((signal): signal is AbortSignal => Boolean(signal));
@@ -331,7 +343,7 @@ export class AiSdkRuntime implements AgentRuntime {
           // fall through to unmodified request on parse error
         }
       }
-      const response = await fetchWithHeaderTimeout(url, outgoing);
+      const response = await fetchWithHeaderTimeout(url, outgoing, modelName, runLocale);
       refuseKeyRedirect(response, runLocale);
       if (!response.ok) {
         const text = await readHttpErrorBody(response);
@@ -373,7 +385,7 @@ export class AiSdkRuntime implements AgentRuntime {
             // fall through to unmodified request on parse error
           }
         }
-        const response = await fetchWithHeaderTimeout(url, outgoing);
+        const response = await fetchWithHeaderTimeout(url, outgoing, modelName, runLocale);
         refuseKeyRedirect(response, runLocale);
         if (!response.ok) {
           const text = await readHttpErrorBody(response);
@@ -410,7 +422,7 @@ export class AiSdkRuntime implements AgentRuntime {
             // fall through to unmodified request on parse error
           }
         }
-        const response = await fetchWithHeaderTimeout(url, outgoing);
+        const response = await fetchWithHeaderTimeout(url, outgoing, modelName, runLocale);
         refuseKeyRedirect(response, runLocale);
         if (!response.ok) {
           const text = await readHttpErrorBody(response);
@@ -581,6 +593,8 @@ export class AiSdkRuntime implements AgentRuntime {
 
     if (result.failed) {
       if (shouldKeepToolTurn({ tooled: result.toolCompleted, failed: result.failed })) {
+        // Kept so a completed tool is not lost or run twice, but never silent: the caller tells the person why.
+        await input.onEvent({ type: "run.interrupted", message: result.failed });
         await input.onEvent({ type: "run.completed", runId: input.runId, usage: completedUsage });
         return;
       }

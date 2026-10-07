@@ -64,6 +64,11 @@ export type ChatTurnCopy = {
   noSource: string;
   /** The run used every step it had and the last one was still working: what happened and what to do. */
   stepLimit: string;
+  /**
+   * A model call failed after a tool had completed: the tools ran, no answer followed, why (`{reason}`),
+   * and what to send. The tool steps are kept in the turn, so it says they ran and does not offer a redo.
+   */
+  interrupted: string;
 };
 
 const CHAT_TURN_COPY: Record<AppLocale, ChatTurnCopy> = {
@@ -78,6 +83,8 @@ const CHAT_TURN_COPY: Record<AppLocale, ChatTurnCopy> = {
     noSource: "This desk did not have a source for that.",
     stepLimit:
       "I ran out of steps before I could finish this. Ask me to continue and I will pick up from where I stopped.",
+    interrupted:
+      'The tool steps above ran, but I could not finish the answer.\n\nReason: {reason}\n\nSend "continue" and I will try again.',
   },
   id: {
     thinkPast: "Saya akan meninjau percakapan sebelumnya, lalu menjawab dari yang saya temukan.",
@@ -90,6 +97,8 @@ const CHAT_TURN_COPY: Record<AppLocale, ChatTurnCopy> = {
     noSource: "Meja ini tidak punya sumber untuk itu.",
     stepLimit:
       "Langkah kerja saya habis sebelum ini selesai. Minta saya untuk melanjutkan, dan saya akan meneruskannya dari titik terakhir.",
+    interrupted:
+      'Langkah alat di atas sudah berjalan, tetapi saya tidak dapat menyelesaikan jawabannya.\n\nAlasan: {reason}\n\nKirim "lanjutkan" dan saya akan mencoba lagi.',
   },
 };
 
@@ -99,6 +108,11 @@ export function chatTurnCopy(locale: AppLocale): ChatTurnCopy {
 
 export function fillChatTurn(template: string, title: string): string {
   return template.replaceAll("{title}", title);
+}
+
+/** Puts a failure's own words into a sentence. `replaceAll` with a function, so `$&` in a reason stays literal. */
+export function fillChatReason(template: string, reason: string): string {
+  return template.replaceAll("{reason}", () => reason);
 }
 
 export function wantsStubClock(summary: string): boolean {

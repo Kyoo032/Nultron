@@ -106,6 +106,7 @@ async function run(options: {
   tools: string[];
   budget?: RunBudget;
   disabled?: string[];
+  locale?: "en" | "id";
 }): Promise<{ events: RuntimeEvent[]; failed: unknown }> {
   const events: RuntimeEvent[] = [];
   let failed: unknown;
@@ -121,6 +122,7 @@ async function run(options: {
       reasoningEffort: "none",
       reasoningEffortExplicit: true,
       ...(options.budget ? { budget: options.budget } : {}),
+      ...(options.locale ? { locale: options.locale } : {}),
       onEvent: (event) => {
         events.push(event);
       },
@@ -321,5 +323,90 @@ describe("a run that spends every step on tools", () => {
     gateway(() => textStream("hello"));
     const { events } = await run({ tools: ["echo"], budget: { maxSteps: 1, maxToolCalls: 10 } });
     expect(types(events)).not.toContain("run.step_limit");
+  });
+});
+
+/**
+ * Found by a live drive on 2026-10-07: a Word file attached in Chat, `read_file` completed, and the
+ * follow-up model call never answered. The turn ended with a tool row and no words and no error,
+ * because a failure after a completed tool is kept as a plain `run.completed` (`shouldKeepToolTurn`).
+ * The turn is still kept, tool rows and all, but the run now says why it stopped.
+ */
+describe("a run whose follow-up model call fails after a tool completed", () => {
+  const unavailable = () =>
+    new Response('{"error":{"message":"upstream down"}}', {
+      status: 503,
+      headers: { "content-type": "application/json" },
+    });
+
+  it("keeps the tool turn and says why the answer did not come, once, before it completes", async () => {
+    let ran = 0;
+    register("echo", async ({ x }) => {
+      ran += 1;
+      return { echoed: x };
+    });
+    const seen = gateway((request) =>
+      request === 1 ? callsStream([{ name: "echo", args: '{"x":1}' }], 1) : unavailable(),
+    );
+    const { events, failed } = await run({ tools: ["echo"] });
+
+    // Kept: no thrown error, no failed frame, the tool ran once and its row is there.
+    expect(failed).toBeUndefined();
+    expect(types(events)).not.toContain("run.failed");
+    expect(ran).toBe(1);
+    expect(toolOutputs(events)).toEqual([{ echoed: 1 }]);
+    // Not retried: a tool's side effects must not be repeated by a contact retry.
+    expect(seen).toHaveLength(2);
+    // Told: one event, after the last tool result and before the run completes, with the reason.
+    const marks = events.filter((event) => event.type === "run.interrupted");
+    expect(marks).toEqual([
+      { type: "run.interrupted", message: expect.stringContaining("The gateway is unavailable") },
+    ]);
+    const order = types(events);
+    expect(order.lastIndexOf("tool.completed")).toBeLessThan(order.indexOf("run.interrupted"));
+    expect(order.indexOf("run.interrupted")).toBeLessThan(order.indexOf("run.completed"));
+    expect(events.filter((event) => event.type === "run.completed")).toHaveLength(1);
+  });
+
+  it("gives the reason in the run's language", async () => {
+    register("echo", async ({ x }) => ({ echoed: x }));
+    gateway((request) => (request === 1 ? callsStream([{ name: "echo", args: '{"x":1}' }], 1) : unavailable()));
+    const { events } = await run({ tools: ["echo"], locale: "id" });
+    const mark = events.find((event) => event.type === "run.interrupted");
+    expect(mark).toMatchObject({
+      type: "run.interrupted",
+      message: expect.stringContaining("Gateway sedang tidak tersedia"),
+    });
+  });
+
+  it("covers a plain network drop on the follow-up call too", async () => {
+    register("echo", async ({ x }) => ({ echoed: x }));
+    gateway((request) => {
+      if (request === 1) {
+        return callsStream([{ name: "echo", args: '{"x":1}' }], 1);
+      }
+      throw new TypeError("fetch failed");
+    });
+    const { events, failed } = await run({ tools: ["echo"] });
+    expect(failed).toBeUndefined();
+    expect(events.find((event) => event.type === "run.interrupted")).toMatchObject({
+      message: expect.stringContaining("fetch failed"),
+    });
+  });
+
+  it("does not say it when the follow-up call answers", async () => {
+    register("echo", async ({ x }) => ({ echoed: x }));
+    gateway((request) => (request === 1 ? callsStream([{ name: "echo", args: '{"x":1}' }], 1) : textStream("done")));
+    const { events } = await run({ tools: ["echo"] });
+    expect(types(events)).not.toContain("run.interrupted");
+  });
+
+  it("still fails the run, with no interrupted mark, when no tool had completed", async () => {
+    register("echo", async ({ x }) => ({ echoed: x }));
+    gateway(() => unavailable());
+    const { events, failed } = await run({ tools: ["echo"] });
+    expect(failed).toBeDefined();
+    expect(types(events)).toContain("run.failed");
+    expect(types(events)).not.toContain("run.interrupted");
   });
 });
