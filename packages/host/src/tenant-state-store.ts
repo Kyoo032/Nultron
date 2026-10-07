@@ -69,7 +69,7 @@ export type TenantStateEntry = { value: string; stamp: string };
  * Where a payload is kept: a `TenantStateKey`, or that key narrowed to one company inside the tenant
  * (`companyStateKey`). SR-163.
  *
- * **Why a tenant is not always one company.** `tenantId` is the white-label partner (HYP AI, Nultron
+ * **Why a tenant is not always one company.** `tenantId` is the white-label partner (a brand, Nultron
  * Enterprise); every company of a deployment is an organisation inside it, and they all share the
  * partner's `tenant_state` rows. A payload that describes ONE company's key (the gate verdict) cannot
  * live in the partner's row, because the second company to write it would replace the first's. So the

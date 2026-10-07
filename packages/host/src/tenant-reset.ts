@@ -121,7 +121,7 @@ export const TENANT_RESET_FORBIDDEN_MESSAGE =
  * SR-163, review round. A hosted tenant is the white-label partner, and the erase below is written
  * against the partner: it deletes every organisation under it, every person and every session, every
  * company's files, and clears every desk's key. With one company per partner that is "my company". With
- * several (every SME of HYP AI is a company under one partner) the owner of company B would erase
+ * several (every SME of a white-label partner is a company under it) the owner of company B would erase
  * company A. Until the purge is scoped to one organisation (an owner decision, and a bigger change),
  * a partner that holds more than one is refused here, before an audit row is opened or a byte is touched.
  * Scoping the erase to one company is still owed.

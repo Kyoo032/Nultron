@@ -4,7 +4,7 @@
  * `TenantContext.tenantId` is the white-label partner and a company is an organisation inside it. The
  * erase (`tenant-reset.ts`) is written against the partner: `purgeTenantRows` deletes every
  * organisation of the tenant, every session and person, and the file and key steps are partner-wide too.
- * With one company per partner that is "my company"; with several (HYP AI, where every SME is a company
+ * With one company per partner that is "my company"; with several (a white-label partner, where every SME is a company
  * under one partner) it let the owner of company B erase company A.
  *
  * The smallest safe change is a refusal before anything is touched: more than one organisation under

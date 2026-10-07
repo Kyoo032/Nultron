@@ -3,7 +3,7 @@
  *
  * The 2026-10-07 load rig saw it: after a second company saved a gateway key that differed from the
  * first company's, the first company's next Chat turn answered `403 gateway_blocked`. The cause was one
- * level up from where the code looked. `TenantContext.tenantId` is the white-label partner (HYP AI,
+ * level up from where the code looked. `TenantContext.tenantId` is the white-label partner (a brand,
  * Nultron Enterprise), and every company of a deployment is an organisation inside that one partner. The
  * keys are per desk, and a desk belongs to one organisation, so two companies never shared a key; but the
  * verdict (`gateway_gate`) was one `tenant_state` row per partner. Company B's check overwrote

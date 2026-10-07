@@ -14,7 +14,7 @@ over HTTP through `AGENTFORGE_PORTAL_URL`, exactly as it will reach the real one
 Nobody signs up. A first sign-in needs an **invite** an operator issued for that address, which the
 portal e-mails to it (see "Inviting a tester" below); every later sign-in needs only an e-mailed
 six-digit code. There is no password anywhere, **unless the portal is started with
-`PORTAL_SIGNIN_MODE=password`** (owner decision 2026-10-07, for the HYP AI deployment): then there is no e-mail
+`PORTAL_SIGNIN_MODE=password`** (owner decision 2026-10-07, for one white-label deployment): then there is no e-mail
 at all, a person signs in with a username (or the address on record) and a password an operator made for them
 with `pnpm portal:account`, and the rest of this section does not apply. See "Signing in with a password" below.
 
