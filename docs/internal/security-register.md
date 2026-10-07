@@ -260,6 +260,7 @@ queries over a throwaway database with three people of one company on one desk; 
 | [SR-160](#sr-160) | Info | Decision: a hosted desk's saved knowledge map is read only if it carries a shared-scope marker, so every hosted desk maps once more | Accepted (2026-10-07); cost: one re-map per hosted desk | None |
 | [SR-161](#sr-161) | Info | Design only, not being built this round (Rizky, 2026-10-06): a person's own Knowledge Base private by person, sharing through a bot, and what an owner or admin may do when a person leaves | Not built | Blocks nothing now; blocks promising any of it |
 | [SR-162](#sr-162) | Info | What the hosted team-privacy review opened and found sound | Checked, not an issue (2026-10-07) | None |
+| [SR-164](#sr-164) | Low | The SSH private key of the HYP AI production server was attached to an agent conversation, so it is in that transcript | Open (2026-10-07); key moved to `~/.ssh`, owner-only; replace it before handover | Blocks handing the server to Hypernet |
 
 Status values: `open`, `fix in progress — lane X`, `fixed-unverified` (the code is in the tree and
 its test passes, nothing has been driven), `fixed, not driven` (2026-09-23 rows: the code and its
@@ -5235,6 +5236,29 @@ Checked, not an issue.
   lingers in anyone's list.
 - **Education reads through the filtered funnel.** `handlers/education.ts:43` calls `retrieveChunks`, so it is
   behind the same two queries as Chat.
+
+### SR-164 {#sr-164}
+
+**The SSH private key of the HYP AI production server was attached to an agent conversation.**
+Raised 2026-10-07. Low while the server holds no customer data; it becomes Medium once it does. Open.
+
+Evidence: on 2026-10-07 Rizky attached the key file for the new HYP AI CVM (`hypeyprod1.pem`, RSA 2048,
+fingerprint `SHA256:x7S/TPi28ZmBJ9eVD47+I8HkoJXZoMNxA5L4dpJzPEw`) to the session so the agent could deploy.
+Attaching a file sends its content into the conversation, so the private key is in that session's transcript
+on this PC and was sent to the model provider. The key was then moved out of `Downloads` to
+`C:\Users\rizky\.ssh\hypeyprod1.pem`, readable by his Windows user only. It is in no git repository, and both
+this repo and the HYP AI clone ignore `*.pem` (`.gitignore:61`). The agent wrote the key into no file, note or
+log; this entry holds the fingerprint only.
+
+What it means: anyone who can read that transcript can sign in to the server as its login user. The server is
+Hypernet's, so the key should not outlive the handover.
+
+Fix: before the server holds customer data, or at the handover to Hypernet at the latest, create a new key
+pair, add its public key to the server, remove this one from `~/.ssh/authorized_keys` and from the Tencent
+console, and give later agents the key by path, never by attachment. Until then, keep TCP 22 open to Rizky's
+address only.
+
+Gate: **blocks handing the server over to Hypernet.** It does not block the install or the tester round.
 
 ## Must be true before the Tencent Cloud deploy
 
