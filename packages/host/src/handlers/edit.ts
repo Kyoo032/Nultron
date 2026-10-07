@@ -4,6 +4,8 @@ import { ApiError, isServerMode, modeMessage, videoCapabilities, type TenantCont
 import { db, editUnplaced, media } from "@agentforge/db";
 import { jsonError, jsonOk } from "../errors";
 import { requireGatewayAllowedFor } from "../gateway-gate";
+import type { Release } from "../concurrency";
+import { admitRun, guardRunStream } from "../run-limits";
 import { getTenant } from "../tenant";
 import { mediaRelativePath } from "../media-root";
 import { materializeTenantObject, putTenantObject, removeTenantObject } from "../tenant-storage";
@@ -402,15 +404,22 @@ export async function handlePostEditAgent(request: HostRequest): Promise<HostRes
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    const body = asRecord(request.body);
-    const text = typeof body.text === "string" ? body.text : "";
-    const events = await runEditAgent({
-      tenant,
-      projectId: request.params.projectId,
-      text,
-      abortSignal: request.abortSignal,
-    });
-    return { type: "stream", status: 200, events };
+    // One slot for the agent's whole turn (SR-138), given back when its stream ends however it ends.
+    const release = admitRun(tenant);
+    try {
+      const body = asRecord(request.body);
+      const text = typeof body.text === "string" ? body.text : "";
+      const events = await runEditAgent({
+        tenant,
+        projectId: request.params.projectId,
+        text,
+        abortSignal: request.abortSignal,
+      });
+      return { type: "stream", status: 200, events: guardRunStream(release, events) };
+    } catch (error) {
+      release();
+      throw error;
+    }
   } catch (error) {
     return jsonError(error);
   }
@@ -458,6 +467,8 @@ export const RENDER_JOBS_ROUTE_MESSAGE =
   "Exports are started with POST /api/v1/edit/projects/:projectId/export, which checks the review first.";
 
 export async function handlePostEditJobs(request: HostRequest): Promise<HostResult> {
+  // A slot an `asr` job is still holding for the request; handed to the job once it is queued.
+  let held: Release | undefined;
   try {
     const tenant = await getTenant(request);
     // Desk check first: another desk's project id is a 404 whatever the body says.
@@ -480,6 +491,8 @@ export async function handlePostEditJobs(request: HostRequest): Promise<HostResu
     // here exactly as `/agent`, which queues it for the transcribe tool, is.
     if (kind === "asr") {
       requireGatewayAllowedFor(tenant);
+      // The transcription outlives this request, so the slot is held until the job is over (SR-138).
+      held = admitRun(tenant);
     }
     const job = await enqueueEditJob(request.params.projectId, {
       kind,
@@ -487,10 +500,14 @@ export async function handlePostEditJobs(request: HostRequest): Promise<HostResu
       targetClipIds: Array.isArray(body.targetClipIds) ? body.targetClipIds.map(String) : [],
       cardId: typeof body.cardId === "string" ? body.cardId : undefined,
       requestedBy: tenant.userId,
+      onSettled: held,
     });
+    held = undefined;
     return jsonOk(mapJob(job), 201);
   } catch (error) {
     return jsonError(error);
+  } finally {
+    held?.();
   }
 }
 
@@ -658,10 +675,14 @@ export async function handleGetEditMetrics(request: HostRequest): Promise<HostRe
 }
 
 export async function handlePostEditGenerate(request: HostRequest): Promise<HostResult> {
+  // The slot this request holds until the job it queues owns it.
+  let held: Release | undefined;
   try {
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
+    // The generation outlives this request, so the slot is held until the job is over (SR-138).
+    held = admitRun(tenant);
     const projectId = request.params.projectId;
     await foldProject(projectId, tenant.workspaceId);
     const body = asRecord(request.body);
@@ -704,11 +725,14 @@ export async function handlePostEditGenerate(request: HostRequest): Promise<Host
         placeAt,
         toolKey: kind,
       },
-      { runId: "owner" },
+      { runId: "owner", onSettled: held },
     );
+    held = undefined;
     return jsonOk(result, 201);
   } catch (error) {
     return jsonError(error);
+  } finally {
+    held?.();
   }
 }
 

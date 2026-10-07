@@ -83,6 +83,12 @@ export type EnqueueJobInput = {
    * with none recorded does not generate anything.
    */
   requestedBy?: string;
+  /**
+   * Called once, when the job is over however it ends (succeeded, failed, cancelled, never started). The
+   * route that queued it uses it to hold a run slot (SR-138) for the whole life of a job that outlives
+   * the request. Never written to the row.
+   */
+  onSettled?: () => void;
 };
 
 type JobRow = typeof editJobs.$inferSelect;
@@ -520,7 +526,7 @@ export async function enqueueEditJob(projectId: string, input: EnqueueJobInput):
       progress: 0,
     })
     .returning();
-  void processJob(row.id);
+  void processJob(row.id).finally(() => input.onSettled?.());
   return row;
 }
 

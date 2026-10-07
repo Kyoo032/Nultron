@@ -89,6 +89,11 @@ to 127.0.0.1 from the program was refused. That was a direct runner call, run by
 cites no log for it. It was not a hosted Chat drive, it was not the compose or Kubernetes stack, and it did
 not test an operating-system egress deny, so [SR-111](#sr-111) stays open.
 
+Extended on 2026-10-06 with [SR-138](#sr-138): the in-flight run caps (one tenant, and the whole server) for
+every route that calls the gateway. Every `file:line` in that row was read on the branch
+`feat/hosted-run-limits` over `6105c5c`, uncommitted, so the same line numbers do not exist on `main`.
+Nothing was driven on a hosted instance.
+
 ## Summary
 
 | ID | Severity | Title | Status | Gate |
@@ -161,6 +166,7 @@ not test an operating-system egress deny, so [SR-111](#sr-111) stays open.
 | [SR-131](#sr-131) | Medium | The app image's ignore file did not exclude `nultron-files/` (4.5 GB of IP filings and brand work), so a build straight from a working checkout would have sent it into the image | Fixed in tree (2026-10-05), test-pinned; the build context checked with a real `docker build`, no full image built | Blocks building from a checkout |
 | [SR-132](#sr-132) | Medium | The release Caddyfile's deferred header block may replace an artifact's `sandbox` CSP with the app CSP | Open: reasoned from Caddy's docs, not driven (2026-10-06) | Blocks Tencent deploy (Enterprise) |
 | [SR-133](#sr-133) | Medium | The app.nultron-ai.xyz preview runs production without server mode, behind Basic Auth and a Caddy Origin rule | Accepted by the owner (2026-10-06): password-gated shared desk | Preview only |
+| [SR-138](#sr-138) | Medium | One signed-in account could hold any number of model runs open: the limiters count requests, nothing counted runs | Fixed in tree (2026-10-06), tested through the router and the HTTP adapter: every gateway-calling route holds a slot or is on a written list; in memory, per process; not driven on a hosted instance | Blocks Tencent deploy until driven there |
 | [SR-81](#sr-81) | Low | Keyless Research search sends the masked query to four pinned public APIs | Checked, not an issue (2026-09-26) | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
@@ -2938,6 +2944,69 @@ The clean fix is a supported single-desk production mode in the repo. Take the p
 Enterprise bundle serves `app.nultron-ai.xyz`.
 
 Gate: none for Personal or Enterprise. The preview stays password-only.
+
+### SR-138 {#sr-138}
+
+**One signed-in account could hold any number of model runs open.** Enterprise (hosted). Raised
+2026-10-06, ahead of a public launch. Medium. Fixed in the tree, tested, not driven. First written as SR-135, then SR-137; numbered SR-138
+the same day.
+
+Evidence (before): the only per-account bound was the session bucket, 300 requests a minute with a burst of
+50 (`packages/host/src/rate-limit.ts:25-26`). That counts requests, and a Chat run or a video generation is
+one request that stays open for the length of the model call, so it bounds how fast runs start and not how
+many are in flight: fifty `POST /api/v1/videos` in a burst were all admitted. The job pools in
+`packages/host/src/concurrency.ts` (`:288`, `:290`) are global and guard ffmpeg and SQL workers only.
+
+The control is `packages/host/src/run-limits.ts`, server mode only:
+- a slot per run in flight, per tenant (`AGENTFORGE_MAX_RUNS_PER_TENANT`, default 6, `:33`, `:36`) and for the
+  whole server (`AGENTFORGE_MAX_RUNS_TOTAL`, default off, `:34`). A whole number sets a cap; `off`, `none` or
+  `unlimited` remove it; junk is the default (`parseRunCap`, `:53`). **`0` is a cap of zero, not an off
+  switch**: it refuses every run with `server_busy`, the operator's stop for an incident (`:111`). Off server
+  mode there is no cap and no count, whatever the variables say (`:71`, `:172`);
+- a refusal before any work starts, in the ordinary JSON error: 429 `too_many_runs` over the tenant cap, 503
+  `server_busy` over the server cap (`:27-28`), the tenant cap checked first. The 503 keeps its code through
+  `maskServerError`;
+- taken by **every handler that calls the gateway gate**, right after it: `withRunSlot` (`:185`) for the routes
+  that answer when the work is done; the slot rides the stream for Chat text, image and video
+  (`packages/host/src/handlers/runs.ts:50`), the Edit agent and every streaming job (`streamJob`'s `tenant`
+  option, `packages/host/src/job-stream.ts:39-43`); Edit `/generate` and an `asr` job on `/jobs` outlive their
+  request, so they hold the slot until the job is over (`onSettled`, `packages/host/src/edit/jobs.ts`);
+- a slot given back exactly once (`:129-131`) when the work ends however it ends: completed, failed, aborted, the
+  response destroyed, a consumer that stopped or never started reading (`guardRunStream`, `:210`, and the
+  hand-written stream wrapper in `handlers/runs.ts`), or an error before the first frame;
+- counted per organisation inside its white-label partner (`runLimitKey`, `:160`), because
+  `TenantContext.tenantId` is the partner every company of a deployment shares.
+
+Left out on purpose, each with its reason in `LEFT_OUT` (`packages/host/src/run-limits-routes.test.ts`): prompt
+enhance, the knowledge context read, source ingest from a file or URL, one-source re-index and the workspace
+backfill (`/knowledge/backend/reindex`, which answers at once and runs in an outbox). Each is one short call and
+bursty by design (a multi-file drop, a read per keystroke), so counting it would refuse a person their real work.
+The session bucket still bounds them: at most 300 calls a minute from one session.
+
+Tests: `run-limits.test.ts` (parsing, zero, isolation, the server cap, exactly-once release, `withRunSlot`, Personal
+parity), `run-limits-routes.test.ts` (the inventory: it finds every gate-calling handler from the source and fails
+unless it takes a slot or is on the written list, then drives every counted route through the real router at its
+cap), `run-limits-router.test.ts` (Chat: cap, other tenant, finish, abort, early stop, a stream returned before its
+first frame, a client already gone), `run-limits-edit-jobs.test.ts`, `run-limits-adapter.test.ts` (a destroyed
+response and a throwing write through the real HTTP adapter, and the 503 through error masking),
+`job-stream.test.ts`, and `apps/web/lib/run-limit-copy.test.ts` for the catalog copy in `en` and `id` at `apiFetch`.
+
+Residual:
+- **In memory and per process** (`createRunLimiter`, `:106`). A restart empties the counters, and a second app
+  process would keep its own, so the cap does not hold across two processes. The same single-process limit as
+  [SR-66](#sr-66) and the request buckets.
+- **Not a billing control.** It bounds concurrency, not spend, allowance or total runs over time.
+- With the per-tenant cap off and only the server cap set, one customer can take every slot.
+- A slot ends with the stream or the job, not with the model call. A job that ignores its abort signal keeps working
+  after its slot is free, until its next `throwIfJobAborted`. A queued Edit job holds its slot while it waits.
+- Jobs the Edit agent queues from its tools are counted by the agent's own slot, not one each.
+- Ten people in one company share its six slots. Raise the variable for a larger company.
+- No `Retry-After`: the host's JSON result has no header field.
+
+Required action: drive it on a hosted instance (open seven Chat runs as one tenant, fifty `POST /api/v1/videos` in
+a burst, then another tenant's).
+
+Gate: **blocks Tencent deploy** until driven there.
 
 ## Low
 

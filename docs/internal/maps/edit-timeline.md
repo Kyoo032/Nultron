@@ -475,7 +475,7 @@ A's `workerWorkspaceId`.
 |---|---|---|
 | ffmpeg missing | `resolveFfmpegAsync` via `getEditDoctorAsync` (sync: `resolveFfmpeg`) | `edit-needs-ffmpeg` banner with an install command and `ffmpeg-recheck`; probe/cut/captions/export refuse. Hosted: the same banner as one line with no command or button |
 | No gateway key | `hasOpenai` false | `edit-needs-key` in the Generate tab, `edit-generate-submit` disabled; everything else still works. Hosted: also `edit-agent-needs-key` in the Agent pane with `edit-composer-send`, `edit-plan-go` and every `edit-recipe-<id>` disabled and explained, and `sendAgent` refusing (§ 8) |
-| Gateway gate closed | `requireGatewayAllowedFor` on `/agent`, `/generate` and `asr` on `/jobs` (`handlers/edit.ts:401`, `:661`, `:479`); again in the generate worker (`packages/host/src/edit/jobs.ts:226`) | flat `403 gateway_blocked`, no stream; the composer surfaces `edit.errors.agentFailed`. A generate job that meets a closed gate in the worker fails with the gate's message and calls nothing |
+| Gateway gate closed | `requireGatewayAllowedFor` on `/agent`, `/generate` and `asr` on `/jobs` (`handlers/edit.ts:401`, `:661`, `:479`); again in the generate worker (`packages/host/src/edit/jobs.ts:232`) | flat `403 gateway_blocked`, no stream; the composer surfaces `edit.errors.agentFailed`. A generate job that meets a closed gate in the worker fails with the gate's message and calls nothing |
 | Unsupported / oversized upload | `assertEditUpload` (`handlers/edit.ts:600-607`) | `400 invalid_request` / `unsupported_content_type` |
 | ffmpeg cannot read the upload | probe catch (`handlers/edit.ts:257-270`) | `400 unsupported_media`, the saved file is unlinked |
 | `sourcePath` over HTTP | `handlers/edit.ts:214-217` | `400` — IPC only |

@@ -1,6 +1,6 @@
 # Map — Hosted security controls
 
-Last verified: 2026-10-05, working tree over 0b61a29, not committed, for two lines only (the `audit-deployed.mjs` row of the file table and the audit-gate gotcha, which now describe the production closure after SR-113); nothing else on the page was re-read. Before that: 2026-10-02, working tree over 0b61a29, not committed, for one row (the operator-fields row of § 8, which now says who may write a provider key: M4, an owner or an admin, a member is answered `403 settings_key_forbidden`); nothing else on the page was re-read. Before that: 2026-10-01, working tree over 0b61a29, not committed, for two rows only: the `ci-local.mjs` row of the tests table (a vitest step now needs its `Tests N passed` summary, not just exit 0) and the per-tenant model cache bullet of § 10 (the background refill and its log line). Before that, the same day, for the new § 10 (where a tenant's provider key may go: Enterprise BYOK Phase A) and the corrected operator-keys row of § 8, whose "provider keys" claim was wrong before it (`requestsOperatorOnlySettings` lists `toolKeys`, `toolBackends` and `injectionGuardBypass` only). Nothing else on the page was re-read that day. Before that: 2026-09-23 at d4561b8 + working tree for sections 1-4 and every
+Last verified: 2026-10-06, branch `feat/hosted-run-limits` over 6105c5c, not committed, for the run-limits subsection of § 5 and its row in the file table; nothing else on the page was re-read. Before that: 2026-10-05, working tree over 0b61a29, not committed, for two lines only (the `audit-deployed.mjs` row of the file table and the audit-gate gotcha, which now describe the production closure after SR-113); nothing else on the page was re-read. Before that: 2026-10-02, working tree over 0b61a29, not committed, for one row (the operator-fields row of § 8, which now says who may write a provider key: M4, an owner or an admin, a member is answered `403 settings_key_forbidden`); nothing else on the page was re-read. Before that: 2026-10-01, working tree over 0b61a29, not committed, for two rows only: the `ci-local.mjs` row of the tests table (a vitest step now needs its `Tests N passed` summary, not just exit 0) and the per-tenant model cache bullet of § 10 (the background refill and its log line). Before that, the same day, for the new § 10 (where a tenant's provider key may go: Enterprise BYOK Phase A) and the corrected operator-keys row of § 8, whose "provider keys" claim was wrong before it (`requestsOperatorOnlySettings` lists `toolKeys`, `toolBackends` and `injectionGuardBypass` only). Nothing else on the page was re-read that day. Before that: 2026-09-23 at d4561b8 + working tree for sections 1-4 and every
 `http-adapter.ts` citation on this page (the auth pass: the production https rule for the portal
 URL, the malformed Host / request-target 400, the gate's portal re-check, digest session ids). The
 response headers, the ffmpeg failure detail and the top-up link keep their 2026-09-21 reading at
@@ -164,6 +164,57 @@ The gate runs in `gate`, `packages/host/src/router.ts:456`, **before the route t
 Each is overridable by env (`:30-32`). `MAX_RATE_KEYS` (`:35`) caps the map at 50 000 so the
 limiter cannot itself become the memory exhaustion.
 
+#### In-flight run limits (SR-138, 2026-10-06)
+
+`packages/host/src/run-limits.ts`. The buckets above count requests, so they do not stop one signed-in
+account from opening a hundred streams, or fifty `POST /api/v1/videos`, at once. This counts runs in
+flight instead, server mode only:
+
+| Cap | Default | Variable | Refused with |
+|---|---|---|---|
+| per tenant | 6 (`:36`) | `AGENTFORGE_MAX_RUNS_PER_TENANT` (`:33`) | 429 `too_many_runs` |
+| whole server | off | `AGENTFORGE_MAX_RUNS_TOTAL` (`:34`) | 503 `server_busy` |
+
+- **Parsing.** A whole number sets the cap; `off`, `none` or `unlimited` remove it; anything else is
+  the default, so a typo never removes a limit (`parseRunCap`, `:53`). **`0` is not an off switch**: it
+  is a cap of zero, and every run is refused with `server_busy`, the operator's stop for an incident
+  (`admit`, `:111`). Off server mode `runCapsFromEnv` (`:71`) returns no caps and `admitRun`
+  (`:172`) counts nothing, whatever the variables say.
+- **What "tenant" counts.** The organisation inside its white-label partner (`runLimitKey`, `:160`).
+  `TenantContext.tenantId` is the partner, shared by every company of one deployment, so keying on it
+  alone would make all of them share one cap. With the per-tenant cap off and only the server cap set,
+  one customer can take every slot.
+- **Where it is taken: every route that calls the gateway gate**, right after it and before any work,
+  so a refusal is the host's ordinary JSON error. Three shapes:
+  - answers when the work is done: `withRunSlot` (`:185`) around the work, in the Images, Videos,
+    Music, Lyrics, Documents, Presentations, Open Slide, Research, Data, Finance, Market and Knowledge
+    (workspace re-index, self-check, map) handlers;
+  - answers with a stream: Chat text, image and video at `packages/host/src/handlers/runs.ts:50` and the
+    Edit agent, through `guardRunStream` (`:210`); every streaming job through the `tenant` option of
+    `streamJob` (`packages/host/src/job-stream.ts:39-43`);
+  - outlives the request: Edit `/generate` and an `asr` job on `/jobs` hold the slot from the request
+    until the job itself is over, through `onSettled` on `enqueueEditJob`
+    (`packages/host/src/edit/jobs.ts`).
+  The tenant cap is checked first, so an account that is the reason the server is full is told so.
+- **Left out on purpose** (`LEFT_OUT` in `run-limits-routes.test.ts`): prompt enhance, the knowledge
+  context read, source ingest from a file or URL, one-source re-index, and the workspace backfill
+  (`/knowledge/backend/reindex`, which answers at once and runs in an outbox). Each is one short call and
+  bursty by design (a multi-file drop, a read per keystroke), so counting it would refuse a person their
+  real work; the 300-a-minute session bucket still bounds them. `generate-defaults`, `documents/check`,
+  `market/board` and the `education/*` routes never reach the gateway.
+- **Cannot rot.** `packages/host/src/run-limits-routes.test.ts` finds every handler that calls the gate
+  and fails unless it takes a slot or is on `LEFT_OUT` with a reason, then drives each counted route
+  through the real router at its cap and expects 429.
+- **Given back exactly once** (`createRunLimiter`, `:106`; the once-guard is at `:129`) when the work
+  ends however it ends: completed, failed, aborted, the client went away (the response is destroyed),
+  a consumer that never read a frame, or an error before the first frame. The Chat stream wrapper in
+  `handlers/runs.ts` is written by hand so `return()` always reaches the run. A run whose client was
+  already gone before it registered its abort listener ends at once (`packages/host/src/runs.ts:238`).
+- **What it is not.** In memory and per process: a restart empties it and a second app process keeps
+  its own count. Not a billing control and not an allowance. No `Retry-After`: `HostJsonResult` has no
+  header field. The 503 keeps its code through error masking (`maskServerError`) and the renderer puts
+  the catalog sentence in at `apiFetch` (`apps/web/lib/run-limit-copy.ts`), for both codes.
+
 ### 6. What goes back out
 
 - **Headers.** `packages/host/src/security-headers.ts` writes CSP, HSTS, `X-Frame-Options: DENY`,
@@ -260,6 +311,7 @@ Not a request-admission control; what the host does with a key once it has one. 
 | `packages/host/src/local-request.ts` | `filterHttpRequest`: method allowlist, path filter, header and body caps |
 | `packages/host/src/csrf.ts` | Double-submit token mint and check |
 | `packages/host/src/rate-limit.ts` | The three token buckets |
+| `packages/host/src/run-limits.ts` | The in-flight run caps and the exactly-once slot (§ 5, SR-138) |
 | `packages/host/src/auth/session.ts` | Opaque session ids, expiry, cookie names |
 | `packages/host/src/auth/routes.ts` | `requireSessionFor`, the sign-in routes |
 | `packages/host/src/router.ts` | `gate()` — the session check, ahead of the route table |

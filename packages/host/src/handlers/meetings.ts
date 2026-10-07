@@ -142,6 +142,7 @@ export async function handlePostMeetingTranscribe(request: HostRequest): Promise
     const language = readOptionalString(body(request).language);
     return streamJob((emit, abortSignal) => transcribeMeeting(tenant, meetingId, { emit, abortSignal, language }), {
       abortSignal: request.abortSignal,
+      tenant,
     });
   } catch (error) {
     return jsonError(error);
@@ -160,7 +161,7 @@ export async function handlePostMeetingMinutes(request: HostRequest): Promise<Ho
     const translate = input.translate !== false;
     return streamJob(
       (emit, abortSignal) => generateMinutes(tenant, meetingId, { emit, abortSignal, model, modelExplicit, translate }),
-      { abortSignal: request.abortSignal },
+      { abortSignal: request.abortSignal, tenant },
     );
   } catch (error) {
     return jsonError(error);
@@ -180,7 +181,7 @@ export async function handlePostMeetingRunStream(request: HostRequest): Promise<
     const translate = input.translate !== false;
     return streamJob(
       (emit, abortSignal) => runMeeting(tenant, meetingId, { emit, abortSignal, model, modelExplicit, translate }),
-      { abortSignal: request.abortSignal },
+      { abortSignal: request.abortSignal, tenant },
     );
   } catch (error) {
     return jsonError(error);

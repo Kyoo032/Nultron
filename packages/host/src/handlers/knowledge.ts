@@ -2,6 +2,7 @@ import { ApiError } from "@agentforge/core";
 import type { HostRequest, HostResult } from "../types";
 import { jsonError, jsonOk } from "../errors";
 import { requireGatewayAllowedFor } from "../gateway-gate";
+import { withRunSlot } from "../run-limits";
 import { getTenant } from "../tenant";
 import {
   addFileSource,
@@ -206,7 +207,7 @@ export async function handlePostKnowledgeReindex(request: HostRequest): Promise<
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    return jsonOk(await reindexWorkspace(tenant));
+    return jsonOk(await withRunSlot(tenant, () => reindexWorkspace(tenant)));
   } catch (error) {
     return jsonError(error);
   }
@@ -252,11 +253,13 @@ export async function handlePostKnowledgeVerify(request: HostRequest): Promise<H
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    const recent = throttledSelfCheck(getKnowledgeVerify(tenant), Date.now());
-    if (recent) {
-      return jsonOk({ ...recent, throttled: true });
-    }
-    return jsonOk({ ...(await runKnowledgeSelfCheck(tenant)), throttled: false });
+    return await withRunSlot(tenant, async () => {
+      const recent = throttledSelfCheck(getKnowledgeVerify(tenant), Date.now());
+      if (recent) {
+        return jsonOk({ ...recent, throttled: true });
+      }
+      return jsonOk({ ...(await runKnowledgeSelfCheck(tenant)), throttled: false });
+    });
   } catch (error) {
     return jsonError(error);
   }
@@ -293,11 +296,13 @@ export async function handlePostKnowledgeMap(request: HostRequest): Promise<Host
       verifierModel?: unknown;
     };
     return jsonOk(
-      await mapKnowledge(tenant, {
-        embeddingModel: typeof body.embeddingModel === "string" ? body.embeddingModel : undefined,
-        brainModel: typeof body.brainModel === "string" ? body.brainModel : undefined,
-        verifierModel: typeof body.verifierModel === "string" ? body.verifierModel : undefined,
-      }),
+      await withRunSlot(tenant, () =>
+        mapKnowledge(tenant, {
+          embeddingModel: typeof body.embeddingModel === "string" ? body.embeddingModel : undefined,
+          brainModel: typeof body.brainModel === "string" ? body.brainModel : undefined,
+          verifierModel: typeof body.verifierModel === "string" ? body.verifierModel : undefined,
+        }),
+      ),
     );
   } catch (error) {
     return jsonError(error);

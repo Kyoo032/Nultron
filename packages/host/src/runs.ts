@@ -233,6 +233,11 @@ export async function* startModalityRun(options: {
     modelAbort.abort(options.abortSignal?.reason);
   };
   options.abortSignal?.addEventListener("abort", onClientAbort, { once: true });
+  // A disconnect that landed while the thread, the model list and the knowledge were being read has
+  // already fired: an aborted signal never calls a listener added after the fact.
+  if (options.abortSignal?.aborted) {
+    onClientAbort();
+  }
 
   const work = (async () => {
     let assistantText = "";

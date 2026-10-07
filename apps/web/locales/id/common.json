@@ -79,5 +79,9 @@
   "needsKey": {
     "note": "Tambahkan kunci {gateway} Anda di {settings} untuk memakai ini.",
     "blocked": "Tambahkan kunci Anda di {settings} untuk memakai ini."
+  },
+  "runLimit": {
+    "tooManyRuns": "Terlalu banyak permintaan Anda yang berjalan bersamaan. Tunggu salah satu selesai, lalu coba lagi.",
+    "serverBusy": "Layanan sedang sibuk. Tunggu sebentar, lalu coba lagi."
   }
 }
