@@ -169,7 +169,7 @@ export async function startGenerateJob(
   tenant: TenantContext,
   projectId: string,
   input: EditStartGenerateJobInput,
-  options: { runId?: string } = {},
+  options: { runId?: string; onSettled?: () => void } = {},
 ): Promise<EditStartGenerateJobResult> {
   const doc = await foldProject(projectId, tenant.workspaceId);
   const still = input.kind === "generate_video" ? resolveStillSource(doc, input) : null;
@@ -251,6 +251,7 @@ export async function startGenerateJob(
     tier: input.tier,
     estimateUsd,
     requestedBy: tenant.userId,
+    onSettled: options.onSettled,
   });
   const [updated] = await db
     .update(editCards)

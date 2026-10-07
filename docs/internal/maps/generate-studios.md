@@ -151,7 +151,7 @@ Both tools resolve their backend first and return a **structured failure rather 
 | Failure | Where | What the client gets |
 |---|---|---|
 | No key / no backend ready | `resolveToolBackend` inside the tool (`image-generate.ts:62-72`, `video-generate.ts:120-134`) | `{ success: false, error }` → `tool_failed` **400**, "add a Toko Token gateway key in Settings". A stub Images desk (`allowed: true`) can still post; Videos cannot (button disabled on `!ready`). A closed gate disables Images before the post. |
-| Gate closed | `requireGatewayAllowedFor`, `packages/host/src/handlers/jobs.ts:72` (and the video twin at `:114`) | HTTP 403, flat `{error:"gateway_blocked", status, message}`. Both studios show it through `*-studio-error`, since they read `data.error?.message` and the flat body has none — the generic "generate failed" copy wins. |
+| Gate closed | `requireGatewayAllowedFor`, `packages/host/src/handlers/jobs.ts:73` (and the video twin at `:114`) | HTTP 403, flat `{error:"gateway_blocked", status, message}`. Both studios show it through `*-studio-error`, since they read `data.error?.message` and the flat body has none — the generic "generate failed" copy wins. |
 | Empty prompt / bad aspect / out-of-range seconds | zod in `parseImageGenerateBody` / `parseVideoGenerateBody` | HTTP 400, `{error:{code:"invalid_content_part", message}}` |
 | Still on a text-only model | body model in `parseVideoGenerateBody`; resolved model in `packages/core/src/videos/harness.ts:186-188` | HTTP 400, `video_still_unsupported`. No render. |
 | Video route not ready | `studio-generate.ts:416-418` | HTTP 400, `gatewayRequiredMessage("videos")`. **The image path has no equivalent guard.** |

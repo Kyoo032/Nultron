@@ -35,6 +35,7 @@ import { buildPresentationPptx } from "../presentation-pptx";
 import { presentationLocale } from "../presentation-locale";
 import { generateResearchNotes } from "../research-generate";
 import { streamJob } from "../job-stream";
+import { withRunSlot } from "../run-limits";
 import { analyzeDataset } from "../data-generate";
 
 export async function handleGetImages(request: HostRequest): Promise<HostResult> {
@@ -70,7 +71,9 @@ export async function handlePostImages(request: HostRequest): Promise<HostResult
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    const result = await generateStudioImage(tenant, parseImageGenerateBody(request.body ?? {}));
+    const result = await withRunSlot(tenant, () =>
+      generateStudioImage(tenant, parseImageGenerateBody(request.body ?? {})),
+    );
     return jsonOk(result, 201);
   } catch (error) {
     return jsonError(error);
@@ -112,7 +115,9 @@ export async function handlePostVideos(request: HostRequest): Promise<HostResult
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    const result = await generateStudioVideo(tenant, parseVideoGenerateBody(request.body ?? {}));
+    const result = await withRunSlot(tenant, () =>
+      generateStudioVideo(tenant, parseVideoGenerateBody(request.body ?? {})),
+    );
     return jsonOk(result, 201);
   } catch (error) {
     return jsonError(error);
@@ -165,7 +170,9 @@ export async function handlePostMusic(request: HostRequest): Promise<HostResult>
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    const result = await generateStudioMusic(tenant, parseMusicGenerateBody(request.body ?? {}));
+    const result = await withRunSlot(tenant, () =>
+      generateStudioMusic(tenant, parseMusicGenerateBody(request.body ?? {})),
+    );
     return jsonOk(result, 201);
   } catch (error) {
     return jsonError(error);
@@ -176,7 +183,7 @@ export async function handlePostMusicLyrics(request: HostRequest): Promise<HostR
   try {
     const tenant = await getTenant(request);
     requireGatewayAllowedFor(tenant);
-    return jsonOk(await writeStudioLyrics(tenant, parseLyricsWriteBody(request.body ?? {})));
+    return jsonOk(await withRunSlot(tenant, () => writeStudioLyrics(tenant, parseLyricsWriteBody(request.body ?? {}))));
   } catch (error) {
     return jsonError(error);
   }
@@ -187,7 +194,9 @@ export async function handlePostDocuments(request: HostRequest): Promise<HostRes
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    return jsonOk(await generateDocumentDraft(tenant, request.body ?? null, request.abortSignal));
+    return jsonOk(
+      await withRunSlot(tenant, () => generateDocumentDraft(tenant, request.body ?? null, request.abortSignal)),
+    );
   } catch (error) {
     return jsonError(error);
   }
@@ -198,7 +207,9 @@ export async function handlePostDocumentsRegen(request: HostRequest): Promise<Ho
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    return jsonOk(await regenerateDocumentSection(tenant, request.body ?? null, request.abortSignal));
+    return jsonOk(
+      await withRunSlot(tenant, () => regenerateDocumentSection(tenant, request.body ?? null, request.abortSignal)),
+    );
   } catch (error) {
     return jsonError(error);
   }
@@ -225,7 +236,11 @@ export async function handlePostPresentations(request: HostRequest): Promise<Hos
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    return jsonOk(await generatePresentationOutline(tenant, request.body ?? null, undefined, request.abortSignal));
+    return jsonOk(
+      await withRunSlot(tenant, () =>
+        generatePresentationOutline(tenant, request.body ?? null, undefined, request.abortSignal),
+      ),
+    );
   } catch (error) {
     return jsonError(error);
   }
@@ -238,7 +253,7 @@ export async function handlePostPresentationsStream(request: HostRequest): Promi
     requireGatewayAllowedFor(tenant);
     return streamJob(
       (emit, abortSignal) => generatePresentationOutline(tenant, request.body ?? null, emit, abortSignal),
-      { abortSignal: request.abortSignal },
+      { abortSignal: request.abortSignal, tenant },
     );
   } catch (error) {
     return jsonError(error);
@@ -250,7 +265,9 @@ export async function handlePostPresentationsRegen(request: HostRequest): Promis
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    return jsonOk(await regeneratePresentationSlide(tenant, request.body ?? null, request.abortSignal));
+    return jsonOk(
+      await withRunSlot(tenant, () => regeneratePresentationSlide(tenant, request.body ?? null, request.abortSignal)),
+    );
   } catch (error) {
     return jsonError(error);
   }
@@ -278,7 +295,11 @@ export async function handlePostResearch(request: HostRequest): Promise<HostResu
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    return jsonOk(await generateResearchNotes(tenant, request.body ?? null, undefined, request.abortSignal));
+    return jsonOk(
+      await withRunSlot(tenant, () =>
+        generateResearchNotes(tenant, request.body ?? null, undefined, request.abortSignal),
+      ),
+    );
   } catch (error) {
     return jsonError(error);
   }
@@ -292,6 +313,7 @@ export async function handlePostResearchStream(request: HostRequest): Promise<Ho
     requireGatewayAllowedFor(tenant);
     return streamJob((emit, abortSignal) => generateResearchNotes(tenant, request.body ?? null, emit, abortSignal), {
       abortSignal: request.abortSignal,
+      tenant,
     });
   } catch (error) {
     return jsonError(error);
@@ -303,7 +325,9 @@ export async function handlePostData(request: HostRequest): Promise<HostResult> 
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    return jsonOk(await analyzeDataset(tenant, request.body ?? null, undefined, request.abortSignal));
+    return jsonOk(
+      await withRunSlot(tenant, () => analyzeDataset(tenant, request.body ?? null, undefined, request.abortSignal)),
+    );
   } catch (error) {
     return jsonError(error);
   }
@@ -317,6 +341,7 @@ export async function handlePostDataStream(request: HostRequest): Promise<HostRe
     requireGatewayAllowedFor(tenant);
     return streamJob((emit, abortSignal) => analyzeDataset(tenant, request.body ?? null, emit, abortSignal), {
       abortSignal: request.abortSignal,
+      tenant,
     });
   } catch (error) {
     return jsonError(error);

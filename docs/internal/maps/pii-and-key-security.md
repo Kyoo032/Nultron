@@ -45,10 +45,10 @@ Both of the "must have a separator" rules exist for one reason, stated in the co
 
 The feature file says "`createRuntime()` masks". That is exactly right, and the call is not in `packages/host` at all:
 
-1. `packages/host/src/runs.ts:284` — `const runtime = createRuntime(settings);`
+1. `packages/host/src/runs.ts:289` — `const runtime = createRuntime(settings);`
 2. `packages/core/src/runtime/create-runtime.ts:32-40` — builds `AiSdkRuntime` or `StubRuntime` (`:38`) and wraps it in `withToolSecrets(runtime, settings)` (`:39`).
 3. `packages/core/src/runtime/create-runtime.ts:11-30` — the wrapper's own `execute` (`:14-28`) calls `runtime.execute(maskOutboundRunInput(input))` at `:26`.
-4. `packages/host/src/runs.ts:288` — `await runtime.execute({...})` hits that wrapper, so the mask is applied for **stub and live alike**.
+4. `packages/host/src/runs.ts:293` — `await runtime.execute({...})` hits that wrapper, so the mask is applied for **stub and live alike**.
 
 Because it is the wrapper, not the runtime, a future runtime added under `createRuntime` inherits the mask for free; a runtime constructed directly does not.
 
@@ -59,10 +59,10 @@ Ordering inside `startModalityRun`:
 | Step | Line | What it holds |
 |---|---|---|
 | parse + injection-guard the parts | `packages/host/src/runs.ts:135` | original text, attachments possibly blocked |
-| persist the user message | `packages/host/src/runs.ts:253` | **original**, sealed at rest |
-| read history back | `packages/host/src/runs.ts:262` | original |
-| build the runtime | `packages/host/src/runs.ts:284` | — |
-| execute | `packages/host/src/runs.ts:288` | **masked copy** |
+| persist the user message | `packages/host/src/runs.ts:258` | **original**, sealed at rest |
+| read history back | `packages/host/src/runs.ts:267` | original |
+| build the runtime | `packages/host/src/runs.ts:289` | — |
+| execute | `packages/host/src/runs.ts:293` | **masked copy** |
 
 `insertMessage` (`packages/host/src/threads.ts:267-286`) writes `content: sealJson(content)` at `:279` — it seals, it does not mask. `listMessages` (`:258-265`) opens the same bytes. So `message-list` renders the email the owner typed and the model saw `[email]`, and no code path exists that could reverse that.
 
