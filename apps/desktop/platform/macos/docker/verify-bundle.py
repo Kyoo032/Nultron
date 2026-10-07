@@ -10,7 +10,7 @@ off-platform build unstable when they are wrong:
   - the Electron framework symlinks survived (Versions/Current -> A)
   - Info.plist names the product, id and version
   - app.asar holds every shell module main.cjs requires (missing one = crash on require)
-  - staged resources (renderer, drizzle, brand, starters) are present
+  - staged resources (renderer, drizzle, brand, starters, the bundled ffmpeg and ffprobe) are present
   - the main binary, framework and helpers carry an ad-hoc signature rcodesign accepts
   - with --dmg / --zip: the archive lists the same files at the same sizes, and the framework
     symlink is stored as a link, not a copy
@@ -54,6 +54,12 @@ REQUIRED_RESOURCES = [
     "Contents/Resources/drizzle/meta/_journal.json",
     "Contents/Resources/brand/brand.json",
     "Contents/Resources/starters",
+    # The bundled ffmpeg (apps/desktop/scripts/stage-ffmpeg.mjs): `check_binaries` already requires every Mach-O in the
+    # bundle, these two included, to hold the requested arch.
+    "Contents/Resources/ffmpeg/ffmpeg",
+    "Contents/Resources/ffmpeg/ffprobe",
+    "Contents/Resources/ffmpeg/LICENSE.txt",
+    "Contents/Resources/ffmpeg/MANIFEST.json",
     "Contents/Resources/app.asar.unpacked/node_modules/keytar/build/Release/keytar.node",
 ]
 FRAMEWORK = "Contents/Frameworks/Electron Framework.framework"

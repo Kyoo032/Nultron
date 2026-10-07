@@ -11,6 +11,7 @@
   },
   "setupCheck": "Getting a document reader ready",
   "ffmpegLater": "You can continue now and install ffmpeg later. The Edit screen shows the same guide until it is found.",
+  "ffmpegBundledLater": "You can continue now. Editing video and reading meeting recordings stay off until {productName} is reinstalled.",
   "keyTitle": "Paste your {gatewayName} key",
   "keyHelp": "Open {gatewayName}, copy a key, and paste it here. It stays on this computer.",
   "keyLabel": "Your key",

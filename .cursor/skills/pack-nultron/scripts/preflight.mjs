@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const skillDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = join(skillDir, "..", "..", "..");
@@ -73,6 +73,45 @@ const clipFiles = existsSync(clips) ? readdirSync(clips).filter((n) => /\.mp4$/i
 if (starterFiles.length < 7) fail(`starter media: ${starterFiles.length}/7 in ${starters}`);
 if (clipFiles.length < 6) fail(`example clips: ${clipFiles.length}/6 in ${clips}`);
 ok(`media ${starterFiles.length} starters, ${clipFiles.length} clips`);
+
+// Bundled ffmpeg (apps/desktop/scripts/stage-ffmpeg.mjs). Every installer carries ffmpeg and ffprobe; an installer
+// without them shows people an "install ffmpeg" notice, which is the bug this check exists to stop.
+//   - the lock must be valid and pin all three targets (the Windows pack and both mac arches);
+//   - a staged resources/ffmpeg, when there is one, must match the lock (a wrong-arch swap fails here);
+//   - with --require-ffmpeg the folder MUST be staged for win32-x64: run it in the pack worktree after
+//     `node apps/desktop/scripts/stage-ffmpeg.mjs --target win32-x64` and before `desktop:build`.
+// The mac route stages and verifies inside its Docker run (build-mac.sh), so nothing is staged for it here.
+const stageFfmpeg = await import(pathToFileURL(join(desktopRoot, "scripts", "stage-ffmpeg.mjs")).href);
+let ffmpegLock;
+try {
+  ffmpegLock = stageFfmpeg.readLock();
+} catch (error) {
+  fail(`ffmpeg lock: ${error.message}`);
+}
+for (const target of stageFfmpeg.TARGETS) {
+  if (!ffmpegLock.targets[target]) fail(`ffmpeg.lock.json pins nothing for ${target}: that pack would ship without ffmpeg`);
+}
+ok(`ffmpeg lock pins ${stageFfmpeg.TARGETS.join(", ")}`);
+const ffmpegManifest = join(stageFfmpeg.DEFAULT_OUT, "MANIFEST.json");
+const ffmpegStaged = existsSync(ffmpegManifest)
+  ? stageFfmpeg.verifyStaged({ lock: ffmpegLock, out: stageFfmpeg.DEFAULT_OUT })
+  : null;
+if (ffmpegStaged && !ffmpegStaged.ok) {
+  fail(`resources/ffmpeg does not match the lock: ${ffmpegStaged.problems.slice(0, 5).join("; ")}`);
+}
+if (process.argv.includes("--require-ffmpeg")) {
+  if (!ffmpegStaged) {
+    fail("resources/ffmpeg is not staged: run `node apps/desktop/scripts/stage-ffmpeg.mjs --target win32-x64` first");
+  }
+  if (ffmpegStaged.target !== "win32-x64") {
+    fail(`resources/ffmpeg is staged for ${ffmpegStaged.target}, the Windows pack needs win32-x64`);
+  }
+}
+ok(
+  ffmpegStaged
+    ? `ffmpeg staged for ${ffmpegStaged.target}, matches the lock`
+    : "ffmpeg not staged in this checkout (desktop:build stages win32-x64; mac stages per arch in Docker)",
+);
 
 const dist = join(desktopRoot, "dist");
 if (existsSync(dist)) {

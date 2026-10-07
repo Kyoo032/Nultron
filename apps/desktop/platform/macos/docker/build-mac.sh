@@ -24,7 +24,7 @@ die() { echo "mac-build: ERROR: $*" >&2; exit 1; }
 
 [ -d "$SRC/.git" ] || die "/src is not a git checkout"
 [ -d "$OUT" ] || die "/out is not mounted"
-mkdir -p /cache/keytar /cache/anydoc /cache/electron /cache/electron-builder /cache/sandbox
+mkdir -p /cache/keytar /cache/anydoc /cache/electron /cache/electron-builder /cache/sandbox /cache/ffmpeg
 
 # ---------- 1. fresh clone of the committed tree ----------
 log "cloning committed tree"
@@ -141,6 +141,13 @@ for arch in $ARCHES; do
   # The hoisted view must agree with the store, or node-dep-tree may still find the other arch there.
   find node_modules -maxdepth 4 -type l -path '*/.pnpm/node_modules/@firecrawl/anydoc-darwin-*' -delete 2>/dev/null || true
 
+  # ffmpeg and ffprobe are per-arch Mach-O programs, so they are swapped like the native modules above: staging a
+  # target removes the other's files first (resources/ffmpeg is copied as-is by extraResources). The URLs and
+  # sha256 are only in apps/desktop/scripts/ffmpeg.lock.json; the archives are cached in the /cache volume, and a
+  # failed check here stops the pack before electron-builder runs.
+  log "staging ffmpeg darwin-$arch"
+  node scripts/stage-ffmpeg.mjs --target "darwin-$arch" --cache /cache/ffmpeg || die "ffmpeg staging failed for $arch"
+
   log "electron-builder --mac --dir --$arch"
   npx electron-builder --mac --dir "--$arch" -c.npmRebuild=false -c.mac.identity=null --publish never \
     >"/tmp/electron-builder-$arch.log" 2>&1 || { tail -60 "/tmp/electron-builder-$arch.log"; die "electron-builder failed for $arch"; }
@@ -150,8 +157,20 @@ for arch in $ARCHES; do
   [ -n "$APP" ] || die "no Nultron.app produced for $arch"
   log "app at $APP"
 
+  # Before signing, the bundle must hold exactly the pinned programs for this arch: every file re-hashed against
+  # the lock, the programs executable. (Signing may rewrite a Mach-O, so the byte check cannot run after it.)
+  log "verifying ffmpeg inside the bundle"
+  node "$WORK/apps/desktop/scripts/stage-ffmpeg.mjs" --verify --target "darwin-$arch" --out "$APP/Contents/Resources/ffmpeg" \
+    || die "Contents/Resources/ffmpeg is missing or does not match the lock ($arch)"
+
   log "ad-hoc signing with rcodesign"
   rcodesign sign "$APP" >"/tmp/rcodesign-$arch.log" 2>&1 || { tail -40 "/tmp/rcodesign-$arch.log"; die "rcodesign failed for $arch"; }
+  for program in ffmpeg ffprobe; do
+    [ -x "$APP/Contents/Resources/ffmpeg/$program" ] || die "$program is not executable in the signed bundle ($arch)"
+  done
+  node "$WORK/apps/desktop/scripts/stage-ffmpeg.mjs" --verify --target "darwin-$arch" --out "$APP/Contents/Resources/ffmpeg" >/dev/null 2>&1 \
+    && log "signing left the ffmpeg programs byte for byte as pinned" \
+    || log "note: signing rewrote the ffmpeg programs (verify-bundle.py checks them as Mach-O for $arch)"
 
   # The sandbox folder must sit in the signed bundle as the same real files the build produced (every file
   # re-hashed against its manifest); a missing extraResources source is only a warning in electron-builder.
@@ -169,6 +188,8 @@ for arch in $ARCHES; do
 
   unzip -p "$ZIP" "Nultron.app/Contents/Resources/sandbox/MANIFEST.json" | cmp -s - "$APP/Contents/Resources/sandbox/MANIFEST.json" \
     || die "the zip does not carry the sandbox runtime ($arch)"
+  unzip -p "$ZIP" "Nultron.app/Contents/Resources/ffmpeg/MANIFEST.json" | cmp -s - "$APP/Contents/Resources/ffmpeg/MANIFEST.json" \
+    || die "the zip does not carry the bundled ffmpeg ($arch)"
 
   log "dmg -> $DMG"
   python3 "$DOCKER_DIR/make-dmg.py" --app "$APP" --out "$DMG" --volume "Nultron $VERSION"

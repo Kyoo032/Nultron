@@ -459,7 +459,12 @@ async function probeGeneratedMeta(
       fps: probed.fps,
       hasAudio: probed.hasAudio,
     };
-  } catch {
+  } catch (error) {
+    // Metadata is best effort, but a generated "video" that is really a playlist or concat script is not
+    // media: let the refusal fail the job instead of putting the file on the timeline (SR-135).
+    if (error instanceof ApiError && error.code === "unsupported_media") {
+      throw error;
+    }
     return {};
   }
 }

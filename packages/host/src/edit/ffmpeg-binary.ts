@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { trackChild } from "../child-processes";
 import { wellKnownBinaryPaths, wingetPackageBinaryPaths } from "./ffmpeg-locations";
+import { usesBundledFfmpeg } from "./ffmpeg-setup";
 import { minimalEnv } from "./ffmpeg/env";
 
 export type BinaryStatus = {
@@ -176,7 +177,20 @@ async function whichOnPathAsync(name: string): Promise<string | null> {
   }
 }
 
-function packagedBinary(name: "ffmpeg" | "ffprobe"): string | null {
+/** The path a probe or a run is aimed at, and whether the file the packaged app should carry is absent. */
+type DirectCandidate = { path: string; absent?: boolean };
+
+/**
+ * The copy of ffmpeg or ffprobe shipped inside the packaged app (`resources/ffmpeg/`, staged by
+ * `apps/desktop/scripts/stage-ffmpeg.mjs`).
+ *
+ * In the packaged app (`AGENTFORGE_PACKAGED=1`, set by the shell, with no `AGENTFORGE_FFMPEG_PATH`) it is the
+ * answer even when the file is not there: an install that lost its folder reports that, and the person reinstalls.
+ * It does not go looking on PATH, because a copy on PATH never replaces the bundled one
+ * (`apps/desktop/resources/ffmpeg/README.md`). Electron without that flag (the `desktop:dev` window, which is
+ * webdev) keeps the old behaviour: the bundled file when it exists, else PATH.
+ */
+function packagedBinary(name: "ffmpeg" | "ffprobe"): DirectCandidate | null {
   if (!process.versions.electron) {
     return null;
   }
@@ -186,7 +200,10 @@ function packagedBinary(name: "ffmpeg" | "ffprobe"): string | null {
   }
   const file = process.platform === "win32" ? `${name}.exe` : name;
   const candidate = path.join(resourcesPath, "ffmpeg", file);
-  return existsSync(candidate) ? candidate : null;
+  if (existsSync(candidate)) {
+    return { path: candidate };
+  }
+  return usesBundledFfmpeg() ? { path: candidate, absent: true } : null;
 }
 
 function siblingBinary(ffmpegPath: string, name: "ffprobe"): string | null {
@@ -248,28 +265,33 @@ async function probeWellKnownAsync(kind: BinaryKind): Promise<BinaryStatus> {
  * path, then (for ffprobe) the sibling of the configured ffmpeg, then the copy bundled with the
  * packaged app. Whatever this returns is probed and reported as-is, found or not.
  */
-function directCandidate(kind: BinaryKind): string | null {
+function directCandidate(kind: BinaryKind): DirectCandidate | null {
   const envKey = kind === "ffmpeg" ? "AGENTFORGE_FFMPEG_PATH" : "AGENTFORGE_FFPROBE_PATH";
   const fromEnv = process.env[envKey]?.trim();
   if (fromEnv) {
-    return fromEnv;
+    return { path: fromEnv };
   }
   if (kind === "ffprobe") {
     const ffmpegEnv = process.env.AGENTFORGE_FFMPEG_PATH?.trim();
     if (ffmpegEnv) {
       const sibling = siblingBinary(ffmpegEnv, "ffprobe");
       if (sibling) {
-        return sibling;
+        return { path: sibling };
       }
     }
   }
   return packagedBinary(kind);
 }
 
+/** What a packaged install that lost its ffmpeg folder reports: the bundled path, missing. Nothing is run. */
+function absentBundled(candidate: string): BinaryStatus {
+  return { found: false, path: candidate, version: null, reason: "missing" };
+}
+
 function resolveNamed(kind: BinaryKind): BinaryStatus {
   const direct = directCandidate(kind);
   if (direct) {
-    return probeBinary(direct);
+    return direct.absent ? absentBundled(direct.path) : probeBinary(direct.path);
   }
   const onPath = whichOnPath(kind);
   if (onPath) {
@@ -284,7 +306,7 @@ function resolveNamed(kind: BinaryKind): BinaryStatus {
 async function resolveNamedAsync(kind: BinaryKind): Promise<BinaryStatus> {
   const direct = directCandidate(kind);
   if (direct) {
-    return probeBinaryAsync(direct);
+    return direct.absent ? absentBundled(direct.path) : probeBinaryAsync(direct.path);
   }
   const onPath = await whichOnPathAsync(kind);
   if (onPath) {

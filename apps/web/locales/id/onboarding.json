@@ -11,6 +11,7 @@
   },
   "setupCheck": "Menyiapkan pembaca dokumen",
   "ffmpegLater": "Anda dapat lanjut sekarang dan memasang ffmpeg nanti. Layar Edit menampilkan panduan yang sama sampai ffmpeg ditemukan.",
+  "ffmpegBundledLater": "Anda dapat lanjut sekarang. Penyuntingan video dan pembacaan rekaman rapat tetap nonaktif sampai {productName} dipasang ulang.",
   "keyTitle": "Tempel kunci {gatewayName} Anda",
   "keyHelp": "Buka {gatewayName}, salin kunci, lalu tempel di sini. Kunci tetap di komputer ini.",
   "keyLabel": "Kunci Anda",

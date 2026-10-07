@@ -12,8 +12,11 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { ApiError } from "@agentforge/core";
 import { resolveFfmpeg } from "../edit/ffmpeg-binary";
+import { usesBundledFfmpeg } from "../edit/ffmpeg-setup";
+import { assertAcceptableContainer, mediaTimeoutMs } from "../edit/ffmpeg/input-safety";
 import { assertExistingInput, assertInsidePath, type PathAllowlist } from "../edit/ffmpeg/paths";
 import { runFfmpeg } from "../edit/ffmpeg/run";
+import { localeForRun } from "../run-context";
 
 /**
  * One chunk per ten minutes. Mono 16 kHz at 64 kbps is about 4.8 MB for that, which every
@@ -36,7 +39,9 @@ export type ExtractedAudio = {
  * is one less thing to reason about.
  */
 function timeoutForMedia(seconds: number): number {
-  return Math.ceil(Math.max(30_000, 2 * seconds * 1000 + 30_000));
+  // The length a recording declares is only believed up to six hours (MAX_CHUNKS chunks of CHUNK_SECONDS, the
+  // longest this file reads) and a hosted run stops at an hour, so a forged length cannot hold an ffmpeg slot.
+  return mediaTimeoutMs(seconds, 30_000);
 }
 
 export function ffmpegAvailable(): boolean {
@@ -49,7 +54,9 @@ export async function probeDuration(filePath: string, allow: PathAllowlist): Pro
     timeoutMs: 15_000,
     bin: "ffprobe",
   });
-  const parsed = JSON.parse(stdout || "{}") as { format?: { duration?: string } };
+  const parsed = JSON.parse(stdout || "{}") as { format?: { duration?: string; format_name?: string } };
+  // A playlist or concat script is not a recording and names other files or addresses (SR-135).
+  assertAcceptableContainer(parsed.format?.format_name, localeForRun());
   const duration = Number(parsed.format?.duration ?? 0);
   return Number.isFinite(duration) && duration > 0 ? duration : 0;
 }
@@ -65,9 +72,12 @@ export async function extractMeetingAudio(
   allow: PathAllowlist,
 ): Promise<ExtractedAudio> {
   if (!ffmpegAvailable()) {
+    // In the packaged app the ffmpeg is the installer's own: nobody installed it, so nobody is told to.
     throw new ApiError(
       "ffmpeg_missing",
-      "ffmpeg is needed to read a recording. Install it, or paste the transcript instead.",
+      usesBundledFfmpeg()
+        ? "The video tools that come with this app could not start, so this recording cannot be read. Reinstall the app, or paste the transcript instead."
+        : "ffmpeg is needed to read a recording. Install it, or paste the transcript instead.",
       503,
     );
   }

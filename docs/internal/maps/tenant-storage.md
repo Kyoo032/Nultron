@@ -81,7 +81,7 @@ because they are media-root-specific; they all delegate to the helpers above.
 The rule costs one thing: a second tenant's subtree sits **inside** the local tenant's root, so "is this
 path mine?" is not a plain prefix test for `local-tenant`. `tenantDeniedRoots(root, tenantId)`
 (`tenant-paths.ts:95-97`) returns `[<root>/tenants]` for the local tenant and `[]` for everyone else, and
-`isInsideTenantRoot` checks it. `assertInsidePath` (`packages/host/src/edit/ffmpeg/paths.ts:82-126`)
+`isInsideTenantRoot` checks it. `assertInsidePath` (`packages/host/src/edit/ffmpeg/paths.ts:97-141`)
 checks denials **first**, so a denial always beats a root.
 
 That matters most for ffmpeg, whose input paths come out of a project document an agent can write:

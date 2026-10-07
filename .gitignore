@@ -92,3 +92,10 @@ vendor/.sandbox-cache/
 
 # Third-party reference clones (read-only, never committed)
 .ref/
+
+# Bundled ffmpeg and ffprobe (apps/desktop/scripts/stage-ffmpeg.mjs): the staged programs, the licence text and the
+# generated MANIFEST.json in the installer's resources/ffmpeg folder (only its README is tracked), and the download
+# cache for the pinned archives. Rebuilt from apps/desktop/scripts/ffmpeg.lock.json; never committed.
+apps/desktop/resources/ffmpeg/*
+!apps/desktop/resources/ffmpeg/README.md
+vendor/.ffmpeg-cache/
