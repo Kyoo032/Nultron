@@ -165,6 +165,28 @@ Until Rizky lifts it, work is limited to three things, in this order:
 
 **No new modes, harnesses, rail entries or packs.** Do not add a product mode, a new job surface or a new Pack, even a small one. If a fix seems to need one, stop and ask Rizky. Refactors are fine only when a fix needs them.
 
+### Resume here: 2026-10-07, afternoon (read this first)
+
+**Full handoff:** `nultron-files/handoff-2026-10-07/HANDOFF.md`, with one note per lane in flight in `lanes/` and the day's helper scripts in `tools/`. The brief for outside advisers, covering every product and site, is `nultron-files/PRODUCTION-BRIEF.md`.
+
+**Done on 2026-10-07.**
+- Every lane paused on 10-06 is merged into `main`, except the edge login gate and the tester bots: chat error recovery, the hosted run cap, ffmpeg (image limits and the desktop bundle code), documents in Chat, the Chat image fix, the Chat deck tool, hosted team privacy.
+- A live drive found a new bug and it is fixed and merged: a slow gateway answer ended a Chat turn in silence. The wait for response headers is 45 s and a failed follow-up ends with a sentence.
+- Driven on `:3000` with a real key: `self_check`, a Word file, a picture, a deck. Evidence is under `.cursor/skills/verify-agentforge/evidence/chat/2026-10-07-*`.
+- The Nultron preview runs `nultron-web:0d829f00bc81`, rolled desk by desk without touching the proxy.
+- The HYP AI server exists and has its base setup. No app is installed.
+
+**Git.** `main` is local only and not pushed. Check `git log --oneline -15` for the merges. Full local CI was green on `0d829f0`.
+
+**In flight (see the lane notes).**
+- The per-company gateway key check: fixed in `C:\Users\rizky\agentforge-limits`, under independent review, not committed.
+- The portal's username and password sign-in for HYP AI: being built in `C:\Users\rizky\agentforge-chatdocs` on `feat/portal-password-signin`. It needs an independent security review before it is merged.
+- The HYP AI bundle rebuild in `C:\Users\rizky\hypey`. It needs one more pass after the two items above.
+
+**Ready to install HYP AI means:** both fixes merged, the bundle rebuilt in password mode with `check.mjs` passing, and the rehearsal exiting 0 with three people signing in by username and password. Then tell Rizky. On the server each step needs his go: the load test, the install, the three accounts.
+
+**Needs Rizky's decision.** Hosted "erase account" purges every company of a partner (SR-163). Settle it before a second company exists on HYP AI. Also still open: the three accounts' usernames and e-mails, the two domain names, the snapshot policy.
+
 ### Resume here: 2026-10-05, end of day (read this before the 10-03 block below)
 
 **Full handoff, including lanes that were running and their exact scope:** `nultron-files/handoff-2026-10-05/HANDOFF.md`. **Newer, 2026-10-06:** `nultron-files/handoff-2026-10-06/HANDOFF.md`, covering the live sites, the app preview with per-tester desks, PR #139, the 0.16.0 cut and the verify-skill findings. **Newest, evening of 2026-10-06: `nultron-files/handoff-2026-10-06/HANDOFF-evening.md`**, with one note per paused lane in `lanes/`. Read it first: ten lanes were paused mid-work (ffmpeg in the image is live on the preview; the desktop bundle, the run cap, chat error recovery, document upload, the deck tool, the image-attachment fix, team privacy, the H1 knock gate and the HYP AI bundle are on unmerged branches or local folders), the local `edge/` folder is NOT safe to deploy, and the document-upload branch is half way through its review fixes.
