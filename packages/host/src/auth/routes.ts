@@ -42,6 +42,7 @@ import {
   type PortalSessionCheck,
   type PortalSessionCheckOptions,
 } from "./portal-check";
+import type { SignInMode } from "./portal-mode";
 import { createSessionSecrets, type SessionSecrets } from "./session-secrets";
 import {
   configuredClientCredentials,
@@ -149,6 +150,14 @@ export type AuthRouteDeps = {
    * the same instance the portal check uses.
    */
   readonly secrets?: SessionSecrets;
+  /**
+   * How the portal signs people in (`./portal-mode.ts`), asked of the portal and never guessed. Only
+   * `GET /auth/session` uses it, and only to say `signInMode: "password"` when the portal does, so the
+   * sign-in screen does not promise an e-mailed code in front of a portal that sends none. Absent, or
+   * answering `code`, or throwing, the answer carries no such field and is exactly what it always was.
+   * The hosted server passes one; the desktop and webdev never do.
+   */
+  readonly signInMode?: () => Promise<SignInMode>;
 };
 
 /** The doc's own English copy per reason, used when the portal sends none (:409-423). */
@@ -609,14 +618,34 @@ export function createAuthRoutes(deps: AuthRouteDeps): AuthRoutes {
     }
   }
 
+  /**
+   * `{ signInMode: "password" }` when the portal says it signs people in with a password, and nothing
+   * at all otherwise, so the answer in the default mode is byte for byte what it was. Never throws: a
+   * mode the host cannot learn is the default, which is what the screen has always said.
+   */
+  async function modeFields(): Promise<{ readonly signInMode?: "password" }> {
+    if (!deps.signInMode) {
+      return {};
+    }
+    try {
+      return (await deps.signInMode()) === "password" ? { signInMode: "password" } : {};
+    } catch {
+      return {};
+    }
+  }
+
   const handleSession = guarded(async (request: HostRequest) => {
     const { id, verdict } = await loadSession(request, deps);
+    const mode = await modeFields();
     if (verdict.ok) {
       const role = await roleForAnswer(verdict.session);
-      return jsonOk(role ? { ...sessionSummary(verdict.session), role } : sessionSummary(verdict.session));
+      return jsonOk({
+        ...(role ? { ...sessionSummary(verdict.session), role } : sessionSummary(verdict.session)),
+        ...mode,
+      });
     }
     // A visitor who never signed in is not an error and gets no reason to render.
-    return jsonOk(id === null ? { signedIn: false } : { signedIn: false, reason: verdict.reason });
+    return jsonOk({ ...(id === null ? { signedIn: false } : { signedIn: false, reason: verdict.reason }), ...mode });
   });
 
   /**

@@ -30,6 +30,14 @@ async function main(): Promise<void> {
   }
 
   const config = loadConfig();
+  if (config.signInMode === "password") {
+    console.error(
+      "Refused: this portal signs people in with a username and a password (PORTAL_SIGNIN_MODE=password), so\n" +
+        "there is no sign-in code to mint. To give somebody a new password, run:\n\n" +
+        "    portal.sh account reset-password --username <name>",
+    );
+    process.exit(3);
+  }
   if (!config.allowManualOtp) {
     console.error(
       "Refused: PORTAL_ALLOW_MANUAL_OTP=1 is not set.\n\n" +

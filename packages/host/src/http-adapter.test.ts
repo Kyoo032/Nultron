@@ -1987,3 +1987,174 @@ describe("handleNodeRequest Accept-Language forwarding", () => {
     );
   });
 });
+
+describe("handleNodeRequest chat document routes", () => {
+  // The two POSTs the Chat composer makes for an attached document: the read (multipart, one file) and
+  // the save when the message is sent (JSON). Neither has a handler-side Origin, CSRF or size check of
+  // its own, so these are the tests that hold the adapter to its word for these exact paths.
+  const READ_PATH = "/api/v1/chat/documents";
+  const SAVE_PATH = "/api/v1/chat/documents/save";
+  const BOUNDARY = "----agentforgeChatDocBoundary";
+  const token = mintCsrfToken();
+  const web = {
+    host: WEB_HOST,
+    origin: WEB_ORIGIN,
+    cookie: `${CSRF_COOKIE_SECURE}=${token}`,
+    [CSRF_HEADER]: token,
+    ...TRANSPORT,
+  };
+  const multipart = { "content-type": `multipart/form-data; boundary=${BOUNDARY}` };
+  const jsonType = { "content-type": "application/json" };
+  const multipartBody = [
+    `--${BOUNDARY}`,
+    'Content-Disposition: form-data; name="file"; filename="report.pdf"',
+    "Content-Type: application/pdf",
+    "",
+    "%PDF-1.4 fake",
+    `--${BOUNDARY}--`,
+    "",
+  ].join("\r\n");
+  const saveBody = JSON.stringify({ name: "report.pdf", format: "pdf", bytes: 12, masked: 0, text: "hello" });
+  const OVER_CAP = 26 * 1024 * 1024 + 1;
+
+  async function send(input: Parameters<typeof fakeRequest>[0]) {
+    const captured = fakeResponse();
+    await handleNodeRequest(fakeRequest(input), captured.res);
+    return captured;
+  }
+
+  it("carries the read upload through the origin and CSRF rules to the handler, as one file", async () => {
+    useServerMode();
+    const captured = await send({
+      method: "POST",
+      url: READ_PATH,
+      headers: { ...web, ...multipart },
+      body: multipartBody,
+    });
+    expect(captured.status()).toBe(200);
+    expect(dispatched).toHaveLength(1);
+    expect(dispatched[0]?.path).toBe(READ_PATH);
+    expect(dispatched[0]?.files).toHaveLength(1);
+    expect(dispatched[0]?.files?.[0]).toMatchObject({ field: "file", filename: "report.pdf" });
+  });
+
+  it("carries the save call through the same rules to the handler, as a JSON body", async () => {
+    useServerMode();
+    const captured = await send({
+      method: "POST",
+      url: SAVE_PATH,
+      headers: { ...web, ...jsonType },
+      body: saveBody,
+    });
+    expect(captured.status()).toBe(200);
+    expect(dispatched).toHaveLength(1);
+    expect(dispatched[0]?.path).toBe(SAVE_PATH);
+    expect(dispatched[0]?.body).toMatchObject({ name: "report.pdf", text: "hello" });
+  });
+
+  it("refuses both routes from an origin that is not trusted, or from none, before any handler runs", async () => {
+    useServerMode();
+    const withoutOrigin = { ...web, origin: undefined as unknown as string };
+    for (const [url, type, body] of [
+      [READ_PATH, multipart, multipartBody],
+      [SAVE_PATH, jsonType, saveBody],
+    ] as const) {
+      const foreign = await send({
+        method: "POST",
+        url,
+        headers: { ...web, ...type, origin: "https://evil.example" },
+        body,
+      });
+      expect(foreign.status()).toBe(403);
+      expect(foreign.json().error?.code).toBe("origin_forbidden");
+      const missing = await send({ method: "POST", url, headers: { ...withoutOrigin, ...type }, body });
+      expect(missing.status()).toBe(403);
+      expect(missing.json().error?.code).toBe("origin_forbidden");
+    }
+    expect(dispatched).toHaveLength(0);
+  });
+
+  it("refuses both routes with no CSRF token, and with a header that is not the cookie's token", async () => {
+    useServerMode();
+    for (const [url, type, body] of [
+      [READ_PATH, multipart, multipartBody],
+      [SAVE_PATH, jsonType, saveBody],
+    ] as const) {
+      const none = await send({
+        method: "POST",
+        url,
+        headers: { host: WEB_HOST, origin: WEB_ORIGIN, ...TRANSPORT, ...type },
+        body,
+      });
+      expect(none.status()).toBe(403);
+      expect(none.json().error?.code).toBe("csrf_missing");
+      const other = await send({
+        method: "POST",
+        url,
+        headers: {
+          host: WEB_HOST,
+          origin: WEB_ORIGIN,
+          cookie: `${CSRF_COOKIE_SECURE}=${token}`,
+          [CSRF_HEADER]: mintCsrfToken(),
+          ...TRANSPORT,
+          ...type,
+        },
+        body,
+      });
+      expect(other.status()).toBe(403);
+      expect(other.json().error?.code).toBe("csrf_invalid");
+    }
+    expect(dispatched).toHaveLength(0);
+  });
+
+  it("answers 413 payload_too_large on the declared length of either route, before a byte is read", async () => {
+    useServerMode();
+    for (const [url, type] of [
+      [READ_PATH, multipart],
+      [SAVE_PATH, jsonType],
+    ] as const) {
+      const captured = await send({
+        method: "POST",
+        url,
+        headers: { ...web, ...type, "content-length": String(OVER_CAP) },
+        body: "{}",
+      });
+      expect(captured.status()).toBe(413);
+      expect(captured.json().error?.code).toBe("payload_too_large");
+    }
+    expect(dispatched).toHaveLength(0);
+  });
+
+  it("answers 413 payload_too_large when a save body runs past the cap with no length declared", async () => {
+    useServerMode();
+    const oversized = JSON.stringify({ name: "report.pdf", format: "pdf", text: "x".repeat(OVER_CAP) });
+    const captured = await send({
+      method: "POST",
+      url: SAVE_PATH,
+      headers: { ...web, ...jsonType },
+      body: oversized,
+    });
+    expect(captured.status()).toBe(413);
+    expect(captured.json().error?.code).toBe("payload_too_large");
+    expect(dispatched).toHaveLength(0);
+  });
+
+  it("Personal parity: on a desk the same two calls reach the handler with the loopback rules, no CSRF needed", async () => {
+    useLocalMode();
+    const read = await send({
+      method: "POST",
+      url: READ_PATH,
+      headers: { host: LOOPBACK_HOST, ...TRANSPORT, ...multipart },
+      body: multipartBody,
+    });
+    const save = await send({
+      method: "POST",
+      url: SAVE_PATH,
+      headers: { host: LOOPBACK_HOST, ...TRANSPORT, ...jsonType },
+      body: saveBody,
+    });
+    expect(read.status()).toBe(200);
+    expect(save.status()).toBe(200);
+    expect(dispatched.map((request) => request.path)).toEqual([READ_PATH, SAVE_PATH]);
+  });
+});

@@ -27,6 +27,7 @@ import {
   loadUserGuide,
   loadUserKeyLater,
   localDataDir,
+  saveKeysToDesks,
   saveUserLocale,
   saveSettings,
 } from "../settings-store";
@@ -272,6 +273,27 @@ function assertMayChangeCompanyKey(tenant: TenantContext): void {
   }
 }
 
+/**
+ * Hosted only (SR-163, review round): write the provider keys of this save to the caller's company's
+ * other desks. `tenant.tenantId` is the white-label partner, so the desks are listed by the caller's own
+ * organisation, which is what keeps every other company's desks out of it. Only the key fields travel;
+ * a desk's own choices (models, caps) stay its own. Callers pass a patch whose blank fields are already
+ * dropped (`keyFieldValue`), so a field nobody typed is never written onto another desk.
+ */
+async function mirrorKeysToCompanyDesks(patch: SecretPatch, tenant: TenantContext): Promise<void> {
+  const desks = await listLocalWorkspaces(db, tenant.organizationId);
+  saveKeysToDesks(
+    {
+      openaiApiKey: patch.openaiApiKey,
+      googleApiKey: patch.googleApiKey,
+      anthropicApiKey: patch.anthropicApiKey,
+      volcengineApiKey: patch.volcengineApiKey,
+    },
+    tenant,
+    desks.map((desk) => desk.id).filter((id) => id !== tenant.workspaceId),
+  );
+}
+
 /** Injected like `ResetDeps` below, so a test can exercise hosted behaviour without the env flag. */
 export type ServerModeDeps = { isServerMode?: () => boolean };
 
@@ -317,6 +339,10 @@ export async function handlePostSettings(request: HostRequest, deps: ServerModeD
       editTurnCapUsd: readOptionalNumber(body.editTurnCapUsd),
     };
     const saved = saveSettings(patch, tenant);
+    // SR-163: on the server the key is the company's, so it reaches every desk of the company.
+    if (requestsKeyWrite(body, serverMode)) {
+      await mirrorKeysToCompanyDesks(patch, tenant);
+    }
     clearThisKeyCache();
     // A fixed key / URL must take effect now, not after the 5-minute embeddings breaker expires —
     // and the job-side breaker skips a model for the same five minutes, so it is cleared with it, along
@@ -479,10 +505,21 @@ const RESET_DISABLED_MESSAGE =
  *
  * "Start over" stays refused: that one really does still wipe the shared data directory.
  */
-function resetGatewayKey(tenant: TenantContext): HostResult {
+async function resetGatewayKey(tenant: TenantContext, serverMode: boolean): Promise<HostResult> {
   // Every desk of this tenant: a key left on a second desk would keep the gate open after "forget
   // my key". Phase 3 lane D narrowed both calls from the whole install to the caller's tenant.
-  clearGatewayKeyEverywhere(tenant);
+  //
+  // SR-163: on the hosted server the tenant is the white-label partner and a company is one
+  // organisation inside it, so "every desk of this tenant" would be every company's desks and this
+  // button would sign the whole deployment out of the gateway. There it is the caller's own
+  // organisation's desks, and the verdict `clearGateState` drops is that company's own. A desk has
+  // one person and one organisation, and keeps the call exactly as it was.
+  if (serverMode) {
+    const desks = await listLocalWorkspaces(db, tenant.organizationId);
+    clearGatewayKeyEverywhere(tenant, { workspaceIds: desks.map((desk) => desk.id) });
+  } else {
+    clearGatewayKeyEverywhere(tenant);
+  }
   clearGateState(tenant);
   clearThisKeyCache();
   resetEmbedCircuit();
@@ -574,7 +611,7 @@ export async function handleResetApp(request: HostRequest, deps: ResetDeps = {})
       if (serverMode) {
         assertMayChangeCompanyKey(tenant);
       }
-      return resetGatewayKey(tenant);
+      return await resetGatewayKey(tenant, serverMode);
     }
     if (scope === "all") {
       return resetEverything(tenant, readOptionalString(body.confirm), serverMode);

@@ -3,6 +3,7 @@ import { sql } from "@agentforge/db";
 import type { KnowledgeMap, TenantContext } from "@agentforge/core";
 import { sanitizeSourceName } from "./knowledge-text";
 import { sweepOrphanGraph } from "./knowledge-graph-prune";
+import { visibleGraphNodes } from "./knowledge-visibility";
 import { log } from "./log";
 
 /**
@@ -294,32 +295,80 @@ export const GRAPH_NODE_QUERY = `SELECT n.id AS id, n.kind AS kind, n.label AS l
   ORDER BY coalesce(d.degree, 0) DESC, n.id ASC
   LIMIT ?`;
 
+/** An edge with both its ends among `visible(id)`: the hosted reads' filter, in one place. */
+const VISIBLE_ENDS = "from_id IN (SELECT id FROM visible) AND to_id IN (SELECT id FROM visible)";
+
+/**
+ * `GRAPH_NODE_QUERY` for the hosted server: the same ranking, over the nodes this person may see and
+ * the edges between them, so a colleague's heavy edges never move the order or the cut. Placeholders:
+ * the `visible` prefix's, then workspace (edges), workspace (edges), workspace (nodes), limit.
+ */
+function hostedGraphNodeQuery(withVisible: string): string {
+  return `${withVisible}
+  SELECT n.id AS id, n.kind AS kind, n.label AS label
+  FROM knowledge_graph_nodes n
+  LEFT JOIN (
+    SELECT id, count(*) AS degree FROM (
+      SELECT from_id AS id FROM knowledge_graph_edges WHERE workspace_id = ? AND ${VISIBLE_ENDS}
+      UNION ALL
+      SELECT to_id AS id FROM knowledge_graph_edges WHERE workspace_id = ? AND ${VISIBLE_ENDS}
+    ) GROUP BY id
+  ) d ON d.id = n.id
+  WHERE n.workspace_id = ? AND n.id IN (SELECT id FROM visible)
+  ORDER BY coalesce(d.degree, 0) DESC, n.id ASC
+  LIMIT ?`;
+}
+
+type EdgeRow = { from_id: string; to_id: string; kind: GraphEdgeKind; weight: number };
+
+/** The highest-weight edges, `limit` of them, before the node set decides which are drawable. */
+function edgePool(tenant: TenantContext, limit: number): EdgeRow[] {
+  const view = visibleGraphNodes(tenant);
+  if (view) {
+    return sql
+      .prepare(
+        `${view.with}
+         SELECT from_id, to_id, kind, weight FROM knowledge_graph_edges
+         WHERE workspace_id = ? AND ${VISIBLE_ENDS} ORDER BY weight DESC, kind, from_id, to_id LIMIT ?`,
+      )
+      .all(...view.params, tenant.workspaceId, limit) as EdgeRow[];
+  }
+  return sql
+    .prepare(
+      `SELECT from_id, to_id, kind, weight FROM knowledge_graph_edges
+       WHERE workspace_id = ? ORDER BY weight DESC, kind, from_id, to_id LIMIT ?`,
+    )
+    .all(tenant.workspaceId, limit) as EdgeRow[];
+}
+
+function topNodes(tenant: TenantContext, limit: number): GraphNode[] {
+  const ws = tenant.workspaceId;
+  const view = visibleGraphNodes(tenant);
+  if (view) {
+    return sql.prepare(hostedGraphNodeQuery(view.with)).all(...view.params, ws, ws, ws, limit) as GraphNode[];
+  }
+  return sql.prepare(GRAPH_NODE_QUERY).all(ws, ws, ws, limit) as GraphNode[];
+}
+
 /**
  * The graph a client can draw: the `limit` highest-degree nodes and the edges wholly inside that
  * set, so no edge points at a node the caller was not given. Deterministic for a given database.
+ *
+ * Hosted, only the nodes this person may see are candidates (`visibleGraphNodes`): a colleague's Chat
+ * card, their thread (its title is the node label) and any topic named from their card are not drawn,
+ * and neither is an edge that touches one.
  */
 export function getGraph(tenant: TenantContext, options: { limit?: number } = {}): KnowledgeGraph {
   const limit = Math.max(0, Math.min(Math.floor(options.limit ?? 500), 5_000));
   try {
-    const pool = sql
-      .prepare(
-        `SELECT from_id, to_id, kind, weight FROM knowledge_graph_edges
-         WHERE workspace_id = ? ORDER BY weight DESC, kind, from_id, to_id LIMIT ?`,
-      )
-      .all(tenant.workspaceId, limit * EDGE_POOL_FACTOR) as Array<{
-      from_id: string;
-      to_id: string;
-      kind: GraphEdgeKind;
-      weight: number;
-    }>;
+    const pool = edgePool(tenant, limit * EDGE_POOL_FACTOR);
     const pooled: GraphEdge[] = pool.map((row) => ({
       from: row.from_id,
       to: row.to_id,
       kind: row.kind,
       weight: row.weight,
     }));
-    const ws = tenant.workspaceId;
-    const nodes = sql.prepare(GRAPH_NODE_QUERY).all(ws, ws, ws, limit) as GraphNode[];
+    const nodes = topNodes(tenant, limit);
     const kept = new Set(nodes.map((node) => node.id));
     const edges = pooled.filter((edge) => kept.has(edge.from) && kept.has(edge.to)).slice(0, limit);
     return { nodes, edges };
@@ -331,9 +380,23 @@ export function getGraph(tenant: TenantContext, options: { limit?: number } = {}
   }
 }
 
-/** Cheap counts for the loop chart's Graph stage. 0 when the tables are unreachable. */
+/**
+ * Cheap counts for the loop chart's Graph stage. 0 when the tables are unreachable. Hosted, the counts
+ * are of what `getGraph` could draw for this person, so the chart never counts a colleague's nodes.
+ */
 export function graphCounts(tenant: TenantContext): { nodes: number; edges: number } {
   try {
+    const view = visibleGraphNodes(tenant);
+    if (view) {
+      const row = sql
+        .prepare(
+          `${view.with}
+           SELECT (SELECT count(*) FROM visible) AS nodes,
+                  (SELECT count(*) FROM knowledge_graph_edges WHERE workspace_id = ? AND ${VISIBLE_ENDS}) AS edges`,
+        )
+        .get(...view.params, tenant.workspaceId) as { nodes: number; edges: number } | undefined;
+      return { nodes: row?.nodes ?? 0, edges: row?.edges ?? 0 };
+    }
     const nodes = sql
       .prepare("SELECT count(*) AS n FROM knowledge_graph_nodes WHERE workspace_id = ?")
       .get(tenant.workspaceId) as { n: number } | undefined;

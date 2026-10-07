@@ -125,11 +125,12 @@ describe("chat session", () => {
     expect(chatSession).toContain("pendingThreadRef.current = threadIdRef.current;");
   });
 
-  it("keeps send quiet only while busy, enhancing, empty, or the host withholds a live model", () => {
+  it("keeps send quiet only while busy, enhancing, empty, a document is unread, or the host withholds a live model", () => {
     // needsKey is the host gate (`allowed` false). Stub stays allowed, so it still sends.
     // A desk the host has opened still sends, and the thread fallback still carries that send.
+    // `documentsHoldSend` (2026-10-06) is a document still reading or failed: sending would drop it.
     const composer = source("components/chat-composer.tsx");
-    expect(composer).toContain("const sendDisabled = busy || enhancing || sendEmpty || needsKey;");
+    expect(composer).toContain("const sendDisabled = busy || enhancing || sendEmpty || needsKey || documentsHoldSend;");
     expect(composer).toContain("if (needsKey) {");
   });
 });

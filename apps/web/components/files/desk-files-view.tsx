@@ -10,7 +10,7 @@ import { FileViewer } from "./file-viewer";
 import { FilesList } from "./files-list";
 import { FilesNewForm } from "./files-new-form";
 
-export type DeskFilesBusy = "none" | "save" | "upload" | "restore" | "delete";
+export type DeskFilesBusy = "none" | "save" | "upload" | "restore" | "delete" | "download";
 
 export type DeskFilesActions = {
   readonly onOpen: (path: string) => void;
@@ -25,6 +25,7 @@ export type DeskFilesActions = {
   readonly onCancelConfirm: () => void;
   readonly onConfirmRestore: () => void;
   readonly onConfirmDelete: () => void;
+  readonly onDownload: () => void;
 };
 
 export type DeskFilesViewProps = {
@@ -139,7 +140,9 @@ export function DeskFilesView(props: DeskFilesViewProps) {
           state={viewer}
           selfUserId={props.selfUserId}
           busy={busy === "restore" || busy === "delete"}
+          downloading={busy === "download"}
           actionErrorCode={props.actionErrorCode}
+          onDownload={actions.onDownload}
           onClose={actions.onCloseViewer}
           onPick={actions.onPick}
           onAsk={actions.onAsk}

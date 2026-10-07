@@ -5,6 +5,7 @@ import {
   estimateDeskUsd,
   fetchPricingCatalog,
   formatUsd,
+  isServerMode,
   listUsageBucketFrames,
   loadThisKeyState,
   summarizeUsageDesk,
@@ -45,7 +46,22 @@ import { listRunUsage } from "./threads";
  * docs/internal/web-phase5-lane-a.md.
  */
 function deskRecords(tenant: TenantContext): RunUsageRecord[] {
-  return [...listJobUsageRecords(tenant), ...listDeskUsage(tenant.tenantId)];
+  return [...listJobUsageRecords(tenant), ...legacyDeskUsage(tenant)];
+}
+
+/**
+ * SR-163, review round. `desk-usage.json` is one file per tenant id, and on the hosted server the tenant is
+ * the white-label partner every company sits under; the rows in it name no company. Nothing has written it
+ * since the ledger landed, so on the server it holds nothing, and a file that arrived anyway (a restored
+ * data dir, a copied desk volume) must not be shown to whichever company asks first. A desk keeps reading
+ * it: that is its own history, from before the ledger.
+ */
+function legacyDeskUsage(tenant: TenantContext): RunUsageRecord[] {
+  return isServerMode() ? [] : listDeskUsage(tenant.tenantId);
+}
+
+function legacyTimedDeskUsage(tenant: TenantContext): TimestampedRunUsage[] {
+  return isServerMode() ? [] : listTimedDeskUsage(tenant.tenantId);
 }
 
 const PRICING_TTL_MS = 10 * 60 * 1000;
@@ -277,7 +293,7 @@ function emptyBuckets(range: UsageRange, now: Date): UsageBucket[] {
 function timedDeskInRange(tenant: TenantContext, range: UsageRange, now: Date): TimestampedRunUsage[] {
   const keySet = new Set(listUsageBucketFrames(range, now).map((frame) => frame.key));
   const timed: TimestampedRunUsage[] = [];
-  for (const row of [...listTimedJobUsage(tenant), ...listTimedDeskUsage(tenant.tenantId)]) {
+  for (const row of [...listTimedJobUsage(tenant), ...legacyTimedDeskUsage(tenant)]) {
     if (!keySet.has(usageBucketKey(row.startedAt, range))) {
       continue;
     }

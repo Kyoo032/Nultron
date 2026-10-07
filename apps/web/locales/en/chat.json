@@ -7,6 +7,30 @@
   "deleteConfirm": "Delete \"{title}\"? This cannot be undone.",
   "deleteAria": "Delete {title}",
   "removeAttachment": "Remove {name}",
+  "document": {
+    "reading": "Reading {name}…",
+    "readingShort": "Reading…",
+    "cut": "Only the first {sent} of {total} characters are sent.",
+    "masked": "{n} personal details hidden before sending.",
+    "maskedOne": "1 personal detail hidden before sending.",
+    "retry": "Try again",
+    "retryAria": "Try reading {name} again",
+    "tooMany": "A message can carry up to {n} documents.",
+    "mustFinish": "Wait for the documents to finish reading, or remove the ones that failed.",
+    "errors": {
+      "too_large": "This file is over the {mb} MB limit. Attach a smaller one.",
+      "unsupported": "This file type cannot be read here.",
+      "mismatch": "This file is not really the type its name says. Check it and try again.",
+      "needs_ocr": "This PDF is a scan with no text to read. Nothing was sent anywhere. Attach a version with selectable text.",
+      "encrypted": "This file is password protected. Remove the password and attach it again.",
+      "empty": "No text was found in this file.",
+      "unreadable": "This file could not be read. It may be damaged.",
+      "slow": "This file took too long to read. Try a smaller one.",
+      "busy": "Nultron is busy reading other files. Try again in a moment.",
+      "failed": "This file could not be read. Check your connection and try again.",
+      "send": "This file could not be prepared to send, so the message did not go. Check your connection and try again."
+    }
+  },
   "empty": {
     "hello": "Hi, I’m Nultron.",
     "headline": "What are we working on today?",
@@ -53,7 +77,7 @@
     "label": "Account"
   },
   "composer": {
-    "placeholder": "Ask anything, or drop a screenshot, clip, or text file",
+    "placeholder": "Ask anything, or drop a screenshot, clip, or document",
     "modelPrefix": "Model",
     "thinkingPrefix": "Thinking",
     "attach": "Attach",
@@ -62,7 +86,13 @@
     "sending": "Sending…",
     "thinking": "Thinking",
     "imageCaption": "What is in this image?",
-    "videoCaption": "Summarize this video."
+    "videoCaption": "Summarize this video.",
+    "imageNote": {
+      "no": "{model} can't read images. Switch to a model that can, or remove the image.",
+      "unknown": "We can't confirm that {model} reads images. The image is sent anyway. If {model} can't read it, you will see an error.",
+      "switch": "Use {model}"
+    },
+    "videoNote": "Models can't watch video in Chat yet. The video stays in this chat, but only your words go to the model."
   },
   "thinking": {
     "none": "Off",
@@ -145,7 +175,9 @@
     "video": "Video",
     "pastSessions": "Past chats",
     "calculator": "Calculator",
-    "datetime": "Clock"
+    "datetime": "Clock",
+    "selfChecking": "Checking this desk…",
+    "selfCheck": "Desk check"
   },
   "tools": {
     "name": {
@@ -156,7 +188,8 @@
       "search_files": "Search files",
       "delete_file": "Delete file",
       "knowledge_search": "Knowledge search",
-      "run_code": "Run code"
+      "run_code": "Run code",
+      "build_deck": "Build deck"
     },
     "doing": {
       "list_files": "Listing files in {dir}…",
@@ -168,6 +201,7 @@
       "delete_file": "Deleting {path}…",
       "knowledge_search": "Searching your knowledge for “{query}”…",
       "run_code": "Running {language}…",
+      "build_deck": "Building “{title}”…",
       "web_fetch": "Opening {host}…"
     },
     "done": {
@@ -180,6 +214,7 @@
       "delete_file": "Deleted {path}",
       "knowledge_search": "Searched your knowledge for “{query}”",
       "run_code": "Ran {language}",
+      "build_deck": "Built “{title}”",
       "web_fetch": "Opened {host}"
     },
     "failed": {
@@ -191,6 +226,7 @@
       "delete_file": "Could not delete {path}",
       "knowledge_search": "Could not search your knowledge",
       "run_code": "{language} run failed",
+      "build_deck": "Could not build the deck",
       "web_fetch": "Could not open {host}"
     },
     "pending": {
@@ -208,7 +244,9 @@
       "excerpts": "{n} excerpts",
       "excerptsOne": "1 excerpt",
       "lineRange": "Lines {from}–{to} of {total}",
-      "version": "Version {n}"
+      "version": "Version {n}",
+      "slides": "{n} slides",
+      "slidesOne": "1 slide"
     },
     "open": "Open",
     "openAria": "Open {path} in the Knowledge Base",
@@ -235,6 +273,20 @@
         "other": "The run did not finish."
       }
     }
+  },
+  "deck": {
+    "label": "PowerPoint deck",
+    "open": "Open",
+    "close": "Close",
+    "openAria": "Open the slides of {title}",
+    "closeAria": "Close the slides of {title}",
+    "download": "Download",
+    "downloading": "Downloading…",
+    "downloadAria": "Download {title} as {filename}",
+    "downloadFailed": "Could not download the deck. Try again.",
+    "noPreview": "The slides cannot be shown here, but the file is ready to download.",
+    "outlineAria": "Slides in this deck",
+    "previewAria": "Slide preview of {title}"
   },
   "error": {
     "loading": "Chat is still loading",
@@ -275,6 +327,8 @@
     "pastNone": "No earlier chat on this desk matches that.",
     "pastOne": "The earlier chat is \"{title}\".",
     "pastMany": "Earlier chats include \"{title}\".",
-    "noSource": "This desk did not have a source for that."
+    "noSource": "This desk did not have a source for that.",
+    "stepLimit": "I ran out of steps before I could finish this. Ask me to continue and I will pick up from where I stopped.",
+    "interrupted": "The tool steps above ran, but I could not finish the answer.\n\nReason: {reason}\n\nSend \"continue\" and I will try again."
   }
 }

@@ -147,6 +147,45 @@ RUN cd apps/web \
     "import('@agentforge/host/http').then((m) => { console.log('host loads from the production tree:', Object.keys(m).length, 'exports'); process.exit(0); }, (e) => { console.error(e); process.exit(1); })"
 
 # ---------------------------------------------------------------------------
+# ffmpeg: the two programs Edit and Meeting spawn (ffmpeg, ffprobe)
+#
+# The image must carry them. A person on the hosted app cannot install anything, and until this stage
+# existed every desk showed the "ffmpeg was not found" notice. Debian bookworm's package is 5.1 and the
+# host refuses anything older than 6 (packages/host/src/edit/ffmpeg-setup.ts MIN_MAJOR), so this is a
+# static build: BtbN's, which ffmpeg.org's download page links to, from a month-end release (those are
+# kept for about two years; the daily ones are deleted after two weeks). It is pinned by URL and sha256,
+# and BuildKit refuses the download when the hash differs.
+#
+# The GPL variant on purpose: the render recipe encodes with libx264
+# (packages/host/src/edit/ffmpeg/recipes.ts), which the LGPL variant does not carry. ffmpeg runs as a
+# separate program and is not modified; its licence text ships beside it, and
+# docs/internal/ffmpeg-attribution.md names the exact build and where its source is.
+#
+# To move to a newer build, change the tag, both file names and both hashes together.
+# ---------------------------------------------------------------------------
+FROM base AS ffmpeg-amd64
+ADD --checksum=sha256:97ce978979194b5cf7e06a5e68020dbdaa7a4f3294c5452b6a1bc347100dbb79 \
+    https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n8.1.3-9-g29e619e767-linux64-gpl-8.1.tar.xz \
+    /tmp/ffmpeg.tar.xz
+
+FROM base AS ffmpeg-arm64
+ADD --checksum=sha256:10523d1e0be6b3ce62a9708cc50815c4b5eb5f36ae147fbe2afeecda6f2d6845 \
+    https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-09-30-13-08/ffmpeg-n8.1.3-9-g29e619e767-linuxarm64-gpl-8.1.tar.xz \
+    /tmp/ffmpeg.tar.xz
+
+# BuildKit sets TARGETARCH (amd64 or arm64) and builds only the stage it names.
+FROM ffmpeg-${TARGETARCH} AS ffmpeg
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends xz-utils \
+ && rm -rf /var/lib/apt/lists/* \
+ && mkdir -p /opt/ffmpeg/unpacked /opt/ffmpeg/bin /opt/ffmpeg/licenses \
+ && tar -xJf /tmp/ffmpeg.tar.xz -C /opt/ffmpeg/unpacked --strip-components=1 \
+ && cp /opt/ffmpeg/unpacked/bin/ffmpeg /opt/ffmpeg/unpacked/bin/ffprobe /opt/ffmpeg/bin/ \
+ && cp /opt/ffmpeg/unpacked/LICENSE.txt /opt/ffmpeg/licenses/LICENSE.txt \
+ && rm -rf /opt/ffmpeg/unpacked /tmp/ffmpeg.tar.xz \
+ && chmod 0755 /opt/ffmpeg/bin/ffmpeg /opt/ffmpeg/bin/ffprobe
+
+# ---------------------------------------------------------------------------
 # runtime
 # ---------------------------------------------------------------------------
 FROM base AS runtime
@@ -171,6 +210,18 @@ COPY --from=prod --chown=node:node /app /app
 # cannot change a byte of it; compose also mounts the root filesystem read-only.
 COPY --from=build --chown=root:root /opt/sandbox-runtime /app/sandbox
 RUN chmod -R a-w /app/sandbox
+
+# ffmpeg and ffprobe (see the ffmpeg stage). Root-owned in /usr/local/bin, which is on PATH and is one of
+# the places the host looks (packages/host/src/edit/ffmpeg-locations.ts), so nobody sets a path.
+COPY --from=ffmpeg --chown=root:root /opt/ffmpeg/bin/ffmpeg /opt/ffmpeg/bin/ffprobe /usr/local/bin/
+COPY --from=ffmpeg --chown=root:root /opt/ffmpeg/licenses /usr/local/share/licenses/ffmpeg
+# Fail the build, not the first video job, when a binary does not run on this base or lacks an encoder
+# the recipes ask for (libx264 for the render, libmp3lame for extracted audio).
+RUN ffmpeg -hide_banner -version > /dev/null \
+ && ffprobe -hide_banner -version > /dev/null \
+ && ffmpeg -hide_banner -encoders 2> /dev/null | grep -q ' libx264 ' \
+ && ffmpeg -hide_banner -encoders 2> /dev/null | grep -q ' libmp3lame ' \
+ && ffmpeg -hide_banner -version | head -n 1
 
 RUN mkdir -p /data && chown -R node:node /data
 VOLUME ["/data"]

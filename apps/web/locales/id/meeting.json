@@ -22,6 +22,7 @@
   "cancel": "Batalkan",
   "noAsr": "Kunci gerbang ini tidak memuat model speech-to-text, jadi rekaman tidak dapat ditranskripsikan di sini. Tempel transkripnya dan notulen tetap bisa dibuat.",
   "noFfmpeg": "ffmpeg belum terpasang, jadi rekaman tidak dapat dibaca di sini. Tempel transkripnya saja.",
+  "noFfmpegBundled": "Alat video bawaan {productName} tidak dapat dijalankan, jadi rekaman tidak dapat dibaca di sini. Pasang ulang {productName}, atau tempel transkripnya saja.",
   "transcript": "Transkrip",
   "minutesTab": "Notulen",
   "translationTab": "Terjemahan",

@@ -7,9 +7,11 @@
  * caller has to branch on -- `device-code-login.md`, "Login checks and reason codes".
  */
 
+import type { PasswordHash } from "../password/hash";
 import type {
   ActorKind,
   AuthCode,
+  Credential,
   DenialReason,
   Device,
   DeviceCode,
@@ -302,6 +304,97 @@ export type RedeemInviteResult =
       readonly attemptsRemaining: number;
     };
 
+// ---------------------------------------------------------------------------
+// Password sign-in (PORTAL_SIGNIN_MODE=password; apps/portal/migrations/0012_password_signin.sql)
+// ---------------------------------------------------------------------------
+
+export interface CreateCredentialInput {
+  /** An existing `users` row: the credential takes its tenant from it and goes with it. */
+  readonly userId: string;
+  /** Already normalised (lower case) and checked against `USERNAME_PATTERN`. */
+  readonly username: string;
+  readonly secret: PasswordHash;
+  /** Defaults to true: an operator-issued password is one the person replaces at first sign-in. */
+  readonly mustChange?: boolean;
+  readonly now: Date;
+}
+
+/** A person and the credential that lets them in. */
+export interface Account {
+  readonly user: User;
+  readonly credential: Credential;
+}
+
+/** Everyone in an org, with the credential when they have one. The operator's `list`. */
+export interface Person {
+  readonly user: User;
+  readonly credential: Credential | null;
+}
+
+export interface ReserveAttemptInput {
+  readonly userId: string;
+  /** The injected clock's time: lockout expiry is computed from it, not from the database's `now()`. */
+  readonly now: Date;
+  /** Attempts before the account locks. */
+  readonly maxAttempts: number;
+  readonly lockMs: number;
+  /**
+   * How many attempts past the lock this caller may still take (0 to 3, the schema's cap): the flow
+   * passes `PASSWORD_GRACE_ATTEMPTS` for a source address that has not itself failed against this
+   * person in the window and nothing for any other. Absent or 0 is the lock exactly as it was before
+   * the slots existed. The slots are counted in the row (`grace_attempts`), so what a window allows
+   * is `maxAttempts` plus the slots, whoever asks and however many addresses they ask from.
+   */
+  readonly graceAttempts?: number;
+}
+
+/**
+ * The charge-first step. An attempt is counted BEFORE the password is compared, in one transaction
+ * that holds the row, so a burst of parallel guesses is compared exactly as many times as the counter
+ * allows and no more. Only a caller that won an increment is handed the hash.
+ */
+export type ReserveAttemptResult =
+  | {
+      readonly kind: "reserved";
+      /** This attempt's number, 1 to `maxAttempts`; `maxAttempts` for an attempt taken under the lock. */
+      readonly attemptsUsed: number;
+      /** True when this attempt was the last one allowed: the account is locked now. */
+      readonly lockedNow: boolean;
+      /** 0 for an ordinary attempt; 1 to 3 for one taken under the lock, which slot it was. */
+      readonly graceUsed: number;
+      readonly secret: PasswordHash;
+    }
+  /** Locked until then, and no slot for this caller: nothing was counted and nothing was compared. */
+  | { readonly kind: "locked"; readonly until: Iso }
+  /** No credential for this person. */
+  | { readonly kind: "none" };
+
+export interface RecordSuccessInput {
+  readonly userId: string;
+  readonly now: Date;
+  /** The same password under the current cost parameters, when the stored ones are out of date. */
+  readonly rehash?: PasswordHash;
+  /**
+   * The hash that was compared and found right. Nothing is written unless the stored hash is still
+   * this one: a reset that landed while the password was being compared must not be undone by the
+   * sign-in that began before it, whether by writing the old password back (`rehash`) or by clearing
+   * the count the new password has begun.
+   */
+  readonly expectHash: Buffer;
+}
+
+export interface SetPasswordInput {
+  readonly userId: string;
+  readonly secret: PasswordHash;
+  readonly mustChange: boolean;
+  readonly now: Date;
+  /**
+   * When set, the write happens only if the stored hash is still this one: the password was proved a
+   * moment ago, and a change that lost a race with another is refused instead of silently winning.
+   */
+  readonly expectHash?: Buffer;
+}
+
 export interface IssueAuthCodeInput {
   readonly rawCode: string;
   readonly tenantId: string;
@@ -359,6 +452,15 @@ export interface AppendAuditInput {
   readonly after?: JsonObject | null;
   readonly ip?: string | null;
   readonly userAgent?: string | null;
+}
+
+/** Rows of one action in one tenant since a moment, counted per target. See `audit.countByTarget`. */
+export interface CountAuditByTargetInput {
+  readonly tenantId: string;
+  readonly action: string;
+  readonly since: Date;
+  /** Only this target. Absent: every target that has at least one row. */
+  readonly targetId?: string;
 }
 
 export interface LoginPrecheckInput {

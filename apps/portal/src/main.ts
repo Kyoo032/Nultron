@@ -36,6 +36,7 @@ async function main(): Promise<void> {
     host,
     port,
     production: config.production,
+    signInMode: config.signInMode,
     issuer: runtime.issuer,
     trustProxy: runtime.trustProxy,
   });

@@ -54,6 +54,10 @@ export function toolDetail(toolKey: string, output: unknown): string | null {
       const version = readNumber(record, "version");
       return record.status === "saved" && version !== undefined ? t("chat.tools.detail.version", { n: version }) : null;
     }
+    case "build_deck": {
+      const slides = readNumber(record, "slideCount");
+      return slides === undefined ? null : count(slides, "slides", "slidesOne");
+    }
     default:
       return null;
   }

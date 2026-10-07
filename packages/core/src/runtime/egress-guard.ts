@@ -1,4 +1,5 @@
 import type { ContentPart } from "../content/types";
+import { typedTextOf } from "../security/injection-guard";
 import type { ToolDefinition } from "../tools/define-tool";
 
 /**
@@ -108,10 +109,14 @@ export function hostsNamedIn(text: string): string[] {
   return [...hosts];
 }
 
-/** The text of the person's own messages in a run's history. Assistant turns and non-text parts are not theirs. */
+/**
+ * The text of the person's own messages in a run's history. Assistant turns and non-text parts are not
+ * theirs, and neither is an attached file or pasted text file inside a message (`typedTextOf`): a
+ * counterparty's document can name any site, and naming it is not the person asking to open it.
+ */
 export function userTextOf(history: ReadonlyArray<{ role: string; parts: ReadonlyArray<ContentPart> }>): string[] {
   return history.flatMap((item) =>
-    item.role === "user" ? item.parts.flatMap((part) => (part.type === "text" ? [part.text] : [])) : [],
+    item.role === "user" ? item.parts.flatMap((part) => (part.type === "text" ? [typedTextOf(part.text)] : [])) : [],
   );
 }
 

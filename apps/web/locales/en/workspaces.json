@@ -20,10 +20,12 @@
   "currentPrefix": "Current · ",
   "deleteConfirm": "This removes the desk, its chats, Knowledge Base, and saved key from this machine. Type {name} to confirm.",
   "deleteDesk": "Delete desk",
+  "deleteRestricted": "Only an owner or admin can delete a desk.",
   "errors": {
     "create": "Could not create workspace",
     "update": "Could not update workspace",
     "delete": "Could not delete workspace",
+    "deleteForbidden": "Only an owner or admin can delete a desk.",
     "protected": "The Default desk cannot be deleted",
     "confirmName": "Type the desk name to confirm deletion"
   },

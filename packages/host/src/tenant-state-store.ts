@@ -65,19 +65,53 @@ export const ADOPTED_SUFFIX = ".adopted";
  */
 export type TenantStateEntry = { value: string; stamp: string };
 
+/**
+ * Where a payload is kept: a `TenantStateKey`, or that key narrowed to one company inside the tenant
+ * (`companyStateKey`). SR-163.
+ *
+ * **Why a tenant is not always one company.** `tenantId` is the white-label partner (a brand, Nultron
+ * Enterprise); every company of a deployment is an organisation inside it, and they all share the
+ * partner's `tenant_state` rows. A payload that describes ONE company's key (the gate verdict) cannot
+ * live in the partner's row, because the second company to write it would replace the first's. So the
+ * hosted server keeps it under a key of its own, `<key>:<organisation id>`, in the same table: the
+ * partner's foreign key still holds, a partner's erase still takes every row with it, and no table or
+ * column is added.
+ *
+ * A desk has no companies (one person, one machine), and the file backend refuses a scoped slot rather
+ * than invent a filename for it. Nothing on a desk ever asks for one.
+ */
+export type TenantStateSlot = TenantStateKey | `${TenantStateKey}:${string}`;
+
+/**
+ * The slot for `key` held by one company of a tenant. The company id is the organisation's own id and is
+ * used exactly as it is: it is already canonical, and trimming it would let two ids that differ only by
+ * whitespace share one slot. A blank id is still refused (it names no company); a non-blank one is kept
+ * verbatim.
+ */
+export function companyStateKey(key: TenantStateKey, companyId: string): TenantStateSlot {
+  if (typeof companyId !== "string" || companyId.trim().length === 0) {
+    throw new ApiError("company_required", "A company-scoped payload needs the company's id.", 500);
+  }
+  return `${key}:${companyId}`;
+}
+
+function isCompanySlot(slot: TenantStateSlot): boolean {
+  return slot.includes(":");
+}
+
 export interface TenantStateBackend {
   readonly kind: "file" | "db";
   /** The payload, or null when this tenant has never stored one. Throws only on a real IO fault. */
-  read(tenantId: string, key: TenantStateKey): TenantStateEntry | null;
+  read(tenantId: string, key: TenantStateSlot): TenantStateEntry | null;
   /** The change token alone, without paying for the payload. Null when there is nothing stored. */
-  stamp(tenantId: string, key: TenantStateKey): string | null;
-  write(tenantId: string, key: TenantStateKey, value: string): void;
+  stamp(tenantId: string, key: TenantStateSlot): string | null;
+  write(tenantId: string, key: TenantStateSlot, value: string): void;
   /** Idempotent: removing what is not there is not an error. */
-  remove(tenantId: string, key: TenantStateKey): void;
+  remove(tenantId: string, key: TenantStateSlot): void;
   /** Every tenant holding a payload of this kind. The rotation drill is the only caller. */
   tenantsWith(key: TenantStateKey): string[];
   /** Where the payload lives, for a log line or an error message. Never the payload itself. */
-  describe(tenantId: string, key: TenantStateKey): string;
+  describe(tenantId: string, key: TenantStateSlot): string;
 }
 
 function isMissingFile(error: unknown): boolean {
@@ -86,8 +120,13 @@ function isMissingFile(error: unknown): boolean {
 
 /* ------------------------------------------------------------------ file backend (the desktop) */
 
-function statePath(tenantId: string, key: TenantStateKey): string {
-  return resolve(tenantDataDir(assertTenantId(tenantId)), TENANT_STATE_FILENAMES[key]);
+function statePath(tenantId: string, key: TenantStateSlot): string {
+  if (isCompanySlot(key)) {
+    // A desk has one person and no companies. Refusing here, rather than mapping the slot to a name,
+    // keeps "which file is this?" answerable from `TENANT_STATE_FILENAMES` alone.
+    throw new ApiError("company_slot_on_desk", "A desk keeps no per-company state.", 500);
+  }
+  return resolve(tenantDataDir(assertTenantId(tenantId)), TENANT_STATE_FILENAMES[key as TenantStateKey]);
 }
 
 export const fileTenantStateBackend: TenantStateBackend = {
@@ -280,7 +319,9 @@ export const dbTenantStateBackend: TenantStateBackend = {
       .prepare("SELECT value, updated_at FROM tenant_state WHERE tenant_id = ? AND key = ?")
       .get(assertTenantId(tenantId), key) as { value: string; updated_at: number } | undefined;
     if (!row) {
-      return adoptLegacyFile(tenantId, key);
+      // A company's slot has no legacy file: Phase 3 wrote one verdict per tenant, which says nothing
+      // about whose key it judged, so it is not adopted into any company.
+      return isCompanySlot(key) ? null : adoptLegacyFile(tenantId, key as TenantStateKey);
     }
     return { value: row.value, stamp: String(row.updated_at) };
   },

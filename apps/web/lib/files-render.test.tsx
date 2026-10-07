@@ -41,6 +41,7 @@ const ACTIONS: DeskFilesActions = {
   onCancelConfirm: NOOP,
   onConfirmRestore: NOOP,
   onConfirmDelete: NOOP,
+  onDownload: NOOP,
 };
 
 const PATH = "notes/plan.md";
@@ -96,12 +97,13 @@ function view(over: Partial<DeskFilesViewProps> = {}): string {
   );
 }
 
-function viewer(state: ViewerState, selfUserId: string | null = null): string {
+function viewer(state: ViewerState, selfUserId: string | null = null, downloading = false): string {
   return renderToStaticMarkup(
     <FileViewer
       state={state}
       selfUserId={selfUserId}
       busy={false}
+      downloading={downloading}
       actionErrorCode={null}
       onClose={NOOP}
       onPick={NOOP}
@@ -109,6 +111,7 @@ function viewer(state: ViewerState, selfUserId: string | null = null): string {
       onCancelConfirm={NOOP}
       onConfirmRestore={NOOP}
       onConfirmDelete={NOOP}
+      onDownload={NOOP}
     />,
   );
 }
@@ -280,6 +283,32 @@ describe("versions and restore", () => {
     expect(count(older, "file-delete")).toBe(1);
   });
 
+  it("offers Download on the newest version only, because the host sends the newest", () => {
+    const latest = viewer(viewerOn("three"));
+    expect(count(latest, "file-download")).toBe(1);
+    expect(latest).toContain(">Download</button>");
+    expect(latest).toContain('aria-label="Download notes/plan.md to your computer"');
+    const older = viewer(
+      viewerOn("three", [
+        { type: "pick", version: 1 },
+        { type: "versionLoaded", path: PATH, version: 1, read: read(1, "first draft") },
+      ]),
+    );
+    expect(count(older, "file-download")).toBe(0);
+  });
+
+  it("disables Download and says so while the file is being fetched", () => {
+    const busy = viewer(viewerOn("three"), null, true);
+    expect(busy).toMatch(/<button[^>]*disabled=""[^>]*data-testid="file-download"[^>]*>Downloading…<\/button>/);
+  });
+
+  it("says Download in Indonesian", () => {
+    applyLocale("id");
+    const html = viewer(viewerOn("three"));
+    expect(html).toContain(">Unduh</button>");
+    expect(html).toContain('aria-label="Unduh notes/plan.md ke komputer Anda"');
+  });
+
   it("shows a loading line while an older version's text is on its way", () => {
     const html = viewer(viewerOn("three", [{ type: "pick", version: 2 }]));
     expect(html).toContain(t("files.viewer.versionLoading", { version: 2 }));
@@ -312,6 +341,7 @@ describe("versions and restore", () => {
         state={viewerOn("three")}
         selfUserId={null}
         busy={false}
+        downloading={false}
         actionErrorCode="storage_quota_exceeded"
         onClose={NOOP}
         onPick={NOOP}
@@ -319,6 +349,7 @@ describe("versions and restore", () => {
         onCancelConfirm={NOOP}
         onConfirmRestore={NOOP}
         onConfirmDelete={NOOP}
+        onDownload={NOOP}
       />,
     );
     expect(html).toMatch(
@@ -361,6 +392,44 @@ describe("the deep link", () => {
     expect(sources).toBeGreaterThan(-1);
     expect(mount).toBeGreaterThan(sources);
     expect(mount).toBeLessThan(soul);
+  });
+});
+
+describe("the Download wiring", () => {
+  it("asks the host for the open file's newest version and shows a refusal in the viewer's alert", () => {
+    const text = source("../components/files/desk-files.tsx");
+    const start = text.indexOf("async function onDownload()");
+    expect(start).toBeGreaterThan(-1);
+    const section = text.slice(start, text.indexOf("async function onConfirmDelete()"));
+    expect(section).toContain('setBusy("download")');
+    expect(section).toContain("await api.download(path)");
+    expect(section).toContain("setActionErrorCode(outcome.code)");
+    // A second press while one is running does nothing.
+    expect(section).toContain('if (busy !== "none" || path === null)');
+    expect(text).toContain("onDownload: () => void onDownload()");
+    const view = source("../components/files/desk-files-view.tsx");
+    expect(view).toContain('downloading={busy === "download"}');
+    expect(view).toContain("onDownload={actions.onDownload}");
+  });
+
+  it("shows a failed download in the same alert as a failed restore", () => {
+    const html = renderToStaticMarkup(
+      <FileViewer
+        state={viewerOn("three")}
+        selfUserId={null}
+        busy={false}
+        downloading={false}
+        actionErrorCode="not_found"
+        onClose={NOOP}
+        onPick={NOOP}
+        onAsk={NOOP}
+        onCancelConfirm={NOOP}
+        onConfirmRestore={NOOP}
+        onConfirmDelete={NOOP}
+        onDownload={NOOP}
+      />,
+    );
+    expect(html).toMatch(/data-testid="file-viewer-action-error"[^>]*>That file is not on this desk\./);
   });
 });
 

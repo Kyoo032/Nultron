@@ -7,6 +7,36 @@
     "submit": "Lanjutkan",
     "emailMissing": "Masukkan alamat e-mail Anda."
   },
+  "password": {
+    "title": "Masuk",
+    "intro": "Masukkan nama pengguna dan kata sandi Anda.",
+    "identifierLabel": "Nama pengguna atau e-mail",
+    "passwordLabel": "Kata sandi",
+    "submit": "Masuk",
+    "missing": "Masukkan nama pengguna dan kata sandi Anda.",
+    "invalid": "Nama pengguna atau kata sandi itu tidak cocok. Jika ini terus muncul, hubungi admin Anda.",
+    "rateLimited": "Terlalu banyak percobaan. Coba lagi beberapa menit lagi.",
+    "busy": "Proses masuk sedang sibuk. Tunggu sebentar, lalu coba lagi."
+  },
+  "change": {
+    "title": "Pilih kata sandi baru",
+    "lead": "Kata sandi yang Anda terima bersifat sementara. Pilih kata sandi Anda sendiri untuk melanjutkan.",
+    "currentLabel": "Kata sandi saat ini",
+    "newLabel": "Kata sandi baru",
+    "confirmLabel": "Kata sandi baru, sekali lagi",
+    "hint": "Minimal {min} karakter, dan bukan nama pengguna atau e-mail Anda.",
+    "submit": "Simpan dan masuk",
+    "missing": "Isi ketiga kolom.",
+    "refusal": {
+      "too_short": "Gunakan minimal {min} karakter.",
+      "too_long": "Gunakan paling banyak {max} karakter.",
+      "control_characters": "Gunakan hanya karakter yang bisa diketik di papan ketik: tanpa pemisah baris atau karakter kontrol.",
+      "mismatch": "Kedua kata sandi baru itu tidak sama.",
+      "same_as_username": "Pilih kata sandi yang bukan nama pengguna Anda.",
+      "same_as_email": "Pilih kata sandi yang bukan alamat e-mail Anda.",
+      "same_as_current": "Pilih kata sandi yang berbeda dari yang sekarang."
+    }
+  },
   "sent": {
     "title": "Periksa e-mail Anda",
     "body": "Kami mengirim kode masuk ke {email}. Kode berlaku {minutes} menit.",
@@ -94,7 +124,8 @@
   },
   "signedOut": {
     "title": "Sudah keluar",
-    "body": "Sesi masuk di peramban ini sudah berakhir. Lain kali Anda akan diminta alamat e-mail dan kode lagi."
+    "body": "Sesi masuk di peramban ini sudah berakhir. Lain kali Anda akan diminta alamat e-mail dan kode lagi.",
+    "bodyPassword": "Sesi masuk di peramban ini sudah berakhir. Lain kali Anda akan diminta nama pengguna dan kata sandi lagi."
   },
   "error": {
     "title": "Tidak dapat melanjutkan",
@@ -135,6 +166,7 @@
     "hours": "{n} jam"
   },
   "footer": {
-    "note": "Jangan pernah membagikan kode masuk kepada siapa pun."
+    "note": "Jangan pernah membagikan kode masuk kepada siapa pun.",
+    "notePassword": "Jangan pernah membagikan kata sandi Anda kepada siapa pun."
   }
 }

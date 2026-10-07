@@ -3,6 +3,7 @@ import type { PoolClient } from "pg";
 import type { Clock, PortalOps } from "../types";
 import { auditOps } from "./audit";
 import { authCodesOps, oauthClientsOps } from "./auth-codes";
+import { credentialsOps } from "./credentials";
 import { deviceCodesOps } from "./device-codes";
 import { devicesOps, sessionsOps } from "./devices";
 import { orgsOps, tenantConfigOps, tenantsOps, usersOps } from "./identity";
@@ -23,6 +24,7 @@ export function createOps(client: PoolClient, clock: Clock): PortalOps {
     deviceCodes: deviceCodesOps(client, clock),
     loginOtps: loginOtpsOps(client, clock),
     invites: invitesOps(client, clock),
+    credentials: credentialsOps(client),
     authCodes: authCodesOps(client, clock),
     oauthClients: oauthClientsOps(client),
     webSessions: webSessionsOps(client),

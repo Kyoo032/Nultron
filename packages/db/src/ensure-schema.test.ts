@@ -291,6 +291,76 @@ describe("ensureSchema", () => {
     sqlite.close();
   });
 
+  /** Run `fn` as a hosted process (`AGENTFORGE_SERVER=1`) and put the variable back as it was. */
+  function inServerMode<T>(fn: () => T): T {
+    const before = process.env.AGENTFORGE_SERVER;
+    process.env.AGENTFORGE_SERVER = "1";
+    try {
+      return fn();
+    } finally {
+      if (before === undefined) {
+        delete process.env.AGENTFORGE_SERVER;
+      } else {
+        process.env.AGENTFORGE_SERVER = before;
+      }
+    }
+  }
+
+  const artifactIndexNames = (sqlite: Database.Database): string[] =>
+    (sqlite.prepare("PRAGMA index_list(artifacts)").all() as Array<{ name: string }>).map((row) => row.name);
+
+  it("indexes artifacts by desk and size on a hosted server, so the quota is answered without opening a deck row", () => {
+    // A deck row holds a body of megabytes with size_bytes after it, so a sum read from the rows walks
+    // every overflow page (about 2 seconds for 100 decks). The covering index is what avoids that.
+    const sqlite = new Database(":memory:");
+    inServerMode(() => ensureSchema(sqlite));
+    const columns = (sqlite.prepare("PRAGMA index_info(artifacts_ws_size_idx)").all() as Array<{ name: string }>).map(
+      (row) => row.name,
+    );
+    expect(columns).toEqual(["workspace_id", "size_bytes"]);
+    const plan = (
+      sqlite
+        .prepare(
+          "EXPLAIN QUERY PLAN SELECT COALESCE(SUM(size_bytes), 0), COUNT(*) FROM artifacts WHERE workspace_id = ?",
+        )
+        .all("w1") as Array<{ detail: string }>
+    )
+      .map((row) => row.detail)
+      .join(" | ");
+    expect(plan).toContain("COVERING INDEX artifacts_ws_size_idx");
+    sqlite.close();
+  });
+
+  it("leaves a desk's artifacts table as it was: no size index, and nothing read to build one", () => {
+    // Personal has no ceiling, so nothing reads the sum. Its schema and its first open after an update
+    // stay what they were.
+    const sqlite = new Database(":memory:");
+    expect(process.env.AGENTFORGE_SERVER).toBeUndefined();
+    ensureSchema(sqlite);
+    expect(artifactIndexNames(sqlite)).toContain("artifacts_ws_mode_idx");
+    expect(artifactIndexNames(sqlite)).not.toContain("artifacts_ws_size_idx");
+    sqlite.close();
+  });
+
+  it("adds the artifacts size index to a database that already has artifacts, and keeps their rows", () => {
+    // A desk that becomes a hosted server, or a hosted one upgraded in place: the table exists with
+    // rows, the index does not.
+    const sqlite = new Database(":memory:");
+    ensureSchema(sqlite);
+    sqlite
+      .prepare(
+        "INSERT INTO artifacts (id, workspace_id, mode, kind, title, mime, body, meta, size_bytes, created_at, updated_at) VALUES ('a1', 'w1', 'presentations', 'draft', 't', 'x', 'b', '{}', 7, 1, 1)",
+      )
+      .run();
+    expect(artifactIndexNames(sqlite)).not.toContain("artifacts_ws_size_idx");
+    inServerMode(() => ensureSchema(sqlite));
+    inServerMode(() => ensureSchema(sqlite));
+    const names = artifactIndexNames(sqlite);
+    expect(names).toEqual(expect.arrayContaining(["artifacts_ws_mode_idx", "artifacts_ws_size_idx"]));
+    expect(sqlite.prepare("SELECT size_bytes FROM artifacts WHERE id = 'a1'").get()).toEqual({ size_bytes: 7 });
+    sqlite.close();
+  });
+
   it("declares the knowledge_vectors indexes in the drizzle schema, matching the migration", () => {
     // Drift guard: migration 0012 + ensureSchema + schema.ts, or `drizzle-kit generate` re-emits it.
     const config = getTableConfig(knowledgeVectors);

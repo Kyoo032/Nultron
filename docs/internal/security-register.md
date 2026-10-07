@@ -89,6 +89,38 @@ to 127.0.0.1 from the program was refused. That was a direct runner call, run by
 cites no log for it. It was not a hosted Chat drive, it was not the compose or Kubernetes stack, and it did
 not test an operating-system egress deny, so [SR-111](#sr-111) stays open.
 
+Extended on 2026-10-06 with [SR-138](#sr-138): the in-flight run caps (one tenant, and the whole server) for
+every route that calls the gateway. Every `file:line` in that row was read on the branch
+`feat/hosted-run-limits` over `6105c5c`, uncommitted, so the same line numbers do not exist on `main`.
+Nothing was driven on a hosted instance.
+
+Extended on 2026-10-06 with [SR-140](#sr-140): the desk-file download route and Chat's `build_deck` file, raised
+by the change that lets Chat hand a person a real file. Read in the `agentforge-deck` worktree (uncommitted, on
+`6105c5c`); nothing in it is driven in a browser or on the hosted box.
+
+Extended on 2026-10-07 with [SR-163](#sr-163) by the hosted run-limits lane: the hosted gateway verdict was one
+per white-label partner instead of one per company. Fixed in the working tree over `726f369` and tested through
+the real router; nothing was driven on a hosted server. A review the same day added the neighbours that follow
+from the same root: the hosted erase is now refused on a partner that holds more than one company (scoping it to
+one company is still owed and needs the owner's decision), a provider key reaches every desk of its company,
+and the usage ledger and the model-list cache are read by company. Details in the entry.
+
+Extended on 2026-10-07 with [SR-155](#sr-155) … [SR-162](#sr-162) by the hosted team-privacy lane: what a
+company's people can see of, and do to, one another on the one desk they share on the hosted server. Two
+fixes are in the tree and tested ([SR-155](#sr-155), [SR-156](#sr-156)); one finding is open and needs the
+owner ([SR-157](#sr-157)); the rest record what was left alone, what was decided and what was checked.
+Every `file:line` was read in the working tree on top of `main` (`6105c5c`) on 2026-10-07, and the fixes
+are uncommitted. Nothing was driven on a running hosted server. The tests run the host's own handlers and
+queries over a throwaway database with three people of one company on one desk; the browser half of
+[SR-156](#sr-156) is a unit test over rendered markup, not a drive.
+
+Extended on 2026-10-07 with [SR-165](#sr-165): the owner's decision to give one hosted deployment (HYP AI) a
+username-and-password sign-in in place of the e-mailed code, which lifts the "no password" rule for that mode
+only. The mode, its controls and the risks it leaves are read from the working tree on top of `main`
+(`9aba37e`), uncommitted. Nothing in it was driven in a browser or on a server; the tests run the portal's own
+routes and queries over a real Postgres, and the default mode's screens and route table are pinned against
+`main`'s.
+
 ## Summary
 
 | ID | Severity | Title | Status | Gate |
@@ -112,6 +144,8 @@ not test an operating-system egress deny, so [SR-111](#sr-111) stays open.
 | [SR-67](#sr-67) | High | An Edit generate job ran as whatever tenant its stored request named | Fixed, not driven (2026-09-23) | Blocks Tencent deploy |
 | [SR-88](#sr-88) | High | Every first-time hosted sign-in became an owner, so any colleague could erase the company | Fixed, driven on local k8s (2026-10-01); not hosted | Blocks Tencent deploy until the role-sending portal is deployed first |
 | [SR-102](#sr-102) | High | `pnpm ci:local` reported the portal suite as a pass when its Postgres could not start and no test ran | Fixed (2026-10-01), tested | — |
+| [SR-155](#sr-155) | High | Hosted: on a desk shared by a company's people, any member could read every colleague's Chat through the Knowledge Base (Sources list, search, Chat's prompt, `knowledge_search`, graph, map, reindex), because sources were read by desk and not by person | Fixed in tree (2026-10-07), tested with three people of one company; not driven on a running hosted server | Blocks a multi-person hosted pilot until driven |
+| [SR-163](#sr-163) | High | Hosted: the gateway verdict was one row per white-label partner, not per company, so a second company's key check closed the first company's gate (`403 gateway_blocked`), and one company's "forget my key" cleared every company's key | Fixed in tree (2026-10-07), tested through the real router with two companies under one partner and mutation-checked; not driven on a hosted server. Review round the same day: the hosted erase is refused (409) on a partner with more than one company, a provider key reaches every desk of its company, the usage ledger and the model cache are read by company. **Still owed, owner's decision: scope the erase to one company** | Blocks a multi-company hosted server until driven; the erase scoping is open |
 | [SR-21](#sr-21) | Medium | The portal's 30-day browser session cannot be ended: signing out of the app leaves it, and the next sign-in skips the OTP entirely | Fixed-unverified, fix pass X | Blocks Tencent deploy |
 | [SR-48](#sr-48) | Medium | A failed ffmpeg run returned the full argv and raw stderr — absolute paths inside the data dir — to the client | Fixed-unverified, fix pass Y | Blocks Tencent deploy |
 | [SR-42](#sr-42) | Medium | `GET /tenant/config` had no rate limiter and told an anonymous caller which tenant slugs exist | Fixed-unverified, fix pass X | Blocks Tencent deploy |
@@ -161,6 +195,10 @@ not test an operating-system egress deny, so [SR-111](#sr-111) stays open.
 | [SR-131](#sr-131) | Medium | The app image's ignore file did not exclude `nultron-files/` (4.5 GB of IP filings and brand work), so a build straight from a working checkout would have sent it into the image | Fixed in tree (2026-10-05), test-pinned; the build context checked with a real `docker build`, no full image built | Blocks building from a checkout |
 | [SR-132](#sr-132) | Medium | The release Caddyfile's deferred header block may replace an artifact's `sandbox` CSP with the app CSP | Open: reasoned from Caddy's docs, not driven (2026-10-06) | Blocks Tencent deploy (Enterprise) |
 | [SR-133](#sr-133) | Medium | The app.nultron-ai.xyz preview runs production without server mode, behind Basic Auth and a Caddy Origin rule | Accepted by the owner (2026-10-06): password-gated shared desk | Preview only |
+| [SR-138](#sr-138) | Medium | One signed-in account could hold any number of model runs open: the limiters count requests, nothing counted runs | Fixed in tree (2026-10-06), tested through the router and the HTTP adapter: every gateway-calling route holds a slot or is on a written list; in memory, per process; not driven on a hosted instance | Blocks Tencent deploy until driven there |
+| [SR-156](#sr-156) | Medium | Hosted: any signed-in member could delete a desk of the company, and with it every person's chats and the desk's Knowledge Base | Fixed in tree (2026-10-07), tested, renderer hides the button; not driven | Blocks a multi-person hosted pilot until driven |
+| [SR-157](#sr-157) | Medium | Hosted: stored media (pictures, clips, audio) is read, listed and deleted by company, not by person, so a colleague's picture can be fetched by its id, listed in the Images and Videos galleries, and sent to a model by a job | Open: nothing changed, because scoping by person breaks shared reads the product relies on; needs an owner decision (2026-10-07) | Blocks "Chat attachments are private to the person who attached them" |
+| [SR-165](#sr-165) | Medium | Hosted portal: `PORTAL_SIGNIN_MODE=password` gives one deployment (HYP AI) a username-and-password sign-in with no second factor, in place of the e-mailed code; the default sign-in is unchanged | Built in tree, tested over a real Postgres; not driven in a browser or on a server (2026-10-07). Independent review found no critical or high issue; its findings (M1, M2, L1 to L3, N1, N2) are fixed in the tree, uncommitted. The owner's decision; residual risks recorded | None for the pilot the owner asked for; open until the second factor (being designed) ships |
 | [SR-81](#sr-81) | Low | Keyless Research search sends the masked query to four pinned public APIs | Checked, not an issue (2026-09-26) | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
@@ -212,6 +250,13 @@ not test an operating-system egress deny, so [SR-111](#sr-111) stays open.
 | [SR-125](#sr-125) | Low | Two `edit_file` calls on one file could overwrite each other without a word | Fixed in tree, tested; unverified on a packed app (2026-10-03) | None |
 | [SR-126](#sr-126) | Low | Personal: a deleted desk left the sealed text of its folder proposals on disk | Fixed in tree, tested; unverified on a packed app (2026-10-03) | None |
 | [SR-134](#sr-134) | Low | Enterprise: a CRITICAL `proxy-addr` advisory reaches the hosted image through `express`; the app never sets `trust proxy`, so the affected path is not used | Open (2026-10-06) | `audit:deployed` red; blocks Tencent deploy until the lock takes `proxy-addr` 2.0.8 |
+| [SR-135](#sr-135) | Low | Enterprise image and Personal installers carry a third-party static ffmpeg (BtbN on the image and Windows, Martin Riedl's build server on macOS, GPL builds), pinned by sha256; the Personal copy runs with the person's own rights; an upload may not steer it to addresses, other files or hours of run time (input limits) | Recorded (2026-10-06); desktop bundle added the same day, not packed; input limits built 2026-10-06, recorded 2026-10-07, in the tree, not deployed | None for the image; re-pin before the upstream release expires; macOS builds accepted by Rizky on 2026-10-06 for the preview Mac installer only, so a Mac release that is no longer preview is blocked until our own build is pinned |
+| [SR-136](#sr-136) | Low | A Chat turn stored and streamed a tool's input and output with no redaction, and a failed tool's error text now reaches the model | Fixed in tree, tested; not driven on a live model (2026-10-06) | None |
+| [SR-140](#sr-140) | Low | Desk file download serves model- and person-written text from the app's origin, and Chat's `build_deck` stores a model-written Office file that the artifact route serves | Fixed in tree, tested, review fixes applied 2026-10-07 (schema no longer ends the turn, XML-illegal characters removed, saved artifacts counted in hosted storage, packaged save failure shown); not driven in a browser or behind the hosted proxy | Re-check on the hosted box with [SR-132](#sr-132) before the Tencent deploy |
+| [SR-145](#sr-145) | Low | A new upload route runs the native document reader on a file from the Chat composer (both products), and an attachment is untrusted text in a person's message | Fixed in tree, tested at unit level; not driven (2026-10-07; the two High review findings are fixed) | None; drive it before the next cut that carries it |
+| [SR-150](#sr-150) | Low | Chat now sends the pixels of an attached image to the gateway, and the personal-data masker cannot see inside a picture | Open, accepted for the beta (2026-10-06). Review 2026-10-07: link refusal and media-kind check fixed in tree; colleague media and job `https://` attachments recorded, open | None for the beta; colleague media belongs to the hosted team-privacy work |
+| [SR-158](#sr-158) | Low | Hosted: any member can create a desk, rename one and change its modes (the rail every person on the desk sees); only deleting is role-gated | Recorded, not changed (2026-10-07); pinned by a test | None until the owner decides |
+| [SR-159](#sr-159) | Low | Hosted: the Soul, the pinned memories and the retrieval count are the company's and any member can write the first two, so one person's words reach every colleague's Chat prompt | Open, accepted by today's design (2026-10-07) | None until the owner decides |
 | [SR-08](#sr-08) | Info | The portal token vault is process memory only | Superseded by [SR-64](#sr-64), 2026-09-23 | Dev only |
 | [SR-15](#sr-15) | Info | Music relay: checked, not a key-exfiltration issue. It does send a spoofed browser `User-Agent` | Checked, not an issue | Dev only |
 | [SR-18](#sr-18) | Info | `X-Forwarded-Proto` and `X-Forwarded-For` trust: checked, sound as deployed today | Checked, not an issue | Blocks Tencent deploy on any topology change |
@@ -221,12 +266,17 @@ not test an operating-system egress deny, so [SR-111](#sr-111) stays open.
 | [SR-38](#sr-38) | Info | Host and portal reason vocabularies differ in two places: checked, both deliberate | Checked, not an issue | Dev only |
 | [SR-91](#sr-91) | Info | The portal's secrets are kept out of the app container by two env files and a scrub | By design; driven on the local compose rehearsal (2026-10-01) | — |
 | [SR-93](#sr-93) | Info | "Add it later" opens a hosted desk with a closed gate: checked, the host never reads it | Checked, not an issue (2026-10-01) | — |
+| [SR-137](#sr-137) | Info | `self_check` tells a hosted tenant, and the model, a few coarse facts about the server | By design, tested (2026-10-06) | None |
 | [SR-108](#sr-108) | Info | `localeFromAcceptLanguage` parses attacker-controlled input: checked, bounded and pure | Checked, not an issue (2026-10-01) | — |
 | [SR-109](#sr-109) | Info | What the Opus security and code-leak review probed and found sound (2026-10-01) | Checked, not an issue | — |
 | [SR-127](#sr-127) | Info | Personal: a hard link inside an opened folder can name a file outside it | Open, accepted (2026-10-03) | None |
 | [SR-128](#sr-128) | Info | A crash between a desk file's object write and its row commit leaves an object that counts toward the quota | Accepted (2026-10-03) | None |
 | [SR-129](#sr-129) | Info | `AGENTFORGE_SANDBOX_DIR` is ignored by the packaged app, and a comma in the sandbox path fails closed | Checked, not an issue (2026-10-03) | None |
 | [SR-130](#sr-130) | Info | What the mode harness and agent tools review read and found sound | Checked, not an issue | None |
+| [SR-160](#sr-160) | Info | Decision: a hosted desk's saved knowledge map is read only if it carries a shared-scope marker, so every hosted desk maps once more | Accepted (2026-10-07); cost: one re-map per hosted desk | None |
+| [SR-161](#sr-161) | Info | Design only, not being built this round (Rizky, 2026-10-06): a person's own Knowledge Base private by person, sharing through a bot, and what an owner or admin may do when a person leaves | Not built | Blocks nothing now; blocks promising any of it |
+| [SR-162](#sr-162) | Info | What the hosted team-privacy review opened and found sound | Checked, not an issue (2026-10-07) | None |
+| [SR-164](#sr-164) | Low | The SSH private key of the HYP AI production server was attached to an agent conversation, so it is in that transcript | Open (2026-10-07); key moved to `~/.ssh`, owner-only; replace it before handover | Blocks handing the server to Hypernet |
 
 Status values: `open`, `fix in progress — lane X`, `fixed-unverified` (the code is in the tree and
 its test passes, nothing has been driven), `fixed, not driven` (2026-09-23 rows: the code and its
@@ -1067,6 +1117,71 @@ tenant on the next call" went red on 2026-10-01 with no code change, because its
 for the file (`billing.test.ts:97-100`). Test-only; nothing in the product was wrong.
 
 Gate: none now. Was **blocks PR merge**: a CI table that can lie is not a gate.
+
+### SR-155 {#sr-155}
+
+**On a shared hosted desk, any member could read every colleague's Chat through the Knowledge Base.**
+Hosted (Enterprise). The rule is the owner's, 2026-10-06: what a person does in Chat is private to that
+person, even from the company's owner and admins. Raised and fixed 2026-10-07 by the hosted team-privacy
+lane. Fixed in the working tree, tested; **not driven on a running hosted server**.
+
+Evidence, as found:
+- A Chat thread is user-scoped (`getThread` filters on `threads.userId`, `packages/host/src/threads.ts:49-64`).
+  The card the thread leaves in the Knowledge Base is not. `chatWorkCard` writes
+  `origin: { kind: "thread", id }` (`packages/host/src/work-cards.ts:195-206`), and every read of
+  `knowledge_sources`, `knowledge_chunks` and `knowledge_vectors` filtered on `workspace_id` alone. Two
+  people of one company share the home desk (`ensurePortalOwner`, `packages/db/src/portal-owner.ts:177`, finds
+  or creates the organization's one home desk at `:230-244`), so they shared the cards.
+- What a colleague got from that: the card text and the thread title in their Sources list
+  (`listSources`), in search (`ftsRows`, `searchVectors`), in the `## Retrieved sources` block of their own
+  Chat prompt (`knowledgeInjection`), in `knowledge_search` results, in the graph (a thread node's label is
+  the thread title), in the context popover's record, and in the saved map (one row per desk, written from
+  every card). A company owner could read a member's Chat the same way. Reindex returned each card's name
+  and type, and a delete by id removed it.
+
+Fixed, all in `packages/host/src`:
+- **The rule**, in one file: `knowledge-visibility.ts`. A source with `origin_kind = 'thread'` is visible
+  only to the person who owns that thread. No role override. A card whose thread is gone is visible to
+  nobody. Hosted only: `chatCardsArePrivate` (`:46`) reads `isServerMode()` on every call, and off server
+  mode every fragment is empty, so the SQL is what it was.
+- **Where it is applied**, each as a SQL subselect over primary keys and not as a list of ids:
+  `listSources` (`knowledge.ts:213`), the full-text query (`ftsRows`, `knowledge/backends/builtin.ts:220`),
+  the vector query (`searchVectors`, `knowledge-embed.ts:326`, the filter at `:352`), the names on a hit
+  (`sourceNames`, `builtin.ts:55`), the context popover's record (`recordedChunksSql`,
+  `knowledge-last-turn.ts:31`), the graph and its counts (`getGraph`, `graphCounts`,
+  `knowledge-graph.ts:361`, `:387`; `visibleGraphNodes`, `knowledge-visibility.ts:159`), graph expansion
+  (`firstChunkOf`, `knowledge-expand.ts:137`), the map build (`listMappableSources`, `knowledge.ts:228`),
+  reindex (`sourceRow`, `knowledge-reindex.ts:84`; `reindexWorkspace`, `:326`) and delete by id
+  (`handleDeleteKnowledgeSource`, `handlers/knowledge.ts:426`). Chat injection, `knowledge_search` and
+  Education all retrieve through the full-text and vector queries, so one filter covers them.
+- **The map** is built from non-Chat sources only and stamped; see [SR-160](#sr-160).
+- **Cost.** `EXPLAIN QUERY PLAN` on a desk of 4,000 sources and four people shows lookups by primary key and
+  no scan of `threads` (`knowledge-visibility.test.ts` holds the plan); a full-text query for a word in 80
+  chunks went from 0.5 ms to 1.3 ms with the filter. No index was added. The first shape tried, a subselect
+  over every source, cost 94 ms against 4 ms on a 20,000-source desk and was replaced.
+
+Tests: `knowledge-team-privacy.test.ts` (27 cases, three people of one company on one desk: an owner and two
+members) and `knowledge-visibility.test.ts` (15 cases, the fragments and the plan). 21 of the 27 failed
+against the old code, for the reasons above; the six that passed are the controls (shared sources stay
+visible to everyone) and the four Personal-parity cases, which pass before and after. The full-text and
+vector halves are each proved with the other half's rows deleted.
+
+Personal: unchanged, and held by tests. With server mode off, the same reads return every card on the desk,
+the graph is whole, the map is built from every source and stamped with nothing, and reindex and delete act
+on any id, as before (`knowledge-team-privacy.test.ts`, "Personal parity"; `knowledge-visibility.test.ts`,
+"off server mode").
+
+Not covered:
+- A person's attachment in Chat and every other stored picture: [SR-157](#sr-157).
+- The Soul, the pinned memories and the other things that stay the company's: [SR-159](#sr-159).
+- The card text is stored in plaintext in SQLite, PII masked first (`knowledge-ingest.ts:26-28`), as it
+  always was. The host now refuses to hand it to anyone but the thread's owner; nothing encrypts it per
+  person, so someone with the database file or a backup can still read it.
+- Old data stays put: a card written before this change is hidden from everyone but its owner, an old map
+  is read as absent ([SR-160](#sr-160)), and a retrieval record an earlier build wrote is filtered when read.
+
+Gate: **blocks a multi-person hosted pilot** (the five testers on one company) until the two-person drive in
+`features/knowledge.md` has been done on the hosted compose rehearsal.
 
 ## Medium
 
@@ -2939,6 +3054,286 @@ Enterprise bundle serves `app.nultron-ai.xyz`.
 
 Gate: none for Personal or Enterprise. The preview stays password-only.
 
+### SR-138 {#sr-138}
+
+**One signed-in account could hold any number of model runs open.** Enterprise (hosted). Raised
+2026-10-06, ahead of a public launch. Medium. Fixed in the tree, tested, not driven. First written as SR-135, then SR-137; numbered SR-138
+the same day.
+
+Evidence (before): the only per-account bound was the session bucket, 300 requests a minute with a burst of
+50 (`packages/host/src/rate-limit.ts:25-26`). That counts requests, and a Chat run or a video generation is
+one request that stays open for the length of the model call, so it bounds how fast runs start and not how
+many are in flight: fifty `POST /api/v1/videos` in a burst were all admitted. The job pools in
+`packages/host/src/concurrency.ts` (`:288`, `:290`) are global and guard ffmpeg and SQL workers only.
+
+The control is `packages/host/src/run-limits.ts`, server mode only:
+- a slot per run in flight, per tenant (`AGENTFORGE_MAX_RUNS_PER_TENANT`, default 6, `:33`, `:36`) and for the
+  whole server (`AGENTFORGE_MAX_RUNS_TOTAL`, default off, `:34`). A whole number sets a cap; `off`, `none` or
+  `unlimited` remove it; junk is the default (`parseRunCap`, `:53`). **`0` is a cap of zero, not an off
+  switch**: it refuses every run with `server_busy`, the operator's stop for an incident (`:111`). Off server
+  mode there is no cap and no count, whatever the variables say (`:71`, `:172`);
+- a refusal before any work starts, in the ordinary JSON error: 429 `too_many_runs` over the tenant cap, 503
+  `server_busy` over the server cap (`:27-28`), the tenant cap checked first. The 503 keeps its code through
+  `maskServerError`;
+- taken by **every handler that calls the gateway gate**, right after it: `withRunSlot` (`:185`) for the routes
+  that answer when the work is done; the slot rides the stream for Chat text, image and video
+  (`packages/host/src/handlers/runs.ts:50`), the Edit agent and every streaming job (`streamJob`'s `tenant`
+  option, `packages/host/src/job-stream.ts:39-43`); Edit `/generate` and an `asr` job on `/jobs` outlive their
+  request, so they hold the slot until the job is over (`onSettled`, `packages/host/src/edit/jobs.ts`);
+- a slot given back exactly once (`:129-131`) when the work ends however it ends: completed, failed, aborted, the
+  response destroyed, a consumer that stopped or never started reading (`guardRunStream`, `:210`, and the
+  hand-written stream wrapper in `handlers/runs.ts`), or an error before the first frame;
+- counted per organisation inside its white-label partner (`runLimitKey`, `:160`), because
+  `TenantContext.tenantId` is the partner every company of a deployment shares.
+
+Left out on purpose, each with its reason in `LEFT_OUT` (`packages/host/src/run-limits-routes.test.ts`): prompt
+enhance, the knowledge context read, source ingest from a file or URL, one-source re-index and the workspace
+backfill (`/knowledge/backend/reindex`, which answers at once and runs in an outbox). Each is one short call and
+bursty by design (a multi-file drop, a read per keystroke), so counting it would refuse a person their real work.
+The session bucket still bounds them: at most 300 calls a minute from one session.
+
+Tests: `run-limits.test.ts` (parsing, zero, isolation, the server cap, exactly-once release, `withRunSlot`, Personal
+parity), `run-limits-routes.test.ts` (the inventory: it finds every gate-calling handler from the source and fails
+unless it takes a slot or is on the written list, then drives every counted route through the real router at its
+cap), `run-limits-router.test.ts` (Chat: cap, other tenant, finish, abort, early stop, a stream returned before its
+first frame, a client already gone), `run-limits-edit-jobs.test.ts`, `run-limits-adapter.test.ts` (a destroyed
+response and a throwing write through the real HTTP adapter, and the 503 through error masking),
+`job-stream.test.ts`, and `apps/web/lib/run-limit-copy.test.ts` for the catalog copy in `en` and `id` at `apiFetch`.
+
+Residual:
+- **In memory and per process** (`createRunLimiter`, `:106`). A restart empties the counters, and a second app
+  process would keep its own, so the cap does not hold across two processes. The same single-process limit as
+  [SR-66](#sr-66) and the request buckets.
+- **Not a billing control.** It bounds concurrency, not spend, allowance or total runs over time.
+- With the per-tenant cap off and only the server cap set, one customer can take every slot.
+- A slot ends with the stream or the job, not with the model call. A job that ignores its abort signal keeps working
+  after its slot is free, until its next `throwIfJobAborted`. A queued Edit job holds its slot while it waits.
+- Jobs the Edit agent queues from its tools are counted by the agent's own slot, not one each.
+- Ten people in one company share its six slots. Raise the variable for a larger company.
+- No `Retry-After`: the host's JSON result has no header field.
+
+Required action: drive it on a hosted instance (open seven Chat runs as one tenant, fifty `POST /api/v1/videos` in
+a burst, then another tenant's).
+
+Gate: **blocks Tencent deploy** until driven there.
+
+### SR-156 {#sr-156}
+
+**Any signed-in member could delete a desk of the company.** Hosted (Enterprise). Raised in the 2026-10-06
+review of the desk controls and fixed 2026-10-07. Fixed in the working tree, tested; not driven on a hosted
+server.
+
+Evidence, as found: `handleDeleteWorkspace` looked the desk up in the caller's organization and, with the
+desk's name typed as `confirmName`, deleted it. It never read `tenant.role`. Deleting a desk removes
+everything on it: its threads cascade (`packages/db/src/schema.ts:430-432`), its Knowledge Base is wiped
+(`wipeKnowledgeForWorkspace`, `packages/db/src/ensure-local-owner.ts:219`, called at `:250`), and the
+handler purges its files, settings, channels, folder mount and proposals
+(`packages/host/src/handlers/workspaces.ts`). On the hosted server a member could therefore erase every
+colleague's chats on that desk, the chats [SR-155](#sr-155) makes private to their owners.
+
+Fixed: `handleDeleteWorkspace` (`handlers/workspaces.ts:183`) now requires `canAdminister(tenant.role)`, an
+owner or an admin, when the server is hosted (`:193-194`). The check comes after the desk is found and
+before `confirmName` is read, so a refused caller learns nothing from a wrong name. The refusal is
+`403 workspace_delete_forbidden` (`WORKSPACE_DELETE_FORBIDDEN_CODE`, `:166`). A builder, the host's own role,
+is refused too. Hosted mode is injectable (`WorkspaceDeleteDeps`), the same pattern as the company-key gate
+([SR-98](#sr-98)). The renderer hides what the host refuses: `DeskDeleteButton` and `DeskDeleteNote`
+(`apps/web/components/desk-delete-control.tsx`), through `useMayDeleteDesk`
+(`apps/web/lib/desk-delete-access.ts`), drop the button for a member and for a role the page cannot read,
+and say who can in one line, in `en` and `id` (`workspaces.deleteRestricted`, `workspaces.errors.deleteForbidden`).
+A refusal that still comes back is worded from the catalog. This is a courtesy and never the control.
+
+Tests: `packages/host/src/handlers/workspaces-delete-roles.test.ts` (12 cases, 4 of which failed against the
+old handler): a member and a builder get 403 and the desk stays; the refusal comes before the confirmation
+check; an admin and an owner delete; an owner is still asked for the name; an unknown desk is a 404 for a
+member; the Default desk stays undeletable. Personal parity, in the same file: with server mode off a member
+and a builder delete exactly as before, and with nothing injected the environment decides.
+`apps/web/lib/desk-delete-access.test.tsx` (14 cases): the role predicate, the button for owner, admin,
+member and an unknown role, the Personal button byte for byte, and the note and the refusal in both
+languages.
+
+Not changed, deliberately: create and rename stay open to a member ([SR-158](#sr-158)).
+
+Gate: **blocks a multi-person hosted pilot** until a member's Workspaces page and a hand-sent `DELETE` have
+been driven on the hosted compose rehearsal.
+
+### SR-157 {#sr-157}
+
+**Stored media is read, listed and deleted by company, not by person.** Hosted (Enterprise). Raised in the
+2026-10-06 review and confirmed in the code on 2026-10-07. **Open. Nothing was changed, on purpose.**
+
+Evidence:
+- The row records its owner and nothing else about its use. `media.user_id` is NOT NULL
+  (`packages/db/src/schema.ts:714`) and every writer sets it from the caller: `saveMedia`
+  (`packages/host/src/media.ts:99`), the Edit import (`packages/host/src/handlers/edit.ts:99`) and the starter
+  seed (`packages/host/src/edit/starter-media.ts:143`). It has no desk column and no field saying whether a row
+  is a Chat attachment, a studio picture or an Edit asset.
+- Every read looks the row up by organization and id: `readMediaDataUrl` (`media.ts:110-116`),
+  `handleGetMediaFile` (`handlers/media.ts:25-33`), `handleDeleteMedia` (`:82-97`); the lists go by
+  organization and kind (`listMediaByKind`, `media.ts:36-42`).
+- So a request with a colleague's id returns that person's picture (`GET /api/v1/media/:id/file`), and a job
+  can send it to a model: the job modes take `attachments` from the request body
+  (`readJobRegenAttachments`, `job-regen.ts:61-86`) and inline any local media id they name
+  (`job-regen.ts:160`; `inline-local-media.ts:35`). Chat's own history path inlines local media only when the
+  model server is on a loopback address (`runs.ts:302-320`; `inline-local-media.ts:10-18`), which the hosted
+  gateway is not; I did not check every way a base URL can be set.
+- The id is easy to get. The Images, Videos and Music galleries list the whole organization's media of that
+  kind (`handlers/jobs.ts:43`, `:83`, `:125`, to `listStudioGallery`, `studio-generate.ts:667`, to
+  `listMediaByKind`), and a Chat attachment uploaded through `POST /api/v1/media` (`handlers/media.ts:10-23`,
+  `saveMedia` with its default `image` and `video`) is the same kind of row, so a colleague's attached picture
+  is in that list.
+
+Why nothing was changed: requiring the row's user to be the caller, in server mode, in `readMediaDataUrl` and
+`handleGetMediaFile`, breaks reads the product relies on.
+- The galleries show colleagues' studio pictures through `/api/v1/media/<id>/file` URLs. Those images would
+  break unless the gallery lists were scoped too, and that makes all studio output private by person, which
+  nobody has decided.
+- The storage screen lists the organization's largest objects, and its own comment says every id on it is one
+  the caller may then delete (`handlers/storage.ts:38-52`); `handleDeleteMedia` is organization-wide on
+  purpose.
+- Edit checks a still by organization (`edit/start-generate.ts:94-96`), and its worker reads it through
+  `readMediaDataUrl` as the person who asked (`edit/jobs.ts:228`). I did not check whether an Edit project is
+  shared between the people of a desk. If it is, a person-scoped read breaks a colleague's generate on it.
+
+Options for the owner: (1) scope everything by person, galleries, storage list and delete included: the
+simplest rule, and studio output becomes private. (2) Add a column saying what a row is for, and scope only
+Chat attachments by person: this is what "a document attached in Chat is private to the person who attached
+it" needs, and it is the smallest change. (3) Leave media company-wide and record that a Chat attachment is
+shared inside a company. Option 2 is not built; the document-attach work is a separate lane.
+
+Gate: blocks the sentence "a Chat attachment is private to the person who attached it" until one is chosen.
+
+### SR-165 {#sr-165}
+
+**Hosted portal: a username-and-password sign-in, selected by `PORTAL_SIGNIN_MODE=password`, with no second factor.**
+Raised 2026-10-07. Medium. Enterprise (the hosted app's portal), for the HYP AI white-label. Built in the tree and
+tested; not driven in a browser or on a server.
+
+The decision, and who made it: Rizky, 2026-10-07, for the HYP AI deployment: *"the login portal doesnt need email
+code, we will use username and [password] protection for now, with 2FA method being designed."* He chose the real
+multi-user portal (one company, one shared desk) with a username and a password in place of the e-mailed code.
+Until then the rule was "no password" (`device-code-login.md`, "Sign-in method", whose four reasons were that a
+password database is the worst asset to hold, that credential stuffing is the dominant attack on SME SaaS, that
+SSO is an easier path from OTP, and that the user is at a browser anyway). That rule is lifted **for this mode
+only**: the e-mailed code is the default, the other hosted product runs it, and the code mode's 21 routes and 18
+screens are pinned as unchanged (`apps/portal/src/routes/code-mode-unchanged.test.ts`).
+
+Controls, each with the test that holds it:
+
+- **Storage.** scrypt (N = 2^15, r = 8, p = 1, 32 MiB, about 100 to 150 ms; `node:crypto`, no dependency), a random
+  16-byte salt per password, the cost stored beside the hash so it can be raised (and a hash under older cost is
+  re-written at the next correct password), constant-time comparison, NFKC. The hash has no field in any type the
+  store returns, and `tenant_readonly` has no grant on the table (`credentials.test.ts`, `password.test.ts`).
+- **Policy.** 12 to 200 characters, not the username or the address, no control characters, a new password differs
+  from the old one. No password, hash or typed value is in any page, redirect, audit row or log line
+  (`password-sign-in.test.ts`, "secrets", over everything the suite sent and received).
+- **No enumeration.** An unknown username, a wrong password, a lock and a disabled person get the same status,
+  sentence and markup, and each runs exactly one scrypt derivation (a dummy where there is nothing to compare);
+  the test counts derivations per path and compares median times.
+- **Lockout.** Five counted attempts lock an account for 15 minutes, in the database (a restart does not reset it),
+  and an attempt is counted **before** the password is compared, so a parallel burst from one address gets exactly
+  five comparisons (12 over HTTP and 50 at the store). A correct password clears it. While an account is locked, a
+  source address that has not itself attempted that person in the window may take up to three more attempts, counted
+  in the same row (`grace_attempts`, migration 0013, capped by the schema), so the most passwords a window can try is
+  **5 + 3 = 8**, whoever asks and from how many addresses (`flows/password-sign-in.test.ts`: forty addresses at once,
+  eight comparisons; the same over HTTP with twenty-four). A source that has attempted and not got through is
+  refused outright. In process, 20 password posts per 15 minutes per source (an IPv4 address, or an IPv6 /64) and 10
+  per identifier per source, counted before the account is looked up, and at most eight derivations in flight (a ninth
+  is `503`, before anything is counted).
+- **Forced change.** An operator-issued password buys no session: the person must choose their own, proving the
+  temporary one again on that post (counted and locked like a sign-in), and a change ends every session they hold.
+- **No e-mail, no self-sign-up.** The mailer refuses to send; the e-mail, invite and verify routes are 404; the
+  portal has no sign-up route; accounts exist only because an operator ran `portal:account`, which enforces the seat
+  cap, refuses to disable or demote the last owner, and ends sessions on `disable` and `reset-password`.
+- **Same session as the code flow.** A person who is in goes through `completeSignIn`: the login gate (seat cap,
+  disabled, past due), the authorization code, the portal's own cookie. CSRF and the client and `redirect_uri` are
+  validated on both posts, and the pages carry the client's origin in `form-action` (SR-20).
+- **Audit.** `password.verified`, `password.failed`, `password.locked`, `password.lock_repeated`,
+  `password.withheld`, `password.changed`, `account.created`, `account.password_reset`, `account.disabled`,
+  `account.enabled`, and the existing `web_session.revoked` and `member.role_changed`, none carrying a secret. What an
+  outsider causes (`failed`, `locked`, `lock_repeated`, `withheld`) names the system as the actor and the person as the
+  target; only a person's own proof or change has them as the actor. Every such row follows a counted attempt, so what
+  an outsider can add per account per window is bounded (five rows of `withheld` for a person who is not active).
+
+**Independent review, 2026-10-07, and what was done.** A reviewer who was not told the author's conclusions found no
+critical or high issue and said to ship after named fixes. All were applied test-first (a failing test, then the fix;
+where the code came first, the test was shown to fail by undoing it). The tests are named where they are described above;
+each is one line here.
+
+- **M1, the lock was a free denial of service against a named person.** Mitigated, not removed: the three slots under
+  the lock and the in-process record of sources described under "Lockout". The bound on passwords compared is **8 per
+  account per window, up from the 5 the first version held**; that is the price of any scheme that lets a person in under
+  a lock. The identifier budget, which every source shared, was a second way to do the same thing (ten posts at a name
+  made the person's own next try `429` from any address), and is per source now. A second lock within an hour writes
+  `password.lock_repeated`, `account list` shows the locks of the last 24 hours, and `reset-password` clears the count,
+  the slots and the lock and says so.
+- **M2, unauthenticated scrypt cost and IPv6.** The per-source budgets count an IPv6 /64 as one source (the password
+  routes only: the e-mailed-code limits key on the whole address as before), and a step takes one of eight derivation
+  places before it looks anything up or counts anything, answering `503` when none is free. The refusal costs nobody an
+  attempt and says nothing about any account.
+- **L1, an unbounded audit row.** `password.withheld` is written only for an attempt that was counted, so the lock
+  bounds it; `enable` clears what attempts on a disabled person left.
+- **L2, a stale re-hash.** `recordSuccess` is guarded by the hash that was proved. A sign-in overtaken by a
+  `reset-password` writes nothing and is refused (`changed_during_sign_in`), which is one step further than ignoring
+  the write: otherwise it would still be issued a session after the reset ended them all. "Overtaken" means the
+  password's own date moved; a sign-in that only lost a race with another sign-in re-hashing the same password is let in.
+- **L3, a session that predates the credential.** `account create` that attaches a password to an existing person ends
+  their sessions, and a live cookie next to `must_change` no longer resumes at `/authorize` or `/activate`.
+- **N1, the length ceiling.** Measured after NFKC in the sign-in too, as the policy and the hash do.
+- **N2, the actor of the rows an outsider causes.** The system, with the person as the target.
+
+What stays open (the residual risks):
+
+1. **No second factor.** A password that is guessed, phished or reused from another service is a session. The
+   design for 2FA is not finished; the sign-in is shaped as explicit steps so one can be added as one more step
+   (`flows/password-sign-in.ts`), and there is deliberately no column for it. Until then the lock and the budgets
+   are what stand between a guesser and an account.
+2. **No self-service reset or change.** A forgotten password is an operator's `reset-password`, so the operator
+   decides who is who, out of band; the portal cannot help with that. The same post that does the forced change
+   would serve a voluntary one, and no page links to it.
+3. **The operator sees every initial and reset password**, on a terminal and in whatever that terminal's output is
+   kept in (an `exec -T` session, a CI log if the command is ever run through one). The arguments of the command
+   carry no password, so shell history does not. It is temporary and spent at first sign-in, and a first sign-in by
+   somebody else is visible: the real person's first attempt fails and a `password.changed` row names the other.
+4. **A lock still denies a source that has itself failed, and it is still a lever.** A source address that has
+   attempted a person in the window and not got through is refused until the window ends, whatever it types: a
+   person who mistypes five times from their own address, or who shares an address with whoever is hammering them,
+   waits 15 minutes or asks for `reset-password`. And the whole bound is eight attempts per window (five, then three
+   under the lock), so an attacker who spends them from four sources (five from one, one each from three more) keeps
+   the person out: four /64s where the first version needed one. The cost is eight posts every 15 minutes. What
+   would close most of it is a durable list of the sources a person has signed in from, which is not built.
+5. **No common-password or breached-password check.** The policy is length and the three rules above. The bound of
+   eight attempts per window, up from five, is what a weak password has to survive online: 768 guesses a day per account.
+6. **Scrypt is a cost an attacker can spend on us.** Each attempt is about 100 ms and 32 MiB on the libuv pool
+   (four threads by default), shared with other work. One source (an IPv4 address or an IPv6 /64) is bounded by its
+   budget, and at most eight derivations are ever in flight, so the sign-in cannot take more of the pool than that.
+   What a flood from very many sources can still do is keep all eight places taken, so that every sign-in
+   (the person's included) is answered `503` while it lasts. Edge rate limiting is the control for that, and this
+   register does not claim it exists.
+7. **Timing is equalised, not constant.** The paths differ by a few database round trips against a derivation of
+   about a hundred milliseconds; a patient observer with many samples could in principle tell them apart. The
+   budgets cap the samples.
+8. **What is not audited.** An attempt on a username that does not exist (the audit table is append-only and has
+   to name a tenant, so an unauthenticated caller must not be able to grow it), an attempt refused while an
+   account is locked (the lock's own row says so) and an attempt answered `503`.
+9. **The limits are per process, except the account lock.** The two budgets, the eight derivation places and the
+   record of which sources have attempted whom live in the portal process: a second process doubles the budgets and
+   the places, and a restart empties the record (so a source that was locked out is clean again, and takes one of
+   the three slots, which the database still counts). The lock, its count and the slots are in the database, so the
+   bound of eight passwords per account per window holds across processes and restarts.
+10. **The sign-in screen's wording is the host's, learned from the portal.** A portal answer the host cannot read
+    is shown as the default wording. Someone who could answer the host's request to the portal could change that
+    wording and nothing else: it changes no decision and no URL.
+11. **Not driven.** No browser has enforced the new pages' CSP, and nothing ran on a server.
+12. **Switching the mode back turns password accounts into code accounts.** `account create` makes a person who is
+    `active` with the address the operator typed. Set `PORTAL_SIGNIN_MODE` back to `code` (or unset it) and the
+    e-mail step treats that person like any member: whoever can read that inbox is let in with a code, and the
+    password is no longer asked for. The `user_credentials` rows stay, unread, and a switch to `password` again
+    brings those passwords back to life, including any an operator has since forgotten about. Nothing here blocks
+    the switch, and the operator who makes it should know which accounts it changes.
+
+Gate: none for the pilot the owner asked for. It stays open until the second factor ships; when password-only is
+no longer acceptable is the owner's call, and until then nothing should say the hosted app is two-factor.
+
 ## Low
 
 ### SR-01 {#sr-01}
@@ -4000,7 +4395,7 @@ Gate: none.
 rate limit.** Enterprise. Raised by the desk-files lane (2026-10-03). Open, the same trust as artifacts.
 
 Evidence: `handlePostFile`, `handlePostFileRevert` and `handleDeleteFile` take the tenant from
-`getTenant` and write as that user (`deskRootFor`, `packages/host/src/desk-files/routes.ts:82-86`,
+`getTenant` and write as that user (`deskRootFor`, `packages/host/src/desk-files/routes.ts:84-88`,
 `:135-169`). None checks a role: `canAdminister` is read only by Settings and the company erase
 (`packages/host/src/handlers/settings.ts`, `packages/host/src/tenant-reset.ts`). The model's file tools
 are bounded by the run budget. The routes are bounded only by the 2 MB file cap, the 2,000-file cap and
@@ -4163,7 +4558,7 @@ folder root takes the same option as its proposal base, so an approval finds the
 calls together and expects one `saved`, one `conflict` and two versions.
 
 Not covered: a save through `POST /api/v1/files` sends no expected hash
-(`handlePostFile`, `packages/host/src/desk-files/routes.ts:135-147`), so the Files section can still replace a newer agent version.
+(`handlePostFile`, `packages/host/src/desk-files/routes.ts:162-174`), so the Files section can still replace a newer agent version.
 History keeps both and a revert restores either.
 
 Gate: none.
@@ -4215,6 +4610,320 @@ re-run `ci:local --only audit:deployed`. This was not done in the 0.16.0 cut, wh
 only.
 
 Gate: `audit:deployed` stays red until then, which blocks the Tencent deploy.
+
+### SR-136 {#sr-136}
+
+**A Chat turn stored and streamed a tool's input and output with no redaction, and a failed tool's error text now reaches the model.**
+Both products. Raised 2026-10-06 by the Chat resilience pass (finding G7 of the chat-first plan). Low. Fixed in
+tree, tested; not driven on a live model.
+
+Evidence before: `startModalityRun` sent each `tool.started` and `tool.completed` event to the screen as the runtime
+made it, kept the same input and output on the `tool_call` parts it saved with the assistant message, and wrote the
+input and the full output (what the tool returned before it was cut for the model) to `tool_invocations` through
+`insertToolInvocation` (`packages/host/src/threads.ts:339-355`). The rows are sealed with the vault key, so the
+text inside them was protected at rest and not masked. `redactSecrets` covered only the `run.failed` message
+(`packages/host/src/runs.ts`, the `run.failed` branch, now at `:369`). A secret could arrive in four ways: a key the person pasted and the
+model passed to a tool, a page that `web_fetch` read and that echoed a header, a desk file that held a key, and a
+tool error that quoted a header.
+
+Fix: `redactSecretsDeep` (`packages/core/src/security/redact-deep.ts:70`) masks credential-shaped text at any depth and
+the value of a key named like a secret. The text shapes are a bearer token; `sk-`, `sk-ant-`, `tvly-` and `AIza` keys;
+a JWT (the portal's own tokens); a Telegram bot token (`telegramBotToken` is stored in settings); an AWS access key id;
+a PEM private key block; the user and password of a URL (`postgres://u:p@h`, `https://user:pass@host`); and a
+`Cookie:` or `Set-Cookie:` header value (`packages/core/src/security/redact.ts`). The key names include
+`telegramBotToken`, `cookie`, `set-cookie`, `private_key`, `secret_key`, `access_key` and `credentials`. Chat applies
+it on three paths: the frames sent to the screen
+(`redactToolEvent`, `packages/host/src/chat-tool-events.ts`, used at `runs.ts:394`), the `tool_invocations` rows
+(`runs.ts:414`, input and full output) and the `tool_call` parts saved with the message (the same redacted event). The
+model-facing result is not changed, and media is collected from the unredacted output so a signed link still mirrors.
+Tests: `packages/host/src/runs-resilience.test.ts` ("a tool's input and output on a Chat turn": frames, rows and the
+saved message), `chat-tool-events.test.ts`, `packages/core/src/security/redact-deep.test.ts` and
+`redact-shapes.test.ts` (each shape masked at depth in a tool output; a sha256 hash, a signed media URL, a long id, a
+UUID, a URL with an `@` in its query and the numbers of a spreadsheet row come out unchanged: redaction may hide an
+identifier, never a figure).
+
+The same change opens one new route, and holds it. Before it, the model never saw a tool's error, because the run
+ended. Now it reads `{ ok: false, reason: "tool_error", message }` (`toolErrorResult`,
+`packages/core/src/runtime/tool-error.ts:67`). The message passes `redactSecrets`, loses host paths (those under a root
+only a host has; `/workspace/...` and desk paths stay, because the model needs them), and is cut at 220 characters.
+The detail is quoted, so third-party text reads as a quotation. For every tool, whatever its trust, and with
+`injectionGuardBypass` off, a message that matches an injection rule is withheld: the media tools throw a gateway's
+error body under `internal` trust, and on a bring-your-own-key desk that is third-party text. Tests:
+`ai-tools.test.ts`, `tool-error.test.ts`.
+
+The model-echo path, decided: the assistant's own text is not passed through the redactor before it is streamed or
+stored. The reply streams delta by delta, so a secret split across two deltas cannot be masked live, and masking only
+the saved copy would make a reload differ from what the screen showed. The person often asks for exactly that text (a
+config, a key they pasted). Free prose and code blocks are where a redactor hides identifiers it should not. What does
+leave the thread is masked: `chatWorkCard` (`packages/host/src/work-cards.ts:196`) passes the person's message and the
+reply through `redactCredentials` before the card is indexed, listed as a source and retrieved into other prompts.
+`work-cards.test.ts` holds a key and a JWT out and keeps figures, a code block, a hash and a signed link.
+
+Residual:
+- The opaque-token rule of `redactSecrets` is not applied: it would erase content hashes, signed media links and long
+  identifiers the renderer needs. A secret with no known prefix and no secret-looking key name (a bare random token, a
+  GitHub or Slack token, a Basic-auth string, a database password outside a URL) is stored and shown as it came.
+- The model reads the raw tool result, so a secret it repeats lands unredacted in the assistant text, the saved `text`
+  part and the streamed deltas of that thread (the decision above). It no longer reaches the Knowledge Base card.
+- A secret the person types into their own message is not touched in the thread.
+- The Edit agent streams its tool events unredacted (`packages/host/src/edit/agent-run.ts:274`), and a job's `onEvent`
+  hands raw events to job code. Neither writes `tool_invocations`. Not changed in this pass.
+- Rows and messages written before the change keep what they hold.
+- No Chat code path was found that logs a tool's input or output; that is read, not proven by a log capture.
+
+Gate: none.
+
+### SR-145 {#sr-145}
+
+**A new upload route runs the native document reader on a file from the Chat composer, and an attached file is a counterparty's text inside a person's own message.** Both products.
+Raised by the Chat documents change (2026-10-06); reviewed 2026-10-06 and 2026-10-07. Low as built. The review found two High problems (a host named inside an attachment passed the egress guard; the native conversion deadline freed its slot early) and two Medium ones (a half header ended the guard's block; the host's notes sat inside the untrusted block), and the owner added a privacy rule (below). Each is recorded with its fix. Fixed in tree, tested at unit level; not driven.
+
+Two routes carry it. `POST /api/v1/chat/documents` (`packages/host/src/router.ts:327`, handler `packages/host/src/chat-documents/handler.ts:45`) takes one multipart file from a signed-in person (hosted) or the one local owner (Personal), reads it with `file-extract` (the native `@firecrawl/anydoc` converter, or the fallback readers) and answers the cleaned, masked, cut text; it writes nothing. `POST /api/v1/chat/documents/save` (`router.ts:328`, `save-handler.ts:67`) runs when the message is sent: it takes the text back as JSON, cleans and masks it again, and writes it as that person's private desk file. The first is a second public door onto the reader that Knowledge ingest and Finance import already use, so the parser exposure is the same one, not a new kind. What the routes add, and the controls they carry:
+
+- **Size and time.** The HTTP adapter refuses a body over 26 MB (`MAX_BODY_BYTES`, `packages/host/src/http-adapter.ts:43`). `http-adapter.test.ts` ("chat document routes") holds, for both routes, the trusted-Origin rule, the double-submit CSRF token, 413 on a declared length over the cap and 413 on a body that runs past it with no length declared, and that a desk (Personal) call needs neither the Origin nor a token. The read handler refuses a file over 25 MB before any parsing (`handler.ts:28`), and the reader refuses an empty file, applies the same 25 MB cap again and a 20 s deadline (`file-extract/index.ts`, `file-extract/limits.ts`). `formats.test.ts` fails if the composer's cap and the reader's differ. A decompression bomb is the reader's `resource_limit` refusal, reported to the person as an unreadable file. The save route refuses text over the reader's own Markdown cap (`save-handler.ts:43`).
+- **Type.** The extension must be in core's table (`packages/core/src/chat-documents/formats.ts`) and must agree with the real bytes or the file is refused as `format_mismatch` (`file-extract/detect.ts`). A scanned PDF is refused locally as `needs_ocr`; the route never passes the converter an options object, so hosted OCR cannot be reached (`no-hosted-ocr.test.ts`).
+- **Who.** The hosted session gate answers 401 before the route table is consulted (`router.ts` `gate`); both handlers also reach `getTenant`, which throws 401 with no session in server mode (`gate.test.ts`, `handler.test.ts`). The desk copy is written through the desk root, every query of which carries the desk id, so another tenant cannot read it (`handler.test.ts`, "two hosted tenants").
+- **The file name.** It becomes part of a desk path only through `deskPathForDocument` (`chat-documents/desk-name.ts:70`): the last path part only, folded to Unicode NFC, forbidden characters and controls replaced, never a leading dot, length capped, a reserved device name prefixed, and the result always accepted by `parseDeskPath`. It cannot leave `uploads/~<user>/` (`desk-name.test.ts`). The folder comes from the signed-in person, never from the request.
+- **Concurrency and rate (corrected 2026-10-07).** The first version of this entry said the reads went through a limiter of 2 at a time and a 20 s deadline, as if that bounded the CPU. It does not. The deadline answers the caller; it cannot stop the native conversion, which keeps running on the libuv thread pool (four threads, shared with every file read, DNS lookup and zlib call in the process). A file built to run long therefore outlived its slot, and each later upload started another conversion beside it until the pool was full. Fixed: the slot is now held by the native call itself, answered to the caller at the deadline but released only when the native promise settles, with a cap of 2 at once on the hosted server and 3 on a desk (`AGENTFORGE_MAX_NATIVE_CONVERSIONS`) and 429 `too_many_jobs` past it (`file-extract/native-gate.ts:40`, wired at `file-extract/anydoc.ts:174`; `native-gate.test.ts` proves a timed-out conversion keeps its slot and the next file is refused until it ends). Knowledge ingest, Finance import and Education share the flaw and the fix, because all of them call `extractFile`. On top of that, reads wait in `documentLimiter` (`chat-documents/limiter.ts:22`): 2 at a time on the hosted server (`AGENTFORGE_MAX_DOCUMENT_READS`), a waiting room of 8, then 429; unbounded on a desk. The hosted per-IP and per-session buckets still apply (`rate-limit.ts`). The caps are global, not per tenant, like the other limiters (`concurrency.ts`).
+- **Quota.** The read stores nothing. Only the desk copy, written when the message is sent, counts against the tenant's storage quota, through the desk store's own `putTenantObject`; a refusal leaves the attachment working and the notes say the file was not saved (`handler.test.ts`, "when the desk copy cannot be saved"). A document that is attached and removed leaves nothing.
+- **Personal details.** The extracted text is masked with `maskPii` on the read and again on the save, so neither the desk copy nor the model's copy holds the raw text even if a client skips the read, and the whole message is masked once more on the way out (`createRuntime`, `packages/core/src/runtime/create-runtime.ts:26`; `outbound-mask.test.ts`). Tool outputs are not masked, which is why the desk copy is the masked one: `read_file` and `run_code` read it back unchanged.
+- **Injected instructions (revised 2026-10-07).** The text rides in a `--- name ---` block, so `redactAttachedParts` (`packages/host/src/runs.ts:141`) screens it like a text file. Review found three ways around that, all fixed. (1) A document line that began with three dashes and a space, such as `--- Section 2`, ended the guard's block, so everything after it escaped the scan; `cleanDocumentText` (`chat-documents/text.ts:31`) now indents every such line, and the guard itself now runs a block to the next full header (`ATTACH_BLOCK_RE`, `packages/core/src/security/injection-guard.ts:186`), which also closes the same hole for a plain text file that wrote the half header itself (`injection-guard.test.ts`). (2) The host's own notes about the file were inside the untrusted block and a document could forge one; they are now written above the header, outside the block, and a document line that looks like a note is indented too. While adding the test for this a bug showed up: trimming the text after the indent stripped it again from a first line that forged a note. The text is now trimmed first (`text.test.ts`). (3) The default Chat prompt and one host note say that what follows the header is the file's content, data to read and not instructions to follow (`packages/core/src/agents/default-chat.ts`, `notes.ts:72`). Reading the desk copy back later goes through the file tools' output scan (`user_content` trust). This is a rule list and does not catch every phrasing.
+- **Egress (added 2026-10-07).** After a private read, the runtime refuses a fetch to a host the person did not name (`egress-guard.ts`). A host named only inside an attachment counted as named, so a counterparty's document could name a site and have the model fetch it. A plain text attachment, which Chat has always accepted, had the same hole before this change. `userTextOf` (`packages/core/src/runtime/egress-guard.ts:117`) now takes only what was typed, through `typedTextOf` (`injection-guard.ts:206`): everything before the first `--- name ---` header, without the host's note lines, with the cut at the FIRST header running to the end so a file cannot end its own block with a half header and have what follows read as typed (`egress-guard.test.ts`, `injection-guard.test.ts`).
+- **Private by person on a team desk (owner's decision, 2026-10-06).** Even on Enterprise each person's own material is theirs: a document attached in Chat is saved under `uploads/~<user>/`, and on the hosted server only that person can read, list, search, version, write or remove it, the business owner and the admins included. The rule is the host's (`packages/host/src/desk-files/private-uploads.ts:44`, `canSeePath`, asked on every path through the desk store at `file-store.ts:143`); it covers the file tools, the `run_code` inputs, the Files routes and the source files a job names (all read through `createDeskRoot`). Another person's folder answers "not found". A caller with no user id sees none. `private-uploads-store.test.ts` and `handler.test.ts` ("a team desk") drive it with two people on one desk and a third in another company. Personal has one person per desk and the same code guards nothing there (parity tests in both files).
+- **The Knowledge Base card (added 2026-10-07).** The Chat work card stored up to 2,000 characters of the user message, attachment block included, and the thread title came from the same text. A private attachment could therefore sit in a card that is not owner-only on a team desk. The card and the title now use `attachmentsAsMentions` (`injection-guard.ts:224`; `runs.ts:298`, `:471`): what was typed plus `[Attached file: name]`, never the file's text (`card-privacy.test.ts`). The assistant's reply, which the card also stores (up to 5,000 characters), can still restate what the document said; that stays open until the team-privacy lane makes cards owner-only.
+- **Errors and logs.** Every failure answers a fixed sentence and a code; the reader's detail, which can quote a path or a byte, is dropped (`chat-documents/errors.ts`; `handler.test.ts` checks a body never echoes the file). The one log line, `chat_document_desk_copy_failed`, carries only an error name.
+- **Transport.** No gateway call, no socket and no `requireGatewayAllowed()`: `gate.test.ts` shows both routes answer with the gate shut. In the packaged app the file crosses the existing `host:request` IPC channel as a byte array (`apps/web/lib/api-client.ts:44`, `apps/desktop/main.cjs:465`), the same path Finance import uses.
+
+Residuals, none a blocker: (1) a memory-safety bug in the native converter would run in the app process on the hosted server, exactly as it would through Knowledge ingest; the child-process isolation the `run_code` sandbox has ([SR-111](#sr-111)) is not applied to the reader. The same follow-up fixes the next one: (2) a conversion that never ends holds its native slot for good, so enough such files can lock the reader (and Knowledge ingest and Finance import with it) until the process restarts; a killable child process, as the code sandbox uses, would let the host stop the work and not only the wait. (3) The caps are global, so one signed-in tenant, bounded by its 300 requests a minute, can hold the slots for up to 20 s each and delay another tenant; it cannot read anything. (4) A document stays in the thread's history, so every later turn re-sends its up to 60,000 characters. (5) The masking is the generic `maskPii`, not Finance's column-aware scanner, so a long digit string in a spreadsheet can be replaced by `[nik]` or `[card]`. (6) A counterparty chooses the file name, and it reaches the model in the `--- name ---` header and, made safe for the file system but not for meaning, in the host's `Saved on this desk as <path>` note, which is in the host's voice. The egress guard does not read it as typed text and the data note says the block is content, but the injection guard does not scan a file name. (7) The Chat card keeps the assistant's reply, which can restate a document (above). (8) Sharing is meant to go through a bot and a leaver's files are meant to be deleted or kept by the owner or an admin without ever being opened; neither is built (design only, 2026-10-06), so today a private folder has no owner-side control at all.
+
+Not driven: either route in a browser, on the packaged app and on a hosted deploy with two people on one desk; a real encrypted or decompression-bomb file (the mapping from the reader's codes is unit-tested, the reader's own refusals are `file-extract/index.test.ts`'s).
+
+Gate: none. Drive it on webdev, the packed app and the hosted deploy before the next cut that carries it.
+
+
+### SR-150 {#sr-150}
+
+**Chat now sends the pixels of an attached image to the gateway, and the personal-data masker cannot see
+inside a picture.** Both products. Raised while fixing the Chat image bug of 2026-10-06
+(`docs/internal/unreleased.md`). Low. Open, accepted for the beta.
+
+Evidence: until 2026-10-06 a Chat image never left the machine. `imagePartForProvider` replaced it with a
+sentence (`packages/core/src/content/provider-media.ts`, before this change) and the model answered that it
+had been given no image. That was the bug, and it also meant the masker never had pixels to miss.
+`prepareChatImageHistory` (`packages/host/src/chat-image-history.ts`) now sends each image as a data URL,
+so a screenshot with an identity card, an account number or a name in it reaches the model as the person
+attached it. `maskPiiInParts` (`packages/core/src/security/pii.ts:277-284`) rewrites text and thinking parts
+and returns every other part unchanged, so it cannot mask what a picture shows. The text around the image
+is still masked: `packages/host/src/runs-image-input.test.ts`, "keeps the text around the image masked and
+the image itself whole".
+
+What did not change: the destination. The bytes go in the same request as the text, to the same base URL
+the runtime already used (the pinned gateway on Personal, SR-85; the provider registry's literals on the
+hosted server, `docs/internal/maps/model-policy.md` § 8), and the redirect rule of [SR-99](#sr-99) is the
+same as for the text.
+
+Two things make it larger than one request. Each Chat turn re-reads the whole thread, so an earlier image
+is sent again on every later turn, newest first, while the request holds at most 6 MiB of image
+(`CHAT_IMAGE_REQUEST_BYTES`; it was 16 MiB until the review of 2026-10-07, which measured what the AI SDK
+does with a body that size: it sends the whole prompt again on every one of Chat's up to 12 tool steps);
+an image stays in front of the gateway for as long as the conversation runs.
+And the gateway's retention is Toko Token's policy, not this app's (see **Secrets and prompt security** in
+`AGENTS.md`).
+
+**Review findings, 2026-10-07, and what was done.**
+
+- **A link in a Chat turn was a fetch from this host, with no size limit (fixed for Chat).** The first
+  version counted an `https://` image part as 0 bytes and passed it on "for the gateway to fetch". That is
+  true for the chat-completions, Responses and Anthropic wires, which hand the URL to the gateway, and not
+  true for the Google wire: the Gemini provider takes only its own file URLs as URLs
+  (`@ai-sdk/google` `isSupportedFileUrl`), so `ai` 4.3.19 downloads any other `http(s)` image part itself,
+  with a plain `fetch` that follows redirects and has no size cap (`ai/dist/index.js`, `download` and
+  `downloadAssets`). `isUnreachableProviderMediaUrl` refuses loopback only, so on a hosted server a crafted
+  body with `https://169.254.169.254/...` (or a private address, or a redirect to one) was a host-side
+  request to that address, its answer sent to the model as a picture. The composer never sends a link: it
+  uploads the file and sends the stored copy. `assertChatImagesSendable` and `prepareChatImageHistory` now
+  refuse an `https://` image part in a Chat user turn (a sentence for the person on the latest turn, the
+  "cannot see it" note on an earlier one; tests in `chat-image-history.test.ts` and
+  `runs-image-input.test.ts`). **Not fixed here, and the same shape:** job regeneration accepts `https://`
+  image attachments (`readJobRegenAttachments`, `job-regen.ts`), and on a Gemini model the SDK would fetch
+  them from the host the same way. That path was not changed.
+- **A media id named by a crafted part could be a video or an audio file (fixed).** The reader ignored the
+  row's `kind`, so a crafted `image_url` part naming a stored video was read whole, base64-encoded and sent
+  as an image part. Chat now reads a row only when its kind is `image`, and judges its stored size before
+  any bytes are read (`statMedia`, `media.ts`; `chat-image-history.ts`).
+- **Colleagues' media inside one company (recorded, not fixed here).** `readMediaDataUrl` is scoped to the
+  organization (`media.organizationId`), while threads are scoped to the person. On the hosted server a
+  person who learns a colleague's media id can name it in an `image_url` part of their own turn, and the
+  host reads it and sends it to the model, so what it shows can come back in the answer. The existing media
+  file route (`GET /api/v1/media/:mediaId/file`, `router.ts:341`, `handlers/media.ts:32`) already serves the
+  same bytes to anyone in the organization, so this is a second way to the same file, not a wider reach.
+  The fix is person-scoped media in server mode, with a Personal-parity test (Personal has one person per
+  desk, so nothing changes there). It belongs to the hosted team-privacy work (`AGENTS.md`, "Private by
+  person on Enterprise"), not to this lane.
+
+Required action: none for the beta. The person attaches the image on purpose and the composer already says
+what a model will receive. If the owner wants more, the options are a one-line note under the attach control
+that pictures are sent as they are, or a pixel-level redaction step; the second has no helper in the tree.
+
+Gate: none.
+
+### SR-140 {#sr-140}
+
+**Desk file download, and Chat's deck file.** Both products. Raised by the change that gave Chat a
+`build_deck` tool and gave desk files a Download control (2026-10-06, worktree `agentforge-deck`, branch
+`feat/chat-deck-tool` from `6105c5c`, uncommitted). Low. Fixed in the tree and tested; not driven in a
+browser, not behind the hosted proxy, not on a packed app.
+
+**Review round 2026-10-07.** A review of the branch said "ship after named fixes": one High and three Medium.
+All four are fixed in the tree, test first, and recorded in the bullets below: the schema no longer ends the
+turn on an overrun (**Bounded**), characters XML cannot hold are removed before the file is written (**Never
+a file that needs repair**), saved artifacts count in a hosted tenant's storage (**Residual**, first bullet),
+and a failed save in the packaged app now says so (**Residual**, last bullet). Two Low findings stay open and
+are listed under Residual. Nothing in this round was driven in a browser, on the hosted box or on a packed app.
+
+What is new on the wire. `GET /api/v1/files/download?path=` (`packages/host/src/desk-files/routes.ts:122`)
+sends the newest version of one desk file as bytes. The body is text an agent or a person wrote, and on the
+hosted app it is served from the app's own origin, which is the exposure the artifact file route already
+handles (hosted XSS audit, `packages/host/src/handlers/artifacts.ts`). A PowerPoint artifact is the second
+new thing: `PPTX_MIME` is now in `ARTIFACT_MIMES` (`packages/core/src/artifacts/artifact-meta.ts:31`), so
+the existing artifact route serves a model-written `.pptx` under its own type.
+
+Checked, with evidence:
+
+- **Same desk, tenant and path checks as `/content`.** The handler reads through `deskRootFor` and
+  `root.read` (`routes.ts:122-140`), never a path of its own. Another tenant's path answers the same 404 as
+  a path nobody wrote: the `download` rows in `packages/host/src/desk-files/routes.test.ts` and
+  `packages/host/src/tenancy-harness.test.ts`, and `download-wire.test.ts` through the real router with its
+  session gate (404 for the other tenant, 401 with no session).
+- **Never rendered, never sniffed, never cached.** `deskFileDelivery` (`packages/host/src/desk-files/download.ts:40`)
+  sends `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox`
+  and `Cache-Control: no-store`. A type is named only for plain text kinds; `.html`, `.htm` and `.xml` go out as
+  `application/octet-stream` (`routes.test.ts`, "never names a renderable type"). `no-store` matters: the adapter's
+  default for any bytes result is `private, max-age=3600` (`packages/host/src/http-adapter.ts:342`), which would
+  return an old version after an edit; a result's own headers are applied after it (`:349-351`).
+  `download-wire.test.ts` reads all four off a real socket and off the hosted composition (the page policy first,
+  then the handler's).
+- **The file name is a header value.** It is a desk path's last part, and `parseDeskPath` has already refused
+  control characters, a backslash, a quote and the Windows device names (`packages/core/src/tools/files/path.ts:61`).
+  The header is still built by `contentDispositionAttachment` (`packages/host/src/content-disposition.ts:64`), and a
+  name with a space and a non-Latin-1 character is tested (`routes.test.ts`).
+- **A deck is text and shapes, no active content.** `buildPresentationPptx` writes text boxes and Office preset
+  shapes; no hyperlink, media, macro or external reference is added from the model's strings
+  (`packages/host/src/presentation-pptx.ts`). A model-written string that looks like a link is not one.
+  `build_deck` is `internal` trust, so its answer is not scanned as untrusted output; the answer holds only an
+  id, a file name, a count or a refusal written in `packages/host/src/deck/build-deck.ts`, and the call's own
+  arguments are injection-scanned before it runs (`packages/core/src/runtime/invoke-guarded.ts:49-50`). A refusal
+  note quotes the model's own slide headings back to it, which is its own text.
+- **Bounded, and a refusal never ends the turn.** Slides are capped at 14 and every text field has a ceiling
+  (`DECK_*` in `packages/host/src/deck/deck-schema.ts`), enforced by `buildDeckForTenant` through
+  `packages/host/src/deck/deck-limits.ts`, not by the tool's schema. The SDK checks a tool call's arguments
+  against that schema before `execute`, and an argument that fails there ended the whole turn as `run.failed`
+  (review finding, High): a model cannot count characters, so a 2,100-character note was an ordinary mistake that
+  cost the person the turn and told the model nothing. The schema now keeps only the shape and states every limit
+  in words in the field descriptions; an overrun is a tool result that names the field, the limit and what was
+  sent, for every overrun at once (`slides[1].notes is 2100 characters; the limit is 2000`). Proved through the
+  real SDK with a model that overruns, is refused, and then makes the deck
+  (`packages/host/src/deck/build-deck-run.test.ts`; red first: "Invalid arguments for tool build_deck"), and by
+  `build-deck-limits.test.ts` per field. The body cap is 4 MB of base64 (`ARTIFACT_BODY_MAX_BYTES`,
+  `packages/host/src/artifacts.ts:19`) and is now a second line of defence real input cannot reach
+  (`build-deck-too-large.test.ts` drives it with a stubbed exporter). A desk file is at most 2 MB.
+- **Never a file that needs repair.** The PowerPoint writer escapes `& < > " '` and nothing else, so a form feed
+  from a PDF, a NUL or an escape code reached the slide XML and PowerPoint reported the file as needing repair
+  while the tool said `ok` (review finding, Medium). `stripXmlIllegalChars` (`packages/host/src/xml-text.ts`)
+  removes every character XML 1.0 does not allow (form feed and vertical tab become a space so two pages do not
+  run together; a lone surrogate and U+FFFE/U+FFFF are removed) and is applied twice: to the deck's text before
+  it is measured and checked (`deck-limits.ts`) and in the Presentation outline schema
+  (`packages/host/src/presentation-outline.ts`), which every path to the exporter parses through, so the
+  Presentation mode's own export is fixed too. Proved by opening the exported zip and reading every XML part
+  (`presentation-pptx.test.ts`, `build-deck-limits.test.ts`). Not covered: the other exporters (docx, xlsx) were
+  not checked for the same flaw.
+
+Residual:
+
+- **A saved deck now counts toward a hosted tenant's storage, with limits.** It did not: a deck is a row in
+  `artifacts`, the counter holds object-store bytes, and a scripted account could write about 15 MB a minute
+  with the meter at zero (review finding, Medium). `totalUse` in `packages/host/src/tenant-storage.ts` now adds
+  the tenant's saved artifacts (`SUM(size_bytes)` over its desks, `readTenantArtifactUse` in
+  `tenant-storage-store.ts`) to the report, to `assertStorageAdmits` and to the budget `putTenantObject`
+  reserves against; `build_deck` asks about the number its row will carry (the base64 text, not the smaller
+  file). **Server mode only**: a desk has no ceiling and its number is unchanged
+  (`tenant-storage.test.ts`, "does not read the artifacts table at all off the server"). The read is cheap only
+  because of `artifacts_ws_size_idx` (`packages/db/src/ensure-schema.ts`, created on open in server mode only, so a
+  desk's schema is unchanged): `size_bytes` follows the body in the
+  row, so reading it from rows with multi-megabyte bodies walked every overflow page, about 2 seconds for 100
+  decks in a synchronous call that stops the host (measured in a scratch database; with the index, under a
+  millisecond). Residuals of the fix: (1) only `build_deck` and the object writers ask the ceiling; the other
+  artifact writers (research, documents, finance, legal, meeting, open slide, presentation and data modes) still
+  do not call `assertStorageAdmits`, so a tenant at the ceiling can still save a text result there, though it
+  now counts once saved; (2) the check and the insert are not one step, so concurrent builds can overshoot by
+  the size of those in flight (single-process host, per-run cap of 4); (3) `size_bytes` is the plain text, the
+  stored row is sealed and larger, so the true disk use is above the counted use; (4) Settings' "largest" list
+  is media only, so a tenant full of decks sees a full meter and no deck in the list, and deletes them from the
+  Presentation page; (5) the first hosted open after deploy builds the index, which reads every artifact row once.
+  Low.
+- **The release Caddyfile may replace the `Content-Security-Policy` of both routes.** This is [SR-132](#sr-132),
+  reasoned from Caddy's docs and not driven. With the policy gone the protection left is `attachment`, `nosniff`
+  and the inert type, which is how a browser already treats these responses. Review finding, Low, open: the fix
+  is a path-matched `header` in the Caddyfile for `/api/v1/files/download` and `/api/v1/artifacts/*/file`, and a
+  line in `check-app.sh` that reads the policy back. Both live outside this repo (the edge folder and the
+  NultronEnt bundle), so nothing here changes it.
+- **The path is in the query string**, so a proxy access log keeps it, like every desk route. The names are ones a
+  person chose, not secrets, but they are not nothing.
+- **No per-route rate limit.** A GET of a 2 MB file is the same cost as `/content` and falls under the host's
+  per-IP and per-session buckets only.
+- **Packaged: the shell's save result is no longer dropped (fixed in the renderer, not driven).** The shell
+  answers `{ ok, reason }` (`apps/desktop/main.cjs:527-551`) and the renderer discarded it, so a refused or failed
+  write showed nothing, on every download and now on every deck card and file chip (review finding, Medium).
+  `saveDesktopBytes` (`apps/web/lib/desktop-bridge.ts`) returns the answer, `apiFetch` throws a
+  `DesktopSaveError` through `throwIfSaveFailed` (`apps/web/lib/desktop-save.ts`) when `ok` is false and the
+  reason is not `canceled`, and the deck card, the files viewer (`save_failed`) and the studios that show an
+  error message say it in a sentence in both locales. A closed dialog stays silent. `main.cjs` was not changed.
+  An older shell that answers nothing reads as a save that happened. The real write was not driven on a packed
+  app.
+- **The deck's chrome follows the desk language, not the conversation's** (review finding, Low, open). The
+  kicker word on the title slide comes from the desk locale; a conversation in the other language gets the
+  deck's text in its own language and the chrome in the desk's. A later change passes a locale from the tool.
+
+Gate: none beyond [SR-132](#sr-132). Drive both downloads once on the hosted box and read the response headers
+there.
+
+### SR-158 {#sr-158}
+
+**Any member can create a desk, rename one and change its modes.** Hosted (Enterprise). Recorded 2026-10-07
+while fixing [SR-156](#sr-156); nothing was changed. Low.
+
+Evidence: `handlePostWorkspaces` (`packages/host/src/handlers/workspaces.ts:76`) and `handlePatchWorkspace`
+(`:130`) call `getTenant` and never read `tenant.role`. A member can rename the company's desk, or change
+which modes the rail shows to everyone on it. A desk a member creates starts with a copy of the creating
+desk's gateway key (`inheritGatewayKey`, `:38`, called at `:104`); the key is never shown to the member, but
+the new desk carries it. Neither route destroys anything, which is why only delete was gated. The current
+behaviour is pinned by `workspaces-delete-roles.test.ts` ("lets a member create a desk and rename it"), so a
+later change is a decision and not an accident.
+
+Gate: none until the owner decides.
+
+### SR-159 {#sr-159}
+
+**What is still the company's on a team desk, and what any member can write into it.** Hosted (Enterprise).
+Recorded 2026-10-07 from reading the Knowledge area for [SR-155](#sr-155); nothing was changed. Low. This is
+what was opened, not a map of the whole product (`AGENTS.md` says that map is still owed).
+
+- The Soul and the pinned memories are read by workspace alone (`getSoul`, `packages/host/src/knowledge.ts:139`;
+  `listMemories`, `:178`) and become the first blocks of every person's Chat prompt (`knowledgeInjection`).
+  Any member can write them: `handlePutKnowledgeSoul` (`handlers/knowledge.ts:330`),
+  `handlePostKnowledgeMemory` (`:350`) and `handleDeleteKnowledgeMemory` (`:363`) call `getTenant` and nothing
+  else. So one person's pinned memory is in a colleague's prompt. Neither `putSoul` (`knowledge.ts:160`) nor
+  `addMemory` (`:192`) runs the injection scan that sources and cards get.
+- `countRetrievals` counts the desk's retrievals (`knowledge-retrievals.ts:75`) and `GET /api/v1/knowledge`
+  shows it to everyone. A number, not a name.
+- The `artifact` and `media` cards (job outputs, generated pictures and clips) are the company's, as they were.
+  Whether a Research or Images result made by one member should be private to them is not decided.
+- `mapKnowledge` calls `reembedWorkspaceChunks` (`knowledge-map.ts:152`; `knowledge-embed.ts:265`), which
+  re-embeds every chunk on the desk, a person's Chat card included, whenever anyone presses Map or changes the
+  embedding model. Nobody is shown the text; it goes to the embedding model under the company key, as it did
+  when the card was indexed.
+
+Gate: none. Decide item by item when the per-person Knowledge Base is designed ([SR-161](#sr-161)).
 
 ## Info and checked-not-an-issue
 
@@ -4403,6 +5112,25 @@ the app's `.env.example`). The compose rehearsal ran on the two generated files
 Required action: none. A new service that needs a portal secret gets `portal.env`, never the app's
 `.env`.
 
+### SR-137 {#sr-137}
+
+**`self_check` tells a hosted tenant, and the model, a few coarse facts about the server.** Both products. Recorded
+2026-10-06 by the Chat resilience pass as a design property, not a flag.
+
+Evidence: `collectSelfCheck` (`packages/host/src/self-check-tool.ts:110`) answers only booleans, counts and fixed
+words: whether this is the hosted server, the gate's `status`, `allowed` and `grace`, whether code runs are on and the
+sandbox is `ready`, `missing` or `unusable` (`not_checked` while code runs are off: the sandbox's files are not read
+then), whether ffmpeg and ffprobe resolve, the keys of the tools the run does not
+offer, and the run's step and tool-call limits. A hosted tenant therefore learns that it is on a server, whether the
+operator turned code runs on, and whether ffmpeg is installed there. The answer is shown on screen, saved with the
+thread and read by the model. It carries no path, key, tenant, organization, workspace or user id, probe message, or
+OS or binary version: `self-check-tool.test.ts` asserts the paths, the ids, a binary version and a probe's own
+message by value, including one run against the real desk. That is less than the Edit banner already gives a tenant
+(`withoutBinaryPath` keeps a ffmpeg version, `packages/host/src/edit/doctor.ts:42`).
+
+Required action: none. A field added to `SelfCheckReport` has to be a boolean, a count or a fixed word, and the
+no-paths-and-ids test has to name it.
+
 ### SR-93 {#sr-93}
 
 **"Add it later" opens a hosted desk with a closed gate: checked, the host never reads it.**
@@ -4571,7 +5299,7 @@ the working tree on 2026-10-03. Nothing here was driven on a packed app, on Linu
 - **A warm child is never shared across tenants.** The pool key holds the tenant, desk and language, and
   only an exact match is reused (`pool.ts:68-70`, `:147-149`). Eviction kills the child.
 - **Desk files are scoped by desk in every query.** The shared select carries `workspace_id`
-  (`liveSelect`, `file-store.ts:125-128`) and the desk comes from `getTenant` (`packages/host/src/desk-files/routes.ts:82-86`), so
+  (`liveSelect`, `file-store.ts:125-128`) and the desk comes from `getTenant` (`packages/host/src/desk-files/routes.ts:84-88`), so
   another desk's or tenant's path is a 404.
 - **The folder root is Personal only and keeps secrets out.** It is unavailable in server mode
   (`folderRootAvailable`, `packages/host/src/folder-root/availability.ts:11-13`), mounting needs the IPC
@@ -4587,6 +5315,290 @@ the working tree on 2026-10-03. Nothing here was driven on a packed app, on Linu
   `user_content` or `network`, so its output is scanned, and every call's arguments are scanned
   (`invokeToolGuarded`, `packages/core/src/runtime/invoke-guarded.ts:39`, `:50-53`). What this does not
   stop is [SR-112](#sr-112).
+
+### SR-160 {#sr-160}
+
+**Decision: a hosted desk's saved knowledge map is read only if it carries a shared-scope marker.**
+Recorded 2026-10-07. Made in the lane that built [SR-155](#sr-155) (the lead's call for the lane); the owner
+has not been asked.
+
+The saved map is one row per desk, shown to everyone (`knowledge_maps`). Before [SR-155](#sr-155) it was
+written from every card, so its topic titles and its overview text could name a colleague's Chat, and free
+text cannot be filtered after the fact. The two options were to strip the topics that cite Chat cards (the
+overview cannot be cleaned that way) or to treat an older map as absent. The second was chosen. Hosted,
+`saveMap` stamps `privacyScope: "shared-v1"` (`packages/host/src/knowledge-map.ts:65`), `getKnowledgeMap`
+(`:43`) returns only a stamped map and never returns the stamp, and a new map is built from non-Chat sources
+only (`listMappableSources`, `knowledge.ts:228`, so the person who presses Map does not put their own Chat on
+the company's map either). `forgetSourcesOnMap` spreads the map object, so deleting a source keeps the stamp
+(`knowledge-team-privacy.test.ts`, "keeps the stamp when a source is deleted").
+
+Cost: one re-map per hosted desk, which is a gateway call (live brain and verifier), and the old topics are
+lost with the old map. Accepted because no hosted desk held real customer data on 2026-10-07. Off server
+mode nothing is stamped or checked, and an old map reads as it always did. Revisit if a hosted desk with real
+data exists before this ships.
+
+Gate: none.
+
+### SR-161 {#sr-161}
+
+**Design only, not being built this round (Rizky, 2026-10-06).** What the owner said about teams on
+Enterprise, recorded so it is not lost and not mistaken for done (the root `AGENTS.md`, "Private by person on
+Enterprise"):
+- A company shares a desk, but each person's own Knowledge Base is private to that person, and a document a
+  person attaches in Chat is private to the person who attached it.
+- Sharing goes through a bot: a bot shared with the team brings its knowledge with it. There is no "share this
+  source with the company" switch on a person's own Knowledge Base.
+- When a person leaves, the company decides: the business owner or an admin chooses whether that person's
+  knowledge is deleted or kept.
+- Nobody else reads it, the owner and admins included. An owner or admin may delete or keep a person's
+  knowledge and may never open it. The host blocks it; legal terms come later and are not a substitute.
+- "Dont make it too complicated." Build only that a document attached in Chat is private to its person.
+
+What exists today is [SR-155](#sr-155) alone: the card a Chat thread leaves is private to its owner. Not built:
+a per-person Knowledge Base (every source a person adds is still the company's), sharing through a bot, and
+the leaver controls. Whether a person's own Soul and memories are theirs is part of the same design
+([SR-159](#sr-159)). The attachment half is blocked on [SR-157](#sr-157).
+
+Status: not built. Gate: blocks promising any of it to a customer.
+
+### SR-162 {#sr-162}
+
+**What the hosted team-privacy review opened and found sound.** Checked 2026-10-07, each by reading the code.
+Checked, not an issue.
+
+- **The context popover cannot be pointed at another person's thread.** The route handler
+  (`packages/host/src/handlers/knowledge.ts:308`) looks the thread up with the user-scoped `getThread`
+  (`packages/host/src/threads.ts:49`) before it reads the record (`handlers/knowledge.ts:316`), and it is the
+  only caller of `knowledgeContextForThread`. Another person's thread id gives `own = null` and an empty
+  Sources row. The record query is filtered as well ([SR-155](#sr-155)).
+- **`findSourceByOrigin` is left unfiltered because it is only called for the caller's own thread.**
+  `upsertWorkSource` (`knowledge-ingest.ts:45`) builds its card from the run's own thread; `excludedSourceIds`
+  (`knowledge.ts:912`) runs after the same `getThread`, and `knowledge-search-tool.ts:71` takes the thread
+  from the run context; `deleteSourceByOrigin` (`threads.ts:144`) runs after the user-scoped `getThread`.
+- **The self-check cannot return a card.** It plants an artifact-origin source (`SELF_CHECK_ORIGIN`,
+  `knowledge-verify.ts:23`) and reports whether its own token came back, in a detail line with no source text.
+- **"Send to Knowledge Base" writes no Chat card.** `sendArtifactToKnowledge` (`handlers/knowledge.ts:62`)
+  uses the artifact origin; paste, file and URL sources have no origin at all.
+- **The orphan sweep is desk-wide and only deletes.** `sweepOrphanSources` (`knowledge.ts:763`) removes cards
+  whose subject is gone; it runs before the list on `GET /api/v1/knowledge`, so a deleted thread's card never
+  lingers in anyone's list.
+- **Education reads through the filtered funnel.** `handlers/education.ts:43` calls `retrieveChunks`, so it is
+  behind the same two queries as Chat.
+
+### SR-163 {#sr-163}
+
+**Hosted: the gateway verdict belonged to the white-label partner, not to the company.** Found by the
+2026-10-07 load rig on the HYP AI build (`14f05d5`): after a second company saved a gateway key that differed
+from the first company's, the first company's next Chat turn answered `403 gateway_blocked`. Reproduced on
+`main` (`726f369`) as a failing test on 2026-10-07 and fixed in the working tree on `feat/hosted-run-limits`,
+uncommitted. **Not driven on a hosted server.** Severity High: on the first production server, every company
+after the first that pastes its own key locks the others out, and a company that signs out of the gateway
+removes everybody's key.
+
+The topology the bug depended on: `TenantContext.tenantId` is the white-label partner (HYP AI, Nultron
+Enterprise) and a company is an `organizationId` inside it (`packages/core/src/tenancy/types.ts:40-47`; the run
+cap says the same, `packages/host/src/run-limits.ts:150-161`). Every earlier test used one company per tenant id,
+which cannot show this. The test that does puts two organisations under one tenant id.
+
+Evidence, as found:
+- The verdict was one `tenant_state(tenant_id, 'gateway_gate')` row per partner: `loadGateState(tenantId)`,
+  `saveGateState(tenantId, state)` and `clearGateState(scope)` took only the tenant id
+  (`packages/host/src/gateway-gate.ts`, as of `726f369`). Keys are per desk (`settings-store.ts:202`, one slice per
+  workspace id) and a desk belongs to one organisation, so the keys were separate and the verdict was not.
+- What happened: B's key check wrote B's fingerprint over A's verdict. A's key no longer matched the verdict on
+  file, and the hosted gate treats "no verdict for this key" as closed (`deriveGatewayGate`, the `unverified`
+  payload, `error` / `allowed:false` in server mode). With B's key rejected the result was the same for A. The
+  single row also carried one `lastOkAt` for both, and `maybeRefreshGateway`'s throttle slot was
+  `<tenant>:<fingerprint>`, so two companies with the same key shared one background check.
+- Same root, second effect: `clearGatewayKeyEverywhere(tenant)` (`packages/host/src/settings-store.ts`) cleared the
+  key on every desk of the **partner**, and the hosted "forget my key" (`resetGatewayKey`,
+  `packages/host/src/handlers/settings.ts`) calls it. One company's owner pressing it signed every other company
+  out of the gateway.
+- Reproduction before the fix (`packages/host/src/gateway-gate-companies.test.ts`): seven hosted cases red, among
+  them "lets both companies chat after each has saved a different key the gateway accepts" (A's Chat turn answered
+  403 with B's key accepted) and "signing out of the gateway forgets that company's key and verdict, and no one
+  else's" (A's key was gone).
+
+Fixed, server mode only, no table and no migration:
+- **One verdict per company.** The `gateway_gate` key is narrowed to `gateway_gate:<organisation id>`, a row
+  under the partner's own `tenant_id` in the same table (`companyStateKey`,
+  `packages/host/src/tenant-state-store.ts:86`; `ownerOf`, `packages/host/src/gateway-gate.ts:169-188`;
+  `gateSlot`, `:190`). The foreign key to `tenants` still holds and the hosted erase still removes the row with
+  the partner. The slot follows the backend (`tenantStateBackend().kind`), so a desk, whose file backend refuses
+  a company slot (`statePath`, `tenant-state-store.ts:119-125`), cannot produce one.
+- **A hosted gate call with no organisation is refused**, `company_required` (500), from the read, the write,
+  the check and the clear. Never answered from the partner's row. `clearGateState` rethrows only that code, so its
+  old swallow of every other failure is unchanged.
+- **The legacy partner row is read in one case only (changed by the review round, below).** The row-backend
+  read does not adopt a legacy file into a company slot (`tenant-state-store.ts:320`). The first version of
+  this fix never read the old partner row at all; the review round lets a company whose slot is empty adopt it
+  when its fingerprint is exactly the fingerprint of the key the company holds now (see "Review round"). A call
+  that names no company never reads it, and a different key never adopts it (`tenant-secrets.test.ts`).
+- **One company's check cannot reveal another's.** A company with no key reads `needs_key` with null timestamps
+  whatever the others do (test: "tells a company with no key nothing about the others' keys or checks"); a
+  company's `checkedAt` and `lastOkAt` are its own (test: "keeps one company's lastOkAt out of the other's
+  payload"); the background re-check is handed the caller's own settings and tenant, and its throttle slot carries
+  the company on the server (`gateway-gate.ts:676-678`), so two companies holding the same key each get a check
+  (test: "gives two companies that hold the same key one background re-check each"). A key shared by two companies
+  still means the same verdict content for each, but each is written and read separately.
+- **"Forget my key" is the caller's company's.** On the server the handler passes the organisation's desks
+  (`listLocalWorkspaces(db, tenant.organizationId)`, `handlers/settings.ts:492`) as `within`
+  (`ClearKeyWithin`, `settings-store.ts:536`), and `clearGateState` drops that company's verdict. A desk calls
+  both with no `within`, as before. The hosted erase still calls `clearGatewayKeyEverywhere(tenant)` with no
+  `within` on purpose (see "Found, not changed").
+
+Personal parity: with server mode off, the verdict is `<dataDir>/gateway-gate.json` for the local tenant and
+`tenants/<id>/gateway-gate.json` for another, the bytes are the old payload (`version`, `fingerprint`, `status`,
+`checkedAt`, `lastOkAt`) with no company in it whichever organisation the scope names, and a missing file derives
+`ok` / `allowed:true` / `grace:true` / "Not checked yet." exactly as before. The desk's background-check slot is
+still `<tenant>:<fingerprint>`, so two desks with one key still share one throttle. Pinned in
+`gateway-gate-companies.test.ts` ("Personal: server mode off", four cases) and by the unchanged desk suites
+(`gateway-gate.test.ts`, `tenant-state.test.ts`). A mutation that let a desk scope itself by company turned those
+suites red.
+
+Mutation check: with `ownerOf` made to ignore the organisation (the old behaviour), the same seven of the thirteen
+cases in `gateway-gate-companies.test.ts` go red; the keyless-company case, the two-partner case and the four
+Personal cases stay green, as they should.
+
+What is not proven: nothing was driven on a hosted server, on the compose rehearsal or on the Kubernetes
+rehearsal. The tests use the real router and database with a stand-in gateway (`fetch`), not the live gateway,
+and a stand-in runtime. The first production-style check is: two organisations under one portal tenant, each
+saves a different key, both chat; press "forget my key" as one and confirm the other keeps its key.
+
+**Cost on deploy.** Every hosted company starts with no verdict of its own. Before the review round that meant
+`error` ("has not been verified") until its first Settings read started a check, and a check that found the
+gateway unreachable stored `unreachable` with no `lastOkAt`, so there was no grace either. The review round
+closes most of that window: a company whose own key has exactly the fingerprint the old partner row judged adopts
+that verdict, `lastOkAt` included. A company holding any other key still starts with no verdict, so one Chat turn
+sent before its first Settings read can answer `403 gateway_blocked` once; the renderer asks the host for the
+gate again after a refusal. The partner row older builds wrote stays in `tenant_state`; it is read only for that
+adoption, and removed when the partner is erased.
+
+### Review round, 2026-10-07 (an independent review of the diff above; same worktree, uncommitted)
+
+The reviewer found the first fix correct, isolated and parity-safe, and named what had to ship with it because
+the server it goes to holds several companies under one partner. Every item is server mode only, written
+test-first (red, then green), and each has a case proving the desk path is unchanged. **Not driven on a hosted
+server.**
+
+1. **Hosted erase refused on a shared partner (Critical, fixed as a refusal; scoping it is still owed).**
+   `resetTenant` (`packages/host/src/tenant-reset.ts`, `assertSinglePartnerCompany`, called after the owner,
+   confirmation and local-tenant checks and before `openAudit`) counts `organizations WHERE tenant_id = ?` and, when
+   there is more than one, answers `409 tenant_erase_shared_partner`: "This server holds several companies under
+   one account, so an erase from here would delete all of them. Nothing has been deleted. Ask the operator of this
+   server to erase this company." Nothing is read, deleted or audited before it. Zero or one organisation proceeds
+   exactly as before (zero is a second pass over an erase that finished). The renderer says it in both catalogues
+   (`settings.reset.eraseAccountShared`) through `eraseFailureReasonOf`. **Not done, and it is the owner's
+   decision: scope the purge to one organisation.** `purgeTenantRows`, the object prefix and local roots, and
+   `clearGatewayKeyEverywhere` are still partner-wide by design (SR-65), so on a single-company partner nothing
+   changed and on a shared one the act is simply unavailable until the operator does it. Proof:
+   `tenant-reset-companies.test.ts` (10 cases; the four refusal cases were red with the guard off).
+2. **A provider key reaches every desk of its company (High).** `saveSettings` writes one desk's slice and a new
+   desk copies the key once, so rotating K0 to K1 on desk 1 left desk 2 on K0: its fingerprint no longer matched
+   the company's verdict, it answered `403 gateway_blocked`, and a re-check from desk 2 could replace the verdict
+   and close desk 1. On the server `handlePostSettings` now follows a key save with `saveKeysToDesks`
+   (`settings-store.ts`), one write of the typed key fields (`openaiApiKey`, `googleApiKey`, `anthropicApiKey`,
+   `volcengineApiKey`) to the other desks of the caller's **organisation** (`listLocalWorkspaces(db,
+   tenant.organizationId)`, the mirror of "forget my key"'s `within`). Only the key fields travel; a desk's models
+   and caps stay its own, and a blank field is not a key write (`keyFieldValue`). Other companies' desks are not
+   in the list. Proof: `gateway-gate-companies.test.ts`, "two desks in one company" (six cases; five red before).
+3. **Usage ledger read by company (High).** `whereFor` in `tenant-usage.ts` now adds `organization_id = ?` when
+   `isServerMode()` (injectable as `createUsageStore(db, { isServerMode })`), for both `list` and `totals`, so
+   `GET /api/v1/usage` and the `usage` field of `GET /api/v1/settings` list the caller's company only. The legacy
+   `desk-usage.json` (one file per partner, rows name no company, nothing has written it since the ledger)
+   is not read on the server (`account-usage.ts`, `legacyDeskUsage`); a desk still reads it. `listRunUsage` was
+   already by organisation. The allowance counter is the partner's and is accrued by tenant id in `recordUsage`;
+   it never read these queries, so no cap moved. Proof: `usage-companies.test.ts` (9 cases; six red before).
+4. **Model-list cache and probe per company (Medium).** `ModelCacheScope` is `{ tenantId, organizationId? }` and
+   a hosted cache is `tenant_state` key `model_cache:<organisation id>` (`modelCacheOwner`, `companySlot` in
+   `model-cache.ts`; `companyStateKey`). What each caller does without a company: a scope that names one uses it;
+   a scope that names only the partner, inside a request whose session is the same partner's, takes the session's
+   company; anything else on the hosted server throws `company_required` (500), never the partner's row; the
+   warm-up (`warmHostedModelCache`) never throws, logs the refusal and starts nothing, and keeps its in-flight
+   set and throttle per company and passes `{ tenantId, organizationId }` to the refresh. `handlers/edit.ts`
+   (the Edit doctor) built a bare `{ tenantId }` and now passes the session's `orgId` too. Every other caller
+   passes a `TenantContext` and needed no change. The old partner-level `model_cache` row is never read (a
+   catalogue probed with another company's key must not be adopted); a company re-probes through the warm-up. A
+   desk has one file and ignores the organisation. Existing cases that built a bare `{ tenantId }` scope
+   (`model-cache-tenancy`, `model-cache-warmup`, `model-cache-hosted-routes`) were given an `organizationId`.
+   Proof: `model-cache-companies.test.ts` (17 cases; twelve red before) and, through the real Settings and Models
+   routes, `gateway-gate-companies.test.ts` "each Settings shows its own probe and models" (red with the slot
+   forced back to the partner's).
+5. **Deploy window (Medium).** `loadVerdictFor` (`gateway-gate.ts`) is what the report, the check and the
+   background re-check read: a company's own slot, and, only when that slot is empty and the company holds a key,
+   the partner row **if its fingerprint equals the fingerprint of that key**, copied into the company's slot with
+   its `lastOkAt`. Never on a mismatch. A rejected key's verdict is carried over too. The partner row is left
+   for other companies. A desk has no company, so it never reaches this. Proof: `gateway-gate-companies.test.ts`,
+   "the deploy window" (seven cases; five red before). One existing assertion that the old partner row is never
+   read (`tenant-secrets.test.ts`) was changed to the narrower rule.
+6. **Organisation id not trimmed (Low).** `companyStateKey` and `ownerOf` use the id as it is; a blank id is
+   still refused. Two ids that differ only by whitespace are two companies (two red cases before).
+7. **"Forget my key" (Low, report only, not changed).** `clearGatewayKeyEverywhere` clears `openaiApiKey` only
+   (`settings-store.ts`), the same field the button's copy names ("Forgets the saved key", the gateway key), and
+   writes no audit row. Clearing the other provider keys on the server is a few lines (loop the four key fields in
+   `mergeSecrets`) plus a case, but it is a product decision (a company that brought its own Anthropic key
+   would lose it by signing out of the gateway) and, on a desk, a behaviour change for Personal, so it is left.
+   An audit row for key changes would need a table (there is none for key writes: saves are not audited either),
+   which is a migration and not a few lines.
+
+Personal parity for each: erase is refused on a desk with `tenant_reset_disabled` before anything is counted;
+a desk-scoped key save stays desk-scoped (`gateway-gate-companies.test.ts`, "Personal: server mode off, a key saved
+on one desk stays on that desk", through the real routes); the ledger readers and the legacy file are partner-wide
+and read as before (`usage-companies.test.ts`, "Personal"); the model cache is the one file whichever company the
+scope names (`model-cache-companies.test.ts`, "Personal"); a desk never writes a company slot or reads the
+partner row (`gateway-gate-companies.test.ts`).
+
+**Found while checking neighbours, same root: a partner is treated as a company.** Listed with evidence so nobody
+chases them twice.
+- **Hosted erase takes every company of the partner (High, needs the owner).** Now refused where it would (item 1
+  above), not scoped. `purgeTenantRows(sql, tenant.tenantId)` deletes by tenant id
+  (`packages/host/src/tenant-reset.ts`; the cascade root is `organizations WHERE tenant_id = ?`,
+  `packages/db/src/tenant-purge.ts:291`), the object prefix and local roots are the partner's, and
+  `clearGatewayKeyEverywhere(tenant)` clears every desk's key. Scoping the purge to one organisation touches the
+  purge SQL, the object store prefix, the per-partner job trees and the portal sign-out, and the act is
+  owner-specified (SR-65). **Still owed.**
+- **Model-list cache was one row per partner (Medium).** Fixed, item 4.
+- **Usage ledger was read by partner (Medium).** Fixed, item 3.
+- **Plan row is per partner (Info, probably by design).** `requireEntitlementAllowed(tenantId)`
+  (`gateway-gate.ts:547`); `tenant_plan` is one row per tenant id. A partner-level `past_due` closes every
+  company. Left as it was.
+- **Learned Thinking-level limits are per partner (Low).** `scope: input.tenant.tenantId`
+  (`packages/core/src/runtime/ai-sdk-runtime.ts:252`, store `effort-selfheal.ts:190`). What one company's channel
+  refused is applied to the others for up to 30 minutes, then heals.
+- **Checked, not an issue:** the job-model breaker is process-wide by model id (`job-model-fallback.ts:29-47`) and
+  only records transport-class failures of the upstream, which is the same for every company; any company's save,
+  sign-out or erase clears it for everyone (`handlers/settings.ts:325`, `:500`; `tenant-reset.ts:354`), which costs a retry. The key
+  state cache `thisKeyCache` is one slot keyed by a hash of the key (`account-usage.ts:55`, `:65-72`), so it never
+  hands one company another's balance; companies only evict each other. `pricingCache` holds the public price
+  list, fetched with no key (`account-usage.ts:54`, `:154`). The run cap is already per company
+  (`runLimitKey`, `packages/host/src/run-limits.ts:160-162`).
+
+Status: fixed in tree, tested, not driven. Gate: blocks a multi-company hosted server until driven. The hosted erase
+is refused where a partner holds more than one company; **scoping it to one company is still owed and needs the
+owner's decision** before an operator-run erase of a single company can be offered.
+
+### SR-164 {#sr-164}
+
+**The SSH private key of the HYP AI production server was attached to an agent conversation.**
+Raised 2026-10-07. Low while the server holds no customer data; it becomes Medium once it does. Open.
+
+Evidence: on 2026-10-07 Rizky attached the key file for the new HYP AI CVM (`hypeyprod1.pem`, RSA 2048,
+fingerprint `SHA256:x7S/TPi28ZmBJ9eVD47+I8HkoJXZoMNxA5L4dpJzPEw`) to the session so the agent could deploy.
+Attaching a file sends its content into the conversation, so the private key is in that session's transcript
+on this PC and was sent to the model provider. The key was then moved out of `Downloads` to
+`C:\Users\rizky\.ssh\hypeyprod1.pem`, readable by his Windows user only. It is in no git repository, and both
+this repo and the HYP AI clone ignore `*.pem` (`.gitignore:61`). The agent wrote the key into no file, note or
+log; this entry holds the fingerprint only.
+
+What it means: anyone who can read that transcript can sign in to the server as its login user. The server is
+Hypernet's, so the key should not outlive the handover.
+
+Fix: before the server holds customer data, or at the handover to Hypernet at the latest, create a new key
+pair, add its public key to the server, remove this one from `~/.ssh/authorized_keys` and from the Tencent
+console, and give later agents the key by path, never by attachment. Until then, keep TCP 22 open to Rizky's
+address only.
+
+Gate: **blocks handing the server over to Hypernet.** It does not block the install or the tester round.
 
 ## Must be true before the Tencent Cloud deploy
 
@@ -4729,6 +5741,19 @@ Added 2026-10-03:
 - [ ] The host's resident memory with two busy Python children is measured against the pod and
   container limits, and `AGENTFORGE_MAX_CODE_RUNS` is unset or sized from it. ([SR-123](#sr-123))
 
+Added 2026-10-07:
+
+- [ ] Before any second person joins a company on the hosted server: two people of one company (an owner
+  and a member, a third as admin) each send a Chat turn, and neither the other's thread card, its words nor
+  its title shows in the other's Sources list, search, Chat prompt, `knowledge_search` result, graph or map;
+  an old map reads as no map until the desk is mapped again. ([SR-155](#sr-155), [SR-160](#sr-160)) — tested
+  over real queries with three people, not driven on the hosted stack.
+- [ ] On the same rehearsal, a member has no Delete button on the Workspaces page and a hand-sent
+  `DELETE /api/v1/workspaces/:id` from a member answers `403 workspace_delete_forbidden` with the desk
+  left. ([SR-156](#sr-156)) — tested, not driven.
+- [ ] The owner has chosen how stored media is scoped between the people of a company, before anyone says a
+  Chat attachment is private. ([SR-157](#sr-157))
+
 ### SR-49 {#sr-49}
 
 **The hosted image carries the whole source tree, and a build from a working checkout also carries
@@ -4799,3 +5824,109 @@ Fix, not done here (the Dockerfile was deliberately left alone in this pass):
 
 Gate: half 2 **blocks building any image from a developer checkout**. Half 1 **blocks making the
 ghcr image public**. Neither blocks a private-image deploy through `release-web.mjs`.
+
+### SR-135 {#sr-135}
+
+**The hosted image carries a third-party static ffmpeg build.** Enterprise and the app preview. Raised when
+ffmpeg was baked into the image (2026-10-06). Low. Recorded.
+
+Evidence: `webapp-deploy/Dockerfile`, stages `ffmpeg-amd64`, `ffmpeg-arm64` and `ffmpeg`. The file is
+`ffmpeg-n8.1.3-9-g29e619e767-linux64-gpl-8.1.tar.xz` (arm64: `linuxarm64`) from the GitHub release
+`autobuild-2026-09-30-13-08` of `BtbN/FFmpeg-Builds`, the Linux build ffmpeg.org links to. `ADD --checksum`
+pins the sha256, so a changed file fails the build. The two programs are root-owned in `/usr/local/bin`,
+run as the unprivileged `node` user, and get the allowlisted environment every ffmpeg spawn already gets
+(`packages/host/src/edit/ffmpeg-binary.ts`).
+
+What is accepted: the binary is not built by us, and it parses files a tenant uploads. A parser bug in it
+runs inside the app container (read-only root, `cap_drop ALL`, no new privileges), next to the data volume.
+That was already true on any desk where ffmpeg was installed by hand; the image makes it the default.
+
+Two follow-ups. BtbN deletes month-end releases after about two years, so the pin must move to a newer
+release before then or the build fails on the download. It is the GPL variant (the render recipe needs
+`libx264`), so the licence text ships in `/usr/local/share/licenses/ffmpeg` and
+`docs/internal/ffmpeg-attribution.md` names the build and its source; an image handed to a customer to run
+themselves is a distribution and must keep both.
+
+**Extended to the desktop bundle (2026-10-06, in the tree, not packed).** The Personal installers now carry the
+same kind of program. Evidence: `apps/desktop/scripts/ffmpeg.lock.json` pins each archive by https URL, byte size
+and sha256, and each file taken out of it; `apps/desktop/scripts/stage-ffmpeg.mjs` reads nothing from an argument
+or the environment, allows only `github.com`, `raw.githubusercontent.com` and `ffmpeg.martin-riedl.de`, checks hash
+and size before unpacking or caching, refuses any archive with a member whose path leaves the folder, sniffs each
+program's header for the target platform, and `--verify` re-hashes the folder against the lock (the mac route runs it
+on the finished `.app`). `node --test apps/desktop/scripts/stage-ffmpeg.test.mjs` covers each refusal.
+
+- Windows: the same BtbN build as the image (`win64-gpl` zip, sha256 `7b801cdd...b429fa`). BtbN publishes the file
+  hash through the GitHub API; it was matched by downloading the file.
+- macOS: FFmpeg 9.0.2 static builds from `ffmpeg.martin-riedl.de` (a one-person build server with an open build
+  script; ffmpeg.org's download page links only evermeet.cx for macOS, which has no arm64 build). The four zips
+  (`ffmpeg` and `ffprobe` for arm64 and for Intel) hash to the publisher's own `.sha256` files and were re-hashed by
+  downloading; inside, each program is a Mach-O for the right CPU, built for macOS 12 or newer, linking only Apple
+  system libraries (no `/opt/homebrew` or `/usr/local` dylibs), configured with `--enable-gpl --enable-libx264
+  --enable-libmp3lame`, and carrying a code signature load command. The publisher's hash comes from the same host as
+  the file, so it proves the download is intact, not who built it. **Accepted by Rizky on 2026-10-06, for the
+  preview Mac installer only** (see "macOS source" below). Dropping macOS would be deleting the two `darwin-*`
+  lock entries; both stay.
+- What is accepted: a binary we did not build, started by the host as the person's own user with the allowlisted
+  environment, parsing files the person opens in Edit and Meeting. No network is opened by us for it. It is not
+  sandboxed beyond what the OS gives any child of the app.
+- Follow-ups: the installers must carry the GPL source line in their release notes (`ffmpeg-attribution.md`); the
+  macOS programs have not been launched on a Mac, so Gatekeeper and quarantine behaviour of a child program inside
+  an unsigned app is unproven; Martin Riedl stops macOS Intel release builds in January 2027, after which the Intel
+  pin cannot be moved forward.
+
+**macOS source: the decision (Rizky, 2026-10-06).** The macOS builds come from one person's build server that
+ffmpeg.org does not link. Rizky accepted that source for now, because the Mac app is still labelled preview, and
+kept both `darwin-*` lock entries. The record, in full, is in `docs/internal/ffmpeg-attribution.md`; the parts that
+matter to the register:
+
+- Scope: the preview Mac installer only.
+- What the pin proves: the file did not change since it was pinned (size and sha256 are checked before unpacking, and
+  `stage-ffmpeg.mjs --verify` re-hashes the staged folder). It does not prove who built it. The publisher's own
+  `.sha256` comes from the same host as the zip, so it shows the download is intact and nothing more. Nothing
+  sandboxes the programs beyond what macOS gives a child of the app.
+- When the acceptance ends: the Mac app leaves preview, or the publisher's build behind a pinned URL changes (staging
+  fails the hash check).
+- Owed before the Mac app leaves preview: a committed build script that builds FFmpeg from source on Rizky's Mac, our
+  own hashes pinned in the lock, and the same FFmpeg version on Mac and Windows (Windows is 8.1.3, macOS is 9.0.2).
+- Unknown: a quarantined helper inside an un-notarised app may be refused by macOS on first run. The app would say
+  "Reinstall", and reinstalling would not fix it. Not tested; no installer has been opened on a Mac.
+
+**Input limits (review point 3; built 2026-10-06, recorded 2026-10-07; in the tree, not deployed).** On the hosted
+image a tenant chooses the bytes ffmpeg opens, so three limits sit between an upload and the program. Code:
+`packages/host/src/edit/ffmpeg/input-safety.ts`. Tests: `input-safety.test.ts` (18) and `run-input-safety.test.ts`
+(7), which hold the logic with a stubbed ffmpeg, and `packages/host/src/edit/ffmpeg-input-safety-real.test.ts` (18),
+which runs the staged real 8.1.3 programs on small files it generates (mp4, mov, webm, mp3, wav and m4a still probe,
+extract and render; a playlist, a concat script and a metadata file are refused; an address gets no request).
+
+- Protocol whitelist. `runFfmpeg` is the only place either program is spawned (`run.ts:174`). It puts
+  `-protocol_whitelist file,crypto,data` before every `-i` (first for ffprobe) and drops any whitelist a recipe passed,
+  so no call site can widen it. `http`, `https`, `tcp`, `udp`, `rtp`, `rtsp` and the rest are not allowed. It applies
+  on every desk, hosted or not.
+- Format gate. After the probe, an upload whose `format_name` is `hls`, `applehttp`, `concat`, `sdp`, `rtsp`, `rtp`,
+  `ffmetadata`, `data` or `dash` is refused with `400 unsupported_media` in the run's language (`mediaFormatRefused`,
+  `packages/core/src/mode-messages.ts`). It sits in Edit's `probe` (`recipes.ts:73`) and Meeting's `probeDuration`
+  (`meeting/audio.ts:59`). Edit's import (`handlers/edit.ts:330`) and the generated-media probe (`edit/jobs.ts`)
+  let that refusal through instead of turning it into the generic "could not read" line, and `extractMeetingAudio`
+  refuses a concat script before ffmpeg is asked to read it.
+- Timeout caps. The length a file declares is believed only up to six hours (`MAX_MEDIA_SECONDS`, the longest Meeting
+  reads: 36 chunks of ten minutes), so a forged duration cannot buy a timeout of days. On a hosted server only: an
+  analysis step stops at one hour, a render at two (`renderTimeoutMs`), and no single run outlives two hours
+  whatever asked for it (`hostedRunTimeoutMs`, `run.ts:180`), which also covers a recipe added later. A desk keeps
+  its old timeouts exactly. The point is the two ffmpeg slots (`DEFAULT_MAX_FFMPEG`): one forged file must not hold
+  one for days.
+- Measured finding. ffmpeg and ffprobe 8.1.3-9-g29e619e767 already refuse an address named inside a local HLS or SDP
+  file by themselves: a local file's default whitelist is `file,crypto,data`. Re-measured on 2026-10-07 with a
+  loopback server and ffprobe with no whitelist given: the HLS playlist printed "Protocol 'http' not on whitelist
+  'file,crypto,data'", the SDP file printed the same for `rtp`, and the server saw no request in either case. The
+  earlier pass reported the same for DASH; the hand-written manifest used on 2026-10-07 failed as invalid data and
+  made no request, so it does not confirm the reason for DASH. So the flag adds nothing for those formats. Its effect shows
+  with an input that is itself an address: `ffmpeg -i http://127.0.0.1:<port>/x.mp4` made 1 request when run
+  directly and 0 through `runFfmpeg` (`ffmpeg-input-safety-real.test.ts`, the control test and the two after it). The
+  path guard (`assertExistingInput`) already keeps recipes from passing an address, so the flag is a second lock on
+  the same door.
+- Residual. ffmpeg reads an `ffconcat` script with `safe=1`, which allows only relative file names beside the script
+  or below it. If the format gate were bypassed (a file the probe names one way and the run reads another), a script
+  could make ffmpeg read other files of the same tenant in that folder. It could not reach another tenant's folder
+  or an address, because the whitelist is `file` only and uploads are stored per tenant. The gate refuses the format
+  at the probe, so this stays closed unless detection differs between the probe and the run. Do not remove the gate
+  as redundant.

@@ -29,11 +29,12 @@ import { redirectErrorReason } from "../flows/reasons";
 import { verifyLoginOtp } from "../otp/verify";
 import { OTP_TTL_MINUTES } from "../otp/send";
 import { normaliseEmail } from "../crypto";
-import { versionIsLive, webSessionCookieFor } from "../flows/web-session";
+import { mustChangePasswordFirst, versionIsLive, webSessionCookieFor } from "../flows/web-session";
 import { boundedField, stringField } from "../security/body";
 import { redirectResponse } from "../security/headers";
 import type { WebSession } from "../security/web-session";
 import type { PortalRequest, PortalResponse, PortalRoute } from "../server";
+import { handleChangeStep, handlePasswordStep, passwordEntryResponse, type PasswordSpec } from "./password-flow";
 import {
   codeEntryResponse,
   emailEntryResponse,
@@ -56,6 +57,9 @@ const EMAIL_PATH = "/authorize/email";
 const INVITE_PATH = "/authorize/invite";
 const INVITE_RESEND_PATH = "/authorize/invite/resend";
 const VERIFY_PATH = "/authorize/verify";
+/** Password sign-in (`PORTAL_SIGNIN_MODE=password`) has these two posts instead of the four above. */
+const PASSWORD_PATH = "/authorize/password";
+const PASSWORD_CHANGE_PATH = "/authorize/password/change";
 
 const CLIENT_ERROR_COPY: Readonly<Record<string, string>> = Object.freeze({
   invalid_request: "error.badRequest",
@@ -101,6 +105,16 @@ function specFor(params: AuthorizeParams, tenantId: string): SignInSpec {
   };
 }
 
+/** The same, for the password sign-in's two posts. Built only after `checkClient` has returned ok. */
+function passwordSpecFor(params: AuthorizeParams, tenantId: string): PasswordSpec {
+  return {
+    requiredTenantId: tenantId,
+    paths: { password: PASSWORD_PATH, change: PASSWORD_CHANGE_PATH },
+    hidden: hiddenFor(params),
+    formActionOrigins: clientFormAction(params),
+  };
+}
+
 function paramsFromFields(fields: Readonly<Record<string, unknown>>): AuthorizeParams {
   return readAuthorizeParams({
     get: (name) => {
@@ -111,6 +125,23 @@ function paramsFromFields(fields: Readonly<Record<string, unknown>>): AuthorizeP
 }
 
 export function authorizeRoutes(runtime: PortalRuntime): readonly PortalRoute[] {
+  if (runtime.config.signInMode === "password") {
+    // The e-mail, invite and verify posts are not registered at all, so they answer as any other
+    // path that does not exist: the server's own 404.
+    return [
+      { method: "GET", path: "/authorize", handle: (request) => getAuthorize(runtime, request) },
+      {
+        method: "POST",
+        path: PASSWORD_PATH,
+        handle: (request) => authorizePost(runtime, request, (flow) => postPassword(runtime, flow)),
+      },
+      {
+        method: "POST",
+        path: PASSWORD_CHANGE_PATH,
+        handle: (request) => authorizePost(runtime, request, (flow) => postPasswordChange(runtime, flow)),
+      },
+    ];
+  }
   return [
     { method: "GET", path: "/authorize", handle: (request) => getAuthorize(runtime, request) },
     {
@@ -162,6 +193,9 @@ async function getAuthorize(runtime: PortalRuntime, request: PortalRequest): Pro
     // an error nobody can act on. A removed member is then told what any stranger is told.
   }
 
+  if (runtime.config.signInMode === "password") {
+    return passwordEntryResponse(runtime, context, passwordSpecFor(params, client.tenantId));
+  }
   return emailEntryResponse(runtime, context, specFor(params, client.tenantId));
 }
 
@@ -170,6 +204,7 @@ interface AuthorizeFlow {
   readonly fields: Readonly<Record<string, unknown>>;
   readonly params: AuthorizeParams;
   readonly spec: SignInSpec;
+  readonly password: PasswordSpec;
 }
 
 /**
@@ -199,7 +234,38 @@ async function authorizePost(
   if (!client.ok) {
     return htmlError(context, CLIENT_ERROR_COPY[client.reason]);
   }
-  return handle({ context, fields: body.fields, params, spec: specFor(params, client.tenantId) });
+  return handle({
+    context,
+    fields: body.fields,
+    params,
+    spec: specFor(params, client.tenantId),
+    password: passwordSpecFor(params, client.tenantId),
+  });
+}
+
+/**
+ * `POST /authorize/password`: the password sign-in's whole first step. A person who is in goes down
+ * exactly the road a verified e-mailed code does -- `completeSignIn`: the login gate (seat cap,
+ * disabled, past due), an authorization code, the portal's own session cookie, the 302 -- so what the
+ * app receives is the same and needs no new trust decision.
+ */
+async function postPassword(runtime: PortalRuntime, flow: AuthorizeFlow): Promise<PortalResponse> {
+  const step = await handlePasswordStep(runtime, flow.context, flow.password, flow.fields);
+  if (step.kind === "response") {
+    return step.response;
+  }
+  const done = await completeSignIn(runtime, flow.context, flow.params, step.tenantId, step.user.id);
+  return done ?? htmlError(flow.context, "error.generic", { status: 500 });
+}
+
+/** `POST /authorize/password/change`: the forced change, and the same tail once it holds. */
+async function postPasswordChange(runtime: PortalRuntime, flow: AuthorizeFlow): Promise<PortalResponse> {
+  const step = await handleChangeStep(runtime, flow.context, flow.password, flow.fields);
+  if (step.kind === "response") {
+    return step.response;
+  }
+  const done = await completeSignIn(runtime, flow.context, flow.params, step.tenantId, step.user.id);
+  return done ?? htmlError(flow.context, "error.generic", { status: 500 });
 }
 
 async function postVerify(runtime: PortalRuntime, flow: AuthorizeFlow): Promise<PortalResponse> {
@@ -277,6 +343,11 @@ async function completeSignIn(
     }
     const user = await ops.users.findById(userId);
     if (!user) {
+      return { kind: "unknown_user" as const };
+    }
+    // A cookie is not a way past the forced change: a person still owed a new password is shown the
+    // form (password mode only; a sign-in that has just proved the password is never in this branch).
+    if (options.resume && (await mustChangePasswordFirst(runtime, ops, userId))) {
       return { kind: "unknown_user" as const };
     }
     const gate = await runBrowserLoginGate(ops, { tenantId, user, installId });

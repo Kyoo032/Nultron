@@ -82,6 +82,15 @@ const MAIL_FAILED_EXIT = 7;
 async function main(): Promise<void> {
   const args = parseInviteArgs(process.argv.slice(2));
   const config = loadConfig();
+  if (config.signInMode === "password") {
+    // An invite is the e-mailed-code sign-in's first door, and that sign-in does not exist here.
+    console.error(
+      "Refused: this portal signs people in with a username and a password (PORTAL_SIGNIN_MODE=password), so\n" +
+        "there is no invite to issue and no e-mail goes out. Make the person with:\n\n" +
+        "    portal.sh account create --username <name> --email <address>",
+    );
+    process.exit(3);
+  }
   await mkdir(config.dataDir, { recursive: true });
 
   await migrateAsOwner(config);

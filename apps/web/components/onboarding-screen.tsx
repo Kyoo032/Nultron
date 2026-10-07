@@ -10,6 +10,7 @@ import { OnboardingDesks } from "@/components/onboarding-desks";
 import { apiFetch, checkGateway, isElectron } from "@/lib/api-client";
 import { useMayChangeCompanyKey } from "@/lib/company-key-access";
 import { fetchEditDoctor, type EditDoctor } from "@/lib/edit-client";
+import { onboardingFfmpegLaterKey } from "@/lib/ffmpeg-notice-copy";
 import { publishGate } from "@/lib/gate-state";
 import {
   gatewayReasonKey,
@@ -301,7 +302,9 @@ export function OnboardingScreen({ onDone, gateway, onLater, initialStep }: Prop
               {needsFfmpeg && doctor ? (
                 <>
                   <FfmpegSetupNotice doctor={doctor} onDoctor={setDoctor} variant="full" />
-                  <p className="px-4 py-2 text-xs text-[var(--text-2)]">{t("onboarding.ffmpegLater")}</p>
+                  <p className="px-4 py-2 text-xs text-[var(--text-2)]">
+                    {t(onboardingFfmpegLaterKey(doctor), { productName })}
+                  </p>
                 </>
               ) : null}
               <ComponentSetupPanel view={componentSetup} />

@@ -1,7 +1,17 @@
+import { isBinaryArtifactMime } from "@agentforge/core/artifacts";
 import type { ArtifactMode, ArtifactRecord, ArtifactSummary } from "@agentforge/core/artifacts";
 import { apiFetch, isElectron } from "./api-client";
 
 export type { ArtifactMode, ArtifactRecord, ArtifactSummary };
+
+/**
+ * The artifacts whose body is text. A "use a saved result as source" picker fills a text box with the
+ * body, and a Word, Excel or PowerPoint artifact is stored as base64: it would arrive as a megabyte of
+ * noise. Those files are for Download, not for the source box.
+ */
+export function textArtifacts(items: readonly ArtifactSummary[]): ArtifactSummary[] {
+  return items.filter((item) => !isBinaryArtifactMime(item.mime));
+}
 
 function errorMessage(payload: unknown, fallback: string): string {
   if (payload && typeof payload === "object") {

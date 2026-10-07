@@ -107,6 +107,22 @@ export async function saveMedia(
   return row;
 }
 
+/**
+ * What a stored media row says about itself (its kind and stored size), without reading its bytes.
+ * Scoped to the organization like `readMediaDataUrl`: another organization's id answers null.
+ */
+export async function statMedia(
+  tenant: TenantContext,
+  mediaId: string,
+): Promise<{ kind: string; sizeBytes: number } | null> {
+  const rows = await db
+    .select({ kind: media.kind, sizeBytes: media.sizeBytes })
+    .from(media)
+    .where(and(eq(media.organizationId, tenant.organizationId), eq(media.id, mediaId)))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export async function readMediaDataUrl(tenant: TenantContext, mediaId: string): Promise<string | null> {
   const rows = await db
     .select()

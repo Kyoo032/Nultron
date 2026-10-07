@@ -22,6 +22,18 @@ export type RuntimeEvent =
   | { type: "tool.started"; toolKey: string; input: unknown }
   | { type: "tool.completed"; toolKey: string; output: unknown }
   | { type: "run.failed"; message: string }
+  /**
+   * The tool loop used all `steps` model calls it was allowed and the last one asked for tools, so no
+   * closing answer followed. Sent once, just before `run.completed`. A caller that does not care ignores it.
+   */
+  | { type: "run.step_limit"; steps: number }
+  /**
+   * A model call failed after at least one tool had completed. The turn is kept, because a completed
+   * tool's side effects must not be lost or run again, so the run still ends in `run.completed`; this
+   * says why no answer followed (`message` is the failure, already in the run's language). Sent once,
+   * just before `run.completed`, never together with `run.failed`. A caller that does not care ignores it.
+   */
+  | { type: "run.interrupted"; message: string }
   | { type: "run.completed"; runId: string; usage?: RunUsage };
 
 export type AgentRuntime = {

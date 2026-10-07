@@ -43,7 +43,7 @@ Seven routes, all `POST` (`packages/host/src/router.ts:296-302`):
 
 | Route | Handler | Gate | Live runtime |
 |---|---|---|---|
-| `/api/v1/finance` | `handlePostFinance` (`packages/host/src/handlers/finance.ts:13`) | yes (`:17`) | yes |
+| `/api/v1/finance` | `handlePostFinance` (`packages/host/src/handlers/finance.ts:14`) | yes (`:17`) | yes |
 | `/api/v1/finance/stream` | `handlePostFinanceStream` (`:29`) | yes (`:33`) | yes |
 | `/api/v1/finance/parse` | `handlePostFinanceParse` (`:49`) | yes (`:53`) | yes |
 | `/api/v1/finance/regenerate` | `handlePostFinanceRegen` (`:61`) | yes (`:65`) | yes |
@@ -156,7 +156,7 @@ The registry renders it (`packages/host/src/renderers/registry.ts:22-28`): `xlsx
 
 | Case | Where | Result |
 |---|---|---|
-| Gate closed | `requireGatewayAllowedFor`, `packages/host/src/handlers/finance.ts:17, 32, 52, 64` | 403 `gateway_blocked`; `/export`, `/docx` and `/import` are **deliberately** not gated — they never reach the gateway and a closed gate must not stop the owner reading or exporting their own files. Each handler says so; `handlers/finance-gate.test.ts` pins it |
+| Gate closed | `requireGatewayAllowedFor`, `packages/host/src/handlers/finance.ts:18, 32, 52, 64` | 403 `gateway_blocked`; `/export`, `/docx` and `/import` are **deliberately** not gated — they never reach the gateway and a closed gate must not stop the owner reading or exporting their own files. Each handler says so; `handlers/finance-gate.test.ts` pins it |
 | Task not built | `requireFinanceTask`, `packages/host/src/finance-task.ts:55-61` | 400 `finance_task_unavailable` — unreachable today, all five ship |
 | No key / stub runtime | `requireLive`, `packages/host/src/finance-tasks/live.ts:47-57` | `/parse`, `/finance`, `/regenerate`: **503** `runtime_stub`. `/finance/stream`: **200** with one `job.error` frame carrying `status: 503` |
 | Brief has no digit and no currency token | `briefLooksLikeFigures`, `apps/web/lib/finance-brief.ts:11` | no request at all; `finance-error` shows `finance.errors.addItems` (`finance-studio.tsx:226`) |
@@ -176,8 +176,8 @@ The registry renders it (`packages/host/src/renderers/registry.ts:22-28`): `xlsx
 | Posted report oversized / malformed | `readPostedFinanceReport`, `packages/host/src/finance-tasks/report-schema.ts:74-80` | **413** / 400 `invalid_request` |
 | `pdf` export | `packages/host/src/renderers/registry.ts:18-20` | 501 `format_unavailable` |
 | Artifact could not be saved | `persistBrief`, `packages/host/src/finance-generate.ts:150-170` | `log.warn`, `artifactId: null`, run still succeeds |
-| Client cancels | `throwIfJobAborted`, `packages/host/src/job-stream.ts:19` | 499 `aborted`; `useJobStream` resets quietly |
-| DOCX brief malformed | `packages/host/src/handlers/finance.ts:81-83` | 400 `invalid_request` — reachable **without** a key |
+| Client cancels | `throwIfJobAborted`, `packages/host/src/job-stream.ts:20` | 499 `aborted`; `useJobStream` resets quietly |
+| DOCX brief malformed | `packages/host/src/handlers/finance.ts:90-92` | 400 `invalid_request` — reachable **without** a key |
 
 ## Where things live
 

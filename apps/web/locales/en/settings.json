@@ -70,6 +70,7 @@
   "reset.eraseAccountSubmit": "Permanently erase company account",
   "reset.eraseAccountWorking": "Erasing…",
   "reset.eraseAccountForbidden": "Only an owner of this company can erase it. Ask an owner to do it.",
+  "reset.eraseAccountShared": "This server holds several companies under one account, so an erase from here would delete all of them. Nothing has been deleted. Ask the operator of this server to erase this company.",
   "reset.eraseAccountDone": "The company account has been erased. You are being signed out.",
   "storage.heading": "Storage",
   "storage.help": "How much space this account is using, and what is using it.",

@@ -26,7 +26,13 @@ export {
   type RateLimiterOptions,
   type RateLimitVerdict,
 } from "./rate-limit";
-export { clientIp, rateLimitKey, type ClientIpInput } from "./client-ip";
+export { clientIp, rateLimitKey, sourceBucket, type ClientIpInput } from "./client-ip";
+export {
+  createPasswordAttempts,
+  PASSWORD_ATTEMPT_WINDOW_MS,
+  type PasswordAttempts,
+  type PasswordAttemptsOptions,
+} from "./password-attempts";
 export { htmlResponse, redirectResponse, HTML_SECURITY_HEADERS, type HtmlResponseOptions } from "./headers";
 export {
   boundedField,

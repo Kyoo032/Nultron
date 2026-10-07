@@ -1,25 +1,14 @@
-import {
-  DEFAULT_OPENAI_BASE_URL,
-  isLoopbackHost,
-  localMediaId,
-  type ContentPart,
-  type TenantContext,
-} from "@agentforge/core";
+import { localMediaId, type ContentPart, type TenantContext } from "@agentforge/core";
 
-/** Local files can be inlined for Ollama; a remote gateway cannot fetch loopback and may reject data URLs. */
-export function shouldInlineLocalMediaForProvider(baseUrl?: string): boolean {
-  const raw = (baseUrl || DEFAULT_OPENAI_BASE_URL).trim();
-  try {
-    return isLoopbackHost(new URL(raw).hostname);
-  } catch {
-    return false;
-  }
-}
-
-export async function inlineLocalMediaParts(
-  tenant: TenantContext,
-  parts: ContentPart[],
-): Promise<ContentPart[]> {
+/**
+ * Job modes: swap each stored `/api/v1/media/<id>/file` image for its bytes, so the model receives the
+ * picture. Chat does the same through `chat-image-history.ts`, which also bounds the request.
+ *
+ * No gateway can open this machine's media URL, and nothing here asks whether the provider is on
+ * loopback: every provider gets bytes. (Until 2026-10-06 Chat only inlined for loopback, on the guess
+ * that a remote gateway "may reject data URLs", and sent a sentence in place of the image otherwise.)
+ */
+export async function inlineLocalMediaParts(tenant: TenantContext, parts: ContentPart[]): Promise<ContentPart[]> {
   const next: ContentPart[] = [];
   for (const part of parts) {
     if (part.type !== "image_url") {
@@ -33,11 +22,7 @@ export async function inlineLocalMediaParts(
     }
     const { readMediaDataUrl } = await import("./media");
     const dataUrl = await readMediaDataUrl(tenant, id);
-    next.push(
-      dataUrl
-        ? { type: "image_url", image_url: { ...part.image_url, url: dataUrl } }
-        : part,
-    );
+    next.push(dataUrl ? { type: "image_url", image_url: { ...part.image_url, url: dataUrl } } : part);
   }
   return next;
 }

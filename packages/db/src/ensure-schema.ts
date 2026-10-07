@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type Database from "better-sqlite3";
+import { isServerMode } from "@agentforge/core";
 
 const MIGRATIONS_TABLE = "__drizzle_migrations";
 
@@ -697,6 +698,18 @@ function ensureArtifactTables(sqlite: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS artifacts_ws_mode_idx ON artifacts (workspace_id, mode, created_at);
   `);
+  // Not a data shape: the way the hosted storage quota reads what a tenant's saved results hold
+  // (packages/host/src/tenant-storage-store.ts, TENANT_ARTIFACT_USE_SQL). A deck row carries a body of
+  // megabytes, and size_bytes comes after it in the record, so reading it from the row walks every
+  // overflow page of the body (about 2 seconds for 100 decks, with the host stopped). This index holds
+  // the column beside the desk id and answers the sum without opening a row. Server mode only, because
+  // only the hosted quota reads it: a desk has no ceiling, its schema stays what it was, and its first
+  // open after an update does not read every artifact row to build an index nothing uses. It is created
+  // here, on every open, rather than in a numbered migration: it changes no row, it is safe to run
+  // twice, and it needs no slot in the journal that other branches are also adding to.
+  if (isServerMode()) {
+    sqlite.exec("CREATE INDEX IF NOT EXISTS artifacts_ws_size_idx ON artifacts (workspace_id, size_bytes)");
+  }
 }
 
 function tableColumns(sqlite: Database.Database, table: string): string[] {

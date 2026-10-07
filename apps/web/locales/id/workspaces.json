@@ -20,10 +20,12 @@
   "currentPrefix": "Saat ini · ",
   "deleteConfirm": "Ini menghapus meja, percakapan, Basis Pengetahuan, dan kunci tersimpan dari mesin ini. Ketik {name} untuk mengonfirmasi.",
   "deleteDesk": "Hapus meja",
+  "deleteRestricted": "Hanya pemilik atau admin yang dapat menghapus meja.",
   "errors": {
     "create": "Ruang kerja tidak dapat dibuat",
     "update": "Ruang kerja tidak dapat diperbarui",
     "delete": "Ruang kerja tidak dapat dihapus",
+    "deleteForbidden": "Hanya pemilik atau admin yang dapat menghapus meja.",
     "protected": "Meja Default tidak dapat dihapus",
     "confirmName": "Ketik nama meja untuk mengonfirmasi penghapusan"
   },

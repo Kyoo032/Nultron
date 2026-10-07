@@ -361,6 +361,22 @@ to the seat cap. `portal.sh otp` is refused on purpose: manual one-time codes ne
 `PORTAL_ALLOW_MANUAL_OTP=1`, which the production portal will not boot with (SR-10), and the owner decided
 mail goes through SES.
 
+**Signing in with a username and a password instead (owner decision 2026-10-07, for one white-label deployment).**
+Put `PORTAL_SIGNIN_MODE=password` in `portal.env` (the commented line in `portal.env.example`) and recreate the
+portal. Then no e-mail is ever sent, the `PORTAL_SMTP_*` settings are not needed to boot, the e-mail, invite and
+code routes answer 404, and nobody signs themselves up: an operator makes each person with
+`sh scripts/portal.sh account create --username <name> --email <address> --role owner|admin|member`, which
+prints a generated initial password **once** (give it to the person; they must choose their own before the
+portal lets them in). `account list` (which also shows how many times each account was locked in the last 24 hours),
+`reset-password`, `disable`, `enable` and `set-role` do the rest; `disable`, `reset-password` and a `create` that
+gives a password to somebody who already exists end every session the person holds, and `create` and `enable`
+refuse when the org has no seat left. For the owner `seed` made, who has no password yet, `account create --email <that address>` gives
+them one and keeps their role. `portal.sh invite` and `otp` refuse in this mode. Five wrong passwords lock an
+account for 15 minutes, and an address that has not itself failed against that person can still take three more
+attempts under the lock (eight a window at most). A second factor is being designed and is **not built**, and there is no self-service
+reset: a forgotten password is `reset-password`. The app needs no setting for any of this; it asks the portal.
+Spec and residual risks: `docs/internal/portal/device-code-login.md` ("Password sign-in") and SR-165.
+
 Check it from outside, not from the box:
 
 ```sh

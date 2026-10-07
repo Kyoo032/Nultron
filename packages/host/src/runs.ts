@@ -1,10 +1,11 @@
 import {
   assertAgentSupportsModality,
-  assertModelSupportsModality,
+  assertChatModelAcceptsModality,
   createRuntime,
   encodeSse,
   harnessSpecFor,
   redactSecrets,
+  redactSecretsDeep,
   abortErrorMessage,
   isDefaultChatAgent,
   parseImageRunInput,
@@ -17,15 +18,15 @@ import {
   hasModelVisibleContent,
   modelHistoryParts,
   redactAttachedParts,
+  attachmentsAsMentions,
   takeLastToolIo,
-  resolvedGatewayBaseUrl,
-  resolveProviderKeys,
   type ContentPart,
   type InputModality,
   type TenantContext,
   type ToolBindingRecord,
   type ToolCallPart,
   withChatOutputLanguage,
+  withoutDisabledToolSentences,
   bindingsForChatModality,
   chatTurnCopy,
   settleChatTurn,
@@ -48,17 +49,21 @@ import {
   listMessages,
   setThreadTitleFromParts,
 } from "./threads";
+import { redactToolEvent } from "./chat-tool-events";
 import { ensureToolsRegistered } from "./register-tools";
 import { recordChatRunUsage } from "./usage-record";
 import { loadSettings, loadUserLocale } from "./settings-store";
 import { defaultSelectableModel, listSelectableModels } from "./selectable-models";
 import { collectToolMediaParts } from "./tool-media";
-import { inlineLocalMediaParts, shouldInlineLocalMediaForProvider } from "./inline-local-media";
+import { assertChatImagesSendable, prepareChatImageHistory, type ChatTurn } from "./chat-image-history";
 import { saveGeneratedImage, saveGeneratedVideo } from "./media";
 import { getRunContext, hostedRequestLocale, localeForRun, withRunContext } from "./run-context";
 import { withToolRun } from "./tool-run-context";
 import { formatPastSessionsHint } from "./session-recall";
 import { log } from "./log";
+
+/** The longest reason the closing sentence of an interrupted turn carries: a failure's headline, not a stack. */
+const INTERRUPTED_REASON_MAX = 400;
 
 const parsers = {
   text: parseTextRunInput,
@@ -168,13 +173,18 @@ export async function* startModalityRun(options: {
   // someone who never chose (`sessionLocale`), so Chat answers in the language the screen is in. Off
   // server mode no request locale is set and this is `loadUserLocale`, exactly as before.
   const locale = hostedRequestLocale() ?? loadUserLocale(options.tenant);
+  // The model is only told about tools this run offers: a tool that is off (code runs on the hosted
+  // server, or turned off in Settings) loses its sentence in the prompt, so it is not invited to call it.
+  const agentPrompt = withoutDisabledToolSentences(published.version.systemPrompt, settings.disabledTools ?? []);
   const version = {
     ...published.version,
     model,
-    systemPrompt: withChatOutputLanguage(published.version.systemPrompt + pastHint + knowledge.prompt, locale),
+    systemPrompt: withChatOutputLanguage(agentPrompt + pastHint + knowledge.prompt, locale),
   };
   assertAgentSupportsModality(published.version.inputModalities, options.modality);
-  assertModelSupportsModality(version.model, options.modality);
+  // An image goes to any model not known to be text-only; a model we have no line for is tried, and
+  // refused by the gateway in words if it cannot (`chat-image-history.ts`, `image-input.ts`).
+  assertChatModelAcceptsModality(version.model, options.modality);
 
   const queue = new StringQueue();
   let queueClosed = false;
@@ -233,6 +243,11 @@ export async function* startModalityRun(options: {
     modelAbort.abort(options.abortSignal?.reason);
   };
   options.abortSignal?.addEventListener("abort", onClientAbort, { once: true });
+  // A disconnect that landed while the thread, the model list and the knowledge were being read has
+  // already fired: an aborted signal never calls a listener added after the fact.
+  if (options.abortSignal?.aborted) {
+    onClientAbort();
+  }
 
   const work = (async () => {
     let assistantText = "";
@@ -241,6 +256,10 @@ export async function* startModalityRun(options: {
     const mediaParts: ContentPart[] = [];
     const toolTrace: ToolCallPart[] = [];
     let persisted = false;
+    // Set when the runtime says the tool loop used every step and the last one was still working.
+    let stepLimitReached = false;
+    // Set when a model call failed after a tool had completed: the turn is kept, and this is the reason.
+    let interruptedReason = "";
     let runUsage: Record<string, unknown> | null = null;
     let settledRunMetered = false;
     /**
@@ -265,6 +284,8 @@ export async function* startModalityRun(options: {
         offeredSources: knowledge.chunks.length,
         tools: toolTrace,
         locale: replyLocale,
+        stepLimit: stepLimitReached,
+        interrupted: interruptedReason,
       });
       if (settled.appended) {
         send({ type: "assistant.delta", text: settled.appended });
@@ -289,8 +310,16 @@ export async function* startModalityRun(options: {
       return true;
     };
     try {
+      // A picture that cannot be sent is refused before the message is stored, so the refusal does not
+      // leave a bubble with no answer. This reads each image's row, not its bytes; the run reads those.
+      await assertChatImagesSendable(options.tenant, userParts, { locale });
       await insertMessage(options.tenant, thread.id, "user", userParts);
-      await setThreadTitleFromParts(options.tenant, thread.id, userParts);
+      // The title names an attached file, never starts with its text or the host's notes about it.
+      await setThreadTitleFromParts(
+        options.tenant,
+        thread.id,
+        userParts.map((part) => (part.type === "text" ? { ...part, text: attachmentsAsMentions(part.text) } : part)),
+      );
       const run = await insertRun(options.tenant, thread.id, published.version.id, options.modality);
       runId = run.id;
       if (settled) {
@@ -299,10 +328,7 @@ export async function* startModalityRun(options: {
         return;
       }
       const historyRows = await listMessages(options.tenant, thread.id);
-      const inlineLocal = shouldInlineLocalMediaForProvider(
-        resolveProviderKeys(settings).openaiBaseUrl || resolvedGatewayBaseUrl(),
-      );
-      const history: Array<{ role: "user" | "assistant"; parts: ContentPart[] }> = [];
+      const storedHistory: ChatTurn[] = [];
       for (const row of historyRows) {
         if (row.role !== "user" && row.role !== "assistant") {
           continue;
@@ -311,15 +337,11 @@ export async function* startModalityRun(options: {
         if (row.role === "assistant" && !hasModelVisibleContent(parts)) {
           continue;
         }
-        const historyParts = modelHistoryParts(parts);
-        history.push({
-          role: row.role as "user" | "assistant",
-          parts:
-            row.role === "user" && inlineLocal
-              ? await inlineLocalMediaParts(options.tenant, historyParts)
-              : historyParts,
-        });
+        storedHistory.push({ role: row.role as "user" | "assistant", parts: modelHistoryParts(parts) });
       }
+      // Images leave as bytes, within one budget, or the person is told why they cannot. A stored
+      // `/api/v1/media/...` reference is never handed on: no remote model can open it.
+      const history = await prepareChatImageHistory(options.tenant, storedHistory, { model, locale });
       const runtime = createRuntime(settings);
       send({ type: "run.started", runId: run.id });
 
@@ -375,41 +397,56 @@ export async function* startModalityRun(options: {
               send(event);
               return;
             }
-            send(event);
+            if (event.type === "run.step_limit") {
+              // Not a frame for the screen: it decides the closing sentence `persistAssistant` adds.
+              stepLimitReached = true;
+              return;
+            }
+            if (event.type === "run.interrupted") {
+              // Same: not a frame, the closing sentence. The reason is a failure's text, so it is masked
+              // like `run.failed`'s, and held to one short paragraph.
+              interruptedReason = redactSecrets(event.message).trim().slice(0, INTERRUPTED_REASON_MAX);
+              return;
+            }
+            // What leaves the runtime (the screen, the thread, the tool rows) is the redacted copy of a
+            // tool's input and output. `event` stays the runtime's own: media is read from it below.
+            const safe = redactToolEvent(event);
+            send(safe);
             if (event.type === "assistant.delta") {
               assistantText += event.text;
             }
             if (event.type === "assistant.thinking") {
               thinkingText += event.text;
             }
-            if (event.type === "tool.started") {
+            if (safe.type === "tool.started") {
               toolTrace.push({
                 type: "tool_call",
-                toolKey: event.toolKey,
+                toolKey: safe.toolKey,
                 status: "started",
-                input: event.input,
+                input: safe.input,
               });
-              await insertToolInvocation(options.tenant, run.id, event.toolKey, event.input, null, "started");
+              await insertToolInvocation(options.tenant, run.id, safe.toolKey, safe.input, null, "started");
             }
-            if (event.type === "tool.completed") {
+            if (safe.type === "tool.completed" && event.type === "tool.completed") {
               const recorded = takeLastToolIo(event.toolKey);
-              const persistOutput = recorded?.full ?? event.output;
+              const fullOutput = recorded?.full ?? event.output;
+              const persistOutput = redactSecretsDeep(fullOutput);
               const last = [...toolTrace]
                 .reverse()
-                .find((item) => item.toolKey === event.toolKey && item.status === "started");
+                .find((item) => item.toolKey === safe.toolKey && item.status === "started");
               if (last) {
                 last.status = "completed";
-                last.output = event.output;
+                last.output = safe.output;
               } else {
                 toolTrace.push({
                   type: "tool_call",
-                  toolKey: event.toolKey,
+                  toolKey: safe.toolKey,
                   status: "completed",
-                  output: event.output,
+                  output: safe.output,
                 });
               }
-              await insertToolInvocation(options.tenant, run.id, event.toolKey, null, persistOutput, "completed");
-              for (const part of collectToolMediaParts(persistOutput)) {
+              await insertToolInvocation(options.tenant, run.id, safe.toolKey, null, persistOutput, "completed");
+              for (const part of collectToolMediaParts(fullOutput)) {
                 // Every generated URL is mirrored into the local store first: the renderer
                 // only loads host-served media, so a part we cannot mirror is dropped
                 // rather than persisted as a remote URL that would never display.
@@ -460,7 +497,9 @@ export async function* startModalityRun(options: {
             chatWorkCard({
               threadId: thread.id,
               title: fresh?.title ?? "",
-              userText,
+              // An attached file is named in the card, not carried into it: its text is in the person's
+              // own private desk copy, and this card is read from the desk-wide Knowledge Base.
+              userText: attachmentsAsMentions(userText),
               assistantText,
               model,
             }),

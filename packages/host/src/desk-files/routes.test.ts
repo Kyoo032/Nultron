@@ -10,7 +10,7 @@ import { MAX_FILE_BYTES } from "@agentforge/core/tools/files";
 import { mediaRoot } from "../media-root";
 import { forgetTenantJobBytes, resetObjectStoreForTests } from "../tenant-storage";
 import "../tenant-storage-db";
-import type { HostJsonResult, HostRequest } from "../types";
+import type { HostJsonResult, HostRequest, HostResult } from "../types";
 import { DESK_FILE_ROUTES } from "./routes";
 
 process.env.AGENTFORGE_SECRETS_KEY = "3f8a1c05d97e26b4084fa3c1e5d7290b6c48af13e02d95b7ca6318fd4e7092a5";
@@ -81,10 +81,11 @@ afterAll(() => {
 });
 
 describe("the route table", () => {
-  it("is exactly the seven verbs, none of them by id", () => {
+  it("is exactly the eight verbs, none of them by id", () => {
     expect(DESK_FILE_ROUTES.map(([method, path]) => `${method} ${path}`)).toEqual([
       "GET /api/v1/files",
       "GET /api/v1/files/content",
+      "GET /api/v1/files/download",
       "GET /api/v1/files/versions",
       "GET /api/v1/files/version",
       "POST /api/v1/files",
@@ -178,6 +179,7 @@ describe("another tenant's files", () => {
   const probes: Array<[string, string, string, (path: string) => Partial<HostRequest>]> = [
     ["read", "GET", "/api/v1/files/content", (path) => ({ query: { path } })],
     ["history", "GET", "/api/v1/files/versions", (path) => ({ query: { path } })],
+    ["download", "GET", "/api/v1/files/download", (path) => ({ query: { path } })],
     ["one version", "GET", "/api/v1/files/version", (path) => ({ query: { path, version: "1" } })],
     ["revert", "POST", "/api/v1/files/revert", (path) => ({ body: { path, version: 1 } })],
     ["delete", "DELETE", "/api/v1/files", (path) => ({ query: { path } })],
@@ -224,6 +226,124 @@ describe("another tenant's files", () => {
   });
 });
 
+describe("downloading a file", () => {
+  const withSession = (who: Who) => ({
+    session: { id: who.id, tenantId: who.tenantId, orgId: who.orgId, userId: who.userId },
+  });
+
+  function download(who: Who | null, path: string): Promise<HostResult> {
+    return handlerFor(
+      "GET",
+      "/api/v1/files/download",
+    )({
+      method: "GET",
+      path: "/api/v1/files/download",
+      query: { path },
+      params: {},
+      headers: {},
+      ...(who ? withSession(who) : {}),
+    });
+  }
+
+  function delivered(result: HostResult): Extract<HostResult, { type: "bytes" }> {
+    if (result.type !== "bytes") {
+      throw new Error(`expected bytes, got ${result.type}: ${JSON.stringify((result as HostJsonResult).body)}`);
+    }
+    return result;
+  }
+
+  const textOf = (result: Extract<HostResult, { type: "bytes" }>) => Buffer.from(result.bytes).toString("utf8");
+
+  it("sends the saved text byte for byte, named by the file and not its folder", async () => {
+    const text = "1. gather\n2. draft, with an accent: é, and a dash –\n";
+    await put(ALPHA, "dl/notes/plan.md", text);
+    const result = delivered(await download(ALPHA, "dl/notes/plan.md"));
+    expect(result.status).toBe(200);
+    expect(result.filename).toBe("plan.md");
+    expect(result.contentType).toBe("text/markdown; charset=utf-8");
+    expect(textOf(result)).toBe(text);
+    expect(result.bytes.byteLength).toBe(Buffer.byteLength(text, "utf8"));
+  });
+
+  it("is an inert attachment: never sniffed, never sandbox-free, never cached", async () => {
+    await put(ALPHA, "dl/headers.md", "# hi\n");
+    const { headers } = delivered(await download(ALPHA, "dl/headers.md"));
+    expect(headers).toEqual({
+      "Content-Disposition": 'attachment; filename="headers.md"',
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "sandbox",
+      // The adapter's default for bytes is an hour of private cache, which would hand back an old
+      // version after an edit. A file the person edits is never served from a cache.
+      "Cache-Control": "no-store",
+    });
+  });
+
+  it("sends the newest version, and nothing once the file is deleted", async () => {
+    await put(ALPHA, "dl/versions.txt", "first");
+    await put(ALPHA, "dl/versions.txt", "second");
+    expect(textOf(delivered(await download(ALPHA, "dl/versions.txt")))).toBe("second");
+    await call(ALPHA, "DELETE", "/api/v1/files", { query: { path: "dl/versions.txt" } });
+    const gone = await download(ALPHA, "dl/versions.txt");
+    expect(gone).toMatchObject({ type: "json", status: 404 });
+  });
+
+  it("names a type for text the browser would not render, and a plain type for a path nobody typed", async () => {
+    await put(ALPHA, "dl/data.csv", "a,b\n1,2\n");
+    await put(ALPHA, "dl/config.json", '{"a":1}');
+    await put(ALPHA, "dl/README", "no extension");
+    expect(delivered(await download(ALPHA, "dl/data.csv")).contentType).toBe("text/csv; charset=utf-8");
+    expect(delivered(await download(ALPHA, "dl/config.json")).contentType).toBe("application/json; charset=utf-8");
+    expect(delivered(await download(ALPHA, "dl/README")).contentType).toBe("text/plain; charset=utf-8");
+  });
+
+  it("never names a renderable type, whatever the file is called, and keeps the file name", async () => {
+    for (const name of ["page.html", "page.htm", "feed.xml"]) {
+      await put(ALPHA, `dl/${name}`, "<script>alert(1)</script>");
+      const result = delivered(await download(ALPHA, `dl/${name}`));
+      expect(result.contentType, name).toBe("application/octet-stream");
+      expect(result.filename, name).toBe(name);
+      expect(textOf(result), name).toBe("<script>alert(1)</script>");
+    }
+  });
+
+  it("builds the file name header the way the adapter does, for a name with spaces and non-Latin-1 text", async () => {
+    await put(ALPHA, "dl/My plan (v2) ☕.md", "x");
+    const result = delivered(await download(ALPHA, "dl/My plan (v2) ☕.md"));
+    expect(result.filename).toBe("My plan (v2) ☕.md");
+    expect(result.headers?.["Content-Disposition"]).toBe(
+      "attachment; filename=\"My plan (v2) _.md\"; filename*=UTF-8''My%20plan%20%28v2%29%20%E2%98%95.md",
+    );
+  });
+
+  it("carries the largest file a desk can hold", async () => {
+    const big = "line of text\n".repeat(Math.floor(MAX_FILE_BYTES / 13));
+    await put(ALPHA, "dl/big.txt", big);
+    const result = delivered(await download(ALPHA, "dl/big.txt"));
+    expect(result.bytes.byteLength).toBe(Buffer.byteLength(big, "utf8"));
+    expect(textOf(result)).toBe(big);
+  });
+
+  it("works in server mode for the signed-in person, and answers 401 with no session", async () => {
+    process.env.AGENTFORGE_SERVER = "1";
+    await put(BETA, "dl/hosted.md", "hosted text");
+    expect(textOf(delivered(await download(BETA, "dl/hosted.md")))).toBe("hosted text");
+    expect(await download(null, "dl/hosted.md")).toMatchObject({
+      type: "json",
+      status: 401,
+      body: { error: { code: "session_required" } },
+    });
+  });
+
+  it("works off the hosted server for the local desk, which a signed-in tenant cannot see", async () => {
+    await call(ALPHA, "POST", "/api/v1/files", {
+      session: undefined,
+      body: { path: "dl/local.md", content: "local desk text" },
+    });
+    expect(textOf(delivered(await download(null, "dl/local.md")))).toBe("local desk text");
+    expect(await download(ALPHA, "dl/local.md")).toMatchObject({ type: "json", status: 404 });
+  });
+});
+
 describe("refusals", () => {
   async function refused(who: Who, method: string, route: string, over: Partial<HostRequest>) {
     const result = await call(who, method, route, over);
@@ -248,6 +368,7 @@ describe("refusals", () => {
   ])("refuses %s as a bad path on every verb that takes one", async (_name, bad) => {
     for (const [method, route, over] of [
       ["GET", "/api/v1/files/content", { query: { path: bad } }],
+      ["GET", "/api/v1/files/download", { query: { path: bad } }],
       ["GET", "/api/v1/files/versions", { query: { path: bad } }],
       ["GET", "/api/v1/files/version", { query: { path: bad, version: "1" } }],
       ["GET", "/api/v1/files", { query: { dir: bad } }],

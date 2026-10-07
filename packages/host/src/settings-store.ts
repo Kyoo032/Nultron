@@ -505,6 +505,46 @@ export function saveSettings(patch: SecretPatch, scope?: SettingsScope): StoredS
   return next;
 }
 
+/** The provider key fields a hosted save carries to a company's other desks (SR-163). Nothing else travels. */
+export type CompanyKeyPatch = Pick<SecretPatch, "openaiApiKey" | "googleApiKey" | "anthropicApiKey" | "volcengineApiKey">;
+
+/**
+ * Hosted only (SR-163, review round). On the server a provider key belongs to the company, not to the
+ * desk it was typed on, and the gateway verdict is the company's too. `saveSettings` writes one desk's
+ * slice, so a key rotated on one desk left the company's other desks on the old key: their fingerprint no
+ * longer matched the company's verdict, they answered `403 gateway_blocked`, and a re-check from one of
+ * them could replace the verdict and close the first. This writes the same key fields to the named desks
+ * in one write, the mirror of `clearGatewayKeyEverywhere(.., { workspaceIds })` for "forget my key".
+ *
+ * The caller names the desks (its own organisation's, never the partner's, so no other company is
+ * touched), and a field the patch leaves undefined is left alone, so only what was typed travels. A desk
+ * keeps no key of its own on the server, which is why this is not offered on a desk: there the owner's
+ * desks are separate on purpose and `saveSettings` stays desk-scoped.
+ */
+export function saveKeysToDesks(keys: CompanyKeyPatch, scope: SettingsScope, workspaceIds: readonly string[]): string[] {
+  const { tenantId } = resolveSettingsScope(scope);
+  const patch: CompanyKeyPatch = {
+    openaiApiKey: keys.openaiApiKey,
+    googleApiKey: keys.googleApiKey,
+    anthropicApiKey: keys.anthropicApiKey,
+    volcengineApiKey: keys.volcengineApiKey,
+  };
+  if (Object.values(patch).every((value) => value === undefined) || workspaceIds.length === 0) {
+    return [];
+  }
+  const file = loadSettingsFile(tenantId);
+  const workspaces: Record<string, StoredSecrets> = { ...file.workspaces };
+  const touched: string[] = [];
+  for (const id of new Set(workspaceIds)) {
+    const next = withGatewayDefault(mergeSecrets(sliceFor(file, id), patch));
+    assertSavedEndpoints(next);
+    workspaces[id] = next;
+    touched.push(id);
+  }
+  persistEncrypted(tenantId, { ...file, version: 2, workspaces });
+  return touched;
+}
+
 /**
  * Move a pre-isolation machine-wide key onto Default. Other desks stay empty until the owner pastes a key there.
  */
@@ -532,19 +572,35 @@ export function adoptLegacySettings(homeWorkspaceId: string): void {
   persistEncrypted(LOCAL_TENANT_ID, { ...file, version: 2, workspaces: rest });
 }
 
+/** The desks a hosted "forget my key" may touch: the caller's company's own. Never passed on a desk. */
+export type ClearKeyWithin = { readonly workspaceIds: readonly string[] };
+
 /**
  * "Start over — key only": drop the gateway key from every desk **of one tenant** in one write.
  *
  * A key saved on a second desk would otherwise keep the app open after the owner asked to forget
  * it, so this covers every desk — but only the caller's tenant, which is what makes it safe to
  * reach in server mode at all. Returns the desks that actually held a key.
+ *
+ * On the hosted server pass `within` (SR-163): the tenant is the partner, and a company is one
+ * organisation inside it, so the desks to clear are the caller's organisation's. The one caller that
+ * leaves it out there is the hosted erase, which is partner-wide by its own design (`tenant-reset.ts`).
  */
-export function clearGatewayKeyEverywhere(scope?: SettingsScope): string[] {
+export function clearGatewayKeyEverywhere(scope?: SettingsScope, within?: ClearKeyWithin): string[] {
   const { tenantId } = resolveSettingsScope(scope);
   const file = loadSettingsFile(tenantId);
+  // SR-163. A hosted tenant is the white-label partner, and every company of the deployment keeps its
+  // desks in the same payload. "Every desk of the tenant" is right on a desk, where it is one person's
+  // machine, and wrong on the server, where it would sign every other company out of the gateway. The
+  // hosted caller names the desks that are its company's; any slice outside them is left byte for byte.
+  const only = within ? new Set(within.workspaceIds) : null;
   const touched: string[] = [];
   const workspaces: Record<string, StoredSecrets> = {};
   for (const [id, slice] of Object.entries(file.workspaces)) {
+    if (only && !only.has(id)) {
+      workspaces[id] = slice;
+      continue;
+    }
     if (slice.openaiApiKey) {
       touched.push(id);
     }

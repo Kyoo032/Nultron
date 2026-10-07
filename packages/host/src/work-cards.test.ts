@@ -107,6 +107,40 @@ describe("work cards", () => {
     expect(card.body.length).toBeLessThan(5_200);
   });
 
+  describe("a chat card does not carry a credential into the Knowledge Base", () => {
+    const KEY = "sk-live-0123456789abcdefABCDEF";
+    const JWT = ["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9", "eyJzdWIiOiIxMjM0NTY3ODkwIn0", "c2lnbmF0dXJlLXZhbHVl"].join(
+      ".",
+    );
+
+    it("masks a key in what the person typed and in what the model said, and in the title", () => {
+      const card = chatWorkCard({
+        threadId: "t2",
+        title: "",
+        userText: `Use ${KEY} for the call`,
+        assistantText: `Done. The token was ${JWT} and the db is postgres://app:pw@db:5432/x.`,
+      });
+      const text = JSON.stringify(card);
+      for (const secret of [KEY, JWT, ":pw@"]) {
+        expect(text, secret).not.toContain(secret);
+      }
+      expect(card.body).toContain("[REDACTED]");
+      expect(card.body).toContain("postgres://[REDACTED]@db:5432/x.");
+    });
+
+    it("keeps figures, code and identifiers as they were", () => {
+      const assistantText = [
+        "Revenue was 1234567.89 IDR at 12:30:45, ratio 1.5:1.",
+        "```python",
+        "total = sum(row['amount'] for row in rows)  # 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+        "```",
+        "See https://cdn.example.com/a.png?sig=9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+      ].join("\n");
+      const card = chatWorkCard({ threadId: "t3", title: "", userText: "Summarise Q3", assistantText });
+      expect(card.body).toContain(assistantText);
+    });
+  });
+
   it("serializes drafts and outlines to markdown", () => {
     expect(documentDraftMarkdown({ title: "Memo", sections: [{ heading: "Why", body: "Because." }] })).toBe(
       "# Memo\n\n## Why\n\nBecause.",

@@ -1,6 +1,6 @@
 # Map — webapp-deploy: the hosted deployment stack
 
-Last verified: 2026-10-05 at 0b61a29 + the uncommitted working tree. Re-read that day: the build and runtime
+Last verified: 2026-10-05 at 0b61a29 + the uncommitted working tree, except one gotcha corrected on 2026-10-07 (ffmpeg is in the image since `5bec532`; the bullet under Gotchas was written before that). Re-read that day: the build and runtime
 description, the HEALTHCHECK paragraph, the components-check cites, the ignore-file rows and the
 dependencies gotcha, against `webapp-deploy/Dockerfile` as it stands after the SR-113 change. The rest
 of the page keeps the caveat in the note below.
@@ -269,8 +269,12 @@ a plaintext archive; `restore.sh` is destructive and prompts unless given `--yes
 - **`restore.sh` hands three capabilities back.** `cap_drop: ALL` takes `CHOWN` away even from root,
   and both `tar -x` and the chown need it, so the one-shot restore container re-adds `CHOWN`,
   `FOWNER` and `DAC_OVERRIDE`.
-- **ffmpeg and ffprobe are not in the image.** The Edit desk degrades without them. Adding them is a
-  migration-plan decision, not a silent `apt-get`.
+- **ffmpeg and ffprobe are in the image since 2026-10-06 (`5bec532`).** The `ffmpeg` stage of
+  `webapp-deploy/Dockerfile` downloads BtbN's static GPL build `n8.1.3-9-g29e619e767` for the image's CPU, pinned
+  by sha256, and the runtime stage copies both programs to `/usr/local/bin` with the licence text. Debian's own
+  package (5.1) is below the host's minimum of 6, so there is no `apt-get` route. Every run gets an input
+  whitelist, a format gate and hosted timeout caps (`packages/host/src/edit/ffmpeg/input-safety.ts`, in the tree
+  after `5bec532`). Record: security register SR-135 and `docs/internal/ffmpeg-attribution.md`.
 
 ## Verify
 

@@ -40,10 +40,11 @@ export const JOB_FALLBACK_TAIL = ["gpt-6-luna", "claude-sonnet-5-5", "gpt-5.6-lu
 /**
  * The gateway could not answer at all, so the same prompt on another model is worth one try.
  * Covers the three shapes the eval run produced — the 5xx sentence from `gatewayHttpFailure`, the
- * 10 s response-header abort in `ai-sdk-runtime.ts`, and the first-token watchdog — in both locales.
+ * response-header abort in `ai-sdk-runtime.ts` (`HEADERS_TIMEOUT_MS`), and the first-token watchdog — in
+ * both locales.
  */
 const GATEWAY_UNAVAILABLE =
-  /\b50[234]\b|unavailable|unreachable|no available channel|could not reach|could not be contacted|econnrefused|enotfound|etimedout|econnreset|socket hang up|fetch failed|failed to fetch|no response within|no first token from|no stream events from|tidak tersedia|tidak dapat dihubungi|tidak dapat menghubungi|tidak dapat dijangkau|token pertama dari|peristiwa stream dari/i;
+  /\b50[234]\b|unavailable|unreachable|no available channel|could not reach|could not be contacted|econnrefused|enotfound|etimedout|econnreset|socket hang up|fetch failed|failed to fetch|no response within|no first token from|no stream events from|tidak tersedia|tidak dapat dihubungi|tidak dapat menghubungi|tidak dapat dijangkau|tidak ada respons dalam|token pertama dari|peristiwa stream dari/i;
 
 /**
  * Failures a second model would hit the same way (the key, the endpoint) or differently in a way

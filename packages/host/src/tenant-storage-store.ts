@@ -210,3 +210,42 @@ export function tenantsWithStorage(): string[] {
   }>;
   return rows.map((row) => row.tenant_id);
 }
+
+/**
+ * What a tenant's saved artifacts hold: the sum of their `size_bytes` and how many there are.
+ *
+ * **Measured, not counted.** A saved result (a deck, a dossier, a brief) is a row in `artifacts`, keyed
+ * by desk, not an object under the tenant's prefix, so the byte counter above never sees it. Keeping a
+ * second counter would need a hook on every writer and on the purge; reading the rows has none of that
+ * and can never drift, so the quota reads them instead.
+ *
+ * **The shape of the query is what keeps it cheap.** A deck row carries a body of up to several
+ * megabytes, and `size_bytes` sits after that body in the record, so a read that has to open the row
+ * walks every overflow page of the body to reach it: about 20 ms a row, 2 seconds for 100 decks, in a
+ * synchronous call that stops the whole host. `artifacts_ws_size_idx` (`ensureArtifactTables`, created
+ * on open in server mode, which is the only place this runs) holds
+ * `(workspace_id, size_bytes)`, so this is answered from the index alone, under a millisecond. It
+ * counts with `COUNT(*)`: `COUNT(id)` would send the read back to the row. The plan is pinned by
+ * `tenant-artifact-use.test.ts`.
+ */
+export const TENANT_ARTIFACT_USE_SQL = `SELECT COALESCE(SUM(size_bytes), 0) AS bytes, COUNT(*) AS count
+  FROM artifacts
+ WHERE workspace_id IN (
+   SELECT w.id
+     FROM workspaces w
+     JOIN organizations o ON o.id = w.organization_id
+    WHERE o.tenant_id = ?
+ )`;
+
+export type TenantArtifactUse = { readonly bytes: number; readonly count: number };
+
+export function readTenantArtifactUse(tenantId: string): TenantArtifactUse {
+  const row = requireSql().prepare(TENANT_ARTIFACT_USE_SQL).get(tenantId) as
+    | { bytes: number; count: number }
+    | undefined;
+  // Clamped like the counter: a row edited by hand must not hand a tenant room through a negative number.
+  return {
+    bytes: Math.max(0, Math.trunc(Number(row?.bytes ?? 0))),
+    count: Math.max(0, Math.trunc(Number(row?.count ?? 0))),
+  };
+}
