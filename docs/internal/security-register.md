@@ -212,6 +212,7 @@ not test an operating-system egress deny, so [SR-111](#sr-111) stays open.
 | [SR-125](#sr-125) | Low | Two `edit_file` calls on one file could overwrite each other without a word | Fixed in tree, tested; unverified on a packed app (2026-10-03) | None |
 | [SR-126](#sr-126) | Low | Personal: a deleted desk left the sealed text of its folder proposals on disk | Fixed in tree, tested; unverified on a packed app (2026-10-03) | None |
 | [SR-134](#sr-134) | Low | Enterprise: a CRITICAL `proxy-addr` advisory reaches the hosted image through `express`; the app never sets `trust proxy`, so the affected path is not used | Open (2026-10-06) | `audit:deployed` red; blocks Tencent deploy until the lock takes `proxy-addr` 2.0.8 |
+| [SR-136](#sr-136) | Low | A Chat turn stored and streamed a tool's input and output with no redaction, and a failed tool's error text now reaches the model | Fixed in tree, tested; not driven on a live model (2026-10-06) | None |
 | [SR-08](#sr-08) | Info | The portal token vault is process memory only | Superseded by [SR-64](#sr-64), 2026-09-23 | Dev only |
 | [SR-15](#sr-15) | Info | Music relay: checked, not a key-exfiltration issue. It does send a spoofed browser `User-Agent` | Checked, not an issue | Dev only |
 | [SR-18](#sr-18) | Info | `X-Forwarded-Proto` and `X-Forwarded-For` trust: checked, sound as deployed today | Checked, not an issue | Blocks Tencent deploy on any topology change |
@@ -221,6 +222,7 @@ not test an operating-system egress deny, so [SR-111](#sr-111) stays open.
 | [SR-38](#sr-38) | Info | Host and portal reason vocabularies differ in two places: checked, both deliberate | Checked, not an issue | Dev only |
 | [SR-91](#sr-91) | Info | The portal's secrets are kept out of the app container by two env files and a scrub | By design; driven on the local compose rehearsal (2026-10-01) | — |
 | [SR-93](#sr-93) | Info | "Add it later" opens a hosted desk with a closed gate: checked, the host never reads it | Checked, not an issue (2026-10-01) | — |
+| [SR-137](#sr-137) | Info | `self_check` tells a hosted tenant, and the model, a few coarse facts about the server | By design, tested (2026-10-06) | None |
 | [SR-108](#sr-108) | Info | `localeFromAcceptLanguage` parses attacker-controlled input: checked, bounded and pure | Checked, not an issue (2026-10-01) | — |
 | [SR-109](#sr-109) | Info | What the Opus security and code-leak review probed and found sound (2026-10-01) | Checked, not an issue | — |
 | [SR-127](#sr-127) | Info | Personal: a hard link inside an opened folder can name a file outside it | Open, accepted (2026-10-03) | None |
@@ -4216,6 +4218,68 @@ only.
 
 Gate: `audit:deployed` stays red until then, which blocks the Tencent deploy.
 
+### SR-136 {#sr-136}
+
+**A Chat turn stored and streamed a tool's input and output with no redaction, and a failed tool's error text now reaches the model.**
+Both products. Raised 2026-10-06 by the Chat resilience pass (finding G7 of the chat-first plan). Low. Fixed in
+tree, tested; not driven on a live model.
+
+Evidence before: `startModalityRun` sent each `tool.started` and `tool.completed` event to the screen as the runtime
+made it, kept the same input and output on the `tool_call` parts it saved with the assistant message, and wrote the
+input and the full output (what the tool returned before it was cut for the model) to `tool_invocations` through
+`insertToolInvocation` (`packages/host/src/threads.ts:339-355`). The rows are sealed with the vault key, so the
+text inside them was protected at rest and not masked. `redactSecrets` covered only the `run.failed` message
+(`packages/host/src/runs.ts`, the `run.failed` branch, now at `:369`). A secret could arrive in four ways: a key the person pasted and the
+model passed to a tool, a page that `web_fetch` read and that echoed a header, a desk file that held a key, and a
+tool error that quoted a header.
+
+Fix: `redactSecretsDeep` (`packages/core/src/security/redact-deep.ts:70`) masks credential-shaped text at any depth and
+the value of a key named like a secret. The text shapes are a bearer token; `sk-`, `sk-ant-`, `tvly-` and `AIza` keys;
+a JWT (the portal's own tokens); a Telegram bot token (`telegramBotToken` is stored in settings); an AWS access key id;
+a PEM private key block; the user and password of a URL (`postgres://u:p@h`, `https://user:pass@host`); and a
+`Cookie:` or `Set-Cookie:` header value (`packages/core/src/security/redact.ts`). The key names include
+`telegramBotToken`, `cookie`, `set-cookie`, `private_key`, `secret_key`, `access_key` and `credentials`. Chat applies
+it on three paths: the frames sent to the screen
+(`redactToolEvent`, `packages/host/src/chat-tool-events.ts`, used at `runs.ts:394`), the `tool_invocations` rows
+(`runs.ts:414`, input and full output) and the `tool_call` parts saved with the message (the same redacted event). The
+model-facing result is not changed, and media is collected from the unredacted output so a signed link still mirrors.
+Tests: `packages/host/src/runs-resilience.test.ts` ("a tool's input and output on a Chat turn": frames, rows and the
+saved message), `chat-tool-events.test.ts`, `packages/core/src/security/redact-deep.test.ts` and
+`redact-shapes.test.ts` (each shape masked at depth in a tool output; a sha256 hash, a signed media URL, a long id, a
+UUID, a URL with an `@` in its query and the numbers of a spreadsheet row come out unchanged: redaction may hide an
+identifier, never a figure).
+
+The same change opens one new route, and holds it. Before it, the model never saw a tool's error, because the run
+ended. Now it reads `{ ok: false, reason: "tool_error", message }` (`toolErrorResult`,
+`packages/core/src/runtime/tool-error.ts:67`). The message passes `redactSecrets`, loses host paths (those under a root
+only a host has; `/workspace/...` and desk paths stay, because the model needs them), and is cut at 220 characters.
+The detail is quoted, so third-party text reads as a quotation. For every tool, whatever its trust, and with
+`injectionGuardBypass` off, a message that matches an injection rule is withheld: the media tools throw a gateway's
+error body under `internal` trust, and on a bring-your-own-key desk that is third-party text. Tests:
+`ai-tools.test.ts`, `tool-error.test.ts`.
+
+The model-echo path, decided: the assistant's own text is not passed through the redactor before it is streamed or
+stored. The reply streams delta by delta, so a secret split across two deltas cannot be masked live, and masking only
+the saved copy would make a reload differ from what the screen showed. The person often asks for exactly that text (a
+config, a key they pasted). Free prose and code blocks are where a redactor hides identifiers it should not. What does
+leave the thread is masked: `chatWorkCard` (`packages/host/src/work-cards.ts:196`) passes the person's message and the
+reply through `redactCredentials` before the card is indexed, listed as a source and retrieved into other prompts.
+`work-cards.test.ts` holds a key and a JWT out and keeps figures, a code block, a hash and a signed link.
+
+Residual:
+- The opaque-token rule of `redactSecrets` is not applied: it would erase content hashes, signed media links and long
+  identifiers the renderer needs. A secret with no known prefix and no secret-looking key name (a bare random token, a
+  GitHub or Slack token, a Basic-auth string, a database password outside a URL) is stored and shown as it came.
+- The model reads the raw tool result, so a secret it repeats lands unredacted in the assistant text, the saved `text`
+  part and the streamed deltas of that thread (the decision above). It no longer reaches the Knowledge Base card.
+- A secret the person types into their own message is not touched in the thread.
+- The Edit agent streams its tool events unredacted (`packages/host/src/edit/agent-run.ts:274`), and a job's `onEvent`
+  hands raw events to job code. Neither writes `tool_invocations`. Not changed in this pass.
+- Rows and messages written before the change keep what they hold.
+- No Chat code path was found that logs a tool's input or output; that is read, not proven by a log capture.
+
+Gate: none.
+
 ## Info and checked-not-an-issue
 
 ### SR-08 {#sr-08}
@@ -4402,6 +4466,25 @@ the app's `.env.example`). The compose rehearsal ran on the two generated files
 
 Required action: none. A new service that needs a portal secret gets `portal.env`, never the app's
 `.env`.
+
+### SR-137 {#sr-137}
+
+**`self_check` tells a hosted tenant, and the model, a few coarse facts about the server.** Both products. Recorded
+2026-10-06 by the Chat resilience pass as a design property, not a flag.
+
+Evidence: `collectSelfCheck` (`packages/host/src/self-check-tool.ts:110`) answers only booleans, counts and fixed
+words: whether this is the hosted server, the gate's `status`, `allowed` and `grace`, whether code runs are on and the
+sandbox is `ready`, `missing` or `unusable` (`not_checked` while code runs are off: the sandbox's files are not read
+then), whether ffmpeg and ffprobe resolve, the keys of the tools the run does not
+offer, and the run's step and tool-call limits. A hosted tenant therefore learns that it is on a server, whether the
+operator turned code runs on, and whether ffmpeg is installed there. The answer is shown on screen, saved with the
+thread and read by the model. It carries no path, key, tenant, organization, workspace or user id, probe message, or
+OS or binary version: `self-check-tool.test.ts` asserts the paths, the ids, a binary version and a probe's own
+message by value, including one run against the real desk. That is less than the Edit banner already gives a tenant
+(`withoutBinaryPath` keeps a ffmpeg version, `packages/host/src/edit/doctor.ts:42`).
+
+Required action: none. A field added to `SelfCheckReport` has to be a boolean, a count or a fixed word, and the
+no-paths-and-ids test has to name it.
 
 ### SR-93 {#sr-93}
 

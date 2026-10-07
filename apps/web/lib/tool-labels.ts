@@ -22,6 +22,7 @@ const ACTIVITY_KEYS: Record<string, string> = {
   past_sessions: "chat.tool.pastChats",
   calculator: "chat.tool.calculating",
   datetime: "chat.tool.clock",
+  self_check: "chat.tool.selfChecking",
 };
 
 const DONE_KEYS: Record<string, string> = {
@@ -32,6 +33,7 @@ const DONE_KEYS: Record<string, string> = {
   past_sessions: "chat.tool.pastSessions",
   calculator: "chat.tool.calculator",
   datetime: "chat.tool.datetime",
+  self_check: "chat.tool.selfCheck",
 };
 
 export function showsToolActivity(_toolKey: string): boolean {

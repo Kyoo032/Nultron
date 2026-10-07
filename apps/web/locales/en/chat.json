@@ -145,7 +145,9 @@
     "video": "Video",
     "pastSessions": "Past chats",
     "calculator": "Calculator",
-    "datetime": "Clock"
+    "datetime": "Clock",
+    "selfChecking": "Checking this desk…",
+    "selfCheck": "Desk check"
   },
   "tools": {
     "name": {
@@ -275,6 +277,7 @@
     "pastNone": "No earlier chat on this desk matches that.",
     "pastOne": "The earlier chat is \"{title}\".",
     "pastMany": "Earlier chats include \"{title}\".",
-    "noSource": "This desk did not have a source for that."
+    "noSource": "This desk did not have a source for that.",
+    "stepLimit": "I ran out of steps before I could finish this. Ask me to continue and I will pick up from where I stopped."
   }
 }

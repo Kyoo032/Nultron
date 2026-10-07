@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { withChatOutputLanguage } from "./chat-locale";
-import { DEFAULT_CHAT_PROMPT, DEFAULT_CHAT_TOOLS } from "./default-chat";
+import { DEFAULT_CHAT_PROMPT, DEFAULT_CHAT_TOOLS, withoutDisabledToolSentences } from "./default-chat";
 
 describe("default chat tools", () => {
-  it("binds the starter six, then web, knowledge, the six file tools and the code sandbox", () => {
+  it("binds the starter six, then web, knowledge, the six file tools, the code sandbox and the self check", () => {
     expect([...DEFAULT_CHAT_TOOLS]).toEqual([
       "calculator",
       "datetime",
@@ -20,6 +20,7 @@ describe("default chat tools", () => {
       "search_files",
       "delete_file",
       "run_code",
+      "self_check",
     ]);
   });
 
@@ -73,11 +74,63 @@ describe("default chat prompt", () => {
     expect(DEFAULT_CHAT_PROMPT).toMatch(/pending_approval/);
   });
 
+  it("tells the model what to do with a failed call and when to use the self check", () => {
+    expect(DEFAULT_CHAT_PROMPT).toMatch(/self_check reports[^.]*before you tell the owner/);
+    expect(DEFAULT_CHAT_PROMPT).toMatch(/ok false[^.]*message[^.]*another tool/);
+  });
+
   it("leaves the language rule to withChatOutputLanguage", () => {
     expect(DEFAULT_CHAT_PROMPT).not.toMatch(/Bahasa|Indonesia/);
     expect(withChatOutputLanguage(DEFAULT_CHAT_PROMPT, "en")).toBe(DEFAULT_CHAT_PROMPT);
     const id = withChatOutputLanguage(DEFAULT_CHAT_PROMPT, "id");
     expect(id.startsWith(DEFAULT_CHAT_PROMPT)).toBe(true);
     expect(id).toMatch(/Bahasa Indonesia/);
+  });
+});
+
+describe("withoutDisabledToolSentences", () => {
+  it("leaves the prompt alone when nothing is disabled", () => {
+    expect(withoutDisabledToolSentences(DEFAULT_CHAT_PROMPT, [])).toBe(DEFAULT_CHAT_PROMPT);
+  });
+
+  it("drops every mention of run_code when it is disabled, and keeps the calculator line whole", () => {
+    const prompt = withoutDisabledToolSentences(DEFAULT_CHAT_PROMPT, ["run_code"]);
+    expect(prompt).not.toMatch(/run_code/);
+    expect(prompt).not.toMatch(/\/workspace/);
+    expect(prompt).not.toMatch(/Python/);
+    expect(prompt).toMatch(
+      /- Compute: calculator for one arithmetic expression and datetime for the current date and time\./,
+    );
+    expect(prompt).toMatch(/Do not work out a figure that matters in your head\./);
+  });
+
+  it("keeps every other tool named", () => {
+    const prompt = withoutDisabledToolSentences(DEFAULT_CHAT_PROMPT, ["run_code"]);
+    for (const key of DEFAULT_CHAT_TOOLS.filter((tool) => tool !== "run_code")) {
+      expect(prompt, key).toMatch(new RegExp(`\\b${key}\\b`));
+    }
+  });
+
+  it("drops the self check line when that tool is disabled", () => {
+    const prompt = withoutDisabledToolSentences(DEFAULT_CHAT_PROMPT, ["self_check"]);
+    expect(prompt).not.toMatch(/self_check/);
+    expect(prompt).toMatch(/- Make media: image_generate/);
+  });
+
+  it("drops both, in any order, and never leaves a blank bullet behind", () => {
+    const prompt = withoutDisabledToolSentences(DEFAULT_CHAT_PROMPT, ["self_check", "run_code"]);
+    expect(prompt).not.toMatch(/run_code|self_check/);
+    expect(prompt).not.toMatch(/^- \s*$/m);
+    expect(prompt).not.toMatch(/\n\n\n/);
+  });
+
+  it("ignores a key it has no sentence for, and a prompt that does not hold the sentence", () => {
+    expect(withoutDisabledToolSentences(DEFAULT_CHAT_PROMPT, ["web_search"])).toBe(DEFAULT_CHAT_PROMPT);
+    expect(withoutDisabledToolSentences("You answer briefly.", ["run_code", "self_check"])).toBe("You answer briefly.");
+  });
+
+  it("is safe to run twice", () => {
+    const once = withoutDisabledToolSentences(DEFAULT_CHAT_PROMPT, ["run_code"]);
+    expect(withoutDisabledToolSentences(once, ["run_code"])).toBe(once);
   });
 });

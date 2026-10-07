@@ -18,6 +18,7 @@ const STARTER_TOOLS_SORTED = [
   "read_file",
   "run_code",
   "search_files",
+  "self_check",
   "video_generate",
   "web_fetch",
   "web_search",

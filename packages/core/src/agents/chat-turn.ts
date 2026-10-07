@@ -177,14 +177,24 @@ export type SettledChatTurn = {
  * The check after one bounded answer. No second model call.
  * A reply that already has words keeps them, minus source numbers the desk did not offer.
  * A tool that returned and left no sentence becomes that sentence.
+ * A run that ended at its step limit gets one closing sentence saying so (`stepLimit`), whatever else it said.
  */
 export function settleChatTurn(options: {
   text: string;
   offeredSources: number;
   tools: readonly SettledTool[];
   locale: AppLocale;
+  stepLimit?: boolean;
 }): SettledChatTurn {
   const locale = parseAppLocale(options.locale);
+  const base = settleWords(options, locale);
+  return options.stepLimit ? withStepLimitNote(base, locale) : base;
+}
+
+function settleWords(
+  options: { text: string; offeredSources: number; tools: readonly SettledTool[] },
+  locale: AppLocale,
+): SettledChatTurn {
   const repaired = repairUnresolvedCites(options.text, options.offeredSources, locale);
   if (repaired.trim()) {
     const appended = repaired.startsWith(options.text) ? repaired.slice(options.text.length) : "";
@@ -202,4 +212,14 @@ export function settleChatTurn(options: {
     return { text: repaired, appended: "" };
   }
   return { text: sentence, appended: sentence };
+}
+
+/** Appends the step-limit sentence once, after a blank line when the reply already has words. */
+function withStepLimitNote(turn: SettledChatTurn, locale: AppLocale): SettledChatTurn {
+  const note = chatTurnCopy(locale).stepLimit;
+  if (turn.text.includes(note)) {
+    return turn;
+  }
+  const tail = turn.text.trim() ? `\n\n${note}` : note;
+  return { text: `${turn.text}${tail}`, appended: `${turn.appended}${tail}` };
 }

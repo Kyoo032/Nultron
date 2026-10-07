@@ -7,19 +7,62 @@ const KEY_PATTERNS = [
   /\bAIza[A-Za-z0-9\-_]{10,}/g,
 ];
 
+/**
+ * Shapes this app handles that no prefix rule above sees. Each is specific on purpose: none is the broad
+ * "long opaque run" rule, so a hash, a signed link or a number in a spreadsheet row is not touched.
+ */
+
+/** A PEM private key block, to its end line or, when the text was cut, to the end of the text. A certificate is public and stays. */
+const PRIVATE_KEY_BLOCK_RE =
+  /-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----[\s\S]*?(?:-----END (?:[A-Z0-9]+ )*PRIVATE KEY-----|$)/g;
+
+/** The user and password of a URL (`postgres://user:pass@host`, `https://token@host`); the scheme and host stay. */
+const URL_USERINFO_RE = /\b([a-z][a-z0-9+.-]*:\/\/)[^\s/@?#()[\]<>"'`]+@/gi;
+
+/** A JWT: three dot-separated base64url parts, the first of which is a JSON header (`{"` encodes to `eyJ`). */
+const JWT_RE = /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g;
+
+/** A Telegram bot token: the bot id, a colon, 35 characters that include at least one letter. */
+const TELEGRAM_TOKEN_RE = /(?<![0-9])\d{6,12}:(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/g;
+
+/** An AWS access key id, except inside a presigned link's `Credential=` parameter, which the link needs to work. */
+const AWS_ACCESS_KEY_ID_RE = /(?<!Credential=)\b(?:AKIA|ASIA)[A-Z0-9]{16}\b/g;
+
+/** A `Cookie:` or `Set-Cookie:` header line. Needs a `name=value` after the colon, so the word cookie in a sentence is safe. */
+const COOKIE_HEADER_RE = /(\b(?:set-)?cookie[ \t]*:[ \t]*)(?=[^\r\n]*=)[^\r\n]+/gi;
+
 /** Min length for a standalone base64-like token to be treated as sensitive. */
 const BASE64_RE = /\b[A-Za-z0-9+/]{32,}={0,2}\b/g;
+
+/**
+ * Masks what is shaped like a credential: a bearer token, a key with a known prefix, a JWT, a Telegram bot
+ * token, an AWS access key id, a PEM private key block, the user and password of a URL, or a cookie header.
+ * It leaves long opaque runs alone, so a content hash, a signed link or a long identifier stays readable.
+ * Use it where the text is data a person or a program reads back (a tool's input or output); use
+ * `redactSecrets` for a message that is only ever shown.
+ */
+export function redactCredentials(text: string): string {
+  if (!text) {
+    return text;
+  }
+  let result = text
+    .replace(PRIVATE_KEY_BLOCK_RE, "[REDACTED]")
+    .replace(URL_USERINFO_RE, "$1[REDACTED]@")
+    .replace(COOKIE_HEADER_RE, "$1[REDACTED]")
+    .replace(JWT_RE, "[REDACTED]")
+    .replace(TELEGRAM_TOKEN_RE, "[REDACTED]")
+    .replace(AWS_ACCESS_KEY_ID_RE, "[REDACTED]")
+    .replace(BEARER_RE, "Bearer [REDACTED]");
+  for (const pattern of KEY_PATTERNS) {
+    pattern.lastIndex = 0;
+    result = result.replace(pattern, "[REDACTED]");
+  }
+  return result;
+}
 
 export function redactSecrets(text: string): string {
   if (!text) {
     return text;
   }
-  let result = text;
-  result = result.replace(BEARER_RE, "Bearer [REDACTED]");
-  for (const pattern of KEY_PATTERNS) {
-    pattern.lastIndex = 0;
-    result = result.replace(pattern, "[REDACTED]");
-  }
-  result = result.replace(BASE64_RE, "[REDACTED]");
-  return result;
+  return redactCredentials(text).replace(BASE64_RE, "[REDACTED]");
 }
