@@ -126,15 +126,15 @@ After a **completed** run the host closes the loop: `recordRetrievals` writes on
 | Failure | Where | What the user sees |
 |---|---|---|
 | Gate closed on add / verify / map / context | `requireGatewayAllowed` (`packages/host/src/handlers/knowledge.ts:378`, `:409`, `:259`, `:294`, `:316`) | `403 gateway_blocked`; the page paints its red `error` line (`apps/web/components/knowledge-page.tsx:455`). `GET /api/v1/knowledge` and `/graph` stay open, so the page still renders |
-| `file://` or non-HTTPS URL | `addUrlSource` → `assertAllowedEndpointUrl` (`packages/host/src/knowledge.ts:578-584`) | error line, no row |
-| Pasted text over 2 MB | `addPastedSource` (`packages/host/src/knowledge.ts:634-643`) | `413`, error line |
+| `file://` or non-HTTPS URL | `addUrlSource` → `assertAllowedEndpointUrl` (`packages/host/src/knowledge.ts:605-611`) | error line, no row |
+| Pasted text over 2 MB | `addPastedSource` (`packages/host/src/knowledge.ts:661-670`) | `413`, error line |
 | Unsupported file type | `extractText` → `rawText`'s default case (`packages/host/src/knowledge-extract.ts:246-253`, `:269-274`) | `400 unsupported_content_type`, error line, no row. The sentence now names the whole list, `.txt` through `.epub` |
 | A `.pptx` / `.xlsx` / `.odt` / `.rtf` / `.epub` the converter refuses | `documentText` (`packages/host/src/knowledge-extract.ts:143-155`) | `400` (or `413` for `too_large`) as `document_<code>`, error line, no row. A scanned PDF is `document_needs_ocr` and the sentence says plainly that nothing was sent anywhere |
-| PDF/DOCX parse failure, no text, injection hit on an upload | `addFileSource` (`packages/host/src/knowledge.ts:552-573`) | **a structured 4xx and no row** as of 2026-09-17. This used to be a `Failed` row answered `201`; a `Failed` row with a hover reason is now only how a *pasted* or *fetched* source fails |
+| PDF/DOCX parse failure, no text, injection hit on an upload | `addFileSource` (`packages/host/src/knowledge.ts:579-600`) | **a structured 4xx and no row** as of 2026-09-17. This used to be a `Failed` row answered `201`; a `Failed` row with a hover reason is now only how a *pasted* or *fetched* source fails |
 | Embedding call fails | `embedTextsWithModel` (`packages/host/src/knowledge-embed.ts:159-174`) | nothing visible: the row still reads `Indexed` because the FTS rows were committed first; the source is keyword-findable only |
 | Self-check fails | `runKnowledgeSelfCheck` (`packages/host/src/knowledge-verify.ts:129`) | `200`; `knowledge-loop-stage-Verified` reads `fail` with `data-state="fail"` |
 | Self-check re-clicked inside 10 s | `throttledSelfCheck` (`packages/host/src/handlers/knowledge.ts:243-254`) | the previous record, `throttled: true` — the stage does not move |
-| Map generate fails (live) | `mapKnowledge` (`packages/host/src/knowledge-map.ts:224-231`) | `generation_failed`, error line, previous map still shown — and, since 2026-09-23, still shown after a reload, because the row keeps it (`markMap`, `:71-81`) |
+| Map generate fails (live) | `mapKnowledge` (`packages/host/src/knowledge-map.ts:238-245`) | `generation_failed`, error line, previous map still shown — and, since 2026-09-23, still shown after a reload, because the row keeps it (`markMap`, `:85-95`) |
 | Graph route missing (old host) | `KnowledgeGraphPanel` effect (`apps/web/components/knowledge-graph-panel.tsx:43-85`, the `!res.ok` branch at `:68-72`) | `knowledge-graph-error` + `knowledge-graph-retry`; the other four loop stages still count |
 | No graph yet | `full.nodes.length === 0` (`apps/web/components/knowledge-graph-panel.tsx:181`) | `knowledge-graph-empty` — "Build map to create topic links." |
 
@@ -174,7 +174,7 @@ After a **completed** run the host closes the loop: `recordRetrievals` writes on
 - **The paste box cannot name anything.** `apps/web/components/knowledge-page.tsx:359` hardcodes the localized "Pasted notes". Every pasted source shares one name, and so does its `[n] <name>` marker — two pastes are indistinguishable in a citation.
 - **Four mutating controls on this page have no testid:** the source row's Remove (`:469-477`), the memory row's Forget (`:572-580`), and the Soul rule draft input + Add rule button (`:513-531`). Everything else here is addressable.
 - **Adding a Soul rule saves nothing.** The Add button mutates `soul.rules` in React state only (`:520-531`); leaving the tab without pressing `knowledge-soul-save` discards it.
-- **Empty Soul fields are silently replaced.** `putSoul` substitutes `DEFAULT_SOUL.name` / `.role` / `.voice` for anything that trims to empty (`packages/host/src/knowledge.ts:154-159`), so "clear the voice and save" is not a thing a user can do from this page.
+- **Empty Soul fields are silently replaced.** `putSoul` substitutes `DEFAULT_SOUL.name` / `.role` / `.voice` for anything that trims to empty (`packages/host/src/knowledge.ts:155-160`), so "clear the voice and save" is not a thing a user can do from this page.
 - **Every memory the page creates is pinned** (`apps/web/components/knowledge-page.tsx:413`), and only pinned memories are injected (`packages/host/src/knowledge.ts:895`). The unpinned state exists in the store and has no UI.
 - **"Map knowledge" re-embeds the workspace first** (`packages/host/src/knowledge-map.ts:138`) but does **not** re-chunk. A chunker change needs the explicit reindex routes, which this page does not expose at all — `POST /knowledge/sources/:id/reindex` and `POST /knowledge/reindex` have no control on the page.
 - **Tab state is not in the URL.** `/knowledge` always opens on Sources; there is no `?tab=` and no deep link to Soul, Memory or Map.

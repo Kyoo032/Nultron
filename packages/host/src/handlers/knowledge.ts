@@ -24,6 +24,7 @@ import {
   type WorkSourceType,
 } from "../knowledge";
 import { getKnowledgeMap, mapKnowledge } from "../knowledge-map";
+import { sourceIsHidden } from "../knowledge-visibility";
 import { backendPayload, parseBackendId, selectKnowledgeBackend } from "../knowledge/backend-api";
 import { countRetrievals } from "../knowledge-retrievals";
 import { knowledgeContextForThread } from "../knowledge-last-turn";
@@ -420,7 +421,11 @@ export async function handlePostKnowledgeSourceUrl(request: HostRequest): Promis
 export async function handleDeleteKnowledgeSource(request: HostRequest): Promise<HostResult> {
   try {
     const tenant = await getTenant(request);
-    deleteSource(tenant, request.params.sourceId);
+    // Hosted: a colleague's Chat card is not this person's to delete by id. It is answered as a
+    // delete of something already gone (the same `ok`), so the answer does not say the card exists.
+    if (!sourceIsHidden(tenant, request.params.sourceId)) {
+      deleteSource(tenant, request.params.sourceId);
+    }
     return jsonOk({ ok: true });
   } catch (error) {
     return jsonError(error);

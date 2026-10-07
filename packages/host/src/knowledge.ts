@@ -24,6 +24,7 @@ import { expandRetrievedChunks } from "./knowledge-expand";
 import { removeGraphForSource, sweepOrphanGraph } from "./knowledge-graph-prune";
 import { forgetSourcesOnMap } from "./knowledge-map-honesty";
 import { localeForRun } from "./run-context";
+import { andSharedSource, andVisibleSource } from "./knowledge-visibility";
 import { defaultSoul, isLegacyDefaultSoul, type KnowledgeSoul } from "./knowledge-soul";
 import { modeDefaultsFor } from "./selectable-models";
 import { loadSettings } from "./settings-store";
@@ -205,10 +206,35 @@ export function deleteMemory(tenant: TenantContext, id: string): void {
   sql.prepare("DELETE FROM knowledge_memories WHERE workspace_id = ? AND id = ?").run(workspaceId(tenant), id);
 }
 
+/**
+ * The sources this person may see. On the hosted server a colleague's Chat card is not among them
+ * (`knowledge-visibility.ts`); off server mode every source on the desk is, exactly as before.
+ */
 export function listSources(tenant: TenantContext): KnowledgeSource[] {
+  const visible = andVisibleSource(tenant);
   const rows = sql
-    .prepare(`SELECT ${SOURCE_COLUMNS} FROM knowledge_sources WHERE workspace_id = ? ORDER BY created_at DESC`)
-    .all(workspaceId(tenant)) as SourceRow[];
+    .prepare(
+      `SELECT ${SOURCE_COLUMNS} FROM knowledge_sources WHERE workspace_id = ?${visible.sql} ORDER BY created_at DESC`,
+    )
+    .all(workspaceId(tenant), ...visible.params) as SourceRow[];
+  return rows.map(sourceFromRow);
+}
+
+/**
+ * The sources the desk's one knowledge map may be built from. Hosted, that excludes every Chat card,
+ * the caller's own too: the saved map is one row shown to the whole company, so it cannot hold
+ * anybody's conversations. Off server mode it is `listSources`, every source on the desk.
+ */
+export function listMappableSources(tenant: TenantContext): KnowledgeSource[] {
+  const shared = andSharedSource();
+  if (!shared.sql) {
+    return listSources(tenant);
+  }
+  const rows = sql
+    .prepare(
+      `SELECT ${SOURCE_COLUMNS} FROM knowledge_sources WHERE workspace_id = ?${shared.sql} ORDER BY created_at DESC`,
+    )
+    .all(workspaceId(tenant), ...shared.params) as SourceRow[];
   return rows.map(sourceFromRow);
 }
 
