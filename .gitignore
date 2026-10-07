@@ -89,3 +89,6 @@ webapp-deploy/portal.env
 vendor/sandbox-runtime/
 vendor/sandbox-runtime.tmp-*/
 vendor/.sandbox-cache/
+
+# Third-party reference clones (read-only, never committed)
+.ref/

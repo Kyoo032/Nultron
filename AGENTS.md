@@ -73,6 +73,41 @@ On **Enterprise** each tenant keeps its own workspaces on Rizky's server. On **P
 
 **North star: like Dots and Muse, but multi-model.** Multi-model chat-first wins.
 
+**Bots on harnesses (Rizky, 2026-10-06 evening).** The chat-first shell shows each harness as a bot with its own conversations and a side panel (computer, routines, the mode's control fields). What sets it apart from a skills-and-instructions product: a bot here is a harness the host enforces. Three decisions from him the same evening:
+
+- People can hire their own bot. That lifts "custom-agent Build stays parked", in the tester code only, until a pull request he approves brings it here.
+- The cloud computer (VPS) and the person's own computer are paid features. A free trial cannot use either, and gets no graphical screen.
+- Routines (scheduled runs) are free on every plan (Rizky, 2026-10-07: "routines are free, since they cost tokens anyway"). A routine that needs a computer still needs a paid plan for that part.
+- The host enforces that from the plan the portal reports. The renderer only displays it.
+
+The plan is in the tester folder: `docs/internal/chat-first-plan.md`, "Second reference", "Hiring a bot", "Free and paid" and Track B.
+
+**Private by person on Enterprise (Rizky, 2026-10-06 evening).** His words: "even on enterprise the knowledge base of everyone will be different and private". A company shares a desk, but each person's Knowledge Base is their own, and a document a person attaches in Chat is private to that person. The host enforces it; the renderer only displays it. Personal has one person per desk, so nothing changes there, and every change for this needs a Personal-parity test. What is shared and what is private on a team desk today has not been mapped yet; map it before changing a table.
+
+Two more answers from him the same evening:
+
+- **Sharing goes through a bot.** A person's own knowledge stays private. What a team shares is a bot's knowledge: a bot shared with the team brings its knowledge with it, so teammates can use that bot and call it. There is no "share this source with the company" switch on a person's own Knowledge Base.
+- **When a person leaves, the company decides.** The business owner or an admin chooses whether that person's knowledge is deleted or kept.
+- **Nobody else reads it, the owner and admins included.** His words: "they cant read the knowledge, it must be blocked", with legal terms to back it later. An owner or admin may delete or keep a person's knowledge and may never open it. The host blocks it; the terms come later and are not a substitute for the block.
+
+**This is design only for now (Rizky, same evening): "dont make it too complicated".** Do not build the per-person Knowledge Base, bot knowledge sharing or the leaver controls yet. The one piece being built is that a document attached in Chat is private to the person who attached it. The build focus is the chat and several agents working together.
+
+### Two codes (Rizky, 2026-10-06; must follow)
+
+Nultron is always kept as two codes, and a change to one must never break the other.
+
+- **Published:** this folder, `C:\Users\rizky\agentforge`, branch `main`. Nultron as released, with the mode screens. HYP AI is built from it. Every release runs from here.
+- **Tester:** `C:\Users\rizky\agentforge-chat`, branch `tester/chat-first`, a git worktree of this repo. Chat only, with the modes running behind the chat as workers. Its plan and specs live in its own `docs/internal/` (`chat-first-plan.md`, `chat-workers-spec.md`, `model-tiers-spec.md`, `chat-computer-spec.md`), and its rules are in its `TESTER.md`.
+
+Rules:
+
+- A problem that shows on `:3000` is fixed here on `main`, then merged into the tester folder. It is never fixed by hand in both.
+- Changes move one way, from `main` into `tester/chat-first`. Tester work reaches `main` only through a pull request Rizky approves.
+- Never run a release from the tester folder. The tester webdev uses port 3200 and its own data folder.
+- The precise map (which change goes where, which files the tester code may edit, how to update) is in Rizky's Obsidian vault: `C:\Users\rizky\Documents\Obsidian\40-Dev\nultron-two-codes-map.md`. Keep it current in the same session as any change to the split.
+
+`.ref/` (gitignored) holds two third-party repositories for reading only, OpenMausBot and hermes-agent. Take ideas, never code, and never anything from `OpenMausBot/enterprise/`.
+
 ## Current focus (Rizky, 2026-10-01): fix, perfect, polish — no new modes
 
 Until Rizky lifts it, work is limited to three things, in this order:
@@ -89,7 +124,7 @@ Until Rizky lifts it, work is limited to three things, in this order:
 
 ### Resume here: 2026-10-05, end of day (read this before the 10-03 block below)
 
-**Full handoff, including lanes that were running and their exact scope:** `nultron-files/handoff-2026-10-05/HANDOFF.md`. **Newer, 2026-10-06:** `nultron-files/handoff-2026-10-06/HANDOFF.md`, covering the live sites, the app preview with per-tester desks, PR #139, the 0.16.0 cut and the verify-skill findings.
+**Full handoff, including lanes that were running and their exact scope:** `nultron-files/handoff-2026-10-05/HANDOFF.md`. **Newer, 2026-10-06:** `nultron-files/handoff-2026-10-06/HANDOFF.md`, covering the live sites, the app preview with per-tester desks, PR #139, the 0.16.0 cut and the verify-skill findings. **Newest, evening of 2026-10-06: `nultron-files/handoff-2026-10-06/HANDOFF-evening.md`**, with one note per paused lane in `lanes/`. Read it first: ten lanes were paused mid-work (ffmpeg in the image is live on the preview; the desktop bundle, the run cap, chat error recovery, document upload, the deck tool, the image-attachment fix, team privacy, the H1 knock gate and the HYP AI bundle are on unmerged branches or local folders), the local `edge/` folder is NOT safe to deploy, and the document-upload branch is half way through its review fixes.
 
 **Git (2026-10-06).**
 - `main` is at `de95267`, after PR #138.
@@ -117,7 +152,7 @@ Until Rizky lifts it, work is limited to three things, in this order:
 
 **Decisions on 10-05.**
 - The vision and prompt-first rules are now at the top of this file.
-- Nultron keeps Toko Token. White-label brands show TokenKu; their backend uses api.tokotokenai.com in the interim.
+- Nultron keeps Toko Token. White-label brands show TokenKu. The HYP AI clone pinned `https://api.tokenku.ai/v1` on 2026-10-06 (Rizky); the interim `api.tokotokenai.com` backend is gone there, and no call with a TokenKu key has been made yet.
 - Hosting (to learn, then try): one Tencent Lighthouse in Jakarta hosting dpscloud.co.id (the parent site), nultron-ai.xyz (app) with portal.nultron-ai.xyz, and tokotokenai.com.
   - Keep the DNS for `api.tokotokenai.com` untouched.
   - Company mailboxes are self-hosted on the same box (Stalwart), sending through Tencent SES; see "Tencent hosting" below. Nultron's sign-in codes go through SES from `mail.dpscloud.co.id`.
