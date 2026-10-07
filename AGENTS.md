@@ -180,8 +180,9 @@ Until Rizky lifts it, work is limited to three things, in this order:
 
 **In flight (see the lane notes).**
 - The per-company gateway key check: reviewed, fixed and merged into `main` as `24fb47c9` (evening). Not driven on a hosted server.
-- The portal's username and password sign-in for HYP AI: built in `C:\Users\rizky\agentforge-chatdocs` on `feat/portal-password-signin`, uncommitted. The independent security review said ship after named fixes (no critical or high). A worker was applying them in the evening; then commit by path and merge.
-- The HYP AI bundle in `C:\Users\rizky\hypey`: `out\hyp-2026.10.07.2` is the e-mail-code build and is NOT the one to install. The password-mode pass (tooling switch, sync, rebuild, three-person rehearsal) was started in the evening.
+- The portal's username and password sign-in for HYP AI: merged. Two independent security reviews, no critical or high finding; the second review's two fixes are local `main` at `e8a069c9`, three commits ahead of GitHub. The residual risks are in SR-165.
+- The HYP AI bundle in `C:\Users\rizky\hypey`: `out\hyp-2026.10.07.3` is the password-mode build from `e8a069c9`. `check.mjs` 135 of 135 and the three-person rehearsal exited 0 (123 of 123), so it meets "ready to install". A rebuild as `hyp-2026.10.07.4` was started at about 21:10 to remove the upstream company's name from the browser-facing locale catalogs; install that one once it is proven. `out\hyp-2026.10.07.2` is the e-mail-code build and must never be installed.
+- The domain: `aiopc.innovationhypernet.com` points at Cloudflare's proxy, not at the server. Hypernet has to make it DNS only, an A record to `43.173.26.50` with no AAAA, and add a second name for the sign-in page.
 
 **Ready to install HYP AI means:** both fixes merged, the bundle rebuilt in password mode with `check.mjs` passing, and the rehearsal exiting 0 with three people signing in by username and password. Then tell Rizky. On the server each step needs his go: the load test, the install, the three accounts.
 
