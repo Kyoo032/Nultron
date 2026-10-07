@@ -1,5 +1,5 @@
 import { type BinaryStatus, resetFfmpegBinaryCache, resolveFfmpeg, resolveFfmpegAsync } from "./ffmpeg-binary";
-import { ffmpegSetupHint, type FfmpegSetupHint } from "./ffmpeg-setup";
+import { ffmpegSetupHint, usesBundledFfmpeg, type FfmpegSetupHint } from "./ffmpeg-setup";
 import { isServerMode } from "@agentforge/core";
 import type { ModelCacheScope } from "../model-cache";
 import { currentRequestSession } from "../tenant-scope";
@@ -17,7 +17,10 @@ export type EditDoctorReport = {
     path: string | null;
     version: string | null;
     reason?: string;
-    /** Present only when ffmpeg is missing or unusable: how to install it on this OS. */
+    /**
+     * Present only when ffmpeg is missing or unusable: how to install it on this OS, or, in the packaged app
+     * (`setup.bundled`), that the install's own copy needs the app reinstalled.
+     */
     setup?: FfmpegSetupHint;
   };
   asr: EditDoctorAsr;
@@ -86,7 +89,9 @@ function reportFor(ffmpeg: BinaryStatus, scope?: ModelCacheScope): EditDoctorRep
       path: ffmpeg.path,
       version: ffmpeg.version,
       ...(ffmpeg.reason ? { reason: ffmpeg.reason } : {}),
-      ...(ffmpeg.found ? {} : { setup: ffmpegSetupHint(process.platform, ffmpeg.reason) }),
+      ...(ffmpeg.found
+        ? {}
+        : { setup: ffmpegSetupHint(process.platform, ffmpeg.reason, { bundled: usesBundledFfmpeg() }) }),
     },
     asr: asrFor(scope),
     fonts: [],

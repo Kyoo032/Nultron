@@ -143,7 +143,7 @@ A refusal is `429 { code: "rate_limited", message: "Too many requests. Please sl
 
 | Pool | Cap env | Default | Wired at |
 |---|---|---|---|
-| ffmpeg / ffprobe children | `AGENTFORGE_MAX_FFMPEG` (`:27`) | 2 (`:29`) | `:288`, used by `packages/host/src/edit/ffmpeg/run.ts:101` |
+| ffmpeg / ffprobe children | `AGENTFORGE_MAX_FFMPEG` (`:27`) | 2 (`:29`) | `:288`, used by `packages/host/src/edit/ffmpeg/run.ts:162` |
 | dataset SQL workers | `AGENTFORGE_MAX_SQL_WORKERS` (`:28`) | 4 (`:30`) | `:290`, used by `packages/host/src/sql-runner.ts:186`, `:278` |
 
 `AGENTFORGE_JOB_QUEUE_TIMEOUT_MS` (`:33`, default 60 000, `:34`) is how long a job may sit in the waiting room before it is refused instead (`:162-167`); the timer is `unref`'d so a waiting room never keeps the process alive (`:169`). Both the full-waiting-room case (`:203-205`) and the timeout case answer the same `ApiError("too_many_jobs", …, 429)` (`:21-22`, `:92-98`) — it is the same answer, reached a minute later.

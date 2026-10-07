@@ -8,6 +8,7 @@ import { streamJob } from "../job-stream";
 import { generateMinutes, runMeeting, saveTranscript, transcribeMeeting } from "../meeting/run";
 import { meetingStore, requireMeeting } from "../meeting/store";
 import { resolveMeetingAsr } from "../meeting/transcribe";
+import { usesBundledFfmpeg } from "../edit/ffmpeg-setup";
 import { ffmpegAvailable } from "../meeting/audio";
 import { localeForRun } from "../run-context";
 import { getTenant } from "../tenant";
@@ -37,8 +38,9 @@ export async function handleGetMeetings(request: HostRequest): Promise<HostResul
     return jsonOk({
       items: meetingStore().list(tenant),
       // What this desk can actually do right now, so the studio can say "paste the transcript"
-      // before the owner uploads 25 MB and finds out.
-      capability: { ...resolveMeetingAsr(tenant), ffmpeg: ffmpegAvailable() },
+      // before the owner uploads 25 MB and finds out. `ffmpegBundled` says the ffmpeg in question is the
+      // packaged app's own, so the studio words a failure as "reinstall" and not as "install ffmpeg".
+      capability: { ...resolveMeetingAsr(tenant), ffmpeg: ffmpegAvailable(), ffmpegBundled: usesBundledFfmpeg() },
     });
   } catch (error) {
     return jsonError(error);

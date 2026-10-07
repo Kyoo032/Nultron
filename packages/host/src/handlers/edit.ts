@@ -324,7 +324,12 @@ export async function handlePostEditImport(request: HostRequest): Promise<HostRe
       let probed: Awaited<ReturnType<typeof probe>>;
       try {
         probed = await probe(abs, { tenantId: tenant.tenantId, projectId });
-      } catch {
+      } catch (error) {
+        // A playlist or concat script is refused by name (`probe` in `edit/ffmpeg/recipes.ts`, SR-135): keep that
+        // sentence rather than the generic "could not read" one. The refund path below is the same.
+        if (error instanceof ApiError && error.code === "unsupported_media") {
+          throw error;
+        }
         throw new ApiError("unsupported_media", modeMessage("editMediaUnreadable", localeForRun()), 400);
       }
       /*

@@ -195,7 +195,7 @@ limiter cannot itself become the memory exhaustion.
   `log.warn("ffmpeg_failed", …)` — redacted, structured, server-side — and the client gets a fixed
   sentence plus a reason class chosen from the failure rather than copied out of it: `unreadable
   input`, `an unsupported codec`, `the tool could not be started`, `an invalid run request`, `too
-  much output`, or `exit code N` (`packages/host/src/edit/ffmpeg/run.ts:80-138`, `:195-199`).
+  much output`, or `exit code N` (`packages/host/src/edit/ffmpeg/run.ts:94-141`, `:215-219`).
   `run-failure-detail.test.ts` asserts that no absolute path, argv fragment or tenant filename
   survives into the message.
 - **An operator's string is not a URL.** `AGENTFORGE_BILLING_TOPUP_URL` was echoed to the browser

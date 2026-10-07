@@ -2,6 +2,7 @@ import { useState } from "react";
 import { fetchEditDoctor, type EditDoctor, type FfmpegSetup } from "@/lib/edit-client";
 import { isHostedBuild } from "@/lib/hosted-build";
 import { t } from "@/lib/i18n";
+import { useProductBrand } from "@/lib/product-brand";
 
 type Props = {
   doctor: EditDoctor;
@@ -34,11 +35,16 @@ async function copyText(text: string): Promise<boolean> {
  *
  * On the hosted build the machine is the server and a tenant cannot install anything on it, so the guide
  * (a Linux command to copy, a re-check, an install link) is replaced by one calm line with none of those.
+ *
+ * In the packaged app the installer carries its own ffmpeg, so nobody installs one by hand. When that copy
+ * will not run the host marks the hint `bundled`, and this shows one line telling the person to reinstall the
+ * app, plus Check again. No command to copy, no install link, no step list, in either variant.
  */
 export function FfmpegSetupNotice({ doctor, onDoctor, variant = "compact" }: Props) {
   const [checking, setChecking] = useState(false);
   const [copied, setCopied] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
+  const { productName } = useProductBrand();
   const ffmpeg = doctor.ffmpeg;
   if (!ffmpeg || ffmpeg.found !== false) {
     return null;
@@ -72,6 +78,26 @@ export function FfmpegSetupNotice({ doctor, onDoctor, variant = "compact" }: Pro
     if (ok) {
       window.setTimeout(() => setCopied(false), 1500);
     }
+  }
+
+  if (setup?.bundled) {
+    return (
+      <div className={NOTICE_CLASS} data-testid="edit-needs-ffmpeg" data-ffmpeg-bundled="true" role="status">
+        <div className="flex flex-wrap items-center gap-2">
+          <span>{t("edit.ffmpeg.bundledUnavailable", { productName })}</span>
+          <button
+            type="button"
+            className="btn btn-secondary px-2 py-0.5 text-xs"
+            onClick={() => void recheck()}
+            disabled={checking}
+            data-testid="ffmpeg-recheck"
+          >
+            {checking ? t("edit.ffmpeg.checking") : t("edit.ffmpeg.checkAgain")}
+          </button>
+        </div>
+        {checkError ? <p className="mt-1 text-red-700">{t("edit.ffmpeg.recheckFailed")}</p> : null}
+      </div>
+    );
   }
 
   return (

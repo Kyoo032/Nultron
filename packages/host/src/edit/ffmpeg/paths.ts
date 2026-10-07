@@ -73,10 +73,20 @@ export function editAllowlist(scope: EditScope): PathAllowlist {
   };
 }
 
+/**
+ * A file path as the value of a filter option inside a `-filter_complex` string, which ffmpeg unescapes twice:
+ * once when the graph is split into filters (it removes one backslash level and splits on `[`, `]`, `,`, `;`),
+ * then once when the filter's own options are split on `:`. A colon therefore needs `\\:` here, not `\:`.
+ *
+ * It used to be one level (`C\:/Users/...`), which ffmpeg read as the filename `C` followed by a second option, so
+ * every export that burned in captions on Windows failed with "Unable to parse original_size". It went unseen
+ * because a path with no colon (macOS, Linux) is unaffected. Proven against the real ffmpeg in
+ * `edit/ffmpeg-input-safety-real.test.ts`.
+ */
 export function escapeFilterPath(filePath: string): string {
-  return filePath
-    .replace(/\\/g, "/")
-    .replace(/:/g, "\\:")
+  const optionLevel = filePath.replace(/\\/g, "/").replace(/'/g, "\\'").replace(/:/g, "\\:");
+  return optionLevel
+    .replace(/\\/g, "\\\\")
     .replace(/'/g, "\\'")
     .replace(/\[/g, "\\[")
     .replace(/\]/g, "\\]")

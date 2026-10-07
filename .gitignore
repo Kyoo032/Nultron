@@ -89,3 +89,10 @@ webapp-deploy/portal.env
 vendor/sandbox-runtime/
 vendor/sandbox-runtime.tmp-*/
 vendor/.sandbox-cache/
+
+# Bundled ffmpeg and ffprobe (apps/desktop/scripts/stage-ffmpeg.mjs): the staged programs, the licence text and the
+# generated MANIFEST.json in the installer's resources/ffmpeg folder (only its README is tracked), and the download
+# cache for the pinned archives. Rebuilt from apps/desktop/scripts/ffmpeg.lock.json; never committed.
+apps/desktop/resources/ffmpeg/*
+!apps/desktop/resources/ffmpeg/README.md
+vendor/.ffmpeg-cache/

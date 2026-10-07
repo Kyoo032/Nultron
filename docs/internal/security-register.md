@@ -212,7 +212,7 @@ not test an operating-system egress deny, so [SR-111](#sr-111) stays open.
 | [SR-125](#sr-125) | Low | Two `edit_file` calls on one file could overwrite each other without a word | Fixed in tree, tested; unverified on a packed app (2026-10-03) | None |
 | [SR-126](#sr-126) | Low | Personal: a deleted desk left the sealed text of its folder proposals on disk | Fixed in tree, tested; unverified on a packed app (2026-10-03) | None |
 | [SR-134](#sr-134) | Low | Enterprise: a CRITICAL `proxy-addr` advisory reaches the hosted image through `express`; the app never sets `trust proxy`, so the affected path is not used | Open (2026-10-06) | `audit:deployed` red; blocks Tencent deploy until the lock takes `proxy-addr` 2.0.8 |
-| [SR-135](#sr-135) | Low | Enterprise: the image now carries a third-party static ffmpeg (BtbN, GPL build), pinned by sha256; the pinned file is deleted upstream after about two years | Recorded (2026-10-06) | None; re-pin before the upstream release expires |
+| [SR-135](#sr-135) | Low | Enterprise image and Personal installers carry a third-party static ffmpeg (BtbN on the image and Windows, Martin Riedl's build server on macOS, GPL builds), pinned by sha256; the Personal copy runs with the person's own rights; an upload may not steer it to addresses, other files or hours of run time (input limits) | Recorded (2026-10-06); desktop bundle added the same day, not packed; input limits built 2026-10-06, recorded 2026-10-07, in the tree, not deployed | None for the image; re-pin before the upstream release expires; macOS builds accepted by Rizky on 2026-10-06 for the preview Mac installer only, so a Mac release that is no longer preview is blocked until our own build is pinned |
 | [SR-08](#sr-08) | Info | The portal token vault is process memory only | Superseded by [SR-64](#sr-64), 2026-09-23 | Dev only |
 | [SR-15](#sr-15) | Info | Music relay: checked, not a key-exfiltration issue. It does send a spoofed browser `User-Agent` | Checked, not an issue | Dev only |
 | [SR-18](#sr-18) | Info | `X-Forwarded-Proto` and `X-Forwarded-For` trust: checked, sound as deployed today | Checked, not an issue | Blocks Tencent deploy on any topology change |
@@ -4822,3 +4822,87 @@ release before then or the build fails on the download. It is the GPL variant (t
 `libx264`), so the licence text ships in `/usr/local/share/licenses/ffmpeg` and
 `docs/internal/ffmpeg-attribution.md` names the build and its source; an image handed to a customer to run
 themselves is a distribution and must keep both.
+
+**Extended to the desktop bundle (2026-10-06, in the tree, not packed).** The Personal installers now carry the
+same kind of program. Evidence: `apps/desktop/scripts/ffmpeg.lock.json` pins each archive by https URL, byte size
+and sha256, and each file taken out of it; `apps/desktop/scripts/stage-ffmpeg.mjs` reads nothing from an argument
+or the environment, allows only `github.com`, `raw.githubusercontent.com` and `ffmpeg.martin-riedl.de`, checks hash
+and size before unpacking or caching, refuses any archive with a member whose path leaves the folder, sniffs each
+program's header for the target platform, and `--verify` re-hashes the folder against the lock (the mac route runs it
+on the finished `.app`). `node --test apps/desktop/scripts/stage-ffmpeg.test.mjs` covers each refusal.
+
+- Windows: the same BtbN build as the image (`win64-gpl` zip, sha256 `7b801cdd...b429fa`). BtbN publishes the file
+  hash through the GitHub API; it was matched by downloading the file.
+- macOS: FFmpeg 9.0.2 static builds from `ffmpeg.martin-riedl.de` (a one-person build server with an open build
+  script; ffmpeg.org's download page links only evermeet.cx for macOS, which has no arm64 build). The four zips
+  (`ffmpeg` and `ffprobe` for arm64 and for Intel) hash to the publisher's own `.sha256` files and were re-hashed by
+  downloading; inside, each program is a Mach-O for the right CPU, built for macOS 12 or newer, linking only Apple
+  system libraries (no `/opt/homebrew` or `/usr/local` dylibs), configured with `--enable-gpl --enable-libx264
+  --enable-libmp3lame`, and carrying a code signature load command. The publisher's hash comes from the same host as
+  the file, so it proves the download is intact, not who built it. **Accepted by Rizky on 2026-10-06, for the
+  preview Mac installer only** (see "macOS source" below). Dropping macOS would be deleting the two `darwin-*`
+  lock entries; both stay.
+- What is accepted: a binary we did not build, started by the host as the person's own user with the allowlisted
+  environment, parsing files the person opens in Edit and Meeting. No network is opened by us for it. It is not
+  sandboxed beyond what the OS gives any child of the app.
+- Follow-ups: the installers must carry the GPL source line in their release notes (`ffmpeg-attribution.md`); the
+  macOS programs have not been launched on a Mac, so Gatekeeper and quarantine behaviour of a child program inside
+  an unsigned app is unproven; Martin Riedl stops macOS Intel release builds in January 2027, after which the Intel
+  pin cannot be moved forward.
+
+**macOS source: the decision (Rizky, 2026-10-06).** The macOS builds come from one person's build server that
+ffmpeg.org does not link. Rizky accepted that source for now, because the Mac app is still labelled preview, and
+kept both `darwin-*` lock entries. The record, in full, is in `docs/internal/ffmpeg-attribution.md`; the parts that
+matter to the register:
+
+- Scope: the preview Mac installer only.
+- What the pin proves: the file did not change since it was pinned (size and sha256 are checked before unpacking, and
+  `stage-ffmpeg.mjs --verify` re-hashes the staged folder). It does not prove who built it. The publisher's own
+  `.sha256` comes from the same host as the zip, so it shows the download is intact and nothing more. Nothing
+  sandboxes the programs beyond what macOS gives a child of the app.
+- When the acceptance ends: the Mac app leaves preview, or the publisher's build behind a pinned URL changes (staging
+  fails the hash check).
+- Owed before the Mac app leaves preview: a committed build script that builds FFmpeg from source on Rizky's Mac, our
+  own hashes pinned in the lock, and the same FFmpeg version on Mac and Windows (Windows is 8.1.3, macOS is 9.0.2).
+- Unknown: a quarantined helper inside an un-notarised app may be refused by macOS on first run. The app would say
+  "Reinstall", and reinstalling would not fix it. Not tested; no installer has been opened on a Mac.
+
+**Input limits (review point 3; built 2026-10-06, recorded 2026-10-07; in the tree, not deployed).** On the hosted
+image a tenant chooses the bytes ffmpeg opens, so three limits sit between an upload and the program. Code:
+`packages/host/src/edit/ffmpeg/input-safety.ts`. Tests: `input-safety.test.ts` (18) and `run-input-safety.test.ts`
+(7), which hold the logic with a stubbed ffmpeg, and `packages/host/src/edit/ffmpeg-input-safety-real.test.ts` (18),
+which runs the staged real 8.1.3 programs on small files it generates (mp4, mov, webm, mp3, wav and m4a still probe,
+extract and render; a playlist, a concat script and a metadata file are refused; an address gets no request).
+
+- Protocol whitelist. `runFfmpeg` is the only place either program is spawned (`run.ts:174`). It puts
+  `-protocol_whitelist file,crypto,data` before every `-i` (first for ffprobe) and drops any whitelist a recipe passed,
+  so no call site can widen it. `http`, `https`, `tcp`, `udp`, `rtp`, `rtsp` and the rest are not allowed. It applies
+  on every desk, hosted or not.
+- Format gate. After the probe, an upload whose `format_name` is `hls`, `applehttp`, `concat`, `sdp`, `rtsp`, `rtp`,
+  `ffmetadata`, `data` or `dash` is refused with `400 unsupported_media` in the run's language (`mediaFormatRefused`,
+  `packages/core/src/mode-messages.ts`). It sits in Edit's `probe` (`recipes.ts:73`) and Meeting's `probeDuration`
+  (`meeting/audio.ts:59`). Edit's import (`handlers/edit.ts:330`) and the generated-media probe (`edit/jobs.ts`)
+  let that refusal through instead of turning it into the generic "could not read" line, and `extractMeetingAudio`
+  refuses a concat script before ffmpeg is asked to read it.
+- Timeout caps. The length a file declares is believed only up to six hours (`MAX_MEDIA_SECONDS`, the longest Meeting
+  reads: 36 chunks of ten minutes), so a forged duration cannot buy a timeout of days. On a hosted server only: an
+  analysis step stops at one hour, a render at two (`renderTimeoutMs`), and no single run outlives two hours
+  whatever asked for it (`hostedRunTimeoutMs`, `run.ts:180`), which also covers a recipe added later. A desk keeps
+  its old timeouts exactly. The point is the two ffmpeg slots (`DEFAULT_MAX_FFMPEG`): one forged file must not hold
+  one for days.
+- Measured finding. ffmpeg and ffprobe 8.1.3-9-g29e619e767 already refuse an address named inside a local HLS or SDP
+  file by themselves: a local file's default whitelist is `file,crypto,data`. Re-measured on 2026-10-07 with a
+  loopback server and ffprobe with no whitelist given: the HLS playlist printed "Protocol 'http' not on whitelist
+  'file,crypto,data'", the SDP file printed the same for `rtp`, and the server saw no request in either case. The
+  earlier pass reported the same for DASH; the hand-written manifest used on 2026-10-07 failed as invalid data and
+  made no request, so it does not confirm the reason for DASH. So the flag adds nothing for those formats. Its effect shows
+  with an input that is itself an address: `ffmpeg -i http://127.0.0.1:<port>/x.mp4` made 1 request when run
+  directly and 0 through `runFfmpeg` (`ffmpeg-input-safety-real.test.ts`, the control test and the two after it). The
+  path guard (`assertExistingInput`) already keeps recipes from passing an address, so the flag is a second lock on
+  the same door.
+- Residual. ffmpeg reads an `ffconcat` script with `safe=1`, which allows only relative file names beside the script
+  or below it. If the format gate were bypassed (a file the probe names one way and the run reads another), a script
+  could make ffmpeg read other files of the same tenant in that folder. It could not reach another tenant's folder
+  or an address, because the whitelist is `file` only and uploads are stored per tenant. The gate refuses the format
+  at the probe, so this stays closed unless detection differs between the probe and the run. Do not remove the gate
+  as redundant.

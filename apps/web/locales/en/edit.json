@@ -189,7 +189,8 @@
     "checking": "Checking…",
     "installGuide": "Install guide",
     "recheckFailed": "Could not reach the local host to re-check. Try again in a moment.",
-    "hostedUnavailable": "Video tools are not set up on this server yet, so probing, cutting, captions and export may not work. Ask your administrator to turn them on."
+    "hostedUnavailable": "Video tools are not set up on this server yet, so probing, cutting, captions and export may not work. Ask your administrator to turn them on.",
+    "bundledUnavailable": "The video tools that come with {productName} did not start, so probing, cutting, captions and export are off. Reinstall {productName} to fix this. Your work and files are kept."
   },
   "errors": {
     "apply": "Could not apply edit",
