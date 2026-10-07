@@ -108,6 +108,39 @@ Rules:
 
 `.ref/` (gitignored) holds two third-party repositories for reading only, OpenMausBot and hermes-agent. Take ideas, never code, and never anything from `OpenMausBot/enterprise/`.
 
+### HYP AI hosting plan (Rizky, 2026-10-07)
+
+His words: "start small first with like 100-500 users", then "when there is demand on the next 2 weeks then we can change and switch". The order of work he set the same day is Nultron preview first, HYP AI after he has tested Nultron. The server itself is a priority, because he has to give Hypernet its address.
+
+**Who owns what (Rizky, same day).** His words: "this machine will be theirs anyway, im on the rnd and theyre on the production and the marketing sales". Rizky's side does research and development. Hypernet runs production, marketing and sales, and the server is theirs. Hypernet connects its own domain to the server: two names, one for the app and one for the sign-in page, each an A record to the Elastic IP, with no AAAA record and no proxy in front, because the server gets its own certificates.
+
+**Stage 1, now: one CVM.**
+- Tencent Cloud CVM in Jakarta, SA5 4 vCPU / 8 GB, Ubuntu 24.04, 50 GB system disk and 100 GB data disk. About 64 USD a month, inside the 100 USD October budget.
+- Its own machine and its own address. Never the Lighthouse box that serves the DPS sites (NDA).
+- Bind an Elastic IP and give Hypernet that address. It stays the same through a resize or a rebuild.
+- Buy it inside a VPC, so it can join a scaling group later.
+- Before testers arrive, a load test on the real machine replaces the capacity estimate. The rig is in `C:\Users\rizky\hypey\deploy\loadtest\`.
+
+**Stage 2, when demand comes: resize the same CVM.**
+- 8 vCPU / 16 GB is about 117 USD a month, then 16 / 32. A resize is a restart of a few minutes.
+- One server is the ceiling, at about 19,000 accounts by the capacity model. That number is an estimate and has not been measured.
+
+**Stage 3, later: Auto Scaling.** He pointed at Tencent Auto Scaling (doc product 377). What its docs say, read on 2026-10-07:
+- It adds and removes whole servers behind a load balancer, by load or by schedule. The service is free and the servers are billed.
+- It cannot make one server bigger: "Auto Scaling does not support scaling up".
+- Apps in a scaling group "should be stateless and replaceable", and the servers "cannot save the status information and data".
+- A CVM bought now can be added to a scaling group later if it is in the same region and VPC and is running. A server added by hand is not terminated when the group shrinks.
+
+The hosted app does not meet that today. It is one process on one SQLite file with customers' files on the local disk (SR-29, SR-66), so a second server would start empty. The Kubernetes manifests in `webapp-deploy/k8s/` run exactly one app pod for the same reason. Before Auto Scaling can add servers:
+- the product database moves off SQLite to a managed database (open decision 1 in the pivot record);
+- files move to object storage (the COS backend has never run against a real bucket);
+- sign-in sessions, the run cap and in-flight jobs are shared between servers;
+- the app starts from a server image and passes a health check behind a load balancer.
+
+None of that is started, and it does not fit in two weeks. Do not start it in passing: it needs Rizky's word. At rest that stage costs about 185 USD a month (two servers, a load balancer, a managed database) before any scaling.
+
+Earlier the same day he chose a Lighthouse 8 vCPU / 16 GB (78 USD a month) and then changed to CVM. Prices, the Lighthouse table and the doc links are in the vault note `40-Dev/nultron-hosting-map.md`. The deck is `nultron-files/hyp-ai/HYP-AI-Auto-Scaling-Tencent.pptx`.
+
 ## Current focus (Rizky, 2026-10-01): fix, perfect, polish — no new modes
 
 Until Rizky lifts it, work is limited to three things, in this order:
