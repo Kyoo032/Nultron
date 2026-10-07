@@ -88,6 +88,18 @@ describe("file, Knowledge and code tool labels (en)", () => {
     ).toBe("Ran JavaScript");
   });
 
+  it("names the deck a build_deck call made, and says so when it could not", () => {
+    const input = { title: "Warung expansion plan", slides: [{ heading: "One" }] };
+    const made = { ok: true, artifactId: "a", filename: "warung-expansion-plan.pptx", slideCount: 2 };
+    expect(toolRowLabel("build_deck", input, made)).toBe("Built “Warung expansion plan”");
+    expect(toolRowLabel("build_deck", input, { ok: false, reason: "checks", message: "x" })).toBe(
+      "Could not build the deck",
+    );
+    expect(toolActivityLabel("build_deck", input)).toBe("Building “Warung expansion plan”…");
+    expect(toolRowLabel("build_deck", {}, made)).toBe("Build deck");
+    expect(toolDoneLabel("build_deck")).toBe("Build deck");
+  });
+
   it("uses the activity wording while the call is still running", () => {
     expect(toolActivityLabel("read_file", { path: "notes/plan.md" })).toBe("Reading notes/plan.md…");
     expect(toolActivityLabel("write_file", { path: "a.md" })).toBe("Writing a.md…");
@@ -241,8 +253,23 @@ describe("the tools catalog resolves every key the rows build at run time", () =
     "delete_file",
     "knowledge_search",
     "run_code",
+    "build_deck",
   ];
   const keys = [
+    ...[
+      "label",
+      "open",
+      "close",
+      "openAria",
+      "closeAria",
+      "download",
+      "downloading",
+      "downloadAria",
+      "downloadFailed",
+      "noPreview",
+      "outlineAria",
+      "previewAria",
+    ].map((name) => `chat.deck.${name}`),
     ...tools.map((tool) => `chat.tools.name.${tool}`),
     ...tools.map((tool) => `chat.tools.doing.${tool}`),
     ...tools.map((tool) => `chat.tools.done.${tool}`),
@@ -263,6 +290,8 @@ describe("the tools catalog resolves every key the rows build at run time", () =
       "excerptsOne",
       "lineRange",
       "version",
+      "slides",
+      "slidesOne",
     ].map((name) => `chat.tools.detail.${name}`),
     ...["timeout", "memory", "syntax", "runtime", "too_large", "busy", "unavailable", "other"].map(
       (reason) => `chat.tools.code.reason.${reason}`,
@@ -281,8 +310,8 @@ describe("the tools catalog resolves every key the rows build at run time", () =
     expect(unresolved).toEqual([]);
   });
 
-  it("lists sixty-eight keys, so a key dropped from the list is noticed", () => {
-    expect(keys).toHaveLength(68);
+  it("lists eighty-six keys, so a key dropped from the list is noticed", () => {
+    expect(keys).toHaveLength(86);
   });
 });
 

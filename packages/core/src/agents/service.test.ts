@@ -7,6 +7,7 @@ import { DEFAULT_CHAT_MODEL, DEFAULT_CHAT_PROMPT, DEFAULT_CHAT_TOOLS } from "./d
 
 /** Every starter tool, sorted: a literal, so a tool added or dropped by accident fails here. */
 const STARTER_TOOLS_SORTED = [
+  "build_deck",
   "calculator",
   "datetime",
   "delete_file",

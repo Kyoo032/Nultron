@@ -217,6 +217,7 @@ describe("formatWhen and filesErrorKey", () => {
     expect(filesErrorKey("not_found")).toBe("files.errors.notFound");
     expect(filesErrorKey("storage_quota_exceeded")).toBe("files.errors.quota");
     expect(filesErrorKey("too_many_files")).toBe("files.errors.tooMany");
+    expect(filesErrorKey("save_failed")).toBe("files.errors.saveFailed");
     expect(filesErrorKey("something_new")).toBe("files.errors.generic");
   });
 

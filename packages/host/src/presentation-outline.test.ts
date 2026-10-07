@@ -8,6 +8,7 @@ import {
   mergePresentationSlide,
   resolvePresentationSlideLayout,
 } from "./presentation-outline";
+import { firstXmlIllegalCharIn } from "./xml-test-support";
 
 describe("extractJsonObject", () => {
   it("pulls the outer object from prose", () => {
@@ -143,5 +144,49 @@ describe("resolvePresentationSlideLayout", () => {
     expect(resolvePresentationSlideLayout(slides, 0).kind).toBe("section");
     expect(resolvePresentationSlideLayout(slides, 1).kind).toBe("bullets");
     expect(resolvePresentationSlideLayout(slides, 2).kind).toBe("close");
+  });
+});
+
+/** XML 1.0 refuses these in a part; PowerPoint answers a file holding one with "needs repair". */
+describe("characters XML cannot hold", () => {
+  const dirty = {
+    title: "Plan\u0000 2027",
+    slides: [
+      {
+        kind: "bullets",
+        heading: "Why\u0008 now",
+        subhead: "Sub\u000bline",
+        bullets: ["Lunch\u000corders doubled", "Delivery\u001b is a third"],
+        aside: "Aside\u0001",
+        notes: "Say it\u0007 slowly",
+        shapes: [{ id: "s1", kind: "text", x: 1, y: 1, w: 10, h: 10, text: "Tag\u0002" }],
+      },
+    ],
+  };
+
+  it("are removed from every text field of an outline body, so the export is never written with one", () => {
+    const outline = parsePresentationOutlineBody(dirty);
+    expect(firstXmlIllegalCharIn(outline)).toBeNull();
+    expect(outline.title).toBe("Plan 2027");
+    expect(outline.slides[0]).toMatchObject({
+      heading: "Why now",
+      subhead: "Sub line",
+      bullets: ["Lunch orders doubled", "Delivery is a third"],
+      aside: "Aside",
+      notes: "Say it slowly",
+    });
+    expect(outline.slides[0]?.shapes[0]?.text).toBe("Tag");
+  });
+
+  it("are removed from a model's outline and from a single regenerated slide", () => {
+    const fromModel = parsePresentationOutline(JSON.stringify(dirty));
+    expect(firstXmlIllegalCharIn(fromModel)).toBeNull();
+    const slide = parsePresentationSlide(JSON.stringify(dirty.slides[0]));
+    expect(firstXmlIllegalCharIn(slide)).toBeNull();
+  });
+
+  it("do not turn a heading made only of them into a heading", () => {
+    expect(() => parsePresentationOutlineBody({ title: "T", slides: [{ heading: "\u0000\u0001" }] })).toThrow(ApiError);
+    expect(() => parsePresentationOutlineBody({ title: "\u0000\u0007", slides: [{ heading: "H" }] })).toThrow(ApiError);
   });
 });

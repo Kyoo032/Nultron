@@ -508,6 +508,10 @@ describe("desk file store", () => {
           measured_at integer,
           updated_at integer NOT NULL
         );
+        -- Empty: the quota also reads the tenant's saved artifacts, and this tenant has none.
+        CREATE TABLE organizations (id text PRIMARY KEY NOT NULL, tenant_id text NOT NULL);
+        CREATE TABLE workspaces (id text PRIMARY KEY NOT NULL, organization_id text NOT NULL);
+        CREATE TABLE artifacts (id text PRIMARY KEY NOT NULL, workspace_id text NOT NULL, size_bytes integer DEFAULT 0 NOT NULL);
       `);
       counters.prepare("INSERT INTO tenants (id) VALUES (?)").run("tenant-quota");
       registerTenantStorageSql(counters);

@@ -278,7 +278,8 @@ test (`bytes_used + ? <= ?`), so SQLite evaluates it against the row under the r
 `changes()` is the verdict. It replaces Phase 6's per-tenant promise chain, which held for one
 process and said so in its own comment; the CVM runbook's scaling step is a second app container
 behind the same Caddy. `putTenantObject` (`packages/host/src/tenant-storage.ts:540`) seeds the
-counter row from a real measure first, subtracts the measured job trees to get the budget, reserves,
+counter row from a real measure first, subtracts the measured job trees (and, since 2026-10-07, the
+tenant's saved artifacts, read from their rows: `tenant-object-storage.md`) to get the budget, reserves,
 and refunds with a negated delta if the put then fails.
 
 ## Where things live

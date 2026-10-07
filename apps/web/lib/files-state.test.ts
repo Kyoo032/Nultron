@@ -48,7 +48,17 @@ function ready(): ViewerState {
 
 function fakeApi(over: Partial<FilesApi> = {}): FilesApi {
   const fail = async (): Promise<FilesOutcome<never>> => ({ ok: false, code: "error", status: 500 });
-  return { list: fail, content: fail, versions: fail, version: fail, save: fail, revert: fail, remove: fail, ...over };
+  return {
+    list: fail,
+    content: fail,
+    download: fail,
+    versions: fail,
+    version: fail,
+    save: fail,
+    revert: fail,
+    remove: fail,
+    ...over,
+  };
 }
 
 describe("opening a file", () => {

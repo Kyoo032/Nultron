@@ -21,6 +21,7 @@ describe("default chat tools", () => {
       "delete_file",
       "run_code",
       "self_check",
+      "build_deck",
     ]);
   });
 
@@ -52,6 +53,12 @@ describe("default chat prompt", () => {
     expect(DEFAULT_CHAT_PROMPT).toMatch(/multiple steps|several steps/);
     expect(DEFAULT_CHAT_PROMPT).toMatch(/written under \/workspace\/out/);
     expect(DEFAULT_CHAT_PROMPT).toMatch(/first Python run[^.]*slow/);
+  });
+
+  it("tells the model build_deck writes the deck in the conversation's language, and where the file appears", () => {
+    expect(DEFAULT_CHAT_PROMPT).toMatch(/build_deck makes a PowerPoint deck from an outline you write/);
+    expect(DEFAULT_CHAT_PROMPT).toMatch(/in the language of this conversation/);
+    expect(DEFAULT_CHAT_PROMPT).toMatch(/download button under your answer/);
   });
 
   it("keeps the past-chats rule the old prompt had", () => {

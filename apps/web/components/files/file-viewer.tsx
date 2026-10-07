@@ -12,9 +12,12 @@ export type FileViewerProps = {
   readonly selfUserId: string | null;
   /** A restore or a delete is in flight: nothing in the viewer may be pressed. */
   readonly busy: boolean;
-  /** The host's code for the last restore or delete that failed. */
+  /** The newest version is being fetched to save: Download waits for it. */
+  readonly downloading: boolean;
+  /** The host's code for the last restore, delete or download that failed. */
   readonly actionErrorCode: string | null;
   readonly onClose: () => void;
+  readonly onDownload: () => void;
   readonly onPick: (version: number) => void;
   readonly onAsk: (confirm: "restore" | "delete") => void;
   readonly onCancelConfirm: () => void;
@@ -307,6 +310,18 @@ export function FileViewer(props: FileViewerProps) {
           {t("files.restore.button")}
         </button>
       )}
+      {latest ? (
+        <button
+          type="button"
+          className="btn btn-secondary"
+          disabled={busy || props.downloading}
+          onClick={props.onDownload}
+          aria-label={t("files.download.aria", { path: state.path })}
+          data-testid="file-download"
+        >
+          {props.downloading ? t("files.download.working") : t("files.download.button")}
+        </button>
+      ) : null}
       <button
         ref={deleteRef}
         type="button"

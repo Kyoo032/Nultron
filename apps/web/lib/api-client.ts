@@ -7,6 +7,7 @@ import {
   type IpcHostRequest,
   type IpcHostResponse,
 } from "./desktop-bridge";
+import { throwIfSaveFailed } from "./desktop-save";
 import { publishGate } from "./gate-state";
 import { noteGatewayResponse } from "./gateway-blocked";
 import { parseGatewayGate, type GatewayGatePayload } from "./gateway-gate";
@@ -211,7 +212,9 @@ async function transportFetch(input: string, init: RequestInit, method: string):
   }
   if (result.type === "bytes") {
     if (result.filename) {
-      await saveDesktopBytes(result.filename, result.bytes);
+      // The shell answers whether the file was written. A refusal (the disk, the size) throws here, so
+      // the button that asked can say it did not save; a closed dialog is the person's choice.
+      throwIfSaveFailed(await saveDesktopBytes(result.filename, result.bytes));
     }
     return bytesResponse(result);
   }

@@ -12,6 +12,7 @@ import { useBuddyClaim } from "@/lib/use-buddy-claim";
 import { useHoldOnMount } from "@/lib/use-hold-on-mount";
 import { fileCardDetail, jobEmbedsFromTools, splitUserFileBlocks } from "@/lib/message-embeds";
 import { collectToolMediaParts } from "@/lib/tool-media";
+import { DeckCards } from "@/components/chat-deck-card";
 import { ToolRowBody, isRichTool } from "@/components/tool-rows/tool-row";
 import { showsToolSpinner, toolActivityLabel, toolCallSummary } from "@/lib/tool-labels";
 import type { ContentPart, ToolCallPart } from "@agentforge/core/content";
@@ -161,6 +162,7 @@ export function ChatTurn({ role, content, live }: Props) {
               </>
             )}
             {liveMedia.length > 0 ? <MediaParts parts={liveMedia} /> : null}
+            <DeckCards tools={visibleTools} />
             {jobs.map((job, index) => (
               <MessageEmbed
                 key={`${job.title}-${index}`}

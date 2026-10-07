@@ -92,6 +92,7 @@ describe("mode harness specs", () => {
       web_fetch: 8,
       run_code: 6,
       self_check: 4,
+      build_deck: 4,
     });
   });
 
@@ -129,6 +130,7 @@ describe("mode harness specs", () => {
       "delete_file",
       "run_code",
       "self_check",
+      "build_deck",
     ]);
   });
 

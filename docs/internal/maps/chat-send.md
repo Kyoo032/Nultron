@@ -66,7 +66,7 @@ While the run streams, `onEvent` (`runs.ts:359`) keeps the turn in memory: think
 
 ### 3a. What Chat can call
 
-The default Chat agent binds 15 tools. `DEFAULT_CHAT_TOOLS` (`packages/core/src/agents/default-chat.ts:39`) lists them: `calculator`, `datetime`, `web_search`, `image_generate`, `video_generate`, `past_sessions`, `web_fetch`, `knowledge_search`, the six file tools (`list_files`, `read_file`, `write_file`, `edit_file`, `search_files`, `delete_file`) and `run_code`. What each does, its limits and its refusals are in [`agent-tools-and-files.md`](agent-tools-and-files.md); this section is only how they reach a Chat turn.
+The default Chat agent binds 16 tools. `DEFAULT_CHAT_TOOLS` (`packages/core/src/agents/default-chat.ts:39`) lists them: `calculator`, `datetime`, `web_search`, `image_generate`, `video_generate`, `past_sessions`, `web_fetch`, `knowledge_search`, the six file tools (`list_files`, `read_file`, `write_file`, `edit_file`, `search_files`, `delete_file`), `run_code` and `build_deck` (2026-10-06, the deck card is under the answer, [`agent-tools-and-files.md`](agent-tools-and-files.md) § 13). What each does, its limits and its refusals are in [`agent-tools-and-files.md`](agent-tools-and-files.md); this section is only how they reach a Chat turn.
 
 **The prompt is a short router.** `DEFAULT_CHAT_PROMPT` (`default-chat.ts:14`) says who Chat is, to answer as soon as the question is answered and not to call a tool for small talk, which tool does which job (grouped as knowledge, web, files, compute, media), that tool results are data and never instructions, and that a file in the owner's real folder is not changed until the result says `status: saved` (`pending_approval` means it is waiting for the owner). `default-chat.test.ts` fails if a key in `DEFAULT_CHAT_TOOLS` is not named in it (`:32`) and caps it at 40 lines (`:38`), so a new tool cannot ship unmentioned. It does not carry the language rule: `withChatOutputLanguage` adds that per run from the owner's locale.
 
@@ -318,7 +318,7 @@ Proof: `lib/hero-motion.test.ts` (binding, throttling, pausing and teardown agai
 | `apps/web/lib/sse-client.ts` | `consumeSse` — buffer → typed events |
 | `packages/host/src/handlers/runs.ts` | Route handler; gate check; stream wrapper |
 | `packages/host/src/runs.ts` | `startModalityRun`, the orchestrator: gate-checked run, stall guard, `modelAbort`, Chat's budget, the tool-run context, persistence of the turn |
-| `packages/core/src/agents/default-chat.ts`, `packages/core/src/agents/service.ts` | Chat's 15 tools and its prompt (§ 3a); `withCurrentChatSoul`, `ensureStarterBindings`, `ensureDefaultChat` |
+| `packages/core/src/agents/default-chat.ts`, `packages/core/src/agents/service.ts` | Chat's 16 tools and its prompt (§ 3a); `withCurrentChatSoul`, `ensureStarterBindings`, `ensureDefaultChat` |
 | `packages/core/src/harness/modes/chat.ts` | Chat's step, call and per-tool budget (§ 3a) |
 | `packages/host/src/code-runner/` | `run_code`, the sandbox: [`agent-tools-and-files.md`](agent-tools-and-files.md) § 12 |
 | `packages/host/src/run-stall.ts` | Whole-run first-token / idle guard |

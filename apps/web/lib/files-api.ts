@@ -3,6 +3,7 @@
  *
  *   GET    /api/v1/files           list (query dir, glob)
  *   GET    /api/v1/files/content   head text (query path)
+ *   GET    /api/v1/files/download  head as a file to save (query path)
  *   GET    /api/v1/files/versions  history (query path)
  *   GET    /api/v1/files/version   one version's text (query path, version)
  *   POST   /api/v1/files           save {path, content}
@@ -13,11 +14,30 @@
  * outcome and never throws: a dead network is `network`, a body this app cannot read is `bad_response`,
  * and a host refusal keeps the host's own code so the screen can say it in the owner's language.
  */
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, isElectron } from "@/lib/api-client";
+import { saveBlob } from "./artifacts-client";
+import { DesktopSaveError } from "./desktop-save";
+import { filenameFromDisposition, leafName } from "./download-name";
 import type { FileEntry, FileRead, FileVersion } from "./files-model";
 
 /** The slice of `apiFetch` these calls use, so a test can hand it a stub. */
 export type FilesFetch = (input: string, init?: RequestInit) => Promise<Response>;
+
+/**
+ * How a finished download reaches the person. In the packaged app `apiFetch` has already written the
+ * bytes through the native save dialog, so there is nothing left to do (a second save would open a
+ * second dialog); on the web the blob is saved through an anchor. Injected so a test can watch both.
+ */
+export type DownloadIo = {
+  readonly desktop: () => boolean;
+  readonly saveBlob: (blob: Blob, filename: string) => void;
+};
+
+/** Called, not bound: a test that mocks `api-client` without `isElectron` can still import this file. */
+const DEFAULT_DOWNLOAD_IO: DownloadIo = {
+  desktop: () => isElectron(),
+  saveBlob: (blob, filename) => saveBlob(blob, filename),
+};
 
 export type FilesOutcome<T> =
   | { readonly ok: true; readonly data: T }
@@ -25,9 +45,14 @@ export type FilesOutcome<T> =
 
 export type SavedFile = { readonly path: string; readonly version: number };
 
+/** The name the file was saved under. The bytes themselves went to the person's disk. */
+export type DownloadedFile = { readonly filename: string };
+
 export type FilesApi = {
   list(dir?: string, glob?: string): Promise<FilesOutcome<FileEntry[]>>;
   content(path: string): Promise<FilesOutcome<FileRead>>;
+  /** Saves the newest version of one file to the person's computer. */
+  download(path: string): Promise<FilesOutcome<DownloadedFile>>;
   versions(path: string): Promise<FilesOutcome<FileVersion[]>>;
   version(path: string, version: number): Promise<FilesOutcome<FileRead>>;
   save(path: string, content: string): Promise<FilesOutcome<SavedFile>>;
@@ -138,7 +163,31 @@ function jsonPost(body: unknown): RequestInit {
   return { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
 }
 
-export function createFilesApi(fetcher: FilesFetch = apiFetch): FilesApi {
+export function createFilesApi(fetcher: FilesFetch = apiFetch, io: DownloadIo = DEFAULT_DOWNLOAD_IO): FilesApi {
+  async function download(path: string): Promise<FilesOutcome<DownloadedFile>> {
+    let res: Response;
+    try {
+      res = await fetcher(`${BASE}/download${query({ path })}`);
+    } catch (error) {
+      // In the packaged app the fetcher also writes the file, and it throws when the disk refused it:
+      // that is not the network, and "check the connection" would send the person the wrong way.
+      return { ok: false, code: error instanceof DesktopSaveError ? "save_failed" : "network", status: 0 };
+    }
+    if (!res.ok) {
+      return { ok: false, code: errorCode(await res.json().catch(() => null)), status: res.status };
+    }
+    const filename = filenameFromDisposition(res.headers.get("Content-Disposition")) ?? leafName(path);
+    if (io.desktop()) {
+      return { ok: true, data: { filename } };
+    }
+    try {
+      io.saveBlob(await res.blob(), filename);
+    } catch {
+      return { ok: false, code: "bad_response", status: res.status };
+    }
+    return { ok: true, data: { filename } };
+  }
+
   async function call<T>(
     url: string,
     init: RequestInit | undefined,
@@ -161,6 +210,7 @@ export function createFilesApi(fetcher: FilesFetch = apiFetch): FilesApi {
   return {
     list: (dir, glob) => call(`${BASE}${query({ dir, glob })}`, undefined, (body) => parseList(body, parseEntry)),
     content: (path) => call(`${BASE}/content${query({ path })}`, undefined, parseRead),
+    download,
     versions: (path) => call(`${BASE}/versions${query({ path })}`, undefined, (body) => parseList(body, parseVersion)),
     version: (path, version) => call(`${BASE}/version${query({ path, version })}`, undefined, parseRead),
     save: (path, content) => call(BASE, jsonPost({ path, content }), parseSaved),
