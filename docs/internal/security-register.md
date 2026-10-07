@@ -221,6 +221,7 @@ Nothing was driven on a hosted instance.
 | [SR-135](#sr-135) | Low | Enterprise image and Personal installers carry a third-party static ffmpeg (BtbN on the image and Windows, Martin Riedl's build server on macOS, GPL builds), pinned by sha256; the Personal copy runs with the person's own rights; an upload may not steer it to addresses, other files or hours of run time (input limits) | Recorded (2026-10-06); desktop bundle added the same day, not packed; input limits built 2026-10-06, recorded 2026-10-07, in the tree, not deployed | None for the image; re-pin before the upstream release expires; macOS builds accepted by Rizky on 2026-10-06 for the preview Mac installer only, so a Mac release that is no longer preview is blocked until our own build is pinned |
 | [SR-136](#sr-136) | Low | A Chat turn stored and streamed a tool's input and output with no redaction, and a failed tool's error text now reaches the model | Fixed in tree, tested; not driven on a live model (2026-10-06) | None |
 | [SR-145](#sr-145) | Low | A new upload route runs the native document reader on a file from the Chat composer (both products), and an attachment is untrusted text in a person's message | Fixed in tree, tested at unit level; not driven (2026-10-07; the two High review findings are fixed) | None; drive it before the next cut that carries it |
+| [SR-150](#sr-150) | Low | Chat now sends the pixels of an attached image to the gateway, and the personal-data masker cannot see inside a picture | Open, accepted for the beta (2026-10-06). Review 2026-10-07: link refusal and media-kind check fixed in tree; colleague media and job `https://` attachments recorded, open | None for the beta; colleague media belongs to the hosted team-privacy work |
 | [SR-08](#sr-08) | Info | The portal token vault is process memory only | Superseded by [SR-64](#sr-64), 2026-09-23 | Dev only |
 | [SR-15](#sr-15) | Info | Music relay: checked, not a key-exfiltration issue. It does send a spoofed browser `User-Agent` | Checked, not an issue | Dev only |
 | [SR-18](#sr-18) | Info | `X-Forwarded-Proto` and `X-Forwarded-For` trust: checked, sound as deployed today | Checked, not an issue | Blocks Tencent deploy on any topology change |
@@ -4377,6 +4378,73 @@ Residuals, none a blocker: (1) a memory-safety bug in the native converter would
 Not driven: either route in a browser, on the packaged app and on a hosted deploy with two people on one desk; a real encrypted or decompression-bomb file (the mapping from the reader's codes is unit-tested, the reader's own refusals are `file-extract/index.test.ts`'s).
 
 Gate: none. Drive it on webdev, the packed app and the hosted deploy before the next cut that carries it.
+
+
+### SR-150 {#sr-150}
+
+**Chat now sends the pixels of an attached image to the gateway, and the personal-data masker cannot see
+inside a picture.** Both products. Raised while fixing the Chat image bug of 2026-10-06
+(`docs/internal/unreleased.md`). Low. Open, accepted for the beta.
+
+Evidence: until 2026-10-06 a Chat image never left the machine. `imagePartForProvider` replaced it with a
+sentence (`packages/core/src/content/provider-media.ts`, before this change) and the model answered that it
+had been given no image. That was the bug, and it also meant the masker never had pixels to miss.
+`prepareChatImageHistory` (`packages/host/src/chat-image-history.ts`) now sends each image as a data URL,
+so a screenshot with an identity card, an account number or a name in it reaches the model as the person
+attached it. `maskPiiInParts` (`packages/core/src/security/pii.ts:277-284`) rewrites text and thinking parts
+and returns every other part unchanged, so it cannot mask what a picture shows. The text around the image
+is still masked: `packages/host/src/runs-image-input.test.ts`, "keeps the text around the image masked and
+the image itself whole".
+
+What did not change: the destination. The bytes go in the same request as the text, to the same base URL
+the runtime already used (the pinned gateway on Personal, SR-85; the provider registry's literals on the
+hosted server, `docs/internal/maps/model-policy.md` § 8), and the redirect rule of [SR-99](#sr-99) is the
+same as for the text.
+
+Two things make it larger than one request. Each Chat turn re-reads the whole thread, so an earlier image
+is sent again on every later turn, newest first, while the request holds at most 6 MiB of image
+(`CHAT_IMAGE_REQUEST_BYTES`; it was 16 MiB until the review of 2026-10-07, which measured what the AI SDK
+does with a body that size: it sends the whole prompt again on every one of Chat's up to 12 tool steps);
+an image stays in front of the gateway for as long as the conversation runs.
+And the gateway's retention is Toko Token's policy, not this app's (see **Secrets and prompt security** in
+`AGENTS.md`).
+
+**Review findings, 2026-10-07, and what was done.**
+
+- **A link in a Chat turn was a fetch from this host, with no size limit (fixed for Chat).** The first
+  version counted an `https://` image part as 0 bytes and passed it on "for the gateway to fetch". That is
+  true for the chat-completions, Responses and Anthropic wires, which hand the URL to the gateway, and not
+  true for the Google wire: the Gemini provider takes only its own file URLs as URLs
+  (`@ai-sdk/google` `isSupportedFileUrl`), so `ai` 4.3.19 downloads any other `http(s)` image part itself,
+  with a plain `fetch` that follows redirects and has no size cap (`ai/dist/index.js`, `download` and
+  `downloadAssets`). `isUnreachableProviderMediaUrl` refuses loopback only, so on a hosted server a crafted
+  body with `https://169.254.169.254/...` (or a private address, or a redirect to one) was a host-side
+  request to that address, its answer sent to the model as a picture. The composer never sends a link: it
+  uploads the file and sends the stored copy. `assertChatImagesSendable` and `prepareChatImageHistory` now
+  refuse an `https://` image part in a Chat user turn (a sentence for the person on the latest turn, the
+  "cannot see it" note on an earlier one; tests in `chat-image-history.test.ts` and
+  `runs-image-input.test.ts`). **Not fixed here, and the same shape:** job regeneration accepts `https://`
+  image attachments (`readJobRegenAttachments`, `job-regen.ts`), and on a Gemini model the SDK would fetch
+  them from the host the same way. That path was not changed.
+- **A media id named by a crafted part could be a video or an audio file (fixed).** The reader ignored the
+  row's `kind`, so a crafted `image_url` part naming a stored video was read whole, base64-encoded and sent
+  as an image part. Chat now reads a row only when its kind is `image`, and judges its stored size before
+  any bytes are read (`statMedia`, `media.ts`; `chat-image-history.ts`).
+- **Colleagues' media inside one company (recorded, not fixed here).** `readMediaDataUrl` is scoped to the
+  organization (`media.organizationId`), while threads are scoped to the person. On the hosted server a
+  person who learns a colleague's media id can name it in an `image_url` part of their own turn, and the
+  host reads it and sends it to the model, so what it shows can come back in the answer. The existing media
+  file route (`GET /api/v1/media/:mediaId/file`, `router.ts:341`, `handlers/media.ts:32`) already serves the
+  same bytes to anyone in the organization, so this is a second way to the same file, not a wider reach.
+  The fix is person-scoped media in server mode, with a Personal-parity test (Personal has one person per
+  desk, so nothing changes there). It belongs to the hosted team-privacy work (`AGENTS.md`, "Private by
+  person on Enterprise"), not to this lane.
+
+Required action: none for the beta. The person attaches the image on purpose and the composer already says
+what a model will receive. If the owner wants more, the options are a one-line note under the attach control
+that pictures are sent as they are, or a pixel-level redaction step; the second has no helper in the tree.
+
+Gate: none.
 
 ## Info and checked-not-an-issue
 

@@ -86,6 +86,12 @@
     "thinking": "Berpikir",
     "imageCaption": "Apa yang ada di gambar ini?",
     "videoCaption": "Ringkas video ini.",
+    "imageNote": {
+      "no": "{model} tidak dapat membaca gambar. Ganti ke model yang bisa, atau hapus gambarnya.",
+      "unknown": "Kami belum bisa memastikan {model} membaca gambar. Gambar tetap dikirim. Jika {model} tidak bisa membacanya, Anda akan melihat pesan kesalahan.",
+      "switch": "Pakai {model}"
+    },
+    "videoNote": "Model belum bisa menonton video di Chat. Video tetap ada di obrolan ini, tetapi hanya tulisan Anda yang dikirim ke model.",
     "needsKey": "Tempel kunci di Pengaturan sebelum ini bisa jalan."
   },
   "thinking": {
