@@ -28,6 +28,11 @@
       "unreachable": "unreachable"
     }
   },
+  "saveFailed": {
+    "writeFailed": "The file could not be written to that location. Choose another folder, or free some space, and try again.",
+    "tooLarge": "This file is too large to save from here.",
+    "generic": "The file could not be saved. Try again."
+  },
   "artifactActions": {
     "download": "Download Markdown",
     "saving": "Saving…",

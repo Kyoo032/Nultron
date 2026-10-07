@@ -117,6 +117,10 @@ function labelVars(toolKey: RichToolKey, args: Rec | null): Record<string, strin
       const language = codeLanguageName(args?.language);
       return language ? { language } : null;
     }
+    case "build_deck": {
+      const title = readString(args, "title");
+      return title ? { title: capArg(title) } : null;
+    }
   }
 }
 

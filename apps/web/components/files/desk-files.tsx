@@ -208,6 +208,20 @@ export function DeskFiles() {
     void refreshList();
   }
 
+  /** Saves the newest version of the open file. A refusal shows in the viewer's own alert. */
+  async function onDownload() {
+    if (busy !== "none" || path === null) {
+      return;
+    }
+    setBusy("download");
+    setActionErrorCode(null);
+    const outcome = await api.download(path);
+    setBusy("none");
+    if (!outcome.ok) {
+      setActionErrorCode(outcome.code);
+    }
+  }
+
   async function onConfirmDelete() {
     if (busy !== "none" || path === null) {
       return;
@@ -259,6 +273,7 @@ export function DeskFiles() {
     onCancelConfirm: () => dispatch({ type: "cancelConfirm" }),
     onConfirmRestore: () => void onConfirmRestore(),
     onConfirmDelete: () => void onConfirmDelete(),
+    onDownload: () => void onDownload(),
   };
 
   return (

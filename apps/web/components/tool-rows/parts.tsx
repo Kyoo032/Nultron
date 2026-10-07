@@ -1,7 +1,8 @@
 "use client";
 
 import { Link, useInRouterContext } from "react-router-dom";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { createFilesApi } from "@/lib/files-api";
 import { t } from "@/lib/i18n";
 import { revealFolderProposals } from "./focus-proposals";
 import { knowledgeFileHref, type ToolStatus } from "./results";
@@ -64,6 +65,44 @@ export function FileChip({ path, text }: { path: string; text: string }) {
     <a href={href} {...props}>
       {inner}
     </a>
+  );
+}
+
+type DownloadState = "idle" | "busy" | "failed";
+
+/**
+ * Saves a desk file to the person's computer, next to the chip that opens it. It asks the host for the
+ * newest version of that path (`GET /api/v1/files/download`), so a file the agent has edited since this
+ * row was drawn downloads as it is now. A refusal (the file was deleted, the network dropped) turns the
+ * label into a short sentence and the button stays pressable.
+ */
+export function FileDownloadButton({ path }: { path: string }) {
+  const api = useMemo(() => createFilesApi(), []);
+  const [state, setState] = useState<DownloadState>("idle");
+  async function onDownload() {
+    if (state === "busy") {
+      return;
+    }
+    setState("busy");
+    const outcome = await api.download(path);
+    setState(outcome.ok ? "idle" : "failed");
+  }
+  return (
+    <button
+      type="button"
+      className={`${CHIP} cursor-pointer disabled:cursor-wait disabled:opacity-60`}
+      disabled={state === "busy"}
+      onClick={() => void onDownload()}
+      title={path}
+      aria-label={t("files.download.aria", { path })}
+      data-testid="tool-row-file-download"
+    >
+      {state === "busy"
+        ? t("files.download.working")
+        : state === "failed"
+          ? t("files.download.failed")
+          : t("files.download.button")}
+    </button>
   );
 }
 

@@ -156,7 +156,8 @@
       "search_files": "Search files",
       "delete_file": "Delete file",
       "knowledge_search": "Knowledge search",
-      "run_code": "Run code"
+      "run_code": "Run code",
+      "build_deck": "Build deck"
     },
     "doing": {
       "list_files": "Listing files in {dir}…",
@@ -168,6 +169,7 @@
       "delete_file": "Deleting {path}…",
       "knowledge_search": "Searching your knowledge for “{query}”…",
       "run_code": "Running {language}…",
+      "build_deck": "Building “{title}”…",
       "web_fetch": "Opening {host}…"
     },
     "done": {
@@ -180,6 +182,7 @@
       "delete_file": "Deleted {path}",
       "knowledge_search": "Searched your knowledge for “{query}”",
       "run_code": "Ran {language}",
+      "build_deck": "Built “{title}”",
       "web_fetch": "Opened {host}"
     },
     "failed": {
@@ -191,6 +194,7 @@
       "delete_file": "Could not delete {path}",
       "knowledge_search": "Could not search your knowledge",
       "run_code": "{language} run failed",
+      "build_deck": "Could not build the deck",
       "web_fetch": "Could not open {host}"
     },
     "pending": {
@@ -208,7 +212,9 @@
       "excerpts": "{n} excerpts",
       "excerptsOne": "1 excerpt",
       "lineRange": "Lines {from}–{to} of {total}",
-      "version": "Version {n}"
+      "version": "Version {n}",
+      "slides": "{n} slides",
+      "slidesOne": "1 slide"
     },
     "open": "Open",
     "openAria": "Open {path} in the Knowledge Base",
@@ -235,6 +241,20 @@
         "other": "The run did not finish."
       }
     }
+  },
+  "deck": {
+    "label": "PowerPoint deck",
+    "open": "Open",
+    "close": "Close",
+    "openAria": "Open the slides of {title}",
+    "closeAria": "Close the slides of {title}",
+    "download": "Download",
+    "downloading": "Downloading…",
+    "downloadAria": "Download {title} as {filename}",
+    "downloadFailed": "Could not download the deck. Try again.",
+    "noPreview": "The slides cannot be shown here, but the file is ready to download.",
+    "outlineAria": "Slides in this deck",
+    "previewAria": "Slide preview of {title}"
   },
   "error": {
     "loading": "Chat is still loading",

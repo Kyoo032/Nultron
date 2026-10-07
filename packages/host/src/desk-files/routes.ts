@@ -3,6 +3,7 @@
  *
  *   GET    /api/v1/files           list (query dir, glob)
  *   GET    /api/v1/files/content   read the head (query path)
+ *   GET    /api/v1/files/download  the head as an attachment (query path)
  *   GET    /api/v1/files/versions  version history (query path)
  *   GET    /api/v1/files/version   read one version (query path, version)
  *   POST   /api/v1/files           save {path, content} as the signed-in person
@@ -20,6 +21,7 @@ import type { DeskPath, FileRefusalCode } from "@agentforge/core/tools/files";
 import { jsonError, jsonOk } from "../errors";
 import { getTenant } from "../tenant";
 import type { HostHandler, HostRequest, HostResult } from "../types";
+import { deskFileDelivery } from "./download";
 import { createDeskRoot, listVersions, readVersion, revertTo } from "./store";
 
 export type DeskFileRoute = readonly [method: string, path: string, handler: HostHandler];
@@ -111,6 +113,31 @@ export async function handleGetFileContent(request: HostRequest): Promise<HostRe
   }
 }
 
+/**
+ * The head of one file as a download. It reads through the same desk root as `/content`, so the desk,
+ * the tenant and the path rules are the ones every other file route has, and another tenant's path is
+ * the same 404 as a path nobody wrote. Packaged, the bytes cross IPC and `apiFetch` opens the native
+ * save dialog; on the web the renderer saves the blob.
+ */
+export async function handleGetFileDownload(request: HostRequest): Promise<HostResult> {
+  try {
+    const path = requirePath(request.query.path);
+    const { root } = await deskRootFor(request);
+    const file = await root.read(path);
+    const delivery = deskFileDelivery(path);
+    return {
+      type: "bytes",
+      status: 200,
+      bytes: new Uint8Array(Buffer.from(file.text, "utf8")),
+      contentType: delivery.contentType,
+      filename: delivery.filename,
+      headers: { ...delivery.headers },
+    };
+  } catch (error) {
+    return fail(error);
+  }
+}
+
 export async function handleGetFileVersions(request: HostRequest): Promise<HostResult> {
   try {
     const path = requirePath(request.query.path);
@@ -172,6 +199,7 @@ export async function handleDeleteFile(request: HostRequest): Promise<HostResult
 export const DESK_FILE_ROUTES: readonly DeskFileRoute[] = [
   ["GET", "/api/v1/files", handleGetFiles],
   ["GET", "/api/v1/files/content", handleGetFileContent],
+  ["GET", "/api/v1/files/download", handleGetFileDownload],
   ["GET", "/api/v1/files/versions", handleGetFileVersions],
   ["GET", "/api/v1/files/version", handleGetFileVersion],
   ["POST", "/api/v1/files", handlePostFile],

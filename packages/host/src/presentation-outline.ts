@@ -1,5 +1,13 @@
 import { z } from "zod";
 import { ApiError } from "@agentforge/core";
+import { stripXmlIllegalChars } from "./xml-text";
+
+/**
+ * Text for a slide, with the characters XML 1.0 cannot hold taken out (a form feed from a PDF, a NUL).
+ * Every path that reaches the PowerPoint writer parses through this schema, and the writer escapes
+ * markup but not control characters, so this is where the export is kept from needing repair.
+ */
+const slideText = z.string().transform(stripXmlIllegalChars);
 
 export const presentationSlideKindSchema = z.enum(["section", "bullets", "split", "close"]);
 
@@ -28,7 +36,7 @@ export const presentationShapeSchema = z.object({
   y: z.number().finite().min(0).max(100),
   w: z.number().finite().min(1).max(100),
   h: z.number().finite().min(1).max(100),
-  text: z.string().max(200).default(""),
+  text: slideText.pipe(z.string().max(200)).default(""),
   fill: shapeColor.default("F7F7F6"),
   stroke: shapeColor.default("0F766E"),
 });
@@ -44,16 +52,16 @@ const slideLayoutSchema = z.preprocess(
 export const presentationSlideSchema = z.object({
   kind: presentationSlideKindSchema.catch("bullets").default("bullets"),
   layout: slideLayoutSchema,
-  heading: z.string().min(1),
-  subhead: z.string().default(""),
-  bullets: z.array(z.string()).default([]),
-  aside: z.string().default(""),
-  notes: z.string().default(""),
+  heading: slideText.pipe(z.string().min(1)),
+  subhead: slideText.default(""),
+  bullets: z.array(slideText).default([]),
+  aside: slideText.default(""),
+  notes: slideText.default(""),
   shapes: z.array(presentationShapeSchema).max(24).default([]),
 });
 
 export const presentationOutlineSchema = z.object({
-  title: z.string().min(1),
+  title: slideText.pipe(z.string().min(1)),
   slides: z.array(presentationSlideSchema).min(1),
 });
 

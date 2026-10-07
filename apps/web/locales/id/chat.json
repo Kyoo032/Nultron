@@ -156,7 +156,8 @@
       "search_files": "Cari berkas",
       "delete_file": "Hapus berkas",
       "knowledge_search": "Pencarian pengetahuan",
-      "run_code": "Jalankan kode"
+      "run_code": "Jalankan kode",
+      "build_deck": "Buat deck"
     },
     "doing": {
       "list_files": "Menampilkan daftar berkas di {dir}…",
@@ -168,6 +169,7 @@
       "delete_file": "Sedang menghapus {path}…",
       "knowledge_search": "Mencari “{query}” di basis pengetahuan Anda…",
       "run_code": "Sedang menjalankan {language}…",
+      "build_deck": "Sedang menyusun “{title}”…",
       "web_fetch": "Sedang membuka {host}…"
     },
     "done": {
@@ -180,6 +182,7 @@
       "delete_file": "Menghapus {path}",
       "knowledge_search": "Pencarian “{query}” di basis pengetahuan Anda",
       "run_code": "Menjalankan {language}",
+      "build_deck": "Menyusun “{title}”",
       "web_fetch": "Membuka {host}"
     },
     "failed": {
@@ -191,6 +194,7 @@
       "delete_file": "Tidak dapat menghapus {path}",
       "knowledge_search": "Tidak dapat mencari di basis pengetahuan Anda",
       "run_code": "Menjalankan {language} gagal",
+      "build_deck": "Tidak dapat membuat deck",
       "web_fetch": "Tidak dapat membuka {host}"
     },
     "pending": {
@@ -208,7 +212,9 @@
       "excerpts": "{n} kutipan",
       "excerptsOne": "1 kutipan",
       "lineRange": "Baris {from}–{to} dari {total}",
-      "version": "Versi {n}"
+      "version": "Versi {n}",
+      "slides": "{n} slide",
+      "slidesOne": "Satu slide"
     },
     "open": "Buka",
     "openAria": "Buka {path} di Basis Pengetahuan",
@@ -235,6 +241,20 @@
         "other": "Proses tidak selesai."
       }
     }
+  },
+  "deck": {
+    "label": "Deck PowerPoint",
+    "open": "Buka",
+    "close": "Tutup",
+    "openAria": "Buka slide {title}",
+    "closeAria": "Tutup slide {title}",
+    "download": "Unduh",
+    "downloading": "Mengunduh…",
+    "downloadAria": "Unduh {title} sebagai {filename}",
+    "downloadFailed": "Tidak bisa mengunduh deck. Coba lagi.",
+    "noPreview": "Slide tidak bisa ditampilkan di sini, tetapi berkasnya siap diunduh.",
+    "outlineAria": "Slide dalam deck ini",
+    "previewAria": "Pratinjau slide {title}"
   },
   "error": {
     "loading": "Chat masih dimuat",

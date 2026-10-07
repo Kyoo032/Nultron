@@ -89,6 +89,10 @@ to 127.0.0.1 from the program was refused. That was a direct runner call, run by
 cites no log for it. It was not a hosted Chat drive, it was not the compose or Kubernetes stack, and it did
 not test an operating-system egress deny, so [SR-111](#sr-111) stays open.
 
+Extended on 2026-10-06 with [SR-140](#sr-140): the desk-file download route and Chat's `build_deck` file, raised
+by the change that lets Chat hand a person a real file. Read in the `agentforge-deck` worktree (uncommitted, on
+`6105c5c`); nothing in it is driven in a browser or on the hosted box.
+
 ## Summary
 
 | ID | Severity | Title | Status | Gate |
@@ -212,6 +216,7 @@ not test an operating-system egress deny, so [SR-111](#sr-111) stays open.
 | [SR-125](#sr-125) | Low | Two `edit_file` calls on one file could overwrite each other without a word | Fixed in tree, tested; unverified on a packed app (2026-10-03) | None |
 | [SR-126](#sr-126) | Low | Personal: a deleted desk left the sealed text of its folder proposals on disk | Fixed in tree, tested; unverified on a packed app (2026-10-03) | None |
 | [SR-134](#sr-134) | Low | Enterprise: a CRITICAL `proxy-addr` advisory reaches the hosted image through `express`; the app never sets `trust proxy`, so the affected path is not used | Open (2026-10-06) | `audit:deployed` red; blocks Tencent deploy until the lock takes `proxy-addr` 2.0.8 |
+| [SR-140](#sr-140) | Low | Desk file download serves model- and person-written text from the app's origin, and Chat's `build_deck` stores a model-written Office file that the artifact route serves | Fixed in tree, tested, review fixes applied 2026-10-07 (schema no longer ends the turn, XML-illegal characters removed, saved artifacts counted in hosted storage, packaged save failure shown); not driven in a browser or behind the hosted proxy | Re-check on the hosted box with [SR-132](#sr-132) before the Tencent deploy |
 | [SR-08](#sr-08) | Info | The portal token vault is process memory only | Superseded by [SR-64](#sr-64), 2026-09-23 | Dev only |
 | [SR-15](#sr-15) | Info | Music relay: checked, not a key-exfiltration issue. It does send a spoofed browser `User-Agent` | Checked, not an issue | Dev only |
 | [SR-18](#sr-18) | Info | `X-Forwarded-Proto` and `X-Forwarded-For` trust: checked, sound as deployed today | Checked, not an issue | Blocks Tencent deploy on any topology change |
@@ -4000,7 +4005,7 @@ Gate: none.
 rate limit.** Enterprise. Raised by the desk-files lane (2026-10-03). Open, the same trust as artifacts.
 
 Evidence: `handlePostFile`, `handlePostFileRevert` and `handleDeleteFile` take the tenant from
-`getTenant` and write as that user (`deskRootFor`, `packages/host/src/desk-files/routes.ts:82-86`,
+`getTenant` and write as that user (`deskRootFor`, `packages/host/src/desk-files/routes.ts:84-88`,
 `:135-169`). None checks a role: `canAdminister` is read only by Settings and the company erase
 (`packages/host/src/handlers/settings.ts`, `packages/host/src/tenant-reset.ts`). The model's file tools
 are bounded by the run budget. The routes are bounded only by the 2 MB file cap, the 2,000-file cap and
@@ -4163,7 +4168,7 @@ folder root takes the same option as its proposal base, so an approval finds the
 calls together and expects one `saved`, one `conflict` and two versions.
 
 Not covered: a save through `POST /api/v1/files` sends no expected hash
-(`handlePostFile`, `packages/host/src/desk-files/routes.ts:135-147`), so the Files section can still replace a newer agent version.
+(`handlePostFile`, `packages/host/src/desk-files/routes.ts:162-174`), so the Files section can still replace a newer agent version.
 History keeps both and a revert restores either.
 
 Gate: none.
@@ -4215,6 +4220,126 @@ re-run `ci:local --only audit:deployed`. This was not done in the 0.16.0 cut, wh
 only.
 
 Gate: `audit:deployed` stays red until then, which blocks the Tencent deploy.
+
+### SR-140 {#sr-140}
+
+**Desk file download, and Chat's deck file.** Both products. Raised by the change that gave Chat a
+`build_deck` tool and gave desk files a Download control (2026-10-06, worktree `agentforge-deck`, branch
+`feat/chat-deck-tool` from `6105c5c`, uncommitted). Low. Fixed in the tree and tested; not driven in a
+browser, not behind the hosted proxy, not on a packed app.
+
+**Review round 2026-10-07.** A review of the branch said "ship after named fixes": one High and three Medium.
+All four are fixed in the tree, test first, and recorded in the bullets below: the schema no longer ends the
+turn on an overrun (**Bounded**), characters XML cannot hold are removed before the file is written (**Never
+a file that needs repair**), saved artifacts count in a hosted tenant's storage (**Residual**, first bullet),
+and a failed save in the packaged app now says so (**Residual**, last bullet). Two Low findings stay open and
+are listed under Residual. Nothing in this round was driven in a browser, on the hosted box or on a packed app.
+
+What is new on the wire. `GET /api/v1/files/download?path=` (`packages/host/src/desk-files/routes.ts:122`)
+sends the newest version of one desk file as bytes. The body is text an agent or a person wrote, and on the
+hosted app it is served from the app's own origin, which is the exposure the artifact file route already
+handles (hosted XSS audit, `packages/host/src/handlers/artifacts.ts`). A PowerPoint artifact is the second
+new thing: `PPTX_MIME` is now in `ARTIFACT_MIMES` (`packages/core/src/artifacts/artifact-meta.ts:31`), so
+the existing artifact route serves a model-written `.pptx` under its own type.
+
+Checked, with evidence:
+
+- **Same desk, tenant and path checks as `/content`.** The handler reads through `deskRootFor` and
+  `root.read` (`routes.ts:122-140`), never a path of its own. Another tenant's path answers the same 404 as
+  a path nobody wrote: the `download` rows in `packages/host/src/desk-files/routes.test.ts` and
+  `packages/host/src/tenancy-harness.test.ts`, and `download-wire.test.ts` through the real router with its
+  session gate (404 for the other tenant, 401 with no session).
+- **Never rendered, never sniffed, never cached.** `deskFileDelivery` (`packages/host/src/desk-files/download.ts:40`)
+  sends `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, `Content-Security-Policy: sandbox`
+  and `Cache-Control: no-store`. A type is named only for plain text kinds; `.html`, `.htm` and `.xml` go out as
+  `application/octet-stream` (`routes.test.ts`, "never names a renderable type"). `no-store` matters: the adapter's
+  default for any bytes result is `private, max-age=3600` (`packages/host/src/http-adapter.ts:342`), which would
+  return an old version after an edit; a result's own headers are applied after it (`:349-351`).
+  `download-wire.test.ts` reads all four off a real socket and off the hosted composition (the page policy first,
+  then the handler's).
+- **The file name is a header value.** It is a desk path's last part, and `parseDeskPath` has already refused
+  control characters, a backslash, a quote and the Windows device names (`packages/core/src/tools/files/path.ts:61`).
+  The header is still built by `contentDispositionAttachment` (`packages/host/src/content-disposition.ts:64`), and a
+  name with a space and a non-Latin-1 character is tested (`routes.test.ts`).
+- **A deck is text and shapes, no active content.** `buildPresentationPptx` writes text boxes and Office preset
+  shapes; no hyperlink, media, macro or external reference is added from the model's strings
+  (`packages/host/src/presentation-pptx.ts`). A model-written string that looks like a link is not one.
+  `build_deck` is `internal` trust, so its answer is not scanned as untrusted output; the answer holds only an
+  id, a file name, a count or a refusal written in `packages/host/src/deck/build-deck.ts`, and the call's own
+  arguments are injection-scanned before it runs (`packages/core/src/runtime/invoke-guarded.ts:49-50`). A refusal
+  note quotes the model's own slide headings back to it, which is its own text.
+- **Bounded, and a refusal never ends the turn.** Slides are capped at 14 and every text field has a ceiling
+  (`DECK_*` in `packages/host/src/deck/deck-schema.ts`), enforced by `buildDeckForTenant` through
+  `packages/host/src/deck/deck-limits.ts`, not by the tool's schema. The SDK checks a tool call's arguments
+  against that schema before `execute`, and an argument that fails there ended the whole turn as `run.failed`
+  (review finding, High): a model cannot count characters, so a 2,100-character note was an ordinary mistake that
+  cost the person the turn and told the model nothing. The schema now keeps only the shape and states every limit
+  in words in the field descriptions; an overrun is a tool result that names the field, the limit and what was
+  sent, for every overrun at once (`slides[1].notes is 2100 characters; the limit is 2000`). Proved through the
+  real SDK with a model that overruns, is refused, and then makes the deck
+  (`packages/host/src/deck/build-deck-run.test.ts`; red first: "Invalid arguments for tool build_deck"), and by
+  `build-deck-limits.test.ts` per field. The body cap is 4 MB of base64 (`ARTIFACT_BODY_MAX_BYTES`,
+  `packages/host/src/artifacts.ts:19`) and is now a second line of defence real input cannot reach
+  (`build-deck-too-large.test.ts` drives it with a stubbed exporter). A desk file is at most 2 MB.
+- **Never a file that needs repair.** The PowerPoint writer escapes `& < > " '` and nothing else, so a form feed
+  from a PDF, a NUL or an escape code reached the slide XML and PowerPoint reported the file as needing repair
+  while the tool said `ok` (review finding, Medium). `stripXmlIllegalChars` (`packages/host/src/xml-text.ts`)
+  removes every character XML 1.0 does not allow (form feed and vertical tab become a space so two pages do not
+  run together; a lone surrogate and U+FFFE/U+FFFF are removed) and is applied twice: to the deck's text before
+  it is measured and checked (`deck-limits.ts`) and in the Presentation outline schema
+  (`packages/host/src/presentation-outline.ts`), which every path to the exporter parses through, so the
+  Presentation mode's own export is fixed too. Proved by opening the exported zip and reading every XML part
+  (`presentation-pptx.test.ts`, `build-deck-limits.test.ts`). Not covered: the other exporters (docx, xlsx) were
+  not checked for the same flaw.
+
+Residual:
+
+- **A saved deck now counts toward a hosted tenant's storage, with limits.** It did not: a deck is a row in
+  `artifacts`, the counter holds object-store bytes, and a scripted account could write about 15 MB a minute
+  with the meter at zero (review finding, Medium). `totalUse` in `packages/host/src/tenant-storage.ts` now adds
+  the tenant's saved artifacts (`SUM(size_bytes)` over its desks, `readTenantArtifactUse` in
+  `tenant-storage-store.ts`) to the report, to `assertStorageAdmits` and to the budget `putTenantObject`
+  reserves against; `build_deck` asks about the number its row will carry (the base64 text, not the smaller
+  file). **Server mode only**: a desk has no ceiling and its number is unchanged
+  (`tenant-storage.test.ts`, "does not read the artifacts table at all off the server"). The read is cheap only
+  because of `artifacts_ws_size_idx` (`packages/db/src/ensure-schema.ts`, created on open in server mode only, so a
+  desk's schema is unchanged): `size_bytes` follows the body in the
+  row, so reading it from rows with multi-megabyte bodies walked every overflow page, about 2 seconds for 100
+  decks in a synchronous call that stops the host (measured in a scratch database; with the index, under a
+  millisecond). Residuals of the fix: (1) only `build_deck` and the object writers ask the ceiling; the other
+  artifact writers (research, documents, finance, legal, meeting, open slide, presentation and data modes) still
+  do not call `assertStorageAdmits`, so a tenant at the ceiling can still save a text result there, though it
+  now counts once saved; (2) the check and the insert are not one step, so concurrent builds can overshoot by
+  the size of those in flight (single-process host, per-run cap of 4); (3) `size_bytes` is the plain text, the
+  stored row is sealed and larger, so the true disk use is above the counted use; (4) Settings' "largest" list
+  is media only, so a tenant full of decks sees a full meter and no deck in the list, and deletes them from the
+  Presentation page; (5) the first hosted open after deploy builds the index, which reads every artifact row once.
+  Low.
+- **The release Caddyfile may replace the `Content-Security-Policy` of both routes.** This is [SR-132](#sr-132),
+  reasoned from Caddy's docs and not driven. With the policy gone the protection left is `attachment`, `nosniff`
+  and the inert type, which is how a browser already treats these responses. Review finding, Low, open: the fix
+  is a path-matched `header` in the Caddyfile for `/api/v1/files/download` and `/api/v1/artifacts/*/file`, and a
+  line in `check-app.sh` that reads the policy back. Both live outside this repo (the edge folder and the
+  NultronEnt bundle), so nothing here changes it.
+- **The path is in the query string**, so a proxy access log keeps it, like every desk route. The names are ones a
+  person chose, not secrets, but they are not nothing.
+- **No per-route rate limit.** A GET of a 2 MB file is the same cost as `/content` and falls under the host's
+  per-IP and per-session buckets only.
+- **Packaged: the shell's save result is no longer dropped (fixed in the renderer, not driven).** The shell
+  answers `{ ok, reason }` (`apps/desktop/main.cjs:527-551`) and the renderer discarded it, so a refused or failed
+  write showed nothing, on every download and now on every deck card and file chip (review finding, Medium).
+  `saveDesktopBytes` (`apps/web/lib/desktop-bridge.ts`) returns the answer, `apiFetch` throws a
+  `DesktopSaveError` through `throwIfSaveFailed` (`apps/web/lib/desktop-save.ts`) when `ok` is false and the
+  reason is not `canceled`, and the deck card, the files viewer (`save_failed`) and the studios that show an
+  error message say it in a sentence in both locales. A closed dialog stays silent. `main.cjs` was not changed.
+  An older shell that answers nothing reads as a save that happened. The real write was not driven on a packed
+  app.
+- **The deck's chrome follows the desk language, not the conversation's** (review finding, Low, open). The
+  kicker word on the title slide comes from the desk locale; a conversation in the other language gets the
+  deck's text in its own language and the chrome in the desk's. A later change passes a locale from the tool.
+
+Gate: none beyond [SR-132](#sr-132). Drive both downloads once on the hosted box and read the response headers
+there.
 
 ## Info and checked-not-an-issue
 
@@ -4571,7 +4696,7 @@ the working tree on 2026-10-03. Nothing here was driven on a packed app, on Linu
 - **A warm child is never shared across tenants.** The pool key holds the tenant, desk and language, and
   only an exact match is reused (`pool.ts:68-70`, `:147-149`). Eviction kills the child.
 - **Desk files are scoped by desk in every query.** The shared select carries `workspace_id`
-  (`liveSelect`, `file-store.ts:125-128`) and the desk comes from `getTenant` (`packages/host/src/desk-files/routes.ts:82-86`), so
+  (`liveSelect`, `file-store.ts:125-128`) and the desk comes from `getTenant` (`packages/host/src/desk-files/routes.ts:84-88`), so
   another desk's or tenant's path is a 404.
 - **The folder root is Personal only and keeps secrets out.** It is unavailable in server mode
   (`folderRootAvailable`, `packages/host/src/folder-root/availability.ts:11-13`), mounting needs the IPC
