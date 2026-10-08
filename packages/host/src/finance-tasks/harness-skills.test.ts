@@ -21,9 +21,10 @@ import { parseRatiosInput, type ParsedRatios } from "./parse-ratios";
 
 /**
  * The two skills the harness adds, against each task's own catalog sentence.
- * The first answer is not sections, so the reading is asked for once more. The second quotes a
- * computed figure and says the opposite of its direction, so that section is rewritten once.
- * The third answer keeps the direction. Nothing here reaches the network.
+ * A reading that is not sections is asked for once more. A section that quotes a computed figure and
+ * says the opposite of its direction is rewritten once. Both draw on the run's ONE shared extra call
+ * (`call-budget.ts`), so a run that asked again for the reading has none left for the rewrite and the
+ * contradicting sentence is taken out in code instead. Nothing here reaches the network.
  */
 const asked: Array<Record<string, unknown>> = [];
 const answers: string[] = [];
@@ -175,51 +176,72 @@ describe("finance harness skills", () => {
     cancelAt = null;
   });
 
-  it.each(TASKS.flatMap((task) => (["en", "id"] as const).map((locale) => [task, locale] as const)))(
-    "%s asks once more and keeps the computed direction (%s)",
-    async (task, locale) => {
-      const body = await confirmed(task, locale);
-      const claims = claimsFor(task, body);
-      const claim = claims[0];
-      expect(claim, `${task} ${locale} produced no direction claim`).toBeTruthy();
-      if (!claim) {
-        return;
+  const CASES = TASKS.flatMap((task) => (["en", "id"] as const).map((locale) => [task, locale] as const));
+
+  /** Run one task over its own catalog sentence with a queue of model answers, and say what happened. */
+  async function runDirectionCase(
+    task: FinanceTask,
+    locale: ReportLocale,
+    queue: (wrong: string, right: string) => string[],
+  ) {
+    const body = await confirmed(task, locale);
+    const claim = claimsFor(task, body)[0];
+    expect(claim, `${task} ${locale} produced no direction claim`).toBeTruthy();
+    if (!claim) {
+      throw new Error(`${task} ${locale} produced no direction claim`);
+    }
+    const figure = quote(claim.amount);
+    const against = phrase(claim.contradict, locale);
+    const withDirection = phrase(claim.agree, locale);
+    const wrong = `The reading is ${against} at ${figure}.`;
+    const right = `The reading is ${withDirection} at ${figure}.`;
+    answers.push(...queue(narration(task, locale, wrong), JSON.stringify({ heading: "The result", body: right })));
+    const events: JobEvent[] = [];
+    const emit = (event: JobEvent) => events.push(event);
+    const module = getFinanceTaskModule(task);
+    if (task !== "brief" && !module) {
+      throw new Error(`${task} has no module`);
+    }
+    const result =
+      task === "brief" || !module
+        ? await generateFinanceBrief(tenant, body, emit)
+        : await runFinanceTask(module, { tenant, body, emit });
+    const steps = events.filter((event) => event.type === "job.step").map((event) => event.label);
+    for (const call of asked) {
+      const system = String(call.systemPrompt);
+      if (locale === "id") {
+        expect(system).toContain("Bahasa Indonesia");
+      } else {
+        expect(system).toContain("Keep every number exactly as given.");
       }
-      const figure = quote(claim.amount);
-      const against = phrase(claim.contradict, locale);
-      const withDirection = phrase(claim.agree, locale);
-      const wrong = `The reading is ${against} at ${figure}.`;
-      const right = `The reading is ${withDirection} at ${figure}.`;
-      answers.push("not json", narration(task, locale, wrong), JSON.stringify({ heading: "The result", body: right }));
-      const events: JobEvent[] = [];
-      const emit = (event: JobEvent) => events.push(event);
-      const module = getFinanceTaskModule(task);
-      if (task !== "brief" && !module) {
-        throw new Error(`${task} has no module`);
-      }
-      const result =
-        task === "brief" || !module
-          ? await generateFinanceBrief(tenant, body, emit)
-          : await runFinanceTask(module, { tenant, body, emit });
-      const steps = events.filter((event) => event.type === "job.step").map((event) => event.label);
-      expect(asked).toHaveLength(3);
-      expect(asked[2]?.runPrefix).toBe("finance-direction");
-      for (const call of asked) {
-        const system = String(call.systemPrompt);
-        if (locale === "id") {
-          expect(system).toContain("Bahasa Indonesia");
-        } else {
-          expect(system).toContain("Keep every number exactly as given.");
-        }
-      }
-      expect(steps).toContain("Asked once more for the reading");
-      expect(steps).toContain("Reading contradicted a computed direction");
-      expect(
-        steps.some((label) => label.includes("contradicted a computed direction") && label.includes("removed")),
-      ).toBe(false);
-      expect(readingOf(task, result)).toContain(withDirection);
-    },
-  );
+    }
+    return { steps, reading: readingOf(task, result), against, withDirection };
+  }
+
+  const removedStep = (label: string) =>
+    label.includes("contradicted a computed direction") && label.includes("removed");
+
+  it.each(CASES)("%s keeps the computed direction through one rewrite (%s)", async (task, locale) => {
+    const run = await runDirectionCase(task, locale, (wrong, right) => [wrong, right]);
+    expect(asked).toHaveLength(2);
+    expect(asked[1]?.runPrefix).toBe("finance-direction");
+    expect(run.steps).toContain("Reading contradicted a computed direction");
+    expect(run.steps.some(removedStep)).toBe(false);
+    expect(run.reading).toContain(run.withDirection);
+  });
+
+  // The reading came back wrong the first time, so the one extra call went on asking again. The
+  // contradicting sentence then has no call left to be rewritten with: code takes it out, and says so.
+  it.each(CASES)("%s asks once more, then drops a contradicting sentence in code (%s)", async (task, locale) => {
+    const run = await runDirectionCase(task, locale, (wrong) => ["not json", wrong]);
+    expect(asked).toHaveLength(2);
+    expect(asked.some((call) => call.runPrefix === "finance-direction")).toBe(false);
+    expect(run.steps).toContain("Asked once more for the reading");
+    expect(run.steps).toContain("Reading contradicted a computed direction");
+    expect(run.steps.some(removedStep)).toBe(true);
+    expect(run.reading).not.toContain(run.against);
+    expect(run.reading).not.toBe("");
+  });
 
   describe("a cancelled job", () => {
     async function runCancelled(task: "brief" | "cashflow", signal: AbortSignal): Promise<unknown> {

@@ -6,6 +6,7 @@
  * is the error the desk already shows.
  */
 import { ApiError } from "@agentforge/core";
+import { takeExtraCall, type CallBudget } from "./call-budget";
 
 /** 502 from a narration that was empty or not the sections this task asked for. */
 export function isUnreadReading(error: unknown): boolean {
@@ -21,12 +22,16 @@ export function isUnreadReading(error: unknown): boolean {
  *
  * `onRetry` fires before the second ask so the desk can say the reading was requested again.
  * Anything that is not that 502 — a closed gate, a missing input — is not retried.
+ *
+ * The second ask is one of the run's extra calls: with a `budget` it is drawn from it, and when the
+ * budget is spent the first error stands (a reading that never came back has no code-only stand-in).
+ * With no budget the ask is made, as it always was.
  */
-export async function askForReading<T>(ask: () => Promise<T>, onRetry: () => void): Promise<T> {
+export async function askForReading<T>(ask: () => Promise<T>, onRetry: () => void, budget?: CallBudget): Promise<T> {
   try {
     return await ask();
   } catch (error) {
-    if (!isUnreadReading(error)) {
+    if (!isUnreadReading(error) || !takeExtraCall(budget)) {
       throw error;
     }
     onRetry();

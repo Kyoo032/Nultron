@@ -13,9 +13,16 @@ import type { AppLocale, TenantContext } from "@agentforge/core";
 import { collectJobAssistantRun } from "./job-regen";
 import { throwIfJobAborted } from "./job-stream";
 import { guardSection, parseBriefSection, type GuardReport } from "./finance-brief-build";
+import { takeExtraCall, type CallBudget } from "./finance-tasks/call-budget";
 
-/** Sentence boundaries that survive "Rp 1.250.000.000" — a full stop between digits is not one. */
-const SENTENCE_END = /(?<![0-9])([.!?])\s+(?=[A-ZÀ-ÖØ-Þ"“(])/g;
+/**
+ * Sentence boundaries. A full stop only ends a sentence when white space and a capital follow it, so
+ * the dots inside "Rp 1.250.000.000" never do. A sentence that ends on a figure ("Cash was 900.") does
+ * end there; what is refused is a list number at the start of a line or sentence ("1. Revenue up"),
+ * which is a marker and not the end of anything. (It used to refuse every stop after a digit, so a
+ * sentence ending in a figure was glued to the next one and both were removed together.)
+ */
+const SENTENCE_END = /(?<!(?:^|\n|[.!?:;]\s+)\d{1,3})([.!?])\s+(?=[A-ZÀ-ÖØ-Þ"“(])/g;
 
 export type RepairPrompt = {
   readonly tenant: TenantContext;
@@ -25,6 +32,11 @@ export type RepairPrompt = {
   readonly locale: AppLocale;
   /** The job's cancel: it reaches the rewrite call, and a cancelled rewrite stops the repair. */
   readonly signal?: AbortSignal;
+  /**
+   * The run's shared allowance of extra calls. Each section's rewrite draws on it; a section that
+   * cannot get a call has its marked sentences taken out without one. Absent means no limit.
+   */
+  readonly budget?: CallBudget;
 };
 
 /** Split on sentence ends only where a capital follows, so grouped figures stay whole. */
@@ -100,6 +112,9 @@ export type RepairResult = { readonly brief: FinanceBrief; readonly guard: Guard
 /**
  * One retry per marked section, then a clean removal. `guard.removed` is what the report turns into
  * the "a sentence was removed" flag.
+ *
+ * With a `prompt.budget` the retries are the run's shared extra calls: a section that cannot get one
+ * skips the rewrite and goes straight to the removal, so the marker is still never left in it.
  */
 export async function repairUnverifiedSections(
   brief: FinanceBrief,
@@ -116,7 +131,7 @@ export async function repairUnverifiedSections(
       sections.push(section);
       continue;
     }
-    const retried = await rewriteOnce(prompt, section, offending);
+    const retried = takeExtraCall(prompt.budget) ? await rewriteOnce(prompt, section, offending) : null;
     const guarded = retried ? guardSection(retried, computed, knownKeys) : null;
     const candidate = guarded?.section ?? section;
     for (const text of guarded?.flagged ?? []) {

@@ -18,6 +18,7 @@ vi.mock("./job-regen", async (importOriginal) => {
 });
 
 const { repairUnverifiedSections, splitSentences, stripMarkedSentences } = await import("./finance-section-repair");
+const { createCallBudget } = await import("./finance-tasks/call-budget");
 const { readFinanceLocale } = await import("./finance-locale");
 
 const tenant: TenantContext = {
@@ -56,6 +57,25 @@ describe("sentence splitting", () => {
     expect(splitSentences("Pendapatan Rp 1.250.000.000 naik. Marjin tetap.")).toEqual([
       "Pendapatan Rp 1.250.000.000 naik.",
       "Marjin tetap.",
+    ]);
+  });
+
+  it("ends a sentence that ends on a figure, so the next one is not carried away with it", () => {
+    expect(splitSentences("Cash was 900. Burn held.")).toEqual(["Cash was 900.", "Burn held."]);
+    expect(splitSentences("Pendapatan Rp 1.250.000.000. Marjin tetap.")).toEqual([
+      "Pendapatan Rp 1.250.000.000.",
+      "Marjin tetap.",
+    ]);
+    const stripped = stripMarkedSentences(`Cash was 900. Burn was ${UNVERIFIED_MARKER}. Rent held.`);
+    expect(stripped.body).toBe("Cash was 900. Rent held.");
+    expect(stripped.removed).toHaveLength(1);
+  });
+
+  it("does not take a list number for the end of a sentence", () => {
+    expect(splitSentences("1. Revenue up. Costs fell.")).toEqual(["1. Revenue up.", "Costs fell."]);
+    expect(splitSentences("Highlights: 2. Costs fell. Cash held.")).toEqual([
+      "Highlights: 2. Costs fell.",
+      "Cash held.",
     ]);
   });
 
@@ -136,6 +156,74 @@ describe("repairUnverifiedSections", () => {
       ),
     ).rejects.toMatchObject({ code: "aborted", status: 499 });
     expect(asked).toHaveLength(1);
+  });
+
+  describe("with the run's shared extra-call budget", () => {
+    const twoMarked = {
+      ...brief("x"),
+      sections: [
+        {
+          heading: "Kinerja",
+          body: `Marjin kotor ${UNVERIFIED_MARKER}. Pendapatan Rp 1.250.000.000.`,
+          tables: [],
+          metrics: [],
+        },
+        {
+          heading: "Arus kas",
+          body: `Kas ${UNVERIFIED_MARKER}. Pendapatan Rp 1.250.000.000.`,
+          tables: [],
+          metrics: [],
+        },
+      ],
+    };
+
+    it("rewrites the first marked section and takes the sentence out of the others without asking", async () => {
+      asked.length = 0;
+      answers.length = 0;
+      answers.push(JSON.stringify({ heading: "Kinerja", body: "Marjin kotor 41,6%.", metrics: [] }));
+      const budget = createCallBudget();
+      const result = await repairUnverifiedSections(twoMarked, computed, { ...prompt, budget });
+      expect(asked).toHaveLength(1);
+      expect(budget.used).toBe(1);
+      expect(budget.refused).toBe(1);
+      expect(result.brief.sections[0]?.body).toBe("Marjin kotor 41,6%.");
+      expect(result.brief.sections[1]?.body).toBe("Pendapatan Rp 1.250.000.000.");
+      expect(result.guard.removed).toBe(1);
+      expect(JSON.stringify(result.brief)).not.toContain(UNVERIFIED_MARKER);
+    });
+
+    it("makes no call at all when the budget is already spent, and still ships no marker", async () => {
+      asked.length = 0;
+      answers.length = 0;
+      const budget = createCallBudget();
+      budget.take();
+      const result = await repairUnverifiedSections(twoMarked, computed, { ...prompt, budget });
+      expect(asked).toEqual([]);
+      expect(result.guard.removed).toBe(2);
+      expect(result.brief.sections.map((section) => section.body)).toEqual([
+        "Pendapatan Rp 1.250.000.000.",
+        "Pendapatan Rp 1.250.000.000.",
+      ]);
+    });
+
+    it("spends nothing on a brief with no marker", async () => {
+      asked.length = 0;
+      const budget = createCallBudget();
+      await repairUnverifiedSections(brief("Pendapatan Rp 1.250.000.000."), computed, { ...prompt, budget });
+      expect(budget.used).toBe(0);
+      expect(budget.refused).toBe(0);
+    });
+
+    it("counts a rewrite that failed as spent: the call was made", async () => {
+      asked.length = 0;
+      answers.length = 0;
+      answers.push("not json at all");
+      const budget = createCallBudget();
+      const result = await repairUnverifiedSections(twoMarked, computed, { ...prompt, budget });
+      expect(asked).toHaveLength(1);
+      expect(budget.remaining).toBe(0);
+      expect(result.guard.removed).toBe(2);
+    });
   });
 
   it("still strips the marker when the retry itself fails", async () => {

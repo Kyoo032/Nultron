@@ -46,6 +46,7 @@ const ingested: WorkCard[] = [];
 
 const { runFinanceTask, runnerMathPhases } = await import("./runner");
 const { readStoredFinanceReport } = await import("./persist");
+const { ADVICE_SENTENCE_FLAG } = await import("./scope");
 const { artifactStore } = await import("../artifacts");
 
 const tenant: TenantContext = {
@@ -263,5 +264,139 @@ describe("runFinanceTask", () => {
     expect(artifact?.meta?.model).toBe("stub-model");
     expect(artifact?.meta?.locale).toBe("en");
     expect(readStoredFinanceReport(artifact?.meta)).toEqual(result.report);
+  });
+});
+
+// A run is the narrative plus at most ONE more model call, shared by every check that would have
+// asked for its own: the second ask for a reading, the rewrite of a section the guard blanked, the
+// rewrite of a section that contradicted a computed direction, and the rewrite of one that advised.
+// The first to ask gets the call; each later one falls back to what code can do on its own.
+describe("one shared extra call", () => {
+  const SECTIONS = [
+    { id: "position", title: { id: "Posisi", en: "Position" } },
+    { id: "outlook", title: { id: "Prospek", en: "Outlook" } },
+  ];
+
+  const twoSections: FinanceTaskModule<Input, Input> = {
+    ...taskModule,
+    sections: SECTIONS,
+    directionClaims: (computed) => [
+      {
+        amount: computed.cash,
+        agree: [{ en: "a surplus", id: "surplus" }],
+        contradict: [{ en: "a deficit", id: "defisit" }],
+      },
+    ],
+  };
+
+  function twoNarration(position: string, outlook: string): string {
+    return JSON.stringify({
+      title: "Runway to March",
+      sections: [
+        { id: "position", heading: "Where cash sits", body: position },
+        { id: "outlook", heading: "What comes next", body: outlook },
+      ],
+      assumptions: ["Monthly figures."],
+    });
+  }
+
+  async function runTwo(extra: Record<string, unknown> = {}) {
+    const events: JobEvent[] = [];
+    const result = await runFinanceTask(twoSections, {
+      tenant,
+      body: body(extra),
+      emit: (event) => events.push(event),
+    });
+    return { result, events };
+  }
+
+  it("rewrites the first blanked section and takes the sentence out of the second without asking", async () => {
+    reset();
+    answers.push(twoNarration("Cash was 900. Burn was 1234 a month.", "Cash was 900. Rent was 777 a month."));
+    answers.push(rewrite("Cash was 900."));
+    const { result, events } = await runTwo();
+    expect(asked).toHaveLength(2);
+    expect(result.report.notes.map((note) => note.body)).toEqual(["Cash was 900.", "Cash was 900."]);
+    expect(result.guard.removed).toBe(1);
+    expect(JSON.stringify(result.report)).not.toContain(UNVERIFIED_MARKER);
+    expect(steps(events)).toContain("The one extra model call was already used; the rest was handled in code");
+  });
+
+  it("spends the second ask for a reading that was not the sections, and removes the blanked sentence in code", async () => {
+    reset();
+    answers.push("this is not json");
+    answers.push(twoNarration("Cash was 900. Burn was 1234 a month.", "Cash was 900."));
+    const { result, events } = await runTwo();
+    expect(asked).toHaveLength(2);
+    expect(steps(events)).toContain("Asked once more for the reading");
+    expect(result.report.notes[0]?.body).toBe("Cash was 900.");
+    expect(result.guard.removed).toBe(1);
+  });
+
+  it("makes no third call when the narration failed twice: the error the desk shows today", async () => {
+    reset();
+    answers.push("not json", "still not json");
+    await expect(runTwo()).rejects.toMatchObject({ code: "invalid_finance", status: 502 });
+    expect(asked).toHaveLength(2);
+  });
+
+  it("takes a contradicting sentence out in code when the repair already used the extra call", async () => {
+    reset();
+    answers.push(twoNarration("Cash was 900 and is a deficit. Burn was 1234 a month.", "Cash was 900."));
+    answers.push(rewrite("Cash was 900 and is a deficit."));
+    const { result } = await runTwo();
+    expect(asked).toHaveLength(2);
+    expect(result.guard.directionRemoved).toBe(1);
+    expect(result.report.notes[0]?.body).not.toContain("deficit");
+  });
+
+  it("rewrites an advising section once, and keeps the rewrite when it only describes the figures", async () => {
+    reset();
+    answers.push(twoNarration("Cash was 900. You should sell the asset now.", "Cash was 900."));
+    answers.push(rewrite("Cash was 900. The asset is a third of the balance sheet."));
+    const { result, events } = await runTwo();
+    expect(asked).toHaveLength(2);
+    expect(String(asked[1]?.runPrefix)).toBe("finance-scope");
+    expect(result.report.notes[0]?.body).toBe("Cash was 900. The asset is a third of the balance sheet.");
+    expect(result.report.flags.some((flag) => flag.text === ADVICE_SENTENCE_FLAG.en)).toBe(false);
+    expect(steps(events)).toContain("Reading gave advice");
+  });
+
+  it("drops advice that survives its rewrite, tells the reader once, and tells the desk", async () => {
+    reset();
+    answers.push(twoNarration("Cash was 900. You should sell the asset now.", "Cash was 900."));
+    answers.push(rewrite("Cash was 900. We recommend selling the asset."));
+    const { result, events } = await runTwo({ locale: "id" });
+    expect(result.report.notes[0]?.body).toBe("Cash was 900.");
+    expect(result.report.flags).toContainEqual({ level: "watch", text: ADVICE_SENTENCE_FLAG.id });
+    expect(steps(events)).toContain("1 sentence(s) removed because they gave advice");
+    expect(result.warnings).toContain("1 sentence(s) were removed because they gave advice");
+    expect(JSON.stringify(result.report)).not.toMatch(/should sell|recommend selling/);
+  });
+
+  it("drops advice in code when the extra call went to the figure repair, with no second rewrite", async () => {
+    reset();
+    answers.push(twoNarration("Cash was 900. Burn was 1234 a month. You should sell the asset.", "Cash was 900."));
+    answers.push(rewrite("Cash was 900. You should sell the asset."));
+    const { result } = await runTwo();
+    expect(asked).toHaveLength(2);
+    expect(result.report.notes[0]?.body).toBe("Cash was 900.");
+    expect(result.report.flags.some((flag) => flag.text === ADVICE_SENTENCE_FLAG.en)).toBe(true);
+  });
+
+  it("does not take a sentence the person's own source text holds for advice", async () => {
+    reset();
+    answers.push(twoNarration("Cash was 900. You should review the outlay before March.", "Cash was 900."));
+    const { result } = await runTwo({ sourceText: "Board note: you should review the outlay before March." });
+    expect(asked).toHaveLength(1);
+    expect(result.report.notes[0]?.body).toBe("Cash was 900. You should review the outlay before March.");
+  });
+
+  it("asks nothing beyond the narrative for a clean write-up", async () => {
+    reset();
+    answers.push(twoNarration("Cash was 900.", "Cash was 900."));
+    const { events } = await runTwo();
+    expect(asked).toHaveLength(1);
+    expect(steps(events).some((label) => label.includes("extra model call"))).toBe(false);
   });
 });

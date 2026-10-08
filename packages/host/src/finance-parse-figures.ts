@@ -31,6 +31,7 @@ import {
   splitDerivedLineItems,
   statedFactsFromProse,
   withFactLabels,
+  type FiguresTextRead,
   type LineItem,
   type LineItemCategory,
   type StatedFact,
@@ -226,6 +227,48 @@ async function proseFactsFor(call: ModelCall, options: ParseOptions, locale: App
   return (await askForFactLabels(call, statedFactsFromProse(prose, locale))).facts;
 }
 
+/** The text as the sheet reader sees it, or null when it is not a table the reader recognises in full. */
+function readTable(text: string, locale: AppLocale): FiguresTextRead | null {
+  const read = readFiguresText(expandMagnitudes(text, locale));
+  return read.deterministic ? read : null;
+}
+
+export type CodeOnlyFigures = {
+  readonly draft: ParsedFiguresDraft;
+  /** The labels no rule could place. They stay `other`; a model could name them, and this read does not ask one. */
+  readonly unclassified: readonly UnclassifiedLabel[];
+};
+
+/**
+ * The same deterministic read as {@link parseFiguresTable}, with every model assist skipped: the
+ * categories pass and the fact-naming pass are not asked for, so a label the rules cannot place stays
+ * `other` and a stated figure is named from its own sentence. Nothing here can reach the gateway, so
+ * it takes no tenant and no model, and the route that uses it needs no key.
+ *
+ * Null when the text is not a table the reader recognises in full — free prose needs the model's read,
+ * and this read says so by answering null rather than by guessing.
+ */
+export function readFiguresCodeOnly(
+  text: string,
+  locale: AppLocale,
+  options: ParseOptions = {},
+): CodeOnlyFigures | null {
+  const read = readTable(text, locale);
+  if (!read) {
+    return null;
+  }
+  const first = lineItemsFromRows(read.rows);
+  if (first.items.length === 0) {
+    return null;
+  }
+  const prose = options.proseText?.trim();
+  const proseFacts = prose ? withFactLabels(statedFactsFromProse(prose, locale), new Map()) : [];
+  return {
+    draft: finish(first.items, first.derived, read.facts, proseFacts, {}),
+    unclassified: first.unclassified,
+  };
+}
+
 /** The deterministic read. Returns null when the text is not a table the reader recognises. */
 export async function parseFiguresTable(
   call: ModelCall,
@@ -233,8 +276,8 @@ export async function parseFiguresTable(
   locale: AppLocale,
   options: ParseOptions = {},
 ): Promise<ParsedFiguresDraft | null> {
-  const read = readFiguresText(expandMagnitudes(text, locale));
-  if (!read.deterministic) {
+  const read = readTable(text, locale);
+  if (!read) {
     return null;
   }
   const prose = await proseFactsFor(call, options, locale);

@@ -200,11 +200,20 @@ function classifiedRow(row: ClassifiedRatioRow, item: LineItem): RatioClassified
   };
 }
 
+export type RatiosParseOptions = {
+  /**
+   * False skips the model's one job here: a label no rule placed is not offered to it, stays
+   * unplaced, and the parse makes no gateway call at all. `/finance/auto` reads this way. Default true.
+   */
+  readonly assists?: boolean;
+};
+
 /** Figures text → classified statement rows the owner confirms. Nothing is computed here. */
 export async function parseRatiosFigures(
   tenant: TenantContext,
   body: unknown,
   abortSignal?: AbortSignal,
+  options: RatiosParseOptions = {},
 ): Promise<ParsedRatios> {
   const guardedText = guardFinanceInput({ figuresText: readFiguresText(body) });
   const read = readRatioRows(guardedText.figuresText);
@@ -213,7 +222,10 @@ export async function parseRatiosFigures(
   }
   const first = classifyRatioRows(read.rows);
   const leftovers = [...new Set(unplacedRatioRows(first).map((row) => row.label))].slice(0, RATIO_MODEL_LABEL_MAX);
-  const assist = leftovers.length === 0 ? null : await askModelForBuckets(tenant, body, leftovers, abortSignal);
+  const assist =
+    leftovers.length === 0 || options.assists === false
+      ? null
+      : await askModelForBuckets(tenant, body, leftovers, abortSignal);
   const rows = assist === null ? first : classifyRatioRows(read.rows, assist.overrides);
   const guardedRows = guardFinanceInput({ lineItems: rows.map((row) => toLineItem(row, read.currency)) });
   return {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { UNVERIFIED_MARKER } from "@agentforge/core/finance";
-import { guardNarration, parseNarration } from "./narrate";
+import { adviceSentencesIn, guardNarration, parseNarration } from "./narrate";
 
 const SECTIONS = [
   { id: "position", title: { id: "Posisi", en: "Position" } },
@@ -67,5 +67,86 @@ describe("guardNarration", () => {
       assumptions: ["Figures for 2025."],
     });
     expect(guard).toEqual({ flagged: [], total: 0 });
+  });
+});
+
+// The appraisal rule "no buy, sell or fund directive" lived in the prompt only. The scope judge is
+// the code that enforces it for every task: advice is found here, rewritten once and dropped by the
+// hold in `scope.ts`, and the figures are untouched by any of it.
+describe("adviceSentencesIn", () => {
+  it("finds a sentence that tells the reader what to do, in English", () => {
+    expect(adviceSentencesIn("Cash was 900. You should sell the asset now. Burn held.", [])).toEqual([
+      "You should sell the asset now.",
+    ]);
+    expect(adviceSentencesIn("We recommend funding the project in full.", [])).toHaveLength(1);
+  });
+
+  it("finds it in Indonesian", () => {
+    expect(adviceSentencesIn("Kas stabil. Sebaiknya Anda menjual aset itu. Beban tetap.", [])).toEqual([
+      "Sebaiknya Anda menjual aset itu.",
+    ]);
+    expect(adviceSentencesIn("Kami sarankan untuk menolak proyek ini.", [])).toHaveLength(1);
+  });
+
+  it("leaves a sentence that describes the figures", () => {
+    expect(adviceSentencesIn("NPV is positive at 14000, so the plan returns more than it costs.", [])).toEqual([]);
+    expect(adviceSentencesIn("The payback is 3.2 years. Burn is lower than last quarter.", [])).toEqual([]);
+  });
+
+  it("leaves a sentence that reports what a document says", () => {
+    expect(adviceSentencesIn("The loan agreement states that the borrower must repay by March.", [])).toEqual([]);
+  });
+
+  it("leaves a sentence the person's own text already contains", () => {
+    const sources = ["Note from the CFO: you should review the outlay before the board meets."];
+    expect(adviceSentencesIn("You should review the outlay before the board meets.", sources)).toEqual([]);
+    expect(adviceSentencesIn("You should review the outlay before the board meets.", [])).toHaveLength(1);
+  });
+
+  it("looks at every paragraph", () => {
+    const body = "Cash was 900.\n\nWe suggest cutting rent.\n\nBurn held.";
+    expect(adviceSentencesIn(body, [])).toEqual(["We suggest cutting rent."]);
+  });
+
+  it("finds nothing in an empty body", () => {
+    expect(adviceSentencesIn("", [])).toEqual([]);
+  });
+});
+
+describe("guardNarration: the scope judge", () => {
+  it("reports the sections that advise, by index, without changing the prose or the figure guard", () => {
+    const draft = draftOf({
+      title: "Cash at 900",
+      sections: [
+        { id: "position", heading: "Where cash sits", body: "Cash was 900. You should sell the asset." },
+        { id: "outlook", heading: "What next", body: "Burn held at 900." },
+      ],
+      assumptions: ["Monthly figures."],
+    });
+    const { prose, guard, advice } = guardNarration(draft, [900], []);
+    expect(advice).toEqual([{ section: 0, sentences: ["You should sell the asset."] }]);
+    expect(prose.sections[0]?.body).toBe("Cash was 900. You should sell the asset.");
+    expect(guard).toEqual({ flagged: [], total: 0 });
+  });
+
+  it("reports nothing when no section advises, and when no sources are given", () => {
+    const draft = draftOf({
+      title: "Cash at 900",
+      sections: [{ id: "position", heading: "Where cash sits", body: "Cash was 900." }],
+      assumptions: [],
+    });
+    expect(guardNarration(draft, [900]).advice).toEqual([]);
+  });
+
+  it("does not report advice the person's own source text already holds", () => {
+    const draft = draftOf({
+      title: "Cash at 900",
+      sections: [
+        { id: "position", heading: "Where cash sits", body: "Cash was 900. We recommend a review before March." },
+      ],
+      assumptions: [],
+    });
+    const sources = ["Auditor: we recommend a review before March."];
+    expect(guardNarration(draft, [900], sources).advice).toEqual([]);
   });
 });

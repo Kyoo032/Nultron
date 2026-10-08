@@ -151,14 +151,15 @@ describe("scrubReportMarkers", () => {
     expect(JSON.stringify(swept.report)).not.toContain(UNVERIFIED_MARKER);
   });
 
-  it("takes the sentence before it too when that one ends in a digit", () => {
-    // The shared splitter refuses to break "Rp 1.250.000.000" in half, so a full stop between a
-    // digit and a capital is not a sentence boundary. The marker still never ships; the note is
-    // just shorter than it had to be. Documented here because it is the splitter's, not ours.
+  it("keeps the sentence before it when that one ends in a digit", () => {
+    // The shared splitter used to refuse every full stop after a digit (to keep "Rp 1.250.000.000"
+    // whole), so a sentence ending on a figure was glued to the next and both were removed. Only the
+    // dots inside a figure are protected now; a stop after a figure ends the sentence.
     const swept = scrubReportMarkers(
       report({ notes: [{ heading: "Position", body: `Cash was 900. Churn was ${UNVERIFIED_MARKER}.` }] }),
     );
-    expect(swept.report.notes[0]?.body).toBe("");
+    expect(swept.report.notes[0]?.body).toBe("Cash was 900.");
+    expect(swept.removed).toBe(1);
     expect(JSON.stringify(swept.report)).not.toContain(UNVERIFIED_MARKER);
   });
 
