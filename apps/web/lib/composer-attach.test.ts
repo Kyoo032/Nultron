@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { CHAT_DOCUMENT_EXTENSIONS, CHAT_DOCUMENT_MAX_BYTES } from "@agentforge/core/chat-documents";
 import {
   CHAT_IMAGE_MAX_BYTES,
   CHAT_VIDEO_MAX_BYTES,
+  COMPOSER_FILE_ACCEPT,
   attachmentOverCap,
   classifyAttachment,
   isRenderableImageUrl,
   isRenderableVideoUrl,
+  pastedFiles,
   routeDecision,
 } from "./composer-attach";
 
@@ -33,7 +36,7 @@ describe("classifyAttachment", () => {
   });
 
   it("marks unknown types unsupported", () => {
-    expect(classifyAttachment({ name: "a.pdf", type: "application/pdf" })).toBe("unsupported");
+    expect(classifyAttachment({ name: "a.pages", type: "application/vnd.apple.pages" })).toBe("unsupported");
     expect(classifyAttachment({ name: "a.bin", type: "application/octet-stream" })).toBe("unsupported");
   });
 
@@ -46,6 +49,71 @@ describe("classifyAttachment", () => {
     expect(attachmentOverCap("video", 40 * 1024 * 1024)).toBe(true);
     expect(attachmentOverCap("text", 80 * 1024 * 1024)).toBe(false);
     expect(attachmentOverCap("unsupported", 1)).toBe(false);
+  });
+});
+
+describe("documents", () => {
+  it("classifies every format the host reads as a document", () => {
+    for (const extension of CHAT_DOCUMENT_EXTENSIONS) {
+      expect(classifyAttachment({ name: `file.${extension}`, type: "application/octet-stream" }), extension).toBe(
+        "document",
+      );
+    }
+    expect(classifyAttachment({ name: "a.pdf", type: "application/pdf" })).toBe("document");
+    expect(classifyAttachment({ name: "Laporan.DOCX", type: "" })).toBe("document");
+  });
+
+  it("reads an rtf as a document even though its MIME type says text", () => {
+    expect(classifyAttachment({ name: "a.rtf", type: "text/rtf" })).toBe("document");
+    expect(classifyAttachment({ name: "a.rtf", type: "application/rtf" })).toBe("document");
+  });
+
+  it("keeps csv and plain text on the text route", () => {
+    expect(classifyAttachment({ name: "data.csv", type: "text/csv" })).toBe("text");
+    expect(classifyAttachment({ name: "notes.txt", type: "text/plain" })).toBe("text");
+  });
+
+  it("puts every document extension on the file input accept list", () => {
+    const accept = COMPOSER_FILE_ACCEPT.split(",");
+    for (const extension of CHAT_DOCUMENT_EXTENSIONS) {
+      expect(accept, extension).toContain(`.${extension}`);
+    }
+    expect(accept).toContain("image/png");
+    expect(accept).toContain(".txt");
+  });
+
+  it("caps a document at the host reader's byte limit", () => {
+    expect(attachmentOverCap("document", CHAT_DOCUMENT_MAX_BYTES)).toBe(false);
+    expect(attachmentOverCap("document", CHAT_DOCUMENT_MAX_BYTES + 1)).toBe(true);
+  });
+
+  it("sends a document with text and with media like a text file", () => {
+    expect(routeDecision(["document"])).toEqual({ route: "text" });
+    expect(routeDecision(["document", "text"])).toEqual({ route: "text" });
+    expect(routeDecision(["document", "image"])).toEqual({ route: "image" });
+  });
+});
+
+describe("pastedFiles", () => {
+  const file = (name: string, type = "") => ({ name, type }) as File;
+  const clipboard = (files: File[], text = "") => ({
+    files,
+    getData: (kind: string) => (kind === "text/plain" ? text : ""),
+  });
+
+  it("returns files pasted on their own, so a pasted file takes the picker's route", () => {
+    const pdf = file("a.pdf", "application/pdf");
+    expect(pastedFiles(clipboard([pdf]))).toEqual([pdf]);
+  });
+
+  it("leaves a paste that carries text alone, so a table copied from a sheet still pastes as text", () => {
+    const sheet = ["a", "b"].join("\t");
+    expect(pastedFiles(clipboard([file("image.png", "image/png")], sheet))).toEqual([]);
+  });
+
+  it("returns nothing for an empty or missing clipboard", () => {
+    expect(pastedFiles(clipboard([]))).toEqual([]);
+    expect(pastedFiles(null)).toEqual([]);
   });
 });
 

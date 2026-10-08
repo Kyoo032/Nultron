@@ -93,9 +93,17 @@ export const REQUIRED_PORTAL_ENV = [
   "PORTAL_SMTP_PASS",
   "PORTAL_SMTP_FROM",
 ];
-/** The few template values that are not empty: the seed's default client id and the SES settings (implicit TLS on 465). */
+/**
+ * What portal.env.example carries that nothing refuses to boot without: how people sign in. It has a default
+ * (`code`, the e-mailed one-time code), so it is listed with that value and a comment, and an operator who never
+ * touches it gets exactly what a portal without the variable has always done. `password` is the other value
+ * (apps/portal/src/config.ts); anything else stops the portal at boot.
+ */
+export const OPTIONAL_PORTAL_ENV = ["PORTAL_SIGNIN_MODE"];
+/** The few template values that are not empty: the seed's default client id, the sign-in mode, and the SES settings (implicit TLS on 465). */
 export const ENV_DEFAULTS = {
   AGENTFORGE_PORTAL_CLIENT_ID: "nultron-web",
+  PORTAL_SIGNIN_MODE: "code",
   PORTAL_SMTP_HOST: "sg-smtp.qcloudmail.com",
   PORTAL_SMTP_PORT: "465",
   PORTAL_SMTP_SECURE: "1",
@@ -458,6 +466,10 @@ export function portalEnvExample() {
       ],
       ["PORTAL_POSTGRES_PASSWORD", "Schema owner's password for the portal database. Read by initdb once, on an empty volume."],
       ["PORTAL_APP_DB_PASSWORD", "Password of portal_app_login, the role the portal serves as. Not the same value."],
+      [
+        "PORTAL_SIGNIN_MODE",
+        "How people sign in. code (the default, and what a portal without this line does) e-mails a one-time code, so the SMTP settings below are required. password signs people in with a username and a password an operator creates: no mail is sent and the SMTP settings may stay blank. Anything else stops the portal at boot.",
+      ],
       ["PORTAL_SMTP_HOST", "Tencent Cloud SES, International site. smtp.qcloudmail.com is the Hong Kong (China site) host."],
       ["PORTAL_SMTP_PORT", "465, implicit TLS. SES documents no other SMTP port."],
       ["PORTAL_SMTP_SECURE", "1 = TLS from the first byte, which is what port 465 speaks."],

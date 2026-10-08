@@ -31,6 +31,7 @@ export const MODE_MESSAGE_KEYS = [
   "editAgentFailed",
   "editFileRequired",
   "editMediaUnreadable",
+  "mediaFormatRefused",
 ] as const;
 
 export type ModeMessageKey = (typeof MODE_MESSAGE_KEYS)[number];
@@ -127,6 +128,12 @@ const MODE_MESSAGES: Record<ModeMessageKey, Record<AppLocale, string>> = {
   editMediaUnreadable: {
     en: "ffprobe could not read this file",
     id: "ffprobe tidak dapat membaca berkas ini",
+  },
+  // A playlist, concat script or metadata file: a list that points at other files or addresses, not a recording.
+  // Refused at the probe before ffmpeg opens anything it names (`packages/host/src/edit/ffmpeg/input-safety.ts`).
+  mediaFormatRefused: {
+    en: "This file is a playlist or a list of other files, not a video or audio recording, so it was not opened",
+    id: "Berkas ini berupa daftar putar atau daftar berkas lain, bukan rekaman video atau audio, jadi tidak dibuka",
   },
 };
 

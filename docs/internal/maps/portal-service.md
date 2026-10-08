@@ -1,6 +1,8 @@
 # Map — Portal service (`apps/portal`)
 
-Last verified: 2026-10-01 at 0b61a29 + working tree, by the sign-in-codes pass (four fixes found by driving
+Last verified: 2026-10-07 at 9aba37e + working tree for section 8 (password sign-in), Where things live, the
+Verify table's last four rows and one Why bullet, written the day the mode was built; the rest of the page keeps
+its reading below. Earlier: 2026-10-01 at 0b61a29 + working tree, by the sign-in-codes pass (four fixes found by driving
 the pilot: a replaced code no longer signs in, one request is one code, the fifth wrong invite code is the
 lock, the seat cap is told at the first step; plus the test run's exit code). That pass rewrote section 3's
 state table and bullets, the OTP and sign-in rows of section 6, Where things live, three Gotchas and
@@ -366,6 +368,54 @@ and serves on `PORTAL_DATABASE_URL` as `portal_app_login`, which 0001 describes 
 `migrations/0010_app_login_role.sql` creates. It asks `pg_roles` who that is before anything
 listens, and a production process refuses to boot as anything that can see past a policy.
 
+### 8. Password sign-in: the second way in (`PORTAL_SIGNIN_MODE=password`, 2026-10-07)
+
+Owner decision for the HYP AI deployment (Rizky, 2026-10-07: username and password in place of the e-mailed
+code, 2FA being designed). **It is a mode, chosen once at boot, and the default is the sign-in described in
+sections 2 and 3, unchanged.** The full account of it, the routes, the storage, the lockout and what is not
+built, is [`../portal/device-code-login.md`](../portal/device-code-login.md), "Password sign-in". What this
+page adds is where it plugs in and what to be careful of.
+
+- **One switch, read once.** `readSignInMode` (`apps/portal/src/config.ts`) answers `code` for unset or empty,
+  `password` for that word and a boot refusal for anything else. In `password` the two production SMTP
+  guards in `readSmtp` are skipped and every other one stays. `createMailer` (`src/mail/index.ts`) hands out
+  `createDisabledMailer` (`src/mail/disabled.ts`), which refuses to send.
+- **Two route tables.** `authorizeRoutes` and `activateRoutes` each return their code-mode list or, in
+  password mode, `GET` plus `POST .../password` and `POST .../password/change`; the e-mail, invite and verify
+  posts are not registered, so they are the server's own 404. `signInModeRoutes` (`src/routes/signin-mode.ts`)
+  registers `GET /auth/signin-mode` only in password mode. `routes/code-mode-unchanged.test.ts` pins both tables
+  as exact lists, and pins the eighteen code-mode screens by sha256 against hashes made from `main`'s view code.
+- **The steps** are `src/flows/password-sign-in.ts`: `identifyAccount`, `verifyPasswordStep`,
+  `signInWithPassword`, `changePasswordAndSignIn`. The route half is `src/routes/password-flow.ts`
+  (`handlePasswordStep`, `handleChangeStep`, the two pages, the budgets), shared by `/authorize/*` and
+  `/activate/*`. A person who is in goes down the same `completeSignIn` the code flow ends in
+  (`routes/authorize.ts`), or `signedInOnActivate` (`routes/activate.ts`). Both re-read `must_change` in the
+  transaction that issues the code or the cookie (`mustChangePasswordFirst`, password mode only), so a
+  `reset-password` that lands after the password check gets the change page and no code, cookie or Approve.
+- **The lockout is `store/postgres/credentials.ts`.** `reserveAttempt` counts the attempt *before* the password
+  is compared, under `FOR UPDATE`, with no hashing in the transaction, and only a caller that won an increment
+  gets the hash. Expiry uses the injected clock. `PASSWORD_MAX_FAILED_ATTEMPTS` (5), `PASSWORD_LOCK_MS`
+  (15 minutes) and `PASSWORD_GRACE_ATTEMPTS` (3, `0013_password_grace.sql`) live there. While the account is
+  locked, a caller that passes `graceAttempts` may still take up to three more, counted in the same row, so a
+  window compares at most 5 + 3 passwords; `recordSuccess` is guarded by the hash that was proved
+  (`expectHash`), so a reset that lands mid-comparison is not undone.
+- **Who may ask for a slot is `src/security/password-attempts.ts`**, in this process: `enter` marks a source as
+  having attempted a person (synchronously, before the comparison) and says whether it was clean; `ordered`
+  charges one person's attempts in the order sources entered; a mark ends fifteen minutes after the first
+  attempt. `PortalRuntime.attempts` holds it. A source is `sourceBucket(ip)` (`security/client-ip.ts`): an IPv4
+  address, or an IPv6 /56 (`IPV6_SOURCE_PREFIX_BITS`, 256 /64s; a routed /48 is 256 sources); the e-mailed-code
+  limits still key on `rateLimitKey`, the whole address.
+- **Hashing is `src/password/`**: `hash.ts` (scrypt, parameters stored beside the hash, `needsRehash`, the dummy
+  derivation that equalises the paths, and `admit()`, the gate of eight derivation places a sign-in step takes
+  before it counts anything), `policy.ts`, `generate.ts`. `PortalRuntime.passwords` is the hasher,
+  overridable in tests so a suite can count derivations.
+- **The operator** is `src/accounts/` and `scripts/account.ts` (`pnpm portal:account`, or `portal.sh account`).
+  `invite` and `otp` refuse to run in password mode.
+- **The host and the app** learn the mode from `GET /auth/signin-mode` through
+  `packages/host/src/auth/portal-mode.ts`, which `GET /api/v1/auth/session` reports as `signInMode: "password"`
+  and nothing otherwise; `apps/web/components/sign-in-screen.tsx` reads it. See
+  [`portal-session-auth.md`](portal-session-auth.md), "Status".
+
 ## Where things live
 
 | File | Role |
@@ -409,9 +459,45 @@ listens, and a production process refuses to boot as anything that can see past 
 | `apps/portal/src/store/postgres/roles.ts` | who a connection is (`pg_roles`), and the development-only password for `portal_app_login` |
 | `apps/portal/src/store/postgres/web-sessions.ts` | the counter: no row means version 1 |
 | `apps/portal/src/testing/{pg,server}.ts` | the `portal_app_test` role, and a real portal on an ephemeral port |
+| `apps/portal/src/flows/password-sign-in.ts` | the password sign-in as steps: identify, verify (take a place, charge first), the forced change; the audit rows |
+| `apps/portal/src/routes/password-flow.ts` | the two password posts and pages, shared by `/authorize` and `/activate`; the 20 / 10 budgets, per source; `503` when busy |
+| `apps/portal/src/routes/signin-mode.ts` | `GET /auth/signin-mode`, registered only in password mode |
+| `apps/portal/src/password/{hash,policy,generate}.ts` | scrypt and its stored parameters, the gate of eight derivation places (`admit`), the 12 to 200 policy and the username pattern, the generated initial password |
+| `apps/portal/src/security/password-attempts.ts` | in this process: which sources have attempted which person, and the order one person's attempts are charged in |
+| `apps/portal/src/store/postgres/credentials.ts` | `user_credentials`: create, find, list, `reserveAttempt` (the lockout and its three slots), `recordSuccess` (guarded by the proved hash), `clearAttempts`, `setPassword` |
+| `apps/portal/migrations/0012_password_signin.sql`, `0013_password_grace.sql` | `user_credentials` and `resolve_tenant_for_username`, no second-factor column; then `grace_attempts`, the three slots under the lock |
+| `apps/portal/src/accounts/`, `apps/portal/scripts/account.ts` | `portal:account`: create, reset-password, disable, enable, set-role, list |
+| `apps/portal/src/mail/disabled.ts` | the mailer of password mode: refuses to send, builds no transport |
+| `apps/portal/src/testing/{password-kit,code-pages}.ts` | a password-mode pilot and its posts; the code-mode screens rendered for the byte pin |
 
 ## Gotchas
 
+- **Password mode: every path through `verifyPasswordStep` runs exactly one derivation.** An unknown
+  username, a disabled person, a locked account, an over-long password and a wrong one each end in
+  `verifyDummy` or `verify`, which is what keeps the form from being an oracle for which accounts exist. A new
+  early `return` in that function that skips both reintroduces one. `password-sign-in.test.ts` counts the
+  derivations per path through a wrapped hasher, so it fails there; a comparison of times would not.
+- **Password mode: count first, compare second, and never hash inside the transaction.** `reserveAttempt` holds
+  the row for a short transaction and hands out the hash only to a caller that won an increment. Moving the
+  comparison into that transaction would pin a pooled connection for ~100 ms per guess; moving the count after
+  the comparison would let a parallel burst buy as many guesses as it can fire. Both are tested.
+- **Password mode: mark the source before the comparison, not after it, and take the place before the count.**
+  `attempts.enter` is called in the same synchronous step as the queued `reserveAttempt`; marking on failure
+  would let a burst from one address all look clean and take the slots under the lock between them. And
+  `signInWithPassword` asks `passwords.admit()` first: a refusal for want of a derivation place (`503`) has
+  counted nothing, which is only true while the permit is taken before `reserveAttempt`, never after. Both
+  orders are pinned (`flows/password-sign-in.test.ts`, "one address exactly five comparisons" and "answers busy
+  before it counts anything").
+- **Password mode: the lock refuses a source that has failed, not the person.** The in-process record is what
+  tells them apart, so it is per process and empty after a restart; the database holds the bound (five plus
+  three), not the record. A change that moves the three slots out of the row, or lets the record raise the
+  count, loses the bound.
+- **Password mode: the `password` field is not trimmed, the identifier is.** A space can be part of a password;
+  `stringField` trims, so the password is read by `passwordField` in `routes/password-flow.ts`. Do not "tidy"
+  that.
+- **Password mode: a person made by `seed` has no credential.** The owner `seed` creates is active and has no
+  password, so they cannot sign in until `portal:account create --email <their address>` attaches one (it keeps
+  their role and takes no new seat).
 - **SR-30 was changed on purpose, by the owner (2026-10-01).** The e-mail step used to be one neutral
   page and a timing floor, so nobody could tell a member from a stranger. It now tells them (section 3):
   member, invitee, spent invite, no access and lock are different pages, which makes it an oracle for
@@ -598,10 +684,16 @@ time with the host's, so prefer the embedded one.)
 | `apps/portal/src/routes/api.test.ts` (34) | the exact token key set, replay, wrong secret, redirect mismatch, refresh reuse, refresh without a `device_id`, the full device flow, `slow_down`, the Bearer endpoints, and behind a proxy the right-most `X-Forwarded-For`, the poll limit, and the per-client refresh bucket |
 | `apps/portal/src/routes/logout.test.ts` (11) | the way out: the cookie cleared on every answer, the origin-exact `post_logout_redirect_uri`, the CSRF-protected post, the server-side revocation, the audit row |
 | `apps/portal/src/security/rls.test.ts` (19) | the connection is a non-superuser `portal_app` member; tenant A reads and writes none of tenant B's `users`, `sessions`, `refresh_tokens`, `login_otps`, `auth_codes`, `invites` (and cannot redeem another tenant's invite); the pre-auth window |
-| `apps/portal/src/security/security.test.ts` (49) | cookie prefixes, the web session, CSRF, rate limits, their eviction and the refresh buckets, client IP from the last hop, headers, body caps, and `form-action` on an authorize page |
+| `apps/portal/src/security/security.test.ts` (57) | cookie prefixes, the web session, CSRF, rate limits, their eviction and the refresh buckets, client IP from the last hop, the password sign-in's source bucket (an IPv6 /56, IPv4 untouched, `rateLimitKey` still the whole address), headers, body caps, and `form-action` on an authorize page |
 | `apps/portal/src/boot.test.ts` (17) | the server role read from `pg_roles` for real roles (superuser, `BYPASSRLS`, `portal_admin` member, stranger); production refuses each; development warns; the app login's password set outside production only, for that role only |
 | `apps/portal/src/server.test.ts` (14) and `process-guards.test.ts` (6) | an unparseable request target is a 400 and a bad Host header is ignored, over a raw socket; the error path's own failure is contained; the process-level last resort logs and exits 1 |
 | `apps/portal/src/views/views.test.ts` (23) | escaping against four injection payloads on every screen (the new ones included), `en`/`id` key parity, locale negotiation, the invite screen never echoes a code |
+| `apps/portal/src/routes/password-sign-in.test.ts` (41) | the password mode over HTTP: the form, the forced change, the redirect and the code the host redeems, one refusal for four causes with equal work and comparable time, the lockout (five from one address, a restart, a parallel burst, the expiry), the person who gets in from their own address while the attacker's stays out and the eight-comparison bound from twenty-four addresses, the forced change's refusals, a disabled person, CSRF, the code routes absent, the device-code page, the seat gate, re-hashing, the two budgets (per source, an IPv6 /56 as one, one address unable to spend a person's budget), `503` when eight are deriving, a live cookie that does not resume past the forced change, a sign-in held past its password check whose credential is then flagged (change page, no code, no cookie, on both doors), and no password in any page, audit row or log line |
+| `apps/portal/src/flows/password-sign-in.test.ts` (20) | the password sign-in's decisions over a real Postgres, with no HTTP: the lock and the person it must not keep out, the bound of five plus three under parallel guesses from forty addresses, across a restart, and from one address; the audit rows (system as the actor, `lock_repeated`, at most five `withheld`); a reset that lands while a password is being compared, and a sign-in that only lost a race to another one re-hashing; the NFKC length ceiling; the `busy` answer that costs nothing and the permit given back on every road out |
+| `apps/portal/src/security/password-attempts.test.ts` (11) | the in-process record: clean the first time, a mark ends fifteen minutes after the first attempt, forgotten on success, bounded in size, and the per-person order of charges |
+| `apps/portal/src/routes/code-mode-unchanged.test.ts` (10) | the default mode is what `main` was: 18 screens by sha256, both route tables as exact lists, the password routes and `/auth/signin-mode` as 404s, the SMTP mailer kept |
+| `apps/portal/src/accounts/cli.test.ts` (7) | `scripts/account.ts` as a real process under `tsx` against a real Postgres, in the environment the container gives it: usage, the refusal off password mode, the one-time password on stdout only, exit codes 2 to 5, reset, disable, enable, and `invite` and `otp` turned away |
+| `apps/portal/src/store/postgres/credentials.test.ts` (28), `src/accounts/accounts.test.ts` (19), `src/password/password.test.ts` (20), `src/views/password-views.test.ts` (8) | the credential store (no secret field, schema CHECKs, tenant isolation, `reserveAttempt` under 50 parallel callers and its three slots under the lock, a stale success that writes nothing, the audit counts), the operator commands (seat cap, last owner, sessions ended on disable, reset and an attaching create, `enable` and `reset-password` clearing the counters, the 24-hour lock count in `list`, no password in the audit row or the list), scrypt, the derivation gate and the policy, and the two screens |
 | `apps/portal/src/jwt/keys.test.ts` (11) and `sign.test.ts` (10) | key derivation, the claim set, tampering, `alg: none`, skew, the JWKS document |
 | `src/{config,log,crypto,manual-otp}.test.ts`, `src/{mail/mail,seed/seed,otp/product-name,routes/assets,views/brand}.test.ts` and the other `src/store/postgres/*.test.ts` | the remaining: the aggregated config refusal and the two DSNs, the log sink's credential scrubbing (invite codes too), the invite code's shape, the manual OTP (it refuses an invited member), SMTP, the seed's once-only secret, the mail product name, the brand mark, and the store suites (including the daily OTP budget, `loginOtps.status`, retired and repeated codes in `otps.test.ts` (32), `hasSeatFor` in `seats.test.ts` (19) and the 0010 role) |
 
@@ -674,9 +766,11 @@ database; `teardown-local.mjs` removes it.
   **only** over HTTP") and `apps/portal/AGENTS.md:11-19`, which states the two import rules.
 - **Postgres from day one, with `0001-0005` unchanged.** `[Direct]`
   `docs/internal/web-phase9-portal-login.md:10`, the owner's second-round ruling 2.
-- **No password, ever.** `[Direct]` `docs/internal/portal/device-code-login.md:132` gives four
-  reasons, the first being that a password database for four whitelabel partners with no shared
-  IdP is the worst asset to hold.
+- **No password, by default; one mode has one.** `[Direct]` `docs/internal/portal/device-code-login.md:132` gives
+  four reasons, the first being that a password database for four whitelabel partners with no shared
+  IdP is the worst asset to hold. The owner lifted that for one mode on 2026-10-07
+  (`PORTAL_SIGNIN_MODE=password`, HYP AI; "2FA method being designed"), so the default sign-in still has none
+  and the other hosted product is unchanged. See section 8 and [SR-165](../security-register.md#sr-165).
 - **A signed cookie for the portal's own session rather than a table.** `[Inferred]` No doc states
   it. The store contract (`apps/portal/src/store/types.ts`) has no browser-session table and
   belongs to another lane, so a migration adding one would have had no code path able to write to

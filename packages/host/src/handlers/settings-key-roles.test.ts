@@ -361,13 +361,13 @@ describe("the Personal app is untouched: no role is read off server mode", () =>
     expect(companyKey()).toBeUndefined();
   });
 
-  it("clears a key with an empty string off server mode, as the desk owner always could", async () => {
+  it("keeps a key on an empty string off server mode, as the server always did", async () => {
     stubFetch(200);
     await save("member", { openaiApiKey: KEY }, DESK);
-    const cleared = await save("member", { openaiApiKey: "" }, DESK);
+    const kept = await save("member", { openaiApiKey: "" }, DESK);
 
-    expect(cleared.status).toBe(200);
-    expect(cleared.body.hasOpenai).toBe(false);
+    expect(kept.status).toBe(200);
+    expect(kept.body.hasOpenai).toBe(true);
   });
 
   it("never asks who the caller is: the refusal is not in the source path the desk takes", async () => {
@@ -382,11 +382,13 @@ describe("the Personal app is untouched: no role is read off server mode", () =>
 
 describe("no key field slips past the gate", () => {
   it("every provider key the settings POST forwards to the patch is one requestsKeyWrite counts", () => {
-    // A drift guard. The settings handler forwards a key through `keyFieldValue(body.<field>, ...)`; the
+    // A drift guard. The settings handler forwards a key through `keyFieldValue(body.<field>)`; the
     // role check counts the same fields. BYOK Phase B will add a field per provider, and a field added to
     // the first without the second would be a key a member can write. This fails the day that happens.
     const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "settings.ts"), "utf8");
-    const forwarded = [...source.matchAll(/keyFieldValue\(body\.(\w+),/g)].map((match) => match[1]).sort();
+    const forwarded = [
+      ...new Set([...source.matchAll(/keyFieldValue\(body\.(\w+)\)/g)].map((match) => match[1])),
+    ].sort();
 
     expect(forwarded).toEqual(["anthropicApiKey", "googleApiKey", "openaiApiKey", "volcengineApiKey"]);
     for (const field of forwarded) {

@@ -10,7 +10,7 @@ export function presentationLocale(): PresentationLocale {
 
 export function presentationLanguageRule(locale: PresentationLocale): string {
   if (locale === "id") {
-    return "Write every user-facing string (title, heading, subhead, bullets, aside, notes) in professional Bahasa Indonesia (polite Anda / infinitive). Keep brand names Nultron, Toko Token, and TokenKu unchanged. Do not mix English except those brands and proper nouns.";
+    return "Write every user-facing string (title, heading, subhead, bullets, aside, notes) in professional Bahasa Indonesia (polite Anda / infinitive). Keep brand names Nultron and Toko Token unchanged. Do not mix English except those brands and proper nouns.";
   }
   return "Write every user-facing string (title, heading, subhead, bullets, aside, notes) in English.";
 }
@@ -24,4 +24,31 @@ export function presentationGatewayMessage(locale: PresentationLocale): string {
     return "Pembuatan presentasi membutuhkan gateway yang aktif. Tempel kunci API Toko Token di Pengaturan, lalu coba lagi.";
   }
   return "Presentation generation needs a live gateway. Paste a Toko Token API key in Settings, then try again.";
+}
+
+/** Progress labels for the design pass. The host emits these on `job.phase`. */
+export function presentationDesignLabel(phase: "designing" | "repairing", locale: PresentationLocale): string {
+  if (locale === "id") {
+    return phase === "designing" ? "Menyusun tata letak" : "Menulis ulang halaman yang sesak";
+  }
+  return phase === "designing" ? "Assigning a layout" : "Rewriting the crowded pages";
+}
+
+/** Shown beside "Round 1 of 1" while the outline is repaired after a failed check. Host-side copy, like the phase labels. */
+export function presentationRepairLabel(locale: PresentationLocale): string {
+  return locale === "id" ? "Memperbaiki kerangka presentasi" : "Repairing the outline";
+}
+
+/** Lines the harness writes onto a deck. Same sentences as `presentation.notesFallback` and `presentation.noFigure`. */
+export function presentationSkillCopy(locale: PresentationLocale): { note: string; noFigure: string } {
+  if (locale === "id") {
+    return {
+      note: "Ucapkan halaman ini sekali, lalu berhenti. Jangan menambah angka yang tidak diberikan.",
+      noFigure: "Tidak ada angka",
+    };
+  }
+  return {
+    note: "Say this page once, then stop. Do not add a number you were not given.",
+    noFigure: "No figure supplied",
+  };
 }

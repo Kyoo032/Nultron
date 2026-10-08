@@ -29,11 +29,19 @@ import { redirectErrorReason } from "../flows/reasons";
 import { verifyLoginOtp } from "../otp/verify";
 import { OTP_TTL_MINUTES } from "../otp/send";
 import { normaliseEmail } from "../crypto";
-import { versionIsLive, webSessionCookieFor } from "../flows/web-session";
+import { mustChangePasswordFirst, versionIsLive, webSessionCookieFor } from "../flows/web-session";
 import { boundedField, stringField } from "../security/body";
 import { redirectResponse } from "../security/headers";
 import type { WebSession } from "../security/web-session";
 import type { PortalRequest, PortalResponse, PortalRoute } from "../server";
+import {
+  changeRequiredResponse,
+  handleChangeStep,
+  handlePasswordStep,
+  passwordEntryResponse,
+  type PasswordSpec,
+  type PasswordStepResult,
+} from "./password-flow";
 import {
   codeEntryResponse,
   emailEntryResponse,
@@ -56,6 +64,9 @@ const EMAIL_PATH = "/authorize/email";
 const INVITE_PATH = "/authorize/invite";
 const INVITE_RESEND_PATH = "/authorize/invite/resend";
 const VERIFY_PATH = "/authorize/verify";
+/** Password sign-in (`PORTAL_SIGNIN_MODE=password`) has these two posts instead of the four above. */
+const PASSWORD_PATH = "/authorize/password";
+const PASSWORD_CHANGE_PATH = "/authorize/password/change";
 
 const CLIENT_ERROR_COPY: Readonly<Record<string, string>> = Object.freeze({
   invalid_request: "error.badRequest",
@@ -101,6 +112,16 @@ function specFor(params: AuthorizeParams, tenantId: string): SignInSpec {
   };
 }
 
+/** The same, for the password sign-in's two posts. Built only after `checkClient` has returned ok. */
+function passwordSpecFor(params: AuthorizeParams, tenantId: string): PasswordSpec {
+  return {
+    requiredTenantId: tenantId,
+    paths: { password: PASSWORD_PATH, change: PASSWORD_CHANGE_PATH },
+    hidden: hiddenFor(params),
+    formActionOrigins: clientFormAction(params),
+  };
+}
+
 function paramsFromFields(fields: Readonly<Record<string, unknown>>): AuthorizeParams {
   return readAuthorizeParams({
     get: (name) => {
@@ -111,6 +132,23 @@ function paramsFromFields(fields: Readonly<Record<string, unknown>>): AuthorizeP
 }
 
 export function authorizeRoutes(runtime: PortalRuntime): readonly PortalRoute[] {
+  if (runtime.config.signInMode === "password") {
+    // The e-mail, invite and verify posts are not registered at all, so they answer as any other
+    // path that does not exist: the server's own 404.
+    return [
+      { method: "GET", path: "/authorize", handle: (request) => getAuthorize(runtime, request) },
+      {
+        method: "POST",
+        path: PASSWORD_PATH,
+        handle: (request) => authorizePost(runtime, request, (flow) => postPassword(runtime, flow)),
+      },
+      {
+        method: "POST",
+        path: PASSWORD_CHANGE_PATH,
+        handle: (request) => authorizePost(runtime, request, (flow) => postPasswordChange(runtime, flow)),
+      },
+    ];
+  }
   return [
     { method: "GET", path: "/authorize", handle: (request) => getAuthorize(runtime, request) },
     {
@@ -162,6 +200,9 @@ async function getAuthorize(runtime: PortalRuntime, request: PortalRequest): Pro
     // an error nobody can act on. A removed member is then told what any stranger is told.
   }
 
+  if (runtime.config.signInMode === "password") {
+    return passwordEntryResponse(runtime, context, passwordSpecFor(params, client.tenantId));
+  }
   return emailEntryResponse(runtime, context, specFor(params, client.tenantId));
 }
 
@@ -170,6 +211,7 @@ interface AuthorizeFlow {
   readonly fields: Readonly<Record<string, unknown>>;
   readonly params: AuthorizeParams;
   readonly spec: SignInSpec;
+  readonly password: PasswordSpec;
 }
 
 /**
@@ -199,7 +241,52 @@ async function authorizePost(
   if (!client.ok) {
     return htmlError(context, CLIENT_ERROR_COPY[client.reason]);
   }
-  return handle({ context, fields: body.fields, params, spec: specFor(params, client.tenantId) });
+  return handle({
+    context,
+    fields: body.fields,
+    params,
+    spec: specFor(params, client.tenantId),
+    password: passwordSpecFor(params, client.tenantId),
+  });
+}
+
+/**
+ * `POST /authorize/password`: the password sign-in's whole first step. A person who is in goes down
+ * exactly the road a verified e-mailed code does -- `completeSignIn`: the login gate (seat cap,
+ * disabled, past due), an authorization code, the portal's own session cookie, the 302 -- so what the
+ * app receives is the same and needs no new trust decision.
+ */
+async function postPassword(runtime: PortalRuntime, flow: AuthorizeFlow): Promise<PortalResponse> {
+  const step = await handlePasswordStep(runtime, flow.context, flow.password, flow.fields);
+  if (step.kind === "response") {
+    return step.response;
+  }
+  return endPasswordSignIn(runtime, flow, step);
+}
+
+/** `POST /authorize/password/change`: the forced change, and the same tail once it holds. */
+async function postPasswordChange(runtime: PortalRuntime, flow: AuthorizeFlow): Promise<PortalResponse> {
+  const step = await handleChangeStep(runtime, flow.context, flow.password, flow.fields);
+  if (step.kind === "response") {
+    return step.response;
+  }
+  return endPasswordSignIn(runtime, flow, step);
+}
+
+/**
+ * The tail of both password posts. A person who is in goes through `completeSignIn`; one whose credential
+ * was flagged for a forced change since the password was checked (an operator's `reset-password` landed
+ * in between) gets the change screen and nothing else, so no code and no cookie outlive the reset.
+ */
+async function endPasswordSignIn(
+  runtime: PortalRuntime,
+  flow: AuthorizeFlow,
+  step: Extract<PasswordStepResult, { readonly kind: "signed_in" }>,
+): Promise<PortalResponse> {
+  const done = await completeSignIn(runtime, flow.context, flow.params, step.tenantId, step.user.id, {
+    ifChangeRequired: () => changeRequiredResponse(runtime, flow.context, flow.password, flow.fields),
+  });
+  return done ?? htmlError(flow.context, "error.generic", { status: 500 });
 }
 
 async function postVerify(runtime: PortalRuntime, flow: AuthorizeFlow): Promise<PortalResponse> {
@@ -255,6 +342,13 @@ function retryCode(
  * sign-in screen shows the copy -- which is where `seat_cap_reached` belongs, next to the admin
  * who can free a seat. `null` means the session's user has gone and the caller should render the
  * form instead.
+ *
+ * **A person still owed a new password gets no code and no cookie, however they got here** (password
+ * mode only; `mustChangePasswordFirst` is false in the other mode, without reading anything). That is
+ * checked on a fresh password sign-in as well as on a resumed cookie: an operator's `reset-password`
+ * can land after the password was proved and before this transaction, and it has already ended the
+ * sessions that existed, so the one this would issue would outlive it. A resumed cookie then falls
+ * through to the form (`null`); a fresh sign-in is answered with `ifChangeRequired`, the change screen.
  */
 async function completeSignIn(
   runtime: PortalRuntime,
@@ -262,7 +356,7 @@ async function completeSignIn(
   params: AuthorizeParams,
   tenantId: string,
   userId: string,
-  options: { readonly resume?: WebSession } = {},
+  options: { readonly resume?: WebSession; readonly ifChangeRequired?: () => PortalResponse } = {},
 ): Promise<PortalResponse | null> {
   const clientId = params.clientId as string;
   const redirectUri = params.redirectUri as string;
@@ -278,6 +372,10 @@ async function completeSignIn(
     const user = await ops.users.findById(userId);
     if (!user) {
       return { kind: "unknown_user" as const };
+    }
+    // Neither a cookie nor a password that was right a moment ago is a way past the forced change.
+    if (await mustChangePasswordFirst(runtime, ops, userId)) {
+      return { kind: "change_required" as const };
     }
     const gate = await runBrowserLoginGate(ops, { tenantId, user, installId });
     if (!gate.ok) {
@@ -316,6 +414,9 @@ async function completeSignIn(
 
   if (outcome.kind === "unknown_user") {
     return null;
+  }
+  if (outcome.kind === "change_required") {
+    return options.ifChangeRequired ? options.ifChangeRequired() : null;
   }
   if (outcome.kind === "denied") {
     return redirectResponse(redirectWithError(redirectUri, redirectErrorReason(outcome.reason), state));

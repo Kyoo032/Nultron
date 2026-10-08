@@ -7,6 +7,7 @@ import {
   ERASE_ACCOUNT_IDLE,
   canSubmitErase,
   eraseAccountReducer,
+  eraseFailureReasonOf,
   isErasePanelOpen,
   typedPhrase,
   type EraseFailureReason,
@@ -157,7 +158,11 @@ export function EraseAccountPanel({
 
       {reason ? (
         <p role="alert" className="text-sm text-[var(--danger)]" data-testid="settings-reset-error">
-          {reason === "forbidden" ? t("settings.reset.eraseAccountForbidden") : t("settings.reset.failed")}
+          {reason === "forbidden"
+            ? t("settings.reset.eraseAccountForbidden")
+            : reason === "shared"
+              ? t("settings.reset.eraseAccountShared")
+              : t("settings.reset.failed")}
         </p>
       ) : null}
 
@@ -226,7 +231,7 @@ export function SettingsEraseAccount() {
       if (!result.ok) {
         dispatch({
           type: "failed",
-          reason: result.code === "tenant_reset_forbidden" ? "forbidden" : "generic",
+          reason: eraseFailureReasonOf(result.code),
         });
         return;
       }

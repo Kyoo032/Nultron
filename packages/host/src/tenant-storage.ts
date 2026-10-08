@@ -29,8 +29,10 @@
  * **What the quota counts.** Everything a tenant is holding: the objects in this store, plus the
  * job trees that stay on local disk because the processes that write them need real file paths
  * (ffmpeg's scratch under `<dataDir>/tenants/<id>/edit/`, dataset files under
- * `<dataDir>/datasets/tenants/<id>/`). Objects are counted in `tenant_storage`; the job trees are
- * measured, briefly memoised, and added. One number, and it is the number the refusal uses.
+ * `<dataDir>/datasets/tenants/<id>/`), plus, on a hosted server, the results the tenant has saved
+ * (decks, dossiers, briefs: rows of the `artifacts` table). Objects are counted in `tenant_storage`;
+ * the job trees are measured, briefly memoised, and added; the artifacts are read from their rows on
+ * every call. One number, and it is the number the refusal uses.
  */
 import { createReadStream } from "node:fs";
 import { createHash } from "node:crypto";
@@ -72,6 +74,7 @@ import {
 } from "./tenant-paths";
 import {
   addTenantStorageBytes,
+  readTenantArtifactUse,
   readTenantStorageCounter,
   reserveTenantStorageBytes,
   setTenantStorageCounter,
@@ -431,10 +434,30 @@ async function objectUse(tenantId: string): Promise<TenantStorageUse & { measure
   return { usedBytes: seeded.bytesUsed, objectCount: seeded.objectCount, measuredAt: seeded.measuredAt };
 }
 
-/** Objects plus job trees: the one number the report shows and the refusal uses. */
-async function totalUse(tenantId: string): Promise<{ objects: TenantStorageUse; jobs: TenantStorageUse }> {
+const NO_USE: TenantStorageUse = { usedBytes: 0, objectCount: 0 };
+
+/**
+ * What a hosted tenant's saved artifacts hold: decks, dossiers, briefs. They are rows, not objects, so
+ * neither the counter nor the job-tree walk sees them, and until the 2026-10-07 `build_deck` fix a
+ * script could fill the database through them with the meter at zero. **Server mode only**, like the
+ * counter: a desk has no ceiling, and its number stays the disk it measures, byte for byte as before.
+ * Measured on every call (see `readTenantArtifactUse` for why that is cheap), never cached, so a deleted
+ * deck gives its room back at once and nothing needs recomputing.
+ */
+function artifactUse(tenantId: string): TenantStorageUse {
+  if (!isServerMode()) {
+    return NO_USE;
+  }
+  const held = readTenantArtifactUse(tenantId);
+  return { usedBytes: held.bytes, objectCount: held.count };
+}
+
+/** Objects, job trees and saved artifacts: the one number the report shows and the refusal uses. */
+async function totalUse(
+  tenantId: string,
+): Promise<{ objects: TenantStorageUse; jobs: TenantStorageUse; artifacts: TenantStorageUse }> {
   const [objects, jobs] = await Promise.all([objectUse(tenantId), measureTenantJobBytes(tenantId)]);
-  return { objects, jobs };
+  return { objects, jobs, artifacts: artifactUse(tenantId) };
 }
 
 /**
@@ -464,19 +487,34 @@ export function isStorageQuotaError(error: unknown): error is StorageQuotaError 
 /**
  * What this tenant is holding and what it is allowed to hold.
  *
- * `usedBytes` is objects plus job trees. `limitBytes` is `null` off server mode, which is what
- * makes the desktop exempt by construction: it measures and reports, and refuses nothing.
+ * `usedBytes` is objects plus job trees plus (on a hosted server) saved artifacts. `limitBytes` is
+ * `null` off server mode, which is what makes the desktop exempt by construction: it measures and
+ * reports, and refuses nothing.
  */
-export async function tenantStorageReport(
-  tenantId: string,
-): Promise<TenantStorageReport & { objectBytes: number; jobBytes: number; backend: ObjectStorageKind }> {
+export async function tenantStorageReport(tenantId: string): Promise<
+  TenantStorageReport & {
+    objectBytes: number;
+    jobBytes: number;
+    artifactBytes: number;
+    backend: ObjectStorageKind;
+  }
+> {
   assertTenantId(tenantId);
-  const { objects, jobs } = await totalUse(tenantId);
+  const { objects, jobs, artifacts } = await totalUse(tenantId);
   const report = storageReport(
-    { usedBytes: objects.usedBytes + jobs.usedBytes, objectCount: objects.objectCount + jobs.objectCount },
+    {
+      usedBytes: objects.usedBytes + jobs.usedBytes + artifacts.usedBytes,
+      objectCount: objects.objectCount + jobs.objectCount + artifacts.objectCount,
+    },
     tenantStorageLimitBytes(),
   );
-  return { ...report, objectBytes: objects.usedBytes, jobBytes: jobs.usedBytes, backend: tenantObjectStore().kind };
+  return {
+    ...report,
+    objectBytes: objects.usedBytes,
+    jobBytes: jobs.usedBytes,
+    artifactBytes: artifacts.usedBytes,
+    backend: tenantObjectStore().kind,
+  };
 }
 
 /**
@@ -491,8 +529,8 @@ export async function assertStorageAdmits(tenantId: string, incomingBytes: numbe
   if (limitBytes === null) {
     return;
   }
-  const { objects, jobs } = await totalUse(tenantId);
-  const usedBytes = Math.max(0, objects.usedBytes + jobs.usedBytes - Math.max(0, replacingBytes));
+  const { objects, jobs, artifacts } = await totalUse(tenantId);
+  const usedBytes = Math.max(0, objects.usedBytes + jobs.usedBytes + artifacts.usedBytes - Math.max(0, replacingBytes));
   const verdict = storageAdmission({ usedBytes, incomingBytes, limitBytes });
   if (!verdict.ok) {
     log.warn("tenant_storage_quota_refused", { tenantId, usedBytes, limitBytes, incomingBytes });
@@ -522,10 +560,10 @@ export async function assertStorageAdmits(tenantId: string, incomingBytes: numbe
  * delta it reserved — and `addTenantStorageBytes` clamps at zero, so a refund that races a
  * reconciliation cannot drive the counter negative.
  *
- * **The budget is the ceiling minus the job trees.** Those bytes (ffmpeg scratch, dataset files,
- * meeting recordings, knowledge uploads) are measured rather than counted, so they cannot be part
- * of an atomic SQL test. Subtracting them first is what keeps the one number the tenant sees and
- * the number the UPDATE enforces the same number.
+ * **The budget is the ceiling minus the job trees and the saved artifacts.** Those bytes (ffmpeg
+ * scratch, dataset files, meeting recordings, knowledge uploads; decks and other saved results) are
+ * measured rather than counted, so they cannot be part of an atomic SQL test. Subtracting them first
+ * is what keeps the one number the tenant sees and the number the UPDATE enforces the same number.
  *
  * **What is no longer guaranteed, said out loud.** With the chain gone, two writes to the *same
  * key* in the same instant can both read the same `head()` and both reserve a full delta, so the
@@ -561,11 +599,14 @@ export async function putTenantObject(
   // needs a row to act on, so this is also what makes the conditional test meaningful at all.
   await objectUse(tenantId);
   const jobs = await measureTenantJobBytes(tenantId);
-  const budget = limitBytes === null ? null : limitBytes - jobs.usedBytes;
+  // Saved artifacts are rows the counter does not know about, exactly like the job trees: the room
+  // left for objects is the ceiling minus both.
+  const artifacts = artifactUse(tenantId);
+  const budget = limitBytes === null ? null : limitBytes - jobs.usedBytes - artifacts.usedBytes;
 
   if (!reserveTenantStorageBytes(tenantId, delta, budget)) {
     const counter = readTenantStorageCounter(tenantId);
-    const usedBytes = (counter?.bytesUsed ?? 0) + jobs.usedBytes;
+    const usedBytes = (counter?.bytesUsed ?? 0) + jobs.usedBytes + artifacts.usedBytes;
     log.warn("tenant_storage_quota_refused", {
       tenantId,
       usedBytes,

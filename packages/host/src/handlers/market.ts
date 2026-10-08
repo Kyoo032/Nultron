@@ -3,6 +3,7 @@ import { marketBriefingSchema } from "@agentforge/core/artifacts";
 import { jsonError, jsonOk } from "../errors";
 import { requireGatewayAllowedFor } from "../gateway-gate";
 import { streamJob } from "../job-stream";
+import { withRunSlot } from "../run-limits";
 import { buildMarketBoard } from "../market-board";
 import { assertBriefingHasNoAdvice } from "../market-briefing-build";
 import { buildMarketBriefingDocx } from "../market-docx";
@@ -27,7 +28,7 @@ export async function handlePostMarket(request: HostRequest): Promise<HostResult
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    return jsonOk(await generateMarketBriefing(tenant, request.body ?? null));
+    return jsonOk(await withRunSlot(tenant, () => generateMarketBriefing(tenant, request.body ?? null)));
   } catch (error) {
     return jsonError(error);
   }
@@ -41,6 +42,7 @@ export async function handlePostMarketStream(request: HostRequest): Promise<Host
     requireGatewayAllowedFor(tenant);
     return streamJob((emit, abortSignal) => generateMarketBriefing(tenant, request.body ?? null, emit, abortSignal), {
       abortSignal: request.abortSignal,
+      tenant,
     });
   } catch (error) {
     return jsonError(error);
@@ -53,7 +55,7 @@ export async function handlePostMarketRegen(request: HostRequest): Promise<HostR
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    return jsonOk(await regenerateBriefingSection(tenant, request.body ?? null));
+    return jsonOk(await withRunSlot(tenant, () => regenerateBriefingSection(tenant, request.body ?? null)));
   } catch (error) {
     return jsonError(error);
   }

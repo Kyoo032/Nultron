@@ -230,3 +230,30 @@ export async function* watchAsyncIterable<T>(
     await iterator.return?.();
   }
 }
+
+/**
+ * How long one model request may take to send its response headers before the run stops waiting for it.
+ * It is three times the 15.1 s that gpt-6-luna's gateway took, twice, to answer HTTP 200 on a Word-file
+ * turn with Thinking Off (2026-10-07; 15 146 ms and 15 135 ms), and three quarters of `STREAM_IDLE_MS`:
+ * on a follow-up call after a tool the idle watchdog is already running, so this has to fire first or the
+ * person would read "no stream events" and never "no response". Its predecessor was 10 s, which cut
+ * that gateway three times in a row. A request that times out is not tried again (`isRetryableModelFailure`):
+ * one more wait of this length is the same silent call.
+ */
+export const HEADERS_TIMEOUT_MS = 45_000;
+
+/**
+ * The words for a request whose response headers did not arrive in time. It is not a verdict that the
+ * gateway is down (the same gateway can answer `/v1/models` at once), so it says only what is known:
+ * nothing came back from this model in that time. "No response within" is the phrase the job fallback
+ * (`isGatewayUnavailableFailure`) reads, and `isRetryableModelFailure` reads the whole sentence as a stop.
+ */
+export function formatHeadersTimeoutError(modelId: string, waitedMs: number, locale: AppLocale = "en"): string {
+  const seconds = Math.max(1, Math.round(waitedMs / 1000));
+  if (parseAppLocale(locale) === "id") {
+    const name = modelId.trim() || "model ini";
+    return `Tidak ada respons dalam ${seconds} detik dari ${name} (timeout). Coba prompt yang lebih pendek, model lain, atau kirim lagi.`;
+  }
+  const name = modelId.trim() || "this model";
+  return `No response within ${seconds}s from ${name} (timeout). Try a smaller prompt, another model, or send again.`;
+}

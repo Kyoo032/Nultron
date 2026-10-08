@@ -215,25 +215,34 @@
   /* The one loop that stays: the working dots. Status, not decoration (see the ambient block). */
   --motion-pulse: 1400ms;
   /* Playful desk: a longer spring entrance and the wiggle. Decoration arrives once; the only loops are
-     the stepped ambient set below and the busy ones, and `lib/motion-tokens.test.ts` fails on any other
+     the ambient set below and the busy ones, and `lib/motion-tokens.test.ts` fails on any other
      `infinite` animation. */
   --motion-5: 560ms;
   --motion-wiggle: 560ms;
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  /* Busy indicators (the working dots, the mascot at a job): four discrete positions per keyframe
-     interval, so about 8 to 12 frames a second instead of a full 60. Without the GPU every extra
-     frame is a whole software-composited frame; the motion is a few pixels and reads the same. */
+  /* Two shells, two timings (owner, 2026-10-05: "smooth the Nultron animation"). The packaged Personal app
+     runs Chromium without the GPU (`app.disableHardwareAcceleration()`), so every frame of a running loop is
+     composited in software: there the loops are stepped, a few frames a second. In a browser (webdev, the
+     hosted Enterprise app) the GPU composites them, so they are smooth. `main.tsx` writes
+     `data-shell="desktop"` on <html> once, in the packaged shell only (`lib/shell-motion.ts`), and the block
+     right after this one hands the stepped values back. The defaults below are the browser's. */
+
+  /* The frame strips (a clip, a four-frame loop) are pictures, so they step in both shells: this token
+     is steps(4) everywhere, one step per frame. */
   --ease-busy: steps(4);
+  /* Busy indicators that are only a transform (the working dots, the mascot head's nod, bob and swell). */
+  --ease-busy-move: ease-in-out;
   /* The ambient loops (owner, 2026-10-01: "reacts + a gentle loop"): the shapes' bob and turn and the dot
-     grid's drift. Stepped, so they cost a few tenths of a percent of the machine without the GPU, and on one
-     400ms grid: a bob is 16 ticks (8 steps in each of its two keyframe intervals), a turn 32, the drift 48
-     (a 1px step every second tick). Their steps land on the same frames, so the desk repaints about 2.5 times
-     a second, not once per loop. They pause with the desk (`html[data-ambient="paused"]`) and are switched
-     off by name under reduced motion; `lib/motion-tokens.test.ts` holds the grid and both of those. */
+     grid's drift. Smooth here: a bob eases out and back, the turn and the drift keep a steady speed
+     (`--ease-ambient-steady`; their keyframes are evenly spaced, so linear is one constant motion). The
+     cycles are shorter than the stepped ones (a bob 4 s, a turn 8 s, the drift 12 s a tile) because a smooth
+     motion needs less time to read as alive. Amplitudes are unchanged. They pause with the desk
+     (`html[data-ambient="paused"]`) and are switched off by name under reduced motion. */
   --motion-tick: 400ms;
-  --motion-ambient: calc(var(--motion-tick) * 16);
-  --motion-drift: calc(var(--motion-tick) * 48);
-  --ease-ambient: steps(8);
+  --motion-ambient: 4000ms;
+  --motion-drift: 12000ms;
+  --ease-ambient: ease-in-out;
+  --ease-ambient-steady: linear;
   --motion-confetti: 1100ms;
 
   /* The compound aliases the rules below read. All four stay on step 1, the 120ms the warm desk
@@ -297,6 +306,22 @@
   --scroll-thumb: color-mix(in srgb, var(--text) 22%, transparent);
   --scroll-thumb-hover: color-mix(in srgb, var(--text) 38%, transparent);
   --scroll-thumb-active: color-mix(in srgb, var(--text) 52%, transparent);
+}
+
+/* The packaged desktop shell (`<html data-shell="desktop">`, written once by `main.tsx`): no GPU, so every
+   loop is stepped, exactly as it was before the browsers went smooth. On one 400ms grid: a bob is 16 ticks
+   (8 steps in each of its two keyframe intervals), a turn 32, the drift 48 (a 1px step every second tick).
+   Their steps land on the same frames, so the desk repaints about 2.5 times a second, not once per loop;
+   measured without the GPU the set costs a few tenths of a percent while the desk is in use. Only tokens
+   live here, never a rule: the loops are declared once, below, and read these. `html[data-shell]` is more
+   specific than `:root`, so the order of the two blocks does not matter. `lib/motion-shell.test.ts` holds
+   every value to what the stepped desk shipped with. */
+html[data-shell="desktop"] {
+  --ease-busy-move: var(--ease-busy);
+  --motion-ambient: calc(var(--motion-tick) * 16);
+  --motion-drift: calc(var(--motion-tick) * 48);
+  --ease-ambient: steps(8);
+  --ease-ambient-steady: steps(8);
 }
 
 /* Same warm paper as `:root`, kept as a real selector because `applyTheme` toggles `.light`. */
@@ -1219,8 +1244,8 @@ h6 {
 
 /* The desk's backdrop takes the colour of the mode on screen: a wash at the top (the canvas' own
    background, above) and a dot grid that fades out down the page (`.desk-backdrop`, below). Both sit
-   behind the content. They answer the pointer and drift one tile in 19 s, stepped; see `attachDeskMotion`
-   and the ambient tokens. */
+   behind the content. They answer the pointer and drift one tile in 12 s (19 s, stepped, in the packaged desktop
+   shell); see `attachDeskMotion` and the ambient tokens. */
 .desk-canvas:has(main[data-mode="chat"]:not([hidden] *)) { --page-mode: var(--mode-chat); }
 .desk-canvas:has(main[data-mode="documents"]:not([hidden] *)) { --page-mode: var(--mode-documents); }
 .desk-canvas:has(main[data-mode="research"]:not([hidden] *)) { --page-mode: var(--mode-research); }
@@ -1310,8 +1335,9 @@ h6 {
 /* The dot grid fades out down the page. The fade is a mask on `.desk-grid`, which never moves, and a mask clips
    its element to the border box, so the dots below the strip are cut too; the dots inside it move, so the
    fade does not slide with them. The dots are the strip's own `::before`, not an element, so the 30px they
-   hold past the strip are clipped by the canvas and are nobody's scroll width. The dots drift one 24px tile along the diagonal in 19 s
-   and start over unseen (`nx-grid-drift`, stepped, a pixel every second tick), and shift up to 6px against the
+   hold past the strip are clipped by the canvas and are nobody's scroll width. The dots drift one 24px tile along the diagonal in 12 s,
+   at a steady speed, and start over unseen (`nx-grid-drift`; in the packaged desktop shell 19 s, stepped, a
+   pixel every second tick), and shift up to 6px against the
    pointer (`--grid-x` / `--grid-y`, whole px from `attachDeskMotion`, which slews them a pixel per write, so
    there is no transition: the layer changes only while it is really moving). The layer is bigger than the
    strip by the most that either can move it (30px up and left, 6px down and right), so no edge ever shows. */
@@ -1329,7 +1355,7 @@ h6 {
   inset: -30px -6px -6px -30px;
   background-image: radial-gradient(circle, color-mix(in srgb, var(--page-mode, var(--accent)) 30%, transparent) 1.3px, transparent 1.8px);
   background-size: 24px 24px;
-  animation: nx-grid-drift var(--motion-drift) var(--ease-ambient) infinite;
+  animation: nx-grid-drift var(--motion-drift) var(--ease-ambient-steady) infinite;
   transform: translate(calc(var(--grid-x, 0) * -1px), calc(var(--grid-y, 0) * -1px));
   will-change: transform;
 }
@@ -1591,9 +1617,11 @@ aside nav > p {
   }
 }
 
-/* The ambient loops (`--ease-ambient`, stepped). Each begins at rest, so it can start at any moment without
-   a jump. The bob is two keyframe intervals, the turn four and the drift three, so that with 8 steps an
-   interval every step is a whole number of 400ms ticks (`lib/motion-tokens.test.ts`). */
+/* The ambient loops (`--ease-ambient` for the bob, `--ease-ambient-steady` for the turn and the drift).
+   Each begins at rest, so it can start at any moment without a jump. The turn and the drift have evenly
+   spaced keyframes, so a linear curve is one constant motion and the stepped desktop shell gets whole pixels
+   and whole degrees. The bob is two keyframe intervals, the turn four and the drift three, so that with 8
+   steps an interval every desktop step is a whole number of 400ms ticks (`lib/motion-shell.test.ts`). */
 @keyframes nx-bob {
   0% {
     translate: 0 0;
@@ -1822,13 +1850,16 @@ aside nav > p {
 }
 
 /* Decorative shapes around heroes and headers (`FloatingShapes`). One settle when they arrive, then a gentle
-   bob (a spinner turns instead), stepped on the desk's 400ms grid (`--ease-ambient`), and they answer the
+   bob (a spinner turns instead), smooth in a browser and stepped on the desk's 400ms grid in the packaged
+   desktop shell (`--ease-ambient`), and they answer the
    pointer: the hero's parallax and a push away from a pointer that comes close (`.float-shapes-live`,
    below), and a pop when tapped. The shape is two boxes: `.float-shape` settles in, takes the pointer and pops,
-   and `.float-shape-body` inside it only loops, so the loop can run on the compositor. They used to bob and
-   spin smoothly for ever, which cost a software-composited frame sixty times a second without the GPU
-   (2026-09-29); stepped they cost a few tenths of a percent. `lib/motion-tokens.test.ts` holds the contract,
-   and a new `infinite` animation outside the busy and ambient sets fails it. */
+   and `.float-shape-body` inside it only loops, so the loop can run on the compositor. They bobbed and
+   spun smoothly for ever until 2026-09-29, which cost a software-composited frame sixty times a second
+   without the GPU; stepped they cost a few tenths of a percent, so the desktop shell keeps them stepped and
+   the browsers, which have the GPU, are smooth again (2026-10-05). `lib/motion-tokens.test.ts` and
+   `lib/motion-shell.test.ts` hold the contract, and a new `infinite` animation outside the busy and ambient
+   sets fails it. */
 .float-shapes {
   position: absolute;
   inset: 0;
@@ -1854,8 +1885,9 @@ aside nav > p {
    <svg> root runs on the main thread, and so does one on an element that carries a second animation, even a
    finished one. Either costs a style recalculation on every frame, 60 a second, for as long as it loops
    (measured on an empty Chat: 481 in 8 s, against 12 with the loop alone on a box). It starts `i` ticks in, so
-   the shapes bob a tick apart, and always on the grid. A spinner turns in eleven-degree steps, one
-   revolution in two bob cycles, instead of bobbing. */
+   the shapes bob a tick apart (and, in the desktop shell, always on the grid). A spinner turns instead of
+   bobbing, one revolution in two bob cycles: at a steady speed in a browser, in eleven-degree steps in the
+   desktop shell. */
 .float-shape-body {
   display: block;
   width: 100%;
@@ -1867,6 +1899,7 @@ aside nav > p {
 .float-shape-spin > .float-shape-body {
   animation-name: nx-turn;
   animation-duration: calc(var(--motion-ambient) * 2);
+  animation-timing-function: var(--ease-ambient-steady);
 }
 
 .float-shape-body > svg {
@@ -2611,7 +2644,7 @@ aside nav > p {
   height: 7px;
   border-radius: 50%;
   background: var(--mode, var(--accent));
-  animation: nx-pulse var(--motion-pulse) var(--ease-busy) infinite;
+  animation: nx-pulse var(--motion-pulse) var(--ease-busy-move) infinite;
 }
 
 .pulse-dots > span:nth-child(2) {
@@ -2675,13 +2708,14 @@ aside nav > p {
    window is hidden, blurred, or has had no input for 12 seconds, and names which one in
    `data-ambient-reason` (idle | blurred | hidden).
 
-   Decoration loops only stepped (2026-10-01, after 2026-09-29 had removed every loop): the shapes' bob
-   and turn and the dot grid's drift, on one 400ms grid, and `lib/motion-tokens.test.ts` fails on any
-   other `infinite` animation that is not status (the working dots, a mascot at a job). Without the GPU
-   a smooth loop costs a full software-composited frame sixty times a second, and a pause that waits for
-   12 quiet seconds cannot help a desk somebody is touching: with ten smooth loops running, an active
-   /chat held 11% of the machine. Stepped and aligned, the ambient set costs a few tenths of a percent
-   while the desk is in use and nothing once it is paused.
+   Decoration loops only in the ambient set (2026-10-01, after 2026-09-29 had removed every loop): the
+   shapes' bob and turn and the dot grid's drift, and `lib/motion-tokens.test.ts` fails on any other
+   `infinite` animation that is not status (the working dots, a mascot at a job). Without the GPU a smooth
+   loop costs a full software-composited frame sixty times a second, and a pause that waits for 12 quiet
+   seconds cannot help a desk somebody is touching: with ten smooth loops running, an active /chat held 11%
+   of the machine. So the packaged desktop shell (`html[data-shell="desktop"]`) steps them on one 400ms
+   grid, a few tenths of a percent while the desk is in use and nothing once it is paused; a browser has the
+   GPU, runs them smooth (2026-10-05), and pauses them the same way.
 
    `!important` keeps this independent of specificity: the mascot's `animation` shorthands reset
    `animation-play-state`, and one of them tied a plain pause. Only loops are listed. An entrance is
@@ -2696,14 +2730,15 @@ html[data-ambient="paused"] :is(.chat-mascot:not([data-busy]), .chat-mascot:not(
 
 /* Status: the working dots and the mascot at a job say "still running". Someone watching a long run
    with their hands off the mouse is `idle`, and a window beside another is `blurred` yet still on
-   screen; a frozen indicator in either would read as a hung app. They are stepped (`--ease-busy`),
-   so they are cheap, and they stop only when the window is not visible at all. */
+   screen; a frozen indicator in either would read as a hung app. In the desktop shell they are stepped
+   (`--ease-busy`, `--ease-busy-move`), so they are cheap, and they stop only when the window is not visible
+   at all. */
 html[data-ambient="paused"][data-ambient-reason="hidden"]
   :is(.pulse-dots > span, .chat-mascot[data-busy], .chat-mascot[data-busy] *) {
   animation-play-state: paused !important;
 }
 
-/* The stepped decoration stands still in every state but active, so a desk nobody is touching costs
+/* The ambient decoration stands still in every state but active, so a desk nobody is touching costs
    nothing: the shapes' bob and turn (`.float-shape-body`), and the dot grid's drift. A shape's settle is on
    the box outside, which is not listed: pausing it would leave a shape that arrives in a window that has
    just lost focus at its invisible first keyframe. */

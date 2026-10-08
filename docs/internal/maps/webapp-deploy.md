@@ -1,6 +1,9 @@
 # Map — webapp-deploy: the hosted deployment stack
 
-Last verified: 2026-09-21 at 2d44f0f + the Phase 7 branch `claude/web-phase7-component-installer-7f5d5l`
+Last verified: 2026-10-05 at 0b61a29 + the uncommitted working tree, except one gotcha corrected on 2026-10-07 (ffmpeg is in the image since `5bec532`; the bullet under Gotchas was written before that). Re-read that day: the build and runtime
+description, the HEALTHCHECK paragraph, the components-check cites, the ignore-file rows and the
+dependencies gotcha, against `webapp-deploy/Dockerfile` as it stands after the SR-113 change. The rest
+of the page keeps the caveat in the note below.
 
 **Phase 0 pilot additions (2026-10-01, working tree on top of 0b61a29):** the sections marked
 *(pilot)* below were re-verified on that date, with the compose stack driven on a developer machine
@@ -29,42 +32,56 @@ folder: what each file does, what depends on what, and the things about it that 
 
 ## How it works
 
-### Build: one image, the whole workspace
+### Build: one image, the whole workspace source, production dependencies
 
-`webapp-deploy/Dockerfile` is three stages over `node:22-bookworm-slim`, and the **build context is
+`webapp-deploy/Dockerfile` is four stages over `node:22-bookworm-slim`, and the **build context is
 the repo root**, not this folder (`Dockerfile:5-6`).
 
-1. **`base`** (`Dockerfile:24-38`) enables corepack and pins pnpm `9.15.9`, matching the root
-   `packageManager` field. It then `chmod a+x`es every `.py` under the corepack home — without that,
+1. **`base`** (`Dockerfile:34-48`) enables corepack and pins pnpm `9.15.9` (`:29`, `:40-41`), matching the
+   root `packageManager` field. It then `chmod a+x`es every `.py` under the corepack home — without that,
    `better-sqlite3`'s regenerated Makefile re-runs `gyp_main.py` directly and dies with `EACCES`
-   (`Dockerfile:33-38`).
-2. **`build`** (`Dockerfile:47-83`) installs `python3`, `make` and `g++` for `better-sqlite3`'s node-gyp
-   fallback, then runs `pnpm install --frozen-lockfile --filter "@agentforge/web..."` (`:59`) — the web
-   app and its workspace dependencies only, so `apps/desktop` and `apps/mobile` are never installed —
-   and `pnpm --filter @agentforge/web build` (`:62`), which is `vite build` into `apps/web/dist`. It
-   ends by proving the image carries its components (`:82-83`); see *Components are the image's* below.
-3. **`runtime`** (`Dockerfile:88-141`) copies the built workspace wholesale (`:103`), creates and chowns
-   `/data` and declares it a volume (`:105-106`), does the same for the components root
-   (`:118-119`), drops to the non-root `node` user (`:121`), and starts `tsx server.ts` (`:141`).
+   (`:43-48`).
+2. **`build`** (`:60-87`) is the **full** install, dev dependencies included, because `vite build` needs
+   `vite`, `tailwindcss` and `postcss`. It installs `python3`, `make` and `g++` for `better-sqlite3`'s
+   node-gyp fallback (`:61-63`), runs `pnpm install --frozen-lockfile --filter "@agentforge/web..."`
+   (`:73`) — the web app and its workspace dependencies only, so `apps/desktop` and `apps/mobile` are
+   never installed — then `pnpm --filter @agentforge/web build` (`:76`), which is `vite build` into
+   `apps/web/dist`, and `node scripts/build-sandbox-runtime.mjs --out /opt/sandbox-runtime` (`:87`), the
+   Pyodide and QuickJS folder `run_code` reads (SR-111). Nothing from this stage's `node_modules` reaches
+   the runtime image; what leaves it is `apps/web/dist` and `/opt/sandbox-runtime`.
+3. **`prod`** (`:102-147`) is the tree that ships: a second, fresh `COPY . .` (`:108`) and
+   `pnpm install --frozen-lockfile --prod --filter "@agentforge/web..."` (`:113`), so only `dependencies`
+   and `optionalDependencies` of the web app and its workspace packages are installed (the root
+   package's dev dependencies are skipped too). It takes the renderer from the build stage
+   (`COPY --from=build`, `:117`), runs the components check (`:137-138`, see *Components* below), and
+   then a **load check** (`:145-147`) that imports `@agentforge/host/http` — the router, every handler,
+   `core` and `db` — from `apps/web` under this tree, so a server import of a package the tree lacks
+   fails the build with `ERR_MODULE_NOT_FOUND` instead of failing the first container start. It is a
+   second install rather than a prune of the build tree on purpose (`:92-95`); see the dependencies
+   gotcha below.
+4. **`runtime`** (`:152-223`) sets the environment (`:157-161`), copies the production tree wholesale
+   (`COPY --from=prod --chown=node:node /app /app`, `:167`) and the sandbox folder, root-owned and
+   read-only, to `/app/sandbox` (`:172-173`), creates and chowns `/data` and declares it a volume
+   (`:175-176`), does the same for the components root (`:188-189`), drops to the non-root `node` user
+   (`:191`), and starts `./node_modules/.bin/tsx server.ts` (`:223`).
+
+The image still carries the TypeScript source of every workspace package, because they export `.ts`
+(`:8-12`; SR-49 half 1). Since 2026-10-05 it no longer carries the dev toolchain (SR-113).
 
 Debian rather than Alpine is deliberate: `pnpm-lock.yaml` resolves `@firecrawl/anydoc` to the
 `-linux-x64-gnu` / `-linux-arm64-gnu` packages, and musl would pick different ones and force a
-`better-sqlite3` rebuild (`Dockerfile:15-17`).
+`better-sqlite3` rebuild (`Dockerfile:24-26`).
 
-The container's own `HEALTHCHECK` (`Dockerfile:138-139`) calls `GET /api/v1/components` on loopback with
-`node -e fetch` — there is no curl in the image. Two rules have to be satisfied at once, and the probe
-fails outright if either is missed:
-
-- The route is ungated on purpose. It is one of the two `UNGATED_GETS`
-  (`packages/host/src/auth/routes.ts:45`; the reason is at
-  `packages/host/src/handlers/components.ts:4-8`), so it answers before any gateway key exists and
-  without opening the database.
-- **The probe sends `x-forwarded-proto: https`** (`Dockerfile:139`). In server mode `rejectPlaintext`
-  (`packages/host/src/http-adapter.ts:315-318`) answers `403 https_required` to any request without
-  that header, on every path, before routing reaches the ungated set
-  (`transportRejection` is called at `:421`). A probe without it never goes healthy. The header is
-  safe here only because the sender is inside the container, past the boundary the rule defends; see
-  [hosted-server-mode.md](hosted-server-mode.md).
+The container's own `HEALTHCHECK` (`Dockerfile:220-221`) calls `GET /healthz` on loopback with
+`node -e fetch` — there is no curl in the image. `/healthz` is answered in the HTTP adapter before routing
+(`isLiveness`, `packages/host/src/http-adapter.ts:548-551`; `respondLiveness`, `:402`, called at `:621`), so it
+never reaches `dispatch`, never opens the database and sits outside the session gate by construction. Its
+body is the frozen `{"status":"ok"}` (`LIVENESS_BODY`, `packages/host/src/handlers/health.ts:51`; the path is
+`LIVENESS_PATH`, `:44`). It is the one request exempt from the TLS-hop rule: `transportRejection` is called with
+`allowPlaintext = isLiveness` (`:612`, `:469-472`), so the probe needs no `x-forwarded-proto` header, while the
+request-line filter, method allowlist, header cap and per-IP bucket still run over it. Every other request
+without that header answers `403 https_required` (`rejectPlaintext`, `:452-455`); see
+[hosted-server-mode.md](hosted-server-mode.md).
 
 ### Components are the image's, not a download
 
@@ -75,14 +92,14 @@ tenant, so `handlers/components.ts` answers `403 install_disabled` to the instal
 
 Two lines in this folder make that true rather than hoped for:
 
-- The build stage runs `scripts/components.ts check` (`Dockerfile:82-83`), which loads every id in
+- The `prod` stage runs `scripts/components.ts check` (`Dockerfile:137-138`), which loads every id in
   `packages/host/src/components/server.ts` `SERVER_COMPONENT_IDS` the way a request would and exits
   non-zero if one does not. A filter change or an unpublished platform package fails the build
   instead of shipping a container that boots healthy and silently reads every document with the
   reduced fallback extractor. It runs with `AGENTFORGE_SERVER=1` and the runtime stage's
   `AGENTFORGE_COMPONENTS_DIR` so its printout is the container's.
-- The runtime stage puts that directory at `/opt/agentforge/components` (`Dockerfile:92-96`,
-  `:116-119`) — **outside** `/data`, on its own volume (`compose.yml:64-68`). See the `noexec`
+- The runtime stage puts that directory at `/opt/agentforge/components` (`Dockerfile:160`,
+  `:188-189`) — **outside** `/data`, on its own volume (`compose.yml:64-68`). See the `noexec`
   gotcha below for why that separation is the point.
 
 `components.sh install` is a **repair**, not an upgrade path: a newer version arrives in a newer
@@ -121,7 +138,7 @@ container's network namespace rather than talking to it over a bridge, because t
 own, which is why `80`, `443` and `443/udp` are published on **`app`** (`compose.yml:109-112`). `proxy`
 gets `NET_BIND_SERVICE` back — the only capability it needs — to bind those ports.
 
-The app binds whatever `resolveBindHost` returns (`apps/web/server.ts:114-115`,
+The app binds whatever `resolveBindHost` returns (`apps/web/server.ts:146-147`,
 `apps/web/lib/bind-host.ts:17-27`), which defaults to loopback and throws on a non-loopback value
 unless `AGENTFORGE_SERVER` is on. The stack does not set `BIND_HOST`, so the default holds.
 
@@ -182,9 +199,9 @@ a plaintext archive; `restore.sh` is destructive and prompts unless given `--yes
 | File | Role |
 |---|---|
 | `webapp-deploy/README.md` | The folder's own reference: image contents, the proxy arrangement, transport filtering, the security group, the before-traffic acceptance list, the incident runbook, the restore drill, and *What is not done yet* |
-| `webapp-deploy/Dockerfile` | The three-stage image. Build context is the repo root |
-| `webapp-deploy/.dockerignore` | Stale, not a copy of the next file, and not read by the documented builds (SR-49 open item) |
-| `webapp-deploy/Dockerfile.dockerignore` | The name BuildKit actually reads for `Dockerfile`, because the Dockerfile is not at the context root. Since 2026-10-01 it also excludes `webapp-deploy/k8s`, `*.env` and `.pilot-local` |
+| `webapp-deploy/Dockerfile` | The four-stage image (base, build, prod, runtime). Build context is the repo root |
+| `webapp-deploy/.dockerignore` | A byte-for-byte copy of the next file, not read by the documented builds (`scripts/pilot-deploy.test.mjs` fails if the two differ; SR-94) |
+| `webapp-deploy/Dockerfile.dockerignore` | The name BuildKit actually reads for `Dockerfile`, because the Dockerfile is not at the context root. Since 2026-10-01 it also excludes `webapp-deploy/k8s`, `*.env` and `.pilot-local`, and since 2026-10-05 `nultron-files` (SR-131) |
 | `webapp-deploy/portal.Dockerfile`, `portal.Dockerfile.dockerignore`, `portal-entry.sh` | *(pilot)* The portal image, its allowlist context, and the DSN wrapper baked into it |
 | `webapp-deploy/compose.yml` | `app`, `proxy`, `portal`, `portal-db`, `portal-prepare`; hardening, limits, published ports, named volumes. `scripts/release-web.mjs` `composeFile()` generates the released twin; `scripts/pilot-deploy.test.mjs` compares them |
 | `webapp-deploy/compose.local.yml`, `pilot-local.mjs` | *(pilot)* The local rehearsal: loopback ports, a throwaway CA, Mailpit with implicit TLS, `up` / `drive` / `down` |
@@ -202,16 +219,24 @@ a plaintext archive; `restore.sh` is destructive and prompts unless given `--yes
 - **Three ignore files, and only two are read.** BuildKit looks for `<dockerfile-path>.dockerignore`
   before `<context>/.dockerignore`. The Dockerfiles live in `webapp-deploy/` and the context is the repo
   root, so the files Docker actually reads are `Dockerfile.dockerignore` (the app image) and
-  `portal.Dockerfile.dockerignore` (the portal image, an allowlist). `.dockerignore` is a stale leftover
-  that nothing reads, and it is not the byte-identical copy this page and the README used to claim
-  (SR-49). Editing only it silently does nothing, and the context goes from small to about 1.4 GB.
+  `portal.Dockerfile.dockerignore` (the portal image, an allowlist). `.dockerignore` is read by nothing in
+  the documented builds; it is a byte copy of `Dockerfile.dockerignore`, pinned by
+  `scripts/pilot-deploy.test.mjs` (SR-94), so an edit goes into both. Editing only the unread one
+  silently does nothing, and the context goes from small to several GB (about 1.4 GB, plus the 4.5 GB
+  `nultron-files/` before SR-131).
 - **Never restart or recreate `app` alone *(pilot)*.** `proxy` shares its network namespace, so after
   `restart app`, `up -d app` or `up -d --force-recreate app` Caddy sits in a namespace that no longer
   exists and the site is down while the app reports healthy. `restart app proxy`, or a full `up -d` with
   no service names (which recreates the proxy), repairs it. Driven 2026-10-01.
-- **Dev dependencies ship on purpose.** `tsx` is a devDependency of `@agentforge/web` and **is** the
-  production entrypoint, and every `@agentforge/*` package exports TypeScript source rather than a
-  build. `pnpm prune --prod` would delete the thing that boots the app (`Dockerfile:100-103`).
+- **The image holds production dependencies only, and `tsx` is one (SR-113).** `tsx` is the production
+  entrypoint and every `@agentforge/*` package exports TypeScript source rather than a build, so `tsx`
+  moved from `devDependencies` to `dependencies` of `@agentforge/web` (`apps/web/package.json:20`), and the
+  `prod` stage installs with `--prod` (`Dockerfile:113`) instead of the runtime copying the full install.
+  The cost: a server-side import of a devDependency no longer resolves by luck. `apps/web/server.ts`
+  imports `vite` dynamically, on the non-production branch only (`:114`), and the load check
+  (`Dockerfile:145-147`) fails the build if the server imports anything else the tree lacks.
+  `scripts/audit-deployed.mjs` audits the same production closure (`LIST_ARGS`, `:55`), and
+  `scripts/audit-deployed.test.mjs` fails if the Dockerfile's `--prod` install and the script drift apart.
 - **The proxy must not rewrite `Host` or `Origin`.** With `AGENTFORGE_SERVER=1` a mutating `/api` call
   needs both to match `AGENTFORGE_TRUSTED_ORIGINS`. Caddy passes them through by default, which is why
   the `Caddyfile` deliberately has no `header_up Host` line — the loopback-rewriting config an older
@@ -244,8 +269,12 @@ a plaintext archive; `restore.sh` is destructive and prompts unless given `--yes
 - **`restore.sh` hands three capabilities back.** `cap_drop: ALL` takes `CHOWN` away even from root,
   and both `tar -x` and the chown need it, so the one-shot restore container re-adds `CHOWN`,
   `FOWNER` and `DAC_OVERRIDE`.
-- **ffmpeg and ffprobe are not in the image.** The Edit desk degrades without them. Adding them is a
-  migration-plan decision, not a silent `apt-get`.
+- **ffmpeg and ffprobe are in the image since 2026-10-06 (`5bec532`).** The `ffmpeg` stage of
+  `webapp-deploy/Dockerfile` downloads BtbN's static GPL build `n8.1.3-9-g29e619e767` for the image's CPU, pinned
+  by sha256, and the runtime stage copies both programs to `/usr/local/bin` with the licence text. Debian's own
+  package (5.1) is below the host's minimum of 6, so there is no `apt-get` route. Every run gets an input
+  whitelist, a format gate and hosted timeout caps (`packages/host/src/edit/ffmpeg/input-safety.ts`, in the tree
+  after `5bec532`). Record: security register SR-135 and `docs/internal/ffmpeg-attribution.md`.
 
 ## Verify
 

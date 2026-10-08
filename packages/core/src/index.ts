@@ -176,7 +176,8 @@ export type { EnvLike } from "./server-mode";
 // Phase 8: what this deployment can do, resolved once from the mode and read by both sides.
 export { hostCapabilities, parseCapabilities } from "./capabilities";
 export type { HostCapabilities } from "./capabilities";
-export { redactSecrets } from "./security/redact";
+export { redactSecrets, redactCredentials } from "./security/redact";
+export { redactSecretsDeep } from "./security/redact-deep";
 export { keyFingerprint, keyFingerprintOrNull } from "./security/fingerprint";
 export { scanPii, maskPii, maskPiiInParts, maskOutboundRunInput, piiWarning, PII_MASK } from "./security/pii";
 export type { PiiKind, PiiFinding } from "./security/pii";
@@ -189,6 +190,8 @@ export {
   blockedInjectionOutput,
   redactAttachedText,
   redactAttachedParts,
+  attachmentsAsMentions,
+  typedTextOf,
 } from "./security/injection-guard";
 export type { InjectionHit, InjectionSeverity } from "./security/injection-guard";
 export { isOpenRouterBaseUrl, openRouterZdrBody } from "./privacy/openrouter";
@@ -255,9 +258,18 @@ export {
 export {
   getModelModalities,
   assertModelSupportsModality,
+  assertChatModelAcceptsModality,
   assertAgentSupportsModality,
   RUN_PATHS,
 } from "./models/capabilities";
+export { modelImageInput, type ImageInputSupport } from "./models/image-input";
+export {
+  EARLIER_IMAGE_NOT_VISIBLE_NOTE,
+  VIDEO_NOT_VISIBLE_NOTE,
+  imageRemoteLinkMessage,
+  imageUnreadableMessage,
+  imagesTooLargeMessage,
+} from "./content/image-copy";
 export {
   usesSeedanceVideoWire,
   videoCapabilities,
@@ -590,6 +602,7 @@ export {
   DEFAULT_CHAT_MODALITIES,
   DEFAULT_CHAT_TOOLS,
   isDefaultChatAgent,
+  withoutDisabledToolSentences,
 } from "./agents/default-chat";
 export {
   defaultAgentPack,
@@ -795,6 +808,20 @@ export type { HarnessSkill, HarnessSkillStatus, ModeHarness } from "./harness/mo
 export { checkDraftAgainstSource } from "./documents/source-check";
 export type { CheckableDraft, SourceCheck, SourceCheckItem } from "./documents/source-check";
 export { holdDraftToSource } from "./documents/source-hold";
+export {
+  SLIDE_CROWD_REASONS,
+  SLIDE_DESIGN_LIMITS,
+  SLIDE_LAYOUTS,
+  assignSlideLayout,
+  fitDesignPage,
+  fitSlideText,
+  inspectSlideDesign,
+  isSlideLayout,
+  slideCrowdReasons,
+  supportingLineCap,
+  textKeepsDigitRuns,
+} from "./presentation/slide-design";
+export type { DesignText, SlideCrowdReason, SlideDesignFailure, SlideLayout } from "./presentation/slide-design";
 export {
   OUTPUT_LANGUAGE_SURFACES,
   outputLanguageRule,

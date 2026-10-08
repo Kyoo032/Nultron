@@ -1125,6 +1125,7 @@ describe("every by-id route refuses another tenant's id", () => {
 
     it.each([
       ["GET", "/api/v1/files/content", (path: string) => ({ query: { path } })],
+      ["GET", "/api/v1/files/download", (path: string) => ({ query: { path } })],
       ["GET", "/api/v1/files/versions", (path: string) => ({ query: { path } })],
       ["GET", "/api/v1/files/version", (path: string) => ({ query: { path, version: "1" } })],
       ["POST", "/api/v1/files/revert", (path: string) => ({ body: { path, version: 1 } })],

@@ -22,6 +22,7 @@ const ACTIVITY_KEYS: Record<string, string> = {
   past_sessions: "chat.tool.pastChats",
   calculator: "chat.tool.calculating",
   datetime: "chat.tool.clock",
+  self_check: "chat.tool.selfChecking",
 };
 
 const DONE_KEYS: Record<string, string> = {
@@ -32,6 +33,7 @@ const DONE_KEYS: Record<string, string> = {
   past_sessions: "chat.tool.pastSessions",
   calculator: "chat.tool.calculator",
   datetime: "chat.tool.datetime",
+  self_check: "chat.tool.selfCheck",
 };
 
 export function showsToolActivity(_toolKey: string): boolean {
@@ -116,6 +118,10 @@ function labelVars(toolKey: RichToolKey, args: Rec | null): Record<string, strin
     case "run_code": {
       const language = codeLanguageName(args?.language);
       return language ? { language } : null;
+    }
+    case "build_deck": {
+      const title = readString(args, "title");
+      return title ? { title: capArg(title) } : null;
     }
   }
 }

@@ -1,16 +1,16 @@
-import { streamText, tool as aiTool, type CoreMessage, type UserContent } from "ai";
+import { streamText, type CoreMessage, type UserContent } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import type { ContentPart } from "../content/types";
-import { getTool } from "../tools/registry";
 import { resolveModelProvider } from "../models/catalog";
 import { jobThinkingPlan } from "../models/job-thinking";
 import { DEFAULT_OPENAI_BASE_URL, isOfficialOpenAIBaseUrl } from "../models/probe";
 import { isOpenRouterBaseUrl } from "../privacy/openrouter";
 import { getDisabledTools } from "../tools/secret-scope";
 import { mapStreamPart } from "./stream-parts";
-import { invokeToolGuarded } from "./invoke-guarded";
+import { buildAiTools, type AiToolSet } from "./ai-tools";
+import { createStepTracker } from "./step-tracker";
 import { createEgressGuard, userTextOf } from "./egress-guard";
 import { createToolBudget, resolveMaxSteps } from "./tool-budget";
 import {
@@ -48,20 +48,23 @@ import {
   withoutReasoningEffort,
 } from "../models/reasoning-effort";
 import type { ReasoningEffort } from "../models/reasoning-effort";
-import { parseAppLocale } from "../locale";
+import { parseAppLocale, type AppLocale } from "../locale";
 import { isServerMode, providerEnv } from "../server-mode";
 import { providerBaseUrl } from "../providers/registry";
 import { directProviderFetch, refuseKeyRedirect, withKeyRedirectPolicy } from "./key-redirect";
 import { redactSecrets } from "../security/redact";
 import { GatewayHttpError, gatewayFailureOf, gatewayHttpFailure } from "../gateway-http-copy";
-import { abortErrorMessage, armStreamWatchdog, watchAsyncIterable } from "./stream-watchdog";
+import {
+  HEADERS_TIMEOUT_MS,
+  abortErrorMessage,
+  armStreamWatchdog,
+  formatHeadersTimeoutError,
+  watchAsyncIterable,
+} from "./stream-watchdog";
 import { readLanguageModelUsage, addTokenUsage } from "../gateway/account";
 import type { AgentRuntime, RunUsage } from "./types";
-import {
-  imagePartForProvider,
-  rewriteUnreachableMediaInJson,
-  scrubUnreachableMediaArgs,
-} from "../content/provider-media";
+import { historyHasImage, imagePartForProvider, rewriteUnreachableMediaInJson } from "../content/provider-media";
+import { VIDEO_NOT_VISIBLE_NOTE } from "../content/image-copy";
 import {
   applyZeroRetention,
   isResponsesRequestUrl,
@@ -90,6 +93,7 @@ export function mergeOpenRouterZdr(body: unknown, baseUrl: string): unknown {
 function toCoreMessages(
   systemPrompt: string,
   history: Array<{ role: "user" | "assistant"; parts: ContentPart[] }>,
+  locale: AppLocale,
 ): CoreMessage[] {
   const messages: CoreMessage[] = [{ role: "system", content: systemPrompt }];
   for (const item of history) {
@@ -106,12 +110,10 @@ function toCoreMessages(
         return { type: "text" as const, text: part.text };
       }
       if (part.type === "image_url") {
-        return imagePartForProvider(part.image_url.url);
+        return imagePartForProvider(part.image_url.url, locale);
       }
-      return {
-        type: "text" as const,
-        text: "[Video attached in the local app. It is already shown to the user.]",
-      };
+      // No wire here carries video. The model is told so, never that a video is "attached".
+      return { type: "text" as const, text: VIDEO_NOT_VISIBLE_NOTE };
     });
     messages.push({ role: "user", content });
   }
@@ -119,13 +121,19 @@ function toCoreMessages(
 }
 
 const USAGE_SETTLE_MS = 5_000;
-/** Response headers must arrive within this; a black-holed gateway otherwise sits until the 120 s watchdog. */
-const HEADERS_TIMEOUT_MS = 10_000;
-
-async function fetchWithHeaderTimeout(url: string | URL | Request, init: RequestInit): Promise<Response> {
+/**
+ * Response headers must arrive within `HEADERS_TIMEOUT_MS` (stream-watchdog.ts, where its number is
+ * explained); a black-holed gateway otherwise sits until the 120 s watchdog.
+ */
+async function fetchWithHeaderTimeout(
+  url: string | URL | Request,
+  init: RequestInit,
+  model: string,
+  locale: AppLocale,
+): Promise<Response> {
   const headers = new AbortController();
   const timer = setTimeout(
-    () => headers.abort(new Error(`Gateway unreachable: no response within ${HEADERS_TIMEOUT_MS / 1000}s`)),
+    () => headers.abort(new Error(formatHeadersTimeoutError(model, HEADERS_TIMEOUT_MS, locale))),
     HEADERS_TIMEOUT_MS,
   );
   const signals = [headers.signal, init.signal].filter((signal): signal is AbortSignal => Boolean(signal));
@@ -212,8 +220,9 @@ export class AiSdkRuntime implements AgentRuntime {
     // One place turns a gateway 4xx/5xx into words: app-locale headline, upstream text to the log.
     // The raw body rides on the error (never in its message) so the runtime can tell when the gateway
     // refused the Thinking parameter and retry with a safer one.
+    const carriesImage = historyHasImage(input.history);
     const gatewayFailure = (status: number, text: string): Error => {
-      const failure = gatewayHttpFailure(status, text, runLocale);
+      const failure = gatewayHttpFailure(status, text, runLocale, { carriesImage });
       if (failure.detail && failure.detail !== failure.message) {
         console.warn(`gateway: HTTP ${status} ${redactSecrets(failure.detail).slice(0, 300)}`);
       }
@@ -334,7 +343,7 @@ export class AiSdkRuntime implements AgentRuntime {
           // fall through to unmodified request on parse error
         }
       }
-      const response = await fetchWithHeaderTimeout(url, outgoing);
+      const response = await fetchWithHeaderTimeout(url, outgoing, modelName, runLocale);
       refuseKeyRedirect(response, runLocale);
       if (!response.ok) {
         const text = await readHttpErrorBody(response);
@@ -376,7 +385,7 @@ export class AiSdkRuntime implements AgentRuntime {
             // fall through to unmodified request on parse error
           }
         }
-        const response = await fetchWithHeaderTimeout(url, outgoing);
+        const response = await fetchWithHeaderTimeout(url, outgoing, modelName, runLocale);
         refuseKeyRedirect(response, runLocale);
         if (!response.ok) {
           const text = await readHttpErrorBody(response);
@@ -413,7 +422,7 @@ export class AiSdkRuntime implements AgentRuntime {
             // fall through to unmodified request on parse error
           }
         }
-        const response = await fetchWithHeaderTimeout(url, outgoing);
+        const response = await fetchWithHeaderTimeout(url, outgoing, modelName, runLocale);
         refuseKeyRedirect(response, runLocale);
         if (!response.ok) {
           const text = await readHttpErrorBody(response);
@@ -449,32 +458,26 @@ export class AiSdkRuntime implements AgentRuntime {
     const toolBudget = createToolBudget(input.budget);
     // Same lifetime as the budget: a private read in one attempt still limits the fetches of the next.
     const egressGuard = createEgressGuard({ userText: userTextOf(input.history) });
-    const tools: Record<string, any> = {};
-    for (const binding of input.bindings.filter((item) => item.enabled)) {
-      if (disabled.has(binding.toolKey)) {
-        continue;
-      }
-      const definition = getTool(binding.toolKey);
-      if (!definition) {
-        continue;
-      }
-      tools[binding.toolKey] = aiTool({
-        description: definition.description,
-        parameters: definition.schema,
-        execute: async (args: unknown) =>
-          invokeToolGuarded(definition, scrubUnreachableMediaArgs(args), input.tenant, toolBudget, egressGuard),
-      });
-    }
+    const built = buildAiTools({
+      bindings: input.bindings,
+      tenant: input.tenant,
+      signal: input.signal,
+      budget: toolBudget,
+      egress: egressGuard,
+      disabled,
+    });
+    // A run whose every bound tool is disabled sends the model no tool list at all, as it always has.
+    const tools = built.offered.length > 0 ? built : undefined;
 
-    const messages = toCoreMessages(input.version.systemPrompt, input.history);
-    const hasTools = Object.keys(tools).length > 0;
+    const messages = toCoreMessages(input.version.systemPrompt, input.history, parseAppLocale(input.locale));
+    const hasTools = tools !== undefined;
     let activeModel = model;
     let wire = openaiWire?.wire;
     // Read at each call, not once: a heal below changes what the run sends.
     const wantsThinking = () => effort.level() !== "none";
     const consumeOnce = async (
       nextModel: Parameters<typeof streamText>[0]["model"],
-      nextTools: Record<string, any> | undefined,
+      nextTools: AiToolSet | undefined,
       options: {
         responses?: boolean;
         messages?: boolean;
@@ -511,7 +514,7 @@ export class AiSdkRuntime implements AgentRuntime {
     };
 
     await probe(1);
-    let first = await consumeOnce(activeModel, hasTools ? tools : undefined, {
+    let first = await consumeOnce(activeModel, tools, {
       responses: wire === "responses",
       messages: wire === "anthropic_messages",
       google: wire === "google_generate_content",
@@ -521,7 +524,7 @@ export class AiSdkRuntime implements AgentRuntime {
     if (first.failed && openaiWire && wire !== "chat_completions" && isMissingWireEndpoint(first.failed)) {
       activeModel = openaiWire.chatModel;
       wire = "chat_completions";
-      first = await consumeOnce(activeModel, hasTools ? tools : undefined, {
+      first = await consumeOnce(activeModel, tools, {
         responses: false,
         forceReasoningNone: !wantsThinking(),
       });
@@ -532,7 +535,7 @@ export class AiSdkRuntime implements AgentRuntime {
     // repeat it — and never for any other failure. What the retry learns is kept per model.
     if (first.failure && !first.text && !first.tooled && !first.thinking) {
       if (effort.heal(first.failure, wire ?? "chat_completions")) {
-        first = await consumeOnce(activeModel, hasTools ? tools : undefined, {
+        first = await consumeOnce(activeModel, tools, {
           responses: wire === "responses",
           messages: wire === "anthropic_messages",
           google: wire === "google_generate_content",
@@ -556,7 +559,7 @@ export class AiSdkRuntime implements AgentRuntime {
         })
       : first;
     let contactAttempts = 1;
-    const retryTools = shouldRetryBare ? undefined : hasTools ? tools : undefined;
+    const retryTools = shouldRetryBare ? undefined : tools;
     while (
       shouldRetryModelContact({
         failed:
@@ -590,6 +593,8 @@ export class AiSdkRuntime implements AgentRuntime {
 
     if (result.failed) {
       if (shouldKeepToolTurn({ tooled: result.toolCompleted, failed: result.failed })) {
+        // Kept so a completed tool is not lost or run twice, but never silent: the caller tells the person why.
+        await input.onEvent({ type: "run.interrupted", message: result.failed });
         await input.onEvent({ type: "run.completed", runId: input.runId, usage: completedUsage });
         return;
       }
@@ -610,6 +615,10 @@ export class AiSdkRuntime implements AgentRuntime {
       await input.onEvent({ type: "run.failed", message });
       throw new Error(message);
     }
+    // The SDK ends a tool loop at its step cap without a word. Say so, so the caller can tell the person.
+    if (result.stepLimit) {
+      await input.onEvent({ type: "run.step_limit", steps: resolveMaxSteps(input.budget) });
+    }
     await input.onEvent({ type: "run.completed", runId: input.runId, usage: completedUsage });
   }
 
@@ -617,7 +626,7 @@ export class AiSdkRuntime implements AgentRuntime {
     model: Parameters<typeof streamText>[0]["model"],
     input: Parameters<AgentRuntime["execute"]>[0],
     messages: CoreMessage[],
-    tools: Record<string, any> | undefined,
+    tools: AiToolSet | undefined,
     options: {
       responses?: boolean;
       messages?: boolean;
@@ -636,6 +645,7 @@ export class AiSdkRuntime implements AgentRuntime {
         thinking: "",
         tooled: false,
         toolCompleted: false,
+        stepLimit: false,
         failed: error instanceof Error && error.message.trim() ? error.message : "The model could not be contacted.",
         usage: { inputTokens: 0, outputTokens: 0 },
       };
@@ -646,7 +656,7 @@ export class AiSdkRuntime implements AgentRuntime {
     model: Parameters<typeof streamText>[0]["model"],
     input: Parameters<AgentRuntime["execute"]>[0],
     messages: CoreMessage[],
-    tools: Record<string, any> | undefined,
+    tools: AiToolSet | undefined,
     options: {
       responses?: boolean;
       messages?: boolean;
@@ -660,6 +670,8 @@ export class AiSdkRuntime implements AgentRuntime {
     thinking: string;
     tooled: boolean;
     toolCompleted: boolean;
+    /** The loop used every step it was allowed and the last one asked for tools, so no answer followed. */
+    stepLimit: boolean;
     failed: string;
     /** Set when the failure was a gateway HTTP refusal: its status and raw body, for classification only. */
     failure?: GatewayFailureDetail | undefined;
@@ -675,15 +687,25 @@ export class AiSdkRuntime implements AgentRuntime {
     const unlinkCallerAbort = linkCallerAbort(abort, input.signal);
     const locale = parseAppLocale(input.locale);
     const watchdog = armStreamWatchdog(input.version.model, abort, input.streamWatchdog, Date.now, locale);
+    const maxSteps = resolveMaxSteps(input.budget);
+    // Tools the run holds but does not offer (a disabled one) stay out of the list the model is given.
+    const hidesSome = tools !== undefined && tools.offered.length < Object.keys(tools.tools).length;
     const result = streamText({
       model,
       messages,
       abortSignal: abort.signal,
       // The contact loop below already retries; SDK retries would triple every offline wait.
       maxRetries: 0,
-      ...(tools ? { tools, maxSteps: resolveMaxSteps(input.budget) } : {}),
+      ...(tools
+        ? {
+            tools: tools.tools,
+            maxSteps,
+            ...(hidesSome ? { experimental_activeTools: tools.offered } : {}),
+          }
+        : {}),
       ...(providerOptions ? { providerOptions } : {}),
     });
+    const steps = createStepTracker();
     // True once readable text has streamed. Whitespace is not text (`hasVisibleText`): a model that
     // answers HTTP 200 with a single space has said nothing, and the checks below (the tool-less retry,
     // the empty-reply failure) must see that, not "the first delta came".
@@ -701,6 +723,7 @@ export class AiSdkRuntime implements AgentRuntime {
 
     try {
       for await (const part of watchAsyncIterable(result.fullStream, abort, () => watchdog.touch(), locale)) {
+        steps.observe(part);
         const event = mapStreamPart(part);
         if (!event) {
           continue;
@@ -756,14 +779,15 @@ export class AiSdkRuntime implements AgentRuntime {
         }
       }
 
-      return { text, thinking, tooled, toolCompleted, failed, failure, usage };
+      const stepLimit = tools !== undefined && !failed && steps.endedAtLimit(maxSteps);
+      return { text, thinking, tooled, toolCompleted, stepLimit, failed, failure, usage };
     } catch (error) {
       const message = abortErrorMessage(error, locale);
       if (!failed) {
         failed = message;
         failure = gatewayFailureOf(error);
       }
-      return { text, thinking, tooled, toolCompleted, failed, failure, usage };
+      return { text, thinking, tooled, toolCompleted, stepLimit: false, failed, failure, usage };
     } finally {
       watchdog.close();
       unlinkCallerAbort();

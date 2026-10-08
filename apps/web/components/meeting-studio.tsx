@@ -15,6 +15,7 @@ import { ModeHeader } from "@/components/mode-header";
 import { NeedsKeyNote } from "@/components/needs-key-note";
 import { StudioEmptyDesk } from "@/components/studio-empty-desk";
 import { apiFetch } from "@/lib/api-client";
+import { meetingFfmpegNoteKey } from "@/lib/ffmpeg-notice-copy";
 import { isGatewayBlockedText } from "@/lib/gateway-blocked";
 import { getLocale, t } from "@/lib/i18n";
 import { Link } from "@/lib/nav";
@@ -42,6 +43,7 @@ import { rescuedKey } from "@/lib/meeting-rescue";
 import type { Capability, Meeting, MeetingTab } from "@/lib/meeting-types";
 import { postMeetingRecording, saveClipToDevice, type UploadOutcome } from "@/lib/meeting-upload";
 import { modelPickBody, studioModelPick } from "@/lib/model-choice";
+import { useProductBrand } from "@/lib/product-brand";
 import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import { useJobModel } from "@/lib/use-job-model";
 import { useJobStream } from "@/lib/use-job-stream";
@@ -65,6 +67,7 @@ export function MeetingStudio() {
   // Nultron Enterprise: a signed-in tenant may open the desk before adding a key. Hosted only; false elsewhere.
   // Recording and uploading are local, so only the transcribe-and-minute run waits for a key.
   const needsKey = useHostedNeedsKey();
+  const { productName } = useProductBrand();
   const { models, model, pinned: modelPinned, setModel } = useJobModel("meeting");
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [capability, setCapability] = useState<Capability | null>(null);
@@ -407,7 +410,7 @@ export function MeetingStudio() {
   }
 
   const blocked = capability && !capability.available;
-  const noFfmpeg = capability && !capability.ffmpeg;
+  const ffmpegNoteKey = meetingFfmpegNoteKey(capability);
   const jobError = job.error ? job.error.message : null;
   const shown = error ?? jobError;
   const { otherDeskClips } = clips;
@@ -468,12 +471,12 @@ export function MeetingStudio() {
           {t("meeting.noAsr")}
         </p>
       ) : null}
-      {noFfmpeg ? (
+      {ffmpegNoteKey ? (
         <p
           className="mt-4 rounded-lg border border-[var(--line)] px-4 py-3 text-sm text-[var(--text-2)]"
           data-testid="meeting-no-ffmpeg"
         >
-          {t("meeting.noFfmpeg")}
+          {t(ffmpegNoteKey, { productName })}
         </p>
       ) : null}
 

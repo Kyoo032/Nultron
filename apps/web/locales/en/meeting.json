@@ -50,6 +50,7 @@
   "translateDefaultHint": "Off by default: translating is a second paid call.",
   "noAsr": "This gateway key lists no speech-to-text model, so a recording cannot be transcribed here. Paste the transcript and the minutes still work.",
   "noFfmpeg": "ffmpeg is not installed, so a recording cannot be read here. Paste the transcript instead.",
+  "noFfmpegBundled": "The video tools that come with {productName} did not start, so a recording cannot be read here. Reinstall {productName}, or paste the transcript instead.",
   "transcript": "Transcript",
   "minutesTab": "Minutes",
   "translationTab": "Translation",

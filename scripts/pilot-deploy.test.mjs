@@ -347,8 +347,33 @@ test("the Kubernetes rehearsal's narrow snapshot admits the same files the allow
 test("the app image's context cannot pick up local pki, secrets files or the deploy folders it never runs", () => {
   const rules = read("webapp-deploy", "Dockerfile.dockerignore");
   // nultron-files/ (4.5 GB of IP filings and brand work, git-ignored) is SR-131.
-  for (const line of ["webapp-deploy/k8s", "webapp-deploy/.env", "webapp-deploy/*.env", "webapp-deploy/.pilot-local", "nultron-files"]) {
+  for (const line of [
+    "webapp-deploy/k8s",
+    "webapp-deploy/.env",
+    "webapp-deploy/*.env",
+    "webapp-deploy/.pilot-local",
+    "nultron-files",
+  ]) {
     assert.ok(rules.split("\n").includes(line), `Dockerfile.dockerignore must exclude ${line}`);
+  }
+});
+
+test("the app image's context keeps every tracked source folder named data", () => {
+  // `**/data` keeps local data dirs out of the image, and also dropped packages/core/src/data (source), which
+  // broke the image's load check (2026-10-06). Every tracked `<pkg>/src/.../data` needs its `!` re-include.
+  const rules = read("webapp-deploy", "Dockerfile.dockerignore").split("\n");
+  assert.ok(rules.includes("**/data"), "the local data dirs stay excluded");
+  const listed = spawnSync("git", ["ls-files"], { cwd: join(dirname(fileURLToPath(import.meta.url)), ".."), encoding: "utf8" });
+  assert.equal(listed.status, 0, listed.stderr);
+  const sourceDataDirs = new Set(
+    listed.stdout
+      .split("\n")
+      .map((file) => /^(.*\/src\/(?:.*\/)?data)\//.exec(file)?.[1])
+      .filter(Boolean),
+  );
+  assert.ok(sourceDataDirs.has("packages/core/src/data"));
+  for (const dir of sourceDataDirs) {
+    assert.ok(rules.includes(`!${dir}`) && rules.includes(`!${dir}/**`), `Dockerfile.dockerignore must re-include ${dir}`);
   }
 });
 

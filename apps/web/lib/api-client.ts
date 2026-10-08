@@ -7,6 +7,7 @@ import {
   type IpcHostRequest,
   type IpcHostResponse,
 } from "./desktop-bridge";
+import { throwIfSaveFailed } from "./desktop-save";
 import { publishGate } from "./gate-state";
 import { noteGatewayResponse } from "./gateway-blocked";
 import { parseGatewayGate, type GatewayGatePayload } from "./gateway-gate";
@@ -20,6 +21,7 @@ import {
 import { errorFromAbortSignal, onAbort, throwIfAborted } from "./ipc-abort";
 import { desktopMediaSrc } from "./media-src";
 import { notePlanResponse } from "./plan-block";
+import { localizeRunLimitBody, localizeRunLimitRefusal } from "./run-limit-copy";
 import { noteApiResponse } from "./session-signal";
 
 export type { IpcHostRequest, IpcHostResponse };
@@ -184,7 +186,10 @@ async function transportFetch(input: string, init: RequestInit, method: string):
     // and on a clone, like the two above: the hosted desk opens without a key now ("Add it later"),
     // so every pane has to hear it and show the same calm state (`gateway-blocked`).
     noteGatewayResponse(response);
-    return response;
+    // ...and a 429 `too_many_runs` / 503 `server_busy` is the hosted server's run cap (SR-138). Every
+    // studio shows `error.message` off a refused call, so it is made the catalog sentence here, in
+    // the desk's language, once, instead of in each studio (`run-limit-copy`).
+    return localizeRunLimitRefusal(response);
   }
   throwIfAborted(init.signal);
   const { path, query } = parsePath(input);
@@ -200,14 +205,16 @@ async function transportFetch(input: string, init: RequestInit, method: string):
   const result = await invokeDesktop(payload);
   throwIfAborted(init.signal);
   if (result.type === "json") {
-    return new Response(JSON.stringify(result.body), {
+    return new Response(JSON.stringify(localizeRunLimitBody(result.status, result.body)), {
       status: result.status,
       headers: { "Content-Type": "application/json" },
     });
   }
   if (result.type === "bytes") {
     if (result.filename) {
-      await saveDesktopBytes(result.filename, result.bytes);
+      // The shell answers whether the file was written. A refusal (the disk, the size) throws here, so
+      // the button that asked can say it did not save; a closed dialog is the person's choice.
+      throwIfSaveFailed(await saveDesktopBytes(result.filename, result.bytes));
     }
     return bytesResponse(result);
   }

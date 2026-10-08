@@ -7,6 +7,7 @@ import { ffmpegLimiter, withLimit, type Limiter } from "../../concurrency";
 import { log } from "../../log";
 import { resolveFfmpeg, resolveFfprobe } from "../ffmpeg-binary";
 import { minimalEnv } from "./env";
+import { hostedRunTimeoutMs, withProtocolWhitelist } from "./input-safety";
 
 const defaultExecFile = promisify(execFileCb);
 
@@ -168,13 +169,15 @@ async function spawnFfmpeg(argv: string[], options: RunFfmpegOptions): Promise<{
   }
   // Only ever reached with a stub in place, per the flag's comment; the stub ignores it.
   const binary = resolved.path ?? (options.bin === "ffprobe" ? "ffprobe" : "ffmpeg");
-  const args = [...argv];
+  // The one place every ffmpeg and ffprobe run passes, so the input whitelist (no addresses, no playlist
+  // fetching) and the hosted run ceiling are set here and no recipe can leave them out. `input-safety.ts`.
+  const args = withProtocolWhitelist(argv, options.bin === "ffprobe" ? "ffprobe" : "ffmpeg");
   if (options.bin !== "ffprobe" && options.onProgress && !args.includes("-progress")) {
     args.push("-progress", "pipe:1", "-nostats");
   }
   try {
     const pending = execFileImpl(binary, args, {
-      timeout: wholeMilliseconds(options.timeoutMs),
+      timeout: hostedRunTimeoutMs(wholeMilliseconds(options.timeoutMs)),
       windowsHide: true,
       env: minimalEnv(),
       signal: options.signal,

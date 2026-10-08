@@ -12,6 +12,7 @@ import type { PortalConfig } from "../config";
 import { createRuntime, type PortalRuntime } from "../flows/context";
 import { resolveKeyring } from "../jwt/keys";
 import type { MailMessage, Mailer, SentMail } from "../mail/types";
+import type { PasswordHasher } from "../password/hash";
 import { registerPortalRoutes } from "../routes";
 import { createPortalLimiters, createRateLimiter, type PortalLimiters } from "../security/rate-limit";
 import { createPortalServer, type PortalServer } from "../server";
@@ -67,6 +68,7 @@ export function createTestMailer(): TestMailer {
 export function testConfig(overrides: Partial<PortalConfig> = {}): PortalConfig {
   return Object.freeze({
     production: false,
+    signInMode: "code",
     host: "127.0.0.1",
     port: 0,
     dataDir: "/tmp/portal-test",
@@ -112,9 +114,16 @@ export interface StartPortalOptions {
    * in thirty times from one address is not a suite about that limit -- and the one that is says so.
    */
   readonly emailStepLimits?: "production" | "relaxed";
+  /**
+   * The same choice for the password sign-in's two budgets (20 per address and 10 per identifier, per
+   * 15 minutes). `relaxed` by default, for the same reason, and the suite that is about them says so.
+   */
+  readonly passwordStepLimits?: "production" | "relaxed";
   readonly clock?: Clock;
   readonly config?: Partial<PortalConfig>;
   readonly trustProxy?: boolean;
+  /** A hasher the suite wraps to count or time the derivation. Absent, the shipped one. */
+  readonly passwords?: PasswordHasher;
 }
 
 export async function startTestPortal(options: StartPortalOptions = {}): Promise<PortalHarness> {
@@ -130,13 +139,25 @@ export async function startTestPortal(options: StartPortalOptions = {}): Promise
   const keys = resolveKeyring(config, log);
   const limiterClock = options.clock ?? store.store.clock;
   const shipped = createPortalLimiters(limiterClock);
-  const limiters: PortalLimiters =
+  const withEmailLimits: PortalLimiters =
     options.emailStepLimits === "production"
       ? shipped
       : {
           ...shipped,
           signInEmailIp: createRateLimiter({ clock: limiterClock, windowMs: FIFTEEN_MINUTES, max: 1_000_000 }),
           signInEmailAddress: createRateLimiter({ clock: limiterClock, windowMs: FIFTEEN_MINUTES, max: 1_000_000 }),
+        };
+  const limiters: PortalLimiters =
+    options.passwordStepLimits === "production"
+      ? withEmailLimits
+      : {
+          ...withEmailLimits,
+          passwordAttemptIp: createRateLimiter({ clock: limiterClock, windowMs: FIFTEEN_MINUTES, max: 1_000_000 }),
+          passwordAttemptIdentifier: createRateLimiter({
+            clock: limiterClock,
+            windowMs: FIFTEEN_MINUTES,
+            max: 1_000_000,
+          }),
         };
   const server = createPortalServer({ config, store: store.store, log, clock: options.clock });
 
@@ -155,6 +176,7 @@ export async function startTestPortal(options: StartPortalOptions = {}): Promise
     issuer: origin,
     trustProxy: options.trustProxy ?? false,
     limiters,
+    passwords: options.passwords,
   });
   registerPortalRoutes(server, runtime);
 

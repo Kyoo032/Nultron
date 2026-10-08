@@ -49,7 +49,7 @@ now rather than a reason not to.
 | A05-2 | **Critical** | `webapp-deploy/compose.yml` took `AGENTFORGE_SERVER` from an optional `.env` | `webapp-deploy/compose.yml:44` | Fixed |
 | A05-3 | Medium | Security headers existed only in the Caddyfile, not in the app | `packages/host/src/security-headers.ts` | Fixed |
 | A06-1 | Medium | No CI ran lint, unit tests or a dependency audit | `scripts/ci-local.mjs` (`pnpm ci:local`) | **Local gate since 2026-09-24**; runs only when someone runs it ([SR-80](security-register.md#sr-80)) |
-| A06-2 | Low | The hosted image ships devDependencies | `webapp-deploy/Dockerfile:100-103` | **Recorded** — open |
+| A06-2 | Low | The hosted image shipped devDependencies | `webapp-deploy/Dockerfile:113`, `:167` | **Resolved 2026-10-05** by a production-only image ([SR-113](security-register.md#sr-113)) |
 | A08-1 | Low | Workflows pinned actions to mutable tags (`@v4`) | `.github/workflows/*.yml` (deleted) | **Closed by removal**, 2026-09-24 |
 | A09-1 | Medium | No request id: nothing correlated a user report to a log line | `packages/host/src/http-adapter.ts:95,435-437` | Fixed |
 | A09-2 | Medium | Authentication failures were not logged at all | `packages/host/src/http-adapter.ts:582-593` | Fixed |
@@ -408,16 +408,23 @@ to the npm version to make a tool happy would reintroduce two known CVEs.**
 Worth noting for the upload path: the parser still runs on caller-supplied spreadsheets, so the
 size and type limits in front of it are doing real work.
 
-### A06-2 — The image ships devDependencies *(recorded, open)*
+### A06-2 — The image ships devDependencies *(resolved 2026-10-05)*
 
-`webapp-deploy/Dockerfile:100-103` copies the whole `/app` tree and does not run
-`pnpm prune --prod`, because `tsx` is a devDependency of `@agentforge/web` and is the production
-entrypoint — pruning would delete the thing that boots the app. The result is 484 packages in the
-image instead of 277, and it is why four of the six advisories above are in scope at all.
+**As found:** the runtime stage copied the whole `/app` tree and did not run `pnpm prune --prod`, because
+`tsx` was a devDependency of `@agentforge/web` and is the production entrypoint — pruning would have deleted
+the thing that boots the app. The result was 484 packages in the image instead of 277, and it is why four of
+the six advisories above were in scope at all.
 
-The fix is to build the server to a bundle and stop running `tsx` in production. That is a
-migration-plan item, not a security patch, so it is recorded rather than attempted here. The audit
-script measures the full closure deliberately, so the number does not lie in the meantime.
+**Resolved by [SR-113](security-register.md#sr-113), and not by the bundle this section proposed.** `tsx`
+moved to `dependencies` (`apps/web/package.json:20`), and `vite` became a dynamic import on the
+non-production branch of `apps/web/server.ts` (`:114`). The `prod` stage of `webapp-deploy/Dockerfile`
+(`:102-147`) runs `pnpm install --frozen-lockfile --prod --filter "@agentforge/web..."` in a fresh tree
+(`:113`), a build-time load check imports the host under it (`:145-147`), and the runtime copies that tree
+(`COPY --from=prod`, `:167`). `scripts/audit-deployed.mjs` audits the same production closure
+(`LIST_ARGS`, `:55`), so the number and the image are the same set again. A local proof image held 265
+packages in `/app/node_modules` (298 MB), against 452 (586 MB) in the 2026-10-02 pilot image, with no `vite`,
+`tailwindcss` or `braces` in it. The source tree still ships ([SR-49](security-register.md#sr-49) half 1);
+building the server to a bundle is still the way to remove that, and is still a migration-plan item.
 
 ## A08 — Software and data integrity failures
 

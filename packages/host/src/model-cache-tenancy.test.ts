@@ -31,8 +31,10 @@ const selectable = await import("./selectable-models");
 const stateStore = await import("./tenant-state-store");
 const { withRequestSession } = await import("./tenant-scope");
 
-const A = { tenantId: "tenant-alpha" };
-const B = { tenantId: "tenant-beta" };
+// SR-163: a hosted cache is a company's, so a scope names its organisation as well as its partner. The ids
+// match `sessionFor` below, so a scope and a request session in these cases mean the same company.
+const A = { tenantId: "tenant-alpha", organizationId: "org-tenant-alpha" };
+const B = { tenantId: "tenant-beta", organizationId: "org-tenant-beta" };
 
 function model(id: string, provider: ChatModel["provider"] = "openai"): ChatModel {
   return { id, label: id, provider, inputModalities: ["text"] };
@@ -146,8 +148,8 @@ describe("on the hosted server each tenant has its own model cache", () => {
     modelCache.saveModelCache(CACHE_B, B);
 
     expect(stateRows()).toEqual([
-      { tenant_id: A.tenantId, key: "model_cache" },
-      { tenant_id: B.tenantId, key: "model_cache" },
+      { tenant_id: A.tenantId, key: `model_cache:${A.organizationId}` },
+      { tenant_id: B.tenantId, key: `model_cache:${B.organizationId}` },
     ]);
     expect(existsSync(path.join(dataDir, "models-cache.json"))).toBe(false);
     expect(existsSync(path.join(dataDir, "tenants", A.tenantId, "models-cache.json"))).toBe(false);
@@ -203,7 +205,7 @@ describe("on the hosted server each tenant has its own model cache", () => {
 
   it("evicts the tenant used least recently, not the one built first", () => {
     hosted();
-    const tenantAt = (index: number) => ({ tenantId: `lru-${index}` });
+    const tenantAt = (index: number) => ({ tenantId: `lru-${index}`, organizationId: `org-lru-${index}` });
     const first = selectable.listCatalogModels(tenantAt(0));
     const second = selectable.listCatalogModels(tenantAt(1));
     for (let index = 2; index < selectable.CATALOG_MEMO_CAP; index += 1) {
@@ -247,15 +249,15 @@ describe("on the hosted server each tenant has its own model cache", () => {
 
   it("refuses a malformed tenant id before it reaches the store", () => {
     hosted();
-    expect(() => modelCache.loadModelCache({ tenantId: "../other" })).toThrow(ApiError);
-    expect(() => modelCache.saveModelCache(CACHE_A, { tenantId: "a/b" })).toThrow(ApiError);
+    expect(() => modelCache.loadModelCache({ tenantId: "../other", organizationId: "org-x" })).toThrow(ApiError);
+    expect(() => modelCache.saveModelCache(CACHE_A, { tenantId: "a/b", organizationId: "org-x" })).toThrow(ApiError);
   });
 
   it("answers a corrupt stored value as an empty cache, like the file always did", () => {
     hosted();
     sqlite
-      .prepare("INSERT INTO tenant_state (tenant_id, key, value, updated_at) VALUES (?, 'model_cache', ?, ?)")
-      .run(A.tenantId, "{not json", Date.now());
+      .prepare("INSERT INTO tenant_state (tenant_id, key, value, updated_at) VALUES (?, ?, ?, ?)")
+      .run(A.tenantId, `model_cache:${A.organizationId}`, "{not json", Date.now());
     expect(modelCache.loadModelCache(A).openai).toBeUndefined();
   });
 });

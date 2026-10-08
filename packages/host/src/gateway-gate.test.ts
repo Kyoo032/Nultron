@@ -500,6 +500,66 @@ describe("maybeRefreshGateway", () => {
     expect(gate.maybeRefreshGateway({}, { envRuntime: undefined, runCheck: box.run })).toBe(false);
     expect(box.calls).toBe(0);
   });
+
+  /** Persist a verdict for this key by running a real check against a gateway that answers `respond`. */
+  async function persistFailure(status: "unreachable" | "error" | "invalid_key", lastOkAt: string | null) {
+    const respond: Record<typeof status, () => Response> = {
+      unreachable: () => {
+        throw new TypeError("fetch failed");
+      },
+      error: () => new Response("boom", { status: 502 }),
+      invalid_key: () => new Response("no", { status: 401 }),
+    };
+    await gate.runGatewayCheck(settings, { envRuntime: undefined, fetchImpl: fakeFetch(respond[status]) });
+    const saved = gate.loadGateState(LOCAL_TENANT_ID);
+    if (!saved || saved.status !== status) {
+      throw new Error(`expected a saved ${status} verdict, got ${saved?.status}`);
+    }
+    gate.saveGateState(LOCAL_TENANT_ID, { ...saved, checkedAt: iso(8 * DAY_MS), lastOkAt });
+  }
+
+  it("re-checks an unreachable or error verdict in the background, at most once per ten minutes", async () => {
+    for (const status of ["unreachable", "error"] as const) {
+      gate.resetGatewayRefreshThrottle();
+      await persistFailure(status, iso(DAY_MS));
+      const box = counting();
+      let clock = 5_000_000;
+      const call = () =>
+        gate.maybeRefreshGateway(settings, { envRuntime: undefined, runCheck: box.run, now: NOW, nowMs: () => clock });
+      expect(call()).toBe(true);
+      clock += 5 * 60_000;
+      expect(call()).toBe(false);
+      clock += 6 * 60_000;
+      expect(call()).toBe(true);
+      expect(box.calls).toBe(2);
+    }
+  });
+
+  it("never re-checks a key the gateway rejected on its own", async () => {
+    await persistFailure("invalid_key", iso(DAY_MS));
+    const box = counting();
+    expect(gate.maybeRefreshGateway(settings, { envRuntime: undefined, runCheck: box.run, now: NOW, nowMs: () => 0 })).toBe(
+      false,
+    );
+    expect(box.calls).toBe(0);
+  });
+
+  it("reopens a desk that one network blip closed after the grace window, once the gateway answers", async () => {
+    await persistFailure("unreachable", iso(8 * DAY_MS));
+    expect(gate.reportGatewayGate(settings, { envRuntime: undefined, now: NOW })).toMatchObject({
+      status: "unreachable",
+      allowed: false,
+    });
+
+    let started: Promise<unknown> | null = null;
+    const runCheck = (s: Parameters<Mod["runGatewayCheck"]>[0], o: Parameters<Mod["runGatewayCheck"]>[1]) => {
+      started = gate.runGatewayCheck(s, { ...o, fetchImpl: fakeFetch(() => new Response("{}", { status: 200 })) });
+      return started;
+    };
+    expect(gate.maybeRefreshGateway(settings, { envRuntime: undefined, runCheck, now: NOW, nowMs: () => 0 })).toBe(true);
+    await started;
+    expect(gate.reportGatewayGate(settings, { envRuntime: undefined })).toMatchObject({ status: "ok", allowed: true });
+  });
 });
 
 describe("deriveGatewayGate in server mode", () => {

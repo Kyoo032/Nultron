@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { chooseImageFrame, type ImageAspect } from "@agentforge/core/images";
 import { messageUnlessBlocked } from "@/lib/gateway-blocked";
 import type { MediaPrice } from "@agentforge/core/media-pricing";
 import { Confetti } from "@/components/confetti";
@@ -50,14 +51,15 @@ type GalleryResponse = {
   defaultModel: string;
 };
 
-const ASPECTS = ["square", "landscape", "portrait"] as const;
+const ASPECTS = ["square", "landscape", "portrait"] as const satisfies readonly ImageAspect[];
 
 export function ImagesStudio() {
   const { gatewayName } = useProductBrand();
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [models, setModels] = useState<StudioModel[]>([]);
   const [model, setModel] = useState("");
-  const [aspect, setAspect] = useState<(typeof ASPECTS)[number]>("square");
+  const [aspectChoice, setAspectChoice] = useState<ImageAspect>("square");
+  const [aspectTouched, setAspectTouched] = useState(false);
   const [prompt, setPrompt] = useState("");
   const needsKey = useDeskNeedsKey();
   const [loading, setLoading] = useState(true);
@@ -92,6 +94,8 @@ export function ImagesStudio() {
     void load();
   }, [load]);
 
+  // Until they move the menu, the sentence picks the frame. Their pick then stands.
+  const aspect: ImageAspect = aspectTouched ? aspectChoice : chooseImageFrame(prompt);
   // List-price estimate. Recomputed from the studio state, never from a live call.
   const estimate = useMemo(() => imageEstimateView({ model, models, aspect }), [model, models, aspect]);
   const modelOptions = useMemo(() => {
@@ -158,7 +162,10 @@ export function ImagesStudio() {
           <select
             className="select-field"
             value={aspect}
-            onChange={(event) => setAspect(event.target.value as (typeof ASPECTS)[number])}
+            onChange={(event) => {
+              setAspectChoice(event.target.value as ImageAspect);
+              setAspectTouched(true);
+            }}
             disabled={generating}
             data-testid="images-studio-aspect"
           >

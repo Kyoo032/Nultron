@@ -106,7 +106,8 @@ const CASES: Array<{ name: string; start: (signal: AbortSignal) => Promise<unkno
   },
   {
     name: "a Presentation outline",
-    start: (signal) => generatePresentationOutline(tenant, { prompt: "Vendor switch deck", model: MODEL }, signal),
+    start: (signal) =>
+      generatePresentationOutline(tenant, { prompt: "Vendor switch deck", model: MODEL }, () => {}, signal),
   },
   {
     name: "a Presentation slide rewrite",
@@ -114,7 +115,7 @@ const CASES: Array<{ name: string; start: (signal: AbortSignal) => Promise<unkno
   },
   {
     name: "an Open Slide deck",
-    start: (signal) => generateOpenSlideDeck(tenant, { prompt: "Vendor switch deck", model: MODEL }, signal),
+    start: (signal) => generateOpenSlideDeck(tenant, { prompt: "Vendor switch deck", model: MODEL }, () => {}, signal),
   },
   {
     name: "a Data analysis",

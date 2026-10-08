@@ -63,6 +63,8 @@ import {
   handlePostBillingWebhook,
 } from "./handlers/billing";
 import { handleGetChat } from "./handlers/chat";
+import { handlePostChatDocument } from "./chat-documents/handler";
+import { handlePostChatDocumentSave } from "./chat-documents/save-handler";
 import { handleGetHealth } from "./handlers/health";
 import { handleGetComponents, handlePostComponentInstallStream } from "./handlers/components";
 import { handleDeleteDataset, handleGetDataset, handleGetDatasets, handlePostDatasets } from "./handlers/datasets";
@@ -118,6 +120,7 @@ import {
   handlePostImages,
   handlePostPresentations,
   handlePostPresentationsPptx,
+  handlePostPresentationsStream,
   handlePostPresentationsRegen,
   handlePostResearch,
   handlePostResearchStream,
@@ -131,6 +134,7 @@ import {
   handleGetOpenSlideDecks,
   handlePostOpenSlide,
   handlePostOpenSlideDeck,
+  handlePostOpenSlideStream,
   handlePostOpenSlidePptx,
 } from "./handlers/open-slide";
 import {
@@ -329,6 +333,9 @@ const routes: Route[] = [
   compile("GET", "/api/v1/components", handleGetComponents),
   compile("POST", "/api/v1/components/install/stream", handlePostComponentInstallStream),
   compile("GET", "/api/v1/chat", handleGetChat),
+  // One attached document, read on this machine. No gateway call, so no gate (maps/chat-documents.md).
+  compile("POST", "/api/v1/chat/documents", handlePostChatDocument),
+  compile("POST", "/api/v1/chat/documents/save", handlePostChatDocumentSave),
   compile("GET", "/api/v1/workspaces", handleGetWorkspaces),
   compile("POST", "/api/v1/workspaces", handlePostWorkspaces),
   compile("POST", "/api/v1/workspaces/:workspaceId/select", handleSelectWorkspace),
@@ -365,9 +372,11 @@ const routes: Route[] = [
   compile("POST", "/api/v1/documents/docx", handlePostDocumentsDocx),
   compile("POST", "/api/v1/documents/check", handlePostDocumentsCheck),
   compile("POST", "/api/v1/presentations", handlePostPresentations),
+  compile("POST", "/api/v1/presentations/stream", handlePostPresentationsStream),
   compile("POST", "/api/v1/presentations/regenerate", handlePostPresentationsRegen),
   compile("POST", "/api/v1/presentations/pptx", handlePostPresentationsPptx),
   compile("POST", "/api/v1/presentations/open-slide", handlePostOpenSlide),
+  compile("POST", "/api/v1/presentations/open-slide/stream", handlePostOpenSlideStream),
   compile("POST", "/api/v1/presentations/open-slide/pptx", handlePostOpenSlidePptx),
   compile("GET", "/api/v1/presentations/open-slide/decks", handleGetOpenSlideDecks),
   compile("POST", "/api/v1/presentations/open-slide/decks", handlePostOpenSlideDeck),

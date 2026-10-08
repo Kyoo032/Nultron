@@ -16,6 +16,9 @@ describe("mode harnesses", () => {
       "chat:say-the-result",
       "chat:look-not-make",
       "documents:check-against-source",
+      "images:write-brief",
+      "images:choose-frame",
+      "images:retry-unsent",
       "videos:write-shot",
       "videos:render-retry",
       "videos:keep-clip",
@@ -43,6 +46,13 @@ describe("mode harnesses", () => {
       "both-takes",
     ]);
     expect(harnessFor("music")?.skills.some((skill) => skill.id === "speak-text")).toBe(false);
+    expect(harnessFor("images")?.skills.map((skill) => skill.id)).toEqual([
+      "write-brief",
+      "choose-frame",
+      "generate-still",
+      "retry-unsent",
+      "estimate-and-tighten",
+    ]);
     expect(harnessFor("videos")?.skills.map((skill) => skill.id)).toEqual([
       "write-shot",
       "start-from-still",

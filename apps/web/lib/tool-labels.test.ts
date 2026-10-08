@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { classifyOutcome } from "@/components/tool-rows/results";
 import { applyLocale, resetLocaleForTests, t } from "./i18n";
 import {
   codeLanguageName,
@@ -32,6 +33,22 @@ describe("tool-labels", () => {
 
   it("summarizes calculator input and output", () => {
     expect(toolCallSummary("calculator", { expression: "2 + 3" }, { result: 5 })).toBe("Calculator · 2 + 3 → 5");
+  });
+
+  it("names the self check in plain words, in both languages", () => {
+    expect(toolActivityLabel("self_check")).toBe("Checking this desk…");
+    expect(toolDoneLabel("self_check")).toBe("Desk check");
+    applyLocale("id");
+    expect(toolActivityLabel("self_check")).toBe("Memeriksa meja ini…");
+    expect(toolDoneLabel("self_check")).toBe("Pemeriksaan meja");
+  });
+
+  it("shows a tool that threw as a refusal, with the words the model was given", () => {
+    const failed = { ok: false, reason: "tool_error", message: "The web_search tool failed: timed out." };
+    expect(classifyOutcome("web_search", "completed", failed)).toEqual({
+      state: "refused",
+      message: "The web_search tool failed: timed out.",
+    });
   });
 });
 
@@ -69,6 +86,18 @@ describe("file, Knowledge and code tool labels (en)", () => {
         { ok: true, stdout: "", stderr: "", filesWritten: [] },
       ),
     ).toBe("Ran JavaScript");
+  });
+
+  it("names the deck a build_deck call made, and says so when it could not", () => {
+    const input = { title: "Warung expansion plan", slides: [{ heading: "One" }] };
+    const made = { ok: true, artifactId: "a", filename: "warung-expansion-plan.pptx", slideCount: 2 };
+    expect(toolRowLabel("build_deck", input, made)).toBe("Built “Warung expansion plan”");
+    expect(toolRowLabel("build_deck", input, { ok: false, reason: "checks", message: "x" })).toBe(
+      "Could not build the deck",
+    );
+    expect(toolActivityLabel("build_deck", input)).toBe("Building “Warung expansion plan”…");
+    expect(toolRowLabel("build_deck", {}, made)).toBe("Build deck");
+    expect(toolDoneLabel("build_deck")).toBe("Build deck");
   });
 
   it("uses the activity wording while the call is still running", () => {
@@ -224,8 +253,23 @@ describe("the tools catalog resolves every key the rows build at run time", () =
     "delete_file",
     "knowledge_search",
     "run_code",
+    "build_deck",
   ];
   const keys = [
+    ...[
+      "label",
+      "open",
+      "close",
+      "openAria",
+      "closeAria",
+      "download",
+      "downloading",
+      "downloadAria",
+      "downloadFailed",
+      "noPreview",
+      "outlineAria",
+      "previewAria",
+    ].map((name) => `chat.deck.${name}`),
     ...tools.map((tool) => `chat.tools.name.${tool}`),
     ...tools.map((tool) => `chat.tools.doing.${tool}`),
     ...tools.map((tool) => `chat.tools.done.${tool}`),
@@ -246,6 +290,8 @@ describe("the tools catalog resolves every key the rows build at run time", () =
       "excerptsOne",
       "lineRange",
       "version",
+      "slides",
+      "slidesOne",
     ].map((name) => `chat.tools.detail.${name}`),
     ...["timeout", "memory", "syntax", "runtime", "too_large", "busy", "unavailable", "other"].map(
       (reason) => `chat.tools.code.reason.${reason}`,
@@ -264,8 +310,8 @@ describe("the tools catalog resolves every key the rows build at run time", () =
     expect(unresolved).toEqual([]);
   });
 
-  it("lists sixty-eight keys, so a key dropped from the list is noticed", () => {
-    expect(keys).toHaveLength(68);
+  it("lists eighty-six keys, so a key dropped from the list is noticed", () => {
+    expect(keys).toHaveLength(86);
   });
 });
 

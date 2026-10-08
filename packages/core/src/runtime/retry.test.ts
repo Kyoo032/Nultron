@@ -12,6 +12,7 @@ import {
   shouldRetryModelContact,
   shouldRetryWithoutTools,
 } from "./retry";
+import { HEADERS_TIMEOUT_MS, formatHeadersTimeoutError } from "./stream-watchdog";
 
 describe("formatContactProbe", () => {
   it("labels the three contact attempts", () => {
@@ -125,6 +126,17 @@ describe("shouldRetryModelContact", () => {
     expect(isRetryableModelFailure("Gateway unreachable")).toBe(true);
     expect(isRetryableModelFailure("No response within 10s")).toBe(true);
     expect(isRetryableModelFailure("Gateway tidak dapat dijangkau: tidak ada respons dalam 10 detik")).toBe(true);
+  });
+
+  it("does not retry a request that sent no headers within the limit: that was one full wait already", () => {
+    const en = formatHeadersTimeoutError("gpt-6-luna", HEADERS_TIMEOUT_MS, "en");
+    const id = formatHeadersTimeoutError("gpt-6-luna", HEADERS_TIMEOUT_MS, "id");
+    expect(en).toMatch(/^No response within 45s from gpt-6-luna/);
+    expect(isRetryableModelFailure(en)).toBe(false);
+    expect(isRetryableModelFailure(id)).toBe(false);
+    expect(shouldRetryModelContact({ failed: en, text: false, tooled: false, attempts: 1 })).toBe(false);
+    // A refused or dropped connection is not a wait, and is still retried.
+    expect(isRetryableModelFailure("fetch failed")).toBe(true);
   });
 
   it("still refuses an auth or bad-request failure that happens to say unreachable", () => {

@@ -23,6 +23,7 @@
 # The sandbox runtime is rebuilt inside the image from the pinned lock; a local build would ship twice.
 vendor/sandbox-runtime
 vendor/.sandbox-cache
+vendor/.ffmpeg-cache
 
 # Local state and secrets - never in an image. Patterns without `**/` match only at
 # the repo root; apps/web/.env.local and .webdev-data-*/.master-key were both
@@ -32,6 +33,10 @@ vendor/.sandbox-cache
 **/.env.*
 !**/.env.example
 **/data
+# ...except packages/core/src/data, which is source (ground.ts, cuts.ts), not local state. Without it the
+# image's load check fails (found 2026-10-06). scripts/pilot-deploy.test.mjs keeps every tracked */src/data in.
+!packages/core/src/data
+!packages/core/src/data/**
 .webdev-data*
 **/*.enc
 **/.master-key

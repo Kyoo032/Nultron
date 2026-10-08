@@ -29,6 +29,7 @@ import {
   ghReleaseArgs,
   IMAGE_REPO,
   main,
+  OPTIONAL_PORTAL_ENV,
   parseArgs,
   PORTAL_IMAGE_REPO,
   PROXY_IMAGE,
@@ -345,26 +346,64 @@ function assignments(env) {
 
 test(".env.example and portal.env.example name every required variable, empty unless the template has a default", () => {
   const bundle = renderBundle(TAG, CADDY_SOURCE);
-  for (const [file, required] of [
-    [".env.example", REQUIRED_ENV],
-    ["portal.env.example", REQUIRED_PORTAL_ENV],
+  for (const [file, required, optional] of [
+    [".env.example", REQUIRED_ENV, []],
+    ["portal.env.example", REQUIRED_PORTAL_ENV, OPTIONAL_PORTAL_ENV],
   ]) {
-    const pairs = assignments(bundle[file]);
+    const names = assignments(bundle[file]).map(([name]) => name);
+    // What nothing refuses to boot without may stand anywhere in the file; what is required is all there, in order.
     assert.deepEqual(
-      pairs.map(([name]) => name),
+      names.filter((name) => !optional.includes(name)),
       required,
       file,
     );
-    for (const [name, value] of pairs) assert.equal(value, ENV_DEFAULTS[name] ?? "", `${file}: ${name}`);
+    assert.deepEqual(
+      names.filter((name) => optional.includes(name)),
+      optional,
+      file,
+    );
+    for (const [name, value] of assignments(bundle[file])) {
+      assert.equal(value, ENV_DEFAULTS[name] ?? "", `${file}: ${name}`);
+    }
   }
   // The two files never share a name: a portal secret in the app's file is the leak the split exists to prevent.
   const app = new Set(REQUIRED_ENV);
   assert.deepEqual(REQUIRED_PORTAL_ENV.filter((name) => app.has(name)), []);
+  assert.deepEqual(OPTIONAL_PORTAL_ENV.filter((name) => app.has(name)), []);
   assert.deepEqual(
-    Object.keys(ENV_DEFAULTS).filter((name) => !app.has(name) && !REQUIRED_PORTAL_ENV.includes(name)),
+    Object.keys(ENV_DEFAULTS).filter(
+      (name) => !app.has(name) && !REQUIRED_PORTAL_ENV.includes(name) && !OPTIONAL_PORTAL_ENV.includes(name),
+    ),
     [],
     "a default for a name no template carries",
   );
+});
+
+test("portal.env.example carries the sign-in mode, says its default is code, and the compose files leave it to portal.env", () => {
+  const bundle = renderBundle(TAG, CADDY_SOURCE);
+  const example = bundle["portal.env.example"];
+  assert.equal(ENV_DEFAULTS.PORTAL_SIGNIN_MODE, "code");
+  assert.ok(example.split("\n").includes("PORTAL_SIGNIN_MODE=code"), "the line is there, set to the default");
+  const comment = example
+    .split("\n")
+    .slice(0, example.split("\n").indexOf("PORTAL_SIGNIN_MODE=code"))
+    .filter((line) => line.startsWith("#"))
+    .at(-1);
+  assert.match(comment ?? "", /\bcode\b.*default/i, "the comment above it says the default is code");
+  assert.match(comment ?? "", /\bpassword\b/);
+  // Reaches the container the way every other portal setting does: through the env_file both services load. A
+  // value pinned under `environment:` would WIN over portal.env and make the line above a lie.
+  const code = (compose, name) =>
+    serviceBlock(compose, name)
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("#"))
+      .join("\n");
+  for (const compose of [bundle["compose.yml"], SOURCE_COMPOSE]) {
+    for (const name of ["portal", "portal-prepare"]) {
+      assert.match(code(compose, name), /- path: portal\.env\b/, `${name} loads portal.env`);
+      assert.doesNotMatch(code(compose, name), /PORTAL_SIGNIN_MODE/, `${name} must not pin the mode`);
+    }
+  }
 });
 
 test("the SES defaults are implicit TLS on 465, which the portal's PORTAL_SMTP_SECURE=1 selects", () => {

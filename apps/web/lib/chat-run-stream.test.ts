@@ -74,6 +74,26 @@ describe("readRunStream", () => {
     ]);
   });
 
+  it("draws the closing sentence of a turn whose model call failed after a tool, as a delta and not as a failure", async () => {
+    // What the host sends for that turn (`packages/host/src/runs-resilience.test.ts`): the tool frames,
+    // then the closing sentence as an ordinary delta, then `run.completed`. No `run.failed`, so the pane
+    // keeps the turn, and the sentence reaches the live bubble with no reload.
+    const sentence =
+      'The tool steps above ran, but I could not finish the answer.\n\nReason: The gateway is unavailable right now.\n\nSend "continue" and I will try again.';
+    const { stream } = body([
+      frame("run.started"),
+      frame("tool.started", { toolKey: "read_file", input: { path: "/a.docx" } }),
+      frame("tool.completed", { toolKey: "read_file", output: { ok: true } }),
+      frame("assistant.delta", { text: sentence }),
+      frame("run.completed", { runId: "r1" }),
+    ]);
+    const { seen, handlers } = recorder();
+
+    await readRunStream(stream, handlers);
+
+    expect(seen).toEqual(["started", "tool:started:read_file", "tool:completed:read_file", `delta:${sentence}`]);
+  });
+
   it("reports the run's own failure", async () => {
     const { stream } = body([frame("run.failed", { message: "Model refused" })]);
     const { seen, handlers } = recorder();

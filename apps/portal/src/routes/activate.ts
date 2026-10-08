@@ -27,12 +27,20 @@ import { errorBody, statusFor } from "../flows/reasons";
 import { OTP_TTL_MINUTES } from "../otp/send";
 import { verifyLoginOtp } from "../otp/verify";
 import { MAX_EMAIL_LENGTH } from "../flows/authorize";
-import { liveWebSessionUser, webSessionCookieFor } from "../flows/web-session";
+import { liveWebSessionUser, mustChangePasswordFirst, webSessionCookieFor } from "../flows/web-session";
 import { boundedField, stringField } from "../security/body";
 import { htmlResponse } from "../security/headers";
 import type { PortalRequest, PortalResponse, PortalRoute } from "../server";
 import type { DeviceCode } from "../store/types";
 import { approvePage, outcomePage, userCodePage, type AccountBanner } from "../views/pages";
+import {
+  changeRequiredResponse,
+  handleChangeStep,
+  handlePasswordStep,
+  passwordEntryResponse,
+  type PasswordSpec,
+  type PasswordStepResult,
+} from "./password-flow";
 import {
   codeEntryResponse,
   emailEntryResponse,
@@ -61,11 +69,32 @@ const EMAIL_PATH = "/activate/email";
 const INVITE_PATH = "/activate/invite";
 const INVITE_RESEND_PATH = "/activate/invite/resend";
 const VERIFY_PATH = "/activate/verify";
+/** Password sign-in (`PORTAL_SIGNIN_MODE=password`) has these two posts instead of the four above. */
+const PASSWORD_PATH = "/activate/password";
+const PASSWORD_CHANGE_PATH = "/activate/password/change";
 const APPROVE_PATH = "/auth/device/approve";
 /** `XXXX-XXXX`, or the eight characters without the dash. */
 const MAX_USER_CODE_LENGTH = 9;
 
 export function activateRoutes(runtime: PortalRuntime): readonly PortalRoute[] {
+  if (runtime.config.signInMode === "password") {
+    // The e-mail, invite and verify posts are not registered at all: they answer as any other path
+    // that does not exist. The approval post is the same in both modes.
+    return [
+      { method: "GET", path: ACTIVATE_PATH, handle: (request) => getActivate(runtime, request) },
+      {
+        method: "POST",
+        path: PASSWORD_PATH,
+        handle: (request) => activatePost(runtime, request, (flow) => postPassword(runtime, flow)),
+      },
+      {
+        method: "POST",
+        path: PASSWORD_CHANGE_PATH,
+        handle: (request) => activatePost(runtime, request, (flow) => postPasswordChange(runtime, flow)),
+      },
+      { method: "POST", path: APPROVE_PATH, handle: (request) => postApprove(runtime, request) },
+    ];
+  }
   return [
     { method: "GET", path: ACTIVATE_PATH, handle: (request) => getActivate(runtime, request) },
     {
@@ -115,6 +144,16 @@ function specFor(userCode: string | null, tenantId: string | null): SignInSpec {
     paths: { email: EMAIL_PATH, invite: INVITE_PATH, inviteResend: INVITE_RESEND_PATH, verify: VERIFY_PATH },
     hidden: { user_code: userCode ?? "" },
     // Nothing leaves this origin on the device-code screens: no client redirect to name.
+    formActionOrigins: [],
+  };
+}
+
+/** The same, for the password sign-in's two posts. */
+function passwordSpecFor(userCode: string | null, tenantId: string | null): PasswordSpec {
+  return {
+    requiredTenantId: tenantId,
+    paths: { password: PASSWORD_PATH, change: PASSWORD_CHANGE_PATH },
+    hidden: { user_code: userCode ?? "" },
     formActionOrigins: [],
   };
 }
@@ -195,6 +234,9 @@ async function getActivate(runtime: PortalRuntime, request: PortalRequest): Prom
   // form exactly as an absent one does.
   const member = await liveWebSessionUser(runtime, context.webSession);
   if (!member || !context.webSession) {
+    if (runtime.config.signInMode === "password") {
+      return passwordEntryResponse(runtime, context, passwordSpecFor(userCode, pending?.tenantId ?? null));
+    }
     return emailEntryResponse(runtime, context, specFor(userCode, pending?.tenantId ?? null));
   }
 
@@ -211,6 +253,7 @@ interface ActivateFlow {
   readonly userCode: string | null;
   readonly pending: { readonly tenantId: string; readonly code: DeviceCode } | null;
   readonly spec: SignInSpec;
+  readonly password: PasswordSpec;
 }
 
 /** Body, CSRF, the per-IP page budget, then the pending device code the flow belongs to. */
@@ -241,7 +284,62 @@ async function activatePost(
     userCode,
     pending,
     spec: specFor(userCode, pending?.tenantId ?? null),
+    password: passwordSpecFor(userCode, pending?.tenantId ?? null),
   });
+}
+
+/**
+ * What follows a person who is in on the device-code page: the portal's own session cookie, then
+ * Approve / Deny -- exactly what a verified e-mailed code leads to (`postVerify`). The seat and the
+ * rest of the login gate are checked when the device is approved, as they are in the other mode.
+ *
+ * A person whose credential was flagged for a forced change after the password was proved (an operator's
+ * `reset-password` landed in between, and has already ended the sessions that existed) gets the change
+ * screen and no cookie: the one this would mint would outlive the reset. The read is the one the resumed
+ * cookie is held to (`mustChangePasswordFirst`), made in the transaction that mints the cookie, and in
+ * the other mode it reads nothing.
+ */
+async function signedInOnActivate(
+  runtime: PortalRuntime,
+  flow: ActivateFlow,
+  signedIn: Extract<PasswordStepResult, { readonly kind: "signed_in" }>,
+): Promise<PortalResponse> {
+  const { context, userCode, pending } = flow;
+  // The session cookie is the response's one Set-Cookie, so the CSRF token already in the
+  // browser is reused rather than reminted.
+  const csrf = ensureCsrf(runtime, context);
+  const cookie = await runtime.store.tx(signedIn.tenantId, async (ops) => {
+    if (await mustChangePasswordFirst(runtime, ops, signedIn.user.id)) {
+      return null;
+    }
+    return webSessionCookieFor(runtime, ops, {
+      tenantId: signedIn.tenantId,
+      userId: signedIn.user.id,
+      orgId: signedIn.user.orgId,
+      installId: `web-client-activate-${signedIn.user.id}`,
+    });
+  });
+  if (cookie === null) {
+    return changeRequiredResponse(runtime, context, flow.password, flow.fields);
+  }
+
+  const account = accountFor(signedIn.user.email, csrf.token);
+  if (pending && pending.tenantId === signedIn.tenantId) {
+    return approveScreen(context, pending, cookie, csrf.token, account);
+  }
+  return userCodeScreen(context, userCode, cookie, csrf.token, account);
+}
+
+/** `POST /activate/password`. */
+async function postPassword(runtime: PortalRuntime, flow: ActivateFlow): Promise<PortalResponse> {
+  const step = await handlePasswordStep(runtime, flow.context, flow.password, flow.fields);
+  return step.kind === "response" ? step.response : signedInOnActivate(runtime, flow, step);
+}
+
+/** `POST /activate/password/change`. */
+async function postPasswordChange(runtime: PortalRuntime, flow: ActivateFlow): Promise<PortalResponse> {
+  const step = await handleChangeStep(runtime, flow.context, flow.password, flow.fields);
+  return step.kind === "response" ? step.response : signedInOnActivate(runtime, flow, step);
 }
 
 async function postVerify(runtime: PortalRuntime, flow: ActivateFlow): Promise<PortalResponse> {

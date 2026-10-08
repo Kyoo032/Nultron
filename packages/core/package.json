@@ -15,6 +15,7 @@
     "./mode-catalog": "./src/models/mode-catalog.ts",
     "./preferred": "./src/models/preferred.ts",
     "./curation": "./src/models/curation.ts",
+    "./image-input": "./src/models/image-input.ts",
     "./templates": "./src/templates/library.ts",
     "./pii": "./src/security/pii.ts",
     "./product-modes": "./src/agents/product-modes.ts",
@@ -46,10 +47,13 @@
     "./meeting": "./src/meeting/index.ts",
     "./channels": "./src/channels/index.ts",
     "./channels/pinned": "./src/channels/pinned.ts",
+    "./chat-documents": "./src/chat-documents/index.ts",
     "./harness": "./src/harness/index.ts",
     "./judges": "./src/harness/judges/index.ts",
+    "./images": "./src/images/harness.ts",
     "./documents": "./src/documents/source-check.ts",
-    "./open-slide": "./src/open-slide/index.ts"
+    "./open-slide": "./src/open-slide/index.ts",
+    "./slide-design": "./src/presentation/slide-design.ts"
   },
   "scripts": {
     "test": "vitest run",

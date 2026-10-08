@@ -314,7 +314,10 @@ function buildSteps(ctx) {
   const closure = path.join(ctx.logDir, "audit-closure.json");
   const audit = path.join(ctx.logDir, "audit.json");
   add("audit", "audit:deployed", true, [
-    pnpm(["list", "--filter", "@agentforge/web...", "--depth", "Infinity", "--json"], { stdoutFile: closure }),
+    // Same flags as LIST_ARGS in scripts/audit-deployed.mjs: the Dockerfile's `prod` stage closure.
+    pnpm(["list", "--filter", "@agentforge/web...", "--prod", "--depth", "Infinity", "--json"], {
+      stdoutFile: closure,
+    }),
     pnpm(["audit", "--json"], { stdoutFile: audit, ignoreExit: true }),
     node(["scripts/audit-deployed.mjs", "--level", "high", "--audit", audit, "--closure", closure]),
   ]);

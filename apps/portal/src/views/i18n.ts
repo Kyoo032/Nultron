@@ -63,11 +63,28 @@ function interpolate(template: string, vars: Vars | undefined): string {
 
 export type Translate = (key: string, vars?: Vars) => string;
 
+/**
+ * The two sentences the pages SHARE between the sign-ins that talk about an e-mailed code, and the
+ * keys that say the password version. In `PORTAL_SIGNIN_MODE=password` the translator reads the right
+ * side wherever a page asks for the left: the footer of every page ("Never share a sign-in code ...")
+ * and the signed-out page ("... your e-mail and a code next time"). The default mode never uses this.
+ */
+const PASSWORD_MODE_KEYS: Readonly<Record<string, string>> = Object.freeze({
+  "footer.note": "footer.notePassword",
+  "signedOut.body": "signedOut.bodyPassword",
+});
+
+export interface TranslatorOptions {
+  /** `PORTAL_SIGNIN_MODE=password`: swap the shared sentences that mention an e-mailed code. */
+  readonly passwordMode?: boolean;
+}
+
 /** A missing `id` key falls back to `en`; a key missing from both returns the key itself. */
-export function translator(locale: PortalLocale): Translate {
+export function translator(locale: PortalLocale, options: TranslatorOptions = {}): Translate {
   return (key, vars) => {
-    const own = lookup(CATALOGS[locale], key);
-    const value = own ?? lookup(CATALOGS[DEFAULT_PORTAL_LOCALE], key) ?? key;
+    const asked = options.passwordMode ? (PASSWORD_MODE_KEYS[key] ?? key) : key;
+    const own = lookup(CATALOGS[locale], asked);
+    const value = own ?? lookup(CATALOGS[DEFAULT_PORTAL_LOCALE], asked) ?? key;
     return interpolate(value, vars);
   };
 }

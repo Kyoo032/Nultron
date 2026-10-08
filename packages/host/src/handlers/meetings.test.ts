@@ -84,6 +84,22 @@ describe("meetings CRUD", () => {
     const capability = (listed.body as { capability: Record<string, unknown> }).capability;
     expect(capability).toMatchObject({ available: expect.any(Boolean), reason: expect.any(String) });
     expect(capability).toHaveProperty("ffmpeg");
+    // Not the packaged app here, so the failure wording is the desk's, not "reinstall".
+    expect(capability).toHaveProperty("ffmpegBundled", false);
+  });
+
+  it("marks the ffmpeg as the packaged app's own when the shell says it is packaged", async () => {
+    const was = { packaged: process.env.AGENTFORGE_PACKAGED, path: process.env.AGENTFORGE_FFMPEG_PATH };
+    delete process.env.AGENTFORGE_FFMPEG_PATH;
+    process.env.AGENTFORGE_PACKAGED = "1";
+    try {
+      const listed = await json("GET", "/api/v1/meetings");
+      expect((listed.body as { capability: Record<string, unknown> }).capability).toHaveProperty("ffmpegBundled", true);
+    } finally {
+      if (was.packaged === undefined) delete process.env.AGENTFORGE_PACKAGED;
+      else process.env.AGENTFORGE_PACKAGED = was.packaged;
+      if (was.path !== undefined) process.env.AGENTFORGE_FFMPEG_PATH = was.path;
+    }
   });
 
   it("refuses a meeting with no title", async () => {

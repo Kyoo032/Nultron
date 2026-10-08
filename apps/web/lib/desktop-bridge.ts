@@ -48,6 +48,16 @@ export type DesktopRelaunchResult = {
 };
 
 /**
+ * What the shell's save dialog answered (`host:save-bytes` in apps/desktop/main.cjs): `ok: true`, or
+ * `ok: false` with `forbidden`, `bad-filename`, `too-large`, `canceled` (the person closed the dialog)
+ * or `write-failed` (the disk refused the file).
+ */
+export type DesktopSaveResult = {
+  ok: boolean;
+  reason?: string;
+};
+
+/**
  * What the shell's folder dialog answered: the folder the owner chose, or nothing chosen (dialog
  * closed, or the shell refused the caller). The path is the owner's pick and still unchecked; the
  * host validates it.
@@ -70,7 +80,8 @@ type DesktopBridge = {
   invoke: (payload: IpcHostRequest) => Promise<IpcHostResponse>;
   stream: (requestId: string, onChunk: (chunk: string) => void) => Promise<void>;
   abortStream?: (requestId: string) => void;
-  saveBytes?: (filename: string, bytes: number[]) => Promise<void>;
+  /** Answers a `DesktopSaveResult`; typed `unknown` because an older shell answered nothing at all. */
+  saveBytes?: (filename: string, bytes: number[]) => Promise<unknown>;
   pickMedia?: () => Promise<string[]>;
   pickFolder?: () => Promise<unknown>;
   updates?: DesktopUpdatesApi;
@@ -128,12 +139,29 @@ export function abortDesktopStream(requestId: string): void {
   desktopBridge()?.abortStream?.(requestId);
 }
 
-export async function saveDesktopBytes(filename: string, bytes: number[]): Promise<void> {
+/**
+ * Write bytes through the shell's native save dialog and hand back what it answered, so the caller can
+ * tell a save from a closed dialog from a disk that refused. `undefined` means there was no answer to
+ * read: no shell, or an older one whose save answered nothing. That is not a failure the renderer can
+ * name, so callers treat it as a save that happened (see `throwIfSaveFailed`).
+ */
+export async function saveDesktopBytes(filename: string, bytes: number[]): Promise<DesktopSaveResult | undefined> {
   const save = desktopBridge()?.saveBytes;
   if (!save) {
-    return;
+    return undefined;
   }
-  await save(filename, bytes);
+  return readSaveAnswer(await save(filename, bytes));
+}
+
+function readSaveAnswer(answer: unknown): DesktopSaveResult | undefined {
+  if (!answer || typeof answer !== "object") {
+    return undefined;
+  }
+  const { ok, reason } = answer as { ok?: unknown; reason?: unknown };
+  if (typeof ok !== "boolean") {
+    return undefined;
+  }
+  return typeof reason === "string" && reason ? { ok, reason } : { ok };
 }
 
 export async function pickMedia(): Promise<string[]> {

@@ -1,6 +1,7 @@
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, wrappingKeyFromSecret, type ChatModel, type TenantContext } from "@agentforge/core";
+import type { JobEvent } from "@agentforge/core/jobs";
 import type { DeskPath, FileRoot } from "@agentforge/core/tools/files";
 import { ensureSchema } from "@agentforge/db/ensure-schema";
 import { createDeskFileStore } from "./desk-files/file-store";
@@ -139,6 +140,7 @@ describe("the model a Presentations job uses and records", () => {
       model: "deepseek-v4-flash",
     });
     expect(outline.title).toBe("Vendor switch");
+    expect(outline.slides[0]?.notes).toMatch(/Say this page once/);
     expect(created[0]?.meta?.model).toBe("gpt-5.6-luna");
     expect(ingested[0]?.model).toBe("gpt-5.6-luna");
   });
@@ -155,6 +157,40 @@ describe("the model a Presentations job uses and records", () => {
   it("leaves a seeded default rescuable", async () => {
     await generatePresentationOutline(tenant, { prompt: "Vendor switch deck", model: "deepseek-v4-flash" });
     expect(asked[0]?.modelExplicit).toBe(false);
+  });
+
+  it("asks once for a crowded slide and still returns the slide that fit", async () => {
+    const crowded = {
+      title: "Saturday pickup",
+      slides: [
+        {
+          kind: "bullets",
+          heading: "Named bags",
+          subhead: "",
+          bullets: ["One", "Two", "Three", "Four", "Five", "Six"],
+          aside: "",
+          notes: "Already noted.",
+        },
+        {
+          kind: "close",
+          heading: "Keep this close",
+          subhead: "",
+          bullets: ["Say yes or no on Thursday."],
+          aside: "",
+          notes: "Stay.",
+        },
+      ],
+    };
+    answer = { text: JSON.stringify(crowded), model: "deepseek-v4-flash" };
+    const outline = await generatePresentationOutline(tenant, { prompt: "Saturday pickup" });
+    expect(asked).toHaveLength(2);
+    expect(String(asked[1]?.prompt)).toContain("too_many_bullets");
+    expect(String(asked[1]?.prompt)).not.toContain("Keep this close");
+    expect(outline.slides[0]?.bullets.length).toBeLessThanOrEqual(5);
+    expect(outline.slides[0]?.layout).toBe("split");
+    expect(outline.slides[1]?.heading).toBe("Keep this close");
+    expect(outline.slides[1]?.layout).toBe("section");
+    expect(outline.title).toBe("Saturday pickup");
   });
 
   it("passes the pin on a slide rewrite too", async () => {
@@ -408,11 +444,34 @@ describe("an outline is done when it passes its checks", () => {
       throw new ApiError("upstream_error", "Gateway returned 502", 502);
     });
     const error = await refusal(
-      generatePresentationOutline(tenant, { prompt: "Vendor switch deck" }, controller.signal),
+      generatePresentationOutline(tenant, { prompt: "Vendor switch deck" }, undefined, controller.signal),
     );
     expect(error).toMatchObject({ code: "aborted", status: 499 });
     expect(created).toHaveLength(0);
     expect(ingested).toHaveLength(0);
+  });
+
+  it("announces the check repair round, then the design pass, on the stream", async () => {
+    const events: JobEvent[] = [];
+    scripted.push(
+      slidesJson(["Billing moves", "Support follows", "Billing moves"]),
+      slidesJson(["Billing moves", "Support follows", "Approve by Friday"]),
+    );
+    const outline = await generatePresentationOutline(tenant, { prompt: "Vendor switch deck" }, (event) =>
+      events.push(event),
+    );
+    expect(asked).toHaveLength(2);
+    expect(
+      events.map((event) =>
+        event.type === "job.round"
+          ? `round ${event.round} of ${event.total}: ${event.label}`
+          : event.type === "job.phase"
+            ? event.phase
+            : event.type,
+      ),
+    ).toEqual(["round 1 of 1: Repairing the outline", "designing"]);
+    expect(outline).not.toHaveProperty("checks");
+    expect(outline.slides.every((slide) => slide.layout !== undefined)).toBe(true);
   });
 
   it("repairs a first answer that is not an outline, quoting it back and saying so", async () => {

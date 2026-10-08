@@ -8,6 +8,7 @@ import {
   type Asset,
   type EditProject,
 } from "@agentforge/core";
+import { localeForRun } from "../../run-context";
 import { materializeTenantObject } from "../../tenant-storage";
 import { resolveFfmpeg } from "../ffmpeg-binary";
 import {
@@ -18,6 +19,7 @@ import {
   escapeFilterPath,
   type EditScope,
 } from "./paths";
+import { assertAcceptableContainer, mediaTimeoutMs, renderTimeoutMs } from "./input-safety";
 import { runFfmpeg } from "./run";
 
 export const RECIPE_KINDS = [
@@ -38,9 +40,13 @@ export function assertKnownRecipe(kind: string): asserts kind is RecipeKind {
   }
 }
 
-/** Whole milliseconds — a probed duration is fractional and `execFile` refuses a fractional timeout. */
+/**
+ * Whole milliseconds — a probed duration is fractional and `execFile` refuses a fractional timeout. The length a
+ * file declares is only believed up to the longest media the product works through, and a hosted run stops at
+ * an hour, so a forged duration cannot hold an ffmpeg slot (`input-safety.ts`, SR-135).
+ */
 function timeoutForMedia(seconds: number): number {
-  return Math.ceil(Math.max(15_000, 2 * seconds * 1000 + 30_000));
+  return mediaTimeoutMs(seconds, 15_000);
 }
 
 export type ProbeResult = {
@@ -61,8 +67,10 @@ export async function probe(filePath: string, scope: EditScope): Promise<ProbeRe
   });
   const parsed = JSON.parse(stdout || "{}") as {
     streams?: Array<Record<string, unknown>>;
-    format?: { duration?: string };
+    format?: { duration?: string; format_name?: string };
   };
+  // A playlist or concat script names other files or addresses; refuse it before anything opens them.
+  assertAcceptableContainer(parsed.format?.format_name, localeForRun());
   const streams = parsed.streams ?? [];
   const video = streams.find((stream) => stream.codec_type === "video");
   const audio = streams.find((stream) => stream.codec_type === "audio");
@@ -291,7 +299,7 @@ export async function render(
     out,
   );
   void preset;
-  await runFfmpeg(argv, { timeoutMs: Math.max(60_000, 10 * timelineSeconds * 1000 + 60_000), outputPath: out });
+  await runFfmpeg(argv, { timeoutMs: renderTimeoutMs(timelineSeconds), outputPath: out });
   return { file: out };
 }
 

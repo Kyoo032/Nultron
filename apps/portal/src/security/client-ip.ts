@@ -71,3 +71,96 @@ export function clientIp(input: ClientIpInput): string | null {
 export function rateLimitKey(ip: string | null): string {
   return ip ?? "unknown-ip";
 }
+
+/** The eight 16-bit groups of an IPv6 address, or `null` when it is not one (an IPv4 address, or junk). */
+function ipv6Groups(address: string): readonly number[] | null {
+  if (!address.includes(":")) {
+    return null;
+  }
+  const halves = address.split("::");
+  if (halves.length > 2) {
+    return null;
+  }
+  const parse = (part: string): number[] | null => {
+    if (part === "") {
+      return [];
+    }
+    const groups = part.split(":");
+    if (!groups.every((group) => /^[0-9a-f]{1,4}$/i.test(group))) {
+      return null;
+    }
+    return groups.map((group) => Number.parseInt(group, 16));
+  };
+  const head = parse(halves[0]);
+  const tail = halves.length === 2 ? parse(halves[1]) : [];
+  if (head === null || tail === null) {
+    return null;
+  }
+  if (halves.length === 1) {
+    return head.length === 8 ? head : null;
+  }
+  // `::` stands for at least one group of zeros.
+  const missing = 8 - head.length - tail.length;
+  return missing >= 1 ? [...head, ...Array.from({ length: missing }, () => 0), ...tail] : null;
+}
+
+/**
+ * How many leading bits of an IPv6 address name the source a password sign-in is counted against.
+ *
+ * A /56 is 256 /64s. It is not a /64, because one routed /48 is 65,536 of those, and every one of them
+ * would be a source of its own with the whole per-source budget: enough requests to hold every
+ * password-derivation permit (`PasswordHasher.admit`) and answer `503` to everybody. A /48 is 256
+ * of these. The cost is that everyone inside one /56 (a home, an office) is one source.
+ */
+export const IPV6_SOURCE_PREFIX_BITS = 56;
+
+/** The address's first `IPV6_SOURCE_PREFIX_BITS` bits, every other bit zero, as the eight groups it is made of. */
+function ipv6Prefix(groups: readonly number[]): string {
+  return groups
+    .map((group, index) => {
+      const kept = Math.max(0, Math.min(16, IPV6_SOURCE_PREFIX_BITS - index * 16));
+      const mask = (0xffff << (16 - kept)) & 0xffff;
+      return (group & mask).toString(16);
+    })
+    .join(":");
+}
+
+/**
+ * The source a password sign-in is counted against: an IPv4 address as it is, an IPv6 address as its
+ * `/56` (`IPV6_SOURCE_PREFIX_BITS`).
+ *
+ * A customer that is given an IPv6 network is given at least a `/64`, which is 2^64 addresses, so
+ * keyed on the whole address every request can arrive from a "new" source and no per-source limit
+ * ever fires. A `/64` is what one subscriber is, but one routed `/48` is 65,536 of them, so the unit
+ * is the `/56` (see the constant). An IPv4-mapped address in either spelling is the IPv4 address it
+ * wraps (not the shared `::/56`, which would put every such client in one bucket). An address that is
+ * not known is the one shared bucket, as `rateLimitKey` has it.
+ *
+ * **Only the password routes use this.** `rateLimitKey` keeps the whole address, because the limits of
+ * the e-mailed-code sign-in count exactly what they always have and that mode does not change.
+ * The lockout's record of sources (`security/password-attempts.ts`) is fed the same value on purpose:
+ * one function says what a source is. Anything that is neither an IPv4 address nor parseable as IPv6
+ * is returned as it came: it cannot come from a socket, and an odd key only ever lands in a bucket of
+ * its own.
+ */
+export function sourceBucket(ip: string | null): string {
+  if (ip === null) {
+    return rateLimitKey(null);
+  }
+  // The dotted spelling, which `clientIp` has already unwrapped; handled here too so that no caller
+  // can reach the shared `::/56` bucket by handing this the address as the socket spelled it.
+  const dotted = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(ip);
+  if (dotted) {
+    return dotted[1];
+  }
+  const groups = ipv6Groups(ip);
+  if (groups === null) {
+    return ip;
+  }
+  const isMapped = groups.slice(0, 5).every((group) => group === 0) && groups[5] === 0xffff;
+  if (isMapped) {
+    const [high, low] = [groups[6], groups[7]];
+    return `${high >> 8}.${high & 0xff}.${low >> 8}.${low & 0xff}`;
+  }
+  return `${ipv6Prefix(groups)}/${IPV6_SOURCE_PREFIX_BITS}`;
+}

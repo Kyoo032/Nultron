@@ -14,6 +14,8 @@ export type ComposerDraftFile = {
   id: string;
   file: File;
   kind: string;
+  /** A document's read state, kept so a finished read is not repeated after a remount. */
+  read?: unknown;
 };
 
 type Stash = {

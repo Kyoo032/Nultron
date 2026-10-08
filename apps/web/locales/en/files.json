@@ -68,6 +68,12 @@
     "working": "Restoring…",
     "done": "Restored version {from} as version {to}."
   },
+  "download": {
+    "button": "Download",
+    "working": "Downloading…",
+    "failed": "Could not download. Try again.",
+    "aria": "Download {path} to your computer"
+  },
   "delete": {
     "button": "Delete",
     "title": "Delete {path}?",
@@ -88,7 +94,8 @@
     "badPath": "That file path is not allowed.",
     "quota": "This account has no storage space left. Every saved version counts.",
     "unavailable": "The file store is unavailable right now. Try again later.",
-    "badResponse": "The files answered in a way this app does not understand."
+    "badResponse": "The files answered in a way this app does not understand.",
+    "saveFailed": "The file could not be saved to your computer. Check the location and try again."
   },
   "pathErrors": {
     "empty": "Give the file a path, like notes/plan.md.",

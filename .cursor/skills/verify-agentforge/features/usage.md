@@ -13,7 +13,7 @@ Usage is the desk spend and this-key wallet page at `/usage`. It is a bottom-rai
 
 ## How to get to it (user POV)
 
-- Choose Usage on the left rail (`usage-link`), expanded or collapsed (`Use`).
+- Choose Usage on the left rail (`usage-link`), expanded or collapsed (collapsed it is icon-only: `aria-label` and `title` read `Usage` / `Pemakaian`, `app-rail.tsx:92`, `:133`; there is no `Use` label).
 - From Settings, follow Open Usage (`usage-open`).
 - Open `/usage` directly.
 
@@ -40,3 +40,5 @@ Preconditions:
 - Usage is not in `PRODUCT_MODES`. Do not hunt for `mode-usage`.
 - Desk estimate and this-key wallet will not match (footer note). Chat chips `chat-usage` / `chat-context` stay on Chat.
 - Settings no longer hosts `usage-by-model` or `usage-desk-range`. Assert those on `/usage` only.
+- Not in the recipe: the by-model list also draws unpriced rows as `usage-model-row-<model>` with different copy ("billed after they finish"), `usage-by-model` always renders (even empty or loading, so its presence proves nothing about spend), the load-error `<p>` (`usage-page.tsx:165`) has no testid (copy `usage.errors.unavailable` on a 404, otherwise `loadStatus`, `incomplete` or `load`), on `/usage` `usage-this-key` carries no "This key:" prefix (the label is a separate panel label) while Settings' `usage-panel` strip does, `trimLeadingEmptyBuckets` keeps at least 7 day bars and 4 week or month bars (`usage-page.tsx:94-102`), and the chart's empty text is hard-coded English (`usage-range-chart.tsx:152-154`).
+- **Driven 2026-10-05 on `:3000` (keyed; maintain3).** Settings `usage-panel` showed `usage-this-key` "This key: $x used · $y left" (live figures: record them, never assert them) and `usage-open`; `usage-open` went to `/usage` with `usage-page`, `usage-intro` and `h1:visible` "Usage"; `usage-link` carried `aria-current="page"`; `usage-range-day` was pressed by default and clicking week, month, day fired exactly one `GET /api/v1/usage?range=week`, `month`, `day` each; `usage-desk-range` "$x · N models", `usage-key-meter` 1, `usage-range-chart` 1, `usage-range-empty` 0, `usage-by-model` 1; at 420 px the collapsed `usage-link` had `aria-label` and `title` "Usage".

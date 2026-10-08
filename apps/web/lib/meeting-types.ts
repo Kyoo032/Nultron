@@ -36,6 +36,8 @@ export type Capability = {
   model: string | null;
   reason: "ok" | "no_model" | "no_key";
   ffmpeg: boolean;
+  /** The ffmpeg in question is the packaged app's own, so a failure means "reinstall", not "install ffmpeg". */
+  ffmpegBundled?: boolean;
 };
 
 export type MeetingTab = "transcript" | "minutes" | "translation";

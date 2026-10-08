@@ -118,6 +118,7 @@ export function handlePostLegalRunStream(request: HostRequest): Promise<HostResu
     assertPartiesForReview(requireLegalMatter(tenant, matterId));
     return streamJob((emit, abortSignal) => generateLegalRun(tenant, matterId, body, emit, abortSignal), {
       abortSignal: request.abortSignal,
+      tenant,
     });
   });
 }

@@ -27,6 +27,7 @@ import {
   loadUserGuide,
   loadUserKeyLater,
   localDataDir,
+  saveKeysToDesks,
   saveUserLocale,
   saveSettings,
 } from "../settings-store";
@@ -190,9 +191,9 @@ export async function handleGetSettings(request: HostRequest, deps: ServerModeDe
  * What still needs `keyFieldValue` below is narrower and has nothing to do with sharing: a key sent
  * as the EMPTY string is not a change anyone asked for — it is the renderer echoing an input nobody
  * typed in (`apps/web/components/settings-page.tsx` posts `openaiApiKey` from state on every save) —
- * and `mergeSecrets` DELETES the stored key on an empty string. Dropping the blank in server mode is
- * what stops a tenant's own Settings save from wiping their own key. Meaning it is "forget my key"
- * is `DELETE /api/v1/settings/reset` with `scope: "key"`, which Phase 4 opens on the server.
+ * and `mergeSecrets` DELETES the stored key on an empty string. Dropping the blank (on the desk too,
+ * since 2026-10-06) is what stops a Settings save from wiping the key. Meaning "forget my key"
+ * is `POST /api/v1/settings/reset` with `scope: "key"`, which Phase 4 opens on the server.
  *
  * Writing a key in server mode is itself gated by role (M4): see `requestsKeyWrite` and
  * `SETTINGS_KEY_FORBIDDEN_CODE` below. It is not an operator-only field, because the company's own
@@ -218,16 +219,14 @@ export function requestsOperatorOnlySettings(body: Record<string, unknown>): boo
 /**
  * A provider key on its way into the patch.
  *
- * Off server mode this is the identity on any string, so a desk owner clearing the field still
- * means "forget my key" and `mergeSecrets` still deletes it. In server mode a blank is dropped
- * instead of forwarded, which is what stops a tenant's own key being wiped by a Settings save that
- * never meant to touch it. A real value passes through in both.
+ * A blank (empty or whitespace) is dropped instead of forwarded, on the desk and on the server alike:
+ * it is the key field nobody typed in, and `mergeSecrets` would read it as "forget my key". Until
+ * 2026-10-06 only server mode dropped it, so on a desk saving Settings with the field empty (changing
+ * only the Edit turn cap, say) signed the desk out of the gateway. Forgetting a key is
+ * `POST /api/v1/settings/reset` with `scope: "key"`, and nothing else. A real value passes through.
  */
-export function keyFieldValue(raw: unknown, serverMode: boolean): string | undefined {
-  if (typeof raw !== "string") {
-    return undefined;
-  }
-  if (serverMode && raw.trim().length === 0) {
+export function keyFieldValue(raw: unknown): string | undefined {
+  if (typeof raw !== "string" || raw.trim().length === 0) {
     return undefined;
   }
   return raw;
@@ -264,7 +263,7 @@ const PROVIDER_KEY_FIELDS = ["openaiApiKey", "googleApiKey", "anthropicApiKey", 
  * `false`, because nothing consults it there and a blank means "forget my key" on a desk.
  */
 export function requestsKeyWrite(body: Record<string, unknown>, serverMode: boolean): boolean {
-  return serverMode && PROVIDER_KEY_FIELDS.some((field) => keyFieldValue(body[field], serverMode) !== undefined);
+  return serverMode && PROVIDER_KEY_FIELDS.some((field) => keyFieldValue(body[field]) !== undefined);
 }
 
 /** Throws the 403 for anyone who is not an owner or an admin. Called only in server mode. */
@@ -272,6 +271,27 @@ function assertMayChangeCompanyKey(tenant: TenantContext): void {
   if (!canAdminister(tenant.role)) {
     throw new ApiError(SETTINGS_KEY_FORBIDDEN_CODE, SETTINGS_KEY_FORBIDDEN_MESSAGE, 403);
   }
+}
+
+/**
+ * Hosted only (SR-163, review round): write the provider keys of this save to the caller's company's
+ * other desks. `tenant.tenantId` is the white-label partner, so the desks are listed by the caller's own
+ * organisation, which is what keeps every other company's desks out of it. Only the key fields travel;
+ * a desk's own choices (models, caps) stay its own. Callers pass a patch whose blank fields are already
+ * dropped (`keyFieldValue`), so a field nobody typed is never written onto another desk.
+ */
+async function mirrorKeysToCompanyDesks(patch: SecretPatch, tenant: TenantContext): Promise<void> {
+  const desks = await listLocalWorkspaces(db, tenant.organizationId);
+  saveKeysToDesks(
+    {
+      openaiApiKey: patch.openaiApiKey,
+      googleApiKey: patch.googleApiKey,
+      anthropicApiKey: patch.anthropicApiKey,
+      volcengineApiKey: patch.volcengineApiKey,
+    },
+    tenant,
+    desks.map((desk) => desk.id).filter((id) => id !== tenant.workspaceId),
+  );
 }
 
 /** Injected like `ResetDeps` below, so a test can exercise hosted behaviour without the env flag. */
@@ -302,10 +322,10 @@ export async function handlePostSettings(request: HostRequest, deps: ServerModeD
     // DELETE the key every tenant shares. `toolKeys`, `toolBackends` and `injectionGuardBypass`
     // never reach the patch in server mode — the check above proved none of them carries a value.
     const patch: SecretPatch = {
-      openaiApiKey: keyFieldValue(body.openaiApiKey, serverMode),
-      googleApiKey: keyFieldValue(body.googleApiKey, serverMode),
-      anthropicApiKey: keyFieldValue(body.anthropicApiKey, serverMode),
-      volcengineApiKey: keyFieldValue(body.volcengineApiKey, serverMode),
+      openaiApiKey: keyFieldValue(body.openaiApiKey),
+      googleApiKey: keyFieldValue(body.googleApiKey),
+      anthropicApiKey: keyFieldValue(body.anthropicApiKey),
+      volcengineApiKey: keyFieldValue(body.volcengineApiKey),
       toolKeys: serverMode ? undefined : readStringMap(body.toolKeys),
       toolBackends: serverMode ? undefined : readStringMap(body.toolBackends),
       imageGenModel: readOptionalString(body.imageGenModel),
@@ -319,6 +339,10 @@ export async function handlePostSettings(request: HostRequest, deps: ServerModeD
       editTurnCapUsd: readOptionalNumber(body.editTurnCapUsd),
     };
     const saved = saveSettings(patch, tenant);
+    // SR-163: on the server the key is the company's, so it reaches every desk of the company.
+    if (requestsKeyWrite(body, serverMode)) {
+      await mirrorKeysToCompanyDesks(patch, tenant);
+    }
     clearThisKeyCache();
     // A fixed key / URL must take effect now, not after the 5-minute embeddings breaker expires —
     // and the job-side breaker skips a model for the same five minutes, so it is cleared with it, along
@@ -400,11 +424,10 @@ async function refreshGatewayGateAfterSave(
   saved: ReturnType<typeof saveSettings>,
   tenant: TenantContext,
 ): Promise<GatewayGatePayload | null> {
-  if (typeof body.openaiApiKey !== "string") {
-    return null;
-  }
-  if (body.openaiApiKey.trim().length === 0) {
-    clearGateState(tenant);
+  // No key typed, or a blank field: the key did not change (`keyFieldValue` drops the blank), so its
+  // verdict stands. Clearing it here used to leave a kept key "never checked". Forgetting a key, and
+  // its verdict, is `resetGatewayKey`.
+  if (keyFieldValue(body.openaiApiKey) === undefined) {
     return null;
   }
   // The verdict this returns is the one the response carries. Re-deriving it from disk instead
@@ -472,7 +495,7 @@ const RESET_DISABLED_MESSAGE =
  * D scoped both calls to the caller's tenant and Phase 4 moved both payloads into that tenant's own
  * `tenant_state` rows, so what this clears now is the caller's key on the caller's desks and the
  * caller's verdict — nobody else's. Leaving it refused would mean a hosted tenant who pasted the
- * wrong key had no way to take it back, since `keyFieldValue` drops a blank in server mode by
+ * wrong key had no way to take it back, since `keyFieldValue` drops a blank by
  * design, and that is the whole of the route out.
  *
  * Who may press it is a separate question from whose key it clears. It is the COMPANY's key, so on the
@@ -482,10 +505,21 @@ const RESET_DISABLED_MESSAGE =
  *
  * "Start over" stays refused: that one really does still wipe the shared data directory.
  */
-function resetGatewayKey(tenant: TenantContext): HostResult {
+async function resetGatewayKey(tenant: TenantContext, serverMode: boolean): Promise<HostResult> {
   // Every desk of this tenant: a key left on a second desk would keep the gate open after "forget
   // my key". Phase 3 lane D narrowed both calls from the whole install to the caller's tenant.
-  clearGatewayKeyEverywhere(tenant);
+  //
+  // SR-163: on the hosted server the tenant is the white-label partner and a company is one
+  // organisation inside it, so "every desk of this tenant" would be every company's desks and this
+  // button would sign the whole deployment out of the gateway. There it is the caller's own
+  // organisation's desks, and the verdict `clearGateState` drops is that company's own. A desk has
+  // one person and one organisation, and keeps the call exactly as it was.
+  if (serverMode) {
+    const desks = await listLocalWorkspaces(db, tenant.organizationId);
+    clearGatewayKeyEverywhere(tenant, { workspaceIds: desks.map((desk) => desk.id) });
+  } else {
+    clearGatewayKeyEverywhere(tenant);
+  }
   clearGateState(tenant);
   clearThisKeyCache();
   resetEmbedCircuit();
@@ -577,7 +611,7 @@ export async function handleResetApp(request: HostRequest, deps: ResetDeps = {})
       if (serverMode) {
         assertMayChangeCompanyKey(tenant);
       }
-      return resetGatewayKey(tenant);
+      return await resetGatewayKey(tenant, serverMode);
     }
     if (scope === "all") {
       return resetEverything(tenant, readOptionalString(body.confirm), serverMode);

@@ -7,6 +7,30 @@
   "deleteConfirm": "Hapus \"{title}\"? Tindakan ini tidak dapat dibatalkan.",
   "deleteAria": "Hapus {title}",
   "removeAttachment": "Hapus {name}",
+  "document": {
+    "reading": "Membaca {name}…",
+    "readingShort": "Membaca…",
+    "cut": "Hanya {sent} dari {total} karakter pertama yang dikirim.",
+    "masked": "{n} data pribadi disembunyikan sebelum dikirim.",
+    "maskedOne": "1 data pribadi disembunyikan sebelum dikirim.",
+    "retry": "Coba lagi",
+    "retryAria": "Coba baca {name} lagi",
+    "tooMany": "Satu pesan dapat membawa hingga {n} dokumen.",
+    "mustFinish": "Tunggu dokumen selesai dibaca, atau hapus yang gagal.",
+    "errors": {
+      "too_large": "Berkas ini melebihi batas {mb} MB. Lampirkan yang lebih kecil.",
+      "unsupported": "Jenis berkas ini tidak dapat dibaca di sini.",
+      "mismatch": "Berkas ini sebenarnya bukan jenis yang disebut namanya. Periksa lalu coba lagi.",
+      "needs_ocr": "PDF ini hasil pindai dan tidak punya teks untuk dibaca. Tidak ada yang dikirim ke mana pun. Lampirkan versi dengan teks yang bisa dipilih.",
+      "encrypted": "Berkas ini dilindungi kata sandi. Hapus kata sandinya lalu lampirkan lagi.",
+      "empty": "Tidak ada teks di berkas ini.",
+      "unreadable": "Berkas ini tidak dapat dibaca. Mungkin rusak.",
+      "slow": "Berkas ini terlalu lama dibaca. Coba yang lebih kecil.",
+      "busy": "Nultron sedang membaca berkas lain. Coba lagi sebentar.",
+      "failed": "Berkas ini tidak dapat dibaca. Periksa koneksi lalu coba lagi.",
+      "send": "Berkas ini tidak dapat disiapkan untuk dikirim, jadi pesan belum terkirim. Periksa koneksi lalu coba lagi."
+    }
+  },
   "empty": {
     "hello": "Hai, aku Nultron.",
     "headline": "Hari ini kita kerjakan apa?",
@@ -53,7 +77,7 @@
     "label": "Akun"
   },
   "composer": {
-    "placeholder": "Tanyakan apa saja, atau lepas tangkapan layar, klip, atau berkas teks",
+    "placeholder": "Tanyakan apa saja, atau lepas tangkapan layar, klip, atau dokumen",
     "modelPrefix": "Model",
     "thinkingPrefix": "Berpikir",
     "attach": "Lampirkan",
@@ -62,6 +86,12 @@
     "thinking": "Berpikir",
     "imageCaption": "Apa yang ada di gambar ini?",
     "videoCaption": "Ringkas video ini.",
+    "imageNote": {
+      "no": "{model} tidak dapat membaca gambar. Ganti ke model yang bisa, atau hapus gambarnya.",
+      "unknown": "Kami belum bisa memastikan {model} membaca gambar. Gambar tetap dikirim. Jika {model} tidak bisa membacanya, Anda akan melihat pesan kesalahan.",
+      "switch": "Pakai {model}"
+    },
+    "videoNote": "Model belum bisa menonton video di Chat. Video tetap ada di obrolan ini, tetapi hanya tulisan Anda yang dikirim ke model.",
     "needsKey": "Tempel kunci di Pengaturan sebelum ini bisa jalan."
   },
   "thinking": {
@@ -145,7 +175,9 @@
     "video": "Video",
     "pastSessions": "Chat sebelumnya",
     "calculator": "Kalkulator",
-    "datetime": "Jam"
+    "datetime": "Jam",
+    "selfChecking": "Memeriksa meja ini…",
+    "selfCheck": "Pemeriksaan meja"
   },
   "tools": {
     "name": {
@@ -156,7 +188,8 @@
       "search_files": "Cari berkas",
       "delete_file": "Hapus berkas",
       "knowledge_search": "Pencarian pengetahuan",
-      "run_code": "Jalankan kode"
+      "run_code": "Jalankan kode",
+      "build_deck": "Buat deck"
     },
     "doing": {
       "list_files": "Menampilkan daftar berkas di {dir}…",
@@ -168,6 +201,7 @@
       "delete_file": "Sedang menghapus {path}…",
       "knowledge_search": "Mencari “{query}” di basis pengetahuan Anda…",
       "run_code": "Sedang menjalankan {language}…",
+      "build_deck": "Sedang menyusun “{title}”…",
       "web_fetch": "Sedang membuka {host}…"
     },
     "done": {
@@ -180,6 +214,7 @@
       "delete_file": "Menghapus {path}",
       "knowledge_search": "Pencarian “{query}” di basis pengetahuan Anda",
       "run_code": "Menjalankan {language}",
+      "build_deck": "Menyusun “{title}”",
       "web_fetch": "Membuka {host}"
     },
     "failed": {
@@ -191,6 +226,7 @@
       "delete_file": "Tidak dapat menghapus {path}",
       "knowledge_search": "Tidak dapat mencari di basis pengetahuan Anda",
       "run_code": "Menjalankan {language} gagal",
+      "build_deck": "Tidak dapat membuat deck",
       "web_fetch": "Tidak dapat membuka {host}"
     },
     "pending": {
@@ -208,7 +244,9 @@
       "excerpts": "{n} kutipan",
       "excerptsOne": "1 kutipan",
       "lineRange": "Baris {from}–{to} dari {total}",
-      "version": "Versi {n}"
+      "version": "Versi {n}",
+      "slides": "{n} slide",
+      "slidesOne": "Satu slide"
     },
     "open": "Buka",
     "openAria": "Buka {path} di Basis Pengetahuan",
@@ -235,6 +273,20 @@
         "other": "Proses tidak selesai."
       }
     }
+  },
+  "deck": {
+    "label": "Deck PowerPoint",
+    "open": "Buka",
+    "close": "Tutup",
+    "openAria": "Buka slide {title}",
+    "closeAria": "Tutup slide {title}",
+    "download": "Unduh",
+    "downloading": "Mengunduh…",
+    "downloadAria": "Unduh {title} sebagai {filename}",
+    "downloadFailed": "Tidak bisa mengunduh deck. Coba lagi.",
+    "noPreview": "Slide tidak bisa ditampilkan di sini, tetapi berkasnya siap diunduh.",
+    "outlineAria": "Slide dalam deck ini",
+    "previewAria": "Pratinjau slide {title}"
   },
   "error": {
     "loading": "Chat masih dimuat",
@@ -275,6 +327,8 @@
     "pastNone": "Tidak ada percakapan sebelumnya di meja ini yang cocok.",
     "pastOne": "Percakapan sebelumnya berjudul \"{title}\".",
     "pastMany": "Percakapan sebelumnya mencakup \"{title}\".",
-    "noSource": "Meja ini tidak punya sumber untuk itu."
+    "noSource": "Meja ini tidak punya sumber untuk itu.",
+    "stepLimit": "Langkah kerja saya habis sebelum ini selesai. Minta saya untuk melanjutkan, dan saya akan meneruskannya dari titik terakhir.",
+    "interrupted": "Langkah alat di atas sudah berjalan, tetapi saya tidak dapat menyelesaikan jawabannya.\n\nAlasan: {reason}\n\nKirim \"lanjutkan\" dan saya akan mencoba lagi."
   }
 }

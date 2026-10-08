@@ -27,9 +27,10 @@ export const ARTIFACT_KINDS = [
 ] as const;
 export const DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 export const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-export const ARTIFACT_MIMES = ["text/markdown", "application/json", DOCX_MIME, XLSX_MIME] as const;
+export const PPTX_MIME = "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+export const ARTIFACT_MIMES = ["text/markdown", "application/json", DOCX_MIME, XLSX_MIME, PPTX_MIME] as const;
 /** Binary bodies are stored base64-encoded; the file route decodes them. */
-export const BINARY_ARTIFACT_MIMES: ReadonlySet<string> = new Set([DOCX_MIME, XLSX_MIME]);
+export const BINARY_ARTIFACT_MIMES: ReadonlySet<string> = new Set([DOCX_MIME, XLSX_MIME, PPTX_MIME]);
 
 export function isBinaryArtifactMime(mime: string): boolean {
   return BINARY_ARTIFACT_MIMES.has(mime);
@@ -111,6 +112,7 @@ const MIME_EXTENSION: Readonly<Record<ArtifactMime, string>> = {
   "application/json": "json",
   [DOCX_MIME]: "docx",
   [XLSX_MIME]: "xlsx",
+  [PPTX_MIME]: "pptx",
 };
 
 export function artifactExtension(mime: ArtifactMime): string {
