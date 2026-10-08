@@ -6,6 +6,7 @@ import { toolDetail } from "./details";
 import {
   BudgetNote,
   FileChip,
+  FileDownloadButton,
   PendingApproval,
   RefusalNote,
   ROW_HEAD,
@@ -31,6 +32,7 @@ export function FileToolRow({ tool }: { tool: RowTool }) {
         <RowLabel text={label} />
         {detail ? <RowDetail text={detail} /> : null}
         {saved ? <FileChip path={saved.path} text={t("chat.tools.open")} /> : null}
+        {saved ? <FileDownloadButton path={saved.path} /> : null}
       </div>
       {outcome.state === "refused" ? <RefusalNote message={outcome.message} /> : null}
       {outcome.state === "budget" ? <BudgetNote message={outcome.message} /> : null}

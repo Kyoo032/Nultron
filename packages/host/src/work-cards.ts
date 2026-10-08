@@ -1,3 +1,4 @@
+import { redactCredentials } from "@agentforge/core";
 import type { SourceOrigin, WorkSourceType } from "./knowledge";
 
 /**
@@ -193,12 +194,16 @@ export type ChatWorkInput = {
  * exchange only (never the whole sealed history). Retrieval skips the asking thread's own card.
  */
 export function chatWorkCard(input: ChatWorkInput): WorkCard {
-  const user = capText(input.userText, CHAT_USER_MAX);
-  const assistant = capText(input.assistantText, CHAT_ASSISTANT_MAX);
+  // The card leaves its thread: it is indexed, shown in the Sources list and retrieved into other prompts.
+  // So a key the person pasted, or one the model repeated from a tool result, is masked here even though the
+  // thread itself keeps what was said (SR-136).
+  const userText = redactCredentials(input.userText);
+  const user = capText(userText, CHAT_USER_MAX);
+  const assistant = capText(redactCredentials(input.assistantText), CHAT_ASSISTANT_MAX);
   return {
     type: "Chat",
     origin: { kind: "thread", id: input.threadId },
-    title: input.title.trim() || titleFromPrompt(input.userText, "Chat"),
+    title: input.title.trim() || titleFromPrompt(userText, "Chat"),
     prompt: undefined,
     pointer: `thread:${input.threadId}`,
     body: [user ? `User: ${user}` : "", assistant ? `Assistant: ${assistant}` : ""].filter(Boolean).join("\n\n"),

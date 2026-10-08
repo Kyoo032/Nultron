@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { beforeAll, describe, expect, it } from "vitest";
-import { readSettingsAnswer } from "@/components/settings-page";
+import { readSettingsAnswer, settingsSaveBody } from "@/components/settings-page";
 import { applyLocale, resetLocaleForTests, t } from "./i18n";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -152,5 +152,29 @@ describe("the Settings page wiring", () => {
       expect(at, testId).toBeGreaterThan(-1);
       expect(page.slice(Math.max(0, at - 200), at), testId).toContain('role="alert"');
     }
+  });
+});
+
+describe("settingsSaveBody", () => {
+  it("leaves a blank key field out, so saving another setting keeps the saved key", () => {
+    expect(settingsSaveBody({ mayChangeKey: true, openaiApiKey: "", editTurnCapUsd: 5 })).toEqual({
+      editTurnCapUsd: 5,
+    });
+    expect(settingsSaveBody({ mayChangeKey: true, openaiApiKey: "   ", editTurnCapUsd: 5 })).toEqual({
+      editTurnCapUsd: 5,
+    });
+  });
+
+  it("sends a key someone typed", () => {
+    expect(settingsSaveBody({ mayChangeKey: true, openaiApiKey: "sk-new-key", editTurnCapUsd: 2 })).toEqual({
+      openaiApiKey: "sk-new-key",
+      editTurnCapUsd: 2,
+    });
+  });
+
+  it("never sends a key for someone who may not change it", () => {
+    expect(settingsSaveBody({ mayChangeKey: false, openaiApiKey: "sk-new-key", editTurnCapUsd: 2 })).toEqual({
+      editTurnCapUsd: 2,
+    });
   });
 });

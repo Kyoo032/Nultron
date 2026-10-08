@@ -41,6 +41,7 @@ import {
   ghReleaseArgs,
   IMAGE_REPO,
   main,
+  OPTIONAL_PORTAL_ENV,
   parseArgs,
   PORTAL_IMAGE_REPO,
   PROXY_IMAGE,
@@ -77,6 +78,37 @@ const NUL = String.fromCharCode(0);
 const refuse = (reason) => {
   throw new ReleaseError(reason);
 };
+
+/** readSiteFiles against a fake git that serves `files` ({ "webapp-deploy/sites/...": text }). */
+function siteBundleFrom(files, tag = TAG) {
+  const git = (args) => {
+    if (args[0] === "ls-tree") return { status: 0, stdout: `${Object.keys(files).join(NUL)}${NUL}` };
+    if (args[0] === "show") {
+      const spec = args.at(-1);
+      const path = spec.slice(spec.indexOf(":") + 1);
+      return path in files ? { status: 0, stdout: files[path] } : { status: 128, stdout: "" };
+    }
+    return { status: 1, stdout: "" };
+  };
+  return readSiteFiles(FULL_SHA, tag, git, refuse);
+}
+
+/** The bundle's `sites/...` files for the fake sha. */
+function fakeSiteBundle() {
+  return siteBundleFrom(FAKE_SITE_FILES);
+}
+
+/** The bundle's `sites/...` files built from the real webapp-deploy/sites folder on disk. */
+function realSiteFiles() {
+  const dir = join(fileURLToPath(new URL("..", import.meta.url)), "webapp-deploy", "sites");
+  const files = {};
+  for (const entry of readdirSync(dir, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    const full = join(entry.parentPath ?? entry.path, entry.name);
+    files[`webapp-deploy/sites/${full.slice(dir.length + 1).replaceAll("\\", "/")}`] = readFileSync(full, "utf8");
+  }
+  return siteBundleFrom(files);
+}
 
 const roots = [];
 after(() => {
@@ -383,26 +415,64 @@ function assignments(env) {
 
 test(".env.example and portal.env.example name every required variable, empty unless the template has a default", () => {
   const bundle = renderBundle(TAG, CADDY_SOURCE);
-  for (const [file, required] of [
-    [".env.example", REQUIRED_ENV],
-    ["portal.env.example", REQUIRED_PORTAL_ENV],
+  for (const [file, required, optional] of [
+    [".env.example", REQUIRED_ENV, []],
+    ["portal.env.example", REQUIRED_PORTAL_ENV, OPTIONAL_PORTAL_ENV],
   ]) {
-    const pairs = assignments(bundle[file]);
+    const names = assignments(bundle[file]).map(([name]) => name);
+    // What nothing refuses to boot without may stand anywhere in the file; what is required is all there, in order.
     assert.deepEqual(
-      pairs.map(([name]) => name),
+      names.filter((name) => !optional.includes(name)),
       required,
       file,
     );
-    for (const [name, value] of pairs) assert.equal(value, ENV_DEFAULTS[name] ?? "", `${file}: ${name}`);
+    assert.deepEqual(
+      names.filter((name) => optional.includes(name)),
+      optional,
+      file,
+    );
+    for (const [name, value] of assignments(bundle[file])) {
+      assert.equal(value, ENV_DEFAULTS[name] ?? "", `${file}: ${name}`);
+    }
   }
   // The two files never share a name: a portal secret in the app's file is the leak the split exists to prevent.
   const app = new Set(REQUIRED_ENV);
   assert.deepEqual(REQUIRED_PORTAL_ENV.filter((name) => app.has(name)), []);
+  assert.deepEqual(OPTIONAL_PORTAL_ENV.filter((name) => app.has(name)), []);
   assert.deepEqual(
-    Object.keys(ENV_DEFAULTS).filter((name) => !app.has(name) && !REQUIRED_PORTAL_ENV.includes(name)),
+    Object.keys(ENV_DEFAULTS).filter(
+      (name) => !app.has(name) && !REQUIRED_PORTAL_ENV.includes(name) && !OPTIONAL_PORTAL_ENV.includes(name),
+    ),
     [],
     "a default for a name no template carries",
   );
+});
+
+test("portal.env.example carries the sign-in mode, says its default is code, and the compose files leave it to portal.env", () => {
+  const bundle = renderBundle(TAG, CADDY_SOURCE);
+  const example = bundle["portal.env.example"];
+  assert.equal(ENV_DEFAULTS.PORTAL_SIGNIN_MODE, "code");
+  assert.ok(example.split("\n").includes("PORTAL_SIGNIN_MODE=code"), "the line is there, set to the default");
+  const comment = example
+    .split("\n")
+    .slice(0, example.split("\n").indexOf("PORTAL_SIGNIN_MODE=code"))
+    .filter((line) => line.startsWith("#"))
+    .at(-1);
+  assert.match(comment ?? "", /\bcode\b.*default/i, "the comment above it says the default is code");
+  assert.match(comment ?? "", /\bpassword\b/);
+  // Reaches the container the way every other portal setting does: through the env_file both services load. A
+  // value pinned under `environment:` would WIN over portal.env and make the line above a lie.
+  const code = (compose, name) =>
+    serviceBlock(compose, name)
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("#"))
+      .join("\n");
+  for (const compose of [bundle["compose.yml"], SOURCE_COMPOSE]) {
+    for (const name of ["portal", "portal-prepare"]) {
+      assert.match(code(compose, name), /- path: portal\.env\b/, `${name} loads portal.env`);
+      assert.doesNotMatch(code(compose, name), /PORTAL_SIGNIN_MODE/, `${name} must not pin the mode`);
+    }
+  }
 });
 
 test("the SES defaults are implicit TLS on 465, which the portal's PORTAL_SMTP_SECURE=1 selects", () => {
@@ -718,4 +788,82 @@ test("the desktop release hands gh the checked notes file by its absolute path",
   assert.equal(run.status, 0, run.stdout + run.stderr);
   assert.ok(run.stdout.includes(`--notes-file ${notes}`) || run.stdout.includes(`--notes-file "${notes}"`), run.stdout);
   assert.match(run.stdout, /dry run, nothing uploaded/);
+});
+
+// ---------- the company sites in the bundle ----------
+
+test("readSiteFiles maps webapp-deploy/sites to sites/, drops comments from Caddy files only, and sorts", () => {
+  const bundle = fakeSiteBundle();
+  assert.deepEqual(Object.keys(bundle), [
+    "sites/dpscloud.caddy",
+    "sites/dpscloud/index.html",
+    "sites/enable-sites.sh",
+    "sites/tokotoken.caddy",
+    "sites/tokotoken/index.html",
+  ]);
+  assert.ok(bundle["sites/dpscloud.caddy"].startsWith(`# Nultron Enterprise ${TAG}. Generated per release; do not edit here.\n`));
+  assert.doesNotMatch(bundle["sites/dpscloud.caddy"], /packages\/host/, "a comment citing a source path is dropped");
+  assert.match(bundle["sites/enable-sites.sh"], /# switch/, "a script keeps its comments");
+});
+
+test("readSiteFiles refuses a sha without a required file, a binary file, an oversize file and a path outside sites/", () => {
+  for (const missing of REQUIRED_SITE_FILES) {
+    const files = { ...FAKE_SITE_FILES };
+    delete files[missing];
+    assert.throws(() => siteBundleFrom(files), (error) => error instanceof ReleaseError && error.message.includes(missing), missing);
+  }
+  assert.throws(
+    () => siteBundleFrom({ ...FAKE_SITE_FILES, "webapp-deploy/sites/dpscloud/logo.png": "x" }),
+    /text files only/,
+  );
+  assert.throws(
+    () => siteBundleFrom({ ...FAKE_SITE_FILES, "webapp-deploy/sites/dpscloud/big.html": "x".repeat(SITE_FILE_MAX_BYTES + 1) }),
+    /over \d+ bytes/,
+  );
+  for (const bad of ["webapp-deploy/other/a.html", "webapp-deploy/sites/../a.html", "webapp-deploy/sites//a.html", "webapp-deploy/sites/a\u005cb.html"]) {
+    assert.throws(() => bundlePathFor(bad), SitesError, bad);
+  }
+  assert.equal(bundlePathFor("webapp-deploy/sites/dpscloud/index.html"), "sites/dpscloud/index.html");
+});
+
+test("the real webapp-deploy/sites folder is a valid bundle, and nothing in it names a customer or the gateway host", () => {
+  const bundle = realSiteFiles();
+  for (const path of REQUIRED_SITE_FILES) assert.ok(`sites/${path.slice("webapp-deploy/sites/".length)}` in bundle, path);
+  for (const [name, text] of Object.entries(bundle)) {
+    assert.deepEqual(forbiddenMarksInPublished(text), [], name);
+    assert.doesNotMatch(text, /tokenku|hyp ?ai|hypey|hypernet/i, `${name}: no customer name in a published file`);
+  }
+  // No wildcard and no catch-all site, and no reverse proxy: a company site only serves its own files.
+  for (const [name, text] of Object.entries(bundle).filter(([path]) => path.endsWith(".caddy"))) {
+    assert.doesNotMatch(text, /reverse_proxy/, `${name}: serves files only`);
+    assert.doesNotMatch(text, /^(\*|:\d+|https?:\/\/:)[^\n]*\{$/m, `${name}: no wildcard or catch-all address`);
+    assert.doesNotMatch(text, /api\.tokotokenai\.com/, `${name}: the gateway host is never served`);
+  }
+});
+
+test("the whole rendered bundle, sites included, has none of the banned marks or customer names", () => {
+  const bundle = renderBundle(TAG, SOURCE_CADDYFILE, realSiteFiles());
+  assert.ok(Object.keys(bundle).length >= BUNDLE_FILES.length + REQUIRED_SITE_FILES.length);
+  for (const [name, text] of Object.entries(bundle)) {
+    assert.deepEqual(forbiddenMarksInPublished(text), [], name);
+    assert.doesNotMatch(text, /tokenku|hyp ?ai|hypey|hypernet/i, name);
+  }
+});
+
+test("DEPLOY.md carries the three extra sections once, and names the images of this tag", () => {
+  const doc = deployDoc(TAG);
+  for (const heading of Object.values(DEPLOY_DOC_SECTIONS)) {
+    assert.equal(doc.split(`\n${heading}\n`).length - 1, 1, heading);
+  }
+  assert.ok(doc.includes(IMAGE) && doc.includes(PORTAL_IMAGE));
+  assert.match(doc, /api\.tokotokenai\.com. is not served from here/);
+});
+
+test(".env.example lists the company-site variables as comments only, and the sender default is in portal.env.example", () => {
+  const env = envExample();
+  for (const [name] of OPTIONAL_ENV) {
+    assert.ok(env.split("\n").includes(`# ${name}=${OPTIONAL_ENV.find(([n]) => n === name)[1]}`), `${name} is a comment`);
+    assert.ok(!assignments(env).some(([n]) => n === name), `${name} is never an assignment`);
+  }
+  assert.ok(portalEnvExample().split("\n").includes(`PORTAL_SMTP_FROM=${ENV_DEFAULTS.PORTAL_SMTP_FROM}`));
 });

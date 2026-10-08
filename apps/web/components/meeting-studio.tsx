@@ -16,10 +16,12 @@ import { isGatewayBlockedText } from "@/lib/gateway-blocked";
 import { NeedsKeyNote } from "@/components/needs-key-note";
 import { WorkingStatus } from "@/components/working-status";
 import { apiFetch } from "@/lib/api-client";
+import { meetingFfmpegNoteKey } from "@/lib/ffmpeg-notice-copy";
 import { t } from "@/lib/i18n";
 import type { MeetingChecksWire } from "@/lib/meeting-checks";
 import type { RecordedClip } from "@/lib/meeting-recorder";
 import { modelPickBody, studioModelPick } from "@/lib/model-choice";
+import { useProductBrand } from "@/lib/product-brand";
 import { postMeetingRecording, saveClipToDevice, type MeetingApiFetch, type UploadOutcome } from "@/lib/meeting-upload";
 import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import { useJobModel } from "@/lib/use-job-model";
@@ -55,6 +57,8 @@ type Capability = {
   model: string | null;
   reason: "ok" | "no_model" | "no_key";
   ffmpeg: boolean;
+  /** The ffmpeg in question is the packaged app's own, so a failure means "reinstall", not "install ffmpeg". */
+  ffmpegBundled?: boolean;
 };
 
 type Tab = "transcript" | "minutes" | "translation";
@@ -280,6 +284,7 @@ export function MeetingStudio() {
   // Nultron Enterprise: a signed-in tenant may open the desk before adding a key. Hosted only; false elsewhere.
   // Recording and uploading are local, so only the transcribe-and-minute run waits for a key.
   const needsKey = useHostedNeedsKey();
+  const { productName } = useProductBrand();
   const { models, model, pinned: modelPinned, setModel } = useJobModel("meeting");
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [capability, setCapability] = useState<Capability | null>(null);
@@ -627,7 +632,7 @@ export function MeetingStudio() {
   }
 
   const blocked = capability && !capability.available;
-  const noFfmpeg = capability && !capability.ffmpeg;
+  const ffmpegNoteKey = meetingFfmpegNoteKey(capability);
   const jobError = job.error ? job.error.message : null;
   const shown = error ?? jobError;
   const otherDeskClips = held.filter((entry) => !onSameDesk(entry.target, workspaceId));
@@ -669,12 +674,12 @@ export function MeetingStudio() {
           {t("meeting.noAsr")}
         </p>
       ) : null}
-      {noFfmpeg ? (
+      {ffmpegNoteKey ? (
         <p
           className="mt-4 rounded-lg border border-[var(--line)] px-4 py-3 text-sm text-[var(--text-2)]"
           data-testid="meeting-no-ffmpeg"
         >
-          {t("meeting.noFfmpeg")}
+          {t(ffmpegNoteKey, { productName })}
         </p>
       ) : null}
 

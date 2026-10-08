@@ -153,6 +153,34 @@ describe("collectJobAssistantText", () => {
     expect(executed[0]?.jobMode).toBeUndefined();
   });
 
+  describe("with an image attached to the section", () => {
+    const attachment = {
+      type: "image_url" as const,
+      image_url: { url: "https://cdn.example/slide.png", detail: "high" as const },
+    };
+
+    it("sends it to a hand-picked model the image rule has no line for, as it did before the rule", async () => {
+      // `glm-5.4` is unknown to `modelImageInput`; the older prefix list read every `glm-` id as vision-capable.
+      const text = await collectJobAssistantText({
+        ...base,
+        model: "glm-5.4",
+        jobMode: "documents",
+        attachments: [attachment],
+      });
+      expect(text).toBe("hello");
+      expect(executed).toHaveLength(1);
+      expect((executed[0]?.history[0]?.parts ?? []).map((part) => part.type)).toEqual(["text", "image_url"]);
+      expect(executed[0]?.version.inputModalities).toEqual(["text", "image"]);
+    });
+
+    it("still refuses a model known to be text-only before any call is made", async () => {
+      await expect(
+        collectJobAssistantText({ ...base, model: "glm-5.3", jobMode: "documents", attachments: [attachment] }),
+      ).rejects.toMatchObject({ code: "model_missing_modality" });
+      expect(executed).toHaveLength(0);
+    });
+  });
+
   it("runs in the locale of the run context so job timeouts are not English on an id desk", async () => {
     await withRunContext({ threadId: "t1", agentId: "finance", locale: "id" }, () => collectJobAssistantText(base));
     expect(executed[0]?.locale).toBe("id");

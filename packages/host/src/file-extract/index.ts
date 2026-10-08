@@ -12,7 +12,9 @@
  * instead of being sent anywhere. `privacy.test.ts` proves the sockets stay shut for every format,
  * including that refusal; `no-hosted-ocr.test.ts` greps the repository so it stays that way.
  */
+import { ApiError } from "@agentforge/core";
 import { FileExtractError, extractDetail, fileExtractErrorFrom } from "./errors";
+import type { NativeGate } from "./native-gate";
 import {
   FILE_EXTRACT_MAX_BYTES,
   FILE_EXTRACT_MAX_MARKDOWN_CHARS,
@@ -71,6 +73,8 @@ export type ExtractFileOptions = {
   readonly loadAnydoc?: AnydocLoader;
   /** Test seam: the extractors used when the binding is missing. */
   readonly fallback?: FallbackExtractors;
+  /** Test seam: the gate that holds a native conversion's slot (`native-gate.ts`). */
+  readonly nativeGate?: NativeGate;
 };
 
 const PAGE_MARKER = /<!-- page \d+ -->/g;
@@ -115,9 +119,11 @@ async function viaAnydoc(
   format: AnydocFormat,
   bytes: Uint8Array,
   timeoutMs: number,
+  gate?: NativeGate,
 ): Promise<ExtractedFile> {
-  const raw = await toMarkdownUnderDeadline(anydoc, bytes, format, timeoutMs).catch((error: unknown) => {
-    throw fileExtractErrorFrom(error);
+  const raw = await toMarkdownUnderDeadline(anydoc, bytes, format, timeoutMs, gate).catch((error: unknown) => {
+    // A refusal for being busy is the host's answer (429), not a statement about the file.
+    throw error instanceof ApiError ? error : fileExtractErrorFrom(error);
   });
   const { markdown, truncated } = capMarkdown(raw);
   const tables = parseMarkdownTables(markdown).slice(0, FILE_EXTRACT_MAX_TABLES);
@@ -178,5 +184,5 @@ export async function extractFile(input: ExtractFileInput, options: ExtractFileO
   if (anydoc === null) {
     return viaFallback(format, input, options.fallback ?? DEFAULT_FALLBACK, timeoutMs);
   }
-  return viaAnydoc(anydoc, format, input.bytes, timeoutMs);
+  return viaAnydoc(anydoc, format, input.bytes, timeoutMs, options.nativeGate);
 }

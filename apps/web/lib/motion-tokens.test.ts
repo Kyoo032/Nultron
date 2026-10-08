@@ -387,13 +387,14 @@ describe("ambient pause", () => {
     expect(grid?.body).toMatch(/animation-play-state:\s*paused\s*!important/);
   });
 
-  it("moves the desk's dot grid only with the pointer and the stepped ambient drift", () => {
+  it("moves the desk's dot grid only with the pointer and the ambient drift", () => {
     const grid = flatRules(outsideReduced).filter(({ selectors }) => selectors.includes(".desk-grid::before"));
     expect(grid.length, ".desk-grid::before rule missing").toBeGreaterThan(0);
     const body = grid.map((rule) => rule.body).join("\n");
-    // The one loop: the stepped drift. Nothing smooth, and no other animation.
+    // The one loop: the drift, at a steady speed in a browser and stepped in the packaged desktop shell (the
+    // easing is a token the shell block redefines, `lib/motion-shell.test.ts`). No other animation.
     expect(body).toMatch(
-      /animation:\s*nx-grid-drift\s+var\(--motion-drift\)\s+var\(--ease-ambient\)\s+infinite\s*;/,
+      /animation:\s*nx-grid-drift\s+var\(--motion-drift\)\s+var\(--ease-ambient-steady\)\s+infinite\s*;/,
     );
     // The pointer: parallax through two whole-pixel variables that attachDeskMotion walks a pixel a write, on
     // the compositor. No transition: a position that glided between writes would keep a desk-wide layer
@@ -406,7 +407,7 @@ describe("ambient pause", () => {
   });
 });
 
-// --- Decoration loops only stepped ------------------------------------------------------------------
+// --- Decoration loops only in the ambient set ---------------------------------------------------------
 //
 // The packaged Windows app runs Chromium without the GPU (`app.disableHardwareAcceleration()`), so a
 // running CSS animation is composited in software on the CPU, a whole frame at a time. Measured in a
@@ -414,12 +415,15 @@ describe("ambient pause", () => {
 // 9 to 11% of the machine for as long as somebody used it, and 0.1% once nothing looped. Pausing after
 // 12 quiet seconds (`lib/ambient-motion.ts`) cannot help a desk that is in use, so the rule is one
 // level up: decoration does not loop. It plays once when it arrives, it moves while the pointer moves,
-// it reacts once to a hover or a tap. Only status may loop, and only stepped.
+// it reacts once to a hover or a tap. Only status may loop.
 //
 // Since 2026-10-01 there is one exception, by the owner's choice ("reacts + a gentle loop"): a short list
-// of ambient loops (`AMBIENT_LOOP_SELECTORS`) that are stepped so they land on a shared 400 ms grid, run on
-// the compositor, pause with the desk and switch off by name under reduced motion. Measured in a
-// GPU-less Chromium, they cost a few tenths of a percent of the machine while somebody is using the desk.
+// of ambient loops (`AMBIENT_LOOP_SELECTORS`) that run on the compositor, pause with the desk and switch off
+// by name under reduced motion. In the packaged desktop shell they are stepped so they land on a shared
+// 400 ms grid; measured in a GPU-less Chromium, they cost a few tenths of a percent of the machine while
+// somebody is using the desk. Since 2026-10-05 a browser, which has the GPU, runs them smooth: the easing is a
+// token (`--ease-ambient`, `--ease-ambient-steady`) that `html[data-shell="desktop"]` hands back as `steps()`.
+// `lib/motion-shell.test.ts` holds both sets of values.
 
 /** Every stylesheet the renderer ships, comments stripped, by path under `apps/web`. */
 function stylesheets(): { file: string; css: string }[] {
@@ -451,8 +455,9 @@ const isBusyLoop = (selector: string) => BUSY_LOOP_SELECTORS.has(selector) || se
 
 /**
  * The decoration that may loop (owner ruling 2026-10-01): the shapes' bob and turn (`.float-shape-body`, the
- * box inside a shape; a spinner only renames the animation) and the dot grid's drift. Stepped with
- * `--ease-ambient`, never smooth. Adding to this list is a product decision, never a styling one.
+ * box inside a shape; a spinner only renames the animation) and the dot grid's drift. Their easing is always
+ * a shell-aware token (`--ease-ambient`, `--ease-ambient-steady`), never a literal curve. Adding to this list
+ * is a product decision, never a styling one.
  */
 const AMBIENT_LOOP_SELECTORS = new Set([".float-shape-body", ".desk-grid::before"]);
 const AMBIENT_KEYFRAMES = ["nx-bob", "nx-turn", "nx-grid-drift"] as const;
@@ -469,7 +474,7 @@ function loopsOutsideTheMascot(sheets: { file: string; css: string }[]) {
     );
 }
 
-describe("decoration loops only stepped, and only the ambient set", () => {
+describe("decoration loops only in the ambient set, on shell-aware easing tokens", () => {
   const sheets = stylesheets();
 
   it("reads the stylesheets it claims to scan (guards the checks below)", () => {
@@ -491,22 +496,28 @@ describe("decoration loops only stepped, and only the ambient set", () => {
       .map(({ file, selector, body }) => `${file}: ${selector} { ${body.replace(/\s+/g, " ").trim()} }`);
     expect(
       offenders,
-      `decoration must not loop unless it is in the stepped ambient set (a smooth loop costs a software-composited frame sixty times a second on the desktop shell).\n` +
+      `decoration must not loop unless it is in the ambient set (a smooth loop costs a software-composited frame sixty times a second on the desktop shell, which steps the ambient set).\n` +
         `Play it once on arrival, or move it with the pointer, or react once to a hover or tap:\n  ${offenders.join("\n  ")}`,
     ).toEqual([]);
   });
 
-  it("steps every allowed loop, so it costs a fraction of a smooth one", () => {
+  it("reads a shell-aware easing token on every allowed loop, so the desktop shell can step it", () => {
     const loops = loopsOutsideTheMascot(sheets);
     expect(
       loops.some(({ selector }) => isAmbientLoop(selector)),
       "the ambient loops: the scan found none",
     ).toBe(true);
     for (const { file, selector, body } of loops) {
-      const token = isAmbientLoop(selector) ? /var\(--ease-ambient\)/ : /var\(--ease-busy\)/;
+      const token = isAmbientLoop(selector)
+        ? /var\(--ease-ambient(-steady)?\)/
+        : /var\(--ease-busy(-move)?\)/;
       expect(body, `${file}: ${selector}`).toMatch(token);
     }
-    expect(blockAfter(css, ":root")).toMatch(/--ease-ambient:\s*steps\(\d+\)/);
+    // The packaged shell hands the stepped values back (every value is held in `lib/motion-shell.test.ts`).
+    const desktop = blockAfter(css, 'html[data-shell="desktop"]');
+    expect(desktop).toMatch(/--ease-ambient:\s*steps\(\d+\)/);
+    expect(desktop).toMatch(/--ease-ambient-steady:\s*steps\(\d+\)/);
+    expect(desktop).toMatch(/--ease-busy-move:\s*var\(--ease-busy\)/);
   });
 
   it("moves the ambient loops with transform properties and opacity only", () => {
@@ -523,16 +534,19 @@ describe("decoration loops only stepped, and only the ambient set", () => {
     }
   });
 
-  it("lands every ambient step on the shared 400 ms grid, so the loops repaint the desk together", () => {
-    // About 2.5 frames a second repaint the whole desk, not one per loop, only while each loop's step is a
-    // whole number of ticks. Steps per interval x intervals per cycle must divide the cycle into those.
+  it("lands every ambient step of the desktop shell on the shared 400 ms grid, so the loops repaint the desk together", () => {
+    // The packaged shell steps the loops: about 2.5 frames a second repaint the whole desk, not one per loop,
+    // only while each loop's step is a whole number of ticks. Steps per interval x intervals per cycle must
+    // divide the cycle into those. The tick is the scale's; the cycle lengths and the step count are the
+    // desktop shell's (a browser's loops are smooth and have no step).
     const root = blockAfter(css, ":root");
+    const desktop = blockAfter(css, 'html[data-shell="desktop"]');
     const tick = Number(/--motion-tick:\s*(\d+)ms/.exec(root)?.[1]);
-    const bobTicks = Number(/--motion-ambient:\s*calc\(var\(--motion-tick\)\s*\*\s*(\d+)\)/.exec(root)?.[1]);
-    const driftTicks = Number(/--motion-drift:\s*calc\(var\(--motion-tick\)\s*\*\s*(\d+)\)/.exec(root)?.[1]);
-    const steps = Number(/--ease-ambient:\s*steps\((\d+)\)/.exec(root)?.[1]);
+    const bobTicks = Number(/--motion-ambient:\s*calc\(var\(--motion-tick\)\s*\*\s*(\d+)\)/.exec(desktop)?.[1]);
+    const driftTicks = Number(/--motion-drift:\s*calc\(var\(--motion-tick\)\s*\*\s*(\d+)\)/.exec(desktop)?.[1]);
+    const steps = Number(/--ease-ambient:\s*steps\((\d+)\)/.exec(desktop)?.[1]);
     for (const [label, value] of Object.entries({ tick, bobTicks, driftTicks, steps })) {
-      expect(Number.isFinite(value) && value > 0, `${label} missing from :root`).toBe(true);
+      expect(Number.isFinite(value) && value > 0, `${label} missing from :root or the desktop shell block`).toBe(true);
     }
     const intervals = (name: string) =>
       (blockAfter(css, `@keyframes ${name} {`).match(/^\s*[\d.]+%\s*\{/gm) ?? []).length - 1;
@@ -552,6 +566,8 @@ describe("decoration loops only stepped, and only the ambient set", () => {
     );
     expect(spin?.body).toMatch(/animation-name:\s*nx-turn\s*;/);
     expect(spin?.body).toMatch(/animation-duration:[^;]*calc\(var\(--motion-ambient\)\s*\*\s*2\)/);
+    // It keeps one constant speed (steady in a browser, the same eight steps in the desktop shell).
+    expect(spin?.body).toMatch(/animation-timing-function:\s*var\(--ease-ambient-steady\)\s*;/);
   });
 
   it("switches every ambient loop off by name under reduced motion", () => {
@@ -590,7 +606,7 @@ describe("decoration loops only stepped, and only the ambient set", () => {
   });
 });
 
-describe("decorative shapes arrive once, then bob in steps", () => {
+describe("decorative shapes arrive once, then bob", () => {
   const shapeRules = flatRules(outsideReduced).filter(({ selectors }) =>
     selectors.some((selector) => /^\.float-shape(-spin)?$/.test(selector)),
   );
@@ -671,17 +687,19 @@ describe("cards that carry an entrance", () => {
   });
 });
 
-describe("busy-state loops step", () => {
-  it("defines the busy easing as a step function token", () => {
+describe("busy-state loops", () => {
+  it("defines the busy easing as a step function token, for the frame strips in every shell", () => {
     expect(blockAfter(css, ":root")).toMatch(/--ease-busy:\s*steps\(\d+\)/);
+    // The desktop shell block hands tokens back; it must never redefine the strips' own step.
+    expect(blockAfter(css, 'html[data-shell="desktop"]')).not.toMatch(/--ease-busy\s*:/);
   });
 
-  it("steps the working dots", () => {
+  it("gives the working dots the busy movement token, which the desktop shell steps", () => {
     const dots = flatRules(outsideReduced).find(({ selectors }) => selectors.includes(".pulse-dots > span"));
-    expect(dots?.body).toMatch(/animation:[^;]*var\(--ease-busy\)[^;]*\binfinite\b/);
+    expect(dots?.body).toMatch(/animation:[^;]*var\(--ease-busy-move\)[^;]*\binfinite\b/);
   });
 
-  it("steps every loop of every mascot pose that means work is running", () => {
+  it("gives every loop of every mascot pose that means work is running a busy token", () => {
     const busyStates = MASCOT_STATES.filter((state) => isMascotBusy(state, "beside"));
     expect(busyStates.length).toBeGreaterThan(8);
     for (const state of busyStates) {
@@ -690,7 +708,7 @@ describe("busy-state loops step", () => {
       );
       expect(rules.length, `${state} has no loop to step`).toBeGreaterThan(0);
       for (const { body } of rules) {
-        expect(body, `${state} loop must use --ease-busy`).toMatch(/var\(--ease-busy\)/);
+        expect(body, `${state} loop must use --ease-busy or --ease-busy-move`).toMatch(/var\(--ease-busy(-move)?\)/);
       }
     }
   });

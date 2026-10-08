@@ -15,7 +15,14 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ApiError, encryptJson, LOCAL_TENANT_ID, resolveProviderKeys, wrappingKeyFromSecret } from "@agentforge/core";
+import {
+  ApiError,
+  encryptJson,
+  keyFingerprintOrNull,
+  LOCAL_TENANT_ID,
+  resolveProviderKeys,
+  wrappingKeyFromSecret,
+} from "@agentforge/core";
 import { ensureSchema } from "@agentforge/db/ensure-schema";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "agentforge-phase4-"));
@@ -32,8 +39,10 @@ const gate = await import("./gateway-gate");
 const stateStore = await import("./tenant-state-store");
 const { TENANTS_DIR } = await import("./tenant-paths");
 
-const A = { tenantId: "tenant-alpha", workspaceId: "desk-a", userId: "user-a1" };
-const B = { tenantId: "tenant-beta", workspaceId: "desk-b", userId: "user-b1" };
+// A real `TenantContext` always names its organisation, and since SR-163 the hosted gate refuses a scope
+// that does not: on the server a verdict belongs to a company, not to the partner row.
+const A = { tenantId: "tenant-alpha", organizationId: "org-alpha", workspaceId: "desk-a", userId: "user-a1" };
+const B = { tenantId: "tenant-beta", organizationId: "org-beta", workspaceId: "desk-b", userId: "user-b1" };
 const KEY_A = "sk-phase4-aaaaaaaaaaaaaaaaaaa";
 const KEY_B = "sk-phase4-bbbbbbbbbbbbbbbbbbb";
 
@@ -136,11 +145,12 @@ describe("the hosted backend keeps a tenant's secrets in rows, not files", () =>
       await gate.runGatewayCheck(settingsB, { tenant: B, envRuntime: undefined, fetchImpl: rejectFetch }),
     ).toMatchObject({ status: "invalid_key", allowed: false });
 
-    expect(gate.loadGateState(A.tenantId)?.status).toBe("ok");
-    expect(gate.loadGateState(B.tenantId)?.status).toBe("invalid_key");
-    expect(stateRows().filter((row) => row.key === "gateway_gate").map((row) => row.tenant_id)).toEqual([
-      A.tenantId,
-      B.tenantId,
+    expect(gate.loadGateState(A.tenantId, A.organizationId)?.status).toBe("ok");
+    expect(gate.loadGateState(B.tenantId, B.organizationId)?.status).toBe("invalid_key");
+    // One row per company, held under its partner's id (the foreign key), with the company in the key.
+    expect(stateRows().filter((row) => row.key.startsWith("gateway_gate"))).toEqual([
+      { tenant_id: A.tenantId, key: `gateway_gate:${A.organizationId}` },
+      { tenant_id: B.tenantId, key: `gateway_gate:${B.organizationId}` },
     ]);
     expect(filesUnder(dataDir)).toEqual([]);
   });
@@ -157,9 +167,82 @@ describe("the hosted backend keeps a tenant's secrets in rows, not files", () =>
     gate.clearGateState(A);
 
     expect(settingsStore.loadSettings(A).openaiApiKey).toBeFalsy();
-    expect(gate.loadGateState(A.tenantId)).toBeNull();
+    expect(gate.loadGateState(A.tenantId, A.organizationId)).toBeNull();
     expect(settingsStore.loadSettings(B).openaiApiKey).toBe(KEY_B);
-    expect(gate.loadGateState(B.tenantId)?.status).toBe("ok");
+    expect(gate.loadGateState(B.tenantId, B.organizationId)?.status).toBe("ok");
+  });
+
+  it("refuses a gate call that names no company, and takes an older build's partner verdict only for the very key it judged", () => {
+    hosted();
+    const partnerOnly = { tenantId: A.tenantId, workspaceId: A.workspaceId };
+    const settingsA = { openaiApiKey: KEY_A, openaiBaseUrl: "https://gateway.example/v1" };
+    expect(() => gate.reportGatewayGate(settingsA, { tenant: partnerOnly, envRuntime: undefined })).toThrow(
+      expect.objectContaining({ code: gate.COMPANY_REQUIRED_CODE }),
+    );
+    expect(() => gate.clearGateState(partnerOnly)).toThrow(
+      expect.objectContaining({ code: gate.COMPANY_REQUIRED_CODE }),
+    );
+
+    // What every build before SR-163 wrote: one `gateway_gate` row per partner. Here it says this very
+    // key is good. A company holding exactly that key adopts the verdict into its own slot (the deploy
+    // window, SR-163 review round); a company holding any other key does not, and a call that names no
+    // company never reads it at all.
+    const now = new Date().toISOString();
+    stateStore.dbTenantStateBackend.write(
+      A.tenantId,
+      "gateway_gate",
+      JSON.stringify({
+        version: 1,
+        fingerprint: keyFingerprintOrNull(KEY_A),
+        status: "ok",
+        checkedAt: now,
+        lastOkAt: now,
+      }),
+    );
+    expect(gate.loadGateState(A.tenantId)?.status).toBe("ok");
+    expect(() => gate.reportGatewayGate(settingsA, { tenant: partnerOnly, envRuntime: undefined })).toThrow(
+      expect.objectContaining({ code: gate.COMPANY_REQUIRED_CODE }),
+    );
+
+    // Another company of the same partner holds a different key: the partner's verdict is not its own.
+    const neighbour = { ...A, organizationId: "org-alpha-neighbour", workspaceId: "desk-n" };
+    const settingsN = { openaiApiKey: KEY_B, openaiBaseUrl: "https://gateway.example/v1" };
+    expect(gate.reportGatewayGate(settingsN, { tenant: neighbour, envRuntime: undefined })).toMatchObject({
+      status: "error",
+      allowed: false,
+    });
+    expect(gate.loadGateState(A.tenantId, neighbour.organizationId)).toBeNull();
+
+    // The company that holds the key the partner's verdict judged adopts it, into its own slot.
+    expect(gate.reportGatewayGate(settingsA, { tenant: A, envRuntime: undefined })).toMatchObject({
+      status: "ok",
+      allowed: true,
+    });
+    expect(gate.loadGateState(A.tenantId, A.organizationId)?.status).toBe("ok");
+  });
+
+  it("clears the key on the named desks only, so one company's sign-out leaves its neighbours' keys alone", () => {
+    hosted();
+    const neighbour = {
+      tenantId: A.tenantId,
+      organizationId: "org-alpha-neighbour",
+      workspaceId: "desk-n",
+      userId: "user-n1",
+    };
+    const second = { ...A, workspaceId: "desk-a2" };
+    settingsStore.saveSettings({ openaiApiKey: KEY_A }, A);
+    settingsStore.saveSettings({ openaiApiKey: KEY_A }, second);
+    settingsStore.saveSettings({ openaiApiKey: KEY_B }, neighbour);
+
+    expect(
+      settingsStore.clearGatewayKeyEverywhere(A, { workspaceIds: [A.workspaceId, second.workspaceId] }).sort(),
+    ).toEqual(["desk-a", "desk-a2"]);
+
+    expect(settingsStore.loadSettings(A).openaiApiKey).toBeFalsy();
+    expect(settingsStore.loadSettings(second).openaiApiKey).toBeFalsy();
+    expect(settingsStore.loadSettings(neighbour).openaiApiKey).toBe(KEY_B);
+    // The hosted erase leaves `within` out on purpose: it is partner-wide by its own design.
+    expect(settingsStore.clearGatewayKeyEverywhere(A)).toEqual(["desk-n"]);
   });
 
   it("picks up a row another process rewrote, rather than serving its cache", () => {

@@ -1,4 +1,7 @@
 import {
+  ApiError,
+  canAdminister,
+  isServerMode,
   isWorkspaceTemplateId,
   productModesForTemplate,
   requireProductModes,
@@ -156,7 +159,28 @@ export async function handlePatchWorkspace(request: HostRequest): Promise<HostRe
   }
 }
 
-export async function handleDeleteWorkspace(request: HostRequest): Promise<HostResult> {
+/**
+ * `403` code for a person who is not an owner or an admin asking to delete a desk on the hosted
+ * server. Exported so the renderer's courtesy (it hides the button) and the tests name the same code.
+ */
+export const WORKSPACE_DELETE_FORBIDDEN_CODE = "workspace_delete_forbidden";
+const WORKSPACE_DELETE_FORBIDDEN_MESSAGE = "Only an owner or an admin can delete a desk.";
+
+/** Injected like `ServerModeDeps` in `./settings.ts`, so a test can exercise hosted behaviour without the env flag. */
+export type WorkspaceDeleteDeps = { isServerMode?: () => boolean };
+
+/**
+ * Delete a desk and everything on it.
+ *
+ * Hosted, that is the company's decision, not any one person's: a desk holds every person's threads,
+ * which are private to them and are removed with it, so only an owner or an admin may ask
+ * (`canAdminister`). A member and a builder get `403 workspace_delete_forbidden`, checked after the desk
+ * is found and before its name is asked for, so a refused caller learns nothing from a wrong name. Off
+ * server mode a desk has one person and there is no role check at all, exactly as before.
+ *
+ * Creating and renaming a desk are not role-checked here (neither destroys anything).
+ */
+export async function handleDeleteWorkspace(request: HostRequest, deps: WorkspaceDeleteDeps = {}): Promise<HostResult> {
   try {
     const tenant = await getTenant(request);
     const workspaceId = request.params.workspaceId;
@@ -164,6 +188,10 @@ export async function handleDeleteWorkspace(request: HostRequest): Promise<HostR
     const found = rows.find((row) => row.id === workspaceId);
     if (!found) {
       return jsonOk({ error: { code: "not_found", message: "Workspace not found" } }, 404);
+    }
+    const serverMode = deps.isServerMode ? deps.isServerMode() : isServerMode();
+    if (serverMode && !canAdminister(tenant.role)) {
+      throw new ApiError(WORKSPACE_DELETE_FORBIDDEN_CODE, WORKSPACE_DELETE_FORBIDDEN_MESSAGE, 403);
     }
     if (found.slug === HOME_WORKSPACE_SLUG) {
       return jsonOk({ error: { code: "protected", message: "The Default desk cannot be deleted" } }, 403);

@@ -6,9 +6,9 @@
  * `GatewayGatePayload` in `@agentforge/core` (`gateway/gate-types.ts`).
  *
  * Split in two on purpose: `deriveGatewayGate` is pure (every rule is unit-testable with no disk
- * and no network), and the rest is the IO around it — one stored verdict per tenant, held by
- * `tenant-state-store.ts` (a file on a desk, a `tenant_state` row on the hosted server), and one
- * live call to the gateway on a 3 s budget.
+ * and no network), and the rest is the IO around it — one stored verdict, held by
+ * `tenant-state-store.ts` (a file per tenant on a desk, a `tenant_state` row per company on the hosted
+ * server, SR-163), and one live call to the gateway on a 3 s budget.
  */
 import {
   ApiError,
@@ -24,7 +24,12 @@ import {
   type StoredSecrets,
   type TenantContext,
 } from "@agentforge/core";
-import { TENANT_STATE_FILENAMES, tenantStateBackend } from "./tenant-state-store";
+import {
+  companyStateKey,
+  TENANT_STATE_FILENAMES,
+  tenantStateBackend,
+  type TenantStateSlot,
+} from "./tenant-state-store";
 import { requireEntitlementAllowed } from "./entitlement-store";
 import { loadSettings, resolveSettingsScope, type SettingsScope } from "./settings-store";
 
@@ -105,14 +110,25 @@ export type DeriveGatewayGateInput = {
   env?: EnvLike;
 };
 
+/**
+ * Whose verdict a call is about. A `TenantContext` is all of it. `organizationId` is optional in the
+ * type only so a desk's callers need not invent one; the hosted server refuses a scope without it
+ * (`ownerOf`), because on the server a verdict belongs to a company.
+ */
+export type GateScope = SettingsScope | (Pick<TenantContext, "tenantId" | "workspaceId"> & { organizationId?: string });
+
 export type GatewayGateOptions = {
   /**
    * Phase 3 lane D: whose verdict this is. Same rule as `loadSettings` — a `TenantContext` names
    * the tenant, a bare string or nothing means the local tenant and is refused in server mode.
    * Without it two tenants would overwrite each other's verdict in one file, and in server mode
    * "no verdict for this key" closes the gate, so tenant A's check would lock tenant B out.
+   *
+   * SR-163: on the hosted server the tenant is the white-label partner and a company is an
+   * organisation inside it, so the verdict is also scoped by `organizationId`. A scope without one is
+   * refused there.
    */
-  tenant?: SettingsScope;
+  tenant?: GateScope;
   now?: Date;
   envRuntime?: string;
   graceMs?: number;
@@ -130,8 +146,51 @@ export type MaybeRefreshGatewayOptions = GatewayGateOptions & {
   runCheck?: (settings: StoredSecrets, opts: GatewayGateOptions) => Promise<unknown>;
 };
 
-function tenantOf(opts: GatewayGateOptions): string {
-  return resolveSettingsScope(opts.tenant).tenantId;
+/**
+ * Whose verdict a call reads and writes: the tenant, and on the hosted server the company inside it.
+ * `companyId` is null on a desk, which is how every desk path stays exactly what it was.
+ */
+export type GateOwner = { tenantId: string; companyId: string | null };
+
+/** What a hosted gate call that names no company is refused with (a bug in the caller, never a user's doing). */
+export const COMPANY_REQUIRED_CODE = "company_required";
+
+/**
+ * SR-163. The verdict is about one key, and a key belongs to a company, but `tenantId` is the
+ * white-label partner every company of a deployment sits under. Scoping the verdict by it alone let
+ * company B's check replace company A's verdict; A's key then matched nothing on file, and the hosted
+ * gate (which closes on "no verdict for this key") answered A `403 gateway_blocked`.
+ *
+ * Followed by the backend, not decided again: `tenantStateBackend()` is a row store exactly when the
+ * process is in server mode, and a row store is the only one that can hold a company's slot. So a
+ * desk, whose file backend has no such slot, never produces a company id, and a hosted call that cannot
+ * name its company is refused instead of falling back to the partner's row.
+ */
+function ownerOf(opts: GatewayGateOptions): GateOwner {
+  const { tenantId } = resolveSettingsScope(opts.tenant);
+  if (tenantStateBackend().kind !== "db") {
+    return { tenantId, companyId: null };
+  }
+  const scope = opts.tenant;
+  // As it is, not trimmed: the id is the organisation's own, and two ids that differ only by whitespace
+  // are two companies (`companyStateKey`).
+  const organizationId =
+    scope !== null && typeof scope === "object" && "organizationId" in scope && typeof scope.organizationId === "string"
+      ? scope.organizationId
+      : "";
+  if (organizationId.trim() === "") {
+    throw new ApiError(
+      COMPANY_REQUIRED_CODE,
+      "This request reached the gateway gate without a company. Hosted requests must name the organisation, never share the partner's verdict.",
+      500,
+    );
+  }
+  return { tenantId, companyId: organizationId };
+}
+
+/** Which stored slot holds this owner's verdict: the tenant's one payload on a desk, the company's own on the server. */
+function gateSlot(companyId: string | null | undefined): TenantStateSlot {
+  return companyId ? companyStateKey(GATE_KEY, companyId) : GATE_KEY;
 }
 
 function isGatewayGateStatus(value: unknown): value is GatewayGateStatus {
@@ -154,11 +213,17 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/** The saved verdict, or null when there is none / it cannot be trusted. Never throws. */
-export function loadGateState(tenantId: string): GateState | null {
+/**
+ * The saved verdict, or null when there is none / it cannot be trusted. Never throws.
+ *
+ * `companyId` is the organisation whose verdict this is, and is only ever passed on the hosted server
+ * (`ownerOf`). Left out, it reads the tenant's one payload: the desk's file, and on the server the
+ * partner row older builds wrote, which nothing reads any more.
+ */
+export function loadGateState(tenantId: string, companyId?: string | null): GateState | null {
   let parsed: unknown;
   try {
-    const stored = tenantStateBackend().read(tenantId, GATE_KEY);
+    const stored = tenantStateBackend().read(tenantId, gateSlot(companyId));
     if (!stored) {
       return null;
     }
@@ -188,6 +253,31 @@ export function loadGateState(tenantId: string): GateState | null {
 }
 
 /**
+ * The verdict this owner should be judged on, for the key whose fingerprint is `fingerprint`.
+ *
+ * On a desk, or for a company that has its own slot, this is `loadGateState` and nothing else. The one
+ * addition is the deploy window (SR-163, review round): before per-company slots a hosted partner had a
+ * single verdict, and a company whose slot is still empty would read "no verdict" (a closed gate on the
+ * server) and, if its first check cannot reach the gateway, get `unreachable` with no `lastOkAt` and so no
+ * grace. The partner's row names the fingerprint of the key it judged. When the company's slot is empty
+ * and that fingerprint is exactly the fingerprint of the key the company holds now, the verdict is about
+ * the same key and is adopted into the company's own slot, `lastOkAt` and all. A different key is never
+ * adopted: it has no history to stand on. The partner's row is left where it is, for the other companies.
+ */
+function loadVerdictFor(owner: GateOwner, fingerprint: string | null): GateState | null {
+  const own = loadGateState(owner.tenantId, owner.companyId);
+  if (own || owner.companyId === null || fingerprint === null) {
+    return own;
+  }
+  const partnerRow = loadGateState(owner.tenantId);
+  if (!partnerRow || partnerRow.fingerprint !== fingerprint) {
+    return null;
+  }
+  saveGateState(owner.tenantId, partnerRow, owner.companyId);
+  return partnerRow;
+}
+
+/**
  * What `saveGateState` reports back. `persisted: false` means the verdict exists only in this
  * reply — the next process to ask will read "never checked".
  */
@@ -196,12 +286,12 @@ export type SaveGateStateResult = {
   persisted: boolean;
 };
 
-export function saveGateState(tenantId: string, state: GateState): SaveGateStateResult {
+export function saveGateState(tenantId: string, state: GateState, companyId?: string | null): SaveGateStateResult {
   // A fingerprint is a SHA-256 prefix, never the key, so this payload is safe at rest beside the
   // sealed settings. The atomic temp-file-and-rename this used to do itself now belongs to the file
   // backend, and the row backend writes one statement, so neither can leave half a verdict.
   try {
-    tenantStateBackend().write(tenantId, GATE_KEY, `${JSON.stringify(state, null, 2)}\n`);
+    tenantStateBackend().write(tenantId, gateSlot(companyId), `${JSON.stringify(state, null, 2)}\n`);
     return { state, persisted: true };
   } catch (error) {
     // Swallow-and-warn, exactly like `clearGateState`. A read-only data dir, a full disk or a
@@ -213,10 +303,15 @@ export function saveGateState(tenantId: string, state: GateState): SaveGateState
   return { state, persisted: false };
 }
 
-export function clearGateState(scope?: SettingsScope): void {
+export function clearGateState(scope?: GateScope): void {
   try {
-    tenantStateBackend().remove(resolveSettingsScope(scope).tenantId, GATE_KEY);
-  } catch {
+    const owner = ownerOf({ tenant: scope });
+    tenantStateBackend().remove(owner.tenantId, gateSlot(owner.companyId));
+  } catch (error) {
+    // A hosted scope with no company is a bug in the caller, so it is not swallowed as "nothing to clear".
+    if (error instanceof ApiError && error.code === COMPANY_REQUIRED_CODE) {
+      throw error;
+    }
     // Nothing to do: a stale verdict for a key that is gone derives as "needs_key" anyway.
   }
 }
@@ -409,12 +504,14 @@ function keyFor(settings: StoredSecrets, envRuntime: string | undefined, env: En
 export function reportGatewayGate(settings: StoredSecrets, opts: GatewayGateOptions = {}): GatewayGatePayload {
   const envRuntime = opts.envRuntime ?? process.env.AGENTFORGE_RUNTIME;
   const key = keyFor(settings, envRuntime, opts.env);
+  const owner = ownerOf(opts);
+  const fingerprint = keyFingerprintOrNull(key);
   return deriveGatewayGate({
     envRuntime,
     hasKey: Boolean(key),
-    fingerprint: keyFingerprintOrNull(key),
+    fingerprint,
     endpoint: gatewayEndpointFor(settings),
-    state: loadGateState(tenantOf(opts)),
+    state: loadVerdictFor(owner, fingerprint),
     now: opts.now ?? new Date(),
     graceMs: opts.graceMs,
     okTtlMs: opts.okTtlMs,
@@ -474,7 +571,8 @@ export function isGatewayBlockedError(error: unknown): error is GatewayBlockedEr
  * is observable: there is no plan.
  */
 export function requireGatewayAllowed(settings: StoredSecrets, opts: GatewayGateOptions = {}): GatewayGatePayload {
-  requireEntitlementAllowed(tenantOf(opts));
+  // The plan is the partner's (`tenant_plan` is one row per tenant id); only the verdict is a company's.
+  requireEntitlementAllowed(resolveSettingsScope(opts.tenant).tenantId);
   const gate = reportGatewayGate(settings, opts);
   if (!gate.allowed) {
     throw new GatewayBlockedError(gate);
@@ -488,7 +586,9 @@ export function requireGatewayAllowed(settings: StoredSecrets, opts: GatewayGate
  * local tenant's key and the local tenant's verdict whoever is calling.
  */
 export function requireGatewayAllowedFor(
-  tenant: Pick<TenantContext, "tenantId" | "workspaceId">,
+  // SR-163: required here, not optional like `GateScope`, so a route that cannot name the caller's
+  // company is a compile error and not a `company_required` 500 on the hosted server.
+  tenant: Pick<TenantContext, "tenantId" | "organizationId" | "workspaceId">,
   opts: Omit<GatewayGateOptions, "tenant"> = {},
 ): GatewayGatePayload {
   return requireGatewayAllowed(loadSettings(tenant), { ...opts, tenant });
@@ -510,9 +610,10 @@ export async function runGatewayCheck(
     return reportGatewayGate(settings, opts);
   }
 
-  const tenantId = tenantOf(opts);
+  const owner = ownerOf(opts);
+  const { tenantId, companyId } = owner;
   const fingerprint = keyFingerprintOrNull(key);
-  const previous = loadGateState(tenantId);
+  const previous = loadVerdictFor(owner, fingerprint);
   let result: GatewayCheckResult;
   try {
     result = await checkGatewayLive({
@@ -528,14 +629,18 @@ export async function runGatewayCheck(
   }
 
   const carriedOkAt = previous?.fingerprint === fingerprint ? (previous?.lastOkAt ?? null) : null;
-  const { persisted } = saveGateState(tenantId, {
-    version: 1,
-    fingerprint,
-    status: result.status,
-    checkedAt: result.checkedAt,
-    lastOkAt: result.status === "ok" ? result.checkedAt : carriedOkAt,
-    ...(result.message ? { message: result.message } : {}),
-  });
+  const { persisted } = saveGateState(
+    tenantId,
+    {
+      version: 1,
+      fingerprint,
+      status: result.status,
+      checkedAt: result.checkedAt,
+      lastOkAt: result.status === "ok" ? result.checkedAt : carriedOkAt,
+      ...(result.message ? { message: result.message } : {}),
+    },
+    companyId,
+  );
   const gate = reportGatewayGate(settings, opts);
   if (persisted) {
     return gate;
@@ -555,7 +660,13 @@ export function resetGatewayRefreshThrottle(): void {
   refreshedAt.clear();
 }
 
-/** (a) no verdict for this key, or (b) the `ok` verdict has aged past the TTL. */
+/**
+ * (a) no verdict for this key, (b) the `ok` verdict has aged past the TTL, or (c) the last check could
+ * not reach the gateway or got an error back. Without (c) one network blip stayed on disk until the
+ * grace window ran out and closed the desk, although the gateway had long since come back. A key the
+ * gateway rejected (`invalid_key`) is not asked again on its own: the owner saves a new key or presses
+ * Re-check.
+ */
 function needsGatewayRefresh(state: GateState | null, fingerprint: string | null, now: Date, okTtlMs: number): boolean {
   if (!state || state.fingerprint !== fingerprint) {
     return true;
@@ -563,14 +674,15 @@ function needsGatewayRefresh(state: GateState | null, fingerprint: string | null
   if (state.status === "ok") {
     return !withinOkTtl(state.checkedAt ?? state.lastOkAt, now, okTtlMs);
   }
-  return false;
+  return state.status === "unreachable" || state.status === "error";
 }
 
 /**
  * Fire-and-forget re-validation, called from `GET /api/v1/settings`.
  *
- * Existing installs carry a key no verdict was ever written for, and a verdict goes stale after a day;
- * both are opened on trust by `deriveGatewayGate`, so something has to actually ask the gateway. This
+ * Existing installs carry a key no verdict was ever written for, a verdict goes stale after a day, and
+ * an `unreachable` or `error` verdict only means the last attempt failed; all three need the gateway
+ * asked again (`needsGatewayRefresh`), so something has to actually ask it. This
  * is that something: it never blocks the response, never throws, and runs at most once every ten
  * minutes per key per process. Returns whether a check was started, which is what the tests assert.
  */
@@ -584,17 +696,22 @@ export function maybeRefreshGateway(settings: StoredSecrets, opts: MaybeRefreshG
     return false;
   }
   const nowMs = opts.nowMs?.() ?? Date.now();
-  const tenantId = tenantOf(opts);
+  const owner = ownerOf(opts);
+  const { tenantId, companyId } = owner;
   const fingerprint = keyFingerprintOrNull(key);
   // Keyed by tenant as well as key: two tenants that happen to share a key must each get a check,
-  // because each writes its own verdict file.
-  const slot = `${tenantId}:${fingerprint ?? ""}`;
+  // because each writes its own verdict file. On the hosted server the company is part of the key
+  // too (SR-163): two companies of one partner that hold the same key each write their own verdict,
+  // so the first one's check must not stand in for the second's. A desk keeps the old slot exactly.
+  const slot = companyId
+    ? JSON.stringify([tenantId, companyId, fingerprint ?? ""])
+    : `${tenantId}:${fingerprint ?? ""}`;
   const last = refreshedAt.get(slot);
   if (last !== undefined && nowMs - last < (opts.throttleMs ?? GATEWAY_REFRESH_THROTTLE_MS)) {
     return false;
   }
   const now = opts.now ?? new Date(nowMs);
-  if (!needsGatewayRefresh(loadGateState(tenantId), fingerprint, now, opts.okTtlMs ?? GATEWAY_OK_TTL_MS)) {
+  if (!needsGatewayRefresh(loadVerdictFor(owner, fingerprint), fingerprint, now, opts.okTtlMs ?? GATEWAY_OK_TTL_MS)) {
     return false;
   }
   refreshedAt.set(slot, nowMs);

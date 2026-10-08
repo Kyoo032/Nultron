@@ -8,6 +8,8 @@
  * - a folder write is not applied yet: `{ ok: true, status: "pending_approval", path, proposalId }`;
  * - `knowledge_search` answers `{ results, note? }` or `{ ok: false, reason: "unavailable", message }`;
  * - `run_code` answers a `CodeRunResult`: `{ ok, stdout, stderr, filesWritten, reason? }`;
+ * - `build_deck` answers `{ ok: true, artifactId, filename, slideCount }` or `{ ok: false, reason, message }`
+ *   (`deck-result.ts` reads it for the card);
  * - a spent budget refuses any tool with `{ ok: false, reason: "budget", message }`.
  */
 
@@ -21,9 +23,14 @@ export const FILE_TOOL_KEYS = [
 ] as const;
 
 export type FileToolKey = (typeof FILE_TOOL_KEYS)[number];
-export type RichToolKey = FileToolKey | "knowledge_search" | "run_code";
+export type RichToolKey = FileToolKey | "knowledge_search" | "run_code" | "build_deck";
 
-const RICH_TOOLS: ReadonlySet<string> = new Set<string>([...FILE_TOOL_KEYS, "knowledge_search", "run_code"]);
+const RICH_TOOLS: ReadonlySet<string> = new Set<string>([
+  ...FILE_TOOL_KEYS,
+  "knowledge_search",
+  "run_code",
+  "build_deck",
+]);
 const FILE_TOOLS: ReadonlySet<string> = new Set<string>(FILE_TOOL_KEYS);
 
 /** The tools whose rows say more than one line. Every other tool keeps the one-line summary. */

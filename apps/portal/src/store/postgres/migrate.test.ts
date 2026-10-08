@@ -61,6 +61,8 @@ describe("runMigrations", () => {
     expect(first.applied).toContain("0006_browser_login.sql");
     expect(first.applied).toContain("0007_tenant_resolvers.sql");
     expect(first.applied).toContain("0011_invites.sql");
+    expect(first.applied).toContain("0012_password_signin.sql");
+    expect(first.applied).toContain("0013_password_grace.sql");
     expect(first.skipped).toHaveLength(0);
 
     const second = await migrate();
@@ -86,6 +88,7 @@ describe("runMigrations", () => {
       "oauth_clients",
       "auth_codes",
       "invites",
+      "user_credentials",
     ]) {
       expect(await tableExists(table), table).toBe(true);
     }
@@ -114,10 +117,11 @@ describe("runMigrations", () => {
           "prune_login_otps",
           "resolve_tenant_by_slug",
           "resolve_tenant_for_refresh",
+          "resolve_tenant_for_username",
         ],
       ],
     );
-    expect(rows).toHaveLength(8);
+    expect(rows).toHaveLength(9);
   });
 
   /**

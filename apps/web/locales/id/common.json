@@ -28,6 +28,11 @@
       "unreachable": "tidak terjangkau"
     }
   },
+  "saveFailed": {
+    "writeFailed": "Berkas tidak dapat ditulis ke lokasi itu. Pilih folder lain, atau kosongkan ruang, lalu coba lagi.",
+    "tooLarge": "Berkas ini terlalu besar untuk disimpan dari sini.",
+    "generic": "Berkas tidak dapat disimpan. Coba lagi."
+  },
   "artifactActions": {
     "download": "Unduh Markdown",
     "saving": "Menyimpan…",
@@ -79,5 +84,9 @@
   "needsKey": {
     "note": "Tambahkan kunci {gateway} Anda di {settings} untuk memakai ini.",
     "blocked": "Tambahkan kunci Anda di {settings} untuk memakai ini."
+  },
+  "runLimit": {
+    "tooManyRuns": "Terlalu banyak permintaan Anda yang berjalan bersamaan. Tunggu salah satu selesai, lalu coba lagi.",
+    "serverBusy": "Layanan sedang sibuk. Tunggu sebentar, lalu coba lagi."
   }
 }

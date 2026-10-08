@@ -19,8 +19,19 @@
  */
 import { eraseAccountPhraseMatches } from "./reset-app";
 
-/** Why the host said no, as far as the screen has different words for it. */
-export type EraseFailureReason = "forbidden" | "generic";
+/**
+ * Why the host said no, as far as the screen has different words for it. `shared` is the hosted server
+ * that holds several companies under one account and so refuses the erase (SR-163).
+ */
+export type EraseFailureReason = "forbidden" | "shared" | "generic";
+
+/** The host's refusal code (`ResetResult.code`) as the reason the panel shows. Anything else is generic. */
+export function eraseFailureReasonOf(code: string | undefined): EraseFailureReason {
+  if (code === "tenant_reset_forbidden") {
+    return "forbidden";
+  }
+  return code === "tenant_erase_shared_partner" ? "shared" : "generic";
+}
 
 export type EraseAccountState =
   | { readonly step: "idle" }

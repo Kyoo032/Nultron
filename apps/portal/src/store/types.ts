@@ -27,6 +27,7 @@
  *     travelling.
  */
 import type {
+  Account,
   ApproveDeviceCodeInput,
   ApproveDeviceCodeResult,
   AppendAuditInput,
@@ -35,6 +36,8 @@ import type {
   Clock,
   ConsumeAuthCodeInput,
   ConsumeAuthCodeResult,
+  CountAuditByTargetInput,
+  CreateCredentialInput,
   CreateDeviceCodeInput,
   CreateInviteInput,
   CreateOAuthClientInput,
@@ -42,6 +45,7 @@ import type {
   CreateSessionInput,
   CreateTenantInput,
   CreateUserInput,
+  Credential,
   DenyDeviceCodeResult,
   Device,
   DeviceCode,
@@ -56,17 +60,22 @@ import type {
   OAuthClient,
   Org,
   OrgStatus,
+  Person,
   PollDeviceCodeResult,
+  RecordSuccessInput,
   RedeemDeviceCodeInput,
   RedeemInviteInput,
   RedeemInviteResult,
   ReasonCode,
   RefreshToken,
+  ReserveAttemptInput,
+  ReserveAttemptResult,
   RotateRefreshTokenInput,
   RotateRefreshTokenResult,
   SendLoginOtpInput,
   SendLoginOtpResult,
   Session,
+  SetPasswordInput,
   Tenant,
   TenantConfig,
   TenantStatus,
@@ -124,6 +133,13 @@ export interface PortalOps {
      * `loginPrecheck` when the authorization code is exchanged, because a seat can go in between.
      */
     hasSeatFor(orgId: string, userId: string): Promise<boolean>;
+    /**
+     * People on record in the org who are not disabled, invited ones included. The operator's
+     * `portal:account create` checks the seat cap against it: stricter than `count_active_users`
+     * (which counts only people with a live session), because an account that is created and cannot
+     * sign in for want of a seat is a worse surprise than a refusal at creation.
+     */
+    countProvisioned(orgId: string): Promise<number>;
   };
 
   readonly users: {
@@ -217,6 +233,36 @@ export interface PortalOps {
     issuedSince(tenantId: string, email: string, since: Iso): Promise<InviteIssueHistory>;
   };
 
+  /**
+   * Password sign-in (`apps/portal/migrations/0012_password_signin.sql`): one scrypt credential per
+   * person, created only by the operator's `portal:account`. The code sign-in never reads it.
+   */
+  readonly credentials: {
+    /**
+     * Inserts the credential for an existing person, taking the tenant from their `users` row.
+     * `null` when it conflicted: the person already has one, or the username is taken in the tenant.
+     */
+    create(input: CreateCredentialInput): Promise<Credential | null>;
+    findByUserId(userId: string): Promise<Credential | null>;
+    /** By username, or by e-mail address when the identifier holds an `@`, inside one tenant. */
+    findAccount(tenantId: string, identifier: string): Promise<Account | null>;
+    /** Every person in the org, oldest first, with their credential when they have one. */
+    listPeople(tenantId: string, orgId: string): Promise<readonly Person[]>;
+    reserveAttempt(input: ReserveAttemptInput): Promise<ReserveAttemptResult>;
+    /**
+     * Clears the counters and the lock, stamps the sign-in, and re-hashes when asked to -- but only
+     * while the stored hash is still `expectHash`. `false` when it was not: nothing was written.
+     */
+    recordSuccess(input: RecordSuccessInput): Promise<boolean>;
+    /** The count, the slots and the lock back to nothing, and no other column. For an `enable`. */
+    clearAttempts(userId: string): Promise<void>;
+    /**
+     * Replaces the password, clears the counters and the lock, and sets `must_change`. `false` when
+     * `expectHash` was given and no longer matched: nothing was written.
+     */
+    setPassword(input: SetPasswordInput): Promise<boolean>;
+  };
+
   readonly authCodes: {
     issue(input: IssueAuthCodeInput): Promise<AuthCode>;
     consume(input: ConsumeAuthCodeInput): Promise<ConsumeAuthCodeResult>;
@@ -257,6 +303,12 @@ export interface PortalOps {
       readonly action?: string;
       readonly limit?: number;
     }): Promise<readonly AuditEntry[]>;
+    /**
+     * How many rows of `action` each target has had since `since`, inside the tenant. Only targets
+     * with at least one row are in the map. `created_at` is the database's own clock, so `since` has
+     * to be a time that clock agrees with (the injected clock, near real time).
+     */
+    countByTarget(input: CountAuditByTargetInput): Promise<ReadonlyMap<string, number>>;
   };
 
   /** `login_precheck(uuid, uuid, uuid)` from 0005, with its advisory lock. */
@@ -272,6 +324,8 @@ export interface TenantResolvers {
   bySlug(slug: string): Promise<string | null>;
   /** NULL when the address is unknown **or** matches users in more than one tenant. */
   byEmail(email: string): Promise<string | null>;
+  /** NULL when the username is unknown **or** is used in more than one tenant. */
+  byUsername(username: string): Promise<string | null>;
   byRefreshToken(rawToken: string): Promise<string | null>;
   byDeviceCode(rawDeviceCode: string): Promise<string | null>;
   byUserCode(userCode: string): Promise<string | null>;

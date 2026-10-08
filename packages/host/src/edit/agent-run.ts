@@ -117,6 +117,10 @@ class StringQueue {
  * rule: one neutral sentence that matches the banner (`edit.ffmpeg.hostedUnavailable`), no platform, no
  * command, no variable name, no path.
  *
+ * In the packaged app the ffmpeg is the installer's own (`ffmpeg.setup.bundled`, set by `doctor.ts`): the
+ * person installed nothing and has nothing to run, so the model is told to pass on "reinstall the app" and no
+ * command.
+ *
  * `report` is a seam for tests; the agent passes none and reads the cached probe.
  */
 export function ffmpegPromptLine(report: Pick<EditDoctorReport, "ffmpeg"> = getEditDoctor()): string {
@@ -132,6 +136,13 @@ export function ffmpegPromptLine(report: Pick<EditDoctorReport, "ffmpeg"> = getE
     ].join(" ");
   }
   const setup = ffmpeg.setup;
+  if (setup?.bundled) {
+    return [
+      `The video tools that come with this app are NOT available: ${setup.summary}`,
+      'If the owner asks for probe, cut, captions or export, or asks why video tools fail, tell them to reinstall the app and then press "Check again" in the Edit banner. There is nothing else for them to install.',
+      "Do not queue ffmpeg jobs until they work.",
+    ].join(" ");
+  }
   return [
     `ffmpeg is NOT available on this ${setup?.platform ?? "machine"}: ${setup?.summary ?? "not found"}`,
     `If the owner asks for probe, cut, captions or export, or asks why video tools fail, tell them to run \`${setup?.installCommand ?? "install ffmpeg"}\` in a terminal, then press "Check again" in the Edit banner. No restart needed.`,

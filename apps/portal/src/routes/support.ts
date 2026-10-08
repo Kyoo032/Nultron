@@ -39,7 +39,7 @@ export function requestContext(runtime: PortalRuntime, request: PortalRequest): 
 
   return Object.freeze({
     locale,
-    t: translator(locale),
+    t: translator(locale, { passwordMode: runtime.config.signInMode === "password" }),
     ip,
     ipKey: rateLimitKey(ip),
     userAgent: (Array.isArray(agent) ? agent[0] : agent) ?? null,

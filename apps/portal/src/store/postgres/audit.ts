@@ -51,5 +51,19 @@ export function auditOps(client: PoolClient): PortalOps["audit"] {
       );
       return Object.freeze(rows.map(toAuditEntry));
     },
+
+    async countByTarget(input) {
+      const { rows } = await client.query<{ target_id: string; n: string }>(
+        `SELECT target_id, count(*) AS n FROM audit_log
+          WHERE tenant_id = $1
+            AND action = $2
+            AND created_at >= $3::timestamptz
+            AND target_id IS NOT NULL
+            AND ($4::uuid IS NULL OR target_id = $4)
+          GROUP BY target_id`,
+        [input.tenantId, input.action, input.since, input.targetId ?? null],
+      );
+      return new Map(rows.map((row) => [row.target_id, Number(row.n)] as const));
+    },
   };
 }

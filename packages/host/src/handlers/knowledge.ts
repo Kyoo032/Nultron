@@ -2,6 +2,7 @@ import { ApiError } from "@agentforge/core";
 import type { HostRequest, HostResult } from "../types";
 import { jsonError, jsonOk } from "../errors";
 import { requireGatewayAllowedFor } from "../gateway-gate";
+import { withRunSlot } from "../run-limits";
 import { getTenant } from "../tenant";
 import {
   addFileSource,
@@ -24,6 +25,7 @@ import {
   type WorkSourceType,
 } from "../knowledge";
 import { getKnowledgeMap, mapKnowledge } from "../knowledge-map";
+import { sourceIsHidden } from "../knowledge-visibility";
 import { backendPayload, parseBackendId, selectKnowledgeBackend } from "../knowledge/backend-api";
 import { countRetrievals } from "../knowledge-retrievals";
 import { knowledgeContextForThread } from "../knowledge-last-turn";
@@ -206,7 +208,7 @@ export async function handlePostKnowledgeReindex(request: HostRequest): Promise<
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    return jsonOk(await reindexWorkspace(tenant));
+    return jsonOk(await withRunSlot(tenant, () => reindexWorkspace(tenant)));
   } catch (error) {
     return jsonError(error);
   }
@@ -252,11 +254,13 @@ export async function handlePostKnowledgeVerify(request: HostRequest): Promise<H
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    const recent = throttledSelfCheck(getKnowledgeVerify(tenant), Date.now());
-    if (recent) {
-      return jsonOk({ ...recent, throttled: true });
-    }
-    return jsonOk({ ...(await runKnowledgeSelfCheck(tenant)), throttled: false });
+    return await withRunSlot(tenant, async () => {
+      const recent = throttledSelfCheck(getKnowledgeVerify(tenant), Date.now());
+      if (recent) {
+        return jsonOk({ ...recent, throttled: true });
+      }
+      return jsonOk({ ...(await runKnowledgeSelfCheck(tenant)), throttled: false });
+    });
   } catch (error) {
     return jsonError(error);
   }
@@ -293,11 +297,13 @@ export async function handlePostKnowledgeMap(request: HostRequest): Promise<Host
       verifierModel?: unknown;
     };
     return jsonOk(
-      await mapKnowledge(tenant, {
-        embeddingModel: typeof body.embeddingModel === "string" ? body.embeddingModel : undefined,
-        brainModel: typeof body.brainModel === "string" ? body.brainModel : undefined,
-        verifierModel: typeof body.verifierModel === "string" ? body.verifierModel : undefined,
-      }),
+      await withRunSlot(tenant, () =>
+        mapKnowledge(tenant, {
+          embeddingModel: typeof body.embeddingModel === "string" ? body.embeddingModel : undefined,
+          brainModel: typeof body.brainModel === "string" ? body.brainModel : undefined,
+          verifierModel: typeof body.verifierModel === "string" ? body.verifierModel : undefined,
+        }),
+      ),
     );
   } catch (error) {
     return jsonError(error);
@@ -420,7 +426,11 @@ export async function handlePostKnowledgeSourceUrl(request: HostRequest): Promis
 export async function handleDeleteKnowledgeSource(request: HostRequest): Promise<HostResult> {
   try {
     const tenant = await getTenant(request);
-    deleteSource(tenant, request.params.sourceId);
+    // Hosted: a colleague's Chat card is not this person's to delete by id. It is answered as a
+    // delete of something already gone (the same `ok`), so the answer does not say the card exists.
+    if (!sourceIsHidden(tenant, request.params.sourceId)) {
+      deleteSource(tenant, request.params.sourceId);
+    }
     return jsonOk({ ok: true });
   } catch (error) {
     return jsonError(error);

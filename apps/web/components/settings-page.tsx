@@ -100,6 +100,22 @@ function hostErrorMessage(body: unknown): string | null {
 }
 
 /**
+ * The body of a Settings save. The key field is sent only when someone typed a key into it: a blank
+ * field means "keep the key I have", never "forget it" (the host drops a blank too). A member never
+ * types one, so their save leaves it out. Forgetting a key is the Start over card's `scope: "key"`.
+ */
+export function settingsSaveBody(input: { mayChangeKey: boolean; openaiApiKey: string; editTurnCapUsd: number }): {
+  openaiApiKey?: string;
+  editTurnCapUsd: number;
+} {
+  const typed = input.mayChangeKey && input.openaiApiKey.trim().length > 0;
+  return {
+    ...(typed ? { openaiApiKey: input.openaiApiKey } : {}),
+    editTurnCapUsd: input.editTurnCapUsd,
+  };
+}
+
+/**
  * Send one settings request and read its answer. Never throws: a request that did not come back, a
  * non-JSON error page and an error body all become `failed`, with the host's own message when it
  * sent one and the catalog's `fallbackKey` otherwise. Only a settings object is ever `ok`.
@@ -281,12 +297,7 @@ export function SettingsPage() {
           apiFetch("/api/v1/settings", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              // A member never types one; leaving the field out says so, and the host would drop a
-              // blank anyway.
-              ...(mayChangeKey ? { openaiApiKey } : {}),
-              editTurnCapUsd,
-            }),
+            body: JSON.stringify(settingsSaveBody({ mayChangeKey, openaiApiKey, editTurnCapUsd })),
           }),
         "settings.saveFailed",
       );

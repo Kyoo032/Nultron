@@ -22,7 +22,7 @@ import {
   downloadedComponentsAllowed,
   hasComponentMarker,
 } from "../components/paths";
-import { FileExtractError } from "./errors";
+import { type NativeGate, nativeGate } from "./native-gate";
 
 /** Spelled once, and only here: the loader below is the single require site for the converter. */
 const MODULE_ID = "@firecrawl/anydoc";
@@ -165,20 +165,17 @@ export function resetAnydocCache(): void {
  *
  * The call is `toMarkdownBytes(bytes, format)` — two arguments, deliberately. Do not add a third:
  * the third parameter is the options bag that carries hosted OCR.
+ *
+ * The deadline answers the caller; it cannot stop the native work. The slot is therefore held by the
+ * native call through `gate` (`native-gate.ts`), which refuses with 429 at its cap instead of letting
+ * a file built to run long start a new orphan every time the deadline passes.
  */
-export async function toMarkdownUnderDeadline(
+export function toMarkdownUnderDeadline(
   anydoc: AnydocModule,
   bytes: Uint8Array,
   format: AnydocFormat | null,
   timeoutMs: number,
+  gate: NativeGate = nativeGate,
 ): Promise<string> {
-  let timer: NodeJS.Timeout | undefined;
-  const deadline = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new FileExtractError("timeout")), Math.max(1, timeoutMs));
-  });
-  try {
-    return await Promise.race([anydoc.toMarkdownBytes(bytes, format), deadline]);
-  } finally {
-    clearTimeout(timer);
-  }
+  return gate.run(() => anydoc.toMarkdownBytes(bytes, format), timeoutMs);
 }

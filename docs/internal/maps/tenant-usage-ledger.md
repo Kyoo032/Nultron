@@ -1,6 +1,6 @@
 # Map — Tenant usage ledger
 
-Last verified: 2026-09-20 at a053245 + the Phase 4 branch `feat/web-phase4-tenant-secrets-rcbu9c` (through e37b3a1)
+Last verified: 2026-10-07, `feat/hosted-run-limits` working tree (uncommitted), for the two Gotchas on reads by company and the legacy file on the server (SR-163 review round; read from `tenant-usage.ts` and `account-usage.ts`, proven by `usage-companies.test.ts`, not driven on a hosted server). Everything else: 2026-09-20 at a053245 + the Phase 4 branch `feat/web-phase4-tenant-secrets-rcbu9c` (through e37b3a1)
 
 ## Overview
 
@@ -65,7 +65,7 @@ that keep their unit and quantity, which a later pass can price in place.
 
 | Mode | Where | Unit |
 |---|---|---|
-| chat | `recordChatRunUsage`, called from `packages/host/src/runs.ts:372` and `:417`, gated on `finishRun`'s return | tokens |
+| chat | `recordChatRunUsage`, called from `packages/host/src/runs.ts:377` and `:417`, gated on `finishRun`'s return | tokens |
 | documents, presentations, research, data, finance, market, legal, knowledge | `rememberJobUsage` in the shared job runtime callback, `packages/host/src/job-regen.ts:145` | tokens |
 | edit agent | `rememberJobUsage`, `packages/host/src/edit/agent-run.ts:186` (live) and `:363` (stub) | tokens |
 | images | `recordImageUsage`, `packages/host/src/studio-generate.ts:301` | images |
@@ -124,9 +124,18 @@ bills 5 s for a 4 s request.
   and is unchanged; `tenant_usage` is the billable event beside it. Anything that sums both will
   double-count chat. The account screen does not: it reads chat from `runs.usage` and everything
   else from the ledger (`packages/host/src/account-usage.ts:43`).
-- **`desk-usage.json` is still read.** A desktop that has been generating since before this
+- **`desk-usage.json` is still read, on a desk only.** A desktop that has been generating since before this
   migration keeps the history the account screen already showed it. The two cannot double-count
-  because nothing writes the file any more — do not add a writer back.
+  because nothing writes the file any more — do not add a writer back. On the hosted server it is not read
+  (`legacyDeskUsage`, `packages/host/src/account-usage.ts`, SR-163 review round): it is one file per partner and its
+  rows name no company, so a copy that arrived (a restored data dir) would have been shown to whichever company
+  asked first.
+- **Reads are by company on the hosted server (SR-163 review round, 2026-10-07).** `tenantId` is the white-label
+  partner and a company is an organisation inside it. `whereFor` (`packages/host/src/tenant-usage.ts`) adds
+  `organization_id = ?` when `isServerMode()` (injectable as `createUsageStore(db, { isServerMode })`), for `list`
+  and `totals`, so `GET /api/v1/usage` and the `usage` field of `GET /api/v1/settings` list the caller's company,
+  never the partner's. A desk reads by tenant alone, as before. The plan's allowance counter is the partner's
+  (`accrueSpend`, by tenant id) and never read these queries, so no cap moved. Test: `usage-companies.test.ts`.
 - **Media rows are metered but not yet on screen.** A `RunUsageRecord` has nowhere to put an image or
   a second, so `listJobUsageRecords` filters to token rows. The cost is in the ledger in micros;
   widening `AccountUsagePayload` is account-screen work lane A deliberately left open.

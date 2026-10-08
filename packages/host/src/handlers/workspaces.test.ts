@@ -16,6 +16,7 @@ delete process.env.DATABASE_URL;
 delete process.env.OPENAI_API_KEY;
 
 const KEY = "sk-workspaces-handler-0000000";
+const OTHER_KEY = "sk-workspaces-handler-1111111";
 
 type Dispatch = (request: HostRequest) => Promise<HostResult>;
 let dispatch: Dispatch;
@@ -96,7 +97,8 @@ afterEach(async () => {
   stubFetchOk();
   const home = await homeDesk();
   await json("POST", `/api/v1/workspaces/${home.id}/select`);
-  await json("POST", "/api/v1/settings", { openaiApiKey: "" });
+  // A blank save keeps a key, so the explicit "forget my key" (every desk) is the cleanup.
+  await json("POST", "/api/v1/settings/reset", { scope: "key" });
   globalThis.fetch = realFetch;
 });
 
@@ -131,14 +133,16 @@ describe("POST /api/v1/workspaces on an install with a gateway key", () => {
   it("leaves the key on the desk it came from when the new desk changes its own", async () => {
     await json("POST", "/api/v1/settings", { openaiApiKey: KEY });
     const home = await homeDesk();
+    const original = (await currentSettings()).fingerprint;
     const desk = await createDesk("verify-desk-own-key");
 
-    // Keys stay per desk: clearing the copy on the new desk does not touch Default's.
-    await json("POST", "/api/v1/settings", { openaiApiKey: "" });
-    expect((await currentSettings()).hasOpenai).toBe(false);
+    // Keys stay per desk: replacing the copy on the new desk does not touch Default's.
+    await json("POST", "/api/v1/settings", { openaiApiKey: OTHER_KEY });
+    const replaced = (await currentSettings()).fingerprint;
+    expect(replaced).not.toBe(original);
 
     await json("POST", `/api/v1/workspaces/${home.id}/select`);
-    expect((await currentSettings()).hasOpenai).toBe(true);
+    expect((await currentSettings()).fingerprint).toBe(original);
 
     await deleteDesk(desk);
   });

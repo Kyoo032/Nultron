@@ -49,6 +49,8 @@ ERROR: /Nultron.app/Contents/Frameworks: … ['Nultron Helper (GPU).app', …]
 
 (The 0.14.26 log that taught this said `DPSBuddy.app`; the parser rule is the same under the new name.) Doubling the HFS+ volume does **not** fix a parser bug. How-to: `apps/desktop/platform/macos/BUILD-DMG-ON-WINDOWS.md`.
 
+**Days 1 to 9 of a month (0.16.0, 2026-10-06).** libdmg-hfsplus pads a one-digit day with a space and prints the month zero-based: on 6 October a row reads `040755   0   0   0  9/ 6/2026 02:42 Contents`. The old whitespace split took `02:42 Contents` as the name, so a pack made on the 1st to the 9th failed with `/Nultron.app: … ['Contents']` after three doublings; every earlier cut happened to be packed on a day of 10 or more. `parse_hfs_ls_name` now matches the whole row with a regex, the same shape as `HFS_LS_LINE` in `verify-bundle.py`, which already allowed the space.
+
 ## Wrong cwd
 
 | You are in | Allowed | If you run the other command |
@@ -101,6 +103,18 @@ A stash or checkout by any agent wipes every other worker's uncommitted edits in
 ## pnpm hoists platform packages — purge the store, not the links (0.14.27, mac)
 
 `@firecrawl/anydoc` has one optional dependency per platform. On the Linux install inside Docker pnpm fetches the `linux-*` ones, and `asarUnpack` `**/node_modules/@firecrawl/anydoc-*/**` then ships their ELF `.node` files into the Mac app; `verify-bundle` refuses it with `2 non-Mach-O native binaries`. Deleting the sibling symlinks under `.pnpm/@firecrawl+anydoc@<v>/node_modules/@firecrawl/` is **not** enough: pnpm also hoists every package into `node_modules/.pnpm/node_modules/` and keeps the real directory in `node_modules/.pnpm/@firecrawl+anydoc-linux-x64-gnu@<v>/`, and app-builder's `node-dep-tree` walks up into both. `build-mac.sh` now removes the non-darwin store entries and their links once after install, dies if a linux/win32 anydoc `.node` is still reachable, and swaps the pinned darwin package (sha512 from `packages/host/src/components/manifest.ts`) in beside anydoc per arch. Bump the manifest and the script together. It took three packs to learn this; the first two are in `superseded-e2e477e/` and the changelog.
+
+## ffmpeg missing from the installer (found 2026-10-06, fixed in the tree, not yet packed)
+
+Every installer up to 0.16.0 shipped `resources/ffmpeg/` with only its README, so each person got an "install ffmpeg" notice. Now `apps/desktop/scripts/stage-ffmpeg.mjs` fills it from `apps/desktop/scripts/ffmpeg.lock.json` and the pack fails when it cannot. Traps to expect on the first real pack, none yet driven:
+
+- **A cold stage is a 190 MB download** (Windows) or about 120 MB per arch (mac), each hash-checked before it is unpacked. The cache is `vendor/.ffmpeg-cache/` on the host and the `/cache/ffmpeg` volume in the mac container. `--offline` fails fast when the cache is cold.
+- **Staging is per target and removes the others.** `desktop:build` stages `win32-x64`; the mac container stages `darwin-<arch>` inside each arch's loop. Never hand-copy a program into the folder: `--verify` (and preflight) reject any file the lock does not name, and `verify-bundle.py` rejects a PE or ELF file in a `.app`.
+- **A Windows exe in the worktree is not in `git`.** The folder is gitignored apart from its README, so the pack worktree stages its own copy; copying the main checkout's folder across is allowed only if `--verify` passes there.
+- **rcodesign may rewrite the mac programs.** The bundle is hash-checked before signing; after signing only "executable" is required and the log says whether the bytes changed. If a Mac refuses to start a bundled program, check that line first.
+- **Windows Defender or SmartScreen may quarantine a 165 MB unsigned `ffmpeg.exe`** on first run. The host then reports the bundled copy as `exec_failed` and the app tells the person to reinstall; it does not fall back to a PATH copy. Look at Defender's history before blaming the pack.
+- **The installer is much larger.** Check `Nultron Setup <v>.exe` against the previous size and say so in the pack record.
+- **Release notes must carry the GPL source line** (`docs/internal/ffmpeg-attribution.md`). `release-desktop.mjs` does not check for it.
 
 ## First Nultron pack (2026-09-29, not yet packed)
 

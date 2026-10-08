@@ -6,6 +6,7 @@
 import type {
   AuditEntry,
   AuthCode,
+  Credential,
   Device,
   DeviceCode,
   Invite,
@@ -136,6 +137,29 @@ export function toUser(row: Row): User {
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
     deactivatedAt: isoOrNull(row.deactivated_at),
+  });
+}
+
+/**
+ * The credential's own columns, none of them secret. `prefix` is for a row that joined `users` and
+ * aliased these (`c_username`), because both tables carry `created_at` and `updated_at`. The hash,
+ * the salt and the cost parameters are deliberately not read here: they are `PasswordHash`, they come
+ * out of `reserveAttempt` and nowhere else, and a mapper that read them would put them in every row
+ * the operator's `list` prints.
+ */
+export function toCredential(row: Row, prefix = ""): Credential {
+  const at = (name: string): unknown => row[`${prefix}${name}`];
+  return freeze({
+    userId: str(at("user_id")),
+    tenantId: str(at("tenant_id")),
+    username: str(at("username")),
+    mustChange: at("must_change") === true,
+    failedAttempts: int(at("failed_attempts")),
+    lockedUntil: isoOrNull(at("locked_until")),
+    passwordChangedAt: iso(at("password_changed_at")),
+    lastSignInAt: isoOrNull(at("last_sign_in_at")),
+    createdAt: iso(at("created_at")),
+    updatedAt: iso(at("updated_at")),
   });
 }
 

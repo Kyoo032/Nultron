@@ -14,6 +14,7 @@
     "seed": "tsx scripts/seed.ts",
     "otp": "tsx scripts/otp.ts",
     "invite": "tsx scripts/invite.ts",
+    "account": "tsx scripts/account.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

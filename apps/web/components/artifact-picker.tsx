@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ArtifactMode, ArtifactRecord, ArtifactSummary } from "@/lib/artifacts-client";
-import { getArtifact, listArtifacts } from "@/lib/artifacts-client";
+import { getArtifact, listArtifacts, textArtifacts } from "@/lib/artifacts-client";
 import { getLocale, t } from "@/lib/i18n";
 import { labeled } from "@/lib/ui-copy";
 
@@ -32,13 +32,7 @@ function formatWhen(ms: number): string {
 }
 
 /** "Use a saved dossier / analysis…" dropdown. Loads the list on open, the body on pick. */
-export function ArtifactPicker({
-  mode,
-  label,
-  disabled = false,
-  testId = "artifact-picker",
-  onPick,
-}: Props) {
+export function ArtifactPicker({ mode, label, disabled = false, testId = "artifact-picker", onPick }: Props) {
   const buttonLabel = label ?? t("documents.source.picker");
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<ArtifactSummary[] | null>(null);
@@ -54,7 +48,8 @@ export function ArtifactPicker({
     listArtifacts(mode).then(
       (list) => {
         if (!cancelled) {
-          setItems(list);
+          // The picker hands a body to a text box: a deck or another Office file is not offered.
+          setItems(textArtifacts(list));
         }
       },
       (err: unknown) => {

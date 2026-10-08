@@ -4,7 +4,13 @@
 > The host-decides/renderer-displays rule below is unchanged and applies to both; the Electron-only transport and wipe details are the Personal app's.
 > Decision record: [`web-pivot-2026-09-18.md`](../web-pivot-2026-09-18.md).
 
-Last verified: 2026-10-02, working tree over 0b61a29, not committed, for who may write the company's gateway key on the hosted server (M4; the "Who may press it" paragraph under Start over, the save-a-key row of the failure modes, the "What the owner can actually change" paragraph, and the key box, the reset card and the onboarding key step in the renderer): in server mode a non-blank provider key in `POST /api/v1/settings`, and `POST /api/v1/settings/reset` with `scope: "key"`, need an owner or an admin and answer a member or a builder `403 settings_key_forbidden`; the screens stop offering those controls to a member. Proven by unit tests (`settings-key-roles.test.ts` against real membership rows and `company-key-access.test.tsx` against a byte-for-byte golden of the Personal Settings page); **not driven in a browser, on the Kubernetes rehearsal or on a packed app**. Every other line of this page is as verified next. Before that: 2026-10-01, working tree over 0b61a29, not committed, a final pass that day, for the language the settings answer carries on the hosted server (the paragraph on the UI locale below, item `locale` / `savedLocale`): a person who never chose one is shown their browser's `Accept-Language`, with the stored choice first and nothing written (`settingsPayload` takes the request's header and the mode it was handed; see [`locale-boot-and-run-harness.md`](locale-boot-and-run-harness.md)). Proven by unit tests and by `dispatch` with real sessions, with a mutation-checked Personal-parity case; not driven in a browser. Before that, later that day, for Edit's Agent pane (its no-key note and quiet Send) and the hosted ffmpeg line, in the hosted needs-key paragraph below (item 5), driven with the hosted marker and the host's answers faked in the browser on `:3000`, not on a deployed hosted build. Before that, the same day, for two Enterprise-only fixes: a hosted tenant that holds a key and has no `model_cache` row (every tenant that upgraded into per-tenant caches) is refilled by one throttled background refresh that the first catalogue read starts (the paragraph after the `probe` / `defaults` one, the files table, the tests paragraph), and hosted prompt-enhance with no key answers `403 gateway_blocked` where it answered 200 stub text (the call-site list and the "Not every gated route checks the gate first" gotcha, whose line moved from `:49` to `:53`). Proven by unit tests and by `dispatch` on a real database with provisioned tenants, each with a Personal-parity case that was mutation-checked; **not driven in a browser, on the Kubernetes rehearsal or on a packed app**. Before that, the same day, for Enterprise "bring your own key" Phase A: the hosted model cache is now one row per tenant (`model_cache`) and the `probe` and `defaults` on this page's answer are the caller's own, a hosted tenant's stored Google, Anthropic and Volcengine base URLs are neither honoured nor echoed, and `refreshModelCache` probes the provider registry's hosts (paragraphs after `settingsPayload()` and after the save table, the state-keys and `model-cache.ts` rows, one Gotcha). Proven by unit tests, by `dispatch` with two provisioned tenants and by running the real router inside the local Kubernetes rehearsal's app container against its own database (Verify); **no browser sign-in** was completed on that cluster (the portal answered "No seats left in your organisation" to a new device), so Chat, Settings and the model list were not seen in a browser. The Personal app is unchanged by construction and by test, and was not driven on an installed app. Before that, the same day: the new "Add the key later (Enterprise only)" section, the Renderer paragraph (`resolveGate` takes a hosted deferral) and the "A closed gate hides Settings too" gotcha: a signed-in hosted tenant can start without a key, the host records the choice (`POST /api/v1/settings/key-later`, `keyLater` on the settings answer, server mode only) and the host's gate and every `403 gateway_blocked` are untouched. Proven by unit tests and by a drive on the local Kubernetes rehearsal (see that section); not driven on the Personal app, which is unchanged by construction and by test. Before that, the same day, for the endpoint-pinning paragraph and the "pinned three ways" paragraph: the packaged marker is now set by `main.cjs`, so "not packaged" in the override rule is true, and a brand flavor's gateway has its own variable ([SR-85](../security-register.md#sr-85)); the `migrateLegacyUserData` citation in the Start over section moved with that edit (`main.cjs:780-810`). Not driven on an installed app. Before that: 2026-09-30, working tree over bcf14f7, not committed (the second time that day), for the `defaults` sentence in the `settingsPayload()` paragraph: the per-mode default ids it carries resolve from the model lists of that day ([`model-policy.md`](model-policy.md) § 7), the Chat default is `gpt-6-luna` now. Before that, the same day, for "What a save does besides saving" and the sign-out paragraph under Start over: a save, a key reset and a tenant reset now call `resetModelReliabilityState`, which clears the learned Thinking-level limits along with the job-model breaker ([`model-policy.md`](model-policy.md) § 4); the citations in that table were re-read and re-anchored the same day. Every other line is as verified next. Before that: 2026-09-29, working tree, not committed, for the first-run guide's record (a `guide` field on `settingsPayload`, `POST /api/v1/settings/guide`, the record inside the sealed payload beside the language, erased by Start over): see "The first-run guide's record" below and [`first-run-desk-and-guide.md`](first-run-desk-and-guide.md); every other line of this page is as verified next. Also 2026-09-29, working tree, not committed, for `settingsPayload` (no `modes`; the range is re-anchored) and the shared settings read, both stated under "Settings per desk". Also 2026-09-29, for the reset wipe list (it gains `models-dev-cache.meta.json`) and every
+Review round, same day, same tree (still uncommitted), for [SR-163](../security-register.md#sr-163) items 1 to 6: on the hosted server a provider key saved on one desk is written to every desk of the company (`saveKeysToDesks`; see "What a Settings save does on the hosted server" below), the Settings `probe` and `defaults` and the model list are the **company's** (`model_cache:<organisation id>`, no longer the partner's), `usage` is the company's, a company whose gate slot is empty adopts the old partner verdict for the very key it holds (`loadVerdictFor`), and the hosted "Erase company account" is refused with `409 tenant_erase_shared_partner` when a partner holds more than one company. Those paragraphs were rewritten in place; the cites into `model-cache.ts`, `selectable-models.ts` and `gateway-gate.ts` that moved with them were re-anchored by name, not by line. Proven by `gateway-gate-companies.test.ts` (30), `model-cache-companies.test.ts` (17), `usage-companies.test.ts` (9), `tenant-reset-companies.test.ts` (10), each red before its fix. **Not driven on a hosted server.** A desk is unchanged in every one of them (each has a Personal case). **Scoping the erase to one company is still owed and is the owner's decision.**
+
+Before that: 2026-10-07 in the working tree over `726f369` (branch `feat/hosted-run-limits`), not committed, for [SR-163](../security-register.md#sr-163): on the hosted server the gate verdict is one row per company, not one per white-label partner. That changes the "SR-163" bullet under "The gateway gate", the "forget my key" paragraph under Start over, three failure-mode rows, and the cites into `gateway-gate.ts` and `tenant-state-store.ts` that moved with it (re-anchored in those sections only; other cites on this page were already drifting before this change and `maps:check` still lists them as soft findings). Proven by unit tests and by `dispatch` with real sessions, two companies under one partner, a stand-in gateway, and a mutation check against the old behaviour (seven hosted cases go red). **Not driven on a hosted server.** A desk's verdict is the file it always was, and `gateway-gate-companies.test.ts` pins its bytes and path. Every other line of this page is as verified next.
+
+Before that: 2026-10-06 on `chore/release-0.16.0` (over `de95267`), for the background re-check of an `unreachable` or `error` verdict (`needsGatewayRefresh`; the paragraph after "The live check") and for a Settings save with the key field blank, which now keeps the key and its verdict on both products (the "Save with an empty key string" row, the `scope: "key"` paragraph and the key-write paragraph). Proven by unit tests; the drive is recorded in `docs/internal/0.16.0-changelog.md`.
+
+Before that: 2026-10-02, working tree over 0b61a29, not committed, for who may write the company's gateway key on the hosted server (M4; the "Who may press it" paragraph under Start over, the save-a-key row of the failure modes, the "What the owner can actually change" paragraph, and the key box, the reset card and the onboarding key step in the renderer): in server mode a non-blank provider key in `POST /api/v1/settings`, and `POST /api/v1/settings/reset` with `scope: "key"`, need an owner or an admin and answer a member or a builder `403 settings_key_forbidden`; the screens stop offering those controls to a member. Proven by unit tests (`settings-key-roles.test.ts` against real membership rows and `company-key-access.test.tsx` against a byte-for-byte golden of the Personal Settings page); **not driven in a browser, on the Kubernetes rehearsal or on a packed app**. Every other line of this page is as verified next. Before that: 2026-10-01, working tree over 0b61a29, not committed, a final pass that day, for the language the settings answer carries on the hosted server (the paragraph on the UI locale below, item `locale` / `savedLocale`): a person who never chose one is shown their browser's `Accept-Language`, with the stored choice first and nothing written (`settingsPayload` takes the request's header and the mode it was handed; see [`locale-boot-and-run-harness.md`](locale-boot-and-run-harness.md)). Proven by unit tests and by `dispatch` with real sessions, with a mutation-checked Personal-parity case; not driven in a browser. Before that, later that day, for Edit's Agent pane (its no-key note and quiet Send) and the hosted ffmpeg line, in the hosted needs-key paragraph below (item 5), driven with the hosted marker and the host's answers faked in the browser on `:3000`, not on a deployed hosted build. Before that, the same day, for two Enterprise-only fixes: a hosted tenant that holds a key and has no `model_cache` row (every tenant that upgraded into per-tenant caches) is refilled by one throttled background refresh that the first catalogue read starts (the paragraph after the `probe` / `defaults` one, the files table, the tests paragraph), and hosted prompt-enhance with no key answers `403 gateway_blocked` where it answered 200 stub text (the call-site list and the "Not every gated route checks the gate first" gotcha, whose line moved from `:49` to `:53`). Proven by unit tests and by `dispatch` on a real database with provisioned tenants, each with a Personal-parity case that was mutation-checked; **not driven in a browser, on the Kubernetes rehearsal or on a packed app**. Before that, the same day, for Enterprise "bring your own key" Phase A: the hosted model cache is now one row per tenant (`model_cache`) and the `probe` and `defaults` on this page's answer are the caller's own, a hosted tenant's stored Google, Anthropic and Volcengine base URLs are neither honoured nor echoed, and `refreshModelCache` probes the provider registry's hosts (paragraphs after `settingsPayload()` and after the save table, the state-keys and `model-cache.ts` rows, one Gotcha). Proven by unit tests, by `dispatch` with two provisioned tenants and by running the real router inside the local Kubernetes rehearsal's app container against its own database (Verify); **no browser sign-in** was completed on that cluster (the portal answered "No seats left in your organisation" to a new device), so Chat, Settings and the model list were not seen in a browser. The Personal app is unchanged by construction and by test, and was not driven on an installed app. Before that, the same day: the new "Add the key later (Enterprise only)" section, the Renderer paragraph (`resolveGate` takes a hosted deferral) and the "A closed gate hides Settings too" gotcha: a signed-in hosted tenant can start without a key, the host records the choice (`POST /api/v1/settings/key-later`, `keyLater` on the settings answer, server mode only) and the host's gate and every `403 gateway_blocked` are untouched. Proven by unit tests and by a drive on the local Kubernetes rehearsal (see that section); not driven on the Personal app, which is unchanged by construction and by test. Before that, the same day, for the endpoint-pinning paragraph and the "pinned three ways" paragraph: the packaged marker is now set by `main.cjs`, so "not packaged" in the override rule is true, and a brand flavor's gateway has its own variable ([SR-85](../security-register.md#sr-85)); the `migrateLegacyUserData` citation in the Start over section moved with that edit (`main.cjs:780-810`). Not driven on an installed app. Before that: 2026-09-30, working tree over bcf14f7, not committed (the second time that day), for the `defaults` sentence in the `settingsPayload()` paragraph: the per-mode default ids it carries resolve from the model lists of that day ([`model-policy.md`](model-policy.md) § 7), the Chat default is `gpt-6-luna` now. Before that, the same day, for "What a save does besides saving" and the sign-out paragraph under Start over: a save, a key reset and a tenant reset now call `resetModelReliabilityState`, which clears the learned Thinking-level limits along with the job-model breaker ([`model-policy.md`](model-policy.md) § 4); the citations in that table were re-read and re-anchored the same day. Every other line is as verified next. Before that: 2026-09-29, working tree, not committed, for the first-run guide's record (a `guide` field on `settingsPayload`, `POST /api/v1/settings/guide`, the record inside the sealed payload beside the language, erased by Start over): see "The first-run guide's record" below and [`first-run-desk-and-guide.md`](first-run-desk-and-guide.md); every other line of this page is as verified next. Also 2026-09-29, working tree, not committed, for `settingsPayload` (no `modes`; the range is re-anchored) and the shared settings read, both stated under "Settings per desk". Also 2026-09-29, for the reset wipe list (it gains `models-dev-cache.meta.json`) and every
 `apps/desktop/main.cjs` and `settings.test.ts` citation in this page's Start over section, re-anchored in the working
 tree, not committed, after the ffmpeg probe moved behind the first paint. Not driven. Before that: 2026-09-26 for the onboarding screen, restyled onto the current desk (gradient hello,
 `hero-aurora`, `card-live` example tiles). A fresh desk is a short hello, then the key, then four
@@ -19,7 +25,7 @@ restart of `:3000` or a packed app picks up.
 
 Before that: 2026-09-23 at 775d16f + working tree (finding 1 of the 0.15.0 verify pass). Changed here: a new desk starts with a copy of the creating desk's gateway key (`inheritGatewayKey`, `packages/host/src/handlers/workspaces.ts:33-39`), and the onboarding screen lists the other desks (`onboarding-desks`) so a keyless desk is never a dead end — see "Settings per desk" below. The gate's derivation is untouched.
 
-Before that: 2026-09-23 at 0774681 + working tree (the 0.15.0 design pass). Changed there: `settings.kicker` is deleted, `settings.runtimeStub` and `settings.gateway.status.stub` no longer claim "Offline demo" (stub means *no key saved*, not a demo), and `settings.intro` was trimmed. The gate's derivation, `resolveGate`, the reset scopes and the endpoint-hiding rule are all untouched. **The sign-out → onboarding behaviour is verified in the packaged personal app, not on webdev**: `deriveGatewayGate` short-circuits `envRuntime === "stub"` to `allowed: true` before it looks at whether a key exists (`packages/host/src/gateway-gate.ts:293-296`), and both `.env` and `apps/web/.env.local` pin `stub` on a dev machine — `apps/desktop/main.cjs` never sets it, so a packaged app derives `needs_key` and sign-out does drop to onboarding.
+Before that: 2026-09-23 at 0774681 + working tree (the 0.15.0 design pass). Changed there: `settings.kicker` is deleted, `settings.runtimeStub` and `settings.gateway.status.stub` no longer claim "Offline demo" (stub means *no key saved*, not a demo), and `settings.intro` was trimmed. The gate's derivation, `resolveGate`, the reset scopes and the endpoint-hiding rule are all untouched. **The sign-out → onboarding behaviour is verified in the packaged personal app, not on webdev**: `deriveGatewayGate` short-circuits `envRuntime === "stub"` to `allowed: true` before it looks at whether a key exists (`packages/host/src/gateway-gate.ts:361-365`), and both `.env` and `apps/web/.env.local` pin `stub` on a dev machine — `apps/desktop/main.cjs` never sets it, so a packaged app derives `needs_key` and sign-out does drop to onboarding.
 
 Supersedes the 2026-09-22 note, which recorded the opposite `stub` copy: `chat-key-status` used to read "Model key connected (offline demo)" on a keyless desk. That string is gone from both catalogs; `stub` now reads as a missing key.
 
@@ -53,7 +59,7 @@ envelope holding `{ version: 2, locale, users, workspaces: { [workspaceId]: Stor
 "per tenant" is which payload.
 
 **Where that payload lives is decided by mode, never by tenant** — `tenantStateBackend()`
-(`packages/host/src/tenant-state-store.ts:331-333`). Off server mode it is lane D's file, at exactly lane D's
+(`packages/host/src/tenant-state-store.ts:368-370`). Off server mode it is lane D's file, at exactly lane D's
 path: `<localDataDir()>/settings.enc` for `local-tenant` and `<localDataDir()>/tenants/<tenantId>/settings.enc`
 for anyone else (`TENANT_STATE_FILENAMES`, `packages/host/src/tenant-state-store.ts:48-54`; see
 [`tenant-storage.md`](tenant-storage.md) for why the local tenant keeps the bare path). In server mode it is a
@@ -116,20 +122,36 @@ fingerprints (`sha256:` + the first 12 hex chars of SHA-256 over the trimmed sec
 `resolvedGatewayBaseUrl()`, never a stored value (`packages/core/src/secrets.ts:270-271`).
 
 **On the hosted server the payload is the caller's own where it used to be the machine's (Enterprise BYOK
-Phase A, 2026-10-01).** `probe` is `probeSummary(undefined, tenant)` and `defaults` is `modeDefaultsFor(tenant)`
-(`packages/host/src/handlers/settings.ts:121`, `:125`): both read the calling tenant's model cache, which on
-the hosted server is a `tenant_state` row (key `model_cache`) and not the one machine file `models-cache.json`
-every tenant's save or Refresh used to write and every tenant's Settings used to read back
-(`packages/host/src/model-cache.ts:35-46`, `:132`, `:151`). So tenant A's catalogue size, its probe errors and
-the default model the host would pick from A's models never reach B. A desk reads and writes the same file as
-before, and ignores the tenant it is handed. `maskSecrets` takes the environment as a second argument and, on the
+Phase A, 2026-10-01; narrowed from the partner to the company by SR-163, 2026-10-07).** `probe` is
+`probeSummary(undefined, tenant)` and `defaults` is `modeDefaultsFor(tenant)`
+(`packages/host/src/handlers/settings.ts`, in `settingsPayload`): both read the calling **company's** model
+cache, which on the hosted server is a `tenant_state` row (key `model_cache:<organisation id>`, under the
+partner's `tenant_id`) and not the one machine file `models-cache.json` every tenant's save or Refresh used to
+write and every tenant's Settings used to read back (`packages/host/src/model-cache.ts`, `modelCacheOwner`,
+`companySlot`, `loadModelCache`, `saveModelCache`). `tenantId` is the white-label partner and a company is an
+organisation inside it, so keyed by the partner alone, company A's Settings showed company B's probe error and
+model list. A scope that names a company uses it; a scope that names only the partner, inside a request whose
+session is the same partner's, takes the session's company; anything else on the hosted server is refused
+(`company_required`, 500), never read from the partner's row. So company A's catalogue size, its probe errors and
+the default model the host would pick from A's models never reach B, in the same partner or another. A desk reads
+and writes the same file as before, and ignores the tenant and the organisation it is handed.
+
+**What a Settings save does on the hosted server (SR-163 review round).** A provider key is the company's, so
+`handlePostSettings` follows `saveSettings` (the caller's desk) with `mirrorKeysToCompanyDesks` →
+`saveKeysToDesks` (`packages/host/src/settings-store.ts`): one write of the key fields this request carried
+(`openaiApiKey`, `googleApiKey`, `anthropicApiKey`, `volcengineApiKey`) to the other desks of the caller's
+**organisation** (`listLocalWorkspaces(db, tenant.organizationId)`). Before it, rotating a key on one desk left
+the company's other desks on the old one: their fingerprint no longer matched the company's verdict, they answered
+`403 gateway_blocked`, and a re-check from one of them could replace the verdict and close the first. A desk's
+own choices (models, caps) are not copied, a blank key field is not a key write, and another company's desks are
+never in the list. A desk calls none of this: a key saved there stays on that desk. `maskSecrets` takes the environment as a second argument and, on the
 hosted server, reports `googleBaseUrl`, `anthropicBaseUrl` and `volcengineBaseUrl` as absent
 (`secrets.ts:257`): the host does not honour a stored one there (`resolveProviderKeys`, `secrets.ts:346`), and
 nothing writes one (the POST body never carried them), so echoing one would claim a setting that is not in force.
 The renderer's Settings page keeps three state fields for them, set from the answer and read nowhere
 (`apps/web/components/settings-page.tsx:138-140`, `:191-193`), and posts none.
 
-**A tenant with a key and no cache row is refilled in the background (2026-10-01, hosted only).** Only a Settings
+**A company with a key and no cache row is refilled in the background (2026-10-01, hosted only; per company since SR-163, the paragraph below still says "tenant" where it means that company: its in-flight set, throttle and `refreshModelCache` scope are `{ tenantId, organizationId }`, and a scope that cannot name a company starts nothing and is logged).** Only a Settings
 save (`handlers/settings.ts:272`) and Refresh (`handlers/models.ts:21`) write a tenant's `model_cache` row, so a
 tenant that already held a key when the server upgraded into per-tenant caches had none: Chat listed static ids,
 Images none, Meeting `no_model`, until somebody saved Settings again. `warmHostedModelCache`
@@ -249,34 +271,35 @@ Contract: `packages/core/src/gateway/gate-types.ts` —
 `{ status, allowed, grace, endpoint, endpointLocked: true, checkedAt, lastOkAt, message? }`, `status` in
 `stub | needs_key | ok | invalid_key | unreachable | error`.
 
-`reportGatewayGate(settings)` (`packages/host/src/gateway-gate.ts:410-424`) resolves the key to judge
-(`keyFor`, `:395-405`), fingerprints it, loads that tenant's verdict (`loadGateState`, `:157-187` — **the
-verdict is keyed by fingerprint; the key itself is never written**), and hands both to the pure
-`deriveGatewayGate` (`:283-332`), which applies in order:
+`reportGatewayGate(settings)` (`packages/host/src/gateway-gate.ts:477-492`) resolves the key to judge
+(`keyFor`, `:464-474`), fingerprints it, loads that owner's verdict (`ownerOf`, `:169`: the tenant on a desk,
+the company inside it on the server; `loadGateState`, `:221-251` — **the verdict is keyed by fingerprint; the
+key itself is never written**), and hands both to the pure `deriveGatewayGate` (`:352-401`), which applies in
+order:
 
 | Condition | Result | Line |
 |---|---|---|
-| `envRuntime === "stub"`, off server mode | `{status:"stub", allowed:true, grace:false}` | `:291-293` |
-| no key, or `stub` runtime on the server | `{status:"needs_key", allowed:false}` | `:294-296` |
-| no verdict, or verdict for a different fingerprint | `{status:"ok", allowed:true, grace:true, message:"Not checked yet."}` — **opened on trust** (hosted server mode instead answers `error` / `allowed:false`, `:301-303`) | `:309-311` |
-| verdict `ok`, fresh (< `GATEWAY_OK_TTL_MS`) | `allowed:true, grace:false` | `:313-318` |
-| verdict `ok`, stale | `allowed = withinGrace(lastOkAt, …)`, `grace:true` | `:319-320` |
-| verdict `invalid_key` | `allowed:false, grace:false` — **no grace, ever** | `:323-325` |
-| verdict `unreachable` / `error` | `allowed = withinGrace(…)`, and `grace` mirrors `allowed` | `:326-329` |
-| persisted `stub` / `needs_key` verdict | treated as never-checked | `:330-331` |
+| `envRuntime === "stub"`, off server mode | `{status:"stub", allowed:true, grace:false}` | `:360-362` |
+| no key, or `stub` runtime on the server | `{status:"needs_key", allowed:false}` | `:363-365` |
+| no verdict, or verdict for a different fingerprint | `{status:"ok", allowed:true, grace:true, message:"Not checked yet."}` — **opened on trust** (hosted server mode instead answers `error` / `allowed:false`, `:370-372`) | `:378-380` |
+| verdict `ok`, fresh (< `GATEWAY_OK_TTL_MS`) | `allowed:true, grace:false` | `:382-387` |
+| verdict `ok`, stale | `allowed = withinGrace(lastOkAt, …)`, `grace:true` | `:388-389` |
+| verdict `invalid_key` | `allowed:false, grace:false` — **no grace, ever** | `:392-394` |
+| verdict `unreachable` / `error` | `allowed = withinGrace(…)`, and `grace` mirrors `allowed` | `:395-398` |
+| persisted `stub` / `needs_key` verdict | treated as never-checked | `:399-401` |
 
-**Phase 4 changed two things here, both about the hosted server rather than the desk.**
+**Phase 4 changed two things here, both about the hosted server rather than the desk.** SR-163 added a third, below them.
 
 - **The verdict moved behind a backend.** `statePath(tenantId)` is gone. `loadGateState`, `saveGateState`
-  and `clearGateState` (`:157-187`, `:198-213`, `:215-221`) go through `tenantStateBackend()`
-  (`packages/host/src/tenant-state-store.ts:331-333`) under the key
+  and `clearGateState` (`:221-251`, `:262-277`, `:279-290`) go through `tenantStateBackend()`
+  (`packages/host/src/tenant-state-store.ts:368-370`) under the key
   `gateway_gate` (`packages/core/src/tenancy/state-keys.ts:19`). On a desk that resolves
   to exactly lane D's file — `<dataDir>/gateway-gate.json` for `local-tenant`, under `tenants/<tenantId>/`
   otherwise, which is what stops two tenants overwriting each other's verdict — because the file backend
   maps the key back through `TENANT_STATE_FILENAMES` (`:48-51`), the one place in the host that may spell
   those filenames. On the server it is a row in `tenant_state`. See
   [`tenant-secrets-backend.md`](tenant-secrets-backend.md).
-- **`keyFor` refuses the process environment in server mode** (`:395-405`). A saved key is still the key.
+- **`keyFor` refuses the process environment in server mode** (`:464-474`). A saved key is still the key.
   But with none saved, an `OPENAI_API_KEY` in the host's own environment belongs to the **operator**, and
   handing it to a tenant who has saved nothing is residual A01-3. The gate now answers `needs_key` there,
   which is what `resolveProviderKeys` does on the call path (`packages/core/src/secrets.ts:319-331`,
@@ -287,31 +310,65 @@ verdict is keyed by fingerprint; the key itself is never written**), and hands b
   Edit's auto-captions run on the timeline worker afterwards, where there is no request to answer
   `403` to, which is why `edit/asr.ts` resolving its own bearer mattered rather than being tidiness
   — see [`tenant-secrets-backend.md`](tenant-secrets-backend.md).
+- **SR-163 — on the server a verdict belongs to a company, not to the partner.** `TenantContext.tenantId` is
+  the white-label partner (HYP AI, Nultron Enterprise) and `organizationId` is the company inside it; a
+  deployment is one partner with many companies. Keys were already per desk, and a desk belongs to one
+  organisation, but the verdict was one `gateway_gate` row per partner. Company B's check replaced company A's
+  verdict, A's key matched nothing on file, and the hosted gate closes on "no verdict for this key": A's next
+  Chat turn answered `403 gateway_blocked` (the 2026-10-07 load-rig finding). Now `ownerOf`
+  (`packages/host/src/gateway-gate.ts:169-188`) names the verdict's owner: the tenant alone on a desk, and on
+  the server the tenant plus `scope.organizationId`, which it requires (`company_required`, 500, if a hosted
+  caller has none: `COMPANY_REQUIRED_CODE`, `:156`). It follows the backend, not a second `isServerMode()`:
+  only the row backend has a company slot, so a desk cannot produce one. The slot is the `gateway_gate` key
+  narrowed to `gateway_gate:<organisation id>` (`gateSlot`, `:190`; `companyStateKey`,
+  `packages/host/src/tenant-state-store.ts:86`), a row under the partner's own tenant id in the same
+  table, so the foreign key still holds and the hosted erase still takes every row with the partner. The file
+  backend refuses a company slot (`statePath`, `tenant-state-store.ts:119-125`); the row backend does not
+  adopt a legacy file into one (`:320`). The verdict an older build wrote for the whole partner is read in one
+  case only (review round): `loadVerdictFor` lets a company whose own slot is empty adopt it, `lastOkAt`
+  included, when its fingerprint is exactly the fingerprint of the key the company holds; never for another key.
+  The background re-check's throttle slot carries the company on the server too (`:676-678`), so two companies
+  holding the same key each get a check; a desk keeps `<tenant>:<fingerprint>`. `requireGatewayAllowed` still
+  asks the **partner's** plan (`requireEntitlementAllowed(tenantId)`, `:547`): the plan row is one per
+  tenant id, which is not part of this change. Tests: `packages/host/src/gateway-gate-companies.test.ts` (two
+  companies under one partner through the real router, and the Personal bytes) and
+  `packages/host/src/tenant-secrets.test.ts` (the rows, the refusal, the legacy row). **Cost on deploy:** a
+  hosted company has no verdict of its own until its first Settings read starts a check, so one Chat turn
+  sent before that read can answer `403 gateway_blocked` once.
 
-Constants (`packages/host/src/gateway-gate.ts`): `GATEWAY_GRACE_MS = 7 * 86_400_000` (`:40`),
-`GATEWAY_CHECK_TIMEOUT_MS = 3_000` (`:43`), `GATEWAY_OK_TTL_MS = 86_400_000` (`:49`),
-`GATEWAY_REFRESH_THROTTLE_MS = 600_000` (`:52`), `GATEWAY_UNCHECKED_MESSAGE = "Not checked yet."` (`:55`),
-`GATEWAY_UNVERIFIED_MESSAGE` (`:62`), `GATEWAY_VERDICT_UNWRITABLE_MESSAGE` (`:69`). The grace boundary is
-inclusive — exactly 7 days still counts (`withinGrace`, `:254-257`, pinned at
-`packages/host/src/gateway-gate.test.ts:146-155`); the TTL check is `withinOkTtl` (`:267-270`).
+Constants (`packages/host/src/gateway-gate.ts`): `GATEWAY_GRACE_MS = 7 * 86_400_000` (`:53`),
+`GATEWAY_CHECK_TIMEOUT_MS = 3_000` (`:56`), `GATEWAY_OK_TTL_MS = 86_400_000` (`:62`),
+`GATEWAY_REFRESH_THROTTLE_MS = 600_000` (`:65`), `GATEWAY_UNCHECKED_MESSAGE = "Not checked yet."` (`:68`),
+`GATEWAY_UNVERIFIED_MESSAGE` (`:75`), `GATEWAY_VERDICT_UNWRITABLE_MESSAGE` (`:82`). The grace boundary is
+inclusive — exactly 7 days still counts (`withinGrace`, `:330-333`, pinned at
+`packages/host/src/gateway-gate.test.ts:146-155`); the TTL check is `withinOkTtl` (`:336-339`).
 
-**The live check** is `checkGatewayLive` (`packages/host/src/gateway-gate.ts:348-383`): `GET {baseUrl}/models`
+**The live check** is `checkGatewayLive` (`packages/host/src/gateway-gate.ts:416-451`): `GET {baseUrl}/models`
 with `Authorization: Bearer <key>` under `AbortSignal.timeout(3_000)`, after `assertAllowedEndpointUrl` rejects
 plain-HTTP remotes. 2xx → `ok`; 401/403 → `invalid_key` (message is `HTTP {status}`, the key is never echoed);
-other non-OK → `error`; thrown/timeout → `unreachable`. `runGatewayCheck` (`:484-530`) wraps it: it
-short-circuits on stub or no key (`:491-493`), maps a throw to `unreachable` (`:506-510`), carries `lastOkAt`
-forward only for the same fingerprint (`:512`), persists, and — when the verdict could **not** be written —
-answers `status: "error"` with `allowed` untouched (`:522-529`).
+other non-OK → `error`; thrown/timeout → `unreachable`. `runGatewayCheck` (`:574-624`) wraps it: it
+short-circuits on stub or no key (`:581-583`), maps a throw to `unreachable` (`:596-600`), carries `lastOkAt`
+forward only for the same fingerprint, **in the same company on the server** (`:602`), persists to the owner's
+slot, and — when the verdict could **not** be written — answers `status: "error"` with `allowed` untouched
+(`:616-623`).
 
 It runs on a key save (`refreshGatewayGateAfterSave` → `runGatewayCheck`,
 `packages/host/src/handlers/settings.ts:320-336`), and which verdict the save response carries is decided by
 `gateVerdictFor` (`packages/host/src/handlers/settings.ts:309-318`). It also runs on
 `POST /api/v1/settings/gateway/check` (`handleGatewayCheck`,
-`packages/host/src/handlers/settings.ts:338-346`, route at `packages/host/src/router.ts:263`). Separately, `maybeRefreshGateway` (`packages/host/src/gateway-gate.ts:593-614`)
-fires an un-awaited check at most once per key per 10 minutes from `handleGetSettings` — that is what turns
-"opened on trust" into a real verdict over time.
+`packages/host/src/handlers/settings.ts:338-346`, route at `packages/host/src/router.ts:263`). Separately, `maybeRefreshGateway` (`packages/host/src/gateway-gate.ts:660-702`)
+fires an un-awaited check at most once per tenant and key per 10 minutes (per company and key on the server) from `handleGetSettings`
+(`packages/host/src/handlers/settings.ts:153`) — that is what turns "opened on trust" into a real verdict over time.
+Which verdicts it re-checks is `needsGatewayRefresh` (`packages/host/src/gateway-gate.ts:641-649`): no verdict for
+this key, an `ok` past its 24 h TTL, and, since 2026-10-06 (0.16.0 cut), an `unreachable` or `error` verdict
+(`:648`). Before that, one failed check stayed on disk until `lastOkAt` left the 7-day grace and the desk closed, though
+the gateway had come back (the 2026-10-05 verify-pass finding). `invalid_key` is still never re-checked on its own;
+only a new key or Re-check replaces it. Tests: `packages/host/src/gateway-gate.test.ts:521` (unreachable and error,
+throttled), `:538` (invalid_key left alone), `:547` (a desk closed past grace reopens once the check answers `ok`).
+The check only rewrites the verdict on disk: a renderer already showing the closed onboarding screen re-reads it on
+its next `GET /api/v1/settings` (a relaunch, or the screen's Re-check), not by itself.
 
-**Enforcement.** `requireGatewayAllowed(settings)` (`packages/host/src/gateway-gate.ts:476-483`) throws
+**Enforcement.** `requireGatewayAllowed(settings)` (`packages/host/src/gateway-gate.ts:545-553`) throws
 `GatewayBlockedError` when `!gate.allowed`, and `jsonError` flattens it (`packages/host/src/errors.ts:17-26`) to
 `403 { error: "gateway_blocked", status, message }` — a flat body, deliberately not the usual
 `{error:{code,message}}` envelope, so `parseGatewayBlocked` can read it without unwrapping. Call sites, all
@@ -390,11 +447,15 @@ Card `settings-reset` (`apps/web/components/settings-reset-card.tsx:159`), mount
 `apps/web/components/settings-page.tsx:535`, fed by `resetPending` on the settings payload.
 
 **Sign out (`scope: "key"`)** — no typed confirmation, fully synchronous. `resetGatewayKey`
-(`packages/host/src/handlers/settings.ts:410-425`) calls `clearGatewayKeyEverywhere(tenant)`
-(`packages/host/src/settings-store.ts:522-538` — **every desk of the caller's tenant**, because "a key left on
+(`packages/host/src/handlers/settings.ts:482-508`) calls `clearGatewayKeyEverywhere(tenant)`
+(`packages/host/src/settings-store.ts:549` — **every desk of the caller's tenant**, because "a key left on
 a second desk would keep the gate open after 'forget my key'"; Phase 3 lane D narrowed it from the whole
-install), then `clearGateState(tenant)`, `clearThisKeyCache()`, `resetEmbedCircuit()` and — added 2026-09-17 —
-`resetModelReliabilityState()` (`:417`; the job-model breaker and the learned Thinking-level limits). Returns `relaunch: false`. Threads, desks and media are untouched. The
+install). **On the hosted server it is the caller's company's desks only (SR-163):** the handler asks for the
+organisation's desks (`listLocalWorkspaces(db, tenant.organizationId)`, `:492`) and passes them as `within`
+(`ClearKeyWithin`, `settings-store.ts:536`), because a hosted tenant is the partner and clearing "every desk of
+the tenant" signed every other company out of the gateway. A desk calls it with no `within`, exactly as before. Then
+`clearGateState(tenant)` (that company's verdict on the server), `clearThisKeyCache()`, `resetEmbedCircuit()` and — added 2026-09-17 —
+`resetModelReliabilityState()` (the job-model breaker and the learned Thinking-level limits). Returns `relaunch: false`. Threads, desks and media are untouched. The
 card navigates to `/chat` and calls `announceGate(result.gateway)`, which dispatches `GATE_EVENT` and drops the
 shell to onboarding.
 
@@ -403,7 +464,8 @@ shell to onboarding.
 lane D scoped `clearGatewayKeyEverywhere` and `clearGateState` to `tenant`, and the three cache resets are
 process-wide breakers that cost a re-check and nothing else. Refusing it also left a hosted tenant with **no**
 way to remove a saved key, because a blank `openaiApiKey` in a settings POST is dropped rather than applied
-(`keyFieldValue`, `packages/host/src/handlers/settings.ts:226-234`); both halves are pinned by `packages/host/src/handlers/settings.test.ts`
+(`keyFieldValue`, `packages/host/src/handlers/settings.ts:227-232`; on the desk too since 2026-10-06, so `scope: "key"`
+is now the only way to forget a key on either product); both halves are pinned by `packages/host/src/handlers/settings.test.ts`
 ("allows scope key, because the key it forgets is the caller's own", and "is the only way a hosted tenant can
 clear its key"). `scope: "all"` stays refused (`resetEverything`, `:423-440`): that one really does wipe the
 shared data directory.
@@ -417,8 +479,8 @@ person out of the gateway, and a live member `POST /api/v1/settings/reset { scop
 points, both server mode only: `handlePostSettings` checks `requestsKeyWrite(body, serverMode)` (`:266`, `:290`) **before
 any write**, so a body that mixes a key with something a member may change (their language, the Edit cap) is refused
 whole; `handleResetApp` checks it for `scope: "key"` (`:574-579`). "A key write" is what `keyFieldValue` lets into the
-patch, a non-blank string in `openaiApiKey`, `googleApiKey`, `anthropicApiKey` or `volcengineApiKey`: the blank the
-Settings page echoes from an untouched box, and a non-string, are no-ops and stay allowed, so a member's ordinary save
+patch, a non-blank string in `openaiApiKey`, `googleApiKey`, `anthropicApiKey` or `volcengineApiKey`: a blank (which the
+Settings page no longer sends since 2026-10-06), and a non-string, are no-ops and stay allowed, so a member's ordinary save
 (language, spend cap) still works. `toolKeys`, `toolBackends` and `injectionGuardBypass` are refused for everybody by
 `requestsOperatorOnlySettings`, as before. Off server mode neither check runs and no role is read: a desk's person is
 its owner. The renderer hides what the host would refuse (`apps/web/lib/company-key-access.ts`, read from the session's
@@ -495,13 +557,16 @@ installing an update or already exiting), races `clearRendererState()` — `clea
 
 | Case | Behaviour |
 |---|---|
-| Verdict missing, unreadable, or not JSON | `loadGateState` returns `null` (`packages/host/src/gateway-gate.ts:158-188`) → opens on trust. Deliberately unlike the sealed settings payload, which refuses rather than reset: a verdict is a cache of something the gateway said, so losing one costs a re-check |
-| Verdict cannot be written | `saveGateState` warns and returns `{persisted:false}` (`:198-213`, warn at `:210`); `runGatewayCheck` then answers `status:"error"` with `allowed` as derived (`:522-529`) — "an unwritable data dir must not close a desk" |
-| Live check throws / times out | mapped to `unreachable` (`:506-510`), never thrown |
-| Background re-check throws | swallowed (`:593-595`); the un-awaited promise also carries its own `.catch` (`:592`) |
-| Save with an empty key string | `clearGateState()` and no check at all (`packages/host/src/handlers/settings.ts:328-331`). On the hosted server the blank never reaches the store either (`keyFieldValue`, `packages/host/src/handlers/settings.ts:226-234`), so a key is dropped through `scope: "key"` rather than through a blank save. A hosted blank save from a member is not refused (it writes nothing) but, because it names `openaiApiKey`, it still clears the tenant's verdict (`refreshGatewayGateAfterSave`, `:398-409`), which the next read re-derives under the 7-day grace |
+| Verdict missing, unreadable, or not JSON | `loadGateState` returns `null` (`packages/host/src/gateway-gate.ts:221-251`) → opens on trust on a desk (closes on the server, where "no verdict for this key" is a closed gate). Deliberately unlike the sealed settings payload, which refuses rather than reset: a verdict is a cache of something the gateway said, so losing one costs a re-check |
+| Verdict cannot be written | `saveGateState` warns and returns `{persisted:false}` (`:262-277`); `runGatewayCheck` then answers `status:"error"` with `allowed` as derived (`:616-623`) — "an unwritable data dir must not close a desk" |
+| Live check throws / times out | mapped to `unreachable` (`:596-600`), never thrown |
+| Background re-check throws | swallowed (`:698-700`); the un-awaited promise also carries its own `.catch` (`:697`) |
+| A hosted gate call names no company (SR-163) | `ownerOf` throws `company_required` (500) (`packages/host/src/gateway-gate.ts:169-188`), also from `clearGateState`; never a fall back to the partner's row. Real requests always carry an organisation, so this is a bug in a caller, not a user's state |
+| A hosted company whose verdict row is missing | Closed (`error`, `allowed:false`, "has not been verified") until a check writes it; the first Settings read starts one. Right after SR-163 lands, a company whose key is the one the old partner row judged adopts that verdict (and its `lastOkAt`, so grace survives an unreachable first check, `loadVerdictFor`); a company with any other key starts here |
+| A hosted "Erase company account" on a partner that holds more than one company | `409 tenant_erase_shared_partner` from `resetTenant` (`assertSinglePartnerCompany`, `packages/host/src/tenant-reset.ts`), after the owner and confirmation checks and before the audit row or any delete; the panel shows `settings.reset.eraseAccountShared`. One company per partner erases as before. Scoping the purge to one company is still owed (owner's decision) |
+| Save with an empty key string | A no-op for the key, on the desk and on the server (since 2026-10-06): the renderer leaves a blank field out of the body (`settingsSaveBody`, `apps/web/components/settings-page.tsx:107`, used at `:300`), the host drops a blank anyway (`keyFieldValue`, `packages/host/src/handlers/settings.ts:227-232`), and the verdict is left alone (`refreshGatewayGateAfterSave` returns early, `:404`). The rest of the body (the Edit cap) still saves. A key is forgotten only through `scope: "key"` (`resetGatewayKey`, `:482`). Before: off server mode a blank went to `mergeSecrets`, which deleted the key, and `refreshGatewayGateAfterSave` cleared the verdict on both products, so a save made only to change the Edit cap signed a desk out of the gateway (2026-10-05 verify-pass finding). Tests: `packages/host/src/handlers/settings.test.ts:290` (key and verdict kept), `:306` (`scope: "key"` forgets both), `:376` (desk blank and whitespace), `apps/web/lib/settings-save.test.ts:158` (`settingsSaveBody`) |
 | Save a key, or forget it, as a hosted member or builder | `403 settings_key_forbidden` before anything is written (`requestsKeyWrite`, `assertMayChangeCompanyKey`, `packages/host/src/handlers/settings.ts:266-275`, `:290`, `:574-579`); the stored key and verdict are untouched |
-| Server mode, no database connection installed | `tenantStateBackend()` throws `tenant_state_backend_missing` (500) on the first read or write (`packages/host/src/tenant-state-store.ts:263-271`). Fail closed and loud, never a silent fall back to the desktop's files — see [`tenant-secrets-backend.md`](tenant-secrets-backend.md) |
+| Server mode, no database connection installed | `tenantStateBackend()` throws `tenant_state_backend_missing` (500) on the first read or write (`packages/host/src/tenant-state-store.ts:298-308`). Fail closed and loud, never a silent fall back to the desktop's files — see [`tenant-secrets-backend.md`](tenant-secrets-backend.md) |
 | Sealed settings that will not open with the current wrap key | server mode refuses the request (`settings_unreadable`, 500) and leaves the payload untouched; a desk quarantines and starts fresh, exactly as before (`onUndecryptableSettings`, `packages/host/src/settings-store.ts:373-385`) |
 | Reset queued, app killed before reboot | `reset-pending.json` persists; the wipe applies on the next boot regardless of how the process died |
 | Reset while runs are in flight | only *tracked* ffmpeg/ffprobe children are signalled (`packages/host/src/child-processes.ts:42-55`); an in-flight chat turn or embed job is simply cut off at exit. No coverage |
@@ -517,7 +582,7 @@ installing an update or already exiting), races `clearRendererState()` — `clea
 | `packages/host/src/tenant-state-store.ts` | **Phase 4.** The backend the two payloads go through: `TenantStateBackend`, the file and row implementations, `TENANT_STATE_FILENAMES`, legacy-file adoption — see [`tenant-secrets-backend.md`](tenant-secrets-backend.md) |
 | `packages/host/src/tenant-state-db.ts` | Three lines; the only place the row backend is handed a connection, imported from `router.ts` |
 | `packages/core/src/tenancy/state-keys.ts` | `TENANT_STATE_KEYS` — `settings`, `gateway_gate` and (hosted only, 2026-10-01) `model_cache`, the names both backends key on |
-| `packages/host/src/model-cache.ts` | The model cache: one machine file on a desk, one `tenant_state` row per tenant on the hosted server; `ModelCacheScope`, `modelCacheSlot`, `modelCacheScopeOf`, `loadModelCache`, `saveModelCache`, `probeSummary` |
+| `packages/host/src/model-cache.ts` | The model cache: one machine file on a desk, one `tenant_state` row per **company** on the hosted server (`model_cache:<organisation id>`, SR-163); `ModelCacheScope` (`{ tenantId, organizationId? }`), `modelCacheOwner`, `modelCacheSlot`, `modelCacheScopeOf`, `loadModelCache`, `saveModelCache`, `probeSummary` |
 | `packages/host/src/selectable-models.ts` | The catalogue built from the cache (a memo per tenant slot), `refreshModelCache` (with `onlyIfMissing`), `warmHostedModelCache` (the hosted background refill, `:505`), `modelCatalogBody`, `modeDefaultsFor` |
 | `packages/host/src/wrap-key-rotation.ts`, `scripts/rotate-wrap-key.ts` | The wrap-key rotation drill and its CLI |
 | `packages/host/src/tenant-paths.ts` | The one place a tenant becomes a directory — see [`tenant-storage.md`](tenant-storage.md) |
@@ -541,9 +606,12 @@ installing an update or already exiting), races `clearRendererState()` — `clea
 
 ## Gotchas
 
-- **A hosted read of the model cache that cannot name its tenant is refused, not guessed (2026-10-01).**
-  `loadModelCache`, `saveModelCache` and `modelCacheStamp` take the tenant, fall back to the request's session
-  (`currentRequestSession`), and otherwise throw `tenant_required` (500) (`model-cache.ts:48`). The session
+- **A hosted read of the model cache that cannot name its company is refused, not guessed (2026-10-01; company
+  since SR-163).** `loadModelCache`, `saveModelCache` and `modelCacheStamp` take the scope, fall back to the request's
+  session (`currentRequestSession`) for the partner and, when the scope names the same partner without an
+  organisation, for the company, and otherwise throw `tenant_required` (no partner) or `company_required` (a
+  partner and no company) (500) (`modelCacheOwner`, `model-cache.ts`). Any caller that builds a bare `{ tenantId }`
+  must add the organisation (the Edit doctor did: `handlers/edit.ts`). The session
   fallback does not reach a stream body (`startModalityRun`, the Edit event stream), which runs outside the
   request's async scope, so every catalogue caller passes its tenant, and
   `packages/host/src/model-catalog-tenancy-guard.test.ts` fails the suite for a call that does not name one.
@@ -653,7 +721,11 @@ the retry never deletes the fresh database, and no path reaches the log); `apps/
 `packages/host/src/settings-desk-scope.test.ts`; `packages/host/src/tenant.test.ts`;
 `apps/web/lib/reset-app.test.ts`; `apps/web/lib/gateway-gate.test.ts`.
 
-For the per-tenant model cache (Enterprise BYOK Phase A, hosted only, each with a Personal-parity case):
+For the per-company model cache (SR-163, hosted only): `packages/host/src/model-cache-companies.test.ts` (two companies
+under one partner: rows, stamps, slots, the catalogue, a scope with no company refused, the request session's
+company, the warm-up per company and the refresh named by company, and the desk's one file) and, through the real
+routes, `gateway-gate-companies.test.ts` "each Settings shows its own probe and models". For the per-tenant model cache
+(Enterprise BYOK Phase A, hosted only, each with a Personal-parity case; its scopes now name an organisation too):
 `packages/host/src/model-cache-tenancy.test.ts` (the store and the catalogue on an in-memory database: tenant A's
 probe and catalogue invisible to B, no machine file written, a read with no tenant refused, the memo per tenant,
 `refreshModelCache` scoped and probing the registry's hosts, speech-to-text discovery and the Edit doctor, and
@@ -689,9 +761,9 @@ licence service, against the bearer on the request.** … If a limit can be defe
 was never enforced."
 
 `[Supported]` The code agrees at every branch: a missing or unreadable verdict opens
-(`loadGateState`, `packages/host/src/gateway-gate.ts:158-188`), an unwritable store costs a cached decision and
-nothing else (`saveGateState`, `:198-213`; `runGatewayCheck`, `:522-529`), the background re-check swallows its
-own failures (`:593-595`), and the stub runtime is always open off server mode (`:291-293`). **Confidence: high.** The design record is prose in `AGENTS.md`, not a commit body —
+(`loadGateState`, `packages/host/src/gateway-gate.ts:221-251`), an unwritable store costs a cached decision and
+nothing else (`saveGateState`, `:262-277`; `runGatewayCheck`, `:616-623`), the background re-check swallows its
+own failures (`:697-700`), and the stub runtime is always open off server mode (`:360-362`). **Confidence: high.** The design record is prose in `AGENTS.md`, not a commit body —
 `git log --oneline -20 -- packages/host/src/gateway-gate.ts packages/core/src/gateway/gate-types.ts` returns only
 `8831bc4` and `4db009a`, and `4db009a`'s message is about locale and layout, not the gate.
 

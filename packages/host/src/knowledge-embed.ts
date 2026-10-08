@@ -11,6 +11,7 @@ import {
 } from "@agentforge/core";
 import { sql } from "@agentforge/db";
 import { loadSettings, type SettingsScope } from "./settings-store";
+import { andVisibleSource } from "./knowledge-visibility";
 import { log } from "./log";
 
 const EMBED_BATCH = 16;
@@ -347,14 +348,16 @@ export async function searchVectors(
   const skip =
     excludeSourceIds.length > 0 ? ` AND source_id NOT IN (${excludeSourceIds.map(() => "?").join(", ")})` : "";
   const ws = workspaceId(tenant);
+  // Hosted: the same subselect also leaves out a colleague's Chat card, so its vectors are never read.
+  const visible = andVisibleSource(tenant);
   // Only vectors whose source row still exists: a vector orphaned by a mid-embed delete is never served.
   const rows = sql
     .prepare(
       `SELECT body, embedding, source_id, chunk_index FROM knowledge_vectors
        WHERE workspace_id = ? AND model = ?
-         AND source_id IN (SELECT id FROM knowledge_sources WHERE workspace_id = ?)${skip}`,
+         AND source_id IN (SELECT id FROM knowledge_sources WHERE workspace_id = ?${visible.sql})${skip}`,
     )
-    .all(ws, model, ws, ...excludeSourceIds) as Array<{
+    .all(ws, model, ws, ...visible.params, ...excludeSourceIds) as Array<{
     body: string;
     embedding: string;
     source_id: string;

@@ -113,15 +113,25 @@ describe("any text block that keeps its line breaks", () => {
 });
 
 describe("the composer's attachment chip", () => {
-  const source = read("components", "chat-composer.tsx");
+  // The chip moved out of `chat-composer.tsx` into its own component when documents arrived (2026-10-06).
+  const source = read("components", "composer-attachment-chip.tsx");
 
   it("gives up characters of a long name before it gives up the remove button", () => {
     // Measured on 2026-09-29 at 320 px: a 66-character name made the chip 235 px in a 186 px row,
     // 36 px past the composer, with the × at 314-323 px in a 320 px window.
-    const chip = /<li\s+key=\{item\.id\}\s+className="([^"]*)"\s+data-testid="composer-attachment"/.exec(source);
+    const chip = /const CHIP =\s*"([^"]*)"/.exec(source);
     expect(chip, "the attachment chip markup changed; update this test with it").not.toBeNull();
     expect(chip?.[1]).toContain("max-w-full");
+    expect(source).toMatch(/<li className=\{CHIP\} data-testid="composer-attachment"/);
     expect(source).toMatch(/<span className="min-w-0 max-w-\[12rem\] truncate">\{item\.file\.name\}<\/span>/);
-    expect(source).toMatch(/className="shrink-0 text-\[var\(--text-3\)\] hover:text-\[var\(--text\)\]"\s+aria-label=\{t\("chat\.removeAttachment"/);
+    expect(source).toMatch(/const REMOVE =\s*"shrink-0 text-\[var\(--text-3\)\] hover:text-\[var\(--text\)\]"/);
+    expect(source).toMatch(/className=\{REMOVE\}[\s\S]*?aria-label=\{t\("chat\.removeAttachment"/);
+  });
+
+  it("holds the same for a document chip, which also wraps its notes instead of widening", () => {
+    const card = /const CARD =\s*"([^"]*)"/.exec(source);
+    expect(card?.[1]).toContain("max-w-full");
+    expect(source).toMatch(/<span className="block min-w-0 max-w-\[16rem\] truncate">\{name\}<\/span>/);
+    expect(source.match(/\[overflow-wrap:anywhere\]/g)?.length).toBeGreaterThanOrEqual(2);
   });
 });

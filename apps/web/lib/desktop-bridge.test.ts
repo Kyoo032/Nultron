@@ -73,6 +73,28 @@ describe("desktop-bridge", () => {
     expect(saveBytes).toHaveBeenCalledWith("note.txt", [1, 2]);
   });
 
+  it("hands back what the shell answered to a save, so a refusal is not lost", async () => {
+    const answer = (value: unknown) => {
+      vi.stubGlobal("window", { agentforge: { isElectron: true, saveBytes: vi.fn(async () => value) } });
+      return saveDesktopBytes("note.txt", [1]);
+    };
+    await expect(answer({ ok: true })).resolves.toEqual({ ok: true });
+    await expect(answer({ ok: false, reason: "write-failed" })).resolves.toEqual({
+      ok: false,
+      reason: "write-failed",
+    });
+    await expect(answer({ ok: false, reason: "canceled" })).resolves.toEqual({ ok: false, reason: "canceled" });
+    // `ok: false` with no reason is still a refusal; a reason that is not text is dropped.
+    await expect(answer({ ok: false, reason: 7 })).resolves.toEqual({ ok: false });
+  });
+
+  it("reads a shell that answered nothing, or something that is not an answer, as no answer", async () => {
+    for (const value of [undefined, null, "saved", 1, {}, { ok: "yes" }]) {
+      vi.stubGlobal("window", { agentforge: { isElectron: true, saveBytes: vi.fn(async () => value) } });
+      await expect(saveDesktopBytes("note.txt", [1])).resolves.toBeUndefined();
+    }
+  });
+
   it("no-ops abort and save when the bridge is missing", async () => {
     abortDesktopStream("r1");
     await expect(saveDesktopBytes("note.txt", [1])).resolves.toBeUndefined();

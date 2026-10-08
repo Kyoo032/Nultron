@@ -2,6 +2,7 @@ import JSZip from "jszip";
 import { describe, expect, it } from "vitest";
 import { buildPresentationPptx } from "./presentation-pptx";
 import { parsePresentationOutlineBody } from "./presentation-outline";
+import { firstXmlIllegalChar } from "./xml-test-support";
 
 describe("buildPresentationPptx", () => {
   it("returns a non-empty pptx buffer and a .pptx filename", async () => {
@@ -87,5 +88,30 @@ describe("buildPresentationPptx", () => {
     expect(xml).toContain('prst="star5"');
     expect(xml).toContain('prst="roundRect"');
     expect(xml.toLowerCase()).toContain("c4512c");
+  });
+});
+
+describe("buildPresentationPptx with text a PDF or a model left control characters in", () => {
+  it("writes no part PowerPoint would call corrupt", async () => {
+    const outline = parsePresentationOutlineBody({
+      title: "Plan\u0000 2027",
+      slides: [
+        {
+          heading: "Why\u0008 now",
+          bullets: ["Lunch\u000corders doubled", "Delivery\u001b is a third"],
+          notes: "Say it\u0007 slowly",
+        },
+      ],
+    });
+    const { buffer } = await buildPresentationPptx(outline);
+    const zip = await JSZip.loadAsync(Buffer.from(buffer));
+    const parts = Object.keys(zip.files).filter((name) => /\.(xml|rels)$/.test(name));
+    expect(parts.length).toBeGreaterThan(5);
+    for (const name of parts) {
+      const text = (await zip.file(name)?.async("string")) ?? "";
+      expect(firstXmlIllegalChar(text), name).toBeNull();
+    }
+    const slide = (await zip.file("ppt/slides/slide2.xml")?.async("string")) ?? "";
+    expect(slide).toContain("Lunch orders doubled");
   });
 });

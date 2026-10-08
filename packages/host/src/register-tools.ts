@@ -8,11 +8,13 @@ import {
 import { registerFileTools, setFileRootResolver } from "@agentforge/core/tools/files";
 import { registerUniversityTools } from "@agentforge/university";
 import { registerCodeTools } from "./code-runner";
+import { registerDeckTools } from "./deck";
 import { resolveHostFileRoot } from "./file-roots";
 import { knowledgeSearchTool } from "./knowledge-search-tool";
 import { marketTools } from "./market/tools";
 import { pastSessionsTool } from "./session-tools";
 import { localeForRun } from "./run-context";
+import { selfCheckTool } from "./self-check-tool";
 import { runSqlTool } from "./sql-tool";
 
 let registered = false;
@@ -34,6 +36,8 @@ export function ensureToolsRegistered(): void {
   registerFileTools();
   setFileRootResolver(resolveHostFileRoot);
   registerCodeTools();
+  registerTool(selfCheckTool);
+  registerDeckTools();
   registered = true;
   void import("./edit/backend").then((mod) => {
     setEditToolBackend(mod.hostEditBackend);

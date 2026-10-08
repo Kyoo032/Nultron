@@ -1,3 +1,4 @@
+import { imageRejectedMessage } from "./content/image-copy";
 import { parseAppLocale, type AppLocale } from "./locale";
 import { parseGatewayHttpDetail } from "./models/request-constraints";
 import { redactSecrets } from "./security/redact";
@@ -125,8 +126,16 @@ export function gatewayHttpFailure(
   status: number,
   bodyText: string,
   locale: AppLocale = "en",
+  /** `carriesImage`: the request had a picture in it, so a refusal about the picture is said as one. */
+  context: { carriesImage?: boolean } = {},
 ): { message: string; detail: string } {
   const detail = parseGatewayHttpDetail(status, bodyText);
+  if (context.carriesImage) {
+    const aboutImage = imageRejectedMessage(detail.code, `${detail.message} ${bodyText}`, locale);
+    if (aboutImage) {
+      return { message: aboutImage, detail: detail.message };
+    }
+  }
   const kind = gatewayErrorKind(detail.code);
   if (!kind) {
     // This branch hands the upstream sentence straight to the person. A gateway that echoes the

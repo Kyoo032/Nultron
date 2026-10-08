@@ -68,6 +68,7 @@ function harness(
     claimSeat?: (identity: PortalIdentity) => Promise<{ readonly ok: boolean }>;
     secrets?: SessionSecrets;
     readRole?: AuthRouteDeps["readRole"];
+    signInMode?: AuthRouteDeps["signInMode"];
   } = {},
 ): Harness {
   const store = options.store ?? createMemorySessionStore();
@@ -99,6 +100,7 @@ function harness(
     now: () => T0,
     secrets: options.secrets ?? SECRETS,
     readRole: options.readRole,
+    signInMode: options.signInMode,
   };
   return { routes: createAuthRoutes(deps), store, vault, portal, deps, provisioned, seated };
 }
@@ -535,6 +537,39 @@ describe("GET /api/v1/auth/session", () => {
     const result = await json(h.routes.handleSession(request({ method: "GET" })));
     expect(result.status).toBe(200);
     expect(body(result)).toEqual({ signedIn: false });
+  });
+
+  // PORTAL_SIGNIN_MODE=password (2026-10-07): the portal says how it signs people in, the host passes
+  // it on, and the sign-in screen does not promise an e-mailed code in front of a portal that sends none.
+  describe("signInMode", () => {
+    it("says password to a signed-out visitor, a stale cookie and a live session, when the portal does", async () => {
+      const h = harness({ signInMode: async () => "password", readRole: async () => "member" });
+      const { id } = await signIn(h);
+
+      const visitor = await json(h.routes.handleSession(request({ method: "GET" })));
+      expect(body(visitor)).toEqual({ signedIn: false, signInMode: "password" });
+      const stale = await json(h.routes.handleSession(withSession("no-such-session", { method: "GET" })));
+      expect(body(stale)).toEqual({ signedIn: false, reason: "session_required", signInMode: "password" });
+      const live = await json(h.routes.handleSession(withSession(id, { method: "GET" })));
+      expect(body(live)).toMatchObject({ signedIn: true, userId: "usr_fake", role: "member", signInMode: "password" });
+    });
+
+    it("adds nothing at all when the portal says code, or nothing, or fails: the answer is what it was", async () => {
+      const plain = await json(harness().routes.handleSession(request({ method: "GET" })));
+      expect(body(plain)).toEqual({ signedIn: false });
+      for (const signInMode of [
+        async () => "code" as const,
+        async () => Promise.reject(new Error("portal unreachable")),
+      ]) {
+        const h = harness({ signInMode });
+        const visitor = await json(h.routes.handleSession(request({ method: "GET" })));
+        expect(body(visitor)).toEqual({ signedIn: false });
+        expect(JSON.stringify(visitor.body)).toBe(JSON.stringify({ signedIn: false }));
+        const { id } = await signIn(h);
+        const live = await json(h.routes.handleSession(withSession(id, { method: "GET" })));
+        expect(body(live)).not.toHaveProperty("signInMode");
+      }
+    });
   });
 
   it("names the reason when a cookie was presented", async () => {

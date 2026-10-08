@@ -143,7 +143,7 @@ A refusal is `429 { code: "rate_limited", message: "Too many requests. Please sl
 
 | Pool | Cap env | Default | Wired at |
 |---|---|---|---|
-| ffmpeg / ffprobe children | `AGENTFORGE_MAX_FFMPEG` (`:27`) | 2 (`:29`) | `:288`, used by `packages/host/src/edit/ffmpeg/run.ts:101` |
+| ffmpeg / ffprobe children | `AGENTFORGE_MAX_FFMPEG` (`:27`) | 2 (`:29`) | `:288`, used by `packages/host/src/edit/ffmpeg/run.ts:162` |
 | dataset SQL workers | `AGENTFORGE_MAX_SQL_WORKERS` (`:28`) | 4 (`:30`) | `:290`, used by `packages/host/src/sql-runner.ts:186`, `:278` |
 
 `AGENTFORGE_JOB_QUEUE_TIMEOUT_MS` (`:33`, default 60 000, `:34`) is how long a job may sit in the waiting room before it is refused instead (`:162-167`); the timer is `unref`'d so a waiting room never keeps the process alive (`:169`). Both the full-waiting-room case (`:203-205`) and the timeout case answer the same `ApiError("too_many_jobs", …, 429)` (`:21-22`, `:92-98`) — it is the same answer, reached a minute later.
@@ -175,7 +175,7 @@ The renderer half matches: `resolveGate(payload, isElectron, hosted)` (`apps/web
 **"Start over" answers 403; "Sign out" does not.** `handleResetApp` (`packages/host/src/handlers/settings.ts:445-461`, route `packages/host/src/router.ts:264`) resolves `serverMode` through an injectable dep (`ResetDeps`, `:443`, resolved `:450`). Phase 4 split the two scopes rather than refusing both:
 - `scope: "all"` → `ApiError(RESET_DISABLED_CODE, RESET_DISABLED_MESSAGE, 403)` (`resetEverything`, `:423-440`, refusal at `:424-426`, constants `:383-386`). The refusal comes **first**, before the confirmation word is checked and before anything is queued, so one workspace's owner cannot arm a wipe of everyone else's data.
 - `DELETE /api/v1/settings/reset` (cancel) refuses the same way (`:477`).
-- `scope: "key"` **no longer refuses** (`resetGatewayKey`, `:400-415`). It used to, on the reasoning that `clearGatewayKeyEverywhere()` was machine-wide — which stopped being true in Phase 3 lane D, when both it and `clearGateState` were narrowed to the caller's tenant. Phase 4 dropped the 403 and the dead `RESET_KEY_DISABLED_MESSAGE` with it, because refusing it left a hosted tenant with no way to remove a saved key: a blank `openaiApiKey` in a settings POST is dropped rather than applied (`keyFieldValue`, `:194-202`). Pinned by `packages/host/src/handlers/settings.test.ts`.
+- `scope: "key"` **no longer refuses** (`resetGatewayKey`, `:400-415`). It used to, on the reasoning that `clearGatewayKeyEverywhere()` was machine-wide — which stopped being true in Phase 3 lane D, when both it and `clearGateState` were narrowed to the caller's tenant. Phase 4 dropped the 403 and the dead `RESET_KEY_DISABLED_MESSAGE` with it, because refusing it left a hosted tenant with no way to remove a saved key: a blank `openaiApiKey` in a settings POST is dropped rather than applied (`keyFieldValue`, `packages/host/src/handlers/settings.ts:227-232`; on the desk too since 2026-10-06). Pinned by `packages/host/src/handlers/settings.test.ts`.
 Off server mode nothing about either scope changed.
 
 ## Where things live

@@ -9,6 +9,7 @@ import { generateFinanceBrief, regenerateFinanceSection } from "../finance-gener
 import { requireFinanceTask } from "../finance-task";
 import { financeTaskParser } from "../finance-tasks/parsers";
 import { streamJob } from "../job-stream";
+import { withRunSlot } from "../run-limits";
 
 export async function handlePostFinance(request: HostRequest): Promise<HostResult> {
   try {
@@ -17,8 +18,10 @@ export async function handlePostFinance(request: HostRequest): Promise<HostResul
     requireGatewayAllowedFor(tenant);
     // `task` is validated before anything reaches the gateway: a task that ships
     // later is a 400 here, not a half-run pipeline.
-    requireFinanceTask(request.body ?? null);
-    return jsonOk(await generateFinanceBrief(tenant, request.body ?? null, undefined, request.abortSignal));
+    return await withRunSlot(tenant, async () => {
+      requireFinanceTask(request.body ?? null);
+      return jsonOk(await generateFinanceBrief(tenant, request.body ?? null, undefined, request.abortSignal));
+    });
   } catch (error) {
     return jsonError(error);
   }
@@ -33,6 +36,7 @@ export async function handlePostFinanceStream(request: HostRequest): Promise<Hos
     requireFinanceTask(request.body ?? null);
     return streamJob((emit, abortSignal) => generateFinanceBrief(tenant, request.body ?? null, emit, abortSignal), {
       abortSignal: request.abortSignal,
+      tenant,
     });
   } catch (error) {
     return jsonError(error);
@@ -50,8 +54,10 @@ export async function handlePostFinanceParse(request: HostRequest): Promise<Host
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    const task = requireFinanceTask(request.body ?? null);
-    return jsonOk(await financeTaskParser(task)(tenant, request.body ?? null, request.abortSignal));
+    return await withRunSlot(tenant, async () => {
+      const task = requireFinanceTask(request.body ?? null);
+      return jsonOk(await financeTaskParser(task)(tenant, request.body ?? null, request.abortSignal));
+    });
   } catch (error) {
     return jsonError(error);
   }
@@ -62,8 +68,10 @@ export async function handlePostFinanceRegen(request: HostRequest): Promise<Host
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    requireFinanceTask(request.body ?? null);
-    return jsonOk(await regenerateFinanceSection(tenant, request.body ?? null, request.abortSignal));
+    return await withRunSlot(tenant, async () => {
+      requireFinanceTask(request.body ?? null);
+      return jsonOk(await regenerateFinanceSection(tenant, request.body ?? null, request.abortSignal));
+    });
   } catch (error) {
     return jsonError(error);
   }

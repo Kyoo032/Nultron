@@ -1,6 +1,6 @@
 # Map — Edit timeline and agent
 
-Last verified: 2026-10-05, the #130 branch merged with `origin/main` at `7354a6b`, for § 8's harness paragraph and for every `agent-run.ts` citation on this page, which moved when the harness block went in front of the stub branch (+2 lines in the header, +23 in `runEditAgent`). The Edit spec now owns the five skills (`packages/core/src/harness/modes/edit.ts`, declared in `packages/core/src/edit/harness.ts`), and a cancelled turn makes no harness tool call. Read against the merged code and the unit tests (`harness-run.test.ts`); not driven in a browser. Before that, 2026-09-28 for the five method-free skills in § 8 (`packages/core/src/edit/harness.ts`, `packages/host/src/edit/harness-run.ts`). Before that, 2026-10-02 (working tree on top of 0b61a29), a later pass that day, for § 5 (the echo and `foldApplied`), the `commitOps` / import / agent-stream passages in § 6, § 7 and § 8, the `applyOp` row of the failure table, and the first Gotchas entry: the renderer now folds each host frame once, by seq, outside any state updater, so the echoed op no longer unmounts the studio. Proven by `apps/web/lib/edit-client.test.ts` and by replaying frames captured from the live host on `:3000` (a throwaway project with an import and a split, in both arrival orders); not driven in a browser. Earlier the same day: the Edit agent's ffmpeg prompt line in § 2 (on the hosted server it no longer names the server's platform, install command or environment variable; the paragraph that listed it as the one uncovered reader of the hint is rewritten) and the `compactPrompt` / `editAgentModelId` citations in the live-path paragraph, which moved. Proven by unit tests with a Personal-parity case that was mutation-checked; not driven in a browser. Before that: 2026-10-01 (working tree on top of 0b61a29), a final pass that day, for the other hosted no-key doors in § 8 and the failure table (`Go` on a plan card, the recipe buttons and the Generate tab's submit are quiet and say why, and `sendAgent` refuses while the key is missing) and for the hosted doctor answer in § 1 and § 2 (it no longer carries `setup`). Proven by unit tests, each with a Personal-parity case that was mutation-checked; **not driven in a browser**. The citations in the passages that pass touched were re-anchored; every other `edit-studio.tsx` citation below `:450` was not re-read and may sit a few lines off after other lanes' edits. Before that, a later pass that day, for the Enterprise no-key states in § 1, § 8 and the failure table (the Agent pane's `edit-agent-needs-key` note and quiet `edit-composer-send`, the hosted one-line `edit-needs-ffmpeg`) and the testid citations into `edit-agent-panel.tsx` and `ffmpeg-setup-notice.tsx`, which moved. The hosted states are driven on `:3000` with the hosted marker and the host's answers faked in the browser (`page.route`, every non-GET aborted), not on a deployed hosted build. Before that, 2026-10-01 (working tree on top of 0b61a29) for § 1's empty-state paragraph, the Gotchas lines about it, and every `edit-studio.tsx` citation that points at or past the `!project` branch (`:715`) or that this pass re-read (the testid list at the foot included): the empty state moved out of `edit-studio.tsx` into `edit-empty-state.tsx`, so everything after it shifted up by 53 lines. Read against the files and driven read-only on `:3000` at 390, 768, 1024, 1100 and 1440 px (which element scrolls, below). Before that, 2026-09-29 for § 2 (doctor), in the working tree and not committed: the doctor route and the boot probe are
+Last verified: 2026-10-07 (working tree on `5bec532`), for the ffmpeg input limits (the import's refusal of a playlist or script, the whitelist, the hosted timeout caps; the failure-mode rows and § 7's import step), the packaged-app missing-folder rule (§ 1, § 2), the `ffmpeg-binary.ts` and `run.ts` citations those moved, and the `escapeFilterPath` finding, which is now fixed (Gotchas); read against the code and `ffmpeg-input-safety-real.test.ts` (staged ffmpeg 8.1.3), not driven in a browser or on a packed app. Before that, 2026-10-06 (working tree on `5bec532`), for the packaged-app ffmpeg paragraph in § 1 and the `ffmpeg-setup-notice.tsx` citations on this page, which moved when the reinstall branch went in; read against the code and held by unit tests (`ffmpeg-binary-bundled.test.ts`, `ffmpeg-bundled-notice.test.tsx`); not driven in a browser or on a packed app. Before that, 2026-10-05, the #130 branch merged with `origin/main` at `7354a6b`, for § 8's harness paragraph and for every `agent-run.ts` citation on this page, which moved when the harness block went in front of the stub branch (+2 lines in the header, +23 in `runEditAgent`). The Edit spec now owns the five skills (`packages/core/src/harness/modes/edit.ts`, declared in `packages/core/src/edit/harness.ts`), and a cancelled turn makes no harness tool call. Read against the merged code and the unit tests (`harness-run.test.ts`); not driven in a browser. Before that, 2026-09-28 for the five method-free skills in § 8 (`packages/core/src/edit/harness.ts`, `packages/host/src/edit/harness-run.ts`). Before that, 2026-10-02 (working tree on top of 0b61a29), a later pass that day, for § 5 (the echo and `foldApplied`), the `commitOps` / import / agent-stream passages in § 6, § 7 and § 8, the `applyOp` row of the failure table, and the first Gotchas entry: the renderer now folds each host frame once, by seq, outside any state updater, so the echoed op no longer unmounts the studio. Proven by `apps/web/lib/edit-client.test.ts` and by replaying frames captured from the live host on `:3000` (a throwaway project with an import and a split, in both arrival orders); not driven in a browser. Earlier the same day: the Edit agent's ffmpeg prompt line in § 2 (on the hosted server it no longer names the server's platform, install command or environment variable; the paragraph that listed it as the one uncovered reader of the hint is rewritten) and the `compactPrompt` / `editAgentModelId` citations in the live-path paragraph, which moved. Proven by unit tests with a Personal-parity case that was mutation-checked; not driven in a browser. Before that: 2026-10-01 (working tree on top of 0b61a29), a final pass that day, for the other hosted no-key doors in § 8 and the failure table (`Go` on a plan card, the recipe buttons and the Generate tab's submit are quiet and say why, and `sendAgent` refuses while the key is missing) and for the hosted doctor answer in § 1 and § 2 (it no longer carries `setup`). Proven by unit tests, each with a Personal-parity case that was mutation-checked; **not driven in a browser**. The citations in the passages that pass touched were re-anchored; every other `edit-studio.tsx` citation below `:450` was not re-read and may sit a few lines off after other lanes' edits. Before that, a later pass that day, for the Enterprise no-key states in § 1, § 8 and the failure table (the Agent pane's `edit-agent-needs-key` note and quiet `edit-composer-send`, the hosted one-line `edit-needs-ffmpeg`) and the testid citations into `edit-agent-panel.tsx` and `ffmpeg-setup-notice.tsx`, which moved. The hosted states are driven on `:3000` with the hosted marker and the host's answers faked in the browser (`page.route`, every non-GET aborted), not on a deployed hosted build. Before that, 2026-10-01 (working tree on top of 0b61a29) for § 1's empty-state paragraph, the Gotchas lines about it, and every `edit-studio.tsx` citation that points at or past the `!project` branch (`:715`) or that this pass re-read (the testid list at the foot included): the empty state moved out of `edit-studio.tsx` into `edit-empty-state.tsx`, so everything after it shifted up by 53 lines. Read against the files and driven read-only on `:3000` at 390, 768, 1024, 1100 and 1440 px (which element scrolls, below). Before that, 2026-09-29 for § 2 (doctor), in the working tree and not committed: the doctor route and the boot probe are
 async and cached, and the packaged app no longer waits on the probe before the first paint. Before that, 2026-09-27 for the preview transport and the timeline hint, which read `edit.preview.*` and `edit.timeline.*`. Before that, 2026-09-27 for agent cards: `applyAgentOps` sets `status: "applied"` after `appendOps` succeeds, and the card offers Keep only while `proposed`. A new project name comes from `edit.defaultProjectName` (`Untitled edit` / `Suntingan baru`). Before that: 2026-09-26 for § 8 (live bindings, chat model, tool-result frames, title defaults, stub "says Hello"). Before that: 2026-09-23 at d4561b8 + uncommitted tree for § 2 (doctor), § 4 (the `appendOps` steps, desk and job
 scope), § 6 (keyboard guard, drag release), § 10 (review gate, and `render` refused on `/jobs`), § 11 (generate,
 the worker's tenant, the still check), § 12 (export, the desktop save dialog) and the gateway-gate failure row —
@@ -56,17 +56,27 @@ on `:3000` with a long project list: pane 306 px (390 viewport) and 520 px (768)
 `edit-generate-tab` and `edit-ops-count` do **not** exist in this state. `edit-export` exists but is
 disabled, because `!project` is the first term of its `disabled` expression (`edit-studio.tsx:684`).
 
-`FfmpegSetupNotice` (`apps/web/components/ffmpeg-setup-notice.tsx:38`) renders **nothing** unless
-`doctor.ffmpeg.found === false` (`:43`); when it does render it is `edit-needs-ffmpeg` (`:78`)
+`FfmpegSetupNotice` (`apps/web/components/ffmpeg-setup-notice.tsx:43`) renders **nothing** unless
+`doctor.ffmpeg.found === false` (`:49`); when it does render it is `edit-needs-ffmpeg` (`:104`)
 with `ffmpeg-install-command` and a `ffmpeg-recheck` button that re-probes via
-`GET /api/v1/edit/doctor?recheck=1`. **On the hosted build** (`isHostedBuild()`, `:46`) it is the same
+`GET /api/v1/edit/doctor?recheck=1`. **On the hosted build** (`isHostedBuild()`, `:52`) it is the same
 `edit-needs-ffmpeg` element holding one calm line (`edit.ffmpeg.hostedUnavailable`) and nothing else: no
 command, no Copy, no re-check, no install link, because a tenant cannot install anything on the server.
 The hosted host agrees with that screen: its doctor answer carries no `setup` hint at all (§ 2), so the
 notice has nothing to read there even if it wanted to. Where it does draw the guide it reads
-`setup?.installCommand` and `setup?.summary` with generic fallback words (`ffmpeg-setup-notice.tsx:53-55`),
+`setup?.installCommand` and `setup?.summary` with generic fallback words (`ffmpeg-setup-notice.tsx:59-61`),
 so a desk talking to a host that sent none (an older one) still renders and does not throw.
 The onboarding key step does not offer the guide on hosted either (`onboarding-screen.tsx:116`).
+
+**In the packaged app (2026-10-06, in the tree, not packed).** The installer carries its own ffmpeg
+(`resources/ffmpeg/`, `apps/desktop/scripts/stage-ffmpeg.mjs`), so the guide is not the answer to a failure
+there. When the host's hint is `setup.bundled` (`ffmpeg-setup.ts` `usesBundledFfmpeg`: `AGENTFORGE_PACKAGED=1` and no
+`AGENTFORGE_FFMPEG_PATH`), `FfmpegSetupNotice` draws a different `edit-needs-ffmpeg` (`data-ffmpeg-bundled="true"`):
+one reinstall line (`edit.ffmpeg.bundledUnavailable`) plus `ffmpeg-recheck`, with no command, Copy, link or step list,
+in both variants. Webdev, the hosted build and a desk that set the path itself keep everything above.
+`packagedBinary` (`ffmpeg-binary.ts:193`) decides before PATH is searched, so a PATH copy never replaces the bundled
+one. A bundled copy that will not run is reported as `exec_failed` against its own path, and a folder that is gone
+as `missing` against the same path (`absentBundled`, `:287`), both with no fall-back to PATH (§ 2).
 
 ### 2. Doctor — ffmpeg and ASR
 
@@ -77,14 +87,19 @@ cached probe (`resetFfmpegBinaryCache`) but is throttled to one forced re-probe 
 ffmpeg and the caller is a local web page. When ffmpeg is missing the report also carries a per-OS
 `setup` hint (`ffmpegSetupHint`, `doctor.ts:89`) — on a desk; the hosted answer drops it, below.
 
-The probe itself is `resolveFfmpegAsync` (`packages/host/src/edit/ffmpeg-binary.ts:340`): `execFile`, so a
+The probe itself is `resolveFfmpegAsync` (`packages/host/src/edit/ffmpeg-binary.ts:367`): `execFile`, so a
 cold PATH walk (`where.exe`, ~200 ms) plus `ffmpeg -version` no longer freezes the host for ~290 ms
-(measured 292 ms blocked before, ≤ 16 ms, one timer tick, after). Sync callers (`getEditDoctor`,
+(measured 292 ms blocked before, ≤ 16 ms, one timer tick, after). The PATH walk is only reached when no
+direct candidate settles the question: in the packaged app (`AGENTFORGE_PACKAGED=1`, no
+`AGENTFORGE_FFMPEG_PATH`) the bundled copy is always the direct candidate (`packagedBinary`, `:193`), present or
+not. An install that lost its `resources/ffmpeg/` folder is reported `missing` against that path
+(`absentBundled`, `:287`) with no PATH walk at all, so a PATH copy never rescues a broken install; Electron without
+the flag (the `desktop:dev` window) keeps the old fallback to PATH. Sync callers (`getEditDoctor`,
 `doctor.ts:81`, used by the Edit agent's prompt line; `run.ts`, `recipes.ts`, `starter-media.ts`,
-`meeting/audio.ts`) keep `resolveFfmpeg` (`:331`) and read the same cache. The cache is per process,
-keyed on the configured `AGENTFORGE_FFMPEG_PATH` / `AGENTFORGE_FFPROBE_PATH` (`:42-47`), shared by two
-callers that arrive during one walk (`resolveCachedAsync`, `:310`), and dropped by
-`resetFfmpegBinaryCache` (`:54`) — the Check-again route above is its one production caller; the
+`meeting/audio.ts`) keep `resolveFfmpeg` (`:358`) and read the same cache. The cache is per process,
+keyed on the configured `AGENTFORGE_FFMPEG_PATH` / `AGENTFORGE_FFPROBE_PATH` (`:45-46`), shared by two
+callers that arrive during one walk (`resolveCachedAsync`, `:332`), and dropped by
+`resetFfmpegBinaryCache` (`:55`) — the Check-again route above is its one production caller; the
 component installer has no ffmpeg entry yet (`components/manifest.ts`).
 
 **Packaged boot.** `bootstrapPackaged` (`apps/desktop/main.cjs:641`) writes `host-status.json` without
@@ -273,8 +288,17 @@ Host side (`packages/host/src/handlers/edit.ts:201-316`):
 1. `foldProject` (desk check), then `saveEditFile` (`:71-97`) — `assertEditUpload` enforces
    `EDIT_UPLOAD_MAX = 500 MB` and an allow-list of image/video/audio mimes (`:28-32`, `:600-607`),
    then writes `mediaRoot()/<organizationId>/<mediaId>.<ext>` and inserts a `media` row.
-2. `probe(abs, projectId)` via ffmpeg. **On a probe failure the file is unlinked again** and the call
-   answers `400 unsupported_media` (`:257-270`) — no orphan bytes.
+2. `probe(abs, projectId)` via ffprobe (`handlers/edit.ts:326`). Every ffmpeg and ffprobe run, this one
+   included, is given `-protocol_whitelist file,crypto,data` in `runFfmpeg` (`edit/ffmpeg/run.ts:174`), so a
+   file cannot make it open an address (SR-135, `edit/ffmpeg/input-safety.ts`). **On a probe failure the file
+   is unlinked again** and the call answers `400 unsupported_media` (`:327-333`) — no orphan bytes. A
+   container that is a playlist or a script (`hls`, `applehttp`, `concat`, `sdp`, `rtsp`, `rtp`, `ffmetadata`,
+   `data`, `dash`) is refused inside `probe` (`recipes.ts:73`, `assertAcceptableContainer`) with its own
+   sentence, `mediaFormatRefused`; the catch lets that one through (`:330-332`) instead of the generic
+   `editMediaUnreadable`, and the same unlink and refund follow. The upload is stored as `<id>.<mime subtype>`
+   (`extFor`, `:63`), so content decides: a text file sent as `video/mp4` that holds an `ffconcat` or
+   `ffmetadata` header is detected and refused, while an HLS playlist is only detected by an `.m3u8` name and
+   so fails as "could not read".
 3. Duration comes from `importedClipDurationFrames`; a still image gets `STILL_IMAGE_SECONDS`
    (`packages/host/src/edit/import-duration.ts`).
 4. `appendOps` with **two** ops: `add_asset` then `add_clip` at `timelineStartFrame: 0` on `v1`
@@ -475,16 +499,17 @@ A's `workerWorkspaceId`.
 |---|---|---|
 | ffmpeg missing | `resolveFfmpegAsync` via `getEditDoctorAsync` (sync: `resolveFfmpeg`) | `edit-needs-ffmpeg` banner with an install command and `ffmpeg-recheck`; probe/cut/captions/export refuse. Hosted: the same banner as one line with no command or button |
 | No gateway key | `hasOpenai` false | `edit-needs-key` in the Generate tab, `edit-generate-submit` disabled; everything else still works. Hosted: also `edit-agent-needs-key` in the Agent pane with `edit-composer-send`, `edit-plan-go` and every `edit-recipe-<id>` disabled and explained, and `sendAgent` refusing (§ 8) |
-| Gateway gate closed | `requireGatewayAllowedFor` on `/agent`, `/generate` and `asr` on `/jobs` (`handlers/edit.ts:401`, `:661`, `:479`); again in the generate worker (`packages/host/src/edit/jobs.ts:226`) | flat `403 gateway_blocked`, no stream; the composer surfaces `edit.errors.agentFailed`. A generate job that meets a closed gate in the worker fails with the gate's message and calls nothing |
+| Gateway gate closed | `requireGatewayAllowedFor` on `/agent`, `/generate` and `asr` on `/jobs` (`handlers/edit.ts:401`, `:661`, `:479`); again in the generate worker (`packages/host/src/edit/jobs.ts:232`) | flat `403 gateway_blocked`, no stream; the composer surfaces `edit.errors.agentFailed`. A generate job that meets a closed gate in the worker fails with the gate's message and calls nothing |
 | Unsupported / oversized upload | `assertEditUpload` (`handlers/edit.ts:600-607`) | `400 invalid_request` / `unsupported_content_type` |
-| ffmpeg cannot read the upload | probe catch (`handlers/edit.ts:257-270`) | `400 unsupported_media`, the saved file is unlinked |
+| ffmpeg cannot read the upload | probe catch (`handlers/edit.ts:327-333`) | `400 unsupported_media` ("could not read this file"), the saved file is unlinked |
+| Upload is a playlist or script (`concat`, `ffmetadata`, `hls`, `sdp`, `dash` and the rest of `REFUSED_CONTAINER_FORMATS`) | `assertAcceptableContainer` in `probe` (`edit/ffmpeg/recipes.ts:73`); the catch rethrows it (`handlers/edit.ts:330-332`) | `400 unsupported_media` with `mediaFormatRefused` ("a playlist or a list of other files, not a video or audio recording"), file unlinked, charge refunded. A generated clip that turns out to be one fails its job the same way (`edit/jobs.ts` `probeGeneratedMeta`) |
 | `sourcePath` over HTTP | `handlers/edit.ts:214-217` | `400` — IPC only |
 | Op invalid (duplicate id, split outside the clip) | `applyOp` (`packages/core/src/edit/ops.ts:342-551`) | server side: the append throws, `jsonError` → 400, and `commitOps` shows the message in the red banner and reloads the project. An echoed op the copy already holds is skipped, and one that does not fit is a `diverged` reload (§ 5); the studio stays mounted |
 | Project id from another desk | `foldProject(projectId, workspaceId)` | 404 before any work |
 | Job id from another project | `jobInProject` (`handlers/edit.ts:171-177`) | 404 |
 | Export before review | `handlePostEditExport` (`:419-421`) | `400 review_required` (the button is already disabled) |
-| ffmpeg render fails | `spawnFfmpeg` under `runFfmpeg` (`packages/host/src/edit/ffmpeg/run.ts:107-123`) | job `failed`, `error: "ffmpeg recipe failed"`, partial output unlinked. **Nothing at all in the UI** |
-| ffmpeg times out / cancelled | same, `:116-121` | `ffmpeg_timeout` / `job_cancelled` |
+| ffmpeg render fails | `spawnFfmpeg` under `runFfmpeg` (`packages/host/src/edit/ffmpeg/run.ts:165-219`) | job `failed`, `error: "ffmpeg recipe failed"`, partial output unlinked. **Nothing at all in the UI** |
+| ffmpeg times out / cancelled | same, `:209-214` | `ffmpeg_timeout` / `job_cancelled`. On a hosted server no run outlives two hours whatever timeout it asked for (`hostedRunTimeoutMs`, `:180`); a declared media length is believed up to six hours; analysis stops at one hour and a render at two (`edit/ffmpeg/input-safety.ts`, SR-135). A desk keeps its own timeouts |
 | Turn cap exceeded | `chargeTurnBudget` (`packages/host/src/edit/budget.ts:27-39`) | a refusal plus an `edit-plan-card`; no job is queued |
 | Export file requested early | `handleGetEditExportFile` (`:441-443`) | `404 not_found` "Export is not ready" |
 
@@ -521,6 +546,7 @@ A's `workerWorkspaceId`.
 | `packages/host/src/edit/events.ts` | The project event bus and its SSE encoding |
 | `packages/host/src/edit/ffmpeg/recipes.ts` | `probe`, `render`, `frameAt`, `compileFilterGraph` |
 | `packages/host/src/edit/ffmpeg/paths.ts` | Scratch roots, the path allow-list, `escapeFilterPath` |
+| `packages/host/src/edit/ffmpeg/input-safety.ts` | The protocol whitelist, the refused container formats and the hosted timeout caps (SR-135); Meeting's `meeting/audio.ts` uses it too |
 | `packages/host/src/edit/doctor.ts` | `GET /api/v1/edit/doctor` and its re-probe throttle |
 | `packages/core/src/edit/ops.ts` | `applyOp` and every invariant it enforces |
 | `packages/core/src/edit/fold.ts` | `foldOps` + `validateDoc` (dangling references) |
@@ -578,12 +604,16 @@ A's `workerWorkspaceId`.
 - **The emit lock is unobservable on stub.** `onCard()` releases it (`apps/web/lib/use-emit-lock.ts:71-73`)
   and the stub emits `tool.started` and the card in the same tick, so `edit-emit-lock` never paints.
   Job-backed tools deliberately never take the lock at all (`use-emit-lock.ts:63-65`).
-- **`escapeFilterPath` under-escapes a Windows drive letter** (`packages/host/src/edit/ffmpeg/paths.ts:71-80`).
-  It emits `C\:/…`, which ffmpeg unescapes once at the filtergraph level, leaving the option parser to
-  split the path on its colon. Since `render()` always attaches an `.ass` file
-  (`recipes.ts:225-228`, `:189-193`) — even with no captions and no titles — **every export on Windows
-  fails** with `ffmpeg recipe failed`, and `frameAt()` carries the same bug. The wire form that works
-  is `C\\:/…`. **Finding, not a design.**
+- **`escapeFilterPath` used to under-escape a Windows drive letter; fixed 2026-10-06 (in the tree).**
+  (`packages/host/src/edit/ffmpeg/paths.ts:86`.) It emitted `C\:/…`, which ffmpeg unescapes once when it
+  splits the filtergraph and once more when it splits the filter's options, so the option parser cut the
+  path at its colon (`C` became a file name; ffmpeg printed "Unable to parse original_size"). When the
+  timeline has a video clip, `compileFilterGraph` always attaches the `.ass` file (`recipes.ts:210-211`,
+  `render` at `:259`, `frameAt` at `:218`), even with no captions and no titles, so **every such export on
+  Windows failed** with `ffmpeg recipe failed`, and `frameAt()` the same. A path with no colon (macOS,
+  Linux, the hosted image) was never affected. It now escapes two levels, `C\\:/…`, and a real render of a
+  timeline with and without a clip, and a still frame, pass against ffmpeg 8.1.3
+  (`edit/ffmpeg-input-safety-real.test.ts`). Not driven in the packaged app.
 - **An export failure is silent.** `onExport` only shows an error when the POST is not ok
   (`edit-studio.tsx:571-575`); a job that fails later just clears `exporting` (`:618-625`).
 - **There is no way back to the project list.** `edit-project-list` only renders in the `!project`
@@ -640,7 +670,8 @@ DOM testids that prove it (the `edit-studio.tsx` and `edit-empty-state.tsx` line
 `:101`, `:114`, `:25`, `:54`),
 `edit-recipe-<id>` (`apps/web/components/edit-recipes-panel.tsx:19`),
 `edit-needs-ffmpeg` / `ffmpeg-install-command` / `ffmpeg-recheck` / `ffmpeg-setup-steps`
-(`apps/web/components/ffmpeg-setup-notice.tsx:78`, `:85`, `:97`, `:109`; the hosted line is `:48`),
+(`apps/web/components/ffmpeg-setup-notice.tsx:104`, `:111`, `:123`, `:135`; the hosted line is `:54`, the
+packaged-app reinstall line `:85`),
 `settings-edit-turn-cap` (`apps/web/components/settings-page.tsx:496`).
 
 Unit proof for the 2026-09-23 fixes: `packages/host/src/edit/jobs-route.test.ts` (the kinds `POST …/jobs` accepts, refuses and gates), `generate-tenant.test.ts` and `wire-generate.test.ts` (the worker's tenant), `metrics-scope.test.ts` (per-tenant metrics), `still-scope.test.ts`, `doctor-hosted.test.ts`, and on the renderer `apps/web/lib/edit-timeline-drag.test.ts`, `shortcut-target.test.ts` and `desktop-download-wiring.test.ts`.
@@ -679,8 +710,11 @@ mechanism, high for the motive given the shape of the check.**
 **Why every ffmpeg path goes through an allow-list.** `[Direct]` `editAllowlist`
 (`packages/host/src/edit/ffmpeg/paths.ts:63-69`) is that tenant's media root plus that one project's
 scratch dir, and `assertInsidePath` rejects empty paths, NUL bytes, UNC/device paths and drive-relative
-paths (`:82-94`) before resolving — then checks the `denied` roots before the allowed ones, which is what
+paths (`:97-108`) before resolving — then checks the `denied` roots before the allowed ones, which is what
 stops the local tenant reaching `media/tenants/<other>/…`. `render` and `frameAt` run every input and
-output through it (`recipes.ts:218`, `:224`, `:252`, `:258`). `[Inferred]` ffmpeg takes paths from a document that an agent can
+output through it (`recipes.ts:233`, `:236`, `:267`, `:270`). `[Inferred]` ffmpeg takes paths from a document that an agent can
 write, so the allow-list is the line between "the agent edits the owner's timeline" and "the agent
-names any file on the disk". **Confidence: high.**
+names any file on the disk". **Confidence: high.** The allow-list names which *files* ffmpeg may open. A
+second lock, added 2026-10-06 (SR-135), keeps an input from naming an *address*: `runFfmpeg` puts
+`-protocol_whitelist file,crypto,data` before every input (`run.ts:174`), and a playlist or script upload
+is refused at the probe, since such a file names other files or addresses of its own.

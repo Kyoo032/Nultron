@@ -36,8 +36,8 @@ const selectable = await import("./selectable-models");
 const settingsStore = await import("./settings-store");
 const stateStore = await import("./tenant-state-store");
 
-const A = { tenantId: "tenant-alpha", workspaceId: "desk-a" };
-const B = { tenantId: "tenant-beta", workspaceId: "desk-b" };
+const A = { tenantId: "tenant-alpha", organizationId: "org-alpha", workspaceId: "desk-a" };
+const B = { tenantId: "tenant-beta", organizationId: "org-beta", workspaceId: "desk-b" };
 const KEY_A = "sk-warmup-aaaaaaaaaaaaaaaaaaaaaaaa";
 
 const model = (id: string): ChatModel => ({ id, label: id, provider: "openai", inputModalities: ["text"] });
@@ -51,7 +51,8 @@ function hosted(): void {
 
 function cacheRows(): string[] {
   return (
-    sqlite.prepare("SELECT tenant_id FROM tenant_state WHERE key = 'model_cache' ORDER BY tenant_id").all() as Array<{
+    // SR-163: a company's row is `model_cache:<organisation id>`, so the key is matched by prefix.
+    sqlite.prepare("SELECT tenant_id FROM tenant_state WHERE key LIKE 'model_cache%' ORDER BY tenant_id").all() as Array<{
       tenant_id: string;
     }>
   ).map((row) => row.tenant_id);
@@ -124,7 +125,10 @@ describe("a hosted catalogue read with no cache row and a saved key", () => {
     expect(settings.openaiApiKey).toBe(KEY_A);
     // Named by tenant, so the probe's result lands in tenant A's row whichever request is in scope,
     // and write-if-absent, so a Save or a Refresh that lands first is never overwritten by this.
-    expect(options).toEqual({ scope: { tenantId: A.tenantId }, onlyIfMissing: true });
+    expect(options).toEqual({
+      scope: { tenantId: A.tenantId, organizationId: A.organizationId },
+      onlyIfMissing: true,
+    });
   });
 
   it("starts nothing for a tenant whose cache row exists, even an empty or errored one", () => {

@@ -58,6 +58,11 @@ export type FfmpegSetup = {
   installUrl: string;
   steps: string[];
   envVar: string;
+  /**
+   * True when the program that failed is the packaged app's own bundled copy: the fix is to reinstall the app,
+   * `installCommand` and `installUrl` are empty, and the notice shows a reinstall line instead of the guide.
+   */
+  bundled?: boolean;
 };
 
 export type EditDoctor = {

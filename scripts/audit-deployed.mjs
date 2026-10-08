@@ -28,7 +28,7 @@
  *
  * Two things keep this honest. `closureNames` reads only the `dependencies` and
  * `optionalDependencies` groups, whatever flags produced the file it is handed, so a closure
- * captured without `--prod` (scripts/ci-local.mjs captures one) cannot widen the gate back out to
+ * captured without `--prod` (scripts/ci-local.mjs used to capture one) cannot widen the gate back out to
  * dev tooling. And the test next to this file fails if the Dockerfile's `prod` stage and this
  * script stop selecting the same packages. A dev dependency that the server starts to import at
  * runtime is caught at image build instead, by the load check in the Dockerfile's `prod` stage.

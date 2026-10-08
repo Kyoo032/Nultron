@@ -1,6 +1,7 @@
 import type Database from "better-sqlite3";
 import { sql } from "@agentforge/db";
 import {
+  isServerMode,
   isUnpricedReason,
   isUsageMode,
   isUsageUnit,
@@ -171,9 +172,24 @@ function rowFrom(raw: Row): TenantUsageRow {
   };
 }
 
-function whereFor(tenantId: string, query: UsageQuery): { clause: string; params: unknown[] } {
+/**
+ * SR-163, review round. `tenantId` is the white-label partner and every company of a hosted deployment
+ * is an organisation inside it, so a reader that filters by `tenant_id` alone hands each company the
+ * partner's whole ledger. Every row carries its `organization_id`, so on the hosted server the readers
+ * add it. A desk has one organisation and one person, and reads exactly what it always read.
+ */
+function whereFor(
+  tenant: Pick<TenantContext, "tenantId" | "organizationId">,
+  query: UsageQuery,
+  byCompany: boolean,
+): { clause: string; params: unknown[] } {
   const parts = ["tenant_id = ?"];
-  const params: unknown[] = [tenantId];
+  const params: unknown[] = [tenant.tenantId];
+  if (byCompany) {
+    // The id the writer stored (`validate` trims it). A blank one matches nothing, which is the safe answer.
+    parts.push("organization_id = ?");
+    params.push((tenant.organizationId ?? "").trim());
+  }
   if (typeof query.from === "number" && Number.isFinite(query.from)) {
     parts.push("at >= ?");
     params.push(Math.round(query.from));
@@ -195,8 +211,18 @@ function whereFor(tenantId: string, query: UsageQuery): { clause: string; params
   return { clause: parts.join(" AND "), params };
 }
 
-/** Repository over the `tenant_usage` table. Nothing here reaches the network or prices anything. */
-export function createUsageStore(db: Database.Database): UsageStore {
+/** Injectable like the other hosted-only seams, so a test can ask for hosted reads without the env flag. */
+export type UsageStoreDeps = { isServerMode?: () => boolean };
+
+/**
+ * Repository over the `tenant_usage` table. Nothing here reaches the network or prices anything.
+ *
+ * On the hosted server `list` and `totals` are the caller's company's (`whereFor`). The plan's allowance
+ * counter is the partner's and is accrued by tenant id in `recordUsage`; it does not read these queries,
+ * so scoping the reads by company moves no cap.
+ */
+export function createUsageStore(db: Database.Database, deps: UsageStoreDeps = {}): UsageStore {
+  const byCompany = (): boolean => (deps.isServerMode ?? isServerMode)();
   return {
     record(tenant, event, billingPeriodStart = null) {
       const row = validate(tenant, event, billingPeriodStart);
@@ -231,7 +257,7 @@ export function createUsageStore(db: Database.Database): UsageStore {
     },
 
     list(tenant, query = {}) {
-      const { clause, params } = whereFor(tenant.tenantId, query);
+      const { clause, params } = whereFor(tenant, query, byCompany());
       const limit = Math.min(Math.max(1, Math.round(query.limit ?? USAGE_LIST_LIMIT)), USAGE_LIST_LIMIT);
       const rows = db
         .prepare(`SELECT * FROM tenant_usage WHERE ${clause} ORDER BY at DESC LIMIT ?`)
@@ -240,7 +266,7 @@ export function createUsageStore(db: Database.Database): UsageStore {
     },
 
     totals(tenant, query = {}) {
-      const { clause, params } = whereFor(tenant.tenantId, query);
+      const { clause, params } = whereFor(tenant, query, byCompany());
       // Summed in SQL rather than in JS: this is the query an allowance check runs, and the
       // ledger is the one table in this schema that only ever grows.
       const priced = db

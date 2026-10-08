@@ -6,6 +6,7 @@ import { PRODUCT_MODES, type ProductMode } from "@agentforge/core/product-modes"
 import { WORKSPACE_TEMPLATES } from "@agentforge/core/templates";
 import { apiFetch } from "@/lib/api-client";
 import { t } from "@/lib/i18n";
+import { DeskDeleteButton, DeskDeleteNote, deskDeleteErrorMessage } from "@/components/desk-delete-control";
 import { ModeHeader } from "@/components/mode-header";
 import { labeled } from "@/lib/ui-copy";
 
@@ -194,7 +195,7 @@ export function WorkspacesPage() {
       body: JSON.stringify({ confirmName: deleteConfirm.trim() }),
     }).then((res) => res.json());
     if (deleted.error) {
-      setError(deleted.error.message ?? t("workspaces.errors.delete"));
+      setError(deskDeleteErrorMessage(deleted.error));
       return;
     }
     setDeletingId(null);
@@ -304,6 +305,7 @@ export function WorkspacesPage() {
         </button>
       )}
       {error ? <p className="mt-3 text-sm text-[var(--danger)]">{error}</p> : null}
+      <DeskDeleteNote />
       <ul className="mt-8 space-y-2 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-3" data-testid="workspace-list">
         {workspaces.map((workspace) => {
           const packLabel = templateLabel(workspace.templatePack);
@@ -336,16 +338,7 @@ export function WorkspacesPage() {
                   >
                     {t("workspaces.edit")}
                   </button>
-                  {workspace.protected || workspace.slug === "home" ? null : (
-                    <button
-                      type="button"
-                      className="rounded-md px-2 py-1 text-sm text-[var(--danger)] underline"
-                      onClick={() => openDelete(workspace)}
-                      data-testid="delete-workspace"
-                    >
-                      {t("workspaces.delete")}
-                    </button>
-                  )}
+                  <DeskDeleteButton workspace={workspace} onOpen={() => openDelete(workspace)} />
                   <button
                     type="button"
                     className="rounded-md px-2 py-1 text-sm text-[var(--accent)] underline"

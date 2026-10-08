@@ -1,6 +1,6 @@
 import { parseAppLocale, type AppLocale } from "../locale";
 import type { InputModality } from "../tenancy/types";
-import { chatTurnCopy, fillChatTurn } from "./chat-locale";
+import { chatTurnCopy, fillChatReason, fillChatTurn } from "./chat-locale";
 
 /** Generate tools stay on a text turn. An attached picture or clip is understand, not a new file. */
 export const CHAT_UNDERSTAND_HIDDEN_TOOLS = ["image_generate", "video_generate"] as const;
@@ -177,14 +177,28 @@ export type SettledChatTurn = {
  * The check after one bounded answer. No second model call.
  * A reply that already has words keeps them, minus source numbers the desk did not offer.
  * A tool that returned and left no sentence becomes that sentence.
+ * A run that ended at its step limit gets one closing sentence saying so (`stepLimit`), whatever else it said.
+ * A run whose model call failed after a tool completed gets one saying the tools ran, why no answer
+ * followed and what to send (`interrupted`, the failure's own words).
  */
 export function settleChatTurn(options: {
   text: string;
   offeredSources: number;
   tools: readonly SettledTool[];
   locale: AppLocale;
+  stepLimit?: boolean;
+  interrupted?: string;
 }): SettledChatTurn {
   const locale = parseAppLocale(options.locale);
+  const base = settleWords(options, locale);
+  const limited = options.stepLimit ? withStepLimitNote(base, locale) : base;
+  return options.interrupted?.trim() ? withInterruptedNote(limited, options.interrupted.trim(), locale) : limited;
+}
+
+function settleWords(
+  options: { text: string; offeredSources: number; tools: readonly SettledTool[] },
+  locale: AppLocale,
+): SettledChatTurn {
   const repaired = repairUnresolvedCites(options.text, options.offeredSources, locale);
   if (repaired.trim()) {
     const appended = repaired.startsWith(options.text) ? repaired.slice(options.text.length) : "";
@@ -202,4 +216,22 @@ export function settleChatTurn(options: {
     return { text: repaired, appended: "" };
   }
   return { text: sentence, appended: sentence };
+}
+
+/** Appends the step-limit sentence once, after a blank line when the reply already has words. */
+function withStepLimitNote(turn: SettledChatTurn, locale: AppLocale): SettledChatTurn {
+  return withClosingNote(turn, chatTurnCopy(locale).stepLimit);
+}
+
+/** Appends the interrupted sentence once, with the failure's own words as the reason. */
+function withInterruptedNote(turn: SettledChatTurn, reason: string, locale: AppLocale): SettledChatTurn {
+  return withClosingNote(turn, fillChatReason(chatTurnCopy(locale).interrupted, reason));
+}
+
+function withClosingNote(turn: SettledChatTurn, note: string): SettledChatTurn {
+  if (turn.text.includes(note)) {
+    return turn;
+  }
+  const tail = turn.text.trim() ? `\n\n${note}` : note;
+  return { text: `${turn.text}${tail}`, appended: `${turn.appended}${tail}` };
 }

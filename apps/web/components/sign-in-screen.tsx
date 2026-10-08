@@ -3,8 +3,12 @@
  *
  * One button. Pressing it asks the host for the portal's authorize URL
  * (`GET /api/v1/auth/start`, which also sets the `state` cookie the login is bound to) and hands
- * the browser over with a top-level navigation. There is nothing to type here: the product has no
- * password and never will (root AGENTS.md, "Two doors, no password") — the portal emails a code.
+ * the browser over with a top-level navigation. There is nothing to type here: this app takes no
+ * password and no code itself. The portal does, and it does it one of two ways. By default it emails
+ * a code. A deployment can run it on a username and a password instead (`PORTAL_SIGNIN_MODE`,
+ * owner decision 2026-10-07, one white-label deployment), and then the host says so (`useSession().signInMode`) and the
+ * three sentences below say that instead: nothing here ever promises a code in front of a portal
+ * that sends none. The portal's own page is where the username and the password are typed.
  *
  * Two rules on this screen are controls rather than polish:
  *
@@ -23,6 +27,7 @@ import { authReasonMessage, errorCodeFrom } from "@/lib/auth-reason";
 import { t } from "@/lib/i18n";
 import { BrandMark } from "@/components/brand-mark";
 import { useProductBrand, usesBundledMark } from "@/lib/product-brand";
+import { useSession } from "@/lib/session";
 
 export const START_PATH = "/api/v1/auth/start";
 
@@ -79,6 +84,9 @@ export function SignInScreen() {
   const location = useLocation();
   const brand = useProductBrand();
   const { productName, logoSrc } = brand;
+  // What the host says the portal does (`lib/session.tsx`). Only ever "password" or absent; absent is
+  // the e-mailed code, and the screen below is then exactly what it was before the password mode.
+  const usesPassword = useSession().signInMode === "password";
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
 
@@ -109,7 +117,9 @@ export function SignInScreen() {
           <img src={logoSrc} alt={productName} className="mb-6 h-8 w-8" />
         ) : null}
         <h1 className="text-2xl font-medium tracking-[var(--track)]">{t("auth.signIn.title", { productName })}</h1>
-        <p className="mt-2 text-[var(--text-2)]">{t("auth.signIn.intro")}</p>
+        <p className="mt-2 text-[var(--text-2)]">
+          {usesPassword ? t("auth.signIn.introPassword") : t("auth.signIn.intro")}
+        </p>
         {reason ? (
           <p
             className="mt-6 rounded-lg border border-[var(--line)] px-3 py-2 text-sm text-[var(--danger)]"
@@ -125,9 +135,11 @@ export function SignInScreen() {
           disabled={busy}
           data-testid="auth-signin-start"
         >
-          {busy ? t("auth.signIn.working") : t("auth.signIn.action")}
+          {busy ? t("auth.signIn.working") : usesPassword ? t("auth.signIn.actionPassword") : t("auth.signIn.action")}
         </button>
-        <p className="mt-4 text-xs text-[var(--text-3)]">{t("auth.signIn.noPassword")}</p>
+        <p className="mt-4 text-xs text-[var(--text-3)]">
+          {usesPassword ? t("auth.signIn.notePassword") : t("auth.signIn.noPassword")}
+        </p>
       </div>
     </main>
   );

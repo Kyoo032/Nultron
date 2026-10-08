@@ -252,6 +252,7 @@ const ERROR_KEYS: Readonly<Record<string, string>> = {
   root_unavailable: "unavailable",
   network: "network",
   bad_response: "badResponse",
+  save_failed: "saveFailed",
 };
 
 export function filesErrorKey(code: string): string {

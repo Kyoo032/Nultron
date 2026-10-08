@@ -8,6 +8,7 @@ import {
 } from "../../knowledge-embed";
 import { getKnowledgeModels } from "../../knowledge";
 import { ftsSourceFilter, knowledgeFtsQuery } from "../../knowledge-text";
+import { andVisibleSource, andVisibleSourceId } from "../../knowledge-visibility";
 import type {
   BackendHealth,
   BackendRetrieveOptions,
@@ -46,14 +47,21 @@ function placeholders(ids: string[]): string {
   return ids.map(() => "?").join(", ");
 }
 
-/** Display names for the sources a result set touched (the FTS table holds ids only). */
-function sourceNames(workspaceId: string, sourceIds: string[]): Map<string, string> {
+/**
+ * Display names for the sources a result set touched (the FTS table holds ids only). A source this
+ * person may not see has no name here, whatever id reached the function: the hits are already
+ * filtered, and this is the second place a colleague's Chat card would have to get through.
+ */
+function sourceNames(tenant: TenantContext, sourceIds: string[]): Map<string, string> {
   if (sourceIds.length === 0) {
     return new Map();
   }
+  const visible = andVisibleSource(tenant);
   const rows = sql
-    .prepare(`SELECT id, name FROM knowledge_sources WHERE workspace_id = ? AND id IN (${placeholders(sourceIds)})`)
-    .all(workspaceId, ...sourceIds) as Array<{ id: string; name: string }>;
+    .prepare(
+      `SELECT id, name FROM knowledge_sources WHERE workspace_id = ? AND id IN (${placeholders(sourceIds)})${visible.sql}`,
+    )
+    .all(tenant.workspaceId, ...sourceIds, ...visible.params) as Array<{ id: string; name: string }>;
   return new Map(rows.map((row) => [row.id, row.name]));
 }
 
@@ -209,15 +217,17 @@ function fusedMode(ftsCount: number, vectorCount: number): RetrieveMode {
 
 type FtsRow = { rid: number; source_id: string; body: string; rank: number };
 
-function ftsRows(workspaceId: string, query: string, limit: number, exclude: string[]): FtsRow[] {
+function ftsRows(tenant: TenantContext, query: string, limit: number, exclude: string[]): FtsRow[] {
+  // Hosted: only chunks of sources this person may see (a colleague's Chat card never matches).
+  const visible = andVisibleSourceId(tenant, "knowledge_chunks.source_id");
   try {
     return sql
       .prepare(
         `SELECT rowid AS rid, source_id, body, bm25(knowledge_chunks) AS rank FROM knowledge_chunks
-         WHERE workspace_id = ? AND knowledge_chunks MATCH ?${notInClause(exclude)}
+         WHERE workspace_id = ? AND knowledge_chunks MATCH ?${notInClause(exclude)}${visible.sql}
          ORDER BY bm25(knowledge_chunks) LIMIT ?`,
       )
-      .all(workspaceId, query, ...exclude, limit) as FtsRow[];
+      .all(tenant.workspaceId, query, ...exclude, ...visible.params, limit) as FtsRow[];
   } catch (error) {
     // A malformed MATCH expression or a missing FTS table must degrade to "no results", never a 500.
     log.warn("knowledge_backend_fts_query_failed", {
@@ -295,7 +305,7 @@ export class SqliteBuiltinBackend implements KnowledgeBackend {
     preferredModel: string | null,
   ): Promise<{ chunks: RetrievedChunk[]; model: string | null }> {
     const { hits, model } = await searchVectors(tenant, query, models, limit, exclude, preferredModel);
-    const names = sourceNames(tenant.workspaceId, [...new Set(hits.map((hit) => hit.sourceId))]);
+    const names = sourceNames(tenant, [...new Set(hits.map((hit) => hit.sourceId))]);
     return {
       chunks: hits.map((hit) => ({
         body: hit.body,
@@ -314,9 +324,9 @@ export class SqliteBuiltinBackend implements KnowledgeBackend {
       return [];
     }
     const ws = tenant.workspaceId;
-    const rows = ftsRows(ws, match, limit, exclude);
+    const rows = ftsRows(tenant, match, limit, exclude);
     const ids = [...new Set(rows.map((row) => row.source_id))];
-    const names = sourceNames(ws, ids);
+    const names = sourceNames(tenant, ids);
     const indexes = vectorChunkIndexes(ws, ids);
     // Rows arrive in bm25 order and are consumed in that order, so a repeated body hands out its
     // indexes one at a time: two copies of one paragraph stay two chunks instead of one.
