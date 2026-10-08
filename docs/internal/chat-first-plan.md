@@ -117,7 +117,9 @@ His words: "this vps and own computers is for the paid customer features, otherw
 | The cloud computer (a VPS the bot works on) | No | Yes |
 | The person's own computer ("This computer") | No | Yes |
 | A graphical screen: the live picture, Take control, a desktop | No | Yes, where the cloud computer or own computer is on |
-| Routines (scheduled runs) | Not decided | Not decided |
+| Routines (scheduled runs) | Yes | Yes |
+
+Routines are free (Rizky, 2026-10-07): "routines are free, since they cost tokens anyway". A scheduled run spends the person's tokens like any other run, so the plan does not gate it. A routine that needs the cloud computer or the person's own computer still needs a paid plan for that part.
 
 Two rules follow from the repo's own:
 
