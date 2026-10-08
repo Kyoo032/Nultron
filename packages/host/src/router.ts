@@ -96,6 +96,7 @@ import {
   handlePostFinanceRegen,
   handlePostFinanceStream,
 } from "./handlers/finance";
+import { handlePostFinanceAuto } from "./handlers/finance-auto";
 import { handlePostFinanceExport } from "./handlers/finance-export";
 import { handlePostFinanceImport } from "./handlers/finance-import";
 import {
@@ -168,7 +169,16 @@ import {
   handlePostLegalMatters,
   handlePostLegalRunStream,
 } from "./handlers/legal";
+import {
+  handleGetLegalAsks,
+  handleGetLegalExtract,
+  handlePostLegalAskStream,
+  handlePostLegalExtractComments,
+  handlePostLegalExtractStream,
+  handlePutLegalExtractEdits,
+} from "./handlers/legal-extract";
 import { handleDeleteMedia, handleGetMediaFile, handlePostMedia } from "./handlers/media";
+import { handlePostMeetingTranscriptFile, handlePostMeetingTranslateStream } from "./handlers/meeting-extra";
 import {
   handleDeleteMeeting,
   handleGetMeeting,
@@ -376,6 +386,9 @@ const routes: Route[] = [
   compile("POST", "/api/v1/finance/docx", handlePostFinanceDocx),
   compile("POST", "/api/v1/finance/export", handlePostFinanceExport),
   compile("POST", "/api/v1/finance/import", handlePostFinanceImport),
+  // Doc flow (docs/internal/doc-flow-plan.md): code only, so NOT behind the gateway gate, like
+  // `/finance/import`. The paid write-up is the existing `/finance/stream`, behind a Run press.
+  compile("POST", "/api/v1/finance/auto", handlePostFinanceAuto),
   compile("POST", "/api/v1/market", handlePostMarket),
   compile("POST", "/api/v1/market/board", handlePostMarketBoard),
   compile("POST", "/api/v1/market/stream", handlePostMarketStream),
@@ -410,6 +423,15 @@ const routes: Route[] = [
   compile("DELETE", "/api/v1/legal/matters/:matterId/files/:docId", handleDeleteLegalMatterFile),
   compile("POST", "/api/v1/legal/matters/:matterId/run/stream", handlePostLegalRunStream),
   compile("GET", "/api/v1/legal/matters/:matterId/runs/:runId", handleGetLegalRun),
+  // Doc flow (docs/internal/doc-flow-plan.md sections 2 and 7a). Each looks the matter up in the
+  // caller's own tenant first; only the two `/stream` presses are behind the gateway gate. The
+  // edits and comments are the owner's own words about the extract, so they stay free.
+  compile("POST", "/api/v1/legal/matters/:matterId/extract/stream", handlePostLegalExtractStream),
+  compile("GET", "/api/v1/legal/matters/:matterId/extract", handleGetLegalExtract),
+  compile("PUT", "/api/v1/legal/matters/:matterId/extract/edits", handlePutLegalExtractEdits),
+  compile("POST", "/api/v1/legal/matters/:matterId/extract/comments", handlePostLegalExtractComments),
+  compile("POST", "/api/v1/legal/matters/:matterId/ask/stream", handlePostLegalAskStream),
+  compile("GET", "/api/v1/legal/matters/:matterId/asks", handleGetLegalAsks),
   compile("GET", "/api/v1/meetings", handleGetMeetings),
   compile("POST", "/api/v1/meetings", handlePostMeetings),
   compile("GET", "/api/v1/meetings/:meetingId", handleGetMeeting),
@@ -419,6 +441,10 @@ const routes: Route[] = [
   compile("POST", "/api/v1/meetings/:meetingId/transcribe/stream", handlePostMeetingTranscribe),
   compile("POST", "/api/v1/meetings/:meetingId/minutes/stream", handlePostMeetingMinutes),
   compile("POST", "/api/v1/meetings/:meetingId/run/stream", handlePostMeetingRunStream),
+  // Doc flow (docs/internal/doc-flow-plan.md section 4): translating is an opt-in press and gated;
+  // a transcript file is read on the machine and is not.
+  compile("POST", "/api/v1/meetings/:meetingId/translate/stream", handlePostMeetingTranslateStream),
+  compile("POST", "/api/v1/meetings/:meetingId/transcript/file", handlePostMeetingTranscriptFile),
   compile("POST", "/api/v1/prompts/enhance", handlePostEnhancePrompt),
   compile("GET", "/api/v1/artifacts", handleGetArtifacts),
   compile("GET", "/api/v1/artifacts/:artifactId", handleGetArtifact),

@@ -1,5 +1,29 @@
 # Nultron
 
+**The vision (Rizky, 2026-10-05): everyone has all their workers inside one desk.**
+
+A desk is a one-person company (OCP). Every job a company needs is a worker on that desk:
+
+- Money: Finance and Data
+- Contracts: Legal
+- Paperwork: Documents
+- Pitch and sell: Presentation and Research
+- Market sense: Market
+- Clients: Meeting
+- Marketing: Images, Videos, Music and Edit
+- Memory: Chat, Knowledge and Education
+
+Each worker is a mode whose harness is already built in: prompt, tools, skills, checks and judges. Nobody sets up agents, skills or prompts. They add their files, ask, and get a checked result. Build with that in mind:
+- **Prompt first** (Rizky, 2026-10-05). Every worker starts from one prompt box, with files optional, and no form up front.
+  - The user adds values (parameters, more files, choices) later, and only when they need them.
+  - Every result can be edited under that mode's rules: inline edits, then regenerating one section, slide, clip or item.
+  - A regeneration keeps the user's edits. Do not make it complicated.
+- Put capability into the worker's harness, not into setup. Defaults, auto-detection and code-run judges are the user's skills, so never add a step or setting the user must configure first.
+- Show the result first. Keep advanced controls under "More", and run a paid step only on the user's Run.
+- Keep every worker on the same desk, reachable from the rail, with one sign-in and one key.
+- Make every worker hand off to the others: research to a deck, a contract's facts to a memo.
+- Enterprise is the same desk shared by a team. White-label brands (HYP AI) carry the same vision under their own name.
+
 **Two products, one repo — read this before touching anything.**
 
 The owner split the product, then still called DPSBuddy, into two products on 2026-09-23. They share a codebase and a renderer, and they diverge on packaging, deployment, identity and versioning. Work on one is not work on the other.
