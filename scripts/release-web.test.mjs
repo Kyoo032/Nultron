@@ -19,9 +19,21 @@ import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import * as sharedMarks from "./release-marks.mjs";
+import { DEPLOY_DOC_SECTIONS } from "./release-web-docs.mjs";
+import {
+  REQUIRED_SITE_FILES,
+  SITE_FILE_MAX_BYTES,
+  SitesError,
+  bundlePathFor,
+  readSiteFiles,
+} from "./release-web-sites.mjs";
 import {
   BUNDLE_FILES,
+  OPTIONAL_ENV,
   caddyfileFrom,
+  deployDoc,
+  envExample,
+  portalEnvExample,
   FORBIDDEN_MARKS,
   forbiddenMarksIn,
   forbiddenMarksInPublished,
@@ -51,7 +63,20 @@ const CADDY_SOURCE =
   "# see packages/host/src/http-adapter.ts\n{\n\tadmin off\n}\n\n\n\n{$NULTRON_DOMAIN} {\n\t# comment\n\treverse_proxy 127.0.0.1:3000\n}\n";
 const README = "# Nultron Enterprise\n";
 /** The git a dry run may run: reads of this repo only. */
-const READ_ONLY_GIT = new Set(["status", "rev-parse", "show", "cat-file"]);
+const READ_ONLY_GIT = new Set(["status", "rev-parse", "show", "cat-file", "ls-tree"]);
+/** The company sites' files at the released sha, as the fake git serves them (the real ones are read further down). */
+const FAKE_SITE_FILES = {
+  "webapp-deploy/sites/enable-sites.sh": '#!/bin/sh\n# switch\nexec "$@"\n',
+  "webapp-deploy/sites/dpscloud.caddy": '# a comment that cites a source path: packages/host/x.ts\n{$DPS_DOMAIN} {\n\trespond "dps"\n}\n',
+  "webapp-deploy/sites/tokotoken.caddy": '{$TOKOTOKEN_DOMAIN} {\n\trespond "toko"\n}\n',
+  "webapp-deploy/sites/dpscloud/index.html": "<!doctype html><title>DPS Cloud</title>\n",
+  "webapp-deploy/sites/tokotoken/index.html": "<!doctype html><title>Toko Token</title>\n",
+};
+
+const NUL = String.fromCharCode(0);
+const refuse = (reason) => {
+  throw new ReleaseError(reason);
+};
 
 const roots = [];
 after(() => {
@@ -75,16 +100,23 @@ function subcommand(args) {
   return args[i];
 }
 
+/** Every file in the clone except .git, by path relative to it (forward slashes), nested folders included. */
 function snapshot(dir) {
-  const names = readdirSync(dir).filter((name) => name !== ".git");
-  return Object.fromEntries(names.map((name) => [name, readFileSync(join(dir, name), "utf8")]));
+  const files = readdirSync(dir, { recursive: true, withFileTypes: true }).filter((entry) => entry.isFile());
+  const relative = (entry) => join(entry.parentPath ?? entry.path, entry.name).slice(dir.length + 1).replaceAll("\\", "/");
+  return Object.fromEntries(
+    files
+      .map((entry) => relative(entry))
+      .filter((name) => name.split("/")[0] !== ".git")
+      .map((name) => [name, readFileSync(join(dir, name), "utf8")]),
+  );
 }
 
 /**
  * A fake git. Every call lands in `calls` with its cwd. `clone` makes the target directory with a
  * README, as NultronEnt's main has; `commit` snapshots the files in the clone at that moment.
  */
-function fakeGit({ dirty = false, known = [FULL_SHA], calls = [], commits = [], cloneReadme = README, missingAtSha = [] } = {}) {
+function fakeGit({ dirty = false, known = [FULL_SHA], calls = [], commits = [], cloneReadme = README, missingAtSha = [], siteFiles = FAKE_SITE_FILES } = {}) {
   const handlers = {
     // `git cat-file -e <sha>:<path>`: does the released commit carry this file?
     "cat-file": (args) => ({ status: missingAtSha.some((path) => args.at(-1).endsWith(`:${path}`)) ? 128 : 0 }),
@@ -97,7 +129,13 @@ function fakeGit({ dirty = false, known = [FULL_SHA], calls = [], commits = [], 
       const hit = known.find((sha) => sha.startsWith(wanted));
       return hit ? { status: 0, stdout: `${hit}\n` } : { status: 1, stdout: "" };
     },
-    show: () => ({ status: 0, stdout: CADDY_SOURCE }),
+    // `git show <sha>:<path>`: the Caddyfile, or one of the company sites' files.
+    show: (args) => {
+      const path = args.at(-1).slice(args.at(-1).indexOf(":") + 1);
+      if (path === "webapp-deploy/Caddyfile") return { status: 0, stdout: CADDY_SOURCE };
+      return path in siteFiles ? { status: 0, stdout: siteFiles[path] } : { status: 128, stdout: "" };
+    },
+    "ls-tree": () => ({ status: 0, stdout: `${Object.keys(siteFiles).join(NUL)}${NUL}` }),
     config: (args) => ({ status: 0, stdout: args.at(-1) === "user.name" ? "rizky\n" : "rizky@example.com\n" }),
     clone: (args) => {
       const dir = args.at(-1);
@@ -443,13 +481,20 @@ test("a real run builds from a git archive of the sha, pushes the image, then th
   assert.equal(existsSync(result.workDir), false, "the temp dir, clone and context are gone");
 });
 
-test("the temp-dir bundle commit holds exactly the five files, as rizky, 'Release <tag>', no trailers", () => {
+test("the temp-dir bundle commit holds exactly the five files and the company sites' files, as rizky, 'Release <tag>', no trailers", () => {
   const root = fakeRepo({ [TAG]: CLEAN_NOTES });
   const d = deps(root);
   const result = main(["--tag", TAG, "--sha", FULL_SHA, "--skip-image"], { ...d, ...recordingGh() });
   assert.equal(d.commits.length, 1);
   const [commit] = d.commits;
-  assert.deepEqual(commit.files, { ...renderBundle(TAG, CADDY_SOURCE), "README.md": README });
+  assert.deepEqual(commit.files, { ...renderBundle(TAG, CADDY_SOURCE, fakeSiteBundle()), "README.md": README });
+  assert.deepEqual(
+    Object.keys(commit.files).filter((name) => name.startsWith("sites/")).sort(),
+    ["sites/dpscloud.caddy", "sites/dpscloud/index.html", "sites/enable-sites.sh", "sites/tokotoken.caddy", "sites/tokotoken/index.html"],
+  );
+  const add = d.gitCalls.find((call) => call.sub === "add");
+  assert.deepEqual(add.args.slice(0, 3), ["add", "--all", "--"], "--all, so a file dropped from sites/ is dropped from the repo too");
+  assert.ok(add.args.includes("sites"), "the whole sites/ folder is staged");
   assert.ok(commit.cwd.startsWith(result.workDir) && commit.cwd.endsWith("NultronEnt"), "a temp clone");
   assert.deepEqual(commit.args.slice(-4), ["commit", "--quiet", "-m", `Release ${TAG}`], "plain message, no trailer");
   assert.ok(commit.args.includes("user.name=rizky"));
@@ -556,10 +601,15 @@ test("the shipped Caddyfile serves the portal on its own name, with its own head
   assert.match(shipped, /^http:\/\/\{\$NULTRON_DOMAIN\}, http:\/\/\{\$PORTAL_DOMAIN\} \{\n\tredir https:\/\/\{host\}\{uri\} permanent\n\}$/m);
 });
 
-test("the proxy gets exactly what the Caddyfile reads, never the whole .env, in both compose files", () => {
-  const read = caddyEnvNames(SOURCE_CADDYFILE);
-  assert.deepEqual(read, ["NULTRON_DOMAIN", "PORTAL_DOMAIN"], "the Caddyfile reads the two names, and the proxy gets those two (SR-73)");
-  const bundle = renderBundle(TAG, SOURCE_CADDYFILE)["compose.yml"];
+test("the proxy gets exactly what the Caddyfile and the site files read, never the whole .env, in both compose files", () => {
+  assert.deepEqual(caddyEnvNames(SOURCE_CADDYFILE), ["NULTRON_DOMAIN", "PORTAL_DOMAIN"], "the Caddyfile itself still reads only Nultron's two names (SR-73)");
+  const sites = realSiteFiles();
+  const siteNames = Object.entries(sites)
+    .filter(([path]) => path.endsWith(".caddy"))
+    .flatMap(([, text]) => [...text.matchAll(/\{\$([A-Za-z_]\w*)/g)].map((m) => m[1]));
+  assert.deepEqual([...new Set(siteNames)].sort(), ["DPS_DOMAIN", "TOKOTOKEN_DOMAIN"], "each site file reads its own one variable");
+  const read = [...new Set([...caddyEnvNames(SOURCE_CADDYFILE), ...siteNames])].sort();
+  const bundle = renderBundle(TAG, SOURCE_CADDYFILE, sites)["compose.yml"];
   for (const [name, compose] of [
     ["the bundle", bundle],
     ["webapp-deploy/compose.yml", SOURCE_COMPOSE],
@@ -571,6 +621,10 @@ test("the proxy gets exactly what the Caddyfile reads, never the whole .env, in 
   }
   assert.match(serviceBlock(bundle, "proxy"), /NULTRON_DOMAIN: \$\{NULTRON_DOMAIN:\?/, "the bundle needs a domain");
   assert.match(serviceBlock(bundle, "proxy"), /PORTAL_DOMAIN: \$\{PORTAL_DOMAIN:\?/, "the bundle needs a portal domain");
+  // The two company names are optional: empty is allowed, and means that site is not served.
+  for (const name of ["DPS_DOMAIN", "TOKOTOKEN_DOMAIN"]) {
+    assert.match(serviceBlock(bundle, "proxy"), new RegExp(`${name}: \\$\\{${name}:-\\}`), `${name} is optional in the bundle`);
+  }
 });
 
 // ---------- the same refusal list on the Personal release ----------
