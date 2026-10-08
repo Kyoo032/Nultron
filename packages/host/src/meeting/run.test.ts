@@ -484,9 +484,21 @@ describe("generateMinutes checks", () => {
     model: "",
   };
 
-  type Item = { task: string; owner: string; due: string; firstStep: string };
-  const item = (task: string, owner: string): Item => ({ task, owner, due: "", firstStep: "" });
-  const decision = (statement: string) => ({ statement, provisional: false, context: "" });
+  type Item = { task: string; owner: string; due: string; firstStep: string; quote: string };
+  // Each item quotes the passage of LONG_TRANSCRIPT it came from, as the writer is asked to.
+  const item = (task: string, owner: string): Item => ({
+    task,
+    owner,
+    due: "",
+    firstStep: "",
+    quote: "nobody owns the vendor contract yet, so we leave that open",
+  });
+  const decision = (statement: string) => ({
+    statement,
+    provisional: false,
+    context: "",
+    quote: "we ship the checkout fix on Friday 14 March",
+  });
 
   function withMinutes(overrides: Partial<MeetingMinutes> = {}): MeetingMinutes {
     return { ...minutes("Checkout weekly"), ...overrides };
@@ -544,6 +556,7 @@ describe("generateMinutes checks", () => {
     { check: "action-owners", ok: true },
     { check: "quoted-dates", ok: true },
     { check: "summary-present", ok: true },
+    { check: "minutes-evidence", ok: true },
   ];
 
   it("asks once and records a passing run when the first minutes pass", async () => {
@@ -623,6 +636,7 @@ describe("generateMinutes checks", () => {
           { check: "action-owners", ok: true },
           { check: "quoted-dates", ok: false },
           { check: "summary-present", ok: true },
+          { check: "minutes-evidence", ok: true },
         ],
       },
     });
@@ -643,6 +657,7 @@ describe("generateMinutes checks", () => {
         { check: "action-owners", ok: true },
         { check: "quoted-dates", ok: false },
         { check: "summary-present", ok: true },
+        { check: "minutes-evidence", ok: true },
       ],
     };
     expect(returned.minutes?.checks).toEqual(failed);

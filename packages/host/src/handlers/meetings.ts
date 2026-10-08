@@ -5,6 +5,7 @@ import { jsonError, jsonOk } from "../errors";
 import { requireGatewayAllowedFor } from "../gateway-gate";
 import { readModelPinned } from "../job-regen";
 import { streamJob } from "../job-stream";
+import { readMeetingRequest } from "../meeting/request";
 import { generateMinutes, runMeeting, saveTranscript, transcribeMeeting } from "../meeting/run";
 import { meetingStore, requireMeeting } from "../meeting/store";
 import { resolveMeetingAsr } from "../meeting/transcribe";
@@ -158,8 +159,11 @@ export async function handlePostMeetingMinutes(request: HostRequest): Promise<Ho
     const model = readOptionalString(input.model);
     const modelExplicit = readModelPinned(input);
     const translate = input.translate !== false;
+    // What the owner asked for steers the minutes only. A bad one is a plain 400, before the stream starts.
+    const prompt = readMeetingRequest(input, tenant);
     return streamJob(
-      (emit, abortSignal) => generateMinutes(tenant, meetingId, { emit, abortSignal, model, modelExplicit, translate }),
+      (emit, abortSignal) =>
+        generateMinutes(tenant, meetingId, { emit, abortSignal, model, modelExplicit, translate, prompt }),
       { abortSignal: request.abortSignal },
     );
   } catch (error) {
@@ -178,8 +182,10 @@ export async function handlePostMeetingRunStream(request: HostRequest): Promise<
     const model = readOptionalString(input.model);
     const modelExplicit = readModelPinned(input);
     const translate = input.translate !== false;
+    const prompt = readMeetingRequest(input, tenant);
     return streamJob(
-      (emit, abortSignal) => runMeeting(tenant, meetingId, { emit, abortSignal, model, modelExplicit, translate }),
+      (emit, abortSignal) =>
+        runMeeting(tenant, meetingId, { emit, abortSignal, model, modelExplicit, translate, prompt }),
       { abortSignal: request.abortSignal },
     );
   } catch (error) {
