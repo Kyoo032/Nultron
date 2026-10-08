@@ -30,8 +30,16 @@ describe("the Meeting studio and the model it sends", () => {
     expect(studio).not.toContain("model: model || undefined");
   });
 
-  it("still asks for the translation", () => {
-    expect(studio).toMatch(/\.\.\.modelPickBody\(studioModelPick\(model, modelPinned\)\),\s*translate: true/);
+  it("translates in the run only when the owner chose to, and passes the prompt only when there is one", () => {
+    // Translation is opt-in (doc-flow plan 7a.2): never a hard-coded `translate: true`.
+    expect(studio).toMatch(
+      /\.\.\.modelPickBody\(studioModelPick\(model, modelPinned\)\),\s*translate: alwaysTranslate,\s*\.\.\.\(request \? \{ prompt: request \} : \{\}\)/,
+    );
+    expect(studio).not.toContain("translate: true");
+  });
+
+  it("sends the pick on the translate route too, so a translation is held to the same model", () => {
+    expect(studio).toMatch(/translate\/stream`,\s*modelPickBody\(studioModelPick\(model, modelPinned\)\)/);
   });
 });
 

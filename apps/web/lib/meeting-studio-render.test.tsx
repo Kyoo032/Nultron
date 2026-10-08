@@ -10,7 +10,7 @@
 import { isValidElement, type ReactElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { MeetingListRow, type MeetingListRowProps } from "@/components/meeting-studio";
+import { MeetingListRow, type MeetingListRowProps } from "@/components/meeting-list-row";
 import { applyLocale, resetLocaleForTests } from "./i18n";
 
 const MEETING = { id: "m1", title: "Checkout weekly", status: "recorded" as const };

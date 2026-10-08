@@ -1,279 +1,64 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
-import { messageUnlessBlocked } from "@/lib/gateway-blocked";
 import type { AppLocale } from "@agentforge/core/locale";
-import type { MeetingMinutes, MeetingTranscript } from "@agentforge/core/meeting";
-import { Link } from "@/lib/nav";
+import { transcriptPlainText, type MinutesItemEdit } from "@agentforge/core/meeting";
 import { JobProgressList } from "@/components/job-progress";
+import { MeetingIntake } from "@/components/meeting-intake";
+import { MeetingListRow } from "@/components/meeting-list-row";
 import { MeetingMinutesPanel } from "@/components/meeting-minutes-panel";
 import { MeetingMinutesView } from "@/components/meeting-minutes-view";
+import { MeetingMore } from "@/components/meeting-more";
 import { MeetingOtherDeskClips, MeetingRecorderPanel } from "@/components/meeting-recorder";
+import { MeetingTranslateBar } from "@/components/meeting-translate-bar";
 import { ModeHeader } from "@/components/mode-header";
-import { ModeIllustration } from "@/components/mode-illustration";
-import { ModelSelect } from "@/components/model-select";
-import { isGatewayBlockedText } from "@/lib/gateway-blocked";
 import { NeedsKeyNote } from "@/components/needs-key-note";
-import { WorkingStatus } from "@/components/working-status";
+import { StudioEmptyDesk } from "@/components/studio-empty-desk";
 import { apiFetch } from "@/lib/api-client";
-import { t } from "@/lib/i18n";
-import type { MeetingChecksWire } from "@/lib/meeting-checks";
-import type { RecordedClip } from "@/lib/meeting-recorder";
+import { isGatewayBlockedText } from "@/lib/gateway-blocked";
+import { getLocale, t } from "@/lib/i18n";
+import { Link } from "@/lib/nav";
+import {
+  classifyMeetingFile,
+  promptForRun,
+  titleFromFileName,
+  titleFromTranscript,
+  wordCount,
+} from "@/lib/meeting-intake";
+import {
+  readAlwaysTranslate,
+  readMeetingLanguage,
+  writeAlwaysTranslate,
+  writeMeetingLanguage,
+} from "@/lib/meeting-prefs";
+import {
+  asMeeting,
+  errorMessage,
+  postMeetingTranscriptFile,
+  putMinutesEdit,
+  requestMeeting,
+} from "@/lib/meeting-request";
+import { rescuedKey } from "@/lib/meeting-rescue";
+import type { Capability, Meeting, MeetingTab } from "@/lib/meeting-types";
+import { postMeetingRecording, saveClipToDevice, type UploadOutcome } from "@/lib/meeting-upload";
 import { modelPickBody, studioModelPick } from "@/lib/model-choice";
-import { postMeetingRecording, saveClipToDevice, type MeetingApiFetch, type UploadOutcome } from "@/lib/meeting-upload";
 import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
 import { useJobModel } from "@/lib/use-job-model";
 import { useJobStream } from "@/lib/use-job-stream";
-import { useMeetingRecorder } from "@/lib/use-meeting-recorder";
-import { useMeetingUpload } from "@/lib/use-meeting-upload";
-import { useWorkspaceScope } from "@/lib/workspace-scope";
-
-type MinutesRecord = {
-  locale: AppLocale;
-  minutes: MeetingMinutes;
-  artifactId: string;
-  model: string;
-  unverifiedNames: string[];
-  /** What the checks made of the first-language minutes; null for a translation and for older records. */
-  checks?: MeetingChecksWire | null;
-};
-
-type Meeting = {
-  id: string;
-  title: string;
-  locale: AppLocale;
-  status: "new" | "recorded" | "transcribed" | "minuted";
-  recording: { name: string; bytes: number } | null;
-  transcript: MeetingTranscript | null;
-  transcriptArtifactId: string;
-  minutes: MinutesRecord | null;
-  translation: MinutesRecord | null;
-};
-
-type Capability = {
-  available: boolean;
-  model: string | null;
-  reason: "ok" | "no_model" | "no_key";
-  ffmpeg: boolean;
-};
-
-type Tab = "transcript" | "minutes" | "translation";
-
-function errorMessage(payload: unknown, fallback: string): string {
-  // Hosted only: a 403 gateway_blocked is "no usable key", said as the catalog sentence (`gateway-blocked.ts`).
-  const blocked = messageUnlessBlocked(payload, () => "");
-  if (blocked) {
-    return blocked;
-  }
-  if (payload && typeof payload === "object") {
-    const error = (payload as { error?: { message?: unknown } }).error;
-    if (error && typeof error.message === "string" && error.message.trim()) {
-      return error.message;
-    }
-  }
-  return fallback;
-}
-
-function readableSize(bytes: number): string {
-  return bytes >= 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`;
-}
+import { useMeetingClips } from "@/lib/use-meeting-clips";
 
 function mentionsSettings(message: string): boolean {
   return /gateway|api key|settings|runtime_stub|live gateway/i.test(message);
 }
 
-/** A body that is a meeting, or null when the host answered 2xx with something else. */
-function asMeeting(value: unknown): Meeting | null {
-  return value && typeof value === "object" && typeof (value as { id?: unknown }).id === "string"
-    ? (value as Meeting)
-    : null;
+/** The tab a meeting opens on: the minutes once it has them, otherwise whatever it has to read. */
+function tabFor(meeting: Meeting): MeetingTab {
+  return meeting.minutes ? "minutes" : "transcript";
 }
 
-export type MeetingRequestOutcome =
-  | { readonly ok: true; readonly meeting: Meeting | null }
-  | { readonly ok: false; readonly message: string };
-
-/**
- * Create a meeting or save a pasted transcript: one JSON POST, answered with the meeting.
- *
- * The order `postMeetingRecording` uses since SR-45: `res.ok` before the body, the error body read
- * with a catch, and a dead network reported rather than thrown. Both callers used to read
- * `res.json()` first with no `catch`, so an html error page or an offline laptop threw a rejection
- * nothing handled and the owner saw no message at all. A 2xx whose body is not a meeting still
- * counts as done; the caller reloads the list to show it.
- */
-export async function requestMeeting(
-  path: string,
-  body: unknown,
-  fallback: string,
-  fetcher: MeetingApiFetch = apiFetch,
-): Promise<MeetingRequestOutcome> {
-  let res: Response;
-  try {
-    res = await fetcher(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-  } catch (error) {
-    return { ok: false, message: error instanceof Error && error.message ? error.message : fallback };
-  }
-  if (!res.ok) {
-    const payload = await res.json().catch(() => null);
-    return { ok: false, message: errorMessage(payload, fallback) };
-  }
-  const payload = await res.json().catch(() => null);
-  return { ok: true, meeting: asMeeting(payload) };
-}
-
-/** The meeting a recording belongs to — fixed when Record is pressed, never re-read from the list. */
-export type ClipTarget = {
-  readonly id: string;
-  readonly title: string;
-  /** The desk it was made on; null when the shell had not named one yet. */
-  readonly workspaceId: string | null;
-};
-
-/** A recording whose studio went away before the host had it. */
-export type RescuedClip = { readonly clip: RecordedClip; readonly target: ClipTarget };
-
-let rescuedClips: readonly RescuedClip[] = [];
-
-/**
- * Keep a recording that outlived its studio.
- *
- * `WorkModeKeepAlive` keys every work mode on the desk id, so a desk switch — or a language
- * restart — unmounts this studio. The recorder hands back what it had captured, and the upload
- * queue still holds whatever had not reached the host; both used to go with the component. They
- * wait here, in module scope, which outlives the pane, until the next studio mounts and takes
- * them. This is memory, not storage: a page reload still loses them.
- */
-export function stashRescuedClip(entry: RescuedClip): void {
-  if (rescuedClips.some((held) => held.clip === entry.clip)) {
-    return;
-  }
-  rescuedClips = [...rescuedClips, entry];
-}
-
-/** Everything held, oldest first. The slot is empty afterwards. */
-export function takeRescuedClips(): readonly RescuedClip[] {
-  const taken = rescuedClips;
-  rescuedClips = [];
-  return taken;
-}
-
-/**
- * Whether a recording can be uploaded from this desk. The host resolves `/meetings/:id` against the
- * desk selected now, so a meeting on another desk answers 404. An unknown desk gets the benefit of
- * the doubt: if it is wrong, the upload fails and the clip is kept with Retry and Save to device.
- */
-export function onSameDesk(target: ClipTarget, workspaceId: string | null): boolean {
-  return target.workspaceId === null || workspaceId === null || target.workspaceId === workspaceId;
-}
-
-/** A stable key for a held recording, for the list and for Save. */
-function rescuedKey(entry: RescuedClip): string {
-  return `${entry.target.id}:${entry.clip.filename}:${entry.clip.bytes}`;
-}
-
-export type MeetingListRowProps = {
-  meeting: Pick<Meeting, "id" | "title" | "status">;
-  selected: boolean;
-  /** The first press armed delete on this row; the confirm panel is showing. */
-  confirming: boolean;
-  deleting: boolean;
-  /**
-   * A recording is running. It belongs to the meeting selected when Record was pressed, so the
-   * owner cannot switch rows until they stop it.
-   */
-  locked?: boolean;
-  /** This row is the meeting being recorded: deleting it would pull the meeting out from under it. */
-  deleteLocked?: boolean;
-  onSelect: () => void;
-  onAskDelete: () => void;
-  onConfirmDelete: () => void;
-  onCancelDelete: () => void;
-};
-
-/**
- * One meeting in the list, with a two-step delete.
- *
- * Deleting removes the meeting folder and its recording, so the × only arms the row; the meeting
- * goes when the owner presses Delete in the panel that opens. Same shape as Settings' sign-out
- * confirm (`settings-reset-card.tsx`): a danger panel, a danger button, and a plain Cancel.
- */
-export function MeetingListRow({
-  meeting,
-  selected,
-  confirming,
-  deleting,
-  locked = false,
-  deleteLocked = false,
-  onSelect,
-  onAskDelete,
-  onConfirmDelete,
-  onCancelDelete,
-}: MeetingListRowProps) {
-  return (
-    <div>
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={onSelect}
-          disabled={locked}
-          title={locked ? t("meeting.record.switchLocked") : undefined}
-          className={`flex-1 px-3 py-2 text-left text-sm disabled:cursor-not-allowed ${
-            selected
-              ? "rounded-lg bg-[var(--surface-2)] text-[var(--text)]"
-              : "card-live text-[var(--text-2)] disabled:opacity-45"
-          }`}
-          data-testid={`meeting-item-${meeting.id}`}
-        >
-          {meeting.title}
-          <span className="block text-xs text-[var(--text-3)]">{meeting.status}</span>
-        </button>
-        <button
-          type="button"
-          onClick={onAskDelete}
-          disabled={confirming || deleteLocked}
-          className="rounded-lg px-2 py-2 text-xs text-[var(--text-3)] disabled:opacity-45"
-          aria-label={t("meeting.delete")}
-          aria-expanded={confirming}
-          data-testid={`meeting-delete-${meeting.id}`}
-        >
-          ×
-        </button>
-      </div>
-      {confirming ? (
-        <div
-          className="mt-1 space-y-2 rounded-md border border-[var(--danger)]/30 bg-[var(--danger)]/5 p-3"
-          data-testid="meeting-delete-panel"
-        >
-          <p className="text-sm text-[var(--text)]">{t("meeting.deleteConfirm", { title: meeting.title })}</p>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              className="rounded-pill bg-[var(--danger)] px-3 py-1.5 text-sm text-[var(--surface)] disabled:opacity-50"
-              disabled={deleting}
-              onClick={onConfirmDelete}
-              data-testid="meeting-delete-confirm"
-            >
-              {t("meeting.deleteConfirmSubmit")}
-            </button>
-            <button
-              type="button"
-              className="rounded-md px-3 py-2 text-sm text-[var(--text-2)] underline disabled:opacity-50"
-              disabled={deleting}
-              onClick={onCancelDelete}
-              data-testid="meeting-delete-cancel"
-            >
-              {t("meeting.cancel")}
-            </button>
-          </div>
-        </div>
-      ) : null}
-    </div>
-  );
+/** A title for a meeting nobody named: it starts from a recording made on the desk. */
+function stampedTitle(): string {
+  return `${t("meeting.untitled")} · ${new Date().toLocaleDateString(getLocale())}`;
 }
 
 export function MeetingStudio() {
@@ -285,48 +70,28 @@ export function MeetingStudio() {
   const [capability, setCapability] = useState<Capability | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
-  const [locale, setLocale] = useState<AppLocale>("en");
+  // The language meetings are usually spoken in: what the owner last picked, else the desk's.
+  const [locale, setLocale] = useState<AppLocale>(() => readMeetingLanguage(getLocale()));
+  const [alwaysTranslate, setAlwaysTranslate] = useState<boolean>(() => readAlwaysTranslate());
+  const [prompt, setPrompt] = useState("");
   const [paste, setPaste] = useState("");
-  const [tab, setTab] = useState<Tab>("minutes");
+  const [tab, setTab] = useState<MeetingTab>("minutes");
   const [busy, setBusy] = useState<"create" | "upload" | "paste" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dropNotice, setDropNotice] = useState<string | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [jobKind, setJobKind] = useState<"run" | "translate" | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
-  /** The meeting of the clip in the upload queue, for the notice that names it. */
-  const [clipTarget, setClipTarget] = useState<ClipTarget | null>(null);
-  /** The last recording ended early and what it captured was kept, and why. */
-  const [kept, setKept] = useState<"salvaged" | "interrupted" | null>(null);
-  /** Recordings rescued from an unmounted studio that have not been queued: see `stashRescuedClip`. */
-  const [held, setHeld] = useState<readonly RescuedClip[]>([]);
-  const fileInput = useRef<HTMLInputElement | null>(null);
-  const { id: workspaceId } = useWorkspaceScope();
   const job = useJobStream<Meeting>();
-
-  /**
-   * Set when Record is pressed, to the meeting selected then. A recording belongs to that meeting
-   * whatever row is selected by the time it stops: the upload used to read the selection at send
-   * time, so switching rows mid-recording — or before Retry — replaced another meeting's recording.
-   */
-  const recordingTargetRef = useRef<ClipTarget | null>(null);
-  /** The meeting of the clip the upload queue holds: what `sendClip`, and so Retry, posts to. */
-  const clipTargetRef = useRef<ClipTarget | null>(null);
-  /** `held` as of now rather than as of the last render, for the stash on unmount. */
-  const heldRef = useRef<readonly RescuedClip[]>([]);
-
-  // Unmounted mid-recording (a desk or language change): what was captured goes to the next studio.
-  const recorder = useMeetingRecorder(undefined, (clip) => {
-    const target = recordingTargetRef.current;
-    if (target) {
-      stashRescuedClip({ clip, target });
-    } else {
-      // Unreachable, since Record sets the target first; but a recording is never simply dropped.
-      saveClipToDevice(clip);
-    }
-  });
 
   const selected = meetings.find((meeting) => meeting.id === selectedId) ?? null;
   const selectedIdRef = useRef(selectedId);
   selectedIdRef.current = selectedId;
+
+  // The recorder, its upload queue and the rescue of a recording that outlives its studio.
+  const clips = useMeetingClips({ send: sendClipTo, busy: busy !== null, selectedIdRef, onSelectMeeting: setSelectedId });
+  const { recorder, upload, recording, kept } = clips;
 
   const load = useCallback(async () => {
     try {
@@ -348,128 +113,47 @@ export function MeetingStudio() {
   }, [load]);
 
   /**
-   * A finished recording takes exactly the path a chosen file does — same route, same "file" field,
-   * same `merge`, so the Run button lights up for a recording the way it does for an upload.
-   *
-   * What differs is who holds the bytes. `MeetingUploadController` does, from the moment the clip
-   * is offered until the host answers 2xx; this studio only says which meeting it goes to and when
-   * it is busy. Clearing the recorder before the POST, which is what this used to do, destroyed the
-   * only copy of an hour of audio whenever that POST failed — see `@/lib/meeting-upload`.
-   */
-  const upload = useMeetingUpload(sendClip);
-
-  const { clip: recordedClip, clearClip, status: recorderStatus } = recorder;
-  const { offer: offerClip, setBlocked, recordingStarted, pending: pendingClip } = upload;
-  const pendingClipRef = useRef(pendingClip);
-  pendingClipRef.current = pendingClip;
-
-  /** True while the microphone is open: choosing a file mid-recording would fight it for the slot. */
-  const recording = recorderStatus !== "idle" && recorderStatus !== "error";
-
-  useEffect(() => {
-    if (!recordedClip) {
-      return;
-    }
-    // Ownership moves first; only then is the recorder's copy dropped. The clip goes to the meeting
-    // Record was pressed for, and a failed recorder hands over what it had captured the same way.
-    const target = recordingTargetRef.current;
-    if (target) {
-      clipTargetRef.current = target;
-      setClipTarget(target);
-      offerClip(recordedClip);
-    } else {
-      saveClipToDevice(recordedClip);
-    }
-    if (recorderStatus === "error") {
-      setKept("salvaged");
-    }
-    clearClip();
-  }, [recordedClip, recorderStatus, clearClip, offerClip]);
-
-  // Busy is a queue, not a bin: a clip offered mid-upload waits here instead of being dropped.
-  // The clip carries its own meeting, so what is selected now does not decide whether it can go.
-  useEffect(() => {
-    setBlocked(busy !== null);
-  }, [setBlocked, busy]);
-
-  // A new recording replaces the last one's notices; nothing else clears them but Dismiss.
-  useEffect(() => {
-    if (recorderStatus === "requesting-permission" || recorderStatus === "recording") {
-      recordingStarted();
-      setKept(null);
-    }
-  }, [recorderStatus, recordingStarted]);
-
-  // A previous studio was unmounted with a recording in hand. Take it: see `stashRescuedClip`.
-  useEffect(() => {
-    const rescued = takeRescuedClips().filter(
-      (entry) => !heldRef.current.some((existing) => existing.clip === entry.clip),
-    );
-    if (rescued.length > 0) {
-      heldRef.current = [...heldRef.current, ...rescued];
-      setHeld(heldRef.current);
-    }
-    return () => {
-      // Unmounting in turn: whatever has not reached the host moves on to the next studio.
-      const pending = pendingClipRef.current;
-      const target = clipTargetRef.current;
-      if (pending && target) {
-        stashRescuedClip({ clip: pending, target });
-      }
-      for (const entry of heldRef.current) {
-        stashRescuedClip(entry);
-      }
-      heldRef.current = [];
-    };
-  }, []);
-
-  // One rescued recording at a time goes into the upload queue, once it is free and on its desk.
-  // A recording from another desk stays held: the host would answer its meeting with 404 here.
-  useEffect(() => {
-    if (pendingClip || recording) {
-      return;
-    }
-    const next = held.find((entry) => onSameDesk(entry.target, workspaceId));
-    if (!next) {
-      return;
-    }
-    heldRef.current = heldRef.current.filter((entry) => entry !== next);
-    setHeld(heldRef.current);
-    clipTargetRef.current = next.target;
-    setClipTarget(next.target);
-    setKept("interrupted");
-    if (selectedIdRef.current === null) {
-      setSelectedId(next.target.id);
-    }
-    offerClip(next.clip);
-  }, [held, pendingClip, recording, workspaceId, offerClip]);
-
-  /** Record, fixing the meeting it is for. The list stays locked until it stops. */
-  function startRecording() {
-    if (!selected) {
-      return;
-    }
-    recordingTargetRef.current = { id: selected.id, title: selected.title, workspaceId };
-    recorder.start();
-  }
-
-  /**
    * Replace one meeting in place so the list does not jump while a job is running. `select: false`
    * is a recording that finished uploading after the owner had moved on: it updates its row without
    * taking the selection back, unless nothing else is selected.
    */
   function merge(meeting: Meeting, select = true) {
-    setMeetings((current) => {
-      const next = current.some((item) => item.id === meeting.id)
+    setMeetings((current) =>
+      current.some((item) => item.id === meeting.id)
         ? current.map((item) => (item.id === meeting.id ? meeting : item))
-        : [meeting, ...current];
-      return next;
-    });
+        : [meeting, ...current],
+    );
     if (select || selectedIdRef.current === null) {
       setSelectedId(meeting.id);
     }
   }
 
+  /**
+   * A meeting to put a file, a pasted transcript or a recording on. `reuse` says which already-selected
+   * meeting will do: "any" for a transcript pasted on a meeting that has a recording, "empty" for a drop,
+   * which starts a new meeting unless the selected one has nothing in it yet (made from More). Creating is
+   * free, and the new meeting is selected. Null, with the reason shown, when the host refused.
+   */
+  async function ensureMeeting(name: string, reuse: "any" | "empty"): Promise<Meeting | null> {
+    if (selected && (reuse === "any" || (!selected.recording && !selected.transcript))) {
+      return selected;
+    }
+    const outcome = await requestMeeting("/api/v1/meetings", { title: name, locale }, t("meeting.errors.create"));
+    if (!outcome.ok) {
+      setError(outcome.message);
+      return null;
+    }
+    if (!outcome.meeting) {
+      // The host made it but could not say which: the list shows it, and the owner drops the file again.
+      await load();
+      setError(t("meeting.errors.create"));
+      return null;
+    }
+    merge(outcome.meeting);
+    return outcome.meeting;
+  }
+
+  /** The manual create form under More: a title and a language, for an owner who wants to name it first. */
   async function onCreate(event: FormEvent) {
     event.preventDefault();
     const name = title.trim();
@@ -499,25 +183,48 @@ export function MeetingStudio() {
   }
 
   /**
-   * The upload queue's sender. It posts to the clip's own meeting, fixed when Record was pressed,
-   * so a clip that waited in the queue — and Retry — goes where the recording was made rather than
-   * to whichever row is selected by then.
+   * A file dropped on the desk, or picked: the meeting is created (named after the file, in the remembered
+   * language) and the file goes on it. Both steps are free. A recording takes the recording route, a
+   * transcript the transcript-file route, and nothing is run until the owner presses Run.
    */
-  function sendClip(file: File): Promise<UploadOutcome> {
-    const target = clipTargetRef.current;
-    if (!target) {
-      return Promise.resolve({ ok: false, message: t("meeting.errors.noMeeting") });
+  async function onFile(file: File, count: number) {
+    if (busy || recording || job.busy) {
+      return;
     }
-    return sendTo(target.id, file, false);
+    setError(null);
+    const kind = classifyMeetingFile(file);
+    if (kind === "unsupported") {
+      setDropNotice(t("meeting.drop.unsupported"));
+      return;
+    }
+    setDropNotice(count > 1 ? t("meeting.drop.oneFile") : null);
+    setBusy("upload");
+    try {
+      const meeting = await ensureMeeting(titleFromFileName(file.name, t("meeting.untitled")), "empty");
+      if (!meeting) {
+        return;
+      }
+      const outcome =
+        kind === "recording" ? await postMeetingRecording(meeting.id, file) : await postMeetingTranscriptFile(meeting.id, file);
+      if (!outcome.ok) {
+        // The meeting exists and is empty: the owner can drop a different file onto it.
+        setError(outcome.message);
+        return;
+      }
+      const updated = asMeeting(outcome.meeting);
+      if (updated) {
+        merge(updated);
+        setTab(kind === "transcript" ? "transcript" : tabFor(updated));
+      } else {
+        await load();
+      }
+    } finally {
+      setBusy(null);
+    }
   }
 
-  /**
-   * The one POST, for a chosen file and for a recording alike.
-   *
-   * It reports rather than decides: the outcome goes back to whoever asked, so the file input can
-   * put a message in the page banner and the upload controller can keep the clip and offer Retry.
-   */
-  async function sendTo(meetingId: string, file: File, select: boolean): Promise<UploadOutcome> {
+  /** The recorder's POST: the same route a chosen file takes, to the meeting it was recorded for. */
+  async function sendClipTo(meetingId: string, file: File): Promise<UploadOutcome> {
     setBusy("upload");
     setError(null);
     try {
@@ -526,7 +233,7 @@ export function MeetingStudio() {
         // A 2xx the host could not serialise is still stored; reloading shows it.
         const meeting = asMeeting(outcome.meeting);
         if (meeting) {
-          merge(meeting, select);
+          merge(meeting, false);
         } else {
           void load();
         }
@@ -537,67 +244,127 @@ export function MeetingStudio() {
     }
   }
 
-  /** The file input's path: the same POST, with the failure shown in the page's error banner. */
-  async function onChooseFile(file: File) {
-    if (!selected || busy) {
+  /**
+   * Record, fixing the meeting it is for. With no meeting selected one is made first (free), so Record
+   * under More needs no form either. The list stays locked until it stops.
+   */
+  async function startRecording() {
+    setError(null);
+    const meeting = selected ?? (await ensureMeeting(stampedTitle(), "any"));
+    if (!meeting) {
       return;
     }
-    const outcome = await sendTo(selected.id, file, true);
-    if (!outcome.ok) {
-      setError(outcome.message);
-    }
-    if (fileInput.current) {
-      fileInput.current.value = "";
-    }
+    clips.beginRecording(meeting);
   }
 
-  async function onPaste() {
-    const text = paste.trim();
-    if (!selected || !text || busy) {
-      return;
-    }
+  /**
+   * Save the pasted words as the transcript of the selected meeting, making one first if there is none.
+   * Free. Answers the meeting as it now is, so a Run pressed on pasted words can go straight on.
+   */
+  async function savePaste(text: string): Promise<Meeting | null> {
     setBusy("paste");
     setError(null);
     try {
+      const meeting = await ensureMeeting(titleFromTranscript(text, t("meeting.untitled")), "any");
+      if (!meeting) {
+        return null;
+      }
       const outcome = await requestMeeting(
-        `/api/v1/meetings/${selected.id}/transcript`,
+        `/api/v1/meetings/${meeting.id}/transcript`,
         { text },
         t("meeting.errors.transcript"),
       );
       if (!outcome.ok) {
         // The pasted transcript stays in the box for another try.
         setError(outcome.message);
-        return;
+        return null;
       }
       setPaste("");
       setTab("transcript");
       if (outcome.meeting) {
         merge(outcome.meeting);
-      } else {
-        await load();
+        return outcome.meeting;
       }
+      await load();
+      return null;
     } finally {
       setBusy(null);
     }
   }
 
+  /** Run: the paid step. Words pasted but not yet saved are saved first (free), then the run goes on them. */
   async function onRun() {
-    if (!selected || job.busy || needsKey) {
+    if (job.busy || busy || needsKey) {
       return;
     }
     setError(null);
+    const pasted = paste.trim();
+    const meeting = pasted && !selected?.transcript ? await savePaste(pasted) : selected;
+    if (!meeting || (!meeting.transcript && !meeting.recording)) {
+      return;
+    }
     // With a transcript already in hand there is nothing to transcribe, so skip straight to the
     // minutes rather than asking the host to re-decide.
-    const url = selected.transcript
-      ? `/api/v1/meetings/${selected.id}/minutes/stream`
-      : `/api/v1/meetings/${selected.id}/run/stream`;
-    // `modelPinned` travels only for a model the person picked: the host then never swaps it for a
-    // stand-in when the gateway cannot reach it (`model-choice.ts`).
-    const result = await job.run(url, { ...modelPickBody(studioModelPick(model, modelPinned)), translate: true });
-    if (result) {
-      merge(result);
-      setTab("minutes");
+    const url = meeting.transcript
+      ? `/api/v1/meetings/${meeting.id}/minutes/stream`
+      : `/api/v1/meetings/${meeting.id}/run/stream`;
+    const request = promptForRun(prompt);
+    setJobKind("run");
+    try {
+      // `modelPinned` travels only for a model the person picked: the host then never swaps it for a
+      // stand-in when the gateway cannot reach it (`model-choice.ts`). Translation is the owner's choice.
+      const result = await job.run(url, {
+        ...modelPickBody(studioModelPick(model, modelPinned)),
+        translate: alwaysTranslate,
+        ...(request ? { prompt: request } : {}),
+      });
+      if (result) {
+        merge(result);
+        setTab("minutes");
+      }
+    } finally {
+      setJobKind(null);
     }
+  }
+
+  /** Translate the stored minutes to the other language: opt-in, one paid call, replaces an earlier one. */
+  async function onTranslate() {
+    const meeting = selected;
+    if (!meeting?.minutes || job.busy || busy || needsKey) {
+      return;
+    }
+    setError(null);
+    setJobKind("translate");
+    try {
+      const result = await job.run(
+        `/api/v1/meetings/${meeting.id}/translate/stream`,
+        modelPickBody(studioModelPick(model, modelPinned)),
+      );
+      if (result) {
+        merge(result);
+        setTab("translation");
+      }
+    } finally {
+      setJobKind(null);
+    }
+  }
+
+  /** Save the owner's change to one item. Free. Answers the host's refusal, or null when it took it. */
+  async function saveEdit(edit: MinutesItemEdit): Promise<string | null> {
+    const meeting = selected;
+    if (!meeting) {
+      return t("meeting.errors.edit");
+    }
+    const outcome = await putMinutesEdit(meeting.id, edit);
+    if (!outcome.ok) {
+      return outcome.message;
+    }
+    if (outcome.meeting) {
+      merge(outcome.meeting, false);
+    } else {
+      await load();
+    }
+    return null;
   }
 
   /** Second press of the two-step delete: the row's confirm panel calls this, never the × itself. */
@@ -626,11 +393,43 @@ export function MeetingStudio() {
     }
   }
 
+  /** Back to the front door with nothing on it: the next file starts another meeting. */
+  function startNew() {
+    if (recording || busy || job.busy) {
+      return;
+    }
+    setSelectedId(null);
+    setPrompt("");
+    setPaste("");
+    setDropNotice(null);
+    setError(null);
+    job.reset();
+  }
+
   const blocked = capability && !capability.available;
   const noFfmpeg = capability && !capability.ffmpeg;
   const jobError = job.error ? job.error.message : null;
   const shown = error ?? jobError;
-  const otherDeskClips = held.filter((entry) => !onSameDesk(entry.target, workspaceId));
+  const { otherDeskClips } = clips;
+  const content = Boolean(selected && (selected.transcript || selected.minutes || selected.translation));
+  const minutesLocale = selected?.minutes?.locale ?? "en";
+  const targetLocale: AppLocale = minutesLocale === "id" ? "en" : "id";
+  const editing = selected?.minutes
+    ? {
+        disabled: job.busy || busy !== null,
+        clearsTranslation: selected.translation !== null,
+        onSave: saveEdit,
+      }
+    : undefined;
+  const translateBar = (
+    <MeetingTranslateBar
+      target={targetLocale}
+      hasTranslation={selected?.translation != null}
+      busy={job.busy && jobKind === "translate"}
+      disabled={job.busy || busy !== null || needsKey}
+      onTranslate={() => void onTranslate()}
+    />
+  );
 
   return (
     <main
@@ -688,46 +487,83 @@ export function MeetingStudio() {
         }}
       />
 
-      <form className="mt-8 flex flex-wrap items-end gap-3" onSubmit={onCreate} data-testid="meeting-new">
-        <label className="flex-1 min-w-[16rem] text-sm">
-          <span className="text-[var(--text-2)]">{t("meeting.meetingTitle")}</span>
-          <input
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder={t("meeting.meetingTitlePlaceholder")}
-            className="mt-1 h-9 w-full rounded-lg border border-[var(--line)] bg-transparent px-3"
-            data-testid="meeting-title"
-          />
-        </label>
-        {/* Same stack as the title field beside it: the label holds a full-width control, so the
-            caption sits on its own line above it instead of butting straight against the select. */}
-        <label className="min-w-[10rem] text-sm">
-          <span className="text-[var(--text-2)]">{t("meeting.language")}</span>
-          <select
-            value={locale}
-            onChange={(event) => setLocale(event.target.value as AppLocale)}
-            className="mt-1 h-9 w-full rounded-lg border border-[var(--line)] bg-transparent px-3"
-            data-testid="meeting-locale"
-          >
-            <option value="en">{t("meeting.languageEnglish")}</option>
-            <option value="id">{t("meeting.languageIndonesian")}</option>
-          </select>
-        </label>
-        <button
-          type="submit"
-          disabled={busy !== null || recording || !title.trim()}
-          className="btn btn-primary h-9 rounded-pill px-4"
-          data-testid="meeting-create"
-        >
-          {t("meeting.create")}
-        </button>
-      </form>
+      <MeetingIntake
+        prompt={prompt}
+        onPrompt={setPrompt}
+        paste={paste}
+        onPasteChange={setPaste}
+        onSavePaste={() => void savePaste(paste.trim())}
+        showPaste={!selected?.transcript}
+        running={job.busy && jobKind === "run"}
+        jobBusy={job.busy}
+        busy={busy !== null}
+        uploading={busy === "upload"}
+        // Choosing a file mid-recording would race the clip that is about to arrive for the same upload slot.
+        fileDisabled={busy !== null || recording || job.busy}
+        hasSource={Boolean(selected?.recording || selected?.transcript || paste.trim())}
+        hasMinutes={selected?.minutes != null}
+        needsKey={needsKey}
+        alwaysTranslate={alwaysTranslate}
+        meetingTitle={selected?.title ?? null}
+        recording={selected?.recording ?? null}
+        transcriptWords={selected?.transcript ? wordCount(transcriptPlainText(selected.transcript)) : null}
+        notice={dropNotice}
+        onFile={(file, count) => void onFile(file, count)}
+        onRun={() => void onRun()}
+        onCancel={job.cancel}
+        onNew={startNew}
+      />
 
-      <div className="mt-8 grid flex-1 gap-6 md:grid-cols-[16rem_1fr]">
-        <aside className="space-y-1" data-testid="meeting-list">
+      <JobProgressList progress={job.progress} busy={job.busy} mode="meeting" testId="meeting-progress" />
+
+      <MeetingMore
+        open={moreOpen || clips.needsAttention}
+        onOpenChange={setMoreOpen}
+        title={title}
+        onTitle={setTitle}
+        locale={locale}
+        onLocale={(value) => {
+          setLocale(value);
+          writeMeetingLanguage(value);
+        }}
+        onCreate={(event) => void onCreate(event)}
+        createDisabled={busy !== null || recording}
+        models={models}
+        model={model}
+        onModel={setModel}
+        alwaysTranslate={alwaysTranslate}
+        onAlwaysTranslate={(value) => {
+          setAlwaysTranslate(value);
+          writeAlwaysTranslate(value);
+        }}
+      >
+        <MeetingRecorderPanel
+          // A clip still in hand is a reason not to start another one: this controller
+          // holds exactly one recording, and a second would replace bytes nothing else has.
+          disabled={busy !== null || job.busy || upload.pending !== null}
+          view={{ ...recorder, start: () => void startRecording() }}
+          clip={{
+            capped: upload.capped,
+            status: upload.status,
+            errorMessage: upload.errorMessage,
+            dismissCapped: upload.dismissCapped,
+            retry: upload.retry,
+            save: () => {
+              if (upload.pending) {
+                saveClipToDevice(upload.pending);
+              }
+            },
+            meetingTitle: upload.pending ? (clips.clipTarget?.title ?? null) : null,
+            kept,
+            dismissKept: clips.dismissKept,
+          }}
+        />
+      </MeetingMore>
+
+      <div className="mt-8 grid flex-1 content-start gap-6 md:grid-cols-[16rem_1fr]">
+        <aside className="order-2 min-w-0 space-y-1 md:order-1" data-testid="meeting-list">
           {meetings.length === 0 ? (
-            // One line only: the character and the "what to do" sentence belong to the main pane beside
-            // it (or under it, on a phone), so an empty desk shows them once.
+            // One line only: the character belongs to the empty desk below, so it shows once.
             <p className="px-2 py-6 text-center text-sm text-[var(--text-2)]" data-testid="meeting-empty">
               {t("meeting.empty")}
             </p>
@@ -745,6 +581,8 @@ export function MeetingStudio() {
                 onSelect={() => {
                   if (!recording) {
                     setSelectedId(meeting.id);
+                    setTab(tabFor(meeting));
+                    setDropNotice(null);
                   }
                 }}
                 onAskDelete={() => setDeletingId(meeting.id)}
@@ -755,126 +593,11 @@ export function MeetingStudio() {
           ))}
         </aside>
 
-        <section className="min-w-0">
-          {selected ? (
+        <section className="order-1 min-w-0 md:order-2">
+          {selected && content ? (
             <>
-              <div className="flex flex-wrap items-end justify-between gap-3">
-                <div className="text-sm text-[var(--text-2)]">
-                  <span className="font-medium text-[var(--text)]">{selected.title}</span>
-                  {selected.recording ? (
-                    <span className="ml-2" data-testid="meeting-recording">
-                      {t("meeting.uploaded", {
-                        name: selected.recording.name,
-                        size: readableSize(selected.recording.bytes),
-                      })}
-                    </span>
-                  ) : null}
-                </div>
-                <ModelSelect models={models} value={model} onChange={setModel} testId="meeting-model" />
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <input
-                  ref={fileInput}
-                  type="file"
-                  accept="audio/*,video/*"
-                  // Choosing a file mid-recording would race the clip that is about to arrive for
-                  // the same upload slot, and the winner would be whichever finished first.
-                  disabled={busy !== null || recording}
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) {
-                      void onChooseFile(file);
-                    }
-                  }}
-                  className="text-sm text-[var(--text-2)]"
-                  data-testid="meeting-file"
-                />
-                {busy === "upload" ? <WorkingStatus label={t("meeting.uploading")} testId="meeting-uploading" /> : null}
-                <button
-                  type="button"
-                  onClick={() => void onRun()}
-                  disabled={job.busy || busy !== null || needsKey || (!selected.recording && !selected.transcript)}
-                  className="btn btn-primary rounded-pill px-4"
-                  data-testid="meeting-run"
-                >
-                  {job.busy ? (
-                    <WorkingStatus label={t("meeting.running")} />
-                  ) : selected.transcript ? (
-                    t("meeting.runFromTranscript")
-                  ) : (
-                    t("meeting.run")
-                  )}
-                </button>
-                {job.busy ? (
-                  <button
-                    type="button"
-                    onClick={job.cancel}
-                    className="inline-flex h-9 items-center rounded-pill border border-[var(--line)] px-4 text-sm"
-                    data-testid="meeting-cancel"
-                  >
-                    {t("meeting.cancel")}
-                  </button>
-                ) : null}
-              </div>
-
-              <div className="mt-3">
-                <MeetingRecorderPanel
-                  // A clip still in hand is a reason not to start another one: this controller
-                  // holds exactly one recording, and a second would replace bytes nothing else has.
-                  disabled={busy !== null || job.busy || upload.pending !== null}
-                  view={{ ...recorder, start: startRecording }}
-                  clip={{
-                    capped: upload.capped,
-                    status: upload.status,
-                    errorMessage: upload.errorMessage,
-                    dismissCapped: upload.dismissCapped,
-                    retry: upload.retry,
-                    save: () => {
-                      if (upload.pending) {
-                        saveClipToDevice(upload.pending);
-                      }
-                    },
-                    meetingTitle: upload.pending ? (clipTarget?.title ?? null) : null,
-                    kept,
-                    dismissKept: () => setKept(null),
-                  }}
-                />
-              </div>
-
-              <p className="mt-2 text-xs text-[var(--text-3)]">{t("meeting.cap")}</p>
-
-              {/* A recording is the headline path; a transcript in hand is the alternative, folded. */}
-              {!selected.transcript ? (
-                <details className="mt-5 rounded-lg border border-[var(--line)] px-3 py-2" data-testid="meeting-how">
-                  <summary className="cursor-pointer select-none text-xs font-medium text-[var(--text-2)]">
-                    {t("meeting.orPaste")}
-                  </summary>
-                  <textarea
-                    id="meeting-paste"
-                    value={paste}
-                    onChange={(event) => setPaste(event.target.value)}
-                    placeholder={t("meeting.pastePlaceholder")}
-                    rows={5}
-                    className="mt-2 w-full rounded-lg border border-[var(--line)] bg-transparent px-3 py-2 text-sm"
-                    data-testid="meeting-paste"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => void onPaste()}
-                    disabled={busy !== null || !paste.trim()}
-                    className="mt-2 inline-flex h-8 items-center rounded-pill border border-[var(--line)] px-4 text-sm disabled:opacity-45"
-                    data-testid="meeting-save-paste"
-                  >
-                    {t("meeting.savePaste")}
-                  </button>
-                </details>
-              ) : null}
-
-              <JobProgressList progress={job.progress} busy={job.busy} mode="meeting" testId="meeting-progress" />
-
-              <nav className="mt-6 flex gap-2 text-sm" data-testid="meeting-tabs">
-                {(["transcript", "minutes", "translation"] as Tab[]).map((name) => (
+              <nav className="flex flex-wrap gap-2 text-sm" data-testid="meeting-tabs">
+                {(["transcript", "minutes", "translation"] as MeetingTab[]).map((name) => (
                   <button
                     key={name}
                     type="button"
@@ -902,22 +625,36 @@ export function MeetingStudio() {
                     {selected.transcript.text}
                   </pre>
                 ) : null}
-                {tab === "minutes" && selected.minutes ? <MeetingMinutesPanel record={selected.minutes} /> : null}
-                {tab === "translation" && selected.translation ? (
-                  <div className="enter-rise">
-                    <MeetingMinutesView minutes={selected.translation.minutes} testId="meeting-translation" />
-                  </div>
+                {tab === "minutes" && selected.minutes ? (
+                  <>
+                    <MeetingMinutesPanel record={selected.minutes} {...(editing ? { editing } : {})} />
+                    <div className="mt-4">{translateBar}</div>
+                  </>
+                ) : null}
+                {tab === "translation" && selected.minutes ? (
+                  selected.translation ? (
+                    <div className="enter-rise">
+                      <MeetingMinutesView minutes={selected.translation.minutes} testId="meeting-translation" />
+                      <div className="mt-4">{translateBar}</div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm text-[var(--text-2)]" data-testid="meeting-translation-empty">
+                        {t("meeting.translateEmpty", {
+                          language: targetLocale === "id" ? t("meeting.languageIndonesian") : t("meeting.languageEnglish"),
+                        })}
+                      </p>
+                      {translateBar}
+                    </div>
+                  )
                 ) : null}
               </div>
             </>
-          ) : (
-            <div className="rounded-xl border border-[var(--line)] bg-[var(--surface)] px-4 py-10 text-center">
-              <ModeIllustration mode="meeting" />
-              <p className="mt-4 text-sm text-[var(--text-2)]">{t("meeting.emptyDetail")}</p>
-            </div>
-          )}
+          ) : null}
         </section>
       </div>
+
+      {selected || job.busy || job.progress.phases.length > 0 ? null : <StudioEmptyDesk mode="meeting" />}
     </main>
   );
 }

@@ -11,15 +11,10 @@
  * owner sees is covered by `meeting-recorder-render.test.tsx` and `meeting-studio-render.test.tsx`.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  onSameDesk,
-  requestMeeting,
-  stashRescuedClip,
-  takeRescuedClips,
-  type ClipTarget,
-} from "@/components/meeting-studio";
 import { applyLocale, resetLocaleForTests } from "./i18n";
 import type { RecordedClip } from "./meeting-recorder";
+import { requestMeeting } from "./meeting-request";
+import { onSameDesk, stashRescuedClip, takeRescuedClips, type ClipTarget } from "./meeting-rescue";
 import type { MeetingApiFetch } from "./meeting-upload";
 
 vi.mock("@/lib/api-client", () => ({
