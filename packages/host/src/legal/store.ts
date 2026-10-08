@@ -11,21 +11,44 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { ApiError, type TenantContext } from "@agentforge/core";
 import type { DocxDocument } from "@agentforge/core/docx";
-import type { DeliverableKind, DocRole, LegalSide, LegalWorkType, MatterDocCard } from "@agentforge/core/legal";
+import type {
+  DeliverableKind,
+  DocRole,
+  LegalAsksFile,
+  LegalExtractEditsFile,
+  LegalExtractRecord,
+  LegalSide,
+  LegalWorkType,
+  MatterDocCard,
+} from "@agentforge/core/legal";
 import { localDataDir } from "@agentforge/db/vault-key";
 import { deleteArtifactsByOwner, sweepOrphanSources } from "../knowledge";
-import { type LegalMatterRecord, type LegalRunRecord, legalMatterRecordSchema, legalRunRecordSchema } from "./records";
+import {
+  type LegalMatterRecord,
+  type LegalRunRecord,
+  legalAsksFileSchema,
+  legalExtractEditsFileSchema,
+  legalExtractRecordSchema,
+  legalMatterRecordSchema,
+  legalRunRecordSchema,
+} from "./records";
 import {
   LEGAL_LIST_LIMIT,
+  asksFile,
   assertFileCaps,
   assertSafeId,
   buildDocCard,
+  cardFile,
   docFile,
+  docNumber,
+  extractEditsFile,
+  extractFilePath,
   listMatterIds,
   matterDir,
   matterFile,
   nextDocId,
-  parseDocxOrThrow,
+  pagesFile,
+  parseLegalFileOrThrow,
   parsedFile,
   readBytesIfPresent,
   readJson,
@@ -52,7 +75,16 @@ export type CreateMatterInput = {
 export type MatterPatch = Partial<
   Pick<
     LegalMatterRecord,
-    "title" | "side" | "workType" | "deliverables" | "instructions" | "playbookId" | "author" | "addressee" | "firm"
+    | "title"
+    | "side"
+    | "sideDeclined"
+    | "workType"
+    | "deliverables"
+    | "instructions"
+    | "playbookId"
+    | "author"
+    | "addressee"
+    | "firm"
   >
 >;
 
@@ -77,6 +109,17 @@ export interface LegalStore {
   update(tenant: TenantContext, id: string, patch: MatterPatch): LegalMatterRecord;
   saveRun(tenant: TenantContext, id: string, run: LegalRunRecord): void;
   getRun(tenant: TenantContext, id: string, runId: string): LegalRunRecord | null;
+  /** Paragraph anchor -> page of a PDF whose reader marked its pages; null for Word files and unmarked PDFs. */
+  readPages(tenant: TenantContext, id: string, docId: string): Record<string, number> | null;
+  /** The latest extraction, or null before the first. */
+  getExtract(tenant: TenantContext, id: string): LegalExtractRecord | null;
+  saveExtract(tenant: TenantContext, id: string, record: LegalExtractRecord): void;
+  /** The owner's edits and comments on the extraction; empty before the first. */
+  getExtractEdits(tenant: TenantContext, id: string): LegalExtractEditsFile;
+  saveExtractEdits(tenant: TenantContext, id: string, file: LegalExtractEditsFile): void;
+  /** The questions asked and their answers, oldest first; empty before the first. */
+  getAsks(tenant: TenantContext, id: string): LegalAsksFile;
+  saveAsks(tenant: TenantContext, id: string, file: LegalAsksFile): void;
 }
 
 const TITLE_MAX = 200;
@@ -141,6 +184,30 @@ export function createLegalStore(rootDir: string): LegalStore {
     return matter;
   };
 
+  /** A record beside matter.json: null when the file is missing, an error when the matter is gone or the file is malformed. */
+  const readSidecar = <T>(
+    tenant: TenantContext,
+    id: string,
+    fileOf: (dir: string) => string,
+    schema: {
+      safeParse(
+        value: unknown,
+      ): { success: true; data: T } | { success: false; error: { issues: { message: string }[] } };
+    },
+    label: string,
+  ): T | null => {
+    require(tenant, id);
+    const raw = readJson(fileOf(dirFor(tenant, id)));
+    if (raw === null) {
+      return null;
+    }
+    const parsed = schema.safeParse(raw);
+    if (!parsed.success) {
+      throw new ApiError("internal_error", `Stored ${label} for ${id} is malformed: ${parsed.error.issues[0]?.message}`, 500);
+    }
+    return parsed.data;
+  };
+
   const requireDoc = (matter: LegalMatterRecord, docId: string): MatterDocCard => {
     const card = matter.docs.find((doc) => doc.id === docId);
     if (!card) {
@@ -191,22 +258,32 @@ export function createLegalStore(rootDir: string): LegalStore {
           409,
         );
       }
-      const doc = await parseDocxOrThrow(file.bytes);
-      const docId = nextDocId(matter.docs);
-      const card = buildDocCard({ id: docId, filename: file.filename, bytes: file.bytes, sha256, doc });
+      const { format, doc, pages } = await parseLegalFileOrThrow(file.bytes);
+      const docId = nextDocId(matter.docs, matter.docSeq ?? 0);
+      const card = buildDocCard({ id: docId, filename: file.filename, bytes: file.bytes, sha256, doc, format });
       const dir = dirFor(tenant, id);
-      const bytesPath = docFile(dir, docId);
+      const bytesPath = docFile(dir, docId, format);
       const cachePath = parsedFile(dir, docId);
+      const pagesPath = pagesFile(dir, docId);
       try {
         mkdirSync(path.dirname(bytesPath), { recursive: true });
         writeFileSync(bytesPath, file.bytes);
         writeJsonAtomic(cachePath, doc);
-        const next = persist(tenant, { ...matter, docs: [...matter.docs, card], updatedAt: Date.now() });
+        if (pages) {
+          writeJsonAtomic(pagesPath, pages);
+        }
+        const next = persist(tenant, {
+          ...matter,
+          docs: [...matter.docs, card],
+          docSeq: docNumber(docId),
+          updatedAt: Date.now(),
+        });
         return { matter: next, card };
       } catch (error) {
         // No card means no file: do not leave orphaned bytes behind.
         rmSync(bytesPath, { force: true });
         rmSync(cachePath, { force: true });
+        rmSync(pagesPath, { force: true });
         throw error;
       }
     },
@@ -220,8 +297,9 @@ export function createLegalStore(rootDir: string): LegalStore {
         docs: matter.docs.filter((doc) => doc.id !== card.id),
         updatedAt: Date.now(),
       });
-      rmSync(docFile(dir, card.id), { force: true });
+      rmSync(cardFile(dir, card), { force: true });
       rmSync(parsedFile(dir, card.id), { force: true });
+      rmSync(pagesFile(dir, card.id), { force: true });
       return next;
     },
 
@@ -245,7 +323,8 @@ export function createLegalStore(rootDir: string): LegalStore {
       if (!matter?.docs.some((doc) => doc.id === docId)) {
         return null;
       }
-      return readBytesIfPresent(docFile(dirFor(tenant, id), docId));
+      const card = matter.docs.find((doc) => doc.id === docId) as MatterDocCard;
+      return readBytesIfPresent(cardFile(dirFor(tenant, id), card));
     },
 
     setRoles(tenant, id, roles) {
@@ -268,7 +347,15 @@ export function createLegalStore(rootDir: string): LegalStore {
       if (!title) {
         throw new ApiError("invalid_request", "Matter title is required", 400);
       }
-      return persist(tenant, { ...matter, ...changes, title, updatedAt: Date.now() });
+      // Setting a side answers the side question, so an earlier "neither" no longer stands.
+      const answered = changes.side !== undefined && changes.side.party.trim() !== "" && matter.sideDeclined === true;
+      return persist(tenant, {
+        ...matter,
+        ...changes,
+        ...(answered && changes.sideDeclined === undefined ? { sideDeclined: false } : {}),
+        title,
+        updatedAt: Date.now(),
+      });
     },
 
     saveRun(tenant, id, run) {
@@ -299,6 +386,58 @@ export function createLegalStore(rootDir: string): LegalStore {
         );
       }
       return parsed.data;
+    },
+
+    readPages(tenant, id, docId) {
+      const matter = load(tenant, id);
+      if (!matter?.docs.some((doc) => doc.id === docId)) {
+        return null;
+      }
+      const raw = readJson(pagesFile(dirFor(tenant, id), docId));
+      if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+        return null;
+      }
+      // The file is on disk and can be edited: keep only `¶n -> page` entries a record may hold.
+      const pages = Object.entries(raw).filter(
+        (entry): entry is [string, number] => /^¶\d+$/.test(entry[0]) && Number.isInteger(entry[1]) && (entry[1] as number) > 0,
+      );
+      return pages.length > 0 ? Object.fromEntries(pages) : null;
+    },
+
+    getExtract(tenant, id) {
+      return readSidecar(tenant, id, extractFilePath, legalExtractRecordSchema, "extraction");
+    },
+
+    saveExtract(tenant, id, record) {
+      require(tenant, id);
+      if (record.matterId !== id) {
+        throw new ApiError("invalid_request", "Extraction does not belong to this matter", 400);
+      }
+      writeJsonAtomic(extractFilePath(dirFor(tenant, id)), legalExtractRecordSchema.parse(record));
+    },
+
+    getExtractEdits(tenant, id) {
+      return (
+        readSidecar(tenant, id, extractEditsFile, legalExtractEditsFileSchema, "edits") ?? {
+          version: 1,
+          edits: [],
+          comments: [],
+        }
+      );
+    },
+
+    saveExtractEdits(tenant, id, file) {
+      require(tenant, id);
+      writeJsonAtomic(extractEditsFile(dirFor(tenant, id)), legalExtractEditsFileSchema.parse(file));
+    },
+
+    getAsks(tenant, id) {
+      return readSidecar(tenant, id, asksFile, legalAsksFileSchema, "questions") ?? { version: 1, asks: [] };
+    },
+
+    saveAsks(tenant, id, file) {
+      require(tenant, id);
+      writeJsonAtomic(asksFile(dirFor(tenant, id)), legalAsksFileSchema.parse(file));
     },
   };
 }

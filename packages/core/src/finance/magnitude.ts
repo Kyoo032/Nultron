@@ -74,10 +74,19 @@ function multiplierFor(suffix: string, locale: AppLocale): number | null {
 
 type Expansion = { text: string; value: number };
 
-/** `groups` is a {@link TOKEN} match: 0 the whole token, then sign, currency, gap, digits, space, suffix. */
+/**
+ * `groups` is a {@link TOKEN} match: 0 the whole token, then sign, lead, gap, digits, space, suffix.
+ *
+ * The pattern reads up to four letters in front of the number as a possible currency, so the "of",
+ * "the" and "dan" in "revenue of 18.4B", "the 5 million" and "dan 5 juta" arrive in the currency slot.
+ * Such a word is not a currency, but it does not hide the figure either: when a space sets it apart
+ * from the number it is kept as it was written and the number after it is expanded. With no space it
+ * is part of a name (`Q3`, `v4`, `FY24`) and the token is left alone.
+ */
 function expandToken(groups: readonly string[], locale: AppLocale): Expansion | null {
-  const [, sign, currency, gap, digits, , suffix] = groups;
-  if (currency !== "" && !CURRENCY_TOKENS.has(currency.toLowerCase())) {
+  const [, sign, lead, gap, digits, , suffix] = groups;
+  const isCurrency = lead === "" || CURRENCY_TOKENS.has(lead.toLowerCase());
+  if (!isCurrency && gap === "") {
     return null;
   }
   const multiplier = multiplierFor(suffix, locale);
@@ -85,12 +94,17 @@ function expandToken(groups: readonly string[], locale: AppLocale): Expansion | 
   if (multiplier === null || mantissa === null) {
     return null;
   }
-  const value = Math.round(mantissa * multiplier) * (sign === "-" ? -1 : 1);
-  if (!Number.isSafeInteger(value)) {
+  const size = Math.round(mantissa * multiplier);
+  if (!Number.isSafeInteger(size)) {
     return null;
   }
+  if (!isCurrency) {
+    // A sign that stood in front of the word stays there; the figure after the word is unsigned.
+    return { text: `${sign}${lead}${gap}${String(size)}`, value: size };
+  }
+  const value = size * (sign === "-" ? -1 : 1);
   // `String(value)` already carries the minus sign the token opened with.
-  return { text: `${currency}${gap}${String(value)}`, value };
+  return { text: `${lead}${gap}${String(value)}`, value };
 }
 
 /**

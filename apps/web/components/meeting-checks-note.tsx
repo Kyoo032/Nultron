@@ -30,7 +30,7 @@ export function MeetingChecksNote({ note }: { readonly note: MeetingChecksNoteMo
         ))}
       </ul>
       <p className="mt-1.5 text-xs text-[var(--text-2)]">
-        {t("meeting.checks.hint", { action: t("meeting.runFromTranscript") })}
+        {t("meeting.checks.hint", { action: t("meeting.runAgain") })}
       </p>
     </div>
   );

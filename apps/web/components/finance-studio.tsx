@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { usePathname, useSearchParams } from "@/lib/nav";
+import { FinanceAuto } from "@/components/finance-auto";
 import { FinanceStudioView } from "@/components/finance-studio-view";
 import { applyBriefDraft, briefDraftOf, briefInputsBody } from "@/components/finance-steps/brief";
 import type { FinanceSource } from "@/components/finance-steps/finance-inputs-panel";
@@ -12,6 +13,7 @@ import type { FinanceStepDraft, FinanceStepPayload } from "@/components/finance-
 import type { JobRegenSubmit } from "@/components/job-regen-panel";
 import { listDatasets, type DatasetSummary } from "@/lib/data-client";
 import { briefLooksLikeFigures, parseFailureMessage } from "@/lib/finance-brief";
+import { budgetRequestParams } from "@/lib/finance-budget";
 import {
   parseFinanceFigures,
   regenerateFinanceSection,
@@ -66,7 +68,12 @@ export function FinanceStudio() {
 
   const available = financeTaskAvailable(task);
   const scopeKey = `${workspaceId ?? ""}|${task}`;
-  const lastScopeRef = useRef(scopeKey);
+  // The prompt-first page and a task page hold different drafts for the same task id: figures the
+  // auto page seeds into a task's draft have to be read when that task's page opens, even when it is
+  // the brief, whose scope does not change on the way from `/finance` to `/finance?task=brief`.
+  const draftKey = showChooser ? `${scopeKey}|choose` : scopeKey;
+  const lastScopeRef = useRef(draftKey);
+  const skipSaveRef = useRef(false);
   const initialDraft = useRef(loadFinanceDraft(workspaceId, task));
 
   const [prompt, setPrompt] = useState(initialDraft.current.prompt);
@@ -115,11 +122,14 @@ export function FinanceStudio() {
 
   // A task switch swaps the whole draft. Scope is desk plus task, so two desks never share one.
   useEffect(() => {
-    if (lastScopeRef.current === scopeKey) {
+    if (lastScopeRef.current === draftKey) {
       return;
     }
-    lastScopeRef.current = scopeKey;
+    lastScopeRef.current = draftKey;
     lastTaskRef.current = task;
+    // The save below runs in this same commit with the fields of the scope that was just left. It
+    // must not write them over the draft that was just loaded (the auto page seeds one on purpose).
+    skipSaveRef.current = true;
     const draft = loadFinanceDraft(workspaceId, task);
     setPrompt(draft.prompt);
     setFigures(draft.figures);
@@ -131,21 +141,36 @@ export function FinanceStudio() {
     setResult(null);
     setLocalError(null);
     setNotice(null);
-  }, [scopeKey, workspaceId, task]);
+  }, [draftKey, workspaceId, task]);
 
   /* Remember what is typed, but never under a scope the fields do not belong to yet. */
   useEffect(() => {
-    if (lastScopeRef.current !== scopeKey) {
+    if (lastScopeRef.current !== draftKey) {
+      return;
+    }
+    if (skipSaveRef.current) {
+      skipSaveRef.current = false;
       return;
     }
     saveFinanceDraft(workspaceId, task, { prompt, figures });
-  }, [scopeKey, workspaceId, task, prompt, figures]);
+  }, [draftKey, workspaceId, task, prompt, figures]);
 
   // The studio owns state; the task owns the steps. One draft bag down, one patch back.
   const steps = financeStepsFor(task);
   const StepInputs = steps.Inputs;
   const StepResult = steps.Result ?? FinanceResultPanel;
-  const briefState = { figures, items, params, source, datasets, parsing: busy === "parse", proseText, statedFacts };
+  // A budget request carries the limits its screen shows: core falls back to 0 for a limit it is not sent.
+  const requestParams = budgetRequestParams(task, params);
+  const briefState = {
+    figures,
+    items,
+    params: requestParams,
+    source,
+    datasets,
+    parsing: busy === "parse",
+    proseText,
+    statedFacts,
+  };
   const briefDraft = briefDraftOf(briefState);
 
   function onStepDraft(patch: FinanceStepDraft): void {
@@ -289,6 +314,18 @@ export function FinanceStudio() {
     <FinanceReadProvider register={registerRead}>
       <FinanceStudioView
         showChooser={showChooser}
+        chooser={
+          showChooser ? (
+            <FinanceAuto
+              workspaceId={workspaceId}
+              needsKey={needsKey}
+              models={models}
+              model={model}
+              modelPinned={modelPinned}
+              onModel={setModel}
+            />
+          ) : null
+        }
         task={task}
         taskName={taskName}
         taskTip={taskTip}

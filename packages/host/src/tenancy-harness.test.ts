@@ -330,6 +330,43 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
     path: "/api/v1/legal/matters/:matterId/runs/:runId",
     params: { matterId: "matterId", runId: "runId" },
   },
+  // Doc flow (docs/internal/doc-flow-plan.md). All six look the matter up with `requireLegalMatter`
+  // before anything else, synchronously and ahead of `streamJob`, so a foreign id is a real 404 on
+  // the two `/stream` rows too (the run/stream row above is the same shape). Keep it that way when
+  // the bodies are filled in: moving the lookup inside the job turns the row into an
+  // `indistinguishable` one that has to say why.
+  //
+  // The bodies below are real ones (lane L1 filled the handlers in): an edit and a comment on an item
+  // tenant A's seeded extraction has. The lookup is ahead of the body check, so a foreign id is a 404
+  // whatever the body, but a body the schema accepts keeps the row honest if that order ever changes.
+  // `PUT .../extract/edits` and `POST .../extract/comments` write, so the survivor check below reads
+  // tenant A's `extract-edits.json` back after tenant B has been through the table.
+  {
+    method: "POST",
+    path: "/api/v1/legal/matters/:matterId/extract/stream",
+    params: { matterId: "matterId" },
+    body: {},
+  },
+  { method: "GET", path: "/api/v1/legal/matters/:matterId/extract", params: { matterId: "matterId" } },
+  {
+    method: "PUT",
+    path: "/api/v1/legal/matters/:matterId/extract/edits",
+    params: { matterId: "matterId" },
+    body: { edits: [{ itemId: "payment:S1", value: "tenant B was here" }] },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/legal/matters/:matterId/extract/comments",
+    params: { matterId: "matterId" },
+    body: { itemId: "payment:S1", text: "tenant B was here" },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/legal/matters/:matterId/ask/stream",
+    params: { matterId: "matterId" },
+    body: { question: "tenant B was here" },
+  },
+  { method: "GET", path: "/api/v1/legal/matters/:matterId/asks", params: { matterId: "matterId" } },
 
   // --- artifacts -------------------------------------------------------------------------------
   { method: "GET", path: "/api/v1/artifacts/:artifactId", params: { artifactId: "artifactId" } },
@@ -460,6 +497,28 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
       "this check is reached under the stub runtime too, and before anything of the meeting is " +
       "read), and a meeting that does not exist takes exactly the same path. Same shape as " +
       "POST /api/v1/edit/projects/:projectId/agent above.",
+  },
+  // Doc flow (docs/internal/doc-flow-plan.md section 4). Unlike the three stream rows above, both
+  // look the meeting up with `requireMeeting` in the handler, before `streamJob` and before the
+  // gate, so a foreign id is a real 404. The transcript file carries a file because a handler that
+  // read the upload before the lookup would otherwise 400 and make the refusal assertion vacuous.
+  {
+    method: "POST",
+    path: "/api/v1/meetings/:meetingId/translate/stream",
+    params: { meetingId: "meetingId" },
+    body: {},
+  },
+  {
+    method: "POST",
+    path: "/api/v1/meetings/:meetingId/transcript/file",
+    params: { meetingId: "meetingId" },
+    files: () => [transcriptFixture()],
+  },
+  {
+    method: "PUT",
+    path: "/api/v1/meetings/:meetingId/minutes/edits",
+    params: { meetingId: "meetingId" },
+    body: {},
   },
 
   // --- folder (Personal only) -------------------------------------------------------------------
@@ -643,6 +702,52 @@ async function seedTenantA(): Promise<Seeds> {
     error: null,
   });
 
+  // The doc-flow files beside the matter: an extraction with one fact, the owner's edit and comment on
+  // it, and a saved question. Tenant B's table below must find none of it, and change none of it.
+  const location = { quote: LEAK_MARKER, docId: "S1", anchor: "¶1", clauseId: null, page: null };
+  legalStore().saveExtract(tenantA, matter.id, {
+    version: 1,
+    matterId: matter.id,
+    createdAt: T0,
+    model: "harness",
+    locale: "en",
+    prompt: "",
+    documentType: LEAK_MARKER,
+    read: { calls: 1, repairs: 0, files: [], partialDocs: [] },
+    files: [],
+    parties: [],
+    facts: [
+      { id: "payment:S1", field: "payment", label: "Payment", value: LEAK_MARKER, status: "verified", ...location },
+    ],
+    redFlags: [],
+    conflicts: [],
+    coverage: [],
+    checks: { passed: true, rounds: 0, verdicts: [] },
+    side: { party: null, ask: false, candidates: [], source: "none" },
+  });
+  legalStore().saveExtractEdits(tenantA, matter.id, {
+    version: 1,
+    edits: [{ itemId: "payment:S1", value: LEAK_MARKER, editedAt: T0, editedBy: tenantA.userId }],
+    comments: [{ id: "harness-comment", itemId: "payment:S1", text: LEAK_MARKER, at: T0, by: tenantA.userId }],
+  });
+  legalStore().saveAsks(tenantA, matter.id, {
+    version: 1,
+    asks: [
+      {
+        id: "harness-ask",
+        question: LEAK_MARKER,
+        answer: LEAK_MARKER,
+        status: "verified",
+        notInDocuments: false,
+        citations: [],
+        askedAt: T0,
+        model: "harness",
+        read: { calls: 1, repairs: 0, files: [], partialDocs: [] },
+        checks: { passed: true, rounds: 0, verdicts: [] },
+      },
+    ],
+  });
+
   const memory = await step("memory", () => addMemory(tenantA, LEAK_MARKER));
   const source = await step("knowledge source", () =>
     addPastedSource(tenantA, LEAK_MARKER, `${LEAK_MARKER} pasted body`),
@@ -733,6 +838,16 @@ function docxFixture(): HostFile {
  */
 function audioFixture(): HostFile {
   return { field: "file", filename: "harness.m4a", mime: "audio/mp4", bytes: new Uint8Array(1024) };
+}
+
+/** A plain-text transcript for the Meeting transcript-file route. Neutral content: tenant B sends it. */
+function transcriptFixture(): HostFile {
+  return {
+    field: "file",
+    filename: "harness.txt",
+    mime: "text/plain",
+    bytes: new TextEncoder().encode("Alice: we agree to ship on Friday.\nBob: I will send the notes."),
+  };
 }
 
 /**
@@ -880,6 +995,30 @@ describe("every by-id route refuses another tenant's id", () => {
     expect(JSON.stringify((result as HostJsonResult).body)).toContain(LEAK_MARKER);
   });
 
+  it("leaves tenant A's extraction, edit, comment and question as they were after tenant B called every doc-flow route", async () => {
+    // B's PUT and POST carried a real edit and a real comment for `payment:S1`, the item A's seeded
+    // extraction has. Each was refused at the matter lookup; this reads A's files back to prove it,
+    // through the route (what A would see) and through the store (what is on disk).
+    const asA = (path: string) =>
+      dispatch(
+        { method: "GET", path, query: {}, params: {}, headers: { cookie: `agentforge_session=${sessionA.id}` } },
+        { serverMode: true, sessionStore: store, now: () => T0 },
+      );
+    const extract = await asA(`/api/v1/legal/matters/${seeds.matterId}/extract`);
+    expect(extract.status).toBe(200);
+    const view = (extract as HostJsonResult).body as {
+      extract: { facts: { id: string; value: string; edited: boolean }[]; comments: { text: string }[] };
+    };
+    expect(view.extract.facts.find((fact) => fact.id === "payment:S1")).toMatchObject({ value: LEAK_MARKER, edited: true });
+    expect(view.extract.comments.map((comment) => comment.text)).toEqual([LEAK_MARKER]);
+    const { legalStore } = await import("./legal/store");
+    const file = legalStore().getExtractEdits(tenantA, seeds.matterId);
+    expect(file.edits.map((edit) => edit.value)).toEqual([LEAK_MARKER]);
+    expect(file.comments.map((comment) => comment.text)).toEqual([LEAK_MARKER]);
+    const asks = await asA(`/api/v1/legal/matters/${seeds.matterId}/asks`);
+    expect((asks as HostJsonResult).body).toMatchObject({ asks: [{ id: "harness-ask", question: LEAK_MARKER }] });
+  });
+
   it("leaves tenant A's media row and its bytes alone, though the delete answered ok", async () => {
     // Phase 8's `DELETE /api/v1/media/:mediaId`, which no-ops rather than 404s. An unscoped no-op
     // would have taken A's row AND its object and still answered `{ ok: true }` — and it ran above,
@@ -1019,6 +1158,39 @@ describe("every by-id route refuses another tenant's id", () => {
         200,
       );
     });
+  });
+
+  /**
+   * The control for the doc-flow rows, which are the only ones whose handlers are still stubs: a
+   * 404 from a route that answered 404 to everybody would satisfy the table above. Tenant A, on its
+   * own matter and meeting, must get past the lookup. The assertion is deliberately not "status is
+   * 501" so it survives the lanes filling the bodies in: whatever the route answers once it is
+   * real (200, 400, a 404 for "no extract yet"), it must not be the lookup's own refusal.
+   */
+  it("lets tenant A through the lookup on the doc-flow routes that B was refused", async () => {
+    const docFlowPaths = new Set([
+      "/api/v1/legal/matters/:matterId/extract/stream",
+      "/api/v1/legal/matters/:matterId/extract",
+      "/api/v1/legal/matters/:matterId/extract/edits",
+      "/api/v1/legal/matters/:matterId/extract/comments",
+      "/api/v1/legal/matters/:matterId/ask/stream",
+      "/api/v1/legal/matters/:matterId/asks",
+      "/api/v1/meetings/:meetingId/translate/stream",
+      "/api/v1/meetings/:meetingId/transcript/file",
+    ]);
+    const routes = BY_ID_ROUTES.filter((route) => docFlowPaths.has(route.path));
+    expect(routes, "the doc-flow rows are missing from BY_ID_ROUTES").toHaveLength(docFlowPaths.size);
+    for (const route of routes) {
+      const result = await dispatch(requestFor(route, sessionA.id), {
+        serverMode: true,
+        sessionStore: store,
+        now: () => T0,
+      });
+      const text = await serialise(result);
+      expect(text, `${route.method} ${route.path} refused tenant A's own row`).not.toMatch(
+        /(Matter|Meeting) not found/,
+      );
+    }
   });
 
   it("covers every by-id route the router registers", () => {

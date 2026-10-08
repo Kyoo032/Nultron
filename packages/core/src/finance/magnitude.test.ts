@@ -63,6 +63,67 @@ describe("expandMagnitudes", () => {
   });
 });
 
+// A short word in front of a suffixed figure used to hide it: the pattern read "of 18.4B" as a
+// four-letter currency "of", saw it was not a currency, and handed the whole token back untouched,
+// so the figure was read as 18. The word stays and the number after it is expanded.
+describe("expandMagnitudes with a short word in front of the figure", () => {
+  it("expands a suffixed figure after 'of', 'the' and other short words in English", () => {
+    expect(expandMagnitudes("revenue of 18.4B", "en")).toBe("revenue of 18400000000");
+    expect(expandMagnitudes("the 5 million", "en")).toBe("the 5000000");
+    expect(expandMagnitudes("sales up 3.2 billion and cost near 900k", "en")).toBe(
+      "sales up 3200000000 and cost near 900000",
+    );
+  });
+
+  it("expands a suffixed figure after 'dan', 'ke' and other short words in Indonesian", () => {
+    expect(expandMagnitudes("dan 5 juta", "id")).toBe("dan 5000000");
+    expect(expandMagnitudes("pendapatan sebesar 18,4 miliar dan beban dari 2,5 jt", "id")).toBe(
+      "pendapatan sebesar 18400000000 dan beban dari 2500000",
+    );
+    expect(expandMagnitudes("naik ke 7,9 M", "id")).toBe("naik ke 7900000000");
+  });
+
+  it("keeps the word exactly as written, including its spacing and case", () => {
+    expect(expandMagnitudes("Of 5 million", "en")).toBe("Of 5000000");
+    expect(expandMagnitudes("of\t5 million", "en")).toBe("of\t5000000");
+  });
+
+  it("still keeps a known currency in front and expands it as before", () => {
+    expect(expandMagnitudes("revenue of IDR 18.4B", "en")).toBe("revenue of IDR 18400000000");
+    expect(expandMagnitudes("the USD 3M and Rp 5 juta", "en")).toBe("the USD 3000000 and Rp 5000000");
+  });
+
+  it("reports the same value the expansion writes", () => {
+    expect(magnitudeValues("revenue of 18.4B and the 5 million", "en")).toEqual([18_400_000_000, 5_000_000]);
+    expect(magnitudeValues("dan 5 juta", "id")).toEqual([5_000_000]);
+  });
+
+  it("does not read an identifier or a code with no space as a short word", () => {
+    // No gap between the letters and the digits: that is a name (Q3, v4, FY24), not a word.
+    expect(expandMagnitudes("Q3 review", "en")).toBe("Q3 review");
+    expect(expandMagnitudes("Q3 B", "en")).toBe("Q3 B");
+    expect(expandMagnitudes("v4 K", "en")).toBe("v4 K");
+    expect(expandMagnitudes("FY24 K", "en")).toBe("FY24 K");
+  });
+
+  it("leaves a short word before a figure that has no magnitude suffix alone", () => {
+    expect(expandMagnitudes("revenue of 18 outlets", "en")).toBe("revenue of 18 outlets");
+    expect(expandMagnitudes("the 5 months", "en")).toBe("the 5 months");
+    expect(expandMagnitudes("dan 5 cabang", "id")).toBe("dan 5 cabang");
+  });
+
+  it("keeps a minus sign where it stood, in front of the word", () => {
+    expect(expandMagnitudes("net -of 2.6B", "en")).toBe("net -of 2600000000");
+  });
+});
+
+describe("looksScaled after the short-word fix", () => {
+  it("restores a mantissa the model copied out of 'revenue of 18.4B'", () => {
+    const items = [row({ label: "revenue", amount: 18.4, category: "revenue" })];
+    expect(looksScaled("revenue of 18.4B", items, "en")[0]?.amount).toBe(18_400_000_000);
+  });
+});
+
 describe("magnitudeValues", () => {
   it("lists what each suffixed figure stands for, in order", () => {
     expect(magnitudeValues(EN_BRIEF, "en")).toEqual([18_400_000_000, 7_900_000_000, 6_100_000_000, 2_600_000_000]);

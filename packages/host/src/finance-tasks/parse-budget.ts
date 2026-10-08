@@ -17,7 +17,7 @@
  * Every pair comes back with its score and the stage that produced it, and `needsConfirmation` is
  * always true: nothing is computed until the owner has looked at the table.
  */
-import { ApiError } from "@agentforge/core";
+import { ApiError, type TenantContext } from "@agentforge/core";
 import {
   budgetSheetsFromSentence,
   isBudgetDerivedLabel,
@@ -148,7 +148,19 @@ export type BudgetParseResult = {
   readonly pii: FinancePiiSummary;
 };
 
-export const parseBudgetInput: FinanceTaskParser = async (tenant, body): Promise<BudgetParseResult> => {
+export type BudgetParseOptions = {
+  /**
+   * False skips the meaning stage: the labels are not embedded, the pairing stays on its local
+   * stages, and the parse makes no gateway call at all. `/finance/auto` reads this way. Default true.
+   */
+  readonly assists?: boolean;
+};
+
+export async function parseBudgetFigures(
+  tenant: TenantContext,
+  body: unknown,
+  options: BudgetParseOptions = {},
+): Promise<BudgetParseResult> {
   // Redacted first: the only copy of these rows that exists past this line is the one the owner sees.
   const guardedText = guardFinanceInput({ figuresText: readFigures(body) });
   const read = budgetRowsFromFiguresText(guardedText.figuresText);
@@ -165,9 +177,12 @@ export const parseBudgetInput: FinanceTaskParser = async (tenant, body): Promise
   const local = proposeBudgetPairs(sides.budget, sides.actual);
   // Only a pairing that still has loose ends on both sides can be changed by a cosine, so only that
   // one is worth a call. Everything else is already decided by evidence a reader can check by hand.
-  const embedded = budgetEmbedWorthwhile(local)
-    ? await embedBudgetLabels(tenant, sides.budget, sides.actual)
-    : ({ status: "not-needed" } as const);
+  // With assists off the stage is skipped on purpose, and the screen is told it did not run.
+  const embedded = !budgetEmbedWorthwhile(local)
+    ? ({ status: "not-needed" } as const)
+    : options.assists === false
+      ? ({ status: "unavailable" } as const)
+      : await embedBudgetLabels(tenant, sides.budget, sides.actual);
   const pairing = embedded.similarity
     ? proposeBudgetPairs(sides.budget, sides.actual, { similarity: embedded.similarity })
     : local;
@@ -185,4 +200,7 @@ export const parseBudgetInput: FinanceTaskParser = async (tenant, body): Promise
     needsConfirmation: true,
     pii: mergeFinancePii(guardedText.pii, guardedRows.pii),
   };
-};
+}
+
+export const parseBudgetInput: FinanceTaskParser = async (tenant, body): Promise<BudgetParseResult> =>
+  parseBudgetFigures(tenant, body);

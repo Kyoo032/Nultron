@@ -9,3 +9,5 @@ export * from "./output-copy";
 export * from "./papers";
 export * from "./position";
 export * from "./clause-reading";
+export * from "./facts";
+export * from "./extract-prompt";

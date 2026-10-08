@@ -5,7 +5,7 @@ import { jsonError, jsonOk } from "../errors";
 import { requireGatewayAllowedFor } from "../gateway-gate";
 import { getTenant } from "../tenant";
 import { streamJob } from "../job-stream";
-import { generateLegalRun } from "../legal-generate";
+import { assertPartiesForReview, generateLegalRun } from "../legal-generate";
 import {
   assertSafeInstructions,
   createMatterBodySchema,
@@ -88,7 +88,7 @@ export function handlePostLegalMatterFile(request: HostRequest): Promise<HostRes
   return withTenant(request, async (tenant) => {
     const file = request.files?.find((item) => item.field === "file") ?? request.files?.[0];
     if (!file) {
-      throw new ApiError("invalid_request", 'Attach one .docx file under the field "file"', 400);
+      throw new ApiError("invalid_request", 'Attach one Word (.docx) or PDF file under the field "file"', 400);
     }
     if (file.bytes.byteLength > LEGAL_FILE_MAX_BYTES) {
       throw new ApiError("invalid_request", "A file exceeds the 25 MB cap", 413);
@@ -114,7 +114,8 @@ export function handlePostLegalRunStream(request: HostRequest): Promise<HostResu
     requireGatewayAllowedFor(tenant);
     const body = parseLegalBody(runBodySchema, request.body);
     const matterId = request.params.matterId;
-    requireLegalMatter(tenant, matterId);
+    // A real 400, before the stream and before any model call: the review acts for one side, so it needs one.
+    assertPartiesForReview(requireLegalMatter(tenant, matterId));
     return streamJob((emit, abortSignal) => generateLegalRun(tenant, matterId, body, emit, abortSignal), {
       abortSignal: request.abortSignal,
       tenant,

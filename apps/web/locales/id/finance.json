@@ -45,7 +45,7 @@
       "encrypted": "Berkas itu terkunci kata sandi. Lepaskan kata sandinya lalu coba lagi.",
       "slow": "Berkas itu terlalu lama dibaca, jadi tidak jadi diimpor."
     },
-    "allSheets": "Semua tabel ({{count}})"
+    "allSheets": "Semua tabel ({count})"
   },
   "orDataset": "Atau gunakan dataset tersimpan",
   "lineItemsBelow": "Pos di bawah",
@@ -196,7 +196,7 @@
   "taskUnavailable": "{task} punya langkah dan perhitungannya sendiri, dan keduanya masih dibangun. Belum ada yang bisa dijalankan di sini.",
   "brief": {
     "statedFacts": {
-      "title": "Tertulis di dokumen ({{count}})",
+      "title": "Tertulis di dokumen ({count})",
       "hint": "Angka yang ditulis dokumen di dalam kalimat, bukan di tabel. Periksa namanya, atau hapus yang tidak ingin dikutip. Angka ini tidak pernah ikut dijumlahkan.",
       "labelPlaceholder": "Angka ini tentang apa",
       "labelAria": "Nama untuk angka yang tertulis ini",
@@ -439,8 +439,78 @@
       "empty": "Tidak ada rasio yang dapat dihitung dari baris ini."
     }
   },
+  "auto": {
+    "promptLabel": "Tanyakan tentang angka Anda",
+    "promptPlaceholder": "Berapa lama kas saya bertahan?",
+    "promptHint": "Tambahkan berkas di bawah jika ada. Membacanya gratis; model baru dipakai saat Anda menekan Tulis hasilnya.",
+    "dropLabel": "Tambahkan laporan atau spreadsheet",
+    "dropHint": "CSV, Excel, PDF, Word, atau PowerPoint, sampai 25 MB. Dibaca di mesin ini, tanpa model.",
+    "dropReading": "Membaca {name}…",
+    "dropReplace": "Ganti berkas",
+    "remove": "Hapus berkas",
+    "fileAria": "Laporan atau spreadsheet yang dibaca",
+    "checking": "Memeriksa seperti apa isinya…",
+    "looksLike": "Tampaknya",
+    "confidence": {
+      "high": "Cocok sekali",
+      "low": "Perkiraan terbaik"
+    },
+    "needsTitle": "Yang dibutuhkan",
+    "needs": {
+      "brief": "Baris pendapatan dan biaya, untuk satu periode atau lebih.",
+      "cashflow": "Uang masuk dan keluar untuk sedikitnya dua bulan, atau saldo awal.",
+      "budget": "Anggaran dan angka realisasinya, baris demi baris.",
+      "appraisal": "Uang yang dikeluarkan sekarang, lalu uang yang kembali tiap tahun.",
+      "ratios": "Neraca dan laporan laba rugi."
+    },
+    "previewTitle": "Pratinjau",
+    "previewHint": "Setiap angka di sini dihitung di kode, di mesin ini. Belum ada yang ditulis oleh model.",
+    "tablesTitle": "Tabel",
+    "tableMoreRows": "{n} baris lagi tidak ditampilkan di sini.",
+    "rows": "Baris terbaca: {n}",
+    "sheets": "Lembar terbaca: {names}",
+    "unplacedTitle": "Baris yang tidak bisa ditempatkan ({n})",
+    "unplacedRow": "{label} ({period})",
+    "unplacedNoPeriod": "{label}",
+    "sheetsSkipped": "Lembar ini tidak muat dalam satu pratinjau dan tidak ikut dibaca: {names}.",
+    "pii": "{n} data pribadi disembunyikan sebelum dibaca",
+    "warningsTitle": "Perlu diperhatikan",
+    "warnings": {
+      "noFigures": "Belum ada angka untuk dibaca. Tambahkan berkas, atau tempel angkanya di Opsi lain.",
+      "proseNoTable": "Tidak ditemukan tabel di teks ini, jadi belum ada pratinjau tanpa model. Model bisa membacanya saat Anda menekan Tulis hasilnya, dan itu memakai kunci Anda.",
+      "notEnoughRows": "Angka sudah dibaca, tetapi terlalu sedikit untuk dibuat pratinjau. Tambahkan baris atau periksa angkanya.",
+      "inputRejected": "Angka ini tampak seperti {task}, tetapi tidak lolos pemeriksaan tugas itu, misalnya karena baris terlalu banyak. Buka tugasnya untuk melihat yang mana.",
+      "fellBack": "Tampaknya ini {from}, tetapi itu tidak bisa dibuat dari berkas ini, jadi dibaca sebagai {to}.",
+      "unplacedRows": "{n} baris tidak bisa ditempatkan oleh aturan dan dibiarkan apa adanya.",
+      "defaultDiscountRate": "Tingkat diskonto tidak ditemukan, jadi ditampilkan {rate}%. Ubah di penilaian investasi.",
+      "unpairedLines": "{n} baris belum punya pasangan di sisi lainnya."
+    },
+    "write": "Tulis hasilnya",
+    "writing": "Bekerja…",
+    "writeNote": "Memakai kunci Anda. Angka di atas tidak berubah; hanya ringkasan tertulisnya yang baru.",
+    "writeNeedsFigures": "Tambahkan berkas berisi angka untuk menulis hasilnya.",
+    "cancel": "Batal",
+    "empty": "Ajukan pertanyaan, atau tambahkan berkas. Pratinjau akan muncul di sini lebih dulu.",
+    "errors": {
+      "read": "Itu tidak bisa dibaca.",
+      "file": "Berkas itu tidak bisa dibaca sebagai tabel",
+      "write": "Hasil tertulisnya tidak bisa diselesaikan."
+    }
+  },
+  "more": {
+    "summary": "Opsi lain",
+    "pasteLabel": "Atau tempel angkanya",
+    "pastePlaceholder": "Pendapatan 2025: $120.000. Hosting $30.000. Gaji $100.000. Kas $90.000…",
+    "pasteHint": "Baris yang ditempel dibaca dengan cara yang sama seperti berkas: di mesin ini, tanpa model.",
+    "modelLabel": "Model untuk hasil tertulis",
+    "switchTitle": "Bukan yang Anda maksud? Baca sebagai",
+    "switchHint": "Membuka tugas itu dengan angka Anda di kotaknya. Belum ada yang dihitung sebelum Anda menekan tombolnya.",
+    "checkRows": "Periksa barisnya",
+    "checkRowsHint": "Membuka {task} dengan angka Anda di kotaknya, agar Anda bisa memeriksa setiap barisnya dulu.",
+    "tasksTitle": "Atau pilih yang ingin dilakukan"
+  },
   "guide": {
-    "lead": "Apa yang ingin Anda lakukan?",
+    "lead": "Tanyakan tentang angka Anda, atau tambahkan berkas.",
     "change": "Pilih yang lain",
     "numbersLead": "Tambahkan berkas atau ketik angkanya.",
     "resultLead": "Ini hasilnya. Unduh berkasnya, atau buka Opsi lain untuk menulis ulang.",

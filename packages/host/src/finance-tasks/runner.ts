@@ -32,6 +32,7 @@ import { renderMd } from "../renderers/md";
 import { upsertWorkSource } from "../knowledge-ingest";
 import { artifactWorkCard } from "../work-cards";
 import { readModelPinned, readPrompt, requireLive, resolveModel } from "./live";
+import { BUDGET_SPENT_STEP, createCallBudget, type CallBudget } from "./call-budget";
 import { holdReadingDirection } from "./direction";
 import { FINANCE_TASK_SYSTEM, guardNarration, parseNarration, sectionRequest, type NarrationDraft } from "./narrate";
 import { askForReading } from "./reading";
@@ -42,6 +43,7 @@ import {
   withDirectionFlag,
   withRemovedFlag,
 } from "./repair";
+import { holdReadingScope, withAdviceFlag } from "./scope";
 import { financeTaskArtifactMeta, financeTaskProvenance, persistFinanceTaskReport } from "./persist";
 import type { FinanceTaskRunContext, FinanceTaskRunResult } from "./types";
 
@@ -163,6 +165,10 @@ type VerifyOptions = {
   readonly phase: FinancePhaseId;
   /** The job's cancel, handed to the rewrite call. */
   readonly signal: AbortSignal | undefined;
+  /** The run's shared extra call: the rewrite of a blanked section draws on it. */
+  readonly budget: CallBudget;
+  /** The person's own words, so a sentence they wrote is not taken for advice. */
+  readonly sources: readonly string[];
 };
 
 /**
@@ -171,13 +177,16 @@ type VerifyOptions = {
  * The repair is the brief's, reached through `finance-tasks/repair.ts`: one rewrite of the marked
  * section with the offending sentence quoted back, then a clean sentence removal. The marker is a
  * message to us and never to the reader, so it may not survive this function.
+ *
+ * `advising` is the scope judge's reading of the draft as it came back, so the run knows whether
+ * `holdReadingScope` has anything to look for before any rewrite changes the text.
  */
 async function verifyNarration(
   draft: NarrationDraft,
   allowed: readonly number[],
   options: VerifyOptions,
-): Promise<{ prose: FinanceTaskProse; guard: GuardReport }> {
-  const { prose, guard } = guardNarration(draft, allowed);
+): Promise<{ prose: FinanceTaskProse; guard: GuardReport; advising: boolean }> {
+  const { prose, guard, advice } = guardNarration(draft, allowed, options.sources);
   options.emit({
     type: "job.step",
     phase: options.phase,
@@ -190,6 +199,7 @@ async function verifyNarration(
     factsBlock: options.factsBlock,
     locale: options.locale,
     signal: options.signal,
+    budget: options.budget,
   });
   if (repair.repaired) {
     options.emit({
@@ -207,14 +217,16 @@ async function verifyNarration(
       // same way as for a sentence the repair took out — and the brief path counts it the same way.
       removed: (guard.removed ?? 0) + (repair.guard.removed ?? 0),
     },
+    advising: advice.length > 0,
   };
 }
 
 /** What the desk should be told about this run beyond the report itself. */
-function runWarnings(flagged: number, removed: number): string[] {
+function runWarnings(flagged: number, removed: number, adviceRemoved: number): string[] {
   return [
     ...(flagged > 0 ? [`${flagged} figure(s) did not trace to the computed facts and were taken out`] : []),
     ...(removed > 0 ? [`${removed} sentence(s) were removed because their figure could not be traced`] : []),
+    ...(adviceRemoved > 0 ? [`${adviceRemoved} sentence(s) were removed because they gave advice`] : []),
   ];
 }
 
@@ -234,6 +246,10 @@ export async function runFinanceTask<I, C>(
   const extra = source.figuresText;
   const locale: ReportLocale = runnerLocale(body);
   const phases = runnerPhases(module.id);
+  // The narrative is one call. Everything else that would ask the model for more — the second ask
+  // for a reading, a blanked section, a contradicting one, an advising one — shares this one extra.
+  const budget = createCallBudget();
+  const sources = [extra, question].filter((text) => text.trim() !== "");
 
   throwIfJobAborted(abortSignal);
   // Every math step the task's graph draws, in its own order. The arithmetic itself is one
@@ -266,34 +282,59 @@ export async function runFinanceTask<I, C>(
       throwIfJobAborted(abortSignal);
       emit({ type: "job.step", phase: phases.finish, label: "Asked once more for the reading" });
     },
+    budget,
   );
 
   throwIfJobAborted(abortSignal);
+  const factsBlock = module.promptFacts(computed, locale);
   const verified = await verifyNarration(answered.draft, allowed, {
     tenant,
     model: answered.run.model,
     locale,
-    factsBlock: module.promptFacts(computed, locale),
+    factsBlock,
     emit,
     phase: phases.finish,
     signal: abortSignal,
+    budget,
+    sources,
   });
   const held = await holdReadingDirection(verified.prose.sections, module.directionClaims?.(computed) ?? [], {
     tenant,
     model: answered.run.model,
     locale,
-    factsBlock: module.promptFacts(computed, locale),
+    factsBlock,
     allowed,
     emit,
     phase: phases.finish,
     signal: abortSignal,
+    budget,
   });
+  // Advice can only be in the text if the draft had it or a rewrite since wrote it. With neither,
+  // nothing is read; otherwise the final bodies are read once more, so a rewrite that advised is caught.
+  const scoped =
+    verified.advising || budget.used > 0
+      ? await holdReadingScope(held.sections, {
+          tenant,
+          model: answered.run.model,
+          locale,
+          factsBlock,
+          allowed,
+          sources,
+          emit,
+          phase: phases.finish,
+          signal: abortSignal,
+          budget,
+        })
+      : { sections: held.sections, adviceRemoved: 0, amountRemoved: 0 };
+  if (budget.refused > 0) {
+    emit({ type: "job.step", phase: phases.finish, label: BUDGET_SPENT_STEP });
+  }
   // A cancelled run is not saved: the rewrite above may have been the call the cancel cut short.
   throwIfJobAborted(abortSignal);
-  const prose = { ...verified.prose, sections: held.sections };
+  const prose = { ...verified.prose, sections: scoped.sections };
   const guard = {
     ...verified.guard,
-    removed: (verified.guard.removed ?? 0) + held.amountRemoved,
+    removed: (verified.guard.removed ?? 0) + held.amountRemoved + scoped.amountRemoved,
     ...(held.directionRemoved > 0 ? { directionRemoved: held.directionRemoved } : {}),
   };
 
@@ -301,7 +342,11 @@ export async function runFinanceTask<I, C>(
   // held to the same rule, so no export can carry the marker.
   const swept = scrubReportMarkers(module.buildReport(computed, prose, { locale, guard }));
   const removed = (guard.removed ?? 0) + swept.removed;
-  const report = withDirectionFlag(withRemovedFlag(swept.report, removed, locale), held.directionRemoved, locale);
+  const report = withAdviceFlag(
+    withDirectionFlag(withRemovedFlag(swept.report, removed, locale), held.directionRemoved, locale),
+    scoped.adviceRemoved,
+    locale,
+  );
   const run = answered.run;
   const markdown = Buffer.from((await renderMd(report)).bytes).toString("utf8");
   const artifactId = persistFinanceTaskReport(
@@ -334,7 +379,7 @@ export async function runFinanceTask<I, C>(
       }),
     );
   }
-  const warnings = runWarnings(guard.total, removed);
+  const warnings = runWarnings(guard.total, removed, scoped.adviceRemoved);
   return {
     task: module.id,
     report,

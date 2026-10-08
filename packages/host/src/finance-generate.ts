@@ -28,6 +28,7 @@ import { readFinanceLocale } from "./finance-locale";
 import { readStatedFacts, statedFactsBlock, withStatedFacts } from "./finance-stated";
 import { parseFiguresText, type ParsedFigures } from "./finance-parse-figures";
 import { repairUnverifiedSections } from "./finance-section-repair";
+import { BUDGET_SPENT_STEP, createCallBudget } from "./finance-tasks/call-budget";
 import { holdReadingDirection } from "./finance-tasks/direction";
 import { askForReading } from "./finance-tasks/reading";
 import { guardFinanceInput, mergeFinancePii, type FinancePiiSummary } from "./finance-privacy";
@@ -217,6 +218,9 @@ export async function generateFinanceBrief(
   const factsBlock = [financePromptBlock(inputs, computed, locale), statedFactsBlock(stated, locale)]
     .filter(Boolean)
     .join("\n\n");
+  // The brief is one call. The second ask for a draft, a blanked section's rewrite and a
+  // contradicting section's rewrite share one extra call; once it is spent the rest is done in code.
+  const budget = createCallBudget();
   const run = await askForReading(
     async () => {
       const answered = await collectJobAssistantRun({
@@ -244,6 +248,7 @@ export async function generateFinanceBrief(
       throwIfJobAborted(abortSignal);
       emit({ type: "job.step", phase: "drafting", label: "Asked once more for the reading" });
     },
+    budget,
   );
 
   throwIfJobAborted(abortSignal);
@@ -257,6 +262,7 @@ export async function generateFinanceBrief(
     factsBlock,
     locale,
     signal: abortSignal,
+    budget,
   });
   const held = await holdReadingDirection(repaired.brief.sections, briefTaskModule.directionClaims?.(computed) ?? [], {
     tenant,
@@ -267,7 +273,11 @@ export async function generateFinanceBrief(
     emit,
     phase: "verifying",
     signal: abortSignal,
+    budget,
   });
+  if (budget.refused > 0) {
+    emit({ type: "job.step", phase: "verifying", label: BUDGET_SPENT_STEP });
+  }
   const brief = financeBriefSchema.parse(
     withEmptiedSectionsNoted({ ...repaired.brief, sections: held.sections }, locale),
   );
@@ -412,6 +422,8 @@ export async function regenerateFinanceSection(
     factsBlock,
     locale,
     signal: abortSignal,
+    // The section rewrite above is the call; the repair is the one extra a run is allowed.
+    budget: createCallBudget(),
   });
   throwIfJobAborted(abortSignal);
   const candidate = repaired.brief.sections[0];

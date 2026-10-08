@@ -6,8 +6,13 @@
  * worth not repeating, so it is persisted before the minutes are written. A desk with no
  * recogniser on its key skips straight to the minutes over a pasted transcript.
  *
- * The minutes call runs its checks and one repair round (`./minutes-checks`). Names, dates, and
- * figures the transcript does not support are then stripped in code, with no further model call.
+ * The minutes call runs its checks and one repair round (`./minutes-checks`). The checks include
+ * the evidence check: every decision and action item quotes the transcript, with the owner and the
+ * due date said beside the quote. Names, dates, and figures the transcript does not support are
+ * then stripped in code, with no further model call, and each item is marked verified or unverified
+ * (never dropped). The owner may pass a `prompt` that steers what the minutes emphasise; it never
+ * reaches the checks. Items the owner edited by hand (`./edit.ts`) survive a regenerate.
+ * Translation is opt-in: `translate: false` skips it, and `translateStoredMinutes` does it on request.
  * The translation is asked once more only when it is not that same sheet, and when it still
  * disagrees the minutes stay and the translation is not saved.
  */
@@ -32,10 +37,11 @@ import {
   MeetingTranslationError,
   emptyMinutesMessage,
   invalidMinutesMessage,
-  meetingMinutesToMarkdown,
+  keepEditedItems,
   meetingPhaseLabel,
   meetingTranscriptToMarkdown,
   minutesPrompt,
+  minutesRequiredMessage,
   settleParsedMinutes,
   transcriptPlainText,
   translateMeetingSheet,
@@ -43,12 +49,9 @@ import {
   type MeetingTranscript,
 } from "@agentforge/core/meeting";
 import { runChecked, type RunCheckedResult } from "../harness/run-checked";
-import { artifactStore } from "../artifacts";
 import { collectJobAssistantRun } from "../job-regen";
 import type { JobEmitter } from "@agentforge/core/jobs";
 import { throwIfJobAborted } from "../job-stream";
-import { artifactWorkCard } from "../work-cards";
-import { upsertWorkSource } from "../knowledge-ingest";
 import { loadSettings, type SettingsScope } from "../settings-store";
 import { modelCacheScopeOf } from "../model-cache";
 import { listSelectableModels, modeDefaultsFor } from "../selectable-models";
@@ -65,6 +68,8 @@ import {
   type MinutesChecksSummary,
   type MinutesDraft,
 } from "./minutes-checks";
+import { removeMeetingArtifactsById } from "./artifacts";
+import { persistMeetingArtifact, saveMinutesArtifact } from "./minutes-artifact";
 import { meetingStore, requireMeeting, type MeetingRecord } from "./store";
 import { resolveMeetingAsr, transcribeChunks } from "./transcribe";
 import type { MeetingMinutesRecord, MinutesChecksRecord } from "./records";
@@ -105,51 +110,6 @@ function meetingFailure(error: unknown): never {
     throw new ApiError(error.code, message, 502);
   }
   throw error;
-}
-
-/** Saving an artifact never fails the run; the minutes are still returned to the caller. */
-function persist(
-  tenant: TenantContext,
-  input: { kind: "transcript" | "minutes"; title: string; body: string; meta: Record<string, unknown> },
-): string {
-  try {
-    return artifactStore().create(tenant, {
-      mode: "meeting",
-      kind: input.kind,
-      title: input.title,
-      mime: "text/markdown",
-      body: input.body,
-      meta: input.meta,
-    }).id;
-  } catch (error) {
-    const code = error instanceof ApiError ? error.code : "internal_error";
-    log.warn("meeting_artifact_not_saved", { code, kind: input.kind });
-    return "";
-  }
-}
-
-async function fileWorkCard(
-  tenant: TenantContext,
-  input: { artifactId: string; title: string; markdown: string; model: string },
-): Promise<void> {
-  if (!input.artifactId) {
-    return;
-  }
-  try {
-    await upsertWorkSource(
-      tenant,
-      artifactWorkCard({
-        type: "Meeting",
-        artifactId: input.artifactId,
-        title: input.title,
-        markdown: input.markdown,
-        model: input.model,
-      }),
-    );
-  } catch (error) {
-    const code = error instanceof ApiError ? error.code : "internal_error";
-    log.warn("meeting_work_card_not_filed", { code });
-  }
 }
 
 /**
@@ -254,7 +214,7 @@ async function transcribeAndMeter(
 export function saveTranscript(tenant: TenantContext, meetingId: string, transcript: MeetingTranscript): MeetingRecord {
   const meeting = requireMeeting(tenant, meetingId);
   const markdown = meetingTranscriptToMarkdown(transcript, `${meeting.title} — transcript`);
-  const artifactId = persist(tenant, {
+  const artifactId = persistMeetingArtifact(tenant, {
     kind: "transcript",
     title: `${meeting.title} — transcript`,
     body: markdown,
@@ -284,6 +244,7 @@ function checksRecordOf(summary: MinutesChecksSummary): MinutesChecksRecord {
  * The minutes call, run until its checks pass or the one repair round is spent. Minutes that still
  * fail are kept, as they were before the checks existed: the person gets a draft to edit, and the
  * verdicts travel with it (`checks` in the artifact meta). Only minutes that never parse are an error.
+ * `request` is what the owner asked for; it steers the writer (and its repair) and is never shown to a check.
  */
 async function writeMinutes(
   tenant: TenantContext,
@@ -291,11 +252,14 @@ async function writeMinutes(
   transcript: string,
   locale: AppLocale,
   model: string,
-  options: { emit: JobEmitter; signal?: AbortSignal; modelExplicit: boolean },
+  options: { emit: JobEmitter; signal?: AbortSignal; modelExplicit: boolean; request?: string },
 ): Promise<WrittenMinutes> {
   const { signal, modelExplicit } = options;
-  const basePrompt = minutesPrompt(transcript, { title: meeting.title });
-  const checks = buildMinutesChecks(transcript);
+  const basePrompt = minutesPrompt(transcript, {
+    title: meeting.title,
+    ...(options.request ? { request: options.request } : {}),
+  });
+  const checks = buildMinutesChecks(transcript, locale);
   let last: MinutesDraft | null = null;
 
   const produce = async (repairNote: string | null): Promise<MinutesDraft> => {
@@ -353,9 +317,15 @@ async function writeMinutes(
     throw minutesParseError(parsed);
   }
   // The checks and the repair asked the model; this is the code's last word on names, dates and figures.
-  const settled = settleParsedMinutes(parsed.minutes, transcript);
+  const settled = settleParsedMinutes(parsed.minutes, transcript, locale);
   if (settled.replacedNames > 0) {
     log.warn("meeting_minutes_names_guarded", { replaced: settled.replacedNames });
+  }
+  const unbacked = [...settled.minutes.decisions, ...settled.minutes.actionItems].filter(
+    (item) => item.evidence !== "verified",
+  ).length;
+  if (unbacked > 0) {
+    log.warn("meeting_minutes_items_unverified", { items: unbacked });
   }
   if (settled.clearedDates > 0 || settled.replacedFigures > 0) {
     log.warn("meeting_minutes_grounded", {
@@ -376,31 +346,6 @@ async function writeMinutes(
   };
 }
 
-async function saveMinutesArtifact(
-  tenant: TenantContext,
-  meeting: MeetingRecord,
-  record: MeetingMinutesRecord,
-  suffix: string,
-): Promise<MeetingMinutesRecord> {
-  const markdown = meetingMinutesToMarkdown(record.minutes);
-  const title = `${meeting.title} — ${suffix}`;
-  const artifactId = persist(tenant, {
-    kind: "minutes",
-    title,
-    body: markdown,
-    meta: {
-      model: record.model,
-      locale: record.locale,
-      unverifiedNames: record.unverifiedNames,
-      meetingId: meeting.id,
-      // Ids and pass/fail only: the meta is not encrypted, so no minutes text goes into it.
-      ...(record.checks ? { checks: record.checks } : {}),
-    },
-  });
-  await fileWorkCard(tenant, { artifactId, title, markdown, model: record.model });
-  return { ...record, artifactId };
-}
-
 type MinutesRunOptions = {
   emit?: JobEmitter;
   abortSignal?: AbortSignal;
@@ -411,7 +356,13 @@ type MinutesRunOptions = {
    * run's error. Unset, `model` is the seeded default and the job model fallback may stand in for it.
    */
   modelExplicit?: boolean;
+  /** Translate the minutes as part of this run. Anything but `false` does; the studio sends `false` (opt-in). */
   translate?: boolean;
+  /**
+   * What the owner asked for ("minutes and who does what"), already length- and safety-checked by the
+   * handler (`readMeetingRequest`). It steers the minutes call and its repair; the checks never see it.
+   */
+  prompt?: string;
 };
 
 /**
@@ -450,11 +401,17 @@ export async function generateMinutes(
     emit,
     signal: options.abortSignal,
     modelExplicit,
+    ...(options.prompt ? { request: options.prompt } : {}),
   });
   // Minutes the person cancelled are not saved as an artifact or a work card.
   throwIfJobAborted(options.abortSignal);
   emit({ type: "job.phase", phase: "saving", label: meetingPhaseLabel("saving", localeForRun()) });
-  const minutes = await saveMinutesArtifact(tenant, meeting, written.record, "minutes");
+  // The owner's own edits are never overwritten by a regenerate: they go back over the new items.
+  const kept = {
+    ...written.record,
+    minutes: keepEditedItems(meeting.minutes?.minutes ?? null, written.record.minutes),
+  };
+  const minutes = await saveMinutesArtifact(tenant, meeting, kept, "minutes");
   // On the meeting before the translation starts, so a translation that fails cannot take the
   // minutes with it. An earlier translation described earlier minutes, so it is cleared here.
   const minuted = meetingStore().update(tenant, meetingId, { status: "minuted", minutes, translation: null });
@@ -547,6 +504,47 @@ export async function translateMinutes(
     },
     target === "id" ? "notulen" : "minutes (English)",
   );
+}
+
+/**
+ * The stored minutes in the other language, on request: one call, and one more only when the first is
+ * not the same sheet (`translateMinutes`). It is the opt-in half of the split run: `generateMinutes`
+ * with `translate: false` writes the minutes, this translates them when the owner presses the button.
+ * It replaces any earlier translation, and a failure leaves the minutes and that translation as they were.
+ */
+export async function translateStoredMinutes(
+  tenant: TenantContext,
+  meetingId: string,
+  options: Pick<MinutesRunOptions, "emit" | "abortSignal" | "model" | "modelExplicit"> = {},
+): Promise<MeetingRecord> {
+  const emit = options.emit ?? NO_EMIT;
+  // Ownership before the runtime gate, as in `generateMinutes`.
+  const meeting = requireMeeting(tenant, meetingId);
+  requireLiveMeetingRuntime(tenant);
+  const source = meeting.minutes;
+  if (!source) {
+    throw new ApiError("invalid_request", minutesRequiredMessage(localeForRun()), 400);
+  }
+  const model = resolveMeetingModel(options.model, tenant);
+  throwIfJobAborted(options.abortSignal);
+  const translation = await translateMinutes(
+    tenant,
+    meeting,
+    source,
+    otherLocale(source.locale),
+    model,
+    options.abortSignal,
+    options.modelExplicit === true,
+    (attempt) =>
+      emit({
+        type: "job.phase",
+        phase: "translating",
+        label: meetingPhaseLabel(attempt === 1 ? "translating" : "translating-again", localeForRun()),
+      }),
+  );
+  // The artifact the replaced translation was saved as goes with it; the new one is already saved.
+  removeMeetingArtifactsById(tenant, [meeting.translation?.artifactId ?? ""]);
+  return meetingStore().update(tenant, meetingId, { translation });
 }
 
 /** The whole path in one call, for the studio's single button. */

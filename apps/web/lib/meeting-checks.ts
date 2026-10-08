@@ -1,7 +1,7 @@
 /**
  * What the Meeting studio says about the checks its minutes still failed.
  *
- * The host runs four checks on the first-language minutes and spends one repair round on a failure
+ * The host runs five checks on the first-language minutes and spends one repair round on a failure
  * (`packages/host/src/meeting/minutes-checks.ts`). Minutes that still fail are kept as a draft to edit,
  * and the verdicts travel with them as `checks` on the minutes record: ids and pass/fail only, never
  * minutes text. This turns that into the few words the page shows.
@@ -12,7 +12,7 @@
  */
 
 /** What the page can name, in the order a reader should look at them. */
-export const MEETING_CHECK_KINDS = ["owners", "dates", "summary", "shape"] as const;
+export const MEETING_CHECK_KINDS = ["owners", "dates", "summary", "shape", "evidence"] as const;
 
 export type MeetingCheckKind = (typeof MEETING_CHECK_KINDS)[number];
 
@@ -22,6 +22,7 @@ const KIND_OF_CHECK: Readonly<Record<string, MeetingCheckKind>> = {
   "quoted-dates": "dates",
   "summary-present": "summary",
   "minutes-shape": "shape",
+  "minutes-evidence": "evidence",
 };
 
 /** The checks as the host sends them on a minutes record. Every field is read defensively. */

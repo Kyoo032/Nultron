@@ -14,7 +14,7 @@ import { isGatewayBlockedText } from "@/lib/gateway-blocked";
 import { NeedsKeyNote } from "@/components/needs-key-note";
 import { SettingsLinkHint } from "@/components/settings-link-hint";
 import { WorkingStatus } from "@/components/working-status";
-import { FinanceChooser, FinanceStepTrail } from "@/components/finance-steps/finance-guide";
+import { FinanceStepTrail } from "@/components/finance-steps/finance-guide";
 import { FinancePhaseStrip } from "@/components/finance-steps/finance-phase-strip";
 import { FinancePromptFields } from "@/components/finance-steps/finance-prompt-bar";
 import { FinanceResultNotices } from "@/components/finance-steps/finance-result-notices";
@@ -27,6 +27,8 @@ import { Link } from "@/lib/nav";
 
 export type FinanceStudioViewProps = {
   showChooser: boolean;
+  /** What `/finance` with no task shows under the header: the prompt-first page (`FinanceAuto`). */
+  chooser: ReactNode;
   task: FinanceTask;
   taskName: string;
   taskTip: string;
@@ -69,6 +71,7 @@ export type FinanceStudioViewProps = {
 
 export function FinanceStudioView({
   showChooser,
+  chooser,
   task,
   taskName,
   taskTip,
@@ -125,12 +128,7 @@ export function FinanceStudioView({
         outcomeTestId={showChooser ? "finance-guide-lead" : "expected-inputs"}
       />
       {showChooser ? (
-        <div className="mt-6">
-          <ModeIllustration mode="finance" />
-          <div className="mt-6">
-            <FinanceChooser />
-          </div>
-        </div>
+        chooser
       ) : (
         <TaskPath
           task={task}
@@ -176,7 +174,7 @@ export function FinanceStudioView({
   );
 }
 
-function TaskPath(props: Omit<FinanceStudioViewProps, "showChooser"> & { step: "numbers" | "result" }) {
+function TaskPath(props: Omit<FinanceStudioViewProps, "showChooser" | "chooser"> & { step: "numbers" | "result" }) {
   const {
     task,
     taskName,

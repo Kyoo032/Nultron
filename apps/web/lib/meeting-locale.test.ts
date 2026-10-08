@@ -54,13 +54,57 @@ describe("meeting locale JSON", () => {
     const placeholders = (value: string) => (value.match(/\{[a-zA-Z]+\}/g) ?? []).sort();
     const en = (load("en") as { checks: Record<string, string> }).checks;
     const id = (load("id") as { checks: Record<string, string> }).checks;
-    for (const key of ["title", "owners", "dates", "summary", "shape", "hint"]) {
+    for (const key of ["title", "owners", "dates", "summary", "shape", "evidence", "hint"]) {
       expect(en[key], `en checks.${key}`).toBeTruthy();
       expect(id[key], `id checks.${key}`).toBeTruthy();
       expect(id[key], `id checks.${key} is still English`).not.toBe(en[key]);
     }
     expect(placeholders(en.hint ?? "")).toEqual(["{action}"]);
     expect(placeholders(id.hint ?? "")).toEqual(["{action}"]);
+  });
+
+  it("says the doc-flow front door, translation, evidence and edit copy in both languages, with the same placeholders", () => {
+    const placeholders = (value: string) => (value.match(/\{[a-zA-Z]+\}/g) ?? []).sort();
+    const en = load("en") as Record<string, unknown>;
+    const id = load("id") as Record<string, unknown>;
+    const at = (tree: Record<string, unknown>, path: string): string => {
+      const value = path.split(".").reduce<unknown>((node, key) => (node as Record<string, unknown> | undefined)?.[key], tree);
+      return typeof value === "string" ? value : "";
+    };
+    const expected: Record<string, string[]> = {
+      transcriptReady: ["{words}"],
+      translate: ["{language}"],
+      translateAgain: ["{language}"],
+      translateEmpty: ["{language}"],
+      "evidence.someUnverified": ["{unverified}", "{verified}"],
+      "prompt.label": [],
+      runNote: [],
+      runNoteTranslate: [],
+      translateDefault: [],
+      "drop.title": [],
+      "drop.unsupported": [],
+      "evidence.unverified": [],
+      "evidence.quote": [],
+      "edit.edited": [],
+      "edit.clearsTranslation": [],
+      "errors.transcriptFile": [],
+      "errors.edit": [],
+    };
+    for (const [key, vars] of Object.entries(expected)) {
+      expect(at(en, key), `en ${key}`).toBeTruthy();
+      expect(at(id, key), `id ${key}`).toBeTruthy();
+      expect(at(id, key), `id ${key} is still English`).not.toBe(at(en, key));
+      expect(placeholders(at(en, key)), `en ${key}`).toEqual(vars);
+      expect(placeholders(at(id, key)), `id ${key}`).toEqual(vars);
+    }
+  });
+
+  it("no longer carries the strings of the form-first desk", () => {
+    for (const locale of ["en", "id"] as const) {
+      const catalog = load(locale) as Record<string, unknown>;
+      expect(catalog.runFromTranscript, `${locale} runFromTranscript`).toBeUndefined();
+      expect(catalog.emptyDetail, `${locale} emptyDetail`).toBeUndefined();
+    }
   });
 
   it("keeps brand names untranslated in id", () => {

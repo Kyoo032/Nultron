@@ -194,6 +194,58 @@ describe("generateFinanceBrief", () => {
     expect(result.guard.removed).toBe(1);
     expect(result.markdown).not.toContain(UNVERIFIED_MARKER);
   });
+
+  // A brief is one call plus at most one more. Two sections the guard blanked used to take a rewrite
+  // each; they now share the one extra call, and the second is cleaned in code.
+  it("shares one extra call across every section the guard blanked, and says so", async () => {
+    queued.push(
+      JSON.stringify({
+        title: "Margin story",
+        sections: [
+          { heading: "Where the margin came from", body: "Margin hit 62.5%. Revenue was 1000.", metrics: [] },
+          { heading: "What to watch", body: "Churn was 4.5%. COGS was 400.", metrics: [] },
+        ],
+        assumptions: [],
+      }),
+      JSON.stringify({ heading: "Where the margin came from", body: "Revenue was 1000.", metrics: [] }),
+    );
+    const steps: string[] = [];
+    const result = await generateFinanceBrief(
+      tenant,
+      { prompt: "Gross margin story", items: ITEMS, locale: "en" },
+      (event) => {
+        if (event.type === "job.step") {
+          steps.push(event.label);
+        }
+      },
+    );
+    if (!("brief" in result)) {
+      throw new Error("expected the brief path");
+    }
+    expect(asked).toHaveLength(2);
+    expect(result.brief.sections.map((section) => section.body)).toEqual(["Revenue was 1000.", "COGS was 400."]);
+    expect(result.guard.removed).toBe(1);
+    expect(JSON.stringify(result.brief)).not.toContain(UNVERIFIED_MARKER);
+    expect(steps).toContain("The one extra model call was already used; the rest was handled in code");
+  });
+
+  it("spends the second ask for a draft that was not the sections, and strips a blanked sentence in code", async () => {
+    queued.push(
+      "this is not json",
+      JSON.stringify({
+        title: "Margin story",
+        sections: [{ heading: "What to watch", body: "Margin hit 62.5%. COGS was 400.", metrics: [] }],
+        assumptions: [],
+      }),
+    );
+    const result = await generateFinanceBrief(tenant, { prompt: "Gross margin story", items: ITEMS, locale: "en" });
+    if (!("brief" in result)) {
+      throw new Error("expected the brief path");
+    }
+    expect(asked).toHaveLength(2);
+    expect(result.brief.sections[0]?.body).toBe("COGS was 400.");
+    expect(result.guard.removed).toBe(1);
+  });
 });
 
 describe("readRegenArtifactId", () => {
@@ -314,6 +366,71 @@ describe("regenerateFinanceSection", () => {
     expect(result.markdown).not.toContain(UNVERIFIED_MARKER);
     expect(result.guard.total).toBe(2);
     expect(result.guard.removed).toBe(1);
+  });
+
+  // What a regenerate does with the owner's edits (docs/internal/doc-flow-plan.md 7a.5). The studio
+  // posts the brief it holds, edits and all, and the host rewrites only the section asked for: every
+  // other section, the title and the assumptions come back exactly as sent, and are not re-guarded.
+  describe("keeps what the owner edited", () => {
+    const EDITED = {
+      title: "My own title, 2.5x better",
+      sections: [
+        { heading: "Where it came from", body: "Revenue was 1000, and my forecast is 1500 next year.", metrics: [] },
+        { heading: "What to watch", body: "COGS was 400.", metrics: [] },
+        { heading: "Next steps", body: "I will ask the board about 77 new hires.", metrics: [] },
+      ],
+      assumptions: ["Figures are FY2025.", "Headcount holds at 140 staff."],
+      computed: { metrics: [], tables: [] },
+    };
+
+    it("leaves every other section, the title and the assumptions exactly as sent, figures the guard would blank included", async () => {
+      const result = await regenerateFinanceSection(tenant, body({ brief: EDITED, sectionIndex: 1 }));
+      expect(result.brief.title).toBe(EDITED.title);
+      expect(result.brief.assumptions).toEqual(EDITED.assumptions);
+      expect(result.brief.sections[0]?.body).toBe(EDITED.sections[0]?.body);
+      expect(result.brief.sections[2]?.body).toBe(EDITED.sections[2]?.body);
+      expect(result.brief.sections[1]?.heading).toBe("What to watch next");
+      expect(result.markdown).toContain("my forecast is 1500 next year");
+      expect(result.markdown).toContain("77 new hires");
+      expect(result.guard.flagged).toEqual([]);
+    });
+
+    it("shows the model the section as the owner left it, edits included, so the rewrite starts from them", async () => {
+      await regenerateFinanceSection(
+        tenant,
+        body({
+          brief: {
+            ...EDITED,
+            sections: [
+              EDITED.sections[0],
+              { heading: "What to watch", body: "COGS was 400, which I think is too high.", metrics: [] },
+              EDITED.sections[2],
+            ],
+          },
+          sectionIndex: 1,
+          instruction: "Keep my point about COGS.",
+        }),
+      );
+      const prompt = String(asked[0]?.prompt);
+      expect(prompt).toContain("COGS was 400, which I think is too high.");
+      expect(prompt).toContain("Keep my point about COGS.");
+    });
+
+    it("keeps the owner's text in the target section when the rewrite leaves nothing the guard accepts", async () => {
+      sectionDraft = JSON.stringify({ heading: "What to watch", body: "Margin hit 62.5%.", metrics: [] });
+      const edited = { heading: "What to watch", body: "COGS was 400, and I want this said my way.", metrics: [] };
+      const result = await regenerateFinanceSection(
+        tenant,
+        body({ brief: { ...EDITED, sections: [EDITED.sections[0], edited, EDITED.sections[2]] }, sectionIndex: 1 }),
+      );
+      expect(result.brief.sections[1]?.body).toBe(edited.body);
+    });
+
+    it("makes the section rewrite plus at most one extra call, never more", async () => {
+      sectionDraft = JSON.stringify({ heading: "What to watch", body: "Margin hit 62.5%. COGS was 400.", metrics: [] });
+      await regenerateFinanceSection(tenant, body({ brief: EDITED, sectionIndex: 1 }));
+      expect(asked).toHaveLength(2);
+    });
   });
 
   it("refuses a malformed body before it reaches the gateway", async () => {

@@ -167,6 +167,20 @@ export {
   hasFinanceTaskModule,
   implementedFinanceTasks,
 } from "./tasks/registry";
+export {
+  FINANCE_FIT_HIGH_LEAD,
+  FINANCE_FIT_HIGH_SCORE,
+  fitConfidence,
+  readAppraisalRows,
+  scoreFinanceTaskFit,
+} from "./task-fit";
+export type {
+  AppraisalRead,
+  FinanceFitConfidence,
+  FinanceTaskFit,
+  FinanceTaskFitInput,
+  FinanceTaskFitResult,
+} from "./task-fit";
 export { briefInputSchema, briefParamsSchema, briefTaskModule } from "./tasks/brief";
 export type { BriefTaskInput } from "./tasks/brief";
 export { cashflowTaskModule } from "./tasks/cashflow";

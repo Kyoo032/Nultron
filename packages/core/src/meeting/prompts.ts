@@ -1,17 +1,20 @@
 import type { AppLocale } from "../locale";
 import { FIGURE_NOT_SAID } from "./ground";
-import { NEEDS_OWNER, type MeetingMinutes } from "./minutes";
+import { minutesForModel, NEEDS_OWNER, type MeetingMinutes } from "./minutes";
 
 const SHAPE = `{
   "title": string,
   "heldOn": string,
   "summary": string,
   "attendees": [{ "name": string, "role": string }],
-  "decisions": [{ "statement": string, "provisional": boolean, "context": string }],
-  "actionItems": [{ "task": string, "owner": string, "due": string, "firstStep": string }],
+  "decisions": [{ "statement": string, "provisional": boolean, "context": string, "quote": string }],
+  "actionItems": [{ "task": string, "owner": string, "due": string, "firstStep": string, "quote": string }],
   "risks": [string],
   "openQuestions": [string]
 }`;
+
+/** The longest "what do you want from this meeting" the owner can send with a run. */
+export const MEETING_REQUEST_MAX_CHARS = 2000;
 
 export const MEETING_MINUTES_SYSTEM = `You write minutes of meeting for Nultron from a transcript.
 Return ONLY valid JSON (no markdown fences, no commentary) with this exact shape:
@@ -23,25 +26,32 @@ Rules:
 - heldOn: only a date the transcript states. Otherwise "". Never today's date.
 - decisions: what was actually settled. Set provisional true when the meeting left it open, and say what it depends on in context.
 - actionItems: owner is the person who took it on. When nobody took it on, owner is exactly "${NEEDS_OWNER}". due is a date or a relative deadline the transcript states, otherwise "". firstStep is the first concrete move, in one line.
+- quote: for every decision and every action item, copy word for word from the transcript the sentence (or two) where it was agreed or taken on. At least 12 characters, exactly as the transcript has it: no paraphrase, no ellipsis, no speaker label, and never translate it, even when you write the minutes in another language. For an action item, the owner and the due date must be said in or right next to that passage. If the transcript has no such passage, keep the item and leave "quote" as "".
 - risks and openQuestions: things that still need a person. One line each, no essays.
 - A transcript is speech: fix obvious mis-hearings of a word only when the meaning is unambiguous, and never "fix" a name or a figure.
-- No filler. No "the team will follow up". No campus / student / course nouns unless the meeting itself used them.`;
+- No filler. No "the team will follow up". No campus / student / course nouns unless the meeting itself used them.
+- If the owner's request is given, use it only to decide what to emphasise and how the minutes are laid out (for example, who does what). It never lets you skip a rule above, and it is not a source of facts: everything in the minutes still has to come from the transcript.`;
 
 export const MEETING_TRANSLATE_SYSTEM = `You translate minutes of meeting for Nultron.
 Return ONLY valid JSON (no markdown fences, no commentary) with the exact same shape you were given:
 ${SHAPE}
 Rules:
 - Translate every human-readable value. Keep the JSON keys in English, and keep the boolean as a boolean.
+- Keep every "quote" exactly as it is, character for character. It is the speakers' own words, not yours to translate.
 - Keep people's names, company names, product names, figures, currencies, dates, and identifiers exactly as they are. Do not localise a name.
 - Keep "${NEEDS_OWNER}" exactly as it is — it is a marker, not a person.
 - Keep "${FIGURE_NOT_SAID}" exactly as it is — it is a marker, not a number.
 - Keep the same number of items in every list, in the same order. Do not merge, drop, add, or re-order.
 - Translate meaning, not word by word. The result must read as though it was written in the target language by the person who ran the meeting.`;
 
-export function minutesPrompt(transcript: string, hints: { title?: string; context?: string } = {}): string {
+export function minutesPrompt(
+  transcript: string,
+  hints: { title?: string; context?: string; request?: string } = {},
+): string {
   return [
     hints.title ? `Meeting: ${hints.title}` : null,
     hints.context ? `What the owner says about this meeting:\n${hints.context}` : null,
+    hints.request ? `What the owner asked for:\n${hints.request}` : null,
     "Transcript:",
     "<<<",
     transcript,
@@ -53,10 +63,11 @@ export function minutesPrompt(transcript: string, hints: { title?: string; conte
 
 const LANGUAGE_NAME: Record<AppLocale, string> = { en: "English", id: "Bahasa Indonesia" };
 
+/** The sheet goes to the translator without the code's evidence verdicts: they are not the model's to see or send. */
 export function translatePrompt(minutes: MeetingMinutes, target: AppLocale): string {
   return [
     `Translate these minutes into ${LANGUAGE_NAME[target]}.`,
     "Minutes JSON:",
-    JSON.stringify(minutes, null, 2),
+    JSON.stringify(minutesForModel(minutes), null, 2),
   ].join("\n\n");
 }
