@@ -32,6 +32,9 @@ vendor/.sandbox-cache
 **/.env.*
 !**/.env.example
 **/data
+# packages/core/src/data is SOURCE (the Data harness: cuts, ground, index), not a data directory. The pattern above
+# dropped it from the image, and the prod stage then failed with ERR_MODULE_NOT_FOUND on the first import of the host.
+!packages/core/src/data
 .webdev-data*
 **/*.enc
 **/.master-key
@@ -75,3 +78,7 @@ webapp-deploy/*.env
 # checkout must not be able to pick up a private key from either (SR-49).
 webapp-deploy/k8s
 webapp-deploy/.pilot-local
+webapp-deploy/.multisite-local
+# The company sites (placeholder pages, their Caddy files and the switch script) are mounted into the PROXY
+# only. The app image has no use for them.
+webapp-deploy/sites
