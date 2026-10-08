@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { LineItem, ReportChart } from "@agentforge/core/finance";
+import { DEFAULT_BUDGET_THRESHOLDS, computeBudget, type LineItem, type ReportChart } from "@agentforge/core/finance";
 import {
+  DEFAULT_BUDGET_FLAG_ABS,
+  DEFAULT_BUDGET_FLAG_PCT,
   budgetBars,
   budgetConfidence,
   budgetPairRows,
   budgetPairsForRequest,
+  budgetParamsWithDefaults,
+  budgetRequestParams,
   budgetPartnerOptions,
   budgetPeriodTables,
   budgetPreview,
@@ -219,5 +223,62 @@ describe("what the rows already say", () => {
 
   it("answers nothing at all when there are no rows to read", () => {
     expect(budgetPreview([], {})).toBeNull();
+  });
+});
+
+describe("the limit the screen shows is the limit that is sent", () => {
+  // Two lines that are 5% and 2% off. Under the 10% the screen shows, neither is over the limit; under
+  // a limit of 0 (what core uses when none is sent) both would be marked.
+  const CLOSE: LineItem[] = [
+    { label: "Marketing", period: "Budget 2025", amount: 10_000, currency: "USD", category: "opex" },
+    { label: "Marketing", period: "Actual 2025", amount: 10_500, currency: "USD", category: "opex" },
+    { label: "Payroll", period: "Budget 2025", amount: 50_000, currency: "USD", category: "opex" },
+    { label: "Payroll", period: "Actual 2025", amount: 49_000, currency: "USD", category: "opex" },
+  ];
+
+  it("fills the shown defaults into a bag that carries none, and keeps whatever was typed", () => {
+    expect(budgetParamsWithDefaults({})).toEqual({
+      flagPct: DEFAULT_BUDGET_FLAG_PCT,
+      flagAbs: DEFAULT_BUDGET_FLAG_ABS,
+      flagMode: "and",
+    });
+    expect(budgetParamsWithDefaults({ flagPct: 4, flagMode: "or" })).toEqual({
+      flagPct: 4,
+      flagAbs: DEFAULT_BUDGET_FLAG_ABS,
+      flagMode: "or",
+    });
+  });
+
+  it("keeps the pairing and the sheet choices it was handed, and never mutates its input", () => {
+    const pairs = [{ budgetLabel: "Marketing", actualLabel: "Marketing" }];
+    const given = Object.freeze({ budgetSheet: "Budget 2025", pairs });
+    const filled = budgetParamsWithDefaults(given);
+    expect(filled.pairs).toBe(pairs);
+    expect(filled.budgetSheet).toBe("Budget 2025");
+    expect(given).toEqual({ budgetSheet: "Budget 2025", pairs });
+  });
+
+  it("fills the defaults into a budget request only, and hands every other task its own bag back untouched", () => {
+    expect(budgetRequestParams("budget", {})).toEqual({
+      flagPct: DEFAULT_BUDGET_FLAG_PCT,
+      flagAbs: DEFAULT_BUDGET_FLAG_ABS,
+      flagMode: "and",
+    });
+    const brief = { discountRatePercent: 12 };
+    expect(budgetRequestParams("brief", brief)).toBe(brief);
+    const cashflow = {};
+    expect(budgetRequestParams("cashflow", cashflow)).toBe(cashflow);
+  });
+
+  it("is the same default core applies in the auto path, so the two screens agree", () => {
+    expect(DEFAULT_BUDGET_FLAG_PCT).toBe(DEFAULT_BUDGET_THRESHOLDS.pct);
+    expect(DEFAULT_BUDGET_FLAG_ABS).toBe(DEFAULT_BUDGET_THRESHOLDS.abs);
+  });
+
+  it("previews with the default limit, not with a limit of 0 that would mark every non-zero line", () => {
+    expect(budgetPreview(CLOSE, {})?.flagged).toBe(0);
+    // The old behaviour, still what core does with no limit at all: every line with any variance.
+    expect(computeBudget({ items: CLOSE, params: {} }).flagCounts.total).toBe(2);
+    expect(budgetPreview(CLOSE, { flagPct: 3 })?.flagged).toBe(1);
   });
 });

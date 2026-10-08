@@ -7,6 +7,7 @@
  * over numbers the report already computed: nothing on this screen produces a figure of its own.
  */
 import {
+  DEFAULT_BUDGET_THRESHOLDS,
   budgetInputSchema,
   computeBudget,
   type LineItem,
@@ -61,9 +62,36 @@ export const EMPTY_BUDGET_PROPOSAL: BudgetProposalState = Object.freeze({
   embedding: "not-needed",
 });
 
-/** Percent limit a fresh sheet starts on, until the owner says otherwise. */
-export const DEFAULT_BUDGET_FLAG_PCT = 10;
-export const DEFAULT_BUDGET_FLAG_ABS = 0;
+/**
+ * The limits a fresh sheet starts on, until the owner says otherwise. They are core's own defaults,
+ * not a copy of them: the number the screen shows, the number the preview counts with and the number
+ * the host computes with have to be the same one (core falls back to 0 for a limit it is not sent,
+ * which marks every line that is off by anything at all).
+ */
+export const DEFAULT_BUDGET_FLAG_PCT = DEFAULT_BUDGET_THRESHOLDS.pct;
+export const DEFAULT_BUDGET_FLAG_ABS = DEFAULT_BUDGET_THRESHOLDS.abs;
+export const DEFAULT_BUDGET_FLAG_MODE = DEFAULT_BUDGET_THRESHOLDS.mode;
+
+/**
+ * The budget parameter bag with the limits the screen shows filled in where the owner typed none.
+ * Used for the preview and for every request, so what is shown is what is sent. Never mutates.
+ */
+export function budgetParamsWithDefaults(params: BudgetUiParams): BudgetUiParams {
+  return {
+    ...params,
+    flagPct: params.flagPct ?? DEFAULT_BUDGET_FLAG_PCT,
+    flagAbs: params.flagAbs ?? DEFAULT_BUDGET_FLAG_ABS,
+    flagMode: params.flagMode ?? DEFAULT_BUDGET_FLAG_MODE,
+  };
+}
+
+/**
+ * The parameter bag a request for `task` carries. Only the budget task has limits with a default the
+ * screen shows; every other task's bag goes through untouched, the same object.
+ */
+export function budgetRequestParams<P extends object>(task: string, params: P): P {
+  return task === "budget" ? (budgetParamsWithDefaults(params as BudgetUiParams) as P) : params;
+}
 
 /** Confidence bands the pairing table shows as chips. A low score is a question, not an answer. */
 export const BUDGET_CONFIDENCE_HIGH = 0.85;
@@ -271,10 +299,11 @@ export type BudgetPreview = {
  *
  * This is the very same `computeBudget` the host will run — core is pure and ships to the browser —
  * so the count shown here and the count in the finished report cannot drift apart. It costs no token
- * and reaches nothing.
+ * and reaches nothing. The limits are the ones the screen shows (`budgetParamsWithDefaults`), the same
+ * ones the request carries.
  */
 export function budgetPreview(items: readonly LineItem[], params: BudgetUiParams): BudgetPreview | null {
-  const parsed = budgetInputSchema.safeParse({ items, params });
+  const parsed = budgetInputSchema.safeParse({ items, params: budgetParamsWithDefaults(params) });
   if (!parsed.success) {
     return null;
   }
