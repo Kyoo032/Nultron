@@ -83,9 +83,13 @@ describe("legal handlers via the router", () => {
     const list = await json("GET", "/api/v1/legal/matters");
     expect((list.body as { matters: { id: string }[] }).matters.some((matter) => matter.id === id)).toBe(true);
 
-    const missingSide = await json("POST", "/api/v1/legal/matters", { ...CREATE_BODY, side: { role: "borrower" } });
-    expect(missingSide).toMatchObject({ status: 400, body: { error: { code: "invalid_request" } } });
-    expect((missingSide.body as { error: { message: string } }).error.message).toMatch(/side\.party/);
+    // A matter needs no parties to be created (the documents say who they are); only the full review asks.
+    const noSide = await json("POST", "/api/v1/legal/matters", { ...CREATE_BODY, side: undefined });
+    expect(noSide).toMatchObject({ status: 201, body: { side: { role: "", party: "", counterparty: "" } } });
+    const partialSide = await json("POST", "/api/v1/legal/matters", { ...CREATE_BODY, side: { role: "borrower" } });
+    expect(partialSide).toMatchObject({ status: 201, body: { side: { role: "borrower", party: "", counterparty: "" } } });
+    const badSide = await json("POST", "/api/v1/legal/matters", { ...CREATE_BODY, side: { party: 5 } });
+    expect(badSide).toMatchObject({ status: 400, body: { error: { code: "invalid_request" } } });
 
     const badKind = await json("POST", "/api/v1/legal/matters", { ...CREATE_BODY, deliverables: ["poem"] });
     expect(badKind.status).toBe(400);
@@ -135,7 +139,7 @@ describe("legal handlers via the router", () => {
       body: {
         error: {
           code: "unsupported_content_type",
-          message: "Only .docx files are accepted in v1. Convert PDF or other formats to .docx first.",
+          message: "Only Word (.docx) and PDF files are accepted.",
         },
       },
     });
@@ -146,6 +150,21 @@ describe("legal handlers via the router", () => {
     const removed = await json("DELETE", `/api/v1/legal/matters/${id}/files/S1`);
     expect(removed).toMatchObject({ status: 200, body: { id, docs: [] } });
     expect((await json("DELETE", `/api/v1/legal/matters/${id}/files/S1`)).status).toBe(404);
+  });
+
+  it("takes the answer to the side question as a free PATCH, and 'neither' as sideDeclined", async () => {
+    const created = await json("POST", "/api/v1/legal/matters", { ...CREATE_BODY, side: undefined });
+    const id = (created.body as { id: string }).id;
+    const picked = await json("PATCH", `/api/v1/legal/matters/${id}`, {
+      side: { role: "lender", party: "Bank Sinar", counterparty: "PT Aurora Holdings" },
+    });
+    expect(picked).toMatchObject({ status: 200, body: { side: { party: "Bank Sinar" } } });
+    expect(await json("PATCH", `/api/v1/legal/matters/${id}`, { side: { party: "" } })).toMatchObject({ status: 400 });
+    const declined = await json("PATCH", `/api/v1/legal/matters/${id}`, { sideDeclined: true });
+    expect(declined).toMatchObject({ status: 200, body: { sideDeclined: true } });
+    // Setting a side again answers the question, so an earlier "neither" no longer stands.
+    const again = await json("PATCH", `/api/v1/legal/matters/${id}`, { side: { party: "Bank Sinar" } });
+    expect(again).toMatchObject({ status: 200, body: { sideDeclined: false, side: { party: "Bank Sinar", counterparty: "" } } });
   });
 
   it("patches roles and fields", async () => {

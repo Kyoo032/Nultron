@@ -62,11 +62,32 @@ export type LegalOutputCopy = {
   redFlagSections: readonly string[];
   kindLabels: Readonly<Record<FindingKind, string>>;
   phase: Readonly<Record<string, string>>;
+  /** Doc flow: add files, get answers (docs/internal/doc-flow-plan.md section 2). */
+  needsOcr: string;
+  pdfUnreadable: string;
+  pdfEncrypted: string;
+  pdfTooLong: string;
+  redlineNeedsWord: string;
+  diffNeedsSameFormat: string;
+  partiesRequired: string;
+  counterpartyFallback: string;
+  noFiles: string;
+  noExtract: string;
+  matterTooLarge: string;
+  readingPart: string;
+  readSummary: string;
+  partFailed: string;
+  modelUnreadable: string;
+  repairing: string;
+  extractSaved: string;
+  notInDocuments: string;
+  answerDropped: string;
+  fieldLabels: Readonly<Record<string, string>>;
 };
 
 const EN: LegalOutputCopy = {
   stubError: "Legal needs a live gateway. Paste a Toko Token API key in Settings, then try again.",
-  unsupportedFile: "Only .docx files are accepted in v1. Convert PDF or other formats to .docx first.",
+  unsupportedFile: "Only Word (.docx) and PDF files are accepted.",
   closingLine: "Draft work product prepared with automated assistance for review by a qualified lawyer.",
   memoTitle: "MEMORANDUM",
   privilegeLine: "PRIVILEGED AND CONFIDENTIAL — ATTORNEY WORK PRODUCT",
@@ -149,6 +170,11 @@ const EN: LegalOutputCopy = {
     ok: "Conforms",
   },
   phase: {
+    reading: "Reading the files",
+    extracting: "Extracting the facts",
+    checking: "Checking against the files",
+    answering: "Answering",
+    saving: "Saving",
     classify: "Classifying documents",
     diff: "Comparing with the prior turn",
     review: "Reviewing provisions",
@@ -160,11 +186,42 @@ const EN: LegalOutputCopy = {
     edit: "Applying corrections",
     package: "Packaging",
   },
+  needsOcr:
+    "This PDF is a scan with no text layer. Scans cannot be read here, and nothing was sent anywhere. Use a PDF with selectable text, or a Word file.",
+  pdfUnreadable: "That PDF could not be read. It may be damaged.",
+  pdfEncrypted: "That PDF is password protected. Remove the password and add it again.",
+  pdfTooLong: "That PDF is too long to read in full. Split it and add the parts.",
+  redlineNeedsWord:
+    "No redline: the counterparty draft is a PDF, and a redline needs a Word file. The memorandum and the other deliverables are not affected.",
+  diffNeedsSameFormat: "The prior turn and the draft are different formats; they were not compared",
+  partiesRequired: "Say which side you act for (your party and the counterparty) before running the full review.",
+  counterpartyFallback: "the counterparty",
+  noFiles: "Add at least one file first.",
+  noExtract: "Nothing to edit yet: run the extraction first.",
+  matterTooLarge: "This matter is too long to read in one pass ({calls} parts). Remove some files and try again.",
+  readingPart: "Reading part {current} of {total}",
+  readSummary: "Read {files} files in {calls} parts",
+  partFailed: "{part} could not be read in full; it is marked as not fully read",
+  modelUnreadable: "The model's answer could not be read. Try again.",
+  repairing: "{count} items did not pass the checks; asking once more",
+  extractSaved: "Saved",
+  notInDocuments: "The documents do not say.",
+  answerDropped: "No quote could be verified; answered as not in the documents",
+  fieldLabels: {
+    parties: "Parties",
+    "effective-date": "Effective date",
+    term: "Term",
+    payment: "Payment",
+    liability: "Liability",
+    termination: "Termination",
+    "governing-law": "Governing law",
+    notable: "Notable",
+  },
 };
 
 const ID: LegalOutputCopy = {
   stubError: "Legal memerlukan gerbang yang aktif. Tempel kunci API Toko Token di Settings, lalu coba lagi.",
-  unsupportedFile: "Hanya berkas .docx yang diterima pada v1. Ubah PDF atau format lain ke .docx terlebih dahulu.",
+  unsupportedFile: "Hanya berkas Word (.docx) dan PDF yang diterima.",
   closingLine:
     "Draf hasil kerja yang disusun dengan bantuan otomatis untuk ditinjau oleh pengacara yang berkualifikasi.",
   memoTitle: "MEMORANDUM",
@@ -248,6 +305,11 @@ const ID: LegalOutputCopy = {
     ok: "Sesuai",
   },
   phase: {
+    reading: "Membaca berkas",
+    extracting: "Mengekstrak fakta",
+    checking: "Memeriksa terhadap berkas",
+    answering: "Menjawab",
+    saving: "Menyimpan",
     classify: "Mengklasifikasi dokumen",
     diff: "Membandingkan dengan giliran sebelumnya",
     review: "Menelaah ketentuan",
@@ -258,6 +320,38 @@ const ID: LegalOutputCopy = {
     verify: "Memverifikasi",
     edit: "Menerapkan koreksi",
     package: "Mengemas",
+  },
+  needsOcr:
+    "PDF ini adalah hasil pindai tanpa lapisan teks. Hasil pindai tidak dapat dibaca di sini, dan tidak ada yang dikirim ke mana pun. Gunakan PDF dengan teks yang dapat dipilih, atau berkas Word.",
+  pdfUnreadable: "PDF itu tidak dapat dibaca. Mungkin rusak.",
+  pdfEncrypted: "PDF itu dilindungi kata sandi. Hapus kata sandinya lalu tambahkan lagi.",
+  pdfTooLong: "PDF itu terlalu panjang untuk dibaca utuh. Pecah lalu tambahkan bagiannya.",
+  redlineNeedsWord:
+    "Tanpa redline: draf pihak lawan berupa PDF, dan redline memerlukan berkas Word. Memorandum dan hasil kerja lain tidak terpengaruh.",
+  diffNeedsSameFormat: "Giliran sebelumnya dan draf berbeda format; keduanya tidak dibandingkan",
+  partiesRequired: "Tentukan pihak yang Anda wakili (pihak Anda dan pihak lawan) sebelum menjalankan telaah penuh.",
+  counterpartyFallback: "pihak lawan",
+  noFiles: "Tambahkan setidaknya satu berkas terlebih dahulu.",
+  noExtract: "Belum ada yang dapat diubah: jalankan ekstraksi terlebih dahulu.",
+  matterTooLarge:
+    "Perkara ini terlalu panjang untuk dibaca sekali jalan ({calls} bagian). Hapus beberapa berkas lalu coba lagi.",
+  readingPart: "Membaca bagian {current} dari {total}",
+  readSummary: "Membaca {files} berkas dalam {calls} bagian",
+  partFailed: "{part} tidak dapat dibaca secara utuh; ditandai belum terbaca utuh",
+  modelUnreadable: "Jawaban model tidak dapat dibaca. Coba lagi.",
+  repairing: "{count} butir tidak lolos pemeriksaan; meminta sekali lagi",
+  extractSaved: "Tersimpan",
+  notInDocuments: "Dokumen tidak menyebutkannya.",
+  answerDropped: "Tidak ada kutipan yang dapat diverifikasi; dijawab sebagai tidak ada dalam dokumen",
+  fieldLabels: {
+    parties: "Para pihak",
+    "effective-date": "Tanggal berlaku",
+    term: "Jangka waktu",
+    payment: "Pembayaran",
+    liability: "Tanggung jawab",
+    termination: "Pengakhiran",
+    "governing-law": "Hukum yang berlaku",
+    notable: "Patut dicatat",
   },
 };
 

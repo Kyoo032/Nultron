@@ -10,6 +10,9 @@ import {
   DELIVERABLE_KINDS,
   DOC_ROLES,
   LEGAL_WORK_TYPES,
+  legalAsksFileSchema,
+  legalExtractEditsFileSchema,
+  legalExtractRecordSchema,
   type DeliverableKind,
   type Finding,
   type LegalManifest,
@@ -37,6 +40,10 @@ export type LegalMatterRecord = {
   docs: MatterDocCard[];
   priorMatterId: string | null;
   lastRunId: string | null;
+  /** The owner answered "Neither / just reading" to the side question: do not ask again. Absent on older matters. */
+  sideDeclined?: boolean;
+  /** The highest `S<n>` number ever handed out, so a removed file's id is never given to another. Absent on older matters. */
+  docSeq?: number;
 };
 
 export type LegalRunArtifact = { kind: DeliverableKind; artifactId: string; filename: string };
@@ -94,7 +101,12 @@ export const legalMatterRecordSchema: z.ZodType<LegalMatterRecord> = z.object({
   docs: z.array(matterDocCardSchema),
   priorMatterId: z.string().nullable(),
   lastRunId: z.string().nullable(),
+  sideDeclined: z.boolean().optional(),
+  docSeq: z.number().int().nonnegative().optional(),
 });
+
+/** `extract.json`, `extract-edits.json` and `asks.json` are re-read on every request like the matter, so they are checked on the way in too. */
+export { legalAsksFileSchema, legalExtractEditsFileSchema, legalExtractRecordSchema };
 
 const isRecordObject = (value: unknown): boolean => typeof value === "object" && value !== null;
 
