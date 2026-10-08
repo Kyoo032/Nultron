@@ -182,7 +182,11 @@ import {
   handlePutLegalExtractEdits,
 } from "./handlers/legal-extract";
 import { handleDeleteMedia, handleGetMediaFile, handlePostMedia } from "./handlers/media";
-import { handlePostMeetingTranscriptFile, handlePostMeetingTranslateStream } from "./handlers/meeting-extra";
+import {
+  handlePostMeetingTranscriptFile,
+  handlePostMeetingTranslateStream,
+  handlePutMeetingMinutesEdit,
+} from "./handlers/meeting-extra";
 import {
   handleDeleteMeeting,
   handleGetMeeting,
@@ -454,6 +458,7 @@ const routes: Route[] = [
   // a transcript file is read on the machine and is not.
   compile("POST", "/api/v1/meetings/:meetingId/translate/stream", handlePostMeetingTranslateStream),
   compile("POST", "/api/v1/meetings/:meetingId/transcript/file", handlePostMeetingTranscriptFile),
+  compile("PUT", "/api/v1/meetings/:meetingId/minutes/edits", handlePutMeetingMinutesEdit),
   compile("POST", "/api/v1/prompts/enhance", handlePostEnhancePrompt),
   compile("GET", "/api/v1/artifacts", handleGetArtifacts),
   compile("GET", "/api/v1/artifacts/:artifactId", handleGetArtifact),

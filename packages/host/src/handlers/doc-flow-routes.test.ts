@@ -70,6 +70,7 @@ const ROUTES: readonly DocFlowRoute[] = [
   { method: "GET", path: "/api/v1/legal/matters/:id/asks", byId: "matter", extra: {} },
   { method: "POST", path: "/api/v1/meetings/:id/translate/stream", byId: "meeting", extra: { body: {} } },
   { method: "POST", path: "/api/v1/meetings/:id/transcript/file", byId: "meeting", extra: { files: [TRANSCRIPT] } },
+  { method: "PUT", path: "/api/v1/meetings/:id/minutes/edits", byId: "meeting", extra: { body: {} } },
   { method: "POST", path: "/api/v1/finance/auto", byId: null, extra: { body: { figuresText: "Revenue 120000" } } },
 ];
 

@@ -244,3 +244,20 @@ A review said "ship after named fixes". The High and the three Medium findings a
 - **Bug.** `**/data` in `webapp-deploy/Dockerfile.dockerignore` (and its byte copy `webapp-deploy/.dockerignore`) keeps local data dirs out of the image, and also dropped the source folder `packages/core/src/data` (`ground.ts`, `cuts.ts`). An image built from `main` at `de95267` with `git archive` failed its own load check. Found while preparing the app.nultron-ai.xyz preview.
 - **Fix.** Both files re-include `packages/core/src/data` and `packages/core/src/data/**`. `scripts/pilot-deploy.test.mjs` adds a test that every tracked `*/src/data` folder has its re-include (30 tests green).
 - **Proof.** `nultron-web:979bd797bdf0`, built on the Tencent Lighthouse box from `git archive 979bd79`, completed with the load check (895 MB). Not yet run as the Enterprise app; the preview runs it in single-desk mode (security register SR-133).
+
+## Add files, get answers: Legal, Finance and Meeting engines and Finance/Meeting screens, merged 2026-10-08 (not finished)
+
+Plan: [`doc-flow-plan.md`](doc-flow-plan.md). Branch `feat/doc-flow-2026-10-05`, merged with `origin/main` at `e9d6149`. Owner rule from 2026-10-05: no automatic paid run; every paid step waits for a Run press; prompt first.
+
+- **Landed and unit-tested:**
+  - Shared judges, `packages/core/src/harness/judges/` (subpath `@agentforge/core/judges`): quote matching, numbers, dates, conflicts, coverage, scope, verdicts.
+  - Legal engine: Word and PDF intake (`docx/plain-document.ts`, `legal/store-files.ts`), the extract engine and checks, side resolution, edits and comments that survive a re-extract, and Ask.
+  - Finance auto path: task fit, code-only preview, call budget.
+  - Meeting: transcript files, evidence with status, item edits, opt-in translation, the optional `prompt` in the Run body.
+  - Finance and Meeting drop-a-file screens.
+- **Routes added** (all in `router.ts`, all with by-id tenancy rows): `POST /finance/auto`; Legal `extract/stream`, `extract`, `extract/edits`, `extract/comments`, `ask/stream`, `asks`; Meeting `translate/stream`, `transcript/file`, `minutes/edits` (registered at the merge; it was written but not wired).
+- **Not done:**
+  - **Legal has no screen yet** (lane L2). The routes exist and nothing in the renderer calls them, so a user cannot reach the Legal extract.
+  - L6 not done: `core/harness/modes/{legal,meeting}` skills, the `harness-judges` map page and the other maps, verify recipes, register rows for `extract.json` / `asks.json` / `extract-edits.json`, and the decisions TSV.
+  - Not driven on webdev or a packed app, and no live gateway call was made. PDF on the packed Personal app depends on anydoc or the pdfjs fallback, which has not been run on an installer.
+- **Merge note:** `apps/web/lib/key-later-wiring.test.ts` now checks `lib/meeting-request.ts` for the hosted-403 mapping, because the doc-flow Meeting screen moved `errorMessage` out of `meeting-studio.tsx`.

@@ -514,6 +514,12 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
     params: { meetingId: "meetingId" },
     files: () => [transcriptFixture()],
   },
+  {
+    method: "PUT",
+    path: "/api/v1/meetings/:meetingId/minutes/edits",
+    params: { meetingId: "meetingId" },
+    body: {},
+  },
 
   // --- folder (Personal only) -------------------------------------------------------------------
   {
