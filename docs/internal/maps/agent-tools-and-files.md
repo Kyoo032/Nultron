@@ -1,6 +1,6 @@
 # Map: agent tools and files, the mode harness, the tool budget, desk files and the Personal folder
 
-Last verified: 2026-10-07 at 444cb3c for the two new paragraphs of § 13 (a model call that fails after a tool completed; how long a request may take to send headers) and the two new Gotchas bullets, written after a live drive and read against the working tree over that commit, not committed. Nothing else on the page was re-read, so a line number elsewhere may have moved. Not driven live by the agent that wrote the fix.
+Last verified: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-07 at 444cb3c for the two new paragraphs of § 13 (a model call that fails after a tool completed; how long a request may take to send headers) and the two new Gotchas bullets, written after a live drive and read against the working tree over that commit, not committed. Nothing else on the page was re-read, so a line number elsewhere may have moved. Not driven live by the agent that wrote the fix.
 
 Last verified: 2026-10-06 at 6105c5c for § 13 (new) and the Chat rows of § 1 to § 3 and the Gotchas, read after the Chat resilience change (working tree over that commit, not committed; the runs.ts line numbers in § 2 and § 7 were moved by it and re-read only where they are named in § 13). Everything else was last verified 2026-10-03 at 0b61a29 (working tree over that commit, not committed; other lanes were editing the tree while this was read, so a mode spec or a line number may have moved since). Second pass the same day, after the `run_code` lane and the Chat prompt rewrite landed: § 1 to § 4, § 6 to § 9 and § 11 were re-read for the new Chat and Data specs, the egress guard in the call order, the compare-and-set on `edit_file`, the run id as the author of a Chat write, and the folder purge on desk delete, and § 12 was rewritten from the code. `run_code` was run for real through `sandbox.integration.test.ts` and `sandbox:verify` (see Verify); it was not driven through Chat on a live model.
 
@@ -334,6 +334,30 @@ The result is `{ ok: true, artifactId, filename, slideCount }`. `filename` is `a
 | `apps/web/components/chat-deck-card.tsx` | The deck card under a Chat answer: `DeckCard`, `DeckCards`, Open and Download |
 | `apps/web/lib/files-api.ts`, `apps/web/lib/download-name.ts`, `apps/web/lib/artifacts-client.ts` | The `download` call for a desk file, the file name from `Content-Disposition`, and the deck's `downloadArtifactFile` and `textArtifacts` |
 | `apps/web/locales/{en,id}/files.json`, `folder.json`, `chat.json` (`tools`) | Copy in both languages |
+
+## Touches / Do not touch
+
+Read before editing the job harness. This page covers `runJobAssistantOnce` in `packages/host/src/job-regen.ts`, the per-mode specs and the tools they bind. Lanes: all four.
+
+**This page owns these** (a change refreshes this page and the matching `features/` recipe):
+
+- Host, the job run: `packages/host/src/job-regen.ts`, `job-stream.ts`, `job-usage.ts`, `job-model-fallback.ts`, `job-source.ts`, `harness/run-checked.ts`, `tool-run-context.ts`, `file-roots.ts`, `register-tools.ts`, `knowledge-search-tool.ts`, `self-check-tool.ts` (all under `packages/host/src/`).
+- Host, the tools: `packages/host/src/desk-files/`, `packages/host/src/folder-root/`, `packages/host/src/deck/`, `packages/host/src/code-runner/`.
+- Core, the spec and budget: `packages/core/src/harness/spec.ts`, `defaults.ts`, `specs.ts`, `modes/*.ts`, `judges/`; `packages/core/src/runtime/tool-budget.ts`, `invoke-guarded.ts`, `ai-tools.ts`; `packages/core/src/tools/files/`.
+- Sandbox build (harness, built folder is gitignored): `scripts/build-sandbox-runtime.mjs`, `scripts/sandbox-runtime-lock.mjs`, `scripts/sandbox-runtime.lock.json`.
+
+**Callers of `job-regen.ts`.** Every mode's generate path calls it, so a changed signature or default breaks all of them at once: `packages/host/src/data-generate.ts`, `document-generate.ts`, `finance-generate.ts`, `finance-parse-figures.ts`, `finance-section-repair.ts`, `finance-tasks/` (`runner.ts`, `live.ts`, `direction.ts`, `scope.ts`, `parse-ratios.ts`), `legal-generate.ts`, `legal/` (`ask.ts`, `extract.ts`, `legal-model.ts`), `market-generate.ts`, `meeting/run.ts`, `open-slide-generate.ts`, `presentation-generate.ts`, `research-generate.ts`, `knowledge-map.ts`, `handlers/enhance-prompt.ts`, `handlers/meetings.ts`, `handlers/meeting-extra.ts`, and `runs.ts`. Change `job-regen.ts` additively (a new optional field), then run `test:packages/host` in `ci:local`.
+
+**Tester shared files in this area.** `packages/core/src/agents/default-chat.ts`, `packages/core/src/harness/modes/chat.ts`, `packages/host/src/runs.ts` and `packages/host/src/register-tools.ts` are edited by the tester branch too. Put a `Lanes:` line in the commit message.
+
+**Do not touch from a harness change** (each has its own page and its own prompts and checks):
+
+- A mode's prompt, checks and repair wording: [`documents.md`](documents.md), [`presentations.md`](presentations.md), [`research-dossier.md`](research-dossier.md), [`finance-tasks.md`](finance-tasks.md), [`market-watch.md`](market-watch.md), [`meeting-minutes.md`](meeting-minutes.md). The spec says which tools and budget; the mode's own file says what it asks.
+- Which model answers and the fallback rule: `packages/core/src/models/` ([`model-policy.md`](model-policy.md)).
+- The usage row a job writes: `packages/host/src/usage-record.ts` ([`tenant-usage-ledger.md`](tenant-usage-ledger.md)).
+- The hosted switch for `run_code`: it stays off unless `AGENTFORGE_CODE_RUNS=on`. Do not flip the default in passing ([`hosted-security-controls.md`](hosted-security-controls.md)).
+- The built `vendor/sandbox-runtime/` folder and the engines inside it: rebuild with `pnpm sandbox:build`, never edit by hand, and run `ci:local --only sandbox:integration` after a runner change.
+- Personal-only surface: the folder root and its native picker (`apps/desktop/main.cjs`). A hosted change must not reach them.
 
 ## Gotchas
 

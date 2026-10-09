@@ -1,6 +1,6 @@
 # Map — Portal service (`apps/portal`)
 
-Last verified: 2026-10-07 at 9aba37e + working tree for section 8 (password sign-in), Where things live, the
+Last verified: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-07 at 9aba37e + working tree for section 8 (password sign-in), Where things live, the
 Verify table's last four rows and one Why bullet, written the day the mode was built; the rest of the page keeps
 its reading below. Earlier: 2026-10-01 at 0b61a29 + working tree, by the sign-in-codes pass (four fixes found by driving
 the pilot: a replaced code no longer signs in, one request is one code, the fifth wrong invite code is the
@@ -470,6 +470,30 @@ page adds is where it plugs in and what to be careful of.
 | `apps/portal/src/accounts/`, `apps/portal/scripts/account.ts` | `portal:account`: create, reset-password, disable, enable, set-role, list |
 | `apps/portal/src/mail/disabled.ts` | the mailer of password mode: refuses to send, builds no transport |
 | `apps/portal/src/testing/{password-kit,code-pages}.ts` | a password-mode pilot and its posts; the code-mode screens rendered for the byte pin |
+
+## Touches / Do not touch
+
+Read before editing `apps/portal`. Lanes: Enterprise and HYP AI. Nultron Enterprise runs the e-mailed code (`PORTAL_SIGNIN_MODE` unset or `code`); HYP AI runs `password`. Both come from this one codebase.
+
+**This page owns these:**
+
+- `apps/portal/src/` (`boot.ts`, `server.ts`, `config.ts`, `routes/`, `flows/`, `jwt/`, `otp/`, `password/`, `security/`, `store/`, `views/`, `mail/`, `invites/`, `accounts/`, `seed/`), `apps/portal/scripts/` (`otp.ts`, `invite.ts`, `account.ts`, `seed.ts`, `migrate.ts`), `apps/portal/locales/`.
+- New schema only as `apps/portal/migrations/0014_*.sql` and up. Files `0006` to `0013` are applied history: add a new file, never edit one.
+- The container side: `webapp-deploy/portal.Dockerfile`, `webapp-deploy/portal-entry.sh`, `webapp-deploy/portal.env.example`, `apps/portal/compose.yml`.
+
+**Hard rules from `apps/portal/AGENTS.md`:**
+
+- The portal imports nothing from `@agentforge/*`, and nothing outside `apps/portal` imports it. Verified: the only match for `@agentforge/` in `apps/portal/src` is a comment in `apps/portal/src/log.ts`, and `packages/host` and `packages/core` mention the portal only in comments and through `AGENTFORGE_PORTAL_URL`.
+- `docs/internal/portal/migrations/0001` to `0005` are the backend team's files. Read at runtime, never copied, never edited.
+
+**Do not touch from a portal change:**
+
+- The e-mailed-code screens and routes. `apps/portal/src/routes/code-mode-unchanged.test.ts` pins them byte for byte against `main` at `9aba37e`; a password-mode change that moves one byte of code mode fails it. Fix the change, not the pin.
+- `packages/host/src/auth/` (the product's side of sign-in): [`portal-session-auth.md`](portal-session-auth.md). A reason code added here needs the copy and the host's reason table in the same change.
+- `packages/core/src/tenancy/types.ts`: the role strings the portal and the host both read; changing them is a wire change.
+- The product database. The portal has its own Postgres under `PORTAL_DATABASE_URL`, never `DATABASE_URL`; the product stays on SQLite.
+- Brand in portal copy: the sign-in and mail text name the product through `apps/portal/src/otp/product-name.ts`, not a typed brand. Keep it that way for HYP AI.
+- HYP AI's Cloudflare edge: not in this repo ([`release-and-sync-lanes.md`](release-and-sync-lanes.md)).
 
 ## Gotchas
 
