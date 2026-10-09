@@ -73,7 +73,7 @@ Each is harness-only (not shipped in an installer or image) unless noted.
 
 ## 5. Staging
 
-1. Guardrails 1 to 3 and the preamble, no product code touched. Proven by deliberately breaking each rule in a throwaway diff and watching the guard fail.
+1. **Built 2026-10-09 (advisory, not required):** `lanes.json`, `scripts/lane-guard.mjs` (warns, `--strict` for later), the `lane-guard` step in `ci:local`, the `change-agentforge` skill with its preamble, the Touches / Do not touch sections, and `maps:check` back to zero hard failures. Making the guard and `maps:check` required is still decision 3. Guardrails 1 to 3 and the preamble, no product code touched. Proven by deliberately breaking each rule in a throwaway diff and watching the guard fail.
 2. Brand constants module and the six seams, behind identical output for Nultron (a test pins that the Nultron build is byte-for-byte unchanged in user-visible strings).
 3. Nultron moved into `brands/nultron/` (output pinned unchanged), then HYP AI as the second pack; the clone reduced to its pack and deploy profile; sync becomes a version bump.
 4. A second, throwaway brand pack to prove N, before any real customer.
