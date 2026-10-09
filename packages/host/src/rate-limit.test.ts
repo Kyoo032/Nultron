@@ -172,8 +172,8 @@ describe("rateLimitConfig", () => {
     expect(DEFAULT_IP_BURST).toBe(100);
     expect(DEFAULT_SESSION_RPM).toBe(300);
     expect(DEFAULT_SESSION_BURST).toBe(50);
-    expect(DEFAULT_AUTH_RPM).toBe(30);
-    expect(DEFAULT_AUTH_BURST).toBe(10);
+    expect(DEFAULT_AUTH_RPM).toBe(120);
+    expect(DEFAULT_AUTH_BURST).toBe(40);
   });
 
   it("reads the three env overrides", () => {
@@ -222,7 +222,7 @@ describe("checkRequestRate", () => {
 
   it("holds auth routes to the tighter bucket the general one would still allow", () => {
     resetRateLimiters();
-    const env = { ...SERVER, AGENTFORGE_RATE_AUTH_RPM: "30" };
+    const env = SERVER;
     for (let i = 0; i < DEFAULT_AUTH_BURST; i += 1) {
       expect(checkRequestRate({ ...base, path: "/api/v1/auth/login", env, now: 0 }).allowed).toBe(true);
     }
@@ -233,6 +233,19 @@ describe("checkRequestRate", () => {
     }
     // The same IP is nowhere near the general per-IP burst, so ordinary traffic still flows.
     expect(checkRequestRate({ ...base, env, now: 0 }).allowed).toBe(true);
+  });
+
+  it("admits an office behind one address at the default auth rate: a burst of 40, then two a second", () => {
+    resetRateLimiters();
+    const auth = (now: number) => checkRequestRate({ ...base, path: "/api/v1/auth/session", env: SERVER, now });
+    for (let i = 0; i < DEFAULT_AUTH_BURST; i += 1) {
+      expect(auth(0).allowed).toBe(true);
+    }
+    expect(auth(0).allowed).toBe(false);
+    // 120 rpm is two tokens a second, so a second later two more sign-in calls fit and a third does not.
+    expect(auth(1_000).allowed).toBe(true);
+    expect(auth(1_000).allowed).toBe(true);
+    expect(auth(1_000).allowed).toBe(false);
   });
 
   it("limits per session too, so one account cannot spread a flood over many IPs", () => {

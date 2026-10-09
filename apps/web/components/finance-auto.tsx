@@ -82,7 +82,10 @@ export function FinanceAuto({ workspaceId, needsKey, models, model, modelPinned,
   // button that was pressed, which on a long preview is a screen away from the top.
   const shown = (message: string | null) => (message && !isGatewayBlockedText(message) ? message : null);
   const readError = shown(fileError ?? read.error);
-  const writeError = shown(actionError ?? job.error?.message ?? null);
+  const writeFailure = actionError ?? job.error?.message ?? null;
+  const writeError = shown(writeFailure);
+  // A refused write-up or rewrite is the needs-key sentence; its note stands in for the banner, at the top.
+  const keyRefused = isGatewayBlockedText(writeFailure);
   const lines = noteLines(answer, file);
 
   /** A write-up belongs to the figures it was made from. New figures start clean. */
@@ -169,7 +172,9 @@ export function FinanceAuto({ workspaceId, needsKey, models, model, modelPinned,
 
   return (
     <form className="mt-4 space-y-5" onSubmit={(event) => void onWrite(event)} data-testid="finance-auto">
-      {needsKey ? <NeedsKeyNote testId="finance-needs-key" className="text-sm text-[var(--text-2)]" /> : null}
+      {needsKey || keyRefused ? (
+        <NeedsKeyNote testId="finance-needs-key" className="text-sm text-[var(--text-2)]" />
+      ) : null}
       <section className="space-y-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4">
         <div>
           <label htmlFor="finance-auto-prompt" className="panel-label">

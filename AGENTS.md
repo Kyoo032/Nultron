@@ -106,13 +106,31 @@ Rules:
 - Never run a release from the tester folder. The tester webdev uses port 3200 and its own data folder.
 - The precise map (which change goes where, which files the tester code may edit, how to update) is in Rizky's Obsidian vault: `C:\Users\rizky\Documents\Obsidian\40-Dev\nultron-two-codes-map.md`. Keep it current in the same session as any change to the split.
 
+### Sync lanes: four things, one source (Rizky, 2026-10-09; must follow)
+
+One codebase feeds four lanes. Every bug fix is made once, on `main`, and reaches the other lanes by the steps below. Map: [`docs/internal/maps/release-and-sync-lanes.md`](docs/internal/maps/release-and-sync-lanes.md).
+
+| Lane | What it is | Where it lives | How it gets a fix from `main` |
+|---|---|---|---|
+| Nultron Personal | The Mac/Windows app | built from `agentforge` `main` | the next `pnpm desktop:build` and `pnpm desktop:release` |
+| Nultron Enterprise | The hosted app and the preview | built from `agentforge` `main` | the next `node scripts/release-web.mjs`; the preview by its safe update |
+| HYP AI | Hypernet's white-label | `C:\Users\rizky\hypey\app` | vendor-branch import, steps in `C:\Users\rizky\hypey\intake\SYNC.md` |
+| Tester | Chat-only code | `C:\Users\rizky\agentforge-chat`, branch `tester/chat-first` | `git merge origin/main` in that folder |
+
+- **One place to fix.** A bug fix is a pull request to `main` from a branch cut from `main`. Never fix by hand in the tester folder or in the HYP AI clone, and never open a fix pull request from `tester/chat-first`. The only thing that goes from tester to `main` is a promotion pull request Rizky approves.
+- **After a pull request merges to `main`, in this order:** (1) merge `origin/main` into the tester folder and run `ci:local`; (2) import it into the HYP AI clone per `SYNC.md`, then run `check-leaks.sh` and `drive-leaks.mjs`; (3) release Personal or Enterprise only when Rizky says. A fix is not done for a lane until its step has run. The pull request says which lanes are still owed.
+- **Shared code carries no brand.** HYP AI shows its own name, gateway and mascot, so shared code and copy never hard-code `Nultron`, `Toko Token`, `TokenKu` or `HYP AI`; they read `productName` and `gatewayName`. A difference between lanes is a setting (`PORTAL_SIGNIN_MODE`, the edge mode), not a fork.
+- **Deploy differences stay in their lane.** The Cloudflare edge and password sign-in belong to HYP AI's deploy; Nultron keeps its direct two-name setup. Never carry one into the other's deploy path.
+- **Label what a change touches.** In a pull request and in `unreleased.md`, name the lanes (Personal, Enterprise, HYP AI, tester). The default is all four.
+- **Priority.** Published wins; in a conflict keep the `main` side. The Obsidian map has the full list.
+
 `.ref/` (gitignored) holds two third-party repositories for reading only, OpenMausBot and hermes-agent. Take ideas, never code, and never anything from `OpenMausBot/enterprise/`.
 
 ### HYP AI hosting plan (Rizky, 2026-10-07)
 
 His words: "start small first with like 100-500 users", then "when there is demand on the next 2 weeks then we can change and switch". The order of work he set the same day is Nultron preview first, HYP AI after he has tested Nultron. The server itself is a priority, because he has to give Hypernet its address.
 
-**Who owns what (Rizky, same day).** His words: "this machine will be theirs anyway, im on the rnd and theyre on the production and the marketing sales". Rizky's side does research and development. Hypernet runs production, marketing and sales, and the server is theirs. Hypernet connects its own domain to the server: two names, one for the app and one for the sign-in page, each an A record to the Elastic IP, with no AAAA record and no proxy in front, because the server gets its own certificates.
+**Who owns what (Rizky, same day).** His words: "this machine will be theirs anyway, im on the rnd and theyre on the production and the marketing sales". Rizky's side does research and development. Hypernet runs production, marketing and sales, and the server is theirs. Hypernet connects its own domain to the server. **Changed 2026-10-08 (Rizky): Hypernet only points its name at our IP; we adapt.** `aiopc.innovationhypernet.com` stays behind Hypernet's Cloudflare proxy (SSL mode Full, proven live), so HYP AI uses one name: the app on 443 and the sign-in portal on `:8443` (bundle `--edge cloudflare`, `ship.ps1 -Cloudflare`, in `C:\Users\rizky\hypey\deploy`). **This Cloudflare setup is for HYP AI only. Nultron does not use Cloudflare** and keeps its direct two-name setup with its own certificates; never carry Cloudflare-mode changes into Nultron's deploy path.
 
 **Sign-in (Rizky, same day): username and password in the portal, no e-mailed code.** His words: "the login portal doesnt need email code, we will use username and email protection for now, with 2FA method being designed". Asked what he meant, he chose the real multi-user portal with a username and password over private desks behind a browser prompt. What follows from it:
 - This lifts "no password" for HYP AI only. Nultron Enterprise keeps the e-mailed code until he says otherwise.

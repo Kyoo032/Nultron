@@ -344,6 +344,37 @@ describe("the role an invite carries", () => {
   });
 });
 
+/** A promise its owner settles by hand: the test that has to choose the order of two transactions. */
+function gate(): { readonly promise: Promise<void>; open(): void } {
+  let open!: () => void;
+  const promise = new Promise<void>((resolve) => {
+    open = resolve;
+  });
+  return { promise, open };
+}
+
+/**
+ * Polls the database until one session of this database is waiting on a lock. The wait is on the
+ * database's state, with a deadline that fails the test loudly; it is not a pause that hopes the
+ * other transaction got as far as its INSERT.
+ */
+async function untilWaitingOnLock(client: Client, deadlineMs = 10_000): Promise<void> {
+  const deadline = Date.now() + deadlineMs;
+  for (;;) {
+    const { rows } = await client.query<{ waiting: number }>(
+      `SELECT count(*)::int AS waiting FROM pg_stat_activity
+        WHERE datname = current_database() AND wait_event_type = 'Lock' AND pid <> pg_backend_pid()`,
+    );
+    if (rows[0].waiting > 0) {
+      return;
+    }
+    if (Date.now() >= deadline) {
+      throw new Error("no session started waiting on a lock within the deadline");
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
 describe("one live invite per address, by the database and not only by the application", () => {
   it("lets exactly one of two simultaneous creates succeed; the other hits the live-invite index", async () => {
     const user = await invitedUser();
@@ -355,21 +386,32 @@ describe("one live invite per address, by the database and not only by the appli
         email: user.email,
         rawCode: randomInviteCode(),
       });
-    const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+    const inserted = gate();
+    const release = gate();
 
-    // The first transaction holds its new invite uncommitted while the second one runs, so the
-    // second one's retire-the-live-one UPDATE cannot see it: only the index can refuse the INSERT.
+    // The first transaction inserts its invite and holds it uncommitted. The second starts only after that
+    // INSERT, so its retire-the-live-one UPDATE cannot see the first invite, and its own INSERT has to wait
+    // on the unique index. The first transaction commits only once the database reports that wait, so the
+    // refusal is the index's, whatever the speed of the machine.
     const first = store.tx(fixture.tenant.id, async (ops) => {
       await create(ops);
-      await pause(400);
+      inserted.open();
+      await release.promise;
     });
-    await pause(100);
-    const second = store.tx(fixture.tenant.id, (ops) => create(ops));
+    try {
+      await Promise.race([inserted.promise, first]);
+      const second = store.tx(fixture.tenant.id, (ops) => create(ops));
+      const settled = Promise.allSettled([first, second]);
 
-    const results = await Promise.allSettled([first, second]);
+      await untilWaitingOnLock(raw);
+      release.open();
+      const results = await settled;
 
-    expect(results.map((result) => result.status)).toEqual(["fulfilled", "rejected"]);
-    expect(String((results[1] as PromiseRejectedResult).reason)).toMatch(/uq_invites_live/);
+      expect(results.map((result) => result.status)).toEqual(["fulfilled", "rejected"]);
+      expect(String((results[1] as PromiseRejectedResult).reason)).toMatch(/uq_invites_live/);
+    } finally {
+      release.open();
+    }
   });
 });
 

@@ -85,4 +85,4 @@ services:
       # The inbox the drive reads the sign-in code from. Loopback only, and on 18025 so it can never
       # collide with the Mailpit of apps/portal/compose.yml (8025).
       - "127.0.0.1:18025:8025"
-    restart: "no"
+    restart: unless-stopped

@@ -15,6 +15,7 @@ import {
   matchStubFillScenario,
   matchStubGenerateScenario,
   modeMessage,
+  redactSecrets,
   resolveRuntimeMode,
   stubEditCardCopy,
   withOutputLanguage,
@@ -36,6 +37,7 @@ import { hostEditBackend } from "./backend";
 import { undoCard } from "./undo";
 import { appendEditMetric } from "./metrics";
 import { runEditHarness } from "./harness-run";
+import { redactToolEvent } from "../chat-tool-events";
 
 const MUTATING = new Set([
   "split_clip",
@@ -202,6 +204,18 @@ function pushToolFrames(queue: StringQueue, output: unknown): void {
   }
 }
 
+/**
+ * What leaves the agent stream for the screen. A tool's input and output are the redacted copy Chat sends
+ * (`redactToolEvent`), and a failure's own words are masked as Chat masks them. The runtime's event is not
+ * changed, and the tool frames are read from this same copy.
+ */
+function screenEvent(event: RuntimeEvent): RuntimeEvent {
+  if (event.type === "run.failed" || event.type === "run.interrupted") {
+    return { ...event, message: redactSecrets(event.message) };
+  }
+  return redactToolEvent(event);
+}
+
 function firstClipId(doc: Awaited<ReturnType<typeof foldProject>>): string | undefined {
   return (
     doc.clips.find((clip) => doc.tracks.find((track) => track.id === clip.trackId)?.kind === "video")?.id ??
@@ -282,9 +296,10 @@ export async function runEditAgent(input: {
             history: [{ role: "user", parts: [{ type: "text", text: input.text }] }],
             ...(input.abortSignal ? { signal: input.abortSignal } : {}),
             onEvent: async (event: RuntimeEvent) => {
-              queue.push(encodeSse(event));
-              if (event.type === "tool.completed") {
-                pushToolFrames(queue, event.output);
+              const safe = screenEvent(event);
+              queue.push(encodeSse(safe));
+              if (safe.type === "tool.completed") {
+                pushToolFrames(queue, safe.output);
               }
               if (event.type === "run.completed") {
                 // Edit-agent spend is metered against the tenant now, not appended to one global

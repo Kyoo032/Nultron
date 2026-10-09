@@ -17,6 +17,7 @@ import {
   resolveChatModel,
   hasModelVisibleContent,
   modelHistoryParts,
+  toolResultNote,
   redactAttachedParts,
   attachmentsAsMentions,
   takeLastToolIo,
@@ -54,6 +55,8 @@ import { ensureToolsRegistered } from "./register-tools";
 import { recordChatRunUsage } from "./usage-record";
 import { loadSettings, loadUserLocale } from "./settings-store";
 import { defaultSelectableModel, listSelectableModels } from "./selectable-models";
+import { markJobModelDown, maySwapModel, pickNext, startModel } from "./job-model-fallback";
+import { readModelPinned } from "./job-regen";
 import { collectToolMediaParts } from "./tool-media";
 import { assertChatImagesSendable, prepareChatImageHistory, type ChatTurn } from "./chat-image-history";
 import { saveGeneratedImage, saveGeneratedVideo } from "./media";
@@ -158,6 +161,10 @@ export async function* startModalityRun(options: {
   const fallback = defaultChat ? defaultSelectableModel(catalog, options.tenant) : published.version.model;
   const requestedModel = readOptionalModel(options.body);
   const model = resolveChatModel(requestedModel, fallback, catalog);
+  // Only the default Chat agent on the host's own default model may be moved to a stand-in when the
+  // gateway cannot reach it. The composer sends `model` on every turn, so a pick is any model other than
+  // the default, or one the picker marked `modelPinned`; an agent the owner built is pinned to its model.
+  const modelExplicit = !defaultChat || readModelPinned(options.body) || model !== fallback;
   const pastHint = await formatPastSessionsHint(options.tenant, thread.agentId, thread.id);
   const userText = userParts
     .map((part) => (part.type === "text" && typeof part.text === "string" ? part.text : ""))
@@ -251,6 +258,8 @@ export async function* startModalityRun(options: {
 
   const work = (async () => {
     let assistantText = "";
+    // The model's own words, kept before the host's closing sentence is added. The Knowledge card reads these.
+    let modelAnswer = "";
     let thinkingText = "";
     let failedMessage = "";
     const mediaParts: ContentPart[] = [];
@@ -279,6 +288,7 @@ export async function* startModalityRun(options: {
         return true;
       }
       const replyLocale = getRunContext() ? localeForRun() : locale;
+      modelAnswer = assistantText;
       const settled = settleChatTurn({
         text: assistantText,
         offeredSources: knowledge.chunks.length,
@@ -339,11 +349,70 @@ export async function* startModalityRun(options: {
         }
         storedHistory.push({ role: row.role as "user" | "assistant", parts: modelHistoryParts(parts) });
       }
+      // The latest assistant turn also tells the model what its tools returned, so "continue" does not run
+      // them again. Older turns stay text only.
+      const lastAssistantRow = [...historyRows].reverse().find((row) => row.role === "assistant");
+      const lastAssistantTurn = [...storedHistory].reverse().find((turn) => turn.role === "assistant");
+      if (lastAssistantRow && lastAssistantTurn && hasModelVisibleContent(lastAssistantRow.content as ContentPart[])) {
+        const note = toolResultNote(lastAssistantRow.content as ContentPart[]);
+        if (note) {
+          lastAssistantTurn.parts = [...lastAssistantTurn.parts, { type: "text", text: note }];
+        }
+      }
       // Images leave as bytes, within one budget, or the person is told why they cannot. A stored
       // `/api/v1/media/...` reference is never handed on: no remote model can open it.
       const history = await prepareChatImageHistory(options.tenant, storedHistory, { model, locale });
       const runtime = createRuntime(settings);
       send({ type: "run.started", runId: run.id });
+
+      // Model fallback, as jobs have it (`job-model-fallback.ts`): when the model this turn was given cannot
+      // be reached before it has produced anything, the same turn runs once on the next live model of the
+      // same gateway. Never when the person picked the model, and never once it has streamed a word.
+      let activeModel = model;
+      let activeVersion = version;
+      let modelSpoke = false;
+      let retried = false;
+      let heldNext: string | undefined;
+      const fallbackOptions = modelExplicit
+        ? undefined
+        : { model, availableModelIds: catalog.map((entry) => entry.id), signal: modelAbort.signal };
+      const acceptsModality = (id: string) => {
+        try {
+          assertChatModelAcceptsModality(id, options.modality);
+          return true;
+        } catch {
+          return false;
+        }
+      };
+      const fallbackFor = (from: string, failure: string): string | undefined => {
+        if (!fallbackOptions || retried || settled) {
+          return undefined;
+        }
+        if (!maySwapModel({ error: new Error(failure), streamed: false }, fallbackOptions)) {
+          return undefined;
+        }
+        const next = pickNext(fallbackOptions, from, Date.now());
+        return next && acceptsModality(next) ? next : undefined;
+      };
+      const announceFallback = (from: string, to: string) => {
+        const message = chatTurnCopy(locale).modelFallback.replaceAll("{from}", from).replaceAll("{to}", to);
+        send({ type: "run.model_fallback", from, to, message });
+        if (thinkingEnabled) {
+          const line = `${message}\n`;
+          thinkingText += line;
+          send({ type: "assistant.thinking", text: line });
+        }
+        stall.touch();
+      };
+      if (fallbackOptions) {
+        // A model this process already saw unreachable is skipped before the first try, not after it.
+        const started = startModel(fallbackOptions, Date.now());
+        if (started !== model && acceptsModality(started)) {
+          activeModel = started;
+          activeVersion = { ...version, model: started };
+          announceFallback(model, started);
+        }
+      }
 
       // `withRunContext` is thread-scoped; a tool that records an author (a file write) reads the
       // tool-run context, so Chat sets it too, keyed by this turn's run. Without it the author of
@@ -352,8 +421,8 @@ export async function* startModalityRun(options: {
         withToolRun({ runId: run.id, mode: "chat" }, () =>
           withRunContext({ threadId: thread.id, agentId: thread.agentId, locale }, fn),
         );
-      await inChatRun(async () => {
-        if (options.modality !== "text" && thinkingEnabled) {
+      const attempt = () => inChatRun(async () => {
+        if (options.modality !== "text" && thinkingEnabled && !retried) {
           const line = `${chatTurnCopy(localeForRun()).lookingAttached}\n`;
           thinkingText += line;
           send({ type: "assistant.thinking", text: line });
@@ -362,7 +431,7 @@ export async function* startModalityRun(options: {
           tenant: options.tenant,
           runId: run.id,
           modality: options.modality,
-          version,
+          version: activeVersion,
           bindings: bindingsForChatModality(withPastSessionsBinding(published.bindings), options.modality),
           // Chat's declared budget is the default agent's; an agent the owner built keeps the runtime's own.
           ...(defaultChat ? { budget: harnessSpecFor("chat").budget } : {}),
@@ -378,7 +447,16 @@ export async function* startModalityRun(options: {
             if (isRunOutputEvent(event)) {
               stall.touchOutput();
             }
+            if (isRunOutputEvent(event)) {
+              modelSpoke = true;
+            }
             if (event.type === "run.failed") {
+              const next = modelSpoke ? undefined : fallbackFor(activeModel, event.message);
+              if (next) {
+                // Held, not sent: the catch below retries once on `next` and the person never sees this one.
+                heldNext = next;
+                return;
+              }
               failedMessage = redactSecrets(event.message);
               send({ ...event, message: failedMessage });
               return;
@@ -459,6 +537,25 @@ export async function* startModalityRun(options: {
           },
         });
       });
+      try {
+        await attempt();
+      } catch (error) {
+        if (!heldNext) {
+          throw error;
+        }
+      }
+      if (heldNext && !settled) {
+        // The default model was unreachable and had said nothing: one more try on the next live model.
+        // The held `run.failed` is dropped; if this try fails too, its own failure is what the person gets.
+        const next = heldNext;
+        heldNext = undefined;
+        retried = true;
+        markJobModelDown(activeModel);
+        announceFallback(activeModel, next);
+        activeModel = next;
+        activeVersion = { ...version, model: next };
+        await attempt();
+      }
       if (settled) {
         // Covers a cancel that landed while the completed event was still being handled.
         meterSettledRun();
@@ -487,7 +584,7 @@ export async function* startModalityRun(options: {
           sourceIds: citedSources(assistantText, knowledge.chunks),
         });
       }
-      if (finished && assistantText.trim()) {
+      if (finished && modelAnswer.trim()) {
         // Fire-and-forget: indexing must not delay stream end. One card per thread, latest exchange only.
         // Anything that goes wrong here is a knowledge concern, never a run failure.
         try {
@@ -500,8 +597,8 @@ export async function* startModalityRun(options: {
               // An attached file is named in the card, not carried into it: its text is in the person's
               // own private desk copy, and this card is read from the desk-wide Knowledge Base.
               userText: attachmentsAsMentions(userText),
-              assistantText,
-              model,
+              assistantText: modelAnswer,
+              model: activeModel,
             }),
           );
         } catch (error) {

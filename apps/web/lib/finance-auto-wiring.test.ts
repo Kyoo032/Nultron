@@ -76,9 +76,13 @@ describe("nothing paid runs on a drop", () => {
     expect(row).toContain('data-testid="finance-auto-write-error"');
     expect(row).not.toContain('data-testid="finance-auto-error"');
     expect(auto).toContain("const readError = shown(fileError ?? read.error);");
-    expect(auto).toContain("const writeError = shown(actionError ?? job.error?.message ?? null);");
-    // The refused-for-no-key sentence stays out of both banners: the needs-key note says it calmly.
+    expect(auto).toContain("const writeFailure = actionError ?? job.error?.message ?? null;");
+    expect(auto).toContain("const writeError = shown(writeFailure);");
+    // The refused-for-no-key sentence stays out of both banners: the needs-key note says it calmly, and
+    // that note stands in for the refusal even when the shared gate flag has cleared.
     expect(auto).toContain("isGatewayBlockedText(message)");
+    expect(auto).toContain("const keyRefused = isGatewayBlockedText(writeFailure);");
+    expect(auto).toContain("{needsKey || keyRefused ? (");
   });
 
   it("says in one line that the write-up uses the key", () => {

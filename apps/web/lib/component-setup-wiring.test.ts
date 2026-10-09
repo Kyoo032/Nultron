@@ -60,9 +60,10 @@ describe("component setup panel", () => {
     expect(panel).toContain("aria-valuenow={setup.percent}");
   });
 
-  it("shows nothing when there is nothing to set up, and collapses once it is done", () => {
-    expect(panel).toContain("if (!visible || !component || collapsed) {");
-    expect(panel).toContain("setCollapsed(true)");
+  it("shows nothing when there is nothing to set up, and leaves the collapse to the hook", () => {
+    expect(panel).toContain("if (!visible || !component) {");
+    expect(panel).not.toContain("|| collapsed");
+    expect(panel).not.toContain("setCollapsed");
   });
 
   it("offers a retry and says the app works without it, only on a failure", () => {
@@ -126,6 +127,16 @@ describe("the hook's rules", () => {
   it("never offers an install for a component the server manages", () => {
     expect(client).toContain("row.auto && !row.managed");
     expect(client).toContain("status?.managed !== true");
+  });
+
+  /**
+   * The section above the key form renders when `visible` is true. The panel draws nothing once it has
+   * collapsed, so the collapse must already be in `visible`, or the section is an empty box after an install.
+   */
+  it("reports visible only while the panel has something to draw", () => {
+    expect(hook).toContain("const [collapsed, setCollapsed] = useState(false);");
+    expect(hook).toContain("window.setTimeout(() => setCollapsed(true), 4000)");
+    expect(hook).toContain("visible: component !== null && !collapsed");
   });
 
   it("lets Retry re-run an install the host still remembers as failed", () => {

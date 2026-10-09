@@ -34,6 +34,12 @@ export type RuntimeEvent =
    * just before `run.completed`, never together with `run.failed`. A caller that does not care ignores it.
    */
   | { type: "run.interrupted"; message: string }
+  /**
+   * The model the turn asked for could not be reached before it said anything, so the host ran the same
+   * turn once on `to`. `message` is the sentence for the person, already in the run's language. Sent
+   * once, right before the retry. A caller that does not care ignores it.
+   */
+  | { type: "run.model_fallback"; from: string; to: string; message: string }
   | { type: "run.completed"; runId: string; usage?: RunUsage };
 
 export type AgentRuntime = {

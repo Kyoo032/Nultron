@@ -24,8 +24,8 @@ export const DEFAULT_IP_RPM = 600;
 export const DEFAULT_IP_BURST = 100;
 export const DEFAULT_SESSION_RPM = 300;
 export const DEFAULT_SESSION_BURST = 50;
-export const DEFAULT_AUTH_RPM = 30;
-export const DEFAULT_AUTH_BURST = 10;
+export const DEFAULT_AUTH_RPM = 120;
+export const DEFAULT_AUTH_BURST = 40;
 
 export const RATE_IP_RPM_ENV = "AGENTFORGE_RATE_IP_RPM";
 export const RATE_SESSION_RPM_ENV = "AGENTFORGE_RATE_SESSION_RPM";

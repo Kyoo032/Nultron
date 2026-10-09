@@ -14,6 +14,7 @@ import { EditRecipesPanel } from "@/components/edit-recipes-panel";
 import { EditPreview } from "@/components/edit-preview";
 import { EditTimeline } from "@/components/edit-timeline";
 import { apiFetch, isElectron } from "@/lib/api-client";
+import { editInterruptedNote } from "@/lib/edit-agent-note";
 import { pickMedia } from "@/lib/desktop-bridge";
 import { gatewayBlockedMessage, hostedGatewayBlocked, isGatewayBlockedText } from "@/lib/gateway-blocked";
 import { isHostedBuild } from "@/lib/hosted-build";
@@ -104,6 +105,8 @@ export function EditStudio() {
   const [composerPrefill, setComposerPrefill] = useState("");
   const [exporting, setExporting] = useState(false);
   const [exportJobId, setExportJobId] = useState<string | null>(null);
+  // The last agent turn's note, such as a run that stopped after its tools ran. Cleared when the next turn starts.
+  const [agentNote, setAgentNote] = useState<string | null>(null);
 
   const loadList = useCallback(async () => {
     try {
@@ -502,6 +505,7 @@ export function EditStudio() {
     agentAbort.current?.abort();
     const abort = new AbortController();
     agentAbort.current = abort;
+    setAgentNote(null);
     const response = await apiFetch(`/api/v1/edit/projects/${project.id}/agent`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -561,6 +565,9 @@ export function EditStudio() {
               { ...card, toolKey: card.toolKey ?? "propose_plan" },
             ]);
           }
+        }
+        if (event.type === "run.interrupted") {
+          setAgentNote(editInterruptedNote(typeof record.message === "string" ? record.message : ""));
         }
       }
     }
@@ -901,6 +908,7 @@ export function EditStudio() {
             onPlace={(id) => void onPlace(id)}
             onDiscard={(id) => void onDiscard(id)}
             needsKey={hostedNeedsKey}
+            note={agentNote}
           />
         </div>
       )}

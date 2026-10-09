@@ -10,6 +10,7 @@ import type { FinanceBrief } from "@agentforge/core/artifacts";
 import type { FinanceReport } from "@agentforge/core/finance";
 import { apiFetch, isElectron } from "./api-client";
 import { saveBlob } from "./artifacts-client";
+import { messageUnlessBlocked } from "./gateway-blocked";
 
 /** The formats the picker offers. The registry can render more; these are the ones Finance shows. */
 export const FINANCE_EXPORT_FORMATS = ["xlsx", "pptx", "docx"] as const;
@@ -128,9 +129,15 @@ export function filenameFromDisposition(disposition: string | null, format: Fina
   return disposition?.match(/filename="([^"]+)"/)?.[1] ?? FINANCE_EXPORT_FALLBACK_NAME[format];
 }
 
+/**
+ * The export route is not gated (`handlers/finance-export.ts`). The flat `gateway_blocked` still reads
+ * as the needs-key sentence, so the Finance contract holds if that ever changes.
+ */
 function messageFrom(payload: unknown, fallback: string): string {
-  const error = (payload as { error?: { message?: unknown } } | null)?.error;
-  return typeof error?.message === "string" && error.message.trim() ? error.message : fallback;
+  return messageUnlessBlocked(payload, () => {
+    const error = (payload as { error?: { message?: unknown } } | null)?.error;
+    return typeof error?.message === "string" && error.message.trim() ? error.message : fallback;
+  });
 }
 
 /** One request, one file. On desktop the host writes it natively, so there is nothing to save here. */

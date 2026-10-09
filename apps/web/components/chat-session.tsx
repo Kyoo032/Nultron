@@ -543,6 +543,7 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
               setSendFailed(true);
               setRunning(false);
             }}
+            onSettled={() => setRunning(false)}
             onComplete={async (run) => {
               notifyThreadsChanged();
               if (!run.showing) {

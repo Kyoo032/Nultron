@@ -49,7 +49,8 @@
     "title": "Agent",
     "writing": "Agent writing…",
     "placeholder": "Ask the editor…",
-    "send": "Send"
+    "send": "Send",
+    "interrupted": "The agent stopped before it could finish. The edits it already made are kept. Reason: {reason}"
   },
   "cards": {
     "reviewTitle": "Review before export",

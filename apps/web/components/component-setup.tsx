@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { NultronMascot } from "@/components/nultron/nultron-mascot";
 import type { SetupStage } from "@/lib/components-client";
 import { t } from "@/lib/i18n";
@@ -50,20 +49,12 @@ function duration(stage: SetupStage): string | null {
  */
 export function ComponentSetupPanel({ view }: { view: ComponentSetupView }) {
   const { productName } = useProductBrand();
-  const [collapsed, setCollapsed] = useState(false);
   const { component, setup, alreadyRunning, retry, visible } = view;
   const finished = setup.status === "done";
   const takesStatus = useBuddyTakesStatus();
 
-  useEffect(() => {
-    if (!finished) {
-      return;
-    }
-    const timer = window.setTimeout(() => setCollapsed(true), 4000);
-    return () => window.clearTimeout(timer);
-  }, [finished]);
-
-  if (!visible || !component || collapsed) {
+  // `visible` already carries the collapse after a finished run (`use-component-setup.ts`).
+  if (!visible || !component) {
     return null;
   }
 

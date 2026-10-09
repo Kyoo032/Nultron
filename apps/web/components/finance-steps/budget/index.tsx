@@ -15,6 +15,7 @@
 import { useMemo, useState } from "react";
 import { formatBudgetAmount } from "@agentforge/core/finance";
 import { FinanceFileUpload } from "@/components/finance-file-upload";
+import { NeedsKeyNote } from "@/components/needs-key-note";
 import { mergeFigures } from "@/lib/finance-brief";
 import {
   DEFAULT_BUDGET_FLAG_ABS,
@@ -29,6 +30,7 @@ import {
 } from "@/lib/finance-budget";
 import { parseBudgetFigures } from "@/lib/finance-budget-client";
 import type { LineItem } from "@/lib/finance-client";
+import { isGatewayBlockedText } from "@/lib/gateway-blocked";
 import { getLocale, t } from "@/lib/i18n";
 import { FinanceFold } from "../finance-guide";
 import { useFinanceRead } from "../finance-read";
@@ -117,6 +119,8 @@ export function BudgetInputs({ locked, model, draft, setDraft }: FinanceStepProp
   const [reading, setReading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const busy = locked || reading;
+  // A refused read is the needs-key sentence: its calm note with a Settings link stands in for the error.
+  const keyRefused = isGatewayBlockedText(error);
 
   function patchParams(next: BudgetUiParams): void {
     setDraft({ params: next } as unknown as FinanceStepDraft);
@@ -178,11 +182,12 @@ export function BudgetInputs({ locked, model, draft, setDraft }: FinanceStepProp
         />
         <p className="mt-1 text-xs text-[var(--text-3)]">{t("finance.budget.readHint")}</p>
       </div>
-      {error ? (
+      {error && !keyRefused ? (
         <p className="text-xs text-[var(--danger)]" role="alert" data-testid="budget-error">
           {error}
         </p>
       ) : null}
+      {keyRefused ? <NeedsKeyNote testId="budget-needs-key" className="text-xs text-[var(--text-2)]" /> : null}
       <FinanceFold>
         <div>
           <p className="panel-label">{t("finance.budget.thresholds")}</p>

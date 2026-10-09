@@ -8,6 +8,7 @@
  */
 import type { LineItem } from "@agentforge/core/finance";
 import { apiFetch } from "./api-client";
+import { messageUnlessBlocked } from "./gateway-blocked";
 import type {
   BudgetCandidate,
   BudgetEmbedStatus,
@@ -89,9 +90,12 @@ function excluded(value: unknown): { label: string; reason: string }[] {
     : [];
 }
 
+/** A hosted `403 gateway_blocked` reads as the needs-key sentence (flat body, see `financeFailure`). */
 function errorMessage(payload: unknown, fallback: string): string {
-  const error = (payload as { error?: { message?: unknown } } | null)?.error;
-  return error && typeof error.message === "string" && error.message.trim() ? error.message : fallback;
+  return messageUnlessBlocked(payload, () => {
+    const error = (payload as { error?: { message?: unknown } } | null)?.error;
+    return error && typeof error.message === "string" && error.message.trim() ? error.message : fallback;
+  });
 }
 
 /** Figures text in, the rows and the proposed pairing out. Nothing is computed in the browser. */

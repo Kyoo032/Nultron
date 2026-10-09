@@ -46,6 +46,12 @@ vi.mock("@agentforge/core", async (importOriginal) => {
   };
 });
 
+// The real card, with a spy on it: the Knowledge Base card a turn writes is read back from the call.
+vi.mock("./work-cards", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./work-cards")>();
+  return { ...actual, chatWorkCard: vi.fn(actual.chatWorkCard) };
+});
+
 const KEY = "sk-live-0123456789abcdefABCDEF";
 const BEARER = "abcdefghijklmnop1234567890";
 const SHA = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
@@ -367,5 +373,56 @@ describe("the Chat prompt and a tool the run does not offer", () => {
     const keys = (executed[0]?.bindings ?? []).map((binding) => binding.toolKey);
     expect(keys).toContain("run_code");
     expect(keys).toContain("self_check");
+  });
+});
+
+describe("the Knowledge Base card of a Chat turn", () => {
+  const reason = "The gateway is unavailable right now. Send again in a moment.";
+
+  async function cardsWritten(): Promise<Array<{ assistantText: string }>> {
+    const { chatWorkCard } = await import("./work-cards");
+    return vi.mocked(chatWorkCard).mock.calls.map(([card]) => card);
+  }
+
+  beforeEach(async () => {
+    const { chatWorkCard } = await import("./work-cards");
+    vi.mocked(chatWorkCard).mockClear();
+  });
+
+  it("indexes the model's own words when the run was interrupted, not the sentence the host added", async () => {
+    script = async (run) => {
+      await run.onEvent({ type: "assistant.delta", text: "Let me read it." });
+      await run.onEvent({ type: "tool.started", toolKey: "list_files", input: {} });
+      await run.onEvent({ type: "tool.completed", toolKey: "list_files", output: { ok: true, items: [] } });
+      await run.onEvent({ type: "run.interrupted", message: reason });
+      await run.onEvent({ type: "run.completed", runId: run.runId });
+    };
+    await postTurn();
+    const cards = await cardsWritten();
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.assistantText).toBe("Let me read it.");
+  });
+
+  it("indexes the model's own words when the run ended at its step limit", async () => {
+    script = async (run) => {
+      await run.onEvent({ type: "assistant.delta", text: "Let me read it." });
+      await run.onEvent({ type: "run.step_limit", steps: 12 });
+      await run.onEvent({ type: "run.completed", runId: run.runId });
+    };
+    await postTurn();
+    const cards = await cardsWritten();
+    expect(cards).toHaveLength(1);
+    expect(cards[0]?.assistantText).toBe("Let me read it.");
+  });
+
+  it("writes no card from the host's sentence alone, when the model wrote no words", async () => {
+    script = async (run) => {
+      await run.onEvent({ type: "tool.started", toolKey: "list_files", input: {} });
+      await run.onEvent({ type: "tool.completed", toolKey: "list_files", output: { ok: true, items: [] } });
+      await run.onEvent({ type: "run.interrupted", message: reason });
+      await run.onEvent({ type: "run.completed", runId: run.runId });
+    };
+    await postTurn();
+    expect(await cardsWritten()).toEqual([]);
   });
 });

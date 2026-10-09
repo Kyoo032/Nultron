@@ -87,7 +87,7 @@ const CHANGED_ON_PURPOSE: Record<string, Partial<{ bestFor: string; tier: string
   "glm-5.2-fast-preview": { friendlyLabel: "GLM 5.2 Fast" },
   "glm-5.3": { friendlyLabel: "GLM 5.3" },
   "glm-5.3-flash": { friendlyLabel: "GLM 5.3 Flash" },
-  "gpt-oss-120b": { friendlyLabel: "GPT Oss 120B" },
+  "gpt-oss-120b": { friendlyLabel: "GPT OSS 120B" },
   "qwen-mt-flash": { friendlyLabel: "Qwen MT Flash" },
   "qwen-mt-lite": { friendlyLabel: "Qwen MT Lite" },
   "qwen-mt-plus": { friendlyLabel: "Qwen MT Plus" },

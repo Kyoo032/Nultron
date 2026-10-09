@@ -159,7 +159,7 @@ The gate runs in `gate`, `packages/host/src/router.ts:456`, **before the route t
 |---|---|---|---|
 | per-IP | 600 rpm (`:23`) | 100 (`:24`) | client IP from `X-Forwarded-For` |
 | per-session | 300 rpm (`:25`) | 50 (`:26`) | session cookie |
-| auth routes | 30 rpm (`:27`) | 10 (`:28`) | client IP |
+| auth routes | 120 rpm (`:27`) | 40 (`:28`) | client IP |
 
 Each is overridable by env (`:30-32`). `MAX_RATE_KEYS` (`:35`) caps the map at 50 000 so the
 limiter cannot itself become the memory exhaustion.

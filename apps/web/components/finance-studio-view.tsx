@@ -250,7 +250,10 @@ function TaskPath(props: Omit<FinanceStudioViewProps, "showChooser" | "chooser">
           ) : null}
         </p>
       ) : null}
-      {needsKey ? <NeedsKeyNote testId="finance-needs-key" className="mb-4 text-sm text-[var(--text-2)]" /> : null}
+      {/* A refused call shows this note even when the shared gate flag has cleared: the sentence is the error. */}
+      {needsKey || isGatewayBlockedText(error) ? (
+        <NeedsKeyNote testId="finance-needs-key" className="mb-4 text-sm text-[var(--text-2)]" />
+      ) : null}
       {notice ? (
         <p className="mb-4 text-sm text-[var(--text-2)]" role="status" data-testid="finance-auto-parsed">
           {notice}

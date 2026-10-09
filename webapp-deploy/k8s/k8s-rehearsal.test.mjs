@@ -243,3 +243,12 @@ describe("prepare-db entry point", () => {
     }
   });
 });
+
+describe("portal sign-in mode", () => {
+  it("the base portal ConfigMap pins PORTAL_SIGNIN_MODE to code, the default, and no overlay changes it", () => {
+    assert.match(read(K8S_DIR, "base", "kustomization.yaml"), /^ {6}- PORTAL_SIGNIN_MODE=code$/m);
+    for (const overlay of ["local", "production"]) {
+      assert.doesNotMatch(read(K8S_DIR, "overlays", overlay, "kustomization.yaml"), /PORTAL_SIGNIN_MODE=/, overlay);
+    }
+  });
+});
