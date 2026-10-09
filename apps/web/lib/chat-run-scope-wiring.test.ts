@@ -84,7 +84,7 @@ describe("chat composer", () => {
   });
 
   it("leaves Send to whichever run now holds it", () => {
-    expect(composer).toMatch(/finally \{\s*if \(showing\(\)\) \{\s*setBusy\(false\);/);
+    expect(composer).toMatch(/finally \{\s*if \(showing\(\) && isCurrentRun\(\)\) \{\s*setBusy\(false\);/);
   });
 
   it("clears only the draft it sent, not one typed since", () => {

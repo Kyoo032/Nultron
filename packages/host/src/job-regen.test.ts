@@ -31,6 +31,8 @@ const unreachable = new Set<string>();
 /** Models whose fake run ends quietly the way the real runtime does: after a tool, or at the step cap. */
 const interruptedModels = new Set<string>();
 const stepLimitModels = new Set<string>();
+/** Models whose fake run uses a tool (no text yet) and then breaks on the gateway's 503, as a live one did. */
+const toolThenInterrupted = new Set<string>();
 /** Models whose call stays in flight until the run's signal fires, as a slow gateway's would. */
 const inFlight = new Set<string>();
 /** What each in-flight call saw on its signal when it woke. */
@@ -89,6 +91,14 @@ vi.mock("@agentforge/core", async (importOriginal) => {
             type: "run.failed",
             message: `Could not reach ${model} after 3 tries. The gateway is unavailable right now (status_code=503)`,
           } as Parameters<typeof input.onEvent>[0]);
+          return;
+        }
+        if (toolThenInterrupted.has(model)) {
+          type Event = Parameters<typeof input.onEvent>[0];
+          await input.onEvent({ type: "tool.started", toolKey: "run_code", input: {} } as Event);
+          await input.onEvent({ type: "tool.completed", toolKey: "run_code", output: {} } as Event);
+          await input.onEvent({ type: "run.interrupted", message: "status_code=503 unavailable" });
+          await input.onEvent({ type: "run.completed", runId: input.runId });
           return;
         }
         if (interruptedModels.has(model)) {
@@ -281,6 +291,19 @@ describe("collectJobAssistantRun with the job model fallback", () => {
     unreachable.add("deepseek-v4-flash");
     await expect(collectJobAssistantRun({ ...run, modelExplicit: true })).rejects.toThrow(/status_code=503/);
     expect(executed.map((input) => input.version.model)).toEqual(["deepseek-v4-flash"]);
+  });
+
+  it("does not replay a job whose tools already ran, and keeps the gateway's words out of the error", async () => {
+    toolThenInterrupted.add("deepseek-v4-flash");
+    try {
+      const failure = await collectJobAssistantRun(run).catch((error: unknown) => error);
+      expect(failure).toMatchObject({ code: "generation_failed" });
+      expect((failure as Error).message).not.toMatch(/503|unavailable|status_code/i);
+      // One call only: a second would run the tool (a desk-file write, run_code) twice.
+      expect(executed.map((input) => input.version.model)).toEqual(["deepseek-v4-flash"]);
+    } finally {
+      toolThenInterrupted.clear();
+    }
   });
 
   it("collectJobAssistantText hides the model that answered, which is why recording callers use the run", async () => {

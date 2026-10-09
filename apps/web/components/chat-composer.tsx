@@ -31,6 +31,7 @@ import { thinkingRequestFields } from "@/lib/chat-thinking";
 import { submitOnEnter } from "@/lib/composer-enter";
 import { getLocale, t } from "@/lib/i18n";
 import { readComposerDraft, writeComposerDraft } from "@/lib/composer-draft";
+import { startRun } from "@/lib/run-generation";
 import { useWorkspaceScope } from "@/lib/workspace-scope";
 import { NeedsKeyNote } from "@/components/needs-key-note";
 import { ComposerAttachmentNotes } from "@/components/composer-attachment-notes";
@@ -255,6 +256,9 @@ export function ChatComposer({
   /** The session on screen as of this render, read by a run to know whether it still is. */
   const sessionRef = useRef(sessionKey);
   sessionRef.current = sessionKey;
+  /** Counts the sends. The host frees Send at `run.completed`, before the stream closes, so a second turn
+   * can start while the first turn's tail is still to run; only the newest run's tail may touch the pane. */
+  const runGenerationRef = useRef(0);
   const [shownSession, setShownSession] = useState(sessionKey);
   if (shownSession !== sessionKey) {
     // Another session is on screen. Whatever run held Send, and its error, belonged to the last one.
@@ -380,10 +384,18 @@ export function ChatComposer({
     // run streams on to the host — which saves the reply — but writes nothing more into this pane.
     const startedIn = sessionRef.current;
     const showing = () => sessionRef.current === startedIn;
+    const isCurrentRun = startRun(runGenerationRef);
     const typed = text;
     const attached = files;
     let runThread: string | null = null;
-    const finish = () => onComplete({ threadId: runThread, showing: showing() });
+    const finish = async () => {
+      if (!isCurrentRun()) {
+        // A newer turn is live. Its own end reloads the thread, with this turn's saved reply in it; this
+        // tail would clear the newer turn's streaming text and tools.
+        return;
+      }
+      await onComplete({ threadId: runThread, showing: showing() });
+    };
     const fail = (message: string) => {
       if (showing()) {
         setError(message);
@@ -407,6 +419,9 @@ export function ChatComposer({
       // The answer is whole: free Send and the Thinking card now, not when the connection closes. The host
       // still saves the reply and closes the stream; `finish` reloads the thread when it does.
       onCompleted: () => {
+        if (!isCurrentRun()) {
+          return;
+        }
         setBusy(false);
         onSettled?.();
       },
@@ -587,7 +602,7 @@ export function ChatComposer({
       fail(abortErrorMessage(err, getLocale()));
       await finish();
     } finally {
-      if (showing()) {
+      if (showing() && isCurrentRun()) {
         setBusy(false);
       }
     }

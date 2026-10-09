@@ -28,19 +28,32 @@ export const JOB_MODEL_DOWN_MS = 5 * 60 * 1000;
 
 const downUntil = new Map<string, number>();
 
-function circuitKey(model: string): string {
-  return model.trim().toLowerCase();
+/**
+ * One entry per company and model. A process serves many companies on the hosted server, and one
+ * company's outage (a bad key, a quota, its own endpoint) must not make another company skip a model that
+ * works for it. A desk, which has one owner, passes no scope and has its own entry.
+ */
+function circuitKey(model: string, scope?: ModelCacheScope): string {
+  const id = model.trim().toLowerCase();
+  if (!id) {
+    return "";
+  }
+  const owner = scope ? `${scope.tenantId}/${scope.organizationId ?? ""}` : "";
+  return `${owner}|${id}`;
 }
 
-export function markJobModelDown(model: string, now: number = Date.now()): void {
-  const key = circuitKey(model);
+export function markJobModelDown(model: string, now: number = Date.now(), scope?: ModelCacheScope): void {
+  const key = circuitKey(model, scope);
   if (key) {
     downUntil.set(key, now + JOB_MODEL_DOWN_MS);
   }
 }
 
-export function isJobModelDown(model: string, now: number = Date.now()): boolean {
-  const key = circuitKey(model);
+export function isJobModelDown(model: string, now: number = Date.now(), scope?: ModelCacheScope): boolean {
+  const key = circuitKey(model, scope);
+  if (!key) {
+    return false;
+  }
   const until = downUntil.get(key);
   if (until === undefined) {
     return false;
@@ -132,13 +145,13 @@ export function pickNext(options: JobModelFallbackOptions, current: string, now:
     ...(options.jobMode ? { mode: options.jobMode } : {}),
     current,
     availableIds: availableIds(options),
-    isDown: (id) => isJobModelDown(id, now),
+    isDown: (id) => isJobModelDown(id, now, options.tenant),
   });
 }
 
 /** A model the circuit already saw fail is skipped before the first attempt, not after it. */
 export function startModel(options: JobModelFallbackOptions, now: number): string {
-  if (!isJobModelDown(options.model, now)) {
+  if (!isJobModelDown(options.model, now, options.tenant)) {
     return options.model;
   }
   return pickNext(options, options.model, now) ?? options.model;
@@ -178,7 +191,7 @@ export async function runWithJobModelFallback<T>(
   if (!maySwapModel(outcome, options)) {
     throw outcome.error;
   }
-  markJobModelDown(first, now());
+  markJobModelDown(first, now(), options.tenant);
   const next = pickNext(options, first, now());
   if (!next) {
     throw outcome.error;
@@ -186,7 +199,7 @@ export async function runWithJobModelFallback<T>(
   const retry = await attempt(next);
   if (!retry.ok) {
     if (maySwapModel(retry, options)) {
-      markJobModelDown(next, now());
+      markJobModelDown(next, now(), options.tenant);
     }
     throw retry.error;
   }

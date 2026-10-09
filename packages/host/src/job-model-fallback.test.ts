@@ -72,6 +72,28 @@ describe("the down circuit", () => {
     expect(isJobModelDown("   ", NOW + 1)).toBe(false);
   });
 
+  it("keeps one company's outage from skipping the model for another company", () => {
+    const a = { tenantId: "partner", organizationId: "company-a" };
+    const b = { tenantId: "partner", organizationId: "company-b" };
+    markJobModelDown("deepseek-v4-flash", NOW, a);
+    expect(isJobModelDown("deepseek-v4-flash", NOW + 1, a)).toBe(true);
+    expect(isJobModelDown("deepseek-v4-flash", NOW + 1, b)).toBe(false);
+    // A desk with no scope has its own entry too.
+    expect(isJobModelDown("deepseek-v4-flash", NOW + 1)).toBe(false);
+  });
+
+  it("marks the run's own tenant down after a failed job, not every tenant", async () => {
+    const a = { tenantId: "partner", organizationId: "company-a" };
+    const b = { tenantId: "partner", organizationId: "company-b" };
+    const runtime = fakeRuntime({ "gpt-6-luna": "ok" });
+    await runWithJobModelFallback(
+      { model: "deepseek-v4-flash", availableModelIds: AVAILABLE, tenant: a, now },
+      runtime.attempt,
+    );
+    expect(isJobModelDown("deepseek-v4-flash", NOW + 1, a)).toBe(true);
+    expect(isJobModelDown("deepseek-v4-flash", NOW + 1, b)).toBe(false);
+  });
+
   it("forgets everything on reset", () => {
     markJobModelDown("deepseek-v4-flash", NOW);
     resetJobModelCircuit();
