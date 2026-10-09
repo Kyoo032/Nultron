@@ -245,10 +245,20 @@ describe("prepare-db entry point", () => {
 });
 
 describe("portal sign-in mode", () => {
-  it("the base portal ConfigMap pins PORTAL_SIGNIN_MODE to code, the default, and no overlay changes it", () => {
-    assert.match(read(K8S_DIR, "base", "kustomization.yaml"), /^ {6}- PORTAL_SIGNIN_MODE=code$/m);
-    for (const overlay of ["local", "production"]) {
-      assert.doesNotMatch(read(K8S_DIR, "overlays", overlay, "kustomization.yaml"), /PORTAL_SIGNIN_MODE=/, overlay);
-    }
+  // Comments are not configuration: a comment may name the variable.
+  const settings = (...path) =>
+    read(K8S_DIR, ...path)
+      .split(/\r?\n/)
+      .filter((line) => !line.trimStart().startsWith("#"))
+      .join("\n");
+
+  it("the base portal ConfigMap pins PORTAL_SIGNIN_MODE to password, the Enterprise default (2026-10-09)", () => {
+    assert.match(settings("base", "kustomization.yaml"), /^ {6}- PORTAL_SIGNIN_MODE=password$/m);
+  });
+
+  it("the production overlay leaves it to the base, and only the Mailpit rehearsal overlay pins the e-mailed code", () => {
+    assert.doesNotMatch(settings("overlays", "production", "kustomization.yaml"), /PORTAL_SIGNIN_MODE/);
+    assert.match(settings("overlays", "local", "kustomization.yaml"), /^ {6}- PORTAL_SIGNIN_MODE=code$/m);
+    assert.match(settings("overlays", "local", "kustomization.yaml"), /^ {6}- PORTAL_SMTP_HOST=mailpit$/m);
   });
 });

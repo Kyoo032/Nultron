@@ -54,8 +54,9 @@ configMapGenerator:
     behavior: merge
     literals:
       - PORTAL_PUBLIC_URL=https://portal.replace-me.invalid
-      # A real provider over STARTTLS (587) or implicit TLS (465 with PORTAL_SMTP_SECURE=1). The portal
-      # refuses a loopback sandbox and refuses to send a code in the clear (SR-39).
+      # Sign-in is `password` here (the base default), so the three SMTP lines below are only used if you set
+      # PORTAL_SIGNIN_MODE=code. A real provider over STARTTLS (587) or implicit TLS (465 with
+      # PORTAL_SMTP_SECURE=1). The portal refuses a loopback sandbox and refuses to send a code in the clear (SR-39).
       - PORTAL_SMTP_HOST=smtp.replace-me.invalid
       - PORTAL_SMTP_PORT=587
       - PORTAL_SMTP_FROM=Nultron <no-reply@replace-me.invalid>

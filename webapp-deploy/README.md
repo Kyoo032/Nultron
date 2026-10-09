@@ -39,7 +39,7 @@ webapp-deploy/
 ├─ pilot-local.mjs            drives that rehearsal: up, drive (headless sign-in), down
 ├─ Caddyfile                  TLS for two names, CSP + security headers, filtered logs, the billing block
 ├─ .env.example               the APP's env: every var the host reads, with one line each
-├─ portal.env.example         the PORTAL's env: signing key, database passwords, Tencent SES login
+├─ portal.env.example         the PORTAL's env: signing key, database passwords, sign-in mode (password by default), Tencent SES login (code mode only)
 ├─ DEPLOY-LOG.md              date | sha | env | who | notes
 ├─ k8s/                       the Kubernetes rehearsal (a second deploy path; its own README)
 └─ scripts/
@@ -196,7 +196,7 @@ rewritten by the proxy - that is the CSRF hole the check exists to close.
 ## Phase 0 pilot (compose)
 
 Owner decision, Rizky, 2026-10-01: Phase 0 is **10 internal testers on ONE Tencent Lighthouse box
-(4 vCPU / 8 GB, Jakarta) with docker compose**. Sign-in e-mail goes through **Tencent SES**. The
+(4 vCPU / 8 GB, Jakarta) with docker compose**. Sign-in e-mail, when the e-mailed code mode is chosen, goes through **Tencent SES**; since 2026-10-09 the bundle's default sign-in is a username and a password and needs no mail sender. The
 billing webhook is **blocked at Caddy** until a payment provider is chosen. Exactly **one app and
 one portal process**. This section is the way to run that; nothing in it is Kubernetes (see
 [`k8s/README.md`](k8s/README.md) for that path).
@@ -299,6 +299,9 @@ one portal process**. This section is the way to run that; nothing in it is Kube
 
 ### Sign-in mail: Tencent SES
 
+Only for `PORTAL_SIGNIN_MODE=code`. The bundle's default since 2026-10-09 is `password`, which sends no mail and does
+not need any of this (see "Signing in with a username and a password" below).
+
 SES offers SMTP, and the portal needs no code change for it. What the official documentation says, and
 what was checked:
 
@@ -349,21 +352,28 @@ sh scripts/portal.sh seed --email you@example.com --tenant nultron --org "Nultro
 
 docker compose up -d                    # now the app and the proxy
 docker compose ps                       # app and portal "healthy"; portal-prepare "exited (0)"
+
+# portal.env says PORTAL_SIGNIN_MODE=password (the default): give the first owner a password BEFORE anyone
+# signs in. Same address as the seed; the generated initial password is printed ONCE.
+sh scripts/portal.sh account create --username <name> --email you@example.com --role owner
 ```
 
 (In the released bundle there is no `scripts/` folder; the seed is
 `docker compose exec -T portal sh /app/webapp-deploy/portal-entry.sh ./node_modules/.bin/tsx scripts/seed.ts ...`,
 which is what `portal.sh` runs.) `sh scripts/portal.sh <name> ...` runs `apps/portal/scripts/<name>.ts`
 inside the running portal with the same two database DSNs the portal itself uses, so no password is typed
-on the host. Testers are added with the portal's invite script when it lands (`sh scripts/portal.sh invite
+on the host. In `code` mode testers are added with the portal's invite script when it lands (`sh scripts/portal.sh invite
 ...`, see `apps/portal/README.md`); until then each tester is another `seed --email` for the same tenant, up
 to the seat cap. `portal.sh otp` is refused on purpose: manual one-time codes need
 `PORTAL_ALLOW_MANUAL_OTP=1`, which the production portal will not boot with (SR-10), and the owner decided
 mail goes through SES.
 
-**Signing in with a username and a password instead (owner decision 2026-10-07, for one white-label deployment).**
-Put `PORTAL_SIGNIN_MODE=password` in `portal.env` (the commented line in `portal.env.example`) and recreate the
-portal. Then no e-mail is ever sent, the `PORTAL_SMTP_*` settings are not needed to boot, the e-mail, invite and
+**Signing in with a username and a password (the default since 2026-10-09; owner decisions 2026-10-07 for HYP AI and
+2026-10-09 for Nultron Enterprise).**
+`portal.env.example` carries `PORTAL_SIGNIN_MODE=password` uncommented, so a portal started from it signs people in
+this way. To use the e-mailed one-time code instead, set it to `code`, fill in every `PORTAL_SMTP_*` value (see
+"Sign-in mail: Tencent SES" above) and recreate the portal; deleting the line also gives `code`, because that is
+the portal's own default when the variable is absent. In `password` mode no e-mail is ever sent, the `PORTAL_SMTP_*` settings are not needed to boot, the e-mail, invite and
 code routes answer 404, and nobody signs themselves up: an operator makes each person with
 `sh scripts/portal.sh account create --username <name> --email <address> --role owner|admin|member`, which
 prints a generated initial password **once** (give it to the person; they must choose their own before the
@@ -385,7 +395,8 @@ curl -sI https://<NULTRON_DOMAIN> | grep -iE 'strict-transport|content-security|
 curl -si -X POST https://<NULTRON_DOMAIN>/api/v1/billing/webhook | head -1   # 404, from Caddy
 ```
 
-then open `https://<NULTRON_DOMAIN>`, press sign in, receive the code on a real inbox, and land on the desk.
+then open `https://<NULTRON_DOMAIN>`, press sign in, enter the first owner's username and initial password (in
+`code` mode: receive the code on a real inbox instead), choose a new password, and land on the desk.
 
 ### Things that are decided or owed here
 

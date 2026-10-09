@@ -1,6 +1,6 @@
 # Map — Chat send
 
-Last verified: 2026-10-07 at 444cb3c for the "A run that stopped early" bullet of § 3b, the two carve-outs in § 4, the header limit in § 5 and the two rows it changed in Failure modes, written after a live drive that found both and read against the working tree over that commit, not committed. Nothing else on the page was re-read. Not driven live by the agent that wrote the fix.
+Last verified: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-07 at 444cb3c for the "A run that stopped early" bullet of § 3b, the two carve-outs in § 4, the header limit in § 5 and the two rows it changed in Failure modes, written after a live drive that found both and read against the working tree over that commit, not committed. Nothing else on the page was re-read. Not driven live by the agent that wrote the fix.
 
 Last verified: 2026-10-07 at 6105c5c for § 3c (an image in the turn), written 2026-10-06 after the "image isn't reaching me" report and re-read the next day against the review fixes (6 MiB budget, row-before-bytes, refused links, the check before the turn is stored); its citations are to the working tree over that commit, not committed. The rest of the page was last verified 2026-10-03 at 0b61a29 (working tree over that commit, not committed; other lanes were editing the tree while this was read, so a line number may have moved since), and the `chat-composer.tsx` and `runs.ts` line numbers elsewhere on this page have moved by a few lines since. The Chat turn check (§ 3b) was written on 2026-09-28 at 7a42ff3 and re-read on 2026-10-05 against the merge of `origin/main` (b58383d) into its branch: § 3b and the `runs.ts` citations in § 3 steps 2 to 6 were re-derived from the merged file; the other `runs.ts:NNN` citations further down are as main left them.
 
@@ -338,6 +338,30 @@ Proof: `lib/hero-motion.test.ts` (binding, throttling, pausing and teardown agai
 | `packages/core/src/models/model-policy.ts`, `packages/core/src/runtime/effort-plan.ts`, `packages/core/src/runtime/effort-selfheal.ts` | How each model is called (wire, levels, Off), the run's effort plan, and the retry when the gateway refuses it: [`model-policy.md`](model-policy.md) |
 | `packages/core/src/models/job-thinking.ts` | The job-only effort knob Chat does not use |
 | `packages/core/src/sse.ts` | `encodeSse` |
+
+## Touches / Do not touch
+
+Read before editing. Lanes: Chat reaches Personal, Enterprise, HYP AI and the tester code; `lanes.json` lists the protected files and `pnpm lane-guard` warns on them.
+
+**Chat send owns these** (a change here refreshes this page and `features/chat.md`):
+
+- Renderer: `apps/web/components/chat-composer.tsx`, `chat-session.tsx`, `chat-turn.tsx`, `chat-launcher.tsx`, `chat-header.tsx`, `chat-hero.tsx`, `chat-key-status.tsx`, `message-embed.tsx`, `model-picker.tsx` and the folders `apps/web/components/tool-rows/`; `apps/web/lib/sse-client.ts`, `apps/web/lib/message-embeds.ts`, `apps/web/lib/picker-panel.ts`, `apps/web/lib/tool-labels.ts`.
+- Host: `packages/host/src/handlers/runs.ts`, `packages/host/src/runs.ts`, `packages/host/src/run-stall.ts`, `packages/host/src/chat-tool-events.ts`.
+- Core: `packages/core/src/agents/default-chat.ts`, `agents/chat-turn.ts`, `agents/chat-locale.ts`, `harness/modes/chat.ts`, `runtime/ai-sdk-runtime.ts`, `runtime/stream-watchdog.ts`, `runtime/retry.ts`, `models/reasoning-effort.ts`, `sse.ts` (all under `packages/core/src/`).
+- Copy: `apps/web/locales/en/chat.json` and `apps/web/locales/id/chat.json`, both in the same change.
+
+**Tester shared files.** The tester branch (`agentforge-chat`, `tester/chat-first`) also edits these, so a change on `main` can conflict at the next merge. Keep such a change small and put a `Lanes:` line in the commit message: `packages/core/src/content/types.ts`, `packages/core/src/runtime/types.ts`, `packages/core/src/agents/default-chat.ts`, `packages/core/src/harness/modes/chat.ts`, `packages/host/src/runs.ts`, `packages/host/src/register-tools.ts`, `apps/web/components/chat-composer.tsx`, `chat-turn.tsx`, `chat-session.tsx`, `app-rail.tsx`, `model-picker.tsx`, and the two `chat.json` files.
+
+**Do not touch from a Chat change** (another page owns them; go there, change them in their own PR):
+
+- `packages/host/src/http-adapter.ts`: admission, CSRF, SSE headers ([`hosted-security-controls.md`](hosted-security-controls.md)).
+- `packages/host/src/code-runner/` and `packages/host/src/file-roots.ts`: `run_code` and the file tools ([`agent-tools-and-files.md`](agent-tools-and-files.md)).
+- `packages/core/src/models/model-policy.ts`, `runtime/effort-plan.ts`, `runtime/effort-selfheal.ts`: how each model is called ([`model-policy.md`](model-policy.md)).
+- `packages/host/src/threads.ts` (`finishRun` is the race resolver) and `packages/host/src/usage-record.ts`: the one-row-per-run ledger write ([`tenant-usage-ledger.md`](tenant-usage-ledger.md)).
+- `apps/web/components/nultron/`, `apps/web/components/buddy-stage.tsx`, `apps/web/lib/desk-buddy-store.ts`: the mascot ([`mascot-and-brand.md`](mascot-and-brand.md)).
+- `apps/web/components/app-rail.tsx` and `apps/web/components/rail-*.tsx`: the rail ([`chat-sessions-and-rail.md`](chat-sessions-and-rail.md)).
+- `apps/web/lib/api-client.ts`, `apps/web/lib/desktop-bridge.ts`, `apps/desktop/preload.cjs`: the one transport switch; Personal's IPC bridge is the only reader of `window.agentforge`.
+- Brand: no `Nultron`, `Toko Token`, `TokenKu` or `HYP AI` typed into Chat prompts, error strings or copy; they read `productName` and `gatewayName`, because HYP AI imports this code.
 
 ## Gotchas
 
