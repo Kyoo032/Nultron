@@ -236,11 +236,14 @@ async function runJobAssistantOnce(options: {
   }
   const indonesian = (options.locale ?? localeForRun()) === "id";
   if (interruptedReason) {
+    // The gateway's own words stay in the log (redacted by the logger), not in the error: a "503" in this
+    // sentence would read as an unreachable gateway to `maySwapModel` and replay a job whose tools ran.
+    log.warn("job_run_interrupted", { runId, reason: interruptedReason });
     throw new ApiError(
       "generation_failed",
       indonesian
-        ? `Model berhenti setelah memakai alat dan tidak menyelesaikan jawaban (${interruptedReason}). Coba lagi atau pilih model lain.`
-        : `The model stopped after using a tool and did not finish its answer (${interruptedReason}). Try again or pick another model.`,
+        ? "Model berhenti setelah memakai alat dan tidak menyelesaikan jawaban. Coba lagi atau pilih model lain."
+        : "The model stopped after using a tool and did not finish its answer. Try again or pick another model.",
       502,
     );
   }
@@ -288,7 +291,13 @@ export async function collectJobAssistantRun(options: JobAssistantOptions): Prom
         ...options,
         model,
         onEvent: (event) => {
-          if (event.type === "assistant.delta" && event.text.length > 0) {
+          // A tool that started has acted (a desk-file write, `run_code`); replaying the job on another
+          // model would act twice, so it counts as the model having answered.
+          if (
+            (event.type === "assistant.delta" && event.text.length > 0) ||
+            event.type === "tool.started" ||
+            event.type === "tool.completed"
+          ) {
             streamed = true;
           }
           options.onEvent?.(event);

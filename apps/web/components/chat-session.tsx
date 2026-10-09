@@ -94,6 +94,8 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
   const [composerDraft, setComposerDraft] = useState<string | null>(null);
   const toolsRef = useRef(tools);
   toolsRef.current = tools;
+  const runningRef = useRef(running);
+  runningRef.current = running;
   // The desk buddy cheers when a reply lands and flinches when a send fails; with it on screen the error
   // line below draws no second Nultron.
   const buddyTakesStatus = useBuddyTakesStatus();
@@ -546,6 +548,15 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
             onSettled={() => setRunning(false)}
             onComplete={async (run) => {
               notifyThreadsChanged();
+              if (run.stale) {
+                // A newer turn began before this one's tail ran, so its streaming text, tools and Running
+                // state are not ours to reset. Its own end reloads the thread, this turn's reply included.
+                // If it never reached the host nothing is live, and this turn's saved reply is reloaded now.
+                if (!runningRef.current && run.showing && run.threadId && run.threadId === threadIdRef.current) {
+                  await refreshMessages(run.threadId).catch(() => undefined);
+                }
+                return;
+              }
               if (!run.showing) {
                 // The owner opened another session while this run streamed, and the host saved the
                 // reply. Show it only if the pane has come back to that thread since.

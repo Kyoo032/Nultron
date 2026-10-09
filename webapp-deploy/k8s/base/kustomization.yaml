@@ -51,7 +51,7 @@ configMapGenerator:
       - PORTAL_HOST=0.0.0.0
       - PORTAL_PORT=4000
       - PORTAL_DATA_DIR=/portal-data
-      # How people sign in. `password` is a username and a password with no e-mail, the HYP AI mode (owner decision,
+      # How people sign in. `password` is a username and a password with no e-mail, the white-label mode (owner decision,
       # 2026-10-07) and, since 2026-10-09, the Nultron Enterprise default. `code` is the e-mailed one-time code: set it
       # here and give an overlay a real PORTAL_SMTP_HOST. Read once at boot; any other value refuses to start. Password
       # accounts are made on the box with `sh webapp-deploy/scripts/portal.sh account` (the first owner before anyone

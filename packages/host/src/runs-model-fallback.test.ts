@@ -222,6 +222,19 @@ describe("Chat model fallback", () => {
     expect(frames.some((frame) => frame.event === "run.failed")).toBe(true);
   });
 
+  it("saves no message for a retry that also failed: the fallback line alone is not an answer", async () => {
+    const { listMessages } = await import("./threads");
+    const before = (await listMessages(tenant, threadId)).length;
+    script = async (input) => failWith(input, UNREACHABLE);
+    const frames = await postTurn({ model: DEFAULT });
+    const added = (await listMessages(tenant, threadId)).slice(before);
+    expect(added.filter((row) => row.role === "assistant")).toEqual([]);
+    expect(JSON.stringify(added)).not.toContain(STAND_IN);
+    // The person still saw the line while it happened, and the run failed normally.
+    expect(frames.some((frame) => frame.event === "run.model_fallback")).toBe(true);
+    expect(frames.filter((frame) => frame.event === "run.failed")).toHaveLength(1);
+  });
+
   it("tells the person the stand-in's failure too, and stops after one retry", async () => {
     script = async (input) => failWith(input, UNREACHABLE);
     const frames = await postTurn({ model: DEFAULT });
