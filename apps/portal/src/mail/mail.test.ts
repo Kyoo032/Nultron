@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createLogger } from "../log";
 import { translator } from "../views/i18n";
-import { createSmtpMailer, smtpTransportOptions, type MailTransport } from "./smtp";
+import { createSmtpMailer, createSmtpTransport, smtpTransportOptions, type MailTransport } from "./smtp";
 import { otpMessage } from "./templates";
 import { MailDeliveryError, recipientDomain } from "./types";
 
@@ -187,5 +187,31 @@ describe("smtpTransportOptions", () => {
     expect(options.ignoreTLS).toBe(true);
     expect(options.requireTLS).toBe(false);
     expect(options.auth).toBeUndefined();
+  });
+
+  /**
+   * An outage must fail fast. Without these, nodemailer's own defaults decide how long a sign-in
+   * request waits on a provider that is down or accepts the socket and then stalls.
+   */
+  it("fails an outage fast: 4 s to connect and to greet, 8 s of silence on the socket", () => {
+    const options = smtpTransportOptions(SMTP);
+    expect(options.connectionTimeout).toBe(4_000);
+    expect(options.greetingTimeout).toBe(4_000);
+    expect(options.socketTimeout).toBe(8_000);
+  });
+
+  it("hands the same timeouts to the nodemailer transport the portal builds", () => {
+    const transport = createSmtpTransport({
+      ...SMTP,
+      host: "smtp.example.com",
+      port: 587,
+      requireTls: true,
+      ignoreTls: false,
+    });
+    expect((transport as unknown as { options: Record<string, unknown> }).options).toMatchObject({
+      connectionTimeout: 4_000,
+      greetingTimeout: 4_000,
+      socketTimeout: 8_000,
+    });
   });
 });

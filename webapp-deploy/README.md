@@ -807,7 +807,7 @@ with `Retry-After` in whole seconds.
 |---|---|---|---|
 | Per client IP | **last** `X-Forwarded-For` hop, else the socket address | 600 rpm, burst 100 | `AGENTFORGE_RATE_IP_RPM` |
 | Per session | SHA-256 of the session cookie value, truncated - the value itself never becomes a map key or a log field. The name is the one this mode mints: `__Host-agentforge_session` in server mode | 300 rpm, burst 50 | `AGENTFORGE_RATE_SESSION_RPM` |
-| `/api/v1/auth/*` | client IP again, tighter, because each of those is a portal round trip | 30 rpm, burst 10 | `AGENTFORGE_RATE_AUTH_RPM` |
+| `/api/v1/auth/*` | client IP again, tighter, because each of those is a portal round trip | 120 rpm, burst 40 | `AGENTFORGE_RATE_AUTH_RPM` |
 
 Set a value to `0` to switch that bucket off. Junk falls back to the default: a typo in
 `.env` must not quietly remove a limit.

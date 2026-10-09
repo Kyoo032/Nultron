@@ -84,7 +84,7 @@ vi.mock("./selectable-models", async (importOriginal) => {
   };
 });
 
-const { analyzeDataset, DATA_SYSTEM } = await import("./data-generate");
+const { analyzeDataset, DATA_SYSTEM, dataSystemFor } = await import("./data-generate");
 const { SQL_STEP_CAP } = await import("./sql-tool");
 
 const tenant: TenantContext = {
@@ -274,5 +274,30 @@ describe("the instruction a Data job runs under", () => {
   it("is a router, not a manual", () => {
     expect(DATA_SYSTEM.split("\n").length).toBeLessThan(40);
     expect(DATA_SYSTEM.length).toBeLessThan(3000);
+  });
+
+  it("never mentions run_code when the run does not offer it", () => {
+    const without = dataSystemFor(["run_sql", "calculator"]);
+    expect(without).not.toContain("run_code");
+    expect(without).toContain("run_sql");
+    expect(without).toContain("calculator");
+    // Rule 3 still stands without its run_code sentences.
+    expect(without).toMatch(/Every number you report must come from a query you ran/);
+    expect(without).toMatch(/Return ONLY valid JSON/);
+    expect(dataSystemFor(["run_sql", "calculator", "run_code"])).toBe(DATA_SYSTEM);
+  });
+
+  it("offers no run_code and writes no run_code lines where code runs are off (the hosted default)", async () => {
+    vi.stubEnv("AGENTFORGE_CODE_RUNS", "off");
+    await analyzeDataset(tenant, { prompt: "Who spends most?", csv: CSV });
+    expect(asked[0]?.toolKeys).toEqual(["run_sql", "calculator"]);
+    expect(String(asked[0]?.systemPrompt)).not.toContain("run_code");
+  });
+
+  it("offers run_code and its lines together where code runs are on", async () => {
+    vi.stubEnv("AGENTFORGE_CODE_RUNS", "on");
+    await analyzeDataset(tenant, { prompt: "Who spends most?", csv: CSV });
+    expect(asked[0]?.toolKeys).toEqual(["run_sql", "calculator", "run_code"]);
+    expect(String(asked[0]?.systemPrompt)).toContain("run_code");
   });
 });

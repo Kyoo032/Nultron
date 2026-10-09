@@ -60,6 +60,8 @@ type Props = {
   onProbing?: (info: { attempt: number; attempts: number; message: string }) => void;
   /** A run ended. `showing` is false when the pane had moved to another session by then. */
   onComplete: (run: RunEnd) => Promise<void> | void;
+  /** The host reported `run.completed`; the stream itself may still be open. */
+  onSettled?: () => void;
   /**
    * The session the pane is showing; the pane changes it when the owner opens another. A run
    * remembers the key it started under, and once the key moves on it draws nothing more — its
@@ -131,6 +133,8 @@ export type RunStreamHandlers = {
     output?: unknown;
   }) => void;
   readonly onFailed?: (message: string) => void;
+  /** The host said the run is over (`run.completed`). The stream may stay open a little longer while it saves. */
+  readonly onCompleted?: () => void;
 };
 
 /** How a run ended, for `onComplete`. */
@@ -191,6 +195,9 @@ export async function readRunStream(
       if (event.type === "run.failed" && event.message) {
         handlers.onFailed?.(event.message);
       }
+      if (event.type === "run.completed") {
+        handlers.onCompleted?.();
+      }
     }
   }
 }
@@ -210,6 +217,7 @@ export function ChatComposer({
   onTool,
   onFailed,
   onComplete,
+  onSettled,
   thinkingEnabled = true,
   onThinkingChange,
   reasoningEffort = "medium",
@@ -395,6 +403,12 @@ export function ChatComposer({
       onFailed: (message) => {
         onFailed?.(message);
         setError(message);
+      },
+      // The answer is whole: free Send and the Thinking card now, not when the connection closes. The host
+      // still saves the reply and closes the stream; `finish` reloads the thread when it does.
+      onCompleted: () => {
+        setBusy(false);
+        onSettled?.();
       },
     };
     setBusy(true);

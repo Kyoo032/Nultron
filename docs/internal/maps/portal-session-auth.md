@@ -489,7 +489,7 @@ so a key-rotating attacker cannot turn the limiter into the leak
 | Bucket | Default rpm / burst | Keyed on | Env override |
 |---|---|---|---|
 | `ip` | 600 / 100 | client IP | `AGENTFORGE_RATE_IP_RPM` |
-| `auth` | **30 / 10** | client IP, only on `/api/v1/auth/` | `AGENTFORGE_RATE_AUTH_RPM` |
+| `auth` | **120 / 40** | client IP, only on `/api/v1/auth/` | `AGENTFORGE_RATE_AUTH_RPM` |
 | `session` | 300 / 50 | SHA-256 prefix of the session cookie | `AGENTFORGE_RATE_SESSION_RPM` |
 
 Defaults at `packages/host/src/rate-limit.ts:23-28`, env names at
@@ -621,7 +621,7 @@ because the portal compares the two against each other.
 | `AGENTFORGE_PORTAL_CLIENT_SECRET` | the same | Its secret. Host process only; never logged, never in an error. |
 | `AGENTFORGE_PUBLIC_URL` | `publicBaseUrl` (`packages/host/src/auth/portal-config.ts:84`) | The origin the browser reaches this deployment on. Defaults to `trustedOrigins(env)[0]`. |
 | `AGENTFORGE_TRUSTED_ORIGINS` | `trustedOrigins` (`packages/core/src/server-mode.ts:52`) | The allowlist, and the default public base. |
-| `AGENTFORGE_RATE_AUTH_RPM` | `rateLimitConfig` (`packages/host/src/rate-limit.ts:165`), name at `:32` | The tight auth bucket, 30/10 by default. |
+| `AGENTFORGE_RATE_AUTH_RPM` | `rateLimitConfig` (`packages/host/src/rate-limit.ts:165`), name at `:32` | The tight auth bucket, 120/40 by default. |
 
 All seven are documented in `webapp-deploy/.env.example`, which is lane H's file, not this one's.
 

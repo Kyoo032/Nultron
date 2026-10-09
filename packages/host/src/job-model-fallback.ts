@@ -124,7 +124,7 @@ function availableIds(options: JobModelFallbackOptions): string[] {
   return options.availableModelIds ?? listSelectableModels(options.tenant).map((model) => model.id);
 }
 
-function pickNext(options: JobModelFallbackOptions, current: string, now: number): string | undefined {
+export function pickNext(options: JobModelFallbackOptions, current: string, now: number): string | undefined {
   if (options.modelExplicit === true) {
     return undefined;
   }
@@ -137,14 +137,14 @@ function pickNext(options: JobModelFallbackOptions, current: string, now: number
 }
 
 /** A model the circuit already saw fail is skipped before the first attempt, not after it. */
-function startModel(options: JobModelFallbackOptions, now: number): string {
+export function startModel(options: JobModelFallbackOptions, now: number): string {
   if (!isJobModelDown(options.model, now)) {
     return options.model;
   }
   return pickNext(options, options.model, now) ?? options.model;
 }
 
-function maySwapModel(
+export function maySwapModel(
   failure: { error: unknown; streamed: boolean },
   options: JobModelFallbackOptions,
 ): boolean {

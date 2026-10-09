@@ -28,6 +28,9 @@ type ExecuteInput = Parameters<AgentRuntime["execute"]>[0];
 const executed: ExecuteInput[] = [];
 /** Models the fake gateway cannot reach, with the sentence the live gateway returned on 2026-09-17. */
 const unreachable = new Set<string>();
+/** Models whose fake run ends quietly the way the real runtime does: after a tool, or at the step cap. */
+const interruptedModels = new Set<string>();
+const stepLimitModels = new Set<string>();
 /** Models whose call stays in flight until the run's signal fires, as a slow gateway's would. */
 const inFlight = new Set<string>();
 /** What each in-flight call saw on its signal when it woke. */
@@ -88,6 +91,16 @@ vi.mock("@agentforge/core", async (importOriginal) => {
           } as Parameters<typeof input.onEvent>[0]);
           return;
         }
+        if (interruptedModels.has(model)) {
+          await input.onEvent({ type: "run.interrupted", message: "status_code=503" });
+          await input.onEvent({ type: "run.completed", runId: input.runId });
+          return;
+        }
+        if (stepLimitModels.has(model)) {
+          await input.onEvent({ type: "run.step_limit", steps: 4 });
+          await input.onEvent({ type: "run.completed", runId: input.runId });
+          return;
+        }
         await input.onEvent({ type: "assistant.delta", text: "hello" });
         if (reportsUsage.has(model)) {
           await input.onEvent({
@@ -125,6 +138,28 @@ describe("collectJobAssistantText", () => {
     versionId: "market-briefing",
     prompt: "draft",
   };
+
+  it("fails a job whose follow-up call broke after a tool, instead of returning an empty answer", async () => {
+    interruptedModels.add("deepseek-v4-flash");
+    try {
+      await expect(collectJobAssistantText({ ...base, modelExplicit: true })).rejects.toMatchObject({
+        code: "generation_failed",
+      });
+    } finally {
+      interruptedModels.clear();
+    }
+  });
+
+  it("fails a job that spent its step cap without writing anything", async () => {
+    stepLimitModels.add("deepseek-v4-flash");
+    try {
+      await expect(collectJobAssistantText({ ...base, modelExplicit: true })).rejects.toMatchObject({
+        code: "generation_failed",
+      });
+    } finally {
+      stepLimitModels.clear();
+    }
+  });
 
   it("forwards a per-run streamWatchdog override into the runtime run input", async () => {
     const text = await collectJobAssistantText({ ...base, streamWatchdog: { ttfbMs: 180_000, idleMs: 150_000 } });

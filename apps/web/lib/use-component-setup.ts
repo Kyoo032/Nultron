@@ -46,6 +46,10 @@ export function useComponentSetup(): ComponentSetupView {
   const [setup, setSetup] = useState<SetupState>(EMPTY_SETUP);
   const [alreadyRunning, setAlreadyRunning] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  // Once the run is done the panel steps away after a few seconds. `visible` follows it, so the section the
+  // panel sits in is not left as an empty box.
+  const [collapsed, setCollapsed] = useState(false);
+  const finished = setup.status === "done";
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: `attempt` is the Retry trigger, so bumping it is exactly how this effect is asked to run again
   useEffect(() => {
@@ -114,6 +118,14 @@ export function useComponentSetup(): ComponentSetupView {
     };
   }, [attempt]);
 
+  useEffect(() => {
+    if (!finished) {
+      return;
+    }
+    const timer = window.setTimeout(() => setCollapsed(true), 4000);
+    return () => window.clearTimeout(timer);
+  }, [finished]);
+
   const retry = useCallback(() => {
     setSetup(EMPTY_SETUP);
     setAlreadyRunning(false);
@@ -123,5 +135,5 @@ export function useComponentSetup(): ComponentSetupView {
   // The desk buddy charges while the install runs and cheers or flinches when it ends, with or without a panel.
   useBuddyStatus(componentSetupMascot(setup.status), setup.status === "running");
 
-  return { component, setup, alreadyRunning, visible: component !== null, retry };
+  return { component, setup, alreadyRunning, visible: component !== null && !collapsed, retry };
 }

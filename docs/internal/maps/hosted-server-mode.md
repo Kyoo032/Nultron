@@ -116,7 +116,7 @@ Every rejection message is fixed text that never echoes any part of the request 
 | Bucket | Keyed on | Default rpm / burst | Env override |
 |---|---|---|---|
 | `ip` | client IP | 600 / 100 | `AGENTFORGE_RATE_IP_RPM` (`:30`) |
-| `auth` | client IP, only for paths under `/api/v1/auth/` | 30 / 10 | `AGENTFORGE_RATE_AUTH_RPM` (`:32`) |
+| `auth` | client IP, only for paths under `/api/v1/auth/` | 120 / 40 | `AGENTFORGE_RATE_AUTH_RPM` (`:32`) |
 | `session` | SHA-256 of the session cookie, first 32 hex chars | 300 / 50 | `AGENTFORGE_RATE_SESSION_RPM` (`:31`) |
 
 Defaults at `:23-28`; `AUTH_PATH_PREFIX` at `:38`; `sessionRateKey` at `:147-153` (`SESSION_KEY_HEX_LENGTH = 32`, `:41`) — a session cookie never becomes a map key in the clear. `isAuthPath` at `:155-157`.

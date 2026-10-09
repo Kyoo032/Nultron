@@ -69,6 +69,8 @@ export type ChatTurnCopy = {
    * and what to send. The tool steps are kept in the turn, so it says they ran and does not offer a redo.
    */
   interrupted: string;
+  /** The model asked for could not be reached before it answered, so the turn ran on another (`{from}`, `{to}`). */
+  modelFallback: string;
 };
 
 const CHAT_TURN_COPY: Record<AppLocale, ChatTurnCopy> = {
@@ -85,6 +87,7 @@ const CHAT_TURN_COPY: Record<AppLocale, ChatTurnCopy> = {
       "I ran out of steps before I could finish this. Ask me to continue and I will pick up from where I stopped.",
     interrupted:
       'The tool steps above ran, but I could not finish the answer.\n\nReason: {reason}\n\nSend "continue" and I will try again.',
+    modelFallback: "{from} is unavailable; used {to} for this answer.",
   },
   id: {
     thinkPast: "Saya akan meninjau percakapan sebelumnya, lalu menjawab dari yang saya temukan.",
@@ -99,6 +102,7 @@ const CHAT_TURN_COPY: Record<AppLocale, ChatTurnCopy> = {
       "Langkah kerja saya habis sebelum ini selesai. Minta saya untuk melanjutkan, dan saya akan meneruskannya dari titik terakhir.",
     interrupted:
       'Langkah alat di atas sudah berjalan, tetapi saya tidak dapat menyelesaikan jawabannya.\n\nAlasan: {reason}\n\nKirim "lanjutkan" dan saya akan mencoba lagi.',
+    modelFallback: "{from} tidak tersedia; menggunakan {to} untuk jawaban ini.",
   },
 };
 

@@ -31,6 +31,8 @@ type Props = {
    * so a pane that is not given it (the Personal app) renders exactly as it always did.
    */
   needsKey?: boolean;
+  /** The last turn's note, such as an interrupted run's sentence. Nothing is drawn when it is empty. */
+  note?: string | null;
 };
 
 export function EditAgentPanel({
@@ -52,6 +54,7 @@ export function EditAgentPanel({
   onPlace,
   onDiscard,
   needsKey = false,
+  note = null,
 }: Props) {
   const [text, setText] = useState("");
   const spent = turnSpendUsd(cards, jobs);
@@ -100,6 +103,11 @@ export function EditAgentPanel({
         needsKey={needsKey}
       />
       <EditTray items={unplaced} onPlace={onPlace} onDiscard={onDiscard} />
+      {note ? (
+        <p className="px-3 pt-2 text-xs text-[var(--text-2)]" data-testid="edit-agent-note" role="status">
+          {note}
+        </p>
+      ) : null}
       <form className="border-t border-[var(--line)] p-2" onSubmit={onSubmit}>
         {needsKey ? (
           <NeedsKeyNote

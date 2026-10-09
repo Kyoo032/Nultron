@@ -10,6 +10,7 @@ import { isOpenRouterBaseUrl } from "../privacy/openrouter";
 import { getDisabledTools } from "../tools/secret-scope";
 import { mapStreamPart } from "./stream-parts";
 import { buildAiTools, type AiToolSet } from "./ai-tools";
+import { createToolCallRepair, isInvalidToolCallEvent, withInvalidToolCall } from "./tool-call-repair";
 import { createStepTracker } from "./step-tracker";
 import { createEgressGuard, userTextOf } from "./egress-guard";
 import { createToolBudget, resolveMaxSteps } from "./tool-budget";
@@ -688,8 +689,9 @@ export class AiSdkRuntime implements AgentRuntime {
     const locale = parseAppLocale(input.locale);
     const watchdog = armStreamWatchdog(input.version.model, abort, input.streamWatchdog, Date.now, locale);
     const maxSteps = resolveMaxSteps(input.budget);
-    // Tools the run holds but does not offer (a disabled one) stay out of the list the model is given.
-    const hidesSome = tools !== undefined && tools.offered.length < Object.keys(tools.tools).length;
+    // Tools the run holds but does not offer (a disabled one, and the correction tool for a refused call)
+    // stay out of the list the model is given. A call the SDK cannot parse comes back to the model as a
+    // result instead of ending the turn (`tool-call-repair.ts`).
     const result = streamText({
       model,
       messages,
@@ -698,9 +700,10 @@ export class AiSdkRuntime implements AgentRuntime {
       maxRetries: 0,
       ...(tools
         ? {
-            tools: tools.tools,
+            tools: withInvalidToolCall(tools.tools),
             maxSteps,
-            ...(hidesSome ? { experimental_activeTools: tools.offered } : {}),
+            experimental_activeTools: tools.offered,
+            experimental_repairToolCall: createToolCallRepair(tools.offered),
           }
         : {}),
       ...(providerOptions ? { providerOptions } : {}),
@@ -725,7 +728,7 @@ export class AiSdkRuntime implements AgentRuntime {
       for await (const part of watchAsyncIterable(result.fullStream, abort, () => watchdog.touch(), locale)) {
         steps.observe(part);
         const event = mapStreamPart(part);
-        if (!event) {
+        if (!event || isInvalidToolCallEvent(event)) {
           continue;
         }
         // Only a mapped part is the model working. The SDK opens every stream with a `step-start`

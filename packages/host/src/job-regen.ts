@@ -178,6 +178,10 @@ async function runJobAssistantOnce(options: {
 
   let assistantText = "";
   let failedMessage = "";
+  // The runtime ends a tool run quietly in two cases a job must not swallow: the call after a tool failed
+  // (`run.interrupted`) and the step cap cut the loop (`run.step_limit`). Chat words both; a job fails.
+  let interruptedReason = "";
+  let stepLimitReached = false;
   const parts: ContentPart[] = [{ type: "text", text: options.prompt }, ...imageParts];
   // The mode's declared harness: its tool set bounds the bindings and its budget bounds the run. A call
   // that names no `jobMode` is not a studio run and keeps what it asked for.
@@ -215,6 +219,12 @@ async function runJobAssistantOnce(options: {
         if (event.type === "run.failed") {
           failedMessage = event.message;
         }
+        if (event.type === "run.interrupted") {
+          interruptedReason = event.message.trim().slice(0, 300) || "interrupted";
+        }
+        if (event.type === "run.step_limit") {
+          stepLimitReached = true;
+        }
         options.onEvent?.(event);
         rememberJobUsage(event, { tenant: options.tenant, mode: usageMode, runId });
       },
@@ -223,6 +233,25 @@ async function runJobAssistantOnce(options: {
 
   if (failedMessage) {
     throw new ApiError("generation_failed", failedMessage, 502);
+  }
+  const indonesian = (options.locale ?? localeForRun()) === "id";
+  if (interruptedReason) {
+    throw new ApiError(
+      "generation_failed",
+      indonesian
+        ? `Model berhenti setelah memakai alat dan tidak menyelesaikan jawaban (${interruptedReason}). Coba lagi atau pilih model lain.`
+        : `The model stopped after using a tool and did not finish its answer (${interruptedReason}). Try again or pick another model.`,
+      502,
+    );
+  }
+  if (stepLimitReached && assistantText.trim().length === 0) {
+    throw new ApiError(
+      "generation_failed",
+      indonesian
+        ? "Model memakai semua langkah alatnya tanpa menulis jawaban. Coba lagi dengan permintaan yang lebih sempit."
+        : "The model used all of its tool steps without writing an answer. Try again with a narrower request.",
+      502,
+    );
   }
   return assistantText;
 }

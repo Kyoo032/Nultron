@@ -246,6 +246,7 @@ export {
   thinkingTextFromParts,
   toolCallsFromParts,
   modelHistoryParts,
+  toolResultNote,
   hasModelVisibleContent,
 } from "./content/transcript";
 export {

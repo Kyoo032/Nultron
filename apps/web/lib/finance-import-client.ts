@@ -4,6 +4,7 @@ import {
   FINANCE_IMPORT_MAX_SHEETS,
 } from "@agentforge/core/finance";
 import { apiFetch } from "./api-client";
+import { messageUnlessBlocked } from "./gateway-blocked";
 import { mergeFigures } from "./finance-brief";
 import {
   parseFinancePii,
@@ -63,14 +64,21 @@ export function financeImportFileAllowed(filename: string): boolean {
   return EXTENSIONS.some((extension) => lower.endsWith(extension));
 }
 
+/**
+ * The import route is not gated (`handlers/finance-import.ts`), so a `gateway_blocked` cannot come from
+ * it today. It still reads the flat body as the needs-key sentence, so the Finance contract holds if
+ * that ever changes.
+ */
 function errorMessage(payload: unknown, fallback: string): string {
-  if (payload && typeof payload === "object") {
-    const error = (payload as { error?: { message?: unknown } }).error;
-    if (error && typeof error.message === "string" && error.message.trim()) {
-      return error.message;
+  return messageUnlessBlocked(payload, () => {
+    if (payload && typeof payload === "object") {
+      const error = (payload as { error?: { message?: unknown } }).error;
+      if (error && typeof error.message === "string" && error.message.trim()) {
+        return error.message;
+      }
     }
-  }
-  return fallback;
+    return fallback;
+  });
 }
 
 function sheetsFrom(value: unknown): FinanceImportSheet[] {

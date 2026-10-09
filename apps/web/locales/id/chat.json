@@ -329,6 +329,7 @@
     "pastMany": "Percakapan sebelumnya mencakup \"{title}\".",
     "noSource": "Meja ini tidak punya sumber untuk itu.",
     "stepLimit": "Langkah kerja saya habis sebelum ini selesai. Minta saya untuk melanjutkan, dan saya akan meneruskannya dari titik terakhir.",
-    "interrupted": "Langkah alat di atas sudah berjalan, tetapi saya tidak dapat menyelesaikan jawabannya.\n\nAlasan: {reason}\n\nKirim \"lanjutkan\" dan saya akan mencoba lagi."
+    "interrupted": "Langkah alat di atas sudah berjalan, tetapi saya tidak dapat menyelesaikan jawabannya.\n\nAlasan: {reason}\n\nKirim \"lanjutkan\" dan saya akan mencoba lagi.",
+    "modelFallback": "{from} tidak tersedia; menggunakan {to} untuk jawaban ini."
   }
 }

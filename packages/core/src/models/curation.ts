@@ -25,7 +25,7 @@ const BRAND_WORDS: Readonly<Record<string, string>> = {
 };
 
 /** Words an id spells in lower case that are read in capitals: a family, a task, a format. */
-const ACRONYMS: ReadonlySet<string> = new Set(["ai", "glm", "gpt", "hd", "it", "llm", "mt", "ocr", "tts", "vl"]);
+const ACRONYMS: ReadonlySet<string> = new Set(["ai", "glm", "gpt", "hd", "it", "llm", "mt", "ocr", "oss", "tts", "vl"]);
 
 /** `120b`, `128k`, `1m`: a size, written with its unit in capitals. `a3b` is an expert layout's active size. */
 const SIZE_TOKEN = /^(?:\d+(?:\.\d+)?[bkm]|a\d+b)$/i;

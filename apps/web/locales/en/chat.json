@@ -329,6 +329,7 @@
     "pastMany": "Earlier chats include \"{title}\".",
     "noSource": "This desk did not have a source for that.",
     "stepLimit": "I ran out of steps before I could finish this. Ask me to continue and I will pick up from where I stopped.",
-    "interrupted": "The tool steps above ran, but I could not finish the answer.\n\nReason: {reason}\n\nSend \"continue\" and I will try again."
+    "interrupted": "The tool steps above ran, but I could not finish the answer.\n\nReason: {reason}\n\nSend \"continue\" and I will try again.",
+    "modelFallback": "{from} is unavailable; used {to} for this answer."
   }
 }

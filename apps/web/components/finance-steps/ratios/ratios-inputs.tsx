@@ -10,8 +10,10 @@
 import { useState } from "react";
 import type { RatioBucket } from "@agentforge/core/finance";
 import { FinanceFileUpload } from "@/components/finance-file-upload";
+import { NeedsKeyNote } from "@/components/needs-key-note";
 import { mergeFigures } from "@/lib/finance-brief";
 import type { FinanceParams, LineItem } from "@/lib/finance-client";
+import { isGatewayBlockedText } from "@/lib/gateway-blocked";
 import { parseRatiosStatement, type RatiosParsed } from "@/lib/finance-ratios-client";
 import {
   ratiosBalance,
@@ -63,6 +65,8 @@ export function RatiosInputs({ locked, model, draft, setDraft }: FinanceStepProp
   const readPeriod = ratiosReadPeriod(ratios.items, ratios.params);
   const unplaced = unplacedCount(rows, changes);
   const busy = locked || reading;
+  // A refused read is the needs-key sentence: its calm note with a Settings link stands in for the error.
+  const keyRefused = isGatewayBlockedText(error);
 
   function onBucket(row: RatiosClassifiedRow, bucket: RatioBucket): void {
     const next = withBucketChange(changes, row, bucket);
@@ -122,11 +126,12 @@ export function RatiosInputs({ locked, model, draft, setDraft }: FinanceStepProp
         />
         <p className="mt-1 text-xs text-[var(--text-3)]">{t("finance.ratios.parseHint")}</p>
       </div>
-      {error ? (
+      {error && !keyRefused ? (
         <p className="text-sm text-[var(--danger)]" role="alert" data-testid="finance-ratios-error">
           {error}
         </p>
       ) : null}
+      {keyRefused ? <NeedsKeyNote testId="finance-ratios-needs-key" className="text-sm text-[var(--text-2)]" /> : null}
       {parsed ? (
         <p className="text-xs text-[var(--text-2)]" data-testid="finance-ratios-read">
           {t("finance.ratios.readCount", { rows: parsed.items.length, periods: parsed.periods.length })}

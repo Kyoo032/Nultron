@@ -150,3 +150,18 @@ describe("readRunStream", () => {
     expect(activity).toBe(2);
   });
 });
+
+describe("run.completed", () => {
+  it("tells the pane the run is over before the stream closes, and still reads to the end", async () => {
+    const { stream, state } = body([frame("assistant.delta", { text: "hi" }), frame("run.completed", { runId: "r" })]);
+    const seen: string[] = [];
+    await readRunStream(stream, {
+      onDelta: (text) => seen.push(`delta:${text}`),
+      onCompleted: () => seen.push(`completed:pulled=${state.pulled}`),
+    });
+    expect(seen[0]).toBe("delta:hi");
+    // Heard on the second chunk, before the read that sees the stream end.
+    expect(seen[1]).toBe("completed:pulled=2");
+    expect(state.cancelled).toBe(false);
+  });
+});

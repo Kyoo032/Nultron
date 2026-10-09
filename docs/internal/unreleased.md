@@ -54,6 +54,32 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Friday update, 2026-10-09: bug findings batch (both products; Rizky, 2026-10-08)
+
+Rizky's call on 2026-10-08: HYP AI is live and working, so the focus is bug findings. Everything found from now on is collected here and released together on Friday 2026-10-09. **Nothing here goes to production before then** (no image to the Nultron preview, no new HYP AI bundle on 43.173.26.50, no installer). Each fix lands on `main` first and is merged one way into the tester code (`agentforge-chat`, `tester/chat-first`) in the same session, per the two-codes rule. HYP AI picks the batch up through a re-synced clone (`hypey\app-sync`) and a new bundle on Friday.
+
+| # | Finding | Where seen | Status |
+|---|---|---|---|
+| F1 | Chat: after the answer has landed as a message, a second "Thinking…" card (`thinking-placeholder`, `apps/web/components/chat-turn.tsx:74`) keeps pulsing under it and never ends. Seen on a phone in Chrome, Claude Sonnet 5.5, Normal. The app log shows only `knowledge_embed_unavailable … embeddings 400` on each run (the TokenKu key has no embeddings). | HYP AI live (`517d24d`), 2026-10-08 13:26 | investigating |
+
+### Friday batch, fixes in the tree (2026-10-08; uncommitted, tested, none driven in a browser or on a server)
+
+Source: the bug-finding review of 2026-10-08. Hosted = Nultron Enterprise and HYP AI; Both = Personal as well.
+
+- **Chat stays on Thinking, Send disabled (Hosted; F1).** `readRunStream` waited for the connection to close, and the host closes it only after saving the reply. The renderer now frees Send and the Thinking card on `run.completed` (`onCompleted`/`onSettled`, `chat-composer.tsx`, `chat-session.tsx`); the stream is still read to the end. Test in `chat-run-stream.test.ts`. Owed: a drive on HYP AI from a phone. If it still sticks there, the next suspect is Cloudflare holding the SSE connection.
+- **Jobs ended silently (Both).** `run.interrupted` and `run.step_limit` are no longer dropped in `job-regen.ts`: an interrupted job fails with a sentence (en/id); a step-limit job with no text fails likewise. Tests in `job-regen.test.ts`.
+- **"continue" re-ran tools (Both).** The latest assistant turn now carries a short note of its completed tool results (`toolResultNote`, `packages/core/src/content/transcript.ts`, used in `runs.ts`). Older turns stay text only.
+- **Chat model fallback (Both).** The default model, on a transport-class failure before any output, is retried once on the next live model (never for a pinned or non-default model; same gateway). New SSE `run.model_fallback`; the renderer shows only the thinking line so far.
+- **Invalid or unbound tool call ended the run (Both).** Repaired through the SDK hook into a hidden `invalid_tool_call` tool the model reads, so the loop continues (`tool-call-repair.ts`).
+- **Data job named `run_code` where it is off (Hosted).** The instruction mentions it only when the tool is offered (`dataSystemFor`).
+- **Sign-in rate limit (Hosted).** Auth bucket 30/10 -> 120/40 per address (`rate-limit.ts`; env overrides unchanged). **Open, needs Rizky:** behind Cloudflare the limiter keys on the last hop, which is Cloudflare's edge address, so users on one edge share a bucket (the portal limits too). The fix would be trusting `CF-Connecting-IP` from verified Cloudflare ranges, a trust change not made here. Rizky (2026-10-09): the sites now connect straight to the Tencent box, and HYP AI may leave Cloudflare, which makes this moot; do not build the trust change unless Cloudflare stays.
+- **Portal and deploy.** SMTP timeouts 4/4/8 s so a mail outage fails fast; `PORTAL_SIGNIN_MODE=code` in the k8s base; the flaky "simultaneous creates" test made deterministic; the local rehearsal Mailpit restarts (`webapp-deploy/compose.local.yml`, was `restart: "no"`). The "already sent a code after a failed send" finding was already fixed (the row is retired on failure).
+- **Edit agent.** The renderer shows a sentence on `run.interrupted`; agent tool events are redacted; failed silence/scene probes are logged. Harness and stub tool events still stream raw.
+- **Finance on a closed gate (Hosted).** The flat `gateway_blocked` answer is read, and each step shows the needs-key note with a Settings link. Ratios and budget parse are gated by the host but treated as keyless by the UI (`handlers/finance.ts:52`): left as is.
+- **Smaller.** Chat's Knowledge card indexes the model's own text, not the host's closing sentence (a turn with no model words no longer makes a card); the empty box above the key form after a component install; "GPT OSS 120B" label; dead locale key `auth.account.tenant` removed.
+- **Not changed, needs Rizky:** SR-157 (colleague's media readable by id) and SR-158 (any member can create or rename a desk) are owner decisions; Chat thread titles stay set on turn 1 only (by design); Finance 1 px scroll drift (cause not found, `BuddyStage` is the only lead, needs a live measurement).
+- **Owed before it ships Friday:** drive on `:3000` after a restart, the two-codes merge into `agentforge-chat`, and a Personal-parity check of the Chat fallback. `ci:local` result: see the PR table.
+
 ## Hosted: the gateway check is per company, not per partner, 2026-10-07 (Enterprise; fixed in the tree on `feat/hosted-run-limits`, not committed, not driven on a hosted server)
 
 - **What a company saw.** On a hosted server, after company B saved a gateway key that differed from company A's, A's next Chat turn answered `403 gateway_blocked`. Reproduced on `main` as `gateway-gate-companies.test.ts` ("lets both companies chat after each has saved a different key the gateway accepts"): A's turn answered 403 with B's key accepted by the gateway. A variant with B's key rejected closed A as well.
@@ -261,3 +287,13 @@ Plan: [`doc-flow-plan.md`](doc-flow-plan.md). Branch `feat/doc-flow-2026-10-05`,
   - L6 not done: `core/harness/modes/{legal,meeting}` skills, the `harness-judges` map page and the other maps, verify recipes, register rows for `extract.json` / `asks.json` / `extract-edits.json`, and the decisions TSV.
   - Not driven on webdev or a packed app, and no live gateway call was made. PDF on the packed Personal app depends on anydoc or the pdfjs fallback, which has not been run on an installer.
 - **Merge note:** `apps/web/lib/key-later-wiring.test.ts` now checks `lib/meeting-request.ts` for the hosted-403 mapping, because the doc-flow Meeting screen moved `errorMessage` out of `meeting-studio.tsx`.
+
+## Edit agent stream, probe logging, Chat card and onboarding setup check, 2026-10-08 (fixed in the tree)
+
+- **Edit agent: an interrupted run said nothing.** The studio dropped `run.interrupted`. It now shows one sentence above the Edit composer (`edit-agent-note`, `edit.agent.interrupted` in en and id), cleared when the next turn starts (`apps/web/lib/edit-agent-note.ts`, `apps/web/components/edit-studio.tsx`).
+- **Edit agent: the stream carried tool input and output unredacted.** `screenEvent` in `packages/host/src/edit/agent-run.ts` sends the copy `redactToolEvent` makes, the way Chat does. A failure's own words (`run.failed`, `run.interrupted`) are masked too. The tool frames are read from the same copy.
+- **Edit probes failed silently.** `probeSilence` and `probeScenes` (`packages/host/src/edit/harness-run.ts`) logged nothing when a probe threw. They now log `edit_silence_probe_failed` or `edit_scene_probe_failed` with the attempt and the redacted message, and keep the same fallback.
+- **Onboarding: an empty box above the key form after an install.** The 4-second collapse lived in the panel, so the Setup check section stayed on screen after the panel had drawn nothing. The collapse moved into `useComponentSetup`, and `visible` is now `component !== null && !collapsed` (`apps/web/lib/use-component-setup.ts`).
+- **Chat Knowledge card indexed the host's own sentence.** `packages/host/src/runs.ts` builds the card from `modelAnswer`, the model's words captured before `settleChatTurn` adds the step-limit or interrupted sentence. Decision for Rizky: a turn where the model wrote no words now writes no card. Before, a tool sentence such as "2 + 3 = 5" was indexed.
+- **Open:** the harness and stub paths in `harness-run.ts` (`invoke`) and `agent-run.ts` (`runStub`) still push their own tool events raw. The harness passes the owner's text into some tools (for example "words on the picture"), so a pasted key can reach that stream.
+- **Tests:** `apps/web/lib/edit-agent-note.test.tsx`, `apps/web/lib/component-setup-wiring.test.ts` (the collapse pins moved to the hook), `packages/host/src/edit/agent-stream-redact.test.ts`, `packages/host/src/edit/harness-probe-failure.test.ts`, and a new describe in `packages/host/src/runs-resilience.test.ts` that spies on `chatWorkCard`.
