@@ -165,8 +165,14 @@ people in with an e-mailed one-time code instead, set \`PORTAL_SIGNIN_MODE=code\
 portal, and create people with the portal's \`invite\` script instead of \`account\`. The two values are exactly
 \`password\` and \`code\`; anything else stops the portal at boot.
 
+**Already running in \`code\` mode?** An update never touches your \`portal.env\`, so the mode stays as you set it. If
+you choose to switch to \`password\`, create an account for everyone first (\`account.ts create\`): a person who was only
+invited, or seeded under \`code\` mode, has no password and cannot sign in until one exists, and \`create\` refuses a
+person still in \`invited\` status, so finish their invite first.
+
 Back up the \`nultron-data\` and \`portal-pgdata\` volumes before an upgrade: the databases migrate forward only. To
-roll back, check out the previous release tag of this repo and repeat steps 6 onward.
+roll back, check out the previous release tag of this repo and repeat step 6 (the accounts from step 7 already exist,
+and \`account create\` refuses to run twice for the same person).
 
 ${extraSections()}`;
 }

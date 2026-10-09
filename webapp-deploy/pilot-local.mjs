@@ -81,6 +81,8 @@ export function localEnvValues(existing = {}, makeSecret = (bytes) => randomByte
       PORTAL_SIGNING_KEY: keep("PORTAL_SIGNING_KEY", () => makeSecret(32)),
       PORTAL_POSTGRES_PASSWORD: keep("PORTAL_POSTGRES_PASSWORD", () => makeSecret(24)),
       PORTAL_APP_DB_PASSWORD: keep("PORTAL_APP_DB_PASSWORD", () => makeSecret(24)),
+      // This rehearsal drives the e-mailed code through Mailpit, so it pins `code` instead of leaning on the default.
+      PORTAL_SIGNIN_MODE: "code",
       // Mailpit speaks implicit TLS from the first byte, like SES on 465: the portal is configured as in production.
       PORTAL_SMTP_HOST: "mailpit",
       PORTAL_SMTP_PORT: "1025",

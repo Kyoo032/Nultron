@@ -264,7 +264,7 @@ export function portalEnvExample() {
       ["PORTAL_APP_DB_PASSWORD", "Password of portal_app_login, the role the portal serves as. Not the same value."],
       [
         "PORTAL_SIGNIN_MODE",
-        "How people sign in. password (the default in this bundle) signs people in with a username and a password an operator creates with the portal's account command (DEPLOY.md, step 5): no mail is sent, so the SMTP settings below may stay blank. code e-mails a one-time code instead, so set it to code and fill in every SMTP setting below. Anything else stops the portal at boot.",
+        "How people sign in. password (the default in this bundle) signs people in with a username and a password an operator creates with the portal's account command (DEPLOY.md, step 7): no mail is sent, so the SMTP settings below may stay blank. code e-mails a one-time code instead, so set it to code and fill in every SMTP setting below. Anything else stops the portal at boot.",
       ],
       ["PORTAL_SMTP_HOST", "Tencent Cloud SES, International site. smtp.qcloudmail.com is the Hong Kong (China site) host."],
       ["PORTAL_SMTP_PORT", "465, implicit TLS. SES documents no other SMTP port."],
