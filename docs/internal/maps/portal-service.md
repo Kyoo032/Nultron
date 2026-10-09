@@ -372,8 +372,8 @@ listens, and a production process refuses to boot as anything that can see past 
 ### 8. Password sign-in: the second way in (`PORTAL_SIGNIN_MODE=password`, 2026-10-07)
 
 Owner decision for the HYP AI deployment (Rizky, 2026-10-07: username and password in place of the e-mailed
-code, 2FA being designed). **It is a mode, chosen once at boot, and the default is the sign-in described in
-sections 2 and 3, unchanged.** The full account of it, the routes, the storage, the lockout and what is not
+code, 2FA being designed). **It is a mode, chosen once at boot, and the portal's own default (variable absent) is the sign-in described in
+sections 2 and 3, unchanged. The Nultron Enterprise bundle sets this mode explicitly since 2026-10-09.** The full account of it, the routes, the storage, the lockout and what is not
 built, is [`../portal/device-code-login.md`](../portal/device-code-login.md), "Password sign-in". What this
 page adds is where it plugs in and what to be careful of.
 
@@ -770,8 +770,9 @@ database; `teardown-local.mjs` removes it.
 - **No password, by default; one mode has one.** `[Direct]` `docs/internal/portal/device-code-login.md:132` gives
   four reasons, the first being that a password database for four whitelabel partners with no shared
   IdP is the worst asset to hold. The owner lifted that for one mode on 2026-10-07
-  (`PORTAL_SIGNIN_MODE=password`, HYP AI; "2FA method being designed"), so the default sign-in still has none
-  and the other hosted product is unchanged. See section 8 and [SR-165](../security-register.md#sr-165).
+  (`PORTAL_SIGNIN_MODE=password`, HYP AI; "2FA method being designed"), so the portal's own default sign-in still has none.
+  Since 2026-10-09 the Nultron Enterprise release bundle selects the password mode explicitly (its templates and
+  `DEPLOY.md`, not this code), so its deployments run it too; `code` stays selectable. See section 8 and [SR-165](../security-register.md#sr-165).
 - **A signed cookie for the portal's own session rather than a table.** `[Inferred]` No doc states
   it. The store contract (`apps/portal/src/store/types.ts`) has no browser-session table and
   belongs to another lane, so a migration adding one would have had no code path able to write to

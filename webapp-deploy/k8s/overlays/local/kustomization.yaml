@@ -33,6 +33,9 @@ configMapGenerator:
     behavior: merge
     literals:
       - PORTAL_PUBLIC_URL=https://portal.nultron.localhost:8443
+      # The rehearsal drives the e-mailed code through Mailpit, so it stays on `code`. The base default is
+      # `password` (Nultron Enterprise, 2026-10-09); production does not set this and gets the base value.
+      - PORTAL_SIGNIN_MODE=code
       - PORTAL_SMTP_HOST=mailpit
       - PORTAL_SMTP_PORT=1025
       - PORTAL_SMTP_FROM=Nultron local <no-reply@nultron.localhost>
