@@ -144,6 +144,11 @@ export type RunEnd = {
   readonly threadId: string | null;
   /** False when the pane had moved to another session by the time the run ended. */
   readonly showing: boolean;
+  /**
+   * True when a newer send began before this run's tail ran. The pane must not reset its live state for
+   * it (the newer turn owns that); it may still reload the thread if no newer turn is live.
+   */
+  readonly stale?: boolean;
 };
 
 /**
@@ -388,16 +393,12 @@ export function ChatComposer({
     const typed = text;
     const attached = files;
     let runThread: string | null = null;
-    const finish = async () => {
-      if (!isCurrentRun()) {
-        // A newer turn is live. Its own end reloads the thread, with this turn's saved reply in it; this
-        // tail would clear the newer turn's streaming text and tools.
-        return;
-      }
-      await onComplete({ threadId: runThread, showing: showing() });
-    };
+    // A newer turn that began first makes this tail stale: the pane is told, so it leaves that turn's
+    // streaming text and tools alone and only reloads this turn's saved reply if no newer turn is live.
+    const finish = () =>
+      onComplete({ threadId: runThread, showing: showing(), ...(isCurrentRun() ? {} : { stale: true }) });
     const fail = (message: string) => {
-      if (showing()) {
+      if (showing() && isCurrentRun()) {
         setError(message);
         onFailed?.(message);
       }
@@ -413,6 +414,9 @@ export function ChatComposer({
       onThinking,
       onTool,
       onFailed: (message) => {
+        if (!isCurrentRun()) {
+          return;
+        }
         onFailed?.(message);
         setError(message);
       },

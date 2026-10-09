@@ -50,11 +50,31 @@ describe("chat composer run generations", () => {
     expect(composer).toContain("const isCurrentRun = startRun(runGenerationRef);");
   });
 
-  it("lets a stale run neither complete the pane nor free Send", () => {
-    expect(composer).toContain("const finish = async () => {\n      if (!isCurrentRun()) {");
+  it("lets a stale run neither reset the pane nor free Send", () => {
+    expect(composer).toContain("...(isCurrentRun() ? {} : { stale: true })");
     expect(composer).toContain(
       "if (!isCurrentRun()) {\n          return;\n        }\n        setBusy(false);\n        onSettled?.();",
     );
     expect(composer).toContain("if (showing() && isCurrentRun()) {\n        setBusy(false);");
+  });
+
+  it("keeps a stale run's late failure (an idle abort after run.completed) off the newer turn", () => {
+    expect(composer).toContain("const fail = (message: string) => {\n      if (showing() && isCurrentRun()) {");
+    expect(composer).toContain(
+      "onFailed: (message) => {\n        if (!isCurrentRun()) {\n          return;\n        }",
+    );
+  });
+});
+
+describe("chat session and a stale run's end", () => {
+  const session = readFileSync(join(web, "components/chat-session.tsx"), "utf8").replace(/\r\n/g, "\n");
+
+  it("resets nothing for a stale run, and reloads its reply only when no newer turn is running", () => {
+    const stale = session.indexOf("if (run.stale) {");
+    const reset = session.indexOf('setStreaming("");', stale);
+    expect(stale).toBeGreaterThan(-1);
+    expect(session.slice(stale, reset)).toContain("!runningRef.current");
+    expect(session.slice(stale, session.indexOf("return;", stale))).not.toContain("setRunning(false)");
+    expect(stale).toBeLessThan(reset);
   });
 });
