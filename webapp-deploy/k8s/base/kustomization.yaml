@@ -51,10 +51,12 @@ configMapGenerator:
       - PORTAL_HOST=0.0.0.0
       - PORTAL_PORT=4000
       - PORTAL_DATA_DIR=/portal-data
-      # How people sign in. `code` is the e-mailed one-time code and the default; `password` is a username and a
-      # password with no e-mail, the HYP AI mode (owner decision, 2026-10-07). Read once at boot; any other value
-      # refuses to start. Password accounts are made on the box with `sh webapp-deploy/scripts/portal.sh account`.
-      - PORTAL_SIGNIN_MODE=code
+      # How people sign in. `password` is a username and a password with no e-mail, the HYP AI mode (owner decision,
+      # 2026-10-07) and, since 2026-10-09, the Nultron Enterprise default. `code` is the e-mailed one-time code: set it
+      # here and give an overlay a real PORTAL_SMTP_HOST. Read once at boot; any other value refuses to start. Password
+      # accounts are made on the box with `sh webapp-deploy/scripts/portal.sh account` (the first owner before anyone
+      # can sign in).
+      - PORTAL_SIGNIN_MODE=password
       # Where the portal database is. A managed Postgres (TencentDB) is these three values and the two passwords,
       # plus deleting postgres.yaml; PORTAL_DB_OWNER is the account that may create roles and extensions.
       - PORTAL_DB_HOST=nultron-portal-db

@@ -54,6 +54,16 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Nultron Enterprise bundle signs in with a username and a password by default, 2026-10-09 (Enterprise only; branch `feat/ent-password-signin-default`, templates and docs, not deployed, not driven)
+
+Owner decision (Rizky, 2026-10-09): the Enterprise release bundle uses the portal's `PORTAL_SIGNIN_MODE=password`, as HYP AI does, instead of the e-mailed code.
+
+- **Lanes.** Nultron Enterprise: changed. HYP AI: unaffected (its clone already sets `password` explicitly; its next sync gets only the template and docs text below). Personal: unaffected (no portal, no `apps/web` change).
+- **What changed.** `scripts/release-web.mjs` (`ENV_DEFAULTS.PORTAL_SIGNIN_MODE` is `password`, so the generated `portal.env.example` carries an uncommented `PORTAL_SIGNIN_MODE=password`); `scripts/release-web-docs.mjs` (the generated `DEPLOY.md` has a step 7 that creates the first owner with `account.ts create --role owner` before anyone can sign in, says no mail sender is needed, and says how to go back to `code`; the SES section is marked "only for code mode"); `webapp-deploy/portal.env.example`, `webapp-deploy/README.md`; `webapp-deploy/k8s/base/kustomization.yaml` (`password`, with a comment). The Mailpit rehearsal overlay `k8s/overlays/local` now pins `PORTAL_SIGNIN_MODE=code` itself, because that rehearsal drives the e-mailed code through Mailpit; the production overlay inherits the base.
+- **Not changed.** The portal's own default when the variable is absent is still `code` (`apps/portal/src/config.ts`); `code` mode is fully supported; `PORTAL_SMTP_*` stay in the template but the portal boots with them blank in password mode. `webapp-deploy/pilot-local.mjs` leaves the mode unset and so still runs `code`. `SignInScreen` already follows the host's `signInMode`, and no other copy in `apps/web` promises a code.
+- **Residuals.** SR-165's no second factor, no self-service reset, operator-made accounts and per-process limits now apply to the Enterprise defaults; item 13 added (a fresh deploy has no password for the seeded owner until the operator runs `account create`).
+- **Proof.** `node --test scripts/release-web.test.mjs scripts/pilot-deploy.test.mjs webapp-deploy/k8s/k8s-rehearsal.test.mjs`. Not run: an Enterprise server on the new default, the first-owner step from a released bundle, and a real `release-web.mjs` run.
+
 ## Friday update, 2026-10-09: bug findings batch (both products; Rizky, 2026-10-08)
 
 Rizky's call on 2026-10-08: HYP AI is live and working, so the focus is bug findings. Everything found from now on is collected here and released together on Friday 2026-10-09. **Nothing here goes to production before then** (no image to the Nultron preview, no new HYP AI bundle on 43.173.26.50, no installer). Each fix lands on `main` first and is merged one way into the tester code (`agentforge-chat`, `tester/chat-first`) in the same session, per the two-codes rule. HYP AI picks the batch up through a re-synced clone (`hypey\app-sync`) and a new bundle on Friday.

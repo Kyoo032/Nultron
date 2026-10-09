@@ -84,8 +84,10 @@ export const REQUIRED_ENV = [
 ];
 /**
  * What the portal, its one-shot prepare step and its database need (apps/portal/src/config.ts, with
- * NODE_ENV=production): the signing key, the two database passwords, and the SMTP login. Loaded by those
- * three services only (compose.yml), never by the app or the proxy.
+ * NODE_ENV=production): the signing key, the two database passwords, and the SMTP login. The SMTP names are
+ * listed in the template so `code` mode is one edit away, but with PORTAL_SIGNIN_MODE=password (the bundle's
+ * default) the portal boots with them blank. Loaded by those three services only (compose.yml), never by the app
+ * or the proxy.
  */
 export const REQUIRED_PORTAL_ENV = [
   "PORTAL_SIGNING_KEY",
@@ -100,9 +102,10 @@ export const REQUIRED_PORTAL_ENV = [
 ];
 /**
  * What portal.env.example carries that nothing refuses to boot without: how people sign in. It has a default
- * (`code`, the e-mailed one-time code), so it is listed with that value and a comment, and an operator who never
- * touches it gets exactly what a portal without the variable has always done. `password` is the other value
- * (apps/portal/src/config.ts); anything else stops the portal at boot.
+ * (`password`, a username and a password an operator creates, since the owner's decision of 2026-10-09), so it is
+ * written as an uncommented assignment with a comment, and an operator who never touches it gets password
+ * sign-in with no mail sender. `code`, the e-mailed one-time code, is the other value (apps/portal/src/config.ts,
+ * where it is also what a portal with the variable unset does); anything else stops the portal at boot.
  */
 export const OPTIONAL_PORTAL_ENV = ["PORTAL_SIGNIN_MODE"];
 /**
@@ -113,7 +116,7 @@ export const OPTIONAL_PORTAL_ENV = ["PORTAL_SIGNIN_MODE"];
  */
 export const ENV_DEFAULTS = {
   AGENTFORGE_PORTAL_CLIENT_ID: "nultron-web",
-  PORTAL_SIGNIN_MODE: "code",
+  PORTAL_SIGNIN_MODE: "password",
   PORTAL_SMTP_HOST: "sg-smtp.qcloudmail.com",
   PORTAL_SMTP_PORT: "465",
   PORTAL_SMTP_SECURE: "1",
@@ -261,7 +264,7 @@ export function portalEnvExample() {
       ["PORTAL_APP_DB_PASSWORD", "Password of portal_app_login, the role the portal serves as. Not the same value."],
       [
         "PORTAL_SIGNIN_MODE",
-        "How people sign in. code (the default, and what a portal without this line does) e-mails a one-time code, so the SMTP settings below are required. password signs people in with a username and a password an operator creates: no mail is sent and the SMTP settings may stay blank. Anything else stops the portal at boot.",
+        "How people sign in. password (the default in this bundle) signs people in with a username and a password an operator creates with the portal's account command (DEPLOY.md, step 7): no mail is sent, so the SMTP settings below may stay blank. code e-mails a one-time code instead, so set it to code and fill in every SMTP setting below. Anything else stops the portal at boot.",
       ],
       ["PORTAL_SMTP_HOST", "Tencent Cloud SES, International site. smtp.qcloudmail.com is the Hong Kong (China site) host."],
       ["PORTAL_SMTP_PORT", "465, implicit TLS. SES documents no other SMTP port."],
