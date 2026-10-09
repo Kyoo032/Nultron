@@ -31,7 +31,7 @@ vi.mock("@/lib/api-client", () => ({
 
 const HOSTED = hostCapabilities({ AGENTFORGE_SERVER: "1" });
 
-async function panel(props: { typed?: string; busy?: boolean; reason?: "forbidden" | "generic" | null }) {
+async function panel(props: { typed?: string; busy?: boolean; reason?: "forbidden" | "shared" | "generic" | null }) {
   const { EraseAccountPanel } = await import("@/components/settings-erase-account");
   return renderToStaticMarkup(
     <EraseAccountPanel
@@ -110,6 +110,20 @@ describe("EraseAccountPanel", () => {
     expect(forbidden).toContain("Only an owner of this company can erase it");
     const generic = await panel({ reason: "generic" });
     expect(generic).toContain("Could not finish that just now");
+  });
+
+  it("says plainly that a server holding several companies erases from the operator's side (SR-163)", async () => {
+    const shared = await panel({ reason: "shared" });
+    expect(shared).toContain('role="alert"');
+    expect(shared).toContain("several companies");
+    expect(shared).toContain("operator");
+    expect(shared).toContain("Nothing has been deleted");
+    applyLocale("id");
+    const indonesian = await panel({ reason: "shared" });
+    expect(indonesian).not.toContain("settings.reset.eraseAccountShared");
+    expect(indonesian).toContain("operator");
+    expect(indonesian).not.toContain("several companies");
+    applyLocale("en");
   });
 
   it("does not autocomplete or spell-check the phrase box", async () => {

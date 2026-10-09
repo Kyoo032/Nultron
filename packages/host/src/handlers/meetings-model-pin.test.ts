@@ -51,7 +51,7 @@ async function drain(result: HostResult): Promise<void> {
   }
 }
 
-type RunOptions = { model?: string; modelExplicit?: boolean; translate?: boolean };
+type RunOptions = { model?: string; modelExplicit?: boolean; translate?: boolean; prompt?: string };
 
 function optionsOf(mock: typeof run.generateMinutes | typeof run.runMeeting): RunOptions {
   const call = mock.mock.calls[0] as unknown as [unknown, string, RunOptions] | undefined;
@@ -106,5 +106,21 @@ describe.each(ROUTES)("POST meetings/:id/$name and the model pin", ({ call, mock
   it("refuses a truthy stand-in for the flag", async () => {
     await drain(await call({ model: "gpt-5.6-sol", modelPinned: "true" }));
     expect(optionsOf(mock).modelExplicit).toBe(false);
+  });
+
+  it("hands the owner prompt on, trimmed, and none when there is none", async () => {
+    await drain(await call({ prompt: "  Minutes and who does what  " }));
+    expect(optionsOf(mock).prompt).toBe("Minutes and who does what");
+    mock.mockClear();
+    await drain(await call({ prompt: "   " }));
+    expect(optionsOf(mock).prompt).toBeUndefined();
+  });
+
+  it("refuses a prompt that is too long, or not text, with a 400 before the stream starts", async () => {
+    for (const prompt of ["a".repeat(2001), 42]) {
+      const result = await call({ prompt });
+      expect(result).toMatchObject({ type: "json", status: 400 });
+    }
+    expect(mock).not.toHaveBeenCalled();
   });
 });

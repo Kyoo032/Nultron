@@ -64,7 +64,7 @@ the key with `mediaRelativePath` and calls `putTenantObject`
 (`packages/host/src/tenant-storage.ts:447-464`), which does three things in this order and no other:
 
 1. `head()` the key, so an overwrite is charged the difference rather than the whole object again.
-2. `assertStorageAdmits` (`packages/host/src/tenant-storage.ts:489-501`) — the check runs **before**
+2. `assertStorageAdmits` (`packages/host/src/tenant-storage.ts:527-539`) — the check runs **before**
    the write, so a refusal never leaves a partial object.
 3. `put()`, then `addTenantStorageBytes` (`packages/host/src/tenant-storage-store.ts:126-145`) — the
    counter moves only after the backend took the write, so a failed put never charges for bytes
@@ -91,6 +91,17 @@ the requested bytes; the COS backend HEADs for the size and then GETs with a `Ra
   no write moved the counter, so a tenant's number changed on an operator's recompute rather than on
   their own upload. The old location is still read by `deleteSource` and `reindexSource` so an
   upgraded desk keeps the bytes it has.
+  **Since 2026-10-07 (uncommitted, `agentforge-deck`), on a hosted server only, a third part: the
+  tenant's saved artifacts** (decks, dossiers, briefs). They are rows of the `artifacts` table, not
+  objects, so neither the counter nor the walk saw them and a script could fill the database through
+  `build_deck` with the meter at zero. `artifactUse` (`packages/host/src/tenant-storage.ts`) reads
+  `SUM(size_bytes)` over the tenant's desks (`TENANT_ARTIFACT_USE_SQL` in `tenant-storage-store.ts`) on
+  every call, never cached, and adds it to the report (`artifactBytes`), to `assertStorageAdmits` and to
+  the budget `putTenantObject` reserves against. A desk reads nothing: its number is what it was. The
+  read is cheap only because of the index `artifacts_ws_size_idx` that `ensureArtifactTables` creates
+  on open in server mode only, so a desk's schema is unchanged (without it the sum walks every overflow page of every deck body: about 2 seconds for 100 decks, with
+  the host stopped). Only `build_deck` and the object writers ask the ceiling; the other artifact
+  writers do not. See [`agent-tools-and-files.md`](agent-tools-and-files.md) § 13.
 - **One tenant's writes are serialised.** `putTenantObject` runs them in a promise chain, so a second
   write cannot read the counter between the first one's check and its increment. It is per tenant, so
   a 500 MB import queues nobody else, and per process — two hosts would still race, which is a
@@ -99,7 +110,7 @@ the requested bytes; the COS backend HEADs for the size and then GETs with a `Ra
   measure on first use (`objectUse`, `packages/host/src/tenant-storage.ts:414-432`) rather than from
   zero, so an upgraded data volume is not declared empty; `recomputeTenantStorage`
   (`packages/host/src/tenant-storage.ts:542-556`) is the operator's reconciliation.
-- **The refusal** is `StorageQuotaError` (`packages/host/src/tenant-storage.ts:448-458`): a flat 403
+- **The refusal** is `StorageQuotaError` (`packages/host/src/tenant-storage.ts:471-481`): a flat 403
   with code `storage_quota_exceeded`, the same shape as `GatewayBlockedError` and `PlanBlockedError`
   and deliberately a third code. `gateway_blocked` routes the renderer to the paste-your-key
   onboarding screen, which is a dead end for a tenant whose problem is that their prefix is full.

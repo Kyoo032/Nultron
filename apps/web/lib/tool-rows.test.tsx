@@ -47,7 +47,7 @@ function part(html: string, testId: string): string {
 const done = (key: string, input: unknown, output: unknown): RowTool => ({ key, status: "completed", input, output });
 
 describe("which tools get a rich row", () => {
-  it("is exactly the eight new tools", () => {
+  it("is exactly the nine new tools", () => {
     for (const key of [
       "list_files",
       "read_file",
@@ -57,6 +57,7 @@ describe("which tools get a rich row", () => {
       "delete_file",
       "knowledge_search",
       "run_code",
+      "build_deck",
     ]) {
       expect(isRichTool(key)).toBe(true);
     }
@@ -123,6 +124,48 @@ describe("file tool rows", () => {
     expect(chip).toContain(">Open</span>");
     expect(html).toContain("Wrote notes/plan.md");
     expect(html).toContain("Version 3");
+  });
+
+  it("puts a Download button beside the chip of a saved desk write, named for the path", () => {
+    const html = render(
+      done(
+        "write_file",
+        { path: "notes/plan.md", content: "x" },
+        { ok: true, root: "desk", status: "saved", path: "notes/plan.md", version: 3 },
+      ),
+    );
+    const button = part(html, "tool-row-file-download");
+    expect(button).toContain("<button");
+    expect(button).toContain('aria-label="Download notes/plan.md to your computer"');
+    expect(button).toContain('title="notes/plan.md"');
+    expect(button).toContain(">Download</button>");
+    expect(html.match(/data-testid="tool-row-file-download"/g)).toHaveLength(1);
+  });
+
+  it("offers no Download for a read, a delete, a refusal or a folder write that waits", () => {
+    const reads = render(done("read_file", { path: "a.md" }, { ok: true, totalLines: 1, firstLine: 1, lastLine: 1 }));
+    const deleted = render(
+      done("delete_file", { path: "a.md" }, { ok: true, root: "desk", status: "saved", path: "a.md", version: 5 }),
+    );
+    const refused = render(done("write_file", { path: "a.md" }, { ok: false, code: "quota", message: "full" }));
+    const waiting = render(
+      done(
+        "write_file",
+        { path: "a.md" },
+        { ok: true, root: "folder", status: "pending_approval", path: "a.md", proposalId: "p1" },
+      ),
+    );
+    for (const html of [reads, deleted, refused, waiting]) {
+      expect(html).not.toContain("tool-row-file-download");
+    }
+  });
+
+  it("says Unduh in Indonesian", () => {
+    applyLocale("id");
+    const html = render(
+      done("write_file", { path: "a.md" }, { ok: true, root: "desk", status: "saved", path: "a.md", version: 1 }),
+    );
+    expect(part(html, "tool-row-file-download")).toContain(">Unduh</button>");
   });
 
   it("encodes an awkward path once in the chip link", () => {
@@ -448,6 +491,9 @@ describe("run_code rows", () => {
     expect(files).toContain('href="/knowledge?file=out%2Fsummary%20report.md"');
     expect(files).toContain(">out/summary report.md</span>");
     expect(html.match(/data-testid="tool-row-file-chip"/g)).toHaveLength(2);
+    // Each saved file can be taken off the desk, not only opened in the Knowledge Base.
+    expect(html.match(/data-testid="tool-row-file-download"/g)).toHaveLength(2);
+    expect(files).toContain('aria-label="Download out/a.csv to your computer"');
     expect(html).not.toContain("It ran and printed nothing.");
   });
 

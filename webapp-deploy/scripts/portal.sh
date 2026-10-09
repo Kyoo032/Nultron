@@ -4,6 +4,8 @@
 #
 #   sh webapp-deploy/scripts/portal.sh seed --email you@example.com --redirect https://app.example.com/auth/callback
 #   sh webapp-deploy/scripts/portal.sh invite ...        # whatever scripts apps/portal ships
+#   sh webapp-deploy/scripts/portal.sh account create --username <name> --email <address>
+#                                        # PORTAL_SIGNIN_MODE=password only: create | reset-password | disable | enable | set-role | list
 #   sh webapp-deploy/scripts/portal.sh migrate
 #
 # <name> is the file name without .ts. The two Postgres DSNs are built by portal-entry.sh from the

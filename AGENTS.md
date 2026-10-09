@@ -37,7 +37,7 @@ The owner split the product, then still called DPSBuddy, into two products on 20
 | What it is | The Mac/Windows Nultron app | The hosted multi-user web app |
 | Shell | Electron (`apps/desktop`), packaged IPC, **no HTTP port** | Express (`apps/web/server.ts`) behind a reverse proxy |
 | Data | On the user's machine, SQLite in the user data dir | Per-tenant, on Rizky's server |
-| Account | A pasted gateway key is the floor | Portal sign-in (one-time code); the pasted key stays the floor for model calls |
+| Account | A pasted gateway key is the floor | Portal sign-in (one-time code; username and password on HYP AI only, since 2026-10-07); the pasted key stays the floor for model calls |
 | Ships by | `pnpm desktop:build` → installers on `Kyoo032/Nultron` | `node scripts/release-web.mjs` → a private image `ghcr.io/kyoo032/nultron-ent:<tag>` plus a deploy bundle (pinned `compose.yml`, `.env.example`, `DEPLOY.md`, `Caddyfile`) and a GitHub Release on `Kyoo032/NultronEnt`; each deploy is logged by commit sha |
 | Version | Semver — **0.16.0** is the current cut (the first Nultron-named installer) | No version number |
 | Entry point | the installer | the hosted URL |
@@ -75,6 +75,102 @@ On **Enterprise** each tenant keeps its own workspaces on Rizky's server. On **P
 
 **North star: like Dots and Muse, but multi-model.** Multi-model chat-first wins.
 
+**Bots on harnesses (Rizky, 2026-10-06 evening).** The chat-first shell shows each harness as a bot with its own conversations and a side panel (computer, routines, the mode's control fields). What sets it apart from a skills-and-instructions product: a bot here is a harness the host enforces. Three decisions from him the same evening:
+
+- People can hire their own bot. That lifts "custom-agent Build stays parked", in the tester code only, until a pull request he approves brings it here.
+- The cloud computer (VPS) and the person's own computer are paid features. A free trial cannot use either, and gets no graphical screen.
+- Routines (scheduled runs) are free on every plan (Rizky, 2026-10-07: "routines are free, since they cost tokens anyway"). A routine that needs a computer still needs a paid plan for that part.
+- The host enforces that from the plan the portal reports. The renderer only displays it.
+
+The plan is in the tester folder: `docs/internal/chat-first-plan.md`, "Second reference", "Hiring a bot", "Free and paid" and Track B.
+
+**Private by person on Enterprise (Rizky, 2026-10-06 evening).** His words: "even on enterprise the knowledge base of everyone will be different and private". A company shares a desk, but each person's Knowledge Base is their own, and a document a person attaches in Chat is private to that person. The host enforces it; the renderer only displays it. Personal has one person per desk, so nothing changes there, and every change for this needs a Personal-parity test. What is shared and what is private on a team desk today has not been mapped yet; map it before changing a table.
+
+Two more answers from him the same evening:
+
+- **Sharing goes through a bot.** A person's own knowledge stays private. What a team shares is a bot's knowledge: a bot shared with the team brings its knowledge with it, so teammates can use that bot and call it. There is no "share this source with the company" switch on a person's own Knowledge Base.
+- **When a person leaves, the company decides.** The business owner or an admin chooses whether that person's knowledge is deleted or kept.
+- **Nobody else reads it, the owner and admins included.** His words: "they cant read the knowledge, it must be blocked", with legal terms to back it later. An owner or admin may delete or keep a person's knowledge and may never open it. The host blocks it; the terms come later and are not a substitute for the block.
+
+**This is design only for now (Rizky, same evening): "dont make it too complicated".** Do not build the per-person Knowledge Base, bot knowledge sharing or the leaver controls yet. The one piece being built is that a document attached in Chat is private to the person who attached it. The build focus is the chat and several agents working together.
+
+### Two codes (Rizky, 2026-10-06; must follow)
+
+Nultron is always kept as two codes, and a change to one must never break the other.
+
+- **Published:** this folder, `C:\Users\rizky\agentforge`, branch `main`. Nultron as released, with the mode screens. HYP AI is built from it. Every release runs from here.
+- **Tester:** `C:\Users\rizky\agentforge-chat`, branch `tester/chat-first`, a git worktree of this repo. Chat only, with the modes running behind the chat as workers. Its plan and specs live in its own `docs/internal/` (`chat-first-plan.md`, `chat-workers-spec.md`, `model-tiers-spec.md`, `chat-computer-spec.md`), and its rules are in its `TESTER.md`.
+
+Rules:
+
+- A problem that shows on `:3000` is fixed here on `main`, then merged into the tester folder. It is never fixed by hand in both.
+- Changes move one way, from `main` into `tester/chat-first`. Tester work reaches `main` only through a pull request Rizky approves.
+- Never run a release from the tester folder. The tester webdev uses port 3200 and its own data folder.
+- The precise map (which change goes where, which files the tester code may edit, how to update) is in Rizky's Obsidian vault: `C:\Users\rizky\Documents\Obsidian\40-Dev\nultron-two-codes-map.md`. Keep it current in the same session as any change to the split.
+
+### Sync lanes: four things, one source (Rizky, 2026-10-09; must follow)
+
+One codebase feeds four lanes. Every bug fix is made once, on `main`, and reaches the other lanes by the steps below. Map: [`docs/internal/maps/release-and-sync-lanes.md`](docs/internal/maps/release-and-sync-lanes.md).
+
+| Lane | What it is | Where it lives | How it gets a fix from `main` |
+|---|---|---|---|
+| Nultron Personal | The Mac/Windows app | built from `agentforge` `main` | the next `pnpm desktop:build` and `pnpm desktop:release` |
+| Nultron Enterprise | The hosted app and the preview | built from `agentforge` `main` | the next `node scripts/release-web.mjs`; the preview by its safe update |
+| HYP AI | Hypernet's white-label | `C:\Users\rizky\hypey\app` | vendor-branch import, steps in `C:\Users\rizky\hypey\intake\SYNC.md` |
+| Tester | Chat-only code | `C:\Users\rizky\agentforge-chat`, branch `tester/chat-first` | `git merge origin/main` in that folder |
+
+- **One place to fix.** A bug fix is a pull request to `main` from a branch cut from `main`. Never fix by hand in the tester folder or in the HYP AI clone, and never open a fix pull request from `tester/chat-first`. The only thing that goes from tester to `main` is a promotion pull request Rizky approves.
+- **After a pull request merges to `main`, in this order:** (1) merge `origin/main` into the tester folder and run `ci:local`; (2) import it into the HYP AI clone per `SYNC.md`, then run `check-leaks.sh` and `drive-leaks.mjs`; (3) release Personal or Enterprise only when Rizky says. A fix is not done for a lane until its step has run. The pull request says which lanes are still owed.
+- **Shared code carries no brand.** HYP AI shows its own name, gateway and mascot, so shared code and copy never hard-code `Nultron`, `Toko Token`, `TokenKu` or `HYP AI`; they read `productName` and `gatewayName`. A difference between lanes is a setting (`PORTAL_SIGNIN_MODE`, the edge mode), not a fork.
+- **Deploy differences stay in their lane.** The Cloudflare edge and password sign-in belong to HYP AI's deploy; Nultron keeps its direct two-name setup. Never carry one into the other's deploy path.
+- **Label what a change touches.** In a pull request and in `unreleased.md`, name the lanes (Personal, Enterprise, HYP AI, tester). The default is all four.
+- **Priority.** Published wins; in a conflict keep the `main` side. The Obsidian map has the full list.
+
+`.ref/` (gitignored) holds two third-party repositories for reading only, OpenMausBot and hermes-agent. Take ideas, never code, and never anything from `OpenMausBot/enterprise/`.
+
+### HYP AI hosting plan (Rizky, 2026-10-07)
+
+His words: "start small first with like 100-500 users", then "when there is demand on the next 2 weeks then we can change and switch". The order of work he set the same day is Nultron preview first, HYP AI after he has tested Nultron. The server itself is a priority, because he has to give Hypernet its address.
+
+**Who owns what (Rizky, same day).** His words: "this machine will be theirs anyway, im on the rnd and theyre on the production and the marketing sales". Rizky's side does research and development. Hypernet runs production, marketing and sales, and the server is theirs. Hypernet connects its own domain to the server. **Changed 2026-10-08 (Rizky): Hypernet only points its name at our IP; we adapt.** `aiopc.innovationhypernet.com` stays behind Hypernet's Cloudflare proxy (SSL mode Full, proven live), so HYP AI uses one name: the app on 443 and the sign-in portal on `:8443` (bundle `--edge cloudflare`, `ship.ps1 -Cloudflare`, in `C:\Users\rizky\hypey\deploy`). **This Cloudflare setup is for HYP AI only. Nultron does not use Cloudflare** and keeps its direct two-name setup with its own certificates; never carry Cloudflare-mode changes into Nultron's deploy path.
+
+**Sign-in (Rizky, same day): username and password in the portal, no e-mailed code.** His words: "the login portal doesnt need email code, we will use username and email protection for now, with 2FA method being designed". Asked what he meant, he chose the real multi-user portal with a username and password over private desks behind a browser prompt. What follows from it:
+- This lifts "no password" for HYP AI only. Nultron Enterprise keeps the e-mailed code until he says otherwise.
+- It is a portal mode chosen by configuration (`PORTAL_SIGNIN_MODE=password`, default `code`), being built on branch `feat/portal-password-signin`. The password lives in the portal. The product app still holds no account stack.
+- Accounts are made by an operator command that prints an initial password once. There is no self-sign-up and no e-mail in this mode, so no mail sender is needed.
+- Two-factor sign-in is being designed and is not built. Do not add it in passing.
+- He asked for three accounts for Hypernet. Their usernames and e-mail addresses were not given yet.
+
+**The server exists (2026-10-07).** Elastic IP `43.173.26.50`, user `ubuntu`, key by path `~/.ssh/hypeyprod1.pem` (never attach it; SR-164). It has the same base setup as the Nultron box: Docker, ufw for 22, 80 and 443, fail2ban, automatic updates, key-only SSH. No app is installed yet. The runbook and log are in `C:\Users\rizky\hypey\deploy\server-setup\README.md`.
+
+**Stage 1, now: one CVM.**
+- Tencent Cloud CVM in Jakarta. **What Rizky ordered on 2026-10-07:** SA9.LARGE8 (4 cores / 8 GiB), pay-as-you-go, Jakarta Zone 2, Ubuntu 24.04, one 200 GiB Balanced SSD system disk and no data disk, Default VPC, a public IP billed by traffic at 20 Mbps, no IPv6, SSH key login. The plan had been SA5 with a 50 GB system disk and a 100 GB data disk at about 64 USD a month; the SA9 price was not read, so the monthly cost of what he ordered is not confirmed.
+- With one disk, the customers' data sits on the system disk. A daily disk snapshot is the backup, and "Reinstall system" in the console would erase it.
+- Its own machine and its own address. Never the Lighthouse box that serves the DPS sites (NDA).
+- Bind an Elastic IP and give Hypernet that address. It stays the same through a resize or a rebuild.
+- Buy it inside a VPC, so it can join a scaling group later.
+- Before testers arrive, a load test on the real machine replaces the capacity estimate. The rig is in `C:\Users\rizky\hypey\deploy\loadtest\`.
+
+**Stage 2, when demand comes: resize the same CVM.**
+- 8 vCPU / 16 GB is about 117 USD a month, then 16 / 32. A resize is a restart of a few minutes.
+- One server is the ceiling, at about 19,000 accounts by the capacity model. That number is an estimate and has not been measured.
+
+**Stage 3, later: Auto Scaling.** He pointed at Tencent Auto Scaling (doc product 377). What its docs say, read on 2026-10-07:
+- It adds and removes whole servers behind a load balancer, by load or by schedule. The service is free and the servers are billed.
+- It cannot make one server bigger: "Auto Scaling does not support scaling up".
+- Apps in a scaling group "should be stateless and replaceable", and the servers "cannot save the status information and data".
+- A CVM bought now can be added to a scaling group later if it is in the same region and VPC and is running. A server added by hand is not terminated when the group shrinks.
+
+The hosted app does not meet that today. It is one process on one SQLite file with customers' files on the local disk (SR-29, SR-66), so a second server would start empty. The Kubernetes manifests in `webapp-deploy/k8s/` run exactly one app pod for the same reason. Before Auto Scaling can add servers:
+- the product database moves off SQLite to a managed database (open decision 1 in the pivot record);
+- files move to object storage (the COS backend has never run against a real bucket);
+- sign-in sessions, the run cap and in-flight jobs are shared between servers;
+- the app starts from a server image and passes a health check behind a load balancer.
+
+None of that is started, and it does not fit in two weeks. Do not start it in passing: it needs Rizky's word. At rest that stage costs about 185 USD a month (two servers, a load balancer, a managed database) before any scaling.
+
+Earlier the same day he chose a Lighthouse 8 vCPU / 16 GB (78 USD a month) and then changed to CVM. Prices, the Lighthouse table and the doc links are in the vault note `40-Dev/nultron-hosting-map.md`. The deck is `nultron-files/hyp-ai/HYP-AI-Auto-Scaling-Tencent.pptx`.
+
 ## Current focus (Rizky, 2026-10-01): fix, perfect, polish — no new modes
 
 Until Rizky lifts it, work is limited to three things, in this order:
@@ -89,9 +185,32 @@ Until Rizky lifts it, work is limited to three things, in this order:
 
 **No new modes, harnesses, rail entries or packs.** Do not add a product mode, a new job surface or a new Pack, even a small one. If a fix seems to need one, stop and ask Rizky. Refactors are fine only when a fix needs them.
 
+### Resume here: 2026-10-07, afternoon (read this first)
+
+**Full handoff:** `nultron-files/handoff-2026-10-07/HANDOFF.md`, with one note per lane in flight in `lanes/` and the day's helper scripts in `tools/`. The brief for outside advisers, covering every product and site, is `nultron-files/PRODUCTION-BRIEF.md`.
+
+**Done on 2026-10-07.**
+- Every lane paused on 10-06 is merged into `main`, except the edge login gate and the tester bots: chat error recovery, the hosted run cap, ffmpeg (image limits and the desktop bundle code), documents in Chat, the Chat image fix, the Chat deck tool, hosted team privacy.
+- A live drive found a new bug and it is fixed and merged: a slow gateway answer ended a Chat turn in silence. The wait for response headers is 45 s and a failed follow-up ends with a sentence.
+- Driven on `:3000` with a real key: `self_check`, a Word file, a picture, a deck. Evidence is under `.cursor/skills/verify-agentforge/evidence/chat/2026-10-07-*`.
+- The Nultron preview runs `nultron-web:0d829f00bc81`, rolled desk by desk without touching the proxy.
+- The HYP AI server exists and has its base setup. No app is installed.
+
+**Git.** Everything up to the password sign-in is on GitHub: PR #142, merged into `main` as `079d325` in the evening at Rizky's word. Full local CI was green on `0d829f0`; after that only the suites named in the PR ran. A follow-up with two fixes from the second security review of the password sign-in is still local.
+
+**In flight (see the lane notes).**
+- The per-company gateway key check: reviewed, fixed and merged into `main` as `24fb47c9` (evening). Not driven on a hosted server.
+- The portal's username and password sign-in for HYP AI: merged. Two independent security reviews, no critical or high finding; the second review's two fixes are local `main` at `e8a069c9`, three commits ahead of GitHub. The residual risks are in SR-165.
+- The HYP AI bundle in `C:\Users\rizky\hypey`: `out\hyp-2026.10.07.3` is the password-mode build from `e8a069c9`. `check.mjs` 135 of 135 and the three-person rehearsal exited 0 (123 of 123), so it meets "ready to install". It is superseded by `outhyp-2026.10.07.4` (clone `517d24d`), which removes the upstream company's name from the browser-facing locale catalogs: `check.mjs` 135 of 135, rehearsal exit 0 with 126 of 126, and a grep inside the built image finds no upstream company, product or gateway name in the served files. **Install `.4`.** `out\hyp-2026.10.07.2` is the e-mail-code build and must never be installed.
+- The domain: `aiopc.innovationhypernet.com` points at Cloudflare's proxy, not at the server. Hypernet has to make it DNS only, an A record to `43.173.26.50` with no AAAA, and add a second name for the sign-in page.
+
+**Ready to install HYP AI means:** both fixes merged, the bundle rebuilt in password mode with `check.mjs` passing, and the rehearsal exiting 0 with three people signing in by username and password. Then tell Rizky. On the server each step needs his go: the load test, the install, the three accounts.
+
+**Needs Rizky's decision.** Hosted "erase account" purges every company of a partner (SR-163). Settle it before a second company exists on HYP AI. Also still open: the three accounts' usernames and e-mails, the two domain names, the snapshot policy.
+
 ### Resume here: 2026-10-05, end of day (read this before the 10-03 block below)
 
-**Full handoff, including lanes that were running and their exact scope:** `nultron-files/handoff-2026-10-05/HANDOFF.md`. **Newer, 2026-10-06:** `nultron-files/handoff-2026-10-06/HANDOFF.md`, covering the live sites, the app preview with per-tester desks, PR #139, the 0.16.0 cut and the verify-skill findings.
+**Full handoff, including lanes that were running and their exact scope:** `nultron-files/handoff-2026-10-05/HANDOFF.md`. **Newer, 2026-10-06:** `nultron-files/handoff-2026-10-06/HANDOFF.md`, covering the live sites, the app preview with per-tester desks, PR #139, the 0.16.0 cut and the verify-skill findings. **Newest, evening of 2026-10-06: `nultron-files/handoff-2026-10-06/HANDOFF-evening.md`**, with one note per paused lane in `lanes/`. Read it first: ten lanes were paused mid-work (ffmpeg in the image is live on the preview; the desktop bundle, the run cap, chat error recovery, document upload, the deck tool, the image-attachment fix, team privacy, the H1 knock gate and the HYP AI bundle are on unmerged branches or local folders), the local `edge/` folder is NOT safe to deploy, and the document-upload branch is half way through its review fixes.
 
 **Git (2026-10-06).**
 - `main` is at `de95267`, after PR #138.
@@ -119,7 +238,7 @@ Until Rizky lifts it, work is limited to three things, in this order:
 
 **Decisions on 10-05.**
 - The vision and prompt-first rules are now at the top of this file.
-- Nultron keeps Toko Token. White-label brands show TokenKu; their backend uses api.tokotokenai.com in the interim.
+- Nultron keeps Toko Token. White-label brands show TokenKu. The HYP AI clone pinned `https://api.tokenku.ai/v1` on 2026-10-06 (Rizky); the interim `api.tokotokenai.com` backend is gone there, and no call with a TokenKu key has been made yet.
 - Hosting (to learn, then try): one Tencent Lighthouse in Jakarta hosting dpscloud.co.id (the parent site), nultron-ai.xyz (app) with portal.nultron-ai.xyz, and tokotokenai.com.
   - Keep the DNS for `api.tokotokenai.com` untouched.
   - Company mailboxes are self-hosted on the same box (Stalwart), sending through Tencent SES; see "Tencent hosting" below. Nultron's sign-in codes go through SES from `mail.dpscloud.co.id`.
@@ -154,7 +273,14 @@ Until Rizky lifts it, work is limited to three things, in this order:
 - Never "closed beta", "testers" or "invitations".
 
 **App preview: https://app.nultron-ai.xyz**
-- It runs the image `nultron-web:<sha>`, built on the box from `git archive` (needs the PR #139 dockerignore fix). The app runs off server mode through `edge/app/preview-server.ts`. Security register SR-133 holds the decision record.
+- It runs the image `nultron-web:<sha>`, built from `git archive`. The app runs off server mode through `edge/app/preview-server.ts`. Security register SR-133 holds the decision record.
+- **Since 2026-10-07 it runs `nultron-web:0d829f00bc81`** (`main` at `0d829f0`). The tag before it was `5bec53280e27`.
+- **Updating it (must follow).** The box also serves three websites through the same proxy, and Rizky asked for care. Use the runbook section "Update the app image only: the safe route" in `nultron-files/deploy/tencent/README.md`:
+  - Rizky says go in the chat for that deploy. If the permission system refuses a step, stop and hand him the commands.
+  - Build and test the image on the PC, send it with `docker save | ssh docker load`, and change only `app/app-image.env`.
+  - Recreate the desks one at a time with `--no-deps`, a tester desk first as a canary, the owner's desk last.
+  - Never recreate the proxy on its own: every desk lives in its network namespace and would answer 502.
+  - Do not run `edge/deploy.ps1` while the local `edge/` folder holds undeployed work.
 - Each login is HTTP Basic Auth and lands on a private desk:
   - `nultron` (Rizky) on port 3000;
   - `tester01`–`tester10` on 3001–3010, each with its own volume and its own key slot, created by `edge/app/add-testers.sh`.
@@ -302,7 +428,7 @@ Today’s skill packs once from HEAD. A repack (same version, after a fix) must 
 - **Pack skill:** [`.cursor/skills/pack-nultron/SKILL.md`](.cursor/skills/pack-nultron/SKILL.md), [`traps.md`](.cursor/skills/pack-nultron/traps.md), `scripts/preflight.mjs` (the directory was `pack-dpsbuddy` until 2026-09-29). Two routes, never in the same cwd: Windows NSIS in an isolated worktree, macOS dmg/zip in Docker Linux from the main checkout. This PC only; Cloud aborts.
 - **pstack** is the Cursor plugin (`~/.cursor/plugins/cache/cursor-public/pstack/…`, 0.15.2) plus the always-on rule `~/.cursor/rules/pstack-guardrails.mdc`. Project skills call `/how`, `/why`, `/create-verification-skill`, `/maintain-verification-skill`; they never copy them. `maintain-verification-skill` edits only `.cursor/skills/verify-agentforge/`; product bugs it finds are reported, not fixed in that PR. Its outcome is one of `clean` / `changed` / `blocked`, said plainly.
 - **Claude Code sessions in this repo work the pstack way too.** Read the subsystem's map page before changing it (`how`), and refresh that page plus the matching `features/<feature>.md` in the same change. Prove by driving the real thing, not by a green `tsc` or a worker's summary (`principle-prove-it-works`); cite `file:line` for every claim. Write docs to `technical-writing` and edit them with `unslop`. Read the skills from the plugin path above; never vendor a copy into this repo. The three recipes owed from this round landed on 2026-09-21: [`features/login.md`](.cursor/skills/verify-agentforge/features/login.md), [`features/plans.md`](.cursor/skills/verify-agentforge/features/plans.md), and the Recording section of [`features/meeting.md`](.cursor/skills/verify-agentforge/features/meeting.md).
-- **Model routing.** Cursor sessions: explore = Composer 2.5, worker = Grok 4.5, fan-out 2 (as the verify skill says). Claude Code sessions: every subagent on Sonnet 5.5 — explorers at medium effort, implementation and review workers at xhigh (set in `~/.claude/agents/`), and the orchestrator verifies every result itself before reporting. Neither adopts pstack’s own Fable/GPT Task slugs.
+- **Model routing.** Cursor sessions: explore = Composer 2.5, worker = Grok 4.5, fan-out 2 (as the verify skill says). Claude Code sessions (Rizky, 2026-10-08): Opus 5.5 orchestrates; general workers run on Haiku 5.5 at xhigh effort (explorers at medium); the hardest work (`architect`, `planner`, `security-reviewer`, `code-reviewer`, `database-reviewer`) runs on Sonnet 5.5 at high effort. Models are set in `~/.claude/agents/`, with no `CLAUDE_CODE_SUBAGENT_MODEL` override. The orchestrator verifies every result itself before reporting. Neither adopts pstack’s own Fable/GPT Task slugs.
 - **Maps:** [`docs/internal/maps/`](docs/internal/maps/README.md) — 46 pages, one per subsystem (`ls docs/internal/maps/*.md` minus `README.md`), each with a `Last verified: <date> at <sha>` line and `file:line` citations. Read the page before working in a subsystem; if your change makes it false, refresh it in the same PR (rewrite in place, bump the verified line) and refresh the matching `features/<feature>.md`. Product bugs a mapping pass finds go to `unreleased.md` as findings, not into the map PR as fixes.
 - **Changelog is the checklist.** Every product change appends to the current changelog; the pack step reads it back; the verify pass drives it. Harness-only changes (skills, `.vscode`, `biome.json`) are labelled “harness, never ship” and stay out of the installer.
 
@@ -333,7 +459,7 @@ Read this before any work on onboarding, Settings, `/api/v1/settings`, keys, or 
 
 **Decisions Rizky has not made — do not assume an answer in code or copy:** offline grace length (7 days is the draft), whether a pasted key beats a live session, seat reclamation after 30 idle days, where BYO-key spend is billed (schema open question 7 / login doc open question 9 — there is no per-user wallet), and a per-device keypair (v1.1, needs a shell change). Payment provider (Xendit / Paddle / Stripe) is still undecided, which is why the webhook is provider-neutral. **Answered on 2026-09-21, do not re-open in code:** every tier name, price, seat cap and number is a placeholder in one config file, and there is **no token allowance** — see Phase 9 below. The "20-seat free tier" above is a draft number of that kind, not a rule.
 
-Product rules for the client stay as before: no password, no Better Auth, no “join Harbor State”. Mail and sessions belong to the portal, not to a package inside `apps/web`. Everything local still works without the portal.
+Product rules for the client stay as before: no password, no Better Auth, no “join Harbor State”. (The portal's password mode for HYP AI, 2026-10-07, is a portal mode; the client still holds no password.) Mail and sessions belong to the portal, not to a package inside `apps/web`. Everything local still works without the portal.
 
 ## Phase 9 — portal login and pricing (in progress, 2026-09-21)
 
@@ -365,7 +491,7 @@ Everything here is proven by unit tests and webdev only; none of it is packed. T
 ## Product (locked 2026-09-02 GTM; closed beta)
 
 - **Gateway-first.** Nultron exists because buying a key at `api.tokotokenai.com` leaves the question “where do I use this?” Open the hosted app, sign in, work. A pasted gateway key still runs the models. Native Anthropic / Google / Ark stay in the settings store, unexposed. The endpoint is pinned to `https://api.tokotokenai.com/v1` since 0.14.26 (`8831bc4`) — the 0.14.21 owner override is gone — and hidden from Settings and onboarding: since 2026-09-26 onboarding does not show the gateway address at all, and Settings still names the host in its intro sentence. `AGENTFORGE_GATEWAY_URL` is a dev/test-only hook, ignored when packaged or when `NODE_ENV=production`.
-- **Two doors, no password.** Portal sign-in (browser one-time code and device code) is the account. A pasted gateway key stays the floor for model calls. No password, no Better Auth, and no account stack inside `apps/web` or `packages/host`. Mail and portal sessions live in the portal, reached over HTTP. `apps/portal` is the in-repo stand-in for that portal; the product never imports it.
+- **Two doors, no password.** Portal sign-in (browser one-time code and device code) is the account. A pasted gateway key stays the floor for model calls. No password, no Better Auth, and no account stack inside `apps/web` or `packages/host`. One exception, by Rizky on 2026-10-07: HYP AI signs in to the portal with a username and password (see "HYP AI hosting plan"). The password lives in the portal, never in the product app. Mail and portal sessions live in the portal, reached over HTTP. `apps/portal` is the in-repo stand-in for that portal; the product never imports it.
 - **One server, many tenants.** Every row belongs to a tenant; the host enforces tenancy, the renderer displays. Data lives in the server's data dir, not on a user's machine.
 - **First-run guide (2026-09-29).** When first-run setup ends, a short guided tour is offered once: coach marks on the real rail, Workspaces, the Chat composer, the Knowledge Base and Settings, each with Next, Back (not on the first), a visible Skip and a close button; Esc closes and a click outside does nothing. It is a state machine (`idle | offered | step(n) | done`, `apps/web/lib/guide-machine.ts`) over a step registry (`guide-steps.ts`). How it ended is stored by the host beside the language (`users[…].guide` in the sealed `settings.enc`, `POST /api/v1/settings/guide`, `guide` on `GET /api/v1/settings`), so it is machine-wide on a desk, never opens on its own again, and "Start over" (which removes `settings.enc`) shows it again. Settings has "Replay the guide". Map: [`docs/internal/maps/first-run-desk-and-guide.md`](docs/internal/maps/first-run-desk-and-guide.md); recipe: `features/guide.md`.
 - **First-run needs:** a gateway API key or a portal sign-in (and later optional local models such as Ollama). The wrap key comes from `AGENTFORGE_SECRETS_KEY` (env / secret manager) on the server; keys never reach the renderer, never go in git, never in `NEXT_PUBLIC_*`. The OS keychain is the desktop path only.
@@ -400,7 +526,7 @@ Harbor State seed as identity leftovers (`packages/university/src/labels.ts` sti
 - Never commit `.env`, API keys, or passwords.
 - Do not commit or push unless Rizky asks.
 - **Never `git add -A` or `git add .` in the webdev worktree `C:\Users\rizky\agentforge-webdev-0f994f5`.** It holds uncommitted work from several lanes at once plus untracked binaries such as `apps/web/public/brand/logo.png`. Stage files explicitly by path. See [`docs/internal/security-register.md`](docs/internal/security-register.md), SR-17.
-- Login is the portal flow in `docs/internal/portal/`: browser one-time code and device code. No password, no Better Auth, and no account stack inside the product app. The client makes no entitlement decision: the host enforces, the renderer displays.
+- Login is the portal flow in `docs/internal/portal/`: browser one-time code and device code. No password, no Better Auth, and no account stack inside the product app. The client makes no entitlement decision: the host enforces, the renderer displays. The one exception is the portal's password mode for HYP AI (Rizky, 2026-10-07): still the portal, still no account stack in the product app.
 - **The HTTP server is the product.** Local webdev binds `127.0.0.1:3000`; the hosted app is the same Express host behind a reverse proxy. The loopback-only Origin allowlist in `packages/host/src/local-request.ts:75-84` (`isAllowedMutatingApiRequest`, wired at `packages/host/src/http-adapter.ts:188`) must become a trusted-origin allowlist **plus CSRF protection** before the web app is exposed — open decision 3. Until that lands the host still binds loopback and sits behind the proxy. Personal desktop: packaged Electron has **no HTTP server** — the renderer talks to the host over IPC (`window.agentforge`). Outbound HTTPS from the host to the gateway and the portal is the only network traffic that carries anything of a tenant's. One exception, and it carries nothing: the component installer fetches pinned, sha512-verified packages from `registry.npmjs.org` (see **Components**); plus the keyless public market and search sources a mode calls by design. Since 2026-09-20 there is a second destination that *does* carry a desk's content, by the owner's own act: **`api.telegram.org`**, for the Channels page (`docs/internal/telegram-channels-plan.md`). It is pinned in code like the gateway, HTTPS only, never followed through a redirect, and **pull-only** — inbound messages are fetched with `getUpdates`, never pushed to a webhook, so it opens no inbound route.
 - Every row belongs to a tenant; the host enforces tenancy, the renderer displays.
 - Every user-facing string exists in both `en` and `id` catalogs, and every job harness applies the output-language rule (see **Locale**).

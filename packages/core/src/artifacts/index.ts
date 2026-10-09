@@ -4,6 +4,7 @@ export {
   ARTIFACT_MODES,
   BINARY_ARTIFACT_MIMES,
   DOCX_MIME,
+  PPTX_MIME,
   XLSX_MIME,
   isBinaryArtifactMime,
   artifactExtension,

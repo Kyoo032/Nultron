@@ -49,7 +49,8 @@
     "title": "Agen",
     "writing": "Agen sedang menulis…",
     "placeholder": "Tanyakan kepada editor…",
-    "send": "Kirim"
+    "send": "Kirim",
+    "interrupted": "Agen berhenti sebelum selesai. Suntingan yang sudah dibuatnya tetap disimpan. Alasan: {reason}"
   },
   "cards": {
     "reviewTitle": "Tinjau sebelum ekspor",
@@ -189,7 +190,8 @@
     "checking": "Memeriksa…",
     "installGuide": "Panduan instalasi",
     "recheckFailed": "Tidak dapat menghubungi host lokal untuk memeriksa ulang. Coba lagi sebentar.",
-    "hostedUnavailable": "Alat video belum disiapkan di server ini, jadi pemeriksaan, pemotongan, teks, dan ekspor mungkin belum berfungsi. Minta administrator Anda untuk mengaktifkannya."
+    "hostedUnavailable": "Alat video belum disiapkan di server ini, jadi pemeriksaan, pemotongan, teks, dan ekspor mungkin belum berfungsi. Minta administrator Anda untuk mengaktifkannya.",
+    "bundledUnavailable": "Alat video bawaan {productName} tidak dapat dijalankan, jadi pemeriksaan, pemotongan, teks, dan ekspor nonaktif. Pasang ulang {productName} untuk memperbaikinya. Pekerjaan dan berkas Anda tetap aman."
   },
   "errors": {
     "apply": "Tidak dapat menerapkan suntingan",

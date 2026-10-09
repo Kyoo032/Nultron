@@ -23,6 +23,7 @@
 # The sandbox runtime is rebuilt inside the image from the pinned lock; a local build would ship twice.
 vendor/sandbox-runtime
 vendor/.sandbox-cache
+vendor/.ffmpeg-cache
 
 # Local state and secrets - never in an image. Patterns without `**/` match only at
 # the repo root; apps/web/.env.local and .webdev-data-*/.master-key were both
@@ -79,3 +80,7 @@ webapp-deploy/*.env
 # checkout must not be able to pick up a private key from either (SR-49).
 webapp-deploy/k8s
 webapp-deploy/.pilot-local
+webapp-deploy/.multisite-local
+# The company sites (placeholder pages, their Caddy files and the switch script) are mounted into the PROXY
+# only. The app image has no use for them.
+webapp-deploy/sites

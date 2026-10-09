@@ -18,6 +18,16 @@ import type { Logger } from "../log";
 import { log as defaultLog } from "../log";
 import { MailDeliveryError, type MailMessage, type Mailer, type SentMail, recipientDomain } from "./types";
 
+/**
+ * How long a send may take at each stage before it counts as an outage. A failed send raises
+ * `MailDeliveryError`, so the sign-in answers its neutral page instead of hanging. Connect and greeting
+ * are where a down provider stalls; the socket budget covers one that accepts the message and then goes
+ * quiet. Without them nodemailer's own defaults decide, and those are minutes.
+ */
+export const SMTP_CONNECTION_TIMEOUT_MS = 4_000;
+export const SMTP_GREETING_TIMEOUT_MS = 4_000;
+export const SMTP_SOCKET_TIMEOUT_MS = 8_000;
+
 export interface SmtpMailerOptions {
   readonly smtp: SmtpConfig;
   readonly logger?: Logger;
@@ -43,6 +53,9 @@ export interface SmtpTransportOptions {
   readonly secure: boolean;
   readonly requireTLS: boolean;
   readonly ignoreTLS: boolean;
+  readonly connectionTimeout: number;
+  readonly greetingTimeout: number;
+  readonly socketTimeout: number;
   readonly auth?: { readonly user: string; readonly pass: string };
 }
 
@@ -67,6 +80,9 @@ export function smtpTransportOptions(smtp: SmtpConfig): SmtpTransportOptions {
     // Only ever true for a loopback sandbox: Mailpit speaks plain SMTP on 1025 and offers no
     // STARTTLS, so `requireTLS` there would refuse every development send.
     ignoreTLS: smtp.ignoreTls,
+    connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+    greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+    socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
     ...(smtp.user && smtp.pass ? { auth: { user: smtp.user, pass: smtp.pass } } : {}),
   });
 }

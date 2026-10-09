@@ -181,8 +181,12 @@ git worktree add --detach $pack $sha
 cd $pack
 # PYTHON + npm_config_python + unset ELECTRON_RUN_AS_NODE (same as §0)
 npx pnpm@9.15.9 install --frozen-lockfile
+node apps/desktop/scripts/stage-ffmpeg.mjs --target win32-x64
+node .cursor/skills/pack-nultron/scripts/preflight.mjs --require-ffmpeg
 npx pnpm@9.15.9 desktop:build
 ```
+
+**ffmpeg is in the installer, never optional.** `stage-ffmpeg.mjs` downloads the pinned ffmpeg and ffprobe (about 190 MB the first time, cached in `vendor/.ffmpeg-cache/`) into `apps/desktop/resources/ffmpeg/`, and `desktop:build` runs it again as a no-op that re-verifies. Both stop the pack when the folder does not match `apps/desktop/scripts/ffmpeg.lock.json`; a pack made without them shows every person an "install ffmpeg" notice. `--require-ffmpeg` in the worktree preflight fails when the folder is not staged for `win32-x64`. After the pack, list `dist\win-unpacked\resources\ffmpeg\` (the two `.exe`, `LICENSE.txt`, `MANIFEST.json`), run `node apps/desktop/scripts/stage-ffmpeg.mjs --verify --out dist\win-unpacked\resources\ffmpeg`, then launch `Nultron.exe` and check `doctor --desktop` shows `editFfmpeg.found: true` with a path under `resources\ffmpeg`. Neither the staging nor that check has been run through a real pack yet.
 
 **Windows feedback:** exe + blockmap + `latest.yml`; grep `host.cjs`; launch `dist\win-unpacked\Nultron.exe`; `doctor.mjs --desktop` from **main** checkout (`transport: "ipc"`). If a shell/menu file changed: Ctrl+V **and** right-click Paste on the key field. NSIS `/S` hangs — [traps.md](traps.md).
 
@@ -199,6 +203,8 @@ Never `electron-builder --mac` on this host.
 
 **macOS feedback:** per-arch `verify: all checks passed` for `.app` **and** `--dmg --zip`. Static only. Cmd+C/V and Dock reopen are **not** proven here.
 
+**ffmpeg, per arch.** `build-mac.sh` stages `darwin-<arch>` into `apps/desktop/resources/ffmpeg/` before electron-builder (removing the other target's files first), checks the bundle's `Contents/Resources/ffmpeg/` against the lock before signing (`stage-ffmpeg.mjs --verify`), checks both programs are executable after signing, and `verify-bundle.py` requires the four files and that each program is Mach-O for the arch. The archives are cached in the `/cache/ffmpeg` volume. Look for `staging ffmpeg darwin-<arch>`, `verifying ffmpeg inside the bundle` and `signing left the ffmpeg programs byte for byte as pinned` (or the `note: signing rewrote ...` line, which is expected if rcodesign re-signs nested Mach-O) in the log. A staging failure stops the pack; the mac route never ships a dmg without ffmpeg. Not yet run in Docker.
+
 ## 4. Combine + release
 
 Copy `Nultron Setup <v>.exe`, `.blockmap`, and `latest.yml` from the **worktree** dist into main `apps/desktop/dist/`.
@@ -212,6 +218,7 @@ Never upload `latest-mac.yml`. Do not `git push` source to Nultron.
 
 ## Do not
 
+- Pack without ffmpeg staged (`resources/ffmpeg/` empty or for the wrong target), or edit `ffmpeg.lock.json` and stage by hand without the Edit recipe afterwards
 - Run `desktop:build` and `desktop:build:mac:docker` in the same cwd
 - Teach the UI Ctrl vs Cmd in `apps/web` — shortcuts come from Electron **roles**
 - `Menu.setApplicationMenu(null)`

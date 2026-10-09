@@ -132,6 +132,71 @@ describe("parseSessionPayload", () => {
     expect(parseSessionPayload({ body: SUMMARY }).status).toBe("signed-in");
   });
 
+  // PORTAL_SIGNIN_MODE=password (2026-10-07): the host says, from the portal's own word, that people
+  // sign in with a password, and the sign-in screen stops promising an e-mailed code. Only that one
+  // word counts, and in the default mode the snapshot has no such field at all.
+  describe("signInMode", () => {
+    it("reads password off a signed-out answer, with or without a reason, and off a signed-in one", () => {
+      expect(parseSessionPayload({ signedIn: false, signInMode: "password" })).toEqual({
+        status: "signed-out",
+        identity: null,
+        reason: null,
+        signInMode: "password",
+      });
+      expect(parseSessionPayload({ signedIn: false, reason: "session_revoked", signInMode: "password" })).toEqual({
+        status: "signed-out",
+        identity: null,
+        reason: "session_revoked",
+        signInMode: "password",
+      });
+      expect(parseSessionPayload({ ...SUMMARY, signInMode: "password" }).signInMode).toBe("password");
+      expect(parseSessionPayload({ body: { signedIn: false, signInMode: "password" } }).signInMode).toBe("password");
+    });
+
+    it("leaves the field out in the default mode, so every snapshot is what it was", () => {
+      for (const payload of [
+        { signedIn: false },
+        { signedIn: false, signInMode: "code" },
+        { signedIn: false, signInMode: "Password" },
+        { signedIn: false, signInMode: true },
+        { signedIn: false, signInMode: ["password"] },
+        SUMMARY,
+      ]) {
+        expect(parseSessionPayload(payload), JSON.stringify(payload)).not.toHaveProperty("signInMode");
+      }
+      expect(parseSessionPayload({ signedIn: false })).toEqual({ status: "signed-out", identity: null, reason: null });
+    });
+
+    it("keeps the mode through a session lost mid-use, so the screen that follows says the same thing", () => {
+      const live = parseSessionPayload({ ...SUMMARY, signInMode: "password" });
+      expect(afterSessionLost(live, "session_revoked")).toEqual({
+        status: "signed-out",
+        identity: null,
+        reason: "session_revoked",
+        signInMode: "password",
+      });
+      expect(afterSessionLost(parseSessionPayload(SUMMARY), "session_revoked")).toEqual({
+        status: "signed-out",
+        identity: null,
+        reason: "session_revoked",
+      });
+    });
+
+    it("reads the mode through the boot read, which is the only place the screen learns it", async () => {
+      respond = answers(HOSTED, { signedIn: false, signInMode: "password" });
+      expect(await readSessionOnce()).toEqual({
+        status: "signed-out",
+        identity: null,
+        reason: null,
+        signInMode: "password",
+      });
+      // And a desk never asks at all, so it never hears of a mode. (Ping is memoised: start it over.)
+      resetPingForTests();
+      respond = answers(DESK, { signedIn: false, signInMode: "password" });
+      expect(await readSessionOnce()).toEqual(SESSIONS_OFF);
+    });
+  });
+
   // The host adds the person's role (the membership row) to this answer so the screen can hide what the
   // host would refuse — the Erase account button for anybody who is not an owner (SR-65). Display only.
   it.each(["owner", "admin", "member"] as const)("reads the role %s the host reports", (role) => {

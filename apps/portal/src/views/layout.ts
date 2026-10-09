@@ -60,6 +60,12 @@ export interface PageOptions {
   readonly product: string;
   readonly body: SafeHtml;
   readonly footer?: string;
+  /**
+   * CSS added after the shared block, for the screens that need more than it has (a form with several
+   * fields). Absent, the page is byte for byte what it was, which is the point: a screen that does not
+   * ask for this -- every screen of the e-mailed-code sign-in -- is unchanged.
+   */
+  readonly extraStyle?: string;
 }
 
 export function page(options: PageOptions): string {
@@ -69,7 +75,7 @@ export function page(options: PageOptions): string {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <title>${options.title} — ${options.product}</title>
-<style>${raw(STYLE)}</style>
+<style>${raw(STYLE)}${raw(options.extraStyle ?? "")}</style>
 </head>
 <body>
 <main>

@@ -2,7 +2,7 @@
 
 import { t } from "@/lib/i18n";
 import { codeLanguageName, toolRowLabel } from "@/lib/tool-labels";
-import { BudgetNote, FileChip, RefusalNote, ROW_HEAD, RowLabel, type RowTool } from "./parts";
+import { BudgetNote, FileChip, FileDownloadButton, RefusalNote, ROW_HEAD, RowLabel, type RowTool } from "./parts";
 import { asRecord, classifyOutcome, readCodeResult, readString } from "./results";
 
 /** A block longer than this is cut for the screen. The runner already caps what it sends. */
@@ -116,7 +116,10 @@ export function CodeToolRow({ tool }: { tool: RowTool }) {
         <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5" data-testid="tool-row-code-files">
           <span className="text-[var(--text-3)]">{t("chat.tools.code.filesWritten")}</span>
           {run.filesWritten.slice(0, FILE_CHIPS_MAX).map((file) => (
-            <FileChip key={file.path} path={file.path} text={file.path} />
+            <span key={file.path} className="inline-flex min-w-0 max-w-full items-center gap-1">
+              <FileChip path={file.path} text={file.path} />
+              <FileDownloadButton path={file.path} />
+            </span>
           ))}
         </div>
       ) : null}

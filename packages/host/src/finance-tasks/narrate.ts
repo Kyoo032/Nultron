@@ -12,6 +12,7 @@ import {
   type FinanceTaskSection,
   type ReportLocale,
 } from "@agentforge/core/finance";
+import { scopeHits } from "@agentforge/core/judges";
 import {
   GUARD_OUTSIDE_SECTIONS,
   guardAssumptions,
@@ -19,6 +20,7 @@ import {
   guardTitle,
   type GuardReport,
 } from "../finance-brief-build";
+import { splitSentences } from "../finance-section-repair";
 import { extractJsonObject } from "../presentation-outline";
 
 export const FINANCE_TASK_SYSTEM = `You write the narrative for one Nultron finance task. Every figure was computed in code and is listed for you; you add none.
@@ -113,6 +115,26 @@ function guardedTitle(draft: NarrationDraft, allowed: readonly number[]) {
     : guardTitle(draft.title, allowed, draft.fallbackTitle);
 }
 
+/** A section whose body told the reader what to do, with the sentences that did. */
+export type AdviceFinding = { readonly section: number; readonly sentences: readonly string[] };
+
+/**
+ * The sentences of a body that advise: "you should", "we recommend", "sebaiknya Anda", and the rest of
+ * the scope judge's list (`@agentforge/core/judges`). `sources` are the person's own words (their
+ * source text and their question): a sentence copied from one of them is theirs, not advice.
+ *
+ * A finance write-up describes what the computed figures show. It does not tell anyone to buy, sell,
+ * fund or approve, whatever the model was told in the prompt, so this is the check that holds the line
+ * in code. Pure: no model, no figure produced.
+ */
+export function adviceSentencesIn(body: string, sources: readonly string[]): string[] {
+  return body
+    .split(/\n{2,}/)
+    .flatMap((paragraph) => splitSentences(paragraph))
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => scopeHits(sentence, sources).some((hit) => hit.kind === "advice"));
+}
+
 /**
  * Prose with every unverified figure dealt with, and the tally the report shows as flags.
  *
@@ -120,13 +142,19 @@ function guardedTitle(draft: NarrationDraft, allowed: readonly number[]) {
  * the sentence out. A title, a heading and an assumption are never rewritten, so their figure is
  * dealt with here: a title is replaced by the fallback, a heading loses the figure, an assumption
  * goes whole. The marker is never left in any of them.
+ *
+ * The scope judge runs here too: `advice` names the sections whose body advised. Nothing is changed
+ * for it — the rewrite and the removal belong to `holdReadingScope`, which spends the run's shared
+ * extra call — so this stays a judgement and the prose below is exactly what the figure guard made.
  */
 export function guardNarration(
   draft: NarrationDraft,
   allowed: readonly number[],
+  sources: readonly string[] = [],
 ): {
   prose: FinanceTaskProse;
   guard: GuardReport;
+  advice: AdviceFinding[];
 } {
   const title = guardedTitle(draft, allowed);
   const guarded = draft.sections.map((section) => ({
@@ -153,5 +181,9 @@ export function guardNarration(
       assumptions: assumptions.assumptions,
     },
     guard: { flagged, total: flagged.length, ...(assumptions.removed > 0 ? { removed: assumptions.removed } : {}) },
+    advice: draft.sections.flatMap((section, index) => {
+      const sentences = adviceSentencesIn(section.body, sources);
+      return sentences.length > 0 ? [{ section: index, sentences }] : [];
+    }),
   };
 }

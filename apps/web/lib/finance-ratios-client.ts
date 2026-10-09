@@ -10,6 +10,7 @@
  */
 import type { LineItem, RatioBucket, RatioStatedRow } from "@agentforge/core/finance";
 import { apiFetch } from "./api-client";
+import { messageUnlessBlocked } from "./gateway-blocked";
 
 export type RatiosParsedRow = {
   readonly label: string;
@@ -33,9 +34,12 @@ export type RatiosParsed = {
   readonly modelAssist: { readonly asked: number; readonly placed: number; readonly error: string | null } | null;
 };
 
+/** A hosted `403 gateway_blocked` reads as the needs-key sentence (flat body, see `financeFailure`). */
 function messageOf(payload: unknown, fallback: string): string {
-  const error = payload && typeof payload === "object" ? (payload as { error?: { message?: unknown } }).error : null;
-  return error && typeof error.message === "string" && error.message.trim() ? error.message : fallback;
+  return messageUnlessBlocked(payload, () => {
+    const error = payload && typeof payload === "object" ? (payload as { error?: { message?: unknown } }).error : null;
+    return error && typeof error.message === "string" && error.message.trim() ? error.message : fallback;
+  });
 }
 
 /** Statement text in, classified rows out. Nothing is computed by this call. */

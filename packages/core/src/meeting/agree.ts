@@ -1,7 +1,7 @@
 import { figureMarks } from "./ground";
 import type { MeetingMinutes } from "./minutes";
 
-export type MinutesAgreeReason = "counts" | "owners" | "dates" | "provisional" | "figures";
+export type MinutesAgreeReason = "counts" | "quotes" | "owners" | "dates" | "provisional" | "figures";
 
 export type MinutesAgreeResult = { ok: true } | { ok: false; reason: MinutesAgreeReason };
 
@@ -21,8 +21,9 @@ function prose(minutes: MeetingMinutes): string[] {
 }
 
 /**
- * The translation is the same sheet when the lists, owners, dates, provisional marks, and figures
- * still line up. Wording may change. A dropped decision, a renamed owner, or a new number may not.
+ * The translation is the same sheet when the lists, quotes, owners, dates, provisional marks, and figures
+ * still line up. Wording may change. A dropped decision, a renamed owner, or a new number may not, and a
+ * quote is the speakers' own words, so it must come back character for character.
  */
 export function minutesAgree(source: MeetingMinutes, translated: MeetingMinutes): MinutesAgreeResult {
   const countsMatch =
@@ -33,6 +34,18 @@ export function minutesAgree(source: MeetingMinutes, translated: MeetingMinutes)
     source.openQuestions.length === translated.openQuestions.length;
   if (!countsMatch) {
     return { ok: false, reason: "counts" };
+  }
+  const quotesMatch =
+    same(
+      source.decisions.map((decision) => decision.quote),
+      translated.decisions.map((decision) => decision.quote),
+    ) &&
+    same(
+      source.actionItems.map((item) => item.quote),
+      translated.actionItems.map((item) => item.quote),
+    );
+  if (!quotesMatch) {
+    return { ok: false, reason: "quotes" };
   }
   const ownersMatch =
     same(

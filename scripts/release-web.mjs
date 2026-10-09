@@ -20,14 +20,16 @@
  *      untracked local state (a webdev data dir with its .master-key, an apps/web/.env.local) out of
  *      the images - the dockerignore only excludes `data` and `.env*` at the repo root;
  *   3. bundle: clone NultronEnt into the same temp dir, write compose.yml (both images pinned to the
- *      tag), .env.example, portal.env.example, DEPLOY.md and Caddyfile, commit `Release <tag>` as the
- *      git user of this repo with no trailers, push `main`;
+ *      tag), .env.example, portal.env.example, DEPLOY.md and Caddyfile, plus the sites/ folder (the proxy's
+ *      switch script, the two company sites' Caddy files and placeholder pages: webapp-deploy/sites at
+ *      <sha>, text files only), commit `Release <tag>` as the git user of this repo with no trailers, push
+ *      `main`;
  *   4. release: `gh release create <tag>` with the notes + `Source: agentforge@<sha>` +
  *      `Image: <image>` + `Portal image: <portal image>`, then `gh release view` to confirm.
  * The temp dir is removed on every exit path.
  *
- * `--dry-run` runs no docker, no gh, and no git beyond reading this repo (status, rev-parse, and
- * `show <sha>:webapp-deploy/Caddyfile`). `--skip-image` skips step 2 only (both images for this tag
+ * `--dry-run` runs no docker, no gh, and no git beyond reading this repo (status, rev-parse, cat-file,
+ * `show <sha>:webapp-deploy/Caddyfile` and `ls-tree` / `show` of webapp-deploy/sites). `--skip-image` skips step 2 only (both images for this tag
  * are already pushed). This script never pushes agentforge.
  *
  * Rizky has not confirmed the tag scheme; ent-CalVer is the working default (AGENTS.md, Web release).
@@ -47,6 +49,9 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { forbiddenMarksIn } from "./release-marks.mjs";
+import { composeFileText } from "./release-web-compose.mjs";
+import { deployDocText } from "./release-web-docs.mjs";
+import { REQUIRED_SITE_FILES, SITES_BUNDLE_DIR, readSiteFiles } from "./release-web-sites.mjs";
 
 // The refusal list and its matcher live in ./release-marks.mjs, shared with the Personal release
 // (apps/desktop/scripts/release-desktop.mjs). Re-exported so this module's API does not change.
@@ -93,13 +98,37 @@ export const REQUIRED_PORTAL_ENV = [
   "PORTAL_SMTP_PASS",
   "PORTAL_SMTP_FROM",
 ];
-/** The few template values that are not empty: the seed's default client id and the SES settings (implicit TLS on 465). */
+/**
+ * What portal.env.example carries that nothing refuses to boot without: how people sign in. It has a default
+ * (`code`, the e-mailed one-time code), so it is listed with that value and a comment, and an operator who never
+ * touches it gets exactly what a portal without the variable has always done. `password` is the other value
+ * (apps/portal/src/config.ts); anything else stops the portal at boot.
+ */
+export const OPTIONAL_PORTAL_ENV = ["PORTAL_SIGNIN_MODE"];
+/**
+ * The few template values that are not empty: the seed's default client id, the sign-in mode, the SES settings
+ * (implicit TLS on 465) and the sender (owner decision 2026-10-05: display name Nultron, address
+ * no-reply@mail.dpscloud.co.id, SES sender domain mail.dpscloud.co.id). The SMTP user and password stay empty:
+ * they are secrets.
+ */
 export const ENV_DEFAULTS = {
   AGENTFORGE_PORTAL_CLIENT_ID: "nultron-web",
+  PORTAL_SIGNIN_MODE: "code",
   PORTAL_SMTP_HOST: "sg-smtp.qcloudmail.com",
   PORTAL_SMTP_PORT: "465",
   PORTAL_SMTP_SECURE: "1",
+  PORTAL_SMTP_FROM: "Nultron <no-reply@mail.dpscloud.co.id>",
 };
+/**
+ * The optional variables of the company sites (DEPLOY.md, "Hosting the company sites on the same server"). Written
+ * to .env.example as comments, never as assignments: unset means the site is not served.
+ */
+export const OPTIONAL_ENV = [
+  ["DPS_DOMAIN", "dpscloud.co.id", "Serve the DPS Cloud website on this name and on www.<name>. Point both A records here first."],
+  ["TOKOTOKEN_DOMAIN", "tokotokenai.com", "Serve the Toko Token website on this name and on www.<name>. Never api.tokotokenai.com: that is the live gateway, hosted elsewhere."],
+  ["DPS_WEB_ROOT", "/srv/sites/dpscloud", "A folder outside this one with the real DPS Cloud site. Default: the placeholder page in ./sites/dpscloud."],
+  ["TOKOTOKEN_WEB_ROOT", "/srv/sites/tokotoken", "A folder outside this one with the real Toko Token site. Default: the placeholder page in ./sites/tokotoken."],
+];
 export const BUNDLE_FILES = ["compose.yml", ".env.example", "portal.env.example", "DEPLOY.md", "Caddyfile"];
 
 const TAG_PATTERN = /^ent-(\d{4})\.(\d{2})\.(\d{2})(?:\.([1-9]\d*))?$/;
@@ -164,244 +193,10 @@ export function releaseBody(notes, fullSha, image, portalImage) {
 /**
  * The released stack: the same five services as webapp-deploy/compose.yml with the hardening kept in step
  * (scripts/pilot-deploy.test.mjs compares them), images pinned to the release tag and nothing built on the
- * server. The comments live in the source file; this one is generated.
+ * server. The text is in release-web-compose.mjs.
  */
 export function composeFile(tag) {
-  return `# Nultron Enterprise ${tag}. Run it with DEPLOY.md. Generated per release; do not edit here.
-# One of each service, on purpose: the app's and the portal's limiters and refresh lock live in
-# process memory, so a second replica of either would double every ceiling.
-name: nultron-ent
-
-services:
-  app:
-    image: ${imageRef(tag)}
-    # .env is the APP's. The portal's secrets are in portal.env, which only the portal side loads.
-    env_file:
-      - path: .env
-        required: true
-    environment:
-      NODE_ENV: production
-      PORT: "3000"
-      AGENTFORGE_SERVER: "1"
-      AGENTFORGE_DATA_DIR: /data
-      AGENTFORGE_COMPONENTS_DIR: /opt/agentforge/components
-      TMPDIR: /tmp
-      XDG_CACHE_HOME: /tmp/.cache
-      NPM_CONFIG_CACHE: /tmp/.npm
-      AGENTFORGE_SECRETS_KEY: \${AGENTFORGE_SECRETS_KEY:-}
-    # The app reaches the portal over https, through the proxy that shares this network namespace: the
-    # portal's public name resolves to this container's own loopback, where the proxy listens on 443.
-    extra_hosts:
-      - "\${PORTAL_DOMAIN:?set it in .env}:127.0.0.1"
-    read_only: true
-    tmpfs:
-      - /tmp:mode=1777,size=512m,nosuid,nodev,noexec
-    volumes:
-      - nultron-data:/data
-      - nultron-components:/opt/agentforge/components
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    init: true
-    pids_limit: 512
-    mem_limit: 6g
-    mem_reservation: 1g
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
-    # The app binds loopback; the proxy shares this network namespace, so the ports live here. The
-    # explicit 0.0.0.0 keeps Docker from also binding [::] on a box with a public IPv6 address.
-    ports:
-      - "0.0.0.0:80:80"
-      - "0.0.0.0:443:443"
-      - "0.0.0.0:443:443/udp"
-    restart: unless-stopped
-
-  proxy:
-    image: ${PROXY_IMAGE}
-    network_mode: "service:app"
-    depends_on:
-      - app
-    # The Caddyfile reads these two names and nothing else, so the secrets in .env stay with the app.
-    environment:
-      NULTRON_DOMAIN: \${NULTRON_DOMAIN:?set it in .env}
-      PORTAL_DOMAIN: \${PORTAL_DOMAIN:?set it in .env}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    read_only: true
-    tmpfs:
-      - /tmp:mode=1777,size=64m,nosuid,nodev,noexec
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    cap_add:
-      - NET_BIND_SERVICE
-    init: true
-    pids_limit: 128
-    mem_limit: 512m
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
-    restart: unless-stopped
-
-  portal-db:
-    image: ${DATABASE_IMAGE}
-    user: "999:999"
-    env_file:
-      - path: portal.env
-        required: true
-    environment:
-      POSTGRES_USER: portal
-      POSTGRES_DB: tokotoken_portal
-      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
-      PGDATA: /var/lib/postgresql/data/pgdata
-    entrypoint:
-      - sh
-      - -c
-      - exec env -u PORTAL_SIGNING_KEY -u PORTAL_SMTP_USER -u PORTAL_SMTP_PASS -u PORTAL_APP_DB_PASSWORD POSTGRES_PASSWORD="$$PORTAL_POSTGRES_PASSWORD" docker-entrypoint.sh postgres
-    volumes:
-      - portal-pgdata:/var/lib/postgresql/data
-    read_only: true
-    tmpfs:
-      - /var/run/postgresql:mode=0755,uid=999,gid=999
-      - /tmp:mode=1777,size=128m,nosuid,nodev,noexec
-    networks:
-      - portal-db
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U portal -d tokotoken_portal"]
-      interval: 10s
-      timeout: 5s
-      retries: 6
-      start_period: 20s
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    init: true
-    pids_limit: 200
-    mem_limit: 1g
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
-    restart: unless-stopped
-
-  portal-prepare:
-    image: ${portalImageRef(tag)}
-    env_file:
-      - path: portal.env
-        required: true
-    environment:
-      NODE_ENV: production
-      PORTAL_DATA_DIR: /portal-data
-      PORTAL_PUBLIC_URL: https://\${PORTAL_DOMAIN:?set it in .env}
-      PORTAL_TRUST_PROXY: "1"
-      TMPDIR: /tmp
-      XDG_CACHE_HOME: /tmp/.cache
-    entrypoint:
-      - sh
-      - /app/webapp-deploy/portal-entry.sh
-    command:
-      - node
-      - /app/webapp-deploy/k8s/base/scripts/prepare-db.mjs
-    read_only: true
-    tmpfs:
-      - /tmp:mode=1777,size=128m,nosuid,nodev,noexec
-      - /portal-data:mode=0700,size=16m,uid=1000,gid=1000
-    networks:
-      - portal-db
-    depends_on:
-      portal-db:
-        condition: service_healthy
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    init: true
-    pids_limit: 128
-    mem_limit: 768m
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
-    restart: "no"
-
-  portal:
-    image: ${portalImageRef(tag)}
-    env_file:
-      - path: portal.env
-        required: true
-    environment:
-      NODE_ENV: production
-      PORTAL_HOST: 0.0.0.0
-      PORTAL_PORT: "4000"
-      PORTAL_DATA_DIR: /portal-data
-      PORTAL_PUBLIC_URL: https://\${PORTAL_DOMAIN:?set it in .env}
-      PORTAL_TRUST_PROXY: "1"
-      TMPDIR: /tmp
-      XDG_CACHE_HOME: /tmp/.cache
-    entrypoint:
-      - sh
-      - /app/webapp-deploy/portal-entry.sh
-    command:
-      - ./node_modules/.bin/tsx
-      - src/main.ts
-    depends_on:
-      portal-prepare:
-        condition: service_completed_successfully
-    read_only: true
-    tmpfs:
-      - /tmp:mode=1777,size=128m,nosuid,nodev,noexec
-      - /portal-data:mode=0700,size=16m,uid=1000,gid=1000
-    networks:
-      - default
-      - portal-db
-    healthcheck:
-      test:
-        - CMD
-        - node
-        - -e
-        - "fetch('http://127.0.0.1:'+(process.env.PORTAL_PORT||4000)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 60s
-    security_opt:
-      - no-new-privileges:true
-    cap_drop:
-      - ALL
-    init: true
-    pids_limit: 256
-    mem_limit: 768m
-    mem_reservation: 128m
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "5"
-    restart: unless-stopped
-
-networks:
-  portal-db:
-    internal: true
-
-volumes:
-  nultron-data:
-  nultron-components:
-  caddy-data:
-  caddy-config:
-  portal-pgdata:
-`;
+  return composeFileText({ tag, app: imageRef(tag), portal: portalImageRef(tag), proxy: PROXY_IMAGE, database: DATABASE_IMAGE });
 }
 
 /** An env template: a comment line, then NAME= with its default or an empty value. */
@@ -410,8 +205,14 @@ function envTemplate(header, entries) {
   return `${header}\n\n${body}\n`;
 }
 
+/** The optional variables as comments, after the required ones. Unset means that site is not served. */
+function optionalEnvBlock() {
+  const lines = OPTIONAL_ENV.map(([name, example, comment]) => `# ${comment}\n# ${name}=${example}`).join("\n");
+  return `\n# ---- Optional: the company sites on this same server (DEPLOY.md, "Hosting the company sites on the same server") ----\n${lines}\n`;
+}
+
 export function envExample() {
-  return envTemplate(
+  return `${envTemplate(
     `# Nultron Enterprise: the APP's environment. Every variable the hosted app refuses to start without.
 # Copy to .env next to compose.yml and fill each one in. Never commit .env, and never put a real secret
 # in this file. The portal's secrets are in portal.env, which the app never loads.`,
@@ -443,7 +244,7 @@ export function envExample() {
         "Required to boot, and given to nobody: the proxy answers 404 on the billing webhook until a payment provider is bound (openssl rand -hex 32).",
       ],
     ],
-  );
+  )}${optionalEnvBlock()}`;
 }
 
 export function portalEnvExample() {
@@ -458,40 +259,23 @@ export function portalEnvExample() {
       ],
       ["PORTAL_POSTGRES_PASSWORD", "Schema owner's password for the portal database. Read by initdb once, on an empty volume."],
       ["PORTAL_APP_DB_PASSWORD", "Password of portal_app_login, the role the portal serves as. Not the same value."],
+      [
+        "PORTAL_SIGNIN_MODE",
+        "How people sign in. code (the default, and what a portal without this line does) e-mails a one-time code, so the SMTP settings below are required. password signs people in with a username and a password an operator creates: no mail is sent and the SMTP settings may stay blank. Anything else stops the portal at boot.",
+      ],
       ["PORTAL_SMTP_HOST", "Tencent Cloud SES, International site. smtp.qcloudmail.com is the Hong Kong (China site) host."],
       ["PORTAL_SMTP_PORT", "465, implicit TLS. SES documents no other SMTP port."],
       ["PORTAL_SMTP_SECURE", "1 = TLS from the first byte, which is what port 465 speaks."],
-      ["PORTAL_SMTP_USER", "The verified SES sender address, in full."],
+      ["PORTAL_SMTP_USER", "The verified SES sender address, in full: no-reply@mail.dpscloud.co.id (the SES sender domain is mail.dpscloud.co.id)."],
       ["PORTAL_SMTP_PASS", "The SMTP password set for that sender address in the SES console."],
-      ["PORTAL_SMTP_FROM", "The From header, e.g. Nultron <no-reply@mail.example.com>. Its address must be the verified sender."],
+      ["PORTAL_SMTP_FROM", "The From header: the display name Nultron and the verified sender address. Change it here to change the sender."],
     ],
   );
 }
 
+/** DEPLOY.md for one release; the text is in release-web-docs.mjs. */
 export function deployDoc(tag) {
-  return `# Deploy Nultron Enterprise ${tag}
-
-This folder runs one release of the hosted app on one server: the app image \`${imageRef(tag)}\`, the portal
-image \`${portalImageRef(tag)}\` (where people sign in) with its own Postgres, and a Caddy proxy in front of
-both. Nothing is built on the server. One of each service: do not scale any of them.
-
-1. \`docker login ghcr.io\` with a GitHub token that can read packages. Both images are private.
-2. \`cp .env.example .env\` and \`cp portal.env.example portal.env\`, fill in every name in both, and keep both
-   off git (\`chmod 600\`). Generate \`AGENTFORGE_SECRETS_KEY\` and \`PORTAL_SIGNING_KEY\` once and keep them: a
-   new wrap key cannot read the old data, and a new signing key signs everyone out.
-3. Point two DNS A records, \`NULTRON_DOMAIN\` and \`PORTAL_DOMAIN\`, at this server (no AAAA record) and open
-   TCP 80 and 443 and UDP 443, inbound, IPv4 only.
-4. Start the portal first, because the app will not boot without the client secret it prints:
-   \`docker compose pull && docker compose up -d portal\` (this starts its database and migrations too).
-5. Seed the first tenant and user. The secret is shown once:
-   \`docker compose exec -T portal sh /app/webapp-deploy/portal-entry.sh ./node_modules/.bin/tsx scripts/seed.ts --email <you> --redirect https://<NULTRON_DOMAIN>/auth/callback\`
-   Put the client secret it prints in \`.env\` as \`AGENTFORGE_PORTAL_CLIENT_SECRET\`.
-6. \`docker compose up -d\`, then \`docker compose ps\` until \`app\` and \`portal\` are \`healthy\`, and open
-   \`https://<NULTRON_DOMAIN>\`.
-
-Back up the \`nultron-data\` and \`portal-pgdata\` volumes before an upgrade: the databases migrate forward only. To
-roll back, check out the previous release tag of this repo and repeat steps 6 onward.
-`;
+  return deployDocText(tag, imageRef(tag), portalImageRef(tag));
 }
 
 /** webapp-deploy/Caddyfile at <sha>, with its comment lines dropped (they cite source paths). */
@@ -506,13 +290,18 @@ export function caddyfileFrom(source, tag) {
   return `# Nultron Enterprise ${tag}. Generated per release; do not edit here.\n${directives}\n`;
 }
 
-export function renderBundle(tag, caddySource) {
+/**
+ * The five top-level files, then the company sites' files (`sites/...`, from readSiteFiles) when there are any.
+ * compose.yml mounts `./sites` into the proxy, so a real release always passes them.
+ */
+export function renderBundle(tag, caddySource, siteFiles = {}) {
   return {
     "compose.yml": composeFile(tag),
     ".env.example": envExample(),
     "portal.env.example": portalEnvExample(),
     "DEPLOY.md": deployDoc(tag),
     Caddyfile: caddyfileFrom(caddySource, tag),
+    ...siteFiles,
   };
 }
 
@@ -641,6 +430,8 @@ export const REQUIRED_SOURCE_FILES = [
   "webapp-deploy/portal.Dockerfile.dockerignore",
   "webapp-deploy/portal-entry.sh",
   "webapp-deploy/k8s/base/scripts/prepare-db.mjs",
+  // The proxy's entrypoint and the company sites it switches on (compose.yml mounts ./sites into it).
+  ...REQUIRED_SITE_FILES,
 ];
 
 function checkSourceFiles(fullSha, deps) {
@@ -650,7 +441,7 @@ function checkSourceFiles(fullSha, deps) {
   if (missing.length > 0) {
     fail(`commit ${fullSha} does not contain ${missing.join(", ")}: the images cannot be built from it (commit them first)`);
   }
-  deps.log("ok - the sha carries both Dockerfiles and the portal's scripts");
+  deps.log("ok - the sha carries both Dockerfiles, the portal's scripts and the proxy's site files");
 }
 
 function buildAndPushImages(fullSha, image, portalImage, workDir, deps) {
@@ -697,9 +488,18 @@ function pushBundle(tag, bundle, workDir, deps) {
     deps.git(["clone", "--quiet", "--depth", "1", "--branch", "main", RELEASE_REPO_URL, cloneDir], workDir),
     "git clone",
   );
-  for (const [name, content] of Object.entries(bundle)) writeFileSync(join(cloneDir, name), content, "utf8");
+  // The bundle's sites/ folder mirrors the released sha: a file dropped from it is dropped from the repo too.
+  rmSync(join(cloneDir, SITES_BUNDLE_DIR), { recursive: true, force: true });
+  for (const [name, content] of Object.entries(bundle)) {
+    const target = resolve(cloneDir, name);
+    if (!target.startsWith(`${resolve(cloneDir)}${sep}`)) fail(`refusing to write ${name} outside the release repo`);
+    mkdirSync(dirname(target), { recursive: true });
+    writeFileSync(target, content, "utf8");
+  }
   assertTreePublishable(cloneDir);
-  expectOk(deps.git(["add", "--", ...Object.keys(bundle)], cloneDir), "git add");
+  const inSites = (name) => name.startsWith(`${SITES_BUNDLE_DIR}/`);
+  const toAdd = [...Object.keys(bundle).filter((name) => !inSites(name)), ...(Object.keys(bundle).some(inSites) ? [SITES_BUNDLE_DIR] : [])];
+  expectOk(deps.git(["add", "--all", "--", ...toAdd], cloneDir), "git add");
   const changed = expectOk(deps.git(["status", "--porcelain"], cloneDir), "git status").stdout.trim();
   if (!changed) {
     deps.log(`ok - bundle already matches ${RELEASE_REPO} main, nothing to commit`);
@@ -757,7 +557,8 @@ export function main(argv = process.argv.slice(2), overrides = {}) {
   checkSourceFiles(fullSha, deps);
   const body = releaseBody(readNotes(flags.tag, deps), fullSha, image, portalImage);
   assertPublishable("the release body", body);
-  const bundle = renderBundle(flags.tag, readCaddyfile(fullSha, deps));
+  const siteFiles = readSiteFiles(fullSha, flags.tag, (args) => deps.git(args, deps.repoRoot), fail);
+  const bundle = renderBundle(flags.tag, readCaddyfile(fullSha, deps), siteFiles);
   for (const [name, content] of Object.entries(bundle)) assertPublishable(name, content);
   deps.log(`ok - bundle has none of the banned marks`);
   const workDir = mkdtempSync(join(tmpdir(), "nultron-ent-release-"));

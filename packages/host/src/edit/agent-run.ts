@@ -15,6 +15,7 @@ import {
   matchStubFillScenario,
   matchStubGenerateScenario,
   modeMessage,
+  redactSecrets,
   resolveRuntimeMode,
   stubEditCardCopy,
   withOutputLanguage,
@@ -36,6 +37,7 @@ import { hostEditBackend } from "./backend";
 import { undoCard } from "./undo";
 import { appendEditMetric } from "./metrics";
 import { runEditHarness } from "./harness-run";
+import { redactToolEvent } from "../chat-tool-events";
 
 const MUTATING = new Set([
   "split_clip",
@@ -117,6 +119,10 @@ class StringQueue {
  * rule: one neutral sentence that matches the banner (`edit.ffmpeg.hostedUnavailable`), no platform, no
  * command, no variable name, no path.
  *
+ * In the packaged app the ffmpeg is the installer's own (`ffmpeg.setup.bundled`, set by `doctor.ts`): the
+ * person installed nothing and has nothing to run, so the model is told to pass on "reinstall the app" and no
+ * command.
+ *
  * `report` is a seam for tests; the agent passes none and reads the cached probe.
  */
 export function ffmpegPromptLine(report: Pick<EditDoctorReport, "ffmpeg"> = getEditDoctor()): string {
@@ -132,6 +138,13 @@ export function ffmpegPromptLine(report: Pick<EditDoctorReport, "ffmpeg"> = getE
     ].join(" ");
   }
   const setup = ffmpeg.setup;
+  if (setup?.bundled) {
+    return [
+      `The video tools that come with this app are NOT available: ${setup.summary}`,
+      'If the owner asks for probe, cut, captions or export, or asks why video tools fail, tell them to reinstall the app and then press "Check again" in the Edit banner. There is nothing else for them to install.',
+      "Do not queue ffmpeg jobs until they work.",
+    ].join(" ");
+  }
   return [
     `ffmpeg is NOT available on this ${setup?.platform ?? "machine"}: ${setup?.summary ?? "not found"}`,
     `If the owner asks for probe, cut, captions or export, or asks why video tools fail, tell them to run \`${setup?.installCommand ?? "install ffmpeg"}\` in a terminal, then press "Check again" in the Edit banner. No restart needed.`,
@@ -189,6 +202,18 @@ function pushToolFrames(queue: StringQueue, output: unknown): void {
   for (const frame of editToolFrames(output)) {
     queue.push(encodeEditSse(frame));
   }
+}
+
+/**
+ * What leaves the agent stream for the screen. A tool's input and output are the redacted copy Chat sends
+ * (`redactToolEvent`), and a failure's own words are masked as Chat masks them. The runtime's event is not
+ * changed, and the tool frames are read from this same copy.
+ */
+function screenEvent(event: RuntimeEvent): RuntimeEvent {
+  if (event.type === "run.failed" || event.type === "run.interrupted") {
+    return { ...event, message: redactSecrets(event.message) };
+  }
+  return redactToolEvent(event);
 }
 
 function firstClipId(doc: Awaited<ReturnType<typeof foldProject>>): string | undefined {
@@ -271,9 +296,10 @@ export async function runEditAgent(input: {
             history: [{ role: "user", parts: [{ type: "text", text: input.text }] }],
             ...(input.abortSignal ? { signal: input.abortSignal } : {}),
             onEvent: async (event: RuntimeEvent) => {
-              queue.push(encodeSse(event));
-              if (event.type === "tool.completed") {
-                pushToolFrames(queue, event.output);
+              const safe = screenEvent(event);
+              queue.push(encodeSse(safe));
+              if (safe.type === "tool.completed") {
+                pushToolFrames(queue, safe.output);
               }
               if (event.type === "run.completed") {
                 // Edit-agent spend is metered against the tenant now, not appended to one global

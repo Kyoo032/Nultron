@@ -59,6 +59,7 @@ import { renderMemoDocx } from "./render-memo";
 import { renderRedFlagsMarkdown } from "./render-redflags";
 import { buildRedlinePatches } from "./render-redline";
 import type { LegalMatterRecord } from "./records";
+import { cardFormat } from "./store-files";
 import {
   applyReserved,
   allowedNumbers,
@@ -93,6 +94,8 @@ export type LegalRunInput = {
   runId: string;
   now: () => Date;
   locale?: LegalLocale;
+  /** The owner's corrections from the extraction, worded for the preamble (`confirmedFactsNote`). Empty when there are none. */
+  confirmedFactsNote?: string;
 };
 
 export type LegalRunDeps = {
@@ -268,6 +271,11 @@ async function diffStage(ctx: RunCtx, ids: { next: () => string }, findings: Fin
   const draftDoc = draftCard ? ctx.input.docs.get(draftCard.id) : undefined;
   if (!prior || !draftCard || !priorDoc || !draftDoc) {
     emitStep(ctx.deps.emit, "diff", copyOf(ctx).noPriorTurn);
+    return [];
+  }
+  // A Word file carries its tracked changes and a PDF carries none: only files of the same format are compared.
+  if (cardFormat(prior) !== cardFormat(draftCard)) {
+    emitStep(ctx.deps.emit, "diff", copyOf(ctx).diffNeedsSameFormat);
     return [];
   }
   const diff = diffDocuments(priorDoc, draftDoc);
@@ -478,6 +486,11 @@ async function draftRedline(
   clauses: readonly DocxClause[],
 ): Promise<Packed> {
   const draftCard = cardByRole(ctx.cards, "counterparty-draft");
+  if (draftCard && cardFormat(draftCard) === "pdf") {
+    // A redline is Word tracked changes written into the draft's own file; a PDF has no such file to mark up.
+    emitStep(ctx.deps.emit, "draft", copyOf(ctx).redlineNeedsWord);
+    return emptyPacked("redline");
+  }
   const original = draftCard ? ctx.input.bytes.get(draftCard.id) : undefined;
   if (!original) {
     emitStep(ctx.deps.emit, "draft", copyOf(ctx).noRedlineBytes);
@@ -791,7 +804,7 @@ function preambleArgs(ctx: RunCtx) {
     firm: ctx.input.matter.firm,
     docs: ctx.cards,
     playbook: ctx.playbook,
-    priorityNote: "",
+    priorityNote: ctx.input.confirmedFactsNote ?? "",
     locale: localeOf(ctx),
   };
 }

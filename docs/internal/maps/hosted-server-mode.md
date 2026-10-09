@@ -116,7 +116,7 @@ Every rejection message is fixed text that never echoes any part of the request 
 | Bucket | Keyed on | Default rpm / burst | Env override |
 |---|---|---|---|
 | `ip` | client IP | 600 / 100 | `AGENTFORGE_RATE_IP_RPM` (`:30`) |
-| `auth` | client IP, only for paths under `/api/v1/auth/` | 30 / 10 | `AGENTFORGE_RATE_AUTH_RPM` (`:32`) |
+| `auth` | client IP, only for paths under `/api/v1/auth/` | 120 / 40 | `AGENTFORGE_RATE_AUTH_RPM` (`:32`) |
 | `session` | SHA-256 of the session cookie, first 32 hex chars | 300 / 50 | `AGENTFORGE_RATE_SESSION_RPM` (`:31`) |
 
 Defaults at `:23-28`; `AUTH_PATH_PREFIX` at `:38`; `sessionRateKey` at `:147-153` (`SESSION_KEY_HEX_LENGTH = 32`, `:41`) — a session cookie never becomes a map key in the clear. `isAuthPath` at `:155-157`.
@@ -143,7 +143,7 @@ A refusal is `429 { code: "rate_limited", message: "Too many requests. Please sl
 
 | Pool | Cap env | Default | Wired at |
 |---|---|---|---|
-| ffmpeg / ffprobe children | `AGENTFORGE_MAX_FFMPEG` (`:27`) | 2 (`:29`) | `:288`, used by `packages/host/src/edit/ffmpeg/run.ts:101` |
+| ffmpeg / ffprobe children | `AGENTFORGE_MAX_FFMPEG` (`:27`) | 2 (`:29`) | `:288`, used by `packages/host/src/edit/ffmpeg/run.ts:162` |
 | dataset SQL workers | `AGENTFORGE_MAX_SQL_WORKERS` (`:28`) | 4 (`:30`) | `:290`, used by `packages/host/src/sql-runner.ts:186`, `:278` |
 
 `AGENTFORGE_JOB_QUEUE_TIMEOUT_MS` (`:33`, default 60 000, `:34`) is how long a job may sit in the waiting room before it is refused instead (`:162-167`); the timer is `unref`'d so a waiting room never keeps the process alive (`:169`). Both the full-waiting-room case (`:203-205`) and the timeout case answer the same `ApiError("too_many_jobs", …, 429)` (`:21-22`, `:92-98`) — it is the same answer, reached a minute later.

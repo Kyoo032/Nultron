@@ -8,7 +8,8 @@ import type { EgressGuard } from "./egress-guard";
 import type { ToolBudget } from "./tool-budget";
 import { reportToolIo } from "./tool-io";
 
-function disabledOutput(toolKey: string): { success: false; error: string } {
+/** What a call to a disabled tool gets back. Also what the runtime answers when the model calls a tool it was never offered. */
+export function disabledToolOutput(toolKey: string): { success: false; error: string } {
   return { success: false, error: `Tool ${toolKey} is disabled on this machine.` };
 }
 
@@ -41,7 +42,7 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
   }
 
   if (getDisabledTools().includes(tool.key)) {
-    const blocked = disabledOutput(tool.key);
+    const blocked = disabledToolOutput(tool.key);
     reportToolIo({ toolKey: tool.key, input: rawArgs, full: blocked, thin: blocked });
     return blocked;
   }

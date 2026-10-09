@@ -1,6 +1,8 @@
 import type { FinanceBrief } from "@agentforge/core/artifacts";
 import type { FinanceParams, FinanceReport, FinanceTask, LineItem, LineItemCategory } from "@agentforge/core/finance";
 import { apiFetch } from "./api-client";
+import { gatewayBlockedMessage, hostedGatewayBlocked } from "./gateway-blocked";
+import { GATEWAY_BLOCKED_ERROR } from "./gateway-gate";
 
 export type { FinanceBrief, FinanceParams, FinanceReport, FinanceTask, LineItem, LineItemCategory };
 
@@ -93,10 +95,25 @@ function errorMessage(payload: unknown, fallback: string): string {
   return fallback;
 }
 
+/**
+ * A failed finance answer, read into the typed error a studio shows.
+ *
+ * A hosted `403 gateway_blocked` is the flat body (`error` is the code itself, not an envelope), so the
+ * enveloped reader above found no message and the studio printed its generic fallback. Here it reads as
+ * the catalog sentence that names Settings, and the studio draws the needs-key note in its place. Off
+ * the hosted build `hostedGatewayBlocked` is `null`, so the Personal app reads exactly as it did.
+ */
+export function financeFailure(data: unknown, fallback: string, status: number): FinanceRequestError {
+  if (hostedGatewayBlocked(data)) {
+    return new FinanceRequestError(GATEWAY_BLOCKED_ERROR, gatewayBlockedMessage(), status);
+  }
+  return new FinanceRequestError(errorCode(data), errorMessage(data, fallback), status);
+}
+
 async function readJson<T>(res: Response, fallback: string): Promise<T> {
   const data = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new FinanceRequestError(errorCode(data), errorMessage(data, fallback), res.status);
+    throw financeFailure(data, fallback, res.status);
   }
   return data as T;
 }

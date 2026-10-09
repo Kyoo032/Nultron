@@ -6,17 +6,28 @@
  * check is conservative on purpose: it fires only on something a reader could prove wrong from the
  * transcript alone, and it names the exact item, so a normal set of minutes never costs a second
  * model call. `guardMinutesNames` still runs after the checks and stays the last word on names.
+ *
+ * The date reader and the evidence judges are the shared ones in `@agentforge/core/judges` and
+ * `@agentforge/core/meeting` (`evidence.ts`); this file only wires them to the minutes draft.
  */
 
-import { ApiError } from "@agentforge/core";
+import { ApiError, type AppLocale } from "@agentforge/core";
+import { judgeCheck, summarizeVerdicts, type ItemJudgement, type VerdictSummary } from "@agentforge/core/judges";
 import {
+  judgeMinutesEvidence,
+  MINUTES_EVIDENCE_WORDS,
   meetingMinutesSchema,
   nameAppearsInTranscript,
   NEEDS_OWNER,
+  untracedDates,
+  withoutMarks,
   type MeetingMinutes,
 } from "@agentforge/core/meeting";
-import type { CheckVerdict } from "@agentforge/core/harness";
+import type { CheckVerdict, OutputCheck } from "@agentforge/core/harness";
 import { extractJsonObject } from "../presentation-outline";
+
+// The reader now lives with the other judges; the old name stays importable from here.
+export { findDateTimeMentions, type DateTimeMention } from "@agentforge/core/judges";
 
 /** A transcript of this many words or fewer is a greeting or a test clip; a summary is not demanded of it. */
 export const TRIVIAL_TRANSCRIPT_WORDS = 20;
@@ -26,6 +37,7 @@ export const MINUTES_CHECK_IDS = {
   owners: "action-owners",
   dates: "quoted-dates",
   summary: "summary-present",
+  evidence: "minutes-evidence",
 } as const;
 
 /** What one model answer turned into: the minutes, or the reason there are none. */
@@ -71,7 +83,8 @@ export function parseMinutesDraft(raw: string): ParsedMinutes {
       detail: "the answer is not a single JSON object",
     };
   }
-  const result = meetingMinutesSchema.safeParse(json);
+  // `evidence` and `edited` are the code's marks: whatever the model sent under them is dropped, not parsed.
+  const result = meetingMinutesSchema.safeParse(withoutMarks(json));
   if (!result.success) {
     return {
       ok: false,
@@ -168,207 +181,19 @@ export function actionOwnersCheck(transcript: string): MinutesCheck {
 
 // -- (c) dates and times ----------------------------------------------------------------------
 
-const MONTHS: ReadonlyArray<readonly [number, readonly string[]]> = [
-  [1, ["January", "Jan", "Januari"]],
-  [2, ["February", "Feb", "Februari", "Pebruari"]],
-  [3, ["March", "Mar", "Maret"]],
-  [4, ["April", "Apr"]],
-  [5, ["May", "Mei"]],
-  [6, ["June", "Jun", "Juni"]],
-  [7, ["July", "Jul", "Juli"]],
-  [8, ["August", "Aug", "Agustus", "Agu", "Agt"]],
-  [9, ["September", "Sept", "Sep"]],
-  [10, ["October", "Oct", "Oktober", "Okt"]],
-  [11, ["November", "Nov", "Nopember"]],
-  [12, ["December", "Dec", "Desember", "Des"]],
-];
-
-const MONTH_BY_NAME: ReadonlyMap<string, number> = new Map(
-  MONTHS.flatMap(([month, names]) => names.map((name) => [name.toLowerCase(), month] as const)),
-);
-
-/** Longest first, so "September" wins over "Sep". */
-const MONTH_ALTERNATION = [...MONTHS.flatMap(([, names]) => names)]
-  .sort((left, right) => right.length - left.length)
-  .join("|");
-
-export type DateTimeMention = {
-  readonly kind: "clock" | "date" | "numeric-date";
-  readonly text: string;
-  /** clock: [hour, minute]; date: [day, year?]; numeric-date: the two day/month parts. */
-  readonly numbers: readonly number[];
-  /** date: the month named. */
-  readonly month: number | null;
-  /** numeric-date: the year part. */
-  readonly year: number | null;
-};
-
-type Heard = { readonly numbers: ReadonlySet<number>; readonly months: ReadonlySet<number> };
-
-// A month name only counts in the minutes when it is capitalised, so the verbs "may" and "march"
-// are not read as dates. The transcript is searched in lower case, where either spelling counts.
-const DAY_THEN_MONTH = new RegExp(
-  `(?<![\\d/-])(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?(${MONTH_ALTERNATION})\\.?(?![A-Za-z])(?:,?\\s+(\\d{4})(?!\\d))?`,
-  "g",
-);
-const MONTH_THEN_DAY = new RegExp(
-  `(?<![A-Za-z])(${MONTH_ALTERNATION})\\.?\\s+(\\d{1,2})(?:st|nd|rd|th)?(?![\\d:])(?:,?\\s+(\\d{4})(?!\\d))?`,
-  "g",
-);
-const ISO_DATE = /(?<![\d-])(\d{4})-(\d{2})-(\d{2})(?![\d-])/g;
-const NUMERIC_DATE = /(?<![\d/-])(\d{1,2})[/-](\d{1,2})[/-](\d{4}|\d{2})(?![\d/-])/g;
-const ID_CLOCK = /\b(?:pukul|jam)\s+(\d{1,2})(?:[:.](\d{2}))?(?!\d)/gi;
-const CLOCK = /(?<![\d:./-])(\d{1,2})(?:([:.])(\d{2}))?(?:\s?([ap])\.?m\.?(?![A-Za-z]))?(?![\d:])/gi;
-
-function blank(text: string, start: number, length: number): string {
-  return `${text.slice(0, start)}${" ".repeat(length)}${text.slice(start + length)}`;
-}
-
-/** Runs `pattern` over `text`, hands each match to `read`, and blanks the matched span so a later pattern skips it. */
-function take(
-  text: string,
-  pattern: RegExp,
-  read: (match: RegExpMatchArray) => DateTimeMention | null,
-): { rest: string; found: DateTimeMention[] } {
-  let rest = text;
-  const found: DateTimeMention[] = [];
-  for (const match of text.matchAll(pattern)) {
-    const mention = read(match);
-    if (mention) {
-      found.push(mention);
-      rest = blank(rest, match.index ?? 0, match[0].length);
-    }
-  }
-  return { rest, found };
-}
-
-function validDay(day: number): boolean {
-  return day >= 1 && day <= 31;
-}
-
-function clockMention(
-  match: RegExpMatchArray,
-  hour: number,
-  minute: number,
-  twelveHour: boolean,
-): DateTimeMention | null {
-  const limit = twelveHour ? 12 : 24;
-  if (hour > limit || (twelveHour && hour < 1) || minute > 59) {
-    return null;
-  }
-  return { kind: "clock", text: match[0].trim(), numbers: [hour, minute], month: null, year: null };
-}
-
-/** Every date and time the text quotes, in the forms the minutes writer uses. Plain weekdays and "next week" are not dates here. */
-export function findDateTimeMentions(text: string): DateTimeMention[] {
-  const monthNumber = (name: string | undefined): number | null =>
-    MONTH_BY_NAME.get((name ?? "").toLowerCase()) ?? null;
-  const dateMention = (
-    match: RegExpMatchArray,
-    day: string | undefined,
-    name: string | undefined,
-    year: string | undefined,
-  ) => {
-    const dayNumber = Number(day);
-    const month = monthNumber(name);
-    if (!validDay(dayNumber) || month === null) {
-      return null;
-    }
-    const numbers = year ? [dayNumber, Number(year)] : [dayNumber];
-    return { kind: "date", text: match[0].trim(), numbers, month, year: null } satisfies DateTimeMention;
-  };
-
-  const iso = take(text, ISO_DATE, (match) => ({
-    kind: "numeric-date",
-    text: match[0],
-    numbers: [Number(match[2]), Number(match[3])],
-    month: null,
-    year: Number(match[1]),
-  }));
-  const numeric = take(iso.rest, NUMERIC_DATE, (match) => ({
-    kind: "numeric-date",
-    text: match[0],
-    numbers: [Number(match[1]), Number(match[2])],
-    month: null,
-    year: Number(match[3]),
-  }));
-  const dayFirst = take(numeric.rest, DAY_THEN_MONTH, (match) => dateMention(match, match[1], match[2], match[3]));
-  const monthFirst = take(dayFirst.rest, MONTH_THEN_DAY, (match) => dateMention(match, match[2], match[1], match[3]));
-  const indonesianClock = take(monthFirst.rest, ID_CLOCK, (match) =>
-    clockMention(match, Number(match[1]), Number(match[2] ?? 0), false),
-  );
-  const clock = take(indonesianClock.rest, CLOCK, (match) => {
-    const separator = match[2];
-    const meridiem = match[4];
-    // "3.5" is a decimal and a bare "3" is a number: a clock needs "3:30" or an am/pm.
-    if (separator !== ":" && !meridiem) {
-      return null;
-    }
-    return clockMention(match, Number(match[1]), Number(match[3] ?? 0), Boolean(meridiem));
-  });
-  return [
-    ...iso.found,
-    ...numeric.found,
-    ...dayFirst.found,
-    ...monthFirst.found,
-    ...indonesianClock.found,
-    ...clock.found,
-  ];
-}
-
-/** The numbers and month names a transcript says. Spelled-out numbers ("fourteenth") are not read. */
-function whatWasHeard(transcript: string): Heard {
-  const numbers = new Set<number>();
-  for (const match of transcript.matchAll(/\d+/g)) {
-    numbers.add(Number(match[0]));
-  }
-  const months = new Set<number>();
-  const lower = transcript.toLowerCase();
-  for (const [name, month] of MONTH_BY_NAME) {
-    if (new RegExp(`(?<![a-z])${name}(?![a-z])`).test(lower)) {
-      months.add(month);
-    }
-  }
-  return { numbers, months };
-}
-
-/** 3, 15 and 03 are one hour on the clock: a transcript that says "3 PM" supports "15:00". */
-function hourVariants(hour: number): number[] {
-  const twelve = hour % 12;
-  return [hour, twelve === 0 ? 12 : twelve, twelve + 12, hour === 24 ? 0 : hour];
-}
-
-function isHeard(mention: DateTimeMention, heard: Heard): boolean {
-  const has = (value: number) => heard.numbers.has(value);
-  switch (mention.kind) {
-    case "clock": {
-      const [hour = 0, minute = 0] = mention.numbers;
-      return hourVariants(hour).some(has) && (minute === 0 || has(minute));
-    }
-    case "date":
-      return mention.numbers.every(has) && mention.month !== null && heard.months.has(mention.month);
-    case "numeric-date": {
-      const part = (value: number) => has(value) || (value >= 1 && value <= 12 && heard.months.has(value));
-      const year = mention.year;
-      const yearHeard = year === null || has(year) || (year < 100 && has(2000 + year));
-      return mention.numbers.every(part) && yearHeard;
-    }
-  }
-}
-
 /**
- * No decision or action item quotes a date or time the transcript never says. A date is "said" when
- * its numbers appear as numbers in the transcript and its month appears by name (English or
- * Indonesian, any case); a clock time when its hour (12- or 24-hour) and minutes do. Items with no
- * date or time in them are never looked at.
+ * No decision or action item quotes a date or time the transcript never says. A date is "said" when the
+ * transcript states it, or when a speaker split it across a sentence (day, month name and year each said,
+ * the day beside its month); a clock time when its hour (12- or 24-hour) and minutes are. The reader and the
+ * rule are `untracedDates` (`@agentforge/core/meeting`), the same one the guard and the evidence check use,
+ * so "1 August" is not found in "31 August". Items with no date or time in them are never looked at.
  */
-export function quotedDatesCheck(transcript: string): MinutesCheck {
-  const heard = whatWasHeard(transcript);
+export function quotedDatesCheck(transcript: string, locale: AppLocale = "en"): MinutesCheck {
   return onMinutes(MINUTES_CHECK_IDS.dates, (minutes) => {
     const problems: string[] = [];
     const items: string[] = [];
     const inspect = (label: string, parts: readonly string[]) => {
-      const unheard = findDateTimeMentions(parts.join("\n")).filter((mention) => !isHeard(mention, heard));
+      const unheard = untracedDates(parts.join("\n"), transcript, locale);
       if (unheard.length > 0) {
         problems.push(`${label} quotes ${unheard.map((mention) => quoted(mention.text)).join(", ")}`);
         items.push(label);
@@ -416,35 +241,54 @@ export function summaryPresentCheck(transcript: string): MinutesCheck {
   });
 }
 
+// -- (e) evidence -----------------------------------------------------------------------------
+
+/**
+ * Every decision and action item quotes the transcript, the owner is named within 240 characters of the
+ * quote, and the due date is said there (`judgeMinutesEvidence`). A draft that never parsed passes: the
+ * shape check owns that. `onJudged` hears every judgement, for a caller that wants to aim the repair.
+ */
+export function minutesEvidenceCheck(
+  transcript: string,
+  locale: AppLocale = "en",
+  options: { readonly onJudged?: (judgements: readonly ItemJudgement[]) => void } = {},
+): OutputCheck<MinutesDraft> {
+  return judgeCheck<MinutesDraft>(
+    MINUTES_CHECK_IDS.evidence,
+    (draft) => (draft.parsed.ok ? judgeMinutesEvidence(draft.parsed.minutes, transcript, locale) : []),
+    MINUTES_EVIDENCE_WORDS,
+    options,
+  );
+}
+
 // -- the set ----------------------------------------------------------------------------------
 
-/** The checks for one meeting, in the order the repair note lists them. */
-export function buildMinutesChecks(transcript: string): readonly MinutesCheck[] {
+/**
+ * The checks for one meeting, in the order the repair note lists them. `locale` is the language the meeting
+ * was spoken in, which decides how an ambiguous date or a magnitude word is read.
+ */
+export function buildMinutesChecks(
+  transcript: string,
+  locale: AppLocale = "en",
+  options: { readonly onEvidenceJudged?: (judgements: readonly ItemJudgement[]) => void } = {},
+): readonly OutputCheck<MinutesDraft>[] {
   return [
     minutesShapeCheck,
     actionOwnersCheck(transcript),
-    quotedDatesCheck(transcript),
+    quotedDatesCheck(transcript, locale),
     summaryPresentCheck(transcript),
+    minutesEvidenceCheck(transcript, locale, { onJudged: options.onEvidenceJudged }),
   ];
 }
 
 /** What a run kept of its checks. Ids and pass/fail only: the artifact meta is not encrypted, so no minutes text goes in it. */
-export type MinutesChecksSummary = {
-  readonly passed: boolean;
-  /** Repair rounds spent; 0 when the first draft passed. */
-  readonly rounds: number;
-  readonly verdicts: ReadonlyArray<{ readonly check: string; readonly ok: boolean }>;
-};
+export type MinutesChecksSummary = VerdictSummary;
 
 export function summarizeMinutesChecks(
-  checks: readonly MinutesCheck[],
+  checks: readonly { readonly id: string }[],
   result: { readonly verdicts: readonly CheckVerdict[]; readonly rounds: number; readonly passed: boolean },
 ): MinutesChecksSummary {
-  return {
-    passed: result.passed,
-    rounds: result.rounds,
-    verdicts: checks.map((check, index) => ({ check: check.id, ok: result.verdicts[index]?.ok ?? false })),
-  };
+  return summarizeVerdicts(checks, result);
 }
 
 /** The first prompt plus, on a repair, the draft that failed and the note on what to fix. */

@@ -3,6 +3,7 @@ import type { TenantContext } from "@agentforge/core";
 import type { RetrievedChunk, RetrieveResult } from "./knowledge/backend";
 import { getGraph } from "./knowledge-graph";
 import { ftsSourceFilter } from "./knowledge-text";
+import { sourceIsVisible } from "./knowledge-visibility";
 import { log } from "./log";
 
 /**
@@ -131,6 +132,11 @@ function siblingSources(tenant: TenantContext, topSourceId: string, blocked: Rea
  */
 function firstChunkOf(tenant: TenantContext, sourceId: string): { body: string; name: string } | null {
   try {
+    // Hosted: a sibling the person may not see is never served, whatever the graph named. The graph
+    // read is already filtered; this is the second place a colleague's Chat card would have to pass.
+    if (!sourceIsVisible(tenant, sourceId)) {
+      return null;
+    }
     // A `MATCH` with the `source_id` column filter, never an unqualified select: without MATCH,
     // FTS5 has no plan but a scan of every chunk in the workspace (see `chunkBodies`).
     const row = sql

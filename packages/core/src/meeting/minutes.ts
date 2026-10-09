@@ -7,11 +7,24 @@ export const meetingAttendeeSchema = z.object({
   role: z.string().default(""),
 });
 
+/**
+ * Whether the transcript backs an item (`./evidence.ts`). Only code sets it: the quote is in the transcript,
+ * the owner is named near it and the due date is said there. Minutes saved before quotes existed have none.
+ */
+export const MINUTES_EVIDENCE = ["verified", "unverified"] as const;
+export const minutesEvidenceSchema = z.enum(MINUTES_EVIDENCE);
+export type MinutesEvidence = z.infer<typeof minutesEvidenceSchema>;
+
 export const meetingDecisionSchema = z.object({
   statement: z.string().min(1),
   /** "provisional" when the meeting did not settle it; the writer must say so rather than imply finality. */
   provisional: z.boolean().default(false),
   context: z.string().default(""),
+  /** The transcript's own words where this was agreed, copied exactly. Empty when the writer gave none. */
+  quote: z.string().default(""),
+  evidence: minutesEvidenceSchema.optional(),
+  /** True once the owner has changed this item by hand (`./edits.ts`). Only code sets it, and a regenerate keeps it. */
+  edited: z.boolean().optional(),
 });
 
 export const meetingActionItemSchema = z.object({
@@ -20,6 +33,11 @@ export const meetingActionItemSchema = z.object({
   owner: z.string().min(1),
   due: z.string().default(""),
   firstStep: z.string().default(""),
+  /** The transcript's own words where the owner took this on, copied exactly. Empty when the writer gave none. */
+  quote: z.string().default(""),
+  evidence: minutesEvidenceSchema.optional(),
+  /** True once the owner has changed this item by hand (`./edits.ts`). Only code sets it, and a regenerate keeps it. */
+  edited: z.boolean().optional(),
 });
 
 export const meetingMinutesSchema = z.object({
@@ -82,6 +100,33 @@ export function meetingMinutesToMarkdown(minutes: MeetingMinutes): string {
   lines.push(...listBlock("Risks and blockers", minutes.risks));
   lines.push(...listBlock("Open questions", minutes.openQuestions));
   return `${lines.join("\n").trim()}\n`;
+}
+
+function withoutMarkKeys(item: unknown): unknown {
+  if (item === null || typeof item !== "object" || Array.isArray(item)) {
+    return item;
+  }
+  const { evidence: _evidence, edited: _edited, ...rest } = item as Record<string, unknown>;
+  return rest;
+}
+
+/**
+ * A writer's JSON with the code's marks, `evidence` and `edited`, dropped from every decision and action
+ * item. They are verdicts and facts the code owns: a writer that claims "verified" gets nothing for it, and a
+ * writer that sends something else under those keys does not fail the parse.
+ */
+export function withoutMarks(json: unknown): unknown {
+  if (json === null || typeof json !== "object" || Array.isArray(json)) {
+    return json;
+  }
+  const sheet = json as Record<string, unknown>;
+  const clean = (list: unknown): unknown => (Array.isArray(list) ? list.map(withoutMarkKeys) : list);
+  return { ...sheet, decisions: clean(sheet.decisions), actionItems: clean(sheet.actionItems) };
+}
+
+/** The sheet as the writer and the translator see it: every field but the code's marks. */
+export function minutesForModel(minutes: MeetingMinutes): MeetingMinutes {
+  return meetingMinutesSchema.parse(withoutMarks(minutes));
 }
 
 /** Every name the minutes assert, in one list, so a guard can check them against the transcript. */

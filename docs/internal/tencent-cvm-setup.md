@@ -343,7 +343,7 @@ and on this server never in `.env` at all.
 | `AGENTFORGE_JOB_QUEUE_TIMEOUT_MS` | `60000` | Legitimate jobs are getting `429 too_many_jobs` |
 | `AGENTFORGE_RATE_IP_RPM` | `600` (burst 100) | A real client is being limited. `0` switches the bucket off; junk falls back to the default rather than silently removing the limit |
 | `AGENTFORGE_RATE_SESSION_RPM` | `300` (burst 50) | Likewise |
-| `AGENTFORGE_RATE_AUTH_RPM` | `30` (burst 10) | Keep this far below the others: each call there is a portal round trip |
+| `AGENTFORGE_RATE_AUTH_RPM` | `120` (burst 40) | Keep this far below the others: each call there is a portal round trip |
 | `AGENTFORGE_LOG_LEVEL` | `info` | Debugging. `debug` is noisier, not less redacted |
 | `BACKUP_RETAIN_DAYS` | `7` | Local copies pile up |
 | `BACKUP_VERIFY` | `1` | Only on a very large volume, and reluctantly |

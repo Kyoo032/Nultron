@@ -45,7 +45,7 @@
       "encrypted": "That file is password protected. Remove the password and try again.",
       "slow": "That file took too long to read and was not imported."
     },
-    "allSheets": "All tables ({{count}})"
+    "allSheets": "All tables ({count})"
   },
   "orDataset": "Or use a saved dataset",
   "lineItemsBelow": "Line items below",
@@ -196,7 +196,7 @@
   "taskUnavailable": "{task} has its own steps and its own maths, and both are still being built. Nothing here can be run yet.",
   "brief": {
     "statedFacts": {
-      "title": "Stated in the document ({{count}})",
+      "title": "Stated in the document ({count})",
       "hint": "Figures the document wrote in a sentence, not in a table. Check the name, or remove one you do not want quoted. They are never added to anything.",
       "labelPlaceholder": "What this figure is",
       "labelAria": "Name for this stated figure",
@@ -439,8 +439,78 @@
       "empty": "No ratio could be computed from these rows."
     }
   },
+  "auto": {
+    "promptLabel": "Ask about your numbers",
+    "promptPlaceholder": "How long does my cash last?",
+    "promptHint": "Add a file below if you have one. Reading it is free; the model is used only when you press Write it up.",
+    "dropLabel": "Add a statement or spreadsheet",
+    "dropHint": "CSV, Excel, PDF, Word or PowerPoint, up to 25 MB. It is read on this machine, with no model.",
+    "dropReading": "Reading {name}…",
+    "dropReplace": "Replace the file",
+    "remove": "Remove the file",
+    "fileAria": "Statement or spreadsheet to read",
+    "checking": "Checking what it looks like…",
+    "looksLike": "Looks like",
+    "confidence": {
+      "high": "Clear match",
+      "low": "Best guess"
+    },
+    "needsTitle": "What it needs",
+    "needs": {
+      "brief": "Revenue and cost lines, for one or more periods.",
+      "cashflow": "Money in and money out for at least two months, or an opening balance.",
+      "budget": "A budget and the actual amounts, line by line.",
+      "appraisal": "The money you spend now, then the money that comes back each year.",
+      "ratios": "A balance sheet and a profit statement."
+    },
+    "previewTitle": "Preview",
+    "previewHint": "Every figure here is worked out in code on this machine. No model has written anything yet.",
+    "tablesTitle": "Tables",
+    "tableMoreRows": "{n} more rows are not shown here.",
+    "rows": "Rows read: {n}",
+    "sheets": "Sheets read: {names}",
+    "unplacedTitle": "Rows that could not be placed ({n})",
+    "unplacedRow": "{label} ({period})",
+    "unplacedNoPeriod": "{label}",
+    "sheetsSkipped": "These sheets did not fit in one preview and were left out: {names}.",
+    "pii": "{n} personal identifiers were hidden before reading",
+    "warningsTitle": "Worth a look",
+    "warnings": {
+      "noFigures": "There are no figures to read yet. Add a file, or paste the numbers under More options.",
+      "proseNoTable": "No table was found in this text, so there is nothing to preview without the model. The model can read it when you press Write it up, and that uses your key.",
+      "notEnoughRows": "The figures were read, but there is too little to preview. Add more rows or check the figures.",
+      "inputRejected": "The figures looked like {task}, but they did not pass that task's checks, for example because there are too many rows. Open the task to see which.",
+      "fellBack": "It looked like {from}, but that could not be built from this file, so it was read as {to}.",
+      "unplacedRows": "{n} row(s) could not be placed by the rules and were left as they are.",
+      "defaultDiscountRate": "No discount rate was found, so {rate}% is shown. Change it in the appraisal.",
+      "unpairedLines": "{n} line(s) have no partner on the other side yet."
+    },
+    "write": "Write it up",
+    "writing": "Working…",
+    "writeNote": "Uses your key. The figures above stay as they are; only the written summary is new.",
+    "writeNeedsFigures": "Add a file with figures to write it up.",
+    "cancel": "Cancel",
+    "empty": "Ask a question, or add a file. You will see a preview here first.",
+    "errors": {
+      "read": "That could not be read.",
+      "file": "Could not read that file as a table",
+      "write": "The write-up could not be finished."
+    }
+  },
+  "more": {
+    "summary": "More options",
+    "pasteLabel": "Or paste your numbers",
+    "pastePlaceholder": "Revenue 2025: $120,000. Hosting $30,000. Payroll $100,000. Cash $90,000…",
+    "pasteHint": "Pasted rows are read the same way as a file: on this machine, with no model.",
+    "modelLabel": "Model for the write-up",
+    "switchTitle": "Not what you meant? Read it as",
+    "switchHint": "Opens that task with your figures in its box. Nothing is calculated until you press its button.",
+    "checkRows": "Check the rows",
+    "checkRowsHint": "Opens {task} with your figures in its box, so you can look at every row first.",
+    "tasksTitle": "Or choose what to do"
+  },
   "guide": {
-    "lead": "What do you want to do?",
+    "lead": "Ask about your numbers, or add a file.",
     "change": "Choose something else",
     "numbersLead": "Add your file or type your numbers.",
     "resultLead": "Here is the result. Download it, or open More options to write it again.",

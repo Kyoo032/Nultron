@@ -22,6 +22,7 @@ export function createResolvers(pool: Pool): TenantResolvers {
   const resolvers: TenantResolvers = {
     bySlug: (slug) => one(`SELECT resolve_tenant_by_slug($1) AS tenant_id`, slug),
     byEmail: (email) => one(`SELECT resolve_tenant_for_email($1) AS tenant_id`, normaliseEmail(email)),
+    byUsername: (username) => one(`SELECT resolve_tenant_for_username($1) AS tenant_id`, username.trim().toLowerCase()),
     byRefreshToken: (rawToken) =>
       one(`SELECT resolve_tenant_for_refresh($1) AS tenant_id`, sha256(rawToken)),
     byDeviceCode: (rawDeviceCode) =>

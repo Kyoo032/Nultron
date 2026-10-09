@@ -11,6 +11,7 @@ import { activateRoutes } from "./activate";
 import { assetRoutes } from "./assets";
 import { authorizeRoutes } from "./authorize";
 import { logoutRoutes } from "./logout";
+import { signInModeRoutes } from "./signin-mode";
 import { tokenRoutes } from "./tokens";
 
 export function portalRoutes(runtime: PortalRuntime): readonly PortalRoute[] {
@@ -19,6 +20,8 @@ export function portalRoutes(runtime: PortalRuntime): readonly PortalRoute[] {
     ...activateRoutes(runtime),
     ...logoutRoutes(runtime),
     ...tokenRoutes(runtime),
+    // Empty unless PORTAL_SIGNIN_MODE=password: the default mode's route table is unchanged.
+    ...signInModeRoutes(runtime),
     // The brand mark the page shell references. Static, unauthenticated, and the only non-text
     // response the portal sends.
     ...assetRoutes(),

@@ -23,6 +23,7 @@ import {
   type TenantContext,
 } from "@agentforge/core";
 import { localeForRun } from "../run-context";
+import { log } from "../log";
 import { chargeTurnBudget, estimateEditJobUsd, type TurnBudget } from "./budget";
 import { encodeEditSse } from "./events";
 import { foldProject } from "./ops";
@@ -97,6 +98,10 @@ function spendRefusal(output: unknown): boolean {
   return refused === "turn_cap_exceeded" || refused === "price_unknown";
 }
 
+function errorDetail(error: unknown): string {
+  return error instanceof Error ? error.message : "unknown";
+}
+
 async function probeSilence(
   stub: boolean,
   clip: NonNullable<ReturnType<typeof harnessTargetClip<EditProject["clips"][number]>>>,
@@ -112,7 +117,9 @@ async function probeSilence(
       ...silenceProbeArgs(attempt),
     });
     return assetFramesToTimeline(clip, probed.ranges);
-  } catch {
+  } catch (error) {
+    // The skill still says it found nothing; the log says why. The logger masks any secret in the message.
+    log.warn("edit_silence_probe_failed", { attempt, detail: errorDetail(error) });
     return [];
   }
 }
@@ -132,7 +139,8 @@ async function probeScenes(
       ...sceneProbeArgs(attempt),
     });
     return framesInsideClip(clip, probed.frames);
-  } catch {
+  } catch (error) {
+    log.warn("edit_scene_probe_failed", { attempt, detail: errorDetail(error) });
     return [];
   }
 }

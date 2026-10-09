@@ -68,6 +68,12 @@
     "working": "Memulihkan…",
     "done": "Versi {from} dipulihkan sebagai versi {to}."
   },
+  "download": {
+    "button": "Unduh",
+    "working": "Mengunduh…",
+    "failed": "Tidak bisa mengunduh. Coba lagi.",
+    "aria": "Unduh {path} ke komputer Anda"
+  },
   "delete": {
     "button": "Hapus",
     "title": "Hapus {path}?",
@@ -88,7 +94,8 @@
     "badPath": "Jalur berkas itu tidak diizinkan.",
     "quota": "Akun ini kehabisan ruang penyimpanan. Setiap versi yang tersimpan dihitung.",
     "unavailable": "Penyimpanan berkas sedang tidak tersedia. Coba lagi nanti.",
-    "badResponse": "Berkas menjawab dengan cara yang tidak dipahami aplikasi ini."
+    "badResponse": "Berkas menjawab dengan cara yang tidak dipahami aplikasi ini.",
+    "saveFailed": "Berkas tidak dapat disimpan ke komputer Anda. Periksa lokasinya, lalu coba lagi."
   },
   "pathErrors": {
     "empty": "Beri berkas sebuah jalur, seperti catatan/rencana.md.",

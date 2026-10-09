@@ -1,3 +1,4 @@
+import { isHostNoteLine } from "../chat-documents/markers";
 import type { ContentPart } from "../content/types";
 
 export type InjectionSeverity = "HIGH" | "CRITICAL";
@@ -35,12 +36,14 @@ const RULES: InjectionRule[] = [
   {
     rule: "prompt-leak",
     severity: "HIGH",
-    pattern: /\b(reveal|print|show|dump|repeat|output)\s+(me\s+)?(?:your\s+(?:hidden\s+)?(?:system\s+)?|(?:hidden\s+)?system\s+)(prompt|instructions)\b/i,
+    pattern:
+      /\b(reveal|print|show|dump|repeat|output)\s+(me\s+)?(?:your\s+(?:hidden\s+)?(?:system\s+)?|(?:hidden\s+)?system\s+)(prompt|instructions)\b/i,
   },
   {
     rule: "id-override",
     severity: "HIGH",
-    pattern: /\babaikan\s+(semua\s+)?(instruksi|perintah)(\s+sebelumnya|\s+sebelum\s+ini)?\b|\blupakan\s+(semua\s+)?instruksi\b/i,
+    pattern:
+      /\babaikan\s+(semua\s+)?(instruksi|perintah)(\s+sebelumnya|\s+sebelum\s+ini)?\b|\blupakan\s+(semua\s+)?instruksi\b/i,
   },
 ];
 
@@ -49,11 +52,61 @@ const ZERO_WIDTH_RE = /[\u200B-\u200F\u2060-\u2064\uFEFF\u00AD]/g;
 
 /** Cyrillic / Greek letters that render like Latin ones, folded so "Ignоre" (Cyrillic о) reads "Ignore". */
 const HOMOGLYPHS: Record<string, string> = {
-  а: "a", е: "e", о: "o", р: "p", с: "c", у: "y", х: "x", і: "i", ѕ: "s", ј: "j", һ: "h", ԁ: "d", ԛ: "q", ԝ: "w",
-  ɡ: "g", ց: "g", ո: "n", ս: "u",
-  А: "A", В: "B", Е: "E", К: "K", М: "M", Н: "H", О: "O", Р: "P", С: "C", Т: "T", Х: "X", І: "I", Ѕ: "S", Ј: "J",
-  α: "a", ο: "o", ν: "v", ι: "i", κ: "k", ρ: "p", τ: "t", υ: "u", χ: "x", Α: "A", Β: "B", Ε: "E", Ζ: "Z", Η: "H",
-  Ι: "I", Κ: "K", Μ: "M", Ν: "N", Ο: "O", Ρ: "P", Τ: "T", Υ: "Y", Χ: "X",
+  а: "a",
+  е: "e",
+  о: "o",
+  р: "p",
+  с: "c",
+  у: "y",
+  х: "x",
+  і: "i",
+  ѕ: "s",
+  ј: "j",
+  һ: "h",
+  ԁ: "d",
+  ԛ: "q",
+  ԝ: "w",
+  ɡ: "g",
+  ց: "g",
+  ո: "n",
+  ս: "u",
+  А: "A",
+  В: "B",
+  Е: "E",
+  К: "K",
+  М: "M",
+  Н: "H",
+  О: "O",
+  Р: "P",
+  С: "C",
+  Т: "T",
+  Х: "X",
+  І: "I",
+  Ѕ: "S",
+  Ј: "J",
+  α: "a",
+  ο: "o",
+  ν: "v",
+  ι: "i",
+  κ: "k",
+  ρ: "p",
+  τ: "t",
+  υ: "u",
+  χ: "x",
+  Α: "A",
+  Β: "B",
+  Ε: "E",
+  Ζ: "Z",
+  Η: "H",
+  Ι: "I",
+  Κ: "K",
+  Μ: "M",
+  Ν: "N",
+  Ο: "O",
+  Ρ: "P",
+  Τ: "T",
+  Υ: "Y",
+  Χ: "X",
 };
 const HOMOGLYPH_RE = new RegExp(`[${Object.keys(HOMOGLYPHS).join("")}]`, "g");
 
@@ -123,7 +176,14 @@ export function blockedInjectionOutput(hit: InjectionHit): { success: false; err
   return { success: false, error: `Blocked by injection guard (rule: ${hit.rule})` };
 }
 
-const ATTACH_BLOCK_RE = /(?:^|\n\n)--- ([^\n]+) ---\n([\s\S]*?)(?=\n\n--- |$)/g;
+const ATTACH_HEADER_RE = /(?:^|\n\n)--- [^\n]+ ---\n/;
+/**
+ * A block runs to the next FULL header (`--- name ---`) or the end. It used to stop at any `--- ` line,
+ * so an attached file could end its own block with a half header such as `--- Section 2` and have
+ * whatever followed it escape the scan. A forged full header only starts another block, and that
+ * block is scanned too.
+ */
+const ATTACH_BLOCK_RE = /(?:^|\n\n)--- ([^\n]+) ---\n([\s\S]*?)(?=\n\n--- [^\n]+ ---\n|$)/g;
 
 /** Replace injected attach bodies with a short marker so the turn still sends. */
 export function redactAttachedText(text: string): string {
@@ -135,6 +195,40 @@ export function redactAttachedText(text: string): string {
     const leading = match.startsWith("\n\n") ? "\n\n" : "";
     return `${leading}--- ${filename} ---\n[Attachment blocked by injection guard (rule: ${hit.rule})]`;
   });
+}
+
+/**
+ * What the person typed in one message: everything before the first `--- name ---` attachment header,
+ * without the host's own bracketed notes. An attachment is a file's content, not the person's words, so
+ * a host it names is not one they asked for. The cut is at the FIRST header and runs to the end, so a
+ * file cannot end its own block early with a half header and have what follows read as typed.
+ */
+export function typedTextOf(text: string): string {
+  const header = ATTACH_HEADER_RE.exec(text);
+  const typed = header ? text.slice(0, header.index) : text;
+  return typed
+    .split("\n")
+    .filter((line) => !isHostNoteLine(line))
+    .join("\n")
+    .trimEnd();
+}
+
+const ATTACH_NAME_RE = /(?:^|\n\n)--- ([^\n]+) ---\n/g;
+
+/**
+ * A message with each attachment replaced by one line that names the file and carries none of its text:
+ * what was typed, then `[Attached file: name]` for every attachment. For the places that keep a message
+ * beyond the turn (the Knowledge Base card of a Chat thread) and must say that a file was attached
+ * without holding what was in it: the content lives in the person's own private desk copy.
+ */
+export function attachmentsAsMentions(text: string): string {
+  const names = [...text.matchAll(ATTACH_NAME_RE)].map((match) => match[1] ?? "");
+  if (names.length === 0) {
+    return text;
+  }
+  const typed = typedTextOf(text);
+  const mentions = names.map((name) => `[Attached file: ${name}]`).join("\n");
+  return typed === "" ? mentions : `${typed}\n\n${mentions}`;
 }
 
 export function redactAttachedParts(parts: ContentPart[]): ContentPart[] {

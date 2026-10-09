@@ -13,7 +13,9 @@ import type { PortalConfig } from "../config";
 import type { Keyring } from "../jwt/keys";
 import type { Logger } from "../log";
 import type { Mailer } from "../mail/types";
+import { createPasswordHasher, type PasswordHasher } from "../password/hash";
 import { cookieNames, cookiesAreSecure, type CookieNames } from "../security/cookies";
+import { createPasswordAttempts, type PasswordAttempts } from "../security/password-attempts";
 import { createPortalLimiters, type PortalLimiters } from "../security/rate-limit";
 import { webSessionSecret, type WebSessionSecret } from "../security/web-session";
 import type { Clock, PortalStore } from "../store/types";
@@ -29,6 +31,13 @@ export interface PortalRuntime {
   readonly cookies: CookieNames;
   readonly secureCookies: boolean;
   readonly limiters: PortalLimiters;
+  /** scrypt, for `PORTAL_SIGNIN_MODE=password`. Built in every mode, and run only in that one. */
+  readonly passwords: PasswordHasher;
+  /**
+   * Which sources have attempted which person in the window, in this process, and the order the
+   * attempts are charged in. Built in every mode and read only in `password` mode.
+   */
+  readonly attempts: PasswordAttempts;
   /** The access token's `iss`, and the origin every absolute link in a page is built from. */
   readonly issuer: string;
   readonly trustProxy: boolean;
@@ -46,6 +55,10 @@ export interface CreateRuntimeOptions {
   readonly trustProxy?: boolean;
   /** Test seam only: a suite that is not about a limit loosens it here, and one that is leaves it. */
   readonly limiters?: PortalLimiters;
+  /** Test seam only: a suite counts how often the hash ran, or measures it. Production builds its own. */
+  readonly passwords?: PasswordHasher;
+  /** Test seam only: a suite plays a restart by handing the next runtime a record of its own. */
+  readonly attempts?: PasswordAttempts;
 }
 
 /**
@@ -86,6 +99,8 @@ export function createRuntime(options: CreateRuntimeOptions): PortalRuntime {
     cookies: cookieNames(mode),
     secureCookies: cookiesAreSecure(mode),
     limiters: options.limiters ?? createPortalLimiters(clock),
+    passwords: options.passwords ?? createPasswordHasher(),
+    attempts: options.attempts ?? createPasswordAttempts({ clock }),
     issuer,
     trustProxy: options.trustProxy ?? options.config.trustProxy,
   });

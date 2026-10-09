@@ -304,3 +304,86 @@ describe("PORTAL_PUBLIC_URL and PORTAL_TRUST_PROXY", () => {
     expect(config.smtp.ignoreTls).toBe(true);
   });
 });
+
+/**
+ * `PORTAL_SIGNIN_MODE` (owner decision 2026-10-07). The default is the e-mailed code and must stay
+ * byte-for-byte what it was, so the first group of cases is "nothing changed", and the second is what
+ * the password mode lets go of (SMTP) and what it does not (everything else).
+ */
+describe("PORTAL_SIGNIN_MODE", () => {
+  const PRODUCTION = {
+    ...BASE,
+    PORTAL_MIGRATE_DATABASE_URL: "postgres://portal_owner:owner@db.internal:5432/tokotoken_portal",
+    NODE_ENV: "production",
+    PORTAL_SIGNING_KEY: Buffer.alloc(32, 1).toString("base64url"),
+    PORTAL_PUBLIC_URL: "https://portal.example.com",
+  } as const;
+
+  it("is code when nothing is set, when it is empty and when it says code", () => {
+    expect(loadConfig({ ...BASE }).signInMode).toBe("code");
+    expect(loadConfig({ ...BASE, PORTAL_SIGNIN_MODE: "" }).signInMode).toBe("code");
+    expect(loadConfig({ ...BASE, PORTAL_SIGNIN_MODE: "   " }).signInMode).toBe("code");
+    expect(loadConfig({ ...BASE, PORTAL_SIGNIN_MODE: "code" }).signInMode).toBe("code");
+  });
+
+  it("is password when it says password, with the edges trimmed", () => {
+    expect(loadConfig({ ...BASE, PORTAL_SIGNIN_MODE: "password" }).signInMode).toBe("password");
+    expect(loadConfig({ ...BASE, PORTAL_SIGNIN_MODE: " password " }).signInMode).toBe("password");
+  });
+
+  it("refuses to start on anything else, and names the variable and what it may be", () => {
+    for (const value of ["Password", "CODE", "passwd", "totp", "password+totp", "1", "true", "email"]) {
+      const message = problemsOf({ ...BASE, PORTAL_SIGNIN_MODE: value }).join();
+      expect(message, value).toContain("PORTAL_SIGNIN_MODE must be code or password");
+      expect(message, value).toContain(JSON.stringify(value));
+    }
+  });
+
+  it("still refuses a production boot with no SMTP host in code mode", () => {
+    const problems = problemsOf({ ...PRODUCTION });
+    expect(problems.some((p) => p.startsWith("PORTAL_SMTP_HOST is required in production"))).toBe(true);
+    // Said outright, as well, for the explicit default.
+    expect(problemsOf({ ...PRODUCTION, PORTAL_SIGNIN_MODE: "code" }).join()).toContain("PORTAL_SMTP_HOST is required");
+    // And a cleartext loopback mail host is still refused there.
+    expect(problemsOf({ ...PRODUCTION, PORTAL_SMTP_HOST: "127.0.0.1", PORTAL_SMTP_PORT: "1025" }).join()).toContain(
+      "without TLS",
+    );
+  });
+
+  it("boots in production with no SMTP settings at all in password mode", () => {
+    const config = loadConfig({ ...PRODUCTION, PORTAL_SIGNIN_MODE: "password" });
+    expect(config.production).toBe(true);
+    expect(config.signInMode).toBe("password");
+    expect(config.publicUrl).toBe("https://portal.example.com");
+  });
+
+  it("does not ask for SMTP in password mode even when a loopback host is left in the environment", () => {
+    expect(() =>
+      loadConfig({ ...PRODUCTION, PORTAL_SIGNIN_MODE: "password", PORTAL_SMTP_HOST: "127.0.0.1" }),
+    ).not.toThrow();
+  });
+
+  it("keeps every other production guard in password mode", () => {
+    const problems = problemsOf({ ...BASE, NODE_ENV: "production", PORTAL_SIGNIN_MODE: "password" });
+    expect(problems.some((p) => p.startsWith("PORTAL_SIGNING_KEY is required in production"))).toBe(true);
+    expect(problems.some((p) => p.startsWith("PORTAL_PUBLIC_URL is required in production"))).toBe(true);
+    expect(problems.some((p) => p.startsWith("PORTAL_MIGRATE_DATABASE_URL is required in production"))).toBe(true);
+    // The two it let go of are absent from the list, which is the whole difference.
+    expect(problems.some((p) => p.includes("PORTAL_SMTP_HOST"))).toBe(false);
+
+    const dev = problemsOf({
+      ...PRODUCTION,
+      PORTAL_SIGNIN_MODE: "password",
+      PORTAL_DEV_OUTBOX: "1",
+      PORTAL_ALLOW_MANUAL_OTP: "1",
+    });
+    expect(dev.some((p) => p.includes("PORTAL_DEV_OUTBOX"))).toBe(true);
+    expect(dev.some((p) => p.includes("PORTAL_ALLOW_MANUAL_OTP"))).toBe(true);
+  });
+
+  it("still checks what SMTP settings it is given in password mode", () => {
+    expect(problemsOf({ ...BASE, PORTAL_SIGNIN_MODE: "password", PORTAL_SMTP_USER: "portal" }).join()).toContain(
+      "PORTAL_SMTP_USER is set without PORTAL_SMTP_PASS",
+    );
+  });
+});

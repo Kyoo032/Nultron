@@ -34,8 +34,14 @@ services:
       - "127.0.0.1:443:443/udp"
 
   proxy:
+    # `!override` replaces compose.yml's whole list, so the company sites' switch script and web roots are
+    # restated here: the proxy's entrypoint is sites/enable-sites.sh, and it has to exist. DPS_DOMAIN and
+    # TOKOTOKEN_DOMAIN are not in .pilot-local/.env, so this rehearsal serves Nultron only, as before.
     volumes: !override
       - ./.pilot-local/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./sites:/etc/caddy/sites:ro
+      - ./sites/dpscloud:/srv/dpscloud:ro
+      - ./sites/tokotoken:/srv/tokotoken:ro
       - ./.pilot-local/pki/edge.crt:/certs/edge.crt:ro
       - ./.pilot-local/pki/edge.key:/certs/edge.key:ro
       - caddy-data:/data
@@ -79,4 +85,4 @@ services:
       # The inbox the drive reads the sign-in code from. Loopback only, and on 18025 so it can never
       # collide with the Mailpit of apps/portal/compose.yml (8025).
       - "127.0.0.1:18025:8025"
-    restart: "no"
+    restart: unless-stopped

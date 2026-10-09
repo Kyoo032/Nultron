@@ -18,3 +18,4 @@ export type * from "./types";
 export { validateDocx } from "./validate";
 export { DOCX_MAX_INFLATED_BYTES, declaredInflatedBytes } from "./zip-limits";
 export { applyRedline } from "./write";
+export { documentFromPlainText, plainTextPages } from "./plain-document";

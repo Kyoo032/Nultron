@@ -31,9 +31,12 @@ describe("path allowlist (G-14)", () => {
     expect(() => assertInsidePath(link, { roots: [dir], denied: [] })).toThrow(ApiError);
   });
 
-  it("escapes C:/ and apostrophes for ass= filters", () => {
+  it("escapes C:/ and apostrophes for ass= filters at both levels ffmpeg unescapes a filtergraph", () => {
+    // Two levels: the graph parser removes one backslash layer, then the filter splits its options on ":".
     const escaped = escapeFilterPath("C:/Users/O'Brien/title.ass");
-    expect(escaped).toContain("C\\:/Users/O\\'Brien/title.ass");
-    expect(escaped.includes("\\[") || true).toBe(true);
+    expect(escaped).toBe("C\\\\:/Users/O\\\\\\'Brien/title.ass");
+    expect(escapeFilterPath("C:\\Users\\a.ass")).toBe("C\\\\:/Users/a.ass");
+    expect(escapeFilterPath("/data/a[1],b;c.ass")).toBe("/data/a\\[1\\]\\,b\\;c.ass");
+    expect(escapeFilterPath("/data/plain.ass")).toBe("/data/plain.ass");
   });
 });

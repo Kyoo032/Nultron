@@ -18,6 +18,7 @@
     "portal:seed": "pnpm --filter @agentforge/portal exec tsx scripts/seed.ts",
     "portal:otp": "pnpm --filter @agentforge/portal exec tsx scripts/otp.ts",
     "portal:invite": "pnpm --filter @agentforge/portal exec tsx scripts/invite.ts",
+    "portal:account": "pnpm --filter @agentforge/portal exec tsx scripts/account.ts",
     "maps:check": "node scripts/map-rot.mjs",
     "maps:drift": "node scripts/map-drift.mjs",
     "edit:starters": "node scripts/edit-starters.mjs",

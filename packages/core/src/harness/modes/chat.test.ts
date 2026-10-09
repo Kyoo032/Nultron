@@ -23,6 +23,8 @@ describe("chat harness spec", () => {
       "search_files",
       "delete_file",
       "run_code",
+      "self_check",
+      "build_deck",
     ]);
   });
 
@@ -30,7 +32,7 @@ describe("chat harness spec", () => {
     expect(chatHarnessSpec.budget).toEqual({
       maxSteps: 12,
       maxToolCalls: 40,
-      perTool: { write_file: 20, edit_file: 20, delete_file: 10, web_fetch: 8, run_code: 6 },
+      perTool: { write_file: 20, edit_file: 20, delete_file: 10, web_fetch: 8, run_code: 6, self_check: 4, build_deck: 4 },
     });
   });
 

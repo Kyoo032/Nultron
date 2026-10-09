@@ -14,7 +14,7 @@ import { applyLocale, resetLocaleForTests } from "./i18n";
 import { meetingChecksNote } from "./meeting-checks";
 
 const verdicts = (failed: string[]) =>
-  ["minutes-shape", "action-owners", "quoted-dates", "summary-present"].map((check) => ({
+  ["minutes-shape", "action-owners", "quoted-dates", "summary-present", "minutes-evidence"].map((check) => ({
     check,
     ok: !failed.includes(check),
   }));
@@ -62,6 +62,15 @@ describe("meetingChecksNote", () => {
     });
   });
 
+  it("names the evidence check, last: some items are not backed by the transcript", () => {
+    expect(meetingChecksNote({ passed: false, rounds: 1, verdicts: verdicts(["minutes-evidence"]) })).toEqual({
+      failed: ["evidence"],
+    });
+    expect(
+      meetingChecksNote({ passed: false, rounds: 1, verdicts: verdicts(["minutes-evidence", "quoted-dates"]) }),
+    ).toEqual({ failed: ["dates", "evidence"] });
+  });
+
   it("ignores a check it has no words for, and a verdict that is not well formed", () => {
     const messy = {
       passed: false,
@@ -93,19 +102,20 @@ describe("MeetingChecksNote", () => {
 
   it("is a calm status that lists what failed in plain English", () => {
     applyLocale("en");
-    const html = renderToStaticMarkup(<MeetingChecksNote note={{ failed: ["owners", "dates", "summary", "shape"] }} />);
+    const html = renderToStaticMarkup(<MeetingChecksNote note={{ failed: ["owners", "dates", "summary", "shape", "evidence"] }} />);
     expect(html).toContain('role="status"');
     expect(html).toContain('data-testid="meeting-checks-note"');
     expect(html).not.toContain('role="alert"');
     expect(html).toContain("These minutes may need a second look");
     expect(html).toContain("The minutes are saved.");
-    expect(html).toContain("Write the minutes");
-    for (const kind of ["owners", "dates", "summary", "shape"]) {
+    expect(html).toContain("Run again");
+    for (const kind of ["owners", "dates", "summary", "shape", "evidence"]) {
       expect(html).toContain(`data-check="${kind}"`);
     }
     expect(html).toContain("owner the transcript never names");
     expect(html).toContain("date or time the transcript never says");
     expect(html).toContain("summary is empty");
+    expect(html).toContain("not backed word for word by the transcript");
     // No raw key leaks into the page when a catalog string is missing.
     expect(html).not.toContain("meeting.checks");
   });
@@ -115,7 +125,7 @@ describe("MeetingChecksNote", () => {
     const html = renderToStaticMarkup(<MeetingChecksNote note={{ failed: ["owners", "dates", "summary", "shape"] }} />);
     expect(html).toContain("Notulen ini mungkin perlu diperiksa lagi");
     expect(html).toContain("Notulen tersimpan.");
-    expect(html).toContain("Tulis notulen");
+    expect(html).toContain("Jalankan lagi");
     expect(html).toContain("tidak pernah disebut");
     expect(html).not.toContain("meeting.checks");
     expect(html).not.toContain("These minutes");

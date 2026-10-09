@@ -2,6 +2,7 @@ import { sql } from "@agentforge/db";
 import type { TenantContext } from "@agentforge/core";
 import type { KnowledgeBackendId, RetrievedChunk, RetrieveResult } from "./knowledge/backend";
 import { knowledgeInjection, sourcesPart, type KnowledgeInjection } from "./knowledge";
+import { andVisibleSource } from "./knowledge-visibility";
 import { log } from "./log";
 
 /**
@@ -22,12 +23,19 @@ const LAST_COMPLETED_RUN = `SELECT id FROM runs
   WHERE organization_id = ? AND thread_id = ? AND status = 'completed'
   ORDER BY started_at DESC, rowid DESC LIMIT 1`;
 
-const RECORDED_CHUNKS = `SELECT r.source_id AS sourceId, r.chunk_index AS chunkIndex, r.score AS score,
+/**
+ * Hosted, the join also leaves out a source this person may not see. A record this build writes never
+ * names one (retrieval never hands it over), but one written by an earlier build can, and the popover
+ * would otherwise replay a colleague's chunk to the person whose thread was handed it.
+ */
+function recordedChunksSql(visibleSource: string): string {
+  return `SELECT r.source_id AS sourceId, r.chunk_index AS chunkIndex, r.score AS score,
     r.backend AS backend, s.name AS sourceName
   FROM knowledge_retrievals r
   JOIN knowledge_sources s ON s.id = r.source_id AND s.workspace_id = r.workspace_id
-  WHERE r.workspace_id = ? AND r.thread_id = ? AND r.run_id = ?
+  WHERE r.workspace_id = ? AND r.thread_id = ? AND r.run_id = ?${visibleSource}
   ORDER BY r.rowid`;
+}
 
 type RecordedChunk = {
   sourceId: string;
@@ -70,7 +78,10 @@ export function lastTurnRetrieval(tenant: TenantContext, threadId: string): Retr
     if (!run) {
       return EMPTY_RETRIEVAL;
     }
-    const recorded = sql.prepare(RECORDED_CHUNKS).all(tenant.workspaceId, threadId, run.id) as RecordedChunk[];
+    const visible = andVisibleSource(tenant, "s");
+    const recorded = sql
+      .prepare(recordedChunksSql(visible.sql))
+      .all(tenant.workspaceId, threadId, run.id, ...visible.params) as RecordedChunk[];
     if (recorded.length === 0) {
       return EMPTY_RETRIEVAL;
     }

@@ -29,6 +29,20 @@ export class PortalConfigError extends Error {
 
 export type Env = Readonly<Record<string, string | undefined>>;
 
+/**
+ * How a person proves who they are at the browser sign-in, chosen once at boot.
+ *
+ *   `code`      the default and the only mode before 2026-10-07: an address, then a code e-mailed to it
+ *               (and an invite code, the first time).
+ *   `password`  a username (or the address on record) and a password, created and reset by the operator
+ *               command `portal:account`. No e-mail is sent, and the e-mailed-code routes do not exist.
+ *
+ * Read from `PORTAL_SIGNIN_MODE`. Unset or empty means `code`; anything else that is not one of the two
+ * words refuses to start, because a typo that quietly fell back to `code` would be a deployment that
+ * thinks it is on passwords and is sending mail.
+ */
+export type SignInMode = "code" | "password";
+
 export interface SmtpConfig {
   readonly host: string;
   readonly port: number;
@@ -49,6 +63,8 @@ export interface SmtpConfig {
 
 export interface PortalConfig {
   readonly production: boolean;
+  /** `PORTAL_SIGNIN_MODE`. In `password` mode SMTP is not needed, and is not required in production. */
+  readonly signInMode: SignInMode;
   readonly host: string;
   readonly port: number;
   readonly dataDir: string;
@@ -237,6 +253,21 @@ function readDataDir(env: Env, problems: string[]): string {
   return absolute;
 }
 
+function readSignInMode(env: Env, problems: string[]): SignInMode {
+  const raw = env.PORTAL_SIGNIN_MODE?.trim();
+  if (raw === undefined || raw === "") {
+    return "code";
+  }
+  if (raw === "code" || raw === "password") {
+    return raw;
+  }
+  problems.push(
+    `PORTAL_SIGNIN_MODE must be code or password (got ${JSON.stringify(raw)}). ` +
+      "Leave it unset for the e-mailed one-time code.",
+  );
+  return "code";
+}
+
 /**
  * The transport's TLS decision, made once here instead of in `mail/smtp.ts`.
  *
@@ -246,7 +277,7 @@ function readDataDir(env: Env, problems: string[]): string {
  * from the first byte (`secure`, port 465), or STARTTLS that must succeed (`requireTls`) — and one
  * exception, a loopback sandbox that speaks no TLS at all (Mailpit).
  */
-function readSmtp(env: Env, production: boolean, problems: string[]): SmtpConfig {
+function readSmtp(env: Env, production: boolean, signInMode: SignInMode, problems: string[]): SmtpConfig {
   const host = env.PORTAL_SMTP_HOST?.trim() || DEFAULT_SMTP_HOST;
   const port = readPort(env, "PORTAL_SMTP_PORT", DEFAULT_SMTP_PORT, problems);
   const secure = readFlag(env, "PORTAL_SMTP_SECURE", problems);
@@ -257,7 +288,11 @@ function readSmtp(env: Env, production: boolean, problems: string[]): SmtpConfig
   const requireTls = !secure && !loopback;
   const ignoreTls = !secure && loopback;
 
-  if (production && !env.PORTAL_SMTP_HOST?.trim()) {
+  // In `password` mode nothing is ever mailed (`createMailer` hands out a mailer that refuses), so
+  // the two guards below, which exist so that a sign-in code cannot be sent to a sandbox or in the
+  // clear, have nothing to guard. Every other production guard in this file still applies.
+  const mailsCodes = signInMode === "code";
+  if (production && mailsCodes && !env.PORTAL_SMTP_HOST?.trim()) {
     // "In production mode with no mail provider the portal refuses to send rather than logging a
     // code" (web-phase9-portal-login.md). Refusing at boot is the same rule, earlier.
     problems.push(
@@ -265,7 +300,7 @@ function readSmtp(env: Env, production: boolean, problems: string[]): SmtpConfig
         "sandbox, and a portal that cannot deliver a code must not start pretending it can.",
     );
   }
-  if (production && ignoreTls) {
+  if (production && mailsCodes && ignoreTls) {
     problems.push(
       `PORTAL_SMTP_HOST is a loopback address (${host}), so the portal would send sign-in codes ` +
         "and SMTP AUTH credentials without TLS. Point it at a real provider, or set " +
@@ -332,9 +367,11 @@ export function loadConfig(env: Env = process.env): PortalConfig {
   const problems: string[] = [];
   const production = env.NODE_ENV?.trim() === "production";
   const databaseUrl = readDatabaseUrl(env, problems);
+  const signInMode = readSignInMode(env, problems);
 
   const config: PortalConfig = {
     production,
+    signInMode,
     host: env.PORTAL_HOST?.trim() || DEFAULT_HOST,
     port: readPort(env, "PORTAL_PORT", DEFAULT_PORT, problems),
     dataDir: readDataDir(env, problems),
@@ -345,7 +382,7 @@ export function loadConfig(env: Env = process.env): PortalConfig {
     allowManualOtp: readFlag(env, "PORTAL_ALLOW_MANUAL_OTP", problems),
     publicUrl: readPublicUrl(env, production, problems),
     trustProxy: readFlag(env, "PORTAL_TRUST_PROXY", problems),
-    smtp: readSmtp(env, production, problems),
+    smtp: readSmtp(env, production, signInMode, problems),
   };
 
   if (production && config.devOutbox) {

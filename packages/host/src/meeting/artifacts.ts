@@ -47,6 +47,24 @@ export function removeMeetingArtifacts(tenant: TenantContext, record: MeetingRec
 }
 
 /**
+ * Delete artifacts the meeting no longer points at (the minutes an edit replaced, a translation it cleared),
+ * scoped to the desk and to `mode = 'meeting'`, and their Knowledge cards with them. An empty id is skipped.
+ */
+export function removeMeetingArtifactsById(tenant: TenantContext, ids: readonly string[]): number {
+  const wanted = ids.filter((id) => id !== "");
+  if (wanted.length === 0) {
+    return 0;
+  }
+  const run = sql.transaction(() => {
+    const statement = sql.prepare("DELETE FROM artifacts WHERE workspace_id = ? AND mode = 'meeting' AND id = ?");
+    return wanted.reduce((removed, id) => removed + statement.run(tenant.workspaceId, id).changes, 0);
+  });
+  const removed = run.immediate();
+  dropOrphanCards(tenant);
+  return removed;
+}
+
+/**
  * The artifacts are already gone, so a card that cannot be dropped now only warns; the next read of
  * the Knowledge Base sweeps it (`GET /api/v1/knowledge`).
  */

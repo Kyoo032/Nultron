@@ -77,6 +77,11 @@ export function isRetryableModelFailure(failed: string): boolean {
   if (/no first token from |no stream events from |token pertama dari |peristiwa stream dari /i.test(text)) {
     return false;
   }
+  // So is a request that sent no headers in `HEADERS_TIMEOUT_MS` (`formatHeadersTimeoutError`): three more
+  // waits of that length against the same silent call would only make the person wait three times as long.
+  if (/no response within \d+s from |tidak ada respons dalam \d+ detik dari /i.test(text)) {
+    return false;
+  }
   return RETRYABLE_FAILURE.test(text);
 }
 

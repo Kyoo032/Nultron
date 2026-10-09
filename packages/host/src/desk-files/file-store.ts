@@ -23,6 +23,7 @@ import { log } from "../log";
 import { tenantRelativePath } from "../tenant-paths";
 import { isStorageQuotaError, putTenantObject, readTenantObject, removeTenantObject } from "../tenant-storage";
 import { openBody, sealBody } from "./body";
+import { canSeePath } from "./private-uploads";
 import { withDeskLock } from "./lock";
 import { mimeForPath } from "./mime";
 
@@ -135,6 +136,16 @@ export function createDeskFileStore(db: Database.Database, keyProvider: () => Bu
     return findLive(workspaceId, path) ?? notFound();
   }
 
+  /**
+   * Another person's private upload folder is not found, on every path through the store. The caller is
+   * the tenant's user; off the hosted server nothing is guarded (`private-uploads.ts`).
+   */
+  function assertVisible(tenant: TenantContext, path: string): void {
+    if (!canSeePath(tenant, path)) {
+      notFound();
+    }
+  }
+
   function liveRows(workspaceId: string, dir: DeskPath | null): LiveRow[] {
     if (dir === null) {
       return db.prepare(`${liveSelect} ORDER BY f.path`).all(workspaceId) as LiveRow[];
@@ -206,6 +217,7 @@ export function createDeskFileStore(db: Database.Database, keyProvider: () => Bu
     by: FileAuthor,
     options?: WriteOptions,
   ): Promise<WriteOutcome> {
+    assertVisible(tenant, path);
     checkContent(content);
     const data = Buffer.from(content, "utf8");
     const sha256 = createHash("sha256").update(data).digest("hex");
@@ -263,6 +275,7 @@ export function createDeskFileStore(db: Database.Database, keyProvider: () => Bu
   }
 
   async function readVersionLocked(tenant: TenantContext, path: DeskPath, version: number): Promise<FileRead> {
+    assertVisible(tenant, path);
     const live = requireLive(tenant.workspaceId, path);
     if (!Number.isInteger(version) || version < 1) {
       notFound();
@@ -289,7 +302,7 @@ export function createDeskFileStore(db: Database.Database, keyProvider: () => Bu
       async list(dir, glob) {
         const matches = glob ? globMatcher(glob) : () => true;
         return liveRows(tenant.workspaceId, dir)
-          .filter((row) => matches(row.path))
+          .filter((row) => matches(row.path) && canSeePath(tenant, row.path))
           .map(
             (row): FileEntry => ({
               path: asDeskPath(row.path),
@@ -302,6 +315,7 @@ export function createDeskFileStore(db: Database.Database, keyProvider: () => Bu
       },
 
       async read(path) {
+        assertVisible(tenant, path);
         const live = requireLive(tenant.workspaceId, path);
         return {
           path,
@@ -317,6 +331,7 @@ export function createDeskFileStore(db: Database.Database, keyProvider: () => Bu
 
       remove: (path, by) =>
         withDeskLock(tenant.workspaceId, async () => {
+          assertVisible(tenant, path);
           const live = requireLive(tenant.workspaceId, path);
           const now = Date.now();
           const done = db
@@ -339,7 +354,7 @@ export function createDeskFileStore(db: Database.Database, keyProvider: () => Bu
         const hits: SearchHit[] = [];
         let readBytes = 0;
         for (const row of liveRows(tenant.workspaceId, null)) {
-          if (!matches(row.path)) {
+          if (!matches(row.path) || !canSeePath(tenant, row.path)) {
             continue;
           }
           if (readBytes + row.bytes > MAX_SEARCH_READ_BYTES) {
@@ -370,6 +385,7 @@ export function createDeskFileStore(db: Database.Database, keyProvider: () => Bu
     createDeskRoot,
 
     async listVersions(tenant, path) {
+      assertVisible(tenant, path);
       const live = requireLive(tenant.workspaceId, path);
       const rows = db
         .prepare(

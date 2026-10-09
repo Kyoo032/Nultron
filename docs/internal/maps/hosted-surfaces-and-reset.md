@@ -1,6 +1,6 @@
 # Map — Hosted surfaces, per-tenant reset and health
 
-Last verified: 2026-10-01 at 0b61a29 + uncommitted tree, a third time that day, for the erase panel at a phone's width (§ 2, the paragraph on the screen): the final button is full width under the phrase box and its label is two lines at most, measured in a browser at 360, 400 and 1180 px against faked host answers. Before that, a second time that day, for **who is an owner** (§ 2): the portal now
+Last verified: 2026-10-07 in the `feat/hosted-run-limits` working tree (uncommitted), for one added step in the erase's checks (§ 2, step 5: refused on a partner that holds more than one company, SR-163 review round; read from `tenant-reset.ts`, proven by `tenant-reset-companies.test.ts`, not driven on a hosted server); every other line is as verified below. Before that: 2026-10-01 at 0b61a29 + uncommitted tree, a third time that day, for the erase panel at a phone's width (§ 2, the paragraph on the screen): the final button is full width under the phrase box and its label is two lines at most, measured in a browser at 360, 400 and 1180 px against faked host answers. Before that, a second time that day, for **who is an owner** (§ 2): the portal now
 sends `role` and the host writes and re-applies it, so the owner-only check stops a colleague (SR-65, second hole); the
 screen shows the button to an owner only. Before that, for the Erase account rewrite (§ 2): owner decision
 2026-10-01 on [SR-65](../security-register.md#sr-65) — erasing the company account deletes every person in
@@ -114,6 +114,14 @@ every refusal happens before anything is deleted:
 3. wrong or missing confirmation → `invalid_request` 400 (`:306`)
 4. `assertPurgeableTenant(tenant.tenantId)` (`packages/host/src/tenant-object-keys.ts:96`) → the
    local tenant's prefix is the whole store, so a mis-resolved id hits a wall before the `rm -rf`
+5. `assertSinglePartnerCompany(tenant.tenantId)` (`packages/host/src/tenant-reset.ts`, SR-163 review round,
+   2026-10-07) → **`409 tenant_erase_shared_partner`** when more than one `organizations` row sits under the
+   partner. Everything below is partner-wide (`purgeTenantRows` deletes by tenant id, the object prefix and local
+   roots are the partner's, every desk's key is cleared), so on a server that holds several companies under one
+   partner an owner's erase would have deleted all of them; now it deletes nothing and says so ("This server holds
+   several companies under one account ... Ask the operator of this server to erase this company."), shown by the
+   panel as `settings.reset.eraseAccountShared`. Zero or one organisation proceeds exactly as before. **Scoping the
+   purge to one company is still owed and is the owner's decision.** Test: `tenant-reset-companies.test.ts`.
 
 Then, in order (`:317-370`): open an audit row as `started` → **read the sealed refresh tokens of the tenant's
 live sessions** (`tenantSessionSeals`, `:321`) → `purgeTenantRows` in one transaction (content, **every
@@ -278,7 +286,8 @@ test (`bytes_used + ? <= ?`), so SQLite evaluates it against the row under the r
 `changes()` is the verdict. It replaces Phase 6's per-tenant promise chain, which held for one
 process and said so in its own comment; the CVM runbook's scaling step is a second app container
 behind the same Caddy. `putTenantObject` (`packages/host/src/tenant-storage.ts:540`) seeds the
-counter row from a real measure first, subtracts the measured job trees to get the budget, reserves,
+counter row from a real measure first, subtracts the measured job trees (and, since 2026-10-07, the
+tenant's saved artifacts, read from their rows: `tenant-object-storage.md`) to get the budget, reserves,
 and refunds with a negated delta if the put then fails.
 
 ## Where things live

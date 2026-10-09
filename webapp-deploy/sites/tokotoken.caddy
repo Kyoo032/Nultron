@@ -1,0 +1,71 @@
+# Toko Token website: {$TOKOTOKEN_DOMAIN} and www.{$TOKOTOKEN_DOMAIN}. Static files only.
+#
+# Switched on by webapp-deploy/sites/enable-sites.sh when TOKOTOKEN_DOMAIN is set in .env; copied into the proxy's
+# /tmp/sites-enabled at start and imported by the Caddyfile. This file is the whole of the site's proxy
+# configuration: it serves files from /srv/tokotoken (a read-only mount, compose.yml) and talks to nothing. It has
+# no reverse_proxy, so it cannot reach the app (127.0.0.1:3000) or the portal (portal:4000), and it reads only
+# TOKOTOKEN_DOMAIN.
+#
+# THE GATEWAY IS NOT HERE. api.tokotokenai.com is the live Toko Token model gateway and is hosted elsewhere.
+# This block names the apex and www ONLY: there is no wildcard (`*.tokotokenai.com`) and no catch-all address in
+# this file or in the Caddyfile, and enable-sites.sh refuses to start when any of the four domain variables is
+# api.tokotokenai.com or a name under it. Its DNS record must be left exactly as it is (webapp-deploy/README.md,
+# "Company sites on the same server"). If this proxy ever answered for that host, the gateway's users would be
+# sent to a placeholder page and Caddy would try to get a certificate for a name this server does not own.
+#
+# It uses the Caddyfile's (sign_in_filters) snippet for its access log and nothing else from the Nultron blocks.
+#
+# DNS first. Caddy asks Let's Encrypt for a certificate for each of the two names the moment it starts, and it
+# can only get one when both names already resolve to this server (an A record, no AAAA) and TCP 80 is open.
+#
+# The headers are a static site's: no script, no frame, no form, no connection out. The page that ships here is a
+# placeholder with one inline <style> block, hence `style-src 'unsafe-inline'`; a real site with its own
+# stylesheet should drop it. HSTS has NO includeSubDomains, deliberately: it would also pin api.tokotokenai.com
+# (and any other subdomain hosted elsewhere) to HTTPS for a year on every browser that has seen this site.
+
+http://{$TOKOTOKEN_DOMAIN}, http://www.{$TOKOTOKEN_DOMAIN} {
+	redir https://{host}{uri} permanent
+}
+
+{$TOKOTOKEN_DOMAIN}, www.{$TOKOTOKEN_DOMAIN} {
+	tls {
+		protocols tls1.2 tls1.3
+	}
+
+	encode zstd gzip
+
+	header {
+		Content-Security-Policy "default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Cross-Origin-Opener-Policy "same-origin"
+		Cross-Origin-Resource-Policy "same-origin"
+		Permissions-Policy "accelerometer=(), autoplay=(), browsing-topics=(), camera=(), display-capture=(), encrypted-media=(), geolocation=(), gyroscope=(), interest-cohort=(), magnetometer=(), microphone=(), midi=(), payment=(), publickey-credentials-get=(), screen-wake-lock=(), serial=(), usb=(), xr-spatial-tracking=()"
+		-Server
+	}
+
+	# This site's own access log: one JSON object per request on stdout, named `tokotoken` so its lines are told
+	# apart from the Nultron sites' by the `logger` field (http.log.access.tokotoken) and by request.host.
+	log tokotoken {
+		output stdout
+		format filter {
+			wrap json
+			fields {
+				import sign_in_filters
+			}
+		}
+	}
+
+	# A static site answers reads and nothing else.
+	@not_read not method GET HEAD OPTIONS
+	header @not_read Allow "GET, HEAD, OPTIONS"
+	respond @not_read 405
+
+	root * /srv/tokotoken
+	file_server {
+		# Never a directory listing (no `browse`), and never a dotfile or an editor's leftovers.
+		hide .* *~ *.bak *.swp
+	}
+}

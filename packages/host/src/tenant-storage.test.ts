@@ -41,6 +41,14 @@ function freshDb(): Database.Database {
       measured_at integer,
       updated_at integer NOT NULL
     );
+    -- Only the columns the artifact measure reads: a desk's rows reach a tenant through its organization.
+    CREATE TABLE organizations (id text PRIMARY KEY NOT NULL, tenant_id text NOT NULL);
+    CREATE TABLE workspaces (id text PRIMARY KEY NOT NULL, organization_id text NOT NULL);
+    CREATE TABLE artifacts (
+      id text PRIMARY KEY NOT NULL,
+      workspace_id text NOT NULL,
+      size_bytes integer DEFAULT 0 NOT NULL
+    );
   `);
   for (const id of [A, B, LOCAL_TENANT_ID]) {
     sqlite.prepare("INSERT INTO tenants (id) VALUES (?)").run(id);
@@ -49,6 +57,22 @@ function freshDb(): Database.Database {
 }
 
 let sqlite: Database.Database | null = null;
+
+/** Saved artifacts for a tenant, one desk each, with the `size_bytes` the artifact store would have written. */
+function seedArtifacts(db: Database.Database, tenantId: string, sizes: number[]): void {
+  db.prepare("INSERT OR IGNORE INTO organizations (id, tenant_id) VALUES (?, ?)").run(`org-${tenantId}`, tenantId);
+  db.prepare("INSERT OR IGNORE INTO workspaces (id, organization_id) VALUES (?, ?)").run(
+    `ws-${tenantId}`,
+    `org-${tenantId}`,
+  );
+  sizes.forEach((size, index) => {
+    db.prepare("INSERT INTO artifacts (id, workspace_id, size_bytes) VALUES (?, ?, ?)").run(
+      `art-${tenantId}-${index}-${size}`,
+      `ws-${tenantId}`,
+      size,
+    );
+  });
+}
 
 function serverMode(limitBytes?: number): void {
   process.env.AGENTFORGE_SERVER = "1";
@@ -311,6 +335,50 @@ describe("the quota", () => {
     const report = await storage.tenantStorageReport(A);
     expect(report.jobBytes).toBe(500);
     expect(report.usedBytes).toBe(500);
+  });
+
+  it("counts the artifacts a tenant has saved: a deck is a row, not an object, and it is still the tenant's bytes", async () => {
+    serverMode(10_000);
+    seedArtifacts(sqlite as Database.Database, A, [300, 200]);
+    seedArtifacts(sqlite as Database.Database, B, [4000]);
+    await storage.putTenantObject(A, key(A, "org", "a.bin"), bytes(100), "application/octet-stream");
+
+    const report = await storage.tenantStorageReport(A);
+    expect(report.artifactBytes).toBe(500);
+    expect(report.objectBytes).toBe(100);
+    expect(report.usedBytes).toBe(600);
+    // Another tenant's rows are not this tenant's use.
+    expect((await storage.tenantStorageReport(B)).artifactBytes).toBe(4000);
+  });
+
+  it("refuses a write the artifacts have already filled the ceiling for", async () => {
+    serverMode(1000);
+    seedArtifacts(sqlite as Database.Database, A, [900]);
+    await expect(storage.assertStorageAdmits(A, 100)).resolves.toBeUndefined();
+    await expect(storage.assertStorageAdmits(A, 101)).rejects.toMatchObject({ code: "storage_quota_exceeded" });
+    await expect(
+      storage.putTenantObject(A, key(A, "org", "late.bin"), bytes(101), "application/octet-stream"),
+    ).rejects.toMatchObject({ code: "storage_quota_exceeded" });
+    // Room freed by deleting an artifact is room again, with nothing to recompute.
+    (sqlite as Database.Database).prepare("DELETE FROM artifacts").run();
+    await expect(storage.assertStorageAdmits(A, 101)).resolves.toBeUndefined();
+  });
+
+  it("does not read the artifacts table at all off the server, so a desk's number is what it always was", async () => {
+    // No connection is installed and no ceiling applies: a desktop is not made to open a table to
+    // save an image. A read of `artifacts` here would reach `requireSql()` and throw.
+    store.registerTenantStorageSql({
+      prepare(source: string) {
+        if (/artifacts/i.test(source)) {
+          throw new Error("an artifact read on a desk");
+        }
+        throw new Error("the counter table on a desk");
+      },
+    });
+    const report = await storage.tenantStorageReport(LOCAL_TENANT_ID);
+    expect(report.artifactBytes).toBe(0);
+    expect(report.limitBytes).toBeNull();
+    await expect(storage.assertStorageAdmits(LOCAL_TENANT_ID, 10 ** 12)).resolves.toBeUndefined();
   });
 
   it("does not bill the local tenant for another tenant's dataset files", async () => {

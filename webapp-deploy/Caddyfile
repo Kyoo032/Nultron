@@ -13,7 +13,9 @@
 # above reverse_proxy for what this file has to keep forwarding for them to work.
 #
 # The two variables above are the ONLY ones this file reads (SR-73): the proxy container
-# gets nothing else from .env.
+# gets nothing else from .env. The optional company sites (the last block of this file) read
+# two more, DPS_DOMAIN and TOKOTOKEN_DOMAIN, each in a file of its own; nothing in the two
+# Nultron site blocks above depends on them.
 
 # The fields every log line has to lose before it is written (L1, SR-72). One list, imported
 # by the default logger and by the access log below, so the two streams cannot drift. It sits
@@ -284,3 +286,18 @@ http://{$NULTRON_DOMAIN}, http://{$PORTAL_DOMAIN} {
 		flush_interval -1
 	}
 }
+
+# OPTIONAL COMPANY SITES, hosted on this same server: the DPS Cloud website ({$DPS_DOMAIN} and www) and the
+# Toko Token website ({$TOKOTOKEN_DOMAIN} and www), each a static site in a file of its own under
+# webapp-deploy/sites/. Not part of Nultron, and not reachable from it: those files have no reverse_proxy, serve
+# their own read-only web root, carry their own headers and access log, and never read NULTRON_DOMAIN or
+# PORTAL_DOMAIN.
+#
+# Which of them run is decided BEFORE Caddy starts, by sites/enable-sites.sh (the proxy's entrypoint): a site's
+# file is copied into /tmp/sites-enabled only when its variable is set in .env. Both unset (the default) leaves one
+# comment-only file there, so this line adds nothing and the proxy serves exactly the two names above.
+#
+# The glob is the only thing this file says about them. There is NO wildcard and NO catch-all site anywhere in
+# this deployment: api.tokotokenai.com, the live Toko Token model gateway, is hosted elsewhere, and this proxy
+# must never answer, proxy or request a certificate for it (enable-sites.sh refuses it by name).
+import /tmp/sites-enabled/*.caddy

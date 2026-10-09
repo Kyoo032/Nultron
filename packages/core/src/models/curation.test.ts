@@ -114,7 +114,7 @@ describe("curateModel", () => {
     // Parameter counts are units.
     ["qwen3.5-27b", "Qwen3.5 27B"],
     ["qwen3.5-35b-a3b", "Qwen3.5 35B A3B"],
-    ["gpt-oss-120b", "GPT Oss 120B"],
+    ["gpt-oss-120b", "GPT OSS 120B"],
     ["gemma-4-31b-it", "Gemma 4 31B IT"],
     // A version split by the dashes of an id is one dotted number, and a dotted one is left alone.
     ["deepseek-v4-1-flash", "DeepSeek V4.1 Flash"],

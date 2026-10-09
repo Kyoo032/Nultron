@@ -6,7 +6,8 @@
 # Five services, ONE of each (SR-29 and SR-66: the app's and the portal's limiters and refresh
 # lock live in process memory, so a second replica of either would double every ceiling):
 #   app            the host (tsx server.ts), loopback only. Owns the published ports.
-#   proxy          Caddy, in the app's network namespace. TLS for NULTRON_DOMAIN and PORTAL_DOMAIN.
+#   proxy          Caddy, in the app's network namespace. TLS for NULTRON_DOMAIN and PORTAL_DOMAIN, and, only when
+#                  DPS_DOMAIN / TOKOTOKEN_DOMAIN are set, for the two company sites (static, see sites/).
 #   portal         apps/portal: browser sign-in with an e-mailed one-time code. Not published.
 #   portal-db      Postgres 16 for the portal, on a network of its own with no way out. Not published.
 #   portal-prepare a one-shot: migrate as the schema owner, set portal_app_login's password (SR-56).
@@ -153,18 +154,42 @@ services:
     network_mode: "service:app"
     depends_on:
       - app
-    # The Caddyfile reads two variables, {$NULTRON_DOMAIN} and {$PORTAL_DOMAIN}, so those are the only
-    # ones this container gets. No env_file: .env also holds the wrap key, the portal client secret and
-    # the billing webhook secret, and a proxy has no use for any of them. Compose still fills the values
-    # in from the .env next to this file. `:-` rather than `:?` because .env is optional above, so that
-    # `docker compose config` and scripts/build.sh keep working on a fresh checkout; with an empty
-    # value Caddy refuses to start instead of serving anything. Keep this block in step with
-    # composeFile() in scripts/release-web.mjs.
+    # The entrypoint decides which OPTIONAL company sites run (webapp-deploy/sites/enable-sites.sh): a site is
+    # on only when its domain variable below is set, and with both unset the proxy serves exactly Nultron's
+    # two names, as it did before the company sites existed. It refuses to start on a malformed name, a
+    # duplicate, or api.tokotokenai.com (the live model gateway, hosted elsewhere), then runs the command.
+    entrypoint:
+      - sh
+      - /etc/caddy/sites/enable-sites.sh
+    command:
+      - caddy
+      - run
+      - --config
+      - /etc/caddy/Caddyfile
+      - --adapter
+      - caddyfile
+    # The Caddyfile and the site files read four variables, {$NULTRON_DOMAIN}, {$PORTAL_DOMAIN}, {$DPS_DOMAIN}
+    # and {$TOKOTOKEN_DOMAIN}, so those are the only ones this container gets. No env_file: .env also holds
+    # the wrap key, the portal client secret and the billing webhook secret, and a proxy has no use for any
+    # of them. Compose still fills the values in from the .env next to this file. `:-` rather than `:?`
+    # because .env is optional above, so that `docker compose config` and scripts/build.sh keep working on a
+    # fresh checkout; with an empty NULTRON_DOMAIN Caddy refuses to start instead of serving anything. The
+    # two company variables are optional on purpose: empty means that site is not served. Keep this block in
+    # step with composeFile() in scripts/release-web.mjs.
     environment:
       NULTRON_DOMAIN: ${NULTRON_DOMAIN:-}
       PORTAL_DOMAIN: ${PORTAL_DOMAIN:-}
+      DPS_DOMAIN: ${DPS_DOMAIN:-}
+      TOKOTOKEN_DOMAIN: ${TOKOTOKEN_DOMAIN:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # The site files and the switch script, read-only. Only the files of an enabled site are ever used.
+      - ./sites:/etc/caddy/sites:ro
+      # One read-only web root per company site, each mounted where only its own file_server can see it. The
+      # placeholder pages are the default; set DPS_WEB_ROOT / TOKOTOKEN_WEB_ROOT in .env to a folder outside
+      # this one to serve the real site without touching the bundle. Read-only: a site cannot write to it.
+      - ${DPS_WEB_ROOT:-./sites/dpscloud}:/srv/dpscloud:ro
+      - ${TOKOTOKEN_WEB_ROOT:-./sites/tokotoken}:/srv/tokotoken:ro
       - caddy-data:/data # ACME account + issued certificates (separate container from app's /data)
       - caddy-config:/config
 

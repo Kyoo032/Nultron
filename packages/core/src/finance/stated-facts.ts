@@ -26,7 +26,7 @@ const PERCENT_AFTER = /^\s*(?:%|persen|percent|pct)\b/i;
 const MONTHS_AFTER = /^\s*(?:bulan|months?)\b/i;
 
 /** How far either side of a number its unit words are looked for. */
-const CONTEXT_CHARS = 20;
+export const CONTEXT_CHARS = 20;
 
 export type StatedFactUnit = "currency" | "percent" | "ratio" | "months" | "count" | "number";
 
@@ -42,7 +42,7 @@ export type StatedFact = {
   readonly label: string;
 };
 
-function currencyOf(before: string, token: string): string {
+export function currencyOf(before: string, token: string): string {
   const mark = CURRENCY_INSIDE.exec(token)?.[0] ?? CURRENCY_BEFORE.exec(before)?.[0] ?? "";
   const cleaned = mark
     .trim()
@@ -57,7 +57,7 @@ function currencyOf(before: string, token: string): string {
   return { $: "USD", "€": "EUR", "£": "GBP", "¥": "JPY" }[cleaned] ?? cleaned.toUpperCase();
 }
 
-function unitOf(before: string, after: string, token: { text: string; unit: string }): StatedFactUnit {
+export function unitOf(before: string, after: string, token: { text: string; unit: string }): StatedFactUnit {
   if (token.unit === "%" || PERCENT_AFTER.test(after)) {
     return "percent";
   }

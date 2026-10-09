@@ -10,6 +10,7 @@ import {
   buildMinutesChecks,
   findDateTimeMentions,
   MINUTES_CHECK_IDS,
+  minutesEvidenceCheck,
   minutesParseError,
   minutesRepairPrompt,
   minutesShapeCheck,
@@ -111,7 +112,7 @@ describe("minutes-shape", () => {
 
 describe("action-owners", () => {
   const check = actionOwnersCheck(TRANSCRIPT);
-  const item = (task: string, owner: string) => ({ task, owner, due: "", firstStep: "" });
+  const item = (task: string, owner: string) => ({ task, owner, due: "", firstStep: "", quote: "" });
 
   it("passes owners the transcript names, in any case, and the explicit marker", () => {
     const value = minutes({
@@ -213,8 +214,8 @@ describe("findDateTimeMentions", () => {
 
 describe("quoted-dates", () => {
   const check = quotedDatesCheck(TRANSCRIPT);
-  const item = (task: string, due = "", firstStep = "") => ({ task, owner: "Dewi", due, firstStep });
-  const decision = (statement: string, context = "") => ({ statement, provisional: false, context });
+  const item = (task: string, due = "", firstStep = "") => ({ task, owner: "Dewi", due, firstStep, quote: "" });
+  const decision = (statement: string, context = "") => ({ statement, provisional: false, context, quote: "" });
 
   it("passes dates and times the transcript says, in either 12- or 24-hour form", () => {
     const value = minutes({
@@ -305,30 +306,109 @@ describe("summary-present", () => {
   });
 });
 
-describe("the set", () => {
-  it("runs the four checks in a fixed order", () => {
-    expect(buildMinutesChecks(TRANSCRIPT).map((check) => check.id)).toEqual([
-      "minutes-shape",
-      "action-owners",
-      "quoted-dates",
-      "summary-present",
-    ]);
-    expect(Object.values(MINUTES_CHECK_IDS)).toEqual([
-      "minutes-shape",
-      "action-owners",
-      "quoted-dates",
-      "summary-present",
-    ]);
+describe("quoted-dates and the near-miss dates", () => {
+  const decision = (statement: string) => ({ statement, provisional: false, context: "", quote: "" });
+
+  it("fails 1 August when the transcript only says 31 August", () => {
+    const check = quotedDatesCheck("Rina: kontrak berakhir 31 Agustus 2026, dan ada 1 vendor baru.", "id");
+    const verdict = failed(check.run(draftOf(minutes({ decisions: [decision("Kontrak berakhir 1 Agustus 2026")] }))));
+    expect(verdict.error).toContain('"1 Agustus 2026"');
   });
 
-  it("passes ordinary minutes of the transcript it was built for", () => {
+  it("passes a date the speaker split across the sentence", () => {
+    const check = quotedDatesCheck("Rina: tenggatnya tanggal 14, bulan Agustus, tahun 2026.", "id");
+    expect(check.run(draftOf(minutes({ decisions: [decision("Tenggat 14 Agustus 2026")] })))).toEqual({ ok: true });
+  });
+});
+
+describe("minutes-evidence", () => {
+  const check = minutesEvidenceCheck(TRANSCRIPT);
+  const decision = (quote: string) => ({ statement: "Ship the checkout fix", provisional: false, context: "", quote });
+  const action = (quote: string, owner = "Budi", due = "") => ({
+    task: "Update the runbook",
+    owner,
+    due,
+    firstStep: "",
+    quote,
+  });
+
+  it("passes quotes that are in the transcript, with the owner and the due date said beside them", async () => {
+    const value = minutes({
+      decisions: [decision("we ship the checkout fix on Friday 14 March")],
+      actionItems: [action("I will update the runbook before 3 pm", "Budi", "3 pm")],
+    });
+    expect(await check.run(draftOf(value))).toEqual({ ok: true });
+  });
+
+  it("passes a draft with no decisions or action items, and one that did not parse", async () => {
+    expect(await check.run(draftOf(minutes()))).toEqual({ ok: true });
+    expect(await check.run({ raw: "", model: "m", parsed: parseMinutesDraft("") })).toEqual({ ok: true });
+  });
+
+  it("fails an item with no quote and one whose quote is not in the transcript, naming each item", async () => {
+    const value = minutes({
+      decisions: [decision(""), decision("we ship the checkout fix on Friday 14 March")],
+      actionItems: [action("the team agreed to refresh the runbook")],
+    });
+    const verdict = failed(await check.run(draftOf(value)));
+    expect(verdict.check).toBe("minutes-evidence");
+    expect(verdict.error).toBe(
+      'These items are not backed by the transcript: decision-1: no quote: copy the exact words where it was agreed; action-1: the quote "the team agreed to refresh the runbook" is not in the transcript.',
+    );
+    expect(verdict.fix).toContain("For decision-1, action-1: copy word for word");
+    expect(verdict.why).not.toBe("");
+  });
+
+  it("fails an owner or a due date the quote does not back", async () => {
+    const value = minutes({
+      actionItems: [action("I will update the runbook before 3 pm", "Zed", "21 April")],
+    });
+    const verdict = failed(await check.run(draftOf(value)));
+    expect(verdict.error).toContain('the owner "Zed" is not named within 240 characters of the quote');
+    expect(verdict.error).toContain('the due date "21 April" is not said within 240 characters of the quote');
+  });
+
+  it("reports every judgement to a caller that wants the failing items", async () => {
+    const seen: string[][] = [];
+    const watched = minutesEvidenceCheck(TRANSCRIPT, "en", {
+      onJudged: (judgements) =>
+        seen.push(judgements.filter((judgement) => !judgement.ok).map((judgement) => judgement.id)),
+    });
+    await watched.run(draftOf(minutes({ decisions: [decision("")] })));
+    expect(seen).toEqual([["decision-1"]]);
+  });
+});
+
+describe("the set", () => {
+  it("runs the five checks in a fixed order, the evidence last", () => {
+    const ids = ["minutes-shape", "action-owners", "quoted-dates", "summary-present", "minutes-evidence"];
+    expect(buildMinutesChecks(TRANSCRIPT).map((check) => check.id)).toEqual(ids);
+    expect(Object.values(MINUTES_CHECK_IDS)).toEqual(ids);
+  });
+
+  it("passes ordinary minutes of the transcript it was built for", async () => {
     const value = minutes({
       heldOn: "14 March",
-      decisions: [{ statement: "Ship the checkout fix on 14 March", provisional: false, context: "" }],
-      actionItems: [{ task: "Update the runbook", owner: "Budi", due: "3 pm", firstStep: "" }],
+      decisions: [
+        {
+          statement: "Ship the checkout fix on 14 March",
+          provisional: false,
+          context: "",
+          quote: "we ship the checkout fix on Friday 14 March",
+        },
+      ],
+      actionItems: [
+        {
+          task: "Update the runbook",
+          owner: "Budi",
+          due: "3 pm",
+          firstStep: "",
+          quote: "I will update the runbook before 3 pm",
+        },
+      ],
     });
-    const verdicts = buildMinutesChecks(TRANSCRIPT).map((check) => check.run(draftOf(value)));
-    expect(verdicts).toEqual([{ ok: true }, { ok: true }, { ok: true }, { ok: true }]);
+    const verdicts = await Promise.all(buildMinutesChecks(TRANSCRIPT).map((check) => check.run(draftOf(value))));
+    expect(verdicts).toEqual([{ ok: true }, { ok: true }, { ok: true }, { ok: true }, { ok: true }]);
   });
 
   it("summarises a run as ids and pass/fail, never the minutes text", () => {
@@ -339,6 +419,13 @@ describe("the set", () => {
         { ok: false, check: "action-owners", error: "secret client name", why: "w", fix: "f" },
         { ok: true },
         { ok: true },
+        {
+          ok: false,
+          check: "minutes-evidence",
+          error: "decision-1: the quote is not in the transcript",
+          why: "w",
+          fix: "f",
+        },
       ],
       rounds: 1,
       passed: false,
@@ -351,6 +438,7 @@ describe("the set", () => {
         { check: "action-owners", ok: false },
         { check: "quoted-dates", ok: true },
         { check: "summary-present", ok: true },
+        { check: "minutes-evidence", ok: false },
       ],
     });
     expect(JSON.stringify(summary)).not.toContain("secret");

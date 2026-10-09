@@ -117,7 +117,7 @@ describe("a studio hides only the refused-for-no-key banner, never every error w
     for (const file of [
       "components/documents-studio.tsx",
       "components/presentations-studio.tsx",
-      "components/meeting-studio.tsx",
+      "lib/meeting-request.ts",
       "components/images-studio.tsx",
       "components/videos-studio.tsx",
       "components/knowledge-page.tsx",

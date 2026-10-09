@@ -28,6 +28,11 @@
       "unreachable": "unreachable"
     }
   },
+  "saveFailed": {
+    "writeFailed": "The file could not be written to that location. Choose another folder, or free some space, and try again.",
+    "tooLarge": "This file is too large to save from here.",
+    "generic": "The file could not be saved. Try again."
+  },
   "artifactActions": {
     "download": "Download Markdown",
     "saving": "Saving…",
@@ -79,5 +84,9 @@
   "needsKey": {
     "note": "Add your {gateway} key in {settings} to use this.",
     "blocked": "Add your key in {settings} to use this."
+  },
+  "runLimit": {
+    "tooManyRuns": "Too many of your requests are running at once. Wait for one to finish, then try again.",
+    "serverBusy": "The service is busy right now. Wait a moment, then try again."
   }
 }

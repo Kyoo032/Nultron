@@ -20,6 +20,7 @@ import { stripMarkedSentences } from "../finance-section-repair";
 import { collectJobAssistantRun } from "../job-regen";
 import { throwIfJobAborted } from "../job-stream";
 import { extractJsonObject } from "../presentation-outline";
+import { takeExtraCall, type CallBudget } from "./call-budget";
 import type { FinanceTaskRunContext } from "./types";
 
 /** What a section says when every sentence in it contradicted a computed direction. No figure. */
@@ -52,6 +53,11 @@ export type DirectionHoldOptions = {
   readonly phase: string;
   /** The job's cancel, handed to each rewrite call. */
   readonly signal?: AbortSignal;
+  /**
+   * The run's shared allowance of extra calls. A section that cannot get one is not rewritten: its
+   * contradicting sentences are dropped in code. Absent means no limit.
+   */
+  readonly budget?: CallBudget;
 };
 
 export type DirectionHoldResult<S extends DirectionSection> = {
@@ -72,11 +78,30 @@ function readRewrite(raw: string): string | null {
   }
 }
 
+/** One model call: the section's body asked for again, keeping the direction the code decided. */
+async function rewriteSection(section: DirectionSection, options: DirectionHoldOptions): Promise<string> {
+  const run = await collectJobAssistantRun({
+    tenant: options.tenant,
+    model: options.model,
+    systemPrompt: withOutputLanguage(DIRECTION_SYSTEM, "finance", options.locale),
+    runPrefix: "finance-direction",
+    agentId: "finance",
+    jobMode: "finance",
+    versionId: "finance-direction",
+    prompt: [options.factsBlock, RETRY[options.locale], `Section:\n${section.heading}\n\n${section.body}`]
+      .filter(Boolean)
+      .join("\n\n"),
+    ...(options.signal ? { signal: options.signal } : {}),
+  });
+  return readRewrite(run.text) ?? section.body;
+}
+
 /**
  * One rewrite of each section that contradicts a claim, then those sentences go.
  *
  * No claim, or no contradicting sentence, asks nothing of the model. The heading the task
- * already had is kept: the rewrite is only the body.
+ * already had is kept: the rewrite is only the body. With an `options.budget` each rewrite draws
+ * on the run's shared extra calls, and a section with none left has its sentences dropped as is.
  */
 export async function holdReadingDirection<S extends DirectionSection>(
   sections: readonly S[],
@@ -105,20 +130,7 @@ export async function holdReadingDirection<S extends DirectionSection>(
       continue;
     }
     throwIfJobAborted(options.signal);
-    const run = await collectJobAssistantRun({
-      tenant: options.tenant,
-      model: options.model,
-      systemPrompt: withOutputLanguage(DIRECTION_SYSTEM, "finance", options.locale),
-      runPrefix: "finance-direction",
-      agentId: "finance",
-      jobMode: "finance",
-      versionId: "finance-direction",
-      prompt: [options.factsBlock, RETRY[options.locale], `Section:\n${section.heading}\n\n${section.body}`]
-        .filter(Boolean)
-        .join("\n\n"),
-      ...(options.signal ? { signal: options.signal } : {}),
-    });
-    const rewritten = readRewrite(run.text) ?? section.body;
+    const rewritten = takeExtraCall(options.budget) ? await rewriteSection(section, options) : section.body;
     const guarded = guardNumbers(rewritten, options.allowed);
     const stripped = stripMarkedSentences(guarded.text);
     amountRemoved += stripped.removed.length;

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  HEADERS_TIMEOUT_MS,
   STREAM_IDLE_MS,
   STREAM_REASONING_IDLE_MS,
   STREAM_REASONING_TTFB_MS,
@@ -7,6 +8,7 @@ import {
   abortErrorMessage,
   armStreamWatchdog,
   checkStreamWatchdog,
+  formatHeadersTimeoutError,
   formatStreamWatchdogError,
   isWatchdogReasoningModel,
   streamWatchdogLimits,
@@ -120,6 +122,31 @@ describe("formatStreamWatchdogError", () => {
     expect(formatStreamWatchdogError("gpt-5.6-luna", "idle", 60_000)).toContain(
       "No stream events from gpt-5.6-luna for 60s",
     );
+  });
+});
+
+describe("formatHeadersTimeoutError", () => {
+  it("names the model and the wait, in English and in Bahasa Indonesia", () => {
+    expect(formatHeadersTimeoutError("gpt-6-luna", 45_000, "en")).toBe(
+      "No response within 45s from gpt-6-luna (timeout). Try a smaller prompt, another model, or send again.",
+    );
+    expect(formatHeadersTimeoutError("gpt-6-luna", 45_000, "id")).toBe(
+      "Tidak ada respons dalam 45 detik dari gpt-6-luna (timeout). Coba prompt yang lebih pendek, model lain, atau kirim lagi.",
+    );
+  });
+
+  it("does not call a slow answer a down gateway, and falls back to English for an unknown locale", () => {
+    expect(formatHeadersTimeoutError("gpt-6-luna", 45_000)).not.toMatch(/unreachable|down/i);
+    expect(formatHeadersTimeoutError("", 45_000, "de" as never)).toContain("from this model");
+    expect(formatHeadersTimeoutError("", 45_000, "id")).toContain("dari model ini");
+  });
+});
+
+describe("HEADERS_TIMEOUT_MS", () => {
+  it("is under the idle budget the watchdog has on a follow-up call, for every model family", () => {
+    expect(HEADERS_TIMEOUT_MS).toBeLessThan(STREAM_IDLE_MS);
+    expect(HEADERS_TIMEOUT_MS).toBeLessThan(STREAM_REASONING_IDLE_MS);
+    expect(HEADERS_TIMEOUT_MS).toBeLessThan(streamWatchdogLimits("gpt-6-luna").idleMs);
   });
 });
 

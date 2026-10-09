@@ -1,4 +1,4 @@
-import { ApiError, hasLiveProvider, resolveChatModel, resolveRuntimeMode, type TenantContext } from "@agentforge/core";
+import { ApiError, resolveChatModel, type TenantContext } from "@agentforge/core";
 import {
   DOCX_MIME,
   XLSX_MIME,
@@ -22,12 +22,14 @@ import { artifactStore } from "./artifacts";
 import { collectJobAssistantRun, readModelPinned } from "./job-regen";
 import { throwIfJobAborted } from "./job-stream";
 import { upsertWorkSource } from "./knowledge-ingest";
+import { readLegalExtractView } from "./legal/extract";
+import { confirmedFacts, confirmedFactsNote } from "./legal/extract-view";
 import type { LegalRunBody } from "./legal/input";
+import { requireLegalLive } from "./legal/legal-model";
 import type { LegalMatterRecord, LegalRunArtifact, LegalRunRecord } from "./legal/records";
 import { runLegalMatter } from "./legal/run";
 import { legalStore, requireLegalMatter } from "./legal/store";
 import { listSelectableModels, modeDefaultsFor } from "./selectable-models";
-import { loadSettings } from "./settings-store";
 import { localeForRun } from "./run-context";
 import { artifactWorkCard } from "./work-cards";
 import { log } from "./log";
@@ -59,16 +61,24 @@ export function encodeArtifactBody(mime: ArtifactMime, bytes: Uint8Array, text: 
   return text.trim() || new TextDecoder().decode(bytes);
 }
 
-function requireLive(tenant: TenantContext): ReturnType<typeof loadSettings> {
-  const settings = loadSettings(tenant);
-  const mode = resolveRuntimeMode({
-    settingsHasKey: hasLiveProvider(settings),
-    envRuntime: process.env.AGENTFORGE_RUNTIME,
-  });
-  if (mode === "stub") {
-    throw new ApiError("runtime_stub", legalOutputCopy(localeForRun()).stubError, 503);
+/**
+ * The full review acts for one side, so it needs to know which: 400 `parties_required`, before any model
+ * call. A matter can be created and read with no parties (the documents say who they are); only this asks.
+ * The counterparty may stay empty (a document with one named party): the run calls it "the counterparty".
+ */
+export function assertPartiesForReview(matter: Pick<LegalMatterRecord, "side">): void {
+  if (matter.side.party.trim() === "") {
+    throw new ApiError("parties_required", legalOutputCopy(localeForRun()).partiesRequired, 400);
   }
-  return settings;
+}
+
+/** The side as the run's prompts and deliverables print it: an empty counterparty reads as "the counterparty". */
+function withCounterpartyFallback(matter: LegalMatterRecord): LegalMatterRecord {
+  if (matter.side.counterparty.trim() !== "") {
+    return matter;
+  }
+  const counterparty = legalOutputCopy(localeForRun()).counterpartyFallback;
+  return { ...matter, side: { ...matter.side, counterparty } };
 }
 
 function readRunBody(body: unknown): LegalRunBody {
@@ -153,7 +163,7 @@ async function loadDocMaps(
     bytes.set(card.id, raw);
   }
   if (docs.size === 0) {
-    throw new ApiError("invalid_request", "Upload at least one .docx before running", 400);
+    throw new ApiError("invalid_request", legalOutputCopy(localeForRun()).noFiles, 400);
   }
   return { docs, bytes };
 }
@@ -238,8 +248,9 @@ export async function generateLegalRun(
   emit: JobEmitter,
   abortSignal?: AbortSignal,
 ): Promise<LegalRunSummary> {
-  requireLive(tenant);
   const matter = requireLegalMatter(tenant, matterId);
+  assertPartiesForReview(matter);
+  requireLegalLive(tenant);
   const runBody = readRunBody(body);
   const models = resolveModels(runBody, tenant);
   const pinned = pinnedLegalModels(body, models);
@@ -247,11 +258,14 @@ export async function generateLegalRun(
   const { docs, bytes } = await loadDocMaps(tenant, matter);
   const runId = crypto.randomUUID();
   const startedAt = Date.now();
+  // What the owner corrected in the extraction is given to the review as fact, beside the source priority.
+  const corrected = readLegalExtractView(tenant, matter).extract;
 
   throwIfJobAborted(abortSignal);
   const result = await runLegalMatter(
     {
-      matter,
+      matter: withCounterpartyFallback(matter),
+      confirmedFactsNote: corrected ? confirmedFactsNote(confirmedFacts(corrected)) : "",
       docs,
       bytes,
       playbook: matter.playbookId ? findPlaybook(matter.playbookId) : null,
