@@ -56,7 +56,9 @@ names in the table above. Do not point a wildcard record at this server.
 
 ${DEPLOY_DOC_SECTIONS.mail}
 
-Nultron sends e-mail for one reason: the one-time code on the sign-in screen. It goes through Tencent Cloud SES
+**Only needed if you set \`PORTAL_SIGNIN_MODE=code\`.** With the bundle's default (\`password\`) Nultron sends no e-mail
+and you can skip this whole section. In \`code\` mode Nultron sends e-mail for one reason: the one-time code on the
+sign-in screen. It goes through Tencent Cloud SES
 (the International site, Singapore) over SMTP, and through nothing else. The DPS Cloud and Toko Token websites send
 no e-mail.
 
@@ -111,8 +113,8 @@ certificates Caddy already holds.
    from IPv4 anywhere, TCP 22 from your own address only, and no IPv6.
 6. **Start the stack on the CVM** (\`docker compose up -d\`) and check it before any DNS change: \`docker compose ps\`
    shows \`app\` and \`portal\` healthy, and from your own machine
-   \`curl --resolve nultron-ai.xyz:443:<CVM address> https://nultron-ai.xyz/healthz\` answers 200. Sign in once with a
-   real code. Do the same \`--resolve\` check for each company site you serve.
+   \`curl --resolve nultron-ai.xyz:443:<CVM address> https://nultron-ai.xyz/healthz\` answers 200. Sign in once with
+   a real account (a real code, if you run \`code\` mode). Do the same \`--resolve\` check for each company site you serve.
 7. **Restore anything written since the image**, if you took the second backup in step 3.
 8. **Switch the A records** of all three domains (the six names) to the CVM's address. Watch \`docker compose logs
    proxy\` on the CVM while traffic moves, and check each name from outside.
@@ -135,8 +137,8 @@ image \`${portal}\` (where people sign in) with its own Postgres, and a Caddy pr
 both. Nothing is built on the server. One of each service: do not scale any of them.
 
 1. \`docker login ghcr.io\` with a GitHub token that can read packages. Both images are private.
-2. \`cp .env.example .env\` and \`cp portal.env.example portal.env\`, fill in every name in both, and keep both
-   off git (\`chmod 600\`). Generate \`AGENTFORGE_SECRETS_KEY\` and \`PORTAL_SIGNING_KEY\` once and keep them: a
+2. \`cp .env.example .env\` and \`cp portal.env.example portal.env\`, fill in every name in both (except the
+   \`PORTAL_SMTP_*\` ones, which password sign-in does not use), and keep both off git (\`chmod 600\`). Generate \`AGENTFORGE_SECRETS_KEY\` and \`PORTAL_SIGNING_KEY\` once and keep them: a
    new wrap key cannot read the old data, and a new signing key signs everyone out.
 3. Point two DNS A records, \`NULTRON_DOMAIN\` and \`PORTAL_DOMAIN\`, at this server (no AAAA record) and open
    TCP 80 and 443 and UDP 443, inbound, IPv4 only.
@@ -145,11 +147,32 @@ both. Nothing is built on the server. One of each service: do not scale any of t
 5. Seed the first tenant and user. The secret is shown once:
    \`docker compose exec -T portal sh /app/webapp-deploy/portal-entry.sh ./node_modules/.bin/tsx scripts/seed.ts --email <you> --redirect https://<NULTRON_DOMAIN>/auth/callback\`
    Put the client secret it prints in \`.env\` as \`AGENTFORGE_PORTAL_CLIENT_SECRET\`.
-6. \`docker compose up -d\`, then \`docker compose ps\` until \`app\` and \`portal\` are \`healthy\`, and open
-   \`https://<NULTRON_DOMAIN>\`.
+6. \`docker compose up -d\`, then \`docker compose ps\` until \`app\` and \`portal\` are \`healthy\`.
+7. Create the first owner account, **before anyone can sign in**. This bundle signs people in with a username and a
+   password (\`PORTAL_SIGNIN_MODE=password\` in \`portal.env\`), and the seed made the owner without one. Give that person
+   a password with the portal's account command, using the same address you gave the seed:
+   \`docker compose exec -T portal sh /app/webapp-deploy/portal-entry.sh ./node_modules/.bin/tsx scripts/account.ts create --username <name> --email <you> --role owner\`
+   It prints a generated initial password **once**: hand it to the person, who must choose their own at first
+   sign-in. Add everyone else the same way (\`--role admin\` or \`member\`, up to the seat cap); \`account.ts\` also has
+   \`list\`, \`reset-password\`, \`disable\`, \`enable\` and \`set-role\`. There is no self-sign-up, no self-service
+   password reset (a forgotten password is \`reset-password\`) and no second factor yet (SR-165 in the source
+   repository's security register records what that leaves open). Then open \`https://<NULTRON_DOMAIN>\` and sign in.
+
+**No mail sender is needed in this mode.** In password mode no e-mail is sent, so the \`PORTAL_SMTP_*\` settings
+in \`portal.env\` may stay blank and the SES setup in the "Sign-in mail" section below can be skipped. To sign
+people in with an e-mailed one-time code instead, set \`PORTAL_SIGNIN_MODE=code\` in \`portal.env\`, fill in every
+\`PORTAL_SMTP_*\` value (a portal in \`code\` mode refuses to boot in production without a real mail host), recreate the
+portal, and create people with the portal's \`invite\` script instead of \`account\`. The two values are exactly
+\`password\` and \`code\`; anything else stops the portal at boot.
+
+**Already running in \`code\` mode?** An update never touches your \`portal.env\`, so the mode stays as you set it. If
+you choose to switch to \`password\`, create an account for everyone first (\`account.ts create\`): a person who was only
+invited, or seeded under \`code\` mode, has no password and cannot sign in until one exists, and \`create\` refuses a
+person still in \`invited\` status, so finish their invite first.
 
 Back up the \`nultron-data\` and \`portal-pgdata\` volumes before an upgrade: the databases migrate forward only. To
-roll back, check out the previous release tag of this repo and repeat steps 6 onward.
+roll back, check out the previous release tag of this repo and repeat step 6 (the accounts from step 7 already exist,
+and \`account create\` refuses to run twice for the same person).
 
 ${extraSections()}`;
 }

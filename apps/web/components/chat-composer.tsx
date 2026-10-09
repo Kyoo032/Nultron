@@ -32,6 +32,7 @@ import { tierStreamLimits, type ChatTierInfo } from "@/lib/chat-tier-pref";
 import { submitOnEnter } from "@/lib/composer-enter";
 import { getLocale, t } from "@/lib/i18n";
 import { readComposerDraft, writeComposerDraft } from "@/lib/composer-draft";
+import { startRun } from "@/lib/run-generation";
 import { useWorkspaceScope } from "@/lib/workspace-scope";
 import { NeedsKeyNote } from "@/components/needs-key-note";
 import { ComposerAttachmentNotes } from "@/components/composer-attachment-notes";
@@ -134,6 +135,11 @@ export type RunEnd = {
   readonly threadId: string | null;
   /** False when the pane had moved to another session by the time the run ended. */
   readonly showing: boolean;
+  /**
+   * True when a newer send began before this run's tail ran. The pane must not reset its live state for
+   * it (the newer turn owns that); it may still reload the thread if no newer turn is live.
+   */
+  readonly stale?: boolean;
 };
 
 /**
@@ -240,6 +246,9 @@ export function ChatComposer({
   /** The session on screen as of this render, read by a run to know whether it still is. */
   const sessionRef = useRef(sessionKey);
   sessionRef.current = sessionKey;
+  /** Counts the sends. The host frees Send at `run.completed`, before the stream closes, so a second turn
+   * can start while the first turn's tail is still to run; only the newest run's tail may touch the pane. */
+  const runGenerationRef = useRef(0);
   const [shownSession, setShownSession] = useState(sessionKey);
   if (shownSession !== sessionKey) {
     // Another session is on screen. Whatever run held Send, and its error, belonged to the last one.
@@ -364,12 +373,16 @@ export function ChatComposer({
     // run streams on to the host — which saves the reply — but writes nothing more into this pane.
     const startedIn = sessionRef.current;
     const showing = () => sessionRef.current === startedIn;
+    const isCurrentRun = startRun(runGenerationRef);
     const typed = text;
     const attached = files;
     let runThread: string | null = null;
-    const finish = () => onComplete({ threadId: runThread, showing: showing() });
+    // A newer turn that began first makes this tail stale: the pane is told, so it leaves that turn's
+    // streaming text and tools alone and only reloads this turn's saved reply if no newer turn is live.
+    const finish = () =>
+      onComplete({ threadId: runThread, showing: showing(), ...(isCurrentRun() ? {} : { stale: true }) });
     const fail = (message: string) => {
-      if (showing()) {
+      if (showing() && isCurrentRun()) {
         setError(message);
         onFailed?.(message);
       }
@@ -385,12 +398,18 @@ export function ChatComposer({
       onThinking,
       onTool,
       onFailed: (message) => {
+        if (!isCurrentRun()) {
+          return;
+        }
         onFailed?.(message);
         setError(message);
       },
       // The answer is whole: free Send and the Thinking card now, not when the connection closes. The host
       // still saves the reply and closes the stream; `finish` reloads the thread when it does.
       onCompleted: () => {
+        if (!isCurrentRun()) {
+          return;
+        }
         setBusy(false);
         onSettled?.();
       },
@@ -567,7 +586,7 @@ export function ChatComposer({
       fail(abortErrorMessage(err, getLocale()));
       await finish();
     } finally {
-      if (showing()) {
+      if (showing() && isCurrentRun()) {
         setBusy(false);
       }
     }

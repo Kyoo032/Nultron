@@ -433,6 +433,12 @@ test("the SES template is implicit TLS on 465, which the portal's config reads a
   assert.equal(portal.PORTAL_SMTP_SECURE, "1");
 });
 
+test("the source portal.env.example sets the same sign-in mode as the release template", () => {
+  const portal = envValues(["webapp-deploy", "portal.env.example"]);
+  assert.equal(portal.PORTAL_SIGNIN_MODE, "password");
+  assert.equal(portal.PORTAL_SIGNIN_MODE, ENV_DEFAULTS.PORTAL_SIGNIN_MODE);
+});
+
 // ---------- the DSN wrapper and the operator script ----------
 
 const ENTRY = join(ROOT, "webapp-deploy", "portal-entry.sh");

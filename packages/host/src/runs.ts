@@ -17,7 +17,6 @@ import {
   resolveChatModel,
   hasModelVisibleContent,
   modelHistoryParts,
-  toolResultNote,
   redactAttachedParts,
   attachmentsAsMentions,
   takeLastToolIo,
@@ -51,6 +50,7 @@ import {
   setThreadTitleFromParts,
 } from "./threads";
 import { redactToolEvent } from "./chat-tool-events";
+import { historyToolNote } from "./chat-history-note";
 import { ensureToolsRegistered } from "./register-tools";
 import { recordChatRunUsage } from "./usage-record";
 import { loadSettings, loadUserLocale } from "./settings-store";
@@ -267,6 +267,10 @@ export async function* startModalityRun(options: {
     // The model's own words, kept before the host's closing sentence is added. The Knowledge card reads these.
     let modelAnswer = "";
     let thinkingText = "";
+    // Lines the host wrote into Thinking itself (the model-fallback notice, "looking at the attachment").
+    // They are shown live, and saved only beside something the model produced: on their own they are not
+    // an answer, and a thinking-only message would mark a failed run as completed.
+    let hostThinking = "";
     let failedMessage = "";
     const mediaParts: ContentPart[] = [];
     const toolTrace: ToolCallPart[] = [];
@@ -308,8 +312,14 @@ export async function* startModalityRun(options: {
       }
       assistantText = settled.text;
       const assistantParts: ContentPart[] = [];
-      if (thinkingText.trim()) {
-        assistantParts.push({ type: "thinking", text: thinkingText.trim() });
+      const producedContent =
+        thinkingText.trim().length > 0 ||
+        toolTrace.length > 0 ||
+        assistantText.trim().length > 0 ||
+        mediaParts.length > 0;
+      const savedThinking = (producedContent ? `${hostThinking}${thinkingText}` : "").trim();
+      if (savedThinking) {
+        assistantParts.push({ type: "thinking", text: savedThinking });
       }
       for (const tool of toolTrace) {
         assistantParts.push(tool);
@@ -360,7 +370,7 @@ export async function* startModalityRun(options: {
       const lastAssistantRow = [...historyRows].reverse().find((row) => row.role === "assistant");
       const lastAssistantTurn = [...storedHistory].reverse().find((turn) => turn.role === "assistant");
       if (lastAssistantRow && lastAssistantTurn && hasModelVisibleContent(lastAssistantRow.content as ContentPart[])) {
-        const note = toolResultNote(lastAssistantRow.content as ContentPart[]);
+        const note = historyToolNote(lastAssistantRow.content as ContentPart[]);
         if (note) {
           lastAssistantTurn.parts = [...lastAssistantTurn.parts, { type: "text", text: note }];
         }
@@ -381,7 +391,13 @@ export async function* startModalityRun(options: {
       let heldNext: string | undefined;
       const fallbackOptions = modelExplicit
         ? undefined
-        : { model, availableModelIds: catalog.map((entry) => entry.id), signal: modelAbort.signal };
+        : {
+            model,
+            availableModelIds: catalog.map((entry) => entry.id),
+            signal: modelAbort.signal,
+            // The down circuit is per company: this turn's outage is not another company's.
+            tenant: options.tenant,
+          };
       const acceptsModality = (id: string) => {
         try {
           assertChatModelAcceptsModality(id, options.modality);
@@ -405,7 +421,7 @@ export async function* startModalityRun(options: {
         send({ type: "run.model_fallback", from, to, message });
         if (thinkingEnabled) {
           const line = `${message}\n`;
-          thinkingText += line;
+          hostThinking += line;
           send({ type: "assistant.thinking", text: line });
         }
         stall.touch();
@@ -430,7 +446,7 @@ export async function* startModalityRun(options: {
       const attempt = () => inChatRun(async () => {
         if (options.modality !== "text" && thinkingEnabled && !retried) {
           const line = `${chatTurnCopy(localeForRun()).lookingAttached}\n`;
-          thinkingText += line;
+          hostThinking += line;
           send({ type: "assistant.thinking", text: line });
         }
         await runtime.execute({
@@ -556,7 +572,7 @@ export async function* startModalityRun(options: {
         const next = heldNext;
         heldNext = undefined;
         retried = true;
-        markJobModelDown(activeModel);
+        markJobModelDown(activeModel, Date.now(), options.tenant);
         announceFallback(activeModel, next);
         activeModel = next;
         activeVersion = { ...version, model: next };

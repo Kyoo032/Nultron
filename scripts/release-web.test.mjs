@@ -448,18 +448,26 @@ test(".env.example and portal.env.example name every required variable, empty un
   );
 });
 
-test("portal.env.example carries the sign-in mode, says its default is code, and the compose files leave it to portal.env", () => {
+test("portal.env.example sets the sign-in mode to password, says code is still selectable, and the compose files leave it to portal.env", () => {
   const bundle = renderBundle(TAG, CADDY_SOURCE);
   const example = bundle["portal.env.example"];
-  assert.equal(ENV_DEFAULTS.PORTAL_SIGNIN_MODE, "code");
-  assert.ok(example.split("\n").includes("PORTAL_SIGNIN_MODE=code"), "the line is there, set to the default");
-  const comment = example
-    .split("\n")
-    .slice(0, example.split("\n").indexOf("PORTAL_SIGNIN_MODE=code"))
+  // Owner decision 2026-10-09: the Enterprise bundle signs people in with a username and a password by default.
+  assert.equal(ENV_DEFAULTS.PORTAL_SIGNIN_MODE, "password");
+  const lines = example.split("\n");
+  assert.ok(lines.includes("PORTAL_SIGNIN_MODE=password"), "the line is there, uncommented, set to password");
+  assert.equal(lines.filter((line) => line.startsWith("PORTAL_SIGNIN_MODE=")).length, 1, "exactly one assignment");
+  const comment = lines
+    .slice(0, lines.indexOf("PORTAL_SIGNIN_MODE=password"))
     .filter((line) => line.startsWith("#"))
     .at(-1);
-  assert.match(comment ?? "", /\bcode\b.*default/i, "the comment above it says the default is code");
-  assert.match(comment ?? "", /\bpassword\b/);
+  assert.match(comment ?? "", /\bpassword\b.*default/i, "the comment above it says password is the default");
+  assert.match(comment ?? "", /\bcode\b/, "and names code as the other value");
+  assert.match(comment ?? "", /account/i, "and says an operator creates the accounts");
+  assert.match(comment ?? "", /SMTP/, "and says the SMTP settings may stay blank");
+  // Password mode needs no mail: the SMTP login stays an empty secret, and the portal boots with it empty.
+  const values = Object.fromEntries(assignments(example));
+  assert.equal(values.PORTAL_SMTP_USER, "");
+  assert.equal(values.PORTAL_SMTP_PASS, "");
   // Reaches the container the way every other portal setting does: through the env_file both services load. A
   // value pinned under `environment:` would WIN over portal.env and make the line above a lie.
   const code = (compose, name) =>
@@ -473,6 +481,19 @@ test("portal.env.example carries the sign-in mode, says its default is code, and
       assert.doesNotMatch(code(compose, name), /PORTAL_SIGNIN_MODE/, `${name} must not pin the mode`);
     }
   }
+});
+
+test("DEPLOY.md tells the operator to create the first owner account, that no mail sender is needed, and how to go back to code", () => {
+  const doc = deployDoc(TAG);
+  assert.match(doc, /PORTAL_SIGNIN_MODE=password/);
+  assert.match(doc, /scripts\/account\.ts create .*--role owner/, "names the portal account command");
+  assert.match(doc, /before anyone can sign in/i, "no one signs in until the owner account exists");
+  assert.match(doc, /no mail sender|no e-mail is sent|needs no mail/i, "says no mail sender is needed");
+  assert.match(doc, /PORTAL_SIGNIN_MODE=code/, "says how to switch back to the e-mailed code");
+  assert.match(doc, /SR-165/, "points at the residual risks");
+  // The seed step must come before the account step, and neither may be told to put the one-time code in a mailbox.
+  assert.ok(doc.indexOf("scripts/seed.ts") < doc.indexOf("scripts/account.ts"));
+  assert.doesNotMatch(doc, /receive the code on a real inbox/i);
 });
 
 test("the SES defaults are implicit TLS on 465, which the portal's PORTAL_SMTP_SECURE=1 selects", () => {

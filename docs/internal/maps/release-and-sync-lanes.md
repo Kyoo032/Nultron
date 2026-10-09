@@ -28,6 +28,7 @@ After a pull request merges to `main`:
 | Thing | Where |
 |---|---|
 | The rule | `AGENTS.md`, "Two codes" and "Sync lanes" |
+| Which path reaches which lane, which files the tester also edits | `lanes.json` at the repo root; `pnpm lane-guard` (`scripts/lane-guard.mjs`) warns, advisory; the sequence is `.cursor/skills/change-agentforge/SKILL.md` |
 | The tester split in full | vault `40-Dev/nultron-two-codes-map.md`, and `agentforge-chat/TESTER.md` |
 | HYP AI sync steps and history | `C:\Users\rizky\hypey\intake\SYNC.md`, `SOURCE_SHA`, `hyp-brand.patch` |
 | HYP AI leak checks | `intake/check-leaks.sh` (static), `intake/drive-leaks.mjs` (running demo) |
@@ -40,6 +41,6 @@ After a pull request merges to `main`:
 - **Brand strings arrive un-rebranded.** New upstream strings never conflict in the HYP AI merge, so a hard-coded `Nultron` or `Toko Token` in shared code ships to HYP AI unless `check-leaks.sh` catches it. Shared code reads `productName` and `gatewayName`.
 - **Line endings.** The HYP AI import converts CRLF the same way the first import did (`core.autocrlf=true` in `commit-upstream.mjs`). Do not import with a plain copy and `git add`.
 - **HYP AI keeps its own backend and mascot.** It maps every mascot state to the Hypey still and keeps its interim gateway host; a new upstream mascot state needs a manifest entry in the clone or its manifest test goes red.
-- **Deploy modes are not forks.** Cloudflare edge and password sign-in are HYP AI's deploy; Nultron uses its direct two-name setup and e-mailed code. Changes to one deploy path do not enter the other.
+- **Deploy modes are not forks.** The Cloudflare edge is HYP AI's deploy only; Nultron uses its direct two-name setup. Password sign-in is the default of both bundles since 2026-10-09 (the Nultron bundle's `portal.env.example` sets `PORTAL_SIGNIN_MODE=password`; the e-mailed code stays selectable), but each bundle sets it in its own files. Changes to one deploy path do not enter the other.
 - **Published wins.** If tester and `main` disagree, `main` stands and the tester code adapts. Tester work reaches `main` only through a promotion pull request Rizky approves.
 - **A fix is not done until each lane has run its step.** The pull request lists the lanes still owed.

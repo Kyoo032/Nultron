@@ -1,0 +1,276 @@
+{
+  "literals": [
+    "Nultron",
+    "Toko Token",
+    "TokenKu",
+    "HYP AI",
+    "Hypey"
+  ],
+  "files": {
+    "apps/web/app/globals.css": {
+      "Nultron": 16
+    },
+    "apps/web/components/app-rail.tsx": {
+      "Nultron": 4
+    },
+    "apps/web/components/app-updates.tsx": {
+      "Nultron": 3
+    },
+    "apps/web/components/brand-mark.tsx": {
+      "Nultron": 1
+    },
+    "apps/web/components/buddy-stage.tsx": {
+      "Nultron": 2
+    },
+    "apps/web/components/chat-composer.tsx": {
+      "Nultron": 1
+    },
+    "apps/web/components/chat-hero.tsx": {
+      "Nultron": 4
+    },
+    "apps/web/components/chat-key-status.tsx": {
+      "Nultron": 1
+    },
+    "apps/web/components/chat-session.tsx": {
+      "Nultron": 6
+    },
+    "apps/web/components/chat-turn.tsx": {
+      "Nultron": 3
+    },
+    "apps/web/components/component-setup.tsx": {
+      "Nultron": 2
+    },
+    "apps/web/components/data-studio.tsx": {
+      "Nultron": 1
+    },
+    "apps/web/components/desk-buddy.tsx": {
+      "Nultron": 4
+    },
+    "apps/web/components/documents-studio.tsx": {
+      "Nultron": 1
+    },
+    "apps/web/components/edit-studio.tsx": {
+      "Nultron": 1
+    },
+    "apps/web/components/finance-studio.tsx": {
+      "Nultron": 1
+    },
+    "apps/web/components/floating-shapes.tsx": {
+      "Nultron": 3
+    },
+    "apps/web/components/folder/folder-surface.tsx": {
+      "Nultron": 1
+    },
+    "apps/web/components/guide-card.tsx": {
+      "Nultron": 2
+    },
+    "apps/web/components/knowledge-page.tsx": {
+      "Nultron": 2
+    },
+    "apps/web/components/legal-studio.tsx": {
+      "Nultron": 1
+    },
+    "apps/web/components/market-studio.tsx": {
+      "Nultron": 1
+    },
+    "apps/web/components/mascot-slot.tsx": {
+      "Nultron": 3
+    },
+    "apps/web/components/meeting-studio.tsx": {
+      "Nultron": 1
+    },
+    "apps/web/components/mode-header.tsx": {
+      "Nultron": 1
+    },
+    "apps/web/components/music-studio.tsx": {
+      "Nultron": 1
+    },
+    "apps/web/components/nultron/nultron-mascot.tsx": {
+      "Nultron": 7
+    },
+    "apps/web/components/nultron/nultron.css": {
+      "Nultron": 1
+    },
+    "apps/web/components/onboarding-screen.tsx": {
+      "Nultron": 3
+    },
+    "apps/web/components/presentations-studio.tsx": {
+      "Nultron": 2
+    },
+    "apps/web/components/research-studio.tsx": {
+      "Nultron": 1
+    },
+    "apps/web/components/studio-empty-desk.tsx": {
+      "Nultron": 1
+    },
+    "apps/web/components/usage-range-chart.tsx": {
+      "Nultron": 1
+    },
+    "apps/web/components/videos-studio.tsx": {
+      "Nultron": 1
+    },
+    "apps/web/index.html": {
+      "Nultron": 1
+    },
+    "apps/web/lib/desk-buddy-state.ts": {
+      "Nultron": 1
+    },
+    "apps/web/lib/desktop-bridge.ts": {
+      "Nultron": 2
+    },
+    "apps/web/lib/gateway-gate.ts": {
+      "Nultron": 1
+    },
+    "apps/web/lib/job-stream.ts": {
+      "Nultron": 1
+    },
+    "apps/web/lib/key-later.ts": {
+      "Nultron": 1
+    },
+    "apps/web/lib/mascot-states.ts": {
+      "Nultron": 1
+    },
+    "apps/web/lib/mascot-triggers.ts": {
+      "Nultron": 2
+    },
+    "apps/web/lib/product-brand.tsx": {
+      "Nultron": 4
+    },
+    "apps/web/lib/use-app-updates.ts": {
+      "Nultron": 2
+    },
+    "apps/web/src/App.tsx": {
+      "Nultron": 1
+    },
+    "packages/core/src/agents/chat-locale.ts": {
+      "Nultron": 1,
+      "Toko Token": 3
+    },
+    "packages/core/src/enhance-prompt.ts": {
+      "Nultron": 3,
+      "Toko Token": 4
+    },
+    "packages/core/src/finance/import-table/read.ts": {
+      "Toko Token": 1
+    },
+    "packages/core/src/gateway.ts": {
+      "Nultron": 2,
+      "Toko Token": 3
+    },
+    "packages/core/src/gateway/account.ts": {
+      "Toko Token": 1
+    },
+    "packages/core/src/gateway/pinned.ts": {
+      "Nultron": 1
+    },
+    "packages/core/src/legal/extract-prompt.ts": {
+      "Nultron": 2
+    },
+    "packages/core/src/legal/output-copy.ts": {
+      "Toko Token": 2
+    },
+    "packages/core/src/legal/prompts.ts": {
+      "Nultron": 1
+    },
+    "packages/core/src/meeting/asr-model.ts": {
+      "Toko Token": 2
+    },
+    "packages/core/src/meeting/prompts.ts": {
+      "Nultron": 2
+    },
+    "packages/core/src/output-language.ts": {
+      "Toko Token": 16
+    },
+    "packages/core/src/presentation/slide-design.ts": {
+      "Nultron": 1
+    },
+    "packages/core/src/privacy/openrouter.ts": {
+      "Toko Token": 1
+    },
+    "packages/core/src/providers/registry.ts": {
+      "Toko Token": 5
+    },
+    "packages/core/src/security/safe-fetch.ts": {
+      "Nultron": 1
+    },
+    "packages/core/src/tools/credentials.ts": {
+      "Toko Token": 9
+    },
+    "packages/core/src/tools/platform/gateway-audio.ts": {
+      "Toko Token": 1
+    },
+    "packages/core/src/tools/platform/image-generate.ts": {
+      "Toko Token": 2
+    },
+    "packages/core/src/tools/platform/keyless-search.ts": {
+      "Nultron": 2
+    },
+    "packages/core/src/tools/platform/music-generate.ts": {
+      "Toko Token": 3
+    },
+    "packages/core/src/tools/platform/video-generate.ts": {
+      "Toko Token": 2
+    },
+    "packages/db/src/ensure-schema.ts": {
+      "Nultron": 1
+    },
+    "packages/host/src/auth/portal-client.ts": {
+      "Toko Token": 1
+    },
+    "packages/host/src/document-generate.ts": {
+      "Nultron": 3
+    },
+    "packages/host/src/edit/agent-run.ts": {
+      "Nultron": 1
+    },
+    "packages/host/src/edit/asr.ts": {
+      "Toko Token": 1
+    },
+    "packages/host/src/finance-generate.ts": {
+      "Nultron": 2
+    },
+    "packages/host/src/finance-tasks/direction.ts": {
+      "Nultron": 1
+    },
+    "packages/host/src/finance-tasks/narrate.ts": {
+      "Nultron": 1
+    },
+    "packages/host/src/finance-tasks/repair.ts": {
+      "Nultron": 1
+    },
+    "packages/host/src/finance-tasks/scope.ts": {
+      "Nultron": 1
+    },
+    "packages/host/src/handlers/key-later.ts": {
+      "Nultron": 1
+    },
+    "packages/host/src/key-later.ts": {
+      "Nultron": 1
+    },
+    "packages/host/src/legal/run.ts": {
+      "Nultron": 1
+    },
+    "packages/host/src/market/reddit.ts": {
+      "Nultron": 1
+    },
+    "packages/host/src/meeting/transcribe.ts": {
+      "Toko Token": 1
+    },
+    "packages/host/src/presentation-checks.ts": {
+      "Nultron": 1
+    },
+    "packages/host/src/presentation-generate.ts": {
+      "Nultron": 15
+    },
+    "packages/host/src/presentation-harness.ts": {
+      "Nultron": 5
+    },
+    "packages/host/src/presentation-locale.ts": {
+      "Nultron": 1,
+      "Toko Token": 3
+    },
+    "packages/host/src/tenant-state-store.ts": {
+      "Nultron": 1
+    }
+  }
+}
