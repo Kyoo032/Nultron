@@ -1,6 +1,6 @@
 # Map — Tenant usage ledger
 
-Last verified: 2026-10-07, `feat/hosted-run-limits` working tree (uncommitted), for the two Gotchas on reads by company and the legacy file on the server (SR-163 review round; read from `tenant-usage.ts` and `account-usage.ts`, proven by `usage-companies.test.ts`, not driven on a hosted server). Everything else: 2026-09-20 at a053245 + the Phase 4 branch `feat/web-phase4-tenant-secrets-rcbu9c` (through e37b3a1)
+Last verified: 2026-10-09 at 8ebc98aa for the `file:line` citations only (re-pointed to the symbols' current lines, nothing else re-read). Before that: 2026-10-07, `feat/hosted-run-limits` working tree (uncommitted), for the two Gotchas on reads by company and the legacy file on the server (SR-163 review round; read from `tenant-usage.ts` and `account-usage.ts`, proven by `usage-companies.test.ts`, not driven on a hosted server). Everything else: 2026-09-20 at a053245 + the Phase 4 branch `feat/web-phase4-tenant-secrets-rcbu9c` (through e37b3a1)
 
 ## Overview
 
@@ -22,7 +22,7 @@ billing webhook and the `plan_*` refusal codes are lanes B to E and do not exist
 
 ## How it works
 
-**The table.** `tenant_usage` (`packages/db/src/schema.ts:49`, migration
+**The table.** `tenant_usage` (`packages/db/src/schema.ts:50-51`, migration
 `packages/db/drizzle/0016_tenant_usage.sql`) carries the tenant, the organization, the workspace and
 the user; the `mode` and `model`; the `unit` and `quantity`; `input_tokens` / `output_tokens`; a
 nullable `cost_usd_micros` with an `unpriced_reason` beside it; the `run_id`; and `at` in epoch
@@ -65,16 +65,16 @@ that keep their unit and quantity, which a later pass can price in place.
 
 | Mode | Where | Unit |
 |---|---|---|
-| chat | `recordChatRunUsage`, called from `packages/host/src/runs.ts:377` and `:417`, gated on `finishRun`'s return | tokens |
-| documents, presentations, research, data, finance, market, legal, knowledge | `rememberJobUsage` in the shared job runtime callback, `packages/host/src/job-regen.ts:145` | tokens |
-| edit agent | `rememberJobUsage`, `packages/host/src/edit/agent-run.ts:186` (live) and `:363` (stub) | tokens |
-| images | `recordImageUsage`, `packages/host/src/studio-generate.ts:301` | images |
-| videos | `recordVideoUsage`, `packages/host/src/studio-generate.ts:369` | seconds |
-| music | `recordMusicUsage`, `packages/host/src/studio-generate.ts:477` (a song) and `:534` (a lyrics draft) | jobs |
-| meetings | `recordTranscriptionUsage`, `packages/host/src/meeting/run.ts:190` (the recording) — the minutes and the translation are token runs under the same mode | seconds |
+| chat | `recordChatRunUsage`, called from `packages/host/src/runs.ts:569` and `:622`, gated on `finishRun`'s return | tokens |
+| documents, presentations, research, data, finance, market, legal, knowledge | `rememberJobUsage` in the shared job runtime callback, `packages/host/src/job-regen.ts:229` | tokens |
+| edit agent | `rememberJobUsage`, `packages/host/src/edit/agent-run.ts:270` and `:307` (live) and `:483` (stub) | tokens |
+| images | `recordImageUsage`, `packages/host/src/studio-generate.ts:357` | images |
+| videos | `recordVideoUsage`, `packages/host/src/studio-generate.ts:444` | seconds |
+| music | `recordMusicUsage`, `packages/host/src/studio-generate.ts:566` (a song) and `:656` (a lyrics draft) | jobs |
+| meetings | `recordTranscriptionUsage`, `packages/host/src/meeting/run.ts:197` and `:206` (the recording) — the minutes and the translation are token runs under the same mode | seconds |
 
 **The mode label is derived, not passed.** `usageModeFromRunPrefix`
-(`packages/core/src/usage/metering.ts:141`) maps the `runPrefix` every job call site already carries
+(`packages/core/src/usage/metering.ts:135-141`) maps the `runPrefix` every job call site already carries
 (`document-section`, `finance-ratios-buckets`, `knowledge-verifier`, `meeting-minutes`, …) onto a
 `UsageMode`. That
 beats adding a required argument at twenty call sites, and beats `JobMode`, which five of those
@@ -88,20 +88,20 @@ completion settles first gets `true`; the others get `false` and write nothing.
 image or clip by then, so a failure to save it must not be a call that vanishes from the ledger. The
 model recorded is the one that answered (`toolModel(output, model)`), not the one that was asked
 for, and a video's billable length is the snapped one
-(`snapVideoSeconds`, `packages/host/src/studio-generate.ts:346`) — a model that only does 5 s clips
+(`snapVideoSeconds`, `packages/core/src/models/video-capabilities.ts:76`) — a model that only does 5 s clips
 bills 5 s for a 4 s request.
 
 **Failure modes**
 
 | Case | What happens |
 |---|---|
-| The ledger write throws | `recordUsage` (`packages/host/src/tenant-usage.ts:300`) logs `usage_write_failed` and swallows it. Metering never fails a generation the tenant has already been charged for. The cost is a lost row, which is why it is a warning and not a debug line |
+| The ledger write throws | `recordUsage` (`packages/host/src/tenant-usage.ts:326`, the log at `:353`) logs `usage_write_failed` and swallows it. Metering never fails a generation the tenant has already been charged for. The cost is a lost row, which is why it is a warning and not a debug line |
 | No tenant, organization or model on the event | `validate` (`:102`) returns null and nothing is written. A row that cannot be attributed inflates the unpriced count without saying whose call it was |
 | A cost with no reason, or a reason with a cost | Reconciled in `validate`: a null cost always gets a reason, defaulting to `catalog_unavailable` |
 | The pricing catalog is cold | `catalog_unavailable` rows; unit and quantity are still right |
 | The tenant row is deleted | The ledger goes with it (`ON DELETE cascade` on `tenant_id`) |
 | An organization is deleted | **The ledger stays.** `organization_id` is deliberately not a foreign key: deleting one org inside a live tenant must not erase spend still to be billed |
-| A database baseline-stamped past 0016 | `ensureTenantUsageTable` (`packages/db/src/ensure-schema.ts:473`, called at `:245`) re-creates the table and its indexes |
+| A database baseline-stamped past 0016 | `ensureTenantUsageTable` (`packages/db/src/ensure-schema.ts:490`, called at `:246`) re-creates the table and its indexes |
 
 ## Where things live
 
@@ -109,21 +109,21 @@ bills 5 s for a 4 s request.
 |---|---|
 | `packages/core/src/usage/metering.ts` | The vocabulary: `USAGE_MODES`, `USAGE_UNITS`, `UNPRICED_REASONS`, `UsageEvent`, `usdToMicros`, `usageModeFromRunPrefix`. Pure, browser-safe |
 | `packages/core/src/gateway/account.ts:139` | `explainRunUsd` — priced, or the reason it is not |
-| `packages/db/src/schema.ts:49` | The `tenantUsage` drizzle table |
+| `packages/db/src/schema.ts:50` | The `tenantUsage` drizzle table |
 | `packages/db/drizzle/0016_tenant_usage.sql` | The migration, and the reasoning for every nullable column |
-| `packages/db/src/ensure-schema.ts:473` | `ensureTenantUsageTable`, the baseline-stamp healer |
+| `packages/db/src/ensure-schema.ts:490` | `ensureTenantUsageTable`, the baseline-stamp healer |
 | `packages/host/src/tenant-usage.ts` | The store: `createUsageStore`, `recordUsage`, `listTenantUsage`, `tenantUsageTotals`, and the `listJobUsageRecords` shim the account screen reads |
 | `packages/host/src/usage-record.ts` | Pricing at write time, and the seven entry points the modes call |
 | `packages/host/src/job-usage.ts` | `rememberJobUsage` — runtime event → tenanted row |
 | `packages/host/src/desk-usage.ts` | **Legacy, read-only.** The old untenanted `desk-usage.json`; nothing writes it any more |
-| `packages/host/src/account-usage.ts:47` | `deskRecords` — ledger rows plus any legacy file rows, for the account screen |
+| `packages/host/src/account-usage.ts:48` | `deskRecords` — ledger rows plus any legacy file rows, for the account screen |
 
 ## Gotchas
 
 - **Chat is in two places on purpose.** `runs.usage` still carries the per-run detail on the run row
   and is unchanged; `tenant_usage` is the billable event beside it. Anything that sums both will
   double-count chat. The account screen does not: it reads chat from `runs.usage` and everything
-  else from the ledger (`packages/host/src/account-usage.ts:43`).
+  else from the ledger (`packages/host/src/account-usage.ts:199` for `runs.usage`, `:48` for the ledger).
 - **`desk-usage.json` is still read, on a desk only.** A desktop that has been generating since before this
   migration keeps the history the account screen already showed it. The two cannot double-count
   because nothing writes the file any more — do not add a writer back. On the hosted server it is not read
@@ -142,7 +142,7 @@ bills 5 s for a 4 s request.
 - **The store is synchronous.** It writes through the same `better-sqlite3` handle as
   `artifacts.ts`, because every caller is inside a runtime `onEvent` or a generate handler, and a
   fire-and-forget promise there is a row that silently does not exist when the process exits.
-- **`setUsageStoreForTests` is a test seam** (`packages/host/src/tenant-usage.ts:291`). Nothing in
+- **`setUsageStoreForTests` is a test seam** (`packages/host/src/tenant-usage.ts:317`). Nothing in
   the app may call it.
 - **ASR has no list price on file, and no gateway fallback.** `gatewayFlatPrice` only serves flat
   per-call rates, which is exactly the wrong shape for audio billed by the minute, so every
@@ -150,7 +150,7 @@ bills 5 s for a 4 s request.
   `media-pricing.ts`. The seconds are recorded regardless, so one row there closes every meeting
   already in the ledger once a repricing pass exists.
 - **The edit timeline's own worker jobs are not metered.** `defaultRunner`
-  (`packages/host/src/edit/jobs.ts:151`) runs the timeline's `asr`, `generate_image` and
+  (`packages/host/src/edit/jobs.ts:215`) runs the timeline's `asr`, `generate_image` and
   `generate_video` jobs from a worker that has a `workspaceId` but no `TenantContext`, so there is
   nothing to key a row on. The edit **agent** is metered; these three are the hole lane A left
   open, and closing it means threading a tenant through the edit job row.

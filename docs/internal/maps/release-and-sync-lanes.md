@@ -28,6 +28,7 @@ After a pull request merges to `main`:
 | Thing | Where |
 |---|---|
 | The rule | `AGENTS.md`, "Two codes" and "Sync lanes" |
+| Which path reaches which lane, which files the tester also edits | `lanes.json` at the repo root; `pnpm lane-guard` (`scripts/lane-guard.mjs`) warns, advisory; the sequence is `.cursor/skills/change-agentforge/SKILL.md` |
 | The tester split in full | vault `40-Dev/nultron-two-codes-map.md`, and `agentforge-chat/TESTER.md` |
 | HYP AI sync steps and history | `C:\Users\rizky\hypey\intake\SYNC.md`, `SOURCE_SHA`, `hyp-brand.patch` |
 | HYP AI leak checks | `intake/check-leaks.sh` (static), `intake/drive-leaks.mjs` (running demo) |

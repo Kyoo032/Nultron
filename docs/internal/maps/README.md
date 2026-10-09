@@ -27,6 +27,7 @@ Sections, in this order:
 | `Overview` | Two or three sentences: what the subsystem is, what it is for, what it is not. |
 | `How it works` | The spine. User action → code path with file paths and function / route names → failure modes. Same shape as the 0.14-changelog `## how — Chat send (pstack)` precedent, expanded. |
 | `Where things live` | Table of file → role. Only the files someone would need to start working here. |
+| `Touches / Do not touch` *(optional, started on the busiest pages: Chat send, the job harness, hosted security controls, the portal)* | Two lists. The files this subsystem owns, and the files that look related but belong to another page or lane, each with the page that owns it. Names the files the tester branch also edits (they need a `Lanes:` line) and the brand rule. `lanes.json` at the repo root is the machine-readable form, read by `pnpm lane-guard`. |
 | `Gotchas` | Non-obvious behaviour, historical artifacts, the things a newcomer gets wrong. |
 | `Verify` | The `verify-agentforge` feature file that proves this page, and the testids or checks that do the proving. |
 | `Why` *(optional)* | Decisions that need a record, in synthesizer shape: claim, source, confidence. Only where sources exist. |

@@ -20,6 +20,7 @@
     "portal:invite": "pnpm --filter @agentforge/portal exec tsx scripts/invite.ts",
     "portal:account": "pnpm --filter @agentforge/portal exec tsx scripts/account.ts",
     "maps:check": "node scripts/map-rot.mjs",
+    "lane-guard": "node scripts/lane-guard.mjs",
     "maps:drift": "node scripts/map-drift.mjs",
     "edit:starters": "node scripts/edit-starters.mjs",
     "edit:starters:check": "node scripts/edit-starters.mjs --check",

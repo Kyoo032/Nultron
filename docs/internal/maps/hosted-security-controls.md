@@ -1,6 +1,6 @@
 # Map — Hosted security controls
 
-Last verified: 2026-10-06, branch `feat/hosted-run-limits` over 6105c5c, not committed, for the run-limits subsection of § 5 and its row in the file table; nothing else on the page was re-read. Before that: 2026-10-05, working tree over 0b61a29, not committed, for two lines only (the `audit-deployed.mjs` row of the file table and the audit-gate gotcha, which now describe the production closure after SR-113); nothing else on the page was re-read. Before that: 2026-10-02, working tree over 0b61a29, not committed, for one row (the operator-fields row of § 8, which now says who may write a provider key: M4, an owner or an admin, a member is answered `403 settings_key_forbidden`); nothing else on the page was re-read. Before that: 2026-10-01, working tree over 0b61a29, not committed, for two rows only: the `ci-local.mjs` row of the tests table (a vitest step now needs its `Tests N passed` summary, not just exit 0) and the per-tenant model cache bullet of § 10 (the background refill and its log line). Before that, the same day, for the new § 10 (where a tenant's provider key may go: Enterprise BYOK Phase A) and the corrected operator-keys row of § 8, whose "provider keys" claim was wrong before it (`requestsOperatorOnlySettings` lists `toolKeys`, `toolBackends` and `injectionGuardBypass` only). Nothing else on the page was re-read that day. Before that: 2026-09-23 at d4561b8 + working tree for sections 1-4 and every
+Last verified: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-06, branch `feat/hosted-run-limits` over 6105c5c, not committed, for the run-limits subsection of § 5 and its row in the file table; nothing else on the page was re-read. Before that: 2026-10-05, working tree over 0b61a29, not committed, for two lines only (the `audit-deployed.mjs` row of the file table and the audit-gate gotcha, which now describe the production closure after SR-113); nothing else on the page was re-read. Before that: 2026-10-02, working tree over 0b61a29, not committed, for one row (the operator-fields row of § 8, which now says who may write a provider key: M4, an owner or an admin, a member is answered `403 settings_key_forbidden`); nothing else on the page was re-read. Before that: 2026-10-01, working tree over 0b61a29, not committed, for two rows only: the `ci-local.mjs` row of the tests table (a vitest step now needs its `Tests N passed` summary, not just exit 0) and the per-tenant model cache bullet of § 10 (the background refill and its log line). Before that, the same day, for the new § 10 (where a tenant's provider key may go: Enterprise BYOK Phase A) and the corrected operator-keys row of § 8, whose "provider keys" claim was wrong before it (`requestsOperatorOnlySettings` lists `toolKeys`, `toolBackends` and `injectionGuardBypass` only). Nothing else on the page was re-read that day. Before that: 2026-09-23 at d4561b8 + working tree for sections 1-4 and every
 `http-adapter.ts` citation on this page (the auth pass: the production https rule for the portal
 URL, the malformed Host / request-target 400, the gate's portal re-check, digest session ids). The
 response headers, the ffmpeg failure detail and the top-up link keep their 2026-09-21 reading at
@@ -325,6 +325,29 @@ Not a request-admission control; what the host does with a key once it has one. 
 | `webapp-deploy/compose.yml` | Container hardening, the pinned `AGENTFORGE_SERVER` |
 | `webapp-deploy/Caddyfile` | TLS, HSTS, the same header set, access log |
 | `scripts/audit-deployed.mjs` | Advisory gate scoped to the production closure the image installs (`--prod`, `LIST_ARGS` `:55`) |
+
+## Touches / Do not touch
+
+Read before editing a hosted control. Lanes: Enterprise and HYP AI (both are the hosted app). Personal has no HTTP port and must stay identical, so every change here is gated on `isServerMode()` and carries a Personal-parity test.
+
+**This page owns these:**
+
+- `packages/core/src/server-mode.ts`, `packages/host/src/hosted-env.ts`, `apps/web/server/hosted-mode-guard.ts`: the switch and the boot refusals.
+- `packages/host/src/http-adapter.ts`, `packages/host/src/local-request.ts`, `packages/host/src/csrf.ts`, `packages/host/src/rate-limit.ts`, `packages/host/src/run-limits.ts`, `packages/host/src/security-headers.ts`, `packages/host/src/content-disposition.ts`, `packages/host/src/safe-fetch.ts`.
+- `packages/host/src/auth/session.ts` and the gate in `packages/host/src/router.ts`.
+- `packages/core/src/security/safe-fetch.ts`, `packages/core/src/security/ip-range.ts`, `packages/core/src/providers/registry.ts`, `packages/core/src/runtime/key-redirect.ts`, `packages/host/src/model-cache.ts`, `packages/db/src/vault-key.ts`.
+- `webapp-deploy/compose.yml` and `webapp-deploy/Caddyfile`, `scripts/audit-deployed.mjs`.
+
+**Change these together or not at all.** `webapp-deploy/Caddyfile` and `packages/host/src/security-headers.ts` carry the same header set, and `packages/host/src/security-headers.test.ts` reads the Caddyfile and fails on any drift. A new route with a `:param` goes through the by-id harness ([`by-id-routes-and-tenancy-harness.md`](by-id-routes-and-tenancy-harness.md)).
+
+**Do not touch from a hosted-security change:**
+
+- `apps/portal/**`: the portal has its own controls ([`portal-service.md`](portal-service.md)); the host reaches it only over HTTP.
+- `packages/host/src/auth/routes.ts` and `portal-*.ts`: the sign-in flow and seat claim ([`portal-session-auth.md`](portal-session-auth.md)).
+- `packages/host/src/gateway-gate.ts`: advisory by design, fails open; never read it as an entitlement ([`settings-and-gateway-gate.md`](settings-and-gateway-gate.md)). Limits and seats are enforced server-side ([`tenant-entitlement.md`](tenant-entitlement.md)).
+- `apps/desktop/renderer-csp.cjs` and `apps/desktop/main.cjs`: Personal's own policy, IPC and no port.
+- HYP AI's Cloudflare edge and password sign-in. They are HYP AI's deploy in `C:\Users\rizky\hypey\deploy`, outside this repo. Never add a Cloudflare mode to `webapp-deploy/Caddyfile`; Nultron keeps its direct two-name setup.
+- `scripts/release-web.mjs` and the pack scripts: release paths need Rizky's word ([`release-and-sync-lanes.md`](release-and-sync-lanes.md)).
 
 ## Gotchas
 
