@@ -4752,8 +4752,24 @@ Residual:
 - The model reads the raw tool result, so a secret it repeats lands unredacted in the assistant text, the saved `text`
   part and the streamed deltas of that thread (the decision above). It no longer reaches the Knowledge Base card.
 - A secret the person types into their own message is not touched in the thread.
-- The Edit agent streams its tool events unredacted (`packages/host/src/edit/agent-run.ts:274`), and a job's `onEvent`
-  hands raw events to job code. Neither writes `tool_invocations`. Not changed in this pass.
+- The Edit agent's tool events, fixed under SH-008 on branch `fix/sh-008-edit-tool-events-redaction` (2026-10-11,
+  fix branch before merge, not driven live). Every `tool.completed` the Edit stream sends, and every `edit.ops`, `edit.card`,
+  `edit.job` and `edit.plan` frame read from a tool's output, is built from `screenToolCompleted`
+  (`packages/host/src/edit/tool-screen.ts`): the scripted path, run_recipe and clear_timeline
+  (`packages/host/src/edit/agent-run.ts:339-354`, `:466-468`), the budget refusal (`:391`), the harness's tool calls
+  (`packages/host/src/edit/harness-run.ts:72-74`) and its made-shot plan card (`:227`). A failed run's message goes
+  through `screenEvent` (`agent-run.ts:306`). The raw result still goes to the model and the harness. Tests:
+  `packages/host/src/edit/tool-events-screen.test.ts` (6 of 6 red on `2df34be` with the secret in the stream; the
+  budget refusal case is a coverage case) and `packages/host/src/edit/job-error-screen.test.ts`.
+  A job's error text is upstream text (a provider can echo the key it was sent). It was stored unredacted on
+  `edit_jobs.error` and streamed on `job.done`. It is now redacted where it is stored, in `failJob`
+  (`packages/host/src/edit/jobs.ts:409`, `redactSecrets`), so `job.done` (`jobs.ts:403`, `:423`), the project
+  bundle (`packages/host/src/edit/projects.ts:136-150`) and the job read carry the redacted copy. Rows stored
+  before this change keep the upstream text.
+  Not screened, and not a leak of the tool's output: the project event stream's ops and unplaced items
+  (`packages/host/src/edit/ops.ts:356`, `jobs.ts:382`) hold the person's own text and the agent's arguments. A secret
+  with no known prefix under a non-secret name is not caught there, as in Chat. A job's `onEvent` hands raw events to
+  job code (`packages/host/src/job-regen.ts:299`); it does not write `tool_invocations`.
 - Rows and messages written before the change keep what they hold.
 - No Chat code path was found that logs a tool's input or output; that is read, not proven by a log capture.
 
