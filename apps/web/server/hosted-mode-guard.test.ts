@@ -110,8 +110,8 @@ describe("the guards also run from server-env.ts, ahead of the host and the data
     expect(importSpecifiers(serverSource)[0]).toBe("./server-env");
   });
 
-  it("imports the guard module and nothing that reaches the database", () => {
-    expect(importSpecifiers(envSource)).toEqual(["./server/hosted-mode-guard"]);
+  it("imports the Node version check first, then the guard module, and nothing that reaches the database", () => {
+    expect(importSpecifiers(envSource)).toEqual(["./lib/node-version-boot", "./server/hosted-mode-guard"]);
   });
 
   it("runs the mode check, then the environment check, at module scope", () => {

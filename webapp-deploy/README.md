@@ -70,8 +70,8 @@ the pilot's second env file. The release path never builds from a checkout anywa
 
 ## What the image contains
 
-- `node:22-bookworm-slim`. The repo only says `"engines": { "node": ">=20" }` and has no
-  `.nvmrc`; 22 is the current LTS and satisfies it. Debian, not Alpine, because
+- `node:22-bookworm-slim`. The root `package.json` says `"engines": { "node": ">=22" }` and
+  `.nvmrc` is `22` (SH-001: the web server refuses an older Node at boot). 22 is the current LTS. Debian, not Alpine, because
   `pnpm-lock.yaml` resolves `@firecrawl/anydoc` to the `-linux-x64-gnu` / `-linux-arm64-gnu`
   packages — musl would pick different ones and force a `better-sqlite3` rebuild.
 - pnpm `9.15.9` via corepack, matching the root `packageManager` field.

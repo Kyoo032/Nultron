@@ -541,7 +541,7 @@ app opens a fresh database on this same boot, and a retry must not delete that o
 this change the marker was dropped whatever happened, so a locked `.master-key` or `settings.enc` simply stayed
 behind after the owner had confirmed the erase ([SR-77](../security-register.md#sr-77),
 [SR-78](../security-register.md#sr-78)). That env flag is set in exactly two places:
-`apps/web/server-env.ts:14` (webdev) and `apps/desktop/main.cjs:652` inside `bootstrapPackaged()`, before
+`apps/web/server-env.ts:54` (webdev) and `apps/desktop/main.cjs:652` inside `bootstrapPackaged()`, before
 `require("./host.cjs")` — so a test or script that imports `@agentforge/db` can never trigger a wipe as a side
 effect.
 
