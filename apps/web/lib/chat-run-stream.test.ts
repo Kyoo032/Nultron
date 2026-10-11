@@ -151,6 +151,43 @@ describe("readRunStream", () => {
   });
 });
 
+describe("run.model_fallback", () => {
+  // The host answers a turn whose model could not be reached with the next live model, and says so once
+  // before the reply (`packages/host/src/runs.ts`, `announceFallback`). The pane must get that, or the
+  // person reads an answer from a model they did not pick with no word about it.
+  it("hands the stand-in to the pane once, with both models and the host's sentence", async () => {
+    const sentence = "gpt-6-luna is unavailable; used glm-5.3 for this answer.";
+    const { stream } = body([
+      frame("run.started"),
+      frame("run.model_fallback", { from: "gpt-6-luna", to: "glm-5.3", message: sentence }),
+      frame("assistant.delta", { text: "Hi" }),
+      frame("run.completed", { runId: "r" }),
+    ]);
+    const { handlers } = recorder();
+    const fallbacks: unknown[] = [];
+
+    await readRunStream(stream, { ...handlers, onModelFallback: (event) => fallbacks.push(event) });
+
+    expect(fallbacks).toEqual([{ from: "gpt-6-luna", to: "glm-5.3", message: sentence }]);
+  });
+
+  it("does not draw a stand-in into a session the owner has left", async () => {
+    const { stream } = body([frame("run.model_fallback", { from: "gpt-6-luna", to: "glm-5.3", message: "m" })]);
+    const { handlers } = recorder();
+    const fallbacks: unknown[] = [];
+
+    await readRunStream(
+      stream,
+      { ...handlers, onModelFallback: (event) => fallbacks.push(event) },
+      {
+        showing: () => false,
+      },
+    );
+
+    expect(fallbacks).toEqual([]);
+  });
+});
+
 describe("run.completed", () => {
   it("tells the pane the run is over before the stream closes, and still reads to the end", async () => {
     const { stream, state } = body([frame("assistant.delta", { text: "hi" }), frame("run.completed", { runId: "r" })]);
