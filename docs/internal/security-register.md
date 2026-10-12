@@ -191,7 +191,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-101](#sr-101) | Medium | A double submit or reload sent two or three sign-in codes and spent the 3-per-15-minutes budget | Fixed, tested (2026-10-01); not yet driven on a rebuilt rehearsal image | Blocks the Phase 0 pilot until driven |
 | [SR-111](#sr-111) | Medium | `run_code` keeps the network out with deleted JavaScript globals and a code-generation flag, not with the operating system | Open | Blocks Tencent deploy |
 | [SR-112](#sr-112) | Medium | Chat holds file, Knowledge and sandbox tools together with a public web tool, so text in a file or page can try to carry other text out in a URL | Fixed in tree, unverified live | Owner decision made 2026-10-03; drive an injected file before testers outside the company and before the next Personal cut |
-| [SR-113](#sr-113) | Medium | `braces` has a HIGH advisory with no fixed release, and it reached the hosted image through `tailwindcss` | Fixed in tree (2026-10-05): the image installs production dependencies only; built, booted and checked in a local proof image | — |
+| [SR-113](#sr-113) | Medium | `braces` has a HIGH advisory with no fixed release, and it reached the hosted image through `tailwindcss` | Fixed in tree (2026-10-05): the image installs production dependencies only; built, booted and checked in a local proof image. Gate re-proven 2026-10-11 after the express and yahoo-finance2 bumps (SH-009, see the section below) | — |
 | [SR-131](#sr-131) | Medium | The app image's ignore file did not exclude `nultron-files/` (4.5 GB of IP filings and brand work), so a build straight from a working checkout would have sent it into the image | Fixed in tree (2026-10-05), test-pinned; the build context checked with a real `docker build`, no full image built | Blocks building from a checkout |
 | [SR-132](#sr-132) | Medium | The release Caddyfile's deferred header block may replace an artifact's `sandbox` CSP with the app CSP | Open: reasoned from Caddy's docs, not driven (2026-10-06) | Blocks Tencent deploy (Enterprise) |
 | [SR-133](#sr-133) | Medium | The app.nultron-ai.xyz preview runs production without server mode, behind Basic Auth and a Caddy Origin rule | Accepted by the owner (2026-10-06): password-gated shared desk | Preview only |
@@ -249,7 +249,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-124](#sr-124) | Low | Personal: the sandbox's integrity check covers the child scripts and QuickJS only when the root `MANIFEST.json` ships, and no pack step checks it | Open (2026-10-03) | Blocks the next Personal cut |
 | [SR-125](#sr-125) | Low | Two `edit_file` calls on one file could overwrite each other without a word | Fixed in tree, tested; unverified on a packed app (2026-10-03) | None |
 | [SR-126](#sr-126) | Low | Personal: a deleted desk left the sealed text of its folder proposals on disk | Fixed in tree, tested; unverified on a packed app (2026-10-03) | None |
-| [SR-134](#sr-134) | Low | Enterprise: a CRITICAL `proxy-addr` advisory reaches the hosted image through `express`; the app never sets `trust proxy`, so the affected path is not used | Open (2026-10-06) | `audit:deployed` red; blocks Tencent deploy until the lock takes `proxy-addr` 2.0.8 |
+| [SR-134](#sr-134) | Low | Enterprise: a CRITICAL `proxy-addr` advisory reaches the hosted image through `express`; the app never sets `trust proxy`, so the affected path is not used | Fixed in tree (2026-10-11, SH-009): `express` 5.3.0 takes `proxy-addr` 2.0.8 | `audit:deployed` passes on this tree; the lock change ships with the SH-009 pull request |
 | [SR-135](#sr-135) | Low | Enterprise image and Personal installers carry a third-party static ffmpeg (BtbN on the image and Windows, Martin Riedl's build server on macOS, GPL builds), pinned by sha256; the Personal copy runs with the person's own rights; an upload may not steer it to addresses, other files or hours of run time (input limits) | Recorded (2026-10-06); desktop bundle added the same day, not packed; input limits built 2026-10-06, recorded 2026-10-07, in the tree, not deployed | None for the image; re-pin before the upstream release expires; macOS builds accepted by Rizky on 2026-10-06 for the preview Mac installer only, so a Mac release that is no longer preview is blocked until our own build is pinned |
 | [SR-136](#sr-136) | Low | A Chat turn stored and streamed a tool's input and output with no redaction, and a failed tool's error text now reaches the model | Fixed in tree, tested; not driven on a live model (2026-10-06) | None |
 | [SR-140](#sr-140) | Low | Desk file download serves model- and person-written text from the app's origin, and Chat's `build_deck` stores a model-written Office file that the artifact route serves | Fixed in tree, tested, review fixes applied 2026-10-07 (schema no longer ends the turn, XML-illegal characters removed, saved artifacts counted in hosted storage, packaged save failure shown); not driven in a browser or behind the hosted proxy | Re-check on the hosted box with [SR-132](#sr-132) before the Tencent deploy |
@@ -2960,6 +2960,21 @@ in the image (`esbuild`, `uuid`, `fast-uri`, `ip-address` twice, `ai`, `@ai-sdk/
 triaged here. [SR-49](#sr-49) half 1 used to say the image carries dev dependencies; it was corrected on 2026-10-05,
 and the source tree still ships.
 
+Re-checked 2026-10-11 (the Nultron triage finding SH-009, `ci:local` on `main` `2df34be`). The gate went red
+again: `audit:deployed --level high` named two advisories in the image, CRITICAL `proxy-addr` 2.0.7
+(GHSA-jqcg-44mw-7w3h, fixed in 2.0.8) and HIGH `@modelcontextprotocol/sdk` 1.30.0 (GHSA-6qxp-vccf-f47h,
+fixed in 1.31.0). `braces` was not in the image. The fix is a lockfile change, with no override and no
+ignore entry. `apps/web` takes `express` `^5.3.0`: it moves from 5.2.1 to 5.3.0, which asks for
+`proxy-addr` `^2.0.8`. `packages/host` takes `yahoo-finance2` `^4.0.3`: it moves from 4.0.2 to 4.0.3, which
+asks for `@modelcontextprotocol/sdk` `^1.32.0`, now 1.32.1. No copy of `express@5.2.1`,
+`proxy-addr@2.0.7`, `@modelcontextprotocol/sdk@1.30.0` or `yahoo-finance2@4.0.2` is left in
+`pnpm-lock.yaml`. The image's advisories went from 9 to 4 (`esbuild` and `uuid` moderate, `ai` and
+`@ai-sdk/provider-utils` low); none is at high or above. Exploitability: no Express `trust proxy` setting in
+`apps/` or `packages/` (searched 2026-10-11; `apps/portal` has its own `PORTAL_TRUST_PROXY` flag and does not
+depend on express), so Express keeps its default and the trusted-subnet path is never compiled. No
+first-party code under `apps/` or `packages/` imports `express-rate-limit`, `content-type`, `content-disposition`
+or `body-parser`. [SR-134](#sr-134) is the same proxy-addr finding, closed by the same change.
+
 Gate: none now.
 
 ### SR-131 {#sr-131}
@@ -4678,7 +4693,7 @@ Gate: none.
 ### SR-134 {#sr-134}
 
 **A CRITICAL `proxy-addr` advisory reaches the hosted image through `express`.** Enterprise. Raised by
-the `ci:local` run of the 0.16.0 cut (2026-10-06). Low. Open.
+the `ci:local` run of the 0.16.0 cut (2026-10-06). Low. Fixed in tree 2026-10-11 (SH-009).
 
 Evidence: `audit:deployed` failed on `de95267` plus the version bump with `CRITICAL proxy-addr — proxy-addr
 vulnerable to IP spoofing via IPv4-mapped IPv6 trust subnet (fixed in >=2.0.8)` in the hosted closure
@@ -4695,7 +4710,11 @@ Required action: refresh the lock so `proxy-addr` resolves to 2.0.8 (or add a `p
 re-run `ci:local --only audit:deployed`. This was not done in the 0.16.0 cut, which is the Personal app
 only.
 
-Gate: `audit:deployed` stays red until then, which blocks the Tencent deploy.
+Fixed in tree (2026-10-11, SH-009): `apps/web` takes `express` `^5.3.0`, which resolves to 5.3.0 and asks
+for `proxy-addr` `^2.0.8`. The lock has no `proxy-addr@2.0.7` left, and `ci:local --only audit:deployed`
+passes. The lock change ships with the SH-009 pull request.
+
+Gate: none now (on this tree). Before 2026-10-11 the gate was red until the lock took `proxy-addr` 2.0.8.
 
 ### SR-136 {#sr-136}
 
@@ -4752,8 +4771,24 @@ Residual:
 - The model reads the raw tool result, so a secret it repeats lands unredacted in the assistant text, the saved `text`
   part and the streamed deltas of that thread (the decision above). It no longer reaches the Knowledge Base card.
 - A secret the person types into their own message is not touched in the thread.
-- The Edit agent streams its tool events unredacted (`packages/host/src/edit/agent-run.ts:274`), and a job's `onEvent`
-  hands raw events to job code. Neither writes `tool_invocations`. Not changed in this pass.
+- The Edit agent's tool events, fixed under SH-008 on branch `fix/sh-008-edit-tool-events-redaction` (2026-10-11,
+  fix branch before merge, not driven live). Every `tool.completed` the Edit stream sends, and every `edit.ops`, `edit.card`,
+  `edit.job` and `edit.plan` frame read from a tool's output, is built from `screenToolCompleted`
+  (`packages/host/src/edit/tool-screen.ts`): the scripted path, run_recipe and clear_timeline
+  (`packages/host/src/edit/agent-run.ts:339-354`, `:466-468`), the budget refusal (`:391`), the harness's tool calls
+  (`packages/host/src/edit/harness-run.ts:72-74`) and its made-shot plan card (`:227`). A failed run's message goes
+  through `screenEvent` (`agent-run.ts:306`). The raw result still goes to the model and the harness. Tests:
+  `packages/host/src/edit/tool-events-screen.test.ts` (6 of 6 red on `2df34be` with the secret in the stream; the
+  budget refusal case is a coverage case) and `packages/host/src/edit/job-error-screen.test.ts`.
+  A job's error text is upstream text (a provider can echo the key it was sent). It was stored unredacted on
+  `edit_jobs.error` and streamed on `job.done`. It is now redacted where it is stored, in `failJob`
+  (`packages/host/src/edit/jobs.ts:409`, `redactSecrets`), so `job.done` (`jobs.ts:403`, `:423`), the project
+  bundle (`packages/host/src/edit/projects.ts:136-150`) and the job read carry the redacted copy. Rows stored
+  before this change keep the upstream text.
+  Not screened, and not a leak of the tool's output: the project event stream's ops and unplaced items
+  (`packages/host/src/edit/ops.ts:356`, `jobs.ts:382`) hold the person's own text and the agent's arguments. A secret
+  with no known prefix under a non-secret name is not caught there, as in Chat. A job's `onEvent` hands raw events to
+  job code (`packages/host/src/job-regen.ts:299`); it does not write `tool_invocations`.
 - Rows and messages written before the change keep what they hold.
 - No Chat code path was found that logs a tool's input or output; that is read, not proven by a log capture.
 
