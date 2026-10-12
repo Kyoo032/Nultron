@@ -1296,7 +1296,7 @@ so, not to write.
 **Fixed 2026-10-01 (proven by a spawned-process test; not driven on a built image).** The first
 import of `apps/web/server.ts` is now `./server-env` (`server.ts:5`, above the host import at
 `:12`). `apps/web/server-env.ts` runs `assertHostedModeCoherent` and `assertHostedEnvComplete` at
-module scope (`:44-45`) and only then sets `AGENTFORGE_APPLY_PENDING_RESET=1` (`:47`), so a refused
+module scope (`:51-52`) and only then sets `AGENTFORGE_APPLY_PENDING_RESET=1` (`:54`), so a refused
 process never reaches `packages/db/src/client.ts` (`mkdirSync` `:17`, `applyPendingDataReset` `:39`,
 `new SqliteDatabase` `:48`, `ensureSchema` `:60`). The guard modules reach the database only
 through `@agentforge/db/vault-key` (`packages/host/src/hosted-env.ts:31`), which does not import
