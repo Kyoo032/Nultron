@@ -100,7 +100,7 @@ In order:
 6. `ensureSchema(sql)` (`:60`), then `drizzle(sql, { schema })` (`:62`).
 
 The two processes allowed to set `AGENTFORGE_APPLY_PENDING_RESET=1` are the webdev server
-(`apps/web/server-env.ts:14`, imported first precisely because ESM hoists imports — `:9-13`) and the
+(`apps/web/server-env.ts:54`, imported first precisely because ESM hoists imports — `:5-8`) and the
 packaged shell's `bootstrapPackaged()` (`apps/desktop/main.cjs:652`).
 
 ### The schema
