@@ -34,3 +34,4 @@ A file that exists only here has no published version, so this folder's version 
 - [`docs/internal/chat-workers-spec.md`](docs/internal/chat-workers-spec.md)
 - [`docs/internal/model-tiers-spec.md`](docs/internal/model-tiers-spec.md)
 - [`docs/internal/chat-computer-spec.md`](docs/internal/chat-computer-spec.md)
+- [`docs/internal/team-board-spec.md`](docs/internal/team-board-spec.md) (design only: the team board, each person's own agent, the company and personal agent stores)
