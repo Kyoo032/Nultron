@@ -27,6 +27,7 @@ import { log } from "../log";
 import { chargeTurnBudget, estimateEditJobUsd, type TurnBudget } from "./budget";
 import { encodeEditSse } from "./events";
 import { foldProject } from "./ops";
+import { screenToolCompleted } from "./tool-screen";
 
 const PROBE_ATTEMPTS = 2;
 
@@ -68,8 +69,9 @@ async function invoke(
   push(encodeEditSse({ type: "tool.started", toolKey, touching }));
   const tool = getTool(toolKey);
   const output = tool ? await invokeToolGuarded(tool, args, tenant) : { error: "missing_tool" };
-  push(encodeSse({ type: "tool.completed", toolKey, output }));
-  pushTool(push, output);
+  const screened = screenToolCompleted(toolKey, output);
+  push(encodeSse(screened));
+  pushTool(push, screened.output);
   return output;
 }
 
@@ -222,8 +224,9 @@ async function placeMadeShot(input: RunInput): Promise<void> {
       steps: [{ tool: toolKey, args, estimateUsd: estimate ?? undefined }],
       totalUsd: estimate ?? 0,
     });
-    if (output && typeof output === "object" && "card" in output) {
-      input.push(encodeEditSse({ type: "edit.plan", card: (output as { card: unknown }).card }));
+    const plan = screenToolCompleted("propose_plan", output).output;
+    if (plan && typeof plan === "object" && "card" in plan) {
+      input.push(encodeEditSse({ type: "edit.plan", card: (plan as { card: unknown }).card }));
     }
     say(input.push, "placeMadeShotBlocked");
     return;

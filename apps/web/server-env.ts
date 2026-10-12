@@ -2,10 +2,16 @@
  * Boot environment for the webdev and hosted server. Imported for its side effects only, and
  * imported FIRST.
  *
- * It does two things, in this order, and both exist because ESM hoists every `import` above the
+ * It does three things, in this order, and they exist because ESM hoists every `import` above the
  * module body of the file that contains it. Whatever has to happen before `@agentforge/host` — and
  * through it `@agentforge/db` — is evaluated therefore has to live in a module that is imported
  * ahead of it. This is that module.
+ *
+ * 0. **Refuse to run on a Node.js older than 22** (SH-001). `./lib/node-version-boot` is the first
+ *    import below, so it runs before the hosted guards and before any module that loads
+ *    better-sqlite3, which segfaults on Node 20 with exit 139 and no message. The check is in
+ *    `./lib/node-version.ts`. Webdev and the hosted server both pass through here; the packaged
+ *    desktop never imports this file (its host bundle starts at `apps/desktop/src/host-entry.ts`).
  *
  * 1. **Refuse a hosted process with a bad environment** (docs/internal/security-register.md, SR-25).
  *    `packages/db/src/client.ts` does real work at module scope: it creates the data dir, applies a
@@ -39,6 +45,7 @@
  *    An assignment at the top of `server.ts` would run *after* `@agentforge/host` had been
  *    evaluated, which is why this is a module of its own.
  */
+import "./lib/node-version-boot";
 import { assertHostedEnvComplete, assertHostedModeCoherent } from "./server/hosted-mode-guard";
 
 assertHostedModeCoherent(process.env);

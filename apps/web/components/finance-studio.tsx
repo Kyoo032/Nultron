@@ -231,15 +231,13 @@ export function FinanceStudio() {
   }
 
   function onRead() {
-    if (locked) {
+    // The gate comes first: a task that reads its own table (ratios, budget) still calls
+    // /finance/parse, and the host refuses that on a closed gate (handlers/finance.ts).
+    if (locked || needsKey) {
       return;
     }
     if (customRead) {
-      // A task that reads its own table (ratios, budget) does it on this machine: no key involved.
       customRead.run();
-      return;
-    }
-    if (needsKey) {
       return;
     }
     if (!figures.trim() && briefLooksLikeFigures(prompt)) {
@@ -335,7 +333,6 @@ export function FinanceStudio() {
         error={error}
         notice={notice}
         needsKey={needsKey}
-        readNeedsKey={needsKey && !customRead}
         needsHint={error ? needsSettingsHint(error) : false}
         ready={ready}
         canRead={canRead}

@@ -3,7 +3,7 @@
 Last verified: 2026-10-05 at 0b61a29 + the uncommitted working tree, except one gotcha corrected on 2026-10-07 (ffmpeg is in the image since `5bec532`; the bullet under Gotchas was written before that). Re-read that day: the build and runtime
 description, the HEALTHCHECK paragraph, the components-check cites, the ignore-file rows and the
 dependencies gotcha, against `webapp-deploy/Dockerfile` as it stands after the SR-113 change. The rest
-of the page keeps the caveat in the note below.
+of the page keeps the caveat in the note below. On 2026-10-11 the *Run: five services* sentence about `portal-entry.sh` was re-read against the script at 2df34be plus the SH-005 fix on branch `fix/sh-005-portal-entry-exit-code` (2026-10-11 at 2df34be, before merge); nothing else on the page changed that day.
 
 **Phase 0 pilot additions (2026-10-01, working tree on top of 0b61a29):** the sections marked
 *(pilot)* below were re-verified on that date, with the compose stack driven on a developer machine
@@ -116,7 +116,7 @@ SR-66). The portal side has its own image (`portal.Dockerfile`, allowlist contex
 `portal.Dockerfile.dockerignore`), its own env file (`portal.env`, loaded only by those three services; the
 app's `.env` never holds the signing key, the database passwords or the SMTP login; the proxy has no env
 file at all and gets only `NULTRON_DOMAIN` and `PORTAL_DOMAIN`), and a database network (`portal-db`,
-`internal: true`) that the app is not on. `portal-entry.sh` builds the portal's two DSNs from the two
+`internal: true`) that the app is not on. `portal-entry.sh` refuses a missing, empty or URL-unsafe password by name and exits 1 under dash and bash (`webapp-deploy/portal-entry.sh:20-21` and `:30-31`; explicit checks, because a failed `${VAR:?}` exits 2 under dash), then builds the portal's two DSNs from the two
 passwords; `portal-prepare` runs the Kubernetes rehearsal's `prepare-db.mjs` from inside the image
 (migrate as the schema owner, set `portal_app_login`'s password, SR-56). The app reaches the portal over
 https through the proxy: `extra_hosts` resolves `PORTAL_DOMAIN` to the app's own loopback, where Caddy
