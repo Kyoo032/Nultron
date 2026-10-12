@@ -7,6 +7,9 @@
  * statically, like `needs-key-states.test.tsx`: the studio's error is its own state, so the view is
  * driven with the props the studio would pass.
  */
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
@@ -28,7 +31,6 @@ function view(overrides: Partial<FinanceStudioViewProps> = {}): ReactElement {
     error: null,
     notice: null,
     needsKey: false,
-    readNeedsKey: false,
     needsHint: false,
     ready: false,
     canRead: false,
@@ -121,5 +123,71 @@ describe("a refused call on the hosted build", () => {
 
     expect(html).toContain('data-testid="finance-needs-key"');
     expect(html).toContain("Pengaturan");
+  });
+});
+
+const WEB = join(dirname(fileURLToPath(import.meta.url)), "..");
+const DISABLED = /\sdisabled=""/;
+
+/** The opening tag of a read button. Fails loudly when the button is not drawn, so a `not.toMatch` cannot pass by accident. */
+function readButton(html: string, testId: string): string {
+  const tag = new RegExp(`<button [^>]*data-testid="${testId}"[^>]*>`).exec(html)?.[0] ?? "";
+  expect(tag, `button ${testId} is drawn`).not.toBe("");
+  return tag;
+}
+
+describe("the read-the-numbers button follows the gate on every task", () => {
+  // Ratios and budget register their own read, which used to stay enabled on a closed gate: the studio
+  // dropped the gate for any task with its own read. The host refuses their parse too, so the read is
+  // disabled before any call, on every task.
+  it("ratios: a closed gate disables the read before any call, with the note already up", () => {
+    const html = render(view({ task: "ratios", needsKey: true, canRead: true }));
+
+    expect(readButton(html, "finance-ratios-parse")).toMatch(DISABLED);
+    expect(html).toContain('data-testid="finance-needs-key"');
+  });
+
+  it("budget: a closed gate disables the read before any call, with the note already up", () => {
+    const html = render(view({ task: "budget", needsKey: true, canRead: true }));
+
+    expect(readButton(html, "finance-parse")).toMatch(DISABLED);
+    expect(html).toContain('data-testid="finance-needs-key"');
+  });
+
+  it.each(["cashflow", "appraisal"] as const)("%s: the shared read is disabled on a closed gate", (task) => {
+    const html = render(view({ task, needsKey: true, canRead: true }));
+
+    expect(readButton(html, "finance-parse")).toMatch(DISABLED);
+  });
+
+  // Personal parity: the gate is advisory there, so `needsKey` is false and every read stays as it was.
+  // The stub runtime reports `allowed: true`, which `hostWithholdsLiveModel` already maps to false
+  // (`use-desk-needs-key.test.ts`), so it reaches this same state.
+  it.each(["ratios", "budget", "cashflow", "appraisal"] as const)(
+    "%s with no closed gate: the read stays enabled and no note is drawn",
+    (task) => {
+      const html = render(view({ task, needsKey: false, canRead: true }));
+      const testId = task === "ratios" ? "finance-ratios-parse" : "finance-parse";
+
+      expect(readButton(html, testId)).not.toMatch(DISABLED);
+      expect(html).not.toContain('data-testid="finance-needs-key"');
+    },
+  );
+});
+
+describe("the studio gives every task's read the same gate", () => {
+  const studio = readFileSync(join(WEB, "components/finance-studio.tsx"), "utf8");
+
+  it("has no per-task gate switch: the read follows needsKey alone", () => {
+    expect(studio).not.toContain("needsKey && !customRead");
+    expect(studio).not.toContain("readNeedsKey");
+  });
+
+  it("checks the gate before a registered read runs, so a closed gate never reaches the task's own call", () => {
+    const body = studio.slice(studio.indexOf("function onRead()"), studio.indexOf("async function onGenerate"));
+    const gate = body.indexOf("if (locked || needsKey)");
+
+    expect(gate).toBeGreaterThan(-1);
+    expect(gate).toBeLessThan(body.indexOf("customRead.run()"));
   });
 });
