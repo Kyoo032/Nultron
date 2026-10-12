@@ -5,7 +5,7 @@ Images is a generate studio (prompt → gallery), not a canvas editor. It lists 
 ## Sub-features
 
 - `images-header` (0.15.0) — title plus one outcome line in `expected-inputs`: "You get: a generated image, saved to the gallery below." No disclosure on this studio; the rail row reads `Images`. Driven 2026-09-23 on a live desk: `images-studio-needs-key` count 0, `images-studio-estimate` starts with `≈ $`, submit not pressed.
-- `images-rail` reaches `/images` from `mode-images` on Default.
+- `images-rail` reaches `/images` from `agent-images` on Default.
 - `images-shell` shows `images-studio` (heading Images, prompt bar, gallery). Each gallery picture is a `GalleryImage` (`apps/web/components/gallery-media.tsx`): `loading="lazy"`, and a row whose file is gone (host `fileMissing`, or a failed load) shows `media-missing` ("File missing" / "Berkas hilang") instead of a broken-image icon. Same tile as Videos and Music; details in [videos.md](./videos.md).
 - `buddy-stage-header` — Nultron on the header's art column (`ModeHeader`, `apps/web/components/mode-header.tsx:66-73`): `buddy-stage-header` and its tap button `buddy-stage-header-tap` (`apps/web/components/buddy-stage.tsx:72`, `:82`) are in the DOM at every width, but the column is `display: none` below 60rem of header width (`apps/web/app/globals.css:1925`; the 60rem `@container` that turns it on is `:1969-1973`), so they are visible only on a wide pane (about a 1280px window and up). While the stage is at least 25% on screen the empty-desk Nultron stands down (see `images-empty`). A visited studio stays mounted, so scope `buddy-stage-header` to `images-studio` or use `.first()`. Detail: [documents.md](./documents.md).
 - `images-needs-key` shows `images-studio-needs-key` only when the host set `allowed` false (`useDeskNeedsKey`, `apps/web/lib/use-desk-needs-key.ts:36`) and the gallery read has finished (`needsKey && !loading`, `apps/web/components/images-studio.tsx:231`). Documents follows the same hook; Research, Presentations, Videos and Music use `useHostedNeedsKey` instead (always false off the hosted build, `use-desk-needs-key.ts:73`). On a stub desk the note is absent and `images-studio-submit` stays enabled once the prompt is non-empty. While `allowed` is true the button does not protect you: a keyless click is a real POST. On a stub desk that POST saves a local stand-in and does not call the gateway. A keyless non-stub desk derives `needs_key` with `allowed: false` (`gateway-gate.ts:390-391`), so the note shows, the button is `disabled` and a direct POST is a 403 at `jobs.ts:73` before generate runs; the `tool_failed` 400 needs an open gate plus a non-ready image route (`image-generate.ts:63-72`, for example a stored backend selection with no credential) and is bypassed on stub (`:308`, `:316-317`). A live click bills.
@@ -16,7 +16,7 @@ Images is a generate studio (prompt → gallery), not a canvas editor. It lists 
 
 ## How to get to it (user POV)
 
-- Choose Images on the left rail (`mode-images`). Default has the tab on a fresh first-run desk and on every older desk.
+- Choose the Images agent on the left rail (`agent-images`), then `agent-open-studio`. Default has the tab on a fresh first-run desk and on every older desk.
 - Open `http://127.0.0.1:3000/images` when the tab is unlocked. A hidden generate URL redirects to the first visible mode.
 
 ## Driving it with the Nultron harness
@@ -24,10 +24,10 @@ Images is a generate studio (prompt → gallery), not a canvas editor. It lists 
 Preconditions:
 
 - Doctor exits 0.
-- `mode-images` is visible on Default. If count is 0, you are on a desk that hid Images (e.g. Legal) — not a missing agent.
+- `agent-images` is visible on Default. If count is 0, you are on a desk that hid Images (e.g. Legal) — not a missing agent.
 - Stub proof: with `allowed: true`, `images-studio-needs-key` is absent and `images-studio-submit` enables once the prompt is non-empty (`apps/web/components/images-studio.tsx`). A stub submit saves a stand-in still and does not bill. Do not submit on a live desk (`doctor` reports `ai`) unless the operator asked: that click bills. A closed gate (`allowed: false`) shows the note and disables the button; both use `needsKey`.
 
-- **Open Images.** Click `mode-images`. URL matches `/images` (15s). `images-studio` is visible (15s).
+- **Open Images.** Click `agent-images`, then `agent-open-studio` (or go to `/images`). URL matches `/images` (15s). `images-studio` is visible (15s).
 - **Closed gate.** When the host set `allowed` false, `images-studio-needs-key` is visible and contains exactly one `<a href="/settings">` (rendered by `SettingsLinkHint`) — assert the anchor, not the word "Settings". `images-studio-submit` is disabled. A keyless stub desk (`allowed: true`) does not show the note. The `id` copy, when the note is shown, is `Tambahkan kunci gateway Toko Token di Pengaturan untuk membuat gambar.`
 - **Empty gallery.** Once the gallery has settled with no saved images and nothing generating, `images-studio-empty` count is 1 (`data-mode` and `data-tier` on it, and `data-staged="true"` only while the header stage is on screen; no text, and no height while the header's Nultron is on screen). It is 0 while `loading` or generating, and 0 again once an image exists. `example-gallery` is first; `images-studio-prompt-bar` is visible under that list (not a sticky dock).
 - **Frame.** Type `a poster of a bakery` into `images-studio-prompt` and do not touch `images-studio-aspect`. Its value is `portrait`. Replace the sentence with `a banner for the shop`; the value is `landscape`. A sentence with no shape stays `square`. Open the menu and pick Square; further typing leaves it on Square.

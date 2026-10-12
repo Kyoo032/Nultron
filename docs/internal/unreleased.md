@@ -440,3 +440,9 @@ Found while building the chat-first shell in `agentforge-chat`. All three are in
 ## White-label plan: downstream brand repos, no brand code in agentforge, 2026-10-12 (docs only)
 
 - `docs/internal/white-label-and-agent-guardrails-plan.md` now records Kyo's 2026-10-12 decision for design B: each brand (HYP AI, Nultron) is a private downstream repo that syncs from `main`; option A (in-repo `brands/<id>/`) is rejected. Adds the sync model (dated sync branches, `ci:local` plus a leak check, Triage runs, Architect reviews, Kyo approves) and the generic hooks still owed on `main`. No code changed.
+
+## Findings from the verify-skill maintenance pass, 2026-10-12 (published code; not fixed)
+
+Found while re-driving the recipes against the chat-first shell on `:3000`. Lanes: Personal, Enterprise, HYP AI, tester.
+
+- [ ] **Guide: the Chat stop still describes a model picker.** `steps.chat.body` says the model picker lets the person choose which model answers (`apps/web/locales/en/guide.json:29`, and `apps/web/locales/id/guide.json:29`, "Pemilih model"). The chat-first Chat has the tier picker (`tier-picker`: Daily, Fastest, Reasoning) and no model picker, so the copy points at a control that is not there. Fix both catalogs together; the parity test keeps the keys aligned but does not check the meaning.

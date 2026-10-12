@@ -13,7 +13,7 @@ Usage is the desk spend and this-key wallet page at `/usage`. It is a link in th
 
 ## How to get to it (user POV)
 
-- Choose Usage on the left rail (`usage-link`), expanded or collapsed (collapsed it is icon-only: `aria-label` and `title` read `Usage` / `Pemakaian`, `app-rail.tsx:131-132`, the expanded label span is `:92`; there is no `Use` label).
+- Choose Usage on the left rail (`usage-link`; the rail is icon-only, so `aria-label` and `title` read `Usage` / `Pemakaian`, `agent-rail.tsx:75-76`; there is no `Use` label).
 - From Settings, follow Open Usage (`usage-open`).
 - Open `/usage` directly.
 

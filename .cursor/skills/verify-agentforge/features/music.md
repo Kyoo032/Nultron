@@ -4,7 +4,7 @@ Music is the third generate studio (describe-or-lyrics brief, style, title, inst
 
 ## Sub-features
 
-- `music-rail` reaches `/music` from `mode-music` on Default.
+- `music-rail` reaches `/music` from `agent-music` on Default.
 - `music-shell` shows `music-studio`.
 - `buddy-stage-header` — Nultron on the header's art column (`ModeHeader`, `apps/web/components/mode-header.tsx:66-73`): `buddy-stage-header` and its tap button `buddy-stage-header-tap` (`apps/web/components/buddy-stage.tsx:72`, `:82`) are in the DOM at every width, but the column is `display: none` below 60rem of header width (`apps/web/app/globals.css:1925`; the 60rem `@container` that turns it on is `:1969-1973`), so they are visible only on a wide pane (about a 1280px window and up). While the stage is at least 25% on screen the empty-desk Nultron stands down (see `music-empty`). A visited studio stays mounted, so scope `buddy-stage-header` to `music-studio` or use `.first()`. Detail: [documents.md](./documents.md).
 - `music-needs-key` shows `music-studio-needs-key` when no key is ready: the library read said `ready: false` and has finished (`!ready && !loading`), or, on the hosted build only, `useHostedNeedsKey` is true (`apps/web/components/music-studio.tsx:397`). `music-studio-submit` and `music-studio-draft-lyrics` are `disabled` unless both `ready` and the hosted gate allow it (`keyReady`, `:131`, `:367`, `:391`). On a keyed desk `ready` is true, so the note is count 0 and Generate is enabled once there is a brief: a click there is a PAID live generate. Copy points at Settings through `SettingsLinkHint`, so assert the single `<a href="/settings">`, not the word "Settings" (locale-dependent).
@@ -22,7 +22,7 @@ Music is the third generate studio (describe-or-lyrics brief, style, title, inst
 
 ## How to get to it (user POV)
 
-- Choose Music on the left rail (`mode-music`). A desk that already has it shows the tab. A fresh first-run desk starts with Research, Images, Videos and Presentation only, so turn this one on first (Workspaces, Edit on the desk).
+- Choose the Music agent on the left rail (`agent-music`), then `agent-open-studio`. A desk that already has it shows the tab. A fresh first-run desk starts with Research, Images, Videos and Presentation only, so hire it first (`/workspaces`, `agent-hire`).
 - Open `http://127.0.0.1:3000/music` when the tab is unlocked.
 
 ## Driving it with the Nultron harness
@@ -30,10 +30,10 @@ Music is the third generate studio (describe-or-lyrics brief, style, title, inst
 Preconditions:
 
 - Doctor exits 0.
-- `mode-music` is visible. If not, skip with that precondition — same rule as Images and Videos.
+- `agent-music` is visible. If not, skip with that precondition — same rule as Images and Videos.
 - Do not submit `music-studio-submit` on the shared Cloud `:3000` desk. A live music generate is an operator-asked action on a desk that owns its key.
 
-- **Open Music.** Click `mode-music`. URL matches `/music` (15s). `music-studio` is visible (15s).
+- **Open Music.** Click `agent-music`, then `agent-open-studio` (or go to `/music`). URL matches `/music` (15s). `music-studio` is visible (15s).
 - **Settle before asserting.** `loading` starts true and suppresses both `music-studio-needs-key` and `music-studio-empty`. Wait for `music-studio-mode` to be visible and then for either the `music-studio-model` select to gain options or `music-studio-no-models` to appear — that is `GET /api/v1/music` landing — before reading either. Harness-wide gotcha **G1**.
 - **No-key state (keyless or stub desk only).** `music-studio-needs-key` is visible when the studio is not ready. Assert the anchor, not the copy. On a keyed desk it is count 0 and `music-studio-submit` and `music-studio-draft-lyrics` enable once there is text, so record that and stop.
 - **Empty gallery.** Once the library has settled with no tracks and nothing generating or drafting, `music-studio-empty` count is 1 (`data-mode` and `data-tier` on it, and `data-staged="true"` only while the header stage is on screen; no text, and no height while the header's Nultron is on screen); it is 0 while `loading`, generating or drafting lyrics. The prompt bar stays. Never delete rows to manufacture an empty library.
