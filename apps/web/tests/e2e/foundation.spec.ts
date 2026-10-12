@@ -1,5 +1,10 @@
 import { expect, type Page, test } from "@playwright/test";
+import chatCopy from "../../locales/en/chat.json" with { type: "json" };
 import { showEveryMode } from "./every-mode";
+
+// The headline the empty Chat renders (chat-hero.tsx, key chat.empty.headline). Read from the en
+// catalog so a copy edit does not break this suite again (SH-003).
+const EMPTY_CHAT_HEADLINE = chatCopy.empty.headline;
 
 /**
  * In the chat-first shell a mode's rail tile is `agent-<mode>`. Every agent opens a conversation. A
@@ -40,7 +45,7 @@ test("chat and workspaces work without an account", async ({ page }) => {
   await expect(page.getByTestId("model-picker")).toHaveCount(0);
   await expect(page.getByTestId("reasoning-effort")).toHaveCount(0);
   await expect(page.getByTestId("chat-wire")).toHaveCount(0);
-  await expect(page.getByTestId("chat-empty")).toContainText("Work starts here");
+  await expect(page.getByTestId("chat-empty")).toContainText(EMPTY_CHAT_HEADLINE);
   // The chat-first rail lists agents: `mode-chat` is the generalist and the others are `agent-<mode>`.
   await expect(page.getByTestId("mode-chat")).toBeVisible();
   await expect(page.getByTestId("agent-documents")).toBeVisible();
@@ -69,7 +74,7 @@ test("chat and workspaces work without an account", async ({ page }) => {
   await page.keyboard.press("Escape");
 
   await page.getByTestId("new-chat-link").click();
-  await expect(page.getByTestId("chat-empty")).toContainText("Work starts here", { timeout: 10_000 });
+  await expect(page.getByTestId("chat-empty")).toContainText(EMPTY_CHAT_HEADLINE, { timeout: 10_000 });
   await page.getByTestId("composer-text").fill(promptTwo);
   await page.getByTestId("composer-send").click();
   await expect(page.getByTestId("message-list")).toContainText(promptTwo, { timeout: 20_000 });

@@ -1,8 +1,12 @@
 # Map — Settings, the gateway gate, and Start over
 
+Last verified: 2026-10-11 at 2df34be (fix branch, before merge). Only "What a save does besides saving" and "What the answer carries" were re-checked; the other cites on this page are unchanged, and some were already stale.
+
 > **Two products, one repo.** **Personal** is the Mac/Windows Nultron app (current cut `0.15.0`); **Enterprise** is the hosted web app.
 > The host-decides/renderer-displays rule below is unchanged and applies to both; the Electron-only transport and wipe details are the Personal app's.
 > Decision record: [`web-pivot-2026-09-18.md`](../web-pivot-2026-09-18.md).
+
+2026-10-11, on `2df34be` (branch `test/sh-004-keygate-fake-gateway`, before merge) plus one new test file, for SH-004, a coverage gap and not a product bug. Until now the bad-key, unreachable and grace states were checked either against a status-only `fetch` stub or by hand-built verdicts, so no test had a real socket answering. `packages/host/src/gateway-gate-fake-gateway.test.ts` (10 cases) drives the real router against a fake gateway on `127.0.0.1` through the dev/test hook `AGENTFORGE_GATEWAY_URL` (`gatewayUrlOverride`, `packages/core/src/gateway/pinned.ts:72-81`). The host test setup (`packages/host/test/setup.ts`) lets only loopback fetches through, so nothing can reach the real gateway. What it proves, all on a desk: a 401 and a 403 each close the desk as `invalid_key` with no grace, and a gated route then answers the flat `403 gateway_blocked`; a refused socket and a dropped socket are `unreachable`, and a validated key stays open on grace while the endpoint is down, then closes once its `lastOkAt` is eight days old; a 500 on a first check is `error` with no grace; a held response with a 200 ms budget through `runGatewayCheck` is `unreachable`; each Re-check makes exactly one live call; a stale `ok` is re-checked in the background when Settings is read; stub runtime makes no gateway call with a key saved. The keys in that file are obviously fake, and the test asserts they reach no response and no verdict file. **Not proven:** the real gateway's answers (a revoked key's status, any 3xx on `/models`, TLS and timeout behaviour), and the 2026-09-15 row that read "Key verified" while live calls returned 401. Those need a real gateway and an owner-approved test key.
 
 Review round, same day, same tree (still uncommitted), for [SR-163](../security-register.md#sr-163) items 1 to 6: on the hosted server a provider key saved on one desk is written to every desk of the company (`saveKeysToDesks`; see "What a Settings save does on the hosted server" below), the Settings `probe` and `defaults` and the model list are the **company's** (`model_cache:<organisation id>`, no longer the partner's), `usage` is the company's, a company whose gate slot is empty adopts the old partner verdict for the very key it holds (`loadVerdictFor`), and the hosted "Erase company account" is refused with `409 tenant_erase_shared_partner` when a partner holds more than one company. Those paragraphs were rewritten in place; the cites into `model-cache.ts`, `selectable-models.ts` and `gateway-gate.ts` that moved with them were re-anchored by name, not by line. Proven by `gateway-gate-companies.test.ts` (30), `model-cache-companies.test.ts` (17), `usage-companies.test.ts` (9), `tenant-reset-companies.test.ts` (10), each red before its fix. **Not driven on a hosted server.** A desk is unchanged in every one of them (each has a Personal case). **Scoping the erase to one company is still owed and is the owner's decision.**
 
@@ -244,24 +248,26 @@ from the renderer, together with the `settings.endpointLabel` / `settings.endpoi
 
 Host and core logic are unchanged. This is a fourth, presentation-only layer on top of the three real pins.
 
-**What a save does besides saving.** `handlePostSettings` (`packages/host/src/handlers/settings.ts:234`)
+**What a save does besides saving.** `handlePostSettings` (`packages/host/src/handlers/settings.ts:342`)
 runs `saveSettings(patch, tenant)` and then four side effects, in order, so a corrected key or URL
 takes effect on the next request instead of after a breaker expires:
 
 | Call | Why |
 |---|---|
-| `clearThisKeyCache()` (`:261`) | the per-key usage strip is keyed on the old credential |
-| `resetEmbedCircuit()` (`:265`) | the embeddings breaker holds a workspace down for five minutes |
-| `resetModelReliabilityState()` (`:266`) | **added 2026-09-17 as `resetJobModelCircuit()`, widened 2026-09-30** — the job-model fallback breaker skips a model for the same five minutes (`JOB_MODEL_DOWN_MS`, `packages/host/src/job-model-fallback.ts:27`), so a save that fixes the key must clear it too or the desk keeps routing around a model that now works. It also forgets the Thinking levels the runtime learned a model refuses (`resetLearnedEffortLimits`, `packages/core/src/runtime/effort-selfheal.ts:254`; they also expire on their own after 30 minutes and are kept per tenant): a new key or endpoint may sit in front of a different upstream, so nothing learned about a model holds (`resetModelReliabilityState`, `packages/host/src/job-model-fallback.ts:67`) |
-| `revokeKnowledgeGatewayModel(...)` (`:270`) | the retrieval sidecar holds a *copy* of the key inside the model row it embeds with; a key changed here but left in that row has not been rotated |
+| `clearThisKeyCache()` (`:388`) | the per-key usage strip is keyed on the old credential |
+| `resetEmbedCircuit()` (`:392`) | the embeddings breaker holds a workspace down for five minutes |
+| `resetModelReliabilityState()` (`:393`) | **added 2026-09-17 as `resetJobModelCircuit()`, widened 2026-09-30** — the job-model fallback breaker skips a model for the same five minutes (`JOB_MODEL_DOWN_MS`, `packages/host/src/job-model-fallback.ts:27`), so a save that fixes the key must clear it too or the desk keeps routing around a model that now works. It also forgets the Thinking levels the runtime learned a model refuses (`resetLearnedEffortLimits`, `packages/core/src/runtime/effort-selfheal.ts:254`; they also expire on their own after 30 minutes and are kept per tenant): a new key or endpoint may sit in front of a different upstream, so nothing learned about a model holds (`resetModelReliabilityState`, `packages/host/src/job-model-fallback.ts:67`) |
+| `revokeKnowledgeGatewayModel(...)` (`:397`) | the retrieval sidecar holds a *copy* of the key inside the model row it embeds with; a key changed here but left in that row has not been rotated |
 
-After those, `refreshModelCache(saved, { scope: tenant })` (`packages/host/src/handlers/settings.ts:272`) lists
+After those, `refreshModelCache(saved, { scope: tenant })` (`packages/host/src/handlers/settings.ts:399`) lists
 the models the saved keys can see and writes **this tenant's** cache: a `tenant_state` row on the hosted server,
 the machine file on a desk (`packages/host/src/selectable-models.ts:336`; a failure is swallowed, airplane mode).
 On the hosted server it probes Anthropic and Google at the provider registry's hosts and only behind a key
 (`:343`), where a desk still probes the stored base URL, and a stored Volcengine URL with no key behind it probes
 nothing. `POST /api/v1/models` (Refresh) does the same with `forceRegistry`, scoped to the caller
 (`packages/host/src/handlers/models.ts:21`).
+
+**What the answer carries (SH-002).** The 200 names every body field the handler does not read, in `ignoredFields`. The set is `KNOWN_SETTINGS_FIELDS` and the helper is `unknownSettingsFields` (`packages/host/src/handlers/settings.ts:276` and `:301`). Such a field is not applied, but the save still goes through, so a body with a typo next to a real key keeps the key. The list holds names only, at most 20 names of 64 characters each, in the order the body sent them. The property is absent when there is nothing to report, so a clean save answers the shape it always had, and a body that is not a JSON object reports none. The set is kept by hand against every `body.*` read in the file: a new read that is not added there is reported as ignored until it is. The three renderer callers (onboarding key, Settings save, Settings language) post only listed names, and the renderer reads the 200 loosely, so the extra property changes nothing there.
 
 `resetGatewayKey` runs the same two breaker resets (the embeddings one and the reliability state) on sign-out — see **Start over** below.
 
@@ -359,12 +365,13 @@ It runs on a key save (`refreshGatewayGateAfterSave` → `runGatewayCheck`,
 `packages/host/src/handlers/settings.ts:338-346`, route at `packages/host/src/router.ts:263`). Separately, `maybeRefreshGateway` (`packages/host/src/gateway-gate.ts:660-702`)
 fires an un-awaited check at most once per tenant and key per 10 minutes (per company and key on the server) from `handleGetSettings`
 (`packages/host/src/handlers/settings.ts:153`) — that is what turns "opened on trust" into a real verdict over time.
-Which verdicts it re-checks is `needsGatewayRefresh` (`packages/host/src/gateway-gate.ts:641-649`): no verdict for
+Which verdicts it re-checks is `needsGatewayRefresh` (`packages/host/src/gateway-gate.ts:670-678`): no verdict for
 this key, an `ok` past its 24 h TTL, and, since 2026-10-06 (0.16.0 cut), an `unreachable` or `error` verdict
-(`:648`). Before that, one failed check stayed on disk until `lastOkAt` left the 7-day grace and the desk closed, though
+(`:677`; cites re-anchored 2026-10-11). Before that, one failed check stayed on disk until `lastOkAt` left the 7-day grace and the desk closed, though
 the gateway had come back (the 2026-10-05 verify-pass finding). `invalid_key` is still never re-checked on its own;
 only a new key or Re-check replaces it. Tests: `packages/host/src/gateway-gate.test.ts:521` (unreachable and error,
 throttled), `:538` (invalid_key left alone), `:547` (a desk closed past grace reopens once the check answers `ok`).
+The same states through the router, against a fake loopback gateway, are `packages/host/src/gateway-gate-fake-gateway.test.ts` (SH-004, 2026-10-11).
 The check only rewrites the verdict on disk: a renderer already showing the closed onboarding screen re-reads it on
 its next `GET /api/v1/settings` (a relaunch, or the screen's Re-check), not by itself.
 
@@ -541,7 +548,7 @@ app opens a fresh database on this same boot, and a retry must not delete that o
 this change the marker was dropped whatever happened, so a locked `.master-key` or `settings.enc` simply stayed
 behind after the owner had confirmed the erase ([SR-77](../security-register.md#sr-77),
 [SR-78](../security-register.md#sr-78)). That env flag is set in exactly two places:
-`apps/web/server-env.ts:14` (webdev) and `apps/desktop/main.cjs:652` inside `bootstrapPackaged()`, before
+`apps/web/server-env.ts:54` (webdev) and `apps/desktop/main.cjs:652` inside `bootstrapPackaged()`, before
 `require("./host.cjs")` — so a test or script that imports `@agentforge/db` can never trigger a wipe as a side
 effect.
 

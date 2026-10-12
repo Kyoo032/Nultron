@@ -37,6 +37,7 @@ import { startRun } from "@/lib/run-generation";
 import { useWorkspaceScope } from "@/lib/workspace-scope";
 import { NeedsKeyNote } from "@/components/needs-key-note";
 import { ComposerAttachmentNotes } from "@/components/composer-attachment-notes";
+import type { ModelFallbackNotice } from "@/components/chat-model-fallback-notice";
 import { imageRefusalMessage } from "@/lib/composer-image-support";
 import { gatewayBlockedMessage, hostedGatewayBlocked } from "@/lib/gateway-blocked";
 import { hostedKeyBlock, useDeskNeedsKey } from "@/lib/use-desk-needs-key";
@@ -62,6 +63,8 @@ type Props = {
   onThinking?: (text: string) => void;
   onTool?: (event: { phase: "started" | "completed"; toolKey: string; input?: unknown; output?: unknown }) => void;
   onFailed?: (message: string) => void;
+  /** The host answered this turn with a stand-in model (`run.model_fallback`). */
+  onModelFallback?: (notice: ModelFallbackNotice) => void;
   onProbing?: (info: { attempt: number; attempts: number; message: string }) => void;
   /** A run ended. `showing` is false when the pane had moved to another session by then. */
   onComplete: (run: RunEnd) => Promise<void> | void;
@@ -133,6 +136,8 @@ export type RunStreamHandlers = {
   readonly onFailed?: (message: string) => void;
   /** A tool the run is driving said what it is doing (`tool.progress` with a phase, step or round label). */
   readonly onToolProgress?: (event: { toolKey: string; label: string }) => void;
+  /** The host answered with a stand-in model (`run.model_fallback`): the model asked for, and the one that answered. */
+  readonly onModelFallback?: (notice: ModelFallbackNotice) => void;
   /** The host said the run is over (`run.completed`). The stream may stay open a little longer while it saves. */
   readonly onCompleted?: () => void;
 };
@@ -216,6 +221,9 @@ export async function readRunStream(
       if (progress) {
         handlers.onToolProgress?.(progress);
       }
+      if (event.type === "run.model_fallback" && event.from && event.to) {
+        handlers.onModelFallback?.({ from: event.from, to: event.to, message: event.message ?? "" });
+      }
       if (event.type === "run.failed" && event.message) {
         handlers.onFailed?.(event.message);
       }
@@ -239,6 +247,7 @@ export function ChatComposer({
   onThinking,
   onTool,
   onFailed,
+  onModelFallback,
   onComplete,
   onSettled,
   draft,
@@ -433,6 +442,12 @@ export function ChatComposer({
         }
         onFailed?.(message);
         setError(message);
+      },
+      onModelFallback: (event) => {
+        if (!isCurrentRun()) {
+          return;
+        }
+        onModelFallback?.(event);
       },
       // The answer is whole: free Send and the Thinking card now, not when the connection closes. The host
       // still saves the reply and closes the stream; `finish` reloads the thread when it does.

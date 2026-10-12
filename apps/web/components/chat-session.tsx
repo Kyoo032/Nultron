@@ -13,6 +13,11 @@ import { FolderSurface } from "@/components/folder/folder-surface";
 import { ChatContextChip } from "@/components/chat-context-chip";
 import { ChatHeader } from "@/components/chat-header";
 import { ChatLauncher } from "@/components/chat-launcher";
+import {
+  ChatModelFallbackNotice,
+  type ModelFallbackNotice,
+  nextModelFallback,
+} from "@/components/chat-model-fallback-notice";
 import { ChatUsageChip } from "@/components/chat-usage-chip";
 import { estimateContextParts, estimateConversationTokens } from "@/lib/estimate-tokens";
 import {
@@ -90,6 +95,11 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
   const [streaming, setStreaming] = useState("");
   const [thinking, setThinking] = useState("");
   const [tools, setTools] = useState<LiveTool[]>([]);
+  /**
+   * The stand-in model that answered this turn, if one did. Held here, not on the live turn, because the live
+   * turn is thrown away when the reply lands; it stays under the reply until the next send or a change of thread.
+   */
+  const [fallback, setFallback] = useState<ModelFallbackNotice | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** A refused send. The sentence lives on `composer-error`; this only holds the error mascot. */
@@ -208,6 +218,7 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
     setStreaming("");
     setThinking("");
     setTools([]);
+    setFallback(null);
     setRunning(false);
     setSendFailed(false);
   }
@@ -510,6 +521,7 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
             />
           </div>
         ) : null}
+        {fallback && !sendFailed ? <ChatModelFallbackNotice notice={fallback} /> : null}
       </div>
       {agentIdReady ? (
         <div className="chat-composer-ledge">
@@ -557,6 +569,7 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
               rememberTier(tierId);
               setThinking("");
               setTools([]);
+              setFallback(null);
               setStreaming("");
               const content =
                 payload.parts && payload.parts.length > 0 ? payload.parts : [{ type: "text", text: payload.text }];
@@ -595,6 +608,7 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
               setSendFailed(true);
               setRunning(false);
             }}
+            onModelFallback={(event) => setFallback((held) => nextModelFallback(held, event))}
             onSettled={() => setRunning(false)}
             onComplete={async (run) => {
               notifyThreadsChanged();

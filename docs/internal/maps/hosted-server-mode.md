@@ -1,6 +1,6 @@
 # Map — Hosted server mode and the transport security pass
 
-Last verified: 2026-09-21 at 4938747 + working tree; four citations re-anchored and the
+Last verified: 2026-10-11 at 2df34be (fix branch, before merge) (SH-001: section 0, the Node 22 boot check). Before that: 2026-09-21 at 4938747 + working tree; four citations re-anchored and the
 review-instance section added, then the boot-guard path re-checked after the fix pass of the same
 day (the guards moved from `apps/web/lib/` to `apps/web/server/`, because `lib` is the renderer's
 namespace and that module re-exports `@agentforge/host`). The rest was last read at c204e5e /
@@ -13,6 +13,10 @@ The hosted, multi-user web deployment and the rules that only exist there. One e
 What this page is **not**: the desktop or webdev path. Every rule below is a branch on one flag, and with the flag off the code takes the path it took before the commit. It is also not the tenancy story — the hosted server is single-tenant today and per-tenant scoping, per-tenant caps and a scoped "Start over" are Phase 3 and Phase 5 (`packages/host/src/concurrency.ts:16`, `packages/host/src/handlers/settings.ts:338-343`).
 
 ## How it works
+
+### 0. Node 22 first (SH-001)
+
+`apps/web/server-env.ts:48` imports `apps/web/lib/node-version-boot.ts` before anything else. That file calls `assertSupportedNode(process.version)` (`apps/web/lib/node-version.ts`, `MIN_NODE_MAJOR = 22`), so a server started on Node 20 throws `This server needs Node.js 22 or newer; it was started with v20.19.2` before the hosted guards run, and before `@agentforge/db` loads `better-sqlite3`, which segfaults on Node 20 with exit 139 and no message. Webdev runs the same entry, so it is checked too. The packaged desktop never imports `server-env.ts` (its host bundle starts at `apps/desktop/src/host-entry.ts`), so it is not checked. The root `package.json` `engines.node` and `.nvmrc` name the same major. The pure function is covered by `apps/web/lib/node-version.test.ts`; the boot order by `apps/web/server/hosted-mode-guard.test.ts` and `apps/web/server/boot-order.test.ts`.
 
 ### 1. The one switch
 

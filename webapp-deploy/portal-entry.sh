@@ -16,9 +16,9 @@
 #          PORTAL_DB_HOST, PORTAL_DB_PORT, PORTAL_DB_OWNER, PORTAL_DB_NAME   optional, for a managed
 #                                     Postgres; they default to the compose service
 set -eu
-
-: "${PORTAL_POSTGRES_PASSWORD:?PORTAL_POSTGRES_PASSWORD is not set (portal.env)}"
-: "${PORTAL_APP_DB_PASSWORD:?PORTAL_APP_DB_PASSWORD is not set (portal.env)}"
+# Not ${VAR:?}: a failed ${VAR:?} exits 2 under dash and 1 under bash, and this refusal must exit 1 under both.
+[ -n "${PORTAL_POSTGRES_PASSWORD:-}" ] || { echo "PORTAL_POSTGRES_PASSWORD is not set (portal.env)" >&2; exit 1; }
+[ -n "${PORTAL_APP_DB_PASSWORD:-}" ] || { echo "PORTAL_APP_DB_PASSWORD is not set (portal.env)" >&2; exit 1; }
 
 # A password goes into a URL, so it has to be URL-safe: letters, digits and -._~ only. `openssl rand
 # -hex 24` is. Refuse anything else by NAME, never by value, rather than build a DSN that parses
