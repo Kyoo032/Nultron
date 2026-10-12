@@ -409,6 +409,20 @@ Lanes: personal, enterprise, hyp-ai, tester (the default: a renderer change that
 - **Not verified:** no live Yahoo call was made (the tests use recorded fixtures); the hosted image was not built; the Personal app was not packed or staged. The Personal `host.cjs` bundle (`apps/desktop/scripts/stage-renderer.mjs`, esbuild of `src/host-entry.ts`) now carries yahoo-finance2 4.0.3, mcp-sdk 1.32.1, express 5.3.0 and zod 4.6.5. An esbuild run to a scratch file, not staged, builds with 0 errors and the three existing guarded `import.meta` warnings. The bundle has not been loaded in Electron. yahoo-finance2 4.0.3 constructs offline with the same options `yahoo.ts` uses, but no live Yahoo call was made; no live gateway call was made. Market's `yahoo-finance2` 4.0.3 is proven to load and to pass its tests, not to return live quotes.
 - **Exploitability:** no Express `trust proxy` setting in `apps/` or `packages/` (`apps/portal` has its own `PORTAL_TRUST_PROXY` flag and does not depend on express), so the proxy-addr trusted-subnet path is not compiled. The register rows are [SR-113](security-register.md#sr-113) and [SR-134](security-register.md#sr-134).
 
+## Chat-first shell promoted from the tester code, 2026-10-12 (PR #157, merged as `b14faa1a`)
+
+Lanes: Personal, Enterprise, HYP AI, tester. Rizky approved the promotion on 2026-10-12, so `main` now draws the chat-first shell (`SHELL_LAYOUT = "chat-first"`, `packages/core/src/agents/product-modes.ts:29`). Setting it back to `modes` restores the mode screens on the rail.
+
+- **Virtual agents.** The rail lists the default agent and one agent per harness on the desk. Each agent is a full Chat with Chat's tools plus the `research_dossier` worker. "Workspaces" is shown as "Virtual agents" (Hire, Let go), and its URL stays `/workspaces`. A turn may start at most 4 pictures and 1 clip. Map: [`maps/virtual-agents.md`](maps/virtual-agents.md).
+- **Model tiers.** Chat picks Daily, Fastest or Reasoning, and the host resolves the tier to a live model. Map: [`maps/model-policy.md`](maps/model-policy.md), "Chat tiers".
+- **The first-run guide** speaks of agents in `en` and `id`.
+- **Proof.** `ci:local` passed every required step at `e8a7eca8`. The shell was driven on the tester webdev `:3200` on 2026-10-09, row by row (`evidence/virtual-agents/2026-10-09-first-drive/RECORD.md`).
+- **Not proven.** The guide copy of 2026-10-12 has unit tests only. Nothing was driven on the packaged Personal app, the hosted preview or the HYP AI clone.
+- **Owed:**
+  - `apps/desktop/main.cjs` does not set `AGENTFORGE_ASSISTANT_NAME` from `brand.json`, and `webapp-deploy/.env.example` does not list it, so a brand flavor names its default agent after the product.
+  - :3000 serves from the main checkout, which is still at `f98213a0`. It shows the new shell only after a pull and a host restart.
+  - The HYP AI import of `b14faa1a`.
+
 ## Findings from the tester's virtual-agents build, 2026-10-09 (published code; not fixed)
 
 Found while building the chat-first shell in `agentforge-chat`. All three are in the published code, so each is a fix for `main` from a branch off `main`, then a merge into the tester folder. Lanes: Personal, Enterprise, HYP AI, tester. None is fixed. The first two are read from the code; the third was seen live on the tester webdev, whose Research harness is the published one.
