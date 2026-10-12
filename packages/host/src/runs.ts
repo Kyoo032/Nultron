@@ -3,7 +3,6 @@ import {
   assertChatModelAcceptsModality,
   createRuntime,
   encodeSse,
-  harnessSpecFor,
   redactSecrets,
   redactSecretsDeep,
   abortErrorMessage,
@@ -55,6 +54,7 @@ import { ensureToolsRegistered } from "./register-tools";
 import { recordChatRunUsage } from "./usage-record";
 import { loadSettings, loadUserLocale } from "./settings-store";
 import { defaultSelectableModel, listSelectableModels } from "./selectable-models";
+import { resolveTierRun } from "./tier-resolve";
 import { markJobModelDown, maySwapModel, pickNext, startModel } from "./job-model-fallback";
 import { readModelPinned } from "./job-regen";
 import { collectToolMediaParts } from "./tool-media";
@@ -62,6 +62,10 @@ import { assertChatImagesSendable, prepareChatImageHistory, type ChatTurn } from
 import { saveGeneratedImage, saveGeneratedVideo } from "./media";
 import { getRunContext, hostedRequestLocale, localeForRun, withRunContext } from "./run-context";
 import { withToolRun } from "./tool-run-context";
+import type { JobEvent } from "@agentforge/core/jobs";
+import { DEFAULT_CHAT_MODALITIES, GENERALIST_WORKER_PROMPT, virtualAgentFor } from "@agentforge/core";
+import { runPolicyFor, withGeneralistWorkers } from "./virtual-agents";
+import { WORKER_STREAM_IDLE_MS, withWorkerChannel } from "./workers/worker-channel";
 import { formatPastSessionsHint } from "./session-recall";
 import { log } from "./log";
 
@@ -146,9 +150,13 @@ export async function* startModalityRun(options: {
   const parsed = parsers[options.modality](options.body as { content?: unknown; stream?: unknown });
   const settings = loadSettings(options.tenant);
   const userParts = settings.injectionGuardBypass === true ? parsed.parts : redactAttachedParts(parsed.parts);
+  // A body that names a `tier` gets its model and Thinking choice from the tier, and the body's own
+  // `thinking` and `reasoningEffort` are never read. A body that names none is `null` and runs as before.
+  const tierRun = resolveTierRun({ body: options.body, modality: options.modality, tenant: options.tenant });
   // `explicit` is what lets the runtime send a model it has never seen no effort at all unless the
   // person picked one; the level alone cannot say that.
-  const { effort: reasoningEffort, explicit: reasoningEffortExplicit } = readReasoningEffortChoice(options.body);
+  const { effort: reasoningEffort, explicit: reasoningEffortExplicit } =
+    tierRun?.reasoning ?? readReasoningEffortChoice(options.body);
   const thinkingEnabled = reasoningEffort !== "none";
   const wire = readOptionalChatWire(options.body);
   const thread = await getThread(options.tenant, options.threadId);
@@ -158,13 +166,21 @@ export async function* startModalityRun(options: {
   const published = await agentService.getPublishedForRun(options.tenant, thread.agentId);
   const catalog = listSelectableModels(options.tenant);
   const defaultChat = isDefaultChatAgent(published.agent);
-  const fallback = defaultChat ? defaultSelectableModel(catalog, options.tenant) : published.version.model;
+  // Tester code: a mode agent's conversation. Its prompt, tools and budget come from the registry in
+  // code, never from the agent row (`./virtual-agents.ts`). Null for Chat and for an agent a person built.
+  const agentPolicy = runPolicyFor(published);
+  // The host picks the model for Chat and for a mode agent; an agent a person built is pinned to its own.
+  const hostPicksModel = defaultChat || agentPolicy != null;
+  const fallback = hostPicksModel ? defaultSelectableModel(catalog, options.tenant) : published.version.model;
   const requestedModel = readOptionalModel(options.body);
-  const model = resolveChatModel(requestedModel, fallback, catalog);
+  const model = tierRun?.model ?? resolveChatModel(requestedModel, fallback, catalog);
   // Only the default Chat agent on the host's own default model may be moved to a stand-in when the
   // gateway cannot reach it. The composer sends `model` on every turn, so a pick is any model other than
   // the default, or one the picker marked `modelPinned`; an agent the owner built is pinned to its model.
-  const modelExplicit = !defaultChat || readModelPinned(options.body) || model !== fallback;
+  // A tier chooses its model on the host side (tester code), so it is never moved to a stand-in either.
+  const modelExplicit = tierRun != null || !hostPicksModel || readModelPinned(options.body) || model !== fallback;
+  // A mode agent is a full chat (owner, 2026-10-09), so it gets what Chat gets: its own earlier
+  // conversations and the desk's Knowledge Base. The egress guard bounds both the same way for both.
   const pastHint = await formatPastSessionsHint(options.tenant, thread.agentId, thread.id);
   const userText = userParts
     .map((part) => (part.type === "text" && typeof part.text === "string" ? part.text : ""))
@@ -182,13 +198,26 @@ export async function* startModalityRun(options: {
   const locale = hostedRequestLocale() ?? loadUserLocale(options.tenant);
   // The model is only told about tools this run offers: a tool that is off (code runs on the hosted
   // server, or turned off in Settings) loses its sentence in the prompt, so it is not invited to call it.
-  const agentPrompt = withoutDisabledToolSentences(published.version.systemPrompt, settings.disabledTools ?? []);
+  // Every virtual agent is also told about the harnesses it can run from its own chat (tester code): a
+  // mode agent's prompt carries that paragraph already, and the default agent's gains it here.
+  const agentPrompt = agentPolicy
+    ? withoutDisabledToolSentences(agentPolicy.systemPrompt, settings.disabledTools ?? [])
+    : withoutDisabledToolSentences(published.version.systemPrompt, settings.disabledTools ?? []) +
+      (defaultChat ? GENERALIST_WORKER_PROMPT : "");
   const version = {
     ...published.version,
     model,
-    systemPrompt: withChatOutputLanguage(agentPrompt + pastHint + knowledge.prompt, locale),
+    // A mode agent has the last word on who is speaking, after the desk's Soul block (`closingPrompt`).
+    systemPrompt: withChatOutputLanguage(
+      agentPrompt + pastHint + knowledge.prompt + (agentPolicy?.closingPrompt ?? ""),
+      locale,
+    ),
   };
-  assertAgentSupportsModality(published.version.inputModalities, options.modality);
+  // A mode agent takes what Chat takes (text, pictures, video), whatever its row was created with.
+  assertAgentSupportsModality(
+    agentPolicy ? [...DEFAULT_CHAT_MODALITIES] : published.version.inputModalities,
+    options.modality,
+  );
   // An image goes to any model not known to be text-only; a model we have no line for is tried, and
   // refused by the gateway in words if it cannot (`chat-image-history.ts`, `image-input.ts`).
   assertChatModelAcceptsModality(version.model, options.modality);
@@ -433,9 +462,26 @@ export async function* startModalityRun(options: {
       // `withRunContext` is thread-scoped; a tool that records an author (a file write) reads the
       // tool-run context, so Chat sets it too, keyed by this turn's run. Without it the author of
       // every file written in a conversation was the thread id.
+      // A worker tool sends its harness's progress here. Each event is also a sign of life: a dossier
+      // spends minutes inside one tool call, and without it the stall guard would end the run.
+      const workerChannel = {
+        emit: (toolKey: string, job: JobEvent) => {
+          if (queueClosed || settled) {
+            return;
+          }
+          stall.touch();
+          // The result travels in `tool.completed`; a harness's own closing events are not for the thread.
+          if (job.type === "job.phase" || job.type === "job.step" || job.type === "job.round") {
+            send({ type: "tool.progress", toolKey, job });
+          }
+        },
+        signal: modelAbort.signal,
+      };
       const inChatRun = <T>(fn: () => Promise<T>): Promise<T> =>
-        withToolRun({ runId: run.id, mode: "chat" }, () =>
-          withRunContext({ threadId: thread.id, agentId: thread.agentId, locale }, fn),
+        withToolRun({ runId: run.id, mode: agentPolicy ? agentPolicy.agent.id : "chat" }, () =>
+          withRunContext({ threadId: thread.id, agentId: thread.agentId, locale }, () =>
+            withWorkerChannel(workerChannel, fn),
+          ),
         );
       const attempt = () => inChatRun(async () => {
         if (options.modality !== "text" && thinkingEnabled && !retried) {
@@ -448,9 +494,22 @@ export async function* startModalityRun(options: {
           runId: run.id,
           modality: options.modality,
           version: activeVersion,
-          bindings: bindingsForChatModality(withPastSessionsBinding(published.bindings), options.modality),
-          // Chat's declared budget is the default agent's; an agent the owner built keeps the runtime's own.
-          ...(defaultChat ? { budget: harnessSpecFor("chat").budget } : {}),
+          bindings: agentPolicy
+            ? bindingsForChatModality(agentPolicy.bindings, options.modality)
+            : bindingsForChatModality(
+                // The default agent can run every wired harness from its own chat, hired or not.
+                defaultChat
+                  ? withGeneralistWorkers(withPastSessionsBinding(published.bindings))
+                  : withPastSessionsBinding(published.bindings),
+                options.modality,
+              ),
+          // The default agent's budget is Chat's declared one plus a ceiling for each worker; a mode
+          // agent's is its own; an agent the owner built keeps the runtime's.
+          ...(agentPolicy
+            ? { budget: agentPolicy.budget }
+            : defaultChat
+              ? { budget: virtualAgentFor("chat").budget }
+              : {}),
           history,
           thinking: thinkingEnabled,
           reasoningEffort,
@@ -458,6 +517,9 @@ export async function* startModalityRun(options: {
           wire,
           locale,
           signal: modelAbort.signal,
+          // A run that binds a worker: the runtime's own stream watchdog must not read a working tool
+          // as a dead stream. The stall guard above keeps the model's budget (`worker-channel.ts`).
+          ...(agentPolicy || defaultChat ? { streamWatchdog: { idleMs: WORKER_STREAM_IDLE_MS } } : {}),
           onEvent: async (event) => {
             stall.touch();
             if (isRunOutputEvent(event)) {

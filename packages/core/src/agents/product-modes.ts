@@ -20,6 +20,14 @@ export const PRODUCT_MODES = [
 
 export type ProductMode = (typeof PRODUCT_MODES)[number]["id"];
 
+/**
+ * Tester code only (`TESTER.md`): which shell the renderer draws. `chat-first` is a rail of virtual
+ * agents, one per harness (`agents/virtual-agents.ts`), with the mode screens off the rail; `modes`
+ * is the published rail of mode screens. One constant, so going back is one word.
+ */
+export type ShellLayout = "chat-first" | "modes";
+export const SHELL_LAYOUT: ShellLayout = "chat-first";
+
 export const PRODUCT_MODE_IDS: ProductMode[] = PRODUCT_MODES.map((mode) => mode.id);
 
 /**

@@ -5,6 +5,7 @@ import type { AppLocale } from "../locale";
 import type { JobMode } from "../models/mode-defaults";
 import type { ReasoningEffort } from "../models/reasoning-effort";
 import type { RunBudget } from "../harness/spec";
+import type { JobEvent } from "../jobs/job-events";
 import type { ChatWire } from "./chat-wire";
 import type { StreamWatchdogLimits } from "./stream-watchdog";
 
@@ -21,6 +22,11 @@ export type RuntimeEvent =
   | { type: "assistant.thinking"; text: string }
   | { type: "tool.started"; toolKey: string; input: unknown }
   | { type: "tool.completed"; toolKey: string; output: unknown }
+  /**
+   * Tester code: one progress event of the harness a worker tool is running (`chat-workers-spec.md`,
+   * section 3). The host sends it, never the runtime. A caller that does not care ignores it.
+   */
+  | { type: "tool.progress"; toolKey: string; job: JobEvent }
   | { type: "run.failed"; message: string }
   /**
    * The tool loop used all `steps` model calls it was allowed and the last one asked for tools, so no

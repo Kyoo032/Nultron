@@ -2,7 +2,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { harnessSpecFor, listChatModels, type AgentRuntime, type TenantContext } from "@agentforge/core";
+import {
+  harnessSpecFor,
+  listChatModels,
+  virtualAgentFor,
+  type AgentRuntime,
+  type TenantContext,
+} from "@agentforge/core";
 import { ROUTER_IMPORT_BUDGET_MS } from "./__fixtures__/test-budgets";
 import type { HostRequest, HostResult } from "./types";
 
@@ -99,10 +105,21 @@ afterAll(async () => {
 });
 
 describe("POST /threads/:id/runs/text and the run budget", () => {
-  it("runs the default Chat agent under the budget Chat's spec declares", async () => {
+  it("runs the default Chat agent under the budget Chat's spec declares, and never a looser one", async () => {
     await postRun(defaultChatThreadId);
     expect(executed).toHaveLength(1);
-    expect(executed[0]?.budget).toBe(harnessSpecFor("chat").budget);
+    // Tester code: the default agent's budget is the registry's (`virtualAgentFor("chat")`): Chat's
+    // declared budget, plus a ceiling for each worker and for paid media. Every number the published
+    // spec declares is still the number the run gets.
+    const budget = executed[0]?.budget;
+    expect(budget).toBe(virtualAgentFor("chat").budget);
+    const declared = harnessSpecFor("chat").budget;
+    expect(budget?.maxSteps).toBe(declared.maxSteps);
+    expect(budget?.maxToolCalls).toBe(declared.maxToolCalls);
+    for (const [toolKey, cap] of Object.entries(declared.perTool ?? {})) {
+      expect(budget?.perTool?.[toolKey], toolKey).toBe(cap);
+    }
+    expect(budget?.perTool).toMatchObject({ research_dossier: 2, image_generate: 4, video_generate: 1 });
   });
 
   it("leaves an agent the owner built on the runtime's default budget", async () => {

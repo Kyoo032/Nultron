@@ -94,17 +94,17 @@ describe("what the registry reads", () => {
     const modes = modesStep();
 
     const listed = modes.body(rail);
-    expect(t(listed.key, listed.vars)).toContain("your 4 tools: Research, Images, Videos, Presentation.");
+    expect(t(listed.key, listed.vars)).toContain("your 4 agents: Research, Images, Videos, Presentation.");
     expect(modes.body(many).key).toBe("guide.steps.modes.bodyMany");
     expect(modes.body(none).key).toBe("guide.steps.modes.bodyNone");
   });
 
-  it("says 'your tool' for one tool, never 'your 1 tools'", () => {
+  it("says 'one more agent' for one, never 'your 1 agents'", () => {
     applyLocale("en");
     const copy = modesStep().body(one);
 
     expect(copy.key).toBe("guide.steps.modes.bodyOne");
-    expect(t(copy.key, copy.vars)).toBe("Chat is home. Below it is your tool: Legal. Pick it to start.");
+    expect(t(copy.key, copy.vars)).toBe("Your assistant is at the top. Below it is one more agent: Legal. Pick it to start.");
   });
 
   it("offers only the tools the desk does not have, three examples at most, and never one it already has", () => {
@@ -123,7 +123,7 @@ describe("what the registry reads", () => {
     // A desk that has everything (the hosted first desk) is not offered what it already shows.
     const all = workspaces.body(everything);
     expect(all.key).toBe("guide.steps.workspaces.bodyAll");
-    expect(t(all.key, all.vars)).toContain("Every tool is already on this desk");
+    expect(t(all.key, all.vars)).toContain("Every agent is already on this desk");
     expect(t(all.key, all.vars)).not.toContain("Documents");
   });
 

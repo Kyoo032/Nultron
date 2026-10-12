@@ -10,6 +10,7 @@ import {
   routeDecision,
   type AttachmentKind,
 } from "@/lib/composer-attach";
+import { TierPicker } from "@/components/tier-picker";
 import { CHAT_DOCUMENTS_PER_MESSAGE } from "@agentforge/core/chat-documents";
 import { ComposerAttachmentChip } from "@/components/composer-attachment-chip";
 import {
@@ -22,12 +23,13 @@ import {
   type DocumentRead,
 } from "@/lib/composer-documents";
 import { useDocumentReads } from "@/lib/use-document-reads";
-import { ModelPicker, type ChatModel } from "@/components/model-picker";
 import { EnhancePromptButton } from "@/components/enhance-prompt-button";
+import { ComposerPlusMenu } from "@/components/composer-plus-menu";
 import { apiFetch } from "@/lib/api-client";
 import { abortErrorMessage, armStreamWatchdog } from "@agentforge/core/stream-watchdog";
-import { REASONING_EFFORTS, type ReasoningEffort } from "@agentforge/core/reasoning-effort";
-import { thinkingRequestFields } from "@/lib/chat-thinking";
+import { DEFAULT_MODEL_TIER, type ModelTierId } from "@agentforge/core/tiers";
+import { buildChatRunBody, tierErrorMessage } from "@/lib/chat-tier-body";
+import { tierStreamLimits, type ChatTierInfo } from "@/lib/chat-tier-pref";
 import { submitOnEnter } from "@/lib/composer-enter";
 import { getLocale, t } from "@/lib/i18n";
 import { readComposerDraft, writeComposerDraft } from "@/lib/composer-draft";
@@ -39,6 +41,7 @@ import type { ModelFallbackNotice } from "@/components/chat-model-fallback-notic
 import { imageRefusalMessage } from "@/lib/composer-image-support";
 import { gatewayBlockedMessage, hostedGatewayBlocked } from "@/lib/gateway-blocked";
 import { hostedKeyBlock, useDeskNeedsKey } from "@/lib/use-desk-needs-key";
+import "@/components/composer-bare.css";
 
 export type ComposerUserSendPayload = {
   text: string;
@@ -49,10 +52,11 @@ type Props = {
   threadId: string | null;
   onEnsureThread?: () => Promise<string>;
   modalities: string[];
-  model?: string;
-  models?: ChatModel[];
-  onModelChange?: (id: string) => void;
-  modelDisabled?: boolean;
+  /** The choice a send carries: Daily, Fastest or Reasoning. The host turns it into a model; this never sees one. */
+  tier?: ModelTierId;
+  /** The three choices as the host reports them, for the picker. */
+  tiers?: readonly ChatTierInfo[];
+  onTierChange?: (tier: ModelTierId) => void;
   onUserSend?: (payload: ComposerUserSendPayload) => void;
   onStarted?: () => void;
   onDelta: (text: string) => void;
@@ -72,20 +76,13 @@ type Props = {
    * stream still runs to the end, so the host keeps the reply — and it no longer holds Send.
    */
   sessionKey?: string | number;
-  thinkingEnabled?: boolean;
-  onThinkingChange?: (enabled: boolean) => void;
-  /** The level the Thinking picker shows. */
-  reasoningEffort?: ReasoningEffort;
-  /**
-   * Did the person pick that level? Only a picked level is sent (`thinkingRequestFields`); an untouched
-   * picker sends none, so the host can tell a choice from a default. A parent that does not say is
-   * read as "yes", so a picker nobody wired this up for still sends what it shows.
-   */
-  reasoningEffortChosen?: boolean;
-  onReasoningEffortChange?: (effort: ReasoningEffort) => void;
   /** A prompt seeded from outside (the empty screen's suggestions). Applied once, then cleared. */
   draft?: string | null;
   onDraftApplied?: () => void;
+  /** The message box placeholder. Defaults to the Chat line; an agent passes its own ("Message {name}"). */
+  placeholder?: string;
+  /** A tool the run is driving reported a progress line (the stream's `tool.progress` events that carry a label). */
+  onToolProgress?: (event: { toolKey: string; label: string }) => void;
 };
 
 type HeldFile = {
@@ -137,11 +134,28 @@ export type RunStreamHandlers = {
     output?: unknown;
   }) => void;
   readonly onFailed?: (message: string) => void;
+  /** A tool the run is driving said what it is doing (`tool.progress` with a phase, step or round label). */
+  readonly onToolProgress?: (event: { toolKey: string; label: string }) => void;
   /** The host answered with a stand-in model (`run.model_fallback`): the model asked for, and the one that answered. */
   readonly onModelFallback?: (notice: ModelFallbackNotice) => void;
   /** The host said the run is over (`run.completed`). The stream may stay open a little longer while it saves. */
   readonly onCompleted?: () => void;
 };
+
+/** The labelled kinds of job event a tool reports as progress; deltas and sources carry no line to show. */
+const PROGRESS_JOB_TYPES = new Set(["job.phase", "job.step", "job.round"]);
+
+/** The line of a `tool.progress` event, or null. Read defensively: the SSE reader passes the payload through untyped. */
+function toolProgressLine(event: { type: string; toolKey?: string }): { toolKey: string; label: string } | null {
+  const job = (event as { job?: { type?: unknown; label?: unknown } }).job;
+  if (event.type !== "tool.progress" || typeof event.toolKey !== "string" || !job) {
+    return null;
+  }
+  if (typeof job.type !== "string" || !PROGRESS_JOB_TYPES.has(job.type)) {
+    return null;
+  }
+  return typeof job.label === "string" && job.label.trim() ? { toolKey: event.toolKey, label: job.label } : null;
+}
 
 /** How a run ended, for `onComplete`. */
 export type RunEnd = {
@@ -203,6 +217,10 @@ export async function readRunStream(
       if (event.type === "tool.completed" && event.toolKey) {
         handlers.onTool?.({ phase: "completed", toolKey: event.toolKey, output: event.output });
       }
+      const progress = toolProgressLine(event);
+      if (progress) {
+        handlers.onToolProgress?.(progress);
+      }
       if (event.type === "run.model_fallback" && event.from && event.to) {
         handlers.onModelFallback?.({ from: event.from, to: event.to, message: event.message ?? "" });
       }
@@ -220,10 +238,9 @@ export function ChatComposer({
   threadId,
   onEnsureThread,
   modalities,
-  model,
-  models,
-  onModelChange,
-  modelDisabled,
+  tier = DEFAULT_MODEL_TIER,
+  tiers,
+  onTierChange,
   onUserSend,
   onStarted,
   onDelta,
@@ -233,14 +250,11 @@ export function ChatComposer({
   onModelFallback,
   onComplete,
   onSettled,
-  thinkingEnabled = true,
-  onThinkingChange,
-  reasoningEffort = "medium",
-  reasoningEffortChosen = true,
-  onReasoningEffortChange,
   draft,
   onDraftApplied,
   sessionKey,
+  placeholder,
+  onToolProgress,
 }: Props) {
   const { id: workspaceId } = useWorkspaceScope();
   // Restored from outside the keep-alive key so a desk-id remount (boot → real id) and a
@@ -281,11 +295,11 @@ export function ChatComposer({
     setBusy(false);
     setError(null);
   }
-  const [shownModel, setShownModel] = useState(model);
-  if (shownModel !== model) {
-    // The sentence under the box may be the refusal written for the model that was picked ("cannot read
-    // images"). Choosing another, from the picker or the button under the attachment, makes it stale.
-    setShownModel(model);
+  const [shownTier, setShownTier] = useState(tier);
+  if (shownTier !== tier) {
+    // The sentence under the box may be the refusal written for the tier that was picked ("cannot read
+    // images"). Choosing another makes it stale.
+    setShownTier(tier);
     setError(null);
   }
 
@@ -298,8 +312,7 @@ export function ChatComposer({
   // the desk before adding a key. It gives the note below a Settings link, and keeps the refused
   // send's own sentence from printing next to it. Always false on the Personal app.
   const keyBlocked = hostedKeyBlock(needsKey);
-  const pickerModels = models ?? [];
-  const showPicker = typeof onModelChange === "function";
+  const showPicker = typeof onTierChange === "function";
   const sendEmpty = !text.trim() && files.length === 0;
   // A document still being read, or one that failed, holds Send: sending now would drop it silently.
   const documentsHoldSend = documentsBlockSend(files);
@@ -422,6 +435,7 @@ export function ChatComposer({
       onDelta,
       onThinking,
       onTool,
+      onToolProgress,
       onFailed: (message) => {
         if (!isCurrentRun()) {
           return;
@@ -458,7 +472,7 @@ export function ChatComposer({
       }
 
       if (decision.route === "image" && !modalities.includes("image")) {
-        setError(imageRefusalMessage(model, pickerModels));
+        setError(imageRefusalMessage(undefined, []));
         setBusy(false);
         return;
       }
@@ -503,7 +517,10 @@ export function ChatComposer({
       }
 
       const abort = new AbortController();
-      const dog = armStreamWatchdog(model ?? "this model", abort, undefined, Date.now, getLocale());
+      // A stall reads "No first token from Reasoning ...": the tier's label, because the renderer is
+      // never told which model answered. The budget is the tier's (`tierStreamLimits`), not a model's.
+      const tierLabel = t(`chat.tiers.${tier}.label`);
+      const dog = armStreamWatchdog(tierLabel, abort, tierStreamLimits(tier), Date.now, getLocale());
       try {
         if (decision.route === "text") {
           if (!showing()) {
@@ -524,20 +541,17 @@ export function ChatComposer({
           const response = await apiFetch(`/api/v1/threads/${id}/runs/text`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              content: outgoing,
-              model,
-              ...thinkingRequestFields(reasoningEffort, reasoningEffortChosen),
-            }),
+            body: JSON.stringify(buildChatRunBody(outgoing, tier)),
             signal: abort.signal,
           });
           if (!response.ok) {
             const payload = await response.json().catch(() => null);
-            // Hosted only: a 403 gateway_blocked is "no usable key", said calmly, not a failed run.
+            // Hosted only: a 403 gateway_blocked is "no usable key", said calmly, not a failed run. A refused
+            // tier (503 tier_unavailable) is said in the catalog's words, never the host's, which can name a model.
             fail(
               hostedGatewayBlocked(payload)
                 ? gatewayBlockedMessage()
-                : (payload?.error?.message ?? t("chat.error.runFailed")),
+                : (tierErrorMessage(payload) ?? payload?.error?.message ?? t("chat.error.runFailed")),
             );
             await finish();
             return;
@@ -595,16 +609,12 @@ export function ChatComposer({
         const response = await apiFetch(`/api/v1/threads/${id}/runs/${decision.route}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            content: parts,
-            model,
-            ...thinkingRequestFields(reasoningEffort, reasoningEffortChosen),
-          }),
+          body: JSON.stringify(buildChatRunBody(parts, tier)),
           signal: abort.signal,
         });
         if (!response.ok) {
           const payload = await response.json().catch(() => null);
-          fail(payload?.error?.message ?? t("chat.error.runFailed"));
+          fail(tierErrorMessage(payload) ?? payload?.error?.message ?? t("chat.error.runFailed"));
           await finish();
           return;
         }
@@ -627,46 +637,68 @@ export function ChatComposer({
     }
   }
 
+  const sendLabel = busy ? t("agents.composer.sending") : t("agents.composer.send");
+
   return (
     <form
-      className={`composer-shell shrink-0 rounded-2xl border border-[var(--line)] bg-transparent px-3 pb-3 pt-2${busy ? " composer-sending" : ""}`}
+      className={`composer-shell composer-bare shrink-0${busy ? " composer-sending" : ""}`}
       data-testid="composer"
+      // The whole bar takes a dropped file and shows the accent ring while one is over it (`composer-bare.css`).
+      data-dragover={dragOver ? "true" : undefined}
       onSubmit={(event) => {
         event.preventDefault();
         void send();
       }}
-    >
-      <div
-        className={`rounded-xl border border-dashed px-2 py-1 ${
-          dragOver ? "border-[var(--accent)] bg-[var(--accent-soft)]" : "border-[var(--line)]"
-        }`}
-        data-testid="composer-dropzone"
-        onDragEnter={(event) => {
-          event.preventDefault();
-          dragDepth.current += 1;
-          setDragOver(true);
-        }}
-        onDragOver={(event) => event.preventDefault()}
-        onDragLeave={(event) => {
-          event.preventDefault();
-          dragDepth.current -= 1;
-          if (dragDepth.current <= 0) {
-            dragDepth.current = 0;
-            setDragOver(false);
-          }
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
+      onDragEnter={(event) => {
+        event.preventDefault();
+        dragDepth.current += 1;
+        setDragOver(true);
+      }}
+      onDragOver={(event) => event.preventDefault()}
+      onDragLeave={(event) => {
+        event.preventDefault();
+        dragDepth.current -= 1;
+        if (dragDepth.current <= 0) {
           dragDepth.current = 0;
           setDragOver(false);
-          addFiles(event.dataTransfer.files);
-        }}
-      >
+        }
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        dragDepth.current = 0;
+        setDragOver(false);
+        addFiles(event.dataTransfer.files);
+      }}
+    >
+      <div className="composer-bare-row" data-testid="composer-dropzone">
+        {/*
+          Everything the toolbar used to hold lives under the plus: Add files, Enhance and, when the pane
+          offers a choice, the tier picker. The rows stay mounted while the menu is closed, so Enhance keeps
+          the prompt it can revert.
+        */}
+        <ComposerPlusMenu disabled={busy} onAddFiles={() => fileInputRef.current?.click()}>
+          <EnhancePromptButton
+            text={text}
+            surface="chat"
+            disabled={busy}
+            onApply={setText}
+            onBusyChange={setEnhancing}
+          />
+          {showPicker ? (
+            <TierPicker
+              tiers={tiers ?? []}
+              value={tier}
+              onChange={onTierChange}
+              disabled={busy}
+              returnFocusRef={textAreaRef}
+            />
+          ) : null}
+        </ComposerPlusMenu>
         <textarea
           ref={textAreaRef}
-          className="composer-text w-full resize-none border-0 bg-transparent px-1 py-2 text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-3)]"
-          style={{ outline: "none" }}
-          placeholder={t("chat.composer.placeholder")}
+          className="composer-text composer-bare-text"
+          rows={1}
+          placeholder={placeholder ?? t("chat.composer.placeholder")}
           value={text}
           onChange={(event) => {
             setText(event.target.value);
@@ -687,23 +719,38 @@ export function ChatComposer({
           }}
           data-testid="composer-text"
         />
-        {/*
-          The dropzone used to carry two more instruction lines under the
-          textarea — "Drop files or browse…" and the size caps — directly above a
-          placeholder that already says the same thing, which is what made the
-          box read as three competing prompts. It is one line now, the
-          placeholder, and the file types are enforced rather than advertised.
-          The size caps still surface when a file is actually refused
-          (`composer-error`), so nothing is lost but the noise (owner report
-          2026-09-23).
-        */}
+        <button
+          type="submit"
+          className={
+            sendDisabled
+              ? "composer-send inline-flex shrink-0 items-center justify-center rounded-pill bg-[var(--line)] text-[var(--text-3)]"
+              : "composer-send btn btn-primary shrink-0 !rounded-pill"
+          }
+          disabled={sendDisabled}
+          aria-label={sendLabel}
+          title={needsKey ? t("chat.composer.needsKey") : sendLabel}
+          data-testid="composer-send"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 19V5M5 12l7-7 7 7" />
+          </svg>
+        </button>
+        {/* The Add files row clicks this. Kept out of the tab order: it is a 1px control with no name. */}
         <input
           ref={fileInputRef}
           className="sr-only"
           type="file"
           multiple
-          // The Attach button opens this. Left in the tab order it was a 1px control with no name
-          // between the message box and the toolbar (found by tabbing, 2026-09-29).
           tabIndex={-1}
           aria-hidden="true"
           accept={COMPOSER_FILE_ACCEPT}
@@ -711,154 +758,21 @@ export function ChatComposer({
           data-testid="composer-file"
         />
       </div>
-      {files.length > 0 ? (
-        <ul className="mt-3 flex flex-wrap gap-2" data-testid="composer-attachments">
-          {files.map((item) => (
-            <ComposerAttachmentChip key={item.id} item={item} onRemove={removeFile} onRetry={retryRead} />
-          ))}
-        </ul>
-      ) : null}
-      <ComposerAttachmentNotes
-        kinds={files.map((item) => item.kind)}
-        model={model}
-        models={pickerModels}
-        onSwitch={showPicker ? onModelChange : undefined}
-      />
-      {error && !(keyBlocked && error === gatewayBlockedMessage()) ? (
-        <p className="mt-2 text-sm text-[var(--danger)]" data-testid="composer-error" role="alert">
-          {error}
-        </p>
-      ) : null}
-      {/*
-        Layout is `.composer-toolbar` in globals.css, chosen by the composer's own width (a
-        container query on `.composer-shell`), not the viewport: one row when wide, controls above an
-        attach/send row when medium, and the same two rows with compact chips when narrow. The class
-        hooks below (`composer-attach`, `composer-controls`, `composer-send`, `composer-needs-key`)
-        are the grid areas — do not put layout utilities back on these elements.
-      */}
-      <div className="composer-toolbar" data-testid="composer-toolbar">
-        <button
-          type="button"
-          className="composer-attach btn btn-ghost btn-icon shrink-0 !rounded-pill wash"
-          data-testid="composer-attach"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={busy}
-          aria-label={t("chat.composer.attach")}
-          title={t("chat.composer.attach")}
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M21.4 11.05 12.25 20.2a5 5 0 0 1-7.07-7.07l9.19-9.19a3 3 0 0 1 4.24 4.24l-9.2 9.19a1 1 0 0 1-1.41-1.41l8.48-8.49" />
-          </svg>
-        </button>
-        <div className="composer-controls">
-          {showPicker ? (
-            <ModelPicker
-              models={pickerModels}
-              value={model ?? ""}
-              onChange={onModelChange}
-              disabled={modelDisabled || busy}
-              returnFocusRef={textAreaRef}
-            />
-          ) : null}
-          {/*
-            One bordered control, like the model picker beside it (owner ruling 2026-09-23).
-            The label and the value used to be two framed things — a bordered `label` wrapping
-            a bordered `select` — which read as a box inside a box however the padding was
-            tuned. It is a single select now, showing just the level ("Normal").
-          */}
-          {onReasoningEffortChange || onThinkingChange ? (
-            <label className="composer-thinking rounded-pill border border-[var(--line)] bg-transparent text-xs text-[var(--text)]">
-              {/* Narrow: the icon stands in for the word, which stays in the tree as the label. */}
-              <svg
-                className="composer-thinking-icon"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M9 18h6M10 21h4" />
-                <path d="M12 3a6 6 0 0 0-3.6 10.8c.6.5 1.1 1.2 1.1 2.2h5c0-1 .5-1.7 1.1-2.2A6 6 0 0 0 12 3Z" />
-              </svg>
-              <span className="composer-thinking-word" data-testid="reasoning-effort-label">
-                {t("chat.composer.thinkingPrefix")}
-              </span>
-              <select
-                className="cursor-pointer border-0 bg-transparent text-xs text-[var(--text)] outline-none disabled:cursor-not-allowed disabled:opacity-45"
-                data-testid="reasoning-effort"
-                aria-label={t("chat.composer.thinkingPrefix")}
-                value={reasoningEffort}
-                disabled={busy}
-                onChange={(event) => {
-                  const next = event.target.value as ReasoningEffort;
-                  onReasoningEffortChange?.(next);
-                  onThinkingChange?.(next !== "none");
-                }}
-              >
-                {REASONING_EFFORTS.map((effort) => (
-                  <option key={effort} value={effort}>
-                    {t(`chat.thinking.${effort}`)}
-                  </option>
-                ))}
-              </select>
-              {/*
-                The select's own arrow is off (`appearance: none`), because Chrome paints it at the
-                select's edge and ignores padding. This chevron replaces it, placed by the pill's
-                CSS and out of the click path, so a tap on it opens the select underneath.
-              */}
-              <svg
-                className="composer-thinking-chevron"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="m4 9 8 8 8-8" />
-              </svg>
-            </label>
-          ) : null}
-          <EnhancePromptButton
-            text={text}
-            surface="chat"
-            model={model}
-            disabled={busy}
-            pill
-            onApply={setText}
-            onBusyChange={setEnhancing}
-          />
-        </div>
-        <button
-          type="submit"
-          className={
-            sendDisabled
-              ? "composer-send inline-flex shrink-0 items-center rounded-pill bg-[var(--line)] px-4 text-sm text-[var(--text-3)]"
-              : "composer-send btn btn-primary shrink-0 !rounded-pill px-4 text-sm"
-          }
-          disabled={sendDisabled}
-          title={needsKey ? t("chat.composer.needsKey") : undefined}
-          data-testid="composer-send"
-        >
-          {busy ? t("chat.composer.sending") : t("chat.composer.send")}
-        </button>
+      {/* Chips, the notes on them, the refusal sentence and the needs-key line sit under the bar's row. */}
+      <div className="composer-bare-under">
+        {files.length > 0 ? (
+          <ul className="flex flex-wrap gap-2" data-testid="composer-attachments">
+            {files.map((item) => (
+              <ComposerAttachmentChip key={item.id} item={item} onRemove={removeFile} onRetry={retryRead} />
+            ))}
+          </ul>
+        ) : null}
+        <ComposerAttachmentNotes kinds={files.map((item) => item.kind)} model={undefined} models={[]} />
+        {error && !(keyBlocked && error === gatewayBlockedMessage()) ? (
+          <p className="text-sm text-[var(--danger)]" data-testid="composer-error" role="alert">
+            {error}
+          </p>
+        ) : null}
         {keyBlocked ? (
           <NeedsKeyNote testId="composer-needs-key" className="composer-needs-key text-xs text-[var(--text-3)]" />
         ) : needsKey ? (

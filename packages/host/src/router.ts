@@ -63,6 +63,7 @@ import {
   handlePostBillingWebhook,
 } from "./handlers/billing";
 import { handleGetChat } from "./handlers/chat";
+import { handleGetVirtualAgents } from "./handlers/virtual-agents";
 import { handlePostChatDocument } from "./chat-documents/handler";
 import { handlePostChatDocumentSave } from "./chat-documents/save-handler";
 import { handleGetHealth } from "./handlers/health";
@@ -337,6 +338,8 @@ const routes: Route[] = [
   compile("GET", "/api/v1/components", handleGetComponents),
   compile("POST", "/api/v1/components/install/stream", handlePostComponentInstallStream),
   compile("GET", "/api/v1/chat", handleGetChat),
+  // Tester code: the desk's virtual agents. Reads the desk and its agent rows; no gateway call.
+  compile("GET", "/api/v1/virtual-agents", handleGetVirtualAgents),
   // One attached document, read on this machine. No gateway call, so no gate (maps/chat-documents.md).
   compile("POST", "/api/v1/chat/documents", handlePostChatDocument),
   compile("POST", "/api/v1/chat/documents/save", handlePostChatDocumentSave),

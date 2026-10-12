@@ -3,6 +3,7 @@ import {
   hostCapabilities,
   listToolRoutes,
   listTools,
+  resolvedAssistantName,
   resolvedGatewayBaseUrl,
   resolvedGatewayName,
   resolvedProductName,
@@ -103,6 +104,8 @@ export async function handlePing(): Promise<HostResult> {
     ok: true,
     transport: "host",
     productName: resolvedProductName(),
+    // Tester code: the default virtual agent's name, which is the brand's character.
+    assistantName: resolvedAssistantName(),
     gatewayName: resolvedGatewayName(),
     gatewayBaseUrl: resolvedGatewayBaseUrl(),
     capabilities: hostCapabilities(),

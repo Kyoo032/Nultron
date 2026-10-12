@@ -26,6 +26,10 @@ import enVideos from "../locales/en/videos.json";
 import enWorkspaces from "../locales/en/workspaces.json";
 import enFiles from "../locales/en/files.json";
 import enFolder from "../locales/en/folder.json";
+import enAgents from "../locales/en/agents.json";
+import enHarness from "../locales/en/harness.json";
+import idAgents from "../locales/id/agents.json";
+import idHarness from "../locales/id/harness.json";
 import idAuth from "../locales/id/auth.json";
 import idChannels from "../locales/id/channels.json";
 import idChat from "../locales/id/chat.json";
@@ -82,6 +86,9 @@ const NAMESPACES = [
   "meeting",
   "auth",
   "guide",
+  // Tester code: the virtual agents shell (`agents`) and what an agent is made of (`harness`).
+  "agents",
+  "harness",
 ] as const;
 type Namespace = (typeof NAMESPACES)[number];
 type MessageTree = { [key: string]: string | MessageTree };
@@ -115,6 +122,8 @@ const catalogs: Record<AppLocale, Record<Namespace, MessageTree>> = {
     meeting: enMeeting,
     auth: enAuth,
     guide: enGuide,
+    agents: enAgents,
+    harness: enHarness,
   },
   id: {
     common: idCommon,
@@ -144,6 +153,8 @@ const catalogs: Record<AppLocale, Record<Namespace, MessageTree>> = {
     meeting: idMeeting,
     auth: idAuth,
     guide: idGuide,
+    agents: idAgents,
+    harness: idHarness,
   },
 };
 

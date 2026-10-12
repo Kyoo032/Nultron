@@ -96,9 +96,10 @@ describe("model picker popover", () => {
     expect(source).not.toContain("relative min-w-0 max-w-[9rem] shrink");
   });
 
-  it("lets the composer toolbar wrap instead of clipping its left group", () => {
-    // The group is `.composer-controls`. Its wrapping and its lack of a clip are in the CSS now.
-    expect(composer).toContain('className="composer-controls"');
+  it("lets the legacy toolbar group wrap instead of clipping, and keeps the picker out of it in the bare composer", () => {
+    // The group is `.composer-controls`. Its wrapping and its lack of a clip are in the CSS now. The bare
+    // composer no longer draws it: the picker is a row of the `+` menu (`composer-bare.css`).
+    expect(composer).not.toContain('className="composer-controls"');
     const group = cssRule(".composer-controls");
     expect(group).toContain("flex-wrap: wrap");
     expect(group).not.toContain("overflow");

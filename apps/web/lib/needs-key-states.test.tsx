@@ -86,10 +86,9 @@ function composer(): ReactElement {
     <ChatComposer
       threadId={null}
       modalities={["text"]}
-      model="model-a"
-      models={[{ id: "model-a", label: "Model A", inputModalities: ["text"] }]}
-      onModelChange={() => {}}
-      onReasoningEffortChange={() => {}}
+      tier="daily"
+      tiers={[{ id: "daily", available: true, inputModalities: ["text"], contextLength: null }]}
+      onTierChange={() => {}}
       onDelta={() => {}}
       onComplete={() => {}}
     />
@@ -122,7 +121,9 @@ describe("hosted, the host reports a closed gate", () => {
     expect(anchor(html, "composer-needs-key-settings")).toContain('href="/settings"');
     expect(html).toContain(t("rail.settings"));
     // Send is quiet and says why in its tooltip.
-    expect(html).toMatch(/<button[^>]*disabled=""[^>]*data-testid="composer-send"|data-testid="composer-send"[^>]*disabled=""/);
+    expect(html).toMatch(
+      /<button[^>]*disabled=""[^>]*data-testid="composer-send"|data-testid="composer-send"[^>]*disabled=""/,
+    );
   });
 
   it("Chat's key pill asks for a key, not 'Signed in · Ready', even for a signed-in session", () => {

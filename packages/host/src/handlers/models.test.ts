@@ -103,6 +103,16 @@ describe("GET /api/v1/models sends the catalogue once", () => {
     expect(typeof body.defaultModel).toBe("string");
   });
 
+  it("carries the model tiers beside the catalogue and takes nothing away", async () => {
+    const { body } = await json("GET", "/api/v1/models");
+    expect((body.tiers as Array<{ id: string }>).map((tier) => tier.id)).toEqual(["daily", "fast", "reasoning"]);
+    expect(body.defaultTier).toBe("daily");
+    expect(Array.isArray(body.models)).toBe(true);
+    expect(typeof body.defaultModel).toBe("string");
+    expect(body).toHaveProperty("defaults");
+    expect(body).toHaveProperty("modes");
+  });
+
   it("answers a refresh with the same shape plus the probe summary", async () => {
     // No key: a stub desk never calls the gateway; only the models.dev registry refresh runs, and it
     // must not reach the network from a test.

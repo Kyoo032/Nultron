@@ -1,0 +1,188 @@
+{
+  "skills": {
+    "chat": {
+      "answer-this-turn": "Answer this turn",
+      "ground-in-desk": "Use your desk, only offered sources",
+      "say-the-result": "Do small jobs and say the result",
+      "look-not-make": "Look at attachments, refuse the wrong kind",
+      "keep-the-turn": "Keep the turn where you can find it"
+    },
+    "documents": {
+      "draft-sections": "Draft the sections",
+      "stay-inside-source": "Stay inside the source",
+      "rewrite-one-section": "Rewrite one section",
+      "preview-and-download": "Preview and download",
+      "check-against-source": "Check the draft against the source"
+    },
+    "research": {
+      "plan-queries": "Plan the queries",
+      "search": "Search the web",
+      "read-pages": "Read the pages",
+      "verbatim-passages": "Pull verbatim passages",
+      "write-dossier": "Write the dossier"
+    },
+    "finance": {
+      "financial-brief": "Financial brief",
+      "cash-flow": "Cash flow and runway",
+      "budget-versus-actual": "Budget versus actual",
+      "investment-appraisal": "Investment appraisal",
+      "ratio-health": "Ratio health check"
+    },
+    "data": {
+      "take-table": "Take the table in",
+      "private-database": "Load a private database",
+      "query-do-not-guess": "Query, never guess",
+      "show-evidence": "Show the evidence",
+      "follow-up": "Answer follow-ups"
+    },
+    "market": {
+      "build-packet": "Build the data packet",
+      "write-briefing": "Write one desk's briefing",
+      "run-team": "Run the team",
+      "rewrite-section": "Rewrite one section",
+      "export-briefing": "Export the briefing"
+    },
+    "legal": {
+      "open-matter": "Open the matter",
+      "diff-prior-turn": "Compare with the last version",
+      "review-playbook": "Review against the playbook",
+      "verify-then-edit": "Verify, then edit",
+      "deliver-set": "Deliver the set"
+    },
+    "meeting": {
+      "capture-meeting": "Capture the meeting",
+      "transcribe": "Transcribe",
+      "write-minutes": "Write the minutes",
+      "guard-names": "Guard the names",
+      "translate-minutes": "Translate the minutes"
+    },
+    "images": {
+      "write-brief": "Write the brief",
+      "choose-frame": "Choose the frame",
+      "generate-still": "Make one still and keep it",
+      "retry-unsent": "Try once more if the call never left",
+      "estimate-and-tighten": "Estimate the cost, tighten the prompt"
+    },
+    "videos": {
+      "write-shot": "Write the shot",
+      "start-from-still": "Start from a still",
+      "estimate-and-tighten": "Estimate the cost, tighten the prompt",
+      "render-retry": "Render once more if the job dies",
+      "keep-clip": "Keep the clip at the billed length"
+    },
+    "music": {
+      "hear-sentence": "Hear one sentence",
+      "desk-language": "Write the words in your language",
+      "shape-lyric": "Shape a lyric you can sing",
+      "name-song": "Name the song",
+      "both-takes": "Bring both takes home"
+    },
+    "edit": {
+      "lift-dead-air": "Lift the dead air",
+      "cut-on-shots": "Cut where the picture changes",
+      "words-on-picture": "Put the words on the picture",
+      "place-made-shot": "Place a made shot",
+      "hand-back-file": "Hand back the file"
+    },
+    "presentations": {
+      "generate-outline": "Generate the outline",
+      "rewrite-one-slide": "Rewrite one slide",
+      "download-pptx": "Download the PPTX",
+      "edit-text": "Edit text",
+      "add-shapes": "Add shapes"
+    },
+    "education": {
+      "teaching-deck": "Teaching deck",
+      "edit-text-and-shapes": "Edit text, add shapes",
+      "exam-from-knowledge": "Exam from the knowledge base",
+      "book-reader": "Book reader with local OCR",
+      "video-presenter": "Video presenter"
+    }
+  },
+  "tools": {
+    "calculator": "Calculator",
+    "datetime": "Date and time",
+    "web_search": "Web search",
+    "web_fetch": "Read a web page",
+    "image_generate": "Make an image",
+    "video_generate": "Make a video clip",
+    "past_sessions": "Earlier chats",
+    "knowledge_search": "Search the Knowledge Base",
+    "list_files": "List desk files",
+    "read_file": "Read a file",
+    "write_file": "Write a file",
+    "edit_file": "Edit a file",
+    "search_files": "Search files",
+    "delete_file": "Delete a file",
+    "run_code": "Run code in a sandbox",
+    "self_check": "Self check",
+    "build_deck": "Build a slide deck",
+    "research_dossier": "Research dossier",
+    "run_sql": "Run a SQL query",
+    "market_quotes": "Live quotes",
+    "market_history": "Price history",
+    "market_technical": "Technical indicators",
+    "market_macro": "Macro data",
+    "market_news": "Market news",
+    "get_project": "Read the project",
+    "list_clips": "List clips",
+    "probe_asset": "Inspect a media file",
+    "list_ingredients": "List ingredients",
+    "detect_silence": "Find silence",
+    "detect_scenes": "Find scene changes",
+    "transcribe": "Transcribe audio",
+    "split_clip": "Split a clip",
+    "trim_clip": "Trim a clip",
+    "move_clip": "Move a clip",
+    "delete_clips": "Delete clips",
+    "remove_silence": "Remove silence",
+    "split_at_scenes": "Split at scene changes",
+    "add_title": "Add a title",
+    "add_caption": "Add captions",
+    "reframe": "Reframe the picture",
+    "set_clip_volume": "Set clip volume",
+    "clear_timeline": "Clear the timeline",
+    "propose_plan": "Propose a plan",
+    "cancel_job": "Cancel a job",
+    "generate_image": "Make an image",
+    "generate_video": "Make a video clip",
+    "regenerate_clip": "Make a clip again",
+    "variations": "Make variations",
+    "extend_clip": "Extend a clip",
+    "generate_storyboard": "Make a storyboard",
+    "animate_storyboard": "Animate a storyboard",
+    "match_look": "Match a look",
+    "propose_alt_cut": "Propose another cut",
+    "run_recipe": "Run a recipe",
+    "export": "Export the video"
+  },
+  "loop": {
+    "agent": "It decides which tools to call, inside its limits.",
+    "pipeline": "The app runs fixed stages, and the model only writes.",
+    "media": "It calls a generation model directly.",
+    "none": "It works on your files without calling a model."
+  },
+  "panel": {
+    "title": "How {name} works",
+    "skills": "Skills",
+    "tools": "Tools",
+    "noTools": "No tools to call: the app does the work in fixed stages.",
+    "limits": "Limits",
+    "steps": "{n} model steps a turn",
+    "stepsOne": "1 model step a turn",
+    "calls": "{n} tool calls a turn",
+    "callsOne": "1 tool call a turn",
+    "checks": "Checks",
+    "repair": "{n} repair rounds before it stops",
+    "repairOne": "1 repair round before it stops",
+    "noRepair": "Checks report; nothing is repaired automatically.",
+    "enforced": "The app enforces these tools and limits on every run of this chat. A prompt cannot change them.",
+    "close": "Close",
+    "statusNew": "New",
+    "statusOff": "Not offered",
+    "inChat": "In this chat",
+    "ownHarness": "The {name} harness",
+    "runsInChat": "Runs in this chat, with its checks.",
+    "runsInStudio": "Runs in the {name} studio. In this chat the work is done with the tools above, without these checks."
+  }
+}

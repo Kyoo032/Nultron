@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { isRenderableImageUrl, isRenderableVideoUrl } from "@/lib/composer-attach";
 import { mediaSrc } from "@/lib/api-client";
 import { FormattedText } from "@/components/formatted-text";
@@ -13,16 +14,21 @@ import { useHoldOnMount } from "@/lib/use-hold-on-mount";
 import { fileCardDetail, jobEmbedsFromTools, splitUserFileBlocks } from "@/lib/message-embeds";
 import { collectToolMediaParts } from "@/lib/tool-media";
 import { DeckCards } from "@/components/chat-deck-card";
+import { DossierCards } from "@/components/chat-dossier-card";
+import "@/components/chat-turn-bubbles.css";
 import { ToolRowBody, isRichTool } from "@/components/tool-rows/tool-row";
 import { showsToolSpinner, toolActivityLabel, toolCallSummary } from "@/lib/tool-labels";
 import type { ContentPart, ToolCallPart } from "@agentforge/core/content";
 import { t } from "@/lib/i18n";
+import { SHELL_LAYOUT } from "@agentforge/core/product-modes";
 
 export type LiveTool = {
   key: string;
   status: "started" | "completed";
   input?: unknown;
   output?: unknown;
+  /** The latest progress line of a started tool (a worker's phase), drawn in its live row. */
+  progress?: string;
 };
 
 type Props = {
@@ -88,18 +94,17 @@ export function ChatTurn({ role, content, live }: Props) {
 
   return (
     <article
-      className={
-        isUser
-          ? "enter-rise ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md border-2 border-[color-mix(in_srgb,var(--accent)_24%,var(--line))] bg-[var(--accent-soft)] px-4 py-3 text-[var(--text)] shadow-[0_3px_0_color-mix(in_srgb,var(--accent)_24%,var(--line))]"
-          : "enter-rise mr-10 px-1 py-1"
-      }
+      className={isUser ? "enter-rise chat-turn--user" : "enter-rise chat-turn--assistant"}
       data-testid="message"
     >
       {isUser ? (
         <MessageBody content={content} />
       ) : (
         <div className={live ? "flex items-start gap-3" : "space-y-2"}>
-          {live && liveState && !takesStatus ? (
+          {/* Tester code: in the chat-first shell no character is drawn inside a thread (owner,
+              2026-10-09: the character must not overlap generated content). The head in the rail is
+              the status character there; it reads the same claim made above. */}
+          {live && liveState && !takesStatus && SHELL_LAYOUT !== "chat-first" ? (
             <NultronMascot state={liveState} busy={Boolean(live.running)} decorative next={LIVE_TURN_NEXT} />
           ) : null}
           <div className="min-w-0 flex-1 space-y-2">
@@ -137,7 +142,12 @@ export function ChatTurn({ role, content, live }: Props) {
                         data-testid="message-tool"
                         data-tool={tool.key}
                       >
-                        {isRichTool(tool.key) ? (
+                        {tool.status === "started" && tool.progress ? (
+                          <span className="flex items-center gap-2" data-testid="message-tool-progress">
+                            {tool.progress}
+                            <PulseDots />
+                          </span>
+                        ) : isRichTool(tool.key) ? (
                           <ToolRowBody tool={tool} />
                         ) : tool.status === "started" && showsToolSpinner(tool.key) ? (
                           toolActivityLabel(tool.key, tool.input)
@@ -152,7 +162,9 @@ export function ChatTurn({ role, content, live }: Props) {
             ) : null}
             {live?.streaming ? (
               <div className="space-y-2">
-                <FormattedText text={live.streaming} className="text-sm" testId="message-output" />
+                <div className="chat-turn-bubble">
+                  <FormattedText text={live.streaming} className="text-sm" testId="message-output" />
+                </div>
                 {live.running && !showDisclosure ? <PulseDots /> : null}
               </div>
             ) : (
@@ -163,6 +175,7 @@ export function ChatTurn({ role, content, live }: Props) {
             )}
             {liveMedia.length > 0 ? <MediaParts parts={liveMedia} /> : null}
             <DeckCards tools={visibleTools} />
+            <DossierCards tools={visibleTools} />
             {jobs.map((job, index) => (
               <MessageEmbed
                 key={`${job.title}-${index}`}
@@ -237,7 +250,9 @@ function MessageBody({ content, outputOnly = false }: { content?: unknown; outpu
       return null;
     }
     return outputOnly ? (
-      <FormattedText text={content} className="text-sm" testId="message-output" />
+      <div className="chat-turn-bubble">
+        <FormattedText text={content} className="text-sm" testId="message-output" />
+      </div>
     ) : (
       <UserPlain text={content} />
     );
@@ -257,6 +272,10 @@ function MessageBody({ content, outputOnly = false }: { content?: unknown; outpu
       })
     : content;
 
+  if (outputOnly) {
+    return <AnswerParts parts={parts} />;
+  }
+
   return (
     <div className="space-y-2">
       {parts.map((part, index) => {
@@ -271,16 +290,53 @@ function MessageBody({ content, outputOnly = false }: { content?: unknown; outpu
         if (part && typeof part === "object" && (part as { type?: unknown }).type === "text" && "text" in part) {
           const text = String((part as { text: string }).text);
           if (!text.trim()) return null;
-          return outputOnly ? (
-            <FormattedText key={index} text={text} className="text-sm" testId="message-output" />
-          ) : (
-            <UserPlain key={index} text={text} />
-          );
+          return <UserPlain key={index} text={text} />;
         }
         return null;
       })}
     </div>
   );
+}
+
+/**
+ * The agent's saved answer: runs of text sit in one soft bubble, and a picture or video between them
+ * stays outside it, at the bubble's left edge, in the order the model wrote them.
+ */
+function AnswerParts({ parts }: { parts: unknown[] }) {
+  const nodes: ReactNode[] = [];
+  let run: string[] = [];
+  const flush = (key: number) => {
+    if (run.length === 0) return;
+    nodes.push(
+      <div key={`text-${key}`} className="chat-turn-bubble">
+        {run.map((text, index) => (
+          <FormattedText key={index} text={text} className="text-sm" testId="message-output" />
+        ))}
+      </div>,
+    );
+    run = [];
+  };
+  parts.forEach((part, index) => {
+    const imageUrl = partImageUrl(part);
+    const videoUrl = imageUrl ? null : partVideoUrl(part);
+    if (imageUrl || videoUrl) {
+      flush(index);
+      nodes.push(
+        imageUrl ? (
+          <MessageEmbed key={index} kind="image" title="" src={imageUrl} alt="" />
+        ) : (
+          <MessageEmbed key={index} kind="video" title="" src={videoUrl ?? undefined} />
+        ),
+      );
+      return;
+    }
+    if (part && typeof part === "object" && (part as { type?: unknown }).type === "text" && "text" in part) {
+      const text = String((part as { text: string }).text);
+      if (text.trim()) run.push(text);
+    }
+  });
+  flush(parts.length);
+  return <div className="space-y-2">{nodes}</div>;
 }
 
 function MediaParts({ parts }: { parts: ContentPart[] }) {

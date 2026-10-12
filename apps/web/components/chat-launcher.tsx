@@ -1,6 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { SHELL_LAYOUT } from "@agentforge/core/product-modes";
 import { ChatHero } from "@/components/chat-hero";
 import { t } from "@/lib/i18n";
 import { useDeskNeedsKey } from "@/lib/use-desk-needs-key";
@@ -127,7 +128,8 @@ export function ChatLauncher({ onSuggest }: { onSuggest?: (text: string) => void
         ))}
       </div>
 
-      {needsKey ? null : (
+      {/* Tester code: in the chat-first shell the tier sits in the header, so "pick a model below" is false. */}
+      {needsKey || SHELL_LAYOUT === "chat-first" ? null : (
         <p className="enter-fade mt-6 text-center text-sm text-[var(--text-2)]" style={{ "--i": 9 } as CSSProperties}>
           {t("chat.empty.pickModel")}
         </p>

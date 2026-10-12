@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { firstVisibleHref, WORK_PRODUCT_MODES, type ProductMode } from "@agentforge/core/product-modes";
+import { firstVisibleHref, SHELL_LAYOUT, WORK_PRODUCT_MODES, type ProductMode } from "@agentforge/core/product-modes";
 import { HOME_WORKSPACE_NAME } from "@agentforge/core/local-owner";
 import { AppShell } from "@/components/app-shell";
 import { ComponentSetupSilent } from "@/components/component-setup";
@@ -20,6 +20,7 @@ import {
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { SettingsPage } from "@/components/settings-page";
 import { UsagePage } from "@/components/usage-page";
+import { VirtualAgentsPage } from "@/components/virtual-agents-page";
 import { WorkspacesPage } from "@/components/workspaces-page";
 import { KnowledgePage } from "@/components/knowledge-page";
 import { ChannelsPage } from "@/components/channels-page";
@@ -420,7 +421,7 @@ export function AppRoutes() {
               path="/workspaces"
               element={
                 <DeskPane>
-                  <WorkspacesPage />
+                  {SHELL_LAYOUT === "chat-first" ? <VirtualAgentsPage /> : <WorkspacesPage />}
                 </DeskPane>
               }
             />

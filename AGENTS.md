@@ -1,5 +1,7 @@
 # Nultron
 
+**This folder is the tester code (chat only, modes parked), not the published code. Read [`TESTER.md`](TESTER.md) before editing anything here.**
+
 **The vision (Rizky, 2026-10-05): everyone has all their workers inside one desk.**
 
 A desk is a one-person company (OCP). Every job a company needs is a worker on that desk:

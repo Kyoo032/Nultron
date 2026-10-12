@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "@/lib/nav";
+import { AgentChatHeader } from "@/components/agent-chat-controls";
+import { AgentHome } from "@/components/agent-home";
+import { TierPicker } from "@/components/tier-picker";
+import { virtualAgentHref, type VirtualAgentInfo } from "@/lib/virtual-agents";
 import { BuddyStage } from "@/components/buddy-stage";
 import { ChatAccountChip } from "@/components/chat-account-chip";
 import { ChatComposer } from "@/components/chat-composer";
@@ -31,42 +35,49 @@ import { collectToolMediaParts } from "@/lib/tool-media";
 import { notifyThreadsChanged } from "@/lib/threads-events";
 import { apiFetch } from "@/lib/api-client";
 import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
-import { chatModalities } from "@/lib/composer-image-support";
+import { DEFAULT_MODEL_TIER, type ModelTierId } from "@agentforge/core/tiers";
 import {
-  pickChatModel,
-  readLastChatModel,
-  readThreadChatModel,
-  writeLastChatModel,
-  writeThreadChatModel,
-} from "@/lib/chat-model-pref";
-import type { ReasoningEffort } from "@agentforge/core/reasoning-effort";
-import { DEFAULT_THINKING_PREF, readStoredThinkingPref, writeThinkingPref } from "@/lib/chat-thinking";
+  initialChatTier,
+  pickChatTier,
+  readLastChatTier,
+  readThreadChatTier,
+  readTierCatalog,
+  tierThinkingEnabled,
+  writeLastChatTier,
+  writeThreadChatTier,
+  type ChatTierInfo,
+} from "@/lib/chat-tier-pref";
 import { t } from "@/lib/i18n";
 import { isPinnedToEnd } from "@/lib/stick-to-bottom";
 
 type Message = { id: string; role: string; content: unknown };
 
-type ModelProvider = "openai" | "anthropic" | "google" | "volcengine";
-
-type ChatModel = {
-  id: string;
-  label: string;
-  friendlyLabel?: string;
-  bestFor?: string;
-  provider?: ModelProvider;
-  inputModalities: string[];
-  contextLength?: number;
+/**
+ * The chat-first shell around a session (tester code, `agent-chat-pane.tsx`): which virtual agent
+ * this conversation is with. Absent, the session draws as the published Chat does.
+ */
+export type ChatSessionShell = {
+  agent: VirtualAgentInfo;
+  /** The agent's name on screen: the product's name for the generalist. */
+  name: string;
+  /** New chat, Conversations, How it works: the header's own controls. */
+  controls?: ReactNode;
+  /** The URL names a thread that belongs to another agent: hand it to that agent's address. */
+  onForeignThread?: (ownerAgentId: string, threadId: string) => void;
+  /** Set when the agent's own harness still runs from its studio: the empty conversation offers it. */
+  onOpenStudio?: () => void;
 };
 
 type Props = {
   agentId?: string;
   initialThreadId?: string;
+  shell?: ChatSessionShell;
 };
 
 /** Nultron's box on the composer's ledge; about half of it shows above the edge. */
 const COMPOSER_BUDDY_SIZE = 112;
 
-export function ChatSession({ agentId, initialThreadId }: Props) {
+export function ChatSession({ agentId, initialThreadId, shell }: Props) {
   // Nultron Enterprise: a signed-in tenant may open the desk before adding a key (hosted only; false and
   // request-free elsewhere). The context estimate below embeds the query, so it goes through the gateway.
   const keyMissing = useHostedNeedsKey();
@@ -76,9 +87,10 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
   const [threadId, setThreadId] = useState<string | null>(null);
   const [agentIdReady, setAgentIdReady] = useState<string | null>(agentId ?? null);
   const [agentModalities, setAgentModalities] = useState<string[]>(["text"]);
-  const [models, setModels] = useState<ChatModel[]>([]);
-  const [modelId, setModelId] = useState("");
-  const [catalogDefault, setCatalogDefault] = useState("");
+  /** The three choices as the host reports them, and the one a send carries. The host picks the model. */
+  const [tiers, setTiers] = useState<readonly ChatTierInfo[]>([]);
+  const [tierId, setTierId] = useState<ModelTierId>(() => initialChatTier(initialThreadId));
+  const [defaultTier, setDefaultTier] = useState<ModelTierId>(DEFAULT_MODEL_TIER);
   const [messages, setMessages] = useState<Message[]>([]);
   const [streaming, setStreaming] = useState("");
   const [thinking, setThinking] = useState("");
@@ -92,18 +104,14 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
   const [error, setError] = useState<string | null>(null);
   /** A refused send. The sentence lives on `composer-error`; this only holds the error mascot. */
   const [sendFailed, setSendFailed] = useState(false);
-  const [thinkingEnabled, setThinkingEnabled] = useState(true);
-  const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>(DEFAULT_THINKING_PREF.effort);
-  /**
-   * Did the person pick the level the picker shows? Until they do, a send carries no level and the host
-   * treats Thinking as defaulted, so a model the policy table does not know is not sent Normal.
-   */
-  const [reasoningChosen, setReasoningChosen] = useState(DEFAULT_THINKING_PREF.chosen);
   const [knowledgeParts, setKnowledgeParts] = useState<ContextPart[]>([]);
   /** A prompt picked from the empty screen's suggestions; handed down once, then cleared. */
   const [composerDraft, setComposerDraft] = useState<string | null>(null);
   const toolsRef = useRef(tools);
   toolsRef.current = tools;
+  /** Read inside the load effect, which must not run again because the shell object is a new one. */
+  const shellRef = useRef(shell);
+  shellRef.current = shell;
   const runningRef = useRef(running);
   runningRef.current = running;
   // The desk buddy cheers when a reply lands and flinches when a send fails; with it on screen the error
@@ -176,53 +184,34 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
   }
   const sessionKey = sessionEpochRef.current;
 
-  useEffect(() => {
-    // A stored level is a real pick (only the picker writes it), so it is sent from the first message.
-    let storage: Storage | undefined;
-    try {
-      storage = window.localStorage;
-    } catch {
-      storage = undefined; // private mode
-    }
-    const stored = readStoredThinkingPref(storage);
-    setReasoningEffort(stored.effort);
-    setThinkingEnabled(stored.effort !== "none");
-    setReasoningChosen(stored.chosen);
-  }, []);
+  // What the chosen tier can take in and how much it can hold, as the host reports it. Never a model.
+  const selectedTier = tiers.find((tier) => tier.id === tierId);
+  const modalities = useMemo(() => {
+    const tierMods: readonly string[] = selectedTier?.inputModalities ?? ["text"];
+    return ["text", "image", "video"].filter(
+      (modality) => agentModalities.includes(modality) && tierMods.includes(modality),
+    );
+  }, [agentModalities, selectedTier]);
 
-  function setReasoningPref(next: ReasoningEffort) {
-    setReasoningEffort(next);
-    setReasoningChosen(true);
-    setThinkingEnabled(next !== "none");
-    try {
-      writeThinkingPref(next, window.localStorage);
-    } catch {
-      // private mode
+  /** Where a thread of this session lives. In the chat-first shell every agent's is under `/chat`. */
+  function threadHref(id: string) {
+    if (shell) {
+      return virtualAgentHref(shell.agent.id, id);
     }
+    return `${agentId ? `/agents/${agentId}` : "/chat"}?thread=${id}`;
   }
 
-  const selectedModel = models.find((model) => model.id === modelId);
-  const modalities = useMemo(() => chatModalities(agentModalities, selectedModel), [agentModalities, selectedModel]);
-
-  function chatPath() {
-    return agentId ? `/agents/${agentId}` : "/chat";
-  }
-
-  function rememberModel(id: string, forThreadId?: string | null) {
-    const next = id.trim();
-    if (!next) {
-      return;
-    }
-    writeLastChatModel(next);
+  function rememberTier(tier: ModelTierId, forThreadId?: string | null) {
+    writeLastChatTier(tier);
     const thread = forThreadId ?? threadIdRef.current;
     if (thread) {
-      writeThreadChatModel(thread, next);
+      writeThreadChatTier(thread, tier);
     }
   }
 
-  function handleModelChange(id: string) {
-    setModelId(id);
-    rememberModel(id);
+  function handleTierChange(next: ModelTierId) {
+    setTierId(next);
+    rememberTier(next);
   }
 
   function resetLive() {
@@ -253,7 +242,7 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
       throw new Error(created.error.message ?? t("chat.error.start"));
     }
     const id = created.thread.id as string;
-    rememberModel(modelId, id);
+    rememberTier(tierId, id);
     notifyThreadsChanged();
     if (sessionEpochRef.current !== startedIn) {
       // The owner opened another session while this thread was being created. Leave the pane
@@ -267,7 +256,7 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
     awaitingUrlThreadRef.current = id;
     seenInitialThreadRef.current = id;
     setThreadId(id);
-    router.replace(`${chatPath()}?thread=${id}`);
+    router.replace(threadHref(id));
     return id;
   }
 
@@ -294,13 +283,12 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
           }
           setAgentName(agentPayload.agent?.name ?? t("chat.agent"));
           setIsDefaultChat(agentPayload.agent?.slug === "quick-chat");
-          setAgentModalities(caps.inputModalities ?? ["text"]);
-          setModels(modelPayload.models ?? []);
-          setCatalogDefault(
-            agentPayload.agent?.slug === "quick-chat"
-              ? (modelPayload.defaultModel ?? caps.model ?? "")
-              : (caps.model ?? modelPayload.defaultModel ?? ""),
-          );
+          // A virtual agent takes what Chat takes, whatever its row was created with; the host holds the
+          // same rule for the run. An agent a person built keeps what its own row says.
+          setAgentModalities(shellRef.current ? ["text", "image", "video"] : (caps.inputModalities ?? ["text"]));
+          const catalog = readTierCatalog(modelPayload);
+          setTiers(catalog.tiers);
+          setDefaultTier(catalog.defaultTier);
           readyId = agentId;
           setAgentIdReady(agentId);
         } else {
@@ -314,8 +302,9 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
           setAgentName(home.agent?.name ?? t("chat.title"));
           setIsDefaultChat(true);
           setAgentModalities(home.version?.inputModalities ?? ["text", "image", "video"]);
-          setModels(home.models ?? []);
-          setCatalogDefault(home.defaultModel ?? home.version?.model ?? "");
+          const catalog = readTierCatalog(home);
+          setTiers(catalog.tiers);
+          setDefaultTier(catalog.defaultTier);
           readyId = home.agent.id;
           setAgentIdReady(home.agent.id);
         }
@@ -332,6 +321,11 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
             return;
           }
           const threadAgentId = payload.thread?.agentId as string | undefined;
+          if (shellRef.current && threadAgentId && readyId && threadAgentId !== readyId) {
+            // An agent's address only ever shows that agent's threads.
+            shellRef.current.onForeignThread?.(threadAgentId, initialThreadId);
+            return;
+          }
           if (threadAgentId && readyId && threadAgentId !== readyId && !agentId) {
             router.replace(`/agents/${threadAgentId}?thread=${initialThreadId}`);
             return;
@@ -367,20 +361,20 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
   }, [agentId, initialThreadId, router]);
 
   useEffect(() => {
-    if (models.length === 0) {
+    if (tiers.length === 0) {
       return;
     }
     const threadKey = initialThreadId ?? threadId ?? "";
-    setModelId((current) =>
-      pickChatModel({
-        models,
+    setTierId((current) =>
+      pickChatTier({
+        tiers,
         current,
-        threadModel: threadKey ? readThreadChatModel(threadKey) : "",
-        lastModel: readLastChatModel(),
-        catalogDefault,
+        threadTier: threadKey ? readThreadChatTier(threadKey) : "",
+        lastTier: readLastChatTier(),
+        defaultTier,
       }),
     );
-  }, [models, catalogDefault, initialThreadId, threadId]);
+  }, [tiers, defaultTier, initialThreadId, threadId]);
 
   /** Reload a thread's messages — unless the pane has moved to another session while they loaded. */
   async function refreshMessages(id: string) {
@@ -430,22 +424,52 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
   }, [keyMissing, threadId, hasReply, newestReplyId]);
 
   return (
-    <main className="flex h-full min-h-0 flex-col" data-testid="chat-home">
-      <ChatHeader title={isDefaultChat ? t("chat.title") : agentName} compact={empty}>
-        {hasReply ? (
-          <ChatContextChip
-            usedTokens={contextTokens}
-            contextLength={selectedModel?.contextLength}
-            parts={contextParts}
-          />
-        ) : null}
-        {hasReply ? <ChatUsageChip /> : null}
-        <ChatAccountChip />
-      </ChatHeader>
+    <main
+      className="flex h-full min-h-0 flex-col"
+      data-testid="chat-home"
+      data-agent={shell?.agent.id}
+      // A mode agent's pane takes its mode's colour, as its studio does. The generalist keeps Chat's.
+      data-mode={shell && !shell.agent.generalist ? shell.agent.id : undefined}
+    >
+      {shell ? (
+        <AgentChatHeader
+          agent={shell.agent}
+          name={shell.name}
+          // The tier is beside the name, not on the composer: the composer is only `+` and the box.
+          tier={<TierPicker tiers={tiers} value={tierId} onChange={handleTierChange} disabled={running} />}
+          chips={
+            <>
+              {hasReply ? (
+                <ChatContextChip
+                  usedTokens={contextTokens}
+                  contextLength={selectedTier?.contextLength ?? undefined}
+                  parts={contextParts}
+                />
+              ) : null}
+              {hasReply ? <ChatUsageChip /> : null}
+              <ChatAccountChip />
+            </>
+          }
+          controls={shell.controls}
+        />
+      ) : (
+        <ChatHeader title={isDefaultChat ? t("chat.title") : agentName} compact={empty}>
+          {hasReply ? (
+            <ChatContextChip
+              usedTokens={contextTokens}
+              contextLength={selectedTier?.contextLength ?? undefined}
+              parts={contextParts}
+            />
+          ) : null}
+          {hasReply ? <ChatUsageChip /> : null}
+          <ChatAccountChip />
+        </ChatHeader>
+      )}
 
       {error ? (
         <div className="flex w-full items-start gap-3 px-[var(--chat-gutter)]">
-          {running || thinking || tools.length > 0 || streaming || buddyTakesStatus ? null : (
+          {/* Never in the chat-first shell: there the head in the rail is the one character on screen. */}
+          {running || thinking || tools.length > 0 || streaming || buddyTakesStatus || shell ? null : (
             <NultronMascot state="error" decorative />
           )}
           <p className="text-sm text-[var(--danger)]" data-testid="chat-error" role="alert">
@@ -464,10 +488,18 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
           }
           pinRef.current = isPinnedToEnd(el.scrollTop, el.scrollHeight, el.clientHeight);
         }}
-        className={`min-h-0 w-full flex-1 overflow-y-auto overscroll-y-contain px-[var(--chat-gutter)] ${empty ? "" : "chat-thread-ledge space-y-4 pt-4"}`}
+        // `chat-thread-ledge` keeps the composer character's height free at the end of the thread. The
+        // chat-first shell draws no character there, so its thread ends with an ordinary gap.
+        className={`min-h-0 w-full flex-1 overflow-y-auto overscroll-y-contain px-[var(--chat-gutter)] ${empty ? "" : shell ? "space-y-4 pb-6 pt-4" : "chat-thread-ledge space-y-4 pt-4"}`}
         data-testid="message-list"
       >
-        {empty && !error ? <ChatLauncher onSuggest={setComposerDraft} /> : null}
+        {empty && !error ? (
+          shell && !shell.agent.generalist ? (
+            <AgentHome agent={shell.agent} name={shell.name} onOpenStudio={shell.onOpenStudio} />
+          ) : (
+            <ChatLauncher onSuggest={setComposerDraft} />
+          )
+        ) : null}
         {messages
           .filter((message) => message.role === "user" || messageHasDisplayableContent(message.content))
           .map((message) => (
@@ -482,7 +514,7 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
                 tools,
                 streaming,
                 running,
-                thinkingEnabled,
+                thinkingEnabled: tierThinkingEnabled(tierId),
                 failed: sendFailed,
                 firstTurn: messages.every((message) => message.role !== "assistant"),
               }}
@@ -494,21 +526,39 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
       {agentIdReady ? (
         <div className="chat-composer-ledge">
           {/* In a thread Nultron peeks over the composer and is the one status character; the empty
-            Chat has the hero instead. */}
-          {empty ? null : <BuddyStage kind="composer" mode="chat" size={COMPOSER_BUDDY_SIZE} />}
+            Chat has the hero instead. Not in the chat-first shell (owner, 2026-10-09: the character
+            must not overlap generated content): the thread scrolls behind this ledge, so there the
+            character is the small head in the rail, where nothing scrolls under it. */}
+          {empty || shell ? null : <BuddyStage kind="composer" mode="chat" size={COMPOSER_BUDDY_SIZE} />}
           <FolderSurface running={running} />
           <ChatComposer
             threadId={threadId}
             sessionKey={sessionKey}
             onEnsureThread={ensureThread}
             modalities={modalities.length > 0 ? modalities : ["text"]}
-            model={modelId}
-            models={models}
-            onModelChange={handleModelChange}
-            thinkingEnabled={thinkingEnabled}
-            reasoningEffort={reasoningEffort}
-            reasoningEffortChosen={reasoningChosen}
-            onReasoningEffortChange={setReasoningPref}
+            tier={tierId}
+            tiers={tiers}
+            // In the chat-first shell the tier is chosen in the header, so the composer shows none.
+            onTierChange={shell ? undefined : handleTierChange}
+            placeholder={shell ? t("agents.composer.placeholder", { name: shell.name }) : undefined}
+            onToolProgress={(event) => {
+              // A worker's progress line belongs to the call of that tool that is still running.
+              setTools((current) => {
+                let index = -1;
+                for (let i = current.length - 1; i >= 0; i -= 1) {
+                  if (current[i]?.key === event.toolKey && current[i]?.status === "started") {
+                    index = i;
+                    break;
+                  }
+                }
+                if (index < 0 || current[index]?.progress === event.label) {
+                  return current;
+                }
+                const next = [...current];
+                next[index] = { ...next[index]!, progress: event.label };
+                return next;
+              });
+            }}
             draft={composerDraft}
             onDraftApplied={() => setComposerDraft(null)}
             onUserSend={(payload) => {
@@ -516,7 +566,7 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
               setError(null);
               setSendFailed(false);
               setRunning(true);
-              rememberModel(modelId);
+              rememberTier(tierId);
               setThinking("");
               setTools([]);
               setFallback(null);
