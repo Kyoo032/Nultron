@@ -13,16 +13,16 @@
   "close": "Tutup panduan",
   "steps": {
     "modes": {
-      "title": "Alat Anda ada di sini",
-      "bodyOne": "Chat adalah beranda. Di bawahnya ada alat Anda: {tools}. Pilih untuk mulai.",
-      "bodyList": "Chat adalah beranda. Di bawahnya ada {count} alat Anda: {tools}. Pilih satu untuk mulai.",
-      "bodyMany": "Chat adalah beranda. Di bawahnya ada satu alat untuk setiap jenis pekerjaan. Pilih satu untuk mulai.",
-      "bodyNone": "Chat adalah beranda. Anda bisa menambah alat ke meja ini dari Ruang kerja."
+      "title": "Agen Anda ada di sini",
+      "bodyOne": "Asisten Anda ada di paling atas. Di bawahnya ada satu agen lagi: {tools}. Pilih untuk mulai.",
+      "bodyList": "Asisten Anda ada di paling atas. Di bawahnya ada {count} agen Anda: {tools}. Pilih satu untuk mulai.",
+      "bodyMany": "Asisten Anda ada di paling atas. Di bawahnya ada satu agen untuk setiap jenis pekerjaan. Pilih satu untuk mulai.",
+      "bodyNone": "Asisten Anda ada di paling atas. Anda bisa merekrut agen lain dari Agen virtual."
     },
     "workspaces": {
-      "title": "Tambah alat kapan saja",
-      "bodyMore": "Ingin alat lain, seperti {tools}? Buka Ruang kerja, pilih Ubah pada meja Anda, lalu nyalakan alatnya. Anda bisa mengubahnya kapan saja.",
-      "bodyAll": "Semua alat sudah ada di meja ini. Untuk mengurangi, buka Ruang kerja, pilih Ubah pada meja Anda, lalu matikan sebagian. Anda bisa mengubahnya kapan saja."
+      "title": "Rekrut agen lain kapan saja",
+      "bodyMore": "Ingin agen lain, seperti {tools}? Buka Agen virtual lalu pilih Rekrut. Anda bisa melepasnya kapan saja.",
+      "bodyAll": "Semua agen sudah ada di meja ini. Untuk mengurangi, buka Agen virtual lalu pilih Lepas pada agen yang tidak Anda perlukan."
     },
     "chat": {
       "title": "Tanyakan apa saja ke Chat",
@@ -39,7 +39,7 @@
   },
   "replay": {
     "title": "Panduan",
-    "body": "Tur satu menit melewati navigasi, Ruang kerja, Chat, Basis pengetahuan, dan Pengaturan.",
+    "body": "Tur satu menit melewati navigasi, Agen virtual, Chat, Basis pengetahuan, dan Pengaturan.",
     "button": "Putar ulang panduan"
   }
 }

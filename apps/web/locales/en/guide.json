@@ -13,16 +13,16 @@
   "close": "Close the guide",
   "steps": {
     "modes": {
-      "title": "Your tools live here",
-      "bodyOne": "Chat is home. Below it is your tool: {tools}. Pick it to start.",
-      "bodyList": "Chat is home. Below it are your {count} tools: {tools}. Pick one to start.",
-      "bodyMany": "Chat is home. Below it is a tool for each kind of work. Pick one to start.",
-      "bodyNone": "Chat is home. You can add tools to this desk from Workspaces."
+      "title": "Your agents live here",
+      "bodyOne": "Your assistant is at the top. Below it is one more agent: {tools}. Pick it to start.",
+      "bodyList": "Your assistant is at the top. Below it are your {count} agents: {tools}. Pick one to start.",
+      "bodyMany": "Your assistant is at the top. Below it is an agent for each kind of work. Pick one to start.",
+      "bodyNone": "Your assistant is at the top. You can hire more agents from Virtual agents."
     },
     "workspaces": {
-      "title": "Add more tools any time",
-      "bodyMore": "Want more tools, like {tools}? Open Workspaces, choose Edit on your desk, and switch them on. You can change it whenever you like.",
-      "bodyAll": "Every tool is already on this desk. To have fewer, open Workspaces, choose Edit on your desk, and switch some off. You can change it whenever you like."
+      "title": "Hire more agents any time",
+      "bodyMore": "Want more agents, like {tools}? Open Virtual agents and choose Hire. You can let one go whenever you like.",
+      "bodyAll": "Every agent is already on this desk. To have fewer, open Virtual agents and choose Let go on the ones you do not need."
     },
     "chat": {
       "title": "Ask Chat anything",
@@ -39,7 +39,7 @@
   },
   "replay": {
     "title": "Guide",
-    "body": "A one-minute walk through the rail, Workspaces, Chat, the Knowledge Base and Settings.",
+    "body": "A one-minute walk through the rail, Virtual agents, Chat, the Knowledge Base and Settings.",
     "button": "Replay the guide"
   }
 }

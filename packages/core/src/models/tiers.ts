@@ -9,7 +9,7 @@ import { CHAT_DEFAULT_PREFERENCES } from "./preferred";
  * knows nothing about the catalog, the breaker or a request. The caller passes those in as
  * `TierLiveness`, which keeps the walk testable and keeps this file free of host imports.
  *
- * - `daily` is the default and behaves like Chat does today: its Toko Token list is exactly
+ * - `daily` is the default and behaves like Chat does today: its gateway list is exactly
  *   `CHAT_DEFAULT_PREFERENCES`, imported rather than copied, so a change to the published default list
  *   reaches Daily on the next sync with no edit here.
  * - `fast` runs with Thinking off and answers first.
@@ -83,7 +83,7 @@ function define(
  * - No worker-routing eval has run yet (`chat-workers-spec.md`, section 5). A model that routes badly
  *   comes off a list when it does.
  *
- * Only Toko Token has lists. Enterprise key providers get theirs in M4.
+ * Only the pinned gateway has lists. Enterprise key providers get theirs in M4.
  */
 export const TIER_DEFINITIONS: TierDefinitions = Object.freeze({
   daily: define("daily", "default", { toko: CHAT_DEFAULT_PREFERENCES }),
@@ -117,7 +117,7 @@ export function readRequestedTier(value: unknown): RequestedTier {
 
 /** What is live right now. The host builds this from the model catalog and the breaker. */
 export type TierLiveness = Readonly<{
-  /** The providers this tenant may use, in the order to try them. Personal passes `availableProviders()`, which is Toko Token only. */
+  /** The providers this tenant may use, in the order to try them. Personal passes `availableProviders()`, which is the pinned gateway only. */
   providers: readonly ProviderId[];
   /**
    * The model as this provider's catalog spells it, or undefined when the catalog does not list it.
