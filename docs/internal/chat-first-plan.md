@@ -1,6 +1,58 @@
 # Chat-first plan (2026-10-06)
 
-Status: **draft for Rizky's review. Nothing here is built.**
+Status: **draft for Rizky's review. Track M's M0 and M1 are built and committed on `tester/chat-first` (the tier resolver and the Daily, Fastest and Reasoning picker). Since 2026-10-09 the parts listed in the update below are built in the uncommitted tester working tree. Everything else here is not built.**
+
+### Update 2026-10-09: virtual agents pulled ahead
+
+The owner said: "we're going to revamp this to be more like muse and hark style, focuses on UIUX of the chat mode, removing all the workspaces and hide them, also to rebrand the name of workspaces into virtual agents, with each using their own harness and with skill and tools embed inside". That moved track B (bots) ahead of track C. On screen a "bot" is now a **virtual agent**, and "Workspaces" is now "Virtual agents". The status line above is older than this block: part of B and C0 is now written in the tester working tree (`tester/chat-first`, uncommitted). It was driven in part on `:3200` the same day, with the owner's key (record: `.cursor/skills/verify-agentforge/evidence/virtual-agents/2026-10-09-first-drive/RECORD.md`, rows 1 to 20). The code is described in [`maps/virtual-agents.md`](maps/virtual-agents.md), and the recipe, which says per step what was driven and what was not, is `.cursor/skills/verify-agentforge/features/virtual-agents.md`. The owner changed the model later the same day; see "Later the same day" below, which supersedes any line here that says otherwise.
+
+Built in the working tree:
+
+- **B0, the registry.** One agent per harness spec, with a test (`packages/core/src/agents/virtual-agents.ts`, `virtual-agents.test.ts`). The tools of an agent come from its registry entry, not from `ModeHarnessSpec.tools`. Every agent binds the same tool set (Chat's 17 tools plus `research_dossier`) under Chat's budget. `conversation` says only where the agent's own harness runs: `harness` (in chat) for Chat and Research, `studio` (in its studio screen) for the rest.
+- **B1, partly: the rail and per-agent conversations.** `AgentRail`, `GET /api/v1/virtual-agents`, one agent row per desk, person and agent, and `/chat?agent=<mode>` with its own history, header and harness panel. One agent handing a task to another is **not** built. The B1 proof as written (the Presentation bot's thread holds the deck) cannot pass, but an Images agent, or any agent, builds a deck in its own thread (RECORD row 17). `SHELL_LAYOUT` is `"chat-first"` (`packages/core/src/agents/product-modes.ts:29`).
+- **The C0 pieces Research needed.** One worker (`research_dossier`, `packages/host/src/workers/`), the `tool.progress` stream event (`packages/core/src/runtime/types.ts:29`), a dossier result card (`apps/web/components/chat-dossier-card.tsx`), and the bare composer (`+`, the message box, Send; `apps/web/components/composer-plus-menu.tsx`).
+- **The Virtual agents page.** It replaces the Workspaces checkboxes at `/workspaces` (`apps/web/components/virtual-agents-page.tsx`). Hire and Let go change the desk's `productModes`.
+- **The character stays out of the generated content.** The owner, 2026-10-09: "careful, to not let the IP overlap with the generated content". In this shell Nultron is not drawn on the composer ledge, where the thread scrolls behind it. It is the small head in the rail footer, the one place nothing scrolls under (`apps/web/components/agent-rail.tsx`, `DeskBuddyChip`; `chat-session.tsx`, `empty || shell`).
+
+Not built: the specialty's own checked run for every agent except Chat and Research (it still lives in that agent's studio screen, which an empty conversation links to); the other twelve workers of C1 to C3; the side panel's mode controls (B2; the panel only says what the agent is made of); the Computer and Routines tabs (B3, B4); hiring your own agent (B5); the free and paid gate (B6); per-person and per-agent knowledge; and tracks K and M, which this update does not touch.
+
+Where the build differs from the specs:
+
+1. **One tool per worker, `research_dossier`, not the `run_worker` multiplexer.** It is bound to every agent, the default agent included (since the owner's later instruction, below). There is no `read_result` tool.
+2. **The card is drawn from the saved `tool_call` part.** There is no `artifact` message part, and `packages/core/src/content/types.ts` is unchanged. The card is dossier-only, and Open shows the dossier inside the thread, not in a full-result view. `tool.progress` has no `toolCallId`, and the renderer reads the event's `label` rather than folding it with `reduceJobProgress`.
+3. **The model tier sits in the agent header, not under `+`.** The `+` menu holds Add files and Enhance. There is no worker choice in it.
+4. **Every agent binds every worker, and a mode agent is a full chat, not a single-harness bot.** The same tools and budget for all (`FULL_CHAT_TOOLS`, `FULL_CHAT_BUDGET`, `packages/core/src/agents/virtual-agents.ts:99-120`). An agent differs by its specialty prompt and its own conversations. This departs from "a bot is one harness" and "a bot elsewhere is instructions the model may ignore" (section 3, "Second reference"), because a mode agent's specialty is partly a prompt. It is the owner's call (instructions 2 and 3 below). What keeps it honest: the host still decides the tools and the budget, never the stored row or the prompt (`runPolicyFor`, `packages/host/src/virtual-agents.ts:185-206`), and the screen and the prompt say where the specialty's checked run lives.
+5. **The default agent's tool bindings are not from the registry.** The default agent still binds the stored row's tools plus `past_sessions` and the workers (`packages/host/src/runs.ts:499-503`); only its budget comes from the registry. The catalog and the panel list the registry's tools for it.
+
+#### Later the same day (2026-10-09)
+
+After the first pass the owner gave three more instructions. His words:
+
+1. "the default mode needs to be nultron or for HYP AI the default mode or the default virtual agents has to be Hypey, take notes and check again"
+2. "the chat agents need to be able to do anything inside their chat, they dont have to create a new virtual agents to be able to generate image or videos"
+3. "not just default agents, all virtual agents able to do everything, its a chat mode now, with model picker and enhance mode, can generate images, videos and all kind of docs, or even build somethings"
+
+What each changed:
+
+- **Instruction 1: the default agent is the brand's character.** `resolvedAssistantName()` reads `AGENTFORGE_ASSISTANT_NAME` and falls back to the product's name (`packages/core/src/gateway.ts:35-37`). The ping carries it as `assistantName` (`packages/host/src/handlers/misc.ts:108`), the Soul names it (`packages/host/src/knowledge-soul.ts:52-67`), and the rail, the header, the page and the greeting read it through `assistantNameOf` (`apps/web/lib/product-brand.tsx:23`). No brand's character is named in the code. **Owed:** `apps/desktop/main.cjs:84-85` does not set the variable from `brand.json`, and `webapp-deploy/.env.example` does not list it, so a packaged flavor or a hosted brand has to be wired before it shows its own character. A desk that already stored its Soul keeps the stored name for the model (`packages/host/src/knowledge.ts:143-157`).
+- **Instruction 2: the default agent can do it all in its own chat.** It binds the worker `research_dossier` as well, hired or not (`withGeneralistWorkers`, `packages/host/src/virtual-agents.ts:156-169`), and its prompt gains a paragraph about workers (`GENERALIST_WORKER_PROMPT`, `packages/core/src/agents/virtual-agents.ts:87-94`). Pictures, clips and decks were already Chat's own tools. This answers part of the missing B1 handoff, since nothing has to be handed over.
+- **Instruction 3: every agent is a full chat.** Each mode agent binds the same tools and budget, takes text, picture and video, and gets the desk's Knowledge Base and its own earlier chats like Chat (`packages/host/src/runs.ts:182-189`, `:216-220`). A `studio` agent no longer has a separate pane: its empty conversation says its checked run lives in the studio and offers a button (`apps/web/components/agent-home.tsx`). "All kind of docs" means what the chat tools make: a deck (`build_deck`), text files (`write_file`), code run in the sandbox (`run_code`), pictures and clips. There is no Word, Excel or PDF writer tool in chat. The model picker is the tier chip in the header; Enhance is a row under `+`.
+
+Also from that pass, found by driving and fixed in the working tree:
+
+- The desk's Soul block made the Images agent answer with the default agent's name, so a mode agent now has a closing line after the Soul block (`packages/core/src/agents/virtual-agents.ts:219-222`, `runs.ts:212`). The line is an instruction to the model, not an enforced rule.
+- The model runtime's own stream watchdog read a running worker as a dead stream and ended the default agent's dossier at 60 s. A run of the default agent or a mode agent now raises that watchdog's idle budget to 10 minutes, and the worker's heartbeat stops at 8 minutes (`packages/host/src/workers/worker-channel.ts:35`, `:46`; `runs.ts:520-522`). This is a behaviour change on every turn of those agents, in a protected shared file.
+
+Risks the new model opens, none ruled on yet:
+
+- A mode agent now reads private material (Knowledge Base, earlier chats) and can send text to the web through `web_search` or `research_dossier`. The egress guard refuses only `web_fetch`, and only after a tool-read of private material (`packages/core/src/runtime/egress-guard.ts:150-169`). This is risk 5 in section 7, still without a ruling from C0. Chat has had the same exposure; mode agents are new to it.
+- Plan risk 4 (paid steps the model starts) is half answered: a turn may make at most 4 pictures and 1 clip (`PAID_MEDIA_PER_TURN`, `packages/core/src/agents/virtual-agents.ts:107-110`). The D4 cost card with a Run control is not built, and every agent's prompt now tells it to make media.
+- The renderer's cap on a turn (the `touchOutput` finding above) stops a long dossier before the host's 8 minute ceiling.
+- The Research harness's keyless search returned unrelated or thin sources in two of three drives (RECORD rows 5 and 20). That is a finding for `main`.
+
+"Hark" was named as a look reference, but no screenshot or link for it is on file. The look follows the two 2026-10-06 references in `nultron-files/chat-first/` only.
+
+One known problem found while reading, for `main` and not fixed here: the renderer's stream watchdog is fed with `touch()` only, so a chat turn is cut off on the client at the first-token budget (240 s on Daily and Reasoning, 120 s on Fastest) however much it has streamed, and a Research dossier that runs longer ends with no card. See "Known limits" in the map page.
 Direction it serves: `AGENTS.md`, "Product direction (Rizky, 2026-10-06): Nultron + HYP AI, chat-first".
 Specs: [`chat-workers-spec.md`](chat-workers-spec.md) (harnesses called from chat), [`model-tiers-spec.md`](model-tiers-spec.md) (masked models) and [`chat-computer-spec.md`](chat-computer-spec.md) (the orchestrator, its computer and the safety design).
 This plan belongs to the tester code. See [`TESTER.md`](../../TESTER.md).
@@ -235,5 +287,7 @@ The first-desk hard rule still decides what a fresh Personal desk shows: Chat (t
 6. C2 and K2.
 7. C3, then C4 and a tester build.
 8. K3 and K4.
+
+**Order changed on 2026-10-09 at the owner's word:** track B (virtual agents) was pulled ahead of track C. Research is the first agent wired to a conversation, which is the C0 proof. The plan expects the other agents to follow as their workers are wired in C1 to C3. See the update block at the top.
 
 All of this is built in the tester code, `C:\Users\rizky\agentforge-chat` on `tester/chat-first`. The published code on `main` does not change until Rizky approves a phase for promotion. See `TESTER.md`.

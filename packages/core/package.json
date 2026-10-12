@@ -20,6 +20,7 @@
     "./templates": "./src/templates/library.ts",
     "./pii": "./src/security/pii.ts",
     "./product-modes": "./src/agents/product-modes.ts",
+    "./virtual-agents": "./src/agents/virtual-agents.ts",
     "./video-capabilities": "./src/models/video-capabilities.ts",
     "./audio-capabilities": "./src/models/audio-capabilities.ts",
     "./media-pricing": "./src/models/media-pricing.ts",

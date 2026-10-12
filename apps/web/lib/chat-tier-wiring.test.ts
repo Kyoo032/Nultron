@@ -154,12 +154,18 @@ describe("the chat pane", () => {
     expect(session).toContain("rememberTier(next)");
   });
 
-  it("hands the composer the tier, the list and the change handler", () => {
+  it("hands the composer the tier and the list, and the change handler only outside the agent shell", () => {
     const composerProps = element(session, "<ChatComposer");
     expect(composerProps).toContain("tier={tierId}");
     expect(composerProps).toContain("tiers={tiers}");
-    expect(composerProps).toContain("onTierChange={handleTierChange}");
+    // In the chat-first shell the choice is made in the agent's header, so the composer draws no picker.
+    expect(composerProps).toContain("onTierChange={shell ? undefined : handleTierChange}");
     expect(composerProps).not.toMatch(/\bmodel=|\bmodels=|reasoningEffort|thinkingEnabled|onThinkingChange/);
+  });
+
+  it("puts the tier choice in the agent's header in the chat-first shell", () => {
+    const header = element(session, "<AgentChatHeader");
+    expect(header).toContain("<TierPicker tiers={tiers} value={tierId} onChange={handleTierChange}");
   });
 
   it("takes the Thinking row from the tier: off for Fastest, on for the others", () => {

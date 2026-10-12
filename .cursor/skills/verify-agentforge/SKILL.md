@@ -137,7 +137,7 @@ Stable handles are `data-testid` values from `apps/web`. Prefer those over CSS, 
 1. `browser_tabs` list. Navigate `http://127.0.0.1:3000/<route>` (omit `position` if you must keep focus).
 2. `browser_lock` then `browser_snapshot`.
 3. Click / type using snapshot refs. If a ref is missing, `browser_cdp` `Runtime.evaluate` to query `[data-testid="…"]` — do not fall back to clicking by CSS class.
-4. Wait on the named testid or URL, not a fixed sleep. Composer send is done when `composer-send` reads `Send` again (up to 30s).
+4. Wait on the named testid or URL, not a fixed sleep. Composer send is done when `composer-send` reads `Send` again (up to 30s). On `:3200` the button has no text, so read its accessible name (`aria-label`) instead.
 5. Unlock when the whole drive is finished.
 
 **Windows (Claude Code — no IDE browser)**
@@ -150,7 +150,7 @@ PORT=3200 AGENTFORGE_RUNTIME=stub AGENTFORGE_DATA_DIR=<throwaway> npx pnpm@9.15.
 node .cursor/skills/verify-agentforge/scripts/doctor.mjs --base http://127.0.0.1:3200
 ```
 
-A throwaway data dir is a **fresh Personal desk**: five rail tabs and no key. To reach the other modes, open `/workspaces`, press `edit-workspace-modes` on Default, press every unpressed `workspace-edit-mode-<id>`, then `save-workspace-modes` (driven 2026-09-30: the rail went from 5 work modes to 14). A scratch script resolves Playwright from `apps/web` (`createRequire("<repo>/apps/web/package.json")("@playwright/test")`), wherever the script itself lives.
+A throwaway data dir is a **fresh Personal desk**: five rail tabs and no key. To reach the other modes, open `/workspaces`, press `edit-workspace-modes` on Default, press every unpressed `workspace-edit-mode-<id>`, then `save-workspace-modes` (driven 2026-09-30: the rail went from 5 work modes to 14). On `:3200` `/workspaces` is the Virtual agents page: click `agent-hire` on each card in `agents-available` instead (driven 2026-10-09 for Legal only). A scratch script resolves Playwright from `apps/web` (`createRequire("<repo>/apps/web/package.json")("@playwright/test")`), wherever the script itself lives.
 
 Stop only the PID listening on your own port at the end (`Get-NetTCPConnection -LocalPort <port>` → `Stop-Process`), never by image name, and never the operator's :3000 / :3100.
 
@@ -163,6 +163,8 @@ AGENTFORGE_RUNTIME=stub npx playwright test
 ```
 
 Use `page.getByTestId("<id>")` exactly as the spec.
+
+**Two layouts (2026-10-09).** The table below is written for the published layout (`:3000`, `SHELL_LAYOUT` `"modes"`). On the tester webdev `:3200` (`"chat-first"`) these handles differ, and a row that names one of them is true of `:3000` only: the work-mode tiles are `agent-<mode>` (only `mode-chat` and `mode-knowledge` keep their `mode-` id); `rail-collapse`, `rail-expand`, `rail-resize`, `product-brand`, `product-logo` and `workspaces-switcher` do not exist; `composer-toolbar`, `composer-controls`, `model-picker`, `reasoning-effort` and `chat-header-menu` do not exist; `tier-picker` is in `chat-header`; `composer-attach` and `composer-enhance` are inside `composer-plus-menu`, hidden until `composer-plus` is clicked; `composer-send` has no text (its accessible name is `Send` or `Sending`); `rail-thread-list`, `thread-item`, `thread-delete` and `threads-see-all` exist only while the header's `agent-history` popover is open (`agent-history-toggle`), and `new-chat-link` is a header icon; `buddy-stage-composer` has count 0 and the character is `desk-buddy-chip` in `rail-footer`; `/workspaces` is `virtual-agents-page` (`agent-hire`, `agent-let-go`), not the Workspaces page. The handles of the new shell are in [virtual-agents.md](features/virtual-agents.md); the per-step forms are in [chat.md](features/chat.md), [model-tiers.md](features/model-tiers.md) and [rail.md](features/rail.md).
 
 **Shared handles**
 
@@ -243,7 +245,7 @@ A proof includes:
 2. **Result** — the named end state from the feature file (URL, visible testid, text)
 3. **Capture** — IDE screenshot + accessibility snapshot, or Playwright trace on Cloud retry
 4. **Doctor JSON** from this run
-5. **Side effect** when the feature mutates: thread title in `rail-thread-list`, new workspace name in `workspace-list`. Settings save is out of bounds unless the operator asked to change keys.
+5. **Side effect** when the feature mutates: thread title in `rail-thread-list` (on `:3200` open `agent-history-toggle` first), new workspace name in `workspace-list` (on `:3200` the agent card in `agents-on-desk`). Settings save is out of bounds unless the operator asked to change keys.
 
 Standards:
 

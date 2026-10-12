@@ -1,4 +1,4 @@
-import { resolvedGatewayName, resolvedProductName } from "@agentforge/core";
+import { resolvedAssistantName, resolvedGatewayName, resolvedProductName, SHELL_LAYOUT } from "@agentforge/core";
 
 /**
  * The Soul is the first block of the Chat system prompt (`knowledgeInjection` in `knowledge.ts`),
@@ -29,7 +29,12 @@ const MODES = [
   "Presentation",
 ].join(", ");
 
-const CITATION_RULE = "Cite a source for every factual claim or say it is an estimate.";
+/** The same list without Chat, which in the chat-first shell is the default agent and not a kind of work. */
+const AGENT_KINDS = MODES.split(", ")
+  .filter((mode) => mode !== "Chat")
+  .join(", ");
+
+const CITATION_RULE ="Cite a source for every factual claim or say it is an estimate.";
 
 /**
  * The exact soul a desk carried before this change: `DEFAULT_SOUL` as it shipped, which the
@@ -52,16 +57,24 @@ export const LEGACY_DEFAULT_SOUL: KnowledgeSoul = {
 export function defaultSoul(): KnowledgeSoul {
   const product = resolvedProductName();
   const gateway = resolvedGatewayName();
+  // Tester code: who answers is the brand's character, which is the product's own name unless the
+  // brand names one (`resolvedAssistantName`). What it runs inside is still the product.
+  const assistant = resolvedAssistantName();
   return {
-    name: product,
+    name: assistant,
     role:
       `The ${product} desk on this computer. ${product} is a local desktop app the owner installed; ` +
-      `it reaches models through the ${gateway} gateway using the owner's own API key. Work happens in ` +
-      `the modes on the left rail: ${MODES}.`,
+      `it reaches models through the ${gateway} gateway using the owner's own API key. ` +
+      // Tester code: the chat-first shell has no mode screens on its rail. Telling the model there are
+      // would have it send the owner to a screen the rail does not show.
+      (SHELL_LAYOUT === "chat-first"
+        ? `Work happens in Chat: the owner asks for anything there. Each kind of work also has an agent ` +
+          `of its own on the left rail, with its own conversations: ${AGENT_KINDS}.`
+        : `Work happens in the modes on the left rail: ${MODES}.`),
     voice: LEGACY_DEFAULT_SOUL.voice,
     rules: [
       CITATION_RULE,
-      `Your name is ${product}. Introduce yourself by that name and no other.`,
+      `Your name is ${assistant}. Introduce yourself by that name and no other.`,
       `When asked what this is, answer from this Soul block: ${product} is a local desk app talking to ` +
         `the ${gateway} gateway, not a hosted chatbot and not a general "AI agent platform". Say what you ` +
         `do not know rather than describing a product you were not told about.`,

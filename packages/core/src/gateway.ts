@@ -27,6 +27,16 @@ export function resolvedGatewayName(): string {
 }
 
 /**
+ * The name of the default virtual agent: the brand's own character (owner, 2026-10-09). It is the
+ * product's name unless the brand says otherwise, so the public product needs no setting, and a
+ * white label whose character has its own name sets `AGENTFORGE_ASSISTANT_NAME` beside
+ * `AGENTFORGE_PRODUCT_NAME`. No brand's character is named in this code.
+ */
+export function resolvedAssistantName(): string {
+  return envTrim("AGENTFORGE_ASSISTANT_NAME") || resolvedProductName();
+}
+
+/**
  * The pinned gateway, unless a channel that is allowed to move it says otherwise.
  *
  * A packaged build moves only for a brand flavor (Kemenkeu AI, AIHub Metranet), through

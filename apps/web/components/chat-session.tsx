@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "@/lib/nav";
+import { AgentChatHeader } from "@/components/agent-chat-controls";
+import { AgentHome } from "@/components/agent-home";
+import { TierPicker } from "@/components/tier-picker";
+import { virtualAgentHref, type VirtualAgentInfo } from "@/lib/virtual-agents";
 import { BuddyStage } from "@/components/buddy-stage";
 import { ChatAccountChip } from "@/components/chat-account-chip";
 import { ChatComposer } from "@/components/chat-composer";
@@ -43,15 +47,32 @@ import { isPinnedToEnd } from "@/lib/stick-to-bottom";
 
 type Message = { id: string; role: string; content: unknown };
 
+/**
+ * The chat-first shell around a session (tester code, `agent-chat-pane.tsx`): which virtual agent
+ * this conversation is with. Absent, the session draws as the published Chat does.
+ */
+export type ChatSessionShell = {
+  agent: VirtualAgentInfo;
+  /** The agent's name on screen: the product's name for the generalist. */
+  name: string;
+  /** New chat, Conversations, How it works: the header's own controls. */
+  controls?: ReactNode;
+  /** The URL names a thread that belongs to another agent: hand it to that agent's address. */
+  onForeignThread?: (ownerAgentId: string, threadId: string) => void;
+  /** Set when the agent's own harness still runs from its studio: the empty conversation offers it. */
+  onOpenStudio?: () => void;
+};
+
 type Props = {
   agentId?: string;
   initialThreadId?: string;
+  shell?: ChatSessionShell;
 };
 
 /** Nultron's box on the composer's ledge; about half of it shows above the edge. */
 const COMPOSER_BUDDY_SIZE = 112;
 
-export function ChatSession({ agentId, initialThreadId }: Props) {
+export function ChatSession({ agentId, initialThreadId, shell }: Props) {
   // Nultron Enterprise: a signed-in tenant may open the desk before adding a key (hosted only; false and
   // request-free elsewhere). The context estimate below embeds the query, so it goes through the gateway.
   const keyMissing = useHostedNeedsKey();
@@ -78,6 +99,9 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
   const [composerDraft, setComposerDraft] = useState<string | null>(null);
   const toolsRef = useRef(tools);
   toolsRef.current = tools;
+  /** Read inside the load effect, which must not run again because the shell object is a new one. */
+  const shellRef = useRef(shell);
+  shellRef.current = shell;
   const runningRef = useRef(running);
   runningRef.current = running;
   // The desk buddy cheers when a reply lands and flinches when a send fails; with it on screen the error
@@ -159,8 +183,12 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
     );
   }, [agentModalities, selectedTier]);
 
-  function chatPath() {
-    return agentId ? `/agents/${agentId}` : "/chat";
+  /** Where a thread of this session lives. In the chat-first shell every agent's is under `/chat`. */
+  function threadHref(id: string) {
+    if (shell) {
+      return virtualAgentHref(shell.agent.id, id);
+    }
+    return `${agentId ? `/agents/${agentId}` : "/chat"}?thread=${id}`;
   }
 
   function rememberTier(tier: ModelTierId, forThreadId?: string | null) {
@@ -217,7 +245,7 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
     awaitingUrlThreadRef.current = id;
     seenInitialThreadRef.current = id;
     setThreadId(id);
-    router.replace(`${chatPath()}?thread=${id}`);
+    router.replace(threadHref(id));
     return id;
   }
 
@@ -244,7 +272,9 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
           }
           setAgentName(agentPayload.agent?.name ?? t("chat.agent"));
           setIsDefaultChat(agentPayload.agent?.slug === "quick-chat");
-          setAgentModalities(caps.inputModalities ?? ["text"]);
+          // A virtual agent takes what Chat takes, whatever its row was created with; the host holds the
+          // same rule for the run. An agent a person built keeps what its own row says.
+          setAgentModalities(shellRef.current ? ["text", "image", "video"] : (caps.inputModalities ?? ["text"]));
           const catalog = readTierCatalog(modelPayload);
           setTiers(catalog.tiers);
           setDefaultTier(catalog.defaultTier);
@@ -280,6 +310,11 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
             return;
           }
           const threadAgentId = payload.thread?.agentId as string | undefined;
+          if (shellRef.current && threadAgentId && readyId && threadAgentId !== readyId) {
+            // An agent's address only ever shows that agent's threads.
+            shellRef.current.onForeignThread?.(threadAgentId, initialThreadId);
+            return;
+          }
           if (threadAgentId && readyId && threadAgentId !== readyId && !agentId) {
             router.replace(`/agents/${threadAgentId}?thread=${initialThreadId}`);
             return;
@@ -378,22 +413,52 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
   }, [keyMissing, threadId, hasReply, newestReplyId]);
 
   return (
-    <main className="flex h-full min-h-0 flex-col" data-testid="chat-home">
-      <ChatHeader title={isDefaultChat ? t("chat.title") : agentName} compact={empty}>
-        {hasReply ? (
-          <ChatContextChip
-            usedTokens={contextTokens}
-            contextLength={selectedTier?.contextLength ?? undefined}
-            parts={contextParts}
-          />
-        ) : null}
-        {hasReply ? <ChatUsageChip /> : null}
-        <ChatAccountChip />
-      </ChatHeader>
+    <main
+      className="flex h-full min-h-0 flex-col"
+      data-testid="chat-home"
+      data-agent={shell?.agent.id}
+      // A mode agent's pane takes its mode's colour, as its studio does. The generalist keeps Chat's.
+      data-mode={shell && !shell.agent.generalist ? shell.agent.id : undefined}
+    >
+      {shell ? (
+        <AgentChatHeader
+          agent={shell.agent}
+          name={shell.name}
+          // The tier is beside the name, not on the composer: the composer is only `+` and the box.
+          tier={<TierPicker tiers={tiers} value={tierId} onChange={handleTierChange} disabled={running} />}
+          chips={
+            <>
+              {hasReply ? (
+                <ChatContextChip
+                  usedTokens={contextTokens}
+                  contextLength={selectedTier?.contextLength ?? undefined}
+                  parts={contextParts}
+                />
+              ) : null}
+              {hasReply ? <ChatUsageChip /> : null}
+              <ChatAccountChip />
+            </>
+          }
+          controls={shell.controls}
+        />
+      ) : (
+        <ChatHeader title={isDefaultChat ? t("chat.title") : agentName} compact={empty}>
+          {hasReply ? (
+            <ChatContextChip
+              usedTokens={contextTokens}
+              contextLength={selectedTier?.contextLength ?? undefined}
+              parts={contextParts}
+            />
+          ) : null}
+          {hasReply ? <ChatUsageChip /> : null}
+          <ChatAccountChip />
+        </ChatHeader>
+      )}
 
       {error ? (
         <div className="flex w-full items-start gap-3 px-[var(--chat-gutter)]">
-          {running || thinking || tools.length > 0 || streaming || buddyTakesStatus ? null : (
+          {/* Never in the chat-first shell: there the head in the rail is the one character on screen. */}
+          {running || thinking || tools.length > 0 || streaming || buddyTakesStatus || shell ? null : (
             <NultronMascot state="error" decorative />
           )}
           <p className="text-sm text-[var(--danger)]" data-testid="chat-error" role="alert">
@@ -412,10 +477,18 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
           }
           pinRef.current = isPinnedToEnd(el.scrollTop, el.scrollHeight, el.clientHeight);
         }}
-        className={`min-h-0 w-full flex-1 overflow-y-auto overscroll-y-contain px-[var(--chat-gutter)] ${empty ? "" : "chat-thread-ledge space-y-4 pt-4"}`}
+        // `chat-thread-ledge` keeps the composer character's height free at the end of the thread. The
+        // chat-first shell draws no character there, so its thread ends with an ordinary gap.
+        className={`min-h-0 w-full flex-1 overflow-y-auto overscroll-y-contain px-[var(--chat-gutter)] ${empty ? "" : shell ? "space-y-4 pb-6 pt-4" : "chat-thread-ledge space-y-4 pt-4"}`}
         data-testid="message-list"
       >
-        {empty && !error ? <ChatLauncher onSuggest={setComposerDraft} /> : null}
+        {empty && !error ? (
+          shell && !shell.agent.generalist ? (
+            <AgentHome agent={shell.agent} name={shell.name} onOpenStudio={shell.onOpenStudio} />
+          ) : (
+            <ChatLauncher onSuggest={setComposerDraft} />
+          )
+        ) : null}
         {messages
           .filter((message) => message.role === "user" || messageHasDisplayableContent(message.content))
           .map((message) => (
@@ -441,8 +514,10 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
       {agentIdReady ? (
         <div className="chat-composer-ledge">
           {/* In a thread Nultron peeks over the composer and is the one status character; the empty
-            Chat has the hero instead. */}
-          {empty ? null : <BuddyStage kind="composer" mode="chat" size={COMPOSER_BUDDY_SIZE} />}
+            Chat has the hero instead. Not in the chat-first shell (owner, 2026-10-09: the character
+            must not overlap generated content): the thread scrolls behind this ledge, so there the
+            character is the small head in the rail, where nothing scrolls under it. */}
+          {empty || shell ? null : <BuddyStage kind="composer" mode="chat" size={COMPOSER_BUDDY_SIZE} />}
           <FolderSurface running={running} />
           <ChatComposer
             threadId={threadId}
@@ -451,7 +526,27 @@ export function ChatSession({ agentId, initialThreadId }: Props) {
             modalities={modalities.length > 0 ? modalities : ["text"]}
             tier={tierId}
             tiers={tiers}
-            onTierChange={handleTierChange}
+            // In the chat-first shell the tier is chosen in the header, so the composer shows none.
+            onTierChange={shell ? undefined : handleTierChange}
+            placeholder={shell ? t("agents.composer.placeholder", { name: shell.name }) : undefined}
+            onToolProgress={(event) => {
+              // A worker's progress line belongs to the call of that tool that is still running.
+              setTools((current) => {
+                let index = -1;
+                for (let i = current.length - 1; i >= 0; i -= 1) {
+                  if (current[i]?.key === event.toolKey && current[i]?.status === "started") {
+                    index = i;
+                    break;
+                  }
+                }
+                if (index < 0 || current[index]?.progress === event.label) {
+                  return current;
+                }
+                const next = [...current];
+                next[index] = { ...next[index]!, progress: event.label };
+                return next;
+              });
+            }}
             draft={composerDraft}
             onDraftApplied={() => setComposerDraft(null)}
             onUserSend={(payload) => {

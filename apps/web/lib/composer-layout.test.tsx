@@ -1,6 +1,10 @@
 /**
  * Chat composer and intent cards, sized by the room they have.
  *
+ * The composer is the bare bar now (`+`, message box, Send; see `composer-bare.test.tsx`), so the toolbar
+ * grid described below stays in `globals.css` for its stylesheet contracts and no longer lays out this
+ * component. The container the bar declares, its markup hooks and its names are still pinned here.
+ *
  * The composer is a CSS query container (`container-name: composer`), and the layout it picks —
  * one row wide, two rows medium, compact chips narrow — lives in `app/globals.css`, keyed to hooks
  * in the markup. The environment is node with no layout engine, so this cannot measure anything.
@@ -116,19 +120,19 @@ describe("composer container", () => {
   });
 });
 
-describe("composer toolbar markup", () => {
-  it("exposes a class hook for every grid area", () => {
+describe("composer markup", () => {
+  // The bare composer (virtual agents): a plus, the box and Send in one row. The toolbar grid in
+  // globals.css is left for the studios; this component no longer draws it. Menu behaviour and the
+  // bare layout are pinned in composer-bare.test.tsx.
+  it("draws no toolbar and none of its grid hooks", () => {
     const html = composerMarkup();
-    expect(html).toMatch(
-      /class="composer-toolbar"[^>]*data-testid="composer-toolbar"|data-testid="composer-toolbar"[^>]*class="composer-toolbar"/,
-    );
-    // `model-picker` is the grid's hook for the choice control, and the tier picker wears it (see tier-picker.tsx).
-    for (const hook of ["composer-attach", "composer-controls", "composer-send", "tier-picker", "model-picker"]) {
-      expect(html, hook).toContain(hook);
-    }
+    expect(html).not.toContain("composer-toolbar");
+    expect(html).not.toContain("composer-controls");
+    // The pill: the shell keeps its container class and gains the bare one.
+    expect(html).toMatch(/<form class="composer-shell composer-bare[ "]/);
     // The Thinking pill is gone from the composer: the tier sets the level.
     expect(html).not.toContain("composer-thinking");
-    // Layout is the CSS's; a utility left on these would fight the grid areas.
+    // Layout is the CSS's; a utility left on these would fight it.
     expect(html).not.toMatch(
       /class="[^"]*\b(?:ml-auto|basis-full|flex-1)\b[^"]*"[^>]*data-testid="composer-(?:send|needs-key)"/,
     );
@@ -136,32 +140,39 @@ describe("composer toolbar markup", () => {
 
   it("keeps every testid the drives rely on", () => {
     const html = composerMarkup();
+    // The menu rows stay mounted while it is closed, so Add files, Enhance and the picker are in the markup.
     for (const id of [
       "composer",
+      "composer-dropzone",
       "composer-text",
-      "composer-toolbar",
+      "composer-plus",
+      "composer-plus-menu",
       "composer-attach",
       "tier-picker",
       "composer-enhance",
       "composer-send",
+      "composer-file",
     ]) {
       expect(html, id).toContain(`data-testid="${id}"`);
     }
     // The model picker and the reasoning-effort select are not in the tester code's composer.
-    for (const gone of ["model-picker", "reasoning-effort", "reasoning-effort-label"]) {
+    for (const gone of ["model-picker", "reasoning-effort", "reasoning-effort-label", "composer-toolbar"]) {
       expect(html, gone).not.toContain(`data-testid="${gone}"`);
     }
   });
 
-  it("keeps a name for each control that the narrow layout hides the words of", () => {
+  it("keeps a name for each control", () => {
     const html = composerMarkup();
     // Tier: the trigger shows the choice's label only, and carries a name that contains it.
     expect(html).toMatch(/<button[^>]*aria-label="Answer style: Daily"[^>]*>/);
     expect(html).toMatch(/data-testid="tier-picker"[^>]*><span[^>]*>Daily<\/span>/);
-    // Enhance: icon-only in the narrow layout, so the name and tooltip must not depend on the label.
+    // Enhance keeps a name and tooltip of its own, and the label span a stylesheet may hide.
     expect(html).toMatch(/<button[^>]*aria-label="Enhance prompt"/);
     expect(html).toMatch(/<button[^>]*title="Enhance prompt"/);
     expect(html).toContain('class="enhance-btn-label"');
+    // The two icon-only buttons.
+    expect(html).toMatch(/data-testid="composer-plus"[^>]*aria-label="Add"/);
+    expect(html).toMatch(/<button[^>]*aria-label="Send"[^>]*data-testid="composer-send"/);
   });
 
   it("names the same controls in Indonesian", () => {
@@ -169,9 +180,14 @@ describe("composer toolbar markup", () => {
     const html = composerMarkup();
     expect(html).toMatch(/<button[^>]*aria-label="Gaya jawaban: Harian"[^>]*>/);
     expect(html).toMatch(/<button[^>]*aria-label="Tingkatkan prompt"/);
-    expect(html).toMatch(/<button[^>]*aria-label="Lampirkan"/);
+    expect(html).toContain("<span>Tambah berkas</span>");
+    expect(html).toMatch(/data-testid="composer-plus"[^>]*aria-label="Tambah"/);
+    expect(html).toMatch(/<button[^>]*aria-label="Kirim"[^>]*data-testid="composer-send"/);
   });
+});
 
+// The toolbar grid is still in globals.css for the other surfaces, so its narrow-layout rules stay pinned.
+describe("legacy toolbar stylesheet", () => {
   it("hides the words with CSS that keeps them readable to a screen reader", () => {
     const narrow = narrowBlock();
     expect(narrow).toContain(".model-picker-prefix");

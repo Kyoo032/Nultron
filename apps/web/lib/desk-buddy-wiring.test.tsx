@@ -132,9 +132,11 @@ describe("one character on screen", () => {
     const slot = read("components", "mascot-slot.tsx");
     expect(slot).toMatch(/if \(beside && takesStatus\) \{\s*return null;/);
     const turn = read("components", "chat-turn.tsx");
-    expect(turn).toMatch(/live && liveState && !takesStatus \?/);
+    // Tester code: and never inside a thread in the chat-first shell, where the rail head is the one character.
+    expect(turn).toMatch(/live && liveState && !takesStatus && SHELL_LAYOUT !== "chat-first" \?/);
     const session = read("components", "chat-session.tsx");
-    expect(session).toMatch(/buddyTakesStatus \? null/);
+    // Tester code: the error line's character also stands down in the chat-first shell (`|| shell`).
+    expect(session).toMatch(/buddyTakesStatus \|\| shell \? null/);
     expect(read("components", "app-updates.tsx")).toMatch(/face && !takesStatus/);
     expect(read("components", "component-setup.tsx")).toMatch(/face && !takesStatus/);
   });

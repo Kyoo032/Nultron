@@ -1,0 +1,96 @@
+{
+  "error": {
+    "load": "Could not load your agents.",
+    "save": "Could not update your agents."
+  },
+  "tagline": {
+    "chat": "Your general assistant. It searches, reads your files, runs code and makes media.",
+    "documents": "Writes a document from your brief, checked against the sources you give it.",
+    "research": "Researches a question on the web and writes a dossier where every finding cites a source.",
+    "finance": "Briefs, ratios, budgets and cash flow. The figures are computed, never guessed.",
+    "data": "Reads a table you add and answers questions about it with real queries.",
+    "market": "A market briefing from live prices and news, with every number computed by the app.",
+    "legal": "Reviews contracts for a matter: memo, redlines and a check on every citation.",
+    "meeting": "Turns a recording or a transcript into minutes, decisions and actions.",
+    "images": "Makes pictures from a description, or changes a picture you add.",
+    "videos": "Makes a short video clip from a description or a first frame.",
+    "music": "Makes a song or an instrumental from a description or your lyrics.",
+    "edit": "Cuts and arranges your video and audio on a timeline.",
+    "presentations": "Builds a slide deck from a brief and checks every slide fits.",
+    "education": "Lesson plans, quizzes and study guides for a topic or a file."
+  },
+  "rail": {
+    "aria": "Navigation",
+    "agentsAria": "Virtual agents",
+    "accountAria": "Account",
+    "manage": "Virtual agents",
+    "studioBadge": "Opens its studio"
+  },
+  "header": {
+    "newChat": "New chat",
+    "history": "Conversations",
+    "historyEmpty": "No conversations yet.",
+    "historyAria": "Conversations with {name}",
+    "harness": "How {name} works",
+    "seeAll": "Show all",
+    "seeFewer": "Show fewer"
+  },
+  "home": {
+    "greeting": "Hi, I'm {name}.",
+    "badge": "Runs on its own harness",
+    "skills": "What I do",
+    "ask": "Message {name}",
+    "studioTitle": "The {name} studio runs its own checks",
+    "studioNote": "This chat does the work with the general tools. The {name} harness, with its own checks, is not connected to the chat yet: open the studio when you need that run.",
+    "openStudio": "Open the {name} studio",
+    "everything": "Ask me anything. I can also write, research, work with your files, and make pictures, clips and decks."
+  },
+  "composer": {
+    "placeholder": "Message {name}",
+    "add": "Add",
+    "addFiles": "Add files",
+    "send": "Send",
+    "sending": "Sending"
+  },
+  "progress": {
+    "working": "Working"
+  },
+  "dossier": {
+    "label": "Research dossier",
+    "open": "Open",
+    "close": "Close",
+    "openAria": "Open the dossier {title}",
+    "closeAria": "Close the dossier {title}",
+    "sources": "{n} sources",
+    "sourcesOne": "1 source",
+    "sections": "{n} sections",
+    "sectionsOne": "1 section",
+    "checksPassed": "Every finding cites a source",
+    "checksFailed": "{n} checks did not pass",
+    "checksFailedOne": "1 check did not pass",
+    "notSaved": "The dossier was written but could not be saved, so it cannot be opened here.",
+    "loading": "Opening the dossier",
+    "loadFailed": "Could not open the dossier.",
+    "outlineAria": "Sections of the dossier",
+    "viewAria": "The dossier {title}"
+  },
+  "page": {
+    "title": "Virtual agents",
+    "lede": "Every agent is a harness: a prompt, tools, limits and checks that the app enforces on each run. Hire the ones your work needs.",
+    "onDesk": "On your desk",
+    "open": "Open",
+    "available": "Ready to hire",
+    "noneAvailable": "Every agent is already on your desk.",
+    "hire": "Hire",
+    "hiring": "Hiring",
+    "letGo": "Let go",
+    "lettingGo": "Letting go",
+    "always": "Always on your desk",
+    "hireAria": "Hire {name}",
+    "letGoAria": "Let {name} go",
+    "skillsCount": "{n} skills",
+    "skillsCountOne": "1 skill",
+    "converses": "Own harness in chat",
+    "studio": "Own harness in studio"
+  }
+}

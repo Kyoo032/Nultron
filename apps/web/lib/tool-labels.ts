@@ -8,6 +8,7 @@ import {
   type RichToolKey,
   type ToolStatus,
 } from "@/components/tool-rows/results";
+import { DOSSIER_TOOL_KEY, readDossierResult } from "@/components/tool-rows/dossier-result";
 import { t } from "@/lib/i18n";
 
 /** Fast tools still show a completed row; they skip the long "Working…" spinner. */
@@ -23,6 +24,7 @@ const ACTIVITY_KEYS: Record<string, string> = {
   calculator: "chat.tool.calculating",
   datetime: "chat.tool.clock",
   self_check: "chat.tool.selfChecking",
+  research_dossier: "agents.progress.working",
 };
 
 const DONE_KEYS: Record<string, string> = {
@@ -34,6 +36,7 @@ const DONE_KEYS: Record<string, string> = {
   calculator: "chat.tool.calculator",
   datetime: "chat.tool.datetime",
   self_check: "chat.tool.selfCheck",
+  research_dossier: "agents.dossier.label",
 };
 
 export function showsToolActivity(_toolKey: string): boolean {
@@ -239,6 +242,19 @@ function gist(value: unknown): string {
   return "";
 }
 
+/**
+ * The Thinking row of a dossier call: the label and the dossier's title, or the reason it failed. The
+ * generic gist would print the question and "6 fields". The card under the answer carries the rest.
+ */
+function dossierSummary(label: string, output: unknown): string {
+  const model = readDossierResult(undefined, output);
+  if (model) {
+    return `${label} · ${gist(model.title)}`;
+  }
+  const message = readString(asRecord(output), "message");
+  return message ? `${label} · ${gist(message)}` : label;
+}
+
 export function toolCallSummary(toolKey: string, input?: unknown, output?: unknown): string {
   if (toolKey === "web_fetch") {
     return webFetchLabel(input, output, "completed");
@@ -247,6 +263,9 @@ export function toolCallSummary(toolKey: string, input?: unknown, output?: unkno
     return toolRowLabel(toolKey, input, output);
   }
   const label = toolDoneLabel(toolKey);
+  if (toolKey === DOSSIER_TOOL_KEY) {
+    return dossierSummary(label, output);
+  }
   const out = gist(output);
   const inn = gist(input);
   if (out && inn) {

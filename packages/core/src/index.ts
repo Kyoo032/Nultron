@@ -6,6 +6,7 @@ export {
   QUOTA_PER_USD,
   DEFAULT_GROUP_RATIO,
   resolvedProductName,
+  resolvedAssistantName,
   resolvedGatewayName,
   resolvedGatewayBaseUrl,
   resolvedGatewayHost,
@@ -636,6 +637,21 @@ export {
   resolveProductModes,
 } from "./agents/product-modes";
 export type { ProductMode, ProductModeSource } from "./agents/product-modes";
+export { SHELL_LAYOUT } from "./agents/product-modes";
+export type { ShellLayout } from "./agents/product-modes";
+export {
+  GENERALIST_WORKER_PROMPT,
+  GENERALIST_WORKER_TOOLS,
+  VIRTUAL_AGENTS,
+  VIRTUAL_AGENT_SLUG_PREFIX,
+  isVirtualAgentSlug,
+  toolKeysWithinVirtualAgent,
+  virtualAgentBySlug,
+  virtualAgentFor,
+  virtualAgentMayCall,
+  virtualAgentsForDesk,
+} from "./agents/virtual-agents";
+export type { VirtualAgent, VirtualAgentConversation } from "./agents/virtual-agents";
 export { defineTool, invokeTool } from "./tools/define-tool";
 export type { ToolDefinition, ToolTrust } from "./tools/define-tool";
 export type {

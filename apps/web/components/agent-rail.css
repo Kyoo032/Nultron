@@ -1,0 +1,201 @@
+/* The chat-first rail (tester code): a fixed icon column. Agents scroll on their own; the account
+   links and the footer stay put under a hairline.
+
+   Sizes ride three variables so the active bar, the tiles and the column padding always agree:
+   the tile is centred in the rail, and the bar sits in the padding at the rail's left edge, inside
+   the scroller's padding box, so the scroller does not clip it. Colours come from the theme
+   variables alone, so light and dark need no second set. */
+
+.agent-rail {
+  --ar-w: 64px;
+  --ar-tile: 40px;
+  --ar-pad: 12px;
+  position: relative;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  width: var(--ar-w);
+  height: 100%;
+  background: var(--rail);
+  border-right: 1px solid var(--rail-line);
+  color: var(--rail-text-2);
+}
+
+.agent-rail-agents,
+.agent-rail-account {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px var(--ar-pad);
+}
+
+.agent-rail-agents {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Hidden: a scrollbar lane would eat the 64 px, and the tiles scroll under the wheel and the keys. */
+  scrollbar-width: none;
+}
+
+.agent-rail-agents::-webkit-scrollbar {
+  display: none;
+}
+
+.agent-rail-account {
+  flex: none;
+  padding-block: 8px;
+}
+
+.agent-rail-divider {
+  flex: none;
+  height: 1px;
+  margin-inline: var(--ar-pad);
+  background: var(--rail-line);
+}
+
+.agent-rail-footer {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 8px var(--ar-pad) 12px;
+}
+
+/* The buddy's dock is mounted so the character has a home, and given no room, so it is always the
+   small head in the footer: a body needs 64 px and would stand over the rail's own icons. */
+.agent-rail-buddy-dock {
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+/* One tile: the link is the hit area, the tile inside it (or the mark) is what is drawn. */
+.agent-rail-link {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--ar-tile);
+  height: var(--ar-tile);
+  border-radius: 12px;
+  color: var(--mode, var(--accent));
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.agent-rail-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.agent-rail-tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--mode) 14%, transparent);
+  color: var(--mode);
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.agent-rail-link:hover .agent-rail-tile {
+  background: color-mix(in srgb, var(--mode) 24%, transparent);
+}
+
+.agent-rail-link[aria-current="page"] .agent-rail-tile {
+  background: var(--mode);
+  color: var(--on-mode);
+}
+
+/* The product mark and a flavor's logo are already tiles, so they sit on the rail itself. */
+.agent-rail-generalist:hover {
+  background: var(--rail-hover);
+}
+
+.agent-rail-generalist[aria-current="page"] {
+  background: var(--rail-active);
+  box-shadow: 0 0 0 2px var(--mode);
+}
+
+.agent-rail-mark,
+.agent-rail-logo {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.agent-rail-monogram {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--rail-active-text, var(--text));
+}
+
+/* The current agent or page: a 3 px bar on the rail's left edge. */
+.agent-rail-link[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: calc(-1 * var(--ar-pad));
+  width: 3px;
+  height: 20px;
+  border-radius: 0 3px 3px 0;
+  background: var(--mode);
+  transform: translateY(-50%);
+}
+
+/* Placeholders for the agents the host has not named yet, the size of the tiles that replace them. */
+.agent-rail-skeleton {
+  flex: none;
+  width: var(--ar-tile);
+  height: var(--ar-tile);
+  border-radius: 12px;
+  background: var(--rail-hover);
+  /* Still, not pulsing: a loop only runs under `data-busy` (the perf contract in
+     `lib/motion-tokens.test.ts`), and these are on screen for one request. */
+  opacity: 0.6;
+}
+
+/* The name, drawn by the rail itself outside the scroller so nothing clips it. */
+.agent-rail-tip {
+  position: fixed;
+  z-index: 60;
+  transform: translateY(-50%);
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.14);
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-rail-link,
+  .agent-rail-tile {
+    transition: none;
+  }
+}
+
+/* A phone: the rail narrows to 56 px and the tiles to 36 px. */
+@media (max-width: 480px) {
+  .agent-rail {
+    --ar-w: 56px;
+    --ar-tile: 36px;
+    --ar-pad: 10px;
+  }
+
+  .agent-rail-agents,
+  .agent-rail-account {
+    gap: 6px;
+  }
+}

@@ -61,7 +61,7 @@
       "map": "docs/internal/maps/chat-send.md",
       "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
       "protected": true,
-      "note": "Tester shared file (the Chat run)."
+      "note": "Tester shared file (the Chat run). 2026-10-09: runs a mode agent from the registry (runPolicyFor), wires the worker channel, and passes a longer idle budget to the model runtime's stream watchdog for the default agent and mode agents."
     },
     {
       "glob": "packages/host/src/register-tools.ts",
@@ -89,7 +89,7 @@
       "map": "docs/internal/maps/chat-send.md",
       "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
       "protected": true,
-      "note": "Tester shared file."
+      "note": "Tester shared file. 2026-10-09: gains the shell prop (an agent's header, empty state and progress lines)."
     },
     {
       "glob": "apps/web/components/app-rail.tsx",
@@ -117,7 +117,119 @@
       "map": null,
       "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
       "protected": true,
-      "note": "Tester shared file (the tester adds exports here)."
+      "note": "Tester shared file (the tester adds exports here). 2026-10-09: added the ./virtual-agents export."
+    },
+    {
+      "glob": "packages/host/src/router.ts",
+      "map": "docs/internal/maps/virtual-agents.md",
+      "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
+      "protected": true,
+      "note": "Tester shared file. 2026-10-09: one route, GET /api/v1/virtual-agents, and its import."
+    },
+    {
+      "glob": "packages/host/src/handlers/chat.ts",
+      "map": "docs/internal/maps/virtual-agents.md",
+      "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
+      "protected": true,
+      "note": "Tester shared file. 2026-10-09: GET /api/v1/chat leaves a virtual agent's row (slug va-<mode>) out of the specialists list."
+    },
+    {
+      "glob": "packages/core/src/index.ts",
+      "map": "docs/internal/maps/virtual-agents.md",
+      "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
+      "protected": true,
+      "note": "Tester shared file. 2026-10-09: exports SHELL_LAYOUT and the virtual agent registry. A merge from main can conflict in the export list."
+    },
+    {
+      "glob": "apps/web/components/app-shell.tsx",
+      "map": "docs/internal/maps/virtual-agents.md",
+      "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
+      "protected": true,
+      "note": "Tester shared file. 2026-10-09: draws AgentRail instead of AppRail when SHELL_LAYOUT is chat-first. The published rail is described in shell-rail-and-workspaces.md."
+    },
+    {
+      "glob": "apps/web/components/chat-launcher.tsx",
+      "map": "docs/internal/maps/chat-send.md",
+      "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
+      "protected": true,
+      "note": "Tester shared file. 2026-10-09: hides the 'pick a model below' line when SHELL_LAYOUT is chat-first, because the tier is in the header there."
+    },
+    {
+      "glob": "apps/web/src/pages/chat-page.tsx",
+      "map": "docs/internal/maps/virtual-agents.md",
+      "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
+      "protected": true,
+      "note": "Tester shared file. 2026-10-09: /chat renders AgentChatPane when SHELL_LAYOUT is chat-first. The working copy also changed from CRLF to LF line endings, so a diff shows the whole file."
+    },
+    {
+      "glob": "apps/web/src/App.tsx",
+      "map": "docs/internal/maps/virtual-agents.md",
+      "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
+      "protected": true,
+      "note": "Tester shared file. 2026-10-09: /workspaces renders VirtualAgentsPage when SHELL_LAYOUT is chat-first."
+    },
+    {
+      "glob": "apps/web/lib/i18n.ts",
+      "map": "docs/internal/maps/locale-boot-and-run-harness.md",
+      "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
+      "protected": true,
+      "note": "Tester shared file. 2026-10-09: registers the agents and harness namespaces. Each needs a parity test."
+    },
+    {
+      "glob": "apps/web/lib/tool-labels.ts",
+      "map": "docs/internal/maps/virtual-agents.md",
+      "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
+      "protected": true,
+      "note": "Tester shared file. 2026-10-09: the row label and activity word for research_dossier."
+    },
+    {
+      "glob": "apps/web/lib/message-embeds.ts",
+      "map": "docs/internal/maps/virtual-agents.md",
+      "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
+      "protected": true,
+      "note": "Tester shared file. 2026-10-09: research_dossier joins NO_EMBED_TOOLS because it draws its own card."
+    },
+    {
+      "glob": "apps/web/locales/{en,id}/rail.json",
+      "map": null,
+      "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
+      "protected": true,
+      "note": "Tester shared file, en and id. 2026-10-09: rail.workspaces now reads Virtual agents (Agen virtual). Only the published rail uses that key, so its Workspaces link changes wording too. Keep brand names out."
+    },
+    {
+      "glob": "packages/core/src/gateway.ts",
+      "map": "docs/internal/maps/virtual-agents.md",
+      "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
+      "protected": true,
+      "note": "Tester shared file. 2026-10-09: adds resolvedAssistantName (AGENTFORGE_ASSISTANT_NAME, falling back to the product name). No brand's character is named here."
+    },
+    {
+      "glob": "packages/host/src/handlers/misc.ts",
+      "map": "docs/internal/maps/virtual-agents.md",
+      "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
+      "protected": true,
+      "note": "Tester shared file. 2026-10-09: the ping also answers assistantName."
+    },
+    {
+      "glob": "packages/host/src/knowledge-soul.ts",
+      "map": "docs/internal/maps/virtual-agents.md",
+      "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
+      "protected": true,
+      "note": "Tester shared file. 2026-10-09: the default Soul's name and its naming rule come from resolvedAssistantName. A desk that stored its Soul keeps the stored name."
+    },
+    {
+      "glob": "apps/web/lib/product-brand.tsx",
+      "map": "docs/internal/maps/virtual-agents.md",
+      "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
+      "protected": true,
+      "note": "Tester shared file. 2026-10-09: ProductBrand gains assistantName and assistantNameOf, read from the ping. A packaged flavor keeps its own over the ping's."
+    },
+    {
+      "glob": "apps/web/components/chat-hero.tsx",
+      "map": "docs/internal/maps/virtual-agents.md",
+      "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
+      "protected": true,
+      "note": "Tester shared file. 2026-10-09: when SHELL_LAYOUT is chat-first the greeting names the default agent through assistantNameOf. Also matches chat-*.tsx, whose map is chat-send.md."
     },
 
     {
@@ -147,6 +259,20 @@
       "lanes": ["personal", "enterprise", "tester"],
       "protected": false,
       "note": "The Nultron mascot. HYP AI maps every state to its own still; a new mascot state needs a manifest entry in the clone."
+    },
+    {
+      "glob": "apps/web/components/{agent-*,virtual-agents-page,composer-plus-menu,chat-dossier-card}.{tsx,css}",
+      "map": "docs/internal/maps/virtual-agents.md",
+      "lanes": ["tester"],
+      "protected": false,
+      "note": "Virtual agents shell, tester code only: the rail, an agent's pane and header, the harness panel, the Virtual agents page, the bare composer's menu and the dossier card. No published version, so no conflict at a merge from main."
+    },
+    {
+      "glob": "{packages/core/src/agents/virtual-agents*.ts,packages/host/src/virtual-agents*.ts,packages/host/src/handlers/virtual-agents.ts,packages/host/src/workers/**,apps/web/lib/virtual-agents*.ts}",
+      "map": "docs/internal/maps/virtual-agents.md",
+      "lanes": ["tester"],
+      "protected": false,
+      "note": "Virtual agents registry, catalog, worker channel and renderer helpers, tester code only."
     },
     {
       "glob": "apps/web/components/settings-*.tsx",

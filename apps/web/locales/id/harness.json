@@ -1,0 +1,188 @@
+{
+  "skills": {
+    "chat": {
+      "answer-this-turn": "Menjawab giliran ini",
+      "ground-in-desk": "Memakai meja kerja, hanya sumber yang ditawarkan",
+      "say-the-result": "Mengerjakan tugas kecil dan melaporkan hasilnya",
+      "look-not-make": "Melihat lampiran, menolak jenis yang salah",
+      "keep-the-turn": "Menyimpan giliran agar mudah ditemukan"
+    },
+    "documents": {
+      "draft-sections": "Menyusun bagian-bagian dokumen",
+      "stay-inside-source": "Tetap di dalam sumber",
+      "rewrite-one-section": "Menulis ulang satu bagian",
+      "preview-and-download": "Pratinjau dan unduh",
+      "check-against-source": "Memeriksa draf terhadap sumber"
+    },
+    "research": {
+      "plan-queries": "Merencanakan kueri",
+      "search": "Mencari di web",
+      "read-pages": "Membaca halaman",
+      "verbatim-passages": "Mengambil kutipan persis",
+      "write-dossier": "Menulis dosir"
+    },
+    "finance": {
+      "financial-brief": "Ringkasan keuangan",
+      "cash-flow": "Arus kas dan runway",
+      "budget-versus-actual": "Anggaran versus realisasi",
+      "investment-appraisal": "Penilaian investasi",
+      "ratio-health": "Pemeriksaan kesehatan rasio"
+    },
+    "data": {
+      "take-table": "Menerima tabel",
+      "private-database": "Memuat basis data pribadi",
+      "query-do-not-guess": "Menjalankan kueri, tidak menebak",
+      "show-evidence": "Menunjukkan bukti",
+      "follow-up": "Menjawab pertanyaan lanjutan"
+    },
+    "market": {
+      "build-packet": "Menyusun paket data",
+      "write-briefing": "Menulis ringkasan satu meja",
+      "run-team": "Menjalankan tim",
+      "rewrite-section": "Menulis ulang satu bagian",
+      "export-briefing": "Mengekspor ringkasan"
+    },
+    "legal": {
+      "open-matter": "Membuka perkara",
+      "diff-prior-turn": "Membandingkan dengan versi terakhir",
+      "review-playbook": "Meninjau berdasarkan playbook",
+      "verify-then-edit": "Memverifikasi, lalu menyunting",
+      "deliver-set": "Menyerahkan satu set berkas"
+    },
+    "meeting": {
+      "capture-meeting": "Merekam rapat",
+      "transcribe": "Mentranskripsi",
+      "write-minutes": "Menulis notulen",
+      "guard-names": "Menjaga ketepatan nama",
+      "translate-minutes": "Menerjemahkan notulen"
+    },
+    "images": {
+      "write-brief": "Menulis brief",
+      "choose-frame": "Memilih bingkai",
+      "generate-still": "Membuat satu gambar dan menyimpannya",
+      "retry-unsent": "Mencoba sekali lagi jika panggilan tidak terkirim",
+      "estimate-and-tighten": "Memperkirakan biaya, merapikan prompt"
+    },
+    "videos": {
+      "write-shot": "Menulis adegan",
+      "start-from-still": "Mulai dari satu gambar",
+      "estimate-and-tighten": "Memperkirakan biaya, merapikan prompt",
+      "render-retry": "Merender ulang jika pekerjaan gagal",
+      "keep-clip": "Menjaga klip sesuai durasi yang ditagih"
+    },
+    "music": {
+      "hear-sentence": "Mendengarkan satu kalimat",
+      "desk-language": "Menulis lirik dalam bahasa Anda",
+      "shape-lyric": "Membentuk lirik yang enak dinyanyikan",
+      "name-song": "Memberi judul lagu",
+      "both-takes": "Membawa pulang kedua versi"
+    },
+    "edit": {
+      "lift-dead-air": "Membuang jeda kosong",
+      "cut-on-shots": "Memotong saat gambar berganti",
+      "words-on-picture": "Menaruh teks di atas gambar",
+      "place-made-shot": "Menempatkan adegan buatan",
+      "hand-back-file": "Menyerahkan kembali berkasnya"
+    },
+    "presentations": {
+      "generate-outline": "Membuat kerangka",
+      "rewrite-one-slide": "Menulis ulang satu slide",
+      "download-pptx": "Mengunduh PPTX",
+      "edit-text": "Menyunting teks",
+      "add-shapes": "Menambah bentuk"
+    },
+    "education": {
+      "teaching-deck": "Slide pengajaran",
+      "edit-text-and-shapes": "Menyunting teks, menambah bentuk",
+      "exam-from-knowledge": "Ujian dari basis pengetahuan",
+      "book-reader": "Pembaca buku dengan OCR lokal",
+      "video-presenter": "Presenter video"
+    }
+  },
+  "tools": {
+    "calculator": "Kalkulator",
+    "datetime": "Tanggal dan waktu",
+    "web_search": "Pencarian web",
+    "web_fetch": "Membaca halaman web",
+    "image_generate": "Membuat gambar",
+    "video_generate": "Membuat klip video",
+    "past_sessions": "Obrolan sebelumnya",
+    "knowledge_search": "Mencari di Basis Pengetahuan",
+    "list_files": "Daftar berkas meja kerja",
+    "read_file": "Membaca berkas",
+    "write_file": "Menulis berkas",
+    "edit_file": "Menyunting berkas",
+    "search_files": "Mencari berkas",
+    "delete_file": "Menghapus berkas",
+    "run_code": "Menjalankan kode di sandbox",
+    "self_check": "Pemeriksaan mandiri",
+    "build_deck": "Membuat slide presentasi",
+    "research_dossier": "Dosir riset",
+    "run_sql": "Menjalankan kueri SQL",
+    "market_quotes": "Kuotasi langsung",
+    "market_history": "Riwayat harga",
+    "market_technical": "Indikator teknikal",
+    "market_macro": "Data makro",
+    "market_news": "Berita pasar",
+    "get_project": "Membaca proyek",
+    "list_clips": "Daftar klip",
+    "probe_asset": "Memeriksa berkas media",
+    "list_ingredients": "Daftar bahan",
+    "detect_silence": "Menemukan jeda hening",
+    "detect_scenes": "Menemukan pergantian adegan",
+    "transcribe": "Mentranskripsi audio",
+    "split_clip": "Membelah klip",
+    "trim_clip": "Memangkas klip",
+    "move_clip": "Memindahkan klip",
+    "delete_clips": "Menghapus klip",
+    "remove_silence": "Membuang jeda hening",
+    "split_at_scenes": "Membelah di pergantian adegan",
+    "add_title": "Menambah judul",
+    "add_caption": "Menambah teks takarir",
+    "reframe": "Mengubah bingkai gambar",
+    "set_clip_volume": "Mengatur volume klip",
+    "clear_timeline": "Mengosongkan lini masa",
+    "propose_plan": "Mengusulkan rencana",
+    "cancel_job": "Membatalkan pekerjaan",
+    "generate_image": "Membuat gambar",
+    "generate_video": "Membuat klip video",
+    "regenerate_clip": "Membuat klip ulang",
+    "variations": "Membuat variasi",
+    "extend_clip": "Memperpanjang klip",
+    "generate_storyboard": "Membuat storyboard",
+    "animate_storyboard": "Menganimasikan storyboard",
+    "match_look": "Menyamakan tampilan",
+    "propose_alt_cut": "Mengusulkan potongan lain",
+    "run_recipe": "Menjalankan resep",
+    "export": "Mengekspor video"
+  },
+  "loop": {
+    "agent": "Ia memutuskan alat mana yang dipanggil, di dalam batasnya.",
+    "pipeline": "Aplikasi menjalankan tahap yang tetap, dan model hanya menulis.",
+    "media": "Ia memanggil model pembuat media secara langsung.",
+    "none": "Ia bekerja pada berkas Anda tanpa memanggil model."
+  },
+  "panel": {
+    "title": "Cara kerja {name}",
+    "skills": "Keahlian",
+    "tools": "Alat",
+    "noTools": "Tidak ada alat untuk dipanggil: aplikasi mengerjakannya dalam tahap yang tetap.",
+    "limits": "Batas",
+    "steps": "{n} langkah model per giliran",
+    "stepsOne": "1 langkah model per giliran",
+    "calls": "{n} panggilan alat per giliran",
+    "callsOne": "1 panggilan alat per giliran",
+    "checks": "Pemeriksaan",
+    "repair": "{n} putaran perbaikan sebelum berhenti",
+    "repairOne": "1 putaran perbaikan sebelum berhenti",
+    "noRepair": "Pemeriksaan hanya melapor; tidak ada yang diperbaiki otomatis.",
+    "enforced": "Aplikasi menegakkan alat dan batas ini pada setiap proses di obrolan ini. Prompt tidak bisa mengubahnya.",
+    "close": "Tutup",
+    "statusNew": "Baru",
+    "statusOff": "Tidak ditawarkan",
+    "inChat": "Di obrolan ini",
+    "ownHarness": "Harness {name}",
+    "runsInChat": "Berjalan di obrolan ini, dengan pengecekannya.",
+    "runsInStudio": "Berjalan di studio {name}. Di obrolan ini pekerjaan dilakukan dengan alat di atas, tanpa pengecekan ini."
+  }
+}

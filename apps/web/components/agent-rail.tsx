@@ -1,0 +1,273 @@
+"use client";
+
+import { useState, type ReactNode, type SyntheticEvent } from "react";
+import type { ProductMode } from "@agentforge/core/product-modes";
+import { Link, usePathname, useSearchParams } from "@/lib/nav";
+import { AppUpdatesButton } from "@/components/app-updates";
+import { BrandMark } from "@/components/brand-mark";
+import { DeskBuddyChip, DeskBuddyDock } from "@/components/desk-buddy";
+import { ModeIcon, isModeIconName, type ModeIconName } from "@/components/mode-icons";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { productMonogram } from "@/components/app-shell";
+import { t } from "@/lib/i18n";
+import { assistantNameOf, useProductBrand, usesBundledMark } from "@/lib/product-brand";
+import type { ShellModesSource } from "@/lib/shell-modes";
+import {
+  activeAgentId,
+  useVirtualAgents,
+  virtualAgentHref,
+  virtualAgentName,
+  type VirtualAgentInfo,
+} from "@/lib/virtual-agents";
+import "./agent-rail.css";
+
+/**
+ * The chat-first shell's rail (tester code): a narrow icon column that lists the desk's virtual
+ * agents, then the account pages. It replaces `AppRail` when `SHELL_LAYOUT` is `"chat-first"`; the
+ * published rail stays for the `"modes"` layout and is not touched.
+ *
+ * No desk switcher, collapse button, resize handle or session list: the rail is a fixed 64 px
+ * (56 px on a phone) and conversations live in the chat header.
+ */
+
+type Props = {
+  /** The desk's modes. The agents come from the host's own list, so this is only kept for the shell's signature. */
+  visibleModes: ProductMode[];
+  modesSource?: ShellModesSource;
+};
+
+/** How many quiet placeholders follow the generalist while the host has not answered. */
+const SKELETON_KEYS = ["a", "b", "c"] as const;
+
+type Tip = { label: string; top: number; left: number };
+
+type RailLinkProps = {
+  href: string;
+  label: string;
+  testId: string;
+  mode: string;
+  active: boolean;
+  children: ReactNode;
+  className?: string;
+  conversation?: VirtualAgentInfo["conversation"];
+  onTip: (label: string) => (event: SyntheticEvent<HTMLElement>) => void;
+  onTipEnd: () => void;
+};
+
+function RailLink({
+  href,
+  label,
+  testId,
+  mode,
+  active,
+  children,
+  className,
+  conversation,
+  onTip,
+  onTipEnd,
+}: RailLinkProps) {
+  const showTip = onTip(label);
+  return (
+    <Link
+      href={href}
+      className={`agent-rail-link${className ? ` ${className}` : ""}`}
+      aria-current={active ? "page" : undefined}
+      aria-label={label}
+      title={label}
+      data-testid={testId}
+      data-mode={mode}
+      data-active={active ? "true" : undefined}
+      data-conversation={conversation}
+      onMouseEnter={showTip}
+      onFocus={showTip}
+      onMouseLeave={onTipEnd}
+      onBlur={onTipEnd}
+    >
+      {children}
+    </Link>
+  );
+}
+
+function GeneralistTile({ productName, logoSrc, bundled }: { productName: string; logoSrc: string; bundled: boolean }) {
+  if (bundled) {
+    // The product mark is already a tile with its own corners, so it is not set inside a second one.
+    return <BrandMark size={32} className="agent-rail-mark" />;
+  }
+  if (logoSrc) {
+    return <img src={logoSrc} alt="" className="agent-rail-logo" />;
+  }
+  return <span className="agent-rail-monogram">{productMonogram(productName)}</span>;
+}
+
+export type AgentRailViewProps = {
+  agents: readonly VirtualAgentInfo[];
+  /** False until the host has answered once. With nothing cached too, the list draws as a skeleton. */
+  loaded: boolean;
+  activeId: ProductMode | null;
+  pathname: string;
+  productName: string;
+  /** The default agent's name: the brand's character (`assistantNameOf`). Left out, the product's name. */
+  assistantName?: string;
+  logoSrc: string;
+  /** `usesBundledMark(brand)`: draw the mark that ships with the renderer instead of `logoSrc`. */
+  bundledMark: boolean;
+  /** The footer controls (theme, updates). A slot so the drawing stays free of the update bridge. */
+  footer?: ReactNode;
+};
+
+const ACCOUNT_LINKS: ReadonlyArray<{ href: string; icon: ModeIconName; testId: string; labelKey: string }> = [
+  { href: "/knowledge", icon: "knowledge", testId: "mode-knowledge", labelKey: "rail.knowledge" },
+  { href: "/channels", icon: "channels", testId: "channels-link", labelKey: "rail.channels" },
+  { href: "/workspaces", icon: "workspaces", testId: "workspaces-link", labelKey: "agents.rail.manage" },
+  { href: "/usage", icon: "usage", testId: "usage-link", labelKey: "rail.usage" },
+  { href: "/settings", icon: "settings", testId: "settings-link", labelKey: "rail.settings" },
+];
+
+/** The generalist is the one agent every desk has, so a host answer that lacks it still gets a tile. */
+const FALLBACK_GENERALIST: VirtualAgentInfo = {
+  id: "chat",
+  generalist: true,
+  conversation: "harness",
+  agentId: null,
+  loop: "agent",
+  tools: [],
+  budget: { maxSteps: 0, maxToolCalls: 0 },
+  repairRounds: 0,
+  skills: [],
+};
+
+export function AgentRailView({
+  agents,
+  loaded,
+  activeId,
+  pathname,
+  productName,
+  assistantName,
+  logoSrc,
+  bundledMark,
+  footer,
+}: AgentRailViewProps) {
+  /*
+   * The name shows in one tooltip drawn by the rail itself, outside the scrolling column. A tooltip
+   * inside that column would be clipped by it (a scroller clips both axes), and a CSS-only one cannot
+   * know where its tile sits once the list has scrolled. `position: fixed` escapes the clip, and the
+   * tile's own rectangle at hover or focus time is the anchor. `title` stays as the fallback.
+   */
+  const [tip, setTip] = useState<Tip | null>(null);
+  const onTip = (label: string) => (event: SyntheticEvent<HTMLElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const rail = event.currentTarget.closest("aside")?.getBoundingClientRect();
+    setTip({ label, top: rect.top + rect.height / 2, left: (rail?.right ?? rect.right) + 8 });
+  };
+  const onTipEnd = () => setTip(null);
+
+  // Nothing cached and no answer yet: the generalist alone, so Chat is reachable from the first frame,
+  // and quiet placeholders where the rest will land.
+  const waiting = !loaded && agents.length === 0;
+  const list = agents.some((agent) => agent.generalist) ? agents : [FALLBACK_GENERALIST, ...agents];
+
+  return (
+    <aside className="agent-rail" aria-label={t("agents.rail.aria")} data-testid="agent-rail" data-rail="min">
+      <nav
+        className="agent-rail-agents"
+        aria-label={t("agents.rail.agentsAria")}
+        aria-busy={waiting || undefined}
+        data-tour="rail-modes"
+        onScroll={onTipEnd}
+      >
+        {list.map((agent) => (
+          <RailLink
+            key={agent.id}
+            href={virtualAgentHref(agent.id)}
+            label={virtualAgentName(agent, assistantName ?? productName)}
+            testId={agent.generalist ? "mode-chat" : `agent-${agent.id}`}
+            mode={agent.id}
+            active={activeId === agent.id}
+            className={agent.generalist ? "agent-rail-generalist" : undefined}
+            conversation={agent.conversation}
+            onTip={onTip}
+            onTipEnd={onTipEnd}
+          >
+            {agent.generalist ? (
+              <GeneralistTile productName={productName} logoSrc={logoSrc} bundled={bundledMark} />
+            ) : (
+              <span className="agent-rail-tile">
+                <ModeIcon name={isModeIconName(agent.id) ? agent.id : "documents"} size={20} strokeWidth={2} />
+              </span>
+            )}
+          </RailLink>
+        ))}
+        {waiting
+          ? SKELETON_KEYS.map((key) => (
+              <span key={key} className="agent-rail-skeleton" data-testid="agent-rail-skeleton" aria-hidden="true" />
+            ))
+          : null}
+      </nav>
+
+      <div className="agent-rail-divider" aria-hidden="true" />
+
+      <div className="agent-rail-account" data-testid="rail-account-group">
+        {ACCOUNT_LINKS.map((item) => (
+          <RailLink
+            key={item.testId}
+            href={item.href}
+            label={t(item.labelKey)}
+            testId={item.testId}
+            mode={item.icon}
+            active={pathname.startsWith(item.href)}
+            onTip={onTip}
+            onTipEnd={onTipEnd}
+          >
+            <span className="agent-rail-tile">
+              <ModeIcon name={item.icon} size={20} strokeWidth={2} />
+            </span>
+          </RailLink>
+        ))}
+      </div>
+
+      <div className="agent-rail-footer" data-testid="rail-footer">
+        {footer}
+      </div>
+
+      {tip ? (
+        <span className="agent-rail-tip" style={{ top: tip.top, left: tip.left }} aria-hidden="true">
+          {tip.label}
+        </span>
+      ) : null}
+    </aside>
+  );
+}
+
+export function AgentRail(_props: Props) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const brand = useProductBrand();
+  const { agents, loaded } = useVirtualAgents();
+
+  return (
+    <AgentRailView
+      agents={agents}
+      loaded={loaded}
+      activeId={activeAgentId(pathname, searchParams)}
+      pathname={pathname}
+      productName={brand.productName}
+      assistantName={assistantNameOf(brand)}
+      logoSrc={brand.logoSrc}
+      bundledMark={usesBundledMark(brand)}
+      footer={
+        <>
+          {/* The character lives here in this shell, as the small head: the rail is the one place on
+              screen where nothing a person or a model wrote ever scrolls under it. The dock is what
+              tells the buddy it has a home; it is given no room (`agent-rail.css`), so the buddy is
+              always the head and never a body standing over the rail's icons. */}
+          <div className="agent-rail-buddy-dock" aria-hidden="true">
+            <DeskBuddyDock collapsed={false} />
+          </div>
+          <DeskBuddyChip />
+          <ThemeToggle />
+          <AppUpdatesButton collapsed />
+        </>
+      }
+    />
+  );
+}
