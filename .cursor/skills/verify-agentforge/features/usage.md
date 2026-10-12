@@ -1,19 +1,19 @@
 # Usage
 
-Usage is the desk spend and this-key wallet page at `/usage`. It is a bottom-rail link next to Workspaces and Settings — not a product mode. Day / Week / Month stacked bars and spend-by-model live here; Settings keeps a compact this-key strip and Open Usage. Map: [`docs/internal/maps/shell-rail-and-workspaces.md`](../../../../docs/internal/maps/shell-rail-and-workspaces.md).
+Usage is the desk spend and this-key wallet page at `/usage`. It is a link in the rail's pinned Account group (`rail-account-group`) next to Workspaces and Settings — not a product mode. Day / Week / Month stacked bars and spend-by-model live here; Settings keeps a compact this-key strip and Open Usage. Map: [`docs/internal/maps/shell-rail-and-workspaces.md`](../../../../docs/internal/maps/shell-rail-and-workspaces.md).
 
 ## Sub-features
 
-- `usage-open-rail` opens Usage from the left rail (`usage-link`) or from the Settings strip (`usage-panel` → `usage-open`). Collapsed rail shows the icon only. Active when the path starts with `/usage`. The page root is `usage-page`.
+- `usage-link` (there is no `usage-open-rail` testid) opens Usage from the left rail or from the Settings strip (`usage-panel` → `usage-open`). Collapsed rail shows the icon only. Active when the path starts with `/usage`. The page root is `usage-page`.
 - `usage-intro` is the header's one outcome line (`ModeHeader` `outcomeTestId`, `apps/web/components/usage-page.tsx:140`): "What this desk and this key have spent over the selected range." (`usage.intro`, `apps/web/locales/en/usage.json:3`; Indonesian in `id/usage.json:3`). Assert the testid, not the sentence.
 - `usage-range` toggles Day / Week / Month (`usage-range-day` | `usage-range-week` | `usage-range-month`). Default Day. Changing the range refetches `GET /api/v1/usage?range=…`.
-- `usage-chart` shows stacked spend-by-model bars (`usage-range-chart`) or one of **two** empty states, both on `usage-range-empty`: “No {productName} runs in this range.” when the window holds nothing (`apps/web/components/usage-range-chart.tsx:54-60`), and “Runs in this range are not priced yet.” when there are runs but no catalog price (`:61-67`). Match the testid, not either sentence — both are hardcoded English even on an `id` desk. No chart library.
+- The chart (there is no `usage-chart` testid; the handle is `usage-range-chart`) shows stacked spend-by-model bars or one of **two** empty states, both on `usage-range-empty`: “No {productName} runs in this range.” when the window holds nothing (`apps/web/components/usage-range-chart.tsx:54-60`), and “Runs in this range are not priced yet.” when there are runs but no catalog price (`:61-67`). Match the testid, not either sentence — both are hardcoded English even on an `id` desk. No chart library.
 - `usage-this-key` shows the this-key wallet card on `/usage` (and the slim strip inside `usage-panel` on Settings), with `usage-key-meter` under it when the gateway answered. Cloud / no key: the needs-key line. Desk card is `usage-desk-range`; by-model list is `usage-by-model` on this page only, one `usage-model-row-<model>` per row. Range toggle sits in the page header (`usage-range`). Do not treat the first-paint “Loading…” as empty spend.
 - The header art column (`buddy-stage-header`, `buddy-stage-header-tap`) is in the DOM at every width but only visible when the header is 60rem or wider.
 
 ## How to get to it (user POV)
 
-- Choose Usage on the left rail (`usage-link`), expanded or collapsed (collapsed it is icon-only: `aria-label` and `title` read `Usage` / `Pemakaian`, `app-rail.tsx:92`, `:133`; there is no `Use` label).
+- Choose Usage on the left rail (`usage-link`), expanded or collapsed (collapsed it is icon-only: `aria-label` and `title` read `Usage` / `Pemakaian`, `app-rail.tsx:131-132`, the expanded label span is `:92`; there is no `Use` label).
 - From Settings, follow Open Usage (`usage-open`).
 - Open `/usage` directly.
 

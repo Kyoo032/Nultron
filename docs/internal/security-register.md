@@ -199,7 +199,11 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-156](#sr-156) | Medium | Hosted: any signed-in member could delete a desk of the company, and with it every person's chats and the desk's Knowledge Base | Fixed in tree (2026-10-07), tested, renderer hides the button; not driven | Blocks a multi-person hosted pilot until driven |
 | [SR-157](#sr-157) | Medium | Hosted: stored media (pictures, clips, audio) is read, listed and deleted by company, not by person, so a colleague's picture can be fetched by its id, listed in the Images and Videos galleries, and sent to a model by a job | Open: nothing changed, because scoping by person breaks shared reads the product relies on; needs an owner decision (2026-10-07) | Blocks "Chat attachments are private to the person who attached them" |
 | [SR-165](#sr-165) | Medium | Hosted portal: `PORTAL_SIGNIN_MODE=password` gives HYP AI, and since 2026-10-09 the Nultron Enterprise release bundle's default, a username-and-password sign-in with no second factor, in place of the e-mailed code; the portal's own default when the variable is absent is still `code`, and `code` stays selectable | Built in tree, tested over a real Postgres; not driven in a browser or on a server (2026-10-07; the Enterprise bundle default is template and docs only, nothing deployed or driven, 2026-10-09). Independent review found no critical or high issue; its findings (M1, M2, L1 to L3, N1, N2) are fixed and merged (`e8a069c9`). The owner's decision, and on 2026-10-09 he accepted password-only sign-in as the Enterprise bundle default with residuals 1 to 13 as recorded; a second independent review of that default found no critical or high issue | None beyond the owner's acceptance; open until the second factor (being designed) ships |
+| [SR-166](#sr-166) | Medium | Tester code only (`agentforge-chat`): every virtual agent reads the desk's Knowledge Base and its earlier chats and can send a question to the web; the egress guard stops `web_fetch` only and never sees what entered through the prompt | Open: same exposure Chat has on `main` (SR-112's residual), new for the twelve mode agents; read from the code, not driven (2026-10-09) | Blocks promoting the chat-first shell to `main` until the owner rules on it |
+| [SR-167](#sr-167) | Medium | Tester code only: a model can start paid pictures and clips from any agent's chat; the only brake is a per-turn ceiling | Mitigated in the tester tree (2026-10-09): four pictures and one clip a turn, held by the host's budget, unit-tested; the cost card with a Run control (plan decision D4) is not built; no paid media was run | Blocks promoting the chat-first shell to `main` until the cost card exists or the owner accepts the ceiling |
 | [SR-81](#sr-81) | Low | Keyless Research search sends the masked query to four pinned public APIs | Checked, not an issue (2026-09-26) | — |
+| [SR-168](#sr-168) | Low | Tester code only: the research worker's answer to the model is text written from web pages, and was first declared host-computed (`internal`), so it was not scanned for injection | Fixed in the tester tree (2026-10-09): declared `network`, so it is scanned; three real outputs pass the scan and a poisoned one is caught, by test | Tester code only; nothing on `main` |
+| [SR-169](#sr-169) | Medium | Hosted: any member of a company can open any desk of that company. The host checks that a desk belongs to the session's company and never reads `workspace_members` | Open, needs the owner's call (2026-10-12): if desks are company-wide by design, record that and close this row; if some desks are for some people only, it is an access-control gap | Before a hosted company keeps material on one desk that some of its members must not see |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -5720,6 +5724,106 @@ console, and give later agents the key by path, never by attachment. Until then,
 address only.
 
 Gate: **blocks handing the server over to Hypernet.** It does not block the install or the tester round.
+
+### SR-166 {#sr-166}
+
+**Tester code only: every virtual agent reads private material and can send a question to the web.**
+Raised 2026-10-09. Medium. Open. This row is about the tester code in `C:\Users\rizky\agentforge-chat`
+(`tester/chat-first`, uncommitted); nothing in it is on `main`.
+
+Evidence: on 2026-10-09 the owner ruled that every virtual agent is a full chat ("not just default agents,
+all virtual agents able to do everything"). A mode agent's run therefore now gets what Chat gets: the
+earlier-chats hint and the Knowledge Base excerpts in its system prompt
+(`agentforge-chat\packages\host\src\runs.ts:184`, `:189`, `:212`), and the full tool set, which includes
+`web_search`, `web_fetch` and the worker `research_dossier`
+(`agentforge-chat\packages\core\src\agents\virtual-agents.ts:99`). The egress guard is the only brake, and it
+stops less than its name says (`packages/core/src/runtime/egress-guard.ts:150-159`, the same file on `main`):
+it refuses `web_fetch` only, and only after a tool whose output is the person's own content has run in that
+turn. It does not check `web_search` or `research_dossier`, so after a private read a model can still put
+private text into a search query or a dossier question. It does not see what enters through the system
+prompt, so reading Knowledge Base excerpts there does not taint the run.
+
+What it means: this is the exposure the published Chat already has (SR-112 and its recorded residual). What is
+new is its reach: twelve more agents have it, each with a prompt that encourages web work in its field. A
+poisoned page or file that makes a model search for a string containing private text would leak that text to
+the search provider.
+
+Fix: an owner ruling first (the plan's risk 5 asked for one in phase C0 and none was made). Options: taint the
+run from the prompt-side reads too, or scan a worker's question the way a fetched URL is checked, or accept it
+as Chat's own residual.
+
+Gate: **blocks promoting the chat-first shell to `main`** until the owner rules. It does not block the tester
+round. Not driven.
+
+### SR-167 {#sr-167}
+
+**Tester code only: a model can start paid media from any agent's chat.**
+Raised 2026-10-09. Medium. Mitigated, not closed.
+
+Evidence: every virtual agent binds `image_generate` and `video_generate`, and the Images and Videos agents'
+prompts tell the model to call them (`agentforge-chat\packages\core\src\agents\virtual-agents.ts`, the
+`SPECIALTIES` table). Each call spends the owner's money at the gateway. The plan's decision D4 says a clip
+shows a cost card and waits for the person's Run; that card is not built.
+
+Mitigation in the tester tree: a ceiling of four pictures and one clip a turn, in every agent's budget
+(`PAID_MEDIA_PER_TURN`, `agentforge-chat\packages\core\src\agents\virtual-agents.ts:107-110`, `:117`), which
+the host's tool budget enforces for the run. Tests:
+`agentforge-chat\packages\core\src\agents\virtual-agents-paid-media.test.ts`, and the budget the default
+agent's run is handed in `agentforge-chat\packages\host\src\runs-budget.test.ts`. No paid media was run, so
+the ceiling is proven by unit test only.
+
+What it means: a model that misreads a request can still spend up to four pictures and one clip in one turn
+without the person pressing anything, and can do it again on the next turn.
+
+Fix: the D4 cost card, or the owner's acceptance of the ceiling as the rule.
+
+Gate: **blocks promoting the chat-first shell to `main`** until one of the two. It does not block the tester
+round.
+
+### SR-168 {#sr-168}
+
+**Tester code only: the research worker's answer to the model was not scanned for injection.**
+Raised 2026-10-09. Low. Fixed in the tester tree, tested.
+
+Evidence: `research_dossier` returns a summary and section headings that a model wrote from web pages. The
+tool was first declared `trust: "internal"`, and the runtime scans a tool's output for injection only when its
+trust is not `internal` (`packages/core/src/runtime/invoke-guarded.ts:71`). The harness scans each page it
+reads (`packages/host/src/research-generate.ts`), so this was a second line that was missing, not the only
+one.
+
+Fix made: the tool is `trust: "network"` (`agentforge-chat\packages\host\src\workers\research-dossier-tool.ts:107`),
+like `web_search` and `web_fetch`. A scan that flagged ordinary dossier text would silently cost every run its
+card, so `agentforge-chat\packages\host\src\workers\research-dossier-scan.test.ts` holds the three outputs
+the tool really returned on 2026-10-09 (two dossiers, one refusal): all three pass, and one with an injected
+instruction is caught. Not driven after the change: the dossiers on screen that day were made before it.
+
+Gate: none. Tester code only.
+
+### SR-169 {#sr-169}
+
+**Hosted: any member of a company can open any desk of that company.**
+Raised 2026-10-12. Medium until the owner rules. Open.
+
+Evidence: `resolvePortalTenant` (`packages/db/src/portal-owner.ts:279-329`) checks that the session's
+company exists in its tenant (`:291-298`) and that the person is a member of that company (`:300-307`).
+For the desk, it loads every desk of the company (`:309`) and accepts the client-supplied desk id when it
+is any one of them (`:313-316`). The `workspace_members` table exists (`packages/db/src/schema.ts:326-345`)
+but nothing on this path reads it. So a member who knows or guesses another desk's id of the same company
+opens it with the WORKSPACE cookie. Another company's desk stays `workspace_not_found`; this is not a
+cross-tenant leak.
+
+Why it is not simply a bug: "a company shares a desk" (`AGENTS.md`, private by person on Enterprise) may
+mean every desk is company-wide by design, and per-person privacy is meant to come from per-person rows
+(threads carry `user_id`, `schema.ts:436`; a chat attachment goes to the person's private folder), not from
+desk membership. Found while writing the tester's team board spec (`agentforge-chat\docs\internal\team-board-spec.md`,
+section 2a), which needs to know who can see a board.
+
+Owner's call: (a) desks are company-wide; record it in `AGENTS.md` and close this row as checked, not an
+issue; or (b) a desk can be limited to some people; then `resolvePortalTenant` reads `workspace_members`
+for the chosen desk, a test proves a non-member gets `workspace_not_found`, and Personal is unchanged (one
+person, one owner row).
+
+Gate: decide before a hosted company keeps material on one desk that some of its members must not see.
 
 ## Must be true before the Tencent Cloud deploy
 
