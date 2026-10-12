@@ -15,7 +15,6 @@ import {
   matchStubFillScenario,
   matchStubGenerateScenario,
   modeMessage,
-  redactSecrets,
   resolveRuntimeMode,
   stubEditCardCopy,
   withOutputLanguage,
@@ -37,7 +36,7 @@ import { hostEditBackend } from "./backend";
 import { undoCard } from "./undo";
 import { appendEditMetric } from "./metrics";
 import { runEditHarness } from "./harness-run";
-import { redactToolEvent } from "../chat-tool-events";
+import { screenEvent, screenToolCompleted } from "./tool-screen";
 
 const MUTATING = new Set([
   "split_clip",
@@ -204,18 +203,6 @@ function pushToolFrames(queue: StringQueue, output: unknown): void {
   }
 }
 
-/**
- * What leaves the agent stream for the screen. A tool's input and output are the redacted copy Chat sends
- * (`redactToolEvent`), and a failure's own words are masked as Chat masks them. The runtime's event is not
- * changed, and the tool frames are read from this same copy.
- */
-function screenEvent(event: RuntimeEvent): RuntimeEvent {
-  if (event.type === "run.failed" || event.type === "run.interrupted") {
-    return { ...event, message: redactSecrets(event.message) };
-  }
-  return redactToolEvent(event);
-}
-
 function firstClipId(doc: Awaited<ReturnType<typeof foldProject>>): string | undefined {
   return (
     doc.clips.find((clip) => doc.tracks.find((track) => track.id === clip.trackId)?.kind === "video")?.id ??
@@ -316,7 +303,7 @@ export async function runEditAgent(input: {
         return;
       }
       const message = error instanceof ApiError ? error.message : modeMessage("editAgentFailed", localeForRun());
-      queue.push(encodeSse({ type: "run.failed", message }));
+      queue.push(encodeSse(screenEvent({ type: "run.failed", message })));
     } finally {
       queue.close();
     }
@@ -349,9 +336,10 @@ async function runStub(
     const args = "buildArgs" in scenario ? scenario.buildArgs(input.text) : scenario.args;
     queue.push(encodeEditSse({ type: "tool.started", toolKey: "run_recipe", touching: [] }));
     const output = tool ? await invokeToolGuarded(tool, args, input.tenant) : { error: "missing_tool" };
-    queue.push(encodeSse({ type: "tool.completed", toolKey: "run_recipe", output }));
-    if (output && typeof output === "object" && "card" in output) {
-      queue.push(encodeEditSse({ type: "edit.plan", card: (output as { card: unknown }).card }));
+    const screenedRecipe = screenToolCompleted("run_recipe", output);
+    queue.push(encodeSse(screenedRecipe));
+    if (screenedRecipe.output && typeof screenedRecipe.output === "object" && "card" in screenedRecipe.output) {
+      queue.push(encodeEditSse({ type: "edit.plan", card: (screenedRecipe.output as { card: unknown }).card }));
     }
     queue.push(encodeSse({ type: "run.completed", runId }));
     return;
@@ -363,7 +351,7 @@ async function runStub(
     const output = tool
       ? await invokeToolGuarded(tool, scenario.args, input.tenant)
       : { success: false, refused: "confirm_required" };
-    queue.push(encodeSse({ type: "tool.completed", toolKey: "clear_timeline", output }));
+    queue.push(encodeSse(screenToolCompleted("clear_timeline", output)));
     queue.push(encodeSse({ type: "run.completed", runId }));
     return;
   }
@@ -400,7 +388,7 @@ async function runStub(
     const estimate = scenario.toolKey === "transcribe" ? 0.02 : estimateEditJobUsd(model, { seconds, count });
     const charged = chargeTurnBudget(budget, estimate);
     if (!charged.ok) {
-      queue.push(encodeSse({ type: "tool.completed", toolKey: scenario.toolKey, output: charged.refusal }));
+      queue.push(encodeSse(screenToolCompleted(scenario.toolKey, charged.refusal)));
       const plan = await hostEditBackend.proposePlan(input.tenant, {
         steps: [
           {
@@ -475,8 +463,9 @@ async function runStub(
   queue.push(encodeEditSse({ type: "tool.started", toolKey: scenario.toolKey, touching }));
   const tool = getTool(scenario.toolKey);
   const output = tool ? await invokeToolGuarded(tool, args, input.tenant) : { error: "missing_tool" };
-  queue.push(encodeSse({ type: "tool.completed", toolKey: scenario.toolKey, output }));
-  pushToolFrames(queue, output);
+  const screened = screenToolCompleted(scenario.toolKey, output);
+  queue.push(encodeSse(screened));
+  pushToolFrames(queue, screened.output);
   const card = stubEditCardCopy(scenario, localeForRun());
   queue.push(encodeSse({ type: "assistant.delta", text: `${card.verb} · ${card.object}` }));
   const completed: RuntimeEvent = { type: "run.completed", runId };

@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { ApiError, secondsToFrames, type Asset, type EditJobKind } from "@agentforge/core";
+import { ApiError, redactSecrets, secondsToFrames, type Asset, type EditJobKind } from "@agentforge/core";
 import { db, editCards, editJobs, editUnplaced } from "@agentforge/db";
 import { requireGatewayAllowedFor } from "../gateway-gate";
 import { readMediaDataUrl } from "../media";
@@ -406,7 +406,7 @@ async function completeSucceeded(job: JobRow, outputAssetIds: string[]): Promise
 async function failJob(job: JobRow, status: "failed" | "cancelled" | "interrupted", error?: string): Promise<JobRow> {
   const finished = await patchJob(job.id, job.projectId, {
     status,
-    error,
+    error: error === undefined ? undefined : redactSecrets(error),
     finishedAt: new Date(),
     cancelRequestedAt: status === "cancelled" ? new Date() : job.cancelRequestedAt,
   });
