@@ -1,6 +1,6 @@
 # Legal
 
-Legal is a matter job: .docx files in, position-aware review, verified deliverables out (issues memorandum, tracked-changes redline, deviation report, red-flags Markdown). v1 accepts .docx only. Live runs need a gateway key; matter intake, uploads, and role editing work without one. Map: [`docs/internal/maps/legal-matter-run.md`](../../../../docs/internal/maps/legal-matter-run.md).
+Legal is a matter job: .docx files in, position-aware review, verified deliverables out (issues memorandum, tracked-changes redline, deviation report, red-flags Markdown). the studio accepts .docx only (`isDocxFile`, `legal-client.ts:327-329`; the host file layer also reads PDF, `store-files.ts:41`, `:243-282`, but the web client never sends one). Live runs need a gateway key; matter intake, uploads, and role editing work without one. Map: [`docs/internal/maps/legal-matter-run.md`](../../../../docs/internal/maps/legal-matter-run.md).
 
 ## Sub-features
 
@@ -37,7 +37,7 @@ Preconditions:
 - Doctor exits 0.
 - `mode-legal` is visible on Home or on the Legal preset. If count is 0, you are on a desk that hid Legal — not a missing agent.
 - Stub proof stops at intake, upload, role editing, and the refused run. Live run only if the operator asked and doctor reports `ai`. The refused run holds only on a keyless or stub desk; on a keyed desk the same press runs the model.
-- Nine of the ten legal routes never reach the gateway (`packages/host/src/handlers/legal.ts:114`). Intake, upload, role editing, delete and playbooks are fully driveable on a keyless desk; only `run/stream` needs a key.
+- The legal routes the web client calls never reach the gateway except `run/stream` (`packages/host/src/handlers/legal.ts:114`; the router now lists 16 legal routes, `router.ts:429-447`, and the model-backed `extract/stream` and `ask/stream` at `:442`, `:446` are gated by `requireGatewayAllowedFor` but called by no web component). Intake, upload, role editing, delete and playbooks are fully driveable on a keyless desk; only `run/stream` needs a key.
 - Packaged proof repeats the same steps in the installed app, not only on `:3000`.
 
 - **Shell.** Rail shows Legal. `/legal` renders `legal-studio` empty, with the matter panel, the matter map, “What will happen”, and previous matters.
@@ -56,7 +56,7 @@ Preconditions:
 
 ## Gotchas
 
-- v1 accepts .docx only. A .txt or .pdf is refused with the exact sentence above — a refusal, not a crash, and nothing joins the matter. The studio's pre-check shows the localized `legal.errors.docxOnly` (`apps/web/components/legal-studio.tsx:74`); the hardcoded English `LEGAL_DOCX_ONLY_MESSAGE` (`apps/web/lib/legal-client.ts:17-18`) is now only the client library's own guard behind it.
+- the studio accepts .docx only (`isDocxFile`, `legal-client.ts:327-329`; the host file layer also reads PDF, `store-files.ts:41`, `:243-282`, but the web client never sends one). A .txt or .pdf is refused with the exact sentence above — a refusal, not a crash, and nothing joins the matter. The studio's pre-check shows the localized `legal.errors.docxOnly` (`apps/web/components/legal-studio.tsx:74`); the hardcoded English `LEGAL_DOCX_ONLY_MESSAGE` (`apps/web/lib/legal-client.ts:17-18`) is now only the client library's own guard behind it.
 - A refusal by the **host** (a renamed `.docx` that fails the zip-magic sniff, `packages/host/src/legal/store-files.ts:163-165`) is a different path: HTTP 400 `unsupported_content_type` with the localized `unsupportedFile` copy (`packages/core/src/legal/output-copy.ts:69`, id at `:167`).
 - The matter is created **lazily** on the first accepted upload (`ensureMatter`, after `refusedUpload`). There is no matter row to assert before a file is dropped; a refused `.txt` no longer leaves an empty matter (fixed 2026-09-23). Clean it up with `DELETE /api/v1/legal/matters/:matterId` — there is no UI control for it.
 - **Clean up your matter with the route, not the UI.** `deleteLegalMatter` exists (`apps/web/lib/legal-client.ts:322-325`) but no component calls it; the only references are in its own test. `DELETE /api/v1/legal/matters/:matterId` returns `{ ok: true }` and `rmSync`s the matter folder (`packages/host/src/legal/store.ts:173`) — but it leaves `<dataDir>/legal/<workspaceId>/` behind as an empty directory, so check for the *matter* folder, not the workspace one.
