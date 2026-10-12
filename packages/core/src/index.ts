@@ -34,6 +34,7 @@ export {
   PROVIDER_IDS,
   PROVIDERS,
   availableProviders,
+  GATEWAY_PROVIDER_ID,
   isProviderId,
   providerBaseUrl,
   providerEntry,

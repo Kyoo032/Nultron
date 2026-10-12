@@ -1,3 +1,4 @@
+import { GATEWAY_PROVIDER_ID } from "../providers/gateway-id";
 import type { ProviderId } from "../providers/registry";
 import { CHAT_DEFAULT_PREFERENCES } from "./preferred";
 
@@ -86,12 +87,12 @@ function define(
  * Only the pinned gateway has lists. Enterprise key providers get theirs in M4.
  */
 export const TIER_DEFINITIONS: TierDefinitions = Object.freeze({
-  daily: define("daily", "default", { toko: CHAT_DEFAULT_PREFERENCES }),
+  daily: define("daily", "default", { [GATEWAY_PROVIDER_ID]: CHAT_DEFAULT_PREFERENCES }),
   fast: define("fast", "off", {
-    toko: ["deepseek-v4-1-flash", "gpt-6-luna", "gpt-5.6-luna", "deepseek-v4-flash"],
+    [GATEWAY_PROVIDER_ID]: ["deepseek-v4-1-flash", "gpt-6-luna", "gpt-5.6-luna", "deepseek-v4-flash"],
   }),
   reasoning: define("reasoning", "deep", {
-    toko: ["claude-opus-5-5", "gpt-6-astra", "gpt-5.6-sol", "kimi-k3"],
+    [GATEWAY_PROVIDER_ID]: ["claude-opus-5-5", "gpt-6-astra", "gpt-5.6-sol", "kimi-k3"],
   }),
 });
 

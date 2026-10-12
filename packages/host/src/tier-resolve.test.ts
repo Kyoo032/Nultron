@@ -1,7 +1,14 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { ApiError, INPUT_MODALITIES, availableProviders, type InputModality } from "@agentforge/core";
+import {
+  ApiError,
+  GATEWAY_PROVIDER_ID,
+  INPUT_MODALITIES,
+  PROVIDER_IDS,
+  availableProviders,
+  type InputModality,
+} from "@agentforge/core";
 import { DEFAULT_MODEL_TIER, MODEL_TIERS, TIER_DEFINITIONS, type ModelTierId } from "@agentforge/core/tiers";
 import { markJobModelDown, resetJobModelCircuit } from "./job-model-fallback";
 import type { SelectableModel } from "./selectable-models";
@@ -40,29 +47,29 @@ function row(id: string, inputModalities: InputModality[] = TEXT, contextLength?
   };
 }
 
-function tokoCandidates(tier: ModelTierId): readonly string[] {
-  return TIER_DEFINITIONS[tier].candidates.toko ?? [];
+function gatewayCandidates(tier: ModelTierId): readonly string[] {
+  return TIER_DEFINITIONS[tier].candidates[GATEWAY_PROVIDER_ID] ?? [];
 }
 
-/** A catalog that lists every Toko Token candidate of every tier, text only. */
+/** A catalog that lists every gateway candidate of every tier, text only. */
 function fullCatalog(modalities: InputModality[] = TEXT): SelectableModel[] {
-  const ids = [...new Set(MODEL_TIERS.flatMap((tier) => tokoCandidates(tier)))];
+  const ids = [...new Set(MODEL_TIERS.flatMap((tier) => gatewayCandidates(tier)))];
   return ids.map((id) => row(id, modalities));
 }
 
 describe("tierLiveness", () => {
-  it("offers the providers the registry allows, which off the hosted server is Toko Token alone", () => {
+  it("offers the providers the registry allows, which off the hosted server is the gateway alone", () => {
     expect(tierLiveness(fullCatalog()).providers).toEqual(availableProviders());
-    expect(tierLiveness(fullCatalog()).providers).toEqual(["toko"]);
+    expect(tierLiveness(fullCatalog()).providers).toEqual([GATEWAY_PROVIDER_ID]);
   });
 
   it("lists a candidate under the catalog's own spelling, ignoring letter case", () => {
     const liveness = tierLiveness([row("GPT-6-Luna")]);
-    expect(liveness.listedAs("toko", "gpt-6-luna")).toBe("GPT-6-Luna");
-    expect(liveness.listedAs("toko", "gpt-6-sol")).toBeUndefined();
+    expect(liveness.listedAs(GATEWAY_PROVIDER_ID, "gpt-6-luna")).toBe("GPT-6-Luna");
+    expect(liveness.listedAs(GATEWAY_PROVIDER_ID, "gpt-6-sol")).toBeUndefined();
   });
 
-  it("supports no provider but toko at M1", () => {
+  it("supports no provider but the gateway at M1", () => {
     const liveness = tierLiveness(fullCatalog());
     for (const provider of ["openai", "anthropic", "google", "openrouter"] as const) {
       expect(liveness.listedAs(provider, "gpt-6-luna"), provider).toBeUndefined();
@@ -71,9 +78,9 @@ describe("tierLiveness", () => {
 
   it("asks the breaker by model alone, whatever the provider and whatever the case", () => {
     const liveness = tierLiveness(fullCatalog());
-    expect(liveness.isDown("toko", "gpt-6-luna")).toBe(false);
+    expect(liveness.isDown(GATEWAY_PROVIDER_ID, "gpt-6-luna")).toBe(false);
     markJobModelDown("GPT-6-LUNA");
-    expect(liveness.isDown("toko", "gpt-6-luna")).toBe(true);
+    expect(liveness.isDown(GATEWAY_PROVIDER_ID, "gpt-6-luna")).toBe(true);
     expect(liveness.isDown("openai", "gpt-6-luna")).toBe(true);
   });
 
@@ -82,10 +89,10 @@ describe("tierLiveness", () => {
     const text = tierLiveness(catalog, "text");
     const image = tierLiveness(catalog, "image");
     const video = tierLiveness(catalog, "video");
-    expect(text.listedAs("toko", "text-only")).toBe("text-only");
-    expect(image.listedAs("toko", "text-only")).toBeUndefined();
-    expect(image.listedAs("toko", "sees")).toBe("sees");
-    expect(video.listedAs("toko", "sees")).toBeUndefined();
+    expect(text.listedAs(GATEWAY_PROVIDER_ID, "text-only")).toBe("text-only");
+    expect(image.listedAs(GATEWAY_PROVIDER_ID, "text-only")).toBeUndefined();
+    expect(image.listedAs(GATEWAY_PROVIDER_ID, "sees")).toBe("sees");
+    expect(video.listedAs(GATEWAY_PROVIDER_ID, "sees")).toBeUndefined();
   });
 });
 
@@ -96,27 +103,27 @@ describe("resolveTierForCatalog", () => {
       const resolved = resolveTierForCatalog(tier, catalog);
       expect(resolved.ok, tier).toBe(true);
       if (resolved.ok) {
-        expect(resolved.model).toBe(tokoCandidates(tier)[0]);
-        expect(resolved.provider).toBe("toko");
+        expect(resolved.model).toBe(gatewayCandidates(tier)[0]);
+        expect(resolved.provider).toBe(GATEWAY_PROVIDER_ID);
       }
     }
   });
 
   it("returns the catalog's spelling, not the list's", () => {
-    const head = tokoCandidates("daily")[0] as string;
+    const head = gatewayCandidates("daily")[0] as string;
     const resolved = resolveTierForCatalog("daily", [row(head.toUpperCase())]);
     expect(resolved.ok && resolved.model).toBe(head.toUpperCase());
   });
 
   it("skips a model the breaker holds down", () => {
-    const [head, second] = tokoCandidates("fast") as [string, string];
+    const [head, second] = gatewayCandidates("fast") as [string, string];
     markJobModelDown(head);
     const resolved = resolveTierForCatalog("fast", fullCatalog());
     expect(resolved.ok && resolved.model).toBe(second);
   });
 
   it("is unavailable when every candidate is held down, and never falls to another tier", () => {
-    for (const id of tokoCandidates("reasoning")) {
+    for (const id of gatewayCandidates("reasoning")) {
       markJobModelDown(id);
     }
     const resolved = resolveTierForCatalog("reasoning", fullCatalog());
@@ -125,7 +132,7 @@ describe("resolveTierForCatalog", () => {
   });
 
   it("filters by input modality for an image run", () => {
-    const [head, second] = tokoCandidates("daily") as [string, string];
+    const [head, second] = gatewayCandidates("daily") as [string, string];
     const catalog = [row(head, TEXT), row(second, TEXT_IMAGE)];
     const asText = resolveTierForCatalog("daily", catalog, "text");
     const asImage = resolveTierForCatalog("daily", catalog, "image");
@@ -149,7 +156,7 @@ describe("tierCatalog", () => {
   });
 
   it("takes the context length from the model the tier resolves to", () => {
-    const [head, second] = tokoCandidates("daily") as [string, string];
+    const [head, second] = gatewayCandidates("daily") as [string, string];
     const entries = tierCatalog([row(head, TEXT, 200_000), row(second, TEXT, 1_000_000)]);
     expect(entries.find((entry) => entry.id === "daily")?.contextLength).toBe(200_000);
   });
@@ -160,19 +167,19 @@ describe("tierCatalog", () => {
   });
 
   it("unions the modalities of every live candidate, so an image can be attached whenever a send could resolve", () => {
-    const [head, second] = tokoCandidates("daily") as [string, string];
+    const [head, second] = gatewayCandidates("daily") as [string, string];
     // The head takes text only and the second takes images: a text send resolves to the head, an
     // image send to the second, so the tier accepts both.
     const entries = tierCatalog([row(head, TEXT), row(second, TEXT_IMAGE)]);
     expect(entries.find((entry) => entry.id === "daily")?.inputModalities).toEqual(["text", "image"]);
     // A tier whose only listed candidate is text only offers text only.
-    const [fastHead] = tokoCandidates("fast") as [string];
+    const [fastHead] = gatewayCandidates("fast") as [string];
     const textOnly = tierCatalog([row(fastHead, TEXT)]);
     expect(textOnly.find((entry) => entry.id === "fast")?.inputModalities).toEqual(["text"]);
   });
 
   it("keeps the modalities in the registry's order and never repeats one", () => {
-    const [head] = tokoCandidates("daily") as [string];
+    const [head] = gatewayCandidates("daily") as [string];
     const entries = tierCatalog([row(head, ["video", "image", "text"])]);
     const modalities = entries.find((entry) => entry.id === "daily")?.inputModalities ?? [];
     expect(modalities).toEqual(INPUT_MODALITIES.filter((modality) => modalities.includes(modality)));
@@ -181,14 +188,14 @@ describe("tierCatalog", () => {
   });
 
   it("leaves a modality out when the only candidate that takes it is held down", () => {
-    const [head, second] = tokoCandidates("daily") as [string, string];
+    const [head, second] = gatewayCandidates("daily") as [string, string];
     markJobModelDown(second);
     const entries = tierCatalog([row(head, TEXT), row(second, TEXT_IMAGE)]);
     expect(entries.find((entry) => entry.id === "daily")?.inputModalities).toEqual(["text"]);
   });
 
   it("marks a tier with no live candidate unavailable, text only, with no context length", () => {
-    const [dailyHead] = tokoCandidates("daily") as [string];
+    const [dailyHead] = gatewayCandidates("daily") as [string];
     const entries = tierCatalog([row(dailyHead, TEXT_IMAGE, 128_000)]);
     const reasoning = entries.find((entry) => entry.id === "reasoning");
     expect(reasoning).toEqual({ id: "reasoning", available: false, inputModalities: ["text"], contextLength: null });
@@ -210,7 +217,7 @@ describe("tierCatalog", () => {
       expect(json, model.id).not.toContain(model.id.toLowerCase());
       expect(json, model.friendlyLabel).not.toContain(model.friendlyLabel.toLowerCase());
     }
-    for (const provider of ["toko", "openai", "anthropic", "google", "openrouter"]) {
+    for (const provider of PROVIDER_IDS) {
       expect(json, provider).not.toContain(provider);
     }
   });
@@ -297,7 +304,7 @@ describe("chooseTierRun", () => {
     const error = failure({ tier: "reasoning" }, "text", []);
     expect(error.code).toBe("tier_unavailable");
     expect(error.status).toBe(503);
-    for (const id of tokoCandidates("reasoning")) {
+    for (const id of gatewayCandidates("reasoning")) {
       expect(error.message).not.toContain(id);
     }
   });
@@ -320,12 +327,14 @@ describe("chooseTierRun", () => {
   });
 
   it("returns the resolved model in the catalog's spelling", () => {
-    const resolved = chooseTierRun({ tier: "daily" }, "text", [row(tokoCandidates("daily")[0]?.toUpperCase() ?? "")]);
-    expect(resolved?.model).toBe(tokoCandidates("daily")[0]?.toUpperCase());
+    const resolved = chooseTierRun({ tier: "daily" }, "text", [
+      row(gatewayCandidates("daily")[0]?.toUpperCase() ?? ""),
+    ]);
+    expect(resolved?.model).toBe(gatewayCandidates("daily")[0]?.toUpperCase());
   });
 
   it("resolves an image run to a model that takes images", () => {
-    const [head, second] = tokoCandidates("daily") as [string, string];
+    const [head, second] = gatewayCandidates("daily") as [string, string];
     const resolved = chooseTierRun({ tier: "daily" }, "image", [row(head, TEXT), row(second, TEXT_IMAGE)]);
     expect(resolved?.model).toBe(second);
   });

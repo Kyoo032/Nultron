@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { availableProviders, PROVIDER_IDS, type ProviderId } from "../providers/registry";
+import { availableProviders, GATEWAY_PROVIDER_ID, PROVIDER_IDS, type ProviderId } from "../providers/registry";
 import type { ResolvedChatWire } from "../runtime/chat-wire";
 import { allowedEffortsFor, modelPolicy, offFormatFor } from "./model-policy";
 import { CHAT_DEFAULT_PREFERENCES } from "./preferred";
@@ -16,7 +16,9 @@ import {
   type TierLiveness,
 } from "./tiers";
 
-const TOKO_IDS = [...new Set(MODEL_TIERS.flatMap((tier) => TIER_DEFINITIONS[tier].candidates.toko ?? []))];
+const GATEWAY_IDS = [
+  ...new Set(MODEL_TIERS.flatMap((tier) => TIER_DEFINITIONS[tier].candidates[GATEWAY_PROVIDER_ID] ?? [])),
+];
 
 type World = {
   providers?: readonly ProviderId[];
@@ -34,9 +36,9 @@ function sameId(a: string, b: string): boolean {
 
 /** A catalog and a breaker as plain data, so a test can say exactly what is live and what is held down. */
 function world(options: World = {}): TierLiveness {
-  const listed = options.listed ?? { toko: TOKO_IDS };
+  const listed = options.listed ?? { [GATEWAY_PROVIDER_ID]: GATEWAY_IDS };
   return {
-    providers: options.providers ?? ["toko"],
+    providers: options.providers ?? [GATEWAY_PROVIDER_ID],
     listedAs: (provider, candidate) => (listed[provider] ?? []).find((id) => sameId(id, candidate)),
     isDown: (provider, model) =>
       (options.down ?? []).some((id) => sameId(id, model)) ||
@@ -133,12 +135,12 @@ describe("the three tiers", () => {
 
 describe("candidate lists", () => {
   it("make daily exactly the Chat default list, so Daily behaves like Chat does today", () => {
-    expect(TIER_DEFINITIONS.daily.candidates.toko).toEqual(CHAT_DEFAULT_PREFERENCES);
+    expect(TIER_DEFINITIONS.daily.candidates[GATEWAY_PROVIDER_ID]).toEqual(CHAT_DEFAULT_PREFERENCES);
   });
 
-  it("give every tier a Toko Token list with no repeated id", () => {
+  it("give every tier a gateway list with no repeated id", () => {
     for (const tier of MODEL_TIERS) {
-      const ids = TIER_DEFINITIONS[tier].candidates.toko ?? [];
+      const ids = TIER_DEFINITIONS[tier].candidates[GATEWAY_PROVIDER_ID] ?? [];
       expect(ids.length, tier).toBeGreaterThan(0);
       expect(new Set(ids).size, tier).toBe(ids.length);
     }
@@ -165,13 +167,13 @@ describe("candidate lists", () => {
   });
 
   it("name only models that fit the Fastest tier: role Fast drafts, and Thinking can be turned off", () => {
-    for (const id of TIER_DEFINITIONS.fast.candidates.toko ?? []) {
+    for (const id of TIER_DEFINITIONS.fast.candidates[GATEWAY_PROVIDER_ID] ?? []) {
       expect(fastProblems(id), id).toEqual([]);
     }
   });
 
   it("name only models that fit the Reasoning tier: role Deep reasoning, and the Deep level is accepted", () => {
-    for (const id of TIER_DEFINITIONS.reasoning.candidates.toko ?? []) {
+    for (const id of TIER_DEFINITIONS.reasoning.candidates[GATEWAY_PROVIDER_ID] ?? []) {
       expect(reasoningProblems(id), id).toEqual([]);
     }
   });
@@ -193,7 +195,7 @@ describe("resolveTier", () => {
     expect(result).toMatchObject({
       ok: true,
       tier: "daily",
-      provider: "toko",
+      provider: GATEWAY_PROVIDER_ID,
       model: CHAT_DEFAULT_PREFERENCES[0],
       thinking: "default",
       skipped: [],
@@ -203,11 +205,14 @@ describe("resolveTier", () => {
   it("skips an id the catalog does not list, and says so", () => {
     const first = CHAT_DEFAULT_PREFERENCES[0] as string;
     const second = CHAT_DEFAULT_PREFERENCES[1] as string;
-    const result = resolveTier("daily", world({ listed: { toko: TOKO_IDS.filter((id) => id !== first) } }));
+    const result = resolveTier(
+      "daily",
+      world({ listed: { [GATEWAY_PROVIDER_ID]: GATEWAY_IDS.filter((id) => id !== first) } }),
+    );
     expect(result).toMatchObject({
       ok: true,
       model: second,
-      skipped: [{ provider: "toko", model: first, reason: "unlisted" }],
+      skipped: [{ provider: GATEWAY_PROVIDER_ID, model: first, reason: "unlisted" }],
     });
   });
 
@@ -218,14 +223,14 @@ describe("resolveTier", () => {
     expect(result).toMatchObject({
       ok: true,
       model: second,
-      skipped: [{ provider: "toko", model: first, reason: "down" }],
+      skipped: [{ provider: GATEWAY_PROVIDER_ID, model: first, reason: "down" }],
     });
   });
 
   it("answers with the catalog's spelling and asks the breaker about that spelling", () => {
     const asked: string[] = [];
     const liveness: TierLiveness = {
-      providers: ["toko"],
+      providers: [GATEWAY_PROVIDER_ID],
       listedAs: (_provider, candidate) => (candidate === "gpt-6-luna" ? "GPT-6-Luna" : undefined),
       isDown: (_provider, model) => {
         asked.push(model);
@@ -242,7 +247,7 @@ describe("resolveTier", () => {
   });
 
   it("answers tier_unavailable when nothing is live", () => {
-    const result = resolveTier("fast", world({ listed: { toko: [] } }));
+    const result = resolveTier("fast", world({ listed: { [GATEWAY_PROVIDER_ID]: [] } }));
     expect(result).toMatchObject({ ok: false, tier: "fast", error: "tier_unavailable" });
   });
 
@@ -255,45 +260,51 @@ describe("resolveTier", () => {
   });
 
   it("never falls through to another tier: a person who chose Reasoning is not given a fast model", () => {
-    const reasoningOnly = (TIER_DEFINITIONS.reasoning.candidates.toko ?? []).filter(
+    const reasoningOnly = (TIER_DEFINITIONS.reasoning.candidates[GATEWAY_PROVIDER_ID] ?? []).filter(
       (id) =>
-        !(TIER_DEFINITIONS.daily.candidates.toko ?? []).includes(id) &&
-        !(TIER_DEFINITIONS.fast.candidates.toko ?? []).includes(id),
+        !(TIER_DEFINITIONS.daily.candidates[GATEWAY_PROVIDER_ID] ?? []).includes(id) &&
+        !(TIER_DEFINITIONS.fast.candidates[GATEWAY_PROVIDER_ID] ?? []).includes(id),
     );
     expect(reasoningOnly.length).toBeGreaterThan(0);
-    const onlyReasoningIsLive = world({ listed: { toko: reasoningOnly } });
+    const onlyReasoningIsLive = world({ listed: { [GATEWAY_PROVIDER_ID]: reasoningOnly } });
     expect(resolveTier("daily", onlyReasoningIsLive).ok).toBe(false);
     expect(resolveTier("fast", onlyReasoningIsLive).ok).toBe(false);
     expect(resolveTier("reasoning", onlyReasoningIsLive).ok).toBe(true);
   });
 
   it("answers tier_unavailable when every candidate is held down", () => {
-    const result = resolveTier("reasoning", world({ down: TOKO_IDS }));
+    const result = resolveTier("reasoning", world({ down: GATEWAY_IDS }));
     expect(result).toMatchObject({ ok: false, error: "tier_unavailable" });
   });
 
   it("reports every skipped candidate in the order it tried them, even on failure", () => {
-    const result = resolveTier("reasoning", world({ listed: { toko: [] } }));
-    const expected = TIER_DEFINITIONS.reasoning.candidates.toko ?? [];
+    const result = resolveTier("reasoning", world({ listed: { [GATEWAY_PROVIDER_ID]: [] } }));
+    const expected = TIER_DEFINITIONS.reasoning.candidates[GATEWAY_PROVIDER_ID] ?? [];
     expect(result.skipped.map((entry) => entry.model)).toEqual([...expected]);
     expect(new Set(result.skipped.map((entry) => entry.reason))).toEqual(new Set(["unlisted"]));
   });
 
   it("returns results nobody can change afterwards", () => {
-    const result = resolveTier("reasoning", world({ listed: { toko: [] } }));
+    const result = resolveTier("reasoning", world({ listed: { [GATEWAY_PROVIDER_ID]: [] } }));
     expect(Object.isFrozen(result)).toBe(true);
     expect(Object.isFrozen(result.skipped)).toBe(true);
     expect(Object.isFrozen(result.skipped[0])).toBe(true);
   });
 
   it("tries a provider named twice only once", () => {
-    const once = resolveTier("reasoning", world({ providers: ["toko"], listed: { toko: [] } }));
-    const twice = resolveTier("reasoning", world({ providers: ["toko", "toko"], listed: { toko: [] } }));
+    const once = resolveTier(
+      "reasoning",
+      world({ providers: [GATEWAY_PROVIDER_ID], listed: { [GATEWAY_PROVIDER_ID]: [] } }),
+    );
+    const twice = resolveTier(
+      "reasoning",
+      world({ providers: [GATEWAY_PROVIDER_ID, GATEWAY_PROVIDER_ID], listed: { [GATEWAY_PROVIDER_ID]: [] } }),
+    );
     expect(twice.skipped).toEqual(once.skipped);
   });
 
   it("never reads an inherited property as a provider's list", () => {
-    const plainObjectLists = definitionsWith("fast", { toko: ["deepseek-v4-1-flash"] });
+    const plainObjectLists = definitionsWith("fast", { [GATEWAY_PROVIDER_ID]: ["deepseek-v4-1-flash"] });
     for (const provider of ["constructor", "toString", "__proto__", "hasOwnProperty"] as unknown as ProviderId[]) {
       for (const definitions of [plainObjectLists, TIER_DEFINITIONS]) {
         const result = resolveTier("fast", world({ providers: [provider], listed: {} }), definitions);
@@ -307,34 +318,38 @@ describe("resolveTier across providers", () => {
   const sonnet = ["claude-sonnet-5-5", "claude-sonnet-5"];
   const definitions = definitionsWith(
     "daily",
-    Object.freeze({ anthropic: Object.freeze(sonnet), toko: Object.freeze(["gpt-6-luna"]) }),
+    Object.freeze({ anthropic: Object.freeze(sonnet), [GATEWAY_PROVIDER_ID]: Object.freeze(["gpt-6-luna"]) }),
   );
-  const listed = { anthropic: sonnet, toko: ["gpt-6-luna"] };
+  const listed = { anthropic: sonnet, [GATEWAY_PROVIDER_ID]: ["gpt-6-luna"] };
 
   it("walks the providers in the order it is given", () => {
-    expect(resolveTier("daily", world({ providers: ["anthropic", "toko"], listed }), definitions)).toMatchObject({
+    expect(
+      resolveTier("daily", world({ providers: ["anthropic", GATEWAY_PROVIDER_ID], listed }), definitions),
+    ).toMatchObject({
       ok: true,
       provider: "anthropic",
       model: "claude-sonnet-5-5",
     });
-    expect(resolveTier("daily", world({ providers: ["toko", "anthropic"], listed }), definitions)).toMatchObject({
+    expect(
+      resolveTier("daily", world({ providers: [GATEWAY_PROVIDER_ID, "anthropic"], listed }), definitions),
+    ).toMatchObject({
       ok: true,
-      provider: "toko",
+      provider: GATEWAY_PROVIDER_ID,
       model: "gpt-6-luna",
     });
   });
 
   it("tries every candidate of one provider before it moves to the next", () => {
-    const oneDown = world({ providers: ["anthropic", "toko"], listed, down: ["claude-sonnet-5-5"] });
+    const oneDown = world({ providers: ["anthropic", GATEWAY_PROVIDER_ID], listed, down: ["claude-sonnet-5-5"] });
     expect(resolveTier("daily", oneDown, definitions)).toMatchObject({
       ok: true,
       provider: "anthropic",
       model: "claude-sonnet-5",
     });
-    const bothDown = world({ providers: ["anthropic", "toko"], listed, down: sonnet });
+    const bothDown = world({ providers: ["anthropic", GATEWAY_PROVIDER_ID], listed, down: sonnet });
     expect(resolveTier("daily", bothDown, definitions)).toMatchObject({
       ok: true,
-      provider: "toko",
+      provider: GATEWAY_PROVIDER_ID,
       model: "gpt-6-luna",
     });
   });
@@ -342,14 +357,17 @@ describe("resolveTier across providers", () => {
   it("holds a model down for one provider without holding it down for another", () => {
     const same = definitionsWith(
       "daily",
-      Object.freeze({ toko: Object.freeze(["claude-sonnet-5-5"]), anthropic: Object.freeze(["claude-sonnet-5-5"]) }),
+      Object.freeze({
+        [GATEWAY_PROVIDER_ID]: Object.freeze(["claude-sonnet-5-5"]),
+        anthropic: Object.freeze(["claude-sonnet-5-5"]),
+      }),
     );
     const result = resolveTier(
       "daily",
       world({
-        providers: ["toko", "anthropic"],
-        listed: { toko: ["claude-sonnet-5-5"], anthropic: ["claude-sonnet-5-5"] },
-        downOn: { toko: ["claude-sonnet-5-5"] },
+        providers: [GATEWAY_PROVIDER_ID, "anthropic"],
+        listed: { [GATEWAY_PROVIDER_ID]: ["claude-sonnet-5-5"], anthropic: ["claude-sonnet-5-5"] },
+        downOn: { [GATEWAY_PROVIDER_ID]: ["claude-sonnet-5-5"] },
       }),
       same,
     );
@@ -357,16 +375,16 @@ describe("resolveTier across providers", () => {
       ok: true,
       provider: "anthropic",
       model: "claude-sonnet-5-5",
-      skipped: [{ provider: "toko", model: "claude-sonnet-5-5", reason: "down" }],
+      skipped: [{ provider: GATEWAY_PROVIDER_ID, model: "claude-sonnet-5-5", reason: "down" }],
     });
   });
 
-  it("uses only the providers it is given: Personal passes Toko Token alone, whatever the lists and the catalog say", () => {
+  it("uses only the providers it is given: Personal passes the gateway alone, whatever the lists and the catalog say", () => {
     const personal = availableProviders({});
-    expect([...personal]).toEqual(["toko"]);
+    expect([...personal]).toEqual([GATEWAY_PROVIDER_ID]);
     expect(resolveTier("daily", world({ providers: personal, listed }), definitions)).toMatchObject({
       ok: true,
-      provider: "toko",
+      provider: GATEWAY_PROVIDER_ID,
       model: "gpt-6-luna",
     });
     const onlyAnthropicIsListed = world({ providers: personal, listed: { anthropic: sonnet } });
@@ -377,9 +395,17 @@ describe("resolveTier across providers", () => {
   });
 
   it("skips a provider that has no list for the tier", () => {
-    const tokoOnly = definitionsWith("fast", Object.freeze({ toko: Object.freeze(["deepseek-v4-1-flash"]) }));
-    const result = resolveTier("fast", world({ providers: ["openrouter", "toko"] }), tokoOnly);
-    expect(result).toMatchObject({ ok: true, provider: "toko", model: "deepseek-v4-1-flash", skipped: [] });
+    const gatewayOnly = definitionsWith(
+      "fast",
+      Object.freeze({ [GATEWAY_PROVIDER_ID]: Object.freeze(["deepseek-v4-1-flash"]) }),
+    );
+    const result = resolveTier("fast", world({ providers: ["openrouter", GATEWAY_PROVIDER_ID] }), gatewayOnly);
+    expect(result).toMatchObject({
+      ok: true,
+      provider: GATEWAY_PROVIDER_ID,
+      model: "deepseek-v4-1-flash",
+      skipped: [],
+    });
   });
 });
 

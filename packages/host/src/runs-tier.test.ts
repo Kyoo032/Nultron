@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentRuntime, InputModality } from "@agentforge/core";
+import { GATEWAY_PROVIDER_ID } from "@agentforge/core";
 import { MODEL_TIERS, TIER_DEFINITIONS, type ModelTierId } from "@agentforge/core/tiers";
 import { ROUTER_IMPORT_BUDGET_MS } from "./__fixtures__/test-budgets";
 import { markJobModelDown, resetJobModelCircuit } from "./job-model-fallback";
@@ -66,10 +67,10 @@ function row(id: string, inputModalities: InputModality[] = TEXT): SelectableMod
 }
 
 function candidates(tier: ModelTierId): readonly string[] {
-  return TIER_DEFINITIONS[tier].candidates.toko ?? [];
+  return TIER_DEFINITIONS[tier].candidates[GATEWAY_PROVIDER_ID] ?? [];
 }
 
-/** Every Toko Token candidate of every tier, text only. */
+/** Every gateway candidate of every tier, text only. */
 function fullCatalog(): SelectableModel[] {
   return [...new Set(MODEL_TIERS.flatMap((tier) => candidates(tier)))].map((id) => row(id));
 }

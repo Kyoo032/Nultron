@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { resolvedGatewayBaseUrl } from "../gateway";
 import { assertProviderRegistryIntegrity, providerRegistryDigest } from "./registry-integrity";
 import {
+  GATEWAY_PROVIDER_ID,
   PROVIDER_ENDPOINTS,
   PROVIDER_IDS,
   PROVIDER_REGISTRY_SHA256,
@@ -52,7 +53,7 @@ describe("the provider registry", () => {
   });
 
   it("names exactly the five providers the owner approved", () => {
-    expect([...PROVIDER_IDS]).toEqual(["toko", "openai", "anthropic", "google", "openrouter"]);
+    expect([...PROVIDER_IDS]).toEqual([GATEWAY_PROVIDER_ID, "openai", "anthropic", "google", "openrouter"]);
     expect(Object.keys(PROVIDERS).sort()).toEqual([...PROVIDER_IDS].sort());
     for (const id of PROVIDER_IDS) {
       expect(providerEntry(id).id).toBe(id);
@@ -61,7 +62,7 @@ describe("the provider registry", () => {
 
   it("recognises a provider id and nothing else", () => {
     expect(isProviderId("openai")).toBe(true);
-    expect(isProviderId("toko")).toBe(true);
+    expect(isProviderId(GATEWAY_PROVIDER_ID)).toBe(true);
     expect(isProviderId("volcengine")).toBe(false);
     expect(isProviderId("https://api.openai.com/v1")).toBe(false);
     expect(isProviderId(undefined)).toBe(false);
@@ -75,27 +76,27 @@ describe("the provider registry", () => {
     expect(providerBaseUrl("openrouter")).toBe("https://openrouter.ai/api/v1");
     expect(providerMediaBaseUrl("google")).toBe("https://generativelanguage.googleapis.com/v1beta/openai");
     expect(providerMediaBaseUrl("openai")).toBeNull();
-    expect(providerMediaBaseUrl("toko")).toBeNull();
+    expect(providerMediaBaseUrl(GATEWAY_PROVIDER_ID)).toBeNull();
   });
 
   it("says how each provider authenticates and which wire it speaks", () => {
-    expect(PROVIDERS.toko).toMatchObject({ auth: "bearer", wire: "chat_completions" });
+    expect(PROVIDERS[GATEWAY_PROVIDER_ID]).toMatchObject({ auth: "bearer", wire: "chat_completions" });
     expect(PROVIDERS.openai).toMatchObject({ auth: "bearer", wire: "chat_completions" });
     expect(PROVIDERS.anthropic).toMatchObject({ auth: "x-api-key", wire: "anthropic_messages" });
     expect(PROVIDERS.google).toMatchObject({ auth: "x-goog-api-key", wire: "google_generate_content" });
     expect(PROVIDERS.openrouter).toMatchObject({ auth: "bearer", wire: "chat_completions" });
   });
 
-  it("resolves Toko Token through the gateway pin, unchanged", () => {
-    expect(providerBaseUrl("toko")).toBe(resolvedGatewayBaseUrl());
-    expect(providerBaseUrl("toko")).toBe("https://api.tokotokenai.com/v1");
+  it("resolves the gateway provider through the gateway pin, unchanged", () => {
+    expect(providerBaseUrl(GATEWAY_PROVIDER_ID)).toBe(resolvedGatewayBaseUrl());
+    expect(providerBaseUrl(GATEWAY_PROVIDER_ID)).toBe("https://api.tokotokenai.com/v1");
   });
 
-  it("follows the gateway pin's own dev hook for Toko, and for no other provider", () => {
+  it("follows the gateway pin's own dev hook for the gateway provider, and for no other", () => {
     process.env.NODE_ENV = "test";
     delete process.env.AGENTFORGE_PACKAGED;
     process.env.AGENTFORGE_GATEWAY_URL = "https://aihub.example.test/v1";
-    expect(providerBaseUrl("toko")).toBe("https://aihub.example.test/v1");
+    expect(providerBaseUrl(GATEWAY_PROVIDER_ID)).toBe("https://aihub.example.test/v1");
     expect(providerBaseUrl("openai")).toBe("https://api.openai.com/v1");
   });
 
@@ -169,10 +170,10 @@ describe("the registry's integrity digest", () => {
 });
 
 describe("which providers a process offers", () => {
-  it("offers only Toko Token off the hosted server", () => {
-    expect(availableProviders({})).toEqual(["toko"]);
-    expect(availableProviders({ AGENTFORGE_SERVER: "0" })).toEqual(["toko"]);
-    expect(availableProviders({ AGENTFORGE_SERVER: "" })).toEqual(["toko"]);
+  it("offers only the gateway off the hosted server", () => {
+    expect(availableProviders({})).toEqual([GATEWAY_PROVIDER_ID]);
+    expect(availableProviders({ AGENTFORGE_SERVER: "0" })).toEqual([GATEWAY_PROVIDER_ID]);
+    expect(availableProviders({ AGENTFORGE_SERVER: "" })).toEqual([GATEWAY_PROVIDER_ID]);
   });
 
   it("offers every provider on the hosted server", () => {
@@ -182,7 +183,7 @@ describe("which providers a process offers", () => {
 
   it("reads the process environment by default, per call", () => {
     delete process.env.AGENTFORGE_SERVER;
-    expect(availableProviders()).toEqual(["toko"]);
+    expect(availableProviders()).toEqual([GATEWAY_PROVIDER_ID]);
     process.env.AGENTFORGE_SERVER = "1";
     expect(availableProviders()).toEqual([...PROVIDER_IDS]);
     delete process.env.AGENTFORGE_SERVER;

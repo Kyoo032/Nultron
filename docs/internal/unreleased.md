@@ -423,6 +423,15 @@ Lanes: Personal, Enterprise, HYP AI, tester. Rizky approved the promotion on 202
   - :3000 serves from the main checkout, which is still at `f98213a0`. It shows the new shell only after a pull and a host restart.
   - The HYP AI import of `b14faa1a`.
 
+## Model tiers: the gateway's provider id is one constant, 2026-10-12
+
+Lanes: Personal, Enterprise, HYP AI, tester. No behaviour changes on any lane: the id is still `toko` on `main`.
+
+- **Why.** The tier lists (`packages/core/src/models/tiers.ts`) and the tier resolver (`packages/host/src/tier-resolve.ts`) spelled the gateway's provider id `"toko"`. HYP AI renames that id to `tokenku` in its registry, so every import of the chat-first shell needed a six-file brand commit (`c90b729` in the HYP AI clone) to keep Daily, Fastest and Reasoning resolving.
+- **What.** `GATEWAY_PROVIDER_ID` (`packages/core/src/providers/gateway-id.ts`, no imports, so the renderer's `@agentforge/core/tiers` pulls in nothing else) is the one place the id is spelled. The registry builds `PROVIDER_IDS`, `PROVIDERS`, `StaticProviderId`, the two gateway checks and the Personal provider list from it; the tier lists key on it; the tier, registry and catalog tests read it, and the catalog leak test walks `PROVIDER_IDS`.
+- **Proof.** With the literal changed to `tokenku`, `tsc` for core and host and the registry, tier, tier-resolve, runs-tier and tier-catalog suites all pass (130 tests), then the literal was put back. The registry test that pins `https://api.tokotokenai.com/v1` stays brand-owned.
+- **Owed on the next HYP AI import:** drop `c90b729` (take upstream's six tier files), regenerate `hyp-brand.patch` (its registry hunk shrinks to `gateway-id.ts` plus the label), and check that `grep -n toko` finds nothing in the tier files of `app-sync`.
+
 ## Findings from the tester's virtual-agents build, 2026-10-09 (published code; not fixed)
 
 Found while building the chat-first shell in `agentforge-chat`. All three are in the published code, so each is a fix for `main` from a branch off `main`, then a merge into the tester folder. Lanes: Personal, Enterprise, HYP AI, tester. None is fixed. The first two are read from the code; the third was seen live on the tester webdev, whose Research harness is the published one.

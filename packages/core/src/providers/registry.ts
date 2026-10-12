@@ -24,8 +24,17 @@
  */
 import { resolvedGatewayBaseUrl } from "../gateway";
 import { isServerMode, type EnvLike } from "../server-mode";
+import { GATEWAY_PROVIDER_ID } from "./gateway-id";
 
-export const PROVIDER_IDS = Object.freeze(["toko", "openai", "anthropic", "google", "openrouter"] as const);
+export { GATEWAY_PROVIDER_ID };
+
+export const PROVIDER_IDS = Object.freeze([
+  GATEWAY_PROVIDER_ID,
+  "openai",
+  "anthropic",
+  "google",
+  "openrouter",
+] as const);
 
 export type ProviderId = (typeof PROVIDER_IDS)[number];
 
@@ -47,7 +56,12 @@ function entry(value: ProviderEntry): ProviderEntry {
 }
 
 export const PROVIDERS: Readonly<Record<ProviderId, ProviderEntry>> = Object.freeze({
-  toko: entry({ id: "toko", label: "Toko Token", auth: "bearer", wire: "chat_completions" }),
+  [GATEWAY_PROVIDER_ID]: entry({
+    id: GATEWAY_PROVIDER_ID,
+    label: "Toko Token",
+    auth: "bearer",
+    wire: "chat_completions",
+  }),
   openai: entry({ id: "openai", label: "OpenAI", auth: "bearer", wire: "chat_completions" }),
   anthropic: entry({ id: "anthropic", label: "Anthropic", auth: "x-api-key", wire: "anthropic_messages" }),
   google: entry({ id: "google", label: "Google", auth: "x-goog-api-key", wire: "google_generate_content" }),
@@ -55,7 +69,7 @@ export const PROVIDERS: Readonly<Record<ProviderId, ProviderEntry>> = Object.fre
 });
 
 /** The providers whose host is a literal here. Toko Token's is the gateway pin, not listed. */
-export type StaticProviderId = Exclude<ProviderId, "toko">;
+export type StaticProviderId = Exclude<ProviderId, typeof GATEWAY_PROVIDER_ID>;
 
 export type ProviderEndpoints = Readonly<{
   /** The chat (and model list) endpoint. */
@@ -108,7 +122,7 @@ export function providerEntry(id: ProviderId): ProviderEntry {
 
 /** The base URL a provider's chat and model-list calls go to. Never read from a setting or the environment. */
 export function providerBaseUrl(id: ProviderId): string {
-  if (id === "toko") {
+  if (id === GATEWAY_PROVIDER_ID) {
     return resolvedGatewayBaseUrl();
   }
   return PROVIDER_ENDPOINTS[id].base;
@@ -116,13 +130,13 @@ export function providerBaseUrl(id: ProviderId): string {
 
 /** Where a provider's image, video and audio calls go when that is not `providerBaseUrl`, else null. */
 export function providerMediaBaseUrl(id: ProviderId): string | null {
-  if (id === "toko") {
+  if (id === GATEWAY_PROVIDER_ID) {
     return null;
   }
   return PROVIDER_ENDPOINTS[id].media ?? null;
 }
 
-const ONLY_TOKO: readonly ProviderId[] = Object.freeze(["toko"] as const);
+const ONLY_GATEWAY: readonly ProviderId[] = Object.freeze([GATEWAY_PROVIDER_ID] as const);
 
 /**
  * The providers this process offers. Toko Token only, unless this is the hosted server: the desktop
@@ -130,7 +144,7 @@ const ONLY_TOKO: readonly ProviderId[] = Object.freeze(["toko"] as const);
  * and `apps/web` set the flag after the module graph is loaded.
  */
 export function availableProviders(env: EnvLike = process.env): readonly ProviderId[] {
-  return isServerMode(env) ? PROVIDER_IDS : ONLY_TOKO;
+  return isServerMode(env) ? PROVIDER_IDS : ONLY_GATEWAY;
 }
 
 function hostOf(url: string | undefined | null): string | null {
