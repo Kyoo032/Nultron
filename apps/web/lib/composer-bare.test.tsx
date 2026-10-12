@@ -219,7 +219,9 @@ describe("the wiring", () => {
     expect(composerSource).toContain("onToolProgress?: (event: { toolKey: string; label: string }) => void;");
   });
 
-  it("does not grow: the file stays within the 773 lines it had before the bare layout", () => {
-    expect(composerSource.split("\n").length).toBeLessThanOrEqual(773);
+  // 773 lines before the bare layout, plus 14 that main's model-fallback wiring (SH-007, PR #150)
+  // added in the 2026-10-12 merge. The tester's own changes still may not grow the file.
+  it("does not grow: the file stays within 787 lines (773 before the bare layout, plus main's SH-007)", () => {
+    expect(composerSource.split("\n").length).toBeLessThanOrEqual(787);
   });
 });
