@@ -100,6 +100,8 @@ describe("ComposerAttachmentNotes", () => {
   });
 });
 
+// Tester code (chat-first): the composer has no model picker, only the tier picker, so it knows no model
+// name. It still draws the video note (no model in Chat takes video) and never an image note or a switch.
 describe("ChatComposer carries the note", () => {
   beforeEach(() => {
     resetComposerDraftForTests();
@@ -108,68 +110,34 @@ describe("ChatComposer carries the note", () => {
       files: [
         {
           id: "f1",
-          file: new File([new Uint8Array([1, 2, 3])], "screenshot.png", { type: "image/png" }),
-          kind: "image",
+          file: new File([new Uint8Array([1, 2, 3])], "clip.mp4", { type: "video/mp4" }),
+          kind: "video",
         },
       ],
     });
   });
   afterEach(() => resetComposerDraftForTests());
 
-  function composer(model: string): string {
-    return renderToStaticMarkup(
+  it("shows the video note under the chip and never a model switch", () => {
+    applyLocale("en");
+    const html = renderToStaticMarkup(
       <ChatComposer
         threadId={null}
         modalities={["text", "image"]}
-        model={model}
-        models={MODELS}
-        onModelChange={() => {}}
-        onReasoningEffortChange={() => {}}
         onDelta={() => {}}
         onComplete={() => {}}
       />,
     );
-  }
-
-  it("shows the note under the chip of an attached screenshot on GLM 5.3", () => {
-    applyLocale("en");
-    const html = composer("glm-5.3");
-    expect(html).toContain("screenshot.png");
-    expect(html.indexOf('data-testid="composer-attachment"')).toBeLessThan(
-      html.indexOf('data-testid="composer-image-note"'),
-    );
-    expect(html).toContain('data-testid="composer-image-switch"');
+    expect(html).toContain("clip.mp4");
+    expect(html).toContain('data-testid="composer-video-note"');
+    expect(html).not.toContain("composer-image-switch");
   });
 
-  it("shows no note on a model that reads images", () => {
-    applyLocale("en");
-    expect(composer("gpt-6-luna")).not.toContain("composer-image-note");
-  });
-
-  it("offers the switch only when the composer has a model picker to move", () => {
-    applyLocale("en");
-    const withPicker = composer("glm-5.3");
-    expect(withPicker).toContain('data-testid="composer-image-switch"');
-    const withoutPicker = renderToStaticMarkup(
-      <ChatComposer
-        threadId={null}
-        modalities={["text", "image"]}
-        model="glm-5.3"
-        models={MODELS}
-        onReasoningEffortChange={() => {}}
-        onDelta={() => {}}
-        onComplete={() => {}}
-      />,
-    );
-    expect(withoutPicker).toContain('data-testid="composer-image-note"');
-    expect(withoutPicker).not.toContain("composer-image-switch");
-  });
-
-  it("clears the refusal sentence when the model changes, so the switch button does not leave it standing", () => {
+  it("clears the refusal sentence when the tier changes, so a stale refusal does not stay standing", () => {
     // React state cannot be driven here (no DOM), so the rule is read from the composer's source: when the
-    // model prop is no longer the one the error was written for, the error goes.
+    // tier prop is no longer the one the error was written for, the error goes.
     expect(composerSource).toMatch(
-      /const \[shownModel, setShownModel\] = useState\(model\);\s+if \(shownModel !== model\) \{[^}]*setShownModel\(model\);[^}]*setError\(null\);/,
+      /const \[shownTier, setShownTier\] = useState\(tier\);\s+if \(shownTier !== tier\) \{[^}]*setShownTier\(tier\);[^}]*setError\(null\);/,
     );
   });
 });

@@ -16,6 +16,7 @@ import { pastSessionsTool } from "./session-tools";
 import { localeForRun } from "./run-context";
 import { selfCheckTool } from "./self-check-tool";
 import { runSqlTool } from "./sql-tool";
+import { researchDossierTool } from "./workers/research-dossier-tool";
 
 let registered = false;
 
@@ -38,6 +39,8 @@ export function ensureToolsRegistered(): void {
   registerCodeTools();
   registerTool(selfCheckTool);
   registerDeckTools();
+  // Tester code: a mode harness as a tool of its own agent's conversation (`workers/`).
+  registerTool(researchDossierTool);
   registered = true;
   void import("./edit/backend").then((mod) => {
     setEditToolBackend(mod.hostEditBackend);

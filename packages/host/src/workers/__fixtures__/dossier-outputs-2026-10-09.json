@@ -1,0 +1,47 @@
+[
+  {
+    "ok": true,
+    "artifact": {
+      "id": "b31dc679-a07b-4944-a7b7-b28806038a06",
+      "kind": "research",
+      "title": "Batik in Indonesia: Evidence Gaps in the Provided Sources"
+    },
+    "summary": "The provided material does not establish batik’s origins in Indonesia.\nIt gives no evidence about regional or court traditions.\nIt does not document colonial-era changes to batik.\nIt does not confirm or describe UNESCO recognition of Indonesian batik.\nIt offers no account of contemporary practice.\nSome sources are explicitly marked as unrelated to batik history or practice.\nThe UNESCO-related material describes the heritage program generally, not batik’s place in it.\nNo disagreements about batik can be identified from these passages.\nConfidence: low; evidence is thin across every requested historical and contemporary topic.",
+    "sections": [
+      "UNESCO context is general, not batik-specific"
+    ],
+    "sourceCount": 1,
+    "checks": {
+      "passed": true,
+      "rounds": 0,
+      "failed": []
+    }
+  },
+  {
+    "ok": false,
+    "reason": "failed",
+    "code": "invalid_research",
+    "message": "No page kept a sentence that can be cited."
+  },
+  {
+    "ok": true,
+    "artifact": {
+      "id": "10f82531-6b77-45f3-a491-b4a528116f36",
+      "kind": "research",
+      "title": "Borobudur Temple: Construction, Builders, and Rediscovery"
+    },
+    "summary": "The sources place Borobudur's construction broadly in the 8th century [S2].\nThey associate the temple with the Shailendra dynasty, which promoted Mahayana Buddhism and built Buddhist monuments in Central Java [S4].\nThe evidence supports a dynasty-level attribution, not the identification of a specific patron, architect, or workforce [S4].\nWorldwide knowledge of the temple's existence was sparked in 1814 [S2].\nThomas Stamford Raffles, then the British administrator of Java, was advised of its location by native Indonesians [S2].\nThe sources do not establish that this was the first local knowledge of the temple [S2].\nA separate passage links Borobudur to the Buddhist Sailendra dynasty but does not give a construction date or rediscovery account [S9].\nNo supplied source directly disputes the broad dating, dynasty association, or 1814 account.\nConfidence: medium; evidence is thin on precise dating, named builders, and the details of the rediscovery.",
+    "sections": [
+      "Construction dates to the 8th century",
+      "The Shailendra dynasty is associated with the temple",
+      "Raffles was informed of its location in 1814",
+      "The additional dynasty reference is contextual"
+    ],
+    "sourceCount": 3,
+    "checks": {
+      "passed": true,
+      "rounds": 0,
+      "failed": []
+    }
+  }
+]

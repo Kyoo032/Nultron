@@ -1,10 +1,16 @@
 # Release and sync lanes
 
+Last verified: 2026-10-12 at e8a7eca8 for the "Chat-first shell" section only (the lanes.json entries the tester added; read against the tester branch before it was promoted to `main`, PR #157). Nothing else on the page was re-read.
+
 Last verified: 2026-10-09 at cc346b0c
 
 ## Overview
 
 One source repo (`Kyoo032/agentforge`, branch `main`) feeds four lanes: Nultron Personal, Nultron Enterprise, HYP AI and the tester code. This page says how a fix made on `main` reaches each lane, what each lane may differ in, and what has to be true before a lane counts as fixed. It is the working form of the "Two codes" and "Sync lanes" rules in `AGENTS.md`; the longer story of the tester split is in Rizky's vault note `40-Dev/nultron-two-codes-map.md`. It does not cover how a release is cut (see [`desktop-pack-routes.md`](desktop-pack-routes.md) and the "Web release" section of `AGENTS.md`).
+
+## Chat-first shell (2026-10-12)
+
+The tester added 16 `protected` entries (32 in all) to `lanes.json`: the shared files it edits (the composer, the rail, `product-modes.ts`, `i18n.ts` and others) and its own paths (`virtual-agents*`, `packages/host/src/workers/**`, the agent components), whose map is [`virtual-agents.md`](virtual-agents.md). Once PR #157 merges, `main` carries the chat-first shell, so those files are no longer tester-only: a fix to them is still a pull request to `main`, and the one switch back to the mode screens is `SHELL_LAYOUT` (`packages/core/src/agents/product-modes.ts:29`). The "Tester shared file" notes in `lanes.json` describe the state before the merge.
 
 ## How it works
 

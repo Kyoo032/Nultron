@@ -144,7 +144,7 @@ describe("the guide card", () => {
       />,
     );
 
-    expect(markup).toContain("Alat Anda ada di sini");
+    expect(markup).toContain("Agen Anda ada di sini");
     expect(markup).toContain("Langkah 1 dari 5");
     expect(markup).toContain(">Lewati<");
     expect(markup).toContain(">Lanjut<");

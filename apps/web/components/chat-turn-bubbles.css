@@ -1,0 +1,48 @@
+/*
+ * Message bubbles of the chat thread. Plain on purpose: the person's message is one solid accent bubble
+ * on the right, the agent's answer a soft bubble on the left, and everything else a turn holds (the
+ * Thinking disclosure, cards, media) sits outside the bubble at the same left edge.
+ */
+
+.chat-turn--user {
+  margin-left: auto;
+  width: fit-content;
+  max-width: 80%;
+  min-width: 0;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 20px 20px 6px 20px;
+  background: var(--accent);
+  /* The theme has no on-accent variable: the primary button puts the surface colour on the accent. */
+  color: var(--on-accent, var(--surface));
+  box-shadow: none;
+}
+
+/* A file card in the person's message keeps its own surface, so it needs the ordinary text colour back. */
+.chat-turn--user .chat-embed {
+  color: var(--text);
+}
+
+.chat-turn--assistant {
+  min-width: 0;
+  padding: 4px 4px;
+}
+
+.chat-turn-bubble {
+  width: fit-content;
+  max-width: min(80%, 46rem);
+  min-width: 0;
+  padding: 10px 14px;
+  border-radius: 20px 20px 20px 6px;
+  background: color-mix(in srgb, var(--text) 6%, var(--surface));
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.chat-turn-bubble > * + * {
+  margin-top: 8px;
+}
+
+.chat-turn-bubble + .chat-turn-bubble {
+  margin-top: 8px;
+}

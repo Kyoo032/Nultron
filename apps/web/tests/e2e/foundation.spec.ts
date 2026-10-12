@@ -1,10 +1,22 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
 import chatCopy from "../../locales/en/chat.json" with { type: "json" };
 import { showEveryMode } from "./every-mode";
 
 // The headline the empty Chat renders (chat-hero.tsx, key chat.empty.headline). Read from the en
 // catalog so a copy edit does not break this suite again (SH-003).
 const EMPTY_CHAT_HEADLINE = chatCopy.empty.headline;
+
+/**
+ * In the chat-first shell a mode's rail tile is `agent-<mode>`. Every agent opens a conversation. A
+ * studio agent's empty conversation (`agent-home`) has a button that opens the old mode screen
+ * (`studioHref`), so this is how a spec reaches one. Research is not a studio agent: its home has no
+ * such button.
+ */
+async function openStudio(page: Page, mode: string) {
+  await page.getByTestId(`agent-${mode}`).click();
+  await expect(page.getByTestId("agent-home")).toBeVisible({ timeout: 15_000 });
+  await page.getByTestId("agent-open-studio").click();
+}
 
 test.describe.configure({ retries: 0 });
 
@@ -22,43 +34,52 @@ test("chat and workspaces work without an account", async ({ page }) => {
   const deskName = `Legal desk ${runId}`;
 
   await page.goto("/chat");
-  await expect(page.getByTestId("model-picker")).toBeVisible({ timeout: 30_000 });
+  // The tester code offers three choices (Daily, Fastest, Reasoning) instead of a model list and a
+  // Thinking select. In the chat-first shell the picker is a chip in the agent's header, so it needs no
+  // `+` click and the composer holds none. A person who never opens the picker is on Daily.
+  const header = page.getByTestId("chat-header");
+  await expect(header.getByTestId("tier-picker")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("composer")).toBeVisible();
-  await expect(page.getByTestId("reasoning-effort")).toBeVisible();
-  await expect(page.getByTestId("reasoning-effort")).toHaveValue("medium");
-  await expect(page.getByTestId("reasoning-effort")).toContainText("Normal");
-  await expect(page.getByTestId("reasoning-effort").locator("option[value=xhigh]")).toHaveText("Extra");
-  await expect(page.getByTestId("reasoning-effort").locator("option[value=max]")).toHaveText("Max");
-  await expect(page.getByTestId("reasoning-effort").locator("option[value=ultra]")).toHaveText("Ultra");
+  await expect(page.getByTestId("composer").getByTestId("tier-picker")).toHaveCount(0);
+  await expect(header.getByTestId("tier-picker")).toContainText("Daily");
+  await expect(page.getByTestId("model-picker")).toHaveCount(0);
+  await expect(page.getByTestId("reasoning-effort")).toHaveCount(0);
   await expect(page.getByTestId("chat-wire")).toHaveCount(0);
   await expect(page.getByTestId("chat-empty")).toContainText(EMPTY_CHAT_HEADLINE);
+  // The chat-first rail lists agents: `mode-chat` is the generalist and the others are `agent-<mode>`.
   await expect(page.getByTestId("mode-chat")).toBeVisible();
-  await expect(page.getByTestId("mode-documents")).toBeVisible();
-  await expect(page.getByTestId("mode-research")).toBeVisible();
-  await expect(page.getByTestId("mode-finance")).toBeVisible();
-  await expect(page.getByTestId("mode-data")).toBeVisible();
-  await expect(page.getByTestId("mode-market")).toBeVisible();
-  await expect(page.getByTestId("mode-images")).toBeVisible();
-  await expect(page.getByTestId("mode-videos")).toBeVisible();
-  await expect(page.getByTestId("mode-edit")).toBeVisible();
-  await expect(page.getByTestId("mode-presentations")).toBeVisible();
+  await expect(page.getByTestId("agent-documents")).toBeVisible();
+  await expect(page.getByTestId("agent-research")).toBeVisible();
+  await expect(page.getByTestId("agent-finance")).toBeVisible();
+  await expect(page.getByTestId("agent-data")).toBeVisible();
+  await expect(page.getByTestId("agent-market")).toBeVisible();
+  await expect(page.getByTestId("agent-images")).toBeVisible();
+  await expect(page.getByTestId("agent-videos")).toBeVisible();
+  await expect(page.getByTestId("agent-edit")).toBeVisible();
+  await expect(page.getByTestId("agent-presentations")).toBeVisible();
   await expect(page.getByTestId("mode-knowledge")).toBeVisible();
   await expect(page.getByTestId("mode-agents")).toHaveCount(0);
-  await expect(page.getByTestId("workspaces-switcher")).toBeVisible();
+  // The agent rail has no desk switcher.
+  await expect(page.getByTestId("workspaces-switcher")).toHaveCount(0);
   await expect(page.getByTestId("workspaces-link")).toBeVisible();
 
   await page.getByTestId("composer-text").fill(promptOne);
   await page.getByTestId("composer-send").click();
   await expect(page.getByTestId("message-list")).toContainText(promptOne, { timeout: 20_000 });
-  await expect(page.getByTestId("composer-send")).toHaveText("Send", { timeout: 30_000 });
+  // The send button is an icon: its name is its aria-label, "Sending" while a turn runs and "Send" after.
+  await expect(page.getByTestId("composer-send")).toHaveAccessibleName("Send", { timeout: 30_000 });
+  // Sessions are in the header's Conversations popover, not in the rail.
+  await page.getByTestId("agent-history-toggle").click();
   await expect(page.getByTestId("rail-thread-list")).toContainText(promptOne);
+  await page.keyboard.press("Escape");
 
   await page.getByTestId("new-chat-link").click();
   await expect(page.getByTestId("chat-empty")).toContainText(EMPTY_CHAT_HEADLINE, { timeout: 10_000 });
   await page.getByTestId("composer-text").fill(promptTwo);
   await page.getByTestId("composer-send").click();
   await expect(page.getByTestId("message-list")).toContainText(promptTwo, { timeout: 20_000 });
-  await expect(page.getByTestId("composer-send")).toHaveText("Send", { timeout: 30_000 });
+  await expect(page.getByTestId("composer-send")).toHaveAccessibleName("Send", { timeout: 30_000 });
+  await page.getByTestId("agent-history-toggle").click();
   await expect(page.getByTestId("rail-thread-list")).toContainText(promptTwo);
   await page.getByTestId("thread-item").filter({ hasText: promptOne }).click();
   await expect(page.getByTestId("message-list")).toContainText(promptOne);
@@ -84,20 +105,20 @@ test("chat and workspaces work without an account", async ({ page }) => {
   await expect(page).toHaveURL(/\/usage/, { timeout: 30_000 });
   await expect(page.getByTestId("usage-range")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("usage-this-key")).toContainText("Paste a gateway key");
-  await expect(
-    page.getByTestId("usage-range-empty").or(page.getByTestId("usage-range-chart")),
-  ).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId("usage-range-empty").or(page.getByTestId("usage-range-chart"))).toBeVisible({
+    timeout: 15_000,
+  });
 
-  await page.getByTestId("mode-images").click();
+  await openStudio(page, "images");
   await expect(page).toHaveURL(/\/images/, { timeout: 15_000 });
   await expect(page.getByTestId("images-studio")).toBeVisible({ timeout: 15_000 });
 
-  await page.getByTestId("mode-videos").click();
+  await openStudio(page, "videos");
   await expect(page).toHaveURL(/\/videos/, { timeout: 15_000 });
   await expect(page.getByTestId("videos-studio")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("videos-studio-needs-key")).toBeVisible();
 
-  await page.getByTestId("mode-presentations").click();
+  await openStudio(page, "presentations");
   await expect(page).toHaveURL(/\/presentations/, { timeout: 15_000 });
   await expect(page.getByTestId("presentations-studio")).toBeVisible({ timeout: 15_000 });
   await page.getByTestId("presentations-more").click();
@@ -117,7 +138,7 @@ test("chat and workspaces work without an account", async ({ page }) => {
   await page.getByTestId("presentations-regen-submit").click();
   await expect(page.getByTestId("presentations-error")).toContainText(/gateway|Settings|API key/i, { timeout: 15_000 });
 
-  await page.getByTestId("mode-documents").click();
+  await openStudio(page, "documents");
   await expect(page).toHaveURL(/\/documents/, { timeout: 15_000 });
   await expect(page.getByTestId("documents-studio")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("documents-studio-model")).toBeVisible();
@@ -133,6 +154,9 @@ test("chat and workspaces work without an account", async ({ page }) => {
   await page.getByTestId("documents-regen-submit").click();
   await expect(page.getByTestId("documents-error")).toContainText(/gateway|Settings|API key/i, { timeout: 15_000 });
 
+  // Not yet updated for the chat-first shell, from here to the end of the test: `/workspaces` is the
+  // Virtual agents page (`virtual-agents-page`), which hires and lets go of agents and cannot create a
+  // desk, so the desk-creation steps and the `mode-<name>` checks after them have no counterpart.
   await page.getByTestId("workspaces-link").click();
   await expect(page).toHaveURL(/\/workspaces/, { timeout: 15_000 });
   await expect(page.getByTestId("create-new-workspace")).toBeVisible();

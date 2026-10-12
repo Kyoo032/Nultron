@@ -202,3 +202,88 @@ describe("run.completed", () => {
     expect(state.cancelled).toBe(false);
   });
 });
+
+describe("tool.progress", () => {
+  const progress = (job: Record<string, unknown>, toolKey = "research_dossier") =>
+    frame("tool.progress", { toolKey, job });
+
+  function progressRecorder() {
+    const lines: { toolKey: string; label: string }[] = [];
+    const handlers: RunStreamHandlers = { onDelta: () => {}, onToolProgress: (event) => lines.push(event) };
+    return { lines, handlers };
+  }
+
+  it("hands the pane the label of a phase, a step and a round, and nothing else", async () => {
+    const { stream } = body([
+      frame("tool.started", { toolKey: "research_dossier" }),
+      progress({ type: "job.phase", phase: "searching", label: "Searching the web" }),
+      progress({ type: "job.delta", text: "partial prose" }),
+      progress({ type: "job.step", phase: "reading", label: "Reading source 2 of 5" }),
+      progress({ type: "job.round", round: 1, total: 2, label: "Checking round 1" }),
+      progress({ type: "job.source", id: "s", title: "t", url: "https://example.com", status: "found" }),
+      frame("tool.completed", { toolKey: "research_dossier", output: {} }),
+      frame("run.completed", { runId: "r" }),
+    ]);
+    const { lines, handlers } = progressRecorder();
+
+    await readRunStream(stream, handlers);
+
+    expect(lines).toEqual([
+      { toolKey: "research_dossier", label: "Searching the web" },
+      { toolKey: "research_dossier", label: "Reading source 2 of 5" },
+      { toolKey: "research_dossier", label: "Checking round 1" },
+    ]);
+  });
+
+  it("ignores a progress event that has no usable label or tool", async () => {
+    const { stream } = body([
+      progress({ type: "job.phase", phase: "searching", label: "   " }),
+      progress({ type: "job.phase", phase: "searching" }),
+      progress({ type: "job.phase", phase: "searching", label: 4 }),
+      frame("tool.progress", { job: { type: "job.phase", label: "No tool key" } }),
+      frame("tool.progress", { toolKey: "research_dossier" }),
+    ]);
+    const { lines, handlers } = progressRecorder();
+
+    await readRunStream(stream, handlers);
+
+    expect(lines).toEqual([]);
+  });
+
+  it("reads one run end to end: one progress line, and the watchdog fed for all five events", async () => {
+    const { stream } = body([
+      frame("tool.started", { toolKey: "research_dossier" }),
+      progress({ type: "job.phase", phase: "searching", label: "Searching" }),
+      progress({ type: "job.delta", text: "x" }),
+      frame("tool.completed", { toolKey: "research_dossier", output: {} }),
+      frame("run.completed", { runId: "r" }),
+    ]);
+    const { lines, handlers } = progressRecorder();
+    let activity = 0;
+
+    await readRunStream(stream, handlers, { onActivity: () => (activity += 1) });
+
+    expect(lines).toEqual([{ toolKey: "research_dossier", label: "Searching" }]);
+    expect(activity).toBe(5);
+  });
+
+  it("works with no progress handler", async () => {
+    const { stream } = body([progress({ type: "job.phase", phase: "searching", label: "Searching" })]);
+    const { seen, handlers } = recorder();
+    let activity = 0;
+
+    await readRunStream(stream, handlers, { onActivity: () => (activity += 1) });
+
+    expect(seen).toEqual([]);
+    expect(activity).toBe(1);
+  });
+
+  it("stops drawing progress once another session is on screen", async () => {
+    const { stream } = body([progress({ type: "job.phase", phase: "searching", label: "Searching" })]);
+    const { lines, handlers } = progressRecorder();
+
+    await readRunStream(stream, handlers, { showing: () => false });
+
+    expect(lines).toEqual([]);
+  });
+});

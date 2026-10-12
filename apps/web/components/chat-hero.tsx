@@ -1,7 +1,9 @@
 "use client";
 
 import { type CSSProperties, useEffect, useReducer, useRef, useState } from "react";
+import { SHELL_LAYOUT } from "@agentforge/core/product-modes";
 import { ChatKeyStatus } from "@/components/chat-key-status";
+import { assistantNameOf, useProductBrand } from "@/lib/product-brand";
 import { Confetti } from "@/components/confetti";
 import { FloatingShapes } from "@/components/floating-shapes";
 import { NultronMascot } from "@/components/nultron/nultron-mascot";
@@ -32,6 +34,11 @@ const CONFETTI_MS = 1600;
  */
 export function ChatHero() {
   const hero = useRef<HTMLElement>(null);
+  // Tester code: in the chat-first shell this is the default virtual agent's own greeting, so it says
+  // the brand's character by name (owner, 2026-10-09) and not a name typed into the catalog.
+  const brand = useProductBrand();
+  const hello =
+    SHELL_LAYOUT === "chat-first" ? t("agents.home.greeting", { name: assistantNameOf(brand) }) : t("chat.empty.hello");
   const [mood, dispatch] = useReducer(reduceHeroMood, INITIAL_HERO_MOOD);
   const [burst, setBurst] = useState(0);
   useHeroMotion(hero);
@@ -88,7 +95,7 @@ export function ChatHero() {
         </button>
         {/* Nultron says hello in a speech bubble: the page opens on the character talking to you. */}
         <div className="chat-bubble enter-rise relative" style={{ "--i": 2 } as CSSProperties} data-testid="chat-hero-bubble">
-          <p className="chat-bubble-hello">{t("chat.empty.hello")}</p>
+          <p className="chat-bubble-hello">{hello}</p>
           <h2 className="chat-hero-title relative text-[var(--text)]">{t("chat.empty.headline")}</h2>
           <div className="enter-fade relative w-full" style={{ "--i": 3 } as CSSProperties}>
             <ChatKeyStatus />

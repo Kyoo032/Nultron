@@ -1,0 +1,288 @@
+/* The header of an agent's conversation, and its Conversations panel (tester code, chat-first shell).
+
+   One row at every width. The agent's tile, its name and the tier chip sit on the left and give way
+   last; the quiet chips (context, usage, account) are the first to go when the pane is narrow; the
+   three controls are always on screen. Colours are the theme's variables, so light and dark need no
+   second set. Nothing here moves. */
+
+.agent-chat-header {
+  position: relative;
+  z-index: 30;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3, 0.75rem);
+  width: 100%;
+  min-height: 3.5rem;
+  padding-block: var(--space-2, 0.5rem);
+  container-type: inline-size;
+}
+
+.agent-chat-identity {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.agent-chat-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-chat-tier {
+  flex: none;
+}
+
+/* The picker's 9rem floor is the composer toolbar's (`globals.css`). Beside a name the chip is only
+   as wide as its word, or on a phone it pushed the name to nothing and slid under the controls. */
+.agent-chat-tier .model-picker {
+  width: auto;
+  min-width: 0;
+}
+
+.agent-chat-tier .model-picker-trigger {
+  width: auto;
+  height: 2rem;
+}
+
+.agent-chat-end {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+}
+
+.agent-chat-chips {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3, 0.75rem);
+}
+
+.agent-chat-controls {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Under about 52rem of header the quiet chips go: with them, a longer agent name was cut to three
+   letters at 45rem. The name and the controls matter more. */
+@container (max-width: 52rem) {
+  .agent-chat-chips {
+    display: none;
+  }
+}
+
+/* A phone-width header holds the tile, the tier and the three controls, and no more. The name stays
+   in the page for a screen reader; on screen the tile and the lit rail entry say who this is. */
+@container (max-width: 22rem) {
+  .agent-chat-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}
+
+.agent-tile {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--mode, var(--accent));
+  color: var(--on-mode, #fff);
+}
+
+.agent-tile-brand {
+  background: transparent;
+  color: var(--text);
+}
+
+.agent-chat-btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.agent-chat-btn:hover,
+.agent-chat-btn[aria-expanded="true"],
+.agent-chat-btn[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text);
+}
+
+.agent-chat-btn:focus-visible,
+.agent-history-item:focus-visible,
+.agent-history-delete:focus-visible,
+.agent-history-more:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.agent-history {
+  position: relative;
+  display: inline-flex;
+}
+
+.agent-history-panel {
+  position: absolute;
+  top: calc(100% + 0.375rem);
+  right: 0;
+  z-index: 60;
+  display: flex;
+  width: min(20rem, calc(100vw - 6rem));
+  max-height: min(26rem, 70vh);
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 12px 32px color-mix(in srgb, #000 16%, transparent);
+}
+
+.agent-history-title {
+  flex: none;
+  padding: 0.75rem 0.875rem 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-3);
+}
+
+.agent-history-list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 0.375rem 0.5rem;
+}
+
+.agent-history-note {
+  padding: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--text-3);
+}
+
+.agent-history-row {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.agent-history-item {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  height: 2.125rem;
+  padding: 0 0.5rem;
+  border-radius: 8px;
+  font-size: 0.8125rem;
+  color: var(--text-2);
+}
+
+.agent-history-item:hover {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--text);
+}
+
+.agent-history-item[aria-current="true"] {
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.agent-history-delete {
+  flex: none;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-3);
+  cursor: pointer;
+  opacity: 0;
+}
+
+.agent-history-row:hover .agent-history-delete,
+.agent-history-row:focus-within .agent-history-delete,
+.agent-history-delete:disabled {
+  opacity: 1;
+}
+
+.agent-history-delete:hover {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+  color: var(--danger);
+}
+
+/* A touch screen has no hover: the delete control is simply there. */
+@media (hover: none) {
+  .agent-history-delete {
+    opacity: 1;
+  }
+}
+
+.agent-history-more {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  height: 2rem;
+  padding: 0 0.5rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 0.75rem;
+  color: var(--text-3);
+  cursor: pointer;
+}
+
+.agent-history-more:hover {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+  color: var(--text);
+}
+
+/* The pane: the conversation, and the harness panel beside it when it is open. */
+.agent-chat-pane {
+  /* The harness panel is a sheet over this pane when the window is narrow (`agent-harness.css`). */
+  position: relative;
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.agent-chat-main {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* A studio agent has no conversation: its pane is the header and what it is made of. */
+.agent-studio-body {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}

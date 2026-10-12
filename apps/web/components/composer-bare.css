@@ -1,0 +1,202 @@
+/* The bare composer (tester code, virtual agents): one rounded bar that is a `+`, the message box and a
+   round Send. Chips, notes and the refusal sentence sit under the row inside the same bar; Enhance, Add
+   files and the tier picker live in the menu that opens upward from the `+`.
+
+   `.composer-shell` stays on the form: it is the query container and carries the shell's margin, and its
+   `:focus-within` warms the border. The old `.composer-toolbar` grid in `app/globals.css` is no longer
+   used by this component. Colours are theme variables only, so light and dark need no second set. The one
+   motion is the border and ring colour, on the desk's focus timing, which reduced motion already zeroes. */
+
+.composer-bare {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  background: var(--surface);
+  transition: border-color var(--motion-focus), box-shadow var(--motion-focus);
+}
+
+/* A file is over the bar: the accent ring, and nothing else changes. */
+.composer-bare[data-dragover="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.composer-bare-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 0;
+  padding: 7px;
+}
+
+.composer-bare-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* One line is 36px; it grows with the text to about eight lines, then scrolls. */
+  max-height: 10rem;
+  margin: 0;
+  padding: 8px 4px;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+/* Two classes, so it beats the `.composer-text` floor that globals.css raises to two lines below 600px. */
+.composer-bare .composer-bare-text {
+  min-height: 36px;
+}
+
+.composer-bare-text::placeholder {
+  color: var(--text-3);
+}
+
+.composer-bare-text:focus {
+  outline: none;
+}
+
+.composer-bare-under {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 16px 12px;
+}
+
+.composer-bare-under:empty {
+  display: none;
+}
+
+/* The round Send. Beats `.composer-send` in globals.css (a grid area and the chip height). */
+.composer-bare .composer-send {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.composer-plus {
+  position: relative;
+  flex: none;
+}
+
+.composer-plus-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background-color var(--motion-hover), color var(--motion-hover);
+}
+
+.composer-plus-btn:hover:not(:disabled),
+.composer-plus-btn[aria-expanded="true"] {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.composer-plus-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.composer-plus-btn:focus-visible,
+.composer-plus-row:focus-visible,
+.composer-plus-menu .enhance-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Opens upward from the `+`, because the bar sits at the foot of the screen. The rows stay mounted while it
+   is closed (Enhance remembers the prompt it can revert), so `hidden` has to win over `display: flex`. */
+.composer-plus-menu {
+  position: absolute;
+  z-index: 70;
+  bottom: calc(100% + 10px);
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: max-content;
+  min-width: 14rem;
+  max-width: min(20rem, calc(100vw - 2 * var(--chat-gutter, 12px)));
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.composer-plus-menu[hidden] {
+  display: none;
+}
+
+/* Each row is a plain full-width button: the pill borders the toolbar gave Enhance and the picker go. */
+.composer-plus-row,
+.composer-plus-menu .enhance-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  height: auto;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  font-size: 0.875rem;
+  font-weight: 400;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* Enhance keeps the colour its own classes give it, which turns red when it fails. */
+.composer-plus-row {
+  color: var(--text);
+}
+
+.composer-plus-row:hover:not(:disabled),
+.composer-plus-menu .enhance-btn:hover:not(:disabled) {
+  background: var(--accent-soft);
+}
+
+.composer-plus-row:disabled,
+.composer-plus-menu .enhance-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* The picker is the last row. Its trigger keeps its own border so it still reads as a choice. */
+.composer-plus-menu .model-picker {
+  flex: none;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  margin-top: 4px;
+}
+
+.composer-plus-menu .model-picker-trigger {
+  height: 40px;
+  padding-inline: 12px;
+}
+
+@media (max-width: 639px) {
+  .composer-plus-menu {
+    min-width: 12rem;
+  }
+}

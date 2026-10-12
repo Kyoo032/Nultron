@@ -8,7 +8,21 @@ export type ProductBrand = {
   gatewayName: string;
   gatewayBaseUrl: string;
   logoSrc: string;
+  /**
+   * Tester code: the brand's character, which is the name of the default virtual agent. Absent means
+   * the brand names none, and the character carries the product's name (`assistantNameOf`).
+   */
+  assistantName?: string;
 };
+
+/**
+ * The default virtual agent's name (owner, 2026-10-09): the brand's own character. A brand that
+ * names its character says so in its settings (the host answers `assistantName` on `/api/v1/ping`);
+ * one that does not gets the product's name. No character is named in this code.
+ */
+export function assistantNameOf(brand: Pick<ProductBrand, "productName" | "assistantName">): string {
+  return brand.assistantName?.trim() || brand.productName;
+}
 
 export const DEFAULT_PRODUCT_BRAND: ProductBrand = {
   productName: DEFAULT_PRODUCT_NAME,
@@ -83,7 +97,18 @@ export function brandFromUnknown(payload: unknown, fallback: ProductBrand): Prod
     typeof nested.gatewayBaseUrl === "string" && nested.gatewayBaseUrl.trim()
       ? nested.gatewayBaseUrl.trim()
       : fallback.gatewayBaseUrl;
-  return { ...fallback, productName, gatewayName, gatewayBaseUrl };
+  // Only a payload that names a character sets one; without it the character follows the product name.
+  const assistantName =
+    typeof nested.assistantName === "string" && nested.assistantName.trim()
+      ? nested.assistantName.trim()
+      : fallback.assistantName;
+  return {
+    ...fallback,
+    productName,
+    gatewayName,
+    gatewayBaseUrl,
+    ...(assistantName ? { assistantName } : {}),
+  };
 }
 
 export function mergePingBrand(current: ProductBrand, payload: unknown): ProductBrand {
@@ -94,8 +119,12 @@ export function mergePingBrand(current: ProductBrand, payload: unknown): Product
   const keepPreloadGateway =
     current.gatewayName !== DEFAULT_PRODUCT_BRAND.gatewayName &&
     next.gatewayName === DEFAULT_PRODUCT_BRAND.gatewayName;
+  // A flavor the preload named keeps its own character too: the ping's is the default product's.
+  const { assistantName: pingAssistant, ...rest } = next;
+  const assistantName = keepPreloadName ? current.assistantName : pingAssistant;
   return {
-    ...next,
+    ...rest,
+    ...(assistantName ? { assistantName } : {}),
     productName: keepPreloadName ? current.productName : next.productName,
     gatewayName: keepPreloadGateway ? current.gatewayName : next.gatewayName,
     gatewayBaseUrl: keepPreloadName ? current.gatewayBaseUrl : next.gatewayBaseUrl,

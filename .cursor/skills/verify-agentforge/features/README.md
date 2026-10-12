@@ -57,6 +57,8 @@ Each file: H1 + one paragraph, then exactly four H2s — `Sub-features`, `How to
 - [Usage](./usage.md) — bottom-rail `/usage` Day/Week/Month stacked spend, this-key strip, desk by-model. Not a product mode.
 - [Workspaces](./workspaces.md) — rail switcher + `/workspaces` create/edit, presets and mode checkboxes, open → Chat.
 - [Models](./models.md) — curated Chat picker (Recommended + brand groups), doctor modeKeys/chatCount/curation on webdev. No `model-picker-all`.
+- [Model tiers](./model-tiers.md) — tester code only: the Chat composer's three choices (`tier-picker`, `tier-option-daily|fast|reasoning`) replace the model picker and the reasoning-effort select, and a send posts `{ content, tier }`. The model-picker steps in `models.md` do not apply there.
+- [Virtual agents](./virtual-agents.md) — tester code only: the chat-first shell. The icon rail of the desk's agents (`agent-rail`, `mode-chat`, `agent-<mode>`), each agent's conversation at `/chat?agent=<mode>` with the tier chip, history, new chat and harness panel in its header, the bare composer (`composer-plus`, `composer-text`, `composer-send`), the Research agent's dossier card (`chat-dossier-card`), and the Virtual agents page that replaces Workspaces (`agent-hire`, `agent-let-go`). Only Research converses; the other agents are studio agents. Written from the code on 2026-10-09 and not yet driven.
 - [Templates](./templates.md) — example galleries on all five mode studios; click pre-fills the prompt.
 - [PII](./pii.md) — host masks outbound prompts (`[email]` / `[phone]` / …); the transcript keeps the typed text.
 - [Security](./security.md) — saved-key fingerprint on Settings (`key-fingerprint`); TLS note on `privacy-note`; at-rest envelope is existing work.
