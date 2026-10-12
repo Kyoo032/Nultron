@@ -266,6 +266,48 @@ export function requestsKeyWrite(body: Record<string, unknown>, serverMode: bool
   return serverMode && PROVIDER_KEY_FIELDS.some((field) => keyFieldValue(body[field]) !== undefined);
 }
 
+/**
+ * Every field `POST /api/v1/settings` reads from its body. Keep it in step with each `body.*` read in this
+ * file: `handlePostSettings`, `requestsOperatorOnlySettings`, `requestsKeyWrite` and
+ * `refreshGatewayGateAfterSave`. `scope` and `confirm` belong to `POST /api/v1/settings/reset`, another route,
+ * so they are not listed. A name missing here is not refused, because an older renderer or the tester branch
+ * may still send one: it is reported in `ignoredFields` instead, so a typo is visible (SH-002).
+ */
+export const KNOWN_SETTINGS_FIELDS: ReadonlySet<string> = new Set<string>([
+  "locale",
+  ...PROVIDER_KEY_FIELDS,
+  "toolKeys",
+  "toolBackends",
+  "imageGenModel",
+  "videoGenModel",
+  "musicGenModel",
+  "documentGenModel",
+  "researchGenModel",
+  "presentationGenModel",
+  "disabledTools",
+  "injectionGuardBypass",
+  "editTurnCapUsd",
+]);
+
+/** The most names one answer carries, and the longest each may be. A body is the caller's own, but a response is not the place to echo an unbounded one. */
+export const MAX_IGNORED_FIELDS = 20;
+export const MAX_IGNORED_FIELD_NAME_LENGTH = 64;
+
+/**
+ * The names of the body's fields this handler does not read, in the order the body sent them. Names only:
+ * a value is never returned, not even a key's. A body that is not a JSON object (plain text, an array, a
+ * number) carries no field names, so it reports none.
+ */
+export function unknownSettingsFields(body: unknown): string[] {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return [];
+  }
+  return Object.keys(body)
+    .filter((name) => !KNOWN_SETTINGS_FIELDS.has(name))
+    .slice(0, MAX_IGNORED_FIELDS)
+    .map((name) => name.slice(0, MAX_IGNORED_FIELD_NAME_LENGTH));
+}
+
 /** Throws the 403 for anyone who is not an owner or an admin. Called only in server mode. */
 function assertMayChangeCompanyKey(tenant: TenantContext): void {
   if (!canAdminister(tenant.role)) {
@@ -373,9 +415,13 @@ export async function handlePostSettings(request: HostRequest, deps: ServerModeD
       console.warn(`gateway verdict refresh failed after save: ${redactSecrets(detail)}`);
     }
     const payload = await settingsPayload(saved, tenant, serverMode, request.headers["accept-language"]);
+    // SH-002: a field this handler does not read was not applied, so the answer names it. Only when there is
+    // one: an answer with nothing to report keeps the shape it always had.
+    const ignoredFields = unknownSettingsFields(body);
     return jsonOk({
       ...payload,
       gateway: gateVerdictFor(payload.gateway, freshGate, gateRefreshFailed),
+      ...(ignoredFields.length > 0 ? { ignoredFields } : {}),
     });
   } catch (error) {
     return jsonError(error);
