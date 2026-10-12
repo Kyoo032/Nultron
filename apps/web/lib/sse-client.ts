@@ -7,6 +7,9 @@ export type ClientRuntimeEvent = {
   message?: string;
   runId?: string;
   model?: string;
+  /** `run.model_fallback`: the model that could not be reached and the one that answered in its place. */
+  from?: string;
+  to?: string;
   attempt?: number;
   attempts?: number;
 };

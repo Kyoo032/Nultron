@@ -37,10 +37,12 @@ export type FinanceStudioViewProps = {
   productName: string;
   error: string | null;
   notice: string | null;
-  /** Hosted only: the desk has no usable gateway key, so the model-calling buttons are quiet and a note says why. */
+  /**
+   * Hosted only: the desk has no usable gateway key, so the model-calling buttons (the read-the-numbers
+   * button included) are quiet and a note says why. The host refuses every `/finance/parse` on a closed
+   * gate whichever task asks, so no task's read runs without a key.
+   */
   needsKey: boolean;
-  /** Like needsKey, but for the read-the-numbers button: a task that reads its own table needs no key. */
-  readNeedsKey: boolean;
   needsHint: boolean;
   ready: boolean;
   canRead: boolean;
@@ -81,7 +83,6 @@ export function FinanceStudioView({
   error,
   notice,
   needsKey,
-  readNeedsKey,
   needsHint,
   ready,
   canRead,
@@ -140,7 +141,6 @@ export function FinanceStudioView({
           error={error}
           notice={notice}
           needsKey={needsKey}
-          readNeedsKey={readNeedsKey}
           needsHint={needsHint}
           ready={ready}
           canRead={canRead}
@@ -185,7 +185,6 @@ function TaskPath(props: Omit<FinanceStudioViewProps, "showChooser" | "chooser">
     error,
     notice,
     needsKey,
-    readNeedsKey,
     needsHint,
     ready,
     canRead,
@@ -285,7 +284,6 @@ function TaskPath(props: Omit<FinanceStudioViewProps, "showChooser" | "chooser">
               reading={reading}
               locked={locked}
               needsKey={needsKey}
-              readNeedsKey={readNeedsKey}
               running={running}
               generateLabel={generateLabel}
               onRead={onRead}
@@ -340,7 +338,6 @@ function TaskPath(props: Omit<FinanceStudioViewProps, "showChooser" | "chooser">
               reading={reading}
               locked={locked}
               needsKey={needsKey}
-              readNeedsKey={readNeedsKey}
               running={running}
               generateLabel={generateLabel}
               onRead={onRead}
@@ -371,7 +368,12 @@ function TaskPath(props: Omit<FinanceStudioViewProps, "showChooser" | "chooser">
                 <FinancePhaseStrip phases={phases} />
               </details>
               {result ? (
-                <button type="submit" className="btn" disabled={locked || !ready || needsKey} data-testid="finance-generate">
+                <button
+                  type="submit"
+                  className="btn"
+                  disabled={locked || !ready || needsKey}
+                  data-testid="finance-generate"
+                >
                   {running ? <WorkingStatus label={generateLabel} /> : generateLabel}
                 </button>
               ) : null}
@@ -399,7 +401,6 @@ function Primary({
   reading,
   locked,
   needsKey,
-  readNeedsKey,
   running,
   generateLabel,
   onRead,
@@ -413,7 +414,6 @@ function Primary({
   reading: boolean;
   locked: boolean;
   needsKey: boolean;
-  readNeedsKey: boolean;
   running: boolean;
   generateLabel: string;
   onRead: () => void;
@@ -444,7 +444,7 @@ function Primary({
       <button
         type="button"
         className="btn btn-primary"
-        disabled={locked || reading || !canRead || readNeedsKey}
+        disabled={locked || reading || !canRead || needsKey}
         onClick={onRead}
         data-testid={task === "ratios" ? "finance-ratios-parse" : "finance-parse"}
       >

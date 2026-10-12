@@ -335,10 +335,7 @@ describe("POST /api/v1/settings in server mode", () => {
   const HOSTED = { isServerMode: () => true };
   const DESK = { isServerMode: () => false };
 
-  async function save(
-    body: Record<string, unknown>,
-    deps: { isServerMode: () => boolean },
-  ): Promise<JsonResponse> {
+  async function save(body: Record<string, unknown>, deps: { isServerMode: () => boolean }): Promise<JsonResponse> {
     const { handlePostSettings } = await import("./settings");
     const result = await handlePostSettings(request("POST", "/api/v1/settings", { body }), deps);
     if (result.type !== "json") {
@@ -400,6 +397,93 @@ describe("POST /api/v1/settings in server mode", () => {
   it("does not refuse any of it off server mode", async () => {
     const response = await save({ toolKeys: { tavily: "tvly-desk" } }, DESK);
     expect(response.status).toBe(200);
+  });
+
+  // SH-002. A field this handler does not read is not applied, and the 200 says so by name instead of
+  // hiding a typo. Each case starts with no saved key, because the cases above leave one behind.
+  it("names a field it does not read, and applies nothing for it", async () => {
+    await json("POST", "/api/v1/settings/reset", { scope: "key" });
+    const response = await save({ openaiKey: "sk-test" }, DESK);
+    expect(response.status).toBe(200);
+    expect(response.body.hasOpenai).toBe(false);
+    expect(response.body.ignoredFields).toEqual(["openaiKey"]);
+  });
+
+  it("still applies the known fields in a body that also carries an unknown one", async () => {
+    await json("POST", "/api/v1/settings/reset", { scope: "key" });
+    const response = await save({ openaiApiKey: KEY, openaiKey: "sk-typo" }, DESK);
+    expect(response.status).toBe(200);
+    expect(response.body.hasOpenai).toBe(true);
+    expect(response.body.ignoredFields).toEqual(["openaiKey"]);
+    await json("POST", "/api/v1/settings/reset", { scope: "key" });
+  });
+
+  it("gives the same unknown-field answer on the desk and on the hosted service", async () => {
+    for (const deps of [HOSTED, DESK]) {
+      await json("POST", "/api/v1/settings/reset", { scope: "key" });
+      const response = await save({ openaiKey: "sk-test" }, deps);
+      expect(response.status).toBe(200);
+      expect(response.body.hasOpenai).toBe(false);
+      expect(response.body.ignoredFields).toEqual(["openaiKey"]);
+    }
+  });
+
+  it("has no ignoredFields property when every field is one it reads, on either product", async () => {
+    for (const deps of [HOSTED, DESK]) {
+      const response = await save({ openaiApiKey: KEY, editTurnCapUsd: 5, locale: "en" }, deps);
+      expect(response.status).toBe(200);
+      expect(response.body).not.toHaveProperty("ignoredFields");
+      await json("POST", "/api/v1/settings/reset", { scope: "key" });
+    }
+  });
+});
+
+describe("unknownSettingsFields (SH-002)", () => {
+  it("lists the names the handler does not read, in the order sent, and no name it reads", async () => {
+    const { unknownSettingsFields } = await import("./settings");
+    expect(
+      unknownSettingsFields({ locale: "en", openaiApiKey: "x", openaiKey: "y", editTurnCapUsd: 5, typo: 1 }),
+    ).toEqual(["openaiKey", "typo"]);
+    expect(unknownSettingsFields({})).toEqual([]);
+  });
+
+  it("recognises every field the handler reads", async () => {
+    const { unknownSettingsFields, KNOWN_SETTINGS_FIELDS } = await import("./settings");
+    for (const name of KNOWN_SETTINGS_FIELDS) {
+      expect(unknownSettingsFields({ [name]: "x" }), name).toEqual([]);
+    }
+    expect(KNOWN_SETTINGS_FIELDS.has("openaiApiKey")).toBe(true);
+    expect(KNOWN_SETTINGS_FIELDS.has("musicGenModel")).toBe(true);
+  });
+
+  it("reports nothing for a body that is not a JSON object", async () => {
+    const { unknownSettingsFields } = await import("./settings");
+    for (const body of ["openaiKey=sk-test", null, undefined, ["openaiKey"], 5]) {
+      expect(unknownSettingsFields(body), JSON.stringify(body)).toEqual([]);
+    }
+  });
+
+  it("treats prototype names as unknown fields, not as known ones", async () => {
+    const { unknownSettingsFields } = await import("./settings");
+    const body = JSON.parse('{"__proto__":1,"constructor":2,"toString":3,"hasOwnProperty":4}') as object;
+    expect(unknownSettingsFields(body)).toEqual(["__proto__", "constructor", "toString", "hasOwnProperty"]);
+  });
+
+  it("caps the number and the length of the names it returns", async () => {
+    const { unknownSettingsFields, MAX_IGNORED_FIELDS, MAX_IGNORED_FIELD_NAME_LENGTH } = await import("./settings");
+    const many = Object.fromEntries(Array.from({ length: 1000 }, (_, index) => [`x${index}`, 1]));
+    const names = unknownSettingsFields(many);
+    expect(names).toHaveLength(MAX_IGNORED_FIELDS);
+    expect(names[0]).toBe("x0");
+    const long = "a".repeat(10_000);
+    expect(unknownSettingsFields({ [long]: "v" })).toEqual(["a".repeat(MAX_IGNORED_FIELD_NAME_LENGTH)]);
+  });
+
+  it("names the field only, never its value", async () => {
+    const { unknownSettingsFields } = await import("./settings");
+    const names = unknownSettingsFields({ openaiKey: "sk-secret-value-123" });
+    expect(names).toEqual(["openaiKey"]);
+    expect(JSON.stringify(names)).not.toContain("sk-secret");
   });
 });
 
