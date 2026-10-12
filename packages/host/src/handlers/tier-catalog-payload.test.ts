@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { INPUT_MODALITIES } from "@agentforge/core";
+import { INPUT_MODALITIES, PROVIDER_IDS } from "@agentforge/core";
 import { MODEL_TIERS } from "@agentforge/core/tiers";
 import { ROUTER_IMPORT_BUDGET_MS } from "../__fixtures__/test-budgets";
 import type { HostRequest, HostResult } from "../types";
@@ -137,7 +137,7 @@ describe.each(SURFACES)("$name carries the tiers", ({ path }) => {
     for (const model of body.models) {
       expect(text, model.id).not.toContain(model.id.toLowerCase());
     }
-    for (const provider of ["toko", "openai", "anthropic", "google", "openrouter", "claude", "gpt", "gemini"]) {
+    for (const provider of [...PROVIDER_IDS, "claude", "gpt", "gemini"]) {
       expect(text, provider).not.toContain(provider);
     }
   });

@@ -2,6 +2,7 @@ import {
   ApiError,
   INPUT_MODALITIES,
   availableProviders,
+  GATEWAY_PROVIDER_ID,
   readOptionalModel,
   type InputModality,
   type ReasoningEffortChoice,
@@ -31,7 +32,7 @@ import { listSelectableModels, type SelectableModel } from "./selectable-models"
  */
 
 /** The only provider with candidate lists at M1. Enterprise key providers get theirs in M4. */
-const SUPPORTED_PROVIDER = "toko";
+const SUPPORTED_PROVIDER = GATEWAY_PROVIDER_ID;
 
 /**
  * What a tier asks of the model's Thinking control, as the choice `readReasoningEffortChoice` would have

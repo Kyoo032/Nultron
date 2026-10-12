@@ -294,7 +294,7 @@ app's network namespace so `127.0.0.1:3000` *is* the app and nothing is exposed 
 
 Not a request-admission control; what the host does with a key once it has one. Detail on the pages named; the point here is that each is a hosted-only control with a Personal-parity test.
 
-- **Pinned hosts.** The provider registry (`packages/core/src/providers/registry.ts:67`) is the only place a provider's base URL lives, digested at `:83`; `isOfficialOpenAIBaseUrl` compares hosts exactly (`packages/core/src/models/probe.ts:40`). [`model-policy.md`](model-policy.md) § 8.
+- **Pinned hosts.** The provider registry (`packages/core/src/providers/registry.ts:81`) is the only place a provider's base URL lives, digested at `:97`; `isOfficialOpenAIBaseUrl` compares hosts exactly (`packages/core/src/models/probe.ts:40`). [`model-policy.md`](model-policy.md) § 8.
 - **No stored endpoint is honoured** (`packages/core/src/secrets.ts:346`, `packages/host/src/selectable-models.ts:343`). [`pii-and-key-security.md`](pii-and-key-security.md) § 10.
 - **A key-bearing request does not follow a redirect** (`packages/core/src/runtime/key-redirect.ts:20`). Outbound calls to a *caller-supplied* URL are the SSRF guard of § 7 and are a different thing.
 - **The model cache is per tenant**, a `tenant_state` row, so one tenant's provider catalogue and probe errors are not another's (`packages/host/src/model-cache.ts`; [`settings-and-gateway-gate.md`](settings-and-gateway-gate.md)). A tenant that has a key and no row is refilled by one background probe named by tenant and written only if the row is still absent (`warmHostedModelCache`, `packages/host/src/selectable-models.ts:505`); its failure line, `model_cache_warmup_failed`, carries the tenant id and the redacted message and no key.
