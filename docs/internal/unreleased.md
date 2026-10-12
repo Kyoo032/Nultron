@@ -445,3 +445,13 @@ Found while building the chat-first shell in `agentforge-chat`. All three are in
 - [ ] **Onboarding on webdev: a null gate opens the "try" step.** `applyGate(null)` calls `resolveGate(null, isElectron())`, which answers "app" off hosted and Electron (`apps/web/lib/gateway-gate.ts:108-109`), so `onboarding-screen.tsx:151-152` jumps to the `try` step and shows `onboarding-key-success` ("That key works.") when Re-check gets no answer (`:198`) or a Settings POST comes back without a parseable `gateway` (`:185`). Read from source and a reader report; not driven. Personal and hosted are unaffected (the resolver treats a missing gate as closed there). Lanes: Personal webdev and tester only.
 - [ ] **`?mascot=<state>` no longer forces an empty-desk character on desks that use `StudioEmptyDesk` at wide widths.** `StudioEmptyDesk` returns nothing while the header stage is on screen (`apps/web/components/studio-empty-desk.tsx`, `staged`), so the dev hook that `MascotSlot` honours (`mascot-slot.tsx:108`) is never reached. Driven 2026-10-09: `/meeting?mascot=sleep` and `/research?mascot=sleep` at 1440 x 900 held only the header buddy; at 900 wide the forced `empty` mascot appeared; `/market` still forces it at 1440. Harness-only (a driver hook), no user-visible effect. The verify recipe now says to sweep below 60rem.
 - Still open from 2026-10-05, not re-driven in this pass: the Finance pane loses 1 px of `scrollTop` per rail detour (verify `shell-scroll.md`).
+
+## White-label plan: downstream brand repos, no brand code in agentforge, 2026-10-12 (docs only)
+
+- `docs/internal/white-label-and-agent-guardrails-plan.md` now records Kyo's 2026-10-12 decision for design B: each brand (HYP AI, Nultron) is a private downstream repo that syncs from `main`; option A (in-repo `brands/<id>/`) is rejected. Adds the sync model (dated sync branches, `ci:local` plus a leak check, Triage runs, Architect reviews, Kyo approves) and the generic hooks still owed on `main`. No code changed.
+
+## Findings from the verify-skill maintenance pass, 2026-10-12 (published code; not fixed)
+
+Found while re-driving the recipes against the chat-first shell on `:3000`. Lanes: Personal, Enterprise, HYP AI, tester.
+
+- [ ] **Guide: the Chat stop still describes a model picker.** `steps.chat.body` says the model picker lets the person choose which model answers (`apps/web/locales/en/guide.json:29`, and `apps/web/locales/id/guide.json:29`, "Pemilih model"). The chat-first Chat has the tier picker (`tier-picker`: Daily, Fastest, Reasoning) and no model picker, so the copy points at a control that is not there. Fix both catalogs together; the parity test keeps the keys aligned but does not check the meaning.

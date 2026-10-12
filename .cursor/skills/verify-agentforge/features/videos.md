@@ -4,7 +4,7 @@ Videos is a generate studio (prompt, aspect, duration, optional resolution, opti
 
 ## Sub-features
 
-- `videos-rail` reaches `/videos` from `mode-videos` on Default.
+- `videos-rail` reaches `/videos` from `agent-videos` on Default.
 - `videos-shell` shows `videos-studio`.
 - `buddy-stage-header` — Nultron on the header's art column (`ModeHeader`, `apps/web/components/mode-header.tsx:66-73`): `buddy-stage-header` and its tap button `buddy-stage-header-tap` (`apps/web/components/buddy-stage.tsx:72`, `:82`) are in the DOM at every width, but the column is `display: none` below 60rem of header width (`apps/web/app/globals.css:1925`; the 60rem `@container` that turns it on is `:1969-1973`), so they are visible only on a wide pane (about a 1280px window and up). While the stage is at least 25% on screen the empty-desk Nultron stands down (see `videos-empty`). A visited studio stays mounted, so scope `buddy-stage-header` to `videos-studio` or use `.first()`. Detail: [documents.md](./documents.md).
 - `videos-needs-key` shows `videos-studio-needs-key` when no key is ready: the gallery read said `ready: false` and has finished (`!ready && !loading`), or, on the hosted build only, `useHostedNeedsKey` is true (`apps/web/components/videos-studio.tsx:362`, the testid at `:363`). `videos-studio-submit` is `disabled` unless both `ready` and the hosted gate allow it (`keyReady`, `:125`; the button is `:356`, its testid `:358`). On a keyed desk `ready` is true, so the note is count 0 and Generate is enabled: a click there is a PAID live generate.
@@ -22,7 +22,7 @@ Videos is a generate studio (prompt, aspect, duration, optional resolution, opti
 
 ## How to get to it (user POV)
 
-- Choose Videos on the left rail (`mode-videos`). Default has the tab on a fresh first-run desk and on every older desk.
+- Choose the Videos agent on the left rail (`agent-videos`), then `agent-open-studio`. Default has the tab on a fresh first-run desk and on every older desk.
 - Open `http://127.0.0.1:3000/videos` when the tab is unlocked.
 
 ## Driving it with the Nultron harness
@@ -30,10 +30,10 @@ Videos is a generate studio (prompt, aspect, duration, optional resolution, opti
 Preconditions:
 
 - Doctor exits 0.
-- `mode-videos` is visible. If not, skip with that precondition — same rule as Images.
+- `agent-videos` is visible. If not, skip with that precondition — same rule as Images.
 - Do not submit `videos-studio-submit` on the shared Cloud `:3000` desk. Isolated live matrix (in-process key, never Settings) is the Cloud live proof. On Windows, only generate from the product UI if the operator asked.
 
-- **Open Videos.** Click `mode-videos`. URL matches `/videos` (15s). `videos-studio` is visible (15s).
+- **Open Videos.** Click `agent-videos`, then `agent-open-studio` (or go to `/videos`). URL matches `/videos` (15s). `videos-studio` is visible (15s).
 - **No-key state (keyless or stub desk only).** `videos-studio-needs-key` is visible when the studio is not ready (no key). On a keyed desk it is count 0 and `videos-studio-submit` is enabled once the prompt is non-empty, so record that and stop. Copy points at Settings. The copy is rendered by `SettingsLinkHint`, so the banner always contains exactly one `<a href="/settings">` — assert the anchor, not the word "Settings", which is locale-dependent. Driven 2026-09-17 on the `id` desk: `Tambahkan kunci gateway Toko Token di Pengaturan untuk membuat video.`
 - **Empty gallery.** Once the gallery has settled with no clips and nothing generating, `videos-studio-empty` count is 1 (`data-mode` and `data-tier` on it, and `data-staged="true"` only while the header stage is on screen; no text, and no height while the header's Nultron is on screen); it is 0 while `loading` or generating. The template/example lists stay above `videos-studio-prompt-bar` (not a sticky dock). Never delete rows to manufacture an empty gallery.
 - **Knobs.** `videos-studio-aspect` and `videos-studio-seconds` are visible on load; `videos-studio-resolution` and `videos-studio-still` are not. Click the `videos-studio-advanced` summary and both become visible (driven 2026-09-23; estimate then read `≈ $0.75 for 5 s at 720p …`). Example gallery stays. Do not generate.

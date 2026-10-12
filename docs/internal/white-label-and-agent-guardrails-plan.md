@@ -1,6 +1,6 @@
 # White-label structure and agent guardrails: plan for approval
 
-Status: proposal, 2026-10-09. Nothing here is built. Three decisions are Rizky's (section 6).
+Status: proposal, 2026-10-09; revised 2026-10-12 (design B chosen by Kyo, see the decision record in section 6). Brand code never lives in agentforge; each brand is a private downstream repo.
 
 ## 1. Why now
 
@@ -37,16 +37,16 @@ The numbers above come from HYP AI because it is the one fork that exists. That 
 | **Deploy profile** (how it is served) | Nultron: direct, two names, own certificates, e-mailed code. HYP AI: Cloudflare edge or direct, one name plus `:8443`, password sign-in | `webapp-deploy/`, `hypey/deploy` |
 
 Scope (Rizky, 2026-10-09): two brands, Nultron and HYP AI, and the web-based Enterprise version first. Personal stays on the same code and keeps its parity rule, but it is not what this plan optimises. Other desktop brands (Kemenkeu AI, AIHub Metranet) are out of scope. Nultron's own needs:
-- **Nultron is brand pack zero.** Its name and gateway ("Nultron", "Toko Token") are baked into shared code as if they were neutral. A second brand can only be clean if Nultron moves into `brands/nultron/` like any other, and the shared code stops knowing its name. This is the largest single change, and it is on Nultron's side, not HYP AI's.
+- **Nultron is a downstream brand, like HYP AI.** Its name and gateway ("Nultron", "Toko Token") are baked into shared code as if they were neutral. Under the 2026-10-12 decision no brand lives in agentforge, so Nultron moves out to its own private downstream repo and shared code falls back to a neutral default brand. Stripping the Nultron name from shared code is still the largest single change, and it is on Nultron's side, not HYP AI's. agentforge may keep per-brand docs that explain what each brand uses, but no brand code or assets.
 - **Personal and Enterprise are profiles, not brands.** Either brand can ship either, but Enterprise (the hosted web version) comes first. The guard needs both rules the repo already has: an Enterprise-only change is gated to server mode and carries a Personal-parity test; a Personal change must not read hosted state.
 - **Nultron's release paths differ from a white label's.** Nultron ships Personal through `pnpm desktop:release` to `Kyoo032/Nultron`, and Enterprise through `release-web.mjs` plus the preview's desk-by-desk update. A white label ships through its own bundle. A shared change must not alter either path silently.
 - **The tester branch is Nultron's.** It tests a new Nultron shape (chat first). A promotion to `main` changes the default brand's UI for every white label too, so the promotion checklist must name which brands inherit it.
 
 ## 3. Two designs
 
-**A. Brand packs (recommended).** Each white label is a folder `brands/<id>/` with `brand.json` (names, gateway name and host, app id, update setting), colours, images and mascot manifest, locale overrides, and a deploy profile. One pipeline is parameterised by brand id. Hosted picks its brand at boot; desktop picks it at pack time as it does now. Two brands now (Nultron, HYP AI); a later white label would cost one folder, not one fork. HYP AI's clone shrinks to its pack plus its deploy profile.
+**A. Brand packs in this repo (rejected 2026-10-12, see section 6).** Each white label is a folder `brands/<id>/` with `brand.json` (names, gateway name and host, app id, update setting), colours, images and mascot manifest, locale overrides, and a deploy profile. One pipeline is parameterised by brand id. Hosted picks its brand at boot; desktop picks it at pack time as it does now. Two brands now (Nultron, HYP AI); a later white label would cost one folder, not one fork. HYP AI's clone shrinks to its pack plus its deploy profile. Rejected: Kyo ruled that no brand is merged into agentforge. What survives from A is the generic loader (brand config schema, boot-time and pack-time selection) and the seams below, with the packs held downstream.
 
-The seams that must exist first (all small, all in the patch above):
+The seams (generic, brand-neutral hooks that still land on `main` under B, so each downstream repo stays thin):
 1. One brand constants module in shared code, with a CommonJS copy for the Electron files, that prompts, error strings and the CSP read.
 2. The Caddy CSP generated from the gateway host, not typed twice.
 3. A neutral provider id (HYP AI renamed `toko` to `tokenku`, which breaks stored ids).
@@ -56,9 +56,17 @@ The seams that must exist first (all small, all in the patch above):
 
 Cost: touches the release scripts, the deploy bundle and the pack scripts, and `AGENTS.md` says a change to those needs Rizky's word. It is a migration, done in steps, with HYP AI as the first pack and Nultron as the default pack.
 
-**B. Keep vendor-branch forks and add guards.** Cheapest today, and sync steps stay as written. Cost grows with every brand, each fork carries its own conflicts, and every shared change needs a leak check per fork.
+**B. Downstream brand repos plus generic hooks (chosen, Kyo 2026-10-12).** Each brand is its own private repo (for example `Kyoo032/hyp-ai`, branches `main`, `upstream` and `sync/*`) that syncs from agentforge `main`. The brand lives there as config and assets read through the hooks above, plus a small named set of brand commits for whatever cannot be config yet. Cost grows with every brand, which the hooks keep small.
 
-Recommendation: A, in stages, with the guardrails in section 4 first because they pay off under either design and make the migration safe.
+Sync model (HYP AI Architect, Dev Findings card BUG-24):
+- `upstream` is a pristine mirror of agentforge `main`; nothing brand-specific lands on it.
+- Each sync: create `sync/YYYY-MM-DD` from the brand's `main`, merge `upstream` (merge, not rebase), replay or adjust the brand layer, run `pnpm ci:local` plus the brand repo's leak check, then PR into the brand's `main`.
+- Brand Triage runs the sync, the brand Architect reviews the brand delta and the leak check, Kyo approves the merge to the brand's `main`. Cadence: each agentforge release or weekly, plus ad hoc for security fixes. Merged sync branches are deleted.
+- Leak check: each downstream repo owns its forbidden-terms list and allowlist; `main` runs a neutral check that fails when shared code names any brand.
+
+Generic hooks to land on `main`: #158 (`GATEWAY_PROVIDER_ID`), one brand config entry point, host config (with the Caddy CSP generated from the gateway host), asset paths read from config, locale overrides, neutral deploy defaults, and a reusable leak-check script parameterised by a forbidden-terms list.
+
+Recommendation: B with the hooks, and the guardrails in section 4 first.
 
 ## 4. Guardrails as mechanisms, not more text
 
@@ -75,11 +83,11 @@ Each is harness-only (not shipped in an installer or image) unless noted.
 
 1. **Built 2026-10-09 (advisory, not required):** `lanes.json`, `scripts/lane-guard.mjs` (warns, `--strict` for later), the `lane-guard` step in `ci:local`, the `change-agentforge` skill with its preamble, the Touches / Do not touch sections, and `maps:check` back to zero hard failures. Making the guard and `maps:check` required is still decision 3. Guardrails 1 to 3 and the preamble, no product code touched. Proven by deliberately breaking each rule in a throwaway diff and watching the guard fail.
 2. Brand constants module and the six seams, behind identical output for Nultron (a test pins that the Nultron build is byte-for-byte unchanged in user-visible strings).
-3. Nultron moved into `brands/nultron/` (output pinned unchanged), then HYP AI as the second pack; the clone reduced to its pack and deploy profile; sync becomes a version bump.
-4. A second, throwaway brand pack to prove N, before any real customer.
+3. Nultron moved out to its own private downstream repo, and shared code left with a neutral default brand (user-visible output for Nultron pinned unchanged in the Nultron repo). HYP AI's delta in `Kyoo032/hyp-ai` reduced to config, assets and a handful of named brand commits. The fork is not retired; sync stays a merge into a dated branch, smaller once the hooks land.
+4. A neutral fixture brand used only in tests (or a throwaway downstream test repo) to prove N brands, before any real customer. No brand pack is added to this repo.
 
 ## 6. Decisions for Rizky
 
-1. **A or B** for white labels, with Nultron as brand pack zero.
+1. **A or B** for white labels. **Decided 2026-10-12 (Kyo): B, downstream brand repos.** Brand code (HYP AI, Nultron) is never merged into agentforge. Each brand lives in its own private downstream repo that syncs from agentforge `main` by the sync model in section 3. agentforge holds only generic, brand-neutral hooks and per-brand docs. This replaces the 2026-10-12 16:08 choice of in-repo brand packs.
 2. **May the release, pack and deploy scripts change** as stage 2 and 3 need (AGENTS.md currently forbids that without his word).
 3. **Make the guard and `maps:check` required** in `ci:local`, so red blocks a PR.

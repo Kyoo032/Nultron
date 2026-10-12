@@ -4,7 +4,7 @@ Legal is a matter job: .docx files in, position-aware review, verified deliverab
 
 ## Sub-features
 
-- `legal-rail` reaches `/legal` from `mode-legal` on Home and on the Legal preset.
+- `legal-rail` reaches `/legal` from `agent-legal` on Home and on the Legal preset.
 - `legal-shell` shows `legal-studio` with the matter panel, the matter map, "What will happen", and previous matters. Its `ModeHeader` draws `buddy-stage-header` in the art column when the header is 60rem wide or more; while that stage is on screen the empty-desk mascot on screen 1 (`MascotSlot`, `apps/web/components/legal-studio.tsx:399`) draws nothing, and below 60rem it is drawn.
 - `legal-file-input` accepts only .docx; a .txt or .pdf shows the message "Only .docx files are accepted in v1. Convert PDF or other formats to .docx first."
 - Upload is disabled until both `legal-side-party` and `legal-side-counterparty` are filled; `legal-upload-hint` says so. The first accepted upload creates the matter lazily; a refused file (not `.docx`, over 25 MB) is refused before the matter exists. Each accepted file appears with a role tag that cycles through the roles on click; the click sends `PATCH /api/v1/legal/matters/:matterId` with a `roles` array, not a per-file route.
@@ -26,7 +26,7 @@ Legal is a matter job: .docx files in, position-aware review, verified deliverab
 
 ## How to get to it (user POV)
 
-- Choose Legal on the left rail (`mode-legal`). Home has the tab; the Legal preset seeds it.
+- Choose the Legal agent on the left rail (`agent-legal`), then `agent-open-studio`. Home has the tab; the Legal preset seeds it.
 - Open `http://127.0.0.1:3000/legal` when the tab is unlocked.
 - Marketing / Students presets do not add this tab unless the owner checks it.
 
@@ -35,7 +35,7 @@ Legal is a matter job: .docx files in, position-aware review, verified deliverab
 Preconditions:
 
 - Doctor exits 0.
-- `mode-legal` is visible on Home or on the Legal preset. If count is 0, you are on a desk that hid Legal — not a missing agent.
+- `agent-legal` is visible on Home or on the Legal preset. If count is 0, you are on a desk that hid Legal — not a missing agent.
 - Stub proof stops at intake, upload, role editing, and the refused run. Live run only if the operator asked and doctor reports `ai`. The refused run holds only on a keyless or stub desk; on a keyed desk the same press runs the model.
 - The legal routes the web client calls never reach the gateway except `run/stream` (`packages/host/src/handlers/legal.ts:114`; the router now lists 16 legal routes, `router.ts:429-447`, and the model-backed `extract/stream` and `ask/stream` at `:442`, `:446` are gated by `requireGatewayAllowedFor` but called by no web component). Intake, upload, role editing, delete and playbooks are fully driveable on a keyless desk; only `run/stream` needs a key.
 - Packaged proof repeats the same steps in the installed app, not only on `:3000`.
