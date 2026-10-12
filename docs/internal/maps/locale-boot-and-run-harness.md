@@ -1,5 +1,7 @@
 # Map — App locale: boot freeze and the run harness
 
+Last verified: 2026-10-12 at e8a7eca8 for the "Chat-first shell" section only (the two new catalog namespaces; read against the tester branch before it was promoted to `main`, PR #157). Nothing else on the page was re-read.
+
 Last verified: 2026-10-01 (working tree on top of 0b61a29) for the hosted first-sign-in default: a person who has
 never chosen a language is served the one their browser's `Accept-Language` asks for, in the Settings answer,
 in every job mode and in Chat (the Overview's last paragraph, step 3 below, level 2 of "The run harness", two
@@ -53,6 +55,10 @@ from another browser is judged on its own header. The HTTP adapter forwards the 
 (`packages/host/src/http-adapter.ts:685-688`); off server mode the request carries the headers it always
 did and no code reads one. Not covered: the anonymous `GET /api/v1/ping` (no person, so no language but the
 install's), and the sign-in screen, which is drawn before any settings read.
+
+## Chat-first shell (2026-10-12)
+
+The renderer has two more namespaces, `agents` (the Virtual agents page and the rail) and `harness` (what an agent is made of), imported at `apps/web/lib/i18n.ts:29-32` and listed at `:90-91`. Both have `en` and `id` catalogs, and `apps/web/lib/agents-locale.test.ts` holds their key parity. Agent conversations are Chat runs, so their output language comes from the Chat rule in this page; no new harness surface was added.
 
 ## How it works
 

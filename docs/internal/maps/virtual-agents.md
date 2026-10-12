@@ -6,7 +6,7 @@ Last verified: 2026-10-09 at 7de8aae6 (uncommitted working tree on tester/chat-f
 
 **Not driven:** Indonesian, a paid picture or video made from an agent's chat (the per-turn ceilings are proven by unit test only), an attached picture in a mode agent's chat, a mode agent reading the Knowledge Base or an earlier chat, a run longer than the client's cap, a stopped run, a worker past its 8 minute ceiling, the harness panel opened (its two-part form is newer than the drive), the click on `agent-open-studio` or `agent-harness-open-studio`, deleting a thread, the foreign-thread redirect, widths other than 360 px, a desk with a Soul the owner saved, the packaged app, and hosted mode.
 
-This page is **tester code only** (`TESTER.md`). The published code on `main` has none of it, and `SHELL_LAYOUT` (`packages/core/src/agents/product-modes.ts:29`) is the switch that turns it off. Plan: [`../chat-first-plan.md`](../chat-first-plan.md), track B, which the owner pulled ahead on 2026-10-09.
+This page was **tester code only** (`TESTER.md`) until PR #157 promoted it to `main` on 2026-10-12. `SHELL_LAYOUT` (`packages/core/src/agents/product-modes.ts:29`) is the switch that turns it off. Plan: [`../chat-first-plan.md`](../chat-first-plan.md), track B, which the owner pulled ahead on 2026-10-09.
 
 ## Overview
 

@@ -1,5 +1,7 @@
 # Map — Chat send
 
+Last verified: 2026-10-12 at e8a7eca8 for the "Chat-first shell" section only (the shell switch, the tier in the run body and the agent conversations; read against the tester branch before it was promoted to `main`, PR #157). Nothing else on the page was re-read.
+
 Last verified: 2026-10-11 at 2df34be (fix branch, before merge) for § 6 only (the stand-in model notice, "The stand-in notice" and the dispatch list; SH-007): read against the fix branch over that commit; the `chat-composer.tsx` and `chat-session.tsx` line numbers in § 6 were taken from that branch. The rest of the page was not re-read.
 
 Last verified: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-07 at 444cb3c for the "A run that stopped early" bullet of § 3b, the two carve-outs in § 4, the header limit in § 5 and the two rows it changed in Failure modes, written after a live drive that found both and read against the working tree over that commit, not committed. Nothing else on the page was re-read. Not driven live by the agent that wrote the fix.
@@ -23,6 +25,14 @@ Supersedes the `## how — Chat send (pstack) — 2026-09-06` block in [`../0.14
 One user turn in Chat: text in the composer, Enter, an assistant answer streaming into the transcript. The path crosses four layers — renderer, transport (HTTP or Electron IPC), host run orchestrator, core runtime — and everything the user sees between "Send" and the finished message is a server-sent-events stream of `RuntimeEvent`s. On the way the model may call tools. The default Chat agent binds 15 (§ 3a), each call is a `tool.started` and a `tool.completed` frame on the same stream, and the transcript shows them as rows inside the Thinking disclosure (§ 6).
 
 The thing to hold onto: **the streamed text is not what ends up on screen.** The deltas paint a live bubble; when the run completes the renderer throws that state away and re-fetches the thread, so the persisted database copy is what the user actually keeps.
+
+## Chat-first shell (2026-10-12)
+
+`SHELL_LAYOUT` (`packages/core/src/agents/product-modes.ts:29`) is `chat-first`, so the rail lists virtual agents instead of mode screens. An agent's conversation is an ordinary Chat session, and it goes through the send path described below. Agents, their run policy and the paid-media cap per turn are in [`virtual-agents.md`](virtual-agents.md).
+
+- **Tier in the body.** The composer builds its run body with `buildChatRunBody` (`apps/web/lib/chat-tier-body.ts`, imported at `apps/web/components/chat-composer.tsx:31`). A body that names a `tier` gets its model and Thinking level from the host (`resolveTierRun`, `packages/host/src/runs.ts:155`), and that model is never moved to a stand-in (`runs.ts:180-181`). Tiers: [`model-policy.md`](model-policy.md), "Chat tiers".
+- **Empty Chat.** In the chat-first shell the empty Chat no longer says "pick a model below", because the tier sits in the header (`apps/web/components/chat-launcher.tsx:131-132`).
+- **Line numbers.** The composer's bare layout and the agent wiring rewrote large parts of `chat-composer.tsx` and `chat-session.tsx`. The line numbers those two files have in the sections below were not re-anchored.
 
 ## How it works
 
