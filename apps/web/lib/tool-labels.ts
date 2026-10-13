@@ -248,11 +248,27 @@ function gist(value: unknown): string {
  */
 function dossierSummary(label: string, output: unknown): string {
   const model = readDossierResult(undefined, output);
-  if (model) {
-    return `${label} · ${gist(model.title)}`;
-  }
   const message = readString(asRecord(output), "message");
-  return message ? `${label} · ${gist(message)}` : label;
+  const head = model ? `${label} · ${gist(model.title)}` : message ? `${label} · ${gist(message)}` : label;
+  return `${head}${dossierSearched(output)}`;
+}
+
+/**
+ * Every web search a dossier asked for, in full, on its own line. What left the desk for a search provider
+ * stays readable after the live progress lines are gone (safe web search, SR-166).
+ */
+function dossierSearched(output: unknown): string {
+  const queries = (asRecord(output)?.queries ?? []) as unknown[];
+  const list = Array.isArray(queries) ? queries.filter((query): query is string => typeof query === "string") : [];
+  return list.length > 0 ? `\n${t("agents.dossier.searched", { queries: list.join(" · ") })}` : "";
+}
+
+/** A search row names its whole query, never a clipped one: the person reads exactly what was searched for. */
+function webSearchSummary(label: string, input: unknown, output: unknown): string {
+  const query = readString(asRecord(input), "query")?.trim() ?? "";
+  const out = gist(output);
+  const head = query ? `${label} · ${query}` : label;
+  return out ? `${head} → ${out}` : head;
 }
 
 export function toolCallSummary(toolKey: string, input?: unknown, output?: unknown): string {
@@ -265,6 +281,9 @@ export function toolCallSummary(toolKey: string, input?: unknown, output?: unkno
   const label = toolDoneLabel(toolKey);
   if (toolKey === DOSSIER_TOOL_KEY) {
     return dossierSummary(label, output);
+  }
+  if (toolKey === "web_search") {
+    return webSearchSummary(label, input, output);
   }
   const out = gist(output);
   const inn = gist(input);

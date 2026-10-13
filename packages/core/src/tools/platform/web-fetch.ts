@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { HTML_TEXT_DEFAULT_MAX_CHARS, htmlToText, isHtmlContent, plainToText } from "../../content/html-text";
 import { ApiError } from "../../errors";
+import { OutboundRefusedError, type OutboundRefusal } from "../../security/outbound-guard";
 import { fetchPublicHttps } from "../../security/safe-fetch";
 import { defineTool } from "../define-tool";
 
@@ -21,7 +22,10 @@ export type WebFetchPage = {
   contentType: string;
 };
 
-export type WebFetchOutput = { success: true; data: WebFetchPage } | { success: false; error: string };
+export type WebFetchOutput =
+  | { success: true; data: WebFetchPage }
+  | { success: false; error: string }
+  | OutboundRefusal;
 
 /** Read one public HTTPS page as text. Shared by the research reader and the agent tool. */
 export async function fetchPageText(
@@ -83,6 +87,9 @@ export const webFetchTool = defineTool({
         }),
       };
     } catch (error) {
+      if (error instanceof OutboundRefusedError) {
+        return error.refusal;
+      }
       return { success: false, error: error instanceof Error ? error.message : "Web fetch failed" };
     }
   },

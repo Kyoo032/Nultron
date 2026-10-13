@@ -1,4 +1,4 @@
-import { ApiError, parseAppLocale, type AppLocale } from "@agentforge/core";
+import { ApiError, parseAppLocale, SEARCH_QUERY_MAX_CHARS, type AppLocale } from "@agentforge/core";
 import {
   citedSourceIds,
   dossierSchema,
@@ -280,6 +280,20 @@ export function claimsForRun(raw: string, sourceText: string, cap = RESEARCH_CAP
   return pulled.length > 0 ? pulled : fallbackClaims(sourceText, cap);
 }
 
+/**
+ * A query no longer than the search limit, cut at a word. A long question or claim leads the list, and the
+ * outbound guard refuses a query over the limit rather than shortening it, so the dossier shortens its own
+ * query here, where the shortened text is what the progress line and "Queries run" show.
+ */
+function searchSized(query: string): string {
+  if (query.length <= SEARCH_QUERY_MAX_CHARS) {
+    return query;
+  }
+  const cut = query.slice(0, SEARCH_QUERY_MAX_CHARS + 1);
+  const space = cut.lastIndexOf(" ");
+  return (space > 0 ? cut.slice(0, space) : cut.slice(0, SEARCH_QUERY_MAX_CHARS)).trim();
+}
+
 /** Each claim is searched. Planner queries fill whatever room the cap still has. */
 export function researchQueries(
   claims: readonly string[],
@@ -288,7 +302,7 @@ export function researchQueries(
   max = RESEARCH_CAPS.maxQueries,
 ): string[] {
   const lead = claims.length > 0 ? [...claims] : [question];
-  return cleanList([...lead, ...planned], max);
+  return cleanList([...lead, ...planned], max).map(searchSized);
 }
 
 function canonicalClaim(claim: string, claims: readonly string[]): string | null {

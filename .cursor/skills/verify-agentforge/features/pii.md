@@ -7,7 +7,7 @@ Product: both · Instance: main :3000
 ## Sub-features
 
 - `pii-keep-original` the composer and `message-list` show the exact text the owner sent.
-- `pii-mask-outbound` `createRuntime()` masks `systemPrompt` and history text parts before stub or live execute. Image/video studio tools and research search queries use the same `maskPii`.
+- `pii-mask-outbound` `createRuntime()` masks `systemPrompt` and history text parts before stub or live execute. Image/video studio tools use the same `maskPii`; every web search query is masked inside the search backends by the outbound guard (`sendableSearchQuery`, 2026-10-13), which also refuses a query carrying a credential, an encoded blob or, in a Chat turn, the turn's private text.
 - `pii-local-scan` is regex only (`scanPii` / `maskPii` in `@agentforge/core/pii`). No remote classifier.
 - `pii-id-indonesia` the same `scanPii` also masks a NIK (`[nik]`), a dotted NPWP (`[npwp]`), a labelled bank account — `No. Rekening 1234567890` → `[account]` — and an `08xx` local phone (`[phone]`). Not Finance-only: this fires in Chat too. An account number with a word between the cue and the digits ("Rekening Bank: 1250000000") is **not** masked, by design.
 - `pii-finance-notice` Finance redacts before the prompt is built and reports a count. Three testids, all read-only: `finance-upload-pii` on the upload step, `finance-auto-pii` on the prompt-first read ("before reading", `finance-auto-parts.tsx:194`) and `finance-result-pii` on the result (`finance-steps/finance-result-notices.tsx:21`). There is no confirm, dismiss or send-anyway control on either — a notice is all there is.

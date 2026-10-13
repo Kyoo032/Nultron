@@ -4,6 +4,7 @@ import { modeMessage } from "../../mode-messages";
 import { defineTool } from "../define-tool";
 import { resolveToolBackend } from "../credentials";
 import { getSecret } from "../secret-scope";
+import { currentOutboundGuard, OutboundRefusedError, sendableSearchQuery } from "../../security/outbound-guard";
 import { currentKeylessLocale, searchKeyless } from "./keyless-search";
 
 type SearchHit = { title: string; url: string; description: string; position: number };
@@ -14,6 +15,7 @@ async function searchTavily(
   baseUrl: string,
   fetchImpl: typeof fetch,
 ): Promise<SearchHit[]> {
+  const sendable = sendableSearchQuery(query, currentKeylessLocale());
   const response = await fetchImpl(`${baseUrl.replace(/\/+$/, "")}/search`, {
     method: "POST",
     headers: {
@@ -21,7 +23,7 @@ async function searchTavily(
       "Content-Type": "application/json",
       "X-Client-Name": "agentforge",
     },
-    body: JSON.stringify({ query, max_results: 5 }),
+    body: JSON.stringify({ query: sendable, max_results: 5 }),
   });
   const body = (await response.json().catch(() => ({}))) as {
     results?: Array<{ title?: string; url?: string; content?: string }>;
@@ -39,8 +41,9 @@ async function searchTavily(
 }
 
 async function searchBrave(query: string, apiKey: string, fetchImpl: typeof fetch): Promise<SearchHit[]> {
+  const sendable = sendableSearchQuery(query, currentKeylessLocale());
   const url = new URL("https://api.search.brave.com/res/v1/web/search");
-  url.searchParams.set("q", query);
+  url.searchParams.set("q", sendable);
   url.searchParams.set("count", "5");
   const response = await fetchImpl(url, {
     headers: {
@@ -92,8 +95,12 @@ export const webSearchTool = defineTool({
           route.backend === "brave-free"
             ? await searchBrave(query, apiKey, fetchImpl)
             : await searchTavily(query, apiKey, route.baseUrl || "https://api.tavily.com", fetchImpl);
+        currentOutboundGuard()?.noteSearchResults(hits.map((hit) => hit.url));
         return { success: true, backend: route.backend, data: { web: hits } };
       } catch (error) {
+        if (error instanceof OutboundRefusedError) {
+          return error.refusal;
+        }
         return { success: false, error: error instanceof Error ? error.message : "Web search failed" };
       }
     }
@@ -103,8 +110,12 @@ export const webSearchTool = defineTool({
       if (result.outage) {
         return { success: false, error: modeMessage("webSearchFailed", locale) };
       }
+      currentOutboundGuard()?.noteSearchResults(result.hits.map((hit) => hit.url));
       return { success: true, backend: "keyless", data: { web: result.hits } };
     } catch (error) {
+      if (error instanceof OutboundRefusedError) {
+        return error.refusal;
+      }
       return {
         success: false,
         error: error instanceof Error ? error.message : modeMessage("webSearchFailed", currentKeylessLocale()),

@@ -4,8 +4,9 @@ import {
   fetchPageText,
   gatewayRequiredMessage,
   hasLiveProvider,
-  maskPii,
+  isOutboundRefusal,
   modeMessage,
+  OutboundRefusedError,
   PAGE_TEXT_MAX_CHARS,
   resolveChatModel,
   resolveRuntimeMode,
@@ -66,6 +67,10 @@ function hitsFromSearch(output: unknown): SearchHit[] {
     return [];
   }
   const record = output as { success?: unknown; error?: unknown; data?: { web?: SearchHit[] } };
+  if (isOutboundRefusal(output)) {
+    // The guard's own sentence reaches the worker's caller, so the model knows to search in general terms.
+    throw new OutboundRefusedError(output);
+  }
   if (record.success !== true) {
     const error =
       typeof record.error === "string" && record.error.trim()
@@ -170,7 +175,7 @@ export async function generateResearchNotes(
         return run.text;
       },
       search: async (query) =>
-        hitsFromSearch(await runWithToolSecrets(scope, () => webSearchTool.execute({ query: maskPii(query) }, tenant))),
+        hitsFromSearch(await runWithToolSecrets(scope, () => webSearchTool.execute({ query }, tenant))),
       readPage: async (url, focus) => {
         const page = await fetchPageText(url, { maxChars: PAGE_TEXT_MAX_CHARS, signal: abortSignal });
         const hit = guardBypass ? null : scanInjection(pageWindow(page.text, focus, RESEARCH_CAPS.pageChars));

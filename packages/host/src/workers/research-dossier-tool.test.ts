@@ -61,11 +61,43 @@ describe("runResearchWorker, a good result", () => {
 
     expect(out).toEqual({
       ok: true,
+      queries: [],
       artifact: { id: "art-1", kind: "research", title: "E-invoicing in Indonesia" },
       summary: "A short summary.",
       sections: ["Rules"],
       sourceCount: 1,
       checks: { passed: true, rounds: 0, failed: [] },
+    });
+  });
+
+  it("lists every search the harness asked for, in order, so the tool row can show them", async () => {
+    generate.mockImplementation(async (_tenant, _body, emit) => {
+      emit?.({ type: "job.phase", phase: "searching", label: "Searching the web" });
+      emit?.({ type: "job.step", phase: "searching", label: "e-faktur 2025 rules", current: 1, total: 2 });
+      emit?.({ type: "job.step", phase: "reading", label: "A page title", current: 1, total: 1 });
+      emit?.({ type: "job.step", phase: "searching", label: "coretax e-invoicing", current: 2, total: 2 });
+      return resultWith();
+    });
+
+    const out = await runResearchWorker({ question: QUESTION }, tenant);
+
+    expect(out.queries).toEqual(["e-faktur 2025 rules", "coretax e-invoicing"]);
+  });
+
+  it("keeps the searches it asked for when the harness fails", async () => {
+    generate.mockImplementation(async (_tenant, _body, emit) => {
+      emit?.({ type: "job.step", phase: "searching", label: "refused query", current: 1, total: 1 });
+      throw new ApiError("outbound_refused", "Not sent.", 400);
+    });
+
+    const out = await runResearchWorker({ question: QUESTION }, tenant);
+
+    expect(out).toEqual({
+      ok: false,
+      queries: ["refused query"],
+      reason: "failed",
+      code: "outbound_refused",
+      message: "Not sent.",
     });
   });
 
@@ -221,6 +253,7 @@ describe("runResearchWorker, failures", () => {
 
     expect(out).toEqual({
       ok: false,
+      queries: [],
       reason: "failed",
       code: "runtime_stub",
       message: "A gateway key is needed for research.",
@@ -232,7 +265,13 @@ describe("runResearchWorker, failures", () => {
 
     const out = await runResearchWorker({ question: QUESTION }, tenant);
 
-    expect(out).toEqual({ ok: false, reason: "failed", code: "internal_error", message: "socket hang up" });
+    expect(out).toEqual({
+      ok: false,
+      queries: [],
+      reason: "failed",
+      code: "internal_error",
+      message: "socket hang up",
+    });
   });
 
   it("gives a plain sentence for something that is not an Error", async () => {

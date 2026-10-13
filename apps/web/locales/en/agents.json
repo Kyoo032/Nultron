@@ -72,7 +72,8 @@
     "loading": "Opening the dossier",
     "loadFailed": "Could not open the dossier.",
     "outlineAria": "Sections of the dossier",
-    "viewAria": "The dossier {title}"
+    "viewAria": "The dossier {title}",
+    "searched": "Searched the web for: {queries}"
   },
   "page": {
     "title": "Virtual agents",

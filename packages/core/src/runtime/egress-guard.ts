@@ -1,5 +1,6 @@
 import type { ContentPart } from "../content/types";
-import { typedTextOf } from "../security/injection-guard";
+import { attachedTextOf, typedTextOf } from "../security/injection-guard";
+import { stringsOf, type OutboundGuard } from "../security/outbound-guard";
 import type { ToolDefinition } from "../tools/define-tool";
 
 /**
@@ -15,8 +16,12 @@ import type { ToolDefinition } from "../tools/define-tool";
  *
  * What this does not cover: a host the person named is trusted, so text the person pasted into their
  * own message counts as theirs; a host that appears in search results is trusted, so a poisoned
- * result can name one; and a run starts untainted, so a private read in an earlier turn does not
- * carry over (the model sees only the earlier turn's text).
+ * result can name one.
+ *
+ * The taint is shared with the run's outbound guard (`../security/outbound-guard.ts`) when the host opened
+ * one: a Chat run whose prompt carried private text (Knowledge Base excerpts, a custom soul, memories, the
+ * earlier-chats hint, an attached file) starts tainted, and a private read here also registers its output
+ * with that guard, which checks every search query and page address before it leaves the host.
  */
 
 /** What `web_fetch` returns, instead of running, once the run has read private material. */
@@ -120,6 +125,15 @@ export function userTextOf(history: ReadonlyArray<{ role: string; parts: Readonl
   );
 }
 
+/** The files attached to the person's messages in a run's history: private material, not their words. */
+export function attachedTextsOf(history: ReadonlyArray<{ role: string; parts: ReadonlyArray<ContentPart> }>): string[] {
+  return history.flatMap((item) =>
+    item.role === "user"
+      ? item.parts.flatMap((part) => (part.type === "text" ? [attachedTextOf(part.text)].filter(Boolean) : []))
+      : [],
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -140,15 +154,19 @@ function searchResultHosts(output: unknown): string[] {
 
 /**
  * One guard for a whole `execute`, made by the caller once next to the tool budget, from the person's
- * own messages in that run's history.
+ * own messages in that run's history. With `outbound` (the run's outbound guard, when the host opened
+ * one) the taint is that guard's: a run whose prompt carried private text starts tainted, and a private
+ * read adds its output to the material the outbound guard compares queries against.
  */
-export function createEgressGuard(options: { userText: readonly string[] }): EgressGuard {
+export function createEgressGuard(options: { userText: readonly string[]; outbound?: OutboundGuard }): EgressGuard {
   const named = new Set(options.userText.flatMap(hostsNamedIn));
   const searched = new Set<string>();
-  let tainted = false;
+  const outbound = options.outbound;
+  let readPrivate = false;
+  const tainted = () => readPrivate || outbound?.isTainted() === true;
   return {
     beforeCall(toolKey, args) {
-      if (!tainted || toolKey !== FETCH_TOOL) {
+      if (!tainted() || toolKey !== FETCH_TOOL) {
         return null;
       }
       const host = hostOfUrl(isRecord(args) ? args.url : undefined);
@@ -159,7 +177,8 @@ export function createEgressGuard(options: { userText: readonly string[] }): Egr
     },
     afterCall(tool, output) {
       if (tool.trust === "user_content") {
-        tainted = true;
+        readPrivate = true;
+        outbound?.taint(stringsOf(output));
       }
       if (tool.key === SEARCH_TOOL) {
         for (const host of searchResultHosts(output)) {

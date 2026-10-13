@@ -3,6 +3,7 @@ import { summarizeParts } from "../content/parse-run-input";
 import type { AgentRuntime, RuntimeEvent } from "./types";
 import { invokeToolGuarded } from "./invoke-guarded";
 import { createEgressGuard, userTextOf } from "./egress-guard";
+import { currentOutboundGuard } from "../security/outbound-guard";
 import { createToolBudget } from "./tool-budget";
 import { resolveRequestReasoningEffort } from "../models/reasoning-effort";
 import { MODEL_CONTACT_ATTEMPTS, formatContactProbe } from "./retry";
@@ -55,7 +56,7 @@ export class StubRuntime implements AgentRuntime {
     });
     const answers: string[] = [];
     const toolBudget = createToolBudget(input.budget);
-    const egressGuard = createEgressGuard({ userText: userTextOf(input.history) });
+    const egressGuard = createEgressGuard({ userText: userTextOf(input.history), outbound: currentOutboundGuard() });
 
     const wantsCalc = hasEnabledBinding(input.bindings, "calculator") && /\d+\s*[+\-*/]\s*\d+/.test(summary);
     const wantsPast = hasEnabledBinding(input.bindings, "past_sessions") && wantsStubPastChat(summary);

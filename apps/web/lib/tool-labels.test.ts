@@ -376,3 +376,33 @@ describe("web_fetch labels", () => {
     expect(keys.filter((key) => t(key) === key)).toEqual([]);
   });
 });
+
+describe("what a search row shows (safe web search)", () => {
+  const LONG_QUERY = "Indonesian personal data protection law cross-border transfer requirements for cloud providers";
+
+  it("names a web search's whole query, not a clipped one", () => {
+    expect(toolCallSummary("web_search", { query: LONG_QUERY }, undefined)).toBe(`Search · ${LONG_QUERY}`);
+  });
+
+  it("shows why a search was not sent", () => {
+    const refusal = { ok: false, reason: "outbound", message: "Not sent: too long." };
+    expect(toolCallSummary("web_search", { query: "q" }, refusal)).toBe("Search · q → Not sent: too long.");
+  });
+
+  it("lists every search a dossier ran on its own line, in both languages", () => {
+    const output = {
+      ok: false,
+      reason: "failed",
+      code: "outbound_refused",
+      message: "Not sent.",
+      queries: ["a b", "c"],
+    };
+    expect(toolCallSummary("research_dossier", { question: "x" }, output)).toBe(
+      "Research dossier · Not sent.\nSearched the web for: a b · c",
+    );
+    applyLocale("id");
+    expect(toolCallSummary("research_dossier", { question: "x" }, output)).toBe(
+      "Dosir riset · Not sent.\nDicari di web: a b · c",
+    );
+  });
+});

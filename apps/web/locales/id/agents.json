@@ -72,7 +72,8 @@
     "loading": "Membuka dosir",
     "loadFailed": "Dosir tidak bisa dibuka.",
     "outlineAria": "Bagian dosir",
-    "viewAria": "Dosir {title}"
+    "viewAria": "Dosir {title}",
+    "searched": "Dicari di web: {queries}"
   },
   "page": {
     "title": "Agen virtual",
