@@ -135,7 +135,7 @@ Ranked: the first five block the build or its safety.
 |---|---|---|---|
 | **K-D0** | Lift the 2026-10-01 freeze to build the board in the tester code, including the first per-person store? | Not lifted; design only. | Nothing is built without it. |
 | **K-D11** | Are desks company-wide by design, or can a desk be limited to some people? (SR-169) | Company-wide: every member of the company sees the board. | The board's visibility rests on it. If desks can be limited, the membership check is fixed on `main` first. |
-| **K-D12** | Do card runs get network tools (`web_search`, `web_fetch`, the research worker)? (SR-166) | **Off by default.** The owner turns them on per card when accepting. | A card is written by any teammate. With network tools on, a card can make the agent put its owner's private text into a search query before anyone reviews anything. Owner acceptance does not stop that. |
+| **K-D12** | Do card runs get network tools (`web_search`, `web_fetch`, the research worker)? (SR-166) | **Yes, always, behind the outbound guard of section 9.3.** (Rizky, 2026-10-13: "web search is needed, its not negotiateable". This replaced the earlier default, "off".) | A card is written by any teammate, so a card can try to make the agent put its owner's private text into a search query. The guard stops copied text, figures, identifiers, PII, secrets and encoded blobs, and shows every query. It cannot stop a model restating a private fact in its own words; that residual needs Rizky's acceptance when the guard lands. |
 | **K-D13** | What does "admins cannot read it" promise, in the app and in the terms? | It holds against the company's admin and owner, against a stolen database or backup, and against a bug in another query. It does **not** hold against the server's operator, because an agent has to run while its owner is offline, so the server must be able to open the owner's key. | The terms must not promise more than the design delivers (section 12.3). |
 | **K-D1** | Personal agent store: tables behind one module (A), or a sealed SQLite file per person (B)? | **A, with a per-person data key.** (Changed from B on 2026-10-13.) | B gives the same protection (one wrap key opens every file), needs a schema migration per file, is copied live by the backup job (which makes a consistent copy of the main database only), and is a dead end at more than one replica. |
 | K-D9 | Which scaling road: CVM Auto Scaling or Kubernetes (TKE)? | **TKE, after the data layer moves.** Until then, resize the CVM. | Section 4.1. The Stage 3 sentence in `AGENTS.md` would change from Auto Scaling to TKE. |
@@ -164,7 +164,7 @@ All tables live in the product database. Every row carries `tenant_id` and `work
 | `card_files` | `id`, `tenant_id`, `workspace_id`, `card_id`, `desk_file_id`, `desk_file_version_id`, `attached_by_kind`, `attached_by_user_id`, `source` (`upload` / `copied_from_private` / `agent_output`), `created_at`, `removed_at` | |
 | `card_events` | `id` (monotonic integer per database), `tenant_id`, `workspace_id`, `card_id`, `actor_kind` (`person` / `agent` / `system`), `actor_user_id`, `type`, `payload` (JSON, ids and small fields only, no bodies), `created_at` | append-only; index (`workspace_id`, `id`) |
 | `notifications` | `id`, `tenant_id`, `workspace_id`, `recipient_user_id`, `event_id`, `reason` (`assigned` / `mentioned` / `needs_accept` / `asked` / `review` / `done`), `read_at` | index (`recipient_user_id`, `read_at`) |
-| `agent_tasks` | `id`, `tenant_id`, `workspace_id`, `card_id`, `owner_user_id`, `state` (section 9.1), `network_allowed` (bool, K-D12), `requested_by`, `attempt`, `run_id`, `claimed_by` (replica id), `claimed_until`, `cost_micros`, `error_code`, `created_at`, `updated_at` | at most one non-final task per card; index (`state`, `claimed_until`) |
+| `agent_tasks` | `id`, `tenant_id`, `workspace_id`, `card_id`, `owner_user_id`, `state` (section 9.1), `requested_by`, `attempt`, `run_id`, `claimed_by` (replica id), `claimed_until`, `cost_micros`, `error_code`, `created_at`, `updated_at` | at most one non-final task per card; index (`state`, `claimed_until`) |
 | `board_audit` | `id`, `tenant_id`, `workspace_id`, `actor_user_id`, `action` (`column.create` / `column.rename` / `column.archive` / `card.archive` / `member.remove_from_board` / `leaver.decide`), `target`, `created_at` | append-only; admins read it |
 
 `description` and `body` are sealed with the existing envelope (`envelope.ts`) like message bodies, so a stolen database shows no card text.
@@ -301,7 +301,21 @@ waiting_accept ──accept──▶ queued ──claim──▶ running ──�
 ### 9.3 Tool policy for a card run
 
 - **Taint from step zero.** A card run has read private material before it starts (the owner's store), so the egress guard starts tainted.
-- **Network tools off unless the owner turned them on** for this task when accepting (K-D12). When on, the guard checks every outbound argument, the search query and the worker question included, not only `web_fetch` URLs (the fix SR-166 names).
+- **Web search stays on** (K-D12), behind the outbound guard below. `agent_tasks.network_allowed` is dropped.
+
+### 9.3a Safe web search (the outbound guard)
+
+Built on `main` as a shared fix (it also protects Chat and every agent), then merged into the tester before K2. Lanes: all four.
+
+1. **One check where text leaves the host.** The check runs inside the functions that send: each search backend and `fetchPublicHttps`, not only in `invokeToolGuarded`, so the research worker and any later worker are covered too. It reads the run's private material from the run context.
+2. **Taint at the start.** A run is tainted from its first step when private text enters its prompt: Knowledge excerpts, soul, memories, the earlier-chats hint, attachments, or (card runs) the owner's store.
+3. **Always, on every backend:** PII masking of the query (Tavily and Brave send it raw today), and refusal of credential-shaped text in any outbound argument (the existing `redactSecrets` patterns).
+4. **When tainted, refuse a query or URL that carries private material:** a span of about five or more words, or any number, amount or identifier, that appears in the run's private material and not in the person's own messages.
+5. **Shape limits:** a length cap on queries, and refusal of base64- or hex-looking blobs.
+6. **On refusal** the model is told to search in general terms and try again, at most twice. Words are never silently stripped.
+7. **Every query is visible**: in the run's tool disclosure, and on a card run in the card's activity for the owner's review.
+8. **Calibration:** a set of ordinary research queries must all pass, so the guard does not break research.
+9. **Residual, said plainly:** a model can restate a private fact in its own words. No filter stops that while one model reads private material and writes queries. Rizky accepts or rejects it when the guard lands.
 - **No `run_code`** in card runs until the sandbox is proven inside the hosted image (`AGENTFORGE_CODE_RUNS`).
 - **No computer** (VPS or own machine) in v1 card runs.
 - **The prompt says the output is shared** with everyone who can see the card, and the owner's review step is the last check.
@@ -334,7 +348,7 @@ The severity here is for the board holding a real company's work. The security r
 | # | Severity for the board | Gap | Where it stands | Closes when |
 |---|---|---|---|---|
 | 1 | Critical | Any member opens any desk of their company | SR-169, open | K-D11 decided; if desks can be limited, the membership check lands on `main` with a test |
-| 2 | Critical | A card can make an agent that holds private knowledge send that knowledge out through a search or a worker question | SR-166, open | Section 9.3 is built: taint from step zero, network off by default, every outbound argument checked |
+| 2 | Critical | A card can make an agent that holds private knowledge send that knowledge out through a search or a worker question | SR-166, open | The safe web search guard (9.3a) is on `main` and merged here, and Rizky has ruled on its residual |
 | 3 | Critical | "Admins cannot read" could be read as a promise against the operator | Design | K-D13 decided and the terms say exactly what section 12.3 says |
 | 4 | High | The board adds the first fan-out stream: one bug sends a card to the wrong company | Design | Section 8.2 built, with a two-company test under one tenant id (the shape that bit SR-163) |
 | 5 | High | Production k8s secrets come from a plaintext file on a laptop | SR-170, open | Secrets come from Tencent Secrets Manager or KMS before TKE |
@@ -375,7 +389,7 @@ All are server-mode only in v1 and answer `404` on Personal. Writes need the CSR
 | `POST /api/v1/board/cards/:id/archive` | `version` | — | `409 card_conflict` |
 | `POST /api/v1/board/cards/:id/comments` | `body` | the comment | `400 invalid_comment` |
 | `POST /api/v1/board/cards/:id/files` | multipart upload, or `{ privateFileId }` to copy from the person's own files | the card file | `413 too_large`, `400 format_mismatch`, `404 private_file_not_found` |
-| `POST /api/v1/board/agent-tasks/:id/accept` | `networkAllowed` (default false) | the task | `403 not_owner`, `409 bad_state` |
+| `POST /api/v1/board/agent-tasks/:id/accept` | — | the task | `403 not_owner`, `409 bad_state` |
 | `POST /api/v1/board/agent-tasks/:id/decline` · `/cancel` · `/approve` · `/send-back` · `/retry` | `comment?` on send-back | the task | `403 not_owner`, `409 bad_state` |
 | `GET /api/v1/board/events` | `Last-Event-ID` header | the stream (section 8) | `401`, `404 board_not_found` |
 | `POST /api/v1/board/columns` · `PATCH /api/v1/board/columns/:id` | `name`, `position` | the column | `403 admin_only` |
@@ -404,7 +418,7 @@ The north star is chat-first, so the board is not only a page:
 
 ## 16. Risks
 
-1. **Private knowledge leaking onto a shared card.** Covered by owner acceptance, taint from step zero, network off by default, and review. A determined owner can still paste their own private material onto a card; that is their choice.
+1. **Private knowledge leaking onto a shared card.** Covered by owner acceptance, taint from step zero, the outbound guard (9.3a), and review. A determined owner can still paste their own private material onto a card; that is their choice.
 2. **Prompt injection through a card.** A card description is untrusted input (section 9.3).
 3. **Event fan-out leaking cards** to people outside the desk. Covered by the per-event check (8.2) and the two-company tests.
 4. **Cost runaway.** Agents cannot create or assign cards; each card run has the plan's budget; at most 3 attempts per acceptance.
@@ -419,7 +433,7 @@ Everything up to K4 runs on one CVM and SQLite. P1 and P2 are the infrastructure
 |---|---|---|
 | K0 | Company tables, task service, event log, `InProcessBoardBus`, SSE with heartbeat and resume, board page; people only, no agents. | Two browsers on two accounts see each other's moves live; a member of another company sees nothing (two-company test); a stale edit gets `409`; a dropped stream resumes without a gap; Personal answers `404`. |
 | K1 | `person-store` module, `person_*` tables, per-person keys (`hkdf-v1`), the agent profile page, access log, leaver keep/delete. | An admin session gets `404` on every personal route; no other file names a `person_*` table (guard test); after a leaver delete the rows in a copied database cannot be opened. |
-| K2 | Agent tasks: accept, claim, run, progress, result, review; tool policy of section 9.3. | A card run end to end on webdev with a real key; the agent read its owner's store and no one else's; with network off, no search or fetch leaves; a killed process returns the task to `queued`. |
+| K2 | Agent tasks: accept, claim, run, progress, result, review; tool policy of section 9.3. | A card run end to end on webdev with a real key; the agent read its owner's store and no one else's; a poisoned card that asks for a sentence of the owner's knowledge to be searched sends no such query; a killed process returns the task to `queued`. |
 | K3 | Mentions and notifications. | A mention notifies the right person only, across two companies. |
 | K4 | Card files and the copy-from-private action. | A chat attachment stays private until copied; the copy is visible on the card; the original is not. |
 | K5 | Promotion PR to `main`, after Rizky approves. | `ci:local` green; Personal-parity test; security register rows updated. |
