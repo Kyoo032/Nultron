@@ -429,6 +429,8 @@ The north star is chat-first, so the board is not only a page:
 
 Everything up to K4 runs on one CVM and SQLite. P1 and P2 are the infrastructure track, and they start only on Rizky's word (K-D9, K-D10).
 
+**How each phase is proven (Rizky, 2026-10-13): "local rehearsal for each phase, real server at the end".** Every phase K0 to K4 is driven on a local rehearsal of the hosted stack on this PC (server mode, real portal sign-in, two people of one company plus a person of a second company), never through a login shortcut. The real server (Enterprise or HYP AI) is driven once, after the promotion PR merges and a deploy Rizky approves.
+
 | Phase | Builds | Proof |
 |---|---|---|
 | K0 | Company tables, task service, event log, `InProcessBoardBus`, SSE with heartbeat and resume, board page; people only, no agents. | Two browsers on two accounts see each other's moves live; a member of another company sees nothing (two-company test); a stale edit gets `409`; a dropped stream resumes without a gap; Personal answers `404`. |
