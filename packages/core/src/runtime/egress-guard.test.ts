@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import type { TenantContext } from "../tenancy/types";
 import { defineTool, type ToolTrust } from "../tools/define-tool";
-import { EGRESS_REFUSAL_MESSAGE, createEgressGuard, hostOfUrl, hostsNamedIn, userTextOf } from "./egress-guard";
+import {
+  EGRESS_REFUSAL_MESSAGE,
+  createEgressGuard,
+  hasNonTextUserPart,
+  hostOfUrl,
+  hostsNamedIn,
+  userTextOf,
+} from "./egress-guard";
 import { invokeToolGuarded } from "./invoke-guarded";
 import { createToolBudget } from "./tool-budget";
 import { runWithToolIoSink, takeLastToolIo } from "./tool-io";
@@ -501,5 +508,37 @@ describe("a host named only inside an attachment is not a host the person named"
 
   it("does not touch a message with no attachment", () => {
     expect(userTextOf(history("open example.com now"))).toEqual(["open example.com now"]);
+  });
+});
+
+describe("hosts named in an attached file (review, 2026-10-13)", () => {
+  it("opens a host the attachment names, after a private read", () => {
+    const guard = createEgressGuard({
+      userText: ["summarise the contract"],
+      attachedText: ["See https://www.ojk.go.id/peraturan for the rule."],
+    });
+    guard.afterCall(READ_FILE, { success: true, text: "salary 12000" });
+    expect(guard.beforeCall("web_fetch", { url: "https://ojk.go.id/peraturan" })).toBeNull();
+    expect(guard.beforeCall("web_fetch", { url: "https://attacker.example/" })).toEqual(REFUSAL);
+  });
+});
+
+describe("hasNonTextUserPart (review M4c, 2026-10-13)", () => {
+  it("is true when a message of the person carries a picture, even with no text", () => {
+    expect(
+      hasNonTextUserPart([
+        { role: "user", parts: [{ type: "text", text: "hi" }] },
+        { role: "user", parts: [{ type: "image_url", image_url: { url: "https://cdn.example/a.png" } }] },
+      ]),
+    ).toBe(true);
+  });
+
+  it("is false for text alone, and ignores the assistant's own parts", () => {
+    expect(
+      hasNonTextUserPart([
+        { role: "user", parts: [{ type: "text", text: "hi" }] },
+        { role: "assistant", parts: [{ type: "image_url", image_url: { url: "https://cdn.example/b.png" } }] },
+      ]),
+    ).toBe(false);
   });
 });

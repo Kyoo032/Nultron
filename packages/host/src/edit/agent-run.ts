@@ -1,6 +1,7 @@
 import {
   ApiError,
   DEFAULT_CHAT_MODEL,
+  createOutboundGuard,
   createRuntime,
   editAgentBindings,
   editStubAssistantCopy,
@@ -16,6 +17,8 @@ import {
   matchStubGenerateScenario,
   modeMessage,
   resolveRuntimeMode,
+  runOutboundGuarded,
+  stringsOf,
   stubEditCardCopy,
   withOutputLanguage,
   type RuntimeEvent,
@@ -214,6 +217,11 @@ function firstAssetId(doc: Awaited<ReturnType<typeof foldProject>>): string | un
   return Object.keys(doc.assets)[0];
 }
 
+/** The words in a project the person wrote or recorded: every string with a space in it (titles, captions, transcript). */
+function projectTextOf(doc: unknown): string[] {
+  return stringsOf(doc).filter((text) => /\s/u.test(text.trim()));
+}
+
 export async function runEditAgent(input: {
   tenant: TenantContext;
   projectId: string;
@@ -233,8 +241,12 @@ export async function runEditAgent(input: {
 
   void (async () => {
     try {
-      await withEditToolContext({ tenant: input.tenant, projectId: input.projectId, runId }, async () => {
+      // Safe web search (H3, 2026-10-13): the Edit agent's turn runs under its own outbound guard. The person's
+      // instruction is theirs; the project's titles, captions and transcript are private and taint the turn.
+      const outbound = createOutboundGuard({ userText: [input.text], privateText: [], locale: localeForRun() });
+      await withEditToolContext({ tenant: input.tenant, projectId: input.projectId, runId }, () => runOutboundGuarded(outbound, async () => {
         const doc = await foldProject(input.projectId, input.tenant.workspaceId);
+        outbound.taint(projectTextOf(doc));
         queue.push(encodeSse({ type: "run.started", runId }));
         const scripted =
           matchStubEditScenario(input.text) ??
@@ -296,7 +308,7 @@ export async function runEditAgent(input: {
             },
           });
         }
-      });
+      }));
     } catch (error) {
       // A cancel is the person's own, and the stream they cancelled is gone: not an Edit failure to report.
       if (input.abortSignal?.aborted) {

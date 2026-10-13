@@ -4,7 +4,13 @@ import { modeMessage } from "../../mode-messages";
 import { defineTool } from "../define-tool";
 import { resolveToolBackend } from "../credentials";
 import { getSecret } from "../secret-scope";
-import { currentOutboundGuard, OutboundRefusedError, sendableSearchQuery } from "../../security/outbound-guard";
+import {
+  currentOutboundGuard,
+  maskedQueryNote,
+  OutboundRefusedError,
+  queryWasMasked,
+  sendableSearchQuery,
+} from "../../security/outbound-guard";
 import { currentKeylessLocale, searchKeyless } from "./keyless-search";
 
 type SearchHit = { title: string; url: string; description: string; position: number };
@@ -76,6 +82,8 @@ export const webSearchTool = defineTool({
     query: z.string().min(1).describe("Search query"),
   }),
   execute: async ({ query }) => {
+    // The query leaves with PII masked; the model is told, so a change to its words is never silent.
+    const masked = queryWasMasked(query) ? { note: maskedQueryNote(currentKeylessLocale()) } : {};
     const route = resolveToolBackend("web");
     // A chosen backend with no key stays an error. No choice and no key uses the keyless APIs.
     if (route.source === "selection" && !route.ready) {
@@ -96,7 +104,7 @@ export const webSearchTool = defineTool({
             ? await searchBrave(query, apiKey, fetchImpl)
             : await searchTavily(query, apiKey, route.baseUrl || "https://api.tavily.com", fetchImpl);
         currentOutboundGuard()?.noteSearchResults(hits.map((hit) => hit.url));
-        return { success: true, backend: route.backend, data: { web: hits } };
+        return { success: true, backend: route.backend, data: { web: hits }, ...masked };
       } catch (error) {
         if (error instanceof OutboundRefusedError) {
           return error.refusal;
@@ -111,7 +119,7 @@ export const webSearchTool = defineTool({
         return { success: false, error: modeMessage("webSearchFailed", locale) };
       }
       currentOutboundGuard()?.noteSearchResults(result.hits.map((hit) => hit.url));
-      return { success: true, backend: "keyless", data: { web: result.hits } };
+      return { success: true, backend: "keyless", data: { web: result.hits }, ...masked };
     } catch (error) {
       if (error instanceof OutboundRefusedError) {
         return error.refusal;

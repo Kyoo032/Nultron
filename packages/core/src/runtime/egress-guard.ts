@@ -134,6 +134,16 @@ export function attachedTextsOf(history: ReadonlyArray<{ role: string; parts: Re
   );
 }
 
+/**
+ * True when a message of the person carries a picture, a file or any other part that is not text. The guard
+ * cannot compare a search against an image, so such a run starts tainted (review M4c, 2026-10-13).
+ */
+export function hasNonTextUserPart(
+  history: ReadonlyArray<{ role: string; parts: ReadonlyArray<ContentPart> }>,
+): boolean {
+  return history.some((item) => item.role === "user" && item.parts.some((part) => part.type !== "text"));
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -157,9 +167,17 @@ function searchResultHosts(output: unknown): string[] {
  * own messages in that run's history. With `outbound` (the run's outbound guard, when the host opened
  * one) the taint is that guard's: a run whose prompt carried private text starts tainted, and a private
  * read adds its output to the material the outbound guard compares queries against.
+ *
+ * A host named in an attached file (`attachedText`) may be opened too (review, 2026-10-13: a contract that
+ * cites a regulator's site is a page the person wants read). An attachment is not the person's own words, so
+ * a poisoned file can name a host; the outbound guard still refuses an address that carries private text.
  */
-export function createEgressGuard(options: { userText: readonly string[]; outbound?: OutboundGuard }): EgressGuard {
-  const named = new Set(options.userText.flatMap(hostsNamedIn));
+export function createEgressGuard(options: {
+  userText: readonly string[];
+  attachedText?: readonly string[];
+  outbound?: OutboundGuard;
+}): EgressGuard {
+  const named = new Set([...options.userText, ...(options.attachedText ?? [])].flatMap(hostsNamedIn));
   const searched = new Set<string>();
   const outbound = options.outbound;
   let readPrivate = false;

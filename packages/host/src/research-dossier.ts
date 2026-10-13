@@ -1,4 +1,10 @@
-import { ApiError, parseAppLocale, SEARCH_QUERY_MAX_CHARS, type AppLocale } from "@agentforge/core";
+import {
+  ApiError,
+  OutboundRefusedError,
+  parseAppLocale,
+  SEARCH_QUERY_MAX_CHARS,
+  type AppLocale,
+} from "@agentforge/core";
 import {
   citedSourceIds,
   dossierSchema,
@@ -801,10 +807,27 @@ export async function runResearchDossier(input: DossierRunInput, deps: DossierDe
   throwIfJobAborted(deps.abortSignal);
   emit({ type: "job.phase", phase: "searching", label: "Searching the web" });
   const perQuery: Array<{ query: string; hits: SearchHit[] }> = [];
+  // A query the outbound guard refused is skipped and the rest still run (review M3, 2026-10-13). Only a
+  // stop ends the search, and a run whose every query was refused ends with the guard's sentence. The step
+  // is emitted once a query was sent, so a refused one never appears in "Searched the web for".
+  let refused: OutboundRefusedError | undefined;
   for (const [index, query] of queries.entries()) {
     throwIfJobAborted(deps.abortSignal);
+    let hits: SearchHit[];
+    try {
+      hits = await deps.search(query);
+    } catch (error) {
+      if (error instanceof OutboundRefusedError && error.refusal.kind !== "stopped") {
+        refused = error;
+        continue;
+      }
+      throw error;
+    }
     emit({ type: "job.step", phase: "searching", label: query, current: index + 1, total: queries.length });
-    perQuery.push({ query, hits: (await deps.search(query)).slice(0, caps.hitsPerQuery) });
+    perQuery.push({ query, hits: hits.slice(0, caps.hitsPerQuery) });
+  }
+  if (perQuery.length === 0 && refused) {
+    throw refused;
   }
   const candidates = dedupeCandidates(perQuery, caps.maxPages + READ_ATTEMPTS_BEYOND_CAP);
   if (candidates.length === 0) {
@@ -911,7 +934,7 @@ export async function runResearchDossier(input: DossierRunInput, deps: DossierDe
     question,
     created: retrievedAt,
     models: input.models,
-    queries,
+    queries: perQuery.map((entry) => entry.query),
     sources,
     findings,
     comparison,

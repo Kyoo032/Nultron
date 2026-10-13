@@ -2,7 +2,7 @@
 
 Product: both · Instance: main :3000
 
-Last verified: 2026-10-13 at 73db3c30 (branch `fix/safe-web-search`, before merge) for the outbound-guard row of Failure modes and the two "does not need a second key" Gotchas only.
+Last verified: 2026-10-13 at 433778dc (branch `fix/safe-web-search`, before merge, with the review fixes) for the outbound-guard row of Failure modes and the two "does not need a second key" Gotchas only.
 
 Last verified: 2026-10-19 at a8866263, plus branch `fix/research-page-window-and-step-retry` (the page read and its window, § 5 step 3; the post-tool resend, Failure modes).
 
@@ -127,7 +127,7 @@ Back in `generateResearchNotes`: `throwIfJobAborted` again (`:183`), so **a canc
 | Gate closed | `requireGatewayAllowedFor`, `packages/host/src/handlers/jobs.ts:266` (non-stream), `:278` (stream) | real **HTTP 403** `gateway_blocked` on both routes (thrown before `streamJob`). On the hosted build the studio shows the needs-key sentence (`errorFromJson`, `apps/web/lib/job-stream.ts:61`) through `research-needs-key` and hides the banner |
 | Stub runtime (no gateway key) | `requireLiveResearch`, `packages/host/src/research-generate.ts:77-85` | stream: **HTTP 200** + `job.error {code:"runtime_stub", status:503}`. Non-stream: HTTP 503 |
 | No Tavily / Brave key | not a refusal | keyless search runs; the desk is not asked for a second key |
-| A query the outbound guard refuses | `sendableSearchQuery` in the backend, rethrown by `hitsFromSearch` (`research-generate.ts:70`) | `job.error {code:"outbound_refused", status:400}` with the guard's en / id message; nothing is sent to any search provider |
+| A query the outbound guard refuses | `sendableSearchQuery` in the backend, rethrown by `hitsFromSearch` (`research-generate.ts:73`); the Research screen runs under its own guard with the question as the person's text (`research-generate.ts:152`) | skipped: the other queries still run, and the refused one is left out of `dossier.queries` and of the "searched" steps (`research-dossier.ts:798`). The run ends with `job.error {code:"outbound_refused", status:400}` and the guard's en / id message only on a "stopped" refusal or when every query was refused; nothing refused is sent to any search provider |
 | Every keyless source failed | `searchKeyless` outage, then `hitsFromSearch` | `job.error {code:"tool_failed", status:503}`, message `webSearchFailed` (en / id) |
 | Selected search backend, key missing | `web-search.ts:77-80` | `job.error {code:"tool_failed", status:503}` naming that backend |
 | Missing / empty `prompt` | `readPrompt`, `:42-51` | `job.error {code:"invalid_request", status:400}` (HTTP 200 on the stream route) |

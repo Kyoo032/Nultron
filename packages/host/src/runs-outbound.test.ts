@@ -139,6 +139,7 @@ describe("a Chat turn with a Knowledge Base excerpt in its prompt", () => {
     expect(completed?.output).toEqual({
       ok: false,
       reason: "outbound",
+      kind: "private",
       message:
         "Not sent: this search or page address carries the person's private details (a phrase, number or code from their files, knowledge or earlier chats). Search again in general terms, without the person's details.",
     });

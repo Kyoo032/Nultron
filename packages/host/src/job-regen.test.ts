@@ -5,8 +5,11 @@ import {
   createToolBudget,
   defineTool,
   harnessSpecFor,
+  createOutboundGuard,
   invokeToolGuarded,
+  runOutboundGuarded,
   type AgentRuntime,
+  type OutboundGuard,
   type JobMode,
   type TenantContext,
 } from "@agentforge/core";
@@ -45,6 +48,8 @@ const metered: string[] = [];
 const toolRunAtStart: Array<ToolRun | undefined> = [];
 /** What a tool saw when the fake runtime called it: the context a file write would read its author from. */
 const toolRunSeenByTool: Array<ToolRun | undefined> = [];
+/** The outbound guard open when each runtime call started (review H3, 2026-10-13). */
+const guardSeen: Array<OutboundGuard | undefined> = [];
 /** When set, the fake runtime calls this tool after it starts, as a model loop would. */
 let callProbeTool = false;
 
@@ -74,6 +79,7 @@ vi.mock("@agentforge/core", async (importOriginal) => {
       async execute(input) {
         executed.push(input);
         toolRunAtStart.push(currentToolRun());
+        guardSeen.push(actual.currentOutboundGuard());
         if (callProbeTool) {
           await invokeToolGuarded(probeTool, {}, input.tenant, createToolBudget(input.budget));
         }
@@ -593,5 +599,59 @@ describe("readJobRegenAttachments", () => {
         attachments: [{ type: "video_url", video_url: { url: "https://cdn.example/a.mp4" } }],
       }),
     ).toThrow(/image_url/);
+  });
+});
+
+describe("collectJobAssistantRun and the outbound guard (review H3, 2026-10-13)", () => {
+  const PRIVATE_PROMPT = "Clause 7: the escrow payment for project Kestrel falls due on the tenth of each month";
+  const base = {
+    tenant,
+    // A model no earlier block marks unreachable in the fake gateway.
+    model: "guard-probe-model",
+    systemPrompt: "system",
+    runPrefix: "documents",
+    agentId: "documents",
+    versionId: "documents-draft",
+    prompt: PRIVATE_PROMPT,
+    modelExplicit: true,
+  };
+
+  beforeEach(() => {
+    guardSeen.length = 0;
+  });
+
+  it("opens a guard whose private text is the whole prompt when the caller names none", async () => {
+    await collectJobAssistantText(base);
+
+    const guard = guardSeen[0];
+    expect(guard).toBeDefined();
+    expect(guard?.isTainted()).toBe(true);
+    expect(guard?.judgeQuery("escrow payment for project Kestrel falls due")).toMatchObject({ kind: "private" });
+  });
+
+  it("reads what the caller says the person typed as theirs", async () => {
+    await collectJobAssistantText({ ...base, outbound: { userText: [PRIVATE_PROMPT], privateText: [] } });
+
+    expect(guardSeen[0]?.isTainted()).toBe(false);
+    expect(guardSeen[0]?.judgeQuery("escrow payment for project Kestrel falls due")).toBeNull();
+  });
+
+  it("uses the guard its caller already opened", async () => {
+    const outer = createOutboundGuard({ userText: [], privateText: [], locale: "en" });
+
+    await runOutboundGuarded(outer, () => collectJobAssistantText(base));
+
+    expect(guardSeen[0]).toBe(outer);
+  });
+
+  it("starts tainted when a picture is attached, even with nothing private in the text", async () => {
+    await collectJobAssistantText({
+      ...base,
+      model: "glm-5.4",
+      outbound: { userText: ["describe this slide"], privateText: [] },
+      attachments: [{ type: "image_url", image_url: { url: "https://cdn.example/slide.png", detail: "high" } }],
+    });
+
+    expect(guardSeen[0]?.isTainted()).toBe(true);
   });
 });

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { resolvedGatewayBaseUrl } from "../../gateway";
 import { DEFAULT_GATEWAY_IMAGE_MODEL } from "../../models/media-kind";
 import { ApiError } from "../../errors";
+import { currentOutboundGuard, mediaSendRefusal } from "../../security/outbound-guard";
 import { defineTool } from "../define-tool";
 import { missingToolRouteMessage, resolveToolBackend } from "../credentials";
 import { getSecret } from "../secret-scope";
@@ -74,6 +75,10 @@ export const imageGenerateTool = defineTool({
     if (!apiKey) {
       return { success: false, error: `${route.envVar} is not set.` };
     }
+    const held = mediaSendRefusal({ imageUrl: image_url, prompt, thirdParty: route.backend !== "gateway" });
+    if (held) {
+      return held;
+    }
     const aspect = aspect_ratio ?? "square";
     const fetchImpl = globalThis.fetch;
     try {
@@ -88,6 +93,7 @@ export const imageGenerateTool = defineTool({
             fetchImpl,
           })
         : await generateWithFal(prompt, aspect, image_url, apiKey, fetchImpl);
+      currentOutboundGuard()?.noteHostMedia([generated.url]);
       return { success: true, backend: route.backend, image: generated.url, model: generated.model, prompt };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : "Image generation failed" };

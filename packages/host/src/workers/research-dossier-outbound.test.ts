@@ -59,7 +59,8 @@ describe("research_dossier under the outbound guard", () => {
     expect(requested).toEqual([]);
     expect(out).toEqual({
       ok: false,
-      queries: [`Find public sources that say: ${LEAK}`],
+      // Every query was refused, so none was searched (review M3).
+      queries: [],
       reason: "failed",
       code: "outbound_refused",
       message: outboundRefusal("private", "en").message,

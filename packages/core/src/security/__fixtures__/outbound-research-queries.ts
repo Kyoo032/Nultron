@@ -25,6 +25,16 @@ sebesar 2 persen per hari keterlambatan. Sengketa diselesaikan melalui Badan Arb
 Jakarta. Kerahasiaan berlaku selama lima tahun setelah perjanjian berakhir. Pengalihan data ke luar negeri
 mengikuti PP 23/2018 dan peraturan Otoritas Jasa Keuangan yang berlaku.`;
 
+/**
+ * Working notes that cite short public numbers (an article of a code, a standard, an RFC, a status code) and
+ * ordinary English phrasing. Since the 2026-10-13 review a number of three to five digits counts only with a
+ * second one, so citing a public article in a private note does not block researching that article.
+ */
+export const PRIVATE_TECH_NOTES = `Catatan tim hukum dan TI. Kasus karyawan gudang mengacu pada Pasal 365 KUHP dan syarat sah
+perjanjian vendor diuji menurut Pasal 1320 KUHPerdata. Server kami belum lulus audit ISO 27001 dan API lama masih
+mengikuti RFC 2616, sehingga klien sering menerima HTTP 404. This vendor is one of the most reliable in the region,
+and the migration will be done in the first quarter of next year.`;
+
 /** Ordinary research a person on that desk would run. Every one must pass. */
 export const ORDINARY_RESEARCH_QUERIES: readonly string[] = [
   "UU No. 40 Tahun 2007 tentang Perseroan Terbatas modal disetor minimum",
@@ -62,6 +72,12 @@ export const ORDINARY_RESEARCH_QUERIES: readonly string[] = [
   "Nvidia H100 price per unit 2025",
   "how does Python asyncio event loop work",
   "Fortune 500 list 2025 top ten companies",
+  "Pasal 365 KUHP pencurian dengan kekerasan",
+  "Pasal 1320 KUHPerdata syarat sah perjanjian",
+  "ISO 27001 annex A controls list",
+  "RFC 2616 HTTP/1.1 status code definitions",
+  "HTTP 404 error meaning and how to fix it",
+  "which cloud provider is one of the most reliable in the region",
   "best practices for SaaS service level agreement uptime 99.9 percent",
 ];
 

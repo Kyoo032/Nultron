@@ -12,7 +12,7 @@ import { mapStreamPart } from "./stream-parts";
 import { buildAiTools, type AiToolSet } from "./ai-tools";
 import { createToolCallRepair, isInvalidToolCallEvent, withInvalidToolCall } from "./tool-call-repair";
 import { createStepTracker } from "./step-tracker";
-import { createEgressGuard, userTextOf } from "./egress-guard";
+import { attachedTextsOf, createEgressGuard, userTextOf } from "./egress-guard";
 import { currentOutboundGuard } from "../security/outbound-guard";
 import { createToolBudget, resolveMaxSteps } from "./tool-budget";
 import {
@@ -478,7 +478,11 @@ export class AiSdkRuntime implements AgentRuntime {
     // One counter for the whole execute: every retry below shares the tools built here.
     const toolBudget = createToolBudget(input.budget);
     // Same lifetime as the budget: a private read in one attempt still limits the fetches of the next.
-    const egressGuard = createEgressGuard({ userText: userTextOf(input.history), outbound: currentOutboundGuard() });
+    const egressGuard = createEgressGuard({
+      userText: userTextOf(input.history),
+      attachedText: attachedTextsOf(input.history),
+      outbound: currentOutboundGuard(),
+    });
     const built = buildAiTools({
       bindings: input.bindings,
       tenant: input.tenant,

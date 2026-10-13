@@ -4,6 +4,7 @@ import {
   attachedTextsOf,
   createOutboundGuard,
   createRuntime,
+  hasNonTextUserPart,
   runOutboundGuarded,
   userTextOf,
   encodeSse,
@@ -494,7 +495,12 @@ export async function* startModalityRun(options: {
       // tainted when any of them is, and every search or worker in it is checked against that text.
       const outbound = createOutboundGuard({
         userText: userTextOf(history),
-        privateText: [pastHint, ...knowledge.privateText, ...attachedTextsOf(history)],
+        privateText: [...knowledge.privateText, ...attachedTextsOf(history)],
+        // Earlier-chat titles are short: a five-word window of a title is ordinary words, so they count for
+        // their figures and codes only (review M2). A picture or a file part in any message taints the run
+        // even with no text to compare against (review M4c).
+        figuresOnlyText: [pastHint],
+        tainted: hasNonTextUserPart(history),
         locale,
       });
       const inChatRun = <T>(fn: () => Promise<T>): Promise<T> =>

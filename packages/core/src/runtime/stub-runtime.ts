@@ -2,7 +2,7 @@ import { getTool } from "../tools/registry";
 import { summarizeParts } from "../content/parse-run-input";
 import type { AgentRuntime, RuntimeEvent } from "./types";
 import { invokeToolGuarded } from "./invoke-guarded";
-import { createEgressGuard, userTextOf } from "./egress-guard";
+import { attachedTextsOf, createEgressGuard, userTextOf } from "./egress-guard";
 import { currentOutboundGuard } from "../security/outbound-guard";
 import { createToolBudget } from "./tool-budget";
 import { resolveRequestReasoningEffort } from "../models/reasoning-effort";
@@ -56,7 +56,11 @@ export class StubRuntime implements AgentRuntime {
     });
     const answers: string[] = [];
     const toolBudget = createToolBudget(input.budget);
-    const egressGuard = createEgressGuard({ userText: userTextOf(input.history), outbound: currentOutboundGuard() });
+    const egressGuard = createEgressGuard({
+      userText: userTextOf(input.history),
+      attachedText: attachedTextsOf(input.history),
+      outbound: currentOutboundGuard(),
+    });
 
     const wantsCalc = hasEnabledBinding(input.bindings, "calculator") && /\d+\s*[+\-*/]\s*\d+/.test(summary);
     const wantsPast = hasEnabledBinding(input.bindings, "past_sessions") && wantsStubPastChat(summary);

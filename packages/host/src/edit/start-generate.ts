@@ -1,6 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import {
   ApiError,
+  assertSendableMediaUrl,
   estimateJobUsd,
   imageToVideoForModel,
   routeEditModel,
@@ -180,6 +181,11 @@ export async function startGenerateJob(
   const model = routeModel(tenant, input, input.kind === "generate_video" && hasStill);
   if (input.kind === "generate_video" && hasStill && !imageToVideoForModel(model)) {
     throw new ApiError("video_still_unsupported", "This model does not accept a still image", 400);
+  }
+  if (still?.kind === "remote") {
+    // The provider fetches a remote still itself. From the Edit agent it must be one the run made, a search
+    // returned or the person typed (H1, 2026-10-13); from the person's own form no guard is open and it passes.
+    assertSendableMediaUrl(still.url);
   }
   if (still) {
     await assertStillAvailable(tenant, still);

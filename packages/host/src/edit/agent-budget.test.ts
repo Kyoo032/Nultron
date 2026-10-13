@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { harnessSpecFor, type AgentRuntime } from "@agentforge/core";
+import { harnessSpecFor, type AgentRuntime, type OutboundGuard } from "@agentforge/core";
 import { EDIT_AGENT_IMPORT_BUDGET_MS } from "../__fixtures__/test-budgets";
 
 /**
@@ -19,6 +19,7 @@ delete process.env.AGENTFORGE_SERVER;
 
 type ExecuteInput = Parameters<AgentRuntime["execute"]>[0];
 const executed: ExecuteInput[] = [];
+const guardSeen: Array<OutboundGuard | undefined> = [];
 
 vi.mock("@agentforge/core", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@agentforge/core")>();
@@ -27,6 +28,7 @@ vi.mock("@agentforge/core", async (importOriginal) => {
     createRuntime: (): AgentRuntime => ({
       async execute(input) {
         executed.push(input);
+        guardSeen.push(actual.currentOutboundGuard());
         await input.onEvent({ type: "run.completed", runId: input.runId });
       },
     }),
@@ -41,6 +43,7 @@ beforeAll(async () => {
 
 beforeEach(() => {
   executed.length = 0;
+  guardSeen.length = 0;
 });
 
 afterAll(async () => {
@@ -63,5 +66,24 @@ describe("the Edit agent and its run budget", () => {
 
     expect(executed).toHaveLength(1);
     expect(executed[0]?.budget).toBe(harnessSpecFor("edit").budget);
+  }, 60_000);
+});
+
+describe("the Edit agent and the outbound guard (review H3, 2026-10-13)", () => {
+  it("runs inside a guard that holds the project as private and the request as the person's", async () => {
+    const { createEditProject } = await import("./projects");
+    const { getTenant } = await import("../tenant");
+    const tenant = await getTenant();
+    const doc = await createEditProject(tenant, { name: "Quarterly board review cut", aspect: "16:9", fps: 30 });
+
+    const events = await agent.runEditAgent({ tenant, projectId: doc.id, text: "Add a clip about rainforest birds" });
+    for await (const _frame of events) {
+      // Drain the stream: the turn only finishes once its frames have been read.
+    }
+
+    const guard = guardSeen[0];
+    expect(guard).toBeDefined();
+    expect(guard?.isTainted()).toBe(true);
+    expect(guard?.judgeQuery("rainforest birds stock footage")).toBeNull();
   }, 60_000);
 });

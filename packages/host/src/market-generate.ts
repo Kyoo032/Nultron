@@ -284,6 +284,15 @@ export function toolKeysFor(specialist: MarketSpecialist, webReady: boolean): st
   ];
 }
 
+/**
+ * What a Market run's outbound guard reads (SR-112). The packet is public market data the host fetched, and
+ * the watchlist is ticker symbols the desk exists to look up, so nothing in the prompt is private: a search for
+ * the question's subject goes out, and the guard still applies its shape rules (length, credentials, blobs).
+ */
+export function marketOutbound(instruction: string): { userText: string[]; privateText: string[] } {
+  return { userText: [instruction], privateText: [] };
+}
+
 export function briefingPrompt(
   packet: MarketWatchPacket,
   instruction: string,
@@ -458,6 +467,7 @@ async function draftBriefing(run: WatchRun, packet: MarketWatchPacket): Promise<
           versionId: "market-briefing",
           prompt: briefingPrompt(packet, request.prompt, request.specialist),
           toolKeys: toolKeysFor(request.specialist, resolved.webReady()),
+          outbound: marketOutbound(request.prompt),
           streamWatchdog: MARKET_STREAM_WATCHDOG,
         }),
       abortSignal,
@@ -506,6 +516,7 @@ async function draftWithTeam(run: WatchRun, packet: MarketWatchPacket): Promise<
           versionId: call.versionId,
           prompt: call.prompt,
           toolKeys: call.toolKeys,
+          outbound: marketOutbound(request.prompt),
           streamWatchdog: MARKET_STREAM_WATCHDOG,
         }),
       abortSignal,
@@ -787,6 +798,7 @@ export async function regenerateBriefingSection(
     versionId: "market-section",
     prompt: appendRegenInstruction(sectionPrompt(briefing, index, current), readOptionalInstruction(record)),
     toolKeys: toolKeysFor(briefing.specialist, resolved.webReady()),
+    outbound: marketOutbound(readOptionalInstruction(record)),
     streamWatchdog: MARKET_STREAM_WATCHDOG,
   });
   const raw = answerOf(reply, model).text;

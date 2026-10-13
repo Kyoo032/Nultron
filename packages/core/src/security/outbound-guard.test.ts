@@ -4,6 +4,7 @@ import {
   ORDINARY_RESEARCH_QUERIES,
   PRIVATE_FINANCE_MEMO,
   PRIVATE_LEGAL_CONTRACT,
+  PRIVATE_TECH_NOTES,
 } from "./__fixtures__/outbound-research-queries";
 import {
   createOutboundGuard,
@@ -142,6 +143,7 @@ describe("outbound guard: refusals", () => {
     expect(id.judgeQuery("dilakukan paling lambat tanggal sepuluh")).toEqual({
       ok: false,
       reason: "outbound",
+      kind: "private",
       message:
         "Tidak dikirim: pencarian atau alamat halaman ini memuat data pribadi orang ini (frasa, angka, atau kode dari berkas, basis pengetahuan, atau obrolan sebelumnya). Cari lagi dengan istilah umum, tanpa data pribadi orang ini.",
     });
@@ -204,7 +206,11 @@ describe("outbound guard: page addresses", () => {
 
 describe("outbound guard: calibration on realistic private material", () => {
   const desk = () =>
-    createOutboundGuard({ userText: [], privateText: [PRIVATE_FINANCE_MEMO, PRIVATE_LEGAL_CONTRACT], locale: "en" });
+    createOutboundGuard({
+      userText: [],
+      privateText: [PRIVATE_FINANCE_MEMO, PRIVATE_LEGAL_CONTRACT, PRIVATE_TECH_NOTES],
+      locale: "en",
+    });
 
   it("has at least 30 ordinary research queries", () => {
     expect(ORDINARY_RESEARCH_QUERIES.length).toBeGreaterThanOrEqual(30);
@@ -218,13 +224,20 @@ describe("outbound guard: calibration on realistic private material", () => {
     expect(desk().judgeQuery(query)).toEqual(PRIVATE_REFUSAL);
   });
 
-  it("refuses a statute number the private contract also cites: the trade-off of rule 4", () => {
+  it("refuses ordinary words that happen to repeat five meaningful words of a note: the known false positive", () => {
+    // "done in the first quarter" is in PRIVATE_TECH_NOTES with three words that are not stopwords. The rule
+    // cannot tell a common phrase from a document's own sentence; the refusal asks for general terms and the
+    // model can rephrase ("cloud migration first quarter plan").
+    expect(desk().judgeQuery("what will be done in the first quarter of a cloud migration")).toEqual(PRIVATE_REFUSAL);
+    expect(desk().judgeQuery("cloud migration plan for the first quarter")).toBeNull();
+  });
+
+  it("sends a statute number the private contract also cites: a short public number alone is not private", () => {
     const contract = createOutboundGuard({
       userText: [],
       privateText: ["Para pihak sepakat syarat sah sesuai Pasal 1320 KUHPerdata."],
       locale: "en",
     });
-    expect(contract.judgeQuery("syarat sah perjanjian Pasal 1320 KUHPerdata")).toEqual(PRIVATE_REFUSAL);
-    expect(contract.judgeQuery("syarat sah perjanjian menurut KUHPerdata")).toBeNull();
+    expect(contract.judgeQuery("syarat sah perjanjian Pasal 1320 KUHPerdata")).toBeNull();
   });
 });

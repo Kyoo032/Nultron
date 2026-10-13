@@ -1,6 +1,8 @@
 import {
   ApiError,
   buildToolSecretScope,
+  createOutboundGuard,
+  currentOutboundGuard,
   fetchPageText,
   gatewayRequiredMessage,
   hasLiveProvider,
@@ -10,6 +12,7 @@ import {
   PAGE_TEXT_MAX_CHARS,
   resolveChatModel,
   resolveRuntimeMode,
+  runOutboundGuarded,
   runWithToolSecrets,
   scanInjection,
   webSearchTool,
@@ -145,46 +148,55 @@ export async function generateResearchNotes(
   let answered: string[] = [];
   let writtenBy = model;
 
+  // The worker searches and reads pages itself, outside the model's tool loop. A Chat run already opened
+  // the outbound guard; the Research screen opens one here, with the question as the person's own text.
+  const guarded = <T>(fn: () => Promise<T>): Promise<T> =>
+    currentOutboundGuard()
+      ? fn()
+      : runOutboundGuarded(createOutboundGuard({ userText: [question], privateText: [], locale: localeForRun() }), fn);
+
   const {
     dossier: planned,
     notes,
     checks,
-  } = await runResearchDossier(
-    { question, models: [model] },
-    {
-      emit,
-      abortSignal,
-      caps: RESEARCH_CAPS,
-      locale: localeForRun(),
-      repairLabel: repairRoundLabel(localeForRun()),
-      ask: async (system, prompt) => {
-        const run = await collectJobAssistantRun({
-          tenant,
-          model,
-          modelExplicit,
-          systemPrompt: withOutputLanguage(system, "research", localeForRun()),
-          runPrefix: "research",
-          agentId: "research",
-          jobMode: "research",
-          versionId: "research-dossier",
-          prompt,
-          ...(abortSignal ? { signal: abortSignal } : {}),
-        });
-        answered = answered.includes(run.model) ? answered : [...answered, run.model];
-        writtenBy = run.model;
-        return run.text;
+  } = await guarded(() =>
+    runResearchDossier(
+      { question, models: [model] },
+      {
+        emit,
+        abortSignal,
+        caps: RESEARCH_CAPS,
+        locale: localeForRun(),
+        repairLabel: repairRoundLabel(localeForRun()),
+        ask: async (system, prompt) => {
+          const run = await collectJobAssistantRun({
+            tenant,
+            model,
+            modelExplicit,
+            systemPrompt: withOutputLanguage(system, "research", localeForRun()),
+            runPrefix: "research",
+            agentId: "research",
+            jobMode: "research",
+            versionId: "research-dossier",
+            prompt,
+            ...(abortSignal ? { signal: abortSignal } : {}),
+          });
+          answered = answered.includes(run.model) ? answered : [...answered, run.model];
+          writtenBy = run.model;
+          return run.text;
+        },
+        search: async (query) =>
+          hitsFromSearch(await runWithToolSecrets(scope, () => webSearchTool.execute({ query }, tenant))),
+        readPage: async (url, focus) => {
+          const page = await fetchPageText(url, { maxChars: PAGE_TEXT_MAX_CHARS, signal: abortSignal });
+          const hit = guardBypass ? null : scanInjection(pageWindow(page.text, focus, RESEARCH_CAPS.pageChars));
+          if (hit) {
+            throw new ApiError("injection_blocked", `blocked by injection guard (rule: ${hit.rule})`, 400);
+          }
+          return page;
+        },
       },
-      search: async (query) =>
-        hitsFromSearch(await runWithToolSecrets(scope, () => webSearchTool.execute({ query }, tenant))),
-      readPage: async (url, focus) => {
-        const page = await fetchPageText(url, { maxChars: PAGE_TEXT_MAX_CHARS, signal: abortSignal });
-        const hit = guardBypass ? null : scanInjection(pageWindow(page.text, focus, RESEARCH_CAPS.pageChars));
-        if (hit) {
-          throw new ApiError("injection_blocked", `blocked by injection guard (rule: ${hit.rule})`, 400);
-        }
-        return page;
-      },
-    },
+    ),
   );
 
   // A cancelled run is not saved: the user asked for it to stop.
