@@ -268,6 +268,34 @@
       "note": "Chat renderer."
     },
     {
+      "glob": "{apps/web/components/projects-*.tsx,apps/web/components/projects.css,apps/web/lib/projects-*.ts}",
+      "map": "docs/internal/maps/knowledge-flows.md",
+      "lanes": ["tester"],
+      "protected": false,
+      "note": "Projects (Workspaces) renderer, tester code only (team-board-spec.md section 2b, W1). Not on main, so no merge conflict; the server routes answer the router 404 on Personal."
+    },
+    {
+      "glob": "{apps/web/components/chat-doc-card.tsx,apps/web/components/add-to-workspace.tsx,apps/web/components/tool-rows/doc-result.ts,apps/web/lib/chat-file-save.ts,apps/web/lib/use-chip-originals.ts}",
+      "map": "docs/internal/maps/chat-send.md",
+      "lanes": ["tester"],
+      "protected": false,
+      "note": "Chat document cards, Add to Workspace (hosted builds only) and the chip's kept original. Not on main, so tester code only."
+    },
+    {
+      "glob": "{apps/web/components/composer-attachment-chip.tsx,apps/web/lib/composer-documents.ts}",
+      "map": "docs/internal/maps/chat-send.md",
+      "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
+      "protected": true,
+      "note": "Shared with main: the document chip, its notes and the save before Send. A tester edit here can conflict at a merge from main."
+    },
+    {
+      "glob": "{packages/host/src/doc-tools/**,packages/host/src/chat-documents/original.ts}",
+      "map": "docs/internal/maps/agent-tools-and-files.md",
+      "lanes": ["tester"],
+      "protected": false,
+      "note": "Word, Excel and PDF tools (create, revise, import) and the kept original of a chat upload. Not on main, so tester code only."
+    },
+    {
       "glob": "apps/web/components/rail-*.tsx",
       "map": "docs/internal/maps/chat-sessions-and-rail.md",
       "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
