@@ -32,6 +32,7 @@ import { DEFAULT_MODEL_TIER, type ModelTierId } from "@agentforge/core/tiers";
 import { buildChatRunBody, tierErrorMessage } from "@/lib/chat-tier-body";
 import { tierStreamLimits, type ChatTierInfo } from "@/lib/chat-tier-pref";
 import { submitOnEnter } from "@/lib/composer-enter";
+import { sendSource } from "@/lib/chat-continue";
 import { getLocale, t } from "@/lib/i18n";
 import { readComposerDraft, writeComposerDraft } from "@/lib/composer-draft";
 import { startRun } from "@/lib/run-generation";
@@ -84,6 +85,11 @@ type Props = {
   placeholder?: string;
   /** A tool the run is driving reported a progress line (the stream's `tool.progress` events that carry a label). */
   onToolProgress?: (event: { toolKey: string; label: string }) => void;
+  /**
+   * Continue writes its sender here. The click calls it with the word `continue`. The send leaves
+   * the draft in the box alone. A ref, not an effect: StrictMode runs an effect twice.
+   */
+  continueSendRef?: { current: ((text: string) => void) | null };
 };
 
 type HeldFile = {
@@ -256,6 +262,7 @@ export function ChatComposer({
   sessionKey,
   placeholder,
   onToolProgress,
+  continueSendRef,
 }: Props) {
   const { id: workspaceId } = useWorkspaceScope();
   // Restored from outside the keep-alive key so a desk-id remount (boot → real id) and a
@@ -393,11 +400,14 @@ export function ChatComposer({
     }
   }
 
-  async function send() {
-    if (needsKey) {
+  async function send(override?: string) {
+    // Continue sends only its word (never the draft or the files in the box), does not wait on a document
+    // still being read, and does nothing when clicked again while its run is going.
+    const { continuing, typed, attached } = sendSource(override, text, files);
+    if (needsKey || (continuing && busy)) {
       return;
     }
-    if (documentsHoldSend) {
+    if (!continuing && documentsHoldSend) {
       setError(t("chat.document.mustFinish"));
       return;
     }
@@ -407,8 +417,6 @@ export function ChatComposer({
     const startedIn = sessionRef.current;
     const showing = () => sessionRef.current === startedIn;
     const isCurrentRun = startRun(runGenerationRef);
-    const typed = text;
-    const attached = files;
     let runThread: string | null = null;
     // A newer turn that began first makes this tail stale: the pane is told, so it leaves that turn's
     // streaming text and tools alone and only reloads this turn's saved reply if no newer turn is live.
@@ -422,6 +430,9 @@ export function ChatComposer({
     };
     /** Only the draft that was sent is cleared, with its chips; what was typed or attached since is the owner's. */
     const clearSent = () => {
+      if (continuing) {
+        return;
+      }
       setText((current) => (current === typed ? "" : current));
       setFiles((current) => current.filter((item) => !attached.some((sent) => sent.id === item.id)));
     };
@@ -457,7 +468,7 @@ export function ChatComposer({
     setBusy(true);
     setError(null);
     try {
-      const decision = routeDecision(files.map((item) => item.kind));
+      const decision = routeDecision(attached.map((item) => item.kind));
       if (decision.route === "error") {
         setError(
           decision.message === "Unsupported file type" ? t("chat.error.unsupportedFile") : t("chat.error.mixedMedia"),
@@ -480,10 +491,10 @@ export function ChatComposer({
       // Text files and documents are both inlined as a `--- name ---` block, in the order attached, with
       // the host's notes above the header. A document's text was read by the host when it was attached
       // and is saved to the desk now; a text file is read here and cut to the same budget.
-      const inlineFiles = files.filter((item) => item.kind === "text" || item.kind === "document");
-      const mediaFiles = files.filter((item) => item.kind === "image" || item.kind === "video");
+      const inlineFiles = attached.filter((item) => item.kind === "text" || item.kind === "document");
+      const mediaFiles = attached.filter((item) => item.kind === "image" || item.kind === "video");
 
-      let composedText = text;
+      let composedText = typed;
       try {
         for (const held of inlineFiles) {
           const block = await inlineBlock(held);
@@ -630,6 +641,13 @@ export function ChatComposer({
         setBusy(false);
       }
     }
+  }
+
+  // The click reads this on the way to `send`. Writing it during render keeps the closure current.
+  if (continueSendRef) {
+    continueSendRef.current = (text: string) => {
+      void send(text);
+    };
   }
 
   const sendLabel = busy ? t("agents.composer.sending") : t("agents.composer.send");

@@ -358,6 +358,9 @@ export async function* startModalityRun(options: {
       if (assistantText.trim()) {
         assistantParts.push({ type: "text", text: assistantText.trim() });
       }
+      if (settled.stepLimit) {
+        assistantParts.push({ type: "step_limit", tools: settled.stepLimit.tools });
+      }
       assistantParts.push(...mediaParts);
       if (assistantParts.length === 0) {
         return false;

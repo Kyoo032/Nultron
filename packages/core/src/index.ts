@@ -235,6 +235,7 @@ export type {
   VideoUrlPart,
   ThinkingPart,
   ToolCallPart,
+  StepLimitPart,
   RunInputBody,
 } from "./content/types";
 export {
@@ -862,6 +863,8 @@ export {
   wantsStubDeskSource,
   chatTurnCopy,
   fillChatTurn,
+  fillChatTools,
+  stepLimitNote,
 } from "./agents/chat-locale";
 export type { StubChatCopy, ChatTurnCopy } from "./agents/chat-locale";
 export {
