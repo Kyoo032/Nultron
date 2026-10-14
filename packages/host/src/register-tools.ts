@@ -9,6 +9,7 @@ import { registerFileTools, setFileRootResolver } from "@agentforge/core/tools/f
 import { registerUniversityTools } from "@agentforge/university";
 import { registerCodeTools } from "./code-runner";
 import { registerDeckTools } from "./deck";
+import { registerDocTools } from "./doc-tools";
 import { resolveHostFileRoot } from "./file-roots";
 import { knowledgeSearchTool } from "./knowledge-search-tool";
 import { marketTools } from "./market/tools";
@@ -39,6 +40,7 @@ export function ensureToolsRegistered(): void {
   registerCodeTools();
   registerTool(selfCheckTool);
   registerDeckTools();
+  registerDocTools();
   // Tester code: a mode harness as a tool of its own agent's conversation (`workers/`).
   registerTool(researchDossierTool);
   registered = true;

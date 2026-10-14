@@ -93,6 +93,10 @@ describe("mode harness specs", () => {
       run_code: 6,
       self_check: 4,
       build_deck: 4,
+      create_document: 4,
+      create_workbook: 4,
+      revise_document: 4,
+      import_document: 4,
     });
   });
 
@@ -131,6 +135,10 @@ describe("mode harness specs", () => {
       "run_code",
       "self_check",
       "build_deck",
+      "create_document",
+      "create_workbook",
+      "revise_document",
+      "import_document",
     ]);
   });
 

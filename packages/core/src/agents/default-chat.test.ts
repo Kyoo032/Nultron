@@ -22,6 +22,10 @@ describe("default chat tools", () => {
       "run_code",
       "self_check",
       "build_deck",
+      "create_document",
+      "create_workbook",
+      "revise_document",
+      "import_document",
     ]);
   });
 

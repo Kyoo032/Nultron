@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   ARTIFACT_MIMES,
   DOCX_MIME,
+  PDF_MIME,
   PPTX_MIME,
   XLSX_MIME,
   artifactExtension,
@@ -28,5 +29,18 @@ describe("the PowerPoint artifact type", () => {
   it("gets a .pptx file name", () => {
     expect(artifactExtension(PPTX_MIME)).toBe("pptx");
     expect(artifactFilename("Q3 plan: growth & risk", PPTX_MIME)).toBe("q3-plan-growth-risk.pptx");
+  });
+});
+
+describe("the PDF artifact type", () => {
+  it("is application/pdf, and a catalog member stored as base64", () => {
+    expect(PDF_MIME).toBe("application/pdf");
+    expect(isArtifactMime(PDF_MIME)).toBe(true);
+    expect(isBinaryArtifactMime(PDF_MIME)).toBe(true);
+  });
+
+  it("gets a .pdf file name", () => {
+    expect(artifactExtension(PDF_MIME)).toBe("pdf");
+    expect(artifactFilename("Q3 plan", PDF_MIME)).toBe("q3-plan.pdf");
   });
 });
