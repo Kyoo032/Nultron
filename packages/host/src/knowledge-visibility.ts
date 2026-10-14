@@ -66,12 +66,28 @@ function ownsThread(threadIdRef: string): string {
 }
 
 /**
- * True for a `knowledge_sources` row this person may see: anything that is not a Chat card, and a Chat
- * card whose thread this person owns. Three placeholders (`ownsThread`). A Chat card with no
- * `origin_id`, or whose thread is gone, is not visible to anyone.
+ * The values `visibleExpression` binds, in order: the person (the owner of a card made from their own
+ * artifact), then organization, desk and person again for `ownsThread`. Every fragment that uses the
+ * expression binds these four, so they cannot drift apart.
+ */
+function visibilityParams(tenant: TenantContext): string[] {
+  return [tenant.userId, ...ownThreadParams(tenant)];
+}
+
+/**
+ * True for a `knowledge_sources` row this person may see. Two rules, both must hold:
+ *
+ * - An owned row (a card made from a person's own artifact, SR-175) is visible only to its owner. A row
+ *   with no owner is a legacy or desk-made source and is company-visible, as it was made.
+ * - Anything that is not a Chat card, and a Chat card whose thread this person owns (`ownsThread`). A
+ *   Chat card with no `origin_id`, or whose thread is gone, is not visible to anyone.
+ *
+ * Four placeholders, bound by `visibilityParams`.
  */
 function visibleExpression(alias: string): string {
-  return `(${alias}.origin_kind IS NULL OR ${alias}.origin_kind <> 'thread' OR ${ownsThread(`${alias}.origin_id`)})`;
+  const ownedByPerson = `(${alias}.owner_user_id IS NULL OR ${alias}.owner_user_id = ?)`;
+  const chatRule = `(${alias}.origin_kind IS NULL OR ${alias}.origin_kind <> 'thread' OR ${ownsThread(`${alias}.origin_id`)})`;
+  return `(${ownedByPerson} AND ${chatRule})`;
 }
 
 /**
@@ -87,7 +103,7 @@ export function andVisibleSource(
   if (!chatCardsArePrivate(options)) {
     return NO_RESTRICTION;
   }
-  return { sql: ` AND ${visibleExpression(alias)}`, params: ownThreadParams(tenant) };
+  return { sql: ` AND ${visibleExpression(alias)}`, params: visibilityParams(tenant) };
 }
 
 /**
@@ -105,7 +121,7 @@ export function andVisibleSourceId(
   }
   return {
     sql: ` AND EXISTS (SELECT 1 FROM knowledge_sources vs WHERE vs.id = ${idColumn} AND vs.workspace_id = ? AND ${visibleExpression("vs")})`,
-    params: [tenant.workspaceId, ...ownThreadParams(tenant)],
+    params: [tenant.workspaceId, ...visibilityParams(tenant)],
   };
 }
 
@@ -118,7 +134,11 @@ export function andSharedSource(alias: string = SOURCES_TABLE, options: Visibili
   if (!chatCardsArePrivate(options)) {
     return NO_RESTRICTION;
   }
-  return { sql: ` AND (${alias}.origin_kind IS NULL OR ${alias}.origin_kind <> 'thread')`, params: [] };
+  // A card made from someone's own artifact (SR-175) is theirs, so it stays out of the desk map too.
+  return {
+    sql: ` AND (${alias}.origin_kind IS NULL OR ${alias}.origin_kind <> 'thread') AND ${alias}.owner_user_id IS NULL`,
+    params: [],
+  };
 }
 
 /** True when the source exists on this desk and this person may not see it. */
@@ -154,7 +174,7 @@ export function sourceIsVisible(tenant: TenantContext, sourceId: string, options
  * person's own, and a `topic` node when every source it `covers` is visible: a topic that covers a
  * colleague's Chat card was named from it. An edge is visible when both of its ends are.
  *
- * The prefix carries 13 placeholders; `params` is in their order.
+ * The prefix carries 15 placeholders; `params` is in their order.
  */
 export function visibleGraphNodes(
   tenant: TenantContext,
@@ -164,6 +184,7 @@ export function visibleGraphNodes(
     return null;
   }
   const own = ownThreadParams(tenant);
+  const visible = visibilityParams(tenant);
   const sourceVisible = (alias: string, idRef: string): string =>
     `EXISTS (SELECT 1 FROM knowledge_sources ${alias} WHERE ${alias}.id = ${idRef} AND ${alias}.workspace_id = ? AND ${visibleExpression(alias)})`;
   return {
@@ -180,7 +201,15 @@ export function visibleGraphNodes(
           ))
         )
     )`,
-    params: [tenant.workspaceId, tenant.workspaceId, ...own, ...own, tenant.workspaceId, tenant.workspaceId, ...own],
+    params: [
+      tenant.workspaceId,
+      tenant.workspaceId,
+      ...visible,
+      ...own,
+      tenant.workspaceId,
+      tenant.workspaceId,
+      ...visible,
+    ],
   };
 }
 

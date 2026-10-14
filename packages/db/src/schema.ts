@@ -540,6 +540,11 @@ export const knowledgeSources = sqliteTable(
      * the backend holds nothing for it. Derived state: losing it costs a re-index, never a card.
      */
     externalId: text("external_id"),
+    /**
+     * The maker of the artifact this card was made from, hosted only (SR-175). Null for every other
+     * source and for every row written before the column existed; added by `ensureOwnershipColumns`.
+     */
+    ownerUserId: text("owner_user_id"),
   },
   (table) => [
     index("knowledge_sources_ws_idx").on(table.workspaceId),

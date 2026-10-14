@@ -260,11 +260,13 @@ export type IndexSourceInput = {
   type: string;
   text: string;
   origin?: SourceOrigin | null;
+  /** The maker of the artifact this card was made from (SR-175); null for every other source. */
+  ownerUserId?: string | null;
 };
 
 const INSERT_SOURCE = `INSERT INTO knowledge_sources
-  (id, workspace_id, name, type, status, chunks, error, created_at, origin_kind, origin_id, external_id)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  (id, workspace_id, name, type, status, chunks, error, created_at, origin_kind, origin_id, external_id, owner_user_id)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
 /**
  * The retrieval backend's handle on a source, read before the row is replaced or deleted.
@@ -352,6 +354,7 @@ function replaceSourceRows(
         input.origin?.kind ?? null,
         input.origin?.id ?? null,
         carriedExternalId,
+        input.ownerUserId ?? null,
       );
     for (const chunk of chunks) {
       insertChunk.run(input.id, ws, chunk);

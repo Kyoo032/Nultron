@@ -1,5 +1,12 @@
-import { maskPii, scanInjection, type TenantContext } from "@agentforge/core";
-import { findSourceByOrigin, indexKnowledgeSource, markSourceFailed, type KnowledgeSource } from "./knowledge";
+import { isServerMode, maskPii, scanInjection, type TenantContext } from "@agentforge/core";
+import { sql } from "@agentforge/db";
+import {
+  findSourceByOrigin,
+  indexKnowledgeSource,
+  markSourceFailed,
+  type KnowledgeSource,
+  type SourceOrigin,
+} from "./knowledge";
 import { loadSettings } from "./settings-store";
 import { renderWorkCard, type WorkCard } from "./work-cards";
 import { log } from "./log";
@@ -51,7 +58,13 @@ export async function upsertWorkSource(tenant: TenantContext, card: WorkCard): P
   // The name is rewritten on every upsert, not only on create: a card's subject can be renamed
   // (a Chat thread that gets a real title after turn 1) and the Sources list, the `[n] <name>`
   // citation marker and the indexed `# <title>` line all have to follow it.
-  const input = { id, name: maskedCard.title, type: card.type, origin: card.origin };
+  const input = {
+    id,
+    name: maskedCard.title,
+    type: card.type,
+    origin: card.origin,
+    ownerUserId: ownerOfCard(tenant, card.origin),
+  };
   // A card that carries injection text would be retrieved into every later Chat as a trusted source.
   // Same guard and owner bypass as attachments / source material; the work itself already succeeded.
   const hit = bypass ? null : (scanInjection(card.body) ?? scanInjection(card.prompt ?? ""));
@@ -84,6 +97,27 @@ export function ingestWorkSource(tenant: TenantContext, card: WorkCard): void {
   void upsertWorkSource(tenant, card).catch((error: unknown) => {
     log.warn("knowledge_ingest_unexpected", { code: errorCode(error) });
   });
+}
+
+/**
+ * The owner a card is written with (SR-175, hosted only). A card made from an artifact takes that
+ * artifact's owner, so a colleague who re-indexes a legacy artifact does not make it theirs, and a
+ * legacy artifact's card stays company-visible. A card whose artifact row cannot be read is written
+ * for the caller, the safe side. Off server mode nothing is owned, and no query runs.
+ */
+function ownerOfCard(tenant: TenantContext, origin: SourceOrigin | null | undefined): string | null {
+  if (origin?.kind !== "artifact" || !isServerMode()) {
+    return null;
+  }
+  try {
+    const row = sql
+      .prepare("SELECT owner_user_id FROM artifacts WHERE workspace_id = ? AND id = ?")
+      .get(tenant.workspaceId, origin.id) as { owner_user_id: string | null } | undefined;
+    return row ? row.owner_user_id : tenant.userId;
+  } catch (error) {
+    log.warn("knowledge_ingest_owner_lookup_failed", { code: errorCode(error) });
+    return tenant.userId;
+  }
 }
 
 function injectionGuardBypass(tenant: TenantContext): boolean {

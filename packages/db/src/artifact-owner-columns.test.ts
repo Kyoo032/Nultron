@@ -75,7 +75,9 @@ describe("ownership columns", () => {
   it("survive a rewound journal being replayed", () => {
     sqlite.exec("DELETE FROM __drizzle_migrations");
     expect(() => ensureSchema(sqlite)).not.toThrow();
-    sqlite.exec("DELETE FROM __drizzle_migrations WHERE created_at >= (SELECT max(created_at) FROM __drizzle_migrations)");
+    sqlite.exec(
+      "DELETE FROM __drizzle_migrations WHERE created_at >= (SELECT max(created_at) FROM __drizzle_migrations)",
+    );
     expect(() => ensureSchema(sqlite)).not.toThrow();
     expect(columnNames(sqlite, "artifacts").filter((name) => name === "owner_user_id")).toHaveLength(1);
   });

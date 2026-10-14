@@ -743,6 +743,8 @@ function ensureOwnershipColumns(sqlite: Database.Database): void {
   };
   addMissing("artifacts", ["owner_user_id", "project_id"]);
   addMissing("media", ["project_id"]);
+  // The maker of the artifact a work card was made from (SR-175, knowledge half). Null on legacy cards.
+  addMissing("knowledge_sources", ["owner_user_id"]);
 }
 
 function tableColumns(sqlite: Database.Database, table: string): string[] {
