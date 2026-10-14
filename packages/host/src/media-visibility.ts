@@ -53,6 +53,17 @@ function ownMediaSql(viewer: MediaReachViewer): SQL | undefined {
 }
 
 /**
+ * The rows a person made and may still delete (SR-176, SR-179): their own, except one held by a live Workspace
+ * they are no longer a member of. The drizzle twin of `isLockedOutOfProject`; the storage list reads it.
+ */
+export function madeAndDeletableWhere(viewer: Pick<TenantContext, "userId">): SQL | undefined {
+  return and(
+    eq(media.userId, viewer.userId),
+    sql`NOT EXISTS (SELECT 1 FROM projects lp WHERE lp.id = ${media.projectId} AND lp.archived_at IS NULL AND NOT EXISTS (SELECT 1 FROM project_members lm WHERE lm.project_id = lp.id AND lm.user_id = ${viewer.userId}))`,
+  );
+}
+
+/**
  * The drizzle condition `reach` adds to a query on `media`, or undefined when it adds none. The `person` answer
  * is the maker's own row or a row in a Workspace of the caller's desk they are a member of. Undefined off server mode and for
  * `desk`, so the query is the one it was.
