@@ -89,6 +89,22 @@ His words: "kanban will be the milestone for later, so the goal is to be able to
 - **One switch per project: Private or Workspace (K-D19).** A project is private to its maker by default. Its maker flips one switch to make it a workspace project, visible to and downloadable by everyone in the company, and can flip it back. A file is visible to others only while it sits in a workspace project; a file made in chat and not added to a project is private. The host enforces it; the renderer shows the switch and a plain label ("Only you" / "Everyone in <company>").
 - F1 therefore builds `projects` with `visibility` (`private` | `workspace`) instead of every project being shared, and F0's read rule becomes "owner, or legacy row, or in a workspace project". F2, F3 and F4 are unchanged.
 
+### Then: a project is called a Workspace, like a Claude project (Rizky, 2026-10-14)
+
+His words: "i would like the virtual agents to be like if you switch from one agents to the other like inside hermes agents, so every bot will have their own sessions that we can control and their own project, which later the user itself can invite their selected bot into the active project, currently lets focus on the project first which we'll name it workspace, where inside the workspace, everyone can share their knowledge base and file sources like inside claude projects".
+
+- **On screen, a project is a Workspace (K-D20).** In code it stays `projects`: `workspace_id` already means a desk everywhere, and renaming tables would touch every lane. The page's route is `/projects`, because `/workspaces` is the Virtual agents page in this shell.
+- **A Workspace works like a Claude project.** It holds files (sources), a shared knowledge base built from them, and instructions. A chat started inside a Workspace reads its instructions and searches its knowledge; any member may add files and knowledge. Its switch (K-D19) decides who the members are: only its maker, or everyone in the company.
+- **Bots switch like Hermes agents.** Each virtual agent keeps its own sessions (it already does) and, later, its own Workspaces; a person will invite a chosen bot into the active Workspace. Bot invites are later; the Workspace comes first.
+
+Workspace phases (replace F1b onward):
+
+| Phase | Builds | Proof |
+|---|---|---|
+| W1 | Host: `projects.instructions`; `knowledge_sources.project_id`; uploading a file straight into a Workspace and adding a chat file both index it into that Workspace's knowledge; `threads.project_id`, so a chat belongs to a Workspace; a chat in a Workspace gets its instructions and searches its knowledge (and the person's own), never another Workspace's. | Two companies through the router: a member of a shared Workspace finds a colleague's file in a Workspace chat; a person outside it does not; a private Workspace is its maker's only; Personal unchanged. |
+| W2 | Renderer: a Workspaces page (list, create, the switch, Files, Knowledge, Instructions, Chats), "Add to Workspace" on chat file cards, and starting a chat in a Workspace with any agent. Shared components, so the enterprise shell (F4) reuses them. | Driven on the local rehearsal with two people. |
+| W3 (later) | Invite a chosen bot into a Workspace. | — |
+
 ## 3. Words
 
 | Word | Meaning |
