@@ -29,9 +29,13 @@
  * (Playwright with AGENTFORGE_RUNTIME=stub). desktop-mac.yml was a release build, not a check; the
  * mac build is `pnpm desktop:build:mac:docker` (apps/desktop/platform/macos/AGENTS.md).
  *
- * Advisory steps (reported as `warn`, never fail the run): audit:workspace, maps:check, lane-guard,
- * edit:starters:check, videos:examples:check, sandbox:manifest. `lane-guard` (scripts/lane-guard.mjs, `--only lane-guard`
- * or `--only lanes`) reads lanes.json; run `pnpm lane-guard` on its own for the lines it prints.
+ * Required steps added for the lane rules: `where-am-i` (scripts/where-am-i.mjs, first; the folder must match its branch)
+ * and `lane-guard` (scripts/lane-guard.mjs without --strict; never-promote paths, protected files without a `Lanes:` line,
+ * brand literals in shared code). `--only where` or `--only lanes` runs them; `pnpm where` and `pnpm lane-guard` print
+ * the lines on their own.
+ *
+ * Advisory steps (reported as `warn`, never fail the run): audit:workspace, maps:check, lane-guard:map (the map page rule,
+ * `--strict`), edit:starters:check, videos:examples:check, sandbox:manifest.
  */
 
 import { spawn } from "node:child_process";
@@ -263,6 +267,9 @@ function buildSteps(ctx) {
   const add = (group, name, required, commands, note, requireTestSummary = false) =>
     steps.push({ group, name, required, commands, note, requireTestSummary });
 
+  // First, so a tester folder on the wrong branch (or main checked out in the tester folder) fails before anything runs.
+  // It only reads git and prints the row; it refuses on mismatch and skips when lanes.json or docs/internal is absent.
+  add("where", "where-am-i", true, [node(["scripts/where-am-i.mjs"])]);
   add("install", "install", true, [pnpm(["install", "--frozen-lockfile"])]);
 
   const lint = (ctx.rootPkg.scripts?.lint ?? "biome check .").split(/\s+/);
@@ -329,11 +336,13 @@ function buildSteps(ctx) {
 
   // Doc and media checks. Never in the old CI; advisory because the media they check is gitignored.
   add("maps", "maps:check", false, [node(["scripts/map-rot.mjs"])]);
-  // Advisory change guard (lanes.json): code without its map page, a protected file without a `Lanes:` line, a new
-  // brand literal in shared code. `--strict` is what makes a warning show as `warn` in the table (the step is advisory,
-  // so it never fails the run); `pnpm lane-guard` without it exits 0. It skips itself when lanes.json or docs/internal
-  // is absent or the range origin/main...HEAD cannot be resolved.
-  add("lanes", "lane-guard", false, [node(["scripts/lane-guard.mjs", "--strict"])]);
+  // Change guard (lanes.json). Required: a path that never reaches main, a protected file without a `Lanes:` line, a new
+  // brand literal in shared code. Those exit 1 without `--strict`. It skips itself when lanes.json or docs/internal is
+  // absent or the range origin/main...HEAD cannot be resolved.
+  add("lanes", "lane-guard", true, [node(["scripts/lane-guard.mjs"])]);
+  // Advisory: a code change without its map page. `--strict` makes that warning show as `warn` in the table (the step is
+  // advisory, so it never fails the run).
+  add("lanes", "lane-guard:map", false, [node(["scripts/lane-guard.mjs", "--strict"])]);
   add("media", "edit:starters:check", false, [node(["scripts/edit-starters.mjs", "--check"])]);
   add("media", "videos:examples:check", false, [node(["scripts/video-examples.mjs", "--check"])]);
 
