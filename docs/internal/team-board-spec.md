@@ -140,6 +140,88 @@ His words, in order: "admins in this case have broader functions, they have thei
   6. **Platform work** (embeddings, titles, the search guard, model refresh) runs on the system key with `purpose = 'platform'` and never touches an allocation (K-D27).
   7. **Reconcile.** A daily job compares the ledger with the gateway's own usage logs, where the credential allows it, and flags any gap to the admin. The host's ledger is what enforces; the gateway's numbers are a check.
 
+### Then: documents in a Workspace (Rizky, 2026-10-14 evening: "focus on docs first, this is the main point"; K-D30)
+
+The goal, from the mock's screen 6: a document lives in a Workspace and opens in the browser. A member edits it one section at a time. A member asks an agent the Workspace holds to rewrite one section, and Keeps, Undoes or retries it. Every version records who changed what, and for whom an agent did it. Members download it as a file. **It is built for HYP AI's Tencent setup:** one CVM, SQLite and the local disk, a single process, renderers in pure JavaScript, and Cloudflare in front. It adds no outside service and no external document viewer.
+
+**What exists in the tester code (read on 2026-10-14).**
+- The F2 document model is a spec of sections and blocks (`packages/host/src/doc-model/types.ts:44-50`). Workbooks are sheets (`:77`).
+- `replaceSection` and `replaceSheet` keep every other part and the id (`doc-model/replace.ts:14,24`). Ids are stable once made: a model-written id, or `s1…sN` on import (`import-markdown.ts:242`).
+- The renderers are pure JavaScript: docx (`render-docx.ts`), pdf-lib (`render-pdf.ts`) and exceljs (`render-xlsx.ts`).
+- The spec is sealed in `artifacts.meta` (`doc-tools/doc-meta.ts`).
+- What is missing: no route lets a person edit a section; no versions (a chat revision saves a whole new `"(revised)"` artifact, `revise-document.ts:173`); no attribution, Keep/Undo, conflict check, presence or HTML preview.
+- The chat revision copy is saved with no Workspace, so it lands in the reviser's private files and not in the Workspace (`doc-save.ts:85` passes no project). This is not a leak, but in a Workspace the result is lost. D1 fixes it.
+
+**Design.**
+- **Versions are specs, never rendered bytes.** A new table `doc_versions` holds:
+  - `artifact_id`, `version`, the sealed spec (the same envelope as `meta.spec`, never plain text);
+  - `changed_section_ids`, `base_version` and a note;
+  - `author_kind` (person or agent), `author_user_id`, `agent_id`, and `asked_by_user_id` (the K-D29 payer, recorded now so billing needs no migration later).
+
+  The artifact row is the head: its spec and rendered body are the latest kept version. Download renders version N from its spec on demand.
+
+  A version cap stops one disk filling up. Proposed: keep 50 versions per document, plus every version from the last 30 days. Older ones fold into the oldest kept one. This is a default, and Rizky may change it.
+- **Section ids stay stable.** A person who adds a section gets an id from the host, never one typed by the client. Restyle and format changes keep every id. A test holds this through create, import, replace, restyle and a round trip of versions.
+- **Conflicts are per section, not per document.** Every section edit and every agent proposal carries the version it started from. The host refuses with `409 section_changed` only when that section changed since then. Two people editing different sections never collide.
+- **An agent revision is a proposal, not a version.**
+  - It stays pending, shown highlighted with Keep, Undo and Try again, until a member presses Keep. Only Keep writes a version, after the same per-section base check.
+  - Try again replaces the pending proposal.
+  - Undo before Keep discards it.
+  - Undo after Keep writes a new version that restores the section. History is never deleted.
+  - One pending proposal per section at a time.
+- **Access is the Workspace membership rule (K-D22) on every route:** the spec, a section edit, a proposal, the versions, `/file` and the doc stream. A non-member gets `404`, the same as a missing id. A company admin has no read bypass ("admins never see files", K-D24 and section 12.3). Deleting stays as SR-176 has it. Only an agent listed in that Workspace's `project_agents` can be asked to revise.
+- **Live updates and presence.** The board bus (`board/bus.ts`) gains topics, and a document stream reuses the board stream's design (`board/stream.ts:39-47`):
+  - a heartbeat every 15 s, inside Cloudflare's roughly 100 s idle cut;
+  - a lifetime of 15 min, then the client reconnects with `Last-Event-ID`;
+  - access re-checked at each heartbeat, so a removed member's stream closes;
+  - its own per-person cap, so a board tab and a document tab do not starve each other.
+
+  Presence ("Sari is here") is held in memory only and never written to SQLite. One process makes that correct. A second replica would need the Postgres bus (K-D10), and is not this sprint.
+- **The HTML preview is React elements built from the spec.** No `dangerouslySetInnerHTML` and no viewer that renders a docx in the browser. The text is shown as text, so the preview is safe from injection by construction.
+- **Scope order.**
+  1. Documents (docx, with pdf as an export only).
+  2. Workbooks (xlsx), sheet by sheet.
+  3. Pptx is out of scope here: decks stay on `build_deck`.
+
+  The UI and this spec say plainly that importing a docx keeps the text and structure, not the styling (`import-docx.ts:50` goes through Markdown).
+- **Shared code reaches Nultron.**
+  - Chat's `revise_document` on a file outside a Workspace keeps today's behaviour (a new revised copy), pinned by a parity test.
+  - The document page opens from a Workspace and from a chat document card. It is not a rail entry and not a mode, so the "no new modes" rule is untouched.
+  - Every string goes in both `en` and `id`. An agent's section rewrite applies the output-language rule (`withOutputLanguage`, surface `documents`).
+
+**Phases.**
+- **D0 Versions and ids.**
+  - Add `doc_versions`, a store, and the version cap.
+  - Make version 1 from an existing document's spec the first time it is opened.
+  - Test that ids stay stable.
+- **D1 Routes, host only.**
+  - `GET /api/v1/docs/:artifactId` returns the spec, the head version, the author of each section, and any pending proposals.
+  - `PUT /api/v1/docs/:artifactId/sections/:sectionId` takes a base version.
+  - `POST …/sections` adds a section, with an id from the host.
+  - Proposals: `POST …/sections/:sectionId/proposals` (an agent, from `project_agents`), plus `keep`, `discard` and `retry`.
+  - `GET …/versions`, `GET …/versions/:n/file?format=docx|pdf|xlsx`, and `POST …/versions/:n/restore`.
+  - `revise_document` on a Workspace file goes through proposals instead of copying.
+  - A four-person router test extends the membership test: A owns, B is a member, C is not a member, D is removed.
+- **D2 The document page.** It follows the mock's screen 6:
+  - the preview built from the spec, with inline editing of one section;
+  - an author mark on each section;
+  - the Ask-an-agent panel, with the agent and section pickers;
+  - Keep, Undo and Try again;
+  - the versions list, and a Download menu.
+
+  Locale parity holds, and it is driven at desktop and phone widths.
+- **D3 Live.** Topics on the bus, the document stream, and presence. A drive with two browsers shows one person's Keep appearing for the other within 2 s.
+- **D4 Workbooks.** The same flow, sheet by sheet.
+- **Proof on HYP AI's stack.** Every phase is green on `:3200` first. Then a bundle built from the tester runs the local rehearsal (`hypey\deploy\rehearse-local.mjs`), with a new drive step:
+  - A makes a document in a Workspace.
+  - B edits section 1.
+  - A's agent proposes section 2, and A keeps it.
+  - C gets `404` on the document, its file and its stream.
+  - D is removed mid-session, and D's stream closes.
+  - The docx and pdf downloads open.
+
+  The real server (`43.173.26.50`) gets it only on Rizky's word at that moment.
+
 ## 3. Words
 
 | Word | Meaning |
