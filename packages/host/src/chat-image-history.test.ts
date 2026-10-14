@@ -216,6 +216,27 @@ describe("prepareChatImageHistory", () => {
     expect(media.read).not.toHaveBeenCalled();
   });
 
+  it("adds the reference beside the latest message's own picture, when it is a stored one the org owns", async () => {
+    const history = [turn("user", text("edit this"), image(ID_A))];
+    const result = await prepareChatImageHistory(tenant, history, gpt(store({ [ID_A]: 5 })));
+    const parts = result[0]?.parts ?? [];
+    const texts = parts.map((part) => (part.type === "text" ? part.text : ""));
+    expect(parts.some((part) => part.type === "image_url")).toBe(true);
+    expect(texts.join("\n")).toContain(`(reference: ${url(ID_A)} — pass it to image_generate to edit this image)`);
+  });
+
+  it("adds no reference for a latest picture sent as a data URL", async () => {
+    const history = [turn("user", { type: "image_url", image_url: { url: dataUrlOf(4) } })];
+    const result = await prepareChatImageHistory(tenant, history, gpt(store({}), { budgetBytes: 10 }));
+    expect(JSON.stringify(result)).not.toContain("(reference:");
+  });
+
+  it("refuses a latest picture whose id this organization does not own, so no reference is written for it", async () => {
+    await expect(prepareChatImageHistory(tenant, [turn("user", image(ID_B))], gpt(store({})))).rejects.toThrow(
+      /could not be read/,
+    );
+  });
+
   it("gives no reference for an earlier image the store does not hold for this organization", async () => {
     const history = [turn("user", image(ID_A)), turn("assistant", text("ok")), turn("user", text("make it brighter"))];
     const result = await prepareChatImageHistory(tenant, history, gpt(store({}), { budgetBytes: 4 }));

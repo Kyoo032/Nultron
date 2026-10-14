@@ -130,7 +130,8 @@ async function inspect(
   return { status: "unreadable" };
 }
 
-type Prepared = { status: "ok"; part: ContentPart; bytes: number } | { status: Refusal };
+/** `mediaId` is set only for a stored image this organization owns (`inspect` read its row). */
+type Prepared = { status: "ok"; part: ContentPart; bytes: number; mediaId: string | null } | { status: Refusal };
 
 /** `inspect`, then the bytes of a stored image, checked again: a row's size is written once, at upload. */
 async function prepare(
@@ -144,7 +145,7 @@ async function prepare(
     return inspected;
   }
   if (!inspected.mediaId) {
-    return { status: "ok", part, bytes: inspected.bytes };
+    return { status: "ok", part, bytes: inspected.bytes, mediaId: null };
   }
   const dataUrl = await media.read(tenant, inspected.mediaId);
   if (!dataUrl) {
@@ -154,7 +155,17 @@ async function prepare(
   if (bytes > remaining) {
     return { status: "too_large" };
   }
-  return { status: "ok", part: { type: "image_url", image_url: { ...part.image_url, url: dataUrl } }, bytes };
+  return {
+    status: "ok",
+    part: { type: "image_url", image_url: { ...part.image_url, url: dataUrl } },
+    bytes,
+    mediaId: inspected.mediaId,
+  };
+}
+
+/** Model-facing, English, one line: the reference of a picture the latest message sent as pixels. */
+function uploadedReferenceText(mediaId: string): string {
+  return `(reference: /api/v1/media/${mediaId}/file — pass it to image_generate to edit this image)`;
 }
 
 /** The sentence for the person when the latest message's own image is refused. */
@@ -258,6 +269,11 @@ export async function prepareChatImageHistory(
       }
       used += ready.bytes;
       parts.push(ready.part);
+      // The latest message's own picture, when it is a stored one: the model sees its pixels, so it also needs
+      // the id to pass to image_generate. Only a row this organization owns reaches here (`inspect`).
+      if (mine && ready.mediaId) {
+        parts.push({ type: "text", text: uploadedReferenceText(ready.mediaId) });
+      }
     }
     prepared[index] = { ...turn, parts };
   }

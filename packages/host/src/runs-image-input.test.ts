@@ -176,7 +176,9 @@ describe("Chat image turn, as the gateway receives it", () => {
     expect(image, `no image part reached the gateway: ${wireText(seen[0] as Captured)}`).toBeDefined();
     // Bytes, not a reference: the gateway cannot open /api/v1/media/... on this machine.
     expect(image?.image_url.url).toBe(PNG_DATA_URL);
-    expect(wireText(seen[0] as Captured)).not.toContain("/api/v1/media/");
+    // The only media path on the wire is the reference line beside the pixels, never an image_url.
+    expect(wireText(seen[0] as Captured).match(/\/api\/v1\/media\//g)).toHaveLength(1);
+    expect(wireText(seen[0] as Captured)).toContain("pass it to image_generate to edit this image");
     expect(wireText(seen[0] as Captured)).not.toContain("Image attached in the local app");
   });
 
