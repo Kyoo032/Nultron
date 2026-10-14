@@ -23,3 +23,6 @@ export { parseRuns, type TextRun } from "./runs";
 export { renderDocx } from "./render-docx";
 export { renderXlsx } from "./render-xlsx";
 export { renderPdf } from "./render-pdf";
+export { docSpecFromMarkdown, type MarkdownImportOptions } from "./import-markdown";
+export { docSpecFromDocx, docSpecFromPdf, type DocImportOptions } from "./import-docx";
+export { sheetSpecFromXlsx, type SheetImportOptions } from "./import-xlsx";

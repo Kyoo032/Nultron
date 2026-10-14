@@ -34,6 +34,8 @@ type Step = {
 const DEFAULT_TITLE = "Imported document";
 const TITLE_MAX = 300;
 const HEADING = /^(#{1,6})\s+(.*?)\s*#*\s*$/;
+/** A line that is only bold text reads as a section heading. The converter writes Word headings this way. */
+const BOLD_HEADING = /^\*\*(\S(?:[^*]{0,118}\S)?)\*\*$/;
 const BULLET = /^\s{0,3}[-*]\s+(.*)$/;
 const NUMBERED = /^\s{0,3}\d+[.)]\s+(.*)$/;
 const QUOTE = /^\s{0,3}>\s?(.*)$/;
@@ -44,10 +46,18 @@ function isBlank(line: string): boolean {
   return line.trim().length === 0;
 }
 
-/** A `#` or `##` heading starts a section; `###` and deeper are ordinary text. */
+/** A `#` or `##` heading, or a bold-only line, starts a section. `###` and deeper are ordinary text. */
 function sectionHeading(line: string): string | undefined {
   const match = HEADING.exec(line);
-  return match && match[1].length <= 2 ? match[2] : undefined;
+  if (match) {
+    return match[1].length <= 2 ? unwrapBold(match[2]) : undefined;
+  }
+  return BOLD_HEADING.exec(line.trim())?.[1];
+}
+
+/** The converter writes a Word heading as `# **Summary**`; the heading text is the words inside. */
+function unwrapBold(text: string): string {
+  return BOLD_HEADING.exec(text.trim())?.[1] ?? text;
 }
 
 /** Cells of one pipe row. An escaped pipe is a character in the cell, never a separator. */
@@ -84,9 +94,7 @@ function isTableStart(lines: readonly string[], index: number): boolean {
     return false;
   }
   const alignmentCells = splitRow(alignment);
-  return (
-    alignmentCells.every((cell) => ALIGNMENT_CELL.test(cell)) && alignmentCells.length === splitRow(header).length
-  );
+  return alignmentCells.every((cell) => ALIGNMENT_CELL.test(cell)) && alignmentCells.length === splitRow(header).length;
 }
 
 /** Lines that open a block of their own, so a paragraph stops in front of them. */
@@ -94,6 +102,7 @@ function startsBlock(lines: readonly string[], index: number): boolean {
   const line = lines[index];
   return (
     HEADING.test(line) ||
+    sectionHeading(line) !== undefined ||
     RULE.test(line) ||
     BULLET.test(line) ||
     NUMBERED.test(line) ||
@@ -113,11 +122,11 @@ function readParagraph(lines: readonly string[], start: number): Step {
 }
 
 function readTable(lines: readonly string[], start: number): Step {
-  const columns = splitRow(lines[start]);
+  const columns = splitRow(lines[start]).map(unwrapBold);
   const rows: string[][] = [];
   let index = start + 2;
   while (index < lines.length && !isBlank(lines[index]) && lines[index].includes("|")) {
-    const cells = splitRow(lines[index]);
+    const cells = splitRow(lines[index]).map(unwrapBold);
     // GFM: a short row is padded with empty cells and a long row loses the cells past the header.
     rows.push(Array.from({ length: columns.length }, (_, position) => cells[position] ?? ""));
     index += 1;
@@ -165,11 +174,13 @@ function readStep(lines: readonly string[], index: number): Step {
   if (isBlank(line)) {
     return { next: index + 1 };
   }
-  const heading = HEADING.exec(line);
-  if (heading) {
-    return heading[1].length <= 2
-      ? { next: index + 1, heading: heading[2] }
-      : { next: index + 1, block: { type: "paragraph", text: heading[2] } };
+  const deepHeading = HEADING.exec(line);
+  if (deepHeading && deepHeading[1].length > 2) {
+    return { next: index + 1, block: { type: "paragraph", text: deepHeading[2] } };
+  }
+  const heading = sectionHeading(line);
+  if (heading !== undefined) {
+    return { next: index + 1, heading };
   }
   if (RULE.test(line)) {
     return { next: index + 1, rule: true };

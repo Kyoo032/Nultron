@@ -99,6 +99,15 @@ describe("docSpecFromMarkdown", () => {
     });
   });
 
+  it("reads a line that is only bold text as a section heading, and a ### line as a paragraph", () => {
+    const spec = docSpecFromMarkdown("**Key facts**\n\nA line.\n\n### Deep\n\n# **Wrapped**\n\nEnd.");
+    expect(spec.sections.map((section) => section.heading)).toEqual(["Key facts", "Wrapped"]);
+    expect(spec.sections[0].blocks).toEqual([
+      { type: "paragraph", text: "A line." },
+      { type: "paragraph", text: "Deep" },
+    ]);
+  });
+
   it("refuses a document over the section cap with a clear message", () => {
     const markdown = Array.from({ length: 201 }, (_, index) => `# Part ${index + 1}\n\nBody`).join("\n\n");
     expect(() => docSpecFromMarkdown(markdown)).toThrow(DocModelError);
