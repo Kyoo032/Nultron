@@ -21,3 +21,16 @@ export function desktopMediaSrc(url: string, electron: boolean): string {
   }
   return url;
 }
+
+/**
+ * The stored media id a chat picture or clip points at, from its `src` in either form: the host path
+ * (`/api/v1/media/<id>/file`) or the desktop shell's `agentforge://media/<id>`. Null for anything else, such as
+ * a remote link or a video example, which cannot be put into a Workspace.
+ */
+export function mediaIdFromSrc(src: string | undefined): string | null {
+  if (!src) {
+    return null;
+  }
+  const match = src.match(/(?:\/api\/v1\/media\/|agentforge:\/\/media\/)([0-9a-f-]{36})(?:\/file|\/)?(?:[?#]|$)/i);
+  return match?.[1] ?? null;
+}

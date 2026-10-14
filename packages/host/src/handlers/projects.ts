@@ -3,12 +3,14 @@
  * every one answers the router's own `404 not_found`, so projects do not exist there at all.
  *
  * Identity is `getTenant(request)` and nothing the request body says. CSRF and the rate limit are the
- * HTTP adapter's, applied to every write before dispatch. Downloads stay on `GET /api/v1/artifacts/:id/file`.
+ * HTTP adapter's, applied to every write before dispatch. Downloads stay on `GET /api/v1/artifacts/:id/file`
+ * for a chat file and `GET /api/v1/media/:id/file` for a generated image or video (SR-175).
  */
 import { ApiError, isServerMode } from "@agentforge/core";
 import { parseAddFile, parseCreateProject, parseUpdateProject } from "../projects/input";
 import {
   addProjectFile,
+  addProjectMedia,
   archiveProject,
   createProject,
   listProjectFiles,
@@ -17,6 +19,7 @@ import {
   listProjects,
   removeProjectFile,
   removeProjectKnowledge,
+  removeProjectMedia,
   updateProject,
   uploadProjectKnowledge,
 } from "../projects/service";
@@ -72,15 +75,27 @@ export const handleGetProjectFiles = projectRoute(async (request) => {
   return jsonOk({ items: listProjectFiles(scope, request.params.id ?? "") });
 });
 
+/** `{ artifactId }` puts a chat file in; `{ mediaId }` puts a generated image or video in (SR-175). */
 export const handlePostProjectFile = projectRoute(async (request) => {
   const scope = await getTenant(request);
-  await addProjectFile(scope, request.params.id ?? "", parseAddFile(request.body));
+  const input = parseAddFile(request.body);
+  if ("mediaId" in input) {
+    addProjectMedia(scope, request.params.id ?? "", input.mediaId);
+  } else {
+    await addProjectFile(scope, request.params.id ?? "", input.artifactId);
+  }
   return jsonOk({ ok: true });
 });
 
 export const handleDeleteProjectFile = projectRoute(async (request) => {
   const scope = await getTenant(request);
   removeProjectFile(scope, request.params.id ?? "", request.params.artifactId ?? "");
+  return jsonOk({ ok: true });
+});
+
+export const handleDeleteProjectMedia = projectRoute(async (request) => {
+  const scope = await getTenant(request);
+  removeProjectMedia(scope, request.params.id ?? "", request.params.mediaId ?? "");
   return jsonOk({ ok: true });
 });
 
@@ -129,6 +144,7 @@ export function projectRoutes(): ReadonlyArray<
     ["GET", "/api/v1/projects/:id/files", handleGetProjectFiles],
     ["POST", "/api/v1/projects/:id/files", handlePostProjectFile],
     ["DELETE", "/api/v1/projects/:id/files/:artifactId", handleDeleteProjectFile],
+    ["DELETE", "/api/v1/projects/:id/media/:mediaId", handleDeleteProjectMedia],
     ["GET", "/api/v1/projects/:id/knowledge", handleGetProjectKnowledge],
     ["POST", "/api/v1/projects/:id/uploads", handlePostProjectUpload],
     ["DELETE", "/api/v1/projects/:id/knowledge/:sourceId", handleDeleteProjectKnowledge],

@@ -607,6 +607,12 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
     path: "/api/v1/projects/:id/files/:artifactId",
     params: { id: "unseeded", artifactId: "unseeded" },
   },
+  // Generated media in a Workspace (SR-175): the add route's `mediaId` body and its remove route, same reasoning.
+  {
+    method: "DELETE",
+    path: "/api/v1/projects/:id/media/:mediaId",
+    params: { id: "unseeded", mediaId: "unseeded" },
+  },
   // Workspace knowledge and chats (W1): the same reasoning, each answers the router's 404 with server mode off.
   { method: "GET", path: "/api/v1/projects/:id/knowledge", params: { id: "unseeded" } },
   { method: "POST", path: "/api/v1/projects/:id/uploads", params: { id: "unseeded" }, body: {} },

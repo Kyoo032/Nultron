@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { ModeIcon } from "@/components/mode-icons";
+import { mediaSrc } from "@/lib/api-client";
 import {
-  downloadProjectFile,
+  downloadFile,
   listProjectFiles,
   ProjectsError,
   removeProjectFile,
+  removeProjectMedia,
   type ProjectFile,
   type ProjectRecord,
 } from "@/lib/projects-client";
@@ -22,10 +24,40 @@ function messageOf(error: unknown, fallback: string): string {
   return error instanceof ProjectsError && error.message ? error.message : fallback;
 }
 
+/** A generated picture or clip shows inline; a chat file shows as its icon and meta only (SR-175). */
+function FilePreview({ file }: { file: ProjectFile }) {
+  if (!file.previewUrl) {
+    return null;
+  }
+  const src = mediaSrc(file.previewUrl);
+  if (file.kind === "video") {
+    return (
+      <video
+        src={src}
+        controls
+        preload="metadata"
+        className="projects-file-preview"
+        aria-label={t("projects.files.previewAlt", { name: file.title })}
+        data-testid="projects-file-video"
+      />
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt={t("projects.files.previewAlt", { name: file.title })}
+      loading="lazy"
+      className="projects-file-preview"
+      data-testid="projects-file-image"
+    />
+  );
+}
+
 /**
  * The Files tab of one Workspace. The list comes from the host, which already filters it to what this
  * person may see. Remove is offered only to the file's maker or the Workspace's maker; the host still
- * decides, and its sentence is shown when it refuses.
+ * decides, and its sentence is shown when it refuses. Every row, a picture or a video included, downloads
+ * through its own `downloadUrl`, which the host names as an attachment.
  */
 export function ProjectFiles({ project, me }: Props) {
   const [files, setFiles] = useState<ProjectFile[] | null>(null);
@@ -49,7 +81,7 @@ export function ProjectFiles({ project, me }: Props) {
     setBusyId(file.id);
     setError(null);
     try {
-      await downloadProjectFile(file.id, file.title);
+      await downloadFile(file.downloadUrl, file.title);
     } catch (caught) {
       setError(messageOf(caught, t("projects.files.downloadFailed")));
     } finally {
@@ -61,7 +93,11 @@ export function ProjectFiles({ project, me }: Props) {
     setBusyId(file.id);
     setError(null);
     try {
-      await removeProjectFile(project.id, file.id);
+      if (file.kind === "artifact") {
+        await removeProjectFile(project.id, file.id);
+      } else {
+        await removeProjectMedia(project.id, file.id);
+      }
       await reload();
     } catch (caught) {
       setError(messageOf(caught, t("projects.files.removeFailed")));
@@ -89,7 +125,13 @@ export function ProjectFiles({ project, me }: Props) {
       {files.length > 0 ? (
         <ul className="projects-file-list" data-testid="projects-file-list">
           {files.map((file) => (
-            <li key={file.id} className="projects-file" data-testid="projects-file" data-artifact-id={file.id}>
+            <li
+              key={file.id}
+              className="projects-file"
+              data-testid="projects-file"
+              data-artifact-id={file.id}
+              data-kind={file.kind}
+            >
               <span className="projects-file-icon" aria-hidden="true">
                 <ModeIcon name={fileIconName(file.mime)} size={18} />
               </span>
@@ -101,6 +143,7 @@ export function ProjectFiles({ project, me }: Props) {
                   <span>{new Date(file.updatedAt).toLocaleDateString()}</span>
                   <span>{formatBytes(file.sizeBytes)}</span>
                 </span>
+                <FilePreview file={file} />
               </span>
               <span className="projects-file-actions">
                 <button

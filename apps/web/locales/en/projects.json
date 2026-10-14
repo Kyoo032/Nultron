@@ -52,7 +52,8 @@
     "loadFailed": "The files could not be loaded.",
     "you": "You",
     "colleague": "A colleague",
-    "downloadLabel": "Download"
+    "downloadLabel": "Download",
+    "previewAlt": "Preview of {name}"
   },
   "kinds": {
     "document": "Document",

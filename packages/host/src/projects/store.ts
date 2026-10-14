@@ -2,12 +2,13 @@
  * Every SQL statement the projects feature runs (tester, F1). Synchronous better-sqlite3, like the board.
  *
  * Every statement filters on `organization_id` AND `workspace_id` from the caller's `TenantContext`,
- * never from the request. Visibility of a file is `visibleTo` in `artifacts.ts`, the one place that
- * rule lives, so this file reuses it rather than writing a second copy.
+ * never from the request. Visibility of a file is `visibleTo` in `artifacts.ts`, and of a stored image or
+ * video `mediaVisibleClause` in `media-visibility.ts`: each rule lives in one place, so this file reuses them.
  */
 import { sql } from "@agentforge/db";
 import type { TenantContext } from "@agentforge/core";
 import { visibleTo } from "../artifacts";
+import { mediaVisibleClause } from "../media-visibility";
 import type { ProjectVisibility } from "./input";
 
 export type ProjectRow = {
@@ -139,6 +140,45 @@ export function setFileProject(scope: TenantContext, artifactId: string, project
   sql
     .prepare("UPDATE artifacts SET project_id = ? WHERE workspace_id = ? AND id = ?")
     .run(projectId, scope.workspaceId, artifactId);
+}
+
+export type ProjectMediaRow = {
+  id: string;
+  kind: string;
+  mime: string;
+  size_bytes: number;
+  user_id: string;
+  project_id: string | null;
+  created_at: number;
+};
+
+const MEDIA_COLUMNS = "id, kind, mime, size_bytes, user_id, project_id, created_at";
+
+/** A stored image or video the caller may see (SR-175), or null: the same answer as an id nobody owns. */
+export function findVisibleMedia(scope: TenantContext, mediaId: string): ProjectMediaRow | null {
+  const visible = mediaVisibleClause(scope);
+  const row = sql
+    .prepare(`SELECT ${MEDIA_COLUMNS} FROM media WHERE organization_id = ? AND id = ?${visible.clause}`)
+    .get(scope.organizationId, mediaId, ...visible.args) as ProjectMediaRow | undefined;
+  return row ?? null;
+}
+
+export function setMediaProject(scope: TenantContext, mediaId: string, projectId: string | null): void {
+  sql
+    .prepare("UPDATE media SET project_id = ? WHERE organization_id = ? AND id = ?")
+    .run(projectId, scope.organizationId, mediaId);
+}
+
+/** The media of a project the caller may see; the project is checked by the caller first. Same per-row rule as files. */
+export function listProjectMedia(scope: TenantContext, projectId: string, limit: number): ProjectMediaRow[] {
+  const visible = mediaVisibleClause(scope);
+  return sql
+    .prepare(
+      `SELECT ${MEDIA_COLUMNS} FROM media
+        WHERE organization_id = ? AND project_id = ?${visible.clause}
+        ORDER BY created_at DESC LIMIT ?`,
+    )
+    .all(scope.organizationId, projectId, ...visible.args, limit) as ProjectMediaRow[];
 }
 
 export type ProjectThreadRow = { id: string; title: string; created_at: number };

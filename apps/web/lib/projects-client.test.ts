@@ -21,11 +21,14 @@ vi.mock("./api-client", () => ({
 
 import {
   addProjectFile,
+  addProjectMedia,
   createProject,
+  downloadFile,
   listProjectFiles,
   listProjects,
   ProjectsError,
   removeProjectFile,
+  removeProjectMedia,
   updateProject,
   downloadProjectFile,
 } from "./projects-client";
@@ -106,14 +109,83 @@ describe("projects client", () => {
   it("reads a file list with size and owner", async () => {
     const file = {
       id: "art_1",
+      kind: "artifact",
       title: "Deck",
       mime: "application/pdf",
       sizeBytes: 2048,
       ownerUserId: "user_me",
       updatedAt: 3,
+      previewUrl: null,
+      downloadUrl: "/api/v1/artifacts/art_1/file",
     };
     calls.push({ path: "/api/v1/projects/proj_1/files", init: undefined, response: json(200, { items: [file] }) });
     expect(await listProjectFiles("proj_1")).toEqual([file]);
+  });
+
+  it("reads a generated image or video with its preview and its attachment URL (SR-175)", async () => {
+    const image = {
+      id: "med_1",
+      kind: "image",
+      title: "image-med_1.png",
+      mime: "image/png",
+      sizeBytes: 9,
+      ownerUserId: "user_colleague",
+      updatedAt: 4,
+      previewUrl: "/api/v1/media/med_1/file",
+      downloadUrl: "/api/v1/media/med_1/file?download=1",
+    };
+    calls.push({ path: "/api/v1/projects/proj_1/files", init: undefined, response: json(200, { items: [image] }) });
+    expect(await listProjectFiles("proj_1")).toEqual([image]);
+  });
+
+  it("refuses a file list whose row has no known kind", async () => {
+    calls.push({
+      path: "/api/v1/projects/proj_1/files",
+      init: undefined,
+      response: json(200, {
+        items: [
+          { id: "x", kind: "audio", title: "t", mime: "audio/mpeg", sizeBytes: 1, updatedAt: 1, downloadUrl: "/d" },
+        ],
+      }),
+    });
+    const error = await listProjectFiles("proj_1").catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ProjectsError);
+    expect((error as ProjectsError).code).toBe("projects_malformed");
+  });
+
+  it("adds a generated image by its media id, in the same body shape the host reads", async () => {
+    calls.push({
+      path: "/api/v1/projects/proj_1/files",
+      init: { method: "POST", body: JSON.stringify({ mediaId: "med_1" }) },
+      response: json(200, { ok: true }),
+    });
+    await expect(addProjectMedia("proj_1", "med_1")).resolves.toBeUndefined();
+  });
+
+  it("takes a generated image out through the media route", async () => {
+    calls.push({
+      path: "/api/v1/projects/proj_1/media/med_1",
+      init: { method: "DELETE" },
+      response: json(200, { ok: true }),
+    });
+    await expect(removeProjectMedia("proj_1", "med_1")).resolves.toBeUndefined();
+  });
+
+  it("downloads a Workspace file from the URL the host gave it", async () => {
+    const anchor = { href: "", download: "", click: vi.fn() };
+    vi.stubGlobal("document", { createElement: () => anchor });
+    vi.stubGlobal("URL", { createObjectURL: () => "blob:x", revokeObjectURL: () => undefined });
+    calls.push({
+      path: "/api/v1/media/med_1/file?download=1",
+      init: undefined,
+      response: new Response("bytes", {
+        status: 200,
+        headers: { "Content-Disposition": 'attachment; filename="image-med_1.png"' },
+      }),
+    });
+    await downloadFile("/api/v1/media/med_1/file?download=1", "fallback.png");
+    expect(anchor.download).toBe("image-med_1.png");
+    expect(anchor.click).toHaveBeenCalledOnce();
   });
 
   it("adds a chat file by its artifact id", async () => {
@@ -170,11 +242,14 @@ describe("projects client", () => {
 describe("projects view rules", () => {
   const file = {
     id: "art_1",
+    kind: "artifact" as const,
     title: "Deck",
     mime: "application/pdf",
     sizeBytes: 1,
     ownerUserId: "user_a",
     updatedAt: 1,
+    previewUrl: null,
+    downloadUrl: "/api/v1/artifacts/art_1/file",
   };
   const project = { ...PROJECT, createdBy: "user_b" };
 

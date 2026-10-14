@@ -5,6 +5,7 @@ import { jsonError, jsonOk } from "../errors";
 import { getTenant } from "../tenant";
 import { log } from "../log";
 import { mediaExt, saveMedia } from "../media";
+import { mediaReachWhere } from "../media-visibility";
 import { readTenantObjectRange, removeTenantObject } from "../tenant-storage";
 
 /**
@@ -34,10 +35,14 @@ export async function handleGetMediaFile(request: HostRequest): Promise<HostResu
   try {
     const tenant = await getTenant(request);
     const mediaId = request.params.mediaId;
+    // SR-175: a person reads their own media and what a shared Workspace of their desk holds. Off server mode
+    // the reach adds nothing, so Personal reads the row as it always did.
     const rows = await db
       .select()
       .from(media)
-      .where(and(eq(media.organizationId, tenant.organizationId), eq(media.id, mediaId)))
+      .where(
+        and(eq(media.organizationId, tenant.organizationId), eq(media.id, mediaId), mediaReachWhere(tenant, "person")),
+      )
       .limit(1);
     const item = rows[0];
     if (!item) {

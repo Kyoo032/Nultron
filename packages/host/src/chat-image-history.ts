@@ -9,7 +9,7 @@ import {
   type ContentPart,
   type TenantContext,
 } from "@agentforge/core";
-import { readMediaDataUrl, statMedia } from "./media";
+import { readVisibleMediaDataUrl, statVisibleMedia } from "./media-visibility";
 
 /**
  * The images in a Chat request, as the model can receive them.
@@ -50,7 +50,7 @@ export type ChatMediaReader = {
   read(tenant: TenantContext, mediaId: string): Promise<string | null>;
 };
 
-const STORE: ChatMediaReader = { stat: statMedia, read: readMediaDataUrl };
+const STORE: ChatMediaReader = { stat: statVisibleMedia, read: readVisibleMediaDataUrl };
 
 type Options = {
   model: string;

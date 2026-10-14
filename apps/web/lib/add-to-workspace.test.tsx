@@ -6,6 +6,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AddToWorkspace } from "@/components/add-to-workspace";
+import { MessageEmbed } from "@/components/message-embed";
 import { DossierCard } from "@/components/chat-dossier-card";
 import { readDossierResult, type DossierCardModel } from "@/components/tool-rows/dossier-result";
 import { applyLocale, resetLocaleForTests } from "@/lib/i18n";
@@ -65,5 +66,47 @@ describe("Add to Workspace on the hosted build", () => {
     applyLocale("id");
     const html = renderToStaticMarkup(<AddToWorkspace artifactId="art-7" />);
     expect(html).toContain(">Tambah ke ruang kerja</button>");
+  });
+});
+
+describe("Add to Workspace on a generated image or video (SR-175)", () => {
+  const MEDIA_ID = "0b8f1c2e-4a5d-4e6f-8a9b-1c2d3e4f5a6b";
+
+  it("draws nothing for a media id on Personal", () => {
+    expect(renderToStaticMarkup(<AddToWorkspace mediaId={MEDIA_ID} />)).toBe("");
+  });
+
+  it("draws the same menu button for a media id on the hosted build", () => {
+    hosted();
+    const html = renderToStaticMarkup(<AddToWorkspace mediaId={MEDIA_ID} />);
+    expect(html).toContain('data-testid="add-to-workspace-open"');
+  });
+
+  it("leaves a chat image card exactly as it was on Personal", () => {
+    const html = renderToStaticMarkup(
+      <MessageEmbed kind="image" title="" src={`/api/v1/media/${MEDIA_ID}/file`} alt="" />,
+    );
+    expect(html).not.toContain("add-to-workspace");
+    expect(html).toContain('data-testid="message-image"');
+  });
+
+  it("puts the button on a chat image and a chat video on the hosted build", () => {
+    hosted();
+    const image = renderToStaticMarkup(
+      <MessageEmbed kind="image" title="" src={`/api/v1/media/${MEDIA_ID}/file`} alt="" />,
+    );
+    const video = renderToStaticMarkup(<MessageEmbed kind="video" title="" src={`/api/v1/media/${MEDIA_ID}/file`} />);
+    expect(image).toContain('data-testid="add-to-workspace-open"');
+    expect(video).toContain('data-testid="add-to-workspace-open"');
+  });
+
+  it("does not put the button on a link card, an upload that is not stored, or a remote picture", () => {
+    hosted();
+    const link = renderToStaticMarkup(
+      <MessageEmbed kind="image" title="" src={`/api/v1/media/${MEDIA_ID}/file`} href="https://example.test" />,
+    );
+    const remote = renderToStaticMarkup(<MessageEmbed kind="image" title="" src="https://cdn.example/a.png" alt="" />);
+    expect(link).not.toContain("add-to-workspace");
+    expect(remote).not.toContain("add-to-workspace");
   });
 });

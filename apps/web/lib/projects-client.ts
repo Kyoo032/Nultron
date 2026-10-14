@@ -20,13 +20,21 @@ export type ProjectRecord = {
   updatedAt: number;
 };
 
+/** A chat file, or a generated image or video the person put into the Workspace (SR-175). */
+export type ProjectFileKind = "artifact" | "image" | "video";
+
 export type ProjectFile = {
   id: string;
+  kind: ProjectFileKind;
   title: string;
   mime: string;
   sizeBytes: number;
   ownerUserId: string | null;
   updatedAt: number;
+  /** A host path a browser can show inline. Null for a chat file, which shows as a card. */
+  previewUrl: string | null;
+  /** A host path that saves the file as an attachment. */
+  downloadUrl: string;
 };
 
 export class ProjectsError extends Error {
@@ -97,14 +105,28 @@ export function parseProject(row: Row): ProjectRecord {
   };
 }
 
+function parseFileKind(value: unknown): ProjectFileKind {
+  if (value !== "artifact" && value !== "image" && value !== "video") {
+    throw malformed();
+  }
+  return value;
+}
+
+function optionalStr(row: Row, key: string): string | null {
+  return row[key] === null || row[key] === undefined ? null : str(row, key);
+}
+
 export function parseProjectFile(row: Row): ProjectFile {
   return {
     id: str(row, "id"),
+    kind: parseFileKind(row.kind),
     title: str(row, "title"),
     mime: str(row, "mime"),
     sizeBytes: num(row, "sizeBytes"),
-    ownerUserId: row.ownerUserId === null || row.ownerUserId === undefined ? null : str(row, "ownerUserId"),
+    ownerUserId: optionalStr(row, "ownerUserId"),
     updatedAt: num(row, "updatedAt"),
+    previewUrl: optionalStr(row, "previewUrl"),
+    downloadUrl: str(row, "downloadUrl"),
   };
 }
 
@@ -178,13 +200,28 @@ export async function removeProjectFile(projectId: string, artifactId: string): 
   await send("DELETE", `${projectPath(projectId)}/files/${encodeURIComponent(artifactId)}`);
 }
 
-/**
- * Downloads a file of a Workspace through the artifact route. The name is the one the host sends in
- * `Content-Disposition` (`filename*` first), so a Hindi or accented title keeps its characters.
- * The desktop shell writes the bytes through its own save dialog inside `apiFetch`.
- */
+/** Puts one of the person's own generated images or videos into the Workspace (SR-175). */
+export async function addProjectMedia(projectId: string, mediaId: string): Promise<void> {
+  await send("POST", `${projectPath(projectId)}/files`, { mediaId });
+}
+
+/** Takes a generated image or video out of the Workspace. The host decides whether the caller may. */
+export async function removeProjectMedia(projectId: string, mediaId: string): Promise<void> {
+  await send("DELETE", `${projectPath(projectId)}/media/${encodeURIComponent(mediaId)}`);
+}
+
+/** Downloads a chat file of a Workspace through the artifact route. */
 export async function downloadProjectFile(artifactId: string, fallbackName: string): Promise<void> {
-  const res = await apiFetch(`/api/v1/artifacts/${encodeURIComponent(artifactId)}/file`);
+  await downloadFile(`/api/v1/artifacts/${encodeURIComponent(artifactId)}/file`, fallbackName);
+}
+
+/**
+ * Saves a host file by its path: a Workspace file's `downloadUrl`, or the artifact route. The name is the one
+ * the host sends in `Content-Disposition` (`filename*` first), so a Hindi or accented title keeps its
+ * characters. The desktop shell writes the bytes through its own save dialog inside `apiFetch`.
+ */
+export async function downloadFile(url: string, fallbackName: string): Promise<void> {
+  const res = await apiFetch(url);
   if (!res.ok) {
     const data: unknown = await res.json().catch(() => null);
     throw errorFrom(data, res.status);

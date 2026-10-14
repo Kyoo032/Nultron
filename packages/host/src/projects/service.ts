@@ -8,12 +8,14 @@
  * - Change visibility: the maker only. An owner or admin may not flip someone else's switch.
  * - Rename and archive: the maker, or an owner or admin, but only for a project they can already see.
  * - Add a file: the file's maker, into a project the caller can see. A file the caller cannot see is a
- *   404; one they can see but did not make is a 403.
+ *   404; one they can see but did not make is a 403. A generated image or video (`media`, SR-175) follows
+ *   the same three rules.
  * - Remove a file: the file's maker, or the project's maker.
  */
 import { ApiError, canAdminister, scanInjection, type TenantContext } from "@agentforge/core";
-import type { AddFileInput, CreateProjectInput, UpdateProjectInput } from "./input";
+import type { CreateProjectInput, UpdateProjectInput } from "./input";
 import { deleteSource, type KnowledgeSource } from "../knowledge";
+import { mediaExt } from "../media";
 import {
   attachArtifactKnowledge,
   detachArtifactKnowledge,
@@ -23,7 +25,7 @@ import {
   type ProjectKnowledgeItem,
 } from "./knowledge";
 import * as store from "./store";
-import type { ProjectFileRow, ProjectRow } from "./store";
+import type { ProjectFileRow, ProjectMediaRow, ProjectRow } from "./store";
 
 /** Live projects one desk may hold. Archived ones do not count. */
 export const PROJECT_LIMIT = 200;
@@ -42,13 +44,21 @@ export type ProjectRecord = {
 
 export type ProjectThread = { id: string; title: string; createdAt: number };
 
+/** A chat file (`artifact`), or a generated image or video (`image` / `video`, SR-175). */
+export type ProjectFileKind = "artifact" | "image" | "video";
+
 export type ProjectFile = {
   id: string;
+  kind: ProjectFileKind;
   title: string;
   mime: string;
   sizeBytes: number;
   ownerUserId: string | null;
   updatedAt: number;
+  /** The URL a browser can show inline (media only; a chat file has none). */
+  previewUrl: string | null;
+  /** The URL that saves the file as an attachment. */
+  downloadUrl: string;
 };
 
 function toRecord(row: ProjectRow): ProjectRecord {
@@ -66,11 +76,34 @@ function toRecord(row: ProjectRow): ProjectRecord {
 function toFile(row: ProjectFileRow): ProjectFile {
   return {
     id: row.id,
+    kind: "artifact",
     title: row.title,
     mime: row.mime,
     sizeBytes: row.size_bytes,
     ownerUserId: row.owner_user_id,
     updatedAt: row.updated_at,
+    previewUrl: null,
+    downloadUrl: `/api/v1/artifacts/${encodeURIComponent(row.id)}/file`,
+  };
+}
+
+/**
+ * A stored image or video as a Workspace file. Its title is built from the row (kind, the first eight
+ * characters of the id and the extension), the name `GET /api/v1/media/:id/file` saves it under.
+ */
+function toMediaFile(row: ProjectMediaRow): ProjectFile {
+  const kind = row.kind === "video" ? "video" : "image";
+  const id = encodeURIComponent(row.id);
+  return {
+    id: row.id,
+    kind,
+    title: `${kind}-${row.id.slice(0, 8)}.${mediaExt(row.mime)}`,
+    mime: row.mime,
+    sizeBytes: row.size_bytes,
+    ownerUserId: row.user_id,
+    updatedAt: row.created_at,
+    previewUrl: `/api/v1/media/${id}/file`,
+    downloadUrl: `/api/v1/media/${id}/file?download=1`,
   };
 }
 
@@ -152,16 +185,19 @@ export function archiveProject(scope: TenantContext, projectId: string, now: num
   });
 }
 
+/** The Workspace's files and its generated media, newest first. Each row is filtered by its own rule too. */
 export function listProjectFiles(scope: TenantContext, projectId: string): ProjectFile[] {
   requireVisible(scope, projectId);
-  return store.listProjectFiles(scope, projectId, FILE_LIST_LIMIT).map(toFile);
+  const artifacts = store.listProjectFiles(scope, projectId, FILE_LIST_LIMIT).map(toFile);
+  const media = store.listProjectMedia(scope, projectId, FILE_LIST_LIMIT).map(toMediaFile);
+  return [...artifacts, ...media].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, FILE_LIST_LIMIT);
 }
 
 /** Put the caller's own chat file into the Workspace, and make it one of the Workspace's knowledge sources. */
-export async function addProjectFile(scope: TenantContext, projectId: string, input: AddFileInput): Promise<void> {
+export async function addProjectFile(scope: TenantContext, projectId: string, artifactId: string): Promise<void> {
   const file = store.inTransaction(() => {
     requireVisible(scope, projectId);
-    const found = store.findVisibleFile(scope, input.artifactId);
+    const found = store.findVisibleFile(scope, artifactId);
     if (!found) {
       throw fileNotFound();
     }
@@ -169,10 +205,32 @@ export async function addProjectFile(scope: TenantContext, projectId: string, in
     if (found.owner_user_id !== scope.userId) {
       throw new ApiError("not_allowed", "Only the person who made this file can add it to a project.", 403);
     }
-    store.setFileProject(scope, input.artifactId, projectId);
+    store.setFileProject(scope, artifactId, projectId);
     return found;
   });
   await attachArtifactKnowledge(scope, file.id, projectId, file.owner_user_id);
+}
+
+/**
+ * Put the caller's own generated image or video into the Workspace (SR-175). The same three rules as a chat
+ * file: a media row the caller cannot see is a 404, one they can see but did not make is a 403, and the
+ * Workspace must be one the caller can see. Only images and videos are added; audio is refused.
+ */
+export function addProjectMedia(scope: TenantContext, projectId: string, mediaId: string): void {
+  store.inTransaction(() => {
+    requireVisible(scope, projectId);
+    const found = store.findVisibleMedia(scope, mediaId);
+    if (!found) {
+      throw fileNotFound();
+    }
+    if (found.user_id !== scope.userId) {
+      throw new ApiError("not_allowed", "Only the person who made this file can add it to a project.", 403);
+    }
+    if (found.kind !== "image" && found.kind !== "video") {
+      throw new ApiError("invalid_project", "Only images and videos can be added to a Workspace.", 400);
+    }
+    store.setMediaProject(scope, mediaId, projectId);
+  });
 }
 
 export function removeProjectFile(scope: TenantContext, projectId: string, artifactId: string): void {
@@ -187,6 +245,21 @@ export function removeProjectFile(scope: TenantContext, projectId: string, artif
     }
     store.setFileProject(scope, artifactId, null);
     detachArtifactKnowledge(scope, artifactId, projectId);
+  });
+}
+
+/** Take a generated image or video out of the Workspace: its maker or the Workspace's maker may (SR-175). */
+export function removeProjectMedia(scope: TenantContext, projectId: string, mediaId: string): void {
+  store.inTransaction(() => {
+    const row = requireVisible(scope, projectId);
+    const found = store.findVisibleMedia(scope, mediaId);
+    if (!found || found.project_id !== projectId) {
+      throw fileNotFound();
+    }
+    if (found.user_id !== scope.userId && !isMaker(scope, row)) {
+      throw new ApiError("not_allowed", "Only the maker of this file or of the project can remove it.", 403);
+    }
+    store.setMediaProject(scope, mediaId, null);
   });
 }
 

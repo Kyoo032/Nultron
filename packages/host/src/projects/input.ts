@@ -19,7 +19,7 @@ export type UpdateProjectInput = {
   readonly instructions?: string;
 };
 
-export type AddFileInput = { readonly artifactId: string };
+export type AddFileInput = { readonly artifactId: string } | { readonly mediaId: string };
 
 function record(body: unknown): Record<string, unknown> {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
@@ -81,10 +81,24 @@ export function parseUpdateProject(body: unknown): UpdateProjectInput {
   return changes;
 }
 
-export function parseAddFile(body: unknown): AddFileInput {
-  const artifactId = record(body).artifactId;
-  if (typeof artifactId !== "string" || artifactId.trim().length === 0 || artifactId.length > 64) {
-    throw new ApiError("invalid_project", "artifactId must be a file id.", 400);
+/** A file id from the body: a chat file (`artifactId`) or a generated image or video (`mediaId`). */
+function fileId(value: unknown, field: string): string {
+  if (typeof value !== "string" || value.trim().length === 0 || value.length > 64) {
+    throw new ApiError("invalid_project", `${field} must be a file id.`, 400);
   }
-  return { artifactId };
+  return value;
+}
+
+/** Exactly one of `artifactId` and `mediaId`. Both, or neither, is a 400. */
+export function parseAddFile(body: unknown): AddFileInput {
+  const raw = record(body);
+  const hasArtifact = raw.artifactId !== undefined;
+  const hasMedia = raw.mediaId !== undefined;
+  if (hasArtifact === hasMedia) {
+    throw new ApiError("invalid_project", "Send exactly one of artifactId or mediaId.", 400);
+  }
+  if (hasMedia) {
+    return { mediaId: fileId(raw.mediaId, "mediaId") };
+  }
+  return { artifactId: fileId(raw.artifactId, "artifactId") };
 }

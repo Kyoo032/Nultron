@@ -3,12 +3,28 @@
 import { useState, type FormEvent } from "react";
 import { t } from "@/lib/i18n";
 import { isHostedBuild } from "@/lib/hosted-build";
-import { addProjectFile, createProject, listProjects, ProjectsError, type ProjectRecord } from "@/lib/projects-client";
+import {
+  addProjectFile,
+  addProjectMedia,
+  createProject,
+  listProjects,
+  ProjectsError,
+  type ProjectRecord,
+} from "@/lib/projects-client";
 
-type Props = {
-  /** The chat file's artifact id: the same id the Download button saves. */
-  readonly artifactId: string;
-};
+/**
+ * What goes into a Workspace: a chat file (its artifact id, the id the Download button saves), or a generated
+ * image or video (its media id, SR-175).
+ */
+export type WorkspaceTarget = { readonly artifactId: string } | { readonly mediaId: string };
+
+type Props = WorkspaceTarget;
+
+function putInWorkspace(projectId: string, target: WorkspaceTarget): Promise<void> {
+  return "mediaId" in target
+    ? addProjectMedia(projectId, target.mediaId)
+    : addProjectFile(projectId, target.artifactId);
+}
 
 function messageOf(error: unknown, fallback: string): string {
   return error instanceof ProjectsError && error.message ? error.message : fallback;
@@ -19,14 +35,14 @@ function messageOf(error: unknown, fallback: string): string {
  * the person's Workspaces, plus "New Workspace…". Hosted only: on Personal it draws nothing. The host
  * decides whether the file may be added; a refusal shows its own sentence.
  */
-export function AddToWorkspace({ artifactId }: Props) {
+export function AddToWorkspace(props: Props) {
   if (!isHostedBuild()) {
     return null;
   }
-  return <AddToWorkspaceMenu artifactId={artifactId} />;
+  return <AddToWorkspaceMenu {...props} />;
 }
 
-function AddToWorkspaceMenu({ artifactId }: Props) {
+function AddToWorkspaceMenu(target: WorkspaceTarget) {
   const [open, setOpen] = useState(false);
   const [projects, setProjects] = useState<ProjectRecord[] | null>(null);
   const [name, setName] = useState("");
@@ -50,7 +66,7 @@ function AddToWorkspaceMenu({ artifactId }: Props) {
     setBusy(true);
     setNote(null);
     try {
-      await addProjectFile(project.id, artifactId);
+      await putInWorkspace(project.id, target);
       setNote({ tone: "ok", text: t("projects.addTo.added", { name: project.name }) });
       setOpen(false);
     } catch (caught) {
@@ -72,7 +88,7 @@ function AddToWorkspaceMenu({ artifactId }: Props) {
       const project = await createProject(text);
       setName("");
       setProjects((current) => [project, ...(current ?? [])]);
-      await addProjectFile(project.id, artifactId);
+      await putInWorkspace(project.id, target);
       setNote({ tone: "ok", text: t("projects.addTo.added", { name: project.name }) });
       setOpen(false);
     } catch (caught) {
