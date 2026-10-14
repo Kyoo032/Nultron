@@ -9,7 +9,7 @@ import { virtualAgentHref, type VirtualAgentInfo } from "@/lib/virtual-agents";
 import { BuddyStage } from "@/components/buddy-stage";
 import { ChatAccountChip } from "@/components/chat-account-chip";
 import { ChatComposer } from "@/components/chat-composer";
-import { CONTINUE_PROMPT } from "@/lib/chat-continue";
+import { continuePrompt, mayOfferContinue } from "@/lib/chat-continue";
 import { FolderSurface } from "@/components/folder/folder-surface";
 import { ChatContextChip } from "@/components/chat-context-chip";
 import { ChatHeader } from "@/components/chat-header";
@@ -48,7 +48,7 @@ import {
   writeThreadChatTier,
   type ChatTierInfo,
 } from "@/lib/chat-tier-pref";
-import { t } from "@/lib/i18n";
+import { getLocale, t } from "@/lib/i18n";
 import { isPinnedToEnd } from "@/lib/stick-to-bottom";
 
 type Message = { id: string; role: string; content: unknown };
@@ -505,19 +505,20 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
         ) : null}
         {messages
           .filter((message) => message.role === "user" || messageHasDisplayableContent(message.content))
-          .map((message) => (
+          .map((message, index, shown) => (
             <ChatTurn
               key={message.id}
               role={message.role}
               content={message.content}
               continueDisabled={running}
+              // Only the newest reply may continue: an older step-limit turn was already followed up.
               onContinue={
-                agentIdReady
+                agentIdReady && mayOfferContinue(index, shown.length, message.role)
                   ? () => {
                       if (runningRef.current) {
                         return;
                       }
-                      continueSendRef.current?.(CONTINUE_PROMPT);
+                      continueSendRef.current?.(continuePrompt(getLocale()));
                     }
                   : undefined
               }

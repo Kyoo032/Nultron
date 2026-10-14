@@ -19,8 +19,8 @@ import "@/components/chat-turn-bubbles.css";
 import { ToolRowBody, isRichTool } from "@/components/tool-rows/tool-row";
 import { showsToolSpinner, toolActivityLabel, toolCallSummary } from "@/lib/tool-labels";
 import type { ContentPart, ToolCallPart } from "@agentforge/core/content";
-import { t } from "@/lib/i18n";
-import { CONTINUE_PROMPT, stepLimitToolsOf } from "@/lib/chat-continue";
+import { getLocale, t } from "@/lib/i18n";
+import { continuePrompt, stepLimitToolsOf } from "@/lib/chat-continue";
 import { SHELL_LAYOUT } from "@agentforge/core/product-modes";
 
 export type LiveTool = {
@@ -177,13 +177,13 @@ export function ChatTurn({ role, content, live, onContinue, continueDisabled = f
             ) : (
               <>
                 <MessageBody content={content} outputOnly />
-                {stepLimitTools ? (
+                {stepLimitTools && onContinue ? (
                   <button
                     type="button"
                     className="btn"
                     data-testid="chat-continue"
-                    disabled={continueDisabled || !onContinue}
-                    onClick={() => onContinue?.(CONTINUE_PROMPT)}
+                    disabled={continueDisabled}
+                    onClick={() => onContinue?.(continuePrompt(getLocale()))}
                   >
                     {t("chat.turn.continue")}
                   </button>

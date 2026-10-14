@@ -31,6 +31,7 @@ import { DEFAULT_MODEL_TIER, type ModelTierId } from "@agentforge/core/tiers";
 import { buildChatRunBody, tierErrorMessage } from "@/lib/chat-tier-body";
 import { tierStreamLimits, type ChatTierInfo } from "@/lib/chat-tier-pref";
 import { submitOnEnter } from "@/lib/composer-enter";
+import { sendSource } from "@/lib/chat-continue";
 import { getLocale, t } from "@/lib/i18n";
 import { readComposerDraft, writeComposerDraft } from "@/lib/composer-draft";
 import { startRun } from "@/lib/run-generation";
@@ -405,12 +406,12 @@ export function ChatComposer({
   }
 
   async function send(override?: string) {
-    if (needsKey) {
+    // Continue sends only its word (never the draft or the files in the box), does not wait on a document
+    // still being read, and does nothing when clicked again while its run is going.
+    const { continuing, typed, attached } = sendSource(override, text, files);
+    if (needsKey || (continuing && busy)) {
       return;
     }
-    // Continue is a text turn of its own. It does not wait on a document still being read, and it
-    // does not send the files sitting in the box.
-    const continuing = override !== undefined;
     if (!continuing && documentsHoldSend) {
       setError(t("chat.document.mustFinish"));
       return;
@@ -421,8 +422,6 @@ export function ChatComposer({
     const startedIn = sessionRef.current;
     const showing = () => sessionRef.current === startedIn;
     const isCurrentRun = startRun(runGenerationRef);
-    const typed = continuing ? override : text;
-    const attached = continuing ? [] : files;
     let runThread: string | null = null;
     // A newer turn that began first makes this tail stale: the pane is told, so it leaves that turn's
     // streaming text and tools alone and only reloads this turn's saved reply if no newer turn is live.
@@ -500,7 +499,7 @@ export function ChatComposer({
       const inlineFiles = attached.filter((item) => item.kind === "text" || item.kind === "document");
       const mediaFiles = attached.filter((item) => item.kind === "image" || item.kind === "video");
 
-      let composedText = text;
+      let composedText = typed;
       try {
         for (const held of inlineFiles) {
           const block = await inlineBlock(held);

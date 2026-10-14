@@ -131,7 +131,7 @@ describe("chat session", () => {
     // `documentsHoldSend` (2026-10-06) is a document still reading or failed: sending would drop it.
     const composer = source("components/chat-composer.tsx");
     expect(composer).toContain("const sendDisabled = busy || enhancing || sendEmpty || needsKey || documentsHoldSend;");
-    expect(composer).toContain("if (needsKey) {");
+    expect(composer).toContain("if (needsKey || (continuing && busy)) {");
   });
 });
 
