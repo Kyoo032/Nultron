@@ -24,7 +24,7 @@ const MEDIA_EXT: Record<string, string> = {
   "audio/x-wav": "wav",
 };
 
-function mediaExt(mime: string): string {
+export function mediaExt(mime: string): string {
   return MEDIA_EXT[mime] ?? mime.split("/")[1] ?? "bin";
 }
 

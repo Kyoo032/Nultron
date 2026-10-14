@@ -717,6 +717,8 @@ export const media = sqliteTable(
     sizeBytes: integer("size_bytes").notNull(),
     storagePath: text("storage_path").notNull(),
     url: text("url").notNull(),
+    /** The project it was put into (SR-175); added on open by `ensureOwnershipColumns`. NULL when in none. */
+    projectId: text("project_id"),
     createdAt: createdAt(),
   },
   (table) => [index("media_org_idx").on(table.organizationId)],
@@ -861,6 +863,10 @@ export const artifacts = sqliteTable(
     body: text("body").notNull(),
     meta: text("meta").notNull(),
     sizeBytes: integer("size_bytes").notNull().default(0),
+    /** Who made it, in server mode (SR-175). NULL on Personal and on legacy rows, which stay company-visible. */
+    ownerUserId: text("owner_user_id"),
+    /** The project it was put into (SR-175); added on open by `ensureOwnershipColumns`. NULL when in none. */
+    projectId: text("project_id"),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },

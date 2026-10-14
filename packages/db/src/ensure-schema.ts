@@ -240,6 +240,7 @@ export function ensureSchema(sqlite: Database.Database): void {
   ensureKnowledgeBackendTables(sqlite);
   ensureEditTables(sqlite);
   ensureArtifactTables(sqlite);
+  ensureOwnershipColumns(sqlite);
   ensureDatasetTables(sqlite);
   ensureMarketTables(sqlite);
   ensureAuthSessionTables(sqlite);
@@ -712,6 +713,34 @@ function ensureArtifactTables(sqlite: Database.Database): void {
   if (isServerMode()) {
     sqlite.exec("CREATE INDEX IF NOT EXISTS artifacts_ws_size_idx ON artifacts (workspace_id, size_bytes)");
   }
+}
+
+/**
+ * Ownership and project columns (SR-175, Rizky 2026-10-14): `artifacts.owner_user_id` and
+ * `artifacts.project_id`, and `media.project_id`. All nullable; a row written before them reads NULL,
+ * which the host treats as a legacy, company-visible row. Personal never writes an owner.
+ *
+ * Here, on every open, and NOT in a numbered migration: `CREATE TABLE IF NOT EXISTS` never alters an
+ * existing table, and an `ALTER TABLE ... ADD` in the journal cannot be replayed (the 0017/0018/0021
+ * suites rewind the journal and replay it; `migrate-0021.test.ts` forbids ALTER for that reason). A
+ * rebuild like 0021's would drop rows, which these tables cannot afford. Checking the columns first
+ * makes this safe to run any number of times. No foreign key on `project_id` yet: `projects` lands in
+ * F1.
+ */
+function ensureOwnershipColumns(sqlite: Database.Database): void {
+  const addMissing = (table: string, wanted: string[]) => {
+    const have = new Set(tableColumns(sqlite, table));
+    if (have.size === 0) {
+      return;
+    }
+    for (const column of wanted) {
+      if (!have.has(column)) {
+        sqlite.exec(`ALTER TABLE \`${table}\` ADD \`${column}\` text`);
+      }
+    }
+  };
+  addMissing("artifacts", ["owner_user_id", "project_id"]);
+  addMissing("media", ["project_id"]);
 }
 
 function tableColumns(sqlite: Database.Database, table: string): string[] {

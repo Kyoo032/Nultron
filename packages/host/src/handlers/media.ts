@@ -4,8 +4,16 @@ import type { HostRequest, HostResult } from "../types";
 import { jsonError, jsonOk } from "../errors";
 import { getTenant } from "../tenant";
 import { log } from "../log";
-import { saveMedia } from "../media";
+import { mediaExt, saveMedia } from "../media";
 import { readTenantObjectRange, removeTenantObject } from "../tenant-storage";
+
+/**
+ * The name a saved media file gets: its kind, the first eight characters of its id and the extension
+ * the mime implies. Built from the row, never from the request, so it is always plain ASCII.
+ */
+export function mediaFilename(kind: string, id: string, mime: string): string {
+  return `${kind}-${id.slice(0, 8)}.${mediaExt(mime)}`;
+}
 
 export async function handlePostMedia(request: HostRequest): Promise<HostResult> {
   try {
@@ -38,12 +46,16 @@ export async function handleGetMediaFile(request: HostRequest): Promise<HostResu
     // Phase 6: served through the object store, so a hosted deployment reads the bucket and a desk
     // reads the file — with the same tenant check in front of both, before any IO.
     const ranged = await readTenantObjectRange(tenant.tenantId, item.storagePath, request.headers.range);
+    // `?download=1` asks for a save-to-disk (SR-175 F0): the adapter turns a filename into
+    // `Content-Disposition: attachment`. Without the flag the response is what it was: inline.
+    const download = request.query.download === "1" || request.query.download === "true";
     return {
       type: "bytes",
       status: ranged.status,
       bytes: ranged.bytes,
       contentType: item.mime,
       headers: ranged.headers,
+      ...(download ? { filename: mediaFilename(item.kind, item.id, item.mime) } : {}),
     };
   } catch (error) {
     return jsonError(error);
