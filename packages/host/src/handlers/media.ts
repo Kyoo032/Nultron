@@ -107,7 +107,7 @@ export async function handleDeleteMedia(request: HostRequest): Promise<HostResul
       .where(and(eq(media.organizationId, tenant.organizationId), eq(media.id, mediaId)))
       .limit(1);
     const item = rows[0];
-    if (!item || !mayDeleteFile(tenant, item.userId)) {
+    if (!item || !mayDeleteFile(tenant, { makerUserId: item.userId, projectId: item.projectId ?? null })) {
       // Already gone, never this tenant's, or not the caller's to delete. The same answer for all three, on purpose.
       return jsonOk({ ok: true, deleted: false, id: mediaId });
     }

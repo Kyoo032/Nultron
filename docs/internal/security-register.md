@@ -212,6 +212,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-175](#sr-175) | Medium | Hosted: a file one person generates on their own (artifacts, media, desk files outside their private folder) is listed and downloadable by every member of the company | Mostly fixed in the tester (2026-10-14: artifacts `bbe9308c`, workspace sharing `62eae740`, Knowledge work cards `a178b9bc`, media file route and chat media reads `fbe5994b`, galleries, storage list, Edit stills and job pictures `6374c386`); Edit projects and desk files still company-visible; not driven hosted; `main` still open | Before a second person of one company uses the hosted app for their own work |
 | [SR-176](#sr-176) | High | Hosted: any member of a company can delete any other member's generated media and artifacts | Fixed in the tester (`6374c386`): only the maker or a company owner or admin deletes; not driven hosted; `main` still open | Before a second person of one company uses the hosted app for their own work |
 | [SR-178](#sr-178) | Medium | Hosted (tester): a Workspace switched to "workspace" is readable by the whole company, not only its members (K-D22) | Fixed in the tester at `c062f4b7`, not driven hosted | Before HYP AI imports from the tester, and before promotion to `main` (a hosted drive is still owed) |
+| [SR-179](#sr-179) | Medium | Hosted (tester): a member removed from a Workspace keeps reading, listing and deleting the files and media they put into it | Fixed in the tester (2026-10-14), not driven hosted | Before HYP AI imports from the tester, and before promotion to `main` |
 | [SR-177](#sr-177) | Low | The new deploy preflight, run in a throwaway container when the server has no node, received the real `AGENTFORGE_SECRETS_KEY` | Fixed before merge (branch `chore/agent-guardrails`, 2026-10-14): the container gets the word `set` or nothing | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
@@ -6062,6 +6063,26 @@ Status: **fixed in the tester at `c062f4b7`, not driven hosted.** What the fix i
 - Test: `packages/host/src/projects-members.test.ts`, four people as above, through the real router; C and D get 404 on every route, equal to an unknown id. A mutation that makes the fragment true for anyone fails it.
 
 Gate: before HYP AI imports from the tester, and before the tester is promoted to `main`. A hosted drive of the four-person case is still owed.
+
+### SR-179 {#sr-179}
+
+**Hosted: a member removed from a Workspace keeps reading, listing and deleting the files and media they put into it.**
+Tester only. Raised 2026-10-14, after SR-178's fix. Medium.
+
+Evidence: the read rule let a maker through on `owner_user_id = ?` (artifacts) and `user_id = ?` (media) whatever the row's `project_id`, and putting a file into a Workspace keeps its maker (`projects/store.ts` `setFileProject`, `setMediaProject`). So after an owner removed D, D still opened, listed and downloaded every file D had put in, and `mayDeleteFile` still let D delete them for everyone. What goes wrong if ignored: a person taken out of a Workspace, often on leaving a team, keeps the Workspace's documents they contributed and can destroy them.
+
+Decision (default for this lane, Rizky may reverse it): **a file in a Workspace belongs to the Workspace.** Its maker reads it only while a member. Taken back out of the Workspace, it is the maker's private file again. **A second default:** archiving a Workspace (W1's delete) hands each file back to its maker, so a file never ends up readable by nobody while it still counts against storage. Knowledge sources already had the first shape (`knowledge-visibility.ts:103`, `owned` requires `project_id IS NULL`) and keep theirs: a Workspace's knowledge of an archived Workspace stays hidden.
+
+Status: **fixed in the tester, not driven hosted.**
+- Two fragments in `packages/host/src/projects/membership-sql.ts`: `heldByNoLiveProjectSql` (`:19`, no live Workspace holds the row) and `lockedOutOfLiveProjectSql` (`:27`, a live Workspace holds it and the person is not a member), plus `isLockedOutOfProject` (`:32`) for a row already loaded.
+- Artifacts: the maker term is `OWN_ARTIFACT_SQL` (`artifacts.ts:89`, used at `:103`). Delete passes the row's project (`artifacts.ts:213`).
+- Media: the raw clause (`media-visibility.ts:76`) and its drizzle twin `ownMediaSql` (`:48`) both add the same condition, so the file route, the galleries, Edit's stills and job pictures all follow it. `mayDeleteFile` takes the file's project and refuses a locked-out maker (`:135`); its callers are `artifacts.ts:213` and `handlers/media.ts:110`. Company owner and admin keep delete as SR-176 has it.
+- The meeting delete path (`meeting/artifacts.ts:79`) has the same lock-out.
+- Tests: `packages/host/src/projects-members.test.ts:415`, three cases through the real router. A removed maker gets 404 on `GET /api/v1/artifacts/:id`, its `/file` and `/api/v1/media/:id/file`, finds neither in `GET /api/v1/artifacts` nor in the image gallery, and is refused delete, while the Workspace owner reads all of it. A maker who takes a file out first keeps it after removal. An archived Workspace hands the files back. Run against the old rules, two of the three fail. `projects-media-companies.test.ts:279` pinned the old "keeps her own" and is changed to the new rule.
+
+Not covered: the storage list (`handlers/storage.ts:54`) still shows a member the size and id of every media row they made, with no link, inside a Workspace or not. It opens nothing, so it is left as it is.
+
+Gate: before HYP AI imports from the tester, and before the tester is promoted to `main`. A hosted drive is still owed.
 
 ## Must be true before the Tencent Cloud deploy
 

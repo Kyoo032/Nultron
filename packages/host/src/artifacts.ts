@@ -15,7 +15,7 @@ import {
   type ArtifactSummary,
 } from "@agentforge/core/artifacts";
 import { mayDeleteFile } from "./media-visibility";
-import { memberOfLiveProjectSql } from "./projects/membership-sql";
+import { heldByNoLiveProjectSql, memberOfLiveProjectSql } from "./projects/membership-sql";
 
 /** Hard cap on a single artifact body (dossiers, analyses, briefs are text). */
 export const ARTIFACT_BODY_MAX_BYTES = 4 * 1024 * 1024;
@@ -85,18 +85,22 @@ export const SHARED_ARTIFACT_SQL = memberOfLiveProjectSql(
   "p.id = artifacts.project_id AND p.workspace_id = artifacts.workspace_id",
 );
 
+/** A file its maker may read as their own: no live Workspace holds it (SR-179). One `?`: the reader. */
+const OWN_ARTIFACT_SQL = `(owner_user_id = ? AND ${heldByNoLiveProjectSql("artifacts.project_id")})`;
+
 /**
- * Who may see a row, on the hosted app (SR-175, SR-178). A file a person makes on their own is theirs; a
- * file in a Workspace is its members' (`SHARED_ARTIFACT_SQL`); a legacy row with no owner and no Workspace
- * stays company-visible, as it was made. Desktop and webdev write no owner, and have one person per desk,
- * so they add no clause at all and their SQL is what it was before.
+ * Who may see a row, on the hosted app (SR-175, SR-178, SR-179). A file a person makes on their own is theirs;
+ * a file in a live Workspace belongs to the Workspace and is its members' (`SHARED_ARTIFACT_SQL`), its maker
+ * included only while a member; taken back out, or once its Workspace is archived, it is the maker's own again.
+ * A legacy row with no owner and no Workspace stays company-visible, as it was made. Desktop and webdev write
+ * no owner, and have one person per desk, so they add no clause at all and their SQL is what it was before.
  */
 export function visibleTo(tenant: TenantContext): { clause: string; args: string[] } {
   if (!isServerMode()) {
     return { clause: "", args: [] };
   }
   return {
-    clause: ` AND ((owner_user_id IS NULL AND project_id IS NULL) OR owner_user_id = ? OR ${SHARED_ARTIFACT_SQL})`,
+    clause: ` AND ((owner_user_id IS NULL AND project_id IS NULL) OR ${OWN_ARTIFACT_SQL} OR ${SHARED_ARTIFACT_SQL})`,
     args: [tenant.userId, tenant.userId],
   };
 }
@@ -199,13 +203,14 @@ export function createArtifactStore(db: Database.Database, keyProvider: () => Bu
     },
 
     remove(tenant, id) {
-      // SR-176: only the maker, or a company owner or admin, deletes a file. The row is looked up without the
-      // read rule, because an admin may delete a file they may never open. Anyone else gets `false`, the same
-      // answer as a missing id, whether or not they can read the file; the route answers 404 for it.
+      // SR-176: only the maker, or a company owner or admin, deletes a file (and SR-179: the maker of a file in a
+      // live Workspace only while a member). The row is looked up without the read rule, because an admin may
+      // delete a file they may never open. Anyone else gets `false`, the same answer as a missing id, whether or
+      // not they can read the file; the route answers 404 for it.
       const row = db
-        .prepare("SELECT owner_user_id FROM artifacts WHERE workspace_id = ? AND id = ?")
-        .get(tenant.workspaceId, id) as { owner_user_id: string | null } | undefined;
-      if (!row || !mayDeleteFile(tenant, row.owner_user_id)) {
+        .prepare("SELECT owner_user_id, project_id FROM artifacts WHERE workspace_id = ? AND id = ?")
+        .get(tenant.workspaceId, id) as { owner_user_id: string | null; project_id: string | null } | undefined;
+      if (!row || !mayDeleteFile(tenant, { makerUserId: row.owner_user_id, projectId: row.project_id })) {
         return false;
       }
       const result = db.prepare("DELETE FROM artifacts WHERE workspace_id = ? AND id = ?").run(tenant.workspaceId, id);

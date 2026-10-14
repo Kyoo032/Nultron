@@ -2,8 +2,9 @@
  * Who may read or delete a generated file on the hosted app (SR-175, SR-176; team-board-spec.md sections 2b and 11).
  *
  * A person's own generated media is theirs. A row joins a Workspace (`media.project_id`, set by
- * `projects/service.ts`), and that Workspace's members may read it (K-D22), nobody else in the company. The
- * rule is one SQL clause and one JavaScript twin, the same shape as `visibleTo` for artifacts (`artifacts.ts`).
+ * `projects/service.ts`), and then it belongs to the Workspace: its members may read it (K-D22), nobody else in the
+ * company, and its maker only while a member (SR-179). Taken back out, or once the Workspace is archived, it is the
+ * maker's own again. The rule is one SQL clause and one JavaScript twin, the same shape as `visibleTo` for artifacts (`artifacts.ts`).
  *
  * Two readers, on purpose:
  * - `desk`: every row of the organization, as before. Nothing reads this way on the hosted app after W1c; it
@@ -11,7 +12,8 @@
  * - `person`: the rule above. Every read on the hosted app uses it: the file route, the studio galleries, the
  *   storage list, Edit's stills and outputs, and a job mode's inlined pictures.
  *
- * Deleting is a separate rule (`mayDeleteFile`): the maker, or a company owner or admin, and nobody else.
+ * Deleting is a separate rule (`mayDeleteFile`): the maker (only while a member, for a file in a live Workspace),
+ * or a company owner or admin, and nobody else.
  *
  * Off server mode every reader here answers as the desk reader does, and the delete rule allows every delete, so
  * Personal's SQL is what it was.
@@ -20,7 +22,7 @@ import { and, eq, or, sql, type SQL } from "drizzle-orm";
 import { db, media } from "@agentforge/db";
 import { canAdminister, isServerMode, type TenantContext } from "@agentforge/core";
 import { readTenantObject } from "./tenant-storage";
-import { memberOfLiveProjectSql } from "./projects/membership-sql";
+import { heldByNoLiveProjectSql, isLockedOutOfProject, memberOfLiveProjectSql } from "./projects/membership-sql";
 
 export type MediaReach = "desk" | "person";
 
@@ -42,6 +44,14 @@ function sharedMediaSql(viewer: MediaReachViewer): SQL {
   return sql`EXISTS (SELECT 1 FROM projects p JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ${viewer.userId} WHERE p.archived_at IS NULL AND p.id = ${media.projectId} AND p.organization_id = ${media.organizationId} AND p.workspace_id = ${viewer.workspaceId})`;
 }
 
+/** The maker's own row that no live Workspace holds (SR-179). The drizzle twin of `heldByNoLiveProjectSql`. */
+function ownMediaSql(viewer: MediaReachViewer): SQL | undefined {
+  return and(
+    eq(media.userId, viewer.userId),
+    sql`NOT EXISTS (SELECT 1 FROM projects lp WHERE lp.id = ${media.projectId} AND lp.archived_at IS NULL)`,
+  );
+}
+
 /**
  * The drizzle condition `reach` adds to a query on `media`, or undefined when it adds none. The `person` answer
  * is the maker's own row or a row in a Workspace of the caller's desk they are a member of. Undefined off server mode and for
@@ -51,7 +61,7 @@ export function mediaReachWhere(viewer: MediaReachViewer, reach: MediaReach): SQ
   if (reach === "desk" || !isServerMode()) {
     return undefined;
   }
-  return or(eq(media.userId, viewer.userId), sharedMediaSql(viewer));
+  return or(ownMediaSql(viewer), sharedMediaSql(viewer));
 }
 
 /**
@@ -63,7 +73,7 @@ export function mediaVisibleClause(tenant: TenantContext): { clause: string; arg
     return { clause: "", args: [] };
   }
   return {
-    clause: ` AND (user_id = ? OR ${memberOfLiveProjectSql(MEDIA_PROJECT_WHERE)})`,
+    clause: ` AND ((user_id = ? AND ${heldByNoLiveProjectSql("media.project_id")}) OR ${memberOfLiveProjectSql(MEDIA_PROJECT_WHERE)})`,
     args: [tenant.userId, tenant.userId, tenant.workspaceId],
   };
 }
@@ -113,7 +123,8 @@ export async function readVisibleMediaDataUrl(tenant: TenantContext, mediaId: st
 }
 
 /**
- * Who may delete a generated file, an image or video or a document or deck alike (SR-176). The maker may. So may a
+ * Who may delete a generated file, an image or video or a document or deck alike (SR-176). The maker may, unless a
+ * live Workspace holds the file and the maker is no longer one of its members (SR-179). So may a
  * company owner or admin, who may delete a person's file and may never read it (the leaver rule, 2026-10-06). A
  * legacy file with no maker is the company's, so only an owner or admin deletes it. Off server mode the desk has one
  * person, so the rule allows every delete, as it always did.
@@ -121,12 +132,20 @@ export async function readVisibleMediaDataUrl(tenant: TenantContext, mediaId: st
  * Callers answer a refusal exactly like a missing id: a delete that this returns false for must look the same as one
  * for a file that is not there.
  */
-export function mayDeleteFile(viewer: Pick<TenantContext, "role" | "userId">, makerUserId: string | null): boolean {
+export function mayDeleteFile(
+  viewer: Pick<TenantContext, "role" | "userId">,
+  file: { readonly makerUserId: string | null; readonly projectId: string | null },
+): boolean {
   if (!isServerMode()) {
     return true;
   }
   if (canAdminister(viewer.role)) {
     return true;
   }
-  return makerUserId !== null && makerUserId === viewer.userId;
+  // SR-179: a file in a live Workspace is the Workspace's; a maker removed from it may not delete it.
+  return (
+    file.makerUserId !== null &&
+    file.makerUserId === viewer.userId &&
+    !isLockedOutOfProject(viewer.userId, file.projectId)
+  );
 }

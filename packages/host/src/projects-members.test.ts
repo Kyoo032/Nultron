@@ -329,9 +329,9 @@ describe("a Workspace is shared with its members only: four people, two companie
     ).toEqual(FORBIDDEN);
     // A non-member (C), another company's person (D) and an unknown id: 404, and nothing changes.
     for (const userId of ["cara", "dan", "nobody"]) {
-      expect(
-        await outcome(await call(alice, "POST", "/api/v1/projects/:id/owner", { id: room }, { userId })),
-      ).toEqual(NOT_FOUND);
+      expect(await outcome(await call(alice, "POST", "/api/v1/projects/:id/owner", { id: room }, { userId }))).toEqual(
+        NOT_FOUND,
+      );
       expect(await outcome(await setRole(alice, room, userId, "admin"))).toEqual(NOT_FOUND);
     }
     expect(await members(alice, room)).toEqual([
@@ -410,6 +410,101 @@ describe("a Workspace is shared with its members only: four people, two companie
     expect(
       await outcome(await call(cara, "POST", "/api/v1/projects/:id/agents", { id: room }, { agentId: "research" })),
     ).toEqual(NOT_FOUND);
+  });
+
+  describe("a file in a Workspace belongs to the Workspace: its maker reads and deletes it only while a member (SR-179)", () => {
+    async function bensFiles(room: string): Promise<{ docId: string; picId: string }> {
+      const { artifactStore } = await import("./artifacts");
+      const docId = artifactStore().create(ben.tenant, {
+        mode: "documents",
+        kind: "draft",
+        title: "ben-plan",
+        mime: "text/markdown",
+        body: "# Ben's plan\n\nThree steps.",
+        meta: {},
+      }).id;
+      const { saveMedia } = await import("./media");
+      const picId = (await saveMedia(ben.tenant, new File([PNG], "ben.png", { type: "image/png" }))).id;
+      for (const body of [{ artifactId: docId }, { mediaId: picId }]) {
+        expect(await outcome(await call(ben, "POST", "/api/v1/projects/:id/files", { id: room }, body))).toEqual(OK);
+      }
+      return { docId, picId };
+    }
+
+    async function reads(person: Person, docId: string, picId: string) {
+      const { listMediaByKind } = await import("./media");
+      const listed = jsonBody<{ items: Array<{ id: string }> }>(await call(person, "GET", "/api/v1/artifacts")).items;
+      return {
+        doc: (await call(person, "GET", "/api/v1/artifacts/:artifactId", { artifactId: docId })).status,
+        docFile: (await call(person, "GET", "/api/v1/artifacts/:artifactId/file", { artifactId: docId })).status,
+        docListed: listed.some((item) => item.id === docId),
+        picFile: (await call(person, "GET", "/api/v1/media/:mediaId/file", { mediaId: picId })).status,
+        picListed: (await listMediaByKind(person.tenant, "image")).some((row) => row.id === picId),
+      };
+    }
+
+    const READS = { doc: 200, docFile: 200, docListed: true, picFile: 200, picListed: true };
+    const HIDDEN = { doc: 404, docFile: 404, docListed: false, picFile: 404, picListed: false };
+
+    it("a removed maker reads, lists and deletes none of it; the owner still reads all of it", async () => {
+      const room = await makeProject(alice, "Removal room");
+      expect(await outcome(await invite(alice, room, "ben"))).toEqual(CREATED);
+      const { docId, picId } = await bensFiles(room);
+      expect(await reads(ben, docId, picId)).toEqual(READS);
+
+      expect(await outcome(await removeMember(alice, room, "ben"))).toEqual(OK);
+      expect(await reads(ben, docId, picId)).toEqual(HIDDEN);
+      expect(await outcome(await call(ben, "DELETE", "/api/v1/artifacts/:artifactId", { artifactId: docId }))).toEqual(
+        NOT_FOUND,
+      );
+      expect(
+        jsonBody<{ deleted: boolean }>(await call(ben, "DELETE", "/api/v1/media/:mediaId", { mediaId: picId })).deleted,
+      ).toBe(false);
+
+      expect(await reads(alice, docId, picId)).toEqual(READS);
+      const files = jsonBody<{ items: Array<{ id: string }> }>(
+        await call(alice, "GET", "/api/v1/projects/:id/files", { id: room }),
+      ).items.map((item) => item.id);
+      expect(files.sort()).toEqual([docId, picId].sort());
+    });
+
+    it("a maker still in the Workspace takes a file out and it is theirs alone again", async () => {
+      const room = await makeProject(alice, "Take-out room");
+      expect(await outcome(await invite(alice, room, "ben"))).toEqual(CREATED);
+      const { docId, picId } = await bensFiles(room);
+      expect(await reads(alice, docId, picId)).toEqual(READS);
+
+      expect(
+        await outcome(
+          await call(ben, "DELETE", "/api/v1/projects/:id/files/:artifactId", { id: room, artifactId: docId }),
+        ),
+      ).toEqual(OK);
+      expect(
+        await outcome(await call(ben, "DELETE", "/api/v1/projects/:id/media/:mediaId", { id: room, mediaId: picId })),
+      ).toEqual(OK);
+      expect(await outcome(await removeMember(alice, room, "ben"))).toEqual(OK);
+
+      expect(await reads(ben, docId, picId)).toEqual(READS);
+      expect(await reads(alice, docId, picId)).toEqual(HIDDEN);
+    });
+
+    it("default: archiving a Workspace hands each file back to its maker", async () => {
+      const room = await makeProject(alice, "Archive room");
+      expect(await outcome(await invite(alice, room, "ben"))).toEqual(CREATED);
+      const { docId, picId } = await bensFiles(room);
+      expect(await outcome(await removeMember(alice, room, "ben"))).toEqual(OK);
+      expect(await reads(ben, docId, picId)).toEqual(HIDDEN);
+
+      expect(await outcome(await call(alice, "POST", "/api/v1/projects/:id/archive", { id: room }))).toEqual(OK);
+      expect(await reads(ben, docId, picId)).toEqual(READS);
+      expect(await reads(alice, docId, picId)).toEqual(HIDDEN);
+      expect(
+        jsonBody<{ deleted: boolean }>(await call(ben, "DELETE", "/api/v1/media/:mediaId", { mediaId: picId })).deleted,
+      ).toBe(true);
+      expect(await outcome(await call(ben, "DELETE", "/api/v1/artifacts/:artifactId", { artifactId: docId }))).toEqual(
+        OK,
+      );
+    });
   });
 
   it("a removed member's run stops reading the Workspace at once", async () => {

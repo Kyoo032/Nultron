@@ -276,7 +276,7 @@ describe("generated media in a Workspace: two companies, real sessions", () => {
     expect(await readMedia(bob, annImage)).toMatchObject({ status: 404 });
   });
 
-  it("a removed member loses the Workspace's media and keeps her own; the members still read hers", async () => {
+  it("a removed member loses the Workspace's media, her own in it too (SR-179); the members still read hers", async () => {
     const project = await makeProject(alice, "Leave media Workspace");
     await shareWithColleagues(alice, project);
     const annImage = await makeImage(ann, "leave-ann-image");
@@ -291,7 +291,7 @@ describe("generated media in a Workspace: two companies, real sessions", () => {
       ),
     ).toEqual({ status: 200 });
     expect(await outcome(await readMedia(ann, aliceImage))).toEqual(NOT_FOUND);
-    expect((await readMedia(ann, annImage)).status).toBe(200);
+    expect(await outcome(await readMedia(ann, annImage))).toEqual(NOT_FOUND);
     expect((await readMedia(alice, annImage)).status).toBe(200);
     expect(await outcome(await readMedia(bob, annImage))).toEqual(NOT_FOUND);
   });

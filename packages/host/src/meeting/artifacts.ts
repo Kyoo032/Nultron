@@ -15,6 +15,7 @@ import { sql } from "@agentforge/db";
 import { isServerMode, type TenantContext } from "@agentforge/core";
 import { artifactIdsOwnedBy, sweepOrphanSources } from "../knowledge";
 import { log } from "../log";
+import { lockedOutOfLiveProjectSql } from "../projects/membership-sql";
 import type { MeetingRecord } from "./records";
 
 /** Every artifact id this meeting owns on this desk: the ids on the record plus the stamped ones. */
@@ -71,13 +72,19 @@ export function removeMeetingArtifactsById(tenant: TenantContext, ids: readonly 
  */
 function meetingArtifactDelete(tenant: TenantContext): (id: string) => number {
   const hosted = isServerMode();
+  // SR-179: a transcript or minutes the maker put into a live Workspace they were removed from stays the Workspace's.
   const statement = sql.prepare(
     `DELETE FROM artifacts WHERE workspace_id = ? AND mode = 'meeting' AND id = ?${
-      hosted ? " AND (owner_user_id IS NULL OR owner_user_id = ?)" : ""
+      hosted
+        ? ` AND (owner_user_id IS NULL OR (owner_user_id = ? AND NOT ${lockedOutOfLiveProjectSql("artifacts.project_id")}))`
+        : ""
     }`,
   );
   return (id) =>
-    (hosted ? statement.run(tenant.workspaceId, id, tenant.userId) : statement.run(tenant.workspaceId, id)).changes;
+    (hosted
+      ? statement.run(tenant.workspaceId, id, tenant.userId, tenant.userId)
+      : statement.run(tenant.workspaceId, id)
+    ).changes;
 }
 
 /**
