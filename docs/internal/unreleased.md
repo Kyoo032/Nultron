@@ -54,6 +54,20 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Workspaces are shared with their members only; Owner, admin and member roles; agents brought in, 2026-10-14 (tester, `tester/chat-first` at `c062f4b7`; K-D22, K-D23, SR-178; not driven hosted)
+
+Lanes: enterprise, hyp-ai, tester
+
+- **What changed.** A Workspace (a `projects` row) is read only by its members. Two tables join the healer (`project_members`, `project_agents`), and the one read fragment `memberOfLiveProjectSql` replaces the `visibility = 'workspace'` checks in artifacts, media, knowledge and the project list. Roles and routes are in [`maps/knowledge-flows.md`](maps/knowledge-flows.md) § 8. Server mode only; Personal writes no `project_id` and reads as before (`projects-personal.test.ts`, `projects-workspace-personal.test.ts`).
+- **Behaviour changes to know about.**
+  - Existing Workspaces get their maker as owner and nobody else, including those switched to `workspace` before this change. They fail closed; their owners invite people again.
+  - The renderer's private/workspace switch is now dead: `PATCH /api/v1/projects/:id` with `visibility` answers 400 `invalid_project`. The renderer was not touched; replacing the switch with a members panel is owed.
+  - Instructions and rename are owner or admin only (W1 allowed any member to edit instructions). A member may leave a Workspace; the owner may not (transfer first).
+  - A job with no recorded requester now reads no Workspace media: there is no person to be a member.
+  - A company owner or admin who is not a member gets 404. The admin-only listing of every Workspace was not built.
+  - Bringing an agent brings its harness only, not its knowledge. The leaver rule (what happens to a removed member's files) is not built.
+- **Proof.** `packages/host/src/projects-members.test.ts` (four people: A owns, B is a member, C is in A's company and not a member, D is in another company; C and D get 404 everywhere), `packages/db/src/projects-schema.test.ts` (backfill, one owner, cascade), the updated Workspace suites and seven new rows in `tenancy-harness.test.ts`. Not driven on a hosted server.
+
 ## Agent guardrails: where a change goes, a push guard, release refusals and a deploy gate, 2026-10-14 (branch `chore/agent-guardrails`; lanes: Enterprise, HYP AI, tester)
 
 - **Why.** Rizky, 2026-10-14: a misconfigured update must not take the app offline, and every change has to reach the right code. `main`'s AGENTS.md opened with the tester banner (carried over by the 2026-10-12 promotion), so an agent on `main` was told it was in the tester.
