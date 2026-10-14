@@ -38,6 +38,7 @@
     "./artifacts": "./src/artifacts/index.ts",
     "./tools/files": "./src/tools/files/index.ts",
     "./tools/code": "./src/tools/code/index.ts",
+    "./tools/media-reference": "./src/tools/media-reference.ts",
     "./jobs": "./src/jobs/index.ts",
     "./finance": "./src/finance/index.ts",
     "./market": "./src/market/index.ts",

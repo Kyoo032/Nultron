@@ -39,6 +39,7 @@ import { recordCites } from "./knowledge-graph";
 import { recordRetrievals, recordsRetrievals } from "./knowledge-retrievals";
 import { ingestWorkSource } from "./knowledge-ingest";
 import { chatWorkCard } from "./work-cards";
+import { withChatMediaReferences } from "./chat-media-resolver";
 import {
   finishRun,
   getThread,
@@ -401,7 +402,7 @@ export async function* startModalityRun(options: {
       // Images leave as bytes, within one budget, or the person is told why they cannot. A stored
       // `/api/v1/media/...` reference is never handed on: no remote model can open it.
       const history = await prepareChatImageHistory(options.tenant, storedHistory, { model, locale });
-      const runtime = createRuntime(settings);
+      const runtime = withChatMediaReferences(createRuntime(settings));
       send({ type: "run.started", runId: run.id });
 
       // Model fallback, as jobs have it (`job-model-fallback.ts`): when the model this turn was given cannot
