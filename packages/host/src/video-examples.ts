@@ -126,8 +126,11 @@ export function listVideoExamples(): VideoExampleItem[] {
   return items;
 }
 
-/** Bytes of one bundled clip, or null when the name is not in the manifest or the file is unusable. */
-export async function readVideoExample(name: string): Promise<Uint8Array | null> {
+/**
+ * Where one bundled clip sits on disk, or null when the name is not in the manifest or the file is
+ * unusable. The range-aware handler reads from this path; `readVideoExample` reads it whole.
+ */
+export function videoExamplePath(name: string): string | null {
   if (!videoExampleByFile(name)) {
     return null;
   }
@@ -135,6 +138,15 @@ export async function readVideoExample(name: string): Promise<Uint8Array | null>
   if (!dir || videoExampleFileProblem(dir, name) !== null) {
     return null;
   }
-  const bytes = await readFile(path.join(dir, name));
+  return path.join(dir, name);
+}
+
+/** Bytes of one bundled clip, or null when the name is not in the manifest or the file is unusable. */
+export async function readVideoExample(name: string): Promise<Uint8Array | null> {
+  const file = videoExamplePath(name);
+  if (!file) {
+    return null;
+  }
+  const bytes = await readFile(file);
   return new Uint8Array(bytes);
 }

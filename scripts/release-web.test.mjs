@@ -1,5 +1,5 @@
 /**
- * Tests for scripts/release-web.mjs, the Enterprise release to Kyoo032/NultronEnt.
+ * Tests for scripts/release-web.mjs, the Enterprise release to Kyoo032/Nultron.
  *
  * Node's own runner, like scripts/review-proxy.test.mjs: repo tooling outside every workspace
  * package, so no vitest config collects it. `node --test "scripts/*.test.mjs"` runs it.
@@ -7,13 +7,23 @@
  * Nothing here calls gh, docker or the network. Every release-web case drives `main` against a temp
  * repo root, a fake git (which "clones" by making a directory), and recording docker / tar / gh stubs.
  * The desktop cases at the end run apps/desktop/scripts/release-desktop.mjs --dry-run in a child
- * process against a temp dist/; the only real command that reaches is `git status` on this repo.
+ * process, against a temp dist/. That script refuses off main, so the child is a copy in a temp repo on main
+ * (desktopReleaseFixture): the same code, not this checkout's branch. Its git calls run in that temp repo only.
  */
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { after, test } from "node:test";
@@ -68,7 +78,8 @@ const READ_ONLY_GIT = new Set(["status", "rev-parse", "show", "cat-file", "ls-tr
 /** The company sites' files at the released sha, as the fake git serves them (the real ones are read further down). */
 const FAKE_SITE_FILES = {
   "webapp-deploy/sites/enable-sites.sh": '#!/bin/sh\n# switch\nexec "$@"\n',
-  "webapp-deploy/sites/dpscloud.caddy": '# a comment that cites a source path: packages/host/x.ts\n{$DPS_DOMAIN} {\n\trespond "dps"\n}\n',
+  "webapp-deploy/sites/dpscloud.caddy":
+    '# a comment that cites a source path: packages/host/x.ts\n{$DPS_DOMAIN} {\n\trespond "dps"\n}\n',
   "webapp-deploy/sites/tokotoken.caddy": '{$TOKOTOKEN_DOMAIN} {\n\trespond "toko"\n}\n',
   "webapp-deploy/sites/dpscloud/index.html": "<!doctype html><title>DPS Cloud</title>\n",
   "webapp-deploy/sites/tokotoken/index.html": "<!doctype html><title>Toko Token</title>\n",
@@ -135,7 +146,10 @@ function subcommand(args) {
 /** Every file in the clone except .git, by path relative to it (forward slashes), nested folders included. */
 function snapshot(dir) {
   const files = readdirSync(dir, { recursive: true, withFileTypes: true }).filter((entry) => entry.isFile());
-  const relative = (entry) => join(entry.parentPath ?? entry.path, entry.name).slice(dir.length + 1).replaceAll("\\", "/");
+  const relative = (entry) =>
+    join(entry.parentPath ?? entry.path, entry.name)
+      .slice(dir.length + 1)
+      .replaceAll("\\", "/");
   return Object.fromEntries(
     files
       .map((entry) => relative(entry))
@@ -146,17 +160,28 @@ function snapshot(dir) {
 
 /**
  * A fake git. Every call lands in `calls` with its cwd. `clone` makes the target directory with a
- * README, as NultronEnt's main has; `commit` snapshots the files in the clone at that moment.
+ * README, as Nultron's main has; `commit` snapshots the files in the clone at that moment.
  */
-function fakeGit({ dirty = false, known = [FULL_SHA], calls = [], commits = [], cloneReadme = README, missingAtSha = [], siteFiles = FAKE_SITE_FILES } = {}) {
+function fakeGit({
+  dirty = false,
+  known = [FULL_SHA],
+  calls = [],
+  commits = [],
+  cloneReadme = README,
+  missingAtSha = [],
+  siteFiles = FAKE_SITE_FILES,
+  branch = "main",
+} = {}) {
   const handlers = {
     // `git cat-file -e <sha>:<path>`: does the released commit carry this file?
     "cat-file": (args) => ({ status: missingAtSha.some((path) => args.at(-1).endsWith(`:${path}`)) ? 128 : 0 }),
     status: (_args, cwd) => {
-      if (cwd.endsWith("NultronEnt")) return { status: 0, stdout: "A  compose.yml\n" };
+      if (cwd.endsWith("Nultron")) return { status: 0, stdout: "A  compose.yml\n" };
       return { status: 0, stdout: dirty ? " M AGENTS.md\n" : "" };
     },
     "rev-parse": (args) => {
+      // `git rev-parse --abbrev-ref HEAD`: the checkout's branch, which a release must find on main.
+      if (args.includes("--abbrev-ref")) return { status: 0, stdout: `${branch}\n` };
       const wanted = args.at(-1).replace("^{commit}", "");
       const hit = known.find((sha) => sha.startsWith(wanted));
       return hit ? { status: 0, stdout: `${hit}\n` } : { status: 1, stdout: "" };
@@ -317,9 +342,16 @@ test("main refuses a dirty tree unless --allow-dirty, and an unknown sha", () =>
 
 test("main refuses a sha that predates the portal image's files, before any docker command", () => {
   const root = fakeRepo({ [TAG]: CLEAN_NOTES });
-  for (const missing of ["webapp-deploy/portal.Dockerfile", "webapp-deploy/portal-entry.sh", "webapp-deploy/k8s/base/scripts/prepare-db.mjs"]) {
+  for (const missing of [
+    "webapp-deploy/portal.Dockerfile",
+    "webapp-deploy/portal-entry.sh",
+    "webapp-deploy/k8s/base/scripts/prepare-db.mjs",
+  ]) {
     const d = deps(root, { missingAtSha: [missing] });
-    assert.throws(() => main(["--tag", TAG, "--sha", FULL_SHA], d), (error) => error instanceof ReleaseError && error.message.includes(missing));
+    assert.throws(
+      () => main(["--tag", TAG, "--sha", FULL_SHA], d),
+      (error) => error instanceof ReleaseError && error.message.includes(missing),
+    );
     assert.deepEqual(d.dockerCalls, [], "nothing was built");
   }
 });
@@ -350,7 +382,7 @@ test("dry run builds the gh argv and the body, and never runs gh", () => {
   ]);
   assert.equal(result.args.length, 9, "no assets, no --draft, nothing after the notes file");
   assert.match(result.args[8], new RegExp(`${TAG}-body\\.md$`));
-  assert.equal(RELEASE_REPO, "Kyoo032/NultronEnt");
+  assert.equal(RELEASE_REPO, "Kyoo032/Nultron");
   assert.equal(
     result.body,
     `${CLEAN_NOTES.trimEnd()}\n\nSource: agentforge@${FULL_SHA}\nImage: ${IMAGE}\nPortal image: ${PORTAL_IMAGE}\n`,
@@ -393,10 +425,21 @@ test("compose.yml pins both images to the tag, and the proxy and database to a t
   assert.equal(PORTAL_IMAGE_REPO, "ghcr.io/kyoo032/nultron-portal");
   assert.ok(serviceBlock(compose, "app").includes(`    image: ${IMAGE}\n`), "app image pinned to the tag");
   for (const name of ["portal", "portal-prepare"]) {
-    assert.ok(serviceBlock(compose, name).includes(`    image: ${PORTAL_IMAGE}\n`), `${name}: portal image pinned to the tag`);
+    assert.ok(
+      serviceBlock(compose, name).includes(`    image: ${PORTAL_IMAGE}\n`),
+      `${name}: portal image pinned to the tag`,
+    );
   }
-  assert.equal(compose.match(/image: ghcr\.io/g).length, 3, "the app image once, the portal image twice, nothing else from ghcr");
-  assert.equal(PROXY_IMAGE, "caddy:2.11-alpine", "the proxy is pinned to a minor: the sign-in log filters need Caddy 2.8+");
+  assert.equal(
+    compose.match(/image: ghcr\.io/g).length,
+    3,
+    "the app image once, the portal image twice, nothing else from ghcr",
+  );
+  assert.equal(
+    PROXY_IMAGE,
+    "caddy:2.11-alpine",
+    "the proxy is pinned to a minor: the sign-in log filters need Caddy 2.8+",
+  );
   assert.ok(serviceBlock(compose, "proxy").includes(`    image: ${PROXY_IMAGE}\n`));
   assert.doesNotMatch(compose, /^\s*build:/m, "the server never builds");
   assert.doesNotMatch(compose, /:latest\b/, "never a floating tag");
@@ -437,8 +480,14 @@ test(".env.example and portal.env.example name every required variable, empty un
   }
   // The two files never share a name: a portal secret in the app's file is the leak the split exists to prevent.
   const app = new Set(REQUIRED_ENV);
-  assert.deepEqual(REQUIRED_PORTAL_ENV.filter((name) => app.has(name)), []);
-  assert.deepEqual(OPTIONAL_PORTAL_ENV.filter((name) => app.has(name)), []);
+  assert.deepEqual(
+    REQUIRED_PORTAL_ENV.filter((name) => app.has(name)),
+    [],
+  );
+  assert.deepEqual(
+    OPTIONAL_PORTAL_ENV.filter((name) => app.has(name)),
+    [],
+  );
   assert.deepEqual(
     Object.keys(ENV_DEFAULTS).filter(
       (name) => !app.has(name) && !REQUIRED_PORTAL_ENV.includes(name) && !OPTIONAL_PORTAL_ENV.includes(name),
@@ -580,13 +629,25 @@ test("the temp-dir bundle commit holds exactly the five files and the company si
   const [commit] = d.commits;
   assert.deepEqual(commit.files, { ...renderBundle(TAG, CADDY_SOURCE, fakeSiteBundle()), "README.md": README });
   assert.deepEqual(
-    Object.keys(commit.files).filter((name) => name.startsWith("sites/")).sort(),
-    ["sites/dpscloud.caddy", "sites/dpscloud/index.html", "sites/enable-sites.sh", "sites/tokotoken.caddy", "sites/tokotoken/index.html"],
+    Object.keys(commit.files)
+      .filter((name) => name.startsWith("sites/"))
+      .sort(),
+    [
+      "sites/dpscloud.caddy",
+      "sites/dpscloud/index.html",
+      "sites/enable-sites.sh",
+      "sites/tokotoken.caddy",
+      "sites/tokotoken/index.html",
+    ],
   );
   const add = d.gitCalls.find((call) => call.sub === "add");
-  assert.deepEqual(add.args.slice(0, 3), ["add", "--all", "--"], "--all, so a file dropped from sites/ is dropped from the repo too");
+  assert.deepEqual(
+    add.args.slice(0, 3),
+    ["add", "--all", "--"],
+    "--all, so a file dropped from sites/ is dropped from the repo too",
+  );
   assert.ok(add.args.includes("sites"), "the whole sites/ folder is staged");
-  assert.ok(commit.cwd.startsWith(result.workDir) && commit.cwd.endsWith("NultronEnt"), "a temp clone");
+  assert.ok(commit.cwd.startsWith(result.workDir) && commit.cwd.endsWith("Nultron"), "a temp clone");
   assert.deepEqual(commit.args.slice(-4), ["commit", "--quiet", "-m", `Release ${TAG}`], "plain message, no trailer");
   assert.ok(commit.args.includes("user.name=rizky"));
   const clone = d.gitCalls.find((call) => call.sub === "clone");
@@ -608,7 +669,10 @@ test("--skip-image skips docker and the archive only; bundle and release still r
   assert.ok(!d.gitCalls.some((call) => call.sub === "archive"));
   assert.ok(d.gitCalls.some((call) => call.sub === "push"));
   assert.deepEqual(gh.calls, [result.args, ["view", TAG]]);
-  assert.ok(result.body.endsWith(`Image: ${IMAGE}\nPortal image: ${PORTAL_IMAGE}\n`), "the body still names both pinned images");
+  assert.ok(
+    result.body.endsWith(`Image: ${IMAGE}\nPortal image: ${PORTAL_IMAGE}\n`),
+    "the body still names both pinned images",
+  );
 });
 
 test("a file in the release repo that carries a banned mark stops the push", () => {
@@ -661,8 +725,15 @@ test("the shipped Caddyfile keeps the sign-in code and state out of the access l
   // One list of filters, imported by BOTH loggers: the site access log and Caddy's default logger, which is
   // where the error line for a failed upstream request (with the request's full URI) is written.
   assert.equal(shipped.match(/^\(sign_in_filters\) \{$/gm)?.length, 1, "one filter list");
-  assert.equal(shipped.match(/^\s*import sign_in_filters$/gm)?.length, 2, "imported by the default log and the access log");
-  assert.match(shipped, /^\tlog default \{\n\t\toutput stderr\n\t\tformat filter \{\n\t\t\twrap json\n\t\t\tfields \{\n\t\t\t\timport sign_in_filters\n/m);
+  assert.equal(
+    shipped.match(/^\s*import sign_in_filters$/gm)?.length,
+    2,
+    "imported by the default log and the access log",
+  );
+  assert.match(
+    shipped,
+    /^\tlog default \{\n\t\toutput stderr\n\t\tformat filter \{\n\t\t\twrap json\n\t\t\tfields \{\n\t\t\t\timport sign_in_filters\n/m,
+  );
   assert.equal(shipped.match(/^\s*import access_log$/gm)?.length, 2, "both sites use the access log");
   const count = (char) => shipped.split(char).length - 1;
   assert.equal(count("{"), count("}"), "unbalanced braces in the shipped Caddyfile");
@@ -686,19 +757,34 @@ test("the shipped Caddyfile serves the portal on its own name, with its own head
   assert.match(portalSite, /reverse_proxy portal:4000 \{/);
   assert.match(portalSite, /health_uri \/healthz/);
   assert.match(portalSite, /^\t\tStrict-Transport-Security "max-age=31536000; includeSubDomains"$/m);
-  assert.doesNotMatch(portalSite, /Content-Security-Policy/, "the portal sets its own CSP; the app's must not replace it");
+  assert.doesNotMatch(
+    portalSite,
+    /Content-Security-Policy/,
+    "the portal sets its own CSP; the app's must not replace it",
+  );
   assert.doesNotMatch(portalSite, /127\.0\.0\.1:3000/, "the portal site never proxies to the app");
   assert.doesNotMatch(portalSite, /billing/, "no billing rule belongs on the portal's name");
-  assert.match(shipped, /^http:\/\/\{\$NULTRON_DOMAIN\}, http:\/\/\{\$PORTAL_DOMAIN\} \{\n\tredir https:\/\/\{host\}\{uri\} permanent\n\}$/m);
+  assert.match(
+    shipped,
+    /^http:\/\/\{\$NULTRON_DOMAIN\}, http:\/\/\{\$PORTAL_DOMAIN\} \{\n\tredir https:\/\/\{host\}\{uri\} permanent\n\}$/m,
+  );
 });
 
 test("the proxy gets exactly what the Caddyfile and the site files read, never the whole .env, in both compose files", () => {
-  assert.deepEqual(caddyEnvNames(SOURCE_CADDYFILE), ["NULTRON_DOMAIN", "PORTAL_DOMAIN"], "the Caddyfile itself still reads only Nultron's two names (SR-73)");
+  assert.deepEqual(
+    caddyEnvNames(SOURCE_CADDYFILE),
+    ["NULTRON_DOMAIN", "PORTAL_DOMAIN"],
+    "the Caddyfile itself still reads only Nultron's two names (SR-73)",
+  );
   const sites = realSiteFiles();
   const siteNames = Object.entries(sites)
     .filter(([path]) => path.endsWith(".caddy"))
     .flatMap(([, text]) => [...text.matchAll(/\{\$([A-Za-z_]\w*)/g)].map((m) => m[1]));
-  assert.deepEqual([...new Set(siteNames)].sort(), ["DPS_DOMAIN", "TOKOTOKEN_DOMAIN"], "each site file reads its own one variable");
+  assert.deepEqual(
+    [...new Set(siteNames)].sort(),
+    ["DPS_DOMAIN", "TOKOTOKEN_DOMAIN"],
+    "each site file reads its own one variable",
+  );
   const read = [...new Set([...caddyEnvNames(SOURCE_CADDYFILE), ...siteNames])].sort();
   const bundle = renderBundle(TAG, SOURCE_CADDYFILE, sites)["compose.yml"];
   for (const [name, compose] of [
@@ -711,16 +797,68 @@ test("the proxy gets exactly what the Caddyfile and the site files read, never t
     assert.match(serviceBlock(compose, "app"), /^\s*env_file:/m, `${name}: the app still loads .env`);
   }
   assert.match(serviceBlock(bundle, "proxy"), /NULTRON_DOMAIN: \$\{NULTRON_DOMAIN:\?/, "the bundle needs a domain");
-  assert.match(serviceBlock(bundle, "proxy"), /PORTAL_DOMAIN: \$\{PORTAL_DOMAIN:\?/, "the bundle needs a portal domain");
+  assert.match(
+    serviceBlock(bundle, "proxy"),
+    /PORTAL_DOMAIN: \$\{PORTAL_DOMAIN:\?/,
+    "the bundle needs a portal domain",
+  );
   // The two company names are optional: empty is allowed, and means that site is not served.
   for (const name of ["DPS_DOMAIN", "TOKOTOKEN_DOMAIN"]) {
-    assert.match(serviceBlock(bundle, "proxy"), new RegExp(`${name}: \\$\\{${name}:-\\}`), `${name} is optional in the bundle`);
+    assert.match(
+      serviceBlock(bundle, "proxy"),
+      new RegExp(`${name}: \\$\\{${name}:-\\}`),
+      `${name} is optional in the bundle`,
+    );
   }
 });
 
 // ---------- the same refusal list on the Personal release ----------
 
-const DESKTOP_RELEASE = join(REPO_ROOT, "apps", "desktop", "scripts", "release-desktop.mjs");
+// The files release-desktop.mjs reads or imports. Its checkCheckout() refuses off main, so these cases cannot
+// run it from a feature checkout: they run a copy of exactly these files in a temp repo whose HEAD is main.
+const DESKTOP_RELEASE_FILES = [
+  "apps/desktop/scripts/release-desktop.mjs",
+  "apps/desktop/scripts/release-artifacts.mjs",
+  "apps/desktop/package.json",
+  "apps/desktop/branding/agentforge/brand.json",
+  "scripts/release-marks.mjs",
+  "scripts/where-am-i.mjs",
+];
+let desktopFixture;
+
+function desktopReleaseFixture() {
+  if (desktopFixture) return desktopFixture;
+  const dir = tempDir("release-desktop-repo-");
+  for (const rel of DESKTOP_RELEASE_FILES) {
+    mkdirSync(dirname(join(dir, rel)), { recursive: true });
+    copyFileSync(join(REPO_ROOT, rel), join(dir, rel));
+  }
+  const init = spawnSync("git", ["init", "-q"], { cwd: dir, encoding: "utf8" });
+  assert.equal(init.status, 0, init.stderr);
+  const head = spawnSync("git", ["symbolic-ref", "HEAD", "refs/heads/main"], { cwd: dir, encoding: "utf8" });
+  assert.equal(head.status, 0, head.stderr);
+  // An unborn branch reads as detached to `git branch --show-current`, so the fixture needs one commit on main.
+  const commit = spawnSync(
+    "git",
+    [
+      "-c",
+      "user.name=fixture",
+      "-c",
+      "user.email=fixture@example.invalid",
+      "-c",
+      "commit.gpgsign=false",
+      "commit",
+      "-q",
+      "--allow-empty",
+      "-m",
+      "fixture",
+    ],
+    { cwd: dir, encoding: "utf8" },
+  );
+  assert.equal(commit.status, 0, commit.stderr);
+  desktopFixture = join(dir, "apps", "desktop", "scripts", "release-desktop.mjs");
+  return desktopFixture;
+}
 
 function tempDir(prefix) {
   const dir = mkdtempSync(join(tmpdir(), prefix));
@@ -764,7 +902,17 @@ function fakeDesktopDist() {
 
 /** release-desktop.mjs exits the process on refusal, so it is run, not imported. --dry-run: gh never runs. */
 function desktopDryRun(notesFile, cwd = process.cwd()) {
-  const args = [DESKTOP_RELEASE, "--dry-run", "--allow-dirty", "--dist", fakeDesktopDist(), "--notes", notesFile];
+  // --allow-retired: these cases are about notes and dist, not the retired refusal (release-desktop-retired.test.mjs).
+  const args = [
+    desktopReleaseFixture(),
+    "--dry-run",
+    "--allow-dirty",
+    "--allow-retired",
+    "--dist",
+    fakeDesktopDist(),
+    "--notes",
+    notesFile,
+  ];
   return spawnSync(process.execPath, args, { cwd, encoding: "utf8" });
 }
 
@@ -822,7 +970,11 @@ test("readSiteFiles maps webapp-deploy/sites to sites/, drops comments from Cadd
     "sites/tokotoken.caddy",
     "sites/tokotoken/index.html",
   ]);
-  assert.ok(bundle["sites/dpscloud.caddy"].startsWith(`# Nultron Enterprise ${TAG}. Generated per release; do not edit here.\n`));
+  assert.ok(
+    bundle["sites/dpscloud.caddy"].startsWith(
+      `# Nultron Enterprise ${TAG}. Generated per release; do not edit here.\n`,
+    ),
+  );
   assert.doesNotMatch(bundle["sites/dpscloud.caddy"], /packages\/host/, "a comment citing a source path is dropped");
   assert.match(bundle["sites/enable-sites.sh"], /# switch/, "a script keeps its comments");
 });
@@ -831,17 +983,30 @@ test("readSiteFiles refuses a sha without a required file, a binary file, an ove
   for (const missing of REQUIRED_SITE_FILES) {
     const files = { ...FAKE_SITE_FILES };
     delete files[missing];
-    assert.throws(() => siteBundleFrom(files), (error) => error instanceof ReleaseError && error.message.includes(missing), missing);
+    assert.throws(
+      () => siteBundleFrom(files),
+      (error) => error instanceof ReleaseError && error.message.includes(missing),
+      missing,
+    );
   }
   assert.throws(
     () => siteBundleFrom({ ...FAKE_SITE_FILES, "webapp-deploy/sites/dpscloud/logo.png": "x" }),
     /text files only/,
   );
   assert.throws(
-    () => siteBundleFrom({ ...FAKE_SITE_FILES, "webapp-deploy/sites/dpscloud/big.html": "x".repeat(SITE_FILE_MAX_BYTES + 1) }),
+    () =>
+      siteBundleFrom({
+        ...FAKE_SITE_FILES,
+        "webapp-deploy/sites/dpscloud/big.html": "x".repeat(SITE_FILE_MAX_BYTES + 1),
+      }),
     /over \d+ bytes/,
   );
-  for (const bad of ["webapp-deploy/other/a.html", "webapp-deploy/sites/../a.html", "webapp-deploy/sites//a.html", "webapp-deploy/sites/a\u005cb.html"]) {
+  for (const bad of [
+    "webapp-deploy/other/a.html",
+    "webapp-deploy/sites/../a.html",
+    "webapp-deploy/sites//a.html",
+    "webapp-deploy/sites/a\u005cb.html",
+  ]) {
     assert.throws(() => bundlePathFor(bad), SitesError, bad);
   }
   assert.equal(bundlePathFor("webapp-deploy/sites/dpscloud/index.html"), "sites/dpscloud/index.html");
@@ -849,7 +1014,8 @@ test("readSiteFiles refuses a sha without a required file, a binary file, an ove
 
 test("the real webapp-deploy/sites folder is a valid bundle, and nothing in it names a customer or the gateway host", () => {
   const bundle = realSiteFiles();
-  for (const path of REQUIRED_SITE_FILES) assert.ok(`sites/${path.slice("webapp-deploy/sites/".length)}` in bundle, path);
+  for (const path of REQUIRED_SITE_FILES)
+    assert.ok(`sites/${path.slice("webapp-deploy/sites/".length)}` in bundle, path);
   for (const [name, text] of Object.entries(bundle)) {
     assert.deepEqual(forbiddenMarksInPublished(text), [], name);
     assert.doesNotMatch(text, /tokenku|hyp ?ai|hypey|hypernet/i, `${name}: no customer name in a published file`);
@@ -883,8 +1049,55 @@ test("DEPLOY.md carries the three extra sections once, and names the images of t
 test(".env.example lists the company-site variables as comments only, and the sender default is in portal.env.example", () => {
   const env = envExample();
   for (const [name] of OPTIONAL_ENV) {
-    assert.ok(env.split("\n").includes(`# ${name}=${OPTIONAL_ENV.find(([n]) => n === name)[1]}`), `${name} is a comment`);
+    assert.ok(
+      env.split("\n").includes(`# ${name}=${OPTIONAL_ENV.find(([n]) => n === name)[1]}`),
+      `${name} is a comment`,
+    );
     assert.ok(!assignments(env).some(([n]) => n === name), `${name} is never an assignment`);
   }
   assert.ok(portalEnvExample().split("\n").includes(`PORTAL_SMTP_FROM=${ENV_DEFAULTS.PORTAL_SMTP_FROM}`));
+});
+
+test("checkout: a release refuses any branch but main, dry runs included, before anything else runs", () => {
+  const root = fakeRepo({ [TAG]: CLEAN_NOTES });
+  const d = deps(root, { branch: "fix/feature" });
+  assert.throws(
+    () => main(["--tag", TAG, "--sha", FULL_SHA, "--dry-run"], d),
+    (error) =>
+      error instanceof ReleaseError &&
+      /releases run from main only; this checkout is on fix\/feature/.test(error.message),
+  );
+  assert.deepEqual(d.dockerCalls, []);
+  assert.deepEqual(d.tarCalls, []);
+  assert.equal(
+    d.lines.some((line) => line.startsWith("ok - target")),
+    false,
+    "the tag and target checks never ran",
+  );
+});
+
+test("checkout: a detached HEAD is refused", () => {
+  const root = fakeRepo({ [TAG]: CLEAN_NOTES });
+  assert.throws(
+    () => main(["--tag", TAG, "--sha", FULL_SHA, "--dry-run"], deps(root, { branch: "HEAD" })),
+    (error) => error instanceof ReleaseError && /on a detached HEAD/.test(error.message),
+  );
+});
+
+test("checkout: the tester folder is refused even when its branch reads main", () => {
+  const parent = mkdtempSync(join(tmpdir(), "release-web-tester-"));
+  roots.push(parent);
+  const root = join(parent, "agentforge-chat");
+  mkdirSync(join(root, "docs", "public"), { recursive: true });
+  writeFileSync(join(root, "docs", "public", `${TAG}-notes.md`), CLEAN_NOTES, "utf8");
+  const d = deps(root, { branch: "main" });
+  assert.throws(
+    () => main(["--tag", TAG, "--sha", FULL_SHA, "--dry-run"], d),
+    (error) => error instanceof ReleaseError && /tester folder \(agentforge-chat\)/.test(error.message),
+  );
+  assert.deepEqual(
+    d.gitCalls.map((call) => call.sub),
+    ["rev-parse"],
+    "the only git call before the refusal is the read-only branch read",
+  );
 });

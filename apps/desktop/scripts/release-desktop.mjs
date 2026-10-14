@@ -1,9 +1,14 @@
 #!/usr/bin/env node
 /**
  * Publish the packed Nultron Setup exe, its blockmap and latest.yml to the public
- * releases repo named in branding/agentforge/brand.json "updates". Run after
- * `pnpm desktop:build`. Uploaded asset names are hyphenated (what electron-updater's
+ * releases repo named in branding/agentforge/brand.json "updates" (Kyoo032/Nultron-Desktop).
+ * Run after `pnpm desktop:build`. Uploaded asset names are hyphenated (what electron-updater's
  * GitHub provider requests); the local files keep the spaced artifactName.
+ *
+ * Retired 2026-10-14 (Rizky): Nultron Personal is being merged into the web app. That repo is
+ * archived and takes no new releases, so do not run this script for a new cut. The code stays.
+ * It refuses outright ("the desktop app is retired") unless `--allow-retired` is passed, and even then
+ * only from a checkout on main that is not the tester folder (releaseProblem in scripts/where-am-i.mjs).
  *
  * macOS artifacts (`Nultron-<version>-mac-<arch>.dmg|zip`, built on a Mac with
  * `pnpm desktop:build:mac` and copied into dist/) are attached to the same release when
@@ -19,7 +24,7 @@
  * it sits under docs/internal (any letter case) or carries a mark from scripts/release-marks.mjs,
  * the same list scripts/release-web.mjs applies to the Enterprise repo.
  *
- *   node scripts/release-desktop.mjs [--dry-run] [--draft] [--allow-dirty] [--allow-stale]
+ *   node scripts/release-desktop.mjs [--dry-run] [--draft] [--allow-dirty] [--allow-stale] [--allow-retired]
  *                                    [--require-mac] [--attach-mac] [--dist <dir>] [--notes <file>]
  */
 import { spawnSync } from "node:child_process";
@@ -38,6 +43,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { forbiddenMarksIn, isInternalDocsPath } from "../../../scripts/release-marks.mjs";
+import { branchOf, releaseProblem } from "../../../scripts/where-am-i.mjs";
 import { describeMacCoverage, selectMacArtifacts } from "./release-artifacts.mjs";
 
 const desktopRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -54,12 +60,16 @@ function ok(message) {
   console.log(`desktop-release: ok - ${message}`);
 }
 
+const RETIRED_REFUSAL =
+  "the desktop app is retired (2026-10-14): Nultron Personal is merged into the web app and its release repo is archived. Pass --allow-retired only when Rizky says so.";
+
 function parseArgs(argv) {
   const defaults = {
     dryRun: false,
     draft: false,
     allowDirty: false,
     allowStale: false,
+    allowRetired: false,
     requireMac: false,
     attachMac: false,
     dist: "dist",
@@ -71,6 +81,7 @@ function parseArgs(argv) {
     "--draft": "draft",
     "--allow-dirty": "allowDirty",
     "--allow-stale": "allowStale",
+    "--allow-retired": "allowRetired",
     "--require-mac": "requireMac",
     "--attach-mac": "attachMac",
   };
@@ -112,14 +123,21 @@ function parseLatestYml(text) {
     .split(/\r?\n/)
     .map((line) => /^(\s*)(- )?(\w+):\s*(.*)$/.exec(line))
     .filter(Boolean)
-    .map(([, indent, dash, key, value]) => ({ nested: indent.length > 0, starts: Boolean(dash), key, value: value.trim() }));
+    .map(([, indent, dash, key, value]) => ({
+      nested: indent.length > 0,
+      starts: Boolean(dash),
+      key,
+      value: value.trim(),
+    }));
   const top = Object.fromEntries(rows.filter((row) => !row.nested).map((row) => [row.key, row.value]));
   // Each "- " row starts a new files[] entry; following nested rows belong to it.
-  const groups = rows.filter((row) => row.nested).reduce((acc, row) => {
-    if (row.starts) acc.push([]);
-    if (acc.length > 0) acc[acc.length - 1].push([row.key, row.value]);
-    return acc;
-  }, []);
+  const groups = rows
+    .filter((row) => row.nested)
+    .reduce((acc, row) => {
+      if (row.starts) acc.push([]);
+      if (acc.length > 0) acc[acc.length - 1].push([row.key, row.value]);
+      return acc;
+    }, []);
   return { ...top, files: groups.map((entries) => Object.fromEntries(entries)) };
 }
 
@@ -158,13 +176,17 @@ function checkDist(distDir, version, flags) {
 function checkMacArtifacts(distDir, version, flags) {
   const selection = selectMacArtifacts(readdirSync(distDir), version);
   if (selection.stale.length > 0 && !flags.allowStale) {
-    fail(`${distDir} holds mac artifacts from another version (${selection.stale.join(", ")}); clean them or pass --allow-stale`);
+    fail(
+      `${distDir} holds mac artifacts from another version (${selection.stale.join(", ")}); clean them or pass --allow-stale`,
+    );
   }
   if (selection.forbidden.length > 0) {
     ok(`${selection.forbidden.join(", ")} present but never uploaded (mac updater is off)`);
   }
   if (flags.requireMac && selection.missingArches.length > 0) {
-    fail(`--require-mac: missing mac artifacts for ${selection.missingArches.join(", ")} (expected Nultron-${version}-mac-<arch>.dmg)`);
+    fail(
+      `--require-mac: missing mac artifacts for ${selection.missingArches.join(", ")} (expected Nultron-${version}-mac-<arch>.dmg)`,
+    );
   }
   ok(describeMacCoverage(selection));
   return selection;
@@ -242,8 +264,16 @@ function stageUploads(files) {
 function ghArgs(target, uploads, notes, flags) {
   const { version, owner, repo } = target;
   return [
-    "release", "create", `v${version}`, "--repo", `${owner}/${repo}`, "--title", `v${version}`,
-    ...notes, ...(flags.draft ? ["--draft"] : []), ...uploads,
+    "release",
+    "create",
+    `v${version}`,
+    "--repo",
+    `${owner}/${repo}`,
+    "--title",
+    `v${version}`,
+    ...notes,
+    ...(flags.draft ? ["--draft"] : []),
+    ...uploads,
   ];
 }
 
@@ -282,7 +312,14 @@ function attachMac(target, flags) {
   const clashes = selection.uploads.filter((name) => existing.includes(name));
   if (clashes.length > 0) fail(`already on the release: ${clashes.join(", ")} (delete them first to replace)`);
   const uploads = selection.uploads.map((name) => join(distDir, name));
-  const uploadArgs = ["release", "upload", `v${target.version}`, "--repo", `${target.owner}/${target.repo}`, ...uploads];
+  const uploadArgs = [
+    "release",
+    "upload",
+    `v${target.version}`,
+    "--repo",
+    `${target.owner}/${target.repo}`,
+    ...uploads,
+  ];
   const editArgs = ["release", "edit", `v${target.version}`, "--repo", `${target.owner}/${target.repo}`, ...notes];
   console.log(`desktop-release: gh ${uploadArgs.join(" ")}`);
   console.log(`desktop-release: gh ${editArgs.join(" ")}`);
@@ -298,8 +335,17 @@ function attachMac(target, flags) {
   ok(`attached ${selection.uploads.length} mac asset(s) to v${target.version}; release now has ${after.length} assets`);
 }
 
+/** A release comes from main in agentforge, never from the tester folder. Runs before any other check. */
+function checkCheckout() {
+  const problem = releaseProblem({ folder: repoRoot, branch: branchOf(repoRoot) });
+  if (problem) fail(problem);
+  ok(`checkout is main, not the tester folder (${repoRoot})`);
+}
+
 function main() {
   const flags = parseArgs(process.argv.slice(2));
+  if (!flags.allowRetired) fail(RETIRED_REFUSAL);
+  checkCheckout();
   const target = readTarget();
   ok(`target ${target.owner}/${target.repo} v${target.version}`);
   checkGitClean(flags);

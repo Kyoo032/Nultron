@@ -2,6 +2,8 @@
 
 Images is a generate studio (prompt → gallery), not a canvas editor. It lists gateway image model ids. `images-studio-needs-key` and `images-studio-submit` both follow the host gate: the note shows and Generate is disabled only when `allowed` is false. A stub desk (`allowed: true`) hides the note and can still generate. Live generate is an operator pass on this machine, never Cloud. Maps: [`generate-studios.md`](../../../../docs/internal/maps/generate-studios.md) and [`media-cost-estimate.md`](../../../../docs/internal/maps/media-cost-estimate.md).
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 ## Sub-features
 
 - `images-header` (0.15.0) — title plus one outcome line in `expected-inputs`: "You get: a generated image, saved to the gallery below." No disclosure on this studio; the rail row reads `Images`. Driven 2026-09-23 on a live desk: `images-studio-needs-key` count 0, `images-studio-estimate` starts with `≈ $`, submit not pressed.

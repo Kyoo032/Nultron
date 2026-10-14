@@ -2,6 +2,8 @@
 
 Videos is a generate studio (prompt, aspect, duration, optional resolution, optional still, gallery). Generate writes a shot when the sentence does not already name a camera and a motion, retries once when the render dies before a video file, and keeps the clip at the snapped length. The screen has no new control. Without a gateway key the expected state is `videos-studio-needs-key` and a quiet Generate. Videos stays on the host route `ready` flag (and, on the hosted build only, `useHostedNeedsKey`): a stub desk with `allowed: true` still quiets Generate. Chat, Documents and Images do not. A keyed desk is ready, so Generate is live there and a click bills. Cloud must not paste a gateway key into the shared webdev Settings desk. Live Toko Token proof is the isolated matrix (gitignored `evidence/videos/live-matrix/`), not a generate from the stub studio. Maps: [`generate-studios.md`](../../../../docs/internal/maps/generate-studios.md) and [`media-cost-estimate.md`](../../../../docs/internal/maps/media-cost-estimate.md).
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 ## Sub-features
 
 - `videos-rail` reaches `/videos` from `agent-videos` on Default.
@@ -48,6 +50,8 @@ Preconditions:
 - **Cloud live matrix (2026-09-02, isolated).** `GET /v1/models` 200 (174 ids: 100 chat / 40 image / 24 video). `seedance-2.0-fast` and `doubao-seedance-2-0-260128` returned **403** `prepaid_async_requires_fixed_price` (prepaid proxy, not a bad key). `grok-imagine-video` accepted `prompt` + `duration` and also `seconds` (POST 200); first variant polled a video URL; Seedance `ratio` returned **400** `json: unknown field "ratio"`. Still/image variant skipped (no live public still). Evidence: `evidence/videos/live-matrix/results.json` (gitignored). The picker is probed-only (`listProbedVideoModels`): video ids from the last `/v1/models` refresh, with no static `CHAT_MODELS` fill-in. An empty refresh leaves the default `""` and `videos-studio-model` empty. A cached probe still lists those ids after the key is removed.
 
 ## Gotchas
+
+- **Bundled example clips honour `Range` (2026-10-14, not driven).** `GET /api/v1/videos/examples/:name/file` answers 200 for the whole clip, 206 with `Content-Range` for a range and 416 past the end, with the mime taken from the file (`rangedFileResult`, `packages/host/src/file-bytes.ts`). A `<video>` element seeks with `Range`, so a request without one still gets 200. Unit proof: `packages/host/src/handlers/video-examples-range.test.ts`.
 
 - `videos-studio-needs-key` is the stub pass. A missing banner on a keyless Cloud run is a product fail. On a keyed desk its absence is correct.
 - The studio posts to `/api/v1/videos` (gateway `POST /v1/video/generations` plus poll), not `/runs/video`. A keyless submit on an open gate is a 400 `invalid_request` (`packages/host/src/studio-generate.ts:416-418` in `generateStudioVideo`); on a closed gate it is the flat 403 `gateway_blocked` before that check runs.

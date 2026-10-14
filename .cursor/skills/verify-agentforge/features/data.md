@@ -2,6 +2,8 @@
 
 Data is a table analyst job: upload or paste a table → it is parsed, profiled and loaded into a private SQLite → the host picks the cuts the columns allow (comparison, over time, a count, blanks) and runs those SELECTs → the model names what the results say through a capped read-only `run_sql` tool (plus `calculator`, and `run_code` for exploration that is never evidence), and the host re-runs its SQL in code to build the evidence tables and charts → a sentence that states a number the queries did not return is rewritten once (`job.round` 1 of 1), then dropped. A follow-up stays on the same sheet and the cuts are chosen again. It is not Research and does not call `web_search`. Parsing, profiling and previewing work without a key; analysis needs one. On a stub desk the generate button still stops at the gateway error before any cut runs. Map: [`docs/internal/maps/data-analysis.md`](../../../../docs/internal/maps/data-analysis.md).
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 ## Sub-features
 
 - `data-rail` (a feature id, not a testid: `[data-rail]` is a real attribute on the rail container, `app-rail.tsx:243`) reaches `/data` from `agent-data` on Default (and any workspace that includes Data).

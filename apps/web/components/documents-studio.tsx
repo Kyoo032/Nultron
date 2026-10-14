@@ -25,6 +25,7 @@ import { PROMPT_INPUT, PROMPT_ROW, PROMPT_SUBMIT } from "@/lib/prompt-row";
 import { useJobModel } from "@/lib/use-job-model";
 import { modelPickBody, regenModelPick, studioModelPick } from "@/lib/model-choice";
 import { apiFetch, isElectron } from "@/lib/api-client";
+import { filenameFromDisposition } from "@/lib/download-name";
 import { isGatewayBlockedText } from "@/lib/gateway-blocked";
 import { NeedsKeyNote } from "@/components/needs-key-note";
 import { hostedKeyBlock, useDeskNeedsKey } from "@/lib/use-desk-needs-key";
@@ -192,9 +193,7 @@ export function DocumentsStudio() {
         return;
       }
       const blob = await res.blob();
-      const disposition = res.headers.get("Content-Disposition") ?? "";
-      const match = disposition.match(/filename="([^"]+)"/);
-      const filename = match?.[1] ?? "document.docx";
+      const filename = filenameFromDisposition(res.headers.get("Content-Disposition")) ?? "document.docx";
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;

@@ -2,6 +2,8 @@
 
 Three surfaces over one placeholder catalog: the public `/pricing` page, the plan panel on Settings, and the blocked screens a refused tenant lands on. **Every price, tier name and seat number is a placeholder** — `packages/core/src/plans/catalog.ts` marks each tier `placeholder: true` and the page says so out loud — so nothing here may be quoted to anybody, and a number that looks wrong is a number nobody has set yet, not a bug. Prices come from an **imported** catalog, so `/pricing` renders in every mode, on a desk, and before anyone signs in. Full mechanism: [`maps/tenant-entitlement.md`](../../../../docs/internal/maps/tenant-entitlement.md). Sign-in itself is [login.md](./login.md).
 
+Product: both · Instance: main :3000 for /pricing; hosted review :3443 for the signed-in panel
+
 ## Sub-features
 
 - **plans-page** — `/pricing` renders `pricing-page`, `pricing-placeholder` (the "Indicative pricing — not final." note, `role="note"`), and one card per tier: `pricing-tier-personal` / `pricing-tier-enterprise`, each with `pricing-price-<id>`, `pricing-features-<id>` and `pricing-cta-<id>`. `pricing-seats-<id>` is present only when that tier has a seat cap, so Personal has none.

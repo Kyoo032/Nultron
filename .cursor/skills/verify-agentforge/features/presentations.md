@@ -2,6 +2,8 @@
 
 Presentation is a job. The first screen is the template list, then the topic box, length and style chips, and Create. The deck that appears is edited by clicking words on the slide. Download is the only primary button after that. Builder, an exact slide count, model, starters, source (pasted text and desk files), movement, save, notes, and shape tools sit in More (`presentations-more`). A selected shape or Open Slide block gets a small toolbar on the slide. The default builder is Open Slide, so Create drafts a deck on a stub desk. Nultron stays in More, and a starter there still opens the Nultron stage. On a live run a Nultron outline passes four host checks with one repair round, and an outline that still fails ships with a note; Open Slide has no structure checks. Both builders then get a layout and design pass. Education does not show the Presentation builder. Its lesson uses the same simple stage, and its own More holds quiz, a page, show, and save. There is no pen, table, chart, or slide master, and no thinking-level control. Map: [`docs/internal/maps/presentations.md`](../../../../docs/internal/maps/presentations.md).
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 ## Sub-features
 
 - `presentations-header` (a feature id, not a testid; the real hooks are `mode-header` and `expected-inputs`), title plus one outcome line in `expected-inputs`: "A few slides you can change, then download." `presentations-download` is the only header button, and only after a deck exists.

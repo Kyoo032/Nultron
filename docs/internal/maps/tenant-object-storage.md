@@ -1,5 +1,7 @@
 # Map — Per-tenant object storage and the quota
 
+Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
+
 Last verified: 2026-09-21 at 208ee85 + the Phase 6 branch `claude/web-phase6-tenant-storage-l9sxnd`
 
 ## Overview

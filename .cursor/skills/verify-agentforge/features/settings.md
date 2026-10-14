@@ -2,6 +2,8 @@
 
 Settings is where the owner pastes a Toko Token gateway key from api.tokotokenai.com. There is no login. The page shows the key field, Save, a compact this-key usage strip with Open Usage, privacy note, and runtime status. There is no Advanced tab, no Extras, no Build/Agents links, and no injection-guard bypass in the UI. Below the privacy note sits the **Start over** card (on a hosted desk `auth-account`, `account-plan` and `settings-storage` sit between them, `settings-page.tsx:586-591`): sign out of the gateway, or reset the machine to a fresh install. Map: [`docs/internal/maps/settings-and-gateway-gate.md`](../../../../docs/internal/maps/settings-and-gateway-gate.md).
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 ## Sub-features
 
 - `settings-open` (a feature id, not a testid; likewise `settings-privacy`, `settings-runtime`, `settings-usage-empty` and `settings-updates`) shows the gateway form (`settings-form`, `openai-key`, `save-settings`). Since 2026-09-23 every settings request says when it did not land: `settings-load-error` (`apps/web/components/settings-page.tsx:425`) when the first read fails — the defaults are no longer shown as though they were this desk's — and `settings-error` (the save error; a failed Re-check lands here too, `settings-page.tsx:353-369`, copy `settings.gateway.checkFailed`) (`:561`) when Save does not come back or answers an error; the host's own sentence when it sent one, the catalog's otherwise.

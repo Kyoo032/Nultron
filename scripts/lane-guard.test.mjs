@@ -12,9 +12,13 @@ import {
   globToRegExp,
   isMapExempt,
   mapWarnings,
+  neverPromoteApplies,
+  neverPromoteWarnings,
+  parseArgs,
   parseLanesLines,
   protectedWarnings,
 } from "./lane-guard.mjs";
+import { TESTER_BRANCH } from "./where-am-i.mjs";
 
 const GUARD = path.join(path.dirname(fileURLToPath(import.meta.url)), "lane-guard.mjs");
 
@@ -52,11 +56,71 @@ test("lanes.json: valid lanes, real map pages, real protected files", { skip: !H
     assert.equal(typeof entry.glob, "string", JSON.stringify(entry));
     assert.equal(typeof entry.protected, "boolean", entry.glob);
     assert.ok(entry.lanes.length > 0 && entry.lanes.every((l) => lanes.has(l)), `${entry.glob}: bad lanes`);
-    if (entry.map !== null) assert.ok(existsSync(path.join(REPO, entry.map)), `${entry.glob}: map ${entry.map} is missing`);
+    if (entry.map !== null)
+      assert.ok(existsSync(path.join(REPO, entry.map)), `${entry.glob}: map ${entry.map} is missing`);
     if (entry.protected && !/[*?{]/.test(entry.glob)) {
       assert.ok(existsSync(path.join(REPO, entry.glob)), `${entry.glob}: protected file is missing`);
     }
   }
+});
+
+test("lanes.json neverPromote: each glob matches no tracked file on main, and never AGENTS.md or TESTER.md", (t) => {
+  if (!HAS_DOCS) return t.skip("lanes.json or docs/internal stripped");
+  const config = JSON.parse(readFileSync(SHIPPED, "utf8"));
+  assert.ok(
+    Array.isArray(config.neverPromote) && config.neverPromote.length > 0,
+    "neverPromote must be a non-empty array",
+  );
+  for (const glob of config.neverPromote) assert.equal(typeof glob, "string", JSON.stringify(glob));
+  const ref = ["origin/main", "main"].find((r) => {
+    try {
+      execFileSync("git", ["-C", REPO, "rev-parse", "--verify", "--quiet", `${r}^{commit}`], { stdio: "ignore" });
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  if (!ref) return t.skip("no main ref in this clone");
+  const tracked = execFileSync("git", ["-C", REPO, "ls-tree", "-r", "--name-only", ref], { encoding: "utf8" })
+    .split("\n")
+    .filter(Boolean);
+  const hits = tracked.filter((file) => config.neverPromote.some((glob) => globToRegExp(glob).test(file)));
+  assert.deepEqual(hits, [], `a neverPromote glob would block a legitimate diff on ${ref}`);
+  assert.deepEqual(
+    neverPromoteWarnings(["AGENTS.md", "TESTER.md", ".env.example", "webapp-deploy/.env.example"], config.neverPromote),
+    [],
+  );
+});
+
+test("neverPromoteWarnings: a changed path on a never-promote glob is hit, the rest are not", () => {
+  const globs = [".webdev-data-chat/**", "**/.env", "**/.env.chat*"];
+  assert.deepEqual(
+    neverPromoteWarnings(
+      [".webdev-data-chat/desk.sqlite", "apps/web/.env.chat", "apps/web/.env.example", "src/a.ts", "x/.env"],
+      globs,
+    ),
+    [".webdev-data-chat/desk.sqlite", "apps/web/.env.chat", "x/.env"],
+  );
+  assert.deepEqual(neverPromoteWarnings(["src/a.ts"], []), []);
+});
+
+test("neverPromoteApplies: a diff to main from any branch but the tester's, detached HEAD included", () => {
+  assert.equal(neverPromoteApplies({ base: "origin/main", branch: "fix/x" }), true);
+  assert.equal(neverPromoteApplies({ base: "main", branch: "fix/x" }), true);
+  assert.equal(neverPromoteApplies({ base: "main", branch: null }), true);
+  assert.equal(neverPromoteApplies({ base: "main", branch: TESTER_BRANCH }), false);
+  assert.equal(neverPromoteApplies({ base: "abc123", branch: "fix/x" }), false);
+});
+
+test("parseArgs reads --branch and refuses a missing value", () => {
+  assert.deepEqual(parseArgs(["--branch", "fix/x", "main...HEAD"]), {
+    range: "main...HEAD",
+    strict: false,
+    writeBaseline: false,
+    root: null,
+    branch: "fix/x",
+  });
+  assert.throws(() => parseArgs(["--branch"]), /--branch needs a branch name/);
 });
 
 test("entriesFor returns every matching entry", () => {
@@ -180,6 +244,7 @@ function makeRepo() {
       version: 1,
       brandLiterals: ["Nultron"],
       brandScope: { include: ["src/**"], exclude: ["**/*.test.*"], extensions: [".ts"] },
+      neverPromote: [".webdev-data-chat/**", "src/*.tester.env"],
       entries: [
         { glob: "src/**", map: "docs/internal/maps/src.md", lanes: ["personal", "enterprise"], protected: false },
         { glob: "src/shared.ts", map: "docs/internal/maps/src.md", lanes: ["tester"], protected: true },
@@ -216,7 +281,7 @@ test("integration: a code-only change with a Lanes line warns about the map and 
   }
 });
 
-test("integration: each of the three warnings fires, exit stays 0 unless --strict", () => {
+test("integration: protected and brand problems block, the map warning advises (exit 1 without --strict)", () => {
   const root = makeRepo();
   try {
     assert.equal(runGuard(root, "--write-baseline").code, 0);
@@ -227,13 +292,117 @@ test("integration: each of the three warnings fires, exit stays 0 unless --stric
     commit(root, "fix: change shared code with no label");
 
     const loose = runGuard(root, "main...HEAD");
-    assert.equal(loose.code, 0, loose.out);
+    assert.equal(loose.code, 1, loose.out);
     assert.match(loose.out, /WARN map: .*docs\/internal\/maps\/src\.md/);
-    assert.match(loose.out, /WARN protected: .*src\/shared\.ts/);
-    assert.match(loose.out, /WARN brand: src\/a\.ts .*Nultron.* 1 -> 2/);
+    assert.match(loose.out, /BLOCK protected: .*src\/shared\.ts/);
+    assert.match(loose.out, /BLOCK brand: src\/a\.ts .*Nultron.* 1 -> 2/);
+    assert.match(loose.out, /2 blocking problem\(s\); exit 1/);
 
     const strict = runGuard(root, "main...HEAD", "--strict");
     assert.equal(strict.code, 1, strict.out);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("integration: a map warning alone stays advisory (exit 0), and --strict makes it fail", () => {
+  const root = makeRepo();
+  try {
+    assert.equal(runGuard(root, "--write-baseline").code, 0);
+    commit(root, "chore: baseline");
+    git(root, "checkout", "--quiet", "-b", "feature");
+    put(root, "src/clean.ts", "export const c = 2;\n");
+    commit(root, "chore: touch\n\nLanes: all");
+    const loose = runGuard(root, "main...HEAD");
+    assert.equal(loose.code, 0, loose.out);
+    assert.match(loose.out, /WARN map/);
+    assert.match(loose.out, /advisory warning\(s\); exit 0/);
+    assert.equal(runGuard(root, "main...HEAD", "--strict").code, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("integration: a tester-only path in a diff to main blocks, exit 1 without --strict", () => {
+  const root = makeRepo();
+  try {
+    assert.equal(runGuard(root, "--write-baseline").code, 0);
+    commit(root, "chore: baseline");
+    git(root, "checkout", "--quiet", "-b", "feature");
+    put(root, "src/app.tester.env", "KEY=1\n");
+    commit(root, "chore: sneak\n\nLanes: all");
+    const result = runGuard(root, "main...HEAD");
+    assert.equal(result.code, 1, result.out);
+    assert.match(result.out, /BLOCK never-promote: src\/app\.tester\.env/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("integration: a deleted never-promote path does not block, and the tester branch is never checked", () => {
+  const root = makeRepo();
+  try {
+    put(root, "src/app.tester.env", "KEY=1\n");
+    commit(root, "chore: base with a tester file");
+    assert.equal(runGuard(root, "--write-baseline").code, 0);
+    commit(root, "chore: baseline");
+    git(root, "checkout", "--quiet", "-b", "feature");
+    rmSync(path.join(root, "src", "app.tester.env"));
+    commit(root, "chore: remove\n\nLanes: all");
+    const deleted = runGuard(root, "main...HEAD");
+    assert.equal(deleted.code, 0, deleted.out);
+    assert.doesNotMatch(deleted.out, /never-promote/);
+
+    git(root, "checkout", "--quiet", "-b", TESTER_BRANCH, "main");
+    put(root, "src/app.tester.env", "KEY=2\n");
+    commit(root, "tester: add\n\nLanes: all");
+    const onTester = runGuard(root, "main...HEAD", "--branch", TESTER_BRANCH);
+    assert.equal(onTester.code, 0, onTester.out);
+    assert.match(onTester.out, /never-promote skipped \(the tester branch\)/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("integration: a never-promote rule does not apply to a range whose base is not main", () => {
+  const root = makeRepo();
+  try {
+    assert.equal(runGuard(root, "--write-baseline").code, 0);
+    commit(root, "chore: baseline");
+    git(root, "checkout", "--quiet", "-b", "feature");
+    put(root, "src/app.tester.env", "KEY=1\n");
+    commit(root, "chore: sneak\n\nLanes: all");
+    const result = runGuard(root, "HEAD~1..HEAD");
+    assert.equal(result.code, 0, result.out);
+    assert.doesNotMatch(result.out, /never-promote/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("integration: a protected file with no Lanes line blocks (exit 1 without --strict)", () => {
+  const root = makeRepo();
+  try {
+    assert.equal(runGuard(root, "--write-baseline").code, 0);
+    commit(root, "chore: baseline");
+    git(root, "checkout", "--quiet", "-b", "feature");
+    put(root, "src/shared.ts", "export const s = 7;\n");
+    commit(root, "fix: shared, unlabelled");
+    const result = runGuard(root, "main...HEAD");
+    assert.equal(result.code, 1, result.out);
+    assert.match(result.out, /BLOCK protected: src\/shared\.ts/);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("integration: a broken lanes.json blocks instead of passing silently", () => {
+  const root = makeRepo();
+  try {
+    put(root, "lanes.json", "{ not json");
+    const result = runGuard(root, "main...HEAD");
+    assert.equal(result.code, 1, result.out);
+    assert.match(result.out, /lane-guard: /);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

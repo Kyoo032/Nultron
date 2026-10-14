@@ -1,6 +1,8 @@
 # Map: Documents job
 
-Last verified: 2026-10-05 at b58383d (`origin/main`: the mode harness, desk files as sources through one picker shared with Presentation, the checks and one repair round, a repair call that fails keeping the first draft, cancel and budget reaching the model call) merged with PR #122 at 1f4f92c (the source hold). The citations into `document-generate.ts`, `source-check.ts`, `source-hold.ts` and `modes/documents.ts` and into the Documents host tests were re-read against the merged tree. Every other citation is carried from the 2026-10-03 verification of the file it names; this merge did not change those files. The generate, check, regenerate and hold flows were read in code and in their unit tests, not driven in a browser by this pass.
+Product: both · Instance: main :3000 + HYP AI :3301
+
+Last verified: 2026-10-14 at 73db3c3 + the uncommitted `fix/hosted-downloads` tree (the download's filename now goes through `filenameFromDisposition`, line 142; read against the file, not driven). Before that: 2026-10-05 at b58383d (`origin/main`: the mode harness, desk files as sources through one picker shared with Presentation, the checks and one repair round, a repair call that fails keeping the first draft, cancel and budget reaching the model call) merged with PR #122 at 1f4f92c (the source hold). The citations into `document-generate.ts`, `source-check.ts`, `source-hold.ts` and `modes/documents.ts` and into the Documents host tests were re-read against the merged tree. Every other citation is carried from the 2026-10-03 verification of the file it names; this merge did not change those files. The generate, check, regenerate and hold flows were read in code and in their unit tests, not driven in a browser by this pass.
 
 ## Overview
 
@@ -139,7 +141,7 @@ Pinned by `packages/core/src/documents/source-hold.test.ts`, `source-check.test.
 
 ### 6. Download: `POST /api/v1/documents/docx`
 
-`onDownload` (`documents-studio.tsx:173-209`) posts the draft as the bare body, reads the response as a `Blob`, takes the filename from `Content-Disposition` (`:195-197`), and clicks a synthetic `<a download>` (`:198-203`). In the packaged app `apiFetch` has already written the bytes through the native save dialog, so it returns before that (`:189-193`).
+`onDownload` (`documents-studio.tsx:173-209`) posts the draft as the bare body, reads the response as a `Blob`, takes the filename from `Content-Disposition` through `filenameFromDisposition` (`apps/web/lib/download-name.ts`, which reads the RFC 5987 `filename*` as well as the quoted form; `:195-197`), and clicks a synthetic `<a download>` (`:198-203`). In the packaged app `apiFetch` has already written the bytes through the native save dialog, so it returns before that (`:189-193`).
 
 `handlePostDocumentsDocx` (`packages/host/src/handlers/jobs.ts:220`) is the odd one out: **no `getTenant`, no `requireGatewayAllowedFor`**. It parses the body with `parseDocumentDraftBody` (400 on a bad shape) and returns a `type: "bytes"` result with the OOXML content type and a filename.
 

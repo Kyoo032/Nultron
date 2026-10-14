@@ -35,6 +35,7 @@ import {
   type OpenSlideMotion,
   type OpenSlidePageCount,
 } from "@agentforge/core/open-slide";
+import { filenameFromDisposition } from "@/lib/download-name";
 import { getLocale, t } from "@/lib/i18n";
 import type { PresentationOutline, PresentationOutlineInput } from "@/lib/presentation-outline";
 import { parsePresentationOutlineBody } from "@/lib/presentation-outline";
@@ -354,8 +355,7 @@ export function PresentationsStudio() {
       }
       const blob = await res.blob();
       const disposition = res.headers.get("Content-Disposition") ?? "";
-      const match = disposition.match(/filename="([^"]+)"/);
-      const filename = match?.[1] ?? "presentation.pptx";
+      const filename = filenameFromDisposition(disposition) ?? "presentation.pptx";
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;

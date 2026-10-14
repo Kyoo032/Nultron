@@ -1,5 +1,7 @@
 # Map: Virtual agents
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 Last verified: 2026-10-14 at 9e77ccda for the first bullet under "What the code does with them" (Chat's 21 tools, the four document tools, the budget), the new bullet on document files for every agent, the paragraph on the `index.ts` export in Touches, and the header. Read from the tester tree over that commit. `lib/tool-labels.test.ts` and `lib/message-embeds.test.tsx` passed in the 207-test web run named in [`chat-send.md`](chat-send.md) Verify. The rest of the page was not re-read in this pass, and the line numbers the drift check flags on it were not re-anchored.
 
 Last verified: 2026-10-09 at 7de8aae6 (uncommitted working tree on tester/chat-first). Read from the code of that working tree, and driven in a browser the same day (below). The unit tests named here were not run for this page.

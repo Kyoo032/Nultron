@@ -1,5 +1,7 @@
 # Map — Tenant entitlement: the allowance, the seat cap and the billing webhook
 
+Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
+
 Last verified: 2026-09-22 at 0774681 + working tree. The pricing offers were rewritten in place:
 Personal is the Mac and Windows app, Enterprise stays contact-DPS, and the one-seat line is gone.
 

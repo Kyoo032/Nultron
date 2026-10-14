@@ -1,10 +1,10 @@
 # Nultron
 
-> **Downloads:** Nultron for Windows and macOS. The current release is **0.15.0**, and the app is under active development.
+> **This desktop app is retired.** Nultron is being merged into the Nultron web app. The last desktop release is **0.15.1**. This repository is archived and gets no new releases.
 > The app was called **DPSBuddy** in earlier releases. It is the same app, now named Nultron everywhere: the installers, the app itself and its data folder. Nultron does not import DPSBuddy data. See [Coming from DPSBuddy](#coming-from-dpsbuddy).
-> Teams can also use **Nultron Enterprise**, a hosted web version you sign in to from a browser. Contact DPS for access.
+> Teams use **Nultron Enterprise**, a hosted web version you sign in to from a browser. Contact DPS for access.
 
-Nultron is a desktop AI workspace. Each kind of work has its own screen in one app: chat, documents, research, finance, data, markets, legal review, meeting minutes, images, video, music, video editing and presentations. Each screen has its own instructions, tools and checks, and gives you a file you can keep. Your threads, files and settings are stored on your own computer.
+Nultron was a desktop AI workspace. Each kind of work has its own screen in one app: chat, documents, research, finance, data, markets, legal review, meeting minutes, images, video, music, video editing and presentations. Each screen has its own instructions, tools and checks, and gives you a file you can keep. Your threads, files and settings are stored on your own computer.
 
 This repository holds installers and update feeds only. It contains no source code.
 
@@ -53,7 +53,7 @@ On first launch Nultron may download a document reader it needs. The download co
 
 ## Download
 
-From the [latest release](https://github.com/Kyoo032/Nultron/releases/latest):
+From the [last release, 0.15.1](https://github.com/Kyoo032/Nultron-Desktop/releases/latest):
 
 | Platform | File |
 |---|---|
@@ -67,7 +67,7 @@ A release without `.dmg` files is Windows-only. The macOS build is a preview and
 
 - The installer is not code-signed yet. If SmartScreen shows "Windows protected your PC", choose **More info → Run anyway**.
 - Installing over an existing Nultron copy upgrades it in place. Your threads, settings and saved key are kept.
-- The app updates itself from this repository. **Settings → Check for updates** downloads new releases from here.
+- **Settings → Check for updates** asks `Kyoo032/Nultron` for new releases. That name now belongs to the Enterprise repo, so the check fails with an error. It does not find a new desktop release. To use Nultron, sign in to Nultron Enterprise from a browser.
 - Video editing uses ffmpeg, which is included in the installer.
 
 ## Install on macOS (preview)
@@ -79,7 +79,7 @@ A release without `.dmg` files is Windows-only. The macOS build is a preview and
   - If macOS still refuses, run `xattr -dr com.apple.quarantine /Applications/Nultron.app` in Terminal.
 - When macOS asks about the Keychain, choose **Always Allow**.
 - Video editing needs ffmpeg on macOS: run `brew install ffmpeg`. Everything else works without it. If Edit still shows the setup banner, press **Check again** in it. No restart is needed.
-- Updates on macOS are manual: download the new `.dmg` from here and drag it over the old app. Your data stays in `~/Library/Application Support/Nultron`.
+- No new macOS build is published. Your data stays in `~/Library/Application Support/Nultron`.
 
 ## Uninstall
 
@@ -92,7 +92,7 @@ Nultron starts on a fresh desk. It does not read the data folder or the saved ke
 
 ## Feedback
 
-You can report problems with an installer or an update on the [issues page](https://github.com/Kyoo032/Nultron/issues).
+You can report problems with an installer on the [issues page](https://github.com/Kyoo032/Nultron-Desktop/issues). The repository is archived, so no fix will be released there.
 
 ---
 

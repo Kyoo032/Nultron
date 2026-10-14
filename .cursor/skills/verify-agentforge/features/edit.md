@@ -2,6 +2,8 @@
 
 Edit is the CapCut-style timeline with an agent panel (`/edit`, rail `agent-edit`). Human and agent share one ops log; every agent change is a card with Keep / Undo / Tweak. Without ffmpeg the studio shows `edit-needs-ffmpeg`. Without a gateway key the agent panel is stub (scripted scenarios) and generation is `edit-needs-key`; on the **hosted** build with no key the Agent pane shows `edit-agent-needs-key` and `edit-composer-send` is disabled. Map: [`docs/internal/maps/edit-timeline.md`](../../../../docs/internal/maps/edit-timeline.md).
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 ## Sub-features
 
 - `edit-shell` shows `edit-studio`, `edit-timeline`, `edit-preview`, `edit-agent-panel`, plus the header handles `edit-tier`, `edit-jobs`, `edit-export`, `edit-export-progress`, `edit-export-download` and the footer counter `edit-ops-count`. With **no** project open the list side is `edit-project-list` + `edit-starter` + `edit-starter-description` + `edit-project-name` + `edit-new-project`, `edit-export` is disabled, and `edit-composer`, `edit-composer-send`, `edit-import`, `edit-generate-tab` and `edit-ops-count` have count **0**. That empty state is `EditEmptyState` (`apps/web/components/edit-empty-state.tsx`), one, two or three columns by the pane's width (see the **Empty-state layouts** step below). The header art column (`buddy-stage-header`, `buddy-stage-header-tap`) is in the DOM at every width but only visible when the header is 60rem or wider.
@@ -74,6 +76,8 @@ Fill scenarios F1–F5 (owner runs; Result filled in Loop 3):
 | F5 | "Propose an alternate cut" | 1 × `propose_alt_cut`, clips on `v_compare` only | |
 
 ## Gotchas
+
+- **The export file route honours `Range` (2026-10-14, not driven).** `GET /api/v1/edit/projects/:id/export/:jobId/file` answers 200 for the whole render, 206 with `Content-Range` for a range and 416 past the end, and takes the mime and the `export.<ext>` name from the file the job wrote (`rangedFileResult`, `packages/host/src/file-bytes.ts`). A plain browser download sends no `Range`, so a 200 is the normal answer; to check seeking, send `Range: bytes=0-99` and expect 206. The download name now also reads an RFC 5987 `filename*` (`filenameFromDisposition`, `apps/web/lib/download-name.ts`). Unit proof: `packages/host/src/edit/export-file-route.test.ts`.
 
 - Stub agent replies are scripted per prompt; a live reply needs the operator's key on Windows only. "Add a title card that says Hello" is the stub title path (`S11`): it calls `add_title`, which lands an `add_clip` op, so the card reads `add clip · <clipId>` and the timeline clip is labelled with the clip id prefix while Hello is drawn in `edit-preview`. S6 "Summer Sale" is unchanged.
 - A live turn binds every edit tool and sends the refreshed chat model. The literal model id `edit` is not a gateway model, and an empty binding list leaves the timeline empty because the runtime never calls `add_title`.

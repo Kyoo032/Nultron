@@ -1,5 +1,7 @@
 # Map: Team board (K0)
 
+Product: tester only (HYP AI SME board, not on main) · Instance: tester :3200
+
 Last verified: 2026-10-13 at 823ea20c (uncommitted working tree on tester/chat-first, the K0 commit, after the K0 security review's fixes). Read from the code of that working tree. The host and renderer tests named below were run that day and passed. Driven in a browser on a local rehearsal of the hosted stack before the review fixes; the fixes themselves are proven by tests only (see "Not driven").
 
 Tester code only (`TESTER.md`), lane `tester`. Spec: [`../team-board-spec.md`](../team-board-spec.md); Rizky accepted its defaults on 2026-10-13. This page covers phase K0: people only. Agents, personal stores, card files and mentions are K1 to K4. Recipe: [`features/board.md`](../../../.cursor/skills/verify-agentforge/features/board.md).

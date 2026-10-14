@@ -2,6 +2,8 @@
 
 Music is the third generate studio (describe-or-lyrics brief, style, title, instrumental, gallery). Without a gateway key the expected state is `music-studio-needs-key` and a quiet Generate. Music stays on the host route `ready` flag (plus `useHostedNeedsKey` on the hosted build), the same rule as Videos: a stub desk with `allowed: true` still quiets Generate. Chat, Documents and Images do not. A keyed desk is ready, so Generate and Write lyrics are live there and a click bills. Two things are unlike Images and Videos and both come from the gateway: **one job returns two takes for one charge**, and the wire is an async Suno relay mounted on the gateway *origin* (`POST /suno/submit/music`, then `GET /suno/fetch/<id>`), not a `/v1` route. That relay has **never been driven live** — Cloud has no egress to the gateway host — so every automated check below stubs `fetch`, and `scripts/probe-gateway-music.ts` is the one-command live proof a keyed desk still owes. Do not paste a gateway key into the shared webdev Settings desk. Map: [`docs/internal/maps/music-mode.md`](../../../../docs/internal/maps/music-mode.md).
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 ## Sub-features
 
 - `music-rail` reaches `/music` from `agent-music` on Default.

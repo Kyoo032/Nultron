@@ -2,6 +2,8 @@
 
 Builtin-only Knowledge Base. WeKnora sidecar was stripped 2026-09-12 (binary never built). Cloud proves Phases 0–4 with Vitest plus stub webdev on `127.0.0.1:3000`. Live `[n]` cites need a gateway key — skip that step on Cloud. This file is the testing path; drive recipes live in [knowledge.md](./knowledge.md), [knowledge-ingest.md](./knowledge-ingest.md), and [knowledge-graph.md](./knowledge-graph.md). Maps: [`knowledge-flows.md`](../../../../docs/internal/maps/knowledge-flows.md) and [`knowledge-base-page.md`](../../../../docs/internal/maps/knowledge-base-page.md).
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 ## Sub-features
 
 - `phase-0-seam` is the backend contract + cited retrieve + `knowledge_retrievals` + PDF/DOCX ingest. Unit: `packages/host/src/knowledge/backend.contract.test.ts`, `knowledge-extract.test.ts`, `knowledge-retrievals.test.ts`. Drive: planted-fact recipe in [knowledge.md](./knowledge.md).

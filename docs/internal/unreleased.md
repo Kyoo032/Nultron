@@ -54,6 +54,18 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Agent guardrails: where a change goes, a push guard, release refusals and a deploy gate, 2026-10-14 (branch `chore/agent-guardrails`; lanes: Enterprise, HYP AI, tester)
+
+- **Why.** Rizky, 2026-10-14: a misconfigured update must not take the app offline, and every change has to reach the right code. `main`'s AGENTS.md opened with the tester banner (carried over by the 2026-10-12 promotion), so an agent on `main` was told it was in the tester.
+- **Instructions.** AGENTS.md opens with "Where am I?", "Where a change goes" and "Which product a change reaches"; TESTER.md applies only on `tester/chat-first` in `agentforge-chat`. The change skill and the verify skill start with `pnpm where`; every verify recipe and map page carries a `Product: · Instance:` line.
+- **Push guard.** `scripts/hooks/pre-push` (opt-in per checkout: `pnpm hooks:install`) refuses any push to `main`, a push of `tester/chat-first` anywhere but itself, and runs `scripts/lane-guard.mjs`, whose never-promote list (`lanes.json` `neverPromote`), protected-file `Lanes:` rule and brand rule now block. Map warnings still only advise.
+- **Releases.** `scripts/release-web.mjs` refuses in the tester folder or off `main`, dry runs included. `apps/desktop/scripts/release-desktop.mjs` refuses because the desktop app is retired, unless `--allow-retired`; `pnpm desktop:release` and the pack skill hit that refusal too.
+- **Deploy gate.** `scripts/deploy-preflight.mjs` checks `.env`, `portal.env` and the compose file before anything switches; `webapp-deploy/scripts/deploy.sh` keeps the running image as `:previous`, waits for health with a bound and rolls back on failure. A worker flagged that the no-node fallback container received the real `AGENTFORGE_SECRETS_KEY`; fixed before merge, the container gets only `set` or nothing.
+- **What the deploy gate does not cover.** It guards the `webapp-deploy/scripts/deploy.sh` route only. Neither route that serves people today calls it: the Nultron preview is updated by the safe-update runbook in `nultron-files/deploy/tencent` (`docker load`, `app-image.env`, desks one at a time), and HYP AI ships by `C:\Users\rizky\hypey\deploy\ship.ps1`. Wiring the preflight into those two is outside this repo and needs Rizky's go.
+- **Push guard scope.** `pnpm hooks:install` writes `core.hooksPath` to the clone's local config, so one run arms every worktree, the tester folder included. The hook lets through pushes to other GitHub repositories (`Kyoo032/hyp-ai`, the release repos); any other URL is judged.
+- **Not proven.** No server run of the deploy gate, no real push through the hook. The Nultron staging subdomain is not named yet. The security register gains SR-177 and carries SR-170 to SR-176 from the main checkout's uncommitted edits.
+- **Lanes owed after merge.** Tester: merge `origin/main`, `ci:local`, `pnpm hooks:install` there. HYP AI: the next import must bring `scripts/where-am-i.mjs` with `lane-guard.mjs`.
+
 ## Chat: Continue on a step-limit turn (K0-G6), 2026-10-14 (lanes: Personal, Enterprise, HYP AI, tester; on `feat/k0-g6-continue`, not packed, not driven on a live model)
 
 - **Lanes.** Personal, Enterprise, HYP AI, tester. Shared renderer and host. No new mode or rail entry.
@@ -485,3 +497,13 @@ Found while building the chat-first shell in `agentforge-chat`. All three are in
 Found while re-driving the recipes against the chat-first shell on `:3000`. Lanes: Personal, Enterprise, HYP AI, tester.
 
 - [ ] **Guide: the Chat stop still describes a model picker.** `steps.chat.body` says the model picker lets the person choose which model answers (`apps/web/locales/en/guide.json:29`, and `apps/web/locales/id/guide.json:29`, "Pemilih model"). The chat-first Chat has the tier picker (`tier-picker`: Daily, Fastest, Reasoning) and no model picker, so the copy points at a control that is not there. Fix both catalogs together; the parity test keeps the keys aligned but does not check the meaning.
+
+## Hosted downloads work in a plain browser, 2026-10-14 (branch `fix/hosted-downloads`, uncommitted)
+
+Lanes: Personal, Enterprise, HYP AI, tester. Every lane reaches this code, so the default applies. Not driven on `:3000` or on a hosted build; proven by unit and route tests only.
+
+- **Filenames.** The download helpers in `artifacts-client.ts`, `finance-export.ts`, `edit-studio.tsx` and `documents-studio.tsx` read only `filename="…"`, so a name that exists only as RFC 5987 `filename*=UTF-8''…` fell back to a generic name. All four now call `filenameFromDisposition` (`apps/web/lib/download-name.ts`). Tests: `download-name.test.ts` (filename*-only case) and `finance-export.test.ts`.
+- **Ranges on file routes.** `GET /api/v1/edit/projects/:id/export/:jobId/file` and `GET /api/v1/videos/examples/:name/file` answer `Range` with 206 and `Content-Range`, and 416 past the end, through the new `packages/host/src/file-bytes.ts` (`rangedFileResult`, `mediaMimeForPath`). The edit export names its file `export.<ext>` and takes the mime from the file the job wrote, not a fixed `video/mp4`. Tests: `file-bytes.test.ts`, `handlers/video-examples-range.test.ts`, `edit/export-file-route.test.ts` (200, 206, 416, 404 through the router).
+- **Caddy compression.** `webapp-deploy/Caddyfile` (both sites) and `webapp-deploy/k8s/base/caddy/security.caddy` had a bare `encode zstd gzip`, which compresses every response, including `text/event-stream` (job progress, SR-174) and media. Each now has a `match` on the text types only (html, css, plain, xml, javascript, json, svg). The explicit list keeps `text/event-stream` out; a `text/*` wildcard would not. `packages/host/src/caddy-encode.test.ts` pins it. The bundle (`scripts/release-web.mjs`) reads `webapp-deploy/Caddyfile` at the sha, so this reaches the bundle with no script change. **Caddy was not run:** no caddy binary and no Docker daemon on this PC, so the syntax is unvalidated.
+- **Not changed, on purpose.** The company sites `webapp-deploy/sites/dpscloud.caddy` and `tokotoken.caddy` keep a bare `encode zstd gzip`: they serve static pages with no SSE or media, and they are not Nultron.
+- **Owed, same bug, outside this change:** `apps/web/components/presentations-studio.tsx:357` still parses only `filename="…"` (`presentations.md` § on `onDownload`). Same one-line fix, not made here.

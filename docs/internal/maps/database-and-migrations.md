@@ -1,5 +1,7 @@
 # Map — Database and migrations
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 Last verified: 2026-09-29 for the three `apps/desktop/main.cjs` citations (`bootstrapPackaged` lines), re-anchored in the
 working tree, not committed, after the ffmpeg probe moved behind the first paint. Before that: 2026-09-23 at d4561b8 + uncommitted tree for the migrations table and the numbering note (now
 through `0021`), the `auth_sessions` row of the schema families, "Start over, applied at next boot" (every

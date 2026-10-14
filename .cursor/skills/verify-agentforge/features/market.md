@@ -2,6 +2,8 @@
 
 Market is a job: a named desk picked by `?specialist=`, that desk's own watchlist of up to 15 tickers from any market, and a briefing instruction → the host fetches quotes, bars at that desk's depth, TradingView ratings, headlines, and macro levels on the user's machine, computes the rest (signals, rotation, sessions, swings, metals) in code, builds a chart per ticker, and the model writes a briefing (Bahasa Indonesia by default) over that data packet → guarded briefing → DOCX. It is analysis, not investment advice, and it never tells the reader to buy or sell now. Runs inside the host like Research, Data, and Finance: no server, no sidecar, no port, no Settings fields. Landed on `feat/market-mode` (2026-09-09, v2); see `docs/internal/0.14.25-changelog.md` and `docs/internal/market-mode-plan.md`. Map: [`docs/internal/maps/market-watch.md`](../../../../docs/internal/maps/market-watch.md).
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 ## Sub-features
 
 - `mode-header` (the shared `ModeHeader`, `data-mode="market"`, 0.15.0; there is no `market-header` testid) — title plus one outcome line in `expected-inputs`: "You get live prices and a chart per ticker, plus a written briefing — type up to 15 tickers, no file upload. Analysis, not investment advice." At a header 60rem wide or more the same `ModeHeader` also draws `buddy-stage-header` (Nultron in the art column, `apps/web/components/mode-header.tsx:66-73`). The rail's `rail-market-specialists-toggle` shows the word `specialists` (`Show specialists` stays in `aria-label` / `title`) and the list starts closed. Driven 2026-09-23: `rail-market-specialist-crypto` → `/market?specialist=crypto`, `market-specialist-current` `Crypto`; watchlist not edited, briefing not generated.

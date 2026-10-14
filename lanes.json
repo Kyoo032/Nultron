@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "Ownership manifest read by scripts/lane-guard.mjs (advisory). Each entry maps a path glob to the map page that describes it, the lanes the path reaches, and whether it is protected. Lanes: personal (Nultron Personal), enterprise (the hosted app), hyp-ai (the white label, imported from main), tester (agentforge-chat, tester/chat-first). A file may match several entries: its map pages are the union, it is protected if any match is. 'map: null' means no map check. Not in this repo: HYP AI's Cloudflare edge and password-mode deploy live in C:\\Users\\rizky\\hypey\\deploy. Plan: docs/internal/white-label-and-agent-guardrails-plan.md. Map: docs/internal/maps/release-and-sync-lanes.md.",
+  "about": "Ownership manifest read by scripts/lane-guard.mjs. Its never-promote (neverPromote), protected and brand rules block; the map rule only advises. Each entry maps a path glob to the map page that describes it, the lanes the path reaches, and whether it is protected. Lanes: personal (Nultron Personal), enterprise (the hosted app), hyp-ai (the white label, imported from main), tester (agentforge-chat, tester/chat-first). A file may match several entries: its map pages are the union, it is protected if any match is. 'map: null' means no map check. Not in this repo: HYP AI's Cloudflare edge and password-mode deploy live in C:\\Users\\rizky\\hypey\\deploy. Plan: docs/internal/white-label-and-agent-guardrails-plan.md. Map: docs/internal/maps/release-and-sync-lanes.md.",
   "brandLiterals": ["Nultron", "Toko Token", "TokenKu", "HYP AI", "Hypey"],
   "brandScope": {
     "include": ["apps/web/**", "packages/**"],
@@ -20,6 +20,14 @@
     ],
     "extensions": [".ts", ".tsx", ".js", ".mjs", ".cjs", ".json", ".css", ".html"]
   },
+  "neverPromote": [
+    ".webdev-data*/**",
+    "**/.env",
+    "**/.env.local",
+    "**/.env.chat*",
+    "**/.env.tester*",
+    ".claude/**"
+  ],
   "entries": [
     {
       "glob": "packages/core/src/content/types.ts",
@@ -514,7 +522,7 @@
       "map": "docs/internal/maps/release-and-sync-lanes.md",
       "lanes": ["personal"],
       "protected": true,
-      "note": "Release script for Kyoo032/Nultron. AGENTS.md: a change to the release scripts needs Rizky's word. Never run from the tester folder."
+      "note": "Retired desktop release script. It published to Kyoo032/Nultron-Desktop, now archived (2026-10-14), so it takes no new cut. Code kept. AGENTS.md: a change to the release scripts needs Rizky's word. Never run from the tester folder."
     },
     {
       "glob": "apps/desktop/**",
@@ -536,7 +544,7 @@
       "map": "docs/internal/maps/release-and-sync-lanes.md",
       "lanes": ["enterprise"],
       "protected": true,
-      "note": "Enterprise release to Kyoo032/NultronEnt. AGENTS.md: a change to the release scripts needs Rizky's word."
+      "note": "Enterprise release to Kyoo032/Nultron (renamed from NultronEnt on 2026-10-14). AGENTS.md: a change to the release scripts needs Rizky's word."
     },
     {
       "glob": "scripts/{ci-local,lane-guard,map-rot,map-drift}.mjs",

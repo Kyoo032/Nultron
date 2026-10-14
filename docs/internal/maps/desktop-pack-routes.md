@@ -1,10 +1,14 @@
 # Map — Desktop pack routes
 
-> **Two products, one repo.** **Personal** is the Mac/Windows Nultron app — current cut `0.15.0`, under active development again.
-> **Enterprise** is the hosted multi-user web app.
+Product: retired-desktop · Instance: none (Personal desktop retired 2026-10-14); history
+
+> **Retired 2026-10-14 (Rizky).** **Personal**, the Mac/Windows Nultron app, is being merged into the web app. Its last release was `0.15.1`. Its release repo `Kyoo032/Nultron-Desktop` is archived and takes no new releases, so the two routes below are no longer run for a new cut. They stay as a record, and the code stays in the tree.
+> **Enterprise** is the hosted multi-user web app. Its release repo is `Kyoo032/Nultron`.
 > Decision record: [`web-pivot-2026-09-18.md`](../web-pivot-2026-09-18.md).
 
 Last verified: 2026-09-28 at 7a281ad
+
+Retirement noted 2026-10-14 (repo rename, branch `chore/release-repo-rename`): the Release table's repo names and the updater posture were changed. Every other citation on this page is still as of 7a281ad.
 
 Re-anchored 2026-09-29, working tree, not committed: the two `main.cjs` citations for `installContentSecurityPolicy` (the
 ffmpeg probe moved behind the first paint and shifted them), and the note on `editFfmpeg` in **Proof**.
@@ -98,14 +102,14 @@ Gates in `apps/desktop/scripts/release-desktop.mjs`, in order:
 | 5 | `latest.yml` version matches; exe size matches; exe sha512 matches in both the file entry and top level; `url` and `path` equal the hyphenated exe name | `:159-175` |
 | 6 | Refuses to publish `docs/internal/` notes to the public repo | `:177-188` |
 | 7 | Stages hyphenated copies (electron-updater's GitHub provider expects hyphens, not spaces) | `:190-210` |
-| 8 | `gh release create` uses `brand.json` `updates.repo` (`Nultron` as of 0.15.1) | `:280-288` |
+| 8 | `gh release create` uses `brand.json` `updates.repo` (`Nultron-Desktop` since 2026-10-14, archived; `Nultron` for 0.15.1 and earlier) | `:280-288` |
 | 9 | Post-upload, re-reads the release and fails unless the asset-name set matches exactly | `:220-241`, `:287` |
 
 `--attach-mac` adds mac artifacts to an already-published Windows release without touching the exe, blockmap or `latest.yml` (`:243-268`), refusing to silently replace an asset that already exists.
 
 ### Updater posture
 
-`publish` is GitHub, owner `Kyoo032`, repo `Nultron`, `releaseType: "release"` (`apps/desktop/package.json:157-162`). There is **no channel concept**. A check or download that loses the connection is tried three times (`auto-update.cjs` `withUpdateRetry`). A 404 and a checksum failure are not retried.
+`publish` is GitHub, owner `Kyoo032`, repo `Nultron-Desktop` since 2026-10-14 (archived, so no release is found there; it was `Nultron` for 0.15.1 and earlier), `releaseType: "release"` (`apps/desktop/package.json:157-162`). There is **no channel concept**. A check or download that loses the connection is tried three times (`auto-update.cjs` `withUpdateRetry`). A 404 and a checksum failure are not retried.
 
 **Windows: on.** `updatesEnabled(productName, isPackaged, platform)` (`apps/desktop/auto-update.cjs:53-55`) requires packaged, the public product name, and a platform not in `UNSIGNED_PLATFORMS`. `autoDownload` and `autoInstallOnAppQuit` are both **false** (`:308-311`) — "This app exits via `app.exit()` … so Electron's 'quit' event never fires and install-on-quit would be dead code; installs go through `updates:install` -> `quitAndInstall` only." A startup check runs unless offline (`:419-426`), and `updates:check` never offers a downgrade.
 
@@ -124,7 +128,7 @@ Gates in `apps/desktop/scripts/release-desktop.mjs`, in order:
 | `hfsplus ls` parser | `ERROR: /Nultron.app: … ['Contents']` (recorded as `/DPSBuddy.app` in 0.14.26) | `make-dmg.py`'s `parse_hfs_ls_name` must keep spaced helper names (`Nultron Helper (GPU).app`) and accept both numeric and `Jan 01 1980` date columns. Fix the parser, do not double the volume (`traps.md:41-50`; history in `BUILD-DMG-ON-WINDOWS.md:47`, fixed in `051382e` / `9c0bd27`) |
 | `hfsplus` silent exit | Prints nothing and exits 0 when the catalog cannot grow | Per-directory `ls` read-back in `make-dmg.py`, plus `verify-bundle.py --dmg` as the second net (`BUILD-DMG-ON-WINDOWS.md:46`) |
 | 7-Zip symlink reading | Shows dmg symlinks as small files whose bytes are the target path | Prove from the HFS+ catalog's own mode bits via `dmg extract` + `hfsplus ls` (`verify-bundle.py:323-352`) |
-| Two repos | Source pushed to the wrong repo | Source stays on `Kyoo032/agentforge`; binaries go to `Kyoo032/Nultron`; never `git push` source there (`traps.md:79-81`) |
+| Two repos | Source pushed to the wrong repo | Source stays on `Kyoo032/agentforge`; binaries went to `Kyoo032/Nultron-Desktop` (archived 2026-10-14, no new releases); never `git push` source there (`traps.md:79-81`) |
 
 ### Proof, and what is not proof
 

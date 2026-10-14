@@ -2,6 +2,8 @@
 
 A workspace is a desk: its own `productModes`, gateway key, Settings and Knowledge Base. In the chat-first shell on `:3000` there is no desk switcher and no Workspaces page: `workspaces-link` in the account group opens `/workspaces`, which is the **Virtual agents** page, where a person hires or lets go of agents (that edits the current desk's `productModes`); see [virtual-agents.md](./virtual-agents.md). The desk-management screen (`WorkspacesPage`: `workspaces-switcher`, `create-new-workspace`, `workspace-list`, `edit-workspace-modes`, `delete-workspace*`, the template picker) is routed only in the `"modes"` fallback layout (`SHELL_LAYOUT` `modes`) and is not driven by this recipe; the host routes behind it (`/api/v1/workspaces`) are unchanged. The first desk of a fresh Personal install is written with Chat, Research, Images, Videos and Presentation only (2026-09-29, `FIRST_RUN_MODES`); the hosted first desk has every mode. Map: [`docs/internal/maps/shell-rail-and-workspaces.md`](../../../../docs/internal/maps/shell-rail-and-workspaces.md).
 
+Product: both · Instance: main :3000 + HYP AI :3301 (the Private/Workspace project switch is tester :3200 only, no recipe yet)
+
 ## Sub-features
 
 - `workspaces-open` is `workspaces-link` (label "Virtual agents", `aria-label` and tooltip) in `rail-account-group`; it opens `/workspaces`, the Virtual agents page. `workspaces-page` and `create-new-workspace` are count 0 on `:3000` (driven 2026-10-12).

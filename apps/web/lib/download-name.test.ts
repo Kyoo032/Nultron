@@ -12,6 +12,12 @@ describe("filenameFromDisposition", () => {
     ).toBe("My plan ☕.md");
   });
 
+  it("reads a name that only has the RFC 5987 form", () => {
+    expect(filenameFromDisposition("attachment; filename*=UTF-8''Rapat%20Dir%C3%A9ksi.docx")).toBe(
+      "Rapat Diréksi.docx",
+    );
+  });
+
   it("falls back to the plain name when the UTF-8 form has a bad escape", () => {
     expect(filenameFromDisposition("attachment; filename=\"a.md\"; filename*=UTF-8''%E2%98")).toBe("a.md");
   });

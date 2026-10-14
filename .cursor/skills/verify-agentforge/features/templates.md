@@ -2,6 +2,8 @@
 
 Example galleries on Images, Videos, Documents, Research, and Presentation load a full brief into the mode composer. Clicking a card does not generate. Map: [`docs/internal/maps/documents.md`](../../../../docs/internal/maps/documents.md).
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 ## Sub-features
 
 - `example-gallery` is the “Start from a template” region on each job-mode studio.
@@ -31,7 +33,7 @@ Preconditions:
 
 ## Gotchas
 
-- Default already has the job-mode tabs a first desk starts with (Research, Images, Videos, Presentation). Missing `agent-images` on Default is a fail; missing `agent-documents` on a fresh Personal desk is expected. On a Legal desk it is expected — switch to Default or add the tab in Workspaces.
+- Default already has the job-mode tabs a first desk starts with (Research, Images, Videos, Presentation). Missing `agent-images` on Default is a fail; missing `agent-documents` on a fresh Personal desk is expected. On a Legal desk it is expected — switch to Default or hire the agent on Virtual agents (`agent-hire`).
 - `images-studio-gallery` / `videos-studio-gallery` are generated-result galleries, not the example cards.
 - Documents / Presentations starters load a worked offline draft/outline. Template cards only prefill the prompt: `ExampleGallery`'s `onSelect` does nothing but `setPrompt(entry.prompt)` (`apps/web/components/documents-studio.tsx:324`), so a card can never produce `documents-preview` — only `documents-starter` and a live generate can.
 - Prefill targets the mode studio prompt, not Chat `composer-text`.

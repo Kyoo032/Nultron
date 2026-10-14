@@ -2,6 +2,8 @@
 
 Account page at `/board` on the hosted app only: a company's shared columns and cards, with comments, that every person on the desk sees change live. Phase K0, people only. On Personal and on the tester webdev (`:3200`, not in server mode) it does not exist: the routes answer 404, the rail has no entry and `/board` lands on Chat. How it works: [`maps/board.md`](../../../../docs/internal/maps/board.md). Spec: [`team-board-spec.md`](../../../../docs/internal/team-board-spec.md).
 
+Product: tester only (HYP AI SME board, not on main) · Instance: tester :3200
+
 ## Sub-features
 
 - **board-columns**: five built-in columns (To do, Doing, Review, Blocked, Done; Indonesian names on an `id` desk), plus custom ones an owner or admin adds, renames or archives. Built-in columns cannot be archived; a column with cards cannot be archived.

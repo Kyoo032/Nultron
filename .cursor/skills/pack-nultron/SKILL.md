@@ -1,17 +1,17 @@
 ---
 name: pack-nultron
 description: >-
-  Pack and ship Nultron installers on Kyo's Windows desk — isolated NSIS worktree
-  plus Docker macOS dmg/zip, then desktop:release to Kyoo032/Nultron. Maps how each
-  OS owns copy/paste (Ctrl vs Cmd, right-click), menus, quit, secrets, and updater.
-  Use when the user says pack, repack, ship, desktop:build, desktop:release, Windows
-  and macOS installers, or cut a 0.14.2x release. Not Cloud. Not webdev :3000.
+  RETIRED 2026-10-14. The Personal desktop app is being merged into the web app, and its
+  release repo Kyoo032/Nultron-Desktop is archived. Do not pack or publish a desktop cut.
+  Kept as a record of the old Windows NSIS and Docker macOS routes, the OS copy/paste,
+  menu, quit, secrets and updater rules. Not Cloud. Not webdev :3000.
 ---
 
-# Pack Nultron (this Windows PC)
+# Pack Nultron (this Windows PC): retired
 
-> **Two products, one repo.** **Personal** is the Mac/Windows Nultron app — current cut `0.16.0` (2026-10-06, the first Nultron-named installer), under active development. `0.15.1` was published 2026-09-28.
-> These pack and release routes serve the Personal app only; the Enterprise web app ships through the deploy route.
+> **Retired 2026-10-14 (Rizky).** Personal, the Mac/Windows Nultron app, is being merged into the web app. Its last release was `0.15.1` (2026-09-28). The `0.16.0` cut (2026-10-06) was packed but never published. The release repo `Kyoo032/Nultron-Desktop` is archived and takes no new releases. Do not run `desktop:build`, `desktop:build:mac:docker` or `desktop:release` for a new cut. The steps below stay as a record of how the routes worked.
+> **Enterprise** ships through the deploy route (`scripts/release-web.mjs`), not through this skill.
+> **Two products, one repo** (before the retirement): these pack and release routes served the Personal app only.
 > Decision record: [`web-pivot-2026-09-18.md`](../../../docs/internal/web-pivot-2026-09-18.md).
 >
 > **Renamed 2026-09-29.** The app, installer and bundle are `Nultron` from the first pack after that date: `Nultron.exe`, `Nultron.app`, `Nultron Setup <v>.exe`, `Nultron-<v>-mac-<arch>.dmg|zip`. Anything in `apps/desktop/dist/` cut before it is `DPSBuddy Setup <v>.exe` or `DPSBuddy-<v>-mac-<arch>.*` — archive it before packing, because `release-desktop.mjs` counts every `*Setup*.exe` in `dist/` and fails on two unless `--allow-stale`. `appId` is unchanged. There is no data migration: a DPSBuddy install that updates starts on a fresh desk, an upgrade leaves the old `%APPDATA%\DPSBuddy` folder behind, and only a real uninstall also removes it and `DPSBuddy/wrap-key`. None of this has been packed or driven yet.
@@ -52,7 +52,7 @@ flowchart TB
 
   subgraph ship [Ship]
     S1[copy Windows artifacts into main dist]
-    S2["desktop-release --require-mac → Kyoo032/Nultron"]
+    S2["desktop-release --require-mac → Kyoo032/Nultron-Desktop (archived; retired 2026-10-14)"]
   end
 
   P --> winRoute
@@ -214,7 +214,7 @@ npx pnpm@9.15.9 --filter @agentforge/desktop exec node scripts/release-desktop.m
 npx pnpm@9.15.9 --filter @agentforge/desktop exec node scripts/release-desktop.mjs --require-mac
 ```
 
-Never upload `latest-mac.yml`. Do not `git push` source to Nultron.
+Never upload `latest-mac.yml`. Do not `git push` source to Nultron-Desktop. Retired 2026-10-14: do not run these commands for a new cut.
 
 ## Do not
 

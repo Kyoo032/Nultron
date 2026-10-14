@@ -535,9 +535,10 @@ instance; the container publishes only 80/443 on the host, and `PORT` is the por
 sh webapp-deploy/scripts/deploy.sh
 ```
 
-Pulls (`git pull --ff-only`), rebuilds, `up -d`, waits for the healthcheck, then prints a
-ready-made row for `DEPLOY-LOG.md`. Append it there **and** to the deploy log in the
-decision record. Use `--no-pull` to redeploy the checkout as it stands.
+Pulls (`git pull --ff-only`), runs the [deploy gate](#deploy-gate), rebuilds, `up -d`, and waits
+for the healthchecks. A failed check rolls the stack back to the images from before the deploy.
+On success it prints a ready-made row for `DEPLOY-LOG.md`. Append it there **and** to the deploy
+log in the decision record. Use `--no-pull` to redeploy the checkout as it stands.
 
 ### Back up first when the deploy carries a migration
 
@@ -561,6 +562,59 @@ still open.
 
 `0015_tenants` (Phase 3 tenancy) is the first migration this applies to: it adds the
 `tenants` table and `organizations.tenant_id`, and is additive but one-way.
+
+## Deploy gate
+
+Every `deploy.sh` run goes through the four steps below. Nothing is called deployed until the last
+one passes, and a failure after the swap puts the previous images back.
+
+1. **Preflight, before anything is switched.** `scripts/deploy-preflight.mjs` reads `.env`,
+   `portal.env` and `compose.yml`, and checks them offline:
+   - every name the release writes into `.env.example` and `portal.env.example` is set. The lists are
+     `REQUIRED_ENV` and `REQUIRED_PORTAL_ENV` in `scripts/release-web.mjs`, which the preflight imports.
+     The portal's mail settings are needed only in `code` sign-in mode (`apps/portal/src/config.ts`);
+   - `AGENTFORGE_PORTAL_URL` and every `AGENTFORGE_TRUSTED_ORIGINS` entry are https origins with no path;
+   - the public names agree: `PORTAL_DOMAIN` is the host of `AGENTFORGE_PORTAL_URL`, and `NULTRON_DOMAIN`
+     is the host of one trusted origin (`compose.yml` `extra_hosts`, `Caddyfile`);
+   - no image is `latest` or untagged, and the release images carry an `ent-YYYY.MM.DD` tag;
+   - `docker compose config -q` parses the file, when docker is on the host.
+
+   Each problem is one sentence that names the variable. The preflight never prints a value. It runs
+   with the host's node, or in a `node:22-bookworm-slim` container with no network when the host has
+   none (`PREFLIGHT_IMAGE` changes that image). It does **not** judge the secret values. The app's own
+   boot guard does (`packages/host/src/hosted-env.ts`), and a value it refuses makes the new container
+   fail its health check, which rolls back.
+2. **The previous images are kept.** The running app and portal images are tagged `nultron-web:previous`
+   and `nultron-portal:previous` before the build, because the build overwrites `:local`. They stay
+   until the next deploy.
+3. **Health, after `up -d`.** The app's own `HEALTHCHECK` polls `GET /healthz` on its loopback port
+   (`Dockerfile`; the route is `packages/host/src/handlers/health.ts`, answered before routing). A
+   container that exits, keeps restarting or reports unhealthy fails at once, not at the timeout. Then
+   the portal's healthcheck. Then `GET https://$NULTRON_DOMAIN/healthz` through Caddy, with the name
+   pointed at loopback, so the probe needs no DNS. `DEPLOY_PUBLIC_PROBE_TRIES` sets its tries (12 by
+   default, 5 seconds apart). Without curl on the host this probe is skipped with a warning.
+4. **Rollback.** A failure in step 3 retags `:previous` as `:local` and runs
+   `docker compose up -d --no-build --force-recreate app proxy portal`. Nothing is built again, and the
+   app is waited on again. The proxy is recreated with the app and never on its own, because it shares
+   the app's network namespace (`compose.yml`). The script exits 1 in every case, so a run that rolled
+   back never reads as a success.
+
+**What rollback does not do.** It restores images, not data. A migration that already ran stays
+applied, because the schema runner is forward-only (see "Back up first when the deploy carries a
+migration"). A first deploy has no previous image, so a failure there is reported and left for the
+operator to fix.
+
+**Where a change goes first.** This gate protects one stack, and that stack runs one app container, so
+it has no canary of its own. Two other places take a change before the hosted main instance:
+
+- **The tester staging instance** runs each update before main does. Where that instance runs is
+  Rizky's open decision, and this folder does not name a host for it.
+- **The preview desks** (`app.nultron-ai.xyz`) are a different stack. They follow "Update the app image
+  only: the safe route" in `nultron-files/deploy/tencent/README.md`, which is outside this repo and
+  gitignored. That route recreates a tester desk first, then the rest one at a time, and never the proxy.
+
+**Every run on a server needs Rizky's go in the chat for that deploy.** A go for an earlier deploy does
+not count, and the gate does not replace that go.
 
 ## Back up
 
@@ -610,7 +664,12 @@ Cloud Monitor custom metric, to that alarm.
 # data
 sh webapp-deploy/scripts/restore.sh backups/nultron-data-20260918T120000Z.tar.gz
 
-# code
+# code, one step back: the images from before the LAST deploy (run from webapp-deploy/)
+docker image tag nultron-web:previous nultron-web:local
+docker image tag nultron-portal:previous nultron-portal:local
+docker compose -f compose.yml up -d --no-build --force-recreate app proxy portal
+
+# code, an older sha: a rebuild, since no image is kept for it
 git -C .. checkout <previous-sha>        # run on the server, by hand
 sh webapp-deploy/scripts/deploy.sh --no-pull
 ```
@@ -620,8 +679,10 @@ consistent snapshot over `agentforge.sqlite` (dropping the stale `-wal`/`-shm` s
 can never be replayed on top of it), and starts back up. It asks for confirmation unless
 you pass `--yes`.
 
-Rolling back code is a rebuild at an older sha. There is no image registry yet, so there
-is no `docker pull <old-tag>` path; adding one is a migration-plan item.
+`:previous` holds the images from before the **last** deploy only, so it is one step back. An older
+sha is a rebuild. There is no image registry yet, so there is no `docker pull <old-tag>` path;
+adding one is a migration-plan item. The restore above brings back the data, not the code. A
+migration that ran is not undone.
 
 ## Migrating from the DPSBuddy names
 
@@ -696,7 +757,7 @@ and the data has to be copied across once. Nothing below deletes the old volumes
    volumes and backups hold a full copy of every tenant's data and the old secret entries
    hold a second copy of the wrap key.
 
-The released Enterprise bundle (`Kyoo032/NultronEnt`) renames the same things with the
+The released Enterprise bundle (`Kyoo032/Nultron`) renames the same things with the
 project `nultron-ent` (old: `dpsbuddy-ent`) and the image `ghcr.io/kyoo032/nultron-ent`
 (old: `ghcr.io/kyoo032/dpsbuddy-ent`). Substitute those prefixes in the commands above,
 run `docker compose pull` in place of `build.sh`, and make sure the token used for
