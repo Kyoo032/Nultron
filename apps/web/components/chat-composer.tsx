@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { consumeSse } from "@/lib/sse-client";
 import {
   COMPOSER_FILE_ACCEPT,
@@ -22,6 +22,7 @@ import {
   restoreDocumentRead,
   type DocumentRead,
 } from "@/lib/composer-documents";
+import { useChipOriginals } from "@/lib/use-chip-originals";
 import { useDocumentReads } from "@/lib/use-document-reads";
 import { EnhancePromptButton } from "@/components/enhance-prompt-button";
 import { ComposerPlusMenu } from "@/components/composer-plus-menu";
@@ -270,11 +271,9 @@ export function ChatComposer({
       // A read that was in flight when the pane went away starts again; a finished one is kept.
       .map((item) => ({ ...item, read: restoreDocumentRead(item.read) })),
   );
-  const reportRead = useCallback((id: string, read: DocumentRead | undefined) => {
-    setFiles((current) => current.map((item) => (item.id === id ? { ...item, read } : item)));
-  }, []);
-  const { retry: retryRead } = useDocumentReads(files, reportRead);
   const [busy, setBusy] = useState(false);
+  const { reportRead, removeChip } = useChipOriginals(files, setFiles, busy);
+  const { retry: retryRead } = useDocumentReads(files, reportRead);
   const [enhancing, setEnhancing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -394,10 +393,6 @@ export function ChatComposer({
     }
   }
 
-  function removeFile(id: string) {
-    setFiles((current) => current.filter((item) => item.id !== id));
-  }
-
   async function send() {
     if (needsKey) {
       return;
@@ -425,10 +420,10 @@ export function ChatComposer({
         onFailed?.(message);
       }
     };
-    /** Only the draft that was sent is cleared; anything typed or attached since is the owner's. */
+    /** Only the draft that was sent is cleared, with its chips; what was typed or attached since is the owner's. */
     const clearSent = () => {
       setText((current) => (current === typed ? "" : current));
-      setFiles((current) => (current === attached ? [] : current));
+      setFiles((current) => current.filter((item) => !attached.some((sent) => sent.id === item.id)));
     };
     const live: RunStreamHandlers = {
       onStarted,
@@ -763,7 +758,7 @@ export function ChatComposer({
         {files.length > 0 ? (
           <ul className="flex flex-wrap gap-2" data-testid="composer-attachments">
             {files.map((item) => (
-              <ComposerAttachmentChip key={item.id} item={item} onRemove={removeFile} onRetry={retryRead} />
+              <ComposerAttachmentChip key={item.id} item={item} onRemove={removeChip} onRetry={retryRead} />
             ))}
           </ul>
         ) : null}

@@ -13,6 +13,7 @@ vi.mock("./api-client", () => ({ apiFetch: (...args: unknown[]) => apiFetch(...a
 import {
   attachmentBlock,
   type ChatDocumentResult,
+  discardChipOriginal,
   documentErrorKey,
   documentsBlockSend,
   documentsOverLimit,
@@ -27,6 +28,9 @@ import {
   type DocumentRead,
 } from "./composer-documents";
 import { applyLocale, resetLocaleForTests, t } from "./i18n";
+
+/** A kept original's artifact id, as the host answers it. */
+const KEPT = "0b6f0e7a-3c1d-4f5e-9a2b-7c8d9e0f1a2b";
 
 function fileOf(name: string, size = 10, type = "application/pdf"): File {
   return new File([new Uint8Array(size)], name, { type });
@@ -86,6 +90,8 @@ const RESULT: ChatDocumentResult = {
   sentChars: 5,
   truncated: false,
   masked: 2,
+  originalId: null,
+  originalSkipped: null,
 };
 
 beforeEach(() => {
@@ -128,6 +134,28 @@ describe("parseChatDocument", () => {
     });
     expect(parsed).toMatchObject({ bytes: 0, chars: 0, sentChars: 0, masked: 0, fullText: null, truncated: false });
   });
+
+  it("reads the kept original's id, or the reason it was not kept", () => {
+    expect(
+      parseChatDocument({ document: { ...GOOD.document, originalId: KEPT, originalSkipped: null } }),
+    ).toMatchObject({
+      originalId: KEPT,
+      originalSkipped: null,
+    });
+    expect(
+      parseChatDocument({ document: { ...GOOD.document, originalId: null, originalSkipped: "quota" } }),
+    ).toMatchObject({ originalId: null, originalSkipped: "quota" });
+  });
+
+  it("never trusts the wire for the original: a malformed id or an unknown reason is none", () => {
+    expect(parseChatDocument({ document: { ...GOOD.document, originalId: "../x" } })).toMatchObject({
+      originalId: null,
+    });
+    expect(parseChatDocument({ document: { ...GOOD.document, originalSkipped: "nope" } })).toMatchObject({
+      originalSkipped: null,
+    });
+    expect(parseChatDocument(GOOD)).toMatchObject({ originalId: null, originalSkipped: null });
+  });
 });
 
 describe("parseSavedChatDocument", () => {
@@ -156,7 +184,23 @@ describe("saveChatDocument", () => {
       bytes: 10,
       masked: 2,
       text: "hello world",
+      originalId: null,
+      originalSkipped: null,
     });
+  });
+
+  it("sends the kept original's id back with the save, so the host can name it in the notes", async () => {
+    apiFetch.mockResolvedValue(reply(200, SAVED));
+    await saveChatDocument("a.pdf", { ...RESULT, originalId: KEPT });
+    const [, init] = apiFetch.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toMatchObject({ originalId: KEPT, originalSkipped: null });
+  });
+
+  it("sends the reason the original was not kept, so the host can say so in the notes", async () => {
+    apiFetch.mockResolvedValue(reply(200, SAVED));
+    await saveChatDocument("a.docx", { ...RESULT, format: "docx", originalSkipped: "too_large" });
+    const [, init] = apiFetch.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toMatchObject({ originalId: null, originalSkipped: "too_large" });
   });
 
   it("posts the text that was read when nothing was cut", async () => {
@@ -183,6 +227,45 @@ describe("saveChatDocument", () => {
     await expect(saveChatDocument("a.pdf", RESULT)).rejects.toMatchObject({ key: "send" });
     apiFetch.mockResolvedValueOnce(reply(500, { error: { code: "internal_error", message: "x" } }));
     await expect(saveChatDocument("a.pdf", RESULT)).rejects.toMatchObject({ key: "send" });
+  });
+});
+
+describe("discardChipOriginal", () => {
+  const READY_KEPT: DocumentRead = { status: "ready", result: { ...RESULT, originalId: KEPT } };
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("deletes a removed chip's kept original, once, through the artifacts route", async () => {
+    apiFetch.mockResolvedValue(reply(200, { ok: true }));
+    await discardChipOriginal(READY_KEPT, false);
+    expect(apiFetch).toHaveBeenCalledTimes(1);
+    const [path, init] = apiFetch.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe(`/api/v1/artifacts/${KEPT}`);
+    expect(init.method).toBe("DELETE");
+  });
+
+  it("leaves the original alone while the message that names it is going", async () => {
+    await discardChipOriginal(READY_KEPT, true);
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("has nothing to delete for a chip with no kept original, or one that is still reading or failed", async () => {
+    await discardChipOriginal({ status: "ready", result: RESULT }, false);
+    await discardChipOriginal(undefined, false);
+    await discardChipOriginal({ status: "reading" }, false);
+    await discardChipOriginal({ status: "failed", error: "needs_ocr" }, false);
+    expect(apiFetch).not.toHaveBeenCalled();
+  });
+
+  it("logs a failed delete and never throws, so the chip is still removed", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    apiFetch.mockResolvedValueOnce(reply(404, { error: { code: "not_found", message: "Not found" } }));
+    await expect(discardChipOriginal(READY_KEPT, false)).resolves.toBeUndefined();
+    apiFetch.mockRejectedValueOnce(new Error("offline"));
+    await expect(discardChipOriginal(READY_KEPT, false)).resolves.toBeUndefined();
+    expect(warn).toHaveBeenCalledTimes(2);
   });
 });
 

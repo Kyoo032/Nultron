@@ -48,6 +48,9 @@ function readNotes(result: ChatDocumentResult): string[] {
       result.masked === 1 ? t("chat.document.maskedOne") : t("chat.document.masked", { n: formatCount(result.masked) }),
     );
   }
+  if (result.originalSkipped !== null) {
+    notes.push(t("chat.document.originalSkipped"));
+  }
   return notes;
 }
 

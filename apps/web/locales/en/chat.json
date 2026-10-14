@@ -13,6 +13,7 @@
     "cut": "Only the first {sent} of {total} characters are sent.",
     "masked": "{n} personal details hidden before sending.",
     "maskedOne": "1 personal detail hidden before sending.",
+    "originalSkipped": "Only the text was kept, not the original file.",
     "retry": "Try again",
     "retryAria": "Try reading {name} again",
     "tooMany": "A message can carry up to {n} documents.",

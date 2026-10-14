@@ -13,6 +13,7 @@
     "cut": "Hanya {sent} dari {total} karakter pertama yang dikirim.",
     "masked": "{n} data pribadi disembunyikan sebelum dikirim.",
     "maskedOne": "1 data pribadi disembunyikan sebelum dikirim.",
+    "originalSkipped": "Hanya teksnya yang disimpan, bukan berkas aslinya.",
     "retry": "Coba lagi",
     "retryAria": "Coba baca {name} lagi",
     "tooMany": "Satu pesan dapat membawa hingga {n} dokumen.",

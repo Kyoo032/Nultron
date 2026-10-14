@@ -190,16 +190,21 @@ export function splitUserFileBlocks(text: string): UserTextSegment[] {
 }
 
 /**
- * What a file card says about the host's notes: each note without its brackets, in one line. The line
- * that only tells the model what the block below is (`[Attached file: ...]`) is the same on every file
- * and says nothing about this one, so the card leaves it out; the rest (what the file is, where it is
- * saved, how much was cut, a failed save) is shown, so nothing the model was told about the file is
+ * The notes written for the model alone. `[Attached file: ...]` tells the model what the block below is:
+ * the same on every file, so the card leaves it out. `[Original file ...]` names the artifact id that
+ * `import_document` takes (K-D21): an id is for the model's tool, never for the person's card.
+ */
+const MODEL_ONLY_NOTE_PREFIXES: ReadonlyArray<string> = [HOST_NOTE_PREFIXES[0], "[Original file"];
+
+/**
+ * What a file card says about the host's notes: each note without its brackets, in one line. The notes
+ * written for the model alone (`MODEL_ONLY_NOTE_PREFIXES`) are left out; the rest (what the file is, where
+ * it is saved, how much was cut, a failed save) is shown, so nothing the model was told about the file is
  * hidden from the person.
  */
 export function fileCardDetail(notes: ReadonlyArray<string> | undefined): string | undefined {
-  const modelOnly = HOST_NOTE_PREFIXES[0];
   const shown = (notes ?? [])
-    .filter((line) => !line.startsWith(modelOnly))
+    .filter((line) => !MODEL_ONLY_NOTE_PREFIXES.some((prefix) => line.startsWith(prefix)))
     .map((line) => line.slice(1, line.lastIndexOf("]")).trim())
     .filter((line) => line !== "");
   return shown.length > 0 ? shown.join(" ") : undefined;

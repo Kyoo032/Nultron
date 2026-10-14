@@ -28,8 +28,16 @@ import {
   CHAT_DOCUMENTS_PER_MESSAGE,
   cutTextAttachment,
 } from "@agentforge/core/chat-documents";
+import { deleteArtifact } from "./artifacts-client";
 import { apiFetch } from "./api-client";
 import { t } from "./i18n";
+
+/** Why the host did not keep a Word, Excel or PDF file's original (`original.ts` on the host). */
+const ORIGINAL_SKIP_REASONS = ["too_large", "quota", "unavailable"] as const;
+export type OriginalSkipReason = (typeof ORIGINAL_SKIP_REASONS)[number];
+
+/** An artifact id as the host mints it: a lowercase UUID. */
+const ARTIFACT_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 /** What the host answered when it read one document, as the composer keeps it. */
 export type ChatDocumentResult = {
@@ -47,6 +55,10 @@ export type ChatDocumentResult = {
   readonly truncated: boolean;
   /** Personal details the host masked. */
   readonly masked: number;
+  /** The artifact that keeps the file's own bytes, private to the person who attached it (K-D21). */
+  readonly originalId: string | null;
+  /** Why the original was not kept, for a format that has one. */
+  readonly originalSkipped: OriginalSkipReason | null;
 };
 
 /** What the host answered when the message was sent: its notes, and the text for the attachment block. */
@@ -132,6 +144,14 @@ function documentOf(payload: unknown): Record<string, unknown> | null {
   return document && typeof document === "object" ? (document as Record<string, unknown>) : null;
 }
 
+function originalIdOf(value: unknown): string | null {
+  return typeof value === "string" && ARTIFACT_ID.test(value) ? value : null;
+}
+
+function originalSkipOf(value: unknown): OriginalSkipReason | null {
+  return ORIGINAL_SKIP_REASONS.find((reason) => reason === value) ?? null;
+}
+
 /** Never trust the wire: a malformed answer is null, so the composer says "could not read" instead. */
 export function parseChatDocument(payload: unknown): ChatDocumentResult | null {
   const record = documentOf(payload);
@@ -148,6 +168,8 @@ export function parseChatDocument(payload: unknown): ChatDocumentResult | null {
     sentChars: count(record.sentChars),
     truncated: record.truncated === true,
     masked: count(pii?.count),
+    originalId: originalIdOf(record.originalId),
+    originalSkipped: originalSkipOf(record.originalSkipped),
   };
 }
 
@@ -223,6 +245,8 @@ export async function saveChatDocument(name: string, result: ChatDocumentResult)
         bytes: result.bytes,
         masked: result.masked,
         text: result.fullText ?? result.text,
+        originalId: result.originalId,
+        originalSkipped: result.originalSkipped,
       }),
     });
   } catch {
@@ -237,6 +261,23 @@ export async function saveChatDocument(name: string, result: ChatDocumentResult)
     throw new ChatDocumentError("send");
   }
   return saved;
+}
+
+/**
+ * Removing a chip before Send takes the original the host kept at attach with it (K-D21), so it does not
+ * stay in the person's storage. Nothing is deleted while a send is in flight (`sendInFlight`): the message
+ * may already name that original. A delete that fails is logged, never shown, and never stops the chip from
+ * going; the original then stays as the person's own artifact.
+ */
+export async function discardChipOriginal(read: DocumentRead | undefined, sendInFlight: boolean): Promise<void> {
+  if (sendInFlight || read?.status !== "ready" || read.result.originalId === null) {
+    return;
+  }
+  try {
+    await deleteArtifact(read.result.originalId);
+  } catch (error) {
+    console.warn("Chat: a removed file's kept original could not be deleted", error);
+  }
 }
 
 /**
