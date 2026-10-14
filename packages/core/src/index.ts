@@ -269,6 +269,7 @@ export { modelImageInput, type ImageInputSupport } from "./models/image-input";
 export {
   EARLIER_IMAGE_NOT_VISIBLE_NOTE,
   VIDEO_NOT_VISIBLE_NOTE,
+  earlierImageNote,
   imageRemoteLinkMessage,
   imageUnreadableMessage,
   imagesTooLargeMessage,

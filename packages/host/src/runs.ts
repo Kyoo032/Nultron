@@ -50,7 +50,7 @@ import {
   setThreadTitleFromParts,
 } from "./threads";
 import { redactToolEvent } from "./chat-tool-events";
-import { historyToolNote } from "./chat-history-note";
+import { historyMediaPart, historyToolNote } from "./chat-history-note";
 import { ensureToolsRegistered } from "./register-tools";
 import { recordChatRunUsage } from "./usage-record";
 import { loadSettings, loadUserLocale } from "./settings-store";
@@ -387,7 +387,13 @@ export async function* startModalityRun(options: {
         if (row.role === "assistant" && !hasModelVisibleContent(parts)) {
           continue;
         }
-        storedHistory.push({ role: row.role as "user" | "assistant", parts: modelHistoryParts(parts) });
+        // An assistant turn's stored media is named by reference, so a later turn can edit it (chat-history-note.ts).
+        const media = row.role === "assistant" ? historyMediaPart(parts) : null;
+        const modelParts = modelHistoryParts(parts);
+        storedHistory.push({
+          role: row.role as "user" | "assistant",
+          parts: media ? [...modelParts, media] : modelParts,
+        });
       }
       // The latest assistant turn also tells the model what its tools returned, so "continue" does not run
       // them again. Older turns stay text only.
