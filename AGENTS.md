@@ -2,7 +2,9 @@
 
 ## Where am I?
 
-Check before any edit: `pnpm where` (`scripts/where-am-i.mjs`, added on branch `chore/agent-guardrails`). Until it lands, run `git rev-parse --show-toplevel` and `git branch --show-current`, and match the row. If the folder and branch match no row, stop and ask Rizky.
+Check before any edit: `pnpm where` (`scripts/where-am-i.mjs`). Where it is missing (an older branch), run `git rev-parse --show-toplevel` and `git branch --show-current`, and match the row. If `pnpm where` refuses (exit 1), or the folder and branch break a row, stop and ask Rizky. A folder outside the table, such as a Cloud VM clone, prints `other`: work only on a branch cut from `main` there, and never release or deploy from it.
+
+Turn the push guard on once per clone with `pnpm hooks:install`. It writes `core.hooksPath` to this clone's own git config, so every worktree of the clone, the tester folder included, gets it.
 
 | Folder | Branch | What it is | Webdev |
 |---|---|---|---|
@@ -121,6 +123,8 @@ The plan is in the tester code (`C:\Users\rizky\agentforge-chat`): `docs/interna
 
 **Private by person on Enterprise (Rizky, 2026-10-06 evening).** His words: "even on enterprise the knowledge base of everyone will be different and private". A company shares a desk, but each person's Knowledge Base is their own, and a document a person attaches in Chat is private to that person. The host enforces it; the renderer only displays it. Personal has one person per desk, so nothing changes there, and every change for this needs a Personal-parity test. What is shared and what is private on a team desk today has not been mapped yet; map it before changing a table.
 
+**Desks are company-wide (Rizky, 2026-10-13, team board decision K-D11).** Every member of a company may open every desk of that company. Per-person privacy comes from per-person rows (threads, private chat uploads, and later the personal agent store), not from desk membership. SR-169 is closed on this ruling.
+
 Two more answers from him the same evening:
 
 - **Sharing goes through a bot.** A person's own knowledge stays private. What a team shares is a bot's knowledge: a bot shared with the team brings its knowledge with it, so teammates can use that bot and call it. There is no "share this source with the company" switch on a person's own Knowledge Base.
@@ -184,6 +188,8 @@ The hosted app does not meet that today. It is one process on one SQLite file wi
 - files move to object storage (the COS backend has never run against a real bucket);
 - sign-in sessions, the run cap and in-flight jobs are shared between servers;
 - the app starts from a server image and passes a health check behind a load balancer.
+
+**Changed 2026-10-13 (Rizky, team board decisions K-D9 and K-D10): the scaling road is Kubernetes (TKE), not CVM Auto Scaling, and only after the data layer moves.** Until a second copy of the app is needed, scaling means resizing the one CVM (Stage 2), and the hosted product database stays SQLite. Reasons and the Caddy placement: `agentforge-chat\docs\internal\team-board-spec.md`, section 4.
 
 None of that is started, and it does not fit in two weeks. Do not start it in passing: it needs Rizky's word. At rest that stage costs about 185 USD a month (two servers, a load balancer, a managed database) before any scaling.
 
