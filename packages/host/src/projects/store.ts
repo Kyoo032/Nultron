@@ -1,25 +1,29 @@
 /**
- * Every SQL statement the projects feature runs (tester, F1). Synchronous better-sqlite3, like the board.
+ * Every SQL statement the projects feature runs (tester, F1 and W1). Synchronous better-sqlite3, like the board.
  *
  * Every statement filters on `organization_id` AND `workspace_id` from the caller's `TenantContext`,
- * never from the request. Visibility of a file is `visibleTo` in `artifacts.ts`, and of a stored image or
- * video `mediaVisibleClause` in `media-visibility.ts`: each rule lives in one place, so this file reuses them.
+ * never from the request. A Workspace is read only through the caller's own `project_members` row (K-D22):
+ * a project the caller is not a member of is never selected. Visibility of a file is `visibleTo` in
+ * `artifacts.ts`, and of a stored image or video `mediaVisibleClause` in `media-visibility.ts`: each rule
+ * lives in one place, so this file reuses them.
  */
 import { sql } from "@agentforge/db";
 import type { TenantContext } from "@agentforge/core";
 import { visibleTo } from "../artifacts";
 import { mediaVisibleClause } from "../media-visibility";
-import type { ProjectVisibility } from "./input";
+import type { WorkspaceRole } from "./input";
 
+/** A project as its member sees it: the row, the caller's own role in it, and how many members it has. */
 export type ProjectRow = {
   id: string;
   name: string;
-  visibility: ProjectVisibility;
   instructions: string | null;
   created_by: string;
   created_at: number;
   updated_at: number;
   archived_at: number | null;
+  role: WorkspaceRole;
+  member_count: number;
 };
 
 export type ProjectFileRow = {
@@ -32,11 +36,11 @@ export type ProjectFileRow = {
   updated_at: number;
 };
 
-/** Visible to the caller: their own project, or any project switched to the workspace. Never archived. */
-const VISIBLE_PROJECT = `id = ? AND organization_id = ? AND workspace_id = ? AND archived_at IS NULL
-  AND (created_by = ? OR visibility = 'workspace')`;
-
-const PROJECT_COLUMNS = "id, name, visibility, instructions, created_by, created_at, updated_at, archived_at";
+/** A live project of the caller's desk, joined to the caller's own membership row. Binds the person first. */
+const MEMBER_PROJECT_SELECT = `SELECT p.id, p.name, p.instructions, p.created_by, p.created_at, p.updated_at, p.archived_at,
+    m.role AS role, (SELECT count(*) FROM project_members c WHERE c.project_id = p.id) AS member_count
+  FROM projects p JOIN project_members m ON m.project_id = p.id AND m.user_id = ?
+  WHERE p.organization_id = ? AND p.workspace_id = ? AND p.archived_at IS NULL`;
 
 export function countLiveProjects(scope: TenantContext): number {
   const row = sql
@@ -47,6 +51,7 @@ export function countLiveProjects(scope: TenantContext): number {
   return row.n;
 }
 
+/** A new project and its maker as its owner. Run inside the caller's transaction. */
 export function insertProject(scope: TenantContext, id: string, name: string, now: number): void {
   sql
     .prepare(
@@ -54,30 +59,27 @@ export function insertProject(scope: TenantContext, id: string, name: string, no
        VALUES (?, ?, ?, ?, 'private', ?, ?, ?)`,
     )
     .run(id, scope.organizationId, scope.workspaceId, name, scope.userId, now, now);
+  insertMember(id, scope.userId, "owner", scope.userId, now);
 }
 
-export function findVisibleProject(scope: TenantContext, id: string): ProjectRow | null {
+/** The project if the caller is a member of it; null for one they are not in, the same as an unknown id. */
+export function findMemberProject(scope: TenantContext, id: string): ProjectRow | null {
   const row = sql
-    .prepare(`SELECT ${PROJECT_COLUMNS} FROM projects WHERE ${VISIBLE_PROJECT}`)
-    .get(id, scope.organizationId, scope.workspaceId, scope.userId) as ProjectRow | undefined;
+    .prepare(`${MEMBER_PROJECT_SELECT} AND p.id = ?`)
+    .get(scope.userId, scope.organizationId, scope.workspaceId, id) as ProjectRow | undefined;
   return row ?? null;
 }
 
-export function listVisibleProjects(scope: TenantContext, limit: number): ProjectRow[] {
+export function listMemberProjects(scope: TenantContext, limit: number): ProjectRow[] {
   return sql
-    .prepare(
-      `SELECT ${PROJECT_COLUMNS} FROM projects
-        WHERE organization_id = ? AND workspace_id = ? AND archived_at IS NULL
-          AND (created_by = ? OR visibility = 'workspace')
-        ORDER BY updated_at DESC LIMIT ?`,
-    )
-    .all(scope.organizationId, scope.workspaceId, scope.userId, limit) as ProjectRow[];
+    .prepare(`${MEMBER_PROJECT_SELECT} ORDER BY p.updated_at DESC LIMIT ?`)
+    .all(scope.userId, scope.organizationId, scope.workspaceId, limit) as ProjectRow[];
 }
 
 export function updateProjectRow(
   scope: TenantContext,
   id: string,
-  changes: { name?: string; visibility?: ProjectVisibility; instructions?: string },
+  changes: { name?: string; instructions?: string },
   now: number,
 ): void {
   // Column names are fixed literals below, never taken from the request.
@@ -86,10 +88,6 @@ export function updateProjectRow(
   if (changes.name !== undefined) {
     sets.push("name = ?");
     args.push(changes.name);
-  }
-  if (changes.visibility !== undefined) {
-    sets.push("visibility = ?");
-    args.push(changes.visibility);
   }
   if (changes.instructions !== undefined) {
     sets.push("instructions = ?");
@@ -108,10 +106,105 @@ export function archiveProjectRow(scope: TenantContext, id: string, now: number)
     .run(now, now, id, scope.organizationId, scope.workspaceId);
 }
 
+export type MemberRow = {
+  user_id: string;
+  name: string | null;
+  role: WorkspaceRole;
+  added_by: string;
+  added_at: number;
+};
+
+/** The members of a project, owner first. The caller has checked they are one. */
+export function listMembers(projectId: string): MemberRow[] {
+  return sql
+    .prepare(
+      `SELECT m.user_id, u.name AS name, m.role, m.added_by, m.added_at
+         FROM project_members m LEFT JOIN user u ON u.id = m.user_id
+        WHERE m.project_id = ?
+        ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, m.added_at, m.user_id`,
+    )
+    .all(projectId) as MemberRow[];
+}
+
+export function memberRole(projectId: string, userId: string): WorkspaceRole | null {
+  const row = sql
+    .prepare("SELECT role FROM project_members WHERE project_id = ? AND user_id = ?")
+    .get(projectId, userId) as { role: WorkspaceRole } | undefined;
+  return row?.role ?? null;
+}
+
+/** Adds a member. A person who is one already keeps the role they have. */
+export function insertMember(
+  projectId: string,
+  userId: string,
+  role: WorkspaceRole,
+  addedBy: string,
+  now: number,
+): void {
+  sql
+    .prepare(
+      "INSERT OR IGNORE INTO project_members (project_id, user_id, role, added_by, added_at) VALUES (?, ?, ?, ?, ?)",
+    )
+    .run(projectId, userId, role, addedBy, now);
+}
+
+export function deleteMember(projectId: string, userId: string): void {
+  sql.prepare("DELETE FROM project_members WHERE project_id = ? AND user_id = ?").run(projectId, userId);
+}
+
+export function setMemberRole(projectId: string, userId: string, role: WorkspaceRole): void {
+  sql.prepare("UPDATE project_members SET role = ? WHERE project_id = ? AND user_id = ?").run(role, projectId, userId);
+}
+
+/** A person of the caller's company, in the caller's tenant: the only people a Workspace may take in. */
+export function isCompanyMember(scope: TenantContext, userId: string): boolean {
+  return (
+    sql
+      .prepare(
+        `SELECT 1 AS ok FROM organization_members om JOIN organizations o ON o.id = om.organization_id
+          WHERE om.organization_id = ? AND o.tenant_id = ? AND om.user_id = ?`,
+      )
+      .get(scope.organizationId, scope.tenantId, userId) !== undefined
+  );
+}
+
+export type ProjectAgentRow = { agent_id: string; brought_by: string; added_at: number };
+
+export function listProjectAgents(projectId: string): ProjectAgentRow[] {
+  return sql
+    .prepare(
+      "SELECT agent_id, brought_by, added_at FROM project_agents WHERE project_id = ? ORDER BY added_at, agent_id, brought_by",
+    )
+    .all(projectId) as ProjectAgentRow[];
+}
+
+export function insertProjectAgent(projectId: string, agentId: string, broughtBy: string, now: number): void {
+  sql
+    .prepare("INSERT OR IGNORE INTO project_agents (project_id, agent_id, brought_by, added_at) VALUES (?, ?, ?, ?)")
+    .run(projectId, agentId, broughtBy, now);
+}
+
+/** Takes the agent out: every member's copy of it, or only `broughtBy`'s when one is named. Returns the rows removed. */
+export function deleteProjectAgent(projectId: string, agentId: string, broughtBy: string | null): number {
+  if (broughtBy === null) {
+    return sql.prepare("DELETE FROM project_agents WHERE project_id = ? AND agent_id = ?").run(projectId, agentId)
+      .changes;
+  }
+  return sql
+    .prepare("DELETE FROM project_agents WHERE project_id = ? AND agent_id = ? AND brought_by = ?")
+    .run(projectId, agentId, broughtBy).changes;
+}
+
+export function hasProjectAgent(projectId: string, agentId: string): boolean {
+  return (
+    sql.prepare("SELECT 1 AS ok FROM project_agents WHERE project_id = ? AND agent_id = ?").get(projectId, agentId) !==
+    undefined
+  );
+}
+
 /**
- * The files of a project the caller may see. The project's visibility is checked by the caller first;
- * the file rule is applied again per row, so a file a colleague added and the maker later made private
- * is not listed to anyone else.
+ * The files of a project the caller may see. The caller's membership is checked first; the file rule
+ * (`visibleTo`) is applied again per row.
  */
 export function listProjectFiles(scope: TenantContext, projectId: string, limit: number): ProjectFileRow[] {
   const visible = visibleTo(scope);
@@ -169,7 +262,7 @@ export function setMediaProject(scope: TenantContext, mediaId: string, projectId
     .run(projectId, scope.organizationId, mediaId);
 }
 
-/** The media of a project the caller may see; the project is checked by the caller first. Same per-row rule as files. */
+/** The media of a project the caller may see; membership is checked by the caller first. Same per-row rule as files. */
 export function listProjectMedia(scope: TenantContext, projectId: string, limit: number): ProjectMediaRow[] {
   const visible = mediaVisibleClause(scope);
   return sql

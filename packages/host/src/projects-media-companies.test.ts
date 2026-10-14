@@ -1,10 +1,10 @@
 /**
  * Generated media in a Workspace on the hosted app, through the real router with real sessions and a real
- * database (team-board-spec.md section 2b, W1b; SR-175; K-D18, K-D19, K-D20).
+ * database (team-board-spec.md section 2b, W1b; SR-175; K-D18, K-D20, K-D22).
  *
  * Rule: a person's own image or video is visible only to them. Adding it to a Workspace makes it visible to,
- * and downloadable by, everyone in the company while that Workspace is `workspace`. Only its maker may add
- * it, and only into a Workspace the caller can see. Removing it clears its Workspace.
+ * and downloadable by, that Workspace's members. Only its maker may add it, and only into a Workspace the
+ * caller is a member of. Removing it clears its Workspace.
  *
  * Company A has an owner (Alice, A1) and a member (Ann, A2); company B has an owner (Bob, B1). Each refusal
  * is paired with a success at the same call, so a server that refused everybody would fail.
@@ -91,10 +91,28 @@ async function makeProject(person: Person, name: string): Promise<string> {
   return ((result as HostJsonResult).body as { project: { id: string } }).project.id;
 }
 
-async function setVisibility(person: Person, projectId: string, visibility: "private" | "workspace"): Promise<void> {
-  expect(await outcome(await call(person, "PATCH", "/api/v1/projects/:id", { id: projectId }, { visibility }))).toEqual(
-    { status: 200 },
-  );
+/** The person's colleagues in this file: Alice's is Ann; Bob has none. */
+function colleaguesOf(person: Person): Person[] {
+  return person === alice ? [ann] : [];
+}
+
+/** Invites the person's colleagues into the Workspace: it is shared with its members only (K-D22). */
+async function shareWithColleagues(person: Person, projectId: string): Promise<void> {
+  for (const colleague of colleaguesOf(person)) {
+    expect(
+      await outcome(
+        await call(
+          person,
+          "POST",
+          "/api/v1/projects/:id/members",
+          { id: projectId },
+          {
+            userId: colleague.tenant.userId,
+          },
+        ),
+      ),
+    ).toEqual({ status: 201 });
+  }
 }
 
 /** A generated image as a person's own media row: the same writer the Images studio and chat use. */
@@ -161,7 +179,7 @@ describe("generated media in a Workspace: two companies, real sessions", () => {
 
   it("adding the image to a shared Workspace lets a colleague read and download it; another company still gets 404", async () => {
     const project = await makeProject(alice, "Shared image Workspace");
-    await setVisibility(alice, project, "workspace");
+    await shareWithColleagues(alice, project);
     const image = await makeImage(alice, "shared-image");
 
     expect(
@@ -183,7 +201,7 @@ describe("generated media in a Workspace: two companies, real sessions", () => {
 
   it("the Workspace file list carries the media row: kind, mime, size, who added it, and a download URL", async () => {
     const project = await makeProject(alice, "Listed media Workspace");
-    await setVisibility(alice, project, "workspace");
+    await shareWithColleagues(alice, project);
     const image = await makeImage(alice, "listed-image");
     await call(alice, "POST", "/api/v1/projects/:id/files", { id: project }, { mediaId: image });
 
@@ -202,7 +220,7 @@ describe("generated media in a Workspace: two companies, real sessions", () => {
 
   it("a video added to a Workspace is listed as a video and streams for a colleague", async () => {
     const project = await makeProject(alice, "Shared video Workspace");
-    await setVisibility(alice, project, "workspace");
+    await shareWithColleagues(alice, project);
     const video = await makeVideo(alice, "shared-video");
     expect(
       await outcome(await call(alice, "POST", "/api/v1/projects/:id/files", { id: project }, { mediaId: video })),
@@ -215,7 +233,7 @@ describe("generated media in a Workspace: two companies, real sessions", () => {
 
   it("a colleague may not add the maker's media to her own Workspace (403); a private Workspace's media is its maker's only", async () => {
     const shared = await makeProject(alice, "Shared for refusal");
-    await setVisibility(alice, shared, "workspace");
+    await shareWithColleagues(alice, shared);
     const aliceImage = await makeImage(alice, "refused-image");
     await call(alice, "POST", "/api/v1/projects/:id/files", { id: shared }, { mediaId: aliceImage });
 
@@ -247,7 +265,7 @@ describe("generated media in a Workspace: two companies, real sessions", () => {
 
   it("a colleague's own image joins a shared Workspace, and the maker of the Workspace sees it there", async () => {
     const project = await makeProject(alice, "Ann image Workspace");
-    await setVisibility(alice, project, "workspace");
+    await shareWithColleagues(alice, project);
     const annImage = await makeImage(ann, "ann-image");
     expect(await outcome(await readMedia(alice, annImage))).toEqual(NOT_FOUND);
 
@@ -258,22 +276,29 @@ describe("generated media in a Workspace: two companies, real sessions", () => {
     expect(await readMedia(bob, annImage)).toMatchObject({ status: 404 });
   });
 
-  it("flipping the Workspace back to private hides a colleague's media from the others; its maker still reads it", async () => {
-    const project = await makeProject(alice, "Flip media Workspace");
-    await setVisibility(alice, project, "workspace");
-    const annImage = await makeImage(ann, "flip-ann-image");
+  it("a removed member loses the Workspace's media and keeps her own; the members still read hers", async () => {
+    const project = await makeProject(alice, "Leave media Workspace");
+    await shareWithColleagues(alice, project);
+    const annImage = await makeImage(ann, "leave-ann-image");
+    const aliceImage = await makeImage(alice, "leave-alice-image");
     await call(ann, "POST", "/api/v1/projects/:id/files", { id: project }, { mediaId: annImage });
-    expect((await readMedia(alice, annImage)).status).toBe(200);
+    await call(alice, "POST", "/api/v1/projects/:id/files", { id: project }, { mediaId: aliceImage });
+    expect((await readMedia(ann, aliceImage)).status).toBe(200);
 
-    await setVisibility(alice, project, "private");
-    expect(await outcome(await readMedia(alice, annImage))).toEqual(NOT_FOUND);
-    expect(await outcome(await readMedia(bob, annImage))).toEqual(NOT_FOUND);
+    expect(
+      await outcome(
+        await call(alice, "DELETE", "/api/v1/projects/:id/members/:userId", { id: project, userId: "ann" }),
+      ),
+    ).toEqual({ status: 200 });
+    expect(await outcome(await readMedia(ann, aliceImage))).toEqual(NOT_FOUND);
     expect((await readMedia(ann, annImage)).status).toBe(200);
+    expect((await readMedia(alice, annImage)).status).toBe(200);
+    expect(await outcome(await readMedia(bob, annImage))).toEqual(NOT_FOUND);
   });
 
   it("the file's maker removes it from a shared Workspace; the Workspace's maker removes a colleague's media; a stranger's refusal is a 404", async () => {
     const project = await makeProject(alice, "Removal media Workspace");
-    await setVisibility(alice, project, "workspace");
+    await shareWithColleagues(alice, project);
     const annImage = await makeImage(ann, "removal-ann-image");
     await call(ann, "POST", "/api/v1/projects/:id/files", { id: project }, { mediaId: annImage });
     const aliceImage = await makeImage(alice, "removal-alice-image");
@@ -320,7 +345,7 @@ describe("generated media in a Workspace: two companies, real sessions", () => {
 
   it("archiving the Workspace sends its media back to its makers", async () => {
     const project = await makeProject(alice, "Archived media Workspace");
-    await setVisibility(alice, project, "workspace");
+    await shareWithColleagues(alice, project);
     const annImage = await makeImage(ann, "archived-ann-image");
     await call(ann, "POST", "/api/v1/projects/:id/files", { id: project }, { mediaId: annImage });
     expect((await readMedia(alice, annImage)).status).toBe(200);
@@ -340,7 +365,7 @@ describe("generated media in a Workspace: two companies, real sessions", () => {
     expect(ghost).toEqual(hidden);
 
     const project = await makeProject(bob, "Bob ghost check");
-    await setVisibility(bob, project, "workspace");
+    await shareWithColleagues(bob, project);
     const addHidden = await outcome(
       await call(ann, "POST", "/api/v1/projects/:id/files", { id: project }, { mediaId: image }),
     );
@@ -363,7 +388,7 @@ describe("generated media in a Workspace: two companies, real sessions", () => {
     expect(await chatMediaReferenceResolver(alice.tenant, image)).toMatch(/^data:image\/png;base64,/);
 
     const project = await makeProject(alice, "Chat reference Workspace");
-    await setVisibility(alice, project, "workspace");
+    await shareWithColleagues(alice, project);
     await call(alice, "POST", "/api/v1/projects/:id/files", { id: project }, { mediaId: image });
     expect(await chatMediaReferenceResolver(ann.tenant, image)).toMatch(/^data:image\/png;base64,/);
   });

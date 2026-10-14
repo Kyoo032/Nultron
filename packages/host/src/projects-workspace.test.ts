@@ -1,5 +1,5 @@
 /**
- * A Workspace works like a Claude project (team-board-spec.md section 2b, W1; K-D19, K-D20). Its files
+ * A Workspace works like a Claude project (team-board-spec.md section 2b, W1; K-D20, K-D22). Its files
  * are knowledge, its instructions go into the chat's system prompt, and a chat started in it searches
  * its knowledge and the person's own, never another Workspace's. Real router, real sessions, real
  * database, server mode on.
@@ -109,6 +109,20 @@ async function makeThread(person: Person, projectId?: string): Promise<{ id: str
 
 type KnowledgeItem = { id: string; name: string; addedBy: string | null; status: string };
 
+/** Alice invites a colleague into her Workspace: it is shared with its members only (K-D22). */
+async function invite(projectId: string, colleague: Person): Promise<void> {
+  const result = await call(
+    alice,
+    "POST",
+    "/api/v1/projects/:id/members",
+    { id: projectId },
+    {
+      userId: colleague.tenant.userId,
+    },
+  );
+  expect(result.status).toBe(201);
+}
+
 async function knowledgeNames(person: Person, projectId: string): Promise<string[]> {
   const result = await call(person, "GET", "/api/v1/projects/:id/knowledge", { id: projectId });
   return jsonBody<{ items: KnowledgeItem[] }>(result).items.map((item) => item.name);
@@ -200,7 +214,7 @@ describe("a Workspace: files, knowledge, instructions and chats, two companies",
     ).toBe(NOT_FOUND);
   });
 
-  it("flipped to workspace, a colleague's Workspace chat gets the file and the instructions; outside chats do not", async () => {
+  it("once invited, a colleague's Workspace chat gets the file and the instructions; outside chats do not", async () => {
     const project = await makeProject(alice, "Shared ledger desk");
     await call(alice, "PATCH", "/api/v1/projects/:id", { id: project }, { instructions: INSTRUCTIONS });
     expect(
@@ -215,9 +229,7 @@ describe("a Workspace: files, knowledge, instructions and chats, two companies",
         ),
       ),
     ).toBe(201);
-    expect(
-      statusOf(await call(alice, "PATCH", "/api/v1/projects/:id", { id: project }, { visibility: "workspace" })),
-    ).toBe(200);
+    await invite(project, ann);
 
     expect(await knowledgeNames(ann, project)).toEqual(["shared.md"]);
     const annKnowledge = await call(ann, "GET", "/api/v1/projects/:id/knowledge", { id: project });
@@ -243,8 +255,8 @@ describe("a Workspace: files, knowledge, instructions and chats, two companies",
     expect(await injectedFor(bob, project)).not.toContain(PHRASE);
   });
 
-  it("flipped back to private, the colleague's Workspace chat loses the file again", async () => {
-    const project = await makeProject(alice, "Flip ledger desk");
+  it("removed from the Workspace, the colleague's Workspace chat loses the file again", async () => {
+    const project = await makeProject(alice, "Leave ledger desk");
     await call(
       alice,
       "POST",
@@ -253,12 +265,12 @@ describe("a Workspace: files, knowledge, instructions and chats, two companies",
       undefined,
       markdownUpload(`${PHRASE} flip.`, "flip.md"),
     );
-    await call(alice, "PATCH", "/api/v1/projects/:id", { id: project }, { visibility: "workspace" });
+    await invite(project, ann);
     const annChat = await makeThread(ann, project);
     expect(await searchFor(ann, project, annChat.id)).toContain("flip.md");
 
     expect(
-      statusOf(await call(alice, "PATCH", "/api/v1/projects/:id", { id: project }, { visibility: "private" })),
+      statusOf(await call(alice, "DELETE", "/api/v1/projects/:id/members/:userId", { id: project, userId: "ann" })),
     ).toBe(200);
     expect(statusOf(await call(ann, "GET", "/api/v1/projects/:id/knowledge", { id: project }))).toBe(NOT_FOUND);
     expect(await searchFor(ann, project, annChat.id)).not.toContain("flip.md");
@@ -278,7 +290,7 @@ describe("a Workspace: files, knowledge, instructions and chats, two companies",
       body: `# Note\n\n${PHRASE} from chat.`,
       meta: {},
     });
-    await call(alice, "PATCH", "/api/v1/projects/:id", { id: project }, { visibility: "workspace" });
+    await invite(project, ann);
 
     expect(
       statusOf(await call(alice, "POST", "/api/v1/projects/:id/files", { id: project }, { artifactId: artifact.id })),
@@ -297,7 +309,7 @@ describe("a Workspace: files, knowledge, instructions and chats, two companies",
 
   it("a chat belongs to its person: the Workspace lists each person's own threads only", async () => {
     const project = await makeProject(alice, "Threads desk");
-    await call(alice, "PATCH", "/api/v1/projects/:id", { id: project }, { visibility: "workspace" });
+    await invite(project, ann);
     const annThread = await makeThread(ann, project);
     const aliceThread = await makeThread(alice, project);
 

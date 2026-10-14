@@ -2,7 +2,7 @@
  * Who may read or delete a generated file on the hosted app (SR-175, SR-176; team-board-spec.md sections 2b and 11).
  *
  * A person's own generated media is theirs. A row joins a Workspace (`media.project_id`, set by
- * `projects/service.ts`), and while that Workspace is `workspace` everyone in the company may read it. The
+ * `projects/service.ts`), and that Workspace's members may read it (K-D22), nobody else in the company. The
  * rule is one SQL clause and one JavaScript twin, the same shape as `visibleTo` for artifacts (`artifacts.ts`).
  *
  * Two readers, on purpose:
@@ -20,6 +20,7 @@ import { and, eq, or, sql, type SQL } from "drizzle-orm";
 import { db, media } from "@agentforge/db";
 import { canAdminister, isServerMode, type TenantContext } from "@agentforge/core";
 import { readTenantObject } from "./tenant-storage";
+import { memberOfLiveProjectSql } from "./projects/membership-sql";
 
 export type MediaReach = "desk" | "person";
 
@@ -29,17 +30,21 @@ export type MediaReachViewer = Pick<TenantContext, "userId" | "workspaceId">;
 /** A caller, and the company it reads in. Edit reads a job's output as the requester, with this shape. */
 export type MediaViewer = Pick<TenantContext, "organizationId" | "userId" | "workspaceId">;
 
+/** The Workspace a media row sits in must be on the caller's current desk, so another desk's is not a way in. */
+const MEDIA_PROJECT_WHERE =
+  "p.id = media.project_id AND p.organization_id = media.organization_id AND p.workspace_id = ?";
+
 /**
- * The media of a live, shared Workspace on the caller's desk. Only the caller's current desk is named, so a
- * Workspace of another desk of the same company is not a way in. Keep this and `mediaVisibleClause` in step.
+ * The media of a live Workspace on the caller's desk that the caller is a member of (K-D22). The drizzle twin
+ * of `memberOfLiveProjectSql(MEDIA_PROJECT_WHERE)`, which `mediaVisibleClause` uses; keep the two in step.
  */
 function sharedMediaSql(viewer: MediaReachViewer): SQL {
-  return sql`EXISTS (SELECT 1 FROM projects p WHERE p.id = ${media.projectId} AND p.organization_id = ${media.organizationId} AND p.workspace_id = ${viewer.workspaceId} AND p.visibility = 'workspace' AND p.archived_at IS NULL)`;
+  return sql`EXISTS (SELECT 1 FROM projects p JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ${viewer.userId} WHERE p.archived_at IS NULL AND p.id = ${media.projectId} AND p.organization_id = ${media.organizationId} AND p.workspace_id = ${viewer.workspaceId})`;
 }
 
 /**
  * The drizzle condition `reach` adds to a query on `media`, or undefined when it adds none. The `person` answer
- * is the maker's own row or a row in a shared Workspace of the caller's desk. Undefined off server mode and for
+ * is the maker's own row or a row in a Workspace of the caller's desk they are a member of. Undefined off server mode and for
  * `desk`, so the query is the one it was.
  */
 export function mediaReachWhere(viewer: MediaReachViewer, reach: MediaReach): SQL | undefined {
@@ -58,8 +63,8 @@ export function mediaVisibleClause(tenant: TenantContext): { clause: string; arg
     return { clause: "", args: [] };
   }
   return {
-    clause: ` AND (user_id = ? OR EXISTS (SELECT 1 FROM projects p WHERE p.id = media.project_id AND p.organization_id = media.organization_id AND p.workspace_id = ? AND p.visibility = 'workspace' AND p.archived_at IS NULL))`,
-    args: [tenant.userId, tenant.workspaceId],
+    clause: ` AND (user_id = ? OR ${memberOfLiveProjectSql(MEDIA_PROJECT_WHERE)})`,
+    args: [tenant.userId, tenant.userId, tenant.workspaceId],
   };
 }
 

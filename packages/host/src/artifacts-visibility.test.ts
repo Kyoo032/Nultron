@@ -1,6 +1,6 @@
 /**
  * Who sees an artifact (SR-175, Rizky 2026-10-14): on the hosted app a file a person makes on their
- * own is visible only to them; a file put into a collective project is visible to the company; a
+ * own is visible only to them; a file put into a Workspace is visible to its members (K-D22); a
  * legacy row with no owner stays company-visible, as it was made. Personal has one person per desk
  * and must behave exactly as before.
  *
@@ -11,7 +11,7 @@ import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { wrappingKeyFromSecret, type TenantContext } from "@agentforge/core";
 import { ensureSchema } from "@agentforge/db/ensure-schema";
-import { SHARED_ARTIFACT_SQL, createArtifactStore, isSharedForViewer, type ArtifactStore } from "./artifacts";
+import { createArtifactStore, type ArtifactStore } from "./artifacts";
 
 const KEY = wrappingKeyFromSecret("c".repeat(64));
 
@@ -75,12 +75,27 @@ describe("artifact visibility on the hosted app", () => {
     expect(store.get(ann, made.id)).not.toBeNull();
   });
 
-  it("grants nothing from a project id that no project row backs, in SQL or in the JavaScript twin", () => {
-    const row = { project_id: "proj-1", workspace_id: "desk-a" };
-    expect(isSharedForViewer(row, bob)).toBe(false);
-    expect(isSharedForViewer({ project_id: null, workspace_id: "desk-a" }, bob)).toBe(false);
-    expect(SHARED_ARTIFACT_SQL).toContain("FROM projects p");
-    expect(SHARED_ARTIFACT_SQL).toContain("p.visibility = 'workspace'");
+  it("shows a file in a Workspace to its members and to nobody else of the company (K-D22, SR-178)", () => {
+    db.exec(`
+      INSERT INTO tenants (id, slug, name, status, created_at) VALUES ('partner', 'partner', 'partner', 'active', 1);
+      INSERT INTO organizations (id, tenant_id, name, slug, industry_pack, created_at)
+        VALUES ('org-a', 'partner', 'a', 'a', 'generic', 1);
+      INSERT INTO workspaces (id, organization_id, name, slug, created_at) VALUES ('desk-a', 'org-a', 'd', 'd', 1);
+      INSERT INTO projects (id, organization_id, workspace_id, name, visibility, created_by, created_at, updated_at)
+        VALUES ('proj-1', 'org-a', 'desk-a', 'p', 'workspace', 'ann', 1, 1);
+      INSERT INTO project_members (project_id, user_id, role, added_by, added_at) VALUES ('proj-1', 'ann', 'owner', 'ann', 1);
+    `);
+    const made = store.create(ann, INPUT);
+    db.prepare("UPDATE artifacts SET project_id = 'proj-1' WHERE id = ?").run(made.id);
+    // `visibility = 'workspace'` on the row grants nothing: bob is not a member yet.
+    expect(store.get(bob, made.id)).toBeNull();
+    db.prepare(
+      "INSERT INTO project_members (project_id, user_id, role, added_by, added_at) VALUES ('proj-1', 'bob', 'member', 'ann', 2)",
+    ).run();
+    expect(store.list(bob).map((item) => item.id)).toEqual([made.id]);
+    expect(store.get(bob, made.id)?.body).toBe("# Plan\n\nbody");
+    db.prepare("UPDATE projects SET archived_at = 3 WHERE id = 'proj-1'").run();
+    expect(store.get(bob, made.id)).toBeNull();
   });
 
   it("keeps a legacy row with no owner visible to the company", () => {

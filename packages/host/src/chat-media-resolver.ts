@@ -2,7 +2,7 @@
  * The media reference resolver for a chat run. A tool (`image_generate`, `video_generate`) that is
  * given a stored image's reference reads it through here, and only through here: the core tool never
  * reads the database. The read is scoped to what the caller may see (SR-175) by `statVisibleMedia` and
- * `readVisibleMediaDataUrl`: their own media and a shared Workspace's. Another person's or another
+ * `readVisibleMediaDataUrl`: their own media and their Workspaces' (K-D22). Another person's or another
  * organization's media id answers null, which the tool reports as "no image with that reference" and
  * never as bytes.
  */

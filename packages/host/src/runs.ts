@@ -34,7 +34,7 @@ import { ApiError } from "@agentforge/core";
 import { agentService } from "./tenant";
 import { armRunStallGuard, isRunOutputEvent } from "./run-stall";
 import { knowledgeInjection } from "./knowledge";
-import { workspacePromptBlock } from "./projects/service";
+import { workspaceForRun, workspacePromptBlock } from "./projects/service";
 import { citedSources } from "./knowledge-cites";
 import { recordCites } from "./knowledge-graph";
 import { recordRetrievals, recordsRetrievals } from "./knowledge-retrievals";
@@ -189,7 +189,8 @@ export async function* startModalityRun(options: {
     .join("\n");
   // The thread's own work card is skipped so Chat never retrieves its last reply back into itself.
   // A chat started in a Workspace (W1) searches that Workspace's sources too, and no other Workspace's.
-  const projectId = thread.projectId ?? null;
+  // Checked on every run (K-D22): a person who left, or an agent that was taken out, runs as an ordinary chat.
+  const projectId = workspaceForRun(options.tenant, thread.projectId ?? null, published.agent.slug);
   const knowledge = await knowledgeInjection(options.tenant, userText, { excludeThreadId: thread.id, projectId });
   // Phase 4: the language of the person who sent the message, not the language the process booted
   // in. On a desk they are the same value, because `saveUserLocale` writes both; on a hosted server

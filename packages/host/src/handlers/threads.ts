@@ -68,8 +68,11 @@ export async function handlePostThreads(request: HostRequest): Promise<HostResul
     }
     const title = typeof body.title === "string" ? body.title.trim().slice(0, THREAD_TITLE_MAX) : undefined;
     // A Workspace chat (W1) is server mode only: on Personal the field is ignored, so the chat is what it was.
+    // The agent must be the default one or one a member brought into the Workspace (K-D22).
     const projectId =
-      isServerMode() && typeof body.projectId === "string" ? requireChatWorkspace(tenant, body.projectId) : null;
+      isServerMode() && typeof body.projectId === "string"
+        ? requireChatWorkspace(tenant, body.projectId, agent.slug)
+        : null;
     const thread = await createThread(tenant, agent.id, title || undefined, projectId);
     return jsonOk({ thread }, 201);
   } catch (error) {

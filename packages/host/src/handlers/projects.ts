@@ -7,19 +7,33 @@
  * for a chat file and `GET /api/v1/media/:id/file` for a generated image or video (SR-175).
  */
 import { ApiError, isServerMode } from "@agentforge/core";
-import { parseAddFile, parseCreateProject, parseUpdateProject } from "../projects/input";
+import {
+  parseAddFile,
+  parseAgentInput,
+  parseCreateProject,
+  parsePersonInput,
+  parseRoleInput,
+  parseUpdateProject,
+} from "../projects/input";
 import {
   addProjectFile,
   addProjectMedia,
+  addProjectMember,
   archiveProject,
+  bringProjectAgent,
   createProject,
   listProjectFiles,
   listProjectKnowledgeFor,
+  listProjectMembers,
   listProjectThreadsFor,
   listProjects,
+  removeProjectAgent,
   removeProjectFile,
   removeProjectKnowledge,
   removeProjectMedia,
+  removeProjectMember,
+  setProjectMemberRole,
+  transferProjectOwnership,
   updateProject,
   uploadProjectKnowledge,
 } from "../projects/service";
@@ -129,6 +143,50 @@ export const handleGetProjectThreads = projectRoute(async (request) => {
   return jsonOk({ items: listProjectThreadsFor(scope, request.params.id ?? "") });
 });
 
+/** The people and the agents brought in (K-D22, K-D23), for any member. */
+export const handleGetProjectMembers = projectRoute(async (request) => {
+  const scope = await getTenant(request);
+  return jsonOk(listProjectMembers(scope, request.params.id ?? ""));
+});
+
+export const handlePostProjectMember = projectRoute(async (request) => {
+  const scope = await getTenant(request);
+  const { userId } = parsePersonInput(request.body);
+  return jsonOk({ members: addProjectMember(scope, request.params.id ?? "", userId) }, 201);
+});
+
+export const handlePatchProjectMember = projectRoute(async (request) => {
+  const scope = await getTenant(request);
+  const { role } = parseRoleInput(request.body);
+  setProjectMemberRole(scope, request.params.id ?? "", request.params.userId ?? "", role);
+  return jsonOk({ ok: true });
+});
+
+export const handleDeleteProjectMember = projectRoute(async (request) => {
+  const scope = await getTenant(request);
+  removeProjectMember(scope, request.params.id ?? "", request.params.userId ?? "");
+  return jsonOk({ ok: true });
+});
+
+export const handlePostProjectOwner = projectRoute(async (request) => {
+  const scope = await getTenant(request);
+  const { userId } = parsePersonInput(request.body);
+  transferProjectOwnership(scope, request.params.id ?? "", userId);
+  return jsonOk({ ok: true });
+});
+
+export const handlePostProjectAgent = projectRoute(async (request) => {
+  const scope = await getTenant(request);
+  const { agentId } = parseAgentInput(request.body);
+  return jsonOk({ agents: await bringProjectAgent(scope, request.params.id ?? "", agentId) }, 201);
+});
+
+export const handleDeleteProjectAgent = projectRoute(async (request) => {
+  const scope = await getTenant(request);
+  removeProjectAgent(scope, request.params.id ?? "", request.params.agentId ?? "");
+  return jsonOk({ ok: true });
+});
+
 /**
  * The F1 project route table. `router.ts` compiles it with one line. Every by-id route here has its row
  * in `tenancy-harness.test.ts`, which fails for any by-id route without one.
@@ -149,5 +207,12 @@ export function projectRoutes(): ReadonlyArray<
     ["POST", "/api/v1/projects/:id/uploads", handlePostProjectUpload],
     ["DELETE", "/api/v1/projects/:id/knowledge/:sourceId", handleDeleteProjectKnowledge],
     ["GET", "/api/v1/projects/:id/threads", handleGetProjectThreads],
+    ["GET", "/api/v1/projects/:id/members", handleGetProjectMembers],
+    ["POST", "/api/v1/projects/:id/members", handlePostProjectMember],
+    ["PATCH", "/api/v1/projects/:id/members/:userId", handlePatchProjectMember],
+    ["DELETE", "/api/v1/projects/:id/members/:userId", handleDeleteProjectMember],
+    ["POST", "/api/v1/projects/:id/owner", handlePostProjectOwner],
+    ["POST", "/api/v1/projects/:id/agents", handlePostProjectAgent],
+    ["DELETE", "/api/v1/projects/:id/agents/:agentId", handleDeleteProjectAgent],
   ];
 }

@@ -101,13 +101,23 @@ async function makeAudio(person: Person, name: string): Promise<string> {
   return saved.id;
 }
 
-async function shareInWorkspace(person: Person, mediaId: string): Promise<void> {
+/** Puts the file in a new Workspace of `person` and invites `members`: a Workspace is shared with its members only (K-D22). */
+async function shareInWorkspace(person: Person, mediaId: string, members: readonly Person[]): Promise<void> {
   const created = await call(person, "POST", "/api/v1/projects", {}, { name: `Shared ${mediaId.slice(0, 8)}` });
   expect(created.status).toBe(201);
   const project = jsonBody<{ project: { id: string } }>(created).project.id;
-  expect(
-    (await call(person, "PATCH", "/api/v1/projects/:id", { id: project }, { visibility: "workspace" })).status,
-  ).toBe(200);
+  for (const member of members) {
+    const invited = await call(
+      person,
+      "POST",
+      "/api/v1/projects/:id/members",
+      { id: project },
+      {
+        userId: member.tenant.userId,
+      },
+    );
+    expect(invited.status).toBe(201);
+  }
   const attached = await call(person, "POST", "/api/v1/projects/:id/files", { id: project }, { mediaId });
   expect(attached.status).toBe(200);
 }
@@ -140,11 +150,11 @@ describe("generated media reads on the hosted app: two companies and an admin", 
 
     aliceOwnImage = await makeImage(alice, "alice-own");
     aliceSharedImage = await makeImage(alice, "alice-shared");
-    await shareInWorkspace(alice, aliceSharedImage);
+    await shareInWorkspace(alice, aliceSharedImage, [ann, adam]);
     annOwnImage = await makeImage(ann, "ann-own");
     aliceOwnVideo = await makeVideo(alice, "alice-own");
     annSharedVideo = await makeVideo(ann, "ann-shared");
-    await shareInWorkspace(ann, annSharedVideo);
+    await shareInWorkspace(ann, annSharedVideo, [alice, adam]);
     aliceOwnAudio = await makeAudio(alice, "alice-own");
   }, ROUTER_IMPORT_BUDGET_MS);
 
@@ -267,11 +277,13 @@ describe("generated media reads on the hosted app: two companies and an admin", 
       expect(await loadMediaRow(aliceOwnImage, bob.tenant)).toBeNull();
     });
 
-    it("a job with no recorded requester reads as nobody: a shared row only, never a colleague's private one", async () => {
+    it("a job with no recorded requester reads as nobody: nobody is a Workspace member, so no row at all (K-D22)", async () => {
       const { loadMediaRow } = await import("./edit/wire-generate");
       const nobody = { ...alice.tenant, userId: "" };
       expect(await loadMediaRow(aliceOwnImage, nobody)).toBeNull();
-      expect(await loadMediaRow(aliceSharedImage, nobody)).not.toBeNull();
+      expect(await loadMediaRow(aliceSharedImage, nobody)).toBeNull();
+      // Positive control: a member of that Workspace finds the same row.
+      expect(await loadMediaRow(aliceSharedImage, ann.tenant)).not.toBeNull();
     });
   });
 

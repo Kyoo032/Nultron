@@ -1,9 +1,11 @@
 /**
- * The collective projects table, phase F1 (team-board-spec.md section 2b, K-D19).
+ * The collective projects tables (team-board-spec.md section 2b; on screen a project is a Workspace).
  *
- * A project is private to its maker by default. Its maker flips one switch to `workspace`, which makes
- * the project's files visible to, and downloadable by, everyone in the company. A file is shared only
- * while it sits in a workspace project (`SHARED_ARTIFACT_SQL` in `packages/host/src/artifacts.ts`).
+ * A Workspace is shared with its members only, never the whole company (K-D22). `project_members` holds
+ * them with a role (K-D23): exactly one `owner`, any number of `admin` and `member`. A file in a Workspace is
+ * readable by its members (`sharedArtifactSql` in `packages/host/src/artifacts.ts`). `projects.visibility`
+ * is the retired K-D19 switch: kept in the table, read by nothing that grants access.
+ * `project_agents` holds the agents each member brought in, by product-mode id.
  *
  * Added the same way as the board's K0 tables (`board-schema.ts`): `CREATE TABLE IF NOT EXISTS` on
  * every open, not a numbered migration, so the tester branch never edits the journal `main` owns.
@@ -15,7 +17,7 @@
  */
 import type Database from "better-sqlite3";
 
-export const PROJECT_TABLES = ["projects"] as const;
+export const PROJECT_TABLES = ["projects", "project_members", "project_agents"] as const;
 
 /** Refuses a project whose organization is not the organization of its desk. Insert and update. */
 function organizationGuards(table: string): string {
@@ -41,6 +43,20 @@ function ensureInstructionsColumn(sqlite: Database.Database): void {
   }
 }
 
+/**
+ * Every project with no member row gets its maker as `owner`. Only those: a project always keeps its owner
+ * (nobody can remove one), so a project that has rows already had its owner set, and a maker who handed
+ * ownership on and was then removed is never written back. A project shared company-wide under K-D19 gets
+ * no extra members: the safe direction, its maker invites them.
+ */
+function backfillOwners(sqlite: Database.Database): void {
+  sqlite.exec(`
+    INSERT INTO project_members (project_id, user_id, role, added_by, added_at)
+      SELECT p.id, p.created_by, 'owner', p.created_by, p.created_at FROM projects p
+       WHERE NOT EXISTS (SELECT 1 FROM project_members m WHERE m.project_id = p.id);
+  `);
+}
+
 export function ensureProjectTables(sqlite: Database.Database): void {
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS projects (
@@ -59,5 +75,27 @@ export function ensureProjectTables(sqlite: Database.Database): void {
     CREATE INDEX IF NOT EXISTS projects_ws_archived_idx ON projects (workspace_id, archived_at);
   `);
   ensureInstructionsColumn(sqlite);
-  sqlite.exec(PROJECT_TABLES.map(organizationGuards).join("\n"));
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS project_members (
+      project_id text NOT NULL REFERENCES projects(id) ON DELETE cascade,
+      user_id text NOT NULL,
+      role text NOT NULL,
+      added_by text NOT NULL,
+      added_at integer NOT NULL,
+      PRIMARY KEY (project_id, user_id),
+      CONSTRAINT project_members_role_check CHECK (role IN ('owner', 'admin', 'member'))
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS project_members_one_owner ON project_members (project_id) WHERE role = 'owner';
+    CREATE INDEX IF NOT EXISTS project_members_user_idx ON project_members (user_id, project_id);
+    CREATE TABLE IF NOT EXISTS project_agents (
+      project_id text NOT NULL REFERENCES projects(id) ON DELETE cascade,
+      agent_id text NOT NULL,
+      brought_by text NOT NULL,
+      added_at integer NOT NULL,
+      PRIMARY KEY (project_id, agent_id, brought_by)
+    );
+  `);
+  backfillOwners(sqlite);
+  // The two new tables hang off `projects`, so the organization guard on `projects` covers them.
+  sqlite.exec(organizationGuards("projects"));
 }

@@ -15,6 +15,7 @@ import {
   type ArtifactSummary,
 } from "@agentforge/core/artifacts";
 import { mayDeleteFile } from "./media-visibility";
+import { memberOfLiveProjectSql } from "./projects/membership-sql";
 
 /** Hard cap on a single artifact body (dossiers, analyses, briefs are text). */
 export const ARTIFACT_BODY_MAX_BYTES = 4 * 1024 * 1024;
@@ -76,34 +77,18 @@ function summaryFromRow(row: Row): ArtifactSummary {
 }
 
 /**
- * Shared with the company through a project (K-D19, Rizky 2026-10-14: projects are private by default,
- * with one switch to workspace). A file is visible to others only while it sits in a WORKSPACE project.
- * The project must be in the same desk as the file (the outer names are qualified, so the subquery
- * cannot compare a project with itself), not archived, and switched to `workspace`. Every read and the
- * delete rule go through `visibleTo`, which goes through this. Keep this and `isSharedForViewer` in step.
+ * A file in a Workspace the reader is a member of (K-D22, Rizky 2026-10-14: a Workspace is shared with its
+ * members, never the whole company). The project must be on the file's desk (the outer names are qualified,
+ * so the subquery cannot compare a project with itself) and not archived. One `?`: the reader.
  */
-export const SHARED_ARTIFACT_SQL = `EXISTS (SELECT 1 FROM projects p WHERE p.id = artifacts.project_id AND p.workspace_id = artifacts.workspace_id AND p.visibility = 'workspace' AND p.archived_at IS NULL)`;
-
-/** The JavaScript twin of `SHARED_ARTIFACT_SQL`, for a row already in hand. Keep the two in step. */
-export function isSharedForViewer(
-  row: { project_id: string | null; workspace_id: string },
-  _viewer: TenantContext,
-): boolean {
-  if (row.project_id === null) {
-    return false;
-  }
-  const found = sql
-    .prepare(
-      `SELECT 1 AS ok FROM projects WHERE id = ? AND workspace_id = ? AND visibility = 'workspace' AND archived_at IS NULL`,
-    )
-    .get(row.project_id, row.workspace_id);
-  return found !== undefined;
-}
+export const SHARED_ARTIFACT_SQL = memberOfLiveProjectSql(
+  "p.id = artifacts.project_id AND p.workspace_id = artifacts.workspace_id",
+);
 
 /**
- * Who may see a row, on the hosted app (SR-175, Rizky 2026-10-14). A file a person makes on their own
- * is theirs; a shared file (`SHARED_ARTIFACT_SQL`) is the company's; a legacy row with no owner stays
- * company-visible, as it was made. Desktop and webdev write no owner, and have one person per desk,
+ * Who may see a row, on the hosted app (SR-175, SR-178). A file a person makes on their own is theirs; a
+ * file in a Workspace is its members' (`SHARED_ARTIFACT_SQL`); a legacy row with no owner and no Workspace
+ * stays company-visible, as it was made. Desktop and webdev write no owner, and have one person per desk,
  * so they add no clause at all and their SQL is what it was before.
  */
 export function visibleTo(tenant: TenantContext): { clause: string; args: string[] } {
@@ -111,8 +96,8 @@ export function visibleTo(tenant: TenantContext): { clause: string; args: string
     return { clause: "", args: [] };
   }
   return {
-    clause: ` AND (owner_user_id IS NULL OR owner_user_id = ? OR ${SHARED_ARTIFACT_SQL})`,
-    args: [tenant.userId],
+    clause: ` AND ((owner_user_id IS NULL AND project_id IS NULL) OR owner_user_id = ? OR ${SHARED_ARTIFACT_SQL})`,
+    args: [tenant.userId, tenant.userId],
   };
 }
 

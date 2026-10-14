@@ -109,12 +109,13 @@ async function makeArtifact(person: Person, title: string): Promise<string> {
   return record.id;
 }
 
+/** A Workspace of `person` with Ann invited: a Workspace is shared with its members only (K-D22). */
 async function makeSharedProject(person: Person, name: string): Promise<string> {
   const created = await call(person, "POST", "/api/v1/projects", {}, { name });
   expect(created.status).toBe(201);
   const id = jsonBody<{ project: { id: string } }>(created).project.id;
-  const shared = await call(person, "PATCH", "/api/v1/projects/:id", { id }, { visibility: "workspace" });
-  expect(shared.status).toBe(200);
+  const invited = await call(person, "POST", "/api/v1/projects/:id/members", { id }, { userId: ann.tenant.userId });
+  expect(invited.status).toBe(201);
   return id;
 }
 

@@ -1,5 +1,6 @@
 import { sql } from "@agentforge/db";
 import { isServerMode, type TenantContext } from "@agentforge/core";
+import { memberOfLiveProjectSql } from "./projects/membership-sql";
 
 /**
  * Who may see a Knowledge Base source on a desk several people share.
@@ -77,12 +78,12 @@ function ownsThread(threadIdRef: string): string {
  * expression binds these four, so they cannot drift apart.
  */
 /**
- * A Workspace's source is visible to the Workspace's members: its maker while it is private, everyone in
- * the company once it is switched to `workspace`, and never once it is archived. Two placeholders: the
- * Workspace the caller searches from (checked against the row's own `project_id`), and the person.
+ * A Workspace's source is visible to the Workspace's members (`project_members`, K-D22), nobody else in the
+ * company, and nobody once it is archived. One placeholder: the person. With the `project_id = ?` before it
+ * in `visibleExpression`, the Workspace the caller searches from comes first, then the person.
  */
 function memberOfProject(alias: string): string {
-  return `EXISTS (SELECT 1 FROM projects p WHERE p.id = ${alias}.project_id AND p.workspace_id = ${alias}.workspace_id AND p.archived_at IS NULL AND (p.created_by = ? OR p.visibility = 'workspace'))`;
+  return memberOfLiveProjectSql(`p.id = ${alias}.project_id AND p.workspace_id = ${alias}.workspace_id`);
 }
 
 /**

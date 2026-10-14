@@ -1,9 +1,10 @@
 /**
  * Collective projects on the hosted app, through the real router with real sessions and a real database
- * (team-board-spec.md section 2b, F1; K-D19, Rizky 2026-10-14).
+ * (team-board-spec.md section 2b, F1; K-D22, Rizky 2026-10-14).
  *
- * Rule: a project is private to its maker. Its maker flips one switch to `workspace`, and then everyone
- * in the company sees its files and may download them. Flip it back and the others get a 404 again.
+ * Rule: a project (a Workspace) is shared with its members only. Its owner invites a colleague, who then
+ * sees its files and may download them. Remove her and she gets a 404 again. The four-person proof with
+ * roles is `projects-members.test.ts`.
  *
  * Company A has an owner (Alice, A1) and a member (Ann, A2); company B has an owner (Bob, B1). Each
  * refusal is paired with the maker's success at the same call, so a server that refused everybody fails.
@@ -89,6 +90,20 @@ async function makeProject(person: Person, name: string): Promise<string> {
   return ((result as HostJsonResult).body as { project: { id: string } }).project.id;
 }
 
+/** Invites a colleague into a Workspace: it is shared with its members only (K-D22). */
+async function invite(person: Person, projectId: string, colleague: Person): Promise<void> {
+  const result = await call(
+    person,
+    "POST",
+    "/api/v1/projects/:id/members",
+    { id: projectId },
+    {
+      userId: colleague.tenant.userId,
+    },
+  );
+  expect(result.status).toBe(201);
+}
+
 async function makeArtifact(person: Person, title: string): Promise<string> {
   const { artifactStore } = await import("./artifacts");
   const record = artifactStore().create(person.tenant, {
@@ -168,14 +183,12 @@ describe("collective projects: two companies, real sessions", () => {
     ).toEqual(NOT_FOUND);
   });
 
-  it("flipping to workspace shares the project and its files; flipping back hides them again", async () => {
+  it("inviting a colleague shares the project and its files; removing her hides them again", async () => {
     const project = await makeProject(alice, "Alice shared brief");
     const file = await makeArtifact(alice, "Alice shared file");
     await call(alice, "POST", "/api/v1/projects/:id/files", { id: project }, { artifactId: file });
 
-    expect(
-      await outcome(await call(alice, "PATCH", "/api/v1/projects/:id", { id: project }, { visibility: "workspace" })),
-    ).toEqual({ status: 200 });
+    await invite(alice, project, ann);
 
     expect(projectIds(await call(ann, "GET", "/api/v1/projects"))).toContain(project);
     expect(fileIds(await call(ann, "GET", "/api/v1/projects/:id/files", { id: project }))).toContain(file);
@@ -189,7 +202,9 @@ describe("collective projects: two companies, real sessions", () => {
     expect(await outcome(await download(bob, file))).toEqual(NOT_FOUND);
 
     expect(
-      await outcome(await call(alice, "PATCH", "/api/v1/projects/:id", { id: project }, { visibility: "private" })),
+      await outcome(
+        await call(alice, "DELETE", "/api/v1/projects/:id/members/:userId", { id: project, userId: "ann" }),
+      ),
     ).toEqual({ status: 200 });
 
     expect(projectIds(await call(ann, "GET", "/api/v1/projects"))).not.toContain(project);
@@ -198,11 +213,19 @@ describe("collective projects: two companies, real sessions", () => {
     expect((await download(alice, file)).status).toBe(200);
   });
 
-  it("a colleague cannot add the maker's now-shared file to her own project (403), and cannot flip or rename it", async () => {
+  it("the old switch is gone: visibility in a PATCH is a 400 and shares nothing (K-D22)", async () => {
+    const project = await makeProject(alice, "Alice no switch");
+    expect(
+      await outcome(await call(alice, "PATCH", "/api/v1/projects/:id", { id: project }, { visibility: "workspace" })),
+    ).toEqual({ status: 400, code: "invalid_project" });
+    expect(projectIds(await call(ann, "GET", "/api/v1/projects"))).not.toContain(project);
+  });
+
+  it("a member cannot add the owner's file to her own project (403), and cannot rename the Workspace", async () => {
     const project = await makeProject(alice, "Alice shared two");
     const file = await makeArtifact(alice, "Alice shared two file");
     await call(alice, "POST", "/api/v1/projects/:id/files", { id: project }, { artifactId: file });
-    await call(alice, "PATCH", "/api/v1/projects/:id", { id: project }, { visibility: "workspace" });
+    await invite(alice, project, ann);
 
     const annProject = await makeProject(ann, "Ann project for alice file");
     expect(
@@ -215,33 +238,35 @@ describe("collective projects: two companies, real sessions", () => {
     ).toEqual({ status: 200 });
 
     expect(
-      await outcome(await call(ann, "PATCH", "/api/v1/projects/:id", { id: project }, { visibility: "private" })),
+      await outcome(await call(ann, "PATCH", "/api/v1/projects/:id", { id: project }, { name: "Hijacked" })),
     ).toEqual({ status: 403, code: "not_allowed" });
-    expect(await outcome(await call(ann, "PATCH", "/api/v1/projects/:id", { id: project }, { name: "Hijacked" }))).toEqual(
-      { status: 403, code: "not_allowed" },
-    );
+    expect(
+      await outcome(await call(alice, "PATCH", "/api/v1/projects/:id", { id: project }, { name: "Renamed" })),
+    ).toEqual({ status: 200 });
   });
 
-  it("an owner cannot see a colleague's private project; an owner may rename a workspace project but not flip it", async () => {
-    const annPrivate = await makeProject(ann, "Ann private to herself");
-    expect(await outcome(await call(alice, "PATCH", "/api/v1/projects/:id", { id: annPrivate }, { name: "x" }))).toEqual(
+  it("a company owner is not a member of a colleague's Workspace: 404 on every call, rename and archive included", async () => {
+    const annWorkspace = await makeProject(ann, "Ann Workspace");
+    expect(
+      await outcome(await call(alice, "PATCH", "/api/v1/projects/:id", { id: annWorkspace }, { name: "x" })),
+    ).toEqual(NOT_FOUND);
+    expect(await outcome(await call(alice, "POST", "/api/v1/projects/:id/archive", { id: annWorkspace }))).toEqual(
       NOT_FOUND,
     );
-    expect(await outcome(await call(alice, "POST", "/api/v1/projects/:id/archive", { id: annPrivate }))).toEqual(NOT_FOUND);
-
-    const annWorkspace = await makeProject(ann, "Ann workspace project");
-    await call(ann, "PATCH", "/api/v1/projects/:id", { id: annWorkspace }, { visibility: "workspace" });
+    expect(projectIds(await call(alice, "GET", "/api/v1/projects"))).not.toContain(annWorkspace);
+    // Invited as a plain member, the company owner still may not rename it: the Workspace role decides.
+    await invite(ann, annWorkspace, alice);
     expect(
-      await outcome(await call(alice, "PATCH", "/api/v1/projects/:id", { id: annWorkspace }, { name: "Renamed by owner" })),
-    ).toEqual({ status: 200 });
-    expect(
-      await outcome(await call(alice, "PATCH", "/api/v1/projects/:id", { id: annWorkspace }, { visibility: "private" })),
-    ).toEqual({ status: 403, code: "not_allowed" });
+      await outcome(await call(alice, "PATCH", "/api/v1/projects/:id", { id: annWorkspace }, { name: "x" })),
+    ).toEqual({
+      status: 403,
+      code: "not_allowed",
+    });
   });
 
-  it("the file's maker removes it from a workspace project, and the project's maker removes a colleague's file", async () => {
+  it("the file's maker removes it from a Workspace, and the Workspace's owner removes a member's file", async () => {
     const project = await makeProject(alice, "Alice removal project");
-    await call(alice, "PATCH", "/api/v1/projects/:id", { id: project }, { visibility: "workspace" });
+    await invite(alice, project, ann);
 
     const annFile = await makeArtifact(ann, "Ann file in Alice project");
     expect(
@@ -254,12 +279,11 @@ describe("collective projects: two companies, real sessions", () => {
 
     const annAgain = await makeArtifact(ann, "Ann file for Alice to remove");
     await call(ann, "POST", "/api/v1/projects/:id/files", { id: project }, { artifactId: annAgain });
-    // Ann removes a file from a project she did not make and whose file is hers: allowed for the file's
-    // maker. A third party (Bob) cannot even see the project.
+    // A third party (Bob) cannot even see the project.
     expect(
       await outcome(await call(bob, "DELETE", "/api/v1/projects/:id/files/:artifactId", { id: project, artifactId: annAgain })),
     ).toEqual(NOT_FOUND);
-    // The project's maker removes Ann's file from her project.
+    // The Workspace's owner removes Ann's file from it.
     expect(
       await outcome(await call(alice, "DELETE", "/api/v1/projects/:id/files/:artifactId", { id: project, artifactId: annAgain })),
     ).toEqual({ status: 200 });
@@ -269,8 +293,10 @@ describe("collective projects: two companies, real sessions", () => {
     const project = await makeProject(alice, "Alice archive project");
     const file = await makeArtifact(alice, "Alice archived file");
     await call(alice, "POST", "/api/v1/projects/:id/files", { id: project }, { artifactId: file });
-    await call(alice, "PATCH", "/api/v1/projects/:id", { id: project }, { visibility: "workspace" });
-    expect(await outcome(await call(alice, "POST", "/api/v1/projects/:id/archive", { id: project }))).toEqual({ status: 200 });
+    await invite(alice, project, ann);
+    expect(await outcome(await call(alice, "POST", "/api/v1/projects/:id/archive", { id: project }))).toEqual({
+      status: 200,
+    });
 
     expect(projectIds(await call(alice, "GET", "/api/v1/projects"))).not.toContain(project);
     expect(projectIds(await call(ann, "GET", "/api/v1/projects"))).not.toContain(project);
@@ -280,7 +306,7 @@ describe("collective projects: two companies, real sessions", () => {
 
   it("a stranger gets the same 404 for every project id as for an id nobody owns", async () => {
     const project = await makeProject(alice, "Alice stranger check");
-    await call(alice, "PATCH", "/api/v1/projects/:id", { id: project }, { visibility: "workspace" });
+    await invite(alice, project, ann);
     const calls: Array<[string, string, Record<string, string>, unknown]> = [
       ["PATCH", "/api/v1/projects/:id", { id: "" }, { name: "x" }],
       ["POST", "/api/v1/projects/:id/archive", { id: "" }, undefined],

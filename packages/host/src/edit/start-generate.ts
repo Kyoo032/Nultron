@@ -83,7 +83,7 @@ const STILL_NOT_FOUND = new ApiError(
  * Local media is inlined as a data URL at submit time (see `withInlinedStill`) because a
  * remote gateway cannot fetch this machine; here we only confirm the media row exists.
  *
- * Only what the caller may read (SR-175): their own media and a shared Workspace's, the same rule the worker
+ * Only what the caller may read (SR-175): their own media and that of a Workspace they are a member of, the same rule the worker
  * reads the still by (`readVisibleMediaDataUrl`). Anything else, a colleague's private picture included, is
  * answered as an unknown id, so the answer does not tell a caller whether the id exists.
  */

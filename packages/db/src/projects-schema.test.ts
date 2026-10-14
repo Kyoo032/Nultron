@@ -116,3 +116,73 @@ describe("Workspace columns (W1)", () => {
     expect(columnsOf("projects").filter((name) => name === "instructions")).toHaveLength(1);
   });
 });
+
+/** K-D22, K-D23: a Workspace's members, one owner each, and the backfill for projects made before them. */
+describe("Workspace members", () => {
+  function members(projectId: string): Array<{ user_id: string; role: string }> {
+    return sqlite
+      .prepare("SELECT user_id, role FROM project_members WHERE project_id = ? ORDER BY user_id")
+      .all(projectId) as Array<{ user_id: string; role: string }>;
+  }
+
+  it("gives a project made before membership its maker as owner, and a shared one no other member", () => {
+    const a = seedDesk("bf");
+    insertProject("old-private", a.orgId, a.workspaceId, "private");
+    insertProject("old-shared", a.orgId, a.workspaceId, "workspace");
+    expect(members("old-shared")).toEqual([]);
+
+    ensureSchema(sqlite);
+
+    expect(members("old-private")).toEqual([{ user_id: "u", role: "owner" }]);
+    expect(members("old-shared")).toEqual([{ user_id: "u", role: "owner" }]);
+  });
+
+  it("never writes a maker back after ownership moved and the maker was removed", () => {
+    const a = seedDesk("tr");
+    insertProject("moved", a.orgId, a.workspaceId);
+    ensureSchema(sqlite);
+    const now = Date.now();
+    sqlite
+      .prepare(
+        "INSERT INTO project_members (project_id, user_id, role, added_by, added_at) VALUES ('moved', 'v', 'admin', 'u', ?)",
+      )
+      .run(now);
+    sqlite.prepare("UPDATE project_members SET role = 'admin' WHERE project_id = 'moved' AND user_id = 'u'").run();
+    sqlite.prepare("UPDATE project_members SET role = 'owner' WHERE project_id = 'moved' AND user_id = 'v'").run();
+    sqlite.prepare("DELETE FROM project_members WHERE project_id = 'moved' AND user_id = 'u'").run();
+
+    ensureSchema(sqlite);
+
+    expect(members("moved")).toEqual([{ user_id: "v", role: "owner" }]);
+  });
+
+  it("refuses a second owner and a role outside owner, admin and member", () => {
+    const a = seedDesk("one");
+    insertProject("solo", a.orgId, a.workspaceId);
+    ensureSchema(sqlite);
+    const add = sqlite.prepare(
+      "INSERT INTO project_members (project_id, user_id, role, added_by, added_at) VALUES ('solo', ?, ?, 'u', 1)",
+    );
+    expect(() => add.run("w", "owner")).toThrow(/UNIQUE/);
+    expect(() => add.run("w", "guest")).toThrow(/CHECK/);
+    add.run("w", "member");
+    expect(members("solo")).toEqual([
+      { user_id: "u", role: "owner" },
+      { user_id: "w", role: "member" },
+    ]);
+  });
+
+  it("goes with its project, and so do the agents brought in", () => {
+    const a = seedDesk("gone");
+    insertProject("bye", a.orgId, a.workspaceId);
+    ensureSchema(sqlite);
+    sqlite
+      .prepare(
+        "INSERT INTO project_agents (project_id, agent_id, brought_by, added_at) VALUES ('bye', 'research', 'u', 1)",
+      )
+      .run();
+    sqlite.prepare("DELETE FROM projects WHERE id = 'bye'").run();
+    const count = (table: string) => (sqlite.prepare(`SELECT count(*) AS n FROM ${table}`).get() as { n: number }).n;
+    expect([count("project_members"), count("project_agents")]).toEqual([0, 0]);
+  });
+});

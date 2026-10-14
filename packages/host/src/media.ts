@@ -43,7 +43,7 @@ export { mediaIdFromUrl } from "./media-id";
 export type StoredMediaKind = "image" | "video" | "audio";
 
 /**
- * The studio gallery of one kind, as the caller may see it (SR-175): their own media and a shared Workspace's,
+ * The studio gallery of one kind, as the caller may see it (SR-175): their own media and their Workspaces' (K-D22),
  * never a colleague's private file. The gallery lists only what the file route will open for the same caller.
  */
 export async function listMediaByKind(tenant: TenantContext, kind: StoredMediaKind) {

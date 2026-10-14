@@ -622,6 +622,42 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
     params: { id: "unseeded", sourceId: "unseeded" },
   },
   { method: "GET", path: "/api/v1/projects/:id/threads", params: { id: "unseeded" } },
+  // Members, roles and agents (K-D22, K-D23): the same reasoning. The four-person proof is projects-members.test.ts.
+  { method: "GET", path: "/api/v1/projects/:id/members", params: { id: "unseeded" } },
+  {
+    method: "POST",
+    path: "/api/v1/projects/:id/members",
+    params: { id: "unseeded" },
+    body: { userId: "unseeded" },
+  },
+  {
+    method: "PATCH",
+    path: "/api/v1/projects/:id/members/:userId",
+    params: { id: "unseeded", userId: "unseeded" },
+    body: { role: "admin" },
+  },
+  {
+    method: "DELETE",
+    path: "/api/v1/projects/:id/members/:userId",
+    params: { id: "unseeded", userId: "unseeded" },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/projects/:id/owner",
+    params: { id: "unseeded" },
+    body: { userId: "unseeded" },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/projects/:id/agents",
+    params: { id: "unseeded" },
+    body: { agentId: "research" },
+  },
+  {
+    method: "DELETE",
+    path: "/api/v1/projects/:id/agents/:agentId",
+    params: { id: "unseeded", agentId: "unseeded" },
+  },
 ];
 
 let store: ReturnType<typeof createMemorySessionStore>;

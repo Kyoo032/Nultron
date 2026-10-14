@@ -289,8 +289,8 @@ async function resolveGenerateAsset(
   }
   if (outputId && (job.kind === "generate_image" || job.kind === "generate_video")) {
     // SR-175: the worker generated this output as the person who queued the job, so the row is read as that
-    // person, in their company and desk. With no requester recorded the read is as nobody: on the hosted app only
-    // a shared Workspace's row is found, and off server mode (one person per desk) the company read is unchanged.
+    // person, in their company and desk. With no requester recorded the read is as nobody: on the hosted app nobody is
+    // a member of any Workspace, so no row is found, and off server mode (one person per desk) the company read is unchanged.
     const { organizationId, workspaceId: desk } = await workerProjectScope(job.projectId);
     const row = await loadMediaRow(outputId, {
       organizationId,
