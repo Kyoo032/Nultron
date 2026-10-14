@@ -12,8 +12,9 @@ import {
   type EditStartGenerateJobResult,
   type TenantContext,
 } from "@agentforge/core";
-import { db, editCards, media } from "@agentforge/db";
+import { db, editCards } from "@agentforge/db";
 import type { ModelCacheScope } from "../model-cache";
+import { statVisibleMedia } from "../media-visibility";
 import { listImageModels, listVideoModels } from "../selectable-models";
 import { appendOps, foldProject, writeSnapshot } from "./ops";
 import { enqueueEditJob } from "./jobs";
@@ -82,20 +83,15 @@ const STILL_NOT_FOUND = new ApiError(
  * Local media is inlined as a data URL at submit time (see `withInlinedStill`) because a
  * remote gateway cannot fetch this machine; here we only confirm the media row exists.
  *
- * Only inside the caller's organization, which is where the worker reads the still from
- * (`readMediaDataUrl`). Looked up by id alone, another tenant's media id passed this check while an
- * unknown id was refused, so the answer told a caller whether an id existed anywhere.
+ * Only what the caller may read (SR-175): their own media and a shared Workspace's, the same rule the worker
+ * reads the still by (`readVisibleMediaDataUrl`). Anything else, a colleague's private picture included, is
+ * answered as an unknown id, so the answer does not tell a caller whether the id exists.
  */
 async function assertStillAvailable(tenant: TenantContext, still: StillSource): Promise<void> {
   if (still.kind !== "local") {
     return;
   }
-  const rows = await db
-    .select({ id: media.id })
-    .from(media)
-    .where(and(eq(media.organizationId, tenant.organizationId), eq(media.id, still.mediaId)))
-    .limit(1);
-  if (!rows[0]) {
+  if (!(await statVisibleMedia(tenant, still.mediaId))) {
     throw STILL_NOT_FOUND;
   }
 }
@@ -192,7 +188,8 @@ export async function startGenerateJob(
   const requestedSeconds = input.addSeconds ?? input.seconds ?? (input.kind === "generate_video" ? 5 : undefined);
   // Veo only renders 4/6/8 s; snap here so the job, the placeholder and the price agree.
   const seconds = input.kind === "generate_video" ? snapVideoSeconds(model, requestedSeconds) : requestedSeconds;
-  const timedInput = input.kind === "generate_video" ? { ...input, seconds, addSeconds: input.addSeconds ? seconds : undefined } : input;
+  const timedInput =
+    input.kind === "generate_video" ? { ...input, seconds, addSeconds: input.addSeconds ? seconds : undefined } : input;
   const estimateUsd = estimateJobUsd(model, {
     seconds,
     count,
@@ -229,8 +226,7 @@ export async function startGenerateJob(
     ops.map((op) => ({ ...op, cardId })),
     { actor, cardId, workspaceId: tenant.workspaceId },
   );
-  const targetClipIds =
-    toolKey === "regenerate_clip" && parent ? [parent.id] : clips.map((clip) => clip.id);
+  const targetClipIds = toolKey === "regenerate_clip" && parent ? [parent.id] : clips.map((clip) => clip.id);
   const job = await enqueueEditJob(projectId, {
     kind: input.kind,
     // No tenant in the request: the worker resolves it from the project and `requestedBy`.

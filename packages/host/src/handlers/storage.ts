@@ -17,6 +17,7 @@
  */
 import { and, desc, eq } from "drizzle-orm";
 import { db, media } from "@agentforge/db";
+import { canAdminister, isServerMode } from "@agentforge/core";
 import type { HostRequest, HostResult } from "../types";
 import { jsonError, jsonOk } from "../errors";
 import { getTenant } from "../tenant";
@@ -36,6 +37,10 @@ export async function handleGetStorageUsage(request: HostRequest): Promise<HostR
     // Scoped by `organizationId`, exactly as `handleGetMediaFile` and `handleDeleteMedia` are: the
     // media table is org-keyed, and using the caller's own org is what makes every id on this list
     // an id the caller may then delete. A tenant id in the WHERE would be wider than the delete.
+    // SR-175 / SR-176: on the hosted app an owner or admin sees sizes and ids for the whole company, since
+    // they manage the storage; a member sees only the media she made. No row here carries a link. The file
+    // route decides what a person may open, and an admin may open none of a colleague's private files.
+    const ownOnly = isServerMode() && !canAdminister(tenant.role);
     const rows = await db
       .select({
         id: media.id,
@@ -45,7 +50,9 @@ export async function handleGetStorageUsage(request: HostRequest): Promise<HostR
         createdAt: media.createdAt,
       })
       .from(media)
-      .where(and(eq(media.organizationId, tenant.organizationId)))
+      .where(
+        and(eq(media.organizationId, tenant.organizationId), ownOnly ? eq(media.userId, tenant.userId) : undefined),
+      )
       .orderBy(desc(media.sizeBytes))
       .limit(LARGEST_OBJECT_LIMIT);
     return jsonOk({

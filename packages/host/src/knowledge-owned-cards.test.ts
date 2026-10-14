@@ -279,8 +279,8 @@ describe("hosted: Edit reads generated media only inside its own company", () =>
       storagePath: "media/none.png",
       url: `/media/${mediaId}`,
     });
-    expect(await loadMediaRow(mediaId, ORG_A)).not.toBeNull();
-    expect(await loadMediaRow(mediaId, ORG_B)).toBeNull();
+    expect(await loadMediaRow(mediaId, a1.tenant)).not.toBeNull();
+    expect(await loadMediaRow(mediaId, { ...a1.tenant, organizationId: ORG_B })).toBeNull();
   });
 });
 

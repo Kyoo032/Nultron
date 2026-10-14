@@ -1,9 +1,7 @@
-import { and, eq } from "drizzle-orm";
-import { media } from "@agentforge/db";
-import { db } from "@agentforge/db";
 import type { TenantContext } from "@agentforge/core";
 import { generateStudioImage, generateStudioVideo } from "../studio-generate";
 import { mediaIdFromUrl } from "../media-id";
+import { loadVisibleMediaRow, type MediaViewer } from "../media-visibility";
 import { setGenerateSubmit } from "./generate";
 
 let wired = false;
@@ -85,14 +83,9 @@ export function ensureGenerateSubmitWired(): void {
 }
 
 /**
- * A generated media row, read inside its own company only (SR-175): the job names a media id, and a
- * row from another organization is answered as missing, never loaded into a project.
+ * A generated media row, read as the viewer (SR-175): the job names a media id, and a row the viewer may not read
+ * (another company's, or a colleague's private one) is answered as missing, never loaded into a project.
  */
-export async function loadMediaRow(mediaId: string, organizationId: string) {
-  const rows = await db
-    .select()
-    .from(media)
-    .where(and(eq(media.id, mediaId), eq(media.organizationId, organizationId)))
-    .limit(1);
-  return rows[0] ?? null;
+export function loadMediaRow(mediaId: string, viewer: MediaViewer) {
+  return loadVisibleMediaRow(viewer, mediaId);
 }

@@ -5,7 +5,7 @@ import { jsonError, jsonOk } from "../errors";
 import { getTenant } from "../tenant";
 import { log } from "../log";
 import { mediaExt, saveMedia } from "../media";
-import { mediaReachWhere } from "../media-visibility";
+import { mayDeleteFile, mediaReachWhere } from "../media-visibility";
 import { readTenantObjectRange, removeTenantObject } from "../tenant-storage";
 
 /**
@@ -83,11 +83,12 @@ export async function handleGetMediaFile(request: HostRequest): Promise<HostResu
  * orphan again. This way round the worst case is an object that is gone with its row still there,
  * which the next read reports as a 404 and a `recompute` reconciles.
  *
- * **It is the tenant's own media and nothing else's.** The row is looked up with the caller's
- * `organizationId` in the WHERE, exactly as `handleGetMediaFile` does, so another tenant's id is a
- * 404 rather than a 403 — the same existence-oracle rule lane D set for every by-id route. The key
- * then goes through `assertObjectKey` inside the store, which refuses anything outside the
- * caller's prefix before any IO.
+ * **It is the maker's, or a company owner's or admin's, and nobody else's (SR-176).** The row is looked up
+ * with the caller's `organizationId` in the WHERE, exactly as `handleGetMediaFile` does, so another
+ * tenant's id is a 404 rather than a 403 — the same existence-oracle rule lane D set for every by-id
+ * route. A colleague who is not an owner or admin gets the same answer as for an id that does not exist,
+ * and nothing is removed. The key then goes through `assertObjectKey` inside the store, which refuses
+ * anything outside the caller's prefix before any IO.
  *
  * **Idempotent.** A delete of something already deleted answers 200 with `deleted: false` rather
  * than 404: the caller asked for it to be gone and afterwards it is, and a retry after a dropped
@@ -106,8 +107,8 @@ export async function handleDeleteMedia(request: HostRequest): Promise<HostResul
       .where(and(eq(media.organizationId, tenant.organizationId), eq(media.id, mediaId)))
       .limit(1);
     const item = rows[0];
-    if (!item) {
-      // Already gone, or never this tenant's. The same answer for both, on purpose.
+    if (!item || !mayDeleteFile(tenant, item.userId)) {
+      // Already gone, never this tenant's, or not the caller's to delete. The same answer for all three, on purpose.
       return jsonOk({ ok: true, deleted: false, id: mediaId });
     }
     await removeTenantObject(tenant.tenantId, item.storagePath);

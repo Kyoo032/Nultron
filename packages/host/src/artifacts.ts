@@ -14,6 +14,7 @@ import {
   type ArtifactRecord,
   type ArtifactSummary,
 } from "@agentforge/core/artifacts";
+import { mayDeleteFile } from "./media-visibility";
 
 /** Hard cap on a single artifact body (dossiers, analyses, briefs are text). */
 export const ARTIFACT_BODY_MAX_BYTES = 4 * 1024 * 1024;
@@ -213,20 +214,14 @@ export function createArtifactStore(db: Database.Database, keyProvider: () => Bu
     },
 
     remove(tenant, id) {
-      if (isServerMode()) {
-        // A row the caller cannot see is a 404 (the caller's `requireArtifact` answers it). A row
-        // they can see but did not make is refused by name: the company may read a project file,
-        // but only its maker deletes it (SR-175). A legacy row with no owner is anyone's, as before.
-        const visible = visibleTo(tenant);
-        const row = db
-          .prepare(`SELECT owner_user_id FROM artifacts WHERE workspace_id = ? AND id = ?${visible.clause}`)
-          .get(tenant.workspaceId, id, ...visible.args) as { owner_user_id: string | null } | undefined;
-        if (!row) {
-          return false;
-        }
-        if (row.owner_user_id !== null && row.owner_user_id !== tenant.userId) {
-          throw new ApiError("forbidden", "Only the person who made this file can delete it", 403);
-        }
+      // SR-176: only the maker, or a company owner or admin, deletes a file. The row is looked up without the
+      // read rule, because an admin may delete a file they may never open. Anyone else gets `false`, the same
+      // answer as a missing id, whether or not they can read the file; the route answers 404 for it.
+      const row = db
+        .prepare("SELECT owner_user_id FROM artifacts WHERE workspace_id = ? AND id = ?")
+        .get(tenant.workspaceId, id) as { owner_user_id: string | null } | undefined;
+      if (!row || !mayDeleteFile(tenant, row.owner_user_id)) {
+        return false;
       }
       const result = db.prepare("DELETE FROM artifacts WHERE workspace_id = ? AND id = ?").run(tenant.workspaceId, id);
       return result.changes > 0;

@@ -114,12 +114,16 @@ describe("artifact visibility on the hosted app", () => {
     expect(store.remove(ann, made.id)).toBe(true);
   });
 
-  it("lets anyone in the company delete a legacy row, as before", () => {
+  it("a legacy row with no owner is deleted by a company owner or admin, never by a member (SR-176)", () => {
     db.prepare(
       `INSERT INTO artifacts (id, workspace_id, mode, kind, title, mime, body, meta, size_bytes, created_at, updated_at)
        VALUES ('legacy', 'desk-a', 'documents', 'draft', 'Old', 'text/markdown', 'x', '{}', 1, 1, 1)`,
     ).run();
-    expect(store.remove(bob, "legacy")).toBe(true);
+    // The row stays company-visible, as it was made, but a member's delete is the answer for a missing id.
+    expect(store.remove(bob, "legacy")).toBe(false);
+    expect(store.get(bob, "legacy")).not.toBeNull();
+    expect(store.remove({ ...bob, role: "admin" }, "legacy")).toBe(true);
+    expect(store.get(bob, "legacy")).toBeNull();
   });
 });
 

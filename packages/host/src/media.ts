@@ -5,7 +5,8 @@ import { ApiError } from "@agentforge/core";
 import type { DownloadedMedia } from "./media-download";
 import { downloadGeneratedMedia } from "./media-download";
 import { mediaRelativePath } from "./media-root";
-import { putTenantObject, readTenantObject } from "./tenant-storage";
+import { mediaReachWhere } from "./media-visibility";
+import { putTenantObject } from "./tenant-storage";
 
 const IMAGE_MAX = 10 * 1024 * 1024;
 const VIDEO_MAX = 50 * 1024 * 1024;
@@ -14,7 +15,15 @@ const AUDIO_MAX = 25 * 1024 * 1024;
 
 const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
-const AUDIO_TYPES = new Set(["audio/mpeg", "audio/mp4", "audio/wav", "audio/x-wav", "audio/ogg", "audio/webm", "audio/flac"]);
+const AUDIO_TYPES = new Set([
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/ogg",
+  "audio/webm",
+  "audio/flac",
+]);
 
 /** File extension for a stored mime, where the subtype is not already the extension. */
 const MEDIA_EXT: Record<string, string> = {
@@ -33,11 +42,17 @@ export { mediaIdFromUrl } from "./media-id";
 
 export type StoredMediaKind = "image" | "video" | "audio";
 
+/**
+ * The studio gallery of one kind, as the caller may see it (SR-175): their own media and a shared Workspace's,
+ * never a colleague's private file. The gallery lists only what the file route will open for the same caller.
+ */
 export async function listMediaByKind(tenant: TenantContext, kind: StoredMediaKind) {
   return db
     .select()
     .from(media)
-    .where(and(eq(media.organizationId, tenant.organizationId), eq(media.kind, kind)))
+    .where(
+      and(eq(media.organizationId, tenant.organizationId), eq(media.kind, kind), mediaReachWhere(tenant, "person")),
+    )
     .orderBy(desc(media.createdAt));
 }
 
@@ -108,38 +123,10 @@ export async function saveMedia(
 }
 
 /**
- * What a stored media row says about itself (its kind and stored size), without reading its bytes.
- * Scoped to the organization like `readMediaDataUrl`: another organization's id answers null.
+ * By-id reads of a stored file are in `media-visibility.ts` (`statVisibleMedia`, `loadVisibleMediaRow`,
+ * `readVisibleMediaDataUrl`). The desk-wide `statMedia` and `readMediaDataUrl` were removed in W1c (SR-175):
+ * nothing may read a stored file by id without the viewer.
  */
-export async function statMedia(
-  tenant: TenantContext,
-  mediaId: string,
-): Promise<{ kind: string; sizeBytes: number } | null> {
-  const rows = await db
-    .select({ kind: media.kind, sizeBytes: media.sizeBytes })
-    .from(media)
-    .where(and(eq(media.organizationId, tenant.organizationId), eq(media.id, mediaId)))
-    .limit(1);
-  return rows[0] ?? null;
-}
-
-export async function readMediaDataUrl(tenant: TenantContext, mediaId: string): Promise<string | null> {
-  const rows = await db
-    .select()
-    .from(media)
-    .where(and(eq(media.organizationId, tenant.organizationId), eq(media.id, mediaId)))
-    .limit(1);
-  const item = rows[0];
-  if (!item) {
-    return null;
-  }
-  try {
-    const bytes = await readTenantObject(tenant.tenantId, item.storagePath);
-    return `data:${item.mime};base64,${Buffer.from(bytes).toString("base64")}`;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Mirror a generated image into the local store so the renderer only ever loads
