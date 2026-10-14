@@ -1,5 +1,7 @@
 # Map — Tenant usage ledger
 
+Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
+
 Last verified: 2026-10-09 at 8ebc98aa for the `file:line` citations only (re-pointed to the symbols' current lines, nothing else re-read). Before that: 2026-10-07, `feat/hosted-run-limits` working tree (uncommitted), for the two Gotchas on reads by company and the legacy file on the server (SR-163 review round; read from `tenant-usage.ts` and `account-usage.ts`, proven by `usage-companies.test.ts`, not driven on a hosted server). Everything else: 2026-09-20 at a053245 + the Phase 4 branch `feat/web-phase4-tenant-secrets-rcbu9c` (through e37b3a1)
 
 ## Overview

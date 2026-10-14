@@ -190,7 +190,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-100](#sr-100) | Medium | A retired sign-in code worked again after the newer one was used | Fixed, tested (2026-10-01); not yet driven on a rebuilt rehearsal image | Blocks the Phase 0 pilot until driven |
 | [SR-101](#sr-101) | Medium | A double submit or reload sent two or three sign-in codes and spent the 3-per-15-minutes budget | Fixed, tested (2026-10-01); not yet driven on a rebuilt rehearsal image | Blocks the Phase 0 pilot until driven |
 | [SR-111](#sr-111) | Medium | `run_code` keeps the network out with deleted JavaScript globals and a code-generation flag, not with the operating system | Open | Blocks Tencent deploy |
-| [SR-112](#sr-112) | Medium | Chat holds file, Knowledge and sandbox tools together with a public web tool, so text in a file or page can try to carry other text out in a URL | Fixed in tree, unverified live | Owner decision made 2026-10-03; drive an injected file before testers outside the company and before the next Personal cut |
+| [SR-112](#sr-112) | Medium | Chat holds file, Knowledge and sandbox tools together with a public web tool, so text in a file or page can try to carry other text out in a URL | Fixed in tree, unverified live. Widened 2026-10-13 to every search query, page address and media source by the outbound guard on branch `fix/safe-web-search` (`433778dc`, `8ebecb46`), not merged | Owner decision made 2026-10-03; drive an injected file before testers outside the company and before the next Personal cut |
 | [SR-113](#sr-113) | Medium | `braces` has a HIGH advisory with no fixed release, and it reached the hosted image through `tailwindcss` | Fixed in tree (2026-10-05): the image installs production dependencies only; built, booted and checked in a local proof image. Gate re-proven 2026-10-11 after the express and yahoo-finance2 bumps (SH-009, see the section below) | — |
 | [SR-131](#sr-131) | Medium | The app image's ignore file did not exclude `nultron-files/` (4.5 GB of IP filings and brand work), so a build straight from a working checkout would have sent it into the image | Fixed in tree (2026-10-05), test-pinned; the build context checked with a real `docker build`, no full image built | Blocks building from a checkout |
 | [SR-132](#sr-132) | Medium | The release Caddyfile's deferred header block may replace an artifact's `sandbox` CSP with the app CSP | Open: reasoned from Caddy's docs, not driven (2026-10-06) | Blocks Tencent deploy (Enterprise) |
@@ -199,11 +199,19 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-156](#sr-156) | Medium | Hosted: any signed-in member could delete a desk of the company, and with it every person's chats and the desk's Knowledge Base | Fixed in tree (2026-10-07), tested, renderer hides the button; not driven | Blocks a multi-person hosted pilot until driven |
 | [SR-157](#sr-157) | Medium | Hosted: stored media (pictures, clips, audio) is read, listed and deleted by company, not by person, so a colleague's picture can be fetched by its id, listed in the Images and Videos galleries, and sent to a model by a job | Open: nothing changed, because scoping by person breaks shared reads the product relies on; needs an owner decision (2026-10-07) | Blocks "Chat attachments are private to the person who attached them" |
 | [SR-165](#sr-165) | Medium | Hosted portal: `PORTAL_SIGNIN_MODE=password` gives HYP AI, and since 2026-10-09 the Nultron Enterprise release bundle's default, a username-and-password sign-in with no second factor, in place of the e-mailed code; the portal's own default when the variable is absent is still `code`, and `code` stays selectable | Built in tree, tested over a real Postgres; not driven in a browser or on a server (2026-10-07; the Enterprise bundle default is template and docs only, nothing deployed or driven, 2026-10-09). Independent review found no critical or high issue; its findings (M1, M2, L1 to L3, N1, N2) are fixed and merged (`e8a069c9`). The owner's decision, and on 2026-10-09 he accepted password-only sign-in as the Enterprise bundle default with residuals 1 to 13 as recorded; a second independent review of that default found no critical or high issue | None beyond the owner's acceptance; open until the second factor (being designed) ships |
-| [SR-166](#sr-166) | Medium | Tester code only (`agentforge-chat`): every virtual agent reads the desk's Knowledge Base and its earlier chats and can send a question to the web; the egress guard stops `web_fetch` only and never sees what entered through the prompt | Open: same exposure Chat has on `main` (SR-112's residual), new for the twelve mode agents; read from the code, not driven (2026-10-09) | Blocks promoting the chat-first shell to `main` until the owner rules on it |
-| [SR-167](#sr-167) | Medium | Tester code only: a model can start paid pictures and clips from any agent's chat; the only brake is a per-turn ceiling | Mitigated in the tester tree (2026-10-09): four pictures and one clip a turn, held by the host's budget, unit-tested; the cost card with a Run control (plan decision D4) is not built; no paid media was run | Blocks promoting the chat-first shell to `main` until the cost card exists or the owner accepts the ceiling |
+| [SR-166](#sr-166) | Medium | On `main` since the chat-first promotion (PR #157, 2026-10-12; was tester only): every virtual agent reads the desk's Knowledge Base and its earlier chats and can send a question to the web; the egress guard stops `web_fetch` only and never sees what entered through the prompt | Open: same exposure Chat has on `main` (SR-112's residual), new for the twelve mode agents; read from the code, not driven (2026-10-09). The promotion merged with no ruling recorded (2026-10-13) | Blocks the next Enterprise or HYP AI release that carries the chat-first shell, until the owner rules |
+| [SR-167](#sr-167) | Medium | On `main` since PR #157 (was tester only): a model can start paid pictures and clips from any agent's chat; the only brake is a per-turn ceiling | Mitigated in the tester tree (2026-10-09): four pictures and one clip a turn, held by the host's budget, unit-tested; the cost card with a Run control (plan decision D4) is not built; no paid media was run | Blocks promoting the chat-first shell to `main` until the cost card exists or the owner accepts the ceiling |
 | [SR-81](#sr-81) | Low | Keyless Research search sends the masked query to four pinned public APIs | Checked, not an issue (2026-09-26) | — |
 | [SR-168](#sr-168) | Low | Tester code only: the research worker's answer to the model is text written from web pages, and was first declared host-computed (`internal`), so it was not scanned for injection | Fixed in the tester tree (2026-10-09): declared `network`, so it is scanned; three real outputs pass the scan and a poisoned one is caught, by test | Tester code only; nothing on `main` |
-| [SR-169](#sr-169) | Medium | Hosted: any member of a company can open any desk of that company. The host checks that a desk belongs to the session's company and never reads `workspace_members` | Open, needs the owner's call (2026-10-12): if desks are company-wide by design, record that and close this row; if some desks are for some people only, it is an access-control gap | Before a hosted company keeps material on one desk that some of its members must not see |
+| [SR-169](#sr-169) | Medium | Hosted: any member of a company can open any desk of that company. The host checks that a desk belongs to the session's company and never reads `workspace_members` | Closed 2026-10-13: company-wide by design (Rizky, team board decision K-D11) | Before a hosted company keeps material on one desk that some of its members must not see |
+| [SR-170](#sr-170) | Medium | The TKE production overlay builds the app's k8s Secret (wrap key included) from a plaintext `secrets.env` on the operator's machine; no Tencent Secrets Manager or KMS, and etcd encryption is not confirmed | Open (2026-10-13) | Blocks Tencent TKE |
+| [SR-171](#sr-171) | Medium | The k8s backup CronJob is suspended, its archive is AES-256-CBC with no authentication, and nothing leaves the cluster | Open (2026-10-13) | Before the first company keeps work it cannot lose on TKE |
+| [SR-172](#sr-172) | Low | HYP AI behind Cloudflare: Cloudflare reads sign-in passwords, cookies and pasted keys in clear (Full mode), and the origin still answers around Cloudflare on 80, 443 and 8443 | Recorded as known in the HYP AI deploy README (2026-10-08); restricting the origin is optional there; needs the owner's call | HYP AI only; Nultron does not use Cloudflare |
+| [SR-173](#sr-173) | Info | The wrap key becomes the AES key through one unsalted SHA-256 | Checked, not an issue (2026-10-13) | — |
+| [SR-174](#sr-174) | Low | Caddy compresses every `text/*` response, `text/event-stream` included, which can hold live-update frames back | Fixed on `main` (PR #167, 2026-10-14): `encode` matches text types only, without `text/event-stream`, video or audio; unit-tested, Caddy syntax not validated, not driven | Before the team board (tester) is deployed behind Caddy |
+| [SR-175](#sr-175) | Medium | Hosted: a file one person generates on their own (artifacts, media, desk files outside their private folder) is listed and downloadable by every member of the company | Mostly fixed in the tester (2026-10-14: artifacts `bbe9308c`, workspace sharing `62eae740`, Knowledge work cards `a178b9bc`, media file route and chat media reads `fbe5994b`, galleries, storage list, Edit stills and job pictures `6374c386`); Edit projects and desk files still company-visible; not driven hosted; `main` still open | Before a second person of one company uses the hosted app for their own work |
+| [SR-176](#sr-176) | High | Hosted: any member of a company can delete any other member's generated media and artifacts | Fixed in the tester (`6374c386`): only the maker or a company owner or admin deletes; not driven hosted; `main` still open | Before a second person of one company uses the hosted app for their own work |
+| [SR-177](#sr-177) | Low | The new deploy preflight, run in a throwaway container when the server has no node, received the real `AGENTFORGE_SECRETS_KEY` | Fixed before merge (branch `chore/agent-guardrails`, 2026-10-14): the container gets the word `set` or nothing | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -2870,6 +2878,34 @@ person pastes into their own message counts as theirs.
 
 Gate: **owner decision** on the residuals before testers outside the company and before the next
 Personal cut.
+
+Update 2026-10-13: the outbound guard. Rizky ruled the same day that web search stays on everywhere, so the
+fix is a check where text leaves the host. Built on branch `fix/safe-web-search` (`433778dc`, then `8ebecb46`
+after a security review found three high gaps: media source URLs, URL shape, and run paths with no guard).
+Not merged, not driven on a live model.
+
+- Guard state in a core AsyncLocalStorage (`packages/core/src/security/outbound-guard.ts`, matcher
+  `outbound-match.ts`), opened for Chat turns (`packages/host/src/runs.ts`), job runs with tools
+  (`job-regen.ts`), the Research screen (`research-generate.ts`) and the Edit agent (`edit/agent-run.ts`). A web
+  call inside a tool call with no guard open is refused (`kind: "unguarded"`).
+- Checked where text leaves: every search backend, `fetchPublicHttps` for model-chosen addresses, media source
+  URLs (only ones this run made, a search returned or the person typed), and prompts sent to third-party media
+  backends.
+- Always: PII mask (with a note to the model), refusal of credentials, 24-char hex or base64 blobs, queries over
+  300 chars; for URLs, per-segment decoding up to three times, a 512-char path limit and a host-label limit.
+- When the run holds private text (prompt-side Knowledge, memories, custom soul, attachments, and `user_content`
+  tools, now including `run_sql` and the Edit reading tools; any picture or file taints): refuse a 5-word span
+  with three meaningful words, an account-like code, a 6-digit figure or two shorter figures, that the person did
+  not type. At most two counted refusals per turn.
+- Proof: 42 of 42 ordinary en/id research queries pass, 5 of 5 leaks refused; adversarial tests through Chat, the
+  live AI SDK loop and `research_dossier`; `ci:local` green on the branch; 277 guard tests re-run by the
+  coordinator.
+
+Accepted residuals, for the owner's ruling: paraphrase or translation; a span split across queries; spelled-out
+numbers and round amounts; names and phrases under five words; a single 3-5 digit figure; earlier assistant
+turns are not indexed; a poisoned page can use up the two refusals and stop search for that turn; a key the
+person pasted into their own message can reach a search provider; hosts named in an attachment are allowed for
+`web_fetch`, and an attachment can be poisoned.
 
 ### SR-113 {#sr-113}
 
@@ -5755,6 +5791,32 @@ as Chat's own residual.
 Gate: **blocks promoting the chat-first shell to `main`** until the owner rules. It does not block the tester
 round. Not driven.
 
+Update 2026-10-13: the chat-first shell reached `main` in PR #157 (`b14faa1a`) with this row still open and no
+ruling recorded (`docs/internal/unreleased.md:25` lists it as open). The same code is now on `main`: every agent
+gets the full chat tool set (`packages/core/src/agents/virtual-agents.ts:99`) and the earlier-chats hint and
+Knowledge Base excerpts (`packages/host/src/runs.ts:182-212`). So the exposure reaches whatever is released from
+`main` next, and the HYP AI import. New gate: **blocks the next Enterprise or HYP AI release that carries the
+chat-first shell** until the owner rules. The tester team board spec (`team-board-spec.md`, section 9.3) designs
+the fix for card runs: taint from step zero, every outbound argument checked (network tools stay on, by the owner's ruling below).
+
+Two more gaps found 2026-10-13, read from the code on `main` at `73db3c30`:
+
+- **The research worker goes around the egress guard.** `research_dossier` is declared `network` and does not
+  taint (`packages/host/src/workers/research-dossier-tool.ts:107`). Its searches and page reads call
+  `webSearchTool.execute` and `fetchPageText` directly (`packages/host/src/research-generate.ts:170-173`), not
+  through `invokeToolGuarded`, so the guard never sees them. A run that read private material can pass private
+  text as the worker's question, and the queries it plans reach search after `maskPii` only.
+- **Tavily and Brave get the raw query.** `web_search` sends the model's query unmasked to Tavily
+  (`packages/core/src/tools/platform/web-search.ts:24`) and Brave (`:43`); only the keyless path masks PII
+  (`keyless-search.ts:87`). `maskOutboundRunInput` masks the system prompt and history, not tool arguments
+  (`packages/core/src/security/pii.ts:286-297`).
+
+Owner ruling 2026-10-13: **web search stays on, for chat agents and card runs; it is not negotiable.** The fix is
+therefore a guard at the point where text leaves the host, not turning search off. Plan: the "safe web search"
+section of `agentforge-chat\docs\internal\team-board-spec.md` (9.3). The leftover risk, a model restating a
+private fact in its own words inside a query, cannot be closed while one model both reads private material and
+writes free-text queries; it needs the owner's acceptance when the guard lands.
+
 ### SR-167 {#sr-167}
 
 **Tester code only: a model can start paid media from any agent's chat.**
@@ -5779,6 +5841,10 @@ Fix: the D4 cost card, or the owner's acceptance of the ceiling as the rule.
 
 Gate: **blocks promoting the chat-first shell to `main`** until one of the two. It does not block the tester
 round.
+
+Update 2026-10-13: the shell reached `main` in PR #157 with this row still open and no ruling recorded. New gate:
+**blocks the next Enterprise or HYP AI release that carries the chat-first shell** until the owner accepts the
+ceiling or the cost card is built.
 
 ### SR-168 {#sr-168}
 
@@ -5824,6 +5890,158 @@ for the chosen desk, a test proves a non-member gets `workspace_not_found`, and 
 person, one owner row).
 
 Gate: decide before a hosted company keeps material on one desk that some of its members must not see.
+
+Ruling 2026-10-13: Rizky accepted the team board spec's defaults, including K-D11: **desks are company-wide by
+design.** Every member of a company may open every desk of that company; per-person privacy comes from per-person
+rows, not desk membership. Recorded in `AGENTS.md` ("Private by person on Enterprise"). Closed as checked, not an
+issue. If a desk ever needs to be limited to some people, this row reopens with option (b).
+
+### SR-170 {#sr-170}
+
+**TKE production secrets come from a plaintext file on the operator's machine.**
+Raised 2026-10-13. Medium. Open. Found in the read-only review behind the tester's team board spec
+(`agentforge-chat\docs\internal\team-board-spec.md`, section 12.1).
+
+Evidence: `webapp-deploy/k8s/overlays/production/kustomization.yaml:10` tells the operator to copy
+`secrets.env.example` to `secrets.env` and fill it, and `:70` feeds `secrets.env` to a kustomize secret
+generator. The app reads `AGENTFORGE_SECRETS_KEY` from that Secret. So the wrap key, which opens every sealed
+row, sits in a plaintext file on whichever machine runs `kubectl apply`, and in the cluster as a base64 k8s
+Secret. Whether TKE encrypts etcd at rest was not checked. On the single CVM today the compose path exports
+the key from the shell, which is acceptable for Stage 1.
+
+Fix: before TKE, source the Secret from Tencent Secrets Manager or KMS (a TKE add-on or CSI driver, if one
+exists in Jakarta; not confirmed on 2026-10-13), turn on etcd encryption, and delete the local `secrets.env`.
+
+Gate: **blocks Tencent TKE.** Not driven.
+
+### SR-171 {#sr-171}
+
+**The k8s backup is off, unauthenticated and stays on the cluster.**
+Raised 2026-10-13. Medium. Open.
+
+Evidence: `webapp-deploy/k8s/base/backup-cronjob.yaml:19` sets `suspend: true`; its header says the archive
+lands on the `nultron-backups` volume and "Upload to COS is NOT done here" (`:10`). The archive is
+`openssl enc -aes-256-cbc -pbkdf2` (`webapp-deploy/k8s/base/scripts/encrypt.sh:5,31`): encrypted, but with no
+authentication tag, so a changed archive is not detected before it is restored. No restore drill is recorded.
+The HYP AI server's backup is a disk snapshot whose policy is still an open decision (`AGENTS.md`, HYP AI hosting
+plan).
+
+Fix: when the database moves to TencentDB, its automated backups replace this. Until then: a daily snapshot
+on each server that holds customers' data, an archive with authentication (AES-GCM, or an HMAC over the CBC
+output), a copy off the cluster (COS), and one restore drill.
+
+Gate: before the first company keeps work it cannot lose on TKE. Not driven.
+
+### SR-172 {#sr-172}
+
+**HYP AI behind Cloudflare: Cloudflare sees credentials, and the origin answers around it.**
+Raised 2026-10-13 as a register row. Low. Both facts were already written down in the HYP AI deploy README
+(`C:\Users\rizky\hypey\deploy\README.md`, 2026-10-08), which this row points to rather than repeats.
+
+Evidence: that README says that under SSL mode Full Cloudflare ends each visitor's TLS, so it reads the
+sign-in password, the session cookies and every pasted gateway key in clear; and that ports 80, 443 and 8443
+answer on the server's public address without Cloudflare, with restricting them to Cloudflare's ranges marked
+optional.
+
+What it means: Cloudflare's WAF and rate limits can be bypassed by anyone who finds the address
+(`43.173.26.50` is not secret), and the edge provider is inside the trust boundary for credentials.
+
+Fix (owner's call): restrict 80, 443 and 8443 in the security group to Cloudflare's published ranges, or turn
+on Authenticated Origin Pulls; state in HYP AI's terms that the edge provider handles traffic. Nultron is not
+affected and must not inherit the Cloudflare mode.
+
+Gate: HYP AI only. Not driven.
+
+### SR-173 {#sr-173}
+
+**The wrap key becomes the AES key through one unsalted SHA-256.**
+Raised 2026-10-13. Info. Checked, not an issue.
+
+Evidence: `wrappingKeyFromSecret` is `createHash("sha256").update(secret)` (`packages/core/src/crypto/envelope.ts:14-16`).
+A salt and a slow KDF protect a guessable secret, such as a password. This secret is not guessable: in server mode the
+host refuses to start unless `AGENTFORGE_SECRETS_KEY` carries at least 32 random bytes (`packages/db/src/vault-key.ts`,
+`MIN_VAULT_KEY_BYTES` and `SERVER_VAULT_KEY_TOO_WEAK`), and the deploy docs generate it with `openssl rand -hex 32`
+(`webapp-deploy/README.md:287,508`). Hashing 256 random bits gives a 256-bit key. Recorded so nobody chases it twice.
+
+### SR-174 {#sr-174}
+
+**Caddy compresses Server-Sent Events.**
+Raised 2026-10-13. Low. Open. Found while building phase K0 of the tester's team board, the first long-lived
+`text/event-stream` the hosted app serves to many viewers.
+
+Evidence: `webapp-deploy/Caddyfile:108` and `:262` say `encode zstd gzip` with no `match`. Caddy's default
+match list includes `text/*` (Caddy 2.11 docs and source, read through a docs lookup), so `text/event-stream` is
+compressed, and a compressor may buffer small frames. A heartbeat or card move could then reach the browser late
+or in a burst. Not observed against a real proxy; `reverse_proxy`'s own flushing may change the outcome.
+
+Fix: exclude `text/event-stream` from `encode` (a `match` block listing the compressible types without it),
+then confirm on the local rehearsal that a board move reaches a second tab within about a second and the stream
+has no `content-encoding`.
+
+Gate: before the team board is deployed behind Caddy. Not driven.
+
+### SR-175 {#sr-175}
+
+**Hosted: a person's own generated files are visible to the whole company.**
+Raised 2026-10-14. Medium. Open. Found by read-only scouts of the tester code (`agentforge-chat`, which carries
+the same stores as `main`) while planning the team board's files phase.
+
+Rule (Rizky, 2026-10-14): a file a person makes on their own is visible only to them; a file put into a
+collective project is visible to, and downloadable by, everyone in the company. Until now the register said the
+`artifact` and `media` outputs "are the company's, as they were" and left per-person privacy undecided
+(knowledge section above); this ruling decides it.
+
+Evidence (tester paths, same code on `main`):
+- `artifacts` has no owner column (`packages/db/src/schema.ts:852-868`); list, get and delete filter on
+  `workspace_id` only (`packages/host/src/artifacts.ts:147-177`), and `GET /api/v1/artifacts/:id/file`
+  (`handlers/artifacts.ts:96-113`) has no owner check. Desks are company-wide (K-D11, SR-169), so every member
+  lists and downloads every other member's generated document or deck.
+- `media` stores `user_id` (`schema.ts:714`) but `GET /api/v1/media/:id/file` filters on `organization_id`
+  only (`handlers/media.ts:25-40`).
+- `desk_files` has no owner (`schema.ts:953-971`); the live query filters on `workspace_id`
+  (`desk-files/file-store.ts:126-129`). Only `uploads/~<user>/` is meant to be private
+  (`desk-files/private-uploads.ts`), and its enforcement on list, read and download is not yet traced.
+
+Fix (tester first, server mode only, Personal unchanged with a parity test): an owner and a visibility
+(`private` or shared to a project) on every generated output; lists and reads in server mode return a row only
+to its owner or when it is shared; two people of one company plus one of another prove it through the real
+router. Legacy rows with no owner: decide with Rizky (draft: stay company-visible, since that is how they were
+made).
+
+Gate: before a second person of one company uses the hosted app for their own work. Not fixed.
+
+
+### SR-176 {#sr-176}
+
+**Hosted: any member of a company can delete another member's files.**
+Raised 2026-10-14. High. Open. Found by the W1b worker in the tester and checked on `main` by the orchestrator.
+
+Evidence (`main`):
+- `DELETE /api/v1/media/:mediaId` (`packages/host/src/handlers/media.ts:82-107`) selects and deletes on `organization_id` and the id only. It never compares `media.user_id` with the caller, so any signed-in member removes a colleague's image or video and its stored file.
+- Artifact delete filters on `workspace_id` only (`packages/host/src/artifacts.ts`, see SR-175 evidence). Desks are company-wide (K-D11), so the same holds for a colleague's document or deck.
+
+Why High and not Medium like SR-175: SR-175 leaks a read; this destroys another person's work with no undo.
+
+Fix (tester first, server mode only, Personal unchanged with a parity test): a delete succeeds only for the row's owner, or for a company owner or admin (who may delete and never read, the leaver rule of 2026-10-06). Taking a file out of a Workspace clears `project_id` and deletes nothing. Two people of one company plus one of another through the real router.
+
+Gate: before a second person of one company uses the hosted app for their own work. Not fixed.
+
+### SR-177 {#sr-177}
+
+**The deploy preflight's fallback container received the real wrap key.**
+Raised 2026-10-14 by the worker that wrote the deploy gate. Low: fixed before it reached `main`. Related: SR-46.
+
+Evidence: the first draft of `run_preflight` in `webapp-deploy/scripts/deploy.sh` ran, on a server with no
+node, `docker run --rm --network none -v "$REPO_ROOT:/repo:ro" ... -e AGENTFORGE_SECRETS_KEY node:22-bookworm-slim`.
+The `-e NAME` form passes the shell's value, so the real wrap key sat in that container's environment. The
+container had no network and was removed after the run, but `scripts/deploy-preflight.mjs` only checks that
+the key is set (`effectiveValue`, `SHELL_SUPPLIED`); it never needed the value.
+
+Fix: `deploy.sh` now passes `-e "AGENTFORGE_SECRETS_KEY=$_key_present"`, where `_key_present` is `set` when the
+shell has a non-empty key and empty otherwise. The key never reaches the container or the command line.
+`bash -n` and the 40 preflight tests pass; the no-node path has not run on a server.
+
+Gate: none.
 
 ## Must be true before the Tencent Cloud deploy
 
@@ -5978,6 +6196,15 @@ Added 2026-10-07:
   left. ([SR-156](#sr-156)) — tested, not driven.
 - [ ] The owner has chosen how stored media is scoped between the people of a company, before anyone says a
   Chat attachment is private. ([SR-157](#sr-157))
+
+Added 2026-10-13:
+
+- [ ] Before moving to Tencent TKE: the app's Secret comes from Tencent Secrets Manager or KMS, not a local
+  `secrets.env`, and etcd encryption is on. ([SR-170](#sr-170))
+- [ ] Before a company keeps work it cannot lose: a daily snapshot or managed backup, an authenticated archive
+  copied off the server, and one restore drill. ([SR-171](#sr-171))
+- [ ] Before the next release that carries the chat-first shell: the owner has ruled on SR-166 and SR-167.
+  ([SR-166](#sr-166), [SR-167](#sr-167))
 
 ### SR-49 {#sr-49}
 

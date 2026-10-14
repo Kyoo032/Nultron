@@ -1,5 +1,7 @@
 # Map: documents in the Chat composer
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 Last verified: 2026-10-07 at 6105c5c (working tree over that commit, not committed). Read against the code and driven by unit tests only: the two host routes, the chip markup, the composer wiring, the thread's file card and the HTTP adapter's Origin, CSRF and size rules for both routes. Not driven in a browser, on the packaged app or on a hosted deploy; `features/chat.md` "Documents" is the recipe for that.
 
 ## Overview

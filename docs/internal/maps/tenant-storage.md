@@ -1,5 +1,7 @@
 # Map — Per-tenant storage and state
 
+Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
+
 Last verified: 2026-10-01 (working tree over 0b61a29) for the locale bullet only (the hosted default from `Accept-Language`, and its citations); every other line is as verified next. Before that, 2026-09-23 at d4561b8 + uncommitted tree for "Requests, and work that outlives them" (the
 `ops.ts` citations, `workerTenant` and the per-tenant Edit metrics file) and the metrics row of the layout table.
 Everything else was last verified 2026-09-20 at a053245 + the Phase 4 branch

@@ -2,6 +2,8 @@
 
 `run_code` is the sandbox tool: the model can run a short Python or JavaScript program, read what it printed, and save text results to the desk. It is not a product mode, has no rail entry and no page of its own. The owner reaches it by asking Chat to compute or analyse something, and the only on-screen evidence is its tool row inside the Thinking disclosure and the files it saved. This recipe has two halves: the real engines driven from the repo (no key and no browser), and the Chat scenarios (a live key, a browser, and a host started after 2026-10-03). Map: [`docs/internal/maps/agent-tools-and-files.md`](../../../../docs/internal/maps/agent-tools-and-files.md) § 12. The Chat side of the tool rows is also in [chat.md](./chat.md), and the files it writes are in [files.md](./files.md).
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 ## Sub-features
 
 - `code-tool` is what the model can call: `run_code` with `language` (`python` or `javascript`), `code` and optional `files` (at most 20 desk paths). It answers `{ ok, stdout, stderr, filesWritten, reason? }`. Chat binds it (6 calls a turn) and Data binds it for exploration (4 calls a job, never evidence). Finance and Market never get it. A binding the owner switched off stays off.

@@ -1,5 +1,7 @@
 # Map: agent tools and files, the mode harness, the tool budget, desk files and the Personal folder
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 Last verified: 2026-10-14 for the step-limit paragraph of § 13 only (the sentence names the tools that finished, and the host saves a `step_limit` part). Nothing else on the page was re-read.
 
 Last verified: 2026-10-12 at e8a7eca8 for the "Chat-first shell" section only (the research_dossier tool; read against the tester branch before it was promoted to `main`, PR #157). Nothing else on the page was re-read.

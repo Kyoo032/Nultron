@@ -1,5 +1,7 @@
 # Map — Tenancy schema and TenantContext
 
+Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
+
 Last verified: 2026-09-20 at a053245 + the Phase 4 branch `feat/web-phase4-tenant-secrets-rcbu9c` (through e37b3a1)
 
 ## Overview

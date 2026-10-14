@@ -1,5 +1,7 @@
 # Map — App locale: boot freeze and the run harness
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 Last verified: 2026-10-12 at e8a7eca8 for the "Chat-first shell" section only (the two new catalog namespaces; read against the tester branch before it was promoted to `main`, PR #157). Nothing else on the page was re-read.
 
 Last verified: 2026-10-01 (working tree on top of 0b61a29) for the hosted first-sign-in default: a person who has

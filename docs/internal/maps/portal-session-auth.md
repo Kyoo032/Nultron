@@ -1,5 +1,7 @@
 # Map — Portal browser session (hosted server)
 
+Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
+
 Re-checked 2026-10-07 at 9aba37e + working tree, for one paragraph only: **`signInMode`** under "Status" (the
 host learns from the portal whether it signs people in with a password, and the sign-in screen says so). Every
 other line is as verified next.

@@ -2,6 +2,8 @@
 
 **Parked / verified-unreachable (GTM).** Post-create soul/tools/model edit lived at `/studio/[agentId]`. That URL now redirects to Chat (nothing named Build exists there). Do not drive `save-soul` or treat missing Studio as a regression.
 
+Product: both · Instance: main :3000 (parked: `/studio` redirects to Chat)
+
 ## Sub-features
 
 - `studio-parked` — `/studio/<uuid>` redirects to Chat.

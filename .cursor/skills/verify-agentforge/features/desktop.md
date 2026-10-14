@@ -2,6 +2,8 @@
 
 > **Retired 2026-10-14 (Rizky).** The Personal desktop app is being merged into the web app. Its release repo `Kyoo032/Nultron-Desktop` is archived, and no new desktop build will be packed or published. The recipe below stays as a record of the installed app. Do not drive a new pack from it.
 
+Product: retired-desktop · Instance: none (Personal desktop retired 2026-10-14)
+
 Electron is the installed local app. Packaged builds have **no HTTP server**. The renderer talks to the host over IPC. Port 3000 is the **local webdev** (`pnpm dev`) only. Wrap key: keytar uses the product name (`Nultron` / `Kemenkeu AI` / `AIHub Metranet`) plus account `wrap-key`. SQLite and `host-status.json` live in that product's Electron `userData`. Flavor rail names: [desktop-brands.md](./desktop-brands.md). Map: [`docs/internal/maps/desktop-pack-routes.md`](../../../../docs/internal/maps/desktop-pack-routes.md).
 
 ## Sub-features

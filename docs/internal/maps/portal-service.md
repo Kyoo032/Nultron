@@ -1,5 +1,7 @@
 # Map — Portal service (`apps/portal`)
 
+Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
+
 Last verified: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-07 at 9aba37e + working tree for section 8 (password sign-in), Where things live, the
 Verify table's last four rows and one Why bullet, written the day the mode was built; the rest of the page keeps
 its reading below. Earlier: 2026-10-01 at 0b61a29 + working tree, by the sign-in-codes pass (four fixes found by driving

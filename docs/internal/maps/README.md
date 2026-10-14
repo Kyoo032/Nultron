@@ -4,7 +4,7 @@
 
 The sibling half of the map is **where to press**: `.cursor/skills/verify-agentforge/features/<feature>.md`, user POV, owned by the verify skill. A feature file links its map page; a map page names the feature file that verifies it. Neither file is allowed to invent the other's job.
 
-[`desktop-pack-routes.md`](desktop-pack-routes.md) documents the **Personal** app's pack route: the Mac/Windows Nultron app, current cut `0.15.0` ([`../web-pivot-2026-09-18.md`](../web-pivot-2026-09-18.md)). It was called frozen while the desktop was maintenance-only (2026-09-18 → 2026-09-23); it is under active development again and the page is expected to grow.
+[`desktop-pack-routes.md`](desktop-pack-routes.md) documents the **Personal** app's pack route: the Mac/Windows Nultron app, last cut `0.16.0` ([`../web-pivot-2026-09-18.md`](../web-pivot-2026-09-18.md)). Personal was retired on 2026-10-14, so this page is history: no pack is owed.
 
 > **A map that disagrees with the code is fixed the same day or deleted.** A stale map is worse than none (`AGENTS.md`, Harness). If you touch a subsystem, re-run the relevant part of `how` and refresh its page in the same PR.
 
@@ -12,9 +12,11 @@ The sibling half of the map is **where to press**: `.cursor/skills/verify-agentf
 
 One file per subsystem, `docs/internal/maps/<subsystem>.md`. A **single H1 document, edited in place** — not append-only like a changelog. When the code moves, rewrite the affected section and bump the verified line; do not stack a new dated block on top of a stale one.
 
-Under the H1, one line:
+Under the H1, two lines in this order, each after a blank line:
 
 ```
+Product: <product> · Instance: <instance>
+
 Last verified: <YYYY-MM-DD> at <short sha>
 ```
 
@@ -85,54 +87,62 @@ or rewritten — those need a person, because the sentence around them may no lo
 idempotent: run it once, from the recorded sha, then bump `Last verified:`. Run it again from the new
 sha and a settled tree reports zero.
 
+## Product and instance
+
+Every page names its product. The first line under the H1 says `Product: … · Instance: …`, and the Product column below repeats the product. Values: `both` (the shared renderer or host, which serves Nultron (OPC) and HYP AI (SME); hosted-only pages such as sign-in, tenancy, portal and deploy also say `both`, and their Instance names the hosted instance) and `retired-desktop` (the Personal desktop app, retired 2026-10-14: history only). The `opc` and `sme` folders are not built yet.
+
+**A change to a shared page reaches both products and needs both drives:** `main :3000` and `HYP AI :3301`, as set out in [SKILL.md](../../../.cursor/skills/verify-agentforge/SKILL.md) under **Where am I?**. Tester-only subjects (the team board and the Private/Workspace projects) have no page yet; when one gets a page, it names `tester :3200` as its instance. `release-and-sync-lanes.md` is a process page, and its header line is not added here because another owner holds that file.
+
 ## Pages
 
-| Page | Subsystem | Verified by |
-|---|---|---|
-| [`channels.md`](channels.md) | Channels: Telegram bot token, desk channel store, send and poll, pinned egress | `features/channels.md` |
-| [`chat-send.md`](chat-send.md) | Chat send: composer → transport → run route → runtime → SSE → rendered message | `features/chat.md` |
-| [`chat-documents.md`](chat-documents.md) | Documents in the Chat composer: one format table, three doors, the local read route, the masked and cut text, the save on send with the host's notes, the private `uploads/~<user>/` desk copy, and the reload | `features/chat.md` |
-| [`model-policy.md`](model-policy.md) | How each gateway model is called: the policy table (wire, Thinking levels, Off, job knob, tier), the run's effort plan, and the one retry when a call's Thinking parameter is refused; since the second pass also the Responses `reasoning` block for GPT-6, Chat sending a level only once picked, and the dev-only `catalog-diff` and `probe` tools; since the third pass (2026-09-30) also the recommendation lists (Chat default `gpt-6-luna`, the Recommended set, per-mode and outage lists, the video order) | `features/models.md` |
-| [`agent-tools-and-files.md`](agent-tools-and-files.md) | The per-mode harness spec (loop, tools, step and tool-call budget, repair rounds), where it is enforced (Chat, jobs, Edit), the runtime tool budget and tool trust, `runChecked`, the six file tools, the desk's versioned file store and the Personal folder root with approval proposals, `knowledge_search`, and the Files and folder UI. § 12 covers the `run_code` sandbox: one call from the tool to a pooled Pyodide or QuickJS child, the child's permission flags and empty environment, the limits, what reaches the model, and the ship directory with how each platform packages it | `features/files.md`, `features/folder.md`, `features/code.md` |
-| [`settings-and-gateway-gate.md`](settings-and-gateway-gate.md) | Per-desk settings, the host gateway gate, Start over, key pinning | `features/settings.md`, `features/gateway-gate.md` |
-| [`locale-boot-and-run-harness.md`](locale-boot-and-run-harness.md) | App locale freeze + restart, and how `id` reaches the model | `features/settings.md`, `features/locale.md` |
-| [`knowledge-ingest-loop.md`](knowledge-ingest-loop.md) | Knowledge ingest, injection guard, embedding, retrieval, tenant scoping | `features/knowledge-ingest.md`, `features/knowledge.md` |
-| [`desktop-pack-routes.md`](desktop-pack-routes.md) | Windows NSIS worktree route, macOS Docker route, release and updater | `features/desktop.md` |
-| [`release-and-sync-lanes.md`](release-and-sync-lanes.md) | The four lanes (Personal, Enterprise, HYP AI, tester): how a fix on `main` reaches each, and what must be true before a lane counts as fixed | none (process) |
-| [`renderer-media.md`](renderer-media.md) | What a rendered answer may auto-load, and how remote media becomes host-served media | `features/images.md`, `features/videos.md`, `features/security.md` |
-| [`media-cost-estimate.md`](media-cost-estimate.md) | The price shown in the Images / Videos studio before generating | `features/images.md`, `features/videos.md` |
-| [`finance-parse-and-generate.md`](finance-parse-and-generate.md) | The Finance spine: routes and gates, file import, deterministic parse, compute → narrate → number guard, persist and export | `features/finance.md` |
-| [`finance-tasks.md`](finance-tasks.md) | The five Finance tasks: ids, phase graph, the `FinanceTaskModule` contract, the generic runner, the dev-only eval harness | `features/finance.md` |
-| [`tenancy-schema.md`](tenancy-schema.md) | The tenant in the schema: `tenants`, `organizations.tenant_id`, migration 0015 and its healer, `TenantContext.tenantId` | no feature file; `packages/db/src/migrate-0015.test.ts` |
-| [`tenant-usage-ledger.md`](tenant-usage-ledger.md) | The tenant usage ledger: one `tenant_usage` row per gateway call for every mode, priced at write time in USD micros, migration 0016 | no feature file; `packages/host/src/usage-record.test.ts`, `packages/db/src/migrate-0016.test.ts` |
-| [`tenant-resolution.md`](tenant-resolution.md) | Whose data a request may read: `getTenant`, the session seam, first-sign-in provisioning, the scoped workspace cookie, session-bound CSRF | no feature file yet (`features/login.md` lands with the sign-in screen); `packages/host/src/tenant-session.test.ts` |
-| [`by-id-routes-and-tenancy-harness.md`](by-id-routes-and-tenancy-harness.md) | The by-id route surface: how each handler is scoped, the `getTenant(request)` sweep, the cross-tenant harness and its completeness assertion, the tenant id on every log line | no feature file (two tenants on a running server needs a portal sign-in); `packages/host/src/tenancy-harness.test.ts` |
-| [`tenant-storage.md`](tenant-storage.md) | Where a tenant's bytes go: the `tenants/<id>/` prefix, the local tenant's bare root, per-tenant `settings.enc` and gate state | no feature file; `packages/host/src/tenant-paths.test.ts`, `packages/host/src/tenant-state.test.ts` |
-| [`tenant-object-storage.md`](tenant-object-storage.md) | Phase 6: the object-storage interface, the COS backend and its signature, migration `0019`, the per-tenant quota and its refusal code | no feature file; `packages/host/src/tenant-storage-writers.test.ts` |
-| [`tenant-entitlement.md`](tenant-entitlement.md) | The allowance, the seat cap and the billing webhook — plus the renderer surfaces: `/pricing`, the plan panel, the blocked screens | `features/plans.md` |
-| [`hosted-surfaces-and-reset.md`](hosted-surfaces-and-reset.md) | Phase 8: the hosted surfaces, per-tenant reset and the health routes | no feature file |
-| [`tenant-secrets-backend.md`](tenant-secrets-backend.md) | Phase 4: the `settings` and `gateway_gate` payloads behind one backend chosen by mode, `tenant_state` and migration 0018, legacy-file adoption, the wrap-key rotation drill | no feature file; `packages/host/src/tenant-secrets.test.ts`, `packages/host/src/wrap-key-rotation.test.ts`, `packages/db/src/migrate-0018.test.ts` |
-| [`chat-sessions-and-rail.md`](chat-sessions-and-rail.md) | Chat sessions in the left rail: list, open, new, delete, desk scoping | `features/chat.md` |
-| [`virtual-agents.md`](virtual-agents.md) | **Tester code only.** Virtual agents in the chat-first shell: the registry (one agent per harness spec, `harness` or `studio`), the rail, an agent's conversation and header, the Research run to the dossier card, hire and let go, and what the host enforces from the registry | `features/virtual-agents.md` |
-| [`shell-rail-and-workspaces.md`](shell-rail-and-workspaces.md) | The shell around a mode page: rail blocks, desk switcher, `/workspaces`, `/usage` | `features/rail.md`, `features/workspaces.md`, `features/usage.md` |
-| [`documents.md`](documents.md) | Documents job: brief + `sourceText` → JSON draft → HTML preview → `.docx` | `features/documents.md`, `features/templates.md` |
-| [`research-dossier.md`](research-dossier.md) | Research: plan → search → read → extract → synthesize, streamed as `job.*` | `features/research.md` |
-| [`data-analysis.md`](data-analysis.md) | Data: the dataset store, the `run_sql` tool, and host-materialized evidence | `features/data.md` |
-| [`presentations.md`](presentations.md) | Presentation: topic → outline → stage, filmstrip, nine shapes → `.pptx` | `features/presentations.md` |
-| [`education.md`](education.md) | Education: lesson deck, exam from knowledge, local page reading, presenter plan | `features/education.md` |
-| [`meeting-minutes.md`](meeting-minutes.md) | Meeting: recording intake, ffmpeg chunking, gateway transcription, minutes, the name guard, EN/ID translation | `features/meeting.md` |
-| [`legal-matter-run.md`](legal-matter-run.md) | Legal matter: `.docx` intake, role classification, the nine-stage run, deliverables | `features/legal.md` |
-| [`edit-timeline.md`](edit-timeline.md) | Edit: the append-only ops log, the agent turn, cards, the review gate, export | `features/edit.md` |
-| [`generate-studios.md`](generate-studios.md) | Images and Videos studios: knob snapping, generate, mirror, gallery | `features/images.md`, `features/videos.md` |
-| [`music-mode.md`](music-mode.md) | Music: rail desk → describe/custom brief → Suno relay submit + poll → two takes mirrored into the media store | `features/music.md` |
-| [`knowledge-flows.md`](knowledge-flows.md) | How each mode and each manual entry point reaches the Knowledge Base: trigger, stored text, retrieval, removal | `features/knowledge-ingest.md`, `features/knowledge.md` |
-| [`knowledge-base-page.md`](knowledge-base-page.md) | The `/knowledge` page: Sources, Soul, Memory, Map, and what Chat injects | `features/knowledge.md`, `features/knowledge-graph.md` |
-| [`pii-and-key-security.md`](pii-and-key-security.md) | PII masking on the outbound copy, and the gateway key envelope | `features/pii.md`, `features/security.md` |
-| [`market-watch.md`](market-watch.md) | Market Watch: rail desk → per-desk watchlist → keyless board → harness packet → guarded briefing | `features/market.md`, `features/rail.md` |
-| [`component-installer.md`](component-installer.md) | First-run installer for native components: manifest → stages → hash-checked download → marker | `features/components.md` |
-| [`hosted-server-mode.md`](hosted-server-mode.md) | Server mode: the Origin/Host allowlist, CSRF, the HTTP filter, rate limits, masked errors, the redacting logger | `features/security.md` (partial) |
-| [`portal-session-auth.md`](portal-session-auth.md) | The portal browser session, host side: mint, verify, refresh, revoke, the server-mode session gate on `/api`, and the renderer's sign-in and boot order | `features/login.md`; unit tests under `packages/host/src/auth/` |
-| [`portal-service.md`](portal-service.md) | `apps/portal`, the portal stand-in: the browser and device-code flows, the Postgres store and its RLS, OTP, JWT, and every security control with the test that pins it | `features/login.md`; the suites under `apps/portal/src/` |
-| [`database-and-migrations.md`](database-and-migrations.md) | `packages/db`: the data dir, the wrap key, the SQLite connection, the schema, the committed migrations, Start over | `features/settings.md`, `features/data.md` (partial) |
-| [`webapp-deploy.md`](webapp-deploy.md) | The hosted deployment stack: image, compose, Caddy, and the build / deploy / backup / restore scripts | none — see `../tencent-cvm-setup.md` §9 |
-| [`hosted-security-controls.md`](hosted-security-controls.md) | The hosted perimeter: server mode, admission order, sessions, CSRF, rate limits, response headers, SSRF guard, container hardening | none yet — see the page's Verify section |
+| Page | Product | Subsystem | Verified by |
+|---|---|---|---|
+| [`channels.md`](channels.md) | both | Channels: Telegram bot token, desk channel store, send and poll, pinned egress | `features/channels.md` |
+| [`chat-send.md`](chat-send.md) | both | Chat send: composer → transport → run route → runtime → SSE → rendered message | `features/chat.md` |
+| [`chat-documents.md`](chat-documents.md) | both | Documents in the Chat composer: one format table, three doors, the local read route, the masked and cut text, the save on send with the host's notes, the private `uploads/~<user>/` desk copy, and the reload | `features/chat.md` |
+| [`model-policy.md`](model-policy.md) | both | How each gateway model is called: the policy table (wire, Thinking levels, Off, job knob, tier), the run's effort plan, and the one retry when a call's Thinking parameter is refused; since the second pass also the Responses `reasoning` block for GPT-6, Chat sending a level only once picked, and the dev-only `catalog-diff` and `probe` tools; since the third pass (2026-09-30) also the recommendation lists (Chat default `gpt-6-luna`, the Recommended set, per-mode and outage lists, the video order) | `features/models.md` |
+| [`agent-tools-and-files.md`](agent-tools-and-files.md) | both | The per-mode harness spec (loop, tools, step and tool-call budget, repair rounds), where it is enforced (Chat, jobs, Edit), the runtime tool budget and tool trust, `runChecked`, the six file tools, the desk's versioned file store and the Personal folder root with approval proposals, `knowledge_search`, and the Files and folder UI. § 12 covers the `run_code` sandbox: one call from the tool to a pooled Pyodide or QuickJS child, the child's permission flags and empty environment, the limits, what reaches the model, and the ship directory with how each platform packages it | `features/files.md`, `features/folder.md`, `features/code.md` |
+| [`settings-and-gateway-gate.md`](settings-and-gateway-gate.md) | both | Per-desk settings, the host gateway gate, Start over, key pinning | `features/settings.md`, `features/gateway-gate.md` |
+| [`locale-boot-and-run-harness.md`](locale-boot-and-run-harness.md) | both | App locale freeze + restart, and how `id` reaches the model | `features/settings.md`, `features/locale.md` |
+| [`knowledge-ingest-loop.md`](knowledge-ingest-loop.md) | both | Knowledge ingest, injection guard, embedding, retrieval, tenant scoping | `features/knowledge-ingest.md`, `features/knowledge.md` |
+| [`desktop-pack-routes.md`](desktop-pack-routes.md) | retired-desktop | Windows NSIS worktree route, macOS Docker route, release and updater | `features/desktop.md` |
+| [`release-and-sync-lanes.md`](release-and-sync-lanes.md) | both | How a fix on `main` reaches each downstream lane, and what must be true before a lane counts as fixed. Personal is retired (2026-10-14) | none (process) |
+| [`renderer-media.md`](renderer-media.md) | both | What a rendered answer may auto-load, and how remote media becomes host-served media | `features/images.md`, `features/videos.md`, `features/security.md` |
+| [`media-cost-estimate.md`](media-cost-estimate.md) | both | The price shown in the Images / Videos studio before generating | `features/images.md`, `features/videos.md` |
+| [`finance-parse-and-generate.md`](finance-parse-and-generate.md) | both | The Finance spine: routes and gates, file import, deterministic parse, compute → narrate → number guard, persist and export | `features/finance.md` |
+| [`finance-tasks.md`](finance-tasks.md) | both | The five Finance tasks: ids, phase graph, the `FinanceTaskModule` contract, the generic runner, the dev-only eval harness | `features/finance.md` |
+| [`tenancy-schema.md`](tenancy-schema.md) | both | The tenant in the schema: `tenants`, `organizations.tenant_id`, migration 0015 and its healer, `TenantContext.tenantId` | no feature file; `packages/db/src/migrate-0015.test.ts` |
+| [`tenant-usage-ledger.md`](tenant-usage-ledger.md) | both | The tenant usage ledger: one `tenant_usage` row per gateway call for every mode, priced at write time in USD micros, migration 0016 | no feature file; `packages/host/src/usage-record.test.ts`, `packages/db/src/migrate-0016.test.ts` |
+| [`tenant-resolution.md`](tenant-resolution.md) | both | Whose data a request may read: `getTenant`, the session seam, first-sign-in provisioning, the scoped workspace cookie, session-bound CSRF | no feature file yet (`features/login.md` lands with the sign-in screen); `packages/host/src/tenant-session.test.ts` |
+| [`by-id-routes-and-tenancy-harness.md`](by-id-routes-and-tenancy-harness.md) | both | The by-id route surface: how each handler is scoped, the `getTenant(request)` sweep, the cross-tenant harness and its completeness assertion, the tenant id on every log line | no feature file (two tenants on a running server needs a portal sign-in); `packages/host/src/tenancy-harness.test.ts` |
+| [`tenant-storage.md`](tenant-storage.md) | both | Where a tenant's bytes go: the `tenants/<id>/` prefix, the local tenant's bare root, per-tenant `settings.enc` and gate state | no feature file; `packages/host/src/tenant-paths.test.ts`, `packages/host/src/tenant-state.test.ts` |
+| [`tenant-object-storage.md`](tenant-object-storage.md) | both | Phase 6: the object-storage interface, the COS backend and its signature, migration `0019`, the per-tenant quota and its refusal code | no feature file; `packages/host/src/tenant-storage-writers.test.ts` |
+| [`tenant-entitlement.md`](tenant-entitlement.md) | both | The allowance, the seat cap and the billing webhook — plus the renderer surfaces: `/pricing`, the plan panel, the blocked screens | `features/plans.md` |
+| [`hosted-surfaces-and-reset.md`](hosted-surfaces-and-reset.md) | both | Phase 8: the hosted surfaces, per-tenant reset and the health routes | no feature file |
+| [`tenant-secrets-backend.md`](tenant-secrets-backend.md) | both | Phase 4: the `settings` and `gateway_gate` payloads behind one backend chosen by mode, `tenant_state` and migration 0018, legacy-file adoption, the wrap-key rotation drill | no feature file; `packages/host/src/tenant-secrets.test.ts`, `packages/host/src/wrap-key-rotation.test.ts`, `packages/db/src/migrate-0018.test.ts` |
+| [`chat-sessions-and-rail.md`](chat-sessions-and-rail.md) | both | Chat sessions in the left rail: list, open, new, delete, desk scoping | `features/chat.md` |
+| [`virtual-agents.md`](virtual-agents.md) | both | Virtual agents in the chat-first shell, on `main` since PR #157 (2026-10-12): the registry (one agent per harness spec, `harness` or `studio`), the rail, an agent's conversation and header, the Research run to the dossier card, hire and let go, and what the host enforces from the registry | `features/virtual-agents.md` |
+| [`shell-rail-and-workspaces.md`](shell-rail-and-workspaces.md) | both | The shell around a mode page: rail blocks, desk switcher, `/workspaces`, `/usage` | `features/rail.md`, `features/workspaces.md`, `features/usage.md` |
+| [`documents.md`](documents.md) | both | Documents job: brief + `sourceText` → JSON draft → HTML preview → `.docx` | `features/documents.md`, `features/templates.md` |
+| [`research-dossier.md`](research-dossier.md) | both | Research: plan → search → read → extract → synthesize, streamed as `job.*` | `features/research.md` |
+| [`data-analysis.md`](data-analysis.md) | both | Data: the dataset store, the `run_sql` tool, and host-materialized evidence | `features/data.md` |
+| [`presentations.md`](presentations.md) | both | Presentation: topic → outline → stage, filmstrip, nine shapes → `.pptx` | `features/presentations.md` |
+| [`education.md`](education.md) | both | Education: lesson deck, exam from knowledge, local page reading, presenter plan | `features/education.md` |
+| [`meeting-minutes.md`](meeting-minutes.md) | both | Meeting: recording intake, ffmpeg chunking, gateway transcription, minutes, the name guard, EN/ID translation | `features/meeting.md` |
+| [`legal-matter-run.md`](legal-matter-run.md) | both | Legal matter: `.docx` intake, role classification, the nine-stage run, deliverables | `features/legal.md` |
+| [`edit-timeline.md`](edit-timeline.md) | both | Edit: the append-only ops log, the agent turn, cards, the review gate, export | `features/edit.md` |
+| [`generate-studios.md`](generate-studios.md) | both | Images and Videos studios: knob snapping, generate, mirror, gallery | `features/images.md`, `features/videos.md` |
+| [`music-mode.md`](music-mode.md) | both | Music: rail desk → describe/custom brief → Suno relay submit + poll → two takes mirrored into the media store | `features/music.md` |
+| [`knowledge-flows.md`](knowledge-flows.md) | both | How each mode and each manual entry point reaches the Knowledge Base: trigger, stored text, retrieval, removal | `features/knowledge-ingest.md`, `features/knowledge.md` |
+| [`knowledge-base-page.md`](knowledge-base-page.md) | both | The `/knowledge` page: Sources, Soul, Memory, Map, and what Chat injects | `features/knowledge.md`, `features/knowledge-graph.md` |
+| [`pii-and-key-security.md`](pii-and-key-security.md) | both | PII masking on the outbound copy, and the gateway key envelope | `features/pii.md`, `features/security.md` |
+| [`market-watch.md`](market-watch.md) | both | Market Watch: rail desk → per-desk watchlist → keyless board → harness packet → guarded briefing | `features/market.md`, `features/rail.md` |
+| [`component-installer.md`](component-installer.md) | both | First-run installer for native components: manifest → stages → hash-checked download → marker | `features/components.md` |
+| [`hosted-server-mode.md`](hosted-server-mode.md) | both | Server mode: the Origin/Host allowlist, CSRF, the HTTP filter, rate limits, masked errors, the redacting logger | `features/security.md` (partial) |
+| [`portal-session-auth.md`](portal-session-auth.md) | both | The portal browser session, host side: mint, verify, refresh, revoke, the server-mode session gate on `/api`, and the renderer's sign-in and boot order | `features/login.md`; unit tests under `packages/host/src/auth/` |
+| [`portal-service.md`](portal-service.md) | both | `apps/portal`, the portal stand-in: the browser and device-code flows, the Postgres store and its RLS, OTP, JWT, and every security control with the test that pins it | `features/login.md`; the suites under `apps/portal/src/` |
+| [`database-and-migrations.md`](database-and-migrations.md) | both | `packages/db`: the data dir, the wrap key, the SQLite connection, the schema, the committed migrations, Start over | `features/settings.md`, `features/data.md` (partial) |
+| [`webapp-deploy.md`](webapp-deploy.md) | both | The hosted deployment stack: image, compose, Caddy, and the build / deploy / backup / restore scripts | none — see `../tencent-cvm-setup.md` §9 |
+| [`hosted-security-controls.md`](hosted-security-controls.md) | both | The hosted perimeter: server mode, admission order, sessions, CSRF, rate limits, response headers, SSRF guard, container hardening | none yet — see the page's Verify section |
+| [`first-run-desk-and-guide.md`](first-run-desk-and-guide.md) | both | The first-run desk and the first-run guide | `features/guide.md`, `features/workspaces.md` |
+| [`mascot-and-brand.md`](mascot-and-brand.md) | both | Mascot and brand: the Nultron character | `features/mascot.md`, `features/desktop-brands.md` |

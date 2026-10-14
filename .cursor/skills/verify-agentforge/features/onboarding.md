@@ -2,6 +2,8 @@
 
 The first-run screen, in three steps. A fresh desk says hello, then asks for a key, then offers four examples (Chat, Research, Images, Presentation) and a line that a quick tour comes next. On the Personal app the first desk's rail has five modes, Chat, Research, Images, Videos and Presentation (`FIRST_RUN_MODES`, `packages/core/src/agents/product-modes.ts:55-61`); the examples leave Videos out. The hosted app's first desk has every work mode (`HOSTED_FIRST_DESK_MODES`, `:69`, chosen by `firstDeskModes`, `:76-78`), and the four examples are the same there. The examples render only after the host reports `allowed`. The renderer displays that decision and does not decide it. The in-app name is `{productName}` (Nultron). There is no password and no sign-in form, and the gateway address is not on the screen. **On the hosted app only** (Nultron Enterprise, owner decision 2026-10-01) a signed-in person also gets "Add it later" next to Check this key, which opens Chat with no key and is remembered by the host; the Personal app never shows it. How the gate is derived is [gateway-gate.md](./gateway-gate.md); the document-reader panel is [components.md](./components.md). The gate map is [`docs/internal/maps/settings-and-gateway-gate.md`](../../../../docs/internal/maps/settings-and-gateway-gate.md).
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 ## Sub-features
 
 - `onboarding-steps` is the three-item step list (`welcome`, `key`, `try`) above every step: each item is `onboarding-step-<id>`, and the current one carries `aria-current="step"` (`apps/web/components/onboarding-screen.tsx:243-250`). The `try` item is there before the examples exist; the list is the way to read which step is showing.

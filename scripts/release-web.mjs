@@ -9,6 +9,8 @@
  *        [--dry-run] [--skip-image] [--draft] [--allow-dirty]
  *
  * In order:
+ *   0. checkout: refused unless the folder is not the tester folder (agentforge-chat) and its branch is main.
+ *      Dry runs are refused too (releaseProblem in scripts/where-am-i.mjs);
  *   1. preflight: the tag is `ent-YYYY.MM.DD[.N]`, the tree is clean (unless --allow-dirty), <sha>
  *      resolves, docs/public/<tag>-notes.md exists and carries none of the five banned marks, and
  *      every file about to be published passes the same check;
@@ -50,6 +52,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { forbiddenMarksIn } from "./release-marks.mjs";
 import { composeFileText } from "./release-web-compose.mjs";
+import { releaseProblem } from "./where-am-i.mjs";
 import { deployDocText } from "./release-web-docs.mjs";
 import { REQUIRED_SITE_FILES, SITES_BUNDLE_DIR, readSiteFiles } from "./release-web-sites.mjs";
 
@@ -127,10 +130,26 @@ export const ENV_DEFAULTS = {
  * to .env.example as comments, never as assignments: unset means the site is not served.
  */
 export const OPTIONAL_ENV = [
-  ["DPS_DOMAIN", "dpscloud.co.id", "Serve the DPS Cloud website on this name and on www.<name>. Point both A records here first."],
-  ["TOKOTOKEN_DOMAIN", "tokotokenai.com", "Serve the Toko Token website on this name and on www.<name>. Never api.tokotokenai.com: that is the live gateway, hosted elsewhere."],
-  ["DPS_WEB_ROOT", "/srv/sites/dpscloud", "A folder outside this one with the real DPS Cloud site. Default: the placeholder page in ./sites/dpscloud."],
-  ["TOKOTOKEN_WEB_ROOT", "/srv/sites/tokotoken", "A folder outside this one with the real Toko Token site. Default: the placeholder page in ./sites/tokotoken."],
+  [
+    "DPS_DOMAIN",
+    "dpscloud.co.id",
+    "Serve the DPS Cloud website on this name and on www.<name>. Point both A records here first.",
+  ],
+  [
+    "TOKOTOKEN_DOMAIN",
+    "tokotokenai.com",
+    "Serve the Toko Token website on this name and on www.<name>. Never api.tokotokenai.com: that is the live gateway, hosted elsewhere.",
+  ],
+  [
+    "DPS_WEB_ROOT",
+    "/srv/sites/dpscloud",
+    "A folder outside this one with the real DPS Cloud site. Default: the placeholder page in ./sites/dpscloud.",
+  ],
+  [
+    "TOKOTOKEN_WEB_ROOT",
+    "/srv/sites/tokotoken",
+    "A folder outside this one with the real Toko Token site. Default: the placeholder page in ./sites/tokotoken.",
+  ],
 ];
 export const BUNDLE_FILES = ["compose.yml", ".env.example", "portal.env.example", "DEPLOY.md", "Caddyfile"];
 
@@ -199,7 +218,13 @@ export function releaseBody(notes, fullSha, image, portalImage) {
  * server. The text is in release-web-compose.mjs.
  */
 export function composeFile(tag) {
-  return composeFileText({ tag, app: imageRef(tag), portal: portalImageRef(tag), proxy: PROXY_IMAGE, database: DATABASE_IMAGE });
+  return composeFileText({
+    tag,
+    app: imageRef(tag),
+    portal: portalImageRef(tag),
+    proxy: PROXY_IMAGE,
+    database: DATABASE_IMAGE,
+  });
 }
 
 /** An env template: a comment line, then NAME= with its default or an empty value. */
@@ -225,7 +250,10 @@ export function envExample() {
         "PORTAL_DOMAIN",
         "Public hostname of the portal, where people sign in: a second DNS record for this server. The host of AGENTFORGE_PORTAL_URL.",
       ],
-      ["AGENTFORGE_SECRETS_KEY", "32-byte hex wrap key for stored secrets (openssl rand -hex 32). Generate once and keep it."],
+      [
+        "AGENTFORGE_SECRETS_KEY",
+        "32-byte hex wrap key for stored secrets (openssl rand -hex 32). Generate once and keep it.",
+      ],
       [
         "AGENTFORGE_TRUSTED_ORIGINS",
         "The app's public origin with its scheme, https://<NULTRON_DOMAIN>. Comma-separated for more than one.",
@@ -260,18 +288,30 @@ export function portalEnvExample() {
         "PORTAL_SIGNING_KEY",
         "Ed25519 seed that signs access tokens, 64 hex characters (openssl rand -hex 32). Rotating it signs everyone out.",
       ],
-      ["PORTAL_POSTGRES_PASSWORD", "Schema owner's password for the portal database. Read by initdb once, on an empty volume."],
+      [
+        "PORTAL_POSTGRES_PASSWORD",
+        "Schema owner's password for the portal database. Read by initdb once, on an empty volume.",
+      ],
       ["PORTAL_APP_DB_PASSWORD", "Password of portal_app_login, the role the portal serves as. Not the same value."],
       [
         "PORTAL_SIGNIN_MODE",
         "How people sign in. password (the default in this bundle) signs people in with a username and a password an operator creates with the portal's account command (DEPLOY.md, step 7): no mail is sent, so the SMTP settings below may stay blank. code e-mails a one-time code instead, so set it to code and fill in every SMTP setting below. Anything else stops the portal at boot.",
       ],
-      ["PORTAL_SMTP_HOST", "Tencent Cloud SES, International site. smtp.qcloudmail.com is the Hong Kong (China site) host."],
+      [
+        "PORTAL_SMTP_HOST",
+        "Tencent Cloud SES, International site. smtp.qcloudmail.com is the Hong Kong (China site) host.",
+      ],
       ["PORTAL_SMTP_PORT", "465, implicit TLS. SES documents no other SMTP port."],
       ["PORTAL_SMTP_SECURE", "1 = TLS from the first byte, which is what port 465 speaks."],
-      ["PORTAL_SMTP_USER", "The verified SES sender address, in full: no-reply@mail.dpscloud.co.id (the SES sender domain is mail.dpscloud.co.id)."],
+      [
+        "PORTAL_SMTP_USER",
+        "The verified SES sender address, in full: no-reply@mail.dpscloud.co.id (the SES sender domain is mail.dpscloud.co.id).",
+      ],
       ["PORTAL_SMTP_PASS", "The SMTP password set for that sender address in the SES console."],
-      ["PORTAL_SMTP_FROM", "The From header: the display name Nultron and the verified sender address. Change it here to change the sender."],
+      [
+        "PORTAL_SMTP_FROM",
+        "The From header: the display name Nultron and the verified sender address. Change it here to change the sender.",
+      ],
     ],
   );
 }
@@ -387,6 +427,15 @@ function expectOk(result, what) {
   return result;
 }
 
+/** Releases come from main in agentforge, never from the tester folder. Runs before anything else, dry runs too. */
+function checkCheckout(deps) {
+  const head = deps.git(["rev-parse", "--abbrev-ref", "HEAD"], deps.repoRoot);
+  const named = head.status === 0 ? head.stdout.trim() : null;
+  const problem = releaseProblem({ folder: deps.repoRoot, branch: named === "HEAD" ? null : named });
+  if (problem) fail(problem);
+  deps.log(`ok - checkout is main, not the tester folder (${deps.repoRoot})`);
+}
+
 function checkGitClean(flags, deps) {
   const status = deps.git(["status", "--porcelain"], deps.repoRoot);
   if (status.status !== 0) fail("git status failed");
@@ -442,7 +491,9 @@ function checkSourceFiles(fullSha, deps) {
     (path) => deps.git(["cat-file", "-e", `${fullSha}:${path}`], deps.repoRoot).status !== 0,
   );
   if (missing.length > 0) {
-    fail(`commit ${fullSha} does not contain ${missing.join(", ")}: the images cannot be built from it (commit them first)`);
+    fail(
+      `commit ${fullSha} does not contain ${missing.join(", ")}: the images cannot be built from it (commit them first)`,
+    );
   }
   deps.log("ok - the sha carries both Dockerfiles, the portal's scripts and the proxy's site files");
 }
@@ -501,7 +552,10 @@ function pushBundle(tag, bundle, workDir, deps) {
   }
   assertTreePublishable(cloneDir);
   const inSites = (name) => name.startsWith(`${SITES_BUNDLE_DIR}/`);
-  const toAdd = [...Object.keys(bundle).filter((name) => !inSites(name)), ...(Object.keys(bundle).some(inSites) ? [SITES_BUNDLE_DIR] : [])];
+  const toAdd = [
+    ...Object.keys(bundle).filter((name) => !inSites(name)),
+    ...(Object.keys(bundle).some(inSites) ? [SITES_BUNDLE_DIR] : []),
+  ];
   expectOk(deps.git(["add", "--all", "--", ...toAdd], cloneDir), "git add");
   const changed = expectOk(deps.git(["status", "--porcelain"], cloneDir), "git status").stdout.trim();
   if (!changed) {
@@ -550,6 +604,7 @@ function logPlan(flags, image, portalImage, ghArgs, bundle, deps) {
 export function main(argv = process.argv.slice(2), overrides = {}) {
   const deps = { ...defaultDeps, ...overrides };
   const flags = parseArgs(argv);
+  checkCheckout(deps);
   const problem = tagProblem(flags.tag);
   if (problem) fail(problem);
   const image = imageRef(flags.tag);

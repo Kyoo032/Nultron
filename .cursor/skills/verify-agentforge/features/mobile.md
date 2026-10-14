@@ -2,6 +2,8 @@
 
 There is no built Nultron iOS or Android app. No App Store / Play listing, no Capacitor or Cordova project, no mobile electron-builder target, nothing to install or drive. A phone browser pointed at a LAN `:3000` is **not** a product surface — a local run binds `127.0.0.1` (`apps/web/server.ts:146-147`; a non-loopback `BIND_HOST` is honoured only when `AGENTFORGE_SERVER` is set, `apps/web/lib/bind-host.ts:15-26`). An Android-first Expo client **is** planned in-repo under `apps/mobile` — rules only today (`apps/mobile/AGENTS.md:3` "Status: **rules only** (2026-09-07). No app code yet."), scoped as a direct gateway client, never part of the desktop installer (`apps/mobile/AGENTS.md:7` and the plan `docs/internal/mobile-android-plan.md:7`; `docs/mobile.md:11` says only that it is paused; `apps/mobile/AGENTS.md:8` re-scopes a future phone client to target the hosted app, not a LAN desktop). Until app code lands, mobile is `verified-unreachable (no mobile app)` on every run.
 
+Product: retired-desktop · Instance: none (no mobile build; retired with the desktop lane)
+
 ## Sub-features
 
 - `mobile-none` — no mobile build, no store package, no `--mobile` doctor flag.

@@ -9,9 +9,9 @@ Documents, Research, Finance, Data, Market, Legal, Images, Videos, Music, Meetin
 ## Baseline preconditions
 
 - **Webdev:** the operator's instance answers at `http://127.0.0.1:3000` (never a LAN IP). Doctor with no args. An isolated instance you started yourself on another port is doctored with `--base http://127.0.0.1:<port>`.
-- **Packaged desktop:** Electron window; doctor `--desktop` reads `host-status.json` (`transport: "ipc"`). No HTTP port.
-- SQLite is `data/agentforge.sqlite` (webdev) or Electron userData (packaged: `%APPDATA%\Nultron`, `$XDG_CONFIG_HOME/Nultron` or `~/.config/Nultron`, `~/Library/Application Support/Nultron`).
-- **No product login on webdev or the desktop.** A gateway key is optional; stub Chat works without one. The hosted deployment is different: since Phase 9 it has a sign-in, and it is the portal door — by default an e-mail and a six-digit code, or, on a portal started with `PORTAL_SIGNIN_MODE=password` (HYP AI, 2026-10-07; also the Nultron Enterprise release bundle's default since 2026-10-09, while the portal's own default with the variable unset is still the code), a username and a password the operator made; the app itself never has a password field, and an e-mail domain is never used to pick a tenant. Drive it with [login.md](./login.md) on the review instance, never on `:3000`.
+- **Packaged desktop (history: retired 2026-10-14, not owed):** Electron window; doctor `--desktop` reads `host-status.json` (`transport: "ipc"`). No HTTP port.
+- SQLite is `data/agentforge.sqlite` (webdev) or, history only, Electron userData (packaged: `%APPDATA%\Nultron`, `$XDG_CONFIG_HOME/Nultron` or `~/.config/Nultron`, `~/Library/Application Support/Nultron`).
+- **No product login on webdev or the retired desktop.** A gateway key is optional; stub Chat works without one. The hosted deployment is different: since Phase 9 it has a sign-in, and it is the portal door — by default an e-mail and a six-digit code, or, on a portal started with `PORTAL_SIGNIN_MODE=password` (HYP AI, 2026-10-07; also the Nultron Enterprise release bundle's default since 2026-10-09, while the portal's own default with the variable unset is still the code), a username and a password the operator made; the app itself never has a password field, and an e-mail domain is never used to pick a tenant. Drive it with [login.md](./login.md) on the review instance, never on `:3000`.
 - The **gateway gate** decides whether a desk opens at all: `allowed: false` puts the whole app on onboarding and answers `403 gateway_blocked` on every gateway-calling route. See [gateway-gate.md](./gateway-gate.md).
 - Windows: drive webdev with the IDE browser where you have one. A Claude Code session has no IDE browser — it drives `:3000` (the isolated webdev) with a short scratch Playwright script (see SKILL.md **Drive**) and never runs `pnpm test:e2e`. `:3000` may hold a real, billed key: read doctor's `runtime` first and keep model calls to what the owner asked for.
 - Cloud (and `pnpm ci:local --e2e`): `AGENTFORGE_RUNTIME=stub` and Playwright `foundation.spec.ts` against **webdev** :3000.
@@ -38,7 +38,64 @@ Documents, Research, Finance, Data, Market, Legal, Images, Videos, Music, Meetin
 
 ## Feature entry contract
 
-Each file: H1 + one paragraph, then exactly four H2s — `Sub-features`, `How to get to it (user POV)`, `Driving it with the Nultron harness`, `Gotchas`.
+Each file: H1, one paragraph, the `Product: … · Instance: …` line, then exactly four H2s — `Sub-features`, `How to get to it (user POV)`, `Driving it with the Nultron harness`, `Gotchas`.
+
+## Product and instance
+
+Every recipe names its product and the instance it is driven on. The same pair sits under each recipe's H1 paragraph as `Product: … · Instance: …`. [maps/README.md](../../../../docs/internal/maps/README.md) uses the same words for the subsystem pages.
+
+- **Product.** `both` means the shared renderer and host, which serve Nultron (OPC, the hosted one-owner app) and HYP AI (SME). `retired-desktop` means the Personal desktop app, retired 2026-10-14: history, not owed a drive. The `opc` and `sme` folders are not built yet, so no recipe says `opc` or `sme`.
+- **Instance.** `main :3000` is the published checkout, `C:\Users\rizky\agentforge`. `HYP AI :3301` is the brand clone, which takes shared code by import, so a shared recipe needs a drive on both. `tester :3200` is staging: new work is driven there first. Which instance you are in is in [SKILL.md](../SKILL.md#where-am-i).
+- **Checked against the code** (main `cdb727b4`, tester `06e73cef`, 2026-10-14). The team board (`packages/host/src/board/`, `apps/web/components/board-*.tsx`) and the Private/Workspace project switch (`apps/web/components/projects-*.tsx`) exist only on the tester, and no recipe covers either yet, so none is tagged tester-only. Documents in Chat is on both: the base is on main (`apps/web/components/chat-deck-card.tsx`, `packages/host/src/chat-documents/`), and the newer document cards (`chat-doc-card.tsx`, `tool-rows/doc-result.ts`) are tester-only. `/workspaces` (the Virtual agents page) and private uploads (`packages/host/src/desk-files/private-uploads.ts`) are on main.
+
+| Recipe | Product | Instance |
+|---|---|---|
+| [Build](./build.md) | both | main :3000 (parked: `/studio` redirects to Chat) |
+| [Channels (Telegram)](./channels.md) | both | main :3000 + HYP AI :3301 |
+| [Chat](./chat.md) | both | main :3000 + HYP AI :3301 (the newer document cards are tester :3200 only) |
+| [Code](./code.md) | both | main :3000 + HYP AI :3301 |
+| [Components (first-run installer)](./components.md) | both | main :3000 + HYP AI :3301 |
+| [Data](./data.md) | both | main :3000 + HYP AI :3301 |
+| [Desktop brands](./desktop-brands.md) | retired-desktop | none (Personal desktop retired 2026-10-14) |
+| [Desktop](./desktop.md) | retired-desktop | none (Personal desktop retired 2026-10-14) |
+| [Documents](./documents.md) | both | main :3000 + HYP AI :3301 |
+| [Edit](./edit.md) | both | main :3000 + HYP AI :3301 |
+| [Education](./education.md) | both | main :3000 + HYP AI :3301 |
+| [Files](./files.md) | both | main :3000 + HYP AI :3301 |
+| [Finance](./finance.md) | both | main :3000 + HYP AI :3301 |
+| [Folder](./folder.md) | retired-desktop | none (Personal desktop retired 2026-10-14) |
+| [Gateway gate](./gateway-gate.md) | both | main :3000 + HYP AI :3301 |
+| [Guide](./guide.md) | both | main :3000 + HYP AI :3301 |
+| [Images](./images.md) | both | main :3000 + HYP AI :3301 |
+| [Knowledge graph](./knowledge-graph.md) | both | main :3000 + HYP AI :3301 |
+| [Knowledge ingest loop](./knowledge-ingest.md) | both | main :3000 + HYP AI :3301 |
+| [Knowledge phases](./knowledge-phases.md) | both | main :3000 + HYP AI :3301 |
+| [Knowledge](./knowledge.md) | both | main :3000 + HYP AI :3301 |
+| [Legal](./legal.md) | both | main :3000 + HYP AI :3301 |
+| [Locale](./locale.md) | both | main :3000 + HYP AI :3301 |
+| [Login (hosted sign-in)](./login.md) | both | hosted review :3443 (not :3000) |
+| [Market](./market.md) | both | main :3000 + HYP AI :3301 |
+| [Mascot](./mascot.md) | both | main :3000 + HYP AI :3301 |
+| [Meeting](./meeting.md) | both | main :3000 + HYP AI :3301 |
+| [Mobile](./mobile.md) | retired-desktop | none (no mobile build; retired with the desktop lane) |
+| [Model tiers](./model-tiers.md) | both | main :3000 + HYP AI :3301 |
+| [Models](./models.md) | both | main :3000 + HYP AI :3301 |
+| [Music](./music.md) | both | main :3000 + HYP AI :3301 |
+| [Onboarding](./onboarding.md) | both | main :3000 + HYP AI :3301 |
+| [PII](./pii.md) | both | main :3000 + HYP AI :3301 |
+| [Plans and pricing](./plans.md) | both | main :3000 for /pricing; hosted review :3443 for the signed-in panel |
+| [Presentation](./presentations.md) | both | main :3000 + HYP AI :3301 |
+| [Rail](./rail.md) | both | main :3000 + HYP AI :3301 |
+| [Research](./research.md) | both | main :3000 + HYP AI :3301 |
+| [Security](./security.md) | both | main :3000 + HYP AI :3301 |
+| [Settings](./settings.md) | both | main :3000 + HYP AI :3301 |
+| [Shell scroll](./shell-scroll.md) | both | main :3000 + HYP AI :3301 |
+| [Studio advanced](./studio-advanced.md) | both | main :3000 (parked: `/studio` redirects to Chat) |
+| [Templates](./templates.md) | both | main :3000 + HYP AI :3301 |
+| [Usage](./usage.md) | both | main :3000 + HYP AI :3301 |
+| [Videos](./videos.md) | both | main :3000 + HYP AI :3301 |
+| [Virtual agents](./virtual-agents.md) | both | main :3000 + HYP AI :3301 (on main since PR #157) |
+| [Workspaces](./workspaces.md) | both | main :3000 + HYP AI :3301 (the Private/Workspace project switch is tester :3200 only, no recipe yet) |
 
 ## Features
 
@@ -74,7 +131,7 @@ Each file: H1 + one paragraph, then exactly four H2s — `Sub-features`, `How to
 - [Knowledge ingest loop](./knowledge-ingest.md) — every finished Chat turn / job writes a text work card (pointer, not bytes); the `knowledge-loop` health strip of tiles on Sources (not a chart); Chat skips its own card; example clips never ingest.
 - [Knowledge graph](./knowledge-graph.md) — Phase 4 builtin: completed Chat replies with `[n]` markers add `cites` edges (a stub reply can cite too, for the desk phrase "what does the desk say about ...", and every retrieving send adds a `retrieved` edge); one-hop `covers` expansion is behind `knowledge.graphExpand` (off in Chat); panel is the existing Phase 2 base. Drive on webdev :3000.
 - [Files](./files.md): desk files, both products: the Files section at the bottom of the Knowledge Base's Sources tab (`files-section`), New file and Upload text file, a viewer with numbered text and version history, Restore and Delete behind confirms, the `/knowledge?file=` deep link, the seven `/api/v1/files` routes, and the Chat tool rows for the six file tools. Stub Chat never writes a file; the Chat write-and-edit scenario needs a live key. Drive on a throwaway desk.
-- [Folder](./folder.md): **Personal lane (desktop only).** Open one real folder from the Chat composer (`folder-open`), let the agent read it, and Approve, Reject or find stale each change it proposes (`folder-proposal`). Needs a packed app, because `pnpm desktop:dev` has no preload; webdev proves only the refusals (`GET /api/v1/folder`, a mount over HTTP). Not driven on any packed app yet.
+- [Folder](./folder.md): **Retired with the Personal desktop (2026-10-14): history only.** Open one real folder from the Chat composer (`folder-open`), let the agent read it, and Approve, Reject or find stale each change it proposes (`folder-proposal`). Needs a packed app, because `pnpm desktop:dev` has no preload; webdev proves only the refusals (`GET /api/v1/folder`, a mount over HTTP). No packed app was ever driven, and nothing here is owed now.
 - [Code](./code.md): the `run_code` sandbox. No page of its own: the model runs a short Python or JavaScript program and the Chat turn shows a `tool-row-code` row, with the files it saved as chips. Two halves: the real engines driven from the repo (`sandbox:verify` and the 27-test integration suite, no key and no browser) and Chat scenarios that need a live key and a host started after 2026-10-03. A stub Chat never calls it.
 - [Images](./images.md) — studio shell on Default. The needs-key note and Generate both follow the host gate. A stub desk (`allowed: true`) hides the note and does not quiet Generate (it is still disabled while the prompt is empty). The frame (aspect) is picked from the prompt until the owner touches the menu.
 - [Videos](./videos.md) — studio shell. `videos-studio-needs-key` and a quiet Generate follow the video route's `ready` flag, including on a stub desk with no key.
@@ -83,8 +140,8 @@ Each file: H1 + one paragraph, then exactly four H2s — `Sub-features`, `How to
 - [Edit](./edit.md) — CapCut-style timeline + agent panel (`agent-edit`), shipped in 0.14.22. Storyboard generate is still a Phase 3 placeholder and `animate_storyboard` is backend-only.
 - [Presentation](./presentations.md) — slide stage: filmstrip, nine shapes, nudge / duplicate / delete, title / heading / bullets on the slide, PPTX from a starter. The default builder is Open Slide (streamed Create, per-page `data-layout`, a local draft on a stub desk); Nultron is the engine under More. Regen is a real 503 without a key; Create is a stream (HTTP 200 plus `job.error`).
 - [Education](./education.md) — lesson on that stage, an exam sheet, and a presenter stage. Local page reading. Lesson, page and show need no gateway key; the quiz embeds its topic on a keyed desk.
-- [Desktop](./desktop.md) — Electron one-window launch, splash → Chat, IPC host (no loopback HTTP). Windows NSIS exists; mac/linux are builder targets.
-- [Desktop brands](./desktop-brands.md) — packaged Kemenkeu AI / AIHub Metranet vs public Nultron. Rail `product-brand` + `product-logo` must match the installed flavor, not leftover Nultron copy.
-- [Mobile](./mobile.md) — docs only. No iOS/Android build, no stores, no Capacitor. A phone on LAN `:3000` is not a product surface.
+- [Desktop](./desktop.md) — **retired 2026-10-14, history only.** Electron one-window launch, splash → Chat, IPC host (no loopback HTTP). Windows NSIS exists; mac/linux are builder targets.
+- [Desktop brands](./desktop-brands.md) — **retired 2026-10-14, history only.** Packaged Kemenkeu AI / AIHub Metranet vs public Nultron. Rail `product-brand` + `product-logo` must match the installed flavor, not leftover Nultron copy.
+- [Mobile](./mobile.md) — **history only.** Docs only. No iOS/Android build, no stores, no Capacitor. A phone on LAN `:3000` is not a product surface.
 - [Build](./build.md) — **parked / verified-unreachable.** `/studio` redirects to Chat.
 - [Studio advanced](./studio-advanced.md) — **parked / verified-unreachable.** Same redirect.

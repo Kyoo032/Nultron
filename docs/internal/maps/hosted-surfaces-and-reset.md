@@ -1,5 +1,7 @@
 # Map — Hosted surfaces, per-tenant reset and health
 
+Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
+
 Last verified: 2026-10-07 in the `feat/hosted-run-limits` working tree (uncommitted), for one added step in the erase's checks (§ 2, step 5: refused on a partner that holds more than one company, SR-163 review round; read from `tenant-reset.ts`, proven by `tenant-reset-companies.test.ts`, not driven on a hosted server); every other line is as verified below. Before that: 2026-10-01 at 0b61a29 + uncommitted tree, a third time that day, for the erase panel at a phone's width (§ 2, the paragraph on the screen): the final button is full width under the phrase box and its label is two lines at most, measured in a browser at 360, 400 and 1180 px against faked host answers. Before that, a second time that day, for **who is an owner** (§ 2): the portal now
 sends `role` and the host writes and re-applies it, so the owner-only check stops a colleague (SR-65, second hole); the
 screen shows the button to an owner only. Before that, for the Erase account rewrite (§ 2): owner decision

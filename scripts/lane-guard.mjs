@@ -1,39 +1,47 @@
 #!/usr/bin/env node
 /**
- * Lane guard: an ADVISORY check that a change says which lanes it touches and keeps its map page
- * and brand-neutral rule. It warns, like `maps:check`; it never blocks (exit 0), unless `--strict`.
+ * Lane guard: a change says which lanes it touches, keeps its map page, and stays brand-neutral.
+ * Plan: docs/internal/white-label-and-agent-guardrails-plan.md.
  *
  * Why: one source repo feeds four lanes (Nultron Personal, Nultron Enterprise, HYP AI, the tester
  * code). Agents cannot see the vault note that lists which files the tester branch edits, and a
  * brand name typed into shared code ships to HYP AI. `lanes.json` at the repo root is that list, in
- * the repo, and this script reads it. Plan: docs/internal/white-label-and-agent-guardrails-plan.md.
+ * the repo, and this script reads it.
  *
  * Usage (repo root):
  *   node scripts/lane-guard.mjs                    the diff origin/main...HEAD
  *   node scripts/lane-guard.mjs <range>            e.g. main...HEAD or abc123..HEAD
- *   node scripts/lane-guard.mjs --strict           exit 1 when anything warns (ci:local passes this)
+ *   node scripts/lane-guard.mjs --branch <name>    judge this branch, not the checked-out one (the pre-push hook)
+ *   node scripts/lane-guard.mjs --strict           also exit 1 on map warnings (ci:local does not pass this)
  *   node scripts/lane-guard.mjs --write-baseline   record today's brand-literal counts, see below
  *   node scripts/lane-guard.mjs --root <dir>       run against another repo (tests)
  *
- * Three warnings:
+ * Three BLOCKING rules (exit 1 with or without --strict):
+ *   never-promote  a path added or changed in a diff to main that matches lanes.json `neverPromote`
+ *                  (tester-only config, data and env files). Skipped on the tester branch itself and
+ *                  for ranges whose base is not main.
+ *   protected      a file marked "protected" changed and no commit in the range has a `Lanes:` line.
+ *   brand          a brand literal (Nultron, Toko Token, TokenKu, HYP AI, Hypey) appears more often in a
+ *                  shared-code file than `scripts/lane-guard.baseline.json` recorded. "Nultron" is the
+ *                  default brand and the mascot name today, so a plain ban would be red on day one;
+ *                  the ratchet only lets the count go down. Regenerate the baseline on a clean tree
+ *                  with `--write-baseline` after a cleanup lowers a count, never to excuse an increase.
+ *
+ * One ADVISORY rule (exit 0 unless --strict):
  *   map        code under a lanes.json glob changed, but none of that glob's map pages did.
  *              Tests, markdown and fixtures never trigger it. An entry with "map": null is exempt.
- *   protected  a file marked "protected" changed and no commit in the range has a `Lanes:` line.
- *   brand      a brand literal (Nultron, Toko Token, TokenKu, HYP AI, Hypey) appears more often in a
- *              shared-code file than `scripts/lane-guard.baseline.json` recorded. "Nultron" is the
- *              default brand and the mascot name today, so a plain ban would be red on day one;
- *              the ratchet only lets the count go down. Regenerate the baseline on a clean tree
- *              with `--write-baseline` after a cleanup lowers a count, never to excuse an increase.
  *
  * It skips (prints a line, exits 0, even under --strict) when lanes.json or docs/internal is absent
  * (the HYP AI import strips docs/internal) or when the range cannot be resolved or is empty (a
- * clone with no remote, or `main` itself).
+ * clone with no remote, or `main` itself). A lanes.json that cannot be read exits 1: an unreadable
+ * manifest must not pass as a clean one.
  */
 
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { TESTER_BRANCH } from "./where-am-i.mjs";
 
 const DEFAULT_RANGE = "origin/main...HEAD";
 const LANES_FILE = "lanes.json";
@@ -89,7 +97,15 @@ export function entriesFor(file, entries) {
   return entries.filter((entry) => matchesGlob(file, entry.glob));
 }
 
-const MAP_EXEMPT = ["**/*.test.*", "**/*.spec.*", "**/*.md", "**/__fixtures__/**", "**/test/**", "**/tests/**", "docs/**"];
+const MAP_EXEMPT = [
+  "**/*.test.*",
+  "**/*.spec.*",
+  "**/*.md",
+  "**/__fixtures__/**",
+  "**/test/**",
+  "**/tests/**",
+  "docs/**",
+];
 
 /** A change to a test, a fixture or a document does not need a map refresh. */
 export function isMapExempt(file) {
@@ -106,7 +122,13 @@ export function mapWarnings(changed, entries) {
   const groups = new Map();
   for (const file of changed) {
     if (isMapExempt(file)) continue;
-    const maps = [...new Set(entriesFor(file, entries).map((e) => e.map).filter(Boolean))].sort();
+    const maps = [
+      ...new Set(
+        entriesFor(file, entries)
+          .map((e) => e.map)
+          .filter(Boolean),
+      ),
+    ].sort();
     if (maps.length === 0) continue;
     const key = maps.join("|");
     const group = groups.get(key) ?? { maps, files: [] };
@@ -134,6 +156,19 @@ export function protectedWarnings(changed, entries, messages) {
   if (files.length === 0) return [];
   const lanes = [...new Set(files.flatMap((f) => entriesFor(f, entries).flatMap((e) => e.lanes ?? [])))].sort();
   return [{ files, lanes }];
+}
+
+/** Changed paths (added, copied, modified, renamed) that match a `neverPromote` glob. */
+export function neverPromoteWarnings(changed, globs) {
+  return changed.filter((file) => globs.some((glob) => globToRegExp(glob).test(file)));
+}
+
+/**
+ * The never-promote rule judges a diff to main, from any branch but the tester's. A detached HEAD
+ * (`branch` null) is still a diff to main. Ranges with another base are not promotions.
+ */
+export function neverPromoteApplies({ base, branch }) {
+  return (base === "main" || base === "origin/main") && branch !== TESTER_BRANCH;
 }
 
 /** `{ Nultron: 2 }` for the literals present at least once. Case-sensitive, substring. */
@@ -192,7 +227,13 @@ function git(root, args, { allowFail = false } = {}) {
   }
 }
 
-const resolves = (root, ref) => git(root, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], { allowFail: true }) !== null;
+const resolves = (root, ref) =>
+  git(root, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`], { allowFail: true }) !== null;
+
+/** The checked-out branch, or null on a detached HEAD. */
+const currentBranch = (root) => (git(root, ["branch", "--show-current"], { allowFail: true }) ?? "").trim() || null;
+
+const splitNul = (text) => (text ?? "").split("\0").filter(Boolean);
 
 /** `A...B`, `A..B` or a lone ref (meaning `ref...HEAD`) → { base, tip }. */
 export function splitRange(range) {
@@ -231,15 +272,18 @@ function writeBaseline(root, config) {
 // Run
 // ---------------------------------------------------------------------------------------------
 
+const VALUE_FLAGS = { "--root": "a directory", "--branch": "a branch name" };
+
 export function parseArgs(argv) {
-  const args = { range: null, strict: false, writeBaseline: false, root: null };
+  const args = { range: null, strict: false, writeBaseline: false, root: null, branch: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--strict") args.strict = true;
     else if (arg === "--write-baseline") args.writeBaseline = true;
-    else if (arg === "--root") {
-      args.root = argv[i + 1];
-      if (!args.root) throw new Error("--root needs a directory");
+    else if (VALUE_FLAGS[arg]) {
+      const value = argv[i + 1];
+      if (!value || value.startsWith("--")) throw new Error(`${arg} needs ${VALUE_FLAGS[arg]}`);
+      args[arg.slice(2)] = value;
       i += 1;
     } else if (arg.startsWith("--")) throw new Error(`unknown argument: ${arg}`);
     else args.range = arg;
@@ -247,60 +291,99 @@ export function parseArgs(argv) {
   return args;
 }
 
-/** Returns the printable lines and the number of warnings. Throws only on a broken lanes.json. */
+/** lanes.json `neverPromote`: an array of glob strings. Anything else is a broken manifest. */
+function readNeverPromote(config) {
+  const globs = config.neverPromote ?? [];
+  if (!Array.isArray(globs) || globs.some((glob) => typeof glob !== "string")) {
+    throw new Error(`${LANES_FILE} neverPromote must be an array of glob strings`);
+  }
+  return globs;
+}
+
+/**
+ * Returns the printable lines, the blocking count and the advisory count. Throws when lanes.json cannot
+ * be read or its neverPromote is malformed; main() turns that into exit 1.
+ */
 export function run(args, defaultRoot) {
   const root = path.resolve(args.root ?? defaultRoot);
   const lanesPath = path.join(root, LANES_FILE);
-  if (!existsSync(lanesPath)) return { lines: [`lane-guard: ${LANES_FILE} not found, skipped.`], warnings: 0 };
+  if (!existsSync(lanesPath))
+    return { lines: [`lane-guard: ${LANES_FILE} not found, skipped.`], blocking: 0, advisory: 0 };
   if (!existsSync(path.join(root, DOCS_DIR))) {
-    return { lines: [`lane-guard: ${DOCS_DIR} not found (stripped import?), skipped.`], warnings: 0 };
+    return { lines: [`lane-guard: ${DOCS_DIR} not found (stripped import?), skipped.`], blocking: 0, advisory: 0 };
   }
   const config = readJson(lanesPath);
+  const neverPromote = readNeverPromote(config);
 
   if (args.writeBaseline) {
     const n = writeBaseline(root, config);
-    return { lines: [`lane-guard: wrote ${BASELINE_FILE} (${n} files carry a brand literal).`], warnings: 0 };
+    return {
+      lines: [`lane-guard: wrote ${BASELINE_FILE} (${n} files carry a brand literal).`],
+      blocking: 0,
+      advisory: 0,
+    };
   }
 
   const range = args.range ?? DEFAULT_RANGE;
   let { base, tip } = splitRange(range);
   if (!resolves(root, base) && !args.range && resolves(root, "main")) base = "main";
   if (!resolves(root, base) || !resolves(root, tip)) {
-    return { lines: [`lane-guard: cannot resolve ${range} here (no remote?), skipped.`], warnings: 0 };
+    return { lines: [`lane-guard: cannot resolve ${range} here (no remote?), skipped.`], blocking: 0, advisory: 0 };
   }
   const changed = (git(root, ["diff", "--name-only", "-z", `${base}...${tip}`]) ?? "").split("\0").filter(Boolean);
-  if (changed.length === 0) return { lines: [`lane-guard: nothing changed in ${base}...${tip}, skipped.`], warnings: 0 };
+  if (changed.length === 0)
+    return { lines: [`lane-guard: nothing changed in ${base}...${tip}, skipped.`], blocking: 0, advisory: 0 };
   const messages = (git(root, ["log", `${base}..${tip}`, "--format=%B%x00"]) ?? "").split("\0").filter((m) => m.trim());
 
+  const branch = args.branch ?? currentBranch(root);
   const lines = [`lane-guard: ${base}...${tip}, ${changed.length} changed file(s), ${messages.length} commit(s).`];
-  let warnings = 0;
+  const found = { blocking: 0, advisory: 0 };
+  const block = (text) => {
+    found.blocking += 1;
+    lines.push(text);
+  };
   const warn = (text) => {
-    warnings += 1;
+    found.advisory += 1;
     lines.push(text);
   };
 
+  if (neverPromote.length > 0) {
+    if (neverPromoteApplies({ base, branch })) {
+      const added = splitNul(git(root, ["diff", "--name-only", "--diff-filter=d", "-z", `${base}...${tip}`]));
+      for (const file of neverPromoteWarnings(added, neverPromote)) {
+        block(
+          `BLOCK never-promote: ${file} is tester-only (lanes.json neverPromote). A diff to main must not carry it; take it out of the change.`,
+        );
+      }
+    } else if (branch === TESTER_BRANCH) {
+      lines.push("lane-guard: never-promote skipped (the tester branch).");
+    }
+  }
+
   for (const w of mapWarnings(changed, config.entries ?? [])) {
     const shown = w.files.slice(0, 3).join(", ") + (w.files.length > 3 ? `, +${w.files.length - 3} more` : "");
-    warn(`WARN map: ${shown} changed; refresh ${w.maps.join(" or ")} in the same PR (rewrite in place, bump "Last verified").`);
+    warn(
+      `WARN map: ${shown} changed; refresh ${w.maps.join(" or ")} in the same PR (rewrite in place, bump "Last verified").`,
+    );
   }
   for (const w of protectedWarnings(changed, config.entries ?? [], messages)) {
-    warn(
-      `WARN protected: ${w.files.join(", ")} ${w.files.length > 1 ? "are" : "is"} shared with ${w.lanes.join(", ") || "other lanes"}; add a "Lanes: ..." line to a commit message naming the lanes this touches.`,
+    block(
+      `BLOCK protected: ${w.files.join(", ")} ${w.files.length > 1 ? "are" : "is"} shared with ${w.lanes.join(", ") || "other lanes"}; add a "Lanes: ..." line to a commit message naming the lanes this touches.`,
     );
   }
   const baselinePath = path.join(root, BASELINE_FILE);
   if (existsSync(baselinePath) && config.brandScope && config.brandLiterals) {
     const read = (file) => git(root, ["show", `${tip}:${file}`], { allowFail: true });
     for (const w of brandWarnings(changed, config.brandScope, config.brandLiterals, readJson(baselinePath), read)) {
-      warn(
-        `WARN brand: ${w.file} has "${w.literal}" ${w.was} -> ${w.now}; shared code reads productName / gatewayName instead of a brand name.`,
+      block(
+        `BLOCK brand: ${w.file} has "${w.literal}" ${w.was} -> ${w.now}; shared code reads productName / gatewayName instead of a brand name.`,
       );
     }
   } else {
     lines.push(`lane-guard: no ${BASELINE_FILE}, brand check skipped.`);
   }
-  if (warnings === 0) lines.push("lane-guard: no warnings.");
-  return { lines, warnings };
+  if (found.blocking + found.advisory === 0) lines.push("lane-guard: no warnings.");
+  return { lines, ...found };
 }
 
 function main() {
@@ -313,13 +396,23 @@ function main() {
     return 1;
   }
   try {
-    const { lines, warnings } = run(args, defaultRoot);
+    const { lines, blocking, advisory } = run(args, defaultRoot);
     console.log(lines.join("\n"));
-    if (warnings > 0 && !args.strict) console.log(`lane-guard: ${warnings} advisory warning(s); exit 0 (use --strict to fail).`);
-    return args.strict && warnings > 0 ? 1 : 0;
+    if (blocking > 0) {
+      console.log(`lane-guard: ${blocking} blocking problem(s); exit 1.`);
+      return 1;
+    }
+    if (advisory === 0) return 0;
+    if (args.strict) {
+      console.log(`lane-guard: ${advisory} advisory warning(s) under --strict; exit 1.`);
+      return 1;
+    }
+    console.log(`lane-guard: ${advisory} advisory warning(s); exit 0 (use --strict to fail).`);
+    return 0;
   } catch (error) {
+    // A manifest or git call that fails means the guard did not run. That must not pass as clean.
     console.error(`lane-guard: ${error.message}`);
-    return args.strict ? 1 : 0;
+    return 1;
   }
 }
 

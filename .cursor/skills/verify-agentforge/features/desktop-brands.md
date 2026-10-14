@@ -2,6 +2,8 @@
 
 Public git and GitHub releases were **Nultron** (Toko Token) until the Personal app was retired on 2026-10-14. Its release repo `Kyoo032/Nultron-Desktop` is archived. Two local Windows flavors exist on the operator machine only: **Kemenkeu AI** and **AIHub Metranet**. Flavor folders under `apps/desktop/branding/kemenkeu/` and `apps/desktop/branding/metranet/` are gitignored. Do not upload those two installers. The splash, exe, and Start menu can show the flavor while Chat still says Nultron if the renderer never received `brand.json`. Packaged chrome must come from preload (`window.agentforge.brand` + `brandLogo`), not a host ping that can fire before IPC is ready or fail closed to Nultron. Map: [`docs/internal/maps/desktop-pack-routes.md`](../../../../docs/internal/maps/desktop-pack-routes.md).
 
+Product: retired-desktop · Instance: none (Personal desktop retired 2026-10-14)
+
 ## Sub-features
 
 - `desktop-brand-agentforge` is the public product: rail `product-brand` is Nultron, Settings gateway is Toko Token, splash/exe match. Webdev on :3000 is always this flavor unless brand env is injected for a proof.

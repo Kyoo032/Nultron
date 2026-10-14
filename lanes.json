@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "Ownership manifest read by scripts/lane-guard.mjs (advisory). Each entry maps a path glob to the map page that describes it, the lanes the path reaches, and whether it is protected. Lanes: personal (Nultron Personal), enterprise (the hosted app), hyp-ai (the white label, imported from main), tester (agentforge-chat, tester/chat-first). A file may match several entries: its map pages are the union, it is protected if any match is. 'map: null' means no map check. Not in this repo: HYP AI's Cloudflare edge and password-mode deploy live in C:\\Users\\rizky\\hypey\\deploy. Plan: docs/internal/white-label-and-agent-guardrails-plan.md. Map: docs/internal/maps/release-and-sync-lanes.md.",
+  "about": "Ownership manifest read by scripts/lane-guard.mjs. Its never-promote (neverPromote), protected and brand rules block; the map rule only advises. Each entry maps a path glob to the map page that describes it, the lanes the path reaches, and whether it is protected. Lanes: personal (Nultron Personal), enterprise (the hosted app), hyp-ai (the white label, imported from main), tester (agentforge-chat, tester/chat-first). A file may match several entries: its map pages are the union, it is protected if any match is. 'map: null' means no map check. Not in this repo: HYP AI's Cloudflare edge and password-mode deploy live in C:\\Users\\rizky\\hypey\\deploy. Plan: docs/internal/white-label-and-agent-guardrails-plan.md. Map: docs/internal/maps/release-and-sync-lanes.md.",
   "brandLiterals": ["Nultron", "Toko Token", "TokenKu", "HYP AI", "Hypey"],
   "brandScope": {
     "include": ["apps/web/**", "packages/**"],
@@ -20,6 +20,14 @@
     ],
     "extensions": [".ts", ".tsx", ".js", ".mjs", ".cjs", ".json", ".css", ".html"]
   },
+  "neverPromote": [
+    ".webdev-data*/**",
+    "**/.env",
+    "**/.env.local",
+    "**/.env.chat*",
+    "**/.env.tester*",
+    ".claude/**"
+  ],
   "entries": [
     {
       "glob": "packages/core/src/content/types.ts",

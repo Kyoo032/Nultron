@@ -1,5 +1,7 @@
 # Map — Data analysis
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 Last verified: 2026-10-05 at 99922bb (origin/main merged into the Data harness branch of PR #132; main's sha, because the merge commit does not exist yet as this is written). Every `file:line` on the page was re-read against the merged source that day. The page carries two sets of changes. From main, 2026-10-03: the job's instruction `DATA_SYSTEM` rewritten as a router and now exported, a third tool `run_code` (a lead, never evidence, at most 4 runs, with its own progress step), `queries` in the saved artifact's meta is the list of SQL the model ran, each meta field dropping on its own when it is wrongly typed, and the dataset store's tenant-scoped file path and its cascade on delete. From the Data harness, 2026-09-28: the host chooses and runs the cuts before the model speaks, one repair round (`repairRounds` 1 in the Data spec, `job.round` 1 of 1), the sentence check, and the code fallback from the cut rows. Not driven: no live analysis was run after the merge, and `:3000` still runs a host that predates both.
 
 ## Overview

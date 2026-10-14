@@ -2,6 +2,8 @@
 
 Edit is the CapCut-style timeline with an agent panel (`/edit`, rail `agent-edit`). Human and agent share one ops log; every agent change is a card with Keep / Undo / Tweak. Without ffmpeg the studio shows `edit-needs-ffmpeg`. Without a gateway key the agent panel is stub (scripted scenarios) and generation is `edit-needs-key`; on the **hosted** build with no key the Agent pane shows `edit-agent-needs-key` and `edit-composer-send` is disabled. Map: [`docs/internal/maps/edit-timeline.md`](../../../../docs/internal/maps/edit-timeline.md).
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 ## Sub-features
 
 - `edit-shell` shows `edit-studio`, `edit-timeline`, `edit-preview`, `edit-agent-panel`, plus the header handles `edit-tier`, `edit-jobs`, `edit-export`, `edit-export-progress`, `edit-export-download` and the footer counter `edit-ops-count`. With **no** project open the list side is `edit-project-list` + `edit-starter` + `edit-starter-description` + `edit-project-name` + `edit-new-project`, `edit-export` is disabled, and `edit-composer`, `edit-composer-send`, `edit-import`, `edit-generate-tab` and `edit-ops-count` have count **0**. That empty state is `EditEmptyState` (`apps/web/components/edit-empty-state.tsx`), one, two or three columns by the pane's width (see the **Empty-state layouts** step below). The header art column (`buddy-stage-header`, `buddy-stage-header-tap`) is in the DOM at every width but only visible when the header is 60rem or wider.

@@ -1,5 +1,7 @@
 # Map — Finance tasks: the catalog and the generic runner
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 Last verified: 2026-10-11 on 2df34be (SH-006: the read button follows the gate on every task; code-read and unit-tested, not driven). Earlier: 2026-10-05, PR #133 merged with `origin/main` at 99922bb, not re-driven; the runner citations were re-read against the merged `runner.ts`, and the job's cancel signal now reaches the second ask and the direction rewrite. Earlier: 2026-09-28. A reading that is not the sections is asked for once more (`askForReading`, `packages/host/src/finance-tasks/reading.ts`), and a sentence that quotes a computed figure while saying the opposite of its direction is rewritten once then dropped (`holdReadingDirection`, `packages/host/src/finance-tasks/direction.ts`). Claims come from each task (`directionClaims` on `FinanceTaskModule`, `packages/core/src/finance/tasks/types.ts:62`). The guided three-step screen is unchanged. Earlier: 2026-09-27 for the chooser mascot. Catalog sentences for every task are read in core (`plain-sentences.ts`) and covered by `sample-sentences.test.ts`. § 7 testids were re-read against the guided path on 2026-09-26 at 4477d27.
 
 ## Overview
