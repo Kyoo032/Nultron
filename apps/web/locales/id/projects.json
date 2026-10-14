@@ -3,33 +3,32 @@
     "label": "Ruang kerja"
   },
   "title": "Ruang kerja",
-  "intro": "Ruang bersama untuk berkas dan pengetahuan. Setiap ruang kerja hanya untuk Anda, atau terbuka untuk semua orang di perusahaan Anda.",
+  "intro": "Ruang bersama untuk berkas dan pengetahuan. Hanya orang yang Anda undang yang bisa melihat ruang kerja.",
   "loading": "Memuat ruang kerja…",
   "loadFailed": "Ruang kerja tidak bisa dimuat.",
   "retry": "Coba lagi",
   "saveFailed": "Perubahan itu tidak bisa disimpan.",
   "list": {
     "own": "Ruang kerja Anda",
-    "shared": "Dibagikan dengan perusahaan Anda",
+    "shared": "Dibagikan dengan Anda",
     "empty": "Belum ada ruang kerja.",
-    "open": "Buka {name}"
+    "open": "Buka {name}",
+    "onlyYou": "Hanya Anda",
+    "memberCount": "{count} orang"
   },
   "create": {
     "label": "Ruang kerja baru",
     "namePlaceholder": "Nama ruang kerja",
     "submit": "Buat"
   },
-  "visibility": {
-    "label": "Siapa yang bisa melihat",
-    "private": "Hanya Anda",
-    "workspace": "Semua orang di perusahaan Anda",
-    "notePrivate": "Hanya Anda yang bisa melihat ruang kerja ini dan berkasnya. Nyalakan sakelar untuk membagikannya ke perusahaan Anda.",
-    "noteWorkspace": "Semua orang di perusahaan Anda bisa melihat dan mengunduh berkas ruang kerja ini. Matikan sakelar untuk membuatnya pribadi lagi."
+  "roles": {
+    "owner": "Pemilik",
+    "admin": "Admin",
+    "member": "Anggota"
   },
   "detail": {
     "back": "Semua ruang kerja",
-    "madeByYou": "Dibuat oleh Anda",
-    "madeByColleague": "Dibuat oleh rekan",
+    "yourRole": "Peran Anda: {role}",
     "rename": "Ganti nama",
     "save": "Simpan",
     "cancel": "Batal",
@@ -38,6 +37,7 @@
   "tabs": {
     "aria": "Bagian ruang kerja",
     "files": "Berkas",
+    "members": "Anggota",
     "knowledge": "Pengetahuan",
     "instructions": "Instruksi",
     "chats": "Obrolan",
@@ -65,6 +65,34 @@
     "audio": "Audio",
     "text": "Teks",
     "other": "Berkas"
+  },
+  "members": {
+    "heading": "Orang",
+    "note": "Hanya orang di sini yang melihat ruang kerja ini, berkasnya, dan pengetahuannya.",
+    "loading": "Memuat anggota…",
+    "loadFailed": "Anggota tidak bisa dimuat.",
+    "you": "Anda",
+    "yourId": "ID akun Anda: {id}",
+    "yourIdNote": "Rekan mengundang Anda dengan ID ini.",
+    "inviteLabel": "ID akun rekan",
+    "invitePlaceholder": "ID akun",
+    "invite": "Undang",
+    "roleOf": "Peran {name}",
+    "remove": "Keluarkan",
+    "handOver": "Jadikan pemilik",
+    "leave": "Keluar",
+    "confirmHandOver": "Jadikan {name} pemilik ruang kerja ini? Anda tetap menjadi admin.",
+    "confirmLeave": "Keluar dari ruang kerja ini? Anda tidak akan melihat berkasnya lagi, termasuk yang Anda tambahkan."
+  },
+  "agents": {
+    "heading": "Agen",
+    "note": "Agen bawaan bekerja di setiap ruang kerja. Bawa agen lain dari meja Anda agar anggota bisa mengobrol dengannya di sini.",
+    "empty": "Belum ada agen yang dibawa masuk.",
+    "broughtBy": "Dibawa masuk oleh {name}",
+    "pickLabel": "Agen yang dibawa masuk",
+    "bring": "Bawa masuk",
+    "takeOut": "Keluarkan",
+    "noneToBring": "Semua agen di meja Anda sudah ada di sini."
   },
   "addTo": {
     "label": "Tambah ke ruang kerja",

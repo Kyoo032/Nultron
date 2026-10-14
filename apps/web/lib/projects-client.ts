@@ -1,5 +1,5 @@
 /**
- * The Workspace calls (team-board-spec.md section 2b, K-D19 and K-D20). Server mode only: on Personal
+ * The Workspace calls (team-board-spec.md section 2b, K-D20, K-D22, K-D23). Server mode only: on Personal
  * the host answers the router's own 404 to every one of them, and the page that calls them is not
  * routed there. On screen a project is a Workspace; in code and on the wire it stays `projects`.
  *
@@ -9,16 +9,35 @@
 import { apiFetch, isElectron } from "./api-client";
 import { filenameFromDisposition } from "./download-name";
 
-export type ProjectVisibility = "private" | "workspace";
+/** A person's role inside one Workspace (K-D23). Exactly one `owner`. */
+export type WorkspaceRole = "owner" | "admin" | "member";
+
+/** The roles the role route hands out. `owner` moves only by a hand-over. */
+export type AssignableRole = Exclude<WorkspaceRole, "owner">;
 
 export type ProjectRecord = {
   id: string;
   name: string;
-  visibility: ProjectVisibility;
+  /** The caller's own role in this Workspace. */
+  role: WorkspaceRole;
+  memberCount: number;
   createdBy: string;
   createdAt: number;
   updatedAt: number;
 };
+
+export type ProjectMember = {
+  userId: string;
+  name: string;
+  role: WorkspaceRole;
+  addedBy: string;
+  addedAt: number;
+};
+
+/** An agent a member brought in. The same agent may be brought by several members, one row each. */
+export type ProjectAgent = { agentId: string; broughtBy: string; addedAt: number };
+
+export type ProjectPeople = { members: ProjectMember[]; agents: ProjectAgent[] };
 
 /** A chat file, or a generated image or video the person put into the Workspace (SR-175). */
 export type ProjectFileKind = "artifact" | "image" | "video";
@@ -87,8 +106,8 @@ function list<T>(value: unknown, parse: (row: Row) => T): T[] {
   });
 }
 
-function parseVisibility(value: unknown): ProjectVisibility {
-  if (value !== "private" && value !== "workspace") {
+function parseRole(value: unknown): WorkspaceRole {
+  if (value !== "owner" && value !== "admin" && value !== "member") {
     throw malformed();
   }
   return value;
@@ -98,11 +117,26 @@ export function parseProject(row: Row): ProjectRecord {
   return {
     id: str(row, "id"),
     name: str(row, "name"),
-    visibility: parseVisibility(row.visibility),
+    role: parseRole(row.role),
+    memberCount: num(row, "memberCount"),
     createdBy: str(row, "createdBy"),
     createdAt: num(row, "createdAt"),
     updatedAt: num(row, "updatedAt"),
   };
+}
+
+function parseMember(row: Row): ProjectMember {
+  return {
+    userId: str(row, "userId"),
+    name: str(row, "name"),
+    role: parseRole(row.role),
+    addedBy: str(row, "addedBy"),
+    addedAt: num(row, "addedAt"),
+  };
+}
+
+function parseAgent(row: Row): ProjectAgent {
+  return { agentId: str(row, "agentId"), broughtBy: str(row, "broughtBy"), addedAt: num(row, "addedAt") };
 }
 
 function parseFileKind(value: unknown): ProjectFileKind {
@@ -171,16 +205,52 @@ export async function createProject(name: string): Promise<ProjectRecord> {
   return parseProject(data.project);
 }
 
-/** Rename, or flip the switch: `visibility` is `private` (only its maker) or `workspace` (the company). */
-export async function updateProject(
-  projectId: string,
-  change: { name?: string; visibility?: ProjectVisibility },
-): Promise<ProjectRecord> {
-  const data = await send("PATCH", projectPath(projectId), change);
+/** Rename. Who sees a Workspace is its members, so a rename sends the name and nothing else. */
+export async function renameProject(projectId: string, name: string): Promise<ProjectRecord> {
+  const data = await send("PATCH", projectPath(projectId), { name });
   if (!isRow(data.project)) {
     throw malformed();
   }
   return parseProject(data.project);
+}
+
+/** The people of a Workspace, owner first, and the agents its members brought in. */
+export async function listProjectPeople(projectId: string): Promise<ProjectPeople> {
+  const data = await call(`${projectPath(projectId)}/members`);
+  return { members: list(data.members, parseMember), agents: list(data.agents, parseAgent) };
+}
+
+const memberPath = (projectId: string, userId: string) =>
+  `${projectPath(projectId)}/members/${encodeURIComponent(userId)}`;
+
+/** Invites a person of the company by their account id, the one thing the host's invite route takes. */
+export async function inviteProjectMember(projectId: string, userId: string): Promise<ProjectMember[]> {
+  const data = await send("POST", `${projectPath(projectId)}/members`, { userId });
+  return list(data.members, parseMember);
+}
+
+export async function setProjectMemberRole(projectId: string, userId: string, role: AssignableRole): Promise<void> {
+  await send("PATCH", memberPath(projectId, userId), { role });
+}
+
+/** Removes a person, or, with the caller's own id, leaves the Workspace. */
+export async function removeProjectMember(projectId: string, userId: string): Promise<void> {
+  await send("DELETE", memberPath(projectId, userId));
+}
+
+/** Hands the Workspace to another member. The caller stays on as an admin. */
+export async function handOverProject(projectId: string, userId: string): Promise<void> {
+  await send("POST", `${projectPath(projectId)}/owner`, { userId });
+}
+
+/** Brings an agent from the caller's own desk, by its mode id. */
+export async function bringProjectAgent(projectId: string, agentId: string): Promise<ProjectAgent[]> {
+  const data = await send("POST", `${projectPath(projectId)}/agents`, { agentId });
+  return list(data.agents, parseAgent);
+}
+
+export async function takeOutProjectAgent(projectId: string, agentId: string): Promise<void> {
+  await send("DELETE", `${projectPath(projectId)}/agents/${encodeURIComponent(agentId)}`);
 }
 
 export async function archiveProject(projectId: string): Promise<void> {

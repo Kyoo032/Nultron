@@ -12,7 +12,7 @@ import "./projects.css";
 /**
  * The Workspaces page (team-board-spec.md section 2b, K-D20). Server mode only: App.tsx routes
  * `/projects` on a hosted build alone. The list is what the host returns; the page splits it into the
- * person's own Workspaces and the ones the company shares. Opening one shows its detail view.
+ * Workspaces the person owns and the ones others shared with them (K-D22). Opening one shows its detail view.
  */
 export function ProjectsPage() {
   const me = useSession().identity?.userId ?? null;
@@ -63,7 +63,8 @@ export function ProjectsPage() {
           onChanged={(project) =>
             setItems((current) => (current ?? []).map((row) => (row.id === project.id ? project : row)))
           }
-          onArchived={() => {
+          onRefresh={() => void reload()}
+          onGone={() => {
             setOpenId(null);
             void reload();
           }}
@@ -110,32 +111,31 @@ export function ProjectsPage() {
             </button>
           ) : null}
 
-          {items !== null ? <ProjectList items={items} me={me} onOpen={setOpenId} /> : null}
+          {items !== null ? <ProjectList items={items} onOpen={setOpenId} /> : null}
         </>
       )}
     </main>
   );
 }
 
-function ProjectList({
-  items,
-  me,
-  onOpen,
-}: {
-  items: ProjectRecord[];
-  me: string | null;
-  onOpen: (id: string) => void;
-}) {
+function ProjectList({ items, onOpen }: { items: ProjectRecord[]; onOpen: (id: string) => void }) {
   if (items.length === 0) {
     return <p className="projects-status">{t("projects.list.empty")}</p>;
   }
-  const { own, shared } = splitProjects(items, me);
+  const { own, shared } = splitProjects(items);
   return (
     <div className="projects-groups" data-testid="projects-list">
       {own.length > 0 ? <ProjectGroup heading={t("projects.list.own")} rows={own} onOpen={onOpen} /> : null}
       {shared.length > 0 ? <ProjectGroup heading={t("projects.list.shared")} rows={shared} onOpen={onOpen} /> : null}
     </div>
   );
+}
+
+/** "Only you" for a Workspace of one, else how many people are in it. */
+export function memberLine(project: Pick<ProjectRecord, "memberCount">): string {
+  return project.memberCount <= 1
+    ? t("projects.list.onlyYou")
+    : t("projects.list.memberCount", { count: project.memberCount });
 }
 
 function ProjectGroup({
@@ -159,14 +159,10 @@ function ProjectGroup({
               onClick={() => onOpen(project.id)}
               aria-label={t("projects.list.open", { name: project.name })}
               data-testid="projects-row"
-              data-visibility={project.visibility}
+              data-role={project.role}
             >
               <span className="projects-row-name">{project.name}</span>
-              <span className="projects-row-meta">
-                {t(
-                  project.visibility === "workspace" ? "projects.visibility.workspace" : "projects.visibility.private",
-                )}
-              </span>
+              <span className="projects-row-meta">{memberLine(project)}</span>
             </button>
           </li>
         ))}

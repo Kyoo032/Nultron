@@ -2,52 +2,52 @@
 
 import { useState, type FormEvent } from "react";
 import { ProjectFiles } from "@/components/projects-files";
-import {
-  archiveProject,
-  ProjectsError,
-  updateProject,
-  type ProjectRecord,
-  type ProjectVisibility,
-} from "@/lib/projects-client";
+import { ProjectMembersPanel } from "@/components/projects-members";
+import { archiveProject, ProjectsError, renameProject, type ProjectRecord } from "@/lib/projects-client";
 import { t } from "@/lib/i18n";
-import { visibilityChange } from "@/lib/projects-view";
+import { canManage, isOwner } from "@/lib/projects-view";
 
 type Props = {
   project: ProjectRecord;
   me: string | null;
-  /** Called with the Workspace as the host now has it, after a rename or a switch. */
+  /** Called with the Workspace as the host now has it, after a rename. */
   onChanged: (project: ProjectRecord) => void;
-  /** Called after the Workspace is archived, so the list drops it. */
-  onArchived: () => void;
+  /** The caller's role or the member count may have changed: read the list again. */
+  onRefresh: () => void;
+  /** Called after the Workspace is archived, or the caller left it, so the list drops it. */
+  onGone: () => void;
   onBack: () => void;
 };
 
-type TabId = "files" | "knowledge" | "instructions" | "chats";
-const TABS: readonly TabId[] = ["files", "knowledge", "instructions", "chats"];
+type TabId = "files" | "members" | "knowledge" | "instructions" | "chats";
+const TABS: readonly TabId[] = ["files", "members", "knowledge", "instructions", "chats"];
+const LIVE_TABS: ReadonlySet<TabId> = new Set(["files", "members"]);
 
 function messageOf(error: unknown): string {
   return error instanceof ProjectsError && error.message ? error.message : t("projects.saveFailed");
 }
 
 /**
- * One Workspace: its name, the Private or Workspace switch (K-D19), and its sections. Knowledge,
- * Instructions and Chats are listed and disabled until W1 brings their routes. The switch sends one
- * PATCH with the new visibility only, and the host decides who may flip it.
+ * One Workspace: its name, the caller's role in it (K-D23), and its sections. Who sees it is its members, managed on
+ * the Members tab. Rename and Archive show for the roles the host allows them to; the host checks again.
  */
-export function ProjectsDetail({ project, me, onChanged, onArchived, onBack }: Props) {
+export function ProjectsDetail({ project, me, onChanged, onRefresh, onGone, onBack }: Props) {
   const [tab, setTab] = useState<TabId>("files");
   const [renaming, setRenaming] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const isWorkspace = project.visibility === "workspace";
-  const madeByYou = project.createdBy === me;
-
-  async function applyChange(change: { name?: string; visibility?: ProjectVisibility }) {
+  async function rename(event: FormEvent) {
+    event.preventDefault();
+    const name = (renaming ?? "").trim();
+    if (!name || name === project.name) {
+      setRenaming(null);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      onChanged(await updateProject(project.id, change));
+      onChanged(await renameProject(project.id, name));
       setRenaming(null);
     } catch (caught) {
       setError(messageOf(caught));
@@ -56,29 +56,12 @@ export function ProjectsDetail({ project, me, onChanged, onArchived, onBack }: P
     }
   }
 
-  function flip() {
-    const change = visibilityChange(project.visibility, isWorkspace ? "private" : "workspace");
-    if (change) {
-      void applyChange(change);
-    }
-  }
-
-  function rename(event: FormEvent) {
-    event.preventDefault();
-    const name = (renaming ?? "").trim();
-    if (!name || name === project.name) {
-      setRenaming(null);
-      return;
-    }
-    void applyChange({ name });
-  }
-
   async function archive() {
     setBusy(true);
     setError(null);
     try {
       await archiveProject(project.id);
-      onArchived();
+      onGone();
     } catch (caught) {
       setError(messageOf(caught));
     } finally {
@@ -87,7 +70,7 @@ export function ProjectsDetail({ project, me, onChanged, onArchived, onBack }: P
   }
 
   return (
-    <section className="projects-detail" data-testid="projects-detail" data-visibility={project.visibility}>
+    <section className="projects-detail" data-testid="projects-detail" data-role={project.role}>
       <button type="button" className="btn btn-ghost projects-back" onClick={onBack}>
         ← {t("projects.detail.back")}
       </button>
@@ -115,59 +98,36 @@ export function ProjectsDetail({ project, me, onChanged, onArchived, onBack }: P
             <h2 className="projects-title" data-testid="projects-title">
               {project.name}
             </h2>
-            <p className="projects-meta">
-              {madeByYou ? t("projects.detail.madeByYou") : t("projects.detail.madeByColleague")}
+            <p className="projects-meta" data-testid="projects-your-role">
+              {t("projects.detail.yourRole", { role: t(`projects.roles.${project.role}`) })}
             </p>
             <div className="projects-head-actions">
-              <button
-                type="button"
-                className="btn btn-ghost"
-                disabled={busy}
-                onClick={() => setRenaming(project.name)}
-                data-testid="projects-rename"
-              >
-                {t("projects.detail.rename")}
-              </button>
-              <button
-                type="button"
-                className="btn btn-ghost"
-                disabled={busy}
-                onClick={() => void archive()}
-                data-testid="projects-archive"
-              >
-                {t("projects.detail.archive")}
-              </button>
+              {canManage(project.role) ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={busy}
+                  onClick={() => setRenaming(project.name)}
+                  data-testid="projects-rename"
+                >
+                  {t("projects.detail.rename")}
+                </button>
+              ) : null}
+              {isOwner(project.role) ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  disabled={busy}
+                  onClick={() => void archive()}
+                  data-testid="projects-archive"
+                >
+                  {t("projects.detail.archive")}
+                </button>
+              ) : null}
             </div>
           </>
         )}
       </header>
-
-      <div className="projects-visibility">
-        <div className="projects-visibility-row">
-          <span className="projects-visibility-label" id="projects-visibility-label">
-            {t("projects.visibility.label")}
-          </span>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={isWorkspace}
-            aria-labelledby="projects-visibility-label"
-            className="projects-switch"
-            disabled={busy || !madeByYou}
-            onClick={flip}
-            data-testid="projects-visibility"
-            data-state={isWorkspace ? "workspace" : "private"}
-          >
-            <span className="projects-switch-track" aria-hidden="true">
-              <span className="projects-switch-thumb" />
-            </span>
-            <span>{t(isWorkspace ? "projects.visibility.workspace" : "projects.visibility.private")}</span>
-          </button>
-        </div>
-        <p className="projects-note" data-testid="projects-visibility-note">
-          {t(isWorkspace ? "projects.visibility.noteWorkspace" : "projects.visibility.notePrivate")}
-        </p>
-      </div>
 
       {error ? (
         <p className="projects-error" role="alert" data-testid="projects-error">
@@ -177,7 +137,7 @@ export function ProjectsDetail({ project, me, onChanged, onArchived, onBack }: P
 
       <div className="projects-tabs" role="tablist" aria-label={t("projects.tabs.aria")}>
         {TABS.map((id) => {
-          const soon = id !== "files";
+          const soon = !LIVE_TABS.has(id);
           return (
             <button
               key={id}
@@ -201,7 +161,10 @@ export function ProjectsDetail({ project, me, onChanged, onArchived, onBack }: P
 
       <div role="tabpanel" id="projects-panel" aria-labelledby={`projects-tab-${tab}`} className="projects-panel">
         {tab === "files" ? <ProjectFiles project={project} me={me} /> : null}
-        {tab !== "files" ? <p className="projects-status">{t("projects.tabs.comingNext")}</p> : null}
+        {tab === "members" ? (
+          <ProjectMembersPanel project={project} me={me} onChanged={onRefresh} onLeft={onGone} />
+        ) : null}
+        {!LIVE_TABS.has(tab) ? <p className="projects-status">{t("projects.tabs.comingNext")}</p> : null}
       </div>
     </section>
   );

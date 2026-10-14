@@ -127,76 +127,37 @@
   gap: var(--space-2);
 }
 
-.projects-visibility {
-  margin: var(--space-4) 0;
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-}
-
-.projects-visibility-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.projects-visibility-label {
-  font-size: 14px;
-  font-weight: 600;
-}
-
-.projects-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--text);
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.projects-switch:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.projects-switch-track {
-  position: relative;
-  width: 36px;
-  height: 20px;
-  border-radius: 999px;
-  background: var(--line-strong, var(--line));
-  transition: background 150ms ease;
-}
-
-.projects-switch[aria-checked="true"] .projects-switch-track {
-  background: var(--mode);
-}
-
-.projects-switch-thumb {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--surface);
-  transition: transform 150ms ease;
-}
-
-.projects-switch[aria-checked="true"] .projects-switch-thumb {
-  transform: translateX(16px);
-}
-
 .projects-note {
   margin-top: var(--space-2);
   font-size: 13px;
   color: var(--text-2);
+}
+
+.projects-members {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.projects-members-section {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.projects-member {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  min-width: 0;
+}
+
+.projects-role-select {
+  width: auto;
 }
 
 .projects-tabs {
@@ -293,6 +254,10 @@
 
   .projects-file {
     grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .projects-member {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .projects-file-actions {

@@ -19,20 +19,28 @@ vi.mock("./api-client", () => ({
   isElectron: () => electron,
 }));
 
+import { apiFetch } from "./api-client";
 import {
   addProjectFile,
   addProjectMedia,
+  bringProjectAgent,
   createProject,
   downloadFile,
+  handOverProject,
+  inviteProjectMember,
   listProjectFiles,
+  listProjectPeople,
   listProjects,
   ProjectsError,
   removeProjectFile,
   removeProjectMedia,
-  updateProject,
+  removeProjectMember,
+  renameProject,
+  setProjectMemberRole,
+  takeOutProjectAgent,
   downloadProjectFile,
 } from "./projects-client";
-import { visibilityChange, canRemoveFile, splitProjects, formatBytes, fileIconName, fileKind } from "./projects-view";
+import { canRemoveFile, splitProjects, formatBytes, fileIconName, fileKind } from "./projects-view";
 
 const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -40,7 +48,8 @@ const json = (status: number, body: unknown) =>
 const PROJECT = {
   id: "proj_1",
   name: "Q4 plan",
-  visibility: "private",
+  role: "owner",
+  memberCount: 1,
   createdBy: "user_me",
   createdAt: 1,
   updatedAt: 2,
@@ -61,13 +70,32 @@ describe("projects client", () => {
     expect(await listProjects()).toEqual([PROJECT]);
   });
 
-  it("refuses a list whose visibility is not one of the two words", async () => {
+  it("refuses a list whose role is not one of the three Workspace roles", async () => {
     calls.push({
       path: "/api/v1/projects",
       init: undefined,
-      response: json(200, { items: [{ ...PROJECT, visibility: "public" }] }),
+      response: json(200, { items: [{ ...PROJECT, role: "superuser" }] }),
     });
     await expect(listProjects()).rejects.toMatchObject({ code: "projects_malformed", status: 502 });
+  });
+
+  it("reads the caller's role and the member count, and drops the old visibility word the host still sends", async () => {
+    calls.push({
+      path: "/api/v1/projects",
+      init: undefined,
+      response: json(200, { items: [{ ...PROJECT, role: "admin", memberCount: 3, visibility: "workspace" }] }),
+    });
+    expect(await listProjects()).toEqual([
+      {
+        id: "proj_1",
+        name: "Q4 plan",
+        role: "admin",
+        memberCount: 3,
+        createdBy: "user_me",
+        createdAt: 1,
+        updatedAt: 2,
+      },
+    ]);
   });
 
   it("creates a Workspace from a name only", async () => {
@@ -79,20 +107,79 @@ describe("projects client", () => {
     expect((await createProject("Q4 plan")).id).toBe("proj_1");
   });
 
-  it("sends the switch as a PATCH of visibility alone", async () => {
+  it("renames with a body that holds the name and nothing else, since the host refuses visibility", async () => {
     calls.push({
       path: "/api/v1/projects/proj_1",
-      init: { method: "PATCH", body: JSON.stringify({ visibility: "workspace" }) },
-      response: json(200, { project: { ...PROJECT, visibility: "workspace" } }),
+      init: { method: "PATCH", body: JSON.stringify({ name: "Q1 plan" }) },
+      response: json(200, { project: { ...PROJECT, name: "Q1 plan" } }),
     });
-    const updated = await updateProject("proj_1", { visibility: "workspace" });
-    expect(updated.visibility).toBe("workspace");
+    expect((await renameProject("proj_1", "Q1 plan")).name).toBe("Q1 plan");
+    expect(vi.mocked(apiFetch).mock.calls.at(-1)?.[1]?.body).toBe('{"name":"Q1 plan"}');
   });
 
-  it("the switch sends nothing when it does not move", () => {
-    expect(visibilityChange("private", "private")).toBeNull();
-    expect(visibilityChange("private", "workspace")).toEqual({ visibility: "workspace" });
-    expect(visibilityChange("workspace", "private")).toEqual({ visibility: "private" });
+  it("lists the members and the agents brought in", async () => {
+    const member = { userId: "user_me", name: "Ana", role: "owner", addedBy: "user_me", addedAt: 5 };
+    const agent = { agentId: "research", broughtBy: "user_me", addedAt: 6 };
+    calls.push({
+      path: "/api/v1/projects/proj_1/members",
+      init: undefined,
+      response: json(200, { members: [member], agents: [agent] }),
+    });
+    expect(await listProjectPeople("proj_1")).toEqual({ members: [member], agents: [agent] });
+  });
+
+  it("sends each member and agent action to its own route, in the body shape the host reads", async () => {
+    const members = [{ userId: "u b", name: "u b", role: "member", addedBy: "user_me", addedAt: 5 }];
+    calls.push(
+      {
+        path: "/api/v1/projects/proj_1/members",
+        init: { method: "POST", body: JSON.stringify({ userId: "u b" }) },
+        response: json(201, { members }),
+      },
+      {
+        path: "/api/v1/projects/proj_1/members/u%20b",
+        init: { method: "PATCH", body: JSON.stringify({ role: "admin" }) },
+        response: json(200, { ok: true }),
+      },
+      {
+        path: "/api/v1/projects/proj_1/owner",
+        init: { method: "POST", body: JSON.stringify({ userId: "u b" }) },
+        response: json(200, { ok: true }),
+      },
+      { path: "/api/v1/projects/proj_1/members/u%20b", init: { method: "DELETE" }, response: json(200, { ok: true }) },
+      {
+        path: "/api/v1/projects/proj_1/agents",
+        init: { method: "POST", body: JSON.stringify({ agentId: "research" }) },
+        response: json(201, { agents: [{ agentId: "research", broughtBy: "user_me", addedAt: 7 }] }),
+      },
+      {
+        path: "/api/v1/projects/proj_1/agents/research",
+        init: { method: "DELETE" },
+        response: json(200, { ok: true }),
+      },
+    );
+    expect(await inviteProjectMember("proj_1", "u b")).toEqual(members);
+    await setProjectMemberRole("proj_1", "u b", "admin");
+    await handOverProject("proj_1", "u b");
+    await removeProjectMember("proj_1", "u b");
+    expect(await bringProjectAgent("proj_1", "research")).toEqual([
+      { agentId: "research", broughtBy: "user_me", addedAt: 7 },
+    ]);
+    await takeOutProjectAgent("proj_1", "research");
+    expect(calls).toEqual([]);
+  });
+
+  it("keeps the host's 404 for an id that is not a person of the company", async () => {
+    calls.push({
+      path: "/api/v1/projects/proj_1/members",
+      init: { method: "POST", body: JSON.stringify({ userId: "nobody" }) },
+      response: json(404, { error: { code: "not_found", message: "Not found" } }),
+    });
+    await expect(inviteProjectMember("proj_1", "nobody")).rejects.toMatchObject({
+      code: "not_found",
+      status: 404,
+      message: "Not found",
+    });
   });
 
   it("keeps the host's own sentence when the host refuses", async () => {
@@ -251,19 +338,20 @@ describe("projects view rules", () => {
     previewUrl: null,
     downloadUrl: "/api/v1/artifacts/art_1/file",
   };
-  const project = { ...PROJECT, createdBy: "user_b" };
-
-  it("lets the file's maker or the Workspace's maker see Remove, and nobody else", () => {
-    expect(canRemoveFile(file, project, "user_a")).toBe(true);
-    expect(canRemoveFile(file, project, "user_b")).toBe(true);
-    expect(canRemoveFile(file, project, "user_c")).toBe(false);
-    expect(canRemoveFile(file, project, null)).toBe(false);
+  it("lets the file's maker, or the Workspace's owner or an admin, see Remove, and no other member", () => {
+    const asMember = { ...PROJECT, role: "member" as const };
+    expect(canRemoveFile(file, asMember, "user_a")).toBe(true);
+    expect(canRemoveFile(file, asMember, "user_c")).toBe(false);
+    expect(canRemoveFile(file, { ...PROJECT, role: "admin" }, "user_c")).toBe(true);
+    expect(canRemoveFile(file, { ...PROJECT, role: "owner" }, "user_c")).toBe(true);
+    expect(canRemoveFile(file, { ...PROJECT, role: "owner" }, null)).toBe(false);
   });
 
-  it("splits the list into the person's own Workspaces and the company's", () => {
-    const mine = { ...PROJECT, id: "p1", createdBy: "user_me" };
-    const theirs = { ...PROJECT, id: "p2", createdBy: "user_other", visibility: "workspace" as const };
-    expect(splitProjects([mine, theirs], "user_me")).toEqual({ own: [mine], shared: [theirs] });
+  it("splits the list into the Workspaces the person owns and the ones shared with them", () => {
+    const mine = { ...PROJECT, id: "p1", role: "owner" as const };
+    const adminOf = { ...PROJECT, id: "p2", role: "admin" as const, createdBy: "user_other" };
+    const memberOf = { ...PROJECT, id: "p3", role: "member" as const, createdBy: "user_other" };
+    expect(splitProjects([mine, adminOf, memberOf])).toEqual({ own: [mine], shared: [adminOf, memberOf] });
   });
 
   it("maps a file type from its mime, never from its name", () => {

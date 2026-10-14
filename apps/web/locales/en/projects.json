@@ -3,33 +3,32 @@
     "label": "Workspaces"
   },
   "title": "Workspaces",
-  "intro": "Shared spaces for files and knowledge. Each one is private to you, or open to everyone in your company.",
+  "intro": "Shared spaces for files and knowledge. Only the people you invite can see a Workspace.",
   "loading": "Loading Workspaces…",
   "loadFailed": "The Workspaces could not be loaded.",
   "retry": "Try again",
   "saveFailed": "That change could not be saved.",
   "list": {
     "own": "Your Workspaces",
-    "shared": "Shared with your company",
+    "shared": "Shared with you",
     "empty": "No Workspaces yet.",
-    "open": "Open {name}"
+    "open": "Open {name}",
+    "onlyYou": "Only you",
+    "memberCount": "{count} people"
   },
   "create": {
     "label": "New Workspace",
     "namePlaceholder": "Workspace name",
     "submit": "Create"
   },
-  "visibility": {
-    "label": "Who can see it",
-    "private": "Only you",
-    "workspace": "Everyone in your company",
-    "notePrivate": "Only you can see this Workspace and its files. Switch it on to share it with your company.",
-    "noteWorkspace": "Everyone in your company can see and download this Workspace's files. Switch it off to make it private again."
+  "roles": {
+    "owner": "Owner",
+    "admin": "Admin",
+    "member": "Member"
   },
   "detail": {
     "back": "All Workspaces",
-    "madeByYou": "Made by you",
-    "madeByColleague": "Made by a colleague",
+    "yourRole": "Your role: {role}",
     "rename": "Rename",
     "save": "Save",
     "cancel": "Cancel",
@@ -38,6 +37,7 @@
   "tabs": {
     "aria": "Workspace sections",
     "files": "Files",
+    "members": "Members",
     "knowledge": "Knowledge",
     "instructions": "Instructions",
     "chats": "Chats",
@@ -65,6 +65,34 @@
     "audio": "Audio",
     "text": "Text",
     "other": "File"
+  },
+  "members": {
+    "heading": "People",
+    "note": "Only the people here see this Workspace, its files and its knowledge.",
+    "loading": "Loading the members…",
+    "loadFailed": "The members could not be loaded.",
+    "you": "you",
+    "yourId": "Your account id: {id}",
+    "yourIdNote": "A colleague invites you with this id.",
+    "inviteLabel": "A colleague's account id",
+    "invitePlaceholder": "Account id",
+    "invite": "Invite",
+    "roleOf": "Role of {name}",
+    "remove": "Remove",
+    "handOver": "Make owner",
+    "leave": "Leave",
+    "confirmHandOver": "Make {name} the owner of this Workspace? You stay on as an admin.",
+    "confirmLeave": "Leave this Workspace? You will no longer see its files, including the ones you added."
+  },
+  "agents": {
+    "heading": "Agents",
+    "note": "The default agent works in every Workspace. Bring in another agent from your desk so members can chat with it here.",
+    "empty": "No agents brought in yet.",
+    "broughtBy": "Brought in by {name}",
+    "pickLabel": "Agent to bring in",
+    "bring": "Bring in",
+    "takeOut": "Take out",
+    "noneToBring": "Every agent on your desk is here already."
   },
   "addTo": {
     "label": "Add to Workspace",
