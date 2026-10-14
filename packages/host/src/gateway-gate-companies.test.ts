@@ -710,8 +710,10 @@ describe("the company id is used exactly as it is", () => {
     version: 1 as const,
     fingerprint: "fp",
     status,
-    checkedAt: new Date(T0).toISOString(),
-    lastOkAt: status === "ok" ? new Date(T0).toISOString() : null,
+    // A verdict from an hour ago, read against the real clock: a fixed date here expired with the 7-day grace
+    // (it went red on 2026-10-14 at 09:00 UTC, one week after T0).
+    checkedAt: new Date(Date.now() - 3_600_000).toISOString(),
+    lastOkAt: status === "ok" ? new Date(Date.now() - 3_600_000).toISOString() : null,
   });
 
   it("keeps two organisation ids that differ only by whitespace in two slots", async () => {
