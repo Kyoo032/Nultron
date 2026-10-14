@@ -2,6 +2,8 @@
 
 Usage is the desk spend and this-key wallet page at `/usage`. It is a link in the rail's pinned Account group (`rail-account-group`) next to Workspaces and Settings — not a product mode. Day / Week / Month stacked bars and spend-by-model live here; Settings keeps a compact this-key strip and Open Usage. Map: [`docs/internal/maps/shell-rail-and-workspaces.md`](../../../../docs/internal/maps/shell-rail-and-workspaces.md).
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 ## Sub-features
 
 - `usage-link` (there is no `usage-open-rail` testid) opens Usage from the left rail or from the Settings strip (`usage-panel` → `usage-open`). Collapsed rail shows the icon only. Active when the path starts with `/usage`. The page root is `usage-page`.

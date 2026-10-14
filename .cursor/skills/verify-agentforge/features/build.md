@@ -2,6 +2,8 @@
 
 **Parked / verified-unreachable (GTM).** Custom-agent Build is not a product surface. `/studio/new` and `/agents` redirect to Chat. `mode-agents` count is 0. `settings-build-link` count is 0. The renderer half is **gone**, not parked: there is no Studio page component left in `apps/web` (grep `save-soul|agent-prompt|create-agent` → 0 hits) and `apps/web/app/` holds only `fonts/` and `globals.css`. The host still exposes agent create, read and revise routes (`packages/host/src/router.ts:329-330` and `:449-457`, the soul route at `:453`, the tools route at `:452`; there is no DELETE or PATCH agent route), so un-parking means rebuilding UI against surviving routes — not un-hiding a page. Do not treat the redirect as a product regression.
 
+Product: both · Instance: main :3000 (parked: `/studio` redirects to Chat)
+
 ## Sub-features
 
 - `build-parked` — navigating `/studio/new` or `/agents` lands on Chat.

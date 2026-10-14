@@ -1,5 +1,7 @@
 # Map — Chat send
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 Last verified: 2026-10-12 at e8a7eca8 for the "Chat-first shell" section only (the shell switch, the tier in the run body and the agent conversations; read against the tester branch before it was promoted to `main`, PR #157). Nothing else on the page was re-read.
 
 Last verified: 2026-10-11 at 2df34be (fix branch, before merge) for § 6 only (the stand-in model notice, "The stand-in notice" and the dispatch list; SH-007): read against the fix branch over that commit; the `chat-composer.tsx` and `chat-session.tsx` line numbers in § 6 were taken from that branch. The rest of the page was not re-read.

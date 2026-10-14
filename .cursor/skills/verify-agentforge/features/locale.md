@@ -2,6 +2,8 @@
 
 Nultron ships English and Bahasa Indonesia. Settings has one language select; picking a language saves it immediately but **does not retranslate the screen** — a restart banner appears, and only its button applies the new locale to the renderer and re-freezes the host's boot locale. Both the renderer (`apps/web/lib/i18n.ts`) and the host (`packages/host/src/locale-boot.ts`) hold the locale in a module-level frozen variable, which is why a page reload alone is not enough. Testids never change with locale, so every recipe in this map stays valid on an `id` desk — only the visible strings move. Map: [`docs/internal/maps/locale-boot-and-run-harness.md`](../../../../docs/internal/maps/locale-boot-and-run-harness.md).
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 ## Sub-features
 
 - `locale-select` is `settings-locale` on Settings: a `<select>` with `en` ("English") and `id` ("Bahasa Indonesia"). Label `Language` / `Bahasa`, help line "Applies after you restart Nultron…" / "Berlaku setelah Anda mulai ulang Nultron…".

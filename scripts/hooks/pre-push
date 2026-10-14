@@ -1,0 +1,4 @@
+#!/bin/sh
+# Git pre-push hook (core.hooksPath = scripts/hooks, set by `pnpm hooks:install`). Logic: pre-push.mjs.
+# Agents never push with --no-verify: this hook is the only thing that stops a tester push to main.
+exec node "$(dirname "$0")/pre-push.mjs" "$@"

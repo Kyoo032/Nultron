@@ -2,6 +2,8 @@
 
 The desk is the viewport. The document does not scroll, and each page has one scrollport: Chat and Edit fill the pane and scroll inside it, and every other work mode plus Settings, Knowledge, Workspaces, Usage and Channels scroll the pane. Work modes stay mounted, so a rail click keeps `scrollTop`. Reading columns stay near 768px on Education, onboarding and the Finance chooser only (`--content-max`); Chat has no reading cap (`chat-page.tsx:7-12`: the pane owns the whole width, `message-list` is `w-full` with `px-[var(--chat-gutter)]`, `chat-home` measured 1192px in a 1440px window); studios grow on a wide window and stop short of the desk edge. Map: [`docs/internal/maps/shell-rail-and-workspaces.md`](../../../../docs/internal/maps/shell-rail-and-workspaces.md) §2. The 480px rail collapse is [rail.md](./rail.md), not this file.
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 ## Sub-features
 
 - `shell-one-scroller` — `body` is `overflow: hidden` and `document.scrollingElement` does not move. `[data-testid="app-main-panel"]` is `overflow: hidden` (there is no `#app-main-panel` id: select it by the testid, `apps/web/components/app-shell.tsx:37`). On a scrolling page the only desk scroller is the pane around the page (the visible `overflow-y: auto` ancestor of `legal-studio`, `finance-studio`, or `settings-form`). The rail `<nav>` is the rail's own scroller and is not a second desk bar.

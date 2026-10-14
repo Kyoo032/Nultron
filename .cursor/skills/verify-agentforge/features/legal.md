@@ -2,6 +2,8 @@
 
 Legal is a matter job: .docx files in, position-aware review, verified deliverables out (issues memorandum, tracked-changes redline, deviation report, red-flags Markdown). the studio accepts .docx only (`isDocxFile`, `legal-client.ts:327-329`; the host file layer also reads PDF, `store-files.ts:41`, `:243-282`, but the web client never sends one). Live runs need a gateway key; matter intake, uploads, and role editing work without one. Map: [`docs/internal/maps/legal-matter-run.md`](../../../../docs/internal/maps/legal-matter-run.md).
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 ## Sub-features
 
 - `legal-rail` reaches `/legal` from `agent-legal` on Home and on the Legal preset.

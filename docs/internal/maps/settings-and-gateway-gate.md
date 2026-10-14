@@ -1,5 +1,7 @@
 # Map — Settings, the gateway gate, and Start over
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 Last verified: 2026-10-11 at 2df34be (fix branch, before merge). Only "What a save does besides saving" and "What the answer carries" were re-checked; the other cites on this page are unchanged, and some were already stale.
 
 > **Two products, one repo.** **Personal** is the Mac/Windows Nultron app (current cut `0.15.0`); **Enterprise** is the hosted web app.

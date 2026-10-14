@@ -1,5 +1,7 @@
 # Map — Hosted server mode and the transport security pass
 
+Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
+
 Last verified: 2026-10-11 at 2df34be (fix branch, before merge) (SH-001: section 0, the Node 22 boot check). Before that: 2026-09-21 at 4938747 + working tree; four citations re-anchored and the
 review-instance section added, then the boot-guard path re-checked after the fix pass of the same
 day (the guards moved from `apps/web/lib/` to `apps/web/server/`, because `lib` is the renderer's

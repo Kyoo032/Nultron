@@ -1,5 +1,7 @@
 # Map — The by-id route surface and the tenancy harness
 
+Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
+
 Last verified: 2026-09-20 at 6984d84 (the merge of PR #81, which adds this page)
 
 ## Overview

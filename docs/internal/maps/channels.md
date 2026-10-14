@@ -1,5 +1,7 @@
 # Channels (Telegram)
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 Last verified: 2026-10-01, working tree on top of 0b61a29, for the first line below only (the rail row, the route and the page component: each cite re-read against the file). The rest as of 2026-09-20 at a053245 + the Phase 4 branch `feat/web-phase4-tenant-secrets-rcbu9c` (through e37b3a1)
 
 ## Overview

@@ -1,5 +1,7 @@
 # Map: Documents job
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 Last verified: 2026-10-05 at b58383d (`origin/main`: the mode harness, desk files as sources through one picker shared with Presentation, the checks and one repair round, a repair call that fails keeping the first draft, cancel and budget reaching the model call) merged with PR #122 at 1f4f92c (the source hold). The citations into `document-generate.ts`, `source-check.ts`, `source-hold.ts` and `modes/documents.ts` and into the Documents host tests were re-read against the merged tree. Every other citation is carried from the 2026-10-03 verification of the file it names; this merge did not change those files. The generate, check, regenerate and hold flows were read in code and in their unit tests, not driven in a browser by this pass.
 
 ## Overview

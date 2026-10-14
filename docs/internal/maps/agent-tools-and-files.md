@@ -1,5 +1,7 @@
 # Map: agent tools and files, the mode harness, the tool budget, desk files and the Personal folder
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 Last verified: 2026-10-12 at e8a7eca8 for the "Chat-first shell" section only (the research_dossier tool; read against the tester branch before it was promoted to `main`, PR #157). Nothing else on the page was re-read.
 
 Last verified: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-07 at 444cb3c for the two new paragraphs of § 13 (a model call that fails after a tool completed; how long a request may take to send headers) and the two new Gotchas bullets, written after a live drive and read against the working tree over that commit, not committed. Nothing else on the page was re-read, so a line number elsewhere may have moved. Not driven live by the agent that wrote the fix.

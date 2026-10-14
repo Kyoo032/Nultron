@@ -1,5 +1,7 @@
 # Map — PII masking and key security
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 Last verified: 2026-10-01, working tree over 0b61a29, not committed, for the new § 10 (where a provider key may travel on the hosted server: the provider registry, no redirect on a key-bearing request, no stored base URL, per-tenant model cache; Enterprise BYOK Phase A) and the two lines of § 8 it changes. Proven by unit tests, with a Personal-parity case each, and by running the real router in the local Kubernetes rehearsal's app container; no real key was used and no provider was called. Before that, the same day: the `AGENTFORGE_PACKAGED` gotcha in § Gotchas (its claim was true until that day and is rewritten) and the `pinned.test.ts` citation in § Verify. Not driven on an installed app. Before that: 2026-09-29 for the one `doctor.mjs` citation in § 3 and the `settingsPayload` range in § 8 (re-anchored after `modes` left the payload, working tree, not committed). Before that: 2026-09-23 at d4561b8 + uncommitted tree for the new rows of § 5 (the sealed portal refresh token
 and the hashed session id). Everything else was last verified 2026-09-20 at a053245 + the Phase 4 branch
 `feat/web-phase4-tenant-secrets-rcbu9c` (through e37b3a1). The four finance parsers' `guardFinanceInput`

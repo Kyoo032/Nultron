@@ -2,6 +2,8 @@
 
 **Personal lane (desktop only).** The folder lets the owner open one real folder on their own computer so Chat can read its files and propose changes to them. Nothing is written until the owner presses Approve. The control and the "Changes to approve" panel sit above the Chat composer, and they exist only in the packaged desktop app: the hosted app and webdev render nothing here. The agent reaches the folder with the same six file tools as the desk's own files ([files.md](./files.md)), with `root: "folder"`. How it works: [`docs/internal/maps/agent-tools-and-files.md`](../../../../docs/internal/maps/agent-tools-and-files.md), § 9 and § 11.
 
+Product: retired-desktop · Instance: none (Personal desktop retired 2026-10-14)
+
 ## Sub-features
 
 - `folder-surface` wraps the whole thing above the composer (`apps/web/components/folder/folder-surface.tsx:42`). It is mounted on the empty Chat as well as in a thread (`FolderSurface` at `apps/web/components/chat-session.tsx:489` has no `empty` guard), so on the packed app `folder-open` is there before the first message. It renders nothing at all (count 0) when the host reports `available: false`, and also when the shell has no folder picker and no open folder has changes to show.

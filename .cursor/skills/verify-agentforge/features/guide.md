@@ -2,6 +2,8 @@
 
 The first-run tour and the first desk it points at. After first-run setup a short guided tour is offered once: five coach marks on the real shell (the rail and its tools, Workspaces, the Chat composer, the Knowledge Base, Settings), each with Next, Back (not on the first), a visible Skip and a close button. Esc closes it and a click outside does nothing. A fresh **Personal** desk starts with Research, Images, Videos and Presentation plus Chat only; the tour's second stop is where the rest are switched on. How it works, file by file: [`docs/internal/maps/first-run-desk-and-guide.md`](../../../../docs/internal/maps/first-run-desk-and-guide.md). The tour is shared by Personal and Enterprise; the first-desk rule is Personal's.
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 ## Sub-features
 
 - `guide-offer` is the welcome card: `guide-card` with `data-guide-mode="offer"`, `guide-next` ("Show me around"), `guide-skip`, `guide-close`. No `guide-back`, no `guide-progress`, no `guide-dots`. Centred.

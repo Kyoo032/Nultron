@@ -54,6 +54,16 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Agent guardrails: where a change goes, a push guard, release refusals and a deploy gate, 2026-10-14 (branch `chore/agent-guardrails`; lanes: Enterprise, HYP AI, tester)
+
+- **Why.** Rizky, 2026-10-14: a misconfigured update must not take the app offline, and every change has to reach the right code. `main`'s AGENTS.md opened with the tester banner (carried over by the 2026-10-12 promotion), so an agent on `main` was told it was in the tester.
+- **Instructions.** AGENTS.md opens with "Where am I?", "Where a change goes" and "Which product a change reaches"; TESTER.md applies only on `tester/chat-first` in `agentforge-chat`. The change skill and the verify skill start with `pnpm where`; every verify recipe and map page carries a `Product: · Instance:` line.
+- **Push guard.** `scripts/hooks/pre-push` (opt-in per checkout: `pnpm hooks:install`) refuses any push to `main`, a push of `tester/chat-first` anywhere but itself, and runs `scripts/lane-guard.mjs`, whose never-promote list (`lanes.json` `neverPromote`), protected-file `Lanes:` rule and brand rule now block. Map warnings still only advise.
+- **Releases.** `scripts/release-web.mjs` refuses in the tester folder or off `main`, dry runs included. `apps/desktop/scripts/release-desktop.mjs` refuses because the desktop app is retired, unless `--allow-retired`; `pnpm desktop:release` and the pack skill hit that refusal too.
+- **Deploy gate.** `scripts/deploy-preflight.mjs` checks `.env`, `portal.env` and the compose file before anything switches; `webapp-deploy/scripts/deploy.sh` keeps the running image as `:previous`, waits for health with a bound and rolls back on failure. A worker flagged that the no-node fallback container received the real `AGENTFORGE_SECRETS_KEY`; fixed before merge, the container gets only `set` or nothing.
+- **Not proven.** No server run of the deploy gate, no real push through the hook. The Nultron staging subdomain is not named yet.
+- **Lanes owed after merge.** Tester: merge `origin/main`, `ci:local`, `pnpm hooks:install` there. HYP AI: the next import must bring `scripts/where-am-i.mjs` with `lane-guard.mjs`.
+
 ## Stub Playwright follows the chat-first rail and the Virtual agents page, 2026-10-14 (SH-012, SH-013; test only; lanes: Personal, Enterprise, HYP AI, tester)
 
 - **Lanes.** Personal, Enterprise, HYP AI, tester. The specs live in the shared renderer. Nothing in the product changed. Branch `fix/sh-012-013`, cut from `main`.

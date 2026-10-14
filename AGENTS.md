@@ -1,6 +1,39 @@
 # Nultron
 
-**This folder is the tester code (chat only, modes parked), not the published code. Read [`TESTER.md`](TESTER.md) before editing anything here.**
+## Where am I?
+
+Check before any edit: `pnpm where` (`scripts/where-am-i.mjs`, added on branch `chore/agent-guardrails`). Until it lands, run `git rev-parse --show-toplevel` and `git branch --show-current`, and match the row. If the folder and branch match no row, stop and ask Rizky.
+
+| Folder | Branch | What it is | Webdev |
+|---|---|---|---|
+| `C:\Users\rizky\agentforge` and worktrees `C:\Users\rizky\agentforge-<topic>` | `main`, or a branch cut from `main` | Published code. Every release and deploy comes from here. | `:3000` |
+| `C:\Users\rizky\agentforge-chat` | `tester/chat-first` | Tester = staging. New work lands here first. Read `TESTER.md`. | `:3200` |
+| `C:\Users\rizky\hypey\app` | its own `main` (remote `Kyoo032/hyp-ai`) | HYP AI's brand repo (downstream). Brand only. | `:3301` |
+
+- **Stage (Rizky, 2026-10-14).** The tester is the staging code at every stage. HYP AI as a whole is still in the tester stage: "the current stage are all still tester". Its server, `aiopc.innovationhypernet.com`, is not yet production.
+- **Staging instance.** Nultron's tester stages on the tester's staging subdomain (name pending). `TESTER.md`, "Staging instance", has the detail.
+- **Open (Rizky).** HYP AI still imports from `main` per `C:\Users\rizky\hypey\intake\SYNC.md`. Whether that changes is Rizky's call.
+
+## Where a change goes
+
+| The change | Cut the branch from | Work in | Pull request to | Still owed before it counts as done |
+|---|---|---|---|---|
+| A bug seen on the live app, the preview or `:3000` | `main` | a worktree `agentforge-<topic>` | `main` | merge `origin/main` into the tester + `ci:local` there; HYP AI import + its leak checks |
+| A new feature or a behaviour change | `tester/chat-first` | `agentforge-chat` | none at first (commit on the tester) | a drive on the staging instance (the tester's staging subdomain, name pending), then a promotion pull request Rizky approves |
+| A bug in a feature that exists only in the tester | `tester/chat-first` | `agentforge-chat` | none | a drive on the staging instance (the tester's staging subdomain, name pending) |
+| HYP AI's name, logo, copy, edge or deploy | HYP AI repo `main` | `hypey\app` | `Kyoo032/hyp-ai` | its leak checks |
+| Docs, maps, skills about shared code | `main` | a worktree | `main` | merge into the tester |
+| A release or a deploy | `main` only | `agentforge` | none | Rizky's go at that moment |
+
+Never: a fix pull request from `tester/chat-first`; a release from `C:\Users\rizky\agentforge-chat`; a hand fix in two places.
+
+## Which product a change reaches
+
+After the opc/sme split. Until then every shared file reaches both.
+
+- `engine` or `ui`: both Nultron (OPC) and HYP AI (SME). Tests must pass for both profiles.
+- `opc`: Nultron only. `sme`: HYP AI only. They never import each other.
+- Shared code names no brand.
 
 **The vision (Rizky, 2026-10-05): everyone has all their workers inside one desk.**
 
@@ -84,7 +117,7 @@ On **Enterprise** each tenant keeps its own workspaces on Rizky's server. On **P
 - Routines (scheduled runs) are free on every plan (Rizky, 2026-10-07: "routines are free, since they cost tokens anyway"). A routine that needs a computer still needs a paid plan for that part.
 - The host enforces that from the plan the portal reports. The renderer only displays it.
 
-The plan is in the tester folder: `docs/internal/chat-first-plan.md`, "Second reference", "Hiring a bot", "Free and paid" and Track B.
+The plan is in the tester code (`C:\Users\rizky\agentforge-chat`): `docs/internal/chat-first-plan.md`, "Second reference", "Hiring a bot", "Free and paid" and Track B.
 
 **Private by person on Enterprise (Rizky, 2026-10-06 evening).** His words: "even on enterprise the knowledge base of everyone will be different and private". A company shares a desk, but each person's Knowledge Base is their own, and a document a person attaches in Chat is private to that person. The host enforces it; the renderer only displays it. Personal has one person per desk, so nothing changes there, and every change for this needs a Personal-parity test. What is shared and what is private on a team desk today has not been mapped yet; map it before changing a table.
 
@@ -96,39 +129,20 @@ Two more answers from him the same evening:
 
 **This is design only for now (Rizky, same evening): "dont make it too complicated".** Do not build the per-person Knowledge Base, bot knowledge sharing or the leaver controls yet. The one piece being built is that a document attached in Chat is private to the person who attached it. The build focus is the chat and several agents working together.
 
-### Two codes (Rizky, 2026-10-06; must follow)
+### Lanes: one source, main and its downstream (Rizky, 2026-10-06, 2026-10-09, 2026-10-14; must follow)
 
-Nultron is always kept as two codes, and a change to one must never break the other.
+The tables at the top say where a change is cut, made and merged. This section keeps the rules behind them. The working form is [`docs/internal/maps/release-and-sync-lanes.md`](docs/internal/maps/release-and-sync-lanes.md).
 
-- **Published:** this folder, `C:\Users\rizky\agentforge`, branch `main`. Nultron as released, with the mode screens. HYP AI is built from it. Every release runs from here.
-- **Tester:** `C:\Users\rizky\agentforge-chat`, branch `tester/chat-first`, a git worktree of this repo. Chat only, with the modes running behind the chat as workers. Its plan and specs live in its own `docs/internal/` (`chat-first-plan.md`, `chat-workers-spec.md`, `model-tiers-spec.md`, `chat-computer-spec.md`), and its rules are in its `TESTER.md`.
-
-Rules:
-
-- A problem that shows on `:3000` is fixed here on `main`, then merged into the tester folder. It is never fixed by hand in both.
-- Changes move one way, from `main` into `tester/chat-first`. Tester work reaches `main` only through a pull request Rizky approves.
-- Never run a release from the tester folder. The tester webdev uses port 3200 and its own data folder.
-- The precise map (which change goes where, which files the tester code may edit, how to update) is in Rizky's Obsidian vault: `C:\Users\rizky\Documents\Obsidian\40-Dev\nultron-two-codes-map.md`. Keep it current in the same session as any change to the split.
-
-### Sync lanes: four things, one source (Rizky, 2026-10-09; must follow)
-
-One codebase feeds four lanes. Every bug fix is made once, on `main`, and reaches the other lanes by the steps below. Map: [`docs/internal/maps/release-and-sync-lanes.md`](docs/internal/maps/release-and-sync-lanes.md).
-
-| Lane | What it is | Where it lives | How it gets a fix from `main` |
-|---|---|---|---|
-| Nultron Personal | The Mac/Windows app | built from `agentforge` `main` | the next `pnpm desktop:build` and `pnpm desktop:release` |
-| Nultron Enterprise | The hosted app and the preview | built from `agentforge` `main` | the next `node scripts/release-web.mjs`; the preview by its safe update |
-| HYP AI | Hypernet's white-label | `C:\Users\rizky\hypey\app` | vendor-branch import, steps in `C:\Users\rizky\hypey\intake\SYNC.md` |
-| Tester | Chat-only code | `C:\Users\rizky\agentforge-chat`, branch `tester/chat-first` | `git merge origin/main` in that folder |
-
-- **One place to fix.** A bug fix is a pull request to `main` from a branch cut from `main`. Never fix by hand in the tester folder or in the HYP AI clone, and never open a fix pull request from `tester/chat-first`. The only thing that goes from tester to `main` is a promotion pull request Rizky approves.
-- **After a pull request merges to `main`, in this order:** (1) merge `origin/main` into the tester folder and run `ci:local`; (2) import it into the HYP AI clone per `SYNC.md`, then run `check-leaks.sh` and `drive-leaks.mjs`; (3) release Personal or Enterprise only when Rizky says. A fix is not done for a lane until its step has run. The pull request says which lanes are still owed.
+- **Lanes.** `main` is the published code: Nultron as the OPC web app, and the Enterprise and SME base. The tester (`C:\Users\rizky\agentforge-chat`, `tester/chat-first`) is the staging code at every stage. HYP AI (`C:\Users\rizky\hypey\app`) is a downstream brand repo: brand only. Nultron Personal is retired (2026-10-14): no sync step is owed to it, and no release is cut from it.
+- **One place to fix.** A bug fix is a pull request to `main` from a branch cut from `main`. Never fix by hand in `C:\Users\rizky\agentforge-chat` or in the HYP AI clone, and never open a fix pull request from `tester/chat-first`. Tester work reaches `main` only through a promotion pull request Rizky approves.
+- **Two codes, one way.** Changes move one way, from `main` into `tester/chat-first`: `git fetch origin`, then `git merge origin/main` in `C:\Users\rizky\agentforge-chat`. Never run a release from `C:\Users\rizky\agentforge-chat`. Its webdev uses port 3200 and its own data folder, so it never shares a database with `:3000`. The precise map (which change goes where, which files the tester may edit) is Rizky's vault note `C:\Users\rizky\Documents\Obsidian\40-Dev\nultron-two-codes-map.md`. Keep it current in the same session as any change to the split.
+- **After a pull request merges to `main`, in this order:** (1) merge `origin/main` into `C:\Users\rizky\agentforge-chat` and run `ci:local`; (2) import it into the HYP AI clone per `C:\Users\rizky\hypey\intake\SYNC.md`, then run `check-leaks.sh` and `drive-leaks.mjs`; (3) release Enterprise only when Rizky says. A fix is not done for a lane until its step has run. The pull request says which lanes are still owed.
 - **Shared code carries no brand.** HYP AI shows its own name, gateway and mascot, so shared code and copy never hard-code `Nultron`, `Toko Token`, `TokenKu` or `HYP AI`; they read `productName` and `gatewayName`. A difference between lanes is a setting (`PORTAL_SIGNIN_MODE`, the edge mode), not a fork.
 - **Deploy differences stay in their lane.** The Cloudflare edge and password sign-in belong to HYP AI's deploy; Nultron keeps its direct two-name setup. Never carry one into the other's deploy path.
-- **Label what a change touches.** In a pull request and in `unreleased.md`, name the lanes (Personal, Enterprise, HYP AI, tester). The default is all four.
+- **Label what a change touches.** In a pull request and in `unreleased.md`, name the lanes with the tokens `lanes.json` already reads: `enterprise`, `hyp-ai`, `tester`, and `personal` (retired, owes nothing). Shared code defaults to `enterprise`, `hyp-ai` and `tester`. The guard checks only that a `Lanes:` line exists, not which tokens it names.
 - **Priority.** Published wins; in a conflict keep the `main` side. The Obsidian map has the full list.
 
-**Change guard (advisory, 2026-10-09).** Any change follows the project skill [`.cursor/skills/change-agentforge/SKILL.md`](.cursor/skills/change-agentforge/SKILL.md): name the lanes, read the map page, check blast radius on shared files, edit only owned paths, refresh the map and recipe, run the guards, PR to `main` from a branch off `main`, then the sync steps. Paste [`preamble.md`](.cursor/skills/change-agentforge/preamble.md) at the top of every subagent prompt. [`lanes.json`](lanes.json) at the repo root maps path globs to their map page, the lanes they reach and a `protected` flag (the files the tester branch also edits). `pnpm lane-guard` (`scripts/lane-guard.mjs`, also an advisory `ci:local` step) warns when code changes without its map page, when a protected file changes with no `Lanes:` line in a commit message, or when a brand literal is added to shared code beyond `scripts/lane-guard.baseline.json`. It only warns (exit 0; `--strict` exits 1) and skips itself where `docs/internal` or `lanes.json` is absent, so the HYP AI import can keep it. When the tester branch starts editing another shared file, add it to `lanes.json` in the same session. Plan: [`docs/internal/white-label-and-agent-guardrails-plan.md`](docs/internal/white-label-and-agent-guardrails-plan.md).
+**Change guard (advisory, 2026-10-09).** Any change follows the project skill [`.cursor/skills/change-agentforge/SKILL.md`](.cursor/skills/change-agentforge/SKILL.md). Paste [`preamble.md`](.cursor/skills/change-agentforge/preamble.md) at the top of every subagent prompt. [`lanes.json`](lanes.json) maps path globs to their map page, the lanes they reach and a `protected` flag. `pnpm lane-guard` (`scripts/lane-guard.mjs`) prints three kinds of warning: a map page not refreshed, a protected file with no `Lanes:` line, a brand literal added to shared code. It exits 0 unless `--strict`. `ci:local` runs it with `--strict` as an advisory step: a warning shows in the table and never fails the run. The strict rules, the never-promote list, the pre-push hook and the release-script checks are added on branch `chore/agent-guardrails`; the map page names the file that holds each. Plan: [`docs/internal/white-label-and-agent-guardrails-plan.md`](docs/internal/white-label-and-agent-guardrails-plan.md).
 
 `.ref/` (gitignored) holds two third-party repositories for reading only, OpenMausBot and hermes-agent. Take ideas, never code, and never anything from `OpenMausBot/enterprise/`.
 

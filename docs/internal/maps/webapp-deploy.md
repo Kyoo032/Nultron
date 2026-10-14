@@ -1,5 +1,7 @@
 # Map — webapp-deploy: the hosted deployment stack
 
+Product: both · Instance: hosted servers, not :3000
+
 Last verified: 2026-10-05 at 0b61a29 + the uncommitted working tree, except one gotcha corrected on 2026-10-07 (ffmpeg is in the image since `5bec532`; the bullet under Gotchas was written before that). Re-read that day: the build and runtime
 description, the HEALTHCHECK paragraph, the components-check cites, the ignore-file rows and the
 dependencies gotcha, against `webapp-deploy/Dockerfile` as it stands after the SR-113 change. The rest

@@ -2,6 +2,8 @@
 
 Documents is a job: prompt or starter → section preview → DOCX download. It is not a Word editor. Live generate needs a gateway key. Starters load a canned draft without one. Source material is optional and becomes the only facts the model may use. It comes from the **Source material** box (`sourceText`, pasted text, a saved artifact or a Research handoff) and from up to five **desk files** the person picks (`sourceFiles`), under one 120k-character ceiling. A live generate then passes two host checks (structure, and grounding when there is a source) with one repair round, and a draft that still fails ships with a note. A repair call that fails keeps the first draft. With a source, code then cuts any sentence the source still does not support (`documents-source-hold`). Map: [`docs/internal/maps/documents.md`](../../../../docs/internal/maps/documents.md).
 
+Product: both · Instance: main :3000 + HYP AI :3301
+
 ## Sub-features
 
 - `mode-header` (0.15.0; there is no `documents-header` testid), the shared `ModeHeader` (`apps/web/components/mode-header.tsx:19`), title plus one outcome line in `expected-inputs`: "You get: a titled, sectioned draft you can preview and download as a DOCX." No kicker and no second subtitle. `documents-prompt` is a bordered `text-field` input (it was transparent and borderless before 0.15.0). Driven 2026-09-23: `documents-starter` → five `documents-section`; `documents-download` → `POST /api/v1/documents/docx` 200 with the wordprocessingml type, no model call.
