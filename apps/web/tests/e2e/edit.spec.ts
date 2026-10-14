@@ -13,7 +13,9 @@ test.beforeEach(async ({ request }) => {
 
 test("edit shell renders on /edit", async ({ page }) => {
   await page.goto("/edit");
-  await expect(page.getByTestId("mode-edit")).toBeVisible({ timeout: 30_000 });
+  // The chat-first rail names a non-generalist agent `agent-<mode>`. `mode-edit` is the published rail.
+  await expect(page.getByTestId("agent-edit")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("mode-edit")).toHaveCount(0);
   await expect(page.getByTestId("edit-studio")).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("edit-timeline")).toBeVisible();
   await expect(page.getByTestId("edit-preview")).toBeVisible();
