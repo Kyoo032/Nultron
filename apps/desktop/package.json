@@ -161,7 +161,7 @@
     "publish": {
       "provider": "github",
       "owner": "Kyoo032",
-      "repo": "Nultron",
+      "repo": "Nultron-Desktop",
       "releaseType": "release"
     },
     "nsis": {

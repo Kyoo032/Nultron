@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 /**
  * Publish the packed Nultron Setup exe, its blockmap and latest.yml to the public
- * releases repo named in branding/agentforge/brand.json "updates". Run after
- * `pnpm desktop:build`. Uploaded asset names are hyphenated (what electron-updater's
+ * releases repo named in branding/agentforge/brand.json "updates" (Kyoo032/Nultron-Desktop).
+ * Run after `pnpm desktop:build`. Uploaded asset names are hyphenated (what electron-updater's
  * GitHub provider requests); the local files keep the spaced artifactName.
+ *
+ * Retired 2026-10-14 (Rizky): Nultron Personal is being merged into the web app. That repo is
+ * archived and takes no new releases, so do not run this script for a new cut. The code stays.
  *
  * macOS artifacts (`Nultron-<version>-mac-<arch>.dmg|zip`, built on a Mac with
  * `pnpm desktop:build:mac` and copied into dist/) are attached to the same release when

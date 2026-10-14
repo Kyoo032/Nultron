@@ -8,14 +8,14 @@ This file lists every product built from this repo, one card per target, coverin
 
 **Agents read this file before starting any task.** Name the target your task serves, then keep the change inside it. If the change lands on another target, stop and say so.
 
-Last updated: 2026-10-05 (agentforge `main` at `be2c267`). The hex colours below were sampled from each brand's own logo file.
+Last updated: 2026-10-14 (repo rename; base agentforge `main` at `c35dc695`). The hex colours below were sampled from each brand's own logo file.
 
 ## At a glance
 
 | Target | Type | Company | Product name | Gateway users see | Status | Focus now |
 |---|---|---|---|---|---|---|
-| [`nultron-personal`](#nultron-personal) | Desktop app | Public | Nultron | Toko Token | Released v0.15.1; v0.16.0 packed 2026-10-06, not published | Publish 0.16.0 after the owed drives; the public sites say "coming soon" and link no download |
-| [`nultron-enterprise`](#nultron-enterprise) | Hosted web app | Nultron Enterprise customers (via DPS) | Nultron | Toko Token + BYOK | Pilot, not deployed. A password-gated single-desk preview (one private desk per tester) runs at app.nultron-ai.xyz since 2026-10-06 | First Tencent Enterprise deploy, Thu 8 Oct; it replaces the preview |
+| [`nultron-personal`](#nultron-personal) | Desktop app | Public (retired) | Nultron | Toko Token | Retired 2026-10-14. Last release v0.15.1. Repo `Kyoo032/Nultron-Desktop` archived | None. The app is merged into the web app; no new cut |
+| [`nultron-enterprise`](#nultron-enterprise) | Hosted web app | Nultron Enterprise customers (via DPS) | Nultron | Toko Token + BYOK | Pilot, not deployed. A password-gated single-desk preview (one private desk per tester) runs at app.nultron-ai.xyz since 2026-10-06. Release repo is `Kyoo032/Nultron` since 2026-10-14 | First Tencent Enterprise deploy, Thu 8 Oct; it replaces the preview |
 | [`hyp-ai`](#hyp-ai) | White-label hosted | Hypernet (XLSMART) | HYP AI | TokenKu | Setting up | Rebrand the clone; plan approval |
 | [`kemenkeu-ai`](#kemenkeu-ai) | Desktop flavor | Kemenkeu (Ministry of Finance) | Kemenkeu AI | AIHub | Built locally | Later, after Nultron and HYP AI |
 | [`aihub-metranet`](#aihub-metranet) | Desktop flavor | Metranet (Telkom Indonesia) | AIHub Metranet | AIHub | Built locally | Later, after Nultron and HYP AI |
@@ -66,6 +66,8 @@ The next milestone is to **simulate pushing one agentforge update into both bran
 
 <img src="../../apps/desktop/branding/agentforge/logo.png" alt="Nultron app logo" width="96">
 
+**Retired (Rizky, 2026-10-14).** Nultron Personal is being merged into the web app. Its release repo `Kyoo032/Nultron-Desktop` is archived and gets no new releases. Do not pack or publish a desktop cut. The code and the identity below stay in the tree until the merge.
+
 **Identity**
 
 | Element | Value | Files |
@@ -95,13 +97,10 @@ The next milestone is to **simulate pushing one agentforge update into both bran
 - **Services:**
   - Windows NSIS installer.
   - macOS dmg/zip, still a preview: nobody has smoke-tested it on a Mac yet.
-  - In-app updater reading `Kyoo032/Nultron`.
-- **Ships by:** the [pack skill](../../.cursor/skills/pack-nultron/SKILL.md), then `pnpm desktop:release` to the public repo `Kyoo032/Nultron`.
-- **Versions:** semver. Published `v0.15.1` (2026-09-28). `0.16.0` cut on 2026-10-06 (branch `chore/release-0.16.0`, [`0.16.0-changelog.md`](0.16.0-changelog.md)), the first Nultron-named installer; not published.
-- **Focus now:**
-  1. Drive on the packed 0.16.0 app: `run_code`, the folder flow, Start over, and the DPSBuddy → Nultron upgrade on Windows ([`traps.md`](../../.cursor/skills/pack-nultron/traps.md), "First Nultron pack").
-  2. Drive SR-112's injected file before publishing.
-  3. Publish 0.16.0 with `release-desktop.mjs --require-mac` when Rizky confirms.
+  - In-app updater: this tree's `brand.json` names `Kyoo032/Nultron-Desktop` (archived). Installed 0.15.1 copies still read `Kyoo032/Nultron`, which is now the Enterprise repo, so their check errors.
+- **Ships by:** nothing now. The [pack skill](../../.cursor/skills/pack-nultron/SKILL.md) and `pnpm desktop:release` are retired with the repo.
+- **Versions:** semver. Published `v0.15.1` (2026-09-28), the last release. `0.16.0` was packed on 2026-10-06 (branch `chore/release-0.16.0`, [`0.16.0-changelog.md`](0.16.0-changelog.md)) and was never published. It will not be published.
+- **Focus now:** none. Do not drive the packed app or cut a release for it.
 - **Logs:**
   - Pack table in the current changelog's `## Pack + publish`; published rows in [`unreleased.md`](unreleased.md).
   - Changelogs: `0.15.x-changelog.md`, `0.16.0-changelog.md`.
@@ -132,9 +131,9 @@ The next milestone is to **simulate pushing one agentforge update into both bran
 
 - **Live on the box (2026-10-06):** dpscloud.co.id, tokotokenai.com and nultron-ai.xyz are live static sites. app.nultron-ai.xyz is the preview: off server mode, Basic Auth, 11 private desks (security register SR-133). Company mailboxes moved to Lark; SES stays for the sign-in codes. Runbook: `nultron-files/deploy/tencent/README.md`.
 - **Where it runs (updated 2026-10-05):** Phase 0 is one Tencent Lighthouse box in Jakarta that will also host dpscloud.co.id (the parent site) and tokotokenai.com. Nultron goes on **nultron-ai.xyz**, with sign-in on **portal.nultron-ai.xyz**. **Never point api.tokotokenai.com at it.** Email is Tencent SES only, for the sign-in codes: "Nultron <no-reply@mail.dpscloud.co.id>", no mailboxes. After a 1-month test, move to a bigger Tencent CVM by sharing a Lighthouse custom image to CVM (same region), restoring the newer data, and switching DNS. Multi-site build: branch `feat/multi-site-edge`. Guide: `nultron-files/deploy/hosting-guide.html`. Before that, Phase 0 was one Tencent Lighthouse box in Jakarta. Phase 1 is TKE; its manifests are in `webapp-deploy/k8s/`, not yet applied.
-- **Ships by:** `node scripts/release-web.mjs --tag <tag> --sha <sha>`, with `--dry-run` first. It pushes both images, plus a deploy bundle to `Kyoo032/NultronEnt`.
+- **Ships by:** `node scripts/release-web.mjs --tag <tag> --sha <sha>`, with `--dry-run` first. It pushes both images, plus a deploy bundle to `Kyoo032/Nultron` (the release repo, renamed from `Kyoo032/NultronEnt` on 2026-10-14).
 - **Tag:** `ent-YYYY.MM.DD`. Every deploy is logged by sha.
-- **Current:** nothing is released or deployed yet. `Kyoo032/NultronEnt` has no release, and the deploy log is empty.
+- **Current:** as of 2026-10-05, nothing was released or deployed, and the deploy log was empty. Not re-checked on 2026-10-14.
 - **Focus now:**
   1. Build the image, driven with a real hosted Chat.
   2. Dry run of the release.
@@ -205,7 +204,7 @@ The two app-accent tokens are the ones the HYP AI build actually uses (`apps/web
   - Screenshots are in `hypey\intake\screens\`.
 - **Not yet rebranded:**
   - "Contact DPS" in the plans copy.
-  - `scripts/release-web.mjs` still points at `Kyoo032/*` and `ghcr.io/kyoo032/nultron-*`.
+  - `scripts/release-web.mjs` still names the Enterprise release repo (`Kyoo032/Nultron`, renamed 2026-10-14) and `ghcr.io/kyoo032/nultron-*`.
   - Defaults and copyright lines that name Rizky.
 - **Behaviour tuned for Toko Token, not yet checked against TokenKu:**
   - The Suno relay.

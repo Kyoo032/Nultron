@@ -4,9 +4,11 @@ Last verified: 2026-10-12 at e8a7eca8 for the "Chat-first shell" section only (t
 
 Last verified: 2026-10-09 at cc346b0c
 
+Repo names refreshed 2026-10-14 (repo rename, branch `chore/release-repo-rename`): the Enterprise release repo is `Kyoo032/Nultron` (was `Kyoo032/NultronEnt`), and the retired Personal release repo is `Kyoo032/Nultron-Desktop` (was `Kyoo032/Nultron`), archived. Only the release rows and the sync steps were re-read for this.
+
 ## Overview
 
-One source repo (`Kyoo032/agentforge`, branch `main`) feeds four lanes: Nultron Personal, Nultron Enterprise, HYP AI and the tester code. This page says how a fix made on `main` reaches each lane, what each lane may differ in, and what has to be true before a lane counts as fixed. It is the working form of the "Two codes" and "Sync lanes" rules in `AGENTS.md`; the longer story of the tester split is in Rizky's vault note `40-Dev/nultron-two-codes-map.md`. It does not cover how a release is cut (see [`desktop-pack-routes.md`](desktop-pack-routes.md) and the "Web release" section of `AGENTS.md`).
+One source repo (`Kyoo032/agentforge`, branch `main`) feeds the lanes: Nultron Personal (retired 2026-10-14, no more releases), Nultron Enterprise, HYP AI and the tester code. This page says how a fix made on `main` reaches each lane, what each lane may differ in, and what has to be true before a lane counts as fixed. It is the working form of the "Two codes" and "Sync lanes" rules in `AGENTS.md`; the longer story of the tester split is in Rizky's vault note `40-Dev/nultron-two-codes-map.md`. It does not cover how a release is cut (see [`desktop-pack-routes.md`](desktop-pack-routes.md) and the "Web release" section of `AGENTS.md`).
 
 ## Chat-first shell (2026-10-12)
 
@@ -18,8 +20,8 @@ A fix starts as a pull request to `main` from a branch cut from `main`. Nothing 
 
 | Lane | Folder or repo | Built or released by | Takes a fix by |
 |---|---|---|---|
-| Nultron Personal | `agentforge`, `main` | `pnpm desktop:build`, then `pnpm desktop:release` (`apps/desktop/scripts/release-desktop.mjs`) to `Kyoo032/Nultron` | the next pack |
-| Nultron Enterprise | `agentforge`, `main` | `node scripts/release-web.mjs` to `Kyoo032/NultronEnt`; the preview at `app.nultron-ai.xyz` by its safe desk-by-desk update | the next release or preview update |
+| Nultron Personal (retired) | `agentforge`, `main` | Nothing. The code stays in the tree, but `pnpm desktop:release` (`apps/desktop/scripts/release-desktop.mjs`) publishes to `Kyoo032/Nultron-Desktop`, which is archived | nothing: no new cut |
+| Nultron Enterprise | `agentforge`, `main` | `node scripts/release-web.mjs` to `Kyoo032/Nultron`; the preview at `app.nultron-ai.xyz` by its safe desk-by-desk update | the next release or preview update |
 | HYP AI | `C:\Users\rizky\hypey\app`, a git repo with no remote | its own bundle in `C:\Users\rizky\hypey\deploy` | vendor-branch import, `C:\Users\rizky\hypey\intake\SYNC.md` |
 | Tester | `C:\Users\rizky\agentforge-chat`, `tester/chat-first` | never released | `git merge origin/main` |
 
@@ -27,7 +29,7 @@ After a pull request merges to `main`:
 
 1. **Tester.** In the tester folder: `git status` clean, `git fetch origin`, `git merge origin/main`, `pnpm install --frozen-lockfile`, `ci:local`. Conflicts: keep the `main` side of any fix. If both cannot be kept, `git merge --abort` and ask Rizky.
 2. **HYP AI.** Follow `SYNC.md`: stop the demo server on :3301, `commit-upstream.mjs <sha>` imports the sha onto the clone's `upstream` branch, `git merge upstream`, then `check-leaks.sh` for any new string that says Nultron, Toko Token or DPSBuddy, then `drive-leaks.mjs` against the running demo, then add a row to the sync history. The clone's last import was `e8a069c9` (recorded in `intake/SOURCE_SHA`), so it is behind everything merged since 2026-10-07.
-3. **Personal and Enterprise.** Only when Rizky says release. A release never implies a sync, and a sync never implies a release.
+3. **Enterprise.** Only when Rizky says release. Personal has no release step any more (retired 2026-10-14). A release never implies a sync, and a sync never implies a release.
 
 ## Where things live
 

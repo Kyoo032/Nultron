@@ -451,7 +451,7 @@
       "map": "docs/internal/maps/release-and-sync-lanes.md",
       "lanes": ["personal"],
       "protected": true,
-      "note": "Release script for Kyoo032/Nultron. AGENTS.md: a change to the release scripts needs Rizky's word. Never run from the tester folder."
+      "note": "Retired desktop release script. It published to Kyoo032/Nultron-Desktop, now archived (2026-10-14), so it takes no new cut. Code kept. AGENTS.md: a change to the release scripts needs Rizky's word. Never run from the tester folder."
     },
     {
       "glob": "apps/desktop/**",
@@ -473,7 +473,7 @@
       "map": "docs/internal/maps/release-and-sync-lanes.md",
       "lanes": ["enterprise"],
       "protected": true,
-      "note": "Enterprise release to Kyoo032/NultronEnt. AGENTS.md: a change to the release scripts needs Rizky's word."
+      "note": "Enterprise release to Kyoo032/Nultron (renamed from NultronEnt on 2026-10-14). AGENTS.md: a change to the release scripts needs Rizky's word."
     },
     {
       "glob": "scripts/{ci-local,lane-guard,map-rot,map-drift}.mjs",
