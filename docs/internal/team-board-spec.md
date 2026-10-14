@@ -104,6 +104,9 @@ Workspace phases (replace F1b onward):
 | W1 | Host: `projects.instructions`; `knowledge_sources.project_id`; uploading a file straight into a Workspace and adding a chat file both index it into that Workspace's knowledge; `threads.project_id`, so a chat belongs to a Workspace; a chat in a Workspace gets its instructions and searches its knowledge (and the person's own), never another Workspace's. | Two companies through the router: a member of a shared Workspace finds a colleague's file in a Workspace chat; a person outside it does not; a private Workspace is its maker's only; Personal unchanged. |
 | W2 | Renderer: a Workspaces page (list, create, the switch, Files, Knowledge, Instructions, Chats), "Add to Workspace" on chat file cards, and starting a chat in a Workspace with any agent. Shared components, so the enterprise shell (F4) reuses them. | Driven on the local rehearsal with two people. |
 | W3 (later) | Invite a chosen bot into a Workspace. | — |
+| U1 | Host: a chat upload keeps its original file, private to the person who attached it (K-D21); `import_document` accepts that upload, so "edit the file I attached" works. | A colleague in the same company cannot read, list or import another person's upload; Personal unchanged. |
+
+- **A chat upload stays the uploader's own (K-D21, Rizky, 2026-10-14).** The original file of a chat attachment is kept, and only the person who attached it can read, download or import it. To share a file, the person uploads it into a specific Workspace (W1's upload route); a chat upload never becomes shared on its own.
 
 ## 3. Words
 
