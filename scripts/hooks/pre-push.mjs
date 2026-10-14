@@ -71,6 +71,16 @@ export function judgePush({ testerFolder = false, localRef, localSha, remoteRef 
   return { refuse: null, lanesCheck, branch: localBranch };
 }
 
+/**
+ * Whether the guard judges a push to this remote URL. A push to another GitHub repository (the HYP AI
+ * clone's Kyoo032/hyp-ai, a release repo) has its own main, so the guard lets it through. Any other URL,
+ * a local path included, is judged: the guard fails closed.
+ */
+export function guardsRemote(url) {
+  const match = /github\.com[:/][^/]+\/([^/]+?)(?:\.git)?\/?$/i.exec(String(url ?? "").trim());
+  return !match || match[1].toLowerCase() === "agentforge";
+}
+
 /** The argv for one lane-guard run: the pushed branch judged against its own tip, never the checked-out one. */
 export function laneGuardArgs({ root, branch, base, tip }) {
   return [LANE_GUARD, "--root", root, "--branch", branch, `${base}...${tip}`];
@@ -139,6 +149,8 @@ async function main() {
     console.error("pre-push: refused: not inside a git checkout.");
     return 1;
   }
+  // Git passes the remote name, then its URL.
+  if (!guardsRemote(process.argv[3])) return 0;
   const { code, message, output } = checkPush({ root, stdinText: await readStdin() });
   if (output) process.stderr.write(output);
   if (message) console.error(message);

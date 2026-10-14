@@ -6,7 +6,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { installHooks } from "./install-hooks.mjs";
-import { judgePush, laneGuardArgs, MAIN_REF, parsePushLines } from "./hooks/pre-push.mjs";
+import { guardsRemote, judgePush, laneGuardArgs, MAIN_REF, parsePushLines } from "./hooks/pre-push.mjs";
 import { TESTER_BRANCH } from "./where-am-i.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -25,6 +25,26 @@ test("parsePushLines reads one object per ref and skips blank lines", () => {
     { localRef: "refs/heads/main", localSha: SHA, remoteRef: "refs/heads/main", remoteSha: ZERO },
   ]);
   assert.deepEqual(parsePushLines(""), []);
+});
+
+test("guardsRemote judges agentforge and unknown URLs, and lets other GitHub repositories through", () => {
+  for (const url of [
+    "https://github.com/Kyoo032/agentforge.git",
+    "https://github.com/Kyoo032/agentforge",
+    "git@github.com:Kyoo032/agentforge.git",
+    "C:/Users/rizky/some-bare-repo",
+    "",
+    undefined,
+  ]) {
+    assert.equal(guardsRemote(url), true, String(url));
+  }
+  for (const url of [
+    "https://github.com/Kyoo032/hyp-ai.git",
+    "git@github.com:Kyoo032/Nultron.git",
+    "https://github.com/Kyoo032/agentforge-fork",
+  ]) {
+    assert.equal(guardsRemote(url), false, url);
+  }
 });
 
 test("judgePush refuses the tester branch on any remote branch but its own", () => {
