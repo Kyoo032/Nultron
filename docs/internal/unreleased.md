@@ -54,6 +54,13 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Stub Playwright follows the chat-first rail and the Virtual agents page, 2026-10-14 (SH-012, SH-013; test only; lanes: Personal, Enterprise, HYP AI, tester)
+
+- **Lanes.** Personal, Enterprise, HYP AI, tester. The specs live in the shared renderer. Nothing in the product changed. Branch `fix/sh-012-013`, cut from `main`.
+- **SH-013.** `apps/web/tests/e2e/edit.spec.ts` waited for `mode-edit`. The chat-first rail renders `agent-edit` (`apps/web/components/agent-rail.tsx`, a non-generalist tile is `agent-<mode>`). The spec now waits for `agent-edit` and asserts `mode-edit` is absent. The other e2e file is `foundation.spec.ts`: `mode-chat` and `mode-knowledge` are still real ids (the generalist and the Knowledge account link), and `mode-agents` is still asserted absent. The tail's `mode-documents`, `mode-research`, `mode-presentations`, `mode-images`, `mode-videos`, `mode-edit`, `mode-finance`, `mode-data` and `mode-market` were the stale rail ids; they are now asserted absent, and the visible tiles are `agent-<mode>`.
+- **SH-012.** `foundation.spec.ts` waited for `create-new-workspace` and then created a Legal desk. `/workspaces` is `virtual-agents-page` (`apps/web/src/App.tsx` when `SHELL_LAYOUT` is `chat-first`). The tail now asserts that page: the lede, no desk-create controls, one card per mode from `EVERY_MODE` (the `beforeEach` hires them all), the generalist cannot be let go, and letting Edit go removes only `agent-edit` before hiring it back. No test was skipped or deleted.
+- **Lanes owed after merge.** Tester: merge `origin/main` and run `ci:local`. HYP AI: the next import; the change is test-only. Personal and Enterprise: nothing to release.
+
 ## Prompt-template panel follows the desk locale (SH-011), 2026-10-14 (fix branch `fix/sh-011`, before merge)
 
 - **Lanes:** Personal, Enterprise, HYP AI, tester. The panel is shared renderer code (`apps/web/components/edit-prompt-templates.tsx`), mounted on Edit › Generate › Video and on `/videos`. No catalog keys were added; `en` and `id` `edit.templates.*` were already in sync. The HYP AI brand patch overrides locale strings, so after the next import the panel shows that patch's copy.
