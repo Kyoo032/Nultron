@@ -80,6 +80,15 @@ What the scouts found on 2026-10-14 (`file:line` in their reports, summarised he
 
 Then K1 and K2 with any hired agent, then K3. F0 to F4 are built in the tester and reach `main` by the promotion PR, like the board.
 
+### Later the same day: the board is a later milestone, collaboration first (Rizky, 2026-10-14)
+
+His words: "kanban will be the milestone for later, so the goal is to be able to assign, currently dont make things more confusing as it already has, and focus more into team collaboration, and the user able to choose to either add the project inside the public workspace file or private to them, so a switch button to allow them for doing this".
+
+- **The board (K1 to K3, agents and mentions on cards) is a later milestone.** K0 stays as built; no new board work until he says. Assigning work to people and agents remains the goal it leads to.
+- **Do not add confusion.** No new rail entries, settings or screens beyond what the switch needs.
+- **One switch per project: Private or Workspace (K-D19).** A project is private to its maker by default. Its maker flips one switch to make it a workspace project, visible to and downloadable by everyone in the company, and can flip it back. A file is visible to others only while it sits in a workspace project; a file made in chat and not added to a project is private. The host enforces it; the renderer shows the switch and a plain label ("Only you" / "Everyone in <company>").
+- F1 therefore builds `projects` with `visibility` (`private` | `workspace`) instead of every project being shared, and F0's read rule becomes "owner, or legacy row, or in a workspace project". F2, F3 and F4 are unchanged.
+
 ## 3. Words
 
 | Word | Meaning |
