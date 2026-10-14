@@ -211,6 +211,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-174](#sr-174) | Low | Caddy compresses every `text/*` response, `text/event-stream` included, which can hold live-update frames back | Fixed on `main` (PR #167, 2026-10-14): `encode` matches text types only, without `text/event-stream`, video or audio; unit-tested, Caddy syntax not validated, not driven | Before the team board (tester) is deployed behind Caddy |
 | [SR-175](#sr-175) | Medium | Hosted: a file one person generates on their own (artifacts, media, desk files outside their private folder) is listed and downloadable by every member of the company | Mostly fixed in the tester (2026-10-14: artifacts `bbe9308c`, workspace sharing `62eae740`, Knowledge work cards `a178b9bc`, media file route and chat media reads `fbe5994b`, galleries, storage list, Edit stills and job pictures `6374c386`); Edit projects and desk files still company-visible; not driven hosted; `main` still open | Before a second person of one company uses the hosted app for their own work |
 | [SR-176](#sr-176) | High | Hosted: any member of a company can delete any other member's generated media and artifacts | Fixed in the tester (`6374c386`): only the maker or a company owner or admin deletes; not driven hosted; `main` still open | Before a second person of one company uses the hosted app for their own work |
+| [SR-178](#sr-178) | Medium | Hosted (tester): a Workspace switched to "workspace" is readable by the whole company, not only its members (K-D22) | Open; membership fix planned | Before HYP AI imports from the tester, and before promotion to `main` |
 | [SR-177](#sr-177) | Low | The new deploy preflight, run in a throwaway container when the server has no node, received the real `AGENTFORGE_SECRETS_KEY` | Fixed before merge (branch `chore/agent-guardrails`, 2026-10-14): the container gets the word `set` or nothing | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
@@ -6043,6 +6044,17 @@ shell has a non-empty key and empty otherwise. The key never reaches the contain
 `bash -n` and the 40 preflight tests pass; the no-node path has not run on a server.
 
 Gate: none.
+
+### SR-178 {#sr-178}
+
+**Hosted: a Workspace switched to "workspace" is readable by every person of the company, not only its members.**
+Tester only. Raised 2026-10-14 evening, when Rizky ruled that a Workspace is shared with its members only (team-board-spec, K-D22). Medium.
+
+Evidence: W1 (`e29be2b5`, `62eae740`) reads a project's files, knowledge and chats for any person of the tenant when `projects.visibility = 'workspace'`, which was the K-D19 rule. That rule is now wrong. What goes wrong if ignored: a colleague who was never invited lists and downloads the Workspace's files and finds them in their own Workspace-less chats' knowledge search.
+
+Fix (planned): a membership table with roles (Owner, admin, member) and the agents each member brought; the read rule becomes "member of the project, or own row, or legacy row"; a router test with four people (A owns, B is a member, C is in the same company and not a member, D is in another company) where C and D get 404. Personal unchanged.
+
+Gate: before HYP AI imports from the tester, and before the tester is promoted to `main`.
 
 ## Must be true before the Tencent Cloud deploy
 
