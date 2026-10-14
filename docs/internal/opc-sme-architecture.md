@@ -67,7 +67,7 @@ Each step is its own pull request. Nultron keeps working after every step.
 6. **Build out `opc`:** the 24/7 runner on the VPS, handoffs between agents, the owner inbox.
 7. **Retire the desktop app** (section 7).
 
-When the apps are split, the separate tester branch is no longer needed: each product has its own app folder.
+**The tester stays (Rizky, 2026-10-14).** It is the staging code at every stage, including after the apps split: new work lands in the tester first and runs on a staging instance, and only a promotion pull request Rizky approves brings it to `main`. A misconfigured update then breaks the staging instance, never the live app. Where each change goes is in AGENTS.md, "Where a change goes".
 
 ## 7. What retiring the desktop app removes (later, step 7)
 
@@ -75,6 +75,6 @@ When the apps are split, the separate tester branch is no longer needed: each pr
 - The pack skill (`.cursor/skills/pack-nultron`) and the Docker route that builds the mac app.
 - The Personal rule in `FIRST_RUN_MODES` and its tests, and every Personal-parity test, replaced by OPC and SME profile tests.
 - SR-85 (the packaged gateway pin).
-- The AGENTS.md sections that become false: the Personal / Enterprise table, the release flow to the old desktop repo, "Two codes".
+- The AGENTS.md sections that become false: the Personal / Enterprise table and the release flow to the old desktop repo. "Two codes" stays: the tester remains the staging code.
 
 Installed desktop apps (0.15.x) now get a not-found answer when they check for updates, because `Kyoo032/Nultron` is private and no longer holds desktop releases. They keep working offline as before.
