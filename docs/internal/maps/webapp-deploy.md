@@ -1,6 +1,6 @@
 # Map — webapp-deploy: the hosted deployment stack
 
-Last verified: 2026-10-05 at 0b61a29 + the uncommitted working tree, except one gotcha corrected on 2026-10-07 (ffmpeg is in the image since `5bec532`; the bullet under Gotchas was written before that). Re-read that day: the build and runtime
+Last verified: 2026-10-14 at 73db3c3 + the uncommitted `fix/hosted-downloads` tree, for the `encode` match on the app and portal sites (`webapp-deploy/Caddyfile`, and the k8s copy in `k8s/base/caddy/security.caddy`, which the rehearsal does not parse for it). Read against the file; Caddy itself not run on this box, so the syntax is unvalidated. Before that: 2026-10-05 at 0b61a29 + the uncommitted working tree, except one gotcha corrected on 2026-10-07 (ffmpeg is in the image since `5bec532`; the bullet under Gotchas was written before that). Re-read that day: the build and runtime
 description, the HEALTHCHECK paragraph, the components-check cites, the ignore-file rows and the
 dependencies gotcha, against `webapp-deploy/Dockerfile` as it stands after the SR-113 change. The rest
 of the page keeps the caveat in the note below. On 2026-10-11 the *Run: five services* sentence about `portal-entry.sh` was re-read against the script at 2df34be plus the SH-005 fix on branch `fix/sh-005-portal-entry-exit-code` (2026-10-11 at 2df34be, before merge); nothing else on the page changed that day.
@@ -205,7 +205,7 @@ a plaintext archive; `restore.sh` is destructive and prompts unless given `--yes
 | `webapp-deploy/portal.Dockerfile`, `portal.Dockerfile.dockerignore`, `portal-entry.sh` | *(pilot)* The portal image, its allowlist context, and the DSN wrapper baked into it |
 | `webapp-deploy/compose.yml` | `app`, `proxy`, `portal`, `portal-db`, `portal-prepare`; hardening, limits, published ports, named volumes. `scripts/release-web.mjs` `composeFile()` generates the released twin; `scripts/pilot-deploy.test.mjs` compares them |
 | `webapp-deploy/compose.local.yml`, `pilot-local.mjs` | *(pilot)* The local rehearsal: loopback ports, a throwaway CA, Mailpit with implicit TLS, `up` / `drive` / `down` |
-| `webapp-deploy/Caddyfile` | TLS for two names, the security header block, two filtered JSON log streams, the billing block, two `reverse_proxy`s |
+| `webapp-deploy/Caddyfile` | TLS for two names, the security header block, two filtered JSON log streams, the billing block, two `reverse_proxy`s, and a text-only `encode` match on both sites (no `text/event-stream`, `video/*` or `audio/*`; `packages/host/src/caddy-encode.test.ts` pins it) |
 | `webapp-deploy/.env.example`, `portal.env.example` | The app's env (every var the host reads) and the portal's (signing key, database passwords, Tencent SES login) |
 | `webapp-deploy/DEPLOY-LOG.md` | date / sha / env / who / notes. Mirrors the log in `../web-pivot-2026-09-18.md`, which is the one of record |
 | `webapp-deploy/scripts/_common.sh` | Shared helpers. Sourced, not run |

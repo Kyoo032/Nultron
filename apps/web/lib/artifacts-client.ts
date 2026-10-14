@@ -1,6 +1,7 @@
 import { isBinaryArtifactMime } from "@agentforge/core/artifacts";
 import type { ArtifactMode, ArtifactRecord, ArtifactSummary } from "@agentforge/core/artifacts";
 import { apiFetch, isElectron } from "./api-client";
+import { filenameFromDisposition } from "./download-name";
 
 export type { ArtifactMode, ArtifactRecord, ArtifactSummary };
 
@@ -59,8 +60,7 @@ export async function downloadArtifactFile(id: string, fallbackName = "artifact.
     return;
   }
   const blob = await res.blob();
-  const disposition = res.headers.get("Content-Disposition") ?? "";
-  const filename = disposition.match(/filename="([^"]+)"/)?.[1] ?? fallbackName;
+  const filename = filenameFromDisposition(res.headers.get("Content-Disposition")) ?? fallbackName;
   saveBlob(blob, filename);
 }
 

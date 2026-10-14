@@ -33,7 +33,22 @@
 
 # L2: one JSON object per request on stdout, filtered.
 (access_log) {
-	encode zstd gzip
+	# Compress text only. text/event-stream (job progress, SR-174) must reach the browser as it is
+	# written, and video/*, audio/* and images are already compressed. The list is explicit on
+	# purpose: a `text/*` wildcard would catch text/event-stream.
+	encode zstd gzip {
+		match {
+			header Content-Type text/html*
+			header Content-Type text/css*
+			header Content-Type text/plain*
+			header Content-Type text/xml*
+			header Content-Type text/javascript*
+			header Content-Type application/javascript*
+			header Content-Type application/json*
+			header Content-Type application/xml*
+			header Content-Type image/svg+xml*
+		}
+	}
 	log {
 		output stdout
 		format filter {

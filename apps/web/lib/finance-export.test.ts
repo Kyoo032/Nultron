@@ -98,6 +98,12 @@ describe("filenameFromDisposition", () => {
     expect(filenameFromDisposition('attachment; filename="Q3.xlsx"', "xlsx")).toBe("Q3.xlsx");
     expect(filenameFromDisposition(null, "pptx")).toBe(FINANCE_EXPORT_FALLBACK_NAME.pptx);
   });
+
+  it("reads the UTF-8 name when the header carries only filename*", () => {
+    expect(filenameFromDisposition("attachment; filename*=UTF-8''Laporan%20Keuangan%20Q3.xlsx", "xlsx")).toBe(
+      "Laporan Keuangan Q3.xlsx",
+    );
+  });
 });
 
 describe("downloadFinanceExport", () => {
