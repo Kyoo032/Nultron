@@ -105,7 +105,8 @@
   },
   "turn": {
     "thinking": "Berpikir",
-    "thinkingPlaceholder": "Berpikir…"
+    "thinkingPlaceholder": "Berpikir…",
+    "continue": "Lanjutkan"
   },
   "mascot": {
     "idle": "Siap bila Anda siap",
@@ -347,7 +348,9 @@
     "pastOne": "Percakapan sebelumnya berjudul \"{title}\".",
     "pastMany": "Percakapan sebelumnya mencakup \"{title}\".",
     "noSource": "Meja ini tidak punya sumber untuk itu.",
-    "stepLimit": "Langkah kerja saya habis sebelum ini selesai. Minta saya untuk melanjutkan, dan saya akan meneruskannya dari titik terakhir.",
+    "stepLimit": "{tools} sudah selesai, tetapi jawabannya belum. Minta saya untuk melanjutkan, dan saya akan meneruskannya dari titik terakhir.",
+    "stepLimitEmpty": "Tidak ada alat yang selesai, tetapi jawabannya belum. Minta saya untuk melanjutkan, dan saya akan meneruskannya dari titik terakhir.",
+    "stepLimitAnd": "dan",
     "interrupted": "Langkah alat di atas sudah berjalan, tetapi saya tidak dapat menyelesaikan jawabannya.\n\nAlasan: {reason}\n\nKirim \"lanjutkan\" dan saya akan mencoba lagi.",
     "modelFallback": "{from} tidak tersedia; menggunakan {to} untuk jawaban ini."
   }

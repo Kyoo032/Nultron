@@ -54,6 +54,12 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Chat: Continue on a step-limit turn (K0-G6), 2026-10-14 (lanes: Personal, Enterprise, HYP AI, tester; on `feat/k0-g6-continue`, not packed, not driven on a live model)
+
+- **Lanes.** Personal, Enterprise, HYP AI, tester. Shared renderer and host. No new mode or rail entry.
+- **What changed.** A turn that stops at the step limit now says which tools finished and that the answer did not, in English and Bahasa Indonesia (`stepLimitNote`). The host saves a `step_limit` part on that assistant message. Continue (`chat-continue`) is shown only when that part is present. The click sends the word `continue`. The renderer does not match the sentence. An interrupted turn still has its sentence and no button.
+- **Proof.** Unit tests in `chat-turn.test.ts`, `runs-resilience.test.ts` and `apps/web/lib/chat-continue.test.tsx`. Not driven on a live model: a stub desk cannot reach the step limit.
+
 ## Stub Playwright follows the chat-first rail and the Virtual agents page, 2026-10-14 (SH-012, SH-013; test only; lanes: Personal, Enterprise, HYP AI, tester)
 
 - **Lanes.** Personal, Enterprise, HYP AI, tester. The specs live in the shared renderer. Nothing in the product changed. Branch `fix/sh-012-013`, cut from `main`.

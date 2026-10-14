@@ -19,7 +19,8 @@ import "@/components/chat-turn-bubbles.css";
 import { ToolRowBody, isRichTool } from "@/components/tool-rows/tool-row";
 import { showsToolSpinner, toolActivityLabel, toolCallSummary } from "@/lib/tool-labels";
 import type { ContentPart, ToolCallPart } from "@agentforge/core/content";
-import { t } from "@/lib/i18n";
+import { getLocale, t } from "@/lib/i18n";
+import { continuePrompt, stepLimitToolsOf } from "@/lib/chat-continue";
 import { SHELL_LAYOUT } from "@agentforge/core/product-modes";
 
 export type LiveTool = {
@@ -44,6 +45,10 @@ type Props = {
     /** The thread has no assistant reply yet: this is the first turn of a new chat. */
     firstTurn?: boolean;
   };
+  /** Sends the word the step-limit sentence asks for. Absent, Continue is shown disabled. */
+  onContinue?: (text: string) => void;
+  /** A run is already in flight, so Continue waits. */
+  continueDisabled?: boolean;
 };
 
 function PulseDots() {
@@ -56,7 +61,7 @@ function PulseDots() {
   );
 }
 
-export function ChatTurn({ role, content, live }: Props) {
+export function ChatTurn({ role, content, live, onContinue, continueDisabled = false }: Props) {
   const isUser = role === "user";
   // A new chat's first turn opens with the lets-go clip, then the working state takes over.
   const launching = useHoldOnMount(Boolean(live?.firstTurn), LETS_GO_MS);
@@ -91,6 +96,8 @@ export function ChatTurn({ role, content, live }: Props) {
   const hasActivity = Boolean(thinking) || visibleTools.length > 0;
   const showDisclosure = hasActivity || showThinkingPlaceholder;
   const jobs = jobEmbedsFromTools(visibleTools);
+  // The host's step_limit part, not the sentence. A live bubble has not been saved yet, so it has no mark.
+  const stepLimitTools = !isUser && !live ? stepLimitToolsOf(content) : null;
 
   return (
     <article
@@ -170,6 +177,17 @@ export function ChatTurn({ role, content, live }: Props) {
             ) : (
               <>
                 <MessageBody content={content} outputOnly />
+                {stepLimitTools && onContinue ? (
+                  <button
+                    type="button"
+                    className="btn"
+                    data-testid="chat-continue"
+                    disabled={continueDisabled}
+                    onClick={() => onContinue?.(continuePrompt(getLocale()))}
+                  >
+                    {t("chat.turn.continue")}
+                  </button>
+                ) : null}
                 {live?.running && !showDisclosure ? <PulseDots /> : null}
               </>
             )}
@@ -207,7 +225,7 @@ export function messageHasDisplayableContent(content: unknown): boolean {
     if (type === "thinking") {
       return String((part as { text?: unknown }).text ?? "").trim().length > 0;
     }
-    if (type === "tool_call") {
+    if (type === "tool_call" || type === "step_limit") {
       return true;
     }
     if (type === "text") {
