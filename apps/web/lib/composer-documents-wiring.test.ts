@@ -42,7 +42,11 @@ describe("chat composer: one route for every attachment", () => {
   it("holds Send while a document is reading or has failed, on the button and on Enter", () => {
     expect(source).toContain("const documentsHoldSend = documentsBlockSend(files);");
     expect(source).toMatch(/const sendDisabled = [^;]*documentsHoldSend;/);
-    expect(source).toMatch(/async function send\(\) \{[\s\S]*?if \(documentsHoldSend\) \{[\s\S]*?return;/);
+    // Continue is a text turn and does not take the files in the box. A normal send still waits.
+    expect(source).toMatch(
+      /async function send\(override\?: string\) \{[\s\S]*?const continuing = override !== undefined;[\s\S]*?if \(!continuing && documentsHoldSend\) \{[\s\S]*?return;/,
+    );
+    expect(source).toContain("const attached = continuing ? [] : files");
   });
 
   it("inlines every text file and document through inlineBlock, and reads no file as text itself", () => {

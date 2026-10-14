@@ -9,6 +9,7 @@ import { virtualAgentHref, type VirtualAgentInfo } from "@/lib/virtual-agents";
 import { BuddyStage } from "@/components/buddy-stage";
 import { ChatAccountChip } from "@/components/chat-account-chip";
 import { ChatComposer } from "@/components/chat-composer";
+import { CONTINUE_PROMPT } from "@/lib/chat-continue";
 import { FolderSurface } from "@/components/folder/folder-surface";
 import { ChatContextChip } from "@/components/chat-context-chip";
 import { ChatHeader } from "@/components/chat-header";
@@ -107,6 +108,8 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
   const [knowledgeParts, setKnowledgeParts] = useState<ContextPart[]>([]);
   /** A prompt picked from the empty screen's suggestions; handed down once, then cleared. */
   const [composerDraft, setComposerDraft] = useState<string | null>(null);
+  /** The composer's text send, for Continue. Null until the composer has rendered. */
+  const continueSendRef = useRef<((text: string) => void) | null>(null);
   const toolsRef = useRef(tools);
   toolsRef.current = tools;
   /** Read inside the load effect, which must not run again because the shell object is a new one. */
@@ -503,7 +506,22 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
         {messages
           .filter((message) => message.role === "user" || messageHasDisplayableContent(message.content))
           .map((message) => (
-            <ChatTurn key={message.id} role={message.role} content={message.content} />
+            <ChatTurn
+              key={message.id}
+              role={message.role}
+              content={message.content}
+              continueDisabled={running}
+              onContinue={
+                agentIdReady
+                  ? () => {
+                      if (runningRef.current) {
+                        return;
+                      }
+                      continueSendRef.current?.(CONTINUE_PROMPT);
+                    }
+                  : undefined
+              }
+            />
           ))}
         {running || thinking || tools.length > 0 || streaming || sendFailed ? (
           <div data-testid="assistant-live">
@@ -560,6 +578,7 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
               });
             }}
             draft={composerDraft}
+            continueSendRef={continueSendRef}
             onDraftApplied={() => setComposerDraft(null)}
             onUserSend={(payload) => {
               pinRef.current = true;

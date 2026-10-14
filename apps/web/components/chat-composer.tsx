@@ -83,6 +83,11 @@ type Props = {
   placeholder?: string;
   /** A tool the run is driving reported a progress line (the stream's `tool.progress` events that carry a label). */
   onToolProgress?: (event: { toolKey: string; label: string }) => void;
+  /**
+   * Continue writes its sender here. The click calls it with the word `continue`. The send leaves
+   * the draft in the box alone. A ref, not an effect: StrictMode runs an effect twice.
+   */
+  continueSendRef?: { current: ((text: string) => void) | null };
 };
 
 type HeldFile = {
@@ -255,6 +260,7 @@ export function ChatComposer({
   sessionKey,
   placeholder,
   onToolProgress,
+  continueSendRef,
 }: Props) {
   const { id: workspaceId } = useWorkspaceScope();
   // Restored from outside the keep-alive key so a desk-id remount (boot → real id) and a
@@ -398,11 +404,14 @@ export function ChatComposer({
     setFiles((current) => current.filter((item) => item.id !== id));
   }
 
-  async function send() {
+  async function send(override?: string) {
     if (needsKey) {
       return;
     }
-    if (documentsHoldSend) {
+    // Continue is a text turn of its own. It does not wait on a document still being read, and it
+    // does not send the files sitting in the box.
+    const continuing = override !== undefined;
+    if (!continuing && documentsHoldSend) {
       setError(t("chat.document.mustFinish"));
       return;
     }
@@ -412,8 +421,8 @@ export function ChatComposer({
     const startedIn = sessionRef.current;
     const showing = () => sessionRef.current === startedIn;
     const isCurrentRun = startRun(runGenerationRef);
-    const typed = text;
-    const attached = files;
+    const typed = continuing ? override : text;
+    const attached = continuing ? [] : files;
     let runThread: string | null = null;
     // A newer turn that began first makes this tail stale: the pane is told, so it leaves that turn's
     // streaming text and tools alone and only reloads this turn's saved reply if no newer turn is live.
@@ -427,6 +436,9 @@ export function ChatComposer({
     };
     /** Only the draft that was sent is cleared; anything typed or attached since is the owner's. */
     const clearSent = () => {
+      if (continuing) {
+        return;
+      }
       setText((current) => (current === typed ? "" : current));
       setFiles((current) => (current === attached ? [] : current));
     };
@@ -462,7 +474,7 @@ export function ChatComposer({
     setBusy(true);
     setError(null);
     try {
-      const decision = routeDecision(files.map((item) => item.kind));
+      const decision = routeDecision(attached.map((item) => item.kind));
       if (decision.route === "error") {
         setError(
           decision.message === "Unsupported file type" ? t("chat.error.unsupportedFile") : t("chat.error.mixedMedia"),
@@ -485,8 +497,8 @@ export function ChatComposer({
       // Text files and documents are both inlined as a `--- name ---` block, in the order attached, with
       // the host's notes above the header. A document's text was read by the host when it was attached
       // and is saved to the desk now; a text file is read here and cut to the same budget.
-      const inlineFiles = files.filter((item) => item.kind === "text" || item.kind === "document");
-      const mediaFiles = files.filter((item) => item.kind === "image" || item.kind === "video");
+      const inlineFiles = attached.filter((item) => item.kind === "text" || item.kind === "document");
+      const mediaFiles = attached.filter((item) => item.kind === "image" || item.kind === "video");
 
       let composedText = text;
       try {
@@ -635,6 +647,13 @@ export function ChatComposer({
         setBusy(false);
       }
     }
+  }
+
+  // The click reads this on the way to `send`. Writing it during render keeps the closure current.
+  if (continueSendRef) {
+    continueSendRef.current = (text: string) => {
+      void send(text);
+    };
   }
 
   const sendLabel = busy ? t("agents.composer.sending") : t("agents.composer.send");

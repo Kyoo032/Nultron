@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chatTurnCopy } from "./chat-locale";
+import { chatTurnCopy, stepLimitNote } from "./chat-locale";
 import { bindingsForChatModality, repairUnresolvedCites, settleChatTurn } from "./chat-turn";
 
 describe("Chat turn check", () => {
@@ -61,18 +61,53 @@ describe("Chat turn check", () => {
 
     it("tells the person the steps ran out, in English, when the run left no words", () => {
       const settled = settleChatTurn({ text: "", offeredSources: 0, locale: "en", tools: [], stepLimit: true });
-      const note = chatTurnCopy("en").stepLimit;
-      expect(note).toMatch(/ran out of steps/i);
+      const note = stepLimitNote("en", []);
+      expect(note).toMatch(/no tool finished/i);
+      expect(note).toMatch(/answer didn't/i);
       expect(note).toMatch(/continue/i);
       expect(settled.text).toBe(note);
       expect(settled.appended).toBe(note);
+      expect(settled.stepLimit).toEqual({ tools: [] });
     });
 
     it("says it in Bahasa Indonesia too", () => {
       const settled = settleChatTurn({ text: "", offeredSources: 0, locale: "id", tools: [], stepLimit: true });
-      expect(settled.text).toBe(chatTurnCopy("id").stepLimit);
+      expect(settled.text).toBe(stepLimitNote("id", []));
       expect(settled.text).toMatch(/melanjutkan/);
-      expect(settled.text).not.toBe(chatTurnCopy("en").stepLimit);
+      expect(settled.text).toMatch(/jawabannya belum/);
+      expect(settled.text).not.toBe(stepLimitNote("en", []));
+      expect(settled.stepLimit).toEqual({ tools: [] });
+    });
+
+    it("names the tools that finished, and not one that only started, in both languages", () => {
+      const tools = [
+        { toolKey: "list_files", status: "completed" as const, output: { ok: true } },
+        { toolKey: "read_file", status: "started" as const },
+        { toolKey: "web_search", status: "completed" as const, output: { results: [] } },
+        { toolKey: "list_files", status: "completed" as const, output: { ok: true } },
+      ];
+      const en = settleChatTurn({ text: "", offeredSources: 0, locale: "en", tools, stepLimit: true });
+      expect(en.stepLimit).toEqual({ tools: ["list_files", "web_search"] });
+      expect(en.text).toBe(stepLimitNote("en", ["list_files", "web_search"]));
+      expect(en.text).toMatch(/list_files and web_search finished/i);
+      expect(en.text).toMatch(/answer didn't/i);
+      expect(en.text).not.toContain("read_file");
+      const id = settleChatTurn({ text: "", offeredSources: 0, locale: "id", tools, stepLimit: true });
+      expect(id.text).toBe(
+        "list_files dan web_search sudah selesai, tetapi jawabannya belum. Minta saya untuk melanjutkan, dan saya akan meneruskannya dari titik terakhir.",
+      );
+      expect(id.text).not.toMatch(/answer didn't/i);
+      expect(id.stepLimit).toEqual({ tools: ["list_files", "web_search"] });
+    });
+
+    it("lists three finished tools with a comma and the joining word", () => {
+      const tools = ["list_files", "read_file", "web_search"].map((toolKey) => ({
+        toolKey,
+        status: "completed" as const,
+      }));
+      const settled = settleChatTurn({ text: "", offeredSources: 0, locale: "en", tools, stepLimit: true });
+      expect(settled.text.startsWith("list_files, read_file and web_search finished")).toBe(true);
+      expect(settled.stepLimit).toEqual({ tools: ["list_files", "read_file", "web_search"] });
     });
 
     it("puts it after words the model wrote earlier in the run, and streams only the new part", () => {
@@ -83,7 +118,7 @@ describe("Chat turn check", () => {
         tools: [],
         stepLimit: true,
       });
-      const note = chatTurnCopy("en").stepLimit;
+      const note = stepLimitNote("en", []);
       expect(settled.text).toBe(`Let me look at the files.\n\n${note}`);
       expect(settled.appended).toBe(`\n\n${note}`);
     });
@@ -96,20 +131,51 @@ describe("Chat turn check", () => {
         tools: [calculator],
         stepLimit: true,
       });
-      const note = chatTurnCopy("en").stepLimit;
+      const note = stepLimitNote("en", ["calculator"]);
+      expect(note).toMatch(/calculator finished/i);
       expect(settled.text).toBe(`2 + 3 = 5\n\n${note}`);
       expect(settled.appended).toBe(`2 + 3 = 5\n\n${note}`);
+      expect(settled.stepLimit).toEqual({ tools: ["calculator"] });
     });
 
-    it("does not add it twice", () => {
-      const note = chatTurnCopy("en").stepLimit;
+    it("does not add it twice, and still marks the turn", () => {
+      const note = stepLimitNote("en", []);
       const settled = settleChatTurn({ text: note, offeredSources: 0, locale: "en", tools: [], stepLimit: true });
       expect(settled.text).toBe(note);
       expect(settled.appended).toBe("");
+      expect(settled.stepLimit).toEqual({ tools: [] });
+    });
+
+    it("does not mark a turn whose words merely contain the sentence", () => {
+      const note = stepLimitNote("en", ["list_files"]);
+      const settled = settleChatTurn({
+        text: note,
+        offeredSources: 0,
+        locale: "en",
+        tools: [{ toolKey: "list_files", status: "completed" }],
+        stepLimit: false,
+      });
+      expect(settled.text).toBe(note);
+      expect(settled.stepLimit).toBeUndefined();
+    });
+
+    it("keeps the mark when an interruption is also recorded", () => {
+      const settled = settleChatTurn({
+        text: "",
+        offeredSources: 0,
+        locale: "en",
+        tools: [{ toolKey: "list_files", status: "completed" }],
+        stepLimit: true,
+        interrupted: "gateway down",
+      });
+      expect(settled.stepLimit).toEqual({ tools: ["list_files"] });
+      expect(settled.text).toContain("list_files finished");
+      expect(settled.text).toContain("gateway down");
     });
 
     it("adds nothing when the run did not end at the limit", () => {
       expect(settleChatTurn({ text: "", offeredSources: 0, locale: "en", tools: [] }).text).toBe("");
+      expect(settleChatTurn({ text: "", offeredSources: 0, locale: "en", tools: [] }).stepLimit).toBeUndefined();
       expect(settleChatTurn({ text: "Hi.", offeredSources: 0, locale: "en", tools: [], stepLimit: false }).text).toBe(
         "Hi.",
       );

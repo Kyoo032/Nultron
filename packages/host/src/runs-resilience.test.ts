@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   chatTurnCopy,
+  stepLimitNote,
   openPayload,
   reportToolIo,
   type AgentRuntime,
@@ -227,38 +228,49 @@ describe("a run that ends at its step limit", () => {
     };
   });
 
-  it("tells the person the steps ran out, streams the sentence and saves it with the turn", async () => {
+  it("tells the person the steps ran out, names the tool that finished, and marks the turn", async () => {
     const { frames } = await postTurn();
-    const sentence = chatTurnCopy("en").stepLimit;
+    const sentence = stepLimitNote("en", ["list_files"]);
+    expect(sentence).toMatch(/list_files finished/i);
+    expect(sentence).toMatch(/answer didn't/i);
     const deltas = frames.filter((frame) => frame.event === "assistant.delta").map((frame) => frame.data.text);
     expect(deltas.join("")).toContain(sentence);
     const parts = await lastAssistantParts();
-    const text = parts.find((part) => part.type === "text");
-    expect(text).toMatchObject({ type: "text", text: sentence });
+    expect(parts.map((part) => part.type)).toEqual(["tool_call", "text", "step_limit"]);
+    expect(parts.find((part) => part.type === "text")).toMatchObject({ type: "text", text: sentence });
+    expect(parts.find((part) => part.type === "step_limit")).toEqual({ type: "step_limit", tools: ["list_files"] });
     expect(frames.some((frame) => frame.event === "run.step_limit")).toBe(false);
     expect(frames.some((frame) => frame.event === "run.completed")).toBe(true);
   });
 
-  it("says it in Bahasa Indonesia when the desk's language is Indonesian", async () => {
+  it("says it in Bahasa Indonesia when the desk's language is Indonesian, and still marks the turn", async () => {
     const { saveUserLocale } = await import("./settings-store");
     saveUserLocale(tenant, "id");
     try {
       const { frames } = await postTurn();
       const deltas = frames.filter((frame) => frame.event === "assistant.delta").map((frame) => frame.data.text);
-      expect(deltas.join("")).toContain(chatTurnCopy("id").stepLimit);
-      expect(deltas.join("")).not.toContain(chatTurnCopy("en").stepLimit);
+      const sentence = stepLimitNote("id", ["list_files"]);
+      expect(deltas.join("")).toContain(sentence);
+      expect(deltas.join("")).toMatch(/list_files sudah selesai/);
+      expect(deltas.join("")).toMatch(/jawabannya belum/);
+      expect(deltas.join("")).not.toContain(stepLimitNote("en", ["list_files"]));
+      const parts = await lastAssistantParts();
+      expect(parts.find((part) => part.type === "step_limit")).toEqual({ type: "step_limit", tools: ["list_files"] });
     } finally {
       saveUserLocale(tenant, "en");
     }
   });
 
-  it("adds nothing to a turn that answered", async () => {
+  it("adds nothing to a turn that answered, and does not mark it", async () => {
     script = async (run) => {
       await run.onEvent({ type: "assistant.delta", text: "All done." });
       await run.onEvent({ type: "run.completed", runId: run.runId });
     };
     const { raw } = await postTurn();
-    expect(raw).not.toContain(chatTurnCopy("en").stepLimit);
+    expect(raw).not.toContain(stepLimitNote("en", []));
+    expect(raw).not.toContain("step_limit");
+    const parts = await lastAssistantParts();
+    expect(parts.some((part) => part.type === "step_limit")).toBe(false);
   });
 });
 

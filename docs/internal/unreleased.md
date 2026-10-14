@@ -54,6 +54,12 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Chat: Continue on a step-limit turn (K0-G6), 2026-10-14 (lanes: Personal, Enterprise, HYP AI, tester; on `feat/k0-g6-continue`, not packed, not driven on a live model)
+
+- **Lanes.** Personal, Enterprise, HYP AI, tester. Shared renderer and host. No new mode or rail entry.
+- **What changed.** A turn that stops at the step limit now says which tools finished and that the answer did not, in English and Bahasa Indonesia (`stepLimitNote`). The host saves a `step_limit` part on that assistant message. Continue (`chat-continue`) is shown only when that part is present. The click sends the word `continue`. The renderer does not match the sentence. An interrupted turn still has its sentence and no button.
+- **Proof.** Unit tests in `chat-turn.test.ts`, `runs-resilience.test.ts` and `apps/web/lib/chat-continue.test.tsx`. Not driven on a live model: a stub desk cannot reach the step limit.
+
 ## Node 22 is the floor, and the web server refuses an older Node at boot, 2026-10-11 at 2df34be (fix branch, before merge) (SH-001; lanes: Personal (webdev only), Enterprise, HYP AI, tester; not packed, not deployed)
 
 - **Lanes.** Personal: webdev (`pnpm dev` and the `:3000` server) refuses Node 20 with one sentence instead of a segfault. The packaged desktop is unaffected: its host bundle starts at `apps/desktop/src/host-entry.ts` and never imports `apps/web/server-env.ts`. The Mac pack container (`apps/desktop/platform/macos/docker/Dockerfile`, `FROM node:20-bookworm`) is unaffected too: pnpm 9.15.9 only warns on an unsupported root `engines` (probed 2026-10-11 in a scratch folder: `WARN Unsupported engine`, exit 0), the container never runs the server. The probe ran without `--frozen-lockfile`, which `build-mac.sh:48` uses; the engine check is expected to behave the same, but that flag was not probed, and the container's install log was not read. A Node 20 box still installs and now refuses to start the server, which is the intended change. Enterprise: the hosted image already runs Node 22 (`webapp-deploy/Dockerfile`), so the check passes there and the release bundle does not change. HYP AI: the next vendor import brings the same files; the check refuses only a Node older than 22. Tester: `git merge origin/main`, then `ci:local`; the guard test now expects the boot file first.
