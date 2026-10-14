@@ -8,20 +8,22 @@ The goal is multi-harness inside one app. Each kind of work is its own harness: 
 
 ## Two ways to run it
 
-Nultron ships as two products from this one repository. They share the same app and the same harnesses; they differ in where your work lives.
+Nultron was two products from this one repository. They shared the same app and the same harnesses; they differed in where your work lives. Personal is retired (2026-10-14): it is being merged into the hosted web app, and its release repo is archived.
 
-| | **Personal** | **Enterprise** |
+| | **Personal** (retired) | **Enterprise** |
 |---|---|---|
-| What it is | The Mac/Windows app | The hosted web app |
+| What it is | The Mac/Windows desktop app | The hosted web app |
 | Where your work lives | On your own computer | In your organisation's tenant on the server |
-| How you get in | Install it and paste a gateway key | Ask for an invite, then sign in with a one-time code |
-| Ships as | `Nultron Setup <version>.exe` and the macOS `.dmg` | A hosted URL |
+| How you get in | Was: install it and paste a gateway key | Ask for an invite, then sign in with a one-time code |
+| Ships as | Last cut 0.15.1 (`Nultron Setup <version>.exe`, macOS `.dmg`); no new cut | A hosted URL |
 
-**Personal — the Mac/Windows app (current cut 0.15.0).** Download and install it, then paste your Toko Token gateway key in Settings. Your chats, files and generated media stay on your machine. No account is needed and nothing is uploaded anywhere except the model calls themselves.
+**Personal — the Mac/Windows desktop app (retired).** The last release was 0.15.1. No new desktop build is published. The code stays in this repo until it is merged into the web app.
 
 **Enterprise — the hosted web app.** Ask the operator for an invite, open the hosted URL, and sign in through the portal with a one-time code. Your work stays in your tenant on the server. A pasted gateway key still works here as the floor for model calls; the portal sign-in is the account.
 
-Both run every harness below. Node and pnpm are not required to use either one.
+**Enterprise — the hosted web app.** Ask the operator for an invite, open the hosted URL, and sign in through the portal with a one-time code. Your work stays in your tenant on the server. A pasted gateway key still works here as the floor for model calls; the portal sign-in is the account.
+
+The hosted app runs every harness below. Node and pnpm are not required to use it.
 
 ## Harnesses
 
@@ -71,11 +73,11 @@ pnpm test         # Vitest
 pnpm lint         # Biome
 ```
 
-**Personal (Mac/Windows):** `pnpm desktop:build` produces the Windows installer; `desktop:build:mac` and `desktop:mac` need a Mac. `apps/desktop` compiles `apps/web` into the installer, so most UI work lands in both products at once.
+**Personal (Mac/Windows, retired; code kept):** `pnpm desktop:build` still produces the Windows installer, and `desktop:build:mac` and `desktop:mac` need a Mac. `apps/desktop` compiles `apps/web` into the installer, so UI work still lands in the desktop build too.
 
 **Enterprise (hosted):** `pnpm --filter web build`, then run the host behind the reverse proxy. Deploys are tracked by commit sha.
 
-**Releases:** this repo holds the source for both products. Personal installers are published on [`Kyoo032/Nultron`](https://github.com/Kyoo032/Nultron). The Enterprise deploy bundle (a `compose.yml` pinned to a private `ghcr.io/kyoo032/nultron-ent` image, `.env.example`, `DEPLOY.md`, `Caddyfile`) and its release notes are published on [`Kyoo032/NultronEnt`](https://github.com/Kyoo032/NultronEnt) by `node scripts/release-web.mjs`. This is the only local checkout; the two release repos are written only by their release scripts.
+**Releases:** this repo holds the source for the hosted Nultron app and, still in the tree, the retired desktop app. The Enterprise deploy bundle (a `compose.yml` pinned to a private `ghcr.io/kyoo032/nultron-ent` image, `.env.example`, `DEPLOY.md`, `Caddyfile`) and its release notes are published on [`Kyoo032/Nultron`](https://github.com/Kyoo032/Nultron) by `node scripts/release-web.mjs`. The Personal desktop app is retired (2026-10-14): its old release repo, [`Kyoo032/Nultron-Desktop`](https://github.com/Kyoo032/Nultron-Desktop), is archived and gets no new releases. This is the only local checkout; the release repo is written only by its release script.
 
 There is no mobile app.
 

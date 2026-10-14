@@ -1,5 +1,5 @@
 /**
- * DEPLOY.md for the Enterprise release bundle (Kyoo032/NultronEnt), as text. Split out of release-web.mjs so
+ * DEPLOY.md for the Enterprise release bundle (Kyoo032/Nultron), as text. Split out of release-web.mjs so
  * that file stays a release script and not a manual. Pure: no I/O, and nothing here reads the repo.
  *
  * Everything in it is published, so it passes the same mark check as the rest of the bundle

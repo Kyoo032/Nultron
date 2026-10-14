@@ -19,7 +19,7 @@ export const KEYLESS_ORIGINS = {
 } as const;
 
 /** Contactable User-Agent. Wikimedia asks for a name and a URL or mailbox. */
-export const KEYLESS_USER_AGENT = "NultronResearch/1.0 (+https://github.com/Kyoo032/Nultron)";
+export const KEYLESS_USER_AGENT = "NultronResearch/1.0 (+https://nultron-ai.xyz)";
 
 export const KEYLESS_HIT_CAP = 5;
 export const KEYLESS_TIMEOUT_MS = 8_000;

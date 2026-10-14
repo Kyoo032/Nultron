@@ -28,6 +28,8 @@ Each worker is a mode whose harness is already built in: prompt, tools, skills, 
 
 **Read [`docs/internal/release-targets.md`](docs/internal/release-targets.md) first.** It lists every release target built from this repo: Nultron Personal, Nultron Enterprise, the HYP AI white-label for Hypernet, and the desktop flavors. For each one it gives the type, company, codebase, services, how it ships and what is running now. Name the target your task serves before you edit, and stop if the change lands on another one.
 
+**Changed 2026-10-14 (Rizky): Nultron is the OPC, HYP AI is the SME, and the desktop app is retired.** Nultron is a one-person company whose agents work together 24/7 for one owner, running in a VPS; HYP AI is the small or medium company where people and agents work together through projects and a kanban board. Nultron Personal (the Electron app) is retired into the web app: its release repo is now `Kyoo032/Nultron-Desktop`, archived, and the old `Kyoo032/NultronEnt` was renamed to `Kyoo032/Nultron` (private), the web app's release repo (`RELEASE_REPO` in `scripts/release-web.mjs`). No desktop code is removed yet. The proposed codebase shape is in `docs/internal/opc-sme-architecture.md` (branch `docs/opc-sme-architecture`, awaiting Rizky's approval). Sentences below that describe Personal as a shipping product, or name `NultronEnt`, are history from before this change.
+
 **Two products, one repo — read this before touching anything.**
 
 The owner split the product, then still called DPSBuddy, into two products on 2026-09-23. They share a codebase and a renderer, and they diverge on packaging, deployment, identity and versioning. Work on one is not work on the other.

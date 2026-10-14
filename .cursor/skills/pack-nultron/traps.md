@@ -1,6 +1,6 @@
-# Pack traps (this Windows desk)
+# Pack traps (this Windows desk): retired 2026-10-14
 
-Lived through 0.14.23, 0.14.25 and 0.14.26 (packed twice). Read when a step fails; do not invent a third environment. Windows pack and mac pack are different routes (different cwd, command, natives, artifacts, proof). A failure on one is not diagnosed with the other.
+Retired 2026-10-14: the desktop route is no longer run and its repo is archived, so this file is a record of what broke. Lived through 0.14.23, 0.14.25 and 0.14.26 (packed twice). Read when a step fails; do not invent a third environment. Windows pack and mac pack are different routes (different cwd, command, natives, artifacts, proof). A failure on one is not diagnosed with the other.
 
 ## Python / natives
 
@@ -80,7 +80,7 @@ Windows artifacts land in the **worktree** `dist/`. Mac artifacts land in the **
 
 ## Two repos
 
-Source commits stay on `Kyoo032/agentforge`. `pnpm desktop:release` creates a GitHub **release** on `Kyoo032/Nultron` (binaries + `docs/public/<v>-notes.md`). Do not `git push` source to Nultron.
+Source commits stay on `Kyoo032/agentforge`. `pnpm desktop:release` created a GitHub **release** on `Kyoo032/Nultron-Desktop` (binaries + `docs/public/<v>-notes.md`) until that repo was archived on 2026-10-14. The release repo for the web app is now `Kyoo032/Nultron`, and only `scripts/release-web.mjs` writes to it. Do not `git push` source to either repo.
 
 ## Repacking the same version
 

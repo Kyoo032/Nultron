@@ -1,9 +1,10 @@
 /**
- * The refusal list both public release repos share. AGENTS.md, "Three repos": notes come only from
+ * The refusal list the public release repos share. AGENTS.md, "Three repos": notes come only from
  * docs/public/, never from docs/internal/, and never carry an AI or agent mark.
  *
- *   scripts/release-web.mjs                   -> Kyoo032/NultronEnt, the Enterprise deploy bundle
- *   apps/desktop/scripts/release-desktop.mjs  -> Kyoo032/Nultron, the Personal installers
+ *   scripts/release-web.mjs                   -> Kyoo032/Nultron, the Enterprise deploy bundle (live)
+ *   apps/desktop/scripts/release-desktop.mjs  -> Kyoo032/Nultron-Desktop, the retired Personal
+ *                                                installers (archived 2026-10-14; no new releases)
  *
  * One list in one module, so the two products cannot drift apart on it.
  */

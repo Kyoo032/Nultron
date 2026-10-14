@@ -1,5 +1,5 @@
 /**
- * Tests for scripts/release-web.mjs, the Enterprise release to Kyoo032/NultronEnt.
+ * Tests for scripts/release-web.mjs, the Enterprise release to Kyoo032/Nultron.
  *
  * Node's own runner, like scripts/review-proxy.test.mjs: repo tooling outside every workspace
  * package, so no vitest config collects it. `node --test "scripts/*.test.mjs"` runs it.
@@ -146,14 +146,14 @@ function snapshot(dir) {
 
 /**
  * A fake git. Every call lands in `calls` with its cwd. `clone` makes the target directory with a
- * README, as NultronEnt's main has; `commit` snapshots the files in the clone at that moment.
+ * README, as Nultron's main has; `commit` snapshots the files in the clone at that moment.
  */
 function fakeGit({ dirty = false, known = [FULL_SHA], calls = [], commits = [], cloneReadme = README, missingAtSha = [], siteFiles = FAKE_SITE_FILES } = {}) {
   const handlers = {
     // `git cat-file -e <sha>:<path>`: does the released commit carry this file?
     "cat-file": (args) => ({ status: missingAtSha.some((path) => args.at(-1).endsWith(`:${path}`)) ? 128 : 0 }),
     status: (_args, cwd) => {
-      if (cwd.endsWith("NultronEnt")) return { status: 0, stdout: "A  compose.yml\n" };
+      if (cwd.endsWith("Nultron")) return { status: 0, stdout: "A  compose.yml\n" };
       return { status: 0, stdout: dirty ? " M AGENTS.md\n" : "" };
     },
     "rev-parse": (args) => {
@@ -350,7 +350,7 @@ test("dry run builds the gh argv and the body, and never runs gh", () => {
   ]);
   assert.equal(result.args.length, 9, "no assets, no --draft, nothing after the notes file");
   assert.match(result.args[8], new RegExp(`${TAG}-body\\.md$`));
-  assert.equal(RELEASE_REPO, "Kyoo032/NultronEnt");
+  assert.equal(RELEASE_REPO, "Kyoo032/Nultron");
   assert.equal(
     result.body,
     `${CLEAN_NOTES.trimEnd()}\n\nSource: agentforge@${FULL_SHA}\nImage: ${IMAGE}\nPortal image: ${PORTAL_IMAGE}\n`,
@@ -586,7 +586,7 @@ test("the temp-dir bundle commit holds exactly the five files and the company si
   const add = d.gitCalls.find((call) => call.sub === "add");
   assert.deepEqual(add.args.slice(0, 3), ["add", "--all", "--"], "--all, so a file dropped from sites/ is dropped from the repo too");
   assert.ok(add.args.includes("sites"), "the whole sites/ folder is staged");
-  assert.ok(commit.cwd.startsWith(result.workDir) && commit.cwd.endsWith("NultronEnt"), "a temp clone");
+  assert.ok(commit.cwd.startsWith(result.workDir) && commit.cwd.endsWith("Nultron"), "a temp clone");
   assert.deepEqual(commit.args.slice(-4), ["commit", "--quiet", "-m", `Release ${TAG}`], "plain message, no trailer");
   assert.ok(commit.args.includes("user.name=rizky"));
   const clone = d.gitCalls.find((call) => call.sub === "clone");

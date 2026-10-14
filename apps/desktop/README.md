@@ -1,10 +1,10 @@
 # Nultron desktop
 
-> **Two products, one repo.** **Personal** is the Mac/Windows Nultron app — current cut `0.15.0`, under active development again.
-> **Enterprise** is the hosted multi-user web app.
+> **Retired (Rizky, 2026-10-14).** The desktop app (Personal) is being merged into the web app. Its release repo, `Kyoo032/Nultron-Desktop`, is archived and takes no new releases. Do not pack or publish a new desktop cut. The code in this folder stays in the tree, and nothing here is removed by the retirement.
+> **Enterprise** is the hosted multi-user web app. Its release repo is `Kyoo032/Nultron`.
 > Decision record: [`web-pivot-2026-09-18.md`](../../docs/internal/web-pivot-2026-09-18.md).
 
-Operator / agent only. Humans install from [GitHub Releases](https://github.com/Kyoo032/agentforge/releases), not this file.
+Operator / agent only. The desktop installers were published from [`Kyoo032/Nultron-Desktop`](https://github.com/Kyoo032/Nultron-Desktop/releases), not from this file. That repo is archived.
 
 Electron **is** the packaged product. The main process owns SQLite, secrets, and media. The renderer talks over IPC. There is **no** bundled Next.js child, **no** loopback HTTP server, and **no** `app-url.txt`.
 
@@ -78,7 +78,7 @@ Never commit `.env`, `data/settings.enc`, or `data/.master-key`.
 
 ## In-app updates (Nultron only)
 
-Packaged Nultron checks [GitHub Releases](https://github.com/Kyoo032/Nultron/releases) in the **public** `Kyoo032/Nultron` repo from Settings → **Check for updates**. If a newer version is out, **Update and restart** downloads it and relaunches. Kemenkeu / Metranet builds do not get this button. The source repo (`Kyoo032/agentforge`) stays private: electron-updater's GitHub provider is unauthenticated, so release assets have to live somewhere public.
+A packaged build from this tree checks [GitHub Releases](https://github.com/Kyoo032/Nultron-Desktop/releases) in `Kyoo032/Nultron-Desktop` (the repo `brand.json` names) from Settings → **Check for updates**. That repo is archived and gets no new releases. Copies installed from 0.15.1 check `Kyoo032/Nultron` instead, which now belongs to the Enterprise repo, so their check fails with an error (2026-10-14). Kemenkeu / Metranet builds do not get this button. The source repo (`Kyoo032/agentforge`) stays private: electron-updater's GitHub provider is unauthenticated, so release assets have to live somewhere public.
 
 The update target is written in two places that must agree: `branding/agentforge/brand.json` `updates` (read by `scripts/pack-brand.mjs`, which is what `pnpm desktop:build` runs) and `package.json` `build.publish` (used by the plain `electron-builder --dir/--mac/--linux` scripts). `pnpm desktop:release` refuses to run when they differ. The version comes from `package.json` `version` only.
 
