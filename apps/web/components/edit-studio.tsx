@@ -15,6 +15,7 @@ import { EditPreview } from "@/components/edit-preview";
 import { EditTimeline } from "@/components/edit-timeline";
 import { apiFetch, isElectron } from "@/lib/api-client";
 import { editInterruptedNote } from "@/lib/edit-agent-note";
+import { filenameFromDisposition } from "@/lib/download-name";
 import { pickMedia } from "@/lib/desktop-bridge";
 import { gatewayBlockedMessage, hostedGatewayBlocked, isGatewayBlockedText } from "@/lib/gateway-blocked";
 import { isHostedBuild } from "@/lib/hosted-build";
@@ -681,9 +682,7 @@ export function EditStudio() {
         return;
       }
       const blob = await response.blob();
-      const disposition = response.headers.get("Content-Disposition") ?? "";
-      const match = disposition.match(/filename="([^"]+)"/);
-      const filename = match?.[1] ?? "export.mp4";
+      const filename = filenameFromDisposition(response.headers.get("Content-Disposition")) ?? "export.mp4";
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;

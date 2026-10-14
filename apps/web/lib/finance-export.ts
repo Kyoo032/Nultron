@@ -10,6 +10,7 @@ import type { FinanceBrief } from "@agentforge/core/artifacts";
 import type { FinanceReport } from "@agentforge/core/finance";
 import { apiFetch, isElectron } from "./api-client";
 import { saveBlob } from "./artifacts-client";
+import { filenameFromDisposition as fileNameFromHeader } from "./download-name";
 import { messageUnlessBlocked } from "./gateway-blocked";
 
 /** The formats the picker offers. The registry can render more; these are the ones Finance shows. */
@@ -126,7 +127,7 @@ export function financeExportBody(request: FinanceExportRequest): Record<string,
 }
 
 export function filenameFromDisposition(disposition: string | null, format: FinanceExportFormat): string {
-  return disposition?.match(/filename="([^"]+)"/)?.[1] ?? FINANCE_EXPORT_FALLBACK_NAME[format];
+  return fileNameFromHeader(disposition) ?? FINANCE_EXPORT_FALLBACK_NAME[format];
 }
 
 /**

@@ -49,6 +49,8 @@ Preconditions:
 
 ## Gotchas
 
+- **Bundled example clips honour `Range` (2026-10-14, not driven).** `GET /api/v1/videos/examples/:name/file` answers 200 for the whole clip, 206 with `Content-Range` for a range and 416 past the end, with the mime taken from the file (`rangedFileResult`, `packages/host/src/file-bytes.ts`). A `<video>` element seeks with `Range`, so a request without one still gets 200. Unit proof: `packages/host/src/handlers/video-examples-range.test.ts`.
+
 - `videos-studio-needs-key` is the stub pass. A missing banner on a keyless Cloud run is a product fail. On a keyed desk its absence is correct.
 - The studio posts to `/api/v1/videos` (gateway `POST /v1/video/generations` plus poll), not `/runs/video`. A keyless submit on an open gate is a 400 `invalid_request` (`packages/host/src/studio-generate.ts:416-418` in `generateStudioVideo`); on a closed gate it is the flat 403 `gateway_blocked` before that check runs.
 - Live Seedance-class jobs on this prepaid test key are **403** (`prepaid_async_requires_fixed_price`). That is a billing/proxy class, not a knob or key-format fail. Grok Imagine video is the live generate proof on this key.

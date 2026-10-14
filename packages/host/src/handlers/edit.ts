@@ -7,6 +7,7 @@ import { requireGatewayAllowedFor } from "../gateway-gate";
 import type { Release } from "../concurrency";
 import { admitRun, guardRunStream } from "../run-limits";
 import { getTenant } from "../tenant";
+import { rangedFileResult } from "../file-bytes";
 import { mediaRelativePath } from "../media-root";
 import { materializeTenantObject, putTenantObject, removeTenantObject } from "../tenant-storage";
 import type { HostRequest, HostResult } from "../types";
@@ -570,15 +571,8 @@ export async function handleGetEditExportFile(request: HostRequest): Promise<Hos
     if (!file || job.status !== "succeeded") {
       return jsonOk({ error: { code: "not_found", message: "Export is not ready" } }, 404);
     }
-    const { readFile } = await import("node:fs/promises");
-    const bytes = await readFile(file);
-    return {
-      type: "bytes",
-      status: 200,
-      bytes: new Uint8Array(bytes),
-      contentType: "video/mp4",
-      filename: "export.mp4",
-    };
+    // Ranged, so a video element can seek; the mime and the name follow the file the job wrote.
+    return await rangedFileResult(file, request.headers.range, `export${path.extname(file) || ".mp4"}`);
   } catch (error) {
     return jsonError(error);
   }
