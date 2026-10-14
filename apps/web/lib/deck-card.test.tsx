@@ -207,17 +207,20 @@ describe("the card in Indonesian", () => {
 });
 
 describe("the wiring the card relies on", () => {
-  it("downloads through the artifact client the Documents and Legal buttons use", () => {
+  it("downloads through the shared chat file save, which calls the artifact client the Documents and Legal buttons use", () => {
     const text = source("../components/chat-deck-card.tsx");
-    expect(text).toContain('from "@/lib/artifacts-client"');
-    expect(text).toContain("downloadArtifactFile(");
+    expect(text).toContain('from "@/lib/chat-file-save"');
+    expect(text).toContain("saveChatFile(");
+    const shared = source("../lib/chat-file-save.ts");
+    expect(shared).toContain('from "@/lib/artifacts-client"');
+    expect(shared).toContain("downloadArtifactFile");
   });
 
   it("says why a save failed when the shell refused it, and keeps its generic sentence for everything else", () => {
-    const text = source("../components/chat-deck-card.tsx");
-    expect(text).toContain('from "@/lib/desktop-save"');
-    expect(text).toContain("saveFailureMessage(");
-    expect(text).toContain("chat.deck.downloadFailed");
+    const shared = source("../lib/chat-file-save.ts");
+    expect(shared).toContain('from "@/lib/desktop-save"');
+    expect(shared).toContain("saveFailureMessage(");
+    expect(source("../components/chat-deck-card.tsx")).toContain("chat.deck.downloadFailed");
   });
 
   it("toggles the preview with the Open control and guards a second click while a download runs", () => {

@@ -229,6 +229,29 @@
       "build_deck": "Could not build the deck",
       "web_fetch": "Could not open {host}"
     },
+    "doc": {
+      "name": {
+        "create_document": "Make a document",
+        "create_workbook": "Make a workbook",
+        "revise_document": "Revise a document",
+        "import_document": "Import a document"
+      },
+      "doing": "Making “{title}”…",
+      "doingPlain": "Working on a file…",
+      "done": {
+        "create_document": "Made “{title}”",
+        "create_workbook": "Made “{title}”",
+        "revise_document": "Revised a copy: “{title}”",
+        "import_document": "Imported “{title}”"
+      },
+      "donePlain": "File ready",
+      "failed": {
+        "create_document": "Could not make the document",
+        "create_workbook": "Could not make the workbook",
+        "revise_document": "Could not revise the document",
+        "import_document": "Could not import the file"
+      }
+    },
     "pending": {
       "write_file": "Proposed writing a file",
       "edit_file": "Proposed editing a file",
@@ -287,6 +310,22 @@
     "noPreview": "The slides cannot be shown here, but the file is ready to download.",
     "outlineAria": "Slides in this deck",
     "previewAria": "Slide preview of {title}"
+  },
+  "doc": {
+    "format": {
+      "docx": "Word document",
+      "xlsx": "Excel workbook",
+      "pdf": "PDF file"
+    },
+    "sections": "{n} sections",
+    "sectionsOne": "1 section",
+    "sheets": "{n} sheets",
+    "sheetsOne": "1 sheet",
+    "revisedNote": "The original file is unchanged.",
+    "download": "Download",
+    "downloading": "Downloading…",
+    "downloadAria": "Download {title} as {filename}",
+    "downloadFailed": "Could not download the file. Try again."
   },
   "error": {
     "loading": "Chat is still loading",

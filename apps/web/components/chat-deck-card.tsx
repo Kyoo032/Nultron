@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { AddToWorkspace } from "@/components/add-to-workspace";
 import { PresentationPreview } from "@/components/presentation-preview";
-import { downloadArtifactFile } from "@/lib/artifacts-client";
-import { saveFailureMessage } from "@/lib/desktop-save";
+import { saveChatFile } from "@/lib/chat-file-save";
 import { t } from "@/lib/i18n";
 import { DECK_TOOL_KEY, readDeckResult, type DeckCardModel } from "./tool-rows/deck-result";
 
@@ -43,11 +42,11 @@ export function DeckCard({ model, defaultOpen = false }: CardProps) {
     }
     setState("busy");
     setReason(null);
-    try {
-      await downloadArtifactFile(model.artifactId, filename);
+    const saved = await saveChatFile(model.artifactId, filename);
+    if (saved.ok) {
       setState("idle");
-    } catch (error) {
-      setReason(saveFailureMessage(error));
+    } else {
+      setReason(saved.reason);
       setState("failed");
     }
   }

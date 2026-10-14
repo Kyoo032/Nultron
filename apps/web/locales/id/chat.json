@@ -229,6 +229,29 @@
       "build_deck": "Tidak dapat membuat deck",
       "web_fetch": "Tidak dapat membuka {host}"
     },
+    "doc": {
+      "name": {
+        "create_document": "Buat dokumen",
+        "create_workbook": "Buat buku kerja",
+        "revise_document": "Revisi dokumen",
+        "import_document": "Impor dokumen"
+      },
+      "doing": "Membuat “{title}”…",
+      "doingPlain": "Mengerjakan berkas…",
+      "done": {
+        "create_document": "Dibuat “{title}”",
+        "create_workbook": "Dibuat “{title}”",
+        "revise_document": "Salinan revisi: “{title}”",
+        "import_document": "Diimpor “{title}”"
+      },
+      "donePlain": "Berkas siap",
+      "failed": {
+        "create_document": "Dokumen tidak bisa dibuat",
+        "create_workbook": "Buku kerja tidak bisa dibuat",
+        "revise_document": "Dokumen tidak bisa direvisi",
+        "import_document": "Berkas tidak bisa diimpor"
+      }
+    },
     "pending": {
       "write_file": "Mengusulkan penulisan berkas",
       "edit_file": "Mengusulkan perubahan berkas",
@@ -287,6 +310,22 @@
     "noPreview": "Slide tidak bisa ditampilkan di sini, tetapi berkasnya siap diunduh.",
     "outlineAria": "Slide dalam deck ini",
     "previewAria": "Pratinjau slide {title}"
+  },
+  "doc": {
+    "format": {
+      "docx": "Dokumen Word",
+      "xlsx": "Buku kerja Excel",
+      "pdf": "Berkas PDF"
+    },
+    "sections": "{n} bagian",
+    "sectionsOne": "1 bagian",
+    "sheets": "{n} lembar",
+    "sheetsOne": "1 lembar",
+    "revisedNote": "File asli tidak berubah.",
+    "download": "Unduh",
+    "downloading": "Mengunduh…",
+    "downloadAria": "Unduh {title} sebagai {filename}",
+    "downloadFailed": "Berkas tidak bisa diunduh. Coba lagi."
   },
   "error": {
     "loading": "Chat masih dimuat",

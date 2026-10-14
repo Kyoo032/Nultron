@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AddToWorkspace } from "@/components/add-to-workspace";
 import { FormattedText } from "@/components/formatted-text";
 import { getArtifact } from "@/lib/artifacts-client";
 import { t } from "@/lib/i18n";
@@ -122,6 +123,7 @@ export function DossierCard({ model, defaultOpen = false, initialMarkdown }: Car
             >
               {open ? t("agents.dossier.close") : t("agents.dossier.open")}
             </button>
+            <AddToWorkspace artifactId={artifactId} />
           </div>
         ) : null}
       </div>
