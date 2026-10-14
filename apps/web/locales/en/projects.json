@@ -1,0 +1,76 @@
+{
+  "rail": {
+    "label": "Workspaces"
+  },
+  "title": "Workspaces",
+  "intro": "Shared spaces for files and knowledge. Each one is private to you, or open to everyone in your company.",
+  "loading": "Loading Workspaces…",
+  "loadFailed": "The Workspaces could not be loaded.",
+  "retry": "Try again",
+  "saveFailed": "That change could not be saved.",
+  "list": {
+    "own": "Your Workspaces",
+    "shared": "Shared with your company",
+    "empty": "No Workspaces yet.",
+    "open": "Open {name}"
+  },
+  "create": {
+    "label": "New Workspace",
+    "namePlaceholder": "Workspace name",
+    "submit": "Create"
+  },
+  "visibility": {
+    "label": "Who can see it",
+    "private": "Only you",
+    "workspace": "Everyone in your company",
+    "notePrivate": "Only you can see this Workspace and its files. Switch it on to share it with your company.",
+    "noteWorkspace": "Everyone in your company can see and download this Workspace's files. Switch it off to make it private again."
+  },
+  "detail": {
+    "back": "All Workspaces",
+    "madeByYou": "Made by you",
+    "madeByColleague": "Made by a colleague",
+    "rename": "Rename",
+    "save": "Save",
+    "cancel": "Cancel",
+    "archive": "Archive"
+  },
+  "tabs": {
+    "aria": "Workspace sections",
+    "files": "Files",
+    "knowledge": "Knowledge",
+    "instructions": "Instructions",
+    "chats": "Chats",
+    "comingNext": "Coming next"
+  },
+  "files": {
+    "empty": "No files in this Workspace yet. Add one from a chat answer with Add to Workspace.",
+    "download": "Download {name}",
+    "remove": "Remove",
+    "removeFailed": "The file could not be removed.",
+    "downloadFailed": "The file could not be downloaded.",
+    "loadFailed": "The files could not be loaded.",
+    "you": "You",
+    "colleague": "A colleague",
+    "downloadLabel": "Download"
+  },
+  "kinds": {
+    "document": "Document",
+    "sheet": "Spreadsheet",
+    "slides": "Presentation",
+    "pdf": "PDF",
+    "image": "Image",
+    "video": "Video",
+    "audio": "Audio",
+    "text": "Text",
+    "other": "File"
+  },
+  "addTo": {
+    "label": "Add to Workspace",
+    "title": "Add to a Workspace",
+    "newWorkspace": "New Workspace…",
+    "none": "You have no Workspaces yet.",
+    "added": "Added to {name}.",
+    "failed": "The file could not be added."
+  }
+}

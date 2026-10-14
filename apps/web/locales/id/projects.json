@@ -1,0 +1,76 @@
+{
+  "rail": {
+    "label": "Ruang kerja"
+  },
+  "title": "Ruang kerja",
+  "intro": "Ruang bersama untuk berkas dan pengetahuan. Setiap ruang kerja hanya untuk Anda, atau terbuka untuk semua orang di perusahaan Anda.",
+  "loading": "Memuat ruang kerja…",
+  "loadFailed": "Ruang kerja tidak bisa dimuat.",
+  "retry": "Coba lagi",
+  "saveFailed": "Perubahan itu tidak bisa disimpan.",
+  "list": {
+    "own": "Ruang kerja Anda",
+    "shared": "Dibagikan dengan perusahaan Anda",
+    "empty": "Belum ada ruang kerja.",
+    "open": "Buka {name}"
+  },
+  "create": {
+    "label": "Ruang kerja baru",
+    "namePlaceholder": "Nama ruang kerja",
+    "submit": "Buat"
+  },
+  "visibility": {
+    "label": "Siapa yang bisa melihat",
+    "private": "Hanya Anda",
+    "workspace": "Semua orang di perusahaan Anda",
+    "notePrivate": "Hanya Anda yang bisa melihat ruang kerja ini dan berkasnya. Nyalakan sakelar untuk membagikannya ke perusahaan Anda.",
+    "noteWorkspace": "Semua orang di perusahaan Anda bisa melihat dan mengunduh berkas ruang kerja ini. Matikan sakelar untuk membuatnya pribadi lagi."
+  },
+  "detail": {
+    "back": "Semua ruang kerja",
+    "madeByYou": "Dibuat oleh Anda",
+    "madeByColleague": "Dibuat oleh rekan",
+    "rename": "Ganti nama",
+    "save": "Simpan",
+    "cancel": "Batal",
+    "archive": "Arsipkan"
+  },
+  "tabs": {
+    "aria": "Bagian ruang kerja",
+    "files": "Berkas",
+    "knowledge": "Pengetahuan",
+    "instructions": "Instruksi",
+    "chats": "Obrolan",
+    "comingNext": "Segera hadir"
+  },
+  "files": {
+    "empty": "Belum ada berkas di ruang kerja ini. Tambahkan dari jawaban obrolan dengan Tambah ke ruang kerja.",
+    "download": "Unduh {name}",
+    "remove": "Hapus",
+    "removeFailed": "Berkas tidak bisa dihapus.",
+    "downloadFailed": "Berkas tidak bisa diunduh.",
+    "loadFailed": "Berkas tidak bisa dimuat.",
+    "you": "Anda",
+    "colleague": "Rekan",
+    "downloadLabel": "Unduh"
+  },
+  "kinds": {
+    "document": "Dokumen",
+    "sheet": "Lembar kerja",
+    "slides": "Presentasi",
+    "pdf": "PDF",
+    "image": "Gambar",
+    "video": "Video",
+    "audio": "Audio",
+    "text": "Teks",
+    "other": "Berkas"
+  },
+  "addTo": {
+    "label": "Tambah ke ruang kerja",
+    "title": "Tambah ke ruang kerja",
+    "newWorkspace": "Ruang kerja baru…",
+    "none": "Anda belum punya ruang kerja.",
+    "added": "Ditambahkan ke {name}.",
+    "failed": "Berkas tidak bisa ditambahkan."
+  }
+}

@@ -116,12 +116,22 @@ export type AgentRailViewProps = {
   footer?: ReactNode;
   /** The team board's entry. Hosted only (`isHostedBuild()`): the board does not exist on Personal. */
   showBoard?: boolean;
+  /** The Workspaces entry (K-D20). Hosted only (`isHostedBuild()`), like the board. */
+  showProjects?: boolean;
 };
 
 type AccountLink = { href: string; icon: ModeIconName; testId: string; labelKey: string };
 
 /** The team board (tester lane, K0): an account page beside Knowledge and Settings (team-board-spec.md section 14). */
 const BOARD_LINK: AccountLink = { href: "/board", icon: "board", testId: "board-link", labelKey: "board.rail.label" };
+
+/** The Workspaces page (tester lane, K-D20): the same account group, after the board. */
+const PROJECTS_LINK: AccountLink = {
+  href: "/projects",
+  icon: "workspaces",
+  testId: "projects-link",
+  labelKey: "projects.rail.label",
+};
 
 const ACCOUNT_LINKS: ReadonlyArray<AccountLink> = [
   { href: "/knowledge", icon: "knowledge", testId: "mode-knowledge", labelKey: "rail.knowledge" },
@@ -155,8 +165,10 @@ export function AgentRailView({
   bundledMark,
   footer,
   showBoard = false,
+  showProjects = false,
 }: AgentRailViewProps) {
-  const accountLinks = showBoard ? [BOARD_LINK, ...ACCOUNT_LINKS] : ACCOUNT_LINKS;
+  const hostedLinks = [...(showBoard ? [BOARD_LINK] : []), ...(showProjects ? [PROJECTS_LINK] : [])];
+  const accountLinks = [...hostedLinks, ...ACCOUNT_LINKS];
   /*
    * The name shows in one tooltip drawn by the rail itself, outside the scrolling column. A tooltip
    * inside that column would be clipped by it (a scroller clips both axes), and a CSS-only one cannot
@@ -265,6 +277,7 @@ export function AgentRail(_props: Props) {
       logoSrc={brand.logoSrc}
       bundledMark={usesBundledMark(brand)}
       showBoard={isHostedBuild()}
+      showProjects={isHostedBuild()}
       footer={
         <>
           {/* The character lives here in this shell, as the small head: the rail is the one place on

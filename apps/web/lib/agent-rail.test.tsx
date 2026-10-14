@@ -186,12 +186,18 @@ describe("AgentRailView account group", () => {
 
 describe("AgentRailView team board entry (tester lane, K0)", () => {
   const accountIds = (html: string) =>
-    links(
-      html.slice(html.indexOf('data-testid="rail-account-group"'), html.indexOf('data-testid="rail-footer"')),
-    ).map((tag) => attr(tag, "data-testid"));
+    links(html.slice(html.indexOf('data-testid="rail-account-group"'), html.indexOf('data-testid="rail-footer"'))).map(
+      (tag) => attr(tag, "data-testid"),
+    );
 
   it("leaves the account group exactly as it was on Personal", () => {
-    expect(accountIds(markup())).toEqual(["mode-knowledge", "channels-link", "workspaces-link", "usage-link", "settings-link"]);
+    expect(accountIds(markup())).toEqual([
+      "mode-knowledge",
+      "channels-link",
+      "workspaces-link",
+      "usage-link",
+      "settings-link",
+    ]);
     expect(markup()).not.toContain("/board");
     expect(markup({ showBoard: false })).toBe(markup());
   });
@@ -213,5 +219,27 @@ describe("AgentRailView team board entry (tester lane, K0)", () => {
     applyLocale("id");
     const idTag = links(markup({ showBoard: true })).find((entry) => attr(entry, "data-testid") === "board-link") ?? "";
     expect(attr(idTag, "aria-label")).toBe("Papan");
+  });
+
+  it("adds the Workspaces entry after the board on a hosted build, and only then (K-D20)", () => {
+    expect(accountIds(markup({ showProjects: false }))).not.toContain("projects-link");
+    expect(markup({ showProjects: false })).toBe(markup());
+    expect(accountIds(markup({ showBoard: true, showProjects: true }))).toEqual([
+      "board-link",
+      "projects-link",
+      "mode-knowledge",
+      "channels-link",
+      "workspaces-link",
+      "usage-link",
+      "settings-link",
+    ]);
+    const tag =
+      links(markup({ showProjects: true })).find((entry) => attr(entry, "data-testid") === "projects-link") ?? "";
+    expect(attr(tag, "href")).toBe("/projects");
+    expect(attr(tag, "aria-label")).toBe("Workspaces");
+    applyLocale("id");
+    const idTag =
+      links(markup({ showProjects: true })).find((entry) => attr(entry, "data-testid") === "projects-link") ?? "";
+    expect(attr(idTag, "aria-label")).toBe("Ruang kerja");
   });
 });

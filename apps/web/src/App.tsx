@@ -25,6 +25,7 @@ import { WorkspacesPage } from "@/components/workspaces-page";
 import { KnowledgePage } from "@/components/knowledge-page";
 import { ChannelsPage } from "@/components/channels-page";
 import { BoardPage } from "@/components/board-page";
+import { ProjectsPage } from "@/components/projects-page";
 import { DeskPane } from "@/components/desk-pane";
 import { WorkModeKeepAlive } from "@/components/work-mode-keep-alive";
 import { OnboardingScreen } from "@/components/onboarding-screen";
@@ -449,6 +450,17 @@ export function AppRoutes() {
                 element={
                   <DeskPane>
                     <BoardPage />
+                  </DeskPane>
+                }
+              />
+            ) : null}
+            {/* Tester code: the Workspaces page (K-D20) is hosted only; on Personal `/projects` falls through to Chat. */}
+            {isHostedBuild() ? (
+              <Route
+                path="/projects"
+                element={
+                  <DeskPane>
+                    <ProjectsPage />
                   </DeskPane>
                 }
               />
