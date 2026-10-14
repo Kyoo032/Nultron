@@ -1,5 +1,7 @@
 # Release and sync lanes
 
+Product: both · Instance: every checkout (main, tester, HYP AI); no app drive
+
 Last verified: 2026-10-14 at cdb727b4
 
 Repo names and the lane set were re-read on 2026-10-14 for this rewrite. The "Chat-first shell" section was read on 2026-10-12 at e8a7eca8, against the tester branch, before PR #157 promoted it to `main`.
