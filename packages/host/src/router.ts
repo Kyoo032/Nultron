@@ -65,6 +65,7 @@ import {
 import { handleGetChat } from "./handlers/chat";
 import { handleGetVirtualAgents } from "./handlers/virtual-agents";
 import { boardRoutes } from "./handlers/board";
+import { projectRoutes } from "./handlers/projects";
 import { handlePostChatDocument } from "./chat-documents/handler";
 import { handlePostChatDocumentSave } from "./chat-documents/save-handler";
 import { handleGetHealth } from "./handlers/health";
@@ -343,6 +344,8 @@ const routes: Route[] = [
   compile("GET", "/api/v1/virtual-agents", handleGetVirtualAgents),
   // Tester code: the team board, K0 (handlers/board.ts). Server mode only; no gateway call.
   ...boardRoutes().map(([method, path, handler]) => compile(method, path, handler)),
+  // Tester code: collective projects, F1 (handlers/projects.ts). Server mode only; no gateway call.
+  ...projectRoutes().map(([method, path, handler]) => compile(method, path, handler)),
   // One attached document, read on this machine. No gateway call, so no gate (maps/chat-documents.md).
   compile("POST", "/api/v1/chat/documents", handlePostChatDocument),
   compile("POST", "/api/v1/chat/documents/save", handlePostChatDocumentSave),

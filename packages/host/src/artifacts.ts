@@ -77,15 +77,26 @@ function summaryFromRow(row: Row): ArtifactSummary {
 /**
  * Shared with the company through a project (K-D19, Rizky 2026-10-14: projects are private by default,
  * with one switch to workspace). A file is visible to others only while it sits in a WORKSPACE project.
- * Until F1 adds `projects` and its `visibility`, nothing is shared: `project_id` is recorded but grants
- * no access. F1 changes this fragment and `isSharedForViewer` together, to a `projects.visibility =
- * 'workspace'` check. Every read and the delete rule go through `visibleTo`, which goes through this.
+ * The project must be in the same desk as the file (the outer names are qualified, so the subquery
+ * cannot compare a project with itself), not archived, and switched to `workspace`. Every read and the
+ * delete rule go through `visibleTo`, which goes through this. Keep this and `isSharedForViewer` in step.
  */
-export const SHARED_ARTIFACT_SQL = "0 = 1";
+export const SHARED_ARTIFACT_SQL = `EXISTS (SELECT 1 FROM projects p WHERE p.id = artifacts.project_id AND p.workspace_id = artifacts.workspace_id AND p.visibility = 'workspace' AND p.archived_at IS NULL)`;
 
 /** The JavaScript twin of `SHARED_ARTIFACT_SQL`, for a row already in hand. Keep the two in step. */
-export function isSharedForViewer(_row: { project_id: string | null }, _viewer: TenantContext): boolean {
-  return false;
+export function isSharedForViewer(
+  row: { project_id: string | null; workspace_id: string },
+  _viewer: TenantContext,
+): boolean {
+  if (row.project_id === null) {
+    return false;
+  }
+  const found = sql
+    .prepare(
+      `SELECT 1 AS ok FROM projects WHERE id = ? AND workspace_id = ? AND visibility = 'workspace' AND archived_at IS NULL`,
+    )
+    .get(row.project_id, row.workspace_id);
+  return found !== undefined;
 }
 
 /**
@@ -94,7 +105,7 @@ export function isSharedForViewer(_row: { project_id: string | null }, _viewer: 
  * company-visible, as it was made. Desktop and webdev write no owner, and have one person per desk,
  * so they add no clause at all and their SQL is what it was before.
  */
-function visibleTo(tenant: TenantContext): { clause: string; args: string[] } {
+export function visibleTo(tenant: TenantContext): { clause: string; args: string[] } {
   if (!isServerMode()) {
     return { clause: "", args: [] };
   }

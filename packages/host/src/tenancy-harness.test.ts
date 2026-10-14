@@ -583,6 +583,30 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
     params: { columnId: "unseeded" },
     body: { name: "x" },
   },
+
+  // --- collective projects (tester lane, F1) ----------------------------------------------------
+  // Same reasoning as the board rows above: the projects routes read `isServerMode()` first, which
+  // this harness switches off, so each answers the router's 404. The two-company proof, with server
+  // mode on, is projects-companies.test.ts.
+  {
+    method: "PATCH",
+    path: "/api/v1/projects/:id",
+    params: { id: "unseeded" },
+    body: { name: "x" },
+  },
+  { method: "POST", path: "/api/v1/projects/:id/archive", params: { id: "unseeded" }, body: {} },
+  { method: "GET", path: "/api/v1/projects/:id/files", params: { id: "unseeded" } },
+  {
+    method: "POST",
+    path: "/api/v1/projects/:id/files",
+    params: { id: "unseeded" },
+    body: { artifactId: "unseeded" },
+  },
+  {
+    method: "DELETE",
+    path: "/api/v1/projects/:id/files/:artifactId",
+    params: { id: "unseeded", artifactId: "unseeded" },
+  },
 ];
 
 let store: ReturnType<typeof createMemorySessionStore>;

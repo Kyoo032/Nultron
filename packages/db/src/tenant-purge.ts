@@ -85,6 +85,8 @@ export const CASCADED_TABLES = [
   "card_comments",
   "card_events",
   "board_audit",
+  // Collective projects (tester, `projects-schema.ts`): a workspace foreign key with ON DELETE cascade.
+  "projects",
 ] as const;
 
 /**

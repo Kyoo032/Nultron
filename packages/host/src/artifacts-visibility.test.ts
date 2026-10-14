@@ -75,11 +75,12 @@ describe("artifact visibility on the hosted app", () => {
     expect(store.get(ann, made.id)).not.toBeNull();
   });
 
-  it("grants nothing from a project id by itself, in SQL or in the JavaScript twin", () => {
-    const row = { project_id: "proj-1" };
+  it("grants nothing from a project id that no project row backs, in SQL or in the JavaScript twin", () => {
+    const row = { project_id: "proj-1", workspace_id: "desk-a" };
     expect(isSharedForViewer(row, bob)).toBe(false);
-    expect(isSharedForViewer({ project_id: null }, bob)).toBe(false);
-    expect(SHARED_ARTIFACT_SQL).toBe("0 = 1");
+    expect(isSharedForViewer({ project_id: null, workspace_id: "desk-a" }, bob)).toBe(false);
+    expect(SHARED_ARTIFACT_SQL).toContain("FROM projects p");
+    expect(SHARED_ARTIFACT_SQL).toContain("p.visibility = 'workspace'");
   });
 
   it("keeps a legacy row with no owner visible to the company", () => {
