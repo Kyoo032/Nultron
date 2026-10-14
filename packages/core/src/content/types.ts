@@ -33,7 +33,18 @@ export type ToolCallPart = {
   output?: unknown;
 };
 
-export type ContentPart = TextPart | ImageUrlPart | VideoUrlPart | ThinkingPart | ToolCallPart;
+/**
+ * Assistant-only. The host writes this when the turn stopped at the step limit.
+ * The renderer shows Continue from this part and does not match the sentence.
+ * Never accepted on user run input.
+ */
+export type StepLimitPart = {
+  type: "step_limit";
+  /** Tool keys that finished before the limit, in the order they finished. */
+  tools: string[];
+};
+
+export type ContentPart = TextPart | ImageUrlPart | VideoUrlPart | ThinkingPart | ToolCallPart | StepLimitPart;
 
 export type RunInputBody = {
   content?: unknown;

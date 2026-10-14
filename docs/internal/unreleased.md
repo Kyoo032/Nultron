@@ -64,6 +64,12 @@ Append below, newest first.
 - **Not proven.** No server run of the deploy gate, no real push through the hook. The Nultron staging subdomain is not named yet.
 - **Lanes owed after merge.** Tester: merge `origin/main`, `ci:local`, `pnpm hooks:install` there. HYP AI: the next import must bring `scripts/where-am-i.mjs` with `lane-guard.mjs`.
 
+## Chat: Continue on a step-limit turn (K0-G6), 2026-10-14 (lanes: Personal, Enterprise, HYP AI, tester; on `feat/k0-g6-continue`, not packed, not driven on a live model)
+
+- **Lanes.** Personal, Enterprise, HYP AI, tester. Shared renderer and host. No new mode or rail entry.
+- **What changed.** A turn that stops at the step limit now says which tools finished and that the answer did not, in English and Bahasa Indonesia (`stepLimitNote`). The host saves a `step_limit` part on that assistant message. Continue (`chat-continue`) is shown only when that part is present. The click sends the word `continue`. The renderer does not match the sentence. An interrupted turn still has its sentence and no button.
+- **Proof.** Unit tests in `chat-turn.test.ts`, `runs-resilience.test.ts` and `apps/web/lib/chat-continue.test.tsx`. Not driven on a live model: a stub desk cannot reach the step limit.
+
 ## Stub Playwright follows the chat-first rail and the Virtual agents page, 2026-10-14 (SH-012, SH-013; test only; lanes: Personal, Enterprise, HYP AI, tester)
 
 - **Lanes.** Personal, Enterprise, HYP AI, tester. The specs live in the shared renderer. Nothing in the product changed. Branch `fix/sh-012-013`, cut from `main`.
@@ -478,3 +484,13 @@ Found while building the chat-first shell in `agentforge-chat`. All three are in
 Found while re-driving the recipes against the chat-first shell on `:3000`. Lanes: Personal, Enterprise, HYP AI, tester.
 
 - [ ] **Guide: the Chat stop still describes a model picker.** `steps.chat.body` says the model picker lets the person choose which model answers (`apps/web/locales/en/guide.json:29`, and `apps/web/locales/id/guide.json:29`, "Pemilih model"). The chat-first Chat has the tier picker (`tier-picker`: Daily, Fastest, Reasoning) and no model picker, so the copy points at a control that is not there. Fix both catalogs together; the parity test keeps the keys aligned but does not check the meaning.
+
+## Hosted downloads work in a plain browser, 2026-10-14 (branch `fix/hosted-downloads`, uncommitted)
+
+Lanes: Personal, Enterprise, HYP AI, tester. Every lane reaches this code, so the default applies. Not driven on `:3000` or on a hosted build; proven by unit and route tests only.
+
+- **Filenames.** The download helpers in `artifacts-client.ts`, `finance-export.ts`, `edit-studio.tsx` and `documents-studio.tsx` read only `filename="…"`, so a name that exists only as RFC 5987 `filename*=UTF-8''…` fell back to a generic name. All four now call `filenameFromDisposition` (`apps/web/lib/download-name.ts`). Tests: `download-name.test.ts` (filename*-only case) and `finance-export.test.ts`.
+- **Ranges on file routes.** `GET /api/v1/edit/projects/:id/export/:jobId/file` and `GET /api/v1/videos/examples/:name/file` answer `Range` with 206 and `Content-Range`, and 416 past the end, through the new `packages/host/src/file-bytes.ts` (`rangedFileResult`, `mediaMimeForPath`). The edit export names its file `export.<ext>` and takes the mime from the file the job wrote, not a fixed `video/mp4`. Tests: `file-bytes.test.ts`, `handlers/video-examples-range.test.ts`, `edit/export-file-route.test.ts` (200, 206, 416, 404 through the router).
+- **Caddy compression.** `webapp-deploy/Caddyfile` (both sites) and `webapp-deploy/k8s/base/caddy/security.caddy` had a bare `encode zstd gzip`, which compresses every response, including `text/event-stream` (job progress, SR-174) and media. Each now has a `match` on the text types only (html, css, plain, xml, javascript, json, svg). The explicit list keeps `text/event-stream` out; a `text/*` wildcard would not. `packages/host/src/caddy-encode.test.ts` pins it. The bundle (`scripts/release-web.mjs`) reads `webapp-deploy/Caddyfile` at the sha, so this reaches the bundle with no script change. **Caddy was not run:** no caddy binary and no Docker daemon on this PC, so the syntax is unvalidated.
+- **Not changed, on purpose.** The company sites `webapp-deploy/sites/dpscloud.caddy` and `tokotoken.caddy` keep a bare `encode zstd gzip`: they serve static pages with no SSE or media, and they are not Nultron.
+- **Owed, same bug, outside this change:** `apps/web/components/presentations-studio.tsx:357` still parses only `filename="…"` (`presentations.md` § on `onDownload`). Same one-line fix, not made here.

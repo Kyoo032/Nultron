@@ -15,7 +15,7 @@ Product: both · Instance: main :3000 + HYP AI :3301
 
 - Choose Knowledge Base on the Account rail (`mode-knowledge`) → Sources tab; `knowledge-graph-panel` sits under the `knowledge-loop` health strip and is collapsed until `knowledge-graph-toggle` ("Show map") is clicked.
 - Open `http://127.0.0.1:3000/knowledge` (webdev). This feature needs no sidecar and no `:3100` instance.
-- A `cites` edge appears after a Chat reply that actually cites (`[1]` and friends). With the stub runtime there is no such reply — the stub answers with a tool result or "I need a Toko Token gateway key in Settings to answer that." — so a stub desk can prove the plumbing but not a cite.
+- A `cites` edge appears after a Chat reply that actually cites (`[1]` and friends). A generic stub reply does not cite. One stub phrasing does: a question that mentions "the desk" answers "From the desk [1]." and writes a `cites` edge. The steps are in Driving.
 
 ## Driving it with the Nultron harness
 
@@ -24,7 +24,7 @@ Preconditions:
 - Doctor exits 0 and reports `knowledge: true`.
 - Drive webdev `:3000`, and only the Chat and Knowledge pages.
 - A **model** citing needs a live turn, but a stub reply can cite too, for one phrasing: when the question mentions "the desk" the stub's reply text is "From the desk [1] [99]." (`packages/core/src/agents/chat-locale.ts:84`; the shown reply read "From the desk [1]." when driven 2026-10-09, so the unknown `[99]` is dropped before it reaches `message-output`; the harness test is `packages/host/src/chat-harness.test.ts:27-58`, phrase at `:44`), which writes a `cites` edge from the first retrieved source. A live model citing is on the operator's gateway — do the live step only when the operator asked; otherwise stop after the stub steps and report the stub result.
-- Evidence state before you drive: Phase 4 landed 2026-09-12. Cloud proves it with the unit commands in [knowledge-phases.md](./knowledge-phases.md). Stub Chat cannot cite. Do not write up a live cites run that did not happen.
+- Evidence state before you drive: Phase 4 landed 2026-09-12. Cloud proves it with the unit commands in [knowledge-phases.md](./knowledge-phases.md). A generic stub reply does not cite; the desk phrase does. Do not write up a live cites run that did not happen.
 
 - **Baseline the panel.** Follow the planted-fact recipe in [knowledge.md](./knowledge.md) (paste `The internal code name is zorblatt7731.`, add it, new Chat thread). On `/knowledge` read `knowledge-graph-counts` `data-edges` (call it E). Click `knowledge-graph-toggle` ("Show map"): after a `knowledge-map-run` the drawing shows topic + source nodes and `covers` edges — that base is Phase 2, not this fixture.
 - **A stub turn writes no cites (expected).** Send the planted question. The reply is a tool result or the gateway-key line; `chat-context-breakdown` → Sources still shows the injected `k chunks`, but the reply contained no `[n]`, so after reloading `/knowledge` and reopening the panel no `cites` edge exists. `data-edges` is **not** unchanged: a completed stub turn that was injected chunks still runs `recordRetrievals` (`knowledge-retrievals.ts:39-64`), which projects a `retrieved` source-to-thread edge per distinct injected source plus the thread node, so `data-edges` grows by the retrieved pairs (driven: edges 2 to 3, nodes 3 to 4, titles `covers`, `covers`, `retrieved · weight 1` and no `cites`). Compare against a baseline read after that thread's first send. Do not report this as a bug and do not retry in a loop.

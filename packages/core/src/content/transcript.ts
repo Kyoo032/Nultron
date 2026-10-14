@@ -1,6 +1,14 @@
 import type { ContentPart, TextPart, ThinkingPart, ToolCallPart } from "./types";
 
-export type { ContentPart, TextPart, ImageUrlPart, VideoUrlPart, ThinkingPart, ToolCallPart } from "./types";
+export type {
+  ContentPart,
+  TextPart,
+  ImageUrlPart,
+  VideoUrlPart,
+  ThinkingPart,
+  ToolCallPart,
+  StepLimitPart,
+} from "./types";
 
 export function isTextPart(part: ContentPart): part is TextPart {
   return part.type === "text";
