@@ -5,10 +5,12 @@ import {
   PROMPT_TEMPLATE_CATEGORIES,
   promptTemplateById,
   promptTemplatesFor,
+  type PromptGuideRule,
   type PromptTemplate,
   type PromptTemplateCategory,
 } from "@agentforge/core/edit";
 import { useMemo, useState } from "react";
+import { t } from "@/lib/i18n";
 
 type Props = {
   onPick: (template: PromptTemplate) => void;
@@ -16,6 +18,28 @@ type Props = {
 };
 
 const CATEGORY_BTN = "btn whitespace-nowrap px-1.5 py-0.5 text-xs";
+
+function categoryLabel(id: PromptTemplateCategory): string {
+  switch (id) {
+    case "promo":
+    case "talking-head":
+    case "reel":
+    case "square":
+      return t(`edit.templates.categories.${id}`);
+    default: {
+      const unexpected: never = id;
+      return unexpected;
+    }
+  }
+}
+
+function templateTitle(template: PromptTemplate): string {
+  return t(`edit.templates.titles.${template.id}`);
+}
+
+function guideText(rule: PromptGuideRule): string {
+  return t(`edit.templates.guide.${rule.id}`);
+}
 
 function TemplateSource({ template }: { template: PromptTemplate }) {
   const { source, tips } = template;
@@ -25,7 +49,7 @@ function TemplateSource({ template }: { template: PromptTemplate }) {
       data-testid="edit-prompt-template-source"
     >
       <p className="text-[var(--text)]">
-        From {source.site}: {source.title}
+        {t("edit.templates.fromSource", { site: source.site, title: source.title })}
         {source.section ? <span className="text-[var(--text-2)]"> ({source.section})</span> : null}
       </p>
       <a
@@ -52,11 +76,11 @@ function TemplateSource({ template }: { template: PromptTemplate }) {
 function PromptGuide() {
   return (
     <details className="rounded-md border border-[var(--line)] px-2 py-1 text-xs" data-testid="edit-prompt-guide">
-      <summary className="cursor-pointer select-none text-[var(--text-2)]">Prompting rules</summary>
+      <summary className="cursor-pointer select-none text-[var(--text-2)]">{t("edit.templates.promptingRules")}</summary>
       <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[var(--text-2)]">
         {PROMPT_GUIDE_RULES.map((rule) => (
           <li key={rule.id}>
-            {rule.text} <span className="text-[var(--text-3)]">({rule.source.site})</span>
+            {guideText(rule)} <span className="text-[var(--text-3)]">({rule.source.site})</span>
           </li>
         ))}
       </ul>
@@ -71,7 +95,7 @@ export function EditPromptTemplates({ onPick, selectedId }: Props) {
 
   return (
     <div className="flex min-w-0 flex-col gap-1.5 text-xs" data-testid="edit-prompt-templates">
-      <p className="text-xs text-[var(--text-3)]">Start from a prompt template</p>
+      <p className="text-xs text-[var(--text-3)]">{t("edit.templates.heading")}</p>
       <div className="flex min-w-0 flex-wrap gap-1" data-testid="edit-prompt-template-categories">
         <button
           type="button"
@@ -80,7 +104,7 @@ export function EditPromptTemplates({ onPick, selectedId }: Props) {
           data-testid="edit-prompt-template-category-all"
           onClick={() => setCategory(null)}
         >
-          All
+          {t("edit.templates.all")}
         </button>
         {PROMPT_TEMPLATE_CATEGORIES.map((item) => (
           <button
@@ -91,16 +115,17 @@ export function EditPromptTemplates({ onPick, selectedId }: Props) {
             data-testid={`edit-prompt-template-category-${item.id}`}
             onClick={() => setCategory(item.id)}
           >
-            {item.label}
+            {categoryLabel(item.id)}
           </button>
         ))}
       </div>
       {templates.length === 0 ? (
-        <p className="text-xs text-[var(--text-3)]">No templates in this category.</p>
+        <p className="text-xs text-[var(--text-3)]">{t("edit.templates.empty")}</p>
       ) : (
         <ul className="space-y-1" data-testid="edit-prompt-template-list">
           {templates.map((template) => {
             const isSelected = template.id === selectedId;
+            const title = templateTitle(template);
             return (
               <li key={template.id}>
                 <button
@@ -112,13 +137,13 @@ export function EditPromptTemplates({ onPick, selectedId }: Props) {
                   }`}
                   aria-pressed={isSelected}
                   data-testid={`edit-prompt-template-${template.id}`}
-                  title={template.title}
+                  title={title}
                   onClick={() => onPick(template)}
                 >
-                  <span className="block truncate">{template.title}</span>
+                  <span className="block truncate">{title}</span>
                   <span className="mt-0.5 flex items-center gap-1 text-xs text-[var(--text-3)]">
                     <span className="tag">{template.aspect}</span>
-                    <span>{template.seconds}s</span>
+                    <span>{t("edit.generate.seconds", { value: template.seconds })}</span>
                     <span className="truncate">{template.source.site}</span>
                   </span>
                 </button>

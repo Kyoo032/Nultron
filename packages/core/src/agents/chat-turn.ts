@@ -1,6 +1,6 @@
 import { parseAppLocale, type AppLocale } from "../locale";
 import type { InputModality } from "../tenancy/types";
-import { chatTurnCopy, fillChatReason, fillChatTurn } from "./chat-locale";
+import { chatTurnCopy, fillChatReason, fillChatTurn, stepLimitNote } from "./chat-locale";
 
 /** Generate tools stay on a text turn. An attached picture or clip is understand, not a new file. */
 export const CHAT_UNDERSTAND_HIDDEN_TOOLS = ["image_generate", "video_generate"] as const;
@@ -171,13 +171,19 @@ export type SettledChatTurn = {
   text: string;
   /** Suffix to stream when the saved reply only grew. Empty when the check rewrote the middle. */
   appended: string;
+  /**
+   * Set when the turn stopped at the step limit. The host stores this as a `step_limit` part.
+   * The renderer shows Continue from that part and does not match the sentence.
+   */
+  stepLimit?: { tools: string[] };
 };
 
 /**
  * The check after one bounded answer. No second model call.
  * A reply that already has words keeps them, minus source numbers the desk did not offer.
  * A tool that returned and left no sentence becomes that sentence.
- * A run that ended at its step limit gets one closing sentence saying so (`stepLimit`), whatever else it said.
+ * A run that ended at its step limit gets one closing sentence naming the tools that finished and saying
+ * the answer did not (`stepLimit`), whatever else it said, and a structured mark the renderer reads.
  * A run whose model call failed after a tool completed gets one saying the tools ran, why no answer
  * followed and what to send (`interrupted`, the failure's own words).
  */
@@ -191,7 +197,7 @@ export function settleChatTurn(options: {
 }): SettledChatTurn {
   const locale = parseAppLocale(options.locale);
   const base = settleWords(options, locale);
-  const limited = options.stepLimit ? withStepLimitNote(base, locale) : base;
+  const limited = options.stepLimit ? withStepLimitNote(base, options.tools, locale) : base;
   return options.interrupted?.trim() ? withInterruptedNote(limited, options.interrupted.trim(), locale) : limited;
 }
 
@@ -218,9 +224,28 @@ function settleWords(
   return { text: sentence, appended: sentence };
 }
 
+/** Tool keys that finished, first occurrence, in order. A call that only started is not named. */
+function finishedToolNames(tools: readonly SettledTool[]): string[] {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const tool of tools) {
+    if (tool.status !== "completed") {
+      continue;
+    }
+    const name = tool.toolKey.replace(/\s+/g, " ").trim();
+    if (!name || seen.has(name)) {
+      continue;
+    }
+    seen.add(name);
+    names.push(name);
+  }
+  return names;
+}
+
 /** Appends the step-limit sentence once, after a blank line when the reply already has words. */
-function withStepLimitNote(turn: SettledChatTurn, locale: AppLocale): SettledChatTurn {
-  return withClosingNote(turn, chatTurnCopy(locale).stepLimit);
+function withStepLimitNote(turn: SettledChatTurn, tools: readonly SettledTool[], locale: AppLocale): SettledChatTurn {
+  const names = finishedToolNames(tools);
+  return { ...withClosingNote(turn, stepLimitNote(locale, names)), stepLimit: { tools: names } };
 }
 
 /** Appends the interrupted sentence once, with the failure's own words as the reason. */
@@ -233,5 +258,5 @@ function withClosingNote(turn: SettledChatTurn, note: string): SettledChatTurn {
     return turn;
   }
   const tail = turn.text.trim() ? `\n\n${note}` : note;
-  return { text: `${turn.text}${tail}`, appended: `${turn.appended}${tail}` };
+  return { ...turn, text: `${turn.text}${tail}`, appended: `${turn.appended}${tail}` };
 }

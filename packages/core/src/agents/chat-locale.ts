@@ -62,8 +62,15 @@ export type ChatTurnCopy = {
   /** Stub only: a real marker plus one the desk did not offer, so the check has something to drop. */
   deskCite: string;
   noSource: string;
-  /** The run used every step it had and the last one was still working: what happened and what to do. */
+  /**
+   * The run used every step and the last one was still working. `{tools}` is the tools that finished.
+   * The sentence names them and says the answer did not.
+   */
   stepLimit: string;
+  /** The same close when no tool finished. */
+  stepLimitEmpty: string;
+  /** The word between the last two names in `{tools}`. */
+  stepLimitAnd: string;
   /**
    * A model call failed after a tool had completed: the tools ran, no answer followed, why (`{reason}`),
    * and what to send. The tool steps are kept in the turn, so it says they ran and does not offer a redo.
@@ -83,8 +90,10 @@ const CHAT_TURN_COPY: Record<AppLocale, ChatTurnCopy> = {
     pastMany: 'Earlier chats include "{title}".',
     deskCite: "From the desk [1] [99].",
     noSource: "This desk did not have a source for that.",
-    stepLimit:
-      "I ran out of steps before I could finish this. Ask me to continue and I will pick up from where I stopped.",
+    stepLimit: "{tools} finished, but the answer didn't. Ask me to continue and I will pick up from where I stopped.",
+    stepLimitEmpty:
+      "No tool finished, but the answer didn't. Ask me to continue and I will pick up from where I stopped.",
+    stepLimitAnd: "and",
     interrupted:
       'The tool steps above ran, but I could not finish the answer.\n\nReason: {reason}\n\nSend "continue" and I will try again.',
     modelFallback: "{from} is unavailable; used {to} for this answer.",
@@ -99,7 +108,10 @@ const CHAT_TURN_COPY: Record<AppLocale, ChatTurnCopy> = {
     deskCite: "Dari meja [1] [99].",
     noSource: "Meja ini tidak punya sumber untuk itu.",
     stepLimit:
-      "Langkah kerja saya habis sebelum ini selesai. Minta saya untuk melanjutkan, dan saya akan meneruskannya dari titik terakhir.",
+      "{tools} sudah selesai, tetapi jawabannya belum. Minta saya untuk melanjutkan, dan saya akan meneruskannya dari titik terakhir.",
+    stepLimitEmpty:
+      "Tidak ada alat yang selesai, tetapi jawabannya belum. Minta saya untuk melanjutkan, dan saya akan meneruskannya dari titik terakhir.",
+    stepLimitAnd: "dan",
     interrupted:
       'Langkah alat di atas sudah berjalan, tetapi saya tidak dapat menyelesaikan jawabannya.\n\nAlasan: {reason}\n\nKirim "lanjutkan" dan saya akan mencoba lagi.',
     modelFallback: "{from} tidak tersedia; menggunakan {to} untuk jawaban ini.",
@@ -117,6 +129,43 @@ export function fillChatTurn(template: string, title: string): string {
 /** Puts a failure's own words into a sentence. `replaceAll` with a function, so `$&` in a reason stays literal. */
 export function fillChatReason(template: string, reason: string): string {
   return template.replaceAll("{reason}", () => reason);
+}
+
+/** Puts the finished-tool list into the step-limit sentence. A `$` in a name stays literal. */
+export function fillChatTools(template: string, tools: string): string {
+  return template.replaceAll("{tools}", () => tools);
+}
+
+function listToolNames(names: readonly string[], andWord: string): string {
+  if (names.length <= 1) {
+    return names[0] ?? "";
+  }
+  if (names.length === 2) {
+    return `${names[0]} ${andWord} ${names[1]}`;
+  }
+  return `${names.slice(0, -1).join(", ")} ${andWord} ${names[names.length - 1]}`;
+}
+
+/**
+ * The step-limit sentence. `finishedTools` are the tool keys that completed, in the order they finished.
+ * None finished uses the empty sentence, which still says the answer did not.
+ */
+export function stepLimitNote(locale: AppLocale, finishedTools: readonly string[]): string {
+  const copy = chatTurnCopy(locale);
+  const names: string[] = [];
+  const seen = new Set<string>();
+  for (const tool of finishedTools) {
+    const name = tool.replace(/\s+/g, " ").trim();
+    if (!name || seen.has(name)) {
+      continue;
+    }
+    seen.add(name);
+    names.push(name);
+  }
+  if (names.length === 0) {
+    return copy.stepLimitEmpty;
+  }
+  return fillChatTools(copy.stepLimit, listToolNames(names, copy.stepLimitAnd));
 }
 
 export function wantsStubClock(summary: string): boolean {
