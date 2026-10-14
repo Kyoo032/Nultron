@@ -226,6 +226,7 @@ Rules:
 | `card.moved` | `fromColumnId`, `toColumnId`, `position` |
 | `card.assigned` | `assigneeKind`, `assigneeUserId` |
 | `card.archived` | — |
+| `card.restored` | `columnId`, `position` |
 | `comment.added` / `comment.edited` / `comment.deleted` | `commentId` |
 | `file.attached` / `file.removed` | `cardFileId` |
 | `agent.waiting_accept` / `agent.accepted` / `agent.declined` | `agentTaskId` |
@@ -244,13 +245,17 @@ The client fetches the content an event points at through the normal routes, whi
 - `GET /api/v1/board/events`, `text/event-stream`, one stream per open board tab.
 - Each message: `id: <card_events.id>`, `event: <type>`, `data: {"cardId": …, …payload}`.
 - **Heartbeat**: a comment line (`: hb`) every 15 seconds.
-- **Resume**: the browser sends `Last-Event-ID`; the host replays every event after it, up to 1 000. Past that it sends `event: reset` and the browser reloads the board.
-- Headers: `Cache-Control: no-store`, `X-Accel-Buffering: no`. Caddy and any proxy must not buffer the response.
+- **Resume**: the browser sends `Last-Event-ID`; the host replays every event after it, up to 1 000. Past that it sends `event: reset` and the browser reloads the board. A `Last-Event-ID` that is present but not a number, or that is greater than the desk's newest event, also gets `event: reset`: the browser's idea of the board is not one the host can continue from.
+- **`Last-Event-ID` is forwarded by the HTTP adapter in server mode only** (`http-adapter.ts`, like `accept-language`). The board does not exist off server mode, and the Personal adapter's header set must stay what it was (its parity test holds it).
+- **Lifetime**: a stream is closed after 15 minutes with `event: closed` and `{"reason":"lifetime"}`, checked at the top of every loop turn so a busy desk still closes on time.
+- **Close reasons and what the browser does** (`apps/web/lib/board-stream.ts`): `lifetime`, reconnect at once with `Last-Event-ID`; `replaced` (a newer stream of the same person took the slot), stop and show a "resume" button; `access`, or an HTTP 401, 403 or 404, stop for good. Any other drop reconnects with a backoff of 1 s doubling to 30 s, reset after a connect reaches the stream.
+- Headers: `Cache-Control: no-store, no-transform`, `X-Accel-Buffering: no`. Caddy and any proxy must not buffer the response. **Compression, as driven on 2026-10-13:** behind the real Caddyfile (`caddy:2.11-alpine`, `encode zstd gzip` with no `match`) the stream came back with **no `Content-Encoding`** although Chromium offered `gzip, deflate, br, zstd`, and a change reached the other browser in 0.3 to 0.8 s. Caddy's default `encode` list does include `text/*`; the stream's `Cache-Control: no-transform` is the likely reason it is left alone, so that directive must stay on the stream response. Not isolated by a run without it.
+- **Backpressure**: the adapter writes stream frames respecting `res.write`'s return value; while the socket buffer is full it waits for `drain`, and a heartbeat that would queue behind a full buffer is dropped.
 
 ### 8.2 Who receives what
 
 - Opening the stream needs a signed-in session in server mode and a desk the person may open (K-D11). No CSRF token: it is a GET with no side effect.
-- **Every event is re-checked before it is sent**, against the database, not a cached membership: the person is still a member of the company, the desk is theirs, the card is not archived. Replay uses the same filter.
+- **Every event is re-checked before it is sent**, against the database, not a cached membership: the person is still a member of the company, the desk is theirs, the card is not archived. Replay uses the same filter. The access check (session and membership) runs once per read batch and again before an event only when more than a second has passed since the last check, so it still happens before anything is sent; every heartbeat checks again.
 - A person removed from the company or the board has their open streams closed within one event.
 - Caps: at most 5 open streams per person and 500 per replica. Over the cap the oldest stream is closed.
 
@@ -386,8 +391,9 @@ All are server-mode only in v1 and answer `404` on Personal. Writes need the CSR
 | `GET /api/v1/board/cards/:id` | — | the card with description, comments, files, current agent task | `404 card_not_found` |
 | `POST /api/v1/board/cards` | `title`, `description?`, `columnId`, `assignee?` | the card | `400 invalid_card` |
 | `PATCH /api/v1/board/cards/:id` | `version`, any of `title`, `description`, `columnId`+`position`, `assignee`, `dueAt` | the card | `409 card_conflict` with the current card |
-| `POST /api/v1/board/cards/:id/archive` | `version` | — | `409 card_conflict` |
-| `POST /api/v1/board/cards/:id/comments` | `body` | the comment | `400 invalid_comment` |
+| `POST /api/v1/board/cards/:id/archive` | `version` | — | `409 card_conflict`, `403 not_allowed` |
+| `POST /api/v1/board/cards/:id/restore` | `version` | the card | `403 admin_only`, `409 card_conflict`, `404 card_not_found` |
+| `POST /api/v1/board/cards/:id/comments` | `body` | the comment | `400 invalid_comment`, `409 comment_limit` |
 | `POST /api/v1/board/cards/:id/files` | multipart upload, or `{ privateFileId }` to copy from the person's own files | the card file | `413 too_large`, `400 format_mismatch`, `404 private_file_not_found` |
 | `POST /api/v1/board/agent-tasks/:id/accept` | — | the task | `403 not_owner`, `409 bad_state` |
 | `POST /api/v1/board/agent-tasks/:id/decline` · `/cancel` · `/approve` · `/send-back` · `/retry` | `comment?` on send-back | the task | `403 not_owner`, `409 bad_state` |
@@ -399,6 +405,14 @@ All are server-mode only in v1 and answer `404` on Personal. Writes need the CSR
 | `POST /api/v1/admin/leavers/:userId` | `decision`: `keep` / `delete` | counts only (K-D14) | `403 admin_only` |
 
 New routes go through `packages/host/src/router.ts`, with handlers in `packages/host/src/handlers/board.ts`, and each gets its row in the tenancy route table.
+
+**Who may archive and restore (security review of K0, 2026-10-13).** Archiving a card is allowed to the card's creator, its assignee, or an owner or admin of the company; anyone else gets `403 not_allowed`, checked by the host. Restoring an archived card is owner or admin only (`POST …/restore`), writes a `board_audit` row (`card.restore`) and a `card.restored` event, and puts the card back at the end of the column it was archived from (or To do when that column was archived since).
+
+**Volume caps (same review).** Enforced by the task service inside the write's transaction, each with its own code and copy in both languages: at most **5 000 live cards per desk** (`409 card_limit`), **500 comments per card** (`409 comment_limit`), **50 live columns per desk**, the five built-in ones included (`409 column_limit`).
+
+**Position keys never grow without bound (same review).** A new key longer than 48 characters (`MAX_POSITION_KEY`, well inside the 200 characters `isPositionKey` accepts) is not written: the task service rewrites the keys of that column, evenly spaced and short, in the same transaction, and writes one `column.changed` event so every open board reloads. A case it still cannot place answers `409 position_exhausted`, never a 500.
+
+**Drag conflicts.** A drag that loses the compare-and-set shows its own sentence (`board.errors.moveConflict`): the person typed nothing, so the dialog's "your edits are still in the boxes" does not apply; the board reloads and they can drag again.
 
 ## 14. In the chat-first shell
 
@@ -441,6 +455,24 @@ Everything up to K4 runs on one CVM and SQLite. P1 and P2 are the infrastructure
 | K5 | Promotion PR to `main`, after Rizky approves. | `ci:local` green; Personal-parity test; security register rows updated. |
 | P1 | (On Rizky's word, K-D10.) TencentDB for PostgreSQL; the dialect split in `packages/db`; `PostgresBoardBus`; row-level security on `person_*`; COS for files. | The board and Chat pass on Postgres; the SQLite path still passes for Personal; two concurrent writers on one desk and one open stream: the stream misses no event. |
 | P2 | (On Rizky's word, K-D9.) TKE: shared run cap and rate limits, session row lock, TLS at the CLB, secrets from Secrets Manager or KMS, enforcing network policy, more than one replica. | Two replicas, a stream on each, a move on one shows on the other; a replica killed mid-run loses no task. |
+
+**What P1 owes the board's SQL (security review of K0, 2026-10-13, M3).** K0's SQL is SQLite's, and a straight port to Postgres would break it quietly:
+
+- Position columns need `COLLATE "C"`: a key sorts by code point (`0-9 < A-Z < a-z`), and a locale collation would reorder cards.
+- Timestamps are epoch milliseconds: `bigint`, not `integer`.
+- node-postgres returns `count(*)` and `max(id)` as strings: parse them, or the cursor compare (`id > after`) becomes a string compare.
+- The store is synchronous on `better-sqlite3`; the Postgres port is async end to end.
+- The snapshot's cursor (`latestEventId` read with the board) needs one consistent read: `REPEATABLE READ` for the snapshot, and an advisory lock (or an equivalent) so ids are assigned in commit order. Otherwise a reader can see id 12 committed before id 11 and skip 11 forever.
+
+## 17a. Known follow-ups (not K0)
+
+From the security review of K0 (2026-10-13). None blocks K0; each is recorded so it is not lost.
+
+- **`card_events` retention (M2).** Rows are kept for ever today. Plan: a daily prune of rows older than N days (N to be chosen with Rizky; 30 is the draft), per desk. A stream whose `Last-Event-ID` is older than the oldest kept row must get `event: reset`, which the "greater than newest / more than 1 000 behind" checks do not cover alone: the prune has to keep the reset path correct by comparing against the oldest kept id. The job is not K0.
+- **L5. A per-desk event counter.** `card_events.id` is the global SQLite rowid, so the ids a desk sees have gaps where other desks wrote, and the 1 000 replay limit is counted in rows, not ids. A per-desk sequence would make the cursor local and the gap count exact.
+- **L6. A database-level same-desk guard.** `cards.column_id` and `card_comments.card_id` are checked by the host to belong to the same desk; no trigger or composite key enforces it in the database.
+- **L7. The healer cannot change a table.** `ensureBoardTables` uses `CREATE TABLE IF NOT EXISTS`, which never alters an existing table. K2's agent columns need real `ALTER TABLE` steps (or a drizzle migration) with a test that upgrades a K0 database.
+- **L9. Sealed text is not bound to its row.** `seal.ts` encrypts without additional authenticated data, so a sealed description could be copied onto another card of the same tenant and would still open. Binding the AAD to tenant, desk, card and field closes that.
 
 ## 18. Check on Tencent Cloud before building on it
 

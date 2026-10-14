@@ -183,3 +183,35 @@ describe("AgentRailView account group", () => {
     expect(html).toContain('data-testid="rail-footer"><span data-testid="footer-stub"');
   });
 });
+
+describe("AgentRailView team board entry (tester lane, K0)", () => {
+  const accountIds = (html: string) =>
+    links(
+      html.slice(html.indexOf('data-testid="rail-account-group"'), html.indexOf('data-testid="rail-footer"')),
+    ).map((tag) => attr(tag, "data-testid"));
+
+  it("leaves the account group exactly as it was on Personal", () => {
+    expect(accountIds(markup())).toEqual(["mode-knowledge", "channels-link", "workspaces-link", "usage-link", "settings-link"]);
+    expect(markup()).not.toContain("/board");
+    expect(markup({ showBoard: false })).toBe(markup());
+  });
+
+  it("puts the board first in the account group on a hosted build, in the desk's language", () => {
+    const html = markup({ showBoard: true, pathname: "/board", activeId: null });
+    expect(accountIds(html)).toEqual([
+      "board-link",
+      "mode-knowledge",
+      "channels-link",
+      "workspaces-link",
+      "usage-link",
+      "settings-link",
+    ]);
+    const tag = links(html).find((entry) => attr(entry, "data-testid") === "board-link") ?? "";
+    expect(attr(tag, "href")).toBe("/board");
+    expect(attr(tag, "aria-current")).toBe("page");
+    expect(attr(tag, "aria-label")).toBe("Board");
+    applyLocale("id");
+    const idTag = links(markup({ showBoard: true })).find((entry) => attr(entry, "data-testid") === "board-link") ?? "";
+    expect(attr(idTag, "aria-label")).toBe("Papan");
+  });
+});

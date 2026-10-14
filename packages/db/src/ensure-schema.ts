@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type Database from "better-sqlite3";
 import { isServerMode } from "@agentforge/core";
+import { ensureBoardTables } from "./board-schema";
 
 const MIGRATIONS_TABLE = "__drizzle_migrations";
 
@@ -249,6 +250,7 @@ export function ensureSchema(sqlite: Database.Database): void {
   ensureTenantStorageTable(sqlite);
   ensureTenantResetAuditTable(sqlite);
   ensureDeskFileTables(sqlite);
+  ensureBoardTables(sqlite);
   ensureWorkspaceColumns(sqlite);
   assertKernelTables(sqlite);
 }

@@ -545,6 +545,44 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
     refusal: "indistinguishable",
     why: FOLDER_PROPOSAL_WHY,
   },
+
+  // --- team board (tester lane, K0) -------------------------------------------------------------
+  // These rows keep the table complete and prove little on their own. The board is server mode
+  // only and its handlers read `isServerMode()` (handlers/board.ts:48), which this harness switches
+  // off at the top of the file, so here every board route answers the router's own 404 before it
+  // reads an id. The two-company proof, with server mode on, a positive control for every refusal,
+  // and the live stream, is board/board-companies.test.ts.
+  { method: "GET", path: "/api/v1/board/cards/:cardId", params: { cardId: "unseeded" } },
+  {
+    method: "PATCH",
+    path: "/api/v1/board/cards/:cardId",
+    params: { cardId: "unseeded" },
+    body: { version: 1, title: "x" },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/board/cards/:cardId/archive",
+    params: { cardId: "unseeded" },
+    body: { version: 1 },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/board/cards/:cardId/restore",
+    params: { cardId: "unseeded" },
+    body: { version: 1 },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/board/cards/:cardId/comments",
+    params: { cardId: "unseeded" },
+    body: { body: "x" },
+  },
+  {
+    method: "PATCH",
+    path: "/api/v1/board/columns/:columnId",
+    params: { columnId: "unseeded" },
+    body: { name: "x" },
+  },
 ];
 
 let store: ReturnType<typeof createMemorySessionStore>;

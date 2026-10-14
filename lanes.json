@@ -275,6 +275,20 @@
       "note": "Virtual agents registry, catalog, worker channel and renderer helpers, tester code only."
     },
     {
+      "glob": "{packages/db/src/ensure-schema.ts,packages/db/src/tenant-purge.ts,packages/db/src/migrate-0015.test.ts,packages/host/src/router.ts,packages/host/src/types.ts,packages/host/src/http-adapter.ts,packages/host/src/tenancy-harness.test.ts,apps/web/src/App.tsx,apps/web/lib/i18n.ts,apps/web/components/agent-rail.tsx,apps/web/components/mode-icons.tsx,apps/web/components/mode-illustration.tsx,apps/web/lib/agent-rail.test.tsx,docs/internal/unreleased.md,docs/internal/maps/README.md,.cursor/skills/verify-agentforge/features/README.md}",
+      "map": "docs/internal/maps/board.md",
+      "lanes": ["personal", "enterprise", "hyp-ai", "tester"],
+      "protected": true,
+      "note": "Tester shared files edited for the team board, K0 (2026-10-13). ensure-schema calls ensureBoardTables; tenant-purge lists the five board tables in CASCADED_TABLES; migrate-0015.test lists them as tenant carriers; router compiles boardRoutes() in one line; types adds HostStreamResult.headers; http-adapter applies a stream's own headers and forwards Last-Event-ID; tenancy-harness has the five by-id rows; App routes /board on hosted builds only; i18n registers the board namespace; agent-rail takes showBoard; mode-icons and mode-illustration add the board icon and scene; unreleased.md has one entry at the top of its log and the two README indexes one row each. A merge from main can conflict at each, unreleased.md most likely."
+    },
+    {
+      "glob": "{packages/db/src/board-schema*.ts,packages/host/src/board/**,packages/host/src/handlers/board.ts,apps/web/components/board-page.tsx,apps/web/components/board-card-dialog.tsx,apps/web/components/board.css,apps/web/lib/board-*.ts}",
+      "map": "docs/internal/maps/board.md",
+      "lanes": ["tester"],
+      "protected": false,
+      "note": "Team board K0, tester code only, server mode only (team-board-spec.md). No published version, so no conflict at a merge from main."
+    },
+    {
       "glob": "apps/web/components/settings-*.tsx",
       "map": "docs/internal/maps/settings-and-gateway-gate.md",
       "lanes": ["personal", "enterprise", "hyp-ai", "tester"],

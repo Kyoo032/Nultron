@@ -208,10 +208,18 @@ describe("0015_tenants on a fresh database", () => {
     // a tenant is holding is a property of the tenant, and the quota it feeds is per tenant, not
     // per organization. tenant_reset_audit is Phase 8 (0020): it records that a tenant erased its
     // own content, so it has to hang off the thing that survives that act — the tenant — and never
-    // off the organization the reset deletes. Nothing else is allowed to carry a second tenant_id.
+    // off the organization the reset deletes. The five team-board tables (tester, board-schema.ts)
+    // carry a copy so every board query filters on it (team-board-spec.md section 6); triggers there
+    // refuse a copy that disagrees with the desk's organization, so it is an enforced invariant.
+    // Nothing else is allowed to carry a second tenant_id.
     expect(carriers.sort()).toEqual([
       "auth_sessions",
       "billing_events",
+      "board_audit",
+      "board_columns",
+      "card_comments",
+      "card_events",
+      "cards",
       "tenant_plan",
       "tenant_reset_audit",
       "tenant_seat",

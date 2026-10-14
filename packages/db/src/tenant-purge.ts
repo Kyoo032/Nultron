@@ -79,6 +79,12 @@ export const CASCADED_TABLES = [
   // Reached through `desk_files`, not through `organizations`: the workspace-scoped pass below
   // deletes the desk's files and the foreign key takes their versions with them.
   "desk_file_versions",
+  // The team board (tester, `board-schema.ts`): every table references `workspaces` with ON DELETE cascade.
+  "board_columns",
+  "cards",
+  "card_comments",
+  "card_events",
+  "board_audit",
 ] as const;
 
 /**

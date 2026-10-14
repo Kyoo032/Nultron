@@ -9,6 +9,7 @@ import { DeskBuddyChip, DeskBuddyDock } from "@/components/desk-buddy";
 import { ModeIcon, isModeIconName, type ModeIconName } from "@/components/mode-icons";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { productMonogram } from "@/components/app-shell";
+import { isHostedBuild } from "@/lib/hosted-build";
 import { t } from "@/lib/i18n";
 import { assistantNameOf, useProductBrand, usesBundledMark } from "@/lib/product-brand";
 import type { ShellModesSource } from "@/lib/shell-modes";
@@ -113,9 +114,16 @@ export type AgentRailViewProps = {
   bundledMark: boolean;
   /** The footer controls (theme, updates). A slot so the drawing stays free of the update bridge. */
   footer?: ReactNode;
+  /** The team board's entry. Hosted only (`isHostedBuild()`): the board does not exist on Personal. */
+  showBoard?: boolean;
 };
 
-const ACCOUNT_LINKS: ReadonlyArray<{ href: string; icon: ModeIconName; testId: string; labelKey: string }> = [
+type AccountLink = { href: string; icon: ModeIconName; testId: string; labelKey: string };
+
+/** The team board (tester lane, K0): an account page beside Knowledge and Settings (team-board-spec.md section 14). */
+const BOARD_LINK: AccountLink = { href: "/board", icon: "board", testId: "board-link", labelKey: "board.rail.label" };
+
+const ACCOUNT_LINKS: ReadonlyArray<AccountLink> = [
   { href: "/knowledge", icon: "knowledge", testId: "mode-knowledge", labelKey: "rail.knowledge" },
   { href: "/channels", icon: "channels", testId: "channels-link", labelKey: "rail.channels" },
   { href: "/workspaces", icon: "workspaces", testId: "workspaces-link", labelKey: "agents.rail.manage" },
@@ -146,7 +154,9 @@ export function AgentRailView({
   logoSrc,
   bundledMark,
   footer,
+  showBoard = false,
 }: AgentRailViewProps) {
+  const accountLinks = showBoard ? [BOARD_LINK, ...ACCOUNT_LINKS] : ACCOUNT_LINKS;
   /*
    * The name shows in one tooltip drawn by the rail itself, outside the scrolling column. A tooltip
    * inside that column would be clipped by it (a scroller clips both axes), and a CSS-only one cannot
@@ -207,7 +217,7 @@ export function AgentRailView({
       <div className="agent-rail-divider" aria-hidden="true" />
 
       <div className="agent-rail-account" data-testid="rail-account-group">
-        {ACCOUNT_LINKS.map((item) => (
+        {accountLinks.map((item) => (
           <RailLink
             key={item.testId}
             href={item.href}
@@ -254,6 +264,7 @@ export function AgentRail(_props: Props) {
       assistantName={assistantNameOf(brand)}
       logoSrc={brand.logoSrc}
       bundledMark={usesBundledMark(brand)}
+      showBoard={isHostedBuild()}
       footer={
         <>
           {/* The character lives here in this shell, as the small head: the rail is the one place on
