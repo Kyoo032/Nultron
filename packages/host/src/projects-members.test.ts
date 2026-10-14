@@ -327,9 +327,17 @@ describe("a Workspace is shared with its members only: four people, two companie
     expect(
       await outcome(await call(ben, "POST", "/api/v1/projects/:id/owner", { id: room }, { userId: "ben" })),
     ).toEqual(FORBIDDEN);
-    expect(
-      await outcome(await call(alice, "POST", "/api/v1/projects/:id/owner", { id: room }, { userId: "cara" })),
-    ).toEqual(NOT_FOUND);
+    // A non-member (C), another company's person (D) and an unknown id: 404, and nothing changes.
+    for (const userId of ["cara", "dan", "nobody"]) {
+      expect(
+        await outcome(await call(alice, "POST", "/api/v1/projects/:id/owner", { id: room }, { userId })),
+      ).toEqual(NOT_FOUND);
+      expect(await outcome(await setRole(alice, room, userId, "admin"))).toEqual(NOT_FOUND);
+    }
+    expect(await members(alice, room)).toEqual([
+      { userId: "alice", role: "owner" },
+      { userId: "ben", role: "member" },
+    ]);
     expect(
       await outcome(await call(alice, "POST", "/api/v1/projects/:id/owner", { id: room }, { userId: "ben" })),
     ).toEqual(OK);
