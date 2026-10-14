@@ -14,6 +14,7 @@ export type ProjectRow = {
   id: string;
   name: string;
   visibility: ProjectVisibility;
+  instructions: string | null;
   created_by: string;
   created_at: number;
   updated_at: number;
@@ -34,11 +35,13 @@ export type ProjectFileRow = {
 const VISIBLE_PROJECT = `id = ? AND organization_id = ? AND workspace_id = ? AND archived_at IS NULL
   AND (created_by = ? OR visibility = 'workspace')`;
 
-const PROJECT_COLUMNS = "id, name, visibility, created_by, created_at, updated_at, archived_at";
+const PROJECT_COLUMNS = "id, name, visibility, instructions, created_by, created_at, updated_at, archived_at";
 
 export function countLiveProjects(scope: TenantContext): number {
   const row = sql
-    .prepare("SELECT count(*) AS n FROM projects WHERE organization_id = ? AND workspace_id = ? AND archived_at IS NULL")
+    .prepare(
+      "SELECT count(*) AS n FROM projects WHERE organization_id = ? AND workspace_id = ? AND archived_at IS NULL",
+    )
     .get(scope.organizationId, scope.workspaceId) as { n: number };
   return row.n;
 }
@@ -73,7 +76,7 @@ export function listVisibleProjects(scope: TenantContext, limit: number): Projec
 export function updateProjectRow(
   scope: TenantContext,
   id: string,
-  changes: { name?: string; visibility?: ProjectVisibility },
+  changes: { name?: string; visibility?: ProjectVisibility; instructions?: string },
   now: number,
 ): void {
   // Column names are fixed literals below, never taken from the request.
@@ -86,6 +89,10 @@ export function updateProjectRow(
   if (changes.visibility !== undefined) {
     sets.push("visibility = ?");
     args.push(changes.visibility);
+  }
+  if (changes.instructions !== undefined) {
+    sets.push("instructions = ?");
+    args.push(changes.instructions);
   }
   sql
     .prepare(`UPDATE projects SET ${sets.join(", ")} WHERE id = ? AND organization_id = ? AND workspace_id = ?`)
@@ -133,6 +140,21 @@ export function setFileProject(scope: TenantContext, artifactId: string, project
     .prepare("UPDATE artifacts SET project_id = ? WHERE workspace_id = ? AND id = ?")
     .run(projectId, scope.workspaceId, artifactId);
 }
+
+export type ProjectThreadRow = { id: string; title: string; created_at: number };
+
+/** The caller's own chats in one Workspace, newest first. Threads belong to a person, so the person is part of the key. */
+export function listOwnProjectThreads(scope: TenantContext, projectId: string): ProjectThreadRow[] {
+  return sql
+    .prepare(
+      `SELECT id, title, created_at FROM threads
+        WHERE organization_id = ? AND workspace_id = ? AND user_id = ? AND project_id = ?
+        ORDER BY created_at DESC LIMIT ?`,
+    )
+    .all(scope.organizationId, scope.workspaceId, scope.userId, projectId, PROJECT_THREAD_LIMIT) as ProjectThreadRow[];
+}
+
+const PROJECT_THREAD_LIMIT = 200;
 
 export function inTransaction<T>(work: () => T): T {
   return sql.transaction(work)();

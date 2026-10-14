@@ -5,19 +5,25 @@
  * Identity is `getTenant(request)` and nothing the request body says. CSRF and the rate limit are the
  * HTTP adapter's, applied to every write before dispatch. Downloads stay on `GET /api/v1/artifacts/:id/file`.
  */
-import { isServerMode } from "@agentforge/core";
+import { ApiError, isServerMode } from "@agentforge/core";
 import { parseAddFile, parseCreateProject, parseUpdateProject } from "../projects/input";
 import {
   addProjectFile,
   archiveProject,
   createProject,
   listProjectFiles,
+  listProjectKnowledgeFor,
+  listProjectThreadsFor,
   listProjects,
   removeProjectFile,
+  removeProjectKnowledge,
   updateProject,
+  uploadProjectKnowledge,
 } from "../projects/service";
 import { jsonError, jsonOk } from "../errors";
 import { getTenant } from "../tenant";
+import { requireGatewayAllowedFor } from "../gateway-gate";
+import { KNOWLEDGE_FILE_MAX_BYTES } from "../knowledge-extract";
 import type { HostRequest, HostResult } from "../types";
 
 const NOT_FOUND: HostResult = {
@@ -68,7 +74,7 @@ export const handleGetProjectFiles = projectRoute(async (request) => {
 
 export const handlePostProjectFile = projectRoute(async (request) => {
   const scope = await getTenant(request);
-  addProjectFile(scope, request.params.id ?? "", parseAddFile(request.body));
+  await addProjectFile(scope, request.params.id ?? "", parseAddFile(request.body));
   return jsonOk({ ok: true });
 });
 
@@ -78,11 +84,43 @@ export const handleDeleteProjectFile = projectRoute(async (request) => {
   return jsonOk({ ok: true });
 });
 
+export const handleGetProjectKnowledge = projectRoute(async (request) => {
+  const scope = await getTenant(request);
+  return jsonOk({ items: listProjectKnowledgeFor(scope, request.params.id ?? "") });
+});
+
+/** A file uploaded straight into the Workspace (W1). Every write that reaches the gateway is gated first. */
+export const handlePostProjectUpload = projectRoute(async (request) => {
+  const scope = await getTenant(request);
+  requireGatewayAllowedFor(scope);
+  const file = request.files?.find((item) => item.field === "file") ?? request.files?.[0];
+  if (!file) {
+    throw new ApiError("invalid_request", "file is required", 400);
+  }
+  if (file.bytes.byteLength > KNOWLEDGE_FILE_MAX_BYTES) {
+    throw new ApiError("invalid_request", "The file exceeds the 25 MB cap", 413);
+  }
+  return jsonOk({ source: await uploadProjectKnowledge(scope, request.params.id ?? "", file) }, 201);
+});
+
+export const handleDeleteProjectKnowledge = projectRoute(async (request) => {
+  const scope = await getTenant(request);
+  removeProjectKnowledge(scope, request.params.id ?? "", request.params.sourceId ?? "");
+  return jsonOk({ ok: true });
+});
+
+export const handleGetProjectThreads = projectRoute(async (request) => {
+  const scope = await getTenant(request);
+  return jsonOk({ items: listProjectThreadsFor(scope, request.params.id ?? "") });
+});
+
 /**
  * The F1 project route table. `router.ts` compiles it with one line. Every by-id route here has its row
  * in `tenancy-harness.test.ts`, which fails for any by-id route without one.
  */
-export function projectRoutes(): ReadonlyArray<readonly [string, string, (request: HostRequest) => Promise<HostResult>]> {
+export function projectRoutes(): ReadonlyArray<
+  readonly [string, string, (request: HostRequest) => Promise<HostResult>]
+> {
   return [
     ["GET", "/api/v1/projects", handleGetProjects],
     ["POST", "/api/v1/projects", handlePostProject],
@@ -91,5 +129,9 @@ export function projectRoutes(): ReadonlyArray<readonly [string, string, (reques
     ["GET", "/api/v1/projects/:id/files", handleGetProjectFiles],
     ["POST", "/api/v1/projects/:id/files", handlePostProjectFile],
     ["DELETE", "/api/v1/projects/:id/files/:artifactId", handleDeleteProjectFile],
+    ["GET", "/api/v1/projects/:id/knowledge", handleGetProjectKnowledge],
+    ["POST", "/api/v1/projects/:id/uploads", handlePostProjectUpload],
+    ["DELETE", "/api/v1/projects/:id/knowledge/:sourceId", handleDeleteProjectKnowledge],
+    ["GET", "/api/v1/projects/:id/threads", handleGetProjectThreads],
   ];
 }

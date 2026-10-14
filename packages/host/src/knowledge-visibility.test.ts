@@ -110,7 +110,7 @@ describe("on server mode: each fragment is well formed", () => {
   it("the shared-only fragment (for the map) names no thread, no owned card and takes no values", () => {
     const shared = andSharedSource("s", ON);
     expect(shared.params).toEqual([]);
-    expect(shared.sql).toBe(" AND (s.origin_kind IS NULL OR s.origin_kind <> 'thread') AND s.owner_user_id IS NULL");
+    expect(shared.sql).toBe(" AND (s.origin_kind IS NULL OR s.origin_kind <> 'thread') AND s.owner_user_id IS NULL AND s.project_id IS NULL");
   });
 
   it("binds the person for the owner check, then the organization, desk and person for the thread lookup", () => {

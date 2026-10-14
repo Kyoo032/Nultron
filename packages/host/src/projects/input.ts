@@ -10,9 +10,13 @@ export type ProjectVisibility = "private" | "workspace";
 
 export type CreateProjectInput = { readonly name: string };
 
+/** The most instructions a Workspace may hold (W1). Long enough for a brief, short enough to sit in every prompt. */
+export const PROJECT_INSTRUCTIONS_MAX = 8000;
+
 export type UpdateProjectInput = {
   readonly name?: string;
   readonly visibility?: ProjectVisibility;
+  readonly instructions?: string;
 };
 
 export type AddFileInput = { readonly artifactId: string };
@@ -49,17 +53,30 @@ export function parseCreateProject(body: unknown): CreateProjectInput {
   return { name: name(record(body).name) };
 }
 
+function instructions(value: unknown): string {
+  if (typeof value !== "string") {
+    throw new ApiError("invalid_project", "instructions must be a string.", 400);
+  }
+  if (value.length > PROJECT_INSTRUCTIONS_MAX) {
+    throw new ApiError("invalid_project", `instructions are longer than ${PROJECT_INSTRUCTIONS_MAX} characters.`, 400);
+  }
+  return value.trim();
+}
+
 export function parseUpdateProject(body: unknown): UpdateProjectInput {
   const raw = record(body);
-  const changes: { name?: string; visibility?: ProjectVisibility } = {};
+  const changes: { name?: string; visibility?: ProjectVisibility; instructions?: string } = {};
   if (raw.name !== undefined) {
     changes.name = name(raw.name);
   }
   if (raw.visibility !== undefined) {
     changes.visibility = visibility(raw.visibility);
   }
-  if (changes.name === undefined && changes.visibility === undefined) {
-    throw new ApiError("invalid_project", "Nothing to change: send name or visibility.", 400);
+  if (raw.instructions !== undefined) {
+    changes.instructions = instructions(raw.instructions);
+  }
+  if (changes.name === undefined && changes.visibility === undefined && changes.instructions === undefined) {
+    throw new ApiError("invalid_project", "Nothing to change: send name, visibility or instructions.", 400);
   }
   return changes;
 }

@@ -330,6 +330,7 @@ export async function searchVectors(
   limit = 4,
   excludeSourceIds: string[] = [],
   preferredModel?: string | null,
+  projectId: string | null = null,
 ): Promise<VectorSearch> {
   const trimmed = query.trim();
   if (!trimmed) {
@@ -349,7 +350,8 @@ export async function searchVectors(
     excludeSourceIds.length > 0 ? ` AND source_id NOT IN (${excludeSourceIds.map(() => "?").join(", ")})` : "";
   const ws = workspaceId(tenant);
   // Hosted: the same subselect also leaves out a colleague's Chat card, so its vectors are never read.
-  const visible = andVisibleSource(tenant);
+  // A Workspace's sources are read only when the caller searches from that Workspace (W1).
+  const visible = andVisibleSource(tenant, undefined, { projectId });
   // Only vectors whose source row still exists: a vector orphaned by a mid-embed delete is never served.
   const rows = sql
     .prepare(

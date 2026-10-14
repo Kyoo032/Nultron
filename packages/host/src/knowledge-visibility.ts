@@ -40,6 +40,12 @@ const NO_RESTRICTION: SqlFragment = Object.freeze({ sql: "", params: Object.free
 export type VisibilityOptions = {
   /** Injected by a test; the host reads `isServerMode()` on every call. */
   readonly serverMode?: boolean;
+  /**
+   * The Workspace the caller is searching or reading from (W1, K-D20). Null or absent outside one. A
+   * Workspace's own sources answer only to a caller who names it AND is one of its members; no other
+   * Workspace's sources are ever returned, and outside a Workspace none are.
+   */
+  readonly projectId?: string | null;
 };
 
 /** Whether Chat cards are private on this process: the hosted server, not the desktop or webdev. */
@@ -70,8 +76,13 @@ function ownsThread(threadIdRef: string): string {
  * artifact), then organization, desk and person again for `ownsThread`. Every fragment that uses the
  * expression binds these four, so they cannot drift apart.
  */
-function visibilityParams(tenant: TenantContext): string[] {
-  return [tenant.userId, ...ownThreadParams(tenant)];
+/**
+ * A Workspace's source is visible to the Workspace's members: its maker while it is private, everyone in
+ * the company once it is switched to `workspace`, and never once it is archived. Two placeholders: the
+ * Workspace the caller searches from (checked against the row's own `project_id`), and the person.
+ */
+function memberOfProject(alias: string): string {
+  return `EXISTS (SELECT 1 FROM projects p WHERE p.id = ${alias}.project_id AND p.workspace_id = ${alias}.workspace_id AND p.archived_at IS NULL AND (p.created_by = ? OR p.visibility = 'workspace'))`;
 }
 
 /**
@@ -84,10 +95,20 @@ function visibilityParams(tenant: TenantContext): string[] {
  *
  * Four placeholders, bound by `visibilityParams`.
  */
-function visibleExpression(alias: string): string {
-  const ownedByPerson = `(${alias}.owner_user_id IS NULL OR ${alias}.owner_user_id = ?)`;
+function visibleExpression(alias: string, tenant: TenantContext, projectId: string | null): SqlFragment {
+  // A Workspace's source (`project_id` set, not a Chat card) answers to membership alone, whoever made
+  // it. Every other source keeps the owner rule, and a source with a Workspace is never in that rule, so
+  // a file a colleague put into a Workspace is not the person's own and is not found outside it.
+  const owned = `(${alias}.project_id IS NULL AND (${alias}.owner_user_id IS NULL OR ${alias}.owner_user_id = ?))`;
+  const shared = projectId === null ? null : `(${alias}.project_id = ? AND ${memberOfProject(alias)})`;
   const chatRule = `(${alias}.origin_kind IS NULL OR ${alias}.origin_kind <> 'thread' OR ${ownsThread(`${alias}.origin_id`)})`;
-  return `(${ownedByPerson} AND ${chatRule})`;
+  const either = shared === null ? owned : `(${owned} OR ${shared})`;
+  const params = [
+    tenant.userId,
+    ...(shared === null ? [] : [projectId as string, tenant.userId]),
+    ...ownThreadParams(tenant),
+  ];
+  return { sql: `(${either} AND ${chatRule})`, params };
 }
 
 /**
@@ -103,7 +124,8 @@ export function andVisibleSource(
   if (!chatCardsArePrivate(options)) {
     return NO_RESTRICTION;
   }
-  return { sql: ` AND ${visibleExpression(alias)}`, params: visibilityParams(tenant) };
+  const visible = visibleExpression(alias, tenant, options.projectId ?? null);
+  return { sql: ` AND ${visible.sql}`, params: visible.params };
 }
 
 /**
@@ -119,9 +141,10 @@ export function andVisibleSourceId(
   if (!chatCardsArePrivate(options)) {
     return NO_RESTRICTION;
   }
+  const visible = visibleExpression("vs", tenant, options.projectId ?? null);
   return {
-    sql: ` AND EXISTS (SELECT 1 FROM knowledge_sources vs WHERE vs.id = ${idColumn} AND vs.workspace_id = ? AND ${visibleExpression("vs")})`,
-    params: [tenant.workspaceId, ...visibilityParams(tenant)],
+    sql: ` AND EXISTS (SELECT 1 FROM knowledge_sources vs WHERE vs.id = ${idColumn} AND vs.workspace_id = ? AND ${visible.sql})`,
+    params: [tenant.workspaceId, ...visible.params],
   };
 }
 
@@ -134,9 +157,10 @@ export function andSharedSource(alias: string = SOURCES_TABLE, options: Visibili
   if (!chatCardsArePrivate(options)) {
     return NO_RESTRICTION;
   }
-  // A card made from someone's own artifact (SR-175) is theirs, so it stays out of the desk map too.
+  // A card made from someone's own artifact (SR-175) is theirs, so it stays out of the desk map too; so
+  // does a source that belongs to a Workspace (W1), which only that Workspace's members may read.
   return {
-    sql: ` AND (${alias}.origin_kind IS NULL OR ${alias}.origin_kind <> 'thread') AND ${alias}.owner_user_id IS NULL`,
+    sql: ` AND (${alias}.origin_kind IS NULL OR ${alias}.origin_kind <> 'thread') AND ${alias}.owner_user_id IS NULL AND ${alias}.project_id IS NULL`,
     params: [],
   };
 }
@@ -184,9 +208,10 @@ export function visibleGraphNodes(
     return null;
   }
   const own = ownThreadParams(tenant);
-  const visible = visibilityParams(tenant);
+  // The map is desk-wide and holds no Workspace's sources, so the graph is read with no Workspace named.
+  const visible = visibleExpression("vs", tenant, null).params;
   const sourceVisible = (alias: string, idRef: string): string =>
-    `EXISTS (SELECT 1 FROM knowledge_sources ${alias} WHERE ${alias}.id = ${idRef} AND ${alias}.workspace_id = ? AND ${visibleExpression(alias)})`;
+    `EXISTS (SELECT 1 FROM knowledge_sources ${alias} WHERE ${alias}.id = ${idRef} AND ${alias}.workspace_id = ? AND ${visibleExpression(alias, tenant, null).sql})`;
   return {
     with: `WITH visible(id) AS (
       SELECT n.id FROM knowledge_graph_nodes n

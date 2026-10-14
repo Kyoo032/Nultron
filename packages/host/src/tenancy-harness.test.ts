@@ -607,6 +607,15 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
     path: "/api/v1/projects/:id/files/:artifactId",
     params: { id: "unseeded", artifactId: "unseeded" },
   },
+  // Workspace knowledge and chats (W1): the same reasoning, each answers the router's 404 with server mode off.
+  { method: "GET", path: "/api/v1/projects/:id/knowledge", params: { id: "unseeded" } },
+  { method: "POST", path: "/api/v1/projects/:id/uploads", params: { id: "unseeded" }, body: {} },
+  {
+    method: "DELETE",
+    path: "/api/v1/projects/:id/knowledge/:sourceId",
+    params: { id: "unseeded", sourceId: "unseeded" },
+  },
+  { method: "GET", path: "/api/v1/projects/:id/threads", params: { id: "unseeded" } },
 ];
 
 let store: ReturnType<typeof createMemorySessionStore>;

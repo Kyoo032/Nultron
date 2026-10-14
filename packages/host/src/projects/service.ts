@@ -11,8 +11,17 @@
  *   404; one they can see but did not make is a 403.
  * - Remove a file: the file's maker, or the project's maker.
  */
-import { ApiError, canAdminister, type TenantContext } from "@agentforge/core";
+import { ApiError, canAdminister, scanInjection, type TenantContext } from "@agentforge/core";
 import type { AddFileInput, CreateProjectInput, UpdateProjectInput } from "./input";
+import { deleteSource, type KnowledgeSource } from "../knowledge";
+import {
+  attachArtifactKnowledge,
+  detachArtifactKnowledge,
+  listProjectKnowledge,
+  uploadedSourceOf,
+  uploadProjectFile,
+  type ProjectKnowledgeItem,
+} from "./knowledge";
 import * as store from "./store";
 import type { ProjectFileRow, ProjectRow } from "./store";
 
@@ -24,10 +33,14 @@ export type ProjectRecord = {
   id: string;
   name: string;
   visibility: "private" | "workspace";
+  /** What the Workspace's chats are told (W1). Empty when none has been written. */
+  instructions: string;
   createdBy: string;
   createdAt: number;
   updatedAt: number;
 };
+
+export type ProjectThread = { id: string; title: string; createdAt: number };
 
 export type ProjectFile = {
   id: string;
@@ -43,6 +56,7 @@ function toRecord(row: ProjectRow): ProjectRecord {
     id: row.id,
     name: row.name,
     visibility: row.visibility,
+    instructions: row.instructions ?? "",
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -86,7 +100,11 @@ export function listProjects(scope: TenantContext): ProjectRecord[] {
   return store.listVisibleProjects(scope, PROJECT_LIMIT).map(toRecord);
 }
 
-export function createProject(scope: TenantContext, input: CreateProjectInput, now: number = Date.now()): ProjectRecord {
+export function createProject(
+  scope: TenantContext,
+  input: CreateProjectInput,
+  now: number = Date.now(),
+): ProjectRecord {
   return store.inTransaction(() => {
     if (store.countLiveProjects(scope) >= PROJECT_LIMIT) {
       throw new ApiError("project_limit", "This desk has as many projects as it can hold. Archive some first.", 409);
@@ -111,6 +129,14 @@ export function updateProject(
     if (input.name !== undefined && !isMaker(scope, row) && !canAdminister(scope.role)) {
       throw new ApiError("not_allowed", "Only the maker or an owner or admin can rename this project.", 403);
     }
+    if (input.instructions !== undefined && scanInjection(input.instructions)) {
+      // Instructions go into every chat in the Workspace as trusted text, so they get the same guard as a source.
+      throw new ApiError(
+        "injection_blocked",
+        "These instructions were not saved: they carry prompt-injection text.",
+        400,
+      );
+    }
     store.updateProjectRow(scope, projectId, input, now);
     return toRecord(requireVisible(scope, projectId));
   });
@@ -131,19 +157,22 @@ export function listProjectFiles(scope: TenantContext, projectId: string): Proje
   return store.listProjectFiles(scope, projectId, FILE_LIST_LIMIT).map(toFile);
 }
 
-export function addProjectFile(scope: TenantContext, projectId: string, input: AddFileInput): void {
-  store.inTransaction(() => {
+/** Put the caller's own chat file into the Workspace, and make it one of the Workspace's knowledge sources. */
+export async function addProjectFile(scope: TenantContext, projectId: string, input: AddFileInput): Promise<void> {
+  const file = store.inTransaction(() => {
     requireVisible(scope, projectId);
-    const file = store.findVisibleFile(scope, input.artifactId);
-    if (!file) {
+    const found = store.findVisibleFile(scope, input.artifactId);
+    if (!found) {
       throw fileNotFound();
     }
     // A legacy file with no owner is not the caller's either, so it cannot be put into a project.
-    if (file.owner_user_id !== scope.userId) {
+    if (found.owner_user_id !== scope.userId) {
       throw new ApiError("not_allowed", "Only the person who made this file can add it to a project.", 403);
     }
     store.setFileProject(scope, input.artifactId, projectId);
+    return found;
   });
+  await attachArtifactKnowledge(scope, file.id, projectId, file.owner_user_id);
 }
 
 export function removeProjectFile(scope: TenantContext, projectId: string, artifactId: string): void {
@@ -157,5 +186,83 @@ export function removeProjectFile(scope: TenantContext, projectId: string, artif
       throw new ApiError("not_allowed", "Only the maker of this file or of the project can remove it.", 403);
     }
     store.setFileProject(scope, artifactId, null);
+    detachArtifactKnowledge(scope, artifactId, projectId);
   });
+}
+
+/** The Workspace's knowledge, for a member; anyone else gets the same 404 an unknown Workspace gets. */
+export function listProjectKnowledgeFor(scope: TenantContext, projectId: string): ProjectKnowledgeItem[] {
+  requireVisible(scope, projectId);
+  return listProjectKnowledge(scope, projectId);
+}
+
+/**
+ * An upload into the Workspace. Any member may add knowledge (W1); the uploader owns the source.
+ * Returns the source as the Workspace's knowledge list shows it.
+ */
+export async function uploadProjectKnowledge(
+  scope: TenantContext,
+  projectId: string,
+  file: { filename: string; mime: string; bytes: Uint8Array },
+): Promise<ProjectKnowledgeItem> {
+  requireVisible(scope, projectId);
+  const source: KnowledgeSource = await uploadProjectFile(scope, projectId, file, scope.userId);
+  return {
+    id: source.id,
+    name: source.name,
+    kind: source.type,
+    status: source.status,
+    chunks: source.chunks,
+    addedBy: scope.userId,
+    createdAt: source.createdAt,
+  };
+}
+
+/**
+ * Remove an upload from the Workspace: its uploader or the Workspace's maker may, and the source is deleted
+ * with its chunks and bytes. A source that is not an upload of this Workspace is the same 404 as an unknown id.
+ */
+export function removeProjectKnowledge(scope: TenantContext, projectId: string, sourceId: string): void {
+  const row = requireVisible(scope, projectId);
+  const upload = uploadedSourceOf(scope, projectId, sourceId);
+  if (!upload) {
+    throw new ApiError("not_found", "Not found", 404);
+  }
+  if (upload.ownerUserId !== scope.userId && !isMaker(scope, row)) {
+    throw new ApiError("not_allowed", "Only the uploader or the maker of this Workspace can remove it.", 403);
+  }
+  deleteSource(scope, sourceId);
+}
+
+/** The caller's own chats that were started in this Workspace. Threads stay per person, so no one else's show. */
+export function listProjectThreadsFor(scope: TenantContext, projectId: string): ProjectThread[] {
+  requireVisible(scope, projectId);
+  return store.listOwnProjectThreads(scope, projectId).map((row) => ({
+    id: row.id,
+    title: row.title,
+    createdAt: row.created_at,
+  }));
+}
+
+/**
+ * A chat may be started in a Workspace only by a member of it: a Workspace the caller cannot see is the
+ * same 404 as an unknown id. Returns the id, so the caller can store it on the thread.
+ */
+export function requireChatWorkspace(scope: TenantContext, projectId: string): string {
+  requireVisible(scope, projectId);
+  return projectId;
+}
+
+/**
+ * The block of a chat's system prompt that carries its Workspace's instructions (W1), or the empty string
+ * when the chat is not in a Workspace, the caller is not a member, or none has been written. Labelled, so
+ * the model can tell the maker's instructions from the desk's own rules.
+ */
+export function workspacePromptBlock(scope: TenantContext, projectId: string | null): string {
+  if (projectId === null) {
+    return "";
+  }
+  const row = store.findVisibleProject(scope, projectId);
+  const instructions = row?.instructions?.trim() ?? "";
+  return instructions ? `\n\n# Workspace instructions\n${instructions}` : "";
 }

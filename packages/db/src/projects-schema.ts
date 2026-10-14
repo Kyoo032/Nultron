@@ -27,6 +27,20 @@ function organizationGuards(table: string): string {
       WHEN ${mismatch} BEGIN SELECT RAISE(ABORT, 'project_organization_mismatch'); END;`;
 }
 
+/**
+ * The instructions a Workspace gives its chats (W1, team-board-spec.md section 2b). Added on open when a
+ * table from before W1 lacks it: `CREATE TABLE IF NOT EXISTS` never alters an existing table, and an
+ * ALTER in the journal cannot be replayed (see `ensure-schema.ts`, `ensureOwnershipColumns`).
+ */
+function ensureInstructionsColumn(sqlite: Database.Database): void {
+  const columns = (sqlite.prepare("PRAGMA table_info(projects)").all() as Array<{ name: string }>).map(
+    (column) => column.name,
+  );
+  if (columns.length > 0 && !columns.includes("instructions")) {
+    sqlite.exec("ALTER TABLE projects ADD instructions text");
+  }
+}
+
 export function ensureProjectTables(sqlite: Database.Database): void {
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS projects (
@@ -35,6 +49,7 @@ export function ensureProjectTables(sqlite: Database.Database): void {
       workspace_id text NOT NULL REFERENCES workspaces(id) ON DELETE cascade,
       name text NOT NULL,
       visibility text NOT NULL DEFAULT 'private',
+      instructions text,
       created_by text NOT NULL,
       created_at integer NOT NULL,
       updated_at integer NOT NULL,
@@ -43,5 +58,6 @@ export function ensureProjectTables(sqlite: Database.Database): void {
     );
     CREATE INDEX IF NOT EXISTS projects_ws_archived_idx ON projects (workspace_id, archived_at);
   `);
+  ensureInstructionsColumn(sqlite);
   sqlite.exec(PROJECT_TABLES.map(organizationGuards).join("\n"));
 }

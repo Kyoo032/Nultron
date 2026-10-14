@@ -211,6 +211,27 @@
       "note": "Tester shared file. 2026-10-09: the ping also answers assistantName."
     },
     {
+      "glob": "{packages/db/src/projects-schema*.ts,packages/host/src/projects/**,packages/host/src/handlers/projects.ts,packages/host/src/projects*.test.ts}",
+      "map": "docs/internal/maps/knowledge-flows.md",
+      "lanes": [
+        "tester"
+      ],
+      "protected": false,
+      "note": "Collective projects and Workspaces, tester code only (team-board-spec.md section 2b, F1 and W1). Server mode only; the routes answer the router 404 on Personal."
+    },
+    {
+      "glob": "{packages/host/src/knowledge.ts,packages/host/src/knowledge-embed.ts,packages/host/src/knowledge/backend.ts,packages/host/src/knowledge/backends/builtin.ts,packages/host/src/knowledge-search-tool.ts,packages/host/src/run-context.ts,packages/host/src/threads.ts,packages/host/src/handlers/threads.ts,packages/db/src/schema.ts,packages/db/src/ensure-schema.ts}",
+      "map": "docs/internal/maps/knowledge-flows.md",
+      "lanes": [
+        "personal",
+        "enterprise",
+        "hyp-ai",
+        "tester"
+      ],
+      "protected": true,
+      "note": "Tester shared files for Workspace knowledge (W1, 2026-10-14). A source may carry project_id; retrieval takes a projectId scope (knowledge.ts, builtin.ts, knowledge-embed.ts) that knowledge_search reads from the run context; threads and handlers/threads take an optional projectId, server mode only. Personal writes no project_id, so its SQL and answers are unchanged."
+    },
+    {
       "glob": "packages/host/src/knowledge-soul.ts",
       "map": "docs/internal/maps/virtual-agents.md",
       "lanes": ["personal", "enterprise", "hyp-ai", "tester"],

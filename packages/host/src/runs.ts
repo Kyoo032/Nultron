@@ -34,6 +34,7 @@ import { ApiError } from "@agentforge/core";
 import { agentService } from "./tenant";
 import { armRunStallGuard, isRunOutputEvent } from "./run-stall";
 import { knowledgeInjection } from "./knowledge";
+import { workspacePromptBlock } from "./projects/service";
 import { citedSources } from "./knowledge-cites";
 import { recordCites } from "./knowledge-graph";
 import { recordRetrievals, recordsRetrievals } from "./knowledge-retrievals";
@@ -187,7 +188,9 @@ export async function* startModalityRun(options: {
     .map((part) => (part.type === "text" && typeof part.text === "string" ? part.text : ""))
     .join("\n");
   // The thread's own work card is skipped so Chat never retrieves its last reply back into itself.
-  const knowledge = await knowledgeInjection(options.tenant, userText, { excludeThreadId: thread.id });
+  // A chat started in a Workspace (W1) searches that Workspace's sources too, and no other Workspace's.
+  const projectId = thread.projectId ?? null;
+  const knowledge = await knowledgeInjection(options.tenant, userText, { excludeThreadId: thread.id, projectId });
   // Phase 4: the language of the person who sent the message, not the language the process booted
   // in. On a desk they are the same value, because `saveUserLocale` writes both; on a hosted server
   // two people on one desk each get their own, and `withRunContext` below carries it through every
@@ -210,7 +213,11 @@ export async function* startModalityRun(options: {
     model,
     // A mode agent has the last word on who is speaking, after the desk's Soul block (`closingPrompt`).
     systemPrompt: withChatOutputLanguage(
-      agentPrompt + pastHint + knowledge.prompt + (agentPolicy?.closingPrompt ?? ""),
+      agentPrompt +
+        workspacePromptBlock(options.tenant, projectId) +
+        pastHint +
+        knowledge.prompt +
+        (agentPolicy?.closingPrompt ?? ""),
       locale,
     ),
   };
@@ -486,142 +493,143 @@ export async function* startModalityRun(options: {
       };
       const inChatRun = <T>(fn: () => Promise<T>): Promise<T> =>
         withToolRun({ runId: run.id, mode: agentPolicy ? agentPolicy.agent.id : "chat" }, () =>
-          withRunContext({ threadId: thread.id, agentId: thread.agentId, locale }, () =>
+          withRunContext({ threadId: thread.id, agentId: thread.agentId, locale, projectId }, () =>
             withWorkerChannel(workerChannel, fn),
           ),
         );
-      const attempt = () => inChatRun(async () => {
-        if (options.modality !== "text" && thinkingEnabled && !retried) {
-          const line = `${chatTurnCopy(localeForRun()).lookingAttached}\n`;
-          hostThinking += line;
-          send({ type: "assistant.thinking", text: line });
-        }
-        await runtime.execute({
-          tenant: options.tenant,
-          runId: run.id,
-          modality: options.modality,
-          version: activeVersion,
-          bindings: agentPolicy
-            ? bindingsForChatModality(agentPolicy.bindings, options.modality)
-            : bindingsForChatModality(
-                // The default agent can run every wired harness from its own chat, hired or not.
-                defaultChat
-                  ? withGeneralistWorkers(withPastSessionsBinding(published.bindings))
-                  : withPastSessionsBinding(published.bindings),
-                options.modality,
-              ),
-          // The default agent's budget is Chat's declared one plus a ceiling for each worker; a mode
-          // agent's is its own; an agent the owner built keeps the runtime's.
-          ...(agentPolicy
-            ? { budget: agentPolicy.budget }
-            : defaultChat
-              ? { budget: virtualAgentFor("chat").budget }
-              : {}),
-          history,
-          thinking: thinkingEnabled,
-          reasoningEffort,
-          reasoningEffortExplicit,
-          wire,
-          locale,
-          signal: modelAbort.signal,
-          // A run that binds a worker: the runtime's own stream watchdog must not read a working tool
-          // as a dead stream. The stall guard above keeps the model's budget (`worker-channel.ts`).
-          ...(agentPolicy || defaultChat ? { streamWatchdog: { idleMs: WORKER_STREAM_IDLE_MS } } : {}),
-          onEvent: async (event) => {
-            stall.touch();
-            if (isRunOutputEvent(event)) {
-              stall.touchOutput();
-            }
-            if (isRunOutputEvent(event)) {
-              modelSpoke = true;
-            }
-            if (event.type === "run.failed") {
-              const next = modelSpoke ? undefined : fallbackFor(activeModel, event.message);
-              if (next) {
-                // Held, not sent: the catch below retries once on `next` and the person never sees this one.
-                heldNext = next;
+      const attempt = () =>
+        inChatRun(async () => {
+          if (options.modality !== "text" && thinkingEnabled && !retried) {
+            const line = `${chatTurnCopy(localeForRun()).lookingAttached}\n`;
+            hostThinking += line;
+            send({ type: "assistant.thinking", text: line });
+          }
+          await runtime.execute({
+            tenant: options.tenant,
+            runId: run.id,
+            modality: options.modality,
+            version: activeVersion,
+            bindings: agentPolicy
+              ? bindingsForChatModality(agentPolicy.bindings, options.modality)
+              : bindingsForChatModality(
+                  // The default agent can run every wired harness from its own chat, hired or not.
+                  defaultChat
+                    ? withGeneralistWorkers(withPastSessionsBinding(published.bindings))
+                    : withPastSessionsBinding(published.bindings),
+                  options.modality,
+                ),
+            // The default agent's budget is Chat's declared one plus a ceiling for each worker; a mode
+            // agent's is its own; an agent the owner built keeps the runtime's.
+            ...(agentPolicy
+              ? { budget: agentPolicy.budget }
+              : defaultChat
+                ? { budget: virtualAgentFor("chat").budget }
+                : {}),
+            history,
+            thinking: thinkingEnabled,
+            reasoningEffort,
+            reasoningEffortExplicit,
+            wire,
+            locale,
+            signal: modelAbort.signal,
+            // A run that binds a worker: the runtime's own stream watchdog must not read a working tool
+            // as a dead stream. The stall guard above keeps the model's budget (`worker-channel.ts`).
+            ...(agentPolicy || defaultChat ? { streamWatchdog: { idleMs: WORKER_STREAM_IDLE_MS } } : {}),
+            onEvent: async (event) => {
+              stall.touch();
+              if (isRunOutputEvent(event)) {
+                stall.touchOutput();
+              }
+              if (isRunOutputEvent(event)) {
+                modelSpoke = true;
+              }
+              if (event.type === "run.failed") {
+                const next = modelSpoke ? undefined : fallbackFor(activeModel, event.message);
+                if (next) {
+                  // Held, not sent: the catch below retries once on `next` and the person never sees this one.
+                  heldNext = next;
+                  return;
+                }
+                failedMessage = redactSecrets(event.message);
+                send({ ...event, message: failedMessage });
                 return;
               }
-              failedMessage = redactSecrets(event.message);
-              send({ ...event, message: failedMessage });
-              return;
-            }
-            if (event.type === "run.completed") {
-              if (event.usage) {
-                runUsage = event.usage;
-              }
-              if (settled) {
-                // The person was already told this run failed. A call that finished just before the
-                // cancel keeps its bill, but its answer is not saved on a run marked `failed`.
-                meterSettledRun();
+              if (event.type === "run.completed") {
+                if (event.usage) {
+                  runUsage = event.usage;
+                }
+                if (settled) {
+                  // The person was already told this run failed. A call that finished just before the
+                  // cancel keeps its bill, but its answer is not saved on a run marked `failed`.
+                  meterSettledRun();
+                  return;
+                }
+                await persistAssistant();
+                send(event);
                 return;
               }
-              await persistAssistant();
-              send(event);
-              return;
-            }
-            if (event.type === "run.step_limit") {
-              // Not a frame for the screen: it decides the closing sentence `persistAssistant` adds.
-              stepLimitReached = true;
-              return;
-            }
-            if (event.type === "run.interrupted") {
-              // Same: not a frame, the closing sentence. The reason is a failure's text, so it is masked
-              // like `run.failed`'s, and held to one short paragraph.
-              interruptedReason = redactSecrets(event.message).trim().slice(0, INTERRUPTED_REASON_MAX);
-              return;
-            }
-            // What leaves the runtime (the screen, the thread, the tool rows) is the redacted copy of a
-            // tool's input and output. `event` stays the runtime's own: media is read from it below.
-            const safe = redactToolEvent(event);
-            send(safe);
-            if (event.type === "assistant.delta") {
-              assistantText += event.text;
-            }
-            if (event.type === "assistant.thinking") {
-              thinkingText += event.text;
-            }
-            if (safe.type === "tool.started") {
-              toolTrace.push({
-                type: "tool_call",
-                toolKey: safe.toolKey,
-                status: "started",
-                input: safe.input,
-              });
-              await insertToolInvocation(options.tenant, run.id, safe.toolKey, safe.input, null, "started");
-            }
-            if (safe.type === "tool.completed" && event.type === "tool.completed") {
-              const recorded = takeLastToolIo(event.toolKey);
-              const fullOutput = recorded?.full ?? event.output;
-              const persistOutput = redactSecretsDeep(fullOutput);
-              const last = [...toolTrace]
-                .reverse()
-                .find((item) => item.toolKey === safe.toolKey && item.status === "started");
-              if (last) {
-                last.status = "completed";
-                last.output = safe.output;
-              } else {
+              if (event.type === "run.step_limit") {
+                // Not a frame for the screen: it decides the closing sentence `persistAssistant` adds.
+                stepLimitReached = true;
+                return;
+              }
+              if (event.type === "run.interrupted") {
+                // Same: not a frame, the closing sentence. The reason is a failure's text, so it is masked
+                // like `run.failed`'s, and held to one short paragraph.
+                interruptedReason = redactSecrets(event.message).trim().slice(0, INTERRUPTED_REASON_MAX);
+                return;
+              }
+              // What leaves the runtime (the screen, the thread, the tool rows) is the redacted copy of a
+              // tool's input and output. `event` stays the runtime's own: media is read from it below.
+              const safe = redactToolEvent(event);
+              send(safe);
+              if (event.type === "assistant.delta") {
+                assistantText += event.text;
+              }
+              if (event.type === "assistant.thinking") {
+                thinkingText += event.text;
+              }
+              if (safe.type === "tool.started") {
                 toolTrace.push({
                   type: "tool_call",
                   toolKey: safe.toolKey,
-                  status: "completed",
-                  output: safe.output,
+                  status: "started",
+                  input: safe.input,
                 });
+                await insertToolInvocation(options.tenant, run.id, safe.toolKey, safe.input, null, "started");
               }
-              await insertToolInvocation(options.tenant, run.id, safe.toolKey, null, persistOutput, "completed");
-              for (const part of collectToolMediaParts(fullOutput)) {
-                // Every generated URL is mirrored into the local store first: the renderer
-                // only loads host-served media, so a part we cannot mirror is dropped
-                // rather than persisted as a remote URL that would never display.
-                const mirrored = await mirrorToolMediaPart(options.tenant, part);
-                if (mirrored) {
-                  mediaParts.push(mirrored);
+              if (safe.type === "tool.completed" && event.type === "tool.completed") {
+                const recorded = takeLastToolIo(event.toolKey);
+                const fullOutput = recorded?.full ?? event.output;
+                const persistOutput = redactSecretsDeep(fullOutput);
+                const last = [...toolTrace]
+                  .reverse()
+                  .find((item) => item.toolKey === safe.toolKey && item.status === "started");
+                if (last) {
+                  last.status = "completed";
+                  last.output = safe.output;
+                } else {
+                  toolTrace.push({
+                    type: "tool_call",
+                    toolKey: safe.toolKey,
+                    status: "completed",
+                    output: safe.output,
+                  });
+                }
+                await insertToolInvocation(options.tenant, run.id, safe.toolKey, null, persistOutput, "completed");
+                for (const part of collectToolMediaParts(fullOutput)) {
+                  // Every generated URL is mirrored into the local store first: the renderer
+                  // only loads host-served media, so a part we cannot mirror is dropped
+                  // rather than persisted as a remote URL that would never display.
+                  const mirrored = await mirrorToolMediaPart(options.tenant, part);
+                  if (mirrored) {
+                    mediaParts.push(mirrored);
+                  }
                 }
               }
-            }
-          },
+            },
+          });
         });
-      });
       try {
         await attempt();
       } catch (error) {

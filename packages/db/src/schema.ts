@@ -435,6 +435,8 @@ export const threads = sqliteTable(
       .references(() => agents.id, { onDelete: "cascade" }),
     userId: text("user_id").notNull(),
     title: text("title").notNull().default("New thread"),
+    /** The Workspace this chat was started in (W1); NULL outside one. Added on open by `ensureOwnershipColumns`. */
+    projectId: text("project_id"),
     createdAt: createdAt(),
   },
   (table) => [index("threads_org_user_idx").on(table.organizationId, table.userId)],
@@ -545,6 +547,8 @@ export const knowledgeSources = sqliteTable(
      * source and for every row written before the column existed; added by `ensureOwnershipColumns`.
      */
     ownerUserId: text("owner_user_id"),
+    /** The Workspace (collective project) this source belongs to (W1, K-D20); NULL for every other source. */
+    projectId: text("project_id"),
   },
   (table) => [
     index("knowledge_sources_ws_idx").on(table.workspaceId),

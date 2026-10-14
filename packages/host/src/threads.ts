@@ -32,7 +32,12 @@ function openJson(value: unknown): unknown {
   }
 }
 
-export async function createThread(tenant: TenantContext, agentId: string, title?: string) {
+export async function createThread(
+  tenant: TenantContext,
+  agentId: string,
+  title?: string,
+  projectId: string | null = null,
+) {
   const [row] = await db
     .insert(threads)
     .values({
@@ -41,6 +46,8 @@ export async function createThread(tenant: TenantContext, agentId: string, title
       agentId,
       userId: tenant.userId,
       title: title ?? defaultThreadTitle(localeForRun()),
+      // A chat started in a Workspace belongs to it (W1); the caller checked membership before this call.
+      projectId,
     })
     .returning();
   return row;
@@ -229,8 +236,7 @@ export async function readPastSessionMessages(
     if (!text) {
       continue;
     }
-    const clipped =
-      text.length > READ_MESSAGE_MAX ? `${text.slice(0, READ_MESSAGE_MAX - 1).trimEnd()}…` : text;
+    const clipped = text.length > READ_MESSAGE_MAX ? `${text.slice(0, READ_MESSAGE_MAX - 1).trimEnd()}…` : text;
     if (totalChars + clipped.length > READ_TRANSCRIPT_MAX) {
       break;
     }

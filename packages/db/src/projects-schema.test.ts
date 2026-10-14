@@ -61,9 +61,9 @@ describe("projects table", () => {
     const b = seedDesk("b");
     expect(() => insertProject("p3", b.orgId, a.workspaceId)).toThrow(/project_organization_mismatch/);
     insertProject("p4", a.orgId, a.workspaceId);
-    expect(() =>
-      sqlite.prepare("UPDATE projects SET organization_id = ? WHERE id = 'p4'").run(b.orgId),
-    ).toThrow(/project_organization_mismatch/);
+    expect(() => sqlite.prepare("UPDATE projects SET organization_id = ? WHERE id = 'p4'").run(b.orgId)).toThrow(
+      /project_organization_mismatch/,
+    );
   });
 
   it("is removed with its desk", () => {
@@ -71,5 +71,48 @@ describe("projects table", () => {
     insertProject("p5", a.orgId, a.workspaceId);
     sqlite.prepare("DELETE FROM workspaces WHERE id = ?").run(a.workspaceId);
     expect((sqlite.prepare("SELECT count(*) AS n FROM projects").get() as { n: number }).n).toBe(0);
+  });
+});
+
+/**
+ * W1 (team-board-spec.md section 2b). The instructions column and the Workspace links on sources and
+ * threads are added on open, so a database built before them gets them, and keeps the rows it holds.
+ */
+describe("Workspace columns (W1)", () => {
+  function columnsOf(table: string): string[] {
+    return (sqlite.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>).map((c) => c.name);
+  }
+
+  it("are on a fresh database: instructions, and project_id on knowledge sources and threads", () => {
+    expect(columnsOf("projects")).toContain("instructions");
+    expect(columnsOf("knowledge_sources")).toContain("project_id");
+    expect(columnsOf("threads")).toContain("project_id");
+  });
+
+  it("are added to a projects table from before W1, and the rows it holds keep their values", () => {
+    const a = seedDesk("up");
+    insertProject("kept", a.orgId, a.workspaceId);
+    // A table from before W1: rebuild it without `instructions`, then open the schema again.
+    sqlite.exec("ALTER TABLE projects DROP COLUMN instructions");
+    expect(columnsOf("projects")).not.toContain("instructions");
+
+    ensureSchema(sqlite);
+
+    expect(columnsOf("projects")).toContain("instructions");
+    const row = sqlite.prepare("SELECT name, instructions FROM projects WHERE id = 'kept'").get() as {
+      name: string;
+      instructions: string | null;
+    };
+    expect(row).toEqual({ name: "p", instructions: null });
+    sqlite.prepare("UPDATE projects SET instructions = ? WHERE id = 'kept'").run("Be brief.");
+    expect(
+      (sqlite.prepare("SELECT instructions FROM projects WHERE id = 'kept'").get() as { instructions: string })
+        .instructions,
+    ).toBe("Be brief.");
+  });
+
+  it("is a no-op on a second open", () => {
+    ensureSchema(sqlite);
+    expect(columnsOf("projects").filter((name) => name === "instructions")).toHaveLength(1);
   });
 });
