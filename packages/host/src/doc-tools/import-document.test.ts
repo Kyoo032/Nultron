@@ -3,8 +3,9 @@
  * an editable artifact of the same format. The answer lists the section (or sheet) ids and headings, so
  * the model can revise one part with `revise_document`.
  *
- * The source is a stored artifact on purpose: a chat upload keeps only its extracted text, not the file's
- * bytes (`chat-documents/save-handler.ts`), so there are no uploaded bytes to import yet.
+ * The source is a stored artifact. A Word, Excel or PDF file attached in Chat is kept the same way, as its
+ * attacher's own artifact (`chat-documents/original.ts`), and this tool opens it for that person only
+ * (`chat-documents/original.test.ts`).
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { DOCX_MIME, PDF_MIME, XLSX_MIME } from "@agentforge/core/artifacts";

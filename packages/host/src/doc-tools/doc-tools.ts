@@ -42,6 +42,7 @@ const REVISE_DOCUMENT_DESCRIPTION = [
 
 const IMPORT_DOCUMENT_DESCRIPTION = [
   "Read a stored Word, Excel or PDF file into an editable copy, and save that copy for the owner.",
+  "A file the owner attached in Chat is stored too: the note above that attachment gives its artifactId, and this tool opens it. Only the person who attached it can open it.",
   "It answers the new artifactId and the parts it found: section ids with headings for a document, sheet ids with names for a workbook.",
   "Use those ids with revise_document to change one part. The copy is rebuilt from the text and structure that were read, so its styling may differ from the original.",
   "If the answer is a refusal, tell the owner which file type or problem it names.",

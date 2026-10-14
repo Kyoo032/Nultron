@@ -13,6 +13,7 @@ export const HOST_NOTE_PREFIXES = [
   "[Saved on this desk",
   "[Not saved on this desk",
   "[Cut:",
+  "[Original file",
 ] as const;
 
 /** True for a line the host wrote, as opposed to one a person or a document wrote. */

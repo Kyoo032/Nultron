@@ -145,7 +145,7 @@ afterAll(() => {
 });
 
 describe("reading a document", () => {
-  it("reads a Word file: its text and its table, and writes nothing to the desk", async () => {
+  it("reads a Word file: its text and its table, and writes no desk file (the kept original is in original.test.ts)", async () => {
     const reply = await read([upload("Laporan Q3.docx", await docxFixture())]);
     expect(reply.status).toBe(200);
     const document = doc(reply);
@@ -159,7 +159,7 @@ describe("reading a document", () => {
     expect(document.fullText).toBeUndefined();
     expect(document.tables).toBe(1);
     expect(document.saved).toBeUndefined();
-    // Attaching leaves nothing behind: a removed chip is a document that never touched the desk.
+    // Attaching writes no desk file: a removed chip never reaches the desk copy, which is saved on send.
     expect((await deskList()).filter((path) => path.startsWith("uploads/"))).toEqual([]);
   });
 

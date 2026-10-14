@@ -8,9 +8,15 @@
  */
 import { type ChatDocumentSaveFailure, cutNoteLine } from "@agentforge/core/chat-documents";
 import { formatBytes } from "@agentforge/core/format-bytes";
+import type { OriginalSkipReason } from "./original";
 
 /** Why the desk copy was not written. Fixed codes, never an error message that could quote a path. */
 export type SaveFailure = ChatDocumentSaveFailure;
+
+/** The original file: the id it was kept under, or why it was not kept. Absent when the format has none. */
+export type OriginalNote =
+  | { readonly kind: "kept"; readonly id: string }
+  | { readonly kind: "skipped"; readonly reason: OriginalSkipReason };
 
 export type DocumentNotesInput = {
   readonly format: string;
@@ -23,6 +29,13 @@ export type DocumentNotesInput = {
   readonly masked: number;
   readonly saved: { readonly path: string; readonly partial: boolean } | null;
   readonly saveError: SaveFailure | null;
+  readonly original?: OriginalNote | null;
+};
+
+const ORIGINAL_SKIP_WORDS: Readonly<Record<OriginalSkipReason, string>> = {
+  too_large: "it is larger than a kept original can be",
+  quota: "storage is full",
+  unavailable: "it could not be stored right now",
 };
 
 const SAVE_FAILURE_WORDS: Readonly<Record<SaveFailure, string>> = {
@@ -57,6 +70,17 @@ function savedNote(input: DocumentNotesInput): string {
   return `[Not saved on this desk${why}, so the file tools cannot read it.]`;
 }
 
+/** The original's line: the id the model hands to `import_document`, or why there is none. */
+function originalNote(original: OriginalNote | null | undefined): string | null {
+  if (!original) {
+    return null;
+  }
+  if (original.kind === "kept") {
+    return `[Original file kept: artifact ${original.id}. Call import_document with this id to open or edit the file itself.]`;
+  }
+  return `[Original file not kept (${ORIGINAL_SKIP_WORDS[original.reason]}), so import_document cannot open the file itself.]`;
+}
+
 function cutNote(input: DocumentNotesInput): string | null {
   if (input.sentChars >= input.chars) {
     return null;
@@ -78,7 +102,7 @@ const DATA_NOTE =
  * line of the document that looks like one has been indented away (`cleanDocumentText`).
  */
 export function documentNotes(input: DocumentNotesInput): string {
-  const lines = [sizeNote(input), DATA_NOTE, savedNote(input), cutNote(input)].filter(
+  const lines = [sizeNote(input), DATA_NOTE, savedNote(input), originalNote(input.original), cutNote(input)].filter(
     (line): line is string => line !== null,
   );
   return `${lines.join("\n")}\n\n`;
