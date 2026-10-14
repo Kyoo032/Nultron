@@ -42,6 +42,44 @@ Earlier rules this spec has to keep:
 | Shared code carries no brand. | `AGENTS.md`, sync lanes | Board copy reads `productName`; no `Nultron` or `HYP AI` typed in code or copy. Every string in `en` and `id`. |
 | Auto Scaling, the database move and object storage are "not started" and need Rizky's word. | `AGENTS.md`, HYP AI hosting plan, Stage 3 | This spec designs for them and decides none of them (K-D9, K-D10). |
 
+## 2b. Re-steer: files first, any hired agent, an enterprise shell (Rizky, 2026-10-14)
+
+His words: "the goal is still the same, it's to make enterprise member able to collaborate docs, bring their own virtual agents specialised for them to the kanban, can assign to human or virtual agents, and most importantly seamless integration on all side for documents creation, focus first on 3 things, docs (words, excel, pptx, pdf), images and videos ... make the file available for everyone if they put it into the collective projects, but if they already do it themselves then it's only available for them ... make sure that all the users can see and download the file on the website especially when hosted".
+
+Rulings the same day (asked and answered):
+
+- **A second UI for HYP AI, by a shared setting (K-D15).** "Completely different", simple, enterprise, in the style of Claude Code. It is a brand-neutral shell in shared code, off by default, selected by `AGENTFORGE_SHELL=enterprise`; HYP AI's downstream repo sets it. Nultron's shell and everything Nultron can do stay as they are, pinned by a test. A static mock is shown to Rizky before it is wired.
+- **Any hired agent on a card (K-D1 widened, K-D16).** A person may assign a card to any virtual agent they hired, not only one personal agent. The agent's owner still accepts and reviews (K-D3, K-D5).
+- **Files first (K-D17).** The next phases are files, not the personal store: card files and collective projects (K4 pulled forward), then agents on cards (K1, K2), then mentions (K3).
+- **Visibility (K-D18, SR-175).** A file a person makes on their own is visible only to them. A file put into a collective project is visible to, and downloadable by, everyone in the company. The host enforces it.
+
+**Collective project.** A named shared space on a company desk (`projects`: desk, name, created by). A file is shared by adding it to a project; a card can belong to a project, and a card's files are that project's files. The board stays one per desk (K-D2); projects group its cards and files.
+
+**The three things, and what each must do.** For docs (docx, xlsx, pptx, pdf), images and videos: generate from a prompt, edit an existing or uploaded file, fix one part (a section, sheet, slide, image or clip) while keeping the rest and the person's edits, design (theme, layout, style, aspect), and download in the browser on the hosted app. All of it from every agent's chat (the virtual-agents rule), and from a card run once K2 lands.
+
+What the scouts found on 2026-10-14 (`file:line` in their reports, summarised here):
+
+| | Generate in chat | Edit existing | Fix one part | Design | Download (hosted) |
+|---|---|---|---|---|---|
+| docx | route only | no (uploads become markdown) | route only | none | yes, artifact route |
+| xlsx | Finance only | no | no | Finance only | Finance export only |
+| pptx | yes (`build_deck`) | no | whole outline only | no theme parameter | yes |
+| pdf | no (`renderPdf` answers 501) | no | no | no | no |
+| image | yes (`image_generate`) | URL input only, a stored upload is refused | no | three aspects | inline, no attachment |
+| video | yes (`video_generate`) | Edit studio only | Edit studio only | aspect, Edit tiers | inline; Range works; Edit export has no Range |
+
+### Phases F0 to F4
+
+| Phase | Builds | Proof |
+|---|---|---|
+| F0 | Ownership and visibility on `artifacts`, `media` and desk files (owner, project); server-mode lists and reads return a row only to its owner or when it is in a project; legacy rows stay company-visible. | Two people of one company plus one of another, through the real router: each sees only their own and the shared; Personal unchanged (parity test). |
+| F1 | `projects` table and routes; a Projects page (files with preview and download); add to project, remove from project; card files (section 11) attach from a project, an upload, or a copy of a private file; downloads fixed for the browser (media as attachment on request, `filename*` parsed, Range on Edit export and examples, Caddy `encode` skips video and `text/event-stream`, SR-174). | A file shared by A is downloaded by B in a browser on the local rehearsal; B cannot see A's unshared file; a video seeks. |
+| F2 | Documents: one document model rendered to docx, xlsx, pptx and pdf (pdf through `pdf-lib`, pure JavaScript); chat tools to create, revise one part, restyle, and import an uploaded file into the editable model; every agent gets them. | A docx, an xlsx, a pptx and a pdf made in chat open in Word, Excel, PowerPoint and a PDF reader; one section revised keeps the rest unchanged in its source; an uploaded docx edited and downloaded. |
+| F3 | Images and videos: a stored upload or earlier result as input; fix one image or clip keeping the others; style and size presets; a chat trim and join through ffmpeg; download as attachment. | Driven with a real key on webdev and on the local rehearsal. |
+| F4 | The enterprise shell (K-D15) behind `AGENTFORGE_SHELL`; mock approved first. | Nultron's shell unchanged (test); HYP AI's downstream sets the value and renders the new shell. |
+
+Then K1 and K2 with any hired agent, then K3. F0 to F4 are built in the tester and reach `main` by the promotion PR, like the board.
+
 ## 3. Words
 
 | Word | Meaning |
