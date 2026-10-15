@@ -29,7 +29,7 @@ import {
   type ProjectKnowledgeItem,
 } from "./knowledge";
 import * as store from "./store";
-import type { ProjectFileRow, ProjectMediaRow, ProjectRow } from "./store";
+import type { ProjectFileListRow, ProjectFileRow, ProjectMediaRow, ProjectRow } from "./store";
 
 /** Live projects one desk may hold. Archived ones do not count. */
 export const PROJECT_LIMIT = 200;
@@ -112,7 +112,7 @@ function toRecord(row: ProjectRow): ProjectRecord {
   };
 }
 
-function toFile(row: ProjectFileRow): ProjectFile {
+function toFile(row: ProjectFileListRow): ProjectFile {
   return {
     id: row.id,
     kind: "artifact",
@@ -121,7 +121,7 @@ function toFile(row: ProjectFileRow): ProjectFile {
     sizeBytes: row.size_bytes,
     ownerUserId: row.owner_user_id,
     updatedAt: row.updated_at,
-    editable: isEditableFile(row),
+    editable: row.has_spec === 1,
     previewUrl: null,
     downloadUrl: `/api/v1/artifacts/${encodeURIComponent(row.id)}/file`,
   };

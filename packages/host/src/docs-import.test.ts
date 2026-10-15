@@ -207,6 +207,28 @@ describe("POST /api/v1/docs/import: a stored Word or Excel file becomes an edita
     expect(listed.items.map((item) => item.id)).toContain(copyId);
   });
 
+  it("a copy made while the gate is closed leaves one Failed source in the Workspace, so the Knowledge tab lists it", async () => {
+    const { sql } = await import("@agentforge/db");
+    const title = (sql.prepare("SELECT title FROM artifacts WHERE id = ?").get(copyId) as { title: string }).title;
+    const rows = await vi.waitFor(
+      () => {
+        const found = sql
+          .prepare(
+            "SELECT status, error, project_id, owner_user_id, name FROM knowledge_sources WHERE origin_kind = 'artifact' AND origin_id = ?",
+          )
+          .all(copyId);
+        if (found.length === 0) {
+          throw new Error("not recorded yet");
+        }
+        return found;
+      },
+      { timeout: 5_000 },
+    );
+    expect(rows).toEqual([
+      { status: "Failed", error: "gateway_blocked", project_id: project, owner_user_id: "ben", name: title },
+    ]);
+  });
+
   it("lists editable: true for a sealed-spec document and false for an uploaded file, and never sends the spec", async () => {
     const listed = jsonBody<{ items: Array<{ id: string; editable: boolean }> }>(
       await call(alice, "GET", "/api/v1/projects/:id/files", { id: project }),
@@ -216,6 +238,47 @@ describe("POST /api/v1/docs/import: a stored Word or Excel file becomes an edita
     expect(editableOf(bookId)).toBe(false);
     expect(editableOf(copyId)).toBe(true);
     expect(JSON.stringify(listed)).not.toContain('"spec"');
+  });
+
+  it("the list's rows carry a presence flag and no metadata, so the list never opens a spec", async () => {
+    const { listProjectFiles } = await import("./projects/store");
+    const rows = listProjectFiles(alice.tenant, project, 200);
+    expect(rows.length).toBeGreaterThan(0);
+    for (const row of rows) {
+      expect(Object.keys(row).sort()).toEqual([
+        "has_spec",
+        "id",
+        "mime",
+        "owner_user_id",
+        "project_id",
+        "size_bytes",
+        "title",
+        "updated_at",
+      ]);
+    }
+    expect(rows.find((row) => row.id === copyId)?.has_spec).toBe(1);
+    expect(rows.find((row) => row.id === docId)?.has_spec).toBe(0);
+  });
+
+  it("the list flags a present spec without opening it, so a damaged one lists as editable; the import still answers 201", async () => {
+    const { artifactStore } = await import("./artifacts");
+    const { sql } = await import("@agentforge/db");
+    const damaged = artifactStore().create(alice.tenant, {
+      mode: "documents",
+      kind: "draft",
+      title: "Damaged agreement",
+      mime: DOCX,
+      body: readFileSync(join(FIXTURES, "lender-initial-aca-draft.docx")).toString("base64"),
+    });
+    expect(await outcome(await addToProject(alice, project, damaged.id))).toEqual(OK);
+    sql
+      .prepare("UPDATE artifacts SET meta = ? WHERE id = ?")
+      .run(JSON.stringify({ spec: { garbage: true } }), damaged.id);
+    const listed = jsonBody<{ items: Array<{ id: string; editable: boolean }> }>(
+      await call(alice, "GET", "/api/v1/projects/:id/files", { id: project }),
+    );
+    expect(listed.items.find((item) => item.id === damaged.id)?.editable).toBe(true);
+    expect(await outcome(await importAs(alice, damaged.id))).toEqual(CREATED);
   });
 
   it("refuses to import a document that is already editable with 409 already_editable, and writes no copy", async () => {

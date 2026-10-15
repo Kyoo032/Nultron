@@ -10,6 +10,7 @@
 import { sql } from "@agentforge/db";
 import type { TenantContext } from "@agentforge/core";
 import { visibleTo } from "../artifacts";
+import { SPEC_META_KEY } from "../doc-tools/doc-meta";
 import { mediaVisibleClause } from "../media-visibility";
 import type { WorkspaceRole } from "./input";
 
@@ -36,6 +37,8 @@ export type ProjectFileRow = {
   updated_at: number;
   meta: string;
 };
+
+export type ProjectFileListRow = Omit<ProjectFileRow, "meta"> & { has_spec: number };
 
 /** A live project of the caller's desk, joined to the caller's own membership row. Binds the person first. */
 const MEMBER_PROJECT_SELECT = `SELECT p.id, p.name, p.instructions, p.created_by, p.created_at, p.updated_at, p.archived_at,
@@ -195,15 +198,16 @@ export function hasProjectAgent(projectId: string, agentId: string): boolean {
  * The files of a project the caller may see. The caller's membership is checked first; the file rule
  * (`visibleTo`) is applied again per row.
  */
-export function listProjectFiles(scope: TenantContext, projectId: string, limit: number): ProjectFileRow[] {
+export function listProjectFiles(scope: TenantContext, projectId: string, limit: number): ProjectFileListRow[] {
   const visible = visibleTo(scope);
+  const hasSpec = `CASE WHEN json_valid(meta) THEN IFNULL(json_type(meta, '$.${SPEC_META_KEY}') = 'object', 0) ELSE 0 END`;
   return sql
     .prepare(
-      `SELECT id, title, mime, size_bytes, owner_user_id, project_id, updated_at, meta FROM artifacts
+      `SELECT id, title, mime, size_bytes, owner_user_id, project_id, updated_at, ${hasSpec} AS has_spec FROM artifacts
         WHERE workspace_id = ? AND project_id = ?${visible.clause}
         ORDER BY updated_at DESC LIMIT ?`,
     )
-    .all(scope.workspaceId, projectId, ...visible.args, limit) as ProjectFileRow[];
+    .all(scope.workspaceId, projectId, ...visible.args, limit) as ProjectFileListRow[];
 }
 
 /** A file the caller may see on this desk, or null: the same answer as an id nobody owns. */

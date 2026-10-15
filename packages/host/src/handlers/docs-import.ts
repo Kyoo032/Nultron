@@ -3,6 +3,7 @@ import type { DocRefusal } from "../doc-tools/doc-save";
 import { importDocumentForTenant, type ImportDocumentInput } from "../doc-tools/import-document";
 import { jsonError, jsonOk } from "../errors";
 import { requireGatewayAllowedFor } from "../gateway-gate";
+import { markSourceFailed } from "../knowledge";
 import { log } from "../log";
 import { attachArtifactKnowledge } from "../projects/knowledge";
 import { isEditableFile } from "../projects/service";
@@ -64,11 +65,31 @@ function keepWorkspaceOf(tenant: TenantContext, sourceProjectId: string | null, 
 
 function indexCopyInBackground(tenant: TenantContext, copyId: string): void {
   void (async () => {
-    requireGatewayAllowedFor(tenant);
     const copy = findVisibleFile(tenant, copyId);
-    if (copy?.project_id) {
-      await attachArtifactKnowledge(tenant, copy.id, copy.project_id, copy.owner_user_id);
+    if (!copy?.project_id) {
+      return;
     }
+    try {
+      requireGatewayAllowedFor(tenant);
+    } catch (error) {
+      if (!(error instanceof ApiError)) {
+        throw error;
+      }
+      markSourceFailed(
+        tenant,
+        {
+          id: crypto.randomUUID(),
+          name: copy.title,
+          type: "File",
+          origin: { kind: "artifact", id: copy.id },
+          ownerUserId: copy.owner_user_id,
+          projectId: copy.project_id,
+        },
+        error.code,
+      );
+      return;
+    }
+    await attachArtifactKnowledge(tenant, copy.id, copy.project_id, copy.owner_user_id);
   })().catch((error: unknown) => {
     log.warn("docs_import_index_failed", { detail: error instanceof Error ? error.name : "error" });
   });
