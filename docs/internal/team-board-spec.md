@@ -254,6 +254,30 @@ His proposal: "approaching masked models to something like copilot … give them
 - **Agents.** A custom agent (K-D28) carries a default choice. A member may change it per chat.
 - **Where it is built.** It is a behaviour change, so it is built in the tester. It is queued after documents in a Workspace (D2), and it reaches both Nultron and HYP AI through the shared Chat.
 
+### Then: images and videos from the chat ask first (Rizky, 2026-10-15; K-D32)
+
+His words: "set automatically for them to route text, images and video, because currently on the sme, all of it will basically chat modes like claude, so there has to be some backend in the back like we currently have to route image or videos generation and prompt the users (unless they set it to always allow) to use the video generation tools".
+
+**What exists (read 2026-10-15 on `tester/chat-first`).**
+- **The routing.** Chat already carries `image_generate` and `video_generate` (`DEFAULT_CHAT_TOOLS`, `packages/core/src/agents/default-chat.ts:77-78`). The chat model picks the tool when someone asks for a picture or a clip. No intent router is built and none is needed. K-D31 Auto picks a text model, not a tool.
+- **Both tools run the same code as the studios.** `generateStudioImage` and `generateStudioVideo` (`packages/host/src/studio-generate.ts:298,411`) call the same `execute`.
+- **The cost estimate exists.** `estimateImageCost` and `estimateVideoCost` (`packages/core/src/models/media-pricing.ts:573,602`) are shown only in the studios.
+- **The per-turn cap exists.** `PAID_MEDIA_PER_TURN` (`packages/core/src/agents/virtual-agents.ts:107`) allows 4 images and 1 video per turn.
+- **The approval pattern exists for folder writes only.** It records a proposal, returns `pending_approval`, the person decides on a card, and the host performs the action (`packages/host/src/folder-root/`). `chat-computer-spec.md` Layer 2 makes it the general form, and K0 lists it as gap G1.
+
+**What is built: paid media goes through the Layer 2 approval card.** It is not a new mechanism.
+- **The tool asks first.** In a hosted (SME) chat, `image_generate` and `video_generate` do not run on the model's call. They record a proposal: the kind, the prompt, the model, the options and the estimate. They return `pending_approval`, so the model ends its turn by saying the picture or clip is waiting for the person's OK, never "here it is".
+- **The card in the thread.** It shows the prompt, the estimate in the person's quota currency (K-D29) and Generate, Skip and "Always allow <images | videos>". On Generate, the host runs the existing studio path: gateway gate, model fallback, usage ledger, quota and the per-turn cap all apply unchanged. The result lands in the thread as the tool's result. Skip records a refusal. A proposal expires after 24 hours.
+- **"Always allow" is the person's own choice.** It is set per kind, images and videos separately. It is one row per person and kind in the product database, listed in `tenant-purge.ts`, and Settings can turn it off again. With it on, the tool runs at once and the card shows what was spent.
+- **This is a deliberate exception to Layer 2.** Layer 2 says "never offered for a paid step". Rizky's words above make paid media the exception. A company admin may later forbid "always allow" for its people. Nothing else in Layer 2 changes, and the Never list stays absolute.
+- **Who can say yes, and runs with nobody there.**
+  - Only the person who sent the message can say Generate or Skip. A Workspace member sees the card read-only.
+  - A routine or a card run has nobody to ask. Paid media is denied there unless that person has "always allow" on.
+- **Scope.** The approval applies only to the hosted SME shell (`AGENTFORGE_SHELL=enterprise`, server mode). Nultron's chat keeps generating directly as today, and a parity test holds that.
+- **Known gaps, not in this step.**
+  - A turn with an attachment drops both media tools (`packages/core/src/agents/chat-turn.ts:6,11-20`), so "make a video from this picture" does not route yet.
+  - Whether HYP AI's chat model exists in its gateway's catalog and supports tool calls has not been checked with a real key.
+
 ## 3. Words
 
 | Word | Meaning |
@@ -359,6 +383,7 @@ Ranked: the first five block the build or its safety.
 | K-D6 | When a person leaves: their open cards go to whom, and their agent's comments stay? | Cards go back to unassigned; comments and files stay (company data). The personal store follows the admin's keep/delete choice. | |
 | K-D7 | Does Personal get a board (agents only, one human)? | Not in v1. | |
 | K-D8 | Is the board on the free trial? | Yes, within limits. A card run that needs a computer needs a paid plan, as with routines. | |
+| K-D32 | Do images and videos from a hosted chat run on the model's call, or ask the person first? | **Ask first, on a card with the estimate; the person may set "always allow" per kind.** (Rizky, 2026-10-15.) Nultron's chat unchanged. | Paid steps spend the person's quota (K-D29). |
 | K-D14 | May an admin see the *titles* of a leaver's cards in the personal store, to decide keep or delete? | No. The admin sees only the count of items and their total size. | |
 
 ## 6. Data model
