@@ -16,7 +16,13 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatTurn } from "@/components/chat-turn";
 import { DocCard, DocCards } from "@/components/chat-doc-card";
-import { DOC_TOOL_KEYS, isDocTool, readDocResult, type DocCardModel } from "@/components/tool-rows/doc-result";
+import {
+  DOC_TOOL_KEYS,
+  isDocTool,
+  readDocResult,
+  readPendingDocResult,
+  type DocCardModel,
+} from "@/components/tool-rows/doc-result";
 import { DesktopSaveError } from "@/lib/desktop-save";
 import { saveChatFile } from "@/lib/chat-file-save";
 import { applyLocale, resetLocaleForTests } from "@/lib/i18n";
@@ -79,6 +85,20 @@ const IMPORT_OUTPUT = {
 };
 
 const REFUSAL = { ok: false, reason: "checks", message: "ERROR: a section has no heading." };
+
+const REVISE_PENDING_OUTPUT = {
+  ok: true,
+  pending: true,
+  artifactId: "art-d",
+  proposalId: "prop-1",
+  sectionId: "risks",
+  title: "Q3 report",
+  baseVersion: 2,
+  summary: 'The change to section "risks", based on version 2, is waiting for the person to Keep it.',
+};
+const PENDING_LINE = "Suggested a change to Risks in Q3 report: waiting for Keep";
+
+const doneTool = (key: string, input: unknown, output: unknown) => ({ key, status: "completed", input, output });
 
 const count = (markup: string, testId: string) => markup.split(`data-testid="${testId}"`).length - 1;
 
@@ -399,5 +419,169 @@ describe("the cards under a Chat answer", () => {
     const tools = [{ key: "import_document", status: "completed", output: IMPORT_OUTPUT }];
     expect(jobEmbedsFromTools(tools)).toEqual([]);
     expect(turn([call("import_document", IMPORT_INPUT, IMPORT_OUTPUT), answer])).not.toContain("message-embed");
+  });
+});
+
+describe("reading a revision that waits for Keep", () => {
+  it("reads the proposal, the file, the title and the section heading the call names", () => {
+    expect(readPendingDocResult("revise_document", REVISE_INPUT, REVISE_PENDING_OUTPUT)).toEqual({
+      artifactId: "art-d",
+      proposalId: "prop-1",
+      title: "Q3 report",
+      section: "Risks",
+    });
+  });
+
+  it("names the section by its id when the call gives no heading", () => {
+    const input = { artifactId: "art-d", sectionId: "risks", section: { blocks: [] } };
+    expect(readPendingDocResult("revise_document", input, REVISE_PENDING_OUTPUT)?.section).toBe("risks");
+  });
+
+  it("reads an answer stored as JSON text the same way", () => {
+    expect(readPendingDocResult("revise_document", REVISE_INPUT, JSON.stringify(REVISE_PENDING_OUTPUT))).toMatchObject({
+      proposalId: "prop-1",
+    });
+  });
+
+  it("reads nothing from a copy, a refusal, another tool, or an answer missing its proposal, title or pending flag", () => {
+    expect(readPendingDocResult("revise_document", REVISE_INPUT, REVISE_OUTPUT)).toBeNull();
+    expect(readPendingDocResult("revise_document", REVISE_INPUT, REFUSAL)).toBeNull();
+    expect(readPendingDocResult("create_document", DOCX_INPUT, REVISE_PENDING_OUTPUT)).toBeNull();
+    expect(
+      readPendingDocResult("revise_document", REVISE_INPUT, { ...REVISE_PENDING_OUTPUT, proposalId: "" }),
+    ).toBeNull();
+    expect(
+      readPendingDocResult("revise_document", REVISE_INPUT, { ...REVISE_PENDING_OUTPUT, title: undefined }),
+    ).toBeNull();
+    expect(
+      readPendingDocResult("revise_document", REVISE_INPUT, { ...REVISE_PENDING_OUTPUT, pending: false }),
+    ).toBeNull();
+    expect(readPendingDocResult("revise_document", REVISE_INPUT, undefined)).toBeNull();
+  });
+
+  it("is never read as a file, so no download is offered for it", () => {
+    expect(readDocResult("revise_document", REVISE_INPUT, REVISE_PENDING_OUTPUT)).toBeNull();
+  });
+});
+
+describe("the pending card and row", () => {
+  it("says the change waits for Keep and links Review to the document page, with no download", () => {
+    const html = renderToStaticMarkup(
+      <DocCards tools={[doneTool("revise_document", REVISE_INPUT, REVISE_PENDING_OUTPUT)]} />,
+    );
+    expect(count(html, "chat-doc-pending")).toBe(1);
+    expect(html).toContain(`>${PENDING_LINE}</p>`);
+    expect(html).toContain('href="/docs/art-d"');
+    expect(count(html, "chat-doc-review")).toBe(1);
+    expect(count(html, "chat-doc-download")).toBe(0);
+    expect(count(html, "chat-doc-open")).toBe(0);
+    expect(count(html, "chat-doc-card")).toBe(0);
+    expect(html).not.toContain("Download");
+    expect(html).not.toContain("/api/v1/artifacts");
+  });
+
+  it("uses the router link inside a router", () => {
+    const html = renderToStaticMarkup(
+      <MemoryRouter>
+        <DocCards tools={[doneTool("revise_document", REVISE_INPUT, REVISE_PENDING_OUTPUT)]} />
+      </MemoryRouter>,
+    );
+    expect(count(html, "chat-doc-review")).toBe(1);
+    expect(html).toContain('href="/docs/art-d"');
+  });
+
+  it("draws nothing while the revision call is still running", () => {
+    expect(
+      renderToStaticMarkup(<DocCards tools={[{ key: "revise_document", status: "started", input: REVISE_INPUT }]} />),
+    ).toBe("");
+  });
+
+  it("keeps a pending card and a copy card from one turn, one each", () => {
+    const html = renderToStaticMarkup(
+      <DocCards
+        tools={[
+          doneTool("revise_document", REVISE_INPUT, REVISE_PENDING_OUTPUT),
+          doneTool("revise_document", REVISE_INPUT, REVISE_OUTPUT),
+        ]}
+      />,
+    );
+    expect(count(html, "chat-doc-pending")).toBe(1);
+    expect(count(html, "chat-doc-card")).toBe(1);
+  });
+
+  it("says the pending line in Indonesian from the id catalog", () => {
+    applyLocale("id");
+    const html = renderToStaticMarkup(
+      <DocCards tools={[doneTool("revise_document", REVISE_INPUT, REVISE_PENDING_OUTPUT)]} />,
+    );
+    expect(html).toContain(">Mengusulkan perubahan pada Risks di Q3 report: menunggu Simpan</p>");
+    expect(html).toContain(">Tinjau</a>");
+  });
+
+  it("names the pending revision in the Thinking row, and the answer keeps its card", () => {
+    const html = turn([
+      {
+        type: "tool_call",
+        toolKey: "revise_document",
+        status: "completed",
+        input: REVISE_INPUT,
+        output: REVISE_PENDING_OUTPUT,
+      },
+      { type: "text", text: "Your change is ready to Keep." },
+    ]);
+    expect(html).toContain(PENDING_LINE);
+    expect(html).not.toContain("Revised a copy");
+    expect(count(html, "chat-doc-pending")).toBe(1);
+    expect(count(html, "chat-doc-download")).toBe(0);
+  });
+
+  it("names the pending revision in the row label, in both locales", () => {
+    expect(toolCallSummary("revise_document", REVISE_INPUT, REVISE_PENDING_OUTPUT)).toBe(PENDING_LINE);
+    applyLocale("id");
+    expect(toolCallSummary("revise_document", REVISE_INPUT, REVISE_PENDING_OUTPUT)).toBe(
+      "Mengusulkan perubahan pada Risks di Q3 report: menunggu Simpan",
+    );
+  });
+});
+
+describe("the copy result stays as it is", () => {
+  it("keeps the Revised a copy row sentence and the copy card, with a download and no review link", () => {
+    expect(toolCallSummary("revise_document", REVISE_INPUT, REVISE_OUTPUT)).toBe(
+      "Revised a copy: “Q3 report (revised)”",
+    );
+    const html = renderToStaticMarkup(<DocCards tools={[doneTool("revise_document", REVISE_INPUT, REVISE_OUTPUT)]} />);
+    expect(count(html, "chat-doc-card")).toBe(1);
+    expect(count(html, "chat-doc-download")).toBe(1);
+    expect(html).toContain("The original file is unchanged.");
+    expect(count(html, "chat-doc-review")).toBe(0);
+    expect(count(html, "chat-doc-pending")).toBe(0);
+  });
+
+  it("keeps the Indonesian copy row sentence", () => {
+    applyLocale("id");
+    expect(toolCallSummary("revise_document", REVISE_INPUT, REVISE_OUTPUT)).toBe(
+      "Salinan revisi: “Q3 report (revised)”",
+    );
+  });
+});
+
+describe("no Nultron text on the document cards", () => {
+  it("renders no nultron in text, alt, class, aria or src for a pending card or a copy card", () => {
+    const pending = renderToStaticMarkup(
+      <MemoryRouter>
+        <DocCards tools={[doneTool("revise_document", REVISE_INPUT, REVISE_PENDING_OUTPUT)]} />
+      </MemoryRouter>,
+    );
+    const copy = renderToStaticMarkup(<DocCards tools={[doneTool("create_document", DOCX_INPUT, DOCX_OUTPUT)]} />);
+    for (const markup of [pending, copy]) {
+      expect(markup.toLowerCase()).toContain("chat-doc");
+      expect(markup.toLowerCase()).not.toContain("nultron");
+    }
+  });
+
+  it("keeps nultron out of the card, its reader and the label source", () => {
+    for (const file of ["../components/chat-doc-card.tsx", "../components/tool-rows/doc-result.ts", "tool-labels.ts"]) {
+      expect(source(file).toLowerCase()).not.toContain("nultron");
+    }
   });
 });

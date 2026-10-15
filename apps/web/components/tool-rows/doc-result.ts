@@ -68,7 +68,7 @@ function partCount(toolKey: DocToolKey, input: Rec | null, result: Rec): number 
 /** The card for one finished document call, or null when it made no file (a refusal, or an answer that is not one). */
 export function readDocResult(toolKey: string, input: unknown, output: unknown): DocCardModel | null {
   const result = asRecord(output);
-  if (!isDocTool(toolKey) || result?.ok !== true) {
+  if (!isDocTool(toolKey) || result?.ok !== true || result.pending === true) {
     return null;
   }
   const artifactId = readString(result, "artifactId");
@@ -86,4 +86,31 @@ export function readDocResult(toolKey: string, input: unknown, output: unknown):
     revised: toolKey === "revise_document",
     parts: count === null ? null : { kind: format === "xlsx" ? "sheet" : "section", count },
   };
+}
+
+export type PendingDocModel = {
+  readonly artifactId: string;
+  readonly proposalId: string;
+  readonly title: string;
+  readonly section: string;
+};
+
+function readTrimmed(record: Rec | null, key: string): string | undefined {
+  const value = readString(record, key)?.trim();
+  return value ? value : undefined;
+}
+
+export function readPendingDocResult(toolKey: string, input: unknown, output: unknown): PendingDocModel | null {
+  const result = asRecord(output);
+  if (toolKey !== "revise_document" || result?.ok !== true || result.pending !== true) {
+    return null;
+  }
+  const artifactId = readString(result, "artifactId");
+  const proposalId = readString(result, "proposalId");
+  const title = readTrimmed(result, "title");
+  const section = readTrimmed(asRecord(asRecord(input)?.section), "heading") ?? readTrimmed(result, "sectionId");
+  if (!artifactId || !proposalId || !title || !section) {
+    return null;
+  }
+  return { artifactId, proposalId, title, section };
 }

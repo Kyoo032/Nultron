@@ -252,6 +252,9 @@
         "create_workbook": "Could not make the workbook",
         "revise_document": "Could not revise the document",
         "import_document": "Could not import the file"
+      },
+      "pending": {
+        "revise_document": "Suggested a change to {section} in {title}: waiting for Keep"
       }
     },
     "pending": {
@@ -324,6 +327,8 @@
     "sheets": "{n} sheets",
     "sheetsOne": "1 sheet",
     "revisedNote": "The original file is unchanged.",
+    "pendingLine": "Suggested a change to {section} in {title}: waiting for Keep",
+    "review": "Review",
     "download": "Download",
     "downloading": "Downloading…",
     "downloadAria": "Download {title} as {filename}",

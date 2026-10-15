@@ -252,6 +252,9 @@
         "create_workbook": "Buku kerja tidak bisa dibuat",
         "revise_document": "Dokumen tidak bisa direvisi",
         "import_document": "Berkas tidak bisa diimpor"
+      },
+      "pending": {
+        "revise_document": "Mengusulkan perubahan pada {section} di {title}: menunggu Simpan"
       }
     },
     "pending": {
@@ -324,6 +327,8 @@
     "sheets": "{n} lembar",
     "sheetsOne": "1 lembar",
     "revisedNote": "File asli tidak berubah.",
+    "pendingLine": "Mengusulkan perubahan pada {section} di {title}: menunggu Simpan",
+    "review": "Tinjau",
     "download": "Unduh",
     "downloading": "Mengunduh…",
     "downloadAria": "Unduh {title} sebagai {filename}",

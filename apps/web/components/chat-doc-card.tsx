@@ -7,12 +7,19 @@ import { docPagePath } from "@/components/doc-page/doc-format";
 import { saveChatFile } from "@/lib/chat-file-save";
 import { Link } from "@/lib/nav";
 import { t } from "@/lib/i18n";
-import { isDocTool, readDocResult, type DocCardModel, type DocFormat } from "./tool-rows/doc-result";
+import {
+  isDocTool,
+  readDocResult,
+  readPendingDocResult,
+  type DocCardModel,
+  type DocFormat,
+  type PendingDocModel,
+} from "./tool-rows/doc-result";
 
 type DownloadState = "idle" | "busy" | "failed";
 
 type CardProps = {
-  readonly model: DocCardModel;
+  readonly model: DocCardModel | PendingDocModel;
 };
 
 const FORMAT_LABEL_KEY: Readonly<Record<DocFormat, string>> = {
@@ -44,6 +51,26 @@ export function DocCard({ model }: CardProps) {
   const [state, setState] = useState<DownloadState>("idle");
   // Why the save failed, when the shell said (the disk refused it): null reads as the generic sentence.
   const [reason, setReason] = useState<string | null>(null);
+  if ("proposalId" in model) {
+    return (
+      <section
+        className="min-w-0 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-3 shadow-elev-1"
+        data-testid="chat-doc-pending"
+        data-artifact-id={model.artifactId}
+        data-proposal-id={model.proposalId}
+      >
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <p
+            className="min-w-0 flex-1 basis-48 break-words text-sm text-[var(--text)] [overflow-wrap:anywhere]"
+            data-testid="chat-doc-pending-line"
+          >
+            {t("chat.doc.pendingLine", { section: model.section, title: model.title })}
+          </p>
+          <OpenDocLink artifactId={model.artifactId} label={t("chat.doc.review")} testId="chat-doc-review" />
+        </div>
+      </section>
+    );
+  }
   const { artifactId, filename, format, title } = model;
   const meta = metaLine(model);
 
@@ -144,20 +171,29 @@ function FormatIcon({ format }: { readonly format: DocFormat }) {
   );
 }
 
-function OpenDocLink({ artifactId }: { readonly artifactId: string }) {
+function OpenDocLink({
+  artifactId,
+  label,
+  testId,
+}: {
+  readonly artifactId: string;
+  readonly label?: string;
+  readonly testId?: string;
+}) {
   const inRouter = useInRouterContext();
   const href = docPagePath(artifactId);
-  const label = t("docpage.open.label");
+  const text = label ?? t("docpage.open.label");
+  const id = testId ?? "chat-doc-open";
   if (inRouter) {
     return (
-      <Link to={href} className="btn btn-secondary" data-testid="chat-doc-open">
-        {label}
+      <Link to={href} className="btn btn-secondary" data-testid={id}>
+        {text}
       </Link>
     );
   }
   return (
-    <a href={href} className="btn btn-secondary" data-testid="chat-doc-open">
-      {label}
+    <a href={href} className="btn btn-secondary" data-testid={id}>
+      {text}
     </a>
   );
 }
@@ -166,9 +202,13 @@ type ToolCall = { readonly key: string; readonly status: string; readonly input?
 
 /** One card for each finished document call of this turn that made a file. */
 export function DocCards({ tools }: { readonly tools: readonly ToolCall[] }) {
-  const docs = tools.flatMap((tool) => {
+  const docs = tools.flatMap((tool): (DocCardModel | PendingDocModel)[] => {
     if (!isDocTool(tool.key) || tool.status !== "completed") {
       return [];
+    }
+    const pending = readPendingDocResult(tool.key, tool.input, tool.output);
+    if (pending) {
+      return [pending];
     }
     const model = readDocResult(tool.key, tool.input, tool.output);
     return model ? [model] : [];
@@ -179,7 +219,7 @@ export function DocCards({ tools }: { readonly tools: readonly ToolCall[] }) {
   return (
     <div className="space-y-2" data-testid="chat-doc-cards">
       {docs.map((model) => (
-        <DocCard key={model.artifactId} model={model} />
+        <DocCard key={"proposalId" in model ? `pending-${model.proposalId}` : model.artifactId} model={model} />
       ))}
     </div>
   );

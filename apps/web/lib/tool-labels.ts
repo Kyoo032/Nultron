@@ -9,7 +9,7 @@ import {
   type ToolStatus,
 } from "@/components/tool-rows/results";
 import { DOSSIER_TOOL_KEY, readDossierResult } from "@/components/tool-rows/dossier-result";
-import { isDocTool, type DocToolKey } from "@/components/tool-rows/doc-result";
+import { isDocTool, readPendingDocResult, type DocToolKey } from "@/components/tool-rows/doc-result";
 import { t } from "@/lib/i18n";
 
 /** Fast tools still show a completed row; they skip the long "Working…" spinner. */
@@ -111,6 +111,13 @@ function docToolLabel(toolKey: DocToolKey, input: unknown, output: unknown, stat
   }
   if (state === "refused" || state === "budget") {
     return t(`chat.tools.doc.failed.${toolKey}`);
+  }
+  const pending = readPendingDocResult(toolKey, input, output);
+  if (pending) {
+    return t("chat.tools.doc.pending.revise_document", {
+      section: capArg(pending.section),
+      title: capArg(pending.title),
+    });
   }
   const title = readString(asRecord(output), "title");
   return title ? t(`chat.tools.doc.done.${toolKey}`, { title: capArg(title) }) : t("chat.tools.doc.donePlain");
