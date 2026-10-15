@@ -6,6 +6,7 @@
  * refusal written here), so it is not scanned as untrusted output.
  */
 import { defineTool, registerTool } from "@agentforge/core";
+import { z } from "zod";
 import { createDocumentForTenant, createWorkbookForTenant } from "./create-document";
 import { importDocumentForTenant } from "./import-document";
 import { reviseDocumentForTenant } from "./revise-document";
@@ -38,7 +39,17 @@ const REVISE_DOCUMENT_DESCRIPTION = [
   "A theme restyles the whole file. A format of docx or pdf saves a document in that type. In a Workspace, a section change cannot be combined with a theme or format change: send that in its own call.",
   "Only the part you name changes; everything else in the file stays the same. Give only what changes.",
   "When the answer has pending true, the change is waiting for a member to press Keep: tell the owner that, and that the file is unchanged until then. Use the same artifactId. Otherwise the answer is ok with a new artifactId: tell the owner the new file is ready and that the original is unchanged, and use the new artifactId for any further revision.",
+  "baseVersion is optional and only a section change in a Workspace uses it: leave it out unless an earlier answer for this file gave you its version. A section change is based on the older of two versions: the one this run first saw the file at, and the baseVersion you give, if you give one. If a member changed that section after the version it is based on, the change is refused and nothing is saved: tell the owner, and do not call again with the same change.",
 ].join(" ");
+
+const reviseDocumentToolSchema = reviseDocumentSchema.extend({
+  baseVersion: z
+    .number()
+    .optional()
+    .describe(
+      "The version number this section change is based on, if an earlier answer for this file gave you one. Leave it out otherwise.",
+    ),
+});
 
 const IMPORT_DOCUMENT_DESCRIPTION = [
   "Read a stored Word, Excel or PDF file into an editable copy, and save that copy for the owner.",
@@ -70,7 +81,7 @@ export const reviseDocumentTool = defineTool({
   key: "revise_document",
   name: "Revise a document",
   description: REVISE_DOCUMENT_DESCRIPTION,
-  schema: reviseDocumentSchema,
+  schema: reviseDocumentToolSchema,
   trust: "internal",
   execute: (args, tenant) => reviseDocumentForTenant(args, tenant),
 });

@@ -23,18 +23,12 @@ import {
 import { DOC_THEME_NAMES, type DocThemeName } from "../doc-model/themes";
 import { artifactStore } from "../artifacts";
 import { docVersionStore, proposalStore } from "../doc-versions";
+import { agentForProposal } from "../doc-versions/proposal-agent";
 import { findMemberProject, findVisibleFile } from "../projects/store";
 import { log } from "../log";
-import { currentToolRun } from "../tool-run-context";
+import { currentToolRun, type ToolRun } from "../tool-run-context";
 import { readEditableSpec, specMeta, type EditableSpec } from "./doc-meta";
-import {
-  QUOTA_MESSAGE,
-  UNAVAILABLE_MESSAGE,
-  refuse,
-  saveRenderedArtifact,
-  type DocRefusal,
-  type DocToolResult,
-} from "./doc-save";
+import { QUOTA_MESSAGE, refuse, saveRenderedArtifact, type DocRefusal, type DocToolResult } from "./doc-save";
 
 export type ReviseDocumentInput = {
   readonly artifactId: string;
@@ -44,6 +38,7 @@ export type ReviseDocumentInput = {
   readonly sheet?: Record<string, unknown>;
   readonly theme?: string;
   readonly format?: string;
+  readonly baseVersion?: number;
 };
 
 export type PendingRevision = {
@@ -53,6 +48,7 @@ export type PendingRevision = {
   readonly proposalId: string;
   readonly title: string;
   readonly sectionId: string;
+  readonly baseVersion: number;
   readonly summary: string;
 };
 
@@ -69,6 +65,12 @@ class ReviseRefusal extends Error {
 
 const NOT_FOUND_MESSAGE = "No file with that id is visible to you. Check the id, or ask the owner which file it is.";
 const NOT_EDITABLE_MESSAGE = "This file was not made by the document tools, so it cannot be revised here.";
+const AGENT_NOT_IN_WORKSPACE_MESSAGE =
+  "The agent you are chatting with is not in this Workspace, so it cannot change this file. Tell the owner that a member can bring this agent into the Workspace, and do not call this again for this file with this agent.";
+const STALE_SECTION_MESSAGE =
+  "This section changed after the version this change was based on, so nothing was changed. Tell the owner that the section changed, and ask them to repeat the request. Do not call this again with the same change.";
+const BAD_BASE_MESSAGE =
+  "baseVersion must be a version of this file, from 1 up to its latest. Leave baseVersion out and call again.";
 const DOCUMENT_FORMATS: Readonly<Record<string, ArtifactMime>> = { docx: DOCX_MIME, pdf: PDF_MIME };
 
 function isDocTheme(value: string): value is DocThemeName {
@@ -181,19 +183,58 @@ function restylesToo(input: ReviseDocumentInput): boolean {
   return input.theme !== undefined || input.format !== undefined;
 }
 
-function isInLiveWorkspace(tenant: TenantContext, artifactId: string): boolean {
+function liveWorkspaceProjectId(tenant: TenantContext, artifactId: string): string | null {
   if (!isServerMode()) {
-    return false;
+    return null;
   }
   const projectId = findVisibleFile(tenant, artifactId)?.project_id ?? null;
   if (projectId === null) {
-    return false;
+    return null;
   }
   const project = findMemberProject(tenant, projectId);
-  return project !== null && project.archived_at === null;
+  return project !== null && project.archived_at === null ? projectId : null;
 }
 
-type ProposalRefusal = "not_found" | "not_editable" | "quota" | "bad_base" | "bad_section";
+const PINNED_RUNS_CAP = 1000;
+const runPinnedVersions = new Map<string, Map<string, number>>();
+
+function pinsOfRun(runId: string): Map<string, number> {
+  const existing = runPinnedVersions.get(runId);
+  if (existing !== undefined) {
+    return existing;
+  }
+  if (runPinnedVersions.size >= PINNED_RUNS_CAP) {
+    const oldest = runPinnedVersions.keys().next().value;
+    if (oldest !== undefined) {
+      runPinnedVersions.delete(oldest);
+    }
+  }
+  const created = new Map<string, number>();
+  runPinnedVersions.set(runId, created);
+  return created;
+}
+
+function pinnedVersionOf(run: ToolRun | undefined, artifactId: string, head: number): number {
+  if (run === undefined) {
+    return head;
+  }
+  const pins = pinsOfRun(run.runId);
+  const pinned = pins.get(artifactId);
+  if (pinned !== undefined) {
+    return pinned;
+  }
+  pins.set(artifactId, head);
+  return head;
+}
+
+function baseVersionFor(requested: number | undefined, pinned: number, head: number): number | null {
+  if (requested === undefined) {
+    return pinned;
+  }
+  return Number.isInteger(requested) && requested >= 1 && requested <= head ? Math.min(requested, pinned) : null;
+}
+
+type ProposalRefusal = "not_found" | "not_editable" | "quota" | "bad_base" | "bad_section" | "section_changed";
 
 function proposalRefusal(reason: ProposalRefusal): DocToolResult {
   switch (reason) {
@@ -209,19 +250,27 @@ function proposalRefusal(reason: ProposalRefusal): DocToolResult {
         "That section could not be changed. Check its id and its content, then call the tool again.",
       );
     case "bad_base":
-      return refuse("unavailable", UNAVAILABLE_MESSAGE);
+      return refuse("invalid", BAD_BASE_MESSAGE);
+    case "section_changed":
+      return refuse("unavailable", STALE_SECTION_MESSAGE);
   }
 }
 
-function pendingSummary(sectionId: string): string {
-  return `The change to section "${sectionId}" is waiting for the person to Keep it. No new file was saved, and the file is unchanged until they Keep it. Tell the owner the change is ready to keep in the Workspace. Use the same artifactId for any further revision.`;
+function pendingSummary(sectionId: string, baseVersion: number): string {
+  return `The change to section "${sectionId}", based on version ${baseVersion}, is waiting for the person to Keep it. No new file was saved, and the file is unchanged until they Keep it. Tell the owner the change is ready to keep in the Workspace. Use the same artifactId for any further revision.`;
 }
 
 async function proposeSectionChange(
   input: ReviseDocumentInput,
   tenant: TenantContext,
   record: ArtifactRecord,
+  projectId: string,
 ): Promise<ReviseDocumentResult> {
+  const run = currentToolRun();
+  const agent = await agentForProposal(tenant, projectId, run?.mode ?? virtualAgentFor("chat").id);
+  if (agent === null) {
+    return refuse("unavailable", AGENT_NOT_IN_WORKSPACE_MESSAGE);
+  }
   const first = docVersionStore().ensureFirstVersion(tenant, record.id);
   if (!first.ok) {
     return proposalRefusal(first.reason);
@@ -230,7 +279,19 @@ async function proposeSectionChange(
   if (head === null || head.spec.kind !== "document") {
     return proposalRefusal("not_editable");
   }
+  const baseVersion = baseVersionFor(
+    input.baseVersion,
+    pinnedVersionOf(run, record.id, first.head.version),
+    first.head.version,
+  );
+  if (baseVersion === null) {
+    return refuse("invalid", BAD_BASE_MESSAGE);
+  }
   const part = sectionPart(input);
+  const changedAt = docVersionStore().sectionAuthors(tenant, record.id)?.[part.id]?.version ?? 0;
+  if (changedAt > baseVersion) {
+    return refuse("unavailable", STALE_SECTION_MESSAGE);
+  }
   const edited = reviseDocument(head.spec.spec, input);
   const section = edited.sections.find((candidate) => candidate.id === part.id);
   if (section === undefined) {
@@ -239,8 +300,8 @@ async function proposeSectionChange(
   const created = proposalStore().createProposal(tenant, record.id, {
     sectionId: part.id,
     section,
-    baseVersion: first.head.version,
-    agentId: currentToolRun()?.mode ?? virtualAgentFor("chat").id,
+    baseVersion,
+    agentId: agent.id,
   });
   if (!created.ok) {
     return proposalRefusal(created.reason);
@@ -252,7 +313,8 @@ async function proposeSectionChange(
     proposalId: created.proposal.id,
     title: record.title,
     sectionId: part.id,
-    summary: pendingSummary(part.id),
+    baseVersion,
+    summary: pendingSummary(part.id, baseVersion),
   };
 }
 
@@ -272,10 +334,13 @@ async function reviseOnce(input: ReviseDocumentInput, tenant: TenantContext): Pr
       "Nothing to change: give a sectionId and section, a sheetId and sheet, a theme, or a format.",
     );
   }
-  if (isWorkspaceSectionChange(input, editable) && isInLiveWorkspace(tenant, record.id)) {
-    return restylesToo(input)
-      ? refuse("invalid", SECTION_WITH_RESTYLE_MESSAGE)
-      : proposeSectionChange(input, tenant, record);
+  if (isWorkspaceSectionChange(input, editable)) {
+    const projectId = liveWorkspaceProjectId(tenant, record.id);
+    if (projectId !== null) {
+      return restylesToo(input)
+        ? refuse("invalid", SECTION_WITH_RESTYLE_MESSAGE)
+        : proposeSectionChange(input, tenant, record, projectId);
+    }
   }
   const format = targetFormat(editable, record.mime, input.format);
   const mime = format === "xlsx" ? XLSX_MIME : DOCUMENT_FORMATS[format];

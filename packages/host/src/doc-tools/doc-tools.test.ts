@@ -49,6 +49,14 @@ describe("the document tools", () => {
     expect(reviseDocumentSchema.safeParse({ artifactId: "abc" }).success).toBe(true);
   });
 
+  it("hand revise_document's baseVersion to the host, and take a revision without one", () => {
+    expect(reviseDocumentTool.schema.safeParse({ artifactId: "a", baseVersion: 2 })).toMatchObject({
+      success: true,
+      data: { artifactId: "a", baseVersion: 2 },
+    });
+    expect(reviseDocumentTool.schema.safeParse({ artifactId: "a" }).success).toBe(true);
+  });
+
   it("tell the model a Workspace section change waits for Keep, and that any other revision saves a copy", () => {
     expect(reviseDocumentTool.description).toMatch(
       /In a Workspace, a one-section change to a document waits for a member to press Keep/,

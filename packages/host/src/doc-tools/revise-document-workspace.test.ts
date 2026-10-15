@@ -4,7 +4,7 @@ import { virtualAgentFor, type TenantContext } from "@agentforge/core";
 import { sql } from "@agentforge/db";
 import { artifactStore } from "../artifacts";
 import { docVersionStore, proposalStore } from "../doc-versions";
-import { addProjectMember, createProject } from "../projects/service";
+import { addProjectMember, bringProjectAgent, createProject } from "../projects/service";
 import { setFileProject } from "../projects/store";
 import { forgetTenantJobBytes, resetObjectStoreForTests } from "../tenant-storage";
 import "../tenant-storage-db";
@@ -77,6 +77,34 @@ async function workspaceDocument(): Promise<{ artifactId: string; projectId: str
   return { artifactId: made.artifactId, projectId: project.id };
 }
 
+function headOf(artifactId: string): number {
+  return docVersionStore().listVersions(owner, artifactId)?.[0]?.version ?? 1;
+}
+
+async function changeSectionAsOwner(artifactId: string, sectionId: string): Promise<void> {
+  const created = proposalStore().createProposal(owner, artifactId, {
+    sectionId,
+    section: {
+      id: sectionId,
+      heading: "Changed by the owner",
+      blocks: [{ type: "paragraph", text: "The owner's change." }],
+    },
+    baseVersion: headOf(artifactId),
+    agentId: virtualAgentFor("chat").id,
+  });
+  if (!created.ok) {
+    throw new Error(created.reason);
+  }
+  const kept = proposalStore().keep(owner, created.proposal.id);
+  if (!kept.ok) {
+    throw new Error(kept.reason);
+  }
+}
+
+function sectionChange(artifactId: string, sectionId: string, text: string) {
+  return { artifactId, sectionId, section: { blocks: [{ type: "paragraph" as const, text }] } };
+}
+
 describe("revise_document in a Workspace: a section change waits for Keep", () => {
   it("a member's section change makes one pending proposal and saves no new file", async () => {
     const { artifactId } = await workspaceDocument();
@@ -118,17 +146,29 @@ describe("revise_document in a Workspace: a section change waits for Keep", () =
     expect(kept?.kind === "document" ? kept.spec.sections[1]?.heading : null).toBe("Numbers, corrected");
   });
 
-  it("records the agent running the chat as the proposal's agent", async () => {
+  it("refuses a change under an agent the Workspace never brought in, and writes no proposal or version", async () => {
     const { artifactId } = await workspaceDocument();
-    const result = await withToolRun({ runId: "run-1", mode: "research" }, () =>
-      reviseDocumentForTenant(
-        { artifactId, sectionId: "close", section: { blocks: [{ type: "paragraph", text: "Changed." }] } },
-        member,
-      ),
+    const before = workspaceCount();
+    const result = await withToolRun({ runId: randomUUID(), mode: "research" }, () =>
+      reviseDocumentForTenant(sectionChange(artifactId, "close", "Changed."), member),
+    );
+    expect(result).toMatchObject({ ok: false, reason: "unavailable" });
+    expect(result.ok === false && result.message).toMatch(/not in this Workspace/);
+    expect(workspaceCount()).toBe(before);
+    expect(proposalStore().listPending(member, artifactId)).toEqual([]);
+    expect(rowCount("doc_proposals", artifactId)).toBe(0);
+    expect(rowCount("doc_versions", artifactId)).toBe(0);
+  });
+
+  it("records the agent a member brought into the Workspace as the proposal's agent", async () => {
+    const { artifactId, projectId } = await workspaceDocument();
+    await bringProjectAgent(member, projectId, "research");
+    const result = await withToolRun({ runId: randomUUID(), mode: "research" }, () =>
+      reviseDocumentForTenant(sectionChange(artifactId, "close", "Changed."), member),
     );
     const pending = pendingOf(result);
     expect(proposalStore().listPending(member, artifactId)).toMatchObject([
-      { id: pending.proposalId, agentId: "research", askedByUserId: member.userId },
+      { id: pending.proposalId, agentId: "research", askedByUserId: member.userId, baseVersion: 1 },
     ]);
   });
 
@@ -211,6 +251,77 @@ describe("revise_document in a Workspace: a section change waits for Keep", () =
     expect(result).toMatchObject({ ok: false, reason: "invalid" });
     expect(result.ok === false && result.message).toMatch(/no section "nope"/);
     expect(rowCount("doc_proposals", artifactId)).toBe(0);
+  });
+
+  it("refuses a section that changed after this run first saw the file, and keeps the other sections open", async () => {
+    const { artifactId } = await workspaceDocument();
+    const run = { runId: randomUUID(), mode: "chat" };
+    const first = pendingOf(
+      await withToolRun(run, () =>
+        reviseDocumentForTenant(sectionChange(artifactId, "close", "Closing, first."), member),
+      ),
+    );
+    expect(first.baseVersion).toBe(1);
+
+    await changeSectionAsOwner(artifactId, "numbers");
+    expect(headOf(artifactId)).toBe(2);
+
+    const refused = await withToolRun(run, () =>
+      reviseDocumentForTenant(sectionChange(artifactId, "numbers", "Numbers, late."), member),
+    );
+    expect(refused).toMatchObject({ ok: false, reason: "unavailable" });
+    expect(refused.ok === false && refused.message).toMatch(/changed after the version/);
+    expect(
+      proposalStore()
+        .listPending(member, artifactId)
+        ?.map((proposal) => proposal.sectionId),
+    ).toEqual(["close"]);
+
+    const other = pendingOf(
+      await withToolRun(run, () =>
+        reviseDocumentForTenant(sectionChange(artifactId, "close", "Closing, again."), member),
+      ),
+    );
+    expect(other.baseVersion).toBe(1);
+    expect(
+      proposalStore()
+        .listPending(member, artifactId)
+        ?.map((proposal) => proposal.id),
+    ).toEqual([other.proposalId]);
+  });
+
+  it("bases a change in a new run on the version that run first saw", async () => {
+    const { artifactId } = await workspaceDocument();
+    await changeSectionAsOwner(artifactId, "numbers");
+    const fresh = pendingOf(
+      await withToolRun({ runId: randomUUID(), mode: "chat" }, () =>
+        reviseDocumentForTenant(sectionChange(artifactId, "numbers", "Numbers, fresh."), member),
+      ),
+    );
+    expect(fresh.baseVersion).toBe(2);
+    expect(proposalStore().listPending(member, artifactId)).toMatchObject([{ id: fresh.proposalId, baseVersion: 2 }]);
+  });
+
+  it("checks an explicit baseVersion against the section, and refuses one that is not a version of the file", async () => {
+    const { artifactId } = await workspaceDocument();
+    await changeSectionAsOwner(artifactId, "numbers");
+    const stale = await reviseDocumentForTenant(
+      { ...sectionChange(artifactId, "numbers", "Late."), baseVersion: 1 },
+      member,
+    );
+    expect(stale).toMatchObject({ ok: false, reason: "unavailable" });
+    const future = await reviseDocumentForTenant(
+      { ...sectionChange(artifactId, "numbers", "Late."), baseVersion: 99 },
+      member,
+    );
+    expect(future).toMatchObject({ ok: false, reason: "invalid" });
+    expect(future.ok === false && future.message).toMatch(/baseVersion/);
+    expect(proposalStore().listPending(member, artifactId)).toEqual([]);
+    const current = pendingOf(
+      await reviseDocumentForTenant({ ...sectionChange(artifactId, "numbers", "Current."), baseVersion: 2 }, member),
+    );
+    expect(current.baseVersion).toBe(2);
+    expect(proposalStore().listPending(member, artifactId)).toHaveLength(1);
   });
 });
 
