@@ -1,13 +1,6 @@
-/* The chat-first rail (tester code): a fixed icon column. Agents scroll on their own; the account
-   links and the footer stay put under a hairline.
-
-   Sizes ride three variables so the active bar, the tiles and the column padding always agree:
-   the tile is centred in the rail, and the bar sits in the padding at the rail's left edge, inside
-   the scroller's padding box, so the scroller does not clip it. Colours come from the theme
-   variables alone, so light and dark need no second set. */
-
 .agent-rail {
   --ar-w: 64px;
+  --ar-w-full: 248px;
   --ar-tile: 40px;
   --ar-pad: 12px;
   position: relative;
@@ -19,6 +12,19 @@
   background: var(--rail);
   border-right: 1px solid var(--rail-line);
   color: var(--rail-text-2);
+}
+
+.agent-rail[data-rail="full"] {
+  width: var(--ar-w-full);
+}
+
+.agent-rail-inner {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
 }
 
 .agent-rail-agents,
@@ -83,7 +89,9 @@
   height: var(--ar-tile);
   border-radius: 12px;
   color: var(--mode, var(--accent));
-  transition: background-color 120ms ease, box-shadow 120ms ease;
+  transition:
+    background-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .agent-rail-link:focus-visible {
@@ -100,7 +108,9 @@
   border-radius: 12px;
   background: color-mix(in srgb, var(--mode) 14%, transparent);
   color: var(--mode);
-  transition: background-color 120ms ease, color 120ms ease;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
 }
 
 .agent-rail-link:hover .agent-rail-tile {
@@ -179,14 +189,87 @@
   pointer-events: none;
 }
 
+.agent-rail-label {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--rail-text-2);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-rail-link:hover .agent-rail-label {
+  color: var(--rail-active-text);
+}
+
+.agent-rail-link[aria-current="page"] .agent-rail-label {
+  color: var(--rail-active-text);
+  font-weight: 600;
+}
+
+.agent-rail[data-rail="full"] .agent-rail-agents,
+.agent-rail[data-rail="full"] .agent-rail-account {
+  align-items: stretch;
+}
+
+.agent-rail[data-rail="full"] .agent-rail-link {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 10px;
+  padding-inline: 4px 10px;
+}
+
+.agent-rail[data-rail="full"] .agent-rail-link:hover {
+  background: var(--rail-hover);
+}
+
+.agent-rail[data-rail="full"] .agent-rail-link[aria-current="page"] {
+  background: var(--rail-active);
+  box-shadow: none;
+}
+
+.agent-rail[data-rail="full"] .agent-rail-tile {
+  flex: none;
+  width: 32px;
+  height: 32px;
+}
+
+.agent-rail[data-rail="full"] .agent-rail-mark,
+.agent-rail[data-rail="full"] .agent-rail-logo {
+  flex: none;
+  margin-inline: 2px;
+}
+
+.agent-rail[data-rail="full"] .agent-rail-monogram {
+  flex: none;
+  width: 32px;
+  text-align: center;
+}
+
+.agent-rail[data-rail="full"] .agent-rail-skeleton {
+  width: 100%;
+}
+
+.agent-rail[data-rail="full"] .agent-rail-footer {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.agent-rail {
+  transition: width 140ms ease;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .agent-rail,
   .agent-rail-link,
   .agent-rail-tile {
     transition: none;
   }
 }
 
-/* A phone: the rail narrows to 56 px and the tiles to 36 px. */
 @media (max-width: 480px) {
   .agent-rail {
     --ar-w: 56px;
@@ -197,5 +280,33 @@
   .agent-rail-agents,
   .agent-rail-account {
     gap: 6px;
+  }
+
+  .agent-rail[data-rail="full"] {
+    width: var(--ar-w);
+  }
+
+  .agent-rail[data-rail="full"] .agent-rail-inner {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 50;
+    width: min(280px, 86vw);
+    background: var(--rail);
+    border-right: 1px solid var(--rail-line);
+    box-shadow: 0 0 40px rgb(0 0 0 / 0.28);
+  }
+
+  .agent-rail[data-rail="full"] .agent-rail-link {
+    height: 44px;
+  }
+
+  .agent-rail-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 49;
+    padding: 0;
+    border: 0;
+    background: rgb(0 0 0 / 0.4);
+    cursor: default;
   }
 }
