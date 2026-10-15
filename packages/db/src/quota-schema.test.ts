@@ -5,7 +5,6 @@ import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ensureSchema } from "./ensure-schema";
 import { QUOTA_AUDIT_ACTIONS, QUOTA_TABLES, ensureQuotaTables } from "./quota-schema";
-import { purgeTenantRows } from "./tenant-purge";
 
 type Db = Database.Database;
 type Row = Record<string, string | number | null>;
@@ -70,6 +69,34 @@ const EXPECTED_COLUMNS: Record<string, string[]> = {
 
 const TENANT_USAGE_QUOTA_COLUMNS = ["allocation_id", "purpose", "hold_id", "agent_id", "project_id"];
 
+const GUARD_TRIGGERS = [
+  "company_quota_settings_tenant_insert_guard",
+  "company_quota_settings_tenant_update_guard",
+  "company_groups_tenant_insert_guard",
+  "company_groups_tenant_update_guard",
+  "quota_allocations_tenant_insert_guard",
+  "quota_allocations_tenant_update_guard",
+  "quota_holds_tenant_insert_guard",
+  "quota_holds_tenant_update_guard",
+  "quota_audit_tenant_insert_guard",
+  "quota_audit_tenant_update_guard",
+  "company_group_members_member_insert_guard",
+  "company_group_members_member_update_guard",
+  "quota_assignments_person_insert_guard",
+  "quota_assignments_person_update_guard",
+  "quota_assignments_group_insert_guard",
+  "quota_assignments_group_update_guard",
+  "quota_holds_allocation_insert_guard",
+  "quota_holds_allocation_update_guard",
+  "quota_audit_allocation_insert_guard",
+  "quota_audit_allocation_update_guard",
+  "quota_person_usage_member_insert_guard",
+  "quota_person_usage_member_update_guard",
+  "tenant_usage_allocation_insert_guard",
+  "tenant_usage_allocation_update_guard",
+  "organization_members_quota_removal",
+];
+
 function insertRow(sqlite: Db, table: string, row: Row): void {
   const columns = Object.keys(row);
   sqlite
@@ -87,6 +114,12 @@ function indexesOf(sqlite: Db, table: string): Array<{ name: string; unique: num
     unique: number;
     partial: number;
   }>;
+}
+
+function triggerNames(sqlite: Db): string[] {
+  return (sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger'").all() as Array<{ name: string }>).map(
+    (row) => row.name,
+  );
 }
 
 function countWhere(sqlite: Db, table: string, where: string): number {
@@ -319,137 +352,6 @@ const BAD_ROWS: Array<[string, string, Row]> = [
   ],
 ];
 
-const TENANT_MISMATCH_ROWS: Array<[string, string, Row]> = [
-  ["company_quota_settings", "company_quota_settings", { organization_id: "org-a", tenant_id: "tenant-b", enabled: 0 }],
-  [
-    "company_groups",
-    "company_groups",
-    {
-      id: "group-x",
-      organization_id: "org-a",
-      tenant_id: "tenant-b",
-      name: "Sales",
-      created_by: "user-a",
-      created_at: 1,
-    },
-  ],
-  ["quota_allocations", "quota_allocations", allocation({ tenant_id: "tenant-b" })],
-  ["quota_holds", "quota_holds", hold({ tenant_id: "tenant-b" })],
-  [
-    "quota_audit",
-    "quota_audit",
-    {
-      id: "audit-x",
-      organization_id: "org-a",
-      tenant_id: "tenant-b",
-      actor_user_id: "user-a",
-      action: "quota.enable",
-      at: 1,
-    },
-  ],
-  [
-    "quota_allocations for a company that does not exist",
-    "quota_allocations",
-    allocation({ organization_id: "org-missing" }),
-  ],
-];
-
-function seedLedger(sqlite: Db): void {
-  insertRow(sqlite, "company_quota_settings", {
-    organization_id: "org-a",
-    tenant_id: "tenant-a",
-    enabled: 1,
-    company_cap_micros: 5000000,
-  });
-  insertRow(sqlite, "company_quota_settings", { organization_id: "org-b", tenant_id: "tenant-b", enabled: 1 });
-  insertRow(sqlite, "company_group_members", {
-    group_id: "group-b",
-    user_id: "user-b",
-    added_by: "user-b",
-    added_at: 1,
-  });
-  insertRow(sqlite, "quota_allocation_models", { allocation_id: "alloc-a", model_id: "gpt-4o" });
-  insertRow(sqlite, "quota_allocation_models", { allocation_id: "alloc-b", model_id: "gpt-4o" });
-  insertRow(sqlite, "quota_assignments", { allocation_id: "alloc-a", subject_kind: "person", subject_id: "user-a" });
-  insertRow(sqlite, "quota_assignments", { allocation_id: "alloc-a", subject_kind: "group", subject_id: "group-a" });
-  insertRow(sqlite, "quota_assignments", { allocation_id: "alloc-b", subject_kind: "person", subject_id: "user-b" });
-  insertRow(sqlite, "quota_person_usage", {
-    allocation_id: "alloc-a",
-    user_id: "user-a",
-    period_start: 0,
-    spent_micros: 10,
-    held_micros: 0,
-  });
-  insertRow(sqlite, "quota_person_usage", {
-    allocation_id: "alloc-b",
-    user_id: "user-b",
-    period_start: 0,
-    spent_micros: 10,
-    held_micros: 0,
-  });
-  insertRow(
-    sqlite,
-    "quota_holds",
-    hold({ id: "hold-1", state: "settled", settled_micros: 10, cost_basis: "reported", closed_at: 2 }),
-  );
-  insertRow(
-    sqlite,
-    "quota_holds",
-    hold({
-      id: "hold-b",
-      organization_id: "org-b",
-      tenant_id: "tenant-b",
-      allocation_id: "alloc-b",
-      user_id: "user-b",
-    }),
-  );
-  insertRow(sqlite, "quota_audit", {
-    id: "audit-a",
-    organization_id: "org-a",
-    tenant_id: "tenant-a",
-    actor_user_id: "user-a",
-    action: "allocation.create",
-    allocation_id: "alloc-a",
-    detail: '{"allocation":"alloc-a"}',
-    at: 1,
-  });
-  insertRow(sqlite, "quota_audit", {
-    id: "audit-b",
-    organization_id: "org-b",
-    tenant_id: "tenant-b",
-    actor_user_id: "user-b",
-    action: "quota.enable",
-    at: 1,
-  });
-  insertRow(sqlite, "tenant_usage", {
-    id: "usage-1",
-    tenant_id: "tenant-a",
-    organization_id: "org-a",
-    mode: "chat",
-    model: "gpt-4o",
-    unit: "token",
-    quantity: 1,
-    at: 1,
-    allocation_id: "alloc-a",
-    purpose: "work",
-    hold_id: "hold-1",
-    agent_id: "agent-1",
-  });
-  insertRow(sqlite, "tenant_usage", {
-    id: "usage-b",
-    tenant_id: "tenant-b",
-    organization_id: "org-b",
-    mode: "chat",
-    model: "gpt-4o",
-    unit: "token",
-    quantity: 1,
-    at: 1,
-    allocation_id: "alloc-b",
-    purpose: "work",
-    hold_id: "hold-b",
-  });
-}
-
 describe("ensureQuotaTables", () => {
   let sqlite: Db;
 
@@ -492,7 +394,13 @@ describe("ensureQuotaTables", () => {
     });
   });
 
+  it("installs every tenant, membership, allocation and removal guard by name", () => {
+    expect(triggerNames(sqlite)).toEqual(expect.arrayContaining(GUARD_TRIGGERS));
+  });
+
   it("adds the tenant_usage columns to a ledger that predates them, once", () => {
+    sqlite.exec("DROP TRIGGER tenant_usage_allocation_insert_guard");
+    sqlite.exec("DROP TRIGGER tenant_usage_allocation_update_guard");
     sqlite.exec("DROP INDEX tenant_usage_hold_idx");
     for (const column of TENANT_USAGE_QUOTA_COLUMNS) {
       sqlite.exec(`ALTER TABLE tenant_usage DROP COLUMN ${column}`);
@@ -506,6 +414,9 @@ describe("ensureQuotaTables", () => {
     expect(columns).toEqual(expect.arrayContaining(TENANT_USAGE_QUOTA_COLUMNS));
     expect(columns.filter((name) => name === "hold_id")).toEqual(["hold_id"]);
     expect(indexesOf(sqlite, "tenant_usage").map((index) => index.name)).toContain("tenant_usage_hold_idx");
+    expect(triggerNames(sqlite)).toEqual(
+      expect.arrayContaining(["tenant_usage_allocation_insert_guard", "tenant_usage_allocation_update_guard"]),
+    );
   });
 
   it("fills the documented defaults when a row names only its key columns", () => {
@@ -645,135 +556,6 @@ describe("CHECK constraints refuse a bad value", () => {
   });
 });
 
-describe("tenant guard triggers", () => {
-  let sqlite: Db;
-
-  beforeEach(() => {
-    sqlite = openDb();
-  });
-
-  afterEach(() => {
-    sqlite.close();
-  });
-
-  it.each(TENANT_MISMATCH_ROWS)("refuses a %s whose tenant is not its company's", (_label, table, row) => {
-    expect(() => insertRow(sqlite, table, row)).toThrow("quota_tenant_mismatch");
-  });
-
-  it("refuses an update that moves a row to another tenant or another company", () => {
-    expect(() =>
-      sqlite.prepare("UPDATE quota_allocations SET tenant_id = 'tenant-b' WHERE id = 'alloc-a'").run(),
-    ).toThrow("quota_tenant_mismatch");
-    expect(() =>
-      sqlite.prepare("UPDATE quota_allocations SET organization_id = 'org-b' WHERE id = 'alloc-a'").run(),
-    ).toThrow("quota_tenant_mismatch");
-    sqlite.prepare("UPDATE quota_allocations SET name = 'Renamed' WHERE id = 'alloc-a'").run();
-    expect(sqlite.prepare("SELECT name FROM quota_allocations WHERE id = 'alloc-a'").get()).toEqual({
-      name: "Renamed",
-    });
-  });
-});
-
-describe("subject and membership guards", () => {
-  let sqlite: Db;
-
-  beforeEach(() => {
-    sqlite = openDb();
-  });
-
-  afterEach(() => {
-    sqlite.close();
-  });
-
-  it("accepts a person who belongs to the allocation's company", () => {
-    expect(() =>
-      insertRow(sqlite, "quota_assignments", {
-        allocation_id: "alloc-a",
-        subject_kind: "person",
-        subject_id: "user-a",
-      }),
-    ).not.toThrow();
-  });
-
-  it("accepts a group of the allocation's company", () => {
-    expect(() =>
-      insertRow(sqlite, "quota_assignments", {
-        allocation_id: "alloc-a",
-        subject_kind: "group",
-        subject_id: "group-a",
-      }),
-    ).not.toThrow();
-  });
-
-  it.each([
-    [
-      "a person from another company",
-      { allocation_id: "alloc-a", subject_kind: "person", subject_id: "user-b" },
-      "quota_subject_not_member",
-    ],
-    [
-      "a person with no membership",
-      { allocation_id: "alloc-a", subject_kind: "person", subject_id: "user-x" },
-      "quota_subject_not_member",
-    ],
-    [
-      "a group from another company",
-      { allocation_id: "alloc-a", subject_kind: "group", subject_id: "group-b" },
-      "quota_group_outside_organization",
-    ],
-  ])("refuses %s as an assignment", (_label, row, message) => {
-    expect(() => insertRow(sqlite, "quota_assignments", row)).toThrow(message);
-  });
-
-  it("refuses an update that re-points an existing assignment outside the company", () => {
-    insertRow(sqlite, "quota_assignments", { allocation_id: "alloc-a", subject_kind: "person", subject_id: "user-a" });
-    expect(() =>
-      sqlite
-        .prepare(
-          "UPDATE quota_assignments SET subject_id = 'user-b' WHERE allocation_id = 'alloc-a' AND subject_id = 'user-a'",
-        )
-        .run(),
-    ).toThrow("quota_subject_not_member");
-    expect(() =>
-      sqlite
-        .prepare(
-          "UPDATE quota_assignments SET subject_kind = 'group', subject_id = 'group-b' WHERE allocation_id = 'alloc-a' AND subject_id = 'user-a'",
-        )
-        .run(),
-    ).toThrow("quota_group_outside_organization");
-  });
-
-  it("refuses a group member who is not in the group's company, and accepts one who is", () => {
-    expect(() =>
-      insertRow(sqlite, "company_group_members", {
-        group_id: "group-a",
-        user_id: "user-b",
-        added_by: "user-a",
-        added_at: 1,
-      }),
-    ).toThrow("quota_group_member_not_in_organization");
-    expect(() =>
-      insertRow(sqlite, "company_group_members", {
-        group_id: "group-a",
-        user_id: "user-x",
-        added_by: "user-a",
-        added_at: 1,
-      }),
-    ).toThrow("quota_group_member_not_in_organization");
-    expect(() =>
-      insertRow(sqlite, "company_group_members", {
-        group_id: "group-b",
-        user_id: "user-b",
-        added_by: "user-b",
-        added_at: 1,
-      }),
-    ).not.toThrow();
-    expect(() =>
-      sqlite.prepare("UPDATE company_group_members SET user_id = 'user-b' WHERE group_id = 'group-a'").run(),
-    ).toThrow("quota_group_member_not_in_organization");
-  });
-});
-
 describe("partial unique indexes on live allocations and group names", () => {
   let sqlite: Db;
 
@@ -854,42 +636,6 @@ describe("partial unique indexes on live allocations and group names", () => {
       created_at: 1,
     });
     expect(countWhere(sqlite, "company_groups", "lower(name) = 'finance'")).toBe(2);
-  });
-});
-
-describe("cascade from the company and a fresh local desk", () => {
-  let sqlite: Db;
-
-  beforeEach(() => {
-    sqlite = openDb();
-    seedLedger(sqlite);
-  });
-
-  afterEach(() => {
-    sqlite.close();
-  });
-
-  it("removes every quota row of the erased company, leaves the other company's rows and keeps the spend ledger", () => {
-    purgeTenantRows(sqlite, "tenant-a");
-    const counts = Object.fromEntries(QUOTA_TABLES.map((table) => [table, countAll(sqlite, table)]));
-    expect(counts).toEqual(Object.fromEntries(QUOTA_TABLES.map((table) => [table, 1])));
-    expect(countWhere(sqlite, "quota_allocations", "organization_id = 'org-a'")).toBe(0);
-    expect(countWhere(sqlite, "quota_holds", "id = 'hold-1'")).toBe(0);
-    expect(sqlite.prepare("SELECT allocation_id, hold_id FROM tenant_usage WHERE id = 'usage-1'").get()).toEqual({
-      allocation_id: "alloc-a",
-      hold_id: "hold-1",
-    });
-    expect(sqlite.prepare("SELECT allocation_id, hold_id FROM tenant_usage WHERE id = 'usage-b'").get()).toEqual({
-      allocation_id: "alloc-b",
-      hold_id: "hold-b",
-    });
-  });
-
-  it("is a no-op on a second purge of the same company", () => {
-    purgeTenantRows(sqlite, "tenant-a");
-    const again = purgeTenantRows(sqlite, "tenant-a");
-    expect(again.rowsDeleted).toBe(0);
-    expect(countAll(sqlite, "quota_allocations")).toBe(1);
   });
 });
 

@@ -230,6 +230,54 @@ const MEMBERSHIP_GUARDS = `
       WHEN ${GROUP_SUBJECT_OUTSIDE_ORGANIZATION}
       BEGIN SELECT RAISE(ABORT, 'quota_group_outside_organization'); END;`;
 
+const ALLOCATION_OUTSIDE_ORGANIZATION = `NEW.allocation_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM quota_allocations a
+         WHERE a.id = NEW.allocation_id AND a.organization_id = NEW.organization_id)`;
+
+const PERSON_USAGE_NOT_MEMBER = `NOT EXISTS (
+        SELECT 1 FROM quota_allocations a
+          JOIN organization_members m ON m.organization_id = a.organization_id
+         WHERE a.id = NEW.allocation_id AND m.user_id = NEW.user_id)`;
+
+const ALLOCATION_LINK_GUARDS = `
+    CREATE TRIGGER IF NOT EXISTS quota_holds_allocation_insert_guard BEFORE INSERT ON quota_holds
+      WHEN ${ALLOCATION_OUTSIDE_ORGANIZATION}
+      BEGIN SELECT RAISE(ABORT, 'quota_allocation_outside_organization'); END;
+    CREATE TRIGGER IF NOT EXISTS quota_holds_allocation_update_guard BEFORE UPDATE OF allocation_id, organization_id ON quota_holds
+      WHEN ${ALLOCATION_OUTSIDE_ORGANIZATION}
+      BEGIN SELECT RAISE(ABORT, 'quota_allocation_outside_organization'); END;
+    CREATE TRIGGER IF NOT EXISTS quota_audit_allocation_insert_guard BEFORE INSERT ON quota_audit
+      WHEN ${ALLOCATION_OUTSIDE_ORGANIZATION}
+      BEGIN SELECT RAISE(ABORT, 'quota_allocation_outside_organization'); END;
+    CREATE TRIGGER IF NOT EXISTS quota_audit_allocation_update_guard BEFORE UPDATE OF allocation_id, organization_id ON quota_audit
+      WHEN ${ALLOCATION_OUTSIDE_ORGANIZATION}
+      BEGIN SELECT RAISE(ABORT, 'quota_allocation_outside_organization'); END;
+    CREATE TRIGGER IF NOT EXISTS quota_person_usage_member_insert_guard BEFORE INSERT ON quota_person_usage
+      WHEN ${PERSON_USAGE_NOT_MEMBER}
+      BEGIN SELECT RAISE(ABORT, 'quota_subject_not_member'); END;
+    CREATE TRIGGER IF NOT EXISTS quota_person_usage_member_update_guard BEFORE UPDATE OF allocation_id, user_id ON quota_person_usage
+      WHEN ${PERSON_USAGE_NOT_MEMBER}
+      BEGIN SELECT RAISE(ABORT, 'quota_subject_not_member'); END;`;
+
+const TENANT_USAGE_ALLOCATION_GUARDS = `
+    CREATE TRIGGER IF NOT EXISTS tenant_usage_allocation_insert_guard BEFORE INSERT ON tenant_usage
+      WHEN ${ALLOCATION_OUTSIDE_ORGANIZATION}
+      BEGIN SELECT RAISE(ABORT, 'quota_allocation_outside_organization'); END;
+    CREATE TRIGGER IF NOT EXISTS tenant_usage_allocation_update_guard BEFORE UPDATE OF allocation_id, organization_id ON tenant_usage
+      WHEN ${ALLOCATION_OUTSIDE_ORGANIZATION}
+      BEGIN SELECT RAISE(ABORT, 'quota_allocation_outside_organization'); END;`;
+
+const MEMBER_REMOVAL_CLEANUP = `
+    CREATE TRIGGER IF NOT EXISTS organization_members_quota_removal AFTER DELETE ON organization_members
+      BEGIN
+        DELETE FROM company_group_members
+         WHERE user_id = OLD.user_id
+           AND group_id IN (SELECT id FROM company_groups WHERE organization_id = OLD.organization_id);
+        DELETE FROM quota_assignments
+         WHERE subject_kind = 'person' AND subject_id = OLD.user_id
+           AND allocation_id IN (SELECT id FROM quota_allocations WHERE organization_id = OLD.organization_id);
+      END;`;
+
 function ensureTenantUsageQuotaColumns(sqlite: Database.Database): void {
   const existing = new Set(
     (sqlite.prepare("PRAGMA table_info(tenant_usage)").all() as Array<{ name: string }>).map((column) => column.name),
@@ -245,11 +293,14 @@ function ensureTenantUsageQuotaColumns(sqlite: Database.Database): void {
   sqlite.exec(
     "CREATE UNIQUE INDEX IF NOT EXISTS tenant_usage_hold_idx ON tenant_usage (hold_id) WHERE hold_id IS NOT NULL",
   );
+  sqlite.exec(TENANT_USAGE_ALLOCATION_GUARDS);
 }
 
 export function ensureQuotaTables(sqlite: Database.Database): void {
   sqlite.exec(QUOTA_DDL);
   sqlite.exec(TENANT_GUARDED_TABLES.map(tenantGuards).join("\n"));
   sqlite.exec(MEMBERSHIP_GUARDS);
+  sqlite.exec(ALLOCATION_LINK_GUARDS);
+  sqlite.exec(MEMBER_REMOVAL_CLEANUP);
   ensureTenantUsageQuotaColumns(sqlite);
 }
