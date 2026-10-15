@@ -42,6 +42,7 @@ import {
   handleGetArtifactFile,
   handleGetArtifacts,
 } from "./handlers/artifacts";
+import { handleGetDoc, handleGetDocVersionFile, handleGetDocVersions } from "./handlers/docs-read";
 import { DESK_FILE_ROUTES } from "./desk-files/routes";
 import { FOLDER_ROUTES } from "./folder-root";
 import {
@@ -473,6 +474,9 @@ const routes: Route[] = [
   compile("GET", "/api/v1/artifacts/:artifactId", handleGetArtifact),
   compile("DELETE", "/api/v1/artifacts/:artifactId", handleDeleteArtifact),
   compile("GET", "/api/v1/artifacts/:artifactId/file", handleGetArtifactFile),
+  compile("GET", "/api/v1/docs/:artifactId", handleGetDoc),
+  compile("GET", "/api/v1/docs/:artifactId/versions", handleGetDocVersions),
+  compile("GET", "/api/v1/docs/:artifactId/versions/:n/file", handleGetDocVersionFile),
   ...DESK_FILE_ROUTES.map(([method, path, handler]) => compile(method, path, handler)),
   ...FOLDER_ROUTES.map(([method, path, handler]) => compile(method, path, handler)),
   compile("GET", "/api/v1/knowledge", handleGetKnowledge),

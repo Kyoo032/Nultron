@@ -372,6 +372,13 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
   { method: "GET", path: "/api/v1/artifacts/:artifactId", params: { artifactId: "artifactId" } },
   { method: "DELETE", path: "/api/v1/artifacts/:artifactId", params: { artifactId: "artifactId" } },
   { method: "GET", path: "/api/v1/artifacts/:artifactId/file", params: { artifactId: "artifactId" } },
+  { method: "GET", path: "/api/v1/docs/:artifactId", params: { artifactId: "artifactId" } },
+  { method: "GET", path: "/api/v1/docs/:artifactId/versions", params: { artifactId: "artifactId" } },
+  {
+    method: "GET",
+    path: "/api/v1/docs/:artifactId/versions/:n/file",
+    params: { artifactId: "artifactId", n: "unseeded" },
+  },
 
   // --- knowledge -------------------------------------------------------------------------------
   {
