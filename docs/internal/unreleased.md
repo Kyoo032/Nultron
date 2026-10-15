@@ -54,6 +54,15 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Enterprise first desk is the default agent only, host and db (team board K-D34 item 2), 2026-10-15 (tester K34-a, uncommitted on `tester/chat-first` at `77638399`; not driven on a hosted build)
+
+Lanes: enterprise, hyp-ai, tester
+
+- **The rule.** A company's first desk, written at its first sign-in, stores `["chat"]` when `AGENTFORGE_SHELL=enterprise`. The default and `opc` shells still store every mode. A desk that already exists is never rewritten, including when the shell changes later. Personal (`ensureLocalOwner`, `FIRST_RUN_MODES`) and the hosted default (`HOSTED_FIRST_DESK_MODES`) are unchanged.
+- **Where.** `ENTERPRISE_FIRST_DESK_MODES` (`packages/core/src/agents/product-modes.ts:79`). `ensurePortalOwner` takes `{ firstDeskModes }` (`packages/db/src/portal-owner.ts:186-189`) and writes it at `:253`, only inside `ownedWorkspaces.length === 0`. `provisionPortalDesk` (`packages/host/src/portal-first-desk.ts`) is what the sign-in route's `provision` calls (`packages/host/src/auth/index.ts:280-282`). It reads the shell through `resolvedShell()` in `packages/host/src/shell-setting.ts`, which stays the only reader of `AGENTFORGE_SHELL`.
+- **Tests.** `packages/host/src/first-run-modes.test.ts` 12 of 12. Four new cases in "a company's first desk, through the real sign-in provisioning and the router", through `dispatch`: default and opc both every mode; enterprise stores and resolves `["chat"]`; a company made under the default shell keeps every mode after the shell becomes enterprise. `packages/db/src/first-desk-modes.test.ts` 17 of 17: the enterprise describe, the not-rewritten case, and two structure tests (in `packages/`, only `portal-first-desk.ts` names the constant; the sign-in provision calls `provisionPortalDesk`). `packages/db/src/portal-owner.test.ts` 35 of 35. `packages/host/src/auth` and `packages/host/src/portal-roles.test.ts` 453 of 453 in 13 files. Each run on a fresh `mktemp -d` data dir.
+- **Not done.** No browser drive and no hosted build with `AGENTFORGE_SHELL=enterprise`. The renderer's Chat-only desk belongs to the renderer lane, and its `App.tsx` and `guide-store.ts` hunks are left for later. The comment above `provision` in `packages/host/src/auth/index.ts` still names `ensurePortalOwner`; it is now one step removed and was left as it is.
+
 ## Quota core and the gateway call census (team board K-D25 Q1 and Q2), 2026-10-15 (tester; no behaviour change, nothing wired)
 
 Lanes: enterprise, hyp-ai, tester

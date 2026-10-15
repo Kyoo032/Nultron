@@ -34,6 +34,7 @@ import {
   membershipRoleForPortal,
   type MembershipRole,
   type PortalRole,
+  type ProductMode,
   type TenantContext,
 } from "@agentforge/core";
 import type { Database } from "./client";
@@ -181,7 +182,11 @@ export async function syncPortalRole(
  * tenant an owner's. (Before this, every person provisioned here was an `owner`, so "owner" meant
  * "signed in" and any colleague could erase the company: SR-65.)
  */
-export async function ensurePortalOwner(db: Database, identity: PortalProvisioning): Promise<TenantContext> {
+export async function ensurePortalOwner(
+  db: Database,
+  identity: PortalProvisioning,
+  options: { readonly firstDeskModes?: readonly ProductMode[] } = {},
+): Promise<TenantContext> {
   const role = membershipRoleForPortal(identity.role);
   await ensureTenant(db, {
     id: identity.tenantId,
@@ -245,9 +250,7 @@ export async function ensurePortalOwner(db: Database, identity: PortalProvisioni
         organizationId: org.id,
         name: HOME_WORKSPACE_NAME,
         slug: HOME_WORKSPACE_SLUG,
-        // Enterprise: every mode, as it has always been. The Personal first-run list does not reach
-        // a hosted tenant; the owner has not decided this one.
-        productModes: [...HOSTED_FIRST_DESK_MODES],
+        productModes: [...(options.firstDeskModes ?? HOSTED_FIRST_DESK_MODES)],
       })
       .returning();
   }

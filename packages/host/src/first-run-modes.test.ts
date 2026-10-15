@@ -19,6 +19,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ROUTER_IMPORT_BUDGET_MS } from "./__fixtures__/test-budgets";
+import type { DispatchOptions } from "./router";
 import type { HostRequest, HostResult } from "./types";
 
 const FIRST_RUN_DESK = ["chat", "research", "images", "videos", "presentations"];
@@ -47,8 +48,9 @@ process.env.AGENTFORGE_SECRETS_KEY = "d".repeat(64);
 delete process.env.AGENTFORGE_SERVER;
 delete process.env.AGENTFORGE_SETTINGS_PATH;
 delete process.env.DATABASE_URL;
+delete process.env.AGENTFORGE_SHELL;
 
-type Dispatch = (request: HostRequest) => Promise<HostResult>;
+type Dispatch = (request: HostRequest, options?: DispatchOptions) => Promise<HostResult>;
 let dispatch: Dispatch;
 
 type Desk = { id: string; name: string; slug: string; productModes: string[]; protected: boolean };
@@ -242,4 +244,96 @@ describe("Start over re-creates the first desk with the first-run modes", () => 
 
     expect(again[0]?.desk?.productModes).toEqual(EVERY_MODE);
   }, 340_000);
+});
+
+const SIGN_IN_TIME = Date.UTC(2026, 9, 15, 9, 0, 0);
+
+async function firstDeskAfterSignIn(
+  company: string,
+  shell: string | undefined,
+): Promise<{ stored: string[] | null; resolved: string[] }> {
+  if (shell === undefined) {
+    delete process.env.AGENTFORGE_SHELL;
+  } else {
+    process.env.AGENTFORGE_SHELL = shell;
+  }
+  const identity = {
+    tenantId: `tnt_${company}`,
+    orgId: `org_${company}`,
+    userId: `usr_${company}_owner`,
+    role: "owner" as const,
+    name: null,
+  };
+  const { provisionPortalDesk } = await import("./portal-first-desk");
+  const { sql } = await import("@agentforge/db");
+  const { SESSION_COOKIE_SECURE, createSession } = await import("./auth/session");
+  const { createMemorySessionStore } = await import("./auth/session-store");
+
+  await provisionPortalDesk(identity);
+
+  const sessionStore = createMemorySessionStore();
+  const session = createSession({ ...identity, now: SIGN_IN_TIME });
+  await sessionStore.create(session);
+  const answer = await dispatch(
+    {
+      method: "GET",
+      path: "/api/v1/workspaces",
+      query: {},
+      params: {},
+      headers: { cookie: `${SESSION_COOKIE_SECURE}=${session.id}` },
+    },
+    { serverMode: true, sessionStore, now: () => SIGN_IN_TIME },
+  );
+  expect(answer.type).toBe("json");
+  const body = (answer as { body?: DeskList }).body ?? { workspaces: [], currentWorkspaceId: "" };
+  expect(body.workspaces).toHaveLength(1);
+
+  const row = sql
+    .prepare("SELECT product_modes AS modes FROM workspaces WHERE organization_id = ?")
+    .get(identity.orgId) as { modes: string | null } | undefined;
+  return {
+    stored: row?.modes ? (JSON.parse(row.modes) as string[]) : null,
+    resolved: body.workspaces[0]?.productModes ?? [],
+  };
+}
+
+describe("a company's first desk, through the real sign-in provisioning and the router", () => {
+  beforeAll(() => {
+    process.env.AGENTFORGE_SERVER = "1";
+  });
+
+  afterAll(() => {
+    delete process.env.AGENTFORGE_SERVER;
+    delete process.env.AGENTFORGE_SHELL;
+  });
+
+  it("the default shell gives the hosted first desk every mode, unchanged", async () => {
+    const seen = await firstDeskAfterSignIn("default", undefined);
+
+    expect(seen.stored).toEqual(EVERY_MODE);
+    expect(seen.resolved).toEqual(EVERY_MODE);
+  });
+
+  it("the opc shell is the default shell: every mode", async () => {
+    const seen = await firstDeskAfterSignIn("opc", "opc");
+
+    expect(seen.stored).toEqual(EVERY_MODE);
+    expect(seen.resolved).toEqual(EVERY_MODE);
+  });
+
+  it("the enterprise shell gives a new company's first desk the default agent only: Chat, and no mode agents", async () => {
+    const seen = await firstDeskAfterSignIn("enterprise", "enterprise");
+
+    expect(seen.stored).toEqual(["chat"]);
+    expect(seen.resolved).toEqual(["chat"]);
+  });
+
+  it("a company made under the default shell keeps every mode when the shell later becomes enterprise", async () => {
+    const made = await firstDeskAfterSignIn("existing", undefined);
+    const later = await firstDeskAfterSignIn("existing", "enterprise");
+
+    expect(made.stored).toEqual(EVERY_MODE);
+    expect(later.stored).toEqual(EVERY_MODE);
+    expect(later.resolved).toEqual(EVERY_MODE);
+  });
 });

@@ -76,6 +76,8 @@ export const FIRST_RUN_MODES: readonly ProductMode[] = Object.freeze([
  */
 export const HOSTED_FIRST_DESK_MODES: readonly ProductMode[] = Object.freeze([...WORK_PRODUCT_MODES]);
 
+export const ENTERPRISE_FIRST_DESK_MODES: readonly ProductMode[] = Object.freeze(["chat"] satisfies ProductMode[]);
+
 /**
  * The single answer to "what does a first desk start with?". `hosted` is `isServerMode()` from the
  * caller, passed in rather than read here so this module stays free of `process` (the renderer
