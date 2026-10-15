@@ -265,6 +265,7 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
     return id;
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resetLive is redeclared every render and only sets state; adding it would re-run this load on every render
   useEffect(() => {
     // `?thread=<id>` -> `/chat` is the rail asking for a blank pane, not a re-render to ignore.
     const leftThread = lastInitialThreadRef.current !== undefined && initialThreadId === undefined;
@@ -578,7 +579,11 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
                   return current;
                 }
                 const next = [...current];
-                next[index] = { ...next[index]!, progress: event.label };
+                const target = next[index];
+                if (!target) {
+                  return current;
+                }
+                next[index] = { ...target, progress: event.label };
                 return next;
               });
             }}

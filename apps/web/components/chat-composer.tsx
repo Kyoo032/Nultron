@@ -333,6 +333,7 @@ export function ChatComposer({
     onDraftApplied?.();
   }, [draft, onDraftApplied]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: text is the trigger that re-grows the textarea; the body reads only the ref
   useEffect(() => {
     growTextArea(textAreaRef.current);
   }, [text]);

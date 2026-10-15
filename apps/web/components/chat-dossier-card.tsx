@@ -135,6 +135,7 @@ export function DossierCard({ model, defaultOpen = false, initialMarkdown }: Car
           data-testid="chat-dossier-outline"
         >
           {headings.map((heading, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: headings and dossier cards have no id; the index keeps repeated entries distinct
             <li key={`${index}-${heading}`} className="flex min-w-0 gap-2">
               <span className="shrink-0 tabular-nums text-[var(--text-3)]">{index + 1}</span>
               <span className="min-w-0 truncate" title={heading}>
@@ -192,6 +193,7 @@ export function DossierCards({ tools }: { readonly tools: readonly ToolCall[] })
   return (
     <div className="space-y-2" data-testid="chat-dossier-cards">
       {dossiers.map((model, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: headings and dossier cards have no id; the index keeps repeated entries distinct
         <DossierCard key={`${model.artifactId ?? "unsaved"}-${index}`} model={model} />
       ))}
     </div>

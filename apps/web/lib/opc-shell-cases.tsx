@@ -84,7 +84,7 @@ export function renderOpcCases(impl: RailImplementation): Record<string, string>
     "view-waiting": inRouter("/chat", <AgentRailView {...VIEW_BASE} agents={[]} loaded={false} />),
     "view-bundled-mark": inRouter(
       "/chat",
-      <AgentRailView {...VIEW_BASE} productName="Nultron" logoSrc={WEB_LOGO_SRC} bundledMark />,
+      <AgentRailView {...VIEW_BASE} productName={WEB_BRAND.productName} logoSrc={WEB_LOGO_SRC} bundledMark />,
     ),
     "rail-no-shell": inRouter("/chat", <AgentRail visibleModes={[]} />),
     "rail-opc-shell": inRouter("/chat", withBrand({ ...WEB_BRAND, shell: "opc" }, <AgentRail visibleModes={[]} />)),

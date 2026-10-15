@@ -56,6 +56,7 @@ export function SectionEditor({ section, headVersion, editing, renderBlock }: Ed
         <div className="doc-edit-tables" data-testid="docpage-editor-tables">
           <p className="doc-edit-note">{t("docpage.edit.tablesNote")}</p>
           {split.tables.map((anchor, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: table anchors have no id and the list is derived in order from the document
             <div key={index}>{renderBlock(anchor.block)}</div>
           ))}
         </div>

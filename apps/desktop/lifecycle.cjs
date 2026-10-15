@@ -123,7 +123,7 @@ function legacyMigrationPlan(input) {
  * @returns {{ runtime: string, hasOpenai: boolean }}
  */
 function hostStatusRuntime(input) {
-  const hasOpenai = Boolean(input && input.hasOpenai);
+  const hasOpenai = Boolean(input?.hasOpenai);
   const envRuntime = input && typeof input.envRuntime === "string" ? input.envRuntime.trim() : "";
   return { runtime: hasOpenai ? "ai" : envRuntime || "stub", hasOpenai };
 }

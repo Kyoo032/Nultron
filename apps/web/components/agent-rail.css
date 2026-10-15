@@ -236,6 +236,11 @@
   height: 32px;
 }
 
+.agent-rail-brand .agent-rail-logo {
+  width: 32px;
+  height: 32px;
+}
+
 .agent-rail[data-rail="full"] .agent-rail-mark,
 .agent-rail[data-rail="full"] .agent-rail-logo {
   flex: none;
@@ -322,11 +327,6 @@
   color: var(--rail);
   font-weight: 700;
   line-height: 1;
-}
-
-.agent-rail-brand .agent-rail-logo {
-  width: 32px;
-  height: 32px;
 }
 
 .agent-rail-brand-text {

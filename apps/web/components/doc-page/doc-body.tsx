@@ -63,6 +63,7 @@ function BlockView({ block }: { readonly block: DocBlock }) {
       return (
         <ul className="doc-list">
           {block.items.map((item, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: document blocks, rows and cells have no id and render from one immutable snapshot
             <li key={index}>{item}</li>
           ))}
         </ul>
@@ -71,6 +72,7 @@ function BlockView({ block }: { readonly block: DocBlock }) {
       return (
         <ol className="doc-list">
           {block.items.map((item, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: document blocks, rows and cells have no id and render from one immutable snapshot
             <li key={index}>{item}</li>
           ))}
         </ol>
@@ -86,6 +88,7 @@ function BlockView({ block }: { readonly block: DocBlock }) {
             <thead>
               <tr>
                 {block.columns.map((column, index) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: document blocks, rows and cells have no id and render from one immutable snapshot
                   <th key={index} scope="col">
                     {column}
                   </th>
@@ -94,8 +97,10 @@ function BlockView({ block }: { readonly block: DocBlock }) {
             </thead>
             <tbody>
               {block.rows.map((row, rowIndex) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: document blocks, rows and cells have no id and render from one immutable snapshot
                 <tr key={rowIndex}>
                   {block.columns.map((_, columnIndex) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: document blocks, rows and cells have no id and render from one immutable snapshot
                     <td key={columnIndex}>{cellText(row[columnIndex])}</td>
                   ))}
                 </tr>
@@ -124,6 +129,7 @@ function SheetTable({ sheet }: { readonly sheet: DocSheet }) {
         </thead>
         <tbody>
           {sheet.rows.map((row, rowIndex) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: document blocks, rows and cells have no id and render from one immutable snapshot
             <tr key={rowIndex}>
               {sheet.columns.map((column) => (
                 <td key={column.key} className={NUMERIC.has(column.type) ? "doc-num" : undefined}>
@@ -198,6 +204,7 @@ export function DocBody({ doc, people, renderSectionActions, editing }: BodyProp
                 renderBlock={(block) => <BlockView block={block} />}
               />
             ) : (
+              // biome-ignore lint/suspicious/noArrayIndexKey: document blocks, rows and cells have no id and render from one immutable snapshot
               section.blocks.map((block, index) => <BlockView key={index} block={block} />)
             )}
           </SectionFrame>

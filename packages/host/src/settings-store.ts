@@ -339,8 +339,9 @@ function sliceFor(file: SettingsFileV2, workspaceId: string): StoredSecrets {
   if (own) {
     return own;
   }
-  if (workspaceId === FALLBACK_SETTINGS_WORKSPACE && file.workspaces[LEGACY_SETTINGS_WORKSPACE]) {
-    return file.workspaces[LEGACY_SETTINGS_WORKSPACE]!;
+  const legacy = file.workspaces[LEGACY_SETTINGS_WORKSPACE];
+  if (workspaceId === FALLBACK_SETTINGS_WORKSPACE && legacy) {
+    return legacy;
   }
   return {};
 }

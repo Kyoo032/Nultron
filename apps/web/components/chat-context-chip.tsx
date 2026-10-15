@@ -80,6 +80,7 @@ export function ChatContextChip({ usedTokens, contextLength, parts }: Props) {
       ? parts
       : [{ label: t("chat.context.conversation"), detail: t("chat.context.conversationDetail"), tokens: used }];
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: rows.length re-places the panel when the breakdown grows or shrinks; the body reads no rows
   useEffect(() => {
     if (!open || inMenu) {
       return;

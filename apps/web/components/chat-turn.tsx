@@ -146,6 +146,7 @@ export function ChatTurn({ role, content, live, onContinue, continueDisabled = f
                   <ul className="mt-2 space-y-1" data-testid="message-tools">
                     {visibleTools.map((tool, index) => (
                       <li
+                        // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
                         key={`${tool.key}-${index}`}
                         className="whitespace-pre-wrap break-words rounded-xl border border-[var(--line)] px-3 py-1.5 font-mono text-xs text-[var(--text-2)]"
                         data-testid="message-tool"
@@ -201,6 +202,7 @@ export function ChatTurn({ role, content, live, onContinue, continueDisabled = f
             <DossierCards tools={visibleTools} />
             {jobs.map((job, index) => (
               <MessageEmbed
+                // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
                 key={`${job.title}-${index}`}
                 kind="job"
                 title={job.title}
@@ -304,15 +306,18 @@ function MessageBody({ content, outputOnly = false }: { content?: unknown; outpu
       {parts.map((part, index) => {
         const imageUrl = partImageUrl(part);
         if (imageUrl) {
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
           return <MessageEmbed key={index} kind="image" title="" src={imageUrl} alt="" />;
         }
         const videoUrl = partVideoUrl(part);
         if (videoUrl) {
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
           return <MessageEmbed key={index} kind="video" title="" src={videoUrl} />;
         }
         if (part && typeof part === "object" && (part as { type?: unknown }).type === "text" && "text" in part) {
           const text = String((part as { text: string }).text);
           if (!text.trim()) return null;
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
           return <UserPlain key={index} text={text} />;
         }
         return null;
@@ -333,6 +338,7 @@ function AnswerParts({ parts }: { parts: unknown[] }) {
     nodes.push(
       <div key={`text-${key}`} className="chat-turn-bubble">
         {run.map((text, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
           <FormattedText key={index} text={text} className="text-sm" testId="message-output" />
         ))}
       </div>,
@@ -346,8 +352,10 @@ function AnswerParts({ parts }: { parts: unknown[] }) {
       flush(index);
       nodes.push(
         imageUrl ? (
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
           <MessageEmbed key={index} kind="image" title="" src={imageUrl} alt="" />
         ) : (
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
           <MessageEmbed key={index} kind="video" title="" src={videoUrl ?? undefined} />
         ),
       );
@@ -368,10 +376,12 @@ function MediaParts({ parts }: { parts: ContentPart[] }) {
       {parts.map((part, index) => {
         const imageUrl = partImageUrl(part);
         if (imageUrl) {
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
           return <MessageEmbed key={index} kind="image" title="" src={imageUrl} alt="" />;
         }
         const videoUrl = partVideoUrl(part);
         if (videoUrl) {
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
           return <MessageEmbed key={index} kind="video" title="" src={videoUrl} />;
         }
         return null;
@@ -391,11 +401,13 @@ function UserPlain({ text }: { text: string }) {
     <div className="space-y-2">
       {segments.map((segment, index) =>
         segment.type === "text" ? (
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
           <p key={index} className="whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">
             {segment.text}
           </p>
         ) : (
           <MessageEmbed
+            // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
             key={index}
             kind="file"
             title={segment.name}

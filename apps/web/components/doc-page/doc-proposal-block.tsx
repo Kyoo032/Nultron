@@ -93,6 +93,7 @@ export function ProposalBlock({ proposal, current, agentName, people, busy, fail
       </p>
       <p className="doc-proposal-text" data-testid="docpage-proposal-text">
         {segments.map((segment, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: diff segments have no id and are rendered once per proposal snapshot
           <DiffPiece key={index} segment={segment} />
         ))}
       </p>

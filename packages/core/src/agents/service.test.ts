@@ -245,7 +245,10 @@ describe("resolvePublishedVersion", () => {
       version: 2,
       systemPrompt: "draft prompt should not run",
     });
-    const published = resolvePublishedVersion(publishedAgent!, repo.versions);
+    if (!publishedAgent) {
+      throw new Error("the published agent is missing");
+    }
+    const published = resolvePublishedVersion(publishedAgent, repo.versions);
     expect(published.id).toBe(created.version.id);
     expect(published.systemPrompt).toBe("v1 prompt");
   });

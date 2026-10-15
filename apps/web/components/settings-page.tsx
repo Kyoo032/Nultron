@@ -157,25 +157,25 @@ export function SettingsPage() {
   const [openaiKeyFingerprint, setOpenaiKeyFingerprint] = useState<string | null>(null);
   const [runtime, setRuntime] = useState<"ai" | "stub">("stub");
   const [openaiApiKey, setOpenaiApiKey] = useState("");
-  const [googleApiKey, setGoogleApiKey] = useState("");
-  const [anthropicApiKey, setAnthropicApiKey] = useState("");
-  const [volcengineApiKey, setVolcengineApiKey] = useState("");
+  const [, setGoogleApiKey] = useState("");
+  const [, setAnthropicApiKey] = useState("");
+  const [, setVolcengineApiKey] = useState("");
   const [gateway, setGateway] = useState<GatewayGatePayload | null>(null);
   const [gatewayBusy, setGatewayBusy] = useState(false);
-  const [googleBaseUrl, setGoogleBaseUrl] = useState("");
-  const [anthropicBaseUrl, setAnthropicBaseUrl] = useState("");
-  const [volcengineBaseUrl, setVolcengineBaseUrl] = useState("");
-  const [tavilyKey, setTavilyKey] = useState("");
-  const [braveKey, setBraveKey] = useState("");
-  const [falKey, setFalKey] = useState("");
-  const [toolBackends, setToolBackends] = useState<Record<string, string>>({});
-  const [disabledTools, setDisabledTools] = useState<string[]>([]);
-  const [injectionGuardBypass, setInjectionGuardBypass] = useState(false);
-  const [imageGenModel, setImageGenModel] = useState(DEFAULT_GATEWAY_IMAGE_MODEL);
-  const [videoGenModel, setVideoGenModel] = useState(DEFAULT_GATEWAY_VIDEO_MODEL);
-  const [documentGenModel, setDocumentGenModel] = useState("");
-  const [researchGenModel, setResearchGenModel] = useState("");
-  const [presentationGenModel, setPresentationGenModel] = useState("");
+  const [, setGoogleBaseUrl] = useState("");
+  const [, setAnthropicBaseUrl] = useState("");
+  const [, setVolcengineBaseUrl] = useState("");
+  const [, setTavilyKey] = useState("");
+  const [, setBraveKey] = useState("");
+  const [, setFalKey] = useState("");
+  const [, setToolBackends] = useState<Record<string, string>>({});
+  const [, setDisabledTools] = useState<string[]>([]);
+  const [, setInjectionGuardBypass] = useState(false);
+  const [, setImageGenModel] = useState(DEFAULT_GATEWAY_IMAGE_MODEL);
+  const [, setVideoGenModel] = useState(DEFAULT_GATEWAY_VIDEO_MODEL);
+  const [, setDocumentGenModel] = useState("");
+  const [, setResearchGenModel] = useState("");
+  const [, setPresentationGenModel] = useState("");
   const [editTurnCapUsd, setEditTurnCapUsd] = useState(2);
   const [probe, setProbe] = useState<Probe | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -269,6 +269,7 @@ export function SettingsPage() {
       : answer.message;
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: applyPayload is redeclared every render and only sets state; the settings load must run once on mount
   useEffect(() => {
     let cancelled = false;
     // A failed first load used to leave the defaults on screen as if they were this desk's settings.

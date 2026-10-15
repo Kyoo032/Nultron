@@ -272,7 +272,7 @@ function gist(value: unknown): string {
     // A single named argument (`{"action":"list"}`) is the argument's value, not "1 field".
     const keys = Object.keys(record);
     if (keys.length === 1) {
-      const only = record[keys[0]!];
+      const only = record[keys[0] ?? ""];
       if (typeof only === "string" || typeof only === "number" || typeof only === "boolean") {
         return gist(only);
       }

@@ -35,6 +35,7 @@ vi.mock("@agentforge/core", async (importOriginal) => {
 let dispatch: (request: HostRequest) => Promise<HostResult>;
 let tenant: TenantContext;
 
+// biome-ignore lint/suspicious/noExplicitAny: one helper returns loosely typed JSON bodies that each test narrows itself
 async function json<T = any>(method: string, path: string, body?: unknown): Promise<{ status: number; body: T }> {
   const result = await dispatch({ method, path, query: {}, params: {}, headers: {}, body });
   if (result.type !== "json") {
