@@ -7,6 +7,7 @@ import { getTenant } from "../tenant";
 import { artifactStore, requireArtifact } from "../artifacts";
 import { contentDispositionAttachment } from "../content-disposition";
 import { log } from "../log";
+import { staleHeadFile } from "../doc-versions/render-head";
 
 export async function handleGetArtifacts(request: HostRequest): Promise<HostResult> {
   try {
@@ -97,12 +98,16 @@ export async function handleGetArtifactFile(request: HostRequest): Promise<HostR
   try {
     const tenant = await getTenant(request);
     const artifact = requireArtifact(tenant, request.params.artifactId);
-    const filename = artifactFilename(artifact.title, artifact.mime);
-    const delivery = artifactFileDelivery(artifact.mime, filename);
+    const head = await staleHeadFile(tenant, artifact);
+    const mime = head?.mime ?? artifact.mime;
+    const filename = artifactFilename(artifact.title, mime);
+    const delivery = artifactFileDelivery(mime, filename);
     return {
       type: "bytes",
       status: 200,
-      bytes: new Uint8Array(Buffer.from(artifact.body, isBinaryArtifactMime(artifact.mime) ? "base64" : "utf8")),
+      bytes:
+        head?.bytes ??
+        new Uint8Array(Buffer.from(artifact.body, isBinaryArtifactMime(artifact.mime) ? "base64" : "utf8")),
       contentType: delivery.contentType,
       filename,
       headers: delivery.headers,

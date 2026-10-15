@@ -12,6 +12,10 @@
 import { describe, expect, it } from "vitest";
 import { DOCX_MIME, XLSX_MIME } from "@agentforge/core/artifacts";
 import { artifactStore } from "../artifacts";
+import { replaceSection } from "../doc-model";
+import { createDocumentForTenant } from "../doc-tools/create-document";
+import { docxBodyText, sampleDocInput } from "../doc-tools/doc-tools-fixtures";
+import { docVersionStore } from "../doc-versions";
 import { getTenant } from "../tenant";
 import type { HostRequest, HostResult } from "../types";
 import { ARTIFACT_FILE_CSP, INERT_ARTIFACT_MIME, artifactFileDelivery, handleGetArtifactFile } from "./artifacts";
@@ -107,6 +111,36 @@ describe("handleGetArtifactFile", () => {
     expect(result.filename).toBe("board-memo.docx");
     expect(result.headers?.["X-Content-Type-Options"]).toBe("nosniff");
     expect(result.headers?.["Content-Security-Policy"]).toBe(ARTIFACT_FILE_CSP);
+  });
+
+  it("serves the head's render for a document whose stored body is behind its head", async () => {
+    const tenant = await getTenant();
+    const made = await createDocumentForTenant({ format: "docx", spec: sampleDocInput() }, tenant);
+    if (!made.ok) {
+      throw new Error(made.message);
+    }
+    expect(docVersionStore().ensureFirstVersion(tenant, made.artifactId)).toMatchObject({ ok: true });
+    expect(
+      docVersionStore().appendVersion(tenant, made.artifactId, {
+        baseVersion: 1,
+        author: { kind: "person" },
+        edit: (head) =>
+          head.kind === "document"
+            ? {
+                kind: "document",
+                spec: replaceSection(head.spec, "intro", {
+                  id: "intro",
+                  heading: "Introduction",
+                  blocks: [{ type: "paragraph", text: "Served from the head." }],
+                }),
+              }
+            : head,
+      }),
+    ).toMatchObject({ ok: true, head: { version: 2 } });
+    const result = bytes(await handleGetArtifactFile(request(made.artifactId)));
+    expect(result.contentType).toBe(DOCX_MIME);
+    expect(result.headers?.["Content-Security-Policy"]).toBe(ARTIFACT_FILE_CSP);
+    expect(await docxBodyText(result.bytes)).toContain("Served from the head.");
   });
 
   it("answers an unknown id with the error envelope and no headers to speak of", async () => {

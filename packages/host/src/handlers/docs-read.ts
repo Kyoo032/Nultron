@@ -1,10 +1,25 @@
-import { ApiError, STORAGE_BLOCK, STORAGE_BLOCK_MESSAGE } from "@agentforge/core";
-import { artifactFilename, DOCX_MIME, PDF_MIME, XLSX_MIME, type ArtifactMime } from "@agentforge/core/artifacts";
+import { ApiError, STORAGE_BLOCK, STORAGE_BLOCK_MESSAGE, type TenantContext } from "@agentforge/core";
+import {
+  artifactFilename,
+  DOCX_MIME,
+  PDF_MIME,
+  XLSX_MIME,
+  type ArtifactMime,
+  type ArtifactRecord,
+} from "@agentforge/core/artifacts";
+import { sql } from "@agentforge/db";
 import { requireArtifact } from "../artifacts";
 import { renderDocx, renderPdf, renderXlsx } from "../doc-model";
-import type { EditableSpec } from "../doc-tools/doc-meta";
-import { docVersionStore, proposalStore, type DocVersion, type DocVersionInfo } from "../doc-versions";
-import type { EnsureFirstRefusal } from "../doc-versions/types";
+import { readEditableSpec, type EditableSpec } from "../doc-tools/doc-meta";
+import {
+  docVersionStore,
+  proposalStore,
+  sectionIdsOf,
+  type DocVersion,
+  type DocVersionInfo,
+  type DocVersionStore,
+} from "../doc-versions";
+import type { DocVersionAuthor, EnsureFirstRefusal, SectionAuthors } from "../doc-versions/types";
 import { jsonError, jsonOk } from "../errors";
 import { log } from "../log";
 import { getTenant } from "../tenant";
@@ -20,6 +35,20 @@ const WORKBOOK_FORMATS: ReadonlyMap<string, ArtifactMime> = new Map([["xlsx", XL
 const NOT_EDITABLE_MESSAGE = "This file has no editable spec, so it has no document versions.";
 const VERSION_NOT_FOUND_MESSAGE = "No version with that number.";
 const RENDER_FAILED_MESSAGE = "The file could not be made right now. Try again in a moment.";
+
+type VersionReader = {
+  readonly listVersions: () => DocVersionInfo[] | null;
+  readonly getVersion: (version: number) => DocVersion | null;
+  readonly sectionAuthors: () => SectionAuthors | null;
+};
+
+type OpenedDocument = {
+  readonly tenant: TenantContext;
+  readonly artifactId: string;
+  readonly title: string;
+  readonly head: DocVersionInfo;
+  readonly versions: VersionReader;
+};
 
 function docRoute(work: (request: HostRequest) => Promise<HostResult>): (request: HostRequest) => Promise<HostResult> {
   return async (request) => {
@@ -41,16 +70,70 @@ function refusalOf(reason: EnsureFirstRefusal): ApiError {
   return new ApiError("not_editable", NOT_EDITABLE_MESSAGE, 409);
 }
 
-async function openDocument(request: HostRequest) {
+function storedVersions(store: DocVersionStore, tenant: TenantContext, artifactId: string): VersionReader {
+  return {
+    listVersions: () => store.listVersions(tenant, artifactId),
+    getVersion: (version) => store.getVersion(tenant, artifactId, version),
+    sectionAuthors: () => store.sectionAuthors(tenant, artifactId),
+  };
+}
+
+function ownerOf(tenant: TenantContext, artifactId: string): string | null {
+  const row = sql
+    .prepare("SELECT owner_user_id FROM artifacts WHERE workspace_id = ? AND id = ?")
+    .get(tenant.workspaceId, artifactId) as { owner_user_id: string | null } | undefined;
+  return row?.owner_user_id ?? null;
+}
+
+function unwrittenVersions(
+  tenant: TenantContext,
+  artifact: ArtifactRecord,
+  spec: EditableSpec,
+): Pick<OpenedDocument, "head" | "versions"> {
+  const author: DocVersionAuthor = { kind: "person", userId: ownerOf(tenant, artifact.id) ?? tenant.userId };
+  const head: DocVersionInfo = {
+    version: 1,
+    kind: spec.kind,
+    changedSectionIds: sectionIdsOf(spec),
+    baseVersion: null,
+    note: null,
+    author,
+    createdAt: artifact.createdAt,
+  };
+  const only: DocVersion = { ...head, spec };
+  const sectionAuthors: SectionAuthors = Object.fromEntries(
+    head.changedSectionIds.map((sectionId) => [sectionId, { version: 1, author }]),
+  );
+  return {
+    head,
+    versions: {
+      listVersions: () => [head],
+      getVersion: (version) => (version === head.version ? only : null),
+      sectionAuthors: () => sectionAuthors,
+    },
+  };
+}
+
+async function openDocument(request: HostRequest): Promise<OpenedDocument> {
   const tenant = await getTenant(request);
   const artifactId = request.params.artifactId;
   const artifact = requireArtifact(tenant, artifactId);
   const store = docVersionStore();
   const first = await store.ensureFirstVersion(tenant, artifactId);
-  if (!first.ok) {
+  if (first.ok) {
+    return {
+      tenant,
+      artifactId,
+      title: artifact.title,
+      head: first.head,
+      versions: storedVersions(store, tenant, artifactId),
+    };
+  }
+  const spec = first.reason === "quota" ? readEditableSpec(artifact) : null;
+  if (spec === null) {
     throw refusalOf(first.reason);
   }
-  return { tenant, artifactId, title: artifact.title, head: first.head, store };
+  return { tenant, artifactId, title: artifact.title, ...unwrittenVersions(tenant, artifact, spec) };
 }
 
 function parseVersionNumber(raw: string | undefined): number | null {
@@ -79,9 +162,9 @@ async function renderVersion(spec: EditableSpec, mime: ArtifactMime): Promise<Ui
 }
 
 export const handleGetDoc = docRoute(async (request) => {
-  const { tenant, artifactId, title, head, store } = await openDocument(request);
-  const version = store.getVersion(tenant, artifactId, head.version);
-  const sectionAuthors = store.sectionAuthors(tenant, artifactId);
+  const { tenant, artifactId, title, head, versions } = await openDocument(request);
+  const version = versions.getVersion(head.version);
+  const sectionAuthors = versions.sectionAuthors();
   if (version === null || sectionAuthors === null) {
     throw new ApiError("not_editable", NOT_EDITABLE_MESSAGE, 409);
   }
@@ -97,8 +180,8 @@ export const handleGetDoc = docRoute(async (request) => {
 });
 
 export const handleGetDocVersions = docRoute(async (request) => {
-  const { tenant, artifactId, store } = await openDocument(request);
-  const items = store.listVersions(tenant, artifactId);
+  const { versions } = await openDocument(request);
+  const items = versions.listVersions();
   if (items === null) {
     throw new ApiError("not_found", "Artifact not found", 404);
   }
@@ -106,9 +189,9 @@ export const handleGetDocVersions = docRoute(async (request) => {
 });
 
 export const handleGetDocVersionFile = docRoute(async (request) => {
-  const { tenant, artifactId, title, store } = await openDocument(request);
+  const { title, versions } = await openDocument(request);
   const number = parseVersionNumber(request.params.n);
-  const version: DocVersion | null = number === null ? null : store.getVersion(tenant, artifactId, number);
+  const version: DocVersion | null = number === null ? null : versions.getVersion(number);
   if (number === null || version === null) {
     throw new ApiError("not_found", VERSION_NOT_FOUND_MESSAGE, 404);
   }

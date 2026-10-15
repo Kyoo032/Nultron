@@ -375,6 +375,85 @@ describe("the document routes: a Workspace shares its files with its members onl
   });
 });
 
+const LIMIT_ENV = "AGENTFORGE_TENANT_STORAGE_BYTES";
+
+async function withCeiling<T>(bytes: number, run: () => Promise<T>): Promise<T> {
+  const before = process.env[LIMIT_ENV];
+  process.env[LIMIT_ENV] = String(bytes);
+  try {
+    return await run();
+  } finally {
+    if (before === undefined) {
+      delete process.env[LIMIT_ENV];
+    } else {
+      process.env[LIMIT_ENV] = before;
+    }
+  }
+}
+
+describe("a document nobody has opened, at the storage ceiling", () => {
+  it("reads as version 1 from its spec on all three routes, writes nothing, and a write still answers 403", async () => {
+    const { createDocumentForTenant } = await import("./doc-tools/create-document");
+    const { sampleDocInput, docxBodyText } = await import("./doc-tools/doc-tools-fixtures");
+    const { sql } = await import("@agentforge/db");
+    const { STORAGE_BLOCK } = await import("@agentforge/core");
+    const { tenantStorageReport } = await import("./tenant-storage");
+    await import("./tenant-storage-db");
+    const made = await createDocumentForTenant({ format: "docx", spec: sampleDocInput() }, alice.tenant);
+    if (!made.ok) {
+      throw new Error(made.message);
+    }
+    const docId = made.artifactId;
+    const rowOf = () => sql.prepare("SELECT body, meta, updated_at FROM artifacts WHERE id = ?").get(docId);
+    const versionCount = (): number =>
+      (sql.prepare("SELECT COUNT(*) AS n FROM doc_versions WHERE artifact_id = ?").get(docId) as { n: number }).n;
+    const rowBefore = rowOf();
+    const used = (await tenantStorageReport(PARTNER)).usedBytes;
+
+    const atCeiling = await withCeiling(used + 1, async () => {
+      const doc = await readDoc(alice, docId);
+      expect(doc.status).toBe(200);
+      const body = jsonBody<DocBody>(doc);
+      expect(body.headVersion).toBe(1);
+      const authors = Object.values(body.sectionAuthors);
+      expect(authors.length).toBeGreaterThan(0);
+      expect(authors.every((entry) => entry.version === 1 && entry.author.userId === "alice")).toBe(true);
+
+      const versions = jsonBody<{ items: Array<Record<string, unknown>> }>(await readVersions(alice, docId));
+      expect(versions.items).toHaveLength(1);
+      expect(versions.items[0]).toMatchObject({
+        version: 1,
+        baseVersion: null,
+        note: null,
+        author: { kind: "person", userId: "alice" },
+      });
+
+      expect(await outcome(await readFile(alice, docId, "2", "docx"))).toEqual(NOT_FOUND);
+      const file = bytesOf(await readFile(alice, docId, "1", "docx"));
+      expect(file.status).toBe(200);
+
+      const write = await call(
+        alice,
+        "PUT",
+        "/api/v1/docs/:artifactId/sections/:sectionId",
+        { artifactId: docId, sectionId: "intro" },
+        { baseVersion: 1, section: { blocks: [{ type: "paragraph", text: "Over the ceiling." }] } },
+      );
+      expect(await outcome(write)).toEqual({ status: 403, code: STORAGE_BLOCK });
+
+      expect(versionCount()).toBe(0);
+      expect(rowOf()).toEqual(rowBefore);
+      return file;
+    });
+
+    const reread = jsonBody<DocBody>(await readDoc(alice, docId));
+    expect(reread.headVersion).toBe(1);
+    expect(versionCount()).toBe(1);
+    const real = bytesOf(await readFile(alice, docId, "1", "docx"));
+    expect(await docxBodyText(real.bytes)).toBe(await docxBodyText(atCeiling.bytes));
+  });
+});
+
 describe("Personal: one person, no server mode, the same routes", () => {
   let docId: string;
 

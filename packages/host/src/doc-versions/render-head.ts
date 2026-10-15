@@ -1,10 +1,10 @@
 import { sealPayload, type TenantContext } from "@agentforge/core";
-import { DOCX_MIME, PDF_MIME, XLSX_MIME, type ArtifactMime } from "@agentforge/core/artifacts";
+import { DOCX_MIME, PDF_MIME, XLSX_MIME, type ArtifactMime, type ArtifactRecord } from "@agentforge/core/artifacts";
 import { sql } from "@agentforge/db";
 import { getLocalVaultKey } from "@agentforge/db/vault-key";
 import { ARTIFACT_BODY_MAX_BYTES } from "../artifacts";
 import { renderDocx, renderPdf, renderXlsx } from "../doc-model";
-import type { EditableSpec } from "../doc-tools/doc-meta";
+import { SPEC_META_KEY, type EditableSpec } from "../doc-tools/doc-meta";
 import { log } from "../log";
 import { assertStorageAdmits, isStorageQuotaError } from "../tenant-storage";
 import { docVersionStore } from "./store";
@@ -23,6 +23,10 @@ export type HeadBodyResult =
   | { readonly ok: false; readonly reason: HeadBodyRefusal };
 
 export type HeadRenderer = (spec: EditableSpec, mime: ArtifactMime) => Promise<Uint8Array>;
+
+export const BODY_VERSION_META_KEY = "bodyVersion";
+
+export type HeadFile = { readonly bytes: Uint8Array; readonly mime: ArtifactMime };
 
 type ArtifactFileRow = { readonly mime: string; readonly size_bytes: number };
 
@@ -97,7 +101,8 @@ export async function refreshHeadBody(
     }
     const written = sql
       .prepare(
-        `UPDATE artifacts SET body = ?, mime = ?, size_bytes = ?
+        `UPDATE artifacts SET body = ?, mime = ?, size_bytes = ?,
+            meta = json_set(meta, '$.${BODY_VERSION_META_KEY}', CAST(? AS INTEGER))
           WHERE workspace_id = ? AND id = ?
             AND (SELECT MAX(version) FROM doc_versions WHERE artifact_id = ?) = ?`,
       )
@@ -105,6 +110,7 @@ export async function refreshHeadBody(
         JSON.stringify(sealPayload(body, getLocalVaultKey())),
         mime,
         sizeBytes,
+        head.version,
         tenant.workspaceId,
         artifactId,
         artifactId,
@@ -120,5 +126,38 @@ export async function refreshHeadBody(
       detail: error instanceof Error ? error.name : "error",
     });
     return refused("unavailable");
+  }
+}
+
+export async function staleHeadFile(
+  tenant: TenantContext,
+  artifact: ArtifactRecord,
+  render: HeadRenderer = renderHead,
+): Promise<HeadFile | null> {
+  if (artifact.meta[SPEC_META_KEY] === undefined) {
+    return null;
+  }
+  const store = docVersionStore();
+  const head = store.listVersions(tenant, artifact.id)?.[0];
+  if (head === undefined) {
+    return null;
+  }
+  const marker = artifact.meta[BODY_VERSION_META_KEY];
+  if (marker === head.version || (marker === undefined && head.version === 1)) {
+    return null;
+  }
+  const version = store.getVersion(tenant, artifact.id, head.version);
+  if (version === null) {
+    return null;
+  }
+  const mime = mimeForHead(version.spec, artifact.mime);
+  try {
+    return { bytes: await render(version.spec, mime), mime };
+  } catch (error) {
+    log.warn("doc_head_file_render_failed", {
+      version: head.version,
+      detail: error instanceof Error ? error.name : "error",
+    });
+    return null;
   }
 }
