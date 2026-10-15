@@ -64,6 +64,7 @@ import { assertChatImagesSendable, prepareChatImageHistory, type ChatTurn } from
 import { saveGeneratedImage, saveGeneratedVideo } from "./media";
 import { getRunContext, hostedRequestLocale, localeForRun, withRunContext } from "./run-context";
 import { withToolRun } from "./tool-run-context";
+import { withAttendedRun } from "./media-approval/presence";
 import type { JobEvent } from "@agentforge/core/jobs";
 import { DEFAULT_CHAT_MODALITIES, GENERALIST_WORKER_PROMPT, virtualAgentFor } from "@agentforge/core";
 import { runPolicyFor, withGeneralistWorkers } from "./virtual-agents";
@@ -498,7 +499,7 @@ export async function* startModalityRun(options: {
       const inChatRun = <T>(fn: () => Promise<T>): Promise<T> =>
         withToolRun({ runId: run.id, mode: agentPolicy ? agentPolicy.agent.id : "chat" }, () =>
           withRunContext({ threadId: thread.id, agentId: thread.agentId, locale, projectId }, () =>
-            withWorkerChannel(workerChannel, fn),
+            withWorkerChannel(workerChannel, () => withAttendedRun(fn)),
           ),
         );
       const attempt = () =>

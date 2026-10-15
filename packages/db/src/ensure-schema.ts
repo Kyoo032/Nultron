@@ -6,6 +6,8 @@ import { isServerMode } from "@agentforge/core";
 import { ensureBoardTables } from "./board-schema";
 import { ensureDocProposalTables } from "./doc-proposals-schema";
 import { ensureDocVersionTables } from "./doc-versions-schema";
+import { ensureGatewayTokenTables } from "./gateway-tokens-schema";
+import { ensureMediaApprovalTables } from "./media-approval-schema";
 import { ensureProjectTables } from "./projects-schema";
 
 const MIGRATIONS_TABLE = "__drizzle_migrations";
@@ -258,6 +260,8 @@ export function ensureSchema(sqlite: Database.Database): void {
   ensureProjectTables(sqlite);
   ensureDocVersionTables(sqlite);
   ensureDocProposalTables(sqlite);
+  ensureMediaApprovalTables(sqlite);
+  ensureGatewayTokenTables(sqlite);
   ensureWorkspaceColumns(sqlite);
   assertKernelTables(sqlite);
 }

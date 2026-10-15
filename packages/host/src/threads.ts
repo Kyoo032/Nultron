@@ -360,6 +360,13 @@ export async function insertToolInvocation(
   });
 }
 
+export async function replaceMessageContent(tenant: TenantContext, messageId: string, content: ContentPart[]) {
+  await db
+    .update(messages)
+    .set({ content: sealJson(content) })
+    .where(and(eq(messages.organizationId, tenant.organizationId), eq(messages.id, messageId)));
+}
+
 export function requireThread(thread: unknown, message = "Thread not found") {
   if (!thread) {
     throw new ApiError("not_found", message, 404);

@@ -57,6 +57,7 @@ import {
 } from "./handlers/docs-proposals";
 import { DESK_FILE_ROUTES } from "./desk-files/routes";
 import { FOLDER_ROUTES } from "./folder-root";
+import { MEDIA_APPROVAL_ROUTES } from "./media-approval/routes";
 import {
   handleDeleteChannel,
   handleDeleteTelegramBot,
@@ -378,6 +379,7 @@ const routes: Route[] = [
   compile("POST", "/api/v1/threads/:threadId/runs/video", (req) => handleRun(req, "video")),
   compile("GET", "/api/v1/models", handleGetModels),
   compile("POST", "/api/v1/models", handlePostModels),
+  ...MEDIA_APPROVAL_ROUTES.map(([method, path, handler]) => compile(method, path, handler)),
   compile("POST", "/api/v1/media", handlePostMedia),
   compile("GET", "/api/v1/media/:mediaId/file", handleGetMediaFile),
   // Phase 8: the door out of a full account. Deliberately NOT behind `requireGatewayAllowed()` —

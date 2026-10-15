@@ -92,6 +92,9 @@ export const CASCADED_TABLES = [
   "project_agents",
   "doc_versions",
   "doc_proposals",
+  "media_proposals",
+  "media_always_allow",
+  "gateway_managed_tokens",
 ] as const;
 
 /**

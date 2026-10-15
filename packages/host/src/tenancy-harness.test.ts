@@ -113,6 +113,7 @@ type Seeds = {
   workspaceId: string;
   threadId: string;
   mediaId: string;
+  mediaProposalId: string;
   datasetId: string;
   matterId: string;
   docId: string;
@@ -266,6 +267,19 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
 
   // --- media ---------------------------------------------------------------------------------
   { method: "GET", path: "/api/v1/media/:mediaId/file", params: { mediaId: "mediaId" } },
+  { method: "GET", path: "/api/v1/media/proposals/:proposalId", params: { proposalId: "mediaProposalId" } },
+  {
+    method: "POST",
+    path: "/api/v1/media/proposals/:proposalId/generate",
+    params: { proposalId: "mediaProposalId" },
+    body: {},
+  },
+  {
+    method: "POST",
+    path: "/api/v1/media/proposals/:proposalId/skip",
+    params: { proposalId: "mediaProposalId" },
+    body: {},
+  },
   {
     method: "DELETE",
     path: "/api/v1/media/:mediaId",
@@ -941,6 +955,22 @@ async function seedTenantA(): Promise<Seeds> {
     saveMedia(tenantA, new File([png], `${LEAK_MARKER}.png`, { type: "image/png" })),
   );
 
+  const mediaProposalId = await step("media proposal", async () => {
+    const { defaultMediaApprovalDeps } = await import("./media-approval/deps");
+    const deps = await defaultMediaApprovalDeps();
+    return deps.store.propose({
+      owner: { organizationId: tenantA.organizationId, userId: tenantA.userId },
+      workspaceId: tenantA.workspaceId,
+      threadId: thread.id,
+      runId: null,
+      kind: "image",
+      model: "stub-image",
+      estimateMicros: null,
+      request: { kind: "image", prompt: `${LEAK_MARKER} picture`, aspect: "square", model: "stub-image" },
+      now: T0,
+    });
+  });
+
   return {
     projectId: project.id,
     cardId: card.id,
@@ -950,6 +980,7 @@ async function seedTenantA(): Promise<Seeds> {
     workspaceId: desk.id,
     threadId: thread.id,
     mediaId: mediaRow.id,
+    mediaProposalId,
     datasetId: dataset.id,
     matterId: matter.id,
     // No seed of its own. `addFile` assigns document ids sequentially inside a matter, so a real
