@@ -132,7 +132,11 @@ export function AgentRailView({
   activeWorkspaceId = null,
 }: AgentRailViewProps) {
   const enterprise = look === "enterprise";
-  const hostedLinks = [...(showBoard ? [BOARD_LINK] : []), ...(showProjects ? [PROJECTS_LINK] : [])];
+  const sectionCoversProjects = enterprise && workspaces !== null;
+  const hostedLinks = [
+    ...(showBoard ? [BOARD_LINK] : []),
+    ...(showProjects && !sectionCoversProjects ? [PROJECTS_LINK] : []),
+  ];
   const accountLinks = [...hostedLinks, ...ACCOUNT_LINKS];
   /*
    * The name shows in one tooltip drawn by the rail itself, outside the scrolling column. A tooltip

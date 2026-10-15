@@ -91,6 +91,8 @@ function hrefOf(html: string, id: string): string | undefined {
   return html.match(new RegExp(`<a[^>]*href="([^"]+)"[^>]*data-testid="${id}"`))?.[1];
 }
 
+const COVERED_BY_WORKSPACES_SECTION: Record<string, string> = { "projects-link": "rail-new-workspace" };
+
 beforeEach(() => {
   resetLocaleForTests();
   applyLocale("en");
@@ -128,26 +130,22 @@ describe("the default shell is held to the byte", () => {
 });
 
 describe("the enterprise shell keeps every tool of the rail", () => {
-  it("offers every link the default rail offers", () => {
+  it("offers every link the default rail offers, the Workspaces link through its section", () => {
     const base = inRouter("/chat", <AgentRailView {...VIEW} />);
     const enterpriseLinks = testIds(enterpriseView());
     for (const id of testIds(base).filter((name) => name !== "rail-expand")) {
-      expect(enterpriseLinks, id).toContain(id);
+      expect(enterpriseLinks, id).toContain(COVERED_BY_WORKSPACES_SECTION[id] ?? id);
     }
   });
 
   it("points each of them at the same route", () => {
     const base = inRouter("/chat", <AgentRailView {...VIEW} />);
     const enterprise = enterpriseView();
-    for (const id of [
-      "mode-chat",
-      "agent-research",
-      "board-link",
-      "projects-link",
-      "mode-knowledge",
-      "settings-link",
-    ]) {
+    for (const id of ["mode-chat", "agent-research", "board-link", "mode-knowledge", "settings-link"]) {
       expect(hrefOf(enterprise, id), id).toBe(hrefOf(base, id));
+    }
+    for (const [id, cover] of Object.entries(COVERED_BY_WORKSPACES_SECTION)) {
+      expect(hrefOf(enterprise, cover), id).toBe(hrefOf(base, id));
     }
   });
 
@@ -228,6 +226,30 @@ describe("the enterprise rail", () => {
 
   it("names the character from the brand setting, not from the product", () => {
     expect(enterpriseShell({ ...ENTERPRISE_BRAND, assistantName: "Hana" })).toContain("Hana");
+  });
+});
+
+describe.each([
+  ["en", "Workspaces"],
+  ["id", "Ruang kerja"],
+] as const)("the enterprise rail's Workspaces links (%s)", (locale, accountLabel) => {
+  beforeEach(() => {
+    applyLocale(locale);
+  });
+
+  it("has one link to the Workspaces page itself, from New Workspace; the rows open one Workspace each", () => {
+    for (const collapsed of [false, true]) {
+      const html = enterpriseView({ collapsed });
+      const toPage = html.match(/<a\b[^>]*\shref="\/projects"[^>]*>/g) ?? [];
+      expect(toPage, `collapsed=${collapsed}`).toHaveLength(1);
+      expect(toPage[0], `collapsed=${collapsed}`).toContain('data-testid="rail-new-workspace"');
+      const section = html.slice(html.indexOf('data-testid="rail-workspaces"'), html.indexOf('data-tour="rail-modes"'));
+      expect(section, `collapsed=${collapsed}`).toContain('data-testid="rail-new-workspace"');
+      expect(html, `collapsed=${collapsed}`).not.toContain('data-testid="projects-link"');
+      const labelled = html.match(new RegExp(`<a\\b[^>]*aria-label="${accountLabel}"`, "g")) ?? [];
+      expect(labelled, `collapsed=${collapsed}`).toHaveLength(0);
+      expect(html.toLowerCase(), `collapsed=${collapsed}`).not.toContain("nultron");
+    }
   });
 });
 
