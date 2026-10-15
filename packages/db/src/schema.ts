@@ -82,6 +82,11 @@ export const tenantUsage = sqliteTable(
      * `at`, which stops being true as soon as a period boundary moves.
      */
     billingPeriodStart: integer("billing_period_start"),
+    allocationId: text("allocation_id"),
+    purpose: text("purpose"),
+    holdId: text("hold_id"),
+    agentId: text("agent_id"),
+    projectId: text("project_id"),
   },
   (table) => [
     index("tenant_usage_tenant_at_idx").on(table.tenantId, table.at),
@@ -1039,4 +1044,228 @@ export const fileProposals = sqliteTable(
       sql`${table.status} IN ('pending', 'approved', 'applied', 'rejected', 'stale', 'failed')`,
     ),
   ],
+);
+
+const QUOTA_MICROS_MAX = 1_000_000_000_000;
+
+export const companyQuotaSettings = sqliteTable(
+  "company_quota_settings",
+  {
+    organizationId: text("organization_id")
+      .primaryKey()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    tenantId: text("tenant_id").notNull(),
+    enabled: integer("enabled").notNull().default(0),
+    enabledAt: integer("enabled_at"),
+    enabledBy: text("enabled_by"),
+    companyCapMicros: integer("company_cap_micros"),
+    version: integer("version").notNull().default(1),
+  },
+  (table) => [
+    check("company_quota_settings_enabled_check", sql`${table.enabled} IN (0, 1)`),
+    check(
+      "company_quota_settings_cap_check",
+      sql`${table.companyCapMicros} IS NULL OR ${table.companyCapMicros} BETWEEN 0 AND ${sql.raw(String(QUOTA_MICROS_MAX))}`,
+    ),
+    check("company_quota_settings_version_check", sql`${table.version} >= 1`),
+  ],
+);
+
+export const companyGroups = sqliteTable(
+  "company_groups",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    tenantId: text("tenant_id").notNull(),
+    name: text("name").notNull(),
+    createdBy: text("created_by").notNull(),
+    createdAt: integer("created_at").notNull(),
+    archivedAt: integer("archived_at"),
+  },
+  (table) => [
+    uniqueIndex("company_groups_org_name").on(table.organizationId, sql`lower(${table.name})`),
+    check("company_groups_name_check", sql`length(trim(${table.name})) > 0`),
+  ],
+);
+
+export const companyGroupMembers = sqliteTable(
+  "company_group_members",
+  {
+    groupId: text("group_id")
+      .notNull()
+      .references(() => companyGroups.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    addedBy: text("added_by").notNull(),
+    addedAt: integer("added_at").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.groupId, table.userId] }),
+    index("company_group_members_user_idx").on(table.userId),
+  ],
+);
+
+export const quotaAllocations = sqliteTable(
+  "quota_allocations",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    tenantId: text("tenant_id").notNull(),
+    name: text("name").notNull(),
+    scopeKind: text("scope_kind").notNull().$type<"everyone" | "groups" | "people" | "admins">(),
+    limitMicros: integer("limit_micros").notNull(),
+    perPersonLimitMicros: integer("per_person_limit_micros"),
+    periodKind: text("period_kind").notNull().$type<"lifetime" | "monthly">(),
+    periodStart: integer("period_start"),
+    spentMicros: integer("spent_micros").notNull().default(0),
+    heldMicros: integer("held_micros").notNull().default(0),
+    modelsMode: text("models_mode").notNull().default("all").$type<"all" | "list">(),
+    priority: integer("priority").notNull().default(0),
+    status: text("status").notNull().default("active").$type<"active" | "paused" | "archived">(),
+    gatewayTokenId: text("gateway_token_id"),
+    version: integer("version").notNull().default(1),
+    createdBy: text("created_by").notNull(),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("quota_allocations_live_everyone")
+      .on(table.organizationId)
+      .where(sql`${table.scopeKind} = 'everyone' AND ${table.status} <> 'archived'`),
+    uniqueIndex("quota_allocations_live_admins")
+      .on(table.organizationId)
+      .where(sql`${table.scopeKind} = 'admins' AND ${table.status} <> 'archived'`),
+    index("quota_allocations_org_status_idx").on(table.organizationId, table.status),
+    check("quota_allocations_scope_check", sql`${table.scopeKind} IN ('everyone', 'groups', 'people', 'admins')`),
+    check(
+      "quota_allocations_limit_check",
+      sql`${table.limitMicros} BETWEEN 0 AND ${sql.raw(String(QUOTA_MICROS_MAX))}`,
+    ),
+    check(
+      "quota_allocations_per_person_check",
+      sql`${table.perPersonLimitMicros} IS NULL OR ${table.perPersonLimitMicros} BETWEEN 0 AND ${sql.raw(String(QUOTA_MICROS_MAX))}`,
+    ),
+    check("quota_allocations_period_check", sql`${table.periodKind} IN ('lifetime', 'monthly')`),
+    check("quota_allocations_spent_check", sql`${table.spentMicros} >= 0`),
+    check("quota_allocations_held_check", sql`${table.heldMicros} >= 0`),
+    check("quota_allocations_models_check", sql`${table.modelsMode} IN ('all', 'list')`),
+    check("quota_allocations_status_check", sql`${table.status} IN ('active', 'paused', 'archived')`),
+    check("quota_allocations_version_check", sql`${table.version} >= 1`),
+  ],
+);
+
+export const quotaAllocationModels = sqliteTable(
+  "quota_allocation_models",
+  {
+    allocationId: text("allocation_id")
+      .notNull()
+      .references(() => quotaAllocations.id, { onDelete: "cascade" }),
+    modelId: text("model_id").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.allocationId, table.modelId] }),
+    check(
+      "quota_allocation_models_normal_check",
+      sql`${table.modelId} = lower(trim(${table.modelId})) AND length(${table.modelId}) > 0`,
+    ),
+  ],
+);
+
+export const quotaAssignments = sqliteTable(
+  "quota_assignments",
+  {
+    allocationId: text("allocation_id")
+      .notNull()
+      .references(() => quotaAllocations.id, { onDelete: "cascade" }),
+    subjectKind: text("subject_kind").notNull().$type<"person" | "group">(),
+    subjectId: text("subject_id").notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.allocationId, table.subjectKind, table.subjectId] }),
+    index("quota_assignments_subject_idx").on(table.subjectKind, table.subjectId),
+    check("quota_assignments_kind_check", sql`${table.subjectKind} IN ('person', 'group')`),
+  ],
+);
+
+export const quotaPersonUsage = sqliteTable(
+  "quota_person_usage",
+  {
+    allocationId: text("allocation_id")
+      .notNull()
+      .references(() => quotaAllocations.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    periodStart: integer("period_start").notNull(),
+    spentMicros: integer("spent_micros").notNull().default(0),
+    heldMicros: integer("held_micros").notNull().default(0),
+  },
+  (table) => [
+    primaryKey({ columns: [table.allocationId, table.userId, table.periodStart] }),
+    check("quota_person_usage_spent_check", sql`${table.spentMicros} >= 0`),
+    check("quota_person_usage_held_check", sql`${table.heldMicros} >= 0`),
+  ],
+);
+
+export const quotaHolds = sqliteTable(
+  "quota_holds",
+  {
+    id: text("id").primaryKey(),
+    allocationId: text("allocation_id")
+      .notNull()
+      .references(() => quotaAllocations.id, { onDelete: "cascade" }),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    tenantId: text("tenant_id").notNull(),
+    userId: text("user_id").notNull(),
+    runId: text("run_id").notNull(),
+    seq: integer("seq").notNull(),
+    bootId: text("boot_id").notNull(),
+    kind: text("kind").notNull().$type<"text" | "image" | "video" | "music" | "audio">(),
+    model: text("model").notNull(),
+    amountMicros: integer("amount_micros").notNull(),
+    state: text("state").notNull().default("open").$type<"open" | "settled" | "released" | "expired">(),
+    settledMicros: integer("settled_micros"),
+    costBasis: text("cost_basis").$type<"reported" | "list_price" | "estimated" | "expired_charge">(),
+    createdAt: integer("created_at").notNull(),
+    expiresAt: integer("expires_at").notNull(),
+    closedAt: integer("closed_at"),
+  },
+  (table) => [
+    index("quota_holds_allocation_state_idx").on(table.allocationId, table.state),
+    index("quota_holds_run_idx").on(table.runId, table.seq),
+    index("quota_holds_state_expiry_idx").on(table.state, table.expiresAt),
+    index("quota_holds_boot_idx").on(table.bootId, table.state),
+    check("quota_holds_kind_check", sql`${table.kind} IN ('text', 'image', 'video', 'music', 'audio')`),
+    check("quota_holds_amount_check", sql`${table.amountMicros} BETWEEN 0 AND ${sql.raw(String(QUOTA_MICROS_MAX))}`),
+    check("quota_holds_state_check", sql`${table.state} IN ('open', 'settled', 'released', 'expired')`),
+    check(
+      "quota_holds_settled_check",
+      sql`${table.settledMicros} IS NULL OR ${table.settledMicros} BETWEEN 0 AND ${sql.raw(String(QUOTA_MICROS_MAX))}`,
+    ),
+    check(
+      "quota_holds_cost_basis_check",
+      sql`${table.costBasis} IS NULL OR ${table.costBasis} IN ('reported', 'list_price', 'estimated', 'expired_charge')`,
+    ),
+    check("quota_holds_seq_check", sql`${table.seq} >= 0`),
+  ],
+);
+
+export const quotaAudit = sqliteTable(
+  "quota_audit",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    tenantId: text("tenant_id").notNull(),
+    actorUserId: text("actor_user_id").notNull(),
+    action: text("action").notNull(),
+    allocationId: text("allocation_id"),
+    detail: text("detail"),
+    at: integer("at").notNull(),
+  },
+  (table) => [index("quota_audit_org_at_idx").on(table.organizationId, table.at)],
 );
