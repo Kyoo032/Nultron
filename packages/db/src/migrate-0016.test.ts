@@ -35,6 +35,11 @@ const LEDGER_COLUMNS = [
   "at",
   // Phase 5 lane B (drizzle/0017_tenant_plan.sql): the billing period this row counted against.
   "billing_period_start",
+  "allocation_id",
+  "purpose",
+  "hold_id",
+  "agent_id",
+  "project_id",
 ] as const;
 
 function tableNames(sqlite: Database.Database): string[] {

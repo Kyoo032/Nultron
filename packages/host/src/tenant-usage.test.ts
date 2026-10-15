@@ -62,17 +62,22 @@ describe("tenant usage ledger", () => {
     );
     expect(columns.sort()).toEqual(
       [
+        "agent_id",
+        "allocation_id",
         "at",
         // Phase 5 lane B (drizzle/0017_tenant_plan.sql): the billing period this call counted
         // against. Null on a desk and on every row lane A wrote, because nothing was counting.
         "billing_period_start",
         "cost_usd_micros",
+        "hold_id",
         "id",
         "input_tokens",
         "mode",
         "model",
         "organization_id",
         "output_tokens",
+        "project_id",
+        "purpose",
         "quantity",
         "run_id",
         "tenant_id",

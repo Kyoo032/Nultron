@@ -9,6 +9,7 @@ import { ensureDocVersionTables } from "./doc-versions-schema";
 import { ensureGatewayTokenTables } from "./gateway-tokens-schema";
 import { ensureMediaApprovalTables } from "./media-approval-schema";
 import { ensureProjectTables } from "./projects-schema";
+import { ensureQuotaTables } from "./quota-schema";
 
 const MIGRATIONS_TABLE = "__drizzle_migrations";
 
@@ -262,6 +263,7 @@ export function ensureSchema(sqlite: Database.Database): void {
   ensureDocProposalTables(sqlite);
   ensureMediaApprovalTables(sqlite);
   ensureGatewayTokenTables(sqlite);
+  ensureQuotaTables(sqlite);
   ensureWorkspaceColumns(sqlite);
   assertKernelTables(sqlite);
 }

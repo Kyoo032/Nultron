@@ -95,6 +95,15 @@ export const CASCADED_TABLES = [
   "media_proposals",
   "media_always_allow",
   "gateway_managed_tokens",
+  "company_quota_settings",
+  "company_groups",
+  "company_group_members",
+  "quota_allocations",
+  "quota_allocation_models",
+  "quota_assignments",
+  "quota_person_usage",
+  "quota_holds",
+  "quota_audit",
 ] as const;
 
 /**
