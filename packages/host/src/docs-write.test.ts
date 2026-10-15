@@ -55,9 +55,18 @@ type VersionItem = {
 };
 
 type WriteAnswer = {
-  version: { version: number; note: string | null };
+  headVersion: number;
+  version: { version: number; note: string | null } | null;
   sectionAuthors: DocBody["sectionAuthors"];
+  bodyRefreshed: boolean;
 };
+
+const WRITE_KEYS = ["bodyRefreshed", "headVersion", "sectionAuthors", "version"];
+const VERSION_KEYS = ["author", "baseVersion", "changedSectionIds", "createdAt", "kind", "note", "version"];
+const SECTION_CHANGED = (sectionIds: string[]) => ({
+  error: { code: "section_changed", message: expect.any(String), sectionIds },
+});
+const INVALID_REQUEST = { error: { code: "invalid_request", message: expect.any(String) } };
 
 let sessionStore: ReturnType<typeof createMemorySessionStore>;
 let alice: Person;
@@ -170,9 +179,13 @@ function removeSection(
   sectionId: string,
   baseVersion: number,
 ): Promise<HostResult> {
-  return call(person, "DELETE", "/api/v1/docs/:artifactId/sections/:sectionId", { artifactId, sectionId }, undefined, {
-    baseVersion: String(baseVersion),
-  });
+  return call(
+    person,
+    "DELETE",
+    "/api/v1/docs/:artifactId/sections/:sectionId",
+    { artifactId, sectionId },
+    { baseVersion },
+  );
 }
 
 function restoreVersion(person: Person, artifactId: string, n: number, baseVersion: number): Promise<HostResult> {
@@ -256,7 +269,10 @@ describe("the document write routes: a Workspace's members edit one section at a
     const benEdit = await putSection(ben, id, "intro", 1, { heading: "Introduction", ...paragraph("Ben's intro.") });
     expect(benEdit.status).toBe(200);
     const benAnswer = jsonBody<WriteAnswer>(benEdit);
-    expect(benAnswer.version.version).toBe(2);
+    expect(Object.keys(benAnswer).sort()).toEqual(WRITE_KEYS);
+    expect(benAnswer.version?.version).toBe(2);
+    expect(benAnswer.headVersion).toBe(2);
+    expect(benAnswer.bodyRefreshed).toBe(true);
     expect(benAnswer.sectionAuthors.intro).toEqual({ version: 2, author: { kind: "person", userId: "ben" } });
 
     const aliceEdit = await putSection(alice, id, "numbers", 1, {
@@ -265,7 +281,8 @@ describe("the document write routes: a Workspace's members edit one section at a
     });
     expect(aliceEdit.status).toBe(200);
     const aliceAnswer = jsonBody<WriteAnswer>(aliceEdit);
-    expect(aliceAnswer.version.version).toBe(3);
+    expect(aliceAnswer.version?.version).toBe(3);
+    expect(aliceAnswer.headVersion).toBe(3);
     expect(aliceAnswer.sectionAuthors.numbers).toEqual({ version: 3, author: { kind: "person", userId: "alice" } });
     expect(aliceAnswer.sectionAuthors.intro).toEqual({ version: 2, author: { kind: "person", userId: "ben" } });
 
@@ -281,7 +298,7 @@ describe("the document write routes: a Workspace's members edit one section at a
 
     const stale = await putSection(alice, id, "intro", 1, paragraph("Alice's intro."));
     expect(stale.status).toBe(409);
-    expect((stale as HostJsonResult).body).toEqual({ error: "section_changed", sectionIds: ["intro"] });
+    expect(jsonBody(stale)).toEqual(SECTION_CHANGED(["intro"]));
     expect(sectionOf(await headSpec(alice, id), "intro")?.blocks).toEqual([
       { type: "paragraph", text: "Ben's intro." },
     ]);
@@ -290,10 +307,9 @@ describe("the document write routes: a Workspace's members edit one section at a
       status: 409,
       code: "bad_base",
     });
-    expect(await outcome(await putSection(alice, id, "numbers", 0, paragraph("Too old.")))).toEqual({
-      status: 409,
-      code: "bad_base",
-    });
+    const tooOld = await putSection(alice, id, "numbers", 0, paragraph("Too old."));
+    expect(tooOld.status).toBe(400);
+    expect(jsonBody(tooOld)).toEqual(INVALID_REQUEST);
     expect((await versionsOf(alice, id)).map((item) => item.version)).toEqual([2, 1]);
   });
 
@@ -308,7 +324,9 @@ describe("the document write routes: a Workspace's members edit one section at a
     );
     expect(added.status).toBe(201);
     const answer = jsonBody<WriteAnswer>(added);
-    expect(answer.version.version).toBe(2);
+    expect(Object.keys(answer).sort()).toEqual(WRITE_KEYS);
+    expect(answer.version?.version).toBe(2);
+    expect(answer.headVersion).toBe(2);
 
     const ids = (await headSpec(alice, id)).sections.map((section) => section.id);
     expect(ids).toHaveLength(4);
@@ -364,6 +382,83 @@ describe("the document write routes: a Workspace's members edit one section at a
     expect(await docxBodyText(first.bytes)).toContain("Next quarter we expand.");
   });
 
+  it("every mutation answers the same five keys, its version carries no spec, and the head moves one step each time", async () => {
+    const id = await freshDoc();
+    const answers = [
+      await putSection(alice, id, "intro", 1, paragraph("Shape intro.")),
+      await addSection(alice, id, 2, paragraph("Shape added.")),
+      await removeSection(alice, id, "numbers", 3),
+      await restoreVersion(alice, id, 1, 4),
+    ];
+    expect(answers.map((answer) => answer.status)).toEqual([200, 201, 200, 201]);
+    const bodies = answers.map((answer) => jsonBody<WriteAnswer>(answer));
+    expect(bodies.map((body) => body.headVersion)).toEqual([2, 3, 4, 5]);
+    for (const body of bodies) {
+      expect(Object.keys(body).sort()).toEqual(WRITE_KEYS);
+      expect(body.bodyRefreshed).toBe(true);
+      expect(body.version).not.toBeNull();
+      expect(Object.keys(body.version ?? {}).sort()).toEqual(VERSION_KEYS);
+    }
+    expect(bodies.map((body) => body.version?.version)).toEqual([2, 3, 4, 5]);
+  });
+
+  it("a delete from a base before a later change is 409 section_changed with that id, and removes nothing", async () => {
+    const id = await freshDoc();
+    expect(await outcome(await putSection(ben, id, "intro", 1, paragraph("Ben's intro.")))).toEqual(OK);
+
+    const stale = await removeSection(alice, id, "intro", 1);
+    expect(stale.status).toBe(409);
+    expect(jsonBody(stale)).toEqual(SECTION_CHANGED(["intro"]));
+    expect((await headSpec(alice, id)).sections.map((section) => section.id)).toEqual(["intro", "numbers", "close"]);
+    expect((await versionsOf(alice, id)).map((item) => item.version)).toEqual([2, 1]);
+  });
+
+  it("DELETE reads baseVersion from the body: a query string alone is invalid_request and removes nothing", async () => {
+    const id = await freshDoc();
+    const answer = await call(
+      alice,
+      "DELETE",
+      "/api/v1/docs/:artifactId/sections/:sectionId",
+      { artifactId: id, sectionId: "intro" },
+      undefined,
+      { baseVersion: "1" },
+    );
+    expect(answer.status).toBe(400);
+    expect(jsonBody(answer)).toEqual(INVALID_REQUEST);
+    expect((await headSpec(alice, id)).sections.map((section) => section.id)).toEqual(["intro", "numbers", "close"]);
+    expect((await versionsOf(alice, id)).map((item) => item.version)).toEqual([1]);
+  });
+
+  it("a restore that would overwrite a section someone changed after the base is 409 section_changed", async () => {
+    const id = await freshDoc();
+    expect(await outcome(await putSection(ben, id, "intro", 1, paragraph("Ben's intro.")))).toEqual(OK);
+
+    const refused = await restoreVersion(alice, id, 1, 1);
+    expect(refused.status).toBe(409);
+    expect(jsonBody(refused)).toEqual(SECTION_CHANGED(["intro"]));
+    expect(sectionOf(await headSpec(alice, id), "intro")?.blocks).toEqual([
+      { type: "paragraph", text: "Ben's intro." },
+    ]);
+    expect((await versionsOf(alice, id)).map((item) => item.version)).toEqual([2, 1]);
+  });
+
+  it("restoring the version the head already is writes nothing: 200, version null, the head and its authors unchanged", async () => {
+    const id = await freshDoc();
+    const answer = await restoreVersion(alice, id, 1, 1);
+    expect(answer.status).toBe(200);
+    expect(jsonBody(answer)).toEqual({
+      headVersion: 1,
+      version: null,
+      sectionAuthors: {
+        intro: { version: 1, author: { kind: "person", userId: "alice" } },
+        numbers: { version: 1, author: { kind: "person", userId: "alice" } },
+        close: { version: 1, author: { kind: "person", userId: "alice" } },
+      },
+      bodyRefreshed: true,
+    });
+    expect((await versionsOf(alice, id)).map((item) => item.version)).toEqual([1]);
+  });
+
   it("the file a member downloads after an edit is the new content, not the content it was saved with", async () => {
     const id = await freshDoc();
     expect(
@@ -413,13 +508,51 @@ describe("the document write routes: a Workspace's members edit one section at a
     );
   });
 
-  it("a section the body or the document model refuses is 400 and saves nothing", async () => {
+  it("a malformed body is invalid_request, a section that fails the schema is invalid_section, and both save nothing", async () => {
     const id = await freshDoc();
     const before = JSON.stringify(await versionsOf(alice, id));
 
+    const noBase = await call(
+      alice,
+      "PUT",
+      "/api/v1/docs/:artifactId/sections/:sectionId",
+      { artifactId: id, sectionId: "intro" },
+      { section: paragraph("No base.") },
+    );
+    expect(noBase.status).toBe(400);
+    expect(jsonBody(noBase)).toEqual(INVALID_REQUEST);
+    const fractional = await call(
+      alice,
+      "PUT",
+      "/api/v1/docs/:artifactId/sections/:sectionId",
+      { artifactId: id, sectionId: "intro" },
+      { baseVersion: 1.5, section: paragraph("Fraction.") },
+    );
+    expect(jsonBody(fractional)).toEqual(INVALID_REQUEST);
+    const noSection = await call(
+      alice,
+      "PUT",
+      "/api/v1/docs/:artifactId/sections/:sectionId",
+      { artifactId: id, sectionId: "intro" },
+      { baseVersion: 1 },
+    );
+    expect(noSection.status).toBe(400);
+    expect(jsonBody(noSection)).toEqual(INVALID_REQUEST);
+    const textSection = await putSection(alice, id, "intro", 1, "Plain text" as unknown as Record<string, unknown>);
+    expect(textSection.status).toBe(400);
+    expect(jsonBody(textSection)).toEqual(INVALID_REQUEST);
+    const afterNotText = await call(
+      alice,
+      "POST",
+      "/api/v1/docs/:artifactId/sections",
+      { artifactId: id },
+      { baseVersion: 1, afterSectionId: 7, section: paragraph("Bad after.") },
+    );
+    expect(jsonBody(afterNotText)).toEqual(INVALID_REQUEST);
+
     expect(await outcome(await putSection(alice, id, "intro", 1, { blocks: [{ type: "bogus" }] }))).toEqual({
       status: 400,
-      code: "invalid_request",
+      code: "invalid_section",
     });
 
     const crowded = {
@@ -432,7 +565,7 @@ describe("the document write routes: a Workspace's members edit one section at a
     expect(JSON.stringify(await versionsOf(alice, id))).toBe(before);
   });
 
-  it("a render failure after an append leaves the version saved, keeps the last good file, and a later refresh catches up", async () => {
+  it("a render failure after an append leaves the version saved, the file is the head's render until a refresh catches up", async () => {
     const id = await freshDoc();
     expect(await outcome(await putSection(alice, id, "intro", 1, paragraph("Kept text.")))).toEqual(OK);
 
@@ -465,7 +598,7 @@ describe("the document write routes: a Workspace's members edit one section at a
     const { docxBodyText } = await import("./doc-tools/doc-tools-fixtures");
     const kept = bytesOf(await readArtifactFile(alice, id));
     expect(await docxBodyText(kept.bytes)).toContain("Kept text.");
-    expect(await docxBodyText(kept.bytes)).not.toContain("Unrendered close.");
+    expect(await docxBodyText(kept.bytes)).toContain("Unrendered close.");
 
     expect(await refreshHeadBody(alice.tenant, id)).toEqual({ ok: true, version: 3 });
     const caught = bytesOf(await readArtifactFile(alice, id));
@@ -559,7 +692,7 @@ describe("Personal: one person, no server mode, the same write routes", () => {
       { baseVersion: 1, section: { heading: "Introduction", ...paragraph("Desk intro.") } },
     );
     expect(intro.status).toBe(200);
-    expect(jsonBody<WriteAnswer>(intro).version.version).toBe(2);
+    expect(jsonBody<WriteAnswer>(intro).version?.version).toBe(2);
 
     const added = await personal(
       "POST",
@@ -576,10 +709,10 @@ describe("Personal: one person, no server mode, the same write routes", () => {
       "DELETE",
       "/api/v1/docs/:artifactId/sections/:sectionId",
       { artifactId: docId, sectionId: addedId },
-      undefined,
-      { baseVersion: "3" },
+      { baseVersion: 3 },
     );
     expect(removed.status).toBe(200);
+    expect(Object.keys(jsonBody<WriteAnswer>(removed)).sort()).toEqual(WRITE_KEYS);
 
     const restored = await personal(
       "POST",
@@ -588,7 +721,7 @@ describe("Personal: one person, no server mode, the same write routes", () => {
       { baseVersion: 4 },
     );
     expect(restored.status).toBe(201);
-    expect(jsonBody<WriteAnswer>(restored).version.version).toBe(5);
+    expect(jsonBody<WriteAnswer>(restored).version?.version).toBe(5);
 
     const { docxBodyText } = await import("./doc-tools/doc-tools-fixtures");
     const file = bytesOf(await personal("GET", "/api/v1/artifacts/:artifactId/file", { artifactId: docId }));
@@ -615,8 +748,7 @@ describe("Personal: one person, no server mode, the same write routes", () => {
         "DELETE",
         "/api/v1/docs/:artifactId/sections/:sectionId",
         { artifactId: MISSING, sectionId: "intro" },
-        undefined,
-        { baseVersion: "1" },
+        { baseVersion: 1 },
       ),
       await personal(
         "POST",

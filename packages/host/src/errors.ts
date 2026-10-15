@@ -14,7 +14,7 @@ function asMessage(error: unknown): string {
   return "Internal error";
 }
 
-export function jsonError(error: unknown): HostJsonResult {
+export function jsonError(error: unknown, extra?: Readonly<Record<string, unknown>>): HostJsonResult {
   // The one flat error body in the host: the renderer's `parseGatewayBlocked` reads
   // `record.error === "gateway_blocked"` and `record.status` at the top level, not inside an envelope.
   if (isGatewayBlockedError(error)) {
@@ -33,6 +33,7 @@ export function jsonError(error: unknown): HostJsonResult {
           code: error.code,
           message: redactSecrets(error.message),
           ...(error.suggestModel ? { suggestModel: error.suggestModel } : {}),
+          ...(extra ?? {}),
         },
       },
     };

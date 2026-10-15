@@ -3,7 +3,14 @@ import { requireArtifact } from "../artifacts";
 import { DocModelError, replaceSection, type DocSpec, type Section } from "../doc-model";
 import { sectionSchema } from "../doc-model/types";
 import { readEditableSpec, type EditableSpec } from "../doc-tools/doc-meta";
-import { docVersionStore, newSectionId, type AppendResult } from "../doc-versions";
+import {
+  docVersionStore,
+  newSectionId,
+  type AppendResult,
+  type DocVersionInfo,
+  type SectionAuthors,
+} from "../doc-versions";
+import type { EnsureFirstRefusal } from "../doc-versions/types";
 import { refreshHeadBody } from "../doc-versions/render-head";
 import { jsonError, jsonOk } from "../errors";
 import { getTenant } from "../tenant";
@@ -16,13 +23,23 @@ const LAST_SECTION_MESSAGE = "A document keeps at least one section, so this one
 const VERSION_NOT_FOUND_MESSAGE = "No version with that number.";
 const BAD_BASE_MESSAGE = "The base version is not one this file has.";
 const KIND_CHANGED_MESSAGE = "A document cannot change into a workbook.";
+const SECTION_CHANGED_MESSAGE = "This section changed since the version you started from.";
 const ARTIFACT_NOT_FOUND_MESSAGE = "Artifact not found";
+const BASE_VERSION_MESSAGE = "baseVersion must be a positive whole number.";
+const SECTION_SHAPE_MESSAGE = "section must be an object.";
 
 const SECTION_CONTENT = sectionSchema.omit({ id: true });
 
 type SectionContent = Omit<Section, "id">;
 
 type WriteTarget = { readonly tenant: TenantContext; readonly artifactId: string };
+
+export type WriteAnswer = {
+  readonly headVersion: number;
+  readonly version: DocVersionInfo | null;
+  readonly sectionAuthors: SectionAuthors;
+  readonly bodyRefreshed: boolean;
+};
 
 function docWriteRoute(
   work: (request: HostRequest) => Promise<HostResult>,
@@ -45,8 +62,12 @@ function bodyOf(request: HostRequest): Record<string, unknown> {
     : {};
 }
 
-function baseVersionOf(value: unknown): number {
-  return typeof value === "number" ? value : Number.NaN;
+export function baseVersionOf(body: Record<string, unknown>): number {
+  const value = body.baseVersion;
+  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < 1) {
+    throw new ApiError("invalid_request", BASE_VERSION_MESSAGE, 400);
+  }
+  return value;
 }
 
 function afterSectionOf(value: unknown): string | undefined {
@@ -60,12 +81,15 @@ function afterSectionOf(value: unknown): string | undefined {
 }
 
 function sectionContentOf(raw: unknown): SectionContent {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new ApiError("invalid_request", SECTION_SHAPE_MESSAGE, 400);
+  }
   const parsed = SECTION_CONTENT.safeParse(raw);
   if (!parsed.success) {
     const detail = parsed.error.issues
       .map((issue) => `${issue.path.join(".") || "section"}: ${issue.message}`)
       .join("; ");
-    throw new ApiError("invalid_request", `Invalid section: ${detail}`, 400);
+    throw new ApiError("invalid_section", `Invalid section: ${detail}`, 400);
   }
   return parsed.data;
 }
@@ -147,7 +171,9 @@ async function openForWrite(request: HostRequest): Promise<WriteTarget> {
 function refusedResult(result: Extract<AppendResult, { ok: false }>): HostJsonResult {
   switch (result.reason) {
     case "section_changed":
-      return { type: "json", status: 409, body: { error: "section_changed", sectionIds: result.sectionIds ?? [] } };
+      return jsonError(new ApiError("section_changed", SECTION_CHANGED_MESSAGE, 409), {
+        sectionIds: result.sectionIds ?? [],
+      });
     case "bad_base":
       return jsonError(new ApiError("bad_base", BAD_BASE_MESSAGE, 409));
     case "quota":
@@ -161,6 +187,25 @@ function refusedResult(result: Extract<AppendResult, { ok: false }>): HostJsonRe
   }
 }
 
+export async function writeAnswer(
+  tenant: TenantContext,
+  artifactId: string,
+  head: DocVersionInfo,
+  created: boolean,
+): Promise<WriteAnswer> {
+  const refreshed = await refreshHeadBody(tenant, artifactId);
+  const sectionAuthors = docVersionStore().sectionAuthors(tenant, artifactId);
+  if (sectionAuthors === null) {
+    throw new ApiError("not_found", ARTIFACT_NOT_FOUND_MESSAGE, 404);
+  }
+  return {
+    headVersion: head.version,
+    version: created ? head : null,
+    sectionAuthors,
+    bodyRefreshed: refreshed.ok,
+  };
+}
+
 async function settle(
   tenant: TenantContext,
   artifactId: string,
@@ -170,20 +215,17 @@ async function settle(
   if (!result.ok) {
     return refusedResult(result);
   }
-  await refreshHeadBody(tenant, artifactId);
-  const sectionAuthors = docVersionStore().sectionAuthors(tenant, artifactId);
-  if (sectionAuthors === null) {
-    throw new ApiError("not_found", ARTIFACT_NOT_FOUND_MESSAGE, 404);
-  }
-  return jsonOk({ version: result.head, sectionAuthors }, result.created ? createdStatus : 200);
+  const answer = await writeAnswer(tenant, artifactId, result.head, result.created);
+  return jsonOk(answer, result.created ? createdStatus : 200);
 }
 
 export const handlePutDocSection = docWriteRoute(async (request) => {
   const { tenant, artifactId } = await openForWrite(request);
   const body = bodyOf(request);
+  const baseVersion = baseVersionOf(body);
   const content = sectionContentOf(body.section);
   const result = docVersionStore().appendVersion(tenant, artifactId, {
-    baseVersion: baseVersionOf(body.baseVersion),
+    baseVersion,
     author: { kind: "person" },
     edit: replaceSectionEdit(request.params.sectionId, content),
   });
@@ -193,9 +235,10 @@ export const handlePutDocSection = docWriteRoute(async (request) => {
 export const handlePostDocSection = docWriteRoute(async (request) => {
   const { tenant, artifactId } = await openForWrite(request);
   const body = bodyOf(request);
+  const baseVersion = baseVersionOf(body);
   const content = sectionContentOf(body.section);
   const result = docVersionStore().appendVersion(tenant, artifactId, {
-    baseVersion: baseVersionOf(body.baseVersion),
+    baseVersion,
     author: { kind: "person" },
     edit: insertSectionEdit(content, afterSectionOf(body.afterSectionId)),
   });
@@ -204,24 +247,43 @@ export const handlePostDocSection = docWriteRoute(async (request) => {
 
 export const handleDeleteDocSection = docWriteRoute(async (request) => {
   const { tenant, artifactId } = await openForWrite(request);
+  const baseVersion = baseVersionOf(bodyOf(request));
   const result = docVersionStore().appendVersion(tenant, artifactId, {
-    baseVersion: Number(request.query.baseVersion),
+    baseVersion,
     author: { kind: "person" },
     edit: withoutSectionEdit(request.params.sectionId),
   });
   return settle(tenant, artifactId, result, 200);
 });
 
+function firstVersionRefusal(reason: EnsureFirstRefusal): ApiError {
+  if (reason === "quota") {
+    return new ApiError(STORAGE_BLOCK, STORAGE_BLOCK_MESSAGE, 403);
+  }
+  if (reason === "not_found") {
+    return new ApiError("not_found", ARTIFACT_NOT_FOUND_MESSAGE, 404);
+  }
+  return new ApiError("not_editable", NOT_EDITABLE_MESSAGE, 409);
+}
+
 export const handlePostDocRestore = docWriteRoute(async (request) => {
   const { tenant, artifactId } = await openForWrite(request);
+  const baseVersion = baseVersionOf(bodyOf(request));
   const number = parseVersionNumber(request.params.n);
-  const target = number === null ? null : docVersionStore().getVersion(tenant, artifactId, number);
-  if (number === null || target === null) {
+  if (number === null) {
     throw new ApiError("not_found", VERSION_NOT_FOUND_MESSAGE, 404);
   }
-  const body = bodyOf(request);
-  const result = docVersionStore().appendVersion(tenant, artifactId, {
-    baseVersion: baseVersionOf(body.baseVersion),
+  const versions = docVersionStore();
+  const first = versions.ensureFirstVersion(tenant, artifactId);
+  if (!first.ok) {
+    throw firstVersionRefusal(first.reason);
+  }
+  const target = versions.getVersion(tenant, artifactId, number);
+  if (target === null) {
+    throw new ApiError("not_found", VERSION_NOT_FOUND_MESSAGE, 404);
+  }
+  const result = versions.appendVersion(tenant, artifactId, {
+    baseVersion,
     author: { kind: "person" },
     note: `restored v${number}`,
     edit: () => target.spec,

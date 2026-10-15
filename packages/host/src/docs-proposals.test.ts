@@ -118,6 +118,13 @@ function jsonBody<T>(result: HostResult): T {
 
 type Outcome = { status: number; code?: string; sectionIds?: string[] };
 
+const SECTION_CHANGED = (sectionIds: string[]) => ({
+  error: { code: "section_changed", message: expect.any(String), sectionIds },
+});
+const MODEL_OUTPUT_INVALID = { error: { code: "model_output_invalid", message: expect.any(String) } };
+const PROPOSAL_KEYS = ["proposal"];
+const KEEP_KEYS = ["bodyRefreshed", "headVersion", "proposal", "sectionAuthors", "version"];
+
 function outcomeOf(result: HostResult): Outcome {
   const body = jsonBody<{ error?: { code?: string; sectionIds?: string[] } | string }>(result);
   if (typeof body.error === "string") {
@@ -265,11 +272,22 @@ describe("agent proposals over HTTP: a member asks, then keeps, discards or asks
 
     const kept = await keep(alice, proposal.id);
     expect(kept.status).toBe(200);
-    expect(jsonBody<{ proposal: Proposal; headVersion: number; bodyRefreshed: boolean }>(kept)).toMatchObject({
+    const keptBody = jsonBody<{
+      proposal: Proposal;
+      headVersion: number;
+      bodyRefreshed: boolean;
+      version: Record<string, unknown> | null;
+      sectionAuthors: DocBody["sectionAuthors"];
+    }>(kept);
+    expect(Object.keys(keptBody).sort()).toEqual(KEEP_KEYS);
+    expect(keptBody).toMatchObject({
       headVersion: 2,
       bodyRefreshed: true,
+      version: { version: 2, changedSectionIds: ["close"] },
+      sectionAuthors: { close: { version: 2, author: { kind: "agent", agentId: "documents", askedByUserId: "ben" } } },
       proposal: { id: proposal.id, status: "kept", keptVersion: 2 },
     });
+    expect(Object.keys(keptBody.version ?? {})).not.toContain("spec");
 
     const afterKeep = jsonBody<DocBody>(await readDoc(ben, docId));
     expect(afterKeep.headVersion).toBe(2);
@@ -338,8 +356,8 @@ describe("agent proposals over HTTP: a member asks, then keeps, discards or asks
 
     expect(await pendingOf(alice, docId)).toEqual([]);
     expect(jsonBody<DocBody>(await readDoc(alice, docId)).headVersion).toBe(1);
-    expect(outcomeOf(await keep(alice, proposal.id))).toMatchObject({ status: 409, code: "proposal_not_pending" });
-    expect(outcomeOf(await discard(alice, proposal.id)).code).toBe("proposal_not_pending");
+    expect(outcomeOf(await keep(alice, proposal.id))).toMatchObject({ status: 404, code: "not_found" });
+    expect(outcomeOf(await discard(alice, proposal.id))).toMatchObject({ status: 404, code: "not_found" });
     expect(jsonBody<DocBody>(await readDoc(alice, docId)).headVersion).toBe(1);
   });
 
@@ -352,7 +370,7 @@ describe("agent proposals over HTTP: a member asks, then keeps, discards or asks
     const pending = await pendingOf(ben, docId);
     expect(pending.map((item) => item.id)).toEqual([second.id]);
     expect(pending[0]).toMatchObject({ askedByUserId: "alice", section: { blocks: [{ text: "[model] As bullets" }] } });
-    expect(outcomeOf(await keep(ben, first.id)).code).toBe("proposal_not_pending");
+    expect(outcomeOf(await keep(ben, first.id))).toMatchObject({ status: 404, code: "not_found" });
 
     const other = await proposed(ben, docId, "close");
     expect((await pendingOf(ben, docId)).map((item) => item.id).sort()).toEqual([second.id, other.id].sort());
@@ -363,11 +381,9 @@ describe("agent proposals over HTTP: a member asks, then keeps, discards or asks
     const proposal = await proposed(ben, docId, "numbers");
     await editSection(alice, docId, "numbers", "Alice rewrote the numbers", 1);
 
-    expect(outcomeOf(await keep(alice, proposal.id))).toEqual({
-      status: 409,
-      code: "section_changed",
-      sectionIds: ["numbers"],
-    });
+    const refused = await keep(alice, proposal.id);
+    expect(refused.status).toBe(409);
+    expect(jsonBody(refused)).toEqual(SECTION_CHANGED(["numbers"]));
 
     const doc = jsonBody<DocBody>(await readDoc(ben, docId));
     expect(doc.headVersion).toBe(2);
@@ -400,11 +416,9 @@ describe("agent proposals over HTTP: a member asks, then keeps, discards or asks
     await editSection(alice, docId, "close", "Closing, edited", 1);
     const before = model.calls.length;
 
-    expect(outcomeOf(await ask(ben, docId, "close", { baseVersion: 1 }))).toEqual({
-      status: 409,
-      code: "section_changed",
-      sectionIds: ["close"],
-    });
+    const stale = await ask(ben, docId, "close", { baseVersion: 1 });
+    expect(stale.status).toBe(409);
+    expect(jsonBody(stale)).toEqual(SECTION_CHANGED(["close"]));
     expect(model.calls).toHaveLength(before);
     expect(await pendingOf(ben, docId)).toEqual([]);
 
@@ -412,13 +426,41 @@ describe("agent proposals over HTTP: a member asks, then keeps, discards or asks
     expect((await proposed(ben, docId, "intro", { baseVersion: 1 })).sectionId).toBe("intro");
   });
 
-  it("a reply that is not a section is 502 invalid_section and stores nothing", async () => {
+  it("a reply that is not a section is 502 model_output_invalid and stores nothing", async () => {
     const docId = await freshDoc();
-    expect(outcomeOf(await ask(ben, docId, "intro", { instruction: "garbage in" }))).toMatchObject({
-      status: 502,
-      code: "invalid_section",
-    });
+    const reply = await ask(ben, docId, "intro", { instruction: "garbage in" });
+    expect(reply.status).toBe(502);
+    expect(jsonBody(reply)).toEqual(MODEL_OUTPUT_INVALID);
     expect(await pendingOf(ben, docId)).toEqual([]);
+  });
+
+  it("the create and discard answers have exactly their keys", async () => {
+    const docId = await freshDoc();
+    const made = await ask(ben, docId, "intro");
+    expect(made.status).toBe(201);
+    expect(Object.keys(jsonBody(made))).toEqual(PROPOSAL_KEYS);
+    const discarded = await discard(ben, jsonBody<{ proposal: Proposal }>(made).proposal.id);
+    expect(discarded.status).toBe(200);
+    expect(Object.keys(jsonBody(discarded))).toEqual(PROPOSAL_KEYS);
+  });
+
+  it("keeping a proposal that leaves the section as it is writes no version: version null, the head unchanged", async () => {
+    const docId = await freshDoc();
+    const first = await proposed(ben, docId, "close", { instruction: "Same words" });
+    expect(jsonBody(await keep(alice, first.id))).toMatchObject({ headVersion: 2, version: { version: 2 } });
+
+    const again = await proposed(ben, docId, "close", { instruction: "Same words", baseVersion: 2 });
+    const kept = await keep(alice, again.id);
+    expect(kept.status).toBe(200);
+    expect(Object.keys(jsonBody(kept)).sort()).toEqual(KEEP_KEYS);
+    expect(jsonBody(kept)).toMatchObject({
+      headVersion: 2,
+      version: null,
+      bodyRefreshed: true,
+      proposal: { id: again.id, status: "kept", keptVersion: 2 },
+    });
+    expect(jsonBody<DocBody>(await readDoc(alice, docId)).headVersion).toBe(2);
+    expect(await pendingOf(alice, docId)).toEqual([]);
   });
 
   it("an agent the Workspace does not hold is 403 agent_not_in_workspace, before any model call", async () => {
@@ -485,6 +527,7 @@ describe("agent proposals over HTTP: a member asks, then keeps, discards or asks
     const bad: Array<[string, Record<string, unknown>]> = [
       ["no instruction", { instruction: "  " }],
       ["no agent", { agentId: "" }],
+      ["a base that is missing", { baseVersion: undefined }],
       ["a base that is not a number", { baseVersion: "1" }],
       ["a base of zero", { baseVersion: 0 }],
       ["a base with a fraction", { baseVersion: 1.5 }],
@@ -502,7 +545,7 @@ describe("agent proposals over HTTP: a member asks, then keeps, discards or asks
     });
     expect(outcomeOf(noBody)).toMatchObject({ status: 400, code: "invalid_request" });
     expect(outcomeOf(await ask(ben, docId, "intro", { baseVersion: 9 }))).toMatchObject({
-      status: 400,
+      status: 409,
       code: "bad_base",
     });
     expect(outcomeOf(await ask(ben, docId, "no-such-section"))).toMatchObject({
