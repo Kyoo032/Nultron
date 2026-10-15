@@ -1,5 +1,15 @@
-import { describe, expect, it } from "vitest";
-import { DocsError, docVersionFilePath, errorFromPayload, parseDocPage, parseDocVersions } from "@/lib/docs-client";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { apiFetch } from "@/lib/api-client";
+import {
+  DocsError,
+  docVersionFilePath,
+  errorFromPayload,
+  importDocPage,
+  parseDocPage,
+  parseDocVersions,
+} from "@/lib/docs-client";
+
+vi.mock("@/lib/api-client", () => ({ apiFetch: vi.fn() }));
 
 const DOCUMENT_RESPONSE = {
   artifactId: "art_1",
@@ -210,5 +220,63 @@ describe("docVersionFilePath", () => {
   it("names the version and the format in the file route, with the artifact id encoded", () => {
     expect(docVersionFilePath("art 1", 3, "pdf")).toBe("/api/v1/docs/art%201/versions/3/file?format=pdf");
     expect(docVersionFilePath("art_2", 1, "xlsx")).toBe("/api/v1/docs/art_2/versions/1/file?format=xlsx");
+  });
+});
+
+describe("importDocPage", () => {
+  afterEach(() => {
+    vi.mocked(apiFetch).mockReset();
+  });
+
+  const answer = (status: number, body: unknown): Response =>
+    ({ ok: status >= 200 && status < 300, status, json: async () => body }) as unknown as Response;
+
+  it("posts the artifact id to the import route and returns the new document's id", async () => {
+    vi.mocked(apiFetch).mockResolvedValue(answer(201, { artifactId: "art_9" }));
+
+    await expect(importDocPage("art_1")).resolves.toBe("art_9");
+    expect(apiFetch).toHaveBeenCalledWith("/api/v1/docs/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ artifactId: "art_1" }),
+    });
+  });
+
+  it.each([
+    [413, "too_large"],
+    [409, "not_editable"],
+    [503, "unavailable"],
+    [404, "not_found"],
+  ])("throws the host's code and status on HTTP %i", async (status, code) => {
+    vi.mocked(apiFetch).mockResolvedValue(answer(status, { error: { code, message: "Host sentence." } }));
+
+    const caught = await importDocPage("art_1").catch((error: unknown) => error);
+
+    expect(caught).toBeInstanceOf(DocsError);
+    expect((caught as DocsError).code).toBe(code);
+    expect((caught as DocsError).status).toBe(status);
+    expect((caught as DocsError).message).toBe("Host sentence.");
+  });
+
+  it("falls back to a generic code when the error body is not JSON", async () => {
+    vi.mocked(apiFetch).mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: () => Promise.reject(new SyntaxError("Unexpected token")),
+    } as unknown as Response);
+
+    const caught = await importDocPage("art_1").catch((error: unknown) => error);
+
+    expect((caught as DocsError).code).toBe("docs_error");
+    expect((caught as DocsError).status).toBe(502);
+  });
+
+  it("refuses a success answer without an artifact id as malformed", async () => {
+    vi.mocked(apiFetch).mockResolvedValue(answer(201, { id: "art_9" }));
+
+    const caught = await importDocPage("art_1").catch((error: unknown) => error);
+
+    expect((caught as DocsError).code).toBe("docs_malformed");
+    expect((caught as DocsError).status).toBe(502);
   });
 });

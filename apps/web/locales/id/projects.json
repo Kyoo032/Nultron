@@ -53,7 +53,14 @@
     "you": "Anda",
     "colleague": "Rekan",
     "downloadLabel": "Unduh",
-    "previewAlt": "Pratinjau {name}"
+    "previewAlt": "Pratinjau {name}",
+    "importAsDocument": "Impor sebagai dokumen",
+    "importing": "Mengimpor…",
+    "importFailed": "Berkas tidak bisa diimpor.",
+    "importTooLarge": "Berkas ini terlalu besar untuk diimpor.",
+    "importNotEditable": "Berkas ini tidak bisa dibaca sebagai dokumen.",
+    "importUnavailable": "Impor belum bisa dilakukan sekarang. Coba lagi.",
+    "importNotFound": "Tidak ditemukan, atau Anda bukan anggota ruang kerja ini."
   },
   "kinds": {
     "document": "Dokumen",

@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { docPagePath } from "@/components/doc-page/doc-format";
 import { ModeIcon } from "@/components/mode-icons";
-import { Link } from "@/lib/nav";
+import { Link, useRouter } from "@/lib/nav";
 import { mediaSrc } from "@/lib/api-client";
+import { importDocPage } from "@/lib/docs-client";
+import { canImportAsDocument, importAsDocument, type ProjectFileWithEditable } from "@/lib/projects-doc-import";
 import {
   downloadFile,
   listProjectFiles,
@@ -60,6 +62,31 @@ function FilePreview({ file }: { file: ProjectFile }) {
   );
 }
 
+export function ImportDocumentAction({
+  file,
+  busy,
+  onImport,
+}: {
+  file: ProjectFileWithEditable;
+  busy: boolean;
+  onImport: (file: ProjectFileWithEditable) => void;
+}) {
+  if (!canImportAsDocument(file)) {
+    return null;
+  }
+  return (
+    <button
+      type="button"
+      className="btn btn-secondary"
+      disabled={busy}
+      data-testid="projects-file-import"
+      onClick={() => onImport(file)}
+    >
+      {busy ? t("projects.files.importing") : t("projects.files.importAsDocument")}
+    </button>
+  );
+}
+
 /**
  * The Files tab of one Workspace. The list comes from the host, which already filters it to what this
  * person may see. Remove is offered only to the file's maker or the Workspace's maker; the host still
@@ -70,6 +97,7 @@ export function ProjectFiles({ project, me }: Props) {
   const [files, setFiles] = useState<ProjectFile[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const router = useRouter();
 
   const reload = useCallback(async () => {
     try {
@@ -108,6 +136,22 @@ export function ProjectFiles({ project, me }: Props) {
       await reload();
     } catch (caught) {
       setError(messageOf(caught, t("projects.files.removeFailed")));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function importFile(file: ProjectFile) {
+    setBusyId(file.id);
+    setError(null);
+    try {
+      const outcome = await importAsDocument(file.id, project.id, {
+        importDoc: importDocPage,
+        navigate: (path) => router.push(path),
+      });
+      if (!outcome.ok) {
+        setError(t(outcome.messageKey));
+      }
     } finally {
       setBusyId(null);
     }
@@ -162,6 +206,11 @@ export function ProjectFiles({ project, me }: Props) {
                     {t("docpage.open.label")}
                   </Link>
                 ) : null}
+                <ImportDocumentAction
+                  file={file}
+                  busy={busyId === file.id}
+                  onImport={(picked) => void importFile(picked)}
+                />
                 <button
                   type="button"
                   className="btn btn-secondary"

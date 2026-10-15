@@ -192,3 +192,18 @@ export async function fetchDocPage(artifactId: string): Promise<DocPage> {
 export async function fetchDocVersions(artifactId: string): Promise<DocVersion[]> {
   return parseDocVersions(await getJson(`${docPath(artifactId)}/versions`));
 }
+
+const importedSchema = z.object({ artifactId: z.string() });
+
+export async function importDocPage(artifactId: string): Promise<string> {
+  const res = await apiFetch("/api/v1/docs/import", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ artifactId }),
+  });
+  const data: unknown = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw errorFromPayload(data, res.status);
+  }
+  return parseWith(importedSchema, data).artifactId;
+}
