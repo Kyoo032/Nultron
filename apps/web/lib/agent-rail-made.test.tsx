@@ -78,8 +78,11 @@ describe("AgentRailView made agents", () => {
       "agent-made-ag_1",
       "agent-made-ag_2",
       "agent-research",
-      "rail-new-agent",
     ]);
+  });
+
+  it("draws no New agent entry on the default shell", () => {
+    expect(markup()).not.toContain('data-testid="rail-new-agent"');
   });
 
   it("links each made agent to its own chat and names it for the agent", () => {
@@ -119,26 +122,28 @@ describe("AgentRailView made agents", () => {
   });
 });
 
+const ENTERPRISE: Partial<AgentRailViewProps> = { look: "enterprise" };
+
 describe("AgentRailView New agent entry", () => {
   it("links New agent to /agents/new, after the mode agents", () => {
-    const tag = anchorOf(markup(), "rail-new-agent");
+    const tag = anchorOf(markup(ENTERPRISE), "rail-new-agent");
     expect(attr(tag, "href")).toBe("/agents/new");
     expect(attr(tag, "aria-label")).toBe("New agent");
   });
 
   it("shows its words on the expanded rail and only its title when collapsed", () => {
-    expect(anchorOf(markup(), "rail-new-agent")).toContain('agent-rail-label">New agent</span>');
-    const collapsed = anchorOf(markup({ collapsed: true }), "rail-new-agent");
+    expect(anchorOf(markup(ENTERPRISE), "rail-new-agent")).toContain('agent-rail-label">New agent</span>');
+    const collapsed = anchorOf(markup({ ...ENTERPRISE, collapsed: true }), "rail-new-agent");
     expect(collapsed).toContain('title="New agent"');
     expect(collapsed).not.toContain("agent-rail-label");
   });
 
   it("speaks Indonesian when the desk does", () => {
     applyLocale("id");
-    expect(attr(anchorOf(markup(), "rail-new-agent"), "aria-label")).toBe("Agen baru");
+    expect(attr(anchorOf(markup(ENTERPRISE), "rail-new-agent"), "aria-label")).toBe("Agen baru");
   });
 
   it("is drawn on an empty list too, so a person with no made agents can still make one", () => {
-    expect(anchorOf(markup({ made: [] }), "rail-new-agent")).not.toBe("");
+    expect(anchorOf(markup({ ...ENTERPRISE, made: [] }), "rail-new-agent")).not.toBe("");
   });
 });

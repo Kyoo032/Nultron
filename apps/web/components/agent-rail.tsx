@@ -244,7 +244,7 @@ export function AgentRailView({
             />
           ))}
           {list.filter((agent) => !agent.generalist).map(renderAgent)}
-          <NewAgentRailLink collapsed={collapsed} />
+          {enterprise ? <NewAgentRailLink collapsed={collapsed} /> : null}
           {waiting && !enterprise
             ? SKELETON_KEYS.map((key) => (
                 <span key={key} className="agent-rail-skeleton" data-testid="agent-rail-skeleton" aria-hidden="true" />
