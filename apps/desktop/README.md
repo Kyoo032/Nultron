@@ -1,7 +1,7 @@
 # Nultron desktop
 
 > **Retired (Rizky, 2026-10-14).** The desktop app (Personal) is being merged into the web app. Its release repo, `Kyoo032/Nultron-Desktop`, is archived and takes no new releases. Do not pack or publish a new desktop cut. The code in this folder stays in the tree, and nothing here is removed by the retirement.
-> **Enterprise** is the hosted multi-user web app. Its release repo is `Kyoo032/Nultron`.
+> **Enterprise** is the hosted multi-user web app. Its release repo is `Kyoo032/Nultron-Releases`.
 > Decision record: [`web-pivot-2026-09-18.md`](../../docs/internal/web-pivot-2026-09-18.md).
 
 Operator / agent only. The desktop installers were published from [`Kyoo032/Nultron-Desktop`](https://github.com/Kyoo032/Nultron-Desktop/releases), not from this file. That repo is archived.

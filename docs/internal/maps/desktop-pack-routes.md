@@ -3,7 +3,7 @@
 Product: retired-desktop · Instance: none (Personal desktop retired 2026-10-14); history
 
 > **Retired 2026-10-14 (Rizky).** **Personal**, the Mac/Windows Nultron app, is being merged into the web app. Its last release was `0.15.1`. Its release repo `Kyoo032/Nultron-Desktop` is archived and takes no new releases, so the two routes below are no longer run for a new cut. They stay as a record, and the code stays in the tree.
-> **Enterprise** is the hosted multi-user web app. Its release repo is `Kyoo032/Nultron`.
+> **Enterprise** is the hosted multi-user web app. Its release repo is `Kyoo032/Nultron-Releases`.
 > Decision record: [`web-pivot-2026-09-18.md`](../web-pivot-2026-09-18.md).
 
 Last verified: 2026-09-28 at 7a281ad

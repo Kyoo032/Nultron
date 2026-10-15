@@ -22,6 +22,21 @@ test("folderKind names each row by its folder, case-insensitively and across bot
   assert.equal(folderKind("C:\\Users\\rizky\\hypey\\app-sync"), "other");
   assert.equal(folderKind("C:\\Users\\rizky\\Downloads"), "other");
   assert.equal(folderKind("C:/Users/rizky/agentforge/.claude/worktrees/quizzical-merkle-067d77"), "main");
+  assert.equal(folderKind("C:\\Users\\rizky\\nultron"), "main");
+  assert.equal(folderKind("C:\\Users\\Rizky\\Nultron-Split"), "main");
+  assert.equal(folderKind("C:/Users/rizky/nultron/.claude/worktrees/quizzical-merkle-067d77"), "main");
+  assert.equal(folderKind("C:/Users/rizky/nultronx"), "other");
+});
+
+test("classifyPlace: a folder named nultron is the published row, like agentforge", () => {
+  const published = classifyPlace({ folder: "C:/Users/rizky/nultron", branch: "main" });
+  assert.equal(published.ok, true);
+  assert.equal(published.row, "main");
+  assert.equal(published.webdev, 3000);
+  const worktree = classifyPlace({ folder: "C:/Users/rizky/nultron-split-guard", branch: "chore/rename-guard" });
+  assert.equal(worktree.ok, true);
+  assert.equal(worktree.row, "main");
+  assert.match(worktree.label, /feature branch/);
 });
 
 test("classifyPlace: the main folder is the published row on main", () => {

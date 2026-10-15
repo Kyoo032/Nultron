@@ -78,7 +78,7 @@ export function judgePush({ testerFolder = false, localRef, localSha, remoteRef 
  */
 export function guardsRemote(url) {
   const match = /github\.com[:/][^/]+\/([^/]+?)(?:\.git)?\/?$/i.exec(String(url ?? "").trim());
-  return !match || match[1].toLowerCase() === "agentforge";
+  return !match || ["agentforge", "nultron"].includes(match[1].toLowerCase());
 }
 
 /** The argv for one lane-guard run: the pushed branch judged against its own tip, never the checked-out one. */

@@ -77,7 +77,7 @@ pnpm lint         # Biome
 
 **Enterprise (hosted):** `pnpm --filter web build`, then run the host behind the reverse proxy. Deploys are tracked by commit sha.
 
-**Releases:** this repo holds the source for the hosted Nultron app and, still in the tree, the retired desktop app. The Enterprise deploy bundle (a `compose.yml` pinned to a private `ghcr.io/kyoo032/nultron-ent` image, `.env.example`, `DEPLOY.md`, `Caddyfile`) and its release notes are published on [`Kyoo032/Nultron`](https://github.com/Kyoo032/Nultron) by `node scripts/release-web.mjs`. The Personal desktop app is retired (2026-10-14): its old release repo, [`Kyoo032/Nultron-Desktop`](https://github.com/Kyoo032/Nultron-Desktop), is archived and gets no new releases. This is the only local checkout; the release repo is written only by its release script.
+**Releases:** this repo holds the source for the hosted Nultron app and, still in the tree, the retired desktop app. The Enterprise deploy bundle (a `compose.yml` pinned to a private `ghcr.io/kyoo032/nultron-ent` image, `.env.example`, `DEPLOY.md`, `Caddyfile`) and its release notes are published on [`Kyoo032/Nultron-Releases`](https://github.com/Kyoo032/Nultron-Releases) by `node scripts/release-web.mjs`. The Personal desktop app is retired (2026-10-14): its old release repo, [`Kyoo032/Nultron-Desktop`](https://github.com/Kyoo032/Nultron-Desktop), is archived and gets no new releases. This is the only local checkout; the release repo is written only by its release script.
 
 There is no mobile app.
 

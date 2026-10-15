@@ -757,7 +757,7 @@ and the data has to be copied across once. Nothing below deletes the old volumes
    volumes and backups hold a full copy of every tenant's data and the old secret entries
    hold a second copy of the wrap key.
 
-The released Enterprise bundle (`Kyoo032/Nultron`) renames the same things with the
+The released Enterprise bundle (`Kyoo032/Nultron-Releases`) renames the same things with the
 project `nultron-ent` (old: `dpsbuddy-ent`) and the image `ghcr.io/kyoo032/nultron-ent`
 (old: `ghcr.io/kyoo032/dpsbuddy-ent`). Substitute those prefixes in the commands above,
 run `docker compose pull` in place of `build.sh`, and make sure the token used for

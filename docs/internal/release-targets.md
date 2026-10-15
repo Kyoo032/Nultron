@@ -15,7 +15,7 @@ Last updated: 2026-10-14 (repo rename; base agentforge `main` at `c35dc695`). Th
 | Target | Type | Company | Product name | Gateway users see | Status | Focus now |
 |---|---|---|---|---|---|---|
 | [`nultron-personal`](#nultron-personal) | Desktop app | Public (retired) | Nultron | Toko Token | Retired 2026-10-14. Last release v0.15.1. Repo `Kyoo032/Nultron-Desktop` archived | None. The app is merged into the web app; no new cut |
-| [`nultron-enterprise`](#nultron-enterprise) | Hosted web app | Nultron Enterprise customers (via DPS) | Nultron | Toko Token + BYOK | Pilot, not deployed. A password-gated single-desk preview (one private desk per tester) runs at app.nultron-ai.xyz since 2026-10-06. Release repo is `Kyoo032/Nultron` since 2026-10-14 | First Tencent Enterprise deploy, Thu 8 Oct; it replaces the preview |
+| [`nultron-enterprise`](#nultron-enterprise) | Hosted web app | Nultron Enterprise customers (via DPS) | Nultron | Toko Token + BYOK | Pilot, not deployed. A password-gated single-desk preview (one private desk per tester) runs at app.nultron-ai.xyz since 2026-10-06. Release repo is `Kyoo032/Nultron-Releases` (renamed from `Kyoo032/Nultron` on 2026-10-15) | First Tencent Enterprise deploy, Thu 8 Oct; it replaces the preview |
 | [`hyp-ai`](#hyp-ai) | White-label hosted | Hypernet (XLSMART) | HYP AI | TokenKu | Setting up | Rebrand the clone; plan approval |
 | [`kemenkeu-ai`](#kemenkeu-ai) | Desktop flavor | Kemenkeu (Ministry of Finance) | Kemenkeu AI | AIHub | Built locally | Later, after Nultron and HYP AI |
 | [`aihub-metranet`](#aihub-metranet) | Desktop flavor | Metranet (Telkom Indonesia) | AIHub Metranet | AIHub | Built locally | Later, after Nultron and HYP AI |
@@ -131,7 +131,7 @@ The next milestone is to **simulate pushing one agentforge update into both bran
 
 - **Live on the box (2026-10-06):** dpscloud.co.id, tokotokenai.com and nultron-ai.xyz are live static sites. app.nultron-ai.xyz is the preview: off server mode, Basic Auth, 11 private desks (security register SR-133). Company mailboxes moved to Lark; SES stays for the sign-in codes. Runbook: `nultron-files/deploy/tencent/README.md`.
 - **Where it runs (updated 2026-10-05):** Phase 0 is one Tencent Lighthouse box in Jakarta that will also host dpscloud.co.id (the parent site) and tokotokenai.com. Nultron goes on **nultron-ai.xyz**, with sign-in on **portal.nultron-ai.xyz**. **Never point api.tokotokenai.com at it.** Email is Tencent SES only, for the sign-in codes: "Nultron <no-reply@mail.dpscloud.co.id>", no mailboxes. After a 1-month test, move to a bigger Tencent CVM by sharing a Lighthouse custom image to CVM (same region), restoring the newer data, and switching DNS. Multi-site build: branch `feat/multi-site-edge`. Guide: `nultron-files/deploy/hosting-guide.html`. Before that, Phase 0 was one Tencent Lighthouse box in Jakarta. Phase 1 is TKE; its manifests are in `webapp-deploy/k8s/`, not yet applied.
-- **Ships by:** `node scripts/release-web.mjs --tag <tag> --sha <sha>`, with `--dry-run` first. It pushes both images, plus a deploy bundle to `Kyoo032/Nultron` (the release repo, renamed from `Kyoo032/NultronEnt` on 2026-10-14).
+- **Ships by:** `node scripts/release-web.mjs --tag <tag> --sha <sha>`, with `--dry-run` first. It pushes both images, plus a deploy bundle to `Kyoo032/Nultron-Releases` (the release repo, renamed from `Kyoo032/Nultron` on 2026-10-15 and from `Kyoo032/NultronEnt` on 2026-10-14).
 - **Tag:** `ent-YYYY.MM.DD`. Every deploy is logged by sha.
 - **Current:** as of 2026-10-05, nothing was released or deployed, and the deploy log was empty. Not re-checked on 2026-10-14.
 - **Focus now:**
@@ -204,7 +204,7 @@ The two app-accent tokens are the ones the HYP AI build actually uses (`apps/web
   - Screenshots are in `hypey\intake\screens\`.
 - **Not yet rebranded:**
   - "Contact DPS" in the plans copy.
-  - `scripts/release-web.mjs` still names the Enterprise release repo (`Kyoo032/Nultron`, renamed 2026-10-14) and `ghcr.io/kyoo032/nultron-*`.
+  - `scripts/release-web.mjs` still names the Enterprise release repo (`Kyoo032/Nultron-Releases`, renamed 2026-10-15) and `ghcr.io/kyoo032/nultron-*`.
   - Defaults and copyright lines that name Rizky.
 - **Behaviour tuned for Toko Token, not yet checked against TokenKu:**
   - The Suno relay.
