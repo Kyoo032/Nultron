@@ -7,9 +7,6 @@ import { localMediaId, type ContentPart, type TenantContext } from "@agentforge/
  * No gateway can open this machine's media URL, and nothing here asks whether the provider is on
  * loopback: every provider gets bytes. (Until 2026-10-06 Chat only inlined for loopback, on the guess
  * that a remote gateway "may reject data URLs", and sent a sentence in place of the image otherwise.)
- *
- * SR-175: a picture is inlined only for the caller it was read for, through the same rule as the file route. A
- * colleague's private picture stays a reference the model cannot open, exactly as a missing one does.
  */
 export async function inlineLocalMediaParts(tenant: TenantContext, parts: ContentPart[]): Promise<ContentPart[]> {
   const next: ContentPart[] = [];
@@ -23,8 +20,8 @@ export async function inlineLocalMediaParts(tenant: TenantContext, parts: Conten
       next.push(part);
       continue;
     }
-    const { readVisibleMediaDataUrl } = await import("./media-visibility");
-    const dataUrl = await readVisibleMediaDataUrl(tenant, id);
+    const { readMediaDataUrl } = await import("./media");
+    const dataUrl = await readMediaDataUrl(tenant, id);
     next.push(dataUrl ? { type: "image_url", image_url: { ...part.image_url, url: dataUrl } } : part);
   }
   return next;

@@ -1,15 +1,3 @@
-/**
- * A Chat attachment's original file, through the real router with real sessions and a real database
- * (K-D21, Rizky 2026-10-14; team-board-spec.md section 2b, U1).
- *
- * Rule: the original of a chat upload is kept as an artifact of the person who attached it. Only that
- * person can read, download or import it. A colleague on the same desk and a person in another company
- * get exactly the answer a missing id gets. A chat upload never becomes shared on its own (no project).
- *
- * Each refusal is paired with the owner reading the same thing successfully, so a server that refused
- * everybody fails here. `AGENTFORGE_SERVER` is set only inside the hosted tests: the artifact store reads
- * `isServerMode()` on each call, so the Personal tests run with it unset and prove nothing is hidden there.
- */
 import { mkdtempSync, rmSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
@@ -38,7 +26,6 @@ const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.doc
 const PARTNER = "chat-originals-partner";
 
 type Person = { readonly tenant: TenantContext; readonly sessionId: string };
-/** A hosted caller (a signed-in person, or `null` for no session) or the one local owner on a desk. */
 type Caller = { readonly hosted: true; readonly person: Person | null } | { readonly hosted: false };
 type Reply = { status: number; body: Record<string, unknown> };
 
@@ -94,7 +81,6 @@ async function save(caller: Caller, body: Record<string, unknown>): Promise<Repl
 
 const doc = (reply: Reply) => reply.body.document as Record<string, unknown>;
 
-/** Attach, then send: the save body the composer posts, with the read's answers handed back. */
 async function attachAndSend(caller: Caller, filename: string, bytes: Uint8Array) {
   const read = await attach(caller, filename, bytes);
   const answer = doc(read);
@@ -115,7 +101,6 @@ async function artifactIdsOf(caller: Caller): Promise<string[]> {
   return body.items.map((item) => item.id);
 }
 
-/** The status a caller gets for one artifact: the bytes of the file, or the refusal's status. */
 async function fileStatus(caller: Caller, id: string): Promise<number> {
   const result = await call(caller, "GET", `/api/v1/artifacts/${id}/file`, { params: { artifactId: id } });
   return result.status;
@@ -133,17 +118,15 @@ async function keptRows(owner: string): Promise<number> {
   return row.n;
 }
 
-/** A Word file padded past the artifact cap once it is base64: the reader still reads it, the store will not keep it. */
 async function oversizedDocx(): Promise<Uint8Array> {
   const zip = await JSZip.loadAsync(await docxFixture());
   zip.file("customXml/pad.bin", randomBytes(3_400_000), { compression: "STORE" });
   return zip.generateAsync({ type: "uint8array", compression: "STORE" });
 }
 
-async function importAs(person: Person, artifactId: string): Promise<{ ok: boolean; reason?: string }> {
-  const { importDocumentForTenant } = await import("../doc-tools/import-document");
-  const result = await importDocumentForTenant({ artifactId }, person.tenant);
-  return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+async function downloaded(caller: Caller, artifactId: string): Promise<Buffer | null> {
+  const result = await call(caller, "GET", `/api/v1/artifacts/${artifactId}/file`, { params: { artifactId } });
+  return result.type === "bytes" ? Buffer.from((result as HostBytesResult).bytes) : null;
 }
 
 beforeAll(async () => {
@@ -166,7 +149,6 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  // Close the database before the directory goes: Windows refuses to delete an open SQLite file.
   const { sql } = await import("@agentforge/db");
   sql.close();
   rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
@@ -205,38 +187,36 @@ describe("hosted: an attached original is private to the person who attached it"
     const id = (await artifactIdsOf(HOSTED(ana)))[0] as string;
     const notes = doc(sent).notes as string;
     expect(notes).toContain(`artifact ${id}`);
-    expect(notes).toContain("import_document");
+    expect(notes).toContain(`[Original file kept: artifact ${id}, the file as it was attached.]`);
     expect(doc(sent).text as string).not.toContain(id);
   });
 
-  it("lets the owner read, download, list and import it", async () => {
-    const { read } = await attachAndSend(HOSTED(ana), "Kontrak.docx", await docxFixture());
+  it("lets the owner read, download and list it", async () => {
+    const bytes = await docxFixture();
+    const { read } = await attachAndSend(HOSTED(ana), "Kontrak.docx", bytes);
     const id = doc(read).originalId as string;
     expect(await getStatus(HOSTED(ana), id)).toBe(200);
     expect(await fileStatus(HOSTED(ana), id)).toBe(200);
     expect(await artifactIdsOf(HOSTED(ana))).toContain(id);
-    expect(await importAs(ana, id)).toEqual({ ok: true });
+    expect((await downloaded(HOSTED(ana), id))?.equals(bytes)).toBe(true);
   });
 
-  it("hides it from a colleague on the same desk: no read, no download, no list, no import", async () => {
+  it("hides it from a colleague on the same desk: no read, no download, no list", async () => {
     const { read } = await attachAndSend(HOSTED(ana), "Rahasia.docx", await docxFixture());
     const id = doc(read).originalId as string;
     expect(id).toMatch(UUID);
-    // Positive controls: Ana reads it, and Ben really shares her desk, so the refusals below are about the owner.
     expect(await getStatus(HOSTED(ana), id)).toBe(200);
     expect(await fileStatus(HOSTED(ana), id)).toBe(200);
     expect(ben.tenant.workspaceId).toBe(ana.tenant.workspaceId);
     expect(await getStatus(HOSTED(ben), id)).toBe(404);
     expect(await fileStatus(HOSTED(ben), id)).toBe(404);
     expect(await artifactIdsOf(HOSTED(ben))).not.toContain(id);
-    expect(await importAs(ben, id)).toEqual({ ok: false, reason: "not_found" });
   });
 
   it("does not let a colleague make the model name Ana's file through a save", async () => {
     const { read } = await attachAndSend(HOSTED(ana), "Gaji.docx", await docxFixture());
     const id = doc(read).originalId as string;
     expect(id).toMatch(UUID);
-    // Positive control: Ana's own save names the file, so a missing line below is the refusal.
     const own = await save(HOSTED(ana), {
       name: "Gaji.docx",
       format: "docx",
@@ -266,16 +246,16 @@ describe("hosted: an attached original is private to the person who attached it"
     expect(await getStatus(HOSTED(cal), id)).toBe(404);
     expect(await fileStatus(HOSTED(cal), id)).toBe(404);
     expect(await artifactIdsOf(HOSTED(cal))).not.toContain(id);
-    expect(await importAs(cal, id)).toEqual({ ok: false, reason: "not_found" });
     const missing = "00000000-0000-4000-8000-000000000000";
     expect(await getStatus(HOSTED(cal), missing)).toBe(404);
   });
 
-  it("lets a colleague import their own attachment, and keeps it out of Ana's list", async () => {
-    const { read } = await attachAndSend(HOSTED(ben), "Anggaran.docx", await docxFixture());
+  it("lets a colleague download their own attachment, and keeps it out of Ana's list", async () => {
+    const bytes = await docxFixture();
+    const { read } = await attachAndSend(HOSTED(ben), "Anggaran.docx", bytes);
     const id = doc(read).originalId as string;
     expect(id).toMatch(UUID);
-    expect(await importAs(ben, id)).toEqual({ ok: true });
+    expect((await downloaded(HOSTED(ben), id))?.equals(bytes)).toBe(true);
     expect(await artifactIdsOf(HOSTED(ana))).not.toContain(id);
   });
 
@@ -308,12 +288,13 @@ describe("hosted: an attached original is private to the person who attached it"
     expect(await keptRows(ana.tenant.userId)).toBe(before);
   });
 
-  it("keeps the PDF original too, and import opens it as a PDF", async () => {
-    const reply = await attach(HOSTED(ana), "Ringkasan.pdf", pdfFixture());
+  it("keeps the PDF original too, and the owner downloads it unchanged", async () => {
+    const pdf = pdfFixture();
+    const reply = await attach(HOSTED(ana), "Ringkasan.pdf", pdf);
     expect(reply.status).toBe(200);
     const id = doc(reply).originalId as string;
     expect(id).toMatch(UUID);
-    expect(await importAs(ana, id)).toEqual({ ok: true });
+    expect((await downloaded(HOSTED(ana), id))?.equals(pdf)).toBe(true);
   });
 
   it("answers 401 for an attachment with no session, and keeps nothing", async () => {
@@ -355,7 +336,7 @@ describe("hosted: an attached original is private to the person who attached it"
 });
 
 describe("on Personal there is one person, so the original is on the desk (parity)", () => {
-  it("keeps the original as the desk's own artifact, and import_document opens it", async () => {
+  it("keeps the original as the desk's own artifact, and the desk downloads it unchanged", async () => {
     const bytes = await docxFixture();
     const reply = await attach(LOCAL, "Laporan Q3.docx", bytes);
     expect(reply.status).toBe(200);
@@ -369,11 +350,8 @@ describe("on Personal there is one person, so the original is on the desk (parit
     };
     expect(row.owner_user_id).toBeNull();
     expect(row.project_id).toBeNull();
-    const { getTenant } = await import("../tenant");
-    const owner = await getTenant();
-    const { importDocumentForTenant } = await import("../doc-tools/import-document");
-    expect(await importDocumentForTenant({ artifactId: id }, owner)).toMatchObject({ ok: true });
     expect(await getStatus(LOCAL, id)).toBe(200);
+    expect((await downloaded(LOCAL, id))?.equals(bytes)).toBe(true);
   });
 
   it("keeps the text, the desk copy and the notes as they were, plus the original", async () => {
@@ -385,7 +363,6 @@ describe("on Personal there is one person, so the original is on the desk (parit
   });
 });
 
-/** Hosted callers, in one place so the tests read the same way. */
 function HOSTED(person: Person | null): Caller {
   return { hosted: true, person };
 }

@@ -1,17 +1,3 @@
-/**
- * Deleting a generated file on the hosted app, through the real router with real sessions and a real database
- * (SR-176, team-board-spec.md section 2b and 11; K-D11, K-D19, the leaver rule of 2026-10-06).
- *
- * Rule: a delete succeeds only for the file's maker, or for a company owner or admin. An owner or admin may
- * delete a person's file and may never read it. Anyone else gets the answer for a missing id, and nothing is
- * removed. Taking a file out of a Workspace is a different route and deletes nothing.
- *
- * Company A has an owner (Alice, A1), a member (Ann, A2) and an admin (Adam, A3); company B has an owner (Bob,
- * B1). Each refusal sits next to a success on the same route, so a server that refused everybody would fail.
- *
- * `AGENTFORGE_SERVER` is set in the environment: the delete rule reads `isServerMode()`, and without it every
- * refusal below would pass for the wrong reason.
- */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -35,7 +21,6 @@ import type { HostJsonResult, HostRequest, HostResult } from "./types";
 const { dispatch } = await import("./router");
 
 const PARTNER = "files-delete-partner";
-const MISSING = "00000000-0000-4000-8000-000000000000";
 const PNG = Buffer.from("fake-png-bytes-for-a-delete-test");
 
 type Person = { readonly tenant: TenantContext; readonly sessionId: string };
@@ -157,51 +142,11 @@ describe("deleting a person's generated files on the hosted app: two companies a
   });
 
   describe("media", () => {
-    it("a colleague's delete of a private image answers as a missing id, removes nothing, and the maker still reads it", async () => {
-      const image = await makeImage(alice, "colleague-delete");
-      const refused = jsonBody<{ ok: boolean; deleted: boolean; id: string }>(await deleteMedia(ann, image));
-      const ghost = jsonBody<{ ok: boolean; deleted: boolean; id: string }>(await deleteMedia(ann, MISSING));
-
-      expect(refused).toEqual({ ok: true, deleted: false, id: image });
-      expect(ghost).toEqual({ ok: true, deleted: false, id: MISSING });
-      expect(await mediaRowExists(image)).toBe(true);
-      expect((await readMedia(alice, image)).status).toBe(200);
-    });
-
-    it("a colleague who can read a file in a shared Workspace still cannot delete it", async () => {
-      const project = await makeSharedProject(alice, "Shared delete refusal");
-      const image = await makeImage(alice, "shared-delete-refusal");
-      expect(
-        await outcome(await call(alice, "POST", "/api/v1/projects/:id/files", { id: project }, { mediaId: image })),
-      ).toEqual({ status: 200 });
-      // Positive control: the colleague reads the shared file, so the refusal below is about the delete rule.
-      expect((await readMedia(ann, image)).status).toBe(200);
-
-      expect(jsonBody<{ deleted: boolean }>(await deleteMedia(ann, image)).deleted).toBe(false);
-      expect(await mediaRowExists(image)).toBe(true);
-      expect((await readMedia(ann, image)).status).toBe(200);
-      expect((await readMedia(alice, image)).status).toBe(200);
-    });
-
     it("a member of another company gets the missing-id answer for a file of this company, and it stays", async () => {
       const image = await makeImage(alice, "other-company-delete");
       expect(jsonBody<{ deleted: boolean }>(await deleteMedia(bob, image)).deleted).toBe(false);
       expect(await mediaRowExists(image)).toBe(true);
       expect((await readMedia(alice, image)).status).toBe(200);
-    });
-
-    it("an admin deletes a member's private file but cannot read it, before or after the delete", async () => {
-      const image = await makeImage(ann, "admin-delete");
-      expect(await outcome(await readMedia(adam, image))).toEqual(NOT_FOUND);
-
-      expect(jsonBody<{ ok: boolean; deleted: boolean; id: string }>(await deleteMedia(adam, image))).toMatchObject({
-        ok: true,
-        deleted: true,
-        id: image,
-      });
-      expect(await mediaRowExists(image)).toBe(false);
-      expect(await outcome(await readMedia(ann, image))).toEqual(NOT_FOUND);
-      expect(await outcome(await readMedia(adam, image))).toEqual(NOT_FOUND);
     });
 
     it("a company owner deletes a member's file", async () => {
@@ -214,6 +159,19 @@ describe("deleting a person's generated files on the hosted app: two companies a
       const image = await makeImage(ann, "maker-delete");
       expect(jsonBody<{ deleted: boolean }>(await deleteMedia(ann, image)).deleted).toBe(true);
       expect(await mediaRowExists(image)).toBe(false);
+    });
+
+    it("an admin deletes a member's file, and nobody reads it once it is gone", async () => {
+      const image = await makeImage(ann, "admin-delete");
+
+      expect(jsonBody<{ ok: boolean; deleted: boolean; id: string }>(await deleteMedia(adam, image))).toMatchObject({
+        ok: true,
+        deleted: true,
+        id: image,
+      });
+      expect(await mediaRowExists(image)).toBe(false);
+      expect(await outcome(await readMedia(ann, image))).toEqual(NOT_FOUND);
+      expect(await outcome(await readMedia(adam, image))).toEqual(NOT_FOUND);
     });
   });
 

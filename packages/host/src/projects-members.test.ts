@@ -276,7 +276,6 @@ describe("a Workspace is shared with its members only: four people, two companie
       expect((await call(stranger, "GET", "/api/v1/artifacts/:artifactId/file", { artifactId: fileId })).status).toBe(
         404,
       );
-      expect((await call(stranger, "GET", "/api/v1/media/:mediaId/file", { mediaId: imageId })).status).toBe(404);
       expect(await outcome(await startChat(stranger, project)), who).toEqual(NOT_FOUND);
       expect(await injectedFor(stranger, project), who).not.toContain(PHRASE);
       expect(await searchFor(stranger, project, MISSING), who).toEqual([]);
@@ -465,45 +464,31 @@ describe("a Workspace is shared with its members only: four people, two companie
       return { docId, picId };
     }
 
-    async function reads(person: Person, docId: string, picId: string) {
-      const { listMediaByKind } = await import("./media");
+    async function reads(person: Person, docId: string) {
       const listed = jsonBody<{ items: Array<{ id: string }> }>(await call(person, "GET", "/api/v1/artifacts")).items;
       return {
         doc: (await call(person, "GET", "/api/v1/artifacts/:artifactId", { artifactId: docId })).status,
         docFile: (await call(person, "GET", "/api/v1/artifacts/:artifactId/file", { artifactId: docId })).status,
         docListed: listed.some((item) => item.id === docId),
-        picFile: (await call(person, "GET", "/api/v1/media/:mediaId/file", { mediaId: picId })).status,
-        picListed: (await listMediaByKind(person.tenant, "image")).some((row) => row.id === picId),
       };
     }
 
-    /** Ben is a plain company member, so the storage list shows him only what he made and may still delete. */
-    async function inBensStorage(picId: string): Promise<boolean> {
-      const body = jsonBody<{ largest: Array<{ id: string }> }>(await call(ben, "GET", "/api/v1/storage/usage"));
-      return body.largest.some((item) => item.id === picId);
-    }
-
-    const READS = { doc: 200, docFile: 200, docListed: true, picFile: 200, picListed: true };
-    const HIDDEN = { doc: 404, docFile: 404, docListed: false, picFile: 404, picListed: false };
+    const READS = { doc: 200, docFile: 200, docListed: true };
+    const HIDDEN = { doc: 404, docFile: 404, docListed: false };
 
     it("a removed maker reads, lists and deletes none of it; the owner still reads all of it", async () => {
       const room = await makeProject(alice, "Removal room");
       expect(await outcome(await invite(alice, room, "ben"))).toEqual(CREATED);
       const { docId, picId } = await bensFiles(room);
-      expect(await reads(ben, docId, picId)).toEqual(READS);
-      expect(await inBensStorage(picId)).toBe(true);
+      expect(await reads(ben, docId)).toEqual(READS);
 
       expect(await outcome(await removeMember(alice, room, "ben"))).toEqual(OK);
-      expect(await reads(ben, docId, picId)).toEqual(HIDDEN);
-      expect(await inBensStorage(picId)).toBe(false);
+      expect(await reads(ben, docId)).toEqual(HIDDEN);
       expect(await outcome(await call(ben, "DELETE", "/api/v1/artifacts/:artifactId", { artifactId: docId }))).toEqual(
         NOT_FOUND,
       );
-      expect(
-        jsonBody<{ deleted: boolean }>(await call(ben, "DELETE", "/api/v1/media/:mediaId", { mediaId: picId })).deleted,
-      ).toBe(false);
 
-      expect(await reads(alice, docId, picId)).toEqual(READS);
+      expect(await reads(alice, docId)).toEqual(READS);
       const files = jsonBody<{ items: Array<{ id: string }> }>(
         await call(alice, "GET", "/api/v1/projects/:id/files", { id: room }),
       ).items.map((item) => item.id);
@@ -514,7 +499,7 @@ describe("a Workspace is shared with its members only: four people, two companie
       const room = await makeProject(alice, "Take-out room");
       expect(await outcome(await invite(alice, room, "ben"))).toEqual(CREATED);
       const { docId, picId } = await bensFiles(room);
-      expect(await reads(alice, docId, picId)).toEqual(READS);
+      expect(await reads(alice, docId)).toEqual(READS);
 
       expect(
         await outcome(
@@ -526,8 +511,8 @@ describe("a Workspace is shared with its members only: four people, two companie
       ).toEqual(OK);
       expect(await outcome(await removeMember(alice, room, "ben"))).toEqual(OK);
 
-      expect(await reads(ben, docId, picId)).toEqual(READS);
-      expect(await reads(alice, docId, picId)).toEqual(HIDDEN);
+      expect(await reads(ben, docId)).toEqual(READS);
+      expect(await reads(alice, docId)).toEqual(HIDDEN);
     });
 
     it("default: archiving a Workspace hands each file back to its maker", async () => {
@@ -535,12 +520,11 @@ describe("a Workspace is shared with its members only: four people, two companie
       expect(await outcome(await invite(alice, room, "ben"))).toEqual(CREATED);
       const { docId, picId } = await bensFiles(room);
       expect(await outcome(await removeMember(alice, room, "ben"))).toEqual(OK);
-      expect(await reads(ben, docId, picId)).toEqual(HIDDEN);
+      expect(await reads(ben, docId)).toEqual(HIDDEN);
 
       expect(await outcome(await call(alice, "POST", "/api/v1/projects/:id/archive", { id: room }))).toEqual(OK);
-      expect(await reads(ben, docId, picId)).toEqual(READS);
-      expect(await inBensStorage(picId)).toBe(true);
-      expect(await reads(alice, docId, picId)).toEqual(HIDDEN);
+      expect(await reads(ben, docId)).toEqual(READS);
+      expect(await reads(alice, docId)).toEqual(HIDDEN);
       expect(
         jsonBody<{ deleted: boolean }>(await call(ben, "DELETE", "/api/v1/media/:mediaId", { mediaId: picId })).deleted,
       ).toBe(true);

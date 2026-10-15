@@ -208,20 +208,6 @@ describe("generated files on the hosted app: two companies, real sessions", () =
     expect((attached as HostBytesResult).filename).toBe(`image-${id.slice(0, 8)}.png`);
   });
 
-  it("a colleague cannot read or download a person's own media file until it is in a shared Workspace (SR-175)", async () => {
-    // The media file route was company-wide until the Workspace media rule; a private image is the maker's only.
-    const id = await makeMedia(alice);
-    expect(await outcome(await call(ann, "GET", `/api/v1/media/${id}/file`, { params: { mediaId: id } }))).toEqual({
-      status: 404,
-      code: "not_found",
-    });
-    expect(
-      await outcome(
-        await call(ann, "GET", `/api/v1/media/${id}/file`, { params: { mediaId: id }, query: { download: "1" } }),
-      ),
-    ).toEqual({ status: 404, code: "not_found" });
-  });
-
   it("another company's media id is still a 404, download or not", async () => {
     const id = await makeMedia(alice);
     const other = await call(bob, "GET", `/api/v1/media/${id}/file`, {

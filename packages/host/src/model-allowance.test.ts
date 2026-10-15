@@ -84,10 +84,9 @@ describe("allow-all matches listSelectableModels on the desk (AGENTFORGE_SERVER 
     rmSync(cacheDir, { recursive: true, force: true });
   });
 
-  it("returns exactly what listSelectableModels returns, with no allocation", () => {
+  it("returns exactly what listSelectableModels returns", () => {
     const listed = listSelectableModels(TENANT);
     expect(idsOf(listed)).toEqual(expect.arrayContaining(LIVE_IDS));
-    expect(allowanceFor(TENANT).allocationId).toBeNull();
     expect(catalogFor(TENANT, allowanceFor(TENANT))).toEqual(listed);
   });
 
@@ -99,7 +98,6 @@ describe("allow-all matches listSelectableModels on the desk (AGENTFORGE_SERVER 
         seenPrices.push(price);
         return allowed.has(model.id);
       },
-      allocationId: "stub-allocation",
     };
     const catalogue = listSelectableModels(TENANT);
     const filtered = catalogFor(TENANT, stub);
@@ -141,10 +139,9 @@ describe("allow-all matches listSelectableModels on the hosted server (AGENTFORG
     resetCatalogMemo();
   });
 
-  it("returns exactly what listSelectableModels returns for the tenant, with no allocation", () => {
+  it("returns exactly what listSelectableModels returns for the tenant", () => {
     const listed = listSelectableModels(TENANT);
     expect(idsOf(listed)).toEqual(expect.arrayContaining(LIVE_IDS));
-    expect(allowanceFor(TENANT).allocationId).toBeNull();
     expect(catalogFor(TENANT, allowanceFor(TENANT))).toEqual(listed);
   });
 

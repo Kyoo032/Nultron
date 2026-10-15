@@ -1,17 +1,3 @@
-/**
- * Generated media in a Workspace on the hosted app, through the real router with real sessions and a real
- * database (team-board-spec.md section 2b, W1b; SR-175; K-D18, K-D20, K-D22).
- *
- * Rule: a person's own image or video is visible only to them. Adding it to a Workspace makes it visible to,
- * and downloadable by, that Workspace's members. Only its maker may add it, and only into a Workspace the
- * caller is a member of. Removing it clears its Workspace.
- *
- * Company A has an owner (Alice, A1) and a member (Ann, A2); company B has an owner (Bob, B1). Each refusal
- * is paired with a success at the same call, so a server that refused everybody would fail.
- *
- * `AGENTFORGE_SERVER` is set in the environment: the media reads and the project handlers read
- * `isServerMode()`, and without it every isolation assertion would pass for the wrong reason.
- */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -168,15 +154,6 @@ describe("generated media in a Workspace: two companies, real sessions", () => {
     rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
-  it("before it is added, a colleague gets 404 for another person's image; the maker reads it", async () => {
-    const image = await makeImage(alice, "before-add");
-    expect(await outcome(await readMedia(ann, image))).toEqual(NOT_FOUND);
-    expect(await outcome(await readMedia(bob, image))).toEqual(NOT_FOUND);
-    const own = await readMedia(alice, image);
-    expect(own.type).toBe("bytes");
-    expect(own.status).toBe(200);
-  });
-
   it("adding the image to a shared Workspace lets a colleague read and download it; another company still gets 404", async () => {
     const project = await makeProject(alice, "Shared image Workspace");
     await shareWithColleagues(alice, project);
@@ -231,7 +208,7 @@ describe("generated media in a Workspace: two companies, real sessions", () => {
     expect((await readMedia(ann, video)).status).toBe(200);
   });
 
-  it("a colleague may not add the maker's media to her own Workspace (403); a private Workspace's media is its maker's only", async () => {
+  it("a colleague may not add the maker's media to her own Workspace (403), and the maker may", async () => {
     const shared = await makeProject(alice, "Shared for refusal");
     await shareWithColleagues(alice, shared);
     const aliceImage = await makeImage(alice, "refused-image");
@@ -253,13 +230,6 @@ describe("generated media in a Workspace: two companies, real sessions", () => {
         await call(alice, "POST", "/api/v1/projects/:id/files", { id: privateProject }, { mediaId: aliceVideo }),
       ),
     ).toEqual({ status: 200 });
-    expect(await outcome(await readMedia(ann, aliceVideo))).toEqual(NOT_FOUND);
-    expect(await outcome(await call(ann, "GET", "/api/v1/projects/:id/files", { id: privateProject }))).toEqual(
-      NOT_FOUND,
-    );
-    expect(
-      await outcome(await call(ann, "POST", "/api/v1/projects/:id/files", { id: annProject }, { mediaId: aliceVideo })),
-    ).toEqual(NOT_FOUND);
     expect((await readMedia(alice, aliceVideo)).status).toBe(200);
   });
 
@@ -267,33 +237,12 @@ describe("generated media in a Workspace: two companies, real sessions", () => {
     const project = await makeProject(alice, "Ann image Workspace");
     await shareWithColleagues(alice, project);
     const annImage = await makeImage(ann, "ann-image");
-    expect(await outcome(await readMedia(alice, annImage))).toEqual(NOT_FOUND);
 
     expect(
       await outcome(await call(ann, "POST", "/api/v1/projects/:id/files", { id: project }, { mediaId: annImage })),
     ).toEqual({ status: 200 });
     expect((await readMedia(alice, annImage)).status).toBe(200);
     expect(await readMedia(bob, annImage)).toMatchObject({ status: 404 });
-  });
-
-  it("a removed member loses the Workspace's media, her own in it too (SR-179); the members still read hers", async () => {
-    const project = await makeProject(alice, "Leave media Workspace");
-    await shareWithColleagues(alice, project);
-    const annImage = await makeImage(ann, "leave-ann-image");
-    const aliceImage = await makeImage(alice, "leave-alice-image");
-    await call(ann, "POST", "/api/v1/projects/:id/files", { id: project }, { mediaId: annImage });
-    await call(alice, "POST", "/api/v1/projects/:id/files", { id: project }, { mediaId: aliceImage });
-    expect((await readMedia(ann, aliceImage)).status).toBe(200);
-
-    expect(
-      await outcome(
-        await call(alice, "DELETE", "/api/v1/projects/:id/members/:userId", { id: project, userId: "ann" }),
-      ),
-    ).toEqual({ status: 200 });
-    expect(await outcome(await readMedia(ann, aliceImage))).toEqual(NOT_FOUND);
-    expect(await outcome(await readMedia(ann, annImage))).toEqual(NOT_FOUND);
-    expect((await readMedia(alice, annImage)).status).toBe(200);
-    expect(await outcome(await readMedia(bob, annImage))).toEqual(NOT_FOUND);
   });
 
   it("the file's maker removes it from a shared Workspace; the Workspace's maker removes a colleague's media; a stranger's refusal is a 404", async () => {
@@ -327,7 +276,6 @@ describe("generated media in a Workspace: two companies, real sessions", () => {
       (item) => item.id,
     );
     expect(listed).not.toContain(annImage);
-    expect(await outcome(await readMedia(alice, annImage))).toEqual(NOT_FOUND);
     expect((await readMedia(ann, annImage)).status).toBe(200);
     // The Workspace's maker removes her own media from it.
     expect(
@@ -343,24 +291,10 @@ describe("generated media in a Workspace: two companies, real sessions", () => {
     ).toEqual(NOT_FOUND);
   });
 
-  it("archiving the Workspace sends its media back to its makers", async () => {
-    const project = await makeProject(alice, "Archived media Workspace");
-    await shareWithColleagues(alice, project);
-    const annImage = await makeImage(ann, "archived-ann-image");
-    await call(ann, "POST", "/api/v1/projects/:id/files", { id: project }, { mediaId: annImage });
-    expect((await readMedia(alice, annImage)).status).toBe(200);
-
-    expect(await outcome(await call(alice, "POST", "/api/v1/projects/:id/archive", { id: project }))).toEqual({
-      status: 200,
-    });
-    expect(await outcome(await readMedia(alice, annImage))).toEqual(NOT_FOUND);
-    expect((await readMedia(ann, annImage)).status).toBe(200);
-  });
-
   it("a stranger gets the same 404 for a media id that is hidden as for an id nobody owns", async () => {
     const image = await makeImage(alice, "ghost-check");
-    const hidden = await outcome(await readMedia(ann, image));
-    const ghost = await outcome(await readMedia(ann, MISSING));
+    const hidden = await outcome(await readMedia(bob, image));
+    const ghost = await outcome(await readMedia(bob, MISSING));
     expect(hidden).toEqual(NOT_FOUND);
     expect(ghost).toEqual(hidden);
 
@@ -374,23 +308,6 @@ describe("generated media in a Workspace: two companies, real sessions", () => {
     );
     expect(addHidden).toEqual(NOT_FOUND);
     expect(addGhost).toEqual(addHidden);
-  });
-
-  it("a chat's reads of a stored image by reference follow the same rule: a colleague's private image is not handed on", async () => {
-    const { statVisibleMedia, readVisibleMediaDataUrl } = await import("./media-visibility");
-    const { chatMediaReferenceResolver } = await import("./chat-media-resolver");
-    const image = await makeImage(alice, "chat-reference");
-
-    expect(await statVisibleMedia(ann.tenant, image)).toBeNull();
-    expect(await readVisibleMediaDataUrl(ann.tenant, image)).toBeNull();
-    expect(await chatMediaReferenceResolver(ann.tenant, image)).toBeNull();
-    expect((await statVisibleMedia(alice.tenant, image))?.kind).toBe("image");
-    expect(await chatMediaReferenceResolver(alice.tenant, image)).toMatch(/^data:image\/png;base64,/);
-
-    const project = await makeProject(alice, "Chat reference Workspace");
-    await shareWithColleagues(alice, project);
-    await call(alice, "POST", "/api/v1/projects/:id/files", { id: project }, { mediaId: image });
-    expect(await chatMediaReferenceResolver(ann.tenant, image)).toMatch(/^data:image\/png;base64,/);
   });
 
   it("the add body names exactly one of artifactId and mediaId; anything else is a 400", async () => {

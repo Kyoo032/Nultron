@@ -4,14 +4,12 @@
  * Every statement filters on `organization_id` AND `workspace_id` from the caller's `TenantContext`,
  * never from the request. A Workspace is read only through the caller's own `project_members` row (K-D22):
  * a project the caller is not a member of is never selected. Visibility of a file is `visibleTo` in
- * `artifacts.ts`, and of a stored image or video `mediaVisibleClause` in `media-visibility.ts`: each rule
- * lives in one place, so this file reuses them.
+ * `artifacts.ts`, so this file reuses it.
  */
 import { sql } from "@agentforge/db";
 import type { TenantContext } from "@agentforge/core";
 import { visibleTo } from "../artifacts";
 import { SPEC_META_KEY } from "../doc-tools/doc-meta";
-import { mediaVisibleClause } from "../media-visibility";
 import type { WorkspaceRole } from "./input";
 
 /** A project as its member sees it: the row, the caller's own role in it, and how many members it has. */
@@ -240,12 +238,11 @@ export type ProjectMediaRow = {
 
 const MEDIA_COLUMNS = "id, kind, mime, size_bytes, user_id, project_id, created_at";
 
-/** A stored image or video the caller may see (SR-175), or null: the same answer as an id nobody owns. */
+/** A stored image or video of the caller's organization, or null. */
 export function findVisibleMedia(scope: TenantContext, mediaId: string): ProjectMediaRow | null {
-  const visible = mediaVisibleClause(scope);
   const row = sql
-    .prepare(`SELECT ${MEDIA_COLUMNS} FROM media WHERE organization_id = ? AND id = ?${visible.clause}`)
-    .get(scope.organizationId, mediaId, ...visible.args) as ProjectMediaRow | undefined;
+    .prepare(`SELECT ${MEDIA_COLUMNS} FROM media WHERE organization_id = ? AND id = ?`)
+    .get(scope.organizationId, mediaId) as ProjectMediaRow | undefined;
   return row ?? null;
 }
 
@@ -255,16 +252,15 @@ export function setMediaProject(scope: TenantContext, mediaId: string, projectId
     .run(projectId, scope.organizationId, mediaId);
 }
 
-/** The media of a project the caller may see; membership is checked by the caller first. Same per-row rule as files. */
+/** The media of a project; membership is checked by the caller first. */
 export function listProjectMedia(scope: TenantContext, projectId: string, limit: number): ProjectMediaRow[] {
-  const visible = mediaVisibleClause(scope);
   return sql
     .prepare(
       `SELECT ${MEDIA_COLUMNS} FROM media
-        WHERE organization_id = ? AND project_id = ?${visible.clause}
+        WHERE organization_id = ? AND project_id = ?
         ORDER BY created_at DESC LIMIT ?`,
     )
-    .all(scope.organizationId, projectId, ...visible.args, limit) as ProjectMediaRow[];
+    .all(scope.organizationId, projectId, limit) as ProjectMediaRow[];
 }
 
 export type ProjectThreadRow = { id: string; title: string; created_at: number };

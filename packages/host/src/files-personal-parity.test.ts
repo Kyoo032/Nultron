@@ -1,12 +1,3 @@
-/**
- * Generated files on Personal are what they were before the hosted delete and read rules (SR-175, SR-176;
- * team-board-spec.md sections 2b and 11). Personal has one person per desk, so there is no colleague to
- * hide a file from or to refuse a delete to: every delete, gallery, storage list and by-id read is desk-wide.
- *
- * The rows here are written by "some-other-member" on purpose: on Personal a row's maker is never the one
- * asking, and the parity claim is that nothing changes for that row. `AGENTFORGE_SERVER` is unset.
- * The hosted proof is `files-delete-companies.test.ts` and `files-reads-companies.test.ts`.
- */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -115,6 +106,6 @@ describe("generated files on Personal", () => {
     ]);
     const first = parts[0];
     expect(first?.type === "image_url" ? first.image_url.url : "").toMatch(/^data:image\/png;base64,/);
-    expect(await loadMediaRow(saved.id, local)).not.toBeNull();
+    expect(await loadMediaRow(saved.id)).not.toBeNull();
   });
 });

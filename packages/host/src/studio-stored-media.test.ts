@@ -33,7 +33,6 @@ let alice: TenantContext;
 let ann: TenantContext;
 let bob: TenantContext;
 let aliceImage: string;
-let annImage: string;
 let bobImage: string;
 let studio: typeof import("./studio-generate");
 
@@ -60,7 +59,9 @@ function videoBody(imageUrl: string, model = VIDEO_MODEL) {
 }
 
 function imageTool() {
-  return vi.spyOn(imageGenerateTool, "execute").mockResolvedValue({ success: true, image: PNG_DATA_URL, model: IMAGE_MODEL });
+  return vi
+    .spyOn(imageGenerateTool, "execute")
+    .mockResolvedValue({ success: true, image: PNG_DATA_URL, model: IMAGE_MODEL });
 }
 
 function videoRender() {
@@ -78,7 +79,7 @@ beforeAll(async () => {
   const { saveMedia } = await import("./media");
   const png = () => new File([PNG], "lantern.png", { type: "image/png" });
   aliceImage = (await saveMedia(alice, png())).id;
-  annImage = (await saveMedia(ann, png())).id;
+  await saveMedia(ann, png());
   bobImage = (await saveMedia(bob, png())).id;
   const { saveModelCache } = await import("./model-cache");
   const { resetCatalogMemo } = await import("./selectable-models");
@@ -126,7 +127,7 @@ describe("studio image from a stored reference", () => {
     expect(spy.mock.calls[1]?.[0]).toMatchObject({ image_url: CDN_URL });
   });
 
-  it("answers another person's private image and another company's image with the same 404 as a missing id", async () => {
+  it("answers another company's image with the same 404 as a missing id", async () => {
     const spy = imageTool();
     const ownAlice = await studio.generateStudioImage(alice, imageBody(aliceImage), { workType: "Edit" });
     const ownBob = await studio.generateStudioImage(bob, imageBody(bobImage), { workType: "Edit" });
@@ -134,35 +135,23 @@ describe("studio image from a stored reference", () => {
     expect(ownBob.id).toBeTruthy();
     expect(spy).toHaveBeenCalledTimes(2);
 
-    const missing = await refusal(() =>
-      studio.generateStudioImage(alice, imageBody(GHOST), { workType: "Edit" }),
-    );
-    const colleague = await refusal(() =>
-      studio.generateStudioImage(alice, imageBody(annImage), { workType: "Edit" }),
-    );
+    const missing = await refusal(() => studio.generateStudioImage(alice, imageBody(GHOST), { workType: "Edit" }));
     const otherCompany = await refusal(() =>
       studio.generateStudioImage(alice, imageBody(bobImage), { workType: "Edit" }),
     );
     const otherCompanyReverse = await refusal(() =>
       studio.generateStudioImage(bob, imageBody(aliceImage), { workType: "Edit" }),
     );
-    const colleagueAsOwner = await refusal(() =>
-      studio.generateStudioImage(ann, imageBody(aliceImage), { workType: "Edit" }),
-    );
 
     expect(missing).toEqual({ status: 404, code: "not_found", message: "Media not found" });
-    expect(colleague).toEqual(missing);
     expect(otherCompany).toEqual(missing);
     expect(otherCompanyReverse).toEqual(missing);
-    expect(colleagueAsOwner).toEqual(missing);
     expect(spy).toHaveBeenCalledTimes(2);
   });
 
-  it("refuses a foreign reference on the Images page before the stub stand-in, and still serves the caller's own", async () => {
+  it("refuses a missing reference on the Images page before the stub stand-in, and still serves the caller's own", async () => {
     const spy = imageTool();
     const missing = await refusal(() => studio.generateStudioImage(alice, imageBody(GHOST)));
-    const colleague = await refusal(() => studio.generateStudioImage(alice, imageBody(annImage)));
-    expect(colleague).toEqual(missing);
     expect(missing).toEqual({ status: 404, code: "not_found", message: "Media not found" });
     const own = await studio.generateStudioImage(alice, imageBody(aliceImage));
     expect(own.url).toMatch(/^\/api\/v1\/media\//);
@@ -198,18 +187,16 @@ describe("studio video from a stored reference", () => {
     expect(renderVideo.mock.calls[0]?.[0]).toMatchObject({ image_url: CDN_URL });
   });
 
-  it("answers another person's private image and another company's image with the same 404 as a missing id, and renders nothing", async () => {
+  it("answers another company's image with the same 404 as a missing id, and renders nothing", async () => {
     const renderVideo = videoRender();
     const own = await studio.generateStudioVideo(bob, videoBody(bobImage), { renderVideo });
     expect(own.id).toBeTruthy();
     expect(renderVideo).toHaveBeenCalledTimes(1);
 
     const missing = await refusal(() => studio.generateStudioVideo(alice, videoBody(GHOST), { renderVideo }));
-    const colleague = await refusal(() => studio.generateStudioVideo(alice, videoBody(annImage), { renderVideo }));
     const otherCompany = await refusal(() => studio.generateStudioVideo(alice, videoBody(bobImage), { renderVideo }));
 
     expect(missing).toEqual({ status: 404, code: "not_found", message: "Media not found" });
-    expect(colleague).toEqual(missing);
     expect(otherCompany).toEqual(missing);
     expect(renderVideo).toHaveBeenCalledTimes(1);
   });

@@ -6,7 +6,6 @@ import { ApiError, type ChatModel, type TenantContext } from "@agentforge/core";
 import { AUTO_LIMITS } from "@agentforge/core/auto-choice";
 import {
   ChoiceUnavailableError,
-  choiceProfileFor,
   readRunChoice,
   readThreadContext,
   resolveRunChoice,
@@ -60,7 +59,7 @@ function resolveWith(
 }
 
 function allowOnly(ids: readonly string[]): ModelAllowance {
-  return { allows: (model: SelectableModel) => ids.includes(model.id), allocationId: "stub-allocation" };
+  return { allows: (model: SelectableModel) => ids.includes(model.id) };
 }
 
 describe("readRunChoice reads the body's choice", () => {
@@ -120,40 +119,10 @@ describe("readRunChoice reads the body's choice", () => {
   });
 });
 
-describe("choiceProfileFor picks the profile of the running shell", () => {
-  let previousShell: string | undefined;
-
-  beforeEach(() => {
-    previousShell = process.env.AGENTFORGE_SHELL;
-    delete process.env.AGENTFORGE_SHELL;
-  });
-
-  afterEach(() => {
-    if (previousShell === undefined) {
-      delete process.env.AGENTFORGE_SHELL;
-    } else {
-      process.env.AGENTFORGE_SHELL = previousShell;
-    }
-  });
-
-  it("uses the opc profile by default and the enterprise profile when the shell says so", () => {
-    expect(choiceProfileFor().id).toBe("opc");
-    expect(choiceProfileFor("opc").id).toBe("opc");
-    expect(choiceProfileFor("enterprise").id).toBe("enterprise");
-    process.env.AGENTFORGE_SHELL = "enterprise";
-    expect(choiceProfileFor().id).toBe("enterprise");
-  });
-
-  it("seeds both shells with the same candidate lists", () => {
-    expect(choiceProfileFor("enterprise").lists).toEqual(choiceProfileFor("opc").lists);
-  });
-});
-
 describe("resolveRunChoice on the desk catalogue", () => {
   let cacheDir: string;
   let previousCachePath: string | undefined;
   let previousServer: string | undefined;
-  let previousShell: string | undefined;
 
   function useDeskCache(openai: ChatModel[]): void {
     saveModelCache({ openai, anthropic: [chat("claude-sonnet-5", ["text"], "anthropic")] });
@@ -163,9 +132,7 @@ describe("resolveRunChoice on the desk catalogue", () => {
   beforeEach(() => {
     previousCachePath = process.env.AGENTFORGE_MODELS_CACHE_PATH;
     previousServer = process.env.AGENTFORGE_SERVER;
-    previousShell = process.env.AGENTFORGE_SHELL;
     delete process.env.AGENTFORGE_SERVER;
-    delete process.env.AGENTFORGE_SHELL;
     cacheDir = mkdtempSync(join(tmpdir(), "af-choice-resolve-"));
     process.env.AGENTFORGE_MODELS_CACHE_PATH = join(cacheDir, "models-cache.json");
     resetJobModelCircuit();
@@ -182,7 +149,6 @@ describe("resolveRunChoice on the desk catalogue", () => {
     };
     restore("AGENTFORGE_MODELS_CACHE_PATH", previousCachePath);
     restore("AGENTFORGE_SERVER", previousServer);
-    restore("AGENTFORGE_SHELL", previousShell);
     resetJobModelCircuit();
     resetCatalogMemo();
     rmSync(cacheDir, { recursive: true, force: true });

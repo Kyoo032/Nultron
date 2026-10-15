@@ -1,10 +1,3 @@
-/**
- * Generated media on Personal is what it was before the Workspace media rule (SR-175; team-board-spec.md
- * section 2b). Personal has one person per desk, so there is no colleague to hide a file from: every media
- * read is desk-wide, the by-reference reads too, and the project routes do not exist at all.
- *
- * `AGENTFORGE_SERVER` is unset here. The hosted proof is `projects-media-companies.test.ts`.
- */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -52,7 +45,6 @@ describe("generated media on Personal", () => {
 
   it("a desk reads every media row on it by id, whoever's tenant user wrote it, as before", async () => {
     const { saveMedia } = await import("./media");
-    // A row another member of this desk wrote. On Personal there is no other member, so this is the parity case.
     const saved = await saveMedia(
       { ...local, userId: "some-other-member" },
       new File([Buffer.from("png-bytes-personal")], "personal.png", { type: "image/png" }),
@@ -66,14 +58,14 @@ describe("generated media on Personal", () => {
 
   it("the by-reference reads of chat and the Edit jobs stay desk-wide off server mode", async () => {
     const { saveMedia } = await import("./media");
-    const { statVisibleMedia, readVisibleMediaDataUrl } = await import("./media-visibility");
+    const { readMediaDataUrl, statMedia } = await import("./media");
     const { chatMediaReferenceResolver } = await import("./chat-media-resolver");
     const saved = await saveMedia(
       { ...local, userId: "some-other-member" },
       new File([Buffer.from("png-bytes-reference")], "reference.png", { type: "image/png" }),
     );
-    expect((await statVisibleMedia(local, saved.id))?.kind).toBe("image");
-    expect(await readVisibleMediaDataUrl(local, saved.id)).toMatch(/^data:image\/png;base64,/);
+    expect((await statMedia(local, saved.id))?.kind).toBe("image");
+    expect(await readMediaDataUrl(local, saved.id)).toMatch(/^data:image\/png;base64,/);
     expect(await chatMediaReferenceResolver(local, saved.id)).toMatch(/^data:image\/png;base64,/);
   });
 

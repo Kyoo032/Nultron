@@ -17,7 +17,7 @@ import {
   type ModelChoiceRequest,
   type RanChoice,
 } from "@agentforge/core/model-choice";
-import { CHOICE_PROFILES, PROFILE_FOR_SHELL, type ChoiceProfile } from "@agentforge/core/choice-profiles";
+import { CHOICE_PROFILES, type ChoiceProfile } from "@agentforge/core/choice-profiles";
 import { decideAuto, estimateContextTokens, type AutoInput, type AutoReason } from "@agentforge/core/auto-choice";
 import { resolveChoice, type ChoiceResolution, type ChoiceResolutionError } from "@agentforge/core/resolve-choice";
 import { allowanceFor, catalogFor, type ModelAllowance } from "./model-allowance";
@@ -25,7 +25,6 @@ import { isJobModelDown } from "./job-model-fallback";
 import { messageText } from "./message-text";
 import { listMessages } from "./threads";
 import type { SelectableModel } from "./selectable-models";
-import { resolvedShell, type ShellKind } from "./shell-setting";
 
 const CHOICE_FIELD = "choice";
 const LEGACY_TIER_FIELD = "tier";
@@ -57,7 +56,6 @@ export type RunChoiceInput = Readonly<{
   modality: InputModality;
   currentText?: string;
   history?: ThreadContext;
-  shell?: ShellKind;
   allowance?: ModelAllowance;
   now?: number;
 }>;
@@ -134,10 +132,6 @@ export function readRunChoice(body: unknown): ModelChoiceRequest | null {
   return legacyTierRequest(tier);
 }
 
-export function choiceProfileFor(shell: ShellKind = resolvedShell()): ChoiceProfile {
-  return CHOICE_PROFILES[PROFILE_FOR_SHELL[shell]];
-}
-
 function reasoningOf(effort: ReasoningEffort | "default"): ReasoningEffortChoice {
   return effort === "default" ? { effort: MODEL_DEFAULT_EFFORT, explicit: false } : { effort, explicit: true };
 }
@@ -196,7 +190,7 @@ function resolveAuto(walk: Walk, input: RunChoiceInput): RunChoiceResolution {
 export function resolveRunChoice(input: RunChoiceInput): RunChoiceResolution {
   const now = input.now ?? Date.now();
   const walk: Walk = {
-    profile: choiceProfileFor(input.shell),
+    profile: CHOICE_PROFILES.opc,
     catalog: catalogFor(input.tenant, input.allowance ?? allowanceFor(input.tenant)),
     isDown: (model) => isJobModelDown(model, now, input.tenant),
     modality: input.modality,

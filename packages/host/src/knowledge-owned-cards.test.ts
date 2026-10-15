@@ -264,26 +264,6 @@ describe("hosted: meeting artifacts are deleted under the owner rule", () => {
   });
 });
 
-describe("hosted: Edit reads generated media only inside its own company", () => {
-  it("loads a media row for its own company and never for another", async () => {
-    const { db, media } = await import("@agentforge/db");
-    const { loadMediaRow } = await import("./edit/wire-generate");
-    const mediaId = crypto.randomUUID();
-    await db.insert(media).values({
-      id: mediaId,
-      organizationId: ORG_A,
-      userId: a1.tenant.userId,
-      kind: "image",
-      mime: "image/png",
-      sizeBytes: 4,
-      storagePath: "media/none.png",
-      url: `/media/${mediaId}`,
-    });
-    expect(await loadMediaRow(mediaId, a1.tenant)).not.toBeNull();
-    expect(await loadMediaRow(mediaId, { ...a1.tenant, organizationId: ORG_B })).toBeNull();
-  });
-});
-
 describe("Personal parity: off server mode no owner is written and every card is shown", () => {
   it("writes no owner and lists the card to a colleague, as before", async () => {
     vi.stubEnv("AGENTFORGE_SERVER", "0");

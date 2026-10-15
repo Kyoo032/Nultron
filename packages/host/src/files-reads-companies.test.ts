@@ -1,17 +1,3 @@
-/**
- * Reads of generated media on the hosted app, through the real router and the real stores with real sessions
- * and a real database (SR-175, team-board-spec.md sections 2b and 11, K-D19).
- *
- * Rule: a person sees their own generated media and what a live Workspace of their desk holds. The studio
- * galleries, the storage report's largest-files list, Edit's still and output reads, and a job mode's inlined
- * picture all follow it. The storage report is the one exception on the owner side: an owner or admin sees the
- * sizes and ids of the whole company's media (they manage storage) and no link to any of it.
- *
- * Company A has an owner (Alice, A1), a member (Ann, A2) and an admin (Adam, A3); company B has an owner (Bob,
- * B1). Each refusal sits next to the same person reading the same row successfully.
- *
- * `AGENTFORGE_SERVER` is set in the environment: every reader here checks `isServerMode()`.
- */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -101,30 +87,8 @@ async function makeAudio(person: Person, name: string): Promise<string> {
   return saved.id;
 }
 
-/** Puts the file in a new Workspace of `person` and invites `members`: a Workspace is shared with its members only (K-D22). */
-async function shareInWorkspace(person: Person, mediaId: string, members: readonly Person[]): Promise<void> {
-  const created = await call(person, "POST", "/api/v1/projects", {}, { name: `Shared ${mediaId.slice(0, 8)}` });
-  expect(created.status).toBe(201);
-  const project = jsonBody<{ project: { id: string } }>(created).project.id;
-  for (const member of members) {
-    const invited = await call(
-      person,
-      "POST",
-      "/api/v1/projects/:id/members",
-      { id: project },
-      {
-        userId: member.tenant.userId,
-      },
-    );
-    expect(invited.status).toBe(201);
-  }
-  const attached = await call(person, "POST", "/api/v1/projects/:id/files", { id: project }, { mediaId });
-  expect(attached.status).toBe(200);
-}
-
 type GalleryItem = { id: string; url: string };
 
-/** The ids a person's gallery lists, and a check that every one of them is a file that person can open. */
 async function galleryIds(person: Person, path: string): Promise<string[]> {
   const items = jsonBody<{ items: GalleryItem[] }>(await call(person, "GET", path)).items;
   for (const item of items) {
@@ -134,12 +98,11 @@ async function galleryIds(person: Person, path: string): Promise<string[]> {
 }
 
 describe("generated media reads on the hosted app: two companies and an admin", () => {
-  let aliceOwnImage: string;
-  let aliceSharedImage: string;
-  let annOwnImage: string;
-  let aliceOwnVideo: string;
-  let annSharedVideo: string;
-  let aliceOwnAudio: string;
+  let aliceImage: string;
+  let annImage: string;
+  let aliceVideo: string;
+  let annVideo: string;
+  let aliceAudio: string;
 
   beforeAll(async () => {
     sessionStore = createMemorySessionStore();
@@ -148,57 +111,45 @@ describe("generated media reads on the hosted app: two companies and an admin", 
     adam = await provision("org-a", "adam", "admin");
     bob = await provision("org-b", "bob", "owner");
 
-    aliceOwnImage = await makeImage(alice, "alice-own");
-    aliceSharedImage = await makeImage(alice, "alice-shared");
-    await shareInWorkspace(alice, aliceSharedImage, [ann, adam]);
-    annOwnImage = await makeImage(ann, "ann-own");
-    aliceOwnVideo = await makeVideo(alice, "alice-own");
-    annSharedVideo = await makeVideo(ann, "ann-shared");
-    await shareInWorkspace(ann, annSharedVideo, [alice, adam]);
-    aliceOwnAudio = await makeAudio(alice, "alice-own");
+    aliceImage = await makeImage(alice, "alice");
+    annImage = await makeImage(ann, "ann");
+    aliceVideo = await makeVideo(alice, "alice");
+    annVideo = await makeVideo(ann, "ann");
+    aliceAudio = await makeAudio(alice, "alice");
   }, ROUTER_IMPORT_BUDGET_MS);
 
   afterAll(async () => {
-    // Close the database before the directory goes: Windows refuses to delete an open SQLite file.
     const { sql } = await import("@agentforge/db");
     sql.close();
     rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
   describe("studio galleries", () => {
-    it("the Images gallery lists a person's own images and a shared Workspace's, never a colleague's private one", async () => {
-      const alices = await galleryIds(alice, "/api/v1/images");
-      const anns = await galleryIds(ann, "/api/v1/images");
-      const adams = await galleryIds(adam, "/api/v1/images");
+    it("the Images gallery lists the company's images, and never to another company", async () => {
+      for (const person of [alice, ann, adam]) {
+        expect(await galleryIds(person, "/api/v1/images")).toEqual(expect.arrayContaining([aliceImage, annImage]));
+      }
       const bobs = await galleryIds(bob, "/api/v1/images");
-
-      expect(alices).toEqual(expect.arrayContaining([aliceOwnImage, aliceSharedImage]));
-      expect(alices).not.toContain(annOwnImage);
-      expect(anns).toEqual(expect.arrayContaining([annOwnImage, aliceSharedImage]));
-      expect(anns).not.toContain(aliceOwnImage);
-      // An admin manages storage, not other people's files: a private image is not on the admin's gallery.
-      expect(adams).toContain(aliceSharedImage);
-      expect(adams).not.toContain(aliceOwnImage);
-      expect(adams).not.toContain(annOwnImage);
-      expect(bobs).not.toContain(aliceSharedImage);
+      expect(bobs).not.toContain(aliceImage);
+      expect(bobs).not.toContain(annImage);
     });
 
     it("the Videos gallery follows the same rule", async () => {
-      const alices = await galleryIds(alice, "/api/v1/videos");
-      const anns = await galleryIds(ann, "/api/v1/videos");
-      const adams = await galleryIds(adam, "/api/v1/videos");
-
-      expect(alices).toEqual(expect.arrayContaining([aliceOwnVideo, annSharedVideo]));
-      expect(anns).toEqual(expect.arrayContaining([annSharedVideo]));
-      expect(anns).not.toContain(aliceOwnVideo);
-      expect(adams).toContain(annSharedVideo);
-      expect(adams).not.toContain(aliceOwnVideo);
+      expect(await galleryIds(ann, "/api/v1/videos")).toEqual(expect.arrayContaining([aliceVideo, annVideo]));
+      const bobs = await galleryIds(bob, "/api/v1/videos");
+      expect(bobs).not.toContain(aliceVideo);
+      expect(bobs).not.toContain(annVideo);
     });
 
-    it("the Music gallery lists only its maker's audio, since audio cannot sit in a Workspace", async () => {
-      expect(await galleryIds(alice, "/api/v1/music")).toContain(aliceOwnAudio);
-      expect(await galleryIds(ann, "/api/v1/music")).not.toContain(aliceOwnAudio);
-      expect(await galleryIds(adam, "/api/v1/music")).not.toContain(aliceOwnAudio);
+    it("the Music gallery follows the same rule", async () => {
+      expect(await galleryIds(alice, "/api/v1/music")).toContain(aliceAudio);
+      expect(await galleryIds(bob, "/api/v1/music")).not.toContain(aliceAudio);
+    });
+
+    it("another company's file answers as a missing one", async () => {
+      expect(await readMedia(bob, aliceImage)).toMatchObject({ status: 404 });
+      expect(await readMedia(bob, crypto.randomUUID())).toMatchObject({ status: 404 });
+      expect(await readMedia(alice, aliceImage)).toMatchObject({ status: 200 });
     });
   });
 
@@ -215,15 +166,15 @@ describe("generated media reads on the hosted app: two companies and an admin", 
       const alices = (await largest(alice)).items.map((item) => item.id);
       const adams = (await largest(adam)).items.map((item) => item.id);
       for (const ids of [alices, adams]) {
-        expect(ids).toEqual(expect.arrayContaining([aliceOwnImage, annOwnImage, annSharedVideo]));
+        expect(ids).toEqual(expect.arrayContaining([aliceImage, annImage, annVideo]));
       }
     });
 
-    it("a member sees only their own media in the storage list", async () => {
-      const anns = (await largest(ann)).items.map((item) => item.id);
-      expect(anns).toEqual(expect.arrayContaining([annOwnImage, annSharedVideo]));
-      expect(anns).not.toContain(aliceOwnImage);
-      expect(anns).not.toContain(aliceOwnVideo);
+    it("another company's storage list holds none of this company's media", async () => {
+      const bobs = (await largest(bob)).items.map((item) => item.id);
+      for (const id of [aliceImage, annImage, aliceVideo, annVideo, aliceAudio]) {
+        expect(bobs).not.toContain(id);
+      }
     });
 
     it("no entry of the storage list carries a preview or a download link, to an owner or admin either", async () => {
@@ -236,54 +187,24 @@ describe("generated media reads on the hosted app: two companies and an admin", 
         }
       }
     });
-
-    it("an admin who lists a colleague's file cannot open it", async () => {
-      const adamsList = (await largest(adam)).items.map((item) => item.id);
-      expect(adamsList).toContain(aliceOwnImage);
-      expect(await readMedia(adam, aliceOwnImage)).toMatchObject({ status: 404 });
-    });
   });
 
-  describe("job-mode pictures and Edit's output", () => {
+  describe("job-mode pictures", () => {
     const part = (mediaId: string) => ({
       type: "image_url" as const,
       image_url: { url: `/api/v1/media/${mediaId}/file` },
     });
 
-    it("a job mode's inlined picture is the caller's own or a shared one; a colleague's private picture is left as a reference", async () => {
+    it("a job mode inlines its own company's picture and leaves another company's as a reference", async () => {
       const { inlineLocalMediaParts } = await import("./inline-local-media");
-      const parts = [part(aliceOwnImage), part(annOwnImage), part(aliceSharedImage), part(aliceOwnVideo)];
+      const urlsOf = (items: Awaited<ReturnType<typeof inlineLocalMediaParts>>) =>
+        items.map((item) => (item.type === "image_url" ? item.image_url.url : ""));
 
-      const forAnn = await inlineLocalMediaParts(ann.tenant, parts);
-      const urls = forAnn.map((item) => (item.type === "image_url" ? item.image_url.url : ""));
-      expect(urls[0]).toBe(`/api/v1/media/${aliceOwnImage}/file`);
-      expect(urls[1]).toMatch(/^data:image\/png;base64,/);
-      expect(urls[2]).toMatch(/^data:image\/png;base64,/);
-      expect(urls[3]).toBe(`/api/v1/media/${aliceOwnVideo}/file`);
+      const forAnn = urlsOf(await inlineLocalMediaParts(ann.tenant, [part(aliceImage)]));
+      expect(forAnn[0]).toMatch(/^data:image\/png;base64,/);
 
-      const forBob = await inlineLocalMediaParts(bob.tenant, [part(aliceSharedImage), part(annOwnImage)]);
-      expect(forBob.map((item) => (item.type === "image_url" ? item.image_url.url : ""))).toEqual([
-        `/api/v1/media/${aliceSharedImage}/file`,
-        `/api/v1/media/${annOwnImage}/file`,
-      ]);
-    });
-
-    it("Edit's output lookup finds a row for its maker and for a shared Workspace, and for no one else", async () => {
-      const { loadMediaRow } = await import("./edit/wire-generate");
-      expect(await loadMediaRow(aliceOwnImage, alice.tenant)).not.toBeNull();
-      expect(await loadMediaRow(aliceOwnImage, ann.tenant)).toBeNull();
-      expect(await loadMediaRow(aliceOwnImage, adam.tenant)).toBeNull();
-      expect(await loadMediaRow(aliceSharedImage, ann.tenant)).not.toBeNull();
-      expect(await loadMediaRow(aliceOwnImage, bob.tenant)).toBeNull();
-    });
-
-    it("a job with no recorded requester reads as nobody: nobody is a Workspace member, so no row at all (K-D22)", async () => {
-      const { loadMediaRow } = await import("./edit/wire-generate");
-      const nobody = { ...alice.tenant, userId: "" };
-      expect(await loadMediaRow(aliceOwnImage, nobody)).toBeNull();
-      expect(await loadMediaRow(aliceSharedImage, nobody)).toBeNull();
-      // Positive control: a member of that Workspace finds the same row.
-      expect(await loadMediaRow(aliceSharedImage, ann.tenant)).not.toBeNull();
+      const forBob = urlsOf(await inlineLocalMediaParts(bob.tenant, [part(aliceImage), part(annImage)]));
+      expect(forBob).toEqual([`/api/v1/media/${aliceImage}/file`, `/api/v1/media/${annImage}/file`]);
     });
   });
 
@@ -292,15 +213,13 @@ describe("generated media reads on the hosted app: two companies and an admin", 
       kind: "generate_video" as const,
       prompt: "the still, slowly moving",
       imageUrl: `/api/v1/media/${mediaId}/file`,
-      // Accepts a still, so the only thing that can refuse the request is the still itself.
       model: "grok-imagine-video",
     });
 
-    it("a colleague's private still is refused exactly like a missing one, and a shared still is accepted", async () => {
+    it("another company's still is refused exactly like a missing one, and the company's own is accepted", async () => {
       const { createEditProject } = await import("./edit/projects");
       const { startGenerateJob } = await import("./edit/start-generate");
       const { getEditJob, setEditJobRunnerForTests, resetEditJobsForTests } = await import("./edit/jobs");
-      // No gateway here: a queued job finishes as soon as it starts.
       const settle = async (jobId: string, projectId: string): Promise<string> => {
         const start = Date.now();
         while (Date.now() - start < 5_000) {
@@ -314,24 +233,23 @@ describe("generated media reads on the hosted app: two companies and an admin", 
       };
       setEditJobRunnerForTests(async () => ({ outputAssetIds: [] }));
       try {
-        const project = await createEditProject(ann.tenant, { name: "still reads", aspect: "16:9", fps: 30 });
         const refusal = (pending: Promise<unknown>) =>
           pending.then(
             () => null,
             (error: unknown) => error as { code?: string; status?: number; message?: string },
           );
 
-        const hidden = await refusal(startGenerateJob(ann.tenant, project.id, stillVideo(aliceOwnImage)));
-        const missing = await refusal(startGenerateJob(ann.tenant, project.id, stillVideo(crypto.randomUUID())));
+        const bobsProject = await createEditProject(bob.tenant, { name: "still reads", aspect: "16:9", fps: 30 });
+        const hidden = await refusal(startGenerateJob(bob.tenant, bobsProject.id, stillVideo(aliceImage)));
+        const missing = await refusal(startGenerateJob(bob.tenant, bobsProject.id, stillVideo(crypto.randomUUID())));
         expect(hidden).toMatchObject({ code: "still_not_found", status: 400 });
         expect(missing).toMatchObject({ code: "still_not_found", status: 400 });
         expect(hidden?.message).toBe(missing?.message);
 
-        // The still of a shared Workspace is the company's, so the same call is accepted, and its job runs to the end
-        // here, so no background write outlives the database this file closes.
-        const accepted = await startGenerateJob(ann.tenant, project.id, stillVideo(aliceSharedImage));
+        const annsProject = await createEditProject(ann.tenant, { name: "still reads", aspect: "16:9", fps: 30 });
+        const accepted = await startGenerateJob(ann.tenant, annsProject.id, stillVideo(aliceImage));
         const jobId = (accepted.job as { id: string }).id;
-        expect(await settle(jobId, project.id)).toBe("succeeded");
+        expect(await settle(jobId, annsProject.id)).toBe("succeeded");
       } finally {
         resetEditJobsForTests();
       }

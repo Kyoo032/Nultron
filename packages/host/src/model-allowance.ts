@@ -21,7 +21,6 @@ export type PriceInfo = Readonly<{
 
 export type ModelAllowance = Readonly<{
   allows(model: SelectableModel, price: PriceInfo | null): boolean;
-  allocationId: string | null;
 }>;
 
 const PER_CALL_QUOTA_TYPE = 1;
@@ -71,7 +70,7 @@ export function priceBandFor(modelId: string): PriceBand | null {
 }
 
 export function allowanceFor(_tenant: TenantContext): ModelAllowance {
-  return { allows: () => true, allocationId: null };
+  return { allows: () => true };
 }
 
 export function catalogFor(tenant: TenantContext, allowance: ModelAllowance): SelectableModel[] {

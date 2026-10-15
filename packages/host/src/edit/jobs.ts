@@ -2,11 +2,11 @@ import { and, eq } from "drizzle-orm";
 import { ApiError, redactSecrets, secondsToFrames, type Asset, type EditJobKind } from "@agentforge/core";
 import { db, editCards, editJobs, editUnplaced } from "@agentforge/db";
 import { requireGatewayAllowedFor } from "../gateway-gate";
+import { readMediaDataUrl } from "../media";
 import { mediaRelativePath } from "../media-root";
-import { readVisibleMediaDataUrl } from "../media-visibility";
 import { materializeTenantObject } from "../tenant-storage";
 import { withInlinedStill } from "./still-source";
-import { appendOps, foldProject, workerProjectScope, workerTenant, workerTenantId, workerWorkspaceId } from "./ops";
+import { appendOps, foldProject, workerTenant, workerTenantId, workerWorkspaceId } from "./ops";
 import { editEvents } from "./events";
 import { appendEditMetric } from "./metrics";
 import { mapJob } from "./projects";
@@ -230,9 +230,8 @@ async function defaultRunner(
     // well as on the route, so no way of queueing a job reaches the gateway past a closed gate.
     const tenant = await workerTenant(job.projectId, requesterOf(job.requestJson));
     requireGatewayAllowedFor(tenant);
-    // The still is read as the requester, the same rule the submit check applies (SR-175).
     const request = await withInlinedStill(withoutIdentity(job.requestJson), (mediaId) =>
-      readVisibleMediaDataUrl(tenant, mediaId),
+      readMediaDataUrl(tenant, mediaId),
     );
     return runGenerateJob(kind, request, signal, tenant);
   }
@@ -288,15 +287,7 @@ async function resolveGenerateAsset(
     return { assetId: outputId, addOps: [] };
   }
   if (outputId && (job.kind === "generate_image" || job.kind === "generate_video")) {
-    // SR-175: the worker generated this output as the person who queued the job, so the row is read as that
-    // person, in their company and desk. With no requester recorded the read is as nobody: on the hosted app nobody is
-    // a member of any Workspace, so no row is found, and off server mode (one person per desk) the company read is unchanged.
-    const { organizationId, workspaceId: desk } = await workerProjectScope(job.projectId);
-    const row = await loadMediaRow(outputId, {
-      organizationId,
-      userId: requesterOf(job.requestJson) ?? "",
-      workspaceId: desk,
-    });
+    const row = await loadMediaRow(outputId);
     if (row) {
       const assetId = crypto.randomUUID();
       const kind = row.kind === "image" || row.kind === "audio" ? row.kind : "video";
