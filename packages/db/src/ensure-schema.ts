@@ -4,6 +4,7 @@ import path from "node:path";
 import type Database from "better-sqlite3";
 import { isServerMode } from "@agentforge/core";
 import { ensureBoardTables } from "./board-schema";
+import { ensureDocProposalTables } from "./doc-proposals-schema";
 import { ensureDocVersionTables } from "./doc-versions-schema";
 import { ensureProjectTables } from "./projects-schema";
 
@@ -256,6 +257,7 @@ export function ensureSchema(sqlite: Database.Database): void {
   ensureBoardTables(sqlite);
   ensureProjectTables(sqlite);
   ensureDocVersionTables(sqlite);
+  ensureDocProposalTables(sqlite);
   ensureWorkspaceColumns(sqlite);
   assertKernelTables(sqlite);
 }

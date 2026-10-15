@@ -91,6 +91,7 @@ export const CASCADED_TABLES = [
   "project_members",
   "project_agents",
   "doc_versions",
+  "doc_proposals",
 ] as const;
 
 /**
