@@ -158,7 +158,8 @@ export function AgentRailView({
   // Nothing cached and no answer yet: the generalist alone, so Chat is reachable from the first frame,
   // and quiet placeholders where the rest will land.
   const waiting = !loaded && agents.length === 0;
-  const list = agents.some((agent) => agent.generalist) ? agents : [FALLBACK_GENERALIST, ...agents];
+  const withGeneralist = agents.some((agent) => agent.generalist) ? agents : [FALLBACK_GENERALIST, ...agents];
+  const list = enterprise ? withGeneralist.filter((agent) => agent.generalist) : withGeneralist;
 
   return (
     <aside
@@ -220,7 +221,7 @@ export function AgentRailView({
               )}
             </RailLink>
           ))}
-          {waiting
+          {waiting && !enterprise
             ? SKELETON_KEYS.map((key) => (
                 <span key={key} className="agent-rail-skeleton" data-testid="agent-rail-skeleton" aria-hidden="true" />
               ))

@@ -91,6 +91,8 @@ function hrefOf(html: string, id: string): string | undefined {
   return html.match(new RegExp(`<a[^>]*href="([^"]+)"[^>]*data-testid="${id}"`))?.[1];
 }
 
+const MODE_AGENT_IDS = ["agent-research", "agent-documents"];
+
 const COVERED_BY_WORKSPACES_SECTION: Record<string, string> = { "projects-link": "rail-new-workspace" };
 
 beforeEach(() => {
@@ -133,7 +135,7 @@ describe("the enterprise shell keeps every tool of the rail", () => {
   it("offers every link the default rail offers, the Workspaces link through its section", () => {
     const base = inRouter("/chat", <AgentRailView {...VIEW} />);
     const enterpriseLinks = testIds(enterpriseView());
-    for (const id of testIds(base).filter((name) => name !== "rail-expand")) {
+    for (const id of testIds(base).filter((name) => name !== "rail-expand" && !MODE_AGENT_IDS.includes(name))) {
       expect(enterpriseLinks, id).toContain(COVERED_BY_WORKSPACES_SECTION[id] ?? id);
     }
   });
@@ -141,7 +143,7 @@ describe("the enterprise shell keeps every tool of the rail", () => {
   it("points each of them at the same route", () => {
     const base = inRouter("/chat", <AgentRailView {...VIEW} />);
     const enterprise = enterpriseView();
-    for (const id of ["mode-chat", "agent-research", "board-link", "mode-knowledge", "settings-link"]) {
+    for (const id of ["mode-chat", "board-link", "mode-knowledge", "settings-link"]) {
       expect(hrefOf(enterprise, id), id).toBe(hrefOf(base, id));
     }
     for (const [id, cover] of Object.entries(COVERED_BY_WORKSPACES_SECTION)) {
@@ -156,6 +158,13 @@ describe("the enterprise shell keeps every tool of the rail", () => {
 });
 
 describe("the enterprise rail", () => {
+  it("lists the default agent only, never the built-in mode agents", () => {
+    const ids = testIds(enterpriseView());
+    expect(ids).toContain("mode-chat");
+    expect(ids.filter((id) => MODE_AGENT_IDS.includes(id))).toEqual([]);
+    expect(ids).toContain("workspaces-link");
+  });
+
   it("names the product from the brand and badges it Enterprise", () => {
     const html = enterpriseView();
     expect(html).toContain('data-look="enterprise"');
