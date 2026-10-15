@@ -43,6 +43,7 @@ import {
   type TenantContext,
 } from "@agentforge/core";
 import { ImageModelRejectedError, runImageSkills } from "@agentforge/core/images";
+import { mediaReferenceId } from "@agentforge/core/tools/media-reference";
 import { loadSettings } from "./settings-store";
 import type { ModelCacheScope } from "./model-cache";
 import { listImageModels, listMusicModels, listProbedVideoModels, listSpeechModels } from "./selectable-models";
@@ -68,18 +69,25 @@ export type VideoGenerateOptions = StudioGenerateOptions & {
 /** The media kinds a studio gallery can list. Music shares the media store with Images and Videos. */
 export type StudioKind = "image" | "video" | "audio";
 
+const httpUrlSchema = z.string().url();
+
+const studioImageSourceSchema = z.string().refine(
+  (value) => httpUrlSchema.safeParse(value).success || mediaReferenceId(value) !== null,
+  { message: "Pass an image URL, or the reference of an image you can see (/api/v1/media/<id>/file or the id)." },
+);
+
 export const imageGenerateBodySchema = z.object({
   prompt: z.string().trim().min(1, "prompt is required"),
   aspect: z.enum(["square", "landscape", "portrait"]).optional(),
   model: z.string().trim().min(1).optional(),
-  imageUrl: z.string().url().optional(),
+  imageUrl: studioImageSourceSchema.optional(),
 });
 
 export const videoGenerateBodySchema = z.object({
   prompt: z.string().trim().min(1, "prompt is required"),
   aspect: z.enum(["16:9", "9:16", "1:1"]).optional().default("16:9"),
   model: z.string().trim().min(1).optional(),
-  imageUrl: z.string().url().optional(),
+  imageUrl: studioImageSourceSchema.optional(),
   seconds: z.number().int().min(2).max(12).optional(),
   resolution: z.enum(["480p", "720p", "1080p"]).optional(),
 });
@@ -295,6 +303,19 @@ export function studioRouteReady(
 const STUB_IMAGE_DATA_URL =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
+async function studioSourceImage(tenant: TenantContext, imageUrl: string | undefined): Promise<string | undefined> {
+  const mediaId = imageUrl === undefined ? null : mediaReferenceId(imageUrl);
+  if (!mediaId) {
+    return imageUrl;
+  }
+  const { chatMediaReferenceResolver } = await import("./chat-media-resolver");
+  const dataUrl = await chatMediaReferenceResolver(tenant, mediaId);
+  if (!dataUrl) {
+    throw new ApiError("not_found", "Media not found", 404);
+  }
+  return dataUrl;
+}
+
 export async function generateStudioImage(
   tenant: TenantContext,
   body: ImageGenerateBody,
@@ -304,6 +325,7 @@ export async function generateStudioImage(
   const locale = localeForRun();
   const scope = buildToolSecretScope(settings);
   const model = body.model || settings.imageGenModel || defaultStudioImageModel(undefined, tenant);
+  const sourceImage = await studioSourceImage(tenant, body.imageUrl);
   // Edit keeps the live tool. The Images page, including a stub desk, uses the harness.
   const standIn = process.env.AGENTFORGE_RUNTIME === "stub" && options.workType !== "Edit";
   let ran: Awaited<ReturnType<typeof runImageSkills<string>>>;
@@ -321,7 +343,7 @@ export async function generateStudioImage(
             {
               prompt: withImageOutputLanguage(attempt.prompt, locale),
               aspect_ratio: attempt.aspect,
-              image_url: body.imageUrl,
+              image_url: sourceImage,
               model: attempt.model,
             },
             tenant,
@@ -421,13 +443,14 @@ export async function generateStudioVideo(
   const locale = localeForRun();
   const availableIds = listStudioVideoModels(undefined, tenant).map((item) => item.id);
   const requested = (body.model || settings.videoGenModel || "").trim();
+  const sourceImage = await studioSourceImage(tenant, body.imageUrl);
   const harness = await runVideoHarness(
     {
       prompt: body.prompt,
       requestedModel: requested,
       availableIds,
       aspect: body.aspect,
-      imageUrl: body.imageUrl,
+      imageUrl: sourceImage,
       seconds: body.seconds,
       resolution: body.resolution,
       locale,

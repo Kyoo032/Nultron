@@ -668,3 +668,12 @@ Lanes: enterprise, hyp-ai, tester. Host only; the renderer is a later task. Prov
 - **Two flags on both agent lists** (`GET /api/v1/workspaces/:id/agents`, the `specialists` of `GET /api/v1/chat`): `madeFromPrompt` and `deletable`, computed by the host.
 - **Slugs.** A name that slugs to `quick-chat` or `va-<mode>` now gets the `agent-` prefix on every create route.
 - **Not built:** sharing a prompt-made agent with a Workspace; a billing line per person for the draft call.
+
+## Stored pictures as the studio source image, 2026-10-15 (tester, F3)
+
+Lanes: tester, hyp-ai, enterprise. Host only (`packages/host/src/studio-generate.ts`); the same visibility rule as SR-175 applies. Proven by `packages/host/src/studio-stored-media.test.ts` (11 of 11 green) and the existing studio, harness, chat-resolver, edit and media-approval suites, each on a fresh data dir. Not driven in a browser.
+
+- **`POST /api/v1/images` and `POST /api/v1/videos` take a stored picture.** `imageUrl` accepts the reference the chat tools take, `/api/v1/media/<id>/file` or the bare id, besides the https URL that still works exactly as before. The reference is read through the chat resolver, so only the caller's own media and a Workspace's the caller is a member of are readable.
+- **A foreign or missing reference is one answer.** Another person's private picture, another company's, and an id that is not there all answer 404 `not_found`, "Media not found", the same status, code and message. A malformed reference is the parser's 400 `invalid_content_part`. A reference is never fetched.
+- **Resolution comes before the stub stand-in,** so a stub desk also refuses foreign media. The Edit job path does not change: it inlines its still as a data URL before it gets here (`edit/start-generate.ts:183`, `edit/still-source.ts:51`). The media-approval path now answers a foreign reference 404 where it answered the tool's 400 before (by code reading; not driven).
+- **Not built:** a picker for a stored source image on the studio pages. The Videos still box (`videos-studio.tsx:315-321`) is a plain URL field, so a reference typed into it is now accepted by the host, and the renderer was not changed.
