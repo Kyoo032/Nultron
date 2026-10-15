@@ -1,6 +1,6 @@
 # Map — Database and migrations
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 Last verified: 2026-10-15 at 0182543b and the working tree, for the quota tables (K-D25 Q3) only. Nothing else on the page was re-read.
 

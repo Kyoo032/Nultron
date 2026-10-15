@@ -1,6 +1,6 @@
 # Map: Research dossier
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 Last verified: 2026-09-28 at 2baaa92
 

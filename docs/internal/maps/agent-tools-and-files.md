@@ -1,6 +1,6 @@
 # Map: agent tools and files, the mode harness, the tool budget, desk files and the Personal folder
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 Last verified: 2026-10-15 at ea8ac258 (tester/chat-first) for the import route's gate refusal and the line numbers of its paragraph (§ 15, "The import route"), read from `packages/host/src/handlers/docs-import.ts` and its test `docs-import.test.ts`; nothing else re-read.
 

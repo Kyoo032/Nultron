@@ -1,6 +1,6 @@
 # Map — Shell, rail and workspaces
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 Last verified: 2026-10-15 at `5c50b561` plus the uncommitted `product-modes.ts` comment deletion for the first-desk sentence in § Overview, for the enterprise look paragraph added to § Chat-first shell, and for the citations that moved in §§ 2, 3 and 6, the failure table, the Gotchas and the Why section (all of them `product-modes.ts`, `desk-pane.tsx` or `workspaces.ts` lines); the rest of the page was not re-read at this sha. Before that: 2026-10-12 at e8a7eca8 for the "Chat-first shell" section only (the shell switch and the Virtual agents page; read against the tester branch before it was promoted to `main`, PR #157). Nothing else on the page was re-read.
 

@@ -1,6 +1,6 @@
 # Map — Settings, the gateway gate, and Start over
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 Last verified: 2026-10-15 at 77638399 (tester HEAD) plus the uncommitted G1 working tree, for the company gateway management token (K-D25 step one, SR-183): the `companies` slot in "Settings per desk", the rows for `gateway-tokens/` and `handlers/company-gateway-admin.ts` in "Where things live". Read in that tree: `settings-store.ts` (`:194-205`, `:276-291`, `:318-327`, `:808-841`), `handlers/company-gateway-admin.ts`, `gateway-tokens/{adapter,check,admin-record}.ts`. Tested through the real router (`tenancy-harness.test.ts`), the handler (`company-gateway-admin.test.ts`), the adapter and the check (`gateway-tokens/*.test.ts`), the settings store (`settings-store.test.ts`) and the rotation (`wrap-key-rotation.test.ts`); not driven on a live gateway. Before that: 2026-10-11 at 2df34be (fix branch, before merge). Only "What a save does besides saving" and "What the answer carries" were re-checked; the other cites on this page are unchanged, and some were already stale.
 
@@ -321,7 +321,7 @@ order:
   `403` to, which is why `edit/asr.ts` resolving its own bearer mattered rather than being tidiness
   — see [`tenant-secrets-backend.md`](tenant-secrets-backend.md).
 - **SR-163 — on the server a verdict belongs to a company, not to the partner.** `TenantContext.tenantId` is
-  the white-label partner (HYP AI, Nultron Enterprise) and `organizationId` is the company inside it; a
+  the white-label partner (for example Nultron Enterprise) and `organizationId` is the company inside it; a
   deployment is one partner with many companies. Keys were already per desk, and a desk belongs to one
   organisation, but the verdict was one `gateway_gate` row per partner. Company B's check replaced company A's
   verdict, A's key matched nothing on file, and the hosted gate closes on "no verdict for this key": A's next

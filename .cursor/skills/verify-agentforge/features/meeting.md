@@ -2,7 +2,7 @@
 
 Meeting turns a recording or a pasted transcript into a transcript, structured minutes, and the same minutes in the other language. Rail tab `agent-meeting` (an existing Default has it, a fresh Personal first desk does not; the `id` rail row reads "Rapat"; the row reads `Meeting` with no `New` badge since 0.15.0), route `/meeting`, studio `meeting-studio`. The desk is prompt-first: the header outcome line (`meeting-studio.tsx:443`, `meeting.subtitle`) reads "Say what you need, add a recording or a transcript, and get minutes where every decision and action shows the words behind it.", and the prompt bar, drop zone and Run are mounted before any meeting exists. Create, drop, upload, paste, editing a minutes item and the recorder's controls need no key; `meeting-run` and `meeting-translate` are the paid calls (translation is opt-in, or runs with Run when `meeting-translate-default` is ticked). On a live run the minutes call passes five host checks (valid minutes JSON, action owners the transcript names, no invented dates or times, a non-empty summary, and `minutes-evidence`: every decision and action carries a quote the transcript backs, shown as `data-check="evidence"`; `packages/host/src/meeting/minutes-checks.ts:35-40`) with one repair round. Minutes that still fail are kept and shown with `meeting-checks-note`; the translation is not checked. A model you pick in `meeting-model` is held for the whole run. Full mechanism map: [`docs/internal/maps/meeting-minutes.md`](../../../../docs/internal/maps/meeting-minutes.md).
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 

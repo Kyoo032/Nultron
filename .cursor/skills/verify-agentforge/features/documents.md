@@ -2,7 +2,7 @@
 
 Documents is a job: prompt or starter → section preview → DOCX download. It is not a Word editor. Live generate needs a gateway key. Starters load a canned draft without one. Source material is optional and becomes the only facts the model may use. It comes from the **Source material** box (`sourceText`, pasted text, a saved artifact or a Research handoff) and from up to five **desk files** the person picks (`sourceFiles`), under one 120k-character ceiling. A live generate then passes two host checks (structure, and grounding when there is a source) with one repair round, and a draft that still fails ships with a note. A repair call that fails keeps the first draft. With a source, code then cuts any sentence the source still does not support (`documents-source-hold`). Map: [`docs/internal/maps/documents.md`](../../../../docs/internal/maps/documents.md).
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 

@@ -2,7 +2,7 @@
 
 The desk is the viewport. The document does not scroll, and each page has one scrollport: Chat and Edit fill the pane and scroll inside it, and every other work mode plus Settings, Knowledge, Workspaces, Usage and Channels scroll the pane. Work modes stay mounted, so a rail click keeps `scrollTop`. Reading columns stay near 768px on Education, onboarding and the Finance chooser only (`--content-max`); Chat has no reading cap (`chat-page.tsx:7-12`: the pane owns the whole width, `message-list` is `w-full` with `px-[var(--chat-gutter)]`, `chat-home` measured 1192px in a 1440px window); studios grow on a wide window and stop short of the desk edge. Map: [`docs/internal/maps/shell-rail-and-workspaces.md`](../../../../docs/internal/maps/shell-rail-and-workspaces.md) §2. The 480px rail collapse is [rail.md](./rail.md), not this file.
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 

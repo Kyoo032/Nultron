@@ -25,7 +25,7 @@ const GUARD = path.join(path.dirname(fileURLToPath(import.meta.url)), "lane-guar
 const ENTRIES = [
   { glob: "packages/host/**", map: "docs/internal/maps/host.md", lanes: ["enterprise"], protected: false },
   { glob: "packages/host/src/runs.ts", map: "docs/internal/maps/chat.md", lanes: ["tester"], protected: true },
-  { glob: "apps/web/locales/**", map: null, lanes: ["hyp-ai"], protected: false },
+  { glob: "apps/web/locales/**", map: null, lanes: ["tester"], protected: false },
 ];
 
 test("globToRegExp: ** crosses directories, * does not", () => {
@@ -43,14 +43,12 @@ test("globToRegExp: ** crosses directories, * does not", () => {
   assert.ok(!braces.test("src/other.ts"));
 });
 
-// The shipped manifest. Skipped where docs/internal is stripped (the HYP AI import).
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SHIPPED = path.join(REPO, "lanes.json");
-const HAS_DOCS = existsSync(SHIPPED) && existsSync(path.join(REPO, "docs", "internal"));
 
-test("lanes.json: valid lanes, real map pages, real protected files", { skip: !HAS_DOCS }, () => {
+test("lanes.json: valid lanes, real map pages, real protected files", () => {
   const config = JSON.parse(readFileSync(SHIPPED, "utf8"));
-  const lanes = new Set(["personal", "enterprise", "hyp-ai", "tester"]);
+  const lanes = new Set(["personal", "enterprise", "tester"]);
   assert.ok(config.entries.length > 0);
   for (const entry of config.entries) {
     assert.equal(typeof entry.glob, "string", JSON.stringify(entry));
@@ -65,7 +63,6 @@ test("lanes.json: valid lanes, real map pages, real protected files", { skip: !H
 });
 
 test("lanes.json neverPromote: each glob matches no tracked file on main, and never AGENTS.md or TESTER.md", (t) => {
-  if (!HAS_DOCS) return t.skip("lanes.json or docs/internal stripped");
   const config = JSON.parse(readFileSync(SHIPPED, "utf8"));
   assert.ok(
     Array.isArray(config.neverPromote) && config.neverPromote.length > 0,
@@ -416,7 +413,7 @@ test("integration: a map change and a Lanes line silence the map and protected w
     git(root, "checkout", "--quiet", "-b", "feature");
     put(root, "src/shared.ts", "export const s = 3;\n");
     put(root, "docs/internal/maps/src.md", "# Map: src\n\nrefreshed\n");
-    commit(root, "fix: labelled\n\nLanes: personal, enterprise, hyp-ai, tester");
+    commit(root, "fix: labelled\n\nLanes: personal, enterprise, tester");
     const result = runGuard(root, "main...HEAD", "--strict");
     assert.equal(result.code, 0, result.out);
     assert.doesNotMatch(result.out, /WARN/);
@@ -425,7 +422,7 @@ test("integration: a map change and a Lanes line silence the map and protected w
   }
 });
 
-test("integration: skips cleanly with no lanes.json, with no docs/internal, on an empty range", () => {
+test("integration: skips cleanly with no lanes.json, on an empty range", () => {
   const root = makeRepo();
   try {
     assert.equal(runGuard(root, "--write-baseline").code, 0);
@@ -437,11 +434,6 @@ test("integration: skips cleanly with no lanes.json, with no docs/internal, on a
     git(root, "checkout", "--quiet", "-b", "feature");
     put(root, "src/shared.ts", "export const s = 9;\n");
     commit(root, "fix: x");
-
-    rmSync(path.join(root, "docs", "internal"), { recursive: true, force: true });
-    const noDocs = runGuard(root, "main...HEAD", "--strict");
-    assert.equal(noDocs.code, 0, noDocs.out);
-    assert.match(noDocs.out, /skipped/);
 
     rmSync(path.join(root, "lanes.json"));
     const noLanes = runGuard(root, "main...HEAD", "--strict");

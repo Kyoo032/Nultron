@@ -1,6 +1,6 @@
 # Component installer (first run)
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 Last verified: 2026-09-26 for the onboarding mount (`onboarding-setup-check` on the key step, `apps/web/components/onboarding-screen.tsx:230-245`). The installer itself was last verified 2026-09-21 at 2d44f0f + the Phase 7 branch `claude/web-phase7-component-installer-7f5d5l`.
 

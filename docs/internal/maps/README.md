@@ -89,9 +89,9 @@ sha and a settled tree reports zero.
 
 ## Product and instance
 
-Every page names its product. The first line under the H1 says `Product: … · Instance: …`, and the Product column below repeats the product. Values: `both` (the shared renderer or host, which serves Nultron (OPC) and HYP AI (SME); hosted-only pages such as sign-in, tenancy, portal and deploy also say `both`, and their Instance names the hosted instance) and `retired-desktop` (the Personal desktop app, retired 2026-10-14: history only). The `opc` and `sme` folders are not built yet.
+Every page names its product. The first line under the H1 says `Product: … · Instance: …`, and the Product column below repeats the product. Values: `both` (the shared renderer or host of the hosted web app, which serves Nultron (OPC); hosted-only pages such as sign-in, tenancy, portal and deploy also say `both`, and their Instance names the hosted instance) and `retired-desktop` (the Personal desktop app, retired 2026-10-14: history only). The `opc` folder is not built yet.
 
-**A change to a shared page reaches both products and needs both drives:** `main :3000` and `HYP AI :3301`, as set out in [SKILL.md](../../../.cursor/skills/verify-agentforge/SKILL.md) under **Where am I?**. Tester-only subjects (the team board and the Private/Workspace projects) have no page yet; when one gets a page, it names `tester :3200` as its instance. `release-and-sync-lanes.md` is a process page, and its header line is not added here because another owner holds that file.
+**A change to a shared page reaches the hosted web app and needs its drive:** `main :3000`, as set out in [SKILL.md](../../../.cursor/skills/verify-agentforge/SKILL.md) under **Where am I?**. Tester-only subjects (the team board and the Private/Workspace projects) have no page yet; when one gets a page, it names `tester :3200` as its instance. `release-and-sync-lanes.md` is a process page, and its header line is not added here because another owner holds that file.
 
 ## Pages
 

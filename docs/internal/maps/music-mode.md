@@ -1,6 +1,6 @@
 # Map — Music mode
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 Last verified: 2026-10-05, merge of origin/main (b58383d) into the Music harness branch, for the harness in § 5 and § 8 (brief, words, name, takes) and for every `studio-generate.ts` cite on this page, which was re-read against the merged file. Speech stays off. Before that: 2026-10-01, working tree on top of 0b61a29, for the rail row cite in § 1, the `keepModelChoice` cite, the `studio-generate.ts` cites in the "nothing downstream rejects an id" paragraph. Before that: 2026-09-29, working tree, not committed, for the gallery `items` bullet (a track whose file is gone) and the `modes.music` line (the catalogue on the wire). Before that: 2026-09-23 at d4561b8 + uncommitted tree for § 5 (what reaches the relay in custom mode), the
 `studio-generate.ts` citations, the studio keeping its picked model after a generate, and the test table.

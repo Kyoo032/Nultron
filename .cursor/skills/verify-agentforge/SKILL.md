@@ -1,13 +1,13 @@
 ---
 name: verify-agentforge
-description: Drives Nultron and HYP AI the way a user does, on their webdev instances: main on 127.0.0.1:3000, the tester on :3200, the HYP AI clone on :3301. Start with Where am I? (checkout and instance). data-testid handles, stub runtime, SQLite in the data dir. Launch, doctor, walk Chat/Settings/Virtual agents/Images/Videos, keep evidence. Use after UI or product-mode work, when refusing done from a compile, or before claiming a settings/chat change works.
+description: Drives Nultron the way a user does, on its webdev instances: main on 127.0.0.1:3000, the tester on :3200. Start with Where am I? (checkout and instance). data-testid handles, stub runtime, SQLite in the data dir. Launch, doctor, walk Chat/Settings/Virtual agents/Images/Videos, keep evidence. Use after UI or product-mode work, when refusing done from a compile, or before claiming a settings/chat change works.
 ---
 
 # Verify Nultron
 
 Agent guardrail, same class as `AGENTS.md`. Not part of the Nultron app.
 
-- **Product** is `apps/`, `packages/`, Chat / Settings / Virtual agents / job modes, on one renderer. Two products run on it: **Nultron** (OPC, one owner, hosted) and **HYP AI** (SME, a team, hosted). The **Personal** desktop app (last cut **0.16.0**) was retired on 2026-10-14, so it is history only. The `opc` / `sme` folder split is planned, not built. A UI change in `apps/web` reaches both products; deploy and identity differ per lane (`AGENTS.md`). Decision record: [`web-pivot-2026-09-18.md`](../../../docs/internal/web-pivot-2026-09-18.md); cut checklist: [`0.16.0-changelog.md`](../../../docs/internal/0.16.0-changelog.md).
+- **Product** is `apps/`, `packages/`, Chat / Settings / Virtual agents / job modes, on one renderer. The product in this repo is **Nultron** (OPC, one owner, hosted). HYP AI (SME) is its own repo since 2026-10-15 and is not driven from here. The **Personal** desktop app (last cut **0.16.0**) was retired on 2026-10-14, so it is history only. The `opc` folder split is planned, not built. A UI change in `apps/web` reaches the hosted app and the tester; deploy and identity differ per lane (`AGENTS.md`). Decision record: [`web-pivot-2026-09-18.md`](../../../docs/internal/web-pivot-2026-09-18.md); cut checklist: [`0.16.0-changelog.md`](../../../docs/internal/0.16.0-changelog.md).
 - **This directory** is how agents map and prove *this* repo (where to press, how to doctor, what counts as proof).
 - Original pstack skills stay in the Cursor pstack plugin. Call them. Do not copy them into product code or the desktop bundle.
 - **Map:** this `features/` map, then pstack `how` for how a subsystem works and where to fix.
@@ -20,30 +20,29 @@ A cold agent reads this mid-task. Drive the real app. A green `tsc` or worker su
 
 Step 0, before any drive or edit. Find the checkout and the instance you are in, then match them to a row.
 
-1. Run `node scripts/where-am-i.mjs` from the checkout. It prints the folder, the branch and the row with its webdev port. `pnpm where` is not wired into `package.json` yet. The HYP AI clone has no `lanes.json` or `docs/internal`, so the script skips there: run `git rev-parse --show-toplevel` and `git branch --show-current` by hand instead.
+1. Run `node scripts/where-am-i.mjs` from the checkout. It prints the folder, the branch and the row with its webdev port. `pnpm where` is not wired into `package.json` yet. A folder outside the table prints the row `other` and no webdev port (`scripts/where-am-i.mjs`): stop and ask Rizky.
 2. The folder and the branch must both match the same row below. The branch decides between the main row and the tester row. If no row matches both, stop and ask Rizky.
 
 | Checkout | Branch | Instance you drive | Data dir | What it is |
 |---|---|---|---|---|
 | `C:\Users\rizky\agentforge`, and worktrees `C:\Users\rizky\agentforge-<topic>` | `main`, or a branch cut from `main` | main webdev, `:3000` | `.webdev-data-design` (`AGENTS.md`; check the listening pid's command line) | Published code. Every release and deploy comes from here. A bug seen on the live app is fixed on `main` first. |
 | `C:\Users\rizky\agentforge-chat` | `tester/chat-first` | tester webdev, `:3200` | `.webdev-data-chat` (`TESTER.md`) | Tester = staging. New work is driven here first. Read `TESTER.md`. |
-| `C:\Users\rizky\hypey\app` | its own `main` | HYP AI clone, `:3301` (`hypey\start-hyp-ai.cmd`) | `hypey\demo-data` | HYP AI brand repo (downstream). Brand only. Shared code arrives by import, so it is driven here after the import. |
 
 Rules:
 
 - **Never drive an instance whose checkout differs from the code you changed.** A drive on `:3000` proves `main`, not the tester branch, and the reverse.
 - **Tester first for new work.** A new feature or behaviour change is driven on `:3200` before its promotion pull request. A bug on the live app is fixed on `main`, driven on `:3000`, then merged into the tester and driven on `:3200`.
-- **A shared recipe needs both drives.** A recipe marked `both` in [features/README.md](features/README.md) is driven on `:3000` and on `:3301` before it counts as done.
+- **A shared recipe needs both drives.** A recipe marked `both` in [features/README.md](features/README.md) is driven on `:3000` and on `:3200` before it counts as done.
 - **Only Rizky restarts `:3000`.** `tsx server.ts` has no watcher. A host or core change is live only after its instance restarts, so say "restart :3000" in the report. Renderer edits hot-reload.
-- **Doctor what answers.** Doctor the instance you drive with `--base http://127.0.0.1:<port>` (`:3200` for the tester, `:3301` for HYP AI). Those ports belong to their checkouts. If nothing answers, ask Rizky; do not start a process on them.
+- **Doctor what answers.** Doctor the instance you drive with `--base http://127.0.0.1:<port>` (`:3200` for the tester). That port belongs to its checkout. If nothing answers, ask Rizky; do not start a process on them.
 
 ## Surfaces
 
-Each checkout has its own webdev, and the surfaces do **not** share a port. Pick the instance with the table above. Shared UI code (`apps/web`) reaches every instance, so a change to it is driven on `:3000` and `:3301`. The hosted review instance (`https://localhost:3443`) is the only hosted proof path, for sign-in and plans (see [login.md](features/login.md)). **The packaged Personal desktop is retired (2026-10-14).** Its `--desktop` doctor route stays below for history only. It is not owed, and nothing waits on a pack or an installer.
+Each checkout has its own webdev, and the surfaces do **not** share a port. Pick the instance with the table above. Shared UI code (`apps/web`) reaches both instances, so a change to it is driven on `:3000` and `:3200`. The hosted review instance (`https://localhost:3443`) is the only hosted proof path, for sign-in and plans (see [login.md](features/login.md)). **The packaged Personal desktop is retired (2026-10-14).** Its `--desktop` doctor route stays below for history only. It is not owed, and nothing waits on a pack or an installer.
 
 | Surface | How to reach it | Doctor | Port |
 |---|---|---|---|
-| **Local webdev** | `pnpm --filter @agentforge/web dev` → Chrome / IDE browser | `node .cursor/skills/verify-agentforge/scripts/doctor.mjs` | **Per checkout**: `:3000` (main), `:3200` (tester), `:3301` (HYP AI); see Where am I? (`tsx server.ts` → Express + Vite on loopback) |
+| **Local webdev** | `pnpm --filter @agentforge/web dev` → Chrome / IDE browser | `node .cursor/skills/verify-agentforge/scripts/doctor.mjs` | **Per checkout**: `:3000` (main), `:3200` (tester); see Where am I? (`tsx server.ts` → Express + Vite on loopback) |
 | **Packaged desktop (retired 2026-10-14: history, not owed)** | Installed Nultron, or local Kemenkeu AI / AIHub Metranet (Windows NSIS; mac/linux operator-built) | `node .cursor/skills/verify-agentforge/scripts/doctor.mjs --desktop` | **None.** IPC only. Status in userData `host-status.json` (Windows `%APPDATA%\Nultron`, `%APPDATA%\Kemenkeu AI` / `%APPDATA%\AIHub Metranet`, or the legacy `%APPDATA%\@agentforge\desktop`; Linux `$XDG_CONFIG_HOME/Nultron` or `~/.config/Nultron`; macOS `~/Library/Application Support/Nultron`; on Linux and macOS the Kemenkeu AI / AIHub Metranet flavors sit under the same parent) |
 
 `pnpm desktop:dev` is the local webdev inside an Electron window (may reuse :3000). That is not packaged proof. APIs exist under `/api/v1/*` but proof is the user path, not an internal setter.
@@ -105,7 +104,7 @@ Run this first whenever anything looks off, and before every drive:
 # local webdev on :3000 (the operator's instance)
 node .cursor/skills/verify-agentforge/scripts/doctor.mjs
 
-# an isolated webdev instance you started yourself on another port (not 3200 or 3301/3302: other jobs own those)
+# an isolated webdev instance you started yourself on another port (not 3200: the tester owns it)
 node .cursor/skills/verify-agentforge/scripts/doctor.mjs --base http://127.0.0.1:3210
 
 # packaged desktop, history only (retired 2026-10-14, not owed): reads OS userData host-status.json, not :3000, not HTTP
