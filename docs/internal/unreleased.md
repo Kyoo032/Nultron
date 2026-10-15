@@ -54,6 +54,22 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Document versions in a Workspace (D0, K-D30), 2026-10-15 (tester; in progress, entry follows)
+
+Lanes: enterprise, hyp-ai, tester
+
+## Workspace Members: invite through a people picker, by name, 2026-10-15 (tester, `tester/chat-first` at `c76cfff4` and `204aeaa8`; not driven hosted)
+
+Lanes: enterprise, hyp-ai, tester
+
+- **Why.** The Members tab invited by account id. HYP AI people sign in with a username and know nobody's id, so nobody could share a Workspace.
+- **Host.** `GET /api/v1/projects/:id/invitable` lists the people of the caller's own company who are not members yet, as `{ userId, name }`. Owner or admin only; a member gets 403, a non-member 404 (the same as an unknown id), Personal the router 404. It reuses the board's company people query, moved to `packages/host/src/company-people.ts` with the one `isCompanyMember` check both features now share. No email: the board's list never showed one. Details in [`maps/knowledge-flows.md`](maps/knowledge-flows.md) § 8.
+- **Renderer.** The account-id box is a labelled search-as-you-type combobox over that list (`components/projects-people-picker.tsx`, `lib/projects-picker.ts`): type to filter by name or id, arrows to move, Enter to pick, Escape to close, Invite sends the picked id to the existing add route. New copy in `en` and `id` (`projects.members.picker*`); `inviteLabel` and `invitePlaceholder` are gone. A person's own id now shows only while the host knows them by id alone.
+- **Names (shared portal and auth code).** The host had no name for anyone: `user.name` was the portal user id. The portal's token body now carries `display_name` and `username` at every mint and refresh; the host keeps the display name, else the username, as one name (control characters dropped, 120 characters), and each sign-in writes it to `user.name`. No new column. The board's assignee list gets the same names.
+- **Defaults chosen.** People already in are left out of the list, not marked. A person with a display name is found by that name, not by their username (the host stores one name). A refresh does not rewrite the name; the next sign-in does.
+- **Not done.** A person who has never signed in to the app is not on the list: the host knows only people it has provisioned. Everyone signed in before this lands stays named by id until their next sign-in. No features recipe covers Workspace members yet. HYP AI imports from `main`, so it gets none of this until a promotion pull request.
+- **Proof.** `projects-members.test.ts` (owner and admin see colleagues not in yet, never another company's; member 403; stranger and unknown id 404; a provisioned name shows), `projects-personal.test.ts`, one new row in `tenancy-harness.test.ts`, `auth/portal-client.test.ts` and `auth/routes.test.ts` (name parsing and hand-off), `packages/db/src/portal-owner.test.ts` (first sign-in, change, no name), the portal against Postgres (`routes/api.test.ts` key set, `routes/password-sign-in.test.ts`), and static renders (`projects-picker.test.tsx`, `projects-members.test.tsx`, `projects-client.test.ts`). Not driven in a browser or on a hosted server.
+
 ## Workspaces are shared with their members only; Owner, admin and member roles; agents brought in, 2026-10-14 (tester, `tester/chat-first` at `c062f4b7`; K-D22, K-D23, SR-178; not driven hosted)
 
 Lanes: enterprise, hyp-ai, tester

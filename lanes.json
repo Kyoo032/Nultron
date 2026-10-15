@@ -219,7 +219,7 @@
       "note": "Tester shared file. 2026-10-09: the ping also answers assistantName."
     },
     {
-      "glob": "{packages/db/src/projects-schema*.ts,packages/host/src/projects/**,packages/host/src/handlers/projects.ts,packages/host/src/projects*.test.ts}",
+      "glob": "{packages/db/src/projects-schema*.ts,packages/host/src/company-people.ts,packages/host/src/projects/**,packages/host/src/handlers/projects.ts,packages/host/src/projects*.test.ts}",
       "map": "docs/internal/maps/knowledge-flows.md",
       "lanes": [
         "tester"

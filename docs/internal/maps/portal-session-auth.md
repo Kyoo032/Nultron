@@ -19,7 +19,7 @@ sessions and stored refresh tokens (the "Removed" bullet under the token at rest
 owner decision 2026-10-01 on SR-65, detail in [hosted-surfaces-and-reset.md](hosted-surfaces-and-reset.md) § 2.
 Every other line is as verified next.
 
-Last verified: 2026-09-23 at d4561b8 + working tree, in two passes the same day. The first: the
+Last verified: 2026-10-15 at 204aeaa8 (tester) for the `display_name` and `username` row of the contract table only. Before that: 2026-09-23 at d4561b8 + working tree, in two passes the same day. The first: the
 gate's portal re-check, digest session ids, refresh-first sign-out. The second: the refresh token
 kept sealed at rest so a restart signs nobody out, and every refresh authenticated as the
 confidential client. The sections those passes changed — the session gate, Verify / slide / expire,
@@ -559,6 +559,7 @@ below is "matches the design document".
 | `POST /auth/token` with `grant_type=refresh_token`, carrying the server-side `device_id` rather than the client `install_id` | Matches the doc (`docs/internal/portal/device-code-login.md:196-200`), which is itself unimplemented. |
 | `POST /auth/logout`, Bearer token, `{ all_devices: false }`, idempotent | Matches the doc (`docs/internal/portal/device-code-login.md:228-230`). Since 2026-09-23 the host refreshes first so the token is live, the client rejects on any non-2xx answer, and the route logs the reason and signs out locally regardless. |
 | `role` in every token body (`owner` / `admin` / `member`) | **New, 2026-10-01.** Built and tested on the portal's side the same day (`apps/portal/src/flows/token.ts`); the host's reading of it is tested against a scripted portal and driven on the local Kubernetes rehearsal against the stand-in. The doc (`docs/internal/portal/device-code-login.md`) predates it, so the field is assumed from the stand-in's source. |
+| `display_name` and `username` in every token body | **New, 2026-10-15 (tester).** Built in the stand-in (`memberOf`, `apps/portal/src/flows/token.ts`) and tested against Postgres (`api.test.ts`, `password-sign-in.test.ts`). `toTokens` reads them as one optional `name`: the display name, else the username, control characters dropped, at most 120 characters, anything that is not text read as no name. The login route hands it to `ensurePortalOwner`, which writes `user.name` at the first sign-in and again when it changes, and keeps the stored name when a sign-in carries none. A refresh does not rewrite the name. |
 | The error body `{ error, reason, message_en, message_id, retry_after }` | Matches the doc (`docs/internal/portal/device-code-login.md:85-94`). `retry_after` is parsed onto `PortalError` (`packages/host/src/auth/portal-client.ts:65`, `packages/host/src/auth/portal-client.ts:117-121`) and then **never read** by any route. |
 | The reason codes and their English copy | Matches the doc's table (`docs/internal/portal/device-code-login.md:407-425`). |
 | The portal's own `GET /auth/session` (`docs/internal/portal/device-code-login.md:232-234`) | **Not implemented.** `PortalClient` has three methods (`packages/host/src/auth/portal-client.ts:49-56`); the host answers `/api/v1/auth/session` from its own row and never asks the portal for status. |

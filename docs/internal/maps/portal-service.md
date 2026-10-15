@@ -2,7 +2,7 @@
 
 Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
 
-Last verified: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-07 at 9aba37e + working tree for section 8 (password sign-in), Where things live, the
+Last verified: 2026-10-15 at 204aeaa8 (tester) for the token body paragraph only (`display_name`, `username`). Before that: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-07 at 9aba37e + working tree for section 8 (password sign-in), Where things live, the
 Verify table's last four rows and one Why bullet, written the day the mode was built; the rest of the page keeps
 its reading below. Earlier: 2026-10-01 at 0b61a29 + working tree, by the sign-in-codes pass (four fixes found by driving
 the pilot: a replaced code no longer signs in, one request is one code, the fifth wrong invite code is the
@@ -79,7 +79,10 @@ are optional and all three are sent. Since 2026-10-01 the body also carries **`r
 first-time sign-in's membership from it once a host worker wires it, and must not default a missing one
 to `owner`. The same value is the access token's `role` claim and `/auth/session`'s `user.role`. Built once in `mintSession`
 (`apps/portal/src/flows/token.ts:161`), and the exact key set is pinned by
-`apps/portal/src/routes/api.test.ts`.
+`apps/portal/src/routes/api.test.ts`. Since 2026-10-15 (tester) the body also carries **`display_name`**
+(the member's `users.display_name`, or null) and **`username`** (their password-mode credential's username,
+or null in code mode), both read with the role in `memberOf` at every mint and every refresh. The host keeps
+the display name, else the username, as the person's name (`docs/internal/maps/knowledge-flows.md` § 8).
 
 **Every error body** is `{ error, reason, message_en, message_id, retry_after? }`
 (`errorBody`, `apps/portal/src/flows/reasons.ts:124`). `error` is the RFC 6749/8628 family,
