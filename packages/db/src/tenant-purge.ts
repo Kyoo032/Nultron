@@ -90,6 +90,7 @@ export const CASCADED_TABLES = [
   // A Workspace's members and the agents brought in: a project foreign key with ON DELETE cascade.
   "project_members",
   "project_agents",
+  "doc_versions",
 ] as const;
 
 /**

@@ -4,6 +4,7 @@ import path from "node:path";
 import type Database from "better-sqlite3";
 import { isServerMode } from "@agentforge/core";
 import { ensureBoardTables } from "./board-schema";
+import { ensureDocVersionTables } from "./doc-versions-schema";
 import { ensureProjectTables } from "./projects-schema";
 
 const MIGRATIONS_TABLE = "__drizzle_migrations";
@@ -254,6 +255,7 @@ export function ensureSchema(sqlite: Database.Database): void {
   ensureDeskFileTables(sqlite);
   ensureBoardTables(sqlite);
   ensureProjectTables(sqlite);
+  ensureDocVersionTables(sqlite);
   ensureWorkspaceColumns(sqlite);
   assertKernelTables(sqlite);
 }
