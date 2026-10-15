@@ -1,3 +1,4 @@
+import { personName } from "./people-names";
 import type { InvitablePerson } from "./projects-client";
 
 export type PickerState = {
@@ -28,12 +29,7 @@ export function matchPeople(
   limit: number = PICKER_LIMIT,
 ): InvitablePerson[] {
   const needle = query.trim().toLocaleLowerCase();
-  const found = needle
-    ? people.filter(
-        (person) =>
-          person.name.toLocaleLowerCase().includes(needle) || person.userId.toLocaleLowerCase().includes(needle),
-      )
-    : people;
+  const found = needle ? people.filter((person) => personName(person).toLocaleLowerCase().includes(needle)) : people;
   return found.slice(0, limit);
 }
 
@@ -54,7 +50,7 @@ export function pickerStep(state: PickerState, event: PickerEvent, count: number
       }
       return { ...state, open: true, active: event.by === 1 ? 0 : count - 1 };
     case "choose":
-      return { query: event.person.name, chosen: event.person.userId, active: -1, open: false };
+      return { query: personName(event.person), chosen: event.person.userId, active: -1, open: false };
     case "open":
       return { ...state, open: true };
     case "close":

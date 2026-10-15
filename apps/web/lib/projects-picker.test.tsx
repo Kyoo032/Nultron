@@ -30,12 +30,20 @@ function render(state: PickerState, people: InvitablePerson[] | null = PEOPLE, b
   );
 }
 
+const UNNAMED_ID = "0f1c2a3b-0000-4000-8000-00000000000d";
+const WITH_UNNAMED: InvitablePerson[] = [...PEOPLE, { userId: UNNAMED_ID, name: null }];
+
 describe("matching colleagues", () => {
-  it("matches the name or the id, ignoring case and outer spaces", () => {
+  it("matches the name only, ignoring case and outer spaces, never the id", () => {
     expect(matchPeople(PEOPLE, "  SAN ").map((person) => person.userId)).toEqual(["u-budi"]);
-    expect(matchPeople(PEOPLE, "u-cit").map((person) => person.userId)).toEqual(["u-citra"]);
+    expect(matchPeople(PEOPLE, "u-cit")).toEqual([]);
     expect(matchPeople(PEOPLE, "a").map((person) => person.userId)).toEqual(["u-ana", "u-budi", "u-citra"]);
     expect(matchPeople(PEOPLE, "zzz")).toEqual([]);
+  });
+
+  it("finds an unnamed colleague by the label the picker shows, and never by the id", () => {
+    expect(matchPeople(WITH_UNNAMED, "colleague").map((person) => person.userId)).toEqual([UNNAMED_ID]);
+    expect(matchPeople(WITH_UNNAMED, UNNAMED_ID)).toEqual([]);
   });
 
   it("offers everyone for an empty query, up to the limit", () => {
@@ -93,6 +101,15 @@ describe("the picker as drawn", () => {
     expect(render(chosen)).toMatch(/<button type="submit" class="btn btn-secondary" data-testid="projects-invite">/);
     expect(render(chosen, PEOPLE, true)).toContain('disabled="" data-testid="projects-invite"');
     expect(render(chosen)).not.toContain('role="listbox"');
+  });
+
+  it("renders names only: each option is a name or the neutral label, never the id", () => {
+    const html = render({ query: "", chosen: null, active: -1, open: true }, WITH_UNNAMED);
+    const options = [...html.matchAll(/data-testid="projects-picker-option"[^>]*>([^<]*)<\/li>/g)].map(
+      (match) => match[1],
+    );
+    expect(options).toEqual(["Ana Putri", "Budi Santoso", "Citra", "dewi.k", "Colleague 0F1C2A"]);
+    expect(options.join(" ")).not.toContain(UNNAMED_ID);
   });
 
   it("says nobody matches, in Indonesian too", () => {

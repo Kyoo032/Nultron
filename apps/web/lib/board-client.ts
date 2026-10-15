@@ -38,7 +38,7 @@ export type CardComment = {
   createdAt: number;
 };
 
-export type BoardPerson = { userId: string; name: string };
+export type BoardPerson = { userId: string; name: string | null };
 
 export type BoardSnapshot = {
   workspaceId: string;
@@ -90,6 +90,10 @@ function str(row: Row, key: string): string {
     throw malformed();
   }
   return value;
+}
+
+function nullableStr(row: Row, key: string): string | null {
+  return row[key] === null ? null : str(row, key);
 }
 
 function num(row: Row, key: string): number {
@@ -175,7 +179,7 @@ export function parseBoardSnapshot(value: unknown): BoardSnapshot {
     cursor: num(value, "cursor"),
     columns: list(value.columns, parseColumn),
     cards: list(value.cards, parseCardSummary),
-    people: list(value.people, (row) => ({ userId: str(row, "userId"), name: str(row, "name") })),
+    people: list(value.people, (row) => ({ userId: str(row, "userId"), name: nullableStr(row, "name") })),
     me: { userId: str(value.me, "userId"), canAdminister: value.me.canAdminister === true },
   };
 }

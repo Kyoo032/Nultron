@@ -28,7 +28,7 @@ export type ProjectRecord = {
 
 export type ProjectMember = {
   userId: string;
-  name: string;
+  name: string | null;
   role: WorkspaceRole;
   addedBy: string;
   addedAt: number;
@@ -39,7 +39,7 @@ export type ProjectAgent = { agentId: string; broughtBy: string; addedAt: number
 
 export type ProjectPeople = { members: ProjectMember[]; agents: ProjectAgent[] };
 
-export type InvitablePerson = { readonly userId: string; readonly name: string };
+export type InvitablePerson = { readonly userId: string; readonly name: string | null };
 
 /** A chat file, or a generated image or video the person put into the Workspace (SR-175). */
 export type ProjectFileKind = "artifact" | "image" | "video";
@@ -88,6 +88,10 @@ function str(row: Row, key: string): string {
   return value;
 }
 
+function nullableStr(row: Row, key: string): string | null {
+  return row[key] === null ? null : str(row, key);
+}
+
 function num(row: Row, key: string): number {
   const value = row[key];
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -130,7 +134,7 @@ export function parseProject(row: Row): ProjectRecord {
 function parseMember(row: Row): ProjectMember {
   return {
     userId: str(row, "userId"),
-    name: str(row, "name"),
+    name: nullableStr(row, "name"),
     role: parseRole(row.role),
     addedBy: str(row, "addedBy"),
     addedAt: num(row, "addedAt"),
@@ -224,7 +228,7 @@ export async function listProjectPeople(projectId: string): Promise<ProjectPeopl
 
 export async function listInvitablePeople(projectId: string): Promise<InvitablePerson[]> {
   const data = await call(`${projectPath(projectId)}/invitable`);
-  return list(data.items, (row) => ({ userId: str(row, "userId"), name: str(row, "name") }));
+  return list(data.items, (row) => ({ userId: str(row, "userId"), name: nullableStr(row, "name") }));
 }
 
 const memberPath = (projectId: string, userId: string) =>

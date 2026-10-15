@@ -22,16 +22,20 @@ afterEach(() => {
 
 const hosted = () => vi.stubGlobal("__AGENTFORGE_SERVER__", "1");
 
-const member = (userId: string, role: WorkspaceRole): ProjectMember => ({
+const member = (userId: string, role: WorkspaceRole, name: string | null = null): ProjectMember => ({
   userId,
-  name: userId,
+  name,
   role,
   addedBy: "ana",
   addedAt: 1,
 });
 
 const PEOPLE: ProjectPeople = {
-  members: [member("ana", "owner"), member("budi", "admin"), member("citra", "member")],
+  members: [
+    member("ana", "owner", "Ana Putri"),
+    member("budi", "admin", "Budi Santoso"),
+    member("citra", "member", "Citra"),
+  ],
   agents: [
     { agentId: "research", broughtBy: "ana", addedAt: 2 },
     { agentId: "documents", broughtBy: "citra", addedAt: 3 },
@@ -183,7 +187,7 @@ describe("the Members tab on the hosted build", () => {
       "projects-member-remove",
     ]);
     expect(html).toContain('data-testid="projects-invite-input"');
-    expect(html).toContain("Your account id: ana");
+    expect(html).not.toContain('data-testid="projects-your-id"');
     expect(html.split('data-testid="projects-agent-takeout"').length - 1).toBe(2);
   });
 
@@ -203,7 +207,7 @@ describe("the Members tab on the hosted build", () => {
     expect(html).not.toContain('data-testid="projects-invite-input"');
     expect(html).not.toContain('data-testid="projects-picker"');
     expect(html.split('data-testid="projects-agent-takeout"').length - 1).toBe(1);
-    expect(html).toContain("citra (you)");
+    expect(html).toContain("Citra (you)");
   });
 
   it("as owner: the invite is a labelled search box over her colleagues, and Invite waits for a pick", () => {
@@ -227,12 +231,25 @@ describe("the Members tab on the hosted build", () => {
     expect(everyone).not.toContain('role="combobox"');
   });
 
-  it("shows her own id only while the host knows her by id alone", () => {
-    expect(view("ana", "owner")).toContain('data-testid="projects-your-id"');
-    const named: ProjectPeople = { ...PEOPLE, members: [{ ...member("ana", "owner"), name: "Ana Putri" }] };
-    const html = view("ana", "owner", named);
+  it("never shows an account id: a person with no name is the neutral label and a short code", () => {
+    const unnamed: ProjectPeople = {
+      ...PEOPLE,
+      members: [member("ana", "owner", "Ana Putri"), member("budi", "admin")],
+    };
+    const html = view("ana", "owner", unnamed);
+    expect(html).not.toContain("Your account id");
     expect(html).not.toContain('data-testid="projects-your-id"');
-    expect(html).toContain("Ana Putri (you)");
+    expect(html).toContain(">Colleague BUDI</span>");
+    expect(html).toContain(">Ana Putri (you)</span>");
+  });
+
+  it("names a viewer who has no name by the neutral label, with no id line", () => {
+    const html = view("budi", "admin", {
+      ...PEOPLE,
+      members: [member("ana", "owner", "Ana Putri"), member("budi", "admin")],
+    });
+    expect(html).toContain(">Colleague BUDI (you)</span>");
+    expect(html).not.toContain('data-testid="projects-your-id"');
   });
 
   it("offers only the agent not brought in yet, by its mode's name", () => {

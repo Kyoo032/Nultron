@@ -138,6 +138,22 @@ describe("projects client", () => {
     expect(await listInvitablePeople("proj_1")).toEqual([{ userId: "u_cara", name: "Cara" }]);
   });
 
+  it("reads a colleague or a member with no name as a null name, not a broken answer", async () => {
+    const unnamed = { userId: "u_dan", name: null, role: "member", addedBy: "user_me", addedAt: 7 };
+    calls.push({
+      path: "/api/v1/projects/proj_1/invitable",
+      init: undefined,
+      response: json(200, { items: [{ userId: "u_dan", name: null }] }),
+    });
+    expect(await listInvitablePeople("proj_1")).toEqual([{ userId: "u_dan", name: null }]);
+    calls.push({
+      path: "/api/v1/projects/proj_1/members",
+      init: undefined,
+      response: json(200, { members: [unnamed], agents: [] }),
+    });
+    expect(await listProjectPeople("proj_1")).toEqual({ members: [unnamed], agents: [] });
+  });
+
   it("sends each member and agent action to its own route, in the body shape the host reads", async () => {
     const members = [{ userId: "u b", name: "u b", role: "member", addedBy: "user_me", addedAt: 5 }];
     calls.push(

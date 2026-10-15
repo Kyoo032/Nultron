@@ -5,6 +5,7 @@
 import type { BoardColumn, BoardPerson, CardSummary } from "./board-client";
 import { BoardError } from "./board-client";
 import { t } from "./i18n";
+import { personName } from "./people-names";
 
 /** A built-in column nobody renamed carries no name; the page shows the desk's word for its kind. */
 export function columnLabel(column: BoardColumn): string {
@@ -19,7 +20,8 @@ export function personLabel(people: readonly BoardPerson[], userId: string, me: 
   if (!person) {
     return t("board.unknownPerson");
   }
-  return userId === me ? t("board.you", { name: person.name }) : person.name;
+  const label = personName(person);
+  return userId === me ? t("board.you", { name: label }) : label;
 }
 
 /**

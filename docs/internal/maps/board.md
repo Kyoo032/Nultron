@@ -2,7 +2,7 @@
 
 Product: tester only (HYP AI SME board, not on main) · Instance: tester :3200
 
-Last verified: 2026-10-15 at c76cfff4 for the people list's new home only ("What K1 needs to know"); the board tests passed with it. Before that: 2026-10-13 at 823ea20c (uncommitted working tree on tester/chat-first, the K0 commit, after the K0 security review's fixes). Read from the code of that working tree. The host and renderer tests named below were run that day and passed. Driven in a browser on a local rehearsal of the hosted stack before the review fixes; the fixes themselves are proven by tests only (see "Not driven").
+Last verified: 2026-10-15 at 0e3b3eae (tester), plus the SR-181 commit that adds this sentence, for the people list's names (`realPersonName`, `BoardPerson` in `board/types.ts`, `personLabel`) and its new home ("What K1 needs to know"); the board tests passed with it. Before that: 2026-10-13 at 823ea20c (uncommitted working tree on tester/chat-first, the K0 commit, after the K0 security review's fixes). Read from the code of that working tree. The host and renderer tests named below were run that day and passed. Driven in a browser on a local rehearsal of the hosted stack before the review fixes; the fixes themselves are proven by tests only (see "Not driven").
 
 Tester code only (`TESTER.md`), lane `tester`. Spec: [`../team-board-spec.md`](../team-board-spec.md); Rizky accepted its defaults on 2026-10-13. This page covers phase K0: people only. Agents, personal stores, card files and mentions are K1 to K4. Recipe: [`features/board.md`](../../../.cursor/skills/verify-agentforge/features/board.md).
 
@@ -116,6 +116,6 @@ Dark mode; a dropped stream resuming in the browser (the resume is proven by `bo
 ## What K1 needs to know
 
 - An open board tab reconnects every 15 minutes through the session gate, and each request slides the session. An open board keeps a session alive until the hard expiry. Decide whether that is wanted.
-- The board's people list and its assignee check are `listCompanyPeople` and `isCompanyMember` in `packages/host/src/company-people.ts` (moved out of `board/store.ts` on 2026-10-15, so Workspaces' people picker reads the same query). They read display names from the user table, which sign-in now fills from the portal's `display_name` or `username` (`knowledge-flows.md` § 8). A person store (K1) must not be joined here.
+- The board's people list and its assignee check are `listCompanyPeople` and `isCompanyMember` in `packages/host/src/company-people.ts` (moved out of `board/store.ts` on 2026-10-15, so Workspaces' people picker reads the same query). They read the user table's name through `realPersonName` (`company-people.ts:8`): null when the stored name is blank or is the person's id, so the list carries a real name or nothing, and the renderer shows `Colleague <code>` for nothing (`apps/web/lib/people-names.ts`, `board-view.ts` `personLabel`). Sign-in fills that name from the portal's display name only (SR-181, `knowledge-flows.md` § 8). A person store (K1) must not be joined here.
 - The stream's access check is two reads, once per read batch and at most once a second inside one. A desk with many viewers multiplies that; a shared membership cache would be the next step.
 - `card_events` is never pruned in K0. The retention plan is spec section 17a.

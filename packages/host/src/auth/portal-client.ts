@@ -274,6 +274,18 @@ function asPersonName(value: unknown): string | null {
   return cleaned.length > 0 ? cleaned.slice(0, PERSON_NAME_MAX) : null;
 }
 
+function personNameFrom(displayName: unknown, username: unknown): string | null {
+  const name = asPersonName(displayName);
+  const login = asPersonName(username);
+  if (name === null) {
+    return null;
+  }
+  if (login !== null && login.toLocaleLowerCase() === name.toLocaleLowerCase()) {
+    return null;
+  }
+  return name;
+}
+
 function toTokens(body: unknown): PortalTokens {
   const record = (body ?? {}) as Record<string, unknown>;
   const accessToken = asString(record.access_token);
@@ -298,7 +310,7 @@ function toTokens(body: unknown): PortalTokens {
     tenantId,
     // Exact match against the three values; anything else, or nothing, is no role.
     role: parsePortalRole(record.role),
-    name: asPersonName(record.display_name) ?? asPersonName(record.username),
+    name: personNameFrom(record.display_name, record.username),
   };
 }
 

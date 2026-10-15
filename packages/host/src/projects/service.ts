@@ -15,7 +15,7 @@
  */
 import { ApiError, isDefaultChatAgent, scanInjection, virtualAgentBySlug, type TenantContext } from "@agentforge/core";
 import type { AssignableRole, CreateProjectInput, ProjectVisibility, UpdateProjectInput, WorkspaceRole } from "./input";
-import { isCompanyMember, listCompanyPeople, type CompanyPerson } from "../company-people";
+import { isCompanyMember, listCompanyPeople, realPersonName, type CompanyPerson } from "../company-people";
 import { deleteSource, type KnowledgeSource } from "../knowledge";
 import { mediaExt } from "../media";
 import { virtualAgentsOnDesk } from "../virtual-agents";
@@ -59,7 +59,7 @@ export type ProjectThread = { id: string; title: string; createdAt: number };
 
 export type ProjectMember = {
   userId: string;
-  name: string;
+  name: string | null;
   role: WorkspaceRole;
   addedBy: string;
   addedAt: number;
@@ -210,7 +210,7 @@ export function archiveProject(scope: TenantContext, projectId: string, now: num
 function toMember(row: store.MemberRow): ProjectMember {
   return {
     userId: row.user_id,
-    name: row.name ?? row.user_id,
+    name: realPersonName(row.user_id, row.name),
     role: row.role,
     addedBy: row.added_by,
     addedAt: row.added_at,

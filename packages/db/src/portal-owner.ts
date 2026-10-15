@@ -149,7 +149,11 @@ async function writeMembershipRole(
  * never provisioned (or whose rows an erase deleted) gets nothing created, and the org must belong
  * to the tenant the session names. Returns whether anything changed.
  */
-export async function syncPortalRole(db: Database, identity: PortalIdentity, role: PortalRole | null): Promise<boolean> {
+export async function syncPortalRole(
+  db: Database,
+  identity: PortalIdentity,
+  role: PortalRole | null,
+): Promise<boolean> {
   if (identity.tenantId === LOCAL_TENANT_ID) {
     // The desktop's and webdev's one local owner (`ensureLocalOwner`) has no portal to reconcile
     // with. No session carries this tenant id, so this is a wall, not a code path.
@@ -206,16 +210,16 @@ export async function ensurePortalOwner(db: Database, identity: PortalProvisioni
   }
 
   const [existingUser] = await db.select().from(user).where(eq(user.id, identity.userId)).limit(1);
-  const name = identity.name ?? null;
+  const stated = identity.name === undefined ? undefined : (identity.name ?? identity.userId);
   if (!existingUser) {
     await db.insert(user).values({
       id: identity.userId,
-      name: name ?? identity.userId,
+      name: stated ?? identity.userId,
       email: placeholderEmail(identity.userId),
       emailVerified: false,
     });
-  } else if (name !== null && existingUser.name !== name) {
-    await db.update(user).set({ name, updatedAt: new Date() }).where(eq(user.id, identity.userId));
+  } else if (stated !== undefined && existingUser.name !== stated) {
+    await db.update(user).set({ name: stated, updatedAt: new Date() }).where(eq(user.id, identity.userId));
   }
 
   const [membership] = await db

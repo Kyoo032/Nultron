@@ -307,11 +307,11 @@ describe("a Workspace is shared with its members only: four people, two companie
       jsonBody<{ items: Array<{ userId: string; name: string }> }>(await invitable(person, room)).items;
 
     expect(await listed(alice)).toEqual([
-      { userId: "ben", name: "ben" },
-      { userId: "cara", name: "cara" },
+      { userId: "ben", name: null },
+      { userId: "cara", name: null },
     ]);
     expect(await outcome(await invite(alice, room, "ben"))).toEqual(CREATED);
-    expect(await listed(alice)).toEqual([{ userId: "cara", name: "cara" }]);
+    expect(await listed(alice)).toEqual([{ userId: "cara", name: null }]);
 
     expect(await outcome(await invitable(ben, room))).toEqual(FORBIDDEN);
     for (const stranger of [cara, dan]) {
@@ -321,7 +321,7 @@ describe("a Workspace is shared with its members only: four people, two companie
     }
 
     expect(await outcome(await setRole(alice, room, "ben", "admin"))).toEqual(OK);
-    expect(await listed(ben)).toEqual([{ userId: "cara", name: "cara" }]);
+    expect(await listed(ben)).toEqual([{ userId: "cara", name: null }]);
     expect(await outcome(await invite(ben, room, "cara"))).toEqual(CREATED);
     expect(await listed(alice)).toEqual([]);
 

@@ -21,7 +21,7 @@ export const BOARD_VOLUME = {
 /** A position key longer than this is never written: the column's keys are rewritten short instead. */
 export const MAX_POSITION_KEY = 48;
 
-export const BUILTIN_COLUMN_KINDS =["todo", "doing", "review", "blocked", "done"] as const;
+export const BUILTIN_COLUMN_KINDS = ["todo", "doing", "review", "blocked", "done"] as const;
 export type BuiltinColumnKind = (typeof BUILTIN_COLUMN_KINDS)[number];
 export type ColumnKind = BuiltinColumnKind | "custom";
 
@@ -74,7 +74,7 @@ export type CardComment = {
   readonly createdAt: number;
 };
 
-export type BoardPerson = { readonly userId: string; readonly name: string };
+export type BoardPerson = { readonly userId: string; readonly name: string | null };
 
 export type BoardSnapshot = {
   readonly workspaceId: string;

@@ -2,6 +2,7 @@
 
 import { useId, useState, type FormEvent, type KeyboardEvent } from "react";
 import { t } from "@/lib/i18n";
+import { personName } from "@/lib/people-names";
 import type { InvitablePerson } from "@/lib/projects-client";
 import {
   INITIAL_PICKER,
@@ -122,7 +123,7 @@ export function PeoplePickerView({ baseId, people, loadFailed, busy, state, onEv
                     send({ type: "choose", person });
                   }}
                 >
-                  {person.name}
+                  {personName(person)}
                 </li>
               ))}
             </ul>

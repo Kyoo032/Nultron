@@ -318,12 +318,20 @@ describe("the person's name in the token body", () => {
     return tokens.name;
   }
 
-  it("takes the display name first, then the username, from both grants", async () => {
+  it("takes the display name from both grants, and never the username in its place", async () => {
     const both = { ...TOKEN_BODY, display_name: "Rina Wulandari", username: "rina" };
     expect(await nameFrom(both, "code")).toBe("Rina Wulandari");
     expect(await nameFrom(both, "refresh")).toBe("Rina Wulandari");
-    expect(await nameFrom({ ...TOKEN_BODY, display_name: null, username: "rina" }, "code")).toBe("rina");
-    expect(await nameFrom({ ...TOKEN_BODY, display_name: "   ", username: "rina" }, "code")).toBe("rina");
+    expect(await nameFrom({ ...TOKEN_BODY, display_name: null, username: "rina" }, "code")).toBeNull();
+    expect(await nameFrom({ ...TOKEN_BODY, display_name: "   ", username: "rina" }, "code")).toBeNull();
+  });
+
+  it("is no name when the display name is the username itself, in any letter case (SR-181)", async () => {
+    expect(await nameFrom({ ...TOKEN_BODY, display_name: "rina", username: "rina" }, "code")).toBeNull();
+    expect(await nameFrom({ ...TOKEN_BODY, display_name: " RINA ", username: "rina" }, "refresh")).toBeNull();
+    expect(await nameFrom({ ...TOKEN_BODY, display_name: "Rina Wulandari", username: "rina" }, "code")).toBe(
+      "Rina Wulandari",
+    );
   });
 
   it("is no name when the portal sends none, or sends something that is not text", async () => {

@@ -214,7 +214,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-178](#sr-178) | Medium | Hosted (tester): a Workspace switched to "workspace" is readable by the whole company, not only its members (K-D22) | Fixed in the tester at `c062f4b7`, not driven hosted | Before HYP AI imports from the tester, and before promotion to `main` (a hosted drive is still owed) |
 | [SR-179](#sr-179) | Medium | Hosted (tester): a member removed from a Workspace keeps reading, listing and deleting the files and media they put into it | Fixed in the tester (2026-10-14), not driven hosted | Before HYP AI imports from the tester, and before promotion to `main` |
 | [SR-180](#sr-180) | Medium | Hosted (tester): document versions are not counted against a tenant's storage, and the cap keeps every version from the last 30 days with no count limit, so a busy document can fill the one disk | Open, not reachable: no route writes a version yet (D0, 2026-10-15) | Before D1 adds a route that appends a version |
-| [SR-181](#sr-181) | Low | Hosted (tester): a person with no display name is shown to every colleague by their password-mode username, so a colleague can lock them out with five wrong passwords | Open, accepted for the tester; the username fallback is an open decision for Rizky | Before HYP AI imports from the tester |
+| [SR-181](#sr-181) | Low | Hosted (tester): a person with no display name is shown to every colleague by their password-mode username, so a colleague can lock them out with five wrong passwords | Fixed on the tester 2026-10-15, names only (Rizky's decision): the username is never sent as a name, and a person with no name shows as "Colleague <code>". One residual: a name stored by the old username fallback stays until that person's next sign-in | Before HYP AI imports from the tester |
 | [SR-177](#sr-177) | Low | The new deploy preflight, run in a throwaway container when the server has no node, received the real `AGENTFORGE_SECRETS_KEY` | Fixed before merge (branch `chore/agent-guardrails`, 2026-10-14): the container gets the word `set` or nothing | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
@@ -6112,15 +6112,26 @@ Tester only. Raised 2026-10-15 with the Workspace people picker. Low.
 
 Evidence:
 - The portal's token body now carries the person's username beside the display name (`memberOf`, `apps/portal/src/flows/token.ts:237`, username at `:246`).
-- The host keeps the display name, else the username, as the person's name (`packages/host/src/auth/portal-client.ts:301`) and writes it to `user.name` at sign-in (`packages/db/src/portal-owner.ts:217`).
-- `listCompanyPeople` (`packages/host/src/company-people.ts:8`) shows that name to every owner or admin of a Workspace through `GET /api/v1/projects/:id/invitable`, and to every member of the company through the board's people list.
+- As first written (before the fix below), the host kept the display name, else the username, as the person's name (`packages/host/src/auth/portal-client.ts:301`) and wrote it to `user.name` at sign-in (`packages/db/src/portal-owner.ts:217`).
+- As first written, `listCompanyPeople` (`packages/host/src/company-people.ts:8`) showed that name to every owner or admin of a Workspace through `GET /api/v1/projects/:id/invitable`, and to every member of the company through the board's people list.
 - The portal locks an account after five failed passwords for 15 minutes (`PASSWORD_MAX_FAILED_ATTEMPTS`, `PASSWORD_LOCK_MS`, `apps/portal/src/store/postgres/credentials.ts:40-41`), and gives the same answer for a wrong password and an unknown username, so a username was not guessable from outside.
 
 What goes wrong if ignored: a colleague who reads a person's username in the picker can lock that person out for 15 minutes at a time. The reach is the same company only, and a password sign-in also takes the e-mail address on record, which colleagues often know already, so the step is small.
 
-Status: **open, accepted for the tester.** The brief asked for names a HYP AI person can recognise, and for most password-mode accounts the username is the only one. Open decision for Rizky: keep the username fallback, show it only to Workspace owners and admins, or require the operator to set a display name. No code change until he decides.
+Decision (Rizky, 2026-10-15): "hide usernames and show names only". In password sign-in mode a colleague's username is never shown to, or sent to, other people.
 
-Gate: before HYP AI imports from the tester.
+Fix (2026-10-15, tester; the host and renderer tests named below):
+- The host keeps the display name only. `personNameFrom` (`packages/host/src/auth/portal-client.ts:277`) reads the username only to drop a display name that equals it, ignoring case, and the token's name is set at `:313`.
+- Sign-in writes the display name, or the id when there is none, at every sign-in (`packages/db/src/portal-owner.ts:213-223`; the login route passes an explicit null when the portal sends no name, `packages/host/src/auth/routes.ts:519`), so a name stored by the old username fallback is replaced at that person's next sign-in. A provision that states no name at all keeps the stored name.
+- Every list reads the name through `realPersonName` (`packages/host/src/company-people.ts:8`): null when the stored name is blank or is the person's id. It serves the invitable list and the board's people list (`listCompanyPeople`, `company-people.ts:13`), and the members list (`toMember`, `packages/host/src/projects/service.ts:210`).
+- The renderer shows the name, or `Colleague <code>` with a six-character code taken from the id (`apps/web/lib/people-names.ts`; `projects.members.unnamed` in `en` and `id`). The picker's search matches the label shown, never the id. The Members tab's "Your account id" line is removed (its keys left both catalogs), since the picker now chooses by name.
+- Account creation is not changed. The operator's `--name` (`apps/portal/src/accounts/args.ts`) stays optional, because the neutral label covers accounts made without one and existing accounts need the label anyway.
+
+Tests: `packages/host/src/company-people-names.test.ts` (password mode, through the real router: the invitable list, the members list and the board's people list carry no username; a display name equal to the username, and a row that stored the username, come out as no name); `packages/host/src/auth/portal-client.test.ts` ("the person's name in the token body"); `packages/db/src/portal-owner.test.ts` ("the person's name from the portal"); `packages/host/src/projects-members.test.ts` (the people picker's names); `apps/web/lib/projects-picker.test.tsx` (renders names only); `apps/web/lib/projects-members.test.tsx`; `apps/web/lib/people-names.test.ts`; `apps/web/lib/board-view.test.ts`.
+
+Status: **fixed on the tester, 2026-10-15; one residual.** A row that stored a username in the window between `204aeaa8` and this fix keeps it until that person's next sign-in: the host holds no username, so it cannot tell a stored username from a name at read time. Open for Rizky: a one-off clean-up with the portal for the people who have not signed in since, and whether `--name` should become required for new password accounts. The portal token still carries `username` (`apps/portal/src/flows/token.ts:246`); the host now reads it only for the comparison. Dropping it from the token is a portal change, not made here.
+
+Gate: before HYP AI imports from the tester. The residual is named in the same gate.
 
 ## Must be true before the Tencent Cloud deploy
 

@@ -100,13 +100,23 @@ describe("the person's name from the portal", () => {
     expect(await nameOf("usr_b")).toBe("usr_b");
   });
 
-  it("takes a changed name at the next sign-in, and keeps the name when a sign-in carries none", async () => {
+  it("takes a changed name at the next sign-in", async () => {
     await ensurePortalOwner(db, OWNER_A);
     await ensurePortalOwner(db, { ...OWNER_A, name: "rina" });
     expect(await nameOf("usr_a")).toBe("rina");
-    await ensurePortalOwner(db, { ...OWNER_A, name: null });
-    expect(await nameOf("usr_a")).toBe("rina");
     await ensurePortalOwner(db, { ...OWNER_A, name: "Rina Wulandari" });
+    expect(await nameOf("usr_a")).toBe("Rina Wulandari");
+  });
+
+  it("sets the id back at a sign-in that carries no name, so a name stored earlier never outlives the portal's word (SR-181)", async () => {
+    await ensurePortalOwner(db, { ...OWNER_A, name: "rina" });
+    await ensurePortalOwner(db, { ...OWNER_A, name: null });
+    expect(await nameOf("usr_a")).toBe("usr_a");
+  });
+
+  it("keeps the stored name when a provision does not state a name at all, and never writes the id over it", async () => {
+    await ensurePortalOwner(db, { ...OWNER_A, name: "Rina Wulandari" });
+    await ensurePortalOwner(db, OWNER_A);
     expect(await nameOf("usr_a")).toBe("Rina Wulandari");
   });
 });

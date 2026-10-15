@@ -3,10 +3,15 @@ import type { TenantContext } from "@agentforge/core";
 
 export type CompanyScope = Pick<TenantContext, "tenantId" | "organizationId">;
 
-export type CompanyPerson = { readonly userId: string; readonly name: string };
+export type CompanyPerson = { readonly userId: string; readonly name: string | null };
+
+export function realPersonName(userId: string, stored: string | null | undefined): string | null {
+  const name = stored?.trim() ?? "";
+  return name === "" || name === userId ? null : name;
+}
 
 export function listCompanyPeople(scope: CompanyScope): CompanyPerson[] {
-  return sql
+  const rows = sql
     .prepare(
       `SELECT u.id AS userId, u.name AS name
          FROM organization_members om
@@ -15,7 +20,8 @@ export function listCompanyPeople(scope: CompanyScope): CompanyPerson[] {
         WHERE om.organization_id = ? AND o.tenant_id = ?
         ORDER BY u.name, u.id`,
     )
-    .all(scope.organizationId, scope.tenantId) as CompanyPerson[];
+    .all(scope.organizationId, scope.tenantId) as Array<{ userId: string; name: string | null }>;
+  return rows.map((row) => ({ userId: row.userId, name: realPersonName(row.userId, row.name) }));
 }
 
 export function isCompanyMember(scope: CompanyScope, userId: string): boolean {

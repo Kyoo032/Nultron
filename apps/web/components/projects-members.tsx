@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { PeoplePicker } from "@/components/projects-people-picker";
 import { isHostedBuild } from "@/lib/hosted-build";
 import { t } from "@/lib/i18n";
+import { personName } from "@/lib/people-names";
 import {
   bringProjectAgent,
   handOverProject,
@@ -51,9 +52,9 @@ function agentName(agentId: string): string {
   return virtualAgentName({ id: agentId as VirtualAgentInfo["id"], generalist: false }, "");
 }
 
-function personName(people: ProjectPeople, userId: string, me: string | null): string {
+function labelOf(people: ProjectPeople, userId: string, me: string | null): string {
   const found = people.members.find((member) => member.userId === userId);
-  const name = found?.name ?? userId;
+  const name = personName({ userId, name: found?.name ?? null });
   return userId === me ? `${name} (${t("projects.members.you")})` : name;
 }
 
@@ -83,8 +84,6 @@ export function ProjectMembersView({
   const viewer = me ? { userId: me, role: project.role } : null;
   const bringable = agentsToBring(deskAgents, people.agents);
   const chosen = bringable.some((agent) => agent.id === pick) ? pick : (bringable[0]?.id ?? "");
-  const myName = people.members.find((member) => member.userId === me)?.name;
-  const nameUnknown = me !== null && (myName === undefined || myName === me);
 
   function submitBring(event: FormEvent) {
     event.preventDefault();
@@ -107,7 +106,7 @@ export function ProjectMembersView({
         <ul className="projects-file-list">
           {people.members.map((member) => {
             const can = memberActions(viewer, member);
-            const label = personName(people, member.userId, me);
+            const label = labelOf(people, member.userId, me);
             return (
               <li
                 key={member.userId}
@@ -176,11 +175,6 @@ export function ProjectMembersView({
         {canManage(project.role) ? (
           <PeoplePicker people={candidates} loadFailed={candidatesFailed} busy={busy} onInvite={actions.invite} />
         ) : null}
-        {nameUnknown ? (
-          <p className="projects-note" data-testid="projects-your-id">
-            {t("projects.members.yourId", { id: me })} {t("projects.members.yourIdNote")}
-          </p>
-        ) : null}
       </section>
 
       <section className="projects-members-section">
@@ -202,7 +196,7 @@ export function ProjectMembersView({
                 <span className="projects-file-main">
                   <span className="projects-file-title">{agentName(agent.agentId)}</span>
                   <span className="projects-file-meta">
-                    {t("projects.agents.broughtBy", { name: personName(people, agent.broughtBy, me) })}
+                    {t("projects.agents.broughtBy", { name: labelOf(people, agent.broughtBy, me) })}
                   </span>
                 </span>
                 <span className="projects-file-actions">
@@ -329,7 +323,7 @@ function MembersContainer({ project, me, onChanged, onLeft }: PanelProps) {
     setRole: (member, role) => void run(() => setProjectMemberRole(project.id, member.userId, role)),
     remove: (member) => void run(() => removeProjectMember(project.id, member.userId)),
     handOver: (member) => {
-      if (window.confirm(t("projects.members.confirmHandOver", { name: member.name }))) {
+      if (window.confirm(t("projects.members.confirmHandOver", { name: personName(member) }))) {
         void run(() => handOverProject(project.id, member.userId));
       }
     },
