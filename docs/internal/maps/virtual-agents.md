@@ -1,6 +1,6 @@
 # Map: Virtual agents
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 Last verified: 2026-10-09 at 7de8aae6 (uncommitted working tree on tester/chat-first). Read from the code of that working tree, and driven in a browser the same day (below). The unit tests named here were not run for this page.
 
@@ -116,7 +116,7 @@ Driven 2026-10-09 on a brand that names no separate character: the ping carried 
 - `webapp-deploy/.env.example:87-93` lists `AGENTFORGE_GATEWAY_NAME` and `AGENTFORGE_PRODUCT_NAME` and not `AGENTFORGE_ASSISTANT_NAME`. A hosted brand has to know to set it.
 - A desk that already stored its Soul keeps the stored name. `getSoul` returns `defaultSoul()` only when the desk has no row, or the row is the old "Forge" default (`packages/host/src/knowledge.ts:143-157`). On such a desk the rail and the greeting follow the setting, and the name the model is told does not.
 
-These two steps are owed before a branded flavor, such as the HYP AI clone, shows its own character. Shared code and copy hold no brand literal.
+These two steps are owed before a branded flavor, such as HYP AI's own repo, shows its own character. Shared code and copy hold no brand literal.
 
 ### 6. Hiring and letting go
 
@@ -249,5 +249,5 @@ Unit tests that pin parts of this page: `packages/core/src/agents/virtual-agents
 - **Why every agent is a full chat.** `[Direct]` the owner, 2026-10-09, instructions 2 and 3 at the top of this page. It departs from the plan's "a bot is one harness" (`chat-first-plan.md`, "Second reference") and from the advice that a prompt-only agent is what the product is not. It is the owner's call. What keeps it honest: the tools and budget are still the host's, and the screen and the prompt say where the specialty's checked run lives.
 - **Why prompt, tools and budget come from code and not from the row.** `[Direct]` `packages/host/src/virtual-agents.ts:26-28`: nothing stored on a desk can widen what an agent may do. This holds for a mode agent. The default agent still takes its prompt and bindings from its stored row, as Chat always did.
 - **Why a mode agent has a closing line.** `[Direct]` the comment at `packages/core/src/agents/virtual-agents.ts:52-58`: the Soul block names the desk's default assistant and tells the model to use that name and no other, and the Images agent answered with it when driven.
-- **Why the default agent is the brand's character.** `[Direct]` the owner, instruction 1 at the top of this page. On the public brand the character carries the product's name; the HYP AI brand's name for it is a setting that is not wired yet (section 5).
+- **Why the default agent is the brand's character.** `[Direct]` the owner, instruction 1 at the top of this page. On the public brand the character carries the product's name; a white-label brand's name for it is a setting that is not wired yet (section 5).
 - **Why virtual agents at all.** `[Direct]` the owner, 2026-10-09: "we're going to revamp this to be more like muse and hark style, focuses on UIUX of the chat mode, removing all the workspaces and hide them, also to rebrand the name of workspaces into virtual agents, with each using their own harness and with skill and tools embed inside". "Hark" was named as a look reference; no screenshot or link for it is on file, so the layout follows the two 2026-10-06 references only.

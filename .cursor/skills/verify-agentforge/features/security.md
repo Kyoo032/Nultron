@@ -2,7 +2,7 @@
 
 Settings can confirm which gateway key is saved without ever showing the raw secret. The host hashes the trimmed key (SHA-256) and returns a short `sha256:` prefix. TLS and at-rest seal are already in product; this file maps those surfaces, it does not claim a new envelope. Map: [`docs/internal/maps/pii-and-key-security.md`](../../../../docs/internal/maps/pii-and-key-security.md).
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 

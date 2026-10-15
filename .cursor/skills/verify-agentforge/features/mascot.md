@@ -2,7 +2,7 @@
 
 Nultron is the desk's one character, drawn by one component, `NultronMascot` (`apps/web/components/nultron/nultron-mascot.tsx`): a root `chat-mascot` with `data-mascot="nultron"`. What it does is data, 21 states in `apps/web/lib/mascot-states.ts`; what it looks like is a set of pre-rendered 3D images named by `apps/web/components/nultron/images/manifest.json` (a still per state, a one-shot clip for six states, a four-frame loop for thirteen working states). Job desks place it through `MascotSlot`; Chat's hero and live turn are in [chat.md](./chat.md). Since 2026-10-01 it also stands in the rail as the **desk buddy** (`apps/web/components/desk-buddy.tsx`), the one status character while it is on screen: the sub-features and recipes for it are `desk-buddy*` below. The map is [`docs/internal/maps/mascot-and-brand.md`](../../../../docs/internal/maps/mascot-and-brand.md).
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 

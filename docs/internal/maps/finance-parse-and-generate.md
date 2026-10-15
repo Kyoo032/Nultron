@@ -1,6 +1,6 @@
 # Map — Finance: parse and generate
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 Last verified: 2026-10-11 on 2df34be (SH-006: the read button follows the gate on every task; only the read-button and generate cites, plus section 4's Paste paragraph, were re-checked, and the other cites on this page are unchanged and some were already stale; code-read and unit-tested, not driven). Earlier: 2026-10-05, PR #133 merged with `origin/main` at 99922bb, not re-driven (the `:3000` host needs a restart). The brief asks once more when the draft is not sections, then checks that a sentence quoting operating profit or net profit does not say the opposite of that sign. `BRIEF_SYSTEM` is unchanged. The cancel signal now reaches the second ask and the direction rewrite, and a cancelled run is not saved. The two model-choice bullets in § 6 were last verified 2026-09-30 against the model lists of that day ([`model-policy.md`](model-policy.md) § 7; not driven). Earlier: 2026-09-26 at 083f925. A catalog sentence is rewritten by `labeledAmountLines` before the model path. The renderer surface in § 2 and the paste door in § 4 were re-read against the guided path on 2026-09-26 at 4477d27 and driven on stub webdev.
 

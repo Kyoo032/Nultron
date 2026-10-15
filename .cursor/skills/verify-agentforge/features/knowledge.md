@@ -2,7 +2,7 @@
 
 Knowledge is an Account-rail page (like Usage), not a `PRODUCT_MODES` id. Soul, pinned Memory, and Sources persist in workspace SQLite. The owner picks Embedding / Brain / Verifier models. Chat injects soul + pinned memories + RAG-retrieved chunks (vectors with FTS fallback). Map reviews the desk; stub map is valid. Sources also fill themselves: every finished Chat turn or job writes a text work card (see [knowledge-ingest.md](./knowledge-ingest.md)); the Sources tab shows that cycle as `knowledge-loop`. See [`docs/internal/maps/knowledge-base-page.md`](../../../../docs/internal/maps/knowledge-base-page.md) for how the page itself works (routes, the one `reload()`, the loop maths, the graph fetch, and what Chat does with Soul / Memory / Sources), and [`docs/internal/maps/knowledge-ingest-loop.md`](../../../../docs/internal/maps/knowledge-ingest-loop.md) for the ingest pipeline behind it.
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 

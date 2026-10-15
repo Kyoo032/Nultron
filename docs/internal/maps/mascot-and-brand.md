@@ -1,6 +1,6 @@
 # Mascot and brand: the Nultron character
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 Last verified: 2026-10-05 on be2c267 + working tree, for § 4's "Two shells" paragraph, the loop-busy row of § 1's table, "Where things live", "Verify" and the last "Why" entry (the ambient and busy transform loops are smooth in a browser and stepped in the packaged app), driven on webdev; nothing else on the page was re-read that day. Before that: 2026-10-01 on 0b61a29 + working tree, for § 5 (the status character), § 7 (the desk buddy, new) and § 6's wordmark paragraph and the tokens and tests they name. Later the same day, after the Chat redesign, re-read against the source: § 7a (page stages), which had one overclaim and sat before § 7 (now after it), § 5's Chat hero row and the empty-desk rule, the "takesStatus" sentences of § 7, the hero-height gotcha, and every `app/globals.css`, `nultron.css`, `nultron-mascot.tsx` and `chat-hero.tsx` line citation on the page (`globals.css` is about 800 lines longer than when they were written). The rest of the page was last verified 2026-09-29 at aaf249d (uncommitted working tree on top of it)
 

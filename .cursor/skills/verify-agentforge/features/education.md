@@ -2,7 +2,7 @@
 
 Education is a work mode on the Default rail. Opening it with no task shows four plain cards: Lesson, Quiz, A page, and Show. There is no rail chevron in the chat-first shell. Each task is `/education?task=`. An unknown task is the lesson. The lesson that appears is edited by clicking words on the slide. Save and shape tools sit in More (`education-more`). A selected shape gets a small toolbar on the slide. None of these writes with a model, but on a desk with a live key the quiz still reaches the gateway: `POST /api/v1/education/exam` embeds the topic to find passages (see Gotchas). The chooser shows the presenting mascot only while the header stage (`buddy-stage-header`) is not on screen; see the chooser bullet. Map: [`docs/internal/maps/education.md`](../../../../docs/internal/maps/education.md).
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 

@@ -8,7 +8,7 @@ This file lists every product built from this repo, one card per target, coverin
 
 **Agents read this file before starting any task.** Name the target your task serves, then keep the change inside it. If the change lands on another target, stop and say so.
 
-Last updated: 2026-10-14 (repo rename; base agentforge `main` at `c35dc695`). The hex colours below were sampled from each brand's own logo file.
+Last updated: 2026-10-15 (HYP AI moved to its own repo; base agentforge `main` at `8a42aaed`). The hex colours below were sampled from each brand's own logo file.
 
 ## At a glance
 
@@ -16,46 +16,29 @@ Last updated: 2026-10-14 (repo rename; base agentforge `main` at `c35dc695`). Th
 |---|---|---|---|---|---|---|
 | [`nultron-personal`](#nultron-personal) | Desktop app | Public (retired) | Nultron | Toko Token | Retired 2026-10-14. Last release v0.15.1. Repo `Kyoo032/Nultron-Desktop` archived | None. The app is merged into the web app; no new cut |
 | [`nultron-enterprise`](#nultron-enterprise) | Hosted web app | Nultron Enterprise customers (via DPS) | Nultron | Toko Token + BYOK | Pilot, not deployed. A password-gated single-desk preview (one private desk per tester) runs at app.nultron-ai.xyz since 2026-10-06. Release repo is `Kyoo032/Nultron-Releases` (renamed from `Kyoo032/Nultron` on 2026-10-15) | First Tencent Enterprise deploy, Thu 8 Oct; it replaces the preview |
-| [`hyp-ai`](#hyp-ai) | White-label hosted | Hypernet (XLSMART) | HYP AI | TokenKu | Setting up | Rebrand the clone; plan approval |
-| [`kemenkeu-ai`](#kemenkeu-ai) | Desktop flavor | Kemenkeu (Ministry of Finance) | Kemenkeu AI | AIHub | Built locally | Later, after Nultron and HYP AI |
-| [`aihub-metranet`](#aihub-metranet) | Desktop flavor | Metranet (Telkom Indonesia) | AIHub Metranet | AIHub | Built locally | Later, after Nultron and HYP AI |
+| [`hyp-ai`](#hyp-ai) | White-label hosted | Hypernet (XLSMART) | HYP AI | TokenKu | Own repo since 2026-10-15 (`Kyoo032/hyp-ai`), not built from here | Its own repo |
+| [`kemenkeu-ai`](#kemenkeu-ai) | Desktop flavor | Kemenkeu (Ministry of Finance) | Kemenkeu AI | AIHub | Built locally | Later, after Nultron |
+| [`aihub-metranet`](#aihub-metranet) | Desktop flavor | Metranet (Telkom Indonesia) | AIHub Metranet | AIHub | Built locally | Later, after Nultron |
 
 ## Scope now (Rizky, 2026-10-05)
 
-**Nultron and HYP AI come first.** Kemenkeu AI and AIHub Metranet come later and get no work until then.
-
-The next milestone is to **simulate pushing one agentforge update into both brands**, to prove the update path before Hypernet gets a VM. Plan:
-
-1. Make one small, real change in agentforge and merge it to `main`.
-2. Push it into **Nultron Enterprise**:
-   - run `release-web.mjs --dry-run` on the new sha;
-   - rebuild the local pilot stack (`webapp-deploy/pilot-local.mjs`) from that sha;
-   - check the change is live.
-3. Push it into **HYP AI**:
-   - export the new sha into `hypey\app`;
-   - `git apply --3way --binary hyp-brand.patch`;
-   - run the tests;
-   - build the images;
-   - run them as a stand-in for Hypernet's VM: a local compose stack with its own volumes, then `update.sh <tag>`;
-   - check the change is live and the brand survived.
-4. Record each step's time, every patch conflict, and what broke. The results decide whether the brand-config build-out (see `hyp-ai` below) is needed now or can wait.
+**Superseded 2026-10-15.** HYP AI is its own repo and takes no push from here. The sync plan that stood in this section is history, kept in git.
 
 ## Which targets a change touches
 
 | Path | Targets |
 |---|---|
-| `apps/web/**`, `packages/**` | Every target. The renderer and host are shared. HYP AI receives it on its next sync. |
-| Code behind `isServerMode()` / `isHostedBuild()` | `nultron-enterprise`, `hyp-ai`. Personal must stay identical, proven by a parity test. |
+| `apps/web/**`, `packages/**` | Every target built from here. The renderer and host are shared. |
+| Code behind `isServerMode()` / `isHostedBuild()` | `nultron-enterprise`. Personal must stay identical, proven by a parity test. |
 | `apps/desktop/**` | `nultron-personal`, `kemenkeu-ai`, `aihub-metranet` |
 | `apps/desktop/branding/<id>/**` | That one desktop target only |
-| `apps/portal/**`, `webapp-deploy/**`, `scripts/release-web.mjs` | `nultron-enterprise`, and `hyp-ai` through its bundle |
-| `C:\Users\rizky\hypey\**` (outside this repo) | `hyp-ai` only |
+| `apps/portal/**`, `webapp-deploy/**`, `scripts/release-web.mjs` | `nultron-enterprise` |
 | `apps/mobile/**` | None. It holds rules only, and nothing ships from it. |
 
 ## Brand rules for every target
 
 - **Gateway names stay distinct.** Toko Token, TokenKu and AIHub are three different gateways. Never merge or swap their names in copy, catalogs or prompts.
-- **White-label brands show TokenKu (Rizky, 2026-10-05).** Users of HYP AI, and of every later white-label brand, see TokenKu as the gateway. Until TokenKu keys exist, the backend of those brands calls the Toko Token endpoint `https://api.tokotokenai.com/v1`. That is a backend setting only; never show the Toko Token name or host in their UI copy. **Nultron keeps Toko Token** as its gateway, in the UI and in the backend (Rizky, 2026-10-05).
+- **White-label brands show TokenKu (Rizky, 2026-10-05).** Users of every white-label brand, HYP AI included (its own repo since 2026-10-15), see TokenKu as the gateway. Until TokenKu keys exist, the backend of those brands calls the Toko Token endpoint `https://api.tokotokenai.com/v1`. That is a backend setting only; never show the Toko Token name or host in their UI copy. **Nultron keeps Toko Token** as its gateway, in the UI and in the backend (Rizky, 2026-10-05).
 - **Each client's art stays in its own build.** A client's logo, mascot or colours never appear in another target's installer, image or screenshots.
 - **Never edit a client's logo.** Use the file exactly as received. To shrink a logo, crop it; never redraw it.
 - **Copy follows `{productName}` and `{gatewayName}`.** A literal product or gateway name in UI copy is a bug on every other target.
@@ -145,86 +128,7 @@ The next milestone is to **simulate pushing one agentforge update into both bran
 
 ## hyp-ai
 
-<img src="file:///C:/Users/rizky/hypey/intake/hypey-hello.png" alt="Hypey, the HYP AI mascot and logo" width="120">
-
-The client's art stays outside this repo, at `C:\Users\rizky\hypey\intake\hypey-hello.png` (4725 × 4725 PNG, Hypey waving).
-
-**Identity**
-
-| Element | Value | Notes |
-|---|---|---|
-| Name | **HYP AI** | Exactly these letters and that space |
-| Company line | Hypernet, an XLSMART company | As printed on Hypey's jacket |
-| Logo | **Hypey** | A head-and-helmet crop for favicons and the rail mark. Hypernet's own logomark (the white mark on the helmet) needs their permission first. |
-| Mascot | Hypey: a field technician in a teal hard hat and black work jacket, waving | One 2D pose today, which stands in for all 21 states. A 3D render set is planned, built the way `tools/nultron-3d` built Nultron's. |
-| Type | Not chosen yet | Inherits DM Sans and Source Serif 4 until Hypernet sends brand guidelines |
-| Voice | Not given yet | Use Nultron's plain, friendly voice under the HYP AI name |
-
-| Colour | Hex | Role |
-|---|---|---|
-| Helmet teal | `#209D84` | fills, gradients, the mascot. About 3.4:1 on white, so never use it for body text. |
-| Light teal | `#38B39C` | highlights on dark surfaces |
-| Shade teal | `#1F8B7B` | secondary fills |
-| Deep teal | `#1C756D` | accent text, buttons and links on light (about 5.5:1 on white) |
-| Jacket black | `#282C2D` | ink and dark surfaces |
-| App accent (light) | `#0E7565` | in-app text accent and buttons, 5.6:1 on white |
-| App accent (dark) | `#3FC4AA` | in-app accent on dark, 8.4:1 |
-
-The two app-accent tokens are the ones the HYP AI build actually uses (`apps/web/app/globals.css` in `hypey\app`); the rest are sampled from the Hypey art.
-
-**Release**
-
-- **Type:** white-label of [`nultron-enterprise`](#nultron-enterprise), hosted only.
-- **Company:** Hypernet (XLSMART).
-- **Codebase:** agentforge `main`, synced into `C:\Users\rizky\hypey\app` with the brand applied.
-  - It has fresh git history.
-  - Never edit it by hand: fixes go to agentforge, then a new sync.
-  - The source sha is in `hypey\intake\SOURCE_SHA` (`b58383d` on 2026-10-05).
-  - Agent files and `docs/internal/` are stripped, with one exception: `docs/internal/portal/migrations/` stays, because the portal reads its shared SQL migrations from there (`apps/portal/src/store/postgres/migrate.ts:30`).
-- **Gateway shown to users:** TokenKu, in the demo and in every HYP AI build (Rizky, 2026-10-05).
-- **Interim backend:** the backend calls **`https://api.tokotokenai.com/v1`** until TokenKu keys exist, because the only API key available today is a Toko Token key.
-  - The switch is two constants, both marked `INTERIM`: the pin in `packages/core/src/gateway/pinned.ts` (URL plus SHA) and `GATEWAY_HOST` in `packages/core/src/gateway.ts`. The tests assert the interim endpoint.
-  - Target: `https://api.tokenku.ai/v1`, with SHA `154fd598f550478d375e0ebc28410577f8c978c6b52e39f26d9d9a33523dfb55`.
-- **Services:** the same compose stack as Enterprise (app, Caddy, portal, Postgres), branded HYP AI.
-- **Where it runs:** a VM that Hypernet provides. Rizky deploys over SSH. The VM is not provisioned yet.
-- **Ships by:**
-  - *Interim:*
-    1. Export agentforge `main` into `hypey\app`.
-    2. `git apply --3way` the brand patch.
-    3. Test, then commit `Release <tag>`.
-    4. Build the images.
-    5. Copy the tarball and bundle to the VM and run `./update.sh <tag>`.
-  - *Target:* `scripts/release-brand.mjs --brand hypernet`, reading brand data from `brands/hypernet/`. This is not built yet and waits on approval of the plan.
-- **Tag:** `hyp-YYYY.MM.DD` (proposed). Each tag maps to one agentforge sha.
-- **Rule:** ship only a sha that has already been released and driven as `nultron-enterprise`.
-- **Current (end of 2026-10-05):** synced to agentforge b39cdf2 by vendor branch (`hypeyintakeSYNC.md`) and running on :3301. Slides, video, SOP and research were driven live. Deck, 90 s video and DEMO.md were in progress for the 06 Oct demo.
-- **Earlier:** the clone was rebranded (2026-10-05) but nothing was committed or released.
-  - The brand patch is `hypey\intake\hyp-brand.patch`: 292 files and 13.5 MB, because it carries the logo and mascot binaries.
-  - Lint, tsc, and the web, core and host suites pass.
-  - Screenshots are in `hypey\intake\screens\`.
-- **Not yet rebranded:**
-  - "Contact DPS" in the plans copy.
-  - `scripts/release-web.mjs` still names the Enterprise release repo (`Kyoo032/Nultron-Releases`, renamed 2026-10-15) and `ghcr.io/kyoo032/nultron-*`.
-  - Defaults and copyright lines that name Rizky.
-- **Behaviour tuned for Toko Token, not yet checked against TokenKu:**
-  - The Suno relay.
-  - The image and video routes.
-  - The model-id preference lists.
-  - The wallet and usage endpoints.
-- **Focus now:**
-  1. Probe TokenKu with a real key: models, image, video, music, usage.
-  2. Owner decisions:
-     - the brand-config build-out (about 12–14 days);
-     - image tarball or a registry;
-     - BYOK: TokenKu only, or all five providers;
-     - whether Hypernet gets source code;
-     - TLS, SMTP and backups;
-     - whether to hide the plans page.
-  3. Later: the 3D Hypey render set.
-- **Docs:**
-  - `hypey\intake\BRIEF.md`.
-  - `hypey\intake\WHITE_LABEL_PLAN.md`.
-  - The visual plan: https://claude.ai/artifact/57kU4X3iAuJY3CiHB1Fh8G.
+HYP AI moved to its own repo on 2026-10-15 (`Kyoo032/hyp-ai`). It is no longer built from this repo: nothing here syncs into it, and its brand, deploy and release notes live there. The brand rules that still apply to shared code are in "Brand rules for every target" above.
 
 ## kemenkeu-ai
 

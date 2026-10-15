@@ -1,6 +1,6 @@
 # Map — Renderer media: what an answer is allowed to load
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 Last verified: 2026-09-20 at 6984d84
 

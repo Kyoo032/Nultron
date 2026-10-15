@@ -2,7 +2,7 @@
 
 Every finished piece of work becomes a **text work card** in the Knowledge Base without the user doing anything: Chat turns, Images / Videos / Edit generates, Research dossiers, Data analyses, Finance briefs, Documents drafts, Presentation outlines. Bytes stay where they already live (`media` rows, `artifacts` rows); the card carries title, mode, prompt excerpt, a pointer (`media:<id>` / `artifact:<id>` / `thread:<id>`), and a capped body (≤ 8k chars). Chat retrieves cards, never mp4s. The Sources tab shows the cycle as `knowledge-loop`. Stub runtime indexes too, so a webdev stub proof is valid. Per-surface detail — what triggers each mode's card, what text lands in it, what is left out, who can retrieve it and what a delete removes — is [`docs/internal/maps/knowledge-flows.md`](../../../../docs/internal/maps/knowledge-flows.md); the pipeline underneath it is [`docs/internal/maps/knowledge-ingest-loop.md`](../../../../docs/internal/maps/knowledge-ingest-loop.md).
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 

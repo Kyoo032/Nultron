@@ -2,7 +2,7 @@
 
 Finance is prompt-first. `/finance` with no task is `finance-auto`: a prompt box and a drop zone, where a file is read for free (`POST /api/v1/finance/import`, then `POST /api/v1/finance/auto`, code only, no gateway gate), the page shows which task the numbers fit and a preview, and the one paid step is `finance-auto-write` ("write it up", `POST /api/v1/finance/stream`). The five task cards sit inside a closed `finance-more` disclosure; a card or `finance-auto-check-rows` open `/finance?task=<id>`, which is the older numbers → result → export page. Each task keeps its own inputs and its own result, and one export in Excel, PowerPoint or Word. Each task keeps its own inputs and its own result, and one export in Excel, PowerPoint or Word. It is not a spreadsheet. There are no starter cards and no canned preview: every written result comes from a live generate, so the result-and-download surface needs a working gateway key. The host never invents figures. How it works underneath: [`docs/internal/maps/finance-parse-and-generate.md`](../../../../docs/internal/maps/finance-parse-and-generate.md), and the task catalog in [`docs/internal/maps/finance-tasks.md`](../../../../docs/internal/maps/finance-tasks.md).
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 

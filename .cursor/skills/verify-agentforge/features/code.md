@@ -2,7 +2,7 @@
 
 `run_code` is the sandbox tool: the model can run a short Python or JavaScript program, read what it printed, and save text results to the desk. It is not a product mode, has no rail entry and no page of its own. The owner reaches it by asking Chat to compute or analyse something, and the only on-screen evidence is its tool row inside the Thinking disclosure and the files it saved. This recipe has two halves: the real engines driven from the repo (no key and no browser), and the Chat scenarios (a live key, a browser, and a host started after 2026-10-03). Map: [`docs/internal/maps/agent-tools-and-files.md`](../../../../docs/internal/maps/agent-tools-and-files.md) § 12. The Chat side of the tool rows is also in [chat.md](./chat.md), and the files it writes are in [files.md](./files.md).
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 
