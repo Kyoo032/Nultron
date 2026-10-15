@@ -54,6 +54,16 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Enterprise look: one token block, scoped to `html[data-product-shell="enterprise"]` (team board K-D34 item 1), 2026-10-15 (tester, uncommitted on `tester/chat-first`; not driven in a browser)
+
+Lanes: enterprise, hyp-ai, tester. `apps/web/app/globals.css` is shared renderer code. Personal and the default shell are untouched: every rule added sits under the enterprise attribute, and the rest of the file matches `HEAD` after the scoped rules are removed. The attribute is written on `<html>` by `ProductBrandProvider` (`apps/web/lib/product-brand.tsx:172`), so the scope is `html` and `html.dark`; the shell `<div>` in `app-shell.tsx` carries it too but is not the selector's target.
+
+- Light (`html[data-product-shell="enterprise"]`): the spec's page `#fafaf8`, sidebar `#f1f0ec`, white raised surfaces, one accent `#0f5c7a`, system sans, 6px radii (`--r-nav`, `--r-card`, `--r-hero`); every `--mode-*` and `--page-mode` maps to `var(--text-3)`.
+- Dark (`html.dark[data-product-shell="enterprise"]`): the dark surfaces of the earlier enterprise block and the old mock's dark sidebar (`#0f1e1b`). The accent is the light accent's hue lifted for the dark page (`#5eabc9`, 197 degrees, the same hue as `#0f5c7a`), not the old mock's teal `#3fc4aa`, so there is one accent in both themes. The mock folder in the scratchpad has no dark theme, so these dark values are derived, not read from a mock.
+- Off, in the scope only: the canvas wash and the Chat sky (`.desk-canvas`, and its `:has(chat-home)` rule, which needs the longer selector to beat (0,3,0)), the dot grid and pointer light (`.desk-backdrop`), the floating shapes (`.float-shapes`), the mascot (`.chat-mascot.nx-root`, which needs (0,3,1) to beat `nultron.css`), the empty-Chat orb that holds the mascot (`.chat-hero-orb`), the desk buddy (`.buddy-stage`, `.desk-buddy`, `.desk-buddy-dock`, `.desk-buddy-chip`, `.agent-rail-buddy-dock`), the mode header art (`.mode-header-art`) and the hero's gem rings (`.chat-hero-panel::before`).
+- `apps/web/lib/enterprise-look.test.ts` (11 tests) holds the scope, the HEAD comparison (`git show HEAD:apps/web/app/globals.css`), the values, the one-hue accent, the mode mapping, the dark parity, the hidden classes, the contrast pairs and the no-comment rule.
+- Not done here: the rail, the chat column and the composer layout (the spec's layout item), the first-run modes, and any component. First paint: the attribute is set in an effect after mount, so the first frame of an enterprise desk may paint the default colours.
+
 ## Prompt-made agents: the renderer (rail, New agent page, delete), 2026-10-15 (tester K34-c, on top of the host half `3b58cd6d`; not driven in a browser)
 
 Lanes: hyp-ai, tester
