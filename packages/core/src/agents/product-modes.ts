@@ -68,12 +68,6 @@ export const FIRST_RUN_MODES: readonly ProductMode[] = Object.freeze([
   "presentations",
 ] satisfies ProductMode[]);
 
-/**
- * What the hosted Enterprise app creates a tenant's first desk with: every mode, exactly as before.
- * The owner has not decided Enterprise's first desk, so the Personal rule above does not reach it.
- * `ensurePortalOwner` (`packages/db/src/portal-owner.ts`) reads this; `ensureLocalOwner` reads
- * `FIRST_RUN_MODES` through `firstDeskModes(false)`.
- */
 export const HOSTED_FIRST_DESK_MODES: readonly ProductMode[] = Object.freeze([...WORK_PRODUCT_MODES]);
 
 export const ENTERPRISE_FIRST_DESK_MODES: readonly ProductMode[] = Object.freeze(["chat"] satisfies ProductMode[]);
