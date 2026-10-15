@@ -11,8 +11,9 @@ const FENCE = /^\s{0,3}(```|~~~)/;
 export function bindingsForChatModality<T extends { toolKey: string }>(
   bindings: readonly T[],
   modality: InputModality,
+  options: { keepGenerateTools?: boolean } = {},
 ): T[] {
-  if (modality === "text") {
+  if (modality === "text" || options.keepGenerateTools) {
     return [...bindings];
   }
   const hidden = new Set<string>(CHAT_UNDERSTAND_HIDDEN_TOOLS);

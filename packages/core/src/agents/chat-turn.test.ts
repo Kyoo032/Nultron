@@ -272,4 +272,20 @@ describe("Chat turn check", () => {
       "past_sessions",
     ]);
   });
+
+  it("keeps both generate tools on an attached turn only when the approval gate says so", () => {
+    const bindings = [
+      { toolKey: "calculator" },
+      { toolKey: "image_generate" },
+      { toolKey: "video_generate" },
+      { toolKey: "past_sessions" },
+    ];
+    const keysFor = (modality: "image" | "video", keepGenerateTools?: boolean) =>
+      bindingsForChatModality(bindings, modality, { keepGenerateTools }).map((binding) => binding.toolKey);
+    for (const modality of ["image", "video"] as const) {
+      expect(keysFor(modality)).toEqual(["calculator", "past_sessions"]);
+      expect(keysFor(modality, false)).toEqual(["calculator", "past_sessions"]);
+      expect(keysFor(modality, true)).toEqual(["calculator", "image_generate", "video_generate", "past_sessions"]);
+    }
+  });
 });

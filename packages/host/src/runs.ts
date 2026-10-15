@@ -53,6 +53,7 @@ import {
 import { redactToolEvent } from "./chat-tool-events";
 import { historyMediaPart, historyToolNote } from "./chat-history-note";
 import { ensureToolsRegistered } from "./register-tools";
+import { mediaApprovalOn } from "./media-approval/gate";
 import { recordChatRunUsage } from "./usage-record";
 import { loadSettings, loadUserLocale } from "./settings-store";
 import { defaultSelectableModel, listSelectableModels } from "./selectable-models";
@@ -516,7 +517,9 @@ export async function* startModalityRun(options: {
             modality: options.modality,
             version: activeVersion,
             bindings: agentPolicy
-              ? bindingsForChatModality(agentPolicy.bindings, options.modality)
+              ? bindingsForChatModality(agentPolicy.bindings, options.modality, {
+                  keepGenerateTools: mediaApprovalOn(),
+                })
               : bindingsForChatModality(
                   // The default agent can run every wired harness from its own chat, hired or not.
                   defaultChat
@@ -525,6 +528,7 @@ export async function* startModalityRun(options: {
                       ? published.bindings
                       : withPastSessionsBinding(published.bindings),
                   options.modality,
+                  { keepGenerateTools: mediaApprovalOn() },
                 ),
             // The default agent's budget is Chat's declared one plus a ceiling for each worker; a mode
             // agent's is its own; an agent the owner built keeps the runtime's.
