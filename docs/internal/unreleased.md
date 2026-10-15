@@ -54,6 +54,15 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Quota core and the gateway call census (team board K-D25 Q1 and Q2), 2026-10-15 (tester; no behaviour change, nothing wired)
+
+Lanes: enterprise, hyp-ai, tester
+
+- `packages/core/src/quota/` (`@agentforge/core/quota`), pure and database-free: `resolveAllocation` (most specific live allocation wins: person, then group, then admins, then everyone; no fall-through to a broader pool; a paused winner refuses `quota_paused`; a non-member gets `quota_none`), `headroomMicros` (with an optional per-person ceiling, failing closed when its counters are missing), the hold and settle maths on the gateway price list (`holdMicros` ceil, `settleMicros` ceil with a 1-micro minimum), `outputCapFor` (one hold takes at most half the headroom; under 256 output tokens is `quota_exceeded`), `withOutputCap` per wire (chat, Responses, Messages, Gemini; keeps a smaller existing cap; unknown wire unchanged) and the error codes with their statuses.
+- `packages/host/src/quota/call-sites.ts` and `gateway-call-sites.test.ts`: every file under `packages/*/src` that matches a gateway call pattern carries a tag (`work`, `platform`, or `none:<reason>`), and every file that calls `createRuntime(`, `new AiSdkRuntime(` or `resolveProviderKeys(` is listed. A new untagged file or a stale entry fails the suite. The scan is by text, so a bare `fetch(` with a key header is not caught yet (the design's later `gatewayFetch()` wrapper closes that).
+- Design and the security review's amendments: the K-D25 design note (the orchestrator's scratchpad), with its open questions for Rizky. Known limit to show Rizky: the half-headroom rule leaves the last part of each allocation unusable, so a person can see "exceeded" beside a positive balance.
+- Tests: core 76, host 7. Not done: schema, store, pricing warm-up, admission, the meter, routes, renderer.
+
 ## Four model choices, core and the host allowance seam (team board K-D31 U1 to U5), 2026-10-15 (tester; nothing wired to a run yet)
 
 Lanes: enterprise, hyp-ai, tester
