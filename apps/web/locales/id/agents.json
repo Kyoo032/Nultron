@@ -108,7 +108,7 @@
     "moreAria": "Lainnya untuk {name}",
     "delete": "Hapus",
     "deleteTitle": "Hapus {name}?",
-    "deleteBody": "Obrolan Anda dengan {name} dihapus, beserta pesan, catatan alat, dan kartu yang ditinggalkannya di Basis pengetahuan. Berkas, unggahan, dan obrolan orang lain tetap ada. {name} dikeluarkan dari Workspace mana pun tempat ia dibawa; Workspace tetap menyimpan semua isinya yang lain.",
+    "deleteBody": "Semua obrolan dengan {name} dihapus, beserta pesan, catatan alat, dan kartu yang ditinggalkannya di Basis pengetahuan. Berkas dan unggahan tetap ada. {name} dikeluarkan dari Workspace mana pun tempat ia dibawa; Workspace tetap menyimpan semua isinya yang lain.",
     "deleteCancel": "Simpan",
     "deleteConfirm": "Hapus agen",
     "deleting": "Menghapus",

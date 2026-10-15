@@ -6151,7 +6151,7 @@ Fix (2026-10-15, tester):
 
 Tests: `packages/host/src/agent-prompt-made.test.ts` (the 404 table for owner, admin and a second member over nine routes; the lists; the delete cases), `packages/core/src/agents/service-privacy.test.ts`, the tenancy harness row for the DELETE route.
 
-Residual: an owner or admin can still delete the agent and with it the maker's chats, by design (K-D34 item 4). The confirmation in the renderer must say so. Sharing a prompt-made agent with a Workspace is not built; when it lands `canView` needs a Workspace clause.
+Residual: an owner or admin can still delete the agent and with it the maker's chats, by design (K-D34 item 4). The confirmation in the renderer says so since 2026-10-15: every chat with the agent is deleted, with its messages, tool records and Knowledge cards (`agents.made.deleteBody` in `apps/web/locales/{en,id}/agents.json:111`, pinned by `apps/web/lib/agent-delete-dialog.test.tsx`). Before that it said other people's chats stay, which was false. Sharing a prompt-made agent with a Workspace is not built; when it lands `canView` needs a Workspace clause.
 
 Review follow-up (2026-10-15, code review of `3b58cd6d`): a member could bind any tool to their own prompt-made agent.
 - Cause: `requireOwned` had dropped the builder check for a private agent, so the older routes `POST /api/v1/agents/:id/tools` and `/soul` (with unvalidated `toolKeys`) reached `bindTool` and `createRevision` for a member, bypassing the mode allow-list. `POST /api/v1/workspaces/:id/agents` also took a member with an unvalidated body, and a non-string `name` made `slugify` throw a 500.
