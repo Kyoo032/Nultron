@@ -153,6 +153,8 @@ describe("a sign-in that succeeds", () => {
     expect(tokens.user_id).toBe(person.userId);
     expect(tokens.tenant_id).toBe(pilot.fixture.tenant.id);
     expect(tokens.role).toBe("member");
+    expect(tokens.username).toBe(person.username);
+    expect(tokens.display_name).toBeNull();
     expect(typeof tokens.access_token).toBe("string");
 
     // From then on the chosen password goes straight through, by username or by the address on record.
@@ -167,11 +169,15 @@ describe("a sign-in that succeeds", () => {
   });
 
   it("gives a person who chose their own password the role the operator made them", async () => {
-    const admin = await makePerson(pilot, { role: "admin", chosen: CHOSEN });
+    const admin = await makePerson(pilot, { role: "admin", chosen: CHOSEN, displayName: "Rina Wulandari" });
     const reply = await signIn(admin.username, CHOSEN, "state-role");
     const redirected = redirectedWith(reply);
     const exchanged = await exchangeCode(pilot.portal, pilot.fixture.clientSecret, redirected?.code ?? "");
-    expect(exchanged.json<{ role: string }>().role).toBe("admin");
+    expect(exchanged.json<{ role: string; display_name: string; username: string }>()).toMatchObject({
+      role: "admin",
+      display_name: "Rina Wulandari",
+      username: admin.username,
+    });
   });
 });
 

@@ -42,9 +42,14 @@ let ben: Person;
 let cara: Person;
 let dan: Person;
 
-async function provision(orgId: string, userId: string, role: "owner" | "admin" | "member"): Promise<Person> {
+async function provision(
+  orgId: string,
+  userId: string,
+  role: "owner" | "admin" | "member",
+  name: string | null = null,
+): Promise<Person> {
   const { db, ensurePortalOwner } = await import("@agentforge/db");
-  const tenant = await ensurePortalOwner(db, { tenantId: PARTNER, orgId, userId, role });
+  const tenant = await ensurePortalOwner(db, { tenantId: PARTNER, orgId, userId, role, name });
   const session = createSession({ tenantId: PARTNER, orgId, userId, now: Date.now() });
   await sessionStore.create(session);
   return { tenant, sessionId: session.id };
@@ -319,6 +324,9 @@ describe("a Workspace is shared with its members only: four people, two companie
     expect(await listed(ben)).toEqual([{ userId: "cara", name: "cara" }]);
     expect(await outcome(await invite(ben, room, "cara"))).toEqual(CREATED);
     expect(await listed(alice)).toEqual([]);
+
+    await provision("org-1", "eva", "member", "Eva Lestari");
+    expect(await listed(alice)).toEqual([{ userId: "eva", name: "Eva Lestari" }]);
   });
 
   it("roles: a member cannot invite until made admin; an admin removes members, never the owner or another admin", async () => {

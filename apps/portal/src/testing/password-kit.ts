@@ -149,6 +149,7 @@ export async function makePerson(
     readonly email?: string;
     readonly role?: UserRole;
     readonly chosen?: string;
+    readonly displayName?: string;
   } = {},
 ): Promise<MadePerson> {
   personSeq += 1;
@@ -161,7 +162,7 @@ export async function makePerson(
       username,
       email: options.email ?? `${username}@pilot.test`,
       role: options.role ?? null,
-      displayName: null,
+      displayName: options.displayName ?? null,
     },
   );
   if (!created.ok) {

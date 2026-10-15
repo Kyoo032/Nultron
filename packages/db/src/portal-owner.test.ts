@@ -87,6 +87,30 @@ describe("ensurePortalOwner", () => {
   });
 });
 
+describe("the person's name from the portal", () => {
+  async function nameOf(userId: string): Promise<string | undefined> {
+    const [row] = await db.select({ name: user.name }).from(user).where(eq(user.id, userId));
+    return row?.name;
+  }
+
+  it("names a new person by the portal's name, and by the id when the portal sends none", async () => {
+    await ensurePortalOwner(db, { ...OWNER_A, name: "Rina Wulandari" });
+    await ensurePortalOwner(db, OWNER_B);
+    expect(await nameOf("usr_a")).toBe("Rina Wulandari");
+    expect(await nameOf("usr_b")).toBe("usr_b");
+  });
+
+  it("takes a changed name at the next sign-in, and keeps the name when a sign-in carries none", async () => {
+    await ensurePortalOwner(db, OWNER_A);
+    await ensurePortalOwner(db, { ...OWNER_A, name: "rina" });
+    expect(await nameOf("usr_a")).toBe("rina");
+    await ensurePortalOwner(db, { ...OWNER_A, name: null });
+    expect(await nameOf("usr_a")).toBe("rina");
+    await ensurePortalOwner(db, { ...OWNER_A, name: "Rina Wulandari" });
+    expect(await nameOf("usr_a")).toBe("Rina Wulandari");
+  });
+});
+
 describe("resolvePortalTenant", () => {
   it("resolves a provisioned identity to its own org and home desk", async () => {
     const provisioned = await ensurePortalOwner(db, OWNER_A);

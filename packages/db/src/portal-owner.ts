@@ -53,7 +53,10 @@ export type PortalIdentity = {
  * cannot forget it: the host has no default role of its own, and no role is a `member`, never an
  * `owner`.
  */
-export type PortalProvisioning = PortalIdentity & { readonly role: PortalRole | null };
+export type PortalProvisioning = PortalIdentity & {
+  readonly role: PortalRole | null;
+  readonly name?: string | null;
+};
 
 /**
  * Why a session could not be turned into a tenant. Each maps to an existing reason code in
@@ -203,13 +206,16 @@ export async function ensurePortalOwner(db: Database, identity: PortalProvisioni
   }
 
   const [existingUser] = await db.select().from(user).where(eq(user.id, identity.userId)).limit(1);
+  const name = identity.name ?? null;
   if (!existingUser) {
     await db.insert(user).values({
       id: identity.userId,
-      name: identity.userId,
+      name: name ?? identity.userId,
       email: placeholderEmail(identity.userId),
       emailVerified: false,
     });
+  } else if (name !== null && existingUser.name !== name) {
+    await db.update(user).set({ name, updatedAt: new Date() }).where(eq(user.id, identity.userId));
   }
 
   const [membership] = await db

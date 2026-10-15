@@ -102,6 +102,7 @@ describe("exchangeCode", () => {
       orgId: "org_1",
       tenantId: "tnt_1",
       role: "member",
+      name: null,
     });
   });
 
@@ -303,6 +304,40 @@ describe("the role in the token body", () => {
     expect(await roleFrom({ ...TOKEN_BODY, access_token: jwtLike, role: "member" }, "code")).toBe("member");
     const { role: _dropped, ...withoutRole } = TOKEN_BODY;
     expect(await roleFrom({ ...withoutRole, access_token: jwtLike }, "code")).toBeNull();
+  });
+});
+
+describe("the person's name in the token body", () => {
+  async function nameFrom(body: Record<string, unknown>, grant: "code" | "refresh"): Promise<unknown> {
+    const { impl } = recordingFetch(() => json(body));
+    const client = createPortalClient({ baseUrl, fetchImpl: impl });
+    const tokens =
+      grant === "code"
+        ? await client.exchangeCode({ code: "c", ...EXCHANGE })
+        : await client.refresh({ refreshToken: "r", deviceId: "dev_1" });
+    return tokens.name;
+  }
+
+  it("takes the display name first, then the username, from both grants", async () => {
+    const both = { ...TOKEN_BODY, display_name: "Rina Wulandari", username: "rina" };
+    expect(await nameFrom(both, "code")).toBe("Rina Wulandari");
+    expect(await nameFrom(both, "refresh")).toBe("Rina Wulandari");
+    expect(await nameFrom({ ...TOKEN_BODY, display_name: null, username: "rina" }, "code")).toBe("rina");
+    expect(await nameFrom({ ...TOKEN_BODY, display_name: "   ", username: "rina" }, "code")).toBe("rina");
+  });
+
+  it("is no name when the portal sends none, or sends something that is not text", async () => {
+    expect(await nameFrom(TOKEN_BODY, "code")).toBeNull();
+    for (const value of [1, true, ["rina"], { name: "rina" }]) {
+      expect(await nameFrom({ ...TOKEN_BODY, display_name: value, username: value }, "refresh")).toBeNull();
+    }
+  });
+
+  it("drops control characters, folds spaces and caps the length at 120", async () => {
+    const messy = "Ri\u0000na\n\u202eWu  landari";
+    expect(await nameFrom({ ...TOKEN_BODY, display_name: messy }, "code")).toBe("Ri na Wu landari");
+    const long = await nameFrom({ ...TOKEN_BODY, display_name: "a".repeat(500) }, "code");
+    expect(long).toBe("a".repeat(120));
   });
 });
 
