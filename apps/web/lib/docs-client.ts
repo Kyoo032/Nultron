@@ -250,6 +250,46 @@ export async function fetchDocVersions(artifactId: string): Promise<DocVersion[]
   return parseDocVersions(await getJson(`${docPath(artifactId)}/versions`));
 }
 
+export type DocSectionInput = { readonly heading?: string; readonly blocks: readonly DocBlock[] };
+
+const sectionsPath = (artifactId: string) => `${docPath(artifactId)}/sections`;
+
+async function sendDocJson(method: "PUT" | "POST" | "DELETE", path: string, body: unknown): Promise<DocChange> {
+  const res = await apiFetch(path, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data: unknown = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw errorFromPayload(data, res.status);
+  }
+  return parseWith(changeSchema, data);
+}
+
+export function putDocSection(
+  artifactId: string,
+  sectionId: string,
+  input: { readonly baseVersion: number; readonly section: DocSectionInput },
+): Promise<DocChange> {
+  return sendDocJson("PUT", `${sectionsPath(artifactId)}/${encodeURIComponent(sectionId)}`, input);
+}
+
+export function postDocSection(
+  artifactId: string,
+  input: { readonly baseVersion: number; readonly afterSectionId?: string; readonly section: DocSectionInput },
+): Promise<DocChange> {
+  return sendDocJson("POST", sectionsPath(artifactId), input);
+}
+
+export function deleteDocSection(
+  artifactId: string,
+  sectionId: string,
+  input: { readonly baseVersion: number },
+): Promise<DocChange> {
+  return sendDocJson("DELETE", `${sectionsPath(artifactId)}/${encodeURIComponent(sectionId)}`, input);
+}
+
 const importedSchema = z.object({ artifactId: z.string() });
 
 export async function importDocPage(artifactId: string): Promise<string> {

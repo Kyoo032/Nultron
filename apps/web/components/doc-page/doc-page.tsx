@@ -9,6 +9,7 @@ import {
   fetchDocPage,
   fetchDocVersions,
   DocsError,
+  type DocChange,
   type DocFormat,
   type DocPage as DocPageData,
   type DocProposal,
@@ -41,6 +42,7 @@ import {
   withoutProposal,
   type ProposalFailure,
 } from "./doc-proposal-flow";
+import { useSectionEditing } from "@/lib/doc-section-editing";
 import "./doc-page.css";
 
 const IDLE_VERSIONS: VersionsState = { status: "idle", items: [] };
@@ -70,6 +72,31 @@ export function DocPage() {
   const [restoring, setRestoring] = useState(false);
   const [restoreFailure, setRestoreFailure] = useState<RestoreControls["failure"]>(null);
   const requestRef = useRef(0);
+
+  const applyDoc = useCallback(
+    (next: DocPageData) => {
+      if (next.artifactId === artifactId) {
+        setPage({ status: "ready", doc: next });
+      }
+    },
+    [artifactId],
+  );
+
+  const applyWrite = useCallback(
+    (write: DocChange) => {
+      setPage((current) =>
+        current.status === "ready" && current.doc.artifactId === artifactId
+          ? {
+              status: "ready",
+              doc: { ...current.doc, headVersion: write.headVersion, sectionAuthors: write.sectionAuthors },
+            }
+          : current,
+      );
+    },
+    [artifactId],
+  );
+
+  const editing = useSectionEditing(artifactId, applyDoc, applyWrite);
 
   const load = useCallback(() => {
     const request = ++requestRef.current;
@@ -365,6 +392,7 @@ export function DocPage() {
       agentPanel={askPanel}
       renderSectionActions={renderSectionActions}
       restore={restore}
+      editing={readyDoc && readyDoc.spec.kind === "document" ? editing : undefined}
     />
   );
 }

@@ -81,5 +81,32 @@
   },
   "time": {
     "now": "just now"
+  },
+  "edit": {
+    "edit": "Edit",
+    "editAria": "Edit {name}",
+    "untitled": "Untitled section",
+    "save": "Save section",
+    "saving": "Saving…",
+    "cancel": "Cancel",
+    "headingLabel": "Heading",
+    "textLabel": "Text",
+    "hint": "A blank line separates paragraphs. Start a line with - for a bullet, 1. for a numbered item, > for a quote, or --- for a page break. Start a line with a backslash (\\) to keep a leading -, 1., > or --- as plain text.",
+    "tablesNote": "Tables are edited by asking an agent for now",
+    "conflict": "Someone changed this section while you were editing",
+    "reloadTheirs": "Reload their version",
+    "keepMine": "Keep my text and try again",
+    "quota": "There is no storage left for this change, so it was not saved.",
+    "lastSection": "A document keeps at least one section, so this one cannot be deleted.",
+    "sectionGone": "This section is no longer in the document.",
+    "refreshFailed": "The change was saved, but the page could not be refreshed. Reload the page.",
+    "failed": "The change could not be saved. Try again.",
+    "add": "Add section",
+    "adding": "Adding…",
+    "delete": "Delete section",
+    "deleteAsk": "Delete this section? Its text is removed from the document.",
+    "deleteYes": "Delete it",
+    "deleteNo": "Keep it",
+    "deleting": "Deleting…"
   }
 }

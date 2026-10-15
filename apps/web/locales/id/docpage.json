@@ -81,5 +81,32 @@
   },
   "time": {
     "now": "baru saja"
+  },
+  "edit": {
+    "edit": "Edit",
+    "editAria": "Edit {name}",
+    "untitled": "Bagian tanpa judul",
+    "save": "Simpan bagian",
+    "saving": "Menyimpan…",
+    "cancel": "Batal",
+    "headingLabel": "Judul",
+    "textLabel": "Teks",
+    "hint": "Baris kosong memisahkan paragraf. Awali baris dengan - untuk poin, 1. untuk daftar bernomor, > untuk kutipan, atau --- untuk pemisah halaman. Awali baris dengan garis miring terbalik (\\) untuk menjaga -, 1., > atau --- tetap sebagai teks biasa.",
+    "tablesNote": "Tabel untuk sementara diedit dengan meminta agen",
+    "conflict": "Seseorang mengubah bagian ini saat Anda sedang mengeditnya",
+    "reloadTheirs": "Muat ulang versi mereka",
+    "keepMine": "Simpan teks saya dan coba lagi",
+    "quota": "Tidak ada ruang penyimpanan tersisa untuk perubahan ini, jadi belum disimpan.",
+    "lastSection": "Dokumen harus punya minimal satu bagian, jadi bagian ini tidak bisa dihapus.",
+    "sectionGone": "Bagian ini sudah tidak ada di dokumen.",
+    "refreshFailed": "Perubahan sudah disimpan, tetapi halaman tidak bisa diperbarui. Muat ulang halaman.",
+    "failed": "Perubahan belum bisa disimpan. Coba lagi.",
+    "add": "Tambah bagian",
+    "adding": "Menambahkan…",
+    "delete": "Hapus bagian",
+    "deleteAsk": "Hapus bagian ini? Teksnya akan dihapus dari dokumen.",
+    "deleteYes": "Ya, hapus",
+    "deleteNo": "Simpan",
+    "deleting": "Menghapus…"
   }
 }

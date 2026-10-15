@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "@/lib/nav";
 import { t } from "@/lib/i18n";
 import type { DocFormat, DocPage, DocsError, DocVersion } from "@/lib/docs-client";
+import type { SectionEditing } from "@/lib/doc-section-editing";
 import { DocBody, type SectionActions } from "./doc-body";
 import { DownloadMenu } from "./doc-download-menu";
 import { type DocPeople, failureKind, primaryFormat } from "./doc-format";
@@ -31,6 +32,7 @@ type Props = {
   readonly agentPanel?: ReactNode;
   readonly renderSectionActions?: SectionActions;
   readonly restore?: RestoreControls;
+  readonly editing?: SectionEditing;
 };
 
 const FORMAT_LABEL_KEY: Readonly<Record<DocFormat, string>> = {
@@ -73,6 +75,7 @@ function ReadyView({
   agentPanel,
   renderSectionActions,
   restore,
+  editing,
 }: Omit<Props, "page" | "onRetry"> & { readonly doc: DocPage }) {
   const formatKey = FORMAT_LABEL_KEY[primaryFormat(doc.kind)];
   return (
@@ -103,7 +106,7 @@ function ReadyView({
       ) : null}
       <div className="doc-layout" data-testid="docpage-layout">
         <div className="doc-main">
-          <DocBody doc={doc} people={people} renderSectionActions={renderSectionActions} />
+          <DocBody doc={doc} people={people} renderSectionActions={renderSectionActions} editing={editing} />
         </div>
         <SidePanel
           tab={tab}
@@ -146,6 +149,7 @@ export function DocPageView(props: Props) {
           agentPanel={props.agentPanel}
           renderSectionActions={props.renderSectionActions}
           restore={props.restore}
+          editing={props.editing}
         />
       ) : (
         <div className="doc-head-bar">

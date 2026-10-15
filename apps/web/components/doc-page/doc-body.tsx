@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 import { t } from "@/lib/i18n";
-import type { DocBlock, DocPage, DocSheet, SectionAuthors } from "@/lib/docs-client";
+import type { DocBlock, DocPage, DocSection, DocSheet, SectionAuthors } from "@/lib/docs-client";
+import type { SectionEditing } from "@/lib/doc-section-editing";
 import { AuthorMark } from "./doc-author-mark";
 import type { DocPeople } from "./doc-format";
+import { AddSection, SectionEditor, SectionTools } from "./section-editor";
 
 export type SectionActions = (sectionId: string) => ReactNode;
 
@@ -10,6 +12,7 @@ type BodyProps = {
   readonly doc: DocPage;
   readonly people: DocPeople;
   readonly renderSectionActions?: SectionActions;
+  readonly editing?: SectionEditing;
 };
 
 type CellInput = string | number | null | undefined;
@@ -135,9 +138,23 @@ function SheetTable({ sheet }: { readonly sheet: DocSheet }) {
   );
 }
 
-export function DocBody({ doc, people, renderSectionActions }: BodyProps) {
+export function DocBody({ doc, people, renderSectionActions, editing }: BodyProps) {
   const authors = doc.sectionAuthors;
   const actionsFor = (id: string): ReactNode => (renderSectionActions ? renderSectionActions(id) : null);
+  const actionsForSection = (section: DocSection, open: boolean): ReactNode => {
+    if (editing === undefined) {
+      return actionsFor(section.id);
+    }
+    if (open) {
+      return null;
+    }
+    return (
+      <>
+        {actionsFor(section.id)}
+        <SectionTools section={section} headVersion={doc.headVersion} editing={editing} />
+      </>
+    );
+  };
 
   if (doc.spec.kind === "workbook") {
     return (
@@ -162,20 +179,38 @@ export function DocBody({ doc, people, renderSectionActions }: BodyProps) {
   return (
     <article className="doc-paper" data-testid="docpage-paper" data-kind="document">
       <h1 className="doc-title">{doc.spec.title}</h1>
-      {doc.spec.sections.map((section) => (
-        <SectionFrame
-          key={section.id}
-          id={section.id}
-          heading={section.heading}
-          mark={markFor(authors, section.id, people)}
-          actions={actionsFor(section.id)}
-          testId="docpage-section"
-        >
-          {section.blocks.map((block, index) => (
-            <BlockView key={index} block={block} />
-          ))}
-        </SectionFrame>
-      ))}
+      {doc.spec.sections.map((section) => {
+        const open = editing !== undefined && editing.openId === section.id;
+        return (
+          <SectionFrame
+            key={section.id}
+            id={section.id}
+            heading={open ? null : section.heading}
+            mark={markFor(authors, section.id, people)}
+            actions={actionsForSection(section, open)}
+            testId="docpage-section"
+          >
+            {open && editing !== undefined ? (
+              <SectionEditor
+                section={section}
+                headVersion={doc.headVersion}
+                editing={editing}
+                renderBlock={(block) => <BlockView block={block} />}
+              />
+            ) : (
+              section.blocks.map((block, index) => <BlockView key={index} block={block} />)
+            )}
+          </SectionFrame>
+        );
+      })}
+      {editing !== undefined ? (
+        <AddSection
+          afterSectionId={doc.spec.sections.at(-1)?.id}
+          sectionIds={doc.spec.sections.map((section) => section.id)}
+          headVersion={doc.headVersion}
+          editing={editing}
+        />
+      ) : null}
     </article>
   );
 }
