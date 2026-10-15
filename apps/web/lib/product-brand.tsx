@@ -3,6 +3,12 @@ import { DEFAULT_PRODUCT_NAME, GATEWAY_BASE_URL, GATEWAY_NAME } from "@agentforg
 import { getDesktopBrand, getDesktopBrandLogo, isElectron } from "@/lib/api-client";
 import { pingOnce } from "@/lib/host-ping";
 
+export type ShellLook = "opc" | "enterprise";
+
+export function parseShellLook(value: unknown): ShellLook | null {
+  return value === "opc" || value === "enterprise" ? value : null;
+}
+
 export type ProductBrand = {
   productName: string;
   gatewayName: string;
@@ -13,6 +19,7 @@ export type ProductBrand = {
    * the brand names none, and the character carries the product's name (`assistantNameOf`).
    */
   assistantName?: string;
+  shell?: ShellLook;
 };
 
 /**
@@ -64,10 +71,14 @@ export function usesNultronWordmark(brand: ProductBrand): boolean {
   return brand.productName === DEFAULT_PRODUCT_NAME;
 }
 
-const BrandContext = createContext<ProductBrand>(DEFAULT_PRODUCT_BRAND);
+export const BrandContext = createContext<ProductBrand>(DEFAULT_PRODUCT_BRAND);
 
 export function useProductBrand(): ProductBrand {
   return useContext(BrandContext);
+}
+
+export function useShellLook(): ShellLook | null {
+  return useContext(BrandContext).shell ?? null;
 }
 
 export function gatewayHostLabel(url: string): string {
@@ -102,12 +113,14 @@ export function brandFromUnknown(payload: unknown, fallback: ProductBrand): Prod
     typeof nested.assistantName === "string" && nested.assistantName.trim()
       ? nested.assistantName.trim()
       : fallback.assistantName;
+  const shell = parseShellLook(nested.shell) ?? fallback.shell;
   return {
     ...fallback,
     productName,
     gatewayName,
     gatewayBaseUrl,
     ...(assistantName ? { assistantName } : {}),
+    ...(shell ? { shell } : {}),
   };
 }
 
@@ -124,6 +137,7 @@ export function mergePingBrand(current: ProductBrand, payload: unknown): Product
   const assistantName = keepPreloadName ? current.assistantName : pingAssistant;
   return {
     ...rest,
+    shell: next.shell ?? "opc",
     ...(assistantName ? { assistantName } : {}),
     productName: keepPreloadName ? current.productName : next.productName,
     gatewayName: keepPreloadGateway ? current.gatewayName : next.gatewayName,
@@ -151,6 +165,15 @@ export function ProductBrandProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.title = brand.productName;
   }, [brand.productName]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    if (brand.shell === "enterprise") {
+      root.dataset.productShell = "enterprise";
+    } else {
+      delete root.dataset.productShell;
+    }
+  }, [brand.shell]);
 
   useEffect(() => {
     // Phase 8: one shared `/api/v1/ping`, because the capabilities provider reads the same payload.

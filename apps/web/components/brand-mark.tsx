@@ -1,3 +1,5 @@
+import { BrandMonogram } from "@/components/brand-monogram";
+import { useProductBrand, useShellLook } from "@/lib/product-brand";
 import mark24 from "@/components/brand-art/mark-24.png";
 import mark32 from "@/components/brand-art/mark-32.png";
 import mark48 from "@/components/brand-art/mark-48.png";
@@ -32,6 +34,11 @@ type Props = {
 };
 
 export function BrandMark({ size = 24, className, testId, alt = "" }: Props) {
+  const enterprise = useShellLook() === "enterprise";
+  const { productName } = useProductBrand();
+  if (enterprise) {
+    return <BrandMonogram name={productName} size={size} className={className} testId={testId} alt={alt} />;
+  }
   const file = MARK_FILES[size];
   return (
     <img

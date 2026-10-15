@@ -427,6 +427,50 @@ html[data-shell="desktop"] {
   --nultron-cyan-text: #44e3eb;
 }
 
+[data-product-shell="enterprise"] {
+  --bg: #f3f5f4;
+  --surface: #ffffff;
+  --surface-2: #e9efed;
+  --line: #e1e6e4;
+  --text: #15201d;
+  --text-2: #34443f;
+  --text-3: #55655f;
+  --accent: #0e7565;
+  --accent-soft: #e3f1ee;
+  --mark: #0e7565;
+  --mode-chat: #0e7565;
+  --rail: #0f1e1b;
+  --rail-text: #dce7e4;
+  --rail-text-2: #dce7e4;
+  --rail-text-3: #8fa5a0;
+  --rail-line: #22403a;
+  --rail-hover: #17302b;
+  --rail-active: #1d3631;
+  --rail-active-text: #ffffff;
+  --rail-accent: #3fc4aa;
+  --ws-chip-0: #3fc4aa;
+  --ws-chip-1: #e9b44c;
+  --ws-chip-2: #7da7f0;
+  --ws-chip-3: #e58b7b;
+  --ws-chip-4: #b79ae8;
+  --ws-chip-5: #8bcb74;
+}
+
+.dark[data-product-shell="enterprise"],
+.dark [data-product-shell="enterprise"] {
+  --bg: #0e1513;
+  --surface: #141d1a;
+  --surface-2: #1b2723;
+  --line: #24332f;
+  --text: #e6eeec;
+  --text-2: #c3d0cc;
+  --text-3: #93a7a2;
+  --accent: #3fc4aa;
+  --accent-soft: #14302b;
+  --mark: #3fc4aa;
+  --mode-chat: #3fc4aa;
+}
+
 /* Firefox has no ::-webkit-scrollbar; Chromium drops the pseudo-elements as soon as
    scrollbar-color is set, so keep the standard properties fenced off from it. */
 @supports not selector(::-webkit-scrollbar) {

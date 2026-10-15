@@ -5,6 +5,7 @@ import { ModeHeader } from "@/components/mode-header";
 import { ProjectsDetail } from "@/components/projects-detail";
 import { createProject, listProjects, ProjectsError, type ProjectRecord } from "@/lib/projects-client";
 import { t } from "@/lib/i18n";
+import { useRouter, useSearchParams } from "@/lib/nav";
 import { useSession } from "@/lib/session";
 import { splitProjects } from "@/lib/projects-view";
 import "./projects.css";
@@ -18,7 +19,9 @@ export function ProjectsPage() {
   const me = useSession().identity?.userId ?? null;
   const [items, setItems] = useState<ProjectRecord[] | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const router = useRouter();
+  const wanted = useSearchParams().get("open");
+  const [openId, setOpenId] = useState<string | null>(wanted);
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -34,6 +37,19 @@ export function ProjectsPage() {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  useEffect(() => {
+    if (wanted) {
+      setOpenId(wanted);
+    }
+  }, [wanted]);
+
+  function closeDetail() {
+    setOpenId(null);
+    if (wanted) {
+      router.replace("/projects");
+    }
+  }
 
   async function create(event: FormEvent) {
     event.preventDefault();
@@ -65,10 +81,10 @@ export function ProjectsPage() {
           }
           onRefresh={() => void reload()}
           onGone={() => {
-            setOpenId(null);
+            closeDetail();
             void reload();
           }}
-          onBack={() => setOpenId(null)}
+          onBack={closeDetail}
         />
       ) : (
         <>

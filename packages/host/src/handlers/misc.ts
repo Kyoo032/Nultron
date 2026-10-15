@@ -19,6 +19,7 @@ import { getTenant } from "../tenant";
 import { ensureToolsRegistered } from "../register-tools";
 import { loadSettings } from "../settings-store";
 import { localePayload } from "../locale-boot";
+import { resolvedShell } from "../shell-setting";
 
 export async function handleGetTools(request: HostRequest): Promise<HostResult> {
   try {
@@ -106,6 +107,7 @@ export async function handlePing(): Promise<HostResult> {
     productName: resolvedProductName(),
     // Tester code: the default virtual agent's name, which is the brand's character.
     assistantName: resolvedAssistantName(),
+    shell: resolvedShell(),
     gatewayName: resolvedGatewayName(),
     gatewayBaseUrl: resolvedGatewayBaseUrl(),
     capabilities: hostCapabilities(),
