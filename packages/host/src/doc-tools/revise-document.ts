@@ -1,15 +1,3 @@
-/**
- * `revise_document`: one part of a saved file changes, and the owner gets a new file.
- *
- * The file is loaded through the artifact store, so the visibility rule applies: another person's file
- * (or another company's) answers "not found", exactly as a missing id does. The stored spec is opened,
- * one section or sheet is replaced through the document model's own edit helpers (`replaceSection`,
- * `replaceSheet`, `restyle`), and the result is rendered and saved as a NEW artifact. The original row
- * is never touched, so a revision never loses the earlier version.
- *
- * Refusals are values, the same as the other document tools. The internal `ReviseRefusal` only carries a
- * refusal up to the one place that turns it into the model-facing answer.
- */
 import {
   DOCX_MIME,
   PDF_MIME,

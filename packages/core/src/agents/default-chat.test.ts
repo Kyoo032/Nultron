@@ -90,6 +90,14 @@ describe("default chat prompt", () => {
     expect(DEFAULT_CHAT_PROMPT).toMatch(/ok false[^.]*message[^.]*another tool/);
   });
 
+  it("says a one-section change in a Workspace waits for Keep, and that any other revision saves a copy", () => {
+    expect(DEFAULT_CHAT_PROMPT).toMatch(
+      /In a Workspace, a one-section change to a document waits for a member to press Keep/,
+    );
+    expect(DEFAULT_CHAT_PROMPT).toMatch(/Elsewhere, and for a sheet, theme or format change, a revised copy is saved/);
+    expect(DEFAULT_CHAT_PROMPT).not.toMatch(/saves a new copy, keeping the original/);
+  });
+
   it("leaves the language rule to withChatOutputLanguage", () => {
     expect(DEFAULT_CHAT_PROMPT).not.toMatch(/Bahasa|Indonesia/);
     expect(withChatOutputLanguage(DEFAULT_CHAT_PROMPT, "en")).toBe(DEFAULT_CHAT_PROMPT);

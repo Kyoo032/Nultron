@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_CHAT_TOOLS, getTool, VIRTUAL_AGENTS, virtualAgentMayCall } from "@agentforge/core";
 import { harnessSpecFor } from "@agentforge/core/harness";
 import { ensureToolsRegistered } from "../register-tools";
-import { createDocumentTool, DOC_TOOLS } from "./doc-tools";
+import { createDocumentTool, DOC_TOOLS, reviseDocumentTool } from "./doc-tools";
 import { createDocumentSchema, reviseDocumentSchema } from "./doc-tool-schemas";
 
 const DOC_TOOL_KEYS = ["create_document", "create_workbook", "revise_document", "import_document"];
@@ -47,6 +47,16 @@ describe("the document tools", () => {
     expect(createDocumentTool.description).toMatch(/artifactId/);
     expect(createDocumentTool.description).not.toMatch(/download button/i);
     expect(reviseDocumentSchema.safeParse({ artifactId: "abc" }).success).toBe(true);
+  });
+
+  it("tell the model a Workspace section change waits for Keep, and that any other revision saves a copy", () => {
+    expect(reviseDocumentTool.description).toMatch(
+      /In a Workspace, a one-section change to a document waits for a member to press Keep/,
+    );
+    expect(reviseDocumentTool.description).toMatch(
+      /Elsewhere, and for a sheet, theme or format change, a revised copy is saved/,
+    );
+    expect(reviseDocumentTool.description).toMatch(/pending true/);
   });
 });
 

@@ -33,11 +33,11 @@ const CREATE_WORKBOOK_DESCRIPTION = [
 ].join(" ");
 
 const REVISE_DOCUMENT_DESCRIPTION = [
-  "Change one part of a file you or the owner made, and save the result as a NEW file. The original is kept as it was.",
+  "Change one part of a file you or the owner made. In a Workspace, a one-section change to a document waits for a member to press Keep, and the file does not change until then. Elsewhere, and for a sheet, theme or format change, a revised copy is saved as a NEW file and the original is kept as it was.",
   "For a document, give sectionId and section (its new content: an optional heading and its blocks). For a workbook, give sheetId and sheet (a name, columns and rows).",
-  "A theme restyles the whole file. A format of docx or pdf saves a document in that type.",
+  "A theme restyles the whole file. A format of docx or pdf saves a document in that type. In a Workspace, a section change cannot be combined with a theme or format change: send that in its own call.",
   "Only the part you name changes; everything else in the file stays the same. Give only what changes.",
-  "When it answers ok, tell the owner the new file is ready and that the original is unchanged. Use the new artifactId for any further revision.",
+  "When the answer has pending true, the change is waiting for a member to press Keep: tell the owner that, and that the file is unchanged until then. Use the same artifactId. Otherwise the answer is ok with a new artifactId: tell the owner the new file is ready and that the original is unchanged, and use the new artifactId for any further revision.",
 ].join(" ");
 
 const IMPORT_DOCUMENT_DESCRIPTION = [
