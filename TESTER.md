@@ -18,6 +18,10 @@ The full map is in Rizky's Obsidian vault at `C:\Users\rizky\Documents\Obsidian\
 - Never run a release command from `C:\Users\rizky\agentforge-chat`.
 - The tester's webdev uses port 3200 and the data folder `.webdev-data-chat`. It never shares a database with `:3000`.
 
+## Storing data (Rizky, 2026-10-15)
+
+Every file, table or folder the app writes must map onto the HYP AI box. Before adding one, read [`docs/internal/maps/hyp-ai-storage.md`](docs/internal/maps/hyp-ai-storage.md), section "Rules for new storage", and add its row to that page in the same change.
+
 ## Priority when the two disagree
 
 Published wins (Rizky, 2026-10-06).
