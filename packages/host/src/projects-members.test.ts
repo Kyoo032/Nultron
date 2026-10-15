@@ -295,6 +295,32 @@ describe("a Workspace is shared with its members only: four people, two companie
     ]);
   });
 
+  it("the people picker lists colleagues not in yet, never another company's; a member gets 403, a stranger 404", async () => {
+    const room = await makeProject(alice, "Picker room");
+    const invitable = (person: Person, id: string) => call(person, "GET", "/api/v1/projects/:id/invitable", { id });
+    const listed = async (person: Person) =>
+      jsonBody<{ items: Array<{ userId: string; name: string }> }>(await invitable(person, room)).items;
+
+    expect(await listed(alice)).toEqual([
+      { userId: "ben", name: "ben" },
+      { userId: "cara", name: "cara" },
+    ]);
+    expect(await outcome(await invite(alice, room, "ben"))).toEqual(CREATED);
+    expect(await listed(alice)).toEqual([{ userId: "cara", name: "cara" }]);
+
+    expect(await outcome(await invitable(ben, room))).toEqual(FORBIDDEN);
+    for (const stranger of [cara, dan]) {
+      const who = stranger.tenant.userId;
+      expect(await outcome(await invitable(stranger, room)), who).toEqual(NOT_FOUND);
+      expect(await outcome(await invitable(stranger, MISSING)), who).toEqual(NOT_FOUND);
+    }
+
+    expect(await outcome(await setRole(alice, room, "ben", "admin"))).toEqual(OK);
+    expect(await listed(ben)).toEqual([{ userId: "cara", name: "cara" }]);
+    expect(await outcome(await invite(ben, room, "cara"))).toEqual(CREATED);
+    expect(await listed(alice)).toEqual([]);
+  });
+
   it("roles: a member cannot invite until made admin; an admin removes members, never the owner or another admin", async () => {
     const room = await makeProject(alice, "Roles room");
     expect(await outcome(await invite(alice, room, "ben"))).toEqual(CREATED);

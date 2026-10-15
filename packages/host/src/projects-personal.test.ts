@@ -8,6 +8,25 @@ import { dispatch } from "./router";
 import type { HostJsonResult } from "./types";
 
 describe("collective projects on Personal", () => {
+  it("answers the people picker's route with the router's own 404, like an unknown path", async () => {
+    const saved = process.env.AGENTFORGE_SERVER;
+    delete process.env.AGENTFORGE_SERVER;
+    try {
+      const { projectRoutes } = await import("./handlers/projects");
+      expect(projectRoutes().map(([method, path]) => `${method} ${path}`)).toContain(
+        "GET /api/v1/projects/:id/invitable",
+      );
+      const ask = (path: string) =>
+        dispatch({ method: "GET", path, query: {}, params: {}, headers: {} }, { serverMode: false });
+      const unknown = await ask("/api/v1/no-such-route");
+      const picker = await ask("/api/v1/projects/00000000-0000-7000-8000-000000000000/invitable");
+      expect(picker.status).toBe(404);
+      expect((picker as HostJsonResult).body).toEqual((unknown as HostJsonResult).body);
+    } finally {
+      process.env.AGENTFORGE_SERVER = saved;
+    }
+  });
+
   it("answers every project route with the router's own 404", async () => {
     const saved = process.env.AGENTFORGE_SERVER;
     delete process.env.AGENTFORGE_SERVER;

@@ -6,6 +6,7 @@
  * commits, and only ids travel on it.
  */
 import { ApiError, canAdminister } from "@agentforge/core";
+import { isCompanyMember, listCompanyPeople } from "../company-people";
 import { boardBus } from "./bus";
 import { evenKeys, keyBetween } from "./fractional";
 import type { CreateCardInput, CreateColumnInput, MoveInput, UpdateCardInput, UpdateColumnInput } from "./input";
@@ -59,7 +60,7 @@ function requireAdmin(scope: BoardScope, message = "Only an owner or admin can c
 }
 
 function requireMember(scope: BoardScope, userId: string): void {
-  if (!store.isCompanyMember(scope, userId)) {
+  if (!isCompanyMember(scope, userId)) {
     throw new ApiError("invalid_card", "The assignee is not a member of this company.", 400);
   }
 }
@@ -72,7 +73,7 @@ export function getBoard(scope: BoardScope, now: number = Date.now()): BoardSnap
       cursor: store.latestEventId(scope),
       columns: store.listColumns(scope),
       cards: store.listCards(scope),
-      people: store.listPeople(scope),
+      people: listCompanyPeople(scope),
       me: { userId: scope.userId, canAdminister: canAdminister(scope.role) },
     };
   });

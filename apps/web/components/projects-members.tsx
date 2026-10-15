@@ -1,18 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { PeoplePicker } from "@/components/projects-people-picker";
 import { isHostedBuild } from "@/lib/hosted-build";
 import { t } from "@/lib/i18n";
 import {
   bringProjectAgent,
   handOverProject,
   inviteProjectMember,
+  listInvitablePeople,
   listProjectPeople,
   ProjectsError,
   removeProjectMember,
   setProjectMemberRole,
   takeOutProjectAgent,
   type AssignableRole,
+  type InvitablePerson,
   type ProjectMember,
   type ProjectPeople,
   type ProjectRecord,
@@ -36,6 +39,8 @@ type ViewProps = {
   readonly me: string | null;
   readonly people: ProjectPeople | null;
   readonly loadFailed: boolean;
+  readonly candidates: readonly InvitablePerson[] | null;
+  readonly candidatesFailed: boolean;
   readonly deskAgents: readonly Pick<VirtualAgentInfo, "id" | "generalist">[];
   readonly busy: boolean;
   readonly error: string | null;
@@ -53,8 +58,18 @@ function personName(people: ProjectPeople, userId: string, me: string | null): s
 }
 
 /** The people and agents of a Workspace, drawn from what the host answered, with the buttons the caller's role allows. */
-export function ProjectMembersView({ project, me, people, loadFailed, deskAgents, busy, error, actions }: ViewProps) {
-  const [inviteId, setInviteId] = useState("");
+export function ProjectMembersView({
+  project,
+  me,
+  people,
+  loadFailed,
+  candidates,
+  candidatesFailed,
+  deskAgents,
+  busy,
+  error,
+  actions,
+}: ViewProps) {
   const [pick, setPick] = useState("");
 
   if (!people) {
@@ -68,15 +83,8 @@ export function ProjectMembersView({ project, me, people, loadFailed, deskAgents
   const viewer = me ? { userId: me, role: project.role } : null;
   const bringable = agentsToBring(deskAgents, people.agents);
   const chosen = bringable.some((agent) => agent.id === pick) ? pick : (bringable[0]?.id ?? "");
-
-  function submitInvite(event: FormEvent) {
-    event.preventDefault();
-    const userId = inviteId.trim();
-    if (userId) {
-      actions.invite(userId);
-      setInviteId("");
-    }
-  }
+  const myName = people.members.find((member) => member.userId === me)?.name;
+  const nameUnknown = me !== null && (myName === undefined || myName === me);
 
   function submitBring(event: FormEvent) {
     event.preventDefault();
@@ -166,27 +174,9 @@ export function ProjectMembersView({ project, me, people, loadFailed, deskAgents
         </ul>
 
         {canManage(project.role) ? (
-          <form className="projects-inline-form" onSubmit={submitInvite}>
-            <input
-              className="input"
-              value={inviteId}
-              maxLength={128}
-              placeholder={t("projects.members.invitePlaceholder")}
-              aria-label={t("projects.members.inviteLabel")}
-              onChange={(event) => setInviteId(event.target.value)}
-              data-testid="projects-invite-input"
-            />
-            <button
-              type="submit"
-              className="btn btn-secondary"
-              disabled={busy || !inviteId.trim()}
-              data-testid="projects-invite"
-            >
-              {t("projects.members.invite")}
-            </button>
-          </form>
+          <PeoplePicker people={candidates} loadFailed={candidatesFailed} busy={busy} onInvite={actions.invite} />
         ) : null}
-        {me ? (
+        {nameUnknown ? (
           <p className="projects-note" data-testid="projects-your-id">
             {t("projects.members.yourId", { id: me })} {t("projects.members.yourIdNote")}
           </p>
@@ -289,6 +279,8 @@ function MembersContainer({ project, me, onChanged, onLeft }: PanelProps) {
   const { agents: deskAgents } = useVirtualAgents();
   const [people, setPeople] = useState<ProjectPeople | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  const [candidates, setCandidates] = useState<InvitablePerson[] | null>(null);
+  const [candidatesFailed, setCandidatesFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -299,7 +291,16 @@ function MembersContainer({ project, me, onChanged, onLeft }: PanelProps) {
     } catch {
       setLoadFailed(true);
     }
-  }, [project.id]);
+    if (!canManage(project.role)) {
+      return;
+    }
+    try {
+      setCandidates(await listInvitablePeople(project.id));
+      setCandidatesFailed(false);
+    } catch {
+      setCandidatesFailed(true);
+    }
+  }, [project.id, project.role]);
 
   useEffect(() => {
     void reload();
@@ -347,6 +348,8 @@ function MembersContainer({ project, me, onChanged, onLeft }: PanelProps) {
       me={me}
       people={people}
       loadFailed={loadFailed}
+      candidates={candidates}
+      candidatesFailed={candidatesFailed}
       deskAgents={deskAgents}
       busy={busy}
       error={error}

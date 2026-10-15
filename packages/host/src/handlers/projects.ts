@@ -22,6 +22,7 @@ import {
   archiveProject,
   bringProjectAgent,
   createProject,
+  listInvitablePeople,
   listProjectFiles,
   listProjectKnowledgeFor,
   listProjectMembers,
@@ -149,6 +150,11 @@ export const handleGetProjectMembers = projectRoute(async (request) => {
   return jsonOk(listProjectMembers(scope, request.params.id ?? ""));
 });
 
+export const handleGetProjectInvitable = projectRoute(async (request) => {
+  const scope = await getTenant(request);
+  return jsonOk({ items: listInvitablePeople(scope, request.params.id ?? "") });
+});
+
 export const handlePostProjectMember = projectRoute(async (request) => {
   const scope = await getTenant(request);
   const { userId } = parsePersonInput(request.body);
@@ -208,6 +214,7 @@ export function projectRoutes(): ReadonlyArray<
     ["DELETE", "/api/v1/projects/:id/knowledge/:sourceId", handleDeleteProjectKnowledge],
     ["GET", "/api/v1/projects/:id/threads", handleGetProjectThreads],
     ["GET", "/api/v1/projects/:id/members", handleGetProjectMembers],
+    ["GET", "/api/v1/projects/:id/invitable", handleGetProjectInvitable],
     ["POST", "/api/v1/projects/:id/members", handlePostProjectMember],
     ["PATCH", "/api/v1/projects/:id/members/:userId", handlePatchProjectMember],
     ["DELETE", "/api/v1/projects/:id/members/:userId", handleDeleteProjectMember],

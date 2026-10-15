@@ -156,18 +156,6 @@ export function setMemberRole(projectId: string, userId: string, role: Workspace
   sql.prepare("UPDATE project_members SET role = ? WHERE project_id = ? AND user_id = ?").run(role, projectId, userId);
 }
 
-/** A person of the caller's company, in the caller's tenant: the only people a Workspace may take in. */
-export function isCompanyMember(scope: TenantContext, userId: string): boolean {
-  return (
-    sql
-      .prepare(
-        `SELECT 1 AS ok FROM organization_members om JOIN organizations o ON o.id = om.organization_id
-          WHERE om.organization_id = ? AND o.tenant_id = ? AND om.user_id = ?`,
-      )
-      .get(scope.organizationId, scope.tenantId, userId) !== undefined
-  );
-}
-
 export type ProjectAgentRow = { agent_id: string; brought_by: string; added_at: number };
 
 export function listProjectAgents(projectId: string): ProjectAgentRow[] {

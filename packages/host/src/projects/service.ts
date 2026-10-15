@@ -15,6 +15,7 @@
  */
 import { ApiError, isDefaultChatAgent, scanInjection, virtualAgentBySlug, type TenantContext } from "@agentforge/core";
 import type { AssignableRole, CreateProjectInput, ProjectVisibility, UpdateProjectInput, WorkspaceRole } from "./input";
+import { isCompanyMember, listCompanyPeople, type CompanyPerson } from "../company-people";
 import { deleteSource, type KnowledgeSource } from "../knowledge";
 import { mediaExt } from "../media";
 import { virtualAgentsOnDesk } from "../virtual-agents";
@@ -232,6 +233,16 @@ export function listProjectMembers(
   };
 }
 
+const INVITE_REFUSED = "Only the owner or an admin of this Workspace can invite people.";
+
+export function listInvitablePeople(scope: TenantContext, projectId: string): CompanyPerson[] {
+  return store.inTransaction(() => {
+    requireRole(scope, projectId, MAY.manage, INVITE_REFUSED);
+    const members = new Set(store.listMembers(projectId).map((row) => row.user_id));
+    return listCompanyPeople(scope).filter((person) => !members.has(person.userId));
+  });
+}
+
 /**
  * Invite a person of the caller's company. An id that is not a person of the company is the same 404 as an
  * unknown Workspace, so the route never says whether an id exists. A person already in keeps their role.
@@ -243,8 +254,8 @@ export function addProjectMember(
   now: number = Date.now(),
 ): ProjectMember[] {
   return store.inTransaction(() => {
-    requireRole(scope, projectId, MAY.manage, "Only the owner or an admin of this Workspace can invite people.");
-    if (!store.isCompanyMember(scope, userId)) {
+    requireRole(scope, projectId, MAY.manage, INVITE_REFUSED);
+    if (!isCompanyMember(scope, userId)) {
       throw notFound();
     }
     store.insertMember(projectId, userId, "member", scope.userId, now);

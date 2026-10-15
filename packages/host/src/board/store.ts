@@ -13,7 +13,6 @@ import {
   boardId,
   type BoardColumn,
   type BoardEventRow,
-  type BoardPerson,
   type CardComment,
   type CardDetail,
   type CardSummary,
@@ -466,31 +465,6 @@ export function cardIsLive(scope: Pick<BoardScope, "tenantId" | "workspaceId">, 
     sql
       .prepare(`SELECT 1 AS ok FROM cards WHERE id = ? AND tenant_id = ? AND workspace_id = ? AND archived_at IS NULL`)
       .get(cardId, scope.tenantId, scope.workspaceId) !== undefined
-  );
-}
-
-/** The people of the caller's company, by display name. Never reads anything personal beyond the name. */
-export function listPeople(scope: BoardScope): BoardPerson[] {
-  return sql
-    .prepare(
-      `SELECT u.id AS userId, u.name AS name
-         FROM organization_members om
-         JOIN organizations o ON o.id = om.organization_id
-         JOIN user u ON u.id = om.user_id
-        WHERE om.organization_id = ? AND o.tenant_id = ?
-        ORDER BY u.name, u.id`,
-    )
-    .all(scope.organizationId, scope.tenantId) as BoardPerson[];
-}
-
-export function isCompanyMember(scope: BoardScope, userId: string): boolean {
-  return (
-    sql
-      .prepare(
-        `SELECT 1 AS ok FROM organization_members om JOIN organizations o ON o.id = om.organization_id
-          WHERE om.organization_id = ? AND o.tenant_id = ? AND om.user_id = ?`,
-      )
-      .get(scope.organizationId, scope.tenantId, userId) !== undefined
   );
 }
 

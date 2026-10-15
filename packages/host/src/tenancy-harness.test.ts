@@ -624,6 +624,7 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
   { method: "GET", path: "/api/v1/projects/:id/threads", params: { id: "unseeded" } },
   // Members, roles and agents (K-D22, K-D23): the same reasoning. The four-person proof is projects-members.test.ts.
   { method: "GET", path: "/api/v1/projects/:id/members", params: { id: "unseeded" } },
+  { method: "GET", path: "/api/v1/projects/:id/invitable", params: { id: "unseeded" } },
   {
     method: "POST",
     path: "/api/v1/projects/:id/members",

@@ -6,7 +6,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ProjectMembersPanel, ProjectMembersView, type MembersActions } from "@/components/projects-members";
 import { applyLocale, resetLocaleForTests } from "@/lib/i18n";
-import type { ProjectMember, ProjectPeople, ProjectRecord, WorkspaceRole } from "@/lib/projects-client";
+import type {
+  InvitablePerson,
+  ProjectMember,
+  ProjectPeople,
+  ProjectRecord,
+  WorkspaceRole,
+} from "@/lib/projects-client";
 import { agentsToBring, canTakeOutAgent, memberActions } from "@/lib/projects-view";
 
 afterEach(() => {
@@ -59,13 +65,26 @@ const NOOP: MembersActions = {
   takeOut: () => {},
 };
 
-function view(me: string, role: WorkspaceRole, people: ProjectPeople | null = PEOPLE): string {
+const COLLEAGUES: InvitablePerson[] = [
+  { userId: "dewi", name: "Dewi" },
+  { userId: "eko", name: "Eko" },
+];
+
+function view(
+  me: string,
+  role: WorkspaceRole,
+  people: ProjectPeople | null = PEOPLE,
+  candidates: InvitablePerson[] | null = COLLEAGUES,
+  candidatesFailed = false,
+): string {
   return renderToStaticMarkup(
     <ProjectMembersView
       project={project(role)}
       me={me}
       people={people}
       loadFailed={false}
+      candidates={candidates}
+      candidatesFailed={candidatesFailed}
       deskAgents={DESK}
       busy={false}
       error={null}
@@ -182,8 +201,38 @@ describe("the Members tab on the hosted build", () => {
     expect(rowControls(html, "budi")).toEqual([]);
     expect(rowControls(html, "citra")).toEqual(["projects-member-leave"]);
     expect(html).not.toContain('data-testid="projects-invite-input"');
+    expect(html).not.toContain('data-testid="projects-picker"');
     expect(html.split('data-testid="projects-agent-takeout"').length - 1).toBe(1);
     expect(html).toContain("citra (you)");
+  });
+
+  it("as owner: the invite is a labelled search box over her colleagues, and Invite waits for a pick", () => {
+    const html = view("ana", "owner");
+    const label = html.match(/<label class="projects-picker-label" for="([^"]+)">Find a colleague by name<\/label>/);
+    expect(label).not.toBeNull();
+    expect(html).toContain(`id="${label?.[1]}"`);
+    expect(html).toContain('role="combobox"');
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toMatch(
+      /<button type="submit" class="btn btn-secondary" disabled="" data-testid="projects-invite">Invite<\/button>/,
+    );
+    expect(html).not.toContain("Account id");
+  });
+
+  it("says when the colleagues are loading, could not be loaded, or are all in already", () => {
+    expect(view("ana", "owner", PEOPLE, null)).toContain("Loading your colleagues…");
+    expect(view("ana", "owner", PEOPLE, null, true)).toContain("Your colleagues could not be loaded.");
+    const everyone = view("ana", "owner", PEOPLE, []);
+    expect(everyone).toContain('data-testid="projects-picker-everyone"');
+    expect(everyone).not.toContain('role="combobox"');
+  });
+
+  it("shows her own id only while the host knows her by id alone", () => {
+    expect(view("ana", "owner")).toContain('data-testid="projects-your-id"');
+    const named: ProjectPeople = { ...PEOPLE, members: [{ ...member("ana", "owner"), name: "Ana Putri" }] };
+    const html = view("ana", "owner", named);
+    expect(html).not.toContain('data-testid="projects-your-id"');
+    expect(html).toContain("Ana Putri (you)");
   });
 
   it("offers only the agent not brought in yet, by its mode's name", () => {
@@ -210,6 +259,8 @@ describe("the Members tab on the hosted build", () => {
         me="citra"
         people={PEOPLE}
         loadFailed={false}
+        candidates={COLLEAGUES}
+        candidatesFailed={false}
         deskAgents={DESK}
         busy={false}
         error="Only the owner of this Workspace can change a role."

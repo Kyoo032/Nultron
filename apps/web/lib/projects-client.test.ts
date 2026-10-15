@@ -28,6 +28,7 @@ import {
   downloadFile,
   handOverProject,
   inviteProjectMember,
+  listInvitablePeople,
   listProjectFiles,
   listProjectPeople,
   listProjects,
@@ -126,6 +127,15 @@ describe("projects client", () => {
       response: json(200, { members: [member], agents: [agent] }),
     });
     expect(await listProjectPeople("proj_1")).toEqual({ members: [member], agents: [agent] });
+  });
+
+  it("reads the colleagues a Workspace may invite, by id and name only", async () => {
+    calls.push({
+      path: "/api/v1/projects/proj_1/invitable",
+      init: undefined,
+      response: json(200, { items: [{ userId: "u_cara", name: "Cara", email: "cara@example.test" }] }),
+    });
+    expect(await listInvitablePeople("proj_1")).toEqual([{ userId: "u_cara", name: "Cara" }]);
   });
 
   it("sends each member and agent action to its own route, in the body shape the host reads", async () => {

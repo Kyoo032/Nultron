@@ -39,6 +39,8 @@ export type ProjectAgent = { agentId: string; broughtBy: string; addedAt: number
 
 export type ProjectPeople = { members: ProjectMember[]; agents: ProjectAgent[] };
 
+export type InvitablePerson = { readonly userId: string; readonly name: string };
+
 /** A chat file, or a generated image or video the person put into the Workspace (SR-175). */
 export type ProjectFileKind = "artifact" | "image" | "video";
 
@@ -218,6 +220,11 @@ export async function renameProject(projectId: string, name: string): Promise<Pr
 export async function listProjectPeople(projectId: string): Promise<ProjectPeople> {
   const data = await call(`${projectPath(projectId)}/members`);
   return { members: list(data.members, parseMember), agents: list(data.agents, parseAgent) };
+}
+
+export async function listInvitablePeople(projectId: string): Promise<InvitablePerson[]> {
+  const data = await call(`${projectPath(projectId)}/invitable`);
+  return list(data.items, (row) => ({ userId: str(row, "userId"), name: str(row, "name") }));
 }
 
 const memberPath = (projectId: string, userId: string) =>
