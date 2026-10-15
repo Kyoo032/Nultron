@@ -44,6 +44,12 @@ import {
 } from "./handlers/artifacts";
 import { handleGetDoc, handleGetDocVersionFile, handleGetDocVersions } from "./handlers/docs-read";
 import {
+  handleDeleteDocSection,
+  handlePostDocRestore,
+  handlePostDocSection,
+  handlePutDocSection,
+} from "./handlers/docs-write";
+import {
   handlePostDocProposal,
   handlePostDocProposalDiscard,
   handlePostDocProposalKeep,
@@ -482,6 +488,10 @@ const routes: Route[] = [
   compile("GET", "/api/v1/docs/:artifactId", handleGetDoc),
   compile("GET", "/api/v1/docs/:artifactId/versions", handleGetDocVersions),
   compile("GET", "/api/v1/docs/:artifactId/versions/:n/file", handleGetDocVersionFile),
+  compile("PUT", "/api/v1/docs/:artifactId/sections/:sectionId", handlePutDocSection),
+  compile("POST", "/api/v1/docs/:artifactId/sections", handlePostDocSection),
+  compile("DELETE", "/api/v1/docs/:artifactId/sections/:sectionId", handleDeleteDocSection),
+  compile("POST", "/api/v1/docs/:artifactId/versions/:n/restore", handlePostDocRestore),
   compile("POST", "/api/v1/docs/:artifactId/sections/:sectionId/proposals", handlePostDocProposal),
   compile("POST", "/api/v1/docs/proposals/:proposalId/keep", handlePostDocProposalKeep),
   compile("POST", "/api/v1/docs/proposals/:proposalId/discard", handlePostDocProposalDiscard),

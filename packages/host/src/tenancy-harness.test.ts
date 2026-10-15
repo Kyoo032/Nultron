@@ -380,6 +380,29 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
     params: { artifactId: "artifactId", n: "unseeded" },
   },
   {
+    method: "PUT",
+    path: "/api/v1/docs/:artifactId/sections/:sectionId",
+    params: { artifactId: "artifactId", sectionId: "unseeded" },
+    body: { baseVersion: 1, section: { blocks: [{ type: "paragraph", text: "tenant B was here" }] } },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/docs/:artifactId/sections",
+    params: { artifactId: "artifactId" },
+    body: { baseVersion: 1, section: { blocks: [{ type: "paragraph", text: "tenant B was here" }] } },
+  },
+  {
+    method: "DELETE",
+    path: "/api/v1/docs/:artifactId/sections/:sectionId",
+    params: { artifactId: "artifactId", sectionId: "unseeded" },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/docs/:artifactId/versions/:n/restore",
+    params: { artifactId: "artifactId", n: "unseeded" },
+    body: { baseVersion: 1 },
+  },
+  {
     method: "POST",
     path: "/api/v1/docs/:artifactId/sections/:sectionId/proposals",
     params: { artifactId: "artifactId", sectionId: "unseeded" },
