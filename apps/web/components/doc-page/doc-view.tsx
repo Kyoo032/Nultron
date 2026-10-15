@@ -6,7 +6,7 @@ import { DocBody, type SectionActions } from "./doc-body";
 import { DownloadMenu } from "./doc-download-menu";
 import { type DocPeople, failureKind, primaryFormat } from "./doc-format";
 import { SidePanel, type PanelTab } from "./doc-side-panel";
-import { VersionsList, type VersionsState } from "./doc-versions";
+import { VersionsList, type RestoreControls, type VersionsState } from "./doc-versions";
 
 export type PageState =
   | { readonly status: "loading" }
@@ -30,6 +30,7 @@ type Props = {
   readonly onRetry: () => void;
   readonly agentPanel?: ReactNode;
   readonly renderSectionActions?: SectionActions;
+  readonly restore?: RestoreControls;
 };
 
 const FORMAT_LABEL_KEY: Readonly<Record<DocFormat, string>> = {
@@ -71,6 +72,7 @@ function ReadyView({
   onDownloadVersion,
   agentPanel,
   renderSectionActions,
+  restore,
 }: Omit<Props, "page" | "onRetry"> & { readonly doc: DocPage }) {
   const formatKey = FORMAT_LABEL_KEY[primaryFormat(doc.kind)];
   return (
@@ -112,7 +114,13 @@ function ReadyView({
             </div>
           }
           versionsPanel={
-            <VersionsList state={versions} people={people} busy={download.busy} onDownload={onDownloadVersion} />
+            <VersionsList
+              state={versions}
+              people={people}
+              busy={download.busy}
+              onDownload={onDownloadVersion}
+              restore={restore}
+            />
           }
         />
       </div>
@@ -137,6 +145,7 @@ export function DocPageView(props: Props) {
           onDownloadVersion={props.onDownloadVersion}
           agentPanel={props.agentPanel}
           renderSectionActions={props.renderSectionActions}
+          restore={props.restore}
         />
       ) : (
         <div className="doc-head-bar">

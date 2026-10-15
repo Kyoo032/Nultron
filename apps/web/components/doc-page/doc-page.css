@@ -189,6 +189,130 @@
   display: none;
 }
 
+.doc-section:has(.doc-proposal) > .doc-section-body {
+  display: none;
+}
+
+.doc-proposal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 -12px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  outline: 2px solid var(--accent);
+  min-width: 0;
+}
+
+.doc-proposal-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.doc-proposal-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--accent);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.doc-proposal-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.doc-diff-removed {
+  color: var(--danger);
+  text-decoration: line-through;
+}
+
+.doc-diff-added {
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.doc-proposal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-family: var(--font);
+}
+
+.doc-settings-link {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.doc-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.doc-ask-text {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  resize: none;
+  font: inherit;
+  font-size: 13px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.doc-ask-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.doc-ask-field {
+  display: flex;
+  flex: 1 1 140px;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.doc-ask-field select {
+  min-height: 40px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.doc-version-confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--text-2);
+}
+
 .doc-mark {
   display: inline-flex;
   align-items: center;

@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { apiFetch } from "./api-client";
+import { GATEWAY_BLOCKED_ERROR } from "./gateway-gate";
 
 export type DocFormat = "docx" | "pdf" | "xlsx";
 export type DocKind = "document" | "workbook";
@@ -147,6 +148,9 @@ const MALFORMED_MESSAGE = "The document answer could not be read.";
 const FAILED_MESSAGE = "The document request failed.";
 
 export function errorFromPayload(payload: unknown, status: number): DocsError {
+  if (payload && typeof payload === "object" && (payload as { error?: unknown }).error === GATEWAY_BLOCKED_ERROR) {
+    return new DocsError(GATEWAY_BLOCKED_ERROR, FAILED_MESSAGE, status);
+  }
   const envelope = payload && typeof payload === "object" ? (payload as { error?: unknown }).error : undefined;
   const error = envelope && typeof envelope === "object" ? (envelope as Record<string, unknown>) : null;
   const code = error && typeof error.code === "string" ? error.code : GENERIC_CODE;
@@ -183,6 +187,59 @@ async function getJson(path: string): Promise<unknown> {
     throw errorFromPayload(data, res.status);
   }
   return data;
+}
+
+const proposalEnvelopeSchema = z.object({ proposal: proposalSchema });
+
+const changeSchema = z.object({
+  headVersion: z.number().int(),
+  version: versionSchema.nullable(),
+  sectionAuthors: sectionAuthorsSchema,
+  bodyRefreshed: z.boolean(),
+});
+
+export type DocChange = z.infer<typeof changeSchema>;
+
+export type AskSectionInput = {
+  readonly agentId: string;
+  readonly instruction: string;
+  readonly baseVersion: number;
+};
+
+async function postJson(path: string, body: unknown = {}): Promise<unknown> {
+  const res = await apiFetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data: unknown = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw errorFromPayload(data, res.status);
+  }
+  return data;
+}
+
+const proposalPath = (proposalId: string) => `/api/v1/docs/proposals/${encodeURIComponent(proposalId)}`;
+
+export async function askDocSection(
+  artifactId: string,
+  sectionId: string,
+  input: AskSectionInput,
+): Promise<DocProposal> {
+  const path = `${docPath(artifactId)}/sections/${encodeURIComponent(sectionId)}/proposals`;
+  return parseWith(proposalEnvelopeSchema, await postJson(path, input)).proposal;
+}
+
+export async function keepDocProposal(proposalId: string): Promise<DocProposal> {
+  return parseWith(proposalEnvelopeSchema, await postJson(`${proposalPath(proposalId)}/keep`)).proposal;
+}
+
+export async function discardDocProposal(proposalId: string): Promise<DocProposal> {
+  return parseWith(proposalEnvelopeSchema, await postJson(`${proposalPath(proposalId)}/discard`)).proposal;
+}
+
+export async function restoreDocVersion(artifactId: string, version: number, baseVersion: number): Promise<DocChange> {
+  return parseWith(changeSchema, await postJson(`${docPath(artifactId)}/versions/${version}/restore`, { baseVersion }));
 }
 
 export async function fetchDocPage(artifactId: string): Promise<DocPage> {

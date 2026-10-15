@@ -38,7 +38,28 @@
     "versions": "Versions"
   },
   "ask": {
-    "placeholder": "An agent can rewrite a section of this document here. This part is not ready yet."
+    "placeholder": "Ask an agent to rewrite this section, make it shorter, or fix a fact.",
+    "instruction": "What should the agent do?",
+    "agent": "Agent",
+    "section": "Section",
+    "sectionN": "Section {n}",
+    "send": "Send",
+    "working": "The agent is working on this section…",
+    "gatewayBlocked": "Models are off until a key is added.",
+    "openSettings": "Open Settings",
+    "agentNotInWorkspace": "This agent is not in this Workspace. A member brings it in first, or pick another agent.",
+    "workbook": "Agents rewrite one section of a document, not a workbook.",
+    "noSections": "This document has no sections to rewrite yet."
+  },
+  "proposal": {
+    "header": "{agent} rewrote this section · asked by {name}",
+    "keep": "Keep",
+    "undo": "Undo",
+    "retry": "Try again",
+    "working": "Working…",
+    "sectionChanged": "This section changed since the agent read it.",
+    "gone": "This proposal was already kept or undone.",
+    "failed": "The change could not be applied. Try again."
   },
   "versions": {
     "loading": "Loading versions…",
@@ -48,7 +69,15 @@
     "savedBy": "Saved by {name}",
     "agentAsked": "{agent}, asked by {name}",
     "download": "Download",
-    "downloadAria": "Download version {n}"
+    "downloadAria": "Download version {n}",
+    "restore": "Restore",
+    "restoreAria": "Restore version {n}",
+    "restoreConfirm": "Restore v{n}? The document goes back to this version.",
+    "restoreYes": "Restore this version",
+    "restoring": "Restoring…",
+    "cancel": "Cancel",
+    "restoreFailed": "The version could not be restored. Try again.",
+    "restoreConflict": "The document changed since you opened it. Reload, then try again."
   },
   "time": {
     "now": "just now"

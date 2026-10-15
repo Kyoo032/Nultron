@@ -38,7 +38,28 @@
     "versions": "Versi"
   },
   "ask": {
-    "placeholder": "Agen bisa menulis ulang satu bagian dokumen ini di sini. Bagian ini belum siap."
+    "placeholder": "Minta agen menulis ulang bagian ini, membuatnya lebih singkat, atau memperbaiki satu fakta.",
+    "instruction": "Apa yang harus dilakukan agen?",
+    "agent": "Agen",
+    "section": "Bagian",
+    "sectionN": "Bagian {n}",
+    "send": "Kirim",
+    "working": "Agen sedang mengerjakan bagian ini…",
+    "gatewayBlocked": "Model nonaktif sampai kunci ditambahkan.",
+    "openSettings": "Buka Pengaturan",
+    "agentNotInWorkspace": "Agen ini tidak ada di ruang kerja ini. Anggota perlu menambahkannya dulu, atau pilih agen lain.",
+    "workbook": "Agen menulis ulang satu bagian dokumen, bukan buku kerja.",
+    "noSections": "Dokumen ini belum punya bagian untuk ditulis ulang."
+  },
+  "proposal": {
+    "header": "{agent} menulis ulang bagian ini · diminta oleh {name}",
+    "keep": "Simpan",
+    "undo": "Batalkan",
+    "retry": "Coba lagi",
+    "working": "Sedang bekerja…",
+    "sectionChanged": "Bagian ini berubah sejak agen membacanya.",
+    "gone": "Usulan ini sudah disimpan atau dibatalkan.",
+    "failed": "Perubahan tidak bisa diterapkan. Coba lagi."
   },
   "versions": {
     "loading": "Memuat versi…",
@@ -48,7 +69,15 @@
     "savedBy": "Disimpan oleh {name}",
     "agentAsked": "{agent}, diminta oleh {name}",
     "download": "Unduh",
-    "downloadAria": "Unduh versi {n}"
+    "downloadAria": "Unduh versi {n}",
+    "restore": "Pulihkan",
+    "restoreAria": "Pulihkan versi {n}",
+    "restoreConfirm": "Pulihkan v{n}? Dokumen kembali ke versi ini.",
+    "restoreYes": "Pulihkan versi ini",
+    "restoring": "Memulihkan…",
+    "cancel": "Batal",
+    "restoreFailed": "Versi tidak bisa dipulihkan. Coba lagi.",
+    "restoreConflict": "Dokumen berubah sejak Anda membukanya. Muat ulang, lalu coba lagi."
   },
   "time": {
     "now": "baru saja"
