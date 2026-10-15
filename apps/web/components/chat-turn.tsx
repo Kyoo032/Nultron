@@ -15,7 +15,6 @@ import { fileCardDetail, jobEmbedsFromTools, splitUserFileBlocks } from "@/lib/m
 import { collectToolMediaParts } from "@/lib/tool-media";
 import { AutoAllowedNotes, MediaApprovalCards } from "@/components/chat-media-approval-card";
 import { DeckCards } from "@/components/chat-deck-card";
-import { DocCards } from "@/components/chat-doc-card";
 import { DossierCards } from "@/components/chat-dossier-card";
 import "@/components/chat-turn-bubbles.css";
 import { ToolRowBody, isRichTool } from "@/components/tool-rows/tool-row";
@@ -198,7 +197,6 @@ export function ChatTurn({ role, content, live, onContinue, continueDisabled = f
             <AutoAllowedNotes tools={visibleTools} />
             <MediaApprovalCards tools={visibleTools} />
             <DeckCards tools={visibleTools} />
-            <DocCards tools={visibleTools} />
             <DossierCards tools={visibleTools} />
             {jobs.map((job, index) => (
               <MessageEmbed

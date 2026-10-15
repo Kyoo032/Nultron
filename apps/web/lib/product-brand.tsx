@@ -64,7 +64,7 @@ export function usesNultronWordmark(brand: ProductBrand): boolean {
   return brand.productName === DEFAULT_PRODUCT_NAME;
 }
 
-export const BrandContext = createContext<ProductBrand>(DEFAULT_PRODUCT_BRAND);
+const BrandContext = createContext<ProductBrand>(DEFAULT_PRODUCT_BRAND);
 
 export function useProductBrand(): ProductBrand {
   return useContext(BrandContext);

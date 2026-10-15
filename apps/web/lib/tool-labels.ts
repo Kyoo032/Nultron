@@ -9,7 +9,6 @@ import {
   type ToolStatus,
 } from "@/components/tool-rows/results";
 import { DOSSIER_TOOL_KEY, readDossierResult } from "@/components/tool-rows/dossier-result";
-import { isDocTool, readPendingDocResult, type DocToolKey } from "@/components/tool-rows/doc-result";
 import { readPendingMedia } from "@/components/tool-rows/media-result";
 import { t } from "@/lib/i18n";
 
@@ -95,35 +94,6 @@ function webFetchLabel(input: unknown, output: unknown, status: ToolStatus): str
   return host ? t("chat.tools.done.web_fetch", { host }) : t("chat.tool.fetch");
 }
 
-/** The title a document tool's call names: the new file's title, from the spec its input carries. */
-function docInputTitle(input: unknown): string | undefined {
-  return readString(asRecord(asRecord(input)?.spec), "title");
-}
-
-/**
- * One sentence for a document tool call: "Making “Plan”…", "Made “Plan”", "Could not make the document".
- * A revision or an import names no new file in its input, so while it runs it only says it is working.
- */
-function docToolLabel(toolKey: DocToolKey, input: unknown, output: unknown, status: ToolStatus): string {
-  const state = classifyOutcome(toolKey, status, output).state;
-  if (state === "running") {
-    const title = docInputTitle(input);
-    return title ? t("chat.tools.doc.doing", { title: capArg(title) }) : t("chat.tools.doc.doingPlain");
-  }
-  if (state === "refused" || state === "budget") {
-    return t(`chat.tools.doc.failed.${toolKey}`);
-  }
-  const pending = readPendingDocResult(toolKey, input, output);
-  if (pending) {
-    return t("chat.tools.doc.pending.revise_document", {
-      section: capArg(pending.section),
-      title: capArg(pending.title),
-    });
-  }
-  const title = readString(asRecord(output), "title");
-  return title ? t(`chat.tools.doc.done.${toolKey}`, { title: capArg(title) }) : t("chat.tools.doc.donePlain");
-}
-
 /**
  * What a rich tool's label names, taken from its arguments. Null when a required argument is
  * missing; `list_files` names nothing when it is asked for the top of the desk, so it gets `{}`.
@@ -192,9 +162,6 @@ export function toolRowLabel(
   if (toolKey === "web_fetch") {
     return webFetchLabel(input, output, status);
   }
-  if (isDocTool(toolKey)) {
-    return docToolLabel(toolKey, input, output, status);
-  }
   if (!isRichTool(toolKey)) {
     return toolDoneLabel(toolKey);
   }
@@ -212,9 +179,6 @@ export function toolRowLabel(
 }
 
 export function toolActivityLabel(toolKey: string, input?: unknown): string {
-  if (isDocTool(toolKey)) {
-    return docToolLabel(toolKey, input, undefined, "started");
-  }
   if (toolKey === "web_fetch") {
     return webFetchLabel(input, undefined, "started");
   }
@@ -225,9 +189,6 @@ export function toolActivityLabel(toolKey: string, input?: unknown): string {
 }
 
 export function toolDoneLabel(toolKey: string): string {
-  if (isDocTool(toolKey)) {
-    return t(`chat.tools.doc.name.${toolKey}`);
-  }
   if (isRichTool(toolKey)) {
     return t(`chat.tools.name.${toolKey}`);
   }
@@ -296,9 +257,6 @@ function dossierSummary(label: string, output: unknown): string {
 }
 
 export function toolCallSummary(toolKey: string, input?: unknown, output?: unknown): string {
-  if (isDocTool(toolKey)) {
-    return docToolLabel(toolKey, input, output, "completed");
-  }
   if (toolKey === "web_fetch") {
     return webFetchLabel(input, output, "completed");
   }

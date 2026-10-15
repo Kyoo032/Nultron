@@ -14,8 +14,6 @@ type ViewProps = {
   logoSrc: string;
   bundledMark: boolean;
   footer?: ReactNode;
-  showBoard?: boolean;
-  showProjects?: boolean;
   collapsed?: boolean;
   onToggle?: () => void;
   onDismiss?: () => void;
@@ -55,8 +53,6 @@ const VIEW_BASE: ViewProps = {
   productName: "Acme Desk",
   logoSrc: "",
   bundledMark: false,
-  showBoard: true,
-  showProjects: true,
   footer: <span data-testid="footer-slot" />,
 };
 

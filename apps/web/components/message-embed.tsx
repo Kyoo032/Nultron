@@ -1,6 +1,4 @@
-import { AddToWorkspace } from "@/components/add-to-workspace";
 import { t } from "@/lib/i18n";
-import { mediaIdFromSrc } from "@/lib/media-src";
 
 export type MessageEmbedKind = "link" | "file" | "image" | "video" | "job";
 
@@ -22,7 +20,8 @@ const KICKER: Record<MessageEmbedKind, string> = {
   job: "chat.embed.job",
 };
 
-const CARD = "chat-embed card-live enter-fade mt-2 flex max-w-full flex-col px-3 py-3 no-underline text-inherit";
+const CARD =
+  "chat-embed card-live enter-fade mt-2 flex max-w-full flex-col px-3 py-3 no-underline text-inherit";
 
 /**
  * One card for a link, a file, an image, a video, or a job result in a Chat turn.
@@ -30,8 +29,6 @@ const CARD = "chat-embed card-live enter-fade mt-2 flex max-w-full flex-col px-3
  */
 export function MessageEmbed({ kind, title, detail, href, src, alt, body }: Props) {
   const longBody = Boolean(body && body.length > 180);
-  // A generated picture or clip in a Chat answer can join a Workspace (SR-175). A card that is a link cannot.
-  const mediaId = !href && (kind === "image" || kind === "video") ? mediaIdFromSrc(src) : null;
   const inner = (
     <>
       <span className="block text-xs font-medium uppercase tracking-[0.12em] text-[var(--text-3)]">
@@ -52,7 +49,6 @@ export function MessageEmbed({ kind, title, detail, href, src, alt, body }: Prop
       {kind === "video" && src ? (
         <video src={src} controls className="mt-2 max-w-full rounded-[var(--r-card)]" data-testid="message-video" />
       ) : null}
-      {mediaId ? <AddToWorkspace mediaId={mediaId} /> : null}
       {body && !longBody ? (
         <span className="mt-1 block whitespace-pre-wrap text-xs text-[var(--text-2)] [overflow-wrap:anywhere]">
           {body}

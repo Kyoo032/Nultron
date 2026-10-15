@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { AddToWorkspace } from "@/components/add-to-workspace";
 import { PresentationPreview } from "@/components/presentation-preview";
 import { saveChatFile } from "@/lib/chat-file-save";
 import { t } from "@/lib/i18n";
@@ -104,7 +103,6 @@ export function DeckCard({ model, defaultOpen = false }: CardProps) {
           >
             {state === "busy" ? t("chat.deck.downloading") : t("chat.deck.download")}
           </button>
-          <AddToWorkspace artifactId={model.artifactId} />
         </div>
       </div>
 

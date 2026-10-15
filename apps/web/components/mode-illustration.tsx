@@ -368,23 +368,6 @@ const SCENES: Record<ModeIconName, ReactNode> = {
       </Pop>
     </>
   ),
-  board: (
-    <>
-      <rect x="20" y="18" width="36" height="74" rx="6" fill={LINE} />
-      <rect x="62" y="18" width="36" height="74" rx="6" fill={LINE} />
-      <rect x="104" y="18" width="36" height="74" rx="6" fill={LINE} />
-      <Pop i={0}>
-        <rect x="25" y="24" width="26" height="16" rx="3" fill={A2} />
-      </Pop>
-      <Pop i={1}>
-        <rect x="67" y="24" width="26" height="16" rx="3" fill={MODE} />
-      </Pop>
-      <Pop i={2}>
-        <rect x="109" y="24" width="26" height="16" rx="3" fill={A4} />
-      </Pop>
-      <rect x="25" y="45" width="26" height="16" rx="3" fill={SURFACE} />
-    </>
-  ),
   usage: (
     <>
       <path d="M28 78 A52 52 0 0 1 132 78" fill="none" stroke={LINE} strokeWidth="10" strokeLinecap="round" />

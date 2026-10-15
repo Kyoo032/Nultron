@@ -11,7 +11,6 @@ import { ModeIcon, isModeIconName, type ModeIconName } from "@/components/mode-i
 import { ThemeToggle } from "@/components/theme-toggle";
 import { productMonogram } from "@/components/app-shell";
 import { buddyAllowedAt } from "@/lib/buddy-routes";
-import { isHostedBuild } from "@/lib/hosted-build";
 import { t } from "@/lib/i18n";
 import { assistantNameOf, useProductBrand, usesBundledMark } from "@/lib/product-brand";
 import type { ShellModesSource } from "@/lib/shell-modes";
@@ -59,10 +58,6 @@ export type AgentRailViewProps = {
   bundledMark: boolean;
   /** The footer controls (theme, updates). A slot so the drawing stays free of the update bridge. */
   footer?: ReactNode;
-  /** The team board's entry. Hosted only (`isHostedBuild()`): the board does not exist on Personal. */
-  showBoard?: boolean;
-  /** The Workspaces entry (K-D20). Hosted only (`isHostedBuild()`), like the board. */
-  showProjects?: boolean;
   /** The icon strip when true (the default, the rail as it was); icons with their names when false. */
   collapsed?: boolean;
   onToggle?: () => void;
@@ -70,20 +65,7 @@ export type AgentRailViewProps = {
   onDismiss?: () => void;
 };
 
-type AccountLink = { href: string; icon: ModeIconName; testId: string; labelKey: string };
-
-/** The team board (tester lane, K0): an account page beside Knowledge and Settings (team-board-spec.md section 14). */
-const BOARD_LINK: AccountLink = { href: "/board", icon: "board", testId: "board-link", labelKey: "board.rail.label" };
-
-/** The Workspaces page (tester lane, K-D20): the same account group, after the board. */
-const PROJECTS_LINK: AccountLink = {
-  href: "/projects",
-  icon: "workspaces",
-  testId: "projects-link",
-  labelKey: "projects.rail.label",
-};
-
-const ACCOUNT_LINKS: ReadonlyArray<AccountLink> = [
+const ACCOUNT_LINKS: ReadonlyArray<{ href: string; icon: ModeIconName; testId: string; labelKey: string }> = [
   { href: "/knowledge", icon: "knowledge", testId: "mode-knowledge", labelKey: "rail.knowledge" },
   { href: "/channels", icon: "channels", testId: "channels-link", labelKey: "rail.channels" },
   { href: "/workspaces", icon: "workspaces", testId: "workspaces-link", labelKey: "agents.rail.manage" },
@@ -114,14 +96,10 @@ export function AgentRailView({
   logoSrc,
   bundledMark,
   footer,
-  showBoard = false,
-  showProjects = false,
   collapsed = true,
   onToggle,
   onDismiss,
 }: AgentRailViewProps) {
-  const hostedLinks = [...(showBoard ? [BOARD_LINK] : []), ...(showProjects ? [PROJECTS_LINK] : [])];
-  const accountLinks = [...hostedLinks, ...ACCOUNT_LINKS];
   /*
    * The name shows in one tooltip drawn by the rail itself, outside the scrolling column. A tooltip
    * inside that column would be clipped by it (a scroller clips both axes), and a CSS-only one cannot
@@ -195,7 +173,7 @@ export function AgentRailView({
         <div className="agent-rail-divider" aria-hidden="true" />
 
         <div className="agent-rail-account" data-testid="rail-account-group">
-          {accountLinks.map((item) => (
+          {ACCOUNT_LINKS.map((item) => (
             <RailLink
               key={item.testId}
               href={item.href}
@@ -249,7 +227,6 @@ export function AgentRail(_props: Props) {
   const desk = useRailCollapse(true);
   const drawer = useRailDrawer(phone, `${pathname}?${searchParams.toString()}`);
   const collapsed = phone ? !drawer.open : desk.collapsed;
-  const hosted = isHostedBuild();
   const buddy = buddyAllowedAt(pathname);
 
   return (
@@ -262,8 +239,6 @@ export function AgentRail(_props: Props) {
       assistantName={assistantNameOf(brand)}
       logoSrc={brand.logoSrc}
       bundledMark={usesBundledMark(brand)}
-      showBoard={hosted}
-      showProjects={hosted}
       collapsed={collapsed}
       onToggle={phone ? drawer.toggle : desk.toggle}
       onDismiss={phone ? drawer.close : undefined}
