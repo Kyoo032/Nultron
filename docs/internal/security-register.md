@@ -6153,8 +6153,6 @@ Tests: `packages/host/src/agent-prompt-made.test.ts` (the 404 table for owner, a
 
 Residual: an owner or admin can still delete the agent and with it the maker's chats, by design (K-D34 item 4). The confirmation in the renderer must say so. Sharing a prompt-made agent with a Workspace is not built; when it lands `canView` needs a Workspace clause.
 
-Gate: before HYP AI imports from the tester.
-
 Review follow-up (2026-10-15, code review of `3b58cd6d`): a member could bind any tool to their own prompt-made agent.
 - Cause: `requireOwned` had dropped the builder check for a private agent, so the older routes `POST /api/v1/agents/:id/tools` and `/soul` (with unvalidated `toolKeys`) reached `bindTool` and `createRevision` for a member, bypassing the mode allow-list. `POST /api/v1/workspaces/:id/agents` also took a member with an unvalidated body, and a non-string `name` made `slugify` throw a 500.
 - Members' route scope now: only `POST /api/v1/agents/draft`, `POST /api/v1/agents` and `DELETE /api/v1/agents/:id` (their own agent). The older mutating routes (tools, soul, share, product-modes, generate-defaults, workspace create) need the builder role again: `requireOwned` asks `canBuild` after the visibility and maker checks (`packages/core/src/agents/service.ts`, `requireOwned`), and `create` asks it for any visibility. The one exception is `publish` of a prompt-made version of the member's own private agent (`requireMaker`), which the create route needs; its tools are already bound under the allow-list.
@@ -6169,6 +6167,8 @@ Residuals left open:
 - The admin `DELETE` answer carries the maker's chat count (`chatsDeleted`), a small activity leak.
 - There is no admin listing to clean up a departed maker's private agents.
 - Media-approval proposals and the private chat uploads of deleted threads are not cleaned (the same gap as `deleteThread`).
+- Whether the edit tool backend scopes `projectId` per person is unchecked; it is moot while members cannot bind edit tools.
+
 Gate: before HYP AI imports from the tester.
 
 ### SR-183 {#sr-183}
@@ -6213,8 +6213,6 @@ Residual:
 6. Clearing the token (DELETE) removes only the sealed slot. The platform's rows in `gateway_managed_tokens` and the gateway tokens they name stay where they are, and a new token that passes the check manages them again (`clearCompanyGatewayAdmin`, `packages/host/src/settings-store.ts:825-841`). Nothing deletes them on the gateway.
 
 Gate: before the first live token-API call (Rizky's go, and Hypernet's word for TokenKu production), and before HYP AI imports from the tester.
-- Whether the edit tool backend scopes `projectId` per person is unchecked; it is moot while members cannot bind edit tools.
-
 
 ## Must be true before the Tencent Cloud deploy
 
