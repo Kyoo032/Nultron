@@ -2,7 +2,7 @@
 
 Desk files are the versioned text files an agent and its owner share on one desk. They live in a Files section at the bottom of the Knowledge Base's Sources tab (`mode-knowledge`, `knowledge-tab-sources`). There is no rail entry and it is not a product mode. Chat writes them through six tools (`list_files`, `read_file`, `write_file`, `edit_file`, `search_files`, `delete_file`), the owner writes them from the page or the API, and every change is kept as a version that can be restored. Both products have them. How it works: [`docs/internal/maps/agent-tools-and-files.md`](../../../../docs/internal/maps/agent-tools-and-files.md), § 6 to § 8 and § 11. The Personal-only folder is [folder.md](./folder.md).
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 

@@ -2,7 +2,7 @@
 
 The Chat model picker lists curated models first under **Recommended** (`model-group-recommended`) with per-model `bestFor` hints (`model-best-for`), then brand groups (`GPT`, `Claude`, `Gemini`, …) with no extra testids. There is no Advanced disclosure and no `model-picker-all`. Reasoning ids show a `model-thinking-badge`. Doctor (webdev) probes `GET /api/v1/models` so a drive knows mode keys, chat-list size, and that curation metadata is present. Maps: [`docs/internal/maps/chat-send.md`](../../../../docs/internal/maps/chat-send.md) for the send path and [`docs/internal/maps/model-policy.md`](../../../../docs/internal/maps/model-policy.md) for how each model is called and what happens when a call is refused.
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 

@@ -2,7 +2,7 @@
 
 Videos is a generate studio (prompt, aspect, duration, optional resolution, optional still, gallery). Generate writes a shot when the sentence does not already name a camera and a motion, retries once when the render dies before a video file, and keeps the clip at the snapped length. The screen has no new control. Without a gateway key the expected state is `videos-studio-needs-key` and a quiet Generate. Videos stays on the host route `ready` flag (and, on the hosted build only, `useHostedNeedsKey`): a stub desk with `allowed: true` still quiets Generate. Chat, Documents and Images do not. A keyed desk is ready, so Generate is live there and a click bills. Cloud must not paste a gateway key into the shared webdev Settings desk. Live Toko Token proof is the isolated matrix (gitignored `evidence/videos/live-matrix/`), not a generate from the stub studio. Maps: [`generate-studios.md`](../../../../docs/internal/maps/generate-studios.md) and [`media-cost-estimate.md`](../../../../docs/internal/maps/media-cost-estimate.md).
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 

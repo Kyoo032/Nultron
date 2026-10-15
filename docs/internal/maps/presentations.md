@@ -1,6 +1,6 @@
 # Map: Presentation
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 Last verified: 2026-10-05 at 99922bb plus the merge of PR #125 (`cursor/presentation-harness-ddcf`): the streamed Create, the design pass and the Open Slide length, source and notes skills now sit on top of the outline checks, desk sources and cancel path. The new and rewritten sections (3, 3c, 5, 9, the failure table, the files table, the gotchas) were read against the merged code and their unit tests. Every older citation was re-pointed by diff against the file it names, and each one that names a function, test id or constant was checked to still sit on it; a citation that names nothing checkable was shifted by the diff only. Nothing here was driven in a browser or on a live gateway by this pass.
 

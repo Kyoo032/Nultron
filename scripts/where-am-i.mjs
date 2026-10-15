@@ -9,28 +9,25 @@
  *
  * Rows: the published folder `agentforge` (or `nultron`, once the source repo takes that name) and its worktrees `agentforge-<topic>` or `nultron-<topic>` (and Claude Code's
  * worktrees under `agentforge/.claude/worktrees`) on `main` or on a branch cut from main; the tester
- * folder `agentforge-chat` on `tester/chat-first` and nothing else; the HYP AI clone `hypey/app` on its
- * own `main`. A main-family branch that holds the tester's commits was not cut from main, so it is refused.
+ * folder `agentforge-chat` on `tester/chat-first` and nothing else. A main-family branch that holds the
+ * tester's commits was not cut from main, so it is refused.
  *
  * Any other folder (a Cloud VM clone, a copy under another name) has no row, so it prints its place and
  * passes: a required ci:local step must not turn red because of a folder name. The tester's-commits rule
  * still applies to it. Decision recorded 2026-10-14; `releaseProblem` below is the one hard release gate.
- *
- * Skips with exit 0 when lanes.json or docs/internal is absent: that is the stripped HYP AI import, whose
- * folder name may differ (`app-sync`), and it must not fail its own ci:local. Same rule as lane-guard.
  *
  * Also exported for the release scripts: `releaseProblem` says why a release may not run from a checkout
  * (not on main, or the tester folder). scripts/release-web.mjs and apps/desktop/scripts/release-desktop.mjs
  * refuse on it.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, realpathSync } from "node:fs";
+import { realpathSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 export const TESTER_BRANCH = "tester/chat-first";
 const MAIN_BRANCH = "main";
-const WEBDEV_PORT = { main: 3000, tester: 3200, "hyp-ai": 3301 };
+const WEBDEV_PORT = { main: 3000, tester: 3200 };
 
 /** Which row a folder belongs to, by its name. Windows names are case-insensitive. */
 export function folderKind(folder) {
@@ -41,7 +38,6 @@ export function folderKind(folder) {
     .map((part) => part.toLowerCase());
   const name = parts.at(-1) ?? "";
   if (name === "agentforge-chat") return "tester";
-  if (name === "app" && parts.at(-2) === "hypey") return "hyp-ai";
   if (/^(agentforge|nultron)(-.+)?$/.test(name)) return "main";
   const claudeWorktree = parts.at(-3) === ".claude" && parts.at(-2) === "worktrees";
   if (claudeWorktree && ["agentforge", "nultron"].includes(parts.at(-4))) return "main";
@@ -68,10 +64,6 @@ export function classifyPlace({ folder, branch, branchHoldsTester = false }) {
   }
   if (branch === TESTER_BRANCH) {
     return refused(`branch ${TESTER_BRANCH} belongs in agentforge-chat, not in ${folder}.`);
-  }
-  if (kind === "hyp-ai") {
-    if (branch === MAIN_BRANCH) return placed("hyp-ai", "the HYP AI brand repo on its own main");
-    return refused(`the HYP AI clone (${folder}) is on ${branch}; it has its own main only.`);
   }
   if (kind === "main") {
     if (branch === MAIN_BRANCH) return placed("main", "the published folder on main");
@@ -154,10 +146,6 @@ export function parseArgs(argv) {
 /** Prints the place and returns the exit code. */
 export function run(args, defaultRoot) {
   const root = path.resolve(args.root ?? defaultRoot);
-  if (!existsSync(path.join(root, "lanes.json")) || !existsSync(path.join(root, "docs", "internal"))) {
-    console.log("where-am-i: lanes.json or docs/internal not found (stripped import?), skipped.");
-    return 0;
-  }
   const place = readPlace(root);
   if (!place) {
     console.error(`where-am-i: ${root} is not a git checkout; run this inside agentforge or its worktrees.`);

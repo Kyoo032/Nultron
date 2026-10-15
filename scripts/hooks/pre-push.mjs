@@ -72,8 +72,8 @@ export function judgePush({ testerFolder = false, localRef, localSha, remoteRef 
 }
 
 /**
- * Whether the guard judges a push to this remote URL. A push to another GitHub repository (the HYP AI
- * clone's Kyoo032/hyp-ai, a release repo) has its own main, so the guard lets it through. Any other URL,
+ * Whether the guard judges a push to this remote URL. A push to another GitHub repository, such as a
+ * release repo, has its own main, so the guard lets it through. Any other URL,
  * a local path included, is judged: the guard fails closed.
  */
 export function guardsRemote(url) {

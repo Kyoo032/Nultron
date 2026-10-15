@@ -2,7 +2,7 @@
 
 Since PR #157 (2026-10-12) Chat offers three choices instead of a model list: **Daily** (the default), **Fastest** and **Reasoning**. In the chat-first shell the choice is a chip in the agent's header beside its name (`chat-header`), and the composer is only `+`, the message box and Send; before that shell the same control sat in the composer toolbar. The trigger `tier-picker` shows the current choice's label and nothing else, and its panel `tier-picker-panel` lists the three as `tier-option-daily`, `tier-option-fast` and `tier-option-reasoning`, each with a line on what it is for. A send carries `{ content, tier }` and never a model, a Thinking flag or a reasoning level; the host turns the tier into a model and the renderer is never told which. The reasoning-effort select is gone, because the tier sets Thinking (Fastest is Off, Reasoning is Deep, Daily is the model's default). **The steps in [models.md](./models.md) that drive `model-picker`, `model-group-recommended`, `model-best-for` and `reasoning-effort` do not apply to the chat-first shell on `:3000`**; they apply only to the `"modes"` fallback layout, where those controls still exist. Spec: [`docs/internal/model-tiers-spec.md`](../../../../docs/internal/model-tiers-spec.md). The host half (the catalog, the walk, the mask test) is its own track; this file covers what the person sees and what the browser posts.
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 

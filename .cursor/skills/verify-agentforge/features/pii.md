@@ -2,7 +2,7 @@
 
 Chat (and other model runs) keep the prompt the owner typed. Before that text becomes the model/tool prompt, the host replaces local PII matches with `[email]`, `[phone]`, `[id]`, `[card]` and — since 2026-09-17 — `[nik]`, `[npwp]`, `[account]`. There is no warn banner and no Send anyway — the system handles it. Finance has a **second, earlier** guard with its own two notices; it is the only mode that shows the owner a count of what was hidden. The map is [`docs/internal/maps/pii-and-key-security.md`](../../../../docs/internal/maps/pii-and-key-security.md).
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 

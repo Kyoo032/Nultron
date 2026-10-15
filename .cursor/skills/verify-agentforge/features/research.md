@@ -2,7 +2,7 @@
 
 Research is a job: claims pulled from the question and any pasted text → search on the sources Research already uses → fetched pages → a comparison built in code → a cited dossier as Markdown. A claim with no passage kept from a page is dropped. The model writes the reading and does not invent a source or a quote. A finding may cite only a source that was read and kept a verbatim passage; when the draft does not, those findings are rewritten once and any cite that still does not resolve is dropped. It is not a citation manager and it has no offline output. Live generate needs a gateway key. Search uses a saved Tavily or Brave key when the desk has one, and otherwise Wikipedia, OpenAlex, arXiv, and Crossref. It does not ask for a second key. After the last model call the host checks the findings (every citation resolves, every finding is cited, no section is empty) and sends them back once if they fail. The empty shell, the template prefill and the refused generate (no gateway key) are the stub proof. The comparison and the passage-cite check are proven by `packages/host/src/research-dossier.test.ts` (the stub desk refuses before search). Map: [`docs/internal/maps/research-dossier.md`](../../../../docs/internal/maps/research-dossier.md).
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 

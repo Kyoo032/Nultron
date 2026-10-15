@@ -2,7 +2,7 @@
 
 Native dependencies the app installs by itself: today only `anydoc`, the local document reader. How it works is in [`docs/internal/maps/component-installer.md`](../../../../docs/internal/maps/component-installer.md). Nothing here needs a gateway key, and nothing here may ever ask the owner to run a command.
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 

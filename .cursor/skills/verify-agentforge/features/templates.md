@@ -2,7 +2,7 @@
 
 Example galleries on Images, Videos, Documents, Research, and Presentation load a full brief into the mode composer. Clicking a card does not generate. Map: [`docs/internal/maps/documents.md`](../../../../docs/internal/maps/documents.md).
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 

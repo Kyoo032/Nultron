@@ -44,58 +44,58 @@ Each file: H1, one paragraph, the `Product: … · Instance: …` line, then exa
 
 Every recipe names its product and the instance it is driven on. The same pair sits under each recipe's H1 paragraph as `Product: … · Instance: …`. [maps/README.md](../../../../docs/internal/maps/README.md) uses the same words for the subsystem pages.
 
-- **Product.** `both` means the shared renderer and host, which serve Nultron (OPC, the hosted one-owner app) and HYP AI (SME). `retired-desktop` means the Personal desktop app, retired 2026-10-14: history, not owed a drive. The `opc` and `sme` folders are not built yet, so no recipe says `opc` or `sme`.
-- **Instance.** `main :3000` is the published checkout, `C:\Users\rizky\agentforge`. `HYP AI :3301` is the brand clone, which takes shared code by import, so a shared recipe needs a drive on both. `tester :3200` is staging: new work is driven there first. Which instance you are in is in [SKILL.md](../SKILL.md#where-am-i).
+- **Product.** `both` means the shared renderer and host, which serve Nultron (OPC, the hosted one-owner app). `retired-desktop` means the Personal desktop app, retired 2026-10-14: history, not owed a drive. The `opc` folder is not built yet, so no recipe says `opc`.
+- **Instance.** `main :3000` is the published checkout, `C:\Users\rizky\agentforge`. `tester :3200` is staging: new work is driven there first. Which instance you are in is in [SKILL.md](../SKILL.md#where-am-i).
 - **Checked against the code** (main `cdb727b4`, tester `06e73cef`, 2026-10-14). The team board (`packages/host/src/board/`, `apps/web/components/board-*.tsx`) and the Private/Workspace project switch (`apps/web/components/projects-*.tsx`) exist only on the tester, and no recipe covers either yet, so none is tagged tester-only. Documents in Chat is on both: the base is on main (`apps/web/components/chat-deck-card.tsx`, `packages/host/src/chat-documents/`), and the newer document cards (`chat-doc-card.tsx`, `tool-rows/doc-result.ts`) are tester-only. `/workspaces` (the Virtual agents page) and private uploads (`packages/host/src/desk-files/private-uploads.ts`) are on main.
 
 | Recipe | Product | Instance |
 |---|---|---|
 | [Build](./build.md) | both | main :3000 (parked: `/studio` redirects to Chat) |
-| [Channels (Telegram)](./channels.md) | both | main :3000 + HYP AI :3301 |
-| [Chat](./chat.md) | both | main :3000 + HYP AI :3301 (the newer document cards are tester :3200 only) |
-| [Code](./code.md) | both | main :3000 + HYP AI :3301 |
-| [Components (first-run installer)](./components.md) | both | main :3000 + HYP AI :3301 |
-| [Data](./data.md) | both | main :3000 + HYP AI :3301 |
+| [Channels (Telegram)](./channels.md) | both | main :3000 |
+| [Chat](./chat.md) | both | main :3000 (the newer document cards are tester :3200 only) |
+| [Code](./code.md) | both | main :3000 |
+| [Components (first-run installer)](./components.md) | both | main :3000 |
+| [Data](./data.md) | both | main :3000 |
 | [Desktop brands](./desktop-brands.md) | retired-desktop | none (Personal desktop retired 2026-10-14) |
 | [Desktop](./desktop.md) | retired-desktop | none (Personal desktop retired 2026-10-14) |
-| [Documents](./documents.md) | both | main :3000 + HYP AI :3301 |
-| [Edit](./edit.md) | both | main :3000 + HYP AI :3301 |
-| [Education](./education.md) | both | main :3000 + HYP AI :3301 |
-| [Files](./files.md) | both | main :3000 + HYP AI :3301 |
-| [Finance](./finance.md) | both | main :3000 + HYP AI :3301 |
+| [Documents](./documents.md) | both | main :3000 |
+| [Edit](./edit.md) | both | main :3000 |
+| [Education](./education.md) | both | main :3000 |
+| [Files](./files.md) | both | main :3000 |
+| [Finance](./finance.md) | both | main :3000 |
 | [Folder](./folder.md) | retired-desktop | none (Personal desktop retired 2026-10-14) |
-| [Gateway gate](./gateway-gate.md) | both | main :3000 + HYP AI :3301 |
-| [Guide](./guide.md) | both | main :3000 + HYP AI :3301 |
-| [Images](./images.md) | both | main :3000 + HYP AI :3301 |
-| [Knowledge graph](./knowledge-graph.md) | both | main :3000 + HYP AI :3301 |
-| [Knowledge ingest loop](./knowledge-ingest.md) | both | main :3000 + HYP AI :3301 |
-| [Knowledge phases](./knowledge-phases.md) | both | main :3000 + HYP AI :3301 |
-| [Knowledge](./knowledge.md) | both | main :3000 + HYP AI :3301 |
-| [Legal](./legal.md) | both | main :3000 + HYP AI :3301 |
-| [Locale](./locale.md) | both | main :3000 + HYP AI :3301 |
+| [Gateway gate](./gateway-gate.md) | both | main :3000 |
+| [Guide](./guide.md) | both | main :3000 |
+| [Images](./images.md) | both | main :3000 |
+| [Knowledge graph](./knowledge-graph.md) | both | main :3000 |
+| [Knowledge ingest loop](./knowledge-ingest.md) | both | main :3000 |
+| [Knowledge phases](./knowledge-phases.md) | both | main :3000 |
+| [Knowledge](./knowledge.md) | both | main :3000 |
+| [Legal](./legal.md) | both | main :3000 |
+| [Locale](./locale.md) | both | main :3000 |
 | [Login (hosted sign-in)](./login.md) | both | hosted review :3443 (not :3000) |
-| [Market](./market.md) | both | main :3000 + HYP AI :3301 |
-| [Mascot](./mascot.md) | both | main :3000 + HYP AI :3301 |
-| [Meeting](./meeting.md) | both | main :3000 + HYP AI :3301 |
+| [Market](./market.md) | both | main :3000 |
+| [Mascot](./mascot.md) | both | main :3000 |
+| [Meeting](./meeting.md) | both | main :3000 |
 | [Mobile](./mobile.md) | retired-desktop | none (no mobile build; retired with the desktop lane) |
-| [Model tiers](./model-tiers.md) | both | main :3000 + HYP AI :3301 |
-| [Models](./models.md) | both | main :3000 + HYP AI :3301 |
-| [Music](./music.md) | both | main :3000 + HYP AI :3301 |
-| [Onboarding](./onboarding.md) | both | main :3000 + HYP AI :3301 |
-| [PII](./pii.md) | both | main :3000 + HYP AI :3301 |
+| [Model tiers](./model-tiers.md) | both | main :3000 |
+| [Models](./models.md) | both | main :3000 |
+| [Music](./music.md) | both | main :3000 |
+| [Onboarding](./onboarding.md) | both | main :3000 |
+| [PII](./pii.md) | both | main :3000 |
 | [Plans and pricing](./plans.md) | both | main :3000 for /pricing; hosted review :3443 for the signed-in panel |
-| [Presentation](./presentations.md) | both | main :3000 + HYP AI :3301 |
-| [Rail](./rail.md) | both | main :3000 + HYP AI :3301 |
-| [Research](./research.md) | both | main :3000 + HYP AI :3301 |
-| [Security](./security.md) | both | main :3000 + HYP AI :3301 |
-| [Settings](./settings.md) | both | main :3000 + HYP AI :3301 |
-| [Shell scroll](./shell-scroll.md) | both | main :3000 + HYP AI :3301 |
+| [Presentation](./presentations.md) | both | main :3000 |
+| [Rail](./rail.md) | both | main :3000 |
+| [Research](./research.md) | both | main :3000 |
+| [Security](./security.md) | both | main :3000 |
+| [Settings](./settings.md) | both | main :3000 |
+| [Shell scroll](./shell-scroll.md) | both | main :3000 |
 | [Studio advanced](./studio-advanced.md) | both | main :3000 (parked: `/studio` redirects to Chat) |
-| [Templates](./templates.md) | both | main :3000 + HYP AI :3301 |
-| [Usage](./usage.md) | both | main :3000 + HYP AI :3301 |
-| [Videos](./videos.md) | both | main :3000 + HYP AI :3301 |
-| [Virtual agents](./virtual-agents.md) | both | main :3000 + HYP AI :3301 (on main since PR #157) |
-| [Workspaces](./workspaces.md) | both | main :3000 + HYP AI :3301 (the Private/Workspace project switch is tester :3200 only, no recipe yet) |
+| [Templates](./templates.md) | both | main :3000 |
+| [Usage](./usage.md) | both | main :3000 |
+| [Videos](./videos.md) | both | main :3000 |
+| [Virtual agents](./virtual-agents.md) | both | main :3000 (on main since PR #157) |
+| [Workspaces](./workspaces.md) | both | main :3000 (the Private/Workspace project switch is tester :3200 only, no recipe yet) |
 
 ## Features
 

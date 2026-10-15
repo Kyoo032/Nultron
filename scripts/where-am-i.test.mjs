@@ -18,7 +18,7 @@ test("folderKind names each row by its folder, case-insensitively and across bot
   assert.equal(folderKind(WORKTREE), "main");
   assert.equal(folderKind("C:\\Users\\rizky\\agentforge-tier-neutral"), "main");
   assert.equal(folderKind("C:\\Users\\Rizky\\AgentForge-Chat"), "tester");
-  assert.equal(folderKind(HYP), "hyp-ai");
+  assert.equal(folderKind(HYP), "other");
   assert.equal(folderKind("C:\\Users\\rizky\\hypey\\app-sync"), "other");
   assert.equal(folderKind("C:\\Users\\rizky\\Downloads"), "other");
   assert.equal(folderKind("C:/Users/rizky/agentforge/.claude/worktrees/quizzical-merkle-067d77"), "main");
@@ -82,12 +82,11 @@ test("classifyPlace: the tester branch outside agentforge-chat is refused", () =
   assert.equal(classifyPlace({ folder: WORKTREE, branch: TESTER_BRANCH }).ok, false);
 });
 
-test("classifyPlace: the HYP AI clone is its own main and nothing else", () => {
-  const ok = classifyPlace({ folder: HYP, branch: "main" });
-  assert.equal(ok.ok, true);
-  assert.equal(ok.row, "hyp-ai");
-  assert.equal(ok.webdev, 3301);
-  assert.equal(classifyPlace({ folder: HYP, branch: "feature/x" }).ok, false);
+test("classifyPlace: the hypey clone is an unnamed folder here, so it passes as other with no webdev port", () => {
+  const place = classifyPlace({ folder: HYP, branch: "main" });
+  assert.equal(place.ok, true);
+  assert.equal(place.row, "other");
+  assert.equal(place.webdev, undefined);
 });
 
 test("classifyPlace: a detached HEAD is refused with a sentence; an unnamed folder passes as other", () => {
@@ -154,7 +153,7 @@ function git(root, ...args) {
 }
 
 /** A checkout named `folder` under a fresh temp dir, on main with lanes.json and docs/internal in place. */
-function makeCheckout(folder, { manifest = true } = {}) {
+function makeCheckout(folder) {
   const parent = mkdtempSync(path.join(os.tmpdir(), "where-am-i-"));
   const root = path.join(parent, folder);
   mkdirSync(root, { recursive: true });
@@ -164,11 +163,9 @@ function makeCheckout(folder, { manifest = true } = {}) {
   git(root, "config", "user.email", "where@example.invalid");
   git(root, "config", "commit.gpgsign", "false");
   writeFileSync(path.join(root, "README.md"), "# checkout\n");
-  if (manifest) {
-    writeFileSync(path.join(root, "lanes.json"), '{"version": 1}\n');
-    mkdirSync(path.join(root, "docs", "internal"), { recursive: true });
-    writeFileSync(path.join(root, "docs", "internal", "note.md"), "# note\n");
-  }
+  writeFileSync(path.join(root, "lanes.json"), '{"version": 1}\n');
+  mkdirSync(path.join(root, "docs", "internal"), { recursive: true });
+  writeFileSync(path.join(root, "docs", "internal", "note.md"), "# note\n");
   git(root, "add", "--all");
   git(root, "commit", "--quiet", "-m", "base");
   return { parent, root };
@@ -247,17 +244,6 @@ test("integration: tester work already promoted into main does not count as the 
     const result = runWhere(root);
     assert.equal(result.code, 0, result.err);
     assert.match(result.out, /a feature branch cut from main/);
-  } finally {
-    rmSync(parent, { recursive: true, force: true });
-  }
-});
-
-test("integration: a stripped checkout (no lanes.json) skips with exit 0", () => {
-  const { parent, root } = makeCheckout("app-sync", { manifest: false });
-  try {
-    const result = runWhere(root);
-    assert.equal(result.code, 0, result.err);
-    assert.match(result.out, /skipped/);
   } finally {
     rmSync(parent, { recursive: true, force: true });
   }

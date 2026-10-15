@@ -1,6 +1,6 @@
 # Map — Knowledge ingest loop
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 Last verified: 2026-09-28 for the retrieve miss and the map-id check. A non-empty question with no chunk still writes `## Retrieved sources` (the miss line). A live map that is not JSON is asked once more, then grounded to indexed ids (`takeKnowledgeMapText`, `groundKnowledgeMap`). Earlier: 2026-09-20 at 6984d84; citations re-anchored at e37b3a1.
 

@@ -1,6 +1,6 @@
 # Map — Chat send
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 Last verified: 2026-10-14 for the Continue sentence at the end of § 3b only. Nothing else on the page was re-read.
 
@@ -359,7 +359,7 @@ Proof: `lib/hero-motion.test.ts` (binding, throttling, pausing and teardown agai
 
 ## Touches / Do not touch
 
-Read before editing. Lanes: Chat reaches Personal, Enterprise, HYP AI and the tester code; `lanes.json` lists the protected files and `pnpm lane-guard` warns on them.
+Read before editing. Lanes: Chat reaches Personal, Enterprise and the tester code; `lanes.json` lists the protected files and `pnpm lane-guard` warns on them.
 
 **Chat send owns these** (a change here refreshes this page and `features/chat.md`):
 
@@ -379,7 +379,7 @@ Read before editing. Lanes: Chat reaches Personal, Enterprise, HYP AI and the te
 - `apps/web/components/nultron/`, `apps/web/components/buddy-stage.tsx`, `apps/web/lib/desk-buddy-store.ts`: the mascot ([`mascot-and-brand.md`](mascot-and-brand.md)).
 - `apps/web/components/app-rail.tsx` and `apps/web/components/rail-*.tsx`: the rail ([`chat-sessions-and-rail.md`](chat-sessions-and-rail.md)).
 - `apps/web/lib/api-client.ts`, `apps/web/lib/desktop-bridge.ts`, `apps/desktop/preload.cjs`: the one transport switch; Personal's IPC bridge is the only reader of `window.agentforge`.
-- Brand: no `Nultron`, `Toko Token`, `TokenKu` or `HYP AI` typed into Chat prompts, error strings or copy; they read `productName` and `gatewayName`, because HYP AI imports this code.
+- Brand: no `Nultron`, `Toko Token`, `TokenKu` or `HYP AI` typed into Chat prompts, error strings or copy; they read `productName` and `gatewayName`, because white-label brands are built from this code.
 
 ## Gotchas
 

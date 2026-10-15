@@ -2,7 +2,7 @@
 
 Phase 4 builtin makes the Graph stage two-way. Downstream, every completed Chat turn whose reply names bare `[n]` markers records `cites` edges (`source → thread`) — the only signal that a chunk was used rather than merely offered, counted separately from `retrieved`. Upstream, one hop over `covers` can add up to two sibling chunks when the top hit is weak — behind `knowledge.graphExpand`, which is **off in Chat today** (no settings key, no UI). The panel itself is the Phase 2 base under the loop chart; this fixture covers the Phase 4 edges on it — the `cites` writes, the off-by-default expansion, and what the existing `knowledge-graph-panel` shows for them. Builtin only: the WeKnora sidecar is not part of the product. See [knowledge.md](./knowledge.md) for the panel's base behaviour, [knowledge-ingest.md](./knowledge-ingest.md) for the loop chart, and [knowledge-phases.md](./knowledge-phases.md) for the Cloud unit + stub path. Map: [`docs/internal/maps/knowledge-base-page.md`](../../../../docs/internal/maps/knowledge-base-page.md).
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 

@@ -1,6 +1,6 @@
 # Map — Legal matter run
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 Last verified: 2026-10-05 at b58383d plus the Legal harness merge (§ 7 stages, § 8 deliverable and § 9 verify line citations, Failure modes and Gotchas re-read against the merged `packages/host/src/legal/run.ts`; Legal harness: one untagged file, a built-in position, one verbatim-quote retry, first verified 2026-09-28 at f20a90b). The `legal-studio.tsx`, `legal-client.ts`, `legal-matter-panel.tsx`, `legal-matter-map.tsx`, `legal-file-list.tsx`, `App.tsx` and `app-rail.tsx` line citations and the layout sentence at the end of § 1 are as of 2026-10-01 (working tree on top of 0b61a29). Intake sections §2, §5 and the Gotchas were refreshed 2026-09-23 at 775d16f for the 0.15.0 finding-2 fix.
 

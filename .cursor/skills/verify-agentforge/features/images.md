@@ -2,7 +2,7 @@
 
 Images is a generate studio (prompt → gallery), not a canvas editor. It lists gateway image model ids. `images-studio-needs-key` and `images-studio-submit` both follow the host gate: the note shows and Generate is disabled only when `allowed` is false. A stub desk (`allowed: true`) hides the note and can still generate. Live generate is an operator pass on this machine, never Cloud. Maps: [`generate-studios.md`](../../../../docs/internal/maps/generate-studios.md) and [`media-cost-estimate.md`](../../../../docs/internal/maps/media-cost-estimate.md).
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 ## Sub-features
 

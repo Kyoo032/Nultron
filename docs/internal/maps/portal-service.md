@@ -475,7 +475,7 @@ page adds is where it plugs in and what to be careful of.
 
 ## Touches / Do not touch
 
-Read before editing `apps/portal`. Lanes: Enterprise and HYP AI. Nultron Enterprise runs the e-mailed code (`PORTAL_SIGNIN_MODE` unset or `code`); HYP AI runs `password`. Both come from this one codebase.
+Read before editing `apps/portal`. Lanes: Enterprise. The Nultron Enterprise bundle sets `PORTAL_SIGNIN_MODE=password` (since 2026-10-09; `scripts/release-web.mjs` `ENV_DEFAULTS` and the k8s base). The portal's own default when the variable is unset is still `code`. HYP AI's own repo sets `password` too.
 
 **This page owns these:**
 
@@ -494,8 +494,8 @@ Read before editing `apps/portal`. Lanes: Enterprise and HYP AI. Nultron Enterpr
 - `packages/host/src/auth/` (the product's side of sign-in): [`portal-session-auth.md`](portal-session-auth.md). A reason code added here needs the copy and the host's reason table in the same change.
 - `packages/core/src/tenancy/types.ts`: the role strings the portal and the host both read; changing them is a wire change.
 - The product database. The portal has its own Postgres under `PORTAL_DATABASE_URL`, never `DATABASE_URL`; the product stays on SQLite.
-- Brand in portal copy: the sign-in and mail text name the product through `apps/portal/src/otp/product-name.ts`, not a typed brand. Keep it that way for HYP AI.
-- HYP AI's Cloudflare edge: not in this repo ([`release-and-sync-lanes.md`](release-and-sync-lanes.md)).
+- Brand in portal copy: the sign-in and mail text name the product through `apps/portal/src/otp/product-name.ts`, not a typed brand. Keep it that way for every white-label brand.
+- HYP AI's Cloudflare edge: HYP AI's own repo holds it, not this one ([`release-and-sync-lanes.md`](release-and-sync-lanes.md)).
 
 ## Gotchas
 

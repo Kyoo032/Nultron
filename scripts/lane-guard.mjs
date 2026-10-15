@@ -3,9 +3,9 @@
  * Lane guard: a change says which lanes it touches, keeps its map page, and stays brand-neutral.
  * Plan: docs/internal/white-label-and-agent-guardrails-plan.md.
  *
- * Why: one source repo feeds four lanes (Nultron Personal, Nultron Enterprise, HYP AI, the tester
+ * Why: one source repo feeds three lanes (Nultron Personal, retired; Nultron Enterprise; the tester
  * code). Agents cannot see the vault note that lists which files the tester branch edits, and a
- * brand name typed into shared code ships to HYP AI. `lanes.json` at the repo root is that list, in
+ * brand name typed into shared code leaks into any white-label build. `lanes.json` at the repo root is that list, in
  * the repo, and this script reads it.
  *
  * Usage (repo root):
@@ -31,9 +31,8 @@
  *   map        code under a lanes.json glob changed, but none of that glob's map pages did.
  *              Tests, markdown and fixtures never trigger it. An entry with "map": null is exempt.
  *
- * It skips (prints a line, exits 0, even under --strict) when lanes.json or docs/internal is absent
- * (the HYP AI import strips docs/internal) or when the range cannot be resolved or is empty (a
- * clone with no remote, or `main` itself). A lanes.json that cannot be read exits 1: an unreadable
+ * It skips (prints a line, exits 0, even under --strict) when lanes.json is absent or when the range
+ * cannot be resolved or is empty (a clone with no remote, or `main` itself). A lanes.json that cannot be read exits 1: an unreadable
  * manifest must not pass as a clean one.
  */
 
@@ -46,7 +45,6 @@ import { TESTER_BRANCH } from "./where-am-i.mjs";
 const DEFAULT_RANGE = "origin/main...HEAD";
 const LANES_FILE = "lanes.json";
 const BASELINE_FILE = "scripts/lane-guard.baseline.json";
-const DOCS_DIR = "docs/internal";
 
 // ---------------------------------------------------------------------------------------------
 // Pure helpers (tested in lane-guard.test.mjs)
@@ -309,9 +307,6 @@ export function run(args, defaultRoot) {
   const lanesPath = path.join(root, LANES_FILE);
   if (!existsSync(lanesPath))
     return { lines: [`lane-guard: ${LANES_FILE} not found, skipped.`], blocking: 0, advisory: 0 };
-  if (!existsSync(path.join(root, DOCS_DIR))) {
-    return { lines: [`lane-guard: ${DOCS_DIR} not found (stripped import?), skipped.`], blocking: 0, advisory: 0 };
-  }
   const config = readJson(lanesPath);
   const neverPromote = readNeverPromote(config);
 

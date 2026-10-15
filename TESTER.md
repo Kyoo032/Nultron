@@ -4,7 +4,7 @@ These rules apply only when `git branch --show-current` prints `tester/chat-firs
 
 Rizky's rule, 2026-10-06, must follow: Nultron is kept as two codes.
 
-- **Published:** `C:\Users\rizky\agentforge`, branch `main`. Nultron as released, with the mode screens. HYP AI is built from it.
+- **Published:** `C:\Users\rizky\agentforge`, branch `main`. Nultron as released, with the mode screens.
 - **Tester:** `C:\Users\rizky\agentforge-chat`, branch `tester/chat-first`. Chat only, with the modes running behind the chat as workers.
 
 The full map is in Rizky's Obsidian vault at `C:\Users\rizky\Documents\Obsidian\40-Dev\nultron-two-codes-map.md`. It says which change goes where, which files the tester may edit, and how to update. Read it before editing in `C:\Users\rizky\agentforge-chat`.
@@ -36,7 +36,7 @@ The tester is the staging code at every stage (Rizky, 2026-10-14). New work is d
 
 - **Nultron:** the tester's staging subdomain (name pending). Rizky will give the name.
 - **HYP AI:** HYP AI as a whole is still in the tester stage. Rizky, 2026-10-14: "the current stage are all still tester". Its server, `aiopc.innovationhypernet.com`, is not yet production.
-- **Open, for Rizky:** HYP AI still imports from `main` per `C:\Users\rizky\hypey\intake\SYNC.md`. Whether that changes is Rizky's call. Nothing here changes it.
+- **Separate repo:** HYP AI left this repo on 2026-10-15 (`Kyoo032/hyp-ai`). It takes no import, vendor sync or merge from here.
 
 ## What the tester is building
 

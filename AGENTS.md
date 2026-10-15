@@ -10,20 +10,18 @@ Turn the push guard on once per clone with `pnpm hooks:install`. It writes `core
 |---|---|---|---|
 | `C:\Users\rizky\agentforge` and worktrees `C:\Users\rizky\agentforge-<topic>` | `main`, or a branch cut from `main` | Published code. Every release and deploy comes from here. | `:3000` |
 | `C:\Users\rizky\agentforge-chat` | `tester/chat-first` | Tester = staging. New work lands here first. Read `TESTER.md`. | `:3200` |
-| `C:\Users\rizky\hypey\app` | its own `main` (remote `Kyoo032/hyp-ai`) | HYP AI's brand repo (downstream). Brand only. | `:3301` |
 
-- **Stage (Rizky, 2026-10-14).** The tester is the staging code at every stage. HYP AI as a whole is still in the tester stage: "the current stage are all still tester". Its server, `aiopc.innovationhypernet.com`, is not yet production.
+- **Stage (Rizky, 2026-10-14).** The tester is the staging code at every stage.
 - **Staging instance.** Nultron's tester stages on the tester's staging subdomain (name pending). `TESTER.md`, "Staging instance", has the detail.
-- **Open (Rizky).** HYP AI still imports from `main` per `C:\Users\rizky\hypey\intake\SYNC.md`. Whether that changes is Rizky's call.
+- **HYP AI.** Its own repo since 2026-10-15 (`Kyoo032/hyp-ai`, folder `C:\Users\rizky\hyp-ai`). It takes no import, vendor sync or merge from this repo.
 
 ## Where a change goes
 
 | The change | Cut the branch from | Work in | Pull request to | Still owed before it counts as done |
 |---|---|---|---|---|
-| A bug seen on the live app, the preview or `:3000` | `main` | a worktree `agentforge-<topic>` | `main` | merge `origin/main` into the tester + `ci:local` there; HYP AI import + its leak checks |
+| A bug seen on the live app, the preview or `:3000` | `main` | a worktree `agentforge-<topic>` | `main` | merge `origin/main` into the tester + `ci:local` there |
 | A new feature or a behaviour change | `tester/chat-first` | `agentforge-chat` | none at first (commit on the tester) | a drive on the staging instance (the tester's staging subdomain, name pending), then a promotion pull request Rizky approves |
 | A bug in a feature that exists only in the tester | `tester/chat-first` | `agentforge-chat` | none | a drive on the staging instance (the tester's staging subdomain, name pending) |
-| HYP AI's name, logo, copy, edge or deploy | HYP AI repo `main` | `hypey\app` | `Kyoo032/hyp-ai` | its leak checks |
 | Docs, maps, skills about shared code | `main` | a worktree | `main` | merge into the tester |
 | A release or a deploy | `main` only | `agentforge` | none | Rizky's go at that moment |
 
@@ -31,10 +29,10 @@ Never: a fix pull request from `tester/chat-first`; a release from `C:\Users\riz
 
 ## Which product a change reaches
 
-After the opc/sme split. Until then every shared file reaches both.
+Since the 2026-10-15 split this repo is Nultron only. Shared code reaches Nultron and the tester. HYP AI is its own repo and takes nothing from here.
 
-- `engine` or `ui`: both Nultron (OPC) and HYP AI (SME). Tests must pass for both profiles.
-- `opc`: Nultron only. `sme`: HYP AI only. They never import each other.
+- `engine` or `ui`: Nultron (OPC) and the tester. Tests must pass for the OPC profile.
+- `opc`: Nultron only. `sme`: HYP AI's own repo, which takes nothing from here.
 - Shared code names no brand.
 
 **The vision (Rizky, 2026-10-05): everyone has all their workers inside one desk.**
@@ -61,7 +59,7 @@ Each worker is a mode whose harness is already built in: prompt, tools, skills, 
 - Make every worker hand off to the others: research to a deck, a contract's facts to a memo.
 - Enterprise is the same desk shared by a team. White-label brands (HYP AI) carry the same vision under their own name.
 
-**Read [`docs/internal/release-targets.md`](docs/internal/release-targets.md) first.** It lists every release target built from this repo: Nultron Personal, Nultron Enterprise, the HYP AI white-label for Hypernet, and the desktop flavors. For each one it gives the type, company, codebase, services, how it ships and what is running now. Name the target your task serves before you edit, and stop if the change lands on another one.
+**Read [`docs/internal/release-targets.md`](docs/internal/release-targets.md) first.** It lists every release target built from this repo: Nultron Personal, Nultron Enterprise, and the desktop flavors. The HYP AI white-label for Hypernet is no longer built from here (its own repo since 2026-10-15). For each one it gives the type, company, codebase, services, how it ships and what is running now. Name the target your task serves before you edit, and stop if the change lands on another one.
 
 **Changed 2026-10-14 (Rizky): Nultron is the OPC, HYP AI is the SME, and the desktop app is retired.** Nultron is a one-person company whose agents work together 24/7 for one owner, running in a VPS; HYP AI is the small or medium company where people and agents work together through projects and a kanban board. Nultron Personal (the Electron app) is retired into the web app: its release repo is now `Kyoo032/Nultron-Desktop`, archived, and the old `Kyoo032/NultronEnt` was renamed to `Kyoo032/Nultron` (private), the web app's release repo (`RELEASE_REPO` in `scripts/release-web.mjs`). No desktop code is removed yet. The proposed codebase shape is in `docs/internal/opc-sme-architecture.md` (branch `docs/opc-sme-architecture`, awaiting Rizky's approval). Sentences below that describe Personal as a shipping product, or name `NultronEnt`, are history from before this change.
 
@@ -139,13 +137,13 @@ Two more answers from him the same evening:
 
 The tables at the top say where a change is cut, made and merged. This section keeps the rules behind them. The working form is [`docs/internal/maps/release-and-sync-lanes.md`](docs/internal/maps/release-and-sync-lanes.md).
 
-- **Lanes.** `main` is the published code: Nultron as the OPC web app, and the Enterprise and SME base. The tester (`C:\Users\rizky\agentforge-chat`, `tester/chat-first`) is the staging code at every stage. HYP AI (`C:\Users\rizky\hypey\app`) is a downstream brand repo: brand only. Nultron Personal is retired (2026-10-14): no sync step is owed to it, and no release is cut from it.
-- **One place to fix.** A bug fix is a pull request to `main` from a branch cut from `main`. Never fix by hand in `C:\Users\rizky\agentforge-chat` or in the HYP AI clone, and never open a fix pull request from `tester/chat-first`. Tester work reaches `main` only through a promotion pull request Rizky approves.
+- **Lanes.** `main` is the published code: Nultron as the OPC web app. The tester (`C:\Users\rizky\agentforge-chat`, `tester/chat-first`) is the staging code at every stage. HYP AI is its own repo since 2026-10-15 and takes nothing from this one. Nultron Personal is retired (2026-10-14): no sync step is owed to it, and no release is cut from it.
+- **One place to fix.** A bug fix is a pull request to `main` from a branch cut from `main`. Never fix by hand in `C:\Users\rizky\agentforge-chat`, and never open a fix pull request from `tester/chat-first`. Tester work reaches `main` only through a promotion pull request Rizky approves.
 - **Two codes, one way.** Changes move one way, from `main` into `tester/chat-first`: `git fetch origin`, then `git merge origin/main` in `C:\Users\rizky\agentforge-chat`. Never run a release from `C:\Users\rizky\agentforge-chat`. Its webdev uses port 3200 and its own data folder, so it never shares a database with `:3000`. The precise map (which change goes where, which files the tester may edit) is Rizky's vault note `C:\Users\rizky\Documents\Obsidian\40-Dev\nultron-two-codes-map.md`. Keep it current in the same session as any change to the split.
-- **After a pull request merges to `main`, in this order:** (1) merge `origin/main` into `C:\Users\rizky\agentforge-chat` and run `ci:local`; (2) import it into the HYP AI clone per `C:\Users\rizky\hypey\intake\SYNC.md`, then run `check-leaks.sh` and `drive-leaks.mjs`; (3) release Enterprise only when Rizky says. A fix is not done for a lane until its step has run. The pull request says which lanes are still owed.
-- **Shared code carries no brand.** HYP AI shows its own name, gateway and mascot, so shared code and copy never hard-code `Nultron`, `Toko Token`, `TokenKu` or `HYP AI`; they read `productName` and `gatewayName`. A difference between lanes is a setting (`PORTAL_SIGNIN_MODE`, the edge mode), not a fork.
-- **Deploy differences stay in their lane.** The Cloudflare edge and password sign-in belong to HYP AI's deploy; Nultron keeps its direct two-name setup. Never carry one into the other's deploy path.
-- **Label what a change touches.** In a pull request and in `unreleased.md`, name the lanes with the tokens `lanes.json` already reads: `enterprise`, `hyp-ai`, `tester`, and `personal` (retired, owes nothing). Shared code defaults to `enterprise`, `hyp-ai` and `tester`. The guard checks only that a `Lanes:` line exists, not which tokens it names.
+- **After a pull request merges to `main`, in this order:** (1) merge `origin/main` into `C:\Users\rizky\agentforge-chat` and run `ci:local`; (2) release Enterprise only when Rizky says. A fix is not done for a lane until its step has run. The pull request says which lanes are still owed.
+- **Shared code carries no brand.** Shared code and copy never hard-code `Nultron`, `Toko Token`, `TokenKu` or `HYP AI`; they read `productName` and `gatewayName`. A difference between lanes is a setting (`PORTAL_SIGNIN_MODE`, the edge mode), not a fork.
+- **Deploy differences stay in their lane.** The Cloudflare edge belongs to HYP AI's deploy; Nultron keeps its direct two-name setup. Never carry the edge into the other's deploy path. Password sign-in is a portal setting (`PORTAL_SIGNIN_MODE`) that both bundles can set.
+- **Label what a change touches.** In a pull request and in `unreleased.md`, name the lanes with the tokens `lanes.json` already reads: `enterprise`, `tester`, and `personal` (retired, owes nothing). Shared code defaults to `enterprise` and `tester`. The guard checks only that a `Lanes:` line exists, not which tokens it names.
 - **Priority.** Published wins; in a conflict keep the `main` side. The Obsidian map has the full list.
 
 **Change guard (advisory, 2026-10-09).** Any change follows the project skill [`.cursor/skills/change-agentforge/SKILL.md`](.cursor/skills/change-agentforge/SKILL.md). Paste [`preamble.md`](.cursor/skills/change-agentforge/preamble.md) at the top of every subagent prompt. [`lanes.json`](lanes.json) maps path globs to their map page, the lanes they reach and a `protected` flag. `pnpm lane-guard` (`scripts/lane-guard.mjs`) prints three kinds of warning: a map page not refreshed, a protected file with no `Lanes:` line, a brand literal added to shared code. It exits 0 unless `--strict`. `ci:local` runs it with `--strict` as an advisory step: a warning shows in the table and never fails the run. The strict rules, the never-promote list, the pre-push hook and the release-script checks are added on branch `chore/agent-guardrails`; the map page names the file that holds each. Plan: [`docs/internal/white-label-and-agent-guardrails-plan.md`](docs/internal/white-label-and-agent-guardrails-plan.md).

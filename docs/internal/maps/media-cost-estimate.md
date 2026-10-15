@@ -1,6 +1,6 @@
 # Map — Media cost estimate
 
-Product: both · Instance: main :3000 + HYP AI :3301
+Product: both · Instance: main :3000
 
 Last verified: 2026-09-26; on 2026-10-01 (working tree on top of 0b61a29) only the three `images-studio.tsx` / `videos-studio.tsx` cites in the renderer paragraphs were re-anchored (the prompt-row work moved them) and nothing else was re-read. 2026-09-26 (an unknown price is omitted; the `*-estimate-unknown` row is not rendered; a video model is priced only when the refresh listed it). Before that: 2026-09-20 at c204e5e.
 

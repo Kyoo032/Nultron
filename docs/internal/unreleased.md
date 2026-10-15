@@ -496,3 +496,19 @@ Lanes: Personal, Enterprise, HYP AI, tester. Every lane reaches this code, so th
 - **Caddy compression.** `webapp-deploy/Caddyfile` (both sites) and `webapp-deploy/k8s/base/caddy/security.caddy` had a bare `encode zstd gzip`, which compresses every response, including `text/event-stream` (job progress, SR-174) and media. Each now has a `match` on the text types only (html, css, plain, xml, javascript, json, svg). The explicit list keeps `text/event-stream` out; a `text/*` wildcard would not. `packages/host/src/caddy-encode.test.ts` pins it. The bundle (`scripts/release-web.mjs`) reads `webapp-deploy/Caddyfile` at the sha, so this reaches the bundle with no script change. **Caddy was not run:** no caddy binary and no Docker daemon on this PC, so the syntax is unvalidated.
 - **Not changed, on purpose.** The company sites `webapp-deploy/sites/dpscloud.caddy` and `tokotoken.caddy` keep a bare `encode zstd gzip`: they serve static pages with no SSE or media, and they are not Nultron.
 - **Owed, same bug, outside this change:** `apps/web/components/presentations-studio.tsx:357` still parses only `filename="…"` (`presentations.md` § on `onDownload`). Same one-line fix, not made here.
+
+## HYP AI left this repo: lanes and sync steps removed, 2026-10-15 (branch `chore/drop-hyp-lane`)
+
+Lanes: enterprise, tester.
+
+- **Why.** HYP AI is its own repo from 2026-10-15 (`Kyoo032/hyp-ai`, folder `C:\Users\rizky\hyp-ai`). Nothing in this repo imports, vendors, syncs or merges into it, so the HYP AI lane, its sync step and its `lanes.json` tokens described a path that no longer exists.
+- **What.** `scripts/where-am-i.mjs` has no `hyp-ai` row, and a `hypey` folder now reads as `other`. `scripts/lane-guard.mjs` drops the HYP import wording and the `docs/internal` skip; its brand literal list is unchanged. `lanes.json` drops the `hyp-ai` token from every entry. The `scripts/hooks/pre-push.mjs` comment, `AGENTS.md`, `TESTER.md`, `docs/internal/release-targets.md` (the HYP card is now a pointer, and the superseded 2026-10-05 sync plan in its scope section is one line of history), `docs/internal/maps/release-and-sync-lanes.md` (Last verified 2026-10-15 at `8a42aaed`), the other maps, and the verify and change skills are reworded to match. Password sign-in is now described as a portal setting in `AGENTS.md`, the change skill and `docs/internal/maps/portal-service.md:478`, not as HYP AI's alone.
+- **Kept on purpose.** The brand literals the lane guard bans in shared code, the guard baseline, the pre-push test that a `hyp-ai` push is not guarded, the password-mode history in the Enterprise and portal docs, and the HYP AI product history in `docs/internal`. Product history was not deleted to make a grep clean.
+- **Proof.** Unit tests and the guard scripts; see the change report. Not driven: docs and guard scripts only, no server started.
+- **Also fixed.** The `lanes.json` note on the portal entry said Nultron Enterprise keeps the e-mailed code; it now says the bundle sets password mode and the code stays selectable.
+
+## Finding: PORTAL_SIGNIN_MODE default disagreed between the docs and the Enterprise bundle, 2026-10-15 (fixed in `chore/drop-hyp-lane`)
+
+Lanes: enterprise, tester.
+
+- [x] **Stale sign-in note for the Enterprise bundle.** `scripts/release-web.mjs:122` sets `PORTAL_SIGNIN_MODE: "password"` in `ENV_DEFAULTS`, and `webapp-deploy/k8s/base/kustomization.yaml:59` sets `- PORTAL_SIGNIN_MODE=password`. AGENTS.md records Rizky's 2026-10-09 change that this is the Enterprise default, and the code matches it. So `lanes.json:319`, which says Nultron Enterprise keeps the e-mailed code, was stale and is rewritten in the same branch. The map line `docs/internal/maps/portal-service.md:478` said the same and is corrected in this change. Read from source; not driven.
