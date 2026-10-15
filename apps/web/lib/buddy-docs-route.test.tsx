@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -6,36 +5,27 @@ import { AgentRail } from "@/components/agent-rail";
 import { AppShell } from "@/components/app-shell";
 import { buddyAllowedAt } from "./buddy-routes";
 import { applyLocale, resetLocaleForTests } from "./i18n";
-import { BrandContext, DEFAULT_PRODUCT_BRAND, type ProductBrand } from "./product-brand";
 
 vi.mock("@/components/desk-buddy-reactions", () => ({
   DeskBuddyReactions: () => <i data-testid="buddy-reactions" />,
 }));
 
-const ENTERPRISE: ProductBrand = { ...DEFAULT_PRODUCT_BRAND, productName: "Acme Desk", shell: "enterprise" };
-const DEFAULT: ProductBrand = { ...DEFAULT_PRODUCT_BRAND, shell: "opc" };
-
-function shellAt(path: string, brand: ProductBrand): string {
+function shellAt(path: string): string {
   return renderToStaticMarkup(
     <MemoryRouter initialEntries={[path]}>
-      <BrandContext.Provider value={brand}>
-        <AppShell workspaceName="Desk" visibleModes={[]}>
-          <div>page</div>
-        </AppShell>
-      </BrandContext.Provider>
+      <AppShell workspaceName="Desk" visibleModes={[]}>
+        <div>page</div>
+      </AppShell>
     </MemoryRouter>,
   );
 }
 
-function railAt(path: string, brand: ProductBrand): string {
-  const node: ReactNode = (
+function railAt(path: string): string {
+  return renderToStaticMarkup(
     <MemoryRouter initialEntries={[path]}>
-      <BrandContext.Provider value={brand}>
-        <AgentRail visibleModes={[]} />
-      </BrandContext.Provider>
-    </MemoryRouter>
+      <AgentRail visibleModes={[]} />
+    </MemoryRouter>,
   );
-  return renderToStaticMarkup(node);
 }
 
 beforeEach(() => {
@@ -61,31 +51,20 @@ describe("buddyAllowedAt", () => {
 
 describe("the desk buddy on a document page", () => {
   it("stands down in the rail: no dock and no chip", () => {
-    const html = railAt("/docs/art_123", DEFAULT);
+    const html = railAt("/docs/art_123");
     expect(html).not.toContain("agent-rail-buddy-dock");
     expect(html).not.toContain("desk-buddy");
   });
 
   it("is still in the rail on a chat page", () => {
-    const html = railAt("/chat", DEFAULT);
-    expect(html).toContain("agent-rail-buddy-dock");
+    expect(railAt("/chat")).toContain("agent-rail-buddy-dock");
   });
 
   it("stands down in the shell: no reactions on the document page", () => {
-    expect(shellAt("/docs/art_123", DEFAULT)).not.toContain("buddy-reactions");
+    expect(shellAt("/docs/art_123")).not.toContain("buddy-reactions");
   });
 
-  it("keeps the reactions on a chat page in the default shell", () => {
-    expect(shellAt("/chat", DEFAULT)).toContain("buddy-reactions");
-  });
-
-  it("has no reactions anywhere in the enterprise shell", () => {
-    expect(shellAt("/chat", ENTERPRISE)).not.toContain("buddy-reactions");
-    expect(shellAt("/docs/art_123", ENTERPRISE)).not.toContain("buddy-reactions");
-  });
-
-  it("has no dock in the enterprise rail on any page", () => {
-    expect(railAt("/chat", ENTERPRISE)).not.toContain("agent-rail-buddy-dock");
-    expect(railAt("/docs/art_123", ENTERPRISE)).not.toContain("agent-rail-buddy-dock");
+  it("keeps the reactions on a chat page", () => {
+    expect(shellAt("/chat")).toContain("buddy-reactions");
   });
 });

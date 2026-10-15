@@ -1,23 +1,15 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { AlwaysAllowToggles, SettingsMediaCard } from "@/components/settings-media-card";
 import { applyLocale, resetLocaleForTests, t } from "@/lib/i18n";
-import { BrandContext, DEFAULT_PRODUCT_BRAND, type ProductBrand } from "@/lib/product-brand";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const source = (relative: string) => readFileSync(resolve(here, relative), "utf8").replace(/\r\n/g, "\n");
 
-const ENTERPRISE_BRAND: ProductBrand = { ...DEFAULT_PRODUCT_BRAND, productName: "Acme Desk", shell: "enterprise" };
-
 const NOOP = () => undefined;
-
-function enterprise(node: ReactNode, brand: ProductBrand = ENTERPRISE_BRAND): string {
-  return renderToStaticMarkup(<BrandContext.Provider value={brand}>{node}</BrandContext.Provider>);
-}
 
 const count = (markup: string, needle: string) => markup.split(needle).length - 1;
 
@@ -30,24 +22,8 @@ afterEach(() => {
 });
 
 describe("the Media group in Settings", () => {
-  it("is not drawn in the default shell, so that shell's Settings does not change", () => {
+  it("is not drawn on the chat-first shell, so its Settings does not change", () => {
     expect(renderToStaticMarkup(<SettingsMediaCard />)).toBe("");
-    expect(enterprise(<SettingsMediaCard />, { ...DEFAULT_PRODUCT_BRAND, shell: "opc" })).toBe("");
-  });
-
-  it("is drawn in the enterprise shell, with both toggles", () => {
-    const html = enterprise(<SettingsMediaCard />);
-    expect(html).toContain('data-testid="settings-media"');
-    expect(html).toContain("Media");
-    expect(html).toContain("Always allow images");
-    expect(html).toContain("Always allow videos");
-    expect(html).toContain('data-testid="settings-media-image"');
-    expect(html).toContain('data-testid="settings-media-video"');
-  });
-
-  it("holds the toggles until the saved choices are read", () => {
-    const html = enterprise(<SettingsMediaCard />);
-    expect(count(html, ' disabled=""')).toBe(2);
   });
 
   it("is in the Settings page, once, before the storage card", () => {
@@ -90,11 +66,6 @@ describe("the always-allow toggles", () => {
     expect(html).toContain(t("settings.media.loadFailed"));
     expect(html).not.toContain(t("settings.media.failed"));
     expect(html).toContain('role="alert"');
-  });
-
-  it("never names the product's mascot or brand", () => {
-    const html = enterprise(<SettingsMediaCard />).toLowerCase();
-    expect(html).not.toContain("nultron");
   });
 
   it("keeps the Media group in both locales", () => {

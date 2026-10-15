@@ -17,7 +17,6 @@ export type RailLinkProps = {
   active: boolean;
   collapsed: boolean;
   children: ReactNode;
-  trailing?: ReactNode;
   className?: string;
   conversation?: VirtualAgentInfo["conversation"];
   onTip: (label: string) => (event: SyntheticEvent<HTMLElement>) => void;
@@ -32,7 +31,6 @@ export function RailLink({
   active,
   collapsed,
   children,
-  trailing,
   className,
   conversation,
   onTip,
@@ -57,7 +55,6 @@ export function RailLink({
     >
       {children}
       {collapsed ? null : <span className="agent-rail-label">{label}</span>}
-      {collapsed ? null : trailing}
     </Link>
   );
 }

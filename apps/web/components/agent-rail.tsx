@@ -4,7 +4,6 @@ import { useState, type ReactNode, type SyntheticEvent } from "react";
 import type { ProductMode } from "@agentforge/core/product-modes";
 import { usePathname, useSearchParams } from "@/lib/nav";
 import { AppUpdatesButton } from "@/components/app-updates";
-import { EnterpriseRailHeader, SectionHeading, WorkspacesSection } from "@/components/agent-rail-enterprise";
 import { RAIL_PANEL_ID, RailLink, RailToggle, type Tip } from "@/components/agent-rail-parts";
 import { BrandMark } from "@/components/brand-mark";
 import { DeskBuddyChip, DeskBuddyDock } from "@/components/desk-buddy";
@@ -12,11 +11,9 @@ import { ModeIcon, isModeIconName, type ModeIconName } from "@/components/mode-i
 import { ThemeToggle } from "@/components/theme-toggle";
 import { productMonogram } from "@/components/app-shell";
 import { buddyAllowedAt } from "@/lib/buddy-routes";
-import { enterpriseBrandName } from "@/lib/enterprise-brand";
 import { isHostedBuild } from "@/lib/hosted-build";
 import { t } from "@/lib/i18n";
-import { assistantNameOf, useProductBrand, usesBundledMark, useShellLook, type ShellLook } from "@/lib/product-brand";
-import { activeWorkspaceIdOf, useRailWorkspaces, type RailWorkspacesState } from "@/lib/rail-workspaces";
+import { assistantNameOf, useProductBrand, usesBundledMark } from "@/lib/product-brand";
 import type { ShellModesSource } from "@/lib/shell-modes";
 import { RAIL_PHONE_QUERY, useMatchMedia, useRailCollapse, useRailDrawer } from "@/lib/agent-rail-state";
 import {
@@ -71,11 +68,6 @@ export type AgentRailViewProps = {
   onToggle?: () => void;
   /** A phone only: the expanded rail is a drawer over the page, and this is what closes it. */
   onDismiss?: () => void;
-  /** The enterprise shell (`AGENTFORGE_SHELL`): the same rail, with the brand header and the Workspaces section. */
-  look?: ShellLook;
-  /** Hosted enterprise only: the person's Workspaces, drawn above the agents. Null draws no section. */
-  workspaces?: RailWorkspacesState | null;
-  activeWorkspaceId?: string | null;
 };
 
 type AccountLink = { href: string; icon: ModeIconName; testId: string; labelKey: string };
@@ -127,16 +119,8 @@ export function AgentRailView({
   collapsed = true,
   onToggle,
   onDismiss,
-  look = "opc",
-  workspaces = null,
-  activeWorkspaceId = null,
 }: AgentRailViewProps) {
-  const enterprise = look === "enterprise";
-  const sectionCoversProjects = enterprise && workspaces !== null;
-  const hostedLinks = [
-    ...(showBoard ? [BOARD_LINK] : []),
-    ...(showProjects && !sectionCoversProjects ? [PROJECTS_LINK] : []),
-  ];
+  const hostedLinks = [...(showBoard ? [BOARD_LINK] : []), ...(showProjects ? [PROJECTS_LINK] : [])];
   const accountLinks = [...hostedLinks, ...ACCOUNT_LINKS];
   /*
    * The name shows in one tooltip drawn by the rail itself, outside the scrolling column. A tooltip
@@ -158,8 +142,7 @@ export function AgentRailView({
   // Nothing cached and no answer yet: the generalist alone, so Chat is reachable from the first frame,
   // and quiet placeholders where the rest will land.
   const waiting = !loaded && agents.length === 0;
-  const withGeneralist = agents.some((agent) => agent.generalist) ? agents : [FALLBACK_GENERALIST, ...agents];
-  const list = enterprise ? withGeneralist.filter((agent) => agent.generalist) : withGeneralist;
+  const list = agents.some((agent) => agent.generalist) ? agents : [FALLBACK_GENERALIST, ...agents];
 
   const renderAgent = (agent: VirtualAgentInfo) => (
     <RailLink
@@ -175,7 +158,7 @@ export function AgentRailView({
       onTip={onTip}
       onTipEnd={onTipEnd}
     >
-      {agent.generalist && !enterprise ? (
+      {agent.generalist ? (
         <GeneralistTile productName={productName} logoSrc={logoSrc} bundled={bundledMark} />
       ) : (
         <span className="agent-rail-tile">
@@ -191,30 +174,8 @@ export function AgentRailView({
       aria-label={t("agents.rail.aria")}
       data-testid="agent-rail"
       data-rail={collapsed ? "min" : "full"}
-      data-look={enterprise ? "enterprise" : undefined}
     >
       <div className="agent-rail-inner" id={RAIL_PANEL_ID}>
-        {enterprise ? (
-          <EnterpriseRailHeader
-            name={productName}
-            logoSrc={logoSrc}
-            bundledMark={bundledMark}
-            collapsed={collapsed}
-            onToggle={onToggle}
-          />
-        ) : null}
-        {enterprise && workspaces ? (
-          <WorkspacesSection
-            state={workspaces}
-            activeId={activeWorkspaceId}
-            collapsed={collapsed}
-            onTip={onTip}
-            onTipEnd={onTipEnd}
-          />
-        ) : null}
-        {enterprise && !collapsed ? (
-          <SectionHeading label={t("agents.rail.agentsHeading")} testId="rail-agents-title" />
-        ) : null}
         <nav
           className="agent-rail-agents"
           aria-label={t("agents.rail.agentsAria")}
@@ -224,7 +185,7 @@ export function AgentRailView({
         >
           {list.filter((agent) => agent.generalist).map(renderAgent)}
           {list.filter((agent) => !agent.generalist).map(renderAgent)}
-          {waiting && !enterprise
+          {waiting
             ? SKELETON_KEYS.map((key) => (
                 <span key={key} className="agent-rail-skeleton" data-testid="agent-rail-skeleton" aria-hidden="true" />
               ))
@@ -254,7 +215,7 @@ export function AgentRailView({
         </div>
 
         <div className="agent-rail-footer" data-testid="rail-footer">
-          {onToggle && !enterprise ? <RailToggle collapsed={collapsed} onToggle={onToggle} /> : null}
+          {onToggle ? <RailToggle collapsed={collapsed} onToggle={onToggle} /> : null}
           {footer}
         </div>
       </div>
@@ -283,17 +244,13 @@ export function AgentRail(_props: Props) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const brand = useProductBrand();
-  const enterprise = useShellLook() === "enterprise";
   const { agents, loaded } = useVirtualAgents();
   const phone = useMatchMedia(RAIL_PHONE_QUERY);
-  const desk = useRailCollapse(!enterprise);
+  const desk = useRailCollapse(true);
   const drawer = useRailDrawer(phone, `${pathname}?${searchParams.toString()}`);
   const collapsed = phone ? !drawer.open : desk.collapsed;
   const hosted = isHostedBuild();
-  const workspaces = useRailWorkspaces(enterprise && hosted, pathname);
-  const buddy = !enterprise && buddyAllowedAt(pathname);
-  const productName = enterprise ? enterpriseBrandName(brand.productName) : brand.productName;
-  const assistantName = enterprise ? brand.assistantName?.trim() || productName : assistantNameOf(brand);
+  const buddy = buddyAllowedAt(pathname);
 
   return (
     <AgentRailView
@@ -301,8 +258,8 @@ export function AgentRail(_props: Props) {
       loaded={loaded}
       activeId={activeAgentId(pathname, searchParams)}
       pathname={pathname}
-      productName={productName}
-      assistantName={assistantName}
+      productName={brand.productName}
+      assistantName={assistantNameOf(brand)}
       logoSrc={brand.logoSrc}
       bundledMark={usesBundledMark(brand)}
       showBoard={hosted}
@@ -310,9 +267,6 @@ export function AgentRail(_props: Props) {
       collapsed={collapsed}
       onToggle={phone ? drawer.toggle : desk.toggle}
       onDismiss={phone ? drawer.close : undefined}
-      look={enterprise ? "enterprise" : "opc"}
-      workspaces={workspaces}
-      activeWorkspaceId={activeWorkspaceIdOf(pathname, searchParams)}
       footer={
         <>
           {/* The character lives here in this shell, as the small head: the rail is the one place on
@@ -326,7 +280,7 @@ export function AgentRail(_props: Props) {
           ) : null}
           {buddy ? <DeskBuddyChip /> : null}
           <ThemeToggle />
-          {enterprise ? null : <AppUpdatesButton collapsed />}
+          <AppUpdatesButton collapsed />
         </>
       }
     />

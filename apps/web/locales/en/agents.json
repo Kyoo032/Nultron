@@ -24,13 +24,7 @@
     "agentsAria": "Virtual agents",
     "accountAria": "Account",
     "manage": "Virtual agents",
-    "studioBadge": "Opens its studio",
-    "enterpriseBadge": "Enterprise",
-    "enterpriseFallbackName": "Company",
-    "workspacesHeading": "Workspaces",
-    "workspacesAria": "Workspaces",
-    "newWorkspace": "New Workspace",
-    "agentsHeading": "Agents"
+    "studioBadge": "Opens its studio"
   },
   "header": {
     "newChat": "New chat",

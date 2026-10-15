@@ -24,13 +24,7 @@
     "agentsAria": "Agen virtual",
     "accountAria": "Akun",
     "manage": "Agen virtual",
-    "studioBadge": "Membuka studionya",
-    "enterpriseBadge": "Enterprise",
-    "enterpriseFallbackName": "Perusahaan",
-    "workspacesHeading": "Ruang kerja",
-    "workspacesAria": "Ruang kerja",
-    "newWorkspace": "Ruang kerja baru",
-    "agentsHeading": "Agen"
+    "studioBadge": "Membuka studionya"
   },
   "header": {
     "newChat": "Obrolan baru",

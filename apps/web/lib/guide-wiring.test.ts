@@ -36,11 +36,6 @@ describe("the guide is wired into the app", () => {
     expect(app.match(/dispatchGuide|replayGuide/g)).toBeNull();
   });
 
-  it("tells the store which look the desk runs, so the enterprise look is never offered the tour", () => {
-    expect(app).toContain("setGuideShell(shellLook)");
-    expect(app).toContain("const shellLook = useShellLook();");
-  });
-
   it("learns from the host whether the person has been through it, on every settings read", () => {
     expect(app).toContain("hydrateGuide(payload?.guide)");
   });

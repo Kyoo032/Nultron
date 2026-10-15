@@ -5,7 +5,6 @@ import { NxImageRig } from "@/components/nultron/nx-image-rig";
 import { hasClip, hasLoop } from "@/components/nultron/nx-picture";
 import { warmMascotAtIdle } from "@/components/nultron/nx-warm";
 import { t } from "@/lib/i18n";
-import { useShellLook } from "@/lib/product-brand";
 import { useFullBodyPresence } from "@/lib/use-full-body-presence";
 import {
   isMascotBusy,
@@ -62,7 +61,7 @@ export type NultronMascotProps = {
  * and the picture; the desk's ambient-pause and reduced-motion rules in `app/globals.css` target
  * `.chat-mascot` and `data-busy`, so the root class stays.
  */
-function NultronMascotBody({
+export function NultronMascot({
   state,
   placement = "beside",
   mode,
@@ -113,11 +112,4 @@ function NultronMascotBody({
       <NxImageRig state={state} kind={rig} busy={running} />
     </span>
   );
-}
-
-export function NultronMascot(props: NultronMascotProps) {
-  if (useShellLook() === "enterprise") {
-    return null;
-  }
-  return <NultronMascotBody {...props} />;
 }

@@ -26,7 +26,7 @@ import {
 import { applyLocale, getLocale, LOCALE_RESTART_EVENT, t } from "@/lib/i18n";
 import { ModeHeader } from "@/components/mode-header";
 import { isAppLocale, parseAppLocale, type AppLocale } from "@agentforge/core/locale";
-import { gatewayHostLabel, useProductBrand, useShellLook } from "@/lib/product-brand";
+import { gatewayHostLabel, useProductBrand } from "@/lib/product-brand";
 import { useWorkspaceScope } from "@/lib/workspace-scope";
 
 type Probe = {
@@ -145,7 +145,6 @@ export async function readSettingsAnswer(
 
 export function SettingsPage() {
   const { productName, gatewayName, gatewayBaseUrl } = useProductBrand();
-  const shellLook = useShellLook();
   const { name: workspaceName } = useWorkspaceScope();
   // Hosted only: the key is the company's, and the host refuses a member's write (M4). On a desk there
   // is no session, so this is always true and nothing below changes.
@@ -494,7 +493,7 @@ export function SettingsPage() {
         ) : null}
       </section>
 
-      {shellLook === "enterprise" ? null : <SettingsGuideCard />}
+      <SettingsGuideCard />
 
       <form onSubmit={(event) => void onSubmit(event)} className="mt-6 space-y-6" data-testid="settings-form">
         <section className="space-y-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4">

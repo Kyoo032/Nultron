@@ -2,7 +2,7 @@ import type { ComponentType, ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import type { ProductMode } from "@agentforge/core/product-modes";
-import { BrandContext, DEFAULT_PRODUCT_BRAND, type ProductBrand, WEB_LOGO_SRC } from "./product-brand";
+import { DEFAULT_PRODUCT_BRAND, type ProductBrand, WEB_LOGO_SRC } from "./product-brand";
 import type { VirtualAgentInfo } from "./virtual-agents";
 
 type ViewProps = {
@@ -66,10 +66,6 @@ function inRouter(path: string, node: ReactNode): string {
   return renderToStaticMarkup(<MemoryRouter initialEntries={[path]}>{node}</MemoryRouter>);
 }
 
-function withBrand(brand: ProductBrand, node: ReactNode): ReactNode {
-  return <BrandContext.Provider value={brand}>{node}</BrandContext.Provider>;
-}
-
 export function renderOpcCases(impl: RailImplementation): Record<string, string> {
   const { AgentRailView, AgentRail, AppShell } = impl;
   const page = <div data-testid="page">page</div>;
@@ -87,7 +83,7 @@ export function renderOpcCases(impl: RailImplementation): Record<string, string>
       <AgentRailView {...VIEW_BASE} productName={WEB_BRAND.productName} logoSrc={WEB_LOGO_SRC} bundledMark />,
     ),
     "rail-no-shell": inRouter("/chat", <AgentRail visibleModes={[]} />),
-    "rail-opc-shell": inRouter("/chat", withBrand({ ...WEB_BRAND, shell: "opc" }, <AgentRail visibleModes={[]} />)),
+    "rail-opc-shell": inRouter("/chat", <AgentRail visibleModes={[]} />),
     "rail-agent-path": inRouter("/agents/research", <AgentRail visibleModes={[]} />),
     "shell-no-shell": inRouter(
       "/chat",
@@ -97,12 +93,9 @@ export function renderOpcCases(impl: RailImplementation): Record<string, string>
     ),
     "shell-opc-shell": inRouter(
       "/chat",
-      withBrand(
-        { ...WEB_BRAND, shell: "opc" },
-        <AppShell workspaceName="Desk" visibleModes={[]}>
-          {page}
-        </AppShell>,
-      ),
+      <AppShell workspaceName="Desk" visibleModes={[]}>
+        {page}
+      </AppShell>,
     ),
   };
 }

@@ -15,7 +15,6 @@ import {
   offerGuideAfterOnboarding,
   replayGuide,
   resetGuideForTests,
-  setGuideShell,
   subscribeGuide,
 } from "./guide-store";
 import { GUIDE_STEPS } from "./guide-steps";
@@ -66,39 +65,6 @@ describe("offering the guide after first-run setup", () => {
   it("has a real tour to offer: the registry is 4 to 6 stops", () => {
     expect(GUIDE_STEPS.length).toBeGreaterThanOrEqual(4);
     expect(GUIDE_STEPS.length).toBeLessThanOrEqual(6);
-  });
-
-  it("does not offer it under the enterprise look, and asks the host nothing", () => {
-    setGuideShell("enterprise");
-    offerGuideAfterOnboarding();
-    expect(getGuideSnapshot().state).toEqual({ kind: "idle" });
-    expect(apiFetch).not.toHaveBeenCalled();
-  });
-
-  it("does not offer it under the enterprise look even when the host has not said it was seen", () => {
-    setGuideShell("enterprise");
-    hydrateGuide({ seen: false, outcome: null, at: null });
-    offerGuideAfterOnboarding();
-    expect(getGuideSnapshot().state).toEqual({ kind: "idle" });
-  });
-
-  it("offers it under the opc look, as before", () => {
-    setGuideShell("opc");
-    offerGuideAfterOnboarding();
-    expect(getGuideSnapshot().state).toEqual({ kind: "offered" });
-  });
-
-  it("offers it when no look is known, as before", () => {
-    setGuideShell(null);
-    offerGuideAfterOnboarding();
-    expect(getGuideSnapshot().state).toEqual({ kind: "offered" });
-  });
-
-  it("forgets the enterprise look when the store is reset", () => {
-    setGuideShell("enterprise");
-    resetGuideForTests();
-    offerGuideAfterOnboarding();
-    expect(getGuideSnapshot().state).toEqual({ kind: "offered" });
   });
 });
 
