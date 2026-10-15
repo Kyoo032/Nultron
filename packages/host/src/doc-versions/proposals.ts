@@ -36,7 +36,10 @@ export type ProposalInput = {
 
 export type CreateProposalResult =
   | { readonly ok: true; readonly proposal: DocProposal }
-  | { readonly ok: false; readonly reason: "not_found" | "not_editable" | "bad_base" | "bad_section" | "quota" };
+  | {
+      readonly ok: false;
+      readonly reason: "not_found" | "not_editable" | "bad_base" | "bad_section" | "section_changed" | "quota";
+    };
 
 export type ProposalChange =
   | { readonly ok: true; readonly proposal: DocProposal }
@@ -169,6 +172,12 @@ export function createProposalStore(options: ProposalStoreOptions): ProposalStor
     if (current === null || current.spec.kind !== "document") {
       return { ok: false, reason: "not_editable" };
     }
+    const changedAfterBase = (docVersions.listVersions(tenant, artifactId) ?? []).some(
+      (version) => version.version > input.baseVersion && version.changedSectionIds.includes(input.sectionId),
+    );
+    if (changedAfterBase) {
+      return { ok: false, reason: "section_changed" };
+    }
     const section = validatedSection(current.spec.spec, input.sectionId, input.section);
     if (section === null) {
       return { ok: false, reason: "bad_section" };
@@ -179,8 +188,8 @@ export function createProposalStore(options: ProposalStoreOptions): ProposalStor
     }
     const at = now();
     db.prepare(
-      "UPDATE doc_proposals SET status = 'discarded', updated_at = ? WHERE workspace_id = ? AND artifact_id = ? AND section_id = ? AND status = 'pending'",
-    ).run(at, tenant.workspaceId, artifactId, input.sectionId);
+      "DELETE FROM doc_proposals WHERE workspace_id = ? AND artifact_id = ? AND section_id = ? AND status = 'pending'",
+    ).run(tenant.workspaceId, artifactId, input.sectionId);
     const id = randomUUID();
     db.prepare(
       `INSERT INTO doc_proposals (id, workspace_id, artifact_id, section_id, base_version, section, agent_id, asked_by_user_id, status, kept_version, created_at, updated_at)
@@ -235,10 +244,15 @@ export function createProposalStore(options: ProposalStoreOptions): ProposalStor
     if (!result.ok) {
       return result;
     }
-    db.prepare(
-      "UPDATE doc_proposals SET status = 'kept', kept_version = ?, updated_at = ? WHERE workspace_id = ? AND id = ? AND status = 'pending'",
-    ).run(result.head.version, now(), tenant.workspaceId, proposalId);
-    return { ok: true, proposal: reread(tenant, proposalId) };
+    const at = now();
+    db.prepare("DELETE FROM doc_proposals WHERE workspace_id = ? AND id = ? AND status = 'pending'").run(
+      tenant.workspaceId,
+      proposalId,
+    );
+    return {
+      ok: true,
+      proposal: { ...proposalOf(row), status: "kept", keptVersion: result.head.version, updatedAt: at },
+    };
   };
 
   const discardIn = (tenant: TenantContext, proposalId: string): ProposalChange => {
@@ -249,10 +263,12 @@ export function createProposalStore(options: ProposalStoreOptions): ProposalStor
     if (row.status !== "pending") {
       return { ok: false, reason: "not_pending" };
     }
-    db.prepare(
-      "UPDATE doc_proposals SET status = 'discarded', updated_at = ? WHERE workspace_id = ? AND id = ? AND status = 'pending'",
-    ).run(now(), tenant.workspaceId, proposalId);
-    return { ok: true, proposal: reread(tenant, proposalId) };
+    const at = now();
+    db.prepare("DELETE FROM doc_proposals WHERE workspace_id = ? AND id = ? AND status = 'pending'").run(
+      tenant.workspaceId,
+      proposalId,
+    );
+    return { ok: true, proposal: { ...proposalOf(row), status: "discarded", updatedAt: at } };
   };
 
   return {

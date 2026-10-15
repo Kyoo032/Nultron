@@ -11,6 +11,7 @@ import { getTenant } from "../tenant";
 import { pendingBaseVersions } from "./pending-bases";
 import { createDocVersionStore, docVersionStore } from "./store";
 import { createProposalStore, proposalStore } from "./proposals";
+import { readTenantArtifactUse } from "../tenant-storage-store";
 import type { AppendVersionInput } from "./types";
 
 process.env.AGENTFORGE_SECRETS_KEY = "9c2e4a6b8d0f1a3c5e7b9d1f3a5c7e9b0d2f4a6c8e0b2d4f6a8c0e2b4d6f8a1c";
@@ -64,6 +65,14 @@ function statusOf(proposalId: string): string | undefined {
   )?.status;
 }
 
+function rowsFor(artifactId: string, sectionId: string): number {
+  return (
+    sql
+      .prepare("SELECT COUNT(*) AS n FROM doc_proposals WHERE artifact_id = ? AND section_id = ?")
+      .get(artifactId, sectionId) as { n: number }
+  ).n;
+}
+
 function proposalOrThrow<T extends { ok: boolean }>(result: T): Extract<T, { ok: true }> {
   if (!result.ok) {
     throw new Error(`expected a proposal, got ${JSON.stringify(result)}`);
@@ -111,7 +120,7 @@ describe("one pending proposal per section", () => {
     ).toThrow(/UNIQUE/);
   });
 
-  it("a retry replaces the pending proposal for that section and keeps the old one as discarded", async () => {
+  it("a retry replaces the pending proposal for that section and leaves one row for the section", async () => {
     const { artifactId } = await workspaceDocument();
     const store = proposalStore();
     const first = proposalOrThrow(
@@ -133,8 +142,9 @@ describe("one pending proposal per section", () => {
     const pending = store.listPending(ben, artifactId);
     expect(pending?.map((proposal) => proposal.id)).toEqual([second.proposal.id]);
     expect(pending?.[0]?.section).toEqual(section("numbers", "try two"));
-    expect(statusOf(first.proposal.id)).toBe("discarded");
-    expect(store.discard(ben, first.proposal.id)).toEqual({ ok: false, reason: "not_pending" });
+    expect(rowsFor(artifactId, "numbers")).toBe(1);
+    expect(statusOf(first.proposal.id)).toBeUndefined();
+    expect(store.discard(ben, first.proposal.id)).toEqual({ ok: false, reason: "not_found" });
   });
 
   it("refuses a base outside the history, a section the document does not have, and a missing artifact", async () => {
@@ -200,7 +210,9 @@ describe("keeping a proposal", () => {
       head?.kind === "document" ? head.spec.sections.find((part) => part.id === "numbers")?.blocks[0] : undefined,
     ).toEqual({ type: "paragraph", text: "The agent's numbers" });
     expect(store.listPending(alice, artifactId)).toEqual([]);
-    expect(store.keep(alice, made.proposal.id)).toEqual({ ok: false, reason: "not_pending" });
+    expect(rowsFor(artifactId, "numbers")).toBe(0);
+    expect(statusOf(made.proposal.id)).toBeUndefined();
+    expect(store.keep(alice, made.proposal.id)).toEqual({ ok: false, reason: "not_found" });
   });
 
   it("refuses section_changed when another person changed the section after the base, and leaves the proposal pending", async () => {
@@ -265,7 +277,7 @@ describe("keeping a proposal", () => {
 });
 
 describe("discarding a proposal", () => {
-  it("marks it discarded once; a second discard or a keep after it is refused as not pending", async () => {
+  it("answers discarded once and leaves no row; a second discard or a keep after it finds nothing", async () => {
     const { artifactId } = await workspaceDocument();
     const store = proposalStore();
     const made = proposalOrThrow(
@@ -278,8 +290,136 @@ describe("discarding a proposal", () => {
     );
     expect(store.discard(ben, made.proposal.id)).toMatchObject({ ok: true, proposal: { status: "discarded" } });
     expect(store.listPending(ben, artifactId)).toEqual([]);
-    expect(store.discard(ben, made.proposal.id)).toEqual({ ok: false, reason: "not_pending" });
-    expect(store.keep(alice, made.proposal.id)).toEqual({ ok: false, reason: "not_pending" });
+    expect(rowsFor(artifactId, "intro")).toBe(0);
+    expect(statusOf(made.proposal.id)).toBeUndefined();
+    expect(store.discard(ben, made.proposal.id)).toEqual({ ok: false, reason: "not_found" });
+    expect(store.keep(alice, made.proposal.id)).toEqual({ ok: false, reason: "not_found" });
+  });
+});
+
+describe("a proposal for a section that changed during the model call", () => {
+  it("is refused at create with section_changed, and stores nothing", async () => {
+    const { artifactId } = await workspaceDocument();
+    const versions = docVersionStore();
+    const store = proposalStore();
+    versions.ensureFirstVersion(alice, artifactId);
+    expect(versions.appendVersion(alice, artifactId, rewrite("numbers", "Alice moved first", 1))).toMatchObject({
+      ok: true,
+      head: { version: 2 },
+    });
+
+    expect(
+      store.createProposal(ben, artifactId, {
+        sectionId: "numbers",
+        section: section("numbers", "Ben's late numbers"),
+        baseVersion: 1,
+        agentId: "documents",
+      }),
+    ).toEqual({ ok: false, reason: "section_changed" });
+    expect(store.listPending(ben, artifactId)).toEqual([]);
+    expect(rowsFor(artifactId, "numbers")).toBe(0);
+  });
+
+  it("refuses a section that was removed after the base as section_changed, not bad_section", async () => {
+    const { artifactId } = await workspaceDocument();
+    const versions = docVersionStore();
+    const store = proposalStore();
+    versions.ensureFirstVersion(alice, artifactId);
+    expect(
+      versions.appendVersion(alice, artifactId, {
+        baseVersion: 1,
+        author: { kind: "person" },
+        edit: (head) =>
+          head.kind === "document"
+            ? { kind: "document", spec: { ...head.spec, sections: head.spec.sections.slice(0, 2) } }
+            : head,
+      }),
+    ).toMatchObject({ ok: true, head: { version: 2 } });
+
+    expect(
+      store.createProposal(ben, artifactId, {
+        sectionId: "close",
+        section: section("close", "Late close"),
+        baseVersion: 1,
+        agentId: "documents",
+      }),
+    ).toEqual({ ok: false, reason: "section_changed" });
+    expect(rowsFor(artifactId, "close")).toBe(0);
+  });
+
+  it("accepts a proposal whose base already includes the change", async () => {
+    const { artifactId } = await workspaceDocument();
+    const versions = docVersionStore();
+    const store = proposalStore();
+    versions.ensureFirstVersion(alice, artifactId);
+    expect(versions.appendVersion(alice, artifactId, rewrite("numbers", "Alice moved first", 1))).toMatchObject({
+      ok: true,
+      head: { version: 2 },
+    });
+
+    expect(
+      store.createProposal(ben, artifactId, {
+        sectionId: "numbers",
+        section: section("numbers", "Ben, on the new text"),
+        baseVersion: 2,
+        agentId: "documents",
+      }),
+    ).toMatchObject({ ok: true, proposal: { baseVersion: 2, status: "pending" } });
+  });
+
+  it("a stale retry is refused and leaves the pending proposal for that section in place", async () => {
+    const { artifactId } = await workspaceDocument();
+    const versions = docVersionStore();
+    const store = proposalStore();
+    versions.ensureFirstVersion(alice, artifactId);
+    const pending = proposalOrThrow(
+      store.createProposal(ben, artifactId, {
+        sectionId: "numbers",
+        section: section("numbers", "Ben's first try"),
+        baseVersion: 1,
+        agentId: "documents",
+      }),
+    );
+    expect(versions.appendVersion(alice, artifactId, rewrite("numbers", "Alice moved first", 1))).toMatchObject({
+      ok: true,
+      head: { version: 2 },
+    });
+
+    expect(
+      store.createProposal(ben, artifactId, {
+        sectionId: "numbers",
+        section: section("numbers", "Ben's stale retry"),
+        baseVersion: 1,
+        agentId: "documents",
+      }),
+    ).toEqual({ ok: false, reason: "section_changed" });
+    expect(store.listPending(ben, artifactId)?.map((proposal) => proposal.id)).toEqual([pending.proposal.id]);
+    expect(rowsFor(artifactId, "numbers")).toBe(1);
+  });
+});
+
+describe("a proposal's stored section counts against the tenant's storage", () => {
+  it("adds the stored section while it is pending, and gives it back once it is discarded", async () => {
+    const { artifactId } = await workspaceDocument();
+    const store = proposalStore();
+    docVersionStore().ensureFirstVersion(alice, artifactId);
+    const before = readTenantArtifactUse(TENANT).bytes;
+    const made = proposalOrThrow(
+      store.createProposal(ben, artifactId, {
+        sectionId: "intro",
+        section: section("intro", "Ünïcode 漢字 and an emoji 😀 in a proposal"),
+        baseVersion: 1,
+        agentId: "documents",
+      }),
+    );
+    const stored = sql
+      .prepare("SELECT length(CAST(section AS BLOB)) AS n FROM doc_proposals WHERE id = ?")
+      .get(made.proposal.id) as { n: number };
+    expect(stored.n).toBeGreaterThan(0);
+    expect(readTenantArtifactUse(TENANT).bytes - before).toBe(stored.n);
+
+    proposalOrThrow(store.discard(ben, made.proposal.id));
+    expect(readTenantArtifactUse(TENANT).bytes).toBe(before);
   });
 });
 
