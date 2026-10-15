@@ -43,6 +43,11 @@ import {
   handleGetArtifacts,
 } from "./handlers/artifacts";
 import { handleGetDoc, handleGetDocVersionFile, handleGetDocVersions } from "./handlers/docs-read";
+import {
+  handlePostDocProposal,
+  handlePostDocProposalDiscard,
+  handlePostDocProposalKeep,
+} from "./handlers/docs-proposals";
 import { DESK_FILE_ROUTES } from "./desk-files/routes";
 import { FOLDER_ROUTES } from "./folder-root";
 import {
@@ -477,6 +482,9 @@ const routes: Route[] = [
   compile("GET", "/api/v1/docs/:artifactId", handleGetDoc),
   compile("GET", "/api/v1/docs/:artifactId/versions", handleGetDocVersions),
   compile("GET", "/api/v1/docs/:artifactId/versions/:n/file", handleGetDocVersionFile),
+  compile("POST", "/api/v1/docs/:artifactId/sections/:sectionId/proposals", handlePostDocProposal),
+  compile("POST", "/api/v1/docs/proposals/:proposalId/keep", handlePostDocProposalKeep),
+  compile("POST", "/api/v1/docs/proposals/:proposalId/discard", handlePostDocProposalDiscard),
   ...DESK_FILE_ROUTES.map(([method, path, handler]) => compile(method, path, handler)),
   ...FOLDER_ROUTES.map(([method, path, handler]) => compile(method, path, handler)),
   compile("GET", "/api/v1/knowledge", handleGetKnowledge),

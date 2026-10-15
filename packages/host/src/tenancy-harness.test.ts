@@ -379,6 +379,14 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
     path: "/api/v1/docs/:artifactId/versions/:n/file",
     params: { artifactId: "artifactId", n: "unseeded" },
   },
+  {
+    method: "POST",
+    path: "/api/v1/docs/:artifactId/sections/:sectionId/proposals",
+    params: { artifactId: "artifactId", sectionId: "unseeded" },
+    body: { agentId: "documents", instruction: "tenant B was here", baseVersion: 1 },
+  },
+  { method: "POST", path: "/api/v1/docs/proposals/:proposalId/keep", params: { proposalId: "unseeded" }, body: {} },
+  { method: "POST", path: "/api/v1/docs/proposals/:proposalId/discard", params: { proposalId: "unseeded" }, body: {} },
 
   // --- knowledge -------------------------------------------------------------------------------
   {

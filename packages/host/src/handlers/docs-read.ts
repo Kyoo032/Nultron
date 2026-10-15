@@ -3,7 +3,7 @@ import { artifactFilename, DOCX_MIME, PDF_MIME, XLSX_MIME, type ArtifactMime } f
 import { requireArtifact } from "../artifacts";
 import { renderDocx, renderPdf, renderXlsx } from "../doc-model";
 import type { EditableSpec } from "../doc-tools/doc-meta";
-import { docVersionStore, type DocVersion, type DocVersionInfo } from "../doc-versions";
+import { docVersionStore, proposalStore, type DocVersion, type DocVersionInfo } from "../doc-versions";
 import type { EnsureFirstRefusal } from "../doc-versions/types";
 import { jsonError, jsonOk } from "../errors";
 import { log } from "../log";
@@ -92,7 +92,7 @@ export const handleGetDoc = docRoute(async (request) => {
     headVersion: head.version,
     spec: version.spec.spec,
     sectionAuthors,
-    proposals: [],
+    proposals: proposalStore().listPending(tenant, artifactId) ?? [],
   });
 });
 
