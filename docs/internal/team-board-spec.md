@@ -278,6 +278,44 @@ His words: "set automatically for them to route text, images and video, because 
   - A turn with an attachment drops both media tools (`packages/core/src/agents/chat-turn.ts:6,11-20`), so "make a video from this picture" does not route yet.
   - Whether HYP AI's chat model exists in its gateway's catalog and supports tool calls has not been checked with a real key.
 
+### Then: moving the old HYP AI to the SME platform (Rizky, 2026-10-15; K-D33, open)
+
+His words: "this will be a migration from the old opc hyp ai which is looking like nultron to the new hyp ai sme platform … how to migrate the old data? or just remove everything and create a backup of the old ones, especially the 5 testers accounts we alreayd created and the admin".
+
+**What is known (read 2026-10-15, local files only; no SSH).**
+- **The server.** `43.173.26.50` has no install record in the local notes: `hypey/deploy/server-setup/README.md` says "Not installed yet" (2026-10-07). The bundles in `hypey/deploy/out/` run up to `hyp-2026.10.09.2`, which pins `hyp-ai-app:b1ef3af`. The real record is `/opt/hyp-ai/deploy.log` on the server.
+- **Where the data lives.**
+  - App volume `hyp-ai_hyp-ai-data`: `agentforge.sqlite`, media and tenant files.
+  - Portal volume `hyp-ai_portal-pgdata`: Postgres `hyp_portal`, which holds the accounts, password hashes and seats.
+  - `/opt/hyp-ai/shared`: env files and `backup.key`.
+- **Not a database per person.** It is one tenant (`hyp`) with one SQLite file, and the companies are orgs inside it. "Their own database" means their own rows, and since the 2026-10-06 privacy work, their own private uploads.
+- **How accounts are made.** `install.sh --seat-cap 5`, then `add-customer.sh` (`DEPLOY.md:142-144`). There is no local record of which usernames were made, or whether each tester is their own company. `portal.sh account list` on the server answers it.
+- **The schema change is additive.**
+  - From `b1ef3af` the tester adds tables at boot with CREATE IF NOT EXISTS: projects, project_members, project_agents, doc_versions, doc_proposals and the board tables.
+  - It adds nullable `owner_user_id` and `project_id` columns.
+  - Nothing is dropped, and no portal migration changes.
+  - The new columns are one-way: a rollback to the old image is untested and could show owner-only rows company-wide.
+
+**Two ways; Rizky picks (K-D33).**
+
+| | A: upgrade in place | B: back up, then start clean |
+|---|---|---|
+| Accounts | The same usernames and passwords keep working (the portal database is untouched). | Made again: new initial passwords go to each person. |
+| Their old chats and files | Stay. Old rows have no Workspace, so they show as each person's own. | Kept only in the backup, not in the app. |
+| Risk | The one-way columns; old OPC-style desks sit beside the new Workspaces. | People lose what they made in the old look. |
+| Work | The image swap through `update.sh`, which backs up first. | Back up, stop, remove the volumes, install fresh, make the accounts again. |
+
+**Same in both, before anything changes.** Each step on the server needs Rizky's go at that moment.
+1. **Disk snapshot.** A disk snapshot of the CVM in the Tencent console.
+2. **Bundle backup.** `backup.sh`: a SQLite snapshot, a tar of `/data` and a `pg_dump` of `hyp_portal`. Copy the result off the server.
+3. **The account list.** `portal.sh account list` (usernames and roles, no passwords), saved beside the backup.
+4. **The new image.** It is cut from `main` after the SME work is promoted, never from the tester (the lanes rule). HYP AI's clone imports it per `SYNC.md`.
+
+**One company, or one per tester.** In the SME model a company's people share Workspaces by membership (K-D22).
+- If each tester is their own company now and they should share, the portal org changes. That is a Postgres change or new accounts, because `add-customer.sh` refuses a move.
+- Five testers plus an admin is six people. The install used `--seat-cap 5`, so raise the cap or confirm the admin takes no seat.
+- SR-163 (an erase removes every company of a partner) makes any erase tool unsafe here: B removes volumes by hand, after the backup, never through the app's erase.
+
 ## 3. Words
 
 | Word | Meaning |
