@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { docPagePath } from "@/components/doc-page/doc-format";
 import { ModeIcon } from "@/components/mode-icons";
+import { Link } from "@/lib/nav";
 import { mediaSrc } from "@/lib/api-client";
 import {
   downloadFile,
@@ -19,6 +21,11 @@ type Props = {
   project: ProjectRecord;
   me: string | null;
 };
+
+function opensInDocPage(file: ProjectFile): boolean {
+  const kind = fileKind(file.mime);
+  return file.kind === "artifact" && (kind === "document" || kind === "sheet");
+}
 
 function messageOf(error: unknown, fallback: string): string {
   return error instanceof ProjectsError && error.message ? error.message : fallback;
@@ -146,6 +153,15 @@ export function ProjectFiles({ project, me }: Props) {
                 <FilePreview file={file} />
               </span>
               <span className="projects-file-actions">
+                {opensInDocPage(file) ? (
+                  <Link
+                    to={docPagePath(file.id, project.id)}
+                    className="btn btn-secondary"
+                    data-testid="projects-file-open"
+                  >
+                    {t("docpage.open.label")}
+                  </Link>
+                ) : null}
                 <button
                   type="button"
                   className="btn btn-secondary"

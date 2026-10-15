@@ -1,0 +1,56 @@
+{
+  "back": {
+    "chat": "Back to Chat",
+    "workspace": "Back to {name}"
+  },
+  "open": {
+    "label": "Open"
+  },
+  "format": {
+    "docx": "DOCX",
+    "xlsx": "XLSX",
+    "pdf": "PDF"
+  },
+  "version": "version {n}",
+  "loading": "Opening the document…",
+  "notFound": "Not found, or you are not a member of this Workspace.",
+  "notEditable": "This file can't be opened as a document.",
+  "loadFailed": "The document could not be loaded.",
+  "retry": "Try again",
+  "download": "Download",
+  "downloadFailed": "The file could not be downloaded. Try again.",
+  "menu": {
+    "label": "Download this document",
+    "word": "Word (.docx)",
+    "pdf": "PDF (.pdf)",
+    "excel": "Excel (.xlsx)"
+  },
+  "you": "you",
+  "pageBreak": "Page break",
+  "mark": {
+    "edited": "Last edited by {name}",
+    "agentTitle": "Last edited by {agent}, asked by {name}",
+    "agentCaption": "{agent} · asked by {name}"
+  },
+  "tabs": {
+    "label": "Document panel",
+    "ask": "Ask an agent",
+    "versions": "Versions"
+  },
+  "ask": {
+    "placeholder": "An agent can rewrite a section of this document here. This part is not ready yet."
+  },
+  "versions": {
+    "loading": "Loading versions…",
+    "empty": "No versions yet.",
+    "failed": "The versions could not be loaded.",
+    "number": "v{n}",
+    "savedBy": "Saved by {name}",
+    "agentAsked": "{agent}, asked by {name}",
+    "download": "Download",
+    "downloadAria": "Download version {n}"
+  },
+  "time": {
+    "now": "just now"
+  }
+}

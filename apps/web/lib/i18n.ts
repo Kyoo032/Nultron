@@ -34,6 +34,8 @@ import enBoard from "../locales/en/board.json";
 import idBoard from "../locales/id/board.json";
 import enProjects from "../locales/en/projects.json";
 import idProjects from "../locales/id/projects.json";
+import enDocpage from "../locales/en/docpage.json";
+import idDocpage from "../locales/id/docpage.json";
 import idAuth from "../locales/id/auth.json";
 import idChannels from "../locales/id/channels.json";
 import idChat from "../locales/id/chat.json";
@@ -97,6 +99,7 @@ const NAMESPACES = [
   "board",
   // Tester code: the Workspaces page, hosted only (team-board-spec.md section 2b, K-D20).
   "projects",
+  "docpage",
 ] as const;
 type Namespace = (typeof NAMESPACES)[number];
 type MessageTree = { [key: string]: string | MessageTree };
@@ -134,6 +137,7 @@ const catalogs: Record<AppLocale, Record<Namespace, MessageTree>> = {
     harness: enHarness,
     board: enBoard,
     projects: enProjects,
+    docpage: enDocpage,
   },
   id: {
     common: idCommon,
@@ -167,6 +171,7 @@ const catalogs: Record<AppLocale, Record<Namespace, MessageTree>> = {
     harness: idHarness,
     board: idBoard,
     projects: idProjects,
+    docpage: idDocpage,
   },
 };
 

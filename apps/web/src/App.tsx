@@ -26,6 +26,7 @@ import { KnowledgePage } from "@/components/knowledge-page";
 import { ChannelsPage } from "@/components/channels-page";
 import { BoardPage } from "@/components/board-page";
 import { ProjectsPage } from "@/components/projects-page";
+import { DocPage } from "@/components/doc-page/doc-page";
 import { DeskPane } from "@/components/desk-pane";
 import { WorkModeKeepAlive } from "@/components/work-mode-keep-alive";
 import { OnboardingScreen } from "@/components/onboarding-screen";
@@ -465,6 +466,14 @@ export function AppRoutes() {
                 }
               />
             ) : null}
+            <Route
+              path="/docs/:artifactId"
+              element={
+                <DeskPane>
+                  <DocPage />
+                </DeskPane>
+              }
+            />
             <Route path="/studio/*" element={<Navigate to="/chat" replace />} />
             <Route path="/agents/*" element={<Navigate to="/chat" replace />} />
             <Route path="/workspace" element={<Navigate to="/chat" replace />} />

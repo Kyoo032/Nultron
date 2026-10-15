@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useInRouterContext } from "react-router-dom";
 import { AddToWorkspace } from "@/components/add-to-workspace";
+import { docPagePath } from "@/components/doc-page/doc-format";
 import { saveChatFile } from "@/lib/chat-file-save";
+import { Link } from "@/lib/nav";
 import { t } from "@/lib/i18n";
 import { isDocTool, readDocResult, type DocCardModel, type DocFormat } from "./tool-rows/doc-result";
 
@@ -100,6 +103,7 @@ export function DocCard({ model }: CardProps) {
           >
             {state === "busy" ? t("chat.doc.downloading") : t("chat.doc.download")}
           </button>
+          {format !== "pdf" ? <OpenDocLink artifactId={artifactId} /> : null}
           <AddToWorkspace artifactId={artifactId} />
         </div>
       </div>
@@ -137,6 +141,24 @@ function FormatIcon({ format }: { readonly format: DocFormat }) {
       </svg>
       <span className="text-[9px] font-semibold uppercase leading-none tracking-wide">{format}</span>
     </span>
+  );
+}
+
+function OpenDocLink({ artifactId }: { readonly artifactId: string }) {
+  const inRouter = useInRouterContext();
+  const href = docPagePath(artifactId);
+  const label = t("docpage.open.label");
+  if (inRouter) {
+    return (
+      <Link to={href} className="btn btn-secondary" data-testid="chat-doc-open">
+        {label}
+      </Link>
+    );
+  }
+  return (
+    <a href={href} className="btn btn-secondary" data-testid="chat-doc-open">
+      {label}
+    </a>
   );
 }
 

@@ -1,0 +1,56 @@
+{
+  "back": {
+    "chat": "Kembali ke Chat",
+    "workspace": "Kembali ke {name}"
+  },
+  "open": {
+    "label": "Buka"
+  },
+  "format": {
+    "docx": "DOCX",
+    "xlsx": "XLSX",
+    "pdf": "PDF"
+  },
+  "version": "versi {n}",
+  "loading": "Membuka dokumen…",
+  "notFound": "Tidak ditemukan, atau Anda bukan anggota ruang kerja ini.",
+  "notEditable": "File ini tidak bisa dibuka sebagai dokumen.",
+  "loadFailed": "Dokumen tidak bisa dimuat.",
+  "retry": "Coba lagi",
+  "download": "Unduh",
+  "downloadFailed": "File tidak bisa diunduh. Coba lagi.",
+  "menu": {
+    "label": "Unduh dokumen ini",
+    "word": "Word (.docx)",
+    "pdf": "PDF (.pdf)",
+    "excel": "Excel (.xlsx)"
+  },
+  "you": "Anda",
+  "pageBreak": "Ganti halaman",
+  "mark": {
+    "edited": "Terakhir diubah oleh {name}",
+    "agentTitle": "Terakhir diubah oleh {agent}, diminta oleh {name}",
+    "agentCaption": "{agent} · diminta oleh {name}"
+  },
+  "tabs": {
+    "label": "Panel dokumen",
+    "ask": "Minta agen",
+    "versions": "Versi"
+  },
+  "ask": {
+    "placeholder": "Agen bisa menulis ulang satu bagian dokumen ini di sini. Bagian ini belum siap."
+  },
+  "versions": {
+    "loading": "Memuat versi…",
+    "empty": "Belum ada versi.",
+    "failed": "Versi tidak bisa dimuat.",
+    "number": "v{n}",
+    "savedBy": "Disimpan oleh {name}",
+    "agentAsked": "{agent}, diminta oleh {name}",
+    "download": "Unduh",
+    "downloadAria": "Unduh versi {n}"
+  },
+  "time": {
+    "now": "baru saja"
+  }
+}
