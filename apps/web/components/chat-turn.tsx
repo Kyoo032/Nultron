@@ -13,6 +13,7 @@ import { useBuddyClaim } from "@/lib/use-buddy-claim";
 import { useHoldOnMount } from "@/lib/use-hold-on-mount";
 import { fileCardDetail, jobEmbedsFromTools, splitUserFileBlocks } from "@/lib/message-embeds";
 import { collectToolMediaParts } from "@/lib/tool-media";
+import { AutoAllowedNotes, MediaApprovalCards } from "@/components/chat-media-approval-card";
 import { DeckCards } from "@/components/chat-deck-card";
 import { DocCards } from "@/components/chat-doc-card";
 import { DossierCards } from "@/components/chat-dossier-card";
@@ -193,6 +194,8 @@ export function ChatTurn({ role, content, live, onContinue, continueDisabled = f
               </>
             )}
             {liveMedia.length > 0 ? <MediaParts parts={liveMedia} /> : null}
+            <AutoAllowedNotes tools={visibleTools} />
+            <MediaApprovalCards tools={visibleTools} />
             <DeckCards tools={visibleTools} />
             <DocCards tools={visibleTools} />
             <DossierCards tools={visibleTools} />
