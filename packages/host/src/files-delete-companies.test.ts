@@ -94,16 +94,6 @@ async function makeArtifact(person: Person, title: string): Promise<string> {
   return record.id;
 }
 
-/** A Workspace of `person` with Ann invited: a Workspace is shared with its members only (K-D22). */
-async function makeSharedProject(person: Person, name: string): Promise<string> {
-  const created = await call(person, "POST", "/api/v1/projects", {}, { name });
-  expect(created.status).toBe(201);
-  const id = jsonBody<{ project: { id: string } }>(created).project.id;
-  const invited = await call(person, "POST", "/api/v1/projects/:id/members", { id }, { userId: ann.tenant.userId });
-  expect(invited.status).toBe(201);
-  return id;
-}
-
 function deleteMedia(person: Person, mediaId: string): Promise<HostResult> {
   return call(person, "DELETE", "/api/v1/media/:mediaId", { mediaId });
 }
@@ -176,47 +166,12 @@ describe("deleting a person's generated files on the hosted app: two companies a
   });
 
   describe("artifacts", () => {
-    it("a colleague's delete of a private artifact is a 404, and the maker still reads it", async () => {
-      const id = await makeArtifact(alice, "Alice private for delete");
-      expect(await outcome(await deleteArtifact(ann, id))).toEqual(NOT_FOUND);
+    it("a member of another company gets the missing-id answer for an artifact of this company, and it stays", async () => {
+      const id = await makeArtifact(alice, "Other company artifact delete");
       expect(await outcome(await deleteArtifact(bob, id))).toEqual(NOT_FOUND);
-      expect(await outcome(await readArtifact(alice, id))).toEqual({ status: 200 });
-    });
-
-    it("a colleague reads a file in a shared Workspace but cannot delete it: the delete answer is a 404", async () => {
-      const project = await makeSharedProject(alice, "Shared artifact delete refusal");
-      const id = await makeArtifact(alice, "Alice shared for delete");
-      expect(
-        await outcome(await call(alice, "POST", "/api/v1/projects/:id/files", { id: project }, { artifactId: id })),
-      ).toEqual({ status: 200 });
-      // Positive control: the colleague reads the shared artifact.
-      expect(await outcome(await readArtifact(ann, id))).toEqual({ status: 200 });
-
-      expect(await outcome(await deleteArtifact(ann, id))).toEqual(NOT_FOUND);
       const { artifactStore } = await import("./artifacts");
       expect(artifactStore().get(alice.tenant, id)).not.toBeNull();
-    });
-
-    it("an admin deletes a member's private artifact and cannot read it", async () => {
-      const id = await makeArtifact(ann, "Ann private for admin delete");
-      expect(await outcome(await readArtifact(adam, id))).toEqual(NOT_FOUND);
-
-      expect(await outcome(await deleteArtifact(adam, id))).toEqual({ status: 200 });
-      const { artifactStore } = await import("./artifacts");
-      expect(artifactStore().get(ann.tenant, id)).toBeNull();
-      expect(await outcome(await readArtifact(adam, id))).toEqual(NOT_FOUND);
-    });
-
-    it("a legacy artifact with no owner is deleted by a company owner or admin, never by a member", async () => {
-      const id = await makeArtifact(alice, "Legacy no owner");
-      const { sql } = await import("@agentforge/db");
-      sql.prepare("UPDATE artifacts SET owner_user_id = NULL WHERE id = ?").run(id);
-      // Legacy rows stay company-visible, as they were made.
-      expect(await outcome(await readArtifact(ann, id))).toEqual({ status: 200 });
-
-      expect(await outcome(await deleteArtifact(ann, id))).toEqual(NOT_FOUND);
-      expect(await outcome(await readArtifact(ann, id))).toEqual({ status: 200 });
-      expect(await outcome(await deleteArtifact(adam, id))).toEqual({ status: 200 });
+      expect(await outcome(await readArtifact(alice, id))).toEqual({ status: 200 });
     });
 
     it("the maker deletes their own artifact", async () => {

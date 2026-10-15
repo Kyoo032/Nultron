@@ -21,8 +21,6 @@ import type { ModeHarnessSpec } from "../spec";
  * - `self_check` 4: it only reads facts that do not change during a turn, so a second call is already a
  *   loop. Four leaves room for one check before and one after a fix.
  * - `build_deck` 4: a deck, then up to three repairs when its checks name a slide to fix.
- * - `create_document`, `create_workbook`, `revise_document`, `import_document` 4 each: a file, then up to
- *   three fixes or revisions of one part, the same bound as a deck.
  *
  * `repairRounds` is 0 because Chat never asks the model again. What it does have is a check in code
  * on the saved reply (`settleChatTurn`, `agents/chat-turn.ts`): it drops `[n]` source numbers the desk
@@ -44,10 +42,6 @@ export const chatHarnessSpec: ModeHarnessSpec = {
       run_code: 6,
       self_check: 4,
       build_deck: 4,
-      create_document: 4,
-      create_workbook: 4,
-      revise_document: 4,
-      import_document: 4,
     },
   },
   repairRounds: 0,

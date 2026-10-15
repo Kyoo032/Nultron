@@ -110,11 +110,11 @@ async function getStatus(caller: Caller, id: string): Promise<number> {
   return (await call(caller, "GET", `/api/v1/artifacts/${id}`, { params: { artifactId: id } })).status;
 }
 
-async function keptRows(owner: string): Promise<number> {
+async function keptRows(workspaceId: string): Promise<number> {
   const { sql } = await import("@agentforge/db");
   const row = sql
-    .prepare("SELECT COUNT(*) AS n FROM artifacts WHERE owner_user_id = ? AND meta LIKE '%chatUpload%'")
-    .get(owner) as { n: number };
+    .prepare("SELECT COUNT(*) AS n FROM artifacts WHERE workspace_id = ? AND meta LIKE '%chatUpload%'")
+    .get(workspaceId) as { n: number };
   return row.n;
 }
 
@@ -154,12 +154,12 @@ afterAll(async () => {
   rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-describe("hosted: an attached original is private to the person who attached it", () => {
+describe("hosted: an attached original is kept as a desk artifact", () => {
   beforeEach(() => {
     process.env.AGENTFORGE_SERVER = "1";
   });
 
-  it("keeps the original bytes as the attacher's own artifact, outside any project", async () => {
+  it("keeps the original bytes as an artifact on the attacher's desk", async () => {
     const bytes = await docxFixture();
     const reply = await attach(HOSTED(ana), "Laporan Q3.docx", bytes);
     expect(reply.status).toBe(200);
@@ -169,11 +169,10 @@ describe("hosted: an attached original is private to the person who attached it"
     const id = answer.originalId as string;
 
     const { sql } = await import("@agentforge/db");
-    const row = sql
-      .prepare("SELECT owner_user_id, project_id, mime, workspace_id FROM artifacts WHERE id = ?")
-      .get(id) as { owner_user_id: string; project_id: string | null; mime: string; workspace_id: string };
-    expect(row.owner_user_id).toBe(ana.tenant.userId);
-    expect(row.project_id).toBeNull();
+    const row = sql.prepare("SELECT mime, workspace_id FROM artifacts WHERE id = ?").get(id) as {
+      mime: string;
+      workspace_id: string;
+    };
     expect(row.mime).toBe(DOCX);
     expect(row.workspace_id).toBe(ana.tenant.workspaceId);
 
@@ -191,7 +190,7 @@ describe("hosted: an attached original is private to the person who attached it"
     expect(doc(sent).text as string).not.toContain(id);
   });
 
-  it("lets the owner read, download and list it", async () => {
+  it("lets the attacher read, download and list it", async () => {
     const bytes = await docxFixture();
     const { read } = await attachAndSend(HOSTED(ana), "Kontrak.docx", bytes);
     const id = doc(read).originalId as string;
@@ -201,43 +200,7 @@ describe("hosted: an attached original is private to the person who attached it"
     expect((await downloaded(HOSTED(ana), id))?.equals(bytes)).toBe(true);
   });
 
-  it("hides it from a colleague on the same desk: no read, no download, no list", async () => {
-    const { read } = await attachAndSend(HOSTED(ana), "Rahasia.docx", await docxFixture());
-    const id = doc(read).originalId as string;
-    expect(id).toMatch(UUID);
-    expect(await getStatus(HOSTED(ana), id)).toBe(200);
-    expect(await fileStatus(HOSTED(ana), id)).toBe(200);
-    expect(ben.tenant.workspaceId).toBe(ana.tenant.workspaceId);
-    expect(await getStatus(HOSTED(ben), id)).toBe(404);
-    expect(await fileStatus(HOSTED(ben), id)).toBe(404);
-    expect(await artifactIdsOf(HOSTED(ben))).not.toContain(id);
-  });
-
-  it("does not let a colleague make the model name Ana's file through a save", async () => {
-    const { read } = await attachAndSend(HOSTED(ana), "Gaji.docx", await docxFixture());
-    const id = doc(read).originalId as string;
-    expect(id).toMatch(UUID);
-    const own = await save(HOSTED(ana), {
-      name: "Gaji.docx",
-      format: "docx",
-      bytes: 1,
-      masked: 0,
-      text: "isi",
-      originalId: id,
-    });
-    expect(doc(own).notes as string).toContain(`artifact ${id}`);
-    const sent = await save(HOSTED(ben), {
-      name: "Gaji.docx",
-      format: "docx",
-      bytes: 1,
-      masked: 0,
-      text: "isi",
-      originalId: id,
-    });
-    expect(doc(sent).notes as string).not.toContain(id);
-  });
-
-  it("hides it from a person in another company, with the same answers as a missing id", async () => {
+  it("refuses a person in another company, with the same answers as a missing id", async () => {
     const { read } = await attachAndSend(HOSTED(ana), "Perjanjian.docx", await docxFixture());
     const id = doc(read).originalId as string;
     expect(id).toMatch(UUID);
@@ -250,16 +213,15 @@ describe("hosted: an attached original is private to the person who attached it"
     expect(await getStatus(HOSTED(cal), missing)).toBe(404);
   });
 
-  it("lets a colleague download their own attachment, and keeps it out of Ana's list", async () => {
+  it("lets a member download the original they attached", async () => {
     const bytes = await docxFixture();
     const { read } = await attachAndSend(HOSTED(ben), "Anggaran.docx", bytes);
     const id = doc(read).originalId as string;
     expect(id).toMatch(UUID);
     expect((await downloaded(HOSTED(ben), id))?.equals(bytes)).toBe(true);
-    expect(await artifactIdsOf(HOSTED(ana))).not.toContain(id);
   });
 
-  it("does not name a stored file that is not a kept original (a Markdown artifact of the owner's)", async () => {
+  it("does not name a stored file that is not a kept original (a Markdown artifact of Ana's)", async () => {
     const { artifactStore } = await import("../artifacts");
     const note = artifactStore().create(ana.tenant, {
       mode: "documents",
@@ -280,15 +242,15 @@ describe("hosted: an attached original is private to the person who attached it"
   });
 
   it("keeps nothing for a format that is not Word, Excel or PDF, and says so", async () => {
-    const before = await keptRows(ana.tenant.userId);
+    const before = await keptRows(ana.tenant.workspaceId);
     const reply = await attach(HOSTED(ana), "catatan.rtf", rtfFixture());
     expect(reply.status).toBe(200);
     expect(doc(reply).originalId).toBeNull();
     expect(doc(reply).originalSkipped).toBeNull();
-    expect(await keptRows(ana.tenant.userId)).toBe(before);
+    expect(await keptRows(ana.tenant.workspaceId)).toBe(before);
   });
 
-  it("keeps the PDF original too, and the owner downloads it unchanged", async () => {
+  it("keeps the PDF original too, and the attacher downloads it unchanged", async () => {
     const pdf = pdfFixture();
     const reply = await attach(HOSTED(ana), "Ringkasan.pdf", pdf);
     expect(reply.status).toBe(200);
@@ -298,12 +260,12 @@ describe("hosted: an attached original is private to the person who attached it"
   });
 
   it("answers 401 for an attachment with no session, and keeps nothing", async () => {
-    const before = await keptRows(ana.tenant.userId);
+    const before = await keptRows(ana.tenant.workspaceId);
     const reply = jsonOf(
       await call(HOSTED(null), "POST", "/api/v1/chat/documents", { files: [fileOf("x.docx", await docxFixture())] }),
     );
     expect(reply.status).toBe(401);
-    expect(await keptRows(ana.tenant.userId)).toBe(before);
+    expect(await keptRows(ana.tenant.workspaceId)).toBe(before);
   });
 
   it("a file too large to keep still attaches, and the answer says the original was not kept", async () => {
@@ -343,13 +305,6 @@ describe("on Personal there is one person, so the original is on the desk (parit
     const id = doc(reply).originalId as string;
     expect(id).toMatch(UUID);
     expect(doc(reply).originalSkipped).toBeNull();
-    const { sql } = await import("@agentforge/db");
-    const row = sql.prepare("SELECT owner_user_id, project_id FROM artifacts WHERE id = ?").get(id) as {
-      owner_user_id: string | null;
-      project_id: string | null;
-    };
-    expect(row.owner_user_id).toBeNull();
-    expect(row.project_id).toBeNull();
     expect(await getStatus(LOCAL, id)).toBe(200);
     expect((await downloaded(LOCAL, id))?.equals(bytes)).toBe(true);
   });

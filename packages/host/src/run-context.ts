@@ -7,8 +7,6 @@ export type RunContext = {
   threadId: string;
   agentId: string;
   locale: AppLocale;
-  /** The Workspace the run's chat was started in (W1). Absent outside a Workspace. */
-  projectId?: string | null;
 };
 
 const storage = new AsyncLocalStorage<RunContext>();

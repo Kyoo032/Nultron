@@ -99,25 +99,24 @@ describe("on server mode: each fragment is well formed", () => {
     },
   );
 
-  it("builds the graph prefix with 15 placeholders and 15 values (the owner check adds four)", () => {
+  it("builds the graph prefix with 13 placeholders and 13 values", () => {
     const view = visibleGraphNodes(tenant, ON);
     expect(view).not.toBeNull();
-    expect(placeholders(view?.with ?? "")).toBe(15);
-    expect(view?.params).toHaveLength(15);
+    expect(placeholders(view?.with ?? "")).toBe(13);
+    expect(view?.params).toHaveLength(13);
     expect(view?.with).toContain("WITH visible(id)");
   });
 
-  it("the shared-only fragment (for the map) names no thread, no owned card and takes no values", () => {
+  it("the shared-only fragment (for the map) names no thread and takes no values", () => {
     const shared = andSharedSource("s", ON);
     expect(shared.params).toEqual([]);
-    expect(shared.sql).toBe(" AND (s.origin_kind IS NULL OR s.origin_kind <> 'thread') AND s.owner_user_id IS NULL AND s.project_id IS NULL");
+    expect(shared.sql).toBe(" AND (s.origin_kind IS NULL OR s.origin_kind <> 'thread')");
   });
 
-  it("binds the person for the owner check, then the organization, desk and person for the thread lookup", () => {
+  it("scopes the thread lookup to the organization, the desk and the person, in that order", () => {
     const fragment = andVisibleSource(tenant, undefined, ON);
-    expect(fragment.params).toEqual([tenant.userId, tenant.organizationId, tenant.workspaceId, tenant.userId]);
+    expect(fragment.params).toEqual([tenant.organizationId, tenant.workspaceId, tenant.userId]);
     expect(fragment.sql).toContain("t.organization_id = ? AND t.workspace_id = ? AND t.user_id = ?");
-    expect(fragment.sql).toContain("owner_user_id IS NULL OR knowledge_sources.owner_user_id = ?");
   });
 });
 

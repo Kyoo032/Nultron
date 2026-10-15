@@ -12,10 +12,9 @@
  */
 
 import { sql } from "@agentforge/db";
-import { isServerMode, type TenantContext } from "@agentforge/core";
+import type { TenantContext } from "@agentforge/core";
 import { artifactIdsOwnedBy, sweepOrphanSources } from "../knowledge";
 import { log } from "../log";
-import { lockedOutOfLiveProjectSql } from "../projects/membership-sql";
 import type { MeetingRecord } from "./records";
 
 /** Every artifact id this meeting owns on this desk: the ids on the record plus the stamped ones. */
@@ -35,10 +34,10 @@ export function meetingArtifactIds(tenant: TenantContext, record: MeetingRecord)
  */
 export function removeMeetingArtifacts(tenant: TenantContext, record: MeetingRecord): number {
   const run = sql.transaction(() => {
-    const remove = meetingArtifactDelete(tenant);
+    const statement = sql.prepare("DELETE FROM artifacts WHERE workspace_id = ? AND mode = 'meeting' AND id = ?");
     let removed = 0;
     for (const id of meetingArtifactIds(tenant, record)) {
-      removed += remove(id);
+      removed += statement.run(tenant.workspaceId, id).changes;
     }
     return removed;
   });
@@ -57,34 +56,12 @@ export function removeMeetingArtifactsById(tenant: TenantContext, ids: readonly 
     return 0;
   }
   const run = sql.transaction(() => {
-    const remove = meetingArtifactDelete(tenant);
-    return wanted.reduce((removed, id) => removed + remove(id), 0);
+    const statement = sql.prepare("DELETE FROM artifacts WHERE workspace_id = ? AND mode = 'meeting' AND id = ?");
+    return wanted.reduce((removed, id) => removed + statement.run(tenant.workspaceId, id).changes, 0);
   });
   const removed = run.immediate();
   dropOrphanCards(tenant);
   return removed;
-}
-
-/**
- * The delete for one meeting artifact, under the owner rule (SR-175). Hosted, a transcript or minutes
- * row someone else made is left in place, as the artifacts store refuses it; a legacy row with no owner
- * is anyone's, as before. Off server mode the statement has no owner clause, so it is what it was.
- */
-function meetingArtifactDelete(tenant: TenantContext): (id: string) => number {
-  const hosted = isServerMode();
-  // SR-179: a transcript or minutes the maker put into a live Workspace they were removed from stays the Workspace's.
-  const statement = sql.prepare(
-    `DELETE FROM artifacts WHERE workspace_id = ? AND mode = 'meeting' AND id = ?${
-      hosted
-        ? ` AND (owner_user_id IS NULL OR (owner_user_id = ? AND NOT ${lockedOutOfLiveProjectSql("artifacts.project_id")}))`
-        : ""
-    }`,
-  );
-  return (id) =>
-    (hosted
-      ? statement.run(tenant.workspaceId, id, tenant.userId, tenant.userId)
-      : statement.run(tenant.workspaceId, id)
-    ).changes;
 }
 
 /**

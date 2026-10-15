@@ -687,7 +687,7 @@ export { webSearchTool } from "./tools/platform/web-search";
 export { bindKeylessSearchLocale, searchKeyless } from "./tools/platform/keyless-search";
 export { webFetchTool, fetchPageText, WEB_FETCH_MAX_CHARS_CAP } from "./tools/platform/web-fetch";
 export type { WebFetchPage, WebFetchOutput } from "./tools/platform/web-fetch";
-export { imageGenerateTool, imagePrompt, imageShape } from "./tools/platform/image-generate";
+export { imageGenerateTool } from "./tools/platform/image-generate";
 export { videoGenerateTool } from "./tools/platform/video-generate";
 export { musicGenerateTool, lyricsWriteTool, speechGenerateTool } from "./tools/platform/music-generate";
 export {

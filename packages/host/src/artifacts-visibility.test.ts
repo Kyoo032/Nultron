@@ -1,12 +1,3 @@
-/**
- * Who sees an artifact (SR-175, Rizky 2026-10-14): on the hosted app a file a person makes on their
- * own is visible only to them; a file put into a Workspace is visible to its members (K-D22); a
- * legacy row with no owner stays company-visible, as it was made. Personal has one person per desk
- * and must behave exactly as before.
- *
- * This is the store, on an in-memory database. The same rules through the real router, with real
- * sessions and two companies, are in `artifacts-companies.test.ts`.
- */
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { wrappingKeyFromSecret, type TenantContext } from "@agentforge/core";
@@ -53,49 +44,10 @@ describe("artifact visibility on the hosted app", () => {
     }
   });
 
-  it("stamps the maker as owner on save", () => {
-    const made = store.create(ann, INPUT);
-    const row = db.prepare("SELECT owner_user_id, project_id FROM artifacts WHERE id = ?").get(made.id);
-    expect(row).toEqual({ owner_user_id: "ann", project_id: null });
-  });
-
-  it("shows a person's own file to that person only", () => {
+  it("lets the maker list and read back her own file", () => {
     const made = store.create(ann, INPUT);
     expect(store.list(ann).map((item) => item.id)).toEqual([made.id]);
     expect(store.get(ann, made.id)?.body).toBe("# Plan\n\nbody");
-    expect(store.list(bob)).toEqual([]);
-    expect(store.get(bob, made.id)).toBeNull();
-  });
-
-  it("keeps a file in a project private to its maker until F1 makes projects shareable (K-D19)", () => {
-    const made = store.create(ann, INPUT);
-    db.prepare("UPDATE artifacts SET project_id = 'proj-1' WHERE id = ?").run(made.id);
-    expect(store.list(bob)).toEqual([]);
-    expect(store.get(bob, made.id)).toBeNull();
-    expect(store.get(ann, made.id)).not.toBeNull();
-  });
-
-  it("shows a file in a Workspace to its members and to nobody else of the company (K-D22, SR-178)", () => {
-    db.exec(`
-      INSERT INTO tenants (id, slug, name, status, created_at) VALUES ('partner', 'partner', 'partner', 'active', 1);
-      INSERT INTO organizations (id, tenant_id, name, slug, industry_pack, created_at)
-        VALUES ('org-a', 'partner', 'a', 'a', 'generic', 1);
-      INSERT INTO workspaces (id, organization_id, name, slug, created_at) VALUES ('desk-a', 'org-a', 'd', 'd', 1);
-      INSERT INTO projects (id, organization_id, workspace_id, name, visibility, created_by, created_at, updated_at)
-        VALUES ('proj-1', 'org-a', 'desk-a', 'p', 'workspace', 'ann', 1, 1);
-      INSERT INTO project_members (project_id, user_id, role, added_by, added_at) VALUES ('proj-1', 'ann', 'owner', 'ann', 1);
-    `);
-    const made = store.create(ann, INPUT);
-    db.prepare("UPDATE artifacts SET project_id = 'proj-1' WHERE id = ?").run(made.id);
-    // `visibility = 'workspace'` on the row grants nothing: bob is not a member yet.
-    expect(store.get(bob, made.id)).toBeNull();
-    db.prepare(
-      "INSERT INTO project_members (project_id, user_id, role, added_by, added_at) VALUES ('proj-1', 'bob', 'member', 'ann', 2)",
-    ).run();
-    expect(store.list(bob).map((item) => item.id)).toEqual([made.id]);
-    expect(store.get(bob, made.id)?.body).toBe("# Plan\n\nbody");
-    db.prepare("UPDATE projects SET archived_at = 3 WHERE id = 'proj-1'").run();
-    expect(store.get(bob, made.id)).toBeNull();
   });
 
   it("keeps a legacy row with no owner visible to the company", () => {
@@ -107,38 +59,17 @@ describe("artifact visibility on the hosted app", () => {
     expect(store.get(bob, "legacy")).not.toBeNull();
   });
 
-  it("keeps the desk boundary: another desk never sees it, even in a project", () => {
+  it("keeps the desk boundary: another desk never sees a file", () => {
     const made = store.create(ann, INPUT);
-    db.prepare("UPDATE artifacts SET project_id = 'proj-1' WHERE id = ?").run(made.id);
+    expect(store.get(ann, made.id)).not.toBeNull();
     expect(store.list(carol)).toEqual([]);
     expect(store.get(carol, made.id)).toBeNull();
   });
 
-  it("lets only the owner delete a private file", () => {
+  it("lets the maker delete her own file", () => {
     const made = store.create(ann, INPUT);
-    expect(store.remove(bob, made.id)).toBe(false);
     expect(store.get(ann, made.id)).not.toBeNull();
     expect(store.remove(ann, made.id)).toBe(true);
-  });
-
-  it("answers a teammate's delete of a project file that is still private as not found", () => {
-    const made = store.create(ann, INPUT);
-    db.prepare("UPDATE artifacts SET project_id = 'proj-1' WHERE id = ?").run(made.id);
-    expect(store.remove(bob, made.id)).toBe(false);
-    expect(store.get(ann, made.id)).not.toBeNull();
-    expect(store.remove(ann, made.id)).toBe(true);
-  });
-
-  it("a legacy row with no owner is deleted by a company owner or admin, never by a member (SR-176)", () => {
-    db.prepare(
-      `INSERT INTO artifacts (id, workspace_id, mode, kind, title, mime, body, meta, size_bytes, created_at, updated_at)
-       VALUES ('legacy', 'desk-a', 'documents', 'draft', 'Old', 'text/markdown', 'x', '{}', 1, 1, 1)`,
-    ).run();
-    // The row stays company-visible, as it was made, but a member's delete is the answer for a missing id.
-    expect(store.remove(bob, "legacy")).toBe(false);
-    expect(store.get(bob, "legacy")).not.toBeNull();
-    expect(store.remove({ ...bob, role: "admin" }, "legacy")).toBe(true);
-    expect(store.get(bob, "legacy")).toBeNull();
   });
 });
 

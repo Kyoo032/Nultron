@@ -89,12 +89,7 @@ export async function searchKnowledge(
     return UNAVAILABLE;
   }
   try {
-    // The Workspace of the chat that asked (W1): its sources join the search, no other Workspace's do.
-    const projectId = getRunContext()?.projectId ?? null;
-    const retrieved = await retrieveChunks(tenant, query, limit, {
-      excludeSourceIds: excludedSourceIds(tenant),
-      projectId,
-    });
+    const retrieved = await retrieveChunks(tenant, query, limit, { excludeSourceIds: excludedSourceIds(tenant) });
     if (retrieved.chunks.length === 0) {
       return emptyResult(tenant);
     }

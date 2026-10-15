@@ -260,26 +260,11 @@ export type IndexSourceInput = {
   type: string;
   text: string;
   origin?: SourceOrigin | null;
-  /** The maker of the artifact this card was made from (SR-175); null for every other source. */
-  ownerUserId?: string | null;
-  /**
-   * The Workspace this source belongs to (W1). Omitted on a re-index, the row's current Workspace is kept,
-   * so a card re-written by its work does not fall out of the Workspace it was added to.
-   */
-  projectId?: string | null;
 };
 
 const INSERT_SOURCE = `INSERT INTO knowledge_sources
-  (id, workspace_id, name, type, status, chunks, error, created_at, origin_kind, origin_id, external_id, owner_user_id, project_id)
-  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-
-/** The Workspace a source row belongs to right now, or null. Read before the row is replaced. */
-function projectIdOf(workspaceId: string, sourceId: string): string | null {
-  const row = sql
-    .prepare("SELECT project_id FROM knowledge_sources WHERE workspace_id = ? AND id = ?")
-    .get(workspaceId, sourceId) as { project_id: string | null } | undefined;
-  return row?.project_id ?? null;
-}
+  (id, workspace_id, name, type, status, chunks, error, created_at, origin_kind, origin_id, external_id)
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
 /**
  * The retrieval backend's handle on a source, read before the row is replaced or deleted.
@@ -329,7 +314,6 @@ function replaceSourceRows(
   // document would be left behind in the backend, holding our text and reachable by nothing, so it
   // is collected here and deleted after the transaction commits.
   let carriedExternalId = externalIdOf(ws, input.id);
-  const projectId = input.projectId !== undefined ? input.projectId : projectIdOf(ws, input.id);
   let orphanedExternalId: string | null = null;
   const tx = sql.transaction(() => {
     if (input.origin) {
@@ -368,8 +352,6 @@ function replaceSourceRows(
         input.origin?.kind ?? null,
         input.origin?.id ?? null,
         carriedExternalId,
-        input.ownerUserId ?? null,
-        projectId,
       );
     for (const chunk of chunks) {
       insertChunk.run(input.id, ws, chunk);
@@ -496,21 +478,6 @@ function injectionRule(tenant: TenantContext, name: string, text: string): strin
   return (scanInjection(name) ?? scanInjection(text))?.rule ?? null;
 }
 
-/**
- * Index one source the caller already has in hand (a Workspace upload or a chat file, W1), through the same
- * injection guard as every manual source: a blocked one is recorded as `Failed` with its rule, never indexed.
- */
-export function indexGuardedSource(tenant: TenantContext, input: IndexSourceInput): Promise<KnowledgeSource> {
-  const rule = injectionRule(tenant, input.name, input.text);
-  if (rule) {
-    const { id, name, type, origin, ownerUserId, projectId } = input;
-    return Promise.resolve(
-      markSourceFailed(tenant, { id, name, type, origin, ownerUserId, projectId }, `injection_blocked (rule: ${rule})`),
-    );
-  }
-  return indexKnowledgeSource(tenant, input);
-}
-
 function indexSource(
   tenant: TenantContext,
   id: string,
@@ -614,7 +581,6 @@ function removeFrom(dir: string, sourceId: string): number {
 export async function addFileSource(
   tenant: TenantContext,
   file: { filename: string; mime: string; bytes: Uint8Array },
-  placement: { ownerUserId?: string | null; projectId?: string | null } = {},
 ): Promise<KnowledgeSource> {
   const id = crypto.randomUUID();
   const text = await extractText(file.filename, file.mime, Buffer.from(file.bytes));
@@ -632,14 +598,7 @@ export async function addFileSource(
   const full = path.join(uploadDir(tenant), `${id}-${file.filename.replace(/[^\w.-]+/g, "_")}`);
   await mkdir(path.dirname(full), { recursive: true });
   await writeFile(full, Buffer.from(file.bytes));
-  return indexKnowledgeSource(tenant, {
-    id,
-    name: file.filename,
-    type: "File",
-    text,
-    ownerUserId: placement.ownerUserId ?? null,
-    projectId: placement.projectId ?? null,
-  });
+  return indexKnowledgeSource(tenant, { id, name: file.filename, type: "File", text });
 }
 
 /** Whole page for indexing; the 1.5 MB fetch cap already bounds it. Shared with paste and file text. */
@@ -926,8 +885,6 @@ export type RetrieveOptions = {
    * chunks when the top hit is weak. Chat does not pass this yet.
    */
   expand?: boolean;
-  /** The Workspace the question is asked from (W1). Absent or null: no Workspace's sources are searched. */
-  projectId?: string | null;
 };
 
 /** Chunks that answer this query, each carrying its source id / name / score so it can be cited. */
@@ -940,7 +897,6 @@ export async function retrieveChunks(
   const result = await retrieveThroughBackend(tenant, query, {
     limit,
     excludeSourceIds: options.excludeSourceIds ?? [],
-    projectId: options.projectId ?? null,
   });
   return expandRetrievedChunks(tenant, result, {
     expand: options.expand === true,
@@ -951,8 +907,6 @@ export async function retrieveChunks(
 export type KnowledgeInjectionOptions = {
   /** The Chat thread asking. Its own work card is never retrieved back into it (anti-loop). */
   excludeThreadId?: string;
-  /** The Workspace the thread was started in (W1). Its sources, and no other Workspace's, join the search. */
-  projectId?: string | null;
 };
 
 function excludedSourceIds(tenant: TenantContext, options: KnowledgeInjectionOptions): string[] {
@@ -1018,10 +972,7 @@ export async function knowledgeInjection(
   const memories = listMemories(tenant).filter((item) => item.pinned);
   const asked = query.trim().length > 0;
   const retrieved: RetrieveResult = asked
-    ? await retrieveChunks(tenant, query, 4, {
-        excludeSourceIds: excludedSourceIds(tenant, options),
-        projectId: options.projectId ?? null,
-      })
+    ? await retrieveChunks(tenant, query, 4, { excludeSourceIds: excludedSourceIds(tenant, options) })
     : { chunks: [], mode: "none", backend: "builtin", vectorModel: null };
   const soulBlock = [
     `Name: ${soul.name}`,

@@ -1,17 +1,3 @@
-/**
- * Generated files on the hosted app, through the real router with real sessions and a real database
- * (SR-175, Rizky 2026-10-14; team-board-spec.md section 2b, F0).
- *
- * Rule: a file a person makes on their own is visible only to them; a file put into a collective
- * project is visible to, and downloadable by, everyone in the company. Another company never sees it.
- *
- * Company A has an owner (Alice, A1) and a member (Ann, A2); company B has an owner (Bob, B1). Each
- * refusal is paired with the maker reading the same thing successfully, so a server that refused
- * everybody fails here. A row another person cannot see answers exactly like a missing id.
- *
- * `AGENTFORGE_SERVER` is set in the environment: the artifact handlers read `isServerMode()`, and
- * without it every isolation assertion would pass for the wrong reason.
- */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -40,12 +26,11 @@ type Person = { readonly tenant: TenantContext; readonly sessionId: string };
 
 let sessionStore: ReturnType<typeof createMemorySessionStore>;
 let alice: Person;
-let ann: Person;
 let bob: Person;
 
-async function provision(orgId: string, userId: string, role: "owner" | "member"): Promise<Person> {
+async function provision(orgId: string, userId: string): Promise<Person> {
   const { db, ensurePortalOwner } = await import("@agentforge/db");
-  const tenant = await ensurePortalOwner(db, { tenantId: PARTNER, orgId, userId, role });
+  const tenant = await ensurePortalOwner(db, { tenantId: PARTNER, orgId, userId, role: "owner" });
   const session = createSession({ tenantId: PARTNER, orgId, userId, now: Date.now() });
   await sessionStore.create(session);
   return { tenant, sessionId: session.id };
@@ -66,7 +51,6 @@ function call(person: Person, method: string, path: string, over: Partial<HostRe
   return dispatch(request(person, method, path, over), { serverMode: true, sessionStore });
 }
 
-/** The status and error code of a refusal, or the status of a success: what a caller can compare. */
 async function outcome(result: HostResult): Promise<{ status: number; code?: string }> {
   if (result.type === "json") {
     const body = (result as HostJsonResult).body as { error?: { code?: string } };
@@ -94,12 +78,6 @@ async function makeArtifact(person: Person, title: string): Promise<string> {
   return record.id;
 }
 
-async function putInProject(artifactId: string): Promise<void> {
-  const { sql } = await import("@agentforge/db");
-  sql.prepare("UPDATE artifacts SET project_id = 'project-1' WHERE id = ?").run(artifactId);
-}
-
-// A single PNG pixel, enough to make a real media row through the same store chat uses.
 const PNG = new Uint8Array(
   Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=", "base64"),
 );
@@ -113,23 +91,20 @@ async function makeMedia(person: Person): Promise<string> {
 describe("generated files on the hosted app: two companies, real sessions", () => {
   beforeAll(async () => {
     sessionStore = createMemorySessionStore();
-    alice = await provision("org-a", "alice", "owner");
-    ann = await provision("org-a", "ann", "member");
-    bob = await provision("org-b", "bob", "owner");
+    alice = await provision("org-a", "alice");
+    bob = await provision("org-b", "bob");
   }, ROUTER_IMPORT_BUDGET_MS);
 
   afterAll(async () => {
-    // Close the database before the directory goes: Windows refuses to delete an open SQLite file.
     const { sql } = await import("@agentforge/db");
     sql.close();
     rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   });
 
-  it("a person's own artifact is visible to that person only", async () => {
-    const id = await makeArtifact(alice, "Alice private plan");
+  it("a person's artifact is listed for its maker and not for another company", async () => {
+    const id = await makeArtifact(alice, "Alice plan");
 
     expect(artifactIds(await call(alice, "GET", "/api/v1/artifacts"))).toContain(id);
-    expect(artifactIds(await call(ann, "GET", "/api/v1/artifacts"))).not.toContain(id);
     expect(artifactIds(await call(bob, "GET", "/api/v1/artifacts"))).not.toContain(id);
 
     const own = await call(alice, "GET", `/api/v1/artifacts/${id}`, { params: { artifactId: id } });
@@ -137,61 +112,16 @@ describe("generated files on the hosted app: two companies, real sessions", () =
     expect(own.status).toBe(200);
   });
 
-  it("another person's read of a private artifact answers exactly like a missing id", async () => {
-    const id = await makeArtifact(alice, "Alice second plan");
-    const missing = "00000000-0000-4000-8000-000000000000";
+  it("another company neither lists nor reads a person's artifact file, and the maker reads its bytes", async () => {
+    const id = await makeArtifact(alice, "Alice brief");
 
-    for (const path of [
-      (artifactId: string) => `/api/v1/artifacts/${artifactId}`,
-      (artifactId: string) => `/api/v1/artifacts/${artifactId}/file`,
-    ]) {
-      const hidden = await call(ann, "GET", path(id), { params: { artifactId: id } });
-      const gone = await call(ann, "GET", path(missing), { params: { artifactId: missing } });
-      expect(await outcome(hidden)).toEqual({ status: 404, code: "not_found" });
-      expect(await outcome(gone)).toEqual(await outcome(hidden));
-    }
-  });
-
-  it("a private artifact cannot be deleted by a company member who did not make it", async () => {
-    const id = await makeArtifact(alice, "Alice third plan");
-    const hidden = await call(ann, "DELETE", `/api/v1/artifacts/${id}`, { params: { artifactId: id } });
-    expect(await outcome(hidden)).toEqual({ status: 404, code: "not_found" });
-    const { artifactStore } = await import("./artifacts");
-    expect(artifactStore().get(alice.tenant, id)).not.toBeNull();
-  });
-
-  it("a file in a project stays private to its maker until F1 makes projects shareable (K-D19)", async () => {
-    const id = await makeArtifact(alice, "Project brief, still private");
-    await putInProject(id);
-
-    // Private by default: a project id alone grants nothing, to a teammate or to another company.
-    expect(artifactIds(await call(ann, "GET", "/api/v1/artifacts"))).not.toContain(id);
-    expect(
-      await outcome(await call(ann, "GET", `/api/v1/artifacts/${id}/file`, { params: { artifactId: id } })),
-    ).toEqual({ status: 404, code: "not_found" });
     expect(artifactIds(await call(bob, "GET", "/api/v1/artifacts"))).not.toContain(id);
     expect(
       await outcome(await call(bob, "GET", `/api/v1/artifacts/${id}/file`, { params: { artifactId: id } })),
     ).toEqual({ status: 404, code: "not_found" });
     const own = await call(alice, "GET", `/api/v1/artifacts/${id}/file`, { params: { artifactId: id } });
     expect(own.type).toBe("bytes");
-    expect(new TextDecoder().decode((own as HostBytesResult).bytes)).toContain("Project brief, still private");
-  });
-
-  it("a teammate's delete of a project file they cannot see is a 404, and the maker still deletes it", async () => {
-    const id = await makeArtifact(alice, "Project file to keep");
-    await putInProject(id);
-    expect(await outcome(await call(ann, "DELETE", `/api/v1/artifacts/${id}`, { params: { artifactId: id } }))).toEqual(
-      {
-        status: 404,
-        code: "not_found",
-      },
-    );
-    expect(
-      await outcome(await call(alice, "DELETE", `/api/v1/artifacts/${id}`, { params: { artifactId: id } })),
-    ).toEqual({
-      status: 200,
-    });
+    expect(new TextDecoder().decode((own as HostBytesResult).bytes)).toContain("Alice brief");
   });
 
   it("a media file is downloadable as an attachment on request, and inline without the flag, by its maker", async () => {

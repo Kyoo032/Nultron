@@ -1,8 +1,7 @@
-import { ApiError, isDefaultChatAgent, isServerMode } from "@agentforge/core";
+import { ApiError, isDefaultChatAgent } from "@agentforge/core";
 import type { HostRequest, HostResult } from "../types";
 import { jsonError, jsonOk } from "../errors";
 import { agentService, getTenant } from "../tenant";
-import { requireChatWorkspace } from "../projects/service";
 import {
   createThread,
   deleteThread,
@@ -52,28 +51,19 @@ export async function handleGetThreads(request: HostRequest): Promise<HostResult
 export async function handlePostThreads(request: HostRequest): Promise<HostResult> {
   try {
     const tenant = await getTenant(request);
-    const body = (request.body ?? {}) as { agentId?: unknown; title?: unknown; projectId?: unknown };
+    const body = (request.body ?? {}) as { agentId?: unknown; title?: unknown };
     if (body.agentId !== undefined && typeof body.agentId !== "string") {
       throw new ApiError("invalid_request", "agentId must be a string", 400);
     }
     if (body.title !== undefined && typeof body.title !== "string") {
       throw new ApiError("invalid_request", "title must be a string", 400);
     }
-    if (body.projectId !== undefined && typeof body.projectId !== "string") {
-      throw new ApiError("invalid_request", "projectId must be a string", 400);
-    }
     const agent = await agentService.get(tenant, body.agentId ?? "");
     if (!agent) {
       throw new ApiError("not_found", "Agent not found", 404);
     }
     const title = typeof body.title === "string" ? body.title.trim().slice(0, THREAD_TITLE_MAX) : undefined;
-    // A Workspace chat (W1) is server mode only: on Personal the field is ignored, so the chat is what it was.
-    // The agent must be the default one or one a member brought into the Workspace (K-D22).
-    const projectId =
-      isServerMode() && typeof body.projectId === "string"
-        ? requireChatWorkspace(tenant, body.projectId, agent.slug)
-        : null;
-    const thread = await createThread(tenant, agent.id, title || undefined, projectId);
+    const thread = await createThread(tenant, agent.id, title || undefined);
     return jsonOk({ thread }, 201);
   } catch (error) {
     return jsonError(error);

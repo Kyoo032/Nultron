@@ -22,10 +22,6 @@ describe("default chat tools", () => {
       "run_code",
       "self_check",
       "build_deck",
-      "create_document",
-      "create_workbook",
-      "revise_document",
-      "import_document",
     ]);
   });
 
@@ -88,14 +84,6 @@ describe("default chat prompt", () => {
   it("tells the model what to do with a failed call and when to use the self check", () => {
     expect(DEFAULT_CHAT_PROMPT).toMatch(/self_check reports[^.]*before you tell the owner/);
     expect(DEFAULT_CHAT_PROMPT).toMatch(/ok false[^.]*message[^.]*another tool/);
-  });
-
-  it("says a one-section change in a Workspace waits for Keep, and that any other revision saves a copy", () => {
-    expect(DEFAULT_CHAT_PROMPT).toMatch(
-      /In a Workspace, a one-section change to a document waits for a member to press Keep/,
-    );
-    expect(DEFAULT_CHAT_PROMPT).toMatch(/Elsewhere, and for a sheet, theme or format change, a revised copy is saved/);
-    expect(DEFAULT_CHAT_PROMPT).not.toMatch(/saves a new copy, keeping the original/);
   });
 
   it("leaves the language rule to withChatOutputLanguage", () => {

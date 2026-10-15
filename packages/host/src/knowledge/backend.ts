@@ -55,8 +55,6 @@ export type BackendRetrieveOptions = {
   limit: number;
   /** Sources never returned, e.g. the card written from the thread that is asking. */
   excludeSourceIds?: string[];
-  /** The Workspace the caller searches from (W1). Its sources only; absent or null means none of them. */
-  projectId?: string | null;
 };
 
 export type BackendHealth = { ok: boolean; detail?: string };

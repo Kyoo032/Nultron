@@ -1,7 +1,7 @@
 import type Database from "better-sqlite3";
 import { sql } from "@agentforge/db";
 import { getLocalVaultKey } from "@agentforge/db/vault-key";
-import { ApiError, isServerMode, openPayload, sealPayload, type TenantContext } from "@agentforge/core";
+import { ApiError, openPayload, sealPayload, type TenantContext } from "@agentforge/core";
 import {
   artifactMetaSchema,
   isArtifactKind,
@@ -14,8 +14,6 @@ import {
   type ArtifactRecord,
   type ArtifactSummary,
 } from "@agentforge/core/artifacts";
-import { mayDeleteFile } from "./media-visibility";
-import { heldByNoLiveProjectSql, memberOfLiveProjectSql } from "./projects/membership-sql";
 
 /** Hard cap on a single artifact body (dossiers, analyses, briefs are text). */
 export const ARTIFACT_BODY_MAX_BYTES = 4 * 1024 * 1024;
@@ -76,35 +74,6 @@ function summaryFromRow(row: Row): ArtifactSummary {
   };
 }
 
-/**
- * A file in a Workspace the reader is a member of (K-D22, Rizky 2026-10-14: a Workspace is shared with its
- * members, never the whole company). The project must be on the file's desk (the outer names are qualified,
- * so the subquery cannot compare a project with itself) and not archived. One `?`: the reader.
- */
-export const SHARED_ARTIFACT_SQL = memberOfLiveProjectSql(
-  "p.id = artifacts.project_id AND p.workspace_id = artifacts.workspace_id",
-);
-
-/** A file its maker may read as their own: no live Workspace holds it (SR-179). One `?`: the reader. */
-const OWN_ARTIFACT_SQL = `(owner_user_id = ? AND ${heldByNoLiveProjectSql("artifacts.project_id")})`;
-
-/**
- * Who may see a row, on the hosted app (SR-175, SR-178, SR-179). A file a person makes on their own is theirs;
- * a file in a live Workspace belongs to the Workspace and is its members' (`SHARED_ARTIFACT_SQL`), its maker
- * included only while a member; taken back out, or once its Workspace is archived, it is the maker's own again.
- * A legacy row with no owner and no Workspace stays company-visible, as it was made. Desktop and webdev write
- * no owner, and have one person per desk, so they add no clause at all and their SQL is what it was before.
- */
-export function visibleTo(tenant: TenantContext): { clause: string; args: string[] } {
-  if (!isServerMode()) {
-    return { clause: "", args: [] };
-  }
-  return {
-    clause: ` AND ((owner_user_id IS NULL AND project_id IS NULL) OR ${OWN_ARTIFACT_SQL} OR ${SHARED_ARTIFACT_SQL})`,
-    args: [tenant.userId, tenant.userId],
-  };
-}
-
 function validateInput(input: CreateArtifactInput): CreateArtifactInput {
   if (!isArtifactMode(input.mode) || !isArtifactKind(input.kind) || !isArtifactMime(input.mime)) {
     throw new ApiError("invalid_request", "Artifact mode, kind, or mime is not allowed", 400);
@@ -144,11 +113,9 @@ export function createArtifactStore(db: Database.Database, keyProvider: () => Bu
       const now = Date.now();
       const id = crypto.randomUUID();
       const sizeBytes = Buffer.byteLength(input.body, "utf8");
-      // Hosted: the maker owns it until a project holds it (SR-175). Personal writes no owner.
-      const owner = isServerMode() ? tenant.userId : null;
       db.prepare(
-        `INSERT INTO artifacts (id, workspace_id, mode, kind, title, mime, body, meta, size_bytes, owner_user_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO artifacts (id, workspace_id, mode, kind, title, mime, body, meta, size_bytes, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).run(
         id,
         tenant.workspaceId,
@@ -159,7 +126,6 @@ export function createArtifactStore(db: Database.Database, keyProvider: () => Bu
         seal(input.body),
         JSON.stringify(input.meta ?? {}),
         sizeBytes,
-        owner,
         now,
         now,
       );
@@ -179,23 +145,26 @@ export function createArtifactStore(db: Database.Database, keyProvider: () => Bu
     },
 
     list(tenant, mode) {
-      const visible = visibleTo(tenant);
-      const modeClause = mode ? " AND mode = ?" : "";
-      const args = [tenant.workspaceId, ...(mode ? [mode] : []), ...visible.args, ARTIFACT_LIST_LIMIT];
-      const rows = db
-        .prepare(
-          `SELECT id, workspace_id, mode, kind, title, mime, '' AS body, meta, size_bytes, created_at, updated_at
-           FROM artifacts WHERE workspace_id = ?${modeClause}${visible.clause} ORDER BY created_at DESC LIMIT ?`,
-        )
-        .all(...args) as Row[];
+      const rows = mode
+        ? (db
+            .prepare(
+              `SELECT id, workspace_id, mode, kind, title, mime, '' AS body, meta, size_bytes, created_at, updated_at
+               FROM artifacts WHERE workspace_id = ? AND mode = ? ORDER BY created_at DESC LIMIT ?`,
+            )
+            .all(tenant.workspaceId, mode, ARTIFACT_LIST_LIMIT) as Row[])
+        : (db
+            .prepare(
+              `SELECT id, workspace_id, mode, kind, title, mime, '' AS body, meta, size_bytes, created_at, updated_at
+               FROM artifacts WHERE workspace_id = ? ORDER BY created_at DESC LIMIT ?`,
+            )
+            .all(tenant.workspaceId, ARTIFACT_LIST_LIMIT) as Row[]);
       return rows.map(summaryFromRow);
     },
 
     get(tenant, id) {
-      const visible = visibleTo(tenant);
-      const row = db
-        .prepare(`SELECT * FROM artifacts WHERE workspace_id = ? AND id = ?${visible.clause}`)
-        .get(tenant.workspaceId, id, ...visible.args) as Row | undefined;
+      const row = db.prepare("SELECT * FROM artifacts WHERE workspace_id = ? AND id = ?").get(tenant.workspaceId, id) as
+        | Row
+        | undefined;
       if (!row) {
         return null;
       }
@@ -203,16 +172,6 @@ export function createArtifactStore(db: Database.Database, keyProvider: () => Bu
     },
 
     remove(tenant, id) {
-      // SR-176: only the maker, or a company owner or admin, deletes a file (and SR-179: the maker of a file in a
-      // live Workspace only while a member). The row is looked up without the read rule, because an admin may
-      // delete a file they may never open. Anyone else gets `false`, the same answer as a missing id, whether or
-      // not they can read the file; the route answers 404 for it.
-      const row = db
-        .prepare("SELECT owner_user_id, project_id FROM artifacts WHERE workspace_id = ? AND id = ?")
-        .get(tenant.workspaceId, id) as { owner_user_id: string | null; project_id: string | null } | undefined;
-      if (!row || !mayDeleteFile(tenant, { makerUserId: row.owner_user_id, projectId: row.project_id })) {
-        return false;
-      }
       const result = db.prepare("DELETE FROM artifacts WHERE workspace_id = ? AND id = ?").run(tenant.workspaceId, id);
       return result.changes > 0;
     },

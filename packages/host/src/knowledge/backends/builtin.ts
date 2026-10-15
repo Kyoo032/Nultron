@@ -47,11 +47,11 @@ function placeholders(ids: string[]): string {
  * person may not see has no name here, whatever id reached the function: the hits are already
  * filtered, and this is the second place a colleague's Chat card would have to get through.
  */
-function sourceNames(tenant: TenantContext, sourceIds: string[], projectId: string | null): Map<string, string> {
+function sourceNames(tenant: TenantContext, sourceIds: string[]): Map<string, string> {
   if (sourceIds.length === 0) {
     return new Map();
   }
-  const visible = andVisibleSource(tenant, undefined, { projectId });
+  const visible = andVisibleSource(tenant);
   const rows = sql
     .prepare(
       `SELECT id, name FROM knowledge_sources WHERE workspace_id = ? AND id IN (${placeholders(sourceIds)})${visible.sql}`,
@@ -217,15 +217,9 @@ function fusedMode(ftsCount: number, vectorCount: number): RetrieveMode {
 
 type FtsRow = { rid: number; source_id: string; body: string; rank: number };
 
-function ftsRows(
-  tenant: TenantContext,
-  query: string,
-  limit: number,
-  exclude: string[],
-  projectId: string | null,
-): FtsRow[] {
+function ftsRows(tenant: TenantContext, query: string, limit: number, exclude: string[]): FtsRow[] {
   // Hosted: only chunks of sources this person may see (a colleague's Chat card never matches).
-  const visible = andVisibleSourceId(tenant, "knowledge_chunks.source_id", { projectId });
+  const visible = andVisibleSourceId(tenant, "knowledge_chunks.source_id");
   try {
     return sql
       .prepare(
@@ -269,7 +263,6 @@ export class SqliteBuiltinBackend implements KnowledgeBackend {
       return { chunks: [], mode: "none", backend: this.id, vectorModel: null };
     }
     const exclude = opts.excludeSourceIds ?? [];
-    const projectId = opts.projectId ?? null;
     // Settings and the vector model are resolved once per query and handed down: each
     // `resolveVectorModel` costs up to two COUNT scans of `knowledge_vectors`, and the pre-fix path
     // paid for four of them to answer one question.
@@ -277,8 +270,8 @@ export class SqliteBuiltinBackend implements KnowledgeBackend {
     const preferredModel = resolveVectorModel(tenant, models.embeddingModel);
     // Both engines always run: a keyword-only hit and a semantic-only hit are both real answers, and
     // the pre-Phase-2 "vectors won, skip FTS" branch threw one of them away on every query.
-    const vectors = await this.retrieveVectors(tenant, trimmed, opts.limit, exclude, models, preferredModel, projectId);
-    const ftsHits = this.retrieveFts(tenant, trimmed, opts.limit, exclude, projectId);
+    const vectors = await this.retrieveVectors(tenant, trimmed, opts.limit, exclude, models, preferredModel);
+    const ftsHits = this.retrieveFts(tenant, trimmed, opts.limit, exclude);
     return {
       chunks: fuseRrf([ftsHits, vectors.chunks], opts.limit),
       mode: fusedMode(ftsHits.length, vectors.chunks.length),
@@ -310,10 +303,9 @@ export class SqliteBuiltinBackend implements KnowledgeBackend {
     exclude: string[],
     models: KnowledgeModels,
     preferredModel: string | null,
-    projectId: string | null,
   ): Promise<{ chunks: RetrievedChunk[]; model: string | null }> {
-    const { hits, model } = await searchVectors(tenant, query, models, limit, exclude, preferredModel, projectId);
-    const names = sourceNames(tenant, [...new Set(hits.map((hit) => hit.sourceId))], projectId);
+    const { hits, model } = await searchVectors(tenant, query, models, limit, exclude, preferredModel);
+    const names = sourceNames(tenant, [...new Set(hits.map((hit) => hit.sourceId))]);
     return {
       chunks: hits.map((hit) => ({
         body: hit.body,
@@ -326,21 +318,15 @@ export class SqliteBuiltinBackend implements KnowledgeBackend {
     };
   }
 
-  private retrieveFts(
-    tenant: TenantContext,
-    query: string,
-    limit: number,
-    exclude: string[],
-    projectId: string | null,
-  ): RetrievedChunk[] {
+  private retrieveFts(tenant: TenantContext, query: string, limit: number, exclude: string[]): RetrievedChunk[] {
     const match = knowledgeFtsQuery(query);
     if (!match) {
       return [];
     }
     const ws = tenant.workspaceId;
-    const rows = ftsRows(tenant, match, limit, exclude, projectId);
+    const rows = ftsRows(tenant, match, limit, exclude);
     const ids = [...new Set(rows.map((row) => row.source_id))];
-    const names = sourceNames(tenant, ids, projectId);
+    const names = sourceNames(tenant, ids);
     const indexes = vectorChunkIndexes(ws, ids);
     // Rows arrive in bm25 order and are consumed in that order, so a repeated body hands out its
     // indexes one at a time: two copies of one paragraph stay two chunks instead of one.

@@ -32,12 +32,7 @@ function openJson(value: unknown): unknown {
   }
 }
 
-export async function createThread(
-  tenant: TenantContext,
-  agentId: string,
-  title?: string,
-  projectId: string | null = null,
-) {
+export async function createThread(tenant: TenantContext, agentId: string, title?: string) {
   const [row] = await db
     .insert(threads)
     .values({
@@ -46,8 +41,6 @@ export async function createThread(
       agentId,
       userId: tenant.userId,
       title: title ?? defaultThreadTitle(localeForRun()),
-      // A chat started in a Workspace belongs to it (W1); the caller checked membership before this call.
-      projectId,
     })
     .returning();
   return row;
@@ -358,13 +351,6 @@ export async function insertToolInvocation(
     output: sealJson(output),
     status,
   });
-}
-
-export async function replaceMessageContent(tenant: TenantContext, messageId: string, content: ContentPart[]) {
-  await db
-    .update(messages)
-    .set({ content: sealJson(content) })
-    .where(and(eq(messages.organizationId, tenant.organizationId), eq(messages.id, messageId)));
 }
 
 export function requireThread(thread: unknown, message = "Thread not found") {
