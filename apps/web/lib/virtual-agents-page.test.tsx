@@ -197,6 +197,48 @@ describe("VirtualAgentsView", () => {
   });
 });
 
+describe("VirtualAgentsView made agents", () => {
+  const MADE = [
+    { id: "ag_1", name: "Invoices", description: "Checks invoices", deletable: true },
+    { id: "ag_2", name: "Old", description: "", deletable: false },
+  ];
+
+  it("draws no made section when the person has no made agents", () => {
+    expect(view()).not.toContain('data-testid="agents-made"');
+  });
+
+  it("draws each made agent with an Open link to its own chat", () => {
+    const html = view({ made: MADE, onRemove: () => undefined });
+    expect(html).toContain('data-testid="agents-made"');
+    expect(count(html, 'data-testid="made-agent-card"')).toBe(2);
+    expect(html).toContain('href="/chat?made=ag_1"');
+    expect(html).toContain('href="/chat?made=ag_2"');
+  });
+
+  it("gives Remove only to a deletable made agent, and only when a remove handler is given", () => {
+    const html = view({ made: MADE, onRemove: () => undefined });
+    expect(count(html, 'data-testid="made-agent-remove"')).toBe(1);
+    expect(html).toContain('aria-label="Remove Invoices"');
+    expect(html).not.toContain('aria-label="Remove Old"');
+    expect(count(view({ made: MADE }), 'data-testid="made-agent-remove"')).toBe(0);
+  });
+
+  it("draws the made section after the desk and the catalog", () => {
+    const html = view({ made: MADE, onRemove: () => undefined });
+    expect(html.indexOf('data-testid="agents-available"')).toBeLessThan(html.indexOf('data-testid="agents-made"'));
+  });
+
+  it("holds the made section back until the catalog has answered", () => {
+    expect(view({ made: MADE, loaded: false })).not.toContain('data-testid="agents-made"');
+  });
+
+  it("opens the shared delete confirm from Remove, and reads the made agents on the page", () => {
+    expect(pageSource).toContain("onRemove={setPendingRemove}");
+    expect(pageSource).toContain("<AgentDeleteDialog");
+    expect(pageSource).toContain("useMadeAgents()");
+  });
+});
+
 describe("the page's request", () => {
   it("saves with the PATCH the Workspaces page sends, keeping the desk's name", () => {
     expect(pageSource).toMatch(/apiFetch\(`\/api\/v1\/workspaces\/\$\{desk\.id\}`/);

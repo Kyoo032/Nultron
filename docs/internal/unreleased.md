@@ -54,6 +54,18 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Prompt-made agents: the renderer (rail, New agent page, delete), 2026-10-15 (tester K34-c, on top of the host half `3b58cd6d`; not driven in a browser)
+
+Lanes: hyp-ai, tester
+
+- **What changed.** The rail lists the person's prompt-made agents under the default agent. Each has a ⋯ menu with Delete when the host says `deletable`; a confirm says the agent's chats, messages and the cards they left in the Knowledge Base go before `DELETE /api/v1/agents/:id`. `+ New agent` opens `/agents/new`: one prompt box, the draft, the editable fields, then Create, which opens the agent's chat at `/chat?made=<id>`. The Virtual agents page gets a "Made from a prompt" section with Remove on deletable agents.
+- **Where.** Tester shell code: `apps/web/components/agent-*` (rail rows, delete dialog, New agent page, made chat pane, `agent-made.css`), `apps/web/lib/virtual-agents-made.ts`, `apps/web/components/virtual-agents-page.tsx`, `apps/web/components/agent-rail.tsx`, `apps/web/lib/virtual-agents.ts`. One route in `apps/web/src/App.tsx` (`/agents/new`), one branch in `apps/web/src/pages/chat-page.tsx` (`?made=`). Shared file touched: `apps/web/components/chat-session.tsx` (protected), which gains two optional shell fields, `threadHref` and `emptyState`; with neither set, its behaviour is as before.
+- **Contract.** The made chat sends only the made agent's row id: the thread is created with `{ agentId }` (`chat-session.tsx`), and the run posts `{ content, tier }` to that thread. The host reads the agent from the thread's row, so no mode id is sent.
+- **Copy.** `apps/web/locales/{en,id}/agents.json`: `rail.newAgent`, `made.*`, `new.*`. No brand name in code or copy. Parity test `apps/web/lib/agents-locale.test.ts` passes.
+- **Tests.** `virtual-agents-made.test.ts`, `agent-rail-made.test.tsx`, `agent-new-page.test.tsx`, and the made section in `virtual-agents-page.test.tsx`. With the existing rail and page tests, 114 tests in eight files pass, and `tsc --noEmit -p apps/web` is clean.
+- **Not proven.** No browser drive. The ⋯ menu, the confirm, the draft and create against a live model, and the redirect are covered by unit tests only. The host's `madeFromPrompt` and `deletable` flags were not seen on a running server. The ⋯ menu closes on Escape or on its own button, not on a click outside.
+- **Lanes owed.** Tester: a drive on the staging instance, then a promotion pull request that Rizky approves. HYP AI: imports from `main`, so it gets this only after that promotion.
+
 ## Workspace files: an `editable` flag, and a 409 for a document that is already editable, 2026-10-15 (tester, D2-f; uncommitted on `tester/chat-first` at `ca252632`; not driven)
 
 Lanes: enterprise, hyp-ai, tester

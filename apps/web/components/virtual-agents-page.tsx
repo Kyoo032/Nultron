@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PRODUCT_MODES, type ProductMode } from "@agentforge/core/product-modes";
 import { ModeHeader } from "@/components/mode-header";
 import { isModeIconName, ModeIcon } from "@/components/mode-icons";
+import { AgentDeleteDialog } from "@/components/agent-delete-dialog";
 import { apiFetch } from "@/lib/api-client";
 import { t } from "@/lib/i18n";
 import { Link, useRouter } from "@/lib/nav";
@@ -16,6 +17,7 @@ import {
   virtualAgentTagline,
   type VirtualAgentInfo,
 } from "@/lib/virtual-agents";
+import { madeAgentHref, useMadeAgents, type MadeAgent } from "@/lib/virtual-agents-made";
 import "@/components/virtual-agents-page.css";
 
 /**
@@ -138,6 +140,8 @@ export type VirtualAgentsViewProps = {
   productName: string;
   onHire: (agent: VirtualAgentInfo) => void;
   onLetGo: (agent: VirtualAgentInfo) => void;
+  made?: readonly MadeAgent[];
+  onRemove?: (agent: MadeAgent) => void;
 };
 
 /** The page's markup with no data fetching, so tests and the page share one body. */
@@ -150,6 +154,8 @@ export function VirtualAgentsView({
   productName,
   onHire,
   onLetGo,
+  made = [],
+  onRemove,
 }: VirtualAgentsViewProps) {
   return (
     <main
@@ -214,9 +220,51 @@ export function VirtualAgentsView({
               </ul>
             )}
           </section>
+          {made.length > 0 ? (
+            <section className="va-section" aria-labelledby="va-made" data-testid="agents-made">
+              <h2 className="va-section-title" id="va-made">
+                {t("agents.made.section")}
+              </h2>
+              <ul className="va-grid">
+                {made.map((agent) => (
+                  <MadeAgentCard key={agent.id} agent={agent} onRemove={onRemove} />
+                ))}
+              </ul>
+            </section>
+          ) : null}
         </>
       ) : null}
     </main>
+  );
+}
+
+function MadeAgentCard({ agent, onRemove }: { agent: MadeAgent; onRemove?: (agent: MadeAgent) => void }) {
+  return (
+    <li className="va-card" data-testid="made-agent-card" data-agent={agent.id}>
+      <div className="va-card-head">
+        <span className="va-tile" aria-hidden="true">
+          {agent.name.trim().charAt(0).toUpperCase() || "?"}
+        </span>
+        <h3 className="va-name">{agent.name}</h3>
+      </div>
+      {agent.description ? <p className="va-tagline">{agent.description}</p> : null}
+      <div className="va-actions">
+        <Link href={madeAgentHref(agent.id)} className="va-open" data-testid="made-agent-open">
+          {t("agents.page.open")}
+        </Link>
+        {agent.deletable && onRemove ? (
+          <button
+            type="button"
+            className="va-btn va-btn-secondary"
+            data-testid="made-agent-remove"
+            aria-label={t("agents.made.removeAria", { name: agent.name })}
+            onClick={() => onRemove(agent)}
+          >
+            {t("agents.made.remove")}
+          </button>
+        ) : null}
+      </div>
+    </li>
   );
 }
 
@@ -249,6 +297,8 @@ export function VirtualAgentsPage() {
   const [loaded, setLoaded] = useState(false);
   const [busyId, setBusyId] = useState<ProductMode | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const made = useMadeAgents();
+  const [pendingRemove, setPendingRemove] = useState<MadeAgent | null>(null);
 
   const loadCatalog = useCallback(async () => {
     const catalog = await fetchVirtualAgentCatalog();
@@ -331,15 +381,26 @@ export function VirtualAgentsPage() {
   }
 
   return (
-    <VirtualAgentsView
-      agents={agents}
-      available={available}
-      loaded={loaded}
-      busyId={busyId}
-      error={error}
-      productName={productName}
-      onHire={(agent) => void change(agent, "hire")}
-      onLetGo={(agent) => void change(agent, "letGo")}
-    />
+    <>
+      <VirtualAgentsView
+        agents={agents}
+        available={available}
+        loaded={loaded}
+        busyId={busyId}
+        error={error}
+        productName={productName}
+        onHire={(agent) => void change(agent, "hire")}
+        onLetGo={(agent) => void change(agent, "letGo")}
+        made={made.agents}
+        onRemove={setPendingRemove}
+      />
+      {pendingRemove ? (
+        <AgentDeleteDialog
+          agent={pendingRemove}
+          onCancel={() => setPendingRemove(null)}
+          onDeleted={() => setPendingRemove(null)}
+        />
+      ) : null}
+    </>
   );
 }

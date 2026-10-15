@@ -1,0 +1,247 @@
+.agent-rail-made-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.agent-rail-made-row > .agent-rail-link {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.agent-rail-made-tile {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.agent-rail-made-more {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  margin-inline-end: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-3);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.agent-rail-made-more:hover,
+.agent-rail-made-more:focus-visible {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.agent-rail-made-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 30;
+  min-width: 9rem;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.12);
+}
+
+.agent-rail-made-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--danger);
+  font-size: 0.875rem;
+  text-align: start;
+  cursor: pointer;
+}
+
+.agent-rail-made-menu-item:hover,
+.agent-rail-made-menu-item:focus-visible {
+  background: var(--surface-2);
+}
+
+.agent-rail-new-agent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-block: 4px;
+  padding: 4px;
+  border-radius: 8px;
+  color: var(--text-2);
+  text-decoration: none;
+}
+
+.agent-rail-new-agent:hover,
+.agent-rail-new-agent:focus-visible {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.agent-made-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgb(0 0 0 / 0.35);
+}
+
+.agent-made-dialog {
+  box-sizing: border-box;
+  width: min(28rem, 100%);
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.agent-made-dialog-title {
+  margin: 0 0 8px;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.agent-made-dialog-body {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-2);
+}
+
+.agent-made-dialog-error {
+  margin: 12px 0 0;
+  font-size: 0.875rem;
+  color: var(--danger);
+}
+
+.agent-made-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.agent-made-danger,
+.agent-made-primary {
+  padding: 7px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.agent-made-danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--bg);
+}
+
+.agent-made-primary {
+  background: var(--accent);
+  color: var(--bg);
+}
+
+.agent-made-danger:disabled,
+.agent-made-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.agent-new-page {
+  box-sizing: border-box;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 2rem 16px 3rem;
+  color: var(--text);
+}
+
+.agent-new-prompt,
+.agent-new-draft {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 1.5rem;
+}
+
+.agent-new-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.agent-new-textarea,
+.agent-new-input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9375rem;
+}
+
+.agent-new-textarea {
+  resize: vertical;
+}
+
+.agent-new-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.agent-new-draft-title {
+  margin: 1.5rem 0 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.agent-new-note {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--text-2);
+}
+
+.agent-new-error {
+  margin: 1rem 0 0;
+  font-size: 0.875rem;
+  color: var(--danger);
+}
+
+.agent-new-more {
+  margin-top: 4px;
+  font-size: 0.875rem;
+}
+
+.agent-new-more summary {
+  cursor: pointer;
+  color: var(--text-2);
+}
+
+.agent-new-base {
+  margin: 8px 0;
+  color: var(--text-2);
+}
+
+.agent-new-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.agent-new-tool {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

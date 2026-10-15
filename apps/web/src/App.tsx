@@ -21,6 +21,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { SettingsPage } from "@/components/settings-page";
 import { UsagePage } from "@/components/usage-page";
 import { VirtualAgentsPage } from "@/components/virtual-agents-page";
+import { AgentNewPage } from "@/components/agent-new-page";
 import { WorkspacesPage } from "@/components/workspaces-page";
 import { KnowledgePage } from "@/components/knowledge-page";
 import { ChannelsPage } from "@/components/channels-page";
@@ -476,6 +477,14 @@ export function AppRoutes() {
             />
             <Route path="/studio/*" element={<Navigate to="/chat" replace />} />
             <Route path="/agents/*" element={<Navigate to="/chat" replace />} />
+            <Route
+              path="/agents/new"
+              element={
+                <DeskPane>
+                  <AgentNewPage />
+                </DeskPane>
+              }
+            />
             <Route path="/workspace" element={<Navigate to="/chat" replace />} />
             <Route path="*" element={<Navigate to="/chat" replace />} />
           </Routes>

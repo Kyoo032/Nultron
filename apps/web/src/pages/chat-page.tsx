@@ -1,13 +1,19 @@
 import { SHELL_LAYOUT } from "@agentforge/core/product-modes";
 import { useSearchParams } from "@/lib/nav";
 import { AgentChatPane } from "@/components/agent-chat-pane";
+import { AgentMadeChatPane } from "@/components/agent-made-chat-pane";
 import { ChatSession } from "@/components/chat-session";
 import { agentIdFromSearch } from "@/lib/virtual-agents";
+import { madeAgentIdFromSearch } from "@/lib/virtual-agents-made";
 
 export function ChatPage() {
   const params = useSearchParams();
   const thread = params.get("thread") ?? undefined;
   if (SHELL_LAYOUT === "chat-first") {
+    const madeId = madeAgentIdFromSearch(params);
+    if (madeId) {
+      return <AgentMadeChatPane agentId={madeId} threadId={thread} />;
+    }
     // Tester code: `/chat` is every virtual agent's address. `?agent=<mode>` names one; none is the generalist.
     return <AgentChatPane agentMode={agentIdFromSearch(params)} threadId={thread} />;
   }

@@ -30,7 +30,8 @@
     "workspacesHeading": "Workspaces",
     "workspacesAria": "Workspaces",
     "newWorkspace": "New Workspace",
-    "agentsHeading": "Agents"
+    "agentsHeading": "Agents",
+    "newAgent": "New agent"
   },
   "header": {
     "newChat": "New chat",
@@ -98,5 +99,49 @@
     "skillsCountOne": "1 skill",
     "converses": "Own harness in chat",
     "studio": "Own harness in studio"
+  },
+  "made": {
+    "section": "Made from a prompt",
+    "remove": "Remove",
+    "removeAria": "Remove {name}",
+    "more": "More",
+    "moreAria": "More for {name}",
+    "delete": "Delete",
+    "deleteTitle": "Delete {name}?",
+    "deleteBody": "Your chats with {name} are deleted, with their messages, tool records and any cards they left in the Knowledge Base. Your files, uploads and other people's chats stay. {name} is taken out of any Workspace it was brought into; the Workspace keeps everything else it holds.",
+    "deleteCancel": "Keep it",
+    "deleteConfirm": "Delete agent",
+    "deleting": "Deleting",
+    "stubNote": "No model is connected, so this draft is your own words. Edit it, then create the agent.",
+    "error": {
+      "invalidPrompt": "Describe the agent in 2,000 characters or fewer.",
+      "draft": "Could not draft the agent. Try again.",
+      "draftInvalid": "The draft came back in a form the app could not read. Try again with a clearer description.",
+      "invalidAgent": "Check the name, description and instructions, then try again.",
+      "create": "Could not create the agent.",
+      "forbidden": "You cannot do that on this desk.",
+      "notFound": "This agent is no longer on your desk.",
+      "notDeletable": "This agent is built in and cannot be deleted.",
+      "inUse": "Someone else has a chat with this agent, so it cannot be deleted yet.",
+      "delete": "Could not delete the agent."
+    }
+  },
+  "new": {
+    "title": "New agent",
+    "lede": "Describe the agent in one prompt. Check the draft, change anything you like, then create it.",
+    "promptLabel": "Describe the agent",
+    "promptPlaceholder": "For example: reads my invoices and lists the ones that do not match a purchase order.",
+    "draft": "Draft it",
+    "drafting": "Drafting",
+    "draftTitle": "Your agent",
+    "name": "Name",
+    "description": "Description",
+    "instructions": "Instructions",
+    "more": "More",
+    "baseMode": "Based on",
+    "tools": "Tools",
+    "toolsNone": "No tools. It answers from its instructions.",
+    "create": "Create agent",
+    "creating": "Creating"
   }
 }
