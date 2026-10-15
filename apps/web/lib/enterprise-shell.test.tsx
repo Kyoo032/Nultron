@@ -4,12 +4,16 @@ import { fileURLToPath } from "node:url";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MadeAgentHome } from "@/components/agent-made-chat-pane";
 import { AgentRail, AgentRailView, type AgentRailViewProps } from "@/components/agent-rail";
 import { AppShell } from "@/components/app-shell";
 import { BrandMark } from "@/components/brand-mark";
+import { ChatLauncher } from "@/components/chat-launcher";
 import { NultronMascot } from "@/components/nultron/nultron-mascot";
 import { applyLocale, resetLocaleForTests } from "./i18n";
+import { publishGate, resetGateStateForTests } from "./gate-state";
+import type { GatewayGatePayload } from "./gateway-gate";
 import { renderOpcCases } from "./opc-shell-cases";
 import { BrandContext, DEFAULT_PRODUCT_BRAND, type ProductBrand, WEB_LOGO_SRC } from "./product-brand";
 import type { RailWorkspacesState } from "./rail-workspaces";
@@ -334,5 +338,154 @@ describe("the enterprise shell carries nothing of the default brand", () => {
   it("still draws the character and the mark in the default shell", () => {
     expect(renderToStaticMarkup(<NultronMascot state="idle" />)).toContain("chat-mascot");
     expect(renderToStaticMarkup(<BrandMark size={32} />)).toContain("<img");
+  });
+});
+
+const CLOSED_GATE: GatewayGatePayload = {
+  status: "needs_key",
+  allowed: false,
+  grace: false,
+  endpoint: "https://gateway.example.test/v1",
+  endpointLocked: true,
+  checkedAt: null,
+  lastOkAt: null,
+};
+
+function enterpriseChat(brand: ProductBrand = ENTERPRISE_BRAND): string {
+  return inRouter(
+    "/chat",
+    <BrandContext.Provider value={brand}>
+      <ChatLauncher />
+    </BrandContext.Provider>,
+  );
+}
+
+function headingCount(html: string): number {
+  return (html.match(/<h1[\s>]/g) ?? []).length;
+}
+
+function greetingOf(html: string): string {
+  return html.match(/<h1[^>]*>([^<]*)<\/h1>/)?.[1] ?? "";
+}
+
+describe("the enterprise empty chat is one heading and the composer", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    resetGateStateForTests();
+  });
+
+  it("draws the greeting and nothing else while the gate is open", () => {
+    const html = enterpriseChat();
+    expect(testIds(html)).toEqual(["chat-empty", "chat-empty-greeting"]);
+    expect(headingCount(html)).toBe(1);
+  });
+
+  it("draws no ideas grid, speech bubble, hero, mascot or orb", () => {
+    const ids = testIds(enterpriseChat());
+    for (const id of [
+      "chat-suggestions",
+      "chat-suggestion",
+      "chat-ideas-hint",
+      "chat-hero",
+      "chat-hero-bubble",
+      "chat-hero-mascot",
+      "chat-hero-orb",
+      "chat-mascot",
+    ]) {
+      expect(ids, id).not.toContain(id);
+    }
+    expect(enterpriseChat()).not.toMatch(/class="[^"]*\bchat-hero-orb\b/);
+    expect(enterpriseChat()).not.toContain("confetti");
+  });
+
+  it("shows the key status only while the gate is closed", () => {
+    vi.stubGlobal("__AGENTFORGE_SERVER__", "1");
+    publishGate(CLOSED_GATE);
+    const html = enterpriseChat();
+    expect(testIds(html)).toEqual([
+      "chat-empty",
+      "chat-empty-greeting",
+      "chat-key-status",
+      "chat-empty-settings",
+      "chat-whats-this",
+    ]);
+    expect(html).toContain('data-needs-key="true"');
+    expect(headingCount(html)).toBe(1);
+  });
+
+  it("names the greeting after the brand's character when it has one", () => {
+    expect(greetingOf(enterpriseChat({ ...ENTERPRISE_BRAND, assistantName: "Hana" }))).toContain("Hana");
+  });
+
+  it("falls back to the enterprise name, never to the default product's", () => {
+    const html = enterpriseChat({ ...DEFAULT_PRODUCT_BRAND, logoSrc: WEB_LOGO_SRC, shell: "enterprise" });
+    expect(greetingOf(html)).toContain("Company");
+    expect(html.toLowerCase()).not.toContain("nultron");
+    applyLocale("id");
+    expect(greetingOf(enterpriseChat({ ...DEFAULT_PRODUCT_BRAND, shell: "enterprise" }))).toContain("Perusahaan");
+  });
+
+  it("keeps the ideas, the hero and the character in the default shell", () => {
+    const ids = testIds(enterpriseChat(DEFAULT_PRODUCT_BRAND));
+    expect(ids).toContain("chat-suggestions");
+    expect(ids).toContain("chat-hero");
+    expect(ids).toContain("chat-hero-mascot");
+  });
+});
+
+describe("the prompt-made agent's home is one heading under the enterprise shell", () => {
+  it("draws the greeting alone, without the description", () => {
+    const html = renderToStaticMarkup(
+      <BrandContext.Provider value={ENTERPRISE_BRAND}>
+        <MadeAgentHome name="Ledger" description="Checks invoices" />
+      </BrandContext.Provider>,
+    );
+    expect(headingCount(html)).toBe(1);
+    expect(greetingOf(html)).toContain("Ledger");
+    expect(testIds(html)).toEqual(["agent-home"]);
+    expect(html).not.toContain("Checks invoices");
+  });
+
+  it("keeps the description in the default shell", () => {
+    const html = renderToStaticMarkup(<MadeAgentHome name="Ledger" description="Checks invoices" />);
+    expect(html).toContain("agent-home-tagline");
+    expect(html).toContain("Checks invoices");
+  });
+});
+
+describe("the enterprise chat column and rail are CSS scoped to the enterprise look", () => {
+  const webDir = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const globals = readFileSync(join(webDir, "app", "globals.css"), "utf8").replace(/\r\n/g, "\n");
+  const rail = readFileSync(join(webDir, "components", "agent-rail.css"), "utf8").replace(/\r\n/g, "\n");
+
+  function ruleBody(source: string, selector: string): string {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(?:^|\\n)${escaped} \\{([^}]*)\\}`).exec(source)?.[1] ?? "";
+  }
+
+  it("centres the message list in a 760px column, keeping the scrollbar at the pane edge", () => {
+    const body = ruleBody(
+      globals,
+      'html[data-product-shell="enterprise"] .agent-chat-main [data-testid="message-list"]',
+    );
+    expect(body).toContain("padding-inline: max(var(--chat-gutter), calc((100% - 760px) / 2));");
+  });
+
+  it("centres the composer on the same 760px column", () => {
+    const body = ruleBody(globals, 'html[data-product-shell="enterprise"] .agent-chat-main .chat-composer-ledge');
+    expect(body).toContain("max-width: calc(760px + 2 * var(--chat-gutter));");
+    expect(body).toContain("margin-inline: auto;");
+  });
+
+  it("draws the enterprise workspace chips as quiet rows, not one tone each", () => {
+    expect(ruleBody(rail, '.agent-rail[data-look="enterprise"] .agent-rail-ws-chip')).toContain(
+      "background: var(--rail-hover);",
+    );
+  });
+
+  it("draws the active generalist without the mode ring in the enterprise rail", () => {
+    expect(ruleBody(rail, '.agent-rail[data-look="enterprise"] .agent-rail-generalist[aria-current="page"]')).toContain(
+      "box-shadow: none;",
+    );
   });
 });

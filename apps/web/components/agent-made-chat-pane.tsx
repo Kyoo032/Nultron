@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { ChatSession, type ChatSessionShell } from "@/components/chat-session";
 import { t } from "@/lib/i18n";
 import { Link, useRouter } from "@/lib/nav";
+import { useShellLook } from "@/lib/product-brand";
 import { virtualAgentHref, type VirtualAgentInfo } from "@/lib/virtual-agents";
 import { madeAgentHref, useMadeAgents, type MadeAgent } from "@/lib/virtual-agents-made";
 import "./agent-made.css";
@@ -23,10 +24,11 @@ function madeShellAgent(agent: MadeAgent): VirtualAgentInfo {
 }
 
 export function MadeAgentHome({ name, description }: { name: string; description: string }) {
+  const enterprise = useShellLook() === "enterprise";
   return (
     <section className="agent-home" data-testid="agent-home">
       <h1 className="agent-home-greeting">{t("agents.home.greeting", { name })}</h1>
-      {description ? <p className="agent-home-tagline">{description}</p> : null}
+      {enterprise || !description ? null : <p className="agent-home-tagline">{description}</p>}
     </section>
   );
 }

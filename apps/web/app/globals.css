@@ -555,6 +555,16 @@ html[data-product-shell="enterprise"] .chat-hero-panel::before {
   display: none;
 }
 
+html[data-product-shell="enterprise"] .agent-chat-main [data-testid="message-list"] {
+  padding-inline: max(var(--chat-gutter), calc((100% - 760px) / 2));
+}
+
+html[data-product-shell="enterprise"] .agent-chat-main .chat-composer-ledge {
+  width: 100%;
+  max-width: calc(760px + 2 * var(--chat-gutter));
+  margin-inline: auto;
+}
+
 /* Firefox has no ::-webkit-scrollbar; Chromium drops the pseudo-elements as soon as
    scrollbar-color is set, so keep the standard properties fenced off from it. */
 @supports not selector(::-webkit-scrollbar) {

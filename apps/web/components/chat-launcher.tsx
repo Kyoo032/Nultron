@@ -3,7 +3,10 @@
 import type { CSSProperties } from "react";
 import { SHELL_LAYOUT } from "@agentforge/core/product-modes";
 import { ChatHero } from "@/components/chat-hero";
+import { ChatKeyStatus } from "@/components/chat-key-status";
+import { enterpriseBrandName } from "@/lib/enterprise-brand";
 import { t } from "@/lib/i18n";
+import { useProductBrand, useShellLook } from "@/lib/product-brand";
 import { useDeskNeedsKey } from "@/lib/use-desk-needs-key";
 
 /**
@@ -82,8 +85,29 @@ function IdeaIcon({ id }: { id: (typeof IDEAS)[number] }) {
   );
 }
 
+function EnterpriseEmptyChat({ needsKey }: { needsKey: boolean }) {
+  const brand = useProductBrand();
+  const name = brand.assistantName?.trim() || enterpriseBrandName(brand.productName);
+  return (
+    <div
+      className="flex min-h-full w-full flex-col items-center justify-center gap-6 py-6 text-center"
+      data-testid="chat-empty"
+      data-needs-key={needsKey ? "true" : "false"}
+    >
+      <h1 className="text-2xl font-semibold leading-tight text-[var(--text)]" data-testid="chat-empty-greeting">
+        {t("agents.home.greeting", { name })}
+      </h1>
+      {needsKey ? <ChatKeyStatus /> : null}
+    </div>
+  );
+}
+
 export function ChatLauncher({ onSuggest }: { onSuggest?: (text: string) => void }) {
   const needsKey = useDeskNeedsKey();
+  const enterprise = useShellLook() === "enterprise";
+  if (enterprise) {
+    return <EnterpriseEmptyChat needsKey={needsKey} />;
+  }
   return (
     /* `min-h-full` + safe center: short desks sit in the middle. A short window
        (900px) must not push the hero above the pane — `safe center` falls back

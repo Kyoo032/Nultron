@@ -294,6 +294,10 @@
   color: var(--rail-accent);
 }
 
+.agent-rail[data-look="enterprise"] .agent-rail-generalist[aria-current="page"] {
+  box-shadow: none;
+}
+
 .agent-rail-brand {
   display: flex;
   flex: none;
@@ -355,6 +359,12 @@
   letter-spacing: 0.08em;
   line-height: 1.4;
   text-transform: uppercase;
+}
+
+.agent-rail[data-look="enterprise"] .agent-rail-badge {
+  background: transparent;
+  color: var(--rail-text-3);
+  box-shadow: inset 0 0 0 1px var(--rail-line);
 }
 
 .agent-rail-brand .agent-rail-toggle {
@@ -442,6 +452,11 @@
 
 .agent-rail-ws-chip[data-tone="5"] {
   background: var(--ws-chip-5);
+}
+
+.agent-rail[data-look="enterprise"] .agent-rail-ws-chip {
+  background: var(--rail-hover);
+  color: var(--rail-text-2);
 }
 
 .agent-rail-ws-count {
