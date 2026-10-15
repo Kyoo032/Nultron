@@ -139,11 +139,10 @@ describe("revise_document: restyle and format", () => {
     if (!result.ok) {
       return;
     }
-    expect(result.format).toBe("pdf");
+    expect(result).toMatchObject({ format: "pdf", filename: "quarterly-review-revised.pdf" });
     const revised = store.get(tenant, result.artifactId);
     expect(revised?.mime).toBe(PDF_MIME);
     expect(isPdf(bodyBytes(revised?.body ?? ""))).toBe(true);
-    expect(result.filename).toBe("quarterly-review-revised.pdf");
   });
 
   it("refuses to change nothing", async () => {

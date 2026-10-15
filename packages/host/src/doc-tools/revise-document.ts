@@ -10,8 +10,15 @@
  * Refusals are values, the same as the other document tools. The internal `ReviseRefusal` only carries a
  * refusal up to the one place that turns it into the model-facing answer.
  */
-import { DOCX_MIME, PDF_MIME, XLSX_MIME, artifactFilename, type ArtifactMime } from "@agentforge/core/artifacts";
-import type { TenantContext } from "@agentforge/core";
+import {
+  DOCX_MIME,
+  PDF_MIME,
+  XLSX_MIME,
+  artifactFilename,
+  type ArtifactMime,
+  type ArtifactRecord,
+} from "@agentforge/core/artifacts";
+import { isServerMode, virtualAgentFor, type TenantContext } from "@agentforge/core";
 import {
   DocModelError,
   parseDocSpec,
@@ -27,9 +34,19 @@ import {
 } from "../doc-model";
 import { DOC_THEME_NAMES, type DocThemeName } from "../doc-model/themes";
 import { artifactStore } from "../artifacts";
+import { docVersionStore, proposalStore } from "../doc-versions";
+import { findMemberProject, findVisibleFile } from "../projects/store";
 import { log } from "../log";
+import { currentToolRun } from "../tool-run-context";
 import { readEditableSpec, specMeta, type EditableSpec } from "./doc-meta";
-import { refuse, saveRenderedArtifact, type DocRefusal, type DocToolResult } from "./doc-save";
+import {
+  QUOTA_MESSAGE,
+  UNAVAILABLE_MESSAGE,
+  refuse,
+  saveRenderedArtifact,
+  type DocRefusal,
+  type DocToolResult,
+} from "./doc-save";
 
 export type ReviseDocumentInput = {
   readonly artifactId: string;
@@ -40,6 +57,18 @@ export type ReviseDocumentInput = {
   readonly theme?: string;
   readonly format?: string;
 };
+
+export type PendingRevision = {
+  readonly ok: true;
+  readonly pending: true;
+  readonly artifactId: string;
+  readonly proposalId: string;
+  readonly title: string;
+  readonly sectionId: string;
+  readonly summary: string;
+};
+
+export type ReviseDocumentResult = DocToolResult | PendingRevision;
 
 class ReviseRefusal extends Error {
   readonly reason: DocRefusal;
@@ -79,19 +108,24 @@ function parsedSheet(book: SheetSpec, id: string, raw: Record<string, unknown>) 
   return parseSheetSpec({ kind: "workbook", title: book.title, theme: book.theme, sheets: [{ ...raw, id }] }).sheets[0];
 }
 
+function sectionPart(input: ReviseDocumentInput): { readonly id: string; readonly raw: Record<string, unknown> } {
+  if (input.sectionId === undefined || input.section === undefined) {
+    throw new ReviseRefusal(
+      "invalid",
+      "sectionId and section go together: give the id of the section and its new content.",
+    );
+  }
+  return { id: input.sectionId, raw: input.section };
+}
+
 function reviseDocument(spec: DocSpec, input: ReviseDocumentInput): DocSpec {
   if (input.sheetId !== undefined || input.sheet !== undefined) {
     throw new ReviseRefusal("invalid", "This file is a document: use sectionId and section, not sheetId and sheet.");
   }
   let next = spec;
   if (input.sectionId !== undefined || input.section !== undefined) {
-    if (input.sectionId === undefined || input.section === undefined) {
-      throw new ReviseRefusal(
-        "invalid",
-        "sectionId and section go together: give the id of the section and its new content.",
-      );
-    }
-    next = replaceSection(next, input.sectionId, parsedSection(next, input.sectionId, input.section));
+    const part = sectionPart(input);
+    next = replaceSection(next, part.id, parsedSection(next, part.id, part.raw));
   }
   return input.theme === undefined ? next : restyle(next, requireTheme(input.theme));
 }
@@ -143,8 +177,99 @@ async function renderFor(format: string, editable: EditableSpec, spec: DocSpec |
   return format === "pdf" ? renderPdf(spec as DocSpec) : renderDocx(spec as DocSpec);
 }
 
+const SECTION_WITH_RESTYLE_MESSAGE =
+  "A section change to a file in a Workspace waits for the person to Keep it, so give sectionId and section alone. Make a theme or format change in a separate call.";
+
+function isWorkspaceSectionChange(input: ReviseDocumentInput, editable: EditableSpec): boolean {
+  return (
+    editable.kind === "document" &&
+    (input.sectionId !== undefined || input.section !== undefined) &&
+    input.sheetId === undefined &&
+    input.sheet === undefined
+  );
+}
+
+function restylesToo(input: ReviseDocumentInput): boolean {
+  return input.theme !== undefined || input.format !== undefined;
+}
+
+function isInLiveWorkspace(tenant: TenantContext, artifactId: string): boolean {
+  if (!isServerMode()) {
+    return false;
+  }
+  const projectId = findVisibleFile(tenant, artifactId)?.project_id ?? null;
+  if (projectId === null) {
+    return false;
+  }
+  const project = findMemberProject(tenant, projectId);
+  return project !== null && project.archived_at === null;
+}
+
+type ProposalRefusal = "not_found" | "not_editable" | "quota" | "bad_base" | "bad_section";
+
+function proposalRefusal(reason: ProposalRefusal): DocToolResult {
+  switch (reason) {
+    case "not_found":
+      return refuse("not_found", NOT_FOUND_MESSAGE);
+    case "not_editable":
+      return refuse("not_editable", NOT_EDITABLE_MESSAGE);
+    case "quota":
+      return refuse("quota", QUOTA_MESSAGE);
+    case "bad_section":
+      return refuse(
+        "invalid",
+        "That section could not be changed. Check its id and its content, then call the tool again.",
+      );
+    case "bad_base":
+      return refuse("unavailable", UNAVAILABLE_MESSAGE);
+  }
+}
+
+function pendingSummary(sectionId: string): string {
+  return `The change to section "${sectionId}" is waiting for the person to Keep it. No new file was saved, and the file is unchanged until they Keep it. Tell the owner the change is ready to keep in the Workspace. Use the same artifactId for any further revision.`;
+}
+
+async function proposeSectionChange(
+  input: ReviseDocumentInput,
+  tenant: TenantContext,
+  record: ArtifactRecord,
+): Promise<ReviseDocumentResult> {
+  const first = docVersionStore().ensureFirstVersion(tenant, record.id);
+  if (!first.ok) {
+    return proposalRefusal(first.reason);
+  }
+  const head = docVersionStore().getVersion(tenant, record.id, first.head.version);
+  if (head === null || head.spec.kind !== "document") {
+    return proposalRefusal("not_editable");
+  }
+  const part = sectionPart(input);
+  const edited = reviseDocument(head.spec.spec, input);
+  const section = edited.sections.find((candidate) => candidate.id === part.id);
+  if (section === undefined) {
+    return proposalRefusal("bad_section");
+  }
+  const created = proposalStore().createProposal(tenant, record.id, {
+    sectionId: part.id,
+    section,
+    baseVersion: first.head.version,
+    agentId: currentToolRun()?.mode ?? virtualAgentFor("chat").id,
+  });
+  if (!created.ok) {
+    return proposalRefusal(created.reason);
+  }
+  return {
+    ok: true,
+    pending: true,
+    artifactId: record.id,
+    proposalId: created.proposal.id,
+    title: record.title,
+    sectionId: part.id,
+    summary: pendingSummary(part.id),
+  };
+}
+
 /** Apply the revision and save the new file. Each refusal is a value; nothing is written before it passes. */
-async function reviseOnce(input: ReviseDocumentInput, tenant: TenantContext): Promise<DocToolResult> {
+async function reviseOnce(input: ReviseDocumentInput, tenant: TenantContext): Promise<ReviseDocumentResult> {
   const record = artifactStore().get(tenant, input.artifactId);
   if (!record) {
     return refuse("not_found", NOT_FOUND_MESSAGE);
@@ -158,6 +283,11 @@ async function reviseOnce(input: ReviseDocumentInput, tenant: TenantContext): Pr
       "nothing_to_change",
       "Nothing to change: give a sectionId and section, a sheetId and sheet, a theme, or a format.",
     );
+  }
+  if (isWorkspaceSectionChange(input, editable) && isInLiveWorkspace(tenant, record.id)) {
+    return restylesToo(input)
+      ? refuse("invalid", SECTION_WITH_RESTYLE_MESSAGE)
+      : proposeSectionChange(input, tenant, record);
   }
   const format = targetFormat(editable, record.mime, input.format);
   const mime = format === "xlsx" ? XLSX_MIME : DOCUMENT_FORMATS[format];
@@ -195,7 +325,7 @@ async function reviseOnce(input: ReviseDocumentInput, tenant: TenantContext): Pr
 export async function reviseDocumentForTenant(
   input: ReviseDocumentInput,
   tenant: TenantContext,
-): Promise<DocToolResult> {
+): Promise<ReviseDocumentResult> {
   try {
     return await reviseOnce(input, tenant);
   } catch (error) {
