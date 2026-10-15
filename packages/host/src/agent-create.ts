@@ -9,6 +9,7 @@ import { defaultSelectableModel, listSelectableModels } from "./selectable-model
 import { ensureToolsRegistered } from "./register-tools";
 import { removeAgentRow } from "./agent-delete";
 import { agentDraftSchema, refusedToolsFor, type AgentDraft } from "./agent-draft";
+import { log } from "./log";
 import { promptMadeConfig } from "./prompt-made-agent";
 import { agentService } from "./tenant";
 
@@ -39,25 +40,36 @@ export type PromptAgentAnswer = {
 };
 
 export async function createPromptAgent(tenant: TenantContext, draft: AgentDraft): Promise<PromptAgentAnswer> {
-  const created = await agentService.createPromptMade(
-    tenant,
-    {
-      name: draft.name,
-      description: draft.description,
-      systemPrompt: draft.instructions,
-      model: defaultSelectableModel(undefined, tenant),
-      inputModalities: [...DEFAULT_CHAT_MODALITIES],
-      productModes: ["chat"],
-      config: promptMadeConfig(draft.baseMode),
-    },
-    draft.tools,
-    listSelectableModels(tenant),
-  );
+  const agentId = crypto.randomUUID();
   try {
+    const created = await agentService.createPromptMade(
+      tenant,
+      {
+        name: draft.name,
+        description: draft.description,
+        systemPrompt: draft.instructions,
+        model: defaultSelectableModel(undefined, tenant),
+        inputModalities: [...DEFAULT_CHAT_MODALITIES],
+        productModes: ["chat"],
+        config: promptMadeConfig(draft.baseMode),
+      },
+      draft.tools,
+      listSelectableModels(tenant),
+      agentId,
+    );
     const published = await agentService.publish(tenant, created.agent.id, created.version.id);
     return { agent: published, version: created.version, tools: [...draft.tools] };
   } catch (error) {
-    await removeAgentRow(tenant, created.agent.id).catch(() => undefined);
+    await rollBackAgent(tenant, agentId);
     throw error;
   }
+}
+
+async function rollBackAgent(tenant: TenantContext, agentId: string): Promise<void> {
+  await removeAgentRow(tenant, agentId).catch((cleanup: unknown) => {
+    log.warn("agent_create_rollback_failed", {
+      agentId,
+      detail: cleanup instanceof Error ? cleanup.message : "unknown",
+    });
+  });
 }

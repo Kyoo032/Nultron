@@ -185,7 +185,7 @@ export class AgentService {
     if (!canBuild(tenant.role)) {
       throw new ApiError("forbidden", "Builder role required", 403);
     }
-    return this.insertNew(tenant, input, knownModels);
+    return this.insertNew(tenant, input, knownModels, this.id());
   }
 
   async createPromptMade(
@@ -193,13 +193,14 @@ export class AgentService {
     input: Omit<CreateAgentInput, "visibility">,
     toolKeys: readonly string[],
     knownModels: ChatModel[] = listChatModels(),
+    agentId: string = this.id(),
   ): Promise<{ agent: AgentRecord; version: AgentVersionRecord }> {
     const baseMode = input.config?.baseMode;
     if (input.config?.[PROMPT_MADE_KEY] !== true || typeof baseMode !== "string") {
       throw new ApiError("invalid_request", "A prompt-made agent needs a base mode", 400);
     }
     assertPromptMadeTools(baseMode, toolKeys);
-    const { agent, version } = await this.insertNew(tenant, { ...input, visibility: "private" }, knownModels);
+    const { agent, version } = await this.insertNew(tenant, { ...input, visibility: "private" }, knownModels, agentId);
     for (const toolKey of toolKeys) {
       await this.repo.insertBinding({
         id: this.id(),
@@ -217,6 +218,7 @@ export class AgentService {
     tenant: TenantContext,
     input: CreateAgentInput,
     knownModels: ChatModel[],
+    agentId: string,
   ): Promise<{ agent: AgentRecord; version: AgentVersionRecord }> {
     if (typeof input.name !== "string" || input.name.trim().length === 0) {
       throw new ApiError("invalid_request", "name is required", 400);
@@ -225,7 +227,6 @@ export class AgentService {
       throw new ApiError("unknown_model", `Model '${input.model}' is not available`, 400);
     }
     const timestamp = this.now();
-    const agentId = this.id();
     const versionId = this.id();
     const agent: AgentRecord = {
       id: agentId,

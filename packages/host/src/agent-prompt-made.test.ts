@@ -1,5 +1,6 @@
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
-import { virtualAgentFor, type PortalRole, type TenantContext } from "@agentforge/core";
+import { virtualAgentFor, type PortalRole, type TenantContext, type ToolBindingRecord } from "@agentforge/core";
+import type { DrizzleAgentRepository } from "@agentforge/db";
 import { ROUTER_IMPORT_BUDGET_MS } from "./__fixtures__/test-budgets";
 import type { HostJsonResult, HostRequest, HostResult } from "./types";
 
@@ -726,6 +727,45 @@ describe("what a member can do to their own prompt-made agent (SR-182)", () => {
       spy.mockRestore();
     }
     expect(count()).toBe(countBefore);
+    expect(await agentIdsFor("alice")).toEqual(listBefore);
+  }, BUDGET);
+
+  it("writes nothing when a tool binding fails part way through: 500, no agent, version or binding row, and no publish", async () => {
+    const { sql, DrizzleAgentRepository: Repository } = await import("@agentforge/db");
+    const { agentService } = await import("./tenant");
+    const rows = () => ({
+      agents: (sql.prepare("SELECT count(*) AS n FROM agents").get() as { n: number }).n,
+      versions: (sql.prepare("SELECT count(*) AS n FROM agent_versions").get() as { n: number }).n,
+      bindings: (sql.prepare("SELECT count(*) AS n FROM agent_tool_bindings").get() as { n: number }).n,
+    });
+    const listBefore = await agentIdsFor("alice");
+    const rowsBefore = rows();
+    const original = Repository.prototype.insertBinding;
+    let writes = 0;
+    const failing = vi
+      .spyOn(Repository.prototype, "insertBinding")
+      .mockImplementation(async function (this: DrizzleAgentRepository, binding: ToolBindingRecord) {
+        writes += 1;
+        if (writes === 2) {
+          throw new Error("binding insert failed");
+        }
+        return original.call(this, binding);
+      });
+    const publish = vi.spyOn(agentService, "publish");
+    let status = 0;
+    let publishCalls = 0;
+    try {
+      const answer = await call("alice", "POST", "/api/v1/agents", draftBody({ name: "Half made", tools: ["calculator", "datetime"] }));
+      status = answer.status;
+      publishCalls = publish.mock.calls.length;
+    } finally {
+      failing.mockRestore();
+      publish.mockRestore();
+    }
+    expect(status).toBe(500);
+    expect(writes).toBe(2);
+    expect(publishCalls).toBe(0);
+    expect(rows()).toEqual(rowsBefore);
     expect(await agentIdsFor("alice")).toEqual(listBefore);
   }, BUDGET);
 });
