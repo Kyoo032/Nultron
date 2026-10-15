@@ -18,7 +18,7 @@ export type RowTool = {
 /** The first line of a row: the label, then whatever else fits. It wraps instead of overflowing. */
 export const ROW_HEAD = "flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1";
 
-export const CHIP =
+const CHIP =
   "inline-flex min-h-[1.5rem] min-w-0 max-w-full items-center rounded-full border border-[var(--line)] bg-[var(--surface-2)] px-2 py-0.5 text-[11px] leading-4 text-[var(--accent)] no-underline hover:border-[var(--accent)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]";
 
 /**

@@ -354,29 +354,5 @@
     "stepLimitAnd": "and",
     "interrupted": "The tool steps above ran, but I could not finish the answer.\n\nReason: {reason}\n\nSend \"continue\" and I will try again.",
     "modelFallback": "{from} is unavailable; used {to} for this answer."
-  },
-  "media": {
-    "askImage": "Generate this image?",
-    "askVideo": "Generate this video?",
-    "estimate": "Estimated cost {usd}",
-    "priceUnknown": "Price not known",
-    "generate": "Generate",
-    "skip": "Skip",
-    "alwaysImage": "Always allow images",
-    "alwaysVideo": "Always allow videos",
-    "working": "Working…",
-    "notYours": "This can no longer be decided here.",
-    "gatewayBlocked": "Models are off until a key is added. Add it in {settings}.",
-    "quota": "There is no storage left for this, so it was not made.",
-    "network": "Could not reach the server. Try again.",
-    "failed": "This did not work. Try again.",
-    "waitingRow": "Waiting for your OK",
-    "autoAllowed": "Generated automatically (always allow is on)",
-    "status": {
-      "generated": "Generated",
-      "skipped": "Skipped",
-      "expired": "Expired",
-      "failed": "Failed"
-    }
   }
 }

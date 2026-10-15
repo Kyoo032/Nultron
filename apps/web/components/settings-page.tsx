@@ -4,9 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { DEFAULT_GATEWAY_IMAGE_MODEL, DEFAULT_GATEWAY_VIDEO_MODEL } from "@agentforge/core/media-kind";
 import { AccountPlanPanel } from "./account-plan-panel";
 import { AccountSessionRow } from "./account-session-row";
-import { SettingsGatewayAdminCard } from "./settings-gateway-admin-card";
 import { SettingsGuideCard } from "./settings-guide-card";
-import { SettingsMediaCard } from "./settings-media-card";
 import { SettingsResetCard } from "./settings-reset-card";
 // Phase 8: renders only where there is a ceiling to show (hosted); null on a desk.
 import { SettingsStorageCard } from "./settings-storage-card";
@@ -595,15 +593,12 @@ export function SettingsPage() {
         </p>
       </form>
 
-      <SettingsGatewayAdminCard />
-
       {/* Phase 9: who is signed in (lane C) and what this account is on (lane G). Both render
           nothing of substance where there is no session and no plan, which is every desk. */}
       <div className="mt-6">
         <AccountSessionRow />
       </div>
       <AccountPlanPanel />
-      <SettingsMediaCard />
       <SettingsStorageCard />
       <SettingsResetCard resetPending={resetPending} />
     </main>

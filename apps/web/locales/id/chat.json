@@ -354,29 +354,5 @@
     "stepLimitAnd": "dan",
     "interrupted": "Langkah alat di atas sudah berjalan, tetapi saya tidak dapat menyelesaikan jawabannya.\n\nAlasan: {reason}\n\nKirim \"lanjutkan\" dan saya akan mencoba lagi.",
     "modelFallback": "{from} tidak tersedia; menggunakan {to} untuk jawaban ini."
-  },
-  "media": {
-    "askImage": "Buat gambar ini?",
-    "askVideo": "Buat video ini?",
-    "estimate": "Perkiraan biaya {usd}",
-    "priceUnknown": "Harga belum diketahui",
-    "generate": "Buat",
-    "skip": "Lewati",
-    "alwaysImage": "Selalu izinkan gambar",
-    "alwaysVideo": "Selalu izinkan video",
-    "working": "Memproses…",
-    "notYours": "Ini tidak bisa diputuskan di sini lagi.",
-    "gatewayBlocked": "Model nonaktif sampai kunci ditambahkan. Tambahkan di {settings}.",
-    "quota": "Tidak ada ruang penyimpanan tersisa, jadi ini belum dibuat.",
-    "network": "Tidak dapat menghubungi server. Coba lagi.",
-    "failed": "Tidak berhasil. Coba lagi.",
-    "waitingRow": "Menunggu persetujuan Anda",
-    "autoAllowed": "Dibuat otomatis (selalu izinkan aktif)",
-    "status": {
-      "generated": "Dibuat",
-      "skipped": "Dilewati",
-      "expired": "Kedaluwarsa",
-      "failed": "Gagal"
-    }
   }
 }

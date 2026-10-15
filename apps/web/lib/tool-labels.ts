@@ -9,7 +9,6 @@ import {
   type ToolStatus,
 } from "@/components/tool-rows/results";
 import { DOSSIER_TOOL_KEY, readDossierResult } from "@/components/tool-rows/dossier-result";
-import { readPendingMedia } from "@/components/tool-rows/media-result";
 import { t } from "@/lib/i18n";
 
 /** Fast tools still show a completed row; they skip the long "Working…" spinner. */
@@ -262,9 +261,6 @@ export function toolCallSummary(toolKey: string, input?: unknown, output?: unkno
   }
   if (isRichTool(toolKey)) {
     return toolRowLabel(toolKey, input, output);
-  }
-  if (readPendingMedia(toolKey, output)) {
-    return `${toolDoneLabel(toolKey)} · ${t("chat.media.waitingRow")}`;
   }
   const label = toolDoneLabel(toolKey);
   if (toolKey === DOSSIER_TOOL_KEY) {
