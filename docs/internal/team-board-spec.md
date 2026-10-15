@@ -278,7 +278,7 @@ His words: "set automatically for them to route text, images and video, because 
   - A turn with an attachment drops both media tools (`packages/core/src/agents/chat-turn.ts:6,11-20`), so "make a video from this picture" does not route yet.
   - Whether HYP AI's chat model exists in its gateway's catalog and supports tool calls has not been checked with a real key.
 
-### Then: moving the old HYP AI to the SME platform (Rizky, 2026-10-15; K-D33, open)
+### Then: moving the old HYP AI to the SME platform (Rizky, 2026-10-15; K-D33)
 
 His words: "this will be a migration from the old opc hyp ai which is looking like nultron to the new hyp ai sme platform … how to migrate the old data? or just remove everything and create a backup of the old ones, especially the 5 testers accounts we alreayd created and the admin".
 
@@ -296,7 +296,7 @@ His words: "this will be a migration from the old opc hyp ai which is looking li
   - Nothing is dropped, and no portal migration changes.
   - The new columns are one-way: a rollback to the old image is untested and could show owner-only rows company-wide.
 
-**Two ways; Rizky picks (K-D33).**
+**Two ways (K-D33; decided below).**
 
 | | A: upgrade in place | B: back up, then start clean |
 |---|---|---|
@@ -315,6 +315,15 @@ His words: "this will be a migration from the old opc hyp ai which is looking li
 - If each tester is their own company now and they should share, the portal org changes. That is a Postgres change or new accounts, because `add-customer.sh` refuses a move.
 - Five testers plus an admin is six people. The install used `--seat-cap 5`, so raise the cap or confirm the admin takes no seat.
 - SR-163 (an erase removes every company of a partner) makes any erase tool unsafe here: B removes volumes by hand, after the backup, never through the app's erase.
+
+**Decided (Rizky, 2026-10-15): A, upgrade in place, as one company of six.**
+1. Back up first: steps 1–3 above.
+2. Read the account list.
+   - If the six are already in one company, only the seat cap changes, from 5 to 6.
+   - If they are spread over several companies, the move into one company is done by a reviewed portal command on `main`. It must not be a hand edit of Postgres. It changes the org of each person, keeps their username and password, and writes an audit row. The app makes their membership in the new company at their next sign-in (`packages/db/src/portal-owner.ts:192-262`).
+   - Their old rows stay under their old company's desk. Moving those rows is not part of this step, and needs Rizky's word if he wants it.
+3. `update.sh` to the new image (it backs up again first), then sign in as each of the six and check their old chats and files.
+4. Gate: the open register item "five testers on one company, driven on a running hosted server" (`security-register.md:1199`) closes on this drive.
 
 ## 3. Words
 
