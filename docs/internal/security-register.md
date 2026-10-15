@@ -213,6 +213,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-176](#sr-176) | High | Hosted: any member of a company can delete any other member's generated media and artifacts | Fixed in the tester (`6374c386`): only the maker or a company owner or admin deletes; not driven hosted; `main` still open | Before a second person of one company uses the hosted app for their own work |
 | [SR-178](#sr-178) | Medium | Hosted (tester): a Workspace switched to "workspace" is readable by the whole company, not only its members (K-D22) | Fixed in the tester at `c062f4b7`, not driven hosted | Before HYP AI imports from the tester, and before promotion to `main` (a hosted drive is still owed) |
 | [SR-179](#sr-179) | Medium | Hosted (tester): a member removed from a Workspace keeps reading, listing and deleting the files and media they put into it | Fixed in the tester (2026-10-14), not driven hosted | Before HYP AI imports from the tester, and before promotion to `main` |
+| [SR-180](#sr-180) | Medium | Hosted (tester): document versions are not counted against a tenant's storage, and the cap keeps every version from the last 30 days with no count limit, so a busy document can fill the one disk | Open, not reachable: no route writes a version yet (D0, 2026-10-15) | Before D1 adds a route that appends a version |
 | [SR-177](#sr-177) | Low | The new deploy preflight, run in a throwaway container when the server has no node, received the real `AGENTFORGE_SECRETS_KEY` | Fixed before merge (branch `chore/agent-guardrails`, 2026-10-14): the container gets the word `set` or nothing | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
@@ -6083,6 +6084,25 @@ Status: **fixed in the tester, not driven hosted.**
 Not covered: `deleteArtifactsByOwner` (`knowledge.ts:895`), run when a person removes a dataset or matter of their own, deletes that person's artifacts with no Workspace check. It predates this fix and only ever touches the caller's own rows; whether it should spare a row a live Workspace holds is left open.
 
 Gate: before HYP AI imports from the tester, and before the tester is promoted to `main`. A hosted drive is still owed.
+
+### SR-180 {#sr-180}
+
+**Hosted: document versions are not counted against a tenant's storage, and the cap has no count limit inside 30 days.**
+Tester only. Raised 2026-10-15 with D0 of documents in a Workspace (team-board-spec.md, K-D30). Medium.
+
+Evidence:
+- Every append writes a full sealed spec into `doc_versions` (`packages/host/src/doc-versions/store.ts:198`).
+- The hosted storage use counts artifact bodies (`tenant-storage-store.ts`), not version rows, so versions never meet the tenant's ceiling.
+- The cap keeps the newest 50 plus every version younger than 30 days (`DOC_VERSION_CAP`, `packages/host/src/doc-versions/types.ts:3`; `planPrune`, `history.ts:42`), so the 30-day term puts no upper bound on the count.
+
+What goes wrong if ignored: once D1 exposes section edits, a member or a script saving in a loop grows one document's history without limit for 30 days. On HYP AI's single CVM with one disk, that fills the disk every tenant shares.
+
+Status: **open, not reachable.** No route calls `appendVersion` today. D1 must do at least one of these before its first write route:
+- count version bytes in the tenant's storage use;
+- add a hard per-document ceiling on versions or bytes that holds within the 30 days;
+- rate-limit section edits.
+
+Gate: before D1 adds a route that appends a version.
 
 ## Must be true before the Tencent Cloud deploy
 
