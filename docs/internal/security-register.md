@@ -212,6 +212,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-175](#sr-175) | Medium | Hosted: a file one person generates on their own (artifacts, media, desk files outside their private folder) is listed and downloadable by every member of the company | Mostly fixed in the tester (2026-10-14: artifacts `bbe9308c`, workspace sharing `62eae740`, Knowledge work cards `a178b9bc`, media file route and chat media reads `fbe5994b`, galleries, storage list, Edit stills and job pictures `6374c386`); Edit projects and desk files still company-visible; not driven hosted; `main` still open | Before a second person of one company uses the hosted app for their own work |
 | [SR-176](#sr-176) | High | Hosted: any member of a company can delete any other member's generated media and artifacts | Fixed in the tester (`6374c386`): only the maker or a company owner or admin deletes; not driven hosted; `main` still open | Before a second person of one company uses the hosted app for their own work |
 | [SR-177](#sr-177) | Low | The new deploy preflight, run in a throwaway container when the server has no node, received the real `AGENTFORGE_SECRETS_KEY` | Fixed before merge (branch `chore/agent-guardrails`, 2026-10-14): the container gets the word `set` or nothing | — |
+| [SR-184](#sr-184) | Low | Edit's output lookup (`loadMediaRow`) read a media row by id with no organization filter | Fixed on branch `fix/media-row-company` (2026-10-15): filtered on the project's organization; unit-tested, not driven | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -6040,6 +6041,24 @@ the key is set (`effectiveValue`, `SHELL_SUPPLIED`); it never needed the value.
 Fix: `deploy.sh` now passes `-e "AGENTFORGE_SECRETS_KEY=$_key_present"`, where `_key_present` is `set` when the
 shell has a non-empty key and empty otherwise. The key never reaches the container or the command line.
 `bash -n` and the 40 preflight tests pass; the no-node path has not run on a server.
+
+Gate: none.
+
+### SR-184 {#sr-184}
+
+**Edit's output lookup read a media row by id alone, with no organization filter.**
+Raised 2026-10-15 while moving the tester's media reads back onto `main`'s. Low: defence in depth. Related: SR-175.
+
+Evidence: `loadMediaRow(mediaId)` in `packages/host/src/edit/wire-generate.ts:84-87` selected `media` on
+`eq(media.id, mediaId)` only, and `resolveGenerateAsset` in `packages/host/src/edit/jobs.ts:290` used the row's
+`storagePath` to add an asset to the job's project. Every other by-id media read on `main` (`statMedia`,
+`readMediaDataUrl`, the file and delete routes) filters on the caller's `organizationId`. The id comes from the
+job's own generate result, not from a request, so no caller is known to reach another company's row today;
+the gap is that nothing would stop one if that changed.
+
+Fix: `loadMediaRow(mediaId, organizationId)` filters on both, and the job runner passes the project's
+organization from `workerProjectScope`. `packages/host/src/edit/load-media-row.test.ts` proves the own
+organization's row loads and another organization's does not.
 
 Gate: none.
 

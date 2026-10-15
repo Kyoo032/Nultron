@@ -512,3 +512,10 @@ Lanes: enterprise, tester.
 Lanes: enterprise, tester.
 
 - [x] **Stale sign-in note for the Enterprise bundle.** `scripts/release-web.mjs:122` sets `PORTAL_SIGNIN_MODE: "password"` in `ENV_DEFAULTS`, and `webapp-deploy/k8s/base/kustomization.yaml:59` sets `- PORTAL_SIGNIN_MODE=password`. AGENTS.md records Rizky's 2026-10-09 change that this is the Enterprise default, and the code matches it. So `lanes.json:319`, which says Nultron Enterprise keeps the e-mailed code, was stale and is rewritten in the same branch. The map line `docs/internal/maps/portal-service.md:478` said the same and is corrected in this change. Read from source; not driven.
+
+## Edit's output lookup is scoped to the project's organization, 2026-10-15 (branch `fix/media-row-company`, SR-184)
+
+Lanes: enterprise, tester.
+
+- **What.** `loadMediaRow` in `packages/host/src/edit/wire-generate.ts` now takes the organization and filters on it, like every other by-id media read. `resolveGenerateAsset` in `packages/host/src/edit/jobs.ts` passes the project's organization from `workerProjectScope`.
+- **Proof.** `packages/host/src/edit/load-media-row.test.ts` and the edit suite (305 tests). Not driven on `:3000` or a hosted build.
