@@ -216,6 +216,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-180](#sr-180) | Medium | Hosted (tester): document versions are not counted against a tenant's storage, and the cap keeps every version from the last 30 days with no count limit, so a busy document can fill the one disk | Open, not reachable: no route writes a version yet (D0, 2026-10-15) | Before D1 adds a route that appends a version |
 | [SR-181](#sr-181) | Low | Hosted (tester): a person with no display name is shown to every colleague by their password-mode username, so a colleague can lock them out with five wrong passwords | Fixed on the tester 2026-10-15, names only (Rizky's decision): the username is never sent as a name, and a person with no name shows as "Colleague <code>". One residual: a name stored by the old username fallback stays until that person's next sign-in | Before HYP AI imports from the tester |
 | [SR-182](#sr-182) | Medium | Hosted (tester): an owner or admin could open and edit a colleague's private agent | Fixed on the tester 2026-10-15: only the maker sees a private agent on a hosted desk; an owner or admin may delete it without opening it, and the maker's chats go with it. Personal unchanged | Before HYP AI imports from the tester |
+| [SR-183](#sr-183) | Medium | Hosted (tester): the company gateway management token is the credential that changes the company's gateway tokens; a leak of it, or of the wrap key that seals it, lets its holder act on any token of that gateway account, and the platform limits only the tokens it created itself | Built on the tester (G1, 2026-10-15), not driven against a live gateway: sealed with the company settings, never returned or logged, owner-only to set or clear, scope guard in the adapter. The credential type and the account header are unverified | Before the first live token-API call (Rizky's go, and Hypernet's word for TokenKu production), and before HYP AI imports from the tester |
 | [SR-177](#sr-177) | Low | The new deploy preflight, run in a throwaway container when the server has no node, received the real `AGENTFORGE_SECRETS_KEY` | Fixed before merge (branch `chore/agent-guardrails`, 2026-10-14): the container gets the word `set` or nothing | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
@@ -6168,6 +6169,50 @@ Residuals left open:
 - The admin `DELETE` answer carries the maker's chat count (`chatsDeleted`), a small activity leak.
 - There is no admin listing to clean up a departed maker's private agents.
 - Media-approval proposals and the private chat uploads of deleted threads are not cleaned (the same gap as `deleteThread`).
+Gate: before HYP AI imports from the tester.
+
+### SR-183 {#sr-183}
+
+**Hosted (tester): the company gateway management token can change the company's gateway tokens, so where it is kept, who may set it and what the platform lets it reach are the controls.**
+Tester only. Raised 2026-10-15 with team board K-D25, step one (the gateway adapter, G1). Medium. Built and unit-tested; not driven against a live gateway, and no live token-API call has been made (K-D25: only on Rizky's go).
+
+What it is. The credential the gateway's token API takes (`/api/token`, documented as `Authorization: Bearer`). Its type is not yet checked, so it may be an account-level access token. Whoever holds it can act on the gateway account's tokens, including ones made by hand.
+
+Where it is kept:
+- `packages/host/src/settings-store.ts:194` and `:205` add `companies[organizationId].gatewayAdmin` to the sealed settings payload. `companiesMap` reads it back at `:276-291`.
+- `persistEncrypted` (`:318-327`) seals the whole payload with `getLocalVaultKey()` (`packages/db/src/vault-key.ts:184`), the wrap key the gateway key uses. Hosted, the sealed bytes sit in `tenant_state`, not in a plain file.
+- `saveCompanyGatewayAdmin` (`:813-823`), `clearCompanyGatewayAdmin` (`:825-841`) and `loadCompanyGatewayAdmin` (`:808-811`) are the only accessors. `settingsPayload` does not read the slot. The test "the settings answers, read and saved, never carry the token" (`packages/host/src/handlers/company-gateway-admin.test.ts`) reads GET and POST `/api/v1/settings` as an owner and as a member and finds no token.
+
+Who may set it:
+- Owner only, for PUT and DELETE: `assertCanWrite` (`packages/host/src/handlers/company-gateway-admin.ts:36-40`). An admin, a member and a builder get 403 `gateway_admin_forbidden` (test: "lets an admin read the status and never change it, and refuses a member and a builder"). K-D25 says "only the owner or super admin may set it"; the code follows that.
+- GET answers an owner or an admin (`assertCanRead`, `:30-34`) with four fields only: `configured`, `accountIdSet`, `checkedAt`, `status` (`packages/host/src/gateway-tokens/admin-record.ts:64-74`). The token is never in the answer.
+- Off server mode every route answers 404 (`serverModeOn`, `company-gateway-admin.ts:22-24`); the Personal app never writes the slot.
+
+How it is used:
+- One check on save: `checkGatewayManagementToken` makes a single GET to `/api/token/?p=1&page_size=1` on the pinned origin, with `redirect: "manual"` and a 5 s timeout (`packages/host/src/gateway-tokens/check.ts:16-21`, `:48-82`). It logs the status and the HTTP status only (`check.ts:60-80`).
+- The adapter (`packages/host/src/gateway-tokens/adapter.ts`) is the only code that writes tokens to the gateway. The origin is `pinnedGatewayOrigin()` and nothing else (`callGateway`, `:140-173`, `redirect: "manual"` at `:157`). No route calls the adapter in this change.
+- Scope guard: `assertManaged` (`adapter.ts:123-138`) refuses an id that is not in `gateway_managed_tokens` for the caller's company, with 404 `gateway_token_not_managed`, before any call. Update, delete and usage all pass through it (`:206`, `:217`, `:233`). A batch is all or nothing.
+- Ids are numeric strings (`normalizeGatewayId`, `:40-48`), so the usage query carries nothing but a checked number.
+- Create records only the id (`:196`). The gateway's `key` in the create answer is never read (`:183-186`); `adapter.test.ts` checks that a key from the answer appears in neither the result nor the table.
+- Erasing the organization removes its rows: the table is in `CASCADED_TABLES` (`packages/db/src/tenant-purge.ts:97`) and its foreign key cascades (`packages/db/src/gateway-tokens-schema.ts:8`).
+
+Leak checks, all in the tester:
+- `packages/host/src/gateway-tokens/check.test.ts` ("the token is a value redaction leaves alone"): `redactSecrets` does not hide this token, so a log that carried it would not be cleaned up. The rule is that no log line carries a request body. `redactSecrets` (`packages/core/src/security/redact.ts:63-67`) matches credentials and base64-like text only.
+- The HTTP adapter logs the path length, method, IP and the error object on a 500 (`packages/host/src/http-adapter.ts:745-751`). It never logs a request body (`respondRejection`, `:443-455`).
+- `company-gateway-admin.test.ts`, "nothing a caller sees carries the token": every answer and every console line across a full save, read and clear.
+- `adapter.test.ts`, "never puts the management token or a gateway key into an error".
+
+Rotation: `rotateWrapKey` opens each sealed payload and re-seals the whole thing (`packages/host/src/wrap-key-rotation.ts:186-221`), so the token travels with the rest. `packages/host/src/wrap-key-rotation.test.ts`, "re-seals the settings row that holds it, and the token reads back under the new key", proves it on the hosted row through the real writer.
+
+Residual:
+1. The gateway decides what the credential can do, and the scope guard is host-side only. If the credential is account-wide, a holder of it (or of the wrap key that opens the row) can change tokens the platform did not create. The guard limits the platform's own calls, not the gateway account.
+2. One machine-wide wrap key seals every company's token. Its TKE path is SR-170.
+3. Create calls the gateway before the row is written (`adapter.ts:183`, then `:196`). If that insert fails, the gateway keeps a token the platform cannot delete, because the scope guard refuses an id it did not record. Not handled. Fix: write a pending row before the call, once a route calls create.
+4. Unverified against a live gateway: the credential type, whether `New-Api-User` is needed, and what the quota unit is (K-D29 says USD). The adapter's wire fields come from the public docs only.
+5. An admin can reach the adapter (`manageable`, `adapter.ts:104-121`, `canAdminister`), while only the owner can set the token. Nothing reaches it yet, so this is a rule for the route that comes next.
+6. Clearing the token (DELETE) removes only the sealed slot. The platform's rows in `gateway_managed_tokens` and the gateway tokens they name stay where they are, and a new token that passes the check manages them again (`clearCompanyGatewayAdmin`, `packages/host/src/settings-store.ts:825-841`). Nothing deletes them on the gateway.
+
+Gate: before the first live token-API call (Rizky's go, and Hypernet's word for TokenKu production), and before HYP AI imports from the tester.
 - Whether the edit tool backend scopes `projectId` per person is unchecked; it is moot while members cannot bind edit tools.
 
 

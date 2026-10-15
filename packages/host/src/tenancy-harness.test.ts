@@ -44,7 +44,7 @@ import type { DeskPath } from "@agentforge/core/tools/files";
 import { dispatch, isByIdRoute, routeRegistrations } from "./router";
 import { DESK_FILE_ROUTES } from "./desk-files/routes";
 import { createDeskRoot } from "./desk-files/store";
-import { createSession } from "./auth/session";
+import { createSession, SESSION_COOKIE_SECURE } from "./auth/session";
 import { createMemorySessionStore } from "./auth/session-store";
 import type { HostBytesResult, HostFile, HostJsonResult, HostRequest, HostResult, HostStreamResult } from "./types";
 
@@ -1436,6 +1436,92 @@ describe("every by-id route refuses another tenant's id", () => {
   it("covers every by-id route the router registers", () => {
     const registered = routeRegistrations()
       .filter(isByIdRoute)
+  describe("the company gateway management token, which takes no id", () => {
+    const TOKEN_MARKER = "TENANT-A-GATEWAY-TOKEN-MARKER-41c7";
+    const ROUTE = "/api/v1/company/gateway-admin";
+    let previousServer: string | undefined;
+    let previousFetch: typeof fetch;
+
+    const asTenant = (session: { id: string }, method: string, body?: unknown) =>
+      dispatch(
+        {
+          method,
+          path: ROUTE,
+          query: {},
+          params: {},
+          headers: { cookie: `${SESSION_COOKIE_SECURE}=${session.id}` },
+          body,
+        },
+        { serverMode: true, sessionStore: store, now: () => T0 },
+      );
+
+    beforeAll(() => {
+      previousServer = process.env.AGENTFORGE_SERVER;
+      previousFetch = globalThis.fetch;
+      process.env.AGENTFORGE_SERVER = "1";
+      globalThis.fetch = (async () =>
+        new Response(JSON.stringify({ success: true, data: [] }), { status: 200 })) as unknown as typeof fetch;
+    });
+
+    afterAll(() => {
+      globalThis.fetch = previousFetch;
+      if (previousServer === undefined) {
+        delete process.env.AGENTFORGE_SERVER;
+      } else {
+        process.env.AGENTFORGE_SERVER = previousServer;
+      }
+    });
+
+    it("is registered in the router for read, write and clear", () => {
+      const registered = new Set(routeRegistrations().map((route) => `${route.method} ${route.path}`));
+      for (const method of ["GET", "PUT", "DELETE"]) {
+        expect(registered.has(`${method} ${ROUTE}`), `${method} ${ROUTE} is not registered`).toBe(true);
+      }
+    });
+
+    it("lets tenant A save its token and read it back as configured, which is what makes B's refusal mean something", async () => {
+      const saved = await asTenant(sessionA, "PUT", { token: TOKEN_MARKER, accountId: 3 });
+      expect(saved).toMatchObject({ status: 200 });
+      expect((saved as HostJsonResult).body).toMatchObject({ configured: true, accountIdSet: true, status: "ok" });
+
+      const own = await asTenant(sessionA, "GET");
+      expect(own.status).toBe(200);
+      expect((own as HostJsonResult).body).toMatchObject({ configured: true, accountIdSet: true });
+    });
+
+    it("shows tenant B none of A's token, lets it see only its own status, and leaves A's token as it was", async () => {
+      const seen = await asTenant(sessionB, "GET");
+      expect(seen.status).toBe(200);
+      expect((seen as HostJsonResult).body).toEqual({
+        configured: false,
+        accountIdSet: false,
+        checkedAt: null,
+        status: "unchecked",
+      });
+      expect(await serialise(seen), "GET returned tenant A's token").not.toContain(TOKEN_MARKER);
+
+      const cleared = await asTenant(sessionB, "DELETE");
+      expect(cleared.status).toBe(200);
+      expect(await serialise(cleared), "DELETE returned tenant A's token").not.toContain(TOKEN_MARKER);
+
+      const stillA = await asTenant(sessionA, "GET");
+      expect((stillA as HostJsonResult).body).toMatchObject({ configured: true, accountIdSet: true });
+    });
+
+    it("never returns the token in any answer, to either tenant", async () => {
+      for (const [session, method] of [
+        [sessionA, "GET"],
+        [sessionB, "GET"],
+        [sessionB, "PUT"],
+      ] as const) {
+        const result = await asTenant(session, method, method === "PUT" ? { token: "tenant-b-token-0a1b2c3d" } : undefined);
+        expect(await serialise(result), `${method} returned a token`).not.toContain(TOKEN_MARKER);
+      }
+      await asTenant(sessionB, "DELETE");
+      await asTenant(sessionA, "DELETE");
+    });
+  });
+
       .map((route) => `${route.method} ${route.path}`);
     const covered = new Set(BY_ID_ROUTES.map((route) => `${route.method} ${route.path}`));
 

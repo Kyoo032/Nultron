@@ -54,6 +54,32 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Company gateway management token, host side (team board K-D25 step one, G1), 2026-10-15 (tester, uncommitted on `tester/chat-first` at `77638399`; SR-183; hosted only; not driven against a live gateway)
+
+Lanes: enterprise, hyp-ai, tester. Shared code (`settings-store.ts`, the router) is touched; Personal answers 404 on every route and never writes the slot. Proven by unit and router tests on throwaway data dirs (`gateway-tokens/adapter.test.ts` 15 of 15, `gateway-tokens/check.test.ts` 14 of 14, `handlers/company-gateway-admin.test.ts` 15 of 15, `settings-store.test.ts` 8 of 8, `wrap-key-rotation.test.ts` 20 of 20, `tenancy-harness.test.ts` 143 of 143); not driven on `:3200` or a hosted build.
+
+- **Where the token is kept.** A company's token sits in the sealed settings payload under `companies[organizationId].gatewayAdmin` (`packages/host/src/settings-store.ts`). The wrap key seals it, the same as the gateway key. Hosted, that is the `tenant_state` row. A rotation re-seals it with the rest, and the new test proves it on the row.
+- **Who may set it.** Only the owner. The brief for this change said "owners and admins"; K-D25 says "only the owner or super admin may set it", so the code follows the spec (`handlers/company-gateway-admin.ts`, `assertCanWrite`). An admin reads the status and gets 403 on a write. Rizky to confirm.
+- **Never returned.** GET and PUT answer four fields (`configured`, `accountIdSet`, `checkedAt`, `status`). Tests check every answer, including the settings GET and POST, and every log line.
+- **The one check on save.** A single read-only `GET /api/token/?p=1&page_size=1` on the pinned origin, `redirect: "manual"`, five seconds (`gateway-tokens/check.ts`). An unreachable or refused gateway saves the token and reports the status; it does not reject the save.
+- **The adapter, not routed yet.** `gateway-tokens/adapter.ts` creates, renames and batch-deletes gateway tokens and reads usage, all on the pinned origin. It touches only ids the platform recorded in `gateway_managed_tokens` for that company (404 otherwise, all or nothing for a batch). No route calls it in this change.
+- **Does not match the brief.** The brief's "another company gets 404" cannot happen on the GET, because that route takes no id: company B reads its own unconfigured status (200), which the tenancy harness asserts. The by-id 404 is the adapter's scope guard.
+- **Fixed in this pass.** The four test fakes typed `RequestInfo`, which is a DOM type this package does not load; they now take `string | URL | Request`. The four errors are gone. `npx tsc --noEmit -p packages/host` on the last run had one error, in another lane (`packages/host/src/studio-stored-media.test.ts:86`, a `ModelCache` provider type), and none in this change.
+- **Clearing the token keeps the platform's own rows.** DELETE removes only the sealed slot. The `gateway_managed_tokens` rows and the gateway tokens they name stay, and a new token that passes the check manages them again (SR-183, residual 6). Nothing is deleted on the gateway.
+- **Open before the first live call.** The credential type and whether the account header is needed are unverified; create writes the gateway before its local row, so a failed insert leaves a gateway token the platform cannot delete (SR-183, residuals 3 and 4). Blocked until Rizky's go and Hypernet's word for TokenKu production.
+
+## Prompt-made agents: the renderer (rail, New agent page, delete), 2026-10-15 (tester K34-c, on top of the host half `3b58cd6d`; not driven in a browser)
+
+Lanes: hyp-ai, tester
+
+- **What changed.** The rail lists the person's prompt-made agents under the default agent. Each has a ⋯ menu with Delete when the host says `deletable`; a confirm says the agent's chats, messages and the cards they left in the Knowledge Base go before `DELETE /api/v1/agents/:id`. `+ New agent` opens `/agents/new`: one prompt box, the draft, the editable fields, then Create, which opens the agent's chat at `/chat?made=<id>`. The Virtual agents page gets a "Made from a prompt" section with Remove on deletable agents.
+- **Where.** Tester shell code: `apps/web/components/agent-*` (rail rows, delete dialog, New agent page, made chat pane, `agent-made.css`), `apps/web/lib/virtual-agents-made.ts`, `apps/web/components/virtual-agents-page.tsx`, `apps/web/components/agent-rail.tsx`, `apps/web/lib/virtual-agents.ts`. One route in `apps/web/src/App.tsx` (`/agents/new`), one branch in `apps/web/src/pages/chat-page.tsx` (`?made=`). Shared file touched: `apps/web/components/chat-session.tsx` (protected), which gains two optional shell fields, `threadHref` and `emptyState`; with neither set, its behaviour is as before.
+- **Contract.** The made chat sends only the made agent's row id: the thread is created with `{ agentId }` (`chat-session.tsx`), and the run posts `{ content, tier }` to that thread. The host reads the agent from the thread's row, so no mode id is sent.
+- **Copy.** `apps/web/locales/{en,id}/agents.json`: `rail.newAgent`, `made.*`, `new.*`. No brand name in code or copy. Parity test `apps/web/lib/agents-locale.test.ts` passes.
+- **Tests.** `virtual-agents-made.test.ts`, `agent-rail-made.test.tsx`, `agent-new-page.test.tsx`, and the made section in `virtual-agents-page.test.tsx`. With the existing rail and page tests, 114 tests in eight files pass, and `tsc --noEmit -p apps/web` is clean.
+- **Not proven.** No browser drive. The ⋯ menu, the confirm, the draft and create against a live model, and the redirect are covered by unit tests only. The host's `madeFromPrompt` and `deletable` flags were not seen on a running server. The ⋯ menu closes on Escape or on its own button, not on a click outside.
+- **Lanes owed.** Tester: a drive on the staging instance, then a promotion pull request that Rizky approves. HYP AI: imports from `main`, so it gets this only after that promotion.
+
 ## Prompt-made agents: security review fixes (SR-182), 2026-10-15 (tester K34-b follow-up; not driven against a live model)
 
 Lanes: enterprise, hyp-ai, tester

@@ -26,6 +26,7 @@ const { rotateWrapKey, sqlSessionTokens, WrapKeyRotationError } = await import("
 const { openRefresh, sealRefresh } = await import("./auth/session-secrets");
 const stateStore = await import("./tenant-state-store");
 const { TENANTS_DIR } = await import("./tenant-paths");
+const settingsStore = await import("./settings-store");
 
 const OLD_KEY = "11aa22bb33cc44dd55ee66ff7788990011aa22bb33cc44dd55ee66ff77889900";
 const NEW_KEY = "f0e1d2c3b4a5968778695a4b3c2d1e0ff0e1d2c3b4a5968778695a4b3c2d1e0f";
@@ -433,6 +434,69 @@ describe("rotating the session refresh tokens sealed on auth_sessions", () => {
       expect(openRefresh(S1, storedFor(S1) as string, wrap(NEW_KEY))).not.toBeNull();
     } finally {
       delete process.env.AGENTFORGE_SERVER;
+    }
+  });
+});
+
+describe("rotating the company gateway management token, which lives in the hosted settings row", () => {
+  const COMPANY = "org-rotation-company";
+  const MANAGEMENT_TOKEN = "mgmt-tok-rotation-7Kq2Xa9L";
+  let sqlite: Database.Database;
+
+  function settingsRow(tenantId: string): string {
+    return (
+      sqlite.prepare("SELECT value FROM tenant_state WHERE tenant_id = ? AND key = 'settings'").get(tenantId) as {
+        value: string;
+      }
+    ).value;
+  }
+
+  beforeEach(() => {
+    sqlite = new Database(":memory:");
+    ensureSchema(sqlite);
+    stateStore.registerTenantStateSql(sqlite as unknown as Parameters<typeof stateStore.registerTenantStateSql>[0]);
+    sqlite
+      .prepare("INSERT OR IGNORE INTO tenants (id, slug, name, status, created_at) VALUES (?, ?, ?, ?, ?)")
+      .run(A, A, A, "active", Date.now());
+  });
+
+  it("re-seals the settings row that holds it, and the token reads back under the new key", () => {
+    const previousServer = process.env.AGENTFORGE_SERVER;
+    const previousKey = process.env.AGENTFORGE_SECRETS_KEY;
+    process.env.AGENTFORGE_SERVER = "1";
+    process.env.AGENTFORGE_SECRETS_KEY = OLD_KEY;
+    try {
+      settingsStore.saveCompanyGatewayAdmin(
+        { tenantId: A, organizationId: COMPANY },
+        { token: MANAGEMENT_TOKEN, accountId: 9, checkedAt: 1, status: "ok" },
+      );
+      const before = settingsRow(A);
+
+      const result = rotateWrapKey({ from: OLD_KEY, to: NEW_KEY, backend: stateStore.dbTenantStateBackend });
+
+      expect(result).toMatchObject({ backend: "db", rotated: [A] });
+      expect(settingsRow(A)).not.toBe(before);
+      const opened = openWith(settingsRow(A), NEW_KEY) as {
+        companies: Record<string, { gatewayAdmin: unknown }>;
+      };
+      expect(opened.companies[COMPANY].gatewayAdmin).toEqual({
+        token: MANAGEMENT_TOKEN,
+        accountId: 9,
+        checkedAt: 1,
+        status: "ok",
+      });
+      expect(() => openWith(settingsRow(A), OLD_KEY)).toThrow();
+    } finally {
+      if (previousServer === undefined) {
+        delete process.env.AGENTFORGE_SERVER;
+      } else {
+        process.env.AGENTFORGE_SERVER = previousServer;
+      }
+      if (previousKey === undefined) {
+        delete process.env.AGENTFORGE_SECRETS_KEY;
+      } else {
+        process.env.AGENTFORGE_SECRETS_KEY = previousKey;
+      }
     }
   });
 });

@@ -230,6 +230,11 @@ import { handleRun } from "./handlers/runs";
 import { handlePostGuide } from "./handlers/guide";
 import { handlePostKeyLater } from "./handlers/key-later";
 import {
+  handleDeleteCompanyGatewayAdmin,
+  handleGetCompanyGatewayAdmin,
+  handlePutCompanyGatewayAdmin,
+} from "./handlers/company-gateway-admin";
+import {
   handleApplyLocale,
   handleCancelReset,
   handleGatewayCheck,
@@ -333,6 +338,9 @@ const routes: Route[] = [
   compile("POST", "/api/v1/settings/key-later", handlePostKeyLater),
   compile("POST", "/api/v1/settings/reset", handleResetApp),
   compile("DELETE", "/api/v1/settings/reset", handleCancelReset),
+  compile("GET", "/api/v1/company/gateway-admin", handleGetCompanyGatewayAdmin),
+  compile("PUT", "/api/v1/company/gateway-admin", handlePutCompanyGatewayAdmin),
+  compile("DELETE", "/api/v1/company/gateway-admin", handleDeleteCompanyGatewayAdmin),
   compile("GET", "/api/v1/usage", handleGetUsage),
   // Phase 6: what this tenant is holding and what it is allowed to hold.
   compile("GET", "/api/v1/storage/usage", handleGetStorageUsage),
