@@ -10,7 +10,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { db, ensurePortalOwner, ensureSchema, sql } from "@agentforge/db";
 import "./tenant-storage-db";
 import { getTenant } from "./tenant";
-import { readTenantArtifactUse, TENANT_ARTIFACT_USE_SQL } from "./tenant-storage-store";
+import { readTenantArtifactUse, TENANT_ARTIFACT_USE_SQL, TENANT_VERSION_USE_SQL } from "./tenant-storage-store";
 
 process.env.AGENTFORGE_SECRETS_KEY = "3f8a1c05d97e26b4084fa3c1e5d7290b6c48af13e02d95b7ca6318fd4e7092a5";
 
@@ -27,6 +27,16 @@ function addArtifact(workspaceId: string, id: string, sizeBytes: number): void {
        VALUES (?, ?, 'presentations', 'draft', 't', 'x', 'b', '{}', ?, 1, 1)`,
     )
     .run(id, workspaceId, sizeBytes);
+}
+
+function addVersion(id: string, workspaceId: string, artifactId: string, version: number, spec: string): void {
+  sql
+    .prepare(
+      `INSERT INTO doc_versions (id, workspace_id, artifact_id, version, spec, kind, changed_section_ids, base_version, note,
+         author_kind, author_user_id, agent_id, asked_by_user_id, folded_authors, created_at)
+       VALUES (?, ?, ?, ?, ?, 'document', '[]', NULL, NULL, 'person', 'use-user-a', NULL, 'use-user-a', NULL, 1)`,
+    )
+    .run(id, workspaceId, artifactId, version, spec);
 }
 
 beforeAll(async () => {
@@ -51,6 +61,7 @@ beforeAll(async () => {
 });
 
 afterEach(() => {
+  sql.prepare("DELETE FROM doc_versions").run();
   sql.prepare("DELETE FROM artifacts").run();
   sql.prepare("DELETE FROM workspaces WHERE id = 'use-second-desk'").run();
 });
@@ -93,5 +104,35 @@ describe("readTenantArtifactUse", () => {
     // A bare `SCAN artifacts` (or a search by the mode index) would read the row, and with it the body.
     expect(plan).not.toMatch(/SCAN artifacts(?! USING COVERING)/);
     expect(plan).not.toContain("artifacts_ws_mode_idx");
+  });
+
+  it("adds the bytes of every version spec to the tenant's use, and counts a version as no artifact row", () => {
+    const first = JSON.stringify({ text: "é漢😀 rapat" });
+    const second = JSON.stringify({ text: "revisi" });
+    expect(Buffer.byteLength(first, "utf8")).toBeGreaterThan(first.length);
+    addArtifact(alphaDesk, "v-art", 300);
+    addVersion("v-1", alphaDesk, "v-art", 1, first);
+    addVersion("v-2", alphaDesk, "v-art", 2, second);
+    expect(readTenantArtifactUse(ALPHA.tenantId)).toEqual({
+      bytes: 300 + Buffer.byteLength(first, "utf8") + Buffer.byteLength(second, "utf8"),
+      count: 1,
+    });
+  });
+
+  it("keeps another tenant's version specs out of this tenant's use", () => {
+    addArtifact(betaDesk, "v-beta", 40);
+    addVersion("v-b1", betaDesk, "v-beta", 1, "x".repeat(1000));
+    addArtifact(alphaDesk, "v-alpha", 5);
+    addVersion("v-a1", alphaDesk, "v-alpha", 1, "y".repeat(7));
+    expect(readTenantArtifactUse(ALPHA.tenantId)).toEqual({ bytes: 12, count: 1 });
+    expect(readTenantArtifactUse(BETA.tenantId)).toEqual({ bytes: 1040, count: 1 });
+  });
+
+  it("reads the version specs through the document index, never a full scan of the table", () => {
+    const plan = (sql.prepare(`EXPLAIN QUERY PLAN ${TENANT_VERSION_USE_SQL}`).all("t") as Array<{ detail: string }>)
+      .map((row) => row.detail)
+      .join(" | ");
+    expect(plan).toContain("doc_versions_ws_artifact_idx");
+    expect(plan).not.toMatch(/SCAN doc_versions(?! USING)/);
   });
 });

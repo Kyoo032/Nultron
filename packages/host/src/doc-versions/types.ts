@@ -24,7 +24,9 @@ export type SectionAuthor = { readonly version: number; readonly author: DocVers
 
 export type SectionAuthors = Readonly<Record<string, SectionAuthor>>;
 
-export type AppendAuthor = { readonly kind: "person" } | { readonly kind: "agent"; readonly agentId: string };
+export type AppendAuthor =
+  | { readonly kind: "person" }
+  | { readonly kind: "agent"; readonly agentId: string; readonly askedByUserId?: string };
 
 export type AppendVersionInput = {
   readonly baseVersion: number;
@@ -33,10 +35,16 @@ export type AppendVersionInput = {
   readonly note?: string;
 };
 
-export type AppendRefusal = "not_found" | "not_editable" | "bad_base" | "kind_changed" | "section_changed";
+export type AppendRefusal = "not_found" | "not_editable" | "bad_base" | "kind_changed" | "section_changed" | "quota";
 
 export type AppendResult =
   | { readonly ok: true; readonly head: DocVersionInfo; readonly created: boolean }
   | { readonly ok: false; readonly reason: AppendRefusal; readonly sectionIds?: readonly string[] };
+
+export type EnsureFirstRefusal = "not_found" | "not_editable" | "quota";
+
+export type EnsureFirstResult =
+  | { readonly ok: true; readonly head: DocVersionInfo }
+  | { readonly ok: false; readonly reason: EnsureFirstRefusal };
 
 export type ProtectedVersions = (artifactId: string) => ReadonlySet<number>;

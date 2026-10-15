@@ -79,6 +79,7 @@ import {
   reserveTenantStorageBytes,
   setTenantStorageCounter,
   type TenantStorageCounter,
+  type TenantStorageSql,
 } from "./tenant-storage-store";
 
 function isMissing(error: unknown): boolean {
@@ -407,6 +408,10 @@ export function forgetTenantJobBytes(tenantId?: string): void {
   jobBytesCache.delete(tenantId);
 }
 
+export function peekTenantJobBytes(tenantId: string): number {
+  return jobBytesCache.get(tenantId)?.use.usedBytes ?? 0;
+}
+
 /* ------------------------------------------------------------------- the counter and the quota */
 
 /**
@@ -536,6 +541,20 @@ export async function assertStorageAdmits(tenantId: string, incomingBytes: numbe
     log.warn("tenant_storage_quota_refused", { tenantId, usedBytes, limitBytes, incomingBytes });
     throw new StorageQuotaError(usedBytes, limitBytes);
   }
+}
+
+export function admitsArtifactRowWrite(tenantId: string, incomingBytes: number, conn: TenantStorageSql): boolean {
+  const limitBytes = tenantStorageLimitBytes();
+  if (limitBytes === null) {
+    return true;
+  }
+  const objectBytes = readTenantStorageCounter(tenantId)?.bytesUsed ?? 0;
+  const usedBytes = objectBytes + peekTenantJobBytes(tenantId) + readTenantArtifactUse(tenantId, conn).bytes;
+  const verdict = storageAdmission({ usedBytes, incomingBytes, limitBytes });
+  if (!verdict.ok) {
+    log.warn("tenant_storage_quota_refused", { tenantId, usedBytes, limitBytes, incomingBytes });
+  }
+  return verdict.ok;
 }
 
 /**

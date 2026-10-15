@@ -29,8 +29,8 @@ describe("Personal: one person, no server mode", () => {
     }
     const store = docVersionStore();
     expect(store.ensureFirstVersion(owner, made.artifactId)).toMatchObject({
-      version: 1,
-      author: { kind: "person", userId: owner.userId },
+      ok: true,
+      head: { version: 1, author: { kind: "person", userId: owner.userId } },
     });
     const appended = store.appendVersion(owner, made.artifactId, {
       baseVersion: 1,

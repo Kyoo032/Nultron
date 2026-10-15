@@ -46,6 +46,7 @@ async function savedDocument(): Promise<string> {
 describe("a new section id comes from the host", () => {
   it("is unique within the document, and a section with it parses", () => {
     const spec = sample();
+    if (spec.kind !== "document") throw new Error("sample is a document");
     const ids = new Set(Array.from({ length: 300 }, () => newSectionId(spec)));
     expect(ids.size).toBe(300);
     const id = newSectionId(spec);

@@ -10,7 +10,9 @@ import { readEditableSpec, type EditableSpec } from "../doc-tools/doc-meta";
 import { sampleDocInput } from "../doc-tools/doc-tools-fixtures";
 import { addProjectMember, createProject, removeProjectMember } from "../projects/service";
 import { setFileProject } from "../projects/store";
+import { tenantStorageReport } from "../tenant-storage";
 import "../tenant-storage-db";
+import { readTenantArtifactUse } from "../tenant-storage-store";
 import { getTenant } from "../tenant";
 import { newSectionId } from "./section-ids";
 import { createDocVersionStore, docVersionStore } from "./store";
@@ -91,18 +93,21 @@ describe("version 1 is made from the saved spec", () => {
     const { artifactId } = await workspaceDocument();
     const store = docVersionStore();
     expect(store.ensureFirstVersion(ben, artifactId)).toMatchObject({
-      version: 1,
-      kind: "document",
-      changedSectionIds: ["intro", "numbers", "close"],
-      baseVersion: null,
-      note: null,
-      author: { kind: "person", userId: "alice" },
+      ok: true,
+      head: {
+        version: 1,
+        kind: "document",
+        changedSectionIds: ["intro", "numbers", "close"],
+        baseVersion: null,
+        note: null,
+        author: { kind: "person", userId: "alice" },
+      },
     });
     const saved = readEditableSpec(
       artifactStore().get(alice, artifactId) as NonNullable<ReturnType<ReturnType<typeof artifactStore>["get"]>>,
     );
     expect(store.getVersion(alice, artifactId, 1)?.spec).toEqual(saved);
-    expect(store.ensureFirstVersion(alice, artifactId)?.version).toBe(1);
+    expect(store.ensureFirstVersion(alice, artifactId)).toMatchObject({ ok: true, head: { version: 1 } });
     expect(versionCount(artifactId)).toBe(1);
   });
 
@@ -118,8 +123,8 @@ describe("version 1 is made from the saved spec", () => {
         Promise.resolve().then(() => one.ensureFirstVersion(alice, artifactId)),
         Promise.resolve().then(() => two.ensureFirstVersion(ben, artifactId)),
       ]);
-      expect(results.map((result) => result?.version)).toEqual([1, 1]);
-      expect(results.map((result) => result?.author)).toEqual([
+      expect(results.map((result) => (result.ok ? result.head.version : null))).toEqual([1, 1]);
+      expect(results.map((result) => (result.ok ? result.head.author : null))).toEqual([
         { kind: "person", userId: "alice" },
         { kind: "person", userId: "alice" },
       ]);
@@ -144,7 +149,7 @@ describe("version 1 is made from the saved spec", () => {
       mime: "text/markdown",
       body: "# Notes",
     });
-    expect(docVersionStore().ensureFirstVersion(alice, plain.id)).toBeNull();
+    expect(docVersionStore().ensureFirstVersion(alice, plain.id)).toEqual({ ok: false, reason: "not_editable" });
     expect(docVersionStore().appendVersion(alice, plain.id, rewrite("intro", "x", 1))).toEqual({
       ok: false,
       reason: "not_editable",
@@ -303,14 +308,17 @@ describe("who may read the versions: the Workspace member rule", () => {
     const { projectId, artifactId } = await workspaceDocument();
     addProjectMember(alice, projectId, "dina");
     const store = docVersionStore();
-    expect(store.ensureFirstVersion(dina, artifactId)?.version).toBe(1);
+    expect(store.ensureFirstVersion(dina, artifactId)).toMatchObject({ ok: true, head: { version: 1 } });
     expect(store.appendVersion(ben, artifactId, rewrite("intro", "Ben", 1))).toMatchObject({ ok: true });
     removeProjectMember(alice, projectId, "dina");
 
     expect(store.listVersions(ben, artifactId)?.map((version) => version.version)).toEqual([2, 1]);
     expect(textOf(store.getVersion(ben, artifactId, 2)?.spec, "intro")).toBe("Ben");
     for (const stranger of [cara, erik, dina]) {
-      expect(store.ensureFirstVersion(stranger, artifactId), stranger.userId).toBeNull();
+      expect(store.ensureFirstVersion(stranger, artifactId), stranger.userId).toEqual({
+        ok: false,
+        reason: "not_found",
+      });
       expect(store.listVersions(stranger, artifactId), stranger.userId).toBeNull();
       expect(store.getVersion(stranger, artifactId, 2), stranger.userId).toBeNull();
       expect(store.sectionAuthors(stranger, artifactId), stranger.userId).toBeNull();
@@ -355,5 +363,102 @@ describe("versions go with their file", () => {
     expect(versionCount(artifactId)).toBe(0);
     expect(versionCount(made.artifactId)).toBe(0);
     expect(versionCount(kept.artifactId)).toBe(1);
+  });
+});
+
+const LIMIT_ENV = "AGENTFORGE_TENANT_STORAGE_BYTES";
+
+function withCeiling<T>(bytes: number, run: () => T): T {
+  const before = process.env[LIMIT_ENV];
+  process.env[LIMIT_ENV] = String(bytes);
+  try {
+    return run();
+  } finally {
+    if (before === undefined) {
+      delete process.env[LIMIT_ENV];
+    } else {
+      process.env[LIMIT_ENV] = before;
+    }
+  }
+}
+
+function artifactRow(artifactId: string): unknown {
+  return sql.prepare("SELECT meta, updated_at, title FROM artifacts WHERE id = ?").get(artifactId);
+}
+
+describe("the storage ceiling: version rows count, and a write over it is refused as a value", () => {
+  beforeAll(async () => {
+    alice = await person("org-1", "alice", "owner");
+    ben = await person("org-1", "ben", "member");
+  });
+
+  it("a first version the ceiling cannot hold is refused, and nothing is written", async () => {
+    const { artifactId } = await workspaceDocument();
+    const used = (await tenantStorageReport(TENANT)).usedBytes;
+    const before = artifactRow(artifactId);
+    withCeiling(used + 1, () => {
+      expect(docVersionStore().ensureFirstVersion(alice, artifactId)).toEqual({ ok: false, reason: "quota" });
+      expect(docVersionStore().appendVersion(ben, artifactId, rewrite("intro", "over", 1))).toEqual({
+        ok: false,
+        reason: "quota",
+      });
+    });
+    expect(versionCount(artifactId)).toBe(0);
+    expect(artifactRow(artifactId)).toEqual(before);
+  });
+
+  it("over a full ceiling a no-op and the saved head still answer, and a changed append is refused", async () => {
+    const { artifactId } = await workspaceDocument();
+    const store = docVersionStore();
+    expect(store.ensureFirstVersion(alice, artifactId)).toMatchObject({ ok: true, head: { version: 1 } });
+    const used = (await tenantStorageReport(TENANT)).usedBytes;
+    const before = artifactRow(artifactId);
+    withCeiling(used, () => {
+      expect(store.ensureFirstVersion(alice, artifactId)).toMatchObject({ ok: true, head: { version: 1 } });
+      expect(
+        store.appendVersion(ben, artifactId, { baseVersion: 1, author: { kind: "person" }, edit: (head) => head }),
+      ).toMatchObject({ ok: true, created: false, head: { version: 1 } });
+      expect(store.appendVersion(ben, artifactId, rewrite("intro", "over", 1))).toEqual({
+        ok: false,
+        reason: "quota",
+      });
+    });
+    expect(versionCount(artifactId)).toBe(1);
+    expect(artifactRow(artifactId)).toEqual(before);
+  });
+
+  it("inside the caller's own transaction a refusal rolls back only the store's writes", async () => {
+    const { artifactId } = await workspaceDocument();
+    const used = (await tenantStorageReport(TENANT)).usedBytes;
+    const result = withCeiling(used + 1, () =>
+      sql
+        .transaction(() => {
+          const refused = docVersionStore().appendVersion(alice, artifactId, rewrite("intro", "nested", 1));
+          sql.prepare("UPDATE artifacts SET title = ? WHERE id = ?").run("caller kept", artifactId);
+          return refused;
+        })
+        .immediate(),
+    );
+    expect(result).toEqual({ ok: false, reason: "quota" });
+    expect(versionCount(artifactId)).toBe(0);
+    expect(sql.prepare("SELECT title FROM artifacts WHERE id = ?").get(artifactId)).toEqual({ title: "caller kept" });
+  });
+
+  it("the storage use counts the bytes of every version row the store writes", async () => {
+    const { artifactId } = await workspaceDocument();
+    const before = readTenantArtifactUse(TENANT).bytes;
+    const store = docVersionStore();
+    expect(store.ensureFirstVersion(alice, artifactId)).toMatchObject({ ok: true });
+    expect(store.appendVersion(ben, artifactId, rewrite("numbers", "Ben's numbers", 1))).toMatchObject({
+      ok: true,
+      created: true,
+    });
+    const stored = sql.prepare("SELECT spec FROM doc_versions WHERE artifact_id = ?").all(artifactId) as Array<{
+      spec: string;
+    }>;
+    const expected = stored.reduce((sum, row) => sum + Buffer.byteLength(row.spec, "utf8"), 0);
+    expect(stored).toHaveLength(2);
+    expect(expected).toBeGreaterThan(0);
+    expect(readTenantArtifactUse(TENANT).bytes - before).toBe(expected);
   });
 });

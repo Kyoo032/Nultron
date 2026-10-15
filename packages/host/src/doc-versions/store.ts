@@ -6,7 +6,9 @@ import type { TenantContext } from "@agentforge/core";
 import { visibleTo } from "../artifacts";
 import { openSpec, SPEC_META_KEY, sealSpec, type EditableSpec } from "../doc-tools/doc-meta";
 import { parseDocSpec, parseSheetSpec } from "../doc-model";
+import { admitsArtifactRowWrite } from "../tenant-storage";
 import { lastChanges, planPrune, type HistoryRow } from "./history";
+import { pendingBaseVersions } from "./pending-bases";
 import { changedSectionIds, sectionIdsOf } from "./section-ids";
 import {
   DOC_VERSION_CAP,
@@ -16,12 +18,13 @@ import {
   type DocVersionAuthor,
   type DocVersionCap,
   type DocVersionInfo,
+  type EnsureFirstResult,
   type ProtectedVersions,
   type SectionAuthors,
 } from "./types";
 
 export type DocVersionStore = {
-  ensureFirstVersion(tenant: TenantContext, artifactId: string): DocVersionInfo | null;
+  ensureFirstVersion(tenant: TenantContext, artifactId: string): EnsureFirstResult;
   appendVersion(tenant: TenantContext, artifactId: string, input: AppendVersionInput): AppendResult;
   listVersions(tenant: TenantContext, artifactId: string): DocVersionInfo[] | null;
   getVersion(tenant: TenantContext, artifactId: string, version: number): DocVersion | null;
@@ -52,6 +55,10 @@ type VersionRow = {
 };
 
 type SpecRow = VersionRow & { spec: string };
+
+type SeededSpec = { readonly sealed: unknown; readonly spec: EditableSpec };
+
+class QuotaRefused extends Error {}
 
 const INFO_COLUMNS =
   "version, kind, changed_section_ids, base_version, note, author_kind, author_user_id, agent_id, asked_by_user_id, folded_authors, created_at";
@@ -110,9 +117,10 @@ function normalized(spec: EditableSpec): EditableSpec {
 }
 
 function authorColumns(tenant: TenantContext, input: AppendVersionInput) {
+  const askedByUserId = input.author.kind === "agent" ? (input.author.askedByUserId ?? tenant.userId) : tenant.userId;
   return input.author.kind === "agent"
-    ? { kind: "agent", userId: null, agentId: input.author.agentId }
-    : { kind: "person", userId: tenant.userId, agentId: null };
+    ? { kind: "agent", userId: null, agentId: input.author.agentId, askedByUserId }
+    : { kind: "person", userId: tenant.userId, agentId: null, askedByUserId };
 }
 
 export function createDocVersionStore(options: DocVersionStoreOptions): DocVersionStore {
@@ -142,13 +150,26 @@ export function createDocVersionStore(options: DocVersionStoreOptions): DocVersi
       )
       .get(tenant.workspaceId, artifactId, version) as SpecRow | undefined;
 
-  const insertFirst = (tenant: TenantContext, artifactId: string, artifact: ArtifactRow): boolean => {
+  const seedOf = (artifact: ArtifactRow): SeededSpec | null => {
     const sealed = sealedSpecOf(artifact.meta);
     const spec = openSpec(sealed);
-    if (spec === null) {
-      return false;
+    return spec === null ? null : { sealed, spec };
+  };
+
+  const admit = (tenant: TenantContext, incomingBytes: number): void => {
+    if (!admitsArtifactRowWrite(tenant.tenantId, incomingBytes, db)) {
+      throw new QuotaRefused();
     }
+  };
+
+  const writeFirst = (
+    tenant: TenantContext,
+    artifactId: string,
+    artifact: ArtifactRow,
+    seed: SeededSpec,
+  ): DocVersionInfo => {
     const author = artifact.owner_user_id ?? tenant.userId;
+    admit(tenant, Buffer.byteLength(JSON.stringify(seed.sealed), "utf8"));
     db.prepare(
       `INSERT OR IGNORE INTO doc_versions (id, workspace_id, artifact_id, version, spec, kind, changed_section_ids,
          base_version, note, author_kind, author_user_id, agent_id, asked_by_user_id, folded_authors, created_at)
@@ -158,15 +179,15 @@ export function createDocVersionStore(options: DocVersionStoreOptions): DocVersi
       randomUUID(),
       artifact.workspace_id,
       artifactId,
-      JSON.stringify(sealed),
-      spec.kind,
-      JSON.stringify(sectionIdsOf(spec)),
+      JSON.stringify(seed.sealed),
+      seed.spec.kind,
+      JSON.stringify(sectionIdsOf(seed.spec)),
       author,
       author,
       now(),
       artifactId,
     );
-    return true;
+    return infoOf(specRow(tenant, artifactId, 1) as SpecRow);
   };
 
   const prune = (tenant: TenantContext, artifactId: string): void => {
@@ -200,16 +221,19 @@ export function createDocVersionStore(options: DocVersionStoreOptions): DocVersi
     if (artifact === undefined) {
       return { ok: false, reason: "not_found" };
     }
-    if (!insertFirst(tenant, artifactId, artifact)) {
+    const seed = seedOf(artifact);
+    if (seed === null) {
       return { ok: false, reason: "not_editable" };
     }
     const rows = versionRows(tenant, artifactId);
-    const headRow = rows[rows.length - 1] as VersionRow;
-    const head = openStored(specRow(tenant, artifactId, headRow.version)?.spec ?? "null");
+    const headRow = rows[rows.length - 1] as VersionRow | undefined;
+    const head =
+      headRow === undefined ? seed.spec : openStored(specRow(tenant, artifactId, headRow.version)?.spec ?? "null");
     if (head === null) {
       return { ok: false, reason: "not_editable" };
     }
-    if (!Number.isInteger(input.baseVersion) || input.baseVersion < 1 || input.baseVersion > headRow.version) {
+    const headVersion = headRow?.version ?? 1;
+    if (!Number.isInteger(input.baseVersion) || input.baseVersion < 1 || input.baseVersion > headVersion) {
       return { ok: false, reason: "bad_base" };
     }
     const edited = input.edit(head);
@@ -218,7 +242,10 @@ export function createDocVersionStore(options: DocVersionStoreOptions): DocVersi
     }
     const next = normalized(edited);
     if (isDeepStrictEqual(next.spec, head.spec)) {
-      return { ok: true, head: infoOf(headRow), created: false };
+      if (headRow !== undefined) {
+        return { ok: true, head: infoOf(headRow), created: false };
+      }
+      return { ok: true, head: writeFirst(tenant, artifactId, artifact, seed), created: false };
     }
     const changed = changedSectionIds(head, next);
     const last = lastChanges(rows.map(historyOf));
@@ -226,10 +253,14 @@ export function createDocVersionStore(options: DocVersionStoreOptions): DocVersi
     if (conflicts.length > 0) {
       return { ok: false, reason: "section_changed", sectionIds: conflicts };
     }
+    if (headRow === undefined) {
+      writeFirst(tenant, artifactId, artifact, seed);
+    }
     const author = authorColumns(tenant, input);
     const sealed = sealSpec(next.spec);
     const at = now();
-    const version = headRow.version + 1;
+    const version = headVersion + 1;
+    admit(tenant, Buffer.byteLength(JSON.stringify(sealed), "utf8"));
     db.prepare(
       `INSERT INTO doc_versions (id, workspace_id, artifact_id, version, spec, kind, changed_section_ids, base_version, note,
          author_kind, author_user_id, agent_id, asked_by_user_id, folded_authors, created_at)
@@ -247,7 +278,7 @@ export function createDocVersionStore(options: DocVersionStoreOptions): DocVersi
       author.kind,
       author.userId,
       author.agentId,
-      tenant.userId,
+      author.askedByUserId,
       at,
     );
     writeHead(artifactId, artifact, sealed, at);
@@ -256,20 +287,45 @@ export function createDocVersionStore(options: DocVersionStoreOptions): DocVersi
     return { ok: true, head: infoOf(written), created: true };
   };
 
-  const first = (tenant: TenantContext, artifactId: string): DocVersionInfo | null => {
+  const first = (tenant: TenantContext, artifactId: string): EnsureFirstResult => {
     const artifact = visibleArtifact(tenant, artifactId);
-    if (artifact === undefined || !insertFirst(tenant, artifactId, artifact)) {
-      return null;
+    if (artifact === undefined) {
+      return { ok: false, reason: "not_found" };
+    }
+    const seed = seedOf(artifact);
+    if (seed === null) {
+      return { ok: false, reason: "not_editable" };
     }
     const rows = versionRows(tenant, artifactId);
     const headRow = rows[rows.length - 1];
-    return headRow === undefined ? null : infoOf(headRow);
+    if (headRow !== undefined) {
+      return { ok: true, head: infoOf(headRow) };
+    }
+    return { ok: true, head: writeFirst(tenant, artifactId, artifact, seed) };
   };
 
   return {
-    ensureFirstVersion: (tenant, artifactId) => db.transaction(first).immediate(tenant, artifactId),
+    ensureFirstVersion(tenant, artifactId) {
+      try {
+        return db.transaction(first).immediate(tenant, artifactId);
+      } catch (error) {
+        if (error instanceof QuotaRefused) {
+          return { ok: false, reason: "quota" };
+        }
+        throw error;
+      }
+    },
 
-    appendVersion: (tenant, artifactId, input) => db.transaction(append).immediate(tenant, artifactId, input),
+    appendVersion(tenant, artifactId, input) {
+      try {
+        return db.transaction(append).immediate(tenant, artifactId, input);
+      } catch (error) {
+        if (error instanceof QuotaRefused) {
+          return { ok: false, reason: "quota" };
+        }
+        throw error;
+      }
+    },
 
     listVersions(tenant, artifactId) {
       if (visibleArtifact(tenant, artifactId) === undefined) {
@@ -310,7 +366,7 @@ let defaultStore: DocVersionStore | null = null;
 
 export function docVersionStore(): DocVersionStore {
   if (!defaultStore) {
-    defaultStore = createDocVersionStore({ db: sql });
+    defaultStore = createDocVersionStore({ db: sql, protectedVersions: pendingBaseVersions(sql) });
   }
   return defaultStore;
 }

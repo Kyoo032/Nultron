@@ -237,15 +237,23 @@ export const TENANT_ARTIFACT_USE_SQL = `SELECT COALESCE(SUM(size_bytes), 0) AS b
     WHERE o.tenant_id = ?
  )`;
 
+export const TENANT_VERSION_USE_SQL = `SELECT COALESCE(SUM(length(CAST(spec AS BLOB))), 0) AS bytes
+  FROM doc_versions
+ WHERE workspace_id IN (
+   SELECT w.id
+     FROM workspaces w
+     JOIN organizations o ON o.id = w.organization_id
+    WHERE o.tenant_id = ?
+ )`;
+
 export type TenantArtifactUse = { readonly bytes: number; readonly count: number };
 
-export function readTenantArtifactUse(tenantId: string): TenantArtifactUse {
-  const row = requireSql().prepare(TENANT_ARTIFACT_USE_SQL).get(tenantId) as
-    | { bytes: number; count: number }
-    | undefined;
+export function readTenantArtifactUse(tenantId: string, conn: TenantStorageSql = requireSql()): TenantArtifactUse {
+  const row = conn.prepare(TENANT_ARTIFACT_USE_SQL).get(tenantId) as { bytes: number; count: number } | undefined;
+  const versions = conn.prepare(TENANT_VERSION_USE_SQL).get(tenantId) as { bytes: number } | undefined;
   // Clamped like the counter: a row edited by hand must not hand a tenant room through a negative number.
   return {
-    bytes: Math.max(0, Math.trunc(Number(row?.bytes ?? 0))),
+    bytes: Math.max(0, Math.trunc(Number(row?.bytes ?? 0)) + Math.trunc(Number(versions?.bytes ?? 0))),
     count: Math.max(0, Math.trunc(Number(row?.count ?? 0))),
   };
 }
