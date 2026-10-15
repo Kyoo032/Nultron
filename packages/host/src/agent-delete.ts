@@ -73,7 +73,7 @@ export async function deleteAgentFor(tenant: TenantContext, agentId: string): Pr
     throw new ApiError("not_deletable", "This agent is built in and cannot be deleted.", 409);
   }
   const chats = chatsOf(tenant.organizationId, agentId);
-  if (chats.some((chat) => chat.user_id !== agent.createdByUserId)) {
+  if (agent.visibility === "workspace" && chats.some((chat) => chat.user_id !== agent.createdByUserId)) {
     throw new ApiError(
       "agent_in_use",
       "Another person has a chat with this agent, so it cannot be deleted. Nothing was removed.",
@@ -82,9 +82,8 @@ export async function deleteAgentFor(tenant: TenantContext, agentId: string): Pr
   }
   const workspacesRemoved = workspacesOf(agentId);
   dropRows(tenant, agentId);
-  const owner: TenantContext = { ...tenant, userId: agent.createdByUserId };
   for (const chat of chats) {
-    forgetChatKnowledge(owner, chat.id);
+    forgetChatKnowledge({ ...tenant, userId: chat.user_id }, chat.id);
   }
   return { chatsDeleted: chats.length, workspacesRemoved };
 }

@@ -39,7 +39,7 @@ export type PromptAgentAnswer = {
 };
 
 export async function createPromptAgent(tenant: TenantContext, draft: AgentDraft): Promise<PromptAgentAnswer> {
-  const { agent, version } = await agentService.create(
+  const created = await agentService.createPromptMade(
     tenant,
     {
       name: draft.name,
@@ -48,19 +48,16 @@ export async function createPromptAgent(tenant: TenantContext, draft: AgentDraft
       model: defaultSelectableModel(undefined, tenant),
       inputModalities: [...DEFAULT_CHAT_MODALITIES],
       productModes: ["chat"],
-      visibility: "private",
       config: promptMadeConfig(draft.baseMode),
     },
+    draft.tools,
     listSelectableModels(tenant),
   );
   try {
-    for (const toolKey of draft.tools) {
-      await agentService.bindTool(tenant, agent.id, version.id, toolKey);
-    }
-    const published = await agentService.publish(tenant, agent.id, version.id);
-    return { agent: published, version, tools: [...draft.tools] };
+    const published = await agentService.publish(tenant, created.agent.id, created.version.id);
+    return { agent: published, version: created.version, tools: [...draft.tools] };
   } catch (error) {
-    await removeAgentRow(tenant, agent.id).catch(() => undefined);
+    await removeAgentRow(tenant, created.agent.id).catch(() => undefined);
     throw error;
   }
 }

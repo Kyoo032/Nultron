@@ -618,3 +618,143 @@ describe("DELETE /api/v1/agents/:agentId", () => {
     expect(left.n).toBe(0);
   }, BUDGET);
 });
+
+describe("what a member can do to their own prompt-made agent (SR-182)", () => {
+  it("refuses a member the older tool, soul, publish, product-modes and generate-defaults routes", async () => {
+    const mine = await makeAgent("alice", { name: "Member locked", tools: ["calculator"] });
+    const refused: Array<[string, string, unknown]> = [
+      ["POST", `/api/v1/agents/${mine.id}/tools`, { toolKey: "music_generate" }],
+      ["POST", `/api/v1/agents/${mine.id}/tools`, { toolKey: "calculator" }],
+      ["POST", `/api/v1/agents/${mine.id}/soul`, { toolKeys: ["music_generate", "no_such_tool"] }],
+      ["POST", `/api/v1/agents/${mine.id}/soul`, { systemPrompt: "new" }],
+      ["POST", `/api/v1/agents/${mine.id}/product-modes`, { productModes: ["chat", "music"] }],
+      ["POST", `/api/v1/agents/${mine.id}/generate-defaults`, { imageGenModel: "x" }],
+    ];
+    for (const [method, path, body] of refused) {
+      const answer = await call("alice", method, path, body);
+      expect(answer.status, `${method} ${path} ${JSON.stringify(body)}`).toBe(403);
+    }
+    const read = await call("alice", "GET", `/api/v1/agents/${mine.id}`);
+    expect(read.body.publishedBindings.map((binding: { toolKey: string }) => binding.toolKey)).toEqual(["calculator"]);
+  }, BUDGET);
+
+  it("answers a member 403 on the older workspace create, for any body, and stores nothing", async () => {
+    const before = await agentIdsFor("alice");
+    const wid = await workspaceId("alice");
+    for (const body of [
+      { name: "Sneaky", systemPrompt: "x", productModes: ["music"], config: { madeFromPrompt: false } },
+      { name: 7, systemPrompt: "x" },
+      {},
+    ]) {
+      const answer = await call("alice", "POST", `/api/v1/workspaces/${wid}/agents`, body);
+      expect(answer.status, JSON.stringify(body)).toBe(403);
+    }
+    expect(await agentIdsFor("alice")).toEqual(before);
+  }, BUDGET);
+
+  it("answers an owner 400, not 500, for a non-string name on the older create", async () => {
+    const wid = await workspaceId("owner");
+    const answer = await call("owner", "POST", `/api/v1/workspaces/${wid}/agents`, { name: 7, systemPrompt: "x" });
+    expect(answer.status).toBe(400);
+  }, BUDGET);
+
+  it("keeps the older routes for an owner: bind on an agent they built, and refuses a tool outside the mode on a prompt-made one", async () => {
+    const wid = await workspaceId("owner");
+    const built = await call("owner", "POST", `/api/v1/workspaces/${wid}/agents`, {
+      name: "Owner built",
+      systemPrompt: "x",
+    });
+    expect(built.status).toBe(201);
+    const bind = await call("owner", "POST", `/api/v1/agents/${built.body.agent.id}/tools`, { toolKey: "music_generate" });
+    expect(bind.status).toBe(201);
+    const published = await call("owner", "POST", `/api/v1/agents/${built.body.agent.id}/publish`, {
+      versionId: built.body.version.id,
+    });
+    expect(published.status).toBe(200);
+    const revise = await call("owner", "POST", `/api/v1/agents/${built.body.agent.id}/soul`, { systemPrompt: "y" });
+    expect(revise.status).toBe(200);
+
+    const promptMade = await makeAgent("owner", { name: "Owner prompt-made", tools: ["calculator"] });
+    const outside = await call("owner", "POST", `/api/v1/agents/${promptMade.id}/tools`, { toolKey: "music_generate" });
+    expect(outside.status).toBe(400);
+    const outsideSoul = await call("owner", "POST", `/api/v1/agents/${promptMade.id}/soul`, {
+      toolKeys: ["calculator", "music_generate"],
+    });
+    expect(outsideSoul.status).toBe(400);
+    const inside = await call("owner", "POST", `/api/v1/agents/${promptMade.id}/tools`, { toolKey: "datetime" });
+    expect(inside.status).toBe(201);
+  }, BUDGET);
+
+  it("still lets a member make an agent and open a chat with it", async () => {
+    const mine = await makeAgent("alice", { name: "Member chat", tools: ["calculator"] });
+    const thread = await call("alice", "POST", "/api/v1/threads", { agentId: mine.id });
+    expect(thread.status).toBe(201);
+  }, BUDGET);
+
+  it("answers the busy error on the draft when the company is at its run cap, and calls no model", async () => {
+    const { admitRun } = await import("./run-limits");
+    const c = await theCompany();
+    vi.stubEnv("AGENTFORGE_SERVER", "1");
+    vi.stubEnv("AGENTFORGE_MAX_RUNS_PER_TENANT", "1");
+    const held = admitRun(c.tenants.alice);
+    try {
+      model.reply = JSON.stringify(draftBody());
+      const answer = await call("alice", "POST", "/api/v1/agents/draft", { prompt: "an agent" });
+      expect(answer.status).toBe(429);
+      expect(answer.body.error.code).toBe("too_many_runs");
+      expect(model.asked).toHaveLength(0);
+    } finally {
+      held();
+    }
+    const after = await call("alice", "POST", "/api/v1/agents/draft", { prompt: "an agent" });
+    expect(after.status).toBe(200);
+    expect(model.asked).toHaveLength(1);
+  }, BUDGET);
+
+  it("rolls the agent back when publishing fails: 500, and no row is left in the count or the list", async () => {
+    const { sql } = await import("@agentforge/db");
+    const { agentService } = await import("./tenant");
+    const count = () => (sql.prepare("SELECT count(*) AS n FROM agents").get() as { n: number }).n;
+    const listBefore = await agentIdsFor("alice");
+    const countBefore = count();
+    const spy = vi.spyOn(agentService, "publish").mockRejectedValueOnce(new Error("boom"));
+    try {
+      const answer = await call("alice", "POST", "/api/v1/agents", draftBody({ name: "Rolled back" }));
+      expect(answer.status).toBe(500);
+      expect(answer.body.error).toBeDefined();
+    } finally {
+      spy.mockRestore();
+    }
+    expect(count()).toBe(countBefore);
+    expect(await agentIdsFor("alice")).toEqual(listBefore);
+  }, BUDGET);
+});
+
+describe("DELETE of a private agent with a colleague's older thread (SR-182)", () => {
+  it("deletes a private agent whose thread is by an admin, with that thread, and still refuses a workspace agent in use", async () => {
+    const { sql } = await import("@agentforge/db");
+    const { createThread } = await import("./threads");
+    const c = await theCompany();
+    const mine = await makeAgent("alice", { name: "Private with stray thread" });
+    const stray = await createThread(c.tenants.admin, mine.id, "Stray");
+    const own = await createThread(c.tenants.alice, mine.id, "Own");
+    const threadRows = (id: string) =>
+      (sql.prepare("SELECT count(*) AS n FROM threads WHERE id = ?").get(id) as { n: number }).n;
+    expect(threadRows(stray.id)).toBe(1);
+
+    const answer = await call("alice", "DELETE", `/api/v1/agents/${mine.id}`);
+    expect(answer.status).toBe(200);
+    expect(answer.body.chatsDeleted).toBe(2);
+    expect(threadRows(stray.id)).toBe(0);
+    expect(threadRows(own.id)).toBe(0);
+
+    const open = await makeAgent("owner", { name: "Workspace in use" });
+    const shared = await call("owner", "POST", `/api/v1/agents/${open.id}/share`, { visibility: "workspace" });
+    expect(shared.status).toBe(200);
+    const bobs = await createThread(c.tenants.bob, open.id, "Bob's");
+    const refused = await call("owner", "DELETE", `/api/v1/agents/${open.id}`);
+    expect(refused.status).toBe(409);
+    expect(refused.body.error.code).toBe("agent_in_use");
+    expect(threadRows(bobs.id)).toBe(1);
+  }, BUDGET);
+});

@@ -54,6 +54,16 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Prompt-made agents: security review fixes (SR-182), 2026-10-15 (tester K34-b follow-up; not driven against a live model)
+
+Lanes: enterprise, hyp-ai, tester
+
+- A member gets 403 on the older agent routes again: `requireOwned` (`packages/core/src/agents/service.ts`) checks `canBuild` after the visibility and maker checks, so `tools`, `soul`, `share`, `product-modes` and `generate-defaults` are builder-only. The older `POST /workspaces/:id/agents` create is builder-only too, and a bad `name` answers 400, not 500.
+- Members create through `AgentService.createPromptMade` (always private). A prompt-made version may carry only its base mode's harness tools (`assertPromptMadeTools`), checked at create, revision and bind, for every caller including the owner.
+- The draft step takes a run slot (`withRunSlot`): a full cap answers 429 `too_many_runs` with no model call. A prompt-made agent runs under its base mode's harness budget (`promptMadeBudget`).
+- Delete: `agent_in_use` (409) applies only to a workspace-visibility agent; a private agent's chats by anyone go with the cascade, each cleaned under its own person. Create rolls back the row when publish fails (tested).
+- Tests: `agent-prompt-made.test.ts` 33, `agent-prompt-made.budget.test.ts` 2, `agent-prompt-made.personal.test.ts` 4, core `src/agents` 132. Not driven: a live chat run of a member-made agent.
+
 ## Enterprise look: one token block, scoped to `html[data-product-shell="enterprise"]` (team board K-D34 item 1), 2026-10-15 (tester, uncommitted on `tester/chat-first`; not driven in a browser)
 
 Lanes: enterprise, hyp-ai, tester. `apps/web/app/globals.css` is shared renderer code. Personal and the default shell are untouched: every rule added sits under the enterprise attribute, and the rest of the file matches `HEAD` after the scoped rules are removed. The attribute is written on `<html>` by `ProductBrandProvider` (`apps/web/lib/product-brand.tsx:172`), so the scope is `html` and `html.dark`; the shell `<div>` in `app-shell.tsx` carries it too but is not the selector's target.

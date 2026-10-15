@@ -12,9 +12,10 @@ import {
   isDefaultChatAgent,
 } from "./default-chat";
 import { getChatModel, listChatModels, type ChatModel } from "../models/catalog";
-import { requireProductModes, resolveProductModes, type ProductMode } from "./product-modes";
+import { isProductMode, requireProductModes, resolveProductModes, type ProductMode } from "./product-modes";
 import { mergeGeneratePins } from "./generate-defaults";
 import { isVirtualAgentSlug } from "./virtual-agents";
+import { harnessSpecFor } from "../harness/specs";
 
 export type AgentRecord = {
   id: string;
@@ -96,6 +97,24 @@ function slugify(name: string): string {
   return base === DEFAULT_CHAT_SLUG || isVirtualAgentSlug(base) ? `agent-${base}` : base;
 }
 
+const PROMPT_MADE_KEY = "madeFromPrompt";
+
+function assertPromptMadeTools(baseMode: string, toolKeys: readonly string[]): void {
+  const allowed = new Set<string>(isProductMode(baseMode) ? harnessSpecFor(baseMode).tools : []);
+  const refused = toolKeys.filter((toolKey) => !allowed.has(toolKey));
+  if (refused.length > 0) {
+    throw new ApiError("invalid_request", `tools not available for ${baseMode}: ${refused.join(", ")}`, 400);
+  }
+}
+
+function assertVersionTools(version: Pick<AgentVersionRecord, "config">, toolKeys: readonly string[]): void {
+  if (version.config?.[PROMPT_MADE_KEY] !== true) {
+    return;
+  }
+  const baseMode = version.config.baseMode;
+  assertPromptMadeTools(typeof baseMode === "string" ? baseMode : "", toolKeys);
+}
+
 function ensureModalities(input?: InputModality[]): InputModality[] {
   const modalities = input && input.length > 0 ? input : (["text"] as InputModality[]);
   if (!modalities.includes("text")) {
@@ -163,8 +182,44 @@ export class AgentService {
     input: CreateAgentInput,
     knownModels: ChatModel[] = listChatModels(),
   ): Promise<{ agent: AgentRecord; version: AgentVersionRecord }> {
-    if (!canBuild(tenant.role) && (input.visibility ?? "private") !== "private") {
+    if (!canBuild(tenant.role)) {
       throw new ApiError("forbidden", "Builder role required", 403);
+    }
+    return this.insertNew(tenant, input, knownModels);
+  }
+
+  async createPromptMade(
+    tenant: TenantContext,
+    input: Omit<CreateAgentInput, "visibility">,
+    toolKeys: readonly string[],
+    knownModels: ChatModel[] = listChatModels(),
+  ): Promise<{ agent: AgentRecord; version: AgentVersionRecord }> {
+    const baseMode = input.config?.baseMode;
+    if (input.config?.[PROMPT_MADE_KEY] !== true || typeof baseMode !== "string") {
+      throw new ApiError("invalid_request", "A prompt-made agent needs a base mode", 400);
+    }
+    assertPromptMadeTools(baseMode, toolKeys);
+    const { agent, version } = await this.insertNew(tenant, { ...input, visibility: "private" }, knownModels);
+    for (const toolKey of toolKeys) {
+      await this.repo.insertBinding({
+        id: this.id(),
+        agentVersionId: version.id,
+        organizationId: tenant.organizationId,
+        toolKey,
+        config: {},
+        enabled: true,
+      });
+    }
+    return { agent, version };
+  }
+
+  private async insertNew(
+    tenant: TenantContext,
+    input: CreateAgentInput,
+    knownModels: ChatModel[],
+  ): Promise<{ agent: AgentRecord; version: AgentVersionRecord }> {
+    if (typeof input.name !== "string" || input.name.trim().length === 0) {
+      throw new ApiError("invalid_request", "name is required", 400);
     }
     if (!getChatModel(input.model, knownModels)) {
       throw new ApiError("unknown_model", `Model '${input.model}' is not available`, 400);
@@ -297,8 +352,13 @@ export class AgentService {
   }
 
   async publish(tenant: TenantContext, agentId: string, versionId: string): Promise<AgentRecord> {
-    const agent = await this.requireOwned(tenant, agentId);
     const version = await this.repo.findVersionById(tenant.organizationId, versionId);
+    const ownPromptMade =
+      version !== null &&
+      version.agentId === agentId &&
+      version.config?.[PROMPT_MADE_KEY] === true &&
+      !canBuild(tenant.role);
+    const agent = ownPromptMade ? await this.requireMaker(tenant, agentId) : await this.requireOwned(tenant, agentId);
     if (!version || version.agentId !== agent.id) {
       throw new ApiError("not_found", "Version not found", 404);
     }
@@ -342,6 +402,9 @@ export class AgentService {
       config: { ...published.config },
       createdAt: this.now(),
     };
+    if (input.toolKeys !== undefined) {
+      assertVersionTools(version, input.toolKeys);
+    }
     await this.repo.insertVersion(version);
 
     if (input.toolKeys !== undefined) {
@@ -395,6 +458,7 @@ export class AgentService {
     if (!version || version.agentId !== agentId) {
       throw new ApiError("not_found", "Version not found", 404);
     }
+    assertVersionTools(version, [toolKey]);
     const binding: ToolBindingRecord = {
       id: this.id(),
       agentVersionId: versionId,
@@ -525,6 +589,20 @@ export class AgentService {
     return added.length === 0 ? bindings : [...bindings, ...added];
   }
 
+  private async requireMaker(tenant: TenantContext, agentId: string): Promise<AgentRecord> {
+    const agent = await this.repo.findAgentById(tenant.organizationId, agentId);
+    if (
+      !agent ||
+      agent.workspaceId !== tenant.workspaceId ||
+      !this.canSee(agent, tenant) ||
+      agent.createdByUserId !== tenant.userId ||
+      agent.visibility !== "private"
+    ) {
+      throw new ApiError("not_found", "Agent not found", 404);
+    }
+    return agent;
+  }
+
   private async requireOwned(tenant: TenantContext, agentId: string): Promise<AgentRecord> {
     const agent = await this.repo.findAgentById(tenant.organizationId, agentId);
     if (!agent || agent.workspaceId !== tenant.workspaceId || !this.canSee(agent, tenant)) {
@@ -533,7 +611,7 @@ export class AgentService {
     if (agent.createdByUserId !== tenant.userId && !canAdminister(tenant.role)) {
       throw new ApiError("forbidden", "Only the creator can edit this agent", 403);
     }
-    if (!canBuild(tenant.role) && agent.visibility !== "private") {
+    if (!canBuild(tenant.role)) {
       throw new ApiError("forbidden", "Builder role required", 403);
     }
     return agent;

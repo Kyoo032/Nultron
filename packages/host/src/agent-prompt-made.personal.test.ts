@@ -89,9 +89,15 @@ describe("Personal: the owner still sees and edits every agent row on the desk",
     const { agentService } = await import("./tenant");
     const colleague: TenantContext = { ...tenant, userId: "colleague-1", role: "member" };
     const models = listChatModels();
-    const theirs = await agentService.create(
+    const theirs = await agentService.createPromptMade(
       colleague,
-      { name: "Colleague private", systemPrompt: "Help", model: models[0].id, visibility: "private" },
+      {
+        name: "Colleague private",
+        systemPrompt: "Help",
+        model: models[0].id,
+        config: { baseMode: "chat", madeFromPrompt: true },
+      },
+      [],
       models,
     );
     expect(theirs.agent.createdByUserId).toBe("colleague-1");
@@ -112,7 +118,7 @@ describe("Personal: the owner still sees and edits every agent row on the desk",
     const listed = await json("GET", `/api/v1/workspaces/${tenant.workspaceId}/agents`);
     expect(listed.body.agents.find((agent: { id: string }) => agent.id === theirs.agent.id)).toMatchObject({
       deletable: true,
-      madeFromPrompt: false,
+      madeFromPrompt: true,
     });
 
     const removed = await json("DELETE", `/api/v1/agents/${theirs.agent.id}`);

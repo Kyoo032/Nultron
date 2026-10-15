@@ -13,6 +13,7 @@ import {
 } from "@agentforge/core";
 import { requireGatewayAllowed } from "./gateway-gate";
 import { collectJobAssistantText } from "./job-regen";
+import { withRunSlot } from "./run-limits";
 import { defaultSelectableModel } from "./selectable-models";
 import { loadSettings } from "./settings-store";
 import { ensureToolsRegistered } from "./register-tools";
@@ -153,14 +154,16 @@ export async function draftAgent(tenant: TenantContext, prompt: string): Promise
   }
   requireGatewayAllowed(settings, { tenant });
   ensureToolsRegistered();
-  const raw = await collectJobAssistantText({
-    tenant,
-    model: defaultSelectableModel(undefined, tenant),
-    systemPrompt: AGENT_DRAFT_SYSTEM_PROMPT,
-    runPrefix: "agent-draft",
-    agentId: "agent-draft",
-    versionId: "agent-draft",
-    prompt,
-  });
+  const raw = await withRunSlot(tenant, () =>
+    collectJobAssistantText({
+      tenant,
+      model: defaultSelectableModel(undefined, tenant),
+      systemPrompt: AGENT_DRAFT_SYSTEM_PROMPT,
+      runPrefix: "agent-draft",
+      agentId: "agent-draft",
+      versionId: "agent-draft",
+      prompt,
+    }),
+  );
   return { draft: parseAgentDraftReply(raw), source: "live" };
 }

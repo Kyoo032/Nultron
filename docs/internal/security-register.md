@@ -6154,6 +6154,23 @@ Residual: an owner or admin can still delete the agent and with it the maker's c
 
 Gate: before HYP AI imports from the tester.
 
+Review follow-up (2026-10-15, code review of `3b58cd6d`): a member could bind any tool to their own prompt-made agent.
+- Cause: `requireOwned` had dropped the builder check for a private agent, so the older routes `POST /api/v1/agents/:id/tools` and `/soul` (with unvalidated `toolKeys`) reached `bindTool` and `createRevision` for a member, bypassing the mode allow-list. `POST /api/v1/workspaces/:id/agents` also took a member with an unvalidated body, and a non-string `name` made `slugify` throw a 500.
+- Members' route scope now: only `POST /api/v1/agents/draft`, `POST /api/v1/agents` and `DELETE /api/v1/agents/:id` (their own agent). The older mutating routes (tools, soul, share, product-modes, generate-defaults, workspace create) need the builder role again: `requireOwned` asks `canBuild` after the visibility and maker checks (`packages/core/src/agents/service.ts`, `requireOwned`), and `create` asks it for any visibility. The one exception is `publish` of a prompt-made version of the member's own private agent (`requireMaker`), which the create route needs; its tools are already bound under the allow-list.
+- Members create through an internal path, `AgentService.createPromptMade` (`service.ts:191`), always private, which checks the tools first. `packages/host/src/agent-create.ts` calls it, then `publish`, and removes the row if `publish` fails (test: publish rejected gives 500, and the agent count and the maker's list are unchanged).
+- Tool allow-list, enforced in core whoever calls: for a version whose `config.madeFromPrompt === true`, `assertPromptMadeTools` (`service.ts:102`) refuses with 400 any tool not in `harnessSpecFor(config.baseMode).tools` (an unknown base mode allows none). It runs in `createPromptMade` (`:201`), `createRevision` (`:406`, before the new version is stored) and `bindTool` (`:461`). An owner or builder gets the same 400 on a prompt-made agent.
+- Run cap: `draftAgent` takes a run slot (`withRunSlot`, `packages/host/src/agent-draft.ts`) around the model call, so a full cap answers 429 `too_many_runs` and calls no model; the offline stub draft takes none.
+- Budget: a prompt-made agent runs under `harnessSpecFor(baseMode).budget` (`promptMadeBudget`, `packages/host/src/prompt-made-agent.ts`, used in `packages/host/src/runs.ts` beside the other budgets), so the mode's per-tool caps apply. An agent that is not prompt-made keeps the runtime default.
+- Delete: `agent_in_use` (409) now applies only to a workspace-visibility agent (`packages/host/src/agent-delete.ts`). A private agent's threads by anyone else (left from before the privacy change) go with the cascade, and each thread's knowledge is dropped under its own person.
+- Tests: `packages/host/src/agent-prompt-made.test.ts` (section "what a member can do to their own prompt-made agent"; the draft cap; the rollback; the private-delete case), `packages/host/src/agent-prompt-made.budget.test.ts`, `packages/host/src/agent-prompt-made.personal.test.ts` (the Personal owner keeps the older routes), `packages/core/src/agents/service-privacy.test.ts`.
+
+Residuals left open:
+- The admin `DELETE` answer carries the maker's chat count (`chatsDeleted`), a small activity leak.
+- There is no admin listing to clean up a departed maker's private agents.
+- Media-approval proposals and the private chat uploads of deleted threads are not cleaned (the same gap as `deleteThread`).
+- Whether the edit tool backend scopes `projectId` per person is unchecked; it is moot while members cannot bind edit tools.
+
+
 ## Must be true before the Tencent Cloud deploy
 
 Each line names the row that owns it. A line that cannot be ticked is a reason not to hand out the

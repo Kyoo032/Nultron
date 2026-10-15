@@ -68,7 +68,7 @@ import { withAttendedRun } from "./media-approval/presence";
 import type { JobEvent } from "@agentforge/core/jobs";
 import { DEFAULT_CHAT_MODALITIES, GENERALIST_WORKER_PROMPT, virtualAgentFor } from "@agentforge/core";
 import { runPolicyFor, withGeneralistWorkers } from "./virtual-agents";
-import { isPromptMadeVersion } from "./prompt-made-agent";
+import { isPromptMadeVersion, promptMadeBudget } from "./prompt-made-agent";
 import { WORKER_STREAM_IDLE_MS, withWorkerChannel } from "./workers/worker-channel";
 import { formatPastSessionsHint } from "./session-recall";
 import { log } from "./log";
@@ -532,7 +532,9 @@ export async function* startModalityRun(options: {
               ? { budget: agentPolicy.budget }
               : defaultChat
                 ? { budget: virtualAgentFor("chat").budget }
-                : {}),
+                : isPromptMadeVersion(published.version)
+                  ? promptMadeBudget(published.version)
+                  : {}),
             history,
             thinking: thinkingEnabled,
             reasoningEffort,
