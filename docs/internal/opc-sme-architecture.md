@@ -6,7 +6,7 @@ Status: proposal, 2026-10-14. Nothing here is built. Code moves wait for Rizky's
 
 - **Nultron is the OPC.** A one-person company: all the agents work together, 24/7, for one owner.
 - **HYP AI is the SME.** A small or medium company: people and agents work together through projects (Workspaces) and a kanban board.
-- **Nultron Personal, the Electron desktop app, is retired.** It merges into the web app. Its release repo is now `Kyoo032/Nultron-Desktop`, archived. `Kyoo032/NultronEnt` was renamed to `Kyoo032/Nultron` and carries the web app's releases.
+- **Nultron Personal, the Electron desktop app, is retired.** It merges into the web app. Its release repo is now `Kyoo032/Nultron-Desktop`, archived. `Kyoo032/NultronEnt` was renamed to `Kyoo032/Nultron`, then to `Kyoo032/Nultron-Releases` on 2026-10-15, and that repo carries the web app's releases.
 - **Nultron runs inside a VPS**, so its agents keep working while the owner's computer is off.
 - **The names are settled: Nultron OPC, HYP AI SME.** In code the folders are `opc` and `sme`. Nultron and HYP AI stay brand profiles on top of them, because shared code carries no brand (AGENTS.md, "Sync lanes"; PR #159) and the HYP AI link stays private (NDA).
 

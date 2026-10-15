@@ -27,11 +27,14 @@ test("parsePushLines reads one object per ref and skips blank lines", () => {
   assert.deepEqual(parsePushLines(""), []);
 });
 
-test("guardsRemote judges agentforge and unknown URLs, and lets other GitHub repositories through", () => {
+test("guardsRemote judges agentforge and nultron in any case, and unknown URLs; other GitHub repositories pass", () => {
   for (const url of [
     "https://github.com/Kyoo032/agentforge.git",
     "https://github.com/Kyoo032/agentforge",
     "git@github.com:Kyoo032/agentforge.git",
+    "https://github.com/Kyoo032/Nultron.git",
+    "git@github.com:Kyoo032/Nultron.git",
+    "https://github.com/kyoo032/NULTRON/",
     "C:/Users/rizky/some-bare-repo",
     "",
     undefined,
@@ -39,9 +42,12 @@ test("guardsRemote judges agentforge and unknown URLs, and lets other GitHub rep
     assert.equal(guardsRemote(url), true, String(url));
   }
   for (const url of [
+    "https://github.com/Kyoo032/Nultron-Releases.git",
+    "git@github.com:Kyoo032/Nultron-Releases.git",
+    "https://github.com/Kyoo032/Nultron-Desktop.git",
     "https://github.com/Kyoo032/hyp-ai.git",
-    "git@github.com:Kyoo032/Nultron.git",
     "https://github.com/Kyoo032/agentforge-fork",
+    "https://github.com/Kyoo032/nultron-fork",
   ]) {
     assert.equal(guardsRemote(url), false, url);
   }

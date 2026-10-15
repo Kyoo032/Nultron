@@ -565,7 +565,7 @@
       "map": "docs/internal/maps/release-and-sync-lanes.md",
       "lanes": ["enterprise"],
       "protected": true,
-      "note": "Enterprise release to Kyoo032/Nultron (renamed from NultronEnt on 2026-10-14). AGENTS.md: a change to the release scripts needs Rizky's word."
+      "note": "Enterprise release to Kyoo032/Nultron-Releases (renamed from Kyoo032/Nultron on 2026-10-15; before 2026-10-14 it was Kyoo032/NultronEnt). AGENTS.md: a change to the release scripts needs Rizky's word."
     },
     {
       "glob": "scripts/{ci-local,lane-guard,map-rot,map-drift}.mjs",

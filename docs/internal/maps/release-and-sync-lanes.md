@@ -19,7 +19,7 @@ One source repo (`Kyoo032/agentforge`, branch `main`) is the one place a fix is 
 
 The rules for where a change is cut and made are the tables at the top of `AGENTS.md`, "Where am I?" and "Where a change goes". The rules behind them are in `AGENTS.md`, "Lanes". This page is the working form of those rules: how a change reaches each lane, and what must be true before a lane counts as fixed. The longer story of the tester split is in Rizky's vault note `40-Dev/nultron-two-codes-map.md`. This page does not cover how a release is cut (see the "Web release" section of `AGENTS.md`).
 
-Repo names as of 2026-10-14: the Enterprise release repo is `Kyoo032/Nultron` (`RELEASE_REPO`, `scripts/release-web.mjs:60`; it was `Kyoo032/NultronEnt`). The retired Personal release repo is `Kyoo032/Nultron-Desktop`, archived.
+Repo names as of 2026-10-15: the Enterprise release repo is `Kyoo032/Nultron-Releases` (`RELEASE_REPO`, `scripts/release-web.mjs:63`; it was `Kyoo032/Nultron` until the rename of 2026-10-15, and `Kyoo032/NultronEnt` until 2026-10-14). The source repo `agentforge` is renamed to `Kyoo032/Nultron` after that rename. The retired Personal release repo is `Kyoo032/Nultron-Desktop`, archived.
 
 ## Workspace knowledge, W1 (2026-10-14)
 
@@ -35,7 +35,7 @@ Two `lanes.json` entries cover the tester's first Workspace slice (team board W1
 
 | Lane | Folder or repo | Built or released by | Takes a change by |
 |---|---|---|---|
-| `main` (published) | `C:\Users\rizky\agentforge`, branch `main`, and worktrees cut from it | `node scripts/release-web.mjs` to `Kyoo032/Nultron`; the preview at `app.nultron-ai.xyz` by its safe desk-by-desk update | a pull request to `main` from a branch cut from `main` |
+| `main` (published) | `C:\Users\rizky\agentforge`, branch `main`, and worktrees cut from it | `node scripts/release-web.mjs` to `Kyoo032/Nultron-Releases`; the preview at `app.nultron-ai.xyz` by its safe desk-by-desk update | a pull request to `main` from a branch cut from `main` |
 | Tester (staging) | `C:\Users\rizky\agentforge-chat`, branch `tester/chat-first` | never released. Staging instance: the tester's staging subdomain (name pending, Rizky) | new feature work is committed on the tester and driven on staging; then a promotion pull request Rizky approves. Fixes from `main` arrive by `git merge origin/main` |
 | HYP AI (downstream, tester stage) | `C:\Users\rizky\hypey\app`, branch `main`, remote `origin` = `Kyoo032/hyp-ai` (private, per `C:\Users\rizky\hypey\intake\SYNC.md`, line 3) | its own bundle in `C:\Users\rizky\hypey\deploy`. Its server, `aiopc.innovationhypernet.com`, is not yet production | vendor-branch import per `SYNC.md`. It still imports from `main` (open, Rizky's call) |
 | Personal (retired 2026-10-14) | `agentforge`, `main` | nothing. `apps/desktop/scripts/release-desktop.mjs` is still in the tree and targets `Kyoo032/Nultron-Desktop`, which is archived | nothing: no new cut, no sync step owed |

@@ -80,7 +80,7 @@ Windows artifacts land in the **worktree** `dist/`. Mac artifacts land in the **
 
 ## Two repos
 
-Source commits stay on `Kyoo032/agentforge`. `pnpm desktop:release` created a GitHub **release** on `Kyoo032/Nultron-Desktop` (binaries + `docs/public/<v>-notes.md`) until that repo was archived on 2026-10-14. The release repo for the web app is now `Kyoo032/Nultron`, and only `scripts/release-web.mjs` writes to it. Do not `git push` source to either repo.
+Source commits stay on `Kyoo032/agentforge`. `pnpm desktop:release` created a GitHub **release** on `Kyoo032/Nultron-Desktop` (binaries + `docs/public/<v>-notes.md`) until that repo was archived on 2026-10-14. The release repo for the web app is now `Kyoo032/Nultron-Releases`, and only `scripts/release-web.mjs` writes to it. Do not `git push` source to either repo.
 
 ## Repacking the same version
 
