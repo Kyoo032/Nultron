@@ -6,7 +6,7 @@ import { AppShell } from "@/components/app-shell";
 import { ComponentSetupSilent } from "@/components/component-setup";
 import { GuideTour } from "@/components/guide-tour";
 import { apiFetch } from "@/lib/api-client";
-import { hydrateGuide, offerGuideAfterOnboarding } from "@/lib/guide-store";
+import { hydrateGuide, offerGuideAfterOnboarding, setGuideShell } from "@/lib/guide-store";
 import { readSettings } from "@/lib/settings-read";
 import {
   browserShellModesStore,
@@ -47,7 +47,7 @@ import { isHostedBuild } from "@/lib/hosted-build";
 import { canOfferKeyLater, deskDeferral, recordKeyLater } from "@/lib/key-later";
 import { applyLocale, freezeLocale, LOCALE_RESTART_EVENT, t } from "@/lib/i18n";
 import { useAmbientMotion } from "@/lib/use-ambient-motion";
-import { useProductBrand } from "@/lib/product-brand";
+import { useProductBrand, useShellLook } from "@/lib/product-brand";
 import { WorkspaceScope } from "@/lib/workspace-scope";
 import { PlanBlockBoundary } from "@/components/plan-blocked-screen";
 import { PricingPage } from "@/components/pricing-page";
@@ -225,6 +225,10 @@ export function AppRoutes() {
   // false off the hosted build, so every Personal path resolves its gate exactly as it did.
   const [keyLater, setKeyLater] = useState(false);
   const hosted = isHostedBuild();
+  const shellLook = useShellLook();
+  useEffect(() => {
+    setGuideShell(shellLook);
+  }, [shellLook]);
   const canLater = canOfferKeyLater(hosted, session.status);
   // The gate listener below outlives renders; it reads the newest deferral through this.
   const deferralRef = useRef<KeyDeferral>(NO_KEY_DEFERRAL);

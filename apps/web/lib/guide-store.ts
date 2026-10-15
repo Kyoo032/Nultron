@@ -2,6 +2,7 @@ import type { GuideOutcome } from "@agentforge/core/guide";
 import { apiFetch } from "./api-client";
 import { GUIDE_IDLE, guideReducer, outcomeOwed, type GuideEvent, type GuideState } from "./guide-machine";
 import { GUIDE_STEPS } from "./guide-steps";
+import type { ShellLook } from "./product-brand";
 
 /**
  * The one place the first-run guide's state lives while the app runs: a module singleton with a
@@ -28,6 +29,7 @@ export type GuideSnapshot = {
 
 let snapshot: GuideSnapshot = { state: GUIDE_IDLE, seen: null };
 const listeners = new Set<() => void>();
+let guideShell: ShellLook | null = null;
 
 function publish(next: GuideSnapshot): void {
   snapshot = next;
@@ -89,9 +91,13 @@ export function dispatchGuide(event: GuideEvent): void {
   }
 }
 
+export function setGuideShell(shell: ShellLook | null): void {
+  guideShell = shell;
+}
+
 /** First-run setup just finished. Offers the tour unless the host says it has been seen. */
 export function offerGuideAfterOnboarding(): void {
-  if (snapshot.seen === true) {
+  if (guideShell === "enterprise" || snapshot.seen === true) {
     return;
   }
   dispatchGuide({ type: "offer" });
@@ -105,4 +111,5 @@ export function replayGuide(): void {
 export function resetGuideForTests(): void {
   snapshot = { state: GUIDE_IDLE, seen: null };
   listeners.clear();
+  guideShell = null;
 }
