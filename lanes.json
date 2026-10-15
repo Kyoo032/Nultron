@@ -306,9 +306,23 @@
     {
       "glob": "{packages/host/src/doc-versions/**,packages/db/src/doc-versions-schema.ts}",
       "map": "docs/internal/maps/agent-tools-and-files.md",
-      "lanes": ["tester"],
+      "lanes": ["hyp-ai", "tester"],
       "protected": false,
-      "note": "Document versions in a Workspace, D0 (team-board-spec.md K-D30): the doc_versions table, the store, the cap and host section ids. Not on main, so tester code only."
+      "note": "Document versions in a Workspace, D0 (team-board-spec.md K-D30): the doc_versions table, the store, the cap and host section ids. Not on main yet; the hyp-ai lane takes it with the tester's promotion."
+    },
+    {
+      "glob": "packages/db/src/doc-proposals-schema.ts",
+      "map": "docs/internal/maps/agent-tools-and-files.md",
+      "lanes": ["hyp-ai", "tester"],
+      "protected": false,
+      "note": "Document proposals, the table beside doc_versions. Not on main yet; same lanes as doc-versions."
+    },
+    {
+      "glob": "{packages/host/src/handlers/docs-*.ts,packages/host/src/docs-*.test.ts}",
+      "map": "docs/internal/maps/agent-tools-and-files.md",
+      "lanes": ["hyp-ai", "tester"],
+      "protected": false,
+      "note": "Document routes and their tests (docs-import). Not on main yet; the hyp-ai lane takes them with the tester's promotion."
     },
     {
       "glob": "apps/web/components/rail-*.tsx",
