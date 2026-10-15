@@ -1433,9 +1433,6 @@ describe("every by-id route refuses another tenant's id", () => {
     }
   });
 
-  it("covers every by-id route the router registers", () => {
-    const registered = routeRegistrations()
-      .filter(isByIdRoute)
   describe("the company gateway management token, which takes no id", () => {
     const TOKEN_MARKER = "TENANT-A-GATEWAY-TOKEN-MARKER-41c7";
     const ROUTE = "/api/v1/company/gateway-admin";
@@ -1522,6 +1519,9 @@ describe("every by-id route refuses another tenant's id", () => {
     });
   });
 
+  it("covers every by-id route the router registers", () => {
+    const registered = routeRegistrations()
+      .filter(isByIdRoute)
       .map((route) => `${route.method} ${route.path}`);
     const covered = new Set(BY_ID_ROUTES.map((route) => `${route.method} ${route.path}`));
 
