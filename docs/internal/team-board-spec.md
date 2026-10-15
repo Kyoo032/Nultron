@@ -335,6 +335,34 @@ His words: "this will be a migration from the old opc hyp ai which is looking li
    - Their old rows stay under their old company's desk. Moving those rows is not part of this step, and needs Rizky's word if he wants it.
 3. `update.sh` to the new image (it backs up again first), then sign in as each of the six and check their old chats and files.
 4. Gate: the open register item "five testers on one company, driven on a running hosted server" (`security-register.md:1199`) closes on this drive.
+- **Open (put to Rizky):** under upgrade in place, the six keep the fourteen agents their desks already have (existing desks are never rewritten). Whether to trim them is his call; no desk rewrite is built in passing.
+
+### Then: plain, Claude-like, minimal, prompt-made agents (Rizky, 2026-10-15; K-D34)
+
+His words, after trying the SME preview: "this is not it, this doesnt look like claude code. 1. not enterprise ready, still looked like nultron 2. no way to delete virtual agents, fix this 3. bloated everything is installed on the first run 4. user has to be able to create their own virtual agents through just prompt 5. make it simple, professional, not very colourful like this, your artifact form before is already the right way instead of this".
+
+The reference is the "HYP AI Workspace Mock" artifact (2026-10-14). Everything below applies only under `AGENTFORGE_SHELL=enterprise`. Nultron's default shell is unchanged, and its goldens hold byte for byte.
+
+1. **The look.** All of it comes from one token block under `html[data-product-shell="enterprise"]` in `apps/web/app/globals.css`.
+   - **Tokens:** the mock's values. Warm-neutral surfaces (`#FAFAF8` page, `#F1F0EC` sidebar, white raised), one accent `#0F5C7A`, 6 px radii, system sans, and the mock's dark values.
+   - **Mode colours:** every `--mode-*` and `--page-mode` maps to neutral, so no component needs touching for colour.
+   - **Off:** the sky, the dot grid, ambient motion, the mascot and the desk buddy.
+   - **Layout:** the mock's sidebar (mark and company, New chat, Agents, Workspaces, then Files, Settings and the person at the foot), a centred 760 px chat column and a plain composer. The empty chat is one heading plus the composer, with no intent cards and no greeting bubble.
+2. **First run.** A new company's first desk has the default agent only: Chat, with no mode agents.
+   - The host passes the first-desk modes to `ensurePortalOwner`. `shell-setting.ts` stays the only reader of the shell.
+   - The `first-run-modes` test gains an enterprise literal of chat only, as AGENTS.md requires for a first-desk change.
+   - The component-installer panel and the guided tour are not shown under the enterprise shell; the image already carries the dependencies.
+   - Existing desks are never rewritten.
+   - The other modes stay available as starting points when someone makes an agent.
+3. **Making an agent from a prompt.** "New agent" opens one box: describe the agent.
+   - The host makes one model call and returns a draft: name, one-line description, instructions, a base mode chosen from the existing modes, and tools that are a subset of that mode's tools. The draft is checked against a schema; a failure is `model_output_invalid`.
+   - The person sees the draft, with details under "More", and the agent is made only on Create, through the existing `agentService.create`. The tools are enforced through the agent's bindings.
+   - The gateway gate applies, and the person who asks pays (K-D29).
+   - A new agent is private to its maker. It is shared by bringing it into a Workspace (`project_agents`). A colleague who cannot see it gets 404 on read and on run, in the list and in `getPublishedForRun`.
+4. **Deleting an agent.** `DELETE /api/v1/agents/:agentId` is allowed for its maker or a company admin. The default agent is refused.
+   - The confirmation says what happens to the agent's chats and to the Workspaces it was brought into.
+   - A built-in mode agent keeps the existing let-go action, labelled "Remove".
+5. **Proof before "ready".** Screenshots of the preview beside the mock, at desktop width and at 390 px, light and dark.
 
 ## 3. Words
 
@@ -442,6 +470,8 @@ Ranked: the first five block the build or its safety.
 | K-D7 | Does Personal get a board (agents only, one human)? | Not in v1. | |
 | K-D8 | Is the board on the free trial? | Yes, within limits. A card run that needs a computer needs a paid plan, as with routines. | |
 | K-D32 | Do images and videos from a hosted chat run on the model's call, or ask the person first? | **Ask first, on a card with the estimate; the person may set "always allow" per kind.** (Rizky, 2026-10-15.) Nultron's chat unchanged. | Paid steps spend the person's quota (K-D29). |
+| K-D33 | Move the old HYP AI by upgrading in place, or back up and start clean? | **Upgrade in place, one company of six, full backup first.** (Rizky, 2026-10-15.) | Keeps the testers' work and accounts. |
+| K-D34 | What does HYP AI's SME shell look like, and what does a new company get? | **The plain "HYP AI Workspace Mock" look; the first desk is the default agent only; agents are made from a prompt and can be deleted.** (Rizky, 2026-10-15.) Nultron unchanged. | The first preview read as Nultron and as bloated. |
 | K-D14 | May an admin see the *titles* of a leaver's cards in the personal store, to decide keep or delete? | No. The admin sees only the count of items and their total size. | |
 
 ## 6. Data model
