@@ -43,6 +43,7 @@ import {
   handleGetArtifacts,
 } from "./handlers/artifacts";
 import { handleGetDoc, handleGetDocVersionFile, handleGetDocVersions } from "./handlers/docs-read";
+import { handlePostDocImport } from "./handlers/docs-import";
 import {
   handleDeleteDocSection,
   handlePostDocRestore,
@@ -485,6 +486,7 @@ const routes: Route[] = [
   compile("GET", "/api/v1/artifacts/:artifactId", handleGetArtifact),
   compile("DELETE", "/api/v1/artifacts/:artifactId", handleDeleteArtifact),
   compile("GET", "/api/v1/artifacts/:artifactId/file", handleGetArtifactFile),
+  compile("POST", "/api/v1/docs/import", handlePostDocImport),
   compile("GET", "/api/v1/docs/:artifactId", handleGetDoc),
   compile("GET", "/api/v1/docs/:artifactId/versions", handleGetDocVersions),
   compile("GET", "/api/v1/docs/:artifactId/versions/:n/file", handleGetDocVersionFile),

@@ -1312,6 +1312,61 @@ describe("every by-id route refuses another tenant's id", () => {
     });
   });
 
+  describe("the document import route, which takes its file id in the body", () => {
+    const IMPORT = "/api/v1/docs/import";
+
+    let foreignId: string;
+
+    const asSession = (session: { id: string }, method: string, path: string, body?: unknown) =>
+      dispatch(
+        {
+          method,
+          path,
+          query: {},
+          params: {},
+          headers: { cookie: `agentforge_session=${session.id}` },
+          ...(body === undefined ? {} : { body }),
+        },
+        { serverMode: true, sessionStore: store, now: () => T0 },
+      );
+
+    beforeAll(async () => {
+      const { createDocumentForTenant } = await import("./doc-tools/create-document");
+      const { sampleDocInput } = await import("./doc-tools/doc-tools-fixtures");
+      const made = await createDocumentForTenant(
+        { format: "docx", spec: { ...sampleDocInput(), title: LEAK_MARKER } },
+        tenantA,
+      );
+      if (!made.ok) {
+        throw new Error(made.message);
+      }
+      foreignId = made.artifactId;
+    });
+
+    it("is registered in the router", () => {
+      const registered = new Set(routeRegistrations().map((route) => `${route.method} ${route.path}`));
+      expect(registered.has(`POST ${IMPORT}`)).toBe(true);
+    });
+
+    it("refuses tenant A's file to B as it refuses an id nobody wrote, and leaves A's file as it was", async () => {
+      const foreign = await asSession(sessionB, "POST", IMPORT, { artifactId: foreignId });
+      const ghost = await asSession(sessionB, "POST", IMPORT, { artifactId: UNSEEDED_ID });
+      const foreignText = await serialise(foreign);
+      expect(foreignText, `${IMPORT} returned tenant A's data`).not.toContain(LEAK_MARKER);
+      expect(foreign.status, `${IMPORT} did not 404`).toBe(404);
+      expect(shape(foreign, foreignText)).toBe(shape(ghost, await serialise(ghost)));
+
+      const own = await asSession(sessionA, "GET", `/api/v1/docs/${foreignId}`);
+      expect(own.status).toBe(200);
+      expect((own as HostJsonResult).body).toMatchObject({ artifactId: foreignId });
+    });
+
+    it("lets tenant A import her own file, so the 404 for B is not a route that refuses everyone", async () => {
+      const own = await asSession(sessionA, "POST", IMPORT, { artifactId: foreignId });
+      expect(own.status).toBe(201);
+    });
+  });
+
   /**
    * The control for the doc-flow rows, which are the only ones whose handlers are still stubs: a
    * 404 from a route that answered 404 to everybody would satisfy the table above. Tenant A, on its
