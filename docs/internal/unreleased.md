@@ -54,6 +54,17 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Four model choices, core and the host allowance seam (team board K-D31 U1 to U5), 2026-10-15 (tester; nothing wired to a run yet)
+
+Lanes: enterprise, hyp-ai, tester
+
+- `packages/core/src/models/model-choice.ts` (`@agentforge/core/model-choice`): the choices Auto, Everyday, Reasoning and Custom (efforts default, low, medium, high), the request parser `readChoiceRequest` (absent means Auto; the host must call it only when the body has no `model` or `modelPinned`), the legacy tier map (daily to auto, fast to everyday, reasoning to reasoning) and the run label type.
+- `choice-profiles.ts`: one Everyday and one Reasoning candidate list per shell (`opc`, `enterprise`, identical today), seeded from the fast tier and the head of `CHAT_DEFAULT_PREFERENCES` for Everyday and the reasoning tier for Reasoning.
+- `resolve-choice.ts`: walks a list against the catalogue, skips a held-down model or one that cannot read the turn's modality, and for Auto crosses to the other list once (`crossedOver`). Custom never swaps models and answers `custom_model_not_allowed`, `custom_effort_invalid` or `custom_model_unavailable`.
+- `auto-choice.ts`: the Auto rule, first match wins: an attachment, a long context (32,000 tokens or half the Everyday window) or an en/id wording cue picks Reasoning, otherwise Everyday. `injection-guard.ts` gains `attachmentCountOf`.
+- `packages/host/src/model-allowance.ts`: `allowanceFor` (allow-all until K-D25 lands), `catalogFor`, and the Custom price band (band 1 up to USD 1 per million input tokens, band 2 up to 5, band 3 above) from the gateway price list. The band is null while the pricing cache is cold (it is filled only by the Settings usage read and lasts 10 minutes), so Custom then shows "price unknown".
+- Tests: core 80 (choice, profiles, walk) and 30 (Auto), host 13. Not done: host wiring (U6 onward), the picker, the run label, the map and recipe.
+
 ## Company gateway management token, host side (team board K-D25 step one, G1), 2026-10-15 (tester, uncommitted on `tester/chat-first` at `77638399`; SR-183; hosted only; not driven against a live gateway)
 
 Lanes: enterprise, hyp-ai, tester. Shared code (`settings-store.ts`, the router) is touched; Personal answers 404 on every route and never writes the slot. Proven by unit and router tests on throwaway data dirs (`gateway-tokens/adapter.test.ts` 15 of 15, `gateway-tokens/check.test.ts` 14 of 14, `handlers/company-gateway-admin.test.ts` 15 of 15, `settings-store.test.ts` 8 of 8, `wrap-key-rotation.test.ts` 20 of 20, `tenancy-harness.test.ts` 143 of 143); not driven on `:3200` or a hosted build.

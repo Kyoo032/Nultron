@@ -231,6 +231,10 @@ export function attachmentsAsMentions(text: string): string {
   return typed === "" ? mentions : `${typed}\n\n${mentions}`;
 }
 
+export function attachmentCountOf(text: string): number {
+  return [...text.matchAll(ATTACH_NAME_RE)].length;
+}
+
 export function redactAttachedParts(parts: ContentPart[]): ContentPart[] {
   return parts.map((part) => {
     if (part.type !== "text") {
