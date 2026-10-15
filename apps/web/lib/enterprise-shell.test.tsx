@@ -5,7 +5,6 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MadeAgentHome } from "@/components/agent-made-chat-pane";
 import { AgentRail, AgentRailView, type AgentRailViewProps } from "@/components/agent-rail";
 import { AppShell } from "@/components/app-shell";
 import { BrandMark } from "@/components/brand-mark";
@@ -430,26 +429,6 @@ describe("the enterprise empty chat is one heading and the composer", () => {
     expect(ids).toContain("chat-suggestions");
     expect(ids).toContain("chat-hero");
     expect(ids).toContain("chat-hero-mascot");
-  });
-});
-
-describe("the prompt-made agent's home is one heading under the enterprise shell", () => {
-  it("draws the greeting alone, without the description", () => {
-    const html = renderToStaticMarkup(
-      <BrandContext.Provider value={ENTERPRISE_BRAND}>
-        <MadeAgentHome name="Ledger" description="Checks invoices" />
-      </BrandContext.Provider>,
-    );
-    expect(headingCount(html)).toBe(1);
-    expect(greetingOf(html)).toContain("Ledger");
-    expect(testIds(html)).toEqual(["agent-home"]);
-    expect(html).not.toContain("Checks invoices");
-  });
-
-  it("keeps the description in the default shell", () => {
-    const html = renderToStaticMarkup(<MadeAgentHome name="Ledger" description="Checks invoices" />);
-    expect(html).toContain("agent-home-tagline");
-    expect(html).toContain("Checks invoices");
   });
 });
 

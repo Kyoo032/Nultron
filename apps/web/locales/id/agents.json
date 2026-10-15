@@ -30,8 +30,7 @@
     "workspacesHeading": "Ruang kerja",
     "workspacesAria": "Ruang kerja",
     "newWorkspace": "Ruang kerja baru",
-    "agentsHeading": "Agen",
-    "newAgent": "Agen baru"
+    "agentsHeading": "Agen"
   },
   "header": {
     "newChat": "Obrolan baru",
@@ -99,49 +98,5 @@
     "skillsCountOne": "1 keahlian",
     "converses": "Harness sendiri di obrolan",
     "studio": "Harness sendiri di studio"
-  },
-  "made": {
-    "section": "Dibuat dari perintah",
-    "remove": "Hapus",
-    "removeAria": "Hapus {name}",
-    "more": "Lainnya",
-    "moreAria": "Lainnya untuk {name}",
-    "delete": "Hapus",
-    "deleteTitle": "Hapus {name}?",
-    "deleteBody": "Semua obrolan dengan {name} dihapus, beserta pesan, catatan alat, dan kartu yang ditinggalkannya di Basis pengetahuan. Berkas dan unggahan tetap ada. {name} dikeluarkan dari Workspace mana pun tempat ia dibawa; Workspace tetap menyimpan semua isinya yang lain.",
-    "deleteCancel": "Simpan",
-    "deleteConfirm": "Hapus agen",
-    "deleting": "Menghapus",
-    "stubNote": "Belum ada model yang tersambung, jadi draf ini berasal dari kata-kata Anda sendiri. Sunting, lalu buat agen.",
-    "error": {
-      "invalidPrompt": "Jelaskan agen dalam 2.000 karakter atau kurang.",
-      "draft": "Draf agen gagal dibuat. Coba lagi.",
-      "draftInvalid": "Draf datang dalam bentuk yang tidak bisa dibaca aplikasi. Coba lagi dengan deskripsi yang lebih jelas.",
-      "invalidAgent": "Periksa nama, deskripsi, dan instruksi, lalu coba lagi.",
-      "create": "Agen tidak bisa dibuat.",
-      "forbidden": "Anda tidak bisa melakukan itu di meja ini.",
-      "notFound": "Agen ini tidak lagi ada di meja Anda.",
-      "notDeletable": "Agen ini bawaan dan tidak bisa dihapus.",
-      "inUse": "Orang lain punya obrolan dengan agen ini, jadi belum bisa dihapus.",
-      "delete": "Agen tidak bisa dihapus."
-    }
-  },
-  "new": {
-    "title": "Agen baru",
-    "lede": "Jelaskan agen dalam satu perintah. Periksa drafnya, ubah apa saja yang Anda mau, lalu buat.",
-    "promptLabel": "Jelaskan agen",
-    "promptPlaceholder": "Misalnya: membaca faktur saya dan mendaftar yang tidak cocok dengan pesanan pembelian.",
-    "draft": "Buat draf",
-    "drafting": "Membuat draf",
-    "draftTitle": "Agen Anda",
-    "name": "Nama",
-    "description": "Deskripsi",
-    "instructions": "Instruksi",
-    "more": "Lainnya",
-    "baseMode": "Berdasarkan",
-    "tools": "Alat",
-    "toolsNone": "Tidak ada alat. Agen menjawab dari instruksinya.",
-    "create": "Buat agen",
-    "creating": "Membuat"
   }
 }

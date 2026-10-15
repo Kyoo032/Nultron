@@ -68,9 +68,7 @@ beforeEach(() => {
 describe("AgentRailView agents", () => {
   it("draws one link per agent in the given order, the generalist first", () => {
     const html = markup();
-    const agentLinks = links(html.slice(0, html.indexOf('data-testid="rail-account-group"'))).filter(
-      (tag) => attr(tag, "data-testid") !== "rail-new-agent",
-    );
+    const agentLinks = links(html.slice(0, html.indexOf('data-testid="rail-account-group"')));
     expect(agentLinks.map((tag) => attr(tag, "data-testid"))).toEqual([
       "mode-chat",
       "agent-research",

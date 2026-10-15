@@ -173,7 +173,7 @@ export function virtualAgentTagline(agent: Pick<VirtualAgentInfo, "id">): string
   return t(`agents.tagline.${agent.id}`);
 }
 
-export const CHAT_PATH = "/chat";
+const CHAT_PATH = "/chat";
 
 /**
  * Where an agent lives. Every agent, the generalist included, is `/chat`: the generalist with no
@@ -197,15 +197,13 @@ export function agentIdFromSearch(params: URLSearchParams): ProductMode {
   return value && MODE_IDS.has(value) ? (value as ProductMode) : "chat";
 }
 
-export const MADE_AGENT_PARAM = "made";
-
 /**
  * Which agent the current route belongs to, for the rail's highlight: the one `/chat` names, or the
  * one whose studio screen is open. Null on an account page (Knowledge, Settings and so on).
  */
 export function activeAgentId(pathname: string, params: URLSearchParams): ProductMode | null {
   if (pathname === CHAT_PATH) {
-    return params.get(MADE_AGENT_PARAM) ? null : agentIdFromSearch(params);
+    return agentIdFromSearch(params);
   }
   const studio = PRODUCT_MODES.find(
     (mode) => mode.id !== "chat" && (pathname === mode.href || pathname.startsWith(`${mode.href}/`)),

@@ -67,8 +67,6 @@ export type ChatSessionShell = {
   onForeignThread?: (ownerAgentId: string, threadId: string) => void;
   /** Set when the agent's own harness still runs from its studio: the empty conversation offers it. */
   onOpenStudio?: () => void;
-  threadHref?: (threadId: string) => string;
-  emptyState?: ReactNode;
 };
 
 type Props = {
@@ -201,7 +199,7 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
   /** Where a thread of this session lives. In the chat-first shell every agent's is under `/chat`. */
   function threadHref(id: string) {
     if (shell) {
-      return shell.threadHref ? shell.threadHref(id) : virtualAgentHref(shell.agent.id, id);
+      return virtualAgentHref(shell.agent.id, id);
     }
     return `${agentId ? `/agents/${agentId}` : "/chat"}?thread=${id}`;
   }
@@ -500,9 +498,7 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
         data-testid="message-list"
       >
         {empty && !error ? (
-          shell?.emptyState ? (
-            shell.emptyState
-          ) : shell && !shell.agent.generalist ? (
+          shell && !shell.agent.generalist ? (
             <AgentHome agent={shell.agent} name={shell.name} onOpenStudio={shell.onOpenStudio} />
           ) : (
             <ChatLauncher onSuggest={setComposerDraft} />

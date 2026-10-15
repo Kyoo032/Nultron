@@ -2,10 +2,8 @@
 
 import { useState, type ReactNode, type SyntheticEvent } from "react";
 import type { ProductMode } from "@agentforge/core/product-modes";
-import { usePathname, useRouter, useSearchParams } from "@/lib/nav";
+import { usePathname, useSearchParams } from "@/lib/nav";
 import { AppUpdatesButton } from "@/components/app-updates";
-import { AgentDeleteDialog } from "@/components/agent-delete-dialog";
-import { MadeAgentRailRow, NewAgentRailLink } from "@/components/agent-made-rail";
 import { EnterpriseRailHeader, SectionHeading, WorkspacesSection } from "@/components/agent-rail-enterprise";
 import { RAIL_PANEL_ID, RailLink, RailToggle, type Tip } from "@/components/agent-rail-parts";
 import { BrandMark } from "@/components/brand-mark";
@@ -28,7 +26,6 @@ import {
   virtualAgentName,
   type VirtualAgentInfo,
 } from "@/lib/virtual-agents";
-import { madeAgentIdFromSearch, useMadeAgents, type MadeAgent } from "@/lib/virtual-agents-made";
 import "./agent-rail.css";
 
 type Props = {
@@ -79,9 +76,6 @@ export type AgentRailViewProps = {
   /** Hosted enterprise only: the person's Workspaces, drawn above the agents. Null draws no section. */
   workspaces?: RailWorkspacesState | null;
   activeWorkspaceId?: string | null;
-  made?: readonly MadeAgent[];
-  activeMadeId?: string | null;
-  onRequestDelete?: (agent: MadeAgent) => void;
 };
 
 type AccountLink = { href: string; icon: ModeIconName; testId: string; labelKey: string };
@@ -136,9 +130,6 @@ export function AgentRailView({
   look = "opc",
   workspaces = null,
   activeWorkspaceId = null,
-  made = [],
-  activeMadeId = null,
-  onRequestDelete,
 }: AgentRailViewProps) {
   const enterprise = look === "enterprise";
   const sectionCoversProjects = enterprise && workspaces !== null;
@@ -232,19 +223,7 @@ export function AgentRailView({
           onScroll={onTipEnd}
         >
           {list.filter((agent) => agent.generalist).map(renderAgent)}
-          {made.map((agent) => (
-            <MadeAgentRailRow
-              key={agent.id}
-              agent={agent}
-              active={activeMadeId === agent.id}
-              collapsed={collapsed}
-              onRequestDelete={onRequestDelete}
-              onTip={onTip}
-              onTipEnd={onTipEnd}
-            />
-          ))}
           {list.filter((agent) => !agent.generalist).map(renderAgent)}
-          {enterprise ? <NewAgentRailLink collapsed={collapsed} /> : null}
           {waiting && !enterprise
             ? SKELETON_KEYS.map((key) => (
                 <span key={key} className="agent-rail-skeleton" data-testid="agent-rail-skeleton" aria-hidden="true" />
@@ -303,12 +282,9 @@ export function AgentRailView({
 export function AgentRail(_props: Props) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const router = useRouter();
   const brand = useProductBrand();
   const enterprise = useShellLook() === "enterprise";
   const { agents, loaded } = useVirtualAgents();
-  const made = useMadeAgents();
-  const [pendingDelete, setPendingDelete] = useState<MadeAgent | null>(null);
   const phone = useMatchMedia(RAIL_PHONE_QUERY);
   const desk = useRailCollapse(!enterprise);
   const drawer = useRailDrawer(phone, `${pathname}?${searchParams.toString()}`);
@@ -318,57 +294,41 @@ export function AgentRail(_props: Props) {
   const buddy = !enterprise && buddyAllowedAt(pathname);
   const productName = enterprise ? enterpriseBrandName(brand.productName) : brand.productName;
   const assistantName = enterprise ? brand.assistantName?.trim() || productName : assistantNameOf(brand);
-  const openMadeId = pathname === "/chat" ? madeAgentIdFromSearch(searchParams) : null;
-
-  function onDeleted(agentId: string) {
-    setPendingDelete(null);
-    if (madeAgentIdFromSearch(searchParams) === agentId) {
-      router.push(virtualAgentHref("chat"));
-    }
-  }
 
   return (
-    <>
-      <AgentRailView
-        agents={agents}
-        loaded={loaded}
-        activeId={activeAgentId(pathname, searchParams)}
-        made={made.agents}
-        activeMadeId={openMadeId}
-        onRequestDelete={setPendingDelete}
-        pathname={pathname}
-        productName={productName}
-        assistantName={assistantName}
-        logoSrc={brand.logoSrc}
-        bundledMark={usesBundledMark(brand)}
-        showBoard={hosted}
-        showProjects={hosted}
-        collapsed={collapsed}
-        onToggle={phone ? drawer.toggle : desk.toggle}
-        onDismiss={phone ? drawer.close : undefined}
-        look={enterprise ? "enterprise" : "opc"}
-        workspaces={workspaces}
-        activeWorkspaceId={activeWorkspaceIdOf(pathname, searchParams)}
-        footer={
-          <>
-            {/* The character lives here in this shell, as the small head: the rail is the one place on
-              screen where nothing a person or a model wrote ever scrolls under it. The dock is what
-              tells the buddy it has a home; it is given no room (`agent-rail.css`), so the buddy is
-              always the head and never a body standing over the rail's icons. */}
-            {buddy ? (
-              <div className="agent-rail-buddy-dock" aria-hidden="true">
-                <DeskBuddyDock collapsed={false} />
-              </div>
-            ) : null}
-            {buddy ? <DeskBuddyChip /> : null}
-            <ThemeToggle />
-            {enterprise ? null : <AppUpdatesButton collapsed />}
-          </>
-        }
-      />
-      {pendingDelete ? (
-        <AgentDeleteDialog agent={pendingDelete} onCancel={() => setPendingDelete(null)} onDeleted={onDeleted} />
-      ) : null}
-    </>
+    <AgentRailView
+      agents={agents}
+      loaded={loaded}
+      activeId={activeAgentId(pathname, searchParams)}
+      pathname={pathname}
+      productName={productName}
+      assistantName={assistantName}
+      logoSrc={brand.logoSrc}
+      bundledMark={usesBundledMark(brand)}
+      showBoard={hosted}
+      showProjects={hosted}
+      collapsed={collapsed}
+      onToggle={phone ? drawer.toggle : desk.toggle}
+      onDismiss={phone ? drawer.close : undefined}
+      look={enterprise ? "enterprise" : "opc"}
+      workspaces={workspaces}
+      activeWorkspaceId={activeWorkspaceIdOf(pathname, searchParams)}
+      footer={
+        <>
+          {/* The character lives here in this shell, as the small head: the rail is the one place on
+            screen where nothing a person or a model wrote ever scrolls under it. The dock is what
+            tells the buddy it has a home; it is given no room (`agent-rail.css`), so the buddy is
+            always the head and never a body standing over the rail's icons. */}
+          {buddy ? (
+            <div className="agent-rail-buddy-dock" aria-hidden="true">
+              <DeskBuddyDock collapsed={false} />
+            </div>
+          ) : null}
+          {buddy ? <DeskBuddyChip /> : null}
+          <ThemeToggle />
+          {enterprise ? null : <AppUpdatesButton collapsed />}
+        </>
+      }
+    />
   );
 }
