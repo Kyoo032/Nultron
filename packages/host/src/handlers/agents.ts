@@ -7,6 +7,10 @@ import { defaultSelectableModel, listSelectableModels } from "../selectable-mode
 import { ensureToolsRegistered } from "../register-tools";
 import { listThreads } from "../threads";
 import type { InputModality, Visibility } from "@agentforge/core";
+import { draftAgent, readDraftPrompt } from "../agent-draft";
+import { createPromptAgent, readAgentDraftBody } from "../agent-create";
+import { deleteAgentFor } from "../agent-delete";
+import { withAgentFlags } from "../agent-flags";
 
 export async function handleGetAgent(request: HostRequest): Promise<HostResult> {
   try {
@@ -152,6 +156,10 @@ export async function handleGetAgentThreads(request: HostRequest): Promise<HostR
     if (!agentId) {
       return jsonOk({ error: { code: "invalid_content_part", message: "agentId required" } }, 400);
     }
+    const agent = await agentService.get(tenant, agentId);
+    if (!agent) {
+      throw new ApiError("not_found", "Agent not found", 404);
+    }
     const threads = await listThreads(tenant, agentId);
     return jsonOk({ threads });
   } catch (error) {
@@ -165,7 +173,7 @@ export async function handleGetWorkspaceAgents(request: HostRequest): Promise<Ho
     if (request.params.workspaceId !== tenant.workspaceId) {
       return jsonOk({ error: { code: "not_found", message: "Workspace not found" } }, 404);
     }
-    const agents = await agentService.list(tenant);
+    const agents = await withAgentFlags(tenant, await agentService.list(tenant));
     return jsonOk({ agents });
   } catch (error) {
     return jsonError(error);
@@ -207,6 +215,37 @@ export async function handlePostWorkspaceAgents(request: HostRequest): Promise<H
       listSelectableModels(tenant),
     );
     return jsonOk(created, 201);
+  } catch (error) {
+    return jsonError(error);
+  }
+}
+
+export async function handlePostAgentDraft(request: HostRequest): Promise<HostResult> {
+  try {
+    const prompt = readDraftPrompt(request.body ?? null);
+    const tenant = await getTenant(request);
+    return jsonOk(await draftAgent(tenant, prompt));
+  } catch (error) {
+    return jsonError(error);
+  }
+}
+
+export async function handlePostAgents(request: HostRequest): Promise<HostResult> {
+  try {
+    const tenant = await getTenant(request);
+    const draft = readAgentDraftBody(request.body ?? null);
+    return jsonOk(await createPromptAgent(tenant, draft), 201);
+  } catch (error) {
+    return jsonError(error);
+  }
+}
+
+export async function handleDeleteAgent(request: HostRequest): Promise<HostResult> {
+  try {
+    const tenant = await getTenant(request);
+    const agentId = request.params.agentId;
+    const result = await deleteAgentFor(tenant, agentId);
+    return jsonOk({ ok: true, agentId, ...result });
   } catch (error) {
     return jsonError(error);
   }

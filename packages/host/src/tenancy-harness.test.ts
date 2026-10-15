@@ -479,6 +479,7 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
   { method: "POST", path: "/api/v1/agents/:agentId/share", params: { agentId: "agentId" }, body: {} },
   { method: "POST", path: "/api/v1/agents/:agentId/product-modes", params: { agentId: "agentId" }, body: {} },
   { method: "POST", path: "/api/v1/agents/:agentId/generate-defaults", params: { agentId: "agentId" }, body: {} },
+  { method: "DELETE", path: "/api/v1/agents/:agentId", params: { agentId: "agentId" } },
 
   // --- channels (Telegram, PR #67) --------------------------------------------------------------
   { method: "GET", path: "/api/v1/channels/:channelId", params: { channelId: "channelId" } },

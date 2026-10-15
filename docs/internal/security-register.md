@@ -215,6 +215,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-179](#sr-179) | Medium | Hosted (tester): a member removed from a Workspace keeps reading, listing and deleting the files and media they put into it | Fixed in the tester (2026-10-14), not driven hosted | Before HYP AI imports from the tester, and before promotion to `main` |
 | [SR-180](#sr-180) | Medium | Hosted (tester): document versions are not counted against a tenant's storage, and the cap keeps every version from the last 30 days with no count limit, so a busy document can fill the one disk | Open, not reachable: no route writes a version yet (D0, 2026-10-15) | Before D1 adds a route that appends a version |
 | [SR-181](#sr-181) | Low | Hosted (tester): a person with no display name is shown to every colleague by their password-mode username, so a colleague can lock them out with five wrong passwords | Fixed on the tester 2026-10-15, names only (Rizky's decision): the username is never sent as a name, and a person with no name shows as "Colleague <code>". One residual: a name stored by the old username fallback stays until that person's next sign-in | Before HYP AI imports from the tester |
+| [SR-182](#sr-182) | Medium | Hosted (tester): an owner or admin could open and edit a colleague's private agent | Fixed on the tester 2026-10-15: only the maker sees a private agent on a hosted desk; an owner or admin may delete it without opening it, and the maker's chats go with it. Personal unchanged | Before HYP AI imports from the tester |
 | [SR-177](#sr-177) | Low | The new deploy preflight, run in a throwaway container when the server has no node, received the real `AGENTFORGE_SECRETS_KEY` | Fixed before merge (branch `chore/agent-guardrails`, 2026-10-14): the container gets the word `set` or nothing | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
@@ -6132,6 +6133,26 @@ Tests: `packages/host/src/company-people-names.test.ts` (password mode, through 
 Status: **fixed on the tester, 2026-10-15; one residual.** A row that stored a username in the window between `204aeaa8` and this fix keeps it until that person's next sign-in: the host holds no username, so it cannot tell a stored username from a name at read time. Open for Rizky: a one-off clean-up with the portal for the people who have not signed in since, and whether `--name` should become required for new password accounts. The portal token still carries `username` (`apps/portal/src/flows/token.ts:246`); the host now reads it only for the comparison. Dropping it from the token is a portal change, not made here.
 
 Gate: before HYP AI imports from the tester. The residual is named in the same gate.
+
+### SR-182 {#sr-182}
+
+**Hosted: an owner or admin could open and edit a colleague's private agent; now only the maker can, and delete is not a read.**
+Tester only. Raised 2026-10-15 with K34-b (prompt-made agents). Medium, fixed.
+
+Evidence (before):
+- `canView` returned `canAdminister(tenant.role)` for any private agent of the desk (`packages/core/src/agents/service.ts`, the last line of `canView`). An owner or admin therefore read the agent's prompt and tools through `GET /api/v1/agents/:id`, listed it in `GET /api/v1/workspaces/:id/agents` and the Chat specialists, and could edit it, which the colleague had made as a private agent.
+- Members may now make private agents (`service.ts`, `create`: the builder role is asked for only when the visibility is not private), so the exposure would have grown with the feature.
+
+Fix (2026-10-15, tester):
+- `canView` lets the role see a colleague's private agent only when server mode is off (`service.ts:107-120`; the flag is `AgentService`'s fourth constructor argument, wired to `isServerMode()` in `packages/host/src/tenant.ts:16-21`). `get`, `list`, `requireOwned` and so `GET .../threads`, tools, soul, publish, product-modes, generate-defaults, thread creation and runs all answer 404 to everyone but the maker.
+- Delete is not a read. `DELETE /api/v1/agents/:agentId` lets an owner or admin remove a colleague's private agent without ever returning its content (`packages/host/src/agent-delete.ts:60-71`), and answers a member 404 for the same id. Deleting removes the maker's chats with it (`:81-90`); another person's chat on a workspace agent blocks the delete (409 `agent_in_use`, `:75-82`), so nothing of a third person is lost.
+- Personal is unchanged: with the flag off the owner sees and edits every row (`packages/host/src/agent-prompt-made.personal.test.ts`, first case; `packages/core/src/agents/service-privacy.test.ts`).
+
+Tests: `packages/host/src/agent-prompt-made.test.ts` (the 404 table for owner, admin and a second member over nine routes; the lists; the delete cases), `packages/core/src/agents/service-privacy.test.ts`, the tenancy harness row for the DELETE route.
+
+Residual: an owner or admin can still delete the agent and with it the maker's chats, by design (K-D34 item 4). The confirmation in the renderer must say so. Sharing a prompt-made agent with a Workspace is not built; when it lands `canView` needs a Workspace clause.
+
+Gate: before HYP AI imports from the tester.
 
 ## Must be true before the Tencent Cloud deploy
 

@@ -14,6 +14,7 @@ import {
 import { getChatModel, listChatModels, type ChatModel } from "../models/catalog";
 import { requireProductModes, resolveProductModes, type ProductMode } from "./product-modes";
 import { mergeGeneratePins } from "./generate-defaults";
+import { isVirtualAgentSlug } from "./virtual-agents";
 
 export type AgentRecord = {
   id: string;
@@ -91,7 +92,8 @@ function slugify(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
-  return slug.length > 0 ? slug : "agent";
+  const base = slug.length > 0 ? slug : "agent";
+  return base === DEFAULT_CHAT_SLUG || isVirtualAgentSlug(base) ? `agent-${base}` : base;
 }
 
 function ensureModalities(input?: InputModality[]): InputModality[] {
@@ -102,7 +104,7 @@ function ensureModalities(input?: InputModality[]): InputModality[] {
   return [...new Set(modalities)];
 }
 
-function canView(agent: AgentRecord, tenant: TenantContext): boolean {
+function canView(agent: AgentRecord, tenant: TenantContext, serverMode: boolean): boolean {
   if (agent.organizationId !== tenant.organizationId) {
     return false;
   }
@@ -115,7 +117,7 @@ function canView(agent: AgentRecord, tenant: TenantContext): boolean {
   if (agent.createdByUserId === tenant.userId) {
     return true;
   }
-  return canAdminister(tenant.role);
+  return !serverMode && canAdminister(tenant.role);
 }
 
 export function resolvePublishedVersion(
@@ -149,14 +151,19 @@ export class AgentService {
     private readonly repo: AgentRepository,
     private readonly now: () => Date = () => new Date(),
     private readonly id: () => string = () => crypto.randomUUID(),
+    private readonly serverMode: () => boolean = () => false,
   ) {}
+
+  private canSee(agent: AgentRecord, tenant: TenantContext): boolean {
+    return canView(agent, tenant, this.serverMode());
+  }
 
   async create(
     tenant: TenantContext,
     input: CreateAgentInput,
     knownModels: ChatModel[] = listChatModels(),
   ): Promise<{ agent: AgentRecord; version: AgentVersionRecord }> {
-    if (!canBuild(tenant.role)) {
+    if (!canBuild(tenant.role) && (input.visibility ?? "private") !== "private") {
       throw new ApiError("forbidden", "Builder role required", 403);
     }
     if (!getChatModel(input.model, knownModels)) {
@@ -278,7 +285,7 @@ export class AgentService {
 
   async get(tenant: TenantContext, agentId: string): Promise<AgentRecord | null> {
     const agent = await this.repo.findAgentById(tenant.organizationId, agentId);
-    if (!agent || !canView(agent, tenant)) {
+    if (!agent || !this.canSee(agent, tenant)) {
       return null;
     }
     return agent;
@@ -286,7 +293,7 @@ export class AgentService {
 
   async list(tenant: TenantContext): Promise<AgentRecord[]> {
     const agents = await this.repo.listAgents(tenant.organizationId, tenant.workspaceId);
-    return agents.filter((agent) => canView(agent, tenant));
+    return agents.filter((agent) => this.canSee(agent, tenant));
   }
 
   async publish(tenant: TenantContext, agentId: string, versionId: string): Promise<AgentRecord> {
@@ -370,6 +377,9 @@ export class AgentService {
   }
 
   async share(tenant: TenantContext, agentId: string, visibility: Visibility): Promise<AgentRecord> {
+    if (!canBuild(tenant.role)) {
+      throw new ApiError("forbidden", "Builder role required", 403);
+    }
     const agent = await this.requireOwned(tenant, agentId);
     const updated = { ...agent, visibility, updatedAt: this.now() };
     await this.repo.updateAgent(tenant.organizationId, agentId, {
@@ -516,15 +526,15 @@ export class AgentService {
   }
 
   private async requireOwned(tenant: TenantContext, agentId: string): Promise<AgentRecord> {
-    if (!canBuild(tenant.role)) {
-      throw new ApiError("forbidden", "Builder role required", 403);
-    }
     const agent = await this.repo.findAgentById(tenant.organizationId, agentId);
-    if (!agent || agent.workspaceId !== tenant.workspaceId) {
+    if (!agent || agent.workspaceId !== tenant.workspaceId || !this.canSee(agent, tenant)) {
       throw new ApiError("not_found", "Agent not found", 404);
     }
     if (agent.createdByUserId !== tenant.userId && !canAdminister(tenant.role)) {
       throw new ApiError("forbidden", "Only the creator can edit this agent", 403);
+    }
+    if (!canBuild(tenant.role) && agent.visibility !== "private") {
+      throw new ApiError("forbidden", "Builder role required", 403);
     }
     return agent;
   }

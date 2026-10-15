@@ -2,6 +2,8 @@
 
 Product: both · Instance: main :3000 + HYP AI :3301
 
+Last verified: 2026-10-15 at 63924373 for one fact only: `runs.ts` (`isPromptMadeVersion`, the bindings passed to the runtime) adds no automatic `past_sessions` binding to an agent made from a prompt (see [`virtual-agents.md`](virtual-agents.md)). Nothing else on the page was re-read.
+
 Last verified: 2026-10-14 at 9e77ccda for § 1 (the attachment paragraph: a Word, Excel or PDF's kept original, its note and the delete when its chip is removed), § 3a (the 21 tools, the generalist worker `research_dossier` that the default agent gets at run time, and the default agent's budget, which now comes from `virtualAgentFor("chat")`), § 6 (the document cards, Add to Workspace and `NO_EMBED_TOOLS`), the Overview's tool count, and the Where things live, Touches, Gotchas and Verify blocks. Read from the tester tree (`agentforge-chat`) over that commit. The rest of the page was not re-read in this pass: § 3 step 5's bindings cite (`:344`) and the `runs.ts` lines in §§ 3b to 5 and the stream reader in § 6 were last anchored earlier and may have moved; and, from main (#162), the Continue sentence at the end of § 3b.
 
 Also on `main`: Last verified: 2026-10-14 for the Continue sentence at the end of § 3b only. Nothing else on the page was re-read.

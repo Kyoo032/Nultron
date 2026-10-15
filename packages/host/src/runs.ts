@@ -68,6 +68,7 @@ import { withAttendedRun } from "./media-approval/presence";
 import type { JobEvent } from "@agentforge/core/jobs";
 import { DEFAULT_CHAT_MODALITIES, GENERALIST_WORKER_PROMPT, virtualAgentFor } from "@agentforge/core";
 import { runPolicyFor, withGeneralistWorkers } from "./virtual-agents";
+import { isPromptMadeVersion } from "./prompt-made-agent";
 import { WORKER_STREAM_IDLE_MS, withWorkerChannel } from "./workers/worker-channel";
 import { formatPastSessionsHint } from "./session-recall";
 import { log } from "./log";
@@ -520,7 +521,9 @@ export async function* startModalityRun(options: {
                   // The default agent can run every wired harness from its own chat, hired or not.
                   defaultChat
                     ? withGeneralistWorkers(withPastSessionsBinding(published.bindings))
-                    : withPastSessionsBinding(published.bindings),
+                    : isPromptMadeVersion(published.version)
+                      ? published.bindings
+                      : withPastSessionsBinding(published.bindings),
                   options.modality,
                 ),
             // The default agent's budget is Chat's declared one plus a ceiling for each worker; a mode

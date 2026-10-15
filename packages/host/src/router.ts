@@ -24,16 +24,19 @@ import { withRequestLocale } from "./run-context";
 import { withRequestSession } from "./tenant-scope";
 import { clearedWorkspaceCookie } from "./workspace";
 import {
+  handleDeleteAgent,
   handleGetAgent,
   handleGetAgentCapabilities,
   handleGetAgentThreads,
   handleGetWorkspaceAgents,
+  handlePostAgentDraft,
   handlePostAgentGenerateDefaults,
   handlePostAgentProductModes,
   handlePostAgentPublish,
   handlePostAgentShare,
   handlePostAgentSoul,
   handlePostAgentTools,
+  handlePostAgents,
   handlePostWorkspaceAgents,
 } from "./handlers/agents";
 import {
@@ -525,6 +528,9 @@ const routes: Route[] = [
   compile("POST", "/api/v1/agents/:agentId/publish", handlePostAgentPublish),
   compile("POST", "/api/v1/agents/:agentId/share", handlePostAgentShare),
   compile("POST", "/api/v1/agents/:agentId/product-modes", handlePostAgentProductModes),
+  compile("POST", "/api/v1/agents/draft", handlePostAgentDraft),
+  compile("POST", "/api/v1/agents", handlePostAgents),
+  compile("DELETE", "/api/v1/agents/:agentId", handleDeleteAgent),
   compile("POST", "/api/v1/agents/:agentId/generate-defaults", handlePostAgentGenerateDefaults),
   compile("GET", "/api/v1/tools", handleGetTools),
   compile("GET", "/api/v1/context", handleGetContext),
