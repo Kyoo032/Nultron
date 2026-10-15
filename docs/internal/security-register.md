@@ -214,6 +214,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-178](#sr-178) | Medium | Hosted (tester): a Workspace switched to "workspace" is readable by the whole company, not only its members (K-D22) | Fixed in the tester at `c062f4b7`, not driven hosted | Before HYP AI imports from the tester, and before promotion to `main` (a hosted drive is still owed) |
 | [SR-179](#sr-179) | Medium | Hosted (tester): a member removed from a Workspace keeps reading, listing and deleting the files and media they put into it | Fixed in the tester (2026-10-14), not driven hosted | Before HYP AI imports from the tester, and before promotion to `main` |
 | [SR-180](#sr-180) | Medium | Hosted (tester): document versions are not counted against a tenant's storage, and the cap keeps every version from the last 30 days with no count limit, so a busy document can fill the one disk | Open, not reachable: no route writes a version yet (D0, 2026-10-15) | Before D1 adds a route that appends a version |
+| [SR-181](#sr-181) | Low | Hosted (tester): a person with no display name is shown to every colleague by their password-mode username, so a colleague can lock them out with five wrong passwords | Open, accepted for the tester; the username fallback is an open decision for Rizky | Before HYP AI imports from the tester |
 | [SR-177](#sr-177) | Low | The new deploy preflight, run in a throwaway container when the server has no node, received the real `AGENTFORGE_SECRETS_KEY` | Fixed before merge (branch `chore/agent-guardrails`, 2026-10-14): the container gets the word `set` or nothing | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
@@ -6103,6 +6104,23 @@ Status: **open, not reachable.** No route calls `appendVersion` today. D1 must d
 - rate-limit section edits.
 
 Gate: before D1 adds a route that appends a version.
+
+### SR-181 {#sr-181}
+
+**Hosted: colleagues see a person's password-mode username, so any colleague can lock that person out.**
+Tester only. Raised 2026-10-15 with the Workspace people picker. Low.
+
+Evidence:
+- The portal's token body now carries the person's username beside the display name (`memberOf`, `apps/portal/src/flows/token.ts:237`, username at `:246`).
+- The host keeps the display name, else the username, as the person's name (`packages/host/src/auth/portal-client.ts:301`) and writes it to `user.name` at sign-in (`packages/db/src/portal-owner.ts:217`).
+- `listCompanyPeople` (`packages/host/src/company-people.ts:8`) shows that name to every owner or admin of a Workspace through `GET /api/v1/projects/:id/invitable`, and to every member of the company through the board's people list.
+- The portal locks an account after five failed passwords for 15 minutes (`PASSWORD_MAX_FAILED_ATTEMPTS`, `PASSWORD_LOCK_MS`, `apps/portal/src/store/postgres/credentials.ts:40-41`), and gives the same answer for a wrong password and an unknown username, so a username was not guessable from outside.
+
+What goes wrong if ignored: a colleague who reads a person's username in the picker can lock that person out for 15 minutes at a time. The reach is the same company only, and a password sign-in also takes the e-mail address on record, which colleagues often know already, so the step is small.
+
+Status: **open, accepted for the tester.** The brief asked for names a HYP AI person can recognise, and for most password-mode accounts the username is the only one. Open decision for Rizky: keep the username fallback, show it only to Workspace owners and admins, or require the operator to set a display name. No code change until he decides.
+
+Gate: before HYP AI imports from the tester.
 
 ## Must be true before the Tencent Cloud deploy
 
