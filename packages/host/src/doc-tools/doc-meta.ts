@@ -18,13 +18,20 @@ export type EditableSpec =
 
 /** The metadata for a saved document: its sealed spec, and optionally the file it was revised from. */
 export function specMeta(spec: DocSpec | SheetSpec, parentArtifactId?: string): ArtifactMeta {
-  const sealed = sealPayload(spec, getLocalVaultKey());
+  const sealed = sealSpec(spec);
   return parentArtifactId === undefined ? { [SPEC_META_KEY]: sealed } : { [SPEC_META_KEY]: sealed, parentArtifactId };
+}
+
+export function sealSpec(spec: DocSpec | SheetSpec): unknown {
+  return sealPayload(spec, getLocalVaultKey());
 }
 
 /** Open the sealed spec of a saved artifact. Null when the row has none, or it does not open or parse. */
 export function readEditableSpec(record: ArtifactRecord): EditableSpec | null {
-  const sealed = record.meta[SPEC_META_KEY];
+  return openSpec(record.meta[SPEC_META_KEY]);
+}
+
+export function openSpec(sealed: unknown): EditableSpec | null {
   if (sealed === undefined) {
     return null;
   }

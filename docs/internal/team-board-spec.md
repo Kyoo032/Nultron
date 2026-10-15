@@ -194,6 +194,11 @@ The goal, from the mock's screen 6: a document lives in a Workspace and opens in
   - Add `doc_versions`, a store, and the version cap.
   - Make version 1 from an existing document's spec the first time it is opened.
   - Test that ids stay stable.
+  - Built 2026-10-15 (`packages/host/src/doc-versions/`, map `agent-tools-and-files.md` § 16). Choices D1 inherits:
+    - An append takes an edit of the head, not a whole spec. Inside one transaction the host derives the changed sections, applies the per-section base check (`section_changed`), and keeps other people's newer sections.
+    - A new section id is random (`s-` and 10 hex digits), so a deleted section's id is never reused.
+    - A pruned version's section authors fold into the oldest kept row.
+    - Two things are left to D1: re-rendering `artifacts.body` after an append (the head spec moves, the stored bytes do not yet), and whether versions count against the hosted storage quota.
 - **D1 Routes, host only.**
   - `GET /api/v1/docs/:artifactId` returns the spec, the head version, the author of each section, and any pending proposals.
   - `PUT /api/v1/docs/:artifactId/sections/:sectionId` takes a base version.

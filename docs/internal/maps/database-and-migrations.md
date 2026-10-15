@@ -2,6 +2,8 @@
 
 Product: both · Instance: main :3000 + HYP AI :3301
 
+Last verified: 2026-10-15 at de5ce628 (tester tree) for the `doc_versions` paragraph under "The schema" only. Nothing else on the page was re-read.
+
 Last verified: 2026-09-29 for the three `apps/desktop/main.cjs` citations (`bootstrapPackaged` lines), re-anchored in the
 working tree, not committed, after the ffmpeg probe moved behind the first paint. Before that: 2026-09-23 at d4561b8 + uncommitted tree for the migrations table and the numbering note (now
 through `0021`), the `auth_sessions` row of the schema families, "Start over, applied at next boot" (every
@@ -130,6 +132,8 @@ The families:
 Two tables exist only in SQL and have no Drizzle declaration, because they are FTS5 virtual tables:
 `knowledge_chunks` (`packages/db/drizzle/0003_knowledge.sql`) and `market_news_fts`
 (`packages/db/drizzle/0009_market.sql`). The schema file says so at `:662-664`.
+
+The tester adds tables on every open with `CREATE TABLE IF NOT EXISTS` and no Drizzle declaration, so it never edits the journal `main` owns: the board (`board-schema.ts`), the Workspaces (`projects-schema.ts`) and, since 2026-10-15, `doc_versions` (`packages/db/src/doc-versions-schema.ts:5`, called from `ensure-schema.ts:258`). `doc_versions` holds one row per kept version of a saved document (team-board-spec.md, K-D30, phase D0). Its `artifact_id` references `artifacts(id)` with `ON DELETE cascade`, so it is listed in `CASCADED_TABLES` (`tenant-purge.ts:93`): the purge deletes `artifacts` by desk and the foreign key takes the versions; an artifact delete does the same. It carries a `workspace_id` copied from the artifact and no `tenant_id`. `UNIQUE (artifact_id, version)` is the guard that makes "exactly one version 1" hold across connections. Two `CHECK`s keep the author whole: a `person` row has `author_user_id` and no `agent_id`; an `agent` row has `agent_id`. `folded_authors` is plain JSON of section ids, version numbers and user or agent ids, never content; the spec column is the same sealed envelope as `artifacts.meta.spec`. The store that writes it is in [`agent-tools-and-files.md`](agent-tools-and-files.md) § 16. Personal Start over deletes the whole SQLite file (`reset.ts:29`), so it takes the table too.
 
 ### Migrations
 

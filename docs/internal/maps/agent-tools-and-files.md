@@ -2,7 +2,7 @@
 
 Product: both · Instance: main :3000 + HYP AI :3301
 
-Last verified: 2026-10-14 at 9e77ccda for § 1 (the Chat row), § 2 (the Chat tool list and its prompt file), § 14 (the cap and the place in the list), the new § 15 (the four document tools, PDF as an artifact type, the chat upload's original), and the Where things live, Touches and Verify blocks. Read from the tester tree over that commit, and the `file:line` citations in those parts were checked there. The rest of the page was not re-read, so a line number elsewhere may have moved (`node scripts/map-drift.mjs` re-anchors it); and, from main (#162), the step-limit paragraph of § 13 only (the sentence names the tools that finished, and the host saves a `step_limit` part). Nothing else on the page was re-read..
+Last verified: 2026-10-15 at de5ce628 (tester tree) for the new § 16 (document versions) and its row in Where things live and Touches, read from the code it cites; nothing else re-read. Before that: 2026-10-14 at 9e77ccda for § 1 (the Chat row), § 2 (the Chat tool list and its prompt file), § 14 (the cap and the place in the list), the new § 15 (the four document tools, PDF as an artifact type, the chat upload's original), and the Where things live, Touches and Verify blocks. Read from the tester tree over that commit, and the `file:line` citations in those parts were checked there. The rest of the page was not re-read, so a line number elsewhere may have moved (`node scripts/map-drift.mjs` re-anchors it); and, from main (#162), the step-limit paragraph of § 13 only (the sentence names the tools that finished, and the host saves a `step_limit` part). Nothing else on the page was re-read..
 
 Also on `main`: Last verified: 2026-10-14 for the step-limit paragraph of § 13 only (the sentence names the tools that finished, and the host saves a `step_limit` part). Nothing else on the page was re-read.
 
@@ -318,7 +318,7 @@ Four tools let Chat make and change files the person can save: `create_document`
 
 **Making a file.** `create_document` and `create_workbook` (`packages/host/src/doc-tools/create-document.ts:38`, `:85`) validate the spec with the document model's own parsers (`parseDocSpec` and `parseSheetSpec`), render it (`renderDocx`, `renderPdf`, `renderXlsx`) and save it through `saveRenderedArtifact` (`doc-save.ts:76`) as a `documents` draft in the run's desk (`create-document.ts:63-64`, `:103-104`). The validated spec is sealed in the artifact's meta by `specMeta` (`packages/host/src/doc-tools/doc-meta.ts:20`, called at `create-document.ts:68` and `:108`); that is what lets `revise_document` change a part later. A refusal is a value. `invalid` names the field when the spec breaks a cap (`create-document.ts:53`, `:93`). `unavailable`, with a sentence that says not to retry, covers a render or save that fails (`:60`, `:100`).
 
-**Changing a file.** `revise_document` (`revise-document.ts:195`) reads the artifact by id (`:148`) and takes its spec from the meta with `readEditableSpec` (`doc-meta.ts:26`). It does not write over the original. The changed copy is saved as a new artifact titled `<title> (revised)` (`revise-document.ts:173`), with the id of the file it came from recorded as its parent (`specMeta(spec, record.id)`, `:180`). Refusals: `not_found` (`:150`), `not_editable` when the artifact has no spec (`:154`), `nothing_to_change` when the call names no section, sheet, theme or format (`:158`), `unavailable` (`:171`) and `invalid` (`:206`).
+**Changing a file.** `revise_document` (`revise-document.ts:195`) reads the artifact by id (`:148`) and takes its spec from the meta with `readEditableSpec` (`doc-meta.ts:30`). It does not write over the original. The changed copy is saved as a new artifact titled `<title> (revised)` (`revise-document.ts:173`), with the id of the file it came from recorded as its parent (`specMeta(spec, record.id)`, `:180`). Refusals: `not_found` (`:150`), `not_editable` when the artifact has no spec (`:154`), `nothing_to_change` when the call names no section, sheet, theme or format (`:158`), `unavailable` (`:171`) and `invalid` (`:206`).
 
 **Importing a file.** `import_document` (`import-document.ts:85`) reads the stored bytes of an artifact (`artifactStore().get`, `:89`), parses them with the importer for their type (`readStored`, `:55`) and saves an editable copy titled `<title> (imported)` with a spec and the source as its parent (`:110`, `:117`). Refusals: `not_found` (`:91`), `unsupported` for a type it does not read (`:95`), `unreadable` for a broken or scanned file (`:101`) and `unavailable` (`:108`).
 
@@ -327,6 +327,34 @@ Four tools let Chat make and change files the person can save: `create_document`
 **A chat upload's original.** When a person attaches a Word, Excel or PDF file in Chat, `keepOriginal` (`packages/host/src/chat-documents/original.ts:53`) stores the bytes as a private artifact of the same type, with `meta.chatUpload` set to true (`CHAT_UPLOAD_META_KEY`, `:27`, written at `:68`). It never throws. A refusal is an answer (`too_large`, `quota` or `unavailable`, `ORIGINAL_SKIP_REASONS`, `:23`) and the attachment goes on without the original. `verifiedOriginalId` (`:78`) accepts a stored id only when that artifact has the file's mime and the chat-upload flag (`:87`). The original carries no spec, so `revise_document` refuses it as `not_editable`; `import_document` makes it editable first. Removing the attachment's chip deletes its original unless a send is in flight ([`chat-send.md`](chat-send.md) § 1).
 
 The result card and its Download button are in [`chat-send.md`](chat-send.md) § 6 (`DocCards`, `apps/web/components/chat-turn.tsx:179`; `DocCard`, `apps/web/components/chat-doc-card.tsx:40`).
+
+### 16. Document versions (D0 of documents in a Workspace, tester only)
+
+Host and database only, with no route and no screen yet (team-board-spec.md, "Then: documents in a Workspace", K-D30). The table is in [`database-and-migrations.md`](database-and-migrations.md), "The schema". The store is `createDocVersionStore` (`packages/host/src/doc-versions/store.ts:118`), with the app's one instance from `docVersionStore()` (`:311`). It takes the database, a clock, the cap and a `protectedVersions` hook as options, so a test can run two connections, move time and protect a base.
+
+**Who may read.** Every call first reads the artifact row through `visibleTo` (`visibleArtifact`, `:124`), the same rule `artifacts.ts` uses: on the hosted app a file in a live Workspace is its members' only, a removed member and a company admin outside it included (K-D22, SR-179). Anyone the rule refuses gets `null`, or `not_found` from an append, the same answer as an unknown id. Personal adds no clause. Every `doc_versions` query also filters on the caller's desk and the artifact id.
+
+**Version 1.** `ensureFirstVersion` (`:270`) makes version 1 from the spec sealed in `meta.spec` (`insertFirst`, `:145`), copying the envelope as it is. Its author is the file's maker (`owner_user_id`), or the caller where the row has none (Personal, legacy rows). It writes only when the artifact has no version at all, with `INSERT OR IGNORE` on `UNIQUE (artifact_id, version)`, inside an `IMMEDIATE` transaction. So two calls, even from two connections, make one version 1, and a version 1 later pruned by the cap is never made again. It returns the head version, or `null` for a file with no editable spec. D1's `GET` calls it on first open.
+
+**Appending.** `appendVersion` (`:272`) takes a base version, an author (`person`, or `agent` with an agent id) and an `edit` function. It does not take a whole spec from the caller. Inside one `IMMEDIATE` transaction it:
+1. makes version 1 if missing;
+2. opens the head spec;
+3. checks the base is between 1 and the head (`bad_base`, `:213`);
+4. runs `edit` on the head, and refuses a document turned into a workbook (`kind_changed`, `:217`);
+5. derives the changed section ids by comparing head and result (`changedSectionIds`, `section-ids.ts:25`);
+6. refuses with `section_changed` and the ids when one of them changed after the base (`:227`).
+
+Two people editing different sections from the same base both succeed, and the second edit applies to the head, so it never reverts the first. A result equal to the head writes nothing (`created: false`, `:220`). The person ids come from the session, never from the input: a person row is the caller, and an agent row records the caller as `asked_by_user_id`, the K-D29 payer. The same transaction writes the version, merges `meta.spec` into the artifact row while keeping every other meta key (`writeHead`, `:188`), and runs the cap. The spec is sealed with `sealSpec` (`doc-meta.ts:25`), the envelope `meta.spec` uses. An `edit` that throws a `DocModelError` rolls the whole transaction back.
+
+**Not done in D0: the rendered body.** `appendVersion` does not re-render `artifacts.body`. The renderers are async and a better-sqlite3 transaction is synchronous. After an append, `/api/v1/artifacts/:id/file` serves the bytes of the version the file was saved as, while the spec has moved on. D1 has to render the new spec and write the body against the head version it rendered.
+
+**Reading.** `listVersions` returns newest first with no spec. `getVersion(n)` opens the seal (`openSpec`, `doc-meta.ts:34`). `sectionAuthors` gives, for each section or sheet in the head, the last version that changed it and that version's author (`lastChanges`, `history.ts:29`).
+
+**The cap.** `DOC_VERSION_CAP` (`types.ts:3`) is 50 newest versions plus every version from the last 30 days, a default Rizky may change. `planPrune` (`history.ts:42`) keeps those, the head, and every version the `protectedVersions` hook names. D1 will name each pending proposal's base there, and today the hook returns none. Versions are never renumbered. Each dropped version's "last changed this section" entries fold into `folded_authors` on the oldest kept row, so `sectionAuthors` and the conflict check give the same answer before and after a prune (`history.test.ts`, `store.test.ts`).
+
+**Section ids.** `newSectionId` (`section-ids.ts:15`) is the host's id for a new section: `s-` plus 10 random hex digits, checked against the document's ids. It is random rather than `s<max+1>` so a deleted section's id, and its history, is not handed to a new one. Ids survive create, Markdown import (`s1…sN`), `replaceSection`, `restyle`, a docx-to-PDF revision and a version round trip (`section-ids.test.ts`, `store.test.ts`).
+
+**Not counted in storage.** A hosted tenant's storage use counts artifact bodies (`tenant-storage-store.ts`), not version rows, so versions do not count against the quota. D1 owns that decision.
 
 ## Where things live
 
@@ -353,6 +381,7 @@ The result card and its Download button are in [`chat-send.md`](chat-send.md) §
 | `packages/host/src/self-check-tool.ts` | `self_check`, the read-only report of what is in place on the desk |
 | `packages/core/src/artifacts/artifact-meta.ts` | The artifact type catalog, now with `PPTX_MIME` and `PDF_MIME` (binary, base64 body, `.pptx` and `.pdf`) |
 | `packages/host/src/doc-tools/` | `create_document`, `create_workbook`, `revise_document` and `import_document` (`doc-tools.ts` registers them), their saves (`doc-save.ts`) and the sealed spec in the meta (`doc-meta.ts`) (§ 15) |
+| `packages/host/src/doc-versions/` | Document versions: the store (`store.ts`), the cap and the folded authors (`history.ts`), host section ids and the changed-section diff (`section-ids.ts`), the types and `DOC_VERSION_CAP` (`types.ts`) (§ 16). The table is `packages/db/src/doc-versions-schema.ts` |
 | `packages/host/src/chat-documents/original.ts` | A chat upload's kept original. Owned by [`chat-documents.md`](chat-documents.md); `import_document` reads it through the artifact store (§ 15) |
 | `packages/host/src/code-runner/` | `run_code`: the tool (`run-code-tool.ts`), the runner (`run-code.ts`), child process flags (`child-process.ts`), the warm pool (`pool.ts`), run slots (`code-limiter.ts`), every number (`limits.ts`), the child protocol (`protocol.ts`), failure sentences (`outcome.ts`), host scrubbing (`sanitize.ts`), ship directory checks (`ship.ts`) |
 | `packages/host/src/code-runner/child/` | `py-child.mjs` and `qjs-child.mjs`, the code that runs inside the sandbox; copied byte for byte into the ship directory |
@@ -372,7 +401,7 @@ Read before editing the job harness. This page covers `runJobAssistantOnce` in `
 **This page owns these** (a change refreshes this page and the matching `features/` recipe):
 
 - Host, the job run: `packages/host/src/job-regen.ts`, `job-stream.ts`, `job-usage.ts`, `job-model-fallback.ts`, `job-source.ts`, `harness/run-checked.ts`, `tool-run-context.ts`, `file-roots.ts`, `register-tools.ts`, `knowledge-search-tool.ts`, `self-check-tool.ts` (all under `packages/host/src/`).
-- Host, the tools: `packages/host/src/desk-files/`, `packages/host/src/folder-root/`, `packages/host/src/deck/`, `packages/host/src/doc-tools/`, `packages/host/src/code-runner/`.
+- Host, the tools: `packages/host/src/desk-files/`, `packages/host/src/folder-root/`, `packages/host/src/deck/`, `packages/host/src/doc-tools/`, `packages/host/src/doc-versions/` (with `packages/db/src/doc-versions-schema.ts`), `packages/host/src/code-runner/`.
 - Core, the spec and budget: `packages/core/src/harness/spec.ts`, `defaults.ts`, `specs.ts`, `modes/*.ts`, `judges/`; `packages/core/src/runtime/tool-budget.ts`, `invoke-guarded.ts`, `ai-tools.ts`; `packages/core/src/tools/files/`.
 - Sandbox build (harness, built folder is gitignored): `scripts/build-sandbox-runtime.mjs`, `scripts/sandbox-runtime-lock.mjs`, `scripts/sandbox-runtime.lock.json`.
 
