@@ -16,6 +16,7 @@
 import { ApiError, isDefaultChatAgent, scanInjection, virtualAgentBySlug, type TenantContext } from "@agentforge/core";
 import type { AssignableRole, CreateProjectInput, ProjectVisibility, UpdateProjectInput, WorkspaceRole } from "./input";
 import { isCompanyMember, listCompanyPeople, realPersonName, type CompanyPerson } from "../company-people";
+import { openSpec, SPEC_META_KEY } from "../doc-tools/doc-meta";
 import { deleteSource, type KnowledgeSource } from "../knowledge";
 import { mediaExt } from "../media";
 import { virtualAgentsOnDesk } from "../virtual-agents";
@@ -78,11 +79,24 @@ export type ProjectFile = {
   sizeBytes: number;
   ownerUserId: string | null;
   updatedAt: number;
+  editable: boolean;
   /** The URL a browser can show inline (media only; a chat file has none). */
   previewUrl: string | null;
   /** The URL that saves the file as an attachment. */
   downloadUrl: string;
 };
+
+function sealedSpecOf(meta: string): unknown {
+  try {
+    return (JSON.parse(meta) as Record<string, unknown>)[SPEC_META_KEY];
+  } catch {
+    return undefined;
+  }
+}
+
+export function isEditableFile(row: ProjectFileRow): boolean {
+  return openSpec(sealedSpecOf(row.meta)) !== null;
+}
 
 function toRecord(row: ProjectRow): ProjectRecord {
   return {
@@ -107,6 +121,7 @@ function toFile(row: ProjectFileRow): ProjectFile {
     sizeBytes: row.size_bytes,
     ownerUserId: row.owner_user_id,
     updatedAt: row.updated_at,
+    editable: isEditableFile(row),
     previewUrl: null,
     downloadUrl: `/api/v1/artifacts/${encodeURIComponent(row.id)}/file`,
   };
@@ -127,6 +142,7 @@ function toMediaFile(row: ProjectMediaRow): ProjectFile {
     sizeBytes: row.size_bytes,
     ownerUserId: row.user_id,
     updatedAt: row.created_at,
+    editable: false,
     previewUrl: `/api/v1/media/${id}/file`,
     downloadUrl: `/api/v1/media/${id}/file?download=1`,
   };

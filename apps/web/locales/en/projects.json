@@ -59,6 +59,7 @@
     "importFailed": "The file could not be imported.",
     "importTooLarge": "This file is too large to import.",
     "importNotEditable": "This file can't be read as a document.",
+    "importAlreadyEditable": "This file is already a document.",
     "importUnavailable": "The import is not available right now. Try again.",
     "importNotFound": "Not found, or you are not a member of this Workspace."
   },

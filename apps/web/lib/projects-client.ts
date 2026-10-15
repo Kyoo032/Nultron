@@ -52,6 +52,7 @@ export type ProjectFile = {
   sizeBytes: number;
   ownerUserId: string | null;
   updatedAt: number;
+  editable: boolean;
   /** A host path a browser can show inline. Null for a chat file, which shows as a card. */
   previewUrl: string | null;
   /** A host path that saves the file as an attachment. */
@@ -165,6 +166,7 @@ export function parseProjectFile(row: Row): ProjectFile {
     sizeBytes: num(row, "sizeBytes"),
     ownerUserId: optionalStr(row, "ownerUserId"),
     updatedAt: num(row, "updatedAt"),
+    editable: row.editable === true,
     previewUrl: optionalStr(row, "previewUrl"),
     downloadUrl: str(row, "downloadUrl"),
   };

@@ -2,11 +2,12 @@ import { DOCX_MIME, PDF_MIME, XLSX_MIME } from "@agentforge/core/artifacts";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DocsError } from "@/lib/docs-client";
 import { applyLocale, resetLocaleForTests, t } from "@/lib/i18n";
-import type { ProjectFile } from "@/lib/projects-client";
+import { parseProjectFile, type ProjectFile } from "@/lib/projects-client";
 import {
   canImportAsDocument,
   importAsDocument,
   importMessageKey,
+  opensInDocPage,
   type ImportMessageKey,
   type ProjectFileWithEditable,
 } from "@/lib/projects-doc-import";
@@ -24,6 +25,7 @@ const file = (overrides: Partial<ProjectFileWithEditable> = {}): ProjectFileWith
     sizeBytes: 2048,
     ownerUserId: "user_ana",
     updatedAt: 1,
+    editable: false,
     previewUrl: null,
     downloadUrl: "/api/v1/artifacts/art_1/file",
   };
@@ -34,6 +36,7 @@ const EN: Record<ImportMessageKey, string> = {
   "projects.files.importFailed": "The file could not be imported.",
   "projects.files.importTooLarge": "This file is too large to import.",
   "projects.files.importNotEditable": "This file can't be read as a document.",
+  "projects.files.importAlreadyEditable": "This file is already a document.",
   "projects.files.importUnavailable": "The import is not available right now. Try again.",
   "projects.files.importNotFound": "Not found, or you are not a member of this Workspace.",
 };
@@ -42,6 +45,7 @@ const ID: Record<ImportMessageKey, string> = {
   "projects.files.importFailed": "Berkas tidak bisa diimpor.",
   "projects.files.importTooLarge": "Berkas ini terlalu besar untuk diimpor.",
   "projects.files.importNotEditable": "Berkas ini tidak bisa dibaca sebagai dokumen.",
+  "projects.files.importAlreadyEditable": "Berkas ini sudah berupa dokumen.",
   "projects.files.importUnavailable": "Impor belum bisa dilakukan sekarang. Coba lagi.",
   "projects.files.importNotFound": "Tidak ditemukan, atau Anda bukan anggota ruang kerja ini.",
 };
@@ -58,8 +62,37 @@ describe("canImportAsDocument", () => {
     expect(canImportAsDocument(file({ editable: true }))).toBe(false);
   });
 
-  it("hides the import while the host does not say whether the file is editable", () => {
-    expect(canImportAsDocument(file())).toBe(false);
+  it("offers the import when the host sends no editable flag, because the parser reads it as not editable", () => {
+    const parsed = parseProjectFile({
+      id: "art_1",
+      kind: "artifact",
+      title: "Q3 report",
+      mime: DOCX_MIME,
+      sizeBytes: 2048,
+      ownerUserId: "user_ana",
+      updatedAt: 1,
+      previewUrl: null,
+      downloadUrl: "/api/v1/artifacts/art_1/file",
+    });
+    expect(parsed.editable).toBe(false);
+    expect(canImportAsDocument(parsed)).toBe(true);
+  });
+
+  it("hides the import for a file the host marks editable, and reads the flag it sends", () => {
+    const parsed = parseProjectFile({
+      id: "art_2",
+      kind: "artifact",
+      title: "Q3 report (imported)",
+      mime: DOCX_MIME,
+      sizeBytes: 2048,
+      ownerUserId: "user_ana",
+      updatedAt: 1,
+      editable: true,
+      previewUrl: null,
+      downloadUrl: "/api/v1/artifacts/art_2/file",
+    });
+    expect(parsed.editable).toBe(true);
+    expect(canImportAsDocument(parsed)).toBe(false);
   });
 
   it("hides the import for a type that is not Word, Excel or PDF", () => {
@@ -89,6 +122,26 @@ describe("importMessageKey", () => {
 
   it("maps a network failure to the generic sentence", () => {
     expect(importMessageKey(new TypeError("Failed to fetch"))).toBe("projects.files.importFailed");
+  });
+
+  it("maps the already_editable code to its own sentence, whatever the HTTP status", () => {
+    expect(importMessageKey(new DocsError("already_editable", "host sentence", 409))).toBe(
+      "projects.files.importAlreadyEditable",
+    );
+  });
+});
+
+describe("opensInDocPage", () => {
+  it.each([DOCX_MIME, XLSX_MIME])("opens an editable %s file on the document page", (mime) => {
+    expect(opensInDocPage(file({ mime, editable: true }))).toBe(true);
+  });
+
+  it("does not open an uploaded Word file the document page would refuse", () => {
+    expect(opensInDocPage(file({ editable: false }))).toBe(false);
+  });
+
+  it("does not open a generated picture or clip, even when it is marked editable", () => {
+    expect(opensInDocPage(file({ kind: "image", mime: "image/png", editable: true }))).toBe(false);
   });
 });
 

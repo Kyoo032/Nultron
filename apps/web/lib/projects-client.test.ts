@@ -228,6 +228,7 @@ describe("projects client", () => {
       sizeBytes: 2048,
       ownerUserId: "user_me",
       updatedAt: 3,
+      editable: false,
       previewUrl: null,
       downloadUrl: "/api/v1/artifacts/art_1/file",
     };
@@ -244,6 +245,7 @@ describe("projects client", () => {
       sizeBytes: 9,
       ownerUserId: "user_colleague",
       updatedAt: 4,
+      editable: false,
       previewUrl: "/api/v1/media/med_1/file",
       downloadUrl: "/api/v1/media/med_1/file?download=1",
     };
@@ -361,6 +363,7 @@ describe("projects view rules", () => {
     sizeBytes: 1,
     ownerUserId: "user_a",
     updatedAt: 1,
+    editable: false,
     previewUrl: null,
     downloadUrl: "/api/v1/artifacts/art_1/file",
   };

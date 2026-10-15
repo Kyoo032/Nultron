@@ -2,6 +2,10 @@ import { ApiError, STORAGE_BLOCK, STORAGE_BLOCK_MESSAGE, type TenantContext } fr
 import type { DocRefusal } from "../doc-tools/doc-save";
 import { importDocumentForTenant, type ImportDocumentInput } from "../doc-tools/import-document";
 import { jsonError, jsonOk } from "../errors";
+import { requireGatewayAllowedFor } from "../gateway-gate";
+import { log } from "../log";
+import { attachArtifactKnowledge } from "../projects/knowledge";
+import { isEditableFile } from "../projects/service";
 import { findMemberProject, findVisibleFile, setFileProject } from "../projects/store";
 import { getTenant } from "../tenant";
 import type { HostRequest, HostResult } from "../types";
@@ -10,6 +14,7 @@ const NOT_FOUND_MESSAGE = "Artifact not found";
 const BODY_MESSAGE = "artifactId is required: the id of a Word, Excel or PDF file you can open.";
 const TOO_LARGE_MESSAGE = "The imported file is too large to save.";
 const UNAVAILABLE_MESSAGE = "The file could not be imported right now. Try again in a moment.";
+const ALREADY_EDITABLE_MESSAGE = "This file is already an editable document.";
 
 function docImportRoute(
   work: (request: HostRequest) => Promise<HostResult>,
@@ -49,11 +54,24 @@ function refusalOf(reason: DocRefusal, message: string): ApiError {
   }
 }
 
-function keepWorkspaceOf(tenant: TenantContext, sourceProjectId: string | null, copyId: string): void {
+function keepWorkspaceOf(tenant: TenantContext, sourceProjectId: string | null, copyId: string): boolean {
   if (sourceProjectId === null || findMemberProject(tenant, sourceProjectId) === null) {
-    return;
+    return false;
   }
   setFileProject(tenant, copyId, sourceProjectId);
+  return true;
+}
+
+function indexCopyInBackground(tenant: TenantContext, copyId: string): void {
+  void (async () => {
+    requireGatewayAllowedFor(tenant);
+    const copy = findVisibleFile(tenant, copyId);
+    if (copy?.project_id) {
+      await attachArtifactKnowledge(tenant, copy.id, copy.project_id, copy.owner_user_id);
+    }
+  })().catch((error: unknown) => {
+    log.warn("docs_import_index_failed", { detail: error instanceof Error ? error.name : "error" });
+  });
 }
 
 export const handlePostDocImport = docImportRoute(async (request) => {
@@ -63,10 +81,15 @@ export const handlePostDocImport = docImportRoute(async (request) => {
   if (source === null) {
     throw new ApiError("not_found", NOT_FOUND_MESSAGE, 404);
   }
+  if (isEditableFile(source)) {
+    throw new ApiError("already_editable", ALREADY_EDITABLE_MESSAGE, 409);
+  }
   const imported = await importDocumentForTenant({ artifactId }, tenant);
   if (!imported.ok) {
     throw refusalOf(imported.reason, imported.message);
   }
-  keepWorkspaceOf(tenant, source.project_id, imported.artifactId);
+  if (keepWorkspaceOf(tenant, source.project_id, imported.artifactId)) {
+    indexCopyInBackground(tenant, imported.artifactId);
+  }
   return jsonOk({ artifactId: imported.artifactId }, 201);
 });

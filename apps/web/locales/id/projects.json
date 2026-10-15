@@ -59,6 +59,7 @@
     "importFailed": "Berkas tidak bisa diimpor.",
     "importTooLarge": "Berkas ini terlalu besar untuk diimpor.",
     "importNotEditable": "Berkas ini tidak bisa dibaca sebagai dokumen.",
+    "importAlreadyEditable": "Berkas ini sudah berupa dokumen.",
     "importUnavailable": "Impor belum bisa dilakukan sekarang. Coba lagi.",
     "importNotFound": "Tidak ditemukan, atau Anda bukan anggota ruang kerja ini."
   },

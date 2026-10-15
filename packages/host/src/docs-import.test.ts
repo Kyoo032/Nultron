@@ -26,6 +26,7 @@ const FIXTURES = join(dirname(fileURLToPath(import.meta.url)), "../../core/src/d
 const PARTNER = "docs-import-partner";
 const ORG = "docs-import-org";
 const MISSING = "00000000-0000-4000-8000-000000000000";
+const INDEX_KEY = "sk-docs-import-index-test-aaaaaaaaaaaa";
 const DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const PDF = "application/pdf";
@@ -206,6 +207,73 @@ describe("POST /api/v1/docs/import: a stored Word or Excel file becomes an edita
     expect(listed.items.map((item) => item.id)).toContain(copyId);
   });
 
+  it("lists editable: true for a sealed-spec document and false for an uploaded file, and never sends the spec", async () => {
+    const listed = jsonBody<{ items: Array<{ id: string; editable: boolean }> }>(
+      await call(alice, "GET", "/api/v1/projects/:id/files", { id: project }),
+    );
+    const editableOf = (id: string) => listed.items.find((item) => item.id === id)?.editable;
+    expect(editableOf(docId)).toBe(false);
+    expect(editableOf(bookId)).toBe(false);
+    expect(editableOf(copyId)).toBe(true);
+    expect(JSON.stringify(listed)).not.toContain('"spec"');
+  });
+
+  it("refuses to import a document that is already editable with 409 already_editable, and writes no copy", async () => {
+    const { sql } = await import("@agentforge/db");
+    const count = () => (sql.prepare("SELECT count(*) AS n FROM artifacts").get() as { n: number }).n;
+    const before = count();
+    expect(await outcome(await importAs(alice, copyId))).toEqual({ status: 409, code: "already_editable" });
+    expect(count()).toBe(before);
+  });
+
+  it("a company admin who is not a member gets the same 404 for an editable copy as for an unknown id", async () => {
+    await expectSameAsUnknown(cara, await importAs(cara, copyId), await importAs(cara, MISSING));
+  });
+
+  it("indexes the copy into the Workspace's knowledge after the response, once a key is saved and the gateway answers", async () => {
+    const { sql } = await import("@agentforge/db");
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", async (url: unknown) => {
+      const text = String(url);
+      calls.push(text);
+      if (/\/models(\?|$)/.test(text)) {
+        return new Response(JSON.stringify({ data: [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return new Response("{}", { status: 500 });
+    });
+    try {
+      expect((await call(alice, "POST", "/api/v1/settings", {}, { openaiApiKey: INDEX_KEY })).status).toBe(200);
+      calls.length = 0;
+      const imported = await importAs(alice, docId);
+      expect(imported.status).toBe(201);
+      const id = jsonBody<{ artifactId: string }>(imported).artifactId;
+      const indexed = await vi.waitFor(
+        () => {
+          const row = sql
+            .prepare(
+              "SELECT project_id, owner_user_id, status FROM knowledge_sources WHERE origin_kind = 'artifact' AND origin_id = ?",
+            )
+            .get(id) as { project_id: string; owner_user_id: string; status: string } | undefined;
+          if (row === undefined) {
+            throw new Error("not indexed yet");
+          }
+          return row;
+        },
+        { timeout: 10_000 },
+      );
+      expect(indexed).toEqual({ project_id: project, owner_user_id: "alice", status: "Indexed" });
+      expect(calls.some((url) => /embeddings/.test(url))).toBe(true);
+    } finally {
+      vi.stubGlobal("fetch", async (url: unknown) => {
+        fetched.push(String(url));
+        return new Response("{}", { status: 500 });
+      });
+    }
+  }, 20_000);
+
   it("imports A's Excel file as a workbook, with the same route", async () => {
     const imported = await importAs(ben, bookId);
     expect(imported.status).toBe(201);
@@ -313,30 +381,47 @@ describe("POST /api/v1/docs/import: a stored Word or Excel file becomes an edita
 });
 
 describe("POST /api/v1/docs/import: Personal, one person and no server mode", () => {
-  it("imports a Word file on the desk with no owner and no Workspace, and the copy opens", async () => {
+  async function withoutServerMode<T>(work: () => Promise<T>): Promise<T> {
     const previous = process.env.AGENTFORGE_SERVER;
     delete process.env.AGENTFORGE_SERVER;
     try {
+      return await work();
+    } finally {
+      if (previous === undefined) {
+        delete process.env.AGENTFORGE_SERVER;
+      } else {
+        process.env.AGENTFORGE_SERVER = previous;
+      }
+    }
+  }
+
+  const importOnDesk = (artifactId: string) =>
+    dispatch(
+      {
+        method: "POST",
+        path: "/api/v1/docs/import",
+        query: {},
+        params: {},
+        headers: {},
+        body: { artifactId },
+      },
+      { serverMode: false },
+    );
+
+  it("imports a Word file on the desk with no owner and no Workspace, and the copy opens", async () => {
+    await withoutServerMode(async () => {
       const { getTenant } = await import("./tenant");
-      const { createDocumentForTenant } = await import("./doc-tools/create-document");
-      const { sampleDocInput } = await import("./doc-tools/doc-tools-fixtures");
+      const { artifactStore } = await import("./artifacts");
       const { sql } = await import("@agentforge/db");
       const owner = await getTenant();
-      const made = await createDocumentForTenant({ format: "docx", spec: sampleDocInput() }, owner);
-      if (!made.ok) {
-        throw new Error(made.message);
-      }
-      const imported = await dispatch(
-        {
-          method: "POST",
-          path: "/api/v1/docs/import",
-          query: {},
-          params: {},
-          headers: {},
-          body: { artifactId: made.artifactId },
-        },
-        { serverMode: false },
-      );
+      const raw = artifactStore().create(owner, {
+        mode: "documents",
+        kind: "draft",
+        title: "Lender draft",
+        mime: DOCX,
+        body: readFileSync(join(FIXTURES, "lender-initial-aca-draft.docx")).toString("base64"),
+      });
+      const imported = await importOnDesk(raw.id);
       expect(imported.status).toBe(201);
       const id = jsonBody<{ artifactId: string }>(imported).artifactId;
       const opened = await dispatch(
@@ -348,13 +433,27 @@ describe("POST /api/v1/docs/import: Personal, one person and no server mode", ()
         owner_user_id: null,
         project_id: null,
       });
-    } finally {
-      if (previous === undefined) {
-        delete process.env.AGENTFORGE_SERVER;
-      } else {
-        process.env.AGENTFORGE_SERVER = previous;
+    });
+  });
+
+  it("refuses a Word file the desk already made as a document with 409 already_editable, and writes no copy", async () => {
+    await withoutServerMode(async () => {
+      const { getTenant } = await import("./tenant");
+      const { createDocumentForTenant } = await import("./doc-tools/create-document");
+      const { sampleDocInput } = await import("./doc-tools/doc-tools-fixtures");
+      const { sql } = await import("@agentforge/db");
+      const owner = await getTenant();
+      const made = await createDocumentForTenant({ format: "docx", spec: sampleDocInput() }, owner);
+      if (!made.ok) {
+        throw new Error(made.message);
       }
-    }
+      const count = () => (sql.prepare("SELECT count(*) AS n FROM artifacts").get() as { n: number }).n;
+      const before = count();
+      const refused = await importOnDesk(made.artifactId);
+      expect(refused.status).toBe(409);
+      expect(jsonBody<{ error: { code: string } }>(refused).error.code).toBe("already_editable");
+      expect(count()).toBe(before);
+    });
   });
 });
 

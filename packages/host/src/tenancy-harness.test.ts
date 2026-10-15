@@ -1392,9 +1392,10 @@ describe("every by-id route refuses another tenant's id", () => {
       expect((own as HostJsonResult).body).toMatchObject({ artifactId: foreignId });
     });
 
-    it("lets tenant A import her own file, so the 404 for B is not a route that refuses everyone", async () => {
+    it("answers tenant A's own already-editable file with 409, so the 404 for B is not a route that refuses everyone", async () => {
       const own = await asSession(sessionA, "POST", IMPORT, { artifactId: foreignId });
-      expect(own.status).toBe(201);
+      expect(own.status).toBe(409);
+      expect((own as HostJsonResult).body).toMatchObject({ error: { code: "already_editable" } });
     });
   });
 

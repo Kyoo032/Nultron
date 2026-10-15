@@ -54,6 +54,17 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Workspace files: an `editable` flag, and a 409 for a document that is already editable, 2026-10-15 (tester, D2-f; uncommitted on `tester/chat-first` at `ca252632`; not driven)
+
+Lanes: enterprise, hyp-ai, tester
+
+- **The flag.** `ProjectFile.editable` (`packages/host/src/projects/service.ts:124`, `:145`) is true only for a Word, Excel or PDF file with a sealed spec. An uploaded file, a chat upload's kept original and a media row are false. The web parser reads a missing flag as false (`apps/web/lib/projects-client.ts`).
+- **The import.** `POST /api/v1/docs/import` answers `409 already_editable` for a file that is already editable, and writes no copy (`packages/host/src/handlers/docs-import.ts:84-85`). The Workspace page shows "This file is already a document." for that answer (`apps/web/lib/projects-doc-import.ts:38-39`, `apps/web/locales/{en,id}/projects.json`). The same flag decides whether a file opens as a document (`opensInDocPage`, `:16`).
+- **A copy in a Workspace.** The copy joins the source's Workspace and is indexed as a Workspace knowledge source in the background. That step needs the gateway gate open. A refusal there is logged as `docs_import_index_failed`, and the 201 stands (`handlers/docs-import.ts:57`, `:65-67`, `:91-92`).
+- **Tests.** `packages/host/src/docs-import.test.ts`: 18 of 18. `packages/host/src/tenancy-harness.test.ts`: tenant A's own file now expects `409 already_editable` (`:1398-1402`). The same file's "covers every by-id route" test is red on another lane's `DELETE /api/v1/agents/:agentId` row. Web: `projects-doc-import.test.ts`, `projects-client.test.ts` and `projects-locale.test.ts`, 59 of 59.
+- **Not driven.** Not checked in a browser on `:3000`, on the packaged app or on a hosted server. The Workspace index of a copy is proven only by the unit test, which stubs the gateway.
+- **Cost, not measured.** Listing a Workspace opens every sealed spec on it to answer `editable` (`isEditableFile`, `packages/host/src/projects/service.ts:97`).
+
 ## Document versions in a Workspace (D0, K-D30), 2026-10-15 (tester; in progress, entry follows)
 
 Lanes: enterprise, hyp-ai, tester

@@ -6,7 +6,12 @@ import { ModeIcon } from "@/components/mode-icons";
 import { Link, useRouter } from "@/lib/nav";
 import { mediaSrc } from "@/lib/api-client";
 import { importDocPage } from "@/lib/docs-client";
-import { canImportAsDocument, importAsDocument, type ProjectFileWithEditable } from "@/lib/projects-doc-import";
+import {
+  canImportAsDocument,
+  importAsDocument,
+  opensInDocPage,
+  type ProjectFileWithEditable,
+} from "@/lib/projects-doc-import";
 import {
   downloadFile,
   listProjectFiles,
@@ -23,11 +28,6 @@ type Props = {
   project: ProjectRecord;
   me: string | null;
 };
-
-function opensInDocPage(file: ProjectFile): boolean {
-  const kind = fileKind(file.mime);
-  return file.kind === "artifact" && (kind === "document" || kind === "sheet");
-}
 
 function messageOf(error: unknown, fallback: string): string {
   return error instanceof ProjectsError && error.message ? error.message : fallback;

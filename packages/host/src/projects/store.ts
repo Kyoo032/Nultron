@@ -34,6 +34,7 @@ export type ProjectFileRow = {
   owner_user_id: string | null;
   project_id: string | null;
   updated_at: number;
+  meta: string;
 };
 
 /** A live project of the caller's desk, joined to the caller's own membership row. Binds the person first. */
@@ -198,7 +199,7 @@ export function listProjectFiles(scope: TenantContext, projectId: string, limit:
   const visible = visibleTo(scope);
   return sql
     .prepare(
-      `SELECT id, title, mime, size_bytes, owner_user_id, project_id, updated_at FROM artifacts
+      `SELECT id, title, mime, size_bytes, owner_user_id, project_id, updated_at, meta FROM artifacts
         WHERE workspace_id = ? AND project_id = ?${visible.clause}
         ORDER BY updated_at DESC LIMIT ?`,
     )
@@ -210,7 +211,7 @@ export function findVisibleFile(scope: TenantContext, artifactId: string): Proje
   const visible = visibleTo(scope);
   const row = sql
     .prepare(
-      `SELECT id, title, mime, size_bytes, owner_user_id, project_id, updated_at FROM artifacts
+      `SELECT id, title, mime, size_bytes, owner_user_id, project_id, updated_at, meta FROM artifacts
         WHERE workspace_id = ? AND id = ?${visible.clause}`,
     )
     .get(scope.workspaceId, artifactId, ...visible.args) as ProjectFileRow | undefined;
