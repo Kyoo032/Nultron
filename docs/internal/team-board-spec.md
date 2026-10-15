@@ -227,6 +227,33 @@ The goal, from the mock's screen 6: a document lives in a Workspace and opens in
 
   The real server (`43.173.26.50`) gets it only on Rizky's word at that moment.
 
+### Then: four model choices, Copilot-style (Rizky, 2026-10-15; K-D31, replaces the three tiers of PR #157)
+
+His proposal: "approaching masked models to something like copilot … give them the options to choose their own allowed models, so it will be 4 tiers: auto, everyday task, reasoning, custom models (the user can choose the models and the reasoning)". These replace Daily, Fastest and Reasoning (`features/model-tiers.md`).
+
+| Choice | What it is |
+|---|---|
+| **Auto** (the default) | The host picks Everyday or Reasoning for each message. |
+| **Everyday** | Quick and cheap, for simple tasks. Rizky: "either the non reasoning one of the everyday chat models … or we can put them into low reasoning or med at max". Fastest folds into it. |
+| **Reasoning** | Thinks longer, as today. |
+| **Custom** | The person picks an exact model and its reasoning effort. |
+
+- **Custom is always shown.** Rizky: "it should always be there, this is to show them what models assigned to them from the api key that they receive".
+  - On HYP AI, the list is exactly the models allowed on the key or allocation the person draws from (K-D25). An admin's change shows up there.
+  - On Nultron, the owner sees every model the gateway offers.
+  - Reasoning effort (low, medium, high) shows only for a model that supports it.
+  - Each model shows a rough relative price, because quotas are in USD (K-D29).
+  - A picked model never falls back to another one. A failure tells the person to pick again, matching the existing rule of no fallback from a pinned model.
+- **Everyday and Reasoning map per brand on the host.** Everyday is a non-reasoning model, or a reasoning model capped at low or medium effort, and never higher. The host also intersects both with the person's allowed models. When nothing allowed fits a choice, that choice reports itself unavailable.
+- **Auto decides by rules, not by a model call.** A model call to decide would cost money and time on every message. The rules:
+  - an attached file, a long context, or wording that asks for analysis, a plan or a comparison picks Reasoning;
+  - everything else picks Everyday.
+
+  The reply shows which one ran ("Auto · Reasoning"), so the cost on a person's quota makes sense to them. Auto leans cheap.
+- **Names.** Model names appear only inside Custom's list. A gateway or brand name (TokenKu, Toko Token) never appears, under the NDA and the no-brand rule.
+- **Agents.** A custom agent (K-D28) carries a default choice. A member may change it per chat.
+- **Where it is built.** It is a behaviour change, so it is built in the tester. It is queued after documents in a Workspace (D2), and it reaches both Nultron and HYP AI through the shared Chat.
+
 ## 3. Words
 
 | Word | Meaning |
