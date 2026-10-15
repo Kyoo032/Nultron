@@ -1,5 +1,5 @@
 /**
- * Tests for scripts/release-web.mjs, the Enterprise release to Kyoo032/Nultron.
+ * Tests for scripts/release-web.mjs, the Enterprise release to Kyoo032/Nultron-Releases.
  *
  * Node's own runner, like scripts/review-proxy.test.mjs: repo tooling outside every workspace
  * package, so no vitest config collects it. `node --test "scripts/*.test.mjs"` runs it.
@@ -160,7 +160,7 @@ function snapshot(dir) {
 
 /**
  * A fake git. Every call lands in `calls` with its cwd. `clone` makes the target directory with a
- * README, as Nultron's main has; `commit` snapshots the files in the clone at that moment.
+ * README, as Nultron-Releases' main has; `commit` snapshots the files in the clone at that moment.
  */
 function fakeGit({
   dirty = false,
@@ -382,7 +382,8 @@ test("dry run builds the gh argv and the body, and never runs gh", () => {
   ]);
   assert.equal(result.args.length, 9, "no assets, no --draft, nothing after the notes file");
   assert.match(result.args[8], new RegExp(`${TAG}-body\\.md$`));
-  assert.equal(RELEASE_REPO, "Kyoo032/Nultron");
+  assert.equal(RELEASE_REPO, "Kyoo032/Nultron-Releases");
+  assert.equal(RELEASE_REPO_URL, "https://github.com/Kyoo032/Nultron-Releases.git");
   assert.equal(
     result.body,
     `${CLEAN_NOTES.trimEnd()}\n\nSource: agentforge@${FULL_SHA}\nImage: ${IMAGE}\nPortal image: ${PORTAL_IMAGE}\n`,

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Release the Enterprise (hosted web app) to Kyoo032/Nultron, its deploy-bundle + release repo.
+ * Release the Enterprise (hosted web app) to Kyoo032/Nultron-Releases, its deploy-bundle + release repo.
  * Modelled on apps/desktop/scripts/release-desktop.mjs, which did the same for the retired Personal app on
  * Kyoo032/Nultron-Desktop (archived 2026-10-14, no new releases). Run it after the deploy of <sha> is driven and logged in
  * docs/internal/web-pivot-2026-09-18.md (Deploy log).
@@ -21,7 +21,7 @@
  *      either is `docker push`ed. Building from the archive, never from this checkout, is what keeps
  *      untracked local state (a webdev data dir with its .master-key, an apps/web/.env.local) out of
  *      the images - the dockerignore only excludes `data` and `.env*` at the repo root;
- *   3. bundle: clone Kyoo032/Nultron into the same temp dir, write compose.yml (both images pinned to the
+ *   3. bundle: clone Kyoo032/Nultron-Releases into the same temp dir, write compose.yml (both images pinned to the
  *      tag), .env.example, portal.env.example, DEPLOY.md and Caddyfile, plus the sites/ folder (the proxy's
  *      switch script, the two company sites' Caddy files and placeholder pages: webapp-deploy/sites at
  *      <sha>, text files only), commit `Release <tag>` as the git user of this repo with no trailers, push
@@ -60,7 +60,7 @@ import { REQUIRED_SITE_FILES, SITES_BUNDLE_DIR, readSiteFiles } from "./release-
 // (apps/desktop/scripts/release-desktop.mjs). Re-exported so this module's API does not change.
 export { FORBIDDEN_MARKS, forbiddenMarksIn } from "./release-marks.mjs";
 
-export const RELEASE_REPO = "Kyoo032/Nultron";
+export const RELEASE_REPO = "Kyoo032/Nultron-Releases";
 export const RELEASE_REPO_URL = `https://github.com/${RELEASE_REPO}.git`;
 export const SOURCE_REPO_NAME = "agentforge";
 export const IMAGE_REPO = "ghcr.io/kyoo032/nultron-ent";

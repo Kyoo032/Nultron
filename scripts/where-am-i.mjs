@@ -7,7 +7,7 @@
  *   node scripts/where-am-i.mjs            pnpm where
  *   node scripts/where-am-i.mjs --root <dir>
  *
- * Rows: the published folder `agentforge` and its worktrees `agentforge-<topic>` (and Claude Code's
+ * Rows: the published folder `agentforge` (or `nultron`, once the source repo takes that name) and its worktrees `agentforge-<topic>` or `nultron-<topic>` (and Claude Code's
  * worktrees under `agentforge/.claude/worktrees`) on `main` or on a branch cut from main; the tester
  * folder `agentforge-chat` on `tester/chat-first` and nothing else; the HYP AI clone `hypey/app` on its
  * own `main`. A main-family branch that holds the tester's commits was not cut from main, so it is refused.
@@ -42,8 +42,9 @@ export function folderKind(folder) {
   const name = parts.at(-1) ?? "";
   if (name === "agentforge-chat") return "tester";
   if (name === "app" && parts.at(-2) === "hypey") return "hyp-ai";
-  if (/^agentforge(-.+)?$/.test(name)) return "main";
-  if (parts.at(-4) === "agentforge" && parts.at(-3) === ".claude" && parts.at(-2) === "worktrees") return "main";
+  if (/^(agentforge|nultron)(-.+)?$/.test(name)) return "main";
+  const claudeWorktree = parts.at(-3) === ".claude" && parts.at(-2) === "worktrees";
+  if (claudeWorktree && ["agentforge", "nultron"].includes(parts.at(-4))) return "main";
   return "other";
 }
 
