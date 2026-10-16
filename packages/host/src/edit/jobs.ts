@@ -6,7 +6,7 @@ import { readMediaDataUrl } from "../media";
 import { mediaRelativePath } from "../media-root";
 import { materializeTenantObject } from "../tenant-storage";
 import { withInlinedStill } from "./still-source";
-import { appendOps, foldProject, workerTenant, workerTenantId, workerWorkspaceId } from "./ops";
+import { appendOps, foldProject, workerProjectScope, workerTenant, workerTenantId, workerWorkspaceId } from "./ops";
 import { editEvents } from "./events";
 import { appendEditMetric } from "./metrics";
 import { mapJob } from "./projects";
@@ -287,7 +287,8 @@ async function resolveGenerateAsset(
     return { assetId: outputId, addOps: [] };
   }
   if (outputId && (job.kind === "generate_image" || job.kind === "generate_video")) {
-    const row = await loadMediaRow(outputId);
+    const { organizationId } = await workerProjectScope(job.projectId);
+    const row = await loadMediaRow(outputId, organizationId);
     if (row) {
       const assetId = crypto.randomUUID();
       const kind = row.kind === "image" || row.kind === "audio" ? row.kind : "video";
