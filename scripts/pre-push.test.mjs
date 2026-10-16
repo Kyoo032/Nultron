@@ -45,7 +45,7 @@ test("guardsRemote judges agentforge and nultron in any case, and unknown URLs; 
     "https://github.com/Kyoo032/Nultron-Releases.git",
     "git@github.com:Kyoo032/Nultron-Releases.git",
     "https://github.com/Kyoo032/Nultron-Desktop.git",
-    "https://github.com/Kyoo032/hyp-ai.git",
+    "https://github.com/Kyoo032/other-product.git",
     "https://github.com/Kyoo032/agentforge-fork",
     "https://github.com/Kyoo032/nultron-fork",
   ]) {

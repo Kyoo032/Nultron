@@ -54,6 +54,18 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## This repo names only Nultron, 2026-10-16 (Rizky; docs, tests and lane-guard config; branch `chore/nultron-only`)
+
+The other product left on 2026-10-15 and has its own repo and env since 2026-10-16. Rizky asked that this repo carry nothing about it, and that its leak guards move there.
+
+- Live guidance names only Nultron: `AGENTS.md`, `TESTER.md`, `README.md`, the change and verify skills, `apps/mobile/AGENTS.md`, the maps (chat send, hosted security, portal service and session, release lanes, virtual agents), the release targets, the portal design docs, the gateway model guide, the chat-first plan and the guardrails plan. The two design docs that belonged only to the other product (`team-board-spec.md`, `opc-sme-architecture.md`) are deleted; git keeps them.
+- Tests: the catalog, template, virtual-agents-page, release-bundle and push-guard checks no longer name the other product or its gateway. The brand ratchet (`lanes.json` `brandLiterals`, `scripts/lane-guard.baseline.json`) now counts `Nultron` and `Toko Token` only. The one-shot `assemble-agents-md-once.yml` workflow is deleted (no GitHub Actions run here).
+- Kept as written: the security register, this log, the changelogs, the pivot record and the portal migrations (never edited).
+- Proof: `node --test` on the four touched script files, 100 of 100; `ci:local` in the PR.
+- NDA check, name-free (Rizky, same day): `scripts/release-web.mjs` reads its banned terms from the gitignored `nultron-files/release/nda-terms.txt` (`scripts/release-nda.mjs`). The release refuses to run, dry runs included, when that file is missing or empty. It refuses notes, the body, any bundle or site file, or any file in the release repo's clone that carries a term, and it prints a count, never the term. Seven new cases in `release-web.test.mjs` (49 of 49); the real bundle was checked once against the real terms file. The file exists only in the main checkout, so a release from a worktree refuses.
+
+Lanes: enterprise, tester
+
 ## Agent guardrails: where a change goes, a push guard, release refusals and a deploy gate, 2026-10-14 (branch `chore/agent-guardrails`; lanes: Enterprise, HYP AI, tester)
 
 - **Why.** Rizky, 2026-10-14: a misconfigured update must not take the app offline, and every change has to reach the right code. `main`'s AGENTS.md opened with the tester banner (carried over by the 2026-10-12 promotion), so an agent on `main` was told it was in the tester.

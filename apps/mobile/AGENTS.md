@@ -39,5 +39,5 @@ v1: onboarding/settings (paste key → probe `/v1/models` → SecureStore, offli
 
 - Create `android/` or `ios/` native folders by hand. `expo prebuild` owns them; keep them gitignored until a reason to eject appears.
 - Reuse the desktop Electron shell, Capacitor, or a WebView around `apps/web`.
-- Merge Toko Token and TokenKu in copy or catalogs.
+- Merge Toko Token with another gateway name in copy or catalogs.
 - Commit `.env`, keys, keystores, or provisioning profiles.

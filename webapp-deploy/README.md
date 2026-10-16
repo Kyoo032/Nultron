@@ -368,7 +368,7 @@ to the seat cap. `portal.sh otp` is refused on purpose: manual one-time codes ne
 `PORTAL_ALLOW_MANUAL_OTP=1`, which the production portal will not boot with (SR-10), and the owner decided
 mail goes through SES.
 
-**Signing in with a username and a password (the default since 2026-10-09; owner decisions 2026-10-07 for HYP AI and
+**Signing in with a username and a password (the default since 2026-10-09; owner decisions 2026-10-07 and
 2026-10-09 for Nultron Enterprise).**
 `portal.env.example` carries `PORTAL_SIGNIN_MODE=password` uncommented, so a portal started from it signs people in
 this way. To use the e-mailed one-time code instead, set it to `code`, fill in every `PORTAL_SMTP_*` value (see

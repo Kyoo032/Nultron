@@ -26,7 +26,6 @@ describe("data locale JSON", () => {
   it("keeps brand names untranslated in id", () => {
     const raw = readFileSync(resolve(localesDir, "id", "data.json"), "utf8");
     expect(raw).toContain("Toko Token");
-    expect(raw).not.toMatch(/TokenKu/);
     expect(JSON.parse(raw).title).toBe("Data");
   });
 });

@@ -25,7 +25,6 @@ describe("videos locale JSON", () => {
 
   it("keeps brand names untranslated in id", () => {
     const raw = readFileSync(resolve(localesDir, "id", "videos.json"), "utf8");
-    expect(raw).not.toMatch(/TokenKu/);
     expect(raw).toMatch(/Toko Token/);
   });
 });

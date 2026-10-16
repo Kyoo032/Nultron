@@ -7,7 +7,7 @@ description: The ordered sequence for ANY change to this repo. First check where
 
 Agent guardrail, same class as `AGENTS.md`. Not part of any product. It ships in no installer or image.
 
-Lanes: `main` is the published code (Nultron as the OPC web app, and the Enterprise base). The tester (`C:\Users\rizky\agentforge-chat`, branch `tester/chat-first`) is the staging code at every stage. HYP AI is its own repo since 2026-10-15 (`Kyoo032/hyp-ai`, folder `C:\Users\rizky\hyp-ai`) and takes nothing from here. Nultron Personal is retired and owes nothing. The rules are in `AGENTS.md` ("Where am I?", "Where a change goes", "Lanes"); the working form is [`release-and-sync-lanes.md`](../../../docs/internal/maps/release-and-sync-lanes.md).
+Lanes: `main` is the published code (Nultron as the OPC web app, and the Enterprise base). The tester (`C:\Users\rizky\agentforge-chat`, branch `tester/chat-first`) is the staging code at every stage. Nultron Personal is retired and owes nothing. The rules are in `AGENTS.md` ("Where am I?", "Where a change goes", "Lanes"); the working form is [`release-and-sync-lanes.md`](../../../docs/internal/maps/release-and-sync-lanes.md).
 
 pstack stays in the Cursor plugin. Call it by path, never copy it: `~/.cursor/plugins/cache/cursor-public/pstack/*/skills/how/SKILL.md` and `.../skills/blast-radius/SKILL.md`. The standard block to paste at the top of every subagent prompt is [`preamble.md`](preamble.md).
 
@@ -31,9 +31,9 @@ Then pick the row in `AGENTS.md` "Where a change goes" that fits the change. Sho
 3. **Read the map page first** (pstack `how`). The page named in `lanes.json`, plus its **Touches / Do not touch** section where it has one. If the page disagrees with the code, that is a finding, fix the page in step 7.
 4. **Blast radius on any shared file.** A file is shared when it is `protected` in `lanes.json` (the tester branch edits it too), when many modes call it (`packages/host/src/job-regen.ts`), or when it sits in `packages/core` or `packages/db`. Run pstack `blast-radius` on the diff before you finish, and prove the one fact the change depends on by running code, not by writing it up.
 5. **Edit only owned paths.** Stay inside the page's Touches list. Anything in Do not touch belongs to another page: change it in its own PR. Rules that always apply:
-   - **Brand-neutral.** Shared code never types `Nultron`, `Toko Token`, `TokenKu`, `HYP AI` or `Hypey`; it reads `productName` and `gatewayName`. New copy goes in both `en` and `id` catalogs.
+   - **Brand-neutral.** Shared code never types `Nultron` or `Toko Token`; it reads `productName` and `gatewayName`. New copy goes in both `en` and `id` catalogs.
    - **Enterprise-only work** is gated on `isServerMode()` and carries a Personal-parity test. Personal work must not read hosted state.
-   - **Deploy differences stay in their lane.** HYP AI's Cloudflare edge is not in this repo; do not carry it into `webapp-deploy/`. Password sign-in is a portal setting (`PORTAL_SIGNIN_MODE`) that both bundles can set, not a HYP AI-only lane.
+   - **Deploy differences stay in their lane.** Nultron has no Cloudflare edge; do not carry one into `webapp-deploy/`. Password sign-in is a portal setting (`PORTAL_SIGNIN_MODE`), not a lane of its own.
    - **Release, pack and deploy scripts** need Rizky's word. Never run one from `C:\Users\rizky\agentforge-chat`.
 6. **Prove it by driving.** A green `tsc` or a worker summary is not proof. Follow [`verify-agentforge`](../verify-agentforge/SKILL.md): doctor, drive the recipe, keep evidence. A tester change is driven on the staging instance (the tester's staging subdomain, name pending). Say "not driven" when you did not.
 7. **Refresh the docs in the same change.** Rewrite the affected section of the map page and bump its `Last verified: <date> at <sha>` line; update the matching `.cursor/skills/verify-agentforge/features/<feature>.md`; append to `docs/internal/unreleased.md` and name the lanes. If you touched a tester shared file or added one, update `lanes.json` and the vault note in the same session.

@@ -12,7 +12,7 @@ Product: retired-desktop · Instance: none (no mobile build; retired with the de
 
 ## How to get to it (user POV)
 
-- You cannot. There is no mobile install path. Use webdev (`http://127.0.0.1:3000`) or packaged desktop (ephemeral loopback ≠ 3000). Product copy and catalogs stay Toko Token; do not invent a TokenKu mobile app.
+- You cannot. There is no mobile install path. Use webdev (`http://127.0.0.1:3000`) or packaged desktop (ephemeral loopback ≠ 3000). Product copy and catalogs stay Toko Token; do not invent another gateway brand for a mobile app.
 
 ## Driving it with the Nultron harness
 

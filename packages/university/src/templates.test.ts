@@ -20,6 +20,5 @@ describe("agent packs", () => {
     const blob = JSON.stringify(universityTemplates);
     expect(blob).not.toMatch(/Harbor State/i);
     expect(blob).not.toMatch(/Course Tutor/i);
-    expect(blob).not.toMatch(/TokenKu/i);
   });
 });

@@ -123,7 +123,7 @@ describe("VirtualAgentsView", () => {
   it("names the generalist after the product, not a brand typed in the page", () => {
     const html = view();
     expect(html).toContain("Acme");
-    expect(pageSource).not.toMatch(/Nultron|Toko Token|TokenKu|HYP AI|Hypey/);
+    expect(pageSource).not.toMatch(/Nultron|Toko Token/);
   });
 
   it("gives every available agent a hire button", () => {
