@@ -54,11 +54,12 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
-## Copy gaps from the 2026-10-16 verify pass (branch `fix/verify-pass-gaps`; tests run, driven on a stub desk)
+## Gaps from the 2026-10-16 verify pass (branch `fix/verify-pass-gaps`; tests run; the gate and pricing driven on a stub desk, the guide copy by tests only)
 
 - Guide stop three names the answer style (Fastest, Daily, Reasoning) instead of a model picker that the chat-first Chat does not draw (`guide.json`, en and id).
 - `/pricing`: the Personal tier no longer describes the retired Mac and Windows app. It reads as the owner's own desk, for one owner, in `plans.json` (en and id). Key ids are unchanged. The wording is a placeholder for Rizky, like every figure on that page.
 - Research: the eight `stub*` keys in `research.json` (the "Offline demo" dossier) had no consumer and are deleted from both locales. `research-locales.test.ts` now checks that each brand name appears in `id` as often as in `en`.
+- Gate: a settings answer with no `gateway` field, or a malformed one, now shows onboarding on every build (`resolveGate`, `apps/web/lib/gateway-gate.ts:84-86`). Before, plain webdev opened the app on it, which was the renderer deciding. The stub host still reports `allowed: true`, so webdev and Playwright open as before. The JSDoc that described the old rule is deleted.
 
 Lanes: enterprise, tester
 
