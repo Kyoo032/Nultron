@@ -6,8 +6,6 @@ Last verified: 2026-10-15 at 8a42aaed
 
 Repo names and the lane set were re-read on 2026-10-15 at 8a42aaed: HYP AI left this repo and is no longer a lane. The earlier rewrite was on 2026-10-14. The "Chat-first shell" section was read on 2026-10-12 at e8a7eca8, against the tester branch, before PR #157 promoted it to `main`.
 
-Last verified: 2026-10-14 at 9e77ccda. The Workspace knowledge (W1) section and the `lanes.json` entries it names were read from the tester tree over that commit. The Chat-first shell section was last read at e8a7eca8 (2026-10-12), and the rest of the page at cc346b0c (2026-10-09). Neither was re-read in this pass.
-
 ## Overview
 
 One source repo (`Kyoo032/agentforge`, branch `main`) is the one place a fix is made. The lanes are:
@@ -20,16 +18,6 @@ One source repo (`Kyoo032/agentforge`, branch `main`) is the one place a fix is 
 The rules for where a change is cut and made are the tables at the top of `AGENTS.md`, "Where am I?" and "Where a change goes". The rules behind them are in `AGENTS.md`, "Lanes". This page is the working form of those rules: how a change reaches each lane, and what must be true before a lane counts as fixed. The longer story of the tester split is in Rizky's vault note `40-Dev/nultron-two-codes-map.md`. This page does not cover how a release is cut (see the "Web release" section of `AGENTS.md`).
 
 Repo names as of 2026-10-15: the Enterprise release repo is `Kyoo032/Nultron-Releases` (`RELEASE_REPO`, `scripts/release-web.mjs:63`; it was `Kyoo032/Nultron` until the rename of 2026-10-15, and `Kyoo032/NultronEnt` until 2026-10-14). The source repo `agentforge` is renamed to `Kyoo032/Nultron` after that rename. The retired Personal release repo is `Kyoo032/Nultron-Desktop`, archived.
-
-## Workspace knowledge, W1 (2026-10-14)
-
-Two `lanes.json` entries cover the tester's first Workspace slice (team board W1, [`team-board-spec.md`](../team-board-spec.md) section 2b). Both map to [`knowledge-flows.md`](knowledge-flows.md).
-
-- **Projects, tester only.** The entry for `packages/db/src/projects-schema*.ts`, `packages/host/src/projects/**`, `packages/host/src/handlers/projects.ts` and the projects tests has `lanes: ["tester"]` and `protected: false`. Collective projects run in server mode only, and the routes answer the router's 404 on Personal (`lanes.json`, note on that entry).
-- **Knowledge, all four lanes.** The entry for the knowledge backend, retrieval, `knowledge-search-tool.ts`, `run-context.ts`, `threads.ts`, its handler and the two db schema files has `lanes` for all four and `protected: true`. A source may carry a `project_id`, and retrieval takes a `projectId` scope that `knowledge_search` reads from the run context. The note on the entry says Personal writes no `project_id`, so its SQL and answers do not change.
-
-**Coverage (added 2026-10-14).** Each file the W1 slice touched has its own `lanes.json` entry. The projects renderer is tester only. The Chat document cards, Add to Workspace, the tool-row reader, the chip's kept original and its hook are tester only. `composer-attachment-chip.tsx` and `composer-documents.ts` are on `main`, so they are protected and reach all four lanes. `packages/host/src/doc-tools/**` and `chat-documents/original.ts` are tester only. Whether a file is on `main` was read with `git ls-tree main`. A file with no narrower entry still falls under the broad `apps/web/**` and `packages/host/**` entries, which name no map, so `lane-guard` raises no map warning for it.
-
 
 ## Lanes
 

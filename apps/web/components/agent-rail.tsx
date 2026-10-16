@@ -10,7 +10,6 @@ import { DeskBuddyChip, DeskBuddyDock } from "@/components/desk-buddy";
 import { ModeIcon, isModeIconName, type ModeIconName } from "@/components/mode-icons";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { productMonogram } from "@/components/app-shell";
-import { buddyAllowedAt } from "@/lib/buddy-routes";
 import { t } from "@/lib/i18n";
 import { assistantNameOf, useProductBrand, usesBundledMark } from "@/lib/product-brand";
 import type { ShellModesSource } from "@/lib/shell-modes";
@@ -227,7 +226,6 @@ export function AgentRail(_props: Props) {
   const desk = useRailCollapse(true);
   const drawer = useRailDrawer(phone, `${pathname}?${searchParams.toString()}`);
   const collapsed = phone ? !drawer.open : desk.collapsed;
-  const buddy = buddyAllowedAt(pathname);
 
   return (
     <AgentRailView
@@ -248,12 +246,10 @@ export function AgentRail(_props: Props) {
             screen where nothing a person or a model wrote ever scrolls under it. The dock is what
             tells the buddy it has a home; it is given no room (`agent-rail.css`), so the buddy is
             always the head and never a body standing over the rail's icons. */}
-          {buddy ? (
-            <div className="agent-rail-buddy-dock" aria-hidden="true">
-              <DeskBuddyDock collapsed={false} />
-            </div>
-          ) : null}
-          {buddy ? <DeskBuddyChip /> : null}
+          <div className="agent-rail-buddy-dock" aria-hidden="true">
+            <DeskBuddyDock collapsed={false} />
+          </div>
+          <DeskBuddyChip />
           <ThemeToggle />
           <AppUpdatesButton collapsed />
         </>

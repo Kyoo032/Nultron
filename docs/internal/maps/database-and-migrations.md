@@ -2,10 +2,6 @@
 
 Product: both · Instance: main :3000
 
-Last verified: 2026-10-15 at 0182543b and the working tree, for the quota tables (K-D25 Q3) only. Nothing else on the page was re-read.
-
-Last verified: 2026-10-15 at de5ce628 (tester tree) for the `doc_versions` paragraph under "The schema" only. Nothing else on the page was re-read.
-
 Last verified: 2026-09-29 for the three `apps/desktop/main.cjs` citations (`bootstrapPackaged` lines), re-anchored in the
 working tree, not committed, after the ffmpeg probe moved behind the first paint. Before that: 2026-09-23 at d4561b8 + uncommitted tree for the migrations table and the numbering note (now
 through `0021`), the `auth_sessions` row of the schema families, "Start over, applied at next boot" (every
@@ -134,32 +130,6 @@ The families:
 Two tables exist only in SQL and have no Drizzle declaration, because they are FTS5 virtual tables:
 `knowledge_chunks` (`packages/db/drizzle/0003_knowledge.sql`) and `market_news_fts`
 (`packages/db/drizzle/0009_market.sql`). The schema file says so at `:662-664`.
-
-The tester adds tables on every open with `CREATE TABLE IF NOT EXISTS` and no Drizzle declaration, so it never edits the journal `main` owns: the board (`board-schema.ts`), the Workspaces (`projects-schema.ts`) and, since 2026-10-15, `doc_versions` (`packages/db/src/doc-versions-schema.ts:5`, called from `ensure-schema.ts:258`). `doc_versions` holds one row per kept version of a saved document (team-board-spec.md, K-D30, phase D0). Its `artifact_id` references `artifacts(id)` with `ON DELETE cascade`, so it is listed in `CASCADED_TABLES` (`tenant-purge.ts:93`): the purge deletes `artifacts` by desk and the foreign key takes the versions; an artifact delete does the same. It carries a `workspace_id` copied from the artifact and no `tenant_id`. `UNIQUE (artifact_id, version)` is the guard that makes "exactly one version 1" hold across connections. Two `CHECK`s keep the author whole: a `person` row has `author_user_id` and no `agent_id`; an `agent` row has `agent_id`. `folded_authors` is plain JSON of section ids, version numbers and user or agent ids, never content; the spec column is the same sealed envelope as `artifacts.meta.spec`. The store that writes it is in [`agent-tools-and-files.md`](agent-tools-and-files.md) § 16. Personal Start over deletes the whole SQLite file (`reset.ts:29`), so it takes the table too.
-
-### The quota tables (K-D25 Q3)
-
-`packages/db/src/quota-schema.ts` adds nine quota tables and five nullable `tenant_usage` columns (`allocation_id`, `purpose`, `hold_id`, `agent_id`, `project_id`). `ensureQuotaTables` runs from `ensure-schema.ts:266`, after the gateway token tables, and the names are in `QUOTA_TABLES` (`quota-schema.ts:3`). Nothing reads or writes them yet: admission, holds and settle come in Q4 to Q8. The limit, the company cap, a hold's amount and its settled amount are checked to lie between 0 and 10^12 (`quota-schema.ts:65`, `:108-109`, `:165`, `:167`); the spent and held counters are checked only to be non-negative (`:111-112`). The quota tables cascade with their company through `CASCADED_TABLES` (`tenant-purge.ts:98-106`), and `tenant_usage` is kept (`tenant-purge.ts:33`).
-
-Every guard is `CREATE TRIGGER IF NOT EXISTS`, so a changed trigger body needs a new name to reach a database that has already healed. What each guard refuses:
-
-| Guard | Protects | Refuses (error text) | Where |
-|---|---|---|---|
-| Tenant | `company_quota_settings`, `company_groups`, `quota_allocations`, `quota_holds`, `quota_audit` | a row whose `tenant_id` is not its company's (`quota_tenant_mismatch`) | `tenantGuards`, `quota-schema.ts:189` |
-| Membership | `company_group_members` | a user who is not a member of the group's company (`quota_group_member_not_in_organization`) | `MEMBERSHIP_GUARDS`, `quota-schema.ts:213` |
-| Subject | `quota_assignments` | a person who is not a member of the allocation's company (`quota_subject_not_member`), or a group outside it (`quota_group_outside_organization`); a missing allocation fails the same way | `quota-schema.ts:220-231` |
-| Allocation | every `quota_holds` row, a `quota_audit` row that names an allocation, and a `tenant_usage` row that names one | an allocation that belongs to another company or does not exist (`quota_allocation_outside_organization`) | `ALLOCATION_LINK_GUARDS`, `quota-schema.ts:242`; `TENANT_USAGE_ALLOCATION_GUARDS`, `:262` |
-| Person usage | `quota_person_usage` | a user who is not a member of the allocation's company (`quota_subject_not_member`) | `PERSON_USAGE_NOT_MEMBER`, `quota-schema.ts:237` |
-| Removal | `organization_members`, after a delete | nothing. It deletes the user's group places and person assignments in that company and keeps their spend | `MEMBER_REMOVAL_CLEANUP`, `quota-schema.ts:270`; the table is `organizationMembers` in `schema.ts` |
-
-Not guarded, on purpose:
-
-- `quota_allocation_models` has no company or user column, so a trigger has nothing to compare its allocation with. Its company is the allocation's own, and the host must write it under the caller's company.
-- `quota_person_usage` refuses an insert for someone who is no longer a member, and a `spent_micros` or `held_micros` update is not guarded. The reserve path has to create a period row while the person is still a member; settle then only updates it.
-
-Gotcha: SQLite refuses `ALTER TABLE tenant_usage DROP COLUMN` while a trigger names that column. A migration that drops `allocation_id` or `organization_id` must drop the two `tenant_usage_allocation_*` triggers first. The legacy-ledger test does that (`quota-schema.test.ts`, "adds the tenant_usage columns to a ledger that predates them").
-
-Tests: `quota-schema.test.ts` (columns, defaults, CHECKs, indexes, trigger names, the legacy ledger) and `quota-schema-guards.test.ts` (the guards, member removal, the purge cascade).
 
 ### Migrations
 
@@ -349,7 +319,6 @@ a package script only, not exposed at the root (`packages/db/package.json:12`).
 | `packages/db/src/client.ts` | Opens better-sqlite3, sets pragmas, runs the reset hook and `ensureSchema`, exports `db` / `sql` / `Database`. |
 | `packages/db/src/schema.ts` | Every Drizzle table. No queries. |
 | `packages/db/src/ensure-schema.ts` | `migrationsFolder()`, `ensureSchema()`, baseline stamping, the `ensure*` healers, `assertKernelTables`. |
-| `packages/db/src/quota-schema.ts` | `ensureQuotaTables`: the quota tables, their guard triggers and the `tenant_usage` quota columns. |
 | `packages/db/drizzle/` | The 22 committed `.sql` migrations, `0000`-`0021`, plus `meta/_journal.json`, whose array runs `0018` before `0017` (see the numbering note). |
 | `packages/db/src/ensure-local-owner.ts` | The single owner, org, home workspace, and workspace CRUD. |
 | `packages/core/src/local-owner.ts` | The id/slug/name constants and `pickWorkspaceId`. |

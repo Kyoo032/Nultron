@@ -191,8 +191,8 @@ export function splitUserFileBlocks(text: string): UserTextSegment[] {
 
 /**
  * The notes written for the model alone. `[Attached file: ...]` tells the model what the block below is:
- * the same on every file, so the card leaves it out. `[Original file ...]` names the artifact id that
- * `import_document` takes (K-D21): an id is for the model's tool, never for the person's card.
+ * the same on every file, so the card leaves it out. `[Original file ...]` names the kept original by its
+ * artifact id: an id is for the model, never for the person's card.
  */
 const MODEL_ONLY_NOTE_PREFIXES: ReadonlyArray<string> = [HOST_NOTE_PREFIXES[0], "[Original file"];
 
@@ -292,18 +292,10 @@ export function jobEmbedsFromOutput(output: unknown): JobEmbedModel[] {
 
 /**
  * Tools whose results are the owner's own material, already summarised on their tool row (or, for a
- * deck, a document or a dossier, drawn as its own card). A knowledge excerpt shaped like a search hit is not
- * a web result to surface under the answer.
+ * deck or a dossier, drawn as its own card). A knowledge excerpt shaped like a search hit is not a web
+ * result to surface under the answer.
  */
-const NO_EMBED_TOOLS = new Set([
-  "knowledge_search",
-  "build_deck",
-  "create_document",
-  "create_workbook",
-  "revise_document",
-  "import_document",
-  "research_dossier",
-]);
+const NO_EMBED_TOOLS = new Set(["knowledge_search", "build_deck", "research_dossier"]);
 
 export function jobEmbedsFromTools(tools: Array<{ key?: string; status: string; output?: unknown }>): JobEmbedModel[] {
   const cards: JobEmbedModel[] = [];

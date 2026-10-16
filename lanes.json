@@ -219,26 +219,6 @@
       "note": "Tester shared file. 2026-10-09: the ping also answers assistantName."
     },
     {
-      "glob": "{packages/db/src/projects-schema*.ts,packages/host/src/company-people.ts,packages/host/src/projects/**,packages/host/src/handlers/projects.ts,packages/host/src/projects*.test.ts}",
-      "map": "docs/internal/maps/knowledge-flows.md",
-      "lanes": [
-        "tester"
-      ],
-      "protected": false,
-      "note": "Collective projects and Workspaces, tester code only (team-board-spec.md section 2b, F1 and W1). Server mode only; the routes answer the router 404 on Personal."
-    },
-    {
-      "glob": "{packages/host/src/knowledge.ts,packages/host/src/knowledge-embed.ts,packages/host/src/knowledge/backend.ts,packages/host/src/knowledge/backends/builtin.ts,packages/host/src/knowledge-search-tool.ts,packages/host/src/run-context.ts,packages/host/src/threads.ts,packages/host/src/handlers/threads.ts,packages/db/src/schema.ts,packages/db/src/ensure-schema.ts}",
-      "map": "docs/internal/maps/knowledge-flows.md",
-      "lanes": [
-        "personal",
-        "enterprise",
-        "tester"
-      ],
-      "protected": true,
-      "note": "Tester shared files for Workspace knowledge (W1, 2026-10-14). A source may carry project_id; retrieval takes a projectId scope (knowledge.ts, builtin.ts, knowledge-embed.ts) that knowledge_search reads from the run context; threads and handlers/threads take an optional projectId, server mode only. Personal writes no project_id, so its SQL and answers are unchanged."
-    },
-    {
       "glob": "packages/host/src/knowledge-soul.ts",
       "map": "docs/internal/maps/virtual-agents.md",
       "lanes": ["personal", "enterprise", "tester"],
@@ -275,55 +255,6 @@
       "note": "Chat renderer."
     },
     {
-      "glob": "{apps/web/components/projects-*.tsx,apps/web/components/projects.css,apps/web/lib/projects-*.ts}",
-      "map": "docs/internal/maps/knowledge-flows.md",
-      "lanes": ["tester"],
-      "protected": false,
-      "note": "Projects (Workspaces) renderer, tester code only (team-board-spec.md section 2b, W1). Not on main, so no merge conflict; the server routes answer the router 404 on Personal."
-    },
-    {
-      "glob": "{apps/web/components/chat-doc-card.tsx,apps/web/components/add-to-workspace.tsx,apps/web/components/tool-rows/doc-result.ts,apps/web/lib/chat-file-save.ts,apps/web/lib/use-chip-originals.ts}",
-      "map": "docs/internal/maps/chat-send.md",
-      "lanes": ["tester"],
-      "protected": false,
-      "note": "Chat document cards, Add to Workspace (hosted builds only) and the chip's kept original. Not on main, so tester code only."
-    },
-    {
-      "glob": "{apps/web/components/composer-attachment-chip.tsx,apps/web/lib/composer-documents.ts}",
-      "map": "docs/internal/maps/chat-send.md",
-      "lanes": ["personal", "enterprise", "tester"],
-      "protected": true,
-      "note": "Shared with main: the document chip, its notes and the save before Send. A tester edit here can conflict at a merge from main."
-    },
-    {
-      "glob": "{packages/host/src/doc-tools/**,packages/host/src/chat-documents/original.ts}",
-      "map": "docs/internal/maps/agent-tools-and-files.md",
-      "lanes": ["tester"],
-      "protected": false,
-      "note": "Word, Excel and PDF tools (create, revise, import) and the kept original of a chat upload. Not on main, so tester code only."
-    },
-    {
-      "glob": "{packages/host/src/doc-versions/**,packages/db/src/doc-versions-schema.ts}",
-      "map": "docs/internal/maps/agent-tools-and-files.md",
-      "lanes": ["tester"],
-      "protected": false,
-      "note": "Document versions in a Workspace, D0 (team-board-spec.md K-D30): the doc_versions table, the store, the cap and host section ids. Not on main yet; the hyp-ai lane takes it with the tester's promotion."
-    },
-    {
-      "glob": "packages/db/src/doc-proposals-schema.ts",
-      "map": "docs/internal/maps/agent-tools-and-files.md",
-      "lanes": ["tester"],
-      "protected": false,
-      "note": "Document proposals, the table beside doc_versions. Not on main yet; same lanes as doc-versions."
-    },
-    {
-      "glob": "{packages/host/src/handlers/docs-*.ts,packages/host/src/docs-*.test.ts}",
-      "map": "docs/internal/maps/agent-tools-and-files.md",
-      "lanes": ["tester"],
-      "protected": false,
-      "note": "Document routes and their tests (docs-import). Not on main yet; the hyp-ai lane takes them with the tester's promotion."
-    },
-    {
       "glob": "apps/web/components/rail-*.tsx",
       "map": "docs/internal/maps/chat-sessions-and-rail.md",
       "lanes": ["personal", "enterprise", "tester"],
@@ -350,20 +281,6 @@
       "lanes": ["tester"],
       "protected": false,
       "note": "Virtual agents registry, catalog, worker channel and renderer helpers, tester code only."
-    },
-    {
-      "glob": "{packages/db/src/ensure-schema.ts,packages/db/src/tenant-purge.ts,packages/db/src/migrate-0015.test.ts,packages/host/src/router.ts,packages/host/src/types.ts,packages/host/src/http-adapter.ts,packages/host/src/tenancy-harness.test.ts,apps/web/src/App.tsx,apps/web/lib/i18n.ts,apps/web/components/agent-rail.tsx,apps/web/components/mode-icons.tsx,apps/web/components/mode-illustration.tsx,apps/web/lib/agent-rail.test.tsx,docs/internal/unreleased.md,docs/internal/maps/README.md,.cursor/skills/verify-agentforge/features/README.md}",
-      "map": "docs/internal/maps/board.md",
-      "lanes": ["personal", "enterprise", "tester"],
-      "protected": true,
-      "note": "Tester shared files edited for the team board, K0 (2026-10-13). ensure-schema calls ensureBoardTables; tenant-purge lists the five board tables in CASCADED_TABLES; migrate-0015.test lists them as tenant carriers; router compiles boardRoutes() in one line; types adds HostStreamResult.headers; http-adapter applies a stream's own headers and forwards Last-Event-ID; tenancy-harness has the five by-id rows; App routes /board on hosted builds only; i18n registers the board namespace; agent-rail takes showBoard; mode-icons and mode-illustration add the board icon and scene; unreleased.md has one entry at the top of its log and the two README indexes one row each. A merge from main can conflict at each, unreleased.md most likely."
-    },
-    {
-      "glob": "{packages/db/src/board-schema*.ts,packages/host/src/board/**,packages/host/src/handlers/board.ts,apps/web/components/board-page.tsx,apps/web/components/board-card-dialog.tsx,apps/web/components/board.css,apps/web/lib/board-*.ts}",
-      "map": "docs/internal/maps/board.md",
-      "lanes": ["tester"],
-      "protected": false,
-      "note": "Team board K0, tester code only, server mode only (team-board-spec.md). No published version, so no conflict at a merge from main."
     },
     {
       "glob": "apps/web/components/settings-*.tsx",

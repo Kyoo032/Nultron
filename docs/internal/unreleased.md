@@ -54,6 +54,19 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## OPC strip: the tester is Nultron only (repo split P5b), 2026-10-16 (tester, committed on `tester/chat-first` in waves R1 to R4, H1 to H4, C1, D1 and W9; tests and typecheck run, not driven in a browser)
+
+Rizky's rulings of 2026-10-15. Removed from the tester: the team board, collective-project Workspaces, versioned documents and the document tools, quota and the company gateway management token, the enterprise shell, prompt-made agents, people names, paid media approval, and per-person file privacy. Kept: the chat-first bots shell, the four model choices (K-D31, with the host on the `opc` profile), stored pictures as input (F3) and chat upload originals (U1, now saved through `packages/host/src/artifact-save.ts`).
+
+- Every stripped file is back to main's copy or deleted; `git diff origin/main` shows only the kept areas and the tester's earlier work.
+- New databases stop creating the SME tables. A database written before the strip keeps them orphaned, with no DROP. Every one of them cascades from `organizations`, `workspaces`, `artifacts` or `threads`, so a tenant purge still clears their rows. `packages/db/src/pre-opc-schema.test.ts` opens such a database (fixture `__fixtures__/pre-opc-schema.json`), runs the current `ensureSchema` and purges one tenant of two.
+- Their leftover triggers on `tenant_usage` and `organization_members` stay too. They fire only on a non-null `allocation_id`, which nothing writes now, or delete rows from the orphaned quota tables.
+- Tests that asserted a colleague was refused were cut (Rizky, 2026-10-15). Every other-company and other-desk assertion is kept.
+- Security register: SR-175, SR-176 and SR-178 to SR-183 are not applicable.
+- Not driven: no browser drive on `:3200` and no hosted drive after the strip.
+
+Lanes: tester
+
 ## Lint: Biome warnings in the chat, document, settings and desktop files, and the agent-rail CSS order, 2026-10-15 (tester, committed as `92bde965`; lint and cascade only, no behaviour change; tests run, not driven in a browser)
 
 Biome exits 0 with zero errors, before and after. The count in `pnpm lint` was 225 warnings and 27 infos at the start (other workers' files included). The 54 warnings in the 17 files this block names are cleared; 169 remain repo-wide. Split for review: 21 are in the files the brief named (`lifecycle.cjs`, `main.cjs`, `agent-rail.css`, `chat-composer.tsx`, `chat-context-chip.tsx`, `component-setup.tsx`, `chat-turn.tsx`, `chat-dossier-card.tsx`); 33 are in files the branch already touches (`chat-session.tsx`, `doc-page/doc-body.tsx`, `doc-page/doc-proposal-block.tsx`, `doc-page/section-editor.tsx`, `settings-page.tsx`, `lib/tool-labels.ts`, `packages/host/src/settings-store.ts`, `packages/core/src/agents/service.test.ts`, `packages/host/src/agent-prompt-made.personal.test.ts`), and either set can be dropped by hunk. Not done in this block: `packages/host/src/agent-prompt-made.test.ts` (4 warnings) and `apps/web/src/App.tsx` (1), both with another worker's uncommitted edits; `apps/web/components/nultron/nultron.css` and the Studio files, out of scope; the rest of the repo.

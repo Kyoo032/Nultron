@@ -5,8 +5,6 @@ import { AppRail } from "@/components/app-rail";
 import { DeskBuddyReactions } from "@/components/desk-buddy-reactions";
 import { DeskBackdrop } from "@/components/desk-backdrop";
 import { ModeRedirect } from "@/components/mode-redirect";
-import { buddyAllowedAt } from "@/lib/buddy-routes";
-import { usePathname } from "@/lib/nav";
 import { modeRedirectAllowed, type ShellModesSource } from "@/lib/shell-modes";
 
 type Props = {
@@ -30,7 +28,6 @@ export function productMonogram(name: string): string {
 }
 
 export function AppShell({ workspaceName, visibleModes, modesSource = "host", children }: Props) {
-  const pathname = usePathname();
   return (
     <div className="flex h-full min-h-0 overflow-hidden bg-app text-inkbase">
       {/* A remembered or unknown list is only good for the first frame: nobody is redirected on it. */}
@@ -41,7 +38,7 @@ export function AppShell({ workspaceName, visibleModes, modesSource = "host", ch
         <AppRail workspaceName={workspaceName} visibleModes={visibleModes} modesSource={modesSource} />
       )}
       {/* The buddy stands in the rail; this draws nothing and only gives it its shell-level reactions. */}
-      {!buddyAllowedAt(pathname) ? null : <DeskBuddyReactions />}
+      <DeskBuddyReactions />
       <div className="desk-canvas flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" data-testid="app-main-panel">
         <DeskBackdrop />
         {/* Not a scroller, and not keyed on the route. Each desk page owns one

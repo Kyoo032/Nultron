@@ -55,7 +55,7 @@ export type ChatDocumentResult = {
   readonly truncated: boolean;
   /** Personal details the host masked. */
   readonly masked: number;
-  /** The artifact that keeps the file's own bytes, private to the person who attached it (K-D21). */
+  /** The artifact that keeps the file's own bytes, private to the person who attached it. */
   readonly originalId: string | null;
   /** Why the original was not kept, for a format that has one. */
   readonly originalSkipped: OriginalSkipReason | null;
@@ -264,7 +264,7 @@ export async function saveChatDocument(name: string, result: ChatDocumentResult)
 }
 
 /**
- * Removing a chip before Send takes the original the host kept at attach with it (K-D21), so it does not
+ * Removing a chip before Send takes the original the host kept at attach with it, so it does not
  * stay in the person's storage. Nothing is deleted while a send is in flight (`sendInFlight`): the message
  * may already name that original. A delete that fails is logged, never shown, and never stops the chip from
  * going; the original then stays as the person's own artifact.

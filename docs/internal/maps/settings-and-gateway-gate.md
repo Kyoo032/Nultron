@@ -2,7 +2,7 @@
 
 Product: both · Instance: main :3000
 
-Last verified: 2026-10-15 at 77638399 (tester HEAD) plus the uncommitted G1 working tree, for the company gateway management token (K-D25 step one, SR-183): the `companies` slot in "Settings per desk", the rows for `gateway-tokens/` and `handlers/company-gateway-admin.ts` in "Where things live". Read in that tree: `settings-store.ts` (`:194-205`, `:276-291`, `:318-327`, `:808-841`), `handlers/company-gateway-admin.ts`, `gateway-tokens/{adapter,check,admin-record}.ts`. Tested through the real router (`tenancy-harness.test.ts`), the handler (`company-gateway-admin.test.ts`), the adapter and the check (`gateway-tokens/*.test.ts`), the settings store (`settings-store.test.ts`) and the rotation (`wrap-key-rotation.test.ts`); not driven on a live gateway. Before that: 2026-10-11 at 2df34be (fix branch, before merge). Only "What a save does besides saving" and "What the answer carries" were re-checked; the other cites on this page are unchanged, and some were already stale.
+Last verified: 2026-10-11 at 2df34be (fix branch, before merge). Only "What a save does besides saving" and "What the answer carries" were re-checked; the other cites on this page are unchanged, and some were already stale.
 
 > **Two products, one repo.** **Personal** is the Mac/Windows Nultron app (current cut `0.15.0`); **Enterprise** is the hosted web app.
 > The host-decides/renderer-displays rule below is unchanged and applies to both; the Electron-only transport and wipe details are the Personal app's.
@@ -71,8 +71,6 @@ for anyone else (`TENANT_STATE_FILENAMES`, `packages/host/src/tenant-state-store
 [`tenant-storage.md`](tenant-storage.md) for why the local tenant keeps the bare path). In server mode it is a
 `tenant_state` row and no file is written at all. The whole of that story is
 [`tenant-secrets-backend.md`](tenant-secrets-backend.md); this page assumes it and carries on.
-
-**A company slot in the same payload (hosted only, 2026-10-15).** `SettingsFileV2` gained `companies: { [organizationId]: { gatewayAdmin? } }` (`packages/host/src/settings-store.ts:194-205`), read by `companiesMap` (`:276-291`). It holds the company gateway management token (SR-183). Only `saveCompanyGatewayAdmin`, `clearCompanyGatewayAdmin` and `loadCompanyGatewayAdmin` (`:808-841`) touch it, and no settings payload reads it. Because it sits in the same sealed envelope, the wrap-key rotation re-seals it with everything else. The token's own map is `gateway-tokens/`; its routes are `handlers/company-gateway-admin.ts`.
 
 `loadSettings(scope?)` / `saveSettings(patch, scope?)` (`packages/host/src/settings-store.ts:469-487`) take a
 `SettingsScope` (`:41`): a `TenantContext`, or a bare desk id. `resolveSettingsScope` (`:45-58`) turns either
@@ -600,8 +598,6 @@ installing an update or already exiting), races `clearRendererState()` — `clea
 | `packages/host/src/workspace.ts` | `workspace-id.txt` read/write |
 | `packages/host/src/tenant.ts` | `getTenant` — desk resolution, stamping, legacy adoption |
 | `packages/host/src/handlers/settings.ts` | `settingsPayload`, GET/POST settings, `gateVerdictFor`, `refreshGatewayGateAfterSave`, `handleGatewayCheck`, reset, cancel; `HOST_RESET_ENTRIES` |
-| `packages/host/src/handlers/company-gateway-admin.ts` | **Hosted only (2026-10-15).** GET, PUT and DELETE `/api/v1/company/gateway-admin`: the owner sets or clears the company gateway management token, an owner or admin reads its four-field status (`assertCanWrite`, `assertCanRead`); 404 off server mode |
-| `packages/host/src/gateway-tokens/` | **Hosted only (2026-10-15, SR-183).** `check.ts` (the one read-only check on save, pinned origin, `redirect: "manual"`), `admin-record.ts` (the stored shape and the four-field payload), `adapter.ts` (create, update, batch delete and usage against `/api/token`, scoped to ids in `gateway_managed_tokens`) |
 | `packages/core/src/gateway/gate-types.ts` | The gate contract |
 | `packages/host/src/gateway-gate.ts` | Derivation, the per-tenant verdict (through the state backend), live check, `requireGatewayAllowed` / `requireGatewayAllowedFor`, background refresh |
 | `packages/core/src/gateway/pinned.ts` | The pinned URL, its integrity hash, the dev-only override rule |

@@ -74,7 +74,7 @@ describe("chat composer: one route for every attachment", () => {
   });
 });
 
-describe("chat composer: a removed chip's kept original (K-D21)", () => {
+describe("chat composer: a removed chip's kept original", () => {
   it("takes a chip out through the hook, the one place that deletes its original", () => {
     expect(source).toContain("useChipOriginals(files, setFiles, busy)");
     expect(source).toContain("onRemove={removeChip}");

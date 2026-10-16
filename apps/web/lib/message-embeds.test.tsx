@@ -174,16 +174,16 @@ describe("file blocks and job results", () => {
     });
 
     it("never shows the kept original's line, nor its id, and keeps the rest of the notes", () => {
-      const kept = `[Original file kept: artifact ${KEPT}. Call import_document with this id to open or edit the file itself.]`;
+      const kept = `[Original file kept: artifact ${KEPT}, the file as it was attached.]`;
       const detail = fileCardDetail([...DOC_NOTES, kept]);
       expect(detail).not.toContain("Original");
-      expect(detail).not.toContain("import_document");
+      expect(detail).not.toContain("as it was attached");
       expect(detail).not.toContain(KEPT);
       expect(detail).toContain("Saved on this desk as uploads/~me/a.pdf.md.");
     });
 
     it("never shows the line that says the original was not kept", () => {
-      const notKept = "[Original file not kept (storage is full), so import_document cannot open the file itself.]";
+      const notKept = "[Original file not kept (storage is full), so the file itself is not available.]";
       const detail = fileCardDetail([...DOC_NOTES, notKept]);
       expect(detail).not.toContain("Original");
       expect(detail).not.toContain("storage is full");
@@ -191,7 +191,7 @@ describe("file blocks and job results", () => {
     });
 
     it("keeps the original's line out of a card drawn from a whole message", () => {
-      const kept = `[Original file kept: artifact ${KEPT}. Call import_document with this id to open or edit the file itself.]`;
+      const kept = `[Original file kept: artifact ${KEPT}, the file as it was attached.]`;
       const segment = splitUserFileBlocks(
         `Please read this.\n\n${[...DOC_NOTES, kept].join("\n")}\n\n--- a.pdf ---\nhello`,
       ).find((item) => item.type === "file");
@@ -205,7 +205,7 @@ describe("file blocks and job results", () => {
       expect(html).toContain("Saved on this desk as uploads/~me/a.pdf.md.");
       expect(html).toContain("hello");
       expect(html).not.toContain("Original file");
-      expect(html).not.toContain("import_document");
+      expect(html).not.toContain("as it was attached");
       expect(html).not.toContain(KEPT);
     });
   });

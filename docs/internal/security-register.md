@@ -209,14 +209,14 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-172](#sr-172) | Low | HYP AI behind Cloudflare: Cloudflare reads sign-in passwords, cookies and pasted keys in clear (Full mode), and the origin still answers around Cloudflare on 80, 443 and 8443 | Recorded as known in the HYP AI deploy README (2026-10-08); restricting the origin is optional there; needs the owner's call | HYP AI only; Nultron does not use Cloudflare |
 | [SR-173](#sr-173) | Info | The wrap key becomes the AES key through one unsalted SHA-256 | Checked, not an issue (2026-10-13) | — |
 | [SR-174](#sr-174) | Low | Caddy compresses every `text/*` response, `text/event-stream` included, which can hold live-update frames back | Fixed on `main` (PR #167, 2026-10-14): `encode` matches text types only, without `text/event-stream`, video or audio; unit-tested, Caddy syntax not validated, not driven | Before the team board (tester) is deployed behind Caddy |
-| [SR-175](#sr-175) | Medium | Hosted: a file one person generates on their own (artifacts, media, desk files outside their private folder) is listed and downloadable by every member of the company | Mostly fixed in the tester (2026-10-14: artifacts `bbe9308c`, workspace sharing `62eae740`, Knowledge work cards `a178b9bc`, media file route and chat media reads `fbe5994b`, galleries, storage list, Edit stills and job pictures `6374c386`); Edit projects and desk files still company-visible; not driven hosted; `main` still open | Before a second person of one company uses the hosted app for their own work |
-| [SR-176](#sr-176) | High | Hosted: any member of a company can delete any other member's generated media and artifacts | Fixed in the tester (`6374c386`): only the maker or a company owner or admin deletes; not driven hosted; `main` still open | Before a second person of one company uses the hosted app for their own work |
-| [SR-178](#sr-178) | Medium | Hosted (tester): a Workspace switched to "workspace" is readable by the whole company, not only its members (K-D22) | Fixed in the tester at `c062f4b7`, not driven hosted | Before HYP AI imports from the tester, and before promotion to `main` (a hosted drive is still owed) |
-| [SR-179](#sr-179) | Medium | Hosted (tester): a member removed from a Workspace keeps reading, listing and deleting the files and media they put into it | Fixed in the tester (2026-10-14), not driven hosted | Before HYP AI imports from the tester, and before promotion to `main` |
-| [SR-180](#sr-180) | Medium | Hosted (tester): document versions are not counted against a tenant's storage, and the cap keeps every version from the last 30 days with no count limit, so a busy document can fill the one disk | Open, not reachable: no route writes a version yet (D0, 2026-10-15) | Before D1 adds a route that appends a version |
-| [SR-181](#sr-181) | Low | Hosted (tester): a person with no display name is shown to every colleague by their password-mode username, so a colleague can lock them out with five wrong passwords | Fixed on the tester 2026-10-15, names only (Rizky's decision): the username is never sent as a name, and a person with no name shows as "Colleague <code>". One residual: a name stored by the old username fallback stays until that person's next sign-in | Before HYP AI imports from the tester |
-| [SR-182](#sr-182) | Medium | Hosted (tester): an owner or admin could open and edit a colleague's private agent | Fixed on the tester 2026-10-15: only the maker sees a private agent on a hosted desk; an owner or admin may delete it without opening it, and the maker's chats go with it. Personal unchanged | Before HYP AI imports from the tester |
-| [SR-183](#sr-183) | Medium | Hosted (tester): the company gateway management token is the credential that changes the company's gateway tokens; a leak of it, or of the wrap key that seals it, lets its holder act on any token of that gateway account, and the platform limits only the tokens it created itself | Built on the tester (G1, 2026-10-15), not driven against a live gateway: sealed with the company settings, never returned or logged, owner-only to set or clear, scope guard in the adapter. The credential type and the account header are unverified | Before the first live token-API call (Rizky's go, and Hypernet's word for TokenKu production), and before HYP AI imports from the tester |
+| [SR-175](#sr-175) | Medium | Hosted: a file one person generates on their own (artifacts, media, desk files outside their private folder) is listed and downloadable by every member of the company | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
+| [SR-176](#sr-176) | High | Hosted: any member of a company can delete any other member's generated media and artifacts | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
+| [SR-178](#sr-178) | Medium | Hosted (tester): a Workspace switched to "workspace" is readable by the whole company, not only its members (K-D22) | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
+| [SR-179](#sr-179) | Medium | Hosted (tester): a member removed from a Workspace keeps reading, listing and deleting the files and media they put into it | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
+| [SR-180](#sr-180) | Medium | Hosted (tester): document versions are not counted against a tenant's storage, and the cap keeps every version from the last 30 days with no count limit, so a busy document can fill the one disk | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
+| [SR-181](#sr-181) | Low | Hosted (tester): a person with no display name is shown to every colleague by their password-mode username, so a colleague can lock them out with five wrong passwords | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
+| [SR-182](#sr-182) | Medium | Hosted (tester): an owner or admin could open and edit a colleague's private agent | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
+| [SR-183](#sr-183) | Medium | Hosted (tester): the company gateway management token is the credential that changes the company's gateway tokens; a leak of it, or of the wrap key that seals it, lets its holder act on any token of that gateway account, and the platform limits only the tokens it created itself | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
 | [SR-177](#sr-177) | Low | The new deploy preflight, run in a throwaway container when the server has no node, received the real `AGENTFORGE_SECRETS_KEY` | Fixed before merge (branch `chore/agent-guardrails`, 2026-10-14): the container gets the word `set` or nothing | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
@@ -5990,6 +5990,9 @@ Gate: before the team board is deployed behind Caddy. Not driven.
 ### SR-175 {#sr-175}
 
 **Hosted: a person's own generated files are visible to the whole company.**
+
+**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+
 Raised 2026-10-14. Medium. Open. Found by read-only scouts of the tester code (`agentforge-chat`, which carries
 the same stores as `main`) while planning the team board's files phase.
 
@@ -6021,6 +6024,9 @@ Gate: before a second person of one company uses the hosted app for their own wo
 ### SR-176 {#sr-176}
 
 **Hosted: any member of a company can delete another member's files.**
+
+**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+
 Raised 2026-10-14. High. Open. Found by the W1b worker in the tester and checked on `main` by the orchestrator.
 
 Evidence (`main`):
@@ -6053,6 +6059,9 @@ Gate: none.
 ### SR-178 {#sr-178}
 
 **Hosted: a Workspace switched to "workspace" is readable by every person of the company, not only its members.**
+
+**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+
 Tester only. Raised 2026-10-14 evening, when Rizky ruled that a Workspace is shared with its members only (team-board-spec, K-D22). Medium.
 
 Evidence: W1 (`e29be2b5`, `62eae740`) reads a project's files, knowledge and chats for any person of the tenant when `projects.visibility = 'workspace'`, which was the K-D19 rule. That rule is now wrong. What goes wrong if ignored: a colleague who was never invited lists and downloads the Workspace's files and finds them in their own Workspace-less chats' knowledge search.
@@ -6071,6 +6080,9 @@ Gate: before HYP AI imports from the tester, and before the tester is promoted t
 ### SR-179 {#sr-179}
 
 **Hosted: a member removed from a Workspace keeps reading, listing and deleting the files and media they put into it.**
+
+**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+
 Tester only. Raised 2026-10-14, after SR-178's fix. Medium.
 
 Evidence: the read rule let a maker through on `owner_user_id = ?` (artifacts) and `user_id = ?` (media) whatever the row's `project_id`, and putting a file into a Workspace keeps its maker (`projects/store.ts` `setFileProject`, `setMediaProject`). So after an owner removed D, D still opened, listed and downloaded every file D had put in, and `mayDeleteFile` still let D delete them for everyone. What goes wrong if ignored: a person taken out of a Workspace, often on leaving a team, keeps the Workspace's documents they contributed and can destroy them.
@@ -6091,6 +6103,9 @@ Gate: before HYP AI imports from the tester, and before the tester is promoted t
 ### SR-180 {#sr-180}
 
 **Hosted: document versions are not counted against a tenant's storage, and the cap has no count limit inside 30 days.**
+
+**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+
 Tester only. Raised 2026-10-15 with D0 of documents in a Workspace (team-board-spec.md, K-D30). Medium.
 
 Evidence:
@@ -6110,6 +6125,9 @@ Gate: before D1 adds a route that appends a version.
 ### SR-181 {#sr-181}
 
 **Hosted: colleagues see a person's password-mode username, so any colleague can lock that person out.**
+
+**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+
 Tester only. Raised 2026-10-15 with the Workspace people picker. Low.
 
 Evidence:
@@ -6138,6 +6156,9 @@ Gate: before HYP AI imports from the tester. The residual is named in the same g
 ### SR-182 {#sr-182}
 
 **Hosted: an owner or admin could open and edit a colleague's private agent; now only the maker can, and delete is not a read.**
+
+**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+
 Tester only. Raised 2026-10-15 with K34-b (prompt-made agents). Medium, fixed.
 
 Evidence (before):
@@ -6174,6 +6195,9 @@ Gate: before HYP AI imports from the tester.
 ### SR-183 {#sr-183}
 
 **Hosted (tester): the company gateway management token can change the company's gateway tokens, so where it is kept, who may set it and what the platform lets it reach are the controls.**
+
+**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+
 Tester only. Raised 2026-10-15 with team board K-D25, step one (the gateway adapter, G1). Medium. Built and unit-tested; not driven against a live gateway, and no live token-API call has been made (K-D25: only on Rizky's go).
 
 What it is. The credential the gateway's token API takes (`/api/token`, documented as `Authorization: Bearer`). Its type is not yet checked, so it may be an account-level access token. Whoever holds it can act on the gateway account's tokens, including ones made by hand.
