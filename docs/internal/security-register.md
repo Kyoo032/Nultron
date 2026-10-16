@@ -217,7 +217,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-181](#sr-181) | Low | Hosted (tester): a person with no display name is shown to every colleague by their password-mode username, so a colleague can lock them out with five wrong passwords | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
 | [SR-182](#sr-182) | Medium | Hosted (tester): an owner or admin could open and edit a colleague's private agent | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
 | [SR-183](#sr-183) | Medium | Hosted (tester): the company gateway management token is the credential that changes the company's gateway tokens; a leak of it, or of the wrap key that seals it, lets its holder act on any token of that gateway account, and the platform limits only the tokens it created itself | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
-| [SR-185](#sr-185) | Medium | Hosted (tester): after the OPC strip, the kept original of a file attached in Chat was readable by every member of the company | Contained in the tester (2026-10-16): no original is kept in server mode; Rizky to choose the lasting option | Before the tester is promoted to `main` |
+| [SR-185](#sr-185) | Medium | Hosted (tester): after the OPC strip, the kept original of a file attached in Chat was readable by every member of the company | Closed (2026-10-16): hosted keeps no original, by Rizky's choice | None |
 | [SR-177](#sr-177) | Low | The new deploy preflight, run in a throwaway container when the server has no node, received the real `AGENTFORGE_SECRETS_KEY` | Fixed before merge (branch `chore/agent-guardrails`, 2026-10-14): the container gets the word `set` or nothing | — |
 | [SR-184](#sr-184) | Low | Edit's output lookup (`loadMediaRow`) read a media row by id with no organization filter | Fixed on branch `fix/media-row-company` (2026-10-15): filtered on the project's organization; unit-tested, not driven | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
@@ -6261,15 +6261,15 @@ Gate: none.
 ### SR-185 {#sr-185}
 
 **Hosted (tester): after the OPC strip, the kept original of a file attached in Chat was readable by every member of the company.**
-Tester only. Raised 2026-10-16 by the advisor's review of P5b. Medium, contained.
+Tester only. Raised 2026-10-16 by the advisor's review of P5b. Medium, closed.
 
 Evidence: U1 keeps a Word, Excel or PDF file attached in Chat as an artifact (`keepOriginal`, `packages/host/src/chat-documents/original.ts:30`, through `saveRenderedArtifact`, `packages/host/src/artifact-save.ts:35`). P5b took main's `packages/host/src/artifacts.ts`, which has no owner column, and a hosted desk is company-wide (K-D11). So a colleague could list, read and download a person's attached original. Rizky's rule of 2026-10-06 is that a document attached in Chat is private to the person who attached it, and main keeps that rule for the desk copy (`uploads/~<user>/`, `packages/host/src/desk-files/private-uploads.ts`). The P5b strip also removed the test that held the original to the same rule ("hides it from a colleague on the same desk"). Main has no U1, so main is not affected.
 
-Status: **contained in the tester, 2026-10-16.** In server mode `keepOriginal` keeps nothing (`original.ts:35`) and `verifiedOriginalId` names nothing (`:54`), so a hosted desk stores no original and the notes never point at one. `packages/host/src/chat-documents/original.test.ts` holds it: on hosted, nothing new appears in a colleague's list or another company's list, a stored artifact marked as a chat upload is not named, and on Personal the original is kept as before. Originals stored on a hosted tester desk before this change are still ordinary artifacts there. Checked 2026-10-16: the tester webdev data dir (`.webdev-data-chat`) holds no artifact marked `chatUpload`, and no tester pilot stack was running; the volumes of a stopped pilot stack were not opened. Not driven hosted.
+Contained in the tester on 2026-10-16: in server mode `keepOriginal` keeps nothing (`original.ts:35`) and `verifiedOriginalId` names nothing (`:54`), so a hosted desk stores no original and the notes never point at one. `packages/host/src/chat-documents/original.test.ts` holds it: on hosted, nothing new appears in a colleague's list or another company's list, a stored artifact marked as a chat upload is not named, and on Personal the original is kept as before. Originals stored on a hosted tester desk before this change are still ordinary artifacts there. Checked 2026-10-16: the tester webdev data dir (`.webdev-data-chat`) holds no artifact marked `chatUpload`, and no tester pilot stack was running; the volumes of a stopped pilot stack were not opened. Not driven hosted.
 
-Open for Rizky: keep originals off on hosted (now), store them under the person's `uploads/~<user>/` folder like the desk copy, or drop U1, which has no consumer since the document tools were stripped.
+Decision (Rizky, 2026-10-16): **hosted keeps no original.** The containment above is the lasting rule, and the per-person folder and dropping U1 are not taken. The non-hosted desk keeps originals as before. Status: **closed.** A drive on the staging instance is still owed.
 
-Gate: before the tester is promoted to `main`.
+Gate: none.
 
 ## Must be true before the Tencent Cloud deploy
 
