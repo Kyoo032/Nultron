@@ -5504,7 +5504,7 @@ Gate: none.
 
 **Design only, not being built this round (Rizky, 2026-10-06).** What the owner said about teams on
 Enterprise, recorded so it is not lost and not mistaken for done (the root `AGENTS.md`, "Private by person on
-Enterprise"):
+Enterprise"; since 2026-10-16 the hyp-ai repo's `AGENTS.md`, "Team rules"):
 - A company shares a desk, but each person's own Knowledge Base is private to that person, and a document a
   person attaches in Chat is private to the person who attached it.
 - Sharing goes through a bot: a bot shared with the team brings its knowledge with it. There is no "share this
@@ -5893,7 +5893,7 @@ Gate: decide before a hosted company keeps material on one desk that some of its
 
 Ruling 2026-10-13: Rizky accepted the team board spec's defaults, including K-D11: **desks are company-wide by
 design.** Every member of a company may open every desk of that company; per-person privacy comes from per-person
-rows, not desk membership. Recorded in `AGENTS.md` ("Private by person on Enterprise"). Closed as checked, not an
+rows, not desk membership. Recorded in `AGENTS.md` ("Private by person on Enterprise"; since 2026-10-16 the hyp-ai repo's `AGENTS.md`, "Team rules"). Closed as checked, not an
 issue. If a desk ever needs to be limited to some people, this row reopens with option (b).
 
 ### SR-170 {#sr-170}
