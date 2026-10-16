@@ -50,7 +50,7 @@ There is **no tool that writes a Word, Excel or PDF file in chat**. A Documents 
 
 ### 1. The rail draws the desk's agents
 
-1. `AppShell` picks `AgentRail` when `SHELL_LAYOUT === "chat-first"` (`apps/web/components/app-shell.tsx:38-42`). The published `AppRail` stays in the tree for `"modes"`.
+1. `AppShell` picks `AgentRail` when `SHELL_LAYOUT === "chat-first"` (`apps/web/components/app-shell.tsx:35-39`). The published `AppRail` stays in the tree for `"modes"`.
 2. `AgentRail` (`apps/web/components/agent-rail.tsx:221`) calls `useVirtualAgents` (`apps/web/lib/virtual-agents.ts:122`). That hook asks `GET /api/v1/virtual-agents`, keeps the last answer in a module variable so a second list draws at once, and asks again on `VIRTUAL_AGENTS_CHANGED_EVENT` (`:104`) and on `agentforge-shell-refresh` (`:152`).
 3. The route (`packages/host/src/router.ts:342`) calls `handleGetVirtualAgents` (`packages/host/src/handlers/virtual-agents.ts:7`), which calls `listVirtualAgents` (`packages/host/src/virtual-agents.ts:143`).
 4. `listVirtualAgents` reads the desk's `productModes` (`deskModes`, `:94`) and keeps the default agent plus the desk's modes in catalog order (`virtualAgentsForDesk`, `packages/core/src/agents/virtual-agents.ts:281-284`). So the first-desk rule carries over with no second list: a fresh Personal desk gets Chat, Research, Images, Videos and Presentation, and the other nine agents are `available`.
