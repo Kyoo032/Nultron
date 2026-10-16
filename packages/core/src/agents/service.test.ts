@@ -9,18 +9,14 @@ import { DEFAULT_CHAT_MODEL, DEFAULT_CHAT_PROMPT, DEFAULT_CHAT_TOOLS } from "./d
 const STARTER_TOOLS_SORTED = [
   "build_deck",
   "calculator",
-  "create_document",
-  "create_workbook",
   "datetime",
   "delete_file",
   "edit_file",
   "image_generate",
-  "import_document",
   "knowledge_search",
   "list_files",
   "past_sessions",
   "read_file",
-  "revise_document",
   "run_code",
   "search_files",
   "self_check",
@@ -245,10 +241,7 @@ describe("resolvePublishedVersion", () => {
       version: 2,
       systemPrompt: "draft prompt should not run",
     });
-    if (!publishedAgent) {
-      throw new Error("the published agent is missing");
-    }
-    const published = resolvePublishedVersion(publishedAgent, repo.versions);
+    const published = resolvePublishedVersion(publishedAgent!, repo.versions);
     expect(published.id).toBe(created.version.id);
     expect(published.systemPrompt).toBe("v1 prompt");
   });

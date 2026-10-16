@@ -43,8 +43,6 @@ export interface TokenResponseBody {
    * next token.
    */
   readonly role: UserRole;
-  readonly display_name: string | null;
-  readonly username: string | null;
 }
 
 export type TokenResult =
@@ -174,7 +172,7 @@ export async function mintSession(
 ): Promise<TokenResult> {
   const config = await ops.tenantConfig.get(input.tenantId);
   const scope = scopeFor(config?.featureFlags);
-  const { role, display_name, username } = await memberOf(ops, input.userId);
+  const role = await roleOf(ops, input.userId);
 
   const session = await ops.sessions.create({
     tenantId: input.tenantId,
@@ -228,23 +226,16 @@ export async function mintSession(
       org_id: input.orgId,
       tenant_id: input.tenantId,
       role,
-      display_name,
-      username,
     }),
   };
 }
 
-async function memberOf(
-  ops: PortalOps,
-  userId: string,
-): Promise<Pick<TokenResponseBody, "role" | "display_name" | "username">> {
-  const user = await ops.users.findById(userId);
-  const credential = await ops.credentials.findByUserId(userId);
-  return {
-    role: user?.role ?? "member",
-    display_name: user?.displayName ?? null,
-    username: credential?.username ?? null,
-  };
+/**
+ * The role a token carries: the member's own, read now. A member who cannot be read (removed
+ * between the check and the mint) gets the least privilege there is, never a default of `owner`.
+ */
+async function roleOf(ops: PortalOps, userId: string): Promise<UserRole> {
+  return (await ops.users.findById(userId))?.role ?? "member";
 }
 
 export interface ClientCredentials {
@@ -331,7 +322,7 @@ export async function exchangeRefreshToken(
   return runtime.store.tx(rotated.tenantId, async (ops) => {
     const config = await ops.tenantConfig.get(rotated.tenantId);
     const scope = scopeFor(config?.featureFlags);
-    const { role, display_name, username } = await memberOf(ops, rotated.userId);
+    const role = await roleOf(ops, rotated.userId);
 
     await ops.audit.append({
       tenantId: rotated.tenantId,
@@ -371,8 +362,6 @@ export async function exchangeRefreshToken(
         org_id: rotated.orgId,
         tenant_id: rotated.tenantId,
         role,
-        display_name,
-        username,
       }),
     };
   });

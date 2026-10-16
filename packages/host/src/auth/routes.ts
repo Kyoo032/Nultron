@@ -516,7 +516,7 @@ export function createAuthRoutes(deps: AuthRouteDeps): AuthRoutes {
       // the host recognises). It rides only into provisioning: the seat claim below is about a
       // person, not a privilege, and the session carries no role at all — it is read from the
       // membership row on each request.
-      await deps.provision({ ...identity, role: tokens.role, name: tokens.name ?? null });
+      await deps.provision({ ...identity, role: tokens.role });
     } catch (error) {
       throw fromPortal(error);
     }

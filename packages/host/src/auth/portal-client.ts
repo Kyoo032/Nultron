@@ -90,7 +90,6 @@ export type PortalTokens = {
    * claim is deliberately not read: the body is the portal's answer to this call.
    */
   readonly role: PortalRole | null;
-  readonly name?: string | null;
 };
 
 /**
@@ -261,31 +260,6 @@ export function mapPortalError(status: number, body: unknown): PortalError {
   return new PortalError("invalid_grant", status, copy);
 }
 
-const PERSON_NAME_MAX = 120;
-
-function asPersonName(value: unknown): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-  const cleaned = value
-    .replace(/[\p{Cc}\p{Cf}]/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return cleaned.length > 0 ? cleaned.slice(0, PERSON_NAME_MAX) : null;
-}
-
-function personNameFrom(displayName: unknown, username: unknown): string | null {
-  const name = asPersonName(displayName);
-  const login = asPersonName(username);
-  if (name === null) {
-    return null;
-  }
-  if (login !== null && login.toLocaleLowerCase() === name.toLocaleLowerCase()) {
-    return null;
-  }
-  return name;
-}
-
 function toTokens(body: unknown): PortalTokens {
   const record = (body ?? {}) as Record<string, unknown>;
   const accessToken = asString(record.access_token);
@@ -310,7 +284,6 @@ function toTokens(body: unknown): PortalTokens {
     tenantId,
     // Exact match against the three values; anything else, or nothing, is no role.
     role: parsePortalRole(record.role),
-    name: personNameFrom(record.display_name, record.username),
   };
 }
 

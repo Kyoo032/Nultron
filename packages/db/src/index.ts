@@ -25,4 +25,3 @@ export {
   updateLocalWorkspace,
   deleteLocalWorkspace,
 } from "./ensure-local-owner";
-export { QUOTA_AUDIT_ACTIONS } from "./quota-schema";

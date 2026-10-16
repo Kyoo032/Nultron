@@ -49,18 +49,6 @@ function freshDb(): Database.Database {
       workspace_id text NOT NULL,
       size_bytes integer DEFAULT 0 NOT NULL
     );
-    CREATE TABLE doc_versions (
-      id text PRIMARY KEY NOT NULL,
-      workspace_id text NOT NULL,
-      artifact_id text NOT NULL,
-      spec text NOT NULL
-    );
-    CREATE TABLE doc_proposals (
-      id text PRIMARY KEY NOT NULL,
-      workspace_id text NOT NULL,
-      artifact_id text NOT NULL,
-      section text NOT NULL
-    );
   `);
   for (const id of [A, B, LOCAL_TENANT_ID]) {
     sqlite.prepare("INSERT INTO tenants (id) VALUES (?)").run(id);
@@ -363,41 +351,6 @@ describe("the quota", () => {
     expect((await storage.tenantStorageReport(B)).artifactBytes).toBe(4000);
   });
 
-  it("counts the bytes of a tenant's document versions in its artifact use, and nobody else's", async () => {
-    serverMode(10_000);
-    seedArtifacts(sqlite as Database.Database, A, [300]);
-    seedArtifacts(sqlite as Database.Database, B, [4000]);
-    const spec = JSON.stringify({ text: "é漢" });
-    (sqlite as Database.Database)
-      .prepare("INSERT INTO doc_versions (id, workspace_id, artifact_id, spec) VALUES (?, ?, ?, ?)")
-      .run("v-a", `ws-${A}`, `art-${A}-0-300`, spec);
-    (sqlite as Database.Database)
-      .prepare("INSERT INTO doc_versions (id, workspace_id, artifact_id, spec) VALUES (?, ?, ?, ?)")
-      .run("v-b", `ws-${B}`, `art-${B}-0-4000`, "z".repeat(900));
-
-    const report = await storage.tenantStorageReport(A);
-    expect(report.artifactBytes).toBe(300 + Buffer.byteLength(spec, "utf8"));
-    expect(report.artifactBytes).toBeGreaterThan(300 + spec.length);
-    expect((await storage.tenantStorageReport(B)).artifactBytes).toBe(4900);
-  });
-
-  it("counts the stored sections of a tenant's proposals in its artifact use, and nobody else's", async () => {
-    serverMode(10_000);
-    seedArtifacts(sqlite as Database.Database, A, [300]);
-    seedArtifacts(sqlite as Database.Database, B, [4000]);
-    const section = JSON.stringify({ id: "intro", text: "é漢" });
-    (sqlite as Database.Database)
-      .prepare("INSERT INTO doc_proposals (id, workspace_id, artifact_id, section) VALUES (?, ?, ?, ?)")
-      .run("p-a", `ws-${A}`, `art-${A}-0-300`, section);
-    (sqlite as Database.Database)
-      .prepare("INSERT INTO doc_proposals (id, workspace_id, artifact_id, section) VALUES (?, ?, ?, ?)")
-      .run("p-b", `ws-${B}`, `art-${B}-0-4000`, "z".repeat(900));
-
-    const report = await storage.tenantStorageReport(A);
-    expect(report.artifactBytes).toBe(300 + Buffer.byteLength(section, "utf8"));
-    expect((await storage.tenantStorageReport(B)).artifactBytes).toBe(4900);
-  });
-
   it("refuses a write the artifacts have already filled the ceiling for", async () => {
     serverMode(1000);
     seedArtifacts(sqlite as Database.Database, A, [900]);
@@ -524,9 +477,7 @@ describe("two writes at once", () => {
     // A rejected write must leave nothing behind that a later write trips over — a poisoned chain
     // under Phase 6, a reserved-but-never-refunded delta under Phase 8.
     serverMode(100_000);
-    await expect(
-      storage.putTenantObject(A, "tenants/other/x.bin", bytes(10), "application/octet-stream"),
-    ).rejects.toThrow();
+    await expect(storage.putTenantObject(A, "tenants/other/x.bin", bytes(10), "application/octet-stream")).rejects.toThrow();
     await storage.putTenantObject(A, key(A, "org", "after.bin"), bytes(20), "application/octet-stream");
     expect(await storage.tenantStorageReport(A).then((report) => report.usedBytes)).toBe(20);
   });

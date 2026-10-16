@@ -3,13 +3,6 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type Database from "better-sqlite3";
 import { isServerMode } from "@agentforge/core";
-import { ensureBoardTables } from "./board-schema";
-import { ensureDocProposalTables } from "./doc-proposals-schema";
-import { ensureDocVersionTables } from "./doc-versions-schema";
-import { ensureGatewayTokenTables } from "./gateway-tokens-schema";
-import { ensureMediaApprovalTables } from "./media-approval-schema";
-import { ensureProjectTables } from "./projects-schema";
-import { ensureQuotaTables } from "./quota-schema";
 
 const MIGRATIONS_TABLE = "__drizzle_migrations";
 
@@ -246,7 +239,6 @@ export function ensureSchema(sqlite: Database.Database): void {
   ensureKnowledgeBackendTables(sqlite);
   ensureEditTables(sqlite);
   ensureArtifactTables(sqlite);
-  ensureOwnershipColumns(sqlite);
   ensureDatasetTables(sqlite);
   ensureMarketTables(sqlite);
   ensureAuthSessionTables(sqlite);
@@ -257,13 +249,6 @@ export function ensureSchema(sqlite: Database.Database): void {
   ensureTenantStorageTable(sqlite);
   ensureTenantResetAuditTable(sqlite);
   ensureDeskFileTables(sqlite);
-  ensureBoardTables(sqlite);
-  ensureProjectTables(sqlite);
-  ensureDocVersionTables(sqlite);
-  ensureDocProposalTables(sqlite);
-  ensureMediaApprovalTables(sqlite);
-  ensureGatewayTokenTables(sqlite);
-  ensureQuotaTables(sqlite);
   ensureWorkspaceColumns(sqlite);
   assertKernelTables(sqlite);
 }
@@ -725,38 +710,6 @@ function ensureArtifactTables(sqlite: Database.Database): void {
   if (isServerMode()) {
     sqlite.exec("CREATE INDEX IF NOT EXISTS artifacts_ws_size_idx ON artifacts (workspace_id, size_bytes)");
   }
-}
-
-/**
- * Ownership and project columns (SR-175, Rizky 2026-10-14): `artifacts.owner_user_id` and
- * `artifacts.project_id`, and `media.project_id`. All nullable; a row written before them reads NULL,
- * which the host treats as a legacy, company-visible row. Personal never writes an owner.
- *
- * Here, on every open, and NOT in a numbered migration: `CREATE TABLE IF NOT EXISTS` never alters an
- * existing table, and an `ALTER TABLE ... ADD` in the journal cannot be replayed (the 0017/0018/0021
- * suites rewind the journal and replay it; `migrate-0021.test.ts` forbids ALTER for that reason). A
- * rebuild like 0021's would drop rows, which these tables cannot afford. Checking the columns first
- * makes this safe to run any number of times. No foreign key on `project_id` yet: `projects` lands in
- * F1.
- */
-function ensureOwnershipColumns(sqlite: Database.Database): void {
-  const addMissing = (table: string, wanted: string[]) => {
-    const have = new Set(tableColumns(sqlite, table));
-    if (have.size === 0) {
-      return;
-    }
-    for (const column of wanted) {
-      if (!have.has(column)) {
-        sqlite.exec(`ALTER TABLE \`${table}\` ADD \`${column}\` text`);
-      }
-    }
-  };
-  addMissing("artifacts", ["owner_user_id", "project_id"]);
-  addMissing("media", ["project_id"]);
-  // The maker of the artifact a work card was made from (SR-175, knowledge half). Null on legacy cards.
-  addMissing("knowledge_sources", ["owner_user_id", "project_id"]);
-  // The Workspace a chat was started in (W1, K-D20). Null for every thread a person starts outside one.
-  addMissing("threads", ["project_id"]);
 }
 
 function tableColumns(sqlite: Database.Database, table: string): string[] {

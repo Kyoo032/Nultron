@@ -66,8 +66,6 @@ export type HostStreamResult = {
   type: "stream";
   status: number;
   events: AsyncIterable<string>;
-  /** Response headers that replace the adapter's defaults, e.g. the board stream's `no-store`. */
-  headers?: Record<string, string>;
 };
 
 export type HostBytesResult = {

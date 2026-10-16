@@ -112,16 +112,6 @@ function seedTenant(sqlite: Database.Database, id: string): Seeded {
     .run(`${id}-artifact`, workspaceId, now, now);
   sqlite
     .prepare(
-      "INSERT INTO doc_versions (id, workspace_id, artifact_id, version, spec, kind, changed_section_ids, author_kind, author_user_id, asked_by_user_id, created_at) VALUES (?, ?, ?, 1, '{}', 'document', '[]', 'person', ?, ?, ?)",
-    )
-    .run(`${id}-docversion`, workspaceId, `${id}-artifact`, userId, userId, now);
-  sqlite
-    .prepare(
-      "INSERT INTO doc_proposals (id, workspace_id, artifact_id, section_id, base_version, section, agent_id, asked_by_user_id, status, kept_version, created_at, updated_at) VALUES (?, ?, ?, 'intro', 1, '{}', 'documents', ?, 'pending', NULL, ?, ?)",
-    )
-    .run(`${id}-docproposal`, workspaceId, `${id}-artifact`, userId, now, now);
-  sqlite
-    .prepare(
       "INSERT INTO datasets (id, workspace_id, name, filename, rows, cols, columns, storage_path, size_bytes, created_at) VALUES (?, ?, 'd', 'd.csv', 1, 1, '[]', ?, 1, ?)",
     )
     .run(`${id}-dataset`, workspaceId, `datasets/tenants/${id}/d.csv`, now);
@@ -300,8 +290,6 @@ describe("purgeTenantRows", () => {
     expect(count(sqlite, "file_proposals", "workspace_id", alpha.workspaceId)).toBe(0);
     // Versions follow their file through the foreign key.
     expect(count(sqlite, "desk_file_versions", "file_id", `${alpha.tenantId}-deskfile`)).toBe(0);
-    expect(count(sqlite, "doc_versions", "artifact_id", `${alpha.tenantId}-artifact`)).toBe(0);
-    expect(count(sqlite, "doc_proposals", "artifact_id", `${alpha.tenantId}-artifact`)).toBe(0);
     // Tenant-keyed, and these two go.
     expect(count(sqlite, "tenant_state", "tenant_id", alpha.tenantId)).toBe(0);
     expect(count(sqlite, "tenant_storage", "tenant_id", alpha.tenantId)).toBe(0);
@@ -329,8 +317,6 @@ describe("purgeTenantRows", () => {
     expect(count(sqlite, "datasets", "workspace_id", beta.workspaceId)).toBe(1);
     expect(count(sqlite, "desk_files", "workspace_id", beta.workspaceId)).toBe(1);
     expect(count(sqlite, "desk_file_versions", "file_id", `${beta.tenantId}-deskfile`)).toBe(1);
-    expect(count(sqlite, "doc_versions", "artifact_id", `${beta.tenantId}-artifact`)).toBe(1);
-    expect(count(sqlite, "doc_proposals", "artifact_id", `${beta.tenantId}-artifact`)).toBe(1);
     expect(count(sqlite, "file_proposals", "workspace_id", beta.workspaceId)).toBe(1);
     expect(count(sqlite, "tenant_state", "tenant_id", beta.tenantId)).toBe(1);
     expect(count(sqlite, "tenant_storage", "tenant_id", beta.tenantId)).toBe(1);

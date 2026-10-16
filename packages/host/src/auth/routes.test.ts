@@ -187,14 +187,8 @@ describe("POST /api/v1/auth/login", () => {
     const h = harness();
     await signIn(h);
     expect(h.provisioned).toEqual([
-      { tenantId: "tnt_fake", orgId: "org_fake", userId: "usr_fake", role: "member", name: null },
+      { tenantId: "tnt_fake", orgId: "org_fake", userId: "usr_fake", role: "member" },
     ]);
-  });
-
-  it("provisions with the name the portal sent, so colleagues can find the person", async () => {
-    const h = harness({ portal: createFakePortalClient({ tokens: { name: "Rina Wulandari" } }) });
-    await signIn(h);
-    expect(h.provisioned.map((entry) => entry.name)).toEqual(["Rina Wulandari"]);
   });
 
   // SR-65: "owner" on the host used to mean "signed in", because the host wrote an owner row for

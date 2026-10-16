@@ -358,37 +358,11 @@ export async function writeHostResult(
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no");
-  for (const [name, value] of Object.entries(result.headers ?? {})) {
-    res.setHeader(name, value);
-  }
   res.flushHeaders?.();
   for await (const chunk of result.events) {
-    // Backpressure: while the socket's buffer is full, a comment line (an SSE heartbeat, which every client
-    // ignores) is dropped rather than queued, and anything else waits for `drain`. A closed socket never
-    // drains, so it is not waited on; writing to it is a no-op.
-    if (res.writableNeedDrain && !res.destroyed) {
-      if (chunk.startsWith(":")) {
-        continue;
-      }
-      await drainOrClose(res);
-    }
     res.write(chunk);
   }
   res.end();
-}
-
-function drainOrClose(res: ServerResponse): Promise<void> {
-  return new Promise((resolve) => {
-    const done = () => {
-      res.off("drain", done);
-      res.off("close", done);
-      res.off("error", done);
-      resolve();
-    };
-    res.once("drain", done);
-    res.once("close", done);
-    res.once("error", done);
-  });
 }
 
 /** A refusal that never reaches a handler: status, reason code and fixed text, plus Retry-After. */
@@ -712,9 +686,6 @@ export async function handleNodeRequest(req: IncomingMessage, res: ServerRespons
       // Off server mode the request carries exactly the headers it always did, so the desk's boot
       // locale is the only locale there is.
       ...(context.serverMode ? { "accept-language": header(req, "accept-language") } : {}),
-      // Hosted only, like the line above: the team board's stream resumes from it
-      // (team-board-spec.md section 8.1), and the board does not exist off server mode.
-      ...(context.serverMode ? { "last-event-id": header(req, "last-event-id") } : {}),
       "x-agentforge-transport": "http",
     },
     body,

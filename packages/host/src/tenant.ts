@@ -13,12 +13,7 @@ import { currentRequestSession } from "./tenant-scope";
 import type { HostRequest, HostSession } from "./types";
 import { log } from "./log";
 
-export const agentService = new AgentService(
-  new DrizzleAgentRepository(db),
-  undefined,
-  undefined,
-  () => isServerMode(),
-);
+export const agentService = new AgentService(new DrizzleAgentRepository(db));
 
 /**
  * A fresh install has no `workspace-id.txt` — only create / select / delete in the workspace

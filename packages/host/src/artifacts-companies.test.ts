@@ -124,25 +124,10 @@ describe("generated files on the hosted app: two companies, real sessions", () =
     expect(new TextDecoder().decode((own as HostBytesResult).bytes)).toContain("Alice brief");
   });
 
-  it("a media file is downloadable as an attachment on request, and inline without the flag, by its maker", async () => {
-    const id = await makeMedia(alice);
-    const inline = await call(alice, "GET", `/api/v1/media/${id}/file`, { params: { mediaId: id } });
-    expect(inline.type).toBe("bytes");
-    expect((inline as HostBytesResult).filename).toBeUndefined();
-
-    const attached = await call(alice, "GET", `/api/v1/media/${id}/file`, {
-      params: { mediaId: id },
-      query: { download: "1" },
-    });
-    expect(attached.type).toBe("bytes");
-    expect((attached as HostBytesResult).filename).toBe(`image-${id.slice(0, 8)}.png`);
-  });
-
-  it("another company's media id is still a 404, download or not", async () => {
+  it("another company's media id is a 404", async () => {
     const id = await makeMedia(alice);
     const other = await call(bob, "GET", `/api/v1/media/${id}/file`, {
       params: { mediaId: id },
-      query: { download: "1" },
     });
     expect(await outcome(other)).toEqual({ status: 404, code: "not_found" });
   });

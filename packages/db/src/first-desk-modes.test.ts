@@ -11,7 +11,6 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PRODUCT_MODES } from "@agentforge/core";
-import { ENTERPRISE_FIRST_DESK_MODES } from "@agentforge/core/product-modes";
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { eq } from "drizzle-orm";
@@ -135,45 +134,6 @@ describe("the hosted Enterprise app keeps every mode on a first desk", () => {
   });
 });
 
-describe("the enterprise shell's first desk is the default agent only", () => {
-  const SHELL_IDENTITY = { tenantId: "tnt_shell", orgId: "org_shell", userId: "usr_shell", role: "owner" as const };
-
-  it("a new company's first desk stores exactly Chat when the caller passes the enterprise modes", async () => {
-    const tenant = await ensurePortalOwner(
-      db,
-      { ...SHELL_IDENTITY, name: null },
-      { firstDeskModes: ENTERPRISE_FIRST_DESK_MODES },
-    );
-
-    const [row] = await db.select().from(workspaces).where(eq(workspaces.id, tenant.workspaceId));
-    expect(row?.productModes).toEqual(["chat"]);
-  });
-
-  it("a later sign-in to a company that already has a desk does not rewrite it", async () => {
-    await ensurePortalOwner(db, { ...SHELL_IDENTITY, name: null }, { firstDeskModes: ENTERPRISE_FIRST_DESK_MODES });
-
-    const again = await ensurePortalOwner(db, { ...SHELL_IDENTITY, name: null });
-
-    const [row] = await db.select().from(workspaces).where(eq(workspaces.id, again.workspaceId));
-    expect(row?.productModes).toEqual(["chat"]);
-    expect(await db.select().from(workspaces)).toHaveLength(1);
-  });
-
-  it("a company made under the default shell keeps every mode when the shell later becomes enterprise", async () => {
-    await ensurePortalOwner(db, { ...SHELL_IDENTITY, name: null });
-
-    const later = await ensurePortalOwner(
-      db,
-      { ...SHELL_IDENTITY, name: null },
-      { firstDeskModes: ENTERPRISE_FIRST_DESK_MODES },
-    );
-
-    const [row] = await db.select().from(workspaces).where(eq(workspaces.id, later.workspaceId));
-    expect(row?.productModes).toEqual(EVERY_MODE);
-    expect(await db.select().from(workspaces)).toHaveLength(1);
-  });
-});
-
 /**
  * A structure test, not a behaviour one: it fails when somebody adds a second place that writes a
  * desk row, because a second place is where a first-run default drifts. The two writers that exist
@@ -222,21 +182,7 @@ describe("every desk writer takes its first-desk modes from the named constants"
 
   it("the hosted first desk reads HOSTED_FIRST_DESK_MODES, so Enterprise cannot inherit the Personal list", () => {
     const source = readFileSync(join(packagesRoot, "db", "src", "portal-owner.ts"), "utf8");
-    expect(source).toContain("productModes: [...(options.firstDeskModes ?? HOSTED_FIRST_DESK_MODES)]");
+    expect(source).toContain("productModes: [...HOSTED_FIRST_DESK_MODES]");
     expect(source).not.toContain("FIRST_RUN_MODES");
-  });
-
-  it("in packages, only portal-first-desk.ts names ENTERPRISE_FIRST_DESK_MODES, besides the constant's own file", () => {
-    const users = sourceFiles(packagesRoot)
-      .filter((file) => readFileSync(file, "utf8").includes("ENTERPRISE_FIRST_DESK_MODES"))
-      .map((file) => relative(packagesRoot, file).replaceAll("\\", "/"))
-      .sort();
-    expect(users).toEqual(["core/src/agents/product-modes.ts", "host/src/portal-first-desk.ts"]);
-  });
-
-  it("the sign-in provision goes through provisionPortalDesk, the one place that picks the first-desk modes", () => {
-    const source = readFileSync(join(packagesRoot, "host", "src", "auth", "index.ts"), "utf8");
-    expect(source).toContain("provisionPortalDesk(identity)");
-    expect(source).not.toContain("ensurePortalOwner(db, identity)");
   });
 });

@@ -512,8 +512,6 @@ describe("desk file store", () => {
         CREATE TABLE organizations (id text PRIMARY KEY NOT NULL, tenant_id text NOT NULL);
         CREATE TABLE workspaces (id text PRIMARY KEY NOT NULL, organization_id text NOT NULL);
         CREATE TABLE artifacts (id text PRIMARY KEY NOT NULL, workspace_id text NOT NULL, size_bytes integer DEFAULT 0 NOT NULL);
-        CREATE TABLE doc_versions (id text PRIMARY KEY NOT NULL, workspace_id text NOT NULL, artifact_id text NOT NULL, spec text NOT NULL);
-        CREATE TABLE doc_proposals (id text PRIMARY KEY NOT NULL, workspace_id text NOT NULL, artifact_id text NOT NULL, section text NOT NULL);
       `);
       counters.prepare("INSERT INTO tenants (id) VALUES (?)").run("tenant-quota");
       registerTenantStorageSql(counters);

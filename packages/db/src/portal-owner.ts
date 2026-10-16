@@ -34,7 +34,6 @@ import {
   membershipRoleForPortal,
   type MembershipRole,
   type PortalRole,
-  type ProductMode,
   type TenantContext,
 } from "@agentforge/core";
 import type { Database } from "./client";
@@ -54,10 +53,7 @@ export type PortalIdentity = {
  * cannot forget it: the host has no default role of its own, and no role is a `member`, never an
  * `owner`.
  */
-export type PortalProvisioning = PortalIdentity & {
-  readonly role: PortalRole | null;
-  readonly name?: string | null;
-};
+export type PortalProvisioning = PortalIdentity & { readonly role: PortalRole | null };
 
 /**
  * Why a session could not be turned into a tenant. Each maps to an existing reason code in
@@ -150,11 +146,7 @@ async function writeMembershipRole(
  * never provisioned (or whose rows an erase deleted) gets nothing created, and the org must belong
  * to the tenant the session names. Returns whether anything changed.
  */
-export async function syncPortalRole(
-  db: Database,
-  identity: PortalIdentity,
-  role: PortalRole | null,
-): Promise<boolean> {
+export async function syncPortalRole(db: Database, identity: PortalIdentity, role: PortalRole | null): Promise<boolean> {
   if (identity.tenantId === LOCAL_TENANT_ID) {
     // The desktop's and webdev's one local owner (`ensureLocalOwner`) has no portal to reconcile
     // with. No session carries this tenant id, so this is a wall, not a code path.
@@ -182,11 +174,7 @@ export async function syncPortalRole(
  * tenant an owner's. (Before this, every person provisioned here was an `owner`, so "owner" meant
  * "signed in" and any colleague could erase the company: SR-65.)
  */
-export async function ensurePortalOwner(
-  db: Database,
-  identity: PortalProvisioning,
-  options: { readonly firstDeskModes?: readonly ProductMode[] } = {},
-): Promise<TenantContext> {
+export async function ensurePortalOwner(db: Database, identity: PortalProvisioning): Promise<TenantContext> {
   const role = membershipRoleForPortal(identity.role);
   await ensureTenant(db, {
     id: identity.tenantId,
@@ -215,16 +203,13 @@ export async function ensurePortalOwner(
   }
 
   const [existingUser] = await db.select().from(user).where(eq(user.id, identity.userId)).limit(1);
-  const stated = identity.name === undefined ? undefined : (identity.name ?? identity.userId);
   if (!existingUser) {
     await db.insert(user).values({
       id: identity.userId,
-      name: stated ?? identity.userId,
+      name: identity.userId,
       email: placeholderEmail(identity.userId),
       emailVerified: false,
     });
-  } else if (stated !== undefined && existingUser.name !== stated) {
-    await db.update(user).set({ name: stated, updatedAt: new Date() }).where(eq(user.id, identity.userId));
   }
 
   const [membership] = await db
@@ -250,7 +235,9 @@ export async function ensurePortalOwner(
         organizationId: org.id,
         name: HOME_WORKSPACE_NAME,
         slug: HOME_WORKSPACE_SLUG,
-        productModes: [...(options.firstDeskModes ?? HOSTED_FIRST_DESK_MODES)],
+        // Enterprise: every mode, as it has always been. The Personal first-run list does not reach
+        // a hosted tenant; the owner has not decided this one.
+        productModes: [...HOSTED_FIRST_DESK_MODES],
       })
       .returning();
   }

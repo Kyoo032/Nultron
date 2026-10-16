@@ -93,12 +93,8 @@ describe("artifact visibility on Personal (no server mode)", () => {
     }
   });
 
-  it("writes no owner, and every desk member reads and deletes as before", () => {
+  it("every desk member reads and deletes as before", () => {
     const made = store.create(ann, INPUT);
-    const row = db.prepare("SELECT owner_user_id FROM artifacts WHERE id = ?").get(made.id) as {
-      owner_user_id: string | null;
-    };
-    expect(row.owner_user_id).toBeNull();
     expect(store.list(ann).map((item) => item.id)).toEqual([made.id]);
     expect(store.list(bob).map((item) => item.id)).toEqual([made.id]);
     expect(store.get(bob, made.id)?.body).toBe("# Plan\n\nbody");

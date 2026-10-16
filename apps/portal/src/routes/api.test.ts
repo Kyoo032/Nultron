@@ -100,7 +100,6 @@ describe("POST /auth/token, grant_type=authorization_code", () => {
     expect(Object.keys(body).sort()).toEqual([
       "access_token",
       "device_id",
-      "display_name",
       "expires_in",
       "org_id",
       "refresh_expires_in",
@@ -110,11 +109,8 @@ describe("POST /auth/token, grant_type=authorization_code", () => {
       "tenant_id",
       "token_type",
       "user_id",
-      "username",
     ]);
     expect(body.token_type).toBe("Bearer");
-    expect(body.display_name).toBeNull();
-    expect(body.username).toBeNull();
     // The helper signs in a seeded MEMBER, and the role is the member's own row, never a default.
     expect(body.role).toBe("member");
     expect(body.expires_in).toBe(3600);
@@ -224,10 +220,9 @@ describe("POST /auth/token, grant_type=refresh_token", () => {
     });
 
     expect(reply.status).toBe(200);
-    const second = reply.json<Record<string, unknown>>();
+    const second = reply.json<{ refresh_token: string; session_id: string }>();
     expect(second.refresh_token).not.toBe(first.refresh_token);
     expect(second.session_id).toBe(first.session_id);
-    expect(second).toMatchObject({ display_name: null, username: null });
   });
 
   it("kills the whole chain when a spent generation is presented again", async () => {
