@@ -333,6 +333,7 @@ test("main refuses a missing or empty notes file", () => {
 test("parseNdaTerms keeps one lowercased term per line and drops blanks and comments", () => {
   assert.deepEqual(parseNdaTerms(FAKE_NDA_TERMS), ["zebrapartner", "quokka gateway"]);
   assert.deepEqual(parseNdaTerms("# only a comment\r\n\r\n"), []);
+  assert.deepEqual(parseNdaTerms("\uFEFFzebrapartner\r\n"), ["zebrapartner"]);
 });
 
 test("the NDA terms file is gitignored", () => {
