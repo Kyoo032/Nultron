@@ -2,8 +2,8 @@
 
 Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
 
-Last verified: 2026-09-22 at 0774681 + working tree. The pricing offers were rewritten in place:
-Personal is the Mac and Windows app, Enterprise stays contact-DPS, and the one-seat line is gone.
+Last verified: 2026-09-22 at 0774681 + working tree; the Personal pricing copy on 2026-10-16. The pricing offers were rewritten in place:
+Personal is the owner's own desk, for one owner, Enterprise stays contact-DPS, and the one-seat line is gone.
 
 ## Overview
 
@@ -156,7 +156,7 @@ public routes in `apps/web/src/App.tsx`, which is why a `seat_cap_reached` refus
 there while they are signed out by definition. Testids: `pricing-page`, `pricing-placeholder`, and
 per tier `pricing-tier-<id>`, `pricing-price-<id>`, `pricing-features-<id>`,
 `pricing-cta-<id>`, plus `pricing-seats-<id>` only when the tier has a seat cap, and
-`pricing-contact-help` even when a top-up URL is set. Personal is the Mac and Windows app, a
+`pricing-contact-help` even when a top-up URL is set. Personal is the owner's own desk, for one owner, a
 complement when the customer is buying a lot of tokens, and it does not start a seat subscription.
 Enterprise is the web product: its control stays contact-DPS and does not become a checkout link
 when a billing top-up URL is set. The Enterprise card states unified knowledge-base storage, user

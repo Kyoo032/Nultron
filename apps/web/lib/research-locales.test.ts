@@ -24,8 +24,10 @@ describe("research locale JSON", () => {
   });
 
   it("keeps brand names untranslated in id", () => {
-    const raw = readFileSync(resolve(localesDir, "id", "research.json"), "utf8");
-    expect(raw).toContain("Nultron");
-    expect(raw).toContain("Toko Token");
+    const read = (locale: string) => readFileSync(resolve(localesDir, locale, "research.json"), "utf8");
+    const count = (text: string, name: string) => text.split(name).length - 1;
+    for (const name of ["Nultron", "Toko Token"]) {
+      expect(count(read("id"), name), name).toBe(count(read("en"), name));
+    }
   });
 });

@@ -1,7 +1,7 @@
 {
   "kicker": "Paket",
   "title": "Pilih paket",
-  "intro": "Personal adalah aplikasi Nultron untuk Mac dan Windows, pelengkap dari DPS ketika Anda membeli banyak token. Enterprise adalah Nultron berbasis web.",
+  "intro": "Personal adalah desk Nultron Anda sendiri untuk satu pemilik, pelengkap dari DPS ketika Anda membeli banyak token. Enterprise adalah Nultron berbasis web.",
   "placeholderNotice": "Harga indikatif — belum final.",
   "period": {
     "month": "/ bulan"
@@ -14,7 +14,7 @@
   "tier": {
     "personal": {
       "name": "Personal",
-      "description": "Aplikasi Nultron untuk Mac dan Windows. Pelengkap dari DPS ketika Anda membeli banyak token."
+      "description": "Desk Nultron Anda sendiri, untuk satu pemilik. Pelengkap dari DPS ketika Anda membeli banyak token."
     },
     "enterprise": {
       "name": "Enterprise",
@@ -22,7 +22,7 @@
     }
   },
   "feature": {
-    "macWindowsApp": "Nultron untuk Mac dan Windows",
+    "macWindowsApp": "Desk Nultron Anda sendiri, untuk satu pemilik",
     "tokenComplement": "Pelengkap dari DPS ketika Anda membeli banyak token",
     "webProduct": "Nultron berbasis web",
     "contactDps": "Hubungi DPS untuk mengaktifkan. Tidak ada pembelian mandiri.",
@@ -34,7 +34,7 @@
   "cta": {
     "current": "Ini paket Anda",
     "contact": "Hubungi DPS",
-    "personalApp": "Aplikasi Mac dan Windows",
+    "personalApp": "Desk Anda sendiri",
     "contactHelp": "Tidak ada pembelian mandiri untuk Enterprise. Hubungi DPS untuk berlangganan per pengguna.",
     "checkoutFailed": "Tautan itu tidak bisa dibuka. Hubungi pengelola instalasi ini."
   },

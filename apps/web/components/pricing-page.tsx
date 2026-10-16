@@ -25,7 +25,7 @@ import { useSession, type SessionStatus } from "@/lib/session";
  * page carries a strip that says so while `tier.placeholder` is true. Nothing here may be quoted
  * to a customer until the owner replaces the figures and clears that flag.
  *
- * **There is no self-serve purchase on this page.** Personal is the Mac and Windows app and does
+ * **There is no self-serve purchase on this page.** Personal does
  * not start a seat subscription. Enterprise stays a contact with DPS even when the deployment has
  * a billing top-up URL — that URL is for the blocked screen's payment update, not for buying
  * Enterprise here. A call to action is either a plain statement when the tenant is already on that

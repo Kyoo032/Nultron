@@ -420,9 +420,9 @@ has blocked can still read why and pay.
   `/api/v1/usage`, `/api/v1/models`.
 
 **Renderer.** `parseGatewayGate` (`apps/web/lib/gateway-gate.ts:56-75`) requires a known `status` and a boolean
-`allowed` or returns `null`; `MISSING_GATEWAY_GATE` fails closed. `resolveGate(payload, isElectron, hosted, deferral)` (`:101`)
-obeys a reported gate as-is, and on a missing or malformed one falls closed **under Electron and on a hosted build** — webdev and
-Playwright keep working before the host answers. The one exception to "obeys a reported gate as-is" is the hosted deferral: a closed gate opens the desk for a signed-in hosted person who chose "Add it later" (next section), and for nobody else. `App.tsx` holds `gate` / `gateway` / `localeEpoch` state
+`allowed` or returns `null`; `MISSING_GATEWAY_GATE` fails closed. `resolveGate(payload, isElectron, hosted, deferral)` (`:77`)
+obeys a reported gate as-is, and on a missing or malformed one falls closed **on every build** (since 2026-10-16; before that
+webdev stayed open). Webdev and Playwright still open, because the stub host reports `status: "stub", allowed: true`. The one exception to "obeys a reported gate as-is" is the hosted deferral: a closed gate opens the desk for a signed-in hosted person who chose "Add it later" (next section), and for nobody else. `App.tsx` holds `gate` / `gateway` / `localeEpoch` state
 (`apps/web/src/App.tsx:77-79`), listens for `GATE_EVENT = "agentforge-gate"`
 (`apps/web/lib/gateway-gate.ts:108`, listener at `App.tsx:89-97`), re-fetches settings and re-resolves on every
 locale epoch (`:99-122`), and renders `OnboardingScreen` when `gate === "onboarding"` (`:139-140`). Reason copy

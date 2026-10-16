@@ -57,7 +57,7 @@ describe("the plans namespace", () => {
     const text = (locale: "en" | "id") => JSON.stringify(load(locale));
     const english = text("en");
     for (const phrase of [
-      "Mac and Windows",
+      "for one owner",
       "complement from DPS",
       "buying a lot of tokens",
       "web-based",
@@ -73,7 +73,7 @@ describe("the plans namespace", () => {
     expect(english).not.toContain("One seat");
     const indonesian = text("id");
     for (const phrase of [
-      "Mac dan Windows",
+      "untuk satu pemilik",
       "pelengkap dari DPS",
       "banyak token",
       "berbasis web",
