@@ -26,7 +26,7 @@
  * - **A seat cap is meaningless on Personal** (§D2: "must be nullable, not defaulted to 1"), so
  *   Personal's `seatCap` is `null`, and `seatAdmission` reads that as "no cap configured", which
  *   admits everybody. Enterprise carries a placeholder number. The pricing copy does not call
- *   that null a seat count: Personal is the Mac and Windows app, Enterprise is the web offer.
+ *   that null a seat count.
  *
  * Pure, browser-safe and frozen: the renderer imports it through `@agentforge/core/plans` and
  * renders the catalog in every mode without asking the host anything (phase 9 open decision 9).
@@ -86,9 +86,7 @@ export type PlanTier = {
 /**
  * PLACEHOLDER tiers, in ascending price order — which is also the order the pricing page renders.
  *
- * No `tokenAllowance`, and no allowance of any kind: see the file header. The offers differ by
- * product — Personal is the Mac and Windows app, Enterprise is the web offer a customer activates
- * by contacting DPS — while the entitlement columns stay the kind and the seat cap.
+ * No `tokenAllowance`, and no allowance of any kind: see the file header.
  */
 const TIERS: readonly PlanTier[] = [
   {

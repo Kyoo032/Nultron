@@ -105,7 +105,7 @@ describe("the price list", () => {
 
   it("names two different products, and a seat cap only where the catalog has one", () => {
     const markup = view();
-    expect(markup).toContain("Mac and Windows");
+    expect(markup).toContain("for one owner");
     expect(markup).toContain("complement from DPS");
     expect(markup).toContain("buying a lot of tokens");
     expect(markup).toContain("web-based");
@@ -126,7 +126,7 @@ describe("the price list", () => {
     resetLocaleForTests();
     applyLocale("id");
     const markup = view();
-    expect(markup).toContain("Mac dan Windows");
+    expect(markup).toContain("untuk satu pemilik");
     expect(markup).toContain("pelengkap dari DPS");
     expect(markup).toContain("banyak token");
     expect(markup).toContain("berbasis web");
