@@ -279,7 +279,7 @@ with **no** reason to render; a visitor who presented a cookie that failed gets
 `{ signedIn: false, reason }`.
 
 **`signInMode` (2026-10-07).** When the portal is run with `PORTAL_SIGNIN_MODE=password` (a username and a
-password in place of the e-mailed code; owner decision for HYP AI, see [`portal-service.md`](portal-service.md)
+password in place of the e-mailed code; owner decision, see [`portal-service.md`](portal-service.md)
 section 8), every answer of this route, signed in or not, carries `signInMode: "password"`, and in the default
 mode it carries no such field, so the answer is byte for byte what it was. The host learns it from the portal,
 never from the environment and never from the renderer: `createPortalModeReader`

@@ -11,15 +11,15 @@ const GUARD = path.join(path.dirname(fileURLToPath(import.meta.url)), "where-am-
 const MAIN_FOLDER = "C:/Users/rizky/agentforge";
 const WORKTREE = "C:/Users/rizky/agentforge-guardrails";
 const TESTER = "C:/Users/rizky/agentforge-chat";
-const HYP = "C:/Users/rizky/hypey/app";
+const OTHER = "C:/Users/rizky/other-product/app";
 
 test("folderKind names each row by its folder, case-insensitively and across both slash styles", () => {
   assert.equal(folderKind(MAIN_FOLDER), "main");
   assert.equal(folderKind(WORKTREE), "main");
   assert.equal(folderKind("C:\\Users\\rizky\\agentforge-tier-neutral"), "main");
   assert.equal(folderKind("C:\\Users\\Rizky\\AgentForge-Chat"), "tester");
-  assert.equal(folderKind(HYP), "other");
-  assert.equal(folderKind("C:\\Users\\rizky\\hypey\\app-sync"), "other");
+  assert.equal(folderKind(OTHER), "other");
+  assert.equal(folderKind("C:\\Users\\rizky\\other-product\\app-sync"), "other");
   assert.equal(folderKind("C:\\Users\\rizky\\Downloads"), "other");
   assert.equal(folderKind("C:/Users/rizky/agentforge/.claude/worktrees/quizzical-merkle-067d77"), "main");
   assert.equal(folderKind("C:\\Users\\rizky\\nultron"), "main");
@@ -82,8 +82,8 @@ test("classifyPlace: the tester branch outside agentforge-chat is refused", () =
   assert.equal(classifyPlace({ folder: WORKTREE, branch: TESTER_BRANCH }).ok, false);
 });
 
-test("classifyPlace: the hypey clone is an unnamed folder here, so it passes as other with no webdev port", () => {
-  const place = classifyPlace({ folder: HYP, branch: "main" });
+test("classifyPlace: an unrelated clone is an unnamed folder here, so it passes as other with no webdev port", () => {
+  const place = classifyPlace({ folder: OTHER, branch: "main" });
   assert.equal(place.ok, true);
   assert.equal(place.row, "other");
   assert.equal(place.webdev, undefined);

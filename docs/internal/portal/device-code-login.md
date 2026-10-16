@@ -17,7 +17,7 @@ Goals
 - Portal is the control plane. The app holds no licence state and makes no entitlement decision of its own.
 - A user signs in on a machine once, gets a device-bound session, and the app silently refreshes it.
 - Every `/v1` call carries org + user + device so the gateway can meter spend, enforce caps, and write an immutable `usage` row.
-- Whitelabel is tenant config fetched at login (branding, model allowlist, feature flags). One binary for JAST / Hypernet / Metranet / direct.
+- Whitelabel is tenant config fetched at login (branding, model allowlist, feature flags). One binary for JAST / Metranet / direct.
 - Revocation is fast: an admin revoking a device or a session stops that machine within one access-token lifetime (~1 h) and immediately on the next refresh.
 - The app boots fully offline. No network call is on the startup critical path.
 
@@ -129,11 +129,11 @@ A browser page, not an API. Rendered with the tenant's branding when `?code=` re
 
 Shows: the `user_code` field (prefilled from `?code=`), the requesting device's `platform` + `label` + approximate location from IP ("Jakarta, ID"), and a plain sentence: *"Only continue if you just started a sign-in on that device."* On submit of a valid pending code it asks the user to sign in, then renders **Approve / Deny** with the device details repeated.
 
-**Sign-in method: email + one-time code (OTP), no password.** Justification: (1) we would otherwise own a password database for four whitelabel partners with no shared IdP — the worst possible asset to hold; (2) credential stuffing is the dominant attack on Indonesian SME SaaS and OTP removes it entirely; (3) partners who later want SSO drop in OIDC without a password migration; (4) the user is already at a browser, so there is no UX cost. OTP is 6 digits, 10 min TTL, 5 attempts, one-time, rate limited 3 sends / 15 min per email. A session cookie on the portal (30 days) means the second and third device activation need no OTP at all.
+**Sign-in method: email + one-time code (OTP), no password.** Justification: (1) we would otherwise own a password database for every whitelabel partner with no shared IdP — the worst possible asset to hold; (2) credential stuffing is the dominant attack on Indonesian SME SaaS and OTP removes it entirely; (3) partners who later want SSO drop in OIDC without a password migration; (4) the user is already at a browser, so there is no UX cost. OTP is 6 digits, 10 min TTL, 5 attempts, one-time, rate limited 3 sends / 15 min per email. A session cookie on the portal (30 days) means the second and third device activation need no OTP at all.
 
 This is the `login_otps` table (`0002_core_tables.sql`): `otp_hash = sha256(code)` only — the raw six digits exist in the email and nowhere else — with `attempts` capped at 5 by a CHECK, `expires_at` at `created_at + 10 minutes`, and `consumed_at` set in the same transaction that signs the user in, which is what makes the code single-use rather than merely short-lived. The 3-sends-per-15-minutes limit is counted from the rows themselves over `ix_login_otps_tenant_email (tenant_id, email, created_at DESC)`, so there is no counter to reconcile; `prune_login_otps()` keeps 24 h precisely so the send window stays countable. `login_otps.tenant_id` is NOT NULL: the tenant is resolved *before* a code is minted — from `device_codes.tenant_id` when `?code=` carried a `tenant_hint` — and an address matching users in more than one tenant sends nothing while still rendering the same neutral "check your email" page. Note the gap: the "resolve the tenant from the approving user" fallback cannot be done with a plain `users` lookup, because `portal_app` reads `users` under RLS and has no `app.tenant_id` to set yet. A generic (unbranded) build therefore needs an explicit resolution path — a `portal_admin`-owned `SECURITY DEFINER` lookup that returns at most a tenant id, or a per-tenant loop — and that function does not exist in `0005_functions.sql` yet. Branded builds, which are every shipped installer today, always carry `tenant_hint` and never hit this.
 
-**Since 2026-10-07 this is the default, not the only method.** A deployment can run the portal with `PORTAL_SIGNIN_MODE=password` (owner decision, HYP AI), and then the e-mail step, the invite step and the code step do not exist and a username and a password take their place: see "Password sign-in" below. The four reasons above are the reasons the e-mailed code is the default; the owner chose to hold a password database for that one deployment, with a second factor being designed, and the residual risks are recorded as SR-165.
+**Since 2026-10-07 this is the default, not the only method.** A deployment can run the portal with `PORTAL_SIGNIN_MODE=password` (owner decision), and then the e-mail step, the invite step and the code step do not exist and a username and a password take their place: see "Password sign-in" below. The four reasons above are the reasons the e-mailed code is the default; the owner chose to hold a password database for a deployment that selects it, with a second factor being designed, and the residual risks are recorded as SR-165.
 
 SSO hook: if `tenant_config.feature_flags.sso_provider` is set for the resolved tenant, `/activate` redirects to that OIDC provider and skips the OTP form. Everything downstream is identical.
 
@@ -511,7 +511,7 @@ This ordering does not create a seat-cap loophole: a BYO key carries no `oid`, s
 
 ## Password sign-in (`PORTAL_SIGNIN_MODE=password`, 2026-10-07)
 
-**The decision.** Rizky, 2026-10-07, for the white-label deployment HYP AI: *"the login portal doesnt need email code, we will use username and [password] protection for now, with 2FA method being designed."* He chose the real multi-user portal (one company, one shared desk) with a username and a password in place of the e-mailed code. This lifts the project rule "no password" **for this mode only**. The e-mailed-code sign-in is the default and is what the other hosted product runs; it is unchanged. The rest of this document describes that sign-in, and everything in this section is an alternative to the e-mail step, the invite step and the code step, not an addition to them.
+**The decision.** Rizky, 2026-10-07: *"the login portal doesnt need email code, we will use username and [password] protection for now, with 2FA method being designed."* He chose the real multi-user portal (one company, one shared desk) with a username and a password in place of the e-mailed code. This lifts the project rule "no password" **for this mode only**. The e-mailed-code sign-in is the default and is unchanged. The rest of this document describes that sign-in, and everything in this section is an alternative to the e-mail step, the invite step and the code step, not an addition to them.
 
 **Selecting it.** `PORTAL_SIGNIN_MODE` is read once at boot (`apps/portal/src/config.ts`). Unset or empty is `code`. `code` and `password` are the only other values; anything else, `Password` and `totp` included, refuses to start and names the variable. In `password` mode:
 
@@ -575,12 +575,12 @@ The routes of the other mode are not registered, so they answer as any path that
 **Operator commands** (`pnpm portal:account`, or through the deploy bundle's wrapper from the host: `sh webapp-deploy/scripts/portal.sh account <command> ...`; it runs `apps/portal/scripts/account.ts` in the portal container with the container's own `PORTAL_SIGNIN_MODE` and database settings). Non-interactive, so it works with `exec -T`. Refused when the portal is not in password mode. Fake values:
 
 ```
-sh portal.sh account create --username hyp.alice --email alice@example.test --role owner --name "Alice Example"
+sh portal.sh account create --username alice --email alice@example.test --role owner --name "Alice Example"
   # prints the person, and, once: "password   XXXX-XXXX-XXXX-XXXX-XXXX"
-sh portal.sh account reset-password --username hyp.alice     # new initial password, once; ends sessions; clears failed attempts, the slots taken under a lock, and the lock
+sh portal.sh account reset-password --username alice     # new initial password, once; ends sessions; clears failed attempts, the slots taken under a lock, and the lock
 sh portal.sh account disable --email alice@example.test      # ends every session; refused for the last owner
-sh portal.sh account enable  --username hyp.alice            # with the password they had; refused if no seat is left
-sh portal.sh account set-role --username hyp.alice --role admin
+sh portal.sh account enable  --username alice            # with the password they had; refused if no seat is left
+sh portal.sh account set-role --username alice --role admin
 sh portal.sh account list                                    # username, address, role, status, password state, last password seen, lock, locks in the last 24 hours
 ```
 

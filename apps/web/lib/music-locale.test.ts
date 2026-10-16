@@ -25,7 +25,6 @@ describe("music locale JSON", () => {
 
   it("keeps brand names untranslated in id", () => {
     const raw = readFileSync(resolve(localesDir, "id", "music.json"), "utf8");
-    expect(raw).not.toMatch(/TokenKu/);
   });
 
   it("gives the rail a Music label in both locales", () => {

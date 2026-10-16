@@ -21,7 +21,7 @@
  *                  (tester-only config, data and env files). Skipped on the tester branch itself and
  *                  for ranges whose base is not main.
  *   protected      a file marked "protected" changed and no commit in the range has a `Lanes:` line.
- *   brand          a brand literal (Nultron, Toko Token, TokenKu, HYP AI, Hypey) appears more often in a
+ *   brand          a brand literal (Nultron, Toko Token) appears more often in a
  *                  shared-code file than `scripts/lane-guard.baseline.json` recorded. "Nultron" is the
  *                  default brand and the mascot name today, so a plain ban would be red on day one;
  *                  the ratchet only lets the count go down. Regenerate the baseline on a clean tree

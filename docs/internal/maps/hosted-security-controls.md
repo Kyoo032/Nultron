@@ -348,7 +348,7 @@ Read before editing a hosted control. Lanes: Enterprise (the hosted app). Person
 - `packages/host/src/auth/routes.ts` and `portal-*.ts`: the sign-in flow and seat claim ([`portal-session-auth.md`](portal-session-auth.md)).
 - `packages/host/src/gateway-gate.ts`: advisory by design, fails open; never read it as an entitlement ([`settings-and-gateway-gate.md`](settings-and-gateway-gate.md)). Limits and seats are enforced server-side ([`tenant-entitlement.md`](tenant-entitlement.md)).
 - `apps/desktop/renderer-csp.cjs` and `apps/desktop/main.cjs`: Personal's own policy, IPC and no port.
-- HYP AI's Cloudflare edge and password sign-in. They are HYP AI's deploy, in HYP AI's own repo, outside this one. Never add a Cloudflare mode to `webapp-deploy/Caddyfile`; Nultron keeps its direct two-name setup.
+- Never add a Cloudflare mode to `webapp-deploy/Caddyfile`; Nultron keeps its direct two-name setup.
 - `scripts/release-web.mjs` and the pack scripts: release paths need Rizky's word ([`release-and-sync-lanes.md`](release-and-sync-lanes.md)).
 
 ## Gotchas

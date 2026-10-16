@@ -12,7 +12,6 @@ describe("legal pack", () => {
     expect(legalTemplates[0]?.toolKeys).toContain("web_search");
     const blob = JSON.stringify(legalTemplates);
     expect(blob).not.toMatch(/Harbor State/i);
-    expect(blob).not.toMatch(/TokenKu/i);
     expect(blob).not.toMatch(/\bstudent\b/i);
     expect(blob).not.toMatch(/\bcourse\b/i);
   });

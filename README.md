@@ -4,7 +4,7 @@
 
 The goal is multi-harness inside one app. Each kind of work is its own harness: its own screen, its own checks, and a file you can take with you. Chat, documents, research, finance, data, market, legal, meetings, images, video, music, edit, and presentations all live here. A new kind of work is another harness in this app. Custom-agent building stays parked. Hermes stays the separate tinkering surface.
 
-> Do not confuse **Toko Token** (`api.tokotokenai.com`) with TokenKu.
+> Do not confuse **Toko Token** (`api.tokotokenai.com`) with any other gateway name.
 
 ## Two ways to run it
 

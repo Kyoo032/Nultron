@@ -25,7 +25,6 @@ describe("market locale JSON", () => {
 
   it("keeps brand names untranslated in id", () => {
     const raw = readFileSync(resolve(localesDir, "id", "market.json"), "utf8");
-    expect(raw).not.toMatch(/TokenKu/);
     expect(raw).toMatch(/TradingView/);
   });
 });

@@ -8,7 +8,7 @@ This file lists every product built from this repo, one card per target, coverin
 
 **Agents read this file before starting any task.** Name the target your task serves, then keep the change inside it. If the change lands on another target, stop and say so.
 
-Last updated: 2026-10-15 (HYP AI moved to its own repo; base agentforge `main` at `8a42aaed`). The hex colours below were sampled from each brand's own logo file.
+Last updated: 2026-10-15 (base agentforge `main` at `8a42aaed`). The hex colours below were sampled from each brand's own logo file.
 
 ## At a glance
 
@@ -16,13 +16,8 @@ Last updated: 2026-10-15 (HYP AI moved to its own repo; base agentforge `main` a
 |---|---|---|---|---|---|---|
 | [`nultron-personal`](#nultron-personal) | Desktop app | Public (retired) | Nultron | Toko Token | Retired 2026-10-14. Last release v0.15.1. Repo `Kyoo032/Nultron-Desktop` archived | None. The app is merged into the web app; no new cut |
 | [`nultron-enterprise`](#nultron-enterprise) | Hosted web app | Nultron Enterprise customers (via DPS) | Nultron | Toko Token + BYOK | Pilot, not deployed. A password-gated single-desk preview (one private desk per tester) runs at app.nultron-ai.xyz since 2026-10-06. Release repo is `Kyoo032/Nultron-Releases` (renamed from `Kyoo032/Nultron` on 2026-10-15) | First Tencent Enterprise deploy, Thu 8 Oct; it replaces the preview |
-| [`hyp-ai`](#hyp-ai) | White-label hosted | Hypernet (XLSMART) | HYP AI | TokenKu | Own repo since 2026-10-15 (`Kyoo032/hyp-ai`), not built from here | Its own repo |
 | [`kemenkeu-ai`](#kemenkeu-ai) | Desktop flavor | Kemenkeu (Ministry of Finance) | Kemenkeu AI | AIHub | Built locally | Later, after Nultron |
 | [`aihub-metranet`](#aihub-metranet) | Desktop flavor | Metranet (Telkom Indonesia) | AIHub Metranet | AIHub | Built locally | Later, after Nultron |
-
-## Scope now (Rizky, 2026-10-05)
-
-**Superseded 2026-10-15.** HYP AI is its own repo and takes no push from here. The sync plan that stood in this section is history, kept in git.
 
 ## Which targets a change touches
 
@@ -37,8 +32,8 @@ Last updated: 2026-10-15 (HYP AI moved to its own repo; base agentforge `main` a
 
 ## Brand rules for every target
 
-- **Gateway names stay distinct.** Toko Token, TokenKu and AIHub are three different gateways. Never merge or swap their names in copy, catalogs or prompts.
-- **White-label brands show TokenKu (Rizky, 2026-10-05).** Users of every white-label brand, HYP AI included (its own repo since 2026-10-15), see TokenKu as the gateway. Until TokenKu keys exist, the backend of those brands calls the Toko Token endpoint `https://api.tokotokenai.com/v1`. That is a backend setting only; never show the Toko Token name or host in their UI copy. **Nultron keeps Toko Token** as its gateway, in the UI and in the backend (Rizky, 2026-10-05).
+- **Gateway names stay distinct.** Toko Token and AIHub are two different gateways. Never merge or swap their names in copy, catalogs or prompts.
+- **Nultron keeps Toko Token** as its gateway, in the UI and in the backend (Rizky, 2026-10-05).
 - **Each client's art stays in its own build.** A client's logo, mascot or colours never appear in another target's installer, image or screenshots.
 - **Never edit a client's logo.** Use the file exactly as received. To shrink a logo, crop it; never redraw it.
 - **Copy follows `{productName}` and `{gatewayName}`.** A literal product or gateway name in UI copy is a bug on every other target.
@@ -125,10 +120,6 @@ Last updated: 2026-10-15 (HYP AI moved to its own repo; base agentforge `main` a
 - **Logs:**
   - [Deploy log](web-pivot-2026-09-18.md#deploy-log).
   - [`security-register.md`](security-register.md), the deploy gate.
-
-## hyp-ai
-
-HYP AI moved to its own repo on 2026-10-15 (`Kyoo032/hyp-ai`). It is no longer built from this repo: nothing here syncs into it, and its brand, deploy and release notes live there. The brand rules that still apply to shared code are in "Brand rules for every target" above.
 
 ## kemenkeu-ai
 

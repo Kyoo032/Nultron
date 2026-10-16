@@ -4,7 +4,7 @@ Product: both · Instance: every checkout (main, tester); no app drive
 
 Last verified: 2026-10-15 at 8a42aaed
 
-Repo names and the lane set were re-read on 2026-10-15 at 8a42aaed: HYP AI left this repo and is no longer a lane. The earlier rewrite was on 2026-10-14. The "Chat-first shell" section was read on 2026-10-12 at e8a7eca8, against the tester branch, before PR #157 promoted it to `main`.
+Repo names and the lane set were re-read on 2026-10-15 at 8a42aaed: the lanes are `main` and the tester, and Personal is retired. The earlier rewrite was on 2026-10-14. The "Chat-first shell" section was read on 2026-10-12 at e8a7eca8, against the tester branch, before PR #157 promoted it to `main`.
 
 ## Overview
 
@@ -12,7 +12,6 @@ One source repo (`Kyoo032/agentforge`, branch `main`) is the one place a fix is 
 
 - `main` is the published code: Nultron as the OPC web app, and the Enterprise base.
 - The tester (`tester/chat-first`) is the staging code at every stage. It is never released.
-- HYP AI is its own repo since 2026-10-15 (`Kyoo032/hyp-ai`). It is not a lane here, and nothing in this repo syncs into it.
 - Nultron Personal (the desktop app) is retired (2026-10-14). No release, no sync step.
 
 The rules for where a change is cut and made are the tables at the top of `AGENTS.md`, "Where am I?" and "Where a change goes". The rules behind them are in `AGENTS.md`, "Lanes". This page is the working form of those rules: how a change reaches each lane, and what must be true before a lane counts as fixed. The longer story of the tester split is in Rizky's vault note `40-Dev/nultron-two-codes-map.md`. This page does not cover how a release is cut (see the "Web release" section of `AGENTS.md`).
@@ -75,7 +74,7 @@ Added on branch `chore/agent-guardrails` (not on `main` yet):
 ## Gotchas
 
 - **Shared code reads `productName` and `gatewayName`.** A hard-coded `Nultron` or `Toko Token` in shared code is a brand-rule finding in `pnpm lane-guard`, and the baseline is the ratchet.
-- **Deploy modes are not forks.** The Cloudflare edge is HYP AI's deploy only, and it lives in HYP AI's own repo; Nultron uses its direct two-name setup. Password sign-in is the default of the Nultron bundle since 2026-10-09 (`portal.env.example` sets `PORTAL_SIGNIN_MODE=password`; the e-mailed code stays selectable). Changes to one deploy path do not enter the other.
+- **Deploy modes are not forks.** Nultron uses its direct two-name setup, with no Cloudflare edge. Password sign-in is the default of the Nultron bundle since 2026-10-09 (`portal.env.example` sets `PORTAL_SIGNIN_MODE=password`; the e-mailed code stays selectable).
 - **Published wins.** If the tester and `main` disagree, `main` stands and the tester code adapts. Tester work reaches `main` only through a promotion pull request Rizky approves.
 - **Personal is retired, not deleted.** Its code is still in the tree, so a change that touches it still goes through `main`. No lane is owed a sync for it.
 - **A fix is not done until each lane has run its step.** The pull request lists the lanes still owed.

@@ -40,7 +40,7 @@ Consequence: phone and desktop are **independent devices**. Threads/media do not
 
 ## v1 scope (Android, sideloaded APK)
 
-1. **Onboarding / Settings** — paste gateway key → probe `GET /v1/models` → SecureStore. Offline demo mode until a key is saved (mirrors desktop). Toko Token branding; never merge with TokenKu.
+1. **Onboarding / Settings** — paste gateway key → probe `GET /v1/models` → SecureStore. Offline demo mode until a key is saved (mirrors desktop). Toko Token branding; never merge it with another gateway name.
 2. **Chat** — model picker (curated chat bucket from live `/v1/models`), composer, SSE streaming, session list stored in local SQLite. Feature parity target: desktop Chat minus tool-bound media generation.
 3. **Usage** — this-key spend by day/week/month via NewAPI `/api/usage/token` + `/api/pricing`.
 

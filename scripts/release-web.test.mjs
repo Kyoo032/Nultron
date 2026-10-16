@@ -1019,7 +1019,6 @@ test("the real webapp-deploy/sites folder is a valid bundle, and nothing in it n
     assert.ok(`sites/${path.slice("webapp-deploy/sites/".length)}` in bundle, path);
   for (const [name, text] of Object.entries(bundle)) {
     assert.deepEqual(forbiddenMarksInPublished(text), [], name);
-    assert.doesNotMatch(text, /tokenku|hyp ?ai|hypey|hypernet/i, `${name}: no customer name in a published file`);
   }
   // No wildcard and no catch-all site, and no reverse proxy: a company site only serves its own files.
   for (const [name, text] of Object.entries(bundle).filter(([path]) => path.endsWith(".caddy"))) {
@@ -1034,7 +1033,6 @@ test("the whole rendered bundle, sites included, has none of the banned marks or
   assert.ok(Object.keys(bundle).length >= BUNDLE_FILES.length + REQUIRED_SITE_FILES.length);
   for (const [name, text] of Object.entries(bundle)) {
     assert.deepEqual(forbiddenMarksInPublished(text), [], name);
-    assert.doesNotMatch(text, /tokenku|hyp ?ai|hypey|hypernet/i, name);
   }
 });
 
