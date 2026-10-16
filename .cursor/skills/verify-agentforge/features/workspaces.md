@@ -2,7 +2,7 @@
 
 A workspace is a desk: its own `productModes`, gateway key, Settings and Knowledge Base. In the chat-first shell on `:3000` there is no desk switcher and no Workspaces page: `workspaces-link` in the account group opens `/workspaces`, which is the **Virtual agents** page, where a person hires or lets go of agents (that edits the current desk's `productModes`); see [virtual-agents.md](./virtual-agents.md). The desk-management screen (`WorkspacesPage`: `workspaces-switcher`, `create-new-workspace`, `workspace-list`, `edit-workspace-modes`, `delete-workspace*`, the template picker) is routed only in the `"modes"` fallback layout (`SHELL_LAYOUT` `modes`) and is not driven by this recipe; the host routes behind it (`/api/v1/workspaces`) are unchanged. The first desk of a fresh Personal install is written with Chat, Research, Images, Videos and Presentation only (2026-09-29, `FIRST_RUN_MODES`); the hosted first desk has every mode. Map: [`docs/internal/maps/shell-rail-and-workspaces.md`](../../../../docs/internal/maps/shell-rail-and-workspaces.md).
 
-Product: both · Instance: main :3000 (the Private/Workspace project switch is tester :3200 only, no recipe yet)
+Product: both · Instance: main :3000
 
 ## Sub-features
 
@@ -33,11 +33,11 @@ Preconditions:
 
 ## Gotchas
 
-- The current desk is a **process-global file**, `data/workspace-id.txt` (`packages/host/src/workspace.ts:35-41`), not a per-browser session. `readSelectedWorkspaceId` and `writeSelectedWorkspaceId` are no-ops in server mode (`:24-26`, `:36-38`), so the file exists only on the desktop and on webdev.
+- The current desk is a **process-global file**, `data/workspace-id.txt` (`packages/host/src/workspace.ts:20`), not a per-browser session. `readSelectedWorkspaceId` and `writeSelectedWorkspaceId` are no-ops in server mode (`:23-26`, `:35-38`), so the file exists only on non-hosted builds (webdev; the retired desktop used it too).
 - Deleting a desk cascades its threads, messages and runs (`packages/db/src/schema.ts:430-452`), wipes seven `knowledge_*` tables (`wipeKnowledgeForWorkspace`, `packages/db/src/ensure-local-owner.ts:219-232`) and drops the desk's `settings.enc` entry. It is not recoverable locally. The API refuses a bare `DELETE /api/v1/workspaces/:id` with `400 confirm_required`, and Default is protected (403).
 - **Hosted: deleting a desk takes every person's chats with it, which is why only an owner or an admin may.** An owner or admin can delete other people's chats this way without being able to read them; no decision about desk deletion itself has been recorded.
 - Workspaces is not a product mode. The control is `workspaces-link`, not `mode-workspaces`.
 - Kernel forbids `student` / `course` nouns in core schema. The Students chip is a pack id (`students`), not a kernel table.
 - Default with null `productModes` after migrate is all work modes, not Chat-only (a read rule for an old row).
-- **A keyless desk shows the key screen only where the gate closes without a key, which is runtime `ai`.** Under `AGENTFORGE_RUNTIME=stub` the gate is `stub` with `allowed: true` (`packages/host/src/gateway-gate.ts:292-294`), so a new desk with no key lands on `/chat`.
+- **A keyless desk shows the key screen only where the gate closes without a key, which is runtime `ai`.** Under `AGENTFORGE_RUNTIME=stub` the gate is `stub` with `allowed: true` (`packages/host/src/gateway-gate.ts:387-388`), so a new desk with no key lands on `/chat`.
 - The 2026-09-23 finding that a keyless new desk used to block the whole app (selected desk is process-global) was fixed the same day; creating a desk now falls back to the onboarding key step with the other desks listed.
