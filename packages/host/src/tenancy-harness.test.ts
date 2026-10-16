@@ -44,7 +44,7 @@ import type { DeskPath } from "@agentforge/core/tools/files";
 import { dispatch, isByIdRoute, routeRegistrations } from "./router";
 import { DESK_FILE_ROUTES } from "./desk-files/routes";
 import { createDeskRoot } from "./desk-files/store";
-import { createSession, SESSION_COOKIE_SECURE } from "./auth/session";
+import { createSession } from "./auth/session";
 import { createMemorySessionStore } from "./auth/session-store";
 import type { HostBytesResult, HostFile, HostJsonResult, HostRequest, HostResult, HostStreamResult } from "./types";
 
@@ -113,7 +113,6 @@ type Seeds = {
   workspaceId: string;
   threadId: string;
   mediaId: string;
-  mediaProposalId: string;
   datasetId: string;
   matterId: string;
   docId: string;
@@ -267,19 +266,6 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
 
   // --- media ---------------------------------------------------------------------------------
   { method: "GET", path: "/api/v1/media/:mediaId/file", params: { mediaId: "mediaId" } },
-  { method: "GET", path: "/api/v1/media/proposals/:proposalId", params: { proposalId: "mediaProposalId" } },
-  {
-    method: "POST",
-    path: "/api/v1/media/proposals/:proposalId/generate",
-    params: { proposalId: "mediaProposalId" },
-    body: {},
-  },
-  {
-    method: "POST",
-    path: "/api/v1/media/proposals/:proposalId/skip",
-    params: { proposalId: "mediaProposalId" },
-    body: {},
-  },
   {
     method: "DELETE",
     path: "/api/v1/media/:mediaId",
@@ -386,44 +372,6 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
   { method: "GET", path: "/api/v1/artifacts/:artifactId", params: { artifactId: "artifactId" } },
   { method: "DELETE", path: "/api/v1/artifacts/:artifactId", params: { artifactId: "artifactId" } },
   { method: "GET", path: "/api/v1/artifacts/:artifactId/file", params: { artifactId: "artifactId" } },
-  { method: "GET", path: "/api/v1/docs/:artifactId", params: { artifactId: "artifactId" } },
-  { method: "GET", path: "/api/v1/docs/:artifactId/versions", params: { artifactId: "artifactId" } },
-  {
-    method: "GET",
-    path: "/api/v1/docs/:artifactId/versions/:n/file",
-    params: { artifactId: "artifactId", n: "unseeded" },
-  },
-  {
-    method: "PUT",
-    path: "/api/v1/docs/:artifactId/sections/:sectionId",
-    params: { artifactId: "artifactId", sectionId: "unseeded" },
-    body: { baseVersion: 1, section: { blocks: [{ type: "paragraph", text: "tenant B was here" }] } },
-  },
-  {
-    method: "POST",
-    path: "/api/v1/docs/:artifactId/sections",
-    params: { artifactId: "artifactId" },
-    body: { baseVersion: 1, section: { blocks: [{ type: "paragraph", text: "tenant B was here" }] } },
-  },
-  {
-    method: "DELETE",
-    path: "/api/v1/docs/:artifactId/sections/:sectionId",
-    params: { artifactId: "artifactId", sectionId: "unseeded" },
-  },
-  {
-    method: "POST",
-    path: "/api/v1/docs/:artifactId/versions/:n/restore",
-    params: { artifactId: "artifactId", n: "unseeded" },
-    body: { baseVersion: 1 },
-  },
-  {
-    method: "POST",
-    path: "/api/v1/docs/:artifactId/sections/:sectionId/proposals",
-    params: { artifactId: "artifactId", sectionId: "unseeded" },
-    body: { agentId: "documents", instruction: "tenant B was here", baseVersion: 1 },
-  },
-  { method: "POST", path: "/api/v1/docs/proposals/:proposalId/keep", params: { proposalId: "unseeded" }, body: {} },
-  { method: "POST", path: "/api/v1/docs/proposals/:proposalId/discard", params: { proposalId: "unseeded" }, body: {} },
 
   // --- knowledge -------------------------------------------------------------------------------
   {
@@ -479,7 +427,6 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
   { method: "POST", path: "/api/v1/agents/:agentId/share", params: { agentId: "agentId" }, body: {} },
   { method: "POST", path: "/api/v1/agents/:agentId/product-modes", params: { agentId: "agentId" }, body: {} },
   { method: "POST", path: "/api/v1/agents/:agentId/generate-defaults", params: { agentId: "agentId" }, body: {} },
-  { method: "DELETE", path: "/api/v1/agents/:agentId", params: { agentId: "agentId" } },
 
   // --- channels (Telegram, PR #67) --------------------------------------------------------------
   { method: "GET", path: "/api/v1/channels/:channelId", params: { channelId: "channelId" } },
@@ -597,120 +544,6 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
     body: {},
     refusal: "indistinguishable",
     why: FOLDER_PROPOSAL_WHY,
-  },
-
-  // --- team board (tester lane, K0) -------------------------------------------------------------
-  // These rows keep the table complete and prove little on their own. The board is server mode
-  // only and its handlers read `isServerMode()` (handlers/board.ts:48), which this harness switches
-  // off at the top of the file, so here every board route answers the router's own 404 before it
-  // reads an id. The two-company proof, with server mode on, a positive control for every refusal,
-  // and the live stream, is board/board-companies.test.ts.
-  { method: "GET", path: "/api/v1/board/cards/:cardId", params: { cardId: "unseeded" } },
-  {
-    method: "PATCH",
-    path: "/api/v1/board/cards/:cardId",
-    params: { cardId: "unseeded" },
-    body: { version: 1, title: "x" },
-  },
-  {
-    method: "POST",
-    path: "/api/v1/board/cards/:cardId/archive",
-    params: { cardId: "unseeded" },
-    body: { version: 1 },
-  },
-  {
-    method: "POST",
-    path: "/api/v1/board/cards/:cardId/restore",
-    params: { cardId: "unseeded" },
-    body: { version: 1 },
-  },
-  {
-    method: "POST",
-    path: "/api/v1/board/cards/:cardId/comments",
-    params: { cardId: "unseeded" },
-    body: { body: "x" },
-  },
-  {
-    method: "PATCH",
-    path: "/api/v1/board/columns/:columnId",
-    params: { columnId: "unseeded" },
-    body: { name: "x" },
-  },
-
-  // --- collective projects (tester lane, F1) ----------------------------------------------------
-  // Same reasoning as the board rows above: the projects routes read `isServerMode()` first, which
-  // this harness switches off, so each answers the router's 404. The two-company proof, with server
-  // mode on, is projects-companies.test.ts.
-  {
-    method: "PATCH",
-    path: "/api/v1/projects/:id",
-    params: { id: "unseeded" },
-    body: { name: "x" },
-  },
-  { method: "POST", path: "/api/v1/projects/:id/archive", params: { id: "unseeded" }, body: {} },
-  { method: "GET", path: "/api/v1/projects/:id/files", params: { id: "unseeded" } },
-  {
-    method: "POST",
-    path: "/api/v1/projects/:id/files",
-    params: { id: "unseeded" },
-    body: { artifactId: "unseeded" },
-  },
-  {
-    method: "DELETE",
-    path: "/api/v1/projects/:id/files/:artifactId",
-    params: { id: "unseeded", artifactId: "unseeded" },
-  },
-  // Generated media in a Workspace (SR-175): the add route's `mediaId` body and its remove route, same reasoning.
-  {
-    method: "DELETE",
-    path: "/api/v1/projects/:id/media/:mediaId",
-    params: { id: "unseeded", mediaId: "unseeded" },
-  },
-  // Workspace knowledge and chats (W1): the same reasoning, each answers the router's 404 with server mode off.
-  { method: "GET", path: "/api/v1/projects/:id/knowledge", params: { id: "unseeded" } },
-  { method: "POST", path: "/api/v1/projects/:id/uploads", params: { id: "unseeded" }, body: {} },
-  {
-    method: "DELETE",
-    path: "/api/v1/projects/:id/knowledge/:sourceId",
-    params: { id: "unseeded", sourceId: "unseeded" },
-  },
-  { method: "GET", path: "/api/v1/projects/:id/threads", params: { id: "unseeded" } },
-  // Members, roles and agents (K-D22, K-D23): the same reasoning. The four-person proof is projects-members.test.ts.
-  { method: "GET", path: "/api/v1/projects/:id/members", params: { id: "unseeded" } },
-  { method: "GET", path: "/api/v1/projects/:id/invitable", params: { id: "unseeded" } },
-  {
-    method: "POST",
-    path: "/api/v1/projects/:id/members",
-    params: { id: "unseeded" },
-    body: { userId: "unseeded" },
-  },
-  {
-    method: "PATCH",
-    path: "/api/v1/projects/:id/members/:userId",
-    params: { id: "unseeded", userId: "unseeded" },
-    body: { role: "admin" },
-  },
-  {
-    method: "DELETE",
-    path: "/api/v1/projects/:id/members/:userId",
-    params: { id: "unseeded", userId: "unseeded" },
-  },
-  {
-    method: "POST",
-    path: "/api/v1/projects/:id/owner",
-    params: { id: "unseeded" },
-    body: { userId: "unseeded" },
-  },
-  {
-    method: "POST",
-    path: "/api/v1/projects/:id/agents",
-    params: { id: "unseeded" },
-    body: { agentId: "research" },
-  },
-  {
-    method: "DELETE",
-    path: "/api/v1/projects/:id/agents/:agentId",
-    params: { id: "unseeded", agentId: "unseeded" },
   },
 ];
 
@@ -956,22 +789,6 @@ async function seedTenantA(): Promise<Seeds> {
     saveMedia(tenantA, new File([png], `${LEAK_MARKER}.png`, { type: "image/png" })),
   );
 
-  const mediaProposalId = await step("media proposal", async () => {
-    const { defaultMediaApprovalDeps } = await import("./media-approval/deps");
-    const deps = await defaultMediaApprovalDeps();
-    return deps.store.propose({
-      owner: { organizationId: tenantA.organizationId, userId: tenantA.userId },
-      workspaceId: tenantA.workspaceId,
-      threadId: thread.id,
-      runId: null,
-      kind: "image",
-      model: "stub-image",
-      estimateMicros: null,
-      request: { kind: "image", prompt: `${LEAK_MARKER} picture`, aspect: "square", model: "stub-image" },
-      now: T0,
-    });
-  });
-
   return {
     projectId: project.id,
     cardId: card.id,
@@ -981,7 +798,6 @@ async function seedTenantA(): Promise<Seeds> {
     workspaceId: desk.id,
     threadId: thread.id,
     mediaId: mediaRow.id,
-    mediaProposalId,
     datasetId: dataset.id,
     matterId: matter.id,
     // No seed of its own. `addFile` assigns document ids sequentially inside a matter, so a real
@@ -1193,7 +1009,10 @@ describe("every by-id route refuses another tenant's id", () => {
     const view = (extract as HostJsonResult).body as {
       extract: { facts: { id: string; value: string; edited: boolean }[]; comments: { text: string }[] };
     };
-    expect(view.extract.facts.find((fact) => fact.id === "payment:S1")).toMatchObject({ value: LEAK_MARKER, edited: true });
+    expect(view.extract.facts.find((fact) => fact.id === "payment:S1")).toMatchObject({
+      value: LEAK_MARKER,
+      edited: true,
+    });
     expect(view.extract.comments.map((comment) => comment.text)).toEqual([LEAK_MARKER]);
     const { legalStore } = await import("./legal/store");
     const file = legalStore().getExtractEdits(tenantA, seeds.matterId);
@@ -1344,62 +1163,6 @@ describe("every by-id route refuses another tenant's id", () => {
     });
   });
 
-  describe("the document import route, which takes its file id in the body", () => {
-    const IMPORT = "/api/v1/docs/import";
-
-    let foreignId: string;
-
-    const asSession = (session: { id: string }, method: string, path: string, body?: unknown) =>
-      dispatch(
-        {
-          method,
-          path,
-          query: {},
-          params: {},
-          headers: { cookie: `agentforge_session=${session.id}` },
-          ...(body === undefined ? {} : { body }),
-        },
-        { serverMode: true, sessionStore: store, now: () => T0 },
-      );
-
-    beforeAll(async () => {
-      const { createDocumentForTenant } = await import("./doc-tools/create-document");
-      const { sampleDocInput } = await import("./doc-tools/doc-tools-fixtures");
-      const made = await createDocumentForTenant(
-        { format: "docx", spec: { ...sampleDocInput(), title: LEAK_MARKER } },
-        tenantA,
-      );
-      if (!made.ok) {
-        throw new Error(made.message);
-      }
-      foreignId = made.artifactId;
-    });
-
-    it("is registered in the router", () => {
-      const registered = new Set(routeRegistrations().map((route) => `${route.method} ${route.path}`));
-      expect(registered.has(`POST ${IMPORT}`)).toBe(true);
-    });
-
-    it("refuses tenant A's file to B as it refuses an id nobody wrote, and leaves A's file as it was", async () => {
-      const foreign = await asSession(sessionB, "POST", IMPORT, { artifactId: foreignId });
-      const ghost = await asSession(sessionB, "POST", IMPORT, { artifactId: UNSEEDED_ID });
-      const foreignText = await serialise(foreign);
-      expect(foreignText, `${IMPORT} returned tenant A's data`).not.toContain(LEAK_MARKER);
-      expect(foreign.status, `${IMPORT} did not 404`).toBe(404);
-      expect(shape(foreign, foreignText)).toBe(shape(ghost, await serialise(ghost)));
-
-      const own = await asSession(sessionA, "GET", `/api/v1/docs/${foreignId}`);
-      expect(own.status).toBe(200);
-      expect((own as HostJsonResult).body).toMatchObject({ artifactId: foreignId });
-    });
-
-    it("answers tenant A's own already-editable file with 409, so the 404 for B is not a route that refuses everyone", async () => {
-      const own = await asSession(sessionA, "POST", IMPORT, { artifactId: foreignId });
-      expect(own.status).toBe(409);
-      expect((own as HostJsonResult).body).toMatchObject({ error: { code: "already_editable" } });
-    });
-  });
-
   /**
    * The control for the doc-flow rows, which are the only ones whose handlers are still stubs: a
    * 404 from a route that answered 404 to everybody would satisfy the table above. Tenant A, on its
@@ -1431,92 +1194,6 @@ describe("every by-id route refuses another tenant's id", () => {
         /(Matter|Meeting) not found/,
       );
     }
-  });
-
-  describe("the company gateway management token, which takes no id", () => {
-    const TOKEN_MARKER = "TENANT-A-GATEWAY-TOKEN-MARKER-41c7";
-    const ROUTE = "/api/v1/company/gateway-admin";
-    let previousServer: string | undefined;
-    let previousFetch: typeof fetch;
-
-    const asTenant = (session: { id: string }, method: string, body?: unknown) =>
-      dispatch(
-        {
-          method,
-          path: ROUTE,
-          query: {},
-          params: {},
-          headers: { cookie: `${SESSION_COOKIE_SECURE}=${session.id}` },
-          body,
-        },
-        { serverMode: true, sessionStore: store, now: () => T0 },
-      );
-
-    beforeAll(() => {
-      previousServer = process.env.AGENTFORGE_SERVER;
-      previousFetch = globalThis.fetch;
-      process.env.AGENTFORGE_SERVER = "1";
-      globalThis.fetch = (async () =>
-        new Response(JSON.stringify({ success: true, data: [] }), { status: 200 })) as unknown as typeof fetch;
-    });
-
-    afterAll(() => {
-      globalThis.fetch = previousFetch;
-      if (previousServer === undefined) {
-        delete process.env.AGENTFORGE_SERVER;
-      } else {
-        process.env.AGENTFORGE_SERVER = previousServer;
-      }
-    });
-
-    it("is registered in the router for read, write and clear", () => {
-      const registered = new Set(routeRegistrations().map((route) => `${route.method} ${route.path}`));
-      for (const method of ["GET", "PUT", "DELETE"]) {
-        expect(registered.has(`${method} ${ROUTE}`), `${method} ${ROUTE} is not registered`).toBe(true);
-      }
-    });
-
-    it("lets tenant A save its token and read it back as configured, which is what makes B's refusal mean something", async () => {
-      const saved = await asTenant(sessionA, "PUT", { token: TOKEN_MARKER, accountId: 3 });
-      expect(saved).toMatchObject({ status: 200 });
-      expect((saved as HostJsonResult).body).toMatchObject({ configured: true, accountIdSet: true, status: "ok" });
-
-      const own = await asTenant(sessionA, "GET");
-      expect(own.status).toBe(200);
-      expect((own as HostJsonResult).body).toMatchObject({ configured: true, accountIdSet: true });
-    });
-
-    it("shows tenant B none of A's token, lets it see only its own status, and leaves A's token as it was", async () => {
-      const seen = await asTenant(sessionB, "GET");
-      expect(seen.status).toBe(200);
-      expect((seen as HostJsonResult).body).toEqual({
-        configured: false,
-        accountIdSet: false,
-        checkedAt: null,
-        status: "unchecked",
-      });
-      expect(await serialise(seen), "GET returned tenant A's token").not.toContain(TOKEN_MARKER);
-
-      const cleared = await asTenant(sessionB, "DELETE");
-      expect(cleared.status).toBe(200);
-      expect(await serialise(cleared), "DELETE returned tenant A's token").not.toContain(TOKEN_MARKER);
-
-      const stillA = await asTenant(sessionA, "GET");
-      expect((stillA as HostJsonResult).body).toMatchObject({ configured: true, accountIdSet: true });
-    });
-
-    it("never returns the token in any answer, to either tenant", async () => {
-      for (const [session, method] of [
-        [sessionA, "GET"],
-        [sessionB, "GET"],
-        [sessionB, "PUT"],
-      ] as const) {
-        const result = await asTenant(session, method, method === "PUT" ? { token: "tenant-b-token-0a1b2c3d" } : undefined);
-        expect(await serialise(result), `${method} returned a token`).not.toContain(TOKEN_MARKER);
-      }
-      await asTenant(sessionB, "DELETE");
-      await asTenant(sessionA, "DELETE");
-    });
   });
 
   it("covers every by-id route the router registers", () => {

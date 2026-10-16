@@ -24,19 +24,16 @@ import { withRequestLocale } from "./run-context";
 import { withRequestSession } from "./tenant-scope";
 import { clearedWorkspaceCookie } from "./workspace";
 import {
-  handleDeleteAgent,
   handleGetAgent,
   handleGetAgentCapabilities,
   handleGetAgentThreads,
   handleGetWorkspaceAgents,
-  handlePostAgentDraft,
   handlePostAgentGenerateDefaults,
   handlePostAgentProductModes,
   handlePostAgentPublish,
   handlePostAgentShare,
   handlePostAgentSoul,
   handlePostAgentTools,
-  handlePostAgents,
   handlePostWorkspaceAgents,
 } from "./handlers/agents";
 import {
@@ -45,22 +42,8 @@ import {
   handleGetArtifactFile,
   handleGetArtifacts,
 } from "./handlers/artifacts";
-import { handleGetDoc, handleGetDocVersionFile, handleGetDocVersions } from "./handlers/docs-read";
-import { handlePostDocImport } from "./handlers/docs-import";
-import {
-  handleDeleteDocSection,
-  handlePostDocRestore,
-  handlePostDocSection,
-  handlePutDocSection,
-} from "./handlers/docs-write";
-import {
-  handlePostDocProposal,
-  handlePostDocProposalDiscard,
-  handlePostDocProposalKeep,
-} from "./handlers/docs-proposals";
 import { DESK_FILE_ROUTES } from "./desk-files/routes";
 import { FOLDER_ROUTES } from "./folder-root";
-import { MEDIA_APPROVAL_ROUTES } from "./media-approval/routes";
 import {
   handleDeleteChannel,
   handleDeleteTelegramBot,
@@ -81,8 +64,6 @@ import {
 } from "./handlers/billing";
 import { handleGetChat } from "./handlers/chat";
 import { handleGetVirtualAgents } from "./handlers/virtual-agents";
-import { boardRoutes } from "./handlers/board";
-import { projectRoutes } from "./handlers/projects";
 import { handlePostChatDocument } from "./chat-documents/handler";
 import { handlePostChatDocumentSave } from "./chat-documents/save-handler";
 import { handleGetHealth } from "./handlers/health";
@@ -230,11 +211,6 @@ import { handleRun } from "./handlers/runs";
 import { handlePostGuide } from "./handlers/guide";
 import { handlePostKeyLater } from "./handlers/key-later";
 import {
-  handleDeleteCompanyGatewayAdmin,
-  handleGetCompanyGatewayAdmin,
-  handlePutCompanyGatewayAdmin,
-} from "./handlers/company-gateway-admin";
-import {
   handleApplyLocale,
   handleCancelReset,
   handleGatewayCheck,
@@ -338,9 +314,6 @@ const routes: Route[] = [
   compile("POST", "/api/v1/settings/key-later", handlePostKeyLater),
   compile("POST", "/api/v1/settings/reset", handleResetApp),
   compile("DELETE", "/api/v1/settings/reset", handleCancelReset),
-  compile("GET", "/api/v1/company/gateway-admin", handleGetCompanyGatewayAdmin),
-  compile("PUT", "/api/v1/company/gateway-admin", handlePutCompanyGatewayAdmin),
-  compile("DELETE", "/api/v1/company/gateway-admin", handleDeleteCompanyGatewayAdmin),
   compile("GET", "/api/v1/usage", handleGetUsage),
   // Phase 6: what this tenant is holding and what it is allowed to hold.
   compile("GET", "/api/v1/storage/usage", handleGetStorageUsage),
@@ -367,10 +340,6 @@ const routes: Route[] = [
   compile("GET", "/api/v1/chat", handleGetChat),
   // Tester code: the desk's virtual agents. Reads the desk and its agent rows; no gateway call.
   compile("GET", "/api/v1/virtual-agents", handleGetVirtualAgents),
-  // Tester code: the team board, K0 (handlers/board.ts). Server mode only; no gateway call.
-  ...boardRoutes().map(([method, path, handler]) => compile(method, path, handler)),
-  // Tester code: collective projects, F1 (handlers/projects.ts). Server mode only; no gateway call.
-  ...projectRoutes().map(([method, path, handler]) => compile(method, path, handler)),
   // One attached document, read on this machine. No gateway call, so no gate (maps/chat-documents.md).
   compile("POST", "/api/v1/chat/documents", handlePostChatDocument),
   compile("POST", "/api/v1/chat/documents/save", handlePostChatDocumentSave),
@@ -390,7 +359,6 @@ const routes: Route[] = [
   compile("POST", "/api/v1/threads/:threadId/runs/video", (req) => handleRun(req, "video")),
   compile("GET", "/api/v1/models", handleGetModels),
   compile("POST", "/api/v1/models", handlePostModels),
-  ...MEDIA_APPROVAL_ROUTES.map(([method, path, handler]) => compile(method, path, handler)),
   compile("POST", "/api/v1/media", handlePostMedia),
   compile("GET", "/api/v1/media/:mediaId/file", handleGetMediaFile),
   // Phase 8: the door out of a full account. Deliberately NOT behind `requireGatewayAllowed()` —
@@ -499,17 +467,6 @@ const routes: Route[] = [
   compile("GET", "/api/v1/artifacts/:artifactId", handleGetArtifact),
   compile("DELETE", "/api/v1/artifacts/:artifactId", handleDeleteArtifact),
   compile("GET", "/api/v1/artifacts/:artifactId/file", handleGetArtifactFile),
-  compile("POST", "/api/v1/docs/import", handlePostDocImport),
-  compile("GET", "/api/v1/docs/:artifactId", handleGetDoc),
-  compile("GET", "/api/v1/docs/:artifactId/versions", handleGetDocVersions),
-  compile("GET", "/api/v1/docs/:artifactId/versions/:n/file", handleGetDocVersionFile),
-  compile("PUT", "/api/v1/docs/:artifactId/sections/:sectionId", handlePutDocSection),
-  compile("POST", "/api/v1/docs/:artifactId/sections", handlePostDocSection),
-  compile("DELETE", "/api/v1/docs/:artifactId/sections/:sectionId", handleDeleteDocSection),
-  compile("POST", "/api/v1/docs/:artifactId/versions/:n/restore", handlePostDocRestore),
-  compile("POST", "/api/v1/docs/:artifactId/sections/:sectionId/proposals", handlePostDocProposal),
-  compile("POST", "/api/v1/docs/proposals/:proposalId/keep", handlePostDocProposalKeep),
-  compile("POST", "/api/v1/docs/proposals/:proposalId/discard", handlePostDocProposalDiscard),
   ...DESK_FILE_ROUTES.map(([method, path, handler]) => compile(method, path, handler)),
   ...FOLDER_ROUTES.map(([method, path, handler]) => compile(method, path, handler)),
   compile("GET", "/api/v1/knowledge", handleGetKnowledge),
@@ -536,9 +493,6 @@ const routes: Route[] = [
   compile("POST", "/api/v1/agents/:agentId/publish", handlePostAgentPublish),
   compile("POST", "/api/v1/agents/:agentId/share", handlePostAgentShare),
   compile("POST", "/api/v1/agents/:agentId/product-modes", handlePostAgentProductModes),
-  compile("POST", "/api/v1/agents/draft", handlePostAgentDraft),
-  compile("POST", "/api/v1/agents", handlePostAgents),
-  compile("DELETE", "/api/v1/agents/:agentId", handleDeleteAgent),
   compile("POST", "/api/v1/agents/:agentId/generate-defaults", handlePostAgentGenerateDefaults),
   compile("GET", "/api/v1/tools", handleGetTools),
   compile("GET", "/api/v1/context", handleGetContext),

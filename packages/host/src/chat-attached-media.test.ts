@@ -26,11 +26,11 @@ const TINY_PNG =
 const GENERATE_TOOLS = ["image_generate", "video_generate"];
 
 type ExecuteInput = Parameters<AgentRuntime["execute"]>[0];
-type Seen = { modality: string; keys: string[]; output?: Record<string, unknown>; fetchCalls?: number };
+type Seen = { modality: string; keys: string[] };
 type Person = { readonly tenant: TenantContext; readonly sessionId: string };
 type Send = (method: string, path: string, body?: unknown) => Promise<HostResult>;
 
-const swap = vi.hoisted(() => ({ runtime: null as AgentRuntime | null, probeGenerate: false }));
+const swap = vi.hoisted(() => ({ runtime: null as AgentRuntime | null }));
 
 vi.mock("@agentforge/core", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@agentforge/core")>();
@@ -61,24 +61,16 @@ vi.mock("./gateway-gate", async (importOriginal) => {
 const seen: Seen[] = [];
 let router: typeof import("./router");
 let sessionStore: import("./auth/session-store").SessionStore;
-let getTool: typeof import("@agentforge/core").getTool;
 let ensureToolsRegistered: typeof import("./register-tools").ensureToolsRegistered;
 let owner: Person;
 
 function recordingRuntime(): AgentRuntime {
   return {
     async execute(input: ExecuteInput) {
-      const entry: Seen = {
+      seen.push({
         modality: input.modality,
         keys: input.bindings.map((binding) => binding.toolKey).sort(),
-      };
-      if (input.modality === "image" && swap.probeGenerate) {
-        const fetchSpy = vi.spyOn(globalThis, "fetch");
-        const tool = getTool("image_generate");
-        entry.output = (await tool?.execute({ prompt: "fix this picture" }, input.tenant)) as Record<string, unknown>;
-        entry.fetchCalls = fetchSpy.mock.calls.length;
-      }
-      seen.push(entry);
+      });
       await input.onEvent({ type: "assistant.delta", text: "ok" });
       await input.onEvent({ type: "run.completed", runId: input.runId });
     },
@@ -146,12 +138,10 @@ async function turn(send: Send, threadId: string, modality: "text" | "image"): P
 
 function clearGateEnv(): void {
   delete process.env.AGENTFORGE_SERVER;
-  delete process.env.AGENTFORGE_SHELL;
 }
 
 beforeAll(async () => {
   router = await import("./router");
-  ({ getTool } = await import("@agentforge/core"));
   ({ ensureToolsRegistered } = await import("./register-tools"));
   ensureToolsRegistered();
   const sessions = await import("./auth/session-store");
@@ -167,14 +157,12 @@ beforeAll(async () => {
 beforeEach(() => {
   seen.length = 0;
   swap.runtime = recordingRuntime();
-  swap.probeGenerate = false;
   clearGateEnv();
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
   swap.runtime = null;
-  swap.probeGenerate = false;
   clearGateEnv();
 });
 
@@ -184,30 +172,8 @@ afterAll(async () => {
   rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-describe("an attached picture on a chat turn, by shell", () => {
-  it("keeps both generate tools on a hosted enterprise turn, and a generate call waits for approval", async () => {
-    process.env.AGENTFORGE_SERVER = "1";
-    process.env.AGENTFORGE_SHELL = "enterprise";
-    swap.probeGenerate = true;
-    const send = hostedSend(owner);
-    const threadId = await chatThread(send);
-
-    const text = await turn(send, threadId, "text");
-    const attached = await turn(send, threadId, "image");
-
-    expect(text.keys).toEqual(expect.arrayContaining(GENERATE_TOOLS));
-    expect(attached.keys).toEqual(text.keys);
-    expect(attached.output).toMatchObject({ ok: true, status: "pending_approval", kind: "image" });
-    expect(typeof attached.output?.proposalId).toBe("string");
-    expect(attached.fetchCalls).toBe(0);
-
-    const proposalId = String(attached.output?.proposalId);
-    const read = jsonOf(await send("GET", `/api/v1/media/proposals/${proposalId}`));
-    expect(read.status).toBe(200);
-    expect(read.body.proposal).toMatchObject({ id: proposalId, kind: "image", status: "pending", threadId });
-  });
-
-  it("drops both generate tools on a hosted turn when the shell is not enterprise", async () => {
+describe("an attached picture on a chat turn", () => {
+  it("drops both generate tools on a hosted turn", async () => {
     process.env.AGENTFORGE_SERVER = "1";
     const send = hostedSend(owner);
     const threadId = await chatThread(send);
@@ -217,7 +183,6 @@ describe("an attached picture on a chat turn, by shell", () => {
 
     expect(text.keys).toEqual(expect.arrayContaining(GENERATE_TOOLS));
     expect(attached.keys).toEqual(text.keys.filter((key) => !GENERATE_TOOLS.includes(key)));
-    expect(attached.output).toBeUndefined();
   });
 
   it("drops both generate tools on a Personal turn, as before", async () => {
@@ -229,6 +194,5 @@ describe("an attached picture on a chat turn, by shell", () => {
 
     expect(text.keys).toEqual(expect.arrayContaining(GENERATE_TOOLS));
     expect(attached.keys).toEqual(text.keys.filter((key) => !GENERATE_TOOLS.includes(key)));
-    expect(attached.output).toBeUndefined();
   });
 });

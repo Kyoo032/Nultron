@@ -34,7 +34,6 @@ import { ApiError } from "@agentforge/core";
 import { agentService } from "./tenant";
 import { armRunStallGuard, isRunOutputEvent } from "./run-stall";
 import { knowledgeInjection } from "./knowledge";
-import { workspaceForRun, workspacePromptBlock } from "./projects/service";
 import { citedSources } from "./knowledge-cites";
 import { recordCites } from "./knowledge-graph";
 import { recordRetrievals, recordsRetrievals } from "./knowledge-retrievals";
@@ -53,7 +52,6 @@ import {
 import { redactToolEvent } from "./chat-tool-events";
 import { historyMediaPart, historyToolNote } from "./chat-history-note";
 import { ensureToolsRegistered } from "./register-tools";
-import { mediaApprovalOn } from "./media-approval/gate";
 import { recordChatRunUsage } from "./usage-record";
 import { loadSettings, loadUserLocale } from "./settings-store";
 import { defaultSelectableModel, listSelectableModels } from "./selectable-models";
@@ -65,11 +63,9 @@ import { assertChatImagesSendable, prepareChatImageHistory, type ChatTurn } from
 import { saveGeneratedImage, saveGeneratedVideo } from "./media";
 import { getRunContext, hostedRequestLocale, localeForRun, withRunContext } from "./run-context";
 import { withToolRun } from "./tool-run-context";
-import { withAttendedRun } from "./media-approval/presence";
 import type { JobEvent } from "@agentforge/core/jobs";
 import { DEFAULT_CHAT_MODALITIES, GENERALIST_WORKER_PROMPT, virtualAgentFor } from "@agentforge/core";
 import { runPolicyFor, withGeneralistWorkers } from "./virtual-agents";
-import { isPromptMadeVersion, promptMadeBudget } from "./prompt-made-agent";
 import { WORKER_STREAM_IDLE_MS, withWorkerChannel } from "./workers/worker-channel";
 import { formatPastSessionsHint } from "./session-recall";
 import { log } from "./log";
@@ -191,10 +187,7 @@ export async function* startModalityRun(options: {
     .map((part) => (part.type === "text" && typeof part.text === "string" ? part.text : ""))
     .join("\n");
   // The thread's own work card is skipped so Chat never retrieves its last reply back into itself.
-  // A chat started in a Workspace (W1) searches that Workspace's sources too, and no other Workspace's.
-  // Checked on every run (K-D22): a person who left, or an agent that was taken out, runs as an ordinary chat.
-  const projectId = workspaceForRun(options.tenant, thread.projectId ?? null, published.agent.slug);
-  const knowledge = await knowledgeInjection(options.tenant, userText, { excludeThreadId: thread.id, projectId });
+  const knowledge = await knowledgeInjection(options.tenant, userText, { excludeThreadId: thread.id });
   // Phase 4: the language of the person who sent the message, not the language the process booted
   // in. On a desk they are the same value, because `saveUserLocale` writes both; on a hosted server
   // two people on one desk each get their own, and `withRunContext` below carries it through every
@@ -217,11 +210,7 @@ export async function* startModalityRun(options: {
     model,
     // A mode agent has the last word on who is speaking, after the desk's Soul block (`closingPrompt`).
     systemPrompt: withChatOutputLanguage(
-      agentPrompt +
-        workspacePromptBlock(options.tenant, projectId) +
-        pastHint +
-        knowledge.prompt +
-        (agentPolicy?.closingPrompt ?? ""),
+      agentPrompt + pastHint + knowledge.prompt + (agentPolicy?.closingPrompt ?? ""),
       locale,
     ),
   };
@@ -401,7 +390,6 @@ export async function* startModalityRun(options: {
         if (row.role === "assistant" && !hasModelVisibleContent(parts)) {
           continue;
         }
-        // An assistant turn's stored media is named by reference, so a later turn can edit it (chat-history-note.ts).
         const media = row.role === "assistant" ? historyMediaPart(parts) : null;
         const modelParts = modelHistoryParts(parts);
         storedHistory.push({
@@ -500,8 +488,8 @@ export async function* startModalityRun(options: {
       };
       const inChatRun = <T>(fn: () => Promise<T>): Promise<T> =>
         withToolRun({ runId: run.id, mode: agentPolicy ? agentPolicy.agent.id : "chat" }, () =>
-          withRunContext({ threadId: thread.id, agentId: thread.agentId, locale, projectId }, () =>
-            withWorkerChannel(workerChannel, () => withAttendedRun(fn)),
+          withRunContext({ threadId: thread.id, agentId: thread.agentId, locale }, () =>
+            withWorkerChannel(workerChannel, fn),
           ),
         );
       const attempt = () =>
@@ -517,18 +505,13 @@ export async function* startModalityRun(options: {
             modality: options.modality,
             version: activeVersion,
             bindings: agentPolicy
-              ? bindingsForChatModality(agentPolicy.bindings, options.modality, {
-                  keepGenerateTools: mediaApprovalOn(),
-                })
+              ? bindingsForChatModality(agentPolicy.bindings, options.modality)
               : bindingsForChatModality(
                   // The default agent can run every wired harness from its own chat, hired or not.
                   defaultChat
                     ? withGeneralistWorkers(withPastSessionsBinding(published.bindings))
-                    : isPromptMadeVersion(published.version)
-                      ? published.bindings
-                      : withPastSessionsBinding(published.bindings),
+                    : withPastSessionsBinding(published.bindings),
                   options.modality,
-                  { keepGenerateTools: mediaApprovalOn() },
                 ),
             // The default agent's budget is Chat's declared one plus a ceiling for each worker; a mode
             // agent's is its own; an agent the owner built keeps the runtime's.
@@ -536,9 +519,7 @@ export async function* startModalityRun(options: {
               ? { budget: agentPolicy.budget }
               : defaultChat
                 ? { budget: virtualAgentFor("chat").budget }
-                : isPromptMadeVersion(published.version)
-                  ? promptMadeBudget(published.version)
-                  : {}),
+                : {}),
             history,
             thinking: thinkingEnabled,
             reasoningEffort,

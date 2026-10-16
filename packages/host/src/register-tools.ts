@@ -9,11 +9,9 @@ import { registerFileTools, setFileRootResolver } from "@agentforge/core/tools/f
 import { registerUniversityTools } from "@agentforge/university";
 import { registerCodeTools } from "./code-runner";
 import { registerDeckTools } from "./deck";
-import { registerDocTools } from "./doc-tools";
 import { resolveHostFileRoot } from "./file-roots";
 import { knowledgeSearchTool } from "./knowledge-search-tool";
 import { marketTools } from "./market/tools";
-import { gatedImageGenerateTool, gatedVideoGenerateTool } from "./media-approval/gated-tools";
 import { pastSessionsTool } from "./session-tools";
 import { localeForRun } from "./run-context";
 import { selfCheckTool } from "./self-check-tool";
@@ -28,8 +26,6 @@ export function ensureToolsRegistered(): void {
     return;
   }
   registerPlatformTools();
-  registerTool(gatedImageGenerateTool());
-  registerTool(gatedVideoGenerateTool());
   registerUniversityTools();
   registerTool(pastSessionsTool);
   registerTool(runSqlTool);
@@ -43,7 +39,6 @@ export function ensureToolsRegistered(): void {
   registerCodeTools();
   registerTool(selfCheckTool);
   registerDeckTools();
-  registerDocTools();
   // Tester code: a mode harness as a tool of its own agent's conversation (`workers/`).
   registerTool(researchDossierTool);
   registered = true;

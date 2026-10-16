@@ -19,7 +19,6 @@ import {
 } from "@agentforge/core";
 import { getLocalVaultKey } from "@agentforge/db/vault-key";
 import { withCodeRunPolicy } from "./code-runner/enabled";
-import { parseGatewayAdminRecord, type GatewayAdminRecord } from "./gateway-tokens/admin-record";
 import { parseKeyLaterRecord, type KeyLaterRecord } from "./key-later";
 import { readSelectedWorkspaceId } from "./workspace";
 import { assertTenantId, tenantDataDir } from "./tenant-paths";
@@ -191,8 +190,6 @@ function tryDeleteLegacyPlaintext(tenantId: string): void {
  */
 type UserPrefs = { locale?: AppLocale; guide?: GuideRecord; keyLater?: KeyLaterRecord };
 
-type CompanyPrefs = { gatewayAdmin?: GatewayAdminRecord };
-
 type SettingsFileV2 = {
   version: 2;
   /**
@@ -202,7 +199,6 @@ type SettingsFileV2 = {
    */
   locale?: AppLocale;
   users?: Record<string, UserPrefs>;
-  companies?: Record<string, CompanyPrefs>;
   workspaces: Record<string, StoredSecrets>;
 };
 
@@ -273,34 +269,15 @@ function usersMap(value: unknown): Record<string, UserPrefs> | undefined {
   return Object.keys(next).length > 0 ? next : undefined;
 }
 
-function companiesMap(value: unknown): Record<string, CompanyPrefs> | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
-  }
-  const next: Record<string, CompanyPrefs> = {};
-  for (const [companyId, prefs] of Object.entries(value as Record<string, unknown>)) {
-    if (!companyId.trim() || !prefs || typeof prefs !== "object") {
-      continue;
-    }
-    const gatewayAdmin = parseGatewayAdminRecord((prefs as CompanyPrefs).gatewayAdmin);
-    if (gatewayAdmin) {
-      next[companyId] = { gatewayAdmin };
-    }
-  }
-  return Object.keys(next).length > 0 ? next : undefined;
-}
-
 function parseSettingsFile(decrypted: unknown): { file: SettingsFileV2; migrated: boolean } {
   if (isSettingsFileV2(decrypted)) {
     const source = decrypted as SettingsFileV2;
     const users = usersMap(source.users);
-    const companies = companiesMap(source.companies);
     return {
       file: {
         version: 2,
         locale: readLocaleField(source.locale),
         ...(users ? { users } : {}),
-        ...(companies ? { companies } : {}),
         workspaces: secretsMap(decrypted.workspaces as Record<string, unknown>),
       },
       migrated: false,
@@ -339,9 +316,8 @@ function sliceFor(file: SettingsFileV2, workspaceId: string): StoredSecrets {
   if (own) {
     return own;
   }
-  const legacy = file.workspaces[LEGACY_SETTINGS_WORKSPACE];
-  if (workspaceId === FALLBACK_SETTINGS_WORKSPACE && legacy) {
-    return legacy;
+  if (workspaceId === FALLBACK_SETTINGS_WORKSPACE && file.workspaces[LEGACY_SETTINGS_WORKSPACE]) {
+    return file.workspaces[LEGACY_SETTINGS_WORKSPACE]!;
   }
   return {};
 }
@@ -530,7 +506,10 @@ export function saveSettings(patch: SecretPatch, scope?: SettingsScope): StoredS
 }
 
 /** The provider key fields a hosted save carries to a company's other desks (SR-163). Nothing else travels. */
-export type CompanyKeyPatch = Pick<SecretPatch, "openaiApiKey" | "googleApiKey" | "anthropicApiKey" | "volcengineApiKey">;
+export type CompanyKeyPatch = Pick<
+  SecretPatch,
+  "openaiApiKey" | "googleApiKey" | "anthropicApiKey" | "volcengineApiKey"
+>;
 
 /**
  * Hosted only (SR-163, review round). On the server a provider key belongs to the company, not to the
@@ -545,7 +524,11 @@ export type CompanyKeyPatch = Pick<SecretPatch, "openaiApiKey" | "googleApiKey" 
  * keeps no key of its own on the server, which is why this is not offered on a desk: there the owner's
  * desks are separate on purpose and `saveSettings` stays desk-scoped.
  */
-export function saveKeysToDesks(keys: CompanyKeyPatch, scope: SettingsScope, workspaceIds: readonly string[]): string[] {
+export function saveKeysToDesks(
+  keys: CompanyKeyPatch,
+  scope: SettingsScope,
+  workspaceIds: readonly string[],
+): string[] {
   const { tenantId } = resolveSettingsScope(scope);
   const patch: CompanyKeyPatch = {
     openaiApiKey: keys.openaiApiKey,
@@ -794,50 +777,6 @@ export function saveUserKeyLater(scope: UserScope, now: number = Date.now()): Ke
   const users = { ...(file.users ?? {}), [userId]: { ...(file.users?.[userId] ?? {}), keyLater: record } };
   persistEncrypted(tenantId, { ...file, version: 2, users });
   return record;
-}
-
-export type CompanyScope = Pick<TenantContext, "tenantId" | "organizationId">;
-
-function companyIdOf(scope: CompanyScope): string {
-  const organizationId = typeof scope.organizationId === "string" ? scope.organizationId : "";
-  if (organizationId.trim().length === 0) {
-    throw new ApiError("company_required", "This needs the company's own id.", 500);
-  }
-  return organizationId;
-}
-
-export function loadCompanyGatewayAdmin(scope: CompanyScope): GatewayAdminRecord | null {
-  const tenantId = assertTenantId(scope.tenantId);
-  return loadSettingsFile(tenantId).companies?.[companyIdOf(scope)]?.gatewayAdmin ?? null;
-}
-
-export function saveCompanyGatewayAdmin(scope: CompanyScope, record: GatewayAdminRecord): GatewayAdminRecord {
-  const tenantId = assertTenantId(scope.tenantId);
-  const companyId = companyIdOf(scope);
-  const file = loadSettingsFile(tenantId);
-  const companies = {
-    ...(file.companies ?? {}),
-    [companyId]: { ...(file.companies?.[companyId] ?? {}), gatewayAdmin: record },
-  };
-  persistEncrypted(tenantId, { ...file, version: 2, companies });
-  return record;
-}
-
-export function clearCompanyGatewayAdmin(scope: CompanyScope): void {
-  const tenantId = assertTenantId(scope.tenantId);
-  const companyId = companyIdOf(scope);
-  const file = loadSettingsFile(tenantId);
-  if (!file.companies?.[companyId]) {
-    return;
-  }
-  const { companies: previous, ...others } = file;
-  const remaining = { ...(previous ?? {}) };
-  delete remaining[companyId];
-  persistEncrypted(tenantId, {
-    ...others,
-    version: 2,
-    ...(Object.keys(remaining).length > 0 ? { companies: remaining } : {}),
-  });
 }
 
 /** Test seam: forget every decrypted payload so a suite can rewrite the store underneath. */

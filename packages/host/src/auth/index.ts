@@ -278,8 +278,8 @@ export function hostAuthRoutes(): AuthRoutes {
     // import — must not be pulled in statically from here.
     // The identity carries the portal's role (`null` for none); `ensurePortalOwner` writes exactly it.
     provision: async (identity) => {
-      const { provisionPortalDesk } = await import("../portal-first-desk");
-      return provisionPortalDesk(identity);
+      const { db, ensurePortalOwner } = await import("@agentforge/db");
+      return ensurePortalOwner(db, identity);
     },
     // Phase 5 lane B. Dynamic for the same reason `provision` is: `entitlement-db.ts` imports
     // `@agentforge/db`, which opens SQLite at import, and the desktop imports this module without
