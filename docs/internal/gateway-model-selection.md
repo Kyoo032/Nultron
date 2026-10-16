@@ -1,8 +1,8 @@
-# TokenKu AI Model Selection Guide (for agents)
+# Gateway Model Selection Guide (for agents)
 
-**Gateway:** `https://api.tokenku.ai/v1` (legacy host `api.tokotokenai.com/v1`, same catalog) · **Catalog snapshot:** `v1-models.json`, 170 ids · **Research date:** 2026-09-13 · **Audience:** LLM agents and routers choosing a `model` id per task.
+**Gateway:** `https://api.tokotokenai.com/v1` · **Catalog snapshot:** `v1-models.json`, 170 ids · **Research date:** 2026-09-13 · **Audience:** LLM agents and routers choosing a `model` id per task.
 
-This document replaces the keyword heuristic ("if id contains `flash` → Fast drafts", etc.). Keywords misroute: `pro` puts `gpt-5.5-pro` (a slow, $30/$180 deep-reasoning tier) into "Long documents"; `flash` hides `gemini-3.5-flash` (a frontier-class model) in "Fast drafts"; `MiniMax-M3` is a cheap fast agentic model, not a deep-reasoning flagship; `Doubao Seed 1.6 Thinking` is not even in the catalog. Every claim below comes from vendor docs/pricing pages or reputable trackers (Artificial Analysis, OpenRouter) checked on the research date; anything not verifiable is marked **[unverified]**. Full per-model records with source URLs live in the companion `tokenku-models-catalog.json`.
+This document replaces the keyword heuristic ("if id contains `flash` → Fast drafts", etc.). Keywords misroute: `pro` puts `gpt-5.5-pro` (a slow, $30/$180 deep-reasoning tier) into "Long documents"; `flash` hides `gemini-3.5-flash` (a frontier-class model) in "Fast drafts"; `MiniMax-M3` is a cheap fast agentic model, not a deep-reasoning flagship; `Doubao Seed 1.6 Thinking` is not even in the catalog. Every claim below comes from vendor docs/pricing pages or reputable trackers (Artificial Analysis, OpenRouter) checked on the research date; anything not verifiable is marked **[unverified]**. Full per-model records with source URLs live in a companion per-model catalog.
 
 **Update 2026-09-30:** the gateway's catalogue moved (GPT 6 Luna and Sol, Claude 5.5, DeepSeek V4.1 Flash, `hy3`) and the product's recommendations moved with it. Sections 1 to 9 below are the 2026-09-13 research, kept as history; the live list, the gateway's prices, the probe verdicts and the new recommendation lists are in **Section 10**, at the end.
 
@@ -14,7 +14,7 @@ This document replaces the keyword heuristic ("if id contains `flash` → Fast d
 4. For anything not text-in/text-out (image, video, audio, embeddings, translation, GUI), go to Section 5.
 5. Section 6 is the full 170-id index; Section 7 is the deprecation calendar; Section 8 is what was **not** verifiable.
 
-Prices quoted are the **upstream vendor list price, USD per 1M tokens (input/output)**, used only for *relative* ranking. TokenKu bills its own rates (currently a flat −10% off the TokenKu base price for all models) — read the actual price from the TokenKu pricing page, not from here. Speed figures are third-party medians on the vendor's own API; the gateway adds proxy latency and may route some models through a different host than the vendor (see `owned_by` caveat in Section 2.2).
+Prices quoted are the **upstream vendor list price, USD per 1M tokens (input/output)**, used only for *relative* ranking. The gateway bills its own rates; read the actual price from its pricing page, not from here. Speed figures are third-party medians on the vendor's own API; the gateway adds proxy latency and may route some models through a different host than the vendor (see `owned_by` caveat in Section 2.2).
 
 ---
 
@@ -177,7 +177,7 @@ Text models exposing both `openai` and `anthropic` can be driven by either SDK. 
 
 ### 2.2 `owned_by` is a routing label, not the vendor
 
-`owned_by=ali` means "served via Alibaba Cloud Model Studio" — that is where TokenKu sources DeepSeek, GLM 5.2, Kimi K2.x, MiniMax and Qwen. `owned_by=openai` is applied to `kimi-k3`, `glm-5.3`, `glm-5.3-flash`, `gpt-oss-120b`, Grok Imagine, HappyHorse, Midjourney, Suno, Veo and `nano-banana*` — none of which are OpenAI models. `owned_by=doubaovideo` / `volcengine` are the two ByteDance routes (CN Ark snapshot-pinned vs. BytePlus international alias); `mimo-v2.5-asr` is Xiaomi, mislabeled `volcengine`. Consequences: upstream-only behaviours (e.g. DeepSeek's V4-Pro → V4.1-Flash remap, Alibaba region-locked features like function calling on `qwen3-coder-flash`) may or may not apply on TokenKu's route — **[unverified]** per model; test before relying on it.
+`owned_by=ali` means "served via Alibaba Cloud Model Studio" — that is where the gateway sources DeepSeek, GLM 5.2, Kimi K2.x, MiniMax and Qwen. `owned_by=openai` is applied to `kimi-k3`, `glm-5.3`, `glm-5.3-flash`, `gpt-oss-120b`, Grok Imagine, HappyHorse, Midjourney, Suno, Veo and `nano-banana*` — none of which are OpenAI models. `owned_by=doubaovideo` / `volcengine` are the two ByteDance routes (CN Ark snapshot-pinned vs. BytePlus international alias); `mimo-v2.5-asr` is Xiaomi, mislabeled `volcengine`. Consequences: upstream-only behaviours (e.g. DeepSeek's V4-Pro → V4.1-Flash remap, Alibaba region-locked features like function calling on `qwen3-coder-flash`) may or may not apply on the gateway's route — **[unverified]** per model; test before relying on it.
 
 ### 2.3 Alias vs pinned snapshot
 
@@ -194,7 +194,7 @@ Text models exposing both `openai` and `anthropic` can be driven by either SDK. 
 - **Full native structured outputs + tools:** all OpenAI GPT-5.x/6 text models except `gpt-5.4-pro`; all Claude; all Gemini text; Qwen hosted plus/flash/max; DeepSeek, GLM, Kimi, MiniMax; Seed 2.x.
 - **Tools but no JSON-schema mode:** `qwen3.5-omni-*-realtime`, `qwen-audio-3.0-realtime-*`.
 - **Neither:** `qwen3.5-omni-plus`/`-flash` (non-realtime), `qwen3.5-ocr`, `qwen-mt-*`, media models.
-- **Region-locked upstream (Beijing-only function calling):** `qwen3-coder-flash`, `qwen-flash` — [unverified] on TokenKu.
+- **Region-locked upstream (Beijing-only function calling):** `qwen3-coder-flash`, `qwen-flash` — [unverified] on the gateway.
 - **Sampling params rejected:** Claude 4.7+ (incl. Sonnet 5, Opus 5, Fable) return 400 on non-default `temperature`/`top_p`/`top_k`. Don't send them.
 - **Streaming not supported:** `gpt-5.4-pro`, `gpt-5.5-pro`. **Streaming required:** all `qwen*-omni*` calls.
 - **Forced `tool_choice` broken:** `claude-fable-5-1` (per Anthropic release notes) — use auto tool choice.
@@ -390,7 +390,7 @@ Pricing here is per image or per image-token, not per text token. Ordered best-q
 | `gpt-image-2.5-sunburst` | OpenAI | Highest quality / edit precision (2026-09-08) | $5 text-in / $8 img-in / $30 img-out per 1M tokens (2x gpt-image-2); quality `low`…`max`/`auto` | Precise edits, complex compositions |
 | `gpt-image-2.5-flare` | OpenAI | Fast default of the 2.5 line, ~50% lower latency than 2 | same pricing as Sunburst; generation-only on gateway | Default OpenAI image gen |
 | `gpt-image-2` | OpenAI | 2026-04; reasoning/planning step, native 2K, multilingual text | $2.50 / $4 / $15; generation **and** `/images/edits` | Cheaper than 2.5; only OpenAI id with edit endpoint |
-| `gpt-image-2-count` | OpenAI (gateway alias) | Same model, per-image ("count") billing [unverified] | — | If TokenKu bills per image rather than per token |
+| `gpt-image-2-count` | OpenAI (gateway alias) | Same model, per-image ("count") billing [unverified] | — | If the gateway bills per image rather than per token |
 | `nano-banana-pro` = `gemini-3-pro-image-preview` | Google | Gemini 3 Pro Image — reasoning-driven, best text-in-image/infographics | $0.134 (1–2K) – $0.24 (4K) per image; **preview id shut down upstream 2026-06-25** — use `nano-banana-pro` | Text-heavy, infographics, highest fidelity |
 | `nano-banana-2` = `gemini-3.1-flash-image-preview` | Google | Gemini 3.1 Flash Image — fast, thinking + grounding | $0.067 (1K) – $0.151 (4K); 131K ctx | Default Google image gen |
 | `gemini-3.1-flash-lite-image` | Google | Nano Banana 2 Lite — fastest/cheapest Gemini image (2026-06) | $0.0336/image, 1K only, sub-2 s target | Volume thumbnails |
@@ -667,24 +667,24 @@ Legend — **Gen:** latest / current / previous / legacy / deprecated / preview.
 
 ## 8. What could not be verified (do not assume)
 
-- `gpt-oss-120b`: not served by api.openai.com; TokenKu's host, price and throughput unknown.
+- `gpt-oss-120b`: not served by api.openai.com; the gateway's host, price and throughput unknown.
 - `gpt-image-2-count`: hypothesised per-image billing alias of `gpt-image-2`.
 - `omni-fast`, `omni-fast-v2v`: no upstream match; Gemini Omni Flash is the best guess.
 - `dreamina-seedance-2-0-ep`, `dreamina-seedance-2-0-fast-ep`: hypothesised provisioned-endpoint routes to the same 260128 weights.
 - `mj_upsample_action`: not in the standard New API action map; likely the post-upscale "Upscale Subtle/Creative/2x/4x" buttons.
 - `glm-5.2-fast-preview`: release date and USD price (Model Studio lists CNY 16/56 ≈ $2.20/$7.80; AIMLAPI resells at $4.55/$14.30).
-- `deepseek-v4-flash` on TokenKu: whether the Alibaba-hosted (`owned_by=ali`) route mirrors DeepSeek's own V4.1-Flash remap or still serves original V4-Flash weights.
+- `deepseek-v4-flash` on the gateway: whether the Alibaba-hosted (`owned_by=ali`) route mirrors DeepSeek's own V4.1-Flash remap or still serves original V4-Flash weights.
 - Qwen: `qwen3-max` USD price (used AA's $1.20/$6.00); `qwen3.5-ocr`, `qwen3-vl-embedding`, `qwen3-vl-rerank` have China-region pricing only; livetranslate ids have no USD price; `qwen-flash-character` release date.
 - ByteDance: no official USD price card for Seed 2.1 — figures are CNY conversions; official Volcengine pages are JS-rendered and were read via the rendered AI Hub page and third-party trackers.
 - Anthropic benchmark scores are published as images — exact numbers omitted.
-- All speed figures are vendor-API medians (Artificial Analysis / OpenRouter), not TokenKu measurements.
+- All speed figures are vendor-API medians (Artificial Analysis / OpenRouter), not gateway measurements.
 - Gateway behaviour for region-locked features (Alibaba Beijing-only function calling on `qwen3-coder-flash`, `qwen-flash`; `gui-plus` Beijing-only).
 
 ---
 
 ## 9. Sources
 
-Primary documentation consulted (per-model URLs are in `tokenku-models-catalog.json` → `sources`):
+Primary documentation consulted (per-model URLs are in the companion catalog → `sources`):
 
 - OpenAI: developers.openai.com/api/docs/models (per-model pages for gpt-6-astra, gpt-5.6-sol/terra/luna, gpt-5.5, gpt-5.5-pro, gpt-5.4*, gpt-5.3-codex, gpt-5.2, gpt-5-mini/nano, gpt-4.1*, gpt-4o*, gpt-image-2/2.5), openai.com/api/pricing, OpenAI deprecations page, openai.com news (GPT-6 Astra, GPT-5.6, GPT-Image-2.5), huggingface.co/openai/gpt-oss-120b.
 - Anthropic: platform.claude.com/docs (models overview, pricing, model deprecations, extended/adaptive thinking, effort), anthropic.com/news (Opus 5, Sonnet 5, Fable 5 / 5.1, Opus 4.6–4.8).

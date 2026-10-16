@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { media } from "@agentforge/db";
 import { db } from "@agentforge/db";
 import type { TenantContext } from "@agentforge/core";
@@ -84,7 +84,11 @@ export function ensureGenerateSubmitWired(): void {
   });
 }
 
-export async function loadMediaRow(mediaId: string) {
-  const rows = await db.select().from(media).where(eq(media.id, mediaId)).limit(1);
+export async function loadMediaRow(mediaId: string, organizationId: string) {
+  const rows = await db
+    .select()
+    .from(media)
+    .where(and(eq(media.organizationId, organizationId), eq(media.id, mediaId)))
+    .limit(1);
   return rows[0] ?? null;
 }

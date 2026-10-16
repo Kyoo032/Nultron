@@ -109,7 +109,6 @@ describe("meeting locale JSON", () => {
 
   it("keeps brand names untranslated in id", () => {
     const raw = readFileSync(resolve(localesDir, "id", "meeting.json"), "utf8");
-    expect(raw).not.toMatch(/TokenKu/);
   });
 });
 

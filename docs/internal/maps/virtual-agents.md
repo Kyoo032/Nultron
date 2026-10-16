@@ -16,7 +16,7 @@ A virtual agent is a person-facing worker on the desk with its own conversations
 
 **Every agent is a full chat.** The owner's words, 2026-10-09, in the order he gave them:
 
-1. "the default mode needs to be nultron or for HYP AI the default mode or the default virtual agents has to be Hypey, take notes and check again"
+1. "the default mode needs to be nultron [...] take notes and check again"
 2. "the chat agents need to be able to do anything inside their chat, they dont have to create a new virtual agents to be able to generate image or videos"
 3. "not just default agents, all virtual agents able to do everything, its a chat mode now, with model picker and enhance mode, can generate images, videos and all kind of docs, or even build somethings"
 
@@ -116,7 +116,7 @@ Driven 2026-10-09 on a brand that names no separate character: the ping carried 
 - `webapp-deploy/.env.example:87-93` lists `AGENTFORGE_GATEWAY_NAME` and `AGENTFORGE_PRODUCT_NAME` and not `AGENTFORGE_ASSISTANT_NAME`. A hosted brand has to know to set it.
 - A desk that already stored its Soul keeps the stored name. `getSoul` returns `defaultSoul()` only when the desk has no row, or the row is the old "Forge" default (`packages/host/src/knowledge.ts:143-157`). On such a desk the rail and the greeting follow the setting, and the name the model is told does not.
 
-These two steps are owed before a branded flavor, such as HYP AI's own repo, shows its own character. Shared code and copy hold no brand literal.
+These two steps are owed before a branded flavor shows its own character. Shared code and copy hold no brand literal.
 
 ### 6. Hiring and letting go
 

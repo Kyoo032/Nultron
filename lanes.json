@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "about": "Ownership manifest read by scripts/lane-guard.mjs. Its never-promote (neverPromote), protected and brand rules block; the map rule only advises. Each entry maps a path glob to the map page that describes it, the lanes the path reaches, and whether it is protected. Lanes: personal (Nultron Personal, retired), enterprise (the hosted app), tester (agentforge-chat, tester/chat-first). HYP AI is its own repo since 2026-10-15 and has no lane here. A file may match several entries: its map pages are the union, it is protected if any match is. 'map: null' means no map check. Not in this repo: HYP AI's Cloudflare edge and password-mode deploy live in HYP AI's own repo. Plan: docs/internal/white-label-and-agent-guardrails-plan.md. Map: docs/internal/maps/release-and-sync-lanes.md.",
-  "brandLiterals": ["Nultron", "Toko Token", "TokenKu", "HYP AI", "Hypey"],
+  "about": "Ownership manifest read by scripts/lane-guard.mjs. Its never-promote (neverPromote), protected and brand rules block; the map rule only advises. Each entry maps a path glob to the map page that describes it, the lanes the path reaches, and whether it is protected. Lanes: personal (Nultron Personal, retired), enterprise (the hosted app), tester (agentforge-chat, tester/chat-first). A file may match several entries: its map pages are the union, it is protected if any match is. 'map: null' means no map check. Plan: docs/internal/white-label-and-agent-guardrails-plan.md. Map: docs/internal/maps/release-and-sync-lanes.md.",
+  "brandLiterals": ["Nultron", "Toko Token"],
   "brandScope": {
     "include": ["apps/web/**", "packages/**"],
     "exclude": [
@@ -474,7 +474,7 @@
       "map": "docs/internal/maps/webapp-deploy.md",
       "lanes": ["enterprise"],
       "protected": false,
-      "note": "Nultron Enterprise deploy stack (direct, two names, own certificates). Never carry HYP AI's Cloudflare edge into it; HYP AI is its own repo now, and that edge lives there, not here."
+      "note": "Nultron Enterprise deploy stack (direct, two names, own certificates). It uses no Cloudflare edge."
     },
     {
       "glob": "scripts/release-web*.mjs",

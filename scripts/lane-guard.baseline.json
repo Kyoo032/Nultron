@@ -1,10 +1,7 @@
 {
   "literals": [
     "Nultron",
-    "Toko Token",
-    "TokenKu",
-    "HYP AI",
-    "Hypey"
+    "Toko Token"
   ],
   "files": {
     "apps/web/app/globals.css": {

@@ -219,6 +219,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-183](#sr-183) | Medium | Hosted (tester): the company gateway management token is the credential that changes the company's gateway tokens; a leak of it, or of the wrap key that seals it, lets its holder act on any token of that gateway account, and the platform limits only the tokens it created itself | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
 | [SR-185](#sr-185) | Medium | Hosted (tester): after the OPC strip, the kept original of a file attached in Chat was readable by every member of the company | Contained in the tester (2026-10-16): no original is kept in server mode; Rizky to choose the lasting option | Before the tester is promoted to `main` |
 | [SR-177](#sr-177) | Low | The new deploy preflight, run in a throwaway container when the server has no node, received the real `AGENTFORGE_SECRETS_KEY` | Fixed before merge (branch `chore/agent-guardrails`, 2026-10-14): the container gets the word `set` or nothing | — |
+| [SR-184](#sr-184) | Low | Edit's output lookup (`loadMediaRow`) read a media row by id with no organization filter | Fixed on branch `fix/media-row-company` (2026-10-15): filtered on the project's organization; unit-tested, not driven | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -6238,6 +6239,24 @@ Residual:
 6. Clearing the token (DELETE) removes only the sealed slot. The platform's rows in `gateway_managed_tokens` and the gateway tokens they name stay where they are, and a new token that passes the check manages them again (`clearCompanyGatewayAdmin`, `packages/host/src/settings-store.ts:825-841`). Nothing deletes them on the gateway.
 
 Gate: before the first live token-API call (Rizky's go, and Hypernet's word for TokenKu production), and before HYP AI imports from the tester.
+
+### SR-184 {#sr-184}
+
+**Edit's output lookup read a media row by id alone, with no organization filter.**
+Raised 2026-10-15 while moving the tester's media reads back onto `main`'s. Low: defence in depth. Related: SR-175.
+
+Evidence: `loadMediaRow(mediaId)` in `packages/host/src/edit/wire-generate.ts:84-87` selected `media` on
+`eq(media.id, mediaId)` only, and `resolveGenerateAsset` in `packages/host/src/edit/jobs.ts:290` used the row's
+`storagePath` to add an asset to the job's project. Every other by-id media read on `main` (`statMedia`,
+`readMediaDataUrl`, the file and delete routes) filters on the caller's `organizationId`. The id comes from the
+job's own generate result, not from a request, so no caller is known to reach another company's row today;
+the gap is that nothing would stop one if that changed.
+
+Fix: `loadMediaRow(mediaId, organizationId)` filters on both, and the job runner passes the project's
+organization from `workerProjectScope`. `packages/host/src/edit/load-media-row.test.ts` proves the own
+organization's row loads and another organization's does not.
+
+Gate: none.
 
 ### SR-185 {#sr-185}
 

@@ -13,8 +13,7 @@ Turn the push guard on once per clone with `pnpm hooks:install`. It writes `core
 
 - **Stage (Rizky, 2026-10-14).** The tester is the staging code at every stage.
 - **Staging instance.** Nultron's tester stages on the tester's staging subdomain (name pending). `TESTER.md`, "Staging instance", has the detail.
-- **HYP AI.** Its own repo since 2026-10-15 (`Kyoo032/hyp-ai`, folder `C:\Users\rizky\hyp-ai`). It takes no import, vendor sync or merge from this repo. Its server, domain, accounts, edge and team rules are in that repo's `AGENTS.md`, not here.
-- **The tester is OPC only (Rizky, 2026-10-15; stripped 2026-10-16, repo split P5b).** The team board, collective Workspaces, versioned documents and the document tools, quota and the company gateway management token, the enterprise shell, prompt-made agents, people names, paid media approval and per-person file privacy were removed from `tester/chat-first`. What stays there beyond `main`: the chat-first bots shell, the four model choices (K-D31, on the `opc` profile), stored pictures as input (F3) and chat upload originals (U1). Their old tables stay orphaned in existing databases, with no DROP. Do not build any of the removed features here; they are HYP AI's.
+- **The tester is OPC only (Rizky, 2026-10-15; stripped 2026-10-16, repo split P5b).** The team board, collective Workspaces, versioned documents and the document tools, quota and the company gateway management token, the enterprise shell, prompt-made agents, people names, paid media approval and per-person file privacy were removed from `tester/chat-first`. What stays there beyond `main`: the chat-first bots shell, the four model choices (K-D31, on the `opc` profile), stored pictures as input (F3) and chat upload originals (U1). Their old tables stay orphaned in existing databases, with no DROP. Do not build any of the removed features here.
 
 ## Where a change goes
 
@@ -30,10 +29,10 @@ Never: a fix pull request from `tester/chat-first`; a release from `C:\Users\riz
 
 ## Which product a change reaches
 
-Since the 2026-10-15 split this repo is Nultron only. Shared code reaches Nultron and the tester. HYP AI is its own repo and takes nothing from here.
+Since the 2026-10-15 split this repo is Nultron only. Shared code reaches Nultron and the tester.
 
 - `engine` or `ui`: Nultron (OPC) and the tester. Tests must pass for the OPC profile.
-- `opc`: Nultron only. `sme`: HYP AI's own repo, which takes nothing from here.
+- `opc`: Nultron only.
 - Shared code names no brand.
 
 **The vision (Rizky, 2026-10-05): everyone has all their workers inside one desk.**
@@ -58,13 +57,13 @@ Each worker is a mode whose harness is already built in: prompt, tools, skills, 
 - Show the result first. Keep advanced controls under "More", and run a paid step only on the user's Run.
 - Keep every worker on the same desk, reachable from the rail, with one sign-in and one key.
 - Make every worker hand off to the others: research to a deck, a contract's facts to a memo.
-- A desk serves one owner and that owner's agents (the OPC, 2026-10-14). People and agents working together as a team is HYP AI's product, built in its own repo.
+- A desk serves one owner and that owner's agents (the OPC, 2026-10-14). Team features (a board, shared Workspaces, people working beside agents) are not built here.
 
-**Read [`docs/internal/release-targets.md`](docs/internal/release-targets.md) first.** It lists every release target built from this repo: Nultron Personal, Nultron Enterprise, and the desktop flavors. The HYP AI white-label for Hypernet is no longer built from here (its own repo since 2026-10-15). For each one it gives the type, company, codebase, services, how it ships and what is running now. Name the target your task serves before you edit, and stop if the change lands on another one.
+**Read [`docs/internal/release-targets.md`](docs/internal/release-targets.md) first.** It lists every release target built from this repo: Nultron Personal, Nultron Enterprise, and the desktop flavors. For each one it gives the type, company, codebase, services, how it ships and what is running now. Name the target your task serves before you edit, and stop if the change lands on another one.
 
-**Changed 2026-10-14 (Rizky): Nultron is the OPC, HYP AI is the SME, and the desktop app is retired.** Nultron is a one-person company whose agents work together 24/7 for one owner, running in a VPS; HYP AI is the small or medium company where people and agents work together through projects and a kanban board. Nultron Personal (the Electron app) is retired into the web app: its release repo is now `Kyoo032/Nultron-Desktop`, archived, and the old `Kyoo032/NultronEnt` was renamed to `Kyoo032/Nultron` (private), the web app's release repo (`RELEASE_REPO` in `scripts/release-web.mjs`). No desktop code is removed yet. The proposed codebase shape is in `docs/internal/opc-sme-architecture.md` (branch `docs/opc-sme-architecture`, awaiting Rizky's approval). Sentences below that describe Personal as a shipping product, or name `NultronEnt`, are history from before this change.
+**Changed 2026-10-14 (Rizky): Nultron is the OPC, and the desktop app is retired.** Nultron is a one-person company whose agents work together 24/7 for one owner, running in a VPS. Nultron Personal (the Electron app) is retired into the web app: its release repo is now `Kyoo032/Nultron-Desktop`, archived, and the old `Kyoo032/NultronEnt` was renamed to `Kyoo032/Nultron` (private), the web app's release repo (`RELEASE_REPO` in `scripts/release-web.mjs`). No desktop code is removed yet. Sentences below that describe Personal as a shipping product, or name `NultronEnt`, are history from before this change.
 
-**Changed 2026-10-15 (Rizky): the repo split.** The web app's release repo is `Kyoo032/Nultron-Releases` (`RELEASE_REPO`), renamed from `Kyoo032/Nultron`. After that rename the source repo `Kyoo032/agentforge` becomes `Kyoo032/Nultron`, for the OPC only, and HYP AI moves to its own independent repo. The pre-push guard judges a remote named `agentforge` or `nultron`, and `pnpm where` also takes folders named `nultron` and `nultron-<topic>`. Image names and `AGENTFORGE_*` names are unchanged. Sentences below that call `Kyoo032/Nultron` or `Kyoo032/NultronEnt` the release repo are history from before this change.
+**Changed 2026-10-15 (Rizky): the repo split.** The web app's release repo is `Kyoo032/Nultron-Releases` (`RELEASE_REPO`), renamed from `Kyoo032/Nultron`. After that rename the source repo `Kyoo032/agentforge` becomes `Kyoo032/Nultron`, for the OPC only; company and team features left this repo. The pre-push guard judges a remote named `agentforge` or `nultron`, and `pnpm where` also takes folders named `nultron` and `nultron-<topic>`. Image names and `AGENTFORGE_*` names are unchanged. Sentences below that call `Kyoo032/Nultron` or `Kyoo032/NultronEnt` the release repo are history from before this change.
 
 **Two products, one repo — read this before touching anything.**
 
@@ -105,7 +104,7 @@ On **Enterprise** each tenant keeps its own workspaces on Rizky's server. On **P
 
 ## Product direction (Rizky, 2026-10-06; this repo Nultron only since 2026-10-15): chat-first
 
-**Nultron is the product developed here.** Keep shipping and iterating on it as the main build focus. HYP AI is developed in its own repo (`Kyoo032/hyp-ai`).
+**Nultron is the product developed here.** Keep shipping and iterating on it as the main build focus.
 
 **Archive / deprioritize mode-heavy complicated UI setup.** Do not invest in elaborate multi-mode UI configuration flows.
 
@@ -115,24 +114,24 @@ On **Enterprise** each tenant keeps its own workspaces on Rizky's server. On **P
 
 **Bots on harnesses (Rizky, 2026-10-06 evening).** The chat-first shell shows each harness as a bot with its own conversations and a side panel (computer, routines, the mode's control fields). What sets it apart from a skills-and-instructions product: a bot here is a harness the host enforces. Three decisions from him the same evening:
 
-- People can hire their own bot. The tester built it as prompt-made agents; the OPC strip removed them on 2026-10-16, and hiring a bot is HYP AI's now. Custom-agent Build stays parked here.
+- Hiring your own bot is not built in Nultron: the tester's prompt-made agents were removed on 2026-10-16. Custom-agent Build stays parked.
 - The cloud computer (VPS) and the person's own computer are paid features. A free trial cannot use either, and gets no graphical screen.
 - Routines (scheduled runs) are free on every plan (Rizky, 2026-10-07: "routines are free, since they cost tokens anyway"). A routine that needs a computer still needs a paid plan for that part.
 - The host enforces that from the plan the portal reports. The renderer only displays it.
 
-The plan is [`docs/internal/chat-first-plan.md`](docs/internal/chat-first-plan.md): "Second reference", "Free and paid" and Track B. Its "Hiring a bot" section is HYP AI's since the 2026-10-16 strip.
+The plan is [`docs/internal/chat-first-plan.md`](docs/internal/chat-first-plan.md): "Second reference", "Free and paid" and Track B.
 
-**Team privacy rules moved to HYP AI (2026-10-15).** Rizky's rulings of 2026-10-06 and 2026-10-13 about teams are HYP AI's and live in that repo's `AGENTS.md`: per-person Knowledge Bases, company-wide desks (K-D11), sharing through a bot, what happens when a person leaves, and owners and admins never reading a person's knowledge. A Nultron desk has one owner, so do not build them here. What `main` already enforces on a hosted desk stays as built: a Chat card is visible only to the person who owns its thread, the owner and admins included (`knowledge-visibility.ts`, [`knowledge-flows.md`](docs/internal/maps/knowledge-flows.md) § 7), and each person's chat uploads folder is their own ([`chat-documents.md`](docs/internal/maps/chat-documents.md)). The build focus is the chat and several agents working together.
+**No team privacy rules here (2026-10-15).** A Nultron desk has one owner, so team rules (per-person Knowledge Bases, company-wide desks, sharing through a bot, leavers) are not built here. What `main` already enforces on a hosted desk stays as built: a Chat card is visible only to the person who owns its thread, the owner and admins included (`knowledge-visibility.ts`, [`knowledge-flows.md`](docs/internal/maps/knowledge-flows.md) § 7), and each person's chat uploads folder is their own ([`chat-documents.md`](docs/internal/maps/chat-documents.md)). The build focus is the chat and several agents working together.
 
 ### Lanes: one source, main and its downstream (Rizky, 2026-10-06, 2026-10-09, 2026-10-14; must follow)
 
 The tables at the top say where a change is cut, made and merged. This section keeps the rules behind them. The working form is [`docs/internal/maps/release-and-sync-lanes.md`](docs/internal/maps/release-and-sync-lanes.md).
 
-- **Lanes.** `main` is the published code: Nultron as the OPC web app. The tester (`C:\Users\rizky\agentforge-chat`, `tester/chat-first`) is the staging code at every stage. HYP AI is its own repo since 2026-10-15 and takes nothing from this one. Nultron Personal is retired (2026-10-14): no sync step is owed to it, and no release is cut from it.
+- **Lanes.** `main` is the published code: Nultron as the OPC web app. The tester (`C:\Users\rizky\agentforge-chat`, `tester/chat-first`) is the staging code at every stage. Nultron Personal is retired (2026-10-14): no sync step is owed to it, and no release is cut from it.
 - **One place to fix.** A bug fix is a pull request to `main` from a branch cut from `main`. Never fix by hand in `C:\Users\rizky\agentforge-chat`, and never open a fix pull request from `tester/chat-first`. Tester work reaches `main` only through a promotion pull request Rizky approves.
 - **Two codes, one way.** Changes move one way, from `main` into `tester/chat-first`: `git fetch origin`, then `git merge origin/main` in `C:\Users\rizky\agentforge-chat`. Never run a release from `C:\Users\rizky\agentforge-chat`. Its webdev uses port 3200 and its own data folder, so it never shares a database with `:3000`. The precise map (which change goes where, which files the tester may edit) is Rizky's vault note `C:\Users\rizky\Documents\Obsidian\40-Dev\nultron-two-codes-map.md`. Keep it current in the same session as any change to the split.
 - **After a pull request merges to `main`, in this order:** (1) merge `origin/main` into `C:\Users\rizky\agentforge-chat` and run `ci:local`; (2) release Enterprise only when Rizky says. A fix is not done for a lane until its step has run. The pull request says which lanes are still owed.
-- **Shared code carries no brand.** Shared code and copy never hard-code `Nultron`, `Toko Token`, `TokenKu` or `HYP AI`; they read `productName` and `gatewayName`. A difference between lanes is a setting (`PORTAL_SIGNIN_MODE`, the edge mode), not a fork.
+- **Shared code carries no brand.** Shared code and copy never hard-code `Nultron` or `Toko Token`; they read `productName` and `gatewayName`. A difference between lanes is a setting (`PORTAL_SIGNIN_MODE`, the edge mode), not a fork.
 - **No edge on Nultron.** Nultron keeps its direct two-name setup with its own certificates and uses no Cloudflare edge. Password sign-in is a portal setting (`PORTAL_SIGNIN_MODE`).
 - **Label what a change touches.** In a pull request and in `unreleased.md`, name the lanes with the tokens `lanes.json` already reads: `enterprise`, `tester`, and `personal` (retired, owes nothing). Shared code defaults to `enterprise` and `tester`. The guard checks only that a `Lanes:` line exists, not which tokens it names.
 - **Priority.** Published wins; in a conflict keep the `main` side. The Obsidian map has the full list.
@@ -143,13 +142,13 @@ The tables at the top say where a change is cut, made and merged. This section k
 
 ### Hosting and scaling (Rizky, 2026-10-07 and 2026-10-13)
 
-The hosted app is one process on one SQLite file, with customers' files on the local disk (SR-29, SR-66), so a second server would start empty. The Kubernetes manifests in `webapp-deploy/k8s/` run exactly one app pod for the same reason. Scaling means resizing the one server. The road to more than one copy is Kubernetes (TKE), not CVM Auto Scaling, and only after the data layer moves (team board decisions K-D9 and K-D10, recorded in the hyp-ai repo's `docs/internal/team-board-spec.md`, section 4.1). Before a second copy can run:
+The hosted app is one process on one SQLite file, with customers' files on the local disk (SR-29, SR-66), so a second server would start empty. The Kubernetes manifests in `webapp-deploy/k8s/` run exactly one app pod for the same reason. Scaling means resizing the one server. The road to more than one copy is Kubernetes (TKE), not CVM Auto Scaling, and only after the data layer moves (Rizky's decisions K-D9 and K-D10, 2026-10-13). Before a second copy can run:
 - the product database moves off SQLite to a managed database (open decision 1 in the pivot record);
 - files move to object storage (the COS backend has never run against a real bucket);
 - sign-in sessions, the run cap and in-flight jobs are shared between servers;
 - the app starts from a server image and passes a health check behind a load balancer.
 
-None of that is started. Do not start it in passing: it needs Rizky's word. HYP AI's own server, domain, accounts and Cloudflare edge are in the hyp-ai repo's `AGENTS.md` since 2026-10-16.
+None of that is started. Do not start it in passing: it needs Rizky's word.
 
 ## Current focus (Rizky, 2026-10-01): fix, perfect, polish — no new modes
 
@@ -167,7 +166,7 @@ Until Rizky lifts it, work is limited to three things, in this order:
 
 ### Resume here: 2026-10-07, afternoon (history)
 
-**These Resume-here blocks are history from before the 2026-10-15 split.** Their HYP AI items (the bundle, the server, the domain, the demo) belong to the hyp-ai repo now; read them for Nultron context only.
+**These Resume-here blocks are history from before the 2026-10-15 split.** Items about the other product were removed on 2026-10-16; read them for Nultron context only.
 
 **Full handoff:** `nultron-files/handoff-2026-10-07/HANDOFF.md`, with one note per lane in flight in `lanes/` and the day's helper scripts in `tools/`. The brief for outside advisers, covering every product and site, is `nultron-files/PRODUCTION-BRIEF.md`.
 
@@ -176,23 +175,18 @@ Until Rizky lifts it, work is limited to three things, in this order:
 - A live drive found a new bug and it is fixed and merged: a slow gateway answer ended a Chat turn in silence. The wait for response headers is 45 s and a failed follow-up ends with a sentence.
 - Driven on `:3000` with a real key: `self_check`, a Word file, a picture, a deck. Evidence is under `.cursor/skills/verify-agentforge/evidence/chat/2026-10-07-*`.
 - The Nultron preview runs `nultron-web:0d829f00bc81`, rolled desk by desk without touching the proxy.
-- The HYP AI server exists and has its base setup. No app is installed.
 
 **Git.** Everything up to the password sign-in is on GitHub: PR #142, merged into `main` as `079d325` in the evening at Rizky's word. Full local CI was green on `0d829f0`; after that only the suites named in the PR ran. A follow-up with two fixes from the second security review of the password sign-in is still local.
 
 **In flight (see the lane notes).**
 - The per-company gateway key check: reviewed, fixed and merged into `main` as `24fb47c9` (evening). Not driven on a hosted server.
-- The portal's username and password sign-in for HYP AI: merged. Two independent security reviews, no critical or high finding; the second review's two fixes are local `main` at `e8a069c9`, three commits ahead of GitHub. The residual risks are in SR-165.
-- The HYP AI bundle in `C:\Users\rizky\hypey`: `out\hyp-2026.10.07.3` is the password-mode build from `e8a069c9`. `check.mjs` 135 of 135 and the three-person rehearsal exited 0 (123 of 123), so it meets "ready to install". It is superseded by `outhyp-2026.10.07.4` (clone `517d24d`), which removes the upstream company's name from the browser-facing locale catalogs: `check.mjs` 135 of 135, rehearsal exit 0 with 126 of 126, and a grep inside the built image finds no upstream company, product or gateway name in the served files. **Install `.4`.** `out\hyp-2026.10.07.2` is the e-mail-code build and must never be installed.
-- The domain: `aiopc.innovationhypernet.com` points at Cloudflare's proxy, not at the server. Hypernet has to make it DNS only, an A record to `43.173.26.50` with no AAAA, and add a second name for the sign-in page.
+- The portal's username and password sign-in: merged. Two independent security reviews, no critical or high finding; the second review's two fixes are local `main` at `e8a069c9`, three commits ahead of GitHub. The residual risks are in SR-165.
 
-**Ready to install HYP AI means:** both fixes merged, the bundle rebuilt in password mode with `check.mjs` passing, and the rehearsal exiting 0 with three people signing in by username and password. Then tell Rizky. On the server each step needs his go: the load test, the install, the three accounts.
-
-**Needs Rizky's decision.** Hosted "erase account" purges every company of a partner (SR-163). Settle it before a second company exists on HYP AI. Also still open: the three accounts' usernames and e-mails, the two domain names, the snapshot policy.
+**Needs Rizky's decision.** Hosted "erase account" purges every company of a partner (SR-163). Settle it before a second company exists on a hosted server. Also still open: the snapshot policy.
 
 ### Resume here: 2026-10-05, end of day (read this before the 10-03 block below)
 
-**Full handoff, including lanes that were running and their exact scope:** `nultron-files/handoff-2026-10-05/HANDOFF.md`. **Newer, 2026-10-06:** `nultron-files/handoff-2026-10-06/HANDOFF.md`, covering the live sites, the app preview with per-tester desks, PR #139, the 0.16.0 cut and the verify-skill findings. **Newest, evening of 2026-10-06: `nultron-files/handoff-2026-10-06/HANDOFF-evening.md`**, with one note per paused lane in `lanes/`. Read it first: ten lanes were paused mid-work (ffmpeg in the image is live on the preview; the desktop bundle, the run cap, chat error recovery, document upload, the deck tool, the image-attachment fix, team privacy, the H1 knock gate and the HYP AI bundle are on unmerged branches or local folders), the local `edge/` folder is NOT safe to deploy, and the document-upload branch is half way through its review fixes.
+**Full handoff, including lanes that were running and their exact scope:** `nultron-files/handoff-2026-10-05/HANDOFF.md`. **Newer, 2026-10-06:** `nultron-files/handoff-2026-10-06/HANDOFF.md`, covering the live sites, the app preview with per-tester desks, PR #139, the 0.16.0 cut and the verify-skill findings. **Newest, evening of 2026-10-06: `nultron-files/handoff-2026-10-06/HANDOFF-evening.md`**, with one note per paused lane in `lanes/`. Read it first: ten lanes were paused mid-work (ffmpeg in the image is live on the preview; the desktop bundle, the run cap, chat error recovery, document upload, the deck tool, the image-attachment fix, team privacy and the H1 knock gate are on unmerged branches or local folders), the local `edge/` folder is NOT safe to deploy, and the document-upload branch is half way through its review fixes.
 
 **Git (2026-10-06).**
 - `main` is at `de95267`, after PR #138.
@@ -220,17 +214,12 @@ Until Rizky lifts it, work is limited to three things, in this order:
 
 **Decisions on 10-05.**
 - The vision and prompt-first rules are now at the top of this file.
-- Nultron keeps Toko Token. White-label brands show TokenKu. The HYP AI clone pinned `https://api.tokenku.ai/v1` on 2026-10-06 (Rizky); the interim `api.tokotokenai.com` backend is gone there, and no call with a TokenKu key has been made yet.
+- Nultron keeps Toko Token.
 - Hosting (to learn, then try): one Tencent Lighthouse in Jakarta hosting dpscloud.co.id (the parent site), nultron-ai.xyz (app) with portal.nultron-ai.xyz, and tokotokenai.com.
   - Keep the DNS for `api.tokotokenai.com` untouched.
   - Company mailboxes are self-hosted on the same box (Stalwart), sending through Tencent SES; see "Tencent hosting" below. Nultron's sign-in codes go through SES from `mail.dpscloud.co.id`.
   - Guide: `nultron-files/deploy/hosting-guide.html`.
 - Nultron motion: smooth in browsers, stepped in the packed app. The CPU trade-off is still open; Rizky has not chosen between capping the background at 20 fps or keeping 60.
-
-**HYP AI (Hypernet) demo, 2026-10-06: ready.**
-- The clone `C:\Users\rizky\hypey\app` is synced to b39cdf2 by vendor branch (`hypey/intake/SYNC.md`), committed on its own `main` (`35f2c8f`). It runs on :3301 (`hypey\start-hyp-ai.cmd`, gate ok). Do not sync upstream before the demo.
-- Deck: 26 slides, `hypey/intake/deck/HYP-AI-OPC-Platform.pptx` (+ `.pdf`); an animated copy `...-animated.pptx` was being built. Video: `hypey/intake/video/HYP-AI-OPC-90s.mp4` (1080p30, 90 s).
-- 3D Hypey is paused. The look-dev is in `hypey/intake/3d/look-dev/`.
 
 **Tencent hosting (updated 2026-10-06).** Everything lives in `nultron-files/deploy/tencent/`, which is gitignored. Its `README.md` is the runbook and the log. The day's full handoff is `nultron-files/handoff-2026-10-06/HANDOFF.md`; read it first next session.
 
@@ -481,7 +470,6 @@ Everything here is proven by unit tests and webdev only; none of it is packed. T
 - Chat is ready immediately. Model picker + composer. Building custom agents is parked, not a gate.
 - Pack templates are optional workspace presets. Default Chat never uses a pack template.
 - University/Harbor State is an **optional pack of templates**, not the identity of the app. Kernel stays industry-neutral (`student` / `course` do not belong in core schema).
-- Do not merge **Toko Token** with **TokenKu** in copy or catalogs.
 - Custom agents / Studio stay in the tree and redirect to Chat. Do not add a GTM “hidden Build” door.
 
 ### Web target
@@ -598,7 +586,7 @@ Rizky decided on 2026-09-23: one private source repo, one public release repo pe
 - **`Kyoo032/Nultron` (public; renamed from `Kyoo032/DPSBuddy` on 2026-09-25)** is Personal releases only: README + `Nultron Setup <v>.exe` + `.blockmap` + `latest.yml` + the mac dmg/zip, published with `pnpm desktop:release`. From 0.15.1 the packaged app's updater requests `Kyoo032/Nultron` (`brand.json` `updates.repo`). Installs from 0.15.0 and earlier still request `Kyoo032/DPSBuddy`, and GitHub redirects that name. Release notes come from `docs/public/<version>-notes.md`. Nothing about the hosted web app is published there. The README was set to the Nultron text in `620689f`, outside a release.
 - **`Kyoo032/NultronEnt` (public; created 2026-09-23 as `Kyoo032/DPSBuddy-Ent`, renamed 2026-09-25, default branch `main`)** is the Enterprise deploy-bundle and release repo, in the same relationship to agentforge as `Kyoo032/Nultron` has to the installers. `main` holds the README, the LICENSE and the current bundle: `compose.yml` pinned to `ghcr.io/kyoo032/nultron-ent:<tag>`, `.env.example`, `DEPLOY.md` and `Caddyfile`. Each release is a `Release <tag>` commit plus a GitHub Release whose body is `docs/public/ent-YYYY.MM.DD-notes.md` followed by the `Source:` and `Image:` lines. Everything is written by `node scripts/release-web.mjs` (see **Web release (hosted)**). It never holds TypeScript source, and nothing about the desktop app is published there. The README was set to the Nultron Enterprise text in `54da47a`, outside a release.
 - **The only local checkout is `agentforge`.** `Kyoo032/Nultron` and `Kyoo032/NultronEnt` are written only by their release scripts (`pnpm desktop:release`, `node scripts/release-web.mjs`). Keep no clone of either on disk. `release-web.mjs` clones `Kyoo032/Nultron-Releases` into a temp dir under `%TEMP%` and deletes it before it exits. The 2026-09-25 README updates were a one-off through the GitHub contents API, not a clone and not a release.
-- **Rules for both public repos.** Never source, never flavor builds, never `docs/internal/` notes, never any AI/agent marks. Notes come only from `docs/public/`. Commits and releases are authored as Rizky, with plain messages and no trailers. Published by the script, never by hand, and never with a `git push` from agentforge. Both release scripts — `scripts/release-web.mjs` and `apps/desktop/scripts/release-desktop.mjs` — refuse a notes file that names `Claude`, `Anthropic`, `agent`, `Co-Authored` or `docs/internal`, from one shared list in `scripts/release-marks.mjs`. `release-desktop.mjs`, which takes `--notes <file>`, also refuses a notes path under `docs/internal` in any letter case or through a link; `release-web.mjs` only ever reads `docs/public/<tag>-notes.md`, and also runs the mark check on every file it would push and on the release body, and there the only exception is the source repo's own name `agentforge`, which the app's `AGENTFORGE_*` variables and the `Source:` line cannot avoid.
+- **Rules for both public repos.** Never source, never flavor builds, never `docs/internal/` notes, never any AI/agent marks. Notes come only from `docs/public/`. Commits and releases are authored as Rizky, with plain messages and no trailers. Published by the script, never by hand, and never with a `git push` from agentforge. Both release scripts — `scripts/release-web.mjs` and `apps/desktop/scripts/release-desktop.mjs` — refuse a notes file that names `Claude`, `Anthropic`, `agent`, `Co-Authored` or `docs/internal`, from one shared list in `scripts/release-marks.mjs`. `release-desktop.mjs`, which takes `--notes <file>`, also refuses a notes path under `docs/internal` in any letter case or through a link; `release-web.mjs` only ever reads `docs/public/<tag>-notes.md`, and also runs the mark check on every file it would push and on the release body, and there the only exception is the source repo's own name `agentforge`, which the app's `AGENTFORGE_*` variables and the `Source:` line cannot avoid. `release-web.mjs` also refuses to run, dry runs included, unless `nultron-files/release/nda-terms.txt` exists with at least one term (Rizky, 2026-10-16). The notes, the release body, every bundle file (the company sites included) and every file in the release repo's clone must carry none of those terms. The file is gitignored, so it exists only in the main checkout; never commit it or copy its terms into the repo, and the refusal prints a count, never a term (`scripts/release-nda.mjs`).
 - Order is fixed: work → verify inside agentforge → only when everything on the ship list is proven, cut the release into that product's repo. A release to one repo never implies a release to the other.
 - **Pack/ship on this Windows desk:** [`.cursor/skills/pack-nultron`](.cursor/skills/pack-nultron/SKILL.md) (isolated NSIS worktree + Docker mac dmg). Cloud must not run it.
 - **Versioning (Rizky, 2026-09-07; re-scoped 2026-09-23):** two products, two schemes. **Personal (the desktop app)** uses semver — `0.16.0` is the current cut (Rizky asked for v0.16 on 2026-10-06; it is the first installer under the Nultron name), and the next maintenance cut would be `0.16.1`. Do not use `0.14.3+`. The old "never bump to 0.15 until Rizky says so" rule is spent: he said so on 2026-09-23. The `0.14.21`…`0.14.27` line was scoped to desktop *maintenance* cuts while the desktop was frozen; 0.15.0 is a product release and takes the next minor. Semver still orders these correctly for the updater. Current tree: `apps/desktop/package.json` is `0.16.0`. **Enterprise (the hosted web app)** is tracked by commit sha, not by this scheme; its release tag on NultronEnt, which is also the image tag on ghcr, is `ent-YYYY.MM.DD` (working default, not yet confirmed by Rizky — see **Web release (hosted)**).

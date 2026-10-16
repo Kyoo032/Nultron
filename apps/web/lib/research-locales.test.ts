@@ -27,6 +27,5 @@ describe("research locale JSON", () => {
     const raw = readFileSync(resolve(localesDir, "id", "research.json"), "utf8");
     expect(raw).toContain("Nultron");
     expect(raw).toContain("Toko Token");
-    expect(raw).not.toMatch(/TokenKu/);
   });
 });

@@ -2,7 +2,7 @@
 
 Nultron’s left nav is **mode-first**. Tabs come from a kernel catalog. **Which tabs appear** is the current workspace’s `productModes`. The first desk of a fresh **Personal** install stores only Research, Images, Videos and Presentation plus Chat (owner decision, 2026-09-29, see [First-run desk](#first-run-desk-personal)); the first desk of the hosted **Enterprise** app stores every work mode, and an existing desk keeps whatever it has. Editing the current desk on Workspaces, or creating another desk (Legal, Marketing, Students, or custom checkboxes), can shrink or grow that rail. Packs are workspace presets. Custom agents do not drive the rail.
 
-Gateway identity stays **Toko Token** (`api.tokotokenai.com/v1`). Do not merge Toko Token with TokenKu in copy or catalogs. Kernel stays industry-neutral: no `student` / `course` / campus nouns outside `packages/university`.
+Gateway identity stays **Toko Token** (`api.tokotokenai.com/v1`). Do not merge Toko Token with any other gateway name in copy or catalogs. Kernel stays industry-neutral: no `student` / `course` / campus nouns outside `packages/university`.
 
 ## Catalog (fixed order)
 

@@ -52,7 +52,7 @@ erDiagram
 ## 2. Table-by-table rationale
 
 ### `tenants`
-The whitelabel partner: Toko Token itself, JAST, Hypernet, Metranet. It is the root of every RLS
+The whitelabel partner: Toko Token itself, JAST, Metranet. It is the root of every RLS
 scope, so it is the only table whose policy keys on `id` rather than `tenant_id`.
 `status` drives `tenant_inactive`. `slug` doubles as the suffix of the per-tenant DB role
 (`tenant_jast`) and must therefore match `^[a-z][a-z0-9_]{1,30}$`. `residency` records where the
@@ -110,7 +110,7 @@ How a first sign-in is earned (owner decision 2026-10-01: nobody signs up). One 
 **A trap for whoever builds account erasure.** A member who has ever signed in cannot be `DELETE`d from `users`: `audit_log.actor_user_id` is `ON DELETE SET NULL`, which is an UPDATE the append-only trigger refuses, and with that trigger off the NULL it writes breaks `audit_log_actor_shape_chk` (a user actor must name a user). Removal today is `users.status = 'disabled'`; a real erase has to deal with those audit rows first.
 
 ### `user_credentials` (stand-in addition: `apps/portal/migrations/0012_password_signin.sql`)
-The credential behind `PORTAL_SIGNIN_MODE=password` (owner decision 2026-10-07, HYP AI: username and password in place of the e-mailed code, with 2FA being designed). One row per person who signs in that way, created only by the operator command `portal:account`, which also makes the `users` row (active, with the role the operator chose), so `login_precheck` and the seat count read the person exactly as they read anyone who got in through the e-mailed code. A portal in the default mode never reads this table; an existing deployment migrates it empty.
+The credential behind `PORTAL_SIGNIN_MODE=password` (owner decision 2026-10-07: username and password in place of the e-mailed code, with 2FA being designed). One row per person who signs in that way, created only by the operator command `portal:account`, which also makes the `users` row (active, with the role the operator chose), so `login_precheck` and the seat count read the person exactly as they read anyone who got in through the e-mailed code. A portal in the default mode never reads this table; an existing deployment migrates it empty.
 
 `user_id` is the primary key (one credential per person, gone with the person: `ON DELETE CASCADE`), and `tenant_id` is NOT NULL for the RLS policy and is written from the `users` row, never from the caller. `username` is a `citext`, unique per tenant, 3 to 32 characters of `a-z 0-9 . _ -` starting with a letter or digit, and can never contain `@`, so the sign-in form's one field takes a username or an address without ambiguity. `password_hash` and `password_salt` are the scrypt output and its random 16-byte salt; the cost parameters `scrypt_n`, `scrypt_r`, `scrypt_p` sit beside them (the key length is the hash's own `octet_length`), which is the whole point of storing them: raising the cost is a code change, and every account is re-hashed at its next correct password. The CHECKs refuse only what is plainly wrong (a cost below 2^14, a non-power-of-two N, a hash or salt of the wrong size, a username outside the pattern). `must_change` is true for an operator-issued initial or reset password, and the portal issues no session until the person has chosen their own. `failed_attempts` (0 to 5, a CHECK), `grace_attempts` (0 to 3, a CHECK, added by `0013_password_grace.sql`) and `locked_until` are the lockout: an attempt is **counted before** the password is compared, in one `FOR UPDATE` transaction with no hashing in it, the fifth sets `locked_until` fifteen minutes ahead, and a correct password, a reset and the end of the lock clear them; the 5 and the 15 minutes live in the application, and expiry is computed from the injected clock rather than the database's `now()`. `grace_attempts` counts the attempts a source address with no earlier failure against the person may still take while the account is locked, so the most passwords tried per account per window is 5 + 3 = 8 whoever asks, from however many addresses, across a restart; which sources may ask is an in-process record the database does not hold. `password_changed_at` and `last_sign_in_at` (the last time a correct password was presented) exist for the operator's `list` and for nothing else.
 
@@ -154,7 +154,7 @@ policy exposes the NULL window only to `portal_app`. Lookups are by a 32-byte ha
 The browser half of the login has no password to check, so it checks a mailed one-time code
 instead: 6 digits, 10-minute TTL, 5 verify attempts, single use, 3 sends per 15 minutes per
 address. The reason there is no password column anywhere in this schema is in `device-code-login.md`
-("Sign-in method"); the short version is that a password database for four whitelabel partners with
+("Sign-in method"); the short version is that a password database for every whitelabel partner with
 no shared IdP is the worst asset we could choose to hold.
 
 Only `otp_hash = sha256(code)` is stored, never the code — for ten minutes a row here is

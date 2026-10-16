@@ -54,6 +54,18 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## This repo names only Nultron, 2026-10-16 (Rizky; docs, tests and lane-guard config; branch `chore/nultron-only`)
+
+The other product left on 2026-10-15 and has its own repo and env since 2026-10-16. Rizky asked that this repo carry nothing about it, and that its leak guards move there.
+
+- Live guidance names only Nultron: `AGENTS.md`, `TESTER.md`, `README.md`, the change and verify skills, `apps/mobile/AGENTS.md`, the maps (chat send, hosted security, portal service and session, release lanes, virtual agents), the release targets, the portal design docs, the gateway model guide, the chat-first plan and the guardrails plan. The two design docs that belonged only to the other product (`team-board-spec.md`, `opc-sme-architecture.md`) are deleted; git keeps them.
+- Tests: the catalog, template, virtual-agents-page, release-bundle and push-guard checks no longer name the other product or its gateway. The brand ratchet (`lanes.json` `brandLiterals`, `scripts/lane-guard.baseline.json`) now counts `Nultron` and `Toko Token` only. The one-shot `assemble-agents-md-once.yml` workflow is deleted (no GitHub Actions run here).
+- Kept as written: the security register, this log, the changelogs, the pivot record and the portal migrations (never edited).
+- Proof: `node --test` on the four touched script files, 100 of 100; `ci:local` in the PR.
+- NDA check, name-free (Rizky, same day): `scripts/release-web.mjs` reads its banned terms from the gitignored `nultron-files/release/nda-terms.txt` (`scripts/release-nda.mjs`). The release refuses to run, dry runs included, when that file is missing or empty. It refuses notes, the body, any bundle or site file, or any file in the release repo's clone that carries a term, and it prints a count, never the term. Seven new cases in `release-web.test.mjs` (49 of 49); the real bundle was checked once against the real terms file. The file exists only in the main checkout, so a release from a worktree refuses.
+
+Lanes: enterprise, tester
+
 ## OPC strip: the tester is Nultron only (repo split P5b), 2026-10-16 (tester, committed on `tester/chat-first` in waves R1 to R4, H1 to H4, C1, D1 and W9; tests and typecheck run, not driven in a browser)
 
 Rizky's rulings of 2026-10-15. Removed from the tester: the team board, collective-project Workspaces, versioned documents and the document tools, quota and the company gateway management token, the enterprise shell, prompt-made agents, people names, paid media approval, and per-person file privacy. Kept: the chat-first bots shell, the four model choices (K-D31, with the host on the `opc` profile), stored pictures as input (F3) and chat upload originals (U1, now saved through `packages/host/src/artifact-save.ts`).
@@ -844,3 +856,10 @@ Lanes: enterprise, tester.
 Lanes: enterprise, tester.
 
 - [x] **Stale sign-in note for the Enterprise bundle.** `scripts/release-web.mjs:122` sets `PORTAL_SIGNIN_MODE: "password"` in `ENV_DEFAULTS`, and `webapp-deploy/k8s/base/kustomization.yaml:59` sets `- PORTAL_SIGNIN_MODE=password`. AGENTS.md records Rizky's 2026-10-09 change that this is the Enterprise default, and the code matches it. So `lanes.json:319`, which says Nultron Enterprise keeps the e-mailed code, was stale and is rewritten in the same branch. The map line `docs/internal/maps/portal-service.md:478` said the same and is corrected in this change. Read from source; not driven.
+
+## Edit's output lookup is scoped to the project's organization, 2026-10-15 (branch `fix/media-row-company`, SR-184)
+
+Lanes: enterprise, tester.
+
+- **What.** `loadMediaRow` in `packages/host/src/edit/wire-generate.ts` now takes the organization and filters on it, like every other by-id media read. `resolveGenerateAsset` in `packages/host/src/edit/jobs.ts` passes the project's organization from `workerProjectScope`.
+- **Proof.** `packages/host/src/edit/load-media-row.test.ts` and the edit suite (305 tests). Not driven on `:3000` or a hosted build.

@@ -28,7 +28,7 @@ Where the build differs from the specs:
 
 After the first pass the owner gave three more instructions. His words:
 
-1. "the default mode needs to be nultron or for HYP AI the default mode or the default virtual agents has to be Hypey, take notes and check again"
+1. "the default mode needs to be nultron [...] take notes and check again"
 2. "the chat agents need to be able to do anything inside their chat, they dont have to create a new virtual agents to be able to generate image or videos"
 3. "not just default agents, all virtual agents able to do everything, its a chat mode now, with model picker and enhance mode, can generate images, videos and all kind of docs, or even build somethings"
 
@@ -53,7 +53,7 @@ Risks the new model opens, none ruled on yet:
 "Hark" was named as a look reference, but no screenshot or link for it is on file. The look follows the two 2026-10-06 references in `nultron-files/chat-first/` only.
 
 One known problem found while reading, for `main` and not fixed here: the renderer's stream watchdog is fed with `touch()` only, so a chat turn is cut off on the client at the first-token budget (240 s on Daily and Reasoning, 120 s on Fastest) however much it has streamed, and a Research dossier that runs longer ends with no card. See "Known limits" in the map page.
-Direction it serves: `AGENTS.md`, "Product direction (Rizky, 2026-10-06): Nultron + HYP AI, chat-first".
+Direction it serves: `AGENTS.md`, "Product direction (Rizky, 2026-10-06; this repo Nultron only since 2026-10-15): chat-first".
 Specs: [`chat-workers-spec.md`](chat-workers-spec.md) (harnesses called from chat), [`model-tiers-spec.md`](model-tiers-spec.md) (masked models) and [`chat-computer-spec.md`](chat-computer-spec.md) (the orchestrator, its computer and the safety design).
 This plan belongs to the tester code. See [`TESTER.md`](../../TESTER.md).
 
@@ -99,7 +99,7 @@ Today Nultron is a rail of 14 mode screens, and Chat is one of them. After this 
 5. **Files are the setup.** Attaching a spreadsheet, a contract or a recording replaces the mode's form. What the harness cannot infer, the agent asks in the thread.
 6. **A bare composer.** `+` and the message box. Files, the model tier and the explicit worker choice all live under `+`. Nothing else sits on the composer.
 7. **Three model choices.** Daily, Fastest, Reasoning, with Daily chosen for you. Details in the tiers spec.
-8. **Same on both products and under white-label brands.** HYP AI carries the same shell under its own name.
+8. **Same on Nultron and under white-label brands.** A white-label brand carries the same shell under its own name.
 
 The reference also shows the assistant starting a message on its own, a scheduled check-in. That needs a scheduler and runs that keep going without an open tab. Both are in track K: runs that outlive the tab in K1, scheduled tasks in K4.
 
@@ -144,19 +144,7 @@ This adds **track B (bots)** to section 5 and moves two phases of track C: the r
 
 #### Hiring a bot (Rizky, 2026-10-06: "yes the people are able to hire their own bot")
 
-"Hire" is the word on screen: a desk is a one-person company and a bot is a worker on it.
-
-- **Hire a built-in bot.** Pick it from the list. It arrives complete, because it is a harness we wrote. This replaces the Workspaces checkboxes.
-- **Hire your own bot.** The person answers a few questions in the thread, as the reference does (the job, when it runs, what it touches, where it works). The answers fill a **harness spec**, not a block of instructions: a prompt, a set of tools chosen from the registry, a budget, an output type, and checks picked from the ones that exist.
-- **What a person cannot do.** Add a tool that is not in the registry, raise a budget above their plan's ceiling, switch off the approval step for a write, or switch off redaction. The host builds the run from the spec and refuses the rest, the same way it does for built-in bots.
-- **Judges.** A built-in bot has judges written in code for its output (figures computed in core for Finance, the slide checks for Presentation). A person's bot gets the generic checks only. Say so on screen, so nobody reads a hired bot's output as checked the way Finance's is.
-
-- **A bot has its own knowledge, and that is what a team shares** (Rizky, 2026-10-06). On Enterprise each person's Knowledge Base is private to them. A bot carries knowledge of its own: the sources its owner gives it. Sharing a bot with the team shares that knowledge with it, so teammates can use the bot and call it from their own conversations. A person's private knowledge never travels with a bot unless they put a source into the bot on purpose. The host checks on every retrieval which knowledge a run may read: the caller's own, plus the knowledge of the bot being run, and nothing else.
-- **When a person leaves** (Rizky, 2026-10-06): the business owner or an admin decides whether that person's knowledge, and the bots they made, are deleted or kept.
-- **Nobody else reads a person's knowledge, the owner and admins included** (Rizky, 2026-10-06: "they cant read the knowledge, it must be blocked. and protected by legal clausal terms later"). They may delete it or keep it. They may never open it. The host blocks the read; the legal terms come later and do not replace the block.
-- **Design only for now** (Rizky, 2026-10-06: "dont make it too complicated for now, this is design only for now, focus more on the chat and multiple agents to be working"). Knowledge per person, knowledge per bot, sharing and leaver controls are not built in this round. The build order is: the chat works, then several bots work and hand tasks to each other (C0, B0, B1). Knowledge ownership comes after that, as its own phase.
-
-This is the parked custom-agent Build coming back, under a different shape. The published code keeps it parked (`AGENTS.md`); the tester code builds it in phase B5. The agent tables and Studio files that stayed in the tree for "a later show Build again pass" are where it starts.
+Hiring a bot is not built in Nultron. Custom-agent Build stays parked (`AGENTS.md`).
 
 #### Free and paid (Rizky, 2026-10-06)
 
@@ -247,7 +235,7 @@ Track B is the screen for what tracks K and C build. It starts after C0, because
 | B2 | The side panel: the bot's controls (the mode's "More" fields), bound to the same values the conversation sets. A value set in the panel shows in the thread as a short note, and the other way round. | Change a deck's slide count in the panel, then by asking; both paths give the same run input. |
 | B3 | The Computer tab: the screen picture, Take control, Sleep, and "Works on". Needs K2 and K3. | The Research bot opens a page in its browser; the person takes control, clicks, and hands it back. |
 | B4 | The Routines tab: schedules the person confirms. Needs K4. | A daily Market briefing lands in the Market bot's thread with the tab closed. |
-| B5 | Hire your own bot: the setup questions fill a harness spec, the host enforces it, and the bot joins the rail. Plan ceilings apply. | A person hires a bot that reads a folder of invoices and writes a weekly summary; a tool outside its spec is refused by the host, not by the prompt. |
+| B5 | Hire your own bot: the setup questions fill a harness spec, the host enforces it, and the bot joins the rail. Plan ceilings apply. Not built in Nultron: the tester's prompt-made agents were removed on 2026-10-16. | A person hires a bot that reads a folder of invoices and writes a weekly summary; a tool outside its spec is refused by the host, not by the prompt. |
 | B6 | Free and paid: the host reads the plan and refuses a computer start on a free desk; the choice is greyed with the reason. | A free desk gets `403` with a reason code on a computer start through the API, not only a greyed button. |
 
 The first-desk hard rule still decides what a fresh Personal desk shows: Chat (the generalist), Research, Images, Videos, Presentation. Bots replace rail entries one for one, so `FIRST_RUN_MODES` and its tests are not touched.
@@ -267,7 +255,6 @@ The first-desk hard rule still decides what a fresh Personal desk shows: Chat (t
 4. **Paid steps triggered by the model.** A model that decides to make three videos spends real money. Mitigation: D4, plus per-tool caps in the chat budget.
 5. **Private reads then egress.** The egress guard (SR-112) blocks `web_fetch` after a private read. Research needs the web; a thread that has read a desk file may then refuse research. Needs a ruling in C0.
 6. **Two products, one renderer.** Every change lands on Personal and Enterprise. BYOK tier lists stay server mode only.
-7. **HYP AI clone drift.** The clone syncs by vendor branch. A shell rewrite makes that sync large; do it once, after C4.
 
 ## 8. How the work is run
 

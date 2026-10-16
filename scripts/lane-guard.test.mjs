@@ -168,12 +168,10 @@ test("protectedWarnings: protected path needs a Lanes line", () => {
 });
 
 test("countLiterals counts case-sensitive substrings", () => {
-  const text = "Nultron and Nultron; nultron; Toko Token; HYP AI; Hypey";
-  assert.deepEqual(countLiterals(text, ["Nultron", "Toko Token", "TokenKu", "HYP AI", "Hypey"]), {
+  const text = "Nultron and Nultron; nultron; Toko Token; toko token";
+  assert.deepEqual(countLiterals(text, ["Nultron", "Toko Token", "Absent"]), {
     Nultron: 2,
     "Toko Token": 1,
-    "HYP AI": 1,
-    Hypey: 1,
   });
   assert.deepEqual(countLiterals("nothing here", ["Nultron"]), {});
 });

@@ -373,7 +373,7 @@ listens, and a production process refuses to boot as anything that can see past 
 
 ### 8. Password sign-in: the second way in (`PORTAL_SIGNIN_MODE=password`, 2026-10-07)
 
-Owner decision for the HYP AI deployment (Rizky, 2026-10-07: username and password in place of the e-mailed
+Owner decision (Rizky, 2026-10-07: username and password in place of the e-mailed
 code, 2FA being designed). **It is a mode, chosen once at boot, and the portal's own default (variable absent) is the sign-in described in
 sections 2 and 3, unchanged. The Nultron Enterprise bundle sets this mode explicitly since 2026-10-09.** The full account of it, the routes, the storage, the lockout and what is not
 built, is [`../portal/device-code-login.md`](../portal/device-code-login.md), "Password sign-in". What this
@@ -475,7 +475,7 @@ page adds is where it plugs in and what to be careful of.
 
 ## Touches / Do not touch
 
-Read before editing `apps/portal`. Lanes: Enterprise. The Nultron Enterprise bundle sets `PORTAL_SIGNIN_MODE=password` (since 2026-10-09; `scripts/release-web.mjs` `ENV_DEFAULTS` and the k8s base). The portal's own default when the variable is unset is still `code`. HYP AI's own repo sets `password` too.
+Read before editing `apps/portal`. Lanes: Enterprise. The Nultron Enterprise bundle sets `PORTAL_SIGNIN_MODE=password` (since 2026-10-09; `scripts/release-web.mjs` `ENV_DEFAULTS` and the k8s base). The portal's own default when the variable is unset is still `code`.
 
 **This page owns these:**
 
@@ -495,7 +495,6 @@ Read before editing `apps/portal`. Lanes: Enterprise. The Nultron Enterprise bun
 - `packages/core/src/tenancy/types.ts`: the role strings the portal and the host both read; changing them is a wire change.
 - The product database. The portal has its own Postgres under `PORTAL_DATABASE_URL`, never `DATABASE_URL`; the product stays on SQLite.
 - Brand in portal copy: the sign-in and mail text name the product through `apps/portal/src/otp/product-name.ts`, not a typed brand. Keep it that way for every white-label brand.
-- HYP AI's Cloudflare edge: HYP AI's own repo holds it, not this one ([`release-and-sync-lanes.md`](release-and-sync-lanes.md)).
 
 ## Gotchas
 
@@ -796,7 +795,7 @@ database; `teardown-local.mjs` removes it.
 - **No password, by default; one mode has one.** `[Direct]` `docs/internal/portal/device-code-login.md:132` gives
   four reasons, the first being that a password database for four whitelabel partners with no shared
   IdP is the worst asset to hold. The owner lifted that for one mode on 2026-10-07
-  (`PORTAL_SIGNIN_MODE=password`, HYP AI; "2FA method being designed"), so the portal's own default sign-in still has none.
+  (`PORTAL_SIGNIN_MODE=password`; "2FA method being designed"), so the portal's own default sign-in still has none.
   Since 2026-10-09 the Nultron Enterprise release bundle selects the password mode explicitly (its templates and
   `DEPLOY.md`, not this code), so its deployments run it too; `code` stays selectable. See section 8 and [SR-165](../security-register.md#sr-165).
 - **A signed cookie for the portal's own session rather than a table.** `[Inferred]` No doc states

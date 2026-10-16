@@ -382,7 +382,7 @@ Read before editing. Lanes: Chat reaches Personal, Enterprise and the tester cod
 - `apps/web/components/nultron/`, `apps/web/components/buddy-stage.tsx`, `apps/web/lib/desk-buddy-store.ts`: the mascot ([`mascot-and-brand.md`](mascot-and-brand.md)).
 - `apps/web/components/app-rail.tsx` and `apps/web/components/rail-*.tsx`: the rail ([`chat-sessions-and-rail.md`](chat-sessions-and-rail.md)).
 - `apps/web/lib/api-client.ts`, `apps/web/lib/desktop-bridge.ts`, `apps/desktop/preload.cjs`: the one transport switch; Personal's IPC bridge is the only reader of `window.agentforge`.
-- Brand: no `Nultron`, `Toko Token`, `TokenKu` or `HYP AI` typed into Chat prompts, error strings or copy; they read `productName` and `gatewayName`, because white-label brands are built from this code.
+- Brand: no `Nultron` or `Toko Token` typed into Chat prompts, error strings or copy; they read `productName` and `gatewayName`, because white-label brands are built from this code.
 
 ## Gotchas
 
