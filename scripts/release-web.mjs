@@ -13,7 +13,8 @@
  *      Dry runs are refused too (releaseProblem in scripts/where-am-i.mjs);
  *   1. preflight: the tag is `ent-YYYY.MM.DD[.N]`, the tree is clean (unless --allow-dirty), <sha>
  *      resolves, docs/public/<tag>-notes.md exists and carries none of the five banned marks, and
- *      every file about to be published passes the same check;
+ *      every file about to be published passes the same check, plus the NDA terms in the gitignored
+ *      nultron-files/release/nda-terms.txt (scripts/release-nda.mjs), which must exist;
  *   2. images: `git archive <sha>` into a temp dir, then from there
  *      `docker build -f webapp-deploy/Dockerfile -t ghcr.io/kyoo032/nultron-ent:<tag> .` and
  *      `docker build -f webapp-deploy/portal.Dockerfile -t ghcr.io/kyoo032/nultron-portal:<tag> .`
@@ -51,6 +52,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { forbiddenMarksIn } from "./release-marks.mjs";
+import { NDA_TERMS_PATH, NdaTermsError, ndaTermCount, readNdaTerms } from "./release-nda.mjs";
 import { composeFileText } from "./release-web-compose.mjs";
 import { releaseProblem } from "./where-am-i.mjs";
 import { deployDocText } from "./release-web-docs.mjs";
@@ -190,9 +192,24 @@ export function forbiddenMarksInPublished(text) {
   return forbiddenMarksIn(text.replace(/agentforge/gi, ""));
 }
 
-function assertPublishable(name, text) {
+function assertPublishable(name, text, ndaTerms) {
   const marks = forbiddenMarksInPublished(text);
   if (marks.length > 0) fail(`refusing to publish ${name}: it contains ${marks.map((m) => `"${m}"`).join(", ")}`);
+  assertNoNdaTerms(name, text, ndaTerms);
+}
+
+function assertNoNdaTerms(name, text, ndaTerms) {
+  const count = ndaTermCount(text, ndaTerms);
+  if (count > 0) fail(`refusing to publish ${name}: it contains ${count} term(s) from ${NDA_TERMS_PATH}`);
+}
+
+function loadNdaTerms(deps) {
+  try {
+    return readNdaTerms(deps.repoRoot);
+  } catch (error) {
+    if (error instanceof NdaTermsError) fail(error.message);
+    throw error;
+  }
 }
 
 export function imageRef(tag) {
@@ -453,7 +470,7 @@ function resolveSha(sha, deps) {
   return full;
 }
 
-function readNotes(tag, deps) {
+function readNotes(tag, deps, ndaTerms) {
   const file = join(deps.repoRoot, "docs", "public", `${tag}-notes.md`);
   if (!existsSync(file)) fail(`notes file not found: docs/public/${tag}-notes.md`);
   const notes = readFileSync(file, "utf8");
@@ -462,6 +479,7 @@ function readNotes(tag, deps) {
   if (marks.length > 0) {
     fail(`refusing docs/public/${tag}-notes.md: it contains ${marks.map((m) => `"${m}"`).join(", ")}`);
   }
+  assertNoNdaTerms(`docs/public/${tag}-notes.md`, notes, ndaTerms);
   deps.log(`ok - notes docs/public/${tag}-notes.md`);
   return notes;
 }
@@ -526,15 +544,15 @@ function gitIdentity(deps) {
   return ["-c", `user.name=${name}`, "-c", `user.email=${email}`];
 }
 
-function assertTreePublishable(cloneDir) {
+function assertTreePublishable(cloneDir, ndaTerms) {
   for (const entry of readdirSync(cloneDir, { recursive: true, withFileTypes: true })) {
     const rel = relative(cloneDir, join(entry.parentPath ?? entry.path, entry.name));
     if (!entry.isFile() || rel.split(sep)[0] === ".git") continue;
-    assertPublishable(rel, readFileSync(join(cloneDir, rel), "utf8"));
+    assertPublishable(rel, readFileSync(join(cloneDir, rel), "utf8"), ndaTerms);
   }
 }
 
-function pushBundle(tag, bundle, workDir, deps) {
+function pushBundle(tag, bundle, workDir, deps, ndaTerms) {
   const cloneDir = join(workDir, "Nultron");
   if (resolve(cloneDir) === resolve(deps.repoRoot)) fail("refusing to push from the source repo");
   const identity = gitIdentity(deps);
@@ -550,7 +568,7 @@ function pushBundle(tag, bundle, workDir, deps) {
     mkdirSync(dirname(target), { recursive: true });
     writeFileSync(target, content, "utf8");
   }
-  assertTreePublishable(cloneDir);
+  assertTreePublishable(cloneDir, ndaTerms);
   const inSites = (name) => name.startsWith(`${SITES_BUNDLE_DIR}/`);
   const toAdd = [
     ...Object.keys(bundle).filter((name) => !inSites(name)),
@@ -605,6 +623,7 @@ export function main(argv = process.argv.slice(2), overrides = {}) {
   const deps = { ...defaultDeps, ...overrides };
   const flags = parseArgs(argv);
   checkCheckout(deps);
+  const ndaTerms = loadNdaTerms(deps);
   const problem = tagProblem(flags.tag);
   if (problem) fail(problem);
   const image = imageRef(flags.tag);
@@ -613,12 +632,12 @@ export function main(argv = process.argv.slice(2), overrides = {}) {
   checkGitClean(flags, deps);
   const fullSha = resolveSha(flags.sha, deps);
   checkSourceFiles(fullSha, deps);
-  const body = releaseBody(readNotes(flags.tag, deps), fullSha, image, portalImage);
-  assertPublishable("the release body", body);
+  const body = releaseBody(readNotes(flags.tag, deps, ndaTerms), fullSha, image, portalImage);
+  assertPublishable("the release body", body, ndaTerms);
   const siteFiles = readSiteFiles(fullSha, flags.tag, (args) => deps.git(args, deps.repoRoot), fail);
   const bundle = renderBundle(flags.tag, readCaddyfile(fullSha, deps), siteFiles);
-  for (const [name, content] of Object.entries(bundle)) assertPublishable(name, content);
-  deps.log(`ok - bundle has none of the banned marks`);
+  for (const [name, content] of Object.entries(bundle)) assertPublishable(name, content, ndaTerms);
+  deps.log(`ok - bundle has none of the banned marks and none of the ${ndaTerms.length} NDA terms`);
   const workDir = mkdtempSync(join(tmpdir(), "nultron-ent-release-"));
   try {
     const bodyFile = join(workDir, `${flags.tag}-body.md`);
@@ -630,7 +649,7 @@ export function main(argv = process.argv.slice(2), overrides = {}) {
       return { args, body, bundle, image, portalImage, workDir, published: false };
     }
     if (!flags.skipImage) buildAndPushImages(fullSha, image, portalImage, workDir, deps);
-    pushBundle(flags.tag, bundle, workDir, deps);
+    pushBundle(flags.tag, bundle, workDir, deps, ndaTerms);
     publish(args, flags.tag, deps);
     return { args, body, bundle, image, portalImage, workDir, published: true };
   } finally {

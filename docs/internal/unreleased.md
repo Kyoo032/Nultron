@@ -62,6 +62,7 @@ The other product left on 2026-10-15 and has its own repo and env since 2026-10-
 - Tests: the catalog, template, virtual-agents-page, release-bundle and push-guard checks no longer name the other product or its gateway. The brand ratchet (`lanes.json` `brandLiterals`, `scripts/lane-guard.baseline.json`) now counts `Nultron` and `Toko Token` only. The one-shot `assemble-agents-md-once.yml` workflow is deleted (no GitHub Actions run here).
 - Kept as written: the security register, this log, the changelogs, the pivot record and the portal migrations (never edited).
 - Proof: `node --test` on the four touched script files, 100 of 100; `ci:local` in the PR.
+- NDA check, name-free (Rizky, same day): `scripts/release-web.mjs` reads its banned terms from the gitignored `nultron-files/release/nda-terms.txt` (`scripts/release-nda.mjs`). The release refuses to run, dry runs included, when that file is missing or empty. It refuses notes, the body, any bundle or site file, or any file in the release repo's clone that carries a term, and it prints a count, never the term. Seven new cases in `release-web.test.mjs` (49 of 49); the real bundle was checked once against the real terms file. The file exists only in the main checkout, so a release from a worktree refuses.
 
 Lanes: enterprise, tester
 

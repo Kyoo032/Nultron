@@ -29,6 +29,7 @@ import { dirname, join } from "node:path";
 import { after, test } from "node:test";
 import { fileURLToPath } from "node:url";
 import * as sharedMarks from "./release-marks.mjs";
+import { NDA_TERMS_PATH, parseNdaTerms, readNdaTerms } from "./release-nda.mjs";
 import { DEPLOY_DOC_SECTIONS } from "./release-web-docs.mjs";
 import {
   REQUIRED_SITE_FILES,
@@ -73,6 +74,7 @@ const PORTAL_IMAGE = `ghcr.io/kyoo032/nultron-portal:${TAG}`;
 const CADDY_SOURCE =
   "# see packages/host/src/http-adapter.ts\n{\n\tadmin off\n}\n\n\n\n{$NULTRON_DOMAIN} {\n\t# comment\n\treverse_proxy 127.0.0.1:3000\n}\n";
 const README = "# Nultron Enterprise\n";
+const FAKE_NDA_TERMS = "# test terms only\nzebrapartner\n\n  Quokka Gateway  \n";
 /** The git a dry run may run: reads of this repo only. */
 const READ_ONLY_GIT = new Set(["status", "rev-parse", "show", "cat-file", "ls-tree"]);
 /** The company sites' files at the released sha, as the fake git serves them (the real ones are read further down). */
@@ -126,10 +128,14 @@ after(() => {
   for (const root of roots) rmSync(root, { recursive: true, force: true });
 });
 
-function fakeRepo(notesByTag) {
+function fakeRepo(notesByTag, { ndaTerms = FAKE_NDA_TERMS } = {}) {
   const root = mkdtempSync(join(tmpdir(), "release-web-test-"));
   roots.push(root);
   mkdirSync(join(root, "docs", "public"), { recursive: true });
+  if (ndaTerms !== null) {
+    mkdirSync(dirname(join(root, NDA_TERMS_PATH)), { recursive: true });
+    writeFileSync(join(root, NDA_TERMS_PATH), ndaTerms, "utf8");
+  }
   for (const [tag, text] of Object.entries(notesByTag)) {
     writeFileSync(join(root, "docs", "public", `${tag}-notes.md`), text, "utf8");
   }
@@ -320,6 +326,77 @@ test("main refuses a missing or empty notes file", () => {
   assert.throws(() => main(["--tag", TAG, "--sha", FULL_SHA, "--dry-run"], deps(missing)), /notes file not found/);
   const empty = fakeRepo({ [TAG]: "  \n" });
   assert.throws(() => main(["--tag", TAG, "--sha", FULL_SHA, "--dry-run"], deps(empty)), /notes file is empty/);
+});
+
+// ---------- NDA terms, read from a gitignored file ----------
+
+test("parseNdaTerms keeps one lowercased term per line and drops blanks and comments", () => {
+  assert.deepEqual(parseNdaTerms(FAKE_NDA_TERMS), ["zebrapartner", "quokka gateway"]);
+  assert.deepEqual(parseNdaTerms("# only a comment\r\n\r\n"), []);
+});
+
+test("the NDA terms file is gitignored", () => {
+  const check = spawnSync("git", ["check-ignore", "-q", NDA_TERMS_PATH], { cwd: REPO_ROOT });
+  assert.equal(check.status, 0, `${NDA_TERMS_PATH} must be gitignored`);
+});
+
+test("main refuses a missing or empty NDA terms file before the target check, dry runs included", () => {
+  const missing = fakeRepo({ [TAG]: CLEAN_NOTES }, { ndaTerms: null });
+  const d = deps(missing);
+  assert.throws(
+    () => main(["--tag", TAG, "--sha", FULL_SHA, "--dry-run"], d),
+    (error) =>
+      error instanceof ReleaseError && error.message.startsWith(`NDA terms file not found: ${NDA_TERMS_PATH}`),
+  );
+  assert.equal(
+    d.lines.some((line) => line.startsWith("ok - target")),
+    false,
+  );
+  const empty = fakeRepo({ [TAG]: CLEAN_NOTES }, { ndaTerms: "# nothing yet\n\n" });
+  assert.throws(() => main(["--tag", TAG, "--sha", FULL_SHA, "--dry-run"], deps(empty)), /NDA terms file has no terms/);
+});
+
+test("main refuses notes that carry an NDA term in any letter case, and never prints the term", () => {
+  const root = fakeRepo({ [TAG]: "# Notes\n\nNow live for ZebraPartner.\n" });
+  assert.throws(
+    () => main(["--tag", TAG, "--sha", FULL_SHA, "--dry-run"], deps(root)),
+    (error) =>
+      error instanceof ReleaseError &&
+      error.message === `refusing to publish docs/public/${TAG}-notes.md: it contains 1 term(s) from ${NDA_TERMS_PATH}` &&
+      !/zebra/i.test(error.message),
+  );
+});
+
+test("a company site file that carries an NDA term stops the release before any clone", () => {
+  const root = fakeRepo({ [TAG]: CLEAN_NOTES });
+  const siteFiles = {
+    ...FAKE_SITE_FILES,
+    "webapp-deploy/sites/dpscloud/index.html": "<!doctype html><p>Trusted by Quokka Gateway</p>\n",
+  };
+  const d = deps(root, { siteFiles });
+  assert.throws(
+    () => main(["--tag", TAG, "--sha", FULL_SHA, "--dry-run"], d),
+    /refusing to publish sites\/dpscloud\/index\.html: it contains 1 term\(s\)/,
+  );
+  assert.ok(!d.gitCalls.some((call) => call.sub === "clone"));
+});
+
+test("a file in the release repo that carries an NDA term stops the push", () => {
+  const root = fakeRepo({ [TAG]: CLEAN_NOTES });
+  const d = deps(root, { cloneReadme: "# Nultron Enterprise\n\nBuilt with zebrapartner.\n" });
+  assert.throws(
+    () => main(["--tag", TAG, "--sha", FULL_SHA, "--skip-image"], { ...d, ...recordingGh() }),
+    /refusing to publish README\.md: it contains 1 term\(s\)/,
+  );
+  assert.equal(d.commits.length, 0);
+  assert.ok(!d.gitCalls.some((call) => call.sub === "push"));
+});
+
+test("a clean dry run reports how many NDA terms it checked", () => {
+  const root = fakeRepo({ [TAG]: CLEAN_NOTES });
+  const d = deps(root);
+  main(["--tag", TAG, "--sha", FULL_SHA, "--dry-run"], d);
+  assert.ok(d.lines.includes("ok - bundle has none of the banned marks and none of the 2 NDA terms"));
 });
 
 // ---------- rails before the notes ----------
@@ -1031,8 +1108,14 @@ test("the real webapp-deploy/sites folder is a valid bundle, and nothing in it n
 test("the whole rendered bundle, sites included, has none of the banned marks or customer names", () => {
   const bundle = renderBundle(TAG, SOURCE_CADDYFILE, realSiteFiles());
   assert.ok(Object.keys(bundle).length >= BUNDLE_FILES.length + REQUIRED_SITE_FILES.length);
+  const ndaTerms = existsSync(join(REPO_ROOT, NDA_TERMS_PATH)) ? readNdaTerms(REPO_ROOT) : [];
   for (const [name, text] of Object.entries(bundle)) {
     assert.deepEqual(forbiddenMarksInPublished(text), [], name);
+    assert.equal(
+      ndaTerms.filter((term) => text.toLowerCase().includes(term)).length,
+      0,
+      `${name}: no NDA term in a published file`,
+    );
   }
 });
 
