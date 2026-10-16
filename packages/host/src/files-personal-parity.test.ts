@@ -106,6 +106,6 @@ describe("generated files on Personal", () => {
     ]);
     const first = parts[0];
     expect(first?.type === "image_url" ? first.image_url.url : "").toMatch(/^data:image\/png;base64,/);
-    expect(await loadMediaRow(saved.id)).not.toBeNull();
+    expect(await loadMediaRow(saved.id, local.organizationId)).not.toBeNull();
   });
 });
