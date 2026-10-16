@@ -1,7 +1,7 @@
 # Windows — shell rules
 
-> **Two products, one repo.** **Personal** is the Mac/Windows Nultron app — current cut `0.15.0`, under active development again.
-> The facts below describe the shipped Windows build and have to stay true.
+> **Retired (Rizky, 2026-10-14).** **Personal**, the Mac/Windows Nultron app, is retired into the web app. `0.16.0` was its last cut, its release repo `Kyoo032/Nultron-Desktop` is archived, and no new installer is cut. The desktop code is not removed yet.
+> The facts below describe the last shipped Windows build and stay true while the code is in the tree.
 > Decision record: [`web-pivot-2026-09-18.md`](../../../../docs/internal/web-pivot-2026-09-18.md).
 
 Windows is the shipping closed-beta product (NSIS x64). Read [`../README.md`](../README.md) first for the cross-platform matrix; this file only adds what is Windows-specific.

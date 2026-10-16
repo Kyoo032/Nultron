@@ -22,7 +22,7 @@ Earlier rules this spec has to keep:
 
 | Rule | Source | What it means here |
 |---|---|---|
-| Private by person on Enterprise. Owners and admins may delete or keep a person's knowledge and may never read it. | `AGENTS.md`, "Private by person on Enterprise" (2026-10-06) | The personal agent store is private to its person. No route returns it to an admin. |
+| Private by person on Enterprise. Owners and admins may delete or keep a person's knowledge and may never read it. | the hyp-ai repo's `AGENTS.md`, "Team rules" (this repo's `AGENTS.md` until 2026-10-16) (2026-10-06) | The personal agent store is private to its person. No route returns it to an admin. |
 | A document attached in Chat is private to the person who attached it. | same | A card's files are a separate scope (section 6). A private chat file reaches a card only when its owner copies it there. |
 | Sharing goes through a bot. | same | What a person's agent produces on a card is shared. What the agent knows is not. |
 | The host enforces, the renderer displays. | `AGENTS.md`, gateway gate | Every visibility and run rule in this spec lives in the host. |
@@ -101,7 +101,7 @@ The hosted app is one process on one SQLite file today (SR-29, SR-66), and the p
 | "Admin cannot read" | A rule in code. One wrong query breaks it. | The admin's request never opens the file. A bug elsewhere cannot join across it. |
 | A leaver | Delete rows by owner. | Delete or keep one file. |
 | Export of one person's data | A query. | Copy one file. |
-| Stage 3 (several servers) | Moves with the product database. | Files must move to object storage, like customers' files already must (`AGENTS.md`, Stage 3). |
+| Stage 3 (several servers) | Moves with the product database. | Files must move to object storage, like customers' files already must (`AGENTS.md`, "Hosting and scaling"). |
 | Cost to build | Lower. | Higher: a second connection per run, schema migration per file. |
 
 Recommendation: **B for the personal agent store**, because it makes Rizky's "it must be blocked" a property of where the data is, not of every query. Be plain about the limit: the server holds the wrap key, so the operator of the server can decrypt any file. "Admin" here means the company's admin inside the app.
