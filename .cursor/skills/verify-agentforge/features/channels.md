@@ -21,7 +21,7 @@ With no bot connected the page shows the connect form (`channels-bot-token`, `ch
 
 ## Driving it with the Nultron harness
 
-**Surface check, no sandbox and no bot (the floor any desk can prove).** Click `channels-link` in the rail, or `goto /channels`, and settle. URL is `/channels`; `channels-page`, `channels-bot-token` and `channels-bot-connect` are visible; `channels-bot-status` reads the BotFather intro; `channels-empty` and `channels-none-selected` are visible. `channels-send`, `channels-poll`, `channels-sandbox-note`, `channels-needs-bot` and `mode-channels` all have count 0 (the sandbox note is absent only while the host is pointed at `api.telegram.org`).
+**Surface check, no sandbox and no bot (the floor any desk can prove).** Click `channels-link` in the rail, or `goto /channels`, and settle. URL is `/channels`; `channels-page`, `channels-bot-token` and `channels-bot-connect` are visible; `channels-bot-status` reads the BotFather intro; `channels-empty` and `channels-none-selected` are visible. `channels-send`, `channels-poll`, `channels-sandbox-note`, `channels-needs-bot` and `mode-channels` all have count 0 (the sandbox note shows only in a dev or test build, and only while the host is pointed at anything but `api.telegram.org`; `packages/core/src/channels/pinned.ts:30-33`).
 
 **Without a real bot (the normal case).** Start the local Bot API sandbox, point the host at it, and drive the page:
 
@@ -31,7 +31,7 @@ AGENTFORGE_TELEGRAM_API_URL=http://127.0.0.1:3399 pnpm dev
 node .cursor/skills/verify-agentforge/scripts/doctor.mjs
 ```
 
-The page shows `channels-sandbox-note` whenever the host is pointed at anything but `api.telegram.org`. If that note is **absent** during a sandbox drive, the env var did not reach the host — restart `:3000`, it has no watcher.
+In a dev or test build the page shows `channels-sandbox-note` whenever the host is pointed at anything but `api.telegram.org`; elsewhere the override is ignored and the note never shows (`packages/core/src/channels/pinned.ts:30-33`). If that note is **absent** during a sandbox drive, the env var did not reach the host — restart `:3000`, it has no watcher.
 
 1. `goto /channels`, settle, assert `channels-page` and `channels-link` (count 1).
 2. Fill `channels-bot-token` with the token the sandbox printed, click `channels-bot-connect`. Wait for `channels-bot-disconnect`; `channels-bot-status` reads "Connected as @…" and `channels-bot-fingerprint` starts `sha256:`.
@@ -49,7 +49,7 @@ Also true and not obvious: an inbound row reads "From @kyo" and an outbound one 
 
 Proof to keep under `evidence/channels/<run-id>/`: the drive log, the four screenshots (empty, connected, sent, received), and the doctor JSON.
 
-**Driven 2026-10-05 (maintain3), surface only.** On `:3000`, which was started without `AGENTFORGE_TELEGRAM_API_URL` (a second instance is not allowed while `:3000` answers, and the sandbox walk needs the host restarted with that variable), `channels-link` count 1, `mode-channels` count 0, `/channels` showed `channels-page`, `channels-empty`, `channels-none-selected`, `channels-bot-token` and `channels-bot-connect`, with `channels-send`, `channels-poll`, `channels-needs-bot` and `channels-sandbox-note` all count 0. An empty connect did nothing (no request). `not-a-token` was refused locally with the "does not look like a Telegram bot token" text in `channels-error` and no fingerprint. The sandbox walk (steps 1 to 9) was **not driven** in either pass on 2026-10-05: the morning `maintain` pass was surface only too, and the isolated stub instance that was started for it on `:3200` with the sandbox variable died with the session before this walk.
+**Driven 2026-10-05 (maintain3), surface only.** On `:3000`, which was started without `AGENTFORGE_TELEGRAM_API_URL` (a second instance is not allowed while `:3000` answers, and the sandbox walk needs the host restarted with that variable), `channels-link` count 1, `mode-channels` count 0, `/channels` showed `channels-page`, `channels-empty`, `channels-none-selected`, `channels-bot-token` and `channels-bot-connect`, with `channels-send`, `channels-poll`, `channels-needs-bot` and `channels-sandbox-note` all count 0. An empty connect did nothing (no request). `not-a-token` was refused locally with the "does not look like a Telegram bot token" text in `channels-error` and no fingerprint. The sandbox walk (steps 1 to 9) was **not driven** in either pass on 2026-10-05: the morning `maintain` pass was surface only too, and the isolated stub instance that was started for it on `:3200` with the sandbox variable died with the session before this walk. Driven 2026-10-16 on a throwaway stub webdev desk: the surface checks PASS live. Connect, send and poll stay verified-unreachable: they need a bot token or the Telegram sandbox, and a host started with `AGENTFORGE_TELEGRAM_API_URL`. Evidence: `evidence/channels/2026-10-16-maint/`.
 
 ## Gotchas
 

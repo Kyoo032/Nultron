@@ -46,13 +46,13 @@ Every recipe names its product and the instance it is driven on. The same pair s
 
 - **Product.** `both` means the shared renderer and host, which serve Nultron (OPC, the hosted one-owner app). `retired-desktop` means the Personal desktop app, retired 2026-10-14: history, not owed a drive. The `opc` folder is not built yet, so no recipe says `opc`.
 - **Instance.** `main :3000` is the published checkout, `C:\Users\rizky\agentforge`. `tester :3200` is staging: new work is driven there first. Which instance you are in is in [SKILL.md](../SKILL.md#where-am-i).
-- **Checked against the code** (main `cdb727b4`, tester `06e73cef`, 2026-10-14). The team board (`packages/host/src/board/`, `apps/web/components/board-*.tsx`) and the Private/Workspace project switch (`apps/web/components/projects-*.tsx`) exist only on the tester, and no recipe covers either yet, so none is tagged tester-only. Documents in Chat is on both: the base is on main (`apps/web/components/chat-deck-card.tsx`, `packages/host/src/chat-documents/`), and the newer document cards (`chat-doc-card.tsx`, `tool-rows/doc-result.ts`) are tester-only. `/workspaces` (the Virtual agents page) and private uploads (`packages/host/src/desk-files/private-uploads.ts`) are on main.
+- **Checked against the code** (main `9103579f` and branch `chore/nultron-only` at `91da0409`, tester `38bfdd8a`, 2026-10-16). The tester carries only the chat-first OPC features since the 2026-10-16 strip: the team board, the Private/Workspace project switch and the newer document cards (`chat-doc-card.tsx`, `tool-rows/doc-result.ts`) are gone from it, so no recipe is tagged tester-only. Documents in Chat is on main (`apps/web/components/chat-deck-card.tsx`, `packages/host/src/chat-documents/`), and so are `/workspaces` (the Virtual agents page) and private uploads (`packages/host/src/desk-files/private-uploads.ts`).
 
 | Recipe | Product | Instance |
 |---|---|---|
 | [Build](./build.md) | both | main :3000 (parked: `/studio` redirects to Chat) |
 | [Channels (Telegram)](./channels.md) | both | main :3000 |
-| [Chat](./chat.md) | both | main :3000 (the newer document cards are tester :3200 only) |
+| [Chat](./chat.md) | both | main :3000 |
 | [Code](./code.md) | both | main :3000 |
 | [Components (first-run installer)](./components.md) | both | main :3000 |
 | [Data](./data.md) | both | main :3000 |
@@ -95,7 +95,7 @@ Every recipe names its product and the instance it is driven on. The same pair s
 | [Usage](./usage.md) | both | main :3000 |
 | [Videos](./videos.md) | both | main :3000 |
 | [Virtual agents](./virtual-agents.md) | both | main :3000 (on main since PR #157) |
-| [Workspaces](./workspaces.md) | both | main :3000 (the Private/Workspace project switch is tester :3200 only, no recipe yet) |
+| [Workspaces](./workspaces.md) | both | main :3000 |
 
 ## Features
 
@@ -113,7 +113,7 @@ Every recipe names its product and the instance it is driven on. The same pair s
 - [Channels](./channels.md) — account-rail `/channels`: connect a Telegram bot to the desk, add a group or channel, send, and poll for replies. Not a product mode; drive it against `scripts/telegram-sandbox.ts` rather than a real bot.
 - [Usage](./usage.md) — Account-group `/usage` Day/Week/Month stacked spend, this-key strip, desk by-model. Not a product mode.
 - [Workspaces](./workspaces.md) — the desk model behind Virtual agents: `workspaces-link` opens `/workspaces`, hire and let go edit the desk's `productModes`; the old switcher and create-from-template screen are `modes`-fallback only.
-- [Models](./models.md) — the model catalog behind the tiers: doctor modeKeys/chatCount/curation on webdev. The chat-first Chat has no model picker (see Model tiers); the curated picker applies only in the `modes` fallback.
+- [Models](./models.md) — the model catalog behind the tiers: doctor modeKeys/chatCount/curation on webdev. No screen renders the per-model picker or the Thinking control in either shell layout (see Model tiers); the curated order shows in the studios' `<mode>-studio-model` selects.
 - [Model tiers](./model-tiers.md) — the Chat header's three choices (`tier-picker`, `tier-option-daily|fast|reasoning`; Daily, Fastest, Reasoning) replace the model picker and the reasoning-effort select, and a send posts `{ content, tier }`. Driven on `:3000` 2026-10-12.
 - [Virtual agents](./virtual-agents.md) — the chat-first shell's agents and the `/workspaces` page that replaced Workspaces (`virtual-agents-page`, `agent-card`, `agent-hire`, `agent-let-go`, `agent-always`). Harness agents (Research and default Chat) converse at `/chat?agent=<mode>`; the other twelve are studio agents. Driven on `:3000` 2026-10-12.
 - [Templates](./templates.md) — example galleries on all five mode studios; click pre-fills the prompt.
