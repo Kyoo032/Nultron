@@ -39,7 +39,7 @@ Preconditions:
 - **Personal unchanged.** On webdev (`:3000` is stub, so fake a closed gate in the browser as in the hero-shapes step above) and in the packaged app the key step has no `onboarding-later`, and `POST /api/v1/settings/key-later` answers `404`. `lib/onboarding-key-later.test.tsx` and `lib/needs-key-states.test.tsx` hold that in both languages; they are not a substitute for the drive.
 - **Evidence.** Screenshots of the hello, the key step, a rejected key, the examples, and Chat, under `evidence/onboarding/<run-id>/`, plus the settings JSON that showed `allowed` before the examples shot.
 - **Driven 2026-10-12 on `:3000` (maintain, chat-first shell), host faked in the browser.** With a `needs_key` settings fake the desk landed on the hello step, then the key step, then the examples step (`onboarding-try`). With an `invalid_key` fake the key form showed directly with the reason and the re-check control. Nothing was written to the real host.
-- **Driven 2026-10-16 on a stub webdev desk, with the settings read aborted by a `page.route` so the screen shows: PASS.** A stub desk opens the gate, so the onboarding screen appears only when the `GET /api/v1/settings` read fails or is faked.
+- **Driven 2026-10-16 on a stub webdev desk, with the settings read aborted by a `page.route` so the screen shows: PASS.** A stub desk opens the gate, so the onboarding screen appears only when the `GET /api/v1/settings` read fails or is faked. Evidence: `evidence/onboarding/2026-10-16-maint/`.
 
 ## Gotchas
 

@@ -23,7 +23,7 @@ Preconditions:
 - **Query and hash are dropped.** `/agents/<id>?thread=x` lands on bare `/chat` with no `?thread`; `/studio/<any-uuid>` and `/workspace` (`App.tsx:445`) land there too.
 - **Settings.** `settings-link` then `settings-form` visible and `settings-build-link` count 0 (also pinned by `foundation.spec.ts:110`).
 - Do not click Create. Do not unlock modes via a hidden agent.
-- Driven 2026-10-05 on `:3000` (evidence `build/2026-10-05-maintain3/`): `/studio/new`, `/agents`, `/studio/abc-123`, `/agents/abc?thread=x` and `/workspace` each ended on `/chat` with an empty search string; `create-agent`, `save-soul`, `agent-prompt` and `mode-agents` count 0; `settings-form` visible with `settings-build-link` count 0. Driven 2026-10-16 on stub webdev (`:3050`): `/studio`, `/studio/new`, `/studio/abc-123`, `/agents` and `/studio/<uuid>` each ended on `/chat`.
+- Driven 2026-10-05 on `:3000` (evidence `build/2026-10-05-maintain3/`): `/studio/new`, `/agents`, `/studio/abc-123`, `/agents/abc?thread=x` and `/workspace` each ended on `/chat` with an empty search string; `create-agent`, `save-soul`, `agent-prompt` and `mode-agents` count 0; `settings-form` visible with `settings-build-link` count 0. Driven 2026-10-16 on a throwaway stub webdev desk: `/studio`, `/studio/new`, `/studio/abc-123`, `/agents` and `/studio/<uuid>` each ended on `/chat`. Evidence: `evidence/build/2026-10-16-maint/`.
 
 ## Gotchas
 
