@@ -44,4 +44,6 @@ The tester is the staging code at every stage (Rizky, 2026-10-14). New work is d
 - [`docs/internal/chat-workers-spec.md`](docs/internal/chat-workers-spec.md)
 - [`docs/internal/model-tiers-spec.md`](docs/internal/model-tiers-spec.md)
 - [`docs/internal/chat-computer-spec.md`](docs/internal/chat-computer-spec.md)
-- [`docs/internal/team-board-spec.md`](docs/internal/team-board-spec.md) (design only: the team board, each person's own agent, the company and personal agent stores)
+- [`docs/internal/team-board-spec.md`](docs/internal/team-board-spec.md) (HYP AI's design now: the team board, each person's own agent, the company and personal agent stores; the tester's build of it was removed on 2026-10-16)
+
+**OPC only since 2026-10-16 (repo split P5b).** The tester no longer carries the team board, collective Workspaces, versioned documents, quota, the company gateway management token, the enterprise shell, prompt-made agents, people names, paid media approval or per-person file privacy. Beyond `main` it keeps the chat-first bots shell, the four model choices (K-D31), stored pictures as input (F3) and chat upload originals (U1).
