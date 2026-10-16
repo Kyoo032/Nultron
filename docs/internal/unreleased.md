@@ -63,6 +63,8 @@ Rizky's rulings of 2026-10-15. Removed from the tester: the team board, collecti
 - Their leftover triggers on `tenant_usage` and `organization_members` stay too. They fire only on a non-null `allocation_id`, which nothing writes now, or delete rows from the orphaned quota tables.
 - Tests that asserted a colleague was refused were cut (Rizky, 2026-10-15). Every other-company and other-desk assertion is kept.
 - Security register: SR-175, SR-176 and SR-178 to SR-183 are not applicable.
+- SR-185, found in review: with the owner column gone, a hosted desk showed a person's kept chat original (U1) to every colleague. Contained: in server mode no original is kept or named (`original.ts:35`, `:54`). Personal still keeps it. Rizky chooses the lasting option.
+- `pre-opc-schema.test.ts` also checks that every foreign key from an orphaned table into a current table is `CASCADE` or `SET NULL`, and that deleting a desk, a thread, a file and an agent works on an old database.
 - Not driven: no browser drive on `:3200` and no hosted drive after the strip.
 
 Lanes: tester

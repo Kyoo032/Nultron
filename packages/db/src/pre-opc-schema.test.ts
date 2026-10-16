@@ -139,4 +139,46 @@ describe("a database written before the OPC split", () => {
     const artifacts = sqlite.prepare("SELECT workspace_id FROM artifacts ORDER BY workspace_id").all();
     expect(artifacts).toEqual([{ workspace_id: "b-ws" }]);
   });
+
+  it("gives every old table's key into a current table a cascade, so no current delete is blocked", () => {
+    const fresh = new Database(":memory:");
+    ensureSchema(fresh);
+    const current = new Set(
+      (fresh.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>).map(
+        (row) => row.name,
+      ),
+    );
+    fresh.close();
+    const orphaned = (
+      sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>
+    )
+      .map((row) => row.name)
+      .filter((name) => !current.has(name) && !name.startsWith("sqlite_"));
+    expect(orphaned.length).toBeGreaterThan(20);
+    for (const table of orphaned) {
+      const keys = sqlite.prepare(`PRAGMA foreign_key_list(\`${table}\`)`).all() as Array<{
+        table: string;
+        on_delete: string;
+      }>;
+      for (const key of keys.filter((entry) => current.has(entry.table))) {
+        expect(["CASCADE", "SET NULL"], `${table} -> ${key.table}`).toContain(key.on_delete);
+      }
+    }
+  });
+
+  it("deletes a desk, a thread and a file of its own, and takes their old rows with them", () => {
+    ensureSchema(sqlite);
+    seedTenant(sqlite, "a");
+    seedTenant(sqlite, "b");
+
+    sqlite.prepare("DELETE FROM threads WHERE id = ?").run("a-thread");
+    sqlite.prepare("DELETE FROM artifacts WHERE id = ?").run("a-artifact");
+    sqlite.prepare("DELETE FROM agents WHERE id = ?").run("a-agent");
+    sqlite.prepare("DELETE FROM workspaces WHERE id = ?").run("a-ws");
+
+    expect(countFor(sqlite, "board_columns", "a")).toBe(0);
+    expect(countFor(sqlite, "projects", "a")).toBe(0);
+    expect(countFor(sqlite, "board_columns", "b")).toBe(1);
+    expect(countFor(sqlite, "projects", "b")).toBe(1);
+  });
 });

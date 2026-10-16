@@ -1,4 +1,4 @@
-import type { TenantContext } from "@agentforge/core";
+import { isServerMode, type TenantContext } from "@agentforge/core";
 import { DOCX_MIME, PDF_MIME, XLSX_MIME, type ArtifactMime } from "@agentforge/core/artifacts";
 import { type ArtifactRefusal, saveRenderedArtifact } from "../artifact-save";
 import { artifactStore } from "../artifacts";
@@ -32,6 +32,9 @@ export async function keepOriginal(
   file: HostFile,
   format: string,
 ): Promise<OriginalAnswer | null> {
+  if (isServerMode()) {
+    return null;
+  }
   const mime = originalMimeFor(format);
   if (mime === null) {
     return null;
@@ -48,7 +51,7 @@ export async function keepOriginal(
 }
 
 export function verifiedOriginalId(tenant: TenantContext, value: unknown, format: string): string | null {
-  if (typeof value !== "string" || !UUID.test(value)) {
+  if (isServerMode() || typeof value !== "string" || !UUID.test(value)) {
     return null;
   }
   const mime = originalMimeFor(format);

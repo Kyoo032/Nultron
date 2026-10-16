@@ -17,7 +17,7 @@ delete process.env.DATABASE_URL;
 
 import { createSession, SESSION_COOKIE_SECURE } from "../auth/session";
 import { createMemorySessionStore } from "../auth/session-store";
-import { docxFixture, pdfFixture, PLANTED, rtfFixture } from "../file-extract/test-fixtures";
+import { docxFixture, pdfFixture, PLANTED } from "../file-extract/test-fixtures";
 import type { HostBytesResult, HostFile, HostJsonResult, HostRequest, HostResult } from "../types";
 import "../tenant-storage-db";
 
@@ -101,11 +101,6 @@ async function artifactIdsOf(caller: Caller): Promise<string[]> {
   return body.items.map((item) => item.id);
 }
 
-async function fileStatus(caller: Caller, id: string): Promise<number> {
-  const result = await call(caller, "GET", `/api/v1/artifacts/${id}/file`, { params: { artifactId: id } });
-  return result.status;
-}
-
 async function getStatus(caller: Caller, id: string): Promise<number> {
   return (await call(caller, "GET", `/api/v1/artifacts/${id}`, { params: { artifactId: id } })).status;
 }
@@ -154,109 +149,57 @@ afterAll(async () => {
   rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
-describe("hosted: an attached original is kept as a desk artifact", () => {
+describe("hosted: an attached original is not kept, so no colleague can read it", () => {
   beforeEach(() => {
     process.env.AGENTFORGE_SERVER = "1";
   });
 
-  it("keeps the original bytes as an artifact on the attacher's desk", async () => {
-    const bytes = await docxFixture();
-    const reply = await attach(HOSTED(ana), "Laporan Q3.docx", bytes);
+  it("keeps no original for a Word file, and the text still attaches", async () => {
+    const before = await keptRows(ana.tenant.workspaceId);
+    const reply = await attach(HOSTED(ana), "Laporan Q3.docx", await docxFixture());
     expect(reply.status).toBe(200);
-    const answer = doc(reply);
-    expect(answer.originalId).toMatch(UUID);
-    expect(answer.originalSkipped).toBeNull();
-    const id = answer.originalId as string;
-
-    const { sql } = await import("@agentforge/db");
-    const row = sql.prepare("SELECT mime, workspace_id FROM artifacts WHERE id = ?").get(id) as {
-      mime: string;
-      workspace_id: string;
-    };
-    expect(row.mime).toBe(DOCX);
-    expect(row.workspace_id).toBe(ana.tenant.workspaceId);
-
-    const download = await call(HOSTED(ana), "GET", `/api/v1/artifacts/${id}/file`, { params: { artifactId: id } });
-    expect(download.type === "bytes" && Buffer.from((download as HostBytesResult).bytes).equals(bytes)).toBe(true);
+    expect(doc(reply).originalId).toBeNull();
+    expect(doc(reply).originalSkipped).toBeNull();
+    expect(doc(reply).text as string).toContain(PLANTED);
+    expect(await keptRows(ana.tenant.workspaceId)).toBe(before);
   });
 
-  it("names the id to the model above the attachment, once the message is sent", async () => {
-    const { sent } = await attachAndSend(HOSTED(ana), "Laporan Q3.docx", await docxFixture());
+  it("leaves nothing a colleague or another company could list", async () => {
+    const before = await artifactIdsOf(HOSTED(ben));
+    const elsewhere = await artifactIdsOf(HOSTED(cal));
+    expect(ben.tenant.workspaceId).toBe(ana.tenant.workspaceId);
+    await attachAndSend(HOSTED(ana), "Kontrak.docx", await docxFixture());
+    await attach(HOSTED(ana), "Ringkasan.pdf", pdfFixture());
+    expect(await artifactIdsOf(HOSTED(ben))).toEqual(before);
+    expect(await artifactIdsOf(HOSTED(cal))).toEqual(elsewhere);
+  });
+
+  it("names no original to the model once the message is sent", async () => {
+    const { sent } = await attachAndSend(HOSTED(ana), "Perjanjian.docx", await docxFixture());
     expect(sent.status).toBe(200);
-    const id = (await artifactIdsOf(HOSTED(ana)))[0] as string;
-    const notes = doc(sent).notes as string;
-    expect(notes).toContain(`artifact ${id}`);
-    expect(notes).toContain(`[Original file kept: artifact ${id}, the file as it was attached.]`);
-    expect(doc(sent).text as string).not.toContain(id);
+    expect(doc(sent).notes as string).not.toContain("Original file");
+    expect(doc(sent).saved).not.toBeNull();
   });
 
-  it("lets the attacher read, download and list it", async () => {
-    const bytes = await docxFixture();
-    const { read } = await attachAndSend(HOSTED(ana), "Kontrak.docx", bytes);
-    const id = doc(read).originalId as string;
-    expect(await getStatus(HOSTED(ana), id)).toBe(200);
-    expect(await fileStatus(HOSTED(ana), id)).toBe(200);
-    expect(await artifactIdsOf(HOSTED(ana))).toContain(id);
-    expect((await downloaded(HOSTED(ana), id))?.equals(bytes)).toBe(true);
-  });
-
-  it("refuses a person in another company, with the same answers as a missing id", async () => {
-    const { read } = await attachAndSend(HOSTED(ana), "Perjanjian.docx", await docxFixture());
-    const id = doc(read).originalId as string;
-    expect(id).toMatch(UUID);
-    expect(await getStatus(HOSTED(ana), id)).toBe(200);
-    expect(cal.tenant.workspaceId).not.toBe(ana.tenant.workspaceId);
-    expect(await getStatus(HOSTED(cal), id)).toBe(404);
-    expect(await fileStatus(HOSTED(cal), id)).toBe(404);
-    expect(await artifactIdsOf(HOSTED(cal))).not.toContain(id);
-    const missing = "00000000-0000-4000-8000-000000000000";
-    expect(await getStatus(HOSTED(cal), missing)).toBe(404);
-  });
-
-  it("lets a member download the original they attached", async () => {
-    const bytes = await docxFixture();
-    const { read } = await attachAndSend(HOSTED(ben), "Anggaran.docx", bytes);
-    const id = doc(read).originalId as string;
-    expect(id).toMatch(UUID);
-    expect((await downloaded(HOSTED(ben), id))?.equals(bytes)).toBe(true);
-  });
-
-  it("does not name a stored file that is not a kept original (a Markdown artifact of Ana's)", async () => {
+  it("does not name a stored file as a kept original, even one marked as a chat upload", async () => {
     const { artifactStore } = await import("../artifacts");
-    const note = artifactStore().create(ana.tenant, {
+    const marked = artifactStore().create(ana.tenant, {
       mode: "documents",
       kind: "draft",
-      title: "Catatan",
-      mime: "text/markdown",
-      body: "# Catatan",
+      title: "Lama.docx",
+      mime: DOCX,
+      body: Buffer.from(await docxFixture()).toString("base64"),
+      meta: { chatUpload: true },
     });
     const sent = await save(HOSTED(ana), {
-      name: "Catatan.docx",
+      name: "Lama.docx",
       format: "docx",
       bytes: 1,
       masked: 0,
       text: "isi",
-      originalId: note.id,
+      originalId: marked.id,
     });
-    expect(doc(sent).notes as string).not.toContain(note.id);
-  });
-
-  it("keeps nothing for a format that is not Word, Excel or PDF, and says so", async () => {
-    const before = await keptRows(ana.tenant.workspaceId);
-    const reply = await attach(HOSTED(ana), "catatan.rtf", rtfFixture());
-    expect(reply.status).toBe(200);
-    expect(doc(reply).originalId).toBeNull();
-    expect(doc(reply).originalSkipped).toBeNull();
-    expect(await keptRows(ana.tenant.workspaceId)).toBe(before);
-  });
-
-  it("keeps the PDF original too, and the attacher downloads it unchanged", async () => {
-    const pdf = pdfFixture();
-    const reply = await attach(HOSTED(ana), "Ringkasan.pdf", pdf);
-    expect(reply.status).toBe(200);
-    const id = doc(reply).originalId as string;
-    expect(id).toMatch(UUID);
-    expect((await downloaded(HOSTED(ana), id))?.equals(pdf)).toBe(true);
+    expect(doc(sent).notes as string).not.toContain(marked.id);
   });
 
   it("answers 401 for an attachment with no session, and keeps nothing", async () => {
@@ -268,31 +211,11 @@ describe("hosted: an attached original is kept as a desk artifact", () => {
     expect(await keptRows(ana.tenant.workspaceId)).toBe(before);
   });
 
-  it("a file too large to keep still attaches, and the answer says the original was not kept", async () => {
-    const reply = await attach(HOSTED(ana), "Besar.docx", await oversizedDocx());
-    expect(reply.status).toBe(200);
-    expect(doc(reply).originalId).toBeNull();
-    expect(doc(reply).originalSkipped).toBe("too_large");
-    expect(doc(reply).text as string).toContain(PLANTED);
-    const sent = await save(HOSTED(ana), {
-      name: "Besar.docx",
-      format: "docx",
-      bytes: 1,
-      masked: 0,
-      text: doc(reply).text,
-      originalId: null,
-      originalSkipped: "too_large",
-    });
-    expect(doc(sent).notes as string).toContain("Original file not kept");
-    expect(doc(sent).saved).not.toBeNull();
-  });
-
-  it("when storage is full the text still attaches, and the original is not kept", async () => {
+  it("when storage is full the text still attaches", async () => {
     process.env.AGENTFORGE_TENANT_STORAGE_BYTES = "1000";
     const reply = await attach(HOSTED(ana), "Penuh.docx", await docxFixture());
     expect(reply.status).toBe(200);
     expect(doc(reply).originalId).toBeNull();
-    expect(doc(reply).originalSkipped).toBe("quota");
     expect(doc(reply).text as string).toContain(PLANTED);
   });
 });
@@ -307,6 +230,29 @@ describe("on Personal there is one person, so the original is on the desk (parit
     expect(doc(reply).originalSkipped).toBeNull();
     expect(await getStatus(LOCAL, id)).toBe(200);
     expect((await downloaded(LOCAL, id))?.equals(bytes)).toBe(true);
+  });
+
+  it("names the kept original to the model once the message is sent", async () => {
+    const { read, sent } = await attachAndSend(LOCAL, "Laporan Q3.docx", await docxFixture());
+    const id = doc(read).originalId as string;
+    expect(doc(sent).notes as string).toContain(`[Original file kept: artifact ${id}, the file as it was attached.]`);
+    expect(doc(sent).text as string).not.toContain(id);
+  });
+
+  it("keeps the PDF original too, and the desk downloads it unchanged", async () => {
+    const pdf = pdfFixture();
+    const reply = await attach(LOCAL, "Ringkasan.pdf", pdf);
+    const id = doc(reply).originalId as string;
+    expect(id).toMatch(UUID);
+    expect((await downloaded(LOCAL, id))?.equals(pdf)).toBe(true);
+  });
+
+  it("a file too large to keep still attaches, and the answer says the original was not kept", async () => {
+    const reply = await attach(LOCAL, "Besar.docx", await oversizedDocx());
+    expect(reply.status).toBe(200);
+    expect(doc(reply).originalId).toBeNull();
+    expect(doc(reply).originalSkipped).toBe("too_large");
+    expect(doc(reply).text as string).toContain(PLANTED);
   });
 
   it("keeps the text, the desk copy and the notes as they were, plus the original", async () => {

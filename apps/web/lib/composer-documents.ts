@@ -55,7 +55,7 @@ export type ChatDocumentResult = {
   readonly truncated: boolean;
   /** Personal details the host masked. */
   readonly masked: number;
-  /** The artifact that keeps the file's own bytes, private to the person who attached it. */
+  /** The artifact that keeps the file's own bytes. A hosted desk keeps none. */
   readonly originalId: string | null;
   /** Why the original was not kept, for a format that has one. */
   readonly originalSkipped: OriginalSkipReason | null;
