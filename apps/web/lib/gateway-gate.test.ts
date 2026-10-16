@@ -81,17 +81,15 @@ describe("resolveGate", () => {
     }
   });
 
-  it("keeps webdev open when the host reports no gate, exactly as before the hosted build existed", () => {
-    // A browser on a desk is the dev server: the settings call can be mid-flight, or the host can be
-    // an older build with no gate at all, and neither has ever meant "lock the app".
+  it("fails closed off the hosted build too when the host reports no gate", () => {
     for (const payload of unreported) {
-      expect(resolveGate(payload, false, false)).toBe("app");
+      expect(resolveGate(payload, false, false)).toBe("onboarding");
+      expect(resolveGate(payload, true, false)).toBe("onboarding");
     }
   });
 
-  it("defaults `hosted` to the marker on the page, which no test page carries", () => {
-    // Same call the renderer makes, with the third argument left off.
-    expect(resolveGate(undefined, false)).toBe("app");
+  it("fails closed with `hosted` left to the page marker, which no test page carries", () => {
+    expect(resolveGate(undefined, false)).toBe("onboarding");
     expect(resolveGate(undefined, true)).toBe("onboarding");
   });
 
@@ -164,8 +162,8 @@ describe("resolveGate — the hosted deferral", () => {
       }
     });
 
-    it("keeps webdev open on a missing gate, and the packaged app closed, exactly as before", () => {
-      expect(resolveGate(undefined, false, false, chose)).toBe("app");
+    it("never opens a missing gate off the hosted build, whatever was chosen", () => {
+      expect(resolveGate(undefined, false, false, chose)).toBe("onboarding");
       expect(resolveGate(undefined, true, false, chose)).toBe("onboarding");
     });
 

@@ -74,39 +74,15 @@ export function parseGatewayGate(value: unknown): GatewayGatePayload | null {
   };
 }
 
-/**
- * The only gate decision in the renderer.
- *
- * A reported gate is obeyed as-is, everywhere. The branch that differs is the
- * missing or malformed one — "the host did not say":
- *   - packaged desktop: closed, as it has always been (the host is in-process, so
- *     silence there is a broken build, not a slow one);
- *   - hosted build: closed, because a tenant must never see the app on a gate
- *     nobody reported (security spec row T4);
- *   - anything else (webdev, a browser on a desk): open, unchanged. The dev
- *     server answers with `status: "stub", allowed: true`, and a settings call
- *     that is merely in flight has never been a reason to lock the app.
- *
- * `hosted` is a fact the *server* stamped into the page (`hosted-build.ts`), and
- * it can only make a *missing* gate stricter.
- *
- * The one thing that can open a gate the host reported closed is the hosted deferral (Nultron
- * Enterprise, owner decision 2026-10-01): a signed-in hosted person who chose "Add it later" on the
- * onboarding key step. It needs all three of: the hosted build, a live session, and the host's own
- * record of the choice. It never applies to a gate nobody reported, and it never applies on the
- * Personal app, where a closed gate is the key step and nothing else. It changes what the screen
- * shows and nothing about what the host allows: every gateway-calling route still answers
- * `403 gateway_blocked`.
- */
 export function resolveGate(
   payload: unknown,
-  isElectron: boolean,
+  _isElectron: boolean,
   hosted: boolean = isHostedBuild(),
   deferral: KeyDeferral = NO_KEY_DEFERRAL,
 ): GateView {
   const gate = parseGatewayGate(payload);
   if (!gate) {
-    return hosted || isElectron ? "onboarding" : "app";
+    return "onboarding";
   }
   if (gate.allowed) {
     return "app";

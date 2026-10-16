@@ -1,7 +1,7 @@
 {
   "kicker": "Plans",
   "title": "Choose a plan",
-  "intro": "Personal is the Mac and Windows Nultron app, a complement from DPS when you are buying a lot of tokens. Enterprise is the web-based Nultron.",
+  "intro": "Personal is your own Nultron desk for one owner, a complement from DPS when you are buying a lot of tokens. Enterprise is the web-based Nultron.",
   "placeholderNotice": "Indicative pricing — not final.",
   "period": {
     "month": "/ month"
@@ -14,7 +14,7 @@
   "tier": {
     "personal": {
       "name": "Personal",
-      "description": "The Mac and Windows Nultron app. A complement from DPS when you are buying a lot of tokens."
+      "description": "Your own Nultron desk, for one owner. A complement from DPS when you are buying a lot of tokens."
     },
     "enterprise": {
       "name": "Enterprise",
@@ -22,7 +22,7 @@
     }
   },
   "feature": {
-    "macWindowsApp": "Nultron for Mac and Windows",
+    "macWindowsApp": "Your own Nultron desk, for one owner",
     "tokenComplement": "A complement from DPS when you are buying a lot of tokens",
     "webProduct": "Nultron on the web",
     "contactDps": "Contact DPS to activate. There is no checkout.",
@@ -34,7 +34,7 @@
   "cta": {
     "current": "This is your plan",
     "contact": "Contact DPS",
-    "personalApp": "Mac and Windows app",
+    "personalApp": "Your own desk",
     "contactHelp": "There is no checkout for Enterprise. Contact DPS to subscribe per user.",
     "checkoutFailed": "That link could not be opened. Contact whoever runs this deployment."
   },
