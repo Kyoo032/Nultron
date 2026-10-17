@@ -540,3 +540,12 @@ Lanes: enterprise, tester.
 
 - **What.** `loadMediaRow` in `packages/host/src/edit/wire-generate.ts` now takes the organization and filters on it, like every other by-id media read. `resolveGenerateAsset` in `packages/host/src/edit/jobs.ts` passes the project's organization from `workerProjectScope`.
 - **Proof.** `packages/host/src/edit/load-media-row.test.ts` and the edit suite (305 tests). Not driven on `:3000` or a hosted build.
+
+## Theme seams step 2: one theme boot, applied before first paint, 2026-10-17 (branch `theme/step2-theme-boot`, TSK-0004)
+
+Lanes: enterprise, tester.
+
+- **What.** The theme storage key lives only in `apps/web/lib/theme.ts`. `src/main.tsx` no longer carries its own copy of the key and the resolve-and-apply logic: it calls `applyTheme(resolveTheme(getStoredTheme()))`. A tiny classic script, `theme-boot.js`, is emitted at build time by a Vite plugin (`themeBoot()` in `apps/web/vite.config.ts`, text from `apps/web/lib/theme-boot-script.ts`, key read from `theme.ts`), served in dev by the same plugin and loaded first in `<head>`. It applies the stored choice before the first paint, so a stored dark choice no longer flashes light. A file, not an inline script, so the desktop CSP (`script-src 'self'`) still holds.
+- **Unchanged on purpose.** Light-first default; the key value `agentforge-theme` (so every stored choice survives); no OS dark following (Kyo, 2026-10-17: light mode first); no accent change (the portal's accent differs from the app's, left for a design call).
+- **Proof.** `lib/theme-boot-script.test.ts` (8 tests) plus `theme.test.ts` and `renderer-bundle-safety.test.ts`; `vite build` emits `dist/theme-boot.js`. Headless Chrome with the OS set to dark: with the app JS blocked, stored dark gives `dark`, nothing stored gives `light`; the full app ends in the same class as before in all three cases; stub webdev (`AGENTFORGE_RUNTIME=stub`) serves `/theme-boot.js` and shows no page errors.
+- **Not driven.** The packaged desktop app and a hosted server.
