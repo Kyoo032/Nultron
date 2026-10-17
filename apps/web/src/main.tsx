@@ -6,19 +6,12 @@ import { ProductBrandProvider } from "@/lib/product-brand";
 import { HostCapabilitiesProvider } from "@/lib/host-capabilities";
 import { isElectron } from "@/lib/api-client";
 import { applyDeskShell } from "@/lib/shell-motion";
+import { applyTheme, getStoredTheme, resolveTheme } from "@/lib/theme";
 import "../app/globals.css";
 
-const themeInit = () => {
-  try {
-    const stored = localStorage.getItem("agentforge-theme");
-    const theme = stored === "light" || stored === "dark" ? stored : "light";
-    document.documentElement.classList.toggle("light", theme === "light");
-    document.documentElement.classList.toggle("dark", theme === "dark");
-  } catch {
-    // private mode: :root is already the light palette
-  }
-};
-themeInit();
+try {
+  applyTheme(resolveTheme(getStoredTheme()));
+} catch {}
 
 // The packaged app has no GPU, so its loops stay stepped; a browser's are smooth. Written before the first
 // render, so no loop ever starts under the wrong timing.
