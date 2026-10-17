@@ -540,3 +540,11 @@ Lanes: enterprise, tester.
 
 - **What.** `loadMediaRow` in `packages/host/src/edit/wire-generate.ts` now takes the organization and filters on it, like every other by-id media read. `resolveGenerateAsset` in `packages/host/src/edit/jobs.ts` passes the project's organization from `workerProjectScope`.
 - **Proof.** `packages/host/src/edit/load-media-row.test.ts` and the edit suite (305 tests). Not driven on `:3000` or a hosted build.
+
+## Theme seams step 1: stale brand and sync rules, 2026-10-17 (branch `theme/step1-stale-rules`, TSK-0004)
+
+Lanes: enterprise, tester. Harness and docs only, never ships.
+
+- **What.** `lanes.json` `brandLiterals` is now `["Toko Token"]`: `Nultron` may be typed in shared code since the 2026-10-15 split, and `scripts/lane-guard.baseline.json` was regenerated (only the `Nultron` counts left; the `Toko Token` counts are unchanged). `AGENTS.md`, the `change-agentforge` skill and preamble, `chat-send.md` and `release-and-sync-lanes.md` say the same. The white-label plan has a banner and its sync model, hooks list and "Nultron moves out" wording are marked superseded: `Kyoo032/hyp-ai` is standalone and nothing syncs. `lanes.json` notes no longer mention white-label brands overriding strings or mascot states.
+- **Proof.** `pnpm lane-guard`, `node --test scripts/lane-guard.test.mjs`, `pnpm ci:local`. Not driven: no product code changed.
+- **Not changed.** `Kyoo032/hyp-ai`; the `Toko Token` rule; `docs/internal/maps/virtual-agents.md` lines 119 and 229 ("no brand literal" about their own new files).

@@ -33,7 +33,7 @@ Since the 2026-10-15 split this repo is Nultron only. Shared code reaches Nultro
 
 - `engine` or `ui`: Nultron (OPC) and the tester. Tests must pass for the OPC profile.
 - `opc`: Nultron only.
-- Shared code names no brand.
+- Shared code never names the gateway (`Toko Token`). `Nultron` may appear: this repo is the Nultron core.
 
 **The vision (Rizky, 2026-10-05): everyone has all their workers inside one desk.**
 
@@ -123,7 +123,7 @@ The plan is [`docs/internal/chat-first-plan.md`](docs/internal/chat-first-plan.m
 
 **No team privacy rules here (2026-10-15).** A Nultron desk has one owner, so team rules (per-person Knowledge Bases, company-wide desks, sharing through a bot, leavers) are not built here. What `main` already enforces on a hosted desk stays as built: a Chat card is visible only to the person who owns its thread, the owner and admins included (`knowledge-visibility.ts`, [`knowledge-flows.md`](docs/internal/maps/knowledge-flows.md) § 7), and each person's chat uploads folder is their own ([`chat-documents.md`](docs/internal/maps/chat-documents.md)). The build focus is the chat and several agents working together.
 
-### Lanes: one source, main and its downstream (Rizky, 2026-10-06, 2026-10-09, 2026-10-14; must follow)
+### Lanes: main and the tester (Rizky, 2026-10-06, 2026-10-09, 2026-10-14, 2026-10-15; must follow)
 
 The tables at the top say where a change is cut, made and merged. This section keeps the rules behind them. The working form is [`docs/internal/maps/release-and-sync-lanes.md`](docs/internal/maps/release-and-sync-lanes.md).
 
@@ -131,7 +131,7 @@ The tables at the top say where a change is cut, made and merged. This section k
 - **One place to fix.** A bug fix is a pull request to `main` from a branch cut from `main`. Never fix by hand in `C:\Users\rizky\agentforge-chat`, and never open a fix pull request from `tester/chat-first`. Tester work reaches `main` only through a promotion pull request Rizky approves.
 - **Two codes, one way.** Changes move one way, from `main` into `tester/chat-first`: `git fetch origin`, then `git merge origin/main` in `C:\Users\rizky\agentforge-chat`. Never run a release from `C:\Users\rizky\agentforge-chat`. Its webdev uses port 3200 and its own data folder, so it never shares a database with `:3000`. The precise map (which change goes where, which files the tester may edit) is Rizky's vault note `C:\Users\rizky\Documents\Obsidian\40-Dev\nultron-two-codes-map.md`. Keep it current in the same session as any change to the split.
 - **After a pull request merges to `main`, in this order:** (1) merge `origin/main` into `C:\Users\rizky\agentforge-chat` and run `ci:local`; (2) release Enterprise only when Rizky says. A fix is not done for a lane until its step has run. The pull request says which lanes are still owed.
-- **Shared code carries no brand.** Shared code and copy never hard-code `Nultron` or `Toko Token`; they read `productName` and `gatewayName`. A difference between lanes is a setting (`PORTAL_SIGNIN_MODE`, the edge mode), not a fork.
+- **Shared code never names the gateway (Rizky, 2026-10-17).** Shared code and copy never hard-code `Toko Token`; they read `gatewayName`. `Nultron` may be typed: after the 2026-10-15 split this repo is the Nultron core, and `lane-guard` ratchets only `Toko Token`. `Kyoo032/hyp-ai` is a standalone codebase: nothing syncs between the two repos, a fix needed in both is made in each by hand, and brand code never comes into this repo. A difference between lanes is a setting (`PORTAL_SIGNIN_MODE`, the edge mode), not a fork.
 - **No edge on Nultron.** Nultron keeps its direct two-name setup with its own certificates and uses no Cloudflare edge. Password sign-in is a portal setting (`PORTAL_SIGNIN_MODE`).
 - **Label what a change touches.** In a pull request and in `unreleased.md`, name the lanes with the tokens `lanes.json` already reads: `enterprise`, `tester`, and `personal` (retired, owes nothing). Shared code defaults to `enterprise` and `tester`. The guard checks only that a `Lanes:` line exists, not which tokens it names.
 - **Priority.** Published wins; in a conflict keep the `main` side. The Obsidian map has the full list.
