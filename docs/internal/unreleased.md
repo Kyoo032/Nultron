@@ -573,3 +573,11 @@ Lanes: enterprise, tester.
 - **Overlap.** The unmerged `fix/safe-web-search` has a stricter media-source rule (`judgeMediaUrl`). The `image_url` check here is a strict subset; when that branch merges, delete this copy. The model-id half does not overlap.
 - **Limit on `main`.** "Change the picture you made last turn" now works only when the person pastes the picture's address; the tester's stored-picture input covers it there. The tester merge conflicts in `image-generate.ts`: keep the tester's `resolveImageInput` and take `gatewayGenerateModel` for the `model:` line.
 - **Proof.** `egress-guard.test.ts`, the model-choice blocks of `image-generate.test.ts` and `video-generate.test.ts` (8 of them fail on the old tool code), and `create-runtime-media.test.ts`. **Not driven:** `:3000` serves the main checkout, so one picture from Chat on this branch needs the branch checked out there and `:3000` restarted.
+
+## Theme seams step 1: stale brand and sync rules, 2026-10-17 (branch `theme/step1-stale-rules`, TSK-0004)
+
+Lanes: enterprise, tester. Harness and docs only, never ships.
+
+- **What.** `lanes.json` `brandLiterals` is now `["Toko Token"]`: `Nultron` may be typed in shared code since the 2026-10-15 split, and `scripts/lane-guard.baseline.json` was regenerated (only the `Nultron` counts left; the `Toko Token` counts are unchanged). `AGENTS.md`, the `change-agentforge` skill and preamble, `chat-send.md` and `release-and-sync-lanes.md` say the same. The white-label plan has a banner and its sync model, hooks list and "Nultron moves out" wording are marked superseded: `Kyoo032/hyp-ai` is standalone and nothing syncs. `lanes.json` notes no longer mention white-label brands overriding strings or mascot states.
+- **Proof.** `pnpm lane-guard`, `node --test scripts/lane-guard.test.mjs`, `pnpm ci:local`. Not driven: no product code changed.
+- **Not changed.** `Kyoo032/hyp-ai`; the `Toko Token` rule; `docs/internal/maps/virtual-agents.md` lines 119 and 229 ("no brand literal" about their own new files).

@@ -1,5 +1,7 @@
 # White-label structure and agent guardrails: plan for approval
 
+> **Superseded in part, 2026-10-15 and 2026-10-17.** The repo split made `Kyoo032/Nultron` the Nultron core and `Kyoo032/hyp-ai` a standalone codebase. Nothing syncs between them: design B's `upstream` mirror, `sync/YYYY-MM-DD` branches and "hooks to land on main" are history, and so is the idea that Nultron moves out of this repo. What still holds: the guard, `lanes.json` and `maps:check` (sections 4 and 5, stage 1), no brand code from another brand in this repo, and `Toko Token` kept out of shared code. `Nultron` may be typed in shared code.
+
 Status: proposal, 2026-10-09; revised 2026-10-12 (design B chosen by Kyo, see the decision record in section 6). Brand code never lives in agentforge; each brand is a private downstream repo.
 
 ## 1. Why now
@@ -40,15 +42,15 @@ The seams (generic, brand-neutral hooks that still land on `main` under B, so ea
 
 Cost: touches the release scripts, the deploy bundle and the pack scripts, and `AGENTS.md` says a change to those needs Rizky's word. It is a migration, done in steps, with Nultron as the default pack.
 
-**B. Downstream brand repos plus generic hooks (chosen, Kyo 2026-10-12).** Each brand is its own private repo (branches `main`, `upstream` and `sync/*`) that syncs from agentforge `main`. The brand lives there as config and assets read through the hooks above, plus a small named set of brand commits for whatever cannot be config yet. Cost grows with every brand, which the hooks keep small.
+**B. Downstream brand repos plus generic hooks (chosen, Kyo 2026-10-12; superseded by the split, see the banner).** Each brand is its own private repo (branches `main`, `upstream` and `sync/*`) that syncs from agentforge `main`. The brand lives there as config and assets read through the hooks above, plus a small named set of brand commits for whatever cannot be config yet. Cost grows with every brand, which the hooks keep small.
 
-Sync model:
+Sync model (superseded: nothing syncs after the split):
 - `upstream` is a pristine mirror of agentforge `main`; nothing brand-specific lands on it.
 - Each sync: create `sync/YYYY-MM-DD` from the brand's `main`, merge `upstream` (merge, not rebase), replay or adjust the brand layer, run `pnpm ci:local` plus the brand repo's leak check, then PR into the brand's `main`.
 - Brand Triage runs the sync, the brand Architect reviews the brand delta and the leak check, Kyo approves the merge to the brand's `main`. Cadence: each agentforge release or weekly, plus ad hoc for security fixes. Merged sync branches are deleted.
 - Leak check: each downstream repo owns its forbidden-terms list and allowlist; `main` runs a neutral check that fails when shared code names any brand.
 
-Generic hooks to land on `main`: #158 (`GATEWAY_PROVIDER_ID`), one brand config entry point, host config (with the Caddy CSP generated from the gateway host), asset paths read from config, locale overrides, neutral deploy defaults, and a reusable leak-check script parameterised by a forbidden-terms list.
+Generic hooks that were to land on `main` (history): #158 (`GATEWAY_PROVIDER_ID`), one brand config entry point, host config (with the Caddy CSP generated from the gateway host), asset paths read from config, locale overrides, neutral deploy defaults, and a reusable leak-check script parameterised by a forbidden-terms list.
 
 Recommendation: B with the hooks, and the guardrails in section 4 first.
 

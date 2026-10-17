@@ -31,7 +31,7 @@ Then pick the row in `AGENTS.md` "Where a change goes" that fits the change. Sho
 3. **Read the map page first** (pstack `how`). The page named in `lanes.json`, plus its **Touches / Do not touch** section where it has one. If the page disagrees with the code, that is a finding, fix the page in step 7.
 4. **Blast radius on any shared file.** A file is shared when it is `protected` in `lanes.json` (the tester branch edits it too), when many modes call it (`packages/host/src/job-regen.ts`), or when it sits in `packages/core` or `packages/db`. Run pstack `blast-radius` on the diff before you finish, and prove the one fact the change depends on by running code, not by writing it up.
 5. **Edit only owned paths.** Stay inside the page's Touches list. Anything in Do not touch belongs to another page: change it in its own PR. Rules that always apply:
-   - **Brand-neutral.** Shared code never types `Nultron` or `Toko Token`; it reads `productName` and `gatewayName`. New copy goes in both `en` and `id` catalogs.
+   - **Gateway-neutral.** Shared code never types `Toko Token`; it reads `gatewayName`. `Nultron` may be typed (this repo is the Nultron core since the 2026-10-15 split). New copy goes in both `en` and `id` catalogs.
    - **Enterprise-only work** is gated on `isServerMode()` and carries a Personal-parity test. Personal work must not read hosted state.
    - **Deploy differences stay in their lane.** Nultron has no Cloudflare edge; do not carry one into `webapp-deploy/`. Password sign-in is a portal setting (`PORTAL_SIGNIN_MODE`), not a lane of its own.
    - **Release, pack and deploy scripts** need Rizky's word. Never run one from `C:\Users\rizky\agentforge-chat`.
