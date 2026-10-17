@@ -84,7 +84,7 @@
   justify-content: center;
   border-radius: 10px;
   background: var(--mode, var(--accent));
-  color: var(--on-mode, #fff);
+  color: var(--on-mode);
 }
 
 .va-name {

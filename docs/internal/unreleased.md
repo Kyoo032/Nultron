@@ -540,3 +540,12 @@ Lanes: enterprise, tester.
 
 - **What.** `loadMediaRow` in `packages/host/src/edit/wire-generate.ts` now takes the organization and filters on it, like every other by-id media read. `resolveGenerateAsset` in `packages/host/src/edit/jobs.ts` passes the project's organization from `workerProjectScope`.
 - **Proof.** `packages/host/src/edit/load-media-row.test.ts` and the edit suite (305 tests). Not driven on `:3000` or a hosted build.
+
+## Theme seams step 3: component stylesheets under the motion and colour gates, 2026-10-17 (branch `theme/step3-css-gates`, TSK-0004)
+
+Lanes: enterprise, tester.
+
+- **What.** `motion-tokens.test.ts` now also reads every `components/**/*.css`: no literal duration or easing in a `transition` or `animation`, and only `transform` and `opacity` in component keyframes. `contrast-tokens.test.ts` now fails a raw hex, `rgb()` or `hsl()` colour in a component stylesheet, and a `--on-mode` fallback. Both keep a short recorded list of exceptions and fail when a recorded exception disappears.
+- **Fixed with existing tokens, no visual change.** `agent-rail.css` `120ms` is now `var(--motion-1)` (two rules); `agent-chat.css` and `virtual-agents-page.css` lose the dead `#fff` fallback on `var(--on-mode)` (`:root` always defines it). Computed transition and colour of `.agent-rail-link`, `.agent-rail-tile`, `.agent-tile` and `.va-tile` are identical before and after, light and dark (headless Chrome).
+- **Needs a design call, not changed.** (1) `agent-rail.css:86,103` still say `ease`; the desk's token curve is `--ease-out`, a slightly different curve. (2) Three black shades have no token: `agent-chat.css:161` (`#000` in a shadow), `agent-harness.css:31` (`#000000` in the bottom edge) and `agent-rail.css:174` (`rgb(0 0 0 / 0.14)`, the tooltip shadow); the `--shadow-*` tokens are `none` in the light desk, so they cannot stand in. (3) `components/open-slide-stage.tsx:263` paints the selected block with `#0f766e` (teal, not the accent). (4) `agent-rail.css:182` keeps its own `prefers-reduced-motion` block; the universal reset in `globals.css` already covers it, so it is redundant, and the existing "exactly one reduce block" test reads only `globals.css`.
+- **Proof.** `pnpm --filter ./apps/web exec vitest run lib/motion-tokens.test.ts lib/contrast-tokens.test.ts` (79 pass). With the CSS fixes reverted the new tests fail on exactly those lines.

@@ -162,6 +162,71 @@ describe("motion scale", () => {
   });
 });
 
+const componentStylesheets = readdirSync(join(webRoot, "components"), { recursive: true, encoding: "utf8" })
+  .filter((entry) => entry.endsWith(".css"))
+  .map((entry) => entry.replace(/\\/g, "/"))
+  .sort()
+  .map((entry) => ({
+    file: `components/${entry}`,
+    css: stripComments(readFileSync(join(webRoot, "components", entry), "utf8").replace(/\r\n/g, "\n")),
+  }));
+
+const DECLARATION =
+  /\b(transition|transition-duration|transition-delay|transition-timing-function|animation|animation-duration|animation-delay|animation-timing-function)\s*:\s*([^;]+);/g;
+
+const KNOWN_LITERAL_EASINGS: readonly { file: string; value: string }[] = [
+  { file: "components/agent-rail.css", value: "background-color var(--motion-1) ease, box-shadow var(--motion-1) ease" },
+  { file: "components/agent-rail.css", value: "background-color var(--motion-1) ease, color var(--motion-1) ease" },
+];
+
+describe("component stylesheets stay on the motion scale", () => {
+  it("reads the stylesheets it claims to scan", () => {
+    expect(componentStylesheets.length).toBeGreaterThanOrEqual(10);
+    expect(componentStylesheets.some(({ file }) => file === "components/agent-rail.css")).toBe(true);
+    expect(componentStylesheets.some(({ file }) => file === "components/nultron/nultron.css")).toBe(true);
+  });
+
+  it("writes no literal duration in any transition or animation declaration", () => {
+    const offenders: string[] = [];
+    for (const { file, css: sheet } of componentStylesheets) {
+      for (const match of sheet.matchAll(DECLARATION)) {
+        if (LITERAL_DURATION.test(withoutVars(match[2]))) offenders.push(`${file}: ${match[1]}: ${match[2].trim()}`);
+      }
+    }
+    expect(offenders, `durations must come from the scale:\n  ${offenders.join("\n  ")}`).toEqual([]);
+  });
+
+  it("writes no literal easing either, apart from the two recorded ones", () => {
+    const offenders: string[] = [];
+    const seen = new Set<string>();
+    for (const { file, css: sheet } of componentStylesheets) {
+      for (const match of sheet.matchAll(DECLARATION)) {
+        const value = match[2].trim();
+        if (!LITERAL_EASING.test(withoutVars(value))) continue;
+        if (KNOWN_LITERAL_EASINGS.some((known) => known.file === file && known.value === value)) seen.add(`${file}: ${value}`);
+        else offenders.push(`${file}: ${match[1]}: ${value}`);
+      }
+    }
+    expect(offenders, `easings must come from the scale:\n  ${offenders.join("\n  ")}`).toEqual([]);
+    expect(seen.size, "a recorded easing exception is gone: delete it from KNOWN_LITERAL_EASINGS").toBe(
+      KNOWN_LITERAL_EASINGS.length,
+    );
+  });
+
+  it("animates only transform and opacity inside component keyframes", () => {
+    const banned = /\b(width|height|top|left|right|bottom|margin|padding|box-shadow|filter|background-position)\s*:/;
+    const offenders: string[] = [];
+    for (const { file, css: sheet } of componentStylesheets) {
+      for (const match of sheet.matchAll(/@keyframes\s+([\w-]+)\s*\{/g)) {
+        for (const line of blockAfter(sheet, `@keyframes ${match[1]}`).split("\n")) {
+          if (banned.test(line)) offenders.push(`${file}: ${match[1]}: ${line.trim()}`);
+        }
+      }
+    }
+    expect(offenders, `component keyframes must stay on the compositor:\n  ${offenders.join("\n  ")}`).toEqual([]);
+  });
+});
+
 describe("Tailwind motion utilities in the renderer", () => {
   it("reads the sources it claims to scan", () => {
     // A silent empty scan would make the two assertions below vacuous.

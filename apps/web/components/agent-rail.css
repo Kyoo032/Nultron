@@ -83,7 +83,7 @@
   height: var(--ar-tile);
   border-radius: 12px;
   color: var(--mode, var(--accent));
-  transition: background-color 120ms ease, box-shadow 120ms ease;
+  transition: background-color var(--motion-1) ease, box-shadow var(--motion-1) ease;
 }
 
 .agent-rail-link:focus-visible {
@@ -100,7 +100,7 @@
   border-radius: 12px;
   background: color-mix(in srgb, var(--mode) 14%, transparent);
   color: var(--mode);
-  transition: background-color 120ms ease, color 120ms ease;
+  transition: background-color var(--motion-1) ease, color var(--motion-1) ease;
 }
 
 .agent-rail-link:hover .agent-rail-tile {

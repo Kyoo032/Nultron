@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -496,5 +496,54 @@ describe("palette parser", () => {
       const value = contrast(resolve("var(--text-3)", tokens), resolve("var(--line)", tokens));
       expect(value).toBeGreaterThan(1);
     }
+  });
+});
+
+describe("component stylesheets paint only from tokens", () => {
+  const webRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+  const sheets = readdirSync(join(webRoot, "components"), { recursive: true, encoding: "utf8" })
+    .filter((entry) => entry.endsWith(".css"))
+    .map((entry) => entry.replace(/\\/g, "/"))
+    .sort()
+    .map((entry) => ({
+      file: `components/${entry}`,
+      css: readFileSync(join(webRoot, "components", entry), "utf8")
+        .replace(/\r\n/g, "\n")
+        .replace(/\/\*[\s\S]*?\*\//g, ""),
+    }));
+
+  const RAW_COLOUR = /#[0-9a-fA-F]{3,8}\b|\b(?:rgb|rgba|hsl|hsla)\(/g;
+
+  const KNOWN_BLACK_SHADES: readonly { file: string; text: string }[] = [
+    { file: "components/agent-chat.css", text: "#000" },
+    { file: "components/agent-harness.css", text: "#000000" },
+    { file: "components/agent-rail.css", text: "rgb(" },
+  ];
+
+  it("reads the stylesheets it claims to scan", () => {
+    expect(sheets.length).toBeGreaterThanOrEqual(10);
+  });
+
+  it("writes no hex, rgb or hsl colour, apart from the three recorded black shades", () => {
+    const offenders: string[] = [];
+    const seen = new Set<string>();
+    for (const { file, css } of sheets) {
+      for (const match of css.matchAll(RAW_COLOUR)) {
+        const known = KNOWN_BLACK_SHADES.find((entry) => entry.file === file && entry.text === match[0]);
+        if (known) seen.add(`${file}: ${match[0]}`);
+        else offenders.push(`${file}: ${match[0]}`);
+      }
+    }
+    expect(offenders, `component colours must come from the tokens the palette tests hold:\n  ${offenders.join("\n  ")}`).toEqual(
+      [],
+    );
+    expect(seen.size, "a recorded black shade is gone: delete it from KNOWN_BLACK_SHADES").toBe(
+      KNOWN_BLACK_SHADES.length,
+    );
+  });
+
+  it("never gives --on-mode a fallback, since :root always defines it", () => {
+    const offenders = sheets.filter(({ css }) => /var\(--on-mode\s*,/.test(css)).map(({ file }) => file);
+    expect(offenders).toEqual([]);
   });
 });
