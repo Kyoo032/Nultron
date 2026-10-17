@@ -4,6 +4,8 @@ Product: both · Instance: main :3000
 
 Last verified: 2026-10-21 at e7e046c7 for the `createRuntime` call in step 5 of § 3 only (the catalog argument, SR-190). The other line numbers in that step were not re-read. Before that: 2026-10-14 for the Continue sentence at the end of § 3b only. Nothing else on the page was re-read.
 
+Last verified: 2026-10-22 at 7c449636 for one class string only (`chat-context-chip.tsx` reads `var(--text)` where it read the retired `var(--color-text)`; computed style unchanged). Nothing else on the page was re-read.
+
 Last verified: 2026-10-12 at e8a7eca8 for the "Chat-first shell" section only (the shell switch, the tier in the run body and the agent conversations; read against the tester branch before it was promoted to `main`, PR #157). Nothing else on the page was re-read.
 
 Last verified: 2026-10-11 at 2df34be (fix branch, before merge) for § 6 only (the stand-in model notice, "The stand-in notice" and the dispatch list; SH-007): read against the fix branch over that commit; the `chat-composer.tsx` and `chat-session.tsx` line numbers in § 6 were taken from that branch. The rest of the page was not re-read.
