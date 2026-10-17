@@ -18,7 +18,7 @@ const PLATFORM_LABEL: Record<FfmpegSetup["platform"], string> = {
 };
 
 const NOTICE_CLASS =
-  "border-b border-[var(--line)] bg-[color-mix(in_srgb,var(--color-accent)_8%,transparent)] px-4 py-2 text-xs text-[var(--text-2)]";
+  "border-b border-[var(--line)] bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] px-4 py-2 text-xs text-[var(--text-2)]";
 
 async function copyText(text: string): Promise<boolean> {
   try {

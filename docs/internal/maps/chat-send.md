@@ -2,6 +2,8 @@
 
 Product: both · Instance: main :3000
 
+Last verified: 2026-10-17 at 07cb099 for one class string only (`chat-context-chip.tsx` reads `var(--text)` where it read the retired `var(--color-text)`; computed style unchanged). Nothing else on the page was re-read.
+
 Last verified: 2026-10-14 for the Continue sentence at the end of § 3b only. Nothing else on the page was re-read.
 
 Last verified: 2026-10-12 at e8a7eca8 for the "Chat-first shell" section only (the shell switch, the tier in the run body and the agent conversations; read against the tester branch before it was promoted to `main`, PR #157). Nothing else on the page was re-read.

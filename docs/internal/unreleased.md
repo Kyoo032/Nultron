@@ -540,3 +540,11 @@ Lanes: enterprise, tester.
 
 - **What.** `loadMediaRow` in `packages/host/src/edit/wire-generate.ts` now takes the organization and filters on it, like every other by-id media read. `resolveGenerateAsset` in `packages/host/src/edit/jobs.ts` passes the project's organization from `workerProjectScope`.
 - **Proof.** `packages/host/src/edit/load-media-row.test.ts` and the edit suite (305 tests). Not driven on `:3000` or a hosted build.
+
+## Theme seams step 4: one layer of colour tokens, 2026-10-17 (branch `theme/step4-token-layers`, TSK-0004)
+
+Lanes: enterprise, tester.
+
+- **What.** `app/globals.css` no longer carries the legacy `--color-*` layer (`--color-bg`, `-surface`, `-text`, `-accent`, `-divider`, `-paper`, `-ink`, `-mist`, `--color-neutral-100..900`, `--color-accent-100..900`) or `--font-body`. Every reader (the stylesheet, seven components, `svg-chart.tsx`, one test string) reads the base token directly (`--bg`, `--surface`, `--text`, `--accent`, `--line`, `--accent-soft`, `--font`). `tailwind.config.ts` maps its colour names straight to the base tokens; the class names are unchanged. The `.light` block keeps only the three scrollbar thumbs, which differ from `:root`; its 27 repeated declarations are gone. Two new tests in `lib/contrast-tokens.test.ts` hold both.
+- **Proof.** `pnpm --filter ./apps/web exec vitest run lib` (290 files, 3503 tests). Stub webdev in headless Chrome, before and after, light and dark, eight routes (`/`, `/chat`, `/settings`, `/usage`, `/documents`, `/finance`, `/presentations`, `/edit`): 4,408 elements compared on colour, background, border, outline, shadow, font, fill and stroke, 0 differ; the thirteen base tokens on `<html>` are identical.
+- **Not changed, needs a decision.** The Tailwind type scale order (`2xl` 28px, `3xl` to `5xl` 24px): `text-2xl` is used 16 times and `text-3xl` twice, so any reorder changes a rendered size. The `--shadow-sm/md/lg/card: none` tokens and their Tailwind `shadow-*` names were left (not in this step). Unused Tailwind colour names (`paper`, `navy`) were left.
