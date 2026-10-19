@@ -21,6 +21,7 @@
   },
   "jobProgress": {
     "starting": "Starting…",
+    "elapsed": "{time} elapsed",
     "round": "Round {round} of {total} · {label}",
     "source": {
       "found": "found",

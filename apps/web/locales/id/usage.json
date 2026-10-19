@@ -28,7 +28,12 @@
     "aria": "Belanja per model dari waktu ke waktu",
     "empty": "Tidak ada proses {productName} dalam rentang ini.",
     "unpriced": "Proses dalam rentang ini belum diberi harga.",
-    "barTitle": "{label}: {model} · ${usd}"
+    "barTitle": "{label}: {model} · ${usd}",
+    "window": {
+      "day": "Satu batang per hari · {count} hari terakhir · {span}",
+      "week": "Satu batang per minggu · {count} minggu terakhir · {span}",
+      "month": "Satu batang per bulan · {count} bulan terakhir · {span}"
+    }
   },
   "byModel": {
     "label": "Belanja per model",

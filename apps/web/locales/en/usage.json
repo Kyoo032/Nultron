@@ -28,7 +28,12 @@
     "aria": "Spend by model over time",
     "empty": "No {productName} runs in this range.",
     "unpriced": "Runs in this range are not priced yet.",
-    "barTitle": "{label}: {model} · ${usd}"
+    "barTitle": "{label}: {model} · ${usd}",
+    "window": {
+      "day": "One bar per day · last {count} days · {span}",
+      "week": "One bar per week · last {count} weeks · {span}",
+      "month": "One bar per month · last {count} months · {span}"
+    }
   },
   "byModel": {
     "label": "Spend by model",

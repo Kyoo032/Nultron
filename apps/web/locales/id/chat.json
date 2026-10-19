@@ -107,7 +107,8 @@
   "turn": {
     "thinking": "Berpikir",
     "thinkingPlaceholder": "Berpikir…",
-    "continue": "Lanjutkan"
+    "continue": "Lanjutkan",
+    "retry": "Coba lagi"
   },
   "mascot": {
     "idle": "Siap bila Anda siap",
@@ -150,7 +151,6 @@
     "connectKey": "Pemakaian · hubungkan kunci",
     "planSeats": "{plan} · {used} dari {cap} kursi",
     "planName": "Paket: {plan}",
-    "placeholder": "Pemakaian · —",
     "unlimited": "Pemakaian · Tanpa batas",
     "remaining": "Pemakaian · {left}",
     "error": "Pemakaian tidak tersedia"

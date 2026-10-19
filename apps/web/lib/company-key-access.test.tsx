@@ -134,8 +134,16 @@ describe("Settings", () => {
     // Keeps the absence checks below honest: if the golden stopped carrying these, "not.toContain"
     // would pass for the wrong reason.
     expect(GOLDEN["en/desk"]).toContain(t("settings.gatewayHelp"));
-    expect(GOLDEN["en/desk"]).toContain(t("settings.runtimeStub"));
+    expect(GOLDEN["en/desk"]).toContain(escaped(t("settings.statusReading")));
     expect(GOLDEN["en/desk"]).toContain(t("settings.introNeedsKey", { gatewayName: "Toko Token" }));
+  });
+
+  it("the status line says No key to whoever may paste one, and No company key to a member", async () => {
+    const { runtimeStatusLabel } = await import("@/components/settings-page");
+    applyLocale("en");
+    expect(runtimeStatusLabel("stub", true)).toBe(t("settings.runtimeStub"));
+    expect(runtimeStatusLabel("stub", false)).toBe(t("settings.runtimeStubRestricted"));
+    expect(runtimeStatusLabel("ai", false)).toBe(t("settings.runtimeLive"));
   });
 
   it("an owner and an admin on the hosted app get the key field and the Save", async () => {

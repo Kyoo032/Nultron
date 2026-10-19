@@ -28,9 +28,21 @@ export const KEYLESS_CACHE_MAX = 128;
 /** arXiv legacy API: one request every three seconds, one connection. */
 export const KEYLESS_ARXIV_GAP_MS = 3_000;
 
-const THIN_BEFORE_ARXIV = 3;
-const THIN_BEFORE_CROSSREF = 2;
 const SNIPPET_MAX = 400;
+const WORD = /[\p{L}\p{N}]+/gu;
+const STOP_WORDS = new Set(
+  (
+    "a an the and or but of in on at to for from by with about into over as is are was were be been being am do does did " +
+    "has have had it its this that these those there here what which who whom whose when where why how can could will " +
+    "would should shall may might must not no yes than then so if out up down off all any some more most other such " +
+    "only same too very just also you your we our they their them he she his her me my i answer briefly brief concise " +
+    "short explain describe tell give list summarize summary please " +
+    "yang dan atau di ke dari untuk dengan pada dalam adalah ini itu tersebut akan dapat bisa apa apakah bagaimana " +
+    "mengapa kenapa siapa kapan dimana tentang bagi oleh sebagai juga tidak tak ada saja sangat lebih paling secara " +
+    "serta karena jika agar bila sudah belum telah hanya namun tetapi sebuah seorang para jawab jawablah ringkas " +
+    "singkat jelaskan sebutkan berikan"
+  ).split(" "),
+);
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
 
 export type KeylessHit = { title: string; url: string; description: string; position: number };
@@ -99,24 +111,16 @@ export async function searchKeyless(query: string, options: KeylessSearchOptions
   const timeoutMs = options.timeoutMs ?? KEYLESS_TIMEOUT_MS;
   const ctx = { fetchImpl, timeoutMs, signal: options.signal, locale };
 
+  const scholarly = scholarlyQuery(masked);
   const [wiki, openAlex] = await Promise.all([searchWikipedia(masked, ctx), searchOpenAlex(masked, ctx)]);
-  let hits = mergeHits(wiki, openAlex, scholarlyQuery(masked));
-  const tried = [wiki, openAlex];
 
   if (options.signal?.aborted) {
     return { hits: [], outage: true, locale };
   }
 
-  if (scholarlyQuery(masked) || httpsCount(hits) < THIN_BEFORE_ARXIV) {
-    const arxiv = await withArxivSlot(() => searchArxiv(masked, ctx), now, options.sleep ?? defaultSleep);
-    tried.push(arxiv);
-    hits = mergeHits(wiki, openAlex, scholarlyQuery(masked), arxiv);
-    if (httpsCount(hits) < THIN_BEFORE_CROSSREF) {
-      const crossref = await searchCrossref(masked, ctx);
-      tried.push(crossref);
-      hits = mergeHits(wiki, openAlex, scholarlyQuery(masked), arxiv, crossref);
-    }
-  }
+  const scholarSources = scholarly ? await searchScholarly(masked, ctx, now, options.sleep ?? defaultSleep) : [];
+  const tried = [wiki, openAlex, ...scholarSources];
+  const hits = relevantHits(mergeHits(wiki, openAlex, scholarly, ...scholarSources), masked);
 
   const outage = tried.every((source) => !source.ok);
   const capped = numberHits(hits).slice(0, KEYLESS_HIT_CAP);
@@ -130,8 +134,37 @@ function scholarlyQuery(query: string): boolean {
   return SCHOLARLY.test(query);
 }
 
-function httpsCount(hits: KeylessHit[]): number {
-  return hits.length;
+async function searchScholarly(
+  query: string,
+  ctx: FetchCtx,
+  now: () => number,
+  sleep: (ms: number) => Promise<void>,
+): Promise<SourceResult[]> {
+  const arxiv = await withArxivSlot(() => searchArxiv(query, ctx), now, sleep);
+  const crossref = await searchCrossref(query, ctx);
+  return [arxiv, crossref];
+}
+
+function relevantHits(hits: KeylessHit[], query: string): KeylessHit[] {
+  const wanted = meaningfulWords(query);
+  if (wanted.length === 0) {
+    return hits;
+  }
+  return hits.filter((hit) => sharesWord(wanted, meaningfulWords(`${hit.title} ${hit.description}`)));
+}
+
+function meaningfulWords(text: string): string[] {
+  const words = text.toLowerCase().match(WORD) ?? [];
+  return words.filter((word) => word.length >= 3 && !STOP_WORDS.has(word) && !/^\d+$/.test(word));
+}
+
+function sharesWord(wanted: string[], found: string[]): boolean {
+  return wanted.some((word) => found.some((other) => other === word || samePrefixWord(word, other)));
+}
+
+function samePrefixWord(a: string, b: string): boolean {
+  const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a];
+  return shorter.length >= 4 && longer.startsWith(shorter);
 }
 
 function defaultSleep(ms: number): Promise<void> {

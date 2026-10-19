@@ -10,6 +10,7 @@ import { BuddyStage } from "@/components/buddy-stage";
 import { ChatAccountChip } from "@/components/chat-account-chip";
 import { ChatComposer } from "@/components/chat-composer";
 import { continuePrompt, mayOfferContinue } from "@/lib/chat-continue";
+import { canOfferRetry, retryTextOf } from "@/lib/chat-retry";
 import { FolderSurface } from "@/components/folder/folder-surface";
 import { ChatContextChip } from "@/components/chat-context-chip";
 import { ChatHeader } from "@/components/chat-header";
@@ -105,11 +106,12 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
   const [error, setError] = useState<string | null>(null);
   /** A refused send. The sentence lives on `composer-error`; this only holds the error mascot. */
   const [sendFailed, setSendFailed] = useState(false);
+  const [retryText, setRetryText] = useState<string | null>(null);
   const [knowledgeParts, setKnowledgeParts] = useState<ContextPart[]>([]);
   /** A prompt picked from the empty screen's suggestions; handed down once, then cleared. */
   const [composerDraft, setComposerDraft] = useState<string | null>(null);
-  /** The composer's text send, for Continue. Null until the composer has rendered. */
-  const continueSendRef = useRef<((text: string) => void) | null>(null);
+  /** The composer's text send, for Continue and Try again. Null until the composer has rendered. */
+  const continueSendRef = useRef<((text: string, retry?: boolean) => void) | null>(null);
   const toolsRef = useRef(tools);
   toolsRef.current = tools;
   /** Read inside the load effect, which must not run again because the shell object is a new one. */
@@ -224,6 +226,7 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
     setFallback(null);
     setRunning(false);
     setSendFailed(false);
+    setRetryText(null);
   }
 
   async function ensureThread() {
@@ -541,6 +544,18 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
             />
           </div>
         ) : null}
+        {canOfferRetry({ failed: sendFailed, retryText, messages }) ? (
+          <div>
+            <button
+              type="button"
+              className="btn"
+              data-testid="chat-retry"
+              onClick={() => continueSendRef.current?.(retryText ?? "", true)}
+            >
+              {t("chat.turn.retry")}
+            </button>
+          </div>
+        ) : null}
         {fallback && !sendFailed ? <ChatModelFallbackNotice notice={fallback} /> : null}
       </div>
       {agentIdReady ? (
@@ -590,6 +605,7 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
               pinRef.current = true;
               setError(null);
               setSendFailed(false);
+              setRetryText(retryTextOf(payload));
               setRunning(true);
               rememberTier(tierId);
               setThinking("");
@@ -598,7 +614,9 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
               setStreaming("");
               const content =
                 payload.parts && payload.parts.length > 0 ? payload.parts : [{ type: "text", text: payload.text }];
-              setMessages((current) => [...current, { id: `local-${Date.now()}`, role: "user", content }]);
+              setMessages((current) =>
+                payload.retry ? current : [...current, { id: `local-${Date.now()}`, role: "user", content }],
+              );
             }}
             onStarted={() => setRunning(true)}
             onDelta={(text) => setStreaming((current) => current + text)}

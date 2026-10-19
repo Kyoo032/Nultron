@@ -60,6 +60,7 @@ import { markJobModelDown, maySwapModel, pickNext, startModel } from "./job-mode
 import { readModelPinned } from "./job-regen";
 import { collectToolMediaParts } from "./tool-media";
 import { assertChatImagesSendable, prepareChatImageHistory, type ChatTurn } from "./chat-image-history";
+import { readRetryTurn, turnIsStored } from "./chat-retry";
 import { saveGeneratedImage, saveGeneratedVideo } from "./media";
 import { getRunContext, hostedRequestLocale, localeForRun, withRunContext } from "./run-context";
 import { withToolRun } from "./tool-run-context";
@@ -366,13 +367,17 @@ export async function* startModalityRun(options: {
       // A picture that cannot be sent is refused before the message is stored, so the refusal does not
       // leave a bubble with no answer. This reads each image's row, not its bytes; the run reads those.
       await assertChatImagesSendable(options.tenant, userParts, { locale });
-      await insertMessage(options.tenant, thread.id, "user", userParts);
-      // The title names an attached file, never starts with its text or the host's notes about it.
-      await setThreadTitleFromParts(
-        options.tenant,
-        thread.id,
-        userParts.map((part) => (part.type === "text" ? { ...part, text: attachmentsAsMentions(part.text) } : part)),
-      );
+      const retrying = readRetryTurn(options.body);
+      const alreadyStored = retrying && turnIsStored(await listMessages(options.tenant, thread.id), userParts);
+      if (!alreadyStored) {
+        await insertMessage(options.tenant, thread.id, "user", userParts);
+        // The title names an attached file, never starts with its text or the host's notes about it.
+        await setThreadTitleFromParts(
+          options.tenant,
+          thread.id,
+          userParts.map((part) => (part.type === "text" ? { ...part, text: attachmentsAsMentions(part.text) } : part)),
+        );
+      }
       const run = await insertRun(options.tenant, thread.id, published.version.id, options.modality);
       runId = run.id;
       if (settled) {

@@ -22,6 +22,7 @@ import { apiFetch, mediaSrc } from "@/lib/api-client";
 import { useProductBrand } from "@/lib/product-brand";
 import { isGatewayBlockedText } from "@/lib/gateway-blocked";
 import { useDeskNeedsKey } from "@/lib/use-desk-needs-key";
+import { studioPickerEmpty } from "@/lib/studio-picker-empty";
 
 type StudioModel = {
   id: string;
@@ -57,6 +58,7 @@ export function ImagesStudio() {
   const { gatewayName } = useProductBrand();
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [models, setModels] = useState<StudioModel[]>([]);
+  const [listed, setListed] = useState(false);
   const [model, setModel] = useState("");
   const [aspectChoice, setAspectChoice] = useState<ImageAspect>("square");
   const [aspectTouched, setAspectTouched] = useState(false);
@@ -81,6 +83,7 @@ export function ImagesStudio() {
       }
       setItems(data.items ?? []);
       setModels(data.models ?? []);
+      setListed(true);
       // `load` runs again after every generate: keep the model the person chose while it is still listed.
       setModel((current) => keepModelChoice(current, data.models ?? [], data.defaultModel));
     } catch (err) {
@@ -102,10 +105,14 @@ export function ImagesStudio() {
     const hints = mediaPriceHints("images", models);
     return models.map((item) => ({ ...item, hint: hints[item.id] }));
   }, [models]);
+  const noModels = studioPickerEmpty({ listed, loading, keyMissing: needsKey, models });
+  const noModelsTitle = noModels
+    ? t("images.noModels.body", { gateway: gatewayName, settings: t("rail.settings") })
+    : undefined;
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!prompt.trim() || generating || needsKey) {
+    if (!prompt.trim() || generating || needsKey || noModels) {
       return;
     }
     setGenerating(true);
@@ -175,15 +182,25 @@ export function ImagesStudio() {
               </option>
             ))}
           </select>
-          <ModelSelect
-            models={modelOptions}
-            value={model}
-            onChange={setModel}
-            disabled={generating || models.length === 0}
-            testId="images-studio-model"
-            className="select-field min-w-[12rem] flex-1"
-          />
+          {noModels ? null : (
+            <ModelSelect
+              models={modelOptions}
+              value={model}
+              onChange={setModel}
+              disabled={generating || models.length === 0}
+              testId="images-studio-model"
+              className="select-field min-w-[12rem] flex-1"
+            />
+          )}
         </div>
+        {noModels ? (
+          <div className="rounded-lg border border-[var(--line)] px-3 py-2" data-testid="images-studio-no-models">
+            <p className="text-sm font-medium text-[var(--text)]">{t("images.noModels.title")}</p>
+            <p className="mt-1 text-xs text-[var(--text-2)]">
+              <SettingsLinkHint i18nKey="images.noModels.body" vars={{ gateway: gatewayName }} />
+            </p>
+          </div>
+        ) : null}
         {!model || estimate.unknown ? null : (
           <div className="space-y-0.5">
             <p className="text-xs text-[var(--text-2)]" data-testid="images-studio-estimate">
@@ -222,8 +239,10 @@ export function ImagesStudio() {
                 ? "inline-flex h-8 shrink-0 items-center justify-center rounded-pill bg-[var(--line)] px-4 text-sm text-[var(--text-3)]"
                 : "btn btn-primary h-8 shrink-0 rounded-pill px-4"
             }`}
-            disabled={generating || !prompt.trim() || needsKey}
-            title={needsKey ? t("images.needsKey", { gateway: gatewayName, settings: t("rail.settings") }) : undefined}
+            disabled={generating || !prompt.trim() || needsKey || noModels}
+            title={
+              needsKey ? t("images.needsKey", { gateway: gatewayName, settings: t("rail.settings") }) : noModelsTitle
+            }
             data-testid="images-studio-submit"
           >
             {generating ? <WorkingStatus label={t("images.generating")} /> : t("images.generate")}

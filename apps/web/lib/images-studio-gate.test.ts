@@ -32,8 +32,8 @@ function gate(patch: Partial<GatewayGatePayload>): GatewayGatePayload {
 describe("images needs-key note and submit share the host gate", () => {
   it("shows the note and disables submit on the same needsKey flag", () => {
     expect(studio).toContain("const needsKey = useDeskNeedsKey();");
-    expect(studio).toContain("if (!prompt.trim() || generating || needsKey)");
-    expect(studio).toContain("disabled={generating || !prompt.trim() || needsKey}");
+    expect(studio).toContain("if (!prompt.trim() || generating || needsKey || noModels)");
+    expect(studio).toContain("disabled={generating || !prompt.trim() || needsKey || noModels}");
     expect(studio).toMatch(/\{needsKey && !loading \? \([\s\S]*?data-testid="images-studio-needs-key"/);
     expect(studio).not.toMatch(/!ready && !loading/);
     expect(studio).not.toMatch(/disabled=\{[^}]*!ready/);

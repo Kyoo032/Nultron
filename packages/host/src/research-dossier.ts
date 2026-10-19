@@ -71,6 +71,8 @@ export const RESEARCH_CAPS: ResearchCaps = {
   maxPassagesPerSource: 5,
 };
 
+const READ_ATTEMPTS_BEYOND_CAP = 5;
+
 export type SearchHit = { title?: string; url?: string; description?: string };
 export type PageRead = { title: string; text: string; truncated: boolean };
 
@@ -612,6 +614,17 @@ async function mapWithConcurrency<T, R>(
   return results;
 }
 
+type SourceRead = { source: DossierSource; hits: ClaimHit[] };
+
+export function keepReadSources<T extends { source: DossierSource }>(results: readonly T[], cap: number): T[] {
+  const readable = results.filter((result) => result.source.status === "read").slice(0, cap);
+  const unreadable = results
+    .filter((result) => result.source.status !== "read")
+    .slice(0, Math.max(0, cap - readable.length));
+  const kept = new Set<T>([...readable, ...unreadable]);
+  return results.filter((result) => kept.has(result));
+}
+
 function comparisonPromptBlock(rows: readonly ComparisonRow[]): string {
   if (rows.length === 0) {
     return "(no claim kept a passage)";
@@ -777,33 +790,48 @@ export async function runResearchDossier(input: DossierRunInput, deps: DossierDe
     emit({ type: "job.step", phase: "searching", label: query, current: index + 1, total: queries.length });
     perQuery.push({ query, hits: (await deps.search(query)).slice(0, caps.hitsPerQuery) });
   }
-  const candidates = dedupeCandidates(perQuery, caps.maxPages);
+  const candidates = dedupeCandidates(perQuery, caps.maxPages + READ_ATTEMPTS_BEYOND_CAP);
   if (candidates.length === 0) {
     throw new ApiError("tool_failed", "Search returned no readable HTTPS results for this question", 502);
-  }
-  for (const candidate of candidates) {
-    emit({ type: "job.source", id: candidate.id, title: candidate.title, url: candidate.url, status: "found" });
   }
 
   throwIfJobAborted(deps.abortSignal);
   emit({ type: "job.phase", phase: "reading", label: "Reading pages" });
   const retrievedAt = now().toISOString();
   let done = 0;
-  const read = await mapWithConcurrency(candidates, caps.readConcurrency, async (candidate) => {
+  let scheduled = 0;
+  let readable = 0;
+  const outcomes: SourceRead[] = [];
+  while (scheduled < candidates.length && readable < caps.maxPages) {
     throwIfJobAborted(deps.abortSignal);
-    const result = await readSource(candidate, question, claims, deps, retrievedAt, caps.pageChars);
-    done += 1;
-    emit({
-      type: "job.step",
-      phase: "reading",
-      label: result.source.title || result.source.url,
-      current: done,
-      total: candidates.length,
+    const batch = candidates.slice(scheduled, scheduled + caps.maxPages - readable);
+    scheduled += batch.length;
+    for (const candidate of batch) {
+      emit({ type: "job.source", id: candidate.id, title: candidate.title, url: candidate.url, status: "found" });
+    }
+    const results = await mapWithConcurrency(batch, caps.readConcurrency, async (candidate) => {
+      throwIfJobAborted(deps.abortSignal);
+      const result = await readSource(candidate, question, claims, deps, retrievedAt, caps.pageChars);
+      done += 1;
+      emit({
+        type: "job.step",
+        phase: "reading",
+        label: result.source.title || result.source.url,
+        current: done,
+        total: scheduled,
+      });
+      return result;
     });
-    return result;
-  });
-  const sources = read.map((result) => result.source);
-  const hits = read.flatMap((result) => result.hits);
+    for (const result of results) {
+      outcomes.push(result);
+      if (result.source.status === "read") {
+        readable += 1;
+      }
+    }
+  }
+  const kept = keepReadSources(outcomes, caps.maxPages);
+  const sources = kept.map((result) => result.source);
+  const hits = kept.flatMap((result) => result.hits);
 
   throwIfJobAborted(deps.abortSignal);
   const copy = researchHostCopy(deps.locale);

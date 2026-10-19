@@ -107,7 +107,8 @@
   "turn": {
     "thinking": "Thinking",
     "thinkingPlaceholder": "Thinking…",
-    "continue": "Continue"
+    "continue": "Continue",
+    "retry": "Try again"
   },
   "mascot": {
     "idle": "Ready when you are",
@@ -150,7 +151,6 @@
     "connectKey": "Usage · connect a key",
     "planSeats": "{plan} · {used} of {cap} seats",
     "planName": "Plan: {plan}",
-    "placeholder": "Usage · —",
     "unlimited": "Usage · Unlimited",
     "remaining": "Usage · {left}",
     "error": "Usage unavailable"

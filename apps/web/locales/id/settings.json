@@ -2,6 +2,7 @@
   "title": "Pengaturan",
   "intro": "Tempel kunci API gateway {gatewayName} dari {gatewayHost} untuk menjalankan chat dan mode kerja di meja {workspaceName}. Chat, kunci, dan percakapan tetap di meja ini.",
   "status": "Status: {details}",
+  "statusReading": "membaca pengaturan meja ini…",
   "runtimeLive": "Langsung",
   "runtimeStub": "Belum ada kunci — tempel di bawah",
   "keyGateway": "Kunci gateway tersimpan",

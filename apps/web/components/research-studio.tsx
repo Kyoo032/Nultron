@@ -207,7 +207,7 @@ export function ResearchStudio() {
 
       {job.busy || (job.progress.phases.length > 0 && !shown) ? (
         <div className="mt-6">
-          <JobProgressList progress={job.progress} busy={job.busy} mode="research" testId="research-progress" />
+          <JobProgressList progress={job.progress} busy={job.busy} mode="research" testId="research-progress" elapsed />
         </div>
       ) : null}
 

@@ -12,12 +12,13 @@ import {
   type Technical,
   type TickerPacket,
 } from "@/lib/market-client";
+import type { BoardFailure } from "@/lib/market-board-error";
 import { t } from "@/lib/i18n";
 
 type Props = {
   board: Board | null;
   loading: boolean;
-  error: string | null;
+  error: BoardFailure | null;
   tickers: ReadonlyArray<string>;
   onRefresh: () => void;
   testIdPrefix?: string;
@@ -123,6 +124,36 @@ function LoadingCards({ tickers, testIdPrefix }: { tickers: ReadonlyArray<string
   );
 }
 
+function BoardNotice({
+  failure,
+  onRetry,
+  testIdPrefix,
+}: {
+  failure: BoardFailure;
+  onRetry: () => void;
+  testIdPrefix: string;
+}) {
+  if (failure.kind === "message") {
+    return (
+      <p className={NOTE} role="alert" data-testid={`${testIdPrefix}-board-error`}>
+        {failure.text}
+      </p>
+    );
+  }
+  return (
+    <div
+      className={`${NOTE} flex flex-wrap items-center justify-between gap-2`}
+      role="alert"
+      data-testid={`${testIdPrefix}-board-unavailable`}
+    >
+      <p>{t("market.board.unavailable")}</p>
+      <button type="button" className="btn text-xs" onClick={onRetry} data-testid={`${testIdPrefix}-board-retry`}>
+        {t("market.board.retry")}
+      </button>
+    </div>
+  );
+}
+
 /** Quote and chart per ticker as soon as chips exist; works without an API key. */
 export function MarketBoard({ board, loading, error, tickers, onRefresh, testIdPrefix = "market" }: Props) {
   if (tickers.length === 0) {
@@ -151,11 +182,7 @@ export function MarketBoard({ board, loading, error, tickers, onRefresh, testIdP
           {t("market.board.refresh")}
         </button>
       </div>
-      {error ? (
-        <p className={NOTE} role="alert" data-testid={`${testIdPrefix}-board-error`}>
-          {error}
-        </p>
-      ) : null}
+      {error ? <BoardNotice failure={error} onRetry={onRefresh} testIdPrefix={testIdPrefix} /> : null}
       {board && board.failures.length > 0 ? (
         <p className={NOTE} data-testid={`${testIdPrefix}-board-failures`}>
           {board.failures.join("; ")}

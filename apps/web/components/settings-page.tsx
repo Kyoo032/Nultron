@@ -42,7 +42,7 @@ type Probe = {
 const fieldClass =
   "mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)]";
 
-function runtimeStatusLabel(mode: "ai" | "stub", mayChangeKey: boolean): string {
+export function runtimeStatusLabel(mode: "ai" | "stub", mayChangeKey: boolean): string {
   if (mode === "ai") {
     return t("settings.runtimeLive");
   }
@@ -153,6 +153,7 @@ export function SettingsPage() {
   const [hasVolcengine, setHasVolcengine] = useState(false);
   const [openaiKeyFingerprint, setOpenaiKeyFingerprint] = useState<string | null>(null);
   const [runtime, setRuntime] = useState<"ai" | "stub">("stub");
+  const [loaded, setLoaded] = useState(false);
   const [openaiApiKey, setOpenaiApiKey] = useState("");
   const [, setGoogleApiKey] = useState("");
   const [, setAnthropicApiKey] = useState("");
@@ -257,6 +258,7 @@ export function SettingsPage() {
     setLocale(parseAppLocale(payload.locale));
     setSavedLocale(parseAppLocale(payload.savedLocale ?? payload.locale));
     setResetPending(payload.resetPending === true);
+    setLoaded(true);
   }
 
   /** The sentence for an answer that did not land: a closed gate names its reason. */
@@ -441,17 +443,19 @@ export function SettingsPage() {
 
       <p className="mt-3 text-sm text-[var(--text-3)]" data-testid="runtime-status">
         {t("settings.status", {
-          details: [
-            runtimeStatusLabel(runtime, mayChangeKey),
-            hasOpenai ? t("settings.keyGateway") : null,
-            hasAnthropic ? t("settings.keyAnthropic") : null,
-            hasGoogle ? t("settings.keyGoogle") : null,
-            hasVolcengine ? t("settings.keyVolcengine") : null,
-            probe?.detectedDialect ? t("settings.detected", { dialect: probe.detectedDialect }) : null,
-            !hasOpenai && !hasGoogle && !hasAnthropic && !hasVolcengine ? t("settings.noKeys") : null,
-          ]
-            .filter(Boolean)
-            .join(" · "),
+          details: !loaded
+            ? t("settings.statusReading")
+            : [
+                runtimeStatusLabel(runtime, mayChangeKey),
+                hasOpenai ? t("settings.keyGateway") : null,
+                hasAnthropic ? t("settings.keyAnthropic") : null,
+                hasGoogle ? t("settings.keyGoogle") : null,
+                hasVolcengine ? t("settings.keyVolcengine") : null,
+                probe?.detectedDialect ? t("settings.detected", { dialect: probe.detectedDialect }) : null,
+                !hasOpenai && !hasGoogle && !hasAnthropic && !hasVolcengine ? t("settings.noKeys") : null,
+              ]
+                .filter(Boolean)
+                .join(" · "),
         })}
       </p>
 

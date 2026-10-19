@@ -195,10 +195,30 @@ function errorMessage(payload: unknown, fallback: string): string {
   return fallback;
 }
 
+export class MarketRequestError extends Error {
+  readonly code: string | null;
+
+  constructor(message: string, code: string | null) {
+    super(message);
+    this.name = "MarketRequestError";
+    this.code = code;
+  }
+}
+
+function errorCode(payload: unknown): string | null {
+  if (payload && typeof payload === "object") {
+    const error = (payload as { error?: { code?: unknown } }).error;
+    if (error && typeof error.code === "string") {
+      return error.code;
+    }
+  }
+  return null;
+}
+
 async function readJson<T>(res: Response, fallback: string): Promise<T> {
   const data = await res.json().catch(() => null);
   if (!res.ok) {
-    throw new Error(errorMessage(data, fallback));
+    throw new MarketRequestError(errorMessage(data, fallback), errorCode(data));
   }
   return data as T;
 }
@@ -215,9 +235,9 @@ export async function fetchMarketBoard(tickers: readonly string[], signal?: Abor
 }
 
 /** What the studio says when the briefing needs a key the user has not saved yet. */
-export const KEY_HINT =
-  "Quotes and charts work without a key. To write the briefing, add your API key in Settings.";
-export const NO_TICKER_HINT = "None of those tickers could be found. Check the spelling, for example MU, NVDA, or BBCA.";
+export const KEY_HINT = "Quotes and charts work without a key. To write the briefing, add your API key in Settings.";
+export const NO_TICKER_HINT =
+  "None of those tickers could be found. Check the spelling, for example MU, NVDA, or BBCA.";
 export const OFFLINE_HINT = "Market data is not reachable right now. Check your internet connection and try again.";
 
 /** True when the host refused because no gateway API key is saved yet. */

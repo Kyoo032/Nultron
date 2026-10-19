@@ -10,11 +10,11 @@
 import type { ModelTierId } from "@agentforge/core/tiers";
 import { t } from "./i18n";
 
-/** The JSON body of `POST /api/v1/threads/:id/runs/{text,image,video}`: the content and the tier, nothing else. */
-export type ChatRunBody = Readonly<{ content: unknown; tier: ModelTierId }>;
+/** The JSON body of `POST /api/v1/threads/:id/runs/{text,image,video}`: the content and the tier, and `retry` only on a Try again. */
+export type ChatRunBody = Readonly<{ content: unknown; tier: ModelTierId; retry?: true }>;
 
-export function buildChatRunBody(content: unknown, tier: ModelTierId): ChatRunBody {
-  return Object.freeze({ content, tier });
+export function buildChatRunBody(content: unknown, tier: ModelTierId, retry = false): ChatRunBody {
+  return Object.freeze(retry ? { content, tier, retry: true as const } : { content, tier });
 }
 
 /**

@@ -21,6 +21,7 @@
   },
   "jobProgress": {
     "starting": "Memulai…",
+    "elapsed": "{time} berlalu",
     "round": "Putaran {round} dari {total} · {label}",
     "source": {
       "found": "ditemukan",

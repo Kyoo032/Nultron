@@ -32,7 +32,7 @@ function element(text: string, marker: string): string {
 describe("the composer's run requests", () => {
   it("builds the body through one helper at both send sites, the text run and the image or video run", () => {
     expect(composer.match(/JSON\.stringify\(buildChatRunBody\(/g)).toHaveLength(2);
-    expect(composer).toContain("buildChatRunBody(outgoing, tier)");
+    expect(composer).toContain("buildChatRunBody(outgoing, tier, retrying)");
     expect(composer).toContain("buildChatRunBody(parts, tier)");
     expect(composer).toContain('from "@/lib/chat-tier-body"');
   });
