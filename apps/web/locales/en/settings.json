@@ -3,6 +3,7 @@
   "intro": "Paste your {gatewayName} gateway API key from {gatewayHost} to run chat and job modes on the {workspaceName} desk. Chat, keys and threads stay on this desk.",
   "introNeedsKey": "Paste the key from your {gatewayName} account.",
   "status": "Status: {details}",
+  "statusReading": "reading this desk's settings…",
   "runtimeLive": "Live",
   "runtimeStub": "No key — paste one below",
   "keyGateway": "Gateway key saved",
