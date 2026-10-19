@@ -32,6 +32,25 @@ describe("pageWindow", () => {
     expect(window).not.toContain(weak);
   });
 
+  it("ranks a paragraph by the question's rare words, not by words every paragraph shares", () => {
+    const common = (index: number) =>
+      `Section ${index}: official sources for Indonesia list the lower and upper figures across many years, based on census records and surveys.`;
+    const answer = "Bank Indonesia has kept core inflation within its target band of 2.0-4.0%.";
+    const text = page(["Lead.", ...Array.from({ length: 30 }, (_, i) => common(i)), answer]);
+    const question =
+      "What is Bank Indonesia's current inflation target band, including the target midpoint, lower and upper bounds, and the applicable target years, based on official sources?";
+    expect(pageWindow(text, { question, snippet: "" }, 600)).toContain(answer);
+  });
+
+  it("puts a paragraph with two question words side by side ahead of one with them apart", () => {
+    const apart = "The target for exports was met, and the band played at the inflation summit.";
+    const together = "The inflation target band was kept at 2.5 percent.";
+    const text = page(["Lead.", ...Array.from({ length: 40 }, (_, i) => filler(i)), apart, together]);
+    const window = pageWindow(text, { question: "inflation target band", snippet: "" }, 80);
+    expect(window).toContain(together);
+    expect(window).not.toContain(apart);
+  });
+
   it("uses the search snippet when the question's words are not on the page", () => {
     const answer = "Core inflation stayed inside its target band of 2.0-4.0%.";
     const text = page(["Lead.", ...Array.from({ length: 80 }, (_, i) => filler(i)), answer]);
