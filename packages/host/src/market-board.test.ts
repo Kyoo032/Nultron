@@ -2,6 +2,8 @@ import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@agentforge/core";
 import { ensureSchema } from "@agentforge/db/ensure-schema";
+import { jsonError } from "./errors";
+import { maskServerError } from "./http-adapter";
 import { packet as packetFixture } from "./market/__fixtures__/watch";
 import { BOARD_SECTIONS, buildMarketBoard, parseBoardRequest } from "./market-board";
 
@@ -100,5 +102,35 @@ describe("buildMarketBoard", () => {
         },
       ),
     ).rejects.toMatchObject({ status: 502, code: "market_unavailable" });
+  });
+
+  it("answers 502 market_unavailable when every ticker's quote failed, with no unknown symbol among them", async () => {
+    const failure = await buildMarketBoard(
+      { tickers: ["MU", "BBCA"] },
+      {
+        db: () => db,
+        buildPacket: async () => ({
+          packet: packetFixture({ tickers: [] }),
+          failures: ["MU: quote: timeout", "BBCA: quote: ECONNRESET"],
+        }),
+      },
+    ).catch((error: unknown) => error);
+    expect(failure).toMatchObject({ status: 502, code: "market_unavailable" });
+  });
+
+  it("keeps the code and drops the detail once the hosted server masks the answer", async () => {
+    const failure = await buildMarketBoard(
+      { tickers: ["MU", "ZZZZ"] },
+      {
+        db: () => db,
+        buildPacket: async () => ({
+          packet: packetFixture({ tickers: [] }),
+          failures: ["MU: quote: timeout", "ZZZZ: unknown symbol"],
+        }),
+      },
+    ).catch((error: unknown) => error);
+    const answer = maskServerError(jsonError(failure), true);
+    expect(answer).toMatchObject({ status: 502, body: { error: { code: "market_unavailable" } } });
+    expect(JSON.stringify(answer)).not.toContain("quote: timeout");
   });
 });

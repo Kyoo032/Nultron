@@ -158,7 +158,9 @@
     "unchanged": "tidak berubah",
     "aboveAverage": "Di atas rata-rata {days} hari",
     "belowAverage": "Di bawah rata-rata {days} hari",
-    "tradingView": "TradingView: {rating}"
+    "tradingView": "TradingView: {rating}",
+    "unavailable": "Data harga belum bisa diambil sekarang. Daftar pantauan Anda tetap tersimpan, coba lagi sebentar lagi.",
+    "retry": "Coba lagi"
   },
   "session": {
     "pre": "Pra-pasar",

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchMarketBoard, friendlyMarketError, type MarketBoard } from "./market-client";
+import { boardFailureOf, type BoardFailure } from "./market-board-error";
+import { fetchMarketBoard, type MarketBoard } from "./market-client";
 
 /** Chips settle for this long before the board is fetched, so pasting a list makes one request. */
 export const BOARD_DEBOUNCE_MS = 400;
@@ -11,7 +12,7 @@ const SEPARATOR = "|";
 export type MarketBoardState = {
   board: MarketBoard | null;
   loading: boolean;
-  error: string | null;
+  error: BoardFailure | null;
   /** Fetch again for the same watchlist (quotes are cached for a few minutes on the host). */
   refresh: () => void;
 };
@@ -53,8 +54,7 @@ export function useMarketBoard(tickers: ReadonlyArray<string>): MarketBoardState
           if (controller.signal.aborted) {
             return;
           }
-          const message = error instanceof Error ? error.message : "Could not load the watchlist";
-          setState((current) => ({ board: current.board, loading: false, error: friendlyMarketError(message) }));
+          setState((current) => ({ board: current.board, loading: false, error: boardFailureOf(error) }));
         });
     }, BOARD_DEBOUNCE_MS);
     return () => {
