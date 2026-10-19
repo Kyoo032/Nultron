@@ -6280,7 +6280,7 @@ Raised 2026-10-19 while fixing the Research bot. Info: checked, not an issue. SR
 Evidence: before the fix, `readPage` in `packages/host/src/research-generate.ts` ran `scanInjection` on the whole page
 text, and the extraction prompt carried only `page.text.slice(0, 8000)`. Now `fetchPageText` returns up to 400,000
 characters (`PAGE_TEXT_MAX_CHARS`, `packages/core/src/tools/platform/web-fetch.ts:10`), and the extraction prompt
-carries `pageWindow(page.text, focus, pageChars)` (`packages/host/src/research-page-window.ts:60`, used at
+carries `pageWindow(page.text, focus, pageChars)` (`packages/host/src/research-page-window.ts:112`, used at
 `packages/host/src/research-dossier.ts:666`). `scanInjection` runs on that same window
 (`research-generate.ts:176`). The guard therefore covers exactly the text the model reads. Scanning the whole
 400,000 characters instead would block on words the model never sees. The `dan` rule (`/\bdan\s+mode\b/i`)
