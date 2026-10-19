@@ -54,6 +54,13 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Findings from the tester drive on :3200, 2026-10-19 (lanes: tester; found, not fixed)
+
+- [ ] **A saved key can close the desk after a week idle.** The desk's last good check was 2026-10-12, so grace had run out. One 3 s boot check timed out on a loaded machine, and the desk opened on onboarding with "We couldn't reach Toko Token" although the gateway answered in 0.12 s. Check again fixed it. Preview desks idle for a week can hit the same wall.
+- [ ] **The Research bot fails its final write-up with a gateway 503, 3 runs out of 3.** The gateway says "supply pool unavailable". Plain Chat on the same Daily tier answered right before and after, web search included. Threads `b0ec146e-a977-4564-9bfb-c9d2f6e85f52` and `f7668e57-2b03-4cfb-b52d-1efa3d3a5285` on the `.webdev-data-chat` desk. Cause not found. A tier run never swaps model after tool steps (`packages/host/src/runs.ts:424-425`, `:541-547`), so the turn ends with "send continue".
+- [ ] **`research_dossier` kept no citable sentence** ("No page kept a sentence that can be cited.") in both the Research bot and plain Chat, before the BUG-06/07 fix reached the tester. Re-drive after this merge.
+- [ ] **Hosted breaker key mismatch (inferred impact).** `packages/host/src/tier-resolve.ts:75` checks `isJobModelDown(model)` with no tenant, while `runs.ts:641` marks a model down with the tenant, so a tier walk on the hosted server may not see a down mark.
+
 ## Fixes from the 2026-10-18 test report, 2026-10-19 (branch `fix/qa-report-2026-10-18`; lanes: enterprise, tester; tests run, Images and Videos driven on a stub desk, the rest not driven)
 
 The report was written against the HYP AI build. Each bug below was checked against Nultron's own code first.
