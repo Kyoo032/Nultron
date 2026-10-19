@@ -2,6 +2,10 @@
   "title": "Video",
   "expectedInputs": "Anda dapat: klip yang dibuat, tersimpan di galeri di bawah dan dapat diunduh.",
   "needsKey": "Tambahkan kunci gateway {gateway} di {settings} untuk membuat video.",
+  "noModels": {
+    "title": "Tidak ada model video di kunci ini",
+    "body": "Kunci gateway {gateway} ini tidak mencantumkan model video, jadi tidak ada yang bisa dibuat di sini. Periksa kunci di {settings}."
+  },
   "settingsLink": "Pengaturan",
   "loadError": "Studio video tidak dapat dimuat",
   "generateError": "Pembuatan video gagal",
