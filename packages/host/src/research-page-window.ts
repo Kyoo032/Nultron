@@ -6,6 +6,7 @@ const LEAD_CHARS = 600;
 const GAP = "\n\n…\n\n";
 const QUESTION_WEIGHT = 2;
 const SNIPPET_WEIGHT = 1;
+const RARITY_FLOOR = 0.05;
 
 type Block = { index: number; start: number; text: string };
 
@@ -26,6 +27,14 @@ function splitBlocks(text: string): Block[] {
   return blocks;
 }
 
+function sameWord(a: string, b: string): boolean {
+  if (a === b) {
+    return true;
+  }
+  const [shorter, longer] = a.length <= b.length ? [a, b] : [b, a];
+  return shorter.length >= 4 && longer.startsWith(shorter);
+}
+
 function matches(word: string, found: ReadonlySet<string>): boolean {
   if (found.has(word)) {
     return true;
@@ -34,19 +43,62 @@ function matches(word: string, found: ReadonlySet<string>): boolean {
     return false;
   }
   for (const other of found) {
-    const [shorter, longer] = word.length <= other.length ? [word, other] : [other, word];
-    if (shorter.length >= 4 && longer.startsWith(shorter)) {
+    if (sameWord(word, other)) {
       return true;
     }
   }
   return false;
 }
 
-function scoreBlock(text: string, question: readonly string[], snippet: readonly string[]): number {
-  const found = new Set(meaningfulWords(text));
-  const fromQuestion = question.filter((word) => matches(word, found)).length;
-  const fromSnippet = snippet.filter((word) => matches(word, found)).length;
-  return fromQuestion * QUESTION_WEIGHT + fromSnippet * SNIPPET_WEIGHT;
+type BlockWords = { block: Block; ordered: string[]; found: ReadonlySet<string> };
+
+function rarity(terms: readonly string[], blocks: readonly BlockWords[]): Map<string, number> {
+  const total = blocks.length;
+  return new Map(
+    terms.map((term) => {
+      const seen = blocks.filter((entry) => matches(term, entry.found)).length;
+      return [term, Math.log((total + 1) / (seen + 1)) + RARITY_FLOOR] as const;
+    }),
+  );
+}
+
+function adjacentPairs(words: readonly string[]): Array<readonly [string, string]> {
+  const pairs = new Map<string, readonly [string, string]>();
+  for (let at = 1; at < words.length; at++) {
+    const a = words[at - 1] as string;
+    const b = words[at] as string;
+    if (a !== b) {
+      pairs.set(`${a} ${b}`, [a, b]);
+    }
+  }
+  return [...pairs.values()];
+}
+
+function hasPair(ordered: readonly string[], [a, b]: readonly [string, string]): boolean {
+  for (let at = 1; at < ordered.length; at++) {
+    if (sameWord(a, ordered[at - 1] as string) && sameWord(b, ordered[at] as string)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function scoreBlock(
+  entry: BlockWords,
+  terms: { question: readonly string[]; snippet: readonly string[]; pairs: ReadonlyArray<readonly [string, string]> },
+  weight: ReadonlyMap<string, number>,
+): number {
+  const of = (word: string) => weight.get(word) ?? 0;
+  const fromQuestion = terms.question
+    .filter((word) => matches(word, entry.found))
+    .reduce((sum, word) => sum + of(word), 0);
+  const fromSnippet = terms.snippet
+    .filter((word) => matches(word, entry.found))
+    .reduce((sum, word) => sum + of(word), 0);
+  const fromPairs = terms.pairs
+    .filter((pair) => hasPair(entry.ordered, pair))
+    .reduce((sum, [a, b]) => sum + of(a) + of(b), 0);
+  return (fromQuestion + fromPairs) * QUESTION_WEIGHT + fromSnippet * SNIPPET_WEIGHT;
 }
 
 function clipAround(block: Block, words: readonly string[], room: number): string {
@@ -62,14 +114,21 @@ export function pageWindow(text: string, focus: PageFocus, maxChars: number): st
     return text;
   }
   const blocks = splitBlocks(text);
-  const question = [...new Set(meaningfulWords(focus.question))];
+  const questionWords = meaningfulWords(focus.question);
+  const question = [...new Set(questionWords)];
   const snippet = [...new Set(meaningfulWords(focus.snippet))].filter((word) => !question.includes(word));
   const [head, ...rest] = blocks;
   if (!head) {
     return text.slice(0, maxChars);
   }
-  const ranked = rest
-    .map((block) => ({ block, score: scoreBlock(block.text, question, snippet) }))
+  const words: BlockWords[] = rest.map((block) => {
+    const ordered = meaningfulWords(block.text);
+    return { block, ordered, found: new Set(ordered) };
+  });
+  const weight = rarity([...question, ...snippet], words);
+  const terms = { question, snippet, pairs: adjacentPairs(questionWords) };
+  const ranked = words
+    .map((entry) => ({ block: entry.block, score: scoreBlock(entry, terms, weight) }))
     .filter((entry) => entry.score > 0)
     .sort((a, b) => b.score - a.score || a.block.index - b.block.index);
   if (ranked.length === 0) {
