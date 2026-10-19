@@ -872,3 +872,13 @@ Lanes: enterprise, tester.
 
 - **What.** `loadMediaRow` in `packages/host/src/edit/wire-generate.ts` now takes the organization and filters on it, like every other by-id media read. `resolveGenerateAsset` in `packages/host/src/edit/jobs.ts` passes the project's organization from `workerProjectScope`.
 - **Proof.** `packages/host/src/edit/load-media-row.test.ts` and the edit suite (305 tests). Not driven on `:3000` or a hosted build.
+
+## 2026-10-19: Finance business metrics (tester)
+
+Lanes: tester.
+
+- **What.** Five metrics: the equity multiplier, operating cycle days and degree of operating leverage (ratios), the margin of safety (cash flow), and the weighted miss (budget). Core computes each one. The fact sheets and the allowed-numbers lists already carry them to the model and the guard. File and line cites: `docs/internal/maps/finance-tasks.md` § 10.
+- **Edge rule.** The equity multiplier follows the sheet's other equity ratios: null on zero equity only. Negative equity is computed, the same as debt-to-equity.
+- **Not live in the workbook.** Operating cycle days and operating leverage write their engine value as a static cell, as inventory days and receivable days already do. The equity multiplier has a live formula.
+- **Known limit.** Operating leverage reads the period before it from the period order. Year labels are sorted oldest first. Other labels, such as `FY2024`, keep the sheet's order, so a newest-first sheet with those labels reverses the reading. `latest` and `prior` already behave that way. No test covers this yet.
+- **Proof.** Core `npx vitest run src/finance`: 743 passed in 52 files. Host `npx vitest run finance xlsx`: 402 passed in 35 files. Host `vitest related` on the 17 changed core files: 205 of 212 files passed on the first run. The other 7 failed on 5-second timeouts under load. When rerun, they passed. A 7-file batch timed out on two files again, and a 3-file rerun of those passed. Web `vitest related`: 21 files, 286 tests passed. `tsc --noEmit` passes for core, host and web. Biome passes on the 17 changed files. Not driven on `:3000`; the host has not restarted.

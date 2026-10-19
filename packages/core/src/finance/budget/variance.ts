@@ -264,6 +264,25 @@ export function budgetAggregates(
   ];
 }
 
+export type BudgetWeightedError = { readonly revenue: number | null; readonly cost: number | null };
+
+export function budgetWeightedError(
+  lines: readonly { readonly kind: BudgetKind; readonly periods: readonly BudgetVarianceCell[] }[],
+  kind: BudgetKind,
+): number | null {
+  const cells = lines.filter((line) => line.kind === kind).flatMap((line) => line.periods);
+  const budgeted = cells.reduce((sum, cell) => sum + Math.abs(cell.budget), 0);
+  if (budgeted === 0) {
+    return null;
+  }
+  const missed = cells.reduce((sum, cell) => sum + Math.abs(cell.variance), 0);
+  return (missed / budgeted) * 100;
+}
+
+export function budgetWeightedErrors(lines: readonly BudgetVarianceLine[]): BudgetWeightedError {
+  return { revenue: budgetWeightedError(lines, "revenue"), cost: budgetWeightedError(lines, "cost") };
+}
+
 /** How many lines broke the limit in each period, and over the whole period. */
 export function budgetFlagCounts(
   lines: readonly BudgetVarianceLine[],

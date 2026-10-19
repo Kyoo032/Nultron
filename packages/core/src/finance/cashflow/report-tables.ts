@@ -208,6 +208,8 @@ export function breakevenTable(computed: CashflowComputed, locale: ReportLocale)
     "contributionMarginPct",
     "breakevenRevenue.perPeriod",
     "breakevenRevenue.total",
+    "marginOfSafety.perPeriod",
+    "marginOfSafetyPct",
   ]);
   const figures = cashflowFigures(computed, locale).filter((figure) => keys.has(figure.key));
   return {

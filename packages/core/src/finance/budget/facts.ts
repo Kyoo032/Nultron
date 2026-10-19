@@ -31,6 +31,7 @@ const HEADINGS: Readonly<Record<ReportLocale, Readonly<Record<string, string>>>>
     periodOnly: "Flagged in a single period but not over the whole period:",
     rollUps: "Roll-ups:",
     unmatched: "Lines with no partner in the other set:",
+    weightedError: "How far the lines missed in total, before gains and losses cancel out:",
     counts: "Counts:",
     onBudget: "Every other line is within the limit and needs no paragraph of its own.",
     none: "No line ran past the limit.",
@@ -40,6 +41,7 @@ const HEADINGS: Readonly<Record<ReportLocale, Readonly<Record<string, string>>>>
     periodOnly: "Ditandai di satu periode saja, tidak untuk seluruh periode:",
     rollUps: "Rekap pos:",
     unmatched: "Baris yang tidak punya pasangan di set lain:",
+    weightedError: "Seberapa jauh baris meleset secara total, sebelum selisih naik dan turun saling menutup:",
     counts: "Jumlah:",
     onBudget: "Baris lain ada di dalam batas dan tidak perlu paragraf sendiri.",
     none: "Tidak ada baris yang melewati batas.",
@@ -114,6 +116,18 @@ function unmatchedBlock(computed: BudgetComputed, locale: ReportLocale): string[
   return left.length + right.length === 0 ? [] : [heading("unmatched", locale), ...left, ...right];
 }
 
+function weightedErrorBlock(computed: BudgetComputed, locale: ReportLocale): string[] {
+  const formula = budgetWord("weightedErrorFormula", locale);
+  const sides = [
+    ["revenue", budgetWord("weightedErrorRevenue", locale), computed.weightedError.revenue],
+    ["cost", budgetWord("weightedErrorCost", locale), computed.weightedError.cost],
+  ] as const;
+  const lines = sides
+    .filter(([, , value]) => value !== null)
+    .map(([id, label, value]) => `- weighted-error.${id} | ${label} | ${formatBudgetPercent(value, locale)} | ${formula}`);
+  return lines.length === 0 ? [] : [heading("weightedError", locale), ...lines];
+}
+
 function countsBlock(computed: BudgetComputed, locale: ReportLocale): string[] {
   const perPeriod =
     computed.periods.length < 2 ? [] : computed.flagCounts.byPeriod.map((entry) => `- ${entry.period}: ${entry.count}`);
@@ -141,6 +155,7 @@ export function budgetPromptFacts(computed: BudgetComputed, locale: ReportLocale
     ...periodOnlyBlock(computed, locale, currency),
     ...rollUpBlock(computed, locale, currency),
     ...unmatchedBlock(computed, locale),
+    ...weightedErrorBlock(computed, locale),
     ...countsBlock(computed, locale),
     heading("onBudget", locale),
   ].join("\n");
@@ -178,6 +193,9 @@ export function budgetAllowedNumbers(input: BudgetTaskInput, computed: BudgetCom
     ...computed.aggregates.flatMap((aggregate) => [aggregate.total, ...aggregate.periods]),
   ];
   const result = budgetAggregate(computed, "result");
+  const errors = [computed.weightedError.revenue, computed.weightedError.cost].flatMap((value) =>
+    value === null ? [] : [value, Number(value.toFixed(BUDGET_PERCENT_DECIMALS))],
+  );
   return [
     ...new Set(
       withMagnitudes(
@@ -185,6 +203,7 @@ export function budgetAllowedNumbers(input: BudgetTaskInput, computed: BudgetCom
           ...input.items.map((item) => item.amount),
           ...cells.flatMap(cellNumbers),
           ...(result ? cellNumbers(result.total) : []),
+          ...errors,
           computed.lines.length,
           computed.flagCounts.total,
           computed.budgetOnly.length,

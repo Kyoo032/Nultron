@@ -63,6 +63,12 @@ const WORDS = Object.freeze({
   linesCount: { id: "Baris dibandingkan", en: "Lines compared" },
   flaggedCount: { id: "Baris ditandai", en: "Lines flagged" },
   unmatchedCount: { id: "Baris tak berpasangan", en: "Lines unmatched" },
+  weightedErrorRevenue: { id: "Meleset tertimbang, pendapatan", en: "Weighted miss, revenue" },
+  weightedErrorCost: { id: "Meleset tertimbang, beban", en: "Weighted miss, costs" },
+  weightedErrorFormula: {
+    id: "jumlah |realisasi - anggaran| per baris per periode / jumlah |anggaran|",
+    en: "sum of |actual - budget| per line per period / sum of |budget|",
+  },
   chartCap: { id: "Hanya baris dengan selisih terbesar yang digambar.", en: "Only the largest variances are drawn." },
 });
 

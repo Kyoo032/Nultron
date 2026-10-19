@@ -225,6 +225,7 @@ const METRICS: Readonly<Record<string, Metric>> = Object.freeze({
   returnOnAssetsPct: metric([PILE.revenue], (row) => pct(parts(row).netProfit, parts(row).totalAssets)),
   returnOnEquityPct: metric([PILE.revenue], (row) => pct(parts(row).netProfit, parts(row).equity)),
   assetTurnover: metric([PILE.revenue], (row) => div(parts(row).revenue, parts(row).totalAssets)),
+  equityMultiplier: metric([PILE.equity], (row) => div(parts(row).totalAssets, parts(row).equity)),
   inventoryTurnover: metric([PILE.cogs], (row) => div(parts(row).cogs, parts(row).inventory)),
 });
 

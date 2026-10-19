@@ -2,7 +2,7 @@
 
 Product: both · Instance: main :3000
 
-Last verified: 2026-10-11 on 2df34be (SH-006: the read button follows the gate on every task; code-read and unit-tested, not driven). Earlier: 2026-10-05, PR #133 merged with `origin/main` at 99922bb, not re-driven; the runner citations were re-read against the merged `runner.ts`, and the job's cancel signal now reaches the second ask and the direction rewrite. Earlier: 2026-09-28. A reading that is not the sections is asked for once more (`askForReading`, `packages/host/src/finance-tasks/reading.ts`), and a sentence that quotes a computed figure while saying the opposite of its direction is rewritten once then dropped (`holdReadingDirection`, `packages/host/src/finance-tasks/direction.ts`). Claims come from each task (`directionClaims` on `FinanceTaskModule`, `packages/core/src/finance/tasks/types.ts:62`). The guided three-step screen is unchanged. Earlier: 2026-09-27 for the chooser mascot. Catalog sentences for every task are read in core (`plain-sentences.ts`) and covered by `sample-sentences.test.ts`. § 7 testids were re-read against the guided path on 2026-09-26 at 4477d27.
+Last verified: 2026-10-19 on ec62b209 (tester lane: the five business metrics in § 10, which are not on `main`; code-read and unit-tested, not driven). Earlier: 2026-10-11 on 2df34be (SH-006: the read button follows the gate on every task; code-read and unit-tested, not driven). Earlier: 2026-10-05, PR #133 merged with `origin/main` at 99922bb, not re-driven; the runner citations were re-read against the merged `runner.ts`, and the job's cancel signal now reaches the second ask and the direction rewrite. Earlier: 2026-09-28. A reading that is not the sections is asked for once more (`askForReading`, `packages/host/src/finance-tasks/reading.ts`), and a sentence that quotes a computed figure while saying the opposite of its direction is rewritten once then dropped (`holdReadingDirection`, `packages/host/src/finance-tasks/direction.ts`). Claims come from each task (`directionClaims` on `FinanceTaskModule`, `packages/core/src/finance/tasks/types.ts:62`). The guided three-step screen is unchanged. Earlier: 2026-09-27 for the chooser mascot. Catalog sentences for every task are read in core (`plain-sentences.ts`) and covered by `sample-sentences.test.ts`. § 7 testids were re-read against the guided path on 2026-09-26 at 4477d27.
 
 ## Overview
 
@@ -158,7 +158,7 @@ or its workbook stated a number the inputs did not support. Both products run th
   confirmed row carries it, so the workbook's EBITDA and DSCR include it as the report does
   (`typedSupportingRows`, `packages/core/src/finance/ratios/report-tables.ts:52`). A formula whose pile has no
   row in the period is blank, as the report's figure is null, instead of 0 (`blankUnless`,
-  `packages/core/src/finance/ratios/formulas.ts:237`, used by `ratioMetricFormula`, `:247`).
+  `packages/core/src/finance/ratios/formulas.ts:238`, used by `ratioMetricFormula`, `:248`).
 - **Typed ratio inputs keep their bucket's sign.** A repayment typed as -1,050 is a repayment of 1,050
   (`typedAmount`, `packages/core/src/finance/ratios/compute.ts:138`).
 
@@ -168,6 +168,23 @@ The workbook fixes are pinned by evaluating the Calc formulas in the test itself
 `cashflow/report-tables.test.ts` and `ratios/report-tables.test.ts`. The rest: `appraisal/flows.test.ts`,
 `appraisal/grid.test.ts`, `fiscal-periods.test.ts`, `trend-metrics.test.ts`, `metrics.test.ts`,
 `ratios/compute.test.ts`, all under `packages/core/src/finance/`.
+
+### 10. Five business metrics (tester lane, 2026-10-19)
+
+These are on `tester/chat-first` only. `main` does not have them yet. Each figure is computed in core. The model sees a figure only in its fact sheet, and the guard accepts it only through `allowedNumbers`.
+
+**Ratios.** Three new ratio keys are declared in `packages/core/src/finance/ratios/keys.ts:195-216`. They also join the ratio list at `keys.ts:224`, so the scorecard, the bands and the trend table pick them up.
+
+- **Equity multiplier** is total assets over total equity, the third factor of DuPont (`packages/core/src/finance/ratios/compute.ts:238`). It is null only when equity is missing or zero, as `ratio()` already is (`compute.ts:64-70`). Negative equity is computed, the same as debt-to-equity (`compute.ts:206`, `divide` in `packages/core/src/finance/engine.ts:167-172`).
+- **Operating cycle days** is inventory days plus receivable days (`compute.ts:242`). It is null when either half is null.
+- **Degree of operating leverage** is the percent change in EBIT over the percent change in revenue, against the period before (`compute.ts:246-264`). It is null with no prior period (`:254-256`), when revenue did not move (`:259`), or when the prior EBIT is zero or a loss (`change()`, `:247`). The prior period is the entry before it in `periods` (`withOperatingLeverage`, `compute.ts:266-272`). `orderRatioPeriods` (`packages/core/src/finance/ratios/totals.ts:78-91`) sorts year labels oldest first, so a sheet that prints 2024 first still reads right. Other labels keep the sheet's own order, the same assumption `latest` and `prior` already make.
+- In the workbook only the equity multiplier has a live formula (`packages/core/src/finance/ratios/formulas.ts:228`). The other two write the engine's value as a static cell, as `inventoryDays` and `receivableDays` already do (`packages/host/src/renderers/xlsx.ts:120`).
+
+**Cash flow.** The margin of safety is the average cash in per period above breakeven revenue per period, as an amount and as a share of average cash in (`packages/core/src/finance/cashflow/breakeven.ts:36-43`, `:76`). It is null when breakeven cannot be computed (`:37-39`). Its two figures are in `cashflow/figures.ts:141-142` and in the breakeven table (`cashflow/report-tables.ts:211-212`). The "above breakeven" and "below breakeven" direction claims are in `cashflow/facts.ts:134-164`.
+
+**Budget.** The weighted miss is the sum of |actual − budget| over every line and period, divided by the sum of |budget|, as a percent. There is one figure per side, revenue and cost (`packages/core/src/finance/budget/variance.ts:269-284`). It is null when the side has no budget, which includes an empty sheet (`variance.ts:275-277`). It is in the fact sheet (`budget/facts.ts:119-129`, `:158`), in the allowed numbers both exact and rounded to `BUDGET_PERCENT_DECIMALS` (`budget/facts.ts:196-198`), and as report KPIs (`budget/report.ts:60`, `:64-70`).
+
+**Tests.** `packages/core/src/finance/ratios/business-ratios.test.ts` covers zero and negative equity, the Calc drift check, the newest-year-first order, and a zero prior EBIT. `packages/core/src/finance/budget/weighted-error.test.ts` covers empty and all-zero budgets. `packages/core/src/finance/cashflow/margin-of-safety.test.ts` covers the figures, the fact sheet, the guard and the direction claims. Run them with `cd packages/core && npx vitest run src/finance`.
 
 ## Where things live
 

@@ -32,5 +32,23 @@ describe("breakeven from cost behaviour", () => {
     expect(breakeven.contributionMarginPct).toBeNull();
     expect(breakeven.revenuePerPeriod).toBeNull();
     expect(breakeven.revenueTotal).toBeNull();
+    expect(breakeven.marginOfSafety).toBeNull();
+    expect(breakeven.marginOfSafetyPct).toBeNull();
+  });
+
+  it("measures how far average cash in sits above breakeven, as an amount and a share", () => {
+    const breakeven = cashflowBreakeven(kafe);
+    const average = 1_153_300_000 / 12;
+    const perPeriod = breakeven.revenuePerPeriod as number;
+    expect(breakeven.marginOfSafety).toBeCloseTo(average - perPeriod, 4);
+    expect(breakeven.marginOfSafetyPct).toBeCloseTo(((average - perPeriod) / average) * 100, 9);
+    expect(breakeven.marginOfSafetyPct).toBeCloseTo(4.6924, 3);
+  });
+
+  it("keeps the sign when cash in sits below breakeven", () => {
+    const thin = kafe.map((period) => ({ ...period, cashIn: period.cashIn * 0.5 }));
+    const breakeven = cashflowBreakeven(thin);
+    expect(breakeven.marginOfSafety).toBeLessThan(0);
+    expect(breakeven.marginOfSafetyPct).toBeLessThan(0);
   });
 });

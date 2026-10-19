@@ -192,9 +192,33 @@ export const RATIO_RATIO_METRICS: readonly RatioMetricMeta[] = Object.freeze([
   meta("returnOnAssetsPct", "percent", "Imbal hasil aset", "Return on assets", "laba bersih / jumlah aset", "net profit / total assets"),
   meta("returnOnEquityPct", "percent", "Imbal hasil ekuitas", "Return on equity", "laba bersih / jumlah ekuitas", "net profit / total equity"),
   meta("assetTurnover", "ratio", "Perputaran aset", "Asset turnover", "pendapatan / jumlah aset", "revenue / total assets"),
+  meta(
+    "equityMultiplier",
+    "ratio",
+    "Pengali ekuitas",
+    "Equity multiplier",
+    "jumlah aset / jumlah ekuitas; margin bersih x perputaran aset x pengali ekuitas = imbal hasil ekuitas (DuPont)",
+    "total assets / total equity; net margin x asset turnover x equity multiplier = return on equity (DuPont)",
+  ),
   meta("inventoryTurnover", "ratio", "Perputaran persediaan", "Inventory turnover", "HPP / persediaan", "cost of sales / inventory"),
   meta("inventoryDays", "days", "Hari persediaan", "Inventory days", "hari setahun / perputaran persediaan", "days per year / inventory turnover"),
   meta("receivableDays", "days", "Hari piutang", "Receivable days", "piutang / pendapatan x hari setahun", "receivables / revenue x days per year"),
+  meta(
+    "operatingCycleDays",
+    "days",
+    "Siklus operasi",
+    "Operating cycle",
+    "hari persediaan + hari piutang",
+    "inventory days + receivable days",
+  ),
+  meta(
+    "operatingLeverage",
+    "ratio",
+    "Tingkat leverage operasi",
+    "Degree of operating leverage",
+    "perubahan % EBIT / perubahan % pendapatan, dibanding periode sebelumnya",
+    "% change in EBIT / % change in revenue, against the period before",
+  ),
 ]);
 
 export const RATIO_METRICS: readonly RatioMetricMeta[] = Object.freeze([

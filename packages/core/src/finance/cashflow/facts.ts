@@ -132,6 +132,10 @@ const STAYS: DirectionClaim["agree"] = [{ en: "does not run out", id: "tidak hab
  * the closing balance is what a sentence quotes while claiming that it does.
  */
 export function cashflowDirectionClaims(computed: CashflowComputed): readonly DirectionClaim[] {
+  return [...runwayClaims(computed), ...marginOfSafetyClaims(computed)];
+}
+
+function runwayClaims(computed: CashflowComputed): DirectionClaim[] {
   if (computed.monthsToZeroCash !== null && Number.isFinite(computed.monthsToZeroCash)) {
     return [{ amount: computed.monthsToZeroCash, agree: RUNS_OUT, contradict: STAYS }];
   }
@@ -139,4 +143,21 @@ export function cashflowDirectionClaims(computed: CashflowComputed): readonly Di
     return [{ amount: computed.closingCash, agree: STAYS, contradict: RUNS_OUT }];
   }
   return [];
+}
+
+const ABOVE_BREAKEVEN: DirectionClaim["agree"] = [{ en: "above breakeven", id: "di atas titik impas" }];
+const BELOW_BREAKEVEN: DirectionClaim["agree"] = [{ en: "below breakeven", id: "di bawah titik impas" }];
+
+function marginOfSafetyClaims(computed: CashflowComputed): DirectionClaim[] {
+  const { marginOfSafety, marginOfSafetyPct } = computed.breakeven;
+  if (marginOfSafety === null || marginOfSafetyPct === null || marginOfSafety === 0) {
+    return [];
+  }
+  const above = marginOfSafety > 0;
+  const agree = above ? ABOVE_BREAKEVEN : BELOW_BREAKEVEN;
+  const contradict = above ? BELOW_BREAKEVEN : ABOVE_BREAKEVEN;
+  return [
+    { amount: marginOfSafety, agree, contradict },
+    { amount: marginOfSafetyPct, agree, contradict },
+  ];
 }
