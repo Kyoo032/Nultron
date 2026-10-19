@@ -6,6 +6,7 @@ import {
   hasLiveProvider,
   maskPii,
   modeMessage,
+  PAGE_TEXT_MAX_CHARS,
   resolveChatModel,
   resolveRuntimeMode,
   runWithToolSecrets,
@@ -26,6 +27,7 @@ import { collectJobAssistantRun, readModelPinned } from "./job-regen";
 import { throwIfJobAborted } from "./job-stream";
 import { repairRoundLabel, type ResearchChecksReport } from "./research-checks";
 import { RESEARCH_CAPS, runResearchDossier, type SearchHit } from "./research-dossier";
+import { pageWindow } from "./research-page-window";
 import { localeForRun } from "./run-context";
 import { log } from "./log";
 
@@ -169,9 +171,9 @@ export async function generateResearchNotes(
       },
       search: async (query) =>
         hitsFromSearch(await runWithToolSecrets(scope, () => webSearchTool.execute({ query: maskPii(query) }, tenant))),
-      readPage: async (url) => {
-        const page = await fetchPageText(url, { maxChars: RESEARCH_CAPS.pageChars, signal: abortSignal });
-        const hit = guardBypass ? null : scanInjection(page.text);
+      readPage: async (url, focus) => {
+        const page = await fetchPageText(url, { maxChars: PAGE_TEXT_MAX_CHARS, signal: abortSignal });
+        const hit = guardBypass ? null : scanInjection(pageWindow(page.text, focus, RESEARCH_CAPS.pageChars));
         if (hit) {
           throw new ApiError("injection_blocked", `blocked by injection guard (rule: ${hit.rule})`, 400);
         }

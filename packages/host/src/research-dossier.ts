@@ -13,6 +13,7 @@ import type { JobEmitter } from "@agentforge/core/jobs";
 import { runChecked } from "./harness/run-checked";
 import { throwIfJobAborted } from "./job-stream";
 import { extractJsonObject } from "./presentation-outline";
+import { type PageFocus, pageWindow } from "./research-page-window";
 import {
   RESEARCH_SYNTHESIS_CHECKS,
   excerptOf,
@@ -80,7 +81,7 @@ export type DossierDeps = {
   /** Model call: system prompt + user prompt → raw assistant text. */
   ask: (system: string, prompt: string) => Promise<string>;
   search: (query: string) => Promise<SearchHit[]>;
-  readPage: (url: string) => Promise<PageRead>;
+  readPage: (url: string, focus: PageFocus) => Promise<PageRead>;
   emit?: JobEmitter;
   abortSignal?: AbortSignal;
   now?: () => Date;
@@ -657,11 +658,12 @@ async function readSource(
   };
   const emit = deps.emit ?? (() => {});
   try {
-    const page = await deps.readPage(candidate.url);
+    const focus = { question, snippet: candidate.snippet };
+    const page = await deps.readPage(candidate.url, focus);
     const claimList = claims.length > 0 ? claims.map((claim) => `- ${claim}`).join("\n") : "(none)";
     const raw = await deps.ask(
       EXTRACT_SYSTEM,
-      `Question:\n${question}\n\nClaims:\n${claimList}\n\nPage title: ${page.title || candidate.title}\nPage text:\n${page.text.slice(0, pageChars)}`,
+      `Question:\n${question}\n\nClaims:\n${claimList}\n\nPage title: ${page.title || candidate.title}\nPage text:\n${pageWindow(page.text, focus, pageChars)}`,
     );
     const { passages, notes } = parseExtraction(raw, page.text);
     const hits = [

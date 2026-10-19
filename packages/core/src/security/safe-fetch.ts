@@ -21,6 +21,7 @@ export type SafeFetchOptions = {
   lookupImpl?: HostLookup;
   maxHops?: number;
   maxBytes?: number;
+  oversize?: "throw" | "truncate";
   timeoutMs?: number;
   headers?: Record<string, string>;
   /** Caller's abort signal (a cancelled job); combined with the timeout. */
@@ -32,6 +33,7 @@ export type SafeFetchResult = {
   status: number;
   contentType: string;
   body: Buffer;
+  truncated: boolean;
 };
 
 /**
@@ -128,10 +130,14 @@ export async function assertResolvesPublic(hostname: string, lookupImpl: HostLoo
   }
 }
 
-async function readCapped(response: Response, maxBytes: number): Promise<Buffer> {
+async function readCapped(
+  response: Response,
+  maxBytes: number,
+  oversize: "throw" | "truncate",
+): Promise<{ body: Buffer; truncated: boolean }> {
   const reader = response.body?.getReader();
   if (!reader) {
-    return Buffer.alloc(0);
+    return { body: Buffer.alloc(0), truncated: false };
   }
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -140,14 +146,22 @@ async function readCapped(response: Response, maxBytes: number): Promise<Buffer>
     if (done) {
       break;
     }
-    total += value.byteLength;
-    if (total > maxBytes) {
+    if (total + value.byteLength > maxBytes) {
       await reader.cancel();
-      throw new ApiError("invalid_request", `URL body exceeds ${Math.round((maxBytes / 1_000_000) * 10) / 10} MB`, 400);
+      if (oversize === "throw") {
+        throw new ApiError(
+          "invalid_request",
+          `URL body exceeds ${Math.round((maxBytes / 1_000_000) * 10) / 10} MB`,
+          400,
+        );
+      }
+      chunks.push(value.subarray(0, maxBytes - total));
+      return { body: Buffer.concat(chunks), truncated: true };
     }
+    total += value.byteLength;
     chunks.push(value);
   }
-  return Buffer.concat(chunks);
+  return { body: Buffer.concat(chunks), truncated: false };
 }
 
 function linkSignals(options: SafeFetchOptions): { controller: AbortController; dispose: () => void } {
@@ -193,11 +207,13 @@ export async function fetchPublicHttps(url: string, options: SafeFetchOptions = 
         parsed = new URL(next);
         continue;
       }
+      const read = await readCapped(response, maxBytes, options.oversize ?? "throw");
       return {
         finalUrl: current,
         status: response.status,
         contentType: response.headers.get("content-type") ?? "",
-        body: await readCapped(response, maxBytes),
+        body: read.body,
+        truncated: read.truncated,
       };
     }
     throw new ApiError("invalid_request", `Too many redirects (more than ${maxHops})`, 400);

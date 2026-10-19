@@ -54,6 +54,16 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## The Research bot: long pages are read, and a step after a tool is resent on 503, 2026-10-19 (branch `fix/research-page-window-and-step-retry`; tests run; driven on the tester `:3200` after the merge, see the tester log)
+
+Lanes: enterprise, tester
+
+The Research bot on the tester failed two ways. Both causes are in shared code on `main`.
+
+- `research_dossier` answered `invalid_research` ("No page kept a sentence that can be cited"). Keyless search returned mostly off-topic Wikipedia pages. The one on-topic page, Economy_of_Indonesia (1.9 MB), was refused with "URL body exceeds 1.5 MB" and marked unreachable, like six other long articles. Had it been read, extraction saw only its first 8,000 characters, and the answer sat about 172,000 characters in. Now `fetchPageText` reads the first 1.5 MB of an oversize page (`oversize: "truncate"`, opt-in in `fetchPublicHttps`; downloads, Knowledge and media still refuse). Research reads up to 400,000 characters of text, and extraction gets `pageWindow`: the lead plus the paragraphs that best match the question and the search snippet, within the same 8,000 characters (`packages/host/src/research-page-window.ts`). The injection guard scans that window, which is what the model sees. Scanning the whole page would raise false blocks on Indonesian text ("dan mode"). Passages are still checked against the whole page. The `web_fetch` tool keeps its own cap.
+- The turn ended with `HTTP 503 supply pool unavailable`. The request body was not the cause. The same captured body, replayed, answered 200 or 503 at random: about a quarter to two thirds of calls on `gpt-6-luna`, about a quarter on `gpt-5.6-luna`. A bot turn always takes tool steps. The step after a tool had no retry, because the contact retries stop once a tool has run, so any 503 there ended the turn. Now a step that follows a completed tool is sent again on 502 or 503, after 400 ms and then 1,200 ms (`packages/core/src/runtime/step-retry.ts`). The tool never runs twice, and the first step of a turn keeps the contact retries it already had.
+- Finding, not fixed here: the keyless search cannot honour the `site:` queries the planner writes, and off-topic Wikipedia hits still pass the word-overlap gate (such as "Grade inflation" for an inflation question). Most of the read budget goes to pages with nothing to cite.
+
 ## Fixes from the 2026-10-18 test report, 2026-10-19 (branch `fix/qa-report-2026-10-18`; lanes: enterprise, tester; tests run, Images and Videos driven on a stub desk, the rest not driven)
 
 The report was written against the HYP AI build. Each bug below was checked against Nultron's own code first.

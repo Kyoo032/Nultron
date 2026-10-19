@@ -7,6 +7,7 @@ import { defineTool } from "../define-tool";
 export const WEB_FETCH_MAX_CHARS_CAP = 32_000;
 export const WEB_FETCH_MAX_BYTES = 1_500_000;
 export const WEB_FETCH_TIMEOUT_MS = 10_000;
+export const PAGE_TEXT_MAX_CHARS = 400_000;
 
 const READABLE_TYPES =
   /^(text\/(html|plain|markdown|xml)|application\/(json|xml|xhtml\+xml|rss\+xml|atom\+xml|ld\+json)|)$/i;
@@ -27,9 +28,10 @@ export async function fetchPageText(
   url: string,
   options: { maxChars?: number; signal?: AbortSignal; fetchImpl?: typeof fetch } = {},
 ): Promise<WebFetchPage> {
-  const maxChars = Math.min(options.maxChars ?? HTML_TEXT_DEFAULT_MAX_CHARS, WEB_FETCH_MAX_CHARS_CAP);
+  const maxChars = Math.min(options.maxChars ?? HTML_TEXT_DEFAULT_MAX_CHARS, PAGE_TEXT_MAX_CHARS);
   const result = await fetchPublicHttps(url, {
     maxBytes: WEB_FETCH_MAX_BYTES,
+    oversize: "truncate",
     timeoutMs: WEB_FETCH_TIMEOUT_MS,
     signal: options.signal,
     fetchImpl: options.fetchImpl,
@@ -47,7 +49,14 @@ export async function fetchPageText(
   if (!page.text) {
     throw new ApiError("tool_failed", "Page had no readable text", 422);
   }
-  return { url, finalUrl: result.finalUrl, title: page.title, text: page.text, truncated: page.truncated, contentType };
+  return {
+    url,
+    finalUrl: result.finalUrl,
+    title: page.title,
+    text: page.text,
+    truncated: page.truncated || result.truncated,
+    contentType,
+  };
 }
 
 export const webFetchTool = defineTool({
@@ -67,7 +76,12 @@ export const webFetchTool = defineTool({
   }),
   execute: async ({ url, maxChars }): Promise<WebFetchOutput> => {
     try {
-      return { success: true, data: await fetchPageText(url, { maxChars }) };
+      return {
+        success: true,
+        data: await fetchPageText(url, {
+          maxChars: Math.min(maxChars ?? HTML_TEXT_DEFAULT_MAX_CHARS, WEB_FETCH_MAX_CHARS_CAP),
+        }),
+      };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : "Web fetch failed" };
     }
