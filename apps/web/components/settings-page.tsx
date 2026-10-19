@@ -42,7 +42,7 @@ type Probe = {
 const fieldClass =
   "mt-1 w-full rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--text)]";
 
-function runtimeStatusLabel(mode: "ai" | "stub", mayChangeKey: boolean): string {
+export function runtimeStatusLabel(mode: "ai" | "stub", mayChangeKey: boolean): string {
   if (mode === "ai") {
     return t("settings.runtimeLive");
   }
