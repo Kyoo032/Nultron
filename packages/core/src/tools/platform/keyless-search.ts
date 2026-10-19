@@ -153,7 +153,7 @@ function relevantHits(hits: KeylessHit[], query: string): KeylessHit[] {
   return hits.filter((hit) => sharesWord(wanted, meaningfulWords(`${hit.title} ${hit.description}`)));
 }
 
-function meaningfulWords(text: string): string[] {
+export function meaningfulWords(text: string): string[] {
   const words = text.toLowerCase().match(WORD) ?? [];
   return words.filter((word) => word.length >= 3 && !STOP_WORDS.has(word) && !/^\d+$/.test(word));
 }

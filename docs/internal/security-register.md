@@ -220,6 +220,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-185](#sr-185) | Medium | Hosted (tester): after the OPC strip, the kept original of a file attached in Chat was readable by every member of the company | Closed (2026-10-16): hosted keeps no original, by Rizky's choice | None |
 | [SR-177](#sr-177) | Low | The new deploy preflight, run in a throwaway container when the server has no node, received the real `AGENTFORGE_SECRETS_KEY` | Fixed before merge (branch `chore/agent-guardrails`, 2026-10-14): the container gets the word `set` or nothing | — |
 | [SR-184](#sr-184) | Low | Edit's output lookup (`loadMediaRow`) read a media row by id with no organization filter | Fixed on branch `fix/media-row-company` (2026-10-15): filtered on the project's organization; unit-tested, not driven | — |
+| [SR-186](#sr-186) | Info | Research's injection guard now scans the part of a page the model is shown, and a long page is read in part instead of refused | Checked, not an issue (branch `fix/research-page-window-and-step-retry`, 2026-10-19) | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -6268,6 +6269,29 @@ Evidence: U1 keeps a Word, Excel or PDF file attached in Chat as an artifact (`k
 Contained in the tester on 2026-10-16: in server mode `keepOriginal` keeps nothing (`original.ts:35`) and `verifiedOriginalId` names nothing (`:54`), so a hosted desk stores no original and the notes never point at one. `packages/host/src/chat-documents/original.test.ts` holds it: on hosted, nothing new appears in a colleague's list or another company's list, a stored artifact marked as a chat upload is not named, and on Personal the original is kept as before. Originals stored on a hosted tester desk before this change are still ordinary artifacts there. Checked 2026-10-16: the tester webdev data dir (`.webdev-data-chat`) holds no artifact marked `chatUpload`, and no tester pilot stack was running; the volumes of a stopped pilot stack were not opened. Not driven hosted.
 
 Decision (Rizky, 2026-10-16): **hosted keeps no original.** The containment above is the lasting rule, and the per-person folder and dropping U1 are not taken. The non-hosted desk keeps originals as before. Status: **closed.** A drive on the staging instance is still owed.
+
+Gate: none.
+
+### SR-186 {#sr-186}
+
+**Research's injection guard now scans the part of a page the model is shown, and a long page is read in part instead of refused.**
+Raised 2026-10-19 while fixing the Research bot. Info: checked, not an issue. SR-186 because SR-185 is taken on another branch.
+
+Evidence: before the fix, `readPage` in `packages/host/src/research-generate.ts` ran `scanInjection` on the whole page
+text, and the extraction prompt carried only `page.text.slice(0, 8000)`. Now `fetchPageText` returns up to 400,000
+characters (`PAGE_TEXT_MAX_CHARS`, `packages/core/src/tools/platform/web-fetch.ts:10`), and the extraction prompt
+carries `pageWindow(page.text, focus, pageChars)` (`packages/host/src/research-page-window.ts:60`, used at
+`packages/host/src/research-dossier.ts:666`). `scanInjection` runs on that same window
+(`research-generate.ts:176`). The guard therefore covers exactly the text the model reads. Scanning the whole
+400,000 characters instead would block on words the model never sees. The `dan` rule (`/\bdan\s+mode\b/i`)
+matches ordinary Indonesian ("... dan mode ..."), so a long Indonesian page would be refused for no reason.
+Passages the model returns are still checked against the whole page, so the window cannot make a quote that is not on the page.
+
+A body over 1.5 MB is now cut at 1.5 MB instead of refused, only where a caller asks for it
+(`oversize: "truncate"`, `packages/core/src/security/safe-fetch.ts:24`; only `fetchPageText` does). The byte cap,
+the HTTPS-only rule, the private-address refusal and the redirect handling are unchanged. Component downloads,
+Knowledge imports and media downloads keep the default refusal. `packages/host/src/research-page-window.test.ts`
+proves an injection in the window is caught and one outside it never reaches the model.
 
 Gate: none.
 

@@ -22,6 +22,7 @@ import {
   parseSynthesis,
   passageBackedIds,
   runResearchDossier,
+  RESEARCH_CAPS,
   stripInventedQuotes,
   type DossierDeps,
 } from "./research-dossier";
@@ -785,5 +786,86 @@ describe("runResearchDossier synthesis checks", () => {
       code: "aborted",
     });
     expect(prompts).toHaveLength(1);
+  });
+});
+
+describe("a page longer than the extraction window", () => {
+  const ANSWER = "Bank Indonesia keeps the inflation target band at 2.5 percent, plus or minus one point.";
+  const filler = (index: number) =>
+    `Paragraph ${index} covers rice harvests, shipping routes and tourism in the eastern islands across many years.`;
+  const longPage = [
+    "Economy of Indonesia. An overview of the country's economy.",
+    ...Array.from({ length: 120 }, (_, index) => filler(index)),
+    ANSWER,
+    ...Array.from({ length: 40 }, (_, index) => filler(index + 200)),
+  ].join("\n\n");
+
+  function longPageDeps(snippet: string) {
+    const prompts: string[] = [];
+    const deps = fakeDeps({
+      ask: async (system, prompt) => {
+        if (system === CLAIMS_SYSTEM) {
+          return JSON.stringify({ claims: [] });
+        }
+        if (system === PLAN_SYSTEM) {
+          return JSON.stringify({ queries: [] });
+        }
+        if (system === EXTRACT_SYSTEM) {
+          prompts.push(prompt);
+          return JSON.stringify({ passages: prompt.includes(ANSWER) ? [ANSWER] : [], notes: "page" });
+        }
+        if (system === SYNTHESIS_SYSTEM) {
+          return synthesisAnswer({
+            findings: [{ heading: "Target", body: "2.5 percent plus or minus one [S1].", sources: ["S1"] }],
+          });
+        }
+        throw new Error("unexpected system prompt");
+      },
+      search: async () => [{ title: "Economy of Indonesia", url: "https://a.test/economy", description: snippet }],
+      readPage: async () => ({ title: "Economy of Indonesia", text: longPage, truncated: false }),
+    });
+    return { deps, prompts };
+  }
+
+  it("shows the extraction the paragraph that answers the question, not only the page's start", async () => {
+    expect(longPage.indexOf(ANSWER)).toBeGreaterThan(RESEARCH_CAPS.pageChars);
+    const { deps, prompts } = longPageDeps("References: World Factbook, accessed July 2026.");
+    const { dossier } = await runResearchDossier(
+      { question: "What is Indonesia's current inflation target band?", models: [] },
+      deps,
+    );
+    expect(prompts[0]).toContain(ANSWER);
+    expect(prompts[0]).toContain("Economy of Indonesia. An overview");
+    expect(prompts[0]?.split("Page text:\n")[1]?.length ?? 0).toBeLessThanOrEqual(RESEARCH_CAPS.pageChars);
+    expect(dossier.sources[0]?.passages).toEqual([ANSWER]);
+  });
+
+  it("leans on the search snippet when the question's words are spread thin", async () => {
+    const { deps, prompts } = longPageDeps("keeps the inflation target band at 2.5 percent");
+    await runResearchDossier({ question: "Explain the policy number for Jakarta", models: [] }, deps);
+    expect(prompts[0]).toContain(ANSWER);
+  });
+
+  it("sends a short page whole", async () => {
+    const deps = fakeDeps();
+    const prompts: string[] = [];
+    const ask = deps.ask;
+    await runResearchDossier(
+      { question: QUESTION, models: [] },
+      {
+        ...deps,
+        ask: async (system, prompt) => {
+          if (system === EXTRACT_SYSTEM) {
+            prompts.push(prompt);
+          }
+          return ask(system, prompt);
+        },
+      },
+    );
+    expect(
+      prompts.some((prompt) =>
+        prompt.endsWith("Margins reached 12% in 2025. Recyclers report thin returns. Filler sentence here."),
+      ),
+    ).toBe(true);
   });
 });

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TenantContext } from "../../tenancy/types";
 import { invokeTool, type ToolDefinition } from "../define-tool";
-import { fetchPageText, webFetchTool } from "./web-fetch";
+import { WEB_FETCH_MAX_BYTES, WEB_FETCH_MAX_CHARS_CAP, fetchPageText, webFetchTool } from "./web-fetch";
 
 /**
  * The SSRF guard resolves every hop's hostname before it fetches (`assertResolvesPublic` in
@@ -18,7 +18,13 @@ vi.mock("node:dns/promises", async (importOriginal) => ({
 
 const PUBLIC_ANSWER = [{ address: "93.184.216.34", family: 4 }];
 
-const tenant: TenantContext = { tenantId: "local-tenant", organizationId: "org-1", workspaceId: "ws-1", userId: "user-1", role: "member" };
+const tenant: TenantContext = {
+  tenantId: "local-tenant",
+  organizationId: "org-1",
+  workspaceId: "ws-1",
+  userId: "user-1",
+  role: "member",
+};
 const tool = webFetchTool as unknown as ToolDefinition;
 
 function stubFetch(body: string, init: { status?: number; contentType?: string } = {}) {
@@ -110,5 +116,30 @@ describe("webFetchTool", () => {
     expect(page.truncated).toBe(true);
     expect(page.text.length).toBeLessThanOrEqual(200 + "\n[truncated]".length);
     expect(page.contentType).toBe("text/plain");
+  });
+
+  it("reads the start of a page larger than the byte cap instead of refusing it", async () => {
+    const paragraph = `<p>${"inflation target band ".repeat(50)}</p>`;
+    const html = `<html><head><title>Big</title></head><body><main>${paragraph.repeat(Math.ceil((WEB_FETCH_MAX_BYTES * 1.3) / paragraph.length))}</main></body></html>`;
+    stubFetch(html);
+    const page = await fetchPageText("https://example.test/big", { maxChars: 10_000 });
+    expect(page.title).toBe("Big");
+    expect(page.text).toContain("inflation target band");
+    expect(page.truncated).toBe(true);
+  });
+
+  it("gives a reader that asks for more than the tool's cap the longer text", async () => {
+    stubFetch(`<html><body><main><p>${"word ".repeat(20_000)}</p></main></body></html>`);
+    const page = await fetchPageText("https://example.test/long", { maxChars: 90_000 });
+    expect(page.text.length).toBeGreaterThan(80_000);
+  });
+
+  it("still holds the agent tool to its own cap", async () => {
+    stubFetch(`<html><body><main><p>${"word ".repeat(20_000)}</p></main></body></html>`);
+    const result = await invokeTool(tool, { url: "https://example.test/long" }, tenant);
+    expect(result).toMatchObject({ success: true });
+    expect((result as { data: { text: string } }).data.text.length).toBeLessThanOrEqual(
+      WEB_FETCH_MAX_CHARS_CAP + "\n[truncated]".length,
+    );
   });
 });
