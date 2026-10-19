@@ -63,6 +63,15 @@ describe("pageWindow", () => {
     expect(pageWindow(text, { question: "volcano eruption", snippet: "" }, 500)).toBe(text.slice(0, 500));
   });
 
+  it("skips a top-ranked block too long for the window and keeps the paragraphs that fit", () => {
+    const dump = `{{cite web |title=inflation target band ${"Bank Indonesia inflation target band source years ".repeat(300)}}}`;
+    const answer = "Bank Indonesia has kept core inflation within its target band of 2.0-4.0%.";
+    const text = page(["Lead.", dump, ...Array.from({ length: 40 }, (_, i) => filler(i)), answer]);
+    const window = pageWindow(text, { question: "What is Bank Indonesia's inflation target band?", snippet: "" }, 2000);
+    expect(window).toContain(answer);
+    expect(window).not.toContain("{{cite web");
+  });
+
   it("clips one long block around the first match instead of dropping it", () => {
     const block = `${"padding words here ".repeat(400)}the inflation target is 2.5 percent ${"tail words ".repeat(400)}`;
     const text = page(["Lead.", block]);
