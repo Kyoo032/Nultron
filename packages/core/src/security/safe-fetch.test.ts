@@ -93,9 +93,9 @@ describe("fetchPublicHttps", () => {
     for (let i = 0; i < 8; i += 1) {
       loop[`https://a.test/${i}`] = { status: 302, headers: { location: `https://a.test/${i + 1}` } };
     }
-    await expect(fetchPublicHttps("https://a.test/0", { lookupImpl: publicLookup, fetchImpl: fakeFetch(loop, []), maxHops: 3 })).rejects.toThrow(
-      /Too many redirects/,
-    );
+    await expect(
+      fetchPublicHttps("https://a.test/0", { lookupImpl: publicLookup, fetchImpl: fakeFetch(loop, []), maxHops: 3 }),
+    ).rejects.toThrow(/Too many redirects/);
     await expect(
       fetchPublicHttps("https://a.test/big", {
         lookupImpl: publicLookup,
@@ -103,6 +103,27 @@ describe("fetchPublicHttps", () => {
         maxBytes: 10,
       }),
     ).rejects.toThrow(/exceeds/);
+  });
+
+  it("keeps the first maxBytes of an oversized body when the caller asks to truncate", async () => {
+    const result = await fetchPublicHttps("https://a.test/big", {
+      lookupImpl: publicLookup,
+      fetchImpl: fakeFetch({ "https://a.test/big": { status: 200, body: "x".repeat(50) } }, []),
+      maxBytes: 10,
+      oversize: "truncate",
+    });
+    expect(result.body.toString("utf8")).toBe("x".repeat(10));
+    expect(result.truncated).toBe(true);
+  });
+
+  it("reports a body under the cap as whole", async () => {
+    const result = await fetchPublicHttps("https://a.test/small", {
+      lookupImpl: publicLookup,
+      fetchImpl: fakeFetch({ "https://a.test/small": { status: 200, body: "xyz" } }, []),
+      maxBytes: 10,
+      oversize: "truncate",
+    });
+    expect(result.truncated).toBe(false);
   });
 
   it("maps a caller cancel to an aborted ApiError", async () => {

@@ -2,6 +2,8 @@ import { z } from "zod";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AiSdkRuntime } from "./ai-sdk-runtime";
 import { resetLearnedEffortLimits } from "./effort-selfheal";
+import { MODEL_CONTACT_ATTEMPTS } from "./retry";
+import { STEP_RETRY_DELAYS_MS } from "./step-retry";
 import type { AgentVersionRecord, ToolBindingRecord } from "../agents/service";
 import type { RunBudget } from "../harness/spec";
 import { defineTool } from "../tools/define-tool";
@@ -355,8 +357,7 @@ describe("a run whose follow-up model call fails after a tool completed", () => 
     expect(types(events)).not.toContain("run.failed");
     expect(ran).toBe(1);
     expect(toolOutputs(events)).toEqual([{ echoed: 1 }]);
-    // Not retried: a tool's side effects must not be repeated by a contact retry.
-    expect(seen).toHaveLength(2);
+    expect(seen).toHaveLength(2 + STEP_RETRY_DELAYS_MS.length);
     // Told: one event, after the last tool result and before the run completes, with the reason.
     const marks = events.filter((event) => event.type === "run.interrupted");
     expect(marks).toEqual([
@@ -392,6 +393,37 @@ describe("a run whose follow-up model call fails after a tool completed", () => 
     expect(events.find((event) => event.type === "run.interrupted")).toMatchObject({
       message: expect.stringContaining("fetch failed"),
     });
+  });
+
+  it("sends the follow-up call again when the gateway answers 503, and never runs the tool twice", async () => {
+    let ran = 0;
+    register("echo", async ({ x }) => {
+      ran += 1;
+      return { echoed: x };
+    });
+    const seen = gateway((request) =>
+      request === 1
+        ? callsStream([{ name: "echo", args: '{"x":1}' }], 1)
+        : request === 2
+          ? unavailable()
+          : textStream("done"),
+    );
+    const { events, failed } = await run({ tools: ["echo"] });
+
+    expect(failed).toBeUndefined();
+    expect(ran).toBe(1);
+    expect(seen).toHaveLength(3);
+    expect(toolMessages(seen[2] as Captured)).toEqual([{ echoed: 1 }]);
+    expect(types(events)).not.toContain("run.interrupted");
+    expect(types(events).filter((type) => type === "tool.started")).toHaveLength(1);
+    expect(events.filter((event) => event.type === "assistant.delta").map((event) => event.text)).toEqual(["done"]);
+  });
+
+  it("does not send the first call again itself: the contact retries own that", async () => {
+    register("echo", async ({ x }) => ({ echoed: x }));
+    const seen = gateway(() => unavailable());
+    await run({ tools: ["echo"] });
+    expect(seen).toHaveLength(MODEL_CONTACT_ATTEMPTS);
   });
 
   it("does not say it when the follow-up call answers", async () => {

@@ -67,6 +67,7 @@ import { withSignedReasoning } from "./signed-reasoning";
 import type { AgentRuntime, RunUsage } from "./types";
 import { historyHasImage, imagePartForProvider, rewriteUnreachableMediaInJson } from "../content/provider-media";
 import { VIDEO_NOT_VISIBLE_NOTE } from "../content/image-copy";
+import { sendStepWithRetry, type StepRetryGate, takeStepSend } from "./step-retry";
 import {
   applyZeroRetention,
   isResponsesRequestUrl,
@@ -233,6 +234,7 @@ export class AiSdkRuntime implements AgentRuntime {
     const provider = resolveModelProvider(modelName);
     // Direct provider paths build their own SDK client; on the hosted server it must not follow a redirect.
     const directFetch = directProviderFetch(runLocale);
+    const stepGate: StepRetryGate = { sends: 0 };
 
     const openaiLooksCustom = !isOfficialOpenAIBaseUrl(openaiBaseUrl);
     const officialOpenAI = isOfficialOpenAIBaseUrl(openaiBaseUrl);
@@ -345,7 +347,10 @@ export class AiSdkRuntime implements AgentRuntime {
           // fall through to unmodified request on parse error
         }
       }
-      const response = await fetchWithHeaderTimeout(url, outgoing, modelName, runLocale);
+      const response = await sendStepWithRetry(() => fetchWithHeaderTimeout(url, outgoing, modelName, runLocale), {
+        armed: takeStepSend(stepGate),
+        signal: outgoing.signal,
+      });
       refuseKeyRedirect(response, runLocale);
       if (!response.ok) {
         const text = await readHttpErrorBody(response);
@@ -387,7 +392,10 @@ export class AiSdkRuntime implements AgentRuntime {
             // fall through to unmodified request on parse error
           }
         }
-        const response = await fetchWithHeaderTimeout(url, outgoing, modelName, runLocale);
+        const response = await sendStepWithRetry(() => fetchWithHeaderTimeout(url, outgoing, modelName, runLocale), {
+          armed: takeStepSend(stepGate),
+          signal: outgoing.signal,
+        });
         refuseKeyRedirect(response, runLocale);
         if (!response.ok) {
           const text = await readHttpErrorBody(response);
@@ -400,7 +408,13 @@ export class AiSdkRuntime implements AgentRuntime {
         baseURL: openaiBaseUrl,
         fetch: messagesFetch,
       });
-      await this.stream(withSignedReasoning(anthropic(modelName, { sendReasoning: true })), input, effort, openaiWire);
+      await this.stream(
+        withSignedReasoning(anthropic(modelName, { sendReasoning: true })),
+        input,
+        effort,
+        openaiWire,
+        stepGate,
+      );
       return;
     }
 
@@ -424,7 +438,10 @@ export class AiSdkRuntime implements AgentRuntime {
             // fall through to unmodified request on parse error
           }
         }
-        const response = await fetchWithHeaderTimeout(url, outgoing, modelName, runLocale);
+        const response = await sendStepWithRetry(() => fetchWithHeaderTimeout(url, outgoing, modelName, runLocale), {
+          armed: takeStepSend(stepGate),
+          signal: outgoing.signal,
+        });
         refuseKeyRedirect(response, runLocale);
         if (!response.ok) {
           const text = await readHttpErrorBody(response);
@@ -437,11 +454,11 @@ export class AiSdkRuntime implements AgentRuntime {
         baseURL: geminiGenerateContentBaseUrl(openaiBaseUrl),
         fetch: geminiFetch,
       });
-      await this.stream(google(modelName), input, effort, openaiWire);
+      await this.stream(google(modelName), input, effort, openaiWire, stepGate);
       return;
     }
 
-    await this.stream(resolvedWire === "responses" ? responsesModel : chatModel, input, effort, openaiWire);
+    await this.stream(resolvedWire === "responses" ? responsesModel : chatModel, input, effort, openaiWire, stepGate);
   }
 
   private async stream(
@@ -454,6 +471,7 @@ export class AiSdkRuntime implements AgentRuntime {
       chatModel: Parameters<typeof streamText>[0]["model"];
       responsesModel: Parameters<typeof streamText>[0]["model"];
     },
+    stepGate: StepRetryGate = { sends: 0 },
   ): Promise<void> {
     const disabled = new Set(getDisabledTools());
     // One counter for the whole execute: every retry below shares the tools built here.
@@ -491,6 +509,7 @@ export class AiSdkRuntime implements AgentRuntime {
       // the contact retries. A cancel starts none of them.
       input.signal?.throwIfAborted();
       const level = effort.level();
+      stepGate.sends = 0;
       const outcome = await this.consumeSafe(nextModel, input, messages, nextTools, {
         ...options,
         reasoningEffort: level,
