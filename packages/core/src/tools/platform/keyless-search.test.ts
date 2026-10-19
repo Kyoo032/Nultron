@@ -29,7 +29,7 @@ const wikiPage = {
       excerpt: 'Plants <span class="searchmatch">make</span> sugar.',
       description: "Biological process",
     },
-    { key: "Chlorophyll", title: "Chlorophyll", excerpt: "Green pigment", description: "" },
+    { key: "Chlorophyll", title: "Chlorophyll", excerpt: "Green pigment in leaves", description: "" },
     { key: "Leaf", title: "Leaf", excerpt: "Plant organ", description: "" },
   ],
 };
@@ -47,6 +47,8 @@ const openAlexWork = {
   ],
 };
 
+const arxivFeed = `<feed><entry><id>http://arxiv.org/abs/2401.00001v1</id><title>Preprint  title</title><summary>An abstract.</summary></entry></feed>`;
+
 function route(url: string): MockResponse {
   if (url.startsWith(`${KEYLESS_ORIGINS.wikipediaEn}/`) || url.startsWith(`${KEYLESS_ORIGINS.wikipediaId}/`)) {
     return { status: 200, body: JSON.stringify(wikiPage) };
@@ -55,10 +57,7 @@ function route(url: string): MockResponse {
     return { status: 200, body: JSON.stringify(openAlexWork) };
   }
   if (url.startsWith(`${KEYLESS_ORIGINS.arxiv}/`)) {
-    return {
-      status: 200,
-      body: `<feed><entry><id>http://arxiv.org/abs/2401.00001v1</id><title>Preprint  title</title><summary>An abstract.</summary></entry></feed>`,
-    };
+    return { status: 200, body: arxivFeed };
   }
   if (url.startsWith(`${KEYLESS_ORIGINS.crossref}/`)) {
     return {
@@ -75,7 +74,6 @@ function route(url: string): MockResponse {
   return { status: 500, body: "" };
 }
 
-/** `fetch` also accepts `Request`. Tests only read the URL the caller built. */
 function requestUrl(input: string | URL | Request): string {
   if (typeof input === "string") return input;
   return input instanceof URL ? input.toString() : input.url;
@@ -83,6 +81,10 @@ function requestUrl(input: string | URL | Request): string {
 
 function mockFetch(handle: (url: string, init?: RequestInit) => Promise<Response>) {
   return vi.fn(async (input: string | URL | Request, init?: RequestInit) => handle(requestUrl(input), init));
+}
+
+function calledOrigin(fetchMock: { mock: { calls: unknown[][] } }, origin: string): boolean {
+  return fetchMock.mock.calls.some((call) => String(call[0]).startsWith(origin));
 }
 
 describe("searchKeyless", () => {
@@ -101,7 +103,7 @@ describe("searchKeyless", () => {
       expect(headers?.Authorization).toBeUndefined();
       return responseFor(route(url));
     });
-    const result = await searchKeyless("how plants make sugar", {
+    const result = await searchKeyless("how plants green leaves make sugar", {
       fetchImpl: fetchMock,
       locale: "en",
       now: () => 1_000,
@@ -134,12 +136,9 @@ describe("searchKeyless", () => {
       }
       return responseFor(route(url));
     });
-    const result = await searchKeyless("plants", { fetchImpl: fetchMock, locale: "en", now: () => 1_000 });
+    const result = await searchKeyless("leaves", { fetchImpl: fetchMock, locale: "en", now: () => 1_000 });
     expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("evil.example"))).toBe(false);
-    expect(result.hits.map((hit) => hit.url)).toEqual([
-      "https://doi.org/10.1000/leaf",
-      "https://arxiv.org/abs/2401.00001v1",
-    ]);
+    expect(result.hits.map((hit) => hit.url)).toEqual(["https://doi.org/10.1000/leaf"]);
   });
 
   it("follows a same-origin redirect and then reads the body", async () => {
@@ -157,27 +156,89 @@ describe("searchKeyless", () => {
     expect(result.hits[0]?.url).toBe("https://en.wikipedia.org/wiki/Photosynthesis");
   });
 
-  it("calls arXiv and then Crossref when the first pair is thin", async () => {
+  it("does not ask arXiv or Crossref for an ordinary question, even when the encyclopedia pair is empty", async () => {
     const fetchMock = mockFetch(async (url) => {
       if (url.startsWith(KEYLESS_ORIGINS.wikipediaEn) || url.startsWith(KEYLESS_ORIGINS.openAlex)) {
         return responseFor({ status: 200, body: url.includes("openalex") ? '{"results":[]}' : '{"pages":[]}' });
       }
       return responseFor(route(url));
     });
-    const sleeps: number[] = [];
-    const result = await searchKeyless("obscure topic", {
+    const result = await searchKeyless("obscure topic", { fetchImpl: fetchMock, locale: "en", now: () => 5_000 });
+    expect(result).toMatchObject({ hits: [], outage: false });
+    expect(calledOrigin(fetchMock, KEYLESS_ORIGINS.arxiv)).toBe(false);
+    expect(calledOrigin(fetchMock, KEYLESS_ORIGINS.crossref)).toBe(false);
+  });
+
+  it("asks arXiv and Crossref for a scholarly question and keeps only the hits that share a word with it", async () => {
+    const fetchMock = mockFetch(async (url) => {
+      if (url.startsWith(KEYLESS_ORIGINS.arxiv)) {
+        return responseFor({
+          status: 200,
+          body: `<feed><entry><id>http://arxiv.org/abs/2401.00001v1</id><title>Lithium battery recycling study</title><summary>Recovery yields.</summary></entry><entry><id>http://arxiv.org/abs/2401.00002v1</id><title>Faà di Bruno formula for higher derivatives</title><summary>A combinatorial identity.</summary></entry></feed>`,
+        });
+      }
+      return responseFor(route(url));
+    });
+    const result = await searchKeyless("lithium battery study", {
       fetchImpl: fetchMock,
       locale: "en",
       now: () => 5_000,
-      sleep: async (ms) => {
-        sleeps.push(ms);
-      },
     });
-    expect(result.hits.map((hit) => hit.url)).toEqual([
-      "https://arxiv.org/abs/2401.00001v1",
-      "https://doi.org/10.1000/cross",
-    ]);
-    expect(sleeps).toEqual([]);
+    expect(result.hits.map((hit) => hit.url)).toEqual(["https://arxiv.org/abs/2401.00001v1"]);
+    expect(calledOrigin(fetchMock, KEYLESS_ORIGINS.arxiv)).toBe(true);
+    expect(calledOrigin(fetchMock, KEYLESS_ORIGINS.crossref)).toBe(true);
+  });
+
+  it("drops an off-topic hit for an Indonesian solar question and never asks the scholarly sources", async () => {
+    const question = "Apa manfaat utama energi surya untuk rumah tangga di Indonesia? Jawab ringkas.";
+    const fetchMock = mockFetch(async (url) => {
+      if (url.startsWith(KEYLESS_ORIGINS.wikipediaId)) {
+        return responseFor({
+          status: 200,
+          body: JSON.stringify({
+            pages: [
+              {
+                key: "Energi_surya",
+                title: "Energi surya",
+                excerpt: "Energi <span>surya</span> adalah energi dari radiasi matahari.",
+                description: "",
+              },
+            ],
+          }),
+        });
+      }
+      if (url.startsWith(KEYLESS_ORIGINS.openAlex)) {
+        return responseFor({
+          status: 200,
+          body: JSON.stringify({
+            results: [
+              {
+                display_name: "The Faà di Bruno formula for higher derivatives",
+                doi: "https://doi.org/10.1000/faa",
+                id: "https://openalex.org/W9",
+                publication_year: 1857,
+                primary_location: { landing_page_url: "https://example.org/faa" },
+                abstract_inverted_index: { Derivatives: [0], of: [1], composite: [2], functions: [3] },
+              },
+            ],
+          }),
+        });
+      }
+      return responseFor({
+        status: 200,
+        body: `<feed><entry><id>http://arxiv.org/abs/2401.00004v1</id><title>Faà di Bruno formula for higher derivatives</title><summary>Composite functions.</summary></entry></feed>`,
+      });
+    });
+    const result = await searchKeyless(question, { fetchImpl: fetchMock, locale: "id", now: () => 1_000 });
+    expect(result.hits.map((hit) => hit.url)).toEqual(["https://id.wikipedia.org/wiki/Energi_surya"]);
+    expect(calledOrigin(fetchMock, KEYLESS_ORIGINS.arxiv)).toBe(false);
+    expect(calledOrigin(fetchMock, KEYLESS_ORIGINS.crossref)).toBe(false);
+  });
+
+  it("keeps every hit when the query has no word that can be matched", async () => {
+    const fetchMock = mockFetch(async (url) => responseFor(route(url)));
+    const result = await searchKeyless("apa itu", { fetchImpl: fetchMock, locale: "id", now: () => 1_000 });
+    expect(result.hits.map((hit) => hit.title)).toEqual(["Photosynthesis", "Chlorophyll", "Leaf", "A paper on leaves"]);
   });
 
   it("spaces a second arXiv request by three seconds", async () => {
@@ -201,16 +262,15 @@ describe("searchKeyless", () => {
     expect(sleeps).toEqual([KEYLESS_ARXIV_GAP_MS]);
   });
 
-  it("asks arXiv even when Wikipedia is full, if the query is scholarly", async () => {
+  it("asks arXiv and Crossref when the query is scholarly, even when Wikipedia is full", async () => {
     const fetchMock = mockFetch(async (url) => responseFor(route(url)));
     const result = await searchKeyless("battery preprint study", {
       fetchImpl: fetchMock,
       locale: "en",
       now: () => 1_000,
     });
-    expect(result.hits[0]?.url).toBe("https://doi.org/10.1000/leaf");
-    expect(result.hits.some((hit) => hit.url.includes("arxiv.org"))).toBe(true);
-    expect(fetchMock.mock.calls.some((call) => String(call[0]).startsWith(KEYLESS_ORIGINS.crossref))).toBe(false);
+    expect(result.hits.map((hit) => hit.url)).toEqual(["https://arxiv.org/abs/2401.00001v1"]);
+    expect(calledOrigin(fetchMock, KEYLESS_ORIGINS.crossref)).toBe(true);
   });
 
   it("caches a completed search and skips the network", async () => {

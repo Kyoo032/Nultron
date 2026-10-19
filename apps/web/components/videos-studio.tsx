@@ -19,6 +19,7 @@ import { WorkingStatus } from "@/components/working-status";
 import { SettingsLinkHint } from "@/components/settings-link-hint";
 import { isGatewayBlockedText } from "@/lib/gateway-blocked";
 import { useHostedNeedsKey } from "@/lib/use-desk-needs-key";
+import { studioPickerEmpty } from "@/lib/studio-picker-empty";
 import { t } from "@/lib/i18n";
 import { PROMPT_INPUT, PROMPT_ROW, PROMPT_SUBMIT } from "@/lib/prompt-row";
 import { mediaPriceHints, videoEstimateView } from "@/lib/media-estimate";
@@ -67,6 +68,7 @@ export function VideosStudio() {
   const { gatewayName } = useProductBrand();
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [models, setModels] = useState<StudioModel[]>([]);
+  const [listed, setListed] = useState(false);
   const [model, setModel] = useState("");
   const [aspect, setAspect] = useState<(typeof ASPECTS)[number]["id"]>("16:9");
   const [seconds, setSeconds] = useState<number>(5);
@@ -95,6 +97,7 @@ export function VideosStudio() {
       }
       setItems(data.items ?? []);
       setModels(data.models ?? []);
+      setListed(true);
       // `load` runs again after every generate. Keeping the chosen model also keeps the clip length:
       // `seconds` only re-snaps when the model changes.
       setModel((current) => keepModelChoice(current, data.models ?? [], data.defaultModel));
@@ -152,6 +155,10 @@ export function VideosStudio() {
     const hints = mediaPriceHints("videos", models);
     return models.map((item) => ({ ...item, hint: hints[item.id] }));
   }, [models]);
+  const noModels = studioPickerEmpty({ listed, loading, keyMissing: !keyReady, models });
+  const noModelsTitle = noModels
+    ? t("videos.noModels.body", { gateway: gatewayName, settings: t("rail.settings") })
+    : undefined;
 
   function pickTemplate(template: PromptTemplate) {
     setPrompt(template.prompt);
@@ -167,7 +174,7 @@ export function VideosStudio() {
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!prompt.trim() || generating || !keyReady) {
+    if (!prompt.trim() || generating || !keyReady || noModels) {
       return;
     }
     setGenerating(true);
@@ -273,15 +280,25 @@ export function VideosStudio() {
               </option>
             ))}
           </select>
-          <ModelSelect
-            models={modelOptions}
-            value={model}
-            onChange={setModel}
-            disabled={generating || models.length === 0}
-            testId="videos-studio-model"
-            className="select-field min-w-[12rem] flex-1"
-          />
+          {noModels ? null : (
+            <ModelSelect
+              models={modelOptions}
+              value={model}
+              onChange={setModel}
+              disabled={generating || models.length === 0}
+              testId="videos-studio-model"
+              className="select-field min-w-[12rem] flex-1"
+            />
+          )}
         </div>
+        {noModels ? (
+          <div className="rounded-lg border border-[var(--line)] px-3 py-2" data-testid="videos-studio-no-models">
+            <p className="text-sm font-medium text-[var(--text)]">{t("videos.noModels.title")}</p>
+            <p className="mt-1 text-xs text-[var(--text-2)]">
+              <SettingsLinkHint i18nKey="videos.noModels.body" vars={{ gateway: gatewayName }} />
+            </p>
+          </div>
+        ) : null}
         {!model || estimate.unknown ? null : (
           <div className="space-y-0.5">
             <p className="text-xs text-[var(--text-2)]" data-testid="videos-studio-estimate">
@@ -353,8 +370,10 @@ export function VideosStudio() {
                 ? "btn btn-primary h-8 shrink-0 rounded-pill px-4"
                 : "inline-flex h-8 shrink-0 items-center justify-center rounded-pill bg-[var(--line)] px-4 text-sm text-[var(--text-3)]"
             }`}
-            disabled={generating || !keyReady || !prompt.trim()}
-            title={keyReady ? undefined : t("videos.needsKey", { gateway: gatewayName, settings: t("rail.settings") })}
+            disabled={generating || !keyReady || !prompt.trim() || noModels}
+            title={
+              keyReady ? noModelsTitle : t("videos.needsKey", { gateway: gatewayName, settings: t("rail.settings") })
+            }
             data-testid="videos-studio-submit"
           >
             {generating ? <WorkingStatus label={t("videos.generating")} /> : t("videos.generate")}

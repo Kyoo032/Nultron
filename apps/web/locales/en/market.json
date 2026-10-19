@@ -158,7 +158,9 @@
     "unchanged": "unchanged",
     "aboveAverage": "Above {days}-day average",
     "belowAverage": "Below {days}-day average",
-    "tradingView": "TradingView: {rating}"
+    "tradingView": "TradingView: {rating}",
+    "unavailable": "Price data could not be reached right now. Your watchlist is kept, so try again in a moment.",
+    "retry": "Try again"
   },
   "session": {
     "pre": "Pre-market",

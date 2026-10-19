@@ -11,6 +11,7 @@ import {
   type UsageRange,
 } from "./usage-panel";
 import { UsageRangeChart } from "./usage-range-chart";
+import { UsageWindowLabel } from "./usage-window-label";
 import { t } from "@/lib/i18n";
 import { ModeHeader } from "@/components/mode-header";
 import { useProductBrand } from "@/lib/product-brand";
@@ -192,6 +193,7 @@ export function UsagePage() {
 
       <section className="raise mt-4 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4">
         <p className="panel-label">{t("usage.chart.label")}</p>
+        <UsageWindowLabel usage={usage} />
         {loading && !ready ? (
           <p className="mt-4 text-sm text-[var(--text-2)]">{t("usage.loading")}</p>
         ) : (

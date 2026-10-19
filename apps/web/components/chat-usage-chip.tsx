@@ -9,6 +9,7 @@ import { useHostCapabilities } from "@/lib/host-capabilities";
 import { t } from "@/lib/i18n";
 import { parseGatewayGate } from "@/lib/gateway-gate";
 import { fetchAccountPlan, type AccountPlan } from "@/lib/plans-api";
+import { remainingUsageLabel } from "@/lib/chat-usage-label";
 
 type ThisKeyUsage =
   | { status: "needs_key" }
@@ -40,7 +41,7 @@ function planLabel(plan: AccountPlan): string | null {
 
 export function ChatUsageChip() {
   const { plans } = useHostCapabilities();
-  const [label, setLabel] = useState(() => t("chat.usage.placeholder"));
+  const [label, setLabel] = useState<string | null>(null);
   const [title, setTitle] = useState<string | undefined>(undefined);
   const [href, setHref] = useState("/usage");
 
@@ -79,14 +80,14 @@ export function ChatUsageChip() {
           return;
         }
         if (!payload.usage?.thisKey) {
-          setLabel(t("chat.usage.placeholder"));
+          setLabel(null);
           setHref("/usage");
           return;
         }
         const thisKey = payload.usage.thisKey;
         const gate = parseGatewayGate(payload.gateway);
         if (thisKey.status === "needs_key" && gate?.status === "stub") {
-          setLabel(t("chat.usage.placeholder"));
+          setLabel(null);
           setTitle(undefined);
           setHref("/usage");
           return;
@@ -109,8 +110,7 @@ export function ChatUsageChip() {
           setTitle(undefined);
           return;
         }
-        const left = thisKey.data.remainingUsd == null ? "—" : formatUsd(thisKey.data.remainingUsd);
-        setLabel(t("chat.usage.remaining", { left }));
+        setLabel(remainingUsageLabel(thisKey.data.remainingUsd, formatUsd));
         setTitle(undefined);
       } catch {
         if (!cancelled) setLabel(t("chat.usage.error"));
@@ -126,7 +126,8 @@ export function ChatUsageChip() {
       href={href}
       className="chip wash max-w-full whitespace-nowrap"
       data-testid="chat-usage"
-      title={title ?? label}
+      title={title ?? label ?? undefined}
+      style={label === null ? { display: "none" } : undefined}
     >
       <span className="min-w-0 truncate">{label}</span>
     </Link>

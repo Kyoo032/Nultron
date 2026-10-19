@@ -54,6 +54,20 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Fixes from the 2026-10-18 test report, 2026-10-19 (branch `fix/qa-report-2026-10-18`; lanes: enterprise, tester; tests run, Images and Videos driven on a stub desk, the rest not driven)
+
+The report was written against the HYP AI build. Each bug below was checked against Nultron's own code first.
+
+- BUG-01: Chat no longer fails on a Claude thinking block that has a signature and no text (`0c9d1d8a`, red test `b2604673`).
+- BUG-02: the Market board says price data is unreachable and offers Try again (`market-board-unavailable`, `market-board-retry`; `826597b2`).
+- BUG-03, 04, 14: Images and Videos explain an empty model list (`images-studio-no-models`, `videos-studio-no-models`), and a disabled `.btn-primary` is a grey pill in both themes. The grey applies to every disabled main button in the app (`9aa24369`).
+- BUG-06, 07: Research keeps keyless sources on topic (a word-overlap gate, which Chat's `web_search` also uses), reads past dead pages up to the read cap, and shows elapsed time (`ee67e5c2`). Elapsed counts from mount, not from the job's start.
+- BUG-08: a failed text turn offers Try again (`chat-retry`). The host stores the turn once: a run with `retry: true` whose words match the newest stored user turn is answered without a second user row (`packages/host/src/runs-retry.test.ts`). Media turns get no Try again.
+- BUG-09: not in Nultron. The composer has no Thinking select (`chat-tier-wiring.test.ts` forbids one). Nothing changed.
+- BUG-10: Settings says it is still reading instead of "No key" before it loads (`8621f1ee`).
+- BUG-12: Usage names the dates each range covers (`usage-range-window`; `bd5092cb`). Day was always 14 daily bars.
+- BUG-13: the Chat usage chip stays hidden until it has a real figure, so "Usage · —" no longer shows. The key `chat.usage.placeholder` is gone.
+
 ## Gaps from the 2026-10-16 verify pass (branch `fix/verify-pass-gaps`; tests run; the gate and pricing driven on a stub desk, the guide copy by tests only)
 
 - Guide stop three names the answer style (Fastest, Daily, Reasoning) instead of a model picker that the chat-first Chat does not draw (`guide.json`, en and id).

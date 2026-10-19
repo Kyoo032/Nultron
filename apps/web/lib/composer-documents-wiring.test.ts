@@ -44,7 +44,7 @@ describe("chat composer: one route for every attachment", () => {
     expect(source).toMatch(/const sendDisabled = [^;]*documentsHoldSend;/);
     // Continue is a text turn and does not take the files in the box. A normal send still waits.
     expect(source).toMatch(
-      /async function send\(override\?: string\) \{[\s\S]*?const \{ continuing, typed, attached \} = sendSource\(override, text, files\);[\s\S]*?if \(!continuing && documentsHoldSend\) \{[\s\S]*?return;/,
+      /async function send\(override\?: string, retrying = false\) \{[\s\S]*?const \{ continuing, typed, attached \} = sendSource\(override, text, files\);[\s\S]*?if \(!continuing && documentsHoldSend\) \{[\s\S]*?return;/,
     );
     expect(source).toContain("sendSource(override, text, files)");
   });

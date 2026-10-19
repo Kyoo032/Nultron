@@ -38,6 +38,11 @@ describe("buildChatRunBody", () => {
     expect(first).not.toBe(second);
     expect(Object.isFrozen(first)).toBe(true);
   });
+
+  it("adds retry: true only on a Try again, and leaves the default body as it was", () => {
+    expect(buildChatRunBody("hello", "daily", true)).toEqual({ content: "hello", tier: "daily", retry: true });
+    expect(Object.keys(buildChatRunBody("hello", "daily", false)).sort()).toEqual(["content", "tier"]);
+  });
 });
 
 describe("tierErrorMessage", () => {

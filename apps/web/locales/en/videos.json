@@ -2,6 +2,10 @@
   "title": "Videos",
   "expectedInputs": "You get: a generated clip, saved to the gallery below and downloadable.",
   "needsKey": "Add a {gateway} gateway key in {settings} to generate videos.",
+  "noModels": {
+    "title": "No video model on this key",
+    "body": "This {gateway} key lists no video model, so nothing can be generated here. Check the key in {settings}."
+  },
   "settingsLink": "Settings",
   "loadError": "Could not load video studio",
   "generateError": "Video generation failed",
