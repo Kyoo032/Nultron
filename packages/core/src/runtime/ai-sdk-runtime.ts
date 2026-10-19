@@ -63,6 +63,7 @@ import {
   watchAsyncIterable,
 } from "./stream-watchdog";
 import { readLanguageModelUsage, addTokenUsage } from "../gateway/account";
+import { withSignedReasoning } from "./signed-reasoning";
 import type { AgentRuntime, RunUsage } from "./types";
 import { historyHasImage, imagePartForProvider, rewriteUnreachableMediaInJson } from "../content/provider-media";
 import { VIDEO_NOT_VISIBLE_NOTE } from "../content/image-copy";
@@ -399,7 +400,7 @@ export class AiSdkRuntime implements AgentRuntime {
         baseURL: openaiBaseUrl,
         fetch: messagesFetch,
       });
-      await this.stream(anthropic(modelName, { sendReasoning: true }), input, effort, openaiWire);
+      await this.stream(withSignedReasoning(anthropic(modelName, { sendReasoning: true })), input, effort, openaiWire);
       return;
     }
 
