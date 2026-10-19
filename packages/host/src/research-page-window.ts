@@ -142,13 +142,14 @@ export function pageWindow(text: string, focus: PageFocus, maxChars: number): st
     if (cost <= room) {
       chosen.push({ index: block.index, text: block.text });
       room -= cost;
-    } else if (chosen.length === 0 && room > GAP.length) {
-      chosen.push({ index: block.index, text: clipAround(block, [...question, ...snippet], room - GAP.length) });
-      room = 0;
     }
     if (room <= GAP.length) {
       break;
     }
+  }
+  const top = ranked[0];
+  if (chosen.length === 0 && top && room > GAP.length) {
+    chosen.push({ index: top.block.index, text: clipAround(top.block, [...question, ...snippet], room - GAP.length) });
   }
   const body = chosen.sort((a, b) => a.index - b.index).map((entry) => entry.text);
   return [lead, ...body].join(GAP);
