@@ -135,7 +135,7 @@ describe("Continue on a step-limit turn", () => {
     expect(session).toContain("continueSendRef.current?.(continuePrompt(getLocale()))");
     expect(session).toContain("mayOfferContinue(index, shown.length, message.role)");
     expect(session).not.toContain("stepLimitNote");
-    expect(composer).toContain("void send(text)");
+    expect(composer).toContain("void send(text, retry)");
     expect(composer).toContain("sendSource(override, text, files)");
     expect(composer).toContain("if (needsKey || (continuing && busy))");
     // The outgoing message is built from what the send carries, not from the box.

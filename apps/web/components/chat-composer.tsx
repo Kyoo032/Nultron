@@ -44,10 +44,7 @@ import { gatewayBlockedMessage, hostedGatewayBlocked } from "@/lib/gateway-block
 import { hostedKeyBlock, useDeskNeedsKey } from "@/lib/use-desk-needs-key";
 import "@/components/composer-bare.css";
 
-export type ComposerUserSendPayload = {
-  text: string;
-  parts?: unknown[];
-};
+export type ComposerUserSendPayload = { text: string; parts?: unknown[]; retry?: boolean };
 
 type Props = {
   threadId: string | null;
@@ -85,10 +82,11 @@ type Props = {
   /** A tool the run is driving reported a progress line (the stream's `tool.progress` events that carry a label). */
   onToolProgress?: (event: { toolKey: string; label: string }) => void;
   /**
-   * Continue writes its sender here. The click calls it with the word `continue`. The send leaves
-   * the draft in the box alone. A ref, not an effect: StrictMode runs an effect twice.
+   * Continue and Try again write their sender here. The call sends the text it is given (the word
+   * `continue`, or the turn to send again with `retry`) and leaves the draft in the box alone. A ref,
+   * not an effect: StrictMode runs an effect twice.
    */
-  continueSendRef?: { current: ((text: string) => void) | null };
+  continueSendRef?: { current: ((text: string, retry?: boolean) => void) | null };
 };
 
 type HeldFile = {
@@ -405,7 +403,7 @@ export function ChatComposer({
     setFiles((current) => current.filter((item) => item.id !== id));
   }
 
-  async function send(override?: string) {
+  async function send(override?: string, retrying = false) {
     // Continue sends only its word (never the draft or the files in the box), does not wait on a document
     // still being read, and does nothing when clicked again while its run is going.
     const { continuing, typed, attached } = sendSource(override, text, files);
@@ -548,11 +546,12 @@ export function ChatComposer({
           onUserSend?.({
             text: outgoing,
             parts: outgoing ? [{ type: "text", text: outgoing }] : [],
+            retry: retrying,
           });
           const response = await apiFetch(`/api/v1/threads/${id}/runs/text`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(buildChatRunBody(outgoing, tier)),
+            body: JSON.stringify(buildChatRunBody(outgoing, tier, retrying)),
             signal: abort.signal,
           });
           if (!response.ok) {
@@ -650,8 +649,8 @@ export function ChatComposer({
 
   // The click reads this on the way to `send`. Writing it during render keeps the closure current.
   if (continueSendRef) {
-    continueSendRef.current = (text: string) => {
-      void send(text);
+    continueSendRef.current = (text: string, retry = false) => {
+      void send(text, retry);
     };
   }
 
