@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "@agentforge/core";
-import { DOSSIER_HEADINGS, dossierToMarkdown } from "@agentforge/core/artifacts";
+import { DOSSIER_HEADINGS, dossierToMarkdown, type DossierSource } from "@agentforge/core/artifacts";
 import type { JobEvent } from "@agentforge/core/jobs";
 import { formatRepairNote } from "./harness/run-checked";
 import {
@@ -14,6 +14,7 @@ import {
   dedupeCandidates,
   findingCitesResolve,
   groundFindings,
+  keepReadSources,
   parseClaimPassages,
   parseExtraction,
   parsePlan,
@@ -345,6 +346,89 @@ describe("runResearchDossier", () => {
     );
     expect(deps.asked).not.toContain(SYNTHESIS_SYSTEM);
     expect(deps.asked).not.toContain(CITE_REPAIR_SYSTEM);
+  });
+});
+
+describe("read cap and unreachable pages", () => {
+  const manyHits = Array.from({ length: 8 }, (_, index) => ({
+    title: `Page ${index + 1}`,
+    url: `https://site${index + 1}.test/page`,
+    description: `snippet ${index + 1}`,
+  }));
+
+  function readDeps(failing: Set<string>, reads: string[]): DossierDeps {
+    return {
+      ask: async (system, prompt) => {
+        if (system === CLAIMS_SYSTEM) {
+          return JSON.stringify({ claims: [] });
+        }
+        if (system === PLAN_SYSTEM) {
+          return JSON.stringify({ queries: [] });
+        }
+        if (system === EXTRACT_SYSTEM) {
+          const text = prompt.split("Page text:\n")[1] ?? "";
+          return JSON.stringify({ passages: [text.trim()], notes: "ok" });
+        }
+        if (system === SYNTHESIS_SYSTEM) {
+          const ids = [...prompt.matchAll(/^(S\d+) — /gm)].map((match) => match[1] ?? "");
+          return JSON.stringify({
+            title: "T",
+            summary: "Thin.",
+            findings: [{ heading: "H", body: ids.map((id) => `[${id}]`).join(" "), sources: ids }],
+            contradictions: [],
+            openQuestions: [],
+          });
+        }
+        throw new Error("unexpected system prompt");
+      },
+      search: async () => manyHits,
+      readPage: async (url) => {
+        reads.push(url);
+        if (failing.has(url)) {
+          throw new Error("HTTP 503");
+        }
+        return {
+          title: `Title of ${url}`,
+          text: `${url} reports a verified finding about the question.`,
+          truncated: false,
+        };
+      },
+      caps: { maxQueries: 1, hitsPerQuery: 10, maxPages: 2 },
+    };
+  }
+
+  it("reads past unreachable pages until the readable cap is met, then stops", async () => {
+    const reads: string[] = [];
+    const failing = new Set(["https://site1.test/page", "https://site2.test/page", "https://site3.test/page"]);
+    const { dossier } = await runResearchDossier({ question: QUESTION, models: [] }, readDeps(failing, reads));
+    expect(reads).toHaveLength(5);
+    expect(dossier.sources.map((source) => [source.id, source.status])).toEqual([
+      ["S4", "read"],
+      ["S5", "read"],
+    ]);
+  });
+
+  it("never makes more fetch attempts than the read cap plus five", async () => {
+    const reads: string[] = [];
+    const failing = new Set(manyHits.map((hit) => hit.url));
+    await expect(runResearchDossier({ question: QUESTION, models: [] }, readDeps(failing, reads))).rejects.toThrow(
+      /No page kept a sentence/,
+    );
+    expect(reads).toHaveLength(7);
+  });
+
+  it("keeps an unreachable page in Sources only when the readable pages leave room under the cap", () => {
+    const row = (id: string, status: DossierSource["status"]) => ({ source: { id, status } as DossierSource });
+    const ids = (rows: Array<ReturnType<typeof row>>, cap: number) =>
+      keepReadSources(rows, cap).map((item) => item.source.id);
+    expect(ids([row("S1", "unreachable"), row("S2", "read"), row("S3", "read"), row("S4", "read")], 2)).toEqual([
+      "S2",
+      "S3",
+    ]);
+    expect(ids([row("S1", "unreachable"), row("S2", "read"), row("S3", "unreachable")], 3)).toEqual(["S1", "S2", "S3"]);
+    expect(
+      ids([row("S1", "read"), row("S2", "unreachable"), row("S3", "unreachable"), row("S4", "unreachable")], 2),
+    ).toEqual(["S1", "S2"]);
   });
 });
 
