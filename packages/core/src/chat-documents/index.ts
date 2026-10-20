@@ -23,3 +23,5 @@ export type { ChatDocumentErrorCode, ChatDocumentSaveFailure } from "./limits";
 export { cutNoteLine, cutOnLine, cutTextAttachment } from "./cut";
 export type { CutTextAttachment } from "./cut";
 export { HOST_NOTE_PREFIXES, isHostNoteLine } from "./markers";
+export { splitUserFileBlocks } from "./file-blocks";
+export type { UserTextSegment } from "./file-blocks";
