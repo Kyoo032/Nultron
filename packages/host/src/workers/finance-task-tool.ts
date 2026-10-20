@@ -1,10 +1,6 @@
 import { z } from "zod";
 import { ApiError, defineTool, type AppLocale, type TenantContext } from "@agentforge/core";
-import {
-  CHAT_DOCUMENT_DESK_DIR,
-  chatFinanceFiguresSchema,
-  type ChatFinanceFigures,
-} from "@agentforge/core/chat-documents";
+import { CHAT_DOCUMENT_DESK_DIR, type ChatFinanceFigures } from "@agentforge/core/chat-documents";
 import {
   FINANCE_TASKS,
   discountRateFromText,
@@ -16,6 +12,7 @@ import { FileRootError, isFileRefusal, parseDeskPath, type DeskPath } from "@age
 import { FIGURES_SUFFIX } from "../chat-documents/desk-copy";
 import { privateFolderFor } from "../desk-files/private-uploads";
 import { deskFileStore } from "../desk-files/store";
+import { checkFinanceFigures } from "../finance-figures/figures";
 import { generateFinanceBrief } from "../finance-generate";
 import { runFinanceAuto, type FinanceAutoResult } from "../finance-tasks/auto";
 import { localeForRun } from "../run-context";
@@ -122,8 +119,7 @@ async function readOwnFigures(tenant: TenantContext, file: string): Promise<Chat
       return null;
     }
     const read = await store.readVersion(tenant, path, newest.version);
-    const parsed = chatFinanceFiguresSchema.safeParse(JSON.parse(read.text));
-    return parsed.success ? parsed.data : null;
+    return checkFinanceFigures(JSON.parse(read.text), path.split("/").at(-1) ?? path);
   } catch (error) {
     if (error instanceof FileRootError || error instanceof SyntaxError) {
       return null;
