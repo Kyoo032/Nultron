@@ -251,6 +251,24 @@ describe("finance_task, what it asks", () => {
     expect(out).toMatchObject({ ok: false, reason: "needs_input", ask: { field: "discountRatePercent" } });
   });
 
+  it("asks again when the number appears only in a host note or the file name, as the composer sends them", async () => {
+    const file = await attach("cash-50000000.xlsx", CASH_BOOK_NO_OPENING);
+    const userText = [
+      "How long will our cash last?",
+      "",
+      "[Attached file: cash-50000000.xlsx, 50000000 bytes]",
+      `[Figures kept: ${file}. To answer a question about these figures, call finance_task with this path as file.]`,
+      "",
+      "--- cash-50000000.xlsx ---",
+      "Kas masuk | 20000000",
+    ].join("\n");
+    const out = await run(
+      { request: "How long will our cash last?", file, task: "cashflow", answers: { openingCash: 50_000_000 } },
+      { userText },
+    );
+    expect(out).toMatchObject({ ok: false, reason: "needs_input", ask: { field: "openingCash" } });
+  });
+
   it("asks for the opening cash when the cash book has no opening row", async () => {
     const file = await attach("cash.xlsx", CASH_BOOK_NO_OPENING);
     const out = await run({ request: "How long will our cash last?", file, task: "cashflow" });
