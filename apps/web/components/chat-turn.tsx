@@ -15,6 +15,7 @@ import { fileCardDetail, jobEmbedsFromTools } from "@/lib/message-embeds";
 import { collectToolMediaParts } from "@/lib/tool-media";
 import { DeckCards } from "@/components/chat-deck-card";
 import { DossierCards } from "@/components/chat-dossier-card";
+import { FinanceCards } from "@/components/chat-finance-card";
 import "@/components/chat-turn-bubbles.css";
 import { ToolRowBody, isRichTool } from "@/components/tool-rows/tool-row";
 import { showsToolSpinner, toolActivityLabel, toolCallSummary } from "@/lib/tool-labels";
@@ -196,6 +197,7 @@ export function ChatTurn({ role, content, live, onContinue, continueDisabled = f
             {liveMedia.length > 0 ? <MediaParts parts={liveMedia} /> : null}
             <DeckCards tools={visibleTools} />
             <DossierCards tools={visibleTools} />
+            <FinanceCards tools={visibleTools} />
             {jobs.map((job, index) => (
               <MessageEmbed
                 // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity

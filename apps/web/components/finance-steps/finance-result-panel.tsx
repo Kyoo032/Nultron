@@ -17,7 +17,7 @@ export type FinanceResultPanelProps = {
   models: JobStudioModel[];
   defaultModel: string;
   regeneratingIndex: number | null;
-  onRegenerate: (index: number, payload: JobRegenSubmit) => void;
+  onRegenerate?: (index: number, payload: JobRegenSubmit) => void;
   disabled: boolean;
 };
 

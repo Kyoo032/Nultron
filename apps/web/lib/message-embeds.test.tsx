@@ -182,6 +182,22 @@ describe("file blocks and job results", () => {
       { title: "Q3 plan", detail: "Hire two analysts.", href: undefined },
     ]);
   });
+
+  it("draws a finance_task result as its own card, never as a job embed", () => {
+    const output = {
+      ok: true,
+      artifact: { id: "fin-1", kind: "finance", title: "Ratio health check" },
+      task: "ratios",
+      headline: [{ label: "Current ratio", value: "1.8" }],
+      summary: "Liquidity is sound.",
+      facts: "current_ratio=1.8",
+      checks: { passed: true, flagged: 0, removed: 0 },
+      notes: [],
+    };
+    expect(jobEmbedsFromTools([{ key: "finance_task", status: "completed", output }])).toEqual([]);
+    const titled = { ...output, title: "Ratio health check" };
+    expect(jobEmbedsFromTools([{ key: "finance_task", status: "completed", output: titled }])).toEqual([]);
+  });
 });
 
 describe("Nultron mascot", () => {

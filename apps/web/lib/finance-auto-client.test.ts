@@ -11,6 +11,7 @@ import {
   joinFigures,
   openTaskWithDraft,
   parseFinanceAuto,
+  readFinanceReport,
   type FinanceAutoAnswer,
 } from "./finance-auto-client";
 import { loadFinanceDraft } from "./finance-drafts";
@@ -289,5 +290,45 @@ describe("the opening-cash warning", () => {
     expect(en).toMatch(/opening/i);
     applyLocale("id");
     expect(financeAutoWarningText({ code: "no_opening_cash", message: "dev", detail: [] })).toMatch(/saldo awal/i);
+  });
+});
+
+describe("reading a stored report", () => {
+  it("reads a report and drops a malformed row inside it", () => {
+    const report = readFinanceReport({
+      task: "ratios",
+      title: "Ratio health check",
+      locale: "id",
+      summary: [{ label: "Current ratio", value: 1.8, unit: "x", flag: "good" }, { value: 2 }],
+      tables: [{ id: "scorecard", title: "Scorecard", columns: ["Ratio"], rows: [["Current", { x: 1 }]] }, { id: 3 }],
+      charts: "none",
+      flags: [
+        { level: "risk", text: "Thin margin" },
+        { level: "odd", text: "x" },
+      ],
+      notes: [{ heading: "Read", body: "Sound." }],
+    });
+    expect(report).toMatchObject({
+      task: "ratios",
+      title: "Ratio health check",
+      locale: "id",
+      summary: [{ label: "Current ratio", value: 1.8, unit: "x", flag: "good" }],
+      tables: [{ id: "scorecard", rows: [["Current", null]] }],
+      charts: [],
+      flags: [{ level: "risk", text: "Thin margin" }],
+      notes: [{ heading: "Read", body: "Sound." }],
+    });
+  });
+
+  it("reads nothing from a value that is not a report or has no title", () => {
+    expect(readFinanceReport(undefined)).toBeNull();
+    expect(readFinanceReport("report")).toBeNull();
+    expect(readFinanceReport([])).toBeNull();
+    expect(readFinanceReport({ title: "" })).toBeNull();
+    expect(readFinanceReport({ summary: [] })).toBeNull();
+  });
+
+  it("takes the task it is given when the report names none", () => {
+    expect(readFinanceReport({ title: "Budget" }, "budget")?.task).toBe("budget");
   });
 });

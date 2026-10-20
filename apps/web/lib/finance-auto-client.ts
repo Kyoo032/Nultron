@@ -182,7 +182,7 @@ function reportLocale(value: unknown): ReportLocale {
   return value === "id" ? "id" : "en";
 }
 
-function previewOf(value: unknown, task: FinanceTask): FinanceReport | null {
+function previewOf(value: unknown, task: string): FinanceReport | null {
   const row = record(value);
   if (!row) {
     return null;
@@ -199,6 +199,11 @@ function previewOf(value: unknown, task: FinanceTask): FinanceReport | null {
     flags: list(row.flags).flatMap(flagOf),
     notes: list(row.notes).flatMap(noteOf),
   };
+}
+
+export function readFinanceReport(value: unknown, task = ""): FinanceReport | null {
+  const report = previewOf(value, task);
+  return report && report.title.trim() !== "" ? report : null;
 }
 
 // -- the answer, defensively ----------------------------------------------------------------------

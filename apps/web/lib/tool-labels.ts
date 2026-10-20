@@ -9,6 +9,7 @@ import {
   type ToolStatus,
 } from "@/components/tool-rows/results";
 import { DOSSIER_TOOL_KEY, readDossierResult } from "@/components/tool-rows/dossier-result";
+import { FINANCE_TASK_TOOL_KEY, readFinanceResult } from "@/components/tool-rows/finance-result";
 import { t } from "@/lib/i18n";
 
 /** Fast tools still show a completed row; they skip the long "Working…" spinner. */
@@ -25,6 +26,7 @@ const ACTIVITY_KEYS: Record<string, string> = {
   datetime: "chat.tool.clock",
   self_check: "chat.tool.selfChecking",
   research_dossier: "agents.progress.working",
+  finance_task: "agents.progress.working",
 };
 
 const DONE_KEYS: Record<string, string> = {
@@ -37,6 +39,7 @@ const DONE_KEYS: Record<string, string> = {
   datetime: "chat.tool.datetime",
   self_check: "chat.tool.selfCheck",
   research_dossier: "agents.dossier.label",
+  finance_task: "agents.finance.label",
 };
 
 export function showsToolActivity(_toolKey: string): boolean {
@@ -255,6 +258,16 @@ function dossierSummary(label: string, output: unknown): string {
   return message ? `${label} · ${gist(message)}` : label;
 }
 
+function financeSummary(label: string, output: unknown): string {
+  const model = readFinanceResult(undefined, output);
+  if (model) {
+    return `${label} · ${gist(model.title)}`;
+  }
+  const record = asRecord(output);
+  const message = readString(asRecord(record?.ask), "question") ?? readString(record, "message");
+  return message ? `${label} · ${gist(message)}` : label;
+}
+
 export function toolCallSummary(toolKey: string, input?: unknown, output?: unknown): string {
   if (toolKey === "web_fetch") {
     return webFetchLabel(input, output, "completed");
@@ -265,6 +278,9 @@ export function toolCallSummary(toolKey: string, input?: unknown, output?: unkno
   const label = toolDoneLabel(toolKey);
   if (toolKey === DOSSIER_TOOL_KEY) {
     return dossierSummary(label, output);
+  }
+  if (toolKey === FINANCE_TASK_TOOL_KEY) {
+    return financeSummary(label, output);
   }
   const out = gist(output);
   const inn = gist(input);
