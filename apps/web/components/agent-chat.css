@@ -286,3 +286,59 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+
+.agent-chat-pane {
+  --chat-column: 46rem;
+  --chat-user-bubble: var(--accent);
+  --chat-user-bubble-text: var(--on-accent, var(--surface));
+}
+
+.dark .agent-chat-pane {
+  --chat-user-bubble: #2563eb;
+  --chat-user-bubble-text: #ffffff;
+}
+
+.agent-chat-pane [data-testid="message-list"] {
+  padding-inline: max(var(--chat-gutter), calc((100% - var(--chat-column)) / 2));
+}
+
+.agent-chat-pane .chat-composer-ledge [data-testid="composer"] {
+  width: 100%;
+  max-width: var(--chat-column);
+  margin-inline: auto;
+}
+
+.agent-chat-pane .chat-turn--user {
+  background: var(--chat-user-bubble);
+  color: var(--chat-user-bubble-text);
+}
+
+.agent-chat-pane .chat-turn--user a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.agent-chat-pane [data-testid="message-thinking"]:not([open]) {
+  width: fit-content;
+  padding: 3px 12px;
+  border-color: transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 5%, transparent);
+  box-shadow: none;
+}
+
+.agent-chat-pane .agent-harness-details-slot {
+  display: contents;
+}
+
+.agent-chat-pane .agent-chat-details {
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.agent-chat-pane .agent-chat-details-chips {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}

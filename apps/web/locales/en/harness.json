@@ -181,6 +181,7 @@
     "statusNew": "New",
     "statusOff": "Not offered",
     "inChat": "In this chat",
+    "contextUsage": "Context and usage",
     "ownHarness": "The {name} harness",
     "runsInChat": "Runs in this chat, with its checks.",
     "runsInStudio": "Runs in the {name} studio. In this chat the work is done with the tools above, without these checks."

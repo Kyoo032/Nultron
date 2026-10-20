@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "@/lib/nav";
 import { AgentChatHeader } from "@/components/agent-chat-controls";
+import { AgentChatDetails, contextNearlyFull } from "@/components/agent-chat-details";
 import { AgentHome } from "@/components/agent-home";
 import { TierPicker } from "@/components/tier-picker";
 import { virtualAgentHref, type VirtualAgentInfo } from "@/lib/virtual-agents";
@@ -68,6 +69,7 @@ export type ChatSessionShell = {
   onForeignThread?: (ownerAgentId: string, threadId: string) => void;
   /** Set when the agent's own harness still runs from its studio: the empty conversation offers it. */
   onOpenStudio?: () => void;
+  detailsTarget?: HTMLElement | null;
 };
 
 type Props = {
@@ -446,14 +448,13 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
           tier={<TierPicker tiers={tiers} value={tierId} onChange={handleTierChange} disabled={running} />}
           chips={
             <>
-              {hasReply ? (
+              {hasReply && contextNearlyFull(contextTokens, selectedTier?.contextLength ?? undefined) ? (
                 <ChatContextChip
                   usedTokens={contextTokens}
                   contextLength={selectedTier?.contextLength ?? undefined}
                   parts={contextParts}
                 />
               ) : null}
-              {hasReply ? <ChatUsageChip /> : null}
               <ChatAccountChip />
             </>
           }
@@ -472,6 +473,15 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
           <ChatAccountChip />
         </ChatHeader>
       )}
+
+      {shell ? (
+        <AgentChatDetails
+          target={hasReply ? shell.detailsTarget : null}
+          usedTokens={contextTokens}
+          contextLength={selectedTier?.contextLength ?? undefined}
+          parts={contextParts}
+        />
+      ) : null}
 
       {error ? (
         <div className="flex w-full items-start gap-3 px-[var(--chat-gutter)]">

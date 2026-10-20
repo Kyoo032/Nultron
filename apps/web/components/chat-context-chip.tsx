@@ -8,6 +8,7 @@ import { t } from "@/lib/i18n";
 
 const MUTED = "text-[var(--text-3)]";
 const PANEL_WIDTH = 320;
+export const CONTEXT_NEAR_FULL = 0.8;
 const GUTTER = 8;
 
 export type ContextPart = {
@@ -155,7 +156,7 @@ export function ChatContextChip({ usedTokens, contextLength, parts }: Props) {
           </span>
         </div>
       </div>
-      {window_ && fraction >= 0.8 ? (
+      {window_ && fraction >= CONTEXT_NEAR_FULL ? (
         <p className="mt-3 text-xs text-[var(--accent)]">{t("chat.context.approaching")}</p>
       ) : (
         <p className={`mt-3 text-xs ${MUTED}`}>{t("chat.context.estimate")}</p>

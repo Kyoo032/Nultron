@@ -31,6 +31,7 @@ export function AgentChatPane({ agentMode, threadId }: Props) {
   const brand = useProductBrand();
   const { agents, loaded } = useVirtualAgents();
   const [panelOpen, setPanelOpen] = useState(false);
+  const [detailsSlot, setDetailsSlot] = useState<HTMLElement | null>(null);
   const agent = agents.find((entry) => entry.id === agentMode);
   // An agent with no row cannot hold a thread: the host has not hired it for this desk.
   const usable = agent && (agent.generalist || agent.agentId);
@@ -99,6 +100,7 @@ export function AgentChatPane({ agentMode, threadId }: Props) {
             ),
             onForeignThread: openForeignThread,
             onOpenStudio: openStudio,
+            detailsTarget: detailsSlot,
           }}
         />
       </div>
@@ -108,6 +110,7 @@ export function AgentChatPane({ agentMode, threadId }: Props) {
           name={name}
           onClose={() => setPanelOpen(false)}
           onOpenStudio={openStudio}
+          detailsRef={setDetailsSlot}
         />
       ) : null}
     </div>

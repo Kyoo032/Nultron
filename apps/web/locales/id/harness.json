@@ -181,6 +181,7 @@
     "statusNew": "Baru",
     "statusOff": "Tidak ditawarkan",
     "inChat": "Di obrolan ini",
+    "contextUsage": "Konteks dan pemakaian",
     "ownHarness": "Harness {name}",
     "runsInChat": "Berjalan di obrolan ini, dengan pengecekannya.",
     "runsInStudio": "Berjalan di studio {name}. Di obrolan ini pekerjaan dilakukan dengan alat di atas, tanpa pengecekan ini."
