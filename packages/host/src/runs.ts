@@ -490,6 +490,7 @@ export async function* startModalityRun(options: {
           }
         },
         signal: modelAbort.signal,
+        userText,
       };
       const inChatRun = <T>(fn: () => Promise<T>): Promise<T> =>
         withToolRun({ runId: run.id, mode: agentPolicy ? agentPolicy.agent.id : "chat" }, () =>

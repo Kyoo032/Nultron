@@ -68,6 +68,7 @@ type ThreadRow = { id: string; title: string; agentId: string; isDefaultChat: bo
 let dispatch: (request: HostRequest) => Promise<HostResult>;
 let runPolicyFor: typeof import("./virtual-agents").runPolicyFor;
 let runWithWorkerProgress: typeof import("./workers/worker-channel").runWithWorkerProgress;
+let currentWorkerChannel: typeof import("./workers/worker-channel").currentWorkerChannel;
 let chatAgentId = "";
 let researchAgentId = "";
 let imagesAgentId = "";
@@ -141,7 +142,7 @@ function rowsWithSlug(slug: string): number {
 beforeAll(async () => {
   ({ dispatch } = await import("./router"));
   ({ runPolicyFor } = await import("./virtual-agents"));
-  ({ runWithWorkerProgress } = await import("./workers/worker-channel"));
+  ({ runWithWorkerProgress, currentWorkerChannel } = await import("./workers/worker-channel"));
   const { sql } = await import("@agentforge/db");
   countRows = (slug) => (sql.prepare("SELECT count(*) AS n FROM agents WHERE slug = ?").get(slug) as { n: number }).n;
   // The generalist's row and the desk exist before the catalog is asked for, so the first case below
@@ -490,9 +491,11 @@ describe("a run on the Research agent's thread", () => {
   });
 
   it("carries a worker's progress to the thread as tool.progress frames", async () => {
+    let channelText: string | undefined;
     swap.runtime = {
       async execute(input) {
         const run = input as ExecuteInput;
+        channelText = currentWorkerChannel()?.userText;
         await run.onEvent({ type: "tool.started", toolKey: "research_dossier", input: { question: "x" } });
         await runWithWorkerProgress("research_dossier", async (emit) => {
           emit({ type: "job.phase", phase: "searching", label: "Searching the web" });
@@ -508,6 +511,7 @@ describe("a run on the Research agent's thread", () => {
 
     const { frames, types } = await send(threadId, "Research the effects of the new tariff schedule");
 
+    expect(channelText).toContain("Research the effects of the new tariff schedule");
     const progress = frames.filter((frame) => frame.type === "tool.progress");
     expect(progress).toHaveLength(1);
     expect(progress[0]).toMatchObject({

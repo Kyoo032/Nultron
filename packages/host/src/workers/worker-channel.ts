@@ -12,6 +12,7 @@ export type WorkerChannel = {
   /** One progress event of the harness the worker is running. Also tells the run it is still alive. */
   readonly emit: (toolKey: string, job: JobEvent) => void;
   readonly signal?: AbortSignal;
+  readonly userText?: string;
 };
 
 const storage = new AsyncLocalStorage<WorkerChannel>();

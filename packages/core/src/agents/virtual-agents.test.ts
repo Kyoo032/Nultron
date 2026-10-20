@@ -53,6 +53,7 @@ describe("virtual agents", () => {
       expect(agent.tools, agent.id).toEqual(generalist.tools);
       expect(agent.budget, agent.id).toEqual(generalist.budget);
       expect(agent.budget.perTool?.research_dossier, agent.id).toBe(2);
+      expect(agent.budget.perTool?.finance_task, agent.id).toBe(2);
       for (const key of [
         "image_generate",
         "video_generate",
@@ -61,6 +62,7 @@ describe("virtual agents", () => {
         "run_code",
         "web_search",
         "research_dossier",
+        "finance_task",
       ]) {
         expect(agent.tools, `${agent.id} ${key}`).toContain(key);
       }
@@ -88,10 +90,18 @@ describe("virtual agents", () => {
     }
   });
 
-  it("says where an agent's own harness runs: chat and research in the conversation, the rest in a studio", () => {
+  it("says where an agent's own harness runs: chat, research and finance in the conversation, the rest in a studio", () => {
+    const inConversation = new Set(["chat", "research", "finance"]);
     for (const agent of VIRTUAL_AGENTS) {
-      expect(agent.conversation, agent.id).toBe(agent.id === "chat" || agent.id === "research" ? "harness" : "studio");
+      expect(agent.conversation, agent.id).toBe(inConversation.has(agent.id) ? "harness" : "studio");
     }
+  });
+
+  it("sends attached figures on the Finance agent to finance_task and keeps quick sums on calculator", () => {
+    const finance = virtualAgentFor("finance");
+    expect(finance.prompt).toContain("call finance_task");
+    expect(finance.prompt).toContain("calculator or run_code");
+    expect(finance.prompt).toContain("finance_task reviews figures the owner attached");
   });
 
   it("gives a studio agent a conversation like every other: the full tools and a prompt", () => {

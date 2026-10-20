@@ -119,7 +119,12 @@ describe("POST /threads/:id/runs/text and the run budget", () => {
     for (const [toolKey, cap] of Object.entries(declared.perTool ?? {})) {
       expect(budget?.perTool?.[toolKey], toolKey).toBe(cap);
     }
-    expect(budget?.perTool).toMatchObject({ research_dossier: 2, image_generate: 4, video_generate: 1 });
+    expect(budget?.perTool).toMatchObject({
+      research_dossier: 2,
+      finance_task: 2,
+      image_generate: 4,
+      video_generate: 1,
+    });
   });
 
   it("leaves an agent the owner built on the runtime's default budget", async () => {

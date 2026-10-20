@@ -36,7 +36,7 @@ function failureOf(error: unknown): SaveFailure {
   return "unavailable";
 }
 
-const FIGURES_SUFFIX = ".figures.json";
+export const FIGURES_SUFFIX = ".figures.json";
 
 export async function saveDeskFigures(
   tenant: TenantContext,
