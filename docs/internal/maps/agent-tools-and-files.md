@@ -29,7 +29,7 @@ It is not the model-selection layer ([`model-policy.md`](model-policy.md)) and n
 Two more tools are registered, the chat workers. Each runs a mode's checked run from inside a conversation and returns an artifact card.
 
 - `research_dossier` (`RESEARCH_DOSSIER_TOOL_KEY`, `packages/host/src/workers/research-dossier-tool.ts:6`; registered at `packages/host/src/register-tools.ts:44`) runs the Research dossier.
-- `finance_task` (`FINANCE_TASK_TOOL_KEY`, `packages/host/src/workers/finance-task-tool.ts:35`; registered at `register-tools.ts:45`) runs a Finance task on a figures file the person attached. Its trust is `user_content`, so after it runs, the egress guard treats the thread as having read private material. It is tester code only; [`finance-chat-worker.md`](finance-chat-worker.md) maps it.
+- `finance_task` (`FINANCE_TASK_TOOL_KEY`, `packages/host/src/workers/finance-task-tool.ts:32`; registered at `register-tools.ts:45`) runs a Finance task on a figures file the person attached. Its trust is `user_content`, so after it runs, the egress guard treats the thread as having read private material. It is tester code only; [`finance-chat-worker.md`](finance-chat-worker.md) maps it.
 
 Every virtual agent has both, because each one carries Chat's tools plus the workers (`FULL_CHAT_TOOLS`, `packages/core/src/agents/virtual-agents.ts:104`; the workers are the keys of `CHAT_WORKERS`, `:74-86`). Research and Finance are the mode harnesses wired as tools so far. The other agents link to their studio screen for their specialty's checked run. Which agent may call which tool is in [`virtual-agents.md`](virtual-agents.md).
 

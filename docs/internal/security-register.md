@@ -6330,9 +6330,13 @@ Evidence:
   Otherwise the worker asks the person to attach the file again.
 - **Numbers the owner did not type.** A discount rate or opening cash in `answers` is used only when the same number appears in the person's typed text this turn. File blocks are stripped with `splitUserFileBlocks` (`packages/host/src/workers/finance-task-asks.ts`). The typed text reaches the worker on `WorkerChannel.userText` (`packages/host/src/runs.ts`).
 - **A rate in the model's own words.** A discount rate that auto found only in the model-written `request` is asked for again, unless the file states it or the person typed it (`rateUntrusted`).
-- **Tests.** `packages/host/src/workers/finance-task-tool.test.ts` holds all three.
+- **A figures file is checked again when it is read.** A security review on 2026-10-20 found that a person-authored figures file was only schema-checked on read, so a model-written version the person reverted to in the Files view would reach the write-up. `readOwnFigures` now runs `checkFinanceFigures` (redaction, injection scan, schema) on every read.
+- **Tests.** `packages/host/src/workers/finance-task-tool.test.ts` holds all four.
 
-Residual: a task name is a closed choice, and the model may pass one on without the owner naming it. The worst case is the wrong review of the owner's own figures, with every figure still computed in code.
+Residual, from the same review, accepted while a desk has one owner:
+- A task name is a closed choice, and the model may pass one on without the owner naming it. The worst case is the wrong review of the owner's own figures, with every figure still computed in code.
+- The typed-number match checks presence only, with no unit or context (`typedNumberMatches`, `packages/host/src/workers/finance-task-asks.ts`). If the person types "we have 5 projects", a steered model can pass `discountRatePercent: 5`, and the appraisal runs at 5%. The card names the rate it used. An answer also applies when nothing was asked, so a typed number can replace a rate the file states. A tighter rule (a `%` token for the rate, no year or count for the opening cash) would make a bare reply like "12" ask again.
+- The model-written `request` is stored as the artifact's `question` and as the Knowledge Base card's `prompt` (`packages/host/src/finance-tasks/runner.ts`), so a steered sentence is recorded as if the person wrote it.
 
 Gate: none.
 

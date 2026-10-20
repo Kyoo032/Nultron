@@ -21,13 +21,13 @@ Nothing was driven on `:3200`. This doc was checked against the code at `0fdf2bb
 - **The note reads** `[Figures kept: <path>. To answer a question about these figures, call finance_task with this path as file.]` (`packages/host/src/chat-documents/notes.ts:75`). Its prefix is in `HOST_NOTE_PREFIXES` (`packages/core/src/chat-documents/markers.ts:17`) and `MODEL_ONLY_NOTE_PREFIXES` (`apps/web/lib/message-embeds.ts:110`).
 - **The figures read waits behind `documentLimiter`** at attach (`packages/host/src/chat-documents/handler.ts:62-66`). Any failure there becomes "figures not read" and the attachment still works. It reads the raw extract, `extractedTables` and `extractedMarkdown`, never the chat-masked text.
 - **The formats are xlsx (a `.xls` or `.xlsm` is read as xlsx, `packages/core/src/chat-documents/formats.ts:44-46`), docx, pdf and pptx** (`packages/host/src/finance-figures/figures.ts:28-30`).
-- **The author check needed no new store read.** `listVersions` and `readVersion` already existed (`packages/host/src/desk-files/file-store.ts:387`, `:407`). The worker reads the newest version's author with them (`finance-task-tool.ts:120`, `:124`).
-- **Only the generate step is inside `runWithWorkerProgress`** (`finance-task-tool.ts:216`). The file read and auto run before it and send no progress.
-- **One more ask.** A discount rate that auto found only in the model-written `request`, and not in the figures, the prose or the person's typed text, is asked for (`rateUntrusted`, `finance-task-tool.ts:135-146`).
-- **An applied answer drops its own warning.** `withAnswer` (`finance-task-tool.ts:148`) writes the answer into the task input, and the warning it settles (`warningSettledBy`, `packages/host/src/workers/finance-task-asks.ts:151`) leaves the card's notes.
+- **The author check needed no new store read.** `listVersions` and `readVersion` already existed (`packages/host/src/desk-files/file-store.ts:387`, `:407`). The worker reads the newest version's author with them (`finance-task-tool.ts:117`, `:121`).
+- **Only the generate step is inside `runWithWorkerProgress`** (`finance-task-tool.ts:212`). The file read and auto run before it and send no progress.
+- **One more ask.** A discount rate that auto found only in the model-written `request`, and not in the figures, the prose or the person's typed text, is asked for (`rateUntrusted`, `finance-task-tool.ts:131-142`).
+- **An applied answer drops its own warning.** `withAnswer` (`finance-task-tool.ts:144`) writes the answer into the task input, and the warning it settles (`warningSettledBy`, `packages/host/src/workers/finance-task-asks.ts:151`) leaves the card's notes.
 - **Decision 2 is (b).** The output gains `facts`: a "Key figures" table of every KPI, then the report tables with the inputs last, whole rows only, up to 3,000 characters (`factsOf`, `packages/host/src/workers/finance-task-facts.ts:82`). (d) is still open.
 - **The card has Download Excel and Word next to Open,** not only inside the open view.
-- **The harness panel shows no Open studio button for the Finance agent now.** The panel draws it only for an agent whose conversation is `studio` (`ownRunsHere`, `apps/web/components/agent-harness-panel.tsx:39`, `:120`). § 1's claim that the studio stays reachable from that button no longer holds. `/finance` itself is unchanged. Whether another way in from the agent's conversation remains was not checked.
+- **The harness panel shows no Open studio button for the Finance agent now.** The panel draws it only for an agent whose conversation is `studio` (`ownRunsHere`, `apps/web/components/agent-harness-panel.tsx:39`, `:120`). The empty conversation drops its studio offer the same way (`offersStudio`, `apps/web/components/agent-home.tsx:31`), and the pane passes no `onOpenStudio` for a `harness` agent (`apps/web/components/agent-chat-pane.tsx:80-81`). So the Finance agent has no way into the studio any more, as the Research agent already had none. `/finance` itself is unchanged and opens by its address. Whether the Finance agent should keep a way in is Rizky's call.
 
 ## 1. What the person gets
 
@@ -41,7 +41,7 @@ The agent runs the Finance harness, the same task engine the studio uses:
 
 The agent asks at most one question per run, and only for a value that changes every number.
 
-**What does not change.** There is no new mode, rail entry, task or host route. The Finance agent's conversation changes from `studio` to `harness`. The studio stays reachable from the harness panel's Open studio button (`apps/web/components/agent-harness-panel.tsx:121-126`).
+**What does not change.** There is no new mode, rail entry, task or host route. The Finance agent's conversation changes from `studio` to `harness`. As built, that change also removes the Open studio button from the agent's empty conversation and its harness panel; see "As built" above.
 
 ## 2. Where the figures come from
 
@@ -89,7 +89,7 @@ The agent asks at most one question per run, and only for a value that changes e
 | `task` | `brief`, `ratios`, `budget`, `cashflow` or `appraisal`. Only when the person named one. |
 | `answers` | `{ discountRatePercent?, openingCash? }`. Only values the person typed. |
 
-**Steps.** As built, only step 4 runs inside `runWithWorkerProgress("finance_task", (emit, signal) => …)` (`packages/host/src/workers/worker-channel.ts:55`, called at `finance-task-tool.ts:216`). Steps 1 to 3 run before it and send no progress.
+**Steps.** As built, only step 4 runs inside `runWithWorkerProgress("finance_task", (emit, signal) => …)` (`packages/host/src/workers/worker-channel.ts:55`, called at `finance-task-tool.ts:212`). Steps 1 to 3 run before it and send no progress.
 
 1. **Read the figures file, and check who wrote it.**
    - The path must match `uploads/~<this person>/*.figures.json`.
@@ -106,8 +106,8 @@ The agent asks at most one question per run, and only for a value that changes e
      - Otherwise, return `needs_input` with up to three ranked tasks as choices, in the person's language.
      - A task name is a closed choice, not a figure, so the model may pass it on.
      - How often confidence comes back `low` on real files is measured on the drive. If it is low on most files, the bar moves before release, not the ask.
-   - **Discount rate.** Appraisal with auto's `default_discount_rate` warning (`auto.ts:365`) and no answer returns `needs_input`. As built, so does a rate auto found only in the model-written `request` (`rateUntrusted`, `finance-task-tool.ts:135-146`).
-   - **An applied answer.** As built, `withAnswer` (`finance-task-tool.ts:148`) writes it into the task input and drops the warning it settles (`warningSettledBy`, `packages/host/src/workers/finance-task-asks.ts:151`).
+   - **Discount rate.** Appraisal with auto's `default_discount_rate` warning (`auto.ts:365`) and no answer returns `needs_input`. As built, so does a rate auto found only in the model-written `request` (`rateUntrusted`, `finance-task-tool.ts:131-142`).
+   - **An applied answer.** As built, `withAnswer` (`finance-task-tool.ts:144`) writes it into the task input and drops the warning it settles (`warningSettledBy`, `packages/host/src/workers/finance-task-asks.ts:151`).
    - **Opening cash.** Cash flow with no opening row and no answer returns `needs_input`. Today a missing opening row is a silent 0 (`packages/core/src/finance/cashflow/fold.ts:123`, `compute.ts:142-143`). Auto gains a warning, `no_opening_cash`.
    - **Everything else runs.** Unplaced rows, unpaired budget lines, low-confidence cash-flow rows and skipped sheets each become a note on the card (§ 6).
    - **Answer numbers.** A number in `answers` is accepted only if it appears in the person's own typed text this turn, with file blocks stripped. Otherwise the worker asks again. The model passes on a value the person stated; it never supplies one. This needs two pieces of plumbing:

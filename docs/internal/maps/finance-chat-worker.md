@@ -2,7 +2,7 @@
 
 Product: both · Instance: tester :3200
 
-Last verified: 2026-10-20 at 0fdf2bb1. Every citation on this page was read against the code at that commit. Code-read only: no test was run and nothing was driven in this pass. The recipe is [`features/finance.md`](../../../.cursor/skills/verify-agentforge/features/finance.md), "Finance in Chat".
+Last verified: 2026-10-20 at 05cc5f83 for the `finance-task-tool.ts` citations, which the read re-check moved; each was re-read. Before that: 2026-10-20 at 0fdf2bb1. Every citation on this page was read against the code at that commit. Code-read only: no test was run and nothing was driven in this pass. The recipe is [`features/finance.md`](../../../.cursor/skills/verify-agentforge/features/finance.md), "Finance in Chat".
 
 ## Overview
 
@@ -58,11 +58,11 @@ The attach answer carries `figures: { figuresText, proseText, sheetNames, skippe
 
 ### 4. The tool call
 
-`financeTaskTool` (`packages/host/src/workers/finance-task-tool.ts:271`) is registered in `ensureToolsRegistered` beside `research_dossier` (`packages/host/src/register-tools.ts:45`). Its trust is `user_content` (`finance-task-tool.ts:276`), so a run marks the thread as having read private material for the egress guard.
+`financeTaskTool` (`packages/host/src/workers/finance-task-tool.ts:267`) is registered in `ensureToolsRegistered` beside `research_dossier` (`packages/host/src/register-tools.ts:45`). Its trust is `user_content` (`finance-task-tool.ts:272`), so a run marks the thread as having read private material for the egress guard.
 
 Every agent binds it. `FULL_CHAT_TOOLS` (`packages/core/src/agents/virtual-agents.ts:104`) is Chat's tools plus `GENERALIST_WORKER_TOOLS` (`:89`), the keys of `CHAT_WORKERS` (`:74`). The default agent gets it at run time through `withGeneralistWorkers` (`packages/host/src/virtual-agents.ts:161`, called at `packages/host/src/runs.ts:518`). The prompt sentence is `CHAT_WORKERS.finance_task.sentence` (`virtual-agents.ts:81-85`). The Finance agent's own brief names it too (`SPECIALTIES.finance`, `:158-162`), and its `worker` key makes its conversation `harness` (`:254`) and drops the studio note (`:215`).
 
-The input schema (`finance-task-tool.ts:41-66`):
+The input schema (`finance-task-tool.ts:38-63`):
 
 | Field | Rule |
 |---|---|
@@ -75,17 +75,17 @@ The budget allows 2 calls a turn (`perTurn: 2`, `virtual-agents.ts:82`). `FULL_C
 
 ### 5. The provenance check
 
-`runFinanceTaskWorker` (`finance-task-tool.ts:239`) answers `cancelled` at once when the run's signal is already aborted (`:244-246`). Then `readOwnFigures` (`:113`) reads the file. It returns null, which becomes a `needs_input` ask for `file` (`:250-252`), in each of these cases:
+`runFinanceTaskWorker` (`finance-task-tool.ts:235`) answers `cancelled` at once when the run's signal is already aborted (`:240-242`). Then `readOwnFigures` (`:110`) reads the file. It returns null, which becomes a `needs_input` ask for `file` (`:246-248`), in each of these cases:
 
 - `ownFolderPath` (`:102`) refuses the path. The path must parse as a desk path, start with `uploads/<privateFolderFor(userId)>/`, end with `.figures.json`, and have exactly 3 segments. A path in another person's folder, one that climbs out, or one in a subfolder fails.
-- The newest version, from `listVersions` (`packages/host/src/desk-files/file-store.ts:387`), was not written by this person. `authorKind` must be `user` and `authorId` this person's id (`finance-task-tool.ts:121`). Every model-invoked tool writes as `agent`, so a figures file the model wrote or edited with `write_file` or `edit_file` is refused.
-- The file is missing (`FileRootError`), not JSON (`SyntaxError`), or fails `chatFinanceFiguresSchema` (`:125-131`).
+- The newest version, from `listVersions` (`packages/host/src/desk-files/file-store.ts:387`), was not written by this person. `authorKind` must be `user` and `authorId` this person's id (`finance-task-tool.ts:118`). Every model-invoked tool writes as `agent`, so a figures file the model wrote or edited with `write_file` or `edit_file` is refused.
+- The file is missing (`FileRootError`), not JSON (`SyntaxError`), or fails `checkFinanceFigures` (`packages/host/src/finance-figures/figures.ts:140`), which runs the redaction, the injection scan and `chatFinanceFiguresSchema` again, the same check as at save (`finance-task-tool.ts:122-128`). A version the person restored in the Files view is checked like any other.
 
-The read uses the store's existing `readVersion` (`file-store.ts:407`) for that newest version. Any other error is thrown and ends as `failed` (`:254-260`).
+The read uses the store's existing `readVersion` (`file-store.ts:407`) for that newest version. Any other error is thrown and ends as `failed` (`finance-task-tool.ts:250-256`).
 
 ### 6. Auto picks the task, in code
 
-`reviewFigures` (`finance-task-tool.ts:174`) calls `runFinanceAuto` (`packages/host/src/finance-tasks/auto.ts:487`) in process, with no HTTP call. It sends `figuresText`, `proseText`, `sheetNames`, `prompt: request`, the run's locale, and `task` only when the model passed one (`finance-task-tool.ts:183-190`). Auto scores the five tasks, reads the figures with code only, and returns `fits`, `task`, `input` and `warnings`. It calls no model and writes nothing. [`finance-tasks.md`](finance-tasks.md) § 11 covers the forced `task`, `no_opening_cash` and what `high` confidence means.
+`reviewFigures` (`finance-task-tool.ts:170`) calls `runFinanceAuto` (`packages/host/src/finance-tasks/auto.ts:487`) in process, with no HTTP call. It sends `figuresText`, `proseText`, `sheetNames`, `prompt: request`, the run's locale, and `task` only when the model passed one (`finance-task-tool.ts:179-186`). Auto scores the five tasks, reads the figures with code only, and returns `fits`, `task`, `input` and `warnings`. It calls no model and writes nothing. [`finance-tasks.md`](finance-tasks.md) § 11 covers the forced `task`, `no_opening_cash` and what `high` confidence means.
 
 ### 7. The ask rules
 
@@ -99,7 +99,7 @@ The rules are `DECISION_RULES` (`packages/host/src/workers/finance-task-asks.ts:
 | 4 | Appraisal or cash flow, no answer given, and the value is missing: auto warned `default_discount_rate` or `no_opening_cash`, or the appraisal's rate came only from the model-written `request` | `needs_input`, field `discountRatePercent` or `openingCash` |
 | 5 | An answer was given, but the number is not in the person's typed text | `needs_input` for the same field again |
 
-Rule 4's second case is `rateUntrusted` (`finance-task-tool.ts:135-146`). Auto reads the rate from the prompt, the figures and the prose together (`auto.ts:382`), and the prompt is the model's `request`. When the rate auto used did not come from the figures or prose text (`discountRateFromText`, `packages/core/src/finance/appraisal/grid.ts:198`) and the person did not type it, the worker asks.
+Rule 4's second case is `rateUntrusted` (`finance-task-tool.ts:131-142`). Auto reads the rate from the prompt, the figures and the prose together (`auto.ts:382`), and the prompt is the model's `request`. When the rate auto used did not come from the figures or prose text (`discountRateFromText`, `packages/core/src/finance/appraisal/grid.ts:198`) and the person did not type it, the worker asks.
 
 Rule 5 needs the person's own words. The run puts the turn's user text on the worker channel (`userText`, `packages/host/src/workers/worker-channel.ts:15`, set at `packages/host/src/runs.ts:493`). `typedSegments` (`finance-task-asks.ts:55`) keeps only the text segments of `splitUserFileBlocks` (`packages/core/src/chat-documents/file-blocks.ts:27`), so a number inside an attached file never counts. `typedNumberMatches` (`finance-task-asks.ts:69`) compares through `extractNumbers` (`packages/core/src/finance/number-guard.ts:114`), so `12%`, `12.5` and `Rp 50.000.000` match, including a token's alternate reading.
 
@@ -107,7 +107,7 @@ The questions are in English and Indonesian (`QUESTIONS`, `finance-task-asks.ts:
 
 ### 8. The run
 
-`withAnswer` (`finance-task-tool.ts:148`) writes an applied answer into `input.params` and records which warning it settles (`warningSettledBy`, `finance-task-asks.ts:151`). Then `runWithWorkerProgress` (`worker-channel.ts:55`) wraps `generateFinanceBrief` (`packages/host/src/finance-generate.ts:173`) with `{ ...input, task, prompt: request, locale }` (`finance-task-tool.ts:216-218`). The file read and auto run outside that wrapper, so they send no progress.
+`withAnswer` (`finance-task-tool.ts:144`) writes an applied answer into `input.params` and records which warning it settles (`warningSettledBy`, `finance-task-asks.ts:151`). Then `runWithWorkerProgress` (`worker-channel.ts:55`) wraps `generateFinanceBrief` (`packages/host/src/finance-generate.ts:173`) with `{ ...input, task, prompt: request, locale }` (`finance-task-tool.ts:212-214`). The file read and auto run outside that wrapper, so they send no progress.
 
 `generateFinanceBrief` runs the brief path or, for the other four tasks, the generic runner ([`finance-tasks.md`](finance-tasks.md) § 5). The guard, the repair round, the artifact save and the Knowledge Base work card all run as in the studio. The worker sends no `model`, so `resolveModel` (`packages/host/src/finance-tasks/live.ts:59`) picks `settings.documentGenModel`, else the Finance mode default. It is never the chat's tier model. `requireLive` (`live.ts:47`) answers `runtime_stub` 503 on a stub desk, which the worker returns as `failed`.
 
@@ -115,7 +115,7 @@ The gateway gate and the hosted run slot come from the chat run (`packages/host/
 
 ### 9. The output
 
-The tool answers one of three shapes (`FinanceTaskWorkerResult`, `finance-task-tool.ts:72-84`):
+The tool answers one of three shapes (`FinanceTaskWorkerResult`, `finance-task-tool.ts:69-81`):
 
 - `{ ok: true, artifact, task, headline, summary, facts, checks, notes }`;
 - `{ ok: false, reason: "needs_input", ask: { field, question, choices? } }`;
@@ -124,10 +124,10 @@ The tool answers one of three shapes (`FinanceTaskWorkerResult`, `finance-task-t
 On success:
 
 - `headline` is up to 4 KPIs from `report.summary`, rounded to 2 decimals (`headlineOf`, `packages/host/src/workers/finance-task-facts.ts:26`).
-- `summary` is the first note's body, which already passed the number guard, cut to 1,200 characters (`finance-task-tool.ts:227`).
+- `summary` is the first note's body, which already passed the number guard, cut to 1,200 characters (`finance-task-tool.ts:223`).
 - `facts` is decision 2(b). `factsOf` (`finance-task-facts.ts:82`) writes a "Key figures" table of every KPI, then each report table except the calculation table, with the inputs table last (`orderedTables`, `:51`). Whole rows only, up to 3,000 characters (`FACTS_MAX`, `:11`). It stops at the first block or row that does not fit. These are computed figures, so the model may quote them in its reply. The reply itself is not number-guarded.
-- `checks.passed` is true only when the guard flagged and removed nothing (`finance-task-tool.ts:229`).
-- `notes` is auto's warnings, less the one an applied answer settled, plus the run's own warnings as `run_warning` (`:230-235`).
+- `checks.passed` is true only when the guard flagged and removed nothing (`finance-task-tool.ts:225`).
+- `notes` is auto's warnings, less the one an applied answer settled, plus the run's own warnings as `run_warning` (`:226-231`).
 
 The model and the card read the same saved `tool_call` output. There is no new message part.
 
