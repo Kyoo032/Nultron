@@ -115,4 +115,19 @@ describe("documentNotes names the kept original, or why it was not kept", () => 
     expect(documentNotes(BASE)).not.toContain("Original file");
     expect(documentNotes({ ...BASE, original: null })).not.toContain("Original file");
   });
+
+  it("names the kept figures file after the saved-copy line, and tells the model to use finance_task", () => {
+    const notes = documentNotes({ ...BASE, figures: { path: "uploads/~ana/lapkeu.xlsx.figures.json" } });
+    const lines = notes.trim().split("\n");
+    const saved = lines.findIndex((line) => line.startsWith("[Saved on this desk"));
+    expect(lines[saved + 1]).toBe(
+      "[Figures kept: uploads/~ana/lapkeu.xlsx.figures.json. To answer a question about these figures, call finance_task with this path as file.]",
+    );
+    expect(isHostNoteLine(lines[saved + 1] ?? "")).toBe(true);
+  });
+
+  it("adds no figures line when there are none", () => {
+    expect(documentNotes(BASE)).not.toContain("Figures kept");
+    expect(documentNotes({ ...BASE, figures: null })).not.toContain("Figures kept");
+  });
 });

@@ -32,7 +32,10 @@ function wire(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     fits: { top: "cashflow", confidence: "high", ranked: RANKED },
     task: "cashflow",
-    input: { items: [{ label: "Cash in", period: "Jan", amount: 100, currency: "USD", category: "revenue" }], params: {} },
+    input: {
+      items: [{ label: "Cash in", period: "Jan", amount: 100, currency: "USD", category: "revenue" }],
+      params: {},
+    },
     preview: {
       task: "cashflow",
       title: "Cash flow",
@@ -41,7 +44,13 @@ function wire(over: Record<string, unknown> = {}): Record<string, unknown> {
       summary: [{ label: "Runway", value: 4.5, unit: "months", flag: "watch" }],
       tables: [{ id: "runway", title: "Runway", columns: ["Period", "Net"], rows: [["Jan", -100]] }],
       charts: [
-        { id: "cash-balance", title: "Cash", kind: "line", categories: ["Jan", "Feb"], series: [{ name: "Cash", values: [10, null] }] },
+        {
+          id: "cash-balance",
+          title: "Cash",
+          kind: "line",
+          categories: ["Jan", "Feb"],
+          series: [{ name: "Cash", values: [10, null] }],
+        },
       ],
       flags: [{ level: "risk", text: "Cash runs out." }],
       notes: [],
@@ -207,7 +216,9 @@ describe("the write-up request", () => {
   });
 
   it("sends the model only when one was picked, and pins it only when the picker was moved", () => {
-    expect(financeAutoStreamBody(answer, { prompt: "q", language: "en", model: "m-1" })).toMatchObject({ model: "m-1" });
+    expect(financeAutoStreamBody(answer, { prompt: "q", language: "en", model: "m-1" })).toMatchObject({
+      model: "m-1",
+    });
     expect(financeAutoStreamBody(answer, { prompt: "q", language: "en", model: "m-1" })).not.toHaveProperty(
       "modelPinned",
     );
@@ -267,5 +278,16 @@ describe("what a warning says", () => {
     expect(financeAutoWarningText({ code: "reader_note", message: "ignored", detail: ["From the reader."] })).toBe(
       "From the reader.",
     );
+  });
+});
+
+describe("the opening-cash warning", () => {
+  it("is written from the catalog in both languages", () => {
+    applyLocale("en");
+    const en = financeAutoWarningText({ code: "no_opening_cash", message: "dev", detail: [] });
+    expect(en).not.toBe("dev");
+    expect(en).toMatch(/opening/i);
+    applyLocale("id");
+    expect(financeAutoWarningText({ code: "no_opening_cash", message: "dev", detail: [] })).toMatch(/saldo awal/i);
   });
 });

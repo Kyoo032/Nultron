@@ -67,16 +67,16 @@ function accepted(path: string): DeskPath | null {
  * name is folded to Unicode NFC so two spellings that read the same do not become two files. Letter
  * case is kept, because the desk's paths are case sensitive.
  */
-export function deskPathForDocument(filename: string, userId: string): DeskPath {
+export function deskPathForDocument(filename: string, userId: string, suffix: string = SUFFIX): DeskPath {
   const cleaned = sanitise(lastPart(filename));
   const name = HAS_LETTER_OR_DIGIT.test(cleaned) ? cleaned : FALLBACK_NAME;
-  const room = MAX_SEGMENT_CHARS - SUFFIX.length;
+  const room = MAX_SEGMENT_CHARS - suffix.length;
   const folder = `${CHAT_DOCUMENT_DESK_DIR}/${privateFolderFor(userId)}`;
-  const direct = accepted(`${folder}/${shorten(name, room)}${SUFFIX}`);
+  const direct = accepted(`${folder}/${shorten(name, room)}${suffix}`);
   if (direct) {
     return direct;
   }
   // The only thing left that `parseDeskPath` refuses here is a reserved device name (CON, NUL, ...).
-  const prefixed = accepted(`${folder}/${shorten(`doc-${name}`, room)}${SUFFIX}`);
-  return prefixed ?? (`${folder}/${FALLBACK_NAME}${SUFFIX}` as DeskPath);
+  const prefixed = accepted(`${folder}/${shorten(`doc-${name}`, room)}${suffix}`);
+  return prefixed ?? (`${folder}/${FALLBACK_NAME}${suffix}` as DeskPath);
 }

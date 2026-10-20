@@ -86,9 +86,17 @@ function proseOnly(prose: string): ImportPayload {
   };
 }
 
+export function documentProse(markdown: string): string {
+  return capProse(markdownToText(markdown, { withoutTables: true }));
+}
+
+export function workbookSheets(file: HostFile): ReadonlyArray<FinanceSheet> {
+  return readFinanceTable(file.bytes, file.filename).sheets;
+}
+
 export async function readDocument(file: HostFile, wanted: string): Promise<ImportPayload> {
   const extracted = await extractFile({ bytes: file.bytes, filename: file.filename, mime: file.mime });
-  const proseText = capProse(markdownToText(extracted.markdown, { withoutTables: true }));
+  const proseText = documentProse(extracted.markdown);
   const sheets = documentSheets(extracted.tables);
   if (sheets.length === 0) {
     return proseOnly(proseText);
@@ -106,7 +114,7 @@ export async function readDocument(file: HostFile, wanted: string): Promise<Impo
 }
 
 export function readWorkbook(file: HostFile, wanted: string): ImportPayload {
-  const { sheets } = readFinanceTable(file.bytes, file.filename);
+  const sheets = workbookSheets(file);
   const guarded = guardFinanceInput({ sheet: pickSheet(sheets, wanted) });
   return {
     sheets: redactFinanceSheets(sheets),

@@ -206,3 +206,13 @@ describe("Nultron mascot", () => {
     expect(renderToStaticMarkup(<NultronMascot state="idle" placement="beside" />)).toContain(`data-variant="head"`);
   });
 });
+
+describe("the figures note", () => {
+  it("is for the model only, so the file card leaves it out", () => {
+    const detail = fileCardDetail([
+      "[Document: XLSX, 12 KB, 900 characters.]",
+      "[Figures kept: uploads/~me/a.xlsx.figures.json. To answer a question about these figures, call finance_task with this path as file.]",
+    ]);
+    expect(detail).toBe("Document: XLSX, 12 KB, 900 characters.");
+  });
+});

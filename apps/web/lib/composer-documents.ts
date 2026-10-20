@@ -26,7 +26,11 @@ import {
   CHAT_DOCUMENT_ROUTE,
   CHAT_DOCUMENT_SAVE_ROUTE,
   CHAT_DOCUMENTS_PER_MESSAGE,
+  type ChatFinanceFigures,
+  type ChatFinanceFiguresSkip,
+  chatFinanceFiguresSchema,
   cutTextAttachment,
+  isChatFinanceFiguresSkip,
 } from "@agentforge/core/chat-documents";
 import { deleteArtifact } from "./artifacts-client";
 import { apiFetch } from "./api-client";
@@ -59,6 +63,8 @@ export type ChatDocumentResult = {
   readonly originalId: string | null;
   /** Why the original was not kept, for a format that has one. */
   readonly originalSkipped: OriginalSkipReason | null;
+  readonly figures: ChatFinanceFigures | null;
+  readonly figuresSkipped: ChatFinanceFiguresSkip | null;
 };
 
 /** What the host answered when the message was sent: its notes, and the text for the attachment block. */
@@ -152,6 +158,11 @@ function originalSkipOf(value: unknown): OriginalSkipReason | null {
   return ORIGINAL_SKIP_REASONS.find((reason) => reason === value) ?? null;
 }
 
+function figuresOf(value: unknown): ChatFinanceFigures | null {
+  const parsed = chatFinanceFiguresSchema.safeParse(value);
+  return parsed.success ? parsed.data : null;
+}
+
 /** Never trust the wire: a malformed answer is null, so the composer says "could not read" instead. */
 export function parseChatDocument(payload: unknown): ChatDocumentResult | null {
   const record = documentOf(payload);
@@ -170,6 +181,8 @@ export function parseChatDocument(payload: unknown): ChatDocumentResult | null {
     masked: count(pii?.count),
     originalId: originalIdOf(record.originalId),
     originalSkipped: originalSkipOf(record.originalSkipped),
+    figures: figuresOf(record.figures),
+    figuresSkipped: isChatFinanceFiguresSkip(record.figuresSkipped) ? record.figuresSkipped : null,
   };
 }
 
@@ -247,6 +260,7 @@ export async function saveChatDocument(name: string, result: ChatDocumentResult)
         text: result.fullText ?? result.text,
         originalId: result.originalId,
         originalSkipped: result.originalSkipped,
+        ...(result.figures ? { figures: result.figures } : {}),
       }),
     });
   } catch {

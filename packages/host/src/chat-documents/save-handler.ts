@@ -24,7 +24,8 @@ import { jsonError, jsonOk } from "../errors";
 import { FILE_EXTRACT_MAX_MARKDOWN_CHARS } from "../file-extract/limits";
 import { getTenant } from "../tenant";
 import type { HostRequest, HostResult } from "../types";
-import { saveDeskCopy } from "./desk-copy";
+import { checkFinanceFigures } from "../finance-figures/figures";
+import { saveDeskCopy, saveDeskFigures } from "./desk-copy";
 import { chatDocumentError } from "./errors";
 import { documentNotes, type OriginalNote } from "./notes";
 import { originalMimeFor, skipReasonFrom, verifiedOriginalId } from "./original";
@@ -43,6 +44,7 @@ type SaveInput = {
   readonly originalId: unknown;
   /** The read's `originalSkipped`, as sent back. Only a fixed code is ever used. */
   readonly originalSkipped: unknown;
+  readonly figures: unknown;
 };
 
 function whole(value: unknown): number {
@@ -54,7 +56,7 @@ function requireInput(request: HostRequest): SaveInput {
   if (typeof body !== "object" || body === null || Array.isArray(body)) {
     throw new ApiError("invalid_request", "A JSON object body is required", 400);
   }
-  const { name, format, text, bytes, masked, originalId, originalSkipped } = body as Record<string, unknown>;
+  const { name, format, text, bytes, masked, originalId, originalSkipped, figures } = body as Record<string, unknown>;
   if (typeof name !== "string" || name.trim() === "" || name.length > MAX_NAME_CHARS) {
     throw new ApiError("invalid_request", "name must be the file's name", 400);
   }
@@ -78,6 +80,7 @@ function requireInput(request: HostRequest): SaveInput {
     masked: whole(masked),
     originalId,
     originalSkipped,
+    figures,
   };
 }
 
@@ -94,6 +97,11 @@ function originalFor(tenant: TenantContext, input: SaveInput): OriginalNote | nu
   return reason === null || originalMimeFor(input.format) === null ? null : { kind: "skipped", reason };
 }
 
+async function keptFigures(tenant: TenantContext, input: SaveInput): Promise<{ readonly path: string } | null> {
+  const figures = checkFinanceFigures(input.figures, input.name);
+  return figures ? saveDeskFigures(tenant, input.name, figures) : null;
+}
+
 export async function handlePostChatDocumentSave(request: HostRequest): Promise<HostResult> {
   try {
     const input = requireInput(request);
@@ -101,6 +109,7 @@ export async function handlePostChatDocumentSave(request: HostRequest): Promise<
     const fullText = maskPii(cleanDocumentText(input.text));
     const { text: sentText, cut } = cutOnLine(fullText, CHAT_DOCUMENT_TEXT_MAX_CHARS);
     const copy = await saveDeskCopy(tenant, input.name, fullText);
+    const figures = copy.ok ? await keptFigures(tenant, input) : null;
     const notes = documentNotes({
       format: input.format,
       bytes: input.bytes,
@@ -110,6 +119,7 @@ export async function handlePostChatDocumentSave(request: HostRequest): Promise<
       saved: copy.ok ? { path: copy.path, partial: copy.partial } : null,
       saveError: copy.ok ? null : copy.error,
       original: originalFor(tenant, input),
+      figures,
     });
     return jsonOk({
       document: {
@@ -123,6 +133,7 @@ export async function handlePostChatDocumentSave(request: HostRequest): Promise<
         saved: copy.ok ? { path: copy.path, version: copy.version } : null,
         savedPartial: copy.ok ? copy.partial : false,
         saveError: copy.ok ? null : copy.error,
+        figures,
       },
     });
   } catch (error) {

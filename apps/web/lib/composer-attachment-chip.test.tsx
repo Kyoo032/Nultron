@@ -21,6 +21,8 @@ const READY: ChatDocumentResult = {
   masked: 0,
   originalId: null,
   originalSkipped: null,
+  figures: null,
+  figuresSkipped: null,
 };
 
 function chip(kind: string, name: string, read?: DocumentRead, size = 1_258_291): string {

@@ -23,11 +23,16 @@
 import { ApiError } from "@agentforge/core";
 import { CHAT_DOCUMENT_FIELD, CHAT_DOCUMENT_MAX_BYTES, isChatDocumentName } from "@agentforge/core/chat-documents";
 import { jsonError, jsonOk } from "../errors";
+import { withLimit } from "../concurrency";
+import { readFinanceFigures } from "../finance-figures/figures";
 import { getTenant } from "../tenant";
 import type { HostFile, HostRequest, HostResult } from "../types";
 import { chatDocumentError } from "./errors";
+import { documentLimiter } from "./limiter";
 import { keepOriginal } from "./original";
 import { readChatDocument } from "./read";
+
+const FIGURES_NOT_READ = { figures: null, skipped: "unreadable" } as const;
 
 function requireUpload(request: HostRequest): HostFile {
   const file = request.files?.find((item) => item.field === CHAT_DOCUMENT_FIELD) ?? request.files?.[0];
@@ -54,6 +59,11 @@ export async function handlePostChatDocument(request: HostRequest): Promise<Host
     const tenant = await getTenant(request);
     const read = await readChatDocument(file, { signal: request.abortSignal });
     const original = await keepOriginal(tenant, file, read.format);
+    const figures = await withLimit(
+      documentLimiter,
+      () => readFinanceFigures(file, read.format, read.extractedTables, read.extractedMarkdown),
+      request.abortSignal,
+    ).catch(() => FIGURES_NOT_READ);
     return jsonOk({
       document: {
         name: file.filename,
@@ -71,6 +81,8 @@ export async function handlePostChatDocument(request: HostRequest): Promise<Host
         /** The kept original's artifact id, or null when none was kept (`originalSkipped` says why). */
         originalId: original?.id ?? null,
         originalSkipped: original?.skipped ?? null,
+        figures: figures.figures,
+        figuresSkipped: figures.skipped,
       },
     });
   } catch (error) {

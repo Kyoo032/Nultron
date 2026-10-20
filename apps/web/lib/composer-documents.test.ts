@@ -92,6 +92,8 @@ const RESULT: ChatDocumentResult = {
   masked: 2,
   originalId: null,
   originalSkipped: null,
+  figures: null,
+  figuresSkipped: null,
 };
 
 beforeEach(() => {
@@ -473,5 +475,50 @@ describe("how many documents one message holds", () => {
     expect(documentsOverLimit([], CHAT_DOCUMENTS_PER_MESSAGE)).toBe(false);
     expect(documentsOverLimit([], CHAT_DOCUMENTS_PER_MESSAGE + 1)).toBe(true);
     expect(documentsOverLimit([{ id: "t", kind: "text" }], CHAT_DOCUMENTS_PER_MESSAGE)).toBe(false);
+  });
+});
+
+const FIGURES = {
+  figuresText: "Sheet: PL\nPendapatan (2024): 1250000",
+  proseText: "",
+  sheetNames: ["PL"],
+  skipped: [],
+};
+
+describe("Finance figures on a document", () => {
+  it("reads the figures and why there are none", () => {
+    expect(parseChatDocument({ document: { ...GOOD.document, figures: FIGURES, figuresSkipped: null } })).toMatchObject(
+      {
+        figures: FIGURES,
+        figuresSkipped: null,
+      },
+    );
+    expect(
+      parseChatDocument({ document: { ...GOOD.document, figures: null, figuresSkipped: "no_table" } }),
+    ).toMatchObject({ figures: null, figuresSkipped: "no_table" });
+  });
+
+  it("treats an older host's answer, malformed figures or an unknown reason as none", () => {
+    expect(parseChatDocument(GOOD)).toMatchObject({ figures: null, figuresSkipped: null });
+    expect(
+      parseChatDocument({ document: { ...GOOD.document, figures: { figuresText: 5 }, figuresSkipped: "nope" } }),
+    ).toMatchObject({ figures: null, figuresSkipped: null });
+  });
+
+  it("sends the figures back with the save", async () => {
+    apiFetch.mockResolvedValue(reply(200, SAVED));
+    await saveChatDocument("a.xlsx", { ...RESULT, format: "xlsx", figures: FIGURES });
+    const [, init] = apiFetch.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).figures).toEqual(FIGURES);
+  });
+
+  it("sends no figures key for a read with none, or a stash kept before figures existed", async () => {
+    apiFetch.mockImplementation(async () => reply(200, SAVED));
+    await saveChatDocument("a.pdf", RESULT);
+    const { figures: _dropped, ...older } = RESULT;
+    await saveChatDocument("a.pdf", older as ChatDocumentResult);
+    for (const call of apiFetch.mock.calls) {
+      expect(JSON.parse(String((call as [string, RequestInit])[1].body))).not.toHaveProperty("figures");
+    }
   });
 });

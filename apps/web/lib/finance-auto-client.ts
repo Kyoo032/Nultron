@@ -100,7 +100,9 @@ function strings(value: unknown): string[] {
 // -- the preview report, defensively --------------------------------------------------------------
 
 function cellOf(value: unknown): ReportCell {
-  return typeof value === "string" || typeof value === "boolean" || finite(value) !== null ? (value as ReportCell) : null;
+  return typeof value === "string" || typeof value === "boolean" || finite(value) !== null
+    ? (value as ReportCell)
+    : null;
 }
 
 function kpiOf(value: unknown): ReportKpi[] {
@@ -361,6 +363,7 @@ const WARNING_KEYS: Readonly<Record<string, string>> = {
   unplaced_rows: "finance.auto.warnings.unplacedRows",
   default_discount_rate: "finance.auto.warnings.defaultDiscountRate",
   unpaired_lines: "finance.auto.warnings.unpairedLines",
+  no_opening_cash: "finance.auto.warnings.noOpeningCash",
 };
 
 /**

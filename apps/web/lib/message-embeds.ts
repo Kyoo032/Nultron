@@ -107,7 +107,7 @@ export function presentStandaloneLink(href: string, label: string): StandaloneLi
  * the same on every file, so the card leaves it out. `[Original file ...]` names the kept original by its
  * artifact id: an id is for the model, never for the person's card.
  */
-const MODEL_ONLY_NOTE_PREFIXES: ReadonlyArray<string> = [HOST_NOTE_PREFIXES[0], "[Original file"];
+const MODEL_ONLY_NOTE_PREFIXES: ReadonlyArray<string> = [HOST_NOTE_PREFIXES[0], "[Original file", "[Figures kept"];
 
 /**
  * What a file card says about the host's notes: each note without its brackets, in one line. The notes

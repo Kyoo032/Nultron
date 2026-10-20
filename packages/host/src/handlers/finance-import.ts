@@ -15,7 +15,7 @@
  * field `file`, surfaced by the HTTP adapter as `request.files`. Multipart form fields are not
  * surfaced, so a second sheet is chosen with `?sheet=<name>`.
  */
-import { ApiError, scanInjection } from "@agentforge/core";
+import { ApiError } from "@agentforge/core";
 import {
   FINANCE_IMPORT_EXTENSIONS,
   FINANCE_IMPORT_MAX_BYTES,
@@ -27,6 +27,7 @@ import {
 } from "@agentforge/core/finance";
 import { jsonError, jsonOk } from "../errors";
 import { FileExtractError } from "../file-extract";
+import { financeTextBlocked } from "../finance-figures/injection";
 import { readDocument, readWorkbook } from "../finance-figures/read-file";
 import type { HostFile, HostRequest, HostResult } from "../types";
 
@@ -105,7 +106,7 @@ function readSheetParam(request: HostRequest): string {
  * a knowledge upload gets. The owner's way past a false positive is the paste box, which is untouched.
  */
 function requireNoInjection(filename: string, text: string): void {
-  if (scanInjection(filename) ?? scanInjection(text)) {
+  if (financeTextBlocked(filename, text)) {
     throw new ApiError("injection_blocked", INJECTION, 400);
   }
 }

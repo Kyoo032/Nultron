@@ -16,7 +16,7 @@
 import { maskPii, PII_MASK } from "@agentforge/core";
 import { CHAT_DOCUMENT_TEXT_MAX_CHARS } from "@agentforge/core/chat-documents";
 import { type Limiter, withLimit } from "../concurrency";
-import { FileExtractError, extractFile } from "../file-extract";
+import { type ExtractedTable, FileExtractError, extractFile } from "../file-extract";
 import type { HostFile } from "../types";
 import { documentLimiter } from "./limiter";
 import { cleanDocumentText, cutOnLine } from "./text";
@@ -34,6 +34,8 @@ export type ReadDocument = {
   readonly tables: number;
   /** Personal details the mask replaced. */
   readonly masked: number;
+  readonly extractedTables: readonly ExtractedTable[];
+  readonly extractedMarkdown: string;
 };
 
 export type ReadOptions = {
@@ -70,5 +72,7 @@ export async function readChatDocument(file: HostFile, options: ReadOptions = {}
     truncated: cut,
     tables: extracted.tables.length,
     masked: Math.max(0, countMasks(fullText) - countMasks(cleaned)),
+    extractedTables: extracted.tables,
+    extractedMarkdown: extracted.markdown,
   };
 }
