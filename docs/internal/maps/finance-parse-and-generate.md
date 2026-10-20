@@ -2,7 +2,7 @@
 
 Product: both · Instance: main :3000
 
-Last verified: 2026-10-11 on 2df34be (SH-006: the read button follows the gate on every task; only the read-button and generate cites, plus section 4's Paste paragraph, were re-checked, and the other cites on this page are unchanged and some were already stale; code-read and unit-tested, not driven). Earlier: 2026-10-05, PR #133 merged with `origin/main` at 99922bb, not re-driven (the `:3000` host needs a restart). The brief asks once more when the draft is not sections, then checks that a sentence quoting operating profit or net profit does not say the opposite of that sign. `BRIEF_SYSTEM` is unchanged. The cancel signal now reaches the second ask and the direction rewrite, and a cancelled run is not saved. The two model-choice bullets in § 6 were last verified 2026-09-30 against the model lists of that day ([`model-policy.md`](model-policy.md) § 7; not driven). Earlier: 2026-09-26 at 083f925. A catalog sentence is rewritten by `labeledAmountLines` before the model path. The renderer surface in § 2 and the paste door in § 4 were re-read against the guided path on 2026-09-26 at 4477d27 and driven on stub webdev.
+Last verified: 2026-10-20 at 0fdf2bb1 for the injection scan only (§ 4's last paragraph and its Failure modes row now cite `requireNoInjection` and `financeTextBlocked`; code-read, no test run). The tester's `ec41fd07` moved the readers out of `finance-import.ts`, so the page's other `finance-import.ts` line numbers are stale: `handlePostFinanceImport` is now at `:160` and `requireImportFile` at `:73`. Earlier: 2026-10-11 on 2df34be (SH-006: the read button follows the gate on every task; only the read-button and generate cites, plus section 4's Paste paragraph, were re-checked, and the other cites on this page are unchanged and some were already stale; code-read and unit-tested, not driven). Earlier: 2026-10-05, PR #133 merged with `origin/main` at 99922bb, not re-driven (the `:3000` host needs a restart). The brief asks once more when the draft is not sections, then checks that a sentence quoting operating profit or net profit does not say the opposite of that sign. `BRIEF_SYSTEM` is unchanged. The cancel signal now reaches the second ask and the direction rewrite, and a cancelled run is not saved. The two model-choice bullets in § 6 were last verified 2026-09-30 against the model lists of that day ([`model-policy.md`](model-policy.md) § 7; not driven). Earlier: 2026-09-26 at 083f925. A catalog sentence is rewritten by `labeledAmountLines` before the model path. The renderer surface in § 2 and the paste door in § 4 were re-read against the guided path on 2026-09-26 at 4477d27 and driven on stub webdev.
 
 ## Overview
 
@@ -51,7 +51,7 @@ Seven routes, all `POST` (`packages/host/src/router.ts:296-302`):
 | `/api/v1/finance/regenerate` | `handlePostFinanceRegen` (`:61`) | yes (`:65`) | yes |
 | `/api/v1/finance/docx` | `handlePostFinanceDocx` (`:79`) | **no** | no |
 | `/api/v1/finance/export` | `handlePostFinanceExport` (`packages/host/src/handlers/finance-export.ts:119`) | **no** | no |
-| `/api/v1/finance/import` | `handlePostFinanceImport` (`packages/host/src/handlers/finance-import.ts:290`) | **no** | no |
+| `/api/v1/finance/import` | `handlePostFinanceImport` (`packages/host/src/handlers/finance-import.ts:160`) | **no** | no |
 
 **Gate first.** `requireGatewayAllowedFor(tenant)` runs at the top of the four gateway-bound handlers; a closed gate is `403 gateway_blocked` before any work — see [`settings-and-gateway-gate.md`](settings-and-gateway-gate.md). `requireFinanceTask` runs immediately after, so a bad `task` is a 400 before the model is reached.
 
@@ -77,7 +77,7 @@ Documents go through `extractFile` (`:211`, `packages/host/src/file-extract/inde
 
 A sheet becomes figures text in code (`financeFiguresFromSheet`, `packages/core/src/finance/import-table/text.ts:241`): header detection (`layout.ts:66`), period columns (`periods.ts:94`), locale-voted number style (`numbers.ts:147`), ledger/long-format folding (`long-format.ts:119`), register rows (`register-text.ts:178`), subtotal rows tagged `[subtotal]` (`block-rows.ts:15`). Warnings actually produced: `dropped_rows`, `dropped_columns`, `direction_mismatch`, `compacted`, `truncated`, `capped_cells` (one line counting the cells `cleanCell` cut at `FINANCE_IMPORT_MAX_CELL_CHARS`, `read.ts`), `pii_amount_restored`; the client maps them to copy in `apps/web/lib/finance-import-warnings.ts:21-29`. Every declared code is emitted — there is no dead warning left.
 
-Finally `requireNoInjection` (`finance-import.ts:133-137`) scans the filename and the extracted text and answers `injection_blocked` 400.
+Finally `requireNoInjection` (`finance-import.ts:108-112`, called at `:170`) scans the filename and the extracted text through `financeTextBlocked` (`packages/host/src/finance-figures/injection.ts:3`) and answers `injection_blocked` 400. The chat figures file runs the same `financeTextBlocked` at attach and again at save ([`finance-chat-worker.md`](finance-chat-worker.md) § 1, § 2).
 
 ### 5. Stage 1 — parse: code reads the figures, the model only names things
 
@@ -174,7 +174,7 @@ The registry renders it (`packages/host/src/renderers/registry.ts:22-28`): `xlsx
 | Narrative invents a number | `guardNumbers` → one rewrite → sentence removal | marked, counted in `guard.total`, then removed; never shown to the reader |
 | Upload empty / oversized / wrong type | `requireImportFile`, `packages/host/src/handlers/finance-import.ts:88-104` | 400, **413**, `unsupported_content_type` 400 |
 | Scanned PDF | `packages/host/src/file-extract/errors.ts:52` | 400 `needs_ocr`, nothing sent anywhere |
-| Upload carries prompt-injection text | `requireNoInjection`, `finance-import.ts:133-137` | 400 `injection_blocked` |
+| Upload carries prompt-injection text | `requireNoInjection`, `finance-import.ts:108-112`, through `financeTextBlocked` (`packages/host/src/finance-figures/injection.ts:3`) | 400 `injection_blocked` |
 | Posted report oversized / malformed | `readPostedFinanceReport`, `packages/host/src/finance-tasks/report-schema.ts:74-80` | **413** / 400 `invalid_request` |
 | `pdf` export | `packages/host/src/renderers/registry.ts:18-20` | 501 `format_unavailable` |
 | Artifact could not be saved | `persistBrief`, `packages/host/src/finance-generate.ts:150-170` | `log.warn`, `artifactId: null`, run still succeeds |

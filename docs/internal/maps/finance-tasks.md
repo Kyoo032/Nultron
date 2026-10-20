@@ -2,7 +2,7 @@
 
 Product: both · Instance: main :3000
 
-Last verified: 2026-10-19 on ec62b209 (tester lane: the five business metrics in § 10, which are not on `main`; code-read and unit-tested, not driven). Earlier: 2026-10-11 on 2df34be (SH-006: the read button follows the gate on every task; code-read and unit-tested, not driven). Earlier: 2026-10-05, PR #133 merged with `origin/main` at 99922bb, not re-driven; the runner citations were re-read against the merged `runner.ts`, and the job's cancel signal now reaches the second ask and the direction rewrite. Earlier: 2026-09-28. A reading that is not the sections is asked for once more (`askForReading`, `packages/host/src/finance-tasks/reading.ts`), and a sentence that quotes a computed figure while saying the opposite of its direction is rewritten once then dropped (`holdReadingDirection`, `packages/host/src/finance-tasks/direction.ts`). Claims come from each task (`directionClaims` on `FinanceTaskModule`, `packages/core/src/finance/tasks/types.ts:62`). The guided three-step screen is unchanged. Earlier: 2026-09-27 for the chooser mascot. Catalog sentences for every task are read in core (`plain-sentences.ts`) and covered by `sample-sentences.test.ts`. § 7 testids were re-read against the guided path on 2026-09-26 at 4477d27.
+Last verified: 2026-10-20 at 0fdf2bb1 for § 11 only (`/finance/auto` and its two callers, the forced `task`, `no_opening_cash` and the confidence rule; code-read, no test run, not driven). Earlier: 2026-10-19 on ec62b209 (tester lane: the five business metrics in § 10, which are not on `main`; code-read and unit-tested, not driven). Earlier: 2026-10-11 on 2df34be (SH-006: the read button follows the gate on every task; code-read and unit-tested, not driven). Earlier: 2026-10-05, PR #133 merged with `origin/main` at 99922bb, not re-driven; the runner citations were re-read against the merged `runner.ts`, and the job's cancel signal now reaches the second ask and the direction rewrite. Earlier: 2026-09-28. A reading that is not the sections is asked for once more (`askForReading`, `packages/host/src/finance-tasks/reading.ts`), and a sentence that quotes a computed figure while saying the opposite of its direction is rewritten once then dropped (`holdReadingDirection`, `packages/host/src/finance-tasks/direction.ts`). Claims come from each task (`directionClaims` on `FinanceTaskModule`, `packages/core/src/finance/tasks/types.ts:62`). The guided three-step screen is unchanged. Earlier: 2026-09-27 for the chooser mascot. Catalog sentences for every task are read in core (`plain-sentences.ts`) and covered by `sample-sentences.test.ts`. § 7 testids were re-read against the guided path on 2026-09-26 at 4477d27.
 
 ## Overview
 
@@ -186,10 +186,24 @@ These are on `tester/chat-first` only. `main` does not have them yet. Each figur
 
 **Tests.** `packages/core/src/finance/ratios/business-ratios.test.ts` covers zero and negative equity, the Calc drift check, the newest-year-first order, and a zero prior EBIT. `packages/core/src/finance/budget/weighted-error.test.ts` covers empty and all-zero budgets. `packages/core/src/finance/cashflow/margin-of-safety.test.ts` covers the figures, the fact sheet, the guard and the direction claims. Run them with `cd packages/core && npx vitest run src/finance`.
 
+### 11. `/finance/auto` and its two callers (tester lane, 2026-10-20)
+
+`runFinanceAuto` (`packages/host/src/finance-tasks/auto.ts:487`) reads figures into the task they fit and previews it. It calls no model, needs no key and writes nothing. It has two callers.
+
+- **The studio.** `POST /api/v1/finance/auto` (`packages/host/src/router.ts:407`, `handlePostFinanceAuto`, `packages/host/src/handlers/finance-auto.ts:36`). The prompt-first page sends it through `requestFinanceAuto` (`apps/web/lib/finance-auto-io.ts:94`, called from `apps/web/lib/use-finance-auto-read.ts:67`). The body comes from `financeAutoRequestBody` (`apps/web/lib/finance-auto-client.ts:292`), which never sends `task`.
+- **The chat worker.** `finance_task` calls `runFinanceAuto` in process, with no HTTP call (`packages/host/src/workers/finance-task-tool.ts:183-190`). It sends `task` only when the person named or picked one. [`finance-chat-worker.md`](finance-chat-worker.md) maps the rest of that path.
+
+**The forced `task`.** `forcedTask` (`auto.ts:138`) reads an optional `task` from the body. An unknown value is a 400. With a task set, auto tries only that task's reader (`tasks`, `auto.ts:512`) and answers for that task (`:522`), so `input` always belongs to the task the caller asked for. It never falls back to another task, so `fell_back` is not written (`:537`). If that task cannot read the figures, `input` and `preview` are null and the warning says why. Without `task`, auto tries every task that scores at least 0.2 (`FINANCE_AUTO_TRY_MIN_SCORE`, `auto.ts:66`), in fit order, with the brief last (`candidatesOf`, `:474`), and stops at the first that reads.
+
+**`no_opening_cash`.** `readCashflow` adds this warning when `openingCashFromItems` (`packages/core/src/finance/cashflow/periods.ts:86`) finds no opening balance row (`auto.ts:334`, `:340`). The run then starts the cash book from 0. The warning text says so (`COPY.no_opening_cash`, `auto.ts:244`). The chat worker asks for the opening cash when it sees this warning. The appraisal's `default_discount_rate` warning works the same way: no rate was found in the prompt, figures or prose, so 10% is used (`DEFAULT_APPRAISAL_RATE_PERCENT`, `packages/core/src/finance/tasks/appraisal.ts:23`).
+
+**Confidence.** `fits.confidence` is `high` only when the previewed task is the top fit and the fit is clear (`auto.ts:550`). Clear means the top score is at least 0.7 and leads the runner-up by at least 0.2 (`FINANCE_FIT_HIGH_SCORE`, `FINANCE_FIT_HIGH_LEAD`, `fitConfidence`, `packages/core/src/finance/task-fit.ts:35`, `:37`, `:86`). A read that fell back to another task is `low`. A forced task that is not the top fit is also `low`. The chat worker runs on its own pick only when confidence is `high`; otherwise it asks the person to choose.
+
 ## Where things live
 
 | File | Role |
 |---|---|
+| `packages/host/src/finance-tasks/auto.ts` | `runFinanceAuto`: the code-only read into a task, the forced `task`, the warnings (§ 11) |
 | `packages/core/src/finance/task-ids.ts` | The five ids, the default, `isFinanceTask` |
 | `packages/core/src/finance/phase-ids.ts` | The 29 phase ids and their kinds |
 | `packages/core/src/finance/tasks.ts` | `FINANCE_TASK_META` — labels, hints, samples, phases, sections, `available` |

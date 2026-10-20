@@ -221,6 +221,9 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-177](#sr-177) | Low | The new deploy preflight, run in a throwaway container when the server has no node, received the real `AGENTFORGE_SECRETS_KEY` | Fixed before merge (branch `chore/agent-guardrails`, 2026-10-14): the container gets the word `set` or nothing | — |
 | [SR-184](#sr-184) | Low | Edit's output lookup (`loadMediaRow`) read a media row by id with no organization filter | Fixed on branch `fix/media-row-company` (2026-10-15): filtered on the project's organization; unit-tested, not driven | — |
 | [SR-186](#sr-186) | Info | Research's injection guard now scans the part of a page the model is shown, and a long page is read in part instead of refused | Checked, not an issue (branch `fix/research-page-window-and-step-retry`, 2026-10-19) | — |
+| [SR-187](#sr-187) | Low | Tester: the Chat figures file keeps amounts the chat mask would hide, any desk tool can read it, and the text-mode Finance guard missed a 16-digit NIK in a headerless pipe row | Open (2026-10-20): recorded, not fixed | Before a hosted desk has a second person |
+| [SR-188](#sr-188) | Info | Tester: `finance_task` refuses a figures file the model wrote, and asks again for a number the owner did not type | Checked, not an issue (2026-10-20) | — |
+| [SR-189](#sr-189) | Low | Tester: a `finance_task` report made from one person's private attachment is a desk-wide artifact and a desk-wide Knowledge Base card | Open (2026-10-20): acceptable while a desk has one owner (OPC) | Before a hosted desk has a second person |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -6294,6 +6297,60 @@ Knowledge imports and media downloads keep the default refusal. `packages/host/s
 proves an injection in the window is caught and one outside it never reaches the model.
 
 Gate: none.
+
+### SR-187 {#sr-187}
+
+**Tester: the Chat figures file keeps amounts the chat mask would hide, any desk tool can read it, and the text-mode Finance guard missed a 16-digit NIK in a headerless pipe row.**
+Raised 2026-10-20 while building the `finance_task` chat worker. Tester only. Low, open.
+
+Evidence:
+- **Where the file lives.** A Word, Excel, PDF or PowerPoint file attached in Chat whose table fits a Finance task now leaves a second desk file, `uploads/~<person>/<name>.figures.json`. `saveDeskFigures` writes it as the person (`packages/host/src/chat-documents/desk-copy.ts`), in the same private folder as the `.md` copy.
+- **How it is redacted.** The text is redacted the Finance way: `guardFinanceInput` at attach (`packages/host/src/finance-figures/figures.ts`) and again at save (`checkFinanceFigures`). Identifiers are masked and amounts are put back, the same as a studio import (`restoreFinanceAmounts`, `packages/host/src/finance-privacy.ts`). The chat copy uses `maskPii` (`packages/host/src/chat-documents/save-handler.ts`), which can mask a long number the Finance guard keeps as an amount.
+- **Who can read it.** `read_file`, `search_files` and `run_code` can read a desk file in the person's own folder. So the model can see a value in the figures file that the `.md` copy shows masked.
+- **The probe.** During the build, the text-mode guard did not mask a 16-digit NIK written as a bare cell in a pipe row with no header. It did mask `NIK: …` and e-mail addresses.
+
+Scope: the file is private to the person (`assertVisible`, `packages/host/src/desk-files/file-store.ts:388`). On a one-owner desk the model reading the owner's own amounts is the point of the feature.
+
+Status: **open.** Two pieces of work are owed:
+- a column-aware NIK test on headerless rows (`packages/core/src/finance/pii-scan.ts`);
+- a decision on whether desk tools may read `*.figures.json`.
+
+Gate: before a hosted desk has a second person.
+
+### SR-188 {#sr-188}
+
+**Tester: `finance_task` refuses a figures file the model wrote, and asks again for a number the owner did not type.**
+Raised 2026-10-20 while building the worker. Info: checked, not an issue.
+
+Evidence:
+- **A forged figures file.** The model can write desk files with `write_file` and `edit_file`. Every such write is authored `agent` (`currentAgentAuthor`, `packages/host/src/file-roots.ts`), while the chat save writes as `user`. `readOwnFigures` (`packages/host/src/workers/finance-task-tool.ts`) accepts a figures file only when all of these hold:
+  - its path is exactly `uploads/~<own folder>/<name>.figures.json`;
+  - its newest version was written as `user` by this person;
+  - it parses with `chatFinanceFiguresSchema`.
+  Otherwise the worker asks the person to attach the file again.
+- **Numbers the owner did not type.** A discount rate or opening cash in `answers` is used only when the same number appears in the person's typed text this turn. File blocks are stripped with `splitUserFileBlocks` (`packages/host/src/workers/finance-task-asks.ts`). The typed text reaches the worker on `WorkerChannel.userText` (`packages/host/src/runs.ts`).
+- **A rate in the model's own words.** A discount rate that auto found only in the model-written `request` is asked for again, unless the file states it or the person typed it (`rateUntrusted`).
+- **Tests.** `packages/host/src/workers/finance-task-tool.test.ts` holds all three.
+
+Residual: a task name is a closed choice, and the model may pass one on without the owner naming it. The worst case is the wrong review of the owner's own figures, with every figure still computed in code.
+
+Gate: none.
+
+### SR-189 {#sr-189}
+
+**Tester: a `finance_task` report made from one person's private attachment is a desk-wide artifact and a desk-wide Knowledge Base card.**
+Raised 2026-10-20 while building the worker. Tester only. Low, open.
+
+Evidence:
+- **The artifact.** The worker runs the studio's own task runner. That saves the report as an artifact (`persistFinanceTaskReport`, `packages/host/src/finance-tasks/persist.ts`), and artifacts are filtered by desk only (`packages/host/src/artifacts.ts:152-175`).
+- **The Knowledge Base card.** The runner also writes a work card with `origin.kind = "artifact"` (`artifactWorkCard`, `packages/host/src/work-cards.ts:174-175`; called from `packages/host/src/finance-tasks/runner.ts`). On a hosted desk only thread cards are private (`visibleExpression`, `packages/host/src/knowledge-visibility.ts:72-74`). So the card, which holds the report's Markdown, is listed and retrieved for everyone on the desk.
+- **Same as before for studio runs.** A Finance run from the studio already behaves this way. What is new is that the input can be a file the person attached in a private Chat thread.
+
+Status: **open.** This is acceptable while a desk has one owner (the OPC, AGENTS.md 2026-10-14). If a hosted desk gets a second person, either:
+- mark the worker's report and card as the person's own; or
+- skip the card for a report made from a private attachment.
+
+Gate: before a hosted desk has a second person.
 
 ## Must be true before the Tencent Cloud deploy
 
