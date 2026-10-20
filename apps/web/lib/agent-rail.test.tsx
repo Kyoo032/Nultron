@@ -85,7 +85,9 @@ describe("AgentRailView agents", () => {
     const html = markup();
     const byId = (id: string) => links(html).find((tag) => attr(tag, "data-testid") === id) ?? "";
     expect(attr(byId("mode-chat"), "aria-label")).toBe("Acme Desk");
-    expect(attr(byId("mode-chat"), "title")).toBe("Acme Desk");
+    expect(attr(byId("mode-chat"), "title")).toBeNull();
+    const strip = links(markup({ collapsed: true })).find((tag) => attr(tag, "data-testid") === "mode-chat") ?? "";
+    expect(attr(strip, "title")).toBe("Acme Desk");
     expect(attr(byId("agent-research"), "aria-label")).toBe("Research");
   });
 

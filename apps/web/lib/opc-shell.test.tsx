@@ -62,9 +62,9 @@ describe("the chat-first shell is held to the byte", () => {
     }
   });
 
-  it("starts collapsed to the icon strip, as the rail always did", () => {
-    expect(cases["rail-no-shell"]).toContain('data-rail="min"');
-    expect(cases["rail-opc-shell"]).toContain('data-rail="min"');
+  it("starts with the names showing", () => {
+    expect(cases["rail-no-shell"]).toContain('data-rail="full"');
+    expect(cases["rail-opc-shell"]).toContain('data-rail="full"');
   });
 });
 

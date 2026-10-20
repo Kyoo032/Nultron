@@ -82,7 +82,7 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
   },
   {
     id: "workspaces",
-    anchors: ['[data-testid="workspaces-link"]'],
+    anchors: ['[data-testid="workspaces-link"]', '[data-testid="rail-menu"]'],
     placement: "right",
     titleKey: "guide.steps.workspaces.title",
     body: workspacesBody,
@@ -96,14 +96,14 @@ export const GUIDE_STEPS: readonly GuideStep[] = [
   },
   {
     id: "knowledge",
-    anchors: ['[data-testid="mode-knowledge"]'],
+    anchors: ['[data-testid="mode-knowledge"]', '[data-testid="rail-menu"]'],
     placement: "right",
     titleKey: "guide.steps.knowledge.title",
     body: () => ({ key: "guide.steps.knowledge.body" }),
   },
   {
     id: "settings",
-    anchors: ['[data-testid="settings-link"]'],
+    anchors: ['[data-testid="settings-link"]', '[data-testid="rail-menu"]'],
     placement: "right",
     titleKey: "guide.steps.settings.title",
     body: () => ({ key: "guide.steps.settings.body" }),

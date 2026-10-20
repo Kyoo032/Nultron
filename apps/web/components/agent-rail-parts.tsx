@@ -78,6 +78,41 @@ function PanelGlyph() {
   );
 }
 
+function MenuGlyph() {
+  return (
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.75"
+      strokeLinecap="round"
+      aria-hidden="true"
+    >
+      <path d="M4 7h16M4 12h16M4 17h16" />
+    </svg>
+  );
+}
+
+export function RailMenuButton({ open, onToggle }: { open: boolean; onToggle: () => void }) {
+  const label = open ? t("rail.collapse") : t("rail.menu");
+  return (
+    <button
+      type="button"
+      className="agent-rail-menu btn btn-ghost btn-icon h-10 w-10 shrink-0 rounded-md wash"
+      aria-expanded={open}
+      aria-controls={RAIL_PANEL_ID}
+      aria-label={label}
+      title={label}
+      data-testid="rail-menu"
+      onClick={onToggle}
+    >
+      <MenuGlyph />
+    </button>
+  );
+}
+
 export function RailToggle({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const label = collapsed ? t("rail.expand") : t("rail.collapse");
   return (

@@ -4,7 +4,7 @@ import { useState, type ReactNode, type SyntheticEvent } from "react";
 import type { ProductMode } from "@agentforge/core/product-modes";
 import { usePathname, useSearchParams } from "@/lib/nav";
 import { AppUpdatesButton } from "@/components/app-updates";
-import { RAIL_PANEL_ID, RailLink, RailToggle, type Tip } from "@/components/agent-rail-parts";
+import { RAIL_PANEL_ID, RailLink, RailMenuButton, RailToggle, type Tip } from "@/components/agent-rail-parts";
 import { BrandMark } from "@/components/brand-mark";
 import { DeskBuddyChip, DeskBuddyDock } from "@/components/desk-buddy";
 import { ModeIcon, isModeIconName, type ModeIconName } from "@/components/mode-icons";
@@ -34,8 +34,7 @@ const SKELETON_KEYS = ["a", "b", "c"] as const;
 
 function GeneralistTile({ productName, logoSrc, bundled }: { productName: string; logoSrc: string; bundled: boolean }) {
   if (bundled) {
-    // The product mark is already a tile with its own corners, so it is not set inside a second one.
-    return <BrandMark size={32} className="agent-rail-mark" />;
+    return <BrandMark size={24} className="agent-rail-mark" />;
   }
   if (logoSrc) {
     return <img src={logoSrc} alt="" className="agent-rail-logo" />;
@@ -57,8 +56,8 @@ export type AgentRailViewProps = {
   bundledMark: boolean;
   /** The footer controls (theme, updates). A slot so the drawing stays free of the update bridge. */
   footer?: ReactNode;
-  /** The icon strip when true (the default, the rail as it was); icons with their names when false. */
   collapsed?: boolean;
+  menu?: boolean;
   onToggle?: () => void;
   /** A phone only: the expanded rail is a drawer over the page, and this is what closes it. */
   onDismiss?: () => void;
@@ -95,7 +94,8 @@ export function AgentRailView({
   logoSrc,
   bundledMark,
   footer,
-  collapsed = true,
+  collapsed = false,
+  menu = false,
   onToggle,
   onDismiss,
 }: AgentRailViewProps) {
@@ -120,6 +120,8 @@ export function AgentRailView({
   // and quiet placeholders where the rest will land.
   const waiting = !loaded && agents.length === 0;
   const list = agents.some((agent) => agent.generalist) ? agents : [FALLBACK_GENERALIST, ...agents];
+  const here = list.find((agent) => agent.id === activeId);
+  const page = here ? undefined : ACCOUNT_LINKS.find((item) => pathname.startsWith(item.href));
 
   const renderAgent = (agent: VirtualAgentInfo) => (
     <RailLink
@@ -139,7 +141,7 @@ export function AgentRailView({
         <GeneralistTile productName={productName} logoSrc={logoSrc} bundled={bundledMark} />
       ) : (
         <span className="agent-rail-tile">
-          <ModeIcon name={isModeIconName(agent.id) ? agent.id : "documents"} size={20} strokeWidth={2} />
+          <ModeIcon name={isModeIconName(agent.id) ? agent.id : "documents"} size={18} strokeWidth={1.75} />
         </span>
       )}
     </RailLink>
@@ -151,7 +153,27 @@ export function AgentRailView({
       aria-label={t("agents.rail.aria")}
       data-testid="agent-rail"
       data-rail={collapsed ? "min" : "full"}
+      data-menu={menu ? "true" : undefined}
     >
+      {menu ? (
+        <div className="agent-rail-bar" data-testid="rail-bar">
+          {onToggle ? <RailMenuButton open={!collapsed} onToggle={onToggle} /> : null}
+          {here && !here.generalist ? (
+            <span className="agent-rail-tile">
+              <ModeIcon name={isModeIconName(here.id) ? here.id : "documents"} size={18} strokeWidth={1.75} />
+            </span>
+          ) : page ? (
+            <span className="agent-rail-tile">
+              <ModeIcon name={page.icon} size={18} strokeWidth={1.75} />
+            </span>
+          ) : (
+            <GeneralistTile productName={productName} logoSrc={logoSrc} bundled={bundledMark} />
+          )}
+          <span className="agent-rail-bar-name" data-testid="rail-bar-name">
+            {here ? virtualAgentName(here, assistantName ?? productName) : page ? t(page.labelKey) : productName}
+          </span>
+        </div>
+      ) : null}
       <div className="agent-rail-inner" id={RAIL_PANEL_ID}>
         <nav
           className="agent-rail-agents"
@@ -185,14 +207,14 @@ export function AgentRailView({
               onTipEnd={onTipEnd}
             >
               <span className="agent-rail-tile">
-                <ModeIcon name={item.icon} size={20} strokeWidth={2} />
+                <ModeIcon name={item.icon} size={18} strokeWidth={1.75} />
               </span>
             </RailLink>
           ))}
         </div>
 
         <div className="agent-rail-footer" data-testid="rail-footer">
-          {onToggle ? <RailToggle collapsed={collapsed} onToggle={onToggle} /> : null}
+          {onToggle && !(menu && collapsed) ? <RailToggle collapsed={collapsed} onToggle={onToggle} /> : null}
           {footer}
         </div>
       </div>
@@ -223,7 +245,7 @@ export function AgentRail(_props: Props) {
   const brand = useProductBrand();
   const { agents, loaded } = useVirtualAgents();
   const phone = useMatchMedia(RAIL_PHONE_QUERY);
-  const desk = useRailCollapse(true);
+  const desk = useRailCollapse(false);
   const drawer = useRailDrawer(phone, `${pathname}?${searchParams.toString()}`);
   const collapsed = phone ? !drawer.open : desk.collapsed;
 
@@ -238,6 +260,7 @@ export function AgentRail(_props: Props) {
       logoSrc={brand.logoSrc}
       bundledMark={usesBundledMark(brand)}
       collapsed={collapsed}
+      menu={phone}
       onToggle={phone ? drawer.toggle : desk.toggle}
       onDismiss={phone ? drawer.close : undefined}
       footer={

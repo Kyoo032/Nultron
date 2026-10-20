@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 export const AGENT_RAIL_STATE_KEY = "agentforge-agent-rail";
-export const RAIL_PHONE_MAX_WIDTH = 480;
+export const RAIL_PHONE_MAX_WIDTH = 767;
 export const RAIL_PHONE_QUERY = `(max-width: ${RAIL_PHONE_MAX_WIDTH}px)`;
 
 const COLLAPSED = "collapsed";

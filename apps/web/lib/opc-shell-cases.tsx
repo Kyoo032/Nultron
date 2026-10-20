@@ -54,6 +54,7 @@ const VIEW_BASE: ViewProps = {
   logoSrc: "",
   bundledMark: false,
   footer: <span data-testid="footer-slot" />,
+  collapsed: true,
 };
 
 const WEB_BRAND: ProductBrand = { ...DEFAULT_PRODUCT_BRAND, logoSrc: WEB_LOGO_SRC };
