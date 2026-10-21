@@ -26,7 +26,7 @@ import {
 } from "@agentforge/core";
 import { rememberJobUsage } from "../job-usage";
 import type { ModelCacheScope } from "../model-cache";
-import { defaultSelectableModel } from "../selectable-models";
+import { defaultSelectableModel, toolMediaModels } from "../selectable-models";
 import { loadSettings } from "../settings-store";
 import { localeForRun } from "../run-context";
 import { ensureToolsRegistered } from "../register-tools";
@@ -274,7 +274,7 @@ export async function runEditAgent(input: {
         if (stub) {
           await runStub(input, doc, runId, budget, queue);
         } else {
-          const runtime = createRuntime(settings);
+          const runtime = createRuntime(settings, toolMediaModels(input.tenant));
           await runtime.execute({
             tenant: input.tenant,
             runId,

@@ -1,10 +1,10 @@
 import { z } from "zod";
 import { resolvedGatewayBaseUrl } from "../../gateway";
-import { DEFAULT_GATEWAY_VIDEO_MODEL } from "../../models/media-kind";
 import { clampVideoSeconds } from "../../models/video-capabilities";
 import { ApiError } from "../../errors";
 import { currentOutboundGuard, mediaSendRefusal } from "../../security/outbound-guard";
 import { defineTool } from "../define-tool";
+import { gatewayGenerateModel } from "../media-model-choice";
 import { missingToolRouteMessage, resolveToolBackend } from "../credentials";
 import { getSecret } from "../secret-scope";
 import { falVideoUrl, runFalQueue } from "./fal-queue";
@@ -149,7 +149,7 @@ export const videoGenerateTool = defineTool({
               seconds,
               resolution,
               apiKey,
-              model: model || getSecret("VIDEO_GEN_MODEL") || DEFAULT_GATEWAY_VIDEO_MODEL,
+              model: gatewayGenerateModel("video", model),
               baseUrl: getSecret("OPENAI_BASE_URL") || resolvedGatewayBaseUrl(),
               fetchImpl,
             })

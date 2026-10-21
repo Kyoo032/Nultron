@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { resolvedGatewayBaseUrl } from "../../gateway";
-import { DEFAULT_GATEWAY_IMAGE_MODEL } from "../../models/media-kind";
 import { ApiError } from "../../errors";
 import { currentOutboundGuard, mediaSendRefusal } from "../../security/outbound-guard";
 import { defineTool } from "../define-tool";
+import { gatewayGenerateModel } from "../media-model-choice";
 import { missingToolRouteMessage, resolveToolBackend } from "../credentials";
 import { getSecret } from "../secret-scope";
 import { falImageUrl, runFalQueue } from "./fal-queue";
@@ -88,7 +88,7 @@ export const imageGenerateTool = defineTool({
             aspectRatio: aspect,
             imageUrl: image_url,
             apiKey,
-            model: model || getSecret("IMAGE_GEN_MODEL") || DEFAULT_GATEWAY_IMAGE_MODEL,
+            model: gatewayGenerateModel("image", model),
             baseUrl: getSecret("OPENAI_BASE_URL") || resolvedGatewayBaseUrl(),
             fetchImpl,
           })

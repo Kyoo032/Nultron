@@ -25,6 +25,7 @@ import { inlineLocalMediaParts } from "./inline-local-media";
 import { throwIfJobAborted } from "./job-stream";
 import { rememberJobUsage } from "./job-usage";
 import { runWithJobModelFallback, type JobModelOutcome } from "./job-model-fallback";
+import { toolMediaModels } from "./selectable-models";
 import { log } from "./log";
 import { loadSettings } from "./settings-store";
 import { localeForRun } from "./run-context";
@@ -162,7 +163,7 @@ async function runJobAssistantOnce(options: {
   outbound?: { userText: readonly string[]; privateText: readonly string[] };
 }): Promise<string> {
   const settings = loadSettings(options.tenant);
-  const runtime = createRuntime(settings);
+  const runtime = createRuntime(settings, toolMediaModels(options.tenant));
   const attachments = options.attachments ?? [];
   if (attachments.length > 0) {
     assertModelSupportsModality(options.model, "image");

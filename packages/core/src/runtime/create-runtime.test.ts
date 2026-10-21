@@ -15,7 +15,7 @@ describe("createRuntime outbound PII mask", () => {
     const previous = process.env.AGENTFORGE_RUNTIME;
     process.env.AGENTFORGE_RUNTIME = "stub";
     try {
-      const runtime = createRuntime({});
+      const runtime = createRuntime({}, { image: [], video: [] });
       let seen = "";
       await runtime.execute({
         tenant,

@@ -26,6 +26,7 @@ import {
   withContextLengths,
   type ChatModel,
   type CuratedModelMeta,
+  type MediaModelCatalog,
   type ModeModelDefaults,
   type ModelProvider,
   type RoutedModels,
@@ -153,6 +154,13 @@ export function listProbedModels(cache?: ModelCache, scope?: ModelCacheScope): C
 
 export function listProbedVideoModels(cache?: ModelCache, scope?: ModelCacheScope): ChatModel[] {
   return listProbedModels(cache, scope).filter((model) => mediaKind(model.id) === "video");
+}
+
+export function toolMediaModels(scope?: ModelCacheScope): MediaModelCatalog {
+  return {
+    image: listImageModels(scope).flatMap((model) => (mediaKind(model.id) === "image" ? [model.id] : [])),
+    video: listProbedVideoModels(undefined, scope).map((model) => model.id),
+  };
 }
 
 /**
