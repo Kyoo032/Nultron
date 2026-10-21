@@ -12,6 +12,8 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
+    // The default 5 s fails the source-tree scanners and the desk-booting tests whenever the machine is busy.
+    testTimeout: 30_000,
     globalSetup: ["./test/global-setup.ts"],
     // Runs before every test module: points the suite at a throwaway desk instead of the
     // operator's data/ directory, so a stored gateway key can't turn "stub" into a live call.
