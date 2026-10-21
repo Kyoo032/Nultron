@@ -51,7 +51,7 @@ That asymmetry is the design: the host's collector decides what is worth mirrori
 
 ### Host mirroring
 
-In a Chat run (`packages/host/src/runs.ts:355-363`), every `tool.completed` output goes through the host collector, then each part through `mirrorToolMediaPart` (`:453-468`):
+In a Chat run (`packages/host/src/runs.ts:631-639`), every `tool.completed` output goes through the host collector, then each part through `mirrorToolMediaPart` (`:770-785`):
 
 - `image_url` → `saveGeneratedImage`, `video_url` → `saveGeneratedVideo` (`packages/host/src/media.ts:132-183`). An already-local `/api/v1/media/…` URL is returned as-is; a `data:` URL is decoded directly (`decodeMediaDataUrl`, `:125-131`); anything else goes to `downloadGeneratedMedia`.
 - `downloadGeneratedMedia` (`packages/host/src/media-download.ts:39-55`) calls `fetchPublicHttps` with a per-kind byte cap, requires a 2xx, and takes the served content type only when it starts with `image/` or `video/` — otherwise it falls back to `image/png` / `video/mp4`. **The failing URL never appears in the error**, which surfaces to the client (`:26-31`).
@@ -102,8 +102,8 @@ How the policy is injected, and why at pack time, is in [`desktop-pack-routes.md
 | `IMAGE_MAX` / `VIDEO_MAX` (on save) | 10 MB / 50 MB | `packages/host/src/media.ts:10-16` |
 | Allowed image mimes | `image/png`, `image/jpeg`, `image/webp`, `image/gif` | `packages/host/src/media.ts:10-16` |
 | Allowed video mimes | `video/mp4`, `video/webm`, `video/quicktime` | `packages/host/src/media.ts:10-16` |
-| `SAFE_FETCH_MAX_HOPS` | 5 | `packages/core/src/security/safe-fetch.ts:4` |
-| `SAFE_FETCH_DEFAULT_TIMEOUT_MS` | 15 000 | `packages/core/src/security/safe-fetch.ts:6` |
+| `SAFE_FETCH_MAX_HOPS` | 5 | `packages/core/src/security/safe-fetch.ts:6` |
+| `SAFE_FETCH_DEFAULT_TIMEOUT_MS` | 15 000 | `packages/core/src/security/safe-fetch.ts:8` |
 | Default mime when the server declares none of the right family | `image/png` / `video/mp4` | `packages/host/src/media-download.ts:17-21` |
 
 ## Where things live
@@ -118,7 +118,7 @@ How the policy is injected, and why at pack time, is in [`desktop-pack-routes.md
 | `packages/host/src/media-download.ts` | `downloadGeneratedMedia` — per-kind caps over `fetchPublicHttps` |
 | `packages/core/src/security/safe-fetch.ts` | `fetchPublicHttps`, `assertPublicHttpsUrl`, `readCapped` |
 | `packages/host/src/media.ts` | `saveMedia`, `saveGeneratedImage`, `saveGeneratedVideo`, `mediaRoot` |
-| `packages/host/src/runs.ts:471-486` | `mirrorToolMediaPart` for Chat runs |
+| `packages/host/src/runs.ts:770-785` | `mirrorToolMediaPart` for Chat runs |
 | `packages/host/src/studio-generate.ts:302-303, 239-240` | The same mirroring for Images / Videos |
 | `packages/host/src/handlers/media.ts`, `byte-range.ts` | Serving, with `Range` support |
 | `apps/web/components/chat-turn.tsx:35-37, 92` | Mid-stream `liveMedia` render |

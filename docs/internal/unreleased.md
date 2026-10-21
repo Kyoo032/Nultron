@@ -54,6 +54,15 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Safe web search rebased onto `main` for its pull request, 2026-10-21 (branch `fix/safe-web-search`; Lanes: enterprise, tester; `ci:local` run, not driven on a live model)
+
+Lanes: enterprise, tester
+
+- **What happened.** The two commits below (2026-10-13) were rebased onto `main` at `21686b0d` (after PR #181) as `ed0c3459` and `139efdb4`. The two entries below name the lanes `personal`, `enterprise`, `hyp-ai`, `tester`. Since then Personal is retired and HYP AI left this repo, so the lanes this change owes are `enterprise` and `tester`.
+- **Conflicts merged.** The only code conflict was in `packages/host/src/research-generate.ts`. The merge keeps both sides: PR #181's page reader (`readPage(url, focus)`, `PAGE_TEXT_MAX_CHARS`, `pageWindow`) and the branch's `guarded(...)` wrapper around `runResearchDossier`. The Research harness no longer calls `maskPii` on a query, because the guard's `sendableSearchQuery` masks every query. The test conflict in `research-dossier.test.ts` keeps both new `describe` blocks. The doc conflicts were "Last verified" lines and recipe bullets, and both sides' text is kept. Line citations that the rebase moved were re-anchored with `scripts/map-rot.mjs`.
+- **Still owed for the tester.** After this merges: `git merge origin/main` in `C:\Users\rizky\agentforge-chat`, then `ci:local`. The review-fixes entry below adds one more step: any tester-only run path that can reach a web tool must run under `runOutboundGuarded`, or its searches fail closed. Chat turns open the guard in `runs.ts`, so the check is for tester code that runs a model with tools outside a Chat turn. Nobody has checked this yet.
+- **Not driven.** No live model, no `:3000` drive, no hosted server. The SR-112 gate (drive an injected file) still stands.
+
 ## Safe web search, review fixes: media URLs, URL shape, guards on every run, fewer false positives, 2026-10-13 on top of 433778dc (branch `fix/safe-web-search`, before merge) (SR-112, SR-166; Lanes: personal, enterprise, hyp-ai, tester; not packed, not deployed, not driven on a live model)
 
 - **Lanes.** All four. Shared core and host code only (`packages/core/src/security`, the search, image and video tools, the Edit tools, `invoke-guarded.ts`, `egress-guard.ts`, the two runtimes; `packages/host/src/runs.ts`, `job-regen.ts`, `market-generate.ts`, `research-generate.ts`, `research-dossier.ts`, `sql-tool.ts`, `edit/agent-run.ts`, `edit/start-generate.ts`). No brand literal, no renderer change. **Tester is owed a check:** a web call inside a tool call with no guard open now refuses, so after `git merge origin/main` every tester execute site that can reach a web tool (bots, routines, the team board) must run under `runOutboundGuarded` or its searches fail closed.
