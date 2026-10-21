@@ -344,7 +344,7 @@ because the note already says it.
 
 - **Live** (a key is saved): `createRuntime(settings).execute(...)` with a compact project prompt
   (`compactPrompt`, `packages/host/src/edit/agent-run.ts:157-169`) that tells the model a title card
-  is an `add_title` call in this turn. The version model is `editAgentModelId()` (`:157-163`), the
+  is an `add_title` call in this turn. The version model is `editAgentModelId()` (`:172-178`), the
   refreshed chat default — never the literal `"edit"`. `bindings` is `editAgentBindings`
   (`packages/core/src/tools/edit/bindings.ts:5-13`), every `EDIT_TOOLS` key enabled. An empty binding
   list is what left the timeline blank: the runtime only exposes tools from bindings
