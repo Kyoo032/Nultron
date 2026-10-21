@@ -156,8 +156,8 @@ describe("what each source is allowed to do", () => {
     expect(modeRedirectAllowed("host")).toBe(true);
   });
 
-  it("holds four skeleton rows: the job modes of a fresh Personal desk", () => {
-    expect(SKELETON_MODE_ROWS).toBe(4);
+  it("holds no skeleton rows: a fresh desk has the default agent alone", () => {
+    expect(SKELETON_MODE_ROWS).toBe(0);
   });
 });
 

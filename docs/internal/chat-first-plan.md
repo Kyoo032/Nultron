@@ -238,7 +238,7 @@ Track B is the screen for what tracks K and C build. It starts after C0, because
 | B5 | Hire your own bot: the setup questions fill a harness spec, the host enforces it, and the bot joins the rail. Plan ceilings apply. Not built in Nultron: the tester's prompt-made agents were removed on 2026-10-16. | A person hires a bot that reads a folder of invoices and writes a weekly summary; a tool outside its spec is refused by the host, not by the prompt. |
 | B6 | Free and paid: the host reads the plan and refuses a computer start on a free desk; the choice is greyed with the reason. | A free desk gets `403` with a reason code on a computer start through the API, not only a greyed button. |
 
-The first-desk hard rule still decides what a fresh Personal desk shows: Chat (the generalist), Research, Images, Videos, Presentation. Bots replace rail entries one for one, so `FIRST_RUN_MODES` and its tests are not touched.
+The first-desk hard rule still decides what a fresh desk shows. Since 2026-10-21 (Rizky: "all people will start with one agents, which is nultron") that is the generalist alone, on local and hosted desks; the other agents are hired. Bots replace rail entries one for one.
 
 ## 6. What gets parked, and how
 

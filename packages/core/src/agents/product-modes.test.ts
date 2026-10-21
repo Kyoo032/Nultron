@@ -86,12 +86,13 @@ describe("resolveWorkspaceModes", () => {
   });
 });
 
-describe("the first desk of a fresh install (owner decision 2026-09-29)", () => {
+describe("the first desk of a fresh install (owner decision 2026-10-21)", () => {
   // Written out, never derived from the catalog or from the constant under test: a new catalog
   // entry, or an edit to FIRST_RUN_MODES, must make this fail rather than ride along.
-  const EXPECTED_PERSONAL = ["chat", "research", "images", "videos", "presentations"];
+  const EXPECTED_PERSONAL = ["chat"];
+  const EXPECTED_HOSTED = ["chat"];
 
-  it("is Chat plus Research, Images, Videos and Presentation, in catalog order, and nothing else", () => {
+  it("is Chat alone, in catalog order, and nothing else", () => {
     expect([...FIRST_RUN_MODES]).toEqual(EXPECTED_PERSONAL);
     expect(FIRST_RUN_MODES.every((id) => isProductMode(id))).toBe(true);
     const order = FIRST_RUN_MODES.map((id) => PRODUCT_MODE_IDS.indexOf(id));
@@ -107,9 +108,10 @@ describe("the first desk of a fresh install (owner decision 2026-09-29)", () => 
     expect(Object.isFrozen(HOSTED_FIRST_DESK_MODES)).toBe(true);
   });
 
-  it("firstDeskModes answers Personal by default and every mode for the hosted app, as copies", () => {
+  it("firstDeskModes answers Chat alone for Personal and for the hosted app, as copies", () => {
     expect(firstDeskModes(false)).toEqual(EXPECTED_PERSONAL);
-    expect(firstDeskModes(true)).toEqual(PRODUCT_MODE_IDS);
+    expect(firstDeskModes(true)).toEqual(EXPECTED_HOSTED);
+    expect([...HOSTED_FIRST_DESK_MODES]).toEqual(EXPECTED_HOSTED);
     const a = firstDeskModes(false);
     a.push("finance");
     expect(firstDeskModes(false)).toEqual(EXPECTED_PERSONAL);

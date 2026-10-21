@@ -54,6 +54,19 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Every desk starts with one agent, and the default agent's empty chat reads like a chat, 2026-10-21 (Rizky; tester, uncommitted; tests run, driven on `:3200` on an existing desk)
+
+Lanes: tester
+
+Rizky's words: "all people will start with one agents, which is nultron and nultron position is not at the top right there, make it like a chat mode". He chose, from two readings, "drop the top hero".
+
+- **First desk = the default agent alone, local and hosted.** `FIRST_RUN_MODES` and `HOSTED_FIRST_DESK_MODES` are both `["chat"]` (`packages/core/src/agents/product-modes.ts:62`, `:70`); they were Chat plus Research, Images, Videos and Presentation (2026-09-29) and every mode. Research, Images, Videos and Presentation are hired from Virtual agents like the rest. An existing desk is never rewritten, so the operator's `:3000` keeps 14 agents and `:3200` keeps 5. `SKELETON_MODE_ROWS` is now 0. The owner-decision literals moved in `first-run-modes.test.ts`, `first-desk-modes.test.ts` and `product-modes.test.ts`; the host virtual-agents test now hires four agents before it drives them. Onboarding's four example tiles stay: each is a job the default agent does in its own chat (`research_dossier`, `image_generate`, `build_deck`), and `onboarding-first-run-copy.test.tsx` now checks that.
+- **The default agent's empty chat has no character at the top.** `ChatGreeting` (`apps/web/components/chat-greeting.tsx`) replaces `ChatLauncher`'s hero in the chat-first shell: "Hi, I'm {name}.", the headline, the key status row, the composer mid-pane, and the four ideas as chips under it (`ChatIdeaChips`, after `chat-composer-ledge` in `chat-session.tsx`). The first send returns to the normal thread with the composer at the bottom. Testids `chat-empty`, `chat-suggestions` and `chat-suggestion` are kept; `chat-hero` and `chat-hero-bubble` are not drawn in this shell. Non-default agents' `agent-home` is unchanged. Test: `apps/web/lib/chat-greeting.test.tsx`.
+- **Driven** on `:3200` (existing desk, live key): 1024 x 768 and 360 x 740, light and dark, a chip click filled the composer, a send moved the composer from y 368 to y 676. **Not driven:** a fresh data folder in a browser (the rule is held by the two tests above, through the real router and Start over), Bahasa Indonesia on screen, the greeting in the needs-key state, Playwright (`foundation.spec.ts` comments updated only).
+- **Copy:** the guide's chat stop said "type in the box at the bottom"; while the chat is empty the box is mid-pane now, so it says "the message box" (`guide.steps.chat.body`, `en` and `id`).
+- **Known, left as is:** with nothing cached, the chat-first rail still draws three loading placeholders under Nultron (`SKELETON_KEYS`, `agent-rail.tsx:33`) until the agent list answers, so a brand-new person sees them vanish. The account links are pinned to the rail's foot, so nothing jumps; changing it means regenerating `opc-shell.golden.json`.
+- **Owed at promotion:** `AGENTS.md` lines 101, 469 and 494 still state the 2026-09-29 first desk; they change in the promotion pull request to `main`, not here, so the tester's copy does not conflict on every merge.
+
 ## The Research bot: long pages are read, and a step after a tool is resent on 503, 2026-10-19 (branch `fix/research-page-window-and-step-retry`; tests run; driven on the tester `:3200` after the merge, see the tester log)
 
 Lanes: enterprise, tester

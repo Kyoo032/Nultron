@@ -22,7 +22,7 @@ Product: both · Instance: main :3000
 Preconditions:
 
 - Doctor exits 0.
-- `agent-images` (or the target mode tab) is visible on this workspace. An older Default has every work mode, and a fresh Personal desk has Research, Images, Videos and Presentation only. If the tab is missing, you are on a desk that hid it — hire the agent in Virtual agents (`agent-hire`).
+- `agent-images` (or the target mode tab) is visible on this workspace. An older Default has every work mode, a desk made between 2026-09-29 and 2026-10-21 has Research, Images, Videos and Presentation, and a fresh desk since 2026-10-21 has the default agent alone. If the tab is missing, hire the agent in Virtual agents (`agent-hire`) first.
 
 - **Open Images.** Click `agent-images`, then `agent-open-studio` (or go to `/images`). `images-studio` is visible. `example-gallery` is visible.
 - **Gallery.** Images: 10 `example-card` entries (34 in the library: images 10 and videos, documents, research and presentations 6 each, `library.test.ts:12-18`, total `:23`). Scope every count to the studio's own root (`getByTestId("images-studio").getByTestId("example-card")`): the other studios stay mounted (G3). Titles and summaries are localized for all five modes; prompts only for documents and presentations (`ui-copy.ts:48`), the rest fall back to the English library string.
@@ -33,7 +33,7 @@ Preconditions:
 
 ## Gotchas
 
-- Default already has the job-mode tabs a first desk starts with (Research, Images, Videos, Presentation). Missing `agent-images` on Default is a fail; missing `agent-documents` on a fresh Personal desk is expected. On a Legal desk it is expected — switch to Default or hire the agent on Virtual agents (`agent-hire`).
+- A fresh desk (since 2026-10-21) has no job-mode tab: missing `agent-images` or `agent-documents` there is expected, so hire the agent first. Missing `agent-images` on an older Default that had it is a fail. On a Legal desk it is expected — switch to Default or hire the agent on Virtual agents (`agent-hire`).
 - `images-studio-gallery` / `videos-studio-gallery` are generated-result galleries, not the example cards.
 - Documents / Presentations starters load a worked offline draft/outline. Template cards only prefill the prompt: `ExampleGallery`'s `onSelect` does nothing but `setPrompt(entry.prompt)` (`apps/web/components/documents-studio.tsx:324`), so a card can never produce `documents-preview` — only `documents-starter` and a live generate can.
 - Prefill targets the mode studio prompt, not Chat `composer-text`.

@@ -25,7 +25,7 @@ Product: both · Instance: main :3000
 
 ## How to get to it (user POV)
 
-- Left rail `agent-edit`, then `agent-open-studio`, on an existing Default, or `http://127.0.0.1:3000/edit` when unlocked. A fresh non-hosted first desk (a throwaway data dir) has no `agent-edit`: hire it first (`/workspaces`, `agent-hire`; SKILL.md **Drive**).
+- Left rail `agent-edit`, then `agent-open-studio`, on an existing Default, or `http://127.0.0.1:3000/edit` when unlocked. A fresh first desk (a throwaway data dir) has no `agent-edit`: hire it first (`/workspaces`, `agent-hire`; SKILL.md **Drive**).
 
 ## Driving it with the Nultron harness
 

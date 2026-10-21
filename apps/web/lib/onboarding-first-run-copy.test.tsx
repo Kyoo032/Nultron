@@ -1,9 +1,11 @@
 /**
- * First-run setup says nothing that the first desk cannot do. The first desk has Chat, Research,
- * Images, Videos and Presentation (`FIRST_RUN_MODES`); onboarding's hello and its example tiles name
- * only those, in both languages, and promise the tour only while it is coming.
+ * First-run setup says nothing that the first desk cannot do. The first desk has the default agent
+ * alone (`FIRST_RUN_MODES`, owner decision 2026-10-21), and every example tile is a job that agent
+ * does in its own chat with a tool it binds. The hello and the tiles say so in both languages, and
+ * promise the tour only while it is coming.
  */
 import { FIRST_RUN_MODES } from "@agentforge/core/product-modes";
+import { virtualAgentFor } from "@agentforge/core/virtual-agents";
 import { afterEach, describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
@@ -18,10 +20,22 @@ afterEach(() => {
 
 const NOT_ON_A_FIRST_DESK = ["documents", "finance", "data", "market", "legal", "meeting", "music", "edit", "education"];
 
+const EXAMPLE_TOOL: Record<(typeof EXAMPLES)[number], string | null> = {
+  chat: null,
+  research: "research_dossier",
+  images: "image_generate",
+  presentation: "build_deck",
+};
+
 describe("onboarding's example tiles", () => {
-  it("only offer tools a first desk has: every tile's tool is Chat or one of the first-run modes", () => {
+  it("only offer what a first desk does: the default agent alone, with a tool it binds for each tile", () => {
+    expect([...FIRST_RUN_MODES]).toEqual(["chat"]);
+    const tools = virtualAgentFor("chat").tools;
     for (const example of EXAMPLES) {
-      expect(FIRST_RUN_MODES as readonly string[], example).toContain(EXAMPLE_MODE[example]);
+      const tool = EXAMPLE_TOOL[example];
+      if (tool) {
+        expect(tools, example).toContain(tool);
+      }
     }
   });
 

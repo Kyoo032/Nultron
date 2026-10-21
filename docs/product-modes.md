@@ -1,6 +1,6 @@
 # Product modes
 
-Nultron’s left nav is **mode-first**. Tabs come from a kernel catalog. **Which tabs appear** is the current workspace’s `productModes`. The first desk of a fresh **Personal** install stores only Research, Images, Videos and Presentation plus Chat (owner decision, 2026-09-29, see [First-run desk](#first-run-desk-personal)); the first desk of the hosted **Enterprise** app stores every work mode, and an existing desk keeps whatever it has. Editing the current desk on Workspaces, or creating another desk (Legal, Marketing, Students, or custom checkboxes), can shrink or grow that rail. Packs are workspace presets. Custom agents do not drive the rail.
+Nultron’s left nav is **mode-first**. Tabs come from a kernel catalog. **Which tabs appear** is the current workspace’s `productModes`. The first desk of a fresh install, local or hosted, stores only Chat, the default agent (owner decision, 2026-10-21, see [First-run desk](#first-run-desk-personal)), and an existing desk keeps whatever it has. Editing the current desk on Workspaces, or creating another desk (Legal, Marketing, Students, or custom checkboxes), can shrink or grow that rail. Packs are workspace presets. Custom agents do not drive the rail.
 
 Gateway identity stays **Toko Token** (`api.tokotokenai.com/v1`). Do not merge Toko Token with any other gateway name in copy or catalogs. Kernel stays industry-neutral: no `student` / `course` / campus nouns outside `packages/university`.
 
@@ -50,13 +50,13 @@ Redirects:
 
 ## First-run desk (Personal)
 
-Rizky, 2026-09-29: when someone first installs the desktop app, the desk it opens with has **Research, Images, Videos and Presentation**, and nothing else. Chat is the home every desk has and is not one of the "Create" modes, so the stored row is `chat, research, images, videos, presentations`. Knowledge Base, Channels, Workspaces, Usage and Settings are account-rail pages, not modes, and are always there.
+Rizky, 2026-10-21: "all people will start with one agents, which is nultron". A fresh desk opens with the default agent alone, so the stored row is `chat`. From 2026-09-29 to 2026-10-21 it was `chat, research, images, videos, presentations`. Knowledge Base, Channels, Virtual agents, Usage and Settings are account-rail pages, not modes, and are always there.
 
 It is a hard rule, held by structure and by tests:
 
 - One constant, `FIRST_RUN_MODES` (`packages/core/src/agents/product-modes.ts`), written out literally so a new catalog mode can never join it by accident.
 - One place writes a Personal first desk: `ensureLocalOwner` (`packages/db/src/ensure-local-owner.ts`), through `firstDeskModes(isServerMode())`. That covers a fresh data dir, the seed script, and Start over's "all" scope, whose wipe removes the database so the next boot lands on the same branch.
-- The hosted app is separate on purpose. `ensurePortalOwner` (`packages/db/src/portal-owner.ts`) reads `HOSTED_FIRST_DESK_MODES`, every mode, exactly as before, and `isServerMode()` keeps a hosted process that ever reached the local path on the same list. Rizky has not decided Enterprise's first desk.
+- The hosted app has its own constant on purpose. `ensurePortalOwner` (`packages/db/src/portal-owner.ts`) reads `HOSTED_FIRST_DESK_MODES`, also `chat` since 2026-10-21, and `isServerMode()` keeps a hosted process that ever reached the local path on the same list.
 - `packages/host/src/first-run-modes.test.ts` opens a real empty data dir through the real router, and runs two real host processes across a Start over, and fails if the first desk has any other mode. `packages/db/src/first-desk-modes.test.ts` fails if a second place starts writing desk rows.
 - It never rewrites an existing desk. Upgrading from 0.15.1 changes nothing; a desk row with no stored modes still reads as every mode.
 

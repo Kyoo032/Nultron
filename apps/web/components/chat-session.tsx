@@ -15,6 +15,7 @@ import { canOfferRetry, retryTextOf } from "@/lib/chat-retry";
 import { FolderSurface } from "@/components/folder/folder-surface";
 import { ChatContextChip } from "@/components/chat-context-chip";
 import { ChatHeader } from "@/components/chat-header";
+import { ChatGreeting, ChatIdeaChips } from "@/components/chat-greeting";
 import { ChatLauncher } from "@/components/chat-launcher";
 import {
   ChatModelFallbackNotice,
@@ -395,6 +396,7 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
   }
 
   const empty = messages.length === 0 && !streaming && !thinking && !running && tools.length === 0;
+  const greeting = empty && !error && shell?.agent.generalist === true;
   const hasReply = messages.some((message) => message.role === "assistant");
   const conversationTokens = estimateConversationTokens(messages, [thinking, streaming]);
   const knowledgeTokens = knowledgeParts.reduce((sum, part) => sum + part.tokens, 0);
@@ -513,6 +515,8 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
         {empty && !error ? (
           shell && !shell.agent.generalist ? (
             <AgentHome agent={shell.agent} name={shell.name} onOpenStudio={shell.onOpenStudio} />
+          ) : shell ? (
+            <ChatGreeting />
           ) : (
             <ChatLauncher onSuggest={setComposerDraft} />
           )
@@ -728,6 +732,7 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
       ) : error ? null : (
         <p className="mt-6 text-sm text-ink/50">{t("chat.starting")}</p>
       )}
+      {agentIdReady && greeting ? <ChatIdeaChips onSuggest={setComposerDraft} /> : null}
     </main>
   );
 }

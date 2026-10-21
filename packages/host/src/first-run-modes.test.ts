@@ -1,6 +1,6 @@
 /**
- * The hard rule (owner decision, Rizky, 2026-09-29): the first desk of a fresh Personal install has
- * Research, Images, Videos and Presentation, plus the Chat home, and no other mode.
+ * The hard rule (owner decision, Rizky, 2026-10-21, replacing 2026-09-29's list): the first desk of a
+ * fresh Personal install has the Chat home alone, the one default agent, and no other mode.
  *
  * Nothing here mocks the constant or the database. Part one opens a real, empty data dir through the
  * real router, so the desk is created by the same `getTenant` -> `ensureLocalOwner` walk a packaged
@@ -21,7 +21,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { ROUTER_IMPORT_BUDGET_MS } from "./__fixtures__/test-budgets";
 import type { HostRequest, HostResult } from "./types";
 
-const FIRST_RUN_DESK = ["chat", "research", "images", "videos", "presentations"];
+const FIRST_RUN_DESK = ["chat"];
 /** What `widen` sends: the whole catalog, in catalog order. Written out for the same reason as the list above. */
 const EVERY_MODE = [
   "chat",
@@ -97,7 +97,7 @@ describe("a fresh Personal data dir, through the real first-run path", () => {
     expect(existsSync(path.join(dataDir, "settings.enc"))).toBe(false);
   });
 
-  it("creates exactly one desk, Default, with exactly Chat, Research, Images, Videos and Presentation", async () => {
+  it("creates exactly one desk, Default, with exactly Chat", async () => {
     const { workspaces, currentWorkspaceId } = await desks();
 
     expect(workspaces).toHaveLength(1);
@@ -141,15 +141,7 @@ describe("a fresh Personal data dir, through the real first-run path", () => {
     const saved = await json<PatchAnswer>("PATCH", `/api/v1/workspaces/${first.id}`, { productModes: widened });
 
     expect(saved.status).toBe(200);
-    expect(saved.body.workspace.productModes).toEqual([
-      "chat",
-      "documents",
-      "research",
-      "finance",
-      "images",
-      "videos",
-      "presentations",
-    ]);
+    expect(saved.body.workspace.productModes).toEqual(["chat", "documents", "finance"]);
     expect((await onlyDesk()).productModes).toEqual(saved.body.workspace.productModes);
   });
 });

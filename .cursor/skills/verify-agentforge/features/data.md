@@ -24,7 +24,7 @@ Product: both · Instance: main :3000
 
 ## How to get to it (user POV)
 
-- Choose the Data agent on the left rail (`agent-data`), then `agent-open-studio`. A desk that already has it shows the tab. A fresh first-run desk starts with Chat, Research, Images, Videos and Presentation only, so hire it first (`/workspaces`, `agent-hire`).
+- Choose the Data agent on the left rail (`agent-data`), then `agent-open-studio`. A desk that already has it shows the tab. A fresh first-run desk starts with the default agent (Chat) alone since 2026-10-21, so hire it first (`/workspaces`, `agent-hire`).
 - Open `http://127.0.0.1:3000/data` when the tab is unlocked.
 - Legal / Marketing / Students presets do not add this tab unless the owner checks it.
 
@@ -33,7 +33,7 @@ Product: both · Instance: main :3000
 Preconditions:
 
 - Doctor exits 0.
-- `agent-data` is visible on an existing Default (every desk made before 2026-09-29, and the hosted first desk). A fresh non-hosted first desk is also named Default but has only Chat, Research, Images, Videos and Presentation (`FIRST_RUN_MODES`), so turn Data on in Workspaces first; the General and Organisation presets include it (`templates/library.ts:678-688`).
+- `agent-data` is visible on an existing Default (every desk made before 2026-09-29, and a hosted first desk made before 2026-10-21). A fresh first desk is also named Default but has only Chat since 2026-10-21 (`FIRST_RUN_MODES`, hosted or not), so hire Data on Virtual agents first; the General and Organisation presets include it (`templates/library.ts:678-688`).
 - Stub proof: upload (or paste) a table, confirm `data-profile`, press a starter, generate. Expect `data-error` carrying the gateway hint on an HTTP 200 from `/api/v1/data/stream` (G2). Live generate only if the operator asked and doctor reports `runtime: "ai"` and `hasOpenai: true`. The generate-without-a-key step holds only on a keyless or stub desk: on a keyed desk (the operator's `:3000`) `data-generate` is a PAID analysis, so upload, paste, preview and starters are the steps to drive there.
 
 - **Open Data.** Click `agent-data`, then `agent-open-studio` (or go to `/data`). URL matches `/data`. `data-studio`, `data-upload` and `expected-inputs` are visible; `data-how` and `data-paste` are closed `<details>` and `data-csv` is hidden until `data-paste` is opened.
@@ -51,7 +51,7 @@ Preconditions:
 
 ## Gotchas
 
-- An existing Default desk unlocks Data; a fresh non-hosted first desk does not (see the precondition). Seeded Legal / Marketing / Students desks do not.
+- An existing Default desk unlocks Data; a fresh first desk does not (see the precondition). Seeded Legal / Marketing / Students desks do not.
 - This is not `/api/v1/research`. A network call to Tavily/Brave is a fail.
 - Do not POST `/api/v1/data` or `/api/v1/data/stream` as a substitute for the prompt bar on a live proof. `/api/v1/data` is not the UI's route at all — the studio uses `/api/v1/data/stream`.
 - A failed analysis on `/api/v1/data/stream` is HTTP 200 — assert `data-error`; see SKILL.md “Harness-wide gotchas” G2.

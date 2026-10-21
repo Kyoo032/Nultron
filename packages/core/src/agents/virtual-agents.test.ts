@@ -179,13 +179,10 @@ describe("virtual agents", () => {
   });
 
   it("shows a desk its own modes as agents, the generalist always first", () => {
-    expect(virtualAgentsForDesk([...FIRST_RUN_MODES]).map((agent) => agent.id)).toEqual([
-      "chat",
-      "research",
-      "images",
-      "videos",
-      "presentations",
-    ]);
+    expect(virtualAgentsForDesk([...FIRST_RUN_MODES]).map((agent) => agent.id)).toEqual(["chat"]);
+    expect(
+      virtualAgentsForDesk(["chat", "research", "images", "videos", "presentations"]).map((agent) => agent.id),
+    ).toEqual(["chat", "research", "images", "videos", "presentations"]);
     expect(virtualAgentsForDesk(["legal"]).map((agent) => agent.id)).toEqual(["chat", "legal"]);
     expect(virtualAgentsForDesk([]).map((agent) => agent.id)).toEqual(["chat"]);
   });

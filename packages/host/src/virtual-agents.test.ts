@@ -162,6 +162,21 @@ afterAll(async () => {
 });
 
 describe("GET /api/v1/virtual-agents on a fresh desk", () => {
+  it("starts with the default agent alone; hiring four more puts them on the desk", async () => {
+    const fresh = await catalog();
+    expect(fresh.agents.map((agent) => agent.id)).toEqual(["chat"]);
+    expect(rowsWithSlug("va-research")).toBe(0);
+
+    const desks = await call<{ currentWorkspaceId: string }>("GET", "/api/v1/workspaces");
+    const hired = await call<{ workspace: { productModes: string[] } }>(
+      "PATCH",
+      `/api/v1/workspaces/${desks.body.currentWorkspaceId}`,
+      { productModes: ["chat", "research", "images", "videos", "presentations"] },
+    );
+    expect(hired.status).toBe(200);
+    expect(rowsWithSlug("va-research")).toBe(0);
+  });
+
   it("makes one Research row even when two first requests arrive together", async () => {
     expect(rowsWithSlug("va-research")).toBe(0);
 
@@ -175,10 +190,10 @@ describe("GET /api/v1/virtual-agents on a fresh desk", () => {
     imagesAgentId = first.agents.find((agent) => agent.id === "images")?.agentId as string;
   });
 
-  it("lists exactly the first-desk agents, in order", async () => {
+  it("lists exactly the hired agents, the default one first, in catalog order", async () => {
     const data = await catalog();
 
-    expect([...FIRST_RUN_MODES]).toEqual(["chat", "research", "images", "videos", "presentations"]);
+    expect([...FIRST_RUN_MODES]).toEqual(["chat"]);
     expect(data.agents.map((agent) => agent.id)).toEqual(["chat", "research", "images", "videos", "presentations"]);
   });
 
