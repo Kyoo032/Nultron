@@ -22,7 +22,7 @@ import type { ToolDefinition } from "../tools/define-tool";
 /** What `web_fetch` returns, instead of running, once the run has read private material. */
 export type EgressRefusal = {
   readonly ok: false;
-  readonly reason: "egress";
+  readonly reason: "egress" | "image_source";
   readonly message: string;
 };
 
@@ -36,8 +36,13 @@ export type EgressGuard = {
 export const EGRESS_REFUSAL_MESSAGE =
   "After reading private material, this run can only open pages from sites the person named or a search returned. That site is neither. Do not try another address; ask the person if you need a different site.";
 
+export const IMAGE_SOURCE_REFUSAL_MESSAGE =
+  "That image address did not come from this chat. To make a new picture, call the tool again without image_url. To change an image, ask the person to share it.";
+
 const FETCH_TOOL = "web_fetch";
 const SEARCH_TOOL = "web_search";
+const IMAGE_TOOL = "image_generate";
+const GENERATE_TOOLS: ReadonlySet<string> = new Set([IMAGE_TOOL, "video_generate"]);
 
 /**
  * Top-level domains that are far more often a file name in a message (README.md, main.py, run.sh,
@@ -124,6 +129,29 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function absoluteUrl(value: string): URL | null {
+  try {
+    return new URL(value);
+  } catch {
+    return null;
+  }
+}
+
+function imageSourceAllowed(args: unknown, typed: string, made: ReadonlySet<string>): boolean {
+  const value = isRecord(args) && typeof args.image_url === "string" ? args.image_url.trim() : undefined;
+  if (value === undefined) {
+    return true;
+  }
+  const url = absoluteUrl(value);
+  if (url === null || url.protocol === "data:") {
+    return true;
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    return false;
+  }
+  return typed.includes(value) || made.has(value);
+}
+
 /**
  * The hosts of the result URLs of one `web_search` answer. Only each hit's own `url` counts: a snippet
  * is text from the page, which is the thing an attacker controls.
@@ -144,10 +172,17 @@ function searchResultHosts(output: unknown): string[] {
  */
 export function createEgressGuard(options: { userText: readonly string[] }): EgressGuard {
   const named = new Set(options.userText.flatMap(hostsNamedIn));
+  const typed = options.userText.join("\n");
+  const made = new Set<string>();
   const searched = new Set<string>();
   let tainted = false;
   return {
     beforeCall(toolKey, args) {
+      if (GENERATE_TOOLS.has(toolKey)) {
+        return imageSourceAllowed(args, typed, made)
+          ? null
+          : { ok: false, reason: "image_source", message: IMAGE_SOURCE_REFUSAL_MESSAGE };
+      }
       if (!tainted || toolKey !== FETCH_TOOL) {
         return null;
       }
@@ -165,6 +200,9 @@ export function createEgressGuard(options: { userText: readonly string[] }): Egr
         for (const host of searchResultHosts(output)) {
           searched.add(host);
         }
+      }
+      if (tool.key === IMAGE_TOOL && isRecord(output) && output.success === true && typeof output.image === "string") {
+        made.add(output.image.trim());
       }
     },
   };

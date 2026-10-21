@@ -1,11 +1,14 @@
 import { AsyncLocalStorage } from "node:async_hooks";
 import { providerEnv } from "../server-mode";
 
+export type MediaModelCatalog = Readonly<{ image: readonly string[]; video: readonly string[] }>;
+
 export type ToolSecretScope = {
   secrets: Record<string, string>;
   backends: Record<string, string>;
   disabledTools?: string[];
   injectionGuardBypass?: boolean;
+  mediaModels?: MediaModelCatalog;
 };
 
 const storage = new AsyncLocalStorage<ToolSecretScope>();
@@ -49,6 +52,10 @@ export function getToolSelection(capability: string): string | undefined {
 
 export function getDisabledTools(): string[] {
   return storage.getStore()?.disabledTools ?? [];
+}
+
+export function getMediaModels(): MediaModelCatalog | undefined {
+  return storage.getStore()?.mediaModels;
 }
 
 export function getInjectionGuardBypass(): boolean {

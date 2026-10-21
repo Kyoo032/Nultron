@@ -111,3 +111,77 @@ describe("imageGenerateTool", () => {
     });
   });
 });
+
+describe("imageGenerateTool model choice", () => {
+  const gateway = { OPENAI_API_KEY: "sk-model", OPENAI_BASE_URL: "https://api.tokotokenai.com/v1" };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function stubGateway() {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ url: "https://cdn.example/lantern.png" }] }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  function sentModel(fetchMock: ReturnType<typeof vi.fn>): unknown {
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    return JSON.parse(String(init?.body)).model;
+  }
+
+  async function run(
+    args: Record<string, unknown>,
+    options: { secrets?: Record<string, string>; image?: string[] } = {},
+  ) {
+    return runWithToolSecrets(
+      {
+        secrets: { ...gateway, ...options.secrets },
+        backends: {},
+        ...(options.image ? { mediaModels: { image: options.image, video: [] } } : {}),
+      },
+      () => invokeTool(imageGenerateTool, { prompt: "a lantern", ...args }, tenant),
+    );
+  }
+
+  it("replaces a model id the desk's catalog does not list with the catalog's image model", async () => {
+    const fetchMock = stubGateway();
+    const result = await run({ model: "]" }, { image: ["seedream-5.0-pro", "gpt-image-2"] });
+    expect(sentModel(fetchMock)).toBe("gpt-image-2");
+    expect(result).toMatchObject({ success: true, model: "gpt-image-2" });
+  });
+
+  it("falls back to the configured image model before the catalog's pick", async () => {
+    const fetchMock = stubGateway();
+    await run(
+      { model: "gpt-image-9" },
+      { image: ["gpt-image-2", "seedream-5.0-pro"], secrets: { IMAGE_GEN_MODEL: "seedream-5.0-pro" } },
+    );
+    expect(sentModel(fetchMock)).toBe("seedream-5.0-pro");
+  });
+
+  it("keeps a model the catalog lists, in the catalog's spelling", async () => {
+    const fetchMock = stubGateway();
+    await run({ model: "Seedream-5.0-Pro" }, { image: ["gpt-image-2", "seedream-5.0-pro"] });
+    expect(sentModel(fetchMock)).toBe("seedream-5.0-pro");
+  });
+
+  it("with an empty catalog keeps an image model id and drops anything else", async () => {
+    const kept = stubGateway();
+    await run({ model: "seedream-5.0-pro" }, { image: [] });
+    expect(sentModel(kept)).toBe("seedream-5.0-pro");
+    vi.unstubAllGlobals();
+    const dropped = stubGateway();
+    await run({ model: "]" }, { image: [] });
+    expect(sentModel(dropped)).toBe("gpt-image-2");
+  });
+
+  it("sends the model as given when no catalog is in scope, as the Images studio calls it", async () => {
+    const fetchMock = stubGateway();
+    await run({ model: "studio-picked-model" });
+    expect(sentModel(fetchMock)).toBe("studio-picked-model");
+  });
+});

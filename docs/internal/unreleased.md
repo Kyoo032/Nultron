@@ -564,3 +564,12 @@ Lanes: enterprise, tester.
 
 - **What.** `loadMediaRow` in `packages/host/src/edit/wire-generate.ts` now takes the organization and filters on it, like every other by-id media read. `resolveGenerateAsset` in `packages/host/src/edit/jobs.ts` passes the project's organization from `workerProjectScope`.
 - **Proof.** `packages/host/src/edit/load-media-row.test.ts` and the edit suite (305 tests). Not driven on `:3000` or a hosted build.
+
+## Chat's media tools use a model the desk lists and refuse a made-up source picture, 2026-10-21 (branch `claude/determined-pare-9d2949`, SR-190)
+
+Lanes: enterprise, tester.
+
+- **What.** Found by the 2026-10-21 OPC checkup (finding 2): asked for one picture, the chat model called `image_generate` with `model: "]"` and `image_url: "https://example.com/"`, and the gateway refused the model. A model run now hands the tools the desk's image and video catalog (`createRuntime(settings, toolMediaModels(tenant))`), and `gatewayGenerateModel` (`packages/core/src/tools/media-model-choice.ts`) keeps a passed id only when the catalog lists it, else takes the configured model, else the catalog's pick. `video_generate` had the same hole and gets the same fix. The egress guard now refuses an `image_url` on either tool unless the person typed that exact address or an `image_generate` earlier in the turn returned it. The studios are unchanged: they pick their own model and call the tools outside the guard.
+- **Overlap.** The unmerged `fix/safe-web-search` has a stricter media-source rule (`judgeMediaUrl`). The `image_url` check here is a strict subset; when that branch merges, delete this copy. The model-id half does not overlap.
+- **Limit on `main`.** "Change the picture you made last turn" now works only when the person pastes the picture's address; the tester's stored-picture input covers it there. The tester merge conflicts in `image-generate.ts`: keep the tester's `resolveImageInput` and take `gatewayGenerateModel` for the `model:` line.
+- **Proof.** `egress-guard.test.ts`, the model-choice blocks of `image-generate.test.ts` and `video-generate.test.ts` (8 of them fail on the old tool code), and `create-runtime-media.test.ts`. **Not driven:** `:3000` serves the main checkout, so one picture from Chat on this branch needs the branch checked out there and `:3000` restarted.

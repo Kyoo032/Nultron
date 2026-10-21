@@ -2,7 +2,14 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import type { TenantContext } from "../tenancy/types";
 import { defineTool, type ToolTrust } from "../tools/define-tool";
-import { EGRESS_REFUSAL_MESSAGE, createEgressGuard, hostOfUrl, hostsNamedIn, userTextOf } from "./egress-guard";
+import {
+  EGRESS_REFUSAL_MESSAGE,
+  IMAGE_SOURCE_REFUSAL_MESSAGE,
+  createEgressGuard,
+  hostOfUrl,
+  hostsNamedIn,
+  userTextOf,
+} from "./egress-guard";
 import { invokeToolGuarded } from "./invoke-guarded";
 import { createToolBudget } from "./tool-budget";
 import { runWithToolIoSink, takeLastToolIo } from "./tool-io";
@@ -501,5 +508,113 @@ describe("a host named only inside an attachment is not a host the person named"
 
   it("does not touch a message with no attachment", () => {
     expect(userTextOf(history("open example.com now"))).toEqual(["open example.com now"]);
+  });
+});
+
+describe("createEgressGuard image sources", () => {
+  const IMAGE_SOURCE_REFUSAL = { ok: false, reason: "image_source", message: IMAGE_SOURCE_REFUSAL_MESSAGE };
+  const IMAGE_GENERATE = fakeTool("image_generate", "network");
+
+  it("says in plain words what to do instead", () => {
+    expect(IMAGE_SOURCE_REFUSAL_MESSAGE).toBe(
+      "That image address did not come from this chat. To make a new picture, call the tool again without image_url. To change an image, ask the person to share it.",
+    );
+  });
+
+  it("refuses an image_url nobody gave, on a run that read nothing private", () => {
+    const guard = createEgressGuard({ userText: ["make me a picture of a lantern"] });
+    for (const key of ["image_generate", "video_generate"]) {
+      expect(guard.beforeCall(key, { prompt: "a lantern", image_url: "https://example.com/" })).toEqual(
+        IMAGE_SOURCE_REFUSAL,
+      );
+    }
+  });
+
+  it("lets a generate call without image_url run", () => {
+    const guard = createEgressGuard({ userText: ["make me a picture of a lantern"] });
+    expect(guard.beforeCall("image_generate", { prompt: "a lantern" })).toBeNull();
+    expect(guard.beforeCall("video_generate", { prompt: "a lantern" })).toBeNull();
+  });
+
+  it("allows the exact address the person typed, and not another one on that host", () => {
+    const guard = createEgressGuard({ userText: ["brighten https://photos.example.org/cat.png please"] });
+    expect(guard.beforeCall("image_generate", { image_url: "https://photos.example.org/cat.png" })).toBeNull();
+    expect(guard.beforeCall("video_generate", { image_url: " https://photos.example.org/cat.png " })).toBeNull();
+    expect(guard.beforeCall("image_generate", { image_url: "https://photos.example.org/cat.png?d=salary" })).toEqual(
+      IMAGE_SOURCE_REFUSAL,
+    );
+    expect(guard.beforeCall("image_generate", { image_url: "https://photos.example.org/dog.png" })).toEqual(
+      IMAGE_SOURCE_REFUSAL,
+    );
+  });
+
+  it("does not count an address the model wrote in an earlier turn", () => {
+    const guard = createEgressGuard({
+      userText: userTextOf([
+        { role: "user", parts: [{ type: "text", text: "make a lantern" }] },
+        { role: "assistant", parts: [{ type: "text", text: "Done: https://cdn.gateway.example/a.png" }] },
+        { role: "user", parts: [{ type: "text", text: "make it bluer" }] },
+      ]),
+    });
+    expect(guard.beforeCall("image_generate", { image_url: "https://cdn.gateway.example/a.png" })).toEqual(
+      IMAGE_SOURCE_REFUSAL,
+    );
+  });
+
+  it("allows the picture an image_generate earlier in the run returned", () => {
+    const guard = createEgressGuard({ userText: ["make a lantern, then animate it"] });
+    guard.afterCall(IMAGE_GENERATE, { success: true, image: "https://cdn.gateway.example/b.png" });
+    expect(guard.beforeCall("video_generate", { image_url: "https://cdn.gateway.example/b.png" })).toBeNull();
+  });
+
+  it("learns nothing from a failed image_generate", () => {
+    const guard = createEgressGuard({ userText: [] });
+    guard.afterCall(IMAGE_GENERATE, { success: false, image: "https://cdn.gateway.example/c.png" });
+    expect(guard.beforeCall("image_generate", { image_url: "https://cdn.gateway.example/c.png" })).toEqual(
+      IMAGE_SOURCE_REFUSAL,
+    );
+  });
+
+  it("leaves a data: image and a value that is not an absolute URL to the tool", () => {
+    const guard = createEgressGuard({ userText: [] });
+    for (const image_url of [
+      "data:image/png;base64,iVBORw0KGgo=",
+      "/api/v1/media/f66a438a-781a-478b-8e67-c19be7771c20/file",
+      "f66a438a-781a-478b-8e67-c19be7771c20",
+    ]) {
+      expect(guard.beforeCall("image_generate", { image_url })).toBeNull();
+    }
+  });
+
+  it("refuses an address that is not http or https, even one the person typed", () => {
+    const guard = createEgressGuard({ userText: ["see file:///etc/passwd"] });
+    expect(guard.beforeCall("image_generate", { image_url: "file:///etc/passwd" })).toEqual(IMAGE_SOURCE_REFUSAL);
+  });
+});
+
+describe("invokeToolGuarded with an image source refusal", () => {
+  it("does not run the tool and hands the model the refusal", async () => {
+    let ran = 0;
+    const imageTool = defineTool({
+      key: "image_generate",
+      name: "Create image",
+      description: "image",
+      trust: "network",
+      schema: z.object({ prompt: z.string(), image_url: z.string().optional() }),
+      execute: async () => {
+        ran += 1;
+        return { success: true, image: "https://cdn.gateway.example/x.png" };
+      },
+    });
+    const guard = createEgressGuard({ userText: ["a lantern please"] });
+    const output = await invokeToolGuarded(
+      imageTool,
+      { prompt: "a lantern", image_url: "https://example.com/" },
+      tenant,
+      undefined,
+      guard,
+    );
+    expect(output).toEqual({ ok: false, reason: "image_source", message: IMAGE_SOURCE_REFUSAL_MESSAGE });
+    expect(ran).toBe(0);
   });
 });

@@ -731,7 +731,13 @@ export {
   httpStatusForGatewayFailure,
   studioVideoFailureStatus,
 } from "./tools/platform/gateway-media";
-export { runWithToolSecrets, getSecret, getDisabledTools, getInjectionGuardBypass } from "./tools/secret-scope";
+export {
+  runWithToolSecrets,
+  getSecret,
+  getDisabledTools,
+  getInjectionGuardBypass,
+  type MediaModelCatalog,
+} from "./tools/secret-scope";
 export {
   TOOL_CAPABILITIES,
   CHAT_INFERENCE_ENV_VARS,
