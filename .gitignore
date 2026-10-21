@@ -37,7 +37,8 @@ apps/desktop/resources/starters/*.m4a
 apps/desktop/resources/examples/videos/*.mp4
 .DS_Store
 *.tsbuildinfo
-.claude/
+.claude/*
+!.claude/rules/
 _ref/
 
 # Python bytecode from the mac build tooling
