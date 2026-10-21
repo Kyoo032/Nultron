@@ -48,8 +48,8 @@ vi.mock("@agentforge/core", async (importOriginal) => {
   return {
     ...actual,
     // The real stub runtime unless a case sets `swap.runtime`.
-    createRuntime: (settings: Parameters<typeof actual.createRuntime>[0]) =>
-      (swap.runtime as AgentRuntime | null) ?? actual.createRuntime(settings),
+    createRuntime: (...args: Parameters<typeof actual.createRuntime>) =>
+      (swap.runtime as AgentRuntime | null) ?? actual.createRuntime(...args),
   };
 });
 

@@ -53,7 +53,7 @@ import { historyToolNote } from "./chat-history-note";
 import { ensureToolsRegistered } from "./register-tools";
 import { recordChatRunUsage } from "./usage-record";
 import { loadSettings, loadUserLocale } from "./settings-store";
-import { defaultSelectableModel, listSelectableModels } from "./selectable-models";
+import { defaultSelectableModel, listSelectableModels, toolMediaModels } from "./selectable-models";
 import { resolveTierRun } from "./tier-resolve";
 import { markJobModelDown, maySwapModel, pickNext, startModel } from "./job-model-fallback";
 import { readModelPinned } from "./job-regen";
@@ -409,7 +409,7 @@ export async function* startModalityRun(options: {
       // Images leave as bytes, within one budget, or the person is told why they cannot. A stored
       // `/api/v1/media/...` reference is never handed on: no remote model can open it.
       const history = await prepareChatImageHistory(options.tenant, storedHistory, { model, locale });
-      const runtime = createRuntime(settings);
+      const runtime = createRuntime(settings, toolMediaModels(options.tenant));
       send({ type: "run.started", runId: run.id });
 
       // Model fallback, as jobs have it (`job-model-fallback.ts`): when the model this turn was given cannot

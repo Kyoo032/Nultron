@@ -214,6 +214,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-177](#sr-177) | Low | The new deploy preflight, run in a throwaway container when the server has no node, received the real `AGENTFORGE_SECRETS_KEY` | Fixed before merge (branch `chore/agent-guardrails`, 2026-10-14): the container gets the word `set` or nothing | — |
 | [SR-184](#sr-184) | Low | Edit's output lookup (`loadMediaRow`) read a media row by id with no organization filter | Fixed on branch `fix/media-row-company` (2026-10-15): filtered on the project's organization; unit-tested, not driven | — |
 | [SR-186](#sr-186) | Info | Research's injection guard now scans the part of a page the model is shown, and a long page is read in part instead of refused | Checked, not an issue (branch `fix/research-page-window-and-step-retry`, 2026-10-19) | — |
+| [SR-190](#sr-190) | Medium | Chat's `image_generate` and `video_generate` sent any model id and any source-image address the model wrote to the gateway, which fetches that address | Fixed in tree (branch `claude/determined-pare-9d2949`, 2026-10-21), unit-tested, not driven; overlaps the unmerged `fix/safe-web-search`, which supersedes the address half | PR merge to `main` |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -6085,6 +6086,48 @@ Knowledge imports and media downloads keep the default refusal. `packages/host/s
 proves an injection in the window is caught and one outside it never reaches the model.
 
 Gate: none.
+
+### SR-190 {#sr-190}
+
+**Chat's media tools sent any model id and any source-image address the model wrote.**
+Raised 2026-10-21 by the OPC checkup (finding 2). Medium. SR-190 because SR-187 to SR-189 are taken on the tester.
+
+Evidence: asked for one picture, the chat model called `image_generate` with `model: "]"` and
+`image_url: "https://example.com/"`. The schema took any non-empty string as `model` and any URL as
+`image_url` (`packages/core/src/tools/platform/image-generate.ts:59-60` at `21686b0d`), and both went to
+`POST /images/generations`; the gateway answered "The requested model is not available for this API key".
+`video_generate` had the same two holes (`video-generate.ts:115-116`, `:147`). The model id is a reliability
+bug. The address is also an egress channel: the provider fetches `image_url`, so a model steered by text in
+a file or page could put private text in the address and have the gateway carry it to any host (the SR-112
+class, through a tool the egress guard did not check).
+
+Fix:
+- **Model.** A model run puts the desk's image and video catalog on the tool scope
+  (`createRuntime(settings, toolMediaModels(tenant))`, `packages/core/src/runtime/create-runtime.ts:32`;
+  `toolMediaModels`, `packages/host/src/selectable-models.ts:159`). `gatewayGenerateModel`
+  (`packages/core/src/tools/media-model-choice.ts:38`) uses a passed id only when the catalog lists it, else
+  the configured model, else the catalog's pick. The studios run the tools with no catalog in scope, so
+  their picked model goes out unchanged.
+- **Address.** `createEgressGuard` now checks `image_url` on both tools on every run, tainted or not
+  (`packages/core/src/runtime/egress-guard.ts:181-185`): an http(s) address runs only when the person typed
+  that exact address or an `image_generate` earlier in the same run returned it. Otherwise the call is
+  refused with `reason: "image_source"` and does not run. Proven by `egress-guard.test.ts` ("createEgressGuard
+  image sources") and the model-choice blocks in `image-generate.test.ts` and `video-generate.test.ts`.
+
+Residual:
+- **Not driven.** `:3000` serves the main checkout; this branch was not run there.
+- **A `data:` image is not checked.** It carries its own bytes and makes the provider fetch nothing.
+  `fix/safe-web-search` refuses it; this row does not.
+- **The studios' `image_url` is not checked here.** They call the tools directly, outside the guard.
+- **The Edit agent's own generate tools are unchanged.** They are `generate_image` / `generate_video`, not
+  these tools, and route the model through `routeEditModel` (`packages/host/src/edit/start-generate.ts:62-72`),
+  using a passed id only when routing finds none.
+- **Overlap.** The unmerged `fix/safe-web-search` (`8ebecb46`, review finding H1) holds a stricter media-source
+  rule in `packages/core/src/security/outbound-guard.ts` (`judgeMediaUrl`: typed, search-returned or made by
+  this run). The rule here is a strict subset of it. When that branch merges, delete the copy in
+  `egress-guard.ts` and its tests; the model-id half stays.
+
+Gate: PR merge to `main`.
 
 ## Must be true before the Tencent Cloud deploy
 
