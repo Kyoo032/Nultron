@@ -2,7 +2,7 @@
 
 Product: both · Instance: main :3000
 
-Last verified: 2026-10-22 on `cursor/regex-budget-slice-131f` for the regex-search sentence of § 6 only (a vm timeout is charged for the slice it was granted). Nothing else on the page was re-read.
+Last verified: 2026-10-22 at dc70ad73 for the regex-search sentence of § 6 only (a vm timeout is charged for the slice it was granted). Nothing else on the page was re-read.
 
 Last verified: 2026-10-21 at 21686b0d for item 2 of the `invokeToolGuarded` order only (the image-source check, SR-190), read against the working tree of branch `claude/determined-pare-9d2949`, not committed. Nothing else on the page was re-read.
 
