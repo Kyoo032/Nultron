@@ -74,6 +74,27 @@
     "outlineAria": "Bagian dosir",
     "viewAria": "Dosir {title}"
   },
+  "delegate": {
+    "label": "Meminta agen lain",
+    "working": "Sedang meminta agen lain",
+    "asked": "Meminta agen {agent}",
+    "used": "Alat yang dipakai: {tools}",
+    "usedMore": "Alat yang dipakai: {tools} · {n} lainnya",
+    "show": "Tampilkan jawaban",
+    "hide": "Sembunyikan jawaban",
+    "showAria": "Tampilkan jawaban dari agen {agent}",
+    "hideAria": "Sembunyikan jawaban dari agen {agent}",
+    "viewAria": "Jawaban dari agen {agent}",
+    "open": "Buka percakapan",
+    "openAria": "Buka percakapan dengan agen {agent}",
+    "truncated": "Dipersingkat di sini. Jawaban lengkap ada di percakapan.",
+    "failed": {
+      "cancelled": "Dihentikan sebelum selesai.",
+      "timeout": "Tidak selesai tepat waktu.",
+      "no_answer": "Selesai tanpa jawaban.",
+      "failed": "Tidak bisa menyelesaikan tugas."
+    }
+  },
   "page": {
     "title": "Agen virtual",
     "lede": "Setiap agen adalah sebuah harness: prompt, alat, batas, dan pengecekan yang ditegakkan aplikasi pada setiap proses. Rekrut yang dibutuhkan pekerjaan Anda.",

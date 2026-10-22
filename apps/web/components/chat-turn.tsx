@@ -14,6 +14,7 @@ import { useHoldOnMount } from "@/lib/use-hold-on-mount";
 import { fileCardDetail, jobEmbedsFromTools, splitUserFileBlocks } from "@/lib/message-embeds";
 import { collectToolMediaParts } from "@/lib/tool-media";
 import { DeckCards } from "@/components/chat-deck-card";
+import { DelegateCards } from "@/components/chat-delegate-card";
 import { DossierCards } from "@/components/chat-dossier-card";
 import "@/components/chat-turn-bubbles.css";
 import { ToolRowBody, isRichTool } from "@/components/tool-rows/tool-row";
@@ -194,6 +195,7 @@ export function ChatTurn({ role, content, live, onContinue, continueDisabled = f
             {liveMedia.length > 0 ? <MediaParts parts={liveMedia} /> : null}
             <DeckCards tools={visibleTools} />
             <DossierCards tools={visibleTools} />
+            <DelegateCards tools={visibleTools} />
             {jobs.map((job, index) => (
               <MessageEmbed
                 key={`${job.title}-${index}`}
