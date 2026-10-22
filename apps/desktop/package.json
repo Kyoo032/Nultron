@@ -27,7 +27,7 @@
     "keytar": "^7.9.0"
   },
   "devDependencies": {
-    "electron": "^35.1.5",
+    "electron": "^44.9.3",
     "electron-builder": "^25.1.8",
     "esbuild": "^0.25.9"
   },
