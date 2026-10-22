@@ -13,6 +13,7 @@ import { buildAiTools, type AiToolSet } from "./ai-tools";
 import { createToolCallRepair, isInvalidToolCallEvent, withInvalidToolCall } from "./tool-call-repair";
 import { createStepTracker } from "./step-tracker";
 import { createEgressGuard, userTextOf } from "./egress-guard";
+import { createMediaPermission } from "./media-permission";
 import { createToolBudget, resolveMaxSteps } from "./tool-budget";
 import {
   MODEL_CONTACT_ATTEMPTS,
@@ -478,12 +479,15 @@ export class AiSdkRuntime implements AgentRuntime {
     const toolBudget = createToolBudget(input.budget);
     // Same lifetime as the budget: a private read in one attempt still limits the fetches of the next.
     const egressGuard = createEgressGuard({ userText: userTextOf(input.history) });
+    // Same lifetime again: a grant the person gave is spent once per execute, whatever the retries do.
+    const mediaPermission = createMediaPermission(input.mediaPermission);
     const built = buildAiTools({
       bindings: input.bindings,
       tenant: input.tenant,
       signal: input.signal,
       budget: toolBudget,
       egress: egressGuard,
+      permission: mediaPermission,
       disabled,
     });
     // A run whose every bound tool is disabled sends the model no tool list at all, as it always has.

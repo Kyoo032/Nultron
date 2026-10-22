@@ -5,6 +5,7 @@ import { getDisabledTools, getInjectionGuardBypass } from "../tools/secret-scope
 import { blockedInjectionOutput, scanJson } from "../security/injection-guard";
 import { thinToolOutput } from "../security/tool-thin";
 import type { EgressGuard } from "./egress-guard";
+import type { MediaPermission } from "./media-permission";
 import type { ToolBudget } from "./tool-budget";
 import { reportToolIo } from "./tool-io";
 
@@ -21,6 +22,8 @@ export function disabledToolOutput(toolKey: string): { success: false; error: st
  * With an `egress` guard, a `web_fetch` made after the run has read private material returns the guard's
  * refusal instead of running unless the host is one the person named or a search returned (SR-112). The
  * refused call still spends its budget slot, so a model cannot retry it without limit.
+ * With a `permission` gate, `image_generate` and `video_generate` return a `permission` refusal instead of
+ * running until the person has pressed Run on that request (SR-167); it too spends a budget slot.
  */
 export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
   tool: ToolDefinition<TSchema>,
@@ -28,11 +31,18 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
   tenant: TenantContext,
   budget?: ToolBudget,
   egress?: EgressGuard,
+  permission?: MediaPermission,
 ): Promise<unknown> {
   const refusal = budget?.admit(tool.key);
   if (refusal) {
     reportToolIo({ toolKey: tool.key, input: rawArgs, full: refusal, thin: refusal });
     return refusal;
+  }
+
+  const permissionRefusal = permission?.beforeCall(tool.key, rawArgs);
+  if (permissionRefusal) {
+    reportToolIo({ toolKey: tool.key, input: rawArgs, full: permissionRefusal, thin: permissionRefusal });
+    return permissionRefusal;
   }
 
   const egressRefusal = egress?.beforeCall(tool.key, rawArgs);

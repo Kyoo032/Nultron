@@ -200,7 +200,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-157](#sr-157) | Medium | Hosted: stored media (pictures, clips, audio) is read, listed and deleted by company, not by person, so a colleague's picture can be fetched by its id, listed in the Images and Videos galleries, and sent to a model by a job | Open: nothing changed, because scoping by person breaks shared reads the product relies on; needs an owner decision (2026-10-07) | Blocks "Chat attachments are private to the person who attached them" |
 | [SR-165](#sr-165) | Medium | Hosted portal: `PORTAL_SIGNIN_MODE=password` gives HYP AI, and since 2026-10-09 the Nultron Enterprise release bundle's default, a username-and-password sign-in with no second factor, in place of the e-mailed code; the portal's own default when the variable is absent is still `code`, and `code` stays selectable | Built in tree, tested over a real Postgres; not driven in a browser or on a server (2026-10-07; the Enterprise bundle default is template and docs only, nothing deployed or driven, 2026-10-09). Independent review found no critical or high issue; its findings (M1, M2, L1 to L3, N1, N2) are fixed and merged (`e8a069c9`). The owner's decision, and on 2026-10-09 he accepted password-only sign-in as the Enterprise bundle default with residuals 1 to 13 as recorded; a second independent review of that default found no critical or high issue | None beyond the owner's acceptance; open until the second factor (being designed) ships |
 | [SR-166](#sr-166) | Medium | On `main` since the chat-first promotion (PR #157, 2026-10-12; was tester only): every virtual agent reads the desk's Knowledge Base and its earlier chats and can send a question to the web; the egress guard stops `web_fetch` only and never sees what entered through the prompt | Open: same exposure Chat has on `main` (SR-112's residual), new for the twelve mode agents; read from the code, not driven (2026-10-09). The promotion merged with no ruling recorded (2026-10-13) | Blocks the next Enterprise or HYP AI release that carries the chat-first shell, until the owner rules |
-| [SR-167](#sr-167) | Medium | On `main` since PR #157 (was tester only): a model can start paid pictures and clips from any agent's chat; the only brake is a per-turn ceiling | Mitigated in the tester tree (2026-10-09): four pictures and one clip a turn, held by the host's budget, unit-tested; the cost card with a Run control (plan decision D4) is not built; no paid media was run | Blocks promoting the chat-first shell to `main` until the cost card exists or the owner accepts the ceiling |
+| [SR-167](#sr-167) | Medium | On `main` since PR #157 (was tester only): a model can start paid pictures and clips from any agent's chat; `main` still holds only a per-turn ceiling | Fixed in the tester tree (2026-10-22): `image_generate` and `video_generate` do not run until the person presses Run on a card that shows the request and its list price; unit-tested, not driven in a browser; no paid media was run | Lifts when the tester change is promoted to `main` and one Run press has been driven live |
 | [SR-81](#sr-81) | Low | Keyless Research search sends the masked query to four pinned public APIs | Checked, not an issue (2026-09-26) | — |
 | [SR-168](#sr-168) | Low | Tester code only: the research worker's answer to the model is text written from web pages, and was first declared host-computed (`internal`), so it was not scanned for injection | Fixed in the tester tree (2026-10-09): declared `network`, so it is scanned; three real outputs pass the scan and a poisoned one is caught, by test | Tester code only; nothing on `main` |
 | [SR-169](#sr-169) | Medium | Hosted: any member of a company can open any desk of that company. The host checks that a desk belongs to the session's company and never reads `workspace_members` | Closed 2026-10-13: company-wide by design (Rizky, team board decision K-D11) | Before a hosted company keeps material on one desk that some of its members must not see |
@@ -5858,6 +5858,23 @@ round.
 Update 2026-10-13: the shell reached `main` in PR #157 with this row still open and no ruling recorded. New gate:
 **blocks the next Enterprise or HYP AI release that carries the chat-first shell** until the owner accepts the
 ceiling or the cost card is built.
+
+Update 2026-10-22: the owner ruled against a hard cap ("it's their API key anyway") and for a permission blocker, so
+the tester tree no longer holds a ceiling. `image_generate` and `video_generate` pass through a gate in
+`invokeToolGuarded` (`packages/core/src/runtime/media-permission.ts`) and return a `permission` refusal instead of
+running. The screen draws the held request on a card (the prompt, the model, the shape, the list price when the
+price table lists the model named, otherwise the plain admission that none is known) with Run and Not now
+(`apps/web/components/chat-media-permission-card.tsx`). Run sends the next turn with a grant for exactly that
+request in the body (`paidMedia.grants`, read by `packages/host/src/paid-media-body.ts`); the gate lets one call with
+the same arguments through per grant. Only the client's body carries a grant and the body cannot turn the gate off,
+so text in a page or a file cannot press Run, and a model cannot spend more than the card showed. There is no
+stored setting and no migration. Tests: `packages/core/src/runtime/media-permission.test.ts`,
+`packages/host/src/runs-paid-media.test.ts`, `packages/host/src/paid-media-body.test.ts`,
+`apps/web/lib/media-permission.test.tsx`. Still open: the Edit agent's `generate_image` and `generate_video` do not go
+through these tools and are not gated; the price on the card is a list price, not a quote; "stop asking for this
+thread" is deliberately not built (`docs/internal/chat-computer-spec.md` Layer 2 says never for a paid step); and
+nothing has been driven in a browser, so no paid media was run. New gate: lifts when the tester change is promoted to
+`main` and one Run press has been driven live.
 
 ### SR-168 {#sr-168}
 

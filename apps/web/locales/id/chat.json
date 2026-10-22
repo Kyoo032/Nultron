@@ -179,7 +179,9 @@
     "calculator": "Kalkulator",
     "datetime": "Jam",
     "selfChecking": "Memeriksa meja ini…",
-    "selfCheck": "Pemeriksaan meja"
+    "selfCheck": "Pemeriksaan meja",
+    "imageAsk": "Gambar menunggu persetujuan",
+    "videoAsk": "Klip menunggu persetujuan"
   },
   "tools": {
     "name": {
@@ -289,6 +291,21 @@
     "noPreview": "Slide tidak bisa ditampilkan di sini, tetapi berkasnya siap diunduh.",
     "outlineAria": "Slide dalam deck ini",
     "previewAria": "Pratinjau slide {title}"
+  },
+  "media": {
+    "label": "Perlu persetujuan",
+    "imageTitle": "Buat gambar",
+    "videoTitle": "Buat klip",
+    "spends": "Ini memakai kredit pada kunci yang dipakai. Tidak ada yang mulai sebelum Jalankan ditekan.",
+    "priceImage": "Sekitar {usd} per gambar (harga daftar, bukan penawaran)",
+    "priceClip": "Sekitar {usd} untuk {seconds} dtk pada {resolution} (harga daftar, bukan penawaran)",
+    "priceUnknown": "Harga belum diketahui sebelum dijalankan.",
+    "model": "Memakai model {model}",
+    "run": "Jalankan",
+    "runAll": "Jalankan semua {n}",
+    "notNow": "Nanti saja",
+    "runPrompt": "Jalankan",
+    "listAria": "Permintaan berbayar yang menunggu persetujuan"
   },
   "error": {
     "loading": "Chat masih dimuat",

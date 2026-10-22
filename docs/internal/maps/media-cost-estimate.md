@@ -2,11 +2,13 @@
 
 Product: both · Instance: main :3000
 
-Last verified: 2026-09-26; on 2026-10-01 (working tree on top of 0b61a29) only the three `images-studio.tsx` / `videos-studio.tsx` cites in the renderer paragraphs were re-anchored (the prompt-row work moved them) and nothing else was re-read. 2026-09-26 (an unknown price is omitted; the `*-estimate-unknown` row is not rendered; a video model is priced only when the refresh listed it). Before that: 2026-09-20 at c204e5e.
+Last verified: 2026-10-22 for the one added paragraph after the Overview only (tester, code-read). Earlier: 2026-09-26; on 2026-10-01 (working tree on top of 0b61a29) only the three `images-studio.tsx` / `videos-studio.tsx` cites in the renderer paragraphs were re-anchored (the prompt-row work moved them) and nothing else was re-read. 2026-09-26 (an unknown price is omitted; the `*-estimate-unknown` row is not rendered; a video model is priced only when the refresh listed it). Before that: 2026-09-20 at c204e5e.
 
 ## Overview
 
 The line under the prompt bar in the Images and Videos studios that reads roughly `≈ $0.03 per image` before the user presses Generate. It is a **provider list-price estimate from a curated table**, not a quote and not billing: the gateway bills its own (lower) rate, there is no IDR and no credit balance in it. It exists to answer "which of these two models is dearer" at the moment of choosing, the way Google Flow and BytePlus Lumina do.
+
+A second reader, on the tester branch from 2026-10-22: the paid media permission card in Chat (SR-167) prices a held-back picture or clip with the same table, in the browser, from `findMediaListPrice`, `estimateImageCost` and `estimateVideoCost` (`apps/web/lib/media-permission.ts`). It prices only when the request names a model the table lists (a picture by its model, a clip by its model and its seconds); otherwise the card says that no price is known and guesses nothing. Same caveat: a list price, not a quote.
 
 Nothing on this path touches the network. The price table is compiled into the app, the host attaches a price (or `null`) to each model row on the studio's GET, and a pure renderer function turns that into a string.
 

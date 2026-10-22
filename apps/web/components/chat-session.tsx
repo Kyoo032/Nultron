@@ -11,6 +11,7 @@ import { BuddyStage } from "@/components/buddy-stage";
 import { ChatAccountChip } from "@/components/chat-account-chip";
 import { ChatComposer } from "@/components/chat-composer";
 import { continuePrompt, mayOfferContinue } from "@/lib/chat-continue";
+import type { MediaRequest } from "@agentforge/core/media-permission";
 import { canOfferRetry, retryTextOf } from "@/lib/chat-retry";
 import { FolderSurface } from "@/components/folder/folder-surface";
 import { ChatContextChip } from "@/components/chat-context-chip";
@@ -113,7 +114,9 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
   /** A prompt picked from the empty screen's suggestions; handed down once, then cleared. */
   const [composerDraft, setComposerDraft] = useState<string | null>(null);
   /** The composer's text send, for Continue and Try again. Null until the composer has rendered. */
-  const continueSendRef = useRef<((text: string, retry?: boolean) => void) | null>(null);
+  const continueSendRef = useRef<((text: string, retry?: boolean, grants?: readonly MediaRequest[]) => void) | null>(
+    null,
+  );
   const toolsRef = useRef(tools);
   toolsRef.current = tools;
   /** Read inside the load effect, which must not run again because the shell object is a new one. */
@@ -533,6 +536,17 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
                         return;
                       }
                       continueSendRef.current?.(continuePrompt(getLocale()));
+                    }
+                  : undefined
+              }
+              // Same for Run on a paid picture or clip (SR-167): the newest reply's card is the one that waits.
+              onRunMedia={
+                agentIdReady && mayOfferContinue(index, shown.length, message.role)
+                  ? (requests) => {
+                      if (runningRef.current) {
+                        return;
+                      }
+                      continueSendRef.current?.(t("chat.media.runPrompt"), false, requests);
                     }
                   : undefined
               }
