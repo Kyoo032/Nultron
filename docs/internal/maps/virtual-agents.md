@@ -2,7 +2,7 @@
 
 Product: both · Instance: main :3000
 
-Last verified: 2026-10-22, tester/chat-first, built on dba363f, for the paid media sentence in the first bullet list, the "Not driven" line and the unit test list only (code-read and unit-tested). Nothing else on the page was re-read.
+Last verified: 2026-10-22, tester/chat-first, built on dba363f, for the paid media sentence in the first bullet list, the "Not driven" line and the unit test list only (code-read and unit-tested; the card driven on a stub desk, the live round trip not driven). Nothing else on the page was re-read.
 
 Last verified: 2026-10-20, tester/chat-first, built on ec41fd07, for section 1 (the rail's look, its collapse toggle and the menu bar under 768 px) and section 2, step 3 (the header, the "Context and usage" panel section and the thread's look): re-read and driven on the tester webdev `:3200` at 1440, 1280, 768 and 390 px, light and dark (`evidence/virtual-agents/2026-10-20-thread-look/report.json`). Before that: 2026-10-19 at a2c119af for the two new exports in `packages/core/src/index.ts` (`meaningfulWords`, `PAGE_TEXT_MAX_CHARS`, used by the Research page window); no claim on this page changes. Before that: 2026-10-16, tester tree after the OPC strip (P5b); every `file:line` citation on this page re-read against the tree, not driven in a browser. Before that: 2026-10-09 at 7de8aae6 (uncommitted working tree on tester/chat-first). Read from the code of that working tree, and driven in a browser the same day (below). The unit tests named here were not run for this page.
 
