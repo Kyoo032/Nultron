@@ -91,6 +91,18 @@ function isTooSlow(error: unknown): boolean {
   return failure.code === "ERR_SCRIPT_EXECUTION_TIMEOUT" || failure.name === "RangeError";
 }
 
+/** A vm timeout is charged for the slice it was granted, even when the timer fires a millisecond early. */
+function deadlineAfterTimeout(error: unknown, deadline: number, slice: number, started: number): number {
+  if (typeof error !== "object" || error === null) {
+    return deadline;
+  }
+  if ((error as { code?: unknown }).code !== "ERR_SCRIPT_EXECUTION_TIMEOUT") {
+    return deadline;
+  }
+  const unpaid = slice - (Date.now() - started);
+  return unpaid > 0 ? deadline - unpaid : deadline;
+}
+
 /**
  * One scanner per search: it carries the time budget for the whole search, so a pattern that is
  * slow on many files cannot hold the host longer than `budgetMs` in total.
@@ -99,7 +111,7 @@ export function createRegexScanner(source: string, budgetMs = REGEX_BUDGET_MS): 
   // The context's globals are this object's properties, so the per-file inputs are set on it.
   const sandbox = { source, lines: [] as string[], limit: 0, cap: MAX_LINE_CHARS };
   const context = createContext(sandbox);
-  const deadline = Date.now() + budgetMs;
+  let deadline = Date.now() + budgetMs;
   return (path, text, limit) => {
     const remaining = deadline - Date.now();
     if (remaining < 1) {
@@ -108,10 +120,12 @@ export function createRegexScanner(source: string, budgetMs = REGEX_BUDGET_MS): 
     const lines = splitLines(text);
     sandbox.lines = lines;
     sandbox.limit = limit;
+    // Granted before the script runs. node:vm can report the timeout a millisecond
+    // before Date.now() reaches this slice, which used to leave the next file inside the budget.
+    const slice = Math.max(1, Math.floor(Math.min(remaining, REGEX_PER_FILE_MS)));
+    const started = Date.now();
     try {
-      const found = getScanScript().runInContext(context, {
-        timeout: Math.max(1, Math.floor(Math.min(remaining, REGEX_PER_FILE_MS))),
-      }) as number[];
+      const found = getScanScript().runInContext(context, { timeout: slice }) as number[];
       return Array.from(found, (index) => ({
         path,
         line: index + 1,
@@ -119,6 +133,7 @@ export function createRegexScanner(source: string, budgetMs = REGEX_BUDGET_MS): 
       }));
     } catch (error) {
       if (isTooSlow(error)) {
+        deadline = deadlineAfterTimeout(error, deadline, slice, started);
         return "too_slow";
       }
       throw error;
