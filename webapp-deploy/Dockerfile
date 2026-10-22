@@ -25,7 +25,7 @@
 # @firecrawl/anydoc-linux-x64-gnu / -linux-arm64-gnu in pnpm-lock.yaml. Alpine/musl
 # would pick a different package and better-sqlite3 would need a full musl rebuild.
 
-ARG NODE_VERSION=22-bookworm-slim
+ARG NODE_VERSION=22.23.4-bookworm-slim
 ARG PNPM_VERSION=9.15.9
 
 # ---------------------------------------------------------------------------

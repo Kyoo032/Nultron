@@ -36,7 +36,7 @@ folder: what each file does, what depends on what, and the things about it that 
 
 ### Build: one image, the whole workspace source, production dependencies
 
-`webapp-deploy/Dockerfile` is four stages over `node:22-bookworm-slim`, and the **build context is
+`webapp-deploy/Dockerfile` is four stages over `node:22.23.4-bookworm-slim`, and the **build context is
 the repo root**, not this folder (`Dockerfile:5-6`).
 
 1. **`base`** (`Dockerfile:34-48`) enables corepack and pins pnpm `9.15.9` (`:29`, `:40-41`), matching the
