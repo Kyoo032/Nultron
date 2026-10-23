@@ -54,6 +54,10 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Regex file search charges a vm timeout for the slice it was granted, 2026-10-22 (branch `cursor/regex-budget-slice-131f`; lanes: enterprise, tester)
+
+`createRegexScanner` kept the search budget on the wall clock. `node:vm` can report `ERR_SCRIPT_EXECUTION_TIMEOUT` about a millisecond before `Date.now()` reaches the slice, so the next file still ran. Seen on the 2026-10-22 verification of `7c449636`: `search-text.test.ts` "refuses every later file once the time budget is spent" failed once in the core suite (1 failed | 3982 passed | 1 skipped) and 7 of 40 tight loops. A timeout is now charged for the slice it was granted (`deadlineAfterTimeout`). The same test repeats the check 20 times. Not a user-visible change. Not driven in a browser.
+
 ## The Research bot: long pages are read, and a step after a tool is resent on 503, 2026-10-19 (branch `fix/research-page-window-and-step-retry`; tests run; driven on the tester `:3200` after the merge, see the tester log)
 
 Lanes: enterprise, tester

@@ -111,8 +111,12 @@ describe("createRegexScanner", () => {
   });
 
   it("refuses every later file once the time budget is spent", () => {
-    const scan = createRegexScanner("(a|a)*b", 200);
-    expect(scan(path, `${"a".repeat(45)}!`, 5)).toBe("too_slow");
-    expect(scan(path, "b", 5)).toBe("too_slow");
+    // One pass flakes: node:vm can report the timeout a millisecond before the wall
+    // clock reaches the slice, and the next file then still runs. Repeat so that gap shows.
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const scan = createRegexScanner("(a|a)*b", 200);
+      expect(scan(path, `${"a".repeat(45)}!`, 5), `attempt ${attempt} first file`).toBe("too_slow");
+      expect(scan(path, "b", 5), `attempt ${attempt} later file`).toBe("too_slow");
+    }
   });
 });
