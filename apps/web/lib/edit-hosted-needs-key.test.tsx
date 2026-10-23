@@ -246,7 +246,7 @@ describe("the ffmpeg install guide", () => {
     const ROW =
       '<div class="flex flex-wrap items-center gap-2"><span><strong>Linux setup:</strong> ffmpeg was not found.</span><code class="rounded bg-[var(--surface)] px-2 py-0.5 font-mono text-xs" data-testid="ffmpeg-install-command">sudo apt install ffmpeg</code><button type="button" class="btn btn-ghost px-2 py-0.5 text-xs">Copy</button><button type="button" class="btn btn-secondary px-2 py-0.5 text-xs" data-testid="ffmpeg-recheck">Check again</button><a class="underline" href="https://ffmpeg.org/download.html" target="_blank" rel="noopener noreferrer">Install guide</a></div>';
     const WRAP =
-      '<div class="border-b border-[var(--line)] bg-[color-mix(in_srgb,var(--color-accent)_8%,transparent)] px-4 py-2 text-xs text-[var(--text-2)]" data-testid="edit-needs-ffmpeg" role="status">';
+      '<div class="border-b border-[var(--line)] bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] px-4 py-2 text-xs text-[var(--text-2)]" data-testid="edit-needs-ffmpeg" role="status">';
 
     it("keeps the guide, the command, Copy, Check again and the link, byte for byte", () => {
       expect(notice("compact")).toBe(`${WRAP}${ROW}</div>`);

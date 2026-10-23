@@ -809,7 +809,7 @@ export function EditStudio() {
                 type="button"
                 className={`mx-1.5 mb-1 rounded-md px-2 py-1.5 text-left text-sm ${
                   tool === item.id
-                    ? "bg-[color-mix(in_srgb,var(--color-accent)_16%,transparent)]"
+                    ? "bg-[color-mix(in_srgb,var(--accent)_16%,transparent)]"
                     : "hover:bg-[var(--line)]/40"
                 }`}
                 data-testid={

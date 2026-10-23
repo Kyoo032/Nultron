@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Lane guard: a change says which lanes it touches, keeps its map page, and stays brand-neutral.
+ * Lane guard: a change says which lanes it touches, keeps its map page, and keeps the gateway name out of shared code.
  * Plan: docs/internal/white-label-and-agent-guardrails-plan.md.
  *
  * Why: one source repo feeds three lanes (Nultron Personal, retired; Nultron Enterprise; the tester
  * code). Agents cannot see the vault note that lists which files the tester branch edits, and a
- * brand name typed into shared code leaks into any white-label build. `lanes.json` at the repo root is that list, in
+ * gateway name typed into shared code would leak into any other build. `lanes.json` at the repo root is that list, in
  * the repo, and this script reads it.
  *
  * Usage (repo root):
@@ -21,9 +21,9 @@
  *                  (tester-only config, data and env files). Skipped on the tester branch itself and
  *                  for ranges whose base is not main.
  *   protected      a file marked "protected" changed and no commit in the range has a `Lanes:` line.
- *   brand          a brand literal (Nultron, Toko Token) appears more often in a
- *                  shared-code file than `scripts/lane-guard.baseline.json` recorded. "Nultron" is the
- *                  default brand and the mascot name today, so a plain ban would be red on day one;
+ *   brand          a brand literal (`brandLiterals` in lanes.json, now Toko Token) appears more often in a
+ *                  shared-code file than `scripts/lane-guard.baseline.json` recorded. Shared code already carries
+ *                  some literals today, so a plain ban would be red on day one;
  *                  the ratchet only lets the count go down. Regenerate the baseline on a clean tree
  *                  with `--write-baseline` after a cleanup lowers a count, never to excuse an increase.
  *
