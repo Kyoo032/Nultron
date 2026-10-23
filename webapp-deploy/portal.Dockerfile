@@ -22,7 +22,7 @@
 # release path never builds from a checkout anyway (release-web.mjs archives <sha> first), and the
 # allowlist is the second guard (SR-49) for anyone who runs the line above by hand.
 
-ARG NODE_VERSION=22-bookworm-slim
+ARG NODE_VERSION=22.23.4-bookworm-slim
 ARG PNPM_VERSION=9.15.9
 
 FROM node:${NODE_VERSION} AS base

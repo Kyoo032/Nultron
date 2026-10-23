@@ -574,7 +574,7 @@ Lanes: enterprise, tester.
 - **Limit on `main`.** "Change the picture you made last turn" now works only when the person pastes the picture's address; the tester's stored-picture input covers it there. The tester merge conflicts in `image-generate.ts`: keep the tester's `resolveImageInput` and take `gatewayGenerateModel` for the `model:` line.
 - **Proof.** `egress-guard.test.ts`, the model-choice blocks of `image-generate.test.ts` and `video-generate.test.ts` (8 of them fail on the old tool code), and `create-runtime-media.test.ts`. **Not driven:** `:3000` serves the main checkout, so one picture from Chat on this branch needs the branch checked out there and `:3000` restarted.
 
-## Agents can ask each other: the `delegate` tool, 2026-10-22 (branch `claude/project-thread-ivip90`, draft PR, not merged)
+## Agents can ask each other: the `delegate` tool, 2026-10-22 (branch `claude/project-thread-ivip90`, PR #192)
 
 Lanes: enterprise, tester.
 
@@ -584,3 +584,10 @@ Lanes: enterprise, tester.
 - **Choices to review.** The asked run uses the Daily tier (the plan leaned to Fastest for sub-agents; it is one line in `delegateModel`). The cost counts through the per-turn ceiling times the run budget, not against the asking run's own counter, which would need the runtime's internals. Every agent, mode agents included, may ask another; a self-ask is allowed and bounded the same way.
 - **Proof.** Unit tests: `delegation.test.ts`, `egress-guard.test.ts`, `ai-sdk-runtime-egress.test.ts`, `delegate.test.ts` (the host run through the real router, with a stand-in runtime), `delegate-card.test.tsx`, and the updated `virtual-agents` tests. **Not driven:** no live model, no browser, no tester. Owed on the tester: one turn where Chat asks Research for three sources, a stop pressed during a hand-off, and one with Research not hired. Check also with #182's outbound guard once both are merged (a delegated run starts inside the asking run's async context).
 - **Owed.** No `read_result`, no handoff of the conversation, no background hand-off, no cost card, no per-agent permission to be asked.
+
+## Node images pinned to 22.23.4 for the 2026-10-21 Node security release, 2026-10-22 (branch `claude/project-thread-lac3g5`)
+
+- **What.** Node shipped a security release on 2026-10-21 (22.23.4, 24.22.1, 26.12.1): four High (a Brotli decoder out-of-bounds write that can run code, `dns.resolve` cutting a name at a NUL, two TLS hostname-check bypasses) and three Medium, plus new OpenSSL, SQLite, Undici, c-ares and CA bundle. Three of the four High and all three Medium reach 22.x. The hosted image, the portal image and the deploy preflight ran the floating `node:22-bookworm-slim`, so an image built before the new tag landed stayed on the old 22.x, and nothing in the repo said which 22.x a build would get. All three now name `22.23.4-bookworm-slim`.
+- **Mac pack image.** `apps/desktop/platform/macos/docker/Dockerfile` was `FROM node:20-bookworm`. Node 20 is end of life and gets no fix, and the repo already needs Node 22 (`engines`, `.nvmrc`, SH-001). It is now `node:22.23.4-bookworm`. **Not run:** a mac pack on the new base (`mac-build-docker.mjs` needs Docker and the Electron downloads); the next mac pack is the first proof.
+- **Not changed.** The packaged desktop app runs the Node inside Electron, not this image. `apps/desktop` is on Electron 35.7.5, which is past end of support, so its Node is not patched by this change; that needs an Electron major upgrade and a native-module rebuild (better-sqlite3, keytar) on each OS. PHP is not used anywhere in the repo (no `.php`, no composer files).
+- **Next time.** Bump `NODE_VERSION` in both Dockerfiles, `PREFLIGHT_IMAGE` in `deploy.sh` and the mac pack image together after each Node security release.
