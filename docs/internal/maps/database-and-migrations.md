@@ -2,7 +2,7 @@
 
 Product: both · Instance: main :3000
 
-Last verified: 2026-09-29 for the three `apps/desktop/main.cjs` citations (`bootstrapPackaged` lines), re-anchored in the
+Last verified: 2026-10-21 at 8953014 for the test-limit sentence above the unit-suite table. Before that: 2026-09-29 for the three `apps/desktop/main.cjs` citations (`bootstrapPackaged` lines), re-anchored in the
 working tree, not committed, after the ffmpeg probe moved behind the first paint. Before that: 2026-09-23 at d4561b8 + uncommitted tree for the migrations table and the numbering note (now
 through `0021`), the `auth_sessions` row of the schema families, "Start over, applied at next boot" (every
 `reset.ts` citation, and the partial-failure retry) and the drizzle row of Where things live. Not driven:
@@ -423,6 +423,9 @@ above:
 - [`features/data.md`](../../../.cursor/skills/verify-agentforge/features/data.md) — uploading a CSV
   and reopening it from `data-saved` is the cheapest end-to-end proof that the `datasets` table was
   created and is workspace-scoped, and it works with no gateway key.
+
+A test may run 30 s (`packages/db/vitest.config.ts:8`), not vitest's default 5 s: `first-desk-modes.test.ts` walks every
+source file in `packages` and `apps` and takes 5.2 s alone, so it failed whenever the machine was busy.
 
 The real coverage is the unit suite, `pnpm --filter @agentforge/db test`
 (`packages/db/package.json:16`, `packages/db/vitest.config.ts`):

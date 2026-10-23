@@ -91,7 +91,7 @@ fi
 
 # The node image the preflight runs in when this host has no node. Same major line as the NODE_VERSION default in
 # webapp-deploy/Dockerfile.
-PREFLIGHT_IMAGE="${PREFLIGHT_IMAGE:-node:22-bookworm-slim}"
+PREFLIGHT_IMAGE="${PREFLIGHT_IMAGE:-node:22.23.4-bookworm-slim}"
 
 # The offline preflight (scripts/deploy-preflight.mjs), with the host's node when there is one, or a throwaway node
 # container with no network when there is not. The same script reads the same files either way. Only the one secret

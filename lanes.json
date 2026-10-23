@@ -26,7 +26,8 @@
     "**/.env.local",
     "**/.env.chat*",
     "**/.env.tester*",
-    ".claude/**"
+    ".claude/*",
+    ".claude/{agents,commands,hooks,skills,worktrees}/**"
   ],
   "entries": [
     {
