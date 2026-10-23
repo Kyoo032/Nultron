@@ -5862,8 +5862,9 @@ ceiling or the cost card is built.
 Update 2026-10-22: the owner ruled against a hard cap ("it's their API key anyway") and for a permission blocker, so
 the tester tree no longer holds a ceiling. `image_generate` and `video_generate` pass through a gate in
 `invokeToolGuarded` (`packages/core/src/runtime/media-permission.ts`) and return a `permission` refusal instead of
-running. The screen draws the held request on a card (the prompt, the model, the shape, the list price when the
-price table lists the model named, otherwise the plain admission that none is known) with Run and Not now
+running. The screen draws the held request on a card (the prompt, the model, or the default model the tool falls
+back to when none is named, the shape, the list price when the price table lists that model, otherwise the plain
+admission that none is known) with Run and Not now
 (`apps/web/components/chat-media-permission-card.tsx`). Run sends the next turn with a grant for exactly that
 request in the body (`paidMedia.grants`, read by `packages/host/src/paid-media-body.ts`); the gate lets one call with
 the same arguments through per grant. Only the client's body carries a grant and the body cannot turn the gate off,
@@ -5873,7 +5874,7 @@ stored setting and no migration. Tests: `packages/core/src/runtime/media-permiss
 `apps/web/lib/media-permission.test.tsx`. Still open: the Edit agent's `generate_image` and `generate_video` do not go
 through these tools and are not gated; the price on the card is a list price, not a quote; "stop asking for this
 thread" is deliberately not built (`docs/internal/chat-computer-spec.md` Layer 2 says never for a paid step); and
-the card was driven in Chromium on a stub desk (Run, Not now, 390 px) but the live model round trip was not, so no paid media was run. New gate: lifts when the tester change is promoted to
+the card was driven in Chromium on a stub desk (Run, Not now, 390 px). The first live try (2026-10-23, a Daily-tier chat model on the owner's PC) held the picture back as designed and billed nothing, then showed that the model fills optional fields with placeholders (`model: "default"`, `image_url: "https://example.com"`), so the Run turn's call no longer matched its grant and a second card appeared. Fixed in the same branch: placeholders are dropped from the request, and a granted call runs with the card's own fields, never the model's extras. The live retest is still owed, so no paid media has been made yet. New gate: lifts when the tester change is promoted to
 `main` and one Run press has been driven live.
 
 ### SR-168 {#sr-168}

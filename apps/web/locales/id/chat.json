@@ -301,6 +301,7 @@
     "priceClip": "Sekitar {usd} untuk {seconds} dtk pada {resolution} (harga daftar, bukan penawaran)",
     "priceUnknown": "Harga belum diketahui sebelum dijalankan.",
     "model": "Memakai model {model}",
+    "defaultModel": "Model bawaan: {model}",
     "run": "Jalankan",
     "runAll": "Jalankan semua {n}",
     "notNow": "Nanti saja",

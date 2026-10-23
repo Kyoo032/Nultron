@@ -36,6 +36,35 @@ describe("mediaRequestArgs", () => {
     });
   });
 
+  it("leaves out the placeholders a model fills in: a model of default, an example.com picture, a style of none", () => {
+    expect(
+      mediaRequestArgs("image_generate", {
+        prompt: "a red fox",
+        model: "default",
+        image_url: "https://example.com/",
+        style: "none",
+        size: "auto",
+        aspect_ratio: "square",
+      }),
+    ).toEqual({ prompt: "a red fox", aspect_ratio: "square" });
+    expect(mediaRequestArgs("image_generate", { prompt: "p", image_url: "https://www.example.org/a.png" })).toEqual({ prompt: "p" });
+    expect(mediaRequestArgs("video_generate", { prompt: "p", model: "null", image_url: "https://x.test/a.png" })).toEqual({ prompt: "p" });
+  });
+
+  it("keeps a real model, a real source picture and a prompt that happens to read like a placeholder", () => {
+    expect(
+      mediaRequestArgs("image_generate", {
+        prompt: "default",
+        model: "gpt-image-1-mini",
+        image_url: "/api/v1/media/abc/file",
+      }),
+    ).toEqual({ prompt: "default", model: "gpt-image-1-mini", image_url: "/api/v1/media/abc/file" });
+    expect(mediaRequestArgs("image_generate", { prompt: "p", image_url: "https://cdn.mysite.dev/a.png" })).toEqual({
+      prompt: "p",
+      image_url: "https://cdn.mysite.dev/a.png",
+    });
+  });
+
   it("reads a non-object as no fields", () => {
     expect(mediaRequestArgs("image_generate", "oops")).toEqual({});
     expect(mediaRequestArgs("image_generate", null)).toEqual({});
@@ -100,6 +129,41 @@ describe("createMediaPermission", () => {
     expect(gate?.beforeCall("image_generate", { prompt: "a red fox", aspect_ratio: "square" })).toBeNull();
   });
 
+  it("sees a call with the model's placeholders as the request the person pressed Run on", () => {
+    const gate = createMediaPermission(policy([IMAGE]));
+    const call = { prompt: "a red fox", aspect_ratio: "square", model: "default", image_url: "https://example.com/", style: "none" };
+    expect(gate?.beforeCall("image_generate", call)).toBeNull();
+  });
+
+  it("still refuses a call that adds a real choice the card did not show", () => {
+    const gate = createMediaPermission(policy([IMAGE]));
+    expect(gate?.beforeCall("image_generate", { prompt: "a red fox", aspect_ratio: "square", model: "gpt-image-2" })).not.toBeNull();
+    expect(gate?.beforeCall("image_generate", { prompt: "a red fox", aspect_ratio: "square", image_url: "/api/v1/media/x/file" })).not.toBeNull();
+  });
+
+  it("names the default model on a refusal that names none, and not on one that does", () => {
+    const gate = createMediaPermission(policy());
+    expect(gate?.beforeCall("image_generate", { prompt: "a red fox", model: "default" })?.defaultModel).toBe("gpt-image-2");
+    expect(gate?.beforeCall("video_generate", { prompt: "a fox runs" })?.defaultModel).toBe("grok-imagine-video");
+    expect(gate?.beforeCall("image_generate", { prompt: "a red fox", model: "gpt-image-1-mini" })?.defaultModel).toBeUndefined();
+  });
+
+  it("names the host's own default model when the host sets one, and the built-in one when it sets none", () => {
+    const set = createMediaPermission(policy(), (tool) => (tool === "image_generate" ? "my-image-model" : undefined));
+    expect(set?.beforeCall("image_generate", { prompt: "a red fox" })?.defaultModel).toBe("my-image-model");
+    expect(set?.beforeCall("video_generate", { prompt: "a fox runs" })?.defaultModel).toBe("grok-imagine-video");
+    expect(set?.beforeCall("image_generate", { prompt: "a red fox", model: "gpt-image-1-mini" })?.defaultModel).toBeUndefined();
+  });
+
+  it("hands a picture or clip its request's own fields to run with, and any other tool its args as they were", () => {
+    const gate = createMediaPermission(policy());
+    expect(gate?.argsToRun("image_generate", { prompt: " a  red\nfox ", model: "default", image_url: "https://example.com/", extra: 1 })).toEqual({
+      prompt: "a red fox",
+    });
+    const web = { query: "x" };
+    expect(gate?.argsToRun("web_search", web)).toBe(web);
+  });
+
   it("keeps each grant to its own tool", () => {
     const gate = createMediaPermission(policy([VIDEO]));
     expect(gate?.beforeCall("video_generate", { prompt: "a fox runs", seconds: 5, resolution: "720p" })).toBeNull();
@@ -156,6 +220,32 @@ describe("invokeToolGuarded with the gate", () => {
     );
     expect(allowed).toEqual({ success: true });
     expect(ran).toBe(1);
+  });
+
+  it("runs a granted call with the card's fields and none of the model's placeholders", async () => {
+    let seen: unknown;
+    const capture = defineTool({
+      key: "image_generate",
+      name: "fake",
+      description: "fake",
+      capability: "image_gen",
+      schema: z.object({ prompt: z.string(), model: z.string().optional(), image_url: z.string().optional() }),
+      execute: async (args: unknown) => {
+        seen = args;
+        return { success: true };
+      },
+    } as never);
+    const gate = createMediaPermission(policy([{ tool: "image_generate", args: { prompt: "a red fox" } }]));
+    const out = await invokeToolGuarded(
+      capture,
+      { prompt: "a  red fox", model: "default", image_url: "https://example.com/" },
+      tenant,
+      undefined,
+      undefined,
+      gate,
+    );
+    expect(out).toEqual({ success: true });
+    expect(seen).toEqual({ prompt: "a red fox" });
   });
 
   it("spends a budget slot on a refused call, so a model cannot ask without end", async () => {

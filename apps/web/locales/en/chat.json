@@ -301,6 +301,7 @@
     "priceClip": "About {usd} for {seconds} s at {resolution} (a list price, not a quote)",
     "priceUnknown": "No price is known for this one before it runs.",
     "model": "Model: {model}",
+    "defaultModel": "Model: {model} (the default)",
     "run": "Run",
     "runAll": "Run all {n}",
     "notNow": "Not now",

@@ -5,12 +5,20 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createMediaPermission, type MediaRequest } from "@agentforge/core/media-permission";
+import { DEFAULT_GATEWAY_IMAGE_MODEL, DEFAULT_GATEWAY_VIDEO_MODEL } from "@agentforge/core/media-kind";
 import { MEDIA_PRICE_ENTRIES } from "@agentforge/core/media-pricing";
 import { ChatTurn } from "@/components/chat-turn";
 import { MediaPermissionCards } from "@/components/chat-media-permission-card";
 import { applyLocale, resetLocaleForTests } from "@/lib/i18n";
 import { buildChatRunBody } from "@/lib/chat-tier-body";
-import { permissionRequestOf, permissionRequestsOf, requestDetails, requestPriceLine, requestPrompt } from "@/lib/media-permission";
+import {
+  grantOf,
+  permissionRequestOf,
+  permissionRequestsOf,
+  requestDetails,
+  requestPriceLine,
+  requestPrompt,
+} from "@/lib/media-permission";
 import { toolCallSummary } from "@/lib/tool-labels";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -53,9 +61,18 @@ describe("the fixtures", () => {
 describe("permissionRequestOf", () => {
   it("reads the request off a held back picture or clip", () => {
     const image = permissionRequestOf(call("image_generate", refusal("image_generate", { prompt: "a red fox", aspect_ratio: "1:1" })));
-    expect(image).toEqual({ tool: "image_generate", args: { prompt: "a red fox", aspect_ratio: "1:1" } });
+    expect(image).toMatchObject({ tool: "image_generate", args: { prompt: "a red fox", aspect_ratio: "1:1" } });
     const clip = permissionRequestOf(call("video_generate", refusal("video_generate", { prompt: "waves", seconds: 5 })));
-    expect(clip).toEqual({ tool: "video_generate", args: { prompt: "waves", seconds: 5 } });
+    expect(clip).toMatchObject({ tool: "video_generate", args: { prompt: "waves", seconds: 5 } });
+  });
+
+  it("carries the model the tool falls back to when the request names none, and none when it does", () => {
+    const bare = permissionRequestOf(call("image_generate", refusal("image_generate", { prompt: "a red fox" })));
+    expect(bare?.defaultModel).toBe(DEFAULT_GATEWAY_IMAGE_MODEL);
+    const named = permissionRequestOf(call("image_generate", refusal("image_generate", { prompt: "a red fox", model: IMAGE_MODEL })));
+    expect(named?.defaultModel).toBeUndefined();
+    const clip = permissionRequestOf(call("video_generate", refusal("video_generate", { prompt: "waves" })));
+    expect(clip?.defaultModel).toBe(DEFAULT_GATEWAY_VIDEO_MODEL);
   });
 
   it("is null for a call that ran, one still running, or any other tool", () => {
@@ -108,6 +125,20 @@ describe("requestPriceLine", () => {
     expect(requestPriceLine({ tool: "video_generate", args: { prompt: "x", model: VIDEO_MODEL } })).toBe(unknown);
   });
 
+  it("prices the model the tool falls back to when the request names none", () => {
+    const line = requestPriceLine({ tool: "image_generate", args: { prompt: "x" }, defaultModel: IMAGE_MODEL });
+    expect(line).toMatch(/^About \$\d/);
+    const clip = requestPriceLine({ tool: "video_generate", args: { prompt: "x", seconds: 5 }, defaultModel: VIDEO_MODEL });
+    expect(clip).toMatch(/^About \$\d/);
+  });
+
+  it("prefers the model the request names over the default, and admits an unlisted default", () => {
+    const named = requestPriceLine({ tool: "image_generate", args: { prompt: "x", model: "not-a-model" }, defaultModel: IMAGE_MODEL });
+    expect(named).toBe("No price is known for this one before it runs.");
+    const unlisted = requestPriceLine({ tool: "image_generate", args: { prompt: "x" }, defaultModel: "not-a-model" });
+    expect(unlisted).toBe("No price is known for this one before it runs.");
+  });
+
   it("does not price a clip as a picture or a picture as a clip", () => {
     expect(requestPriceLine({ tool: "image_generate", args: { prompt: "x", model: VIDEO_MODEL } })).toBe(
       "No price is known for this one before it runs.",
@@ -128,11 +159,27 @@ describe("requestPrompt and requestDetails", () => {
     expect(requestDetails(request)).toEqual(["Model: some-model", "16:9", "8 s", "720p"]);
   });
 
+  it("names the default model when the request names none, and only then", () => {
+    expect(requestDetails({ tool: "image_generate", args: { prompt: "x" }, defaultModel: "gpt-image-2" })).toEqual([
+      "Model: gpt-image-2 (the default)",
+    ]);
+    expect(requestDetails({ tool: "image_generate", args: { prompt: "x", model: "mine" }, defaultModel: "gpt-image-2" })).toEqual([
+      "Model: mine",
+    ]);
+  });
+
   it("prefers an image size over its aspect ratio and shows nothing for a bare prompt", () => {
     expect(requestDetails({ tool: "image_generate", args: { prompt: "x", size: "1024x1024", aspect_ratio: "1:1" } })).toEqual([
       "1024x1024",
     ]);
     expect(requestDetails({ tool: "image_generate", args: { prompt: "x" } })).toEqual([]);
+  });
+});
+
+describe("grantOf", () => {
+  it("keeps the request and leaves out the default the card priced it by", () => {
+    const shown = { tool: "image_generate" as const, args: { prompt: "a red fox" }, defaultModel: "gpt-image-2" };
+    expect(grantOf(shown)).toEqual({ tool: "image_generate", args: { prompt: "a red fox" } });
   });
 });
 
@@ -157,6 +204,13 @@ describe("the card", () => {
     expect(html).toContain("Nothing starts until you press Run.");
     expect(html).toMatch(/data-testid="chat-media-run"[^>]*>Run</);
     expect(count(html, "chat-media-dismiss")).toBe(1);
+  });
+
+  it("shows the default model and its price for a request that names none", () => {
+    const bare = { tool: "image_generate" as const, args: { prompt: "a red fox" }, defaultModel: IMAGE_MODEL };
+    const html = render({ requests: [bare], onRun: () => undefined });
+    expect(html).toContain(`Model: ${IMAGE_MODEL} (the default)`);
+    expect(html).toContain("About $");
   });
 
   it("runs several requests with one press, and says how many", () => {
@@ -242,6 +296,11 @@ describe("the wiring", () => {
   const session = source("../components/chat-session.tsx");
   const composer = source("../components/chat-composer.tsx");
   const turn = source("../components/chat-turn.tsx");
+  const card = source("../components/chat-media-permission-card.tsx");
+
+  it("sends the request alone on Run, never the default model the card priced it by", () => {
+    expect(card).toContain("onRun?.(requests.map(grantOf))");
+  });
 
   it("offers Run only on the newest reply and sends the grants with the word the person pressed", () => {
     expect(session).toContain("onRunMedia={");

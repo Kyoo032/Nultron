@@ -16,20 +16,29 @@ import { t } from "./i18n";
 
 type ToolLike = { readonly key: string; readonly status: string; readonly output?: unknown };
 
+/** A request as the card shows it: what was asked, plus the model the tool falls back to when none is named. */
+export type ShownMediaRequest = MediaRequest & { readonly defaultModel?: string };
+
 const RESOLUTIONS = ["480p", "720p", "1080p"] as const;
 
 /** The request a finished paid media call was refused on, or null for any other call. */
-export function permissionRequestOf(tool: ToolLike): MediaRequest | null {
+export function permissionRequestOf(tool: ToolLike): ShownMediaRequest | null {
   if (tool.status !== "completed" || !isPaidMediaTool(tool.key) || !isMediaPermissionRefusal(tool.output)) {
     return null;
   }
-  return tool.output.request;
+  const { request, defaultModel } = tool.output;
+  return defaultModel ? { ...request, defaultModel } : request;
+}
+
+/** What a Run press sends back as a grant: the request alone, never the default the card priced it by. */
+export function grantOf(request: ShownMediaRequest): MediaRequest {
+  return { tool: request.tool, args: request.args };
 }
 
 /** Every request a turn is waiting on, in the order the model made them; the same request twice is one card. */
-export function permissionRequestsOf(tools: readonly ToolLike[]): MediaRequest[] {
+export function permissionRequestsOf(tools: readonly ToolLike[]): ShownMediaRequest[] {
   const seen = new Set<string>();
-  const found: MediaRequest[] = [];
+  const found: ShownMediaRequest[] = [];
   for (const tool of tools) {
     const request = permissionRequestOf(tool);
     if (!request) {
@@ -50,12 +59,14 @@ export function requestPrompt(request: MediaRequest): string {
   return typeof prompt === "string" ? prompt : "";
 }
 
-/** What else the request fixes, one short phrase each: the model, the shape, the length. */
-export function requestDetails(request: MediaRequest): string[] {
+/** What else the request fixes, one short phrase each: the model (or the default it falls back to), the shape, the length. */
+export function requestDetails(request: ShownMediaRequest): string[] {
   const { args } = request;
   const details: string[] = [];
   if (typeof args.model === "string") {
     details.push(t("chat.media.model", { model: args.model }));
+  } else if (request.defaultModel) {
+    details.push(t("chat.media.defaultModel", { model: request.defaultModel }));
   }
   const shape = typeof args.size === "string" ? args.size : args.aspect_ratio;
   if (typeof shape === "string") {
@@ -72,10 +83,11 @@ export function requestDetails(request: MediaRequest): string[] {
 
 /**
  * The list price of the request in one sentence, or the plain admission that none is known. A price needs a
- * named model the table lists: the table is curated and nothing is guessed (`media-cost-estimate.md`).
+ * model the table lists, the one named or else the one the tool falls back to: the table is curated and
+ * nothing is guessed (`media-cost-estimate.md`).
  */
-export function requestPriceLine(request: MediaRequest): string {
-  const model = typeof request.args.model === "string" ? request.args.model : null;
+export function requestPriceLine(request: ShownMediaRequest): string {
+  const model = typeof request.args.model === "string" ? request.args.model : (request.defaultModel ?? null);
   const price = model ? findMediaListPrice(model) : null;
   if (!price) {
     return t("chat.media.priceUnknown");

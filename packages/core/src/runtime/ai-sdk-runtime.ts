@@ -7,13 +7,13 @@ import { resolveModelProvider } from "../models/catalog";
 import { jobThinkingPlan } from "../models/job-thinking";
 import { DEFAULT_OPENAI_BASE_URL, isOfficialOpenAIBaseUrl } from "../models/probe";
 import { isOpenRouterBaseUrl } from "../privacy/openrouter";
-import { getDisabledTools } from "../tools/secret-scope";
+import { getDisabledTools, getSecret } from "../tools/secret-scope";
 import { mapStreamPart } from "./stream-parts";
 import { buildAiTools, type AiToolSet } from "./ai-tools";
 import { createToolCallRepair, isInvalidToolCallEvent, withInvalidToolCall } from "./tool-call-repair";
 import { createStepTracker } from "./step-tracker";
 import { createEgressGuard, userTextOf } from "./egress-guard";
-import { createMediaPermission } from "./media-permission";
+import { createMediaPermission, type PaidMediaTool } from "./media-permission";
 import { createToolBudget, resolveMaxSteps } from "./tool-budget";
 import {
   MODEL_CONTACT_ATTEMPTS,
@@ -122,6 +122,11 @@ function toCoreMessages(
     messages.push({ role: "user", content });
   }
   return messages;
+}
+
+/** The model `image_generate` or `video_generate` falls back to on this host, so the permission card can price it. */
+export function hostMediaModel(tool: PaidMediaTool): string | undefined {
+  return getSecret(tool === "image_generate" ? "IMAGE_GEN_MODEL" : "VIDEO_GEN_MODEL");
 }
 
 const USAGE_SETTLE_MS = 5_000;
@@ -480,7 +485,7 @@ export class AiSdkRuntime implements AgentRuntime {
     // Same lifetime as the budget: a private read in one attempt still limits the fetches of the next.
     const egressGuard = createEgressGuard({ userText: userTextOf(input.history) });
     // Same lifetime again: a grant the person gave is spent once per execute, whatever the retries do.
-    const mediaPermission = createMediaPermission(input.mediaPermission);
+    const mediaPermission = createMediaPermission(input.mediaPermission, hostMediaModel);
     const built = buildAiTools({
       bindings: input.bindings,
       tenant: input.tenant,

@@ -45,7 +45,10 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
     return permissionRefusal;
   }
 
-  const egressRefusal = egress?.beforeCall(tool.key, rawArgs);
+  // A call the person pressed Run on runs as the card showed it, not with whatever else the model added.
+  const args = permission ? permission.argsToRun(tool.key, rawArgs) : rawArgs;
+
+  const egressRefusal = egress?.beforeCall(tool.key, args);
   if (egressRefusal) {
     reportToolIo({ toolKey: tool.key, input: rawArgs, full: egressRefusal, thin: egressRefusal });
     return egressRefusal;
@@ -58,7 +61,7 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
   }
 
   if (!getInjectionGuardBypass()) {
-    const hit = scanJson(rawArgs);
+    const hit = scanJson(args);
     if (hit) {
       const blocked = blockedInjectionOutput(hit);
       reportToolIo({ toolKey: tool.key, input: rawArgs, full: blocked, thin: blocked });
@@ -68,7 +71,7 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
 
   let full: unknown;
   try {
-    full = await invokeTool(tool, rawArgs, tenant);
+    full = await invokeTool(tool, args, tenant);
   } catch (error) {
     // A tool that read private material and then failed may have quoted it in its error.
     egress?.afterCall(tool, undefined);
@@ -85,6 +88,6 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
     }
   }
 
-  reportToolIo({ toolKey: tool.key, input: rawArgs, full, thin });
+  reportToolIo({ toolKey: tool.key, input: args, full, thin });
   return thin;
 }

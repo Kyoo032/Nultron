@@ -54,7 +54,7 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
-## Paid pictures and clips wait for a Run press (SR-167), 2026-10-22 (tester, branch `claude/project-thread-0nqxnz`, PR into `tester/chat-first`; core, host and renderer tests run; the card driven in Chromium on a stub desk; the live model round trip not driven; no paid media made)
+## Paid pictures and clips wait for a Run press (SR-167), 2026-10-22 (tester, branch `claude/project-thread-0nqxnz`, PR into `tester/chat-first`; core, host and renderer tests run; the card driven in Chromium on a stub desk; the live model round trip not yet passed; no paid media made)
 
 Lanes: tester
 
@@ -65,6 +65,7 @@ The owner ruled on 2026-10-22 that a person's own key should not be capped, and 
 - Run sends the next turn ("Run it") with `paidMedia.grants` in the body. The host reads at most 12 grants (`packages/host/src/paid-media-body.ts`), lets one call with the same arguments through per grant, and tells the model for that turn only which calls to make. The body cannot turn the gate off, so a page or a file cannot press Run. No setting is stored and there is no migration.
 - Not covered: the Edit agent's own `generate_image` and `generate_video`, and the Images and Videos studios (their Generate is the person's own click). The price is a list price, not a quote. "Stop asking for this thread" is deliberately not built.
 - A call to the run routes that wants paid media from an agent now needs a grant in the body; the chat screen does this on its own.
+- A live chat model fills optional fields with placeholders (`model: "default"`, `image_url: "https://example.com"`). The gate treats those as not chosen: they are left out of the request, and a call that matches a grant runs with the request's own fields (`argsToRun`), never the model's extras. A real extra choice (a model the person never saw) still does not match. When the request names no model, the refusal carries the model the tool will use (`defaultModel`, from the host's `IMAGE_GEN_MODEL` or `VIDEO_GEN_MODEL`, else the built-in default) and the card names it and prices it. First live try 2026-10-23: the picture was held back, nothing was billed, the Run turn exposed the placeholder mismatch; the retest is owed.
 - Driven 2026-10-22 on a stub desk in Chromium (a saved turn carrying the gate's real refusals): one card, two requests, list prices, Run all 2 posts "Run it" with both grants and no `ask`, the older card loses its buttons, Not now posts nothing, no horizontal scroll at 390 px. The stub runtime never calls these tools, so the live refusal-then-grant round trip is proof owed on `:3200`: ask a mode agent for one picture, see the card and no picture, press Run once, see one picture; reload and see the card without buttons.
 
 ## The Research bot: long pages are read, and a step after a tool is resent on 503, 2026-10-19 (branch `fix/research-page-window-and-step-retry`; tests run; driven on the tester `:3200` after the merge, see the tester log)

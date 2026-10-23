@@ -3,17 +3,17 @@
 import { useState } from "react";
 import type { MediaRequest } from "@agentforge/core/media-permission";
 import { t } from "@/lib/i18n";
-import { requestDetails, requestPriceLine, requestPrompt } from "@/lib/media-permission";
+import { grantOf, requestDetails, requestPriceLine, requestPrompt, type ShownMediaRequest } from "@/lib/media-permission";
 
 type Props = {
-  readonly requests: readonly MediaRequest[];
+  readonly requests: readonly ShownMediaRequest[];
   /** Absent once the turn has been followed up: the card then only records what was asked. */
   readonly onRun?: (requests: MediaRequest[]) => void;
   /** A run is in flight, so Run waits. */
   readonly disabled?: boolean;
 };
 
-function titleOf(request: MediaRequest): string {
+function titleOf(request: ShownMediaRequest): string {
   return t(request.tool === "image_generate" ? "chat.media.imageTitle" : "chat.media.videoTitle");
 }
 
@@ -79,7 +79,7 @@ export function MediaPermissionCards({ requests, onRun, disabled = false }: Prop
               className="btn btn-primary"
               data-testid="chat-media-run"
               disabled={disabled}
-              onClick={() => onRun?.([...requests])}
+              onClick={() => onRun?.(requests.map(grantOf))}
             >
               {requests.length === 1 ? t("chat.media.run") : t("chat.media.runAll", { n: requests.length })}
             </button>
