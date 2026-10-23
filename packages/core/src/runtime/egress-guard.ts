@@ -169,13 +169,18 @@ function searchResultHosts(output: unknown): string[] {
 /**
  * One guard for a whole `execute`, made by the caller once next to the tool budget, from the person's
  * own messages in that run's history.
+ *
+ * `tainted` starts the guard in the tainted state. A delegated run (`agents/delegation.ts`) is started by
+ * a model, not by the person, from a task the model wrote: it cannot know what the asking run had read,
+ * so it starts as if it had read private material, and `userText` is the person's own words from the
+ * asking run's conversation, never the task.
  */
-export function createEgressGuard(options: { userText: readonly string[] }): EgressGuard {
+export function createEgressGuard(options: { userText: readonly string[]; tainted?: boolean }): EgressGuard {
   const named = new Set(options.userText.flatMap(hostsNamedIn));
   const typed = options.userText.join("\n");
   const made = new Set<string>();
   const searched = new Set<string>();
-  let tainted = false;
+  let tainted = options.tainted === true;
   return {
     beforeCall(toolKey, args) {
       if (GENERATE_TOOLS.has(toolKey)) {

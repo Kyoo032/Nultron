@@ -1,5 +1,12 @@
 import type { TenantContext } from "@agentforge/core";
-import { isFileRefusal, type FileAuthor, type FileRootKind, type FileRootResolver } from "@agentforge/core/tools/files";
+import {
+  fileRefusal,
+  isFileRefusal,
+  type FileAuthor,
+  type FileRootKind,
+  type FileRootResolver,
+} from "@agentforge/core/tools/files";
+import { currentDelegation } from "./delegation/delegation-context";
 import { createDeskRoot } from "./desk-files/store";
 import { createFolderRoot } from "./folder-root";
 import { getRunContext } from "./run-context";
@@ -19,6 +26,13 @@ export const resolveHostFileRoot: FileRootResolver = async (tenant: TenantContex
   const author = currentAgentAuthor();
   if (kind === "desk") {
     return { root: createDeskRoot(tenant, author), author };
+  }
+  // A delegated run has no owner to approve a change to the real folder, so it gets the desk only.
+  if (currentDelegation()) {
+    return fileRefusal(
+      "root_unavailable",
+      "This run was delegated by another agent and works on the desk's files only. Use root \"desk\".",
+    );
   }
   const folder = await createFolderRoot(tenant, author);
   return isFileRefusal(folder) ? folder : { root: folder, author };
