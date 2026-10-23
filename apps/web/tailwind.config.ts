@@ -48,9 +48,9 @@ const config: Config = {
         lg: ["18px", { lineHeight: "1.45" }],
         xl: ["20px", { lineHeight: "1.4" }],
         "2xl": ["28px", { lineHeight: "1.2" }],
-        "3xl": ["24px", { lineHeight: "1.15" }],
-        "4xl": ["24px", { lineHeight: "1.1" }],
-        "5xl": ["24px", { lineHeight: "1.05" }],
+        "3xl": ["32px", { lineHeight: "1.15" }],
+        "4xl": ["40px", { lineHeight: "1.1" }],
+        "5xl": ["48px", { lineHeight: "1.05" }],
       },
       borderRadius: {
         sm: "6px",

@@ -99,6 +99,8 @@
   --accent-3: #8b5cf6;
   --accent-4: #ff5c8a;
   --accent-edge: color-mix(in srgb, var(--accent) 72%, #000000);
+  /* Pure black, for the shaded edge under a solid tile. Components read this instead of typing `#000`. */
+  --black: #000000;
   --grad-accent: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
   --grad-text: linear-gradient(100deg, var(--accent) 0%, var(--accent-3) 55%, var(--accent-4) 100%);
   --grad-soft: linear-gradient(135deg, color-mix(in srgb, var(--accent) 9%, var(--surface)) 0%, color-mix(in srgb, var(--accent-2) 9%, var(--surface)) 100%);
@@ -2227,7 +2229,7 @@ aside nav > p {
 .icon-orb-solid {
   background: var(--mode, var(--accent));
   color: var(--on-mode);
-  box-shadow: 0 3px 0 color-mix(in srgb, var(--mode, var(--accent)) 70%, #000000);
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--mode, var(--accent)) 70%, var(--black));
 }
 
 .text-gradient {
