@@ -468,6 +468,16 @@ describe("palette parser", () => {
     expect(drift, "`.light` and `:root` disagree").toEqual([]);
   });
 
+  it("keeps `.light` to the declarations that differ from `:root`, so a palette change is made once", () => {
+    const repeated = [...declarations(rule(".light"))].filter(([name, value]) => rootTokens.get(name) === value);
+    expect(repeated, "`.light` repeats `:root`: delete these from `.light`").toEqual([]);
+  });
+
+  it("leaves no --color-* alias layer in globals.css", () => {
+    expect(globalsCss).not.toMatch(/--color-[\w-]+\s*:/);
+    expect(globalsCss).not.toMatch(/var\(--color-/);
+  });
+
   it("every pair resolves to a real colour in both themes", () => {
     const all = [
       ...BODY_TEXT,

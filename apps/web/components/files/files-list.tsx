@@ -13,7 +13,7 @@ type Props = {
 };
 
 const rowClass =
-  "flex w-full flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2.5 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--color-accent)_8%,transparent)] data-[on=true]:bg-[color-mix(in_srgb,var(--color-accent)_14%,transparent)] focus-visible:[outline-offset:-2px]";
+  "flex w-full flex-wrap items-baseline gap-x-3 gap-y-1 px-3 py-2.5 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] data-[on=true]:bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] focus-visible:[outline-offset:-2px]";
 
 /** The desk's files grouped by folder, or the one line that says why there is no list. */
 export function FilesList({ state, selectedPath, onOpen, onRetry }: Props) {

@@ -182,7 +182,7 @@ function VersionList({
                 data-on={entry.version === viewing ? "true" : "false"}
                 data-testid="file-version"
                 data-version={entry.version}
-                className="block w-full px-3 py-2 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--color-accent)_8%,transparent)] disabled:opacity-60 data-[on=true]:bg-[color-mix(in_srgb,var(--color-accent)_14%,transparent)] focus-visible:[outline-offset:-2px]"
+                className="block w-full px-3 py-2 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--accent)_8%,transparent)] disabled:opacity-60 data-[on=true]:bg-[color-mix(in_srgb,var(--accent)_14%,transparent)] focus-visible:[outline-offset:-2px]"
                 onClick={() => onPick(entry.version)}
               >
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-1">

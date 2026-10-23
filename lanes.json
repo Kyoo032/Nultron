@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "about": "Ownership manifest read by scripts/lane-guard.mjs. Its never-promote (neverPromote), protected and brand rules block; the map rule only advises. Each entry maps a path glob to the map page that describes it, the lanes the path reaches, and whether it is protected. Lanes: personal (Nultron Personal, retired), enterprise (the hosted app), tester (agentforge-chat, tester/chat-first). A file may match several entries: its map pages are the union, it is protected if any match is. 'map: null' means no map check. Plan: docs/internal/white-label-and-agent-guardrails-plan.md. Map: docs/internal/maps/release-and-sync-lanes.md.",
-  "brandLiterals": ["Nultron", "Toko Token"],
+  "about": "Ownership manifest read by scripts/lane-guard.mjs. Its never-promote (neverPromote), protected and brand rules block; the map rule only advises. Each entry maps a path glob to the map page that describes it, the lanes the path reaches, and whether it is protected. Lanes: personal (Nultron Personal, retired), enterprise (the hosted app), tester (agentforge-chat, tester/chat-first). A file may match several entries: its map pages are the union, it is protected if any match is. 'map: null' means no map check. Since the 2026-10-15 repo split this repo is Nultron only: Nultron may be named in shared code, Toko Token may not, and no downstream repo syncs from main. Plan (history): docs/internal/white-label-and-agent-guardrails-plan.md. Map: docs/internal/maps/release-and-sync-lanes.md.",
+  "brandLiterals": ["Toko Token"],
   "brandScope": {
     "include": ["apps/web/**", "packages/**"],
     "exclude": [
@@ -119,7 +119,7 @@
       "map": null,
       "lanes": ["personal", "enterprise", "tester"],
       "protected": true,
-      "note": "Tester shared file, en and id. Add every key to both. A white-label brand may override some strings, so keep brand names out of them."
+      "note": "Tester shared file, en and id. Add every key to both. Keep Toko Token out of them; copy that needs the product name takes {productName}."
     },
     {
       "glob": "packages/core/package.json",
@@ -246,7 +246,7 @@
       "map": null,
       "lanes": ["personal", "enterprise", "tester"],
       "protected": false,
-      "note": "en and id catalogs, one JSON per namespace; parity tests in apps/web/lib/*locale*.test.ts. A white-label brand may override strings, so copy takes {productName}, never a brand name. See docs/internal/maps/locale-boot-and-run-harness.md."
+      "note": "en and id catalogs, one JSON per namespace; parity tests in apps/web/lib/*locale*.test.ts. Copy takes {productName} and never names Toko Token. See docs/internal/maps/locale-boot-and-run-harness.md."
     },
     {
       "glob": "apps/web/components/chat-*.tsx",
@@ -267,7 +267,7 @@
       "map": "docs/internal/maps/mascot-and-brand.md",
       "lanes": ["personal", "enterprise", "tester"],
       "protected": false,
-      "note": "The Nultron mascot. A white-label brand may map every state to its own still; a new mascot state needs a manifest entry in that brand's repo."
+      "note": "The Nultron mascot. A new mascot state needs a manifest entry here."
     },
     {
       "glob": "apps/web/components/{agent-*,virtual-agents-page,composer-plus-menu,chat-dossier-card}.{tsx,css}",

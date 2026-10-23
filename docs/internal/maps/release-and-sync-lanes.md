@@ -4,6 +4,8 @@ Product: both · Instance: every checkout (main, tester); no app drive
 
 Last verified: 2026-10-22 at 7c44963 for the never-promote bullet under "Where things live" only. Nothing else on the page was re-read.
 
+Last verified: 2026-10-17 at 07cb099 for the brand-rule bullet only (Nultron no longer checked, Toko Token still is).
+
 Last verified: 2026-10-15 at 8a42aaed
 
 Repo names and the lane set were re-read on 2026-10-15 at 8a42aaed: the lanes are `main` and the tester, and Personal is retired. The earlier rewrite was on 2026-10-14. The "Chat-first shell" section was read on 2026-10-12 at e8a7eca8, against the tester branch, before PR #157 promoted it to `main`.
@@ -75,7 +77,7 @@ Added on branch `chore/agent-guardrails` (not on `main` yet):
 
 ## Gotchas
 
-- **Shared code reads `productName` and `gatewayName`.** A hard-coded `Nultron` or `Toko Token` in shared code is a brand-rule finding in `pnpm lane-guard`, and the baseline is the ratchet.
+- **Shared code reads `gatewayName`.** A hard-coded `Toko Token` in shared code is a brand-rule finding in `pnpm lane-guard`, and the baseline is the ratchet. `Nultron` is no longer checked (2026-10-17).
 - **Deploy modes are not forks.** Nultron uses its direct two-name setup, with no Cloudflare edge. Password sign-in is the default of the Nultron bundle since 2026-10-09 (`portal.env.example` sets `PORTAL_SIGNIN_MODE=password`; the e-mailed code stays selectable).
 - **Published wins.** If the tester and `main` disagree, `main` stands and the tester code adapts. Tester work reaches `main` only through a promotion pull request Rizky approves.
 - **Personal is retired, not deleted.** Its code is still in the tree, so a change that touches it still goes through `main`. No lane is owed a sync for it.
