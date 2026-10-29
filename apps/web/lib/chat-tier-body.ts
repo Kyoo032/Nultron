@@ -7,14 +7,33 @@
  * at best. A body with `tier` and `model` together is a 400 (`tier_and_model`), so the helper has no way
  * to build one.
  */
+import type { MediaRequest } from "@agentforge/core/media-permission";
 import type { ModelTierId } from "@agentforge/core/tiers";
 import { t } from "./i18n";
 
-/** The JSON body of `POST /api/v1/threads/:id/runs/{text,image,video}`: the content and the tier, and `retry` only on a Try again. */
-export type ChatRunBody = Readonly<{ content: unknown; tier: ModelTierId; retry?: true }>;
+/**
+ * The JSON body of `POST /api/v1/threads/:id/runs/{text,image,video}`: the content and the tier, `retry` only on a
+ * Try again, and `paidMedia` only on a turn that follows a Run press (SR-167).
+ */
+export type ChatRunBody = Readonly<{
+  content: unknown;
+  tier: ModelTierId;
+  retry?: true;
+  paidMedia?: Readonly<{ grants: readonly MediaRequest[] }>;
+}>;
 
-export function buildChatRunBody(content: unknown, tier: ModelTierId, retry = false): ChatRunBody {
-  return Object.freeze(retry ? { content, tier, retry: true as const } : { content, tier });
+export function buildChatRunBody(
+  content: unknown,
+  tier: ModelTierId,
+  retry = false,
+  grants: readonly MediaRequest[] = [],
+): ChatRunBody {
+  return Object.freeze({
+    content,
+    tier,
+    ...(retry ? { retry: true as const } : {}),
+    ...(grants.length > 0 ? { paidMedia: Object.freeze({ grants }) } : {}),
+  });
 }
 
 /**

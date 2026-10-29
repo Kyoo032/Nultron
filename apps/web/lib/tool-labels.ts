@@ -11,6 +11,7 @@ import {
 import { DOSSIER_TOOL_KEY, readDossierResult } from "@/components/tool-rows/dossier-result";
 import { FINANCE_TASK_TOOL_KEY, readFinanceResult } from "@/components/tool-rows/finance-result";
 import { t } from "@/lib/i18n";
+import { permissionRequestOf } from "@/lib/media-permission";
 
 /** Fast tools still show a completed row; they skip the long "Working…" spinner. */
 
@@ -274,6 +275,10 @@ export function toolCallSummary(toolKey: string, input?: unknown, output?: unkno
   }
   if (isRichTool(toolKey)) {
     return toolRowLabel(toolKey, input, output);
+  }
+  const asked = permissionRequestOf({ key: toolKey, status: "completed", output });
+  if (asked) {
+    return t(asked.tool === "image_generate" ? "chat.tool.imageAsk" : "chat.tool.videoAsk");
   }
   const label = toolDoneLabel(toolKey);
   if (toolKey === DOSSIER_TOOL_KEY) {
