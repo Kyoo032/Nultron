@@ -54,6 +54,16 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Education: a stub embedding no longer cites an unrelated passage (SH-014), 2026-10-22 (branch `fix/sh-014` from `7c44963`; lanes: enterprise, tester; tests run, not driven on `:3000`)
+
+Lanes: enterprise, tester
+
+After one Chat send, an Education exam for an unrelated topic (`tides`, `glaciers`) quizzed the chat passage. `stub-fnv-32` is 32 hash buckets. A one-word query that lands in any bucket the passage already uses scores about 0.30, and that clears `MIN_COSINE` 0.12. The same score is what a word that really is in the passage gets, so a higher stub floor cannot separate them. The stub is also the keyless and offline fallback, so a desk with no live embedding hit the same false passages.
+
+`searchVectors` now keeps a `stub-fnv-32` hit only when the query and the passage share a word of three letters or more, the same bar full-text search uses. A live model's rows are still cosine alone, floor 0.12. No schema change. Proof: `packages/host/src/education/exam-stub-retrieval.test.ts`. Not driven on `:3000`.
+
+Owed: merge into `tester/chat-first` and `ci:local` there. An Enterprise release only when Rizky says. Personal is retired and owes nothing. `hyp-ai` has the same floor and is a separate repo; it is not touched here.
+
 ## Regex file search charges a vm timeout for the slice it was granted, 2026-10-22 (branch `cursor/regex-budget-slice-131f`; lanes: enterprise, tester)
 
 `createRegexScanner` kept the search budget on the wall clock. `node:vm` can report `ERR_SCRIPT_EXECUTION_TIMEOUT` about a millisecond before `Date.now()` reaches the slice, so the next file still ran. Seen on the 2026-10-22 verification of `7c449636`: `search-text.test.ts` "refuses every later file once the time budget is spent" failed once in the core suite (1 failed | 3982 passed | 1 skipped) and 7 of 40 tight loops. A timeout is now charged for the slice it was granted (`deadlineAfterTimeout`). The same test repeats the check 20 times. Not a user-visible change. Not driven in a browser.
