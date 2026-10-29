@@ -27,6 +27,51 @@
   width: 100%;
 }
 
+.agent-rail-brand {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 10px var(--ar-pad) 8px;
+  border-bottom: 1px solid var(--rail-line);
+}
+
+.agent-rail-brand-identity {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding-inline: 6px;
+}
+
+.agent-rail-brand-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--rail-active-text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-rail[data-rail="min"] .agent-rail-brand {
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px var(--ar-pad) 8px;
+}
+
+.agent-rail[data-rail="min"] .agent-rail-brand-identity {
+  flex: none;
+  justify-content: center;
+  padding-inline: 0;
+}
+
 .agent-rail-agents,
 .agent-rail-account {
   display: flex;
@@ -119,15 +164,15 @@
 .agent-rail-mark,
 .agent-rail-logo {
   flex: none;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   border-radius: 6px;
   object-fit: contain;
 }
 
 .agent-rail-monogram {
   flex: none;
-  width: 20px;
+  width: 24px;
   font-size: 0.8125rem;
   font-weight: 600;
   text-align: center;

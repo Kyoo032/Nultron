@@ -86,6 +86,7 @@
 
 .composer-plus {
   position: relative;
+  display: inline-flex;
   flex: none;
 }
 

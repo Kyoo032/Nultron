@@ -128,7 +128,8 @@ describe("AgentRailView collapse", () => {
     const html = markup({ collapsed: false, onToggle: () => undefined });
     expect(html).toContain('data-rail="full"');
     const labels = [...html.matchAll(/<span class="agent-rail-label">([^<]*)<\/span>/g)].map((match) => match[1]);
-    expect(labels).toContain("Acme Desk");
+    expect(html).toContain('data-testid="rail-brand-name">Acme Desk<');
+    expect(labels).toContain("Chat");
     expect(labels).toContain("Research");
     expect(labels).toContain("Settings");
     const button = html.match(/<button[^>]*data-testid="rail-collapse"[^>]*>/)?.[0] ?? "";

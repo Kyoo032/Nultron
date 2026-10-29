@@ -81,13 +81,14 @@ describe("AgentRailView agents", () => {
     ]);
   });
 
-  it("names each agent: the product name for the generalist, the mode's name for the rest", () => {
+  it("puts the brand name in the header and names the generalist Chat", () => {
     const html = markup();
     const byId = (id: string) => links(html).find((tag) => attr(tag, "data-testid") === id) ?? "";
-    expect(attr(byId("mode-chat"), "aria-label")).toBe("Acme Desk");
+    expect(html).toContain('data-testid="rail-brand-name">Acme Desk<');
+    expect(attr(byId("mode-chat"), "aria-label")).toBe("Chat");
     expect(attr(byId("mode-chat"), "title")).toBeNull();
     const strip = links(markup({ collapsed: true })).find((tag) => attr(tag, "data-testid") === "mode-chat") ?? "";
-    expect(attr(strip, "title")).toBe("Acme Desk");
+    expect(attr(strip, "title")).toBe("Chat");
     expect(attr(byId("agent-research"), "aria-label")).toBe("Research");
   });
 

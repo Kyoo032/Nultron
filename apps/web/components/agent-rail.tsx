@@ -122,12 +122,13 @@ export function AgentRailView({
   const list = agents.some((agent) => agent.generalist) ? agents : [FALLBACK_GENERALIST, ...agents];
   const here = list.find((agent) => agent.id === activeId);
   const page = here ? undefined : ACCOUNT_LINKS.find((item) => pathname.startsWith(item.href));
+  const brandTitle = assistantName ?? productName;
 
   const renderAgent = (agent: VirtualAgentInfo) => (
     <RailLink
       key={agent.id}
       href={virtualAgentHref(agent.id)}
-      label={virtualAgentName(agent, assistantName ?? productName)}
+      label={agent.generalist ? t("rail.chat") : virtualAgentName(agent, brandTitle)}
       testId={agent.generalist ? "mode-chat" : `agent-${agent.id}`}
       mode={agent.id}
       active={activeId === agent.id}
@@ -137,13 +138,9 @@ export function AgentRailView({
       onTip={onTip}
       onTipEnd={onTipEnd}
     >
-      {agent.generalist ? (
-        <GeneralistTile productName={productName} logoSrc={logoSrc} bundled={bundledMark} />
-      ) : (
-        <span className="agent-rail-tile">
-          <ModeIcon name={isModeIconName(agent.id) ? agent.id : "documents"} size={18} strokeWidth={1.75} />
-        </span>
-      )}
+      <span className="agent-rail-tile">
+        <ModeIcon name={isModeIconName(agent.id) ? agent.id : "documents"} size={18} strokeWidth={1.75} />
+      </span>
     </RailLink>
   );
 
@@ -170,11 +167,23 @@ export function AgentRailView({
             <GeneralistTile productName={productName} logoSrc={logoSrc} bundled={bundledMark} />
           )}
           <span className="agent-rail-bar-name" data-testid="rail-bar-name">
-            {here ? virtualAgentName(here, assistantName ?? productName) : page ? t(page.labelKey) : productName}
+            {here ? virtualAgentName(here, brandTitle) : page ? t(page.labelKey) : productName}
           </span>
         </div>
       ) : null}
       <div className="agent-rail-inner" id={RAIL_PANEL_ID}>
+        <div className="agent-rail-brand" data-testid="rail-brand">
+          <div className="agent-rail-brand-identity">
+            <GeneralistTile productName={productName} logoSrc={logoSrc} bundled={bundledMark} />
+            {collapsed ? null : (
+              <span className="agent-rail-brand-name" data-testid="rail-brand-name">
+                {brandTitle}
+              </span>
+            )}
+          </div>
+          {onToggle && !(menu && collapsed) ? <RailToggle collapsed={collapsed} onToggle={onToggle} /> : null}
+        </div>
+
         <nav
           className="agent-rail-agents"
           aria-label={t("agents.rail.agentsAria")}
@@ -214,7 +223,6 @@ export function AgentRailView({
         </div>
 
         <div className="agent-rail-footer" data-testid="rail-footer">
-          {onToggle && !(menu && collapsed) ? <RailToggle collapsed={collapsed} onToggle={onToggle} /> : null}
           {footer}
         </div>
       </div>

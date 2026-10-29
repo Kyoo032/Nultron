@@ -80,6 +80,8 @@ describe("the bar", () => {
     expect(rule(".composer-bare-text")).toContain("max-height: 10rem");
     // Two classes, so it beats the two-line floor globals.css sets below 600px.
     expect(rule(".composer-bare .composer-bare-text")).toContain("min-height: 36px");
+    expect(rule(".composer-plus")).toContain("display: inline-flex");
+    expect(composerSource).toContain('el.style.height = "0px";');
     expect(rule(".composer-bare-row")).toContain("align-items: flex-end");
   });
 

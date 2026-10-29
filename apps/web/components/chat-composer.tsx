@@ -123,7 +123,7 @@ function growTextArea(el: HTMLTextAreaElement | null) {
   if (!el) {
     return;
   }
-  el.style.height = "44px";
+  el.style.height = "0px";
   el.style.height = `${Math.min(el.scrollHeight, COMPOSER_TEXT_MAX_PX)}px`;
 }
 
