@@ -67,9 +67,9 @@ that keep their unit and quantity, which a later pass can price in place.
 
 | Mode | Where | Unit |
 |---|---|---|
-| chat | `recordChatRunUsage`, called from `packages/host/src/runs.ts:569` and `:622`, gated on `finishRun`'s return | tokens |
-| documents, presentations, research, data, finance, market, legal, knowledge | `rememberJobUsage` in the shared job runtime callback, `packages/host/src/job-regen.ts:229` | tokens |
-| edit agent | `rememberJobUsage`, `packages/host/src/edit/agent-run.ts:270` and `:307` (live) and `:483` (stub) | tokens |
+| chat | `recordChatRunUsage`, called from `packages/host/src/runs.ts:673` and `:726`, gated on `finishRun`'s return | tokens |
+| documents, presentations, research, data, finance, market, legal, knowledge | `rememberJobUsage` in the shared job runtime callback, `packages/host/src/job-regen.ts:257` | tokens |
+| edit agent | `rememberJobUsage`, `packages/host/src/edit/agent-run.ts:269` and `:306` (live) and `:484` (stub) | tokens |
 | images | `recordImageUsage`, `packages/host/src/studio-generate.ts:357` | images |
 | videos | `recordVideoUsage`, `packages/host/src/studio-generate.ts:444` | seconds |
 | music | `recordMusicUsage`, `packages/host/src/studio-generate.ts:566` (a song) and `:656` (a lyrics draft) | jobs |

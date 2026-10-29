@@ -134,7 +134,7 @@ export function ChatContextChip({ usedTokens, contextLength, parts }: Props) {
             : t("chat.context.used", { n: formatContextLength(used) })}
         </span>
       </div>
-      <div className="mb-3.5 flex h-2 overflow-hidden bg-[color-mix(in_srgb,var(--color-text)_12%,transparent)]">
+      <div className="mb-3.5 flex h-2 overflow-hidden bg-[color-mix(in_srgb,var(--text)_12%,transparent)]">
         <span className="h-full bg-accent" style={{ width: `${(window_ ? fraction * 100 : 100).toFixed(1)}%` }} />
       </div>
       <div className="flex flex-col">

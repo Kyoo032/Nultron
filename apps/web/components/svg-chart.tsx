@@ -118,7 +118,7 @@ function LineChart({ chart, zeroBaseline }: { chart: DataChart; zeroBaseline: bo
                     cy={point.y}
                     r={MARKER_RADIUS}
                     fill={color}
-                    stroke="var(--color-paper)"
+                    stroke="var(--bg)"
                     strokeWidth={2}
                   >
                     <title>{`${name}: ${formatTick(point.value)} (${point.label})`}</title>
@@ -147,7 +147,7 @@ function ScatterChart({ chart }: { chart: DataChart }) {
           r={MARKER_RADIUS}
           fill={chartPalette(point.seriesIndex)}
           fillOpacity={0.85}
-          stroke="var(--color-paper)"
+          stroke="var(--bg)"
           strokeWidth={2}
         >
           <title>{`${chart.series[point.seriesIndex]?.name ?? ""}: ${formatTick(point.xValue)}, ${formatTick(point.yValue)}`}</title>

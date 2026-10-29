@@ -260,7 +260,7 @@ export function OpenSlideStage({ deck, onChange }: { deck: OpenSlideDeck; onChan
                 fontWeight: block.weight,
                 textAlign: block.align,
                 lineHeight: 1.2,
-                border: active ? "2px solid #0f766e" : "2px solid transparent",
+                border: active ? "2px solid var(--accent)" : "2px solid transparent",
                 padding: 0,
               }}
               data-testid="presentations-open-slide-block"

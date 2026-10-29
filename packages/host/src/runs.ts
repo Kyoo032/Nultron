@@ -1,7 +1,12 @@
 import {
   assertAgentSupportsModality,
   assertChatModelAcceptsModality,
+  attachedTextsOf,
+  createOutboundGuard,
   createRuntime,
+  hasNonTextUserPart,
+  runOutboundGuarded,
+  userTextOf,
   encodeSse,
   redactSecrets,
   redactSecretsDeep,
@@ -54,7 +59,7 @@ import { historyMediaPart, historyToolNote } from "./chat-history-note";
 import { ensureToolsRegistered } from "./register-tools";
 import { recordChatRunUsage } from "./usage-record";
 import { loadSettings, loadUserLocale } from "./settings-store";
-import { defaultSelectableModel, listSelectableModels } from "./selectable-models";
+import { defaultSelectableModel, listSelectableModels, toolMediaModels } from "./selectable-models";
 import { resolveTierRun } from "./tier-resolve";
 import { markJobModelDown, maySwapModel, pickNext, startModel } from "./job-model-fallback";
 import { readModelPinned } from "./job-regen";
@@ -419,7 +424,7 @@ export async function* startModalityRun(options: {
       // Images leave as bytes, within one budget, or the person is told why they cannot. A stored
       // `/api/v1/media/...` reference is never handed on: no remote model can open it.
       const history = await prepareChatImageHistory(options.tenant, storedHistory, { model, locale });
-      const runtime = withChatMediaReferences(createRuntime(settings));
+      const runtime = withChatMediaReferences(createRuntime(settings, toolMediaModels(options.tenant)));
       send({ type: "run.started", runId: run.id });
 
       // Model fallback, as jobs have it (`job-model-fallback.ts`): when the model this turn was given cannot
@@ -496,10 +501,23 @@ export async function* startModalityRun(options: {
         signal: modelAbort.signal,
         userText,
       };
+      // Safe web search (SR-112, SR-166): one outbound guard for the turn and its retry. The earlier-chats
+      // hint, the Knowledge Base and attached files are in the prompt from the first step, so the run starts
+      // tainted when any of them is, and every search or worker in it is checked against that text.
+      const outbound = createOutboundGuard({
+        userText: userTextOf(history),
+        privateText: [...knowledge.privateText, ...attachedTextsOf(history)],
+        // Earlier-chat titles are short: a five-word window of a title is ordinary words, so they count for
+        // their figures and codes only (review M2). A picture or a file part in any message taints the run
+        // even with no text to compare against (review M4c).
+        figuresOnlyText: [pastHint],
+        tainted: hasNonTextUserPart(history),
+        locale,
+      });
       const inChatRun = <T>(fn: () => Promise<T>): Promise<T> =>
         withToolRun({ runId: run.id, mode: agentPolicy ? agentPolicy.agent.id : "chat" }, () =>
           withRunContext({ threadId: thread.id, agentId: thread.agentId, locale }, () =>
-            withWorkerChannel(workerChannel, fn),
+            runOutboundGuarded(outbound, () => withWorkerChannel(workerChannel, fn)),
           ),
         );
       const attempt = () =>

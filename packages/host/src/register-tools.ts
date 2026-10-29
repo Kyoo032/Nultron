@@ -9,6 +9,7 @@ import { registerFileTools, setFileRootResolver } from "@agentforge/core/tools/f
 import { registerUniversityTools } from "@agentforge/university";
 import { registerCodeTools } from "./code-runner";
 import { registerDeckTools } from "./deck";
+import { delegateTool } from "./delegation/delegate-tool";
 import { resolveHostFileRoot } from "./file-roots";
 import { knowledgeSearchTool } from "./knowledge-search-tool";
 import { marketTools } from "./market/tools";
@@ -43,6 +44,8 @@ export function ensureToolsRegistered(): void {
   // Tester code: a mode harness as a tool of its own agent's conversation (`workers/`).
   registerTool(researchDossierTool);
   registerTool(financeTaskTool);
+  // One agent asking another for its answer (`delegation/`).
+  registerTool(delegateTool);
   registered = true;
   void import("./edit/backend").then((mod) => {
     setEditToolBackend(mod.hostEditBackend);

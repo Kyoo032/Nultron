@@ -94,6 +94,8 @@ export function runReadOnlySql(
 export const runSqlTool = defineTool({
   key: "run_sql",
   name: "Run SQL",
+  // Its rows are the person's own dataset: reading them taints the run (SR-112) and the rows are screened.
+  trust: "user_content",
   description:
     "Run one read-only SQLite SELECT against the attached dataset (table `data`). Returns columns and up to 500 rows. Use it for every number you report.",
   schema: z.object({

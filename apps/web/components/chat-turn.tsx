@@ -14,6 +14,7 @@ import { useHoldOnMount } from "@/lib/use-hold-on-mount";
 import { fileCardDetail, jobEmbedsFromTools } from "@/lib/message-embeds";
 import { collectToolMediaParts } from "@/lib/tool-media";
 import { DeckCards } from "@/components/chat-deck-card";
+import { DelegateCards } from "@/components/chat-delegate-card";
 import { DossierCards } from "@/components/chat-dossier-card";
 import { FinanceCards } from "@/components/chat-finance-card";
 import { MediaPermissionCards } from "@/components/chat-media-permission-card";
@@ -208,6 +209,7 @@ export function ChatTurn({ role, content, live, onContinue, continueDisabled = f
               disabled={continueDisabled}
               {...(onRunMedia ? { onRun: onRunMedia } : {})}
             />
+            <DelegateCards tools={visibleTools} />
             {jobs.map((job, index) => (
               <MessageEmbed
                 // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity

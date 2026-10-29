@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, wrappingKeyFromSecret, type TenantContext } from "@agentforge/core";
+import { ApiError, createOutboundGuard, wrappingKeyFromSecret, type TenantContext } from "@agentforge/core";
 import { UNVERIFIED_MARKER } from "@agentforge/core/finance";
 import type { JobEvent, JobStepEvent } from "@agentforge/core/jobs";
 import {
@@ -31,6 +31,7 @@ import {
   MARKET_WEB_TOOL_BINDINGS,
   USER_INSTRUCTION_HEADING,
   generateMarketBriefing,
+  marketOutbound,
   regenerateBriefingSection,
   toolKeysFor,
   withClientAbort,
@@ -303,6 +304,22 @@ describe("generateMarketBriefing", () => {
   it("binds web_search and web_fetch only when a search backend is ready", async () => {
     await generateMarketBriefing(tenant, REQUEST, emit, undefined, deps({ webReady: () => true }));
     expect(asked[0]?.toolKeys).toEqual([...toolKeysFor(DEFAULT_MARKET_SPECIALIST, false), ...MARKET_WEB_TOOL_BINDINGS]);
+  });
+
+  it("hands its job run the question as the person's text, so a search for its subject goes out (review H3)", async () => {
+    const prompt = "Pre-market briefing on memory chip makers and Indonesian banks";
+    await generateMarketBriefing(tenant, { ...REQUEST, prompt }, emit, undefined, deps({ webReady: () => true }));
+
+    const ask = asked[0] as AskOptions;
+    expect(ask.outbound).toEqual({ userText: [prompt], privateText: [] });
+    const query = "memory chip makers and Indonesian banks";
+    // The job runner's default, the whole prompt as private, would refuse that search.
+    expect(
+      createOutboundGuard({ userText: [], privateText: [ask.prompt], locale: "en" }).judgeQuery(query),
+    ).toMatchObject({
+      kind: "private",
+    });
+    expect(createOutboundGuard({ ...marketOutbound(prompt), locale: "en" }).judgeQuery(query)).toBeNull();
   });
 
   it("defaults to the saham agent and records it on the artifact", async () => {

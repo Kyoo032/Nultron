@@ -109,6 +109,13 @@ export type AgentRuntime = {
      * with the same arguments. Omitted, every call runs, as the studios need.
      */
     mediaPermission?: MediaPermissionPolicy;
+    /**
+     * What the egress guard (SR-112) is built from, when the caller knows better than the history does.
+     * Left out, the guard reads the person's own messages from `history` and starts untainted, as for
+     * Chat. A delegated run passes the person's words from the conversation that asked for it, and
+     * starts tainted: its only user message is a task a model wrote (`agents/delegation.ts`).
+     */
+    egress?: { userText: readonly string[]; tainted?: boolean };
     onEvent: (event: RuntimeEvent) => Promise<void> | void;
   }): Promise<void>;
 };

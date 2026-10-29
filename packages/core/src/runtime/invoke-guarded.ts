@@ -3,6 +3,7 @@ import type { TenantContext } from "../tenancy/types";
 import { invokeTool, type ToolDefinition } from "../tools/define-tool";
 import { getDisabledTools, getInjectionGuardBypass } from "../tools/secret-scope";
 import { blockedInjectionOutput, scanJson } from "../security/injection-guard";
+import { runInToolCall } from "../security/outbound-guard";
 import { thinToolOutput } from "../security/tool-thin";
 import type { EgressGuard } from "./egress-guard";
 import type { MediaPermission } from "./media-permission";
@@ -71,7 +72,8 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
 
   let full: unknown;
   try {
-    full = await invokeTool(tool, args, tenant);
+    // Marked as a model's tool call: a sender it reaches with no outbound guard open refuses (fails closed).
+    full = await runInToolCall(() => invokeTool(tool, args, tenant));
   } catch (error) {
     // A tool that read private material and then failed may have quoted it in its error.
     egress?.afterCall(tool, undefined);

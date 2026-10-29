@@ -162,6 +162,22 @@ export {
   nextHopUrl,
 } from "./security/safe-fetch";
 export type { HostLookup, ResolvedAddress, SafeFetchOptions, SafeFetchResult } from "./security/safe-fetch";
+export {
+  OUTBOUND_REFUSALS_MAX,
+  OutboundRefusedError,
+  assertSendableMediaUrl,
+  createOutboundGuard,
+  currentOutboundGuard,
+  inToolCall,
+  isOutboundRefusal,
+  outboundRefusal,
+  runInToolCall,
+  runOutboundGuarded,
+  stringsOf,
+} from "./security/outbound-guard";
+export type { OutboundGuard, OutboundGuardInit, OutboundRefusal, RefusalKind } from "./security/outbound-guard";
+export { SEARCH_QUERY_MAX_CHARS } from "./security/outbound-match";
+export { attachedTextsOf, hasNonTextUserPart, userTextOf } from "./runtime/egress-guard";
 export { isPrivateHostname, isPrivateIpAddress, isPrivateIpLiteral, parseIpAddress } from "./security/ip-range";
 export type { IpAddress } from "./security/ip-range";
 export {
@@ -644,6 +660,26 @@ export type { ProductMode, ProductModeSource } from "./agents/product-modes";
 export { SHELL_LAYOUT } from "./agents/product-modes";
 export type { ShellLayout } from "./agents/product-modes";
 export {
+  DELEGABLE_AGENTS,
+  DELEGATED_RUN_RULES,
+  DELEGATE_BUDGET,
+  DELEGATE_CONTEXT_MAX,
+  DELEGATE_EXCLUDED_TOOLS,
+  DELEGATE_PER_TURN,
+  DELEGATE_SUMMARY_MAX,
+  DELEGATE_TASK_MAX,
+  DELEGATE_TOOL_KEY,
+  DELEGATION_PROMPT,
+  DELEGATION_SENTENCE,
+  delegatedRunPrompt,
+  delegatedTaskMessage,
+  delegatedThreadTitle,
+  delegateToolKeys,
+  isDelegableAgent,
+} from "./agents/delegation";
+export type { DelegableAgent } from "./agents/delegation";
+export {
+  GENERALIST_EXTRA_TOOLS,
   GENERALIST_WORKER_PROMPT,
   GENERALIST_WORKER_TOOLS,
   VIRTUAL_AGENTS,
@@ -733,7 +769,13 @@ export {
   httpStatusForGatewayFailure,
   studioVideoFailureStatus,
 } from "./tools/platform/gateway-media";
-export { runWithToolSecrets, getSecret, getDisabledTools, getInjectionGuardBypass } from "./tools/secret-scope";
+export {
+  runWithToolSecrets,
+  getSecret,
+  getDisabledTools,
+  getInjectionGuardBypass,
+  type MediaModelCatalog,
+} from "./tools/secret-scope";
 export {
   TOOL_CAPABILITIES,
   CHAT_INFERENCE_ENV_VARS,

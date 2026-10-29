@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { resolvedGatewayBaseUrl } from "../../gateway";
-import { DEFAULT_GATEWAY_IMAGE_MODEL } from "../../models/media-kind";
 import { ApiError } from "../../errors";
+import { currentOutboundGuard, mediaSendRefusal } from "../../security/outbound-guard";
 import { defineTool } from "../define-tool";
-import { imageInputSchema, resolveImageInput } from "../media-reference";
+import { gatewayGenerateModel } from "../media-model-choice";
+import { imageInputSchema, mediaReferenceId, resolveImageInput } from "../media-reference";
 import { missingToolRouteMessage, resolveToolBackend } from "../credentials";
 import { getSecret } from "../secret-scope";
 import { falImageUrl, runFalQueue } from "./fal-queue";
@@ -126,6 +127,14 @@ export const imageGenerateTool = defineTool({
     }
     const aspect = imageShape(size, aspect_ratio);
     const finalPrompt = imagePrompt(prompt, style);
+    const held = mediaSendRefusal({
+      imageUrl: image_url && !mediaReferenceId(image_url) ? image_url : undefined,
+      prompt: finalPrompt,
+      thirdParty: route.backend !== "gateway",
+    });
+    if (held) {
+      return held;
+    }
     const fetchImpl = globalThis.fetch;
     try {
       const generated = usesGatewayImages(route.backend)
@@ -134,11 +143,12 @@ export const imageGenerateTool = defineTool({
             aspectRatio: aspect,
             imageUrl: resolved.url,
             apiKey,
-            model: model || getSecret("IMAGE_GEN_MODEL") || DEFAULT_GATEWAY_IMAGE_MODEL,
+            model: gatewayGenerateModel("image", model),
             baseUrl: getSecret("OPENAI_BASE_URL") || resolvedGatewayBaseUrl(),
             fetchImpl,
           })
         : await generateWithFal(finalPrompt, aspect, resolved.url, apiKey, fetchImpl);
+      currentOutboundGuard()?.noteHostMedia([generated.url]);
       return {
         success: true,
         backend: route.backend,

@@ -7,7 +7,7 @@
  */
 
 import { parseAppLocale, type AppLocale } from "../../locale";
-import { maskPii } from "../../security/pii";
+import { sendableSearchQuery } from "../../security/outbound-guard";
 import { assertAllowedEndpointUrl } from "../../security/tls";
 
 export const KEYLESS_ORIGINS = {
@@ -94,9 +94,13 @@ export function resetKeylessSearchState(): void {
 const SCHOLARLY =
   /\b(doi\b|arxiv|preprint|journal|paper|study|studies|meta-analysis|citation|issn|peer-reviewed|jurnal|makalah|penelitian|pracetak|kajian)\b/i;
 
+/**
+ * Throws `OutboundRefusedError` when the outbound guard refuses the query (`security/outbound-guard.ts`).
+ * The check is here, at the entry, and not in `fetchPinnedText`, which turns every error into an outage.
+ */
 export async function searchKeyless(query: string, options: KeylessSearchOptions = {}): Promise<KeylessSearchResult> {
   const locale = options.locale ?? readLocale();
-  const masked = maskPii(query).trim().slice(0, 300);
+  const masked = sendableSearchQuery(query, locale);
   if (!masked) {
     return { hits: [], outage: false, locale };
   }

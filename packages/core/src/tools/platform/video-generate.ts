@@ -1,10 +1,11 @@
 import { z } from "zod";
 import { resolvedGatewayBaseUrl } from "../../gateway";
-import { DEFAULT_GATEWAY_VIDEO_MODEL } from "../../models/media-kind";
 import { clampVideoSeconds } from "../../models/video-capabilities";
 import { ApiError } from "../../errors";
+import { currentOutboundGuard, mediaSendRefusal } from "../../security/outbound-guard";
 import { defineTool } from "../define-tool";
-import { imageInputSchema, resolveImageInput } from "../media-reference";
+import { gatewayGenerateModel } from "../media-model-choice";
+import { imageInputSchema, mediaReferenceId, resolveImageInput } from "../media-reference";
 import { missingToolRouteMessage, resolveToolBackend } from "../credentials";
 import { getSecret } from "../secret-scope";
 import { falVideoUrl, runFalQueue } from "./fal-queue";
@@ -138,6 +139,14 @@ export const videoGenerateTool = defineTool({
       return { success: false, error: resolved.error };
     }
     const sourceImage = resolved.url;
+    const held = mediaSendRefusal({
+      imageUrl: image_url && !mediaReferenceId(image_url) ? image_url : undefined,
+      prompt,
+      thirdParty: route.backend !== "gateway",
+    });
+    if (held) {
+      return held;
+    }
     const aspect = aspect_ratio ?? "16:9";
     const fetchImpl = globalThis.fetch;
     try {
@@ -150,7 +159,7 @@ export const videoGenerateTool = defineTool({
               seconds,
               resolution,
               apiKey,
-              model: model || getSecret("VIDEO_GEN_MODEL") || DEFAULT_GATEWAY_VIDEO_MODEL,
+              model: gatewayGenerateModel("video", model),
               baseUrl: getSecret("OPENAI_BASE_URL") || resolvedGatewayBaseUrl(),
               fetchImpl,
             })
@@ -165,6 +174,7 @@ export const videoGenerateTool = defineTool({
                 seconds,
               )
             : await generateWithFal(prompt, sourceImage, aspect, apiKey, fetchImpl);
+      currentOutboundGuard()?.noteHostMedia([generated.url]);
       return {
         success: true,
         backend: route.backend,

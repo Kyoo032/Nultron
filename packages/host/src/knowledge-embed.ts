@@ -310,6 +310,35 @@ export type VectorHit = {
 
 const MIN_COSINE = 0.12;
 
+/**
+ * Shortest token that counts as a shared word for a stub hit. Three is the same bar an FTS
+ * phrase uses (`FTS_MIN_WORD` in `knowledge-text.ts`): one- and two-letter tokens are noise.
+ */
+const STUB_TERM_MIN = 3;
+
+/** Words `stubEmbed` actually buckets, minus the short tokens FTS would also ignore. */
+function stubTerms(text: string): Set<string> {
+  const terms = new Set<string>();
+  for (const word of text.toLowerCase().split(/\W+/)) {
+    if (word.length >= STUB_TERM_MIN) {
+      terms.add(word);
+    }
+  }
+  return terms;
+}
+
+function bodySharesStubTerm(body: string, wanted: Set<string>): boolean {
+  if (wanted.size === 0) {
+    return false;
+  }
+  for (const word of body.toLowerCase().split(/\W+/)) {
+    if (wanted.has(word)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /** Vector hits plus the model id whose rows were searched (null when none were). */
 export type VectorSearch = { hits: VectorHit[]; model: string | null };
 
@@ -322,6 +351,12 @@ export type VectorSearch = { hits: VectorHit[]; model: string | null };
  * prefix of two unrelated spaces, which reliably clears the cosine floor with pure noise.
  *
  * `preferredModel` lets a caller that already paid for `resolveVectorModel` skip the second lookup.
+ *
+ * A `stub-fnv-32` row is not a semantic embedding. Each word lands in one of 32 buckets, so a
+ * one-word query that shares a bucket with any word in a short passage scores about 0.30 and
+ * clears `MIN_COSINE`. A word that really is in the passage scores the same, so a higher floor
+ * cannot tell them apart. Stub hits stay only when the query and the passage also share a word.
+ * A live model's rows are unchanged: cosine alone, floor 0.12.
  */
 export async function searchVectors(
   tenant: TenantContext,
@@ -345,6 +380,8 @@ export async function searchVectors(
   if (model !== preferred && countVectorsForModel(tenant, model) === 0) {
     return { hits: [], model: null };
   }
+  // Built once. Null means this query was embedded by a live model, so cosine is the only gate.
+  const stubQuery = model === STUB_EMBED_MODEL ? stubTerms(trimmed) : null;
   const skip =
     excludeSourceIds.length > 0 ? ` AND source_id NOT IN (${excludeSourceIds.map(() => "?").join(", ")})` : "";
   const ws = workspaceId(tenant);
@@ -382,7 +419,7 @@ export async function searchVectors(
         score: cosineSimilarity(queryVec, embedding),
       };
     })
-    .filter((item) => item.score >= MIN_COSINE)
+    .filter((item) => item.score >= MIN_COSINE && (stubQuery === null || bodySharesStubTerm(item.body, stubQuery)))
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
   return { hits: ranked.map((item) => ({ ...item, source: "rag" as const })), model };

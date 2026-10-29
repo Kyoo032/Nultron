@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ApiError } from "../../errors";
+import { OutboundRefusedError } from "../../security/outbound-guard";
 import { ASPECT_SIZE, DEFAULT_TITLE_STYLE, titleStyleSchema, type Clip } from "../../edit/document";
 import { RECIPES } from "../../edit/recipes";
 import { imageToVideoForModel } from "../../models/video-capabilities";
@@ -24,6 +25,8 @@ function newId(): string {
 export const getProjectTool = defineTool({
   key: "get_project",
   name: "Get project",
+  // The person's own project: its titles, captions and transcript. Reading it taints the run (SR-112).
+  trust: "user_content",
   description: "Return a compact view of the current Edit project.",
   schema: z.object({}).strict(),
   execute: async (_args, tenant) => {
@@ -35,6 +38,8 @@ export const getProjectTool = defineTool({
 export const listClipsTool = defineTool({
   key: "list_clips",
   name: "List clips",
+  // The person's own project: its titles, captions and transcript. Reading it taints the run (SR-112).
+  trust: "user_content",
   description: "List clips on the timeline, optionally filtered by track id.",
   schema: z
     .object({
@@ -65,6 +70,8 @@ export const probeAssetTool = defineTool({
 export const listIngredientsTool = defineTool({
   key: "list_ingredients",
   name: "List ingredients",
+  // The person's own project: its titles, captions and transcript. Reading it taints the run (SR-112).
+  trust: "user_content",
   description: "List named ingredients (@refs) on the current project.",
   schema: z.object({}).strict(),
   execute: async (_args, tenant) => {
@@ -109,6 +116,8 @@ export const detectScenesTool = defineTool({
 export const transcribeTool = defineTool({
   key: "transcribe",
   name: "Transcribe",
+  // The person's own project: its titles, captions and transcript. Reading it taints the run (SR-112).
+  trust: "user_content",
   description: "Only when ASR is available; otherwise say so and ask for a script or SRT.",
   schema: z
     .object({
@@ -439,6 +448,9 @@ async function runGenerateTool(tenant: TenantContext, input: EditStartGenerateJo
     const result = await requireEditToolBackend().startGenerateJob(tenant, input);
     return { success: true, ...result };
   } catch (error) {
+    if (error instanceof OutboundRefusedError) {
+      return error.refusal;
+    }
     if (error instanceof ApiError && (error.code === "video_still_unsupported" || error.code === "still_unsupported")) {
       return editToolRefusal("still_unsupported", error.message);
     }

@@ -28,7 +28,7 @@
   border-radius: 20px;
   background: var(--mode, var(--accent));
   color: var(--on-mode);
-  box-shadow: 0 3px 0 color-mix(in srgb, var(--mode, var(--accent)) 70%, #000000);
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--mode, var(--accent)) 70%, var(--black));
 }
 
 .agent-home-greeting {

@@ -48,8 +48,8 @@ vi.mock("@agentforge/core", async (importOriginal) => {
   return {
     ...actual,
     // The real stub runtime unless a case sets `swap.runtime`.
-    createRuntime: (settings: Parameters<typeof actual.createRuntime>[0]) =>
-      (swap.runtime as AgentRuntime | null) ?? actual.createRuntime(settings),
+    createRuntime: (...args: Parameters<typeof actual.createRuntime>) =>
+      (swap.runtime as AgentRuntime | null) ?? actual.createRuntime(...args),
   };
 });
 
@@ -437,6 +437,9 @@ describe("a run on the Research agent's thread", () => {
     expect(input.bindings.map((binding) => binding.toolKey)).toEqual([...full.tools]);
     expect(input.bindings.every((binding) => binding.enabled)).toBe(true);
     expect(input.budget).toEqual(full.budget);
+    // Any agent on the desk may ask another one, within the same per-turn ceiling.
+    expect(input.bindings.map((binding) => binding.toolKey)).toContain("delegate");
+    expect(input.budget?.perTool?.delegate).toBe(3);
     expect(input.version.systemPrompt).toContain("You are the Research agent");
   });
 
@@ -556,18 +559,21 @@ describe("a run on the Research agent's thread", () => {
     expect(run.streamWatchdog?.idleMs).toBe(WORKER_STREAM_IDLE_MS);
     const keys = run.bindings.map((binding) => binding.toolKey);
     // Owner, 2026-10-09: the chat agent does anything inside its chat; hiring an agent is never required.
-    for (const key of ["research_dossier", "image_generate", "video_generate", "build_deck", "web_search"]) {
+    for (const key of ["research_dossier", "image_generate", "video_generate", "build_deck", "web_search", "delegate"]) {
       expect(keys, key).toContain(key);
     }
     expect(keys.filter((key) => key === "research_dossier")).toHaveLength(1);
+    expect(keys.filter((key) => key === "delegate")).toHaveLength(1);
     // It is told about the worker, bounded per turn, and is still the general assistant.
     expect(run.version.systemPrompt).toContain("research_dossier researches one question");
+    expect(run.version.systemPrompt).toContain("delegate");
     expect(run.version.systemPrompt).toContain("You are the general assistant");
     expect(run.version.systemPrompt).not.toContain("You are the Research agent");
     // The default agent keeps its own name from the Soul block, so nothing overrides who is speaking.
     expect(run.version.systemPrompt).toContain("Name:");
     expect(run.version.systemPrompt).not.toContain("Who is speaking");
     expect(run.budget?.perTool?.research_dossier).toBe(2);
+    expect(run.budget?.perTool?.delegate).toBe(3);
     expect(run.budget?.maxSteps).toBe(12);
     expect(run.budget?.perTool?.build_deck).toBe(4);
   });

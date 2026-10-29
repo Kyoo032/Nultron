@@ -8,6 +8,7 @@ import {
   type RichToolKey,
   type ToolStatus,
 } from "@/components/tool-rows/results";
+import { DELEGATE_TOOL_KEY, delegatedAgentOf } from "@/components/tool-rows/delegate-result";
 import { DOSSIER_TOOL_KEY, readDossierResult } from "@/components/tool-rows/dossier-result";
 import { FINANCE_TASK_TOOL_KEY, readFinanceResult } from "@/components/tool-rows/finance-result";
 import { t } from "@/lib/i18n";
@@ -28,6 +29,7 @@ const ACTIVITY_KEYS: Record<string, string> = {
   self_check: "chat.tool.selfChecking",
   research_dossier: "agents.progress.working",
   finance_task: "agents.progress.working",
+  delegate: "agents.delegate.working",
 };
 
 const DONE_KEYS: Record<string, string> = {
@@ -41,6 +43,7 @@ const DONE_KEYS: Record<string, string> = {
   self_check: "chat.tool.selfCheck",
   research_dossier: "agents.dossier.label",
   finance_task: "agents.finance.label",
+  delegate: "agents.delegate.label",
 };
 
 export function showsToolActivity(_toolKey: string): boolean {
@@ -252,11 +255,39 @@ function gist(value: unknown): string {
  */
 function dossierSummary(label: string, output: unknown): string {
   const model = readDossierResult(undefined, output);
-  if (model) {
-    return `${label} · ${gist(model.title)}`;
-  }
   const message = readString(asRecord(output), "message");
-  return message ? `${label} · ${gist(message)}` : label;
+  const head = model ? `${label} · ${gist(model.title)}` : message ? `${label} · ${gist(message)}` : label;
+  return `${head}${dossierSearched(output)}`;
+}
+
+/**
+ * Every web search a dossier asked for, in full, on its own line. What left the desk for a search provider
+ * stays readable after the live progress lines are gone (safe web search, SR-166).
+ */
+function dossierSearched(output: unknown): string {
+  const queries = (asRecord(output)?.queries ?? []) as unknown[];
+  const list = Array.isArray(queries) ? queries.filter((query): query is string => typeof query === "string") : [];
+  return list.length > 0 ? `\n${t("agents.dossier.searched", { queries: list.join(" · ") })}` : "";
+}
+
+/** A search row names its whole query, never a clipped one: the person reads exactly what was searched for. */
+function webSearchSummary(label: string, input: unknown, output: unknown): string {
+  const query = readString(asRecord(input), "query")?.trim() ?? "";
+  const out = gist(output);
+  const head = query ? `${label} · ${query}` : label;
+  return out ? `${head} → ${out}` : head;
+}
+
+/**
+ * The Thinking row of a hand-off: the label and which agent was asked, or the reason it was refused. The
+ * generic gist would print the task and a field count. The card under the answer carries the rest.
+ */
+function delegateSummary(label: string, input: unknown, output: unknown): string {
+  const agent = delegatedAgentOf(input, output);
+  const named = agent ? `${label} · ${t(`rail.${agent}`)}` : label;
+  const record = asRecord(output);
+  const message = record?.ok === false ? readString(record, "message") : undefined;
+  return message ? `${named} · ${gist(message)}` : named;
 }
 
 function financeSummary(label: string, output: unknown): string {
@@ -286,6 +317,12 @@ export function toolCallSummary(toolKey: string, input?: unknown, output?: unkno
   }
   if (toolKey === FINANCE_TASK_TOOL_KEY) {
     return financeSummary(label, output);
+  }
+  if (toolKey === "web_search") {
+    return webSearchSummary(label, input, output);
+  }
+  if (toolKey === DELEGATE_TOOL_KEY) {
+    return delegateSummary(label, input, output);
   }
   const out = gist(output);
   const inn = gist(input);

@@ -113,7 +113,7 @@ The result renders in the block at `apps/web/components/knowledge-page.tsx:771-8
 
 ### 8. What Chat does with all of it
 
-Chat never reads the page's state; the host rebuilds it per turn. `startModalityRun` calls `knowledgeInjection(tenant, userText, { excludeThreadId: thread.id })` (`packages/host/src/runs.ts:125`) and concatenates the result onto the published agent's system prompt (`:158`).
+Chat never reads the page's state; the host rebuilds it per turn. `startModalityRun` calls `knowledgeInjection(tenant, userText, { excludeThreadId: thread.id })` (`packages/host/src/runs.ts:195`) and concatenates the result onto the published agent's system prompt (`:218`).
 
 `knowledgeInjection` (`packages/host/src/knowledge.ts`) assembles three sections under one `# Workspace knowledge` heading: `## Soul` from `getSoul`, `## Pinned memories` from the pinned subset of `listMemories`, and `## Retrieved sources`. Hits render as `[${index + 1}] ${sanitizeSourceName(chunk.sourceName)}\n${chunk.body}`. A blank query skips retrieval and adds no sources section. A non-empty query with no hit still adds `## Retrieved sources`, whose body is the desk-language miss line (`knowledgeMissBlock`). The anti-loop is `excludedSourceIds`: the asking thread's own work card is looked up by origin and excluded, which is why proving retrieval of a Chat card needs a fresh thread.
 

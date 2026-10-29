@@ -924,6 +924,12 @@ export type KnowledgeInjection = {
   chunks: RetrievedChunk[];
   /** Which engine served them. Written to `knowledge_retrievals.backend` by the run that used them. */
   backend: KnowledgeBackendId;
+  /**
+   * The owner's own material in `prompt`, without the host's headings: a Soul they wrote (the product's
+   * default Soul is not theirs), each pinned memory and each retrieved chunk. The run's outbound guard
+   * starts tainted when this is not empty and refuses a search that repeats it.
+   */
+  privateText: string[];
 };
 
 /**
@@ -1006,5 +1012,10 @@ export async function knowledgeInjection(
     ],
     chunks: retrieved.chunks,
     backend: retrieved.backend,
+    privateText: [
+      JSON.stringify(soul) === JSON.stringify(defaultSoul()) ? "" : soulBlock,
+      ...memories.map((item) => item.text),
+      ...retrieved.chunks.map((chunk) => chunk.body),
+    ].filter((text) => text.trim() !== ""),
   };
 }

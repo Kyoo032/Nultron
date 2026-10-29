@@ -154,3 +154,74 @@ describe("videoGenerateTool", () => {
     expect(result).toMatchObject({ success: false });
   });
 });
+
+describe("videoGenerateTool model choice", () => {
+  const gateway = { OPENAI_API_KEY: "sk-model", OPENAI_BASE_URL: "https://api.tokotokenai.com/v1" };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function stubGateway() {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: { status: "SUCCESS", result_url: "https://cdn.example/clip.mp4" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  function sentModel(fetchMock: ReturnType<typeof vi.fn>): unknown {
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+    return JSON.parse(String(init?.body)).model;
+  }
+
+  async function run(
+    args: Record<string, unknown>,
+    options: { secrets?: Record<string, string>; video?: string[] } = {},
+  ) {
+    return runWithToolSecrets(
+      {
+        secrets: { ...gateway, ...options.secrets },
+        backends: {},
+        ...(options.video ? { mediaModels: { image: [], video: options.video } } : {}),
+      },
+      () => invokeTool(videoGenerateTool, { prompt: "rain on a window", ...args }, tenant),
+    );
+  }
+
+  it("replaces a model id the desk's catalog does not list with the catalog's video model", async () => {
+    const fetchMock = stubGateway();
+    const result = await run({ model: "]" }, { video: ["veo_3_1-fast", "seedance-2.0"] });
+    expect(sentModel(fetchMock)).toBe("seedance-2.0");
+    expect(result).toMatchObject({ success: true, model: "seedance-2.0" });
+  });
+
+  it("falls back to the configured video model before the catalog's pick", async () => {
+    const fetchMock = stubGateway();
+    await run({ model: "sora-9" }, { video: ["seedance-2.0", "veo_3_1-fast"], secrets: { VIDEO_GEN_MODEL: "veo_3_1-fast" } });
+    expect(sentModel(fetchMock)).toBe("veo_3_1-fast");
+  });
+
+  it("keeps a model the catalog lists, in the catalog's spelling", async () => {
+    const fetchMock = stubGateway();
+    await run({ model: "VEO_3_1-FAST" }, { video: ["seedance-2.0", "veo_3_1-fast"] });
+    expect(sentModel(fetchMock)).toBe("veo_3_1-fast");
+  });
+
+  it("with an empty catalog keeps a video model id and otherwise sends the built-in default", async () => {
+    const kept = stubGateway();
+    await run({ model: "seedance-2.0" }, { video: [] });
+    expect(sentModel(kept)).toBe("seedance-2.0");
+    vi.unstubAllGlobals();
+    const dropped = stubGateway();
+    await run({ model: "]" }, { video: [] });
+    expect(sentModel(dropped)).toBe("grok-imagine-video");
+  });
+
+  it("sends the model as given when no catalog is in scope, as the Videos studio calls it", async () => {
+    const fetchMock = stubGateway();
+    await run({ model: "studio-picked-model" });
+    expect(sentModel(fetchMock)).toBe("studio-picked-model");
+  });
+});

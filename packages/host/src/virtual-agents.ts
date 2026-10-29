@@ -2,7 +2,7 @@ import { db, DrizzleAgentRepository, listLocalWorkspaces } from "@agentforge/db"
 import {
   DEFAULT_CHAT_MODALITIES,
   DEFAULT_CHAT_MODEL,
-  GENERALIST_WORKER_TOOLS,
+  GENERALIST_EXTRA_TOOLS,
   VIRTUAL_AGENTS,
   productModeLabel,
   resolveWorkspaceModes,
@@ -154,13 +154,13 @@ export async function listVirtualAgents(tenant: TenantContext): Promise<VirtualA
 }
 
 /**
- * The default agent's bindings plus one for each worker it may run from its own chat
- * (`GENERALIST_WORKER_TOOLS`). Made here, like a mode agent's, so no desk needs a stored row for a
+ * The default agent's bindings plus one for each worker it may run from its own chat and for `delegate`
+ * (`GENERALIST_EXTRA_TOOLS`). Made here, like a mode agent's, so no desk needs a stored row for a
  * worker and none can be switched off by editing one. A key the desk already binds is left as it is.
  */
 export function withGeneralistWorkers(bindings: ToolBindingRecord[]): ToolBindingRecord[] {
   const have = new Set(bindings.map((binding) => binding.toolKey));
-  const added: ToolBindingRecord[] = GENERALIST_WORKER_TOOLS.filter((toolKey) => !have.has(toolKey)).map(
+  const added: ToolBindingRecord[] = GENERALIST_EXTRA_TOOLS.filter((toolKey) => !have.has(toolKey)).map(
     (toolKey) => ({
       id: `virtual-chat-${toolKey}`,
       agentVersionId: bindings[0]?.agentVersionId ?? "",
@@ -171,6 +171,26 @@ export function withGeneralistWorkers(bindings: ToolBindingRecord[]): ToolBindin
     }),
   );
   return added.length === 0 ? bindings : [...bindings, ...added];
+}
+
+/**
+ * An agent the desk has hired, with the row that owns its threads, or null when the desk has not hired
+ * it (or it is the generalist). The asked agent of a delegation has to be one the owner can open from
+ * the rail, because the task is kept there as a conversation of its own.
+ */
+export async function hiredAgentRow(
+  tenant: TenantContext,
+  mode: ProductMode,
+): Promise<{ readonly agent: VirtualAgent; readonly row: AgentRecord } | null> {
+  const agent = virtualAgentsForDesk(await deskModes(tenant)).find((entry) => entry.id === mode && !entry.generalist);
+  return agent ? { agent, row: await ensureVirtualAgentRow(tenant, agent) } : null;
+}
+
+/** The modes of the agents on this desk other than the generalist, in catalog order. */
+export async function hiredAgentModes(tenant: TenantContext): Promise<ProductMode[]> {
+  return virtualAgentsForDesk(await deskModes(tenant))
+    .filter((agent) => !agent.generalist)
+    .map((agent) => agent.id);
 }
 
 export type VirtualAgentRunPolicy = {

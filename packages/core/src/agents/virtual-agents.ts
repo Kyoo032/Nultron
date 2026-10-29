@@ -1,4 +1,5 @@
 import { DEFAULT_CHAT_PROMPT, DEFAULT_CHAT_SLUG } from "./default-chat";
+import { DELEGATE_PER_TURN, DELEGATE_TOOL_KEY, DELEGATION_PROMPT } from "./delegation";
 import { PRODUCT_MODE_IDS, productModeLabel, type ProductMode } from "./product-modes";
 import type { HarnessSkill } from "../harness/mode-skills";
 import type { HarnessLoop, RunBudget } from "../harness/spec";
@@ -88,8 +89,13 @@ const CHAT_WORKERS: Readonly<Record<string, { readonly perTurn: number; readonly
 /** The worker tool keys every agent binds after chat's own tools, in a stable order. */
 export const GENERALIST_WORKER_TOOLS: readonly string[] = Object.freeze(Object.keys(CHAT_WORKERS));
 
-/** The paragraph every agent's prompt gains for the workers. Empty when there are none. */
-export const GENERALIST_WORKER_PROMPT: string =
+/**
+ * The tools every agent binds beyond Chat's own: the workers, then `delegate`, which asks another agent
+ * for its answer (`delegation.ts`). It is not a harness, so it is not in `CHAT_WORKERS`.
+ */
+export const GENERALIST_EXTRA_TOOLS: readonly string[] = Object.freeze([...GENERALIST_WORKER_TOOLS, DELEGATE_TOOL_KEY]);
+
+const WORKER_PARAGRAPH: string =
   GENERALIST_WORKER_TOOLS.length === 0
     ? ""
     : [
@@ -98,10 +104,13 @@ export const GENERALIST_WORKER_PROMPT: string =
         ...GENERALIST_WORKER_TOOLS.map((key) => `- ${CHAT_WORKERS[key]?.sentence ?? key}`),
       ].join("\n");
 
+/** The paragraphs every agent's prompt gains for the workers and for asking another agent. */
+export const GENERALIST_WORKER_PROMPT: string = `${WORKER_PARAGRAPH}${DELEGATION_PROMPT}`;
+
 const CHAT_SPEC = MODE_HARNESS_SPECS.chat;
 
-/** Every agent's tools: chat's own, then the workers. */
-const FULL_CHAT_TOOLS: readonly string[] = Object.freeze([...CHAT_SPEC.tools, ...GENERALIST_WORKER_TOOLS]);
+/** Every agent's tools: chat's own, then the workers, then `delegate`. */
+const FULL_CHAT_TOOLS: readonly string[] = Object.freeze([...CHAT_SPEC.tools, ...GENERALIST_EXTRA_TOOLS]);
 
 /**
  * Paid media has no ceiling here (owner, 2026-10-22: it is the person's own key). The brake is the
@@ -109,12 +118,17 @@ const FULL_CHAT_TOOLS: readonly string[] = Object.freeze([...CHAT_SPEC.tools, ..
  * the request (`../runtime/media-permission.ts`, plan decision D4). The turn's `maxToolCalls` still bounds a runaway.
  */
 
-/** Every agent's budget: Chat's declared one, plus a ceiling for each worker. */
+/**
+ * Every agent's budget: Chat's declared one, plus a ceiling for each worker and for delegations. A
+ * delegated run has a budget of its own (`DELEGATE_BUDGET`), so the turn's cost is bounded by the
+ * number of delegations it may start.
+ */
 const FULL_CHAT_BUDGET: RunBudget = Object.freeze({
   ...CHAT_SPEC.budget,
   perTool: Object.freeze({
     ...CHAT_SPEC.budget.perTool,
     ...Object.fromEntries(GENERALIST_WORKER_TOOLS.map((key) => [key, CHAT_WORKERS[key]?.perTurn ?? 1])),
+    [DELEGATE_TOOL_KEY]: DELEGATE_PER_TURN,
   }),
 });
 

@@ -70,6 +70,8 @@ async function pause(ms: number): Promise<void> {
 
 async function fetchOnce(pkg: ComponentPackage, options: DownloadOptions): Promise<Buffer> {
   const result = await fetchPublicHttps(pkg.tarball, {
+    // The address is the manifest's, never a model's, so the outbound guard does not judge it.
+    urlSource: "host",
     fetchImpl: options.fetchImpl,
     maxBytes: COMPONENT_MAX_BYTES,
     timeoutMs: COMPONENT_TIMEOUT_MS,

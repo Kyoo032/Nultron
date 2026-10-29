@@ -18,8 +18,14 @@ const schema = z.object({
     .describe("The research question, as one clear sentence or short paragraph, in the conversation's language."),
 });
 
+/**
+ * Every search the dossier asked for, in order, refused ones included. The Chat tool row shows them, so the
+ * person can read what left the desk; the progress lines that carried them live are gone once the call ends.
+ */
+type Queried = { readonly queries: readonly string[] };
+
 export type ResearchWorkerResult =
-  | {
+  | (Queried & {
       readonly ok: true;
       readonly artifact: { readonly id: string | null; readonly kind: "research"; readonly title: string };
       readonly summary: string;
@@ -30,8 +36,13 @@ export type ResearchWorkerResult =
         readonly rounds: number;
         readonly failed: readonly { readonly check: string; readonly error: string }[];
       };
-    }
-  | { readonly ok: false; readonly reason: "failed" | "cancelled"; readonly code: string; readonly message: string };
+    })
+  | (Queried & {
+      readonly ok: false;
+      readonly reason: "failed" | "cancelled";
+      readonly code: string;
+      readonly message: string;
+    });
 
 function clip(text: string, max: number): string {
   const trimmed = text.trim();
@@ -49,9 +60,20 @@ export async function runResearchWorker(
   tenant: TenantContext,
 ): Promise<ResearchWorkerResult> {
   const channel = currentWorkerChannel();
+  const queries: string[] = [];
   try {
     const result = await runWithWorkerProgress(RESEARCH_DOSSIER_TOOL_KEY, (emit, signal) =>
-      generateResearchNotes(tenant, { prompt: args.question }, emit, signal),
+      generateResearchNotes(
+        tenant,
+        { prompt: args.question },
+        (job) => {
+          if (job.type === "job.step" && job.phase === "searching") {
+            queries.push(job.label);
+          }
+          emit(job);
+        },
+        signal,
+      ),
     );
     const sources = new Set<string>();
     for (const note of result.notes) {
@@ -64,6 +86,7 @@ export async function runResearchWorker(
     }
     return {
       ok: true,
+      queries,
       artifact: { id: result.artifactId, kind: "research", title: result.dossier.title },
       summary: clip(result.summary, SUMMARY_MAX),
       sections: result.notes.slice(0, SECTIONS_MAX).map((note) => note.heading),
@@ -80,6 +103,7 @@ export async function runResearchWorker(
     if (channel?.signal?.aborted) {
       return {
         ok: false,
+        queries,
         reason: "cancelled",
         code: "cancelled",
         message: "The run was stopped before the dossier was written.",
@@ -87,7 +111,7 @@ export async function runResearchWorker(
     }
     const code = error instanceof ApiError ? error.code : "internal_error";
     const message = error instanceof Error ? error.message : "The dossier could not be written.";
-    return { ok: false, reason: "failed", code, message };
+    return { ok: false, queries, reason: "failed", code, message };
   }
 }
 

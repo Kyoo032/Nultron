@@ -1,6 +1,7 @@
 import { lookup as dnsLookup } from "node:dns/promises";
 import { ApiError } from "../errors";
 import { isPrivateHostname, isPrivateIpAddress, parseIpAddress } from "./ip-range";
+import { assertSendableUrl } from "./outbound-guard";
 
 export const SAFE_FETCH_MAX_HOPS = 5;
 export const SAFE_FETCH_DEFAULT_MAX_BYTES = 1_500_000;
@@ -26,6 +27,13 @@ export type SafeFetchOptions = {
   headers?: Record<string, string>;
   /** Caller's abort signal (a cancelled job); combined with the timeout. */
   signal?: AbortSignal;
+  /**
+   * Who wrote the URL. `"model"` (the default) is checked by the run's outbound guard
+   * (`./outbound-guard.ts`) before anything is sent. `"host"` is an address the host or the gateway
+   * produced, such as a signed media link, and is not: a model did not write it, and its signature would
+   * read as a credential.
+   */
+  urlSource?: "model" | "host";
 };
 
 export type SafeFetchResult = {
@@ -183,6 +191,10 @@ function linkSignals(options: SafeFetchOptions): { controller: AbortController; 
  * same host/protocol checks, with a timeout and a byte cap on the body.
  */
 export async function fetchPublicHttps(url: string, options: SafeFetchOptions = {}): Promise<SafeFetchResult> {
+  if (options.urlSource !== "host") {
+    // The first address only: a redirect hop is the server's answer, not text the model wrote.
+    assertSendableUrl(url.trim());
+  }
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const maxHops = options.maxHops ?? SAFE_FETCH_MAX_HOPS;
   const maxBytes = options.maxBytes ?? SAFE_FETCH_DEFAULT_MAX_BYTES;

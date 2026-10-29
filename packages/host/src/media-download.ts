@@ -45,6 +45,8 @@ export async function downloadGeneratedMedia(
     maxBytes: MAX_BYTES[kind],
     fetchImpl: options.fetchImpl,
     signal: options.signal,
+    // The gateway's own link, often signed: no model wrote it, so the outbound guard does not judge it.
+    urlSource: "host",
   });
   if (result.status < 200 || result.status >= 300) {
     throw new ApiError(ERROR_CODE[kind], `Could not download the generated ${kind} (${result.status})`, 502);

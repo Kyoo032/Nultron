@@ -118,6 +118,7 @@
     "self_check": "Self check",
     "build_deck": "Build a slide deck",
     "research_dossier": "Research dossier",
+    "delegate": "Ask another agent",
     "run_sql": "Run a SQL query",
     "market_quotes": "Live quotes",
     "market_history": "Price history",

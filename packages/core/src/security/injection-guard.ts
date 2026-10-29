@@ -213,6 +213,12 @@ export function typedTextOf(text: string): string {
     .trimEnd();
 }
 
+/** The other side of `typedTextOf`'s cut: every attached file in one message, headers included, or "". */
+export function attachedTextOf(text: string): string {
+  const header = ATTACH_HEADER_RE.exec(text);
+  return header ? text.slice(header.index) : "";
+}
+
 const ATTACH_NAME_RE = /(?:^|\n\n)--- ([^\n]+) ---\n/g;
 
 /**

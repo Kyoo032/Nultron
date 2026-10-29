@@ -190,7 +190,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-100](#sr-100) | Medium | A retired sign-in code worked again after the newer one was used | Fixed, tested (2026-10-01); not yet driven on a rebuilt rehearsal image | Blocks the Phase 0 pilot until driven |
 | [SR-101](#sr-101) | Medium | A double submit or reload sent two or three sign-in codes and spent the 3-per-15-minutes budget | Fixed, tested (2026-10-01); not yet driven on a rebuilt rehearsal image | Blocks the Phase 0 pilot until driven |
 | [SR-111](#sr-111) | Medium | `run_code` keeps the network out with deleted JavaScript globals and a code-generation flag, not with the operating system | Open | Blocks Tencent deploy |
-| [SR-112](#sr-112) | Medium | Chat holds file, Knowledge and sandbox tools together with a public web tool, so text in a file or page can try to carry other text out in a URL | Fixed in tree, unverified live. Widened 2026-10-13 to every search query, page address and media source by the outbound guard on branch `fix/safe-web-search` (`433778dc`, `8ebecb46`), not merged | Owner decision made 2026-10-03; drive an injected file before testers outside the company and before the next Personal cut |
+| [SR-112](#sr-112) | Medium | Chat holds file, Knowledge and sandbox tools together with a public web tool, so text in a file or page can try to carry other text out in a URL | Fixed in tree, unverified live. Widened 2026-10-13 to every search query, page address and media source by the outbound guard on branch `fix/safe-web-search` (`433778dc`, `8ebecb46`; rebased onto `main` 2026-10-21 as `ed0c3459`, `139efdb4` and opened as a pull request to `main`), not merged | Owner decision made 2026-10-03; drive an injected file before testers outside the company and before the next Personal cut |
 | [SR-113](#sr-113) | Medium | `braces` has a HIGH advisory with no fixed release, and it reached the hosted image through `tailwindcss` | Fixed in tree (2026-10-05): the image installs production dependencies only; built, booted and checked in a local proof image. Gate re-proven 2026-10-11 after the express and yahoo-finance2 bumps (SH-009, see the section below) | — |
 | [SR-131](#sr-131) | Medium | The app image's ignore file did not exclude `nultron-files/` (4.5 GB of IP filings and brand work), so a build straight from a working checkout would have sent it into the image | Fixed in tree (2026-10-05), test-pinned; the build context checked with a real `docker build`, no full image built | Blocks building from a checkout |
 | [SR-132](#sr-132) | Medium | The release Caddyfile's deferred header block may replace an artifact's `sandbox` CSP with the app CSP | Open: reasoned from Caddy's docs, not driven (2026-10-06) | Blocks Tencent deploy (Enterprise) |
@@ -199,7 +199,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-156](#sr-156) | Medium | Hosted: any signed-in member could delete a desk of the company, and with it every person's chats and the desk's Knowledge Base | Fixed in tree (2026-10-07), tested, renderer hides the button; not driven | Blocks a multi-person hosted pilot until driven |
 | [SR-157](#sr-157) | Medium | Hosted: stored media (pictures, clips, audio) is read, listed and deleted by company, not by person, so a colleague's picture can be fetched by its id, listed in the Images and Videos galleries, and sent to a model by a job | Open: nothing changed, because scoping by person breaks shared reads the product relies on; needs an owner decision (2026-10-07) | Blocks "Chat attachments are private to the person who attached them" |
 | [SR-165](#sr-165) | Medium | Hosted portal: `PORTAL_SIGNIN_MODE=password` gives HYP AI, and since 2026-10-09 the Nultron Enterprise release bundle's default, a username-and-password sign-in with no second factor, in place of the e-mailed code; the portal's own default when the variable is absent is still `code`, and `code` stays selectable | Built in tree, tested over a real Postgres; not driven in a browser or on a server (2026-10-07; the Enterprise bundle default is template and docs only, nothing deployed or driven, 2026-10-09). Independent review found no critical or high issue; its findings (M1, M2, L1 to L3, N1, N2) are fixed and merged (`e8a069c9`). The owner's decision, and on 2026-10-09 he accepted password-only sign-in as the Enterprise bundle default with residuals 1 to 13 as recorded; a second independent review of that default found no critical or high issue | None beyond the owner's acceptance; open until the second factor (being designed) ships |
-| [SR-166](#sr-166) | Medium | On `main` since the chat-first promotion (PR #157, 2026-10-12; was tester only): every virtual agent reads the desk's Knowledge Base and its earlier chats and can send a question to the web; the egress guard stops `web_fetch` only and never sees what entered through the prompt | Open: same exposure Chat has on `main` (SR-112's residual), new for the twelve mode agents; read from the code, not driven (2026-10-09). The promotion merged with no ruling recorded (2026-10-13) | Blocks the next Enterprise or HYP AI release that carries the chat-first shell, until the owner rules |
+| [SR-166](#sr-166) | Medium | On `main` since the chat-first promotion (PR #157, 2026-10-12; was tester only): every virtual agent reads the desk's Knowledge Base and its earlier chats and can send a question to the web; the egress guard stops `web_fetch` only and never sees what entered through the prompt | Open: same exposure Chat has on `main` (SR-112's residual), new for the twelve mode agents; read from the code, not driven (2026-10-09). The promotion merged with no ruling recorded (2026-10-13). Owner ruled 2026-10-13: search stays on; the fix is the outbound guard (see SR-112), in a pull request to `main` since 2026-10-21, not merged, not driven | Blocks the next Enterprise release that carries the chat-first shell, until the outbound guard merges and the owner accepts its residual (a model restating private text in its own words) |
 | [SR-167](#sr-167) | Medium | On `main` since PR #157 (was tester only): a model can start paid pictures and clips from any agent's chat; `main` still holds only a per-turn ceiling | Fixed in the tester tree (2026-10-22): `image_generate` and `video_generate` do not run until the person presses Run on a card that shows the request and its list price; unit-tested, and the card driven in Chromium on a stub desk; the live model round trip not driven; no paid media was run | Lifts when the tester change is promoted to `main` and one Run press has been driven live |
 | [SR-81](#sr-81) | Low | Keyless Research search sends the masked query to four pinned public APIs | Checked, not an issue (2026-09-26) | — |
 | [SR-168](#sr-168) | Low | Tester code only: the research worker's answer to the model is text written from web pages, and was first declared host-computed (`internal`), so it was not scanned for injection | Fixed in the tester tree (2026-10-09): declared `network`, so it is scanned; three real outputs pass the scan and a poisoned one is caught, by test | Tester code only; nothing on `main` |
@@ -224,6 +224,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-187](#sr-187) | Low | Tester: the Chat figures file keeps amounts the chat mask would hide, any desk tool can read it, and the text-mode Finance guard missed a 16-digit NIK in a headerless pipe row | Open (2026-10-20): recorded, not fixed | Before a hosted desk has a second person |
 | [SR-188](#sr-188) | Info | Tester: `finance_task` refuses a figures file the model wrote, and asks again for a number the owner did not type | Checked, not an issue (2026-10-20) | — |
 | [SR-189](#sr-189) | Low | Tester: a `finance_task` report made from one person's private attachment is a desk-wide artifact and a desk-wide Knowledge Base card | Open (2026-10-20): acceptable while a desk has one owner (OPC) | Before a hosted desk has a second person |
+| [SR-190](#sr-190) | Medium | Chat's `image_generate` and `video_generate` sent any model id and any source-image address the model wrote to the gateway, which fetches that address | Model half merged to `main` (#183, 2026-10-21), unit-tested, not driven; the address half is `fix/safe-web-search`'s `judgeMediaUrl` (the egress-guard copy from #183 was dropped when that branch took `main`) | PR merge of `fix/safe-web-search` to `main` |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -2894,7 +2895,10 @@ Personal cut.
 Update 2026-10-13: the outbound guard. Rizky ruled the same day that web search stays on everywhere, so the
 fix is a check where text leaves the host. Built on branch `fix/safe-web-search` (`433778dc`, then `8ebecb46`
 after a security review found three high gaps: media source URLs, URL shape, and run paths with no guard).
-Not merged, not driven on a live model.
+Not merged, not driven on a live model. Update 2026-10-21: rebased onto `main` at `21686b0d` (after PR #181) as
+`ed0c3459` and `139efdb4`, and opened as a pull request to `main`. The Research page reader from PR #181 runs
+inside the guard (`research-generate.ts`, `guarded(...)` around `runResearchDossier`), and a search query is now
+masked by the guard alone (`sendableSearchQuery`), not by a second `maskPii` in the Research harness.
 
 - Guard state in a core AsyncLocalStorage (`packages/core/src/security/outbound-guard.ts`, matcher
   `outbound-match.ts`), opened for Chat turns (`packages/host/src/runs.ts`), job runs with tools
@@ -5830,6 +5834,10 @@ section of `agentforge-chat\docs\internal\team-board-spec.md` (9.3). The leftove
 private fact in its own words inside a query, cannot be closed while one model both reads private material and
 writes free-text queries; it needs the owner's acceptance when the guard lands.
 
+Update 2026-10-21: the guard (SR-112's 2026-10-13 update) is rebased onto `main` and open as a pull request to
+`main`; it is not merged or driven. HYP AI left this repo on 2026-10-15, so the gate now names the next Enterprise
+release only. It lifts when the pull request merges and the owner accepts the paraphrase residual above.
+
 ### SR-167 {#sr-167}
 
 **Tester code only: a model can start paid media from any agent's chat.**
@@ -6373,6 +6381,51 @@ Status: **open.** This is acceptable while a desk has one owner (the OPC, AGENTS
 - skip the card for a report made from a private attachment.
 
 Gate: before a hosted desk has a second person.
+
+### SR-190 {#sr-190}
+
+**Chat's media tools sent any model id and any source-image address the model wrote.**
+Raised 2026-10-21 by the OPC checkup (finding 2). Medium. SR-190 because SR-187 to SR-189 are taken on the tester.
+
+Evidence: asked for one picture, the chat model called `image_generate` with `model: "]"` and
+`image_url: "https://example.com/"`. The schema took any non-empty string as `model` and any URL as
+`image_url` (`packages/core/src/tools/platform/image-generate.ts:59-60` at `21686b0d`), and both went to
+`POST /images/generations`; the gateway answered "The requested model is not available for this API key".
+`video_generate` had the same two holes (`video-generate.ts:115-116`, `:147`). The model id is a reliability
+bug. The address is also an egress channel: the provider fetches `image_url`, so a model steered by text in
+a file or page could put private text in the address and have the gateway carry it to any host (the SR-112
+class, through a tool the egress guard did not check).
+
+Fix:
+- **Model.** A model run puts the desk's image and video catalog on the tool scope
+  (`createRuntime(settings, toolMediaModels(tenant))`, `packages/core/src/runtime/create-runtime.ts:32`;
+  `toolMediaModels`, `packages/host/src/selectable-models.ts:159`). `gatewayGenerateModel`
+  (`packages/core/src/tools/media-model-choice.ts:38`) uses a passed id only when the catalog lists it, else
+  the configured model, else the catalog's pick. The studios run the tools with no catalog in scope, so
+  their picked model goes out unchanged.
+- **Address.** #183 added a check in `createEgressGuard` (`reason: "image_source"`): an http(s) `image_url` ran
+  only when the person typed that exact address or an `image_generate` earlier in the run returned it. When
+  `fix/safe-web-search` took `main` (2026-10-21) that copy and its tests were dropped, because the branch holds the
+  same rule inside the tools: `image_generate` and `video_generate` ask the run's outbound guard
+  (`mediaSendRefusal`, `packages/core/src/security/outbound-guard.ts`) and refuse an address the person did not
+  type and no tool in the run made (`judgeMediaUrl`). Proven there by `outbound-review.test.ts`; the model-choice
+  blocks in `image-generate.test.ts` and `video-generate.test.ts` prove the model half.
+
+Residual:
+- **Not driven.** `:3000` serves the main checkout; this branch was not run there.
+- **A `data:` image the person did not type is refused**, as is any address that is not typed or made by the run
+  (`judgeMediaUrl`); #183's copy let it through.
+- **The studios' `image_url` is not checked.** They call the tools directly, outside a guarded run and outside a
+  tool call, where `mediaUrlRefusal` returns null.
+- **The Edit agent's own generate tools are unchanged.** They are `generate_image` / `generate_video`, not
+  these tools, and route the model through `routeEditModel` (`packages/host/src/edit/start-generate.ts:62-72`),
+  using a passed id only when routing finds none.
+- **Overlap, settled.** `fix/safe-web-search` (`8ebecb46`, review finding H1) holds the media-source rule in
+  `packages/core/src/security/outbound-guard.ts` (`judgeMediaUrl`: typed or made by this run), which covers what
+  #183's copy did. The copy in `egress-guard.ts` and its tests were deleted when that branch took `main`; the
+  model-id half stays.
+
+Gate: PR merge to `main`.
 
 ## Must be true before the Tencent Cloud deploy
 
