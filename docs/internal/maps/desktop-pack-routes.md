@@ -6,7 +6,7 @@ Product: retired-desktop · Instance: none (Personal desktop retired 2026-10-14)
 > **Enterprise** is the hosted multi-user web app. Its release repo is `Kyoo032/Nultron-Releases`.
 > Decision record: [`web-pivot-2026-09-18.md`](../web-pivot-2026-09-18.md).
 
-Last verified: 2026-09-28 at 7a281ad
+Last verified: 2026-10-29 at 464b00c5 (Biome optional-chaining cleanup in `apps/desktop/main.cjs` and `apps/desktop/lifecycle.cjs` at `92bde965`; retired-desktop record unchanged; before that: 2026-09-28 at 7a281ad)
 
 Retirement noted 2026-10-14 (repo rename, branch `chore/release-repo-rename`): the Release table's repo names and the updater posture were changed. Every other citation on this page is still as of 7a281ad.
 
