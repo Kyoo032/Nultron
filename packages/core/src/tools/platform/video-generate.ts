@@ -2,6 +2,7 @@ import { z } from "zod";
 import { resolvedGatewayBaseUrl } from "../../gateway";
 import { clampVideoSeconds } from "../../models/video-capabilities";
 import { ApiError } from "../../errors";
+import { currentOutboundGuard, mediaSendRefusal } from "../../security/outbound-guard";
 import { defineTool } from "../define-tool";
 import { gatewayGenerateModel } from "../media-model-choice";
 import { missingToolRouteMessage, resolveToolBackend } from "../credentials";
@@ -132,6 +133,10 @@ export const videoGenerateTool = defineTool({
     if (!apiKey) {
       return { success: false, error: `${route.envVar} is not set.` };
     }
+    const held = mediaSendRefusal({ imageUrl: image_url, prompt, thirdParty: route.backend !== "gateway" });
+    if (held) {
+      return held;
+    }
     const aspect = aspect_ratio ?? "16:9";
     const fetchImpl = globalThis.fetch;
     try {
@@ -159,6 +164,7 @@ export const videoGenerateTool = defineTool({
                 seconds,
               )
             : await generateWithFal(prompt, image_url, aspect, apiKey, fetchImpl);
+      currentOutboundGuard()?.noteHostMedia([generated.url]);
       return {
         success: true,
         backend: route.backend,

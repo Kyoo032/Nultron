@@ -343,8 +343,8 @@ because the note already says it.
 `settings.editTurnCapUsd` and picks a path:
 
 - **Live** (a key is saved): `createRuntime(settings).execute(...)` with a compact project prompt
-  (`compactPrompt`, `packages/host/src/edit/agent-run.ts:142-154`) that tells the model a title card
-  is an `add_title` call in this turn. The version model is `editAgentModelId()` (`:157-163`), the
+  (`compactPrompt`, `packages/host/src/edit/agent-run.ts:157-169`) that tells the model a title card
+  is an `add_title` call in this turn. The version model is `editAgentModelId()` (`:172-178`), the
   refreshed chat default — never the literal `"edit"`. `bindings` is `editAgentBindings`
   (`packages/core/src/tools/edit/bindings.ts:5-13`), every `EDIT_TOOLS` key enabled. An empty binding
   list is what left the timeline blank: the runtime only exposes tools from bindings
@@ -368,7 +368,7 @@ because the note already says it.
 5. A generation tool → estimate, `chargeTurnBudget`; over cap → a refusal (screened, `agent-run.ts:391`) plus an `edit.plan` card.
 6. Otherwise: fill in missing ids from the doc, emit `tool.started`, invoke the tool, and
    forward whatever it returned as `edit.ops` / `edit.card` / `edit.job` frames (`pushToolFrames`,
-   `packages/host/src/edit/agent-run.ts:200`). `add_title` no longer requires a full ASS style:
+   `packages/host/src/edit/agent-run.ts:203`). `add_title` no longer requires a full ASS style:
    `{ text }` lands a clip on `v1` at frame 0 for 90 frames (`packages/core/src/tools/edit/tools.ts:265-288`).
 
 The tool's writes go through `hostEditBackend.applyAgentOps`

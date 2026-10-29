@@ -116,7 +116,7 @@ named exceptions (`studio-generate.ts`, `handlers/jobs.ts`, listed at `:22-23`).
 carry the model catalogue** (2026-09-29): `modes` left it, and only `defaults` (the per-mode default ids, `:113`)
 stayed (they resolve from the lists in [`model-policy.md`](model-policy.md) § 7: on a catalogue that lists them, chat `gpt-6-luna`, documents, finance and market `hy3`, legal and meeting `gpt-6-sol`, presentations `glm-5.3-flash`). It used to spread `modeCatalogPayload()`, which put the chat list under nine mode names, 261 KB of a
 274 KB answer that the shell reads on every cold load; no reader of this route used a list. The catalogue is
-`GET /api/v1/models`, sent once (`modelCatalogBody`, `packages/host/src/selectable-models.ts:304-309`); the
+`GET /api/v1/models`, sent once (`modelCatalogBody`, `packages/host/src/selectable-models.ts:313-318`); the
 tests are `packages/host/src/handlers/models.test.ts`. On the renderer side the shell's gate read and the
 readers that only display the answer (the Chat key pill, the usage chip, the composer's needs-key hook, the
 job-mode model pickers) share one `readSettings` (`apps/web/lib/settings-read.ts`): at most 2 s old, dropped

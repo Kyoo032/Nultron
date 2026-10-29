@@ -162,6 +162,22 @@ export {
   nextHopUrl,
 } from "./security/safe-fetch";
 export type { HostLookup, ResolvedAddress, SafeFetchOptions, SafeFetchResult } from "./security/safe-fetch";
+export {
+  OUTBOUND_REFUSALS_MAX,
+  OutboundRefusedError,
+  assertSendableMediaUrl,
+  createOutboundGuard,
+  currentOutboundGuard,
+  inToolCall,
+  isOutboundRefusal,
+  outboundRefusal,
+  runInToolCall,
+  runOutboundGuarded,
+  stringsOf,
+} from "./security/outbound-guard";
+export type { OutboundGuard, OutboundGuardInit, OutboundRefusal, RefusalKind } from "./security/outbound-guard";
+export { SEARCH_QUERY_MAX_CHARS } from "./security/outbound-match";
+export { attachedTextsOf, hasNonTextUserPart, userTextOf } from "./runtime/egress-guard";
 export { isPrivateHostname, isPrivateIpAddress, isPrivateIpLiteral, parseIpAddress } from "./security/ip-range";
 export type { IpAddress } from "./security/ip-range";
 export {

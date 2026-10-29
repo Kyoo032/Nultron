@@ -1,8 +1,11 @@
 import {
   ApiError,
   assertModelSupportsModality,
+  createOutboundGuard,
   createRuntime,
+  currentOutboundGuard,
   harnessSpecFor,
+  runOutboundGuarded,
   type AgentVersionRecord,
   type AppLocale,
   type ContentPart,
@@ -151,6 +154,13 @@ async function runJobAssistantOnce(options: {
   locale?: AppLocale;
   /** The job's cancel. The runtime aborts the request in flight when it fires; omitted, the call runs to the end. */
   signal?: AbortSignal;
+  /**
+   * What the outbound guard compares this run's search queries and page addresses against (SR-112, review
+   * 2026-10-13). `userText` is what the person typed; `privateText` is the job's private inputs. Omitted, the
+   * whole prompt counts as private and nothing as typed, which is the safe reading for a caller that has not
+   * said. A guard the caller already opened is used as it is.
+   */
+  outbound?: { userText: readonly string[]; privateText: readonly string[] };
 }): Promise<string> {
   const settings = loadSettings(options.tenant);
   const runtime = createRuntime(settings, toolMediaModels(options.tenant));
@@ -198,38 +208,56 @@ async function runJobAssistantOnce(options: {
     enabled: true,
   }));
 
+  const locale = options.locale ?? localeForRun();
+  // Every job run with tools checks what it sends out. A web tool reached with no guard open refuses, so
+  // the job opens one here unless its caller (a research run, say) already did.
+  const openGuard = currentOutboundGuard()
+    ? <T>(fn: () => T): T => fn()
+    : <T>(fn: () => T): T =>
+        runOutboundGuarded(
+          createOutboundGuard({
+            userText: options.outbound?.userText ?? [],
+            privateText: options.outbound?.privateText ?? [options.prompt],
+            tainted: attachments.length > 0,
+            locale,
+          }),
+          fn,
+        );
+
   // File writes by a tool record who made them; a job has no thread, so the run is named here.
-  await withToolRun({ runId, mode: spec?.mode ?? usageMode }, () =>
-    runtime.execute({
-      tenant: options.tenant,
-      runId,
-      modality: "text",
-      version,
-      bindings,
-      history: [{ role: "user", parts }],
-      // Without this every job-side timeout and contact error is English on an Indonesian desk.
-      locale: options.locale ?? localeForRun(),
-      ...(spec ? { budget: spec.budget } : {}),
-      ...(options.streamWatchdog ? { streamWatchdog: options.streamWatchdog } : {}),
-      ...(options.jobMode ? { jobMode: options.jobMode } : {}),
-      ...(options.signal ? { signal: options.signal } : {}),
-      onEvent: (event) => {
-        if (event.type === "assistant.delta") {
-          assistantText += event.text;
-        }
-        if (event.type === "run.failed") {
-          failedMessage = event.message;
-        }
-        if (event.type === "run.interrupted") {
-          interruptedReason = event.message.trim().slice(0, 300) || "interrupted";
-        }
-        if (event.type === "run.step_limit") {
-          stepLimitReached = true;
-        }
-        options.onEvent?.(event);
-        rememberJobUsage(event, { tenant: options.tenant, mode: usageMode, runId });
-      },
-    }),
+  await openGuard(() =>
+    withToolRun({ runId, mode: spec?.mode ?? usageMode }, () =>
+      runtime.execute({
+        tenant: options.tenant,
+        runId,
+        modality: "text",
+        version,
+        bindings,
+        history: [{ role: "user", parts }],
+        // Without this every job-side timeout and contact error is English on an Indonesian desk.
+        locale,
+        ...(spec ? { budget: spec.budget } : {}),
+        ...(options.streamWatchdog ? { streamWatchdog: options.streamWatchdog } : {}),
+        ...(options.jobMode ? { jobMode: options.jobMode } : {}),
+        ...(options.signal ? { signal: options.signal } : {}),
+        onEvent: (event) => {
+          if (event.type === "assistant.delta") {
+            assistantText += event.text;
+          }
+          if (event.type === "run.failed") {
+            failedMessage = event.message;
+          }
+          if (event.type === "run.interrupted") {
+            interruptedReason = event.message.trim().slice(0, 300) || "interrupted";
+          }
+          if (event.type === "run.step_limit") {
+            stepLimitReached = true;
+          }
+          options.onEvent?.(event);
+          rememberJobUsage(event, { tenant: options.tenant, mode: usageMode, runId });
+        },
+      }),
+    ),
   );
 
   if (failedMessage) {

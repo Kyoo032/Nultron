@@ -12,7 +12,8 @@ import { mapStreamPart } from "./stream-parts";
 import { buildAiTools, type AiToolSet } from "./ai-tools";
 import { createToolCallRepair, isInvalidToolCallEvent, withInvalidToolCall } from "./tool-call-repair";
 import { createStepTracker } from "./step-tracker";
-import { createEgressGuard, userTextOf } from "./egress-guard";
+import { attachedTextsOf, createEgressGuard, userTextOf } from "./egress-guard";
+import { currentOutboundGuard } from "../security/outbound-guard";
 import { createToolBudget, resolveMaxSteps } from "./tool-budget";
 import {
   MODEL_CONTACT_ATTEMPTS,
@@ -479,6 +480,8 @@ export class AiSdkRuntime implements AgentRuntime {
     // Same lifetime as the budget: a private read in one attempt still limits the fetches of the next.
     const egressGuard = createEgressGuard({
       userText: input.egress?.userText ?? userTextOf(input.history),
+      attachedText: input.egress ? undefined : attachedTextsOf(input.history),
+      outbound: currentOutboundGuard(),
       tainted: input.egress?.tainted,
     });
     const built = buildAiTools({

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ApiError } from "@agentforge/core";
+import { ApiError, OutboundRefusedError, outboundRefusal } from "@agentforge/core";
 import { DOSSIER_HEADINGS, dossierToMarkdown, type DossierSource } from "@agentforge/core/artifacts";
 import type { JobEvent } from "@agentforge/core/jobs";
 import { formatRepairNote } from "./harness/run-checked";
@@ -867,5 +867,52 @@ describe("a page longer than the extraction window", () => {
         prompt.endsWith("Margins reached 12% in 2025. Recyclers report thin returns. Filler sentence here."),
       ),
     ).toBe(true);
+  });
+});
+
+describe("runResearchDossier and a refused query (review M3, 2026-10-13)", () => {
+  const refusing = (refuse: (query: string) => "private" | "stopped" | null) => {
+    const search = fakeDeps().search;
+    return fakeDeps({
+      search: async (query) => {
+        const kind = refuse(query);
+        if (kind) {
+          throw new OutboundRefusedError(outboundRefusal(kind));
+        }
+        return search(query);
+      },
+    });
+  };
+  const searchedLabels = (events: JobEvent[]) =>
+    events.flatMap((event) =>
+      event.type === "job.step" && event.phase === "searching" ? [(event as { label: string }).label] : [],
+    );
+
+  it("skips the refused query, runs the rest, and leaves it out of the searched list", async () => {
+    const deps = refusing((query) => (query === "lithium recycling margins" ? "private" : null));
+
+    const { dossier } = await runResearchDossier({ question: QUESTION, models: [] }, deps);
+
+    expect(dossier.queries).toEqual([QUESTION, "recycler bankruptcies 2026"]);
+    expect(searchedLabels(deps.events)).toEqual([QUESTION, "recycler bankruptcies 2026"]);
+  });
+
+  it("ends the search on a stop", async () => {
+    const deps = refusing((query) => (query === "lithium recycling margins" ? "stopped" : null));
+
+    await expect(runResearchDossier({ question: QUESTION, models: [] }, deps)).rejects.toMatchObject({
+      code: "outbound_refused",
+      refusal: { kind: "stopped" },
+    });
+  });
+
+  it("ends with the guard's sentence when every query was refused", async () => {
+    const deps = refusing(() => "private");
+
+    await expect(runResearchDossier({ question: QUESTION, models: [] }, deps)).rejects.toMatchObject({
+      code: "outbound_refused",
+      message: outboundRefusal("private").message,
+    });
+    expect(searchedLabels(deps.events)).toEqual([]);
   });
 });

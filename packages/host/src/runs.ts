@@ -1,7 +1,12 @@
 import {
   assertAgentSupportsModality,
   assertChatModelAcceptsModality,
+  attachedTextsOf,
+  createOutboundGuard,
   createRuntime,
+  hasNonTextUserPart,
+  runOutboundGuarded,
+  userTextOf,
   encodeSse,
   redactSecrets,
   redactSecretsDeep,
@@ -485,10 +490,23 @@ export async function* startModalityRun(options: {
         },
         signal: modelAbort.signal,
       };
+      // Safe web search (SR-112, SR-166): one outbound guard for the turn and its retry. The earlier-chats
+      // hint, the Knowledge Base and attached files are in the prompt from the first step, so the run starts
+      // tainted when any of them is, and every search or worker in it is checked against that text.
+      const outbound = createOutboundGuard({
+        userText: userTextOf(history),
+        privateText: [...knowledge.privateText, ...attachedTextsOf(history)],
+        // Earlier-chat titles are short: a five-word window of a title is ordinary words, so they count for
+        // their figures and codes only (review M2). A picture or a file part in any message taints the run
+        // even with no text to compare against (review M4c).
+        figuresOnlyText: [pastHint],
+        tainted: hasNonTextUserPart(history),
+        locale,
+      });
       const inChatRun = <T>(fn: () => Promise<T>): Promise<T> =>
         withToolRun({ runId: run.id, mode: agentPolicy ? agentPolicy.agent.id : "chat" }, () =>
           withRunContext({ threadId: thread.id, agentId: thread.agentId, locale }, () =>
-            withWorkerChannel(workerChannel, fn),
+            runOutboundGuarded(outbound, () => withWorkerChannel(workerChannel, fn)),
           ),
         );
       const attempt = () => inChatRun(async () => {

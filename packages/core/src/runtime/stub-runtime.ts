@@ -2,7 +2,8 @@ import { getTool } from "../tools/registry";
 import { summarizeParts } from "../content/parse-run-input";
 import type { AgentRuntime, RuntimeEvent } from "./types";
 import { invokeToolGuarded } from "./invoke-guarded";
-import { createEgressGuard, userTextOf } from "./egress-guard";
+import { attachedTextsOf, createEgressGuard, userTextOf } from "./egress-guard";
+import { currentOutboundGuard } from "../security/outbound-guard";
 import { createToolBudget } from "./tool-budget";
 import { resolveRequestReasoningEffort } from "../models/reasoning-effort";
 import { MODEL_CONTACT_ATTEMPTS, formatContactProbe } from "./retry";
@@ -57,6 +58,8 @@ export class StubRuntime implements AgentRuntime {
     const toolBudget = createToolBudget(input.budget);
     const egressGuard = createEgressGuard({
       userText: input.egress?.userText ?? userTextOf(input.history),
+      attachedText: input.egress ? undefined : attachedTextsOf(input.history),
+      outbound: currentOutboundGuard(),
       tainted: input.egress?.tainted,
     });
 
