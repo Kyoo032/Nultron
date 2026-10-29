@@ -12,7 +12,7 @@
 # Driven by apps/desktop/scripts/mac-build-docker.mjs; entry point is build-mac.sh next to
 # this file, mounted read-only from the checkout at /src.
 
-FROM node:20-bookworm
+FROM node:22.23.4-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 # hfsprogs is in Debian's non-free component (Apple Public Source License).

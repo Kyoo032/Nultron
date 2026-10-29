@@ -658,6 +658,26 @@ export type { ProductMode, ProductModeSource } from "./agents/product-modes";
 export { SHELL_LAYOUT } from "./agents/product-modes";
 export type { ShellLayout } from "./agents/product-modes";
 export {
+  DELEGABLE_AGENTS,
+  DELEGATED_RUN_RULES,
+  DELEGATE_BUDGET,
+  DELEGATE_CONTEXT_MAX,
+  DELEGATE_EXCLUDED_TOOLS,
+  DELEGATE_PER_TURN,
+  DELEGATE_SUMMARY_MAX,
+  DELEGATE_TASK_MAX,
+  DELEGATE_TOOL_KEY,
+  DELEGATION_PROMPT,
+  DELEGATION_SENTENCE,
+  delegatedRunPrompt,
+  delegatedTaskMessage,
+  delegatedThreadTitle,
+  delegateToolKeys,
+  isDelegableAgent,
+} from "./agents/delegation";
+export type { DelegableAgent } from "./agents/delegation";
+export {
+  GENERALIST_EXTRA_TOOLS,
   GENERALIST_WORKER_PROMPT,
   GENERALIST_WORKER_TOOLS,
   VIRTUAL_AGENTS,

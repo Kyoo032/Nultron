@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CHAT_PROMPT, DEFAULT_CHAT_SLUG, DEFAULT_CHAT_TOOLS } from "./default-chat";
+import { DELEGATE_PER_TURN } from "./delegation";
 import { FIRST_RUN_MODES, PRODUCT_MODE_IDS, productModeLabel } from "./product-modes";
 import { MODE_HARNESS_SPECS } from "../harness/specs";
 import {
   CHAT_IDENTITY_SENTENCE,
+  GENERALIST_EXTRA_TOOLS,
   GENERALIST_WORKER_PROMPT,
   GENERALIST_WORKER_TOOLS,
   VIRTUAL_AGENTS,
@@ -27,7 +29,7 @@ describe("virtual agents", () => {
     expect(first?.id).toBe("chat");
     expect(first?.generalist).toBe(true);
     expect(first?.slug).toBe(DEFAULT_CHAT_SLUG);
-    expect(first?.tools).toEqual([...DEFAULT_CHAT_TOOLS, ...GENERALIST_WORKER_TOOLS]);
+    expect(first?.tools).toEqual([...DEFAULT_CHAT_TOOLS, ...GENERALIST_EXTRA_TOOLS]);
     expect(VIRTUAL_AGENTS.filter((agent) => agent.generalist)).toHaveLength(1);
   });
 
@@ -48,11 +50,12 @@ describe("virtual agents", () => {
 
   it("gives every agent the same full tool set and budget, so none has to be hired to do a job", () => {
     const generalist = virtualAgentFor("chat");
-    expect(generalist.tools).toEqual([...DEFAULT_CHAT_TOOLS, ...GENERALIST_WORKER_TOOLS]);
+    expect(generalist.tools).toEqual([...DEFAULT_CHAT_TOOLS, ...GENERALIST_EXTRA_TOOLS]);
     for (const agent of VIRTUAL_AGENTS) {
       expect(agent.tools, agent.id).toEqual(generalist.tools);
       expect(agent.budget, agent.id).toEqual(generalist.budget);
       expect(agent.budget.perTool?.research_dossier, agent.id).toBe(2);
+      expect(agent.budget.perTool?.delegate, agent.id).toBe(DELEGATE_PER_TURN);
       for (const key of [
         "image_generate",
         "video_generate",
@@ -61,6 +64,7 @@ describe("virtual agents", () => {
         "run_code",
         "web_search",
         "research_dossier",
+        "delegate",
       ]) {
         expect(agent.tools, `${agent.id} ${key}`).toContain(key);
       }

@@ -75,6 +75,27 @@
     "viewAria": "The dossier {title}",
     "searched": "Searched the web for: {queries}"
   },
+  "delegate": {
+    "label": "Asked another agent",
+    "working": "Asking another agent",
+    "asked": "Asked the {agent} agent",
+    "used": "Tools used: {tools}",
+    "usedMore": "Tools used: {tools} · {n} more",
+    "show": "Show answer",
+    "hide": "Hide answer",
+    "showAria": "Show the answer from the {agent} agent",
+    "hideAria": "Hide the answer from the {agent} agent",
+    "viewAria": "The answer from the {agent} agent",
+    "open": "Open conversation",
+    "openAria": "Open the conversation with the {agent} agent",
+    "truncated": "Shortened here. The full answer is in the conversation.",
+    "failed": {
+      "cancelled": "Stopped before it finished.",
+      "timeout": "Did not finish in time.",
+      "no_answer": "Finished without an answer.",
+      "failed": "Could not finish the task."
+    }
+  },
   "page": {
     "title": "Virtual agents",
     "lede": "Every agent is a harness: a prompt, tools, limits and checks that the app enforces on each run. Hire the ones your work needs.",

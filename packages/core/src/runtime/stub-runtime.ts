@@ -57,9 +57,10 @@ export class StubRuntime implements AgentRuntime {
     const answers: string[] = [];
     const toolBudget = createToolBudget(input.budget);
     const egressGuard = createEgressGuard({
-      userText: userTextOf(input.history),
-      attachedText: attachedTextsOf(input.history),
+      userText: input.egress?.userText ?? userTextOf(input.history),
+      attachedText: input.egress ? undefined : attachedTextsOf(input.history),
       outbound: currentOutboundGuard(),
+      tainted: input.egress?.tainted,
     });
 
     const wantsCalc = hasEnabledBinding(input.bindings, "calculator") && /\d+\s*[+\-*/]\s*\d+/.test(summary);

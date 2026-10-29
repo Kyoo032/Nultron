@@ -13,8 +13,8 @@ why investigators: sonnet xhigh
 why synthesizer: opus xhigh
 reflect tooling: sonnet xhigh
 reflect judgment, divergent, synthesizer: opus xhigh
-arena runners: opus xhigh, fable xhigh
-arena cross-judge pool: opus xhigh, fable xhigh
+arena runners: opus xhigh, opus xhigh
+arena cross-judge pool: opus xhigh
 swarm workers: sonnet xhigh
-architect runners: opus xhigh, fable xhigh
-interrogate reviewers: opus xhigh, fable xhigh
+architect runners: opus xhigh, opus xhigh
+interrogate reviewers: opus xhigh

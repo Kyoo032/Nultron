@@ -8,6 +8,7 @@ import {
   type RichToolKey,
   type ToolStatus,
 } from "@/components/tool-rows/results";
+import { DELEGATE_TOOL_KEY, delegatedAgentOf } from "@/components/tool-rows/delegate-result";
 import { DOSSIER_TOOL_KEY, readDossierResult } from "@/components/tool-rows/dossier-result";
 import { t } from "@/lib/i18n";
 
@@ -25,6 +26,7 @@ const ACTIVITY_KEYS: Record<string, string> = {
   datetime: "chat.tool.clock",
   self_check: "chat.tool.selfChecking",
   research_dossier: "agents.progress.working",
+  delegate: "agents.delegate.working",
 };
 
 const DONE_KEYS: Record<string, string> = {
@@ -37,6 +39,7 @@ const DONE_KEYS: Record<string, string> = {
   datetime: "chat.tool.datetime",
   self_check: "chat.tool.selfCheck",
   research_dossier: "agents.dossier.label",
+  delegate: "agents.delegate.label",
 };
 
 export function showsToolActivity(_toolKey: string): boolean {
@@ -271,6 +274,18 @@ function webSearchSummary(label: string, input: unknown, output: unknown): strin
   return out ? `${head} → ${out}` : head;
 }
 
+/**
+ * The Thinking row of a hand-off: the label and which agent was asked, or the reason it was refused. The
+ * generic gist would print the task and a field count. The card under the answer carries the rest.
+ */
+function delegateSummary(label: string, input: unknown, output: unknown): string {
+  const agent = delegatedAgentOf(input, output);
+  const named = agent ? `${label} · ${t(`rail.${agent}`)}` : label;
+  const record = asRecord(output);
+  const message = record?.ok === false ? readString(record, "message") : undefined;
+  return message ? `${named} · ${gist(message)}` : named;
+}
+
 export function toolCallSummary(toolKey: string, input?: unknown, output?: unknown): string {
   if (toolKey === "web_fetch") {
     return webFetchLabel(input, output, "completed");
@@ -284,6 +299,9 @@ export function toolCallSummary(toolKey: string, input?: unknown, output?: unkno
   }
   if (toolKey === "web_search") {
     return webSearchSummary(label, input, output);
+  }
+  if (toolKey === DELEGATE_TOOL_KEY) {
+    return delegateSummary(label, input, output);
   }
   const out = gist(output);
   const inn = gist(input);

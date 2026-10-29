@@ -2,6 +2,10 @@
 
 Product: both · Instance: main :3000
 
+Last verified: 2026-10-22 at 7c44963 plus the working tree of `claude/project-thread-ivip90`, for the egress-guard paragraph in § 3 and the sentences on cards under the answer in § 6 only (the `delegate` tool). Nothing else on the page was re-read. Before that: 2026-10-21 at e7e046c7 for the `createRuntime` call in step 5 of § 3 only (the catalog argument, SR-190). The other line numbers in that step were not re-read. Before that: 2026-10-14 for the Continue sentence at the end of § 3b only. Nothing else on the page was re-read.
+
+Last verified: 2026-10-22 at 7c449636 for one class string only (`chat-context-chip.tsx` reads `var(--text)` where it read the retired `var(--color-text)`; computed style unchanged). Nothing else on the page was re-read.
+
 Last verified: 2026-10-13 at 433778dc (branch `fix/safe-web-search`, before merge, with the review fixes) for the egress-guard and outbound-guard paragraphs of § 3 and the residuals list after them only. Nothing else on the page was re-read.
 
 Last verified: 2026-10-21 at e7e046c7 for the `createRuntime` call in step 5 of § 3 only (the catalog argument, SR-190). The other line numbers in that step were not re-read. Before that: 2026-10-14 for the Continue sentence at the end of § 3b only. Nothing else on the page was re-read.
@@ -121,7 +125,7 @@ A refused call answers `{ ok: false, reason: "outbound", kind, message }` in the
 - A job that passes no `outbound` treats its whole prompt as private and nothing as typed. Market passes its question and nothing private (its packet is public market data). The Edit agent registers its project's text, including earlier clip prompts the person wrote, as private, so a search that repeats an earlier Edit request word for word is refused.
 - A media URL from an earlier turn is not remembered (the media store keeps no source URL), so a source image for `image_generate` or `video_generate` must be generated in this run, returned by a search in it, or typed or re-attached by the person.
 
-**Writes are authored by the run.** `inChatRun` sets the tool-run context to the turn's run id and mode `chat`, so a file the model writes records that run as its author (`packages/host/src/file-roots.ts:9`). `packages/host/src/runs-tool-run.test.ts` pins it.
+**Writes are authored by the run.** `inChatRun` sets the tool-run context to the turn's run id and mode `chat`, so a file the model writes records that run as its author (`packages/host/src/file-roots.ts:16`). `packages/host/src/runs-tool-run.test.ts` pins it.
 
 ### 3b. Check the reply, then save
 
@@ -184,7 +188,7 @@ Budgets (`packages/core/src/runtime/stream-watchdog.ts`): `STREAM_TTFB_MS = 120_
 
 **The tool rows.** `ChatSession.onTool` (`chat-session.tsx:520-545`) adds a `started` row for each `tool.started` and completes the newest matching `started` row for a `tool.completed`, keeping the input from the start frame. `ChatTurn` draws them as `message-tool` items (with `data-tool` set to the tool key, `apps/web/components/chat-turn.tsx:133-138`) inside `message-tools`, inside the Thinking disclosure. The six file tools, `knowledge_search` and `run_code` are rich tools (`isRichTool`, `apps/web/components/tool-rows/results.ts:30`). They get a body of their own through `ToolRowBody` (`apps/web/components/tool-rows/tool-row.tsx:15`): `FileToolRow` (`tool-row-file`), `KnowledgeToolRow` (`tool-row-knowledge`) and `CodeToolRow` (`tool-row-code`), each with a `data-state` of `running`, `done`, `refused`, `budget` or `pending` (a run that ran and failed is `failed` on the code row). [`agent-tools-and-files.md`](agent-tools-and-files.md) § 11 describes them. Every other tool keeps one line: a label while it runs (`toolActivityLabel`) and `toolCallSummary` after (`apps/web/lib/tool-labels.ts:134`, `:196`), which reads the shape of the payload (`gist()`) and never prints raw JSON. `web_fetch` has no catalog label (`toolDoneLabel` falls back to the key with its underscore replaced), so its finished row starts with "web fetch" in both languages.
 
-Under the answer, search hits and a titled tool payload become job cards (`jobEmbedsFromTools`, `chat-turn.tsx:86`, drawn at `:164-172`). A `knowledge_search` result is left out: its excerpts are the owner's own material, already summarised on its tool row, and a hit-shaped excerpt is not a web result to surface, so `NO_EMBED_TOOLS` (`apps/web/lib/message-embeds.ts:292`) makes `jobEmbedsFromTools` skip that tool. A calculator number is not a card either.
+Under the answer, search hits and a titled tool payload become job cards (`jobEmbedsFromTools`, `chat-turn.tsx:86`, drawn at `:164-172`). A `knowledge_search` result is left out: its excerpts are the owner's own material, already summarised on its tool row, and a hit-shaped excerpt is not a web result to surface, so `NO_EMBED_TOOLS` (`apps/web/lib/message-embeds.ts:293`) makes `jobEmbedsFromTools` skip that tool, and `build_deck`, `research_dossier` and `delegate` too: those draw their own cards (`DeckCards`, `DossierCards`, and `DelegateCards` for what another agent did, `apps/web/components/chat-delegate-card.tsx:117`, drawn at `chat-turn.tsx:198`). A calculator number is not a card either.
 
 **The live turn and the status character.** While anything is live, or a send just failed, `ChatTurn` renders inside a `data-testid="assistant-live"` wrapper (`apps/web/components/chat-session.tsx:467-468`). `NultronMascot` sits beside the turn (`apps/web/components/chat-turn.tsx:101-103`) as a 40 px head, with `busy` set while `live.running`, **but only when the desk buddy is not the status character** (`useBuddyTakesStatus`, `chat-turn.tsx:59`; the condition is `live && liveState && !takesStatus`). `takesStatus` is true while an expanded rail has a dock **or a page stage is on screen**, and no other full-body character is visible (`apps/web/lib/desk-buddy-store.ts:115`). Then the live turn draws no head and tells the buddy instead: it publishes its state as a claim (`useBuddyClaim`, `chat-turn.tsx:63-67`: the state below, busy while the run is, none once the send failed), and `useChatBuddyReactions` (`chat-session.tsx:99`) adds a cheer when the reply lands (1.8 s, `CHAT_CHEER_MS`) and a flinch when a send fails or the pane shows an error (2.4 s, `FLASH_MS`) ([`mascot-and-brand.md`](mascot-and-brand.md) sections 7 and 7a).
 
@@ -401,7 +405,7 @@ Read before editing. Lanes: Chat reaches Personal, Enterprise and the tester cod
 - `apps/web/components/nultron/`, `apps/web/components/buddy-stage.tsx`, `apps/web/lib/desk-buddy-store.ts`: the mascot ([`mascot-and-brand.md`](mascot-and-brand.md)).
 - `apps/web/components/app-rail.tsx` and `apps/web/components/rail-*.tsx`: the rail ([`chat-sessions-and-rail.md`](chat-sessions-and-rail.md)).
 - `apps/web/lib/api-client.ts`, `apps/web/lib/desktop-bridge.ts`, `apps/desktop/preload.cjs`: the one transport switch; Personal's IPC bridge is the only reader of `window.agentforge`.
-- Brand: no `Nultron` or `Toko Token` typed into Chat prompts, error strings or copy; they read `productName` and `gatewayName`, because white-label brands are built from this code.
+- Brand: no `Toko Token` typed into Chat prompts, error strings or copy; they read `gatewayName`. `Nultron` may be typed since the 2026-10-15 split.
 
 ## Gotchas
 

@@ -93,7 +93,7 @@ export function DeskFilesView(props: DeskFilesViewProps) {
             {t("files.new.open")}
           </button>
           <label
-            className={`${toolbarButton} ${idle ? "cursor-pointer" : "cursor-not-allowed opacity-45"} focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--color-accent)]`}
+            className={`${toolbarButton} ${idle ? "cursor-pointer" : "cursor-not-allowed opacity-45"} focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--accent)]`}
             data-testid="files-upload"
           >
             {uploading ? t("files.new.saving") : t("files.upload.button")}

@@ -479,9 +479,10 @@ export class AiSdkRuntime implements AgentRuntime {
     const toolBudget = createToolBudget(input.budget);
     // Same lifetime as the budget: a private read in one attempt still limits the fetches of the next.
     const egressGuard = createEgressGuard({
-      userText: userTextOf(input.history),
-      attachedText: attachedTextsOf(input.history),
+      userText: input.egress?.userText ?? userTextOf(input.history),
+      attachedText: input.egress ? undefined : attachedTextsOf(input.history),
       outbound: currentOutboundGuard(),
+      tainted: input.egress?.tainted,
     });
     const built = buildAiTools({
       bindings: input.bindings,

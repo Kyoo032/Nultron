@@ -70,10 +70,13 @@ the pilot's second env file. The release path never builds from a checkout anywa
 
 ## What the image contains
 
-- `node:22-bookworm-slim`. The root `package.json` says `"engines": { "node": ">=22" }` and
-  `.nvmrc` is `22` (SH-001: the web server refuses an older Node at boot). 22 is the current LTS. Debian, not Alpine, because
+- `node:22.23.4-bookworm-slim`. The root `package.json` says `"engines": { "node": ">=22" }` and
+  `.nvmrc` is `22` (SH-001: the web server refuses an older Node at boot). 22 is in maintenance LTS. Debian, not Alpine, because
   `pnpm-lock.yaml` resolves `@firecrawl/anydoc` to the `-linux-x64-gnu` / `-linux-arm64-gnu`
   packages — musl would pick different ones and force a `better-sqlite3` rebuild.
+  The tag names the patch release (22.23.4, which carries the 2026-10-21 Node security release), not just the
+  major, so a rebuild cannot start from an older cached 22.x. Bump `NODE_VERSION` in both Dockerfiles, `PREFLIGHT_IMAGE`
+  in `deploy.sh` and the mac pack image together after each Node security release.
 - pnpm `9.15.9` via corepack, matching the root `packageManager` field.
 - Two installs, in two build stages. The `build` stage runs
   `pnpm install --frozen-lockfile --filter "@agentforge/web..."` (the web app and its
@@ -580,7 +583,7 @@ one passes, and a failure after the swap puts the previous images back.
    - `docker compose config -q` parses the file, when docker is on the host.
 
    Each problem is one sentence that names the variable. The preflight never prints a value. It runs
-   with the host's node, or in a `node:22-bookworm-slim` container with no network when the host has
+   with the host's node, or in a `node:22.23.4-bookworm-slim` container with no network when the host has
    none (`PREFLIGHT_IMAGE` changes that image). It does **not** judge the secret values. The app's own
    boot guard does (`packages/host/src/hosted-env.ts`), and a value it refuses makes the new container
    fail its health check, which rolls back.

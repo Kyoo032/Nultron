@@ -171,16 +171,22 @@ function searchResultHosts(output: unknown): string[] {
  * A host named in an attached file (`attachedText`) may be opened too (review, 2026-10-13: a contract that
  * cites a regulator's site is a page the person wants read). An attachment is not the person's own words, so
  * a poisoned file can name a host; the outbound guard still refuses an address that carries private text.
+ *
+ * `tainted` starts the guard in the tainted state. A delegated run (`agents/delegation.ts`) is started by
+ * a model, not by the person, from a task the model wrote: it cannot know what the asking run had read,
+ * so it starts as if it had read private material, and `userText` is the person's own words from the
+ * asking run's conversation, never the task.
  */
 export function createEgressGuard(options: {
   userText: readonly string[];
   attachedText?: readonly string[];
   outbound?: OutboundGuard;
+  tainted?: boolean;
 }): EgressGuard {
   const named = new Set([...options.userText, ...(options.attachedText ?? [])].flatMap(hostsNamedIn));
   const searched = new Set<string>();
   const outbound = options.outbound;
-  let readPrivate = false;
+  let readPrivate = options.tainted === true;
   const tainted = () => readPrivate || outbound?.isTainted() === true;
   return {
     beforeCall(toolKey, args) {

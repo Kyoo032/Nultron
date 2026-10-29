@@ -1,7 +1,7 @@
 /**
  * The harness copy covers everything the host can send: a line for every skill of every mode spec and
- * for every tool a spec binds (Chat's set, Market's, Edit's, Data's) plus `research_dossier`, which only
- * a virtual agent's conversation adds. The lookups fall back to the host's own words for anything newer.
+ * for every tool a spec binds (Chat's set, Market's, Edit's, Data's) plus `research_dossier` and `delegate`,
+ * which only a virtual agent's conversation adds. The lookups fall back to the host's own words for anything newer.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -24,7 +24,7 @@ function at(catalog: Node, ...path: string[]): unknown {
 }
 
 const specs = Object.values(MODE_HARNESS_SPECS);
-const toolKeys = [...new Set([...specs.flatMap((spec) => spec.tools), "research_dossier"])];
+const toolKeys = [...new Set([...specs.flatMap((spec) => spec.tools), "research_dossier", "delegate"])];
 
 afterEach(() => {
   resetLocaleForTests();
@@ -42,9 +42,10 @@ describe.each(["en", "id"] as const)("harness catalog (%s)", (locale) => {
     }
   });
 
-  it("names every tool a spec binds, and research_dossier", () => {
+  it("names every tool a spec binds, research_dossier and delegate", () => {
     expect(toolKeys).toContain("run_code");
     expect(toolKeys).toContain("research_dossier");
+    expect(toolKeys).toContain("delegate");
     for (const key of toolKeys) {
       const line = at(catalog, "tools", key);
       expect(typeof line === "string" && line.length > 0, key).toBe(true);
