@@ -109,8 +109,8 @@ describe("POST /threads/:id/runs/text and the run budget", () => {
     await postRun(defaultChatThreadId);
     expect(executed).toHaveLength(1);
     // Tester code: the default agent's budget is the registry's (`virtualAgentFor("chat")`): Chat's
-    // declared budget, plus a ceiling for each worker and for paid media. Every number the published
-    // spec declares is still the number the run gets.
+    // declared budget, plus a ceiling for each worker. Paid media has none: the permission card is its
+    // brake (`media-permission.ts`). Every number the published spec declares is still the number the run gets.
     const budget = executed[0]?.budget;
     expect(budget).toBe(virtualAgentFor("chat").budget);
     const declared = harnessSpecFor("chat").budget;
@@ -119,7 +119,12 @@ describe("POST /threads/:id/runs/text and the run budget", () => {
     for (const [toolKey, cap] of Object.entries(declared.perTool ?? {})) {
       expect(budget?.perTool?.[toolKey], toolKey).toBe(cap);
     }
-    expect(budget?.perTool).toMatchObject({ research_dossier: 2, image_generate: 4, video_generate: 1 });
+    expect(budget?.perTool).toMatchObject({
+      research_dossier: 2,
+      finance_task: 2,
+    });
+    expect(budget?.perTool).not.toHaveProperty("image_generate");
+    expect(budget?.perTool).not.toHaveProperty("video_generate");
   });
 
   it("leaves an agent the owner built on the runtime's default budget", async () => {

@@ -11,17 +11,22 @@ import { useBuddyTakesStatus } from "@/lib/desk-buddy-store";
 import { LETS_GO_MS, LIVE_TURN_NEXT, liveTurnMascot } from "@/lib/mascot-triggers";
 import { useBuddyClaim } from "@/lib/use-buddy-claim";
 import { useHoldOnMount } from "@/lib/use-hold-on-mount";
-import { fileCardDetail, jobEmbedsFromTools, splitUserFileBlocks } from "@/lib/message-embeds";
+import { fileCardDetail, jobEmbedsFromTools } from "@/lib/message-embeds";
 import { collectToolMediaParts } from "@/lib/tool-media";
 import { DeckCards } from "@/components/chat-deck-card";
 import { DelegateCards } from "@/components/chat-delegate-card";
 import { DossierCards } from "@/components/chat-dossier-card";
+import { FinanceCards } from "@/components/chat-finance-card";
+import { MediaPermissionCards } from "@/components/chat-media-permission-card";
 import "@/components/chat-turn-bubbles.css";
 import { ToolRowBody, isRichTool } from "@/components/tool-rows/tool-row";
 import { showsToolSpinner, toolActivityLabel, toolCallSummary } from "@/lib/tool-labels";
 import type { ContentPart, ToolCallPart } from "@agentforge/core/content";
+import { splitUserFileBlocks } from "@agentforge/core/chat-documents";
 import { getLocale, t } from "@/lib/i18n";
 import { continuePrompt, stepLimitToolsOf } from "@/lib/chat-continue";
+import { permissionRequestsOf } from "@/lib/media-permission";
+import type { MediaRequest } from "@agentforge/core/media-permission";
 import { SHELL_LAYOUT } from "@agentforge/core/product-modes";
 
 export type LiveTool = {
@@ -50,6 +55,8 @@ type Props = {
   onContinue?: (text: string) => void;
   /** A run is already in flight, so Continue waits. */
   continueDisabled?: boolean;
+  /** Sends the requests the person pressed Run on. Absent once the turn was followed up: the card then only records them. */
+  onRunMedia?: (requests: MediaRequest[]) => void;
 };
 
 function PulseDots() {
@@ -62,7 +69,7 @@ function PulseDots() {
   );
 }
 
-export function ChatTurn({ role, content, live, onContinue, continueDisabled = false }: Props) {
+export function ChatTurn({ role, content, live, onContinue, continueDisabled = false, onRunMedia }: Props) {
   const isUser = role === "user";
   // A new chat's first turn opens with the lets-go clip, then the working state takes over.
   const launching = useHoldOnMount(Boolean(live?.firstTurn), LETS_GO_MS);
@@ -145,6 +152,7 @@ export function ChatTurn({ role, content, live, onContinue, continueDisabled = f
                   <ul className="mt-2 space-y-1" data-testid="message-tools">
                     {visibleTools.map((tool, index) => (
                       <li
+                        // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
                         key={`${tool.key}-${index}`}
                         className="whitespace-pre-wrap break-words rounded-xl border border-[var(--line)] px-3 py-1.5 font-mono text-xs text-[var(--text-2)]"
                         data-testid="message-tool"
@@ -195,9 +203,16 @@ export function ChatTurn({ role, content, live, onContinue, continueDisabled = f
             {liveMedia.length > 0 ? <MediaParts parts={liveMedia} /> : null}
             <DeckCards tools={visibleTools} />
             <DossierCards tools={visibleTools} />
+            <FinanceCards tools={visibleTools} />
+            <MediaPermissionCards
+              requests={permissionRequestsOf(visibleTools)}
+              disabled={continueDisabled}
+              {...(onRunMedia ? { onRun: onRunMedia } : {})}
+            />
             <DelegateCards tools={visibleTools} />
             {jobs.map((job, index) => (
               <MessageEmbed
+                // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
                 key={`${job.title}-${index}`}
                 kind="job"
                 title={job.title}
@@ -301,15 +316,18 @@ function MessageBody({ content, outputOnly = false }: { content?: unknown; outpu
       {parts.map((part, index) => {
         const imageUrl = partImageUrl(part);
         if (imageUrl) {
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
           return <MessageEmbed key={index} kind="image" title="" src={imageUrl} alt="" />;
         }
         const videoUrl = partVideoUrl(part);
         if (videoUrl) {
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
           return <MessageEmbed key={index} kind="video" title="" src={videoUrl} />;
         }
         if (part && typeof part === "object" && (part as { type?: unknown }).type === "text" && "text" in part) {
           const text = String((part as { text: string }).text);
           if (!text.trim()) return null;
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
           return <UserPlain key={index} text={text} />;
         }
         return null;
@@ -330,6 +348,7 @@ function AnswerParts({ parts }: { parts: unknown[] }) {
     nodes.push(
       <div key={`text-${key}`} className="chat-turn-bubble">
         {run.map((text, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
           <FormattedText key={index} text={text} className="text-sm" testId="message-output" />
         ))}
       </div>,
@@ -343,8 +362,10 @@ function AnswerParts({ parts }: { parts: unknown[] }) {
       flush(index);
       nodes.push(
         imageUrl ? (
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
           <MessageEmbed key={index} kind="image" title="" src={imageUrl} alt="" />
         ) : (
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
           <MessageEmbed key={index} kind="video" title="" src={videoUrl ?? undefined} />
         ),
       );
@@ -365,10 +386,12 @@ function MediaParts({ parts }: { parts: ContentPart[] }) {
       {parts.map((part, index) => {
         const imageUrl = partImageUrl(part);
         if (imageUrl) {
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
           return <MessageEmbed key={index} kind="image" title="" src={imageUrl} alt="" />;
         }
         const videoUrl = partVideoUrl(part);
         if (videoUrl) {
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
           return <MessageEmbed key={index} kind="video" title="" src={videoUrl} />;
         }
         return null;
@@ -388,11 +411,13 @@ function UserPlain({ text }: { text: string }) {
     <div className="space-y-2">
       {segments.map((segment, index) =>
         segment.type === "text" ? (
+          // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
           <p key={index} className="whitespace-pre-wrap text-sm [overflow-wrap:anywhere]">
             {segment.text}
           </p>
         ) : (
           <MessageEmbed
+            // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity
             key={index}
             kind="file"
             title={segment.name}

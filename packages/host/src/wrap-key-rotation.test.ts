@@ -83,9 +83,7 @@ describe("rotating the file store (a desk, or a webdev instance)", () => {
 
     expect(result.backend).toBe("file");
     expect(result.rotated.sort()).toEqual([A, B, LOCAL_TENANT_ID].sort());
-    expect(openWith(readFileSync(tenantFile(A), "utf8"), NEW_KEY)).toEqual(
-      payloadFor("desk-a", "sk-alpha-key-0000"),
-    );
+    expect(openWith(readFileSync(tenantFile(A), "utf8"), NEW_KEY)).toEqual(payloadFor("desk-a", "sk-alpha-key-0000"));
     expect(openWith(readFileSync(tenantFile(LOCAL_TENANT_ID), "utf8"), NEW_KEY)).toEqual(
       payloadFor("home", "sk-local-key-0000"),
     );

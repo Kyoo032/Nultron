@@ -210,6 +210,7 @@ export {
   redactAttachedParts,
   attachmentsAsMentions,
   typedTextOf,
+  attachmentCountOf,
 } from "./security/injection-guard";
 export type { InjectionHit, InjectionSeverity } from "./security/injection-guard";
 export { isOpenRouterBaseUrl, openRouterZdrBody } from "./privacy/openrouter";
@@ -286,6 +287,7 @@ export { modelImageInput, type ImageInputSupport } from "./models/image-input";
 export {
   EARLIER_IMAGE_NOT_VISIBLE_NOTE,
   VIDEO_NOT_VISIBLE_NOTE,
+  earlierImageNote,
   imageRemoteLinkMessage,
   imageUnreadableMessage,
   imagesTooLargeMessage,
@@ -805,6 +807,23 @@ export { AiSdkRuntime } from "./runtime/ai-sdk-runtime";
 export { invokeToolGuarded } from "./runtime/invoke-guarded";
 export { createToolBudget, resolveMaxSteps } from "./runtime/tool-budget";
 export type { ToolBudget } from "./runtime/tool-budget";
+export {
+  createMediaPermission,
+  isMediaPermissionRefusal,
+  isPaidMediaTool,
+  mediaGrantNote,
+  mediaRequestArgs,
+  mediaRequestKey,
+  PAID_MEDIA_TOOLS,
+} from "./runtime/media-permission";
+export type {
+  MediaPermission,
+  MediaPermissionPolicy,
+  MediaPermissionRefusal,
+  MediaRequest,
+  MediaRequestArgs,
+  PaidMediaTool,
+} from "./runtime/media-permission";
 export { runWithToolIoSink, reportToolIo, takeLastToolIo } from "./runtime/tool-io";
 export type { ToolIoRecord } from "./runtime/tool-io";
 export type { AgentRuntime, RuntimeEvent, RunUsage } from "./runtime/types";

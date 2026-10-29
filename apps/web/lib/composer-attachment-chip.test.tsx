@@ -19,6 +19,10 @@ const READY: ChatDocumentResult = {
   sentChars: 5_000,
   truncated: false,
   masked: 0,
+  originalId: null,
+  originalSkipped: null,
+  figures: null,
+  figuresSkipped: null,
 };
 
 function chip(kind: string, name: string, read?: DocumentRead, size = 1_258_291): string {
@@ -105,6 +109,22 @@ describe("a document that was read", () => {
     const one = chip("document", "a.docx", { status: "ready", result: { ...READY, masked: 1 } });
     expect(one).toContain("1 personal detail hidden before sending.");
   });
+
+  it("says in one short note that only the text was kept, when the original was not", () => {
+    const html = chip("document", "a.docx", { status: "ready", result: { ...READY, originalSkipped: "too_large" } });
+    expect(html).toContain('data-testid="composer-attachment-note"');
+    expect(html).toContain("Only the text was kept, not the original file.");
+    expect(html).not.toContain("Original file");
+  });
+
+  it("says nothing about the original when it was kept", () => {
+    const html = chip("document", "a.docx", {
+      status: "ready",
+      result: { ...READY, originalId: "0b6f0e7a-3c1d-4f5e-9a2b-7c8d9e0f1a2b" },
+    });
+    expect(html).not.toContain("Only the text was kept");
+    expect(html).not.toContain("composer-attachment-note");
+  });
 });
 
 describe("a document that could not be read", () => {
@@ -144,6 +164,12 @@ describe("in Bahasa Indonesia", () => {
     const html = chip("document", "scan.pdf", { status: "failed", error: "encrypted" });
     expect(html).toContain("dilindungi kata sandi");
     expect(html).toContain('aria-label="Hapus scan.pdf"');
+  });
+
+  it("says that only the text was kept in Indonesian", () => {
+    applyLocale("id");
+    const html = chip("document", "a.docx", { status: "ready", result: { ...READY, originalSkipped: "quota" } });
+    expect(html).toContain("Hanya teksnya yang disimpan, bukan berkas aslinya.");
   });
 
   it("says the cut in Indonesian", () => {

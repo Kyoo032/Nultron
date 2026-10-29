@@ -1,11 +1,6 @@
 import { sql } from "@agentforge/db";
 import type { KnowledgeModels, TenantContext } from "@agentforge/core";
-import {
-  deleteVectorsForSource,
-  indexSourceVectors,
-  resolveVectorModel,
-  searchVectors,
-} from "../../knowledge-embed";
+import { deleteVectorsForSource, indexSourceVectors, resolveVectorModel, searchVectors } from "../../knowledge-embed";
 import { getKnowledgeModels } from "../../knowledge";
 import { ftsSourceFilter, knowledgeFtsQuery } from "../../knowledge-text";
 import { andVisibleSource, andVisibleSourceId } from "../../knowledge-visibility";
@@ -104,15 +99,20 @@ function vectorChunkIndexes(workspaceId: string, sourceIds: string[]): Map<strin
   if (sourceIds.length === 0) {
     return out;
   }
-  const rows = sql
-    .prepare(CHUNK_INDEX_QUERIES.vectors(sourceIds.length))
-    .all(workspaceId, ...sourceIds) as Array<{ source_id: string; chunk_index: number; body: string }>;
+  const rows = sql.prepare(CHUNK_INDEX_QUERIES.vectors(sourceIds.length)).all(workspaceId, ...sourceIds) as Array<{
+    source_id: string;
+    chunk_index: number;
+    body: string;
+  }>;
   for (const row of rows) {
     const key = chunkKey(row.source_id, row.body);
     out.set(key, [...(out.get(key) ?? []), row.chunk_index]);
   }
   for (const [key, indexes] of out) {
-    out.set(key, [...indexes].sort((a, b) => a - b));
+    out.set(
+      key,
+      [...indexes].sort((a, b) => a - b),
+    );
   }
   return out;
 }
@@ -365,11 +365,7 @@ export class SqliteBuiltinBackend implements KnowledgeBackend {
 }
 
 /** The next unused chunk index recorded for this body, or undefined when there is none. */
-function takeIndex(
-  indexes: Map<string, number[]>,
-  taken: Map<string, number>,
-  row: FtsRow,
-): number | undefined {
+function takeIndex(indexes: Map<string, number[]>, taken: Map<string, number>, row: FtsRow): number | undefined {
   const key = chunkKey(row.source_id, row.body);
   const available = indexes.get(key);
   if (!available || available.length === 0) {

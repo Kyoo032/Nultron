@@ -289,7 +289,7 @@ async function wrapKey() {
   if (keytar) {
     try {
       const existing = await keytar.getPassword(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT);
-      if (existing && existing.trim()) {
+      if (existing?.trim()) {
         return existing.trim();
       }
       const secret = (await readLegacyWrapKey(keytar)) ?? crypto.randomBytes(32).toString("hex");
@@ -691,7 +691,7 @@ async function bootstrapPackaged() {
     headers: {},
     workspaceId: host.readSelectedWorkspaceId() ?? null,
   });
-  if (!ping || ping.type !== "json" || ping.status !== 200) {
+  if (ping?.type !== "json" || ping.status !== 200) {
     throw new Error("host ping failed");
   }
   hostReady = true;

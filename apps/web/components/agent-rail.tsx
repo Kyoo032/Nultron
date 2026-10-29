@@ -2,8 +2,9 @@
 
 import { useState, type ReactNode, type SyntheticEvent } from "react";
 import type { ProductMode } from "@agentforge/core/product-modes";
-import { Link, usePathname, useSearchParams } from "@/lib/nav";
+import { usePathname, useSearchParams } from "@/lib/nav";
 import { AppUpdatesButton } from "@/components/app-updates";
+import { RAIL_PANEL_ID, RailLink, RailMenuButton, RailToggle, type Tip } from "@/components/agent-rail-parts";
 import { BrandMark } from "@/components/brand-mark";
 import { DeskBuddyChip, DeskBuddyDock } from "@/components/desk-buddy";
 import { ModeIcon, isModeIconName, type ModeIconName } from "@/components/mode-icons";
@@ -12,6 +13,7 @@ import { productMonogram } from "@/components/app-shell";
 import { t } from "@/lib/i18n";
 import { assistantNameOf, useProductBrand, usesBundledMark } from "@/lib/product-brand";
 import type { ShellModesSource } from "@/lib/shell-modes";
+import { RAIL_PHONE_QUERY, useMatchMedia, useRailCollapse, useRailDrawer } from "@/lib/agent-rail-state";
 import {
   activeAgentId,
   useVirtualAgents,
@@ -20,15 +22,6 @@ import {
   type VirtualAgentInfo,
 } from "@/lib/virtual-agents";
 import "./agent-rail.css";
-
-/**
- * The chat-first shell's rail (tester code): a narrow icon column that lists the desk's virtual
- * agents, then the account pages. It replaces `AppRail` when `SHELL_LAYOUT` is `"chat-first"`; the
- * published rail stays for the `"modes"` layout and is not touched.
- *
- * No desk switcher, collapse button, resize handle or session list: the rail is a fixed 64 px
- * (56 px on a phone) and conversations live in the chat header.
- */
 
 type Props = {
   /** The desk's modes. The agents come from the host's own list, so this is only kept for the shell's signature. */
@@ -39,59 +32,9 @@ type Props = {
 /** How many quiet placeholders follow the generalist while the host has not answered. */
 const SKELETON_KEYS = ["a", "b", "c"] as const;
 
-type Tip = { label: string; top: number; left: number };
-
-type RailLinkProps = {
-  href: string;
-  label: string;
-  testId: string;
-  mode: string;
-  active: boolean;
-  children: ReactNode;
-  className?: string;
-  conversation?: VirtualAgentInfo["conversation"];
-  onTip: (label: string) => (event: SyntheticEvent<HTMLElement>) => void;
-  onTipEnd: () => void;
-};
-
-function RailLink({
-  href,
-  label,
-  testId,
-  mode,
-  active,
-  children,
-  className,
-  conversation,
-  onTip,
-  onTipEnd,
-}: RailLinkProps) {
-  const showTip = onTip(label);
-  return (
-    <Link
-      href={href}
-      className={`agent-rail-link${className ? ` ${className}` : ""}`}
-      aria-current={active ? "page" : undefined}
-      aria-label={label}
-      title={label}
-      data-testid={testId}
-      data-mode={mode}
-      data-active={active ? "true" : undefined}
-      data-conversation={conversation}
-      onMouseEnter={showTip}
-      onFocus={showTip}
-      onMouseLeave={onTipEnd}
-      onBlur={onTipEnd}
-    >
-      {children}
-    </Link>
-  );
-}
-
 function GeneralistTile({ productName, logoSrc, bundled }: { productName: string; logoSrc: string; bundled: boolean }) {
   if (bundled) {
-    // The product mark is already a tile with its own corners, so it is not set inside a second one.
-    return <BrandMark size={32} className="agent-rail-mark" />;
+    return <BrandMark size={24} className="agent-rail-mark" />;
   }
   if (logoSrc) {
     return <img src={logoSrc} alt="" className="agent-rail-logo" />;
@@ -113,6 +56,11 @@ export type AgentRailViewProps = {
   bundledMark: boolean;
   /** The footer controls (theme, updates). A slot so the drawing stays free of the update bridge. */
   footer?: ReactNode;
+  collapsed?: boolean;
+  menu?: boolean;
+  onToggle?: () => void;
+  /** A phone only: the expanded rail is a drawer over the page, and this is what closes it. */
+  onDismiss?: () => void;
 };
 
 const ACCOUNT_LINKS: ReadonlyArray<{ href: string; icon: ModeIconName; testId: string; labelKey: string }> = [
@@ -146,6 +94,10 @@ export function AgentRailView({
   logoSrc,
   bundledMark,
   footer,
+  collapsed = false,
+  menu = false,
+  onToggle,
+  onDismiss,
 }: AgentRailViewProps) {
   /*
    * The name shows in one tooltip drawn by the rail itself, outside the scrolling column. A tooltip
@@ -155,6 +107,9 @@ export function AgentRailView({
    */
   const [tip, setTip] = useState<Tip | null>(null);
   const onTip = (label: string) => (event: SyntheticEvent<HTMLElement>) => {
+    if (!collapsed) {
+      return;
+    }
     const rect = event.currentTarget.getBoundingClientRect();
     const rail = event.currentTarget.closest("aside")?.getBoundingClientRect();
     setTip({ label, top: rect.top + rect.height / 2, left: (rail?.right ?? rect.right) + 8 });
@@ -165,74 +120,128 @@ export function AgentRailView({
   // and quiet placeholders where the rest will land.
   const waiting = !loaded && agents.length === 0;
   const list = agents.some((agent) => agent.generalist) ? agents : [FALLBACK_GENERALIST, ...agents];
+  const here = list.find((agent) => agent.id === activeId);
+  const page = here ? undefined : ACCOUNT_LINKS.find((item) => pathname.startsWith(item.href));
+  const brandTitle = assistantName ?? productName;
+
+  const renderAgent = (agent: VirtualAgentInfo) => (
+    <RailLink
+      key={agent.id}
+      href={virtualAgentHref(agent.id)}
+      label={agent.generalist ? t("rail.chat") : virtualAgentName(agent, brandTitle)}
+      testId={agent.generalist ? "mode-chat" : `agent-${agent.id}`}
+      mode={agent.id}
+      active={activeId === agent.id}
+      collapsed={collapsed}
+      className={agent.generalist ? "agent-rail-generalist" : undefined}
+      conversation={agent.conversation}
+      onTip={onTip}
+      onTipEnd={onTipEnd}
+    >
+      <span className="agent-rail-tile">
+        <ModeIcon name={isModeIconName(agent.id) ? agent.id : "documents"} size={18} strokeWidth={1.75} />
+      </span>
+    </RailLink>
+  );
 
   return (
-    <aside className="agent-rail" aria-label={t("agents.rail.aria")} data-testid="agent-rail" data-rail="min">
-      <nav
-        className="agent-rail-agents"
-        aria-label={t("agents.rail.agentsAria")}
-        aria-busy={waiting || undefined}
-        data-tour="rail-modes"
-        onScroll={onTipEnd}
-      >
-        {list.map((agent) => (
-          <RailLink
-            key={agent.id}
-            href={virtualAgentHref(agent.id)}
-            label={virtualAgentName(agent, assistantName ?? productName)}
-            testId={agent.generalist ? "mode-chat" : `agent-${agent.id}`}
-            mode={agent.id}
-            active={activeId === agent.id}
-            className={agent.generalist ? "agent-rail-generalist" : undefined}
-            conversation={agent.conversation}
-            onTip={onTip}
-            onTipEnd={onTipEnd}
-          >
-            {agent.generalist ? (
-              <GeneralistTile productName={productName} logoSrc={logoSrc} bundled={bundledMark} />
-            ) : (
-              <span className="agent-rail-tile">
-                <ModeIcon name={isModeIconName(agent.id) ? agent.id : "documents"} size={20} strokeWidth={2} />
+    <aside
+      className="agent-rail"
+      aria-label={t("agents.rail.aria")}
+      data-testid="agent-rail"
+      data-rail={collapsed ? "min" : "full"}
+      data-menu={menu ? "true" : undefined}
+    >
+      {menu ? (
+        <div className="agent-rail-bar" data-testid="rail-bar">
+          {onToggle ? <RailMenuButton open={!collapsed} onToggle={onToggle} /> : null}
+          {here && !here.generalist ? (
+            <span className="agent-rail-tile">
+              <ModeIcon name={isModeIconName(here.id) ? here.id : "documents"} size={18} strokeWidth={1.75} />
+            </span>
+          ) : page ? (
+            <span className="agent-rail-tile">
+              <ModeIcon name={page.icon} size={18} strokeWidth={1.75} />
+            </span>
+          ) : (
+            <GeneralistTile productName={productName} logoSrc={logoSrc} bundled={bundledMark} />
+          )}
+          <span className="agent-rail-bar-name" data-testid="rail-bar-name">
+            {here ? virtualAgentName(here, brandTitle) : page ? t(page.labelKey) : productName}
+          </span>
+        </div>
+      ) : null}
+      <div className="agent-rail-inner" id={RAIL_PANEL_ID}>
+        <div className="agent-rail-brand" data-testid="rail-brand">
+          <div className="agent-rail-brand-identity">
+            <GeneralistTile productName={productName} logoSrc={logoSrc} bundled={bundledMark} />
+            {collapsed ? null : (
+              <span className="agent-rail-brand-name" data-testid="rail-brand-name">
+                {brandTitle}
               </span>
             )}
-          </RailLink>
-        ))}
-        {waiting
-          ? SKELETON_KEYS.map((key) => (
-              <span key={key} className="agent-rail-skeleton" data-testid="agent-rail-skeleton" aria-hidden="true" />
-            ))
-          : null}
-      </nav>
+          </div>
+          {onToggle && !(menu && collapsed) ? <RailToggle collapsed={collapsed} onToggle={onToggle} /> : null}
+        </div>
 
-      <div className="agent-rail-divider" aria-hidden="true" />
+        <nav
+          className="agent-rail-agents"
+          aria-label={t("agents.rail.agentsAria")}
+          aria-busy={waiting || undefined}
+          data-tour="rail-modes"
+          onScroll={onTipEnd}
+        >
+          {list.filter((agent) => agent.generalist).map(renderAgent)}
+          {list.filter((agent) => !agent.generalist).map(renderAgent)}
+          {waiting
+            ? SKELETON_KEYS.map((key) => (
+                <span key={key} className="agent-rail-skeleton" data-testid="agent-rail-skeleton" aria-hidden="true" />
+              ))
+            : null}
+        </nav>
 
-      <div className="agent-rail-account" data-testid="rail-account-group">
-        {ACCOUNT_LINKS.map((item) => (
-          <RailLink
-            key={item.testId}
-            href={item.href}
-            label={t(item.labelKey)}
-            testId={item.testId}
-            mode={item.icon}
-            active={pathname.startsWith(item.href)}
-            onTip={onTip}
-            onTipEnd={onTipEnd}
-          >
-            <span className="agent-rail-tile">
-              <ModeIcon name={item.icon} size={20} strokeWidth={2} />
-            </span>
-          </RailLink>
-        ))}
-      </div>
+        <div className="agent-rail-divider" aria-hidden="true" />
 
-      <div className="agent-rail-footer" data-testid="rail-footer">
-        {footer}
+        <div className="agent-rail-account" data-testid="rail-account-group">
+          {ACCOUNT_LINKS.map((item) => (
+            <RailLink
+              key={item.testId}
+              href={item.href}
+              label={t(item.labelKey)}
+              testId={item.testId}
+              mode={item.icon}
+              active={pathname.startsWith(item.href)}
+              collapsed={collapsed}
+              onTip={onTip}
+              onTipEnd={onTipEnd}
+            >
+              <span className="agent-rail-tile">
+                <ModeIcon name={item.icon} size={18} strokeWidth={1.75} />
+              </span>
+            </RailLink>
+          ))}
+        </div>
+
+        <div className="agent-rail-footer" data-testid="rail-footer">
+          {footer}
+        </div>
       </div>
 
       {tip ? (
         <span className="agent-rail-tip" style={{ top: tip.top, left: tip.left }} aria-hidden="true">
           {tip.label}
         </span>
+      ) : null}
+
+      {onDismiss && !collapsed ? (
+        <button
+          type="button"
+          className="agent-rail-scrim"
+          tabIndex={-1}
+          aria-label={t("rail.collapse")}
+          data-testid="rail-scrim"
+          onClick={onDismiss}
+        />
       ) : null}
     </aside>
   );
@@ -243,6 +252,10 @@ export function AgentRail(_props: Props) {
   const searchParams = useSearchParams();
   const brand = useProductBrand();
   const { agents, loaded } = useVirtualAgents();
+  const phone = useMatchMedia(RAIL_PHONE_QUERY);
+  const desk = useRailCollapse(false);
+  const drawer = useRailDrawer(phone, `${pathname}?${searchParams.toString()}`);
+  const collapsed = phone ? !drawer.open : desk.collapsed;
 
   return (
     <AgentRailView
@@ -254,12 +267,16 @@ export function AgentRail(_props: Props) {
       assistantName={assistantNameOf(brand)}
       logoSrc={brand.logoSrc}
       bundledMark={usesBundledMark(brand)}
+      collapsed={collapsed}
+      menu={phone}
+      onToggle={phone ? drawer.toggle : desk.toggle}
+      onDismiss={phone ? drawer.close : undefined}
       footer={
         <>
           {/* The character lives here in this shell, as the small head: the rail is the one place on
-              screen where nothing a person or a model wrote ever scrolls under it. The dock is what
-              tells the buddy it has a home; it is given no room (`agent-rail.css`), so the buddy is
-              always the head and never a body standing over the rail's icons. */}
+            screen where nothing a person or a model wrote ever scrolls under it. The dock is what
+            tells the buddy it has a home; it is given no room (`agent-rail.css`), so the buddy is
+            always the head and never a body standing over the rail's icons. */}
           <div className="agent-rail-buddy-dock" aria-hidden="true">
             <DeskBuddyDock collapsed={false} />
           </div>

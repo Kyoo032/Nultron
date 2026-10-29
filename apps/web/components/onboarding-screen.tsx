@@ -45,9 +45,9 @@ type Props = {
 type Step = "welcome" | "key" | "try";
 
 /*
- * What a first desk has on its rail: Chat, then Research, Images, Videos and Presentation
- * (`FIRST_RUN_MODES`, packages/core). The examples offer only things that are in the menu on the
- * screen this leads to, so no tile names a tool the person has not got yet.
+ * A first desk has the default agent alone (`FIRST_RUN_MODES`, packages/core). Each example is a job
+ * that agent does in its own chat, with a tool it binds, so no tile names a tool the person has not
+ * got yet.
  */
 export const EXAMPLES = ["chat", "research", "images", "presentation"] as const;
 

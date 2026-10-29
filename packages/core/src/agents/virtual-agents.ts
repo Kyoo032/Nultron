@@ -79,6 +79,11 @@ const CHAT_WORKERS: Readonly<Record<string, { readonly perTurn: number; readonly
     sentence:
       "research_dossier researches one question on the web and writes a sourced dossier, in a few minutes: use it when the owner asks for research, a report or a briefing on a subject, not for a quick fact that web_search answers. It returns a short summary and the dossier is shown to the owner as a card under your answer, so say what it covers and any check that failed, and do not paste it.",
   },
+  finance_task: {
+    perTurn: 2,
+    sentence:
+      "finance_task reviews figures the owner attached: use it when a host note [Figures kept: ...] names a file and the owner asks about those figures, and pass their question as request and that path as file. It computes every figure in code and checks the write-up. When it asks for something, put the question to the owner and do not answer it yourself. Never work out a figure yourself. The result is shown to the owner as a card under your answer, so say what it shows and any check that failed, and do not restate figures beyond the headline and the facts it returned.",
+  },
 };
 
 /** The worker tool keys every agent binds after chat's own tools, in a stable order. */
@@ -108,26 +113,20 @@ const CHAT_SPEC = MODE_HARNESS_SPECS.chat;
 const FULL_CHAT_TOOLS: readonly string[] = Object.freeze([...CHAT_SPEC.tools, ...GENERALIST_EXTRA_TOOLS]);
 
 /**
- * Paid media a model may start in one turn (`chat-workers-spec.md`, section 7: four pictures, one
- * clip). Every agent's prompt now tells it to make them, so a model that decides on ten clips must
- * meet a ceiling the host holds. This is a ceiling only: the cost card with a Run control that the
- * plan's decision D4 asks for before a clip is made is not built.
+ * Paid media has no ceiling here (owner, 2026-10-22: it is the person's own key). The brake is the
+ * permission card: `image_generate` and `video_generate` do not run until the person presses Run on
+ * the request (`../runtime/media-permission.ts`, plan decision D4). The turn's `maxToolCalls` still bounds a runaway.
  */
-export const PAID_MEDIA_PER_TURN: Readonly<Record<string, number>> = Object.freeze({
-  image_generate: 4,
-  video_generate: 1,
-});
 
 /**
- * Every agent's budget: Chat's declared one, plus a ceiling for paid media, for each worker and for
- * delegations. A delegated run has a budget of its own (`DELEGATE_BUDGET`), so the turn's cost is
- * bounded by the number of delegations it may start.
+ * Every agent's budget: Chat's declared one, plus a ceiling for each worker and for delegations. A
+ * delegated run has a budget of its own (`DELEGATE_BUDGET`), so the turn's cost is bounded by the
+ * number of delegations it may start.
  */
 const FULL_CHAT_BUDGET: RunBudget = Object.freeze({
   ...CHAT_SPEC.budget,
   perTool: Object.freeze({
     ...CHAT_SPEC.budget.perTool,
-    ...PAID_MEDIA_PER_TURN,
     ...Object.fromEntries(GENERALIST_WORKER_TOOLS.map((key) => [key, CHAT_WORKERS[key]?.perTurn ?? 1])),
     [DELEGATE_TOOL_KEY]: DELEGATE_PER_TURN,
   }),
@@ -165,8 +164,9 @@ const SPECIALTIES: Readonly<Record<ModeAgentId, Specialty>> = {
       "Your specialty is research. For a research question, a report or a briefing on a subject, call research_dossier with one clear question in the language of this conversation: it plans the queries, searches, reads the pages, writes the dossier and checks that every finding cites a source. Do not write research findings from memory. If the request is too vague to research, ask one short question first.",
   },
   finance: {
+    worker: "finance_task",
     brief:
-      "Your specialty is finance: briefs, ratios, budgets, cash flow and appraisals. Never work out a figure in your head: compute every figure with run_code or calculator from the owner's numbers or files, show the inputs, and say a number is missing rather than guess it.",
+      "Your specialty is finance: briefs, ratios, budgets, cash flow and appraisals. When the owner attached figures and a host note [Figures kept: ...] names the file, call finance_task with their question and that path: it computes every figure in code and checks the write-up. For a quick sum on numbers typed in this chat, use calculator or run_code and show the inputs. Never work out a figure in your head, and say a number is missing rather than guess it.",
   },
   data: {
     brief:

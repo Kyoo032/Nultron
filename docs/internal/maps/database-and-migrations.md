@@ -2,7 +2,7 @@
 
 Product: both · Instance: main :3000
 
-Last verified: 2026-10-21 at 8953014 for the test-limit sentence above the unit-suite table. Before that: 2026-09-29 for the three `apps/desktop/main.cjs` citations (`bootstrapPackaged` lines), re-anchored in the
+Last verified: 2026-10-29 at 464b00c5 for the 2026-10-21 one-agent first-desk comments in `packages/db/src/ensure-local-owner.ts` (`FIRST_RUN_MODES`) and `packages/db/src/portal-owner.ts` (`HOSTED_FIRST_DESK_MODES`). Before that: 2026-10-21 at 8953014 for the test-limit sentence above the unit-suite table. Before that: 2026-09-29 for the three `apps/desktop/main.cjs` citations (`bootstrapPackaged` lines), re-anchored in the
 working tree, not committed, after the ffmpeg probe moved behind the first paint. Before that: 2026-09-23 at d4561b8 + uncommitted tree for the migrations table and the numbering note (now
 through `0021`), the `auth_sessions` row of the schema families, "Start over, applied at next boot" (every
 `reset.ts` citation, and the partial-failure retry) and the drizzle row of Where things live. Not driven:

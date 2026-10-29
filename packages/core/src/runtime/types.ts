@@ -7,6 +7,7 @@ import type { ReasoningEffort } from "../models/reasoning-effort";
 import type { RunBudget } from "../harness/spec";
 import type { JobEvent } from "../jobs/job-events";
 import type { ChatWire } from "./chat-wire";
+import type { MediaPermissionPolicy } from "./media-permission";
 import type { StreamWatchdogLimits } from "./stream-watchdog";
 
 export type RunUsage = {
@@ -102,6 +103,12 @@ export type AgentRuntime = {
      * and no tool-call cap.
      */
     budget?: RunBudget;
+    /**
+     * Asks the person before a model starts paid media (SR-167). With `ask` true, `image_generate` and
+     * `video_generate` return a `permission` refusal instead of running, unless `grants` holds a request
+     * with the same arguments. Omitted, every call runs, as the studios need.
+     */
+    mediaPermission?: MediaPermissionPolicy;
     /**
      * What the egress guard (SR-112) is built from, when the caller knows better than the history does.
      * Left out, the guard reads the person's own messages from `history` and starts untainted, as for

@@ -46,7 +46,7 @@ Also from that pass, found by driving and fixed in the working tree:
 Risks the new model opens, none ruled on yet:
 
 - A mode agent now reads private material (Knowledge Base, earlier chats) and can send text to the web through `web_search` or `research_dossier`. The egress guard refuses only `web_fetch`, and only after a tool-read of private material (`packages/core/src/runtime/egress-guard.ts:150-169`). This is risk 5 in section 7, still without a ruling from C0. Chat has had the same exposure; mode agents are new to it.
-- Plan risk 4 (paid steps the model starts) is half answered: a turn may make at most 4 pictures and 1 clip (`PAID_MEDIA_PER_TURN`, `packages/core/src/agents/virtual-agents.ts:107-110`). The D4 cost card with a Run control is not built, and every agent's prompt now tells it to make media.
+- Plan risk 4 (paid steps the model starts) is answered on the tester branch from 2026-10-22: the owner ruled against a hard cap, so the ceiling of 4 pictures and 1 clip is gone, and the D4 card is built instead. `image_generate` and `video_generate` do not run until the person presses Run on a card that names the request and its list price (`packages/core/src/runtime/media-permission.ts`, `apps/web/components/chat-media-permission-card.tsx`; SR-167). Unit-tested and the card driven on a stub desk; the live round trip is not driven. `main` still holds the ceiling until the tester change is promoted.
 - The renderer's cap on a turn (the `touchOutput` finding above) stops a long dossier before the host's 8 minute ceiling.
 - The Research harness's keyless search returned unrelated or thin sources in two of three drives (RECORD rows 5 and 20). That is a finding for `main`.
 
@@ -238,7 +238,7 @@ Track B is the screen for what tracks K and C build. It starts after C0, because
 | B5 | Hire your own bot: the setup questions fill a harness spec, the host enforces it, and the bot joins the rail. Plan ceilings apply. Not built in Nultron: the tester's prompt-made agents were removed on 2026-10-16. | A person hires a bot that reads a folder of invoices and writes a weekly summary; a tool outside its spec is refused by the host, not by the prompt. |
 | B6 | Free and paid: the host reads the plan and refuses a computer start on a free desk; the choice is greyed with the reason. | A free desk gets `403` with a reason code on a computer start through the API, not only a greyed button. |
 
-The first-desk hard rule still decides what a fresh Personal desk shows: Chat (the generalist), Research, Images, Videos, Presentation. Bots replace rail entries one for one, so `FIRST_RUN_MODES` and its tests are not touched.
+The first-desk hard rule still decides what a fresh desk shows. Since 2026-10-21 (Rizky: "all people will start with one agents, which is nultron") that is the generalist alone, on local and hosted desks; the other agents are hired. Bots replace rail entries one for one.
 
 ## 6. What gets parked, and how
 

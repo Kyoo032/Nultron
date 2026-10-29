@@ -8,6 +8,7 @@
  * fixed code and the person is told why the file was not saved.
  */
 import type { TenantContext } from "@agentforge/core";
+import type { ChatFinanceFigures } from "@agentforge/core/chat-documents";
 import { FileRootError, MAX_FILE_BYTES } from "@agentforge/core/tools/files";
 import { createDeskRoot } from "../desk-files/store";
 import { log } from "../log";
@@ -33,6 +34,28 @@ function failureOf(error: unknown): SaveFailure {
   // The detail can quote a path, so only the fact that it failed is logged.
   log.warn("chat_document_desk_copy_failed", { kind: error instanceof Error ? error.name : typeof error });
   return "unavailable";
+}
+
+export const FIGURES_SUFFIX = ".figures.json";
+
+export async function saveDeskFigures(
+  tenant: TenantContext,
+  filename: string,
+  figures: ChatFinanceFigures,
+): Promise<{ readonly path: string } | null> {
+  try {
+    const author = { kind: "user", userId: tenant.userId } as const;
+    const root = createDeskRoot(tenant, author);
+    const outcome = await root.write(
+      deskPathForDocument(filename, tenant.userId, FIGURES_SUFFIX),
+      JSON.stringify(figures),
+      author,
+    );
+    return outcome.status === "saved" ? { path: outcome.path } : null;
+  } catch (error) {
+    failureOf(error);
+    return null;
+  }
 }
 
 /** Save `text` for the person who attached `filename`. Never throws. */

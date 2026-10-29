@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { PresentationPreview } from "@/components/presentation-preview";
-import { downloadArtifactFile } from "@/lib/artifacts-client";
-import { saveFailureMessage } from "@/lib/desktop-save";
+import { saveChatFile } from "@/lib/chat-file-save";
 import { t } from "@/lib/i18n";
 import { DECK_TOOL_KEY, readDeckResult, type DeckCardModel } from "./tool-rows/deck-result";
 
@@ -42,11 +41,11 @@ export function DeckCard({ model, defaultOpen = false }: CardProps) {
     }
     setState("busy");
     setReason(null);
-    try {
-      await downloadArtifactFile(model.artifactId, filename);
+    const saved = await saveChatFile(model.artifactId, filename);
+    if (saved.ok) {
       setState("idle");
-    } catch (error) {
-      setReason(saveFailureMessage(error));
+    } else {
+      setReason(saved.reason);
       setState("failed");
     }
   }
@@ -58,60 +57,28 @@ export function DeckCard({ model, defaultOpen = false }: CardProps) {
 
   return (
     <section
-      className="min-w-0 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-3 shadow-elev-1"
+      className={`${open && outline ? "" : "max-w-[24rem] "}min-w-0 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-3 shadow-elev-1`}
       data-testid="chat-deck-card"
       data-artifact-id={model.artifactId}
       data-open={open && outline ? "true" : "false"}
     >
-      <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-2">
-        <div className="min-w-0 flex-1 basis-48">
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--text-3)]">
-            {t("chat.deck.label")}
-          </p>
-          <h4
-            className="mt-0.5 break-words text-sm font-semibold text-[var(--text)] [overflow-wrap:anywhere]"
-            data-testid="chat-deck-title"
-          >
-            {title}
-          </h4>
-          <p
-            className="mt-0.5 min-w-0 text-xs text-[var(--text-2)] [overflow-wrap:anywhere]"
-            data-testid="chat-deck-meta"
-          >
-            {slidesLabel(model.slideCount)} · {filename}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {outline ? (
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setOpen((current) => !current)}
-              aria-expanded={open}
-              aria-label={t(open ? "chat.deck.closeAria" : "chat.deck.openAria", { title })}
-              data-testid="chat-deck-open"
-            >
-              {open ? t("chat.deck.close") : t("chat.deck.open")}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={state === "busy"}
-            onClick={() => void onDownload()}
-            aria-label={t("chat.deck.downloadAria", { title, filename })}
-            data-testid="chat-deck-download"
-          >
-            {state === "busy" ? t("chat.deck.downloading") : t("chat.deck.download")}
-          </button>
-        </div>
-      </div>
-
-      {state === "failed" ? (
-        <p className="mt-2 text-xs text-[var(--danger)]" role="alert" data-testid="chat-deck-error">
-          {reason ?? t("chat.deck.downloadFailed")}
+      <div className="min-w-0">
+        <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--text-3)]">
+          {t("chat.deck.label")}
         </p>
-      ) : null}
+        <h4
+          className="mt-0.5 break-words text-sm font-semibold text-[var(--text)] [overflow-wrap:anywhere]"
+          data-testid="chat-deck-title"
+        >
+          {title}
+        </h4>
+        <p
+          className="mt-0.5 min-w-0 text-xs text-[var(--text-2)] [overflow-wrap:anywhere]"
+          data-testid="chat-deck-meta"
+        >
+          {slidesLabel(model.slideCount)} · {filename}
+        </p>
+      </div>
 
       {outline ? (
         <ol
@@ -133,6 +100,37 @@ export function DeckCard({ model, defaultOpen = false }: CardProps) {
           {t("chat.deck.noPreview")}
         </p>
       )}
+
+      <div className="mt-3 flex gap-2">
+        {outline ? (
+          <button
+            type="button"
+            className="btn btn-secondary flex-1"
+            onClick={() => setOpen((current) => !current)}
+            aria-expanded={open}
+            aria-label={t(open ? "chat.deck.closeAria" : "chat.deck.openAria", { title })}
+            data-testid="chat-deck-open"
+          >
+            {open ? t("chat.deck.close") : t("chat.deck.open")}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="btn btn-primary flex-1"
+          disabled={state === "busy"}
+          onClick={() => void onDownload()}
+          aria-label={t("chat.deck.downloadAria", { title, filename })}
+          data-testid="chat-deck-download"
+        >
+          {state === "busy" ? t("chat.deck.downloading") : t("chat.deck.download")}
+        </button>
+      </div>
+
+      {state === "failed" ? (
+        <p className="mt-2 text-xs text-[var(--danger)]" role="alert" data-testid="chat-deck-error">
+          {reason ?? t("chat.deck.downloadFailed")}
+        </p>
+      ) : null}
 
       {open && outline ? (
         <div

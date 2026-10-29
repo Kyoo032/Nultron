@@ -1,9 +1,11 @@
 /**
  * `POST /api/v1/chat/documents`: one document from the Chat composer, read on this machine.
  *
- * It answers the text Chat will send (cut to the model's budget) and what it counted. It writes
- * nothing: the desk copy is saved when the message is sent (`save-handler.ts`), so attaching and then
- * removing a document leaves no file behind. Nothing is sent to a model here, so there is deliberately
+ * It answers the text Chat will send (cut to the model's budget) and what it counted. The desk copy of
+ * the text is saved when the message is sent (`save-handler.ts`), so attaching and then removing a
+ * document leaves no desk file behind. The one thing kept here is the file's original bytes, for a Word,
+ * Excel or PDF file (`original.ts`): this request is the only place they exist. The answer carries the
+ * kept original's id, or why it was not kept. Nothing is sent to a model here, so there is deliberately
  * no `requireGatewayAllowed()`: a closed gate must never stop a person reading a file that never leaves
  * their machine (the same call `finance/import` makes).
  *
@@ -21,9 +23,16 @@
 import { ApiError } from "@agentforge/core";
 import { CHAT_DOCUMENT_FIELD, CHAT_DOCUMENT_MAX_BYTES, isChatDocumentName } from "@agentforge/core/chat-documents";
 import { jsonError, jsonOk } from "../errors";
+import { withLimit } from "../concurrency";
+import { readFinanceFigures } from "../finance-figures/figures";
+import { getTenant } from "../tenant";
 import type { HostFile, HostRequest, HostResult } from "../types";
 import { chatDocumentError } from "./errors";
+import { documentLimiter } from "./limiter";
+import { keepOriginal } from "./original";
 import { readChatDocument } from "./read";
+
+const FIGURES_NOT_READ = { figures: null, skipped: "unreadable" } as const;
 
 function requireUpload(request: HostRequest): HostFile {
   const file = request.files?.find((item) => item.field === CHAT_DOCUMENT_FIELD) ?? request.files?.[0];
@@ -45,7 +54,16 @@ function requireUpload(request: HostRequest): HostFile {
 export async function handlePostChatDocument(request: HostRequest): Promise<HostResult> {
   try {
     const file = requireUpload(request);
+    // The original is kept for the person who attached it, so the request needs that person (a 401 on the
+    // hosted server with no session; the desk's one owner otherwise).
+    const tenant = await getTenant(request);
     const read = await readChatDocument(file, { signal: request.abortSignal });
+    const original = await keepOriginal(tenant, file, read.format);
+    const figures = await withLimit(
+      documentLimiter,
+      () => readFinanceFigures(file, read.format, read.extractedTables, read.extractedMarkdown),
+      request.abortSignal,
+    ).catch(() => FIGURES_NOT_READ);
     return jsonOk({
       document: {
         name: file.filename,
@@ -60,6 +78,11 @@ export async function handlePostChatDocument(request: HostRequest): Promise<Host
         truncated: read.truncated,
         tables: read.tables,
         pii: { count: read.masked },
+        /** The kept original's artifact id, or null when none was kept (`originalSkipped` says why). */
+        originalId: original?.id ?? null,
+        originalSkipped: original?.skipped ?? null,
+        figures: figures.figures,
+        figuresSkipped: figures.skipped,
       },
     });
   } catch (error) {

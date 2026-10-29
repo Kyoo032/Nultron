@@ -198,7 +198,8 @@ export async function startGenerateJob(
   const requestedSeconds = input.addSeconds ?? input.seconds ?? (input.kind === "generate_video" ? 5 : undefined);
   // Veo only renders 4/6/8 s; snap here so the job, the placeholder and the price agree.
   const seconds = input.kind === "generate_video" ? snapVideoSeconds(model, requestedSeconds) : requestedSeconds;
-  const timedInput = input.kind === "generate_video" ? { ...input, seconds, addSeconds: input.addSeconds ? seconds : undefined } : input;
+  const timedInput =
+    input.kind === "generate_video" ? { ...input, seconds, addSeconds: input.addSeconds ? seconds : undefined } : input;
   const estimateUsd = estimateJobUsd(model, {
     seconds,
     count,
@@ -235,8 +236,7 @@ export async function startGenerateJob(
     ops.map((op) => ({ ...op, cardId })),
     { actor, cardId, workspaceId: tenant.workspaceId },
   );
-  const targetClipIds =
-    toolKey === "regenerate_clip" && parent ? [parent.id] : clips.map((clip) => clip.id);
+  const targetClipIds = toolKey === "regenerate_clip" && parent ? [parent.id] : clips.map((clip) => clip.id);
   const job = await enqueueEditJob(projectId, {
     kind: input.kind,
     // No tenant in the request: the worker resolves it from the project and `requestedBy`.

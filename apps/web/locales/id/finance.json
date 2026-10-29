@@ -483,7 +483,8 @@
       "fellBack": "Tampaknya ini {from}, tetapi itu tidak bisa dibuat dari berkas ini, jadi dibaca sebagai {to}.",
       "unplacedRows": "{n} baris tidak bisa ditempatkan oleh aturan dan dibiarkan apa adanya.",
       "defaultDiscountRate": "Tingkat diskonto tidak ditemukan, jadi ditampilkan {rate}%. Ubah di penilaian investasi.",
-      "unpairedLines": "{n} baris belum punya pasangan di sisi lainnya."
+      "unpairedLines": "{n} baris belum punya pasangan di sisi lainnya.",
+      "noOpeningCash": "Saldo awal kas tidak ditemukan, jadi buku kas dimulai dari 0. Tambahkan saldo awalnya."
     },
     "write": "Tulis hasilnya",
     "writing": "Bekerja…",

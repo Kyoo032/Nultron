@@ -67,8 +67,8 @@ export async function ensureLocalOwner(db: Database, preferredWorkspaceId?: stri
     // The only place a Personal install's FIRST desk is written: a fresh data dir, and Start over's
     // "all" scope, whose wipe removes the database so the next boot lands here again. It is the one
     // branch on which a first-run rule can apply, because every later boot finds the row and leaves
-    // it alone. Personal starts with Research, Images, Videos and Presentation (`FIRST_RUN_MODES`);
-    // `isServerMode()` keeps a hosted process, should it ever reach this path, on every mode.
+    // it alone. A first desk starts with the default agent alone (`FIRST_RUN_MODES`, 2026-10-21);
+    // `isServerMode()` gives a hosted process, should it ever reach this path, the hosted list.
     const inserted = await db
       .insert(workspaces)
       .values({

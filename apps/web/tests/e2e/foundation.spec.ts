@@ -3,7 +3,7 @@ import agentsCopy from "../../locales/en/agents.json" with { type: "json" };
 import chatCopy from "../../locales/en/chat.json" with { type: "json" };
 import { EVERY_MODE, showEveryMode } from "./every-mode";
 
-// The headline the empty Chat renders (chat-hero.tsx, key chat.empty.headline). Read from the en
+// The headline the empty Chat renders (chat-launcher.tsx, key chat.empty.headline). Read from the en
 // catalog so a copy edit does not break this suite again (SH-003).
 const EMPTY_CHAT_HEADLINE = chatCopy.empty.headline;
 const AGENTS_LEDE = agentsCopy.page.lede;
@@ -34,7 +34,7 @@ test.describe.configure({ retries: 0 });
 
 test.setTimeout(180_000);
 
-// A fresh desk starts with Research, Images, Videos and Presentation only; this spec drives the rest.
+// A fresh desk starts with the default agent alone; this spec hires every other one first.
 test.beforeEach(async ({ request }) => {
   await showEveryMode(request);
 });

@@ -16,6 +16,17 @@
   "hostNeedsKey": "Add a Toko Token gateway key in Settings to generate videos.",
   "textToVideoOnly": "This model is text-to-video only",
   "stillPlaceholder": "Optional still image URL…",
+  "savedPicture": {
+    "open": "Use a saved image",
+    "close": "Hide saved images",
+    "loading": "Loading saved pictures…",
+    "loadError": "Could not load saved pictures",
+    "empty": "No saved pictures yet. Make or upload one first, then pick it here.",
+    "optionAlt": "Saved picture",
+    "chosen": "Saved picture used as the still",
+    "remove": "Remove",
+    "unusable": "This saved picture cannot be used here. Pick another, or paste a URL."
+  },
   "promptPlaceholder": "A slow push-in on a ceramic cup as window light moves across the desk",
   "generate": "Generate",
   "generating": "Generating…",

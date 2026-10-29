@@ -6,6 +6,7 @@ import { blockedInjectionOutput, scanJson } from "../security/injection-guard";
 import { runInToolCall } from "../security/outbound-guard";
 import { thinToolOutput } from "../security/tool-thin";
 import type { EgressGuard } from "./egress-guard";
+import type { MediaPermission } from "./media-permission";
 import type { ToolBudget } from "./tool-budget";
 import { reportToolIo } from "./tool-io";
 
@@ -22,6 +23,8 @@ export function disabledToolOutput(toolKey: string): { success: false; error: st
  * With an `egress` guard, a `web_fetch` made after the run has read private material returns the guard's
  * refusal instead of running unless the host is one the person named or a search returned (SR-112). The
  * refused call still spends its budget slot, so a model cannot retry it without limit.
+ * With a `permission` gate, `image_generate` and `video_generate` return a `permission` refusal instead of
+ * running until the person has pressed Run on that request (SR-167); it too spends a budget slot.
  */
 export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
   tool: ToolDefinition<TSchema>,
@@ -29,6 +32,7 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
   tenant: TenantContext,
   budget?: ToolBudget,
   egress?: EgressGuard,
+  permission?: MediaPermission,
 ): Promise<unknown> {
   const refusal = budget?.admit(tool.key);
   if (refusal) {
@@ -36,7 +40,16 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
     return refusal;
   }
 
-  const egressRefusal = egress?.beforeCall(tool.key, rawArgs);
+  const permissionRefusal = permission?.beforeCall(tool.key, rawArgs);
+  if (permissionRefusal) {
+    reportToolIo({ toolKey: tool.key, input: rawArgs, full: permissionRefusal, thin: permissionRefusal });
+    return permissionRefusal;
+  }
+
+  // A call the person pressed Run on runs as the card showed it, not with whatever else the model added.
+  const args = permission ? permission.argsToRun(tool.key, rawArgs) : rawArgs;
+
+  const egressRefusal = egress?.beforeCall(tool.key, args);
   if (egressRefusal) {
     reportToolIo({ toolKey: tool.key, input: rawArgs, full: egressRefusal, thin: egressRefusal });
     return egressRefusal;
@@ -49,7 +62,7 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
   }
 
   if (!getInjectionGuardBypass()) {
-    const hit = scanJson(rawArgs);
+    const hit = scanJson(args);
     if (hit) {
       const blocked = blockedInjectionOutput(hit);
       reportToolIo({ toolKey: tool.key, input: rawArgs, full: blocked, thin: blocked });
@@ -60,7 +73,7 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
   let full: unknown;
   try {
     // Marked as a model's tool call: a sender it reaches with no outbound guard open refuses (fails closed).
-    full = await runInToolCall(() => invokeTool(tool, rawArgs, tenant));
+    full = await runInToolCall(() => invokeTool(tool, args, tenant));
   } catch (error) {
     // A tool that read private material and then failed may have quoted it in its error.
     egress?.afterCall(tool, undefined);
@@ -77,6 +90,6 @@ export async function invokeToolGuarded<TSchema extends ZodTypeAny>(
     }
   }
 
-  reportToolIo({ toolKey: tool.key, input: rawArgs, full, thin });
+  reportToolIo({ toolKey: tool.key, input: args, full, thin });
   return thin;
 }

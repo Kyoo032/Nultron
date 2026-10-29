@@ -7,6 +7,7 @@ import { getTool } from "../tools/registry";
 import { getInjectionGuardBypass } from "../tools/secret-scope";
 import type { EgressGuard } from "./egress-guard";
 import { disabledToolOutput, invokeToolGuarded } from "./invoke-guarded";
+import type { MediaPermission } from "./media-permission";
 import { isRunAbort, toolErrorResult } from "./tool-error";
 import { reportToolIo } from "./tool-io";
 import type { ToolBudget } from "./tool-budget";
@@ -35,6 +36,8 @@ export function buildAiTools(options: {
   signal?: AbortSignal | undefined;
   budget: ToolBudget;
   egress: EgressGuard;
+  /** Absent for a run whose paid media is the person's own click (the studios): every call runs. */
+  permission?: MediaPermission | undefined;
   disabled: ReadonlySet<string>;
 }): AiToolSet {
   const tools: ToolSet = {};
@@ -65,7 +68,7 @@ export function buildAiTools(options: {
       execute: async (args: unknown, call?: ToolCallOptions) => {
         const input = scrubUnreachableMediaArgs(args);
         try {
-          return await invokeToolGuarded(definition, input, options.tenant, options.budget, options.egress);
+          return await invokeToolGuarded(definition, input, options.tenant, options.budget, options.egress, options.permission);
         } catch (error) {
           // A cancel ends the run. Only a failure on a live run goes back to the model to recover from.
           if (isRunAbort(options.signal, call?.abortSignal)) {

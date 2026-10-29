@@ -10,7 +10,9 @@ import {
 } from "@/components/tool-rows/results";
 import { DELEGATE_TOOL_KEY, delegatedAgentOf } from "@/components/tool-rows/delegate-result";
 import { DOSSIER_TOOL_KEY, readDossierResult } from "@/components/tool-rows/dossier-result";
+import { FINANCE_TASK_TOOL_KEY, readFinanceResult } from "@/components/tool-rows/finance-result";
 import { t } from "@/lib/i18n";
+import { permissionRequestOf } from "@/lib/media-permission";
 
 /** Fast tools still show a completed row; they skip the long "Working…" spinner. */
 
@@ -26,6 +28,7 @@ const ACTIVITY_KEYS: Record<string, string> = {
   datetime: "chat.tool.clock",
   self_check: "chat.tool.selfChecking",
   research_dossier: "agents.progress.working",
+  finance_task: "agents.progress.working",
   delegate: "agents.delegate.working",
 };
 
@@ -39,6 +42,7 @@ const DONE_KEYS: Record<string, string> = {
   datetime: "chat.tool.datetime",
   self_check: "chat.tool.selfCheck",
   research_dossier: "agents.dossier.label",
+  finance_task: "agents.finance.label",
   delegate: "agents.delegate.label",
 };
 
@@ -235,7 +239,7 @@ function gist(value: unknown): string {
     // A single named argument (`{"action":"list"}`) is the argument's value, not "1 field".
     const keys = Object.keys(record);
     if (keys.length === 1) {
-      const only = record[keys[0]!];
+      const only = record[keys[0] ?? ""];
       if (typeof only === "string" || typeof only === "number" || typeof only === "boolean") {
         return gist(only);
       }
@@ -286,6 +290,16 @@ function delegateSummary(label: string, input: unknown, output: unknown): string
   return message ? `${named} · ${gist(message)}` : named;
 }
 
+function financeSummary(label: string, output: unknown): string {
+  const model = readFinanceResult(undefined, output);
+  if (model) {
+    return `${label} · ${gist(model.title)}`;
+  }
+  const record = asRecord(output);
+  const message = readString(asRecord(record?.ask), "question") ?? readString(record, "message");
+  return message ? `${label} · ${gist(message)}` : label;
+}
+
 export function toolCallSummary(toolKey: string, input?: unknown, output?: unknown): string {
   if (toolKey === "web_fetch") {
     return webFetchLabel(input, output, "completed");
@@ -293,9 +307,16 @@ export function toolCallSummary(toolKey: string, input?: unknown, output?: unkno
   if (isRichTool(toolKey)) {
     return toolRowLabel(toolKey, input, output);
   }
+  const asked = permissionRequestOf({ key: toolKey, status: "completed", output });
+  if (asked) {
+    return t(asked.tool === "image_generate" ? "chat.tool.imageAsk" : "chat.tool.videoAsk");
+  }
   const label = toolDoneLabel(toolKey);
   if (toolKey === DOSSIER_TOOL_KEY) {
     return dossierSummary(label, output);
+  }
+  if (toolKey === FINANCE_TASK_TOOL_KEY) {
+    return financeSummary(label, output);
   }
   if (toolKey === "web_search") {
     return webSearchSummary(label, input, output);

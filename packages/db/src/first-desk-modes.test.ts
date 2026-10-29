@@ -1,6 +1,6 @@
 /**
- * The first desk of a fresh Personal install is Research, Images, Videos and Presentation plus Chat
- * (owner decision, Rizky, 2026-09-29), and nothing else. This file holds the structural half of that
+ * The first desk of a fresh install, Personal or hosted, is Chat alone (owner decision, Rizky,
+ * 2026-10-21, replacing 2026-09-29's list), and nothing else. This file holds the structural half of that
  * hard rule; `packages/host/src/first-run-modes.test.ts` holds the half that goes through the real
  * first-run path on a real data dir, including Start over.
  *
@@ -21,7 +21,8 @@ import { ensurePortalOwner } from "./portal-owner";
 import * as schema from "./schema";
 import { workspaces } from "./schema";
 
-const PERSONAL_FIRST_DESK = ["chat", "research", "images", "videos", "presentations"];
+const PERSONAL_FIRST_DESK = ["chat"];
+const HOSTED_FIRST_DESK = ["chat"];
 const EVERY_MODE = PRODUCT_MODES.map((mode) => mode.id);
 
 let sqlite: Database.Database;
@@ -47,7 +48,7 @@ async function homeDesk() {
 }
 
 describe("ensureLocalOwner: the first desk on a fresh Personal install", () => {
-  it("is created with exactly Chat, Research, Images, Videos and Presentation", async () => {
+  it("is created with exactly Chat", async () => {
     await ensureLocalOwner(db);
 
     const row = await homeDesk();
@@ -112,8 +113,8 @@ describe("ensureLocalOwner: the first desk on a fresh Personal install", () => {
   });
 });
 
-describe("the hosted Enterprise app keeps every mode on a first desk", () => {
-  it("ensurePortalOwner creates a tenant's Default desk with every mode", async () => {
+describe("the hosted app starts a first desk with Chat alone too", () => {
+  it("ensurePortalOwner creates a tenant's Default desk with Chat alone", async () => {
     const tenant = await ensurePortalOwner(db, {
       tenantId: "tnt_ent",
       orgId: "org_ent",
@@ -122,15 +123,15 @@ describe("the hosted Enterprise app keeps every mode on a first desk", () => {
     });
 
     const [row] = await db.select().from(workspaces).where(eq(workspaces.id, tenant.workspaceId));
-    expect(row?.productModes).toEqual(EVERY_MODE);
+    expect(row?.productModes).toEqual(HOSTED_FIRST_DESK);
   });
 
-  it("a hosted process that reaches ensureLocalOwner still gets every mode, not the Personal list", async () => {
+  it("a hosted process that reaches ensureLocalOwner gets the hosted list", async () => {
     vi.stubEnv("AGENTFORGE_SERVER", "1");
 
     await ensureLocalOwner(db);
 
-    expect((await homeDesk())?.productModes).toEqual(EVERY_MODE);
+    expect((await homeDesk())?.productModes).toEqual(HOSTED_FIRST_DESK);
   });
 });
 

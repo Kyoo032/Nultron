@@ -55,3 +55,5 @@ export { LEDGER_MIN_ROWS, aggregateLedger, ledgerColumns, monthOf } from "./long
 export type { Ledger, LedgerColumns, LedgerGroup } from "./long-format";
 export { financeImportExtension, financeWorkbookKind, readFinanceTable } from "./read";
 export { DERIVED_TAG, financeFiguresFromSheet, tableToFiguresText } from "./text";
+export { fitFiguresToCap, joinSheetTexts } from "./join-sheets";
+export type { JoinedSheets } from "./join-sheets";

@@ -43,9 +43,7 @@ export async function handleGetAgentCapabilities(request: HostRequest): Promise<
     if (!agent) {
       return jsonOk({ error: { code: "not_found", message: "Agent not found" } }, 404);
     }
-    const published = agent.currentVersionId
-      ? await agentService.getPublishedForRun(tenant, agentId)
-      : null;
+    const published = agent.currentVersionId ? await agentService.getPublishedForRun(tenant, agentId) : null;
     return jsonOk({
       inputModalities: published?.version.inputModalities ?? ["text"],
       model: isDefaultChatAgent(agent)

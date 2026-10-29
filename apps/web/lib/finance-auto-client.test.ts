@@ -8,11 +8,10 @@ import {
   financeAutoStreamBody,
   financeAutoSwitchTasks,
   financeAutoWarningText,
-  fitFiguresToCap,
   joinFigures,
-  joinSheetTexts,
   openTaskWithDraft,
   parseFinanceAuto,
+  readFinanceReport,
   type FinanceAutoAnswer,
 } from "./finance-auto-client";
 import { loadFinanceDraft } from "./finance-drafts";
@@ -34,7 +33,10 @@ function wire(over: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     fits: { top: "cashflow", confidence: "high", ranked: RANKED },
     task: "cashflow",
-    input: { items: [{ label: "Cash in", period: "Jan", amount: 100, currency: "USD", category: "revenue" }], params: {} },
+    input: {
+      items: [{ label: "Cash in", period: "Jan", amount: 100, currency: "USD", category: "revenue" }],
+      params: {},
+    },
     preview: {
       task: "cashflow",
       title: "Cash flow",
@@ -43,7 +45,13 @@ function wire(over: Record<string, unknown> = {}): Record<string, unknown> {
       summary: [{ label: "Runway", value: 4.5, unit: "months", flag: "watch" }],
       tables: [{ id: "runway", title: "Runway", columns: ["Period", "Net"], rows: [["Jan", -100]] }],
       charts: [
-        { id: "cash-balance", title: "Cash", kind: "line", categories: ["Jan", "Feb"], series: [{ name: "Cash", values: [10, null] }] },
+        {
+          id: "cash-balance",
+          title: "Cash",
+          kind: "line",
+          categories: ["Jan", "Feb"],
+          series: [{ name: "Cash", values: [10, null] }],
+        },
       ],
       flags: [{ level: "risk", text: "Cash runs out." }],
       notes: [],
@@ -175,17 +183,6 @@ describe("what is sent for the free read", () => {
   });
 });
 
-describe("holding text to a cap", () => {
-  it("returns short text untouched and long text cut at a line end", () => {
-    expect(fitFiguresToCap("a: 1\nb: 2", 100)).toBe("a: 1\nb: 2");
-    expect(fitFiguresToCap("aaaa\nbbbb\ncccc", 11)).toBe("aaaa\nbbbb");
-  });
-
-  it("keeps the first line even when that line alone is over the cap", () => {
-    expect(fitFiguresToCap("abcdefghij\nxyz", 4)).toBe("abcd");
-  });
-});
-
 describe("the file's figures and what was pasted beside them", () => {
   it("puts them on separate lines, and leaves out whichever is empty", () => {
     expect(joinFigures("Sheet: A\na: 1", "b: 2")).toBe("Sheet: A\na: 1\nb: 2");
@@ -196,51 +193,6 @@ describe("the file's figures and what was pasted beside them", () => {
   it("holds the whole to the cap on a whole line", () => {
     const long = Array.from({ length: 3000 }, (_unused, index) => `Row ${index}: ${index}`).join("\n");
     expect(joinFigures(long, "tail: 1").length).toBeLessThanOrEqual(FINANCE_AUTO_TEXT_MAX);
-  });
-});
-
-describe("joining the sheets of one file", () => {
-  it("starts every sheet with its Sheet: line, which is how the scorer tells them apart", () => {
-    const joined = joinSheetTexts(
-      [
-        { name: "Budget", text: "Sheet: Budget\nRent: 100" },
-        { name: "Actual", text: "Rent: 120" },
-      ],
-      1000,
-    );
-    expect(joined.text).toBe("Sheet: Budget\nRent: 100\nSheet: Actual\nRent: 120");
-    expect(joined.used).toEqual(["Budget", "Actual"]);
-    expect(joined.skipped).toEqual([]);
-  });
-
-  it("adds no Sheet: line to a file with one sheet", () => {
-    expect(joinSheetTexts([{ name: "Only", text: "Rent: 100" }], 1000).text).toBe("Rent: 100");
-  });
-
-  it("leaves out whole sheets that do not fit, and says which, instead of cutting one in half", () => {
-    const big = `Sheet: Big\n${"x: 1\n".repeat(200)}`;
-    const joined = joinSheetTexts(
-      [
-        { name: "A", text: "Sheet: A\na: 1" },
-        { name: "Big", text: big },
-        { name: "C", text: "Sheet: C\nc: 3" },
-      ],
-      60,
-    );
-    expect(joined.used).toEqual(["A", "C"]);
-    expect(joined.skipped).toEqual(["Big"]);
-    expect(joined.text).toBe("Sheet: A\na: 1\nSheet: C\nc: 3");
-  });
-
-  it("skips a sheet that read as nothing", () => {
-    const joined = joinSheetTexts(
-      [
-        { name: "A", text: "a: 1" },
-        { name: "Empty", text: "   " },
-      ],
-      100,
-    );
-    expect(joined.used).toEqual(["A"]);
   });
 });
 
@@ -265,7 +217,9 @@ describe("the write-up request", () => {
   });
 
   it("sends the model only when one was picked, and pins it only when the picker was moved", () => {
-    expect(financeAutoStreamBody(answer, { prompt: "q", language: "en", model: "m-1" })).toMatchObject({ model: "m-1" });
+    expect(financeAutoStreamBody(answer, { prompt: "q", language: "en", model: "m-1" })).toMatchObject({
+      model: "m-1",
+    });
     expect(financeAutoStreamBody(answer, { prompt: "q", language: "en", model: "m-1" })).not.toHaveProperty(
       "modelPinned",
     );
@@ -325,5 +279,56 @@ describe("what a warning says", () => {
     expect(financeAutoWarningText({ code: "reader_note", message: "ignored", detail: ["From the reader."] })).toBe(
       "From the reader.",
     );
+  });
+});
+
+describe("the opening-cash warning", () => {
+  it("is written from the catalog in both languages", () => {
+    applyLocale("en");
+    const en = financeAutoWarningText({ code: "no_opening_cash", message: "dev", detail: [] });
+    expect(en).not.toBe("dev");
+    expect(en).toMatch(/opening/i);
+    applyLocale("id");
+    expect(financeAutoWarningText({ code: "no_opening_cash", message: "dev", detail: [] })).toMatch(/saldo awal/i);
+  });
+});
+
+describe("reading a stored report", () => {
+  it("reads a report and drops a malformed row inside it", () => {
+    const report = readFinanceReport({
+      task: "ratios",
+      title: "Ratio health check",
+      locale: "id",
+      summary: [{ label: "Current ratio", value: 1.8, unit: "x", flag: "good" }, { value: 2 }],
+      tables: [{ id: "scorecard", title: "Scorecard", columns: ["Ratio"], rows: [["Current", { x: 1 }]] }, { id: 3 }],
+      charts: "none",
+      flags: [
+        { level: "risk", text: "Thin margin" },
+        { level: "odd", text: "x" },
+      ],
+      notes: [{ heading: "Read", body: "Sound." }],
+    });
+    expect(report).toMatchObject({
+      task: "ratios",
+      title: "Ratio health check",
+      locale: "id",
+      summary: [{ label: "Current ratio", value: 1.8, unit: "x", flag: "good" }],
+      tables: [{ id: "scorecard", rows: [["Current", null]] }],
+      charts: [],
+      flags: [{ level: "risk", text: "Thin margin" }],
+      notes: [{ heading: "Read", body: "Sound." }],
+    });
+  });
+
+  it("reads nothing from a value that is not a report or has no title", () => {
+    expect(readFinanceReport(undefined)).toBeNull();
+    expect(readFinanceReport("report")).toBeNull();
+    expect(readFinanceReport([])).toBeNull();
+    expect(readFinanceReport({ title: "" })).toBeNull();
+    expect(readFinanceReport({ summary: [] })).toBeNull();
+  });
+
+  it("takes the task it is given when the report names none", () => {
+    expect(readFinanceReport({ title: "Budget" }, "budget")?.task).toBe("budget");
   });
 });

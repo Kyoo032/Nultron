@@ -5,6 +5,7 @@ import { ApiError } from "../../errors";
 import { currentOutboundGuard, mediaSendRefusal } from "../../security/outbound-guard";
 import { defineTool } from "../define-tool";
 import { gatewayGenerateModel } from "../media-model-choice";
+import { imageInputSchema, mediaReferenceId, resolveImageInput } from "../media-reference";
 import { missingToolRouteMessage, resolveToolBackend } from "../credentials";
 import { getSecret } from "../secret-scope";
 import { falVideoUrl, runFalQueue } from "./fal-queue";
@@ -94,9 +95,7 @@ async function generateWithSeedance(
     }
     if (statusBody.status === "failed") {
       const message =
-        typeof statusBody.error === "string"
-          ? statusBody.error
-          : statusBody.error?.message || "Seedance job failed";
+        typeof statusBody.error === "string" ? statusBody.error : statusBody.error?.message || "Seedance job failed";
       throw new ApiError("tool_failed", message, 502);
     }
     await new Promise((resolve) => setTimeout(resolve, 1_000));
@@ -108,24 +107,26 @@ export const videoGenerateTool = defineTool({
   key: "video_generate",
   name: "Create video",
   description:
-    "Create a video from a text prompt, or animate a still by passing image_url. Uses the Toko Token gateway by default (POST /v1/video/generations, then poll). Pass model to pick a catalog video id.",
+    "Create a video from a text prompt, or animate a still by passing image_url: an https URL, or an image reference (/api/v1/media/<id>/file or the id) for an image in this chat. Uses the gateway by default (POST /v1/video/generations, then poll). Pass model to pick a catalog video id.",
   capability: "video_gen",
   schema: z.object({
     prompt: z.string().min(1).describe("Video prompt"),
     aspect_ratio: z.enum(["16:9", "9:16", "1:1"]).optional().describe("Output aspect ratio"),
-    image_url: z.string().url().optional().describe("Optional still image to animate"),
+    image_url: imageInputSchema
+      .optional()
+      .describe("Optional still image to animate: an https URL or an image reference"),
     model: z.string().min(1).optional().describe("Optional catalog video model id"),
     seconds: z.number().int().min(2).max(12).optional().describe("Clip length in seconds (2–12)"),
     resolution: z.enum(["480p", "720p", "1080p"]).optional().describe("Output resolution for Seedance-class models"),
   }),
-  execute: async ({ prompt, aspect_ratio, image_url, model, seconds, resolution }) => {
+  execute: async ({ prompt, aspect_ratio, image_url, model, seconds, resolution }, tenant) => {
     const route = resolveToolBackend("video_gen");
     if (!route.ready || !route.envVar) {
       return {
         success: false,
         error: missingToolRouteMessage(
           route,
-          "Add a Toko Token gateway key in Settings to generate video, or pick FAL / Volcengine Seedance.",
+          "Add a gateway key in Settings to generate video, or pick FAL / Volcengine Seedance.",
         ),
       };
     }
@@ -133,7 +134,16 @@ export const videoGenerateTool = defineTool({
     if (!apiKey) {
       return { success: false, error: `${route.envVar} is not set.` };
     }
-    const held = mediaSendRefusal({ imageUrl: image_url, prompt, thirdParty: route.backend !== "gateway" });
+    const resolved = await resolveImageInput(image_url, tenant);
+    if (!resolved.ok) {
+      return { success: false, error: resolved.error };
+    }
+    const sourceImage = resolved.url;
+    const held = mediaSendRefusal({
+      imageUrl: image_url && !mediaReferenceId(image_url) ? image_url : undefined,
+      prompt,
+      thirdParty: route.backend !== "gateway",
+    });
     if (held) {
       return held;
     }
@@ -145,7 +155,7 @@ export const videoGenerateTool = defineTool({
           ? await generateGatewayVideo({
               prompt,
               aspectRatio: aspect,
-              imageUrl: image_url,
+              imageUrl: sourceImage,
               seconds,
               resolution,
               apiKey,
@@ -156,21 +166,21 @@ export const videoGenerateTool = defineTool({
           : route.backend === "volcengine"
             ? await generateWithSeedance(
                 prompt,
-                image_url,
+                sourceImage,
                 aspect,
                 apiKey,
                 getSecret("ARK_BASE_URL") || "https://ark.cn-beijing.volces.com/api/v3",
                 fetchImpl,
                 seconds,
               )
-            : await generateWithFal(prompt, image_url, aspect, apiKey, fetchImpl);
+            : await generateWithFal(prompt, sourceImage, aspect, apiKey, fetchImpl);
       currentOutboundGuard()?.noteHostMedia([generated.url]);
       return {
         success: true,
         backend: route.backend,
         video: generated.url,
         model: generated.model,
-        modality: image_url ? "image" : "text",
+        modality: sourceImage ? "image" : "text",
         prompt,
       };
     } catch (error) {

@@ -7,12 +7,13 @@ import { resolveModelProvider } from "../models/catalog";
 import { jobThinkingPlan } from "../models/job-thinking";
 import { DEFAULT_OPENAI_BASE_URL, isOfficialOpenAIBaseUrl } from "../models/probe";
 import { isOpenRouterBaseUrl } from "../privacy/openrouter";
-import { getDisabledTools } from "../tools/secret-scope";
+import { getDisabledTools, getSecret } from "../tools/secret-scope";
 import { mapStreamPart } from "./stream-parts";
 import { buildAiTools, type AiToolSet } from "./ai-tools";
 import { createToolCallRepair, isInvalidToolCallEvent, withInvalidToolCall } from "./tool-call-repair";
 import { createStepTracker } from "./step-tracker";
 import { attachedTextsOf, createEgressGuard, userTextOf } from "./egress-guard";
+import { createMediaPermission, type PaidMediaTool } from "./media-permission";
 import { currentOutboundGuard } from "../security/outbound-guard";
 import { createToolBudget, resolveMaxSteps } from "./tool-budget";
 import {
@@ -122,6 +123,11 @@ function toCoreMessages(
     messages.push({ role: "user", content });
   }
   return messages;
+}
+
+/** The model `image_generate` or `video_generate` falls back to on this host, so the permission card can price it. */
+export function hostMediaModel(tool: PaidMediaTool): string | undefined {
+  return getSecret(tool === "image_generate" ? "IMAGE_GEN_MODEL" : "VIDEO_GEN_MODEL");
 }
 
 const USAGE_SETTLE_MS = 5_000;
@@ -484,12 +490,15 @@ export class AiSdkRuntime implements AgentRuntime {
       outbound: currentOutboundGuard(),
       tainted: input.egress?.tainted,
     });
+    // Same lifetime again: a grant the person gave is spent once per execute, whatever the retries do.
+    const mediaPermission = createMediaPermission(input.mediaPermission, hostMediaModel);
     const built = buildAiTools({
       bindings: input.bindings,
       tenant: input.tenant,
       signal: input.signal,
       budget: toolBudget,
       egress: egressGuard,
+      permission: mediaPermission,
       disabled,
     });
     // A run whose every bound tool is disabled sends the model no tool list at all, as it always has.

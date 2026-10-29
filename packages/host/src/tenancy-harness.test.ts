@@ -1009,7 +1009,10 @@ describe("every by-id route refuses another tenant's id", () => {
     const view = (extract as HostJsonResult).body as {
       extract: { facts: { id: string; value: string; edited: boolean }[]; comments: { text: string }[] };
     };
-    expect(view.extract.facts.find((fact) => fact.id === "payment:S1")).toMatchObject({ value: LEAK_MARKER, edited: true });
+    expect(view.extract.facts.find((fact) => fact.id === "payment:S1")).toMatchObject({
+      value: LEAK_MARKER,
+      edited: true,
+    });
     expect(view.extract.comments.map((comment) => comment.text)).toEqual([LEAK_MARKER]);
     const { legalStore } = await import("./legal/store");
     const file = legalStore().getExtractEdits(tenantA, seeds.matterId);

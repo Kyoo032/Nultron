@@ -21,6 +21,20 @@ export const VIDEO_NOT_VISIBLE_NOTE =
 export const EARLIER_IMAGE_NOT_VISIBLE_NOTE =
   "[The person shared an image earlier in this conversation. It is not part of this request, so you cannot see it. Do not describe it or guess what it shows.]";
 
+const MEDIA_ID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The note for an earlier image the model cannot see, with its stored reference when the host knows one.
+ * The reference is what `image_generate` takes to edit that picture, so the model can name it. A value that
+ * is not a media id gets the plain note: only a value of the id's exact shape is ever written into the note.
+ */
+export function earlierImageNote(mediaId?: string | null): string {
+  if (!mediaId || !MEDIA_ID_SHAPE.test(mediaId)) {
+    return EARLIER_IMAGE_NOT_VISIBLE_NOTE;
+  }
+  return `[The person shared an image earlier in this conversation (reference: /api/v1/media/${mediaId}/file). It is not part of this request, so you cannot see it. Do not describe it or guess what it shows. Pass that reference to image_generate to edit it.]`;
+}
+
 const UNREADABLE_COPY: Record<AppLocale, string> = {
   en: "An image you attached could not be read from this app, so nothing was sent. Attach it again.",
   id: "Gambar yang Anda lampirkan tidak dapat dibaca dari aplikasi ini, jadi tidak ada yang dikirim. Lampirkan lagi.",

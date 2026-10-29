@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { EARLIER_IMAGE_NOT_VISIBLE_NOTE, type ContentPart, type TenantContext } from "@agentforge/core";
+
+const EARLIER_NOTE_OPENING = EARLIER_IMAGE_NOT_VISIBLE_NOTE.slice(0, 40);
 import {
   assertChatImagesSendable,
   CHAT_IMAGE_REQUEST_BYTES,
@@ -50,8 +52,9 @@ function store(sizes: Record<string, number>, kinds: Record<string, string> = {}
   } satisfies ChatMediaReader;
 }
 
+/** The notes about an earlier image, with or without a reference (`earlierImageNote`). */
 function noteCount(parts: ContentPart[]): number {
-  return parts.filter((part) => part.type === "text" && part.text === EARLIER_IMAGE_NOT_VISIBLE_NOTE).length;
+  return parts.filter((part) => part.type === "text" && part.text.startsWith(EARLIER_NOTE_OPENING)).length;
 }
 
 const gpt = (media: ChatMediaReader, extra: { budgetBytes?: number; locale?: "en" | "id" } = {}) => ({
@@ -120,12 +123,15 @@ describe("prepareChatImageHistory", () => {
     const history = [turn("user", image(ID_A)), turn("user", image(ID_B)), turn("user", image(ID_C))];
     const media = store({ [ID_A]: 1, [ID_B]: 50, [ID_C]: 5 });
     const result = await prepareChatImageHistory(tenant, history, gpt(media, { budgetBytes: 10 }));
-    // C (latest) fits; B (50) does not; A is small enough to fit but is older than B, so it is not even looked up.
-    expect(media.stat.mock.calls.map((call) => call[1])).toEqual([ID_C, ID_B]);
+    // C (latest) fits; B (50) does not; A is small enough to fit but is older than B, so its bytes are never
+    // read. Its row is read once, for the reference its note names (the owner check). No bytes for any note.
+    // B's row is read again for its note, because the budget check keeps no row (`prepare`).
+    expect(media.stat.mock.calls.map((call) => call[1])).toEqual([ID_C, ID_B, ID_B, ID_A]);
     expect(media.read.mock.calls.map((call) => call[1])).toEqual([ID_C]);
     expect(result[2]?.parts[0]?.type).toBe("image_url");
     expect(noteCount(result[1]?.parts ?? [])).toBe(1);
     expect(noteCount(result[0]?.parts ?? [])).toBe(1);
+    expect(JSON.stringify(result[0]?.parts)).toContain(`reference: ${url(ID_A)}`);
   });
 
   it("refuses, in words, a latest message whose own images are over the limit", async () => {
@@ -191,11 +197,51 @@ describe("prepareChatImageHistory", () => {
       turn("user", text("summarise")),
     ];
     const result = await prepareChatImageHistory(tenant, history, { ...gpt(media), model: "glm-5.3" });
-    expect(media.stat).not.toHaveBeenCalled();
+    // A note reads the row for its reference, never the bytes.
     expect(media.read).not.toHaveBeenCalled();
-    // One note per message, however many images it held.
-    expect(noteCount(result[0]?.parts ?? [])).toBe(1);
+    // One note per picture, each with its reference, so the model can name either one to edit it.
+    expect(noteCount(result[0]?.parts ?? [])).toBe(2);
+    expect(JSON.stringify(result)).toContain(`reference: ${url(ID_A)}`);
+    expect(JSON.stringify(result)).toContain(`reference: ${url(ID_B)}`);
     expect(JSON.stringify(result)).not.toContain("data:image");
+  });
+
+  it("names the reference of an earlier image the person owns, so the model can pass it to image_generate", async () => {
+    const media = store({ [ID_A]: 5 });
+    const history = [turn("user", image(ID_A)), turn("assistant", text("ok")), turn("user", text("make it brighter"))];
+    const result = await prepareChatImageHistory(tenant, history, gpt(media, { budgetBytes: 4 }));
+    const note = result[0]?.parts.find((part) => part.type === "text" && part.text.includes("reference:"));
+    expect(note?.type === "text" ? note.text : "").toContain(`reference: ${url(ID_A)}`);
+    expect(note?.type === "text" ? note.text : "").toContain("image_generate");
+    expect(media.read).not.toHaveBeenCalled();
+  });
+
+  it("adds the reference beside the latest message's own picture, when it is a stored one the org owns", async () => {
+    const history = [turn("user", text("edit this"), image(ID_A))];
+    const result = await prepareChatImageHistory(tenant, history, gpt(store({ [ID_A]: 5 })));
+    const parts = result[0]?.parts ?? [];
+    const texts = parts.map((part) => (part.type === "text" ? part.text : ""));
+    expect(parts.some((part) => part.type === "image_url")).toBe(true);
+    expect(texts.join("\n")).toContain(`(reference: ${url(ID_A)} — pass it to image_generate to edit this image)`);
+  });
+
+  it("adds no reference for a latest picture sent as a data URL", async () => {
+    const history = [turn("user", { type: "image_url", image_url: { url: dataUrlOf(4) } })];
+    const result = await prepareChatImageHistory(tenant, history, gpt(store({}), { budgetBytes: 10 }));
+    expect(JSON.stringify(result)).not.toContain("(reference:");
+  });
+
+  it("refuses a latest picture whose id this organization does not own, so no reference is written for it", async () => {
+    await expect(prepareChatImageHistory(tenant, [turn("user", image(ID_B))], gpt(store({})))).rejects.toThrow(
+      /could not be read/,
+    );
+  });
+
+  it("gives no reference for an earlier image the store does not hold for this organization", async () => {
+    const history = [turn("user", image(ID_A)), turn("assistant", text("ok")), turn("user", text("make it brighter"))];
+    const result = await prepareChatImageHistory(tenant, history, gpt(store({}), { budgetBytes: 4 }));
+    expect(JSON.stringify(result)).not.toContain("reference:");
+    expect(noteCount(result[0]?.parts ?? [])).toBe(1);
   });
 
   it("passes a data URL through and counts its bytes", async () => {

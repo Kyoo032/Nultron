@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { consumeSse } from "@/lib/sse-client";
 import {
   COMPOSER_FILE_ACCEPT,
@@ -12,6 +12,7 @@ import {
 } from "@/lib/composer-attach";
 import { TierPicker } from "@/components/tier-picker";
 import { CHAT_DOCUMENTS_PER_MESSAGE } from "@agentforge/core/chat-documents";
+import type { MediaRequest } from "@agentforge/core/media-permission";
 import { ComposerAttachmentChip } from "@/components/composer-attachment-chip";
 import {
   ChatDocumentError,
@@ -22,6 +23,7 @@ import {
   restoreDocumentRead,
   type DocumentRead,
 } from "@/lib/composer-documents";
+import { useChipOriginals } from "@/lib/use-chip-originals";
 import { useDocumentReads } from "@/lib/use-document-reads";
 import { EnhancePromptButton } from "@/components/enhance-prompt-button";
 import { ComposerPlusMenu } from "@/components/composer-plus-menu";
@@ -86,7 +88,7 @@ type Props = {
    * `continue`, or the turn to send again with `retry`) and leaves the draft in the box alone. A ref,
    * not an effect: StrictMode runs an effect twice.
    */
-  continueSendRef?: { current: ((text: string, retry?: boolean) => void) | null };
+  continueSendRef?: { current: ((text: string, retry?: boolean, grants?: readonly MediaRequest[]) => void) | null };
 };
 
 type HeldFile = {
@@ -122,7 +124,7 @@ function growTextArea(el: HTMLTextAreaElement | null) {
   if (!el) {
     return;
   }
-  el.style.height = "44px";
+  el.style.height = "0px";
   el.style.height = `${Math.min(el.scrollHeight, COMPOSER_TEXT_MAX_PX)}px`;
 }
 
@@ -275,11 +277,9 @@ export function ChatComposer({
       // A read that was in flight when the pane went away starts again; a finished one is kept.
       .map((item) => ({ ...item, read: restoreDocumentRead(item.read) })),
   );
-  const reportRead = useCallback((id: string, read: DocumentRead | undefined) => {
-    setFiles((current) => current.map((item) => (item.id === id ? { ...item, read } : item)));
-  }, []);
-  const { retry: retryRead } = useDocumentReads(files, reportRead);
   const [busy, setBusy] = useState(false);
+  const { reportRead, removeChip } = useChipOriginals(files, setFiles, busy);
+  const { retry: retryRead } = useDocumentReads(files, reportRead);
   const [enhancing, setEnhancing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -332,6 +332,7 @@ export function ChatComposer({
     onDraftApplied?.();
   }, [draft, onDraftApplied]);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: text is the trigger that re-grows the textarea; the body reads only the ref
   useEffect(() => {
     growTextArea(textAreaRef.current);
   }, [text]);
@@ -399,11 +400,7 @@ export function ChatComposer({
     }
   }
 
-  function removeFile(id: string) {
-    setFiles((current) => current.filter((item) => item.id !== id));
-  }
-
-  async function send(override?: string, retrying = false) {
+  async function send(override?: string, retrying = false, grants: readonly MediaRequest[] = []) {
     // Continue sends only its word (never the draft or the files in the box), does not wait on a document
     // still being read, and does nothing when clicked again while its run is going.
     const { continuing, typed, attached } = sendSource(override, text, files);
@@ -431,13 +428,13 @@ export function ChatComposer({
         onFailed?.(message);
       }
     };
-    /** Only the draft that was sent is cleared; anything typed or attached since is the owner's. */
+    /** Only the draft that was sent is cleared, with its chips; what was typed or attached since is the owner's. */
     const clearSent = () => {
       if (continuing) {
         return;
       }
       setText((current) => (current === typed ? "" : current));
-      setFiles((current) => (current === attached ? [] : current));
+      setFiles((current) => current.filter((item) => !attached.some((sent) => sent.id === item.id)));
     };
     const live: RunStreamHandlers = {
       onStarted,
@@ -551,7 +548,7 @@ export function ChatComposer({
           const response = await apiFetch(`/api/v1/threads/${id}/runs/text`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(buildChatRunBody(outgoing, tier, retrying)),
+            body: JSON.stringify(buildChatRunBody(outgoing, tier, retrying, grants)),
             signal: abort.signal,
           });
           if (!response.ok) {
@@ -649,8 +646,8 @@ export function ChatComposer({
 
   // The click reads this on the way to `send`. Writing it during render keeps the closure current.
   if (continueSendRef) {
-    continueSendRef.current = (text: string, retry = false) => {
-      void send(text, retry);
+    continueSendRef.current = (text: string, retry = false, grants: readonly MediaRequest[] = []) => {
+      void send(text, retry, grants);
     };
   }
 
@@ -780,7 +777,7 @@ export function ChatComposer({
         {files.length > 0 ? (
           <ul className="flex flex-wrap gap-2" data-testid="composer-attachments">
             {files.map((item) => (
-              <ComposerAttachmentChip key={item.id} item={item} onRemove={removeFile} onRetry={retryRead} />
+              <ComposerAttachmentChip key={item.id} item={item} onRemove={removeChip} onRetry={retryRead} />
             ))}
           </ul>
         ) : null}

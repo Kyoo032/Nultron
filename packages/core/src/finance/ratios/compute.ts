@@ -226,6 +226,8 @@ function coverageValues(result: Result): Record<string, number | null> {
 function performanceValues(piles: Piles, result: Result, daysPerYear: number): Record<string, number | null> {
   const inventoryTurnover = ratio(result.cogs, piles.inventory);
   const receivableShare = ratio(piles.receivables, result.revenue);
+  const inventoryDays = inventoryTurnover === null || inventoryTurnover === 0 ? null : daysPerYear / inventoryTurnover;
+  const receivableDays = receivableShare === null ? null : receivableShare * daysPerYear;
   return {
     grossMarginPct: percent(result.grossProfit, result.revenue),
     operatingMarginPct: percent(result.ebit, result.revenue),
@@ -233,10 +235,39 @@ function performanceValues(piles: Piles, result: Result, daysPerYear: number): R
     returnOnAssetsPct: percent(result.netProfit, piles.totalAssets),
     returnOnEquityPct: percent(result.netProfit, piles.equity),
     assetTurnover: ratio(result.revenue, piles.totalAssets),
+    equityMultiplier: ratio(piles.totalAssets, piles.equity),
     inventoryTurnover,
-    inventoryDays: inventoryTurnover === null || inventoryTurnover === 0 ? null : daysPerYear / inventoryTurnover,
-    receivableDays: receivableShare === null ? null : receivableShare * daysPerYear,
+    inventoryDays,
+    receivableDays,
+    operatingCycleDays: inventoryDays === null || receivableDays === null ? null : inventoryDays + receivableDays,
   };
+}
+
+function change(current: number | null | undefined, prior: number | null | undefined): number | null {
+  if (current === null || current === undefined || prior === null || prior === undefined || prior <= 0) {
+    return null;
+  }
+  return current / prior - 1;
+}
+
+function operatingLeverage(current: RatioPeriodFigures, prior: RatioPeriodFigures | undefined): number | null {
+  if (prior === undefined) {
+    return null;
+  }
+  const ebitChange = change(current.values.ebit, prior.values.ebit);
+  const revenueChange = change(current.values.revenue, prior.values.revenue);
+  if (ebitChange === null || revenueChange === null || revenueChange === 0) {
+    return null;
+  }
+  const value = ebitChange / revenueChange;
+  return Number.isFinite(value) ? value : null;
+}
+
+function withOperatingLeverage(byPeriod: readonly RatioPeriodFigures[]): RatioPeriodFigures[] {
+  return byPeriod.map((figures, at) => ({
+    ...figures,
+    values: { ...figures.values, operatingLeverage: operatingLeverage(figures, byPeriod[at - 1]) },
+  }));
 }
 
 function balanceOf(piles: Piles): number | null {
@@ -305,7 +336,7 @@ export function computeRatios(
   // the ratios below stay a sum over leaves, and the workbook's own formulas recompute the same
   // figure. What the rows and the printed subtotals still disagree about is reported, never hidden.
   const repaired = repairRatioRows(rows, stated, periods, params.locale ?? "en", currency);
-  const byPeriod = periods.map((period) => figuresFor(repaired.rows, period, params));
+  const byPeriod = withOperatingLeverage(periods.map((period) => figuresFor(repaired.rows, period, params)));
   return {
     rows: repaired.rows,
     periods,

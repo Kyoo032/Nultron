@@ -34,7 +34,15 @@ export const chatHarnessSpec: ModeHarnessSpec = {
   budget: {
     maxSteps: 12,
     maxToolCalls: 40,
-    perTool: { write_file: 20, edit_file: 20, delete_file: 10, web_fetch: 8, run_code: 6, self_check: 4, build_deck: 4 },
+    perTool: {
+      write_file: 20,
+      edit_file: 20,
+      delete_file: 10,
+      web_fetch: 8,
+      run_code: 6,
+      self_check: 4,
+      build_deck: 4,
+    },
   },
   repairRounds: 0,
   skills: [

@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "@/lib/nav";
 import { AgentChatHeader } from "@/components/agent-chat-controls";
+import { AgentChatDetails, contextNearlyFull } from "@/components/agent-chat-details";
 import { AgentHome } from "@/components/agent-home";
 import { TierPicker } from "@/components/tier-picker";
 import { virtualAgentHref, type VirtualAgentInfo } from "@/lib/virtual-agents";
@@ -10,10 +11,12 @@ import { BuddyStage } from "@/components/buddy-stage";
 import { ChatAccountChip } from "@/components/chat-account-chip";
 import { ChatComposer } from "@/components/chat-composer";
 import { continuePrompt, mayOfferContinue } from "@/lib/chat-continue";
+import type { MediaRequest } from "@agentforge/core/media-permission";
 import { canOfferRetry, retryTextOf } from "@/lib/chat-retry";
 import { FolderSurface } from "@/components/folder/folder-surface";
 import { ChatContextChip } from "@/components/chat-context-chip";
 import { ChatHeader } from "@/components/chat-header";
+import { ChatGreeting, ChatIdeaChips } from "@/components/chat-greeting";
 import { ChatLauncher } from "@/components/chat-launcher";
 import {
   ChatModelFallbackNotice,
@@ -68,6 +71,7 @@ export type ChatSessionShell = {
   onForeignThread?: (ownerAgentId: string, threadId: string) => void;
   /** Set when the agent's own harness still runs from its studio: the empty conversation offers it. */
   onOpenStudio?: () => void;
+  detailsTarget?: HTMLElement | null;
 };
 
 type Props = {
@@ -111,7 +115,9 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
   /** A prompt picked from the empty screen's suggestions; handed down once, then cleared. */
   const [composerDraft, setComposerDraft] = useState<string | null>(null);
   /** The composer's text send, for Continue and Try again. Null until the composer has rendered. */
-  const continueSendRef = useRef<((text: string, retry?: boolean) => void) | null>(null);
+  const continueSendRef = useRef<((text: string, retry?: boolean, grants?: readonly MediaRequest[]) => void) | null>(
+    null,
+  );
   const toolsRef = useRef(tools);
   toolsRef.current = tools;
   /** Read inside the load effect, which must not run again because the shell object is a new one. */
@@ -266,6 +272,7 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
     return id;
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: resetLive is redeclared every render and only sets state; adding it would re-run this load on every render
   useEffect(() => {
     // `?thread=<id>` -> `/chat` is the rail asking for a blank pane, not a re-render to ignore.
     const leftThread = lastInitialThreadRef.current !== undefined && initialThreadId === undefined;
@@ -392,6 +399,7 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
   }
 
   const empty = messages.length === 0 && !streaming && !thinking && !running && tools.length === 0;
+  const greeting = empty && !error && shell?.agent.generalist === true;
   const hasReply = messages.some((message) => message.role === "assistant");
   const conversationTokens = estimateConversationTokens(messages, [thinking, streaming]);
   const knowledgeTokens = knowledgeParts.reduce((sum, part) => sum + part.tokens, 0);
@@ -445,14 +453,13 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
           tier={<TierPicker tiers={tiers} value={tierId} onChange={handleTierChange} disabled={running} />}
           chips={
             <>
-              {hasReply ? (
+              {hasReply && contextNearlyFull(contextTokens, selectedTier?.contextLength ?? undefined) ? (
                 <ChatContextChip
                   usedTokens={contextTokens}
                   contextLength={selectedTier?.contextLength ?? undefined}
                   parts={contextParts}
                 />
               ) : null}
-              {hasReply ? <ChatUsageChip /> : null}
               <ChatAccountChip />
             </>
           }
@@ -471,6 +478,15 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
           <ChatAccountChip />
         </ChatHeader>
       )}
+
+      {shell ? (
+        <AgentChatDetails
+          target={hasReply ? shell.detailsTarget : null}
+          usedTokens={contextTokens}
+          contextLength={selectedTier?.contextLength ?? undefined}
+          parts={contextParts}
+        />
+      ) : null}
 
       {error ? (
         <div className="flex w-full items-start gap-3 px-[var(--chat-gutter)]">
@@ -502,6 +518,8 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
         {empty && !error ? (
           shell && !shell.agent.generalist ? (
             <AgentHome agent={shell.agent} name={shell.name} onOpenStudio={shell.onOpenStudio} />
+          ) : shell ? (
+            <ChatGreeting />
           ) : (
             <ChatLauncher onSuggest={setComposerDraft} />
           )
@@ -522,6 +540,17 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
                         return;
                       }
                       continueSendRef.current?.(continuePrompt(getLocale()));
+                    }
+                  : undefined
+              }
+              // Same for Run on a paid picture or clip (SR-167): the newest reply's card is the one that waits.
+              onRunMedia={
+                agentIdReady && mayOfferContinue(index, shown.length, message.role)
+                  ? (requests) => {
+                      if (runningRef.current) {
+                        return;
+                      }
+                      continueSendRef.current?.(t("chat.media.runPrompt"), false, requests);
                     }
                   : undefined
               }
@@ -589,7 +618,11 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
                   return current;
                 }
                 const next = [...current];
-                next[index] = { ...next[index]!, progress: event.label };
+                const target = next[index];
+                if (!target) {
+                  return current;
+                }
+                next[index] = { ...target, progress: event.label };
                 return next;
               });
             }}
@@ -713,6 +746,7 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
       ) : error ? null : (
         <p className="mt-6 text-sm text-ink/50">{t("chat.starting")}</p>
       )}
+      {agentIdReady && greeting ? <ChatIdeaChips onSuggest={setComposerDraft} /> : null}
     </main>
   );
 }

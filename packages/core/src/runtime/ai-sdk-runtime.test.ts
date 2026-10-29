@@ -1,9 +1,28 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AiSdkRuntime, mergeOpenRouterZdr } from "./ai-sdk-runtime";
+import { AiSdkRuntime, hostMediaModel, mergeOpenRouterZdr } from "./ai-sdk-runtime";
 import { applyZeroRetention } from "../models/request-constraints";
+import { runWithToolSecrets } from "../tools/secret-scope";
 import type { AgentVersionRecord } from "../agents/service";
 import type { TenantContext } from "../tenancy/types";
 import type { RuntimeEvent } from "./types";
+
+describe("hostMediaModel", () => {
+  const scope = (secrets: Record<string, string>) => ({ secrets, backends: {}, injectionGuardBypass: true });
+
+  it("reads the model the host sets for a picture or a clip, the same keys the tools read", () => {
+    runWithToolSecrets(scope({ IMAGE_GEN_MODEL: "my-image", VIDEO_GEN_MODEL: "my-clip" }), () => {
+      expect(hostMediaModel("image_generate")).toBe("my-image");
+      expect(hostMediaModel("video_generate")).toBe("my-clip");
+    });
+  });
+
+  it("is nothing when the host sets none", () => {
+    runWithToolSecrets(scope({}), () => {
+      expect(hostMediaModel("image_generate")).toBeUndefined();
+    });
+    expect(hostMediaModel("video_generate")).toBeUndefined();
+  });
+});
 
 describe("mergeOpenRouterZdr", () => {
   it("adds provider.zdr for openrouter.ai base URL", () => {

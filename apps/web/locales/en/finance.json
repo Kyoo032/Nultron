@@ -483,7 +483,8 @@
       "fellBack": "It looked like {from}, but that could not be built from this file, so it was read as {to}.",
       "unplacedRows": "{n} row(s) could not be placed by the rules and were left as they are.",
       "defaultDiscountRate": "No discount rate was found, so {rate}% is shown. Change it in the appraisal.",
-      "unpairedLines": "{n} line(s) have no partner on the other side yet."
+      "unpairedLines": "{n} line(s) have no partner on the other side yet.",
+      "noOpeningCash": "No opening cash balance was found, so the cash book starts from 0. Add the opening balance."
     },
     "write": "Write it up",
     "writing": "Working…",

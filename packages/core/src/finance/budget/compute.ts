@@ -15,9 +15,11 @@ import {
   budgetAggregates,
   budgetFlagCounts,
   budgetVarianceLines,
+  budgetWeightedErrors,
   type BudgetAggregate,
   type BudgetThresholds,
   type BudgetVarianceLine,
+  type BudgetWeightedError,
 } from "./variance";
 
 /** Currency shown when neither the rows nor the request name one. */
@@ -65,6 +67,7 @@ export type BudgetComputed = {
   readonly lines: readonly BudgetVarianceLine[];
   readonly aggregates: readonly BudgetAggregate[];
   readonly flagCounts: ReturnType<typeof budgetFlagCounts>;
+  readonly weightedError: BudgetWeightedError;
   readonly thresholds: BudgetThresholds;
   readonly budgetOnly: readonly string[];
   readonly actualOnly: readonly string[];
@@ -110,6 +113,7 @@ export function computeBudget(input: BudgetTaskInput): BudgetComputed {
     lines,
     aggregates: budgetAggregates(lines, periods, thresholds),
     flagCounts: budgetFlagCounts(lines, periods),
+    weightedError: budgetWeightedErrors(lines),
     thresholds,
     budgetOnly: pairing.budgetOnly,
     actualOnly: pairing.actualOnly,

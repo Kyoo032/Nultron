@@ -1,10 +1,9 @@
 import { expect, type APIRequestContext } from "@playwright/test";
 
 /**
- * Every mode id, written out. A fresh Personal desk starts with only Chat, Research, Images, Videos
- * and Presentation (`FIRST_RUN_MODES`, owner decision 2026-09-29), and these specs drive Documents,
- * Finance, Data, Market and Edit, so they turn the rest on the way an owner does: by editing the
- * Default desk's modes, which is what Workspaces' Edit sends.
+ * Every mode id, written out. A fresh desk starts with the default agent alone (`FIRST_RUN_MODES`,
+ * owner decision 2026-10-21), and these specs drive the other agents, so they hire the rest the way
+ * an owner does: by editing the Default desk's modes, which is what Virtual agents' Hire sends.
  *
  * Written out rather than imported from `@agentforge/core`, so a mode added to the catalog later
  * does not silently join a spec that never drives it.

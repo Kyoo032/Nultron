@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isFileRefusal, parseDeskPath } from "@agentforge/core/tools/files";
+import { MAX_SEGMENT_CHARS, isFileRefusal, parseDeskPath } from "@agentforge/core/tools/files";
 import { privateFolderFor } from "../desk-files/private-uploads";
 import { deskPathForDocument } from "./desk-name";
 
@@ -85,5 +85,18 @@ describe("deskPathForDocument", () => {
 
   it("prefixes a reserved device name instead of refusing it", () => {
     expect(pathFor("CON.pdf")).toBe("uploads/~ana/doc-CON.pdf.md");
+  });
+
+  it("takes another suffix for the figures file, beside the text copy", () => {
+    expect(deskPathForDocument("lapkeu.xlsx", "ana", ".figures.json")).toBe("uploads/~ana/lapkeu.xlsx.figures.json");
+    expect(deskPathForDocument("CON.xlsx", "ana", ".figures.json")).toBe("uploads/~ana/doc-CON.xlsx.figures.json");
+  });
+
+  it("keeps a long name inside one path segment with the longer suffix", () => {
+    const path = deskPathForDocument(`${"a".repeat(300)}.xlsx`, "ana", ".figures.json");
+    const name = path.split("/").pop() ?? "";
+    expect(name.length).toBeLessThanOrEqual(MAX_SEGMENT_CHARS);
+    expect(name.endsWith(".xlsx.figures.json")).toBe(true);
+    expect(isFileRefusal(parseDeskPath(path))).toBe(false);
   });
 });

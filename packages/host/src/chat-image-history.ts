@@ -1,5 +1,5 @@
 import {
-  EARLIER_IMAGE_NOT_VISIBLE_NOTE,
+  earlierImageNote,
   imageRemoteLinkMessage,
   imageUnreadableMessage,
   imagesTooLargeMessage,
@@ -61,8 +61,6 @@ type Options = {
   media?: ChatMediaReader;
 };
 
-const NOTE: ContentPart = { type: "text", text: EARLIER_IMAGE_NOT_VISIBLE_NOTE };
-
 type ImagePart = Extract<ContentPart, { type: "image_url" }>;
 
 function isImagePart(part: ContentPart): part is ImagePart {
@@ -71,6 +69,20 @@ function isImagePart(part: ContentPart): part is ImagePart {
 
 function hasImage(turn: ChatTurn): boolean {
   return turn.role === "user" && turn.parts.some(isImagePart);
+}
+
+/**
+ * The stored id of an image the person sent, when this organization owns it, else null. A row read only:
+ * the bytes are never read for a note. A remote link, a data URL or another organization's id gets no
+ * reference, so the note never names a picture the model could pass back and have resolved.
+ */
+async function ownedReference(tenant: TenantContext, part: ImagePart, media: ChatMediaReader): Promise<string | null> {
+  const mediaId = localMediaId(part.image_url.url.trim());
+  if (!mediaId) {
+    return null;
+  }
+  const row = await media.stat(tenant, mediaId);
+  return row?.kind === "image" ? mediaId : null;
 }
 
 /** Bytes a data URL puts in the request: its decoded size when base64, else its text. */
@@ -118,7 +130,8 @@ async function inspect(
   return { status: "unreadable" };
 }
 
-type Prepared = { status: "ok"; part: ContentPart; bytes: number } | { status: Refusal };
+/** `mediaId` is set only for a stored image this organization owns (`inspect` read its row). */
+type Prepared = { status: "ok"; part: ContentPart; bytes: number; mediaId: string | null } | { status: Refusal };
 
 /** `inspect`, then the bytes of a stored image, checked again: a row's size is written once, at upload. */
 async function prepare(
@@ -132,7 +145,7 @@ async function prepare(
     return inspected;
   }
   if (!inspected.mediaId) {
-    return { status: "ok", part, bytes: inspected.bytes };
+    return { status: "ok", part, bytes: inspected.bytes, mediaId: null };
   }
   const dataUrl = await media.read(tenant, inspected.mediaId);
   if (!dataUrl) {
@@ -142,7 +155,17 @@ async function prepare(
   if (bytes > remaining) {
     return { status: "too_large" };
   }
-  return { status: "ok", part: { type: "image_url", image_url: { ...part.image_url, url: dataUrl } }, bytes };
+  return {
+    status: "ok",
+    part: { type: "image_url", image_url: { ...part.image_url, url: dataUrl } },
+    bytes,
+    mediaId: inspected.mediaId,
+  };
+}
+
+/** Model-facing, English, one line: the reference of a picture the latest message sent as pixels. */
+function uploadedReferenceText(mediaId: string): string {
+  return `(reference: /api/v1/media/${mediaId}/file — pass it to image_generate to edit this image)`;
 }
 
 /** The sentence for the person when the latest message's own image is refused. */
@@ -213,11 +236,15 @@ export async function prepareChatImageHistory(
     }
     const mine = index === latest;
     const parts: ContentPart[] = [];
-    let noted = false;
-    const note = () => {
-      if (!noted) {
-        parts.push(NOTE);
-        noted = true;
+    // One note per picture the model cannot see, keyed by its reference: two pictures with no reference
+    // share the plain note, as one note did before.
+    const noted = new Set<string>();
+    const note = async (part: ImagePart) => {
+      const reference = await ownedReference(tenant, part, media);
+      const key = reference ?? "";
+      if (!noted.has(key)) {
+        noted.add(key);
+        parts.push({ type: "text", text: earlierImageNote(reference) });
       }
     };
     for (const part of turn.parts) {
@@ -226,7 +253,7 @@ export async function prepareChatImageHistory(
         continue;
       }
       if (!modelReads || (!mine && closed)) {
-        note();
+        await note(part);
         continue;
       }
       const ready = await prepare(tenant, part, media, budget - used);
@@ -237,11 +264,16 @@ export async function prepareChatImageHistory(
         if (ready.status === "too_large") {
           closed = true;
         }
-        note();
+        await note(part);
         continue;
       }
       used += ready.bytes;
       parts.push(ready.part);
+      // The latest message's own picture, when it is a stored one: the model sees its pixels, so it also needs
+      // the id to pass to image_generate. Only a row this organization owns reaches here (`inspect`).
+      if (mine && ready.mediaId) {
+        parts.push({ type: "text", text: uploadedReferenceText(ready.mediaId) });
+      }
     }
     prepared[index] = { ...turn, parts };
   }

@@ -57,7 +57,16 @@ function kpisFor(computed: BudgetComputed, locale: ReportLocale): ReportKpi[] {
       value: computed.budgetOnly.length + computed.actualOnly.length,
       unit: "",
     },
+    ...weightedErrorKpis(computed, locale),
   ];
+}
+
+function weightedErrorKpis(computed: BudgetComputed, locale: ReportLocale): ReportKpi[] {
+  const sides = [
+    [budgetWord("weightedErrorRevenue", locale), computed.weightedError.revenue],
+    [budgetWord("weightedErrorCost", locale), computed.weightedError.cost],
+  ] as const;
+  return sides.flatMap(([label, value]) => (value === null ? [] : [{ label, value, unit: "%" }]));
 }
 
 /** The lines worth drawing: the flagged ones first, then the largest, back in the sheet's order. */

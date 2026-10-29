@@ -23,6 +23,7 @@ export function AgentHarnessPanel({
   name,
   onClose,
   onOpenStudio,
+  detailsRef,
 }: {
   agent: VirtualAgentInfo;
   name: string;
@@ -32,6 +33,7 @@ export function AgentHarnessPanel({
    * conversation offers it too, but that is gone after the first message; this stays.
    */
   onOpenStudio?: () => void;
+  detailsRef?: (node: HTMLDivElement | null) => void;
 }) {
   const title = t("harness.panel.title", { name });
   const ownRunsHere = agent.conversation === "harness";
@@ -69,6 +71,7 @@ export function AgentHarnessPanel({
       </header>
 
       <div className="agent-harness-body">
+        {detailsRef ? <div ref={detailsRef} className="agent-harness-details-slot" /> : null}
         <div className="agent-harness-part" data-testid="agent-harness-in-chat">
           <h3 className="agent-harness-part-title">{t("harness.panel.inChat")}</h3>
 
@@ -109,11 +112,7 @@ export function AgentHarnessPanel({
           </p>
         </div>
 
-        <div
-          className="agent-harness-part"
-          data-testid="agent-harness-own"
-          data-runs={ownRunsHere ? "chat" : "studio"}
-        >
+        <div className="agent-harness-part" data-testid="agent-harness-own" data-runs={ownRunsHere ? "chat" : "studio"}>
           <h3 className="agent-harness-part-title">{t("harness.panel.ownHarness", { name })}</h3>
           <p className="agent-harness-where" data-testid="agent-harness-where">
             {ownRunsHere ? t("harness.panel.runsInChat") : t("harness.panel.runsInStudio", { name })}

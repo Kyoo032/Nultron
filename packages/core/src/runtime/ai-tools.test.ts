@@ -8,6 +8,7 @@ import { runWithToolSecrets } from "../tools/secret-scope";
 import type { TenantContext } from "../tenancy/types";
 import { type AiToolSet, buildAiTools } from "./ai-tools";
 import { createEgressGuard } from "./egress-guard";
+import { createMediaPermission, isMediaPermissionRefusal } from "./media-permission";
 import { createToolBudget } from "./tool-budget";
 
 const tenant: TenantContext = {
@@ -258,5 +259,63 @@ describe("buildAiTools", () => {
     const second = (await call(set, "boom", { x: 1 })) as Failure;
     expect(first.reason).toBe("tool_error");
     expect(second.reason).toBe("budget");
+  });
+});
+
+describe("buildAiTools and the paid media gate (SR-167)", () => {
+  function registerImage(execute: (args: { prompt: string }) => Promise<unknown>) {
+    registerTool(
+      defineTool({
+        key: "image_generate",
+        name: "image",
+        description: "image tool",
+        schema: z.object({ prompt: z.string() }),
+        execute,
+      }),
+    );
+  }
+
+  function buildWith(permission: ReturnType<typeof createMediaPermission>) {
+    return buildAiTools({
+      bindings: [binding("image_generate")],
+      tenant,
+      budget: createToolBudget(undefined),
+      egress: createEgressGuard({ userText: [] }),
+      permission,
+      disabled: new Set(),
+    });
+  }
+
+  it("answers the model a permission refusal and runs nothing until the request is granted", async () => {
+    let ran = 0;
+    registerImage(async () => {
+      ran += 1;
+      return { success: true };
+    });
+    const asked = await call(buildWith(createMediaPermission({ ask: true, grants: [] })), "image_generate", {
+      prompt: "a red fox",
+    });
+    expect(isMediaPermissionRefusal(asked)).toBe(true);
+    expect(ran).toBe(0);
+
+    const granted = await call(
+      buildWith(
+        createMediaPermission({ ask: true, grants: [{ tool: "image_generate", args: { prompt: "a red fox" } }] }),
+      ),
+      "image_generate",
+      { prompt: "a red fox" },
+    );
+    expect(granted).toEqual({ success: true });
+    expect(ran).toBe(1);
+  });
+
+  it("runs as before when the run has no gate", async () => {
+    let ran = 0;
+    registerImage(async () => {
+      ran += 1;
+      return { success: true };
+    });
+    await call(buildWith(undefined), "image_generate", { prompt: "a red fox" });
+    expect(ran).toBe(1);
   });
 });

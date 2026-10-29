@@ -23,3 +23,13 @@ export type { ChatDocumentErrorCode, ChatDocumentSaveFailure } from "./limits";
 export { cutNoteLine, cutOnLine, cutTextAttachment } from "./cut";
 export type { CutTextAttachment } from "./cut";
 export { HOST_NOTE_PREFIXES, isHostNoteLine } from "./markers";
+export { splitUserFileBlocks } from "./file-blocks";
+export type { UserTextSegment } from "./file-blocks";
+export {
+  CHAT_FINANCE_FIGURES_NAME_MAX,
+  CHAT_FINANCE_FIGURES_NAMES_MAX,
+  CHAT_FINANCE_FIGURES_SKIPS,
+  chatFinanceFiguresSchema,
+  isChatFinanceFiguresSkip,
+} from "./finance-figures";
+export type { ChatFinanceFigures, ChatFinanceFiguresSkip } from "./finance-figures";

@@ -1,15 +1,8 @@
-/* The chat-first rail (tester code): a fixed icon column. Agents scroll on their own; the account
-   links and the footer stay put under a hairline.
-
-   Sizes ride three variables so the active bar, the tiles and the column padding always agree:
-   the tile is centred in the rail, and the bar sits in the padding at the rail's left edge, inside
-   the scroller's padding box, so the scroller does not clip it. Colours come from the theme
-   variables alone, so light and dark need no second set. */
-
 .agent-rail {
-  --ar-w: 64px;
-  --ar-tile: 40px;
-  --ar-pad: 12px;
+  --ar-w: 56px;
+  --ar-w-full: 216px;
+  --ar-row: 36px;
+  --ar-pad: 10px;
   position: relative;
   display: flex;
   flex: none;
@@ -21,13 +14,71 @@
   color: var(--rail-text-2);
 }
 
+.agent-rail[data-rail="full"] {
+  width: var(--ar-w-full);
+}
+
+.agent-rail-inner {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
+}
+
+.agent-rail-brand {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 10px var(--ar-pad) 8px;
+  border-bottom: 1px solid var(--rail-line);
+}
+
+.agent-rail-brand-identity {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding-inline: 6px;
+}
+
+.agent-rail-brand-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--rail-active-text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-rail[data-rail="min"] .agent-rail-brand {
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px var(--ar-pad) 8px;
+}
+
+.agent-rail[data-rail="min"] .agent-rail-brand-identity {
+  flex: none;
+  justify-content: center;
+  padding-inline: 0;
+}
+
 .agent-rail-agents,
 .agent-rail-account {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 12px var(--ar-pad);
+  gap: 2px;
+  padding: 10px var(--ar-pad);
 }
 
 .agent-rail-agents {
@@ -35,7 +86,6 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  /* Hidden: a scrollbar lane would eat the 64 px, and the tiles scroll under the wheel and the keys. */
   scrollbar-width: none;
 }
 
@@ -60,30 +110,40 @@
   flex: none;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   padding: 8px var(--ar-pad) 12px;
 }
 
-/* The buddy's dock is mounted so the character has a home, and given no room, so it is always the
-   small head in the footer: a body needs 64 px and would stand over the rail's own icons. */
 .agent-rail-buddy-dock {
   width: 0;
   height: 0;
   overflow: hidden;
 }
 
-/* One tile: the link is the hit area, the tile inside it (or the mark) is what is drawn. */
 .agent-rail-link {
   position: relative;
   display: inline-flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  width: var(--ar-tile);
-  height: var(--ar-tile);
-  border-radius: 12px;
-  color: var(--mode, var(--accent));
-  transition: background-color 120ms ease, box-shadow 120ms ease;
+  width: var(--ar-row);
+  height: var(--ar-row);
+  border-radius: 8px;
+  color: var(--rail-text-2);
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.agent-rail-link:hover {
+  background: var(--rail-hover);
+  color: var(--rail-active-text);
+}
+
+.agent-rail-link[aria-current="page"] {
+  background: var(--rail-active);
+  color: var(--rail-active-text);
+  box-shadow: 0 0 0 1px var(--rail-line);
 }
 
 .agent-rail-link:focus-visible {
@@ -93,75 +153,41 @@
 
 .agent-rail-tile {
   display: inline-flex;
+  flex: none;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: 100%;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--mode) 14%, transparent);
-  color: var(--mode);
-  transition: background-color 120ms ease, color 120ms ease;
-}
-
-.agent-rail-link:hover .agent-rail-tile {
-  background: color-mix(in srgb, var(--mode) 24%, transparent);
-}
-
-.agent-rail-link[aria-current="page"] .agent-rail-tile {
-  background: var(--mode);
-  color: var(--on-mode);
-}
-
-/* The product mark and a flavor's logo are already tiles, so they sit on the rail itself. */
-.agent-rail-generalist:hover {
-  background: var(--rail-hover);
-}
-
-.agent-rail-generalist[aria-current="page"] {
-  background: var(--rail-active);
-  box-shadow: 0 0 0 2px var(--mode);
+  width: 20px;
+  height: 20px;
+  color: inherit;
 }
 
 .agent-rail-mark,
 .agent-rail-logo {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
   object-fit: contain;
 }
 
 .agent-rail-monogram {
-  font-size: 0.875rem;
+  flex: none;
+  width: 24px;
+  font-size: 0.8125rem;
   font-weight: 600;
-  color: var(--rail-active-text, var(--text));
+  text-align: center;
+  color: inherit;
 }
 
-/* The current agent or page: a 3 px bar on the rail's left edge. */
-.agent-rail-link[aria-current="page"]::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: calc(-1 * var(--ar-pad));
-  width: 3px;
-  height: 20px;
-  border-radius: 0 3px 3px 0;
-  background: var(--mode);
-  transform: translateY(-50%);
-}
-
-/* Placeholders for the agents the host has not named yet, the size of the tiles that replace them. */
 .agent-rail-skeleton {
   flex: none;
-  width: var(--ar-tile);
-  height: var(--ar-tile);
-  border-radius: 12px;
+  width: var(--ar-row);
+  height: var(--ar-row);
+  border-radius: 8px;
   background: var(--rail-hover);
-  /* Still, not pulsing: a loop only runs under `data-busy` (the perf contract in
-     `lib/motion-tokens.test.ts`), and these are on screen for one request. */
   opacity: 0.6;
 }
 
-/* The name, drawn by the rail itself outside the scroller so nothing clips it. */
 .agent-rail-tip {
   position: fixed;
   z-index: 60;
@@ -179,23 +205,111 @@
   pointer-events: none;
 }
 
+.agent-rail-label {
+  min-width: 0;
+  overflow: hidden;
+  color: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-rail-link[aria-current="page"] .agent-rail-label {
+  font-weight: 600;
+}
+
+.agent-rail[data-rail="full"] .agent-rail-agents,
+.agent-rail[data-rail="full"] .agent-rail-account {
+  align-items: stretch;
+}
+
+.agent-rail[data-rail="full"] .agent-rail-link {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 10px;
+  padding-inline: 8px;
+}
+
+.agent-rail[data-rail="full"] .agent-rail-skeleton {
+  width: 100%;
+}
+
+.agent-rail[data-rail="full"] .agent-rail-footer {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.agent-rail {
+  transition: width 140ms ease;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .agent-rail-link,
-  .agent-rail-tile {
+  .agent-rail,
+  .agent-rail-link {
     transition: none;
   }
 }
 
-/* A phone: the rail narrows to 56 px and the tiles to 36 px. */
-@media (max-width: 480px) {
-  .agent-rail {
-    --ar-w: 56px;
-    --ar-tile: 36px;
-    --ar-pad: 10px;
-  }
+.agent-rail-bar {
+  display: none;
+}
 
-  .agent-rail-agents,
-  .agent-rail-account {
-    gap: 6px;
-  }
+div:has(> .agent-rail[data-menu]) {
+  flex-direction: column;
+}
+
+.agent-rail[data-menu][data-rail] {
+  width: 100%;
+  height: auto;
+  border-right: 0;
+  border-bottom: 1px solid var(--rail-line);
+}
+
+.agent-rail[data-menu] .agent-rail-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding-inline: 6px 12px;
+}
+
+.agent-rail-bar-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--rail-active-text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-rail[data-menu][data-rail="min"] .agent-rail-inner {
+  display: none;
+}
+
+.agent-rail[data-menu][data-rail="full"] .agent-rail-inner {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 50;
+  width: min(280px, 86vw);
+  background: var(--rail);
+  border-right: 1px solid var(--rail-line);
+  box-shadow: 0 0 40px rgb(0 0 0 / 0.28);
+}
+
+.agent-rail[data-menu] .agent-rail-link {
+  height: 44px;
+}
+
+.agent-rail-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 49;
+  padding: 0;
+  border: 0;
+  background: rgb(0 0 0 / 0.4);
+  cursor: default;
 }

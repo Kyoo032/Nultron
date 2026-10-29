@@ -27,9 +27,20 @@ export type CashflowBreakeven = {
   readonly revenuePerPeriod: number | null;
   /** Fixed cost over every period / the margin ratio. */
   readonly revenueTotal: number | null;
+  readonly marginOfSafety: number | null;
+  readonly marginOfSafetyPct: number | null;
 };
 
 const PERCENT = 100;
+
+function marginOfSafety(revenue: number, count: number, breakevenPerPeriod: number | null) {
+  if (breakevenPerPeriod === null || count === 0 || revenue <= 0) {
+    return { marginOfSafety: null, marginOfSafetyPct: null };
+  }
+  const average = revenue / count;
+  const margin = average - breakevenPerPeriod;
+  return { marginOfSafety: margin, marginOfSafetyPct: (margin / average) * PERCENT };
+}
 
 /** The cost-behaviour bases, summed over every period. */
 function bases(periods: readonly CashflowPeriod[]) {
@@ -51,6 +62,8 @@ export function cashflowBreakeven(periods: readonly CashflowPeriod[]): CashflowB
   const usable = total.revenue > 0 && total.variable > 0;
   const contributionMarginPct = usable ? (1 - total.variable / total.revenue) * PERCENT : null;
   const revenueTotal = contributionMarginPct === null ? null : breakevenRevenue(total.fixed, contributionMarginPct);
+  const revenuePerPeriod =
+    contributionMarginPct === null || count === 0 ? null : breakevenRevenue(total.fixed / count, contributionMarginPct);
   return {
     revenueBase: total.revenue,
     variableBase: total.variable,
@@ -58,10 +71,8 @@ export function cashflowBreakeven(periods: readonly CashflowPeriod[]): CashflowB
     oneOffBase: total.oneOff,
     periodCount: count,
     contributionMarginPct,
-    revenuePerPeriod:
-      contributionMarginPct === null || count === 0
-        ? null
-        : breakevenRevenue(total.fixed / count, contributionMarginPct),
+    revenuePerPeriod,
     revenueTotal,
+    ...marginOfSafety(total.revenue, count, revenuePerPeriod),
   };
 }

@@ -11,18 +11,24 @@
  * the block, and whether the file was saved. A refusal to save (quota, limits) is an answer, not an
  * error: the attachment still goes, and the notes say it was not saved.
  *
+ * The body may also carry the read's `originalId` (the kept original's artifact id) or `originalSkipped`
+ * (why it was not kept). The id is named in the notes only if it is this person's own kept original of the
+ * same format (`original.ts`, `verifiedOriginalId`); anything else is dropped without a word.
+ *
  * No gateway call, so no gate. Body: the HTTP adapter's 26 MB cap; the text itself is capped at the
  * reader's own Markdown limit.
  */
-import { ApiError, maskPii } from "@agentforge/core";
+import { ApiError, maskPii, type TenantContext } from "@agentforge/core";
 import { isChatDocumentName, CHAT_DOCUMENT_TEXT_MAX_CHARS } from "@agentforge/core/chat-documents";
 import { jsonError, jsonOk } from "../errors";
 import { FILE_EXTRACT_MAX_MARKDOWN_CHARS } from "../file-extract/limits";
 import { getTenant } from "../tenant";
 import type { HostRequest, HostResult } from "../types";
-import { saveDeskCopy } from "./desk-copy";
+import { checkFinanceFigures } from "../finance-figures/figures";
+import { saveDeskCopy, saveDeskFigures } from "./desk-copy";
 import { chatDocumentError } from "./errors";
-import { documentNotes } from "./notes";
+import { documentNotes, type OriginalNote } from "./notes";
+import { originalMimeFor, skipReasonFrom, verifiedOriginalId } from "./original";
 import { cleanDocumentText, cutOnLine } from "./text";
 
 const MAX_NAME_CHARS = 255;
@@ -34,6 +40,11 @@ type SaveInput = {
   readonly bytes: number;
   readonly masked: number;
   readonly text: string;
+  /** The read's `originalId`, as sent back. Checked before it is named anywhere. */
+  readonly originalId: unknown;
+  /** The read's `originalSkipped`, as sent back. Only a fixed code is ever used. */
+  readonly originalSkipped: unknown;
+  readonly figures: unknown;
 };
 
 function whole(value: unknown): number {
@@ -45,7 +56,7 @@ function requireInput(request: HostRequest): SaveInput {
   if (typeof body !== "object" || body === null || Array.isArray(body)) {
     throw new ApiError("invalid_request", "A JSON object body is required", 400);
   }
-  const { name, format, text, bytes, masked } = body as Record<string, unknown>;
+  const { name, format, text, bytes, masked, originalId, originalSkipped, figures } = body as Record<string, unknown>;
   if (typeof name !== "string" || name.trim() === "" || name.length > MAX_NAME_CHARS) {
     throw new ApiError("invalid_request", "name must be the file's name", 400);
   }
@@ -61,7 +72,34 @@ function requireInput(request: HostRequest): SaveInput {
   if (text.length > FILE_EXTRACT_MAX_MARKDOWN_CHARS) {
     throw new ApiError("document_too_large", "That text is over the size limit.", 413);
   }
-  return { name, format, text, bytes: whole(bytes), masked: whole(masked) };
+  return {
+    name,
+    format,
+    text,
+    bytes: whole(bytes),
+    masked: whole(masked),
+    originalId,
+    originalSkipped,
+    figures,
+  };
+}
+
+/**
+ * The kept original the notes may name: this person's own, when the id checks out, else the fixed reason it
+ * was not kept. Null when the format has no original or the send carries neither.
+ */
+function originalFor(tenant: TenantContext, input: SaveInput): OriginalNote | null {
+  const id = verifiedOriginalId(tenant, input.originalId, input.format);
+  if (id !== null) {
+    return { kind: "kept", id };
+  }
+  const reason = skipReasonFrom(input.originalSkipped);
+  return reason === null || originalMimeFor(input.format) === null ? null : { kind: "skipped", reason };
+}
+
+async function keptFigures(tenant: TenantContext, input: SaveInput): Promise<{ readonly path: string } | null> {
+  const figures = checkFinanceFigures(input.figures, input.name);
+  return figures ? saveDeskFigures(tenant, input.name, figures) : null;
 }
 
 export async function handlePostChatDocumentSave(request: HostRequest): Promise<HostResult> {
@@ -71,6 +109,7 @@ export async function handlePostChatDocumentSave(request: HostRequest): Promise<
     const fullText = maskPii(cleanDocumentText(input.text));
     const { text: sentText, cut } = cutOnLine(fullText, CHAT_DOCUMENT_TEXT_MAX_CHARS);
     const copy = await saveDeskCopy(tenant, input.name, fullText);
+    const figures = copy.ok ? await keptFigures(tenant, input) : null;
     const notes = documentNotes({
       format: input.format,
       bytes: input.bytes,
@@ -79,6 +118,8 @@ export async function handlePostChatDocumentSave(request: HostRequest): Promise<
       masked: input.masked,
       saved: copy.ok ? { path: copy.path, partial: copy.partial } : null,
       saveError: copy.ok ? null : copy.error,
+      original: originalFor(tenant, input),
+      figures,
     });
     return jsonOk({
       document: {
@@ -92,6 +133,7 @@ export async function handlePostChatDocumentSave(request: HostRequest): Promise<
         saved: copy.ok ? { path: copy.path, version: copy.version } : null,
         savedPartial: copy.ok ? copy.partial : false,
         saveError: copy.ok ? null : copy.error,
+        figures,
       },
     });
   } catch (error) {

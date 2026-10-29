@@ -165,6 +165,10 @@ beforeAll(async () => {
   ({ dispatch } = await import("../router"));
   const { getTenant } = await import("../tenant");
   tenant = await getTenant();
+  const desks = await call<{ currentWorkspaceId: string }>("GET", "/api/v1/workspaces");
+  await call("PATCH", `/api/v1/workspaces/${desks.body.currentWorkspaceId}`, {
+    productModes: ["chat", "research", "images", "videos", "presentations"],
+  });
   const agents = await call<{ agents: Array<{ id: string; agentId: string | null }> }>("GET", "/api/v1/virtual-agents");
   chatAgentId = agents.body.agents.find((agent) => agent.id === "chat")?.agentId ?? "";
   researchAgentId = agents.body.agents.find((agent) => agent.id === "research")?.agentId ?? "";

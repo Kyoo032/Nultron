@@ -24,7 +24,7 @@ Product: both · Instance: main :3000
 
 ## How to get to it (user POV)
 
-- Choose the Music agent on the left rail (`agent-music`), then `agent-open-studio`. A desk that already has it shows the tab. A fresh first-run desk starts with Research, Images, Videos and Presentation only, so hire it first (`/workspaces`, `agent-hire`).
+- Choose the Music agent on the left rail (`agent-music`), then `agent-open-studio`. A desk that already has it shows the tab. A fresh first-run desk starts with the default agent (Chat) alone since 2026-10-21, so hire it first (`/workspaces`, `agent-hire`).
 - Open `http://127.0.0.1:3000/music` when the tab is unlocked.
 
 ## Driving it with the Nultron harness

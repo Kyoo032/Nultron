@@ -52,6 +52,8 @@ const WORDS = Object.freeze({
   contributionMargin: { id: "Margin kontribusi", en: "Contribution margin" },
   breakevenPerPeriod: { id: "Pendapatan BEP per periode", en: "Breakeven revenue per period" },
   breakevenTotal: { id: "Pendapatan BEP seluruh periode", en: "Breakeven revenue, all periods" },
+  marginOfSafety: { id: "Margin keamanan per periode", en: "Margin of safety per period" },
+  marginOfSafetyPct: { id: "Margin keamanan", en: "Margin of safety" },
   variableBase: { id: "Biaya variabel", en: "Variable cost" },
   fixedBase: { id: "Biaya tetap", en: "Fixed cost" },
   oneOffBase: { id: "Biaya sekali jalan", en: "One-off cost" },
@@ -136,6 +138,8 @@ function breakevenFigures(computed: CashflowComputed, locale: ReportLocale): Cas
     figure("contributionMarginPct", say(WORDS.contributionMargin, locale), breakeven.contributionMarginPct, "percent", "", "1 - variable cost / cash in"),
     figure("breakevenRevenue.perPeriod", say(WORDS.breakevenPerPeriod, locale), breakeven.revenuePerPeriod, "currency", "", "fixed cost per period / contribution margin"),
     figure("breakevenRevenue.total", say(WORDS.breakevenTotal, locale), breakeven.revenueTotal, "currency", "", "fixed cost / contribution margin"),
+    figure("marginOfSafety.perPeriod", say(WORDS.marginOfSafety, locale), breakeven.marginOfSafety, "currency", "", "average cash in per period - breakeven revenue per period"),
+    figure("marginOfSafetyPct", say(WORDS.marginOfSafetyPct, locale), breakeven.marginOfSafetyPct, "percent", "", "margin of safety per period / average cash in per period"),
   ];
 }
 

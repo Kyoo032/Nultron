@@ -39,9 +39,9 @@ export const SHELL_MODES_KEY = "agentforge-shell-modes";
 export const UNKNOWN_DESK_MODES: readonly ProductMode[] = Object.freeze(["chat"] satisfies ProductMode[]);
 
 /**
- * Skeleton rows drawn for the job modes while the desk is unknown: the job modes of a fresh Personal
- * desk (Research, Images, Videos, Presentation), because a person with nothing cached is almost
- * always a person on a fresh Personal desk, and the account links below then do not move.
+ * Skeleton rows drawn for the job modes while the desk is unknown: the job modes of a fresh desk
+ * (none since 2026-10-21, when a first desk became the default agent alone), because a person with
+ * nothing cached is almost always a person on a fresh desk, and the account links below then do not move.
  */
 export const SKELETON_MODE_ROWS: number = FIRST_RUN_MODES.filter((id) => id !== "chat").length;
 

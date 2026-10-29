@@ -152,7 +152,7 @@ After a **completed** run the host closes the loop: `recordRetrievals` writes on
 | `packages/host/src/knowledge-soul.ts` | `defaultSoul()` — built per call so a branded flavor gets its own name — plus `LEGACY_DEFAULT_SOUL` and `isLegacyDefaultSoul` |
 | `apps/web/components/knowledge-graph-panel.tsx` | Collapsed graph panel, fetch, focus, legend |
 | `apps/web/lib/knowledge-graph.ts` | `normalizeGraph` / `capGraph` / `egoSubgraph` / `layoutGraph`, node + edge kinds, `GRAPH_NODE_LIMIT` |
-| `apps/web/components/chat-context-chip.tsx` | `chat-context` ring and `chat-context-breakdown` popover |
+| `apps/web/components/chat-context-chip.tsx` | `chat-context` ring and `chat-context-breakdown` popover (in the tester's agent panel the breakdown unfolds inline, `agent-chat-details.tsx`) |
 | `apps/web/components/app-rail.tsx` | Account-group `mode-knowledge` item |
 | `apps/web/locales/{en,id}/knowledge.json` | Every string on the page, including the hardcoded pasted-source name |
 | `packages/host/src/handlers/knowledge.ts` | All 16 routes, the gate decisions, the self-check throttle |

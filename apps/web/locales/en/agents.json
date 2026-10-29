@@ -96,6 +96,33 @@
       "failed": "Could not finish the task."
     }
   },
+  "finance": {
+    "label": "Finance",
+    "taskLine": "Finance · {task}",
+    "open": "Open",
+    "close": "Close",
+    "openAria": "Open the finance result {title}",
+    "closeAria": "Close the finance result {title}",
+    "headlineAria": "Headline figures",
+    "checksPassed": "Every figure passed the check",
+    "checksUnknown": "The check did not report on these figures",
+    "flagged": "The check flagged {n} figures",
+    "flaggedOne": "The check flagged 1 figure",
+    "removed": "The check removed {n} figures",
+    "removedOne": "The check removed 1 figure",
+    "notes": "{n} notes",
+    "notesOne": "1 note",
+    "notesTitle": "Notes from the check",
+    "notSaved": "The result was worked out but could not be saved, so it cannot be opened or downloaded here.",
+    "loading": "Opening the result",
+    "loadFailed": "Could not open the result.",
+    "viewAria": "The finance result {title}",
+    "downloadXlsx": "Excel",
+    "downloadDocx": "Word",
+    "downloadAria": "Download {title} as {format}",
+    "downloading": "Preparing the file",
+    "downloadFailed": "Could not download the file."
+  },
   "page": {
     "title": "Virtual agents",
     "lede": "Every agent is a harness: a prompt, tools, limits and checks that the app enforces on each run. Hire the ones your work needs.",

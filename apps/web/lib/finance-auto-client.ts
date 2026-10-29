@@ -15,6 +15,7 @@ import {
   FINANCE_FIGURES_TEXT_MAX,
   FINANCE_TASKS,
   defaultFinancePrompt,
+  fitFiguresToCap,
   isFinanceTask,
   isReportChartKind,
   isReportFlagLevel,
@@ -99,7 +100,9 @@ function strings(value: unknown): string[] {
 // -- the preview report, defensively --------------------------------------------------------------
 
 function cellOf(value: unknown): ReportCell {
-  return typeof value === "string" || typeof value === "boolean" || finite(value) !== null ? (value as ReportCell) : null;
+  return typeof value === "string" || typeof value === "boolean" || finite(value) !== null
+    ? (value as ReportCell)
+    : null;
 }
 
 function kpiOf(value: unknown): ReportKpi[] {
@@ -179,7 +182,7 @@ function reportLocale(value: unknown): ReportLocale {
   return value === "id" ? "id" : "en";
 }
 
-function previewOf(value: unknown, task: FinanceTask): FinanceReport | null {
+function previewOf(value: unknown, task: string): FinanceReport | null {
   const row = record(value);
   if (!row) {
     return null;
@@ -196,6 +199,11 @@ function previewOf(value: unknown, task: FinanceTask): FinanceReport | null {
     flags: list(row.flags).flatMap(flagOf),
     notes: list(row.notes).flatMap(noteOf),
   };
+}
+
+export function readFinanceReport(value: unknown, task = ""): FinanceReport | null {
+  const report = previewOf(value, task);
+  return report && report.title.trim() !== "" ? report : null;
 }
 
 // -- the answer, defensively ----------------------------------------------------------------------
@@ -259,62 +267,10 @@ export function canWriteUp(answer: FinanceAutoAnswer): boolean {
 
 // -- holding text to the host's caps --------------------------------------------------------------
 
-/** `text` cut back to `max` on a whole line, so a row is never sent in half. The first line may be cut. */
-export function fitFiguresToCap(source: string, max: number): string {
-  if (source.length <= max) {
-    return source;
-  }
-  if (source.charAt(max) === "\n") {
-    return source.slice(0, max).trimEnd();
-  }
-  const cut = source.lastIndexOf("\n", max);
-  return (cut > 0 ? source.slice(0, cut) : source.slice(0, max)).trimEnd();
-}
-
 /** The file's figures and anything pasted beside them, as one text held to the host's cap. */
 export function joinFigures(...parts: readonly string[]): string {
   const present = parts.map((part) => part.trim()).filter((part) => part !== "");
   return fitFiguresToCap(present.join("\n"), FINANCE_AUTO_TEXT_MAX);
-}
-
-const SHEET_HEAD = /^\s*Sheet:/;
-
-export type JoinedSheets = {
-  readonly text: string;
-  /** The sheets that made it into `text`, in order. */
-  readonly used: readonly string[];
-  /** Whole sheets that did not fit under the cap and were left out. Said on screen, never silent. */
-  readonly skipped: readonly string[];
-};
-
-/**
- * Every sheet of one file as one figures text, each starting with its own `Sheet:` line (which is how
- * the host tells a budget sheet from an actuals sheet). A sheet that would take the text over `max` is
- * left out whole and named in `skipped`; one is never cut in half.
- */
-export function joinSheetTexts(sheets: readonly { name: string; text: string }[], max: number): JoinedSheets {
-  const present = sheets.filter((sheet) => sheet.text.trim() !== "");
-  const several = present.length > 1;
-  const used: string[] = [];
-  const skipped: string[] = [];
-  let joined = "";
-  for (const sheet of present) {
-    const body = sheet.text.trim();
-    const block = several && !SHEET_HEAD.test(body) ? `Sheet: ${sheet.name}\n${body}` : body;
-    const next = joined === "" ? block : `${joined}\n${block}`;
-    if (next.length <= max) {
-      joined = next;
-      used.push(sheet.name);
-    } else {
-      skipped.push(sheet.name);
-    }
-  }
-  const first = present[0];
-  if (joined === "" && first) {
-    // Even the first sheet is over the cap: send what fits of it rather than nothing.
-    return { text: fitFiguresToCap(first.text.trim(), max), used: [first.name], skipped: skipped.slice(1) };
-  }
-  return { text: joined, used, skipped };
 }
 
 // -- what is sent ---------------------------------------------------------------------------------
@@ -412,6 +368,7 @@ const WARNING_KEYS: Readonly<Record<string, string>> = {
   unplaced_rows: "finance.auto.warnings.unplacedRows",
   default_discount_rate: "finance.auto.warnings.defaultDiscountRate",
   unpaired_lines: "finance.auto.warnings.unpairedLines",
+  no_opening_cash: "finance.auto.warnings.noOpeningCash",
 };
 
 /**

@@ -97,6 +97,11 @@ async function deskModes(tenant: TenantContext): Promise<ProductMode[]> {
   return resolveWorkspaceModes(desk?.productModes);
 }
 
+/** The agents on the caller's desk: the generalist, then the desk's own modes. What a member may bring into a Workspace. */
+export async function virtualAgentsOnDesk(tenant: TenantContext): Promise<readonly VirtualAgent[]> {
+  return virtualAgentsForDesk(await deskModes(tenant));
+}
+
 export type VirtualAgentView = {
   readonly id: ProductMode;
   readonly generalist: boolean;

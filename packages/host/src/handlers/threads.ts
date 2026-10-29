@@ -2,7 +2,14 @@ import { ApiError, isDefaultChatAgent } from "@agentforge/core";
 import type { HostRequest, HostResult } from "../types";
 import { jsonError, jsonOk } from "../errors";
 import { agentService, getTenant } from "../tenant";
-import { createThread, deleteThread, getThread, listMessages, listWorkspaceThreads, type WorkspaceThreadScope } from "../threads";
+import {
+  createThread,
+  deleteThread,
+  getThread,
+  listMessages,
+  listWorkspaceThreads,
+  type WorkspaceThreadScope,
+} from "../threads";
 import { isDefaultThreadTitle, THREAD_TITLE_MAX } from "../thread-title";
 
 function parseScope(value: string | undefined): WorkspaceThreadScope {

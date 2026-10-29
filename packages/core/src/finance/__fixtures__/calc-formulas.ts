@@ -183,17 +183,26 @@ function evaluate(expression: string): Value {
       }
     }
   };
+  const COMPARE: readonly (readonly [string, (a: number, b: number) => boolean])[] = [
+    ["<=", (a, b) => a <= b],
+    [">=", (a, b) => a >= b],
+    ["<>", (a, b) => a !== b],
+    ["<", (a, b) => a < b],
+    [">", (a, b) => a > b],
+    ["=", (a, b) => a === b],
+  ];
   const comparison = (): Value => {
     const left = sum();
-    if (!take("=")) {
+    const operator = COMPARE.find(([token]) => take(token));
+    if (!operator) {
       return left;
     }
     const right = sum();
-    // The sheets only ever compare counts. Excel's rules for comparing a blank are not modelled.
+    // The sheets only ever compare numbers. Excel's rules for comparing a blank are not modelled.
     if (left === BLANK || right === BLANK) {
       throw new Error(`a blank compared in ${expression}`);
     }
-    return combine(left, right, expression, (a, b) => a === b);
+    return combine(left, right, expression, operator[1]);
   };
   const value = comparison();
   if (at !== expression.length) {

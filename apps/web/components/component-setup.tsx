@@ -5,7 +5,6 @@ import type { SetupStage } from "@/lib/components-client";
 import { t } from "@/lib/i18n";
 import { useBuddyTakesStatus } from "@/lib/desk-buddy-store";
 import { componentSetupMascot, SETUP_NEXT } from "@/lib/mascot-triggers";
-import { useBuddyStatus } from "@/lib/use-buddy-claim";
 import { useProductBrand } from "@/lib/product-brand";
 import { useComponentSetup, type ComponentSetupView } from "@/lib/use-component-setup";
 

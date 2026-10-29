@@ -16,6 +16,17 @@
   "hostNeedsKey": "Tambahkan kunci gateway Toko Token di Pengaturan untuk membuat video.",
   "textToVideoOnly": "Model ini hanya mendukung teks-ke-video",
   "stillPlaceholder": "URL gambar diam opsional…",
+  "savedPicture": {
+    "open": "Pakai gambar tersimpan",
+    "close": "Sembunyikan gambar tersimpan",
+    "loading": "Memuat gambar tersimpan…",
+    "loadError": "Gagal memuat gambar tersimpan",
+    "empty": "Belum ada gambar tersimpan. Buat atau unggah dulu, lalu pilih di sini.",
+    "optionAlt": "Gambar tersimpan",
+    "chosen": "Gambar tersimpan dipakai sebagai gambar diam",
+    "remove": "Lepas",
+    "unusable": "Gambar tersimpan ini tidak bisa dipakai di sini. Pilih yang lain, atau tempel URL."
+  },
   "promptPlaceholder": "Dorongan kamera perlahan ke cangkir keramik saat cahaya jendela bergerak di meja",
   "generate": "Buat",
   "generating": "Membuat…",

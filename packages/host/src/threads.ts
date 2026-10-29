@@ -229,8 +229,7 @@ export async function readPastSessionMessages(
     if (!text) {
       continue;
     }
-    const clipped =
-      text.length > READ_MESSAGE_MAX ? `${text.slice(0, READ_MESSAGE_MAX - 1).trimEnd()}…` : text;
+    const clipped = text.length > READ_MESSAGE_MAX ? `${text.slice(0, READ_MESSAGE_MAX - 1).trimEnd()}…` : text;
     if (totalChars + clipped.length > READ_TRANSCRIPT_MAX) {
       break;
     }

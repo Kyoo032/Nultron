@@ -78,52 +78,36 @@ export function DossierCard({ model, defaultOpen = false, initialMarkdown }: Car
 
   return (
     <section
-      className="min-w-0 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-3 shadow-elev-1"
+      className={`${showView ? "" : "max-w-[24rem] "}min-w-0 rounded-xl border border-[var(--line)] bg-[var(--surface)] px-3 py-3 shadow-elev-1`}
       data-testid="chat-dossier-card"
       data-artifact-id={artifactId ?? undefined}
       data-open={showView ? "true" : "false"}
     >
-      <div className="flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-2">
-        <div className="min-w-0 flex-1 basis-48">
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--text-3)]">
-            {t("agents.dossier.label")}
+      <div className="min-w-0">
+        <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-[var(--text-3)]">
+          {t("agents.dossier.label")}
+        </p>
+        <h4
+          className="mt-0.5 break-words text-sm font-semibold text-[var(--text)] [overflow-wrap:anywhere]"
+          data-testid="chat-dossier-title"
+        >
+          {title}
+        </h4>
+        <p
+          className="mt-0.5 min-w-0 text-xs text-[var(--text-2)] [overflow-wrap:anywhere]"
+          data-testid="chat-dossier-meta"
+        >
+          {sourcesLabel(model.sourceCount)} · {sectionsLabel(model.sections.length)}
+        </p>
+        {model.checksPassed ? (
+          <p className="mt-0.5 text-xs text-[var(--text-2)]" data-testid="chat-dossier-checks">
+            {t("agents.dossier.checksPassed")}
           </p>
-          <h4
-            className="mt-0.5 break-words text-sm font-semibold text-[var(--text)] [overflow-wrap:anywhere]"
-            data-testid="chat-dossier-title"
-          >
-            {title}
-          </h4>
-          <p
-            className="mt-0.5 min-w-0 text-xs text-[var(--text-2)] [overflow-wrap:anywhere]"
-            data-testid="chat-dossier-meta"
-          >
-            {sourcesLabel(model.sourceCount)} · {sectionsLabel(model.sections.length)}
+        ) : (
+          <p className="mt-0.5 text-xs text-[var(--danger)]" data-testid="chat-dossier-checks" data-failed="true">
+            {checksLabel(model.failedChecks)}
           </p>
-          {model.checksPassed ? (
-            <p className="mt-0.5 text-xs text-[var(--text-2)]" data-testid="chat-dossier-checks">
-              {t("agents.dossier.checksPassed")}
-            </p>
-          ) : (
-            <p className="mt-0.5 text-xs text-[var(--danger)]" data-testid="chat-dossier-checks" data-failed="true">
-              {checksLabel(model.failedChecks)}
-            </p>
-          )}
-        </div>
-        {artifactId ? (
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={onToggle}
-              aria-expanded={open}
-              aria-label={t(open ? "agents.dossier.closeAria" : "agents.dossier.openAria", { title })}
-              data-testid="chat-dossier-open"
-            >
-              {open ? t("agents.dossier.close") : t("agents.dossier.open")}
-            </button>
-          </div>
-        ) : null}
+        )}
       </div>
 
       {headings.length > 0 ? (
@@ -133,6 +117,7 @@ export function DossierCard({ model, defaultOpen = false, initialMarkdown }: Car
           data-testid="chat-dossier-outline"
         >
           {headings.map((heading, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: headings and dossier cards have no id; the index keeps repeated entries distinct
             <li key={`${index}-${heading}`} className="flex min-w-0 gap-2">
               <span className="shrink-0 tabular-nums text-[var(--text-3)]">{index + 1}</span>
               <span className="min-w-0 truncate" title={heading}>
@@ -147,6 +132,21 @@ export function DossierCard({ model, defaultOpen = false, initialMarkdown }: Car
         <p className="mt-2 text-xs text-[var(--text-3)]" data-testid="chat-dossier-not-saved">
           {t("agents.dossier.notSaved")}
         </p>
+      ) : null}
+
+      {artifactId ? (
+        <div className="mt-3 flex gap-2">
+          <button
+            type="button"
+            className="btn btn-secondary flex-1"
+            onClick={onToggle}
+            aria-expanded={open}
+            aria-label={t(open ? "agents.dossier.closeAria" : "agents.dossier.openAria", { title })}
+            data-testid="chat-dossier-open"
+          >
+            {open ? t("agents.dossier.close") : t("agents.dossier.open")}
+          </button>
+        </div>
       ) : null}
 
       {showView ? (
@@ -190,6 +190,7 @@ export function DossierCards({ tools }: { readonly tools: readonly ToolCall[] })
   return (
     <div className="space-y-2" data-testid="chat-dossier-cards">
       {dossiers.map((model, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: headings and dossier cards have no id; the index keeps repeated entries distinct
         <DossierCard key={`${model.artifactId ?? "unsaved"}-${index}`} model={model} />
       ))}
     </div>

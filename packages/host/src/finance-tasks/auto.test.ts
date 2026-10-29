@@ -423,3 +423,60 @@ describe("runFinanceAuto: privacy", () => {
     nothingWasCalled();
   });
 });
+
+const CASH_BOOK_NO_OPENING = [
+  "Sheet: Arus Kas",
+  "Keterangan | Jan 2024 | Feb 2024 | Mar 2024",
+  "Kas masuk | 20000000 | 22000000 | 25000000",
+  "Kas keluar | 26000000 | 21000000 | 20000000",
+].join("\n");
+
+describe("runFinanceAuto: a named task", () => {
+  it("reads only that task and returns its input, with no fell_back warning", async () => {
+    const result = await runFinanceAuto(tenant, { figuresText: STATEMENTS, task: "brief" });
+    expect(result.task).toBe("brief");
+    expect(result.preview?.task).toBe("brief");
+    expect(result.input).not.toBeNull();
+    expect(result.warnings.map((entry) => entry.code)).not.toContain("fell_back");
+    nothingWasCalled();
+  });
+
+  it("reads a task the scores would not try first", async () => {
+    const result = await runFinanceAuto(tenant, { figuresText: MONTHLY_PL, task: "cashflow" });
+    expect(result.task).toBe("cashflow");
+    expect(result.preview?.task).toBe("cashflow");
+  });
+
+  it("answers no input and says why when the named task cannot read the figures", async () => {
+    const result = await runFinanceAuto(tenant, { figuresText: CASH_BOOK, task: "appraisal" });
+    expect(result.task).toBe("appraisal");
+    expect(result.input).toBeNull();
+    expect(result.preview).toBeNull();
+    expect(["input_rejected", "not_enough_rows", "prose_no_table"]).toContain(result.warnings[0]?.code);
+    expect(result.warnings.map((entry) => entry.code)).not.toContain("fell_back");
+  });
+
+  it("refuses a task that is not one of the five", async () => {
+    await expect(runFinanceAuto(tenant, { figuresText: CASH_BOOK, task: "taxes" })).rejects.toMatchObject({
+      status: 400,
+    });
+    await expect(runFinanceAuto(tenant, { figuresText: CASH_BOOK, task: 3 })).rejects.toMatchObject({ status: 400 });
+  });
+});
+
+describe("runFinanceAuto: the opening cash", () => {
+  it("warns no_opening_cash for a cash book with no opening row, in both languages", async () => {
+    const en = await runFinanceAuto(tenant, { figuresText: CASH_BOOK_NO_OPENING, locale: "en" });
+    const id = await runFinanceAuto(tenant, { figuresText: CASH_BOOK_NO_OPENING, locale: "id" });
+    expect(en.task).toBe("cashflow");
+    const enWarning = en.warnings.find((entry) => entry.code === "no_opening_cash");
+    const idWarning = id.warnings.find((entry) => entry.code === "no_opening_cash");
+    expect(enWarning?.message).toMatch(/opening/i);
+    expect(idWarning?.message).toMatch(/saldo awal/i);
+  });
+
+  it("does not warn when the book has its opening row", async () => {
+    const result = await runFinanceAuto(tenant, { figuresText: CASH_BOOK });
+    expect(result.warnings.map((entry) => entry.code)).not.toContain("no_opening_cash");
+  });
+});

@@ -9,6 +9,7 @@ import { EditPromptTemplates } from "@/components/edit-prompt-templates";
 import { EnhancePromptButton } from "@/components/enhance-prompt-button";
 import { ExampleGallery } from "@/components/example-gallery";
 import { GalleryVideo } from "@/components/gallery-media";
+import { SavedPicturePicker } from "@/components/saved-picture-picker";
 import { VideoExamples } from "@/components/video-examples";
 import { Confetti } from "@/components/confetti";
 import { ModeHeader } from "@/components/mode-header";
@@ -24,6 +25,7 @@ import { t } from "@/lib/i18n";
 import { PROMPT_INPUT, PROMPT_ROW, PROMPT_SUBMIT } from "@/lib/prompt-row";
 import { mediaPriceHints, videoEstimateView } from "@/lib/media-estimate";
 import { keepModelChoice } from "@/lib/model-choice";
+import { stillSource, type SavedPicture } from "@/lib/saved-picture";
 import { apiFetch, mediaSrc } from "@/lib/api-client";
 import { useProductBrand } from "@/lib/product-brand";
 
@@ -76,6 +78,7 @@ export function VideosStudio() {
   const [prompt, setPrompt] = useState("");
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [stillUrl, setStillUrl] = useState("");
+  const [savedPicture, setSavedPicture] = useState<SavedPicture | null>(null);
   const [ready, setReady] = useState(true);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -137,6 +140,7 @@ export function VideosStudio() {
   useEffect(() => {
     if (!imageToVideo) {
       setStillUrl("");
+      setSavedPicture(null);
     }
   }, [imageToVideo]);
 
@@ -187,7 +191,7 @@ export function VideosStudio() {
           prompt: prompt.trim(),
           aspect,
           model: model || undefined,
-          imageUrl: imageToVideo ? stillUrl.trim() || undefined : undefined,
+          imageUrl: stillSource(savedPicture, stillUrl, imageToVideo),
           seconds,
           ...(videoCapabilities(model).resolution ? { resolution } : {}),
         }),
@@ -211,13 +215,16 @@ export function VideosStudio() {
               : t("videos.modelNotOnKeyNoAlt", { model: rejected })
             : data.error?.code === "video_clip_rejected"
               ? t("videos.clipRejected")
-              : messageUnlessBlocked(data, () => data.error?.message ?? t("videos.generateError"));
+              : savedPicture && data.error?.code === "not_found"
+                ? t("videos.savedPicture.unusable")
+                : messageUnlessBlocked(data, () => data.error?.message ?? t("videos.generateError"));
         setError(message);
         return;
       }
       setLanded((count) => count + 1);
       setPrompt("");
       setStillUrl("");
+      setSavedPicture(null);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("videos.generateError"));
@@ -330,15 +337,49 @@ export function VideosStudio() {
               ))}
             </select>
             {imageToVideo ? (
-              <input
-                type="url"
-                className="text-field w-full outline-none placeholder:text-[var(--text-3)]"
-                placeholder={t("videos.stillPlaceholder")}
-                value={stillUrl}
-                onChange={(event) => setStillUrl(event.target.value)}
-                disabled={generating}
-                data-testid="videos-studio-still"
-              />
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  inputMode="url"
+                  className="text-field w-full outline-none placeholder:text-[var(--text-3)]"
+                  placeholder={t("videos.stillPlaceholder")}
+                  value={stillUrl}
+                  onChange={(event) => {
+                    setStillUrl(event.target.value);
+                    setSavedPicture(null);
+                  }}
+                  disabled={generating}
+                  data-testid="videos-studio-still"
+                />
+                {savedPicture ? (
+                  <div className="flex items-center gap-2" data-testid="videos-studio-saved-chosen">
+                    <img
+                      src={mediaSrc(savedPicture.url)}
+                      alt={savedPicture.prompt || t("videos.savedPicture.optionAlt")}
+                      className="h-10 w-10 shrink-0 rounded object-cover"
+                    />
+                    <span className="min-w-0 flex-1 truncate text-xs text-[var(--text-2)]">
+                      {t("videos.savedPicture.chosen")}
+                    </span>
+                    <button
+                      type="button"
+                      className="shrink-0 text-xs underline text-[var(--text-2)] disabled:opacity-50"
+                      disabled={generating}
+                      onClick={() => setSavedPicture(null)}
+                      data-testid="videos-studio-saved-remove"
+                    >
+                      {t("videos.savedPicture.remove")}
+                    </button>
+                  </div>
+                ) : null}
+                <SavedPicturePicker
+                  disabled={generating}
+                  onPick={(picture) => {
+                    setSavedPicture(picture);
+                    setStillUrl("");
+                  }}
+                />
+              </div>
             ) : model ? (
               <p className="text-xs text-[var(--text-3)]">{t("videos.textToVideoOnly")}</p>
             ) : null}

@@ -506,7 +506,10 @@ export function saveSettings(patch: SecretPatch, scope?: SettingsScope): StoredS
 }
 
 /** The provider key fields a hosted save carries to a company's other desks (SR-163). Nothing else travels. */
-export type CompanyKeyPatch = Pick<SecretPatch, "openaiApiKey" | "googleApiKey" | "anthropicApiKey" | "volcengineApiKey">;
+export type CompanyKeyPatch = Pick<
+  SecretPatch,
+  "openaiApiKey" | "googleApiKey" | "anthropicApiKey" | "volcengineApiKey"
+>;
 
 /**
  * Hosted only (SR-163, review round). On the server a provider key belongs to the company, not to the
@@ -521,7 +524,11 @@ export type CompanyKeyPatch = Pick<SecretPatch, "openaiApiKey" | "googleApiKey" 
  * keeps no key of its own on the server, which is why this is not offered on a desk: there the owner's
  * desks are separate on purpose and `saveSettings` stays desk-scoped.
  */
-export function saveKeysToDesks(keys: CompanyKeyPatch, scope: SettingsScope, workspaceIds: readonly string[]): string[] {
+export function saveKeysToDesks(
+  keys: CompanyKeyPatch,
+  scope: SettingsScope,
+  workspaceIds: readonly string[],
+): string[] {
   const { tenantId } = resolveSettingsScope(scope);
   const patch: CompanyKeyPatch = {
     openaiApiKey: keys.openaiApiKey,

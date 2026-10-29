@@ -4,11 +4,11 @@
  * `POST /api/v1/finance/auto` what those figures look like. The paid write-up is not here: it is the
  * existing `/finance/stream`, and the screen sends it only when the person presses its button.
  */
+import { joinSheetTexts } from "@agentforge/core/finance";
 import { apiFetch } from "./api-client";
 import {
   FINANCE_AUTO_PATH,
   FINANCE_AUTO_TEXT_MAX,
-  joinSheetTexts,
   parseFinanceAuto,
   type FinanceAutoAnswer,
 } from "./finance-auto-client";

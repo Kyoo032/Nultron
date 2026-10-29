@@ -21,17 +21,21 @@ import {
   DEFAULT_APPRAISAL_RATE_PERCENT,
   DEFAULT_BUDGET_THRESHOLDS,
   FINANCE_FIGURES_TEXT_MAX,
+  FINANCE_TASKS,
   RATIO_RATIO_METRICS,
   appraisalFlowsFromItems,
   defaultFinancePrompt,
   discountRateFromText,
   financeTaskMeta,
   getFinanceTaskModule,
+  isFinanceTask,
+  openingCashFromItems,
   outlayOf,
   ratioValue,
   readAppraisalRows,
   scoreFinanceTaskFit,
   type AnyFinanceTaskModule,
+  type CashflowItem,
   type FinanceFitConfidence,
   type FinanceReport,
   type FinanceTask,
@@ -72,6 +76,7 @@ export type FinanceAutoWarningCode =
   | "unplaced_rows"
   | "default_discount_rate"
   | "unpaired_lines"
+  | "no_opening_cash"
   | "reader_note";
 
 /** Same shape as an import warning, so the screen can map a code to its own copy and fall back to `message`. */
@@ -127,7 +132,18 @@ type AutoRequest = {
   readonly proseText: string;
   readonly sheetNames: readonly string[];
   readonly prompt: string;
+  readonly task: FinanceTask | null;
 };
+
+function forcedTask(value: unknown): FinanceTask | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (!isFinanceTask(value)) {
+    throw new ApiError("invalid_request", `task must be one of ${FINANCE_TASKS.join(", ")}`, 400);
+  }
+  return value;
+}
 
 function text(value: unknown, field: string, max: number): string {
   if (value === undefined || value === null) {
@@ -169,13 +185,14 @@ function readRequest(body: unknown, tenant: TenantContext): AutoRequest {
   const proseText = text(record.proseText, "proseText", FINANCE_FIGURES_TEXT_MAX);
   const prompt = text(record.prompt, "prompt", FINANCE_AUTO_PROMPT_MAX);
   const sheetNames = sheetNamesFrom(record.sheetNames ?? record.sheets);
+  const task = forcedTask(record.task);
   if (figuresText === "" && proseText === "" && prompt === "") {
     throw new ApiError("invalid_request", "Send figuresText, proseText or a prompt", 400);
   }
   // The prompt becomes the question the paid write-up answers, so it is held to the same injection
   // guard as any text that reaches a model, whether or not this route ever sends it to one.
   assertSafeSourceText(prompt, { injectionGuardBypass: loadSettings(tenant).injectionGuardBypass === true });
-  return { figuresText, proseText, sheetNames, prompt };
+  return { figuresText, proseText, sheetNames, prompt, task };
 }
 
 // -- copy -----------------------------------------------------------------------------------------
@@ -223,6 +240,10 @@ const COPY: Readonly<
   unpaired_lines: {
     en: (detail) => `${detail[0]} line(s) have no partner on the other side yet.`,
     id: (detail) => `${detail[0]} baris belum punya pasangan di sisi lainnya.`,
+  },
+  no_opening_cash: {
+    en: () => "No opening cash balance was found, so the cash book starts from 0. Add the opening balance.",
+    id: () => "Saldo awal kas tidak ditemukan, jadi buku kas dimulai dari 0. Tambahkan saldo awalnya.",
   },
   reader_note: {
     en: (detail) => detail[0] ?? "",
@@ -309,11 +330,14 @@ async function readCashflow(ctx: ReadContext): Promise<TaskRead | null> {
   if (!read) {
     return null;
   }
+  const params = read.currency ? { currency: read.currency } : {};
+  const noOpening = openingCashFromItems(read.items as CashflowItem[]) === null;
+  const readerNotes: Note[] = read.warnings.map((message) => ({ code: "reader_note" as const, detail: [message] }));
   return {
-    input: { items: read.items, params: read.currency ? { currency: read.currency } : {} },
+    input: { items: read.items, params },
     rows: read.items.length,
     unplaced: [],
-    notes: read.warnings.map((message) => ({ code: "reader_note" as const, detail: [message] })),
+    notes: noOpening ? [...readerNotes, { code: "no_opening_cash", detail: [] }] : readerNotes,
     enough: read.periods.length >= 2,
   };
 }
@@ -485,7 +509,8 @@ export async function runFinanceAuto(tenant: TenantContext, body: unknown): Prom
   const hasText = ctx.text.trim() !== "";
   let won: Extract<Attempt, { ok: true }> | null = null;
   const failed: Attempt[] = [];
-  for (const task of hasText ? candidatesOf(fit.ranked) : []) {
+  const tasks = request.task ? [request.task] : candidatesOf(fit.ranked);
+  for (const task of hasText ? tasks : []) {
     const result = await attempt(task, ctx);
     if (result.ok) {
       won = result;
@@ -494,7 +519,7 @@ export async function runFinanceAuto(tenant: TenantContext, body: unknown): Prom
     failed.push(result);
   }
 
-  const task = won?.task ?? fit.top;
+  const task = request.task ?? won?.task ?? fit.top;
   const warnings: FinanceAutoWarning[] = [];
   if (!hasText) {
     warnings.push(warning("no_figures", locale));
@@ -509,7 +534,7 @@ export async function runFinanceAuto(tenant: TenantContext, body: unknown): Prom
         : warning(readAsTable ? "not_enough_rows" : "prose_no_table", locale),
     );
   } else {
-    if (won.task !== fit.top && failed.some((entry) => entry.task === fit.top)) {
+    if (request.task === null && won.task !== fit.top && failed.some((entry) => entry.task === fit.top)) {
       warnings.push(warning("fell_back", locale, [TASK_NAME(fit.top, locale), TASK_NAME(won.task, locale)]));
     }
     for (const note of won.read.notes) {

@@ -68,6 +68,7 @@ type ThreadRow = { id: string; title: string; agentId: string; isDefaultChat: bo
 let dispatch: (request: HostRequest) => Promise<HostResult>;
 let runPolicyFor: typeof import("./virtual-agents").runPolicyFor;
 let runWithWorkerProgress: typeof import("./workers/worker-channel").runWithWorkerProgress;
+let currentWorkerChannel: typeof import("./workers/worker-channel").currentWorkerChannel;
 let chatAgentId = "";
 let researchAgentId = "";
 let imagesAgentId = "";
@@ -141,7 +142,7 @@ function rowsWithSlug(slug: string): number {
 beforeAll(async () => {
   ({ dispatch } = await import("./router"));
   ({ runPolicyFor } = await import("./virtual-agents"));
-  ({ runWithWorkerProgress } = await import("./workers/worker-channel"));
+  ({ runWithWorkerProgress, currentWorkerChannel } = await import("./workers/worker-channel"));
   const { sql } = await import("@agentforge/db");
   countRows = (slug) => (sql.prepare("SELECT count(*) AS n FROM agents WHERE slug = ?").get(slug) as { n: number }).n;
   // The generalist's row and the desk exist before the catalog is asked for, so the first case below
@@ -161,6 +162,21 @@ afterAll(async () => {
 });
 
 describe("GET /api/v1/virtual-agents on a fresh desk", () => {
+  it("starts with the default agent alone; hiring four more puts them on the desk", async () => {
+    const fresh = await catalog();
+    expect(fresh.agents.map((agent) => agent.id)).toEqual(["chat"]);
+    expect(rowsWithSlug("va-research")).toBe(0);
+
+    const desks = await call<{ currentWorkspaceId: string }>("GET", "/api/v1/workspaces");
+    const hired = await call<{ workspace: { productModes: string[] } }>(
+      "PATCH",
+      `/api/v1/workspaces/${desks.body.currentWorkspaceId}`,
+      { productModes: ["chat", "research", "images", "videos", "presentations"] },
+    );
+    expect(hired.status).toBe(200);
+    expect(rowsWithSlug("va-research")).toBe(0);
+  });
+
   it("makes one Research row even when two first requests arrive together", async () => {
     expect(rowsWithSlug("va-research")).toBe(0);
 
@@ -174,10 +190,10 @@ describe("GET /api/v1/virtual-agents on a fresh desk", () => {
     imagesAgentId = first.agents.find((agent) => agent.id === "images")?.agentId as string;
   });
 
-  it("lists exactly the first-desk agents, in order", async () => {
+  it("lists exactly the hired agents, the default one first, in catalog order", async () => {
     const data = await catalog();
 
-    expect([...FIRST_RUN_MODES]).toEqual(["chat", "research", "images", "videos", "presentations"]);
+    expect([...FIRST_RUN_MODES]).toEqual(["chat"]);
     expect(data.agents.map((agent) => agent.id)).toEqual(["chat", "research", "images", "videos", "presentations"]);
   });
 
@@ -493,9 +509,11 @@ describe("a run on the Research agent's thread", () => {
   });
 
   it("carries a worker's progress to the thread as tool.progress frames", async () => {
+    let channelText: string | undefined;
     swap.runtime = {
       async execute(input) {
         const run = input as ExecuteInput;
+        channelText = currentWorkerChannel()?.userText;
         await run.onEvent({ type: "tool.started", toolKey: "research_dossier", input: { question: "x" } });
         await runWithWorkerProgress("research_dossier", async (emit) => {
           emit({ type: "job.phase", phase: "searching", label: "Searching the web" });
@@ -511,6 +529,7 @@ describe("a run on the Research agent's thread", () => {
 
     const { frames, types } = await send(threadId, "Research the effects of the new tariff schedule");
 
+    expect(channelText).toContain("Research the effects of the new tariff schedule");
     const progress = frames.filter((frame) => frame.type === "tool.progress");
     expect(progress).toHaveLength(1);
     expect(progress[0]).toMatchObject({

@@ -72,7 +72,10 @@ export function ensureGenerateSubmitWired(): void {
       };
     } catch (error) {
       const status =
-        error && typeof error === "object" && "status" in error && typeof (error as { status: unknown }).status === "number"
+        error &&
+        typeof error === "object" &&
+        "status" in error &&
+        typeof (error as { status: unknown }).status === "number"
           ? (error as { status: number }).status
           : 500;
       const message = error instanceof Error ? error.message : "generate_failed";

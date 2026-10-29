@@ -14,7 +14,15 @@ const AUDIO_MAX = 25 * 1024 * 1024;
 
 const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const VIDEO_TYPES = new Set(["video/mp4", "video/webm", "video/quicktime"]);
-const AUDIO_TYPES = new Set(["audio/mpeg", "audio/mp4", "audio/wav", "audio/x-wav", "audio/ogg", "audio/webm", "audio/flac"]);
+const AUDIO_TYPES = new Set([
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/wav",
+  "audio/x-wav",
+  "audio/ogg",
+  "audio/webm",
+  "audio/flac",
+]);
 
 /** File extension for a stored mime, where the subtype is not already the extension. */
 const MEDIA_EXT: Record<string, string> = {
@@ -24,7 +32,7 @@ const MEDIA_EXT: Record<string, string> = {
   "audio/x-wav": "wav",
 };
 
-function mediaExt(mime: string): string {
+export function mediaExt(mime: string): string {
   return MEDIA_EXT[mime] ?? mime.split("/")[1] ?? "bin";
 }
 

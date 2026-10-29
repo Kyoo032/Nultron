@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 
 const web = join(dirname(fileURLToPath(import.meta.url)), "..");
 const source = readFileSync(join(web, "components", "chat-composer.tsx"), "utf8").replace(/\r\n/g, "\n");
+const chipSource = readFileSync(join(web, "lib", "use-chip-originals.ts"), "utf8").replace(/\r\n/g, "\n");
 
 describe("chat composer: one route for every attachment", () => {
   it("defines addFiles once", () => {
@@ -44,7 +45,7 @@ describe("chat composer: one route for every attachment", () => {
     expect(source).toMatch(/const sendDisabled = [^;]*documentsHoldSend;/);
     // Continue is a text turn and does not take the files in the box. A normal send still waits.
     expect(source).toMatch(
-      /async function send\(override\?: string, retrying = false\) \{[\s\S]*?const \{ continuing, typed, attached \} = sendSource\(override, text, files\);[\s\S]*?if \(!continuing && documentsHoldSend\) \{[\s\S]*?return;/,
+      /async function send\(override\?: string, retrying = false, grants: readonly MediaRequest\[\] = \[\]\) \{[\s\S]*?const \{ continuing, typed, attached \} = sendSource\(override, text, files\);[\s\S]*?if \(!continuing && documentsHoldSend\) \{[\s\S]*?return;/,
     );
     expect(source).toContain("sendSource(override, text, files)");
   });
@@ -70,5 +71,29 @@ describe("chat composer: one route for every attachment", () => {
   it("draws every attachment through the chip component", () => {
     expect(source).toContain("<ComposerAttachmentChip");
     expect(source).not.toContain('data-testid="composer-attachment"');
+  });
+});
+
+describe("chat composer: a removed chip's kept original", () => {
+  it("takes a chip out through the hook, the one place that deletes its original", () => {
+    expect(source).toContain("useChipOriginals(files, setFiles, busy)");
+    expect(source).toContain("onRemove={removeChip}");
+    expect(source).not.toContain("discardChipOriginal");
+  });
+
+  it("deletes a removed chip's original only through discardChipOriginal, and never while a send is in flight", () => {
+    expect(chipSource).toMatch(/function removeChip|const removeChip = useCallback/);
+    expect(chipSource).toContain("discardChipOriginal(held.read, busy)");
+  });
+
+  it("deletes the original of a chip removed while it was reading, once the read answers", () => {
+    expect(chipSource).toMatch(/removedWhileReading\.current\.has\(id\)[\s\S]*?discardChipOriginal\(read, false\)/);
+    expect(chipSource).toMatch(/removedWhileReading\.current\.add\(id\)/);
+  });
+
+  it("clears from the box only the chips that were sent, so a sent chip cannot be removed later", () => {
+    expect(source).toMatch(
+      /const clearSent = \(\) => \{[\s\S]*?setFiles\(\(current\) => current\.filter\(\(item\) => !attached\.some\(\(sent\) => sent\.id === item\.id\)\)\);/,
+    );
   });
 });

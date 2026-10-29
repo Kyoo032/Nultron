@@ -200,7 +200,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-157](#sr-157) | Medium | Hosted: stored media (pictures, clips, audio) is read, listed and deleted by company, not by person, so a colleague's picture can be fetched by its id, listed in the Images and Videos galleries, and sent to a model by a job | Open: nothing changed, because scoping by person breaks shared reads the product relies on; needs an owner decision (2026-10-07) | Blocks "Chat attachments are private to the person who attached them" |
 | [SR-165](#sr-165) | Medium | Hosted portal: `PORTAL_SIGNIN_MODE=password` gives HYP AI, and since 2026-10-09 the Nultron Enterprise release bundle's default, a username-and-password sign-in with no second factor, in place of the e-mailed code; the portal's own default when the variable is absent is still `code`, and `code` stays selectable | Built in tree, tested over a real Postgres; not driven in a browser or on a server (2026-10-07; the Enterprise bundle default is template and docs only, nothing deployed or driven, 2026-10-09). Independent review found no critical or high issue; its findings (M1, M2, L1 to L3, N1, N2) are fixed and merged (`e8a069c9`). The owner's decision, and on 2026-10-09 he accepted password-only sign-in as the Enterprise bundle default with residuals 1 to 13 as recorded; a second independent review of that default found no critical or high issue | None beyond the owner's acceptance; open until the second factor (being designed) ships |
 | [SR-166](#sr-166) | Medium | On `main` since the chat-first promotion (PR #157, 2026-10-12; was tester only): every virtual agent reads the desk's Knowledge Base and its earlier chats and can send a question to the web; the egress guard stops `web_fetch` only and never sees what entered through the prompt | Open: same exposure Chat has on `main` (SR-112's residual), new for the twelve mode agents; read from the code, not driven (2026-10-09). The promotion merged with no ruling recorded (2026-10-13). Owner ruled 2026-10-13: search stays on; the fix is the outbound guard (see SR-112), in a pull request to `main` since 2026-10-21, not merged, not driven | Blocks the next Enterprise release that carries the chat-first shell, until the outbound guard merges and the owner accepts its residual (a model restating private text in its own words) |
-| [SR-167](#sr-167) | Medium | On `main` since PR #157 (was tester only): a model can start paid pictures and clips from any agent's chat; the only brake is a per-turn ceiling | Mitigated in the tester tree (2026-10-09): four pictures and one clip a turn, held by the host's budget, unit-tested; the cost card with a Run control (plan decision D4) is not built; no paid media was run | Blocks promoting the chat-first shell to `main` until the cost card exists or the owner accepts the ceiling |
+| [SR-167](#sr-167) | Medium | On `main` since PR #157 (was tester only): a model can start paid pictures and clips from any agent's chat; `main` still holds only a per-turn ceiling | Fixed in the tester tree (2026-10-22): `image_generate` and `video_generate` do not run until the person presses Run on a card that shows the request and its list price; unit-tested, and the card driven in Chromium on a stub desk; the live model round trip not driven; no paid media was run | Lifts when the tester change is promoted to `main` and one Run press has been driven live |
 | [SR-81](#sr-81) | Low | Keyless Research search sends the masked query to four pinned public APIs | Checked, not an issue (2026-09-26) | — |
 | [SR-168](#sr-168) | Low | Tester code only: the research worker's answer to the model is text written from web pages, and was first declared host-computed (`internal`), so it was not scanned for injection | Fixed in the tester tree (2026-10-09): declared `network`, so it is scanned; three real outputs pass the scan and a poisoned one is caught, by test | Tester code only; nothing on `main` |
 | [SR-169](#sr-169) | Medium | Hosted: any member of a company can open any desk of that company. The host checks that a desk belongs to the session's company and never reads `workspace_members` | Closed 2026-10-13: company-wide by design (Rizky, team board decision K-D11) | Before a hosted company keeps material on one desk that some of its members must not see |
@@ -209,11 +209,21 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-172](#sr-172) | Low | HYP AI behind Cloudflare: Cloudflare reads sign-in passwords, cookies and pasted keys in clear (Full mode), and the origin still answers around Cloudflare on 80, 443 and 8443 | Recorded as known in the HYP AI deploy README (2026-10-08); restricting the origin is optional there; needs the owner's call | HYP AI only; Nultron does not use Cloudflare |
 | [SR-173](#sr-173) | Info | The wrap key becomes the AES key through one unsalted SHA-256 | Checked, not an issue (2026-10-13) | — |
 | [SR-174](#sr-174) | Low | Caddy compresses every `text/*` response, `text/event-stream` included, which can hold live-update frames back | Fixed on `main` (PR #167, 2026-10-14): `encode` matches text types only, without `text/event-stream`, video or audio; unit-tested, Caddy syntax not validated, not driven | Before the team board (tester) is deployed behind Caddy |
-| [SR-175](#sr-175) | Medium | Hosted: a file one person generates on their own (artifacts, media, desk files outside their private folder) is listed and downloadable by every member of the company | Mostly fixed in the tester (2026-10-14: artifacts `bbe9308c`, workspace sharing `62eae740`, Knowledge work cards `a178b9bc`, media file route and chat media reads `fbe5994b`, galleries, storage list, Edit stills and job pictures `6374c386`); Edit projects and desk files still company-visible; not driven hosted; `main` still open | Before a second person of one company uses the hosted app for their own work |
-| [SR-176](#sr-176) | High | Hosted: any member of a company can delete any other member's generated media and artifacts | Fixed in the tester (`6374c386`): only the maker or a company owner or admin deletes; not driven hosted; `main` still open | Before a second person of one company uses the hosted app for their own work |
+| [SR-175](#sr-175) | Medium | Hosted: a file one person generates on their own (artifacts, media, desk files outside their private folder) is listed and downloadable by every member of the company | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
+| [SR-176](#sr-176) | High | Hosted: any member of a company can delete any other member's generated media and artifacts | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
+| [SR-178](#sr-178) | Medium | Hosted (tester): a Workspace switched to "workspace" is readable by the whole company, not only its members (K-D22) | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
+| [SR-179](#sr-179) | Medium | Hosted (tester): a member removed from a Workspace keeps reading, listing and deleting the files and media they put into it | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
+| [SR-180](#sr-180) | Medium | Hosted (tester): document versions are not counted against a tenant's storage, and the cap keeps every version from the last 30 days with no count limit, so a busy document can fill the one disk | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
+| [SR-181](#sr-181) | Low | Hosted (tester): a person with no display name is shown to every colleague by their password-mode username, so a colleague can lock them out with five wrong passwords | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
+| [SR-182](#sr-182) | Medium | Hosted (tester): an owner or admin could open and edit a colleague's private agent | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
+| [SR-183](#sr-183) | Medium | Hosted (tester): the company gateway management token is the credential that changes the company's gateway tokens; a leak of it, or of the wrap key that seals it, lets its holder act on any token of that gateway account, and the platform limits only the tokens it created itself | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
+| [SR-185](#sr-185) | Medium | Hosted (tester): after the OPC strip, the kept original of a file attached in Chat was readable by every member of the company | Closed (2026-10-16): hosted keeps no original, by Rizky's choice | None |
 | [SR-177](#sr-177) | Low | The new deploy preflight, run in a throwaway container when the server has no node, received the real `AGENTFORGE_SECRETS_KEY` | Fixed before merge (branch `chore/agent-guardrails`, 2026-10-14): the container gets the word `set` or nothing | — |
 | [SR-184](#sr-184) | Low | Edit's output lookup (`loadMediaRow`) read a media row by id with no organization filter | Fixed on branch `fix/media-row-company` (2026-10-15): filtered on the project's organization; unit-tested, not driven | — |
 | [SR-186](#sr-186) | Info | Research's injection guard now scans the part of a page the model is shown, and a long page is read in part instead of refused | Checked, not an issue (branch `fix/research-page-window-and-step-retry`, 2026-10-19) | — |
+| [SR-187](#sr-187) | Low | Tester: the Chat figures file keeps amounts the chat mask would hide, any desk tool can read it, and the text-mode Finance guard missed a 16-digit NIK in a headerless pipe row | Open (2026-10-20): recorded, not fixed | Before a hosted desk has a second person |
+| [SR-188](#sr-188) | Info | Tester: `finance_task` refuses a figures file the model wrote, and asks again for a number the owner did not type | Checked, not an issue (2026-10-20) | — |
+| [SR-189](#sr-189) | Low | Tester: a `finance_task` report made from one person's private attachment is a desk-wide artifact and a desk-wide Knowledge Base card | Open (2026-10-20): acceptable while a desk has one owner (OPC) | Before a hosted desk has a second person |
 | [SR-190](#sr-190) | Medium | Chat's `image_generate` and `video_generate` sent any model id and any source-image address the model wrote to the gateway, which fetches that address | Model half merged to `main` (#183, 2026-10-21), unit-tested, not driven; the address half is `fix/safe-web-search`'s `judgeMediaUrl` (the egress-guard copy from #183 was dropped when that branch took `main`) | PR merge of `fix/safe-web-search` to `main` |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
@@ -4845,14 +4855,15 @@ Gate: none.
 **A new upload route runs the native document reader on a file from the Chat composer, and an attached file is a counterparty's text inside a person's own message.** Both products.
 Raised by the Chat documents change (2026-10-06); reviewed 2026-10-06 and 2026-10-07. Low as built. The review found two High problems (a host named inside an attachment passed the egress guard; the native conversion deadline freed its slot early) and two Medium ones (a half header ended the guard's block; the host's notes sat inside the untrusted block), and the owner added a privacy rule (below). Each is recorded with its fix. Fixed in tree, tested at unit level; not driven.
 
-Two routes carry it. `POST /api/v1/chat/documents` (`packages/host/src/router.ts:327`, handler `packages/host/src/chat-documents/handler.ts:45`) takes one multipart file from a signed-in person (hosted) or the one local owner (Personal), reads it with `file-extract` (the native `@firecrawl/anydoc` converter, or the fallback readers) and answers the cleaned, masked, cut text; it writes nothing. `POST /api/v1/chat/documents/save` (`router.ts:328`, `save-handler.ts:67`) runs when the message is sent: it takes the text back as JSON, cleans and masks it again, and writes it as that person's private desk file. The first is a second public door onto the reader that Knowledge ingest and Finance import already use, so the parser exposure is the same one, not a new kind. What the routes add, and the controls they carry:
+Two routes carry it. `POST /api/v1/chat/documents` (`packages/host/src/router.ts:327`, handler `packages/host/src/chat-documents/handler.ts:45`) takes one multipart file from a signed-in person (hosted) or the one local owner (Personal), reads it with `file-extract` (the native `@firecrawl/anydoc` converter, or the fallback readers) and answers the cleaned, masked, cut text. Since 2026-10-14 (K-D21) it also keeps a Word, Excel or PDF file's original bytes as the attacher's own artifact (`chat-documents/original.ts`, see the 2026-10-14 flags below); it writes no desk file. `POST /api/v1/chat/documents/save` (`router.ts:328`, `save-handler.ts:67`) runs when the message is sent: it takes the text back as JSON, cleans and masks it again, and writes it as that person's private desk file. The first is a second public door onto the reader that Knowledge ingest and Finance import already use, so the parser exposure is the same one, not a new kind. What the routes add, and the controls they carry:
 
 - **Size and time.** The HTTP adapter refuses a body over 26 MB (`MAX_BODY_BYTES`, `packages/host/src/http-adapter.ts:43`). `http-adapter.test.ts` ("chat document routes") holds, for both routes, the trusted-Origin rule, the double-submit CSRF token, 413 on a declared length over the cap and 413 on a body that runs past it with no length declared, and that a desk (Personal) call needs neither the Origin nor a token. The read handler refuses a file over 25 MB before any parsing (`handler.ts:28`), and the reader refuses an empty file, applies the same 25 MB cap again and a 20 s deadline (`file-extract/index.ts`, `file-extract/limits.ts`). `formats.test.ts` fails if the composer's cap and the reader's differ. A decompression bomb is the reader's `resource_limit` refusal, reported to the person as an unreadable file. The save route refuses text over the reader's own Markdown cap (`save-handler.ts:43`).
 - **Type.** The extension must be in core's table (`packages/core/src/chat-documents/formats.ts`) and must agree with the real bytes or the file is refused as `format_mismatch` (`file-extract/detect.ts`). A scanned PDF is refused locally as `needs_ocr`; the route never passes the converter an options object, so hosted OCR cannot be reached (`no-hosted-ocr.test.ts`).
 - **Who.** The hosted session gate answers 401 before the route table is consulted (`router.ts` `gate`); both handlers also reach `getTenant`, which throws 401 with no session in server mode (`gate.test.ts`, `handler.test.ts`). The desk copy is written through the desk root, every query of which carries the desk id, so another tenant cannot read it (`handler.test.ts`, "two hosted tenants").
 - **The file name.** It becomes part of a desk path only through `deskPathForDocument` (`chat-documents/desk-name.ts:70`): the last path part only, folded to Unicode NFC, forbidden characters and controls replaced, never a leading dot, length capped, a reserved device name prefixed, and the result always accepted by `parseDeskPath`. It cannot leave `uploads/~<user>/` (`desk-name.test.ts`). The folder comes from the signed-in person, never from the request.
 - **Concurrency and rate (corrected 2026-10-07).** The first version of this entry said the reads went through a limiter of 2 at a time and a 20 s deadline, as if that bounded the CPU. It does not. The deadline answers the caller; it cannot stop the native conversion, which keeps running on the libuv thread pool (four threads, shared with every file read, DNS lookup and zlib call in the process). A file built to run long therefore outlived its slot, and each later upload started another conversion beside it until the pool was full. Fixed: the slot is now held by the native call itself, answered to the caller at the deadline but released only when the native promise settles, with a cap of 2 at once on the hosted server and 3 on a desk (`AGENTFORGE_MAX_NATIVE_CONVERSIONS`) and 429 `too_many_jobs` past it (`file-extract/native-gate.ts:40`, wired at `file-extract/anydoc.ts:174`; `native-gate.test.ts` proves a timed-out conversion keeps its slot and the next file is refused until it ends). Knowledge ingest, Finance import and Education share the flaw and the fix, because all of them call `extractFile`. On top of that, reads wait in `documentLimiter` (`chat-documents/limiter.ts:22`): 2 at a time on the hosted server (`AGENTFORGE_MAX_DOCUMENT_READS`), a waiting room of 8, then 429; unbounded on a desk. The hosted per-IP and per-session buckets still apply (`rate-limit.ts`). The caps are global, not per tenant, like the other limiters (`concurrency.ts`).
-- **Quota.** The read stores nothing. Only the desk copy, written when the message is sent, counts against the tenant's storage quota, through the desk store's own `putTenantObject`; a refusal leaves the attachment working and the notes say the file was not saved (`handler.test.ts`, "when the desk copy cannot be saved"). A document that is attached and removed leaves nothing.
+- **Quota.** The desk copy, written when the message is sent, counts against the tenant's storage quota, through the desk store's own `putTenantObject`; a refusal leaves the attachment working and the notes say the file was not saved (`handler.test.ts`, "when the desk copy cannot be saved"). Since 2026-10-14 (K-D21) the read also keeps a Word, Excel or PDF original as an artifact, which the same quota checks (`original.test.ts`, "storage is full"). A document that is attached and removed leaves no desk file; its original stays until the owner deletes it (see the 2026-10-14 flags below).
+- **Originals kept (2026-10-14, U1, K-D21; flags for the orchestrator to number on promotion).** `keepOriginal` (`packages/host/src/chat-documents/original.ts`) stores the attached file's bytes as the attacher's own artifact. The host enforces the owner rule (`visibleTo`, `owner_user_id`), proved through the real router with two people of one company and a third company (`original.test.ts`). The flags: (a) the original is kept sealed at rest but **unmasked**, by K-D21's own rule; the model gets the masked text, but `import_document` returns the section headings and sheet names of the original to the model, and a tool result is trusted as `internal`, so those headings are not screened by the outbound mask; (b) a chip that is removed, or a message that is never sent, leaves its original, owner-private, counted against the quota, deletable by the owner through `DELETE /api/v1/artifacts/:artifactId`; (c) re-attaching the same file stores a new copy each time, which can use the owner's quota faster than the text does; (d) files over about 3 MB raw keep their text only, and say so in the answer.
 - **Personal details.** The extracted text is masked with `maskPii` on the read and again on the save, so neither the desk copy nor the model's copy holds the raw text even if a client skips the read, and the whole message is masked once more on the way out (`createRuntime`, `packages/core/src/runtime/create-runtime.ts:26`; `outbound-mask.test.ts`). Tool outputs are not masked, which is why the desk copy is the masked one: `read_file` and `run_code` read it back unchanged.
 - **Injected instructions (revised 2026-10-07).** The text rides in a `--- name ---` block, so `redactAttachedParts` (`packages/host/src/runs.ts:141`) screens it like a text file. Review found three ways around that, all fixed. (1) A document line that began with three dashes and a space, such as `--- Section 2`, ended the guard's block, so everything after it escaped the scan; `cleanDocumentText` (`chat-documents/text.ts:31`) now indents every such line, and the guard itself now runs a block to the next full header (`ATTACH_BLOCK_RE`, `packages/core/src/security/injection-guard.ts:186`), which also closes the same hole for a plain text file that wrote the half header itself (`injection-guard.test.ts`). (2) The host's own notes about the file were inside the untrusted block and a document could forge one; they are now written above the header, outside the block, and a document line that looks like a note is indented too. While adding the test for this a bug showed up: trimming the text after the indent stripped it again from a first line that forged a note. The text is now trimmed first (`text.test.ts`). (3) The default Chat prompt and one host note say that what follows the header is the file's content, data to read and not instructions to follow (`packages/core/src/agents/default-chat.ts`, `notes.ts:72`). Reading the desk copy back later goes through the file tools' output scan (`user_content` trust). This is a rule list and does not catch every phrasing.
 - **Egress (added 2026-10-07).** After a private read, the runtime refuses a fetch to a host the person did not name (`egress-guard.ts`). A host named only inside an attachment counted as named, so a counterparty's document could name a site and have the model fetch it. A plain text attachment, which Chat has always accepted, had the same hole before this change. `userTextOf` (`packages/core/src/runtime/egress-guard.ts:117`) now takes only what was typed, through `typedTextOf` (`injection-guard.ts:206`): everything before the first `--- name ---` header, without the host's note lines, with the cut at the FIRST header running to the end so a file cannot end its own block with a half header and have what follows read as typed (`egress-guard.test.ts`, `injection-guard.test.ts`).
@@ -5856,6 +5867,24 @@ Update 2026-10-13: the shell reached `main` in PR #157 with this row still open 
 **blocks the next Enterprise or HYP AI release that carries the chat-first shell** until the owner accepts the
 ceiling or the cost card is built.
 
+Update 2026-10-22: the owner ruled against a hard cap ("it's their API key anyway") and for a permission blocker, so
+the tester tree no longer holds a ceiling. `image_generate` and `video_generate` pass through a gate in
+`invokeToolGuarded` (`packages/core/src/runtime/media-permission.ts`) and return a `permission` refusal instead of
+running. The screen draws the held request on a card (the prompt, the model, or the default model the tool falls
+back to when none is named, the shape, the list price when the price table lists that model, otherwise the plain
+admission that none is known) with Run and Not now
+(`apps/web/components/chat-media-permission-card.tsx`). Run sends the next turn with a grant for exactly that
+request in the body (`paidMedia.grants`, read by `packages/host/src/paid-media-body.ts`); the gate lets one call with
+the same arguments through per grant. Only the client's body carries a grant and the body cannot turn the gate off,
+so text in a page or a file cannot press Run, and a model cannot spend more than the card showed. There is no
+stored setting and no migration. Tests: `packages/core/src/runtime/media-permission.test.ts`,
+`packages/host/src/runs-paid-media.test.ts`, `packages/host/src/paid-media-body.test.ts`,
+`apps/web/lib/media-permission.test.tsx`. Still open: the Edit agent's `generate_image` and `generate_video` do not go
+through these tools and are not gated; the price on the card is a list price, not a quote; "stop asking for this
+thread" is deliberately not built (`docs/internal/chat-computer-spec.md` Layer 2 says never for a paid step); and
+the card was driven in Chromium on a stub desk (Run, Not now, 390 px). The first live try (2026-10-23, a Daily-tier chat model on the owner's PC) held the picture back as designed and billed nothing, then showed that the model fills optional fields with placeholders (`model: "default"`, `image_url: "https://example.com"`), so the Run turn's call no longer matched its grant and a second card appeared. Fixed in the same branch: placeholders are dropped from the request, and a granted call runs with the card's own fields, never the model's extras. The live retest is still owed, so no paid media has been made yet. New gate: lifts when the tester change is promoted to
+`main` and one Run press has been driven live.
+
 ### SR-168 {#sr-168}
 
 **Tester code only: the research worker's answer to the model was not scanned for injection.**
@@ -5993,6 +6022,9 @@ Gate: before the team board is deployed behind Caddy. Not driven.
 ### SR-175 {#sr-175}
 
 **Hosted: a person's own generated files are visible to the whole company.**
+
+**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+
 Raised 2026-10-14. Medium. Open. Found by read-only scouts of the tester code (`agentforge-chat`, which carries
 the same stores as `main`) while planning the team board's files phase.
 
@@ -6024,6 +6056,9 @@ Gate: before a second person of one company uses the hosted app for their own wo
 ### SR-176 {#sr-176}
 
 **Hosted: any member of a company can delete another member's files.**
+
+**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+
 Raised 2026-10-14. High. Open. Found by the W1b worker in the tester and checked on `main` by the orchestrator.
 
 Evidence (`main`):
@@ -6053,6 +6088,188 @@ shell has a non-empty key and empty otherwise. The key never reaches the contain
 
 Gate: none.
 
+### SR-178 {#sr-178}
+
+**Hosted: a Workspace switched to "workspace" is readable by every person of the company, not only its members.**
+
+**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+
+Tester only. Raised 2026-10-14 evening, when Rizky ruled that a Workspace is shared with its members only (team-board-spec, K-D22). Medium.
+
+Evidence: W1 (`e29be2b5`, `62eae740`) reads a project's files, knowledge and chats for any person of the tenant when `projects.visibility = 'workspace'`, which was the K-D19 rule. That rule is now wrong. What goes wrong if ignored: a colleague who was never invited lists and downloads the Workspace's files and finds them in their own Workspace-less chats' knowledge search.
+
+Fix (planned): a membership table with roles (Owner, admin, member) and the agents each member brought; the read rule becomes "member of the project, or own row, or legacy row"; a router test with four people (A owns, B is a member, C is in the same company and not a member, D is in another company) where C and D get 404. Personal unchanged.
+
+Status: **fixed in the tester at `c062f4b7`, not driven hosted.** What the fix is:
+- `project_members` (one owner per Workspace, by a partial unique index) and `project_agents` are created by the healer in `packages/db/src/projects-schema.ts`. An existing Workspace gets its maker as owner and nobody else, including one that was switched to `workspace`: it fails closed, and its owner invites people again.
+- One fragment, `memberOfLiveProjectSql` (`packages/host/src/projects/membership-sql.ts`), is the read rule everywhere a Workspace's row is read: artifacts (`SHARED_ARTIFACT_SQL`, `artifacts.ts`), media (`sharedMediaSql` and `mediaVisibleClause`, `media-visibility.ts`), knowledge (`memberOfProject`, `knowledge-visibility.ts`), and the project list and lookups (`MEMBER_PROJECT_SELECT`, `projects/store.ts`). `projects.visibility` grants nothing any more, and a PATCH that sends it is a 400.
+- A chat in a Workspace is checked at create (`requireChatWorkspace`, `handlers/threads.ts`) and again on every run (`workspaceForRun`, `runs.ts`), so a removed member's old thread runs with no Workspace scope.
+- A company owner or admin who is not a member gets the same 404 as a stranger. There is no admin listing of every Workspace (not built).
+- Test: `packages/host/src/projects-members.test.ts`, four people as above, through the real router; C and D get 404 on every route, equal to an unknown id. A mutation that makes the fragment true for anyone fails it.
+
+Gate: before HYP AI imports from the tester, and before the tester is promoted to `main`. A hosted drive of the four-person case is still owed.
+
+### SR-179 {#sr-179}
+
+**Hosted: a member removed from a Workspace keeps reading, listing and deleting the files and media they put into it.**
+
+**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+
+Tester only. Raised 2026-10-14, after SR-178's fix. Medium.
+
+Evidence: the read rule let a maker through on `owner_user_id = ?` (artifacts) and `user_id = ?` (media) whatever the row's `project_id`, and putting a file into a Workspace keeps its maker (`projects/store.ts` `setFileProject`, `setMediaProject`). So after an owner removed D, D still opened, listed and downloaded every file D had put in, and `mayDeleteFile` still let D delete them for everyone. What goes wrong if ignored: a person taken out of a Workspace, often on leaving a team, keeps the Workspace's documents they contributed and can destroy them.
+
+Decision (default for this lane, Rizky may reverse it): **a file in a Workspace belongs to the Workspace.** Its maker reads it only while a member. Taken back out of the Workspace, it is the maker's private file again. **A second default:** archiving a Workspace (W1's delete) hands each file back to its maker, so a file never ends up readable by nobody while it still counts against storage. Knowledge sources already had the first shape (`knowledge-visibility.ts:103`, `owned` requires `project_id IS NULL`) and keep theirs: a Workspace's knowledge of an archived Workspace stays hidden.
+
+Status: **fixed in the tester, not driven hosted.**
+- Two fragments in `packages/host/src/projects/membership-sql.ts`: `heldByNoLiveProjectSql` (`:19`, no live Workspace holds the row) and `lockedOutOfLiveProjectSql` (`:27`, a live Workspace holds it and the person is not a member), plus `isLockedOutOfProject` (`:32`) for a row already loaded.
+- Artifacts: the maker term is `OWN_ARTIFACT_SQL` (`artifacts.ts:89`, used at `:103`). Delete passes the row's project (`artifacts.ts:213`).
+- Media: the raw clause (`media-visibility.ts:87`) and its drizzle twin `ownMediaSql` (`:48`) both add the same condition, so the file route, the galleries, Edit's stills and job pictures all follow it. A member's storage list (`handlers/storage.ts:55`) reads `madeAndDeletableWhere` (`media-visibility.ts:59`), the drizzle twin of the delete rule, so it lists only what she may still delete. `mayDeleteFile` takes the file's project and refuses a locked-out maker (`:146`); its callers are `artifacts.ts:213` and `handlers/media.ts:110`. Company owner and admin keep delete as SR-176 has it.
+- The meeting delete path (`meeting/artifacts.ts:79`) has the same lock-out.
+- Tests: `packages/host/src/projects-members.test.ts:415`, three cases through the real router. A removed maker gets 404 on `GET /api/v1/artifacts/:id`, its `/file` and `/api/v1/media/:id/file`, finds neither in `GET /api/v1/artifacts`, the image gallery nor the storage list, and is refused delete, while the Workspace owner reads all of it. A maker who takes a file out first keeps it after removal. An archived Workspace hands the files back. `projects-media-companies.test.ts:279` pinned the old "keeps her own" and is changed to the new rule.
+
+Not covered: `deleteArtifactsByOwner` (`knowledge.ts:895`), run when a person removes a dataset or matter of their own, deletes that person's artifacts with no Workspace check. It predates this fix and only ever touches the caller's own rows; whether it should spare a row a live Workspace holds is left open.
+
+Gate: before HYP AI imports from the tester, and before the tester is promoted to `main`. A hosted drive is still owed.
+
+### SR-180 {#sr-180}
+
+**Hosted: document versions are not counted against a tenant's storage, and the cap has no count limit inside 30 days.**
+
+**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+
+Tester only. Raised 2026-10-15 with D0 of documents in a Workspace (team-board-spec.md, K-D30). Medium.
+
+Evidence:
+- Every append writes a full sealed spec into `doc_versions` (`packages/host/src/doc-versions/store.ts:198`).
+- The hosted storage use counts artifact bodies (`tenant-storage-store.ts`), not version rows, so versions never meet the tenant's ceiling.
+- The cap keeps the newest 50 plus every version younger than 30 days (`DOC_VERSION_CAP`, `packages/host/src/doc-versions/types.ts:3`; `planPrune`, `history.ts:42`), so the 30-day term puts no upper bound on the count.
+
+What goes wrong if ignored: once D1 exposes section edits, a member or a script saving in a loop grows one document's history without limit for 30 days. On HYP AI's single CVM with one disk, that fills the disk every tenant shares.
+
+Status: **open, not reachable.** No route calls `appendVersion` today. D1 must do at least one of these before its first write route:
+- count version bytes in the tenant's storage use;
+- add a hard per-document ceiling on versions or bytes that holds within the 30 days;
+- rate-limit section edits.
+
+Gate: before D1 adds a route that appends a version.
+
+### SR-181 {#sr-181}
+
+**Hosted: colleagues see a person's password-mode username, so any colleague can lock that person out.**
+
+**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+
+Tester only. Raised 2026-10-15 with the Workspace people picker. Low.
+
+Evidence:
+- The portal's token body now carries the person's username beside the display name (`memberOf`, `apps/portal/src/flows/token.ts:237`, username at `:246`).
+- As first written (before the fix below), the host kept the display name, else the username, as the person's name (`packages/host/src/auth/portal-client.ts:301`) and wrote it to `user.name` at sign-in (`packages/db/src/portal-owner.ts:217`).
+- As first written, `listCompanyPeople` (`packages/host/src/company-people.ts:8`) showed that name to every owner or admin of a Workspace through `GET /api/v1/projects/:id/invitable`, and to every member of the company through the board's people list.
+- The portal locks an account after five failed passwords for 15 minutes (`PASSWORD_MAX_FAILED_ATTEMPTS`, `PASSWORD_LOCK_MS`, `apps/portal/src/store/postgres/credentials.ts:40-41`), and gives the same answer for a wrong password and an unknown username, so a username was not guessable from outside.
+
+What goes wrong if ignored: a colleague who reads a person's username in the picker can lock that person out for 15 minutes at a time. The reach is the same company only, and a password sign-in also takes the e-mail address on record, which colleagues often know already, so the step is small.
+
+Decision (Rizky, 2026-10-15): "hide usernames and show names only". In password sign-in mode a colleague's username is never shown to, or sent to, other people.
+
+Fix (2026-10-15, tester; the host and renderer tests named below):
+- The host keeps the display name only. `personNameFrom` (`packages/host/src/auth/portal-client.ts:277`) reads the username only to drop a display name that equals it, ignoring case, and the token's name is set at `:313`.
+- Sign-in writes the display name, or the id when there is none, at every sign-in (`packages/db/src/portal-owner.ts:213-223`; the login route passes an explicit null when the portal sends no name, `packages/host/src/auth/routes.ts:519`), so a name stored by the old username fallback is replaced at that person's next sign-in. A provision that states no name at all keeps the stored name.
+- Every list reads the name through `realPersonName` (`packages/host/src/company-people.ts:8`): null when the stored name is blank or is the person's id. It serves the invitable list and the board's people list (`listCompanyPeople`, `company-people.ts:13`), and the members list (`toMember`, `packages/host/src/projects/service.ts:210`).
+- The renderer shows the name, or `Colleague <code>` with a six-character code taken from the id (`apps/web/lib/people-names.ts`; `projects.members.unnamed` in `en` and `id`). The picker's search matches the label shown, never the id. The Members tab's "Your account id" line is removed (its keys left both catalogs), since the picker now chooses by name.
+- Account creation is not changed. The operator's `--name` (`apps/portal/src/accounts/args.ts`) stays optional, because the neutral label covers accounts made without one and existing accounts need the label anyway.
+
+Tests: `packages/host/src/company-people-names.test.ts` (password mode, through the real router: the invitable list, the members list and the board's people list carry no username; a display name equal to the username, and a row that stored the username, come out as no name); `packages/host/src/auth/portal-client.test.ts` ("the person's name in the token body"); `packages/db/src/portal-owner.test.ts` ("the person's name from the portal"); `packages/host/src/projects-members.test.ts` (the people picker's names); `apps/web/lib/projects-picker.test.tsx` (renders names only); `apps/web/lib/projects-members.test.tsx`; `apps/web/lib/people-names.test.ts`; `apps/web/lib/board-view.test.ts`.
+
+Status: **fixed on the tester, 2026-10-15; one residual.** A row that stored a username in the window between `204aeaa8` and this fix keeps it until that person's next sign-in: the host holds no username, so it cannot tell a stored username from a name at read time. Open for Rizky: a one-off clean-up with the portal for the people who have not signed in since, and whether `--name` should become required for new password accounts. The portal token still carries `username` (`apps/portal/src/flows/token.ts:246`); the host now reads it only for the comparison. Dropping it from the token is a portal change, not made here.
+
+Gate: before HYP AI imports from the tester. The residual is named in the same gate.
+
+### SR-182 {#sr-182}
+
+**Hosted: an owner or admin could open and edit a colleague's private agent; now only the maker can, and delete is not a read.**
+
+**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+
+Tester only. Raised 2026-10-15 with K34-b (prompt-made agents). Medium, fixed.
+
+Evidence (before):
+- `canView` returned `canAdminister(tenant.role)` for any private agent of the desk (`packages/core/src/agents/service.ts`, the last line of `canView`). An owner or admin therefore read the agent's prompt and tools through `GET /api/v1/agents/:id`, listed it in `GET /api/v1/workspaces/:id/agents` and the Chat specialists, and could edit it, which the colleague had made as a private agent.
+- Members may now make private agents (`service.ts`, `create`: the builder role is asked for only when the visibility is not private), so the exposure would have grown with the feature.
+
+Fix (2026-10-15, tester):
+- `canView` lets the role see a colleague's private agent only when server mode is off (`service.ts:107-120`; the flag is `AgentService`'s fourth constructor argument, wired to `isServerMode()` in `packages/host/src/tenant.ts:16-21`). `get`, `list`, `requireOwned` and so `GET .../threads`, tools, soul, publish, product-modes, generate-defaults, thread creation and runs all answer 404 to everyone but the maker.
+- Delete is not a read. `DELETE /api/v1/agents/:agentId` lets an owner or admin remove a colleague's private agent without ever returning its content (`packages/host/src/agent-delete.ts:60-71`), and answers a member 404 for the same id. Deleting removes the maker's chats with it (`:81-90`); another person's chat on a workspace agent blocks the delete (409 `agent_in_use`, `:75-82`), so nothing of a third person is lost.
+- Personal is unchanged: with the flag off the owner sees and edits every row (`packages/host/src/agent-prompt-made.personal.test.ts`, first case; `packages/core/src/agents/service-privacy.test.ts`).
+
+Tests: `packages/host/src/agent-prompt-made.test.ts` (the 404 table for owner, admin and a second member over nine routes; the lists; the delete cases), `packages/core/src/agents/service-privacy.test.ts`, the tenancy harness row for the DELETE route.
+
+Residual: an owner or admin can still delete the agent and with it the maker's chats, by design (K-D34 item 4). The confirmation in the renderer says so since 2026-10-15: every chat with the agent is deleted, with its messages, tool records and Knowledge cards (`agents.made.deleteBody` in `apps/web/locales/{en,id}/agents.json:111`, pinned by `apps/web/lib/agent-delete-dialog.test.tsx`). Before that it said other people's chats stay, which was false. Sharing a prompt-made agent with a Workspace is not built; when it lands `canView` needs a Workspace clause.
+
+Review follow-up (2026-10-15, code review of `3b58cd6d`): a member could bind any tool to their own prompt-made agent.
+- Cause: `requireOwned` had dropped the builder check for a private agent, so the older routes `POST /api/v1/agents/:id/tools` and `/soul` (with unvalidated `toolKeys`) reached `bindTool` and `createRevision` for a member, bypassing the mode allow-list. `POST /api/v1/workspaces/:id/agents` also took a member with an unvalidated body, and a non-string `name` made `slugify` throw a 500.
+- Members' route scope now: only `POST /api/v1/agents/draft`, `POST /api/v1/agents` and `DELETE /api/v1/agents/:id` (their own agent). The older mutating routes (tools, soul, share, product-modes, generate-defaults, workspace create) need the builder role again: `requireOwned` asks `canBuild` after the visibility and maker checks (`packages/core/src/agents/service.ts`, `requireOwned`), and `create` asks it for any visibility. The one exception is `publish` of a prompt-made version of the member's own private agent (`requireMaker`), which the create route needs; its tools are already bound under the allow-list.
+- Members create through an internal path, `AgentService.createPromptMade` (`service.ts:191`), always private, which checks the tools first. `packages/host/src/agent-create.ts` calls it, then `publish`, and removes the row if `publish` fails (test: publish rejected gives 500, and the agent count and the maker's list are unchanged).
+- Tool allow-list, enforced in core whoever calls: for a version whose `config.madeFromPrompt === true`, `assertPromptMadeTools` (`service.ts:102`) refuses with 400 any tool not in `harnessSpecFor(config.baseMode).tools` (an unknown base mode allows none). It runs in `createPromptMade` (`:201`), `createRevision` (`:406`, before the new version is stored) and `bindTool` (`:461`). An owner or builder gets the same 400 on a prompt-made agent.
+- Run cap: `draftAgent` takes a run slot (`withRunSlot`, `packages/host/src/agent-draft.ts`) around the model call, so a full cap answers 429 `too_many_runs` and calls no model; the offline stub draft takes none.
+- Budget: a prompt-made agent runs under `harnessSpecFor(baseMode).budget` (`promptMadeBudget`, `packages/host/src/prompt-made-agent.ts`, used in `packages/host/src/runs.ts` beside the other budgets), so the mode's per-tool caps apply. An agent that is not prompt-made keeps the runtime default.
+- Delete: `agent_in_use` (409) now applies only to a workspace-visibility agent (`packages/host/src/agent-delete.ts`). A private agent's threads by anyone else (left from before the privacy change) go with the cascade, and each thread's knowledge is dropped under its own person.
+- Tests: `packages/host/src/agent-prompt-made.test.ts` (section "what a member can do to their own prompt-made agent"; the draft cap; the rollback; the private-delete case), `packages/host/src/agent-prompt-made.budget.test.ts`, `packages/host/src/agent-prompt-made.personal.test.ts` (the Personal owner keeps the older routes), `packages/core/src/agents/service-privacy.test.ts`.
+
+Residuals left open:
+- The admin `DELETE` answer carries the maker's chat count (`chatsDeleted`), a small activity leak.
+- There is no admin listing to clean up a departed maker's private agents.
+- Media-approval proposals and the private chat uploads of deleted threads are not cleaned (the same gap as `deleteThread`).
+- Whether the edit tool backend scopes `projectId` per person is unchecked; it is moot while members cannot bind edit tools.
+
+Gate: before HYP AI imports from the tester.
+
+### SR-183 {#sr-183}
+
+**Hosted (tester): the company gateway management token can change the company's gateway tokens, so where it is kept, who may set it and what the platform lets it reach are the controls.**
+
+**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+
+Tester only. Raised 2026-10-15 with team board K-D25, step one (the gateway adapter, G1). Medium. Built and unit-tested; not driven against a live gateway, and no live token-API call has been made (K-D25: only on Rizky's go).
+
+What it is. The credential the gateway's token API takes (`/api/token`, documented as `Authorization: Bearer`). Its type is not yet checked, so it may be an account-level access token. Whoever holds it can act on the gateway account's tokens, including ones made by hand.
+
+Where it is kept:
+- `packages/host/src/settings-store.ts:194` and `:205` add `companies[organizationId].gatewayAdmin` to the sealed settings payload. `companiesMap` reads it back at `:276-291`.
+- `persistEncrypted` (`:318-327`) seals the whole payload with `getLocalVaultKey()` (`packages/db/src/vault-key.ts:184`), the wrap key the gateway key uses. Hosted, the sealed bytes sit in `tenant_state`, not in a plain file.
+- `saveCompanyGatewayAdmin` (`:813-823`), `clearCompanyGatewayAdmin` (`:825-841`) and `loadCompanyGatewayAdmin` (`:808-811`) are the only accessors. `settingsPayload` does not read the slot. The test "the settings answers, read and saved, never carry the token" (`packages/host/src/handlers/company-gateway-admin.test.ts`) reads GET and POST `/api/v1/settings` as an owner and as a member and finds no token.
+
+Who may set it:
+- Owner only, for PUT and DELETE: `assertCanWrite` (`packages/host/src/handlers/company-gateway-admin.ts:36-40`). An admin, a member and a builder get 403 `gateway_admin_forbidden` (test: "lets an admin read the status and never change it, and refuses a member and a builder"). K-D25 says "only the owner or super admin may set it"; the code follows that.
+- GET answers an owner or an admin (`assertCanRead`, `:30-34`) with four fields only: `configured`, `accountIdSet`, `checkedAt`, `status` (`packages/host/src/gateway-tokens/admin-record.ts:64-74`). The token is never in the answer.
+- Off server mode every route answers 404 (`serverModeOn`, `company-gateway-admin.ts:22-24`); the Personal app never writes the slot.
+
+How it is used:
+- One check on save: `checkGatewayManagementToken` makes a single GET to `/api/token/?p=1&page_size=1` on the pinned origin, with `redirect: "manual"` and a 5 s timeout (`packages/host/src/gateway-tokens/check.ts:16-21`, `:48-82`). It logs the status and the HTTP status only (`check.ts:60-80`).
+- The adapter (`packages/host/src/gateway-tokens/adapter.ts`) is the only code that writes tokens to the gateway. The origin is `pinnedGatewayOrigin()` and nothing else (`callGateway`, `:140-173`, `redirect: "manual"` at `:157`). No route calls the adapter in this change.
+- Scope guard: `assertManaged` (`adapter.ts:123-138`) refuses an id that is not in `gateway_managed_tokens` for the caller's company, with 404 `gateway_token_not_managed`, before any call. Update, delete and usage all pass through it (`:206`, `:217`, `:233`). A batch is all or nothing.
+- Ids are numeric strings (`normalizeGatewayId`, `:40-48`), so the usage query carries nothing but a checked number.
+- Create records only the id (`:196`). The gateway's `key` in the create answer is never read (`:183-186`); `adapter.test.ts` checks that a key from the answer appears in neither the result nor the table.
+- Erasing the organization removes its rows: the table is in `CASCADED_TABLES` (`packages/db/src/tenant-purge.ts:97`) and its foreign key cascades (`packages/db/src/gateway-tokens-schema.ts:8`).
+
+Leak checks, all in the tester:
+- `packages/host/src/gateway-tokens/check.test.ts` ("the token is a value redaction leaves alone"): `redactSecrets` does not hide this token, so a log that carried it would not be cleaned up. The rule is that no log line carries a request body. `redactSecrets` (`packages/core/src/security/redact.ts:63-67`) matches credentials and base64-like text only.
+- The HTTP adapter logs the path length, method, IP and the error object on a 500 (`packages/host/src/http-adapter.ts:745-751`). It never logs a request body (`respondRejection`, `:443-455`).
+- `company-gateway-admin.test.ts`, "nothing a caller sees carries the token": every answer and every console line across a full save, read and clear.
+- `adapter.test.ts`, "never puts the management token or a gateway key into an error".
+
+Rotation: `rotateWrapKey` opens each sealed payload and re-seals the whole thing (`packages/host/src/wrap-key-rotation.ts:186-221`), so the token travels with the rest. `packages/host/src/wrap-key-rotation.test.ts`, "re-seals the settings row that holds it, and the token reads back under the new key", proves it on the hosted row through the real writer.
+
+Residual:
+1. The gateway decides what the credential can do, and the scope guard is host-side only. If the credential is account-wide, a holder of it (or of the wrap key that opens the row) can change tokens the platform did not create. The guard limits the platform's own calls, not the gateway account.
+2. One machine-wide wrap key seals every company's token. Its TKE path is SR-170.
+3. Create calls the gateway before the row is written (`adapter.ts:183`, then `:196`). If that insert fails, the gateway keeps a token the platform cannot delete, because the scope guard refuses an id it did not record. Not handled. Fix: write a pending row before the call, once a route calls create.
+4. Unverified against a live gateway: the credential type, whether `New-Api-User` is needed, and what the quota unit is (K-D29 says USD). The adapter's wire fields come from the public docs only.
+5. An admin can reach the adapter (`manageable`, `adapter.ts:104-121`, `canAdminister`), while only the owner can set the token. Nothing reaches it yet, so this is a rule for the route that comes next.
+6. Clearing the token (DELETE) removes only the sealed slot. The platform's rows in `gateway_managed_tokens` and the gateway tokens they name stay where they are, and a new token that passes the check manages them again (`clearCompanyGatewayAdmin`, `packages/host/src/settings-store.ts:825-841`). Nothing deletes them on the gateway.
+
+Gate: before the first live token-API call (Rizky's go, and Hypernet's word for TokenKu production), and before HYP AI imports from the tester.
+
 ### SR-184 {#sr-184}
 
 **Edit's output lookup read a media row by id alone, with no organization filter.**
@@ -6068,6 +6285,19 @@ the gap is that nothing would stop one if that changed.
 Fix: `loadMediaRow(mediaId, organizationId)` filters on both, and the job runner passes the project's
 organization from `workerProjectScope`. `packages/host/src/edit/load-media-row.test.ts` proves the own
 organization's row loads and another organization's does not.
+
+Gate: none.
+
+### SR-185 {#sr-185}
+
+**Hosted (tester): after the OPC strip, the kept original of a file attached in Chat was readable by every member of the company.**
+Tester only. Raised 2026-10-16 by the advisor's review of P5b. Medium, closed.
+
+Evidence: U1 keeps a Word, Excel or PDF file attached in Chat as an artifact (`keepOriginal`, `packages/host/src/chat-documents/original.ts:30`, through `saveRenderedArtifact`, `packages/host/src/artifact-save.ts:35`). P5b took main's `packages/host/src/artifacts.ts`, which has no owner column, and a hosted desk is company-wide (K-D11). So a colleague could list, read and download a person's attached original. Rizky's rule of 2026-10-06 is that a document attached in Chat is private to the person who attached it, and main keeps that rule for the desk copy (`uploads/~<user>/`, `packages/host/src/desk-files/private-uploads.ts`). The P5b strip also removed the test that held the original to the same rule ("hides it from a colleague on the same desk"). Main has no U1, so main is not affected.
+
+Contained in the tester on 2026-10-16: in server mode `keepOriginal` keeps nothing (`original.ts:35`) and `verifiedOriginalId` names nothing (`:54`), so a hosted desk stores no original and the notes never point at one. `packages/host/src/chat-documents/original.test.ts` holds it: on hosted, nothing new appears in a colleague's list or another company's list, a stored artifact marked as a chat upload is not named, and on Personal the original is kept as before. Originals stored on a hosted tester desk before this change are still ordinary artifacts there. Checked 2026-10-16: the tester webdev data dir (`.webdev-data-chat`) holds no artifact marked `chatUpload`, and no tester pilot stack was running; the volumes of a stopped pilot stack were not opened. Not driven hosted.
+
+Decision (Rizky, 2026-10-16): **hosted keeps no original.** The containment above is the lasting rule, and the per-person folder and dropping U1 are not taken. The non-hosted desk keeps originals as before. Status: **closed.** A drive on the staging instance is still owed.
 
 Gate: none.
 
@@ -6093,6 +6323,64 @@ Knowledge imports and media downloads keep the default refusal. `packages/host/s
 proves an injection in the window is caught and one outside it never reaches the model.
 
 Gate: none.
+
+### SR-187 {#sr-187}
+
+**Tester: the Chat figures file keeps amounts the chat mask would hide, any desk tool can read it, and the text-mode Finance guard missed a 16-digit NIK in a headerless pipe row.**
+Raised 2026-10-20 while building the `finance_task` chat worker. Tester only. Low, open.
+
+Evidence:
+- **Where the file lives.** A Word, Excel, PDF or PowerPoint file attached in Chat whose table fits a Finance task now leaves a second desk file, `uploads/~<person>/<name>.figures.json`. `saveDeskFigures` writes it as the person (`packages/host/src/chat-documents/desk-copy.ts`), in the same private folder as the `.md` copy.
+- **How it is redacted.** The text is redacted the Finance way: `guardFinanceInput` at attach (`packages/host/src/finance-figures/figures.ts`) and again at save (`checkFinanceFigures`). Identifiers are masked and amounts are put back, the same as a studio import (`restoreFinanceAmounts`, `packages/host/src/finance-privacy.ts`). The chat copy uses `maskPii` (`packages/host/src/chat-documents/save-handler.ts`), which can mask a long number the Finance guard keeps as an amount.
+- **Who can read it.** `read_file`, `search_files` and `run_code` can read a desk file in the person's own folder. So the model can see a value in the figures file that the `.md` copy shows masked.
+- **The probe.** During the build, the text-mode guard did not mask a 16-digit NIK written as a bare cell in a pipe row with no header. It did mask `NIK: …` and e-mail addresses.
+
+Scope: the file is private to the person (`assertVisible`, `packages/host/src/desk-files/file-store.ts:388`). On a one-owner desk the model reading the owner's own amounts is the point of the feature.
+
+Status: **open.** Two pieces of work are owed:
+- a column-aware NIK test on headerless rows (`packages/core/src/finance/pii-scan.ts`);
+- a decision on whether desk tools may read `*.figures.json`.
+
+Gate: before a hosted desk has a second person.
+
+### SR-188 {#sr-188}
+
+**Tester: `finance_task` refuses a figures file the model wrote, and asks again for a number the owner did not type.**
+Raised 2026-10-20 while building the worker. Info: checked, not an issue.
+
+Evidence:
+- **A forged figures file.** The model can write desk files with `write_file` and `edit_file`. Every such write is authored `agent` (`currentAgentAuthor`, `packages/host/src/file-roots.ts`), while the chat save writes as `user`. `readOwnFigures` (`packages/host/src/workers/finance-task-tool.ts`) accepts a figures file only when all of these hold:
+  - its path is exactly `uploads/~<own folder>/<name>.figures.json`;
+  - its newest version was written as `user` by this person;
+  - it parses with `chatFinanceFiguresSchema`.
+  Otherwise the worker asks the person to attach the file again.
+- **Numbers the owner did not type.** A discount rate or opening cash in `answers` is used only when the same number appears in the person's typed text this turn. File blocks are stripped with `splitUserFileBlocks` (`packages/host/src/workers/finance-task-asks.ts`). The typed text reaches the worker on `WorkerChannel.userText` (`packages/host/src/runs.ts`).
+- **A rate in the model's own words.** A discount rate that auto found only in the model-written `request` is asked for again, unless the file states it or the person typed it (`rateUntrusted`).
+- **A figures file is checked again when it is read.** A security review on 2026-10-20 found that a person-authored figures file was only schema-checked on read, so a model-written version the person reverted to in the Files view would reach the write-up. `readOwnFigures` now runs `checkFinanceFigures` (redaction, injection scan, schema) on every read.
+- **Tests.** `packages/host/src/workers/finance-task-tool.test.ts` holds all four.
+
+Residual, from the same review, accepted while a desk has one owner:
+- A task name is a closed choice, and the model may pass one on without the owner naming it. The worst case is the wrong review of the owner's own figures, with every figure still computed in code.
+- The typed-number match checks presence only, with no unit or context (`typedNumberMatches`, `packages/host/src/workers/finance-task-asks.ts`). If the person types "we have 5 projects", a steered model can pass `discountRatePercent: 5`, and the appraisal runs at 5%. The card names the rate it used. An answer also applies when nothing was asked, so a typed number can replace a rate the file states. A tighter rule (a `%` token for the rate, no year or count for the opening cash) would make a bare reply like "12" ask again.
+- The model-written `request` is stored as the artifact's `question` and as the Knowledge Base card's `prompt` (`packages/host/src/finance-tasks/runner.ts`), so a steered sentence is recorded as if the person wrote it.
+
+Gate: none.
+
+### SR-189 {#sr-189}
+
+**Tester: a `finance_task` report made from one person's private attachment is a desk-wide artifact and a desk-wide Knowledge Base card.**
+Raised 2026-10-20 while building the worker. Tester only. Low, open.
+
+Evidence:
+- **The artifact.** The worker runs the studio's own task runner. That saves the report as an artifact (`persistFinanceTaskReport`, `packages/host/src/finance-tasks/persist.ts`), and artifacts are filtered by desk only (`packages/host/src/artifacts.ts:152-175`).
+- **The Knowledge Base card.** The runner also writes a work card with `origin.kind = "artifact"` (`artifactWorkCard`, `packages/host/src/work-cards.ts:174-175`; called from `packages/host/src/finance-tasks/runner.ts`). On a hosted desk only thread cards are private (`visibleExpression`, `packages/host/src/knowledge-visibility.ts:72-74`). So the card, which holds the report's Markdown, is listed and retrieved for everyone on the desk.
+- **Same as before for studio runs.** A Finance run from the studio already behaves this way. What is new is that the input can be a file the person attached in a private Chat thread.
+
+Status: **open.** This is acceptable while a desk has one owner (the OPC, AGENTS.md 2026-10-14). If a hosted desk gets a second person, either:
+- mark the worker's report and card as the person's own; or
+- skip the card for a report made from a private attachment.
+
+Gate: before a hosted desk has a second person.
 
 ### SR-190 {#sr-190}
 
