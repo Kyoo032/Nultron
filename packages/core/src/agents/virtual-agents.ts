@@ -104,22 +104,16 @@ const CHAT_SPEC = MODE_HARNESS_SPECS.chat;
 const FULL_CHAT_TOOLS: readonly string[] = Object.freeze([...CHAT_SPEC.tools, ...GENERALIST_WORKER_TOOLS]);
 
 /**
- * Paid media a model may start in one turn (`chat-workers-spec.md`, section 7: four pictures, one
- * clip). Every agent's prompt now tells it to make them, so a model that decides on ten clips must
- * meet a ceiling the host holds. This is a ceiling only: the cost card with a Run control that the
- * plan's decision D4 asks for before a clip is made is not built.
+ * Paid media has no ceiling here (owner, 2026-10-22: it is the person's own key). The brake is the
+ * permission card: `image_generate` and `video_generate` do not run until the person presses Run on
+ * the request (`../runtime/media-permission.ts`, plan decision D4). The turn's `maxToolCalls` still bounds a runaway.
  */
-export const PAID_MEDIA_PER_TURN: Readonly<Record<string, number>> = Object.freeze({
-  image_generate: 4,
-  video_generate: 1,
-});
 
-/** Every agent's budget: Chat's declared one, plus a ceiling for paid media and for each worker. */
+/** Every agent's budget: Chat's declared one, plus a ceiling for each worker. */
 const FULL_CHAT_BUDGET: RunBudget = Object.freeze({
   ...CHAT_SPEC.budget,
   perTool: Object.freeze({
     ...CHAT_SPEC.budget.perTool,
-    ...PAID_MEDIA_PER_TURN,
     ...Object.fromEntries(GENERALIST_WORKER_TOOLS.map((key) => [key, CHAT_WORKERS[key]?.perTurn ?? 1])),
   }),
 });

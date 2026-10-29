@@ -179,7 +179,9 @@
     "calculator": "Calculator",
     "datetime": "Clock",
     "selfChecking": "Checking this desk…",
-    "selfCheck": "Desk check"
+    "selfCheck": "Desk check",
+    "imageAsk": "Picture waiting for your OK",
+    "videoAsk": "Clip waiting for your OK"
   },
   "tools": {
     "name": {
@@ -289,6 +291,22 @@
     "noPreview": "The slides cannot be shown here, but the file is ready to download.",
     "outlineAria": "Slides in this deck",
     "previewAria": "Slide preview of {title}"
+  },
+  "media": {
+    "label": "Needs your OK",
+    "imageTitle": "Make a picture",
+    "videoTitle": "Make a clip",
+    "spends": "This spends credit on the key in use. Nothing starts until you press Run.",
+    "priceImage": "About {usd} per picture (a list price, not a quote)",
+    "priceClip": "About {usd} for {seconds} s at {resolution} (a list price, not a quote)",
+    "priceUnknown": "No price is known for this one before it runs.",
+    "model": "Model: {model}",
+    "defaultModel": "Model: {model} (the default)",
+    "run": "Run",
+    "runAll": "Run all {n}",
+    "notNow": "Not now",
+    "runPrompt": "Run it",
+    "listAria": "Paid requests waiting for your OK"
   },
   "error": {
     "loading": "Chat is still loading",

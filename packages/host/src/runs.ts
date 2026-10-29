@@ -61,11 +61,12 @@ import { readModelPinned } from "./job-regen";
 import { collectToolMediaParts } from "./tool-media";
 import { assertChatImagesSendable, prepareChatImageHistory, type ChatTurn } from "./chat-image-history";
 import { readRetryTurn, turnIsStored } from "./chat-retry";
+import { readMediaPermission } from "./paid-media-body";
 import { saveGeneratedImage, saveGeneratedVideo } from "./media";
 import { getRunContext, hostedRequestLocale, localeForRun, withRunContext } from "./run-context";
 import { withToolRun } from "./tool-run-context";
 import type { JobEvent } from "@agentforge/core/jobs";
-import { DEFAULT_CHAT_MODALITIES, GENERALIST_WORKER_PROMPT, virtualAgentFor } from "@agentforge/core";
+import { DEFAULT_CHAT_MODALITIES, GENERALIST_WORKER_PROMPT, mediaGrantNote, virtualAgentFor } from "@agentforge/core";
 import { runPolicyFor, withGeneralistWorkers } from "./virtual-agents";
 import { WORKER_STREAM_IDLE_MS, withWorkerChannel } from "./workers/worker-channel";
 import { formatPastSessionsHint } from "./session-recall";
@@ -206,12 +207,15 @@ export async function* startModalityRun(options: {
     ? withoutDisabledToolSentences(agentPolicy.systemPrompt, settings.disabledTools ?? [])
     : withoutDisabledToolSentences(published.version.systemPrompt, settings.disabledTools ?? []) +
       (defaultChat ? GENERALIST_WORKER_PROMPT : "");
+  // Paid media asks first (SR-167): the body carries the requests the person pressed Run on, and the model
+  // is told to make exactly those on this turn. The note is for this turn's prompt only; it is not stored.
+  const mediaPermission = readMediaPermission(options.body);
   const version = {
     ...published.version,
     model,
     // A mode agent has the last word on who is speaking, after the desk's Soul block (`closingPrompt`).
     systemPrompt: withChatOutputLanguage(
-      agentPrompt + pastHint + knowledge.prompt + (agentPolicy?.closingPrompt ?? ""),
+      agentPrompt + pastHint + knowledge.prompt + (agentPolicy?.closingPrompt ?? "") + mediaGrantNote(mediaPermission.grants),
       locale,
     ),
   };
@@ -527,6 +531,7 @@ export async function* startModalityRun(options: {
                 ? { budget: virtualAgentFor("chat").budget }
                 : {}),
             history,
+            mediaPermission,
             thinking: thinkingEnabled,
             reasoningEffort,
             reasoningEffortExplicit,

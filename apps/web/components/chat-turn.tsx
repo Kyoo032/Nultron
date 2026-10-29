@@ -16,6 +16,7 @@ import { collectToolMediaParts } from "@/lib/tool-media";
 import { DeckCards } from "@/components/chat-deck-card";
 import { DossierCards } from "@/components/chat-dossier-card";
 import { FinanceCards } from "@/components/chat-finance-card";
+import { MediaPermissionCards } from "@/components/chat-media-permission-card";
 import "@/components/chat-turn-bubbles.css";
 import { ToolRowBody, isRichTool } from "@/components/tool-rows/tool-row";
 import { showsToolSpinner, toolActivityLabel, toolCallSummary } from "@/lib/tool-labels";
@@ -23,6 +24,8 @@ import type { ContentPart, ToolCallPart } from "@agentforge/core/content";
 import { splitUserFileBlocks } from "@agentforge/core/chat-documents";
 import { getLocale, t } from "@/lib/i18n";
 import { continuePrompt, stepLimitToolsOf } from "@/lib/chat-continue";
+import { permissionRequestsOf } from "@/lib/media-permission";
+import type { MediaRequest } from "@agentforge/core/media-permission";
 import { SHELL_LAYOUT } from "@agentforge/core/product-modes";
 
 export type LiveTool = {
@@ -51,6 +54,8 @@ type Props = {
   onContinue?: (text: string) => void;
   /** A run is already in flight, so Continue waits. */
   continueDisabled?: boolean;
+  /** Sends the requests the person pressed Run on. Absent once the turn was followed up: the card then only records them. */
+  onRunMedia?: (requests: MediaRequest[]) => void;
 };
 
 function PulseDots() {
@@ -63,7 +68,7 @@ function PulseDots() {
   );
 }
 
-export function ChatTurn({ role, content, live, onContinue, continueDisabled = false }: Props) {
+export function ChatTurn({ role, content, live, onContinue, continueDisabled = false, onRunMedia }: Props) {
   const isUser = role === "user";
   // A new chat's first turn opens with the lets-go clip, then the working state takes over.
   const launching = useHoldOnMount(Boolean(live?.firstTurn), LETS_GO_MS);
@@ -198,6 +203,11 @@ export function ChatTurn({ role, content, live, onContinue, continueDisabled = f
             <DeckCards tools={visibleTools} />
             <DossierCards tools={visibleTools} />
             <FinanceCards tools={visibleTools} />
+            <MediaPermissionCards
+              requests={permissionRequestsOf(visibleTools)}
+              disabled={continueDisabled}
+              {...(onRunMedia ? { onRun: onRunMedia } : {})}
+            />
             {jobs.map((job, index) => (
               <MessageEmbed
                 // biome-ignore lint/suspicious/noArrayIndexKey: parts and runs have no id and only grow while a turn streams, so the position is the identity

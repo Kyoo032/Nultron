@@ -28,6 +28,7 @@
     "./video-capabilities": "./src/models/video-capabilities.ts",
     "./audio-capabilities": "./src/models/audio-capabilities.ts",
     "./media-pricing": "./src/models/media-pricing.ts",
+    "./media-permission": "./src/runtime/media-permission.ts",
     "./format-bytes": "./src/storage/format-bytes.ts",
     "./plans": "./src/plans/catalog.ts",
     "./edit": "./src/edit/index.ts",

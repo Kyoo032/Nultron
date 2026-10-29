@@ -12,6 +12,7 @@ import {
 } from "@/lib/composer-attach";
 import { TierPicker } from "@/components/tier-picker";
 import { CHAT_DOCUMENTS_PER_MESSAGE } from "@agentforge/core/chat-documents";
+import type { MediaRequest } from "@agentforge/core/media-permission";
 import { ComposerAttachmentChip } from "@/components/composer-attachment-chip";
 import {
   ChatDocumentError,
@@ -87,7 +88,7 @@ type Props = {
    * `continue`, or the turn to send again with `retry`) and leaves the draft in the box alone. A ref,
    * not an effect: StrictMode runs an effect twice.
    */
-  continueSendRef?: { current: ((text: string, retry?: boolean) => void) | null };
+  continueSendRef?: { current: ((text: string, retry?: boolean, grants?: readonly MediaRequest[]) => void) | null };
 };
 
 type HeldFile = {
@@ -399,7 +400,7 @@ export function ChatComposer({
     }
   }
 
-  async function send(override?: string, retrying = false) {
+  async function send(override?: string, retrying = false, grants: readonly MediaRequest[] = []) {
     // Continue sends only its word (never the draft or the files in the box), does not wait on a document
     // still being read, and does nothing when clicked again while its run is going.
     const { continuing, typed, attached } = sendSource(override, text, files);
@@ -547,7 +548,7 @@ export function ChatComposer({
           const response = await apiFetch(`/api/v1/threads/${id}/runs/text`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(buildChatRunBody(outgoing, tier, retrying)),
+            body: JSON.stringify(buildChatRunBody(outgoing, tier, retrying, grants)),
             signal: abort.signal,
           });
           if (!response.ok) {
@@ -645,8 +646,8 @@ export function ChatComposer({
 
   // The click reads this on the way to `send`. Writing it during render keeps the closure current.
   if (continueSendRef) {
-    continueSendRef.current = (text: string, retry = false) => {
-      void send(text, retry);
+    continueSendRef.current = (text: string, retry = false, grants: readonly MediaRequest[] = []) => {
+      void send(text, retry, grants);
     };
   }
 

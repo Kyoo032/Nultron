@@ -14,9 +14,9 @@ describe("Try again on a failed text turn", () => {
 
   it("sends the same text through the composer's override path, with retry set", () => {
     expect(session).toContain('continueSendRef.current?.(retryText ?? "", true)');
-    expect(composer).toContain("void send(text, retry)");
+    expect(composer).toContain("void send(text, retry, grants)");
     expect(composer).toContain("sendSource(override, text, files)");
-    expect(composer).toContain("buildChatRunBody(outgoing, tier, retrying)");
+    expect(composer).toContain("buildChatRunBody(outgoing, tier, retrying, grants)");
   });
 
   it("does not add the message to the pane a second time when it is retried", () => {
@@ -25,6 +25,6 @@ describe("Try again on a failed text turn", () => {
   });
 
   it("writes retry into the body only on a retry", () => {
-    expect(body).toContain("retry ? { content, tier, retry: true as const } : { content, tier }");
+    expect(body).toContain("...(retry ? { retry: true as const } : {}),");
   });
 });
