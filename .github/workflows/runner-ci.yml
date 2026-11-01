@@ -1,0 +1,17 @@
+name: runner-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: runner-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: Kyoo032/ci/.github/workflows/runner-ci.yml@main
+    with:
+      run: pnpm ci:local
