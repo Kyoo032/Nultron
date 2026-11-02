@@ -75,7 +75,7 @@ const MODE_MESSAGES: Record<ModeMessageKey, Record<AppLocale, string>> = {
   },
   videoClipRejected: {
     en: "The render did not return a video file.",
-    id: "Render tidak mengembalikan berkas video.",
+    id: "Hasil render tidak berisi berkas video.",
   },
   musicGenerateFailed: {
     en: "Music generation failed",

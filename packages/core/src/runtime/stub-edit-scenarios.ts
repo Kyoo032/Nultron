@@ -46,7 +46,7 @@ export const STUB_EDIT_SCENARIOS: StubEditScenario[] = [
     args: { source: "script" },
     cardVerb: "Add captions",
     cardObject: "script",
-    cardVerbId: "Tambahkan teks overlay",
+    cardVerbId: "Tambahkan takarir",
     cardObjectId: "naskah",
   },
   {
@@ -106,7 +106,7 @@ export const STUB_EDIT_SCENARIOS: StubEditScenario[] = [
     args: {},
     cardVerb: "Clear timeline",
     cardObject: "all clips",
-    cardVerbId: "Kosongkan linimasa",
+    cardVerbId: "Kosongkan lini masa",
     cardObjectId: "semua klip",
   },
   {

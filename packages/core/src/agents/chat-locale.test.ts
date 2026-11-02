@@ -45,7 +45,7 @@ describe("chat locale", () => {
     expect(wantsStubPastChat("What is 2 + 3?")).toBe(false);
     expect(wantsStubDeskSource("what does the desk say about the note")).toBe(true);
     expect(wantsStubDeskSource("menurut catatan itu")).toBe(true);
-    expect(chatTurnCopy("id").noSource).toMatch(/Meja ini/);
+    expect(chatTurnCopy("id").noSource).toMatch(/Meja kerja ini/);
     expect(chatTurnCopy("id").lookingAttached).toMatch(/Anda/);
   });
 });

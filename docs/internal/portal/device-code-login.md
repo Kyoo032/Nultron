@@ -415,17 +415,17 @@ The stronger option is a per-device Ed25519 keypair with the private key in the 
 
 | Check | reason | Evaluated at | App copy EN | App copy ID | Recoverable by |
 |---|---|---|---|---|---|
-| tenant active | `tenant_inactive` | approve, token, refresh, gateway | Your provider's account is not active. Contact support. | Akun penyedia Anda tidak aktif. Hubungi dukungan. | Toko Token AI ops |
+| tenant active | `tenant_inactive` | approve, token, refresh, gateway | Your provider's account is not active. Contact support. | Akun penyedia layanan Anda tidak aktif. Hubungi tim dukungan. | Toko Token AI ops |
 | org active | `org_inactive` | approve, token, refresh, gateway | Your organisation is not active. | Organisasi Anda tidak aktif. | org admin → partner |
 | org not past due | `org_past_due` | approve, token, refresh, gateway | Your organisation's payment is overdue. | Pembayaran organisasi Anda tertunggak. | org admin (pay) |
 | user active | `user_inactive` | approve, token, refresh, gateway | Your account is disabled. | Akun Anda dinonaktifkan. | org admin |
-| active users ≤ seat_cap | `seat_cap_reached` | approve, token | No seats left in your organisation. | Tidak ada kursi tersisa di organisasi Anda. | org admin (free/add a seat) |
-| device not revoked | `device_revoked` | approve, token, refresh, gateway | This device was signed out by an admin. | Perangkat ini telah dikeluarkan oleh admin. | org admin |
+| active users ≤ seat_cap | `seat_cap_reached` | approve, token | No seats left in your organisation. | Semua kursi di organisasi Anda sudah terpakai. | org admin (free/add a seat) |
+| device not revoked | `device_revoked` | approve, token, refresh, gateway | This device was signed out by an admin. | Admin telah mengeluarkan akun Anda dari perangkat ini. | org admin |
 | session not revoked | `session_revoked` | refresh, gateway | You were signed out. Please sign in again. | Anda telah keluar. Silakan masuk lagi. | user (sign in) |
-| refresh not replayed | `refresh_reused` | refresh | Signed out for security. Please sign in again. | Keluar demi keamanan. Silakan masuk lagi. | user (sign in) |
-| refresh not expired | `refresh_expired` | refresh | Your session expired. Please sign in again. | Sesi Anda berakhir. Silakan masuk lagi. | user (sign in) |
-| device_code fresh | `device_code_expired` | token | The code expired. Start sign-in again. | Kode kedaluwarsa. Mulai masuk lagi. | user (retry) |
-| device_code approved | `device_code_denied` | token | Sign-in was denied. | Masuk ditolak. | user (retry) |
+| refresh not replayed | `refresh_reused` | refresh | Signed out for security. Please sign in again. | Anda dikeluarkan demi keamanan. Silakan masuk lagi. | user (sign in) |
+| refresh not expired | `refresh_expired` | refresh | Your session expired. Please sign in again. | Sesi Anda sudah berakhir. Silakan masuk lagi. | user (sign in) |
+| device_code fresh | `device_code_expired` | token | The code expired. Start sign-in again. | Kode sudah kedaluwarsa. Mulai proses masuk lagi. | user (retry) |
+| device_code approved | `device_code_denied` | token | Sign-in was denied. | Permintaan masuk ditolak. | user (retry) |
 | poll timing | `authorization_pending` | token | *(no copy — keep polling)* | — | — |
 | poll timing | `slow_down` | token | *(no copy — widen interval by 5 s)* | — | — |
 

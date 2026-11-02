@@ -152,7 +152,7 @@ describe("the line that says who can", () => {
     applyLocale("id");
     const indonesian = render(<controls.DeskDeleteNote />, signedIn("member"), HOSTED);
     expect(indonesian).toContain(t("workspaces.deleteRestricted"));
-    expect(t("workspaces.deleteRestricted")).toBe("Hanya pemilik atau admin yang dapat menghapus meja.");
+    expect(t("workspaces.deleteRestricted")).toBe("Hanya pemilik atau admin yang dapat menghapus meja kerja.");
   });
 
   it("is shown for a role it cannot read, never as if that person were an owner", () => {
@@ -177,7 +177,7 @@ describe("the refusal, if one still comes back", () => {
     expect(controls.deskDeleteErrorMessage({ code: "workspace_delete_forbidden", message: "Only an owner" })).toBe(
       t("workspaces.errors.deleteForbidden"),
     );
-    expect(t("workspaces.errors.deleteForbidden")).toBe("Hanya pemilik atau admin yang dapat menghapus meja.");
+    expect(t("workspaces.errors.deleteForbidden")).toBe("Hanya pemilik atau admin yang dapat menghapus meja kerja.");
   });
 
   it("keeps the host's own wording for every other refusal, and a catalog line when it sent none", () => {

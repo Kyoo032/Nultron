@@ -59,7 +59,7 @@ const META: Readonly<Record<MarketSpecialist, MarketSpecialistMeta>> = {
     id: "saham",
     label: { id: "Saham", en: "Stocks" },
     hint: {
-      id: "Saham di bursa mana pun — IDX, AS, dan seterusnya: peringkat watchlist, pembacaan sektor, sadar jam bursa.",
+      id: "Saham di bursa mana pun — IDX, AS, dan seterusnya: peringkat watchlist, pembacaan sektor, mengikuti jam bursa.",
       en: "Equities on any exchange — IDX, US, and beyond: ranked watchlist, sector read, session-aware.",
     },
     defaultPrompt: MARKET_SPECIALIST_PROMPTS.saham,
@@ -97,7 +97,7 @@ const META: Readonly<Record<MarketSpecialist, MarketSpecialistMeta>> = {
     id: "crypto",
     label: { id: "Kripto", en: "Crypto" },
     hint: {
-      id: "Pasar 24/7: bitcoin sebagai penggerak, dominance, dan volatilitas altcoin.",
+      id: "Pasar 24/7: bitcoin sebagai penggerak, dominasi bitcoin, dan volatilitas altcoin.",
       en: "A 24/7 market: bitcoin as the driver, dominance, and altcoin volatility.",
     },
     defaultPrompt: MARKET_SPECIALIST_PROMPTS.crypto,
@@ -215,7 +215,7 @@ const META: Readonly<Record<MarketSpecialist, MarketSpecialistMeta>> = {
     id: "news",
     label: { id: "Agregator Berita", en: "News Aggregator" },
     hint: {
-      id: "Digest headline per ticker dan per tema, dengan penerbit, waktu, dan tanda basi.",
+      id: "Rangkuman headline per ticker dan per tema, dengan penerbit, waktu, dan penanda kedaluwarsa.",
       en: "A headline digest by ticker and theme, with publisher, time, and a stale flag.",
     },
     defaultPrompt: MARKET_SPECIALIST_PROMPTS.news,

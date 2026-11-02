@@ -154,8 +154,8 @@ describe("SignInScreen when the portal signs people in with a password", () => {
     applyLocale("id");
     const markup = renderPassword();
     expect(markup).toContain("Gunakan nama pengguna dan kata sandi yang diberikan perusahaan Anda.");
-    expect(markup).toContain("Lanjut ke halaman masuk");
-    expect(markup).not.toContain("Lanjut dengan email");
+    expect(markup).toContain("Lanjutkan ke halaman masuk");
+    expect(markup).not.toContain("Lanjutkan dengan email");
     expect(markup).not.toContain("kode undangan");
     expect([...markup.matchAll(/auth\.[\w.]+/g)].map((match) => match[0])).toEqual([]);
   });

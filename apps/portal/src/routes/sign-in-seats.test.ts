@@ -35,7 +35,7 @@ let fixture: Fixture;
 
 /** The English line the portal already has for the `seat_cap_reached` reason. */
 const NO_SEATS_EN = "No seats left in your organisation.";
-const NO_SEATS_ID = "Tidak ada kursi tersisa di organisasi Anda.";
+const NO_SEATS_ID = "Semua kursi di organisasi Anda sudah terpakai.";
 
 beforeAll(async () => {
   portal = await startTestPortal({ trustProxy: true, clock });

@@ -39,8 +39,8 @@ describe("tool-labels", () => {
     expect(toolActivityLabel("self_check")).toBe("Checking this desk…");
     expect(toolDoneLabel("self_check")).toBe("Desk check");
     applyLocale("id");
-    expect(toolActivityLabel("self_check")).toBe("Memeriksa meja ini…");
-    expect(toolDoneLabel("self_check")).toBe("Pemeriksaan meja");
+    expect(toolActivityLabel("self_check")).toBe("Memeriksa meja kerja ini…");
+    expect(toolDoneLabel("self_check")).toBe("Pemeriksaan meja kerja");
   });
 
   it("shows a tool that threw as a refusal, with the words the model was given", () => {
@@ -228,7 +228,7 @@ describe("file, Knowledge and code tool labels (id)", () => {
     );
     expect(
       toolRowLabel("run_code", { language: "python" }, { ok: false, stdout: "", stderr: "x", reason: "syntax" }),
-    ).toBe("Menjalankan Python gagal");
+    ).toBe("Gagal menjalankan Python");
     const pending = { ok: true, status: "pending_approval", path: "a.md", proposalId: "p" };
     expect(toolRowLabel("write_file", { path: "a.md" }, pending)).toBe("Mengusulkan penulisan berkas");
     expect(toolRowLabel("edit_file", { path: "a.md" }, pending)).toBe("Mengusulkan perubahan berkas");
@@ -402,7 +402,7 @@ describe("what a search row shows (safe web search)", () => {
     );
     applyLocale("id");
     expect(toolCallSummary("research_dossier", { question: "x" }, output)).toBe(
-      "Dosir riset · Not sent.\nDicari di web: a b · c",
+      "Dosir riset · Not sent.\nTelah menelusuri web untuk: a b · c",
     );
   });
 });

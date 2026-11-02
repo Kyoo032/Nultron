@@ -12,7 +12,7 @@ const GENERATE_ERROR: Record<ImageStudioLocale, string> = {
 /** Keep in sync with `apps/web/locales/{en,id}/images.json` `modelRejected`. */
 const MODEL_REJECTED: Record<ImageStudioLocale, string> = {
   en: "That model does not make images.",
-  id: "Model itu tidak membuat gambar.",
+  id: "Model itu tidak dapat membuat gambar.",
 };
 
 /** Keep in sync with `apps/web/locales/{en,id}/images.json` `outputTextLanguage`. */

@@ -47,7 +47,7 @@ const RULE: Record<OutputLanguageSurface, Record<AppLocale, string>> = {
   },
   edit: {
     en: "Write user-facing Edit text (card verbs, titles, captions, assistant replies, and any on-image or on-video words) in English. Keep tool names and JSON keys in English.",
-    id: "Tulis teks Edit yang dilihat pengguna (kata kerja kartu, judul, teks overlay, balasan asisten, dan kata pada gambar atau video) dalam bahasa Indonesia. Pertahankan nama alat dan kunci JSON dalam bahasa Inggris.",
+    id: "Tulis teks Edit yang dilihat pengguna (kata kerja kartu, judul, takarir, balasan asisten, dan kata pada gambar atau video) dalam bahasa Indonesia. Pertahankan nama alat dan kunci JSON dalam bahasa Inggris.",
   },
   meeting: {
     en: "Write the minutes — title, summary, decisions, action items, risks, and open questions — in English. Keep every person's name, figure, date, and product name exactly as the transcript said it. Keep JSON keys in English.",
@@ -73,7 +73,7 @@ const EDIT_STUB: Record<AppLocale, { help: string; undo: string }> = {
     undo: "Undo is available on the last card.",
   },
   id: {
-    help: "Saya dapat membantu memangkas, memotong, menambahkan teks overlay, dan memberi judul pada linimasa ini.",
+    help: "Saya dapat membantu memangkas, memotong, menambahkan takarir, dan memberi judul pada lini masa ini.",
     undo: "Urungkan tersedia pada kartu terakhir.",
   },
 };
@@ -112,31 +112,31 @@ export type EditHarnessLineKey =
 const EDIT_HARNESS_LINES: Record<EditHarnessLineKey, Record<AppLocale, string>> = {
   liftDeadAirRan: {
     en: "Lifted the dead air.",
-    id: "Jeda sunyi diangkat.",
+    id: "Jeda sunyi dihilangkan.",
   },
   liftDeadAirEmpty: {
     en: "No dead air to lift on this timeline.",
-    id: "Tidak ada jeda sunyi untuk diangkat pada linimasa ini.",
+    id: "Tidak ada jeda sunyi yang perlu dihilangkan di lini masa ini.",
   },
   cutOnShotsRan: {
     en: "Cut where the picture changes.",
-    id: "Dipotong di tempat gambar berubah.",
+    id: "Dipotong di setiap pergantian gambar.",
   },
   cutOnShotsEmpty: {
     en: "No shot change to cut on.",
-    id: "Tidak ada pergantian gambar untuk dipotong.",
+    id: "Tidak ada pergantian gambar yang bisa dijadikan titik potong.",
   },
   wordsOnPictureRan: {
     en: "Put the words on the picture.",
-    id: "Kata-kata diletakkan pada gambar.",
+    id: "Kata-kata sudah ditempatkan pada gambar.",
   },
   wordsOnPictureEmpty: {
     en: "Say the words to put on the picture.",
-    id: "Sebutkan kata yang ingin diletakkan pada gambar.",
+    id: "Sebutkan kata yang ingin ditempatkan pada gambar.",
   },
   placeMadeShotRan: {
     en: "Placed a made shot on the timeline.",
-    id: "Gambar atau klip buatan diletakkan pada linimasa.",
+    id: "Gambar atau klip buatan sudah ditempatkan di lini masa.",
   },
   placeMadeShotEmpty: {
     en: "Say what still or clip to make.",
@@ -144,19 +144,19 @@ const EDIT_HARNESS_LINES: Record<EditHarnessLineKey, Record<AppLocale, string>> 
   },
   placeMadeShotBlocked: {
     en: "This shot waits on a plan. Nothing was generated.",
-    id: "Gambar ini menunggu rencana. Tidak ada yang dibuat.",
+    id: "Shot ini menunggu rencana. Tidak ada yang dibuat.",
   },
   handBackFileRan: {
     en: "Handing back the file.",
-    id: "Berkas sedang disiapkan.",
+    id: "Berkas sedang diserahkan kepada Anda.",
   },
   handBackFileBlocked: {
     en: "Confirm the timeline before the file can be handed back.",
-    id: "Konfirmasi linimasa sebelum berkas dapat diserahkan.",
+    id: "Konfirmasikan lini masa sebelum berkas dapat diserahkan.",
   },
   handBackFileFailed: {
     en: "The file could not be started.",
-    id: "Berkas tidak dapat dimulai.",
+    id: "Proses berkas tidak bisa dimulai.",
   },
 };
 

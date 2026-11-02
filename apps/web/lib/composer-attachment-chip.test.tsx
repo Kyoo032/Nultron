@@ -178,6 +178,6 @@ describe("in Bahasa Indonesia", () => {
       status: "ready",
       result: { ...READY, chars: 340_000, sentChars: 60_000, truncated: true },
     });
-    expect(html).toContain("karakter pertama yang dikirim");
+    expect(html).toContain("karakter pertama dari");
   });
 });

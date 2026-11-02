@@ -43,7 +43,7 @@ describe("DeskSourceChips", () => {
       <DeskSourceChips selected={["a/very/long/path/to/a/file.md"]} disabled onRemove={NOOP} />,
     );
     expect(html).toContain('aria-label="Hapus a/very/long/path/to/a/file.md"');
-    expect(html).toContain('aria-label="Berkas meja yang dipakai sebagai sumber"');
+    expect(html).toContain('aria-label="Berkas meja kerja yang dipakai sebagai sumber"');
     expect(html).toContain('title="a/very/long/path/to/a/file.md"');
     // The folders shorten first and the file name is a span of its own.
     expect(html).toContain("shrink-[1000] truncate");
@@ -116,7 +116,7 @@ describe("DeskSourcePicker", () => {
   it("keeps the toggle a disclosure and says the limit in Indonesian", () => {
     applyLocale("id");
     const html = renderToStaticMarkup(<DeskSourcePicker selected={["a.md"]} onChange={NOOP} />);
-    expect(html).toContain("Tambah dari berkas meja");
+    expect(html).toContain("Tambah dari berkas meja kerja");
     expect(html).toContain("Maksimal 5 berkas");
     expect(html).toContain('aria-expanded="false"');
     expect(html).not.toContain("Add from desk files");

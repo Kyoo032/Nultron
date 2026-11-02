@@ -74,7 +74,7 @@ describe("ComposerAttachmentNotes", () => {
   it("says it in Bahasa Indonesia", () => {
     applyLocale("id");
     const html = note(["image"], "glm-5.3");
-    expect(html).toContain("GLM 5.3 tidak dapat membaca gambar. Ganti ke model yang bisa, atau hapus gambarnya.");
+    expect(html).toContain("GLM 5.3 tidak dapat membaca gambar. Beralih ke model yang mampu, atau hapus gambarnya.");
     expect(html).toContain("Pakai GPT-6 Luna");
   });
 
@@ -89,7 +89,7 @@ describe("ComposerAttachmentNotes", () => {
     applyLocale("en");
     expect(note(["video"], "gemini-3.5-flash")).toContain("Models can&#x27;t watch video in Chat yet.");
     applyLocale("id");
-    expect(note(["video"], "gemini-3.5-flash")).toContain("Model belum bisa menonton video di Chat.");
+    expect(note(["video"], "gemini-3.5-flash")).toContain("Model belum dapat menonton video di Chat.");
     expect(note(["video"], "gemini-3.5-flash")).toContain('data-testid="composer-video-note"');
   });
 

@@ -148,7 +148,7 @@ describe("imageRefusalMessage", () => {
   it("says it in Bahasa Indonesia on an Indonesian desk", () => {
     applyLocale("id");
     expect(imageRefusalMessage("glm-5.3", LIST)).toBe(
-      "GLM 5.3 tidak dapat membaca gambar. Ganti ke model yang bisa, atau hapus gambarnya.",
+      "GLM 5.3 tidak dapat membaca gambar. Beralih ke model yang mampu, atau hapus gambarnya.",
     );
   });
 

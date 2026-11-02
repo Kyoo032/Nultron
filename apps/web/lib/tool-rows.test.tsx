@@ -559,7 +559,7 @@ describe("the rows in Indonesian", () => {
         { ok: false, stdout: "", stderr: "x", filesWritten: [], reason: "timeout" },
       ),
     );
-    expect(run).toContain("Menjalankan Python gagal");
+    expect(run).toContain("Gagal menjalankan Python");
     expect(part(run, "tool-row-code-reason")).toContain("Berjalan terlalu lama sehingga dihentikan.");
     expect(run).toContain("Tampilkan kode");
     expect(run).toContain(">Kesalahan</p>");

@@ -106,7 +106,7 @@ describe("imageEstimateView", () => {
     freezeLocale("id");
     const view = imageEstimateView({ model: "seedream-4.0", models: IMAGE_MODELS });
     expect(view.line).toContain("≈ $0.03 per gambar");
-    expect(view.line).toContain("Harga ByteDance, angka pihak ketiga, dicek 15 Sep 2026");
+    expect(view.line).toContain("Harga ByteDance dari pihak ketiga, diperiksa 15 Sep 2026");
     expect(view.line).toContain("termurah");
     expect(view.compare).toBe("Model gambar termurah di sini");
   });
@@ -195,7 +195,7 @@ describe("videoEstimateView", () => {
     });
     expect(view.line).toContain("≈ $0.60 untuk 5 dtk pada 720p");
     expect(view.line).toContain("$0.12/dtk");
-    expect(view.line).toContain("Harga ByteDance, angka pihak ketiga, dicek 15 Sep 2026");
+    expect(view.line).toContain("Harga ByteDance dari pihak ketiga, diperiksa 15 Sep 2026");
   });
 
   it("formats the comparison factor with the Indonesian number format", () => {
