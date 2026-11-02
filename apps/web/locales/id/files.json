@@ -1,6 +1,6 @@
 {
   "title": "Berkas",
-  "intro": "Catatan dan dokumen yang dibuat agen Anda di meja kerja ini. Setiap perubahan disimpan sebagai versi, sehingga Anda dapat menengok kembali dan memulihkannya.",
+  "intro": "Catatan dan dokumen yang dibuat agen Anda di meja kerja ini. Setiap perubahan disimpan sebagai versi, jadi Anda bisa melihat kembali dan memulihkannya.",
   "count": "{count} berkas",
   "countOne": "1 berkas",
   "list": {
@@ -14,7 +14,7 @@
   },
   "empty": {
     "title": "Belum ada berkas",
-    "body": "Berkas yang dibuat agen Anda akan muncul di sini, lengkap dengan setiap versinya. Anda juga dapat menambahkan berkas teks sendiri."
+    "body": "Berkas yang dibuat agen Anda akan muncul di sini, lengkap dengan setiap versinya. Anda juga bisa menambahkan berkas teks sendiri."
   },
   "new": {
     "open": "Berkas baru",
@@ -31,9 +31,9 @@
   "upload": {
     "button": "Unggah berkas teks",
     "hint": "Hanya berkas teks, maksimal {max}. Disimpan di tingkat atas dengan nama berkas aslinya.",
-    "tooLarge": "{name} lebih besar dari {max}, sehingga tidak diunggah.",
-    "binary": "{name} bukan berkas teks, sehingga tidak diunggah.",
-    "readFailed": "{name} tidak dapat dibaca."
+    "tooLarge": "{name} melebihi {max}, jadi tidak diunggah.",
+    "binary": "{name} bukan berkas teks, jadi tidak diunggah.",
+    "readFailed": "{name} gagal dibaca."
   },
   "viewer": {
     "aria": "Penampil berkas",
@@ -71,13 +71,13 @@
   "download": {
     "button": "Unduh",
     "working": "Mengunduh…",
-    "failed": "Tidak dapat mengunduh. Coba lagi.",
+    "failed": "Gagal mengunduh. Coba lagi.",
     "aria": "Unduh {path} ke komputer Anda"
   },
   "delete": {
     "button": "Hapus",
     "title": "Hapus {path}?",
-    "body": "Berkas akan hilang dari daftar ini dan tidak dapat lagi dibaca oleh agen. Menghapus tidak mengosongkan ruang penyimpanan.",
+    "body": "Berkas akan hilang dari daftar ini dan tidak bisa lagi dibaca oleh agen. Menghapus tidak mengosongkan ruang penyimpanan.",
     "confirm": "Hapus berkas",
     "working": "Menghapus…",
     "done": "{path} dihapus."
@@ -86,16 +86,16 @@
   "cancel": "Batal",
   "errors": {
     "generic": "Terjadi kesalahan pada berkas. Coba lagi.",
-    "network": "Berkas tidak dapat diakses. Periksa koneksi lalu coba lagi.",
+    "network": "Berkas tidak bisa diakses. Periksa koneksi, lalu coba lagi.",
     "notFound": "Berkas itu tidak ada di meja kerja ini.",
     "tooLarge": "Teks itu lebih besar dari 2 MB.",
-    "tooMany": "Meja kerja ini sudah menyimpan berkas sebanyak yang dapat ditampung. Hapus beberapa terlebih dahulu.",
-    "denied": "Berkas hanya berisi teks biasa. Isi itu bukan teks yang valid.",
+    "tooMany": "Jumlah berkas di meja kerja ini sudah mencapai batas. Hapus beberapa dulu.",
+    "denied": "Berkas hanya boleh berisi teks biasa, dan isi ini bukan teks yang valid.",
     "badPath": "Jalur berkas itu tidak diizinkan.",
     "quota": "Akun ini kehabisan ruang penyimpanan. Setiap versi yang tersimpan ikut dihitung.",
     "unavailable": "Penyimpanan berkas sedang tidak tersedia. Coba lagi nanti.",
-    "badResponse": "Respons dari penyimpanan berkas tidak dapat dipahami aplikasi ini.",
-    "saveFailed": "Berkas tidak dapat disimpan ke komputer Anda. Periksa lokasinya, lalu coba lagi."
+    "badResponse": "Aplikasi tidak bisa memahami respons dari penyimpanan berkas.",
+    "saveFailed": "Berkas gagal disimpan ke komputer Anda. Periksa lokasinya, lalu coba lagi."
   },
   "pathErrors": {
     "empty": "Beri berkas sebuah jalur, seperti catatan/rencana.md.",

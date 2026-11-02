@@ -114,12 +114,12 @@
   "errors": {
     "stub": "Keuangan membutuhkan gateway aktif. Tempel kunci API Toko Token di Pengaturan, lalu coba lagi.",
     "addItems": "Tambahkan pos dulu: tempel angka lalu baca, tambah baris sendiri, atau pilih dataset tersimpan.",
-    "parse": "Angka tersebut tidak dapat dibaca",
+    "parse": "Angka itu gagal dibaca",
     "parseRequired": "teks angka wajib diisi",
     "parseInvalidJson": "Model mengembalikan JSON tidak valid untuk angka tersebut",
-    "parseEmpty": "Tidak ada angka yang dapat dibaca dari teks itu",
-    "regen": "Bagian itu tidak dapat ditulis ulang",
-    "docx": "Berkas DOCX tidak bisa dibuat",
+    "parseEmpty": "Tidak ada angka yang bisa dibaca dari teks itu",
+    "regen": "Bagian itu gagal ditulis ulang",
+    "docx": "Berkas DOCX gagal dibuat",
     "emptyBrief": "Model mengembalikan brief keuangan kosong",
     "invalidBriefJson": "Model mengembalikan JSON tidak valid untuk brief keuangan",
     "noSections": "Model tidak mengembalikan bagian",
@@ -146,7 +146,7 @@
     "lineItemsHeader": "Pos (satu-satunya masukan):",
     "parametersHeader": "Parameter:",
     "metricsHeader": "Metrik terhitung (sudah dihitung di kode; kutip berdasarkan kunci):",
-    "metricsNone": "(tidak ada yang dapat dihitung dari pos ini)",
+    "metricsNone": "(tidak ada yang bisa dihitung dari pos ini)",
     "extraContext": "Konteks tambahan:",
     "briefRequested": "Brief yang diminta:",
     "originalRequest": "Permintaan brief semula:",
@@ -158,7 +158,7 @@
   },
   "stub": {
     "heading": "Angka yang sudah dihitung",
-    "empty": "Tidak ada metrik yang dapat dihitung dari pos ini.",
+    "empty": "Tidak ada metrik yang bisa dihitung dari pos ini.",
     "assumption": "Brief stub: tempel kunci API Toko Token di Pengaturan untuk mendapatkan narasi yang ditulis model."
   },
   "metrics": {
@@ -226,7 +226,7 @@
     "costBehaviour": "Perilaku biaya",
     "classification": "Setiap baris dibaca sebagai apa",
     "classificationHint": "Hasil aturan, bukan model. Ubah yang keliru dan semua angka dihitung ulang.",
-    "needsConfirming": "mohon diperiksa",
+    "needsConfirming": "perlu diperiksa",
     "inflow": "kas masuk",
     "outflow": "kas keluar",
     "opening": "saldo awal",
@@ -271,7 +271,7 @@
     "notAvailable": "tidak tersedia",
     "noReport": "Proses ini selesai tanpa laporan, jadi belum ada yang bisa dibandingkan.",
     "errors": {
-      "read": "Angka itu tidak bisa dibaca menjadi set anggaran dan set realisasi."
+      "read": "Angka itu tidak bisa dipilah menjadi set anggaran dan set realisasi."
     },
     "preview": {
       "heading": "Yang sudah terbaca dari baris ini",
@@ -353,7 +353,7 @@
     "readCount": "{rows} baris terbaca dari {periods} periode.",
     "subtotalsIgnored": "{count} baris jumlah dikeluarkan dan tidak ikut dijumlahkan.",
     "modelAssist": "{placed} dari {asked} label tak dikenal ditempatkan oleh model dengan tingkat keyakinan rendah. Mohon diperiksa.",
-    "modelAssistFailed": "{asked} label tidak dapat ditempatkan otomatis. Pilih kelompoknya satu per satu.",
+    "modelAssistFailed": "{asked} label tidak bisa ditempatkan otomatis. Pilih kelompoknya satu per satu.",
     "unplaced": "{count} baris belum masuk kelompok mana pun, jadi tidak masuk rasio mana pun.",
     "period": "Periode yang dibaca",
     "periodHint": "Setiap rasio hanya memakai kolom periode ini. Antarperiode tidak pernah dijumlahkan.",
@@ -436,7 +436,7 @@
     "scorecard": {
       "heading": "Kartu skor",
       "metric": "Rasio",
-      "empty": "Tidak ada rasio yang dapat dihitung dari baris ini."
+      "empty": "Tidak ada rasio yang bisa dihitung dari baris ini."
     }
   },
   "auto": {
@@ -527,7 +527,7 @@
       "cashflow": "Arus kas. Burn adalah seberapa cepat kas berkurang. Runway adalah berapa bulan kas masih cukup.",
       "budget": "Anggaran dibanding realisasi. Baris ditandai bila melewati batas yang Anda tetapkan.",
       "appraisal": "Uji kelayakan investasi. NPV adalah nilai proyek hari ini. Payback menunjukkan seberapa cepat uang kembali.",
-      "ratios": "Cek kesehatan usaha. Rasio membandingkan apa yang dimiliki, terutang, dan dihasilkan usaha."
+      "ratios": "Pemeriksaan kesehatan usaha. Rasio membandingkan apa yang dimiliki, terutang, dan dihasilkan usaha."
     }
   },
   "tasks": {

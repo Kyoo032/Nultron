@@ -12,13 +12,13 @@ const GENERATE_ERROR: Record<ImageStudioLocale, string> = {
 /** Keep in sync with `apps/web/locales/{en,id}/images.json` `modelRejected`. */
 const MODEL_REJECTED: Record<ImageStudioLocale, string> = {
   en: "That model does not make images.",
-  id: "Model itu tidak dapat membuat gambar.",
+  id: "Model itu tidak bisa membuat gambar.",
 };
 
 /** Keep in sync with `apps/web/locales/{en,id}/images.json` `outputTextLanguage`. */
 const OUTPUT_TEXT_LANGUAGE: Record<ImageStudioLocale, string> = {
   en: "If this image includes any readable text (captions, labels, signs, or on-image UI), write that text in English.",
-  id: "Jika gambar ini memuat teks yang dapat dibaca (keterangan, label, papan, atau UI pada gambar), tulis teks itu dalam bahasa Indonesia.",
+  id: "Kalau gambar memuat teks yang terbaca (keterangan, label, papan, atau UI), tulis teksnya dalam bahasa Indonesia.",
 };
 
 export function imageOutputLanguageHint(locale: ImageStudioLocale): string {

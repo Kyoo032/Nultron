@@ -1,9 +1,9 @@
 {
   "title": "Basis Pengetahuan",
-  "intro": "Sumber yang dirujuk Chat dan setiap mode kerja di meja kerja {name}: jiwa, memori yang disematkan, sumber terindeks, dan peta yang menghubungkan semuanya.",
+  "intro": "Sumber yang dirujuk Chat dan setiap mode kerja di meja kerja {name}: persona, memori yang disematkan, sumber terindeks, dan peta yang menghubungkan semuanya.",
   "tabs": {
     "sources": "Sumber",
-    "soul": "Jiwa",
+    "soul": "Persona",
     "memory": "Memori",
     "map": "Peta"
   },
@@ -14,16 +14,16 @@
     "verifier": "Verifikator"
   },
   "errors": {
-    "load": "Pengetahuan tidak dapat dimuat",
-    "saveModels": "Model pengetahuan tidak dapat disimpan",
-    "map": "Pengetahuan tidak dapat dipetakan",
-    "addUrl": "URL tidak dapat ditambahkan",
-    "addNotes": "Catatan tidak dapat ditambahkan",
-    "addMemory": "Memori itu tidak dapat disematkan",
-    "saveSoul": "Jiwa tidak dapat disimpan",
-    "indexFile": "Berkas tidak dapat diindeks",
-    "selfCheck": "Pemeriksaan mandiri tidak dapat dijalankan",
-    "loadGraph": "Graf tidak dapat dimuat"
+    "load": "Pengetahuan gagal dimuat",
+    "saveModels": "Model pengetahuan gagal disimpan",
+    "map": "Pengetahuan gagal dipetakan",
+    "addUrl": "URL gagal ditambahkan",
+    "addNotes": "Catatan gagal ditambahkan",
+    "addMemory": "Memori itu gagal disematkan",
+    "saveSoul": "Persona gagal disimpan",
+    "indexFile": "Berkas gagal diindeks",
+    "selfCheck": "Pemeriksaan mandiri gagal dijalankan",
+    "loadGraph": "Graf gagal dimuat"
   },
   "sources": {
     "add": "Tambah sumber",
@@ -32,12 +32,12 @@
     "pastePlaceholder": "Tempel catatan…",
     "indexPaste": "Indeks teks tempelan",
     "uploadFile": "Unggah berkas",
-    "uploadHint": "Format yang dapat diindeks: {formats}. Maksimal 25 MB.",
+    "uploadHint": "Format yang didukung: {formats}. Maksimal 25 MB.",
     "pastedName": "Catatan tempelan",
     "chunks": "{count} potongan",
     "chunksOne": "{count} potongan",
     "remove": "Hapus",
-    "embedLocal": "Tersimpan. Embedding langsung melampaui batas waktu, sehingga sumber ini memakai indeks lokal sampai gateway merespons."
+    "embedLocal": "Tersimpan. Embedding langsung kehabisan waktu, jadi sumber ini memakai indeks lokal sampai gateway merespons."
   },
   "status": {
     "Indexed": "Terindeks",
@@ -47,7 +47,7 @@
   "sourceType": {
     "File": "Berkas",
     "URL": "URL",
-    "Paste": "Tempel",
+    "Paste": "Teks tempelan",
     "Chat": "Chat",
     "Documents": "Dokumen",
     "Research": "Riset",
@@ -65,7 +65,7 @@
     "voice": "Gaya bahasa",
     "rulePlaceholder": "Tambah aturan",
     "addRule": "Tambah aturan",
-    "save": "Simpan jiwa"
+    "save": "Simpan persona"
   },
   "memory": {
     "placeholder": "Sematkan memori",
@@ -75,22 +75,22 @@
   },
   "map": {
     "label": "Peta",
-    "intro": "Hasilnya: peta sumber Anda yang sudah ditinjau, memperlihatkan topik apa yang didukung, bagian mana yang lemah, dan apa yang masih kurang.",
+    "intro": "Peta sumber Anda yang sudah ditinjau: topik mana yang sudah didukung, bagian mana yang lemah, dan apa yang masih kurang.",
     "howItWorks": "Cara kerjanya",
-    "howItWorksBody": "Saat ini Chat merujuk memori meja kerja ini, dan mode kerja akan memakai mekanisme yang sama nanti. Peta membaca sumber Anda dengan model embedding, otak, dan verifikator di atas.",
+    "howItWorksBody": "Saat ini hanya Chat yang merujuk memori meja kerja ini; mode kerja akan menyusul memakai cara yang sama. Peta membaca sumber Anda dengan model embedding, otak, dan verifikator di atas.",
     "run": "Petakan pengetahuan",
     "running": "Memetakan…",
     "ready": "Siap",
     "notReady": "Belum siap",
     "gaps": "Celah",
-    "sourceStub": "uji",
+    "sourceStub": "demo",
     "sourceLive": "langsung"
   },
   "verdict": {
     "supported": "didukung",
     "weak": "lemah",
     "unsupported": "tidak didukung",
-    "stub": "uji"
+    "stub": "demo"
   },
   "loop": {
     "label": "Kesehatan pengetahuan",
@@ -115,7 +115,7 @@
       "chunks": "{count} potongan",
       "chunksOne": "{count} potongan",
       "retrieved": "potongan yang dikutip dalam proses",
-      "failed": "buka barisnya untuk alasannya"
+      "failed": "buka barisnya untuk melihat alasannya"
     },
     "verified": {
       "pass": "lulus",
@@ -124,7 +124,7 @@
       "none": "belum ada pemeriksaan mandiri",
       "unknown": "waktu tidak diketahui",
       "justNow": "baru saja",
-      "minutesAgo": "{count} mnt lalu",
+      "minutesAgo": "{count} menit lalu",
       "hoursAgo": "{count} jam lalu",
       "daysAgo": "{count} hari lalu"
     }

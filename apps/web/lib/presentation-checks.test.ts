@@ -73,10 +73,10 @@ describe("presentationCheckLine", () => {
   it("writes each note in Indonesian", () => {
     applyLocale("id");
     expect(presentationCheckLine({ check: "slide_count", slides: [], expected: 7, found: 8 })).toBe(
-      "Anda meminta 8 slide; deck ini memiliki 9.",
+      "Anda meminta 8 slide, tetapi deck ini berisi 9.",
     );
     expect(presentationCheckLine({ check: "duplicate_title", slides: [2, 3] })).toBe(
-      "Judul yang sama pada slide: 3, 4",
+      "Judul kembar di slide: 3, 4",
     );
     expect(presentationCheckLine({ check: "slide_fit", slides: [6] })).toBe(
       "Mungkin tidak muat di slide saat diunduh: 7",

@@ -1,6 +1,6 @@
 {
   "welcome": "Selamat datang di {productName}",
-  "intro": "Ajukan pertanyaan, riset sebuah topik, buat gambar atau video, atau susun presentasi.",
+  "intro": "Tanya apa saja, riset suatu topik, buat gambar atau video, atau susun presentasi.",
   "next": "Lanjutkan",
   "back": "Kembali",
   "stepsLabel": "Langkah penyiapan",
@@ -10,8 +10,8 @@
     "try": "Coba"
   },
   "setupCheck": "Menyiapkan pembaca dokumen",
-  "ffmpegLater": "Anda dapat melanjutkan sekarang dan memasang ffmpeg nanti. Layar Sunting menampilkan panduan yang sama sampai ffmpeg ditemukan.",
-  "ffmpegBundledLater": "Anda dapat lanjut sekarang. Penyuntingan video dan pembacaan rekaman rapat tetap nonaktif sampai {productName} dipasang ulang.",
+  "ffmpegLater": "Anda bisa lanjut sekarang dan memasang ffmpeg nanti. Panduan yang sama akan tampil di layar Sunting sampai ffmpeg ditemukan.",
+  "ffmpegBundledLater": "Anda bisa lanjut sekarang. Fitur penyuntingan video dan pembacaan rekaman rapat baru aktif setelah {productName} dipasang ulang.",
   "keyTitle": "Tempel kunci {gatewayName} Anda",
   "keyHelp": "Buka {gatewayName}, salin kunci, lalu tempel di sini. Kunci hanya disimpan di komputer ini.",
   "keyLabel": "Kunci Anda",
@@ -26,10 +26,10 @@
   "examples": {
     "chat": {
       "title": "Tanyakan sesuatu",
-      "hint": "Rencana, pertanyaan, atau balasan yang perlu Anda kirim."
+      "hint": "Untuk rencana, pertanyaan, atau balasan yang perlu Anda kirim."
     },
     "research": {
-      "title": "Telusuri sebuah topik",
+      "title": "Telusuri satu topik",
       "hint": "Catatan lengkap dengan sumber untuk pertanyaan apa pun."
     },
     "images": {
@@ -43,16 +43,16 @@
   },
   "gate": {
     "invalidKey": "Kunci itu tidak berfungsi. Periksa kembali di {gatewayName}, lalu tempel ulang.",
-    "unreachable": "Kami tidak dapat menghubungi {gatewayName}. Periksa koneksi internet Anda, lalu coba lagi.",
+    "unreachable": "Kami tidak bisa terhubung ke {gatewayName}. Periksa koneksi internet Anda, lalu coba lagi.",
     "error": "Terjadi kesalahan. Tunggu sebentar, lalu coba lagi."
   },
   "desks": {
     "title": "Atau buka meja kerja lain",
-    "failed": "Tidak dapat membuka meja kerja itu. Coba lagi."
+    "failed": "Tidak bisa membuka meja kerja itu. Coba lagi."
   },
   "components": {
     "title": "Menyiapkan {productName}",
-    "description": "Menambahkan pembaca lokal untuk berkas PDF, Word, PowerPoint, Excel, dan e-book. Setiap dokumen dibaca di mesin ini; tidak ada yang diunggah.",
+    "description": "Menambahkan pembaca lokal untuk berkas PDF, Word, PowerPoint, Excel, dan e-book. Setiap dokumen dibaca di komputer ini; tidak ada yang diunggah.",
     "size": "Unduhan sekali saja, sekitar {mb} MB.",
     "progress": "{done} dari {total} langkah · {percent}%",
     "duration": "{seconds} dtk",
@@ -69,10 +69,10 @@
     "retry": "Coba lagi",
     "worksWithout": "{productName} tetap berjalan tanpanya. Sementara itu, dokumen dibaca oleh pembaca lokal yang lebih sederhana sampai pembaca ini terpasang.",
     "errors": {
-      "offline": "Tidak ada koneksi, sehingga pembaca tidak dapat diunduh.",
+      "offline": "Tidak ada koneksi, sehingga pembaca tidak bisa diunduh.",
       "download_failed": "Unduhan tidak selesai.",
-      "integrity_mismatch": "Unduhan tidak cocok dengan checksum-nya, sehingga berkas tersebut dibuang.",
-      "unpack_failed": "Unduhan tidak dapat dibongkar.",
+      "integrity_mismatch": "Unduhan tidak cocok dengan checksum-nya, jadi berkasnya dibuang.",
+      "unpack_failed": "Unduhan gagal diekstrak.",
       "probe_failed": "Pembaca sudah terpasang tetapi gagal dimuat.",
       "unsupported_platform": "Tidak ada versi pembaca untuk sistem operasi ini.",
       "busy": "Jendela lain sedang menyiapkannya.",
@@ -83,5 +83,5 @@
   "laterHint": "Anda bisa menempelkan kunci kapan saja di Pengaturan. Model tetap nonaktif sampai saat itu.",
   "keyTitleRestricted": "Kunci perusahaan Anda belum disiapkan",
   "keyHelpRestricted": "Pemilik atau admin menambahkan kunci perusahaan satu kali, dan semua orang di perusahaan memakainya.",
-  "keyRestricted": "Hanya pemilik atau admin yang dapat menambahkan kunci {gatewayName} perusahaan Anda. Minta salah satu dari mereka menambahkannya, lalu tekan Periksa lagi. Sementara itu, Anda bisa melihat-lihat dulu."
+  "keyRestricted": "Hanya pemilik atau admin yang bisa menambahkan kunci {gatewayName} perusahaan Anda. Minta salah satu dari mereka menambahkannya, lalu tekan Periksa lagi. Sementara itu, Anda bisa melihat-lihat dulu."
 }

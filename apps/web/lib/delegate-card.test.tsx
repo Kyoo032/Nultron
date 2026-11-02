@@ -177,7 +177,7 @@ describe("the delegate card", () => {
     applyLocale("id");
     const html = card({ defaultOpen: true });
     expect(html).toContain("Bertanya ke agen Riset");
-    expect(html).toContain("Buka percakapan");
+    expect(html).toContain("Buka obrolan");
     expect(html).toContain("Sembunyikan jawaban");
   });
 

@@ -17,7 +17,7 @@ describe("t()", () => {
     expect(t("rail.settings")).toBe("Pengaturan");
     expect(t("onboarding.welcome", { productName: "Nultron" })).toBe("Selamat datang di Nultron");
     expect(t("chat.empty.headline")).toBe("Hari ini kita kerjakan apa?");
-    expect(t("chat.empty.pickModel")).toBe("Pilih model di bawah, lalu tulis.");
+    expect(t("chat.empty.pickModel")).toBe("Pilih model di bawah, lalu mulai menulis.");
     expect(t("documents.title")).toBe("Dokumen");
     expect(t("research.title")).toBe("Riset");
     expect(t("images.title")).toBe("Gambar");

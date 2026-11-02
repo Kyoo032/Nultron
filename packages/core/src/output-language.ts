@@ -39,7 +39,7 @@ const RULE: Record<OutputLanguageSurface, Record<AppLocale, string>> = {
   },
   videos: {
     en: "Spoken dialogue, narration, and any on-screen text in this clip must be in English unless the prompt already names another language.",
-    id: "Dialog, narasi, dan teks di layar pada klip ini harus dalam bahasa Indonesia, kecuali prompt sudah menyebut bahasa lain.",
+    id: "Dialog, narasi, dan teks di layar pada klip ini harus berbahasa Indonesia, kecuali prompt sudah menyebut bahasa lain.",
   },
   music: {
     en: "Write the lyrics, the title, and any spoken or sung words in English unless the prompt already names another language. Leave style and genre tags in English.",
@@ -73,8 +73,8 @@ const EDIT_STUB: Record<AppLocale, { help: string; undo: string }> = {
     undo: "Undo is available on the last card.",
   },
   id: {
-    help: "Saya dapat membantu memangkas, memotong, menambahkan takarir, dan memberi judul pada lini masa ini.",
-    undo: "Urungkan tersedia pada kartu terakhir.",
+    help: "Saya bisa membantu memangkas, memotong, menambahkan takarir, dan memberi judul pada lini masa ini.",
+    undo: "Kartu terakhir bisa diurungkan.",
   },
 };
 
@@ -152,7 +152,7 @@ const EDIT_HARNESS_LINES: Record<EditHarnessLineKey, Record<AppLocale, string>> 
   },
   handBackFileBlocked: {
     en: "Confirm the timeline before the file can be handed back.",
-    id: "Konfirmasikan lini masa sebelum berkas dapat diserahkan.",
+    id: "Konfirmasikan lini masa sebelum berkas bisa diserahkan.",
   },
   handBackFileFailed: {
     en: "The file could not be started.",

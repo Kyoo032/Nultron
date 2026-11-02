@@ -1,15 +1,15 @@
 {
   "title": "Presentasi",
-  "expectedInputs": "Beberapa slide yang dapat Anda ubah, lalu unduh.",
+  "expectedInputs": "Hasil: beberapa slide yang bisa Anda ubah, lalu unduh.",
   "download": "Unduh",
   "building": "Menyusun…",
   "generate": "Buat",
   "generating": "Membuat…",
   "regenerate": "Tulis ulang slide ini",
   "regenerating": "Menulis ulang…",
-  "generateError": "Kerangka presentasi tidak dapat dibuat",
-  "regenError": "Slide itu tidak dapat dibuat ulang",
-  "downloadError": "Berkas PPTX tidak dapat dibuat",
+  "generateError": "Kerangka presentasi gagal dibuat",
+  "regenError": "Slide itu gagal ditulis ulang",
+  "downloadError": "Berkas PPTX gagal dibuat",
   "editNote": "Klik kata mana pun di slide untuk mengubahnya.",
   "editTitle": "Judul deck",
   "editHeading": "Judul slide",
@@ -31,11 +31,11 @@
   "fill": "Warna isi",
   "stroke": "Garis tepi",
   "properties": "Properti",
-  "noShape": "Pilih sebuah bentuk di slide untuk mengubah warna isi, garis tepi, dan teksnya.",
+  "noShape": "Pilih salah satu bentuk di slide untuk mengubah warna isi, garis tepi, dan teksnya.",
   "saveDeck": "Simpan deck",
   "savingDeck": "Menyimpan…",
   "deckSaved": "Deck tersimpan di meja kerja ini.",
-  "saveError": "Deck tidak dapat disimpan",
+  "saveError": "Deck gagal disimpan",
   "savedDecks": "Deck tersimpan",
   "downloadNote": "Mengunduh akan menyimpan slide ini sebagai berkas PowerPoint.",
   "openSettings": "Buka Pengaturan",
@@ -50,10 +50,10 @@
   "openSlidePagesShort": "Pendek",
   "openSlidePagesStandard": "Sedang",
   "openSlidePagesDeep": "Sangat panjang",
-  "openSlideDensity": "Gaya",
-  "openSlideDensityMinimal": "Sederhana",
-  "openSlideDensityLight": "Jelas",
-  "openSlideDensityStandard": "Rinci",
+  "openSlideDensity": "Kepadatan",
+  "openSlideDensityMinimal": "Minimalis",
+  "openSlideDensityLight": "Ringan",
+  "openSlideDensityStandard": "Sedang",
   "openSlideDensityDense": "Padat",
   "openSlideMotion": "Gerakan",
   "openSlideMotionStatic": "Diam",
@@ -70,41 +70,41 @@
   "kicker": "Presentasi",
   "notes": "Catatan:",
   "noBullets": "Slide ini tidak punya butir.",
-  "gatewayError": "Pembuatan presentasi membutuhkan gateway yang aktif. Tempel kunci API Toko Token di Pengaturan, lalu coba lagi.",
+  "gatewayError": "Presentasi butuh gateway yang aktif. Tempel kunci API Toko Token di Pengaturan, lalu coba lagi.",
   "notesFallback": "Ucapkan halaman ini sekali, lalu berhenti. Jangan menambah angka yang tidak diberikan.",
   "noFigure": "Tidak ada angka",
   "galleryTitle": "Mulai dari templat",
-  "galleryHint": "Klik sebuah kartu untuk memuat brief lengkap. Ganti detail contoh, lalu buat presentasinya.",
+  "galleryHint": "Klik salah satu kartu untuk memuat brief lengkapnya. Ganti detail contohnya, lalu buat presentasinya.",
   "templates": {
     "seed-stage-pitch": {
       "title": "Pitch tahap seed",
-      "prompt": "Susun kerangka pitch 9 slide yang dapat diikuti orang asing tanpa kehadiran Anda. Ini narasi, bukan daftar label.\n\nPeran: pendiri yang mempresentasikan pitch kepada satu pengambil keputusan (bukan di konferensi).\nAudiens: mereka sudah memakai API model; mereka tidak menginginkan satu lagi “platform agen.”\nKeluaran: 9 slide. Setiap slide: judul berupa klaim (bukan topik), 3–5 butir berupa kalimat lengkap, dan catatan pembicara yang menjelaskan argumen Anda jika mereka membantah.\n\nContoh cerita (ganti isian dalam kurung siku, pertahankan alurnya):\n- [Harbour Street] adalah kasir pengambilan pesanan hari Sabtu. Anda masuk, membayar, lalu pulang membawa tas bernama. Formulir pesanan khusus sengaja ditunda.\n- Masalah: membayar roti masih menyisakan pertanyaan “di mana saya mengambilnya?”\n- Wawasan: pembelinya adalah satu orang yang mengambil satu pesanan, bukan bagian pembelian sebuah kantor.\n- Permintaan: [tiga pelanggan tetap mencoba pengambilan Sabtu] bulan ini — bukan putaran pendanaan dengan valuasi, kecuali Anda mengubahnya.\n\nAlur slide (pertahankan urutan ini):\n1. Judul — pekerjaan yang dilakukan, bukan kategorinya.\n2. Momen setelah mereka membayar.\n3. Mengapa kafe berantai dan formulir pesanan kosong sama-sama meleset.\n4. Kasirnya: setiap pesanan Sabtu punya nama; pada pekan yang sepi, menu dapat diperkecil.\n5. Bagaimana sebuah pesanan (tas atau struk) benar-benar diselesaikan.\n6. Mengapa formulir khusus ditunda.\n7. Bukti atau rencana (kasir sudah buka; jujurlah tentang apa yang belum terbukti).\n8. Permintaan.\n9. Tujuh hari ke depan.\n\nStandar mutu: tanpa slide pengisi “tim / traksi / visi”. Tanpa butir satu kata. Catatan berisi argumen, bukan “singkat saja.”\nJangan mengarang pendapatan atau logo.",
-      "resultSummary": "Pitch 9 slide dengan judul berupa klaim, butir lengkap, dan catatan untuk menghadapi bantahan — bukan sekadar deretan label."
+      "prompt": "Susun kerangka pitch 9 slide yang bisa diikuti orang asing tanpa kehadiran Anda. Ini narasi, bukan daftar label.\n\nPeran: pendiri yang mempresentasikan pitch kepada satu pengambil keputusan (bukan di konferensi).\nAudiens: mereka sudah memakai API model; mereka tidak menginginkan satu lagi “platform agen.”\nKeluaran: 9 slide. Setiap slide: judul berupa klaim (bukan topik), 3–5 butir berupa kalimat lengkap, dan catatan pembicara yang menjelaskan argumen Anda jika mereka membantah.\n\nContoh cerita (ganti isian dalam kurung siku, pertahankan alurnya):\n- [Harbour Street] adalah kasir pengambilan pesanan hari Sabtu. Anda masuk, membayar, lalu pulang membawa tas bernama. Formulir pesanan khusus sengaja ditunda.\n- Masalah: membayar roti masih menyisakan pertanyaan “di mana saya mengambilnya?”\n- Wawasan: pembelinya adalah satu orang yang mengambil satu pesanan, bukan bagian pembelian sebuah kantor.\n- Permintaan: [tiga pelanggan tetap mencoba pengambilan Sabtu] bulan ini — bukan putaran pendanaan dengan valuasi, kecuali Anda mengubahnya.\n\nAlur slide (pertahankan urutan ini):\n1. Judul — pekerjaan yang dilakukan, bukan kategorinya.\n2. Momen setelah mereka membayar.\n3. Mengapa kafe berantai dan formulir pesanan kosong sama-sama meleset.\n4. Kasirnya: setiap pesanan Sabtu punya nama; pada pekan yang sepi, menu bisa diperkecil.\n5. Bagaimana sebuah pesanan (tas atau struk) benar-benar diselesaikan.\n6. Mengapa formulir khusus ditunda.\n7. Bukti atau rencana (kasir sudah buka; jujurlah tentang apa yang belum terbukti).\n8. Permintaan.\n9. Tujuh hari ke depan.\n\nStandar mutu: tanpa slide pengisi “tim / traksi / visi”. Tanpa butir satu kata. Catatan berisi argumen, bukan “singkat saja.”\nJangan mengarang pendapatan atau logo.",
+      "resultSummary": "Pitch 9 slide dengan judul berupa klaim, butir berupa kalimat utuh, dan catatan untuk menghadapi bantahan, bukan sekadar deretan label."
     },
     "weekly-operating-review": {
       "title": "Tinjauan operasional mingguan",
-      "prompt": "Susun tinjauan mingguan 7 slide yang dapat diselesaikan seisi ruangan dalam 15 menit.\n\nPeran: pemilik meja kerja ini.\nAudiens: dua rekan sejawat dan satu pengambil keputusan. Mereka belum membaca pelacak tugas.\nKeluaran: 7 slide. Judul berupa fakta atau permintaan. Butir berupa kalimat lengkap. Catatan menyebut satu angka yang akan Anda pertahankan.\n\nContoh minggu ini (ganti):\n- Dirilis: [tas bernama], [mesin cadangan sudah di kasir].\n- Tertunda: [menu di pintu belum dicetak ulang], sehingga pintu masih menampilkan jam bulan lalu.\n- Risiko: [catatan serah terima hanya satu baris], sehingga hari Sabtu terlihat kurang bekal.\n- Permintaan: [setujui cetak ulang menu] atau [pertahankan papan tulis].\n\nDaftar slide:\n1. Judul + tanggal akhir pekan.\n2. Apa yang benar-benar dirilis (bukti).\n3. Apa yang tertunda dan tanggal pemulihannya.\n4. Satu metrik yang bergerak (atau “tidak ada — ini alasannya”).\n5. Keputusan yang kita butuhkan di ruangan ini.\n6. Minggu depan: tiga hasil, bukan tumpukan tugas.\n7. Risiko yang sedang kita pantau.\n\nStandar mutu: orang yang melewatkan minggu lalu pun dapat ikut memutuskan. Jangan pakai “pembaruan” sebagai judul.\nJangan mengarang metrik.",
-      "resultSummary": "Tinjauan operasional 15 menit dengan bukti, satu hal yang tertunda, dan keputusan di ruangan — bukan tumpukan laporan status."
+      "prompt": "Susun tinjauan mingguan 7 slide yang bisa diselesaikan seisi ruangan dalam 15 menit.\n\nPeran: pemilik meja kerja ini.\nAudiens: dua rekan sejawat dan satu pengambil keputusan. Mereka belum membaca pelacak tugas.\nKeluaran: 7 slide. Judul berupa fakta atau permintaan. Butir berupa kalimat lengkap. Catatan menyebut satu angka yang akan Anda pertahankan.\n\nContoh minggu ini (ganti):\n- Dirilis: [tas bernama], [mesin cadangan sudah di kasir].\n- Tertunda: [menu di pintu belum dicetak ulang], sehingga pintu masih menampilkan jam bulan lalu.\n- Risiko: [catatan serah terima hanya satu baris], sehingga hari Sabtu terlihat kurang bekal.\n- Permintaan: [setujui cetak ulang menu] atau [pertahankan papan tulis].\n\nDaftar slide:\n1. Judul + tanggal akhir pekan.\n2. Apa yang benar-benar dirilis (bukti).\n3. Apa yang tertunda dan tanggal pemulihannya.\n4. Satu metrik yang bergerak (atau “tidak ada — ini alasannya”).\n5. Keputusan yang kita butuhkan di ruangan ini.\n6. Minggu depan: tiga hasil, bukan tumpukan tugas.\n7. Risiko yang sedang kita pantau.\n\nStandar mutu: orang yang melewatkan minggu lalu pun bisa ikut memutuskan. Jangan pakai “pembaruan” sebagai judul.\nJangan mengarang metrik.",
+      "resultSummary": "Tinjauan operasional 15 menit dengan bukti, satu hal yang tertunda, dan keputusan di ruangan, bukan tumpukan laporan status."
     },
     "workshop-opener": {
       "title": "Pembuka lokakarya",
-      "prompt": "Rancang pembuka 6 slide yang dapat dibawakan fasilitator dalam 10 menit, lalu ia mundur memberi ruang.\n\nPeran: fasilitator.\nAudiens: enam orang yang belum membaca bahan pendahuluan.\nKeluaran: 6 slide. Kesepakatan kerja dan hasil yang diharapkan cukup spesifik untuk dirujuk kembali nanti.\n\nContoh sesi (ganti):\n- Tujuan: mengunci cakupan [pengambilan Sabtu] untuk tiga minggu.\n- Hasil: daftar tertulis tentang apa yang masuk dan tidak masuk, serta pemilik minggu pertama sebelum makan siang.\n- Kesepakatan: ponsel disimpan selama 40 menit pertama; tunda pembahasan penggantian nama menu.\n\nSlide:\n1. Mengapa ruangan ini, hari ini.\n2. Keputusan yang harus kita bawa pulang (satu kalimat).\n3. Agenda berwaktu.\n4. Kesepakatan kerja (perilaku, bukan nilai-nilai).\n5. Hal-hal di luar batas untuk sesi ini.\n6. Bagaimana kita tahu bahwa kita berhasil pada pukul 12.00.\n\nStandar mutu: pengganti pun dapat memfasilitasi. Tanpa slide pemecah kebekuan. Tanpa “saling menghormati” yang klise.\nCatatan: kalimat yang diucapkan langsung, bukan catatan desain.",
-      "resultSummary": "Pembuka 10 menit dengan keputusan yang harus dibawa pulang dan kesepakatan yang dapat ditegakkan."
+      "prompt": "Rancang pembuka 6 slide yang bisa dibawakan fasilitator dalam 10 menit, lalu ia mundur memberi ruang.\n\nPeran: fasilitator.\nAudiens: enam orang yang belum membaca bahan pendahuluan.\nKeluaran: 6 slide. Kesepakatan kerja dan hasil yang diharapkan cukup spesifik untuk dirujuk kembali nanti.\n\nContoh sesi (ganti):\n- Tujuan: mengunci cakupan [pengambilan Sabtu] untuk tiga minggu.\n- Hasil: daftar tertulis tentang apa yang masuk dan tidak masuk, serta pemilik minggu pertama sebelum makan siang.\n- Kesepakatan: ponsel disimpan selama 40 menit pertama; tunda pembahasan penggantian nama menu.\n\nSlide:\n1. Mengapa ruangan ini, hari ini.\n2. Keputusan yang harus kita bawa pulang (satu kalimat).\n3. Agenda berwaktu.\n4. Kesepakatan kerja (perilaku, bukan nilai-nilai).\n5. Hal-hal di luar batas untuk sesi ini.\n6. Bagaimana kita tahu bahwa kita berhasil pada pukul 12.00.\n\nStandar mutu: pengganti pun bisa memfasilitasi. Tanpa slide pemecah kebekuan. Tanpa “saling menghormati” yang klise.\nCatatan: kalimat yang diucapkan langsung, bukan catatan desain.",
+      "resultSummary": "Pembuka 10 menit dengan keputusan yang harus dibawa pulang dan kesepakatan yang bisa ditegakkan."
     },
     "ship-day-readout": {
       "title": "Laporan hari rilis",
-      "prompt": "Susun kerangka laporan peluncuran 8 slide untuk orang-orang yang akan mencoba produknya sore ini.\n\nPeran: orang yang merilisnya.\nAudiens: tim dukungan + satu eksekutif + orang-orang yang akan langsung mencobanya.\nKeluaran: 8 slide. Sertakan batasan dan jalur dukungan — peluncuran tanpa keduanya hanyalah demo.\n\nContoh rilis (ganti):\n- Yang dirilis: [pengambilan Sabtu] di kasir.\n- Untuk siapa: [orang yang memesan lebih dulu].\n- Cara mencoba: [datang pukul 10, sebutkan nama, bayar, ambil tas].\n- Batasan yang diketahui: [menu cetak masih edisi bulan lalu sampai kita mencetak ulang].\n- Dukungan: [map arsip di kasir], bukan antrean tiket.\n\nSlide:\n1. Apa yang ada di tangan mereka hari ini.\n2. Untuk siapa (dan bukan untuk siapa).\n3. Alurnya: pintu → nama → tas.\n4. Apa yang seharusnya mereka lihat di kasir.\n5. Apa yang kita tunda dan alasannya.\n6. Batasan yang diketahui (jujur).\n7. Jika ada yang rusak, lakukan ini.\n8. Tonggak berikutnya dan pemiliknya.\n\nStandar mutu: orang dapat mencobanya tanpa Anda. Tanpa “dengan bangga kami umumkan”. Tanpa metrik pemanis.\nJangan mengarang waktu aktif (uptime).",
+      "prompt": "Susun kerangka laporan peluncuran 8 slide untuk orang-orang yang akan mencoba produknya sore ini.\n\nPeran: orang yang merilisnya.\nAudiens: tim dukungan + satu eksekutif + orang-orang yang akan langsung mencobanya.\nKeluaran: 8 slide. Sertakan batasan dan jalur dukungan — peluncuran tanpa keduanya hanyalah demo.\n\nContoh rilis (ganti):\n- Yang dirilis: [pengambilan Sabtu] di kasir.\n- Untuk siapa: [orang yang memesan lebih dulu].\n- Cara mencoba: [datang pukul 10, sebutkan nama, bayar, ambil tas].\n- Batasan yang diketahui: [menu cetak masih edisi bulan lalu sampai kita mencetak ulang].\n- Dukungan: [map arsip di kasir], bukan antrean tiket.\n\nSlide:\n1. Apa yang ada di tangan mereka hari ini.\n2. Untuk siapa (dan bukan untuk siapa).\n3. Alurnya: pintu → nama → tas.\n4. Apa yang seharusnya mereka lihat di kasir.\n5. Apa yang kita tunda dan alasannya.\n6. Batasan yang diketahui (jujur).\n7. Jika ada yang rusak, lakukan ini.\n8. Tonggak berikutnya dan pemiliknya.\n\nStandar mutu: orang bisa mencobanya tanpa Anda. Tanpa “dengan bangga kami umumkan”. Tanpa metrik pemanis.\nJangan mengarang waktu aktif (uptime).",
       "resultSummary": "Deck hari rilis dengan jalur mencoba, pekerjaan yang ditunda, dan satu slide untuk keadaan darurat."
     },
     "retro-with-owners": {
       "title": "Retro dengan pemilik tugas",
-      "prompt": "Susun retro 6 slide yang berakhir pada pemilik bernama, bukan sekadar perasaan.\n\nPeran: orang yang menjalankan siklus terakhir.\nAudiens: orang-orang yang mengerjakannya.\nKeluaran: 6 slide. Butir di bawah delapan kata hanya boleh dipakai jika tetap memuat klaim. Cerita lengkapnya ada di catatan.\n\nContoh siklus (ganti):\n- Dicoba: [buku pesanan bersama], lalu [satu tas bernama untuk setiap pesanan].\n- Berhasil: [kasir dapat melihat setiap pesanan Sabtu].\n- Macet: [catatannya hanya satu baris], sehingga serah terima terlihat kurang bekal.\n- Perubahan: [tulis ulang daftar periksa Sabtu menjadi langkah-langkah lengkap] dan [berhenti menyebut kartu itu “ide”].\n\nSlide:\n1. Siklus yang kita nilai (tanggal).\n2. Apa yang kita coba — fakta.\n3. Apa yang berhasil — bukti.\n4. Apa yang macet — penyebabnya, bukan siapa yang salah.\n5. Apa yang akan kita ubah pada siklus berikutnya (maksimal tiga).\n6. Pemilik dan tanggal pertamanya.\n\nStandar mutu: setiap perubahan ada orangnya. Tanpa “komunikasi lebih baik.”\nJangan mengarang skor sentimen.",
-      "resultSummary": "Retro yang ditutup dengan tiga perubahan beserta pemiliknya — bukan sekadar papan suasana hati."
+      "prompt": "Susun retro 6 slide yang berakhir pada pemilik bernama, bukan sekadar perasaan.\n\nPeran: orang yang menjalankan siklus terakhir.\nAudiens: orang-orang yang mengerjakannya.\nKeluaran: 6 slide. Butir di bawah delapan kata hanya boleh dipakai jika tetap memuat klaim. Cerita lengkapnya ada di catatan.\n\nContoh siklus (ganti):\n- Dicoba: [buku pesanan bersama], lalu [satu tas bernama untuk setiap pesanan].\n- Berhasil: [kasir bisa melihat setiap pesanan Sabtu].\n- Macet: [catatannya hanya satu baris], sehingga serah terima terlihat kurang bekal.\n- Perubahan: [tulis ulang daftar periksa Sabtu menjadi langkah-langkah lengkap] dan [berhenti menyebut kartu itu “ide”].\n\nSlide:\n1. Siklus yang kita nilai (tanggal).\n2. Apa yang kita coba — fakta.\n3. Apa yang berhasil — bukti.\n4. Apa yang macet — penyebabnya, bukan siapa yang salah.\n5. Apa yang akan kita ubah pada siklus berikutnya (maksimal tiga).\n6. Pemilik dan tanggal pertamanya.\n\nStandar mutu: setiap perubahan ada orangnya. Tanpa “komunikasi lebih baik.”\nJangan mengarang skor sentimen.",
+      "resultSummary": "Retro yang ditutup dengan tiga perubahan beserta penanggung jawabnya, bukan sekadar papan suasana hati."
     },
     "all-hands-recap": {
       "title": "Rangkuman all-hands",
-      "prompt": "Rancang rangkuman 7 slide untuk ruangan yang tidak terlibat dalam pekerjaannya.\n\nPeran: orang yang menceritakan dua minggu terakhir.\nAudiens: beragam — sebagian hanya akan mengingat satu slide.\nKeluaran: 7 slide. Satu metrik. Satu cerita. Satu permintaan. Ramah, bukan dibuat-buat.\n\nContoh rangkuman (ganti):\n- Berhasil: [kasir siap tanpa formulir khusus].\n- Meleset: [menu di pintu masih lembaran Agustus].\n- Metrik: [menit dari kedatangan sampai menerima tas] — katakan terus terang jika kita tidak mengukurnya.\n- Cerita: [seseorang sudah membayar tetapi baru bisa menemukan tasnya minggu ini].\n- Permintaan: [cetak ulang menu] atau [pertahankan papan tulis].\n\nSlide:\n1. Judul dua mingguan.\n2. Keberhasilan (bukti).\n3. Yang meleset (tanggung jawab kita).\n4. Satu metrik, atau pengakuan jujur “kami tidak mengukurnya.”\n5. Satu cerita dari lapangan.\n6. Permintaan.\n7. Ucapan terima kasih yang menyebut pekerjaan, bukan kepribadian.\n\nStandar mutu: orang yang datang terlambat dapat menceritakannya kembali. Tanpa peta jalan yang menyamar sebagai rangkuman.\nJangan mengarang kalimat pemancing tepuk tangan.",
-      "resultSummary": "Rangkuman untuk seisi ruangan dengan satu metrik, satu cerita, dan satu permintaan nyata — bukan sekadar kilas sorotan."
+      "prompt": "Rancang rangkuman 7 slide untuk ruangan yang tidak terlibat dalam pekerjaannya.\n\nPeran: orang yang menceritakan dua minggu terakhir.\nAudiens: beragam — sebagian hanya akan mengingat satu slide.\nKeluaran: 7 slide. Satu metrik. Satu cerita. Satu permintaan. Ramah, bukan dibuat-buat.\n\nContoh rangkuman (ganti):\n- Berhasil: [kasir siap tanpa formulir khusus].\n- Meleset: [menu di pintu masih lembaran Agustus].\n- Metrik: [menit dari kedatangan sampai menerima tas] — katakan terus terang jika kita tidak mengukurnya.\n- Cerita: [seseorang sudah membayar tetapi baru bisa menemukan tasnya minggu ini].\n- Permintaan: [cetak ulang menu] atau [pertahankan papan tulis].\n\nSlide:\n1. Judul dua mingguan.\n2. Keberhasilan (bukti).\n3. Yang meleset (tanggung jawab kita).\n4. Satu metrik, atau pengakuan jujur “kami tidak mengukurnya.”\n5. Satu cerita dari lapangan.\n6. Permintaan.\n7. Ucapan terima kasih yang menyebut pekerjaan, bukan kepribadian.\n\nStandar mutu: orang yang datang terlambat bisa menceritakannya kembali. Tanpa peta jalan yang menyamar sebagai rangkuman.\nJangan mengarang kalimat pemancing tepuk tangan.",
+      "resultSummary": "Rangkuman untuk seisi ruangan dengan satu metrik, satu cerita, dan satu permintaan nyata, bukan sekadar kilas sorotan."
     }
   },
   "ask": "Presentasi ini tentang apa?",
@@ -112,16 +112,16 @@
   "more": "Lainnya",
   "shapeNote": "Buat yang {length} dan {style}.",
   "slideCount": {
-    "label": "Jumlah slide tepat",
+    "label": "Jumlah slide yang diinginkan",
     "placeholder": "Opsional",
-    "hint": "Bilangan bulat dari {min} sampai {max}, termasuk slide judul."
+    "hint": "Bilangan bulat {min} sampai {max}, termasuk slide judul."
   },
   "checks": {
     "intro": "Sudah diperiksa. Ada beberapa hal yang perlu Anda tinjau:",
-    "slideCount": "Anda meminta {expected} slide; deck ini memiliki {found}.",
-    "tooMany": "Deck ini memiliki {found} slide; batas maksimumnya {max}.",
-    "content": "Tidak ada judul atau teks pada slide: {slides}",
-    "duplicate": "Judul yang sama pada slide: {slides}",
+    "slideCount": "Anda meminta {expected} slide, tetapi deck ini berisi {found}.",
+    "tooMany": "Deck ini berisi {found} slide, padahal batasnya {max}.",
+    "content": "Slide ini belum punya judul atau teks: {slides}",
+    "duplicate": "Judul kembar di slide: {slides}",
     "fit": "Mungkin tidak muat di slide saat diunduh: {slides}"
   }
 }

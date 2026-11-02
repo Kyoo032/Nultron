@@ -9,7 +9,7 @@
     },
     "documents": {
       "draft-sections": "Menyusun bagian-bagian dokumen",
-      "stay-inside-source": "Tidak keluar dari sumber",
+      "stay-inside-source": "Berpegang pada sumber",
       "rewrite-one-section": "Menulis ulang satu bagian",
       "preview-and-download": "Pratinjau dan unduh",
       "check-against-source": "Memeriksa draf terhadap sumber"
@@ -71,7 +71,7 @@
       "keep-clip": "Menjaga klip sesuai durasi yang ditagih"
     },
     "music": {
-      "hear-sentence": "Mendengarkan satu kalimat",
+      "hear-sentence": "Memahami lagu dari satu kalimat",
       "desk-language": "Menulis lirik dalam bahasa Anda",
       "shape-lyric": "Membentuk lirik yang enak dinyanyikan",
       "name-song": "Memberi judul lagu",
@@ -94,7 +94,7 @@
     "education": {
       "teaching-deck": "Slide pengajaran",
       "edit-text-and-shapes": "Menyunting teks, menambah bentuk",
-      "exam-from-knowledge": "Ujian dari basis pengetahuan",
+      "exam-from-knowledge": "Kuis dari Basis Pengetahuan",
       "book-reader": "Pembaca buku dengan OCR lokal",
       "video-presenter": "Presenter video"
     }
@@ -177,7 +177,7 @@
     "repair": "{n} putaran perbaikan sebelum berhenti",
     "repairOne": "1 putaran perbaikan sebelum berhenti",
     "noRepair": "Pemeriksaan hanya melaporkan; tidak ada yang diperbaiki secara otomatis.",
-    "enforced": "Aplikasi menegakkan alat dan batas ini pada setiap proses di obrolan ini. Prompt tidak dapat mengubahnya.",
+    "enforced": "Aplikasi menjalankan alat dan batas ini pada setiap proses di obrolan ini. Prompt tidak bisa mengubahnya.",
     "close": "Tutup",
     "statusNew": "Baru",
     "statusOff": "Tidak ditawarkan",

@@ -113,7 +113,7 @@ const CHAT_TURN_COPY: Record<AppLocale, ChatTurnCopy> = {
       "Tidak ada alat yang selesai, tetapi jawabannya belum. Minta saya melanjutkan, dan saya akan meneruskan dari titik terakhir.",
     stepLimitAnd: "dan",
     interrupted:
-      'Langkah-langkah alat di atas sudah berjalan, tetapi saya tidak dapat menyelesaikan jawabannya.\n\nAlasan: {reason}\n\nKirim "lanjutkan" dan saya akan mencoba lagi.',
+      'Langkah-langkah alat di atas sudah berjalan, tetapi saya belum bisa menyelesaikan jawabannya.\n\nAlasan: {reason}\n\nKirim "lanjutkan" dan saya akan mencoba lagi.',
     modelFallback: "{from} tidak tersedia; jawaban ini memakai {to}.",
   },
 };

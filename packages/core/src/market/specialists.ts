@@ -59,7 +59,7 @@ const META: Readonly<Record<MarketSpecialist, MarketSpecialistMeta>> = {
     id: "saham",
     label: { id: "Saham", en: "Stocks" },
     hint: {
-      id: "Saham di bursa mana pun — IDX, AS, dan seterusnya: peringkat watchlist, pembacaan sektor, mengikuti jam bursa.",
+      id: "Saham di bursa mana pun (IDX, AS, dan lainnya): peringkat watchlist, pembacaan sektor, mengikuti jam bursa.",
       en: "Equities on any exchange — IDX, US, and beyond: ranked watchlist, sector read, session-aware.",
     },
     defaultPrompt: MARKET_SPECIALIST_PROMPTS.saham,
@@ -81,7 +81,7 @@ const META: Readonly<Record<MarketSpecialist, MarketSpecialistMeta>> = {
     id: "gold",
     label: { id: "Emas & Mineral", en: "Gold & Minerals" },
     hint: {
-      id: "Emas, perak dan tembaga terhadap dolar dan yield riil, plus penambang Indonesia sebagai beta.",
+      id: "Emas, perak, dan tembaga dibaca terhadap dolar dan yield riil, plus penambang Indonesia sebagai beta.",
       en: "Gold, silver and copper against the dollar and real yields, plus the Indonesian miners as beta.",
     },
     defaultPrompt: MARKET_SPECIALIST_PROMPTS.gold,
@@ -119,7 +119,7 @@ const META: Readonly<Record<MarketSpecialist, MarketSpecialistMeta>> = {
     id: "indices",
     label: { id: "Indeks Global", en: "Global Indices" },
     hint: {
-      id: "Estafet sesi Asia-Eropa-Amerika, futures versus indeks tunai.",
+      id: "Estafet sesi Asia–Eropa–Amerika, futures dibandingkan dengan indeks tunai.",
       en: "The Asia-Europe-US session relay, futures against the cash indices.",
     },
     defaultPrompt: MARKET_SPECIALIST_PROMPTS.indices,
@@ -215,7 +215,7 @@ const META: Readonly<Record<MarketSpecialist, MarketSpecialistMeta>> = {
     id: "news",
     label: { id: "Agregator Berita", en: "News Aggregator" },
     hint: {
-      id: "Rangkuman headline per ticker dan per tema, dengan penerbit, waktu, dan penanda kedaluwarsa.",
+      id: "Rangkuman headline per ticker dan per tema, lengkap dengan penerbit, waktu, dan penanda kedaluwarsa.",
       en: "A headline digest by ticker and theme, with publisher, time, and a stale flag.",
     },
     defaultPrompt: MARKET_SPECIALIST_PROMPTS.news,

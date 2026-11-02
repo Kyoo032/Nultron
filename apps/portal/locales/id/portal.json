@@ -14,13 +14,13 @@
     "passwordLabel": "Kata sandi",
     "submit": "Masuk",
     "missing": "Masukkan nama pengguna dan kata sandi Anda.",
-    "invalid": "Nama pengguna atau kata sandi tidak tepat. Jika ini terus muncul, hubungi admin Anda.",
-    "rateLimited": "Terlalu banyak percobaan. Coba lagi beberapa menit lagi.",
+    "invalid": "Nama pengguna atau kata sandi salah. Kalau masih gagal, hubungi admin Anda.",
+    "rateLimited": "Terlalu banyak percobaan. Tunggu beberapa menit, lalu coba lagi.",
     "busy": "Layanan masuk sedang sibuk. Tunggu sebentar, lalu coba lagi."
   },
   "change": {
     "title": "Pilih kata sandi baru",
-    "lead": "Kata sandi yang Anda terima bersifat sementara. Pilih kata sandi Anda sendiri untuk melanjutkan.",
+    "lead": "Kata sandi yang Anda terima hanya sementara. Buat kata sandi Anda sendiri untuk melanjutkan.",
     "currentLabel": "Kata sandi saat ini",
     "newLabel": "Kata sandi baru",
     "confirmLabel": "Kata sandi baru, sekali lagi",
@@ -30,7 +30,7 @@
     "refusal": {
       "too_short": "Gunakan minimal {min} karakter.",
       "too_long": "Gunakan paling banyak {max} karakter.",
-      "control_characters": "Gunakan hanya karakter yang bisa diketik di papan ketik: tanpa pindah baris atau karakter kontrol.",
+      "control_characters": "Pakai karakter biasa dari papan ketik, tanpa pindah baris atau karakter kontrol.",
       "mismatch": "Kedua kata sandi baru itu tidak sama.",
       "same_as_username": "Pilih kata sandi yang bukan nama pengguna Anda.",
       "same_as_email": "Pilih kata sandi yang bukan alamat e-mail Anda.",
@@ -39,16 +39,16 @@
   },
   "sent": {
     "title": "Periksa e-mail Anda",
-    "body": "Kami telah mengirim kode masuk ke {email}. Kode ini akan kedaluwarsa dalam {minutes} menit.",
-    "bodyAfterInvite": "Undangan diterima. Kami baru saja mengirim kode masuk ke {email} untuk memastikan kotak masuk itu milik Anda. Kode ini akan kedaluwarsa dalam {minutes} menit.",
+    "body": "Kami sudah mengirim kode masuk ke {email}. Kode berlaku selama {minutes} menit.",
+    "bodyAfterInvite": "Undangan diterima. Kami baru saja mengirim kode masuk ke {email} untuk memastikan kotak masuk itu milik Anda. Kode berlaku selama {minutes} menit.",
     "bodyWait": "Kami sudah mengirim kode masuk ke {email}.",
-    "bodyFailed": "Kami tidak dapat mengirim kode masuk ke {email} saat ini.",
+    "bodyFailed": "Kode masuk ke {email} belum bisa kami kirim saat ini.",
     "codeLabel": "Kode enam digit",
     "submit": "Lanjutkan",
     "resend": "Kirim kode baru",
     "cooldown": "Kode baru saja dikirim. Periksa kotak masuk Anda, atau minta lagi dalam {minutes} menit.",
     "limited": "Beberapa kode sudah dikirim baru-baru ini. Periksa kotak masuk Anda, atau coba lagi dalam {minutes} menit.",
-    "mailFailed": "E-mail tidak dapat dikirim. Coba lagi beberapa menit lagi."
+    "mailFailed": "E-mail gagal terkirim. Tunggu beberapa menit, lalu coba lagi."
   },
   "invite": {
     "title": "Masukkan kode undangan Anda",
@@ -60,17 +60,17 @@
     "missing": "Masukkan kode undangan dari e-mail.",
     "resent": "Kami mengirim kode undangan baru ke e-mail Anda. Kode sebelumnya tidak berlaku lagi.",
     "wait": "Undangan baru saja dikirim ke e-mail. Periksa kotak masuk Anda, atau minta lagi dalam {minutes} menit.",
-    "mailFailed": "E-mail tidak dapat dikirim. Coba lagi beberapa menit lagi."
+    "mailFailed": "E-mail gagal terkirim. Tunggu beberapa menit, lalu coba lagi."
   },
   "state": {
     "restart": "Gunakan e-mail lain",
     "expired": {
       "title": "Undangan tidak berlaku lagi",
-      "body": "Undangan ini sudah kedaluwarsa atau sudah dipakai. Minta admin Anda untuk undangan baru."
+      "body": "Undangan ini sudah kedaluwarsa atau sudah terpakai. Minta undangan baru ke admin Anda."
     },
     "noAccess": {
       "title": "Belum ada akses",
-      "body": "E-mail ini belum memiliki akses. Minta admin perusahaan Anda untuk mengundang Anda."
+      "body": "E-mail ini belum punya akses. Minta admin perusahaan Anda untuk mengundang Anda."
     },
     "inviteLocked": {
       "title": "Terlalu banyak percobaan",
@@ -120,21 +120,21 @@
   },
   "success": {
     "title": "Berhasil masuk",
-    "body": "Membawa Anda kembali ke {product}."
+    "body": "Mengalihkan Anda kembali ke {product}."
   },
   "signedOut": {
     "title": "Sudah keluar",
-    "body": "Sesi masuk di peramban ini sudah berakhir. Lain kali Anda akan diminta alamat e-mail dan kode lagi.",
-    "bodyPassword": "Sesi masuk di peramban ini sudah berakhir. Lain kali Anda akan diminta nama pengguna dan kata sandi lagi."
+    "body": "Sesi di peramban ini sudah berakhir. Saat masuk lagi nanti, Anda akan diminta alamat e-mail dan kode.",
+    "bodyPassword": "Sesi di peramban ini sudah berakhir. Saat masuk lagi nanti, Anda akan diminta nama pengguna dan kata sandi."
   },
   "error": {
-    "title": "Tidak dapat melanjutkan",
+    "title": "Tidak bisa melanjutkan",
     "generic": "Terjadi kesalahan. Tutup halaman ini lalu mulai lagi.",
     "invalidClient": "Tautan masuk ini tidak valid. Mulai lagi dari aplikasi.",
     "invalidRedirect": "Tautan masuk ini tidak valid. Mulai lagi dari aplikasi.",
-    "badRequest": "Permintaan itu tidak dapat dipahami.",
+    "badRequest": "Permintaan itu tidak bisa dipahami.",
     "expiredForm": "Halaman ini kedaluwarsa. Mulai lagi.",
-    "rateLimited": "Terlalu banyak percobaan. Coba lagi beberapa menit lagi."
+    "rateLimited": "Terlalu banyak percobaan. Tunggu beberapa menit, lalu coba lagi."
   },
   "platform": {
     "windows": "Windows",
@@ -151,15 +151,15 @@
     "org_past_due": "Pembayaran organisasi Anda tertunggak.",
     "user_inactive": "Akun Anda dinonaktifkan.",
     "seat_cap_reached": "Semua kursi di organisasi Anda sudah terpakai.",
-    "device_revoked": "Admin telah mengeluarkan akun Anda dari perangkat ini.",
+    "device_revoked": "Admin telah mencabut akses akun Anda dari perangkat ini.",
     "session_revoked": "Anda telah keluar. Silakan masuk lagi.",
     "refresh_reused": "Anda dikeluarkan demi keamanan. Silakan masuk lagi.",
     "refresh_expired": "Sesi Anda sudah berakhir. Silakan masuk lagi.",
     "device_code_expired": "Kode sudah kedaluwarsa. Mulai proses masuk lagi.",
     "device_code_denied": "Permintaan masuk ditolak.",
-    "invalid_request": "Permintaan itu tidak dapat dipahami.",
-    "invalid_grant": "Proses masuk itu tidak dapat diselesaikan. Mulai lagi.",
-    "rate_limited": "Terlalu banyak percobaan. Coba lagi beberapa menit lagi."
+    "invalid_request": "Permintaan itu tidak bisa dipahami.",
+    "invalid_grant": "Proses masuk itu tidak bisa diselesaikan. Mulai lagi.",
+    "rate_limited": "Terlalu banyak percobaan. Tunggu beberapa menit, lalu coba lagi."
   },
   "wait": {
     "minutes": "{n} menit",

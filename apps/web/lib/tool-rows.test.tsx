@@ -560,7 +560,7 @@ describe("the rows in Indonesian", () => {
       ),
     );
     expect(run).toContain("Gagal menjalankan Python");
-    expect(part(run, "tool-row-code-reason")).toContain("Berjalan terlalu lama sehingga dihentikan.");
+    expect(part(run, "tool-row-code-reason")).toContain("Berjalan terlalu lama, jadi dihentikan.");
     expect(run).toContain("Tampilkan kode");
     expect(run).toContain(">Kesalahan</p>");
 

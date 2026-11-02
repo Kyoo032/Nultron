@@ -44,13 +44,13 @@
     "private": "Pesan langsung"
   },
   "errors": {
-    "load": "Tidak dapat memuat kanal di meja kerja ini.",
-    "connect": "Telegram menolak token tersebut.",
-    "disconnect": "Tidak dapat memutuskan bot.",
-    "add": "Tidak dapat menambahkan kanal tersebut.",
-    "remove": "Tidak dapat menghapus kanal tersebut.",
-    "send": "Telegram menolak pesan tersebut.",
-    "poll": "Tidak dapat memeriksa pesan baru.",
+    "load": "Gagal memuat kanal di meja kerja ini.",
+    "connect": "Telegram menolak token itu.",
+    "disconnect": "Gagal memutuskan koneksi bot.",
+    "add": "Gagal menambahkan kanal itu.",
+    "remove": "Gagal menghapus kanal itu.",
+    "send": "Telegram menolak pesan itu.",
+    "poll": "Gagal memeriksa pesan baru.",
     "notConnected": "Hubungkan bot Telegram untuk meja kerja ini terlebih dahulu."
   }
 }

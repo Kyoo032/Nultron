@@ -99,7 +99,7 @@ const MODE_MESSAGES: Record<ModeMessageKey, Record<AppLocale, string>> = {
   },
   noFiguresParsed: {
     en: "No figures could be read from that text",
-    id: "Tidak ada angka yang dapat dibaca dari teks itu",
+    id: "Tidak ada angka yang bisa dibaca dari teks itu",
   },
   datasetNoNumericColumn: {
     en: "That dataset has no numeric column to use as amounts",

@@ -217,14 +217,14 @@ describe("file, Knowledge and code tool labels (id)", () => {
   it("says a refusal, a proposal and a failed run in Indonesian", () => {
     applyLocale("id");
     const refusal = { ok: false, code: "not_found", message: "Tidak ada." };
-    expect(toolRowLabel("read_file", { path: "a.md" }, refusal)).toBe("Tidak dapat membaca a.md");
-    expect(toolRowLabel("write_file", { path: "a.md" }, refusal)).toBe("Tidak dapat menulis a.md");
-    expect(toolRowLabel("edit_file", { path: "a.md" }, refusal)).toBe("Tidak dapat mengubah a.md");
-    expect(toolRowLabel("delete_file", { path: "a.md" }, refusal)).toBe("Tidak dapat menghapus a.md");
-    expect(toolRowLabel("list_files", {}, refusal)).toBe("Tidak dapat menampilkan daftar berkas");
-    expect(toolRowLabel("search_files", { pattern: "x" }, refusal)).toBe("Tidak dapat mencari “x” di berkas");
+    expect(toolRowLabel("read_file", { path: "a.md" }, refusal)).toBe("Gagal membaca a.md");
+    expect(toolRowLabel("write_file", { path: "a.md" }, refusal)).toBe("Gagal menulis a.md");
+    expect(toolRowLabel("edit_file", { path: "a.md" }, refusal)).toBe("Gagal mengubah a.md");
+    expect(toolRowLabel("delete_file", { path: "a.md" }, refusal)).toBe("Gagal menghapus a.md");
+    expect(toolRowLabel("list_files", {}, refusal)).toBe("Gagal menampilkan daftar berkas");
+    expect(toolRowLabel("search_files", { pattern: "x" }, refusal)).toBe("Gagal mencari “x” di berkas");
     expect(toolRowLabel("knowledge_search", { query: "x" }, { ok: false, reason: "unavailable", message: "." })).toBe(
-      "Tidak dapat mencari di basis pengetahuan Anda",
+      "Gagal mencari di basis pengetahuan Anda",
     );
     expect(
       toolRowLabel("run_code", { language: "python" }, { ok: false, stdout: "", stderr: "x", reason: "syntax" }),
@@ -357,9 +357,9 @@ describe("web_fetch labels", () => {
     const input = { url: "https://example.com/pricing" };
     expect(toolActivityLabel("web_fetch", input)).toBe("Sedang membuka example.com…");
     expect(toolCallSummary("web_fetch", input, page)).toBe("Membuka example.com");
-    expect(toolCallSummary("web_fetch", input, refused)).toBe("Tidak dapat membuka example.com");
+    expect(toolCallSummary("web_fetch", input, refused)).toBe("Gagal membuka example.com");
     expect(toolActivityLabel("web_fetch")).toBe("Sedang membuka halaman…");
-    expect(toolCallSummary("web_fetch", undefined, refused)).toBe("Tidak dapat membuka halaman");
+    expect(toolCallSummary("web_fetch", undefined, refused)).toBe("Gagal membuka halaman");
     expect(toolDoneLabel("web_fetch")).toBe("Halaman web");
   });
 

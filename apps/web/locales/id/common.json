@@ -12,8 +12,8 @@
   },
   "enhance": {
     "failedShort": "Penyempurnaan gagal",
-    "failed": "Prompt tidak dapat disempurnakan. Teks Anda tetap seperti semula.",
-    "failedReason": "Prompt tidak dapat disempurnakan: {reason}"
+    "failed": "Prompt belum bisa disempurnakan. Teks Anda tidak berubah.",
+    "failedReason": "Prompt belum bisa disempurnakan: {reason}"
   },
   "theme": {
     "light": "Terang",
@@ -21,18 +21,18 @@
   },
   "jobProgress": {
     "starting": "Memulai…",
-    "elapsed": "{time} berlalu",
-    "round": "Putaran {round} dari {total} · {label}",
+    "elapsed": "{time} berjalan",
+    "round": "Tahap {round} dari {total} · {label}",
     "source": {
       "found": "ditemukan",
       "read": "dibaca",
-      "unreachable": "tidak terjangkau"
+      "unreachable": "tidak bisa dibuka"
     }
   },
   "saveFailed": {
-    "writeFailed": "Berkas tidak dapat ditulis ke lokasi tersebut. Pilih folder lain atau kosongkan sebagian ruang penyimpanan, lalu coba lagi.",
+    "writeFailed": "Berkas tidak bisa disimpan di lokasi itu. Pilih folder lain atau kosongkan sebagian ruang penyimpanan, lalu coba lagi.",
     "tooLarge": "Berkas ini terlalu besar untuk disimpan dari sini.",
-    "generic": "Berkas tidak dapat disimpan. Coba lagi."
+    "generic": "Berkas gagal disimpan. Coba lagi."
   },
   "artifactActions": {
     "download": "Unduh Markdown",
@@ -41,16 +41,16 @@
     "adding": "Menambahkan…",
     "makeDocument": "Jadikan dokumen",
     "makePresentation": "Jadikan presentasi",
-    "downloadFailed": "Tidak dapat mengunduh",
-    "kbIndexFailed": "Basis Pengetahuan tidak dapat mengindeks ini: {reason}",
-    "unknownReason": "penyebab tidak diketahui",
+    "downloadFailed": "Gagal mengunduh",
+    "kbIndexFailed": "Basis Pengetahuan gagal mengindeks ini: {reason}",
+    "unknownReason": "penyebabnya belum diketahui",
     "kbAlready": "Sudah ada di Basis Pengetahuan.",
     "kbAdded": "Ditambahkan ke Basis Pengetahuan.",
-    "kbFailed": "Tidak dapat menambahkan ke Basis Pengetahuan"
+    "kbFailed": "Gagal menambahkan ke Basis Pengetahuan"
   },
   "mascot": {
     "wave": "Melambai menyapa",
-    "idle": "Siap kapan pun Anda siap",
+    "idle": "Siap kapan saja",
     "sleep": "Istirahat sebentar",
     "thinking": "Sedang memikirkannya",
     "writing": "Sedang menulis",
@@ -63,13 +63,13 @@
     "painting": "Sedang melukis",
     "filming": "Sedang merekam",
     "editing": "Sedang menyunting",
-    "presenting": "Sedang memaparkan",
+    "presenting": "Sedang presentasi",
     "celebrating": "Semua beres",
     "error": "Ada yang perlu diperiksa",
     "surprised": "Terkejut",
     "love": "Senang membantu",
     "charging": "Sedang mengisi tenaga",
-    "lets-go": "Ayo berangkat"
+    "lets-go": "Ayo mulai"
   },
   "buddy": {
     "tap": "Sapa Nultron",
@@ -83,11 +83,11 @@
     "document": "Tulis memo berdasarkan \"{subject}\". Gunakan hanya materi sumber dan sebutkan sumbernya."
   },
   "needsKey": {
-    "note": "Tambahkan kunci {gateway} Anda di {settings} untuk memakai ini.",
-    "blocked": "Tambahkan kunci Anda di {settings} untuk memakai ini."
+    "note": "Tambahkan kunci {gateway} di {settings} agar fitur ini bisa dipakai.",
+    "blocked": "Tambahkan kunci Anda di {settings} agar fitur ini bisa dipakai."
   },
   "runLimit": {
-    "tooManyRuns": "Terlalu banyak permintaan Anda yang berjalan bersamaan. Tunggu hingga salah satunya selesai, lalu coba lagi.",
+    "tooManyRuns": "Terlalu banyak proses Anda yang berjalan bersamaan. Tunggu salah satunya selesai, lalu coba lagi.",
     "serverBusy": "Layanan sedang sibuk. Tunggu sebentar, lalu coba lagi."
   }
 }

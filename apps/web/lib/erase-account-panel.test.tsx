@@ -147,7 +147,7 @@ describe("EraseAccountPanel", () => {
     applyLocale("id");
     const markup = await panel({});
     expect(markup).toContain("Setiap orang di perusahaan ikut dihapus");
-    expect(markup).toContain("tidak dapat dibatalkan");
+    expect(markup).toContain("tidak bisa dibatalkan");
     expect(markup).toContain("kontrak layanan");
     // The server compares one word; the Indonesian screen asks for the same one.
     expect(markup).toContain("DELETE");

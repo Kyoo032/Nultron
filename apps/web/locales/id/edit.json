@@ -1,6 +1,6 @@
 {
   "title": "Sunting",
-  "expectedInputs": "Hasilnya: video yang Anda potong di lini masa, dengan agen yang mengusulkan setiap perubahan sebagai kartu yang bisa Anda Simpan, Urungkan, atau Sesuaikan.",
+  "expectedInputs": "Hasil: video yang Anda potong di lini masa. Agen mengusulkan tiap perubahan dalam bentuk kartu, dan Anda bisa Simpan, Urungkan, atau Sesuaikan.",
   "defaultProjectName": "Suntingan tanpa judul",
   "untitled": "Tanpa judul",
   "projects": "Proyek",
@@ -8,7 +8,7 @@
   "projectNameLabel": "Nama proyek",
   "openProjectHint": "Buka proyek untuk berbincang dengan editor.",
   "phaseLater": "{label} (Tahap 2+)",
-  "jobs": "pekerjaan {count}",
+  "jobs": "{count} pekerjaan",
   "turnMeter": "giliran {spent} / {cap}",
   "opsCount": "ops {count}",
   "parity": "Paritas",
@@ -48,9 +48,9 @@
   "agent": {
     "title": "Agen",
     "writing": "Agen sedang menulis…",
-    "placeholder": "Tanyakan kepada editor…",
+    "placeholder": "Tanya editor…",
     "send": "Kirim",
-    "interrupted": "Agen berhenti sebelum selesai. Suntingan yang sudah dibuatnya tetap disimpan. Alasan: {reason}"
+    "interrupted": "Agen berhenti di tengah jalan. Suntingan yang sudah dibuat tetap tersimpan. Alasan: {reason}"
   },
   "cards": {
     "reviewTitle": "Tinjau sebelum ekspor",
@@ -83,8 +83,8 @@
     "image": "Gambar",
     "videoFromImage": "Video dari gambar",
     "storyboard": "Papan cerita",
-    "storyboardPhase": "Papan cerita hadir di Tahap 3.",
-    "needsKey": "Tambahkan kunci gateway {gateway} di {settings} untuk membuat konten.",
+    "storyboardPhase": "Papan cerita tersedia di Tahap 3.",
+    "needsKey": "Tambahkan kunci gateway {gateway} di {settings} agar bisa membuat konten.",
     "settingsLink": "Pengaturan",
     "animateStillClip": "Animasikan klip gambar di bawah playhead",
     "stillUrlPlaceholder": "URL gambar diam, atau geser playhead ke klip gambar",
@@ -191,22 +191,22 @@
     "installGuide": "Panduan instalasi",
     "recheckFailed": "Tidak bisa terhubung ke host lokal untuk memeriksa ulang. Coba lagi sebentar lagi.",
     "hostedUnavailable": "Alat video belum disiapkan di server ini, jadi pemeriksaan, pemotongan, takarir, dan ekspor mungkin belum berfungsi. Minta administrator Anda untuk mengaktifkannya.",
-    "bundledUnavailable": "Alat video bawaan {productName} tidak dapat dijalankan, jadi pemeriksaan, pemotongan, takarir, dan ekspor nonaktif. Pasang ulang {productName} untuk memperbaikinya. Pekerjaan dan berkas Anda tetap aman."
+    "bundledUnavailable": "Alat video bawaan {productName} tidak bisa dijalankan, jadi pemeriksaan, pemotongan, takarir, dan ekspor nonaktif. Pasang ulang {productName} untuk memperbaikinya. Pekerjaan dan berkas Anda tetap aman."
   },
   "errors": {
-    "apply": "Tidak dapat menerapkan suntingan",
-    "createProject": "Tidak dapat membuat proyek",
+    "apply": "Suntingan gagal diterapkan",
+    "createProject": "Proyek gagal dibuat",
     "import": "Impor gagal",
     "agentUnavailable": "Agen Sunting belum tersedia",
     "agentFailed": "Agen gagal",
     "exportBlocked": "Ekspor diblokir",
     "exportNotReady": "Ekspor belum siap",
-    "exportDownload": "Tidak dapat mengunduh ekspor"
+    "exportDownload": "Ekspor gagal diunduh"
   },
   "pipeline": {
     "languageInstruction": "Tulis teks Edit yang dilihat pengguna (kata kerja kartu, judul, takarir, balasan asisten, dan kata pada gambar atau video) dalam bahasa Indonesia. Pertahankan nama alat dan kunci JSON dalam bahasa Inggris.",
-    "stubHelp": "Saya dapat membantu memangkas, memotong, menambahkan takarir, dan memberi judul pada lini masa ini.",
-    "stubUndo": "Urungkan tersedia pada kartu terakhir.",
+    "stubHelp": "Saya bisa membantu memangkas, memotong, menambahkan takarir, dan memberi judul pada lini masa ini.",
+    "stubUndo": "Kartu terakhir bisa diurungkan.",
     "harness": {
       "liftDeadAirRan": "Jeda sunyi dihilangkan.",
       "liftDeadAirEmpty": "Tidak ada jeda sunyi yang perlu dihilangkan di lini masa ini.",
@@ -218,7 +218,7 @@
       "placeMadeShotEmpty": "Sebutkan gambar diam atau klip yang ingin dibuat.",
       "placeMadeShotBlocked": "Shot ini menunggu rencana. Tidak ada yang dibuat.",
       "handBackFileRan": "Berkas sedang diserahkan kepada Anda.",
-      "handBackFileBlocked": "Konfirmasikan lini masa sebelum berkas dapat diserahkan.",
+      "handBackFileBlocked": "Konfirmasikan lini masa sebelum berkas bisa diserahkan.",
       "handBackFileFailed": "Proses berkas tidak bisa dimulai."
     }
   },

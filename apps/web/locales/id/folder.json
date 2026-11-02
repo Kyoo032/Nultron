@@ -42,17 +42,17 @@
     "appliedDelete": "Diterapkan. Berkas sudah dihapus.",
     "stale": "Tidak diterapkan. Berkas berubah setelah usulan ini dibuat, sehingga tidak ada yang ditulis. Minta Chat membuat perubahan baru.",
     "failedDenied": "Tidak diterapkan. Berkas itu dilindungi atau berada di luar folder yang Anda buka.",
-    "failedIo": "Tidak diterapkan. Berkas tidak dapat ditulis. Pastikan berkas tidak sedang dibuka di program lain dan tidak berstatus hanya-baca.",
+    "failedIo": "Tidak diterapkan. Berkas tidak bisa ditulis. Pastikan berkas tidak sedang dibuka di program lain dan tidak bersifat hanya-baca.",
     "rejected": "Ditolak. Tidak ada yang diubah.",
     "gone": "Perubahan ini sudah diputuskan."
   },
   "error": {
-    "folder_unavailable": "Folder hanya dapat dibuka di aplikasi desktop, di komputer Anda sendiri.",
-    "folder_mount_ipc_only": "Pilih folder dari jendela aplikasi desktop. Folder tidak dapat dibuka dari sini.",
-    "folder_mount_refused": "Folder itu tidak dapat dibuka. Seluruh drive, seluruh folder home, folder sistem, serta folder yang berisi kunci atau data aplikasi ini tidak diizinkan. Pilih folder lain.",
+    "folder_unavailable": "Folder hanya bisa dibuka lewat aplikasi desktop di komputer Anda.",
+    "folder_mount_ipc_only": "Pilih folder dari jendela aplikasi desktop. Folder tidak bisa dibuka dari sini.",
+    "folder_mount_refused": "Folder itu tidak bisa dibuka. Satu drive penuh, seluruh folder home, folder sistem, dan folder yang berisi kunci atau data aplikasi ini tidak diizinkan. Pilih folder lain.",
     "folder_not_mounted": "Belum ada folder yang dibuka. Buka sebuah folder terlebih dahulu.",
-    "network": "Tidak dapat terhubung ke aplikasi. Coba lagi.",
-    "noPicker": "Versi aplikasi ini belum dapat membuka pemilih folder. Perbarui aplikasi, lalu coba lagi.",
+    "network": "Tidak bisa terhubung ke aplikasi. Coba lagi.",
+    "noPicker": "Versi aplikasi ini belum punya pemilih folder. Perbarui aplikasi, lalu coba lagi.",
     "generic": "Terjadi masalah pada folder. Coba lagi."
   }
 }

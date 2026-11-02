@@ -151,7 +151,7 @@ describe("market team catalog", () => {
     expect(en.depth.team).toBe("Analyst team");
     expect(id.depth.team).toBe("Tim analis");
     expect(en.depth.hint.startsWith("Analyst team runs")).toBe(true);
-    expect(id.depth.hint.startsWith("Tim analis menjalankan")).toBe(true);
+    expect(id.depth.hint.startsWith("Empat analis bekerja")).toBe(true);
     expect(en.team.title).toBe("Analyst team");
     expect(id.team.title).toBe("Tim analis");
     expect(en.team.bull).toBe("Bull case");

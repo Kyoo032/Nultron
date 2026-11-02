@@ -1,15 +1,15 @@
 {
   "title": "Gambar",
-  "expectedInputs": "Hasilnya: gambar yang dibuat, tersimpan di galeri di bawah.",
-  "needsKey": "Tambahkan kunci gateway {gateway} di {settings} untuk membuat gambar.",
+  "expectedInputs": "Hasil: gambar yang dibuat, tersimpan di galeri di bawah.",
+  "needsKey": "Tambahkan kunci gateway {gateway} di {settings} agar bisa membuat gambar.",
   "noModels": {
-    "title": "Tidak ada model gambar pada kunci ini",
-    "body": "Kunci gateway {gateway} ini tidak mencantumkan model gambar, sehingga belum ada yang dapat dibuat di sini. Periksa kunci di {settings}."
+    "title": "Kunci ini tidak punya model gambar",
+    "body": "Kunci gateway {gateway} ini tidak memuat model gambar, jadi belum ada yang bisa dibuat di sini. Periksa kuncinya di {settings}."
   },
   "settingsLink": "Pengaturan",
-  "loadError": "Studio gambar tidak dapat dimuat",
+  "loadError": "Studio gambar gagal dimuat",
   "generateError": "Pembuatan gambar gagal",
-  "modelRejected": "Model itu tidak dapat membuat gambar.",
+  "modelRejected": "Model itu tidak bisa membuat gambar.",
   "aspect": {
     "square": "Persegi",
     "landscape": "Lanskap",
@@ -23,8 +23,8 @@
   "emptyBody": "Buat gambar untuk mengisi galeri ini.",
   "generatedAlt": "Gambar yang dibuat",
   "examplesHeading": "Mulai dari templat",
-  "examplesHint": "Klik sebuah kartu untuk memuat brief lengkap. Ganti detail contoh, lalu buat gambarnya.",
-  "outputTextLanguage": "Jika gambar ini memuat teks yang dapat dibaca (keterangan, label, papan, atau UI pada gambar), tulis teks itu dalam bahasa Indonesia.",
+  "examplesHint": "Klik salah satu kartu untuk memuat brief lengkapnya. Ganti detail contohnya, lalu buat gambarnya.",
+  "outputTextLanguage": "Kalau gambar memuat teks yang terbaca (keterangan, label, papan, atau UI), tulis teksnya dalam bahasa Indonesia.",
   "estimate": {
     "perImage": "{usd} per gambar",
     "atQuality": "pada kualitas {quality}",
@@ -35,7 +35,7 @@
     },
     "source": "Harga resmi {vendor}, diperiksa {date}",
     "sourceThirdParty": "Harga {vendor} dari pihak ketiga, diperiksa {date}",
-    "sourceUnverified": "Perkiraan belum terverifikasi; tidak ada halaman resmi vendor",
+    "sourceUnverified": "Perkiraan, belum terverifikasi karena vendor tidak punya halaman harga resmi",
     "sourceGateway": "Harga gateway, diperiksa {date}",
     "tier": {
       "cheapest": "termurah",
@@ -46,14 +46,14 @@
     "compareCheaper": "Sekitar {factor}× lebih murah dari {model}",
     "compareMore": "Sekitar {factor}× lebih mahal dari {model}",
     "compareCheapest": "Model gambar termurah di sini",
-    "unknown": "Belum ada harga resmi untuk model ini",
+    "unknown": "Model ini belum punya harga resmi",
     "unverified": "(belum terverifikasi)",
     "hint": "{usd}/gbr"
   },
   "templates": {
     "launch-page-product-hero": {
       "title": "Visual utama peluncuran produk",
-      "resultSummary": "Visual utama katalog dengan tata cahaya nyata dan ruang teks yang sudah disiapkan — bukan gawai yang melayang di latar abu-abu."
+      "resultSummary": "Visual utama untuk katalog dengan pencahayaan nyata dan ruang teks yang sudah disiapkan, bukan gawai melayang di latar abu-abu."
     },
     "app-in-a-working-desk": {
       "title": "Aplikasi di atas meja kerja",
@@ -65,11 +65,11 @@
     },
     "quiet-kitchen-header": {
       "title": "Banner dapur yang tenang",
-      "resultSummary": "Foto sarapan yang tenang dengan area teks yang disiapkan — layak dipakai sebagai header sungguhan."
+      "resultSummary": "Foto sarapan yang tenang dengan ruang teks yang sudah disiapkan, layak jadi header sungguhan."
     },
     "dusk-city-establishing": {
       "title": "Adegan pembuka kota senja",
-      "resultSummary": "Plat skyline sinematik dengan penanda waktu yang spesifik dan rak di latar depan — bukan senja stok yang generik."
+      "resultSummary": "Plat skyline sinematik dengan penanda waktu yang spesifik dan rak di latar depan, bukan senja stok yang generik."
     },
     "macro-fabric-study": {
       "title": "Studi kain makro",
@@ -77,11 +77,11 @@
     },
     "night-retail-window": {
       "title": "Etalase ritel malam",
-      "resultSummary": "Etalase yang siap bercerita, dengan kontras cahaya yang dapat dipotong untuk kampanye."
+      "resultSummary": "Etalase yang siap bercerita, dengan kontras cahaya yang bisa dipotong untuk kampanye."
     },
     "fog-path-cover": {
       "title": "Sampul jalan setapak berkabut",
-      "resultSummary": "Jalan setapak yang tenang dengan satu titik struktur — layak jadi sampul, bukan wallpaper."
+      "resultSummary": "Jalan setapak yang tenang dengan satu titik struktur, layak jadi sampul, bukan wallpaper."
     },
     "about-page-portrait": {
       "title": "Potret halaman Tentang Kami",
@@ -89,7 +89,7 @@
     },
     "desk-object-still": {
       "title": "Still life objek meja",
-      "resultSummary": "Studi objek yang tenang dengan rencana pencahayaan — bukan tiga properti di atas latar putih polos."
+      "resultSummary": "Studi objek yang tenang dengan rencana pencahayaan, bukan tiga properti di atas latar putih polos."
     }
   }
 }

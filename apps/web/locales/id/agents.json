@@ -1,14 +1,14 @@
 {
   "error": {
-    "load": "Agen Anda tidak dapat dimuat.",
-    "save": "Agen Anda tidak dapat diperbarui."
+    "load": "Agen Anda gagal dimuat.",
+    "save": "Agen Anda gagal diperbarui."
   },
   "tagline": {
     "chat": "Asisten serbaguna Anda: mencari, membaca berkas, menjalankan kode, dan membuat media.",
     "documents": "Menulis dokumen dari arahan Anda, lalu mencocokkannya dengan sumber yang Anda berikan.",
-    "research": "Menelusuri jawaban atas satu pertanyaan di web, lalu menuliskan dosir yang setiap temuannya menyebut sumber.",
+    "research": "Mencari jawaban atas satu pertanyaan di web, lalu menyusun dosir yang setiap temuannya disertai sumber.",
     "finance": "Ringkasan, rasio, anggaran, dan arus kas. Angkanya dihitung, bukan ditebak.",
-    "data": "Membaca tabel yang Anda tambahkan, lalu menjawab pertanyaan lewat kueri sungguhan.",
+    "data": "Membaca tabel yang Anda tambahkan, lalu menjawab pertanyaan dengan kueri yang benar-benar dijalankan.",
     "market": "Ringkasan pasar dari harga dan berita terkini, dengan setiap angka dihitung oleh aplikasi.",
     "legal": "Meninjau kontrak untuk satu perkara: memo, redline, dan pemeriksaan setiap kutipan.",
     "meeting": "Mengubah rekaman atau transkrip menjadi notulen, keputusan, dan tindak lanjut.",
@@ -28,9 +28,9 @@
   },
   "header": {
     "newChat": "Obrolan baru",
-    "history": "Percakapan",
-    "historyEmpty": "Belum ada percakapan.",
-    "historyAria": "Percakapan dengan {name}",
+    "history": "Riwayat obrolan",
+    "historyEmpty": "Belum ada obrolan.",
+    "historyAria": "Obrolan dengan {name}",
     "harness": "Cara kerja {name}",
     "seeAll": "Tampilkan semua",
     "seeFewer": "Tampilkan lebih sedikit"
@@ -41,7 +41,7 @@
     "skills": "Yang saya kerjakan",
     "ask": "Kirim pesan ke {name}",
     "studioTitle": "Studio {name} menjalankan pemeriksaannya sendiri",
-    "studioNote": "Obrolan ini mengerjakannya dengan alat umum. Harness {name}, lengkap dengan pemeriksaannya sendiri, belum terhubung ke obrolan. Buka studionya bila Anda memerlukan proses tersebut.",
+    "studioNote": "Di obrolan ini, tugasnya dikerjakan dengan alat umum. Harness {name} beserta pemeriksaannya sendiri belum terhubung ke obrolan. Buka studionya jika Anda membutuhkannya.",
     "openStudio": "Buka studio {name}",
     "everything": "Tanyakan apa saja. Saya juga bisa menulis, menelusuri, mengolah berkas Anda, serta membuat gambar, klip, dan presentasi."
   },
@@ -68,9 +68,9 @@
     "checksPassed": "Setiap temuan menyebut sumber",
     "checksFailed": "{n} pemeriksaan tidak lolos",
     "checksFailedOne": "1 pemeriksaan tidak lolos",
-    "notSaved": "Dosir sudah ditulis, tetapi tidak dapat disimpan sehingga tidak dapat dibuka di sini.",
+    "notSaved": "Dosir sudah ditulis, tetapi gagal disimpan sehingga tidak bisa dibuka di sini.",
     "loading": "Membuka dosir",
-    "loadFailed": "Dosir tidak dapat dibuka.",
+    "loadFailed": "Dosir gagal dibuka.",
     "outlineAria": "Bagian dosir",
     "viewAria": "Dosir {title}",
     "searched": "Telah menelusuri web untuk: {queries}"
@@ -86,14 +86,14 @@
     "showAria": "Tampilkan jawaban dari agen {agent}",
     "hideAria": "Sembunyikan jawaban dari agen {agent}",
     "viewAria": "Jawaban dari agen {agent}",
-    "open": "Buka percakapan",
-    "openAria": "Buka percakapan dengan agen {agent}",
-    "truncated": "Dipersingkat di sini. Jawaban lengkap ada di percakapan.",
+    "open": "Buka obrolan",
+    "openAria": "Buka obrolan dengan agen {agent}",
+    "truncated": "Dipersingkat di sini. Jawaban lengkap ada di obrolan.",
     "failed": {
       "cancelled": "Dihentikan sebelum selesai.",
       "timeout": "Melewati batas waktu.",
       "no_answer": "Selesai tanpa jawaban.",
-      "failed": "Tugas tidak dapat diselesaikan."
+      "failed": "Tugas gagal diselesaikan."
     }
   },
   "finance": {
@@ -105,7 +105,7 @@
     "closeAria": "Tutup hasil keuangan {title}",
     "headlineAria": "Angka utama",
     "checksPassed": "Setiap angka lolos pemeriksaan",
-    "checksUnknown": "Pemeriksaan tidak memberi laporan atas angka-angka ini",
+    "checksUnknown": "Belum ada laporan pemeriksaan untuk angka-angka ini",
     "flagged": "Pemeriksaan menandai {n} angka",
     "flaggedOne": "Pemeriksaan menandai 1 angka",
     "removed": "Pemeriksaan menghapus {n} angka",
@@ -113,15 +113,15 @@
     "notes": "{n} catatan",
     "notesOne": "1 catatan",
     "notesTitle": "Catatan dari pemeriksaan",
-    "notSaved": "Hasilnya sudah dihitung, tetapi tidak dapat disimpan sehingga tidak dapat dibuka atau diunduh di sini.",
+    "notSaved": "Hasilnya sudah dihitung, tetapi gagal disimpan sehingga tidak bisa dibuka atau diunduh di sini.",
     "loading": "Membuka hasil",
-    "loadFailed": "Hasil tidak dapat dibuka.",
+    "loadFailed": "Hasil gagal dibuka.",
     "viewAria": "Hasil keuangan {title}",
     "downloadXlsx": "Excel",
     "downloadDocx": "Word",
     "downloadAria": "Unduh {title} sebagai {format}",
     "downloading": "Menyiapkan berkas",
-    "downloadFailed": "Berkas tidak dapat diunduh."
+    "downloadFailed": "Berkas gagal diunduh."
   },
   "page": {
     "title": "Agen virtual",

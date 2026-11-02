@@ -54,11 +54,11 @@ describe("the Edit Generate tab's needs-key line", () => {
     const line = note(generate(true));
 
     expect(t("edit.generate.needsKey", { gateway: "Toko Token", settings: "{settings}" })).toBe(
-      "Tambahkan kunci gateway Toko Token di {settings} untuk membuat konten.",
+      "Tambahkan kunci gateway Toko Token di {settings} agar bisa membuat konten.",
     );
     expect(line).toContain("Tambahkan kunci gateway Toko Token di");
     expect(line).toContain(`>${t("rail.settings")}</a>`);
-    expect(line).toContain("untuk membuat konten.");
+    expect(line).toContain("agar bisa membuat konten.");
     expect(line).not.toContain("Add a ");
     expect(line).not.toContain("to generate");
   });

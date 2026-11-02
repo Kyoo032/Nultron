@@ -1,16 +1,16 @@
 {
   "title": "Musik",
-  "expectedInputs": "Hasilnya: lagu jadi, tersimpan di pustaka di bawah dan dapat diunduh.",
-  "needsKey": "Tambahkan kunci gateway {gateway} di {settings} untuk membuat musik.",
+  "expectedInputs": "Hasil: lagu jadi, tersimpan di pustaka di bawah dan bisa diunduh.",
+  "needsKey": "Tambahkan kunci gateway {gateway} di {settings} agar bisa membuat musik.",
   "settingsLink": "Pengaturan",
-  "loadError": "Studio musik tidak dapat dimuat",
+  "loadError": "Studio musik gagal dimuat",
   "generateError": "Pembuatan musik gagal",
   "lyricsError": "Pembuatan lirik gagal",
-  "modeLabel": "Cara menulisnya",
+  "modeLabel": "Cara menulis lirik",
   "modeDescribe": "Deskripsikan",
   "modeCustom": "Lirik saya",
-  "describeHint": "Ceritakan seperti apa lagunya. Model yang menulis liriknya.",
-  "customHint": "Tempel lirik Anda sendiri. Gaya dan judul juga Anda tentukan sendiri.",
+  "describeHint": "Ceritakan seperti apa lagunya. Liriknya ditulis oleh model.",
+  "customHint": "Tempel lirik Anda sendiri. Gaya dan judulnya juga Anda yang menentukan.",
   "promptPlaceholder": "Loop akustik pelan untuk demo produk, tanpa vokal",
   "lyricsPlaceholder": "Bait, refrain, bridge…",
   "stylePlaceholder": "Tag gaya, misalnya lo-fi, mellow, rhodes",
@@ -22,29 +22,29 @@
   "generate": "Buat",
   "generating": "Membuat…",
   "advanced": "Lanjutan",
-  "generatingHint": "Satu lagu membutuhkan beberapa menit. Biarkan halaman ini tetap terbuka.",
+  "generatingHint": "Satu lagu butuh beberapa menit. Biarkan halaman ini tetap terbuka.",
   "loadingLibrary": "Memuat pustaka…",
   "emptyTitle": "Belum ada apa pun",
-  "emptyBody": "Buat sebuah lagu untuk mengisi pustaka ini.",
+  "emptyBody": "Buat satu lagu untuk mengisi pustaka ini.",
   "download": "Unduh",
   "untitled": "Versi tanpa judul",
   "duration": "{n}dtk",
-  "takesNote": "Satu permintaan menghasilkan dua versi dan hanya ditagih sekali. Keduanya disimpan.",
+  "takesNote": "Satu permintaan menghasilkan dua versi, tetapi hanya ditagih sekali. Keduanya disimpan.",
   "noModels": {
-    "title": "Tidak ada model musik untuk dipilih",
-    "body": "Meja kerja ini tidak mendapatkan satu pun model musik. Musik berjalan lewat relay Suno milik gateway, yang tidak diumumkan di daftar modelnya. Jika masalah ini berlanjut, segarkan daftar model di Pengaturan dan beri tahu operator gateway bahwa {gateway} tidak melayani relay tersebut untuk kunci ini."
+    "title": "Tidak ada model musik yang bisa dipilih",
+    "body": "Meja kerja ini tidak mendapat model musik apa pun. Musik berjalan lewat relay Suno milik gateway, yang tidak muncul di daftar modelnya. Kalau masalah ini berlanjut, segarkan daftar model di Pengaturan dan beri tahu operator gateway bahwa {gateway} tidak melayani relay itu untuk kunci ini."
   },
   "voiceHeading": "Sulih suara",
   "voiceUnavailable": {
-    "realtimeOnly": "Satu-satunya model teks-ke-suara di gateway ini bersifat realtime (WebSocket), yang tidak dapat dijangkau rute pekerjaan. Sulih suara akan aktif dengan sendirinya begitu model suara standar muncul di katalog.",
-    "noAudioModels": "Gateway ini tidak menyediakan model teks-ke-suara. Sulih suara akan aktif dengan sendirinya begitu salah satunya muncul di katalog."
+    "realtimeOnly": "Satu-satunya model teks-ke-suara di gateway ini bersifat realtime (WebSocket), yang tidak terjangkau lewat rute pekerjaan. Sulih suara akan aktif sendiri begitu ada model suara standar di katalog.",
+    "noAudioModels": "Gateway ini tidak punya model teks-ke-suara. Sulih suara akan aktif sendiri begitu salah satunya muncul di katalog."
   },
-  "outputTextLanguage": "Lirik, judul, dan setiap kata yang dinyanyikan atau diucapkan harus dalam bahasa Indonesia, kecuali prompt sudah menyebut bahasa lain.",
+  "outputTextLanguage": "Lirik, judul, dan semua kata yang dinyanyikan atau diucapkan harus berbahasa Indonesia, kecuali prompt sudah menyebut bahasa lain.",
   "estimate": {
     "perTrack": "{usd} per lagu",
     "source": "Harga resmi {vendor}, diperiksa {date}",
     "sourceThirdParty": "Harga {vendor} dari pihak ketiga, diperiksa {date}",
-    "sourceUnverified": "Perkiraan belum terverifikasi; tidak ada halaman resmi vendor",
+    "sourceUnverified": "Perkiraan, belum terverifikasi karena vendor tidak punya halaman harga resmi",
     "sourceGateway": "Harga gateway, diperiksa {date}",
     "tier": {
       "cheapest": "termurah",
@@ -55,7 +55,7 @@
     "compareCheaper": "Sekitar {factor}× lebih murah dari {model}",
     "compareMore": "Sekitar {factor}× lebih mahal dari {model}",
     "compareCheapest": "Model musik termurah di sini",
-    "unknown": "Belum ada harga resmi untuk model ini",
+    "unknown": "Model ini belum punya harga resmi",
     "unverified": "(belum terverifikasi)",
     "hint": "{usd}/lagu"
   }
