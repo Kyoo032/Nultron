@@ -21,7 +21,7 @@ Rail → Account → **Customers** (`apps/web/components/app-rail.tsx`, `testId=
 1. `assertPhoneNumberId` and `assertAccessToken` shape-check both values before anything leaves the host.
 2. `WhatsAppClient.getPhoneNumber` (`packages/host/src/inbox/whatsapp.ts:361`) asks Graph to read that number with that token. **This is the ownership proof**: a token that cannot read the number never gets it registered, so a desk cannot claim another company's number id and be sent its customers.
 3. `connectEndpoint` (`packages/host/src/inbox/store.ts:189`) writes `channel_endpoints`. A number belongs to one desk across the whole install (unique `(kind, external_id)`); another desk's claim is a 409 `channel_conflict`. Connecting a second number disables the first.
-4. `saveSettings({ whatsappAccessToken })` puts the token in the desk's slice of `settings.enc` (`packages/core/src/secrets.ts:118`, `KEY_FIELDS`), the same envelope as the gateway key. The renderer sees `connected`, the number, a `sha256:` fingerprint and `pinnedOrigin`; never the token.
+4. `saveSettings({ whatsappAccessToken })` puts the token in the desk's slice of `settings.enc` (`packages/core/src/secrets.ts:112`, `KEY_FIELDS`), the same envelope as the gateway key. The renderer sees `connected`, the number, a `sha256:` fingerprint and `pinnedOrigin`; never the token.
 
 `DELETE` forgets the token and disables the endpoint; conversations stay.
 
