@@ -1,6 +1,6 @@
 {
   "title": "Basis Pengetahuan",
-  "intro": "Yang diambil Chat dan setiap mode kerja di meja {name} — jiwa, memori tersemat, sumber terindeks, dan peta di antara semuanya.",
+  "intro": "Sumber yang dirujuk Chat dan setiap mode kerja di meja kerja {name}: jiwa, memori yang disematkan, sumber terindeks, dan peta yang menghubungkan semuanya.",
   "tabs": {
     "sources": "Sumber",
     "soul": "Jiwa",
@@ -30,14 +30,14 @@
     "urlPlaceholder": "https://…",
     "addUrl": "Tambah URL",
     "pastePlaceholder": "Tempel catatan…",
-    "indexPaste": "Indeks tempelan",
+    "indexPaste": "Indeks teks tempelan",
     "uploadFile": "Unggah berkas",
-    "uploadHint": "Yang bisa diindeks: {formats}. Sampai 25 MB.",
+    "uploadHint": "Format yang dapat diindeks: {formats}. Maksimal 25 MB.",
     "pastedName": "Catatan tempelan",
     "chunks": "{count} potongan",
     "chunksOne": "{count} potongan",
     "remove": "Hapus",
-    "embedLocal": "Tersimpan. Embedding langsung kehabisan waktu, jadi sumber ini memakai indeks lokal sampai gateway menjawab."
+    "embedLocal": "Tersimpan. Embedding langsung melampaui batas waktu, sehingga sumber ini memakai indeks lokal sampai gateway merespons."
   },
   "status": {
     "Indexed": "Terindeks",
@@ -62,7 +62,7 @@
   "soul": {
     "name": "Nama",
     "role": "Peran",
-    "voice": "Suara",
+    "voice": "Gaya bahasa",
     "rulePlaceholder": "Tambah aturan",
     "addRule": "Tambah aturan",
     "save": "Simpan jiwa"
@@ -75,9 +75,9 @@
   },
   "map": {
     "label": "Peta",
-    "intro": "Anda mendapat peta sumber yang sudah ditinjau — topik apa yang didukung, mana yang lemah, dan apa yang masih hilang.",
+    "intro": "Hasilnya: peta sumber Anda yang sudah ditinjau, memperlihatkan topik apa yang didukung, bagian mana yang lemah, dan apa yang masih kurang.",
     "howItWorks": "Cara kerjanya",
-    "howItWorksBody": "Chat mengambil dari memori meja ini sekarang, dan mode kerja akan memakai pengambilan yang sama nanti. Peta membaca sumber Anda dengan model embedding, otak, dan verifikator di atas.",
+    "howItWorksBody": "Saat ini Chat merujuk memori meja kerja ini, dan mode kerja akan memakai mekanisme yang sama nanti. Peta membaca sumber Anda dengan model embedding, otak, dan verifikator di atas.",
     "run": "Petakan pengetahuan",
     "running": "Memetakan…",
     "ready": "Siap",
@@ -105,7 +105,7 @@
     "indexed": "Terindeks",
     "retrieved": "Diambil",
     "failed": "Gagal",
-    "empty": "Belum ada yang terindeks. Kirim pesan Chat atau jalankan mode kerja, lalu kartu muncul di sini.",
+    "empty": "Belum ada yang terindeks. Kirim pesan di Chat atau jalankan mode kerja, dan sebuah kartu akan muncul di sini.",
     "byType": "Menurut jenis",
     "byTypeAria": "Sumber menurut jenis",
     "countTitle": "{indexed} terindeks, {failed} gagal, {chunks} potongan",
@@ -124,9 +124,9 @@
       "none": "belum ada pemeriksaan mandiri",
       "unknown": "waktu tidak diketahui",
       "justNow": "baru saja",
-      "minutesAgo": "{count}m lalu",
-      "hoursAgo": "{count}j lalu",
-      "daysAgo": "{count}h lalu"
+      "minutesAgo": "{count} mnt lalu",
+      "hoursAgo": "{count} jam lalu",
+      "daysAgo": "{count} hari lalu"
     }
   },
   "graph": {
@@ -137,22 +137,22 @@
     "counts": "{nodes} simpul · {edges} sisi",
     "showAll": "Tampilkan semua",
     "showAllNodes": "Tampilkan semua {total}",
-    "drawn": "{shown} tergambar",
+    "drawn": "{shown} ditampilkan",
     "loading": "Memuat tautan…",
     "retry": "Coba lagi",
-    "empty": "Buat peta untuk membuat tautan topik.",
+    "empty": "Petakan pengetahuan untuk membuat tautan antartopik.",
     "around": "sekitar {label}",
-    "svgAria": "Topik, sumber, dan utas dalam tiga kolom, terhubung oleh garis tipis",
-    "hint": "Klik simpul untuk hanya menampilkan yang tersambung; klik lagi untuk menampilkan semua.",
+    "svgAria": "Topik, sumber, dan obrolan dalam tiga kolom, terhubung oleh garis tipis",
+    "hint": "Klik sebuah simpul untuk hanya menampilkan yang terhubung dengannya; klik lagi untuk menampilkan semua.",
     "node": {
       "topic": "topik",
       "source": "sumber",
-      "thread": "utas"
+      "thread": "obrolan"
     },
     "nodeHint": {
       "topic": "topik peta",
       "source": "sumber terindeks",
-      "thread": "utas chat"
+      "thread": "obrolan di Chat"
     },
     "edge": {
       "covers": "mencakup",
@@ -161,8 +161,8 @@
     },
     "edgeHint": {
       "covers": "topik mencakup sumber",
-      "retrieved": "sumber diambil oleh utas",
-      "cites": "utas mengutip sumber"
+      "retrieved": "sumber diambil oleh sebuah obrolan",
+      "cites": "obrolan mengutip sumber"
     },
     "edgeTitle": "{kind} · bobot {weight}"
   },

@@ -1,7 +1,7 @@
 {
   "welcome": "Selamat datang di {productName}",
   "intro": "Ajukan pertanyaan, riset sebuah topik, buat gambar atau video, atau susun presentasi.",
-  "next": "Lanjut",
+  "next": "Lanjutkan",
   "back": "Kembali",
   "stepsLabel": "Langkah penyiapan",
   "steps": {
@@ -10,18 +10,18 @@
     "try": "Coba"
   },
   "setupCheck": "Menyiapkan pembaca dokumen",
-  "ffmpegLater": "Anda dapat lanjut sekarang dan memasang ffmpeg nanti. Layar Edit menampilkan panduan yang sama sampai ffmpeg ditemukan.",
+  "ffmpegLater": "Anda dapat melanjutkan sekarang dan memasang ffmpeg nanti. Layar Sunting menampilkan panduan yang sama sampai ffmpeg ditemukan.",
   "ffmpegBundledLater": "Anda dapat lanjut sekarang. Penyuntingan video dan pembacaan rekaman rapat tetap nonaktif sampai {productName} dipasang ulang.",
   "keyTitle": "Tempel kunci {gatewayName} Anda",
-  "keyHelp": "Buka {gatewayName}, salin kunci, lalu tempel di sini. Kunci tetap di komputer ini.",
+  "keyHelp": "Buka {gatewayName}, salin kunci, lalu tempel di sini. Kunci hanya disimpan di komputer ini.",
   "keyLabel": "Kunci Anda",
   "keyPlaceholder": "Tempel di sini",
   "continue": "Periksa kunci ini",
   "recheck": "Periksa lagi",
-  "keySuccess": "Kunci ini berhasil.",
-  "tryTitle": "Coba salah satu",
-  "tryIntro": "Mulai di Chat. Yang lain tetap di menu.",
-  "tryStart": "Mulai di Chat",
+  "keySuccess": "Kunci ini berfungsi.",
+  "tryTitle": "Coba salah satunya",
+  "tryIntro": "Mulai dari Chat. Lainnya tetap ada di menu.",
+  "tryStart": "Mulai dari Chat",
   "tourNext": "Tur singkat menyusul. Anda bisa melewatinya.",
   "examples": {
     "chat": {
@@ -29,8 +29,8 @@
       "hint": "Rencana, pertanyaan, atau balasan yang perlu Anda kirim."
     },
     "research": {
-      "title": "Riset sebuah topik",
-      "hint": "Catatan bersumber untuk pertanyaan apa pun."
+      "title": "Telusuri sebuah topik",
+      "hint": "Catatan lengkap dengan sumber untuk pertanyaan apa pun."
     },
     "images": {
       "title": "Buat gambar",
@@ -42,13 +42,13 @@
     }
   },
   "gate": {
-    "invalidKey": "Kunci itu tidak diterima. Periksa di {gatewayName}, lalu tempel lagi.",
+    "invalidKey": "Kunci itu tidak berfungsi. Periksa kembali di {gatewayName}, lalu tempel ulang.",
     "unreachable": "Kami tidak dapat menghubungi {gatewayName}. Periksa koneksi internet Anda, lalu coba lagi.",
-    "error": "Ada yang salah. Tunggu sebentar, lalu coba lagi."
+    "error": "Terjadi kesalahan. Tunggu sebentar, lalu coba lagi."
   },
   "desks": {
-    "title": "Atau buka meja lain",
-    "failed": "Tidak dapat membuka meja itu. Coba lagi."
+    "title": "Atau buka meja kerja lain",
+    "failed": "Tidak dapat membuka meja kerja itu. Coba lagi."
   },
   "components": {
     "title": "Menyiapkan {productName}",
@@ -60,20 +60,20 @@
       "check": "Memeriksa yang sudah tersedia",
       "download": "Mengunduh pembaca",
       "verify": "Memverifikasi unduhan",
-      "unpack": "Membongkar berkas",
+      "unpack": "Mengekstrak berkas",
       "probe": "Memuat pembaca",
-      "marker": "Merampungkan"
+      "marker": "Menyelesaikan penyiapan"
     },
     "done": "Pembaca dokumen lokal sudah siap.",
     "alreadyRunning": "Jendela lain sedang menyiapkannya; proses itu akan selesai dengan sendirinya.",
     "retry": "Coba lagi",
-    "worksWithout": "{productName} tetap berjalan tanpanya — dokumen dibaca oleh pembaca lokal yang lebih sederhana sampai pembaca ini terpasang.",
+    "worksWithout": "{productName} tetap berjalan tanpanya. Sementara itu, dokumen dibaca oleh pembaca lokal yang lebih sederhana sampai pembaca ini terpasang.",
     "errors": {
       "offline": "Tidak ada koneksi, sehingga pembaca tidak dapat diunduh.",
       "download_failed": "Unduhan tidak selesai.",
-      "integrity_mismatch": "Unduhan tidak cocok dengan checksum-nya, jadi berkas itu dibuang.",
+      "integrity_mismatch": "Unduhan tidak cocok dengan checksum-nya, sehingga berkas tersebut dibuang.",
       "unpack_failed": "Unduhan tidak dapat dibongkar.",
-      "probe_failed": "Pembaca sudah terpasang tetapi tidak mau dimuat.",
+      "probe_failed": "Pembaca sudah terpasang tetapi gagal dimuat.",
       "unsupported_platform": "Tidak ada versi pembaca untuk sistem operasi ini.",
       "busy": "Jendela lain sedang menyiapkannya.",
       "unknown": "Penyiapan pembaca tidak selesai."
@@ -83,5 +83,5 @@
   "laterHint": "Anda bisa menempelkan kunci kapan saja di Pengaturan. Model tetap nonaktif sampai saat itu.",
   "keyTitleRestricted": "Kunci perusahaan Anda belum disiapkan",
   "keyHelpRestricted": "Pemilik atau admin menambahkan kunci perusahaan satu kali, dan semua orang di perusahaan memakainya.",
-  "keyRestricted": "Hanya pemilik atau admin yang dapat menambahkan kunci {gatewayName} perusahaan Anda. Minta salah satunya menambahkannya, lalu tekan Periksa lagi. Sementara itu Anda bisa melihat-lihat."
+  "keyRestricted": "Hanya pemilik atau admin yang dapat menambahkan kunci {gatewayName} perusahaan Anda. Minta salah satu dari mereka menambahkannya, lalu tekan Periksa lagi. Sementara itu, Anda bisa melihat-lihat dulu."
 }

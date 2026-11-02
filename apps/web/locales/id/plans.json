@@ -1,20 +1,20 @@
 {
   "kicker": "Paket",
   "title": "Pilih paket",
-  "intro": "Personal adalah desk Nultron Anda sendiri untuk satu pemilik, pelengkap dari DPS ketika Anda membeli banyak token. Enterprise adalah Nultron berbasis web.",
+  "intro": "Personal adalah meja kerja Nultron Anda sendiri untuk satu pemilik, pelengkap dari DPS ketika Anda membeli banyak token. Enterprise adalah Nultron berbasis web.",
   "placeholderNotice": "Harga indikatif — belum final.",
   "period": {
     "month": "/ bulan"
   },
   "seats": {
-    "capped": "Hingga {count} kursi"
+    "capped": "Maksimal {count} kursi"
   },
   "currentBadge": "Paket Anda",
   "featuresLabel": "Yang Anda dapat",
   "tier": {
     "personal": {
       "name": "Personal",
-      "description": "Desk Nultron Anda sendiri, untuk satu pemilik. Pelengkap dari DPS ketika Anda membeli banyak token."
+      "description": "Meja kerja Nultron Anda sendiri, untuk satu pemilik. Pelengkap dari DPS ketika Anda membeli banyak token."
     },
     "enterprise": {
       "name": "Enterprise",
@@ -22,21 +22,21 @@
     }
   },
   "feature": {
-    "macWindowsApp": "Desk Nultron Anda sendiri, untuk satu pemilik",
+    "macWindowsApp": "Meja kerja Nultron Anda sendiri, untuk satu pemilik",
     "tokenComplement": "Pelengkap dari DPS ketika Anda membeli banyak token",
     "webProduct": "Nultron berbasis web",
     "contactDps": "Hubungi DPS untuk mengaktifkan. Tidak ada pembelian mandiri.",
-    "knowledgeStorage": "Kursi mencakup penyimpanan untuk basis pengetahuan terpadu",
-    "agentTraffic": "Kursi mencakup lalu lintas pengguna untuk memakai agen",
-    "implementationMaintenance": "Kursi mencakup implementasi dan pemeliharaan dari DPS",
+    "knowledgeStorage": "Setiap kursi sudah mencakup penyimpanan untuk basis pengetahuan terpadu",
+    "agentTraffic": "Setiap kursi sudah mencakup lalu lintas pengguna saat memakai agen",
+    "implementationMaintenance": "Setiap kursi sudah mencakup implementasi dan pemeliharaan dari DPS",
     "seatsAndTokensSeparate": "Kursi dan token ditagih secara terpisah"
   },
   "cta": {
     "current": "Ini paket Anda",
     "contact": "Hubungi DPS",
-    "personalApp": "Desk Anda sendiri",
+    "personalApp": "Meja kerja Anda sendiri",
     "contactHelp": "Tidak ada pembelian mandiri untuk Enterprise. Hubungi DPS untuk berlangganan per pengguna.",
-    "checkoutFailed": "Tautan itu tidak bisa dibuka. Hubungi pengelola instalasi ini."
+    "checkoutFailed": "Tautan itu tidak dapat dibuka. Hubungi pengelola instalasi ini."
   },
   "blocked": {
     "seePlans": "Lihat paket",
@@ -45,26 +45,26 @@
     "contact": "Hubungi kami",
     "plan_past_due": {
       "title": "Pembayaran tertunggak",
-      "body": "Pembayaran terakhir pada akun ini tidak berhasil. Begitu dilunasi, meja kerja terbuka lagi dan tidak ada pekerjaan Anda yang hilang."
+      "body": "Pembayaran terakhir akun ini tidak berhasil diproses. Begitu dilunasi, meja kerja akan terbuka kembali dan tidak ada pekerjaan Anda yang hilang."
     },
     "plan_cancelled": {
       "title": "Tidak ada paket aktif",
-      "body": "Akun ini belum punya paket yang berjalan. Mulai satu paket dan meja kerja terbuka lagi dengan semua pekerjaan Anda seperti semula."
+      "body": "Akun ini tidak memiliki paket yang berjalan. Mulai satu paket, dan meja kerja akan terbuka kembali dengan semua pekerjaan Anda tetap seperti semula."
     },
     "plan_allowance_exhausted": {
       "title": "Batas pemakaian tercapai",
-      "body": "Akun ini sudah mencapai batas pemakaiannya untuk saat ini. Hubungi kami dan kami akan menaikkannya; pekerjaan Anda tidak tersentuh."
+      "body": "Akun ini telah mencapai batas pemakaiannya untuk saat ini. Hubungi kami dan kami akan menaikkannya; pekerjaan Anda tetap aman."
     },
     "plan_unavailable": {
-      "title": "Paket tidak bisa dibaca",
-      "body": "Ini bukan masalah pembayaran — server sedang tidak bisa membaca paket akun ini. Coba lagi sebentar lagi."
+      "title": "Paket tidak dapat dibaca",
+      "body": "Ini bukan masalah pembayaran: server sedang tidak dapat membaca paket akun ini. Coba lagi beberapa saat lagi."
     }
   },
   "account": {
     "label": "Paket",
     "heading": "Paket",
     "loading": "Membaca paket akun ini…",
-    "failed": "Paket akun ini sedang tidak bisa dibaca.",
+    "failed": "Paket akun ini sedang tidak dapat dibaca.",
     "noPlan": "Akun ini belum punya paket.",
     "seats": "{used} dari {cap} kursi terpakai",
     "periodEnd": "Periode berjalan berakhir {date}",
@@ -77,7 +77,7 @@
     },
     "warning": {
       "allowance_low": "Akun ini sudah mendekati batas pemakaian untuk periode ini.",
-      "unpriced_usage": "Sebagian panggilan pada periode ini tidak bisa dihitung biayanya."
+      "unpriced_usage": "Sebagian panggilan pada periode ini belum dapat dihitung biayanya."
     }
   }
 }

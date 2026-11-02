@@ -1,17 +1,17 @@
 {
   "title": "Video",
-  "expectedInputs": "Anda dapat: klip yang dibuat, tersimpan di galeri di bawah dan dapat diunduh.",
+  "expectedInputs": "Hasilnya: klip yang dibuat, tersimpan di galeri di bawah dan dapat diunduh.",
   "needsKey": "Tambahkan kunci gateway {gateway} di {settings} untuk membuat video.",
   "noModels": {
-    "title": "Tidak ada model video di kunci ini",
-    "body": "Kunci gateway {gateway} ini tidak mencantumkan model video, jadi tidak ada yang bisa dibuat di sini. Periksa kunci di {settings}."
+    "title": "Tidak ada model video pada kunci ini",
+    "body": "Kunci gateway {gateway} ini tidak mencantumkan model video, sehingga belum ada yang dapat dibuat di sini. Periksa kunci di {settings}."
   },
   "settingsLink": "Pengaturan",
   "loadError": "Studio video tidak dapat dimuat",
   "generateError": "Pembuatan video gagal",
-  "clipRejected": "Render tidak mengembalikan berkas video.",
+  "clipRejected": "Hasil render tidak berisi berkas video.",
   "modelNotOnKey": "{model} tidak tersedia pada kunci ini. Coba {suggestion}.",
-  "modelNotOnKeyNoAlt": "{model} tidak tersedia pada kunci ini. Segarkan model di Pengaturan dan pilih salah satu yang tercantum pada kunci ini.",
+  "modelNotOnKeyNoAlt": "{model} tidak tersedia pada kunci ini. Segarkan daftar model di Pengaturan, lalu pilih salah satu yang tercantum untuk kunci ini.",
   "stillUnsupported": "Model ini tidak menerima gambar diam",
   "hostNeedsKey": "Tambahkan kunci gateway Toko Token di Pengaturan untuk membuat video.",
   "textToVideoOnly": "Model ini hanya mendukung teks-ke-video",
@@ -20,14 +20,14 @@
     "open": "Pakai gambar tersimpan",
     "close": "Sembunyikan gambar tersimpan",
     "loading": "Memuat gambar tersimpan…",
-    "loadError": "Gagal memuat gambar tersimpan",
-    "empty": "Belum ada gambar tersimpan. Buat atau unggah dulu, lalu pilih di sini.",
+    "loadError": "Tidak dapat memuat gambar tersimpan",
+    "empty": "Belum ada gambar tersimpan. Buat atau unggah satu terlebih dahulu, lalu pilih di sini.",
     "optionAlt": "Gambar tersimpan",
     "chosen": "Gambar tersimpan dipakai sebagai gambar diam",
     "remove": "Lepas",
-    "unusable": "Gambar tersimpan ini tidak bisa dipakai di sini. Pilih yang lain, atau tempel URL."
+    "unusable": "Gambar tersimpan ini tidak dapat dipakai di sini. Pilih yang lain, atau tempel URL."
   },
-  "promptPlaceholder": "Dorongan kamera perlahan ke cangkir keramik saat cahaya jendela bergerak di meja",
+  "promptPlaceholder": "Kamera bergerak maju perlahan ke arah cangkir keramik saat cahaya jendela bergeser melintasi meja",
   "generate": "Buat",
   "generating": "Membuat…",
   "advanced": "Lanjutan",
@@ -37,7 +37,7 @@
   "download": "Unduh",
   "seconds": "{n}s",
   "examplesHeading": "Mulai dari templat",
-  "examplesHint": "Klik kartu untuk memuat brief lengkap. Ganti detail contoh, lalu buat.",
+  "examplesHint": "Klik sebuah kartu untuk memuat brief lengkap. Ganti detail contoh, lalu buat videonya.",
   "clipsHeading": "Contoh klip",
   "clipsHint": "Dihasilkan dari templat prompt di bawah dan disertakan dalam aplikasi. Klik salah satu untuk memuat promptnya.",
   "clipsLoadError": "Contoh klip tidak dapat dimuat",
@@ -46,15 +46,15 @@
   "estimate": {
     "forClip": "{usd} untuk {seconds} dtk pada {resolution}",
     "perSecond": "{usd}/dtk",
-    "source": "Harga resmi {vendor}, dicek {date}",
-    "sourceThirdParty": "Harga {vendor}, angka pihak ketiga, dicek {date}",
-    "sourceUnverified": "Perkiraan belum terverifikasi, tanpa halaman resmi vendor",
-    "sourceGateway": "Harga gateway, dicek {date}",
+    "source": "Harga resmi {vendor}, diperiksa {date}",
+    "sourceThirdParty": "Harga {vendor} dari pihak ketiga, diperiksa {date}",
+    "sourceUnverified": "Perkiraan belum terverifikasi; tidak ada halaman resmi vendor",
+    "sourceGateway": "Harga gateway, diperiksa {date}",
     "tier": {
       "cheapest": "termurah",
       "cheap": "murah",
       "mid": "menengah",
-      "premium": "mahal"
+      "premium": "premium"
     },
     "compareCheaper": "Sekitar {factor}× lebih murah dari {model}",
     "compareMore": "Sekitar {factor}× lebih mahal dari {model}",
@@ -65,28 +65,28 @@
   },
   "templates": {
     "product-page-turntable": {
-      "title": "Turntable halaman produk",
-      "resultSummary": "Putaran 360 yang siap jual, dengan rencana pencahayaan dan tahan di akhir — layak dipakai di halaman produk."
+      "title": "Putaran produk di halaman produk",
+      "resultSummary": "Putaran 360° siap jual, dengan rencana pencahayaan dan jeda di akhir — layak dipakai di halaman produk."
     },
     "feature-walkthrough-open": {
       "title": "Pembuka walkthrough fitur",
-      "resultSummary": "Pembuka sinematik yang mendarat di UI yang terasa nyata, bukan bumper logo."
+      "resultSummary": "Pembuka sinematik yang berlabuh di UI yang tampak nyata, bukan sekadar bumper logo."
     },
     "before-after-process": {
       "title": "Proses sebelum / sesudah",
-      "resultSummary": "Sebelum/sesudah yang terbaca dengan wipe berwaktu — bukan transisi meme."
+      "resultSummary": "Perbandingan sebelum/sesudah yang terbaca jelas dengan wipe berwaktu — bukan transisi ala meme."
     },
     "seamless-social-loop": {
-      "title": "Loop sosial tanpa sambungan",
-      "resultSummary": "Loop sungguhan dengan bingkai awal/akhir yang cocok — siap di bawah teks, bukan lelucon sekali putar."
+      "title": "Loop media sosial yang mulus",
+      "resultSummary": "Loop sungguhan dengan kecocokan bingkai awal dan akhir — layak dipasangi teks, bukan lelucon sekali putar."
     },
     "night-rain-hold": {
-      "title": "Tahan hujan malam",
-      "resultSummary": "Plat hujan yang bisa di-loop dengan gerak rack-focus — tahan intro, bukan B-roll cuaca."
+      "title": "Jeda hujan malam",
+      "resultSummary": "Plat hujan yang dapat di-loop dengan gerakan rack-focus — jeda untuk intro, bukan B-roll cuaca."
     },
     "kitchen-pour-insert": {
-      "title": "Sisipan tuang dapur",
-      "resultSummary": "Tuang berwaktu yang berakhir pada still yang bisa dipakai — sisipan, bukan iklan kopi."
+      "title": "Sisipan menuang di dapur",
+      "resultSummary": "Adegan menuang berwaktu yang berakhir pada still yang dapat dipakai — sebuah sisipan, bukan iklan kopi."
     }
   },
   "exampleClips": {

@@ -1,15 +1,15 @@
 {
   "title": "Data",
-  "expectedInputs": "Anda dapat: analisis tersimpan — temuan, bukti, dan SQL di balik setiap angka.",
+  "expectedInputs": "Hasilnya: analisis tersimpan berisi temuan, bukti, dan SQL di balik setiap angka.",
   "howItWorks": "Cara kerjanya",
-  "howItWorksBody": "Unggah CSV atau XLSX, atau tempel tabel. {productName} memprofilkannya, memilih perbandingan yang kolomnya mendukung, menanyainya dengan SQL, dan menampilkan kueri untuk setiap angka. Tidak ada yang keluar dari mesin ini kecuali pertanyaan dan profil.",
+  "howItWorksBody": "Unggah CSV atau XLSX, atau tempel tabel. {productName} membuat profil tabel, memilih perbandingan yang didukung kolom-kolomnya, menjalankan kueri SQL untuk perbandingan itu, dan menampilkan kueri di balik setiap angka. Tidak ada yang keluar dari mesin ini selain pertanyaan dan profil tabel.",
   "upload": "Unggah CSV / XLSX",
   "reading": "Membaca…",
   "savedAria": "Dataset tersimpan",
   "savedPlaceholder": "Dataset tersimpan…",
   "savedOption": "{name} ({rows} baris)",
   "pasteOptional": "Atau tempel tabel",
-  "pasteLabel": "Baris dengan judul kolom di atas: CSV, atau sel yang disalin dari spreadsheet",
+  "pasteLabel": "Baris dengan judul kolom di paling atas: CSV, atau sel yang disalin dari spreadsheet",
   "pastePlaceholder": "vendor,spend\nAcme,12000\nBeta,4100",
   "usePasted": "Gunakan tabel yang ditempel",
   "datasetMeta": "{rows} baris × {cols} kolom · {size}",
@@ -18,7 +18,7 @@
   "previewCaption": "{total} baris",
   "emptyAsk": "Ajukan pertanyaan tentang tabel ini.",
   "emptyUpload": "Unggah atau tempel tabel, lalu ajukan pertanyaan.",
-  "followUp": "Tindak lanjut {n} pada dataset ini",
+  "followUp": "Pertanyaan lanjutan {n} untuk dataset ini",
   "promptWithTable": "Ajukan pertanyaan tentang tabel…",
   "promptNoTable": "Tambahkan tabel dulu…",
   "cancel": "Batal",
@@ -45,12 +45,12 @@
     "datasetRequired": "datasetId (atau csv yang ditempel) wajib diisi",
     "datasetCap": "Dataset melebihi batas 25 MB",
     "parse": "Berkas tidak dapat diurai",
-    "noHeader": "Tidak ditemukan baris header plus setidaknya satu baris data",
+    "noHeader": "Tidak ditemukan baris judul kolom beserta sedikitnya satu baris data",
     "rowCap": "Dataset melebihi batas {n} baris",
     "fileOrText": "berkas atau teks wajib diisi",
     "missingFile": "Berkas dataset tidak ada di penyimpanan",
     "notFound": "Dataset tidak ditemukan",
-    "inUse": "Dataset sedang dianalisis sekarang; coba lagi setelah pekerjaan selesai"
+    "inUse": "Dataset sedang dianalisis; coba lagi setelah pekerjaan selesai"
   },
   "profile": {
     "meta": "{rows} baris × {cols} kolom",
@@ -66,11 +66,11 @@
   "starters": {
     "vendor-concentration": {
       "label": "Konsentrasi pemasok",
-      "prompt": "Analisis tabel ini untuk konsentrasi: baris teratas menurut pangsa total, apakah ada satu yang melebihi 30%, dan di mana ada daya tawar untuk beralih."
+      "prompt": "Analisis konsentrasi pada tabel ini: baris teratas berdasarkan pangsanya terhadap total, apakah ada satu yang melebihi 30%, dan di mana terdapat daya tawar untuk beralih."
     },
     "anomaly-scan": {
       "label": "Pindai anomali",
-      "prompt": "Pindai dataset ini untuk anomali: baris kunci duplikat, nilai yang jauh di luar sebaran kolom, negatif yang mustahil, dan sel yang kosong."
+      "prompt": "Pindai dataset ini untuk menemukan anomali: baris dengan kunci ganda, nilai yang jauh di luar sebaran kolom, angka negatif di tempat yang mustahil, dan sel kosong."
     },
     "trend": {
       "label": "Tren dari waktu ke waktu",
@@ -79,11 +79,11 @@
   },
   "outputTextLanguage": "Tulis judul, ringkasan, judul temuan, isi temuan, dan judul grafik dalam Bahasa Indonesia yang profesional. Jangan menerjemahkan SQL, pengenal kolom, atau nama tabel.",
   "job": {
-    "profiling": "Memprofilkan dataset",
-    "analyzing": "Mengueri dengan SQL",
+    "profiling": "Membuat profil dataset",
+    "analyzing": "Menjalankan kueri SQL",
     "verifying": "Menjalankan ulang kueri bukti",
     "saving": "Menyimpan analisis",
-    "withheld": "Baris sampel ditahan oleh pelindung injeksi ({rule})",
+    "withheld": "Baris sampel ditahan oleh perlindungan injeksi ({rule})",
     "queryRows": "{count} baris",
     "queryRow": "{count} baris",
     "queryFailed": "gagal: {error}"
@@ -94,22 +94,22 @@
   "markdownTables": "Tabel",
   "markdownCharts": "Grafik",
   "markdownChartFallback": "grafik {type}",
-  "pastedTable": "Tabel ditempel",
+  "pastedTable": "Tabel yang ditempel",
   "harness": {
-    "cutting": "Memilih potongan",
-    "analyzing": "Mengueri dengan SQL",
-    "repairing": "Menulis ulang kalimat yang kuerinya tidak mendukung",
+    "cutting": "Memilih potongan data",
+    "analyzing": "Menjalankan kueri SQL",
+    "repairing": "Menulis ulang kalimat yang tidak didukung kueri",
     "repairRound": "Memperbaiki temuan",
     "verifying": "Mencocokkan kalimat dengan kueri",
-    "cannotForecast": "Lembar ini tidak bisa meramalkan. Angka di bawah adalah potongan yang kolomnya mendukung.",
-    "cannotOtherTable": "Lembar ini satu tabel. Angka di bawah adalah potongan yang kolomnya mendukung.",
+    "cannotForecast": "Lembar ini tidak dapat dipakai untuk meramal. Angka di bawah adalah potongan data yang didukung kolom-kolomnya.",
+    "cannotOtherTable": "Lembar ini hanya satu tabel. Angka di bawah adalah potongan data yang didukung kolom-kolomnya.",
     "fallbackTitle": "Isi lembar ini",
     "fallbackSummary": "Setiap angka di bawah adalah hasil kueri.",
     "blanks": "Sel kosong",
     "rowsTitle": "Baris pada lembar ini",
     "noRows": "Kueri tidak mengembalikan baris.",
-    "cutsFailed": "Lembar ini tidak bisa dikueri.",
-    "repair": "Tulis ulang JSON. Draf sebelumnya memakai angka atau kueri yang hasilnya tidak mendukung. Salin angka hanya dari hasil potongan. Jangan meramalkan dan jangan memakai tabel lain.",
+    "cutsFailed": "Kueri pada lembar ini tidak dapat dijalankan.",
+    "repair": "Tulis ulang JSON. Draf sebelumnya memakai angka atau kueri yang tidak didukung hasil. Salin angka hanya dari hasil potongan data. Jangan meramalkan dan jangan memakai tabel lain.",
     "invalidJson": "Draf sebelumnya bukan JSON yang valid.",
     "noFindings": "Draf sebelumnya tidak punya temuan."
   }

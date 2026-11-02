@@ -1,7 +1,7 @@
 {
   "studio": {
     "title": "Pantauan Pasar",
-    "expectedInputs": "Anda mendapat harga langsung dan grafik per ticker, plus briefing tertulis — ketik sampai 15 ticker, tanpa unggahan berkas. Analisis, bukan saran investasi.",
+    "expectedInputs": "Hasilnya: harga langsung dan grafik per ticker, ditambah briefing tertulis — ketik hingga 15 ticker, tanpa unggah berkas. Ini analisis, bukan saran investasi.",
     "download": "Unduh DOCX",
     "building": "Menyusun…",
     "writeBriefing": "Tulis briefing",
@@ -9,7 +9,7 @@
     "cancel": "Batalkan",
     "options": "Opsi",
     "hideOptions": "Sembunyikan opsi",
-    "machineNote": "{product} membaca harga, grafik, peringkat, berita, dan tingkat pasar di mesin ini, lalu menulis briefing di atas data itu. Angka yang tidak dapat ditelusuri ke data tersebut dihapus.",
+    "machineNote": "{product} membaca harga, grafik, peringkat, berita, dan level pasar di mesin ini, lalu menulis briefing berdasarkan data tersebut. Angka apa pun yang tidak dapat ditelusuri ke data itu akan dihapus.",
     "empty": "Tambahkan ticker di atas untuk melihat harga dan grafiknya.",
     "openSettings": "Buka {settings}",
     "needsKeyNote": "Harga dan grafik tetap berfungsi tanpa kunci. Untuk menulis briefing, tambahkan kunci Anda di {settings}.",
@@ -21,7 +21,7 @@
     "sourcesComputed": "Dihitung di perangkat",
     "startersLead": "Atau mulai dari daftar siap pakai:",
     "positionLabel": "Posisi Anda (opsional)",
-    "positionHelp": "Apa yang Anda miliki dan pada harga berapa. Briefing boleh memakai angka ini; tidak mengarang yang lain.",
+    "positionHelp": "Apa yang Anda miliki dan pada harga berapa. Briefing boleh memakai angka-angka ini, dan tidak akan mengarang angka lain.",
     "promptLabel": "Apa yang harus dicakup briefing",
     "resetPrompt": "Kembalikan ke bawaan",
     "lengthLimit": "Batas panjang (karakter)"
@@ -31,8 +31,8 @@
     "aria": "Mode analisis",
     "quick": "Analis tunggal",
     "team": "Tim analis",
-    "hint": "Tim analis menjalankan empat analis, satu ronde bullish dan bearish, lalu bacaan risiko sebelum briefing ditulis.",
-    "unavailable": "Meja ini tidak punya tim analis, jadi briefingnya ditulis satu analis saja."
+    "hint": "Tim analis menjalankan empat analis, satu ronde perdebatan bullish dan bearish, lalu pembacaan risiko sebelum briefing ditulis.",
+    "unavailable": "Meja kerja ini tidak memiliki tim analis, sehingga briefingnya ditulis oleh satu analis saja."
   },
   "progress": {
     "analysts": "Catatan analis",
@@ -71,19 +71,19 @@
   },
   "errors": {
     "needsKey": "Harga dan grafik tetap berfungsi tanpa kunci. Untuk menulis briefing, tambahkan kunci API Anda di Pengaturan.",
-    "noTicker": "Ticker itu tidak ditemukan. Periksa ejaannya, misalnya MU, NVDA, atau BBCA.",
+    "noTicker": "Tidak satu pun ticker itu ditemukan. Periksa ejaannya, misalnya MU, NVDA, atau BBCA.",
     "offline": "Data pasar tidak dapat dijangkau saat ini. Periksa koneksi internet Anda, lalu coba lagi.",
     "rewrite": "Bagian itu tidak dapat ditulis ulang",
-    "docx": "Berkas DOCX tidak dapat disusun",
+    "docx": "Berkas DOCX tidak dapat dibuat",
     "board": "Daftar pantauan tidak dapat dimuat"
   },
   "watchlist": {
     "label": "Saham mana yang Anda ikuti?",
     "placeholder": "MU, NVDA, BBCA…",
     "placeholderAdd": "Tambah lagi…",
-    "placeholderFull": "Itu sudah batasnya",
-    "help": "Ketik ticker atau nama. Nama IDX (BCA, Astra) dan contoh AS yang umum (NVIDIA, Micron) terisi otomatis. {current}/{max}.",
-    "overflow": "Daftar pantauan menampung {max} ticker, jadi yang lebih tidak ditambahkan.",
+    "placeholderFull": "Sudah mencapai batas",
+    "help": "Ketik simbol ticker atau nama perusahaan. Nama emiten IDX (BCA, Astra) dan contoh yang umum dari AS (NVIDIA, Micron) akan terisi otomatis. {current}/{max}.",
+    "overflow": "Daftar pantauan hanya menampung {max} ticker, sehingga sisanya tidak ditambahkan.",
     "notTickerOne": "{shown} bukan simbol ticker. Coba MU, NVDA, atau BBCA.",
     "notTickerMany": "{shown} bukan simbol ticker. Coba MU, NVDA, atau BBCA.",
     "remove": "Hapus {ticker}"
@@ -105,7 +105,7 @@
   "specialists": {
     "saham": {
       "label": "Saham",
-      "hint": "Saham di bursa mana pun — IDX, AS, dan seterusnya: peringkat watchlist, pembacaan sektor, sadar jam bursa."
+      "hint": "Saham di bursa mana pun — IDX, AS, dan seterusnya: peringkat watchlist, pembacaan sektor, mengikuti jam bursa."
     },
     "forex": {
       "label": "Forex",
@@ -117,7 +117,7 @@
     },
     "crypto": {
       "label": "Kripto",
-      "hint": "Pasar 24/7: bitcoin sebagai penggerak, dominance, dan volatilitas altcoin."
+      "hint": "Pasar 24/7: bitcoin sebagai penggerak, dominasi bitcoin, dan volatilitas altcoin."
     },
     "commodities": {
       "label": "Komoditas",
@@ -141,11 +141,11 @@
     },
     "elliott-wave": {
       "label": "Elliott Wave Count",
-      "hint": "Hitungan gelombang berhati-hati dari swing di paket data, lengkap dengan level invalidasi."
+      "hint": "Hitungan gelombang yang berhati-hati berdasarkan swing pada paket data, lengkap dengan level invalidasi."
     },
     "news": {
       "label": "Agregator Berita",
-      "hint": "Digest headline per ticker dan per tema, dengan penerbit, waktu, dan tanda basi."
+      "hint": "Rangkuman headline per ticker dan per tema, dengan penerbit, waktu, dan penanda kedaluwarsa."
     }
   },
   "board": {
@@ -159,7 +159,7 @@
     "aboveAverage": "Di atas rata-rata {days} hari",
     "belowAverage": "Di bawah rata-rata {days} hari",
     "tradingView": "TradingView: {rating}",
-    "unavailable": "Data harga belum bisa diambil sekarang. Daftar pantauan Anda tetap tersimpan, coba lagi sebentar lagi.",
+    "unavailable": "Data harga belum dapat dijangkau saat ini. Daftar pantauan Anda tetap tersimpan; coba lagi sebentar lagi.",
     "retry": "Coba lagi"
   },
   "session": {
@@ -175,7 +175,7 @@
   },
   "chart": {
     "range": "Rentang grafik",
-    "empty": "Tidak ada riwayat harga untuk digrafik."
+    "empty": "Tidak ada riwayat harga untuk ditampilkan dalam grafik."
   },
   "briefing": {
     "kicker": "Briefing Pantauan Pasar",
@@ -194,11 +194,11 @@
     "observed": "diamati {when}",
     "watchlist": "Daftar pantauan",
     "macro": "Makro",
-    "noMacro": "Kuotasi makro tidak diambil.",
+    "noMacro": "Tidak ada kuotasi makro yang diambil.",
     "positionNotes": "Catatan posisi Anda",
     "rewrite": "Tulis ulang",
     "rewriting": "Menulis ulang…",
-    "guardedSection": "Penjaga saran mengganti sebagian bagian ini."
+    "guardedSection": "Penjaga saran investasi telah mengganti sebagian isi bagian ini."
   },
   "facts": {
     "price": "Harga",
@@ -216,13 +216,13 @@
     "sma200": "SMA200",
     "vsSma200": "vs SMA200",
     "macd": "MACD",
-    "change5d1m": "5h / 1bln",
-    "range52w": "Rentang 52 mg"
+    "change5d1m": "5 hr / 1 bln",
+    "range52w": "Rentang 52 mgg"
   },
   "tables": {
     "ticker": "Ticker",
     "price": "Harga",
-    "chgPct": "Ubh%",
+    "chgPct": "Ubah%",
     "preMkt": "Pra-pasar",
     "prePct": "Pra%",
     "state": "Status",

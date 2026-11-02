@@ -1,9 +1,9 @@
 {
   "title": "Ruang kerja",
-  "deskLabel": "Meja: {name}",
+  "deskLabel": "Meja kerja: {name}",
   "currentSuffix": "saat ini",
   "newWorkspace": "Ruang kerja baru",
-  "lede": "Meja di mesin ini, masing-masing dengan kunci, Pengaturan, dan Basis Pengetahuan sendiri — milik Anda, tidak ada yang perlu diikuti.",
+  "lede": "Meja kerja di mesin ini, masing-masing dengan kunci, Pengaturan, dan Basis Pengetahuannya sendiri. Semuanya milik Anda; tidak ada yang perlu diikuti.",
   "createNew": "Buat ruang kerja baru",
   "create": "Buat",
   "cancel": "Batal",
@@ -18,16 +18,16 @@
   "blank": "Kosong",
   "modes": "Mode",
   "currentPrefix": "Saat ini · ",
-  "deleteConfirm": "Ini menghapus meja, percakapan, Basis Pengetahuan, dan kunci tersimpan dari mesin ini. Ketik {name} untuk mengonfirmasi.",
-  "deleteDesk": "Hapus meja",
-  "deleteRestricted": "Hanya pemilik atau admin yang dapat menghapus meja.",
+  "deleteConfirm": "Tindakan ini menghapus meja kerja beserta percakapan, Basis Pengetahuan, dan kunci yang tersimpan dari mesin ini. Ketik {name} untuk mengonfirmasi.",
+  "deleteDesk": "Hapus meja kerja",
+  "deleteRestricted": "Hanya pemilik atau admin yang dapat menghapus meja kerja.",
   "errors": {
     "create": "Ruang kerja tidak dapat dibuat",
     "update": "Ruang kerja tidak dapat diperbarui",
     "delete": "Ruang kerja tidak dapat dihapus",
-    "deleteForbidden": "Hanya pemilik atau admin yang dapat menghapus meja.",
-    "protected": "Meja Default tidak dapat dihapus",
-    "confirmName": "Ketik nama meja untuk mengonfirmasi penghapusan"
+    "deleteForbidden": "Hanya pemilik atau admin yang dapat menghapus meja kerja.",
+    "protected": "Meja kerja Default tidak dapat dihapus",
+    "confirmName": "Ketik nama meja kerja untuk mengonfirmasi penghapusan"
   },
   "mode": {
     "chat": "Chat",
@@ -48,7 +48,7 @@
   "template": {
     "general": "Umum",
     "organisation": "Organisasi",
-    "students": "Siswa",
+    "students": "Pelajar",
     "office": "Kantor",
     "legal": "Hukum",
     "sales": "Penjualan",
@@ -57,12 +57,12 @@
   },
   "templateDescription": {
     "general": "Semua tab kerja: chat, dokumen, riset, gambar, video, dan presentasi.",
-    "organisation": "Ruang kerja lintas tim dengan setiap tab kerja.",
+    "organisation": "Ruang kerja lintas tim dengan semua tab kerja.",
     "students": "Meja belajar: chat, dokumen, riset, gambar, presentasi, dan pendidikan.",
-    "office": "Operasi harian: chat, dokumen, dan presentasi.",
+    "office": "Pekerjaan kantor sehari-hari: chat, dokumen, dan presentasi.",
     "legal": "Tinjauan perkara, memo, dan redline: chat, dokumen, riset, hukum, dan presentasi.",
     "sales": "Penjangkauan dan ruang transaksi: chat, dokumen, gambar, dan presentasi.",
-    "marketing": "Kampanye dan kreatif: chat, dokumen, gambar, video, dan presentasi.",
+    "marketing": "Kampanye dan materi kreatif: chat, dokumen, gambar, video, dan presentasi.",
     "product": "Spesifikasi dan peta jalan: chat, dokumen, riset, dan presentasi."
   }
 }

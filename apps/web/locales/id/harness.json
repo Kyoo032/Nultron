@@ -2,14 +2,14 @@
   "skills": {
     "chat": {
       "answer-this-turn": "Menjawab giliran ini",
-      "ground-in-desk": "Memakai meja kerja, hanya sumber yang ditawarkan",
+      "ground-in-desk": "Berpijak pada meja kerja, hanya dari sumber yang tersedia",
       "say-the-result": "Mengerjakan tugas kecil dan melaporkan hasilnya",
-      "look-not-make": "Melihat lampiran, menolak jenis yang salah",
+      "look-not-make": "Melihat lampiran, menolak yang tidak sesuai",
       "keep-the-turn": "Menyimpan giliran agar mudah ditemukan"
     },
     "documents": {
       "draft-sections": "Menyusun bagian-bagian dokumen",
-      "stay-inside-source": "Tetap di dalam sumber",
+      "stay-inside-source": "Tidak keluar dari sumber",
       "rewrite-one-section": "Menulis ulang satu bagian",
       "preview-and-download": "Pratinjau dan unduh",
       "check-against-source": "Memeriksa draf terhadap sumber"
@@ -118,9 +118,9 @@
     "self_check": "Pemeriksaan mandiri",
     "build_deck": "Membuat slide presentasi",
     "research_dossier": "Dosir riset",
-    "delegate": "Meminta agen lain",
+    "delegate": "Bertanya ke agen lain",
     "run_sql": "Menjalankan kueri SQL",
-    "market_quotes": "Kuotasi langsung",
+    "market_quotes": "Kuotasi harga langsung",
     "market_history": "Riwayat harga",
     "market_technical": "Indikator teknikal",
     "market_macro": "Data makro",
@@ -139,8 +139,8 @@
     "remove_silence": "Membuang jeda hening",
     "split_at_scenes": "Membelah di pergantian adegan",
     "add_title": "Menambah judul",
-    "add_caption": "Menambah teks takarir",
-    "reframe": "Mengubah bingkai gambar",
+    "add_caption": "Menambahkan takarir",
+    "reframe": "Menyesuaikan bingkai gambar",
     "set_clip_volume": "Mengatur volume klip",
     "clear_timeline": "Mengosongkan lini masa",
     "propose_plan": "Mengusulkan rencana",
@@ -158,8 +158,8 @@
     "export": "Mengekspor video"
   },
   "loop": {
-    "agent": "Ia memutuskan alat mana yang dipanggil, di dalam batasnya.",
-    "pipeline": "Aplikasi menjalankan tahap yang tetap, dan model hanya menulis.",
+    "agent": "Agen memutuskan sendiri alat mana yang dipanggil, dalam batas yang ditetapkan.",
+    "pipeline": "Aplikasi menjalankan tahapan yang tetap, sedangkan model hanya bertugas menulis.",
     "media": "Ia memanggil model pembuat media secara langsung.",
     "none": "Ia bekerja pada berkas Anda tanpa memanggil model."
   },
@@ -167,7 +167,7 @@
     "title": "Cara kerja {name}",
     "skills": "Keahlian",
     "tools": "Alat",
-    "noTools": "Tidak ada alat untuk dipanggil: aplikasi mengerjakannya dalam tahap yang tetap.",
+    "noTools": "Tidak ada alat untuk dipanggil: aplikasi mengerjakannya dalam tahapan yang tetap.",
     "limits": "Batas",
     "steps": "{n} langkah model per giliran",
     "stepsOne": "1 langkah model per giliran",
@@ -176,15 +176,15 @@
     "checks": "Pemeriksaan",
     "repair": "{n} putaran perbaikan sebelum berhenti",
     "repairOne": "1 putaran perbaikan sebelum berhenti",
-    "noRepair": "Pemeriksaan hanya melapor; tidak ada yang diperbaiki otomatis.",
-    "enforced": "Aplikasi menegakkan alat dan batas ini pada setiap proses di obrolan ini. Prompt tidak bisa mengubahnya.",
+    "noRepair": "Pemeriksaan hanya melaporkan; tidak ada yang diperbaiki secara otomatis.",
+    "enforced": "Aplikasi menegakkan alat dan batas ini pada setiap proses di obrolan ini. Prompt tidak dapat mengubahnya.",
     "close": "Tutup",
     "statusNew": "Baru",
     "statusOff": "Tidak ditawarkan",
     "inChat": "Di obrolan ini",
     "contextUsage": "Konteks dan pemakaian",
     "ownHarness": "Harness {name}",
-    "runsInChat": "Berjalan di obrolan ini, dengan pengecekannya.",
-    "runsInStudio": "Berjalan di studio {name}. Di obrolan ini pekerjaan dilakukan dengan alat di atas, tanpa pengecekan ini."
+    "runsInChat": "Berjalan di obrolan ini, lengkap dengan pemeriksaannya.",
+    "runsInStudio": "Berjalan di studio {name}. Di obrolan ini pekerjaan dilakukan dengan alat di atas, tanpa pemeriksaan tersebut."
   }
 }

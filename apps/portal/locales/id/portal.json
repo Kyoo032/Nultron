@@ -14,9 +14,9 @@
     "passwordLabel": "Kata sandi",
     "submit": "Masuk",
     "missing": "Masukkan nama pengguna dan kata sandi Anda.",
-    "invalid": "Nama pengguna atau kata sandi itu tidak cocok. Jika ini terus muncul, hubungi admin Anda.",
+    "invalid": "Nama pengguna atau kata sandi tidak tepat. Jika ini terus muncul, hubungi admin Anda.",
     "rateLimited": "Terlalu banyak percobaan. Coba lagi beberapa menit lagi.",
-    "busy": "Proses masuk sedang sibuk. Tunggu sebentar, lalu coba lagi."
+    "busy": "Layanan masuk sedang sibuk. Tunggu sebentar, lalu coba lagi."
   },
   "change": {
     "title": "Pilih kata sandi baru",
@@ -30,7 +30,7 @@
     "refusal": {
       "too_short": "Gunakan minimal {min} karakter.",
       "too_long": "Gunakan paling banyak {max} karakter.",
-      "control_characters": "Gunakan hanya karakter yang bisa diketik di papan ketik: tanpa pemisah baris atau karakter kontrol.",
+      "control_characters": "Gunakan hanya karakter yang bisa diketik di papan ketik: tanpa pindah baris atau karakter kontrol.",
       "mismatch": "Kedua kata sandi baru itu tidak sama.",
       "same_as_username": "Pilih kata sandi yang bukan nama pengguna Anda.",
       "same_as_email": "Pilih kata sandi yang bukan alamat e-mail Anda.",
@@ -39,8 +39,8 @@
   },
   "sent": {
     "title": "Periksa e-mail Anda",
-    "body": "Kami mengirim kode masuk ke {email}. Kode berlaku {minutes} menit.",
-    "bodyAfterInvite": "Undangan diterima. Kami baru saja mengirim kode masuk ke {email} untuk memastikan itu kotak masuk Anda. Kode berlaku {minutes} menit.",
+    "body": "Kami telah mengirim kode masuk ke {email}. Kode ini akan kedaluwarsa dalam {minutes} menit.",
+    "bodyAfterInvite": "Undangan diterima. Kami baru saja mengirim kode masuk ke {email} untuk memastikan kotak masuk itu milik Anda. Kode ini akan kedaluwarsa dalam {minutes} menit.",
     "bodyWait": "Kami sudah mengirim kode masuk ke {email}.",
     "bodyFailed": "Kami tidak dapat mengirim kode masuk ke {email} saat ini.",
     "codeLabel": "Kode enam digit",
@@ -82,7 +82,7 @@
     },
     "seatCap": {
       "title": "Tidak ada kursi tersisa",
-      "next": "Minta admin Anda untuk mengosongkan atau menambah kursi."
+      "next": "Minta admin Anda mengosongkan satu kursi atau menambah kursi."
     }
   },
   "account": {
@@ -105,7 +105,7 @@
     "warning": "Lanjutkan hanya jika Anda baru saja memulai proses masuk di perangkat itu.",
     "approve": "Setujui",
     "deny": "Tolak",
-    "codeIntro": "Ketik kode yang tampil di perangkat yang sedang Anda masuki.",
+    "codeIntro": "Ketik kode yang tampil di perangkat yang ingin Anda gunakan untuk masuk.",
     "codeLabel": "Kode perangkat",
     "codeSubmit": "Lanjutkan",
     "unknownCode": "Kode itu sudah tidak berlaku. Mulai lagi proses masuk di perangkat tersebut."
@@ -120,7 +120,7 @@
   },
   "success": {
     "title": "Berhasil masuk",
-    "body": "Mengembalikan Anda ke {product}."
+    "body": "Membawa Anda kembali ke {product}."
   },
   "signedOut": {
     "title": "Sudah keluar",
@@ -130,9 +130,9 @@
   "error": {
     "title": "Tidak dapat melanjutkan",
     "generic": "Terjadi kesalahan. Tutup halaman ini lalu mulai lagi.",
-    "invalidClient": "Tautan masuk ini tidak sah. Mulai lagi dari aplikasi.",
-    "invalidRedirect": "Tautan masuk ini tidak sah. Mulai lagi dari aplikasi.",
-    "badRequest": "Permintaan itu tidak dikenali.",
+    "invalidClient": "Tautan masuk ini tidak valid. Mulai lagi dari aplikasi.",
+    "invalidRedirect": "Tautan masuk ini tidak valid. Mulai lagi dari aplikasi.",
+    "badRequest": "Permintaan itu tidak dapat dipahami.",
     "expiredForm": "Halaman ini kedaluwarsa. Mulai lagi.",
     "rateLimited": "Terlalu banyak percobaan. Coba lagi beberapa menit lagi."
   },
@@ -146,18 +146,18 @@
     "unknown": "Tidak diketahui"
   },
   "reason": {
-    "tenant_inactive": "Akun penyedia Anda tidak aktif. Hubungi dukungan.",
+    "tenant_inactive": "Akun penyedia layanan Anda tidak aktif. Hubungi tim dukungan.",
     "org_inactive": "Organisasi Anda tidak aktif.",
     "org_past_due": "Pembayaran organisasi Anda tertunggak.",
     "user_inactive": "Akun Anda dinonaktifkan.",
-    "seat_cap_reached": "Tidak ada kursi tersisa di organisasi Anda.",
-    "device_revoked": "Perangkat ini telah dikeluarkan oleh admin.",
+    "seat_cap_reached": "Semua kursi di organisasi Anda sudah terpakai.",
+    "device_revoked": "Admin telah mengeluarkan akun Anda dari perangkat ini.",
     "session_revoked": "Anda telah keluar. Silakan masuk lagi.",
-    "refresh_reused": "Keluar demi keamanan. Silakan masuk lagi.",
-    "refresh_expired": "Sesi Anda berakhir. Silakan masuk lagi.",
-    "device_code_expired": "Kode kedaluwarsa. Mulai masuk lagi.",
-    "device_code_denied": "Masuk ditolak.",
-    "invalid_request": "Permintaan itu tidak dikenali.",
+    "refresh_reused": "Anda dikeluarkan demi keamanan. Silakan masuk lagi.",
+    "refresh_expired": "Sesi Anda sudah berakhir. Silakan masuk lagi.",
+    "device_code_expired": "Kode sudah kedaluwarsa. Mulai proses masuk lagi.",
+    "device_code_denied": "Permintaan masuk ditolak.",
+    "invalid_request": "Permintaan itu tidak dapat dipahami.",
     "invalid_grant": "Proses masuk itu tidak dapat diselesaikan. Mulai lagi.",
     "rate_limited": "Terlalu banyak percobaan. Coba lagi beberapa menit lagi."
   },

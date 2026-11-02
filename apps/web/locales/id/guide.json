@@ -1,36 +1,36 @@
 {
-  "dialogLabel": "Tur singkat {productName}",
+  "dialogLabel": "Tur singkat mengenal {productName}",
   "offer": {
     "title": "Mau tur singkat?",
-    "body": "{total} perhentian singkat menunjukkan di mana semuanya berada. Sekitar satu menit. Anda bisa melewatinya sekarang, atau menutupnya kapan saja.",
-    "start": "Antar saya berkeliling"
+    "body": "Hanya {total} perhentian singkat untuk menunjukkan letak setiap fitur, sekitar satu menit saja. Anda boleh melewatinya sekarang, atau menutupnya kapan pun.",
+    "start": "Ajak saya berkeliling"
   },
   "progress": "Langkah {current} dari {total}",
-  "next": "Lanjut",
+  "next": "Berikutnya",
   "back": "Kembali",
   "skip": "Lewati",
   "done": "Selesai",
   "close": "Tutup panduan",
   "steps": {
     "modes": {
-      "title": "Agen Anda ada di sini",
-      "bodyOne": "Asisten Anda ada di paling atas. Di bawahnya ada satu agen lagi: {tools}. Pilih untuk mulai.",
-      "bodyList": "Asisten Anda ada di paling atas. Di bawahnya ada {count} agen Anda: {tools}. Pilih satu untuk mulai.",
-      "bodyMany": "Asisten Anda ada di paling atas. Di bawahnya ada satu agen untuk setiap jenis pekerjaan. Pilih satu untuk mulai.",
-      "bodyNone": "Asisten Anda ada di paling atas. Anda bisa merekrut agen lain dari Agen virtual."
+      "title": "Di sinilah agen Anda berada",
+      "bodyOne": "Asisten Anda berada di bagian paling atas. Di bawahnya ada satu agen lagi: {tools}. Pilih untuk memulai.",
+      "bodyList": "Asisten Anda berada di bagian paling atas. Di bawahnya ada {count} agen Anda: {tools}. Pilih salah satu untuk memulai.",
+      "bodyMany": "Asisten Anda berada di bagian paling atas. Di bawahnya ada satu agen untuk setiap jenis pekerjaan. Pilih salah satu untuk memulai.",
+      "bodyNone": "Asisten Anda berada di bagian paling atas. Anda bisa merekrut agen lain dari Agen virtual."
     },
     "workspaces": {
       "title": "Rekrut agen lain kapan saja",
       "bodyMore": "Ingin agen lain, seperti {tools}? Buka Agen virtual lalu pilih Rekrut. Anda bisa melepasnya kapan saja.",
-      "bodyAll": "Semua agen sudah ada di meja ini. Untuk mengurangi, buka Agen virtual lalu pilih Lepas pada agen yang tidak Anda perlukan."
+      "bodyAll": "Semua agen sudah ada di meja kerja ini. Untuk menguranginya, buka Agen virtual lalu pilih Lepas pada agen yang tidak Anda perlukan."
     },
     "chat": {
       "title": "Tanyakan apa saja ke Chat",
-      "body": "Di Chat, ketik di kotak pesan lalu tekan Enter. Gaya jawaban di bagian atas memilih Tercepat, Harian, atau Penalaran."
+      "body": "Di Chat, ketik pesan Anda lalu tekan Enter. Gaya jawaban di bagian atas memungkinkan Anda memilih Tercepat, Harian, atau Penalaran."
     },
     "knowledge": {
-      "title": "Ajari apa yang Anda tahu",
-      "body": "Basis pengetahuan menyimpan catatan, berkas, dan halaman web Anda. Chat memakainya saat menjawab."
+      "title": "Bekali dengan pengetahuan Anda",
+      "body": "Basis Pengetahuan menyimpan catatan, berkas, dan halaman web Anda. Chat memanfaatkannya saat menjawab."
     },
     "settings": {
       "title": "Kunci dan bahasa Anda",
@@ -39,7 +39,7 @@
   },
   "replay": {
     "title": "Panduan",
-    "body": "Tur satu menit melewati navigasi, Agen virtual, Chat, Basis pengetahuan, dan Pengaturan.",
+    "body": "Tur satu menit yang mengenalkan navigasi, Agen virtual, Chat, Basis Pengetahuan, dan Pengaturan.",
     "button": "Putar ulang panduan"
   }
 }

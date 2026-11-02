@@ -8,12 +8,12 @@
   "loading": "Memuat…",
   "mediaMissing": {
     "title": "Berkas hilang",
-    "hint": "Berkas ini sudah tidak tersedia."
+    "hint": "Berkas ini sudah tidak ada."
   },
   "enhance": {
-    "failedShort": "Peningkatan gagal",
-    "failed": "Prompt tidak dapat ditingkatkan. Teks Anda tidak berubah.",
-    "failedReason": "Prompt tidak dapat ditingkatkan: {reason}"
+    "failedShort": "Penyempurnaan gagal",
+    "failed": "Prompt tidak dapat disempurnakan. Teks Anda tetap seperti semula.",
+    "failedReason": "Prompt tidak dapat disempurnakan: {reason}"
   },
   "theme": {
     "light": "Terang",
@@ -30,7 +30,7 @@
     }
   },
   "saveFailed": {
-    "writeFailed": "Berkas tidak dapat ditulis ke lokasi itu. Pilih folder lain, atau kosongkan ruang, lalu coba lagi.",
+    "writeFailed": "Berkas tidak dapat ditulis ke lokasi tersebut. Pilih folder lain atau kosongkan sebagian ruang penyimpanan, lalu coba lagi.",
     "tooLarge": "Berkas ini terlalu besar untuk disimpan dari sini.",
     "generic": "Berkas tidak dapat disimpan. Coba lagi."
   },
@@ -39,55 +39,55 @@
     "saving": "Menyimpan…",
     "sendToKb": "Kirim ke Basis Pengetahuan",
     "adding": "Menambahkan…",
-    "makeDocument": "Buat dokumen",
-    "makePresentation": "Buat presentasi",
+    "makeDocument": "Jadikan dokumen",
+    "makePresentation": "Jadikan presentasi",
     "downloadFailed": "Tidak dapat mengunduh",
     "kbIndexFailed": "Basis Pengetahuan tidak dapat mengindeks ini: {reason}",
-    "unknownReason": "alasan tidak diketahui",
+    "unknownReason": "penyebab tidak diketahui",
     "kbAlready": "Sudah ada di Basis Pengetahuan.",
     "kbAdded": "Ditambahkan ke Basis Pengetahuan.",
     "kbFailed": "Tidak dapat menambahkan ke Basis Pengetahuan"
   },
   "mascot": {
-    "wave": "Melambaikan tangan",
-    "idle": "Siap bila Anda siap",
-    "sleep": "Beristirahat sejenak",
-    "thinking": "Sedang memikirkan ini",
+    "wave": "Melambai menyapa",
+    "idle": "Siap kapan pun Anda siap",
+    "sleep": "Istirahat sebentar",
+    "thinking": "Sedang memikirkannya",
     "writing": "Sedang menulis",
-    "answering": "Sedang menulis jawaban",
-    "searching": "Sedang mencari",
-    "calculating": "Sedang menghitung",
-    "charting": "Sedang melihat grafik",
-    "reviewing": "Sedang meninjau berkas",
+    "answering": "Sedang menyusun balasan",
+    "searching": "Sedang mencari tahu",
+    "calculating": "Sedang mengolah angka",
+    "charting": "Sedang mengamati grafik",
+    "reviewing": "Sedang menelaah berkas",
     "listening": "Sedang mendengarkan",
     "painting": "Sedang melukis",
     "filming": "Sedang merekam",
     "editing": "Sedang menyunting",
-    "presenting": "Sedang mempresentasikan",
-    "celebrating": "Selesai",
-    "error": "Ada yang perlu dilihat",
+    "presenting": "Sedang memaparkan",
+    "celebrating": "Semua beres",
+    "error": "Ada yang perlu diperiksa",
     "surprised": "Terkejut",
     "love": "Senang membantu",
-    "charging": "Sedang mengisi daya",
+    "charging": "Sedang mengisi tenaga",
     "lets-go": "Ayo berangkat"
   },
   "buddy": {
     "tap": "Sapa Nultron",
     "minimise": "Kecilkan Nultron",
-    "restore": "Tampilkan Nultron lagi",
-    "region": "Nultron, teman di meja Anda"
+    "restore": "Tampilkan Nultron kembali",
+    "region": "Nultron, teman di meja kerja Anda"
   },
   "modeHandoff": {
     "fallbackSubject": "materi sumber",
     "presentation": "Ubah \"{subject}\" menjadi presentasi untuk pengambil keputusan. Gunakan hanya materi sumber.",
-    "document": "Tulis memo dari \"{subject}\". Gunakan hanya materi sumber dan kutip sumber-sumbernya."
+    "document": "Tulis memo berdasarkan \"{subject}\". Gunakan hanya materi sumber dan sebutkan sumbernya."
   },
   "needsKey": {
     "note": "Tambahkan kunci {gateway} Anda di {settings} untuk memakai ini.",
     "blocked": "Tambahkan kunci Anda di {settings} untuk memakai ini."
   },
   "runLimit": {
-    "tooManyRuns": "Terlalu banyak permintaan Anda yang berjalan bersamaan. Tunggu salah satu selesai, lalu coba lagi.",
+    "tooManyRuns": "Terlalu banyak permintaan Anda yang berjalan bersamaan. Tunggu hingga salah satunya selesai, lalu coba lagi.",
     "serverBusy": "Layanan sedang sibuk. Tunggu sebentar, lalu coba lagi."
   }
 }

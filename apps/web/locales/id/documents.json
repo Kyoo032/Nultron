@@ -1,24 +1,24 @@
 {
   "title": "Dokumen",
-  "expectedInputs": "Anda dapat: draf berjudul dengan bagian-bagian yang dapat dipratinjau dan diunduh sebagai DOCX.",
+  "expectedInputs": "Hasilnya: draf berjudul dengan bagian-bagian yang dapat dipratinjau dan diunduh sebagai DOCX.",
   "download": "Unduh DOCX",
   "building": "Menyusun…",
   "emptyTitle": "Belum ada dokumen",
-  "emptyHint": "Masukkan topik di bawah, atau muat contoh jadi dan unduh DOCX tanpa pembuatan langsung.",
-  "placeholder": "Buat memo status satu halaman untuk pimpinan",
+  "emptyHint": "Masukkan topik di bawah, atau muat contoh bawaan lalu unduh DOCX tanpa perlu membuat dokumen secara langsung.",
+  "placeholder": "Susun memo status satu halaman untuk pimpinan",
   "topicAria": "Topik dokumen",
   "generate": "Buat",
   "generating": "Membuat…",
   "previewKicker": "Dokumen",
   "galleryTitle": "Mulai dari templat",
-  "galleryHint": "Klik kartu untuk memuat brief lengkap. Ganti detail sampel, lalu buat.",
+  "galleryHint": "Klik sebuah kartu untuk memuat brief lengkap. Ganti detail contoh, lalu buat dokumennya.",
   "settings": "Pengaturan",
   "openSettingsLead": "Buka",
   "outputTextLanguage": "Tulis setiap title, heading, dan body yang dilihat pengguna dalam Bahasa Indonesia (register profesional, sapaan Anda). Kunci JSON tetap bahasa Inggris. Jangan mencampur bahasa kecuali prompt pengguna sendiri mencampur.",
   "errors": {
     "generate": "Dokumen tidak dapat dibuat",
     "regen": "Bagian itu tidak dapat dibuat ulang",
-    "docx": "File DOCX tidak dapat disusun",
+    "docx": "Berkas DOCX tidak dapat dibuat",
     "runtimeStub": "Pembuatan dokumen memerlukan gateway yang aktif. Tempel kunci API Toko Token di Pengaturan, lalu coba lagi."
   },
   "source": {
@@ -27,7 +27,7 @@
     "from": "dari “{title}”",
     "picker": "Gunakan artefak tersimpan…",
     "clear": "Hapus",
-    "placeholder": "Tempel dosier, analisis, atau catatan. Draf hanya memakai materi ini untuk fakta.",
+    "placeholder": "Tempel dosir, analisis, atau catatan. Draf hanya memakai materi ini sebagai dasar fakta.",
     "aria": "Materi sumber",
     "chars": "{current} / {max} karakter",
     "truncated": " — hanya bagian awal yang disimpan"
@@ -36,39 +36,39 @@
     "action": "Buat ulang",
     "busy": "Membuat ulang…",
     "placeholder": "Opsional: apa yang harus diubah?",
-    "aria": "Instruksi buat ulang",
+    "aria": "Instruksi untuk membuat ulang",
     "attach": "Lampirkan",
     "cancel": "Batal",
     "submit": "Buat ulang",
-    "attachImagesOnly": "Lampirkan hanya gambar atau file teks",
-    "attachFailed": "File tidak dapat dilampirkan",
+    "attachImagesOnly": "Lampirkan hanya gambar atau berkas teks",
+    "attachFailed": "Berkas tidak dapat dilampirkan",
     "uploadFailed": "Unggahan gagal",
     "removeFile": "Hapus {name}"
   },
   "starters": {
     "statusMemo": {
       "label": "Memo status",
-      "description": "Memo mingguan jadi yang dapat Anda unduh sebagai DOCX dan tulis ulang.",
-      "title": "Pengambilan Sabtu — minggu berakhir 6 Sep",
+      "description": "Memo mingguan lengkap yang dapat diunduh sebagai DOCX dan ditulis ulang sesuai kebutuhan Anda.",
+      "title": "Pengambilan Sabtu — pekan yang berakhir 6 Sep",
       "s1": {
         "heading": "Yang saya butuhkan dari Anda",
-        "body": "Setujui pengambilan Sabtu tetap di mesin kartu yang sekarang sampai perpanjangan 15 Okt. Maya akan menulis rencana dua mesin minggu ini; keuangan tidak akan menandatangani pemasok kedua sebelum itu.\n\nJika Anda ingin ganti penuh, sampaikan paling lambat Kamis. Jalur itu butuh slot pemasok yang belum kita miliki."
+        "body": "Mohon setujui agar pengambilan Sabtu tetap memakai mesin kartu yang sekarang hingga perpanjangan 15 Okt. Maya akan menulis rencana dua mesin minggu ini; bagian keuangan tidak akan menandatangani kontrak pemasok kedua sebelum itu.\n\nJika Anda lebih memilih beralih sepenuhnya, kabari kami paling lambat Kamis. Jalur itu membutuhkan slot pemasok yang belum kita miliki."
       },
       "s2": {
         "heading": "Yang bergerak",
-        "body": "Antrean Sabtu 8 menit selama empat akhir pekan terakhir (target 5). Dua mesin mati pada Kamis; kita punya catatan kasir, belum nomor tiket perbaikan.\n\nLabel tas sudah keluar untuk dua puluh pesanan pertama. Mengukur antrean masih terbuka — Alex yang memegang, terhambat ketika dua pesanan memakai nama pelanggan yang sama."
+        "body": "Antrean Sabtu rata-rata 8 menit selama empat akhir pekan terakhir (target 5). Dua mesin sempat kehabisan waktu respons pada Kamis; kita punya catatan kasir, tetapi belum ada tiket perbaikan.\n\nLabel tas sudah keluar untuk dua puluh pesanan pertama. Pengukuran antrean masih terbuka — dipegang Alex, terhambat ketika dua pesanan memakai nama pelanggan yang sama."
       },
       "s3": {
         "heading": "Yang tertunda",
-        "body": "Menu di pintu masih lembar 31 Agu. Papan di kasir sudah menampilkan jam Sabtu yang baru; siapa pun yang hanya membaca pintu tidak akan melihatnya sampai kita cetak ulang.\n\nSaya tidak mengukur antrean minggu ini. Saya tidak akan berpura-pura punya angka."
+        "body": "Menu cetak di pintu masih lembar 31 Agu. Papan tulis di kasir sudah menampilkan jam Sabtu yang baru; siapa pun yang hanya membaca pintu tidak akan melihatnya sampai kita mencetak ulang.\n\nSaya tidak mengukur antrean minggu ini, dan saya tidak akan berpura-pura punya angkanya."
       },
       "s4": {
         "heading": "Risiko",
-        "body": "Catatan serah terima hanya satu baris. Sabtu yang baru terlihat tipis jika seseorang menjalankan kasir dari kartu itu saja. Daftar periksa adalah perbaikannya; daftar itu belum menempel di pintu.\n\nNama pelanggan yang sama akan mencampur pesanan orang pertama yang mengambil dua pesanan dengan satu nama."
+        "body": "Catatan serah terima hanya satu baris. Sabtu yang baru akan terasa kurang berpegangan jika seseorang menjalankan kasir hanya dari kartu itu. Daftar periksa adalah perbaikannya, tetapi belum dipasang di pintu.\n\nNama pelanggan yang sama akan mengacaukan pesanan orang pertama yang mengambil dua pesanan atas satu nama."
       },
       "s5": {
         "heading": "Tujuh hari ke depan",
-        "body": "Sen–Sel: rencana dua mesin (Maya). Rab: nama tas yang tetap berbeda (Alex). Kam: keputusan mencetak ulang menu atau tetap memakai papan (Anda). Saya akan mengirim rekap enam baris pada Jumat, dicetak ulang atau tidak."
+        "body": "Sen–Sel: rencana dua mesin (Maya). Rab: nama tas yang tetap berbeda (Alex). Kam: keputusan mencetak ulang menu atau tetap memakai papan tulis (Anda). Saya akan mengirim rekap enam baris pada Jumat, apa pun keputusan cetak ulangnya."
       }
     },
     "onePager": {
@@ -77,65 +77,65 @@
       "title": "Pengambilan Sabtu — brief satu halaman",
       "s1": {
         "heading": "Hasil",
-        "body": "Pelanggan dapat pergi dengan tas bernama dalam kurang dari 8 menit pada Sabtu, tanpa bertanya pesanan yang mana. Sukses adalah 20 pengambilan pertama selesai tanpa perdebadan di kasir, dan antrean di bawah 8 menit."
+        "body": "Pelanggan dapat pulang membawa tas bernama dalam waktu kurang dari 8 menit pada hari Sabtu, tanpa perlu bertanya pesanan yang mana miliknya. Tolok ukur keberhasilannya: 20 pengambilan pertama selesai tanpa perdebatan di kasir, dengan waktu tunggu di bawah 8 menit."
       },
       "s2": {
         "heading": "Untuk siapa",
-        "body": "Orang yang sudah memesan lebih dulu dan mengambilnya pada Sabtu. Mereka tidak mencari toko kedua. Mereka ingin tas yang bisa dibawa pulang."
+        "body": "Orang yang sudah memesan lebih dulu dan mengambilnya pada hari Sabtu. Mereka tidak sedang mencari toko kedua. Mereka ingin tas yang bisa langsung dibawa pulang."
       },
       "s3": {
         "heading": "Dalam cakupan / di luar cakupan",
-        "body": "Dalam: tas bernama, mesin kartu cadangan, tiket tercetak, dan daftar periksa yang bisa diikuti kasir saat listrik mati.\n\nLuar: toko kedua, antar ke rumah, catatan pada pesanan, dan kalimat yang hanya masuk akal di catatan internal kita."
+        "body": "Dalam cakupan: tas bernama, mesin kartu cadangan, tiket tercetak, dan daftar periksa yang tetap bisa diikuti kasir saat listrik padam.\n\nDi luar cakupan: toko kedua, pengantaran ke rumah, catatan pada pesanan, dan kalimat yang hanya masuk akal di catatan internal kita."
       },
       "s4": {
         "heading": "Pendekatan dan risikonya",
-        "body": "Pertahankan daftar periksa Sabtu yang ada. Jangan membuat buku pesanan kedua. Risikonya catatan satu baris yang membuat kasir menebak — daftar periksa harus menyebut untuk siapa, seperti apa selesai, dan satu Sabtu contoh agar orang baru bisa menjalankannya."
+        "body": "Pertahankan daftar periksa Sabtu yang sudah ada. Jangan membuat buku pesanan kedua. Risikonya adalah catatan satu baris yang membuat kasir menebak-nebak — daftar periksa harus menyebutkan untuk siapa, seperti apa wujud selesai, dan satu contoh hari Sabtu agar orang baru dapat menjalankannya."
       },
       "s5": {
         "heading": "Urutan",
-        "body": "Minggu 1 (Alex): nama tas yang berbeda dan daftar periksa yang sudah terisi, bukan kartu kosong.\n\nMinggu 2 (Alex): ukur antrean dengan mesin cadangan, dicek pada Sabtu yang sepi.\n\nMinggu 3 (Maya): satu Sabtu penuh dengan brief ini, lalu tas dibuka di kasir. Jika antrean di atas 8 menit, kita berhenti menambah menu dan memperbaiki antreannya."
+        "body": "Minggu 1 (Alex): nama tas yang berbeda-beda dan daftar periksa yang sudah terisi, bukan kartu kosong.\n\nMinggu 2 (Alex): ukur antrean dengan mesin cadangan, diuji pada Sabtu yang sepi.\n\nMinggu 3 (Maya): satu hari Sabtu penuh dengan brief ini, lalu tas dibuka di kasir. Jika waktu tunggu lebih dari 8 menit, kita berhenti menambah item menu dan membenahi antreannya."
       },
       "s6": {
         "heading": "Permintaan",
-        "body": "Pastikan yang di luar cakupan tetap di luar. Jika Anda ingin toko kedua atau antar ke rumah pada siklus ini, itu brief yang berbeda — sampaikan sekarang."
+        "body": "Pastikan hal-hal di luar cakupan tetap di luar. Jika Anda menginginkan toko kedua atau pengantaran pada siklus ini, itu brief yang berbeda — sampaikan sekarang."
       }
     }
   },
   "templates": {
     "decision-memo": {
       "title": "Memo keputusan",
-      "prompt": "Tulis memo keputusan yang dapat disetujui direktur dalam satu kali baca. Ini memo jadi, bukan kerangka.\n\nPeran: kepala operasional.\nAudiens: orang yang akan memilih satu opsi hari ini.\nHasil: 5–7 bagian, 700–1000 kata. Paragraf pendek. Tanpa ringkasan eksekutif yang kosong.\n\nKonteks sampel (ganti bidang dalam kurung, pertahankan bentuknya):\n- Keputusan: apakah [Harbour Street] [tetap mengambil pesanan Sabtu di mesin kartu yang sekarang] atau [memindahkan volume Sabtu kuartal depan ke mesin kedua].\n- Mengapa sekarang: [kontrak mesin diperpanjang dalam 6 minggu], [antrean Sabtu 8 menit terhadap target 5 menit], [satu akun grosir menunggu slot Sabtu yang bisa diandalkan].\n- Opsi: tetap; jalankan kedua mesin 90 hari; ganti penuh dalam 30 hari.\n- Batasan: [satu minggu waktu Maya] dan [tidak ada kontrak pemasok baru bulan ini] kecuali kita memilih ganti penuh.\n\nBagian wajib:\n1. Keputusan dalam satu kalimat (sebut pilihannya).\n2. Konteks dan biaya menunda.\n3. Opsi dalam prosa (biaya, waktu, risiko, dapat dibalik — tandai yang belum diketahui, jangan menebak).\n4. Rekomendasi dan dua tradeoff yang kita terima.\n5. Apa yang akan diukur dalam 30 hari.\n6. Permintaan (siapa mengerjakan apa, kapan).\n\nStandar mutu: angka konkret dari sampel atau diberi tag [sample]. Tanpa “kita sebaiknya mempertimbangkan untuk menelusuri.” Tanpa “dalam lanskap hari ini.”\nJangan mengada-ada undang-undang, pelanggan, atau kutipan.",
-      "resultSummary": "Memo keputusan sekali baca dengan pilihan bernama, tradeoff, dan ukuran 30 hari — bukan heading kosong."
+      "prompt": "Tulis memo keputusan yang dapat disetujui direktur dalam sekali duduk. Ini memo yang sudah jadi, bukan kerangka.\n\nPeran: kepala operasional.\nAudiens: orang yang akan memilih satu opsi hari ini.\nKeluaran: 5–7 bagian, 700–1000 kata. Paragraf pendek. Tanpa ringkasan eksekutif yang kosong.\n\nContoh konteks (ganti isian dalam kurung siku, pertahankan strukturnya):\n- Keputusan: apakah [Harbour Street] [tetap mengambil pesanan Sabtu di mesin kartu yang sekarang] atau [memindahkan volume Sabtu kuartal depan ke mesin kedua].\n- Mengapa sekarang: [kontrak mesin diperpanjang dalam 6 minggu], [antrean Sabtu 8 menit terhadap target 5 menit], [satu akun grosir menunggu slot Sabtu yang dapat diandalkan].\n- Opsi: tetap; jalankan kedua mesin 90 hari; ganti penuh dalam 30 hari.\n- Batasan: [satu minggu waktu Maya] dan [tidak ada kontrak pemasok baru bulan ini] kecuali kita memilih ganti penuh.\n\nBagian wajib:\n1. Keputusan dalam satu kalimat (sebut pilihannya).\n2. Konteks dan biaya menunda.\n3. Opsi dalam bentuk tabel-dalam-prosa (biaya, waktu, risiko, kemudahan dibatalkan — tandai yang belum diketahui, jangan menebak).\n4. Rekomendasi dan dua trade-off yang kita terima.\n5. Apa yang akan diukur dalam 30 hari.\n6. Permintaan (siapa mengerjakan apa, kapan).\n\nStandar mutu: angka konkret dari sampel atau diberi label [contoh]. Tanpa “kita sebaiknya mempertimbangkan untuk menjajaki.” Tanpa “dalam lanskap hari ini.”\nJangan mengarang undang-undang, pelanggan, atau kutipan.",
+      "resultSummary": "Memo keputusan sekali duduk dengan pilihan yang jelas, trade-off, dan tolok ukur 30 hari — bukan sekadar judul bagian yang kosong."
     },
     "project-one-pager": {
-      "title": "Satu halaman proyek",
-      "prompt": "Tulis brief proyek satu halaman yang dapat dijalankan rekan baru. Prosa jadi, bukan kerangka.\n\nPeran: ketua proyek.\nAudiens: orang yang mengerjakan dan orang yang mendanai.\nHasil: 6 bagian, sekitar 600–800 kata.\n\nKonteks sampel (ganti bidang dalam kurung):\n- Proyek: siapkan [pengambilan Sabtu] [tas bernama dan mesin kartu cadangan] agar [pelanggan] dapat pergi dengan pesanannya.\n- Jendela: [tiga minggu].\n- Sukses: [20 pesanan Sabtu pertama] pergi tanpa perdebadan di kasir; [antrean di bawah 8 menit].\n- Di luar cakupan: [toko kedua], [antar ke rumah].\n\nBagian wajib:\n1. Hasil (satu paragraf, terukur).\n2. Untuk siapa dan pekerjaan yang mereka sewa.\n3. Dalam cakupan / di luar cakupan (dua daftar singkat).\n4. Pendekatan dan satu risiko teknis.\n5. Urutan (minggu 1 / 2 / 3) dengan pemilik bernama per minggu.\n6. Permintaan (keputusan atau sumber daya).\n\nStandar mutu: orang asing dapat melihat seperti apa “selesai”. Tanpa pernyataan misi. Tanpa kalimat yang hanya masuk akal di catatan internal kita.\nJangan mengada-ada pos anggaran yang tidak ada di sampel.",
-      "resultSummary": "Satu halaman yang dapat dijalankan, dengan cakupan, urutan tiga minggu, dan permintaan yang jelas."
+      "title": "Ringkasan proyek satu halaman",
+      "prompt": "Tulis brief proyek satu halaman yang dapat langsung dikerjakan rekan tim baru. Tulis dalam prosa utuh, bukan kerangka.\n\nPeran: ketua proyek.\nAudiens: orang yang mengerjakan dan orang yang mendanai.\nKeluaran: 6 bagian, sekitar 600–800 kata.\n\nContoh konteks (ganti isian dalam kurung siku):\n- Proyek: siapkan [pengambilan Sabtu] [tas bernama dan mesin kartu cadangan] agar [pelanggan] dapat pergi dengan pesanannya.\n- Jangka waktu: [tiga minggu].\n- Tolok ukur keberhasilan: [20 pesanan Sabtu pertama] pergi tanpa perdebatan di kasir; [antrean di bawah 8 menit].\n- Di luar cakupan: [toko kedua], [antar ke rumah].\n\nBagian wajib:\n1. Hasil (satu paragraf, terukur).\n2. Untuk siapa, dan pekerjaan apa yang ingin mereka selesaikan dengan ini.\n3. Dalam cakupan / di luar cakupan (dua daftar singkat).\n4. Pendekatan dan satu risiko teknis.\n5. Urutan (minggu 1 / 2 / 3) dengan pemilik bernama per minggu.\n6. Permintaan (keputusan atau sumber daya).\n\nStandar mutu: orang yang sama sekali baru pun dapat memahami seperti apa “selesai” itu. Tanpa pernyataan misi. Tanpa kalimat yang hanya masuk akal di catatan internal kita.\nJangan mengarang pos anggaran yang tidak ada di sampel.",
+      "resultSummary": "Ringkasan satu halaman yang dapat dijalankan, dengan cakupan, urutan tiga minggu, dan permintaan yang jelas."
     },
     "design-rfc": {
       "title": "RFC desain",
-      "prompt": "Susun RFC desain yang dapat diperdebatkan. Tulis argumennya, bukan daftar isi.\n\nPeran: insinyur yang mengusulkan perubahan.\nAudiens: dua peninjau yang akan menyetujui atau menolak.\nHasil: 7–8 bagian, 900–1300 kata.\n\nKonteks sampel (ganti bidang dalam kurung):\n- Perubahan: simpan [jendela pengambilan Sabtu] pada [pesanan] alih-alih menyimpulkannya dari [nama menu].\n- Masalah: [kasir hanya menampilkan tamu langsung] sampai seseorang menulis catatan; [pesanan di muka tetap di buku samping].\n- Batasan: jangan buang [buku pesanan lama]; kasir masih memakai [tiket tamu langsung].\n\nBagian wajib:\n1. Ringkasan (apa yang berubah, apa yang tidak).\n2. Masalah dan siapa yang merasakannya.\n3. Usulan (data, jalur baca, jalur tulis).\n4. Alternatif yang dipertimbangkan (minimal dua, mengapa kalah).\n5. Peluncuran dan migrasi (jendela kosong berarti setiap Sabtu).\n6. Risiko dan cara kita mengetahuinya.\n7. Pertanyaan terbuka (yang nyata, bukan “TBD”).\n\nStandar mutu: peninjau dapat mengimplementasikan dari naskah ini. Sebut file atau tabel di sampel; jangan membuat skema kedua.\nJangan menulis “RFC ini mengusulkan untuk menelusuri.”",
-      "resultSummary": "RFC yang dapat distempel, dengan usulan nyata, dua alternatif yang ditolak, dan aturan migrasi."
+      "prompt": "Susun RFC desain yang dapat diperdebatkan. Tulis argumennya, bukan daftar isi.\n\nPeran: insinyur yang mengusulkan perubahan.\nAudiens: dua peninjau yang akan menyetujui atau menolak.\nKeluaran: 7–8 bagian, 900–1300 kata.\n\nContoh konteks (ganti isian dalam kurung siku):\n- Perubahan: simpan [jendela pengambilan Sabtu] pada [pesanan] alih-alih menyimpulkannya dari [nama menu].\n- Masalah: [kasir hanya menampilkan pembeli yang datang langsung] sampai seseorang menulis catatan; [pesanan prapesan tetap tercatat di buku terpisah].\n- Batasan: jangan buang [buku pesanan lama]; kasir masih memakai [tiket pembeli langsung].\n\nBagian wajib:\n1. Ringkasan (apa yang berubah, apa yang tidak).\n2. Masalah dan siapa yang merasakannya.\n3. Usulan (data, jalur baca, jalur tulis).\n4. Alternatif yang dipertimbangkan (minimal dua, mengapa kalah).\n5. Peluncuran dan migrasi (jendela kosong berarti setiap Sabtu).\n6. Risiko dan cara kita mengetahuinya.\n7. Pertanyaan terbuka (yang nyata, bukan “TBD”).\n\nStandar mutu: peninjau dapat mengimplementasikannya langsung dari dokumen ini. Sebutkan nama berkas atau tabel dalam contoh; jangan membuat skema kedua.\nJangan menulis “RFC ini mengusulkan untuk menjajaki.”",
+      "resultSummary": "RFC yang siap disetujui, dengan usulan nyata, dua alternatif yang ditolak, dan aturan migrasi."
     },
     "meeting-digest": {
       "title": "Ringkasan rapat",
-      "prompt": "Ubah catatan di bawah menjadi ringkasan yang dapat ditindaklanjuti rekan yang absen. Buang obrolan. Pertahankan pemilik dan tanggal.\n\nPeran: orang yang memimpin rapat.\nAudiens: peserta plus dua orang yang tidak hadir.\nHasil: 4 bagian. Daftar rapat. Setiap tindakan punya pemilik dan tanggal.\n\nCatatan sampel (ganti dengan milik Anda, pertahankan kepadatan ini):\n- Sabtu [Harbour Street]: antrean [8 menit], [Maya] ingin kedua mesin, [Priya] bilang keuangan tidak akan menandatangani pemasok kedua bulan ini.\n- [Label tas]: [minggu 2], [Alex] memegang pencetak; terhambat [dua pesanan memakai nama yang sama].\n- Parkir: [warna selebaran], [ganti nama slot Sabtu].\n- Keputusan (sementara): tetap di mesin yang sekarang sampai [perpanjangan]; tulis rencana dua mesin minggu ini.\n\nBagian wajib:\n1. Keputusan (apa yang benar-benar diputuskan — jika sementara, sebutkan).\n2. Butir tindakan (pemilik + tanggal + langkah konkret pertama).\n3. Risiko / hambatan yang masih butuh orang.\n4. Parkir (satu baris masing-masing, tanpa esai).\n\nStandar mutu: jangan “tim akan menindaklanjuti.” Jika pemilik belum ada, tulis “[needs owner]”.\nJangan mengada-ada peserta yang tidak ada di catatan.",
-      "resultSummary": "Ringkasan tindakan dengan pemilik dan tanggal — bukan transkrip dengan heading yang lebih rapi."
+      "prompt": "Ubah catatan di bawah menjadi ringkasan yang dapat ditindaklanjuti rekan yang absen. Singkirkan basa-basi. Pertahankan pemilik dan tanggal.\n\nPeran: orang yang memimpin rapat.\nAudiens: peserta plus dua orang yang tidak hadir.\nKeluaran: 4 bagian. Daftar yang ringkas. Setiap tindakan punya pemilik dan tanggal.\n\nContoh catatan (ganti dengan catatan Anda, pertahankan kepadatan ini):\n- Sabtu [Harbour Street]: antrean [8 menit], [Maya] ingin kedua mesin, [Priya] bilang keuangan tidak akan menandatangani pemasok kedua bulan ini.\n- [Label tas]: [minggu 2], [Alex] memegang pencetak; terhambat [dua pesanan memakai nama yang sama].\n- Ditunda: [warna selebaran], [ganti nama slot Sabtu].\n- Keputusan (sementara): tetap di mesin yang sekarang sampai [perpanjangan]; tulis rencana dua mesin minggu ini.\n\nBagian wajib:\n1. Keputusan (apa yang benar-benar diputuskan — jika sementara, sebutkan).\n2. Butir tindakan (pemilik + tanggal + langkah konkret pertama).\n3. Risiko / hambatan yang masih membutuhkan penanggung jawab.\n4. Ditunda untuk nanti (satu baris per butir, tanpa esai).\n\nStandar mutu: jangan “tim akan menindaklanjuti.” Jika pemilik belum ada, tulis “[perlu pemilik]”.\nJangan mengada-ada peserta yang tidak ada di catatan.",
+      "resultSummary": "Ringkasan tindakan dengan pemilik dan tanggal — bukan transkrip dengan judul bagian yang lebih rapi."
     },
     "kickoff-agenda": {
       "title": "Agenda kickoff",
-      "prompt": "Tulis agenda kickoff 45 menit yang dapat dijalankan orang lain tanpa Anda di ruangan.\n\nPeran: fasilitator.\nAudiens: ruangan campuran (ops + satu pengambil keputusan).\nHasil: blok berwaktu dengan hasil yang diinginkan per blok, plus satu paragraf tujuan di atas.\n\nKonteks sampel (ganti bidang dalam kurung):\n- Kickoff untuk [pengambilan Sabtu].\n- Ruangan: [Alex] (kasir), [Priya] (keuangan), [Maya] (lantai), [Anda].\n- Harus selesai dengan: [cakupan terkunci], [pemilik minggu-1], [satu risiko yang akan kita awasi].\n\nBlok wajib (pertahankan waktu, tulis ulang promptnya):\n1. 0:00–0:05 Tujuan dan arti “selesai” pada siklus ini.\n2. 0:05–0:15 Konteks: siapa yang kesulitan hari ini, apa yang tidak akan kita bangun.\n3. 0:15–0:30 Urutan dan pemilik (minggu 1/2/3).\n4. 0:30–0:40 Risiko dan keputusan yang dibutuhkan hari ini.\n5. 0:40–0:45 Penutup, parkir, pemilik rekap tertulis.\n\nUntuk setiap blok: waktu, pemilik, pertanyaan yang harus dijawab ruangan, artefak yang mereka bawa pulang.\nStandar mutu: fasilitator pengganti dapat menjalankannya. Tanpa icebreaker. Tanpa “perkenalan jika ada waktu.”",
+      "prompt": "Tulis agenda kickoff 45 menit yang dapat dijalankan orang lain tanpa Anda di ruangan.\n\nPeran: fasilitator.\nAudiens: ruangan campuran (tim operasional + satu pengambil keputusan).\nKeluaran: blok berwaktu dengan hasil yang diinginkan per blok, plus satu paragraf tujuan di atas.\n\nContoh konteks (ganti isian dalam kurung siku):\n- Kickoff untuk [pengambilan Sabtu].\n- Peserta: [Alex] (kasir), [Priya] (keuangan), [Maya] (lantai), [Anda].\n- Harus menghasilkan: [cakupan terkunci], [pemilik minggu-1], [satu risiko yang akan kita awasi].\n\nBlok wajib (pertahankan waktu, tulis ulang pertanyaan pemandunya):\n1. 0:00–0:05 Tujuan dan arti “selesai” pada siklus ini.\n2. 0:05–0:15 Konteks: siapa yang kesulitan hari ini, apa yang tidak akan kita bangun.\n3. 0:15–0:30 Urutan dan pemilik (minggu 1/2/3).\n4. 0:30–0:40 Risiko dan keputusan yang dibutuhkan hari ini.\n5. 0:40–0:45 Penutup, daftar bahasan tertunda, pemilik rekap tertulis.\n\nUntuk setiap blok: waktu, pemilik, pertanyaan yang harus dijawab ruangan, hasil kerja yang dibawa pulang peserta.\nStandar mutu: fasilitator pengganti dapat menjalankannya. Tanpa icebreaker. Tanpa “perkenalan jika ada waktu.”",
       "resultSummary": "Agenda 45 menit siap jalan dengan hasil per blok — bukan daftar topik."
     },
     "handoff-pack": {
       "title": "Paket serah terima",
-      "prompt": "Tulis serah terima yang dapat dipakai pemilik baru pada Senin tanpa panggilan.\n\nPeran: pemilik yang menyerahkan.\nAudiens: orang yang mengambil ini dari nol.\nHasil: 6 bagian, daftar centang jika membantu, paragraf pendek jika tidak.\n\nKonteks sampel (ganti bidang dalam kurung):\n- Menyerahkan [pengambilan Sabtu] dari [Alex] ke [Priya].\n- Selesai: [label tas tercetak], [mesin cadangan di kasir].\n- Sedang dikerjakan: [mengukur antrean Sabtu].\n- Kerusakan diketahui: [dua pesanan dengan nama yang sama masuk satu tas].\n- Lokasinya: [binder kasir], [daftar periksa Sabtu di dinding].\n\nBagian wajib:\n1. Ini apa (satu paragraf).\n2. Selesai (centang, bukti selesai).\n3. Sedang dikerjakan (seperti apa “baik” untuk masing-masing).\n4. Siapa memegang apa setelah hari ini.\n5. Risiko diketahui dan tempat pertama untuk memeriksa.\n6. Jalur, kredensial (tidak ada di repo), dan cara memverifikasi.\n\nStandar mutu: pemilik baru tidak perlu telepon. Tandai nomor kartu sebagai “di laci terkunci,” jangan menulisnya di paket ini.\nJangan mengganti paket ini dengan “siap telepon jika perlu.”",
-      "resultSummary": "Serah terima siap Senin dengan jalur, risiko, dan bukti selesai — bukan paragraf perpisahan."
+      "prompt": "Tulis serah terima yang dapat dipakai pemilik baru pada Senin tanpa perlu menelepon.\n\nPeran: pemilik yang menyerahkan.\nAudiens: orang yang mengambil ini dari nol.\nKeluaran: 6 bagian, daftar centang jika membantu, paragraf pendek jika tidak.\n\nContoh konteks (ganti isian dalam kurung siku):\n- Menyerahkan [pengambilan Sabtu] dari [Alex] ke [Priya].\n- Selesai: [label tas tercetak], [mesin cadangan di kasir].\n- Sedang dikerjakan: [mengukur antrean Sabtu].\n- Masalah yang sudah diketahui: [dua pesanan dengan nama yang sama masuk satu tas].\n- Letaknya: [map arsip di kasir], [daftar periksa Sabtu di dinding].\n\nBagian wajib:\n1. Apa ini sebenarnya (satu paragraf).\n2. Selesai (centang, bukti selesai).\n3. Sedang dikerjakan (seperti apa “baik” untuk masing-masing).\n4. Siapa memegang apa setelah hari ini.\n5. Risiko yang sudah diketahui dan tempat pertama untuk memeriksa.\n6. Lokasi, kredensial (tidak disimpan di repositori), dan cara memverifikasi.\n\nStandar mutu: pemilik baru tidak perlu menelepon siapa pun. Tandai nomor kartu sebagai “di laci terkunci,” jangan menulisnya di paket ini.\nJangan menjadikan “siap ditelepon jika perlu” sebagai pengganti paket ini.",
+      "resultSummary": "Serah terima siap pakai di hari Senin, dengan lokasi, risiko, dan bukti selesai — bukan paragraf perpisahan."
     }
   },
   "artifacts": {
-    "listFailed": "Tidak bisa memuat daftar artefak tersimpan",
-    "openFailed": "Tidak bisa membuka artefak itu",
+    "listFailed": "Tidak dapat memuat daftar artefak tersimpan",
+    "openFailed": "Tidak dapat membuka artefak itu",
     "kind": {
       "dossier": "Dosir",
       "analysis": "Analisis",
@@ -143,28 +143,28 @@
       "briefing": "Pengarahan",
       "draft": "Draf",
       "memo": "Memo",
-      "redline": "Markah revisi",
+      "redline": "Redline",
       "report": "Laporan",
       "summary": "Ringkasan",
-      "red-flags": "Temuan kritis",
+      "red-flags": "Poin berisiko",
       "matter": "Perkara"
     }
   },
-  "needsKeyQuiet": "Tempel kunci di Pengaturan sebelum ini bisa jalan.",
+  "needsKeyQuiet": "Tempel kunci di Pengaturan sebelum fitur ini dapat dijalankan.",
   "check": "Periksa terhadap sumber",
   "checking": "Memeriksa…",
   "checkError": "Draf tidak dapat diperiksa",
   "sourceCheck": {
-    "empty": "Tambahkan materi sumber dulu. Tidak ada yang dapat diperiksa.",
+    "empty": "Tambahkan materi sumber terlebih dahulu. Belum ada acuan untuk memeriksa.",
     "supported": "Didukung",
     "unsupported": "Tidak ada di sumber"
   },
   "checks": {
     "grounding": "{count} bagian mungkin tidak mengikuti sumber",
     "groundingOne": "1 bagian mungkin tidak mengikuti sumber",
-    "groundingHint": "Draf tersimpan. Tekan “{action}” untuk melihat kalimat mana yang tidak ada di sumber, atau tulis ulang bagian itu.",
+    "groundingHint": "Draf tersimpan. Tekan “{action}” untuk melihat kalimat mana yang tidak ada di sumber, atau tulis ulang bagian tersebut.",
     "structure": "Beberapa bagian mungkin hilang atau terlalu singkat",
-    "structureHint": "Draf tersimpan. Buat ulang, atau tulis ulang bagian yang tipis."
+    "structureHint": "Draf sudah tersimpan. Buat ulang draf ini, atau tulis ulang bagian yang masih tipis."
   },
   "harness": {
     "sourceGap": "Tidak ada di sumber."

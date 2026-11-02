@@ -1,11 +1,11 @@
 {
   "title": "Kanal",
-  "intro": "Kirim pesan ke grup atau kanal Telegram dari meja ini, lalu baca balasannya.",
+  "intro": "Kirim pesan ke grup atau kanal Telegram dari meja kerja ini, lalu baca balasannya.",
   "privacyLabel": "Privasi",
-  "privacy": "Semua yang dikirim atau diterima di sini melewati Telegram tanpa enkripsi tambahan. Jangan kirim hal yang tidak pantas ditaruh di obrolan grup.",
+  "privacy": "Semua yang dikirim atau diterima di sini melewati Telegram tanpa enkripsi tambahan. Jangan kirim apa pun yang tidak pantas dibagikan di obrolan grup.",
   "bot": {
     "label": "Bot Telegram",
-    "intro": "Buat bot lewat @BotFather di Telegram, lalu tempel token yang diberikan. Token disimpan terenkripsi di meja ini dan tidak ditampilkan lagi.",
+    "intro": "Buat bot lewat @BotFather di Telegram, lalu tempel token yang diberikan. Token disimpan terenkripsi di meja kerja ini dan tidak akan ditampilkan lagi.",
     "placeholder": "123456789:AA…",
     "connect": "Hubungkan bot",
     "connected": "Terhubung sebagai @{username}",
@@ -13,12 +13,12 @@
     "sandbox": "Aplikasi ini diarahkan ke server uji lokal, bukan ke Telegram."
   },
   "list": {
-    "label": "Kanal di meja ini",
+    "label": "Kanal di meja kerja ini",
     "placeholder": "@username atau ID chat",
     "addAria": "ID chat atau @username",
     "add": "Tambah",
     "remove": "Hapus",
-    "hint": "Tambahkan bot ke grup atau kanal terlebih dahulu. Maksimal {max} kanal per meja.",
+    "hint": "Tambahkan bot ke grup atau kanal terlebih dahulu. Paling banyak {max} kanal per meja kerja.",
     "empty": "Belum ada kanal."
   },
   "conversation": {
@@ -35,7 +35,7 @@
   "poll": {
     "check": "Periksa pesan baru",
     "done": "{received} pesan baru.",
-    "someUnmatched": "{received} pesan baru. {unmatched} berasal dari obrolan yang belum ditambahkan di meja ini."
+    "someUnmatched": "{received} pesan baru. {unmatched} berasal dari obrolan yang belum ditambahkan ke meja kerja ini."
   },
   "chatType": {
     "channel": "Kanal",
@@ -44,13 +44,13 @@
     "private": "Pesan langsung"
   },
   "errors": {
-    "load": "Tidak bisa memuat kanal di meja ini.",
+    "load": "Tidak dapat memuat kanal di meja kerja ini.",
     "connect": "Telegram menolak token tersebut.",
-    "disconnect": "Tidak bisa memutuskan bot.",
-    "add": "Tidak bisa menambahkan kanal tersebut.",
-    "remove": "Tidak bisa menghapus kanal tersebut.",
+    "disconnect": "Tidak dapat memutuskan bot.",
+    "add": "Tidak dapat menambahkan kanal tersebut.",
+    "remove": "Tidak dapat menghapus kanal tersebut.",
     "send": "Telegram menolak pesan tersebut.",
-    "poll": "Tidak bisa memeriksa pesan baru.",
-    "notConnected": "Hubungkan bot Telegram untuk meja ini terlebih dahulu."
+    "poll": "Tidak dapat memeriksa pesan baru.",
+    "notConnected": "Hubungkan bot Telegram untuk meja kerja ini terlebih dahulu."
   }
 }

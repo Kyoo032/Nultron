@@ -1,6 +1,6 @@
 {
   "title": "Riset",
-  "expectedInputs": "Anda dapat: dosir bersitasi — Pertanyaan, Temuan, Sumber — yang dapat dibuka kembali, diunduh, atau dikirim ke Dokumen, Presentasi, atau Basis Pengetahuan.",
+  "expectedInputs": "Hasilnya: dosir bersitasi — Pertanyaan, Temuan, Sumber — yang dapat dibuka kembali, diunduh, atau dikirim ke Dokumen, Presentasi, atau Basis Pengetahuan.",
   "reopenSaved": "Buka riset tersimpan…",
   "openSettings": "Buka Pengaturan.",
   "tabNotes": "Catatan",
@@ -10,38 +10,38 @@
   "promptPlaceholder": "Apa yang berubah pada aturan pencatatan IDX tahun ini?",
   "promptAria": "Pertanyaan riset",
   "cancel": "Batal",
-  "generate": "Hasilkan",
+  "generate": "Mulai riset",
   "working": "Memproses…",
   "previewKicker": "Riset",
   "examplesHeading": "Mulai dari templat",
-  "examplesHint": "Klik kartu untuk memuat brief lengkap. Ganti detail contoh, lalu hasilkan.",
+  "examplesHint": "Klik sebuah kartu untuk memuat brief lengkap. Ganti detail contoh, lalu mulai riset.",
   "templates": {
     "competitive-landscape": {
       "title": "Peta persaingan",
-      "resultSummary": "Peta bersumber dengan pekerjaan pembeli, tiga produk nyata, dan perubahan bertanggal — bukan tiga kata sifat."
+      "resultSummary": "Peta persaingan bersumber, lengkap dengan pekerjaan yang ingin diselesaikan pembeli, tiga produk nyata, dan perubahan bertanggal — bukan tiga kata sifat."
     },
     "source-synthesis": {
       "title": "Sintesis sumber",
-      "resultSummary": "Peta tema dengan ketidaksepakatan dan kriteria batal — bukan ringkasan bertumpuk dari satu pendapat."
+      "resultSummary": "Peta tema lengkap dengan perbedaan pendapat dan kriteria pembatalan — bukan ringkasan bertumpuk dari satu sudut pandang."
     },
     "question-backlog": {
-      "title": "Antrean pertanyaan",
-      "resultSummary": "Dua belas pertanyaan terurut dengan metode dan tolok ukur selesai — bukan curah pendapat."
+      "title": "Daftar pertanyaan",
+      "resultSummary": "Dua belas pertanyaan terurut dengan metode dan penanda selesai — bukan sekadar curah gagasan."
     },
     "claim-check": {
       "title": "Uji klaim",
-      "resultSummary": "Putusan atas satu klaim dengan syarat pembalik — bukan paragraf kedua belah pihak."
+      "resultSummary": "Putusan atas satu klaim beserta syarat yang dapat membalikkannya — bukan paragraf yang membela kedua sisi."
     },
     "options-matrix": {
       "title": "Matriks opsi",
-      "resultSummary": "Kisi opsi berskor dengan ketidaktahuan eksplisit dan metrik batal minggu pertama."
+      "resultSummary": "Kisi opsi berskor dengan hal-hal yang belum diketahui dinyatakan secara eksplisit, serta metrik pembatalan di minggu pertama."
     },
     "vendor-diligence": {
       "title": "Uji tuntas vendor",
-      "resultSummary": "Catatan uji tuntas bersumber dengan putusan kecocokan dan celah ‘tidak dipublikasikan’ — bukan brosur."
+      "resultSummary": "Catatan uji tuntas bersumber dengan putusan kecocokan dan celah ‘tidak dipublikasikan’ — bukan tulisan ulang brosur."
     }
   },
-  "errorGateway": "Riset memerlukan gateway aktif. Tempel kunci API Toko Token di Settings, lalu coba lagi.",
+  "errorGateway": "Riset memerlukan gateway aktif. Tempel kunci API Toko Token di Pengaturan, lalu coba lagi.",
   "errorSearch": "Pencarian web tidak mengembalikan hasil. Coba lagi sebentar lagi.",
   "errorNoHttps": "Pencarian tidak mengembalikan hasil HTTPS yang dapat dibaca untuk pertanyaan ini",
   "errorNoPassage": "Tidak ada halaman yang menyimpan kalimat yang dapat dikutip.",
@@ -50,7 +50,7 @@
   "verdictContradict": "Sumber bertentangan",
   "verdictOnly": "Hanya satu sumber yang menyebutnya",
   "headingComparison": "## Perbandingan",
-  "phasePlanning": "Merencanakan sub-kueri",
+  "phasePlanning": "Merencanakan kueri pencarian",
   "phaseSearching": "Mencari di web",
   "phaseReading": "Membaca halaman",
   "phaseComparing": "Membandingkan sumber",
