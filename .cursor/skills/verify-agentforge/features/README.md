@@ -52,6 +52,7 @@ Every recipe names its product and the instance it is driven on. The same pair s
 |---|---|---|
 | [Build](./build.md) | both | main :3000 (parked: `/studio` redirects to Chat) |
 | [Channels (Telegram)](./channels.md) | both | main :3000 |
+| [Customers (WhatsApp)](./customers.md) | both | main :3000 |
 | [Chat](./chat.md) | both | main :3000 |
 | [Code](./code.md) | both | main :3000 |
 | [Components (first-run installer)](./components.md) | both | main :3000 |
@@ -111,6 +112,7 @@ Every recipe names its product and the instance it is driven on. The same pair s
 - [Rail](./rail.md) — the chat-first `AgentRail`: icon-only 64px column (56px on a phone) of `mode-chat` and `agent-<mode>` tiles marked `data-conversation` harness or studio, `rail-account-group` (Knowledge, Usage, Channels, Virtual agents, Settings), and `rail-footer`. The `productModes` to visible-tiles to hidden-mode-redirect chain, collapse widths, skeleton, theme toggle. The old labelled `AppRail` is the `modes` fallback.
 - [Shell scroll](./shell-scroll.md) — one scroller per desk pane, Chat and Edit scroll inside the pane, scroll position survives a rail click, Chat follows a stream, wide lanes at 1920 / 2560 / 3440. The 480px rail collapse stays in [rail.md](./rail.md). (The older "Presentation preview is two columns from 1600px" has no source: no such breakpoint exists in the presentation components.)
 - [Channels](./channels.md) — account-rail `/channels`: connect a Telegram bot to the desk, add a group or channel, send, and poll for replies. Not a product mode; drive it against `scripts/telegram-sandbox.ts` rather than a real bot.
+- [Customers](./customers.md) — account-rail `/customers`: the WhatsApp customer inbox. Connect a number, read what customers send, reply inside the 24-hour window, mark done. Not a product mode; drive it against `scripts/whatsapp-sandbox.ts`, never a real number.
 - [Usage](./usage.md) — Account-group `/usage` Day/Week/Month stacked spend, this-key strip, desk by-model. Not a product mode.
 - [Workspaces](./workspaces.md) — the desk model behind Virtual agents: `workspaces-link` opens `/workspaces`, hire and let go edit the desk's `productModes`; the old switcher and create-from-template screen are `modes`-fallback only.
 - [Models](./models.md) — the model catalog behind the tiers: doctor modeKeys/chatCount/curation on webdev. No screen renders the per-model picker or the Thinking control in either shell layout (see Model tiers); the curated order shows in the studios' `<mode>-studio-model` selects.

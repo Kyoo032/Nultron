@@ -1,0 +1,88 @@
+{
+  "title": "Customers",
+  "intro": "Your customers' WhatsApp messages in one place. Read what came in, answer it, and see what still needs you.",
+  "today": {
+    "needsYou": "Need you",
+    "withYou": "With you",
+    "received": "Received today",
+    "sent": "Sent today",
+    "firstReply": "Typical first reply",
+    "noReplyYet": "No replies yet",
+    "seconds": "{value} sec",
+    "minutes": "{value} min",
+    "hours": "{value} h"
+  },
+  "connect": {
+    "label": "WhatsApp number",
+    "intro": "Connect the WhatsApp Business number your customers write to. The access token is stored encrypted on this desk and never shown again.",
+    "phoneNumberId": "Phone number ID",
+    "phoneNumberIdPlaceholder": "From Meta's WhatsApp setup, digits only",
+    "accessToken": "Access token",
+    "accessTokenPlaceholder": "Permanent token from Meta",
+    "connect": "Connect number",
+    "connected": "Connected: {phone}",
+    "connectedAs": "{name}",
+    "disconnect": "Disconnect",
+    "disconnectNote": "Disconnecting forgets the token and stops new messages. Your conversations stay.",
+    "callbackLabel": "Callback URL for Meta",
+    "callbackHint": "In Meta's webhook settings, paste this URL, enter the verify token set on the server, and subscribe to \"messages\".",
+    "copy": "Copy",
+    "copied": "Copied",
+    "notReady": "This server does not have its Meta app secret and verify token yet, so Meta cannot deliver messages to it. Ask whoever runs the server to set them.",
+    "sandbox": "This app is pointed at a local test server, not at WhatsApp."
+  },
+  "filters": {
+    "all": "All",
+    "needs_you": "Need you",
+    "with_you": "With you",
+    "closed": "Done"
+  },
+  "list": {
+    "search": "Search by name or number",
+    "empty": "No conversations yet. Messages your customers send to the connected number appear here.",
+    "emptyFiltered": "Nothing matches that.",
+    "unread": "{count} new",
+    "you": "You: {text}"
+  },
+  "thread": {
+    "none": "Pick a conversation to read it.",
+    "empty": "No messages yet.",
+    "fromCustomer": "Customer",
+    "fromYou": "You",
+    "done": "Mark done",
+    "reopen": "Reopen",
+    "states": {
+      "auto": "Handled automatically",
+      "needs_you": "Needs you",
+      "with_you": "With you",
+      "closed": "Done"
+    }
+  },
+  "delivery": {
+    "queued": "Sending…",
+    "sent": "Sent",
+    "delivered": "Delivered",
+    "read": "Read",
+    "failed": "Not delivered"
+  },
+  "window": {
+    "open": "You can reply freely for {hours} h {minutes} min more.",
+    "openMinutes": "You can reply freely for {minutes} min more.",
+    "closed": "The 24-hour window has closed. WhatsApp only allows an approved template message now, which this desk cannot send yet. You can reply as soon as the customer writes again.",
+    "never": "This customer has not written yet, so there is nothing to answer."
+  },
+  "composer": {
+    "placeholder": "Write your reply",
+    "aria": "Reply to this customer",
+    "send": "Send reply"
+  },
+  "errors": {
+    "load": "Could not load your customers.",
+    "connect": "WhatsApp did not accept that number and token.",
+    "disconnect": "Could not disconnect the number.",
+    "send": "WhatsApp did not accept that reply.",
+    "state": "Could not change that conversation.",
+    "notConnected": "Connect a WhatsApp number for this desk first.",
+    "windowClosed": "The 24-hour window has closed, so a free-form reply cannot be sent."
+  }
+}

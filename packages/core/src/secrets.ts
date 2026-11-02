@@ -57,6 +57,14 @@ export type StoredSecrets = {
    * to the renderer — `hasTelegramBot` and the fingerprint are all it ever sees.
    */
   telegramBotToken?: string;
+  /**
+   * WhatsApp Business access token for this desk's customer inbox
+   * (docs/internal/whatsapp-omnichannel-plan.md). Same envelope and the same clear-on-empty rule as
+   * the Telegram token; the renderer is told only whether one is saved, through the Customers
+   * routes, and never sees the value. The Meta app secret is NOT here: it is install-wide, in the
+   * server environment.
+   */
+  whatsappAccessToken?: string;
 };
 
 /** The retrieval engines a desk may select. */
@@ -107,6 +115,7 @@ const KEY_FIELDS = [
   "anthropicApiKey",
   "volcengineApiKey",
   "telegramBotToken",
+  "whatsappAccessToken",
 ] as const;
 const URL_FIELDS = ["openaiBaseUrl", "googleBaseUrl", "anthropicBaseUrl", "volcengineBaseUrl"] as const;
 /** Opaque local strings: stored verbatim, cleared by an empty patch value. */

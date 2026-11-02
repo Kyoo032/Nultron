@@ -1,6 +1,7 @@
 import { DEFAULT_APP_LOCALE, parseAppLocale, type AppLocale } from "@agentforge/core/locale";
 import enAuth from "../locales/en/auth.json";
 import enChannels from "../locales/en/channels.json";
+import enCustomers from "../locales/en/customers.json";
 import enChat from "../locales/en/chat.json";
 import enCommon from "../locales/en/common.json";
 import enData from "../locales/en/data.json";
@@ -32,6 +33,7 @@ import idAgents from "../locales/id/agents.json";
 import idHarness from "../locales/id/harness.json";
 import idAuth from "../locales/id/auth.json";
 import idChannels from "../locales/id/channels.json";
+import idCustomers from "../locales/id/customers.json";
 import idChat from "../locales/id/chat.json";
 import idCommon from "../locales/id/common.json";
 import idData from "../locales/id/data.json";
@@ -77,6 +79,7 @@ const NAMESPACES = [
   "folder",
   "usage",
   "channels",
+  "customers",
   "market",
   "data",
   "finance",
@@ -109,6 +112,7 @@ const catalogs: Record<AppLocale, Record<Namespace, MessageTree>> = {
     plans: enPlans,
     knowledge: enKnowledge,
     channels: enChannels,
+    customers: enCustomers,
     workspaces: enWorkspaces,
     files: enFiles,
     folder: enFolder,
@@ -140,6 +144,7 @@ const catalogs: Record<AppLocale, Record<Namespace, MessageTree>> = {
     plans: idPlans,
     knowledge: idKnowledge,
     channels: idChannels,
+    customers: idCustomers,
     workspaces: idWorkspaces,
     files: idFiles,
     folder: idFolder,

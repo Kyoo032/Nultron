@@ -356,6 +356,20 @@ const SCENES: Record<ModeIconName, ReactNode> = {
       </Pop>
     </>
   ),
+  customers: (
+    <>
+      <rect x="20" y="20" width="76" height="32" rx="10" fill={SURFACE} stroke={LINE} strokeWidth="2" />
+      <Lines x={32} y={30} widths={[48, 32]} />
+      <Pop i={1}>
+        <rect x="66" y="58" width="76" height="32" rx="10" fill={MODE} />
+        <rect x="78" y="68" width="48" height="3" rx="1.5" fill={SURFACE} />
+        <rect x="78" y="78" width="30" height="3" rx="1.5" fill={SURFACE} />
+      </Pop>
+      <Pop i={2}>
+        <Spark x={138} y={26} fill={A4} s={0.8} />
+      </Pop>
+    </>
+  ),
   workspaces: (
     <>
       <rect x="24" y="18" width="48" height="32" rx="6" fill={A2} />

@@ -23,7 +23,7 @@ describe("rail account group", () => {
     const pinned = nav.indexOf('className="rail-pinned shrink-0 pb-2"');
     expect(pinned).toBeGreaterThan(nav.indexOf("jobModes.map"));
     const group = nav.slice(pinned);
-    for (const testId of ["mode-knowledge", "channels-link", "workspaces-link", "usage-link", "settings-link"]) {
+    for (const testId of ["mode-knowledge", "channels-link", "customers-link", "workspaces-link", "usage-link", "settings-link"]) {
       expect(group, testId).toContain(`testId="${testId}"`);
     }
     // Only the Account rows live in it: the other groups scroll.

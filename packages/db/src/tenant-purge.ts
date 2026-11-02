@@ -79,6 +79,10 @@ export const CASCADED_TABLES = [
   // Reached through `desk_files`, not through `organizations`: the workspace-scoped pass below
   // deletes the desk's files and the foreign key takes their versions with them.
   "desk_file_versions",
+  // The customer inbox: reached through `channel_endpoints` (the workspace-scoped pass below deletes
+  // the desk's endpoints; each conversation and message follows through its foreign key).
+  "customer_conversations",
+  "customer_messages",
 ] as const;
 
 /**
@@ -109,6 +113,9 @@ export const WORKSPACE_SCOPED_TABLES = [
   // which the host half of the reset removes whole.
   "desk_files",
   "file_proposals",
+  // Customer inbox: the connected numbers. Their conversations and messages go with them through
+  // the foreign keys, so a purge by desk leaves no customer text behind.
+  "channel_endpoints",
 ] as const;
 
 /** Tables keyed directly by `tenant_id` that a reset clears. */

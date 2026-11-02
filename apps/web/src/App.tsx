@@ -24,6 +24,7 @@ import { VirtualAgentsPage } from "@/components/virtual-agents-page";
 import { WorkspacesPage } from "@/components/workspaces-page";
 import { KnowledgePage } from "@/components/knowledge-page";
 import { ChannelsPage } from "@/components/channels-page";
+import { CustomersPage } from "@/components/customers-page";
 import { DeskPane } from "@/components/desk-pane";
 import { WorkModeKeepAlive } from "@/components/work-mode-keep-alive";
 import { OnboardingScreen } from "@/components/onboarding-screen";
@@ -438,6 +439,14 @@ export function AppRoutes() {
               element={
                 <DeskPane>
                   <ChannelsPage />
+                </DeskPane>
+              }
+            />
+            <Route
+              path="/customers"
+              element={
+                <DeskPane>
+                  <CustomersPage />
                 </DeskPane>
               }
             />

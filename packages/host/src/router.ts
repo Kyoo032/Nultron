@@ -45,6 +45,19 @@ import {
 import { DESK_FILE_ROUTES } from "./desk-files/routes";
 import { FOLDER_ROUTES } from "./folder-root";
 import {
+  handleDeleteWhatsApp,
+  handleGetConversation,
+  handleGetConversations,
+  handleGetCustomersSummary,
+  handleGetWhatsApp,
+  handlePostConversationRead,
+  handlePostConversationReply,
+  handlePostConversationState,
+  handlePostWhatsApp,
+} from "./handlers/customers";
+import { handleWhatsAppWebhookGet, handleWhatsAppWebhookPost } from "./inbox/webhook";
+import { WHATSAPP_WEBHOOK_PATH } from "./inbox/webhook-path";
+import {
   handleDeleteChannel,
   handleDeleteTelegramBot,
   handleGetChannel,
@@ -429,6 +442,21 @@ const routes: Route[] = [
   compile("DELETE", "/api/v1/channels/:channelId", handleDeleteChannel),
   compile("GET", "/api/v1/channels/:channelId/messages", handleGetChannelMessages),
   compile("POST", "/api/v1/channels/:channelId/send", (req) => handlePostChannelSend(req)),
+  // The customer inbox (docs/internal/whatsapp-omnichannel-plan.md). The webhook is the one route a
+  // stranger can reach: it is exempt from the session gate and the CSRF rule (`UNGATED_GETS`,
+  // `UNGATED_POSTS`, `CSRF_EXEMPT_PATHS`) and authenticates by Meta's signature instead. It is a
+  // literal path, listed before the `:channelId` routes so `whatsapp` is never read as a channel id.
+  compile("GET", WHATSAPP_WEBHOOK_PATH, async (req) => handleWhatsAppWebhookGet(req)),
+  compile("POST", WHATSAPP_WEBHOOK_PATH, (req) => handleWhatsAppWebhookPost(req)),
+  compile("GET", "/api/v1/customers/whatsapp", (req) => handleGetWhatsApp(req)),
+  compile("POST", "/api/v1/customers/whatsapp", (req) => handlePostWhatsApp(req)),
+  compile("DELETE", "/api/v1/customers/whatsapp", (req) => handleDeleteWhatsApp(req)),
+  compile("GET", "/api/v1/customers/summary", (req) => handleGetCustomersSummary(req)),
+  compile("GET", "/api/v1/customers/conversations", (req) => handleGetConversations(req)),
+  compile("GET", "/api/v1/customers/conversations/:conversationId", (req) => handleGetConversation(req)),
+  compile("POST", "/api/v1/customers/conversations/:conversationId/read", (req) => handlePostConversationRead(req)),
+  compile("POST", "/api/v1/customers/conversations/:conversationId/reply", (req) => handlePostConversationReply(req)),
+  compile("POST", "/api/v1/customers/conversations/:conversationId/state", (req) => handlePostConversationState(req)),
   compile("GET", "/api/v1/legal/playbooks", handleGetLegalPlaybooks),
   compile("GET", "/api/v1/legal/matters", handleGetLegalMatters),
   compile("POST", "/api/v1/legal/matters", handlePostLegalMatters),

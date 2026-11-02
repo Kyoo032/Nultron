@@ -512,6 +512,55 @@
       "lanes": ["personal", "enterprise", "tester"],
       "protected": false,
       "note": "Agent guardrails (verify, pack, change). Harness only, never ships."
+    },
+    {
+      "glob": "packages/host/src/inbox/**",
+      "map": "docs/internal/maps/customer-inbox.md",
+      "lanes": ["enterprise", "tester"],
+      "protected": false,
+      "note": "Customer inbox (WhatsApp): the public webhook, the desk store, the Graph client."
+    },
+    {
+      "glob": "packages/host/src/handlers/customers*.ts",
+      "map": "docs/internal/maps/customer-inbox.md",
+      "lanes": ["enterprise", "tester"],
+      "protected": false,
+      "note": "The owner's routes for the customer inbox."
+    },
+    {
+      "glob": "packages/core/src/inbox/**",
+      "map": "docs/internal/maps/customer-inbox.md",
+      "lanes": ["enterprise", "tester"],
+      "protected": false,
+      "note": "Inbox shapes, caps, the 24-hour window rule and the pinned Graph origin."
+    },
+    {
+      "glob": "packages/db/drizzle/0023_customer_inbox.sql",
+      "map": "docs/internal/maps/customer-inbox.md",
+      "lanes": ["enterprise", "tester"],
+      "protected": false,
+      "note": "The three inbox tables."
+    },
+    {
+      "glob": "apps/web/components/customers-*.tsx",
+      "map": "docs/internal/maps/customer-inbox.md",
+      "lanes": ["enterprise", "tester"],
+      "protected": false,
+      "note": "The Customers page."
+    },
+    {
+      "glob": "apps/web/lib/customers-*",
+      "map": "docs/internal/maps/customer-inbox.md",
+      "lanes": ["enterprise", "tester"],
+      "protected": false,
+      "note": "The Customers page's fetch layer and pure rules."
+    },
+    {
+      "glob": "scripts/whatsapp-sandbox.ts",
+      "map": "docs/internal/maps/customer-inbox.md",
+      "lanes": ["enterprise", "tester"],
+      "protected": false,
+      "note": "Local stand-in for Meta, dev tooling only."
     }
   ]
 }

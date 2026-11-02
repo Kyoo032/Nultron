@@ -1025,3 +1025,103 @@ export const fileProposals = sqliteTable(
     ),
   ],
 );
+
+/**
+ * Customer inbox (drizzle/0023_customer_inbox.sql): a connected number or bot. The row a webhook is
+ * routed by: the payload names an external id (WhatsApp's phone number id), the desk is whatever
+ * this row says. `(kind, external_id)` is unique across the whole install, so a number belongs to
+ * one desk. `workspace_id` carries no foreign key, like `artifacts` and `datasets`: the tenant purge
+ * deletes these rows by desk (`WORKSPACE_SCOPED_TABLES`) and the cascades below take the rest.
+ */
+export const channelEndpoints = sqliteTable(
+  "channel_endpoints",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id").notNull(),
+    workspaceId: text("workspace_id").notNull(),
+    kind: text("kind").notNull().$type<"whatsapp">(),
+    externalId: text("external_id").notNull(),
+    displayPhone: text("display_phone"),
+    verifiedName: text("verified_name"),
+    status: text("status").notNull().$type<"active" | "disabled">(),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("channel_endpoints_kind_external_unique").on(table.kind, table.externalId),
+    index("channel_endpoints_ws_idx").on(table.workspaceId),
+    check("channel_endpoints_kind_check", sql`${table.kind} IN ('whatsapp')`),
+    check("channel_endpoints_status_check", sql`${table.status} IN ('active', 'disabled')`),
+  ],
+);
+
+/** One customer on one endpoint. Unique per `(endpoint_id, contact_id)`; the thread is `customer_messages`. */
+export const customerConversations = sqliteTable(
+  "customer_conversations",
+  {
+    id: text("id").primaryKey(),
+    organizationId: text("organization_id").notNull(),
+    workspaceId: text("workspace_id").notNull(),
+    endpointId: text("endpoint_id")
+      .notNull()
+      .references(() => channelEndpoints.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull().$type<"whatsapp">(),
+    contactId: text("contact_id").notNull(),
+    contactName: text("contact_name").notNull(),
+    state: text("state").notNull().$type<"auto" | "needs_you" | "with_you" | "closed">(),
+    unreadCount: integer("unread_count").notNull().default(0),
+    lastInboundAt: integer("last_inbound_at"),
+    lastOutboundAt: integer("last_outbound_at"),
+    lastMessageAt: integer("last_message_at").notNull(),
+    lastMessagePreview: text("last_message_preview").notNull(),
+    lastMessageDirection: text("last_message_direction").notNull().$type<"in" | "out">(),
+    createdAt: integer("created_at").notNull(),
+    updatedAt: integer("updated_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("customer_conversations_contact_unique").on(table.endpointId, table.contactId),
+    index("customer_conversations_ws_state_idx").on(table.workspaceId, table.state, table.lastMessageAt),
+    check("customer_conversations_kind_check", sql`${table.kind} IN ('whatsapp')`),
+    check("customer_conversations_state_check", sql`${table.state} IN ('auto', 'needs_you', 'with_you', 'closed')`),
+    check("customer_conversations_direction_check", sql`${table.lastMessageDirection} IN ('in', 'out')`),
+  ],
+);
+
+/**
+ * One message in or out. `(conversation_id, direction, external_id)` is unique where the channel
+ * gave an id, which is what makes Meta's at-least-once delivery harmless: the second copy is
+ * refused by the index, not by a race-prone read.
+ */
+export const customerMessages = sqliteTable(
+  "customer_messages",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id").notNull(),
+    conversationId: text("conversation_id")
+      .notNull()
+      .references(() => customerConversations.id, { onDelete: "cascade" }),
+    direction: text("direction").notNull().$type<"in" | "out">(),
+    sentBy: text("sent_by").notNull().$type<"customer" | "auto" | "owner">(),
+    kind: text("kind").notNull().$type<"text" | "unsupported">(),
+    externalId: text("external_id"),
+    text: text("text").notNull(),
+    delivery: text("delivery").$type<"queued" | "sent" | "delivered" | "read" | "failed">(),
+    deliveryError: text("delivery_error"),
+    createdAt: integer("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("customer_messages_external_unique")
+      .on(table.conversationId, table.direction, table.externalId)
+      .where(sql`${table.externalId} IS NOT NULL`),
+    index("customer_messages_conv_idx").on(table.conversationId, table.createdAt),
+    index("customer_messages_external_idx").on(table.externalId),
+    index("customer_messages_ws_time_idx").on(table.workspaceId, table.createdAt),
+    check("customer_messages_direction_check", sql`${table.direction} IN ('in', 'out')`),
+    check("customer_messages_sent_by_check", sql`${table.sentBy} IN ('customer', 'auto', 'owner')`),
+    check("customer_messages_kind_check", sql`${table.kind} IN ('text', 'unsupported')`),
+    check(
+      "customer_messages_delivery_check",
+      sql`${table.delivery} IS NULL OR ${table.delivery} IN ('queued', 'sent', 'delivered', 'read', 'failed')`,
+    ),
+  ],
+);

@@ -146,6 +146,7 @@ function normalizeSecrets(parsed: StoredSecrets): StoredSecrets {
     weknoraJwtSecret: readString(parsed.weknoraJwtSecret),
     weknoraRevokedModelIds: readString(parsed.weknoraRevokedModelIds),
     telegramBotToken: readString(parsed.telegramBotToken),
+    whatsappAccessToken: readString(parsed.whatsappAccessToken),
   };
 }
 
