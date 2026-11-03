@@ -10,6 +10,7 @@
  *   POST   /api/v1/customers/conversations/:id/read         clear the unread count
  *   POST   /api/v1/customers/conversations/:id/reply        send a free-form reply (inside the window)
  *   POST   /api/v1/customers/conversations/:id/state        mark done, or put it back with the owner
+ *   DELETE /api/v1/customers/conversations/:id              erase the customer and every message (owner only)
  *
  * Everything is desk-scoped through `getTenant`: the `DeskScope` handed to the store is the signed-in
  * tenant's, never anything the request names. A conversation id from another desk is a 404.
@@ -71,9 +72,9 @@ function scopeOf(tenant: TenantContext): DeskScope {
 }
 
 /** Roles that may connect or disconnect a number. A desk has one owner; `admin` is the portal's second word for it. */
-function requireOwner(tenant: TenantContext): void {
+function requireOwner(tenant: TenantContext, what = "change its WhatsApp number"): void {
   if (tenant.role !== "owner" && tenant.role !== "admin") {
-    throw new ApiError("forbidden", "Only the owner of this desk can change its WhatsApp number", 403);
+    throw new ApiError("forbidden", `Only the owner of this desk can ${what}`, 403);
   }
 }
 
@@ -256,6 +257,21 @@ export function handlePostConversationReply(request: HostRequest, deps: Customer
       );
       throw error;
     }
+  });
+}
+
+/**
+ * Erase a customer: the conversation and every message in it, for good. Customer messages are kept
+ * with no time limit (so agents can pull up older threads) and go only when the customer asks, so
+ * this is the owner's deliberate act, not a member's. Another desk's id is a 404 and erases nothing.
+ */
+export function handleDeleteConversation(request: HostRequest, deps: CustomersDeps = {}): Promise<HostResult> {
+  return withTenant(request, (tenant) => {
+    requireOwner(tenant, "erase a customer's conversation");
+    if (!storeOf(deps).eraseConversation(scopeOf(tenant), request.params.conversationId)) {
+      throw notFound();
+    }
+    return jsonOk({ ok: true });
   });
 }
 

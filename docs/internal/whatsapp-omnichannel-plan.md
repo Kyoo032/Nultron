@@ -79,7 +79,7 @@ Support settings and the answer cache can stay as small files per desk, as the s
 2. **Redelivery needs an atomic dedupe.** At-least-once delivery means the same message arrives twice. A unique index settles it. Read-modify-write on a JSON file under concurrent webhooks races.
 3. **The dashboard counts things.** Waiting, answered today, by channel, by tier, response time. Those are queries, not file reads.
 
-Customer conversations keep the support plan's caps (500 conversations, 200 messages each) and join "Start over" and desk deletion (`HOST_RESET_ENTRIES`, `tenant-purge`).
+Customer conversations are kept with no time limit and no count cap (Rizky, 2026-11-03: kept so agents can pull up older threads, deleted when the customer asks, which the owner does with "Erase this customer"), and join "Start over" and desk deletion (`HOST_RESET_ENTRIES`, `tenant-purge`).
 
 ### The webhook, and who it acts as
 
@@ -169,7 +169,8 @@ Numbers are assigned when each phase lands. Added to the support plan's rows:
 |---|---|---|---|
 | A public webhook acts as a desk | High | Phase 1 (local), staging gate | HMAC before parse, one literal path, scoped desk lookup only after both checks, body cap, rate limit, Caddy rule |
 | Redelivery or forged ids cause duplicate or cross-desk writes | Medium | Phase 1 | Unique index on (endpoint, external id), desk taken from the endpoint row and never from the payload |
-| A customer's phone number is stored | Low | Phase 1 | Caps, removal by the owner, Start over, desk deletion, number masked in logs |
+| A customer's phone number is stored | Medium | Phase 1 | Kept with no time limit by Rizky's rule (2026-11-03), so the guard is the owner's "Erase this customer" (a hard delete), plus Start over, desk deletion and logs that carry counts only (SR-193) |
+| An erase leaves a copy an agent made | Medium | Phase 2 | Anything an agent derives from a thread (summary, note, Knowledge Base entry) must be removed by the same erase, or be kept out of shared stores; decide before agents read the history |
 | Policy: the bot drifts into a general assistant | Medium | Phase 2 | Answers only from the owner's marked sources, handoff otherwise |
 
 ## Not in this plan

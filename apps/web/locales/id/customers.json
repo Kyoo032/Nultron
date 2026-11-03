@@ -51,6 +51,13 @@
     "fromYou": "Anda",
     "done": "Tandai selesai",
     "reopen": "Buka lagi",
+    "erase": {
+      "button": "Hapus data pelanggan ini",
+      "note": "Pesan disimpan sampai Anda menghapus pelanggannya.",
+      "confirm": "Hapus {name} beserta semua pesan di percakapan ini? Tidak bisa dibatalkan. Lakukan ini kalau pelanggan minta datanya dihapus.",
+      "yes": "Hapus permanen",
+      "no": "Batal"
+    },
     "states": {
       "auto": "Dibalas otomatis",
       "needs_you": "Perlu dibalas",
@@ -82,6 +89,7 @@
     "disconnect": "Gagal memutuskan nomor.",
     "send": "Balasan itu ditolak WhatsApp.",
     "state": "Gagal mengubah percakapan itu.",
+    "erase": "Gagal menghapus data pelanggan itu.",
     "notConnected": "Hubungkan nomor WhatsApp untuk meja kerja ini dulu.",
     "windowClosed": "Batas 24 jam sudah lewat, jadi balasan bebas tidak bisa dikirim."
   }

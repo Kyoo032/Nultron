@@ -2,7 +2,7 @@
 
 Product: both · Instance: main :3000
 
-Last verified: 2026-11-02, working tree on top of bb502f8 (Phase 1, before its first commit). Driven in Chromium against the local sandbox (`scripts/whatsapp-sandbox.ts`) on a stub-runtime desk; never driven against Meta or on a hosted server.
+Last verified: 2026-11-03, on top of a5a87c8 plus the keep-everything and erase change (Phase 1). Driven in Chromium against the local sandbox (`scripts/whatsapp-sandbox.ts`) on a stub-runtime desk, erase included; never driven against Meta or on a hosted server.
 
 ## Overview
 
@@ -33,7 +33,7 @@ Rail → Account → **Customers** (`apps/web/components/app-rail.tsx`, `testId=
 2. `handleWhatsAppWebhookPost` (`packages/host/src/inbox/webhook.ts:67`) runs `verifySignature` (`whatsapp.ts:59`) first: HMAC-SHA256 of the exact bytes under `AGENTFORGE_WHATSAPP_APP_SECRET`, compared in constant time. No secret set is a 503 (fail closed, not open); a bad or missing `X-Hub-Signature-256` is a 401. Only after that is the body parsed.
 3. `parseWebhook` (`whatsapp.ts:216`) turns it into events. Text keeps its text; any other type becomes a fixed label such as `[image]` (a caption or media id is never copied); reactions and the like are skipped.
 4. **The desk comes from the row, never from the payload.** Each event's `phone_number_id` is looked up in `channel_endpoints` (`findActiveEndpoint`); that row's `organization_id` and `workspace_id` are the `DeskScope` the write runs under. A payload cannot name a desk. An unknown or disconnected number is counted and dropped, and still answered 200 so Meta does not retry it.
-5. `recordInbound` (`store.ts:267`) is one transaction: upsert the conversation, insert the message with `INSERT OR IGNORE` against the partial unique index `(conversation_id, direction, external_id)` (Meta delivers at least once), set the state to `needs_you`, bump `unread_count`, trim to 500 conversations per desk and 200 messages per conversation. `applyStatus` (`store.ts:376`) moves a delivery word forward only (`nextDeliveryStatus`), so a late `sent` never undoes a `read`.
+5. `recordInbound` (`store.ts:267`) is one transaction: upsert the conversation, insert the message with `INSERT OR IGNORE` against the partial unique index `(conversation_id, direction, external_id)` (Meta delivers at least once), set the state to `needs_you`, bump `unread_count`. Nothing is trimmed or expired. `applyStatus` (`store.ts:376`) moves a delivery word forward only (`nextDeliveryStatus`), so a late `sent` never undoes a `read`.
 
 The `GET` is Meta's subscription handshake: it echoes `hub.challenge` as `text/plain` only when `hub.verify_token` matches `AGENTFORGE_WHATSAPP_VERIFY_TOKEN` (`verifyHandshake`, `whatsapp.ts:104`).
 
@@ -41,7 +41,7 @@ Logs carry counts only (`received`, `duplicates`, `reports`, …). No number, na
 
 ### Read and reply
 
-`GET /api/v1/customers/{summary,conversations,conversations/:id}` and `POST …/:id/{read,reply,state}` (`handlers/customers.ts`, `router.ts`). Every one goes through `getTenant`, and the `DeskScope` handed to the store is the signed-in desk's. Every store statement filters on `workspace_id`; another desk's conversation id is a 404.
+`GET /api/v1/customers/{summary,conversations,conversations/:id}`, `POST …/:id/{read,reply,state}` and `DELETE …/:id` (`handlers/customers.ts`, `router.ts`). Every one goes through `getTenant`, and the `DeskScope` handed to the store is the signed-in desk's. Every store statement filters on `workspace_id`; another desk's conversation id is a 404.
 
 `handlePostConversationReply` (`customers.ts:220`): `assertReplyText` (4096 chars) → `sendTarget` → **window check** (`whatsappReplyWindow`, `packages/core/src/inbox/index.ts:85`: free-form replies are allowed strictly before `lastInboundAt + 24 h`; after that it is a 409 `window_closed` and nothing is sent) → `beginOutbound` writes the reply as `queued` → `WhatsAppClient.sendText` → `finishOutbound` (`store.ts:491`) settles it `sent` or `failed` and moves the conversation to `with_you`. A failed send stays in the thread as "Not delivered" with Meta's reason; Meta's error 131047 (window closed at their end) maps to the same `window_closed` code.
 
@@ -79,4 +79,5 @@ Schema: the tables carry `organization_id` and `workspace_id`, **not `tenant_id`
 - **Delivery is at least once and unordered.** Dedupe is the unique index, not a check-then-insert. A message that arrives after its conversation was trimmed re-creates the conversation.
 - **The 24-hour window is Meta's rule, not ours.** The host refuses early (cheaper than Meta refusing); after it only a template may go out, which is Phase 3.
 - **Inbound text is untrusted.** Phase 1 never gives it to a model. Anything in Phase 2 that does must run the same injection guard a knowledge source does.
+- **Messages are kept with no time limit** (Rizky, 2026-11-03: so agents can pull up older threads) and go only when a customer asks to be erased. The owner does that with **Erase this customer** at the foot of a thread: `DELETE /api/v1/customers/conversations/:id` (`handleDeleteConversation`, owner or admin only, a hard delete of the conversation and every message). A thread read returns the newest 500 messages (`INBOX_CAPS.maxThreadMessages`) and the list the newest 100 conversations (`maxListed`); older ones are still stored and the search finds them.
 - **A customer's number is personal data**, stored in the desk's database in the clear (like every other row) and visible to every member of the company (SR-169). [SR-191](../security-register.md#sr-191) to [SR-193](../security-register.md#sr-193).

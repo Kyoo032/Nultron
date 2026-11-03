@@ -1,6 +1,6 @@
 /**
  * The inbox store against a scratch SQLite database: the desk boundary, the one-number-one-desk rule,
- * idempotent inbound, the caps, forward-only delivery status, and the numbers on the Today strip.
+ * idempotent inbound, keep-everything (no expiry) with erase on request, forward-only delivery status, and the numbers on the Today strip.
  */
 import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -165,31 +165,110 @@ describe("recordInbound", () => {
     expect(store.getConversation(deskA, id, NOW)?.state).toBe("needs_you");
   });
 
-  it("keeps the newest 200 messages of a conversation", () => {
+  it("keeps every message and every conversation: nothing is deleted for age or count", () => {
     const endpoint = endpointFor(deskA, "1000001");
-    for (let index = 0; index < INBOX_CAPS.maxStoredMessages + 5; index += 1) {
+    const extra = 20;
+    for (let index = 0; index < INBOX_CAPS.maxThreadMessages + extra; index += 1) {
+      store.recordInbound(endpoint, inbound({ at: NOW + index * 1000, text: `m${index}` }), NOW);
+    }
+    for (let index = 0; index < INBOX_CAPS.maxListed + 20; index += 1) {
+      store.recordInbound(
+        endpoint,
+        inbound({ contactId: String(6281300000000 + index), at: NOW - (index + 1) * 60 * MIN }),
+        NOW,
+      );
+    }
+    expect(count("customer_messages")).toBe(INBOX_CAPS.maxThreadMessages + extra + INBOX_CAPS.maxListed + 20);
+    expect(count("customer_conversations")).toBe(1 + INBOX_CAPS.maxListed + 20);
+  });
+
+  it("reads the newest messages of a long thread, oldest first, and still stores the rest", () => {
+    const endpoint = endpointFor(deskA, "1000001");
+    const extra = 7;
+    for (let index = 0; index < INBOX_CAPS.maxThreadMessages + extra; index += 1) {
       store.recordInbound(endpoint, inbound({ at: NOW + index * 1000, text: `m${index}` }), NOW);
     }
     const id = store.listConversations(deskA, {}, NOW)[0].id;
     const messages = store.listMessages(deskA, id) ?? [];
-    expect(messages).toHaveLength(INBOX_CAPS.maxStoredMessages);
-    expect(messages[0].text).toBe("m5");
-    expect(messages.at(-1)?.text).toBe(`m${INBOX_CAPS.maxStoredMessages + 4}`);
+    expect(messages).toHaveLength(INBOX_CAPS.maxThreadMessages);
+    expect(messages[0].text).toBe(`m${extra}`);
+    expect(messages.at(-1)?.text).toBe(`m${INBOX_CAPS.maxThreadMessages + extra - 1}`);
+    expect(count("customer_messages")).toBe(INBOX_CAPS.maxThreadMessages + extra);
   });
 
-  it("keeps the newest 500 conversations of a desk and takes the oldest with its messages", () => {
+  it("lists the newest conversations but still finds an older one by search", () => {
     const endpoint = endpointFor(deskA, "1000001");
-    for (let index = 0; index < INBOX_CAPS.maxConversationsPerDesk + 3; index += 1) {
+    const total = INBOX_CAPS.maxListed + 5;
+    for (let index = 0; index < total; index += 1) {
       store.recordInbound(
         endpoint,
-        inbound({ contactId: String(6281300000000 + index), at: NOW + index * 1000 }),
+        inbound({ contactId: String(6281300000000 + index), contactName: `Customer ${index}`, at: NOW - index * MIN }),
         NOW,
       );
     }
-    expect(count("customer_conversations")).toBe(INBOX_CAPS.maxConversationsPerDesk);
-    expect(count("customer_messages")).toBe(INBOX_CAPS.maxConversationsPerDesk);
-    const oldest = (db.prepare("SELECT min(contact_id) AS c FROM customer_conversations").get() as { c: string }).c;
-    expect(oldest).toBe("6281300000003");
+    const listed = store.listConversations(deskA, {}, NOW);
+    expect(listed).toHaveLength(INBOX_CAPS.maxListed);
+    expect(listed.some((row) => row.contactName === `Customer ${total - 1}`)).toBe(false);
+    expect(store.listConversations(deskA, { query: `Customer ${total - 1}` }, NOW)).toHaveLength(1);
+  });
+});
+
+describe("erasing a customer", () => {
+  function twoCustomers() {
+    const endpoint = endpointFor(deskA, "1000001");
+    store.recordInbound(endpoint, inbound({ contactId: "6281200000001", contactName: "Dewi", text: "Ada kopi?" }), NOW);
+    store.recordInbound(endpoint, inbound({ contactId: "6281200000002", contactName: "Budi", text: "Ada teh?" }), NOW);
+    const rows = store.listConversations(deskA, {}, NOW);
+    const dewi = rows.find((row) => row.contactName === "Dewi");
+    const budi = rows.find((row) => row.contactName === "Budi");
+    if (!dewi || !budi) {
+      throw new Error("seed failed");
+    }
+    return { endpoint, dewi, budi };
+  }
+
+  it("removes the conversation and every message in it, and leaves the other customer alone", () => {
+    const { dewi, budi } = twoCustomers();
+    const queued = store.beginOutbound(deskA, dewi.id, "Ada, Kak", NOW);
+    store.finishOutbound(deskA, queued.id, { ok: true, externalId: "wamid.OUT1" }, NOW);
+    expect(count("customer_messages")).toBe(3);
+
+    expect(store.eraseConversation(deskA, dewi.id)).toBe(true);
+
+    expect(store.getConversation(deskA, dewi.id, NOW)).toBeNull();
+    expect(store.listMessages(deskA, dewi.id)).toBeNull();
+    expect(store.listConversations(deskA, { query: "Dewi" }, NOW)).toEqual([]);
+    expect(count("customer_messages")).toBe(1);
+    expect(count("customer_conversations")).toBe(1);
+    expect(store.listMessages(deskA, budi.id)?.map((row) => row.text)).toEqual(["Ada teh?"]);
+    expect(store.summary(deskA, NOW - 3600_000)).toMatchObject({ receivedToday: 1, sentToday: 0 });
+  });
+
+  it("reads another desk's id, a made-up id and a second erase alike: false, and nothing changes", () => {
+    const { dewi } = twoCustomers();
+    expect(store.eraseConversation(deskB, dewi.id)).toBe(false);
+    expect(store.eraseConversation(deskA, "does-not-exist")).toBe(false);
+    expect(count("customer_conversations")).toBe(2);
+    expect(store.eraseConversation(deskA, dewi.id)).toBe(true);
+    expect(store.eraseConversation(deskA, dewi.id)).toBe(false);
+  });
+
+  it("starts a fresh conversation, with none of the old messages, when the same customer writes again", () => {
+    const { endpoint, dewi } = twoCustomers();
+    store.eraseConversation(deskA, dewi.id);
+    store.recordInbound(endpoint, inbound({ contactId: "6281200000001", contactName: "Dewi", text: "halo lagi" }), NOW + MIN);
+    const again = store.listConversations(deskA, { query: "Dewi" }, NOW + MIN);
+    expect(again).toHaveLength(1);
+    expect(again[0].id).not.toBe(dewi.id);
+    expect(store.listMessages(deskA, again[0].id)?.map((row) => row.text)).toEqual(["halo lagi"]);
+  });
+
+  it("drops a late delivery report for a message that is gone", () => {
+    const { endpoint, dewi } = twoCustomers();
+    const queued = store.beginOutbound(deskA, dewi.id, "Ada, Kak", NOW);
+    store.finishOutbound(deskA, queued.id, { ok: true, externalId: "wamid.OUT1" }, NOW);
+    store.eraseConversation(deskA, dewi.id);
+    expect(store.applyStatus(endpoint, report("wamid.OUT1", "read"))).toBe(false);
   });
 });
 

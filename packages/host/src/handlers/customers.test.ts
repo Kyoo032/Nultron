@@ -470,6 +470,74 @@ describe("a customer writes and the owner answers", () => {
   });
 });
 
+describe("erasing a customer", () => {
+  async function twoCustomers() {
+    await connect();
+    await deliver(sandbox.inboundBody({ from: "6281200000001", name: "Dewi", text: "Ada kopi?" }));
+    await deliver(sandbox.inboundBody({ from: "6281200000002", name: "Budi", text: "Ada teh?" }));
+    const rows = await conversationsOf("a");
+    return {
+      dewi: rows.find((row) => row.contactName === "Dewi") as Record<string, any>,
+      budi: rows.find((row) => row.contactName === "Budi") as Record<string, any>,
+    };
+  }
+
+  it("keeps messages with no time limit: a year-old thread is still there, with the reply window long shut", async () => {
+    await connect();
+    const yearAgo = T0 - 365 * 24 * 60 * 60 * 1000;
+    await deliver(sandbox.inboundBody({ text: "pesanan tahun lalu", at: yearAgo }));
+    const [conversation] = await conversationsOf("a");
+    expect(conversation).toMatchObject({ lastMessagePreview: "pesanan tahun lalu" });
+    const thread = bodyOf(await call("a", "GET", `/api/v1/customers/conversations/${conversation.id}`));
+    expect(thread.messages.map((row: any) => row.text)).toEqual(["pesanan tahun lalu"]);
+  });
+
+  it("erases the conversation and every message in it when the owner asks, and only that customer", async () => {
+    const { dewi, budi } = await twoCustomers();
+    expect(rowCount("customer_messages")).toBe(2);
+    const erased = await call("a", "DELETE", `/api/v1/customers/conversations/${dewi.id}`);
+    expect(json(erased).status).toBe(200);
+    expect(bodyOf(erased)).toEqual({ ok: true });
+
+    expect(json(await call("a", "GET", `/api/v1/customers/conversations/${dewi.id}`)).status).toBe(404);
+    expect((await conversationsOf("a")).map((row) => row.contactName)).toEqual(["Budi"]);
+    expect(rowCount("customer_messages")).toBe(1);
+    expect(rowCount("customer_conversations")).toBe(1);
+    const stillThere = bodyOf(await call("a", "GET", `/api/v1/customers/conversations/${budi.id}`));
+    expect(stillThere.messages.map((row: any) => row.text)).toEqual(["Ada teh?"]);
+    // A second erase of the same id is a plain 404, not a second deletion of something else.
+    expect(json(await call("a", "DELETE", `/api/v1/customers/conversations/${dewi.id}`)).status).toBe(404);
+    expect(rowCount("customer_conversations")).toBe(1);
+  });
+
+  it("is the owner's to do: a member of the desk can read the thread but not erase it", async () => {
+    const { dewi } = await twoCustomers();
+    const refused = await call("member", "DELETE", `/api/v1/customers/conversations/${dewi.id}`);
+    expect(json(refused).status).toBe(403);
+    expect(errorCode(refused)).toBe("forbidden");
+    expect(json(await call("member", "GET", `/api/v1/customers/conversations/${dewi.id}`)).status).toBe(200);
+    expect(rowCount("customer_messages")).toBe(2);
+  });
+
+  it("will not erase another company's customer, and says nothing that confirms the id exists", async () => {
+    const { dewi } = await twoCustomers();
+    expect(json(await call("b", "DELETE", `/api/v1/customers/conversations/${dewi.id}`)).status).toBe(404);
+    expect(json(await call("b", "DELETE", "/api/v1/customers/conversations/does-not-exist")).status).toBe(404);
+    expect(json(await call("nobody", "DELETE", `/api/v1/customers/conversations/${dewi.id}`)).status).toBe(401);
+    expect(rowCount("customer_messages")).toBe(2);
+  });
+
+  it("starts a clean conversation if the same customer writes again after being erased", async () => {
+    const { dewi } = await twoCustomers();
+    await call("a", "DELETE", `/api/v1/customers/conversations/${dewi.id}`);
+    await deliver(sandbox.inboundBody({ from: "6281200000001", name: "Dewi", text: "halo lagi" }));
+    const again = (await conversationsOf("a")).find((row) => row.contactName === "Dewi") as Record<string, any>;
+    expect(again.id).not.toBe(dewi.id);
+    const thread = bodyOf(await call("a", "GET", `/api/v1/customers/conversations/${again.id}`));
+    expect(thread.messages.map((row: any) => row.text)).toEqual(["halo lagi"]);
+  });
+});
+
 describe("two companies on one server", () => {
   it("routes each company's customers to that company alone", async () => {
     await connect("a", SANDBOX_PHONE_NUMBER_ID);
@@ -493,6 +561,7 @@ describe("two companies on one server", () => {
     expect(json(await call("b", "POST", `${base}/read`)).status).toBe(404);
     expect(json(await call("b", "POST", `${base}/state`, { body: { state: "closed" } })).status).toBe(404);
     expect(json(await call("b", "POST", `${base}/reply`, { body: { text: "hi" } })).status).toBe(404);
+    expect(json(await call("b", "DELETE", base)).status).toBe(404);
     // A made-up id reads exactly the same, so existence is not confirmed across companies.
     expect(json(await call("b", "GET", "/api/v1/customers/conversations/does-not-exist")).status).toBe(404);
     expect(sandbox.sent).toEqual([]);

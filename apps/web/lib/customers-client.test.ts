@@ -4,6 +4,7 @@ import {
   WINDOW_CLOSED_CODE,
   connectWhatsApp,
   disconnectWhatsApp,
+  eraseConversation,
   loadConversation,
   loadConversations,
   loadSummary,
@@ -53,6 +54,20 @@ describe("customers client", () => {
     const calls = stubFetch(200, { connected: false });
     await disconnectWhatsApp();
     expect(lastCall(calls).init.method).toBe("DELETE");
+  });
+
+  it("erases a customer with DELETE on the conversation, id encoded, and no body", async () => {
+    const calls = stubFetch(200, { ok: true });
+    await eraseConversation("conv/1 x");
+    const call = lastCall(calls);
+    expect(call.input).toBe("/api/v1/customers/conversations/conv%2F1%20x");
+    expect(call.init.method).toBe("DELETE");
+    expect(call.init.body).toBeUndefined();
+  });
+
+  it("surfaces the host's refusal when a member tries to erase", async () => {
+    stubFetch(403, { error: { code: "forbidden", message: "Only the owner of this desk can erase a customer's conversation" } });
+    await expect(eraseConversation("conv_1")).rejects.toMatchObject({ code: "forbidden" });
   });
 
   it("sends the owner's local day start to the summary", async () => {

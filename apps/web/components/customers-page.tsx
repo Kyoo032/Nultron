@@ -7,6 +7,7 @@ import {
   WINDOW_CLOSED_CODE,
   connectWhatsApp,
   disconnectWhatsApp,
+  eraseConversation,
   loadConversation,
   loadConversations,
   loadSummary,
@@ -276,6 +277,22 @@ export function CustomersPage() {
                   setDraft("");
                 },
                 "customers.errors.send",
+              );
+            }}
+            onErase={() => {
+              const target = detail?.conversation;
+              if (!target || target.id !== selectedId) {
+                return;
+              }
+              void act(
+                "thread",
+                async () => {
+                  await eraseConversation(target.id);
+                  setSelectedId(null);
+                  setDetail(null);
+                  setDraft("");
+                },
+                "customers.errors.erase",
               );
             }}
             onState={(state: Exclude<ConversationState, "auto">) => {

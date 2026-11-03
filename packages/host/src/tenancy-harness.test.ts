@@ -471,6 +471,13 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
     params: { conversationId: "conversationId" },
     body: { state: "closed" },
   },
+  {
+    // Erasing a customer is the one destructive by-id route here, so the survivor check below matters
+    // most for it: tenant A's conversation must still read after tenant B has tried to erase it.
+    method: "DELETE",
+    path: "/api/v1/customers/conversations/:conversationId",
+    params: { conversationId: "conversationId" },
+  },
 
   // --- meetings (PR #66) -------------------------------------------------------------------------
   { method: "GET", path: "/api/v1/meetings/:meetingId", params: { meetingId: "meetingId" } },

@@ -45,10 +45,13 @@ export const DELIVERY_STATUSES = ["queued", "sent", "delivered", "read", "failed
 export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 
 export const INBOX_CAPS = {
-  /** Customer conversations one desk keeps. Past this the oldest by last message goes. */
-  maxConversationsPerDesk: 500,
-  /** Messages kept per conversation, newest last. Older ones are dropped on write. */
-  maxStoredMessages: 200,
+  /**
+   * Nothing is deleted for age or count: Rizky's rule (2026-11-03) is that customer messages stay so
+   * agents can pull up older threads, and go only when the customer asks to be erased. This is only how
+   * many of a thread's newest messages one read returns, so a very long thread cannot make one huge
+   * response. The older ones are still stored.
+   */
+  maxThreadMessages: 500,
   /** WhatsApp's own text-message limit; checked here rather than by Meta. */
   maxTextChars: 4096,
   /** Display strings from outside (a profile name) are capped so one cannot wreck the list. */

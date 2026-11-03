@@ -11,6 +11,7 @@ Product: both · Instance: main :3000
 - **customers-reply** — a free-form reply, allowed only inside the 24-hour window after the customer's last message. The thread shows Sending… → Sent → Delivered → Read, or Not delivered with Meta's reason.
 - **customers-state** — Mark done / Reopen; the filters (All, Need you, With you, Done) and the search box.
 - **customers-today** — the strip: need you, with you, received today, sent today, typical first reply. "Today" is the owner's local day.
+- **customers-erase** — messages are kept with no time limit and go only when a customer asks: **Erase this customer** (`customers-erase-button`) at the foot of the thread asks first (`customers-erase-confirm`, `customers-erase-yes` / `customers-erase-no`), then deletes the conversation and every message in it. Owner or admin only; a member gets a 403 in the thread's error line.
 - **customers-scope** — a second desk sees none of it: its own number, its own customers.
 
 ## How to get to it (user POV)
@@ -46,7 +47,8 @@ If `customers-sandbox-note` is **absent**, the env var did not reach the host �
 9. Other types: arrive with `{"type":"image"}` — the preview and message read `[image]`; a caption is never shown.
 10. Forged and unsigned: `curl -X POST http://127.0.0.1:3000/api/v1/channels/whatsapp/webhook -d '{}'` → 401, nothing stored. A wrong `hub.verify_token` on the GET → 403.
 11. Disconnect (`customers-disconnect`): the token form returns, `customers-connect-fingerprint` has count 0, the conversations **stay**, and `customers-needs-number` shows under the composer with `customers-send` disabled.
-12. At 390 px wide: no horizontal scroll (`document.documentElement.scrollWidth - clientWidth` is 0); the Today strip is two columns with the last card spanning both.
+12. Erase: open a customer with a reply in the thread, click `customers-erase-button`. `customers-erase-confirm` names the customer and asks "Erase … and every message in this thread? This cannot be undone." Click `customers-erase-no` (**Keep**): the button returns and nothing is deleted. Press it again, then open another customer: the question is closed (it never carries over). Back on the first, click it and `customers-erase-yes`: the item leaves the list, the thread says "Pick a conversation to read it.", `GET /api/v1/customers/conversations/<old id>` is 404, the other customer is untouched, and no `customers-error` shows. Have the same number write again: a new conversation with only the new message. Signed in as a member of the desk (not the owner): the same press shows the host's 403 in `customers-error` and deletes nothing.
+13. At 390 px wide: no horizontal scroll (`document.documentElement.scrollWidth - clientWidth` is 0); the Today strip is two columns with the last card spanning both.
 
 Also true and not obvious: a customer who writes again after a conversation is marked done reopens it as "Need you"; a conversation id from another desk is a 404 on every route; the sandbox's auto receipts can be turned off with `AUTO_RECEIPTS=0`; `scripts/whatsapp-sandbox.ts` expects the app at `http://127.0.0.1:3000` (`APP_URL` to change it).
 

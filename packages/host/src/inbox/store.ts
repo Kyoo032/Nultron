@@ -334,40 +334,8 @@ export function createInboxStore(sql: InboxSql, newId: () => string = () => cryp
         conversationId,
       );
 
-    trimMessages(conversationId);
-    if (!existing) {
-      trimConversations(endpoint.workspaceId);
-    }
     return { duplicate: false, conversationId };
   });
-
-  /** Keep the newest `maxStoredMessages` of a conversation. */
-  function trimMessages(conversationId: string): void {
-    sql
-      .prepare(
-        `DELETE FROM customer_messages
-          WHERE conversation_id = ?
-            AND id NOT IN (
-              SELECT id FROM customer_messages WHERE conversation_id = ?
-               ORDER BY created_at DESC, rowid DESC LIMIT ?
-            )`,
-      )
-      .run(conversationId, conversationId, INBOX_CAPS.maxStoredMessages);
-  }
-
-  /** Keep the newest `maxConversationsPerDesk` conversations of a desk, by last message. */
-  function trimConversations(workspaceId: string): void {
-    sql
-      .prepare(
-        `DELETE FROM customer_conversations
-          WHERE workspace_id = ?
-            AND id NOT IN (
-              SELECT id FROM customer_conversations WHERE workspace_id = ?
-               ORDER BY last_message_at DESC, rowid DESC LIMIT ?
-            )`,
-      )
-      .run(workspaceId, workspaceId, INBOX_CAPS.maxConversationsPerDesk);
-  }
 
   /**
    * Apply a delivery report to an outbound message of this endpoint. Never moves a status backwards
@@ -427,13 +395,35 @@ export function createInboxStore(sql: InboxSql, newId: () => string = () => cryp
     if (!getConversation(scope, conversationId, 0)) {
       return null;
     }
+    // The newest `maxThreadMessages`, shown oldest first. Older ones stay stored (see `INBOX_CAPS`).
     const rows = sql
       .prepare(
-        "SELECT * FROM customer_messages WHERE conversation_id = ? AND workspace_id = ? ORDER BY created_at ASC, rowid ASC",
+        `SELECT * FROM (
+           SELECT *, rowid AS seq FROM customer_messages WHERE conversation_id = ? AND workspace_id = ?
+            ORDER BY created_at DESC, rowid DESC LIMIT ?
+         ) ORDER BY created_at ASC, seq ASC`,
       )
-      .all(conversationId, scope.workspaceId) as MessageDb[];
+      .all(conversationId, scope.workspaceId, INBOX_CAPS.maxThreadMessages) as MessageDb[];
     return rows.map(messageOf);
   }
+
+  /**
+   * Erase one customer from this desk: the conversation and every message in it, for good. This is the
+   * only way a stored message goes (nothing expires). The scope is the signed-in desk's, so another
+   * desk's id erases nothing and reads as not found. Returns false for an id that is not this desk's.
+   */
+  const eraseConversation = sql.transaction((scope: DeskScope, conversationId: string): boolean => {
+    const row = sql
+      .prepare("SELECT id FROM customer_conversations WHERE id = ? AND workspace_id = ?")
+      .get(conversationId, scope.workspaceId);
+    if (!row) {
+      return false;
+    }
+    // Explicit rather than trusting the cascade: this is the call that has to leave nothing behind.
+    sql.prepare("DELETE FROM customer_messages WHERE conversation_id = ? AND workspace_id = ?").run(conversationId, scope.workspaceId);
+    sql.prepare("DELETE FROM customer_conversations WHERE id = ? AND workspace_id = ?").run(conversationId, scope.workspaceId);
+    return true;
+  });
 
   function markRead(scope: DeskScope, conversationId: string): boolean {
     return (
@@ -529,7 +519,6 @@ export function createInboxStore(sql: InboxSql, newId: () => string = () => cryp
             row.conversation_id,
             scope.workspaceId,
           );
-        trimMessages(row.conversation_id);
       } else {
         sql
           .prepare("UPDATE customer_messages SET delivery = 'failed', delivery_error = ? WHERE id = ?")
@@ -622,6 +611,7 @@ export function createInboxStore(sql: InboxSql, newId: () => string = () => cryp
     listMessages,
     markRead,
     setState,
+    eraseConversation,
     sendTarget,
     beginOutbound,
     finishOutbound,

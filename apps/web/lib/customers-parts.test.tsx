@@ -78,6 +78,7 @@ function thread(over: Partial<Parameters<typeof ThreadPane>[0]> = {}): string {
       onDraft={() => undefined}
       onSend={() => undefined}
       onState={() => undefined}
+      onErase={() => undefined}
       {...over}
     />,
   );
@@ -262,6 +263,25 @@ describe("Thread", () => {
     expect(thread({ conversation: conversation({ state: "closed" }) })).toContain("Reopen");
   });
 
+  it("offers erasing the customer at the foot of the thread, behind a second step, with the keep-until-erased note", () => {
+    const html = thread();
+    expect(html).toContain('data-testid="customers-erase-button"');
+    expect(html).toContain("Erase this customer");
+    expect(html).toContain("Messages are kept until you erase the customer.");
+    // The question is asked only after the button is pressed; nothing is erased from a render.
+    expect(html).not.toContain("customers-erase-confirm");
+    expect(html).not.toContain("customers-erase-yes");
+    expect(html.indexOf("customers-composer")).toBeLessThan(html.indexOf("customers-erase"));
+  });
+
+  it("does not offer erasing when no conversation is open", () => {
+    expect(thread({ conversation: null, messages: [] })).not.toContain("customers-erase");
+  });
+
+  it("turns the erase button off while something else is in flight", () => {
+    expect(thread({ busy: true })).toMatch(/<button[^>]*disabled=""[^>]*data-testid="customers-erase-button"/);
+  });
+
   it("renders a hostile name and message as text, never as markup", () => {
     const html = thread({
       conversation: conversation({ contactName: '<img src=x onerror="alert(1)">' }),
@@ -275,5 +295,7 @@ describe("Thread", () => {
   it("speaks Indonesian when the desk does", () => {
     applyLocale("id");
     expect(thread()).toContain("Anda masih bisa membalas bebas selama 23 jam 0 menit lagi.");
+    expect(thread()).toContain("Hapus data pelanggan ini");
+    expect(thread()).toContain("Pesan disimpan sampai Anda menghapus pelanggannya.");
   });
 });

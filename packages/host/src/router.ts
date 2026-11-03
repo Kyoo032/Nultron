@@ -45,6 +45,7 @@ import {
 import { DESK_FILE_ROUTES } from "./desk-files/routes";
 import { FOLDER_ROUTES } from "./folder-root";
 import {
+  handleDeleteConversation,
   handleDeleteWhatsApp,
   handleGetConversation,
   handleGetConversations,
@@ -457,6 +458,7 @@ const routes: Route[] = [
   compile("POST", "/api/v1/customers/conversations/:conversationId/read", (req) => handlePostConversationRead(req)),
   compile("POST", "/api/v1/customers/conversations/:conversationId/reply", (req) => handlePostConversationReply(req)),
   compile("POST", "/api/v1/customers/conversations/:conversationId/state", (req) => handlePostConversationState(req)),
+  compile("DELETE", "/api/v1/customers/conversations/:conversationId", (req) => handleDeleteConversation(req)),
   compile("GET", "/api/v1/legal/playbooks", handleGetLegalPlaybooks),
   compile("GET", "/api/v1/legal/matters", handleGetLegalMatters),
   compile("POST", "/api/v1/legal/matters", handlePostLegalMatters),

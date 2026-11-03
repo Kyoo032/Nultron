@@ -368,6 +368,56 @@ function Bubble({ message, now }: { message: CustomerMessage; now: number }) {
   );
 }
 
+/**
+ * Messages are kept with no time limit and go only when a customer asks, so erasing is a deliberate
+ * two-step act. It sits at the foot of the thread, away from the buttons the owner presses all day, and
+ * the host refuses anyone but the desk's owner (the refusal shows in the thread's error line).
+ */
+function EraseControl({ name, busy, onErase }: { name: string; busy: boolean; onErase: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+  return (
+    <div className="mt-4 border-t border-[var(--line)] pt-3" data-testid="customers-erase">
+      {confirming ? (
+        <div role="alertdialog" aria-label={t("customers.thread.erase.button")} data-testid="customers-erase-confirm">
+          <p className="text-sm text-[var(--text)] [overflow-wrap:anywhere]">
+            {t("customers.thread.erase.confirm", { name })}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="btn"
+              disabled={busy}
+              data-testid="customers-erase-yes"
+              onClick={() => {
+                setConfirming(false);
+                onErase();
+              }}
+            >
+              {t("customers.thread.erase.yes")}
+            </button>
+            <button type="button" className="btn" data-testid="customers-erase-no" onClick={() => setConfirming(false)}>
+              {t("customers.thread.erase.no")}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="btn"
+            disabled={busy}
+            data-testid="customers-erase-button"
+            onClick={() => setConfirming(true)}
+          >
+            {t("customers.thread.erase.button")}
+          </button>
+          <span className="text-[12px] text-[var(--text-2)]">{t("customers.thread.erase.note")}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ThreadPane({
   conversation,
   messages,
@@ -379,6 +429,7 @@ export function ThreadPane({
   onDraft,
   onSend,
   onState,
+  onErase,
 }: {
   conversation: CustomerConversation | null;
   messages: CustomerMessage[];
@@ -392,6 +443,8 @@ export function ThreadPane({
   onDraft: (text: string) => void;
   onSend: () => void;
   onState: (state: Exclude<ConversationState, "auto">) => void;
+  /** Erase this customer and every message. Asked for only after the owner confirms. */
+  onErase: () => void;
 }) {
   const logRef = useRef<HTMLUListElement | null>(null);
   const latest = messages.length;
@@ -509,6 +562,9 @@ export function ThreadPane({
           )}
         </div>
       </form>
+
+      {/* Keyed by the conversation, so a half-answered "are you sure" never carries to another customer. */}
+      <EraseControl key={conversation.id} name={contactLabel(conversation)} busy={busy} onErase={onErase} />
     </section>
   );
 }

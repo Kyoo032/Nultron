@@ -51,6 +51,13 @@
     "fromYou": "You",
     "done": "Mark done",
     "reopen": "Reopen",
+    "erase": {
+      "button": "Erase this customer",
+      "note": "Messages are kept until you erase the customer.",
+      "confirm": "Erase {name} and every message in this thread? This cannot be undone. Do it when the customer asks to be deleted.",
+      "yes": "Erase for good",
+      "no": "Keep"
+    },
     "states": {
       "auto": "Handled automatically",
       "needs_you": "Needs you",
@@ -82,6 +89,7 @@
     "disconnect": "Could not disconnect the number.",
     "send": "WhatsApp did not accept that reply.",
     "state": "Could not change that conversation.",
+    "erase": "Could not erase that customer.",
     "notConnected": "Connect a WhatsApp number for this desk first.",
     "windowClosed": "The 24-hour window has closed, so a free-form reply cannot be sent."
   }

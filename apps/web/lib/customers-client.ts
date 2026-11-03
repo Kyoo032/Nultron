@@ -121,3 +121,9 @@ export async function setConversationState(
   const res = await post(conversationPath(conversationId, "/state"), { state });
   await readJson<{ ok: boolean }>(res, "Could not change that conversation");
 }
+
+/** Erase the conversation and every message in it, for good. The owner's (the host refuses a member). */
+export async function eraseConversation(conversationId: string): Promise<void> {
+  const res = await apiFetch(conversationPath(conversationId), { method: "DELETE" });
+  await readJson<{ ok: boolean }>(res, "Could not erase that customer");
+}
