@@ -20,6 +20,7 @@
     "portal:invite": "pnpm --filter @agentforge/portal exec tsx scripts/invite.ts",
     "portal:account": "pnpm --filter @agentforge/portal exec tsx scripts/account.ts",
     "maps:check": "node scripts/map-rot.mjs",
+    "verify:paid-gate": "node .cursor/skills/verify-paid-media-gate/scripts/check.mjs",
     "lane-guard": "node scripts/lane-guard.mjs",
     "where": "node scripts/where-am-i.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",
