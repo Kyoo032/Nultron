@@ -23,14 +23,14 @@ import * as pages from "../views/pages";
 import { translator } from "../views/i18n";
 import { portalRoutes } from "./index";
 
-/** Produced by `renderCodeModePages` over the views of `main` at `9aba37e`. */
+/** Produced by `renderCodeModePages` over the views of `main` at `9aba37e`; the two `userCode` screens since the typed-code fix of 2026-11-03, whose form is a GET to `/activate?code=`. */
 const GOLDEN: Readonly<Record<string, string>> = {
   "en.signIn": "569f1f42a9868e94ba34c64af589dce01d892212ae02deb533c6699f4cae03d1",
   "en.signIn.error": "0422719e28d40da3c5fcb7abb19dd23c4f0d630f836dcaa065cd264ffb751e42",
   "en.enterCode": "f810f49131ec216f02aad943b7fde20bf01e4d7c185fd701d9c881770bdf4a88",
   "en.invite": "7b99a83ac26fd495441d477645517601035110393272892605ef74616d886647",
   "en.state": "790689fdee432252830f0241c63c63b1e43faf2b32b4d2e6ef5fab1dd32bbefc",
-  "en.userCode": "c03155e8f3bbeb995ebc6cbc06ea2ab391df3ac45a767947668faff9127c22ef",
+  "en.userCode": "2841901e5d2859eff7c29decedca58ec31effb239b5f4bc79d8a3cec2c45b558",
   "en.approve": "f37d934f52f6add3746dc66ceac2f9398826b88c1fcfd401c1e0b1a9ff1735d6",
   "en.signedOut": "e43360de1cadeaa4e1f739ff157810beb2cc02a6b9c56e3d2da1f2061c602f37",
   "en.error": "ade7dd40024801ef9ae291db0d1c5651cc9b2094de164456465e9eb84496b679",
@@ -39,7 +39,7 @@ const GOLDEN: Readonly<Record<string, string>> = {
   "id.enterCode": "63cf6bac6932915ffcc62e625d5eae55cdba5bfb38321e09c2f5a5ebbe88b843",
   "id.invite": "2593227842fa20be872acc439b631146f01727e3057894e47e3ee6942873541d",
   "id.state": "23212fca357210e12ef0c3227e6efc166017ec4636839b8fdd5bc735a7d492c8",
-  "id.userCode": "2a6d36d716d59359488565d8f73b7b0d1124bc8fb853eb0cf5377e8e274103c8",
+  "id.userCode": "94bbb1620f20cd32a4e3a984a99d6896448e98e4cd888be0679fc167f89f0171",
   "id.approve": "baebcb2a9b6e40e8548b9295712be97579594b5c2bb5787297656b3f9c85058e",
   "id.signedOut": "4de83b7bb8da75d55ef354b9d1cb18a0da96223488d7c60e1c03ce84dd851ba0",
   "id.error": "e87373dc8c7eb09401fff644f8688520f4efcab8c73ceabf1f4b17bbd6c464bd",

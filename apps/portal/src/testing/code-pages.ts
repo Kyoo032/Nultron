@@ -83,7 +83,6 @@ export function renderCodeModePages(views: Views): Readonly<Record<string, strin
     out[`${locale}.userCode`] = call(views.userCodePage, {
       ...base,
       action: "/activate",
-      csrfToken: "csrf-fixed",
       userCode: "ABCD-2345",
       error: t("approve.unknownCode"),
       account: { email: "person@example.test", signOutAction: "/logout", csrfToken: "csrf-fixed" },
