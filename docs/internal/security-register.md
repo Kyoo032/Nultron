@@ -6464,8 +6464,11 @@ Residual, needs Rizky's decision:
 - **`zod` 3 has no fix in its line.** The ways out are (1) move the AI SDK to a major that takes `zod` 4 and move
   the product's schemas to `zod` 4 (a migration across core, host and web, not a patch); (2) cap every array schema
   that reads a request body with `.max()` and teach `scripts/audit-deployed.mjs` an accepted-risk entry for this
-  advisory (the script has none today, and AGENTS.md forbids inventing a bypass); (3) leave the gate red. An
-  override of `zod@3` to 4.6.7 is not one of them: the 3.x API that `ai` 4 and our schemas import would be gone.
+  advisory (the script has none today, and AGENTS.md forbids inventing a bypass); (3) leave the gate red. A fourth
+  route was found by a sibling session the same day (corrected 2026-11-03; an earlier wording here said it could not
+  work): override every `zod` below 4.6.6 to 4.6.7 and import `zod/v3`, which 4.6.7 still ships. That turns the gate
+  green, but the upstream fix touches only the v4 core, so our schemas would still run the unfixed v3 parser.
+  Rizky chose (1) on 2026-11-03; it is being built on `fix/zod-4`.
 - **Not driven.** Nothing was booted from this tree; the unit suites and `ci:local` ran, and `express` and
   `yahoo-finance2` import from `apps/web` against the new lock.
 
