@@ -79,14 +79,14 @@ describe("the plans namespace", () => {
       "berbasis web",
       "Hubungi DPS",
       "pembelian mandiri",
-      "basis pengetahuan terpadu",
+      "Knowledge Base terpadu",
       "lalu lintas",
       "implementasi dan pemeliharaan",
       "Kursi dan token ditagih secara terpisah",
     ]) {
       expect(indonesian, phrase).toContain(phrase);
     }
-    expect(indonesian).not.toContain("Satu kursi");
+    expect(indonesian).not.toContain("Satu seat");
   });
 
   it("is registered with the translator, so a tier renders as a sentence rather than a key", () => {

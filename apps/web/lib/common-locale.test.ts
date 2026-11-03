@@ -18,7 +18,7 @@ describe("common locale catalogs", () => {
 
   it("translates the shared job chrome into Indonesian", () => {
     expect(id.jobProgress.starting).toBe("Memulai…");
-    expect(id.artifactActions.sendToKb).toContain("Basis Pengetahuan");
+    expect(id.artifactActions.sendToKb).toContain("Knowledge Base");
     expect(id.modeHandoff.document).toContain("{subject}");
     expect(id.modeHandoff.presentation).toContain("{subject}");
   });

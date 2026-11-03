@@ -195,7 +195,7 @@ describe("education skills", () => {
     expect(run.trace.checked).toBe(true);
     expect(run.trace.attempts).toBe(1);
     expect(run.plan.rendered).toBe(false);
-    expect(run.plan.avatar.label).toBe("Penyaji");
+    expect(run.plan.avatar.label).toBe("Presenter");
     expect(run.plan.cues[0]?.text).toContain("Untuk apa pelajaran ini");
     expect(run.plan.dubScript).toContain("Periksa pemahaman Anda");
     expect(run.language.languageRule).toBe(outputLanguageRule("education", "id"));

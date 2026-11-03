@@ -26,8 +26,8 @@ describe("t()", () => {
     expect(t("market.studio.title")).toBe("Pantauan Pasar");
     expect(t("data.title")).toBe("Data");
     expect(t("finance.title")).toBe("Keuangan");
-    expect(t("legal.studio.title")).toBe("Hukum");
-    expect(t("knowledge.title")).toBe("Basis Pengetahuan");
+    expect(t("legal.studio.title")).toBe("Legal");
+    expect(t("knowledge.title")).toBe("Knowledge Base");
     expect(t("knowledge.tabs.sources")).toBe("Sumber");
     expect(t("settings.title")).toBe("Pengaturan");
     expect(t("workspaces.title")).toBe("Ruang kerja");

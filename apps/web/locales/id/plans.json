@@ -1,20 +1,20 @@
 {
   "kicker": "Paket",
   "title": "Pilih paket",
-  "intro": "Personal adalah meja kerja Nultron Anda sendiri untuk satu pemilik, pelengkap dari DPS ketika Anda membeli banyak token. Enterprise adalah Nultron berbasis web.",
+  "intro": "Personal adalah meja kerja Nultron Anda sendiri untuk satu pemilik, pelengkap dari DPS saat Anda membeli banyak token. Enterprise adalah Nultron berbasis web.",
   "placeholderNotice": "Harga indikatif — belum final.",
   "period": {
     "month": "/ bulan"
   },
   "seats": {
-    "capped": "Maksimal {count} kursi"
+    "capped": "Maksimal {count} seat"
   },
   "currentBadge": "Paket Anda",
   "featuresLabel": "Yang Anda dapatkan",
   "tier": {
     "personal": {
       "name": "Personal",
-      "description": "Meja kerja Nultron Anda sendiri, untuk satu pemilik. Pelengkap dari DPS ketika Anda membeli banyak token."
+      "description": "Meja kerja Nultron Anda sendiri, untuk satu pemilik. Pelengkap dari DPS saat Anda membeli banyak token."
     },
     "enterprise": {
       "name": "Enterprise",
@@ -23,12 +23,12 @@
   },
   "feature": {
     "macWindowsApp": "Meja kerja Nultron Anda sendiri, untuk satu pemilik",
-    "tokenComplement": "Pelengkap dari DPS ketika Anda membeli banyak token",
+    "tokenComplement": "Pelengkap dari DPS saat Anda membeli banyak token",
     "webProduct": "Nultron berbasis web",
     "contactDps": "Hubungi DPS untuk mengaktifkan. Tidak ada pembelian mandiri.",
-    "knowledgeStorage": "Setiap kursi sudah mencakup penyimpanan untuk basis pengetahuan terpadu",
-    "agentTraffic": "Setiap kursi sudah termasuk lalu lintas pengguna saat memakai agen",
-    "implementationMaintenance": "Setiap kursi sudah termasuk implementasi dan pemeliharaan dari DPS",
+    "knowledgeStorage": "Setiap seat sudah mencakup penyimpanan untuk Knowledge Base terpadu",
+    "agentTraffic": "Setiap seat sudah termasuk lalu lintas pengguna saat memakai agen",
+    "implementationMaintenance": "Setiap seat sudah termasuk implementasi dan pemeliharaan dari DPS",
     "seatsAndTokensSeparate": "Kursi dan token ditagih secara terpisah"
   },
   "cta": {
@@ -66,7 +66,7 @@
     "loading": "Membaca paket akun ini…",
     "failed": "Paket akun ini sedang tidak bisa dibaca.",
     "noPlan": "Akun ini belum punya paket.",
-    "seats": "{used} dari {cap} kursi terpakai",
+    "seats": "{used} dari {cap} seat terpakai",
     "periodEnd": "Periode berjalan berakhir {date}",
     "notEnforced": "Paket tidak diberlakukan pada instalasi ini.",
     "seePlans": "Lihat paket",

@@ -13,23 +13,23 @@
     "cut": "Hanya {sent} karakter pertama dari {total} yang dikirim.",
     "masked": "{n} data pribadi disembunyikan sebelum dikirim.",
     "maskedOne": "1 data pribadi disembunyikan sebelum dikirim.",
-    "originalSkipped": "Hanya teksnya yang disimpan, bukan berkas aslinya.",
+    "originalSkipped": "Hanya teksnya yang disimpan, bukan file aslinya.",
     "retry": "Coba lagi",
     "retryAria": "Coba baca {name} lagi",
     "tooMany": "Satu pesan maksimal berisi {n} dokumen.",
-    "mustFinish": "Tunggu hingga semua dokumen selesai dibaca, atau hapus dokumen yang gagal.",
+    "mustFinish": "Tunggu sampai semua dokumen selesai dibaca, atau hapus dokumen yang gagal.",
     "errors": {
-      "too_large": "Berkas ini melebihi batas {mb} MB. Lampirkan berkas yang lebih kecil.",
-      "unsupported": "Jenis berkas ini belum bisa dibaca di sini.",
-      "mismatch": "Isi berkas ini tidak cocok dengan jenis yang tertulis di namanya. Periksa dulu, lalu coba lagi.",
+      "too_large": "File ini melebihi batas {mb} MB. Lampirkan file yang lebih kecil.",
+      "unsupported": "Jenis file ini belum bisa dibaca di sini.",
+      "mismatch": "Isi file ini tidak cocok dengan jenis yang tertulis di namanya. Periksa dulu, lalu coba lagi.",
       "needs_ocr": "PDF ini hasil pindaian dan tidak berisi teks yang bisa dibaca. Tidak ada yang dikirim ke mana pun. Lampirkan versi yang teksnya bisa dipilih.",
-      "encrypted": "Berkas ini dilindungi kata sandi. Hapus kata sandinya lalu lampirkan lagi.",
-      "empty": "Berkas ini tidak berisi teks.",
-      "unreadable": "Berkas ini tidak bisa dibaca. Mungkin rusak.",
-      "slow": "Berkas ini terlalu lama diproses. Coba berkas yang lebih kecil.",
-      "busy": "Nultron masih membaca berkas lain. Coba lagi sebentar lagi.",
-      "failed": "Berkas ini tidak bisa dibaca. Periksa koneksi, lalu coba lagi.",
-      "send": "Berkas ini gagal disiapkan, jadi pesan belum terkirim. Periksa koneksi, lalu coba lagi."
+      "encrypted": "File ini dilindungi kata sandi. Hapus kata sandinya lalu lampirkan lagi.",
+      "empty": "File ini tidak berisi teks.",
+      "unreadable": "File ini tidak bisa dibaca. Mungkin rusak.",
+      "slow": "File ini terlalu lama diproses. Coba file yang lebih kecil.",
+      "busy": "Nultron masih membaca file lain. Coba lagi sebentar lagi.",
+      "failed": "File ini tidak bisa dibaca. Periksa koneksi, lalu coba lagi.",
+      "send": "File ini gagal disiapkan, jadi pesan belum terkirim. Periksa koneksi, lalu coba lagi."
     }
   },
   "empty": {
@@ -48,7 +48,7 @@
       "title": "Mulai dari satu ide",
       "plan": {
         "label": "Susun rencana",
-        "hint": "Ubah catatan kasar menjadi draf langkah-langkah awal.",
+        "hint": "Ubah catatan kasar menjadi draft langkah-langkah awal.",
         "prompt": "Ubah catatan ini menjadi rencana langkah demi langkah:\n\n"
       },
       "summarise": {
@@ -58,7 +58,7 @@
       },
       "rewrite": {
         "label": "Tulis ulang untuk pembaca",
-        "hint": "Kirim draf Anda dan sebutkan siapa pembacanya; bahasanya akan dipertajam.",
+        "hint": "Kirim draft Anda dan sebutkan siapa pembacanya; bahasanya akan dipertajam.",
         "prompt": "Tulis ulang teks ini untuk pembaca tertentu. Pertahankan maknanya dan pertajam pilihan katanya:\n\n"
       },
       "decide": {
@@ -117,13 +117,13 @@
     "error": "Ada yang perlu diperiksa"
   },
   "embed": {
-    "link": "Tautan",
-    "file": "Berkas",
+    "link": "Link",
+    "file": "File",
     "image": "Gambar",
     "video": "Video",
     "job": "Hasil",
     "open": "Buka",
-    "preview": "Lihat isi berkas"
+    "preview": "Lihat isi file"
   },
   "context": {
     "meter": "Konteks: {used} dari {window}",
@@ -136,11 +136,11 @@
     "conversation": "Percakapan",
     "conversationDetail": "pesan dalam obrolan ini",
     "attachments": "Lampiran",
-    "attachmentsDetail": "berkas pada giliran ini",
+    "attachmentsDetail": "file pada giliran ini",
     "knowledge": "Pengetahuan",
     "knowledgeDetail": "disematkan + diambil",
     "pinnedDetail": "{n} tersemat",
-    "soul": "Persona",
+    "soul": "Soul",
     "memories": "Memori",
     "sources": "Sumber",
     "free": "Kosong",
@@ -149,7 +149,7 @@
   },
   "usage": {
     "connectKey": "Pemakaian · hubungkan kunci",
-    "planSeats": "{plan} · {used} dari {cap} kursi",
+    "planSeats": "{plan} · {used} dari {cap} seat",
     "planName": "Paket: {plan}",
     "unlimited": "Pemakaian · Tanpa batas",
     "remaining": "Pemakaian · {left}",
@@ -185,64 +185,64 @@
   },
   "tools": {
     "name": {
-      "list_files": "Daftar berkas",
-      "read_file": "Baca berkas",
-      "write_file": "Tulis berkas",
-      "edit_file": "Ubah berkas",
-      "search_files": "Cari berkas",
-      "delete_file": "Hapus berkas",
+      "list_files": "Daftar file",
+      "read_file": "Baca file",
+      "write_file": "Tulis file",
+      "edit_file": "Ubah file",
+      "search_files": "Cari file",
+      "delete_file": "Hapus file",
       "knowledge_search": "Pencarian pengetahuan",
       "run_code": "Jalankan kode",
       "build_deck": "Buat deck"
     },
     "doing": {
-      "list_files": "Menampilkan daftar berkas di {dir}…",
-      "list_files_top": "Menampilkan daftar berkas Anda…",
+      "list_files": "Menampilkan daftar file di {dir}…",
+      "list_files_top": "Menampilkan daftar file Anda…",
       "read_file": "Sedang membaca {path}…",
       "write_file": "Sedang menulis {path}…",
       "edit_file": "Sedang mengubah {path}…",
-      "search_files": "Mencari “{query}” di berkas…",
+      "search_files": "Mencari “{query}” di file…",
       "delete_file": "Sedang menghapus {path}…",
-      "knowledge_search": "Mencari “{query}” di basis pengetahuan Anda…",
+      "knowledge_search": "Mencari “{query}” di Knowledge Base Anda…",
       "run_code": "Sedang menjalankan {language}…",
       "build_deck": "Sedang menyusun “{title}”…",
       "web_fetch": "Sedang membuka {host}…"
     },
     "done": {
-      "list_files": "Daftar berkas di {dir}",
-      "list_files_top": "Daftar berkas Anda",
+      "list_files": "Daftar file di {dir}",
+      "list_files_top": "Daftar file Anda",
       "read_file": "Membaca {path}",
       "write_file": "Menulis {path}",
       "edit_file": "Mengubah {path}",
-      "search_files": "Pencarian “{query}” di berkas",
+      "search_files": "Pencarian “{query}” di file",
       "delete_file": "Menghapus {path}",
-      "knowledge_search": "Pencarian “{query}” di basis pengetahuan Anda",
+      "knowledge_search": "Pencarian “{query}” di Knowledge Base Anda",
       "run_code": "Menjalankan {language}",
       "build_deck": "Menyusun “{title}”",
       "web_fetch": "Membuka {host}"
     },
     "failed": {
-      "list_files": "Gagal menampilkan daftar berkas",
+      "list_files": "Gagal menampilkan daftar file",
       "read_file": "Gagal membaca {path}",
       "write_file": "Gagal menulis {path}",
       "edit_file": "Gagal mengubah {path}",
-      "search_files": "Gagal mencari “{query}” di berkas",
+      "search_files": "Gagal mencari “{query}” di file",
       "delete_file": "Gagal menghapus {path}",
-      "knowledge_search": "Gagal mencari di basis pengetahuan Anda",
+      "knowledge_search": "Gagal mencari di Knowledge Base Anda",
       "run_code": "Gagal menjalankan {language}",
       "build_deck": "Gagal membuat deck",
       "web_fetch": "Gagal membuka {host}"
     },
     "pending": {
-      "write_file": "Mengusulkan penulisan berkas",
-      "edit_file": "Mengusulkan perubahan berkas",
-      "delete_file": "Mengusulkan penghapusan berkas"
+      "write_file": "Mengusulkan penulisan file",
+      "edit_file": "Mengusulkan perubahan file",
+      "delete_file": "Mengusulkan penghapusan file"
     },
     "detail": {
       "none": "Tidak ada hasil",
       "more": "sisanya tidak ditampilkan",
-      "files": "{n} berkas",
-      "filesOne": "1 berkas",
+      "files": "{n} file",
+      "filesOne": "1 file",
       "matches": "{n} kecocokan",
       "matchesOne": "1 kecocokan",
       "excerpts": "{n} kutipan",
@@ -253,7 +253,7 @@
       "slidesOne": "Satu slide"
     },
     "open": "Buka",
-    "openAria": "Buka {path} di Basis Pengetahuan",
+    "openAria": "Buka {path} di Knowledge Base",
     "pendingTitle": "Menunggu persetujuan Anda",
     "review": "Tinjau",
     "reviewMissing": "Buka panel perubahan folder untuk meninjaunya.",
@@ -265,7 +265,7 @@
       "stderr": "Kesalahan",
       "noOutput": "Kode berjalan dan tidak mencetak apa pun.",
       "cut": "Dipersingkat di sini.",
-      "filesWritten": "Berkas tersimpan",
+      "filesWritten": "File tersimpan",
       "reason": {
         "timeout": "Berjalan terlalu lama, jadi dihentikan.",
         "memory": "Memori yang dipakai melebihi batas, jadi dihentikan.",
@@ -288,9 +288,9 @@
     "downloading": "Mengunduh…",
     "downloadAria": "Unduh {title} sebagai {filename}",
     "downloadFailed": "Deck gagal diunduh. Coba lagi.",
-    "noPreview": "Slide belum bisa ditampilkan di sini, tetapi berkasnya siap diunduh.",
+    "noPreview": "Slide belum bisa ditampilkan di sini, tetapi file-nya siap diunduh.",
     "outlineAria": "Slide dalam deck ini",
-    "previewAria": "Pratinjau slide {title}"
+    "previewAria": "Preview slide {title}"
   },
   "media": {
     "label": "Perlu persetujuan",
@@ -321,9 +321,9 @@
     "loadSessions": "Gagal memuat daftar obrolan",
     "noImageInput": "Agen atau model ini tidak bisa menerima gambar",
     "noVideoInput": "Agen atau model ini tidak bisa menerima video",
-    "emptySend": "Ketik pesan atau lampirkan berkas",
-    "fileTooLarge": "Berkas itu melebihi batas ukuran",
-    "unsupportedFile": "Jenis berkas tidak didukung",
+    "emptySend": "Ketik pesan atau lampirkan file",
+    "fileTooLarge": "File itu melebihi batas ukuran",
+    "unsupportedFile": "Jenis file tidak didukung",
     "mixedMedia": "Kirim lampiran gambar dan video secara terpisah",
     "couldNotReach": "Gagal menghubungi {model} setelah {tries} kali mencoba"
   },
@@ -349,7 +349,7 @@
     },
     "fast": {
       "label": "Tercepat",
-      "hint": "Jawaban paling cepat, cocok untuk pertanyaan singkat dan draf"
+      "hint": "Jawaban paling cepat, cocok untuk pertanyaan singkat dan draft"
     },
     "reasoning": {
       "label": "Penalaran",

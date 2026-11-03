@@ -17,8 +17,8 @@
   "titlePlaceholder": "Judul lagu",
   "instrumental": "Instrumental",
   "instrumentalHint": "Tanpa vokal",
-  "writeLyrics": "Buat draf lirik",
-  "writingLyrics": "Membuat draf…",
+  "writeLyrics": "Buat draft lirik",
+  "writingLyrics": "Membuat draft…",
   "generate": "Buat",
   "generating": "Membuat…",
   "advanced": "Lanjutan",
@@ -34,10 +34,10 @@
     "title": "Tidak ada model musik yang bisa dipilih",
     "body": "Meja kerja ini tidak mendapat model musik apa pun. Musik berjalan lewat relay Suno milik gateway, yang tidak muncul di daftar modelnya. Kalau masalah ini berlanjut, segarkan daftar model di Pengaturan dan beri tahu operator gateway bahwa {gateway} tidak melayani relay itu untuk kunci ini."
   },
-  "voiceHeading": "Sulih suara",
+  "voiceHeading": "Voice over",
   "voiceUnavailable": {
-    "realtimeOnly": "Satu-satunya model teks-ke-suara di gateway ini bersifat realtime (WebSocket), yang tidak terjangkau lewat rute pekerjaan. Sulih suara akan aktif sendiri begitu ada model suara standar di katalog.",
-    "noAudioModels": "Gateway ini tidak punya model teks-ke-suara. Sulih suara akan aktif sendiri begitu salah satunya muncul di katalog."
+    "realtimeOnly": "Satu-satunya model teks-ke-suara di gateway ini bersifat realtime (WebSocket), yang tidak terjangkau lewat rute pekerjaan. Voice over akan aktif sendiri begitu ada model suara standar di katalog.",
+    "noAudioModels": "Gateway ini tidak punya model teks-ke-suara. Voice over akan aktif sendiri begitu salah satunya muncul di katalog."
   },
   "outputTextLanguage": "Lirik, judul, dan semua kata yang dinyanyikan atau diucapkan harus berbahasa Indonesia, kecuali prompt sudah menyebut bahasa lain.",
   "estimate": {

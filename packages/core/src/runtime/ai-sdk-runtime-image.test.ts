@@ -159,7 +159,7 @@ describe("an image in the person's turn", () => {
       locale: "id",
       parts: [{ type: "image_url", image_url: { url: "/api/v1/media/f66a438a-781a-478b-8e67-c19be7771c20/file" } }],
     });
-    expect(String((thrown as Error)?.message)).toMatch(/tidak dapat dibaca/);
+    expect(String((thrown as Error)?.message)).toMatch(/tidak bisa dibaca/);
   });
 });
 
@@ -204,7 +204,7 @@ describe("a gateway that refuses a request carrying an image", () => {
   it("is reported in Bahasa Indonesia on an Indonesian desk", async () => {
     gateway(400, "image input is not supported for this model");
     const { events } = await run({ model: "gpt-4o", parts: lookAtIt, locale: "id" });
-    expect(failedMessage(events)).toContain("tidak dapat menerima gambar");
+    expect(failedMessage(events)).toContain("tidak bisa menerima gambar");
   });
 
   it("treats a payload that is too large as the image's problem too", async () => {

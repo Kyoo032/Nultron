@@ -1,11 +1,11 @@
 {
   "title": "Riset",
-  "expectedInputs": "Hasil: dosir bersitasi (Pertanyaan, Temuan, Sumber) yang bisa dibuka lagi, diunduh, atau dikirim ke Dokumen, Presentasi, atau Basis Pengetahuan.",
+  "expectedInputs": "Hasil: laporan bersitasi (Pertanyaan, Temuan, Sumber) yang bisa dibuka lagi, diunduh, atau dikirim ke Dokumen, Presentasi, atau Knowledge Base.",
   "reopenSaved": "Buka riset tersimpan…",
   "openSettings": "Buka Pengaturan.",
   "tabNotes": "Catatan",
-  "tabDossier": "Dosir",
-  "emptyTitle": "Belum ada dosir",
+  "tabDossier": "Laporan",
+  "emptyTitle": "Belum ada laporan",
   "emptyBody": "Ketik pertanyaan di bawah. Halaman web dibaca lewat HTTPS.",
   "promptPlaceholder": "Apa yang berubah dalam aturan pencatatan IDX tahun ini?",
   "promptAria": "Pertanyaan riset",
@@ -13,7 +13,7 @@
   "generate": "Mulai riset",
   "working": "Sedang bekerja…",
   "previewKicker": "Riset",
-  "examplesHeading": "Mulai dari templat",
+  "examplesHeading": "Mulai dari template",
   "examplesHint": "Klik salah satu kartu untuk memuat brief lengkapnya. Ganti detail contohnya, lalu mulai riset.",
   "templates": {
     "competitive-landscape": {
@@ -56,7 +56,7 @@
   "phaseComparing": "Membandingkan sumber",
   "phaseDrafting": "Menyusun temuan",
   "phaseChecking": "Memeriksa kutipan",
-  "phaseSaving": "Menyimpan dosir",
+  "phaseSaving": "Menyimpan laporan",
   "headingQuestion": "## Pertanyaan",
   "headingQueries": "## Kueri yang dijalankan",
   "headingSources": "## Sumber",
@@ -64,7 +64,7 @@
   "headingContradictions": "## Kontradiksi",
   "headingOpenQuestions": "## Pertanyaan terbuka",
   "notesSources": "Sumber:",
-  "fallbackTitle": "Dosir riset",
+  "fallbackTitle": "Laporan riset",
   "fallbackSummary": "Temuan dari {count} sumber.",
   "unreadPage": "Halaman gagal dibaca: {reason}. Cuplikan hasil pencarian disimpan di atas.",
   "noneRecorded": "Belum ada yang tercatat.",
@@ -79,11 +79,11 @@
   "statusLabel": "Status",
   "languageRule": "Tulis setiap string yang dilihat pengguna (title, summary, judul dan isi temuan, contradictions, openQuestions, dan catatan sumber) dalam Bahasa Indonesia profesional (Anda / infinitif). Pertahankan kunci JSON, id sumber seperti [S1], URL, dan kutipan verbatim. Jangan mencampur heading bahasa Inggris ke dalam temuan.",
   "checks": {
-    "title": "Sebagian isi dosir ini belum sepenuhnya didukung sumber",
+    "title": "Sebagian isi laporan ini belum sepenuhnya didukung sumber",
     "uncited": "Sebagian temuan tidak mencantumkan sumber.",
     "unknownSources": "Sebagian kutipan mengacu ke sumber yang tidak dibaca dalam proses ini.",
     "emptySections": "Sebagian bagian masih kosong.",
-    "hint": "Dosir sudah tersimpan. Buka sumbernya sebelum mengandalkan sebuah temuan, atau jalankan ulang pertanyaannya.",
+    "hint": "Laporan sudah tersimpan. Buka sumbernya sebelum mengandalkan sebuah temuan, atau jalankan ulang pertanyaannya.",
     "listAria": "Hasil pemeriksaan"
   }
 }

@@ -44,9 +44,9 @@ const COPY = {
     noRows: "Kueri tidak mengembalikan baris.",
     cutsFailed: "Kueri pada lembar ini gagal dijalankan.",
     repair:
-      "Tulis ulang JSON. Draf sebelumnya memakai angka atau kueri yang tidak didukung hasil. Salin angka hanya dari hasil potongan data. Jangan meramalkan dan jangan memakai tabel lain.",
-    invalidJson: "Draf sebelumnya bukan JSON yang valid.",
-    noFindings: "Draf sebelumnya tidak punya temuan.",
+      "Tulis ulang JSON. Draft sebelumnya memakai angka atau kueri yang tidak didukung hasil. Salin angka hanya dari hasil potongan data. Jangan meramalkan dan jangan memakai tabel lain.",
+    invalidJson: "Draft sebelumnya bukan JSON yang valid.",
+    noFindings: "Draft sebelumnya tidak punya temuan.",
     by: (measure: string, group: string) => `${measure} menurut ${group}`,
     over: (measure: string, when: string) => `${measure} sepanjang ${when}`,
     split: (group: string) => `Baris menurut ${group}`,

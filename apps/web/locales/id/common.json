@@ -7,8 +7,8 @@
   "restartHint": "Mulai ulang Nultron untuk menerapkan bahasa ini.",
   "loading": "Memuat…",
   "mediaMissing": {
-    "title": "Berkas hilang",
-    "hint": "Berkas ini sudah tidak ada."
+    "title": "File hilang",
+    "hint": "File ini sudah tidak ada."
   },
   "enhance": {
     "failedShort": "Penyempurnaan gagal",
@@ -30,23 +30,23 @@
     }
   },
   "saveFailed": {
-    "writeFailed": "Berkas tidak bisa disimpan di lokasi itu. Pilih folder lain atau kosongkan sebagian ruang penyimpanan, lalu coba lagi.",
-    "tooLarge": "Berkas ini terlalu besar untuk disimpan dari sini.",
-    "generic": "Berkas gagal disimpan. Coba lagi."
+    "writeFailed": "File tidak bisa disimpan di lokasi itu. Pilih folder lain atau kosongkan sebagian ruang penyimpanan, lalu coba lagi.",
+    "tooLarge": "File ini terlalu besar untuk disimpan dari sini.",
+    "generic": "File gagal disimpan. Coba lagi."
   },
   "artifactActions": {
     "download": "Unduh Markdown",
     "saving": "Menyimpan…",
-    "sendToKb": "Kirim ke Basis Pengetahuan",
+    "sendToKb": "Kirim ke Knowledge Base",
     "adding": "Menambahkan…",
     "makeDocument": "Jadikan dokumen",
     "makePresentation": "Jadikan presentasi",
     "downloadFailed": "Gagal mengunduh",
-    "kbIndexFailed": "Basis Pengetahuan gagal mengindeks ini: {reason}",
+    "kbIndexFailed": "Knowledge Base gagal mengindeks ini: {reason}",
     "unknownReason": "penyebabnya belum diketahui",
-    "kbAlready": "Sudah ada di Basis Pengetahuan.",
-    "kbAdded": "Ditambahkan ke Basis Pengetahuan.",
-    "kbFailed": "Gagal menambahkan ke Basis Pengetahuan"
+    "kbAlready": "Sudah ada di Knowledge Base.",
+    "kbAdded": "Ditambahkan ke Knowledge Base.",
+    "kbFailed": "Gagal menambahkan ke Knowledge Base"
   },
   "mascot": {
     "wave": "Melambai menyapa",
@@ -58,11 +58,11 @@
     "searching": "Sedang mencari tahu",
     "calculating": "Sedang mengolah angka",
     "charting": "Sedang mengamati grafik",
-    "reviewing": "Sedang menelaah berkas",
+    "reviewing": "Sedang menelaah file",
     "listening": "Sedang mendengarkan",
     "painting": "Sedang melukis",
     "filming": "Sedang merekam",
-    "editing": "Sedang menyunting",
+    "editing": "Sedang mengedit",
     "presenting": "Sedang presentasi",
     "celebrating": "Semua beres",
     "error": "Ada yang perlu diperiksa",

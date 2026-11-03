@@ -29,12 +29,12 @@
   "analysisKicker": "Analisis data",
   "evidence": "Bukti",
   "errors": {
-    "upload": "Berkas itu gagal diunggah",
+    "upload": "File itu gagal diunggah",
     "paste": "Teks yang ditempel tidak terbaca sebagai tabel",
     "open": "Dataset itu gagal dibuka",
-    "needTable": "Unggah berkas atau tempel tabel dulu.",
-    "fileCap": "Ukuran berkas melebihi batas 25 MB",
-    "readFile": "Berkas itu tidak terbaca sebagai tabel",
+    "needTable": "Unggah file atau tempel tabel dulu.",
+    "fileCap": "Ukuran file melebihi batas 25 MB",
+    "readFile": "File itu tidak terbaca sebagai tabel",
     "list": "Daftar dataset gagal dimuat",
     "delete": "Dataset itu gagal dihapus",
     "stubNeedsKey": "Analisis data butuh gateway yang aktif. Tempel kunci API Toko Token di Pengaturan, lalu coba lagi.",
@@ -44,11 +44,11 @@
     "promptRequired": "prompt wajib diisi",
     "datasetRequired": "datasetId (atau csv yang ditempel) wajib diisi",
     "datasetCap": "Dataset melebihi batas 25 MB",
-    "parse": "Berkas gagal diurai",
+    "parse": "File gagal diurai",
     "noHeader": "Tidak ditemukan baris judul kolom dan sedikitnya satu baris data",
     "rowCap": "Dataset melebihi batas {n} baris",
-    "fileOrText": "berkas atau teks wajib diisi",
-    "missingFile": "Berkas dataset tidak ada di penyimpanan",
+    "fileOrText": "file atau teks wajib diisi",
+    "missingFile": "File dataset tidak ada di penyimpanan",
     "notFound": "Dataset tidak ditemukan",
     "inUse": "Dataset sedang dianalisis. Coba lagi setelah prosesnya selesai"
   },
@@ -109,8 +109,8 @@
     "rowsTitle": "Baris pada lembar ini",
     "noRows": "Kueri tidak mengembalikan baris.",
     "cutsFailed": "Kueri pada lembar ini gagal dijalankan.",
-    "repair": "Tulis ulang JSON. Draf sebelumnya memakai angka atau kueri yang tidak didukung hasil. Salin angka hanya dari hasil potongan data. Jangan meramalkan dan jangan memakai tabel lain.",
-    "invalidJson": "Draf sebelumnya bukan JSON yang valid.",
-    "noFindings": "Draf sebelumnya tidak punya temuan."
+    "repair": "Tulis ulang JSON. Draft sebelumnya memakai angka atau kueri yang tidak didukung hasil. Salin angka hanya dari hasil potongan data. Jangan meramalkan dan jangan memakai tabel lain.",
+    "invalidJson": "Draft sebelumnya bukan JSON yang valid.",
+    "noFindings": "Draft sebelumnya tidak punya temuan."
   }
 }

@@ -64,7 +64,7 @@ describe("the empty Meeting desk", () => {
     const html = emptyDesk();
     expect(count(html, 'data-placement="empty"')).toBe(1);
     expect(html).toContain("Belum ada rapat.");
-    expect(html).toContain("Notulen beserta siapa mengerjakan apa");
+    expect(html).toContain("Notulen dan siapa mengerjakan apa");
     expect(html).not.toContain("Buat satu, tambahkan rekamannya, dan notulen menyusul.");
   });
 

@@ -32,8 +32,8 @@ describe("prompt template panel locale", () => {
       return;
     }
 
-    expect(t("edit.templates.heading")).toBe("Mulai dari templat prompt");
-    expect(html).toContain("Mulai dari templat prompt");
+    expect(t("edit.templates.heading")).toBe("Mulai dari template prompt");
+    expect(html).toContain("Mulai dari template prompt");
     expect(html).toContain("Semua");
     expect(html).toContain("Promo produk");
     expect(html).toContain("Talking head");

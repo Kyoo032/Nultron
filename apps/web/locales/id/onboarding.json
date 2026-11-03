@@ -3,14 +3,14 @@
   "intro": "Tanya apa saja, riset suatu topik, buat gambar atau video, atau susun presentasi.",
   "next": "Lanjutkan",
   "back": "Kembali",
-  "stepsLabel": "Langkah penyiapan",
+  "stepsLabel": "Langkah setup",
   "steps": {
     "welcome": "Halo",
     "key": "Kunci Anda",
     "try": "Coba"
   },
   "setupCheck": "Menyiapkan pembaca dokumen",
-  "ffmpegLater": "Anda bisa lanjut sekarang dan memasang ffmpeg nanti. Panduan yang sama akan tampil di layar Sunting sampai ffmpeg ditemukan.",
+  "ffmpegLater": "Anda bisa lanjut sekarang dan memasang ffmpeg nanti. Panduan yang sama akan tampil di layar Edit sampai ffmpeg ditemukan.",
   "ffmpegBundledLater": "Anda bisa lanjut sekarang. Fitur penyuntingan video dan pembacaan rekaman rapat baru aktif setelah {productName} dipasang ulang.",
   "keyTitle": "Tempel kunci {gatewayName} Anda",
   "keyHelp": "Buka {gatewayName}, salin kunci, lalu tempel di sini. Kunci hanya disimpan di komputer ini.",
@@ -29,7 +29,7 @@
       "hint": "Untuk rencana, pertanyaan, atau balasan yang perlu Anda kirim."
     },
     "research": {
-      "title": "Telusuri satu topik",
+      "title": "Riset satu topik",
       "hint": "Catatan lengkap dengan sumber untuk pertanyaan apa pun."
     },
     "images": {
@@ -52,7 +52,7 @@
   },
   "components": {
     "title": "Menyiapkan {productName}",
-    "description": "Menambahkan pembaca lokal untuk berkas PDF, Word, PowerPoint, Excel, dan e-book. Setiap dokumen dibaca di komputer ini; tidak ada yang diunggah.",
+    "description": "Menambahkan pembaca lokal untuk file PDF, Word, PowerPoint, Excel, dan e-book. Setiap dokumen dibaca di komputer ini; tidak ada yang diunggah.",
     "size": "Unduhan sekali saja, sekitar {mb} MB.",
     "progress": "{done} dari {total} langkah · {percent}%",
     "duration": "{seconds} dtk",
@@ -60,9 +60,9 @@
       "check": "Memeriksa yang sudah tersedia",
       "download": "Mengunduh pembaca",
       "verify": "Memverifikasi unduhan",
-      "unpack": "Mengekstrak berkas",
+      "unpack": "Mengekstrak file",
       "probe": "Memuat pembaca",
-      "marker": "Menyelesaikan penyiapan"
+      "marker": "Menyelesaikan setup"
     },
     "done": "Pembaca dokumen lokal sudah siap.",
     "alreadyRunning": "Jendela lain sedang menyiapkannya; proses itu akan selesai dengan sendirinya.",
@@ -71,12 +71,12 @@
     "errors": {
       "offline": "Tidak ada koneksi, sehingga pembaca tidak bisa diunduh.",
       "download_failed": "Unduhan tidak selesai.",
-      "integrity_mismatch": "Unduhan tidak cocok dengan checksum-nya, jadi berkasnya dibuang.",
+      "integrity_mismatch": "Unduhan tidak cocok dengan checksum-nya, jadi file-nya dibuang.",
       "unpack_failed": "Unduhan gagal diekstrak.",
       "probe_failed": "Pembaca sudah terpasang tetapi gagal dimuat.",
       "unsupported_platform": "Tidak ada versi pembaca untuk sistem operasi ini.",
       "busy": "Jendela lain sedang menyiapkannya.",
-      "unknown": "Penyiapan pembaca tidak selesai."
+      "unknown": "Setup pembaca tidak selesai."
     }
   },
   "later": "Tambahkan nanti",

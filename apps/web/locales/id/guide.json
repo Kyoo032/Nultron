@@ -30,7 +30,7 @@
     },
     "knowledge": {
       "title": "Bekali agen dengan pengetahuan Anda",
-      "body": "Basis Pengetahuan menyimpan catatan, berkas, dan halaman web Anda. Chat memanfaatkannya saat menjawab."
+      "body": "Knowledge Base menyimpan catatan, file, dan halaman web Anda. Chat memanfaatkannya saat menjawab."
     },
     "settings": {
       "title": "Kunci dan bahasa Anda",
@@ -39,7 +39,7 @@
   },
   "replay": {
     "title": "Panduan",
-    "body": "Tur satu menit untuk mengenal navigasi, Agen virtual, Chat, Basis Pengetahuan, dan Pengaturan.",
+    "body": "Tur satu menit untuk mengenal navigasi, Agen virtual, Chat, Knowledge Base, dan Pengaturan.",
     "button": "Putar ulang panduan"
   }
 }

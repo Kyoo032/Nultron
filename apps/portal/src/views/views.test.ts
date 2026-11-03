@@ -103,7 +103,7 @@ describe("copy", () => {
   it("carries the reason-code copy device-code-login.md freezes, in both locales", () => {
     expect(copyPair("reason.seat_cap_reached")).toEqual({
       en: "No seats left in your organisation.",
-      id: "Semua kursi di organisasi Anda sudah terpakai.",
+      id: "Semua seat di organisasi Anda sudah terpakai.",
     });
     expect(copyPair("reason.org_past_due").id).toBe("Pembayaran organisasi Anda tertunggak.");
   });

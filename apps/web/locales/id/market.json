@@ -1,7 +1,7 @@
 {
   "studio": {
     "title": "Pantauan Pasar",
-    "expectedInputs": "Hasil: harga langsung dan grafik per ticker, ditambah briefing tertulis. Ketik hingga 15 ticker, tanpa perlu mengunggah berkas. Ini analisis, bukan saran investasi.",
+    "expectedInputs": "Hasil: harga langsung dan grafik per ticker, ditambah briefing tertulis. Ketik sampai 15 ticker, tanpa perlu mengunggah file. Ini analisis, bukan saran investasi.",
     "download": "Unduh DOCX",
     "building": "Menyusun…",
     "writeBriefing": "Tulis briefing",
@@ -9,7 +9,7 @@
     "cancel": "Batalkan",
     "options": "Opsi",
     "hideOptions": "Sembunyikan opsi",
-    "machineNote": "{product} membaca harga, grafik, peringkat, berita, dan level pasar di komputer ini, lalu menulis briefing berdasarkan data tersebut. Angka apa pun yang tidak bisa ditelusuri ke data itu akan dihapus.",
+    "machineNote": "{product} membaca harga, grafik, peringkat, berita, dan level pasar di komputer ini, lalu menulis briefing berdasarkan data itu. Angka apa pun yang tidak bisa dilacak ke data itu akan dihapus.",
     "empty": "Tambahkan ticker di atas untuk melihat harga dan grafiknya.",
     "openSettings": "Buka {settings}",
     "needsKeyNote": "Harga dan grafik tetap berfungsi tanpa kunci. Untuk menulis briefing, tambahkan kunci Anda di {settings}.",
@@ -31,7 +31,7 @@
     "aria": "Mode analisis",
     "quick": "Analis tunggal",
     "team": "Tim analis",
-    "hint": "Empat analis bekerja lebih dulu, disusul satu ronde debat bullish dan bearish serta pembacaan risiko, baru briefing ditulis.",
+    "hint": "Empat analis bekerja lebih dulu, disusul satu ronde debat bullish dan bearish, lalu pembacaan risiko, baru briefing ditulis.",
     "unavailable": "Meja kerja ini tidak punya tim analis, jadi briefing ditulis oleh satu analis saja."
   },
   "progress": {
@@ -74,7 +74,7 @@
     "noTicker": "Tidak ada ticker yang ditemukan. Periksa ejaannya, misalnya MU, NVDA, atau BBCA.",
     "offline": "Data pasar sedang tidak terjangkau. Periksa koneksi internet Anda, lalu coba lagi.",
     "rewrite": "Bagian itu gagal ditulis ulang",
-    "docx": "Berkas DOCX gagal dibuat",
+    "docx": "File DOCX gagal dibuat",
     "board": "Daftar pantauan gagal dimuat"
   },
   "watchlist": {
@@ -150,11 +150,11 @@
   },
   "board": {
     "refresh": "Segarkan",
-    "loading": "Memuat kuotasi dan grafik…",
-    "fetching": "Mengambil kuotasi dan grafik…",
+    "loading": "Memuat harga dan grafik…",
+    "fetching": "Mengambil harga dan grafik…",
     "updating": "memperbarui…",
     "status": "Pasar AS {session} · per {when}",
-    "noQuote": "Tidak ada kuotasi",
+    "noQuote": "Tidak ada harga",
     "unchanged": "tidak berubah",
     "aboveAverage": "Di atas rata-rata {days} hari",
     "belowAverage": "Di bawah rata-rata {days} hari",
@@ -181,7 +181,7 @@
     "kicker": "Briefing Pantauan Pasar",
     "run": "Dijalankan {when}",
     "usSession": "AS {session}",
-    "guardClean": "Setiap angka dalam briefing ini bisa ditelusuri ke paket data yang diambil atau catatan posisi Anda, dan tidak ada kalimat yang berisi perintah.",
+    "guardClean": "Setiap angka dalam briefing ini bisa dilacak ke paket data yang diambil atau catatan posisi Anda, dan tidak ada kalimat yang berisi perintah.",
     "guardDirty": "{figures} diganti dengan “[unverified figure]”{flagged}. {sentences} dihapus karena {pronoun} terbaca seperti perintah.",
     "unverifiedOne": "{count} angka belum terverifikasi",
     "unverifiedMany": "{count} angka belum terverifikasi",
@@ -194,7 +194,7 @@
     "observed": "diamati {when}",
     "watchlist": "Daftar pantauan",
     "macro": "Makro",
-    "noMacro": "Tidak ada kuotasi makro yang diambil.",
+    "noMacro": "Tidak ada harga makro yang diambil.",
     "positionNotes": "Catatan posisi Anda",
     "rewrite": "Tulis ulang",
     "rewriting": "Menulis ulang…",
@@ -235,7 +235,7 @@
   },
   "ticker": {
     "typedAs": "diketik sebagai {input}",
-    "noData": "Tidak ada kuotasi atau data teknikal.",
+    "noData": "Tidak ada harga atau data teknikal.",
     "noHeadlines": "Tidak ada berita yang diambil.",
     "hiddenOne": "{count} berita disembunyikan karena teksnya terbaca seperti instruksi, bukan berita.",
     "hiddenMany": "{count} berita disembunyikan karena teksnya terbaca seperti instruksi, bukan berita."

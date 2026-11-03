@@ -22,7 +22,7 @@
   "emptyTitle": "Belum ada apa pun",
   "emptyBody": "Buat gambar untuk mengisi galeri ini.",
   "generatedAlt": "Gambar yang dibuat",
-  "examplesHeading": "Mulai dari templat",
+  "examplesHeading": "Mulai dari template",
   "examplesHint": "Klik salah satu kartu untuk memuat brief lengkapnya. Ganti detail contohnya, lalu buat gambarnya.",
   "outputTextLanguage": "Kalau gambar memuat teks yang terbaca (keterangan, label, papan, atau UI), tulis teksnya dalam bahasa Indonesia.",
   "estimate": {
@@ -53,11 +53,11 @@
   "templates": {
     "launch-page-product-hero": {
       "title": "Visual utama peluncuran produk",
-      "resultSummary": "Visual utama untuk katalog dengan pencahayaan nyata dan ruang teks yang sudah disiapkan, bukan gawai melayang di latar abu-abu."
+      "resultSummary": "Visual utama untuk katalog dengan pencahayaan nyata dan ruang teks yang sudah disiapkan, bukan gadget melayang di latar abu-abu."
     },
     "app-in-a-working-desk": {
       "title": "Aplikasi di atas meja kerja",
-      "resultSummary": "Bingkai aplikasi dalam suasana nyata yang meyakinkan, siap dipakai di materi pitch atau situs dokumentasi."
+      "resultSummary": "Frame aplikasi dalam suasana nyata yang meyakinkan, siap dipakai di materi pitch atau situs dokumentasi."
     },
     "lookbook-material-board": {
       "title": "Papan material lookbook",
@@ -68,7 +68,7 @@
       "resultSummary": "Foto sarapan yang tenang dengan ruang teks yang sudah disiapkan, layak jadi header sungguhan."
     },
     "dusk-city-establishing": {
-      "title": "Adegan pembuka kota senja",
+      "title": "Scene pembuka kota senja",
       "resultSummary": "Plat skyline sinematik dengan penanda waktu yang spesifik dan rak di latar depan, bukan senja stok yang generik."
     },
     "macro-fabric-study": {
@@ -85,7 +85,7 @@
     },
     "about-page-portrait": {
       "title": "Potret halaman Tentang Kami",
-      "resultSummary": "Bingkai bahu ke atas yang siap pakai, dengan lensa dan latar nyata, bukan potongan selfie."
+      "resultSummary": "Potret dari bahu ke atas yang siap pakai, dengan lensa dan latar nyata, bukan potongan selfie."
     },
     "desk-object-still": {
       "title": "Still life objek meja",

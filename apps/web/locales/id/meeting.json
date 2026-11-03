@@ -12,7 +12,7 @@
   "create": "Buat",
   "recording": "Rekaman",
   "chooseFile": "Pilih rekaman",
-  "uploading": "Menambahkan berkas…",
+  "uploading": "Menambahkan file…",
   "uploaded": "{name} · {size}",
   "transcriptReady": "Transkrip siap · {words} kata",
   "cap": "Audio atau video, maksimal 25 MB.",
@@ -21,7 +21,7 @@
   "savePaste": "Pakai transkrip ini",
   "prompt": {
     "label": "Apa yang Anda butuhkan dari rapat ini?",
-    "placeholder": "Notulen beserta siapa mengerjakan apa"
+    "placeholder": "Notulen dan siapa mengerjakan apa"
   },
   "run": "Jalankan",
   "runAgain": "Jalankan lagi",
@@ -31,16 +31,16 @@
   "cancel": "Batalkan",
   "drop": {
     "title": "Seret rekaman atau transkrip ke sini",
-    "hint": "atau pilih berkas. Audio atau video maksimal 25 MB, atau transkrip berformat .txt, .md, .vtt, .srt, .docx, atau .pdf.",
-    "choose": "Pilih berkas",
-    "free": "Menambahkan berkas tidak dipungut biaya. Biaya baru muncul saat Anda menekan Jalankan.",
+    "hint": "atau pilih file. Audio atau video maksimal 25 MB, atau transkrip berformat .txt, .md, .vtt, .srt, .docx, atau .pdf.",
+    "choose": "Pilih file",
+    "free": "Menambahkan file tidak dipungut biaya. Biaya baru muncul saat Anda menekan Jalankan.",
     "over": "Lepaskan untuk menambahkan",
-    "another": "Seret berkas lain untuk memulai rapat baru.",
-    "oneFile": "Hanya berkas pertama yang ditambahkan, karena satu rapat hanya memuat satu rekaman atau transkrip.",
-    "unsupported": "Berkas itu bukan rekaman atau transkrip. Pakai audio atau video, atau berkas .txt, .md, .vtt, .srt, .docx, atau .pdf."
+    "another": "Seret file lain untuk memulai rapat baru.",
+    "oneFile": "Hanya file pertama yang ditambahkan, karena satu rapat hanya memuat satu rekaman atau transkrip.",
+    "unsupported": "File itu bukan rekaman atau transkrip. Pakai audio atau video, atau file .txt, .md, .vtt, .srt, .docx, atau .pdf."
   },
   "more": "Lainnya",
-  "howItWorks": "Seret rekaman atau transkrip, ceritakan kebutuhan Anda, lalu tekan Jalankan. Menambahkan berkas, membaca transkrip, dan mengubah notulen gratis. Transkripsi, penulisan notulen, dan terjemahan berbayar, dan hanya berjalan saat Anda memintanya.",
+  "howItWorks": "Seret rekaman atau transkrip, ceritakan kebutuhan Anda, lalu tekan Jalankan. Menambahkan file, membaca transkrip, dan mengubah notulen gratis. Transkripsi, penulisan notulen, dan terjemahan berbayar, dan hanya berjalan saat Anda memintanya.",
   "translate": "Terjemahkan ke bahasa {language}",
   "translateAgain": "Terjemahkan ulang ke bahasa {language}",
   "translateNote": "Memakai kunci Anda: satu panggilan.",
@@ -85,20 +85,20 @@
     "interrupted": "Perekaman berhenti karena meja kerja atau bahasa diganti. Semua yang terekam sampai saat itu tetap tersimpan.",
     "otherDesk": "“{title}” punya rekaman dari meja kerja lain yang belum diunggah. Kembali ke meja kerja itu lalu buka Rapat untuk mengunggahnya, atau simpan ke perangkat Anda.",
     "errors": {
-      "insecure_context": "Merekam butuh halaman yang aman (https atau localhost). Unggah berkas saja.",
-      "unsupported_browser": "Peramban ini tidak bisa merekam audio. Pakai Chrome atau Edge, atau unggah berkas saja.",
-      "permission_denied": "Mikrofon diblokir. Izinkan lewat pengaturan situs di peramban, lalu coba lagi.",
-      "no_device": "Mikrofon tidak ditemukan. Pasang satu, atau unggah berkas saja.",
-      "display_unsupported": "Peramban ini tidak bisa membagikan audio tab. Rekam mikrofon saja.",
+      "insecure_context": "Merekam butuh halaman yang aman (https atau localhost). Unggah file saja.",
+      "unsupported_browser": "Browser ini tidak bisa merekam audio. Pakai Chrome atau Edge, atau unggah file saja.",
+      "permission_denied": "Mikrofon diblokir. Izinkan lewat pengaturan situs di browser, lalu coba lagi.",
+      "no_device": "Mikrofon tidak ditemukan. Pasang satu, atau unggah file saja.",
+      "display_unsupported": "Browser ini tidak bisa membagikan audio tab. Rekam mikrofon saja.",
       "display_cancelled": "Tidak ada yang dibagikan, jadi perekaman tidak dimulai.",
       "display_no_audio": "Yang dibagikan tidak menyertakan suara. Bagikan tab lalu centang “Share tab audio”, atau rekam mikrofon saja.",
-      "recorder_failed": "Perekaman berhenti mendadak. Coba lagi, atau unggah berkas saja.",
+      "recorder_failed": "Perekaman berhenti mendadak. Coba lagi, atau unggah file saja.",
       "empty_recording": "Tidak ada suara yang terekam. Pastikan mikrofon yang benar sudah dipilih, lalu coba lagi."
     }
   },
   "checks": {
     "title": "Notulen ini mungkin perlu diperiksa lagi",
-    "owners": "Ada butir tindakan tanpa penanggung jawab, atau penanggung jawabnya tidak pernah disebut di transkrip.",
+    "owners": "Ada action item tanpa penanggung jawab, atau penanggung jawabnya tidak pernah disebut di transkrip.",
     "dates": "Notulen mengutip tanggal atau jam yang tidak pernah disebut di transkrip.",
     "summary": "Ringkasannya kosong.",
     "shape": "Bentuk notulen yang dihasilkan tidak sesuai format yang diharapkan.",
@@ -107,13 +107,13 @@
   },
   "evidence": {
     "allVerified": "Setiap keputusan dan tindakan punya dasar ucapan di transkrip.",
-    "someUnverified": "Dicocokkan dengan transkrip: {verified} didukung, {unverified} belum terverifikasi. Butir yang belum terverifikasi ditandai di bawah.",
+    "someUnverified": "Dicocokkan dengan transkrip: {verified} didukung, {unverified} belum terverifikasi. Item yang belum terverifikasi ditandai di bawah.",
     "unverified": "Belum terverifikasi",
-    "unverifiedHint": "Transkrip tidak mendukung butir ini kata demi kata. Cocokkan dengan transkrip, atau ubah.",
+    "unverifiedHint": "Transkrip tidak mendukung item ini kata demi kata. Cocokkan dengan transkrip, atau ubah.",
     "quote": "Yang diucapkan"
   },
   "edit": {
-    "edit": "Ubah butir ini",
+    "edit": "Ubah item ini",
     "edited": "Diubah oleh Anda",
     "save": "Simpan",
     "saving": "Menyimpan…",
@@ -123,7 +123,7 @@
     "provisional": "Belum final (sementara)",
     "task": "Tindakan",
     "owner": "Penanggung jawab",
-    "due": "Tenggat",
+    "due": "Deadline",
     "firstStep": "Langkah pertama",
     "clearsTranslation": "Menyimpan perubahan akan menghapus terjemahan, karena terjemahannya masih mengacu pada teks yang lama. Terjemahkan lagi setelah selesai.",
     "free": "Mengubah notulen gratis."
@@ -132,10 +132,10 @@
     "attendees": "Peserta",
     "decisions": "Keputusan",
     "provisional": "sementara",
-    "actions": "Butir tindakan",
+    "actions": "Action item",
     "action": "Tindakan",
     "owner": "Penanggung jawab",
-    "due": "Tenggat",
+    "due": "Deadline",
     "risks": "Risiko dan hambatan",
     "questions": "Pertanyaan terbuka"
   },
@@ -143,7 +143,7 @@
     "create": "Rapat gagal dibuat.",
     "upload": "Rekaman itu gagal diunggah.",
     "transcript": "Transkrip itu gagal disimpan.",
-    "transcriptFile": "Berkas transkrip itu gagal dibaca.",
+    "transcriptFile": "File transkrip itu gagal dibaca.",
     "edit": "Perubahan itu gagal disimpan.",
     "run": "Notulen gagal dibuat.",
     "load": "Daftar rapat gagal dimuat.",

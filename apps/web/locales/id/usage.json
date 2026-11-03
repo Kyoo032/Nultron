@@ -46,7 +46,7 @@
     "unpricedKnownOne": "{model}: {display} · {runs} proses"
   },
   "loading": "Memuat…",
-  "footer": "Perkiraan untuk meja kerja dihitung dari token masuk dan keluar {productName} serta harga katalog {gatewayName}. Pengeluaran kunci ini mencakup aplikasi lain yang memakai kunci yang sama, jadi bisa berbeda dari total meja kerja.",
+  "footer": "Perkiraan untuk meja kerja dihitung dari token masuk dan keluar {productName} dan harga katalog {gatewayName}. Pengeluaran kunci ini mencakup aplikasi lain yang memakai kunci yang sama, jadi bisa berbeda dari total meja kerja.",
   "errors": {
     "unavailable": "Pemakaian belum tersedia.",
     "loadStatus": "Pemakaian gagal dimuat ({status}).",

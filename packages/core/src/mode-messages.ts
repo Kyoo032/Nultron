@@ -39,7 +39,7 @@ export type ModeMessageKey = (typeof MODE_MESSAGE_KEYS)[number];
 const MODE_MESSAGES: Record<ModeMessageKey, Record<AppLocale, string>> = {
   emptyDocumentDraft: {
     en: "Model returned an empty document draft",
-    id: "Model mengembalikan draf dokumen yang kosong",
+    id: "Model mengembalikan draft dokumen yang kosong",
   },
   emptyDocumentSection: {
     en: "Model returned an empty document section",
@@ -75,7 +75,7 @@ const MODE_MESSAGES: Record<ModeMessageKey, Record<AppLocale, string>> = {
   },
   videoClipRejected: {
     en: "The render did not return a video file.",
-    id: "Hasil render tidak berisi berkas video.",
+    id: "Hasil render tidak berisi file video.",
   },
   musicGenerateFailed: {
     en: "Music generation failed",
@@ -95,7 +95,7 @@ const MODE_MESSAGES: Record<ModeMessageKey, Record<AppLocale, string>> = {
   },
   speechUnavailable: {
     en: "This gateway serves no text-to-speech model that a job route can reach",
-    id: "Gerbang ini tidak menyediakan model teks-ke-suara yang dapat dijangkau rute job",
+    id: "Gateway ini tidak menyediakan model teks-ke-suara yang bisa dijangkau rute job",
   },
   noFiguresParsed: {
     en: "No figures could be read from that text",
@@ -103,7 +103,7 @@ const MODE_MESSAGES: Record<ModeMessageKey, Record<AppLocale, string>> = {
   },
   datasetNoNumericColumn: {
     en: "That dataset has no numeric column to use as amounts",
-    id: "Dataset itu tidak memiliki kolom numerik yang dapat dipakai sebagai nominal",
+    id: "Dataset itu tidak memiliki kolom numerik yang bisa dipakai sebagai nominal",
   },
   webSearchFailed: {
     en: "Web search failed",
@@ -123,17 +123,17 @@ const MODE_MESSAGES: Record<ModeMessageKey, Record<AppLocale, string>> = {
   },
   editFileRequired: {
     en: "file is required",
-    id: "berkas wajib diisi",
+    id: "file wajib diisi",
   },
   editMediaUnreadable: {
     en: "ffprobe could not read this file",
-    id: "ffprobe tidak dapat membaca berkas ini",
+    id: "ffprobe tidak bisa membaca file ini",
   },
   // A playlist, concat script or metadata file: a list that points at other files or addresses, not a recording.
   // Refused at the probe before ffmpeg opens anything it names (`packages/host/src/edit/ffmpeg/input-safety.ts`).
   mediaFormatRefused: {
     en: "This file is a playlist or a list of other files, not a video or audio recording, so it was not opened",
-    id: "Berkas ini berupa daftar putar atau daftar berkas lain, bukan rekaman video atau audio, jadi tidak dibuka",
+    id: "File ini berupa daftar putar atau daftar file lain, bukan rekaman video atau audio, jadi tidak dibuka",
   },
 };
 

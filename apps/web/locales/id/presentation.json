@@ -9,11 +9,11 @@
   "regenerating": "Menulis ulang…",
   "generateError": "Kerangka presentasi gagal dibuat",
   "regenError": "Slide itu gagal ditulis ulang",
-  "downloadError": "Berkas PPTX gagal dibuat",
+  "downloadError": "File PPTX gagal dibuat",
   "editNote": "Klik kata mana pun di slide untuk mengubahnya.",
   "editTitle": "Judul deck",
   "editHeading": "Judul slide",
-  "editBullets": "Butir",
+  "editBullets": "Poin",
   "editNotes": "Catatan pembicara",
   "addRectangle": "Persegi",
   "addRounded": "Persegi sudut membulat",
@@ -37,7 +37,7 @@
   "deckSaved": "Deck tersimpan di meja kerja ini.",
   "saveError": "Deck gagal disimpan",
   "savedDecks": "Deck tersimpan",
-  "downloadNote": "Mengunduh akan menyimpan slide ini sebagai berkas PowerPoint.",
+  "downloadNote": "Mengunduh akan menyimpan slide ini sebagai file PowerPoint.",
   "openSettings": "Buka Pengaturan",
   "emptyTitle": "Belum ada slide",
   "emptyBody": "Tulis tentang apa presentasinya, lalu tekan Buat.",
@@ -66,20 +66,20 @@
   "openSlideAccent": "Warna",
   "openSlideAddText": "Tambah teks",
   "openSlideDuplicate": "Gandakan",
-  "openSlideDownloadNote": "Mengunduh akan menyimpan slide ini sebagai berkas PowerPoint.",
+  "openSlideDownloadNote": "Mengunduh akan menyimpan slide ini sebagai file PowerPoint.",
   "kicker": "Presentasi",
   "notes": "Catatan:",
-  "noBullets": "Slide ini tidak punya butir.",
+  "noBullets": "Slide ini tidak punya poin.",
   "gatewayError": "Presentasi butuh gateway yang aktif. Tempel kunci API Toko Token di Pengaturan, lalu coba lagi.",
   "notesFallback": "Ucapkan halaman ini sekali, lalu berhenti. Jangan menambah angka yang tidak diberikan.",
   "noFigure": "Tidak ada angka",
-  "galleryTitle": "Mulai dari templat",
+  "galleryTitle": "Mulai dari template",
   "galleryHint": "Klik salah satu kartu untuk memuat brief lengkapnya. Ganti detail contohnya, lalu buat presentasinya.",
   "templates": {
     "seed-stage-pitch": {
       "title": "Pitch tahap seed",
-      "prompt": "Susun kerangka pitch 9 slide yang bisa diikuti orang asing tanpa kehadiran Anda. Ini narasi, bukan daftar label.\n\nPeran: pendiri yang mempresentasikan pitch kepada satu pengambil keputusan (bukan di konferensi).\nAudiens: mereka sudah memakai API model; mereka tidak menginginkan satu lagi “platform agen.”\nKeluaran: 9 slide. Setiap slide: judul berupa klaim (bukan topik), 3–5 butir berupa kalimat lengkap, dan catatan pembicara yang menjelaskan argumen Anda jika mereka membantah.\n\nContoh cerita (ganti isian dalam kurung siku, pertahankan alurnya):\n- [Harbour Street] adalah kasir pengambilan pesanan hari Sabtu. Anda masuk, membayar, lalu pulang membawa tas bernama. Formulir pesanan khusus sengaja ditunda.\n- Masalah: membayar roti masih menyisakan pertanyaan “di mana saya mengambilnya?”\n- Wawasan: pembelinya adalah satu orang yang mengambil satu pesanan, bukan bagian pembelian sebuah kantor.\n- Permintaan: [tiga pelanggan tetap mencoba pengambilan Sabtu] bulan ini — bukan putaran pendanaan dengan valuasi, kecuali Anda mengubahnya.\n\nAlur slide (pertahankan urutan ini):\n1. Judul — pekerjaan yang dilakukan, bukan kategorinya.\n2. Momen setelah mereka membayar.\n3. Mengapa kafe berantai dan formulir pesanan kosong sama-sama meleset.\n4. Kasirnya: setiap pesanan Sabtu punya nama; pada pekan yang sepi, menu bisa diperkecil.\n5. Bagaimana sebuah pesanan (tas atau struk) benar-benar diselesaikan.\n6. Mengapa formulir khusus ditunda.\n7. Bukti atau rencana (kasir sudah buka; jujurlah tentang apa yang belum terbukti).\n8. Permintaan.\n9. Tujuh hari ke depan.\n\nStandar mutu: tanpa slide pengisi “tim / traksi / visi”. Tanpa butir satu kata. Catatan berisi argumen, bukan “singkat saja.”\nJangan mengarang pendapatan atau logo.",
-      "resultSummary": "Pitch 9 slide dengan judul berupa klaim, butir berupa kalimat utuh, dan catatan untuk menghadapi bantahan, bukan sekadar deretan label."
+      "prompt": "Susun kerangka pitch 9 slide yang bisa diikuti orang asing tanpa kehadiran Anda. Ini narasi, bukan daftar label.\n\nPeran: pendiri yang mempresentasikan pitch ke satu pengambil keputusan (bukan di konferensi).\nAudiens: mereka sudah memakai API model; mereka tidak menginginkan satu lagi “platform agen.”\nKeluaran: 9 slide. Setiap slide: judul berupa klaim (bukan topik), 3–5 poin berupa kalimat lengkap, dan catatan pembicara yang menjelaskan argumen Anda jika mereka membantah.\n\nContoh cerita (ganti isian dalam kurung siku, pertahankan alurnya):\n- [Harbour Street] adalah kasir pengambilan pesanan hari Sabtu. Anda masuk, membayar, lalu pulang membawa tas bernama. Formulir pesanan khusus sengaja ditunda.\n- Masalah: membayar roti masih menyisakan pertanyaan “di mana saya mengambilnya?”\n- Wawasan: pembelinya adalah satu orang yang mengambil satu pesanan, bukan bagian pembelian sebuah kantor.\n- Permintaan: [tiga pelanggan tetap mencoba pengambilan Sabtu] bulan ini — bukan putaran pendanaan dengan valuasi, kecuali Anda mengubahnya.\n\nAlur slide (pertahankan urutan ini):\n1. Judul — pekerjaan yang dilakukan, bukan kategorinya.\n2. Momen setelah mereka membayar.\n3. Mengapa kafe berantai dan formulir pesanan kosong sama-sama meleset.\n4. Kasirnya: setiap pesanan Sabtu punya nama; pada pekan yang sepi, menu bisa diperkecil.\n5. Bagaimana sebuah pesanan (tas atau struk) benar-benar diselesaikan.\n6. Mengapa formulir khusus ditunda.\n7. Bukti atau rencana (kasir sudah buka; jujurlah tentang apa yang belum terbukti).\n8. Permintaan.\n9. Tujuh hari ke depan.\n\nStandar mutu: tanpa slide pengisi “tim / traksi / visi”. Tanpa butir satu kata. Catatan berisi argumen, bukan “singkat saja.”\nJangan mengarang pendapatan atau logo.",
+      "resultSummary": "Pitch 9 slide dengan judul berupa klaim, poin berupa kalimat utuh, dan catatan untuk menghadapi bantahan, bukan sekadar deretan label."
     },
     "weekly-operating-review": {
       "title": "Tinjauan operasional mingguan",
@@ -98,8 +98,8 @@
     },
     "retro-with-owners": {
       "title": "Retro dengan pemilik tugas",
-      "prompt": "Susun retro 6 slide yang berakhir pada pemilik bernama, bukan sekadar perasaan.\n\nPeran: orang yang menjalankan siklus terakhir.\nAudiens: orang-orang yang mengerjakannya.\nKeluaran: 6 slide. Butir di bawah delapan kata hanya boleh dipakai jika tetap memuat klaim. Cerita lengkapnya ada di catatan.\n\nContoh siklus (ganti):\n- Dicoba: [buku pesanan bersama], lalu [satu tas bernama untuk setiap pesanan].\n- Berhasil: [kasir bisa melihat setiap pesanan Sabtu].\n- Macet: [catatannya hanya satu baris], sehingga serah terima terlihat kurang bekal.\n- Perubahan: [tulis ulang daftar periksa Sabtu menjadi langkah-langkah lengkap] dan [berhenti menyebut kartu itu “ide”].\n\nSlide:\n1. Siklus yang kita nilai (tanggal).\n2. Apa yang kita coba — fakta.\n3. Apa yang berhasil — bukti.\n4. Apa yang macet — penyebabnya, bukan siapa yang salah.\n5. Apa yang akan kita ubah pada siklus berikutnya (maksimal tiga).\n6. Pemilik dan tanggal pertamanya.\n\nStandar mutu: setiap perubahan ada orangnya. Tanpa “komunikasi lebih baik.”\nJangan mengarang skor sentimen.",
-      "resultSummary": "Retro yang ditutup dengan tiga perubahan beserta penanggung jawabnya, bukan sekadar papan suasana hati."
+      "prompt": "Susun retro 6 slide yang berakhir pada pemilik bernama, bukan sekadar perasaan.\n\nPeran: orang yang menjalankan siklus terakhir.\nAudiens: orang-orang yang mengerjakannya.\nKeluaran: 6 slide. Poin di bawah delapan kata hanya boleh dipakai jika tetap memuat klaim. Cerita lengkapnya ada di catatan.\n\nContoh siklus (ganti):\n- Dicoba: [buku pesanan bersama], lalu [satu tas bernama untuk setiap pesanan].\n- Berhasil: [kasir bisa melihat setiap pesanan Sabtu].\n- Macet: [catatannya hanya satu baris], sehingga serah terima terlihat kurang bekal.\n- Perubahan: [tulis ulang checklist Sabtu menjadi langkah-langkah lengkap] dan [berhenti menyebut kartu itu “ide”].\n\nSlide:\n1. Siklus yang kita nilai (tanggal).\n2. Apa yang kita coba — fakta.\n3. Apa yang berhasil — bukti.\n4. Apa yang macet — penyebabnya, bukan siapa yang salah.\n5. Apa yang akan kita ubah pada siklus berikutnya (maksimal tiga).\n6. Pemilik dan tanggal pertamanya.\n\nStandar mutu: setiap perubahan ada orangnya. Tanpa “komunikasi lebih baik.”\nJangan mengarang skor sentimen.",
+      "resultSummary": "Retro yang ditutup dengan tiga perubahan lengkap dengan penanggung jawabnya, bukan sekadar papan suasana hati."
     },
     "all-hands-recap": {
       "title": "Rangkuman all-hands",

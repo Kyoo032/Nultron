@@ -1,9 +1,9 @@
 {
-  "title": "Basis Pengetahuan",
-  "intro": "Sumber yang dirujuk Chat dan setiap mode kerja di meja kerja {name}: persona, memori yang disematkan, sumber terindeks, dan peta yang menghubungkan semuanya.",
+  "title": "Knowledge Base",
+  "intro": "Sumber yang dirujuk Chat dan setiap mode kerja di meja kerja {name}: Soul, memori yang disematkan, sumber terindeks, dan peta yang menghubungkan semuanya.",
   "tabs": {
     "sources": "Sumber",
-    "soul": "Persona",
+    "soul": "Soul",
     "memory": "Memori",
     "map": "Peta"
   },
@@ -20,8 +20,8 @@
     "addUrl": "URL gagal ditambahkan",
     "addNotes": "Catatan gagal ditambahkan",
     "addMemory": "Memori itu gagal disematkan",
-    "saveSoul": "Persona gagal disimpan",
-    "indexFile": "Berkas gagal diindeks",
+    "saveSoul": "Soul gagal disimpan",
+    "indexFile": "File gagal diindeks",
     "selfCheck": "Pemeriksaan mandiri gagal dijalankan",
     "loadGraph": "Graf gagal dimuat"
   },
@@ -31,7 +31,7 @@
     "addUrl": "Tambah URL",
     "pastePlaceholder": "Tempel catatan…",
     "indexPaste": "Indeks teks tempelan",
-    "uploadFile": "Unggah berkas",
+    "uploadFile": "Unggah file",
     "uploadHint": "Format yang didukung: {formats}. Maksimal 25 MB.",
     "pastedName": "Catatan tempelan",
     "chunks": "{count} potongan",
@@ -45,7 +45,7 @@
     "Failed": "Gagal"
   },
   "sourceType": {
-    "File": "Berkas",
+    "File": "File",
     "URL": "URL",
     "Paste": "Teks tempelan",
     "Chat": "Chat",
@@ -56,7 +56,7 @@
     "Images": "Gambar",
     "Videos": "Video",
     "Presentation": "Presentasi",
-    "Edit": "Sunting",
+    "Edit": "Edit",
     "Other": "Lainnya"
   },
   "soul": {
@@ -65,7 +65,7 @@
     "voice": "Gaya bahasa",
     "rulePlaceholder": "Tambah aturan",
     "addRule": "Tambah aturan",
-    "save": "Simpan persona"
+    "save": "Simpan Soul"
   },
   "memory": {
     "placeholder": "Sematkan memori",
@@ -138,9 +138,9 @@
     "showAll": "Tampilkan semua",
     "showAllNodes": "Tampilkan semua {total}",
     "drawn": "{shown} ditampilkan",
-    "loading": "Memuat tautan…",
+    "loading": "Memuat link…",
     "retry": "Coba lagi",
-    "empty": "Petakan pengetahuan untuk membuat tautan antartopik.",
+    "empty": "Petakan pengetahuan untuk membuat link antartopik.",
     "around": "sekitar {label}",
     "svgAria": "Topik, sumber, dan obrolan dalam tiga kolom, terhubung oleh garis tipis",
     "hint": "Klik sebuah simpul untuk hanya menampilkan yang terhubung dengannya; klik lagi untuk menampilkan semua.",

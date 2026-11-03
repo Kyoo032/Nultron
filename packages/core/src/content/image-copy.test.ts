@@ -37,7 +37,7 @@ describe("the sentences a person reads about an image that did not reach the mod
       "A web link to an image can't be sent to the model. Attach the image itself.",
     );
     expect(imageRemoteLinkMessage("id")).toBe(
-      "Tautan web ke gambar tidak dapat dikirim ke model. Lampirkan gambar itu sendiri.",
+      "Link web ke gambar tidak bisa dikirim ke model. Lampirkan gambar itu sendiri.",
     );
   });
 

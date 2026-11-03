@@ -545,7 +545,7 @@ describe("the rows in Indonesian", () => {
         { ok: true, root: "folder", status: "pending_approval", path: "laporan/q3.md", proposalId: "p" },
       ),
     );
-    expect(pending).toContain("Mengusulkan penulisan berkas");
+    expect(pending).toContain("Mengusulkan penulisan file");
     expect(part(pending, "tool-row-pending-approval")).toContain("Menunggu persetujuan Anda");
     expect(part(pending, "tool-row-pending-review")).toContain(">Tinjau</button>");
 
@@ -569,12 +569,12 @@ describe("the rows in Indonesian", () => {
     );
     expect(saved).toContain("Mengubah a.md");
     expect(saved).toContain("Versi 7");
-    expect(part(saved, "tool-row-file-chip")).toContain('aria-label="Buka a.md di Basis Pengetahuan"');
+    expect(part(saved, "tool-row-file-chip")).toContain('aria-label="Buka a.md di Knowledge Base"');
     expect(part(saved, "tool-row-file-chip")).toContain(">Buka</span>");
 
     const listed = render(done("list_files", {}, { ok: true, total: 3, truncated: false, entries: [] }));
-    expect(listed).toContain("Daftar berkas Anda");
-    expect(listed).toContain("3 berkas");
+    expect(listed).toContain("Daftar file Anda");
+    expect(listed).toContain("3 file");
   });
 });
 

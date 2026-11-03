@@ -188,13 +188,13 @@ describe("file, Knowledge and code tool labels (id)", () => {
     expect(toolRowLabel("write_file", { path: "catatan/rencana.md" }, saved)).toBe("Menulis catatan/rencana.md");
     expect(toolRowLabel("edit_file", { path: "src/app.ts" }, saved)).toBe("Mengubah src/app.ts");
     expect(toolRowLabel("delete_file", { path: "lama.txt" }, saved)).toBe("Menghapus lama.txt");
-    expect(toolRowLabel("list_files", { dir: "catatan" }, { ok: true })).toBe("Daftar berkas di catatan");
-    expect(toolRowLabel("list_files", {}, { ok: true })).toBe("Daftar berkas Anda");
+    expect(toolRowLabel("list_files", { dir: "catatan" }, { ok: true })).toBe("Daftar file di catatan");
+    expect(toolRowLabel("list_files", {}, { ok: true })).toBe("Daftar file Anda");
     expect(toolRowLabel("search_files", { pattern: "total" }, { ok: true, hits: [] })).toBe(
-      "Pencarian “total” di berkas",
+      "Pencarian “total” di file",
     );
     expect(toolRowLabel("knowledge_search", { query: "pajak" }, { results: [] })).toBe(
-      "Pencarian “pajak” di basis pengetahuan Anda",
+      "Pencarian “pajak” di Knowledge Base Anda",
     );
     expect(toolRowLabel("run_code", { language: "python" }, { ok: true, stdout: "" })).toBe("Menjalankan Python");
   });
@@ -205,11 +205,11 @@ describe("file, Knowledge and code tool labels (id)", () => {
     expect(toolActivityLabel("write_file", { path: "a.md" })).toBe("Sedang menulis a.md…");
     expect(toolActivityLabel("edit_file", { path: "a.md" })).toBe("Sedang mengubah a.md…");
     expect(toolActivityLabel("delete_file", { path: "a.md" })).toBe("Sedang menghapus a.md…");
-    expect(toolActivityLabel("list_files", { dir: "catatan" })).toBe("Menampilkan daftar berkas di catatan…");
-    expect(toolActivityLabel("list_files", {})).toBe("Menampilkan daftar berkas Anda…");
-    expect(toolActivityLabel("search_files", { pattern: "total" })).toBe("Mencari “total” di berkas…");
+    expect(toolActivityLabel("list_files", { dir: "catatan" })).toBe("Menampilkan daftar file di catatan…");
+    expect(toolActivityLabel("list_files", {})).toBe("Menampilkan daftar file Anda…");
+    expect(toolActivityLabel("search_files", { pattern: "total" })).toBe("Mencari “total” di file…");
     expect(toolActivityLabel("knowledge_search", { query: "pajak" })).toBe(
-      "Mencari “pajak” di basis pengetahuan Anda…",
+      "Mencari “pajak” di Knowledge Base Anda…",
     );
     expect(toolActivityLabel("run_code", { language: "javascript" })).toBe("Sedang menjalankan JavaScript…");
   });
@@ -221,23 +221,23 @@ describe("file, Knowledge and code tool labels (id)", () => {
     expect(toolRowLabel("write_file", { path: "a.md" }, refusal)).toBe("Gagal menulis a.md");
     expect(toolRowLabel("edit_file", { path: "a.md" }, refusal)).toBe("Gagal mengubah a.md");
     expect(toolRowLabel("delete_file", { path: "a.md" }, refusal)).toBe("Gagal menghapus a.md");
-    expect(toolRowLabel("list_files", {}, refusal)).toBe("Gagal menampilkan daftar berkas");
-    expect(toolRowLabel("search_files", { pattern: "x" }, refusal)).toBe("Gagal mencari “x” di berkas");
+    expect(toolRowLabel("list_files", {}, refusal)).toBe("Gagal menampilkan daftar file");
+    expect(toolRowLabel("search_files", { pattern: "x" }, refusal)).toBe("Gagal mencari “x” di file");
     expect(toolRowLabel("knowledge_search", { query: "x" }, { ok: false, reason: "unavailable", message: "." })).toBe(
-      "Gagal mencari di basis pengetahuan Anda",
+      "Gagal mencari di Knowledge Base Anda",
     );
     expect(
       toolRowLabel("run_code", { language: "python" }, { ok: false, stdout: "", stderr: "x", reason: "syntax" }),
     ).toBe("Gagal menjalankan Python");
     const pending = { ok: true, status: "pending_approval", path: "a.md", proposalId: "p" };
-    expect(toolRowLabel("write_file", { path: "a.md" }, pending)).toBe("Mengusulkan penulisan berkas");
-    expect(toolRowLabel("edit_file", { path: "a.md" }, pending)).toBe("Mengusulkan perubahan berkas");
-    expect(toolRowLabel("delete_file", { path: "a.md" }, pending)).toBe("Mengusulkan penghapusan berkas");
+    expect(toolRowLabel("write_file", { path: "a.md" }, pending)).toBe("Mengusulkan penulisan file");
+    expect(toolRowLabel("edit_file", { path: "a.md" }, pending)).toBe("Mengusulkan perubahan file");
+    expect(toolRowLabel("delete_file", { path: "a.md" }, pending)).toBe("Mengusulkan penghapusan file");
   });
 
   it("falls back to the Indonesian tool name", () => {
     applyLocale("id");
-    expect(toolDoneLabel("read_file")).toBe("Baca berkas");
+    expect(toolDoneLabel("read_file")).toBe("Baca file");
     expect(toolDoneLabel("knowledge_search")).toBe("Pencarian pengetahuan");
     expect(toolRowLabel("run_code", {}, { ok: true, stdout: "" })).toBe("Jalankan kode");
   });
@@ -402,7 +402,7 @@ describe("what a search row shows (safe web search)", () => {
     );
     applyLocale("id");
     expect(toolCallSummary("research_dossier", { question: "x" }, output)).toBe(
-      "Dosir riset · Not sent.\nTelah menelusuri web untuk: a b · c",
+      "Laporan riset · Not sent.\nSudah mencari di web: a b · c",
     );
   });
 });

@@ -9,7 +9,7 @@
   "settingsLink": "Pengaturan",
   "loadError": "Studio video gagal dimuat",
   "generateError": "Pembuatan video gagal",
-  "clipRejected": "Hasil render tidak berisi berkas video.",
+  "clipRejected": "Hasil render tidak berisi file video.",
   "modelNotOnKey": "{model} tidak tersedia di kunci ini. Coba {suggestion}.",
   "modelNotOnKeyNoAlt": "{model} tidak tersedia di kunci ini. Segarkan daftar model di Pengaturan, lalu pilih salah satu yang tercantum untuk kunci ini.",
   "stillUnsupported": "Model ini tidak menerima gambar diam",
@@ -36,10 +36,10 @@
   "emptyBody": "Buat video untuk mengisi galeri ini.",
   "download": "Unduh",
   "seconds": "{n}s",
-  "examplesHeading": "Mulai dari templat",
+  "examplesHeading": "Mulai dari template",
   "examplesHint": "Klik salah satu kartu untuk memuat brief lengkapnya. Ganti detail contohnya, lalu buat videonya.",
   "clipsHeading": "Contoh klip",
-  "clipsHint": "Dibuat dari templat prompt di bawah dan sudah termasuk dalam aplikasi. Klik salah satu untuk memuat promptnya.",
+  "clipsHint": "Dibuat dari template prompt di bawah dan sudah termasuk dalam aplikasi. Klik salah satu untuk memuat promptnya.",
   "clipsLoadError": "Contoh klip gagal dimuat",
   "usePrompt": "Gunakan prompt ini",
   "outputTextLanguage": "Dialog, narasi, dan teks di layar pada klip ini harus berbahasa Indonesia, kecuali prompt sudah menyebut bahasa lain.",
@@ -78,7 +78,7 @@
     },
     "seamless-social-loop": {
       "title": "Loop media sosial yang mulus",
-      "resultSummary": "Loop sungguhan dengan bingkai awal dan akhir yang cocok, layak diberi teks, bukan lelucon sekali putar."
+      "resultSummary": "Loop sungguhan dengan frame awal dan akhir yang cocok, layak diberi teks, bukan lelucon sekali putar."
     },
     "night-rain-hold": {
       "title": "Jeda hujan malam",
@@ -86,7 +86,7 @@
     },
     "kitchen-pour-insert": {
       "title": "Sisipan menuang di dapur",
-      "resultSummary": "Adegan menuang berwaktu yang berakhir pada still yang bisa dipakai. Sebuah sisipan, bukan iklan kopi."
+      "resultSummary": "Scene menuang berwaktu yang berakhir pada still yang bisa dipakai. Sebuah sisipan, bukan iklan kopi."
     }
   },
   "exampleClips": {
@@ -100,7 +100,7 @@
       "title": "Drone menembus rintangan"
     },
     "talk-calm-line": {
-      "title": "Kalimat sulih suara tenang"
+      "title": "Kalimat voice over tenang"
     },
     "talk-keyboard-review": {
       "title": "Ulasan keyboard"

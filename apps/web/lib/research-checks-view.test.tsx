@@ -85,7 +85,7 @@ describe("ResearchChecksNote", () => {
     applyLocale("id");
     const html = renderToStaticMarkup(<ResearchChecksNote note={{ problems: ["uncited"] }} />);
     expect(html).toContain("Sebagian temuan tidak mencantumkan sumber.");
-    expect(html).toContain("Dosir sudah tersimpan.");
+    expect(html).toContain("Laporan sudah tersimpan.");
     expect(html).not.toContain("Some findings");
     expect(html).not.toContain("research.checks");
   });

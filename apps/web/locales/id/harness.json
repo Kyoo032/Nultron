@@ -11,15 +11,15 @@
       "draft-sections": "Menyusun bagian-bagian dokumen",
       "stay-inside-source": "Berpegang pada sumber",
       "rewrite-one-section": "Menulis ulang satu bagian",
-      "preview-and-download": "Pratinjau dan unduh",
-      "check-against-source": "Memeriksa draf terhadap sumber"
+      "preview-and-download": "Preview dan unduh",
+      "check-against-source": "Memeriksa draft terhadap sumber"
     },
     "research": {
       "plan-queries": "Merencanakan kueri",
       "search": "Mencari di web",
       "read-pages": "Membaca halaman",
       "verbatim-passages": "Mengambil kutipan persis",
-      "write-dossier": "Menulis dosir"
+      "write-dossier": "Menulis laporan"
     },
     "finance": {
       "financial-brief": "Ringkasan keuangan",
@@ -46,8 +46,8 @@
       "open-matter": "Membuka perkara",
       "diff-prior-turn": "Membandingkan dengan versi terakhir",
       "review-playbook": "Meninjau berdasarkan playbook",
-      "verify-then-edit": "Memverifikasi, lalu menyunting",
-      "deliver-set": "Menyerahkan satu set berkas"
+      "verify-then-edit": "Memverifikasi, lalu mengedit",
+      "deliver-set": "Menyerahkan satu set file"
     },
     "meeting": {
       "capture-meeting": "Merekam rapat",
@@ -58,13 +58,13 @@
     },
     "images": {
       "write-brief": "Menulis brief",
-      "choose-frame": "Memilih bingkai",
+      "choose-frame": "Memilih frame",
       "generate-still": "Membuat satu gambar dan menyimpannya",
       "retry-unsent": "Mencoba sekali lagi jika panggilan tidak terkirim",
       "estimate-and-tighten": "Memperkirakan biaya, merapikan prompt"
     },
     "videos": {
-      "write-shot": "Menulis adegan",
+      "write-shot": "Menulis shot",
       "start-from-still": "Mulai dari satu gambar",
       "estimate-and-tighten": "Memperkirakan biaya, merapikan prompt",
       "render-retry": "Merender ulang jika pekerjaan gagal",
@@ -81,20 +81,20 @@
       "lift-dead-air": "Membuang jeda kosong",
       "cut-on-shots": "Memotong saat gambar berganti",
       "words-on-picture": "Menaruh teks di atas gambar",
-      "place-made-shot": "Menempatkan adegan buatan",
-      "hand-back-file": "Menyerahkan kembali berkasnya"
+      "place-made-shot": "Menempatkan shot buatan",
+      "hand-back-file": "Menyerahkan kembali file-nya"
     },
     "presentations": {
       "generate-outline": "Membuat kerangka",
       "rewrite-one-slide": "Menulis ulang satu slide",
       "download-pptx": "Mengunduh PPTX",
-      "edit-text": "Menyunting teks",
+      "edit-text": "Mengedit teks",
       "add-shapes": "Menambah bentuk"
     },
     "education": {
       "teaching-deck": "Slide pengajaran",
-      "edit-text-and-shapes": "Menyunting teks, menambah bentuk",
-      "exam-from-knowledge": "Kuis dari Basis Pengetahuan",
+      "edit-text-and-shapes": "Mengedit teks, menambah bentuk",
+      "exam-from-knowledge": "Kuis dari Knowledge Base",
       "book-reader": "Pembaca buku dengan OCR lokal",
       "video-presenter": "Presenter video"
     }
@@ -107,42 +107,42 @@
     "image_generate": "Membuat gambar",
     "video_generate": "Membuat klip video",
     "past_sessions": "Obrolan sebelumnya",
-    "knowledge_search": "Mencari di Basis Pengetahuan",
-    "list_files": "Daftar berkas meja kerja",
-    "read_file": "Membaca berkas",
-    "write_file": "Menulis berkas",
-    "edit_file": "Menyunting berkas",
-    "search_files": "Mencari berkas",
-    "delete_file": "Menghapus berkas",
+    "knowledge_search": "Mencari di Knowledge Base",
+    "list_files": "Daftar file meja kerja",
+    "read_file": "Membaca file",
+    "write_file": "Menulis file",
+    "edit_file": "Mengedit file",
+    "search_files": "Mencari file",
+    "delete_file": "Menghapus file",
     "run_code": "Menjalankan kode di sandbox",
     "self_check": "Pemeriksaan mandiri",
     "build_deck": "Membuat slide presentasi",
-    "research_dossier": "Dosir riset",
+    "research_dossier": "Laporan riset",
     "delegate": "Bertanya ke agen lain",
     "run_sql": "Menjalankan kueri SQL",
-    "market_quotes": "Kuotasi harga langsung",
+    "market_quotes": "Harga langsung",
     "market_history": "Riwayat harga",
     "market_technical": "Indikator teknikal",
     "market_macro": "Data makro",
     "market_news": "Berita pasar",
     "get_project": "Membaca proyek",
     "list_clips": "Daftar klip",
-    "probe_asset": "Memeriksa berkas media",
+    "probe_asset": "Memeriksa file media",
     "list_ingredients": "Daftar bahan",
     "detect_silence": "Menemukan jeda hening",
-    "detect_scenes": "Menemukan pergantian adegan",
+    "detect_scenes": "Mendeteksi pergantian scene",
     "transcribe": "Mentranskripsi audio",
     "split_clip": "Membelah klip",
     "trim_clip": "Memangkas klip",
     "move_clip": "Memindahkan klip",
     "delete_clips": "Menghapus klip",
     "remove_silence": "Membuang jeda hening",
-    "split_at_scenes": "Membelah di pergantian adegan",
+    "split_at_scenes": "Membelah di pergantian scene",
     "add_title": "Menambah judul",
-    "add_caption": "Menambahkan takarir",
-    "reframe": "Menyesuaikan bingkai gambar",
+    "add_caption": "Menambahkan caption",
+    "reframe": "Menyesuaikan frame gambar",
     "set_clip_volume": "Mengatur volume klip",
-    "clear_timeline": "Mengosongkan lini masa",
+    "clear_timeline": "Mengosongkan timeline",
     "propose_plan": "Mengusulkan rencana",
     "cancel_job": "Membatalkan pekerjaan",
     "generate_image": "Membuat gambar",
@@ -161,7 +161,7 @@
     "agent": "Agen memutuskan sendiri alat mana yang dipanggil, dalam batas yang ditetapkan.",
     "pipeline": "Aplikasi menjalankan tahapan yang tetap, sedangkan model hanya bertugas menulis.",
     "media": "Ia memanggil model pembuat media secara langsung.",
-    "none": "Ia bekerja pada berkas Anda tanpa memanggil model."
+    "none": "Ia bekerja pada file Anda tanpa memanggil model."
   },
   "panel": {
     "title": "Cara kerja {name}",
@@ -185,6 +185,6 @@
     "contextUsage": "Konteks dan pemakaian",
     "ownHarness": "Harness {name}",
     "runsInChat": "Berjalan di obrolan ini, lengkap dengan pemeriksaannya.",
-    "runsInStudio": "Berjalan di studio {name}. Di obrolan ini pekerjaan dilakukan dengan alat di atas, tanpa pemeriksaan tersebut."
+    "runsInStudio": "Berjalan di studio {name}. Di obrolan ini pekerjaan dilakukan dengan alat di atas, tanpa pemeriksaan itu."
   }
 }

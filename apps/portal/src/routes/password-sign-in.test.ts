@@ -112,7 +112,7 @@ describe("GET /authorize in password mode", () => {
         }).toString(),
       { headers: { "accept-language": "id-ID,id;q=0.9" } },
     );
-    expect(reply.text).toContain("Nama pengguna atau e-mail");
+    expect(reply.text).toContain("Nama pengguna atau email");
     expect(reply.text).toContain("Kata sandi");
     expect(reply.text).toContain("Jangan pernah membagikan kata sandi Anda kepada siapa pun.");
     expect(reply.text).not.toContain("kode masuk");

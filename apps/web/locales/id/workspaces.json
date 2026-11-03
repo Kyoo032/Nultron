@@ -14,11 +14,11 @@
   "name": "Nama",
   "namePlaceholder": "Nama ruang kerja baru",
   "nameRequired": "Nama wajib diisi",
-  "templateLegend": "Templat (opsional)",
+  "templateLegend": "Template (opsional)",
   "blank": "Kosong",
   "modes": "Mode",
   "currentPrefix": "Saat ini · ",
-  "deleteConfirm": "Tindakan ini menghapus meja kerja beserta obrolan, Basis Pengetahuan, dan kunci yang tersimpan dari komputer ini. Ketik {name} untuk mengonfirmasi.",
+  "deleteConfirm": "Tindakan ini menghapus meja kerja, obrolan, Knowledge Base, dan kunci yang tersimpan dari komputer ini. Ketik {name} untuk konfirmasi.",
   "deleteDesk": "Hapus meja kerja",
   "deleteRestricted": "Hanya pemilik atau admin yang bisa menghapus meja kerja.",
   "errors": {
@@ -27,7 +27,7 @@
     "delete": "Gagal menghapus ruang kerja",
     "deleteForbidden": "Hanya pemilik atau admin yang bisa menghapus meja kerja.",
     "protected": "Meja kerja Default tidak bisa dihapus",
-    "confirmName": "Ketik nama meja kerja untuk mengonfirmasi penghapusan"
+    "confirmName": "Ketik nama meja kerja untuk konfirmasi penghapusan"
   },
   "mode": {
     "chat": "Chat",
@@ -36,10 +36,10 @@
     "finance": "Keuangan",
     "data": "Data",
     "market": "Pasar",
-    "legal": "Hukum",
+    "legal": "Legal",
     "images": "Gambar",
     "videos": "Video",
-    "edit": "Sunting",
+    "edit": "Edit",
     "meeting": "Rapat",
     "music": "Musik",
     "presentations": "Presentasi",
@@ -50,7 +50,7 @@
     "organisation": "Organisasi",
     "students": "Pelajar",
     "office": "Kantor",
-    "legal": "Hukum",
+    "legal": "Legal",
     "sales": "Penjualan",
     "marketing": "Pemasaran",
     "product": "Produk"

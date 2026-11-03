@@ -4,20 +4,20 @@
     "save": "Agen Anda gagal diperbarui."
   },
   "tagline": {
-    "chat": "Asisten serbaguna Anda: mencari, membaca berkas, menjalankan kode, dan membuat media.",
+    "chat": "Asisten serbaguna Anda: mencari, membaca file, menjalankan kode, dan membuat media.",
     "documents": "Menulis dokumen dari arahan Anda, lalu mencocokkannya dengan sumber yang Anda berikan.",
-    "research": "Mencari jawaban atas satu pertanyaan di web, lalu menyusun dosir yang setiap temuannya disertai sumber.",
+    "research": "Mencari jawaban atas satu pertanyaan di web, lalu menyusun laporan yang setiap temuannya disertai sumber.",
     "finance": "Ringkasan, rasio, anggaran, dan arus kas. Angkanya dihitung, bukan ditebak.",
     "data": "Membaca tabel yang Anda tambahkan, lalu menjawab pertanyaan dengan kueri yang benar-benar dijalankan.",
     "market": "Ringkasan pasar dari harga dan berita terkini, dengan setiap angka dihitung oleh aplikasi.",
     "legal": "Meninjau kontrak untuk satu perkara: memo, redline, dan pemeriksaan setiap kutipan.",
     "meeting": "Mengubah rekaman atau transkrip menjadi notulen, keputusan, dan tindak lanjut.",
     "images": "Membuat gambar dari deskripsi, atau mengubah gambar yang Anda tambahkan.",
-    "videos": "Membuat klip video pendek dari deskripsi atau bingkai pertama.",
+    "videos": "Membuat klip video pendek dari deskripsi atau frame pertama.",
     "music": "Membuat lagu atau instrumental dari deskripsi atau lirik Anda.",
-    "edit": "Memotong dan menyusun video serta audio Anda di lini masa.",
+    "edit": "Memotong dan menyusun video serta audio Anda di timeline.",
     "presentations": "Menyusun presentasi dari arahan Anda dan memastikan setiap slide muat.",
-    "education": "Rencana pelajaran, kuis, dan panduan belajar untuk satu topik atau berkas."
+    "education": "Rencana pelajaran, kuis, dan panduan belajar untuk satu topik atau file."
   },
   "rail": {
     "aria": "Navigasi",
@@ -41,14 +41,14 @@
     "skills": "Yang saya kerjakan",
     "ask": "Kirim pesan ke {name}",
     "studioTitle": "Studio {name} menjalankan pemeriksaannya sendiri",
-    "studioNote": "Di obrolan ini, tugasnya dikerjakan dengan alat umum. Harness {name} beserta pemeriksaannya sendiri belum terhubung ke obrolan. Buka studionya jika Anda membutuhkannya.",
+    "studioNote": "Di obrolan ini, tugasnya dikerjakan dengan alat umum. Harness {name} dan pemeriksaannya sendiri belum terhubung ke obrolan. Buka studionya jika Anda membutuhkannya.",
     "openStudio": "Buka studio {name}",
-    "everything": "Tanyakan apa saja. Saya juga bisa menulis, menelusuri, mengolah berkas Anda, serta membuat gambar, klip, dan presentasi."
+    "everything": "Tanyakan apa saja. Saya juga bisa menulis, mencari di web, mengolah file Anda, membuat gambar, klip, dan presentasi."
   },
   "composer": {
     "placeholder": "Kirim pesan ke {name}",
     "add": "Tambah",
-    "addFiles": "Tambah berkas",
+    "addFiles": "Tambah file",
     "send": "Kirim",
     "sending": "Mengirim"
   },
@@ -56,11 +56,11 @@
     "working": "Sedang bekerja"
   },
   "dossier": {
-    "label": "Dosir riset",
+    "label": "Laporan riset",
     "open": "Buka",
     "close": "Tutup",
-    "openAria": "Buka dosir {title}",
-    "closeAria": "Tutup dosir {title}",
+    "openAria": "Buka laporan {title}",
+    "closeAria": "Tutup laporan {title}",
     "sources": "{n} sumber",
     "sourcesOne": "1 sumber",
     "sections": "{n} bagian",
@@ -68,12 +68,12 @@
     "checksPassed": "Setiap temuan menyebut sumber",
     "checksFailed": "{n} pemeriksaan tidak lolos",
     "checksFailedOne": "1 pemeriksaan tidak lolos",
-    "notSaved": "Dosir sudah ditulis, tetapi gagal disimpan sehingga tidak bisa dibuka di sini.",
-    "loading": "Membuka dosir",
-    "loadFailed": "Dosir gagal dibuka.",
-    "outlineAria": "Bagian dosir",
-    "viewAria": "Dosir {title}",
-    "searched": "Telah menelusuri web untuk: {queries}"
+    "notSaved": "Laporan sudah ditulis, tetapi gagal disimpan sehingga tidak bisa dibuka di sini.",
+    "loading": "Membuka laporan",
+    "loadFailed": "Laporan gagal dibuka.",
+    "outlineAria": "Bagian laporan",
+    "viewAria": "Laporan {title}",
+    "searched": "Sudah mencari di web: {queries}"
   },
   "delegate": {
     "label": "Bertanya ke agen lain",
@@ -120,8 +120,8 @@
     "downloadXlsx": "Excel",
     "downloadDocx": "Word",
     "downloadAria": "Unduh {title} sebagai {format}",
-    "downloading": "Menyiapkan berkas",
-    "downloadFailed": "Berkas gagal diunduh."
+    "downloading": "Menyiapkan file",
+    "downloadFailed": "File gagal diunduh."
   },
   "page": {
     "title": "Agen virtual",

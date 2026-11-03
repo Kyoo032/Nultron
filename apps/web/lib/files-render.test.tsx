@@ -440,8 +440,8 @@ describe("in Indonesian", () => {
       list: { status: "ready", items: [entry("catatan/rencana.md")] },
       viewer: viewerOn("tiga", [{ type: "pick", version: 1 }]),
     });
-    expect(html).toContain("Berkas");
-    expect(html).toContain("Unggah berkas teks");
+    expect(html).toContain("File");
+    expect(html).toContain("Unggah file teks");
     expect(html).toContain("Pulihkan versi ini");
     expect(html).toContain("Versi 3");
     expect(html).toContain("Agen di Riset");

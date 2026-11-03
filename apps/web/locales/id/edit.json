@@ -1,7 +1,7 @@
 {
-  "title": "Sunting",
-  "expectedInputs": "Hasil: video yang Anda potong di lini masa. Agen mengusulkan tiap perubahan dalam bentuk kartu, dan Anda bisa Simpan, Urungkan, atau Sesuaikan.",
-  "defaultProjectName": "Suntingan tanpa judul",
+  "title": "Edit",
+  "expectedInputs": "Hasil: video yang Anda potong di timeline. Agen mengusulkan tiap perubahan dalam bentuk kartu, dan Anda bisa Simpan, Urungkan, atau Sesuaikan.",
+  "defaultProjectName": "Edit tanpa judul",
   "untitled": "Tanpa judul",
   "projects": "Proyek",
   "newProject": "Proyek baru",
@@ -20,25 +20,25 @@
     "generate": "Buat",
     "ingredients": "Bahan",
     "titles": "Judul",
-    "captions": "Takarir",
+    "captions": "Caption",
     "recipes": "Resep",
     "history": "Riwayat"
   },
   "tier": {
-    "draft": "Draf",
+    "draft": "Draft",
     "standard": "Standar",
     "cinematic": "Sinematik"
   },
   "preview": {
     "play": "Putar",
     "pause": "Jeda",
-    "previousFrame": "Bingkai sebelumnya",
-    "nextFrame": "Bingkai berikutnya",
+    "previousFrame": "Frame sebelumnya",
+    "nextFrame": "Frame berikutnya",
     "scrub": "Geser"
   },
   "timeline": {
     "zoom": "Perbesar",
-    "hints": "snap: bingkai · S potong · Del hapus",
+    "hints": "snap: frame · S potong · Del hapus",
     "trimStart": "Pangkas awal",
     "trimEnd": "Pangkas akhir",
     "trackV1": "V1",
@@ -50,11 +50,11 @@
     "writing": "Agen sedang menulis…",
     "placeholder": "Tanya editor…",
     "send": "Kirim",
-    "interrupted": "Agen berhenti di tengah jalan. Suntingan yang sudah dibuat tetap tersimpan. Alasan: {reason}"
+    "interrupted": "Agen berhenti di tengah jalan. Hasil edit yang sudah dibuat tetap tersimpan. Alasan: {reason}"
   },
   "cards": {
     "reviewTitle": "Tinjau sebelum ekspor",
-    "reviewBody": "Periksa seluruh lini masa, atau konfirmasikan bahwa hasilnya sudah baik.",
+    "reviewBody": "Periksa semua timeline, atau konfirmasi bahwa hasilnya sudah baik.",
     "looksGood": "Sudah bagus",
     "estimate": "perkiraan {usd}",
     "priceUnknown": "harga belum diketahui",
@@ -63,7 +63,7 @@
     "keep": "Simpan",
     "undo": "Urungkan",
     "tweak": "Sesuaikan",
-    "fallbackVerb": "Sunting"
+    "fallbackVerb": "Edit"
   },
   "status": {
     "proposed": "diusulkan",
@@ -98,9 +98,9 @@
     "failed": "Pembuatan gagal"
   },
   "templates": {
-    "heading": "Mulai dari templat prompt",
+    "heading": "Mulai dari template prompt",
     "all": "Semua",
-    "empty": "Tidak ada templat di kategori ini.",
+    "empty": "Tidak ada template di kategori ini.",
     "fromSource": "Dari {site}: {title}",
     "promptingRules": "Aturan prompt",
     "categories": {
@@ -137,9 +137,9 @@
       "style-words": "Gunakan kata gaya seperti voxel, felt, clay, atau manga untuk hasil bergaya.",
       "prompt-order": "Susun prompt dengan urutan: subjek, gerakan, lingkungan, gerakan kamera, estetika, lalu suara.",
       "camera-start-end": "Gambarkan kamera sebagai komposisi awal, gerakan, amplitudo, lalu komposisi akhir.",
-      "dialogue-quotes": "Tulis dialog dalam tanda kutip dan sebutkan emosi, nada, serta tempo.",
+      "dialogue-quotes": "Tulis dialog dalam tanda kutip dan sebutkan emosi, nada, dan tempo.",
       "one-move-per-shot": "Gunakan satu gerakan kamera per shot; beri label Shot 1, Shot 2, Shot 3.",
-      "no-text-constraint": "Tambahkan batasan seperti menghindari teks atau subtitle, serta tanpa logo atau watermark.",
+      "no-text-constraint": "Tambahkan batasan seperti menghindari teks atau subtitle, juga tanpa logo atau watermark.",
       "negatives-audio": "Gunakan negatif hanya untuk subtitle atau audio, misalnya No subtitles atau No BGM.",
       "camera-presets": "Nama preset kamera bisa dipakai sebagai frasa prompt: crash zoom in, dolly in, 360 orbit, whip pan."
     }
@@ -154,23 +154,23 @@
   "starters": {
     "blank-16x9": {
       "name": "Kosong 16:9",
-      "description": "Lini masa lanskap kosong."
+      "description": "Timeline lanskap kosong."
     },
     "blank-9x16": {
       "name": "Kosong 9:16",
-      "description": "Lini masa potret kosong."
+      "description": "Timeline potret kosong."
     },
     "blank-1x1": {
       "name": "Kosong 1:1",
-      "description": "Lini masa persegi kosong."
+      "description": "Timeline persegi kosong."
     },
     "promo-16x9": {
       "name": "Promo produk",
       "description": "Kartu judul, tiga shot contoh, dan musik latar. Ganti shot-shot itu dengan rekaman Anda."
     },
     "talk-16x9": {
-      "name": "Talking head + takarir",
-      "description": "Klip bicara 20 detik dengan contoh takarir. Coba “Remove the silences”."
+      "name": "Talking head + caption",
+      "description": "Klip bicara 20 detik dengan contoh caption. Coba “Remove the silences”."
     },
     "reels-9x16": {
       "name": "Reels 9:16",
@@ -182,56 +182,56 @@
     }
   },
   "ffmpeg": {
-    "setup": "Penyiapan:",
-    "platformSetup": "Penyiapan {platform}:",
+    "setup": "Setup:",
+    "platformSetup": "Setup {platform}:",
     "copy": "Salin",
     "copied": "Tersalin",
     "checkAgain": "Periksa lagi",
     "checking": "Memeriksa…",
     "installGuide": "Panduan instalasi",
     "recheckFailed": "Tidak bisa terhubung ke host lokal untuk memeriksa ulang. Coba lagi sebentar lagi.",
-    "hostedUnavailable": "Alat video belum disiapkan di server ini, jadi pemeriksaan, pemotongan, takarir, dan ekspor mungkin belum berfungsi. Minta administrator Anda untuk mengaktifkannya.",
-    "bundledUnavailable": "Alat video bawaan {productName} tidak bisa dijalankan, jadi pemeriksaan, pemotongan, takarir, dan ekspor nonaktif. Pasang ulang {productName} untuk memperbaikinya. Pekerjaan dan berkas Anda tetap aman."
+    "hostedUnavailable": "Alat video belum disiapkan di server ini, jadi pemeriksaan, pemotongan, caption, dan ekspor mungkin belum berfungsi. Minta administrator Anda untuk mengaktifkannya.",
+    "bundledUnavailable": "Alat video bawaan {productName} tidak bisa dijalankan, jadi pemeriksaan, pemotongan, caption, dan ekspor nonaktif. Pasang ulang {productName} untuk memperbaikinya. Pekerjaan dan file Anda tetap aman."
   },
   "errors": {
-    "apply": "Suntingan gagal diterapkan",
+    "apply": "Edit gagal diterapkan",
     "createProject": "Proyek gagal dibuat",
     "import": "Impor gagal",
-    "agentUnavailable": "Agen Sunting belum tersedia",
+    "agentUnavailable": "Agen Edit belum tersedia",
     "agentFailed": "Agen gagal",
     "exportBlocked": "Ekspor diblokir",
     "exportNotReady": "Ekspor belum siap",
     "exportDownload": "Ekspor gagal diunduh"
   },
   "pipeline": {
-    "languageInstruction": "Tulis teks Edit yang dilihat pengguna (kata kerja kartu, judul, takarir, balasan asisten, dan kata pada gambar atau video) dalam bahasa Indonesia. Pertahankan nama alat dan kunci JSON dalam bahasa Inggris.",
-    "stubHelp": "Saya bisa membantu memangkas, memotong, menambahkan takarir, dan memberi judul pada lini masa ini.",
+    "languageInstruction": "Tulis teks Edit yang dilihat pengguna (kata kerja kartu, judul, caption, balasan asisten, dan kata pada gambar atau video) dalam bahasa Indonesia. Pertahankan nama alat dan kunci JSON dalam bahasa Inggris.",
+    "stubHelp": "Saya bisa membantu memangkas, memotong, menambahkan caption, dan memberi judul pada timeline ini.",
     "stubUndo": "Kartu terakhir bisa diurungkan.",
     "harness": {
       "liftDeadAirRan": "Jeda sunyi dihilangkan.",
-      "liftDeadAirEmpty": "Tidak ada jeda sunyi yang perlu dihilangkan di lini masa ini.",
+      "liftDeadAirEmpty": "Tidak ada jeda sunyi yang perlu dihilangkan di timeline ini.",
       "cutOnShotsRan": "Dipotong di setiap pergantian gambar.",
       "cutOnShotsEmpty": "Tidak ada pergantian gambar yang bisa dijadikan titik potong.",
       "wordsOnPictureRan": "Kata-kata sudah ditempatkan pada gambar.",
       "wordsOnPictureEmpty": "Sebutkan kata yang ingin ditempatkan pada gambar.",
-      "placeMadeShotRan": "Gambar atau klip buatan sudah ditempatkan di lini masa.",
+      "placeMadeShotRan": "Gambar atau klip buatan sudah ditempatkan di timeline.",
       "placeMadeShotEmpty": "Sebutkan gambar diam atau klip yang ingin dibuat.",
       "placeMadeShotBlocked": "Shot ini menunggu rencana. Tidak ada yang dibuat.",
-      "handBackFileRan": "Berkas sedang diserahkan kepada Anda.",
-      "handBackFileBlocked": "Konfirmasikan lini masa sebelum berkas bisa diserahkan.",
-      "handBackFileFailed": "Proses berkas tidak bisa dimulai."
+      "handBackFileRan": "File sedang dikembalikan ke Anda.",
+      "handBackFileBlocked": "Konfirmasi timeline sebelum file bisa diserahkan.",
+      "handBackFileFailed": "Proses file tidak bisa dimulai."
     }
   },
   "stubCards": {
     "S1": { "verb": "Hapus 3 jeda sunyi", "object": "v1" },
-    "S2": { "verb": "Potong di pergantian adegan", "object": "v1" },
-    "S3": { "verb": "Tambah takarir", "object": "naskah" },
+    "S2": { "verb": "Potong di pergantian scene", "object": "v1" },
+    "S3": { "verb": "Tambah caption", "object": "script" },
     "S4": { "verb": "Transkripsi", "object": "jalur bicara" },
-    "S5": { "verb": "Ubah bingkai", "object": "9:16" },
+    "S5": { "verb": "Ubah frame", "object": "9:16" },
     "S6": { "verb": "Tambah judul", "object": "Summer Sale" },
     "S7": { "verb": "Pangkas klip", "object": "3 detik" },
     "S8": { "verb": "Pindahkan klip", "object": "awal" },
-    "S9": { "verb": "Kosongkan lini masa", "object": "semua klip" },
+    "S9": { "verb": "Kosongkan timeline", "object": "semua klip" },
     "S10": { "verb": "Urungkan", "object": "perubahan terakhir" },
     "F1": { "verb": "Papan cerita", "object": "gambar diam" },
     "F2": { "verb": "Animasikan", "object": "papan cerita" },

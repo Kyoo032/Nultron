@@ -419,7 +419,7 @@ The stronger option is a per-device Ed25519 keypair with the private key in the 
 | org active | `org_inactive` | approve, token, refresh, gateway | Your organisation is not active. | Organisasi Anda tidak aktif. | org admin → partner |
 | org not past due | `org_past_due` | approve, token, refresh, gateway | Your organisation's payment is overdue. | Pembayaran organisasi Anda tertunggak. | org admin (pay) |
 | user active | `user_inactive` | approve, token, refresh, gateway | Your account is disabled. | Akun Anda dinonaktifkan. | org admin |
-| active users ≤ seat_cap | `seat_cap_reached` | approve, token | No seats left in your organisation. | Semua kursi di organisasi Anda sudah terpakai. | org admin (free/add a seat) |
+| active users ≤ seat_cap | `seat_cap_reached` | approve, token | No seats left in your organisation. | Semua seat di organisasi Anda sudah terpakai. | org admin (free/add a seat) |
 | device not revoked | `device_revoked` | approve, token, refresh, gateway | This device was signed out by an admin. | Admin telah mencabut akses akun Anda dari perangkat ini. | org admin |
 | session not revoked | `session_revoked` | refresh, gateway | You were signed out. Please sign in again. | Anda telah keluar. Silakan masuk lagi. | user (sign in) |
 | refresh not replayed | `refresh_reused` | refresh | Signed out for security. Please sign in again. | Anda dikeluarkan demi keamanan. Silakan masuk lagi. | user (sign in) |
