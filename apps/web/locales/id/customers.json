@@ -14,7 +14,7 @@
   },
   "connect": {
     "label": "Nomor WhatsApp",
-    "intro": "Hubungkan nomor WhatsApp Business yang dipakai pelanggan untuk menghubungi Anda. Token akses disimpan terenkripsi di meja ini dan tidak akan ditampilkan lagi.",
+    "intro": "Hubungkan nomor WhatsApp Business yang dipakai pelanggan untuk menghubungi Anda. Token akses disimpan terenkripsi di meja kerja ini dan tidak akan ditampilkan lagi.",
     "phoneNumberId": "Phone number ID",
     "phoneNumberIdPlaceholder": "Ada di pengaturan WhatsApp di Meta, isinya angka saja",
     "accessToken": "Token akses",
@@ -68,7 +68,7 @@
   "window": {
     "open": "Anda masih bisa membalas bebas selama {hours} jam {minutes} menit lagi.",
     "openMinutes": "Anda masih bisa membalas bebas selama {minutes} menit lagi.",
-    "closed": "Batas 24 jam sudah lewat. Sekarang WhatsApp hanya mengizinkan pesan template yang sudah disetujui, dan itu belum bisa dikirim dari meja ini. Anda bisa membalas lagi begitu pelanggan menulis.",
+    "closed": "Batas 24 jam sudah lewat. Sekarang WhatsApp hanya mengizinkan pesan template yang sudah disetujui, dan itu belum bisa dikirim dari meja kerja ini. Anda bisa membalas lagi begitu pelanggan menulis.",
     "never": "Pelanggan ini belum menulis, jadi belum ada yang perlu dibalas."
   },
   "composer": {
@@ -82,7 +82,7 @@
     "disconnect": "Gagal memutuskan nomor.",
     "send": "Balasan itu ditolak WhatsApp.",
     "state": "Gagal mengubah percakapan itu.",
-    "notConnected": "Hubungkan nomor WhatsApp untuk meja ini dulu.",
+    "notConnected": "Hubungkan nomor WhatsApp untuk meja kerja ini dulu.",
     "windowClosed": "Batas 24 jam sudah lewat, jadi balasan bebas tidak bisa dikirim."
   }
 }
