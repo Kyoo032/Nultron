@@ -183,9 +183,9 @@ describe("GPT-6 on Responses carries its Thinking level", () => {
         expect(request.body.reasoning).toEqual({ effort: "medium", summary: "auto" });
       });
 
-      it("keeps the same body shape as gpt-5.x: reasoning right after input, before stream and store", async () => {
+      it("keeps the same body shape as gpt-5.x: store, then reasoning, then stream", async () => {
         const request = await firstRequest({ model, reasoningEffort: "high", reasoningEffortExplicit: true });
-        expect(Object.keys(request.body)).toEqual(["model", "input", "reasoning", "stream", "store"]);
+        expect(Object.keys(request.body)).toEqual(["model", "input", "store", "reasoning", "stream"]);
       });
     });
   }
@@ -250,10 +250,7 @@ describe("GPT-6 on Responses carries its Thinking level", () => {
 });
 
 describe("GPT-6 against gpt-5.6 on the wire", () => {
-  it("differs only in the model id and the system message's role, which the SDK spells developer for o* and gpt-5* only", async () => {
-    // The Responses API accepts `system` for every model and reads it as `developer` for a reasoning
-    // model, and GPT-6 has answered with it since it was listed, so this is recorded, not changed. If a
-    // later SDK upgrade moves it, this test says so.
+  it("differs only in the model id: AI SDK 5 spells the system message developer for GPT-6 as for gpt-5*", async () => {
     const six = await firstRequest({ model: "gpt-6-luna", reasoningEffort: "high", reasoningEffortExplicit: true });
     const fiveSix = await firstRequest({ model: "gpt-5.6-luna", reasoningEffort: "high", reasoningEffortExplicit: true });
     const normalise = (request: Captured, model: string) =>
@@ -262,7 +259,7 @@ describe("GPT-6 against gpt-5.6 on the wire", () => {
         .replace('"role":"developer"', '"role":"SYSTEM"')
         .replace('"role":"system"', '"role":"SYSTEM"');
     expect(normalise(six, "gpt-6-luna")).toBe(normalise(fiveSix, "gpt-5.6-luna"));
-    expect((six.body.input as Array<{ role: string }>)[0]?.role).toBe("system");
+    expect((six.body.input as Array<{ role: string }>)[0]?.role).toBe("developer");
     expect((fiveSix.body.input as Array<{ role: string }>)[0]?.role).toBe("developer");
   });
 
@@ -278,7 +275,7 @@ describe("what did not move", () => {
   it("gpt-5.6 sends the block the SDK always wrote, in the same place", async () => {
     const request = await firstRequest({ model: "gpt-5.6-luna", reasoningEffort: "high", reasoningEffortExplicit: true });
     expect(request.body.reasoning).toEqual({ effort: "high", summary: "auto" });
-    expect(Object.keys(request.body)).toEqual(["model", "input", "reasoning", "stream", "store"]);
+    expect(Object.keys(request.body)).toEqual(["model", "input", "store", "reasoning", "stream"]);
   });
 
   it("gpt-5.6 Off is still effort none with no summary", async () => {

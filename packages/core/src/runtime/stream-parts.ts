@@ -42,6 +42,9 @@ export function mapStreamPart(part: unknown): RuntimeEvent | undefined {
   }
   const record = part as Record<string, unknown>;
   const type = typeof record.type === "string" ? record.type : "";
+  if (record.invalid === true) {
+    return undefined;
+  }
   const text = asText(record);
 
   if ((type === "text-delta" || type === "text") && text) {

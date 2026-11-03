@@ -36,7 +36,8 @@
                     ],
                     "additionalProperties": false,
                     "$schema": "http://json-schema.org/draft-07/schema#"
-                  }
+                  },
+                  "strict": false
                 }
               }
             ],
@@ -101,7 +102,8 @@
                     ],
                     "additionalProperties": false,
                     "$schema": "http://json-schema.org/draft-07/schema#"
-                  }
+                  },
+                  "strict": false
                 }
               }
             ],
@@ -173,12 +175,12 @@
                 ]
               }
             ],
+            "store": false,
             "reasoning": {
               "effort": "low",
               "summary": "auto"
             },
-            "stream": true,
-            "store": false
+            "stream": true
           }
         }
       ],
@@ -212,7 +214,7 @@
           "url": "https://api.anthropic.com/messages",
           "body": {
             "model": "claude-haiku-4-5",
-            "max_tokens": 4096,
+            "max_tokens": 64000,
             "temperature": 0,
             "system": [
               {
@@ -260,7 +262,7 @@
           "url": "https://api.anthropic.com/messages",
           "body": {
             "model": "claude-haiku-4-5",
-            "max_tokens": 4096,
+            "max_tokens": 64000,
             "temperature": 0,
             "system": [
               {
@@ -379,18 +381,14 @@
                 "role": "user",
                 "parts": [
                   {
+                    "text": "You are helpful.\n\n"
+                  },
+                  {
                     "text": "Say hi."
                   }
                 ]
               }
-            ],
-            "systemInstruction": {
-              "parts": [
-                {
-                  "text": "You are helpful."
-                }
-              ]
-            }
+            ]
           }
         }
       ],
@@ -454,12 +452,16 @@
                     ],
                     "additionalProperties": false,
                     "$schema": "http://json-schema.org/draft-07/schema#"
-                  }
+                  },
+                  "strict": false
                 }
               }
             ],
             "tool_choice": "auto",
-            "stream": true
+            "stream": true,
+            "stream_options": {
+              "include_usage": true
+            }
           }
         },
         {
@@ -479,7 +481,7 @@
               },
               {
                 "role": "assistant",
-                "content": "",
+                "content": null,
                 "tool_calls": [
                   {
                     "id": "call_echo",
@@ -515,12 +517,16 @@
                     ],
                     "additionalProperties": false,
                     "$schema": "http://json-schema.org/draft-07/schema#"
-                  }
+                  },
+                  "strict": false
                 }
               }
             ],
             "tool_choice": "auto",
-            "stream": true
+            "stream": true,
+            "stream_options": {
+              "include_usage": true
+            }
           }
         }
       ],
@@ -738,7 +744,8 @@
                     ],
                     "additionalProperties": false,
                     "$schema": "http://json-schema.org/draft-07/schema#"
-                  }
+                  },
+                  "strict": false
                 }
               },
               {
@@ -758,7 +765,8 @@
                     ],
                     "additionalProperties": false,
                     "$schema": "http://json-schema.org/draft-07/schema#"
-                  }
+                  },
+                  "strict": false
                 }
               }
             ],
@@ -901,7 +909,8 @@
                     ],
                     "additionalProperties": false,
                     "$schema": "http://json-schema.org/draft-07/schema#"
-                  }
+                  },
+                  "strict": false
                 }
               },
               {
@@ -921,7 +930,8 @@
                     ],
                     "additionalProperties": false,
                     "$schema": "http://json-schema.org/draft-07/schema#"
-                  }
+                  },
+                  "strict": false
                 }
               }
             ],
@@ -1029,7 +1039,8 @@
                     ],
                     "additionalProperties": false,
                     "$schema": "http://json-schema.org/draft-07/schema#"
-                  }
+                  },
+                  "strict": false
                 }
               }
             ],
@@ -1061,8 +1072,8 @@
                     "id": "call_nope",
                     "type": "function",
                     "function": {
-                      "name": "invalid_tool_call",
-                      "arguments": "{\"tool\":\"nope\",\"error\":\"Model tried to call unavailable tool 'nope'. Available tools: echo, invalid_tool_call.\",\"available\":[\"echo\"]}"
+                      "name": "nope",
+                      "arguments": "{}"
                     }
                   }
                 ]
@@ -1070,7 +1081,7 @@
               {
                 "role": "tool",
                 "tool_call_id": "call_nope",
-                "content": "{\"ok\":false,\"reason\":\"invalid_tool_call\",\"message\":\"The call to \\\"nope\\\" was rejected and nothing ran: Model tried to call unavailable tool 'nope'. Available tools: echo, invalid_tool_call. Tools you can call: echo. Call one of them with valid arguments, or answer without tools.\"}"
+                "content": "Model tried to call unavailable tool 'nope'. Available tools: echo."
               }
             ],
             "tools": [
@@ -1091,7 +1102,8 @@
                     ],
                     "additionalProperties": false,
                     "$schema": "http://json-schema.org/draft-07/schema#"
-                  }
+                  },
+                  "strict": false
                 }
               }
             ],
@@ -1123,8 +1135,8 @@
                     "id": "call_nope",
                     "type": "function",
                     "function": {
-                      "name": "invalid_tool_call",
-                      "arguments": "{\"tool\":\"nope\",\"error\":\"Model tried to call unavailable tool 'nope'. Available tools: echo, invalid_tool_call.\",\"available\":[\"echo\"]}"
+                      "name": "nope",
+                      "arguments": "{}"
                     }
                   }
                 ]
@@ -1132,7 +1144,7 @@
               {
                 "role": "tool",
                 "tool_call_id": "call_nope",
-                "content": "{\"ok\":false,\"reason\":\"invalid_tool_call\",\"message\":\"The call to \\\"nope\\\" was rejected and nothing ran: Model tried to call unavailable tool 'nope'. Available tools: echo, invalid_tool_call. Tools you can call: echo. Call one of them with valid arguments, or answer without tools.\"}"
+                "content": "Model tried to call unavailable tool 'nope'. Available tools: echo."
               },
               {
                 "role": "assistant",
@@ -1172,7 +1184,8 @@
                     ],
                     "additionalProperties": false,
                     "$schema": "http://json-schema.org/draft-07/schema#"
-                  }
+                  },
+                  "strict": false
                 }
               }
             ],
@@ -1528,6 +1541,7 @@
                 ]
               }
             ],
+            "store": false,
             "reasoning": {
               "effort": "medium",
               "summary": "auto"
@@ -1549,12 +1563,12 @@
                   ],
                   "additionalProperties": false,
                   "$schema": "http://json-schema.org/draft-07/schema#"
-                }
+                },
+                "strict": false
               }
             ],
             "tool_choice": "auto",
-            "stream": true,
-            "store": false
+            "stream": true
           }
         },
         {
@@ -1587,6 +1601,7 @@
                 "output": "{\"echoed\":5}"
               }
             ],
+            "store": false,
             "reasoning": {
               "effort": "medium",
               "summary": "auto"
@@ -1608,12 +1623,12 @@
                   ],
                   "additionalProperties": false,
                   "$schema": "http://json-schema.org/draft-07/schema#"
-                }
+                },
+                "strict": false
               }
             ],
             "tool_choice": "auto",
-            "stream": true,
-            "store": false
+            "stream": true
           }
         }
       ],
@@ -1667,7 +1682,7 @@
             "model": "gpt-6-luna",
             "input": [
               {
-                "role": "system",
+                "role": "developer",
                 "content": "You are helpful."
               },
               {
@@ -1684,12 +1699,12 @@
                 ]
               }
             ],
+            "store": false,
             "reasoning": {
               "effort": "high",
               "summary": "auto"
             },
-            "stream": true,
-            "store": false
+            "stream": true
           }
         }
       ],
@@ -1925,25 +1940,27 @@
                 }
               ]
             },
-            "tools": {
-              "functionDeclarations": [
-                {
-                  "name": "echo",
-                  "description": "Echo a number.",
-                  "parameters": {
-                    "required": [
-                      "x"
-                    ],
-                    "type": "object",
-                    "properties": {
-                      "x": {
-                        "type": "number"
+            "tools": [
+              {
+                "functionDeclarations": [
+                  {
+                    "name": "echo",
+                    "description": "Echo a number.",
+                    "parameters": {
+                      "required": [
+                        "x"
+                      ],
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        }
                       }
                     }
                   }
-                }
-              ]
-            },
+                ]
+              }
+            ],
             "toolConfig": {
               "functionCallingConfig": {
                 "mode": "AUTO"
@@ -1975,11 +1992,13 @@
                 "parts": [
                   {
                     "functionCall": {
+                      "id": "<generated>",
                       "name": "echo",
                       "args": {
                         "x": 2
                       }
-                    }
+                    },
+                    "thoughtSignature": "skip_thought_signature_validator"
                   }
                 ]
               },
@@ -1988,6 +2007,7 @@
                 "parts": [
                   {
                     "functionResponse": {
+                      "id": "<generated>",
                       "name": "echo",
                       "response": {
                         "name": "echo",
@@ -2007,25 +2027,27 @@
                 }
               ]
             },
-            "tools": {
-              "functionDeclarations": [
-                {
-                  "name": "echo",
-                  "description": "Echo a number.",
-                  "parameters": {
-                    "required": [
-                      "x"
-                    ],
-                    "type": "object",
-                    "properties": {
-                      "x": {
-                        "type": "number"
+            "tools": [
+              {
+                "functionDeclarations": [
+                  {
+                    "name": "echo",
+                    "description": "Echo a number.",
+                    "parameters": {
+                      "required": [
+                        "x"
+                      ],
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        }
                       }
                     }
                   }
-                }
-              ]
-            },
+                ]
+              }
+            ],
             "toolConfig": {
               "functionCallingConfig": {
                 "mode": "AUTO"

@@ -119,6 +119,56 @@ export function applyZeroRetention(body: unknown, baseUrl: string): unknown {
   return next;
 }
 
+const ENCRYPTED_REASONING = "reasoning.encrypted_content";
+
+function withoutItemId(item: unknown): unknown {
+  if (typeof item !== "object" || item === null || !("id" in item)) {
+    return item;
+  }
+  const { id: _id, ...rest } = item as Record<string, unknown>;
+  return rest;
+}
+
+export function statelessResponsesBody(body: unknown): unknown {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return body;
+  }
+  const { include, ...rest } = body as Record<string, unknown>;
+  const kept = Array.isArray(include) ? include.filter((item) => item !== ENCRYPTED_REASONING) : include;
+  return {
+    ...rest,
+    ...(kept === undefined || (Array.isArray(kept) && kept.length === 0) ? {} : { include: kept }),
+    ...(Array.isArray(rest.input) ? { input: rest.input.map(withoutItemId) } : {}),
+  };
+}
+
+export function withoutStreamOptions(body: unknown): unknown {
+  if (typeof body !== "object" || body === null || Array.isArray(body) || !("stream_options" in body)) {
+    return body;
+  }
+  const { stream_options: _streamOptions, ...rest } = body as Record<string, unknown>;
+  return rest;
+}
+
+export function withStringToolCallContent(body: unknown): unknown {
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return body;
+  }
+  const record = body as Record<string, unknown>;
+  if (!Array.isArray(record.messages)) {
+    return body;
+  }
+  return {
+    ...record,
+    messages: record.messages.map((message) => {
+      const item = message as Record<string, unknown> | null;
+      return item && item.role === "assistant" && item.content === null && Array.isArray(item.tool_calls)
+        ? { ...item, content: "" }
+        : message;
+    }),
+  };
+}
+
 /** Cap how long we wait for a non-OK body so a held-open 403 cannot wedge Chat. */
 export const GATEWAY_ERROR_BODY_MS = 2_000;
 

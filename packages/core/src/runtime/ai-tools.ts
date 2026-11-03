@@ -1,23 +1,20 @@
 import { tool as aiTool, type ToolSet } from "ai";
-import { z } from "zod";
 import type { ToolBindingRecord } from "../agents/service";
 import { scrubUnreachableMediaArgs } from "../content/provider-media";
 import type { TenantContext } from "../tenancy/types";
 import { getTool } from "../tools/registry";
 import { getInjectionGuardBypass } from "../tools/secret-scope";
 import type { EgressGuard } from "./egress-guard";
-import { disabledToolOutput, invokeToolGuarded } from "./invoke-guarded";
+import { invokeToolGuarded } from "./invoke-guarded";
 import type { MediaPermission } from "./media-permission";
 import { isRunAbort, toolErrorResult } from "./tool-error";
 import { reportToolIo } from "./tool-io";
 import type { ToolBudget } from "./tool-budget";
 
 /**
- * The tools of one model call, as the AI SDK takes them.
- * - `tools` holds every bound tool that exists, including a disabled one, so a call to a tool the run
- *   never offered still reaches `invokeToolGuarded` and comes back as its refusal. Without it the SDK
- *   cannot find the tool, throws, and the run ends.
- * - `offered` is what the model is told it can call: every tool in `tools` except the disabled ones.
+ * The tools of one model call, as the AI SDK takes them: every bound tool that exists and is not disabled.
+ * A call to any other name comes back to the model from the SDK as a tool error, and the loop goes on.
+ * - `offered` is the keys of `tools`.
  */
 export type AiToolSet = {
   tools: ToolSet;
@@ -25,9 +22,6 @@ export type AiToolSet = {
 };
 
 type ToolCallOptions = { abortSignal?: AbortSignal };
-
-/** A disabled tool takes any arguments: the call is refused whatever it says, and must not fail first. */
-const ANY_ARGUMENTS = z.any();
 
 export function buildAiTools(options: {
   bindings: ReadonlyArray<Pick<ToolBindingRecord, "toolKey" | "enabled">>;
@@ -44,27 +38,13 @@ export function buildAiTools(options: {
   const offered: string[] = [];
   for (const binding of options.bindings.filter((item) => item.enabled)) {
     const definition = getTool(binding.toolKey);
-    if (!definition || binding.toolKey in tools) {
-      continue;
-    }
-    if (options.disabled.has(binding.toolKey)) {
-      tools[binding.toolKey] = aiTool({
-        description: definition.description,
-        parameters: ANY_ARGUMENTS,
-        execute: async (args: unknown) => {
-          // The refusal spends a budget slot like any call. Without it a model (or text that steers it) could
-          // call a tool that is off as often as it likes: every call is a row on the screen and a stored result.
-          const refusal = options.budget.admit(definition.key) ?? disabledToolOutput(definition.key);
-          reportToolIo({ toolKey: definition.key, input: args, full: refusal, thin: refusal });
-          return refusal;
-        },
-      });
+    if (!definition || binding.toolKey in tools || options.disabled.has(binding.toolKey)) {
       continue;
     }
     offered.push(binding.toolKey);
     tools[binding.toolKey] = aiTool({
       description: definition.description,
-      parameters: definition.schema,
+      inputSchema: definition.schema,
       execute: async (args: unknown, call?: ToolCallOptions) => {
         const input = scrubUnreachableMediaArgs(args);
         try {

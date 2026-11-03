@@ -569,3 +569,22 @@ describe("the runtime's requests and events, recorded before the AI SDK and zod 
     expect(Object.keys(golden).sort()).toEqual(Object.keys(SCENARIOS).sort());
   });
 });
+
+describe("a failed model call", () => {
+  it("prints nothing to the console: the SDK's error carries the request body", async () => {
+    const printed = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    for (const name of ["chat HTTP 400", "chat error frame mid-stream"]) {
+      await play(SCENARIOS[name] as Scenario);
+    }
+    expect(printed).not.toHaveBeenCalled();
+  });
+});
+
+describe("an ordinary reasoning turn on Responses", () => {
+  it("prints no SDK warning: ai 5 would write one for every temperature it drops", async () => {
+    const emitted = vi.spyOn(process, "emitWarning");
+    await play(SCENARIOS["official OpenAI Responses"] as Scenario);
+    await play(SCENARIOS["responses tools with reasoning summary"] as Scenario);
+    expect(emitted).not.toHaveBeenCalled();
+  });
+});

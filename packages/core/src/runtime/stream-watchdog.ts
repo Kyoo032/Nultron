@@ -217,17 +217,21 @@ export async function* watchAsyncIterable<T>(
   locale: AppLocale = "en",
 ): AsyncGenerator<T> {
   const iterator = iterable[Symbol.asyncIterator]();
+  let finished = false;
   try {
     while (true) {
       const result = await Promise.race([iterator.next(), rejectOnAbort(abort, locale)]);
       if (result.done) {
+        finished = true;
         return;
       }
       onItem?.();
       yield result.value;
     }
   } finally {
-    await iterator.return?.();
+    if (!finished) {
+      await iterator.return?.();
+    }
   }
 }
 

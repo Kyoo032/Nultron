@@ -5,7 +5,10 @@ import {
   parseGatewayHttpError,
   readHttpErrorBody,
   sanitizeGatewayRequestBody,
+  statelessResponsesBody,
   temperatureMustBeOneOrOmitted,
+  withStringToolCallContent,
+  withoutStreamOptions,
 } from "./request-constraints";
 
 describe("temperatureMustBeOneOrOmitted", () => {
@@ -126,5 +129,73 @@ describe("readHttpErrorBody", () => {
     const text = await readHttpErrorBody(new Response(stream, { status: 403 }), 50);
     expect(Date.now() - started).toBeLessThan(1_000);
     expect(text).toContain("held open");
+  });
+});
+
+describe("statelessResponsesBody", () => {
+  it("sends replayed items without their ids and asks for no encrypted reasoning", () => {
+    const body = {
+      model: "gpt-5.6",
+      store: false,
+      include: ["reasoning.encrypted_content"],
+      input: [
+        { role: "user", content: [{ type: "input_text", text: "Say hi." }] },
+        { type: "function_call", id: "fc_1", call_id: "call_1", name: "echo", arguments: "{}" },
+        { type: "function_call_output", call_id: "call_1", output: "{}" },
+      ],
+    };
+    expect(statelessResponsesBody(body)).toEqual({
+      model: "gpt-5.6",
+      store: false,
+      input: [
+        { role: "user", content: [{ type: "input_text", text: "Say hi." }] },
+        { type: "function_call", call_id: "call_1", name: "echo", arguments: "{}" },
+        { type: "function_call_output", call_id: "call_1", output: "{}" },
+      ],
+    });
+  });
+
+  it("keeps any other include entry", () => {
+    const body = { include: ["reasoning.encrypted_content", "web_search_call.action.sources"], input: [] };
+    expect(statelessResponsesBody(body)).toEqual({ include: ["web_search_call.action.sources"], input: [] });
+  });
+});
+
+describe("withStringToolCallContent", () => {
+  it("writes an empty string where an assistant tool call carries null content", () => {
+    const call = { id: "call_1", type: "function", function: { name: "echo", arguments: "{}" } };
+    const body = {
+      messages: [
+        { role: "user", content: "Say hi." },
+        { role: "assistant", content: null, tool_calls: [call] },
+        { role: "tool", tool_call_id: "call_1", content: "{}" },
+      ],
+    };
+    expect(withStringToolCallContent(body)).toEqual({
+      messages: [
+        { role: "user", content: "Say hi." },
+        { role: "assistant", content: "", tool_calls: [call] },
+        { role: "tool", tool_call_id: "call_1", content: "{}" },
+      ],
+    });
+  });
+
+  it("leaves an assistant message with text alone", () => {
+    const body = { messages: [{ role: "assistant", content: "Hi." }] };
+    expect(withStringToolCallContent(body)).toEqual(body);
+  });
+});
+
+describe("withoutStreamOptions", () => {
+  it("drops stream_options and nothing else", () => {
+    expect(withoutStreamOptions({ model: "m", stream: true, stream_options: { include_usage: true } })).toEqual({
+      model: "m",
+      stream: true,
+    });
+  });
+
+  it("leaves a body without it untouched", () => {
+    const body = { model: "m", stream: true };
+    expect(withoutStreamOptions(body)).toBe(body);
   });
 });

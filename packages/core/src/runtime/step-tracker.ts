@@ -1,7 +1,7 @@
 /**
  * Reads the AI SDK's stream to learn how a tool loop ended. The SDK stops after `maxSteps` model calls
  * and says nothing when the last one asked for tools: the run just ends with tool results and no answer.
- * A step is finished at its `step-finish` part; it called a tool if a `tool-call` part came before it.
+ * A step is finished at its `finish-step` part; it called a tool if a `tool-call` part came before it.
  */
 export type StepTracker = {
   observe(part: unknown): void;
@@ -19,7 +19,7 @@ export function createStepTracker(): StepTracker {
       const type = typeof part === "object" && part !== null ? (part as { type?: unknown }).type : undefined;
       if (type === "tool-call") {
         stepCalledTool = true;
-      } else if (type === "step-finish") {
+      } else if (type === "finish-step") {
         finished += 1;
         lastStepCalledTool = stepCalledTool;
         stepCalledTool = false;
