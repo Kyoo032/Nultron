@@ -1,45 +1,45 @@
 {
   "title": "Pelanggan",
-  "intro": "Pesan WhatsApp pelanggan Anda di satu tempat. Baca yang masuk, jawab, dan lihat mana yang masih menunggu Anda.",
+  "intro": "Semua chat WhatsApp dari pelanggan Anda di satu tempat. Baca yang masuk, balas, dan lihat mana yang masih menunggu balasan.",
   "today": {
-    "needsYou": "Menunggu Anda",
-    "withYou": "Sedang Anda tangani",
-    "received": "Diterima hari ini",
+    "needsYou": "Perlu dibalas",
+    "withYou": "Sedang diurus",
+    "received": "Masuk hari ini",
     "sent": "Terkirim hari ini",
     "firstReply": "Balasan pertama biasanya",
     "noReplyYet": "Belum ada balasan",
-    "seconds": "{value} dtk",
-    "minutes": "{value} mnt",
+    "seconds": "{value} detik",
+    "minutes": "{value} menit",
     "hours": "{value} jam"
   },
   "connect": {
     "label": "Nomor WhatsApp",
-    "intro": "Hubungkan nomor WhatsApp Business yang dituju pelanggan Anda. Token akses disimpan terenkripsi di meja ini dan tidak ditampilkan lagi.",
-    "phoneNumberId": "ID nomor telepon",
-    "phoneNumberIdPlaceholder": "Dari pengaturan WhatsApp di Meta, hanya angka",
+    "intro": "Hubungkan nomor WhatsApp Business yang dipakai pelanggan untuk menghubungi Anda. Token akses disimpan terenkripsi di meja ini dan tidak akan ditampilkan lagi.",
+    "phoneNumberId": "Phone number ID",
+    "phoneNumberIdPlaceholder": "Ada di pengaturan WhatsApp di Meta, isinya angka saja",
     "accessToken": "Token akses",
     "accessTokenPlaceholder": "Token permanen dari Meta",
     "connect": "Hubungkan nomor",
     "connected": "Terhubung: {phone}",
     "connectedAs": "{name}",
     "disconnect": "Putuskan",
-    "disconnectNote": "Memutuskan akan melupakan token dan menghentikan pesan baru. Percakapan Anda tetap ada.",
-    "callbackLabel": "URL callback untuk Meta",
-    "callbackHint": "Di pengaturan webhook Meta, tempel URL ini, masukkan token verifikasi yang diatur di server, dan berlangganan \"messages\".",
+    "disconnectNote": "Kalau diputus, token dihapus dan pesan baru tidak masuk lagi. Percakapan yang sudah ada tetap tersimpan.",
+    "callbackLabel": "Callback URL untuk Meta",
+    "callbackHint": "Di pengaturan webhook Meta, tempel URL ini, isi verify token yang sudah diatur di server, lalu subscribe ke \"messages\".",
     "copy": "Salin",
-    "copied": "Tersalin",
-    "notReady": "Server ini belum punya rahasia aplikasi Meta dan token verifikasi, jadi Meta belum bisa mengirim pesan ke sini. Minta pengelola server untuk mengaturnya.",
-    "sandbox": "Aplikasi ini diarahkan ke server uji lokal, bukan ke WhatsApp."
+    "copied": "Disalin",
+    "notReady": "Server ini belum punya app secret dari Meta dan verify token, jadi Meta belum bisa mengirim pesan ke sini. Minta orang yang mengurus server untuk mengisinya.",
+    "sandbox": "Aplikasi ini sedang terhubung ke server uji coba lokal, bukan ke WhatsApp yang asli."
   },
   "filters": {
     "all": "Semua",
-    "needs_you": "Menunggu Anda",
-    "with_you": "Anda tangani",
+    "needs_you": "Perlu dibalas",
+    "with_you": "Sedang diurus",
     "closed": "Selesai"
   },
   "list": {
     "search": "Cari nama atau nomor",
-    "empty": "Belum ada percakapan. Pesan yang dikirim pelanggan ke nomor yang terhubung akan muncul di sini.",
+    "empty": "Belum ada percakapan. Pesan dari pelanggan ke nomor yang terhubung akan muncul di sini.",
     "emptyFiltered": "Tidak ada yang cocok.",
     "unread": "{count} baru",
     "you": "Anda: {text}"
@@ -52,37 +52,37 @@
     "done": "Tandai selesai",
     "reopen": "Buka lagi",
     "states": {
-      "auto": "Ditangani otomatis",
-      "needs_you": "Menunggu Anda",
-      "with_you": "Anda tangani",
+      "auto": "Dibalas otomatis",
+      "needs_you": "Perlu dibalas",
+      "with_you": "Sedang diurus",
       "closed": "Selesai"
     }
   },
   "delivery": {
     "queued": "Mengirim…",
     "sent": "Terkirim",
-    "delivered": "Sampai",
+    "delivered": "Diterima",
     "read": "Dibaca",
-    "failed": "Gagal sampai"
+    "failed": "Gagal terkirim"
   },
   "window": {
-    "open": "Anda bisa membalas bebas selama {hours} jam {minutes} menit lagi.",
-    "openMinutes": "Anda bisa membalas bebas selama {minutes} menit lagi.",
-    "closed": "Jendela 24 jam sudah tertutup. WhatsApp kini hanya mengizinkan pesan templat yang disetujui, yang belum bisa dikirim dari meja ini. Anda bisa membalas begitu pelanggan menulis lagi.",
-    "never": "Pelanggan ini belum menulis, jadi belum ada yang perlu dijawab."
+    "open": "Anda masih bisa membalas bebas selama {hours} jam {minutes} menit lagi.",
+    "openMinutes": "Anda masih bisa membalas bebas selama {minutes} menit lagi.",
+    "closed": "Batas 24 jam sudah lewat. Sekarang WhatsApp hanya mengizinkan pesan template yang sudah disetujui, dan itu belum bisa dikirim dari meja ini. Anda bisa membalas lagi begitu pelanggan menulis.",
+    "never": "Pelanggan ini belum menulis, jadi belum ada yang perlu dibalas."
   },
   "composer": {
-    "placeholder": "Tulis balasan Anda",
+    "placeholder": "Tulis balasan",
     "aria": "Balasan untuk pelanggan ini",
     "send": "Kirim balasan"
   },
   "errors": {
-    "load": "Tidak bisa memuat pelanggan Anda.",
-    "connect": "WhatsApp tidak menerima nomor dan token itu.",
-    "disconnect": "Tidak bisa memutuskan nomor.",
-    "send": "WhatsApp tidak menerima balasan itu.",
-    "state": "Tidak bisa mengubah percakapan itu.",
+    "load": "Gagal memuat pelanggan Anda.",
+    "connect": "Nomor dan token itu ditolak WhatsApp.",
+    "disconnect": "Gagal memutuskan nomor.",
+    "send": "Balasan itu ditolak WhatsApp.",
+    "state": "Gagal mengubah percakapan itu.",
     "notConnected": "Hubungkan nomor WhatsApp untuk meja ini dulu.",
-    "windowClosed": "Jendela 24 jam sudah tertutup, jadi balasan bebas tidak bisa dikirim."
+    "windowClosed": "Batas 24 jam sudah lewat, jadi balasan bebas tidak bisa dikirim."
   }
 }

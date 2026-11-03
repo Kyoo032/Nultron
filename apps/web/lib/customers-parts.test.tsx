@@ -274,6 +274,6 @@ describe("Thread", () => {
 
   it("speaks Indonesian when the desk does", () => {
     applyLocale("id");
-    expect(thread()).toContain("Anda bisa membalas bebas selama 23 jam 0 menit lagi.");
+    expect(thread()).toContain("Anda masih bisa membalas bebas selama 23 jam 0 menit lagi.");
   });
 });
