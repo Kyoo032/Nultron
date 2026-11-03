@@ -138,6 +138,8 @@ The tables at the top say where a change is cut, made and merged. This section k
 
 **Change guard (advisory, 2026-10-09).** Any change follows the project skill [`.cursor/skills/change-agentforge/SKILL.md`](.cursor/skills/change-agentforge/SKILL.md). Paste [`preamble.md`](.cursor/skills/change-agentforge/preamble.md) at the top of every subagent prompt. [`lanes.json`](lanes.json) maps path globs to their map page, the lanes they reach and a `protected` flag. `pnpm lane-guard` (`scripts/lane-guard.mjs`) prints three kinds of warning: a map page not refreshed, a protected file with no `Lanes:` line, a brand literal added to shared code. It exits 0 unless `--strict`. `ci:local` runs it with `--strict` as an advisory step: a warning shows in the table and never fails the run. The strict rules, the never-promote list, the pre-push hook and the release-script checks are added on branch `chore/agent-guardrails`; the map page names the file that holds each. Plan: [`docs/internal/white-label-and-agent-guardrails-plan.md`](docs/internal/white-label-and-agent-guardrails-plan.md).
 
+**Paid media gate check (2026-11-03).** A change that touches the SR-167 Run gate, adds a way to start a model run (a channel, a routine, `delegate`), or binds `image_generate` or `video_generate` runs `pnpm verify:paid-gate` before it merges. The skill is [`.cursor/skills/verify-paid-media-gate/SKILL.md`](.cursor/skills/verify-paid-media-gate/SKILL.md).
+
 `.ref/` (gitignored) holds two third-party repositories for reading only, OpenMausBot and hermes-agent. Take ideas, never code, and never anything from `OpenMausBot/enterprise/`.
 
 ### Hosting and scaling (Rizky, 2026-10-07 and 2026-10-13)

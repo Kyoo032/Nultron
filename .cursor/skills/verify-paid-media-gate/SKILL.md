@@ -37,17 +37,19 @@ That is `node .cursor/skills/verify-paid-media-gate/scripts/check.mjs`. It runs 
 
 Green looks like `pass  gate: N tests` and `pass  reach: N tests`. Red lists the failing test names. A run that finds no tests is red too.
 
+Flags: `--only gate` or `--only reach` runs one group. `--property-only` runs only the two property files, not the older unit tests beside them, to show what the property files catch on their own. `--teeth` is described below. The exit code is 0 when every check passes (and, with `--teeth`, every break is caught), and 1 otherwise.
+
 ## What a pass covers
 
 Within these bounds, and no further:
 
-- **Every call sequence up to 3 calls against every grant list up to 2 grants** (8,775 cases). The requests are two pictures that differ in the prompt and two 12-second clips that differ only in the model (a list price 8x apart). Each request is sent tidy and noisy (extra spaces, a placeholder `model`, an `example.com` picture, unknown fields). For each case the gate must agree with the specification: a call starts exactly when an unspent grant names the same request, starting it spends that grant, and what starts is the request the card showed. The specification borrows only `mediaRequestArgs` (what the card shows) from the code under test; the identity of a request is compared as text.
+- **Every call sequence up to 3 calls against every grant list up to 2 grants** (8,775 cases). The requests are two pictures that differ in the prompt and two 12-second clips that differ only in the model (a list price 8x apart). Each request is sent tidy and noisy (extra spaces, a placeholder `model`, an `example.com` picture, unknown fields). For each case the gate must agree with the specification: a call starts exactly when an unspent grant names the same request, starting it spends that grant, and what starts is the request the card showed. The specification borrows only `mediaRequestArgs` (what the card shows) from the code under test; the identity of a request is compared as text. The count is 15 grant lists (the order of grants does not matter to the gate, so each list is taken once, as a multiset) times 585 call sequences over 8 call forms (four requests, tidy and noisy).
 - **A random search at a larger size** (up to 6 grants, 14 calls) on the same specification.
 - **Parallel calls** through the real `invokeToolGuarded`: eight calls at once against three grants start exactly three tools.
 - **Which tool sets can bind a paid tool.** Only the Chat harness spec lists them; a delegated run never does, whichever agent is asked.
-- **Every way into a run.** The tree is scanned for each `.execute({ bindings })` call. Each must be on the list in the reach test with a reason: `runs.ts` (gated, and must pass `mediaPermission` as an argument), delegation (tools stripped), `job-regen.ts` (bounded by the mode spec), the Edit agent (its own tools, a named residual). A new one fails until somebody writes down how it holds the gate. The same for any file that uses `imageGenerateTool` or `videoGenerateTool` itself.
-- **One gate per run.** `createMediaPermission` is called once, directly in `AiSdkRuntime.stream`, outside any loop or closure, so the runtime's retries share one set of unspent grants.
-- **The request body.** Forty-odd hostile bodies: the gate always asks, at most 12 grants survive, and every kept grant is one a card could have shown.
+- **Every way into a run.** The tree is scanned for each `.execute({ bindings })` call. Each must be on the list in the reach test with a reason: `runs.ts` (gated, and must pass `mediaPermission` as an argument), delegation (tools stripped), `job-regen.ts` (bounded by the mode spec), the Edit agent (its own tools, a named residual). A new one fails until somebody writes down how it holds the gate. The same for any file that uses `imageGenerateTool` or `videoGenerateTool` itself. The scan reads the TypeScript syntax tree, so a comment or a string that says `mediaPermission` does not count; the property must be an argument of the call.
+- **One gate per run.** `createMediaPermission` is called once, directly in `AiSdkRuntime.stream`, outside any loop or closure, so the runtime's retries share one set of unspent grants. Nothing else builds one.
+- **The request body.** Forty-odd hostile bodies: the gate always asks, at most 12 grants survive, and every kept grant is one a card could have shown. Only the person's own client may send grants, and nothing in a body may switch the gate off.
 - **The check can fail.** The specification is run against four wrong gates and must catch each; the scan is run on tiny wrong sources. `--teeth` below does the same to the real code.
 
 ## What it does not cover
@@ -62,13 +64,23 @@ Within these bounds, and no further:
 
 ## Open finding
 
-**F1 (SR-191, Low): two different requests can share a key, so a grant for one lets the other start.** The identity of a request is `fingerprint(...)` in `media-permission.ts`, two 32-bit passes with a comment that says "Not a security hash". Counterexample, in the code's words:
+**F1 (SR-195, Low): two different requests can share a key, so a grant for one lets the other start.** The identity of a request is `fingerprint(...)` in `media-permission.ts`, two 32-bit passes with a comment that says "Not a security hash". Counterexample, in the code's words:
 
 1. The person presses Run on a 12-second clip on `veo-3.1-lite` whose prompt ends in `癋戕紥萐两`. The body's grant reaches `readMediaPermission`, then `createMediaPermission`, which files it under `mediaRequestKey` = `a64e1d812a3b147e`.
 2. The model calls `video_generate` for 12 seconds on `veo_3_1`, prompt `a calm lake at dawn, very soft light 妰蟖纐倨之`. `mediaRequestKey` returns `a64e1d812a3b147e` again, `beforeCall` finds one unspent grant and returns null, and `argsToRun` hands the tool the dear request's own fields.
 3. The tool starts the dearer model for 12 seconds: 8x the card's list price per second ($4.80 against $0.60), or a different picture than the card showed at the same price.
 
-Needs someone who controls what the model writes (text in a page or file) and a pair computed ahead (about five minutes on four cores, `scripts/find-collision.mjs`). It is pinned in `media-permission.property.test.ts` as two `it.fails` tests. The code is unchanged, as this check never edits product code. The fix is one function: make the key the canonical text itself (`${tool}\n${lines}`; values are already single-spaced strings, so it is unambiguous) and delete `fingerprint`. When that lands, the two `it.fails` turn red; change them to `it` and the finding is closed.
+Needs someone who controls what the model writes (text in a page or file) and a pair computed ahead (about five minutes on four cores, `scripts/find-collision.mjs`). The two prompts are the same length up to a five-character tail, and the tails are the only odd part of either prompt. The list prices come from `media-pricing.ts`: `veo-3.1-lite` at 0.05 USD per second and `veo_3_1` at 0.40 USD per second at 720p. The pair is pinned in `media-permission.property.test.ts` as two `it.fails` tests (the `CHEAP` and `DEAR` constants). The code is unchanged, as this check never edits product code. The fix is one function: make the key the canonical text itself (`${tool}\n${lines}`; values are already single-spaced strings, so it is unambiguous) and delete `fingerprint`. When that lands, the two `it.fails` turn red; change them to `it` and the finding is closed.
+
+### Finding a new colliding pair
+
+Only needed if the pinned pair ever has to be replaced. The script needs only Node and makes no network calls.
+
+1. Run `node .cursor/skills/verify-paid-media-gate/scripts/find-collision.mjs <seed>` with seeds 1 to 4 at once, one per core.
+2. Each run prints `RESULT {"tailLite":..,"tailFull":..}` after about five to eight minutes, when it finds a pair that crosses the two prefixes. Otherwise it keeps going.
+3. Append each tail to its prompt and put the pair in `CHEAP` and `DEAR`.
+
+How it works: `fingerprint` in `packages/core/src/runtime/media-permission.ts` keeps a 64-bit state (two 32-bit passes) that moves to a new state one character at a time. Two requests whose texts are the same length up to a tail, and differ before it (here the model id and a few words of the prompt), collide when their states agree after the tail. The search is Floyd's cycle finding on a function from 64 bits to the state after the tail, on the cheap prefix or the dear prefix: one bit picks the branch and 63 bits spell the five-character tail. It takes about 2^32 steps. The tail uses the 16,384 CJK characters from U+4E00, none of which is whitespace; the first four characters carry 14 bits each and the fifth carries 7. The script copies `fingerprint` from the source on purpose, so the test checks the pinned pair against the real `mediaRequestKey`.
 
 ## When it goes red
 
@@ -91,7 +103,9 @@ node .cursor/skills/verify-paid-media-gate/scripts/check.mjs --teeth
 
 Applies eleven breaks to the real source one at a time (a grant never spent, any grant opens any request, the key ignores the model, the model's own fields run, the gate skipped in `invokeToolGuarded`, a delegated run keeping the paid tools, the body turning the gate off, grants uncapped, the gate built in a closure, `runs.ts` without the gate, a new unlisted run entry), requires the right group to go red, restores each file, and runs the checks clean at the end. About two minutes. Add `--property-only` to see what the two property files catch without the older tests. A break reported `NOT RUN` means the code changed shape: update `BREAKS` in the script. `MISSED` means the check has lost a tooth: fix the check.
 
-Last full run (2026-11-03, base `b79a527`): nine of nine caught, every file put back. The breaks `gate-built-per-closure` and `body-grants-uncapped` were added after it and have **not been run yet**; run `--teeth` once before trusting this skill, and replace this line with the result.
+How the breaks work. Each entry in `BREAKS` names a file, the exact text to change (`find`, which must occur exactly once in the file's own line endings, LF or CRLF, or the break is `NOT RUN`) and the groups that must go red (`catchers`). The script refuses to start when the checks are already red, because it would prove nothing. It puts each file back in a `finally` and again on exit. If the process is killed before it restores (power loss), `git diff` shows the file; restore it from git.
+
+Last full run (2026-11-03, base `8dfcd9a`, on Windows with CRLF checkouts): eleven of eleven caught, none missed, none not run. Every file was put back: `git status` was the same before and after, and no product file was modified. Every break turned red in one of the two property files; `delegate-keeps-media` and `new-run-entry` turned red only there. An earlier run on the same day had four breaks `NOT RUN` (`grant-never-spent`, `key-ignores-model`, `delegate-keeps-media`, `run-without-gate`), because their `find` text holds a line break and the Windows checkout ends lines in CRLF; `check.mjs` now matches the file's own line endings, and that is the run reported here.
 
 ## Coverage record
 

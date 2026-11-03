@@ -1,22 +1,4 @@
 #!/usr/bin/env node
-/**
- * One command for the paid media gate check (SR-167). Agent guardrail, not part of the app.
- *
- *   node .cursor/skills/verify-paid-media-gate/scripts/check.mjs            run both checks
- *   node .cursor/skills/verify-paid-media-gate/scripts/check.mjs --teeth    also break the real code on purpose,
- *                                                                           one way at a time, and require the checks to fail
- *   ... --property-only                                                     run only the two property files, not the older unit tests
- *                                                                           beside them (shows what the property files catch on their own)
- *
- * `pnpm verify:paid-gate` runs the first form. Both checks are vitest files that `ci:local` also runs
- * with the rest of core and host, so this script adds the single command and the `--teeth` proof.
- *
- * `--teeth` edits real source files and puts each one back in a `finally` and on exit. If it is
- * killed before it restores (power loss), `git diff` shows the file; `git checkout -- <file>` undoes it.
- * It refuses to start when the checks are already red.
- *
- * Exit code: 0 when every check passes (and, with `--teeth`, every break is caught); 1 otherwise.
- */
 
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -25,7 +7,6 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 
-/** The checks. `files` are vitest files relative to `dir`; the first is the property file, the rest are the older unit tests for the same code. */
 const CHECKS = {
   gate: {
     dir: "packages/core",
@@ -45,11 +26,6 @@ const CHECKS = {
   },
 };
 
-/**
- * Scratch breaks. Each one is a mistake somebody could make, applied to the real code. `find` must
- * occur exactly once: when it does not, the code has changed shape and this list needs a look (that is
- * a finding about the verification, not a pass). `catchers` are the checks that must go red.
- */
 const BREAKS = [
   {
     id: "grant-never-spent",
@@ -140,8 +116,6 @@ const BREAKS = [
   },
 ];
 
-// ---------------------------------------------------------------------------------------------
-
 const ANSI = /\u001b\[[0-9;]*m/g;
 
 function vitestEntry(dir) {
@@ -191,8 +165,6 @@ function show(result) {
   }
 }
 
-// ---------------------------------------------------------------------------------------------
-
 function applyBreak(item) {
   if (item.create) {
     const target = path.join(repoRoot, item.create);
@@ -202,13 +174,17 @@ function applyBreak(item) {
   }
   const target = path.join(repoRoot, item.file);
   const original = readFileSync(target, "utf8");
-  const count = original.split(item.find).length - 1;
+  const eol = original.includes("\r\n") ? "\r\n" : "\n";
+  const fitLineEndings = (text) => text.replace(/\r?\n/g, eol);
+  const find = fitLineEndings(item.find);
+  const replacement = fitLineEndings(item.replace);
+  const count = original.split(find).length - 1;
   if (count !== 1) {
     throw new Error(
       `${item.file}: the text for break "${item.id}" occurs ${count} times, not once. The code changed shape: update BREAKS in this script, then run again.`,
     );
   }
-  writeFileSync(target, original.replace(item.find, () => item.replace));
+  writeFileSync(target, original.replace(find, () => replacement));
   return () => writeFileSync(target, original);
 }
 
@@ -250,8 +226,6 @@ function teeth() {
   }
   return rows.every((row) => row.verdict === "caught");
 }
-
-// ---------------------------------------------------------------------------------------------
 
 const wantTeeth = process.argv.includes("--teeth");
 const only = process.argv.filter((arg, index, all) => all[index - 1] === "--only");

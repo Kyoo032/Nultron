@@ -1,27 +1,3 @@
-/**
- * Reach of the paid media gate (SR-167): every way a model-driven run can start in this repo, and how
- * each one keeps `image_generate` and `video_generate` behind the person's Run press.
- *
- * `media-permission.property.test.ts` in core checks the gate. A gate only helps if every run passes
- * through it, so this file checks the other half from the source: it finds each place that starts an
- * `AgentRuntime` run with tools bound, and fails when one is not on the list below. A new entry into a
- * run (a channel, a routine, WhatsApp) fails here until somebody writes down how it holds the gate.
- *
- * It reads the TypeScript syntax tree, so a comment or a string that says "mediaPermission" does not
- * count; the property must be an argument of the call. Run by the project skill `verify-paid-media-gate`
- * and by `ci:local` with the host's tests.
- *
- * Two more structural facts the "one Run, one start" promise leans on: the runtime builds the gate once
- * per `execute` (its retries share it, so a retry cannot hand a grant out twice), and nothing but the
- * runtime builds one. It also checks the other door: the request body. Only the person's own client may send grants, and
- * nothing in a body may switch the gate off or hand it more than a card list.
- *
- * Covered: calls of `.execute({ bindings, ... })`, uses of the two generator tool objects, and
- * `readMediaPermission` on a fixed set of hostile bodies.
- * Not covered: the Edit agent's own `generate_image` / `generate_video` tools (a known residual of
- * SR-167), a run started through some other object than `.execute`, and a tool called from inside
- * another tool.
- */
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,12 +9,10 @@ import { PAID_MEDIA_GRANTS_MAX, readMediaPermission } from "./paid-media-body";
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 type Entry = {
-  /** How the entry keeps the paid tools behind Run. */
   readonly how: "gated" | "tools stripped" | "tools bounded by the mode spec" | "no gate: the Edit agent's own tools";
   readonly why: string;
 };
 
-/** Every call of `.execute({ bindings, ... })` in non-test source, by file. */
 const RUN_ENTRIES: Readonly<Record<string, Entry>> = {
   "packages/host/src/runs.ts": {
     how: "gated",
@@ -58,7 +32,6 @@ const RUN_ENTRIES: Readonly<Record<string, Entry>> = {
   },
 };
 
-/** Files that use the two generator tool objects themselves, not by their key through a run. */
 const TOOL_OBJECT_USERS: Readonly<Record<string, string>> = {
   "packages/core/src/tools/platform/register.ts":
     "Registers the tools so a run can bind them. A model's call to either goes through invokeToolGuarded, with the run's gate.",
@@ -128,7 +101,6 @@ function runCallSites(file: string, text: string): CallSite[] {
 
 type GateBuilder = { readonly file: string; readonly line: number; readonly owner: string; readonly inLoop: boolean };
 
-/** Calls of `createMediaPermission`, with the function they sit in and whether a loop sits between. */
 function gateBuilders(file: string, text: string): GateBuilder[] {
   const tree = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
   const found: GateBuilder[] = [];
@@ -243,7 +215,6 @@ describe("one gate per run", () => {
   });
 });
 
-/** Grants that look like a card's, and the ways a hand-made body can dress up around them. */
 const VALID_GRANT = { tool: "image_generate", args: { prompt: "a red fox" } };
 const GRANT_LISTS: readonly unknown[] = [
   undefined,

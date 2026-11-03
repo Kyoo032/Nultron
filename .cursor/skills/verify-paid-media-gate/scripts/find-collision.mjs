@@ -1,26 +1,4 @@
 #!/usr/bin/env node
-/**
- * How finding F1 was found (SR-191): two different video requests with the same `mediaRequestKey`.
- * Not part of the check; it is the evidence, and the way to find a new pair if the pinned one ever
- * needs replacing. Agent guardrail, not part of the app.
- *
- *   node .cursor/skills/verify-paid-media-gate/scripts/find-collision.mjs <seed>
- *
- * Run four with seeds 1 to 4 at once (one per core). Each prints `RESULT {"tailLite":..,"tailFull":..}`
- * after about five to eight minutes when it finds a pair that crosses the two prefixes, and keeps
- * going otherwise. Then append each tail to its prompt and put the pair in
- * `media-permission.property.test.ts` (the `CHEAP` and `DEAR` constants).
- *
- * The method: `fingerprint` in `packages/core/src/runtime/media-permission.ts` keeps a 64-bit state
- * (two 32-bit passes) that one character at a time moves to a new state. Two requests whose texts are
- * the same length up to a tail, differing before it (here the model id and a few words of the prompt),
- * collide when their states agree after the tail. The search is Floyd's cycle finding on a function
- * from 64 bits (one branch bit and 63 bits that spell a five-character tail) to the state after that
- * tail on the cheap prefix or the dear prefix, about 2^32 steps. The `fingerprint` below is copied from
- * the source on purpose: the pinned pair is then checked against the real `mediaRequestKey` by the test.
- *
- * Needs only Node. It makes no network calls.
- */
 
 const seed0 = Number(process.argv[2] ?? 1);
 
@@ -41,13 +19,12 @@ if (text1.length !== text2.length) throw new Error("prefix lengths differ");
 const [h1, g1] = stateOf(text1);
 const [h2, g2] = stateOf(text2);
 const idx = text1.length;
-const BASE = 0x4e00; // 16384 CJK characters from here, none of them whitespace
+const BASE = 0x4e00;
 
 let fh = 0;
 let fg = 0;
 let s1 = 0;
 let s2 = 0;
-// z = (h, g) after the salt: branch = top bit of g; tail digits = 14,14,14,14 bits of the low 56 bits, then 7 bits.
 function F(h0, g0) {
   const h = (h0 ^ s1) >>> 0;
   const g = (g0 ^ s2) >>> 0;
@@ -55,10 +32,10 @@ function F(h0, g0) {
   let a = useB ? h2 : h1;
   let b = useB ? g2 : g1;
   const d0 = h & 0x3fff;
-  const d1 = ((h >>> 14) & 0x3fff) | 0; // 14 bits
-  const d2 = ((h >>> 28) | ((g & 0x3ff) << 4)) & 0x3fff; // 4 bits of h + 10 bits of g
-  const d3 = (g >>> 10) & 0x3fff; // 14 bits of g
-  const d4 = (g >>> 24) & 0x7f; // 7 bits of g
+  const d1 = ((h >>> 14) & 0x3fff) | 0;
+  const d2 = ((h >>> 28) | ((g & 0x3ff) << 4)) & 0x3fff;
+  const d3 = (g >>> 10) & 0x3fff;
+  const d4 = (g >>> 24) & 0x7f;
   const digits = [d0, d1, d2, d3, d4];
   for (let k = 0; k < 5; k += 1) {
     const c = BASE + digits[k];

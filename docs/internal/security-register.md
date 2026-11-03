@@ -225,6 +225,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-188](#sr-188) | Info | Tester: `finance_task` refuses a figures file the model wrote, and asks again for a number the owner did not type | Checked, not an issue (2026-10-20) | — |
 | [SR-189](#sr-189) | Low | Tester: a `finance_task` report made from one person's private attachment is a desk-wide artifact and a desk-wide Knowledge Base card | Open (2026-10-20): acceptable while a desk has one owner (OPC) | Before a hosted desk has a second person |
 | [SR-190](#sr-190) | Medium | Chat's `image_generate` and `video_generate` sent any model id and any source-image address the model wrote to the gateway, which fetches that address | Model half merged to `main` (#183, 2026-10-21), unit-tested, not driven; the address half is `fix/safe-web-search`'s `judgeMediaUrl` (the egress-guard copy from #183 was dropped when that branch took `main`) | PR merge of `fix/safe-web-search` to `main` |
+| [SR-195](#sr-195) | Low | Two different paid media requests can share a grant key (`fingerprint` is a 64-bit non-security hash), so a Run press for a cheap clip can start a dear one | Open (2026-11-03): pinned as two `it.fails` tests, fix not applied | Next release that carries the chat-first shell |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -5885,6 +5886,12 @@ thread" is deliberately not built (`docs/internal/chat-computer-spec.md` Layer 2
 the card was driven in Chromium on a stub desk (Run, Not now, 390 px). The first live try (2026-10-23, a Daily-tier chat model on the owner's PC) held the picture back as designed and billed nothing, then showed that the model fills optional fields with placeholders (`model: "default"`, `image_url: "https://example.com"`), so the Run turn's call no longer matched its grant and a second card appeared. Fixed in the same branch: placeholders are dropped from the request, and a granted call runs with the card's own fields, never the model's extras. The live retest is still owed, so no paid media has been made yet. New gate: lifts when the tester change is promoted to
 `main` and one Run press has been driven live.
 
+Update 2026-11-03: the gate now has a formal check, the project skill `.cursor/skills/verify-paid-media-gate`
+(`pnpm verify:paid-gate`). It checks the real gate against a specification for every call sequence up to 3 against
+every grant list up to 2, accounts for every `.execute({ bindings })` call in the host, and proves with `--teeth`
+that it goes red when the code is broken. It found [SR-195](#sr-195). It does not replace the live Run press this
+row still owes.
+
 ### SR-168 {#sr-168}
 
 **Tester code only: the research worker's answer to the model was not scanned for injection.**
@@ -6426,6 +6433,29 @@ Residual:
   model-id half stays.
 
 Gate: PR merge to `main`.
+
+### SR-195 {#sr-195}
+
+**Two different paid media requests can share a grant key, so a Run press for one lets the other start.**
+Raised 2026-11-03 by the formal check of the paid media gate (finding F1). Low. Open. SR-195 because SR-191 to
+SR-194 are taken by the WhatsApp branch (PR #198).
+
+Evidence: a grant is filed under `mediaRequestKey`, which is `fingerprint(...)` of the canonical request text
+(`packages/core/src/runtime/media-permission.ts:121`, `:133-138` at `b79a527`). `fingerprint` is two 32-bit
+passes, and its own note says it is not a security hash. `.cursor/skills/verify-paid-media-gate/scripts/find-collision.mjs`
+found a pair of 12-second clips with the same key `a64e1d812a3b147e`: one on `veo-3.1-lite`, one on `veo_3_1`,
+with different prompt tails. The second model lists at 8x the price per second (`media-pricing.ts`: 0.05 against
+0.40 USD/s at 720p). A grant for the cheap clip lets the dear clip start, and `argsToRun` runs the dear request's
+own fields: $4.80 billed where the card showed $0.60. Pinned as two `it.fails` tests in
+`packages/core/src/runtime/media-permission.property.test.ts`.
+
+What it takes: someone who controls what the model writes (text in a page or a file) and a pair computed ahead of
+time, about five minutes on four cores. The person must still press Run on the cheap card.
+
+Fix: key grants by the canonical text itself (`${tool}\n${lines}`, already unambiguous) and delete `fingerprint`.
+Then change the two `it.fails` tests to `it`. Not applied: the check that found it does not edit product code.
+
+Gate: the same as [SR-167](#sr-167), the next release that carries the chat-first shell.
 
 ## Must be true before the Tencent Cloud deploy
 

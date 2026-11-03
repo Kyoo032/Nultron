@@ -1,24 +1,3 @@
-/**
- * Formal check of the paid media gate (SR-167). Run by the project skill `verify-paid-media-gate`
- * (`.claude/skills/verify-paid-media-gate/SKILL.md`) and by `ci:local` with the rest of core's tests.
- *
- * The promise: a paid picture or clip starts only for a request the person pressed Run on, and one
- * Run press starts it at most once. This file checks the real gate (`createMediaPermission`,
- * `invokeToolGuarded`) against a specification written here that uses no hash:
- *
- *   1. Every call sequence up to a stated bound, against every grant list up to a stated bound
- *      (`BOUND`). A pass covers all of them, not a sample.
- *   2. A random search over the same specification at a larger size.
- *   3. Parallel calls through the real `invokeToolGuarded`.
- *   4. The specification run against four deliberately wrong gates, so the check cannot go
- *      vacuous: if it ever stops failing them, it has stopped looking.
- *   5. The findings, as pinned counterexamples (`it.fails`). A finding stays red-by-design until the
- *      code is fixed; the day it is fixed `it.fails` itself fails, and the fix flips it to `it`.
- *
- * Not covered here: the host's reading of the request body (`paid-media-body.test.ts`), which
- * entries into a run carry the gate (`packages/host/src/paid-media-reach.property.test.ts`), the web
- * card, and whether a gateway price is what the card said.
- */
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -42,21 +21,11 @@ const tenant = { tenantId: "t", workspaceId: "w", userId: "u" } as never;
 type Call = { readonly tool: PaidMediaTool; readonly args: Record<string, unknown> };
 type Gate = Pick<MediaPermission, "beforeCall" | "argsToRun">;
 
-/**
- * The specification's name for "the same request": the tool and the normalised fields, as text. It
- * borrows `mediaRequestArgs` (what the card shows) and nothing else from the code under test, so a
- * key that merges two different requests shows up as a disagreement.
- */
 function requestId(tool: PaidMediaTool, args: unknown): string {
   const picked = mediaRequestArgs(tool, args);
   return JSON.stringify([tool, Object.keys(picked).sort().map((field) => [field, picked[field]])]);
 }
 
-/**
- * Plays `calls` against a gate built from `grants` and returns the first way the gate disagrees with
- * the specification, or null. The specification: a call starts exactly when an unspent grant names
- * the same request; starting it spends that grant; what starts is the request the grant named.
- */
 function firstViolation(makeGate: (grants: MediaRequest[]) => Gate, grants: MediaRequest[], calls: Call[]): string | null {
   const gate = makeGate(grants);
   const unspent = new Map<string, number>();
@@ -98,11 +67,6 @@ const realGate = (grants: MediaRequest[]): Gate => {
   return gate;
 };
 
-// ---------------------------------------------------------------------------------------------
-// The scope of the exhaustive pass. Stated here so the claim "all of them" has a size.
-// ---------------------------------------------------------------------------------------------
-
-/** Four requests: two pictures that differ in the prompt, two clips that differ in the model (a 8x list price). */
 const CLASSES: readonly MediaRequest[] = [
   { tool: "image_generate", args: { prompt: "a red fox" } },
   { tool: "image_generate", args: { prompt: "a blue boat" } },
@@ -110,7 +74,6 @@ const CLASSES: readonly MediaRequest[] = [
   { tool: "video_generate", args: { prompt: "a calm lake", model: "veo_3_1", seconds: 12 } },
 ];
 
-/** What a model really sends for a class: the tidy form, and a form with every kind of noise a live model adds. */
 function variants(request: MediaRequest): Call[] {
   const tidy: Call = { tool: request.tool, args: { ...request.args } };
   const noisy: Call = {
@@ -142,7 +105,6 @@ function* sequences<T>(pool: readonly T[], maxLength: number): Generator<T[]> {
   }
 }
 
-/** Grant lists are multisets: order does not matter to the gate, so each is listed once, in class order. */
 function* grantLists(maxLength: number, from = 0): Generator<MediaRequest[]> {
   yield [];
   if (maxLength === 0) {
@@ -165,10 +127,6 @@ function countCases(): number {
   }
   return total;
 }
-
-// ---------------------------------------------------------------------------------------------
-// Wrong gates, to prove the specification can fail. Each is a bug someone could write.
-// ---------------------------------------------------------------------------------------------
 
 const keyOf = (tool: PaidMediaTool, args: unknown) => requestId(tool, args);
 
@@ -199,8 +157,6 @@ function wrongGate(kind: "never-spends" | "any-grant-opens" | "raw-args-run" | "
     };
   };
 }
-
-// ---------------------------------------------------------------------------------------------
 
 describe("the paid media gate agrees with its specification", () => {
   it(`holds for every call sequence up to ${BOUND.callsMax} against every grant list up to ${BOUND.grantsMax}`, () => {
@@ -297,15 +253,6 @@ describe("the specification can fail", () => {
 });
 
 describe("findings (pinned counterexamples; each flips to a plain `it` when its fix lands)", () => {
-  /**
-   * F1: the identity of a request is a 64-bit non-cryptographic fingerprint (`fingerprint` in
-   * `media-permission.ts`, whose own comment says "Not a security hash"), so two different requests
-   * can share a key, and a grant for one then lets the other start. These two are the same length
-   * up to the tail, and were found with a collision search over a five-character tail (the search is
-   * described in the skill; it took about five minutes on four cores). Both are 12-second clips; the
-   * second is on a model that lists at 8x the price per second (`media-pricing.ts`: `veo-3.1-lite`
-   * 0.05 USD/s, `veo_3_1` 0.40 USD/s at 720p). The tails are the only odd part of the prompts.
-   */
   const CHEAP: MediaRequest = {
     tool: "video_generate",
     args: { prompt: "a calm lake at dawn, soft light \u764b\u6215\u7d25\u8410\u4e24", model: "veo-3.1-lite", seconds: 12 },
@@ -332,8 +279,7 @@ describe("findings (pinned counterexamples; each flips to a plain `it` when its 
 });
 
 it("reports the size of the exhaustive pass", () => {
-  expect(countCases()).toBe(
-    // grant lists: 1 + 4 + 10 = 15; call sequences over 8 calls: 1 + 8 + 64 + 512 = 585
-    15 * 585,
-  );
+  const grantListCount = 1 + 4 + 10;
+  const callSequenceCount = 1 + 8 + 64 + 512;
+  expect(countCases()).toBe(grantListCount * callSequenceCount);
 });
