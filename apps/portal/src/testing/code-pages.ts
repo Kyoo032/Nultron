@@ -4,7 +4,7 @@
  *
  * It takes the view functions as an argument on purpose. The suite passes the current ones; the golden
  * hashes in `code-mode-unchanged.test.ts` were produced by passing the ones from `main` (the commit
- * this branch was cut from, `9aba37e`), through the same function. A change to any of those screens in
+ * this branch was cut from, `9aba37e`; the two `userCode` screens since 2026-11-03), through the same function. A change to any of those screens in
  * the default mode, by one byte, is a different hash.
  */
 import type { PortalLocale, Translate } from "../views/i18n";

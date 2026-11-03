@@ -6,7 +6,7 @@
  * Four kinds of proof, because no one of them is enough:
  *
  *   - **The screens**, byte for byte: eighteen of them, rendered from fixed inputs, hashed, and compared
- *     with hashes made by the SAME function fed the view code from `main` (`9aba37e`).
+ *     with hashes made by the SAME function fed the view code from `main` (`9aba37e`; the two `userCode` screens since 2026-11-03).
  *   - **The route table**, as an exact list: a route added to the default mode is a failure here.
  *   - **The wire**: the password routes and the discovery route are the server's own 404 in the default
  *     mode, and the code routes still answer.
