@@ -54,6 +54,17 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## `ci:local` on `main`: the host type error, `body-parser` and the `zod` 4 copy fixed; `zod` 3 left for a decision (SR-196), 2026-11-03 (branch `fix/ci-local-reds` from `main` at `b79a5275`; `ci:local` run, nothing driven)
+
+Lanes: enterprise, tester
+
+`ci:local` on `main` failed two required steps.
+
+- **`tsc:packages/host`.** `src/chat-attached-media.test.ts:39-40` mocked `createRuntime` with one argument after SR-190 gave it a second (`mediaModels`, `packages/core/src/runtime/create-runtime.ts:32`). The mock now passes every argument through, as `delegation/delegate.test.ts` does. Test-only.
+- **`audit:deployed`.** Root `pnpm.overrides` pin `body-parser@2` to 2.4.0 (GHSA-27r3-jxmh-p828, through `express` 5.3.0) and `yahoo-finance2>zod` to `npm:zod@^4.6.6` (4.6.7; GHSA-mrhx-c7xc-m3w5). Lockfile only, no `package.json` of a workspace changed.
+- **Still red: `zod` 3.25.76.** The same `zod` advisory covers every version below 4.6.6, and 3.x has no fix. It is the product's own `zod` and the one `ai` 4 needs, so it cannot be overridden. The options are in SR-196 and wait for Rizky.
+- Owed: merge `origin/main` into `tester/chat-first` and `ci:local` there; the Enterprise release only when Rizky says.
+
 ## Paid pictures and clips wait for a Run press (SR-167), 2026-10-22 (tester, branch `claude/project-thread-0nqxnz`, PR into `tester/chat-first`; core, host and renderer tests run; the card driven in Chromium on a stub desk; the live model round trip not yet passed; no paid media made)
 
 Lanes: tester
