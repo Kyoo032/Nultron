@@ -6449,7 +6449,11 @@ Evidence (`scripts/audit-deployed.mjs --level high`):
   and the one `ai` 4.3.19 and the `@ai-sdk/*` 1.x providers need (peer `^3.23.8`). Reachable: a request body is
   parsed with an uncapped array schema, for example `flagged` in `exportRequestSchema`
   (`packages/host/src/handlers/finance-export.ts:17`, parsed at `:48`), under a 26 MB body cap. Only a signed-in
-  person (session plus CSRF) can post it, and the cost is the one host process.
+  person (session plus CSRF) can post it, and the cost is the one host process. The advisory names v4 internals,
+  but the v3 API we import grows the same way: measured 2026-11-03 on Node 22 with 3.25.76,
+  `z.array(z.string()).safeParse(new Array(n).fill(1))` gave n issues and about 52 MB of heap at n = 100,000 and
+  about 304 MB at n = 1,000,000. A 26 MB body holds about 13 million such elements, enough to end the process.
+  Neither `ai` 4.3.19 nor `@ai-sdk/provider-utils` 2.2.8 imports `zod/v4`.
 
 Fix (2026-11-03, branch `fix/ci-local-reds`): `pnpm.overrides` in the root `package.json` pin `body-parser@2` to
 2.4.0 and `yahoo-finance2>zod` to `npm:zod@^4.6.6` (4.6.7 resolves; no peer warning). `audit:deployed` then lists
@@ -6462,7 +6466,8 @@ Residual, needs Rizky's decision:
   that reads a request body with `.max()` and teach `scripts/audit-deployed.mjs` an accepted-risk entry for this
   advisory (the script has none today, and AGENTS.md forbids inventing a bypass); (3) leave the gate red. An
   override of `zod@3` to 4.6.7 is not one of them: the 3.x API that `ai` 4 and our schemas import would be gone.
-- **Not driven.** Nothing was booted from this tree; the unit suites and `ci:local` ran.
+- **Not driven.** Nothing was booted from this tree; the unit suites and `ci:local` ran, and `express` and
+  `yahoo-finance2` import from `apps/web` against the new lock.
 
 Gate: `audit:deployed` (a required `ci:local` step) until the `zod` 3 decision. The fixed half ships with the
 `fix/ci-local-reds` pull request.
