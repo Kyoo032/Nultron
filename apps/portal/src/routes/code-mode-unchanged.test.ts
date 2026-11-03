@@ -23,7 +23,11 @@ import * as pages from "../views/pages";
 import { translator } from "../views/i18n";
 import { portalRoutes } from "./index";
 
-/** Produced by `renderCodeModePages` over the views of `main` at `9aba37e`. */
+/**
+ * Produced by `renderCodeModePages` over the views of `main` at `9aba37e`. The `id.*` entries were
+ * produced again by the same function on 2026-11-03, when the Indonesian catalog was revised; the views
+ * had not changed, and the `en.*` entries did not move.
+ */
 const GOLDEN: Readonly<Record<string, string>> = {
   "en.signIn": "569f1f42a9868e94ba34c64af589dce01d892212ae02deb533c6699f4cae03d1",
   "en.signIn.error": "0422719e28d40da3c5fcb7abb19dd23c4f0d630f836dcaa065cd264ffb751e42",
@@ -34,15 +38,15 @@ const GOLDEN: Readonly<Record<string, string>> = {
   "en.approve": "f37d934f52f6add3746dc66ceac2f9398826b88c1fcfd401c1e0b1a9ff1735d6",
   "en.signedOut": "e43360de1cadeaa4e1f739ff157810beb2cc02a6b9c56e3d2da1f2061c602f37",
   "en.error": "ade7dd40024801ef9ae291db0d1c5651cc9b2094de164456465e9eb84496b679",
-  "id.signIn": "36b4bc86c5d68e240deb8185e78c1cce7f4d3319650686aabbb9defba7da2bca",
-  "id.signIn.error": "3a2ee6410a4d15ff84e2f6183aaf8342a1f1c3be95d6b8ec163c5ff3aab87b25",
-  "id.enterCode": "63cf6bac6932915ffcc62e625d5eae55cdba5bfb38321e09c2f5a5ebbe88b843",
-  "id.invite": "2593227842fa20be872acc439b631146f01727e3057894e47e3ee6942873541d",
-  "id.state": "23212fca357210e12ef0c3227e6efc166017ec4636839b8fdd5bc735a7d492c8",
-  "id.userCode": "2a6d36d716d59359488565d8f73b7b0d1124bc8fb853eb0cf5377e8e274103c8",
+  "id.signIn": "238b2d42547032e67ee4422db223a0f2e8307615e9927ff02a433b5cdd33ef3d",
+  "id.signIn.error": "93866caf4718b2229f5e6be466f8fbe993a4e58c74a60c0715eb54dcedab4aaa",
+  "id.enterCode": "1cf7931c5ab94c288bcdfdf1f5bf78193222effda9aac80cee8f04eab0988706",
+  "id.invite": "6ad33a4100f5a524c0d1c27ed82814e67c42a91cf4e2309d90ae4d739209ea56",
+  "id.state": "c9cd267aa5348677e2fddcc9c8c0be07ab690b3a1d04ef663364e9ead641b95a",
+  "id.userCode": "6d314c64fea4c385605251f9de468645a54ac8ca0881bb5c7cacdd74956af138",
   "id.approve": "baebcb2a9b6e40e8548b9295712be97579594b5c2bb5787297656b3f9c85058e",
-  "id.signedOut": "4de83b7bb8da75d55ef354b9d1cb18a0da96223488d7c60e1c03ce84dd851ba0",
-  "id.error": "e87373dc8c7eb09401fff644f8688520f4efcab8c73ceabf1f4b17bbd6c464bd",
+  "id.signedOut": "6f7a8eb1464e0ba53bfa601cd9e755708d7d6a7e50852c066633cd1e1ca713a8",
+  "id.error": "ae496c6a44fa2c07f7489fd1f8f348e8d6395984aea47c141e70b0ba704e3922",
 };
 
 /** Every route of the default mode, as `main` registers them. */
@@ -137,7 +141,7 @@ describe("the screens of the e-mailed-code sign-in", () => {
     expect(translator("en")("footer.note")).toBe("Never share a sign-in code with anyone.");
     expect(translator("en", { passwordMode: false })("footer.note")).toBe("Never share a sign-in code with anyone.");
     expect(translator("en", { passwordMode: true })("footer.note")).toBe("Never share your password with anyone.");
-    expect(translator("id")("signedOut.body")).toContain("e-mail dan kode");
+    expect(translator("id")("signedOut.body")).toContain("email dan kode");
     expect(translator("id", { passwordMode: true })("signedOut.body")).toContain("nama pengguna dan kata sandi");
   });
 });
