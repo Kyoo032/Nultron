@@ -15,6 +15,7 @@ const GOLDEN_URL = new URL("./__fixtures__/runtime-recording-golden.json", impor
 const RECORD = process.env.RECORD_RUNTIME_GOLDEN === "1";
 const GATEWAY = "https://gateway.test/v1";
 const OPENROUTER = "https://openrouter.ai/api/v1";
+const OFFICIAL_OPENAI = "https://api.openai.com/v1";
 const PNG =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
@@ -32,6 +33,7 @@ type Recording = { requests: Recorded[]; events: RuntimeEvent[]; threw: string |
 type Scenario = {
   model: string;
   baseUrl?: string;
+  keys?: { google?: string; anthropic?: string; volcengine?: string };
   tools?: string[];
   reasoningEffort?: ReasoningEffort;
   thinking?: boolean;
@@ -298,6 +300,43 @@ function versionFor(model: string): AgentVersionRecord {
 const SAY_HI: Scenario["history"] = [{ role: "user", parts: [{ type: "text", text: "Say hi." }] }];
 
 const SCENARIOS: Record<string, Scenario> = {
+  "official OpenAI Completions with a tool": {
+    model: "gpt-4o",
+    baseUrl: OFFICIAL_OPENAI,
+    tools: ["echo"],
+    history: SAY_HI,
+    replies: [chatToolCall("call_echo", "echo", '{"x":4}'), chatText("Four.")],
+  },
+  "official OpenAI Responses": {
+    model: "gpt-5.6",
+    baseUrl: OFFICIAL_OPENAI,
+    reasoningEffort: "low",
+    history: SAY_HI,
+    replies: [namedStream([responseCreated, ...responsesText("msg_1", 0, "Hi."), responseCompleted()])],
+  },
+  "direct Anthropic key on a Completions-routed Claude": {
+    model: "claude-haiku-4-5",
+    keys: { anthropic: "sk-ant-test" },
+    tools: ["echo"],
+    history: SAY_HI,
+    replies: [
+      namedStream([messageStart, ...anthropicToolUse(0, "toolu_1", "echo", '{"x":8}'), ...messageEnd("tool_use")]),
+      namedStream([messageStart, ...anthropicText(0, "Eight."), ...messageEnd("end_turn")]),
+    ],
+  },
+  "direct Google key on a gemma id": {
+    model: "gemma-3-27b",
+    keys: { google: "g-test" },
+    history: SAY_HI,
+    replies: [geminiStream([geminiChunk([{ text: "Hi from Gemma." }], "STOP")])],
+  },
+  "Ark key on a doubao id": {
+    model: "doubao-seed-2-0",
+    keys: { volcengine: "ark-test" },
+    tools: ["echo"],
+    history: SAY_HI,
+    replies: [chatToolCall("call_echo", "echo", '{"x":6}'), chatText("Six.")],
+  },
   "chat text, two turns of history": {
     model: "deepseek-v4-flash",
     history: [
@@ -465,7 +504,7 @@ async function play(scenario: Scenario): Promise<Recording> {
   const events: RuntimeEvent[] = [];
   let threw: string | null = null;
   try {
-    await new AiSdkRuntime({ openai: "sk-test", openaiBaseUrl: scenario.baseUrl ?? GATEWAY }).execute({
+    await new AiSdkRuntime({ openai: "sk-test", openaiBaseUrl: scenario.baseUrl ?? GATEWAY, ...scenario.keys }).execute({
       tenant,
       runId: "run-recording",
       modality: "text",
@@ -484,6 +523,21 @@ async function play(scenario: Scenario): Promise<Recording> {
   return { requests: recorded, events, threw };
 }
 
+const GENERATED_ID = /^[A-Za-z0-9]{16}$/;
+
+function withStableIds(value: unknown, key = ""): unknown {
+  if (typeof value === "string") {
+    return (key === "id" || key === "toolCallId") && GENERATED_ID.test(value) ? "<generated>" : value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => withStableIds(item));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([name, item]) => [name, withStableIds(item, name)]));
+  }
+  return value;
+}
+
 function readGolden(): Record<string, Recording> {
   try {
     return (JSON.parse(readFileSync(GOLDEN_URL, "utf8")) as { scenarios: Record<string, Recording> }).scenarios;
@@ -498,7 +552,7 @@ const fresh: Record<string, Recording> = {};
 describe("the runtime's requests and events, recorded before the AI SDK and zod moves", () => {
   for (const [name, scenario] of Object.entries(SCENARIOS)) {
     it(name, async () => {
-      const recording = JSON.parse(JSON.stringify(await play(scenario))) as Recording;
+      const recording = withStableIds(JSON.parse(JSON.stringify(await play(scenario)))) as Recording;
       fresh[name] = recording;
       if (RECORD) {
         return;

@@ -1,5 +1,567 @@
 {
   "scenarios": {
+    "official OpenAI Completions with a tool": {
+      "requests": [
+        {
+          "url": "https://api.openai.com/v1/chat/completions",
+          "body": {
+            "model": "gpt-4o",
+            "temperature": 0,
+            "reasoning_effort": "medium",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": "Say hi."
+              }
+            ],
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "echo",
+                  "description": "Echo a number.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x"
+                    ],
+                    "additionalProperties": false,
+                    "$schema": "http://json-schema.org/draft-07/schema#"
+                  }
+                }
+              }
+            ],
+            "tool_choice": "auto",
+            "stream": true,
+            "stream_options": {
+              "include_usage": true
+            },
+            "store": false
+          }
+        },
+        {
+          "url": "https://api.openai.com/v1/chat/completions",
+          "body": {
+            "model": "gpt-4o",
+            "temperature": 0,
+            "reasoning_effort": "medium",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": "Say hi."
+              },
+              {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                  {
+                    "id": "call_echo",
+                    "type": "function",
+                    "function": {
+                      "name": "echo",
+                      "arguments": "{\"x\":4}"
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "tool",
+                "tool_call_id": "call_echo",
+                "content": "{\"echoed\":4}"
+              }
+            ],
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "echo",
+                  "description": "Echo a number.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x"
+                    ],
+                    "additionalProperties": false,
+                    "$schema": "http://json-schema.org/draft-07/schema#"
+                  }
+                }
+              }
+            ],
+            "tool_choice": "auto",
+            "stream": true,
+            "stream_options": {
+              "include_usage": true
+            },
+            "store": false
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "gpt-4o",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing gpt-4o · 1st try"
+        },
+        {
+          "type": "tool.started",
+          "toolKey": "echo",
+          "input": {
+            "x": 4
+          }
+        },
+        {
+          "type": "tool.completed",
+          "toolKey": "echo",
+          "output": {
+            "echoed": 4
+          }
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Four."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "gpt-4o",
+            "inputTokens": 22,
+            "outputTokens": 14
+          }
+        }
+      ],
+      "threw": null
+    },
+    "official OpenAI Responses": {
+      "requests": [
+        {
+          "url": "https://api.openai.com/v1/responses",
+          "body": {
+            "model": "gpt-5.6",
+            "input": [
+              {
+                "role": "developer",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "input_text",
+                    "text": "Say hi."
+                  }
+                ]
+              }
+            ],
+            "reasoning": {
+              "effort": "low",
+              "summary": "auto"
+            },
+            "stream": true,
+            "store": false
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "gpt-5.6",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing gpt-5.6 · 1st try"
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Hi."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "gpt-5.6",
+            "inputTokens": 21,
+            "outputTokens": 9
+          }
+        }
+      ],
+      "threw": null
+    },
+    "direct Anthropic key on a Completions-routed Claude": {
+      "requests": [
+        {
+          "url": "https://api.anthropic.com/messages",
+          "body": {
+            "model": "claude-haiku-4-5",
+            "max_tokens": 4096,
+            "temperature": 0,
+            "system": [
+              {
+                "type": "text",
+                "text": "You are helpful."
+              }
+            ],
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Say hi."
+                  }
+                ]
+              }
+            ],
+            "tools": [
+              {
+                "name": "echo",
+                "description": "Echo a number.",
+                "input_schema": {
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "x"
+                  ],
+                  "additionalProperties": false,
+                  "$schema": "http://json-schema.org/draft-07/schema#"
+                }
+              }
+            ],
+            "tool_choice": {
+              "type": "auto"
+            },
+            "stream": true
+          }
+        },
+        {
+          "url": "https://api.anthropic.com/messages",
+          "body": {
+            "model": "claude-haiku-4-5",
+            "max_tokens": 4096,
+            "temperature": 0,
+            "system": [
+              {
+                "type": "text",
+                "text": "You are helpful."
+              }
+            ],
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Say hi."
+                  }
+                ]
+              },
+              {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "tool_use",
+                    "id": "toolu_1",
+                    "name": "echo",
+                    "input": {
+                      "x": 8
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "tool_result",
+                    "tool_use_id": "toolu_1",
+                    "content": "{\"echoed\":8}"
+                  }
+                ]
+              }
+            ],
+            "tools": [
+              {
+                "name": "echo",
+                "description": "Echo a number.",
+                "input_schema": {
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "x"
+                  ],
+                  "additionalProperties": false,
+                  "$schema": "http://json-schema.org/draft-07/schema#"
+                }
+              }
+            ],
+            "tool_choice": {
+              "type": "auto"
+            },
+            "stream": true
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "claude-haiku-4-5",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing claude-haiku-4-5 · 1st try"
+        },
+        {
+          "type": "tool.started",
+          "toolKey": "echo",
+          "input": {
+            "x": 8
+          }
+        },
+        {
+          "type": "tool.completed",
+          "toolKey": "echo",
+          "output": {
+            "echoed": 8
+          }
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Eight."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "claude-haiku-4-5",
+            "inputTokens": 62,
+            "outputTokens": 24
+          }
+        }
+      ],
+      "threw": null
+    },
+    "direct Google key on a gemma id": {
+      "requests": [
+        {
+          "url": "https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b:streamGenerateContent?alt=sse",
+          "body": {
+            "generationConfig": {
+              "temperature": 0
+            },
+            "contents": [
+              {
+                "role": "user",
+                "parts": [
+                  {
+                    "text": "Say hi."
+                  }
+                ]
+              }
+            ],
+            "systemInstruction": {
+              "parts": [
+                {
+                  "text": "You are helpful."
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "gemma-3-27b",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing gemma-3-27b · 1st try"
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Hi from Gemma."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "gemma-3-27b",
+            "inputTokens": 17,
+            "outputTokens": 5
+          }
+        }
+      ],
+      "threw": null
+    },
+    "Ark key on a doubao id": {
+      "requests": [
+        {
+          "url": "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+          "body": {
+            "model": "doubao-seed-2-0",
+            "temperature": 0,
+            "reasoning_effort": "medium",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": "Say hi."
+              }
+            ],
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "echo",
+                  "description": "Echo a number.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x"
+                    ],
+                    "additionalProperties": false,
+                    "$schema": "http://json-schema.org/draft-07/schema#"
+                  }
+                }
+              }
+            ],
+            "tool_choice": "auto",
+            "stream": true
+          }
+        },
+        {
+          "url": "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+          "body": {
+            "model": "doubao-seed-2-0",
+            "temperature": 0,
+            "reasoning_effort": "medium",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": "Say hi."
+              },
+              {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                  {
+                    "id": "call_echo",
+                    "type": "function",
+                    "function": {
+                      "name": "echo",
+                      "arguments": "{\"x\":6}"
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "tool",
+                "tool_call_id": "call_echo",
+                "content": "{\"echoed\":6}"
+              }
+            ],
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "echo",
+                  "description": "Echo a number.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x"
+                    ],
+                    "additionalProperties": false,
+                    "$schema": "http://json-schema.org/draft-07/schema#"
+                  }
+                }
+              }
+            ],
+            "tool_choice": "auto",
+            "stream": true
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "doubao-seed-2-0",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing doubao-seed-2-0 · 1st try"
+        },
+        {
+          "type": "tool.started",
+          "toolKey": "echo",
+          "input": {
+            "x": 6
+          }
+        },
+        {
+          "type": "tool.completed",
+          "toolKey": "echo",
+          "output": {
+            "echoed": 6
+          }
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Six."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "doubao-seed-2-0",
+            "inputTokens": 22,
+            "outputTokens": 14
+          }
+        }
+      ],
+      "threw": null
+    },
     "chat text, two turns of history": {
       "requests": [
         {
