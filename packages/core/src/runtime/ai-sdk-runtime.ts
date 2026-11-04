@@ -1,4 +1,4 @@
-import { streamText, type CoreMessage, type UserContent } from "ai";
+import { stepCountIs, streamText, type ModelMessage, type UserContent } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
@@ -10,7 +10,6 @@ import { isOpenRouterBaseUrl } from "../privacy/openrouter";
 import { getDisabledTools, getSecret } from "../tools/secret-scope";
 import { mapStreamPart } from "./stream-parts";
 import { buildAiTools, type AiToolSet } from "./ai-tools";
-import { createToolCallRepair, isInvalidToolCallEvent, withInvalidToolCall } from "./tool-call-repair";
 import { createStepTracker } from "./step-tracker";
 import { attachedTextsOf, createEgressGuard, userTextOf } from "./egress-guard";
 import { createMediaPermission, type PaidMediaTool } from "./media-permission";
@@ -65,7 +64,6 @@ import {
   watchAsyncIterable,
 } from "./stream-watchdog";
 import { readLanguageModelUsage, addTokenUsage } from "../gateway/account";
-import { withSignedReasoning } from "./signed-reasoning";
 import type { AgentRuntime, RunUsage } from "./types";
 import { historyHasImage, imagePartForProvider, rewriteUnreachableMediaInJson } from "../content/provider-media";
 import { VIDEO_NOT_VISIBLE_NOTE } from "../content/image-copy";
@@ -75,7 +73,15 @@ import {
   isResponsesRequestUrl,
   readHttpErrorBody,
   sanitizeGatewayRequestBody,
+  withStringToolCallContent,
+  withoutStreamOptions,
+  statelessResponsesBody,
 } from "../models/request-constraints";
+
+const sdkGlobals = globalThis as { AI_SDK_LOG_WARNINGS?: unknown };
+if (sdkGlobals.AI_SDK_LOG_WARNINGS === undefined) {
+  sdkGlobals.AI_SDK_LOG_WARNINGS = false;
+}
 
 /**
  * Merges `provider.zdr = true` into the request body for OpenRouter endpoints.
@@ -95,12 +101,12 @@ export function mergeOpenRouterZdr(body: unknown, baseUrl: string): unknown {
   return { ...b, provider: { ...existingProvider, zdr: true } };
 }
 
-function toCoreMessages(
+function toModelMessages(
   systemPrompt: string,
   history: Array<{ role: "user" | "assistant"; parts: ContentPart[] }>,
   locale: AppLocale,
-): CoreMessage[] {
-  const messages: CoreMessage[] = [{ role: "system", content: systemPrompt }];
+): ModelMessage[] {
+  const messages: ModelMessage[] = [{ role: "system", content: systemPrompt }];
   for (const item of history) {
     if (item.role === "assistant") {
       const text = item.parts
@@ -281,7 +287,7 @@ export class AiSdkRuntime implements AgentRuntime {
         ...(anthropicBaseUrl ? { baseURL: anthropicBaseUrl } : {}),
         ...(directFetch ? { fetch: directFetch } : {}),
       });
-      await this.stream(anthropic(modelName, { sendReasoning: true }), input, effort);
+      await this.stream(anthropic(modelName), input, effort);
       return;
     }
 
@@ -289,10 +295,9 @@ export class AiSdkRuntime implements AgentRuntime {
       const ark = createOpenAI({
         apiKey: volcengineKey || "ark",
         baseURL: volcengineBaseUrl || "https://ark.cn-beijing.volces.com/api/v3",
-        compatibility: "compatible",
         ...(directFetch ? { fetch: directFetch } : {}),
       });
-      await this.stream(ark(modelName), input, effort);
+      await this.stream(ark.chat(modelName), input, effort);
       return;
     }
 
@@ -320,7 +325,13 @@ export class AiSdkRuntime implements AgentRuntime {
           const scrubbed = rewriteUnreachableMediaInJson(parsed);
           const retained = applyZeroRetention(scrubbed, zdrBaseUrl);
           const withZdr = mergeOpenRouterZdr(retained, zdrBaseUrl);
-          const minimaxBody = applyMinimaxRequest(withZdr);
+          const minimaxBody = isChatCompletionsUrl(url)
+            ? withStringToolCallContent(
+                officialOpenAI ? applyMinimaxRequest(withZdr) : withoutStreamOptions(applyMinimaxRequest(withZdr)),
+              )
+            : isResponsesRequestUrl(url)
+              ? statelessResponsesBody(applyMinimaxRequest(withZdr))
+              : applyMinimaxRequest(withZdr);
           const level = effort.level();
           // Completions carry `reasoning_effort` (written here); Responses carry `reasoning.effort`,
           // which the AI SDK writes itself for `o*` and `gpt-5*` ids only — for any other id it left
@@ -369,10 +380,9 @@ export class AiSdkRuntime implements AgentRuntime {
     const openai = createOpenAI({
       apiKey: openaiKey || "ollama",
       baseURL: openaiBaseUrl,
-      compatibility: isOfficialOpenAIBaseUrl(openaiBaseUrl) ? "strict" : "compatible",
       fetch: wrappedFetch,
     });
-    const chatModel = openai(modelName);
+    const chatModel = openai.chat(modelName);
     const responsesModel = openai.responses(modelName);
     const openaiWire = {
       requested: requestedWire,
@@ -416,7 +426,7 @@ export class AiSdkRuntime implements AgentRuntime {
         fetch: messagesFetch,
       });
       await this.stream(
-        withSignedReasoning(anthropic(modelName, { sendReasoning: true })),
+        anthropic(modelName),
         input,
         effort,
         openaiWire,
@@ -504,7 +514,7 @@ export class AiSdkRuntime implements AgentRuntime {
     // A run whose every bound tool is disabled sends the model no tool list at all, as it always has.
     const tools = built.offered.length > 0 ? built : undefined;
 
-    const messages = toCoreMessages(input.version.systemPrompt, input.history, parseAppLocale(input.locale));
+    const messages = toModelMessages(input.version.systemPrompt, input.history, parseAppLocale(input.locale));
     const hasTools = tools !== undefined;
     let activeModel = model;
     let wire = openaiWire?.wire;
@@ -661,7 +671,7 @@ export class AiSdkRuntime implements AgentRuntime {
   private async consumeSafe(
     model: Parameters<typeof streamText>[0]["model"],
     input: Parameters<AgentRuntime["execute"]>[0],
-    messages: CoreMessage[],
+    messages: ModelMessage[],
     tools: AiToolSet | undefined,
     options: {
       responses?: boolean;
@@ -691,7 +701,7 @@ export class AiSdkRuntime implements AgentRuntime {
   private async consume(
     model: Parameters<typeof streamText>[0]["model"],
     input: Parameters<AgentRuntime["execute"]>[0],
-    messages: CoreMessage[],
+    messages: ModelMessage[],
     tools: AiToolSet | undefined,
     options: {
       responses?: boolean;
@@ -733,12 +743,12 @@ export class AiSdkRuntime implements AgentRuntime {
       abortSignal: abort.signal,
       // The contact loop below already retries; SDK retries would triple every offline wait.
       maxRetries: 0,
+      temperature: 0,
+      onError: () => {},
       ...(tools
         ? {
-            tools: withInvalidToolCall(tools.tools),
-            maxSteps,
-            experimental_activeTools: tools.offered,
-            experimental_repairToolCall: createToolCallRepair(tools.offered),
+            tools: tools.tools,
+            stopWhen: stepCountIs(maxSteps),
           }
         : {}),
       ...(providerOptions ? { providerOptions } : {}),
@@ -763,7 +773,7 @@ export class AiSdkRuntime implements AgentRuntime {
       for await (const part of watchAsyncIterable(result.fullStream, abort, () => watchdog.touch(), locale)) {
         steps.observe(part);
         const event = mapStreamPart(part);
-        if (!event || isInvalidToolCallEvent(event)) {
+        if (!event) {
           continue;
         }
         // Only a mapped part is the model working. The SDK opens every stream with a `step-start`
@@ -811,7 +821,7 @@ export class AiSdkRuntime implements AgentRuntime {
       // never wait more than a few seconds for it otherwise.
       if (!failed) {
         try {
-          usage = readLanguageModelUsage(await settleWithin(result.usage, USAGE_SETTLE_MS));
+          usage = readLanguageModelUsage(await settleWithin(result.totalUsage, USAGE_SETTLE_MS));
         } catch {
           usage = { inputTokens: 0, outputTokens: 0 };
         }

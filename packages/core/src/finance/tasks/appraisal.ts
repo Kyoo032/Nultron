@@ -47,7 +47,7 @@ export const appraisalParamsSchema = z.object({
 /** Confirmed rows plus the optional parameters. Free text never reaches a task module. */
 export const appraisalInputSchema = z.object({
   items: lineItemsSchema,
-  params: appraisalParamsSchema.default({}),
+  params: appraisalParamsSchema.prefault({}),
 });
 
 export type AppraisalTaskInput = z.infer<typeof appraisalInputSchema>;

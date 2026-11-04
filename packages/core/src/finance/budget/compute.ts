@@ -56,7 +56,7 @@ export type BudgetParams = z.infer<typeof budgetParamsSchema>;
 /** Confirmed rows plus the limits. Free text never reaches a task module. */
 export const budgetInputSchema = z.object({
   items: lineItemsSchema,
-  params: budgetParamsSchema.default({}),
+  params: budgetParamsSchema.prefault({}),
 });
 
 export type BudgetTaskInput = z.infer<typeof budgetInputSchema>;

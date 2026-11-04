@@ -52,7 +52,7 @@ export type CashflowParams = z.infer<typeof cashflowParamsSchema>;
 
 export const cashflowInputSchema = z.object({
   items: z.array(cashflowItemSchema).min(1),
-  params: cashflowParamsSchema.default({}),
+  params: cashflowParamsSchema.prefault({}),
 });
 
 export type CashflowInput = z.infer<typeof cashflowInputSchema>;

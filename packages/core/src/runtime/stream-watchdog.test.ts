@@ -12,7 +12,48 @@ import {
   formatStreamWatchdogError,
   isWatchdogReasoningModel,
   streamWatchdogLimits,
+  watchAsyncIterable,
 } from "./stream-watchdog";
+
+function sdkLikeIterable(items: number[]): { iterable: AsyncIterable<number>; returned: () => number } {
+  let returned = 0;
+  let index = 0;
+  const iterable: AsyncIterable<number> = {
+    [Symbol.asyncIterator]: () => ({
+      next: async () => (index < items.length ? { done: false, value: items[index++] as number } : { done: true, value: undefined }),
+      return: async () => {
+        returned += 1;
+        if (index >= items.length) {
+          throw new TypeError("Invalid state: The reader is not attached to a stream");
+        }
+        return { done: true, value: undefined };
+      },
+    }),
+  };
+  return { iterable, returned: () => returned };
+}
+
+describe("watchAsyncIterable", () => {
+  it("does not close an iterator that already finished", async () => {
+    const source = sdkLikeIterable([1, 2]);
+    const seen: number[] = [];
+    for await (const item of watchAsyncIterable(source.iterable, new AbortController())) {
+      seen.push(item);
+    }
+    expect(seen).toEqual([1, 2]);
+    expect(source.returned()).toBe(0);
+  });
+
+  it("still closes an iterator the caller leaves early", async () => {
+    const source = sdkLikeIterable([1, 2, 3]);
+    for await (const item of watchAsyncIterable(source.iterable, new AbortController())) {
+      if (item === 1) {
+        break;
+      }
+    }
+    expect(source.returned()).toBe(1);
+  });
+});
 
 describe("streamWatchdogLimits", () => {
   it("uses Hermes chat TTFB/idle for everyday models", () => {

@@ -31,13 +31,16 @@ export function appendRound(ledger: RunLedger, round: RoundRecord): RunLedger {
   return { ...ledger, rounds: [...ledger.rounds, round] };
 }
 
-function definedFields(draft: Partial<FindingDraft>): Partial<FindingDraft> {
-  return Object.fromEntries(Object.entries(draft).filter(([, value]) => value !== undefined)) as Partial<FindingDraft>;
+function sentFields(draft: Partial<FindingDraft>, sent: unknown): Partial<FindingDraft> {
+  const keys = typeof sent === "object" && sent !== null ? new Set(Object.keys(sent)) : new Set<string>();
+  return Object.fromEntries(
+    Object.entries(draft).filter(([key, value]) => value !== undefined && keys.has(key)),
+  ) as Partial<FindingDraft>;
 }
 
 /** Merge a validated replacement over the original: id and anchor are kept, round is set from the patch. */
-function mergeFinding(original: Finding, draft: Partial<FindingDraft>, round: number): Finding {
-  return { ...original, ...definedFields(draft), id: original.id, quoteAnchor: original.quoteAnchor, round };
+function mergeFinding(original: Finding, draft: Partial<FindingDraft>, sent: unknown, round: number): Finding {
+  return { ...original, ...sentFields(draft, sent), id: original.id, quoteAnchor: original.quoteAnchor, round };
 }
 
 function applyOne(state: FindingEditResult, patch: EditPatch): FindingEditResult {
@@ -47,7 +50,7 @@ function applyOne(state: FindingEditResult, patch: EditPatch): FindingEditResult
     return { ...state, ignored: [...state.ignored, patch.target.ref] };
   }
   const original = state.findings[index] as Finding;
-  const merged = mergeFinding(original, parsed.data, patch.round);
+  const merged = mergeFinding(original, parsed.data, patch.replacement, patch.round);
   return { ...state, findings: state.findings.map((finding, at) => (at === index ? merged : finding)) };
 }
 

@@ -225,6 +225,9 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-188](#sr-188) | Info | Tester: `finance_task` refuses a figures file the model wrote, and asks again for a number the owner did not type | Checked, not an issue (2026-10-20) | — |
 | [SR-189](#sr-189) | Low | Tester: a `finance_task` report made from one person's private attachment is a desk-wide artifact and a desk-wide Knowledge Base card | Open (2026-10-20): acceptable while a desk has one owner (OPC) | Before a hosted desk has a second person |
 | [SR-190](#sr-190) | Medium | Chat's `image_generate` and `video_generate` sent any model id and any source-image address the model wrote to the gateway, which fetches that address | Model half merged to `main` (#183, 2026-10-21), unit-tested, not driven; the address half is `fix/safe-web-search`'s `judgeMediaUrl` (the egress-guard copy from #183 was dropped when that branch took `main`) | PR merge of `fix/safe-web-search` to `main` |
+| [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual: request-body arrays with no `.max()` still cost one issue per bad element | Residual: none blocks; capping the request-body arrays is a follow-up |
+| [SR-197](#sr-197) | Medium | AI SDK 5's `streamText` prints every stream error to the console by default, and an `APICallError` carries the request body (the prompt) and the gateway's error body | Fixed in tree (2026-11-04, `fix/zod-4`): the runtime passes a silent `onError`; tested, not driven | PR merge of the AI SDK 5 move |
+| [SR-198](#sr-198) | Medium | AI SDK 5 brings `undici` 5.29.0 and `@fastify/busboy` into the hosted image, with five HIGH `undici` advisories and one `busboy` advisory | Fixed in tree (2026-11-04, `fix/zod-4`): scoped override to `undici` 6.29.1, which drops `busboy`; the SDK's guarded download fetch checked on it; not driven | PR merge of the AI SDK 5 move |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -6426,6 +6429,108 @@ Residual:
   model-id half stays.
 
 Gate: PR merge to `main`.
+
+### SR-196 {#sr-196}
+
+**Two HIGH advisories reach the hosted image: `zod` and `body-parser`.**
+Raised 2026-11-03 by `ci:local` on `main` at `b79a5275` (`audit:deployed` red). Medium. SR-196 because SR-191 to
+SR-195 are taken on other branches.
+
+Evidence (`scripts/audit-deployed.mjs --level high`):
+
+- **`body-parser` 2.3.0**, GHSA-27r3-jxmh-p828 (denial of service through trailing bytes after a compressed body),
+  fixed in 2.4.0. It comes in through `express` 5.3.0 (`apps/web/package.json:16`) and through `yahoo-finance2` >
+  `@modelcontextprotocol/sdk`. The host reads request bodies itself (`MAX_BODY_BYTES`,
+  `packages/host/src/http-adapter.ts:43`, `:240`) and no `express.json()` or `bodyParser` is mounted, so the
+  affected parser is loaded but not on our path.
+- **`zod` 4.6.5**, GHSA-mrhx-c7xc-m3w5 (an array schema with no length cap collects one issue per failing element,
+  so a large array exhausts memory), fixed in 4.6.6. It comes in only through `yahoo-finance2` 4.0.3
+  (`npm:zod@^4.6.5`).
+- **`zod` 3.25.76**, the same advisory: every version below 4.6.6 is affected and **there is no patched 3.x**.
+  It is the product's own `zod` (`packages/core`, `packages/host`, `apps/web`, `packages/university`, all `^3.24.2`)
+  and the one `ai` 4.3.19 and the `@ai-sdk/*` 1.x providers need (peer `^3.23.8`). Reachable: a request body is
+  parsed with an uncapped array schema, for example `flagged` in `exportRequestSchema`
+  (`packages/host/src/handlers/finance-export.ts:17`, parsed at `:48`), under a 26 MB body cap. Only a signed-in
+  person (session plus CSRF) can post it, and the cost is the one host process. The advisory names v4 internals,
+  but the v3 API we import grows the same way: measured 2026-11-03 on Node 22 with 3.25.76,
+  `z.array(z.string()).safeParse(new Array(n).fill(1))` gave n issues and about 52 MB of heap at n = 100,000 and
+  about 304 MB at n = 1,000,000. A 26 MB body holds about 13 million such elements, enough to end the process.
+  Neither `ai` 4.3.19 nor `@ai-sdk/provider-utils` 2.2.8 imports `zod/v4`.
+
+Fix (2026-11-03, branch `fix/ci-local-reds`): `pnpm.overrides` in the root `package.json` pin `body-parser@2` to
+2.4.0 and `yahoo-finance2>zod` to `npm:zod@^4.6.6` (4.6.7 resolves; no peer warning). `audit:deployed` then lists
+the `zod` 3 finding alone.
+
+Residual, needs Rizky's decision:
+
+- **`zod` 3 has no fix in its line.** The ways out are (1) move the AI SDK to a major that takes `zod` 4 and move
+  the product's schemas to `zod` 4 (a migration across core, host and web, not a patch); (2) cap every array schema
+  that reads a request body with `.max()` and teach `scripts/audit-deployed.mjs` an accepted-risk entry for this
+  advisory (the script has none today, and AGENTS.md forbids inventing a bypass); (3) leave the gate red. A fourth
+  route was found by a sibling session the same day (corrected 2026-11-03; an earlier wording here said it could not
+  work): override every `zod` below 4.6.6 to 4.6.7 and import `zod/v3`, which 4.6.7 still ships. That turns the gate
+  green, but the upstream fix touches only the v4 core, so our schemas would still run the unfixed v3 parser.
+  Rizky chose (1) on 2026-11-03.
+- **Not driven.** Nothing was booted from this tree; the unit suites and `ci:local` ran, and `express` and
+  `yahoo-finance2` import from `apps/web` against the new lock.
+
+Fixed 2026-11-04 on `fix/zod-4`, option (1). The runtime moved to AI SDK 5 first (ai 5.0.278, providers on their
+v2 lines), then `zod` to 4.6.7 in `apps/web`, `packages/core`, `packages/host` and `packages/university`. The lock
+holds one `zod`, 4.6.7, for every importer, `ai` and `yahoo-finance2` included, so the `yahoo-finance2>zod`
+override is gone. No first-party file imports `zod/v3`. `audit:deployed` passes.
+
+Measured again on the migrated tree (Node 22, `zod` 4.6.7): `z.array(z.string()).max(1000)` given 1,000,000
+failing elements stops at 1 issue and about 8 MB of heap; `z.array(z.string())` with no cap still gives 1,000,000
+issues and about 460 MB. The fix covers a constrained collection, as the advisory says, and an unconstrained one is
+still as costly as it was under zod 3.
+
+Residual: a request-body array with no `.max()` (`flagged`, `packages/host/src/handlers/finance-export.ts:17`, and
+others) can still cost a signed-in caller's request a few hundred megabytes under the 26 MB body cap. Capping them
+is a follow-up, not part of the move.
+
+Gate: none left on the advisory; the follow-up gates nothing.
+
+### SR-197 {#sr-197}
+
+**AI SDK 5 prints model errors, request body included, to the console.**
+Raised 2026-11-04 by the second-opinion review of the AI SDK 5 move (`fix/zod-4`). Medium.
+
+Evidence: `streamText` defaults `onError` to `({ error }) => console.error(error)`
+(`ai@5.0.278`, `dist/index.mjs:4929`); ai 4 had no such default. A gateway refusal surfaces as an
+`APICallError`, which holds `requestBodyValues` (the system prompt, the history and tool results) and the
+gateway's response body. On the hosted server the console is the container log, so every failed turn would
+write the person's prompt there, against "Nultron does not log prompts" (AGENTS.md, Secrets and prompt
+security).
+
+Fix: `consume` passes `onError: () => {}` (`packages/core/src/runtime/ai-sdk-runtime.ts:742`); the error still
+reaches the run through the stream's `error` part, as before, and the gateway's own one-line, redacted warning
+(`gatewayFailure`) is unchanged. Test: `ai-sdk-runtime-recording.test.ts` "a failed model call prints nothing to
+the console", which fails without the fix.
+
+Residual: not driven on a hosted server.
+
+Gate: PR merge of the AI SDK 5 move.
+
+### SR-198 {#sr-198}
+
+**AI SDK 5 brings `undici` 5.29.0 and `@fastify/busboy` into the hosted image.**
+Raised 2026-11-04 by `audit:deployed` on `fix/zod-4`. Medium.
+
+Evidence: every `@ai-sdk/provider-utils` 3.0.x build (3.0.41 to 3.0.44) depends on `undici` `^5.29.0`, and `undici` 5
+depends on `@fastify/busboy`. `audit:deployed` then listed five HIGH `undici` advisories (WebSocket decompression and
+fragment limits, `server_max_window_bits`, dropped TLS options in `Agent`, TLS 1.2 renegotiation; fixed in 6.24.0 to
+6.29.1) and one HIGH `@fastify/busboy` advisory (fixed in 3.2.1). The SDK uses `undici` in one place: the fetch it
+downloads prompt media with, an `Agent` whose `connect.lookup` checks every resolved address (`validateDownloadAddress`), then `fetch` with that
+dispatcher (`@ai-sdk/provider-utils` `dist/index.mjs:337-398`).
+
+Fix: root `pnpm.overrides` `"@ai-sdk/provider-utils>undici": "6.29.1"` (published 2026-10-15, Node >= 18.17). The lock
+then holds `undici` 6.29.1 only, and `@fastify/busboy` is gone. The same construction (an `Agent` with a custom
+`connect.lookup`, then `fetch` with it as the dispatcher) was run against a local server on 6.29.1: HTTP 200, and the
+lookup was called. `audit:deployed` passes.
+
+Residual: not driven on a hosted server; the override has to be dropped once the SDK moves to `undici` 6 itself.
+
+Gate: PR merge of the AI SDK 5 move.
 
 ## Must be true before the Tencent Cloud deploy
 

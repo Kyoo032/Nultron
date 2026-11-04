@@ -54,17 +54,16 @@ describe("openaiCompatProviderOptions", () => {
   it("matches Hermes: Responses tools are not strict", () => {
     expect(openaiCompatProviderOptions({ responses: true })).toEqual({
       openai: {
-        strictSchemas: false,
+        strictJsonSchema: false,
+        store: false,
         reasoningEffort: "medium",
         reasoningSummary: "auto",
       },
     });
   });
 
-  it("sends the chosen effort on chat completions", () => {
-    expect(openaiCompatProviderOptions({ reasoningEffort: "ultra" })).toEqual({
-      openai: { reasoningEffort: "ultra" },
-    });
+  it("sends the chosen effort on chat completions, except ultra, which the SDK refuses and the fetch wrapper writes", () => {
+    expect(openaiCompatProviderOptions({ reasoningEffort: "ultra" })).toBeUndefined();
     expect(openaiCompatProviderOptions({ reasoningEffort: "max" })).toEqual({
       openai: { reasoningEffort: "max" },
     });
@@ -76,14 +75,16 @@ describe("openaiCompatProviderOptions", () => {
   it("keeps ultra and max on Toko Responses", () => {
     expect(openaiCompatProviderOptions({ responses: true, reasoningEffort: "ultra" })).toEqual({
       openai: {
-        strictSchemas: false,
+        strictJsonSchema: false,
+        store: false,
         reasoningEffort: "ultra",
         reasoningSummary: "auto",
       },
     });
     expect(openaiCompatProviderOptions({ responses: true, reasoningEffort: "max" })).toEqual({
       openai: {
-        strictSchemas: false,
+        strictJsonSchema: false,
+        store: false,
         reasoningEffort: "max",
         reasoningSummary: "auto",
       },
@@ -99,7 +100,8 @@ describe("openaiCompatProviderOptions", () => {
       }),
     ).toEqual({
       openai: {
-        strictSchemas: false,
+        strictJsonSchema: false,
+        store: false,
         reasoningEffort: "max",
         reasoningSummary: "auto",
       },
@@ -120,7 +122,8 @@ describe("openaiCompatProviderOptions", () => {
       }),
     ).toEqual({
       openai: {
-        strictSchemas: false,
+        strictJsonSchema: false,
+        store: false,
         reasoningEffort: "max",
         reasoningSummary: "auto",
       },
@@ -139,7 +142,7 @@ describe("openaiCompatProviderOptions", () => {
     expect(openaiCompatProviderOptions({ omitReasoning: true, forceReasoningNone: true })).toBeUndefined();
     // Responses still needs its non-strict tool schemas; only the reasoning block goes.
     expect(openaiCompatProviderOptions({ omitReasoning: true, responses: true, reasoningEffort: "high" })).toEqual({
-      openai: { strictSchemas: false },
+      openai: { strictJsonSchema: false, store: false },
     });
   });
 });

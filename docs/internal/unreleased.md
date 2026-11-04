@@ -54,6 +54,32 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## AI SDK 5 and zod 4 (SR-196, SR-197), 2026-11-04 (branch `fix/zod-4`, stacked on `fix/ci-local-reds`; `ci:local` run; not driven live)
+
+Lanes: enterprise, tester
+
+Rizky chose SR-196's option (1) on 2026-11-03: move the AI SDK to a line that takes zod 4, then zod. Two steps, each green:
+
+- **AI SDK 5, zod still 3.** `ai` 5.0.278, `@ai-sdk/openai` 2.0.135, `@ai-sdk/anthropic` 2.0.109, `@ai-sdk/google` 2.0.104. Before the move, `ai-sdk-runtime-recording.test.ts` recorded every request and runtime event on each wire (Completions, Responses, Messages, generateContent, OpenRouter, the official OpenAI URL, direct Anthropic, Google and Ark keys). After it, every runtime event is the same, and eight of the thirteen gateway scenarios send byte-identical requests. What still differs is listed in the commit and the pull request.
+- **Kept as ai 4 sent it, on purpose:** `temperature: 0`; Responses stays stateless (`store: false` told to the SDK, no encrypted-reasoning `include`, no item ids replayed); no `stream_options` on a non-official Completions URL; `""` for a tool-call-only assistant turn.
+- **Changed, for Rizky to accept:** a call to a disabled tool, an unknown tool or with bad arguments now comes back to the model as the SDK's own error and the loop goes on. It no longer spends a budget slot or shows a refusal row (`tool-call-repair.ts` and the disabled-tool stubs are gone). GPT-6 sends `developer` as gpt-5.x did; direct Anthropic keys get the model's max output; direct Google keys on gemma put the system prompt in the first turn; generateContent sends call ids and Gemini 3's signature skip value.
+- **SR-197:** AI SDK 5 printed every stream error, request body included, to the console. The runtime passes a silent `onError`. It also turns the SDK's warning output off by default (`AI_SDK_LOG_WARNINGS`), which otherwise wrote a line to stderr on every reasoning turn. AI SDK 4 printed neither.
+- **SR-198:** AI SDK 5's `@ai-sdk/provider-utils` pulls `undici` 5.29.0 and `@fastify/busboy`, with HIGH advisories. A scoped override moves it to `undici` 6.29.1, which drops `busboy`. The SDK's guarded media fetch was checked on it.
+- **zod 4.6.7** everywhere, one copy in the lock. `stored-shapes.test.ts` pins what zod 3 made of 125 stored-record schemas, and zod 4 reads every one back the same. Eight `.default({…})` became `.prefault(…)`. A legal finding edit keeps only the fields it sent, because zod 4's `.partial()` fills in defaults. `market/schema-lint.ts` sees through the new wrappers, and `ZodTypeDef` uses are gone. `past_sessions` takes `z.guid()`, which matches what zod 3's `.uuid()` accepted. `tool-json-schemas.test.ts` records the JSON schema of all 62 tools: 48 are identical, and 14 gained integer bounds, `anyOf`/`const` for literal unions, `propertyNames` on records, or the guid pattern.
+- **Owed before any deploy (Rizky):** a live text turn, a tool call and an image on each wire (Completions, Responses, Messages, generateContent) against the gateway.
+- Owed after merge: merge `origin/main` into `tester/chat-first` and `ci:local` there.
+
+## `ci:local` on `main`: the host type error, `body-parser` and the `zod` 4 copy fixed; `zod` 3 left for a decision (SR-196), 2026-11-03 (branch `fix/ci-local-reds` from `main` at `b79a5275`; `ci:local` run, nothing driven)
+
+Lanes: enterprise, tester
+
+`ci:local` on `main` failed two required steps.
+
+- **`tsc:packages/host`.** `src/chat-attached-media.test.ts:39-40` mocked `createRuntime` with one argument after SR-190 gave it a second (`mediaModels`, `packages/core/src/runtime/create-runtime.ts:32`). The mock now passes every argument through, as `delegation/delegate.test.ts` does. Test-only.
+- **`audit:deployed`.** Root `pnpm.overrides` pin `body-parser@2` to 2.4.0 (GHSA-27r3-jxmh-p828, through `express` 5.3.0) and `yahoo-finance2>zod` to `npm:zod@^4.6.6` (4.6.7; GHSA-mrhx-c7xc-m3w5). Lockfile only, no `package.json` of a workspace changed.
+- **Still red: `zod` 3.25.76.** The same `zod` advisory covers every version below 4.6.6, and 3.x has no fix. It is the product's own `zod` and the one `ai` 4 needs, so it cannot be overridden. The options are in SR-196 and wait for Rizky.
+- Owed: merge `origin/main` into `tester/chat-first` and `ci:local` there; the Enterprise release only when Rizky says.
+
 ## Portal: a device code typed by hand on `/activate` no longer answers `{"error":"method_not_allowed"}`, 2026-11-03 (branch `claude/practical-burnell-5d1e8d` from `main` at `b79a5275`; portal tests and `ci:local` run, not driven on a deployed portal)
 
 Lanes: enterprise, tester
