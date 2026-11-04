@@ -80,6 +80,17 @@ Lanes: enterprise, tester
 - **Still red: `zod` 3.25.76.** The same `zod` advisory covers every version below 4.6.6, and 3.x has no fix. It is the product's own `zod` and the one `ai` 4 needs, so it cannot be overridden. The options are in SR-196 and wait for Rizky.
 - Owed: merge `origin/main` into `tester/chat-first` and `ci:local` there; the Enterprise release only when Rizky says.
 
+## Portal: a device code typed by hand on `/activate` no longer answers `{"error":"method_not_allowed"}`, 2026-11-03 (branch `claude/practical-burnell-5d1e8d` from `main` at `b79a5275`; portal tests and `ci:local` run, not driven on a deployed portal)
+
+Lanes: enterprise, tester
+
+Found by the screen check of PR #199 on 2026-11-03, in English and Indonesian. A signed-in person on `GET /activate` with no `?code=` got the code screen; its form posted to `/activate`, which has no `POST` route, so typing a code and pressing Continue showed raw JSON. The `?code=` link from the app worked.
+
+- The code screen's form is now `method="get"` with the field `code` (`userCodePage`, `apps/portal/src/views/pages.ts`). It lands on `GET /activate?code=`, the same page the link shows, and an unknown code gets the existing `approve.unknownCode` page (400, HTML). The form carries no CSRF field any more, so no token goes into a URL; the account banner's sign-out form keeps its own. The rate limit is the `authorizeIp` hit `GET /activate` already took. No route was added, and both modes are fixed because they share `getActivate`.
+- **The code-mode golden hashes moved on purpose**, for `en.userCode` and `id.userCode` only (`code-mode-unchanged.test.ts`), regenerated with its own `renderCodeModePages`. The other sixteen screens are byte for byte unchanged.
+- Proof: `apps/portal/src/routes/api.test.ts` "takes a code typed by hand on /activate to the same screen the ?code= link shows" and "answers an unknown typed code with the unknown-code page, not JSON". Both read the form off the rendered page and submit it as a browser would; both failed on `b79a5275` (405 JSON).
+- Owed: merge `origin/main` into `tester/chat-first` and `ci:local` there; the Enterprise release only when Rizky says.
+
 ## Paid pictures and clips wait for a Run press (SR-167), 2026-10-22 (tester, branch `claude/project-thread-0nqxnz`, PR into `tester/chat-first`; core, host and renderer tests run; the card driven in Chromium on a stub desk; the live model round trip not yet passed; no paid media made)
 
 Lanes: tester

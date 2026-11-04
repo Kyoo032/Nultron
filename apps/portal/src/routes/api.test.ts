@@ -462,6 +462,70 @@ describe("the device-code flow", () => {
     expect(third.headers.get("retry-after")).not.toBeNull();
   });
 
+  async function signedInAtActivate() {
+    const email = await freshEmail();
+    const agent = createAgent(portal.origin);
+    const start = await agent.get("/activate");
+    const sent = await agent.postForm("/activate/email", {
+      csrf_token: hiddenValue(start.text, "csrf_token") as string,
+      user_code: "",
+      email,
+    });
+    const codeScreen = await agent.postForm("/activate/verify", {
+      csrf_token: hiddenValue(sent.text, "csrf_token") as string,
+      user_code: "",
+      email,
+      code: portal.mailer.newest()?.code ?? "",
+    });
+    expect(codeScreen.status).toBe(200);
+    expect(codeScreen.text).toContain('id="user_code"');
+    return { agent, codeScreen };
+  }
+
+  async function typeDeviceCode(agent: ReturnType<typeof createAgent>, html: string, typed: string) {
+    const form = (html.match(/<form\b[^>]*>[\s\S]*?<\/form>/g) ?? []).find((f) => f.includes('id="user_code"'));
+    expect(form).toBeDefined();
+    const opening = /<form\b[^>]*>/.exec(form as string)?.[0] ?? "";
+    const method = (/method="([^"]*)"/.exec(opening)?.[1] ?? "get").toLowerCase();
+    const action = /action="([^"]*)"/.exec(opening)?.[1] ?? "/activate";
+    const fields: Record<string, string> = {};
+    for (const input of (form as string).match(/<input\b[^>]*>/g) ?? []) {
+      const name = /name="([^"]*)"/.exec(input)?.[1];
+      if (!name) {
+        continue;
+      }
+      fields[name] = input.includes('id="user_code"') ? typed : (/value="([^"]*)"/.exec(input)?.[1] ?? "");
+    }
+    return method === "post"
+      ? agent.postForm(action, fields)
+      : agent.get(`${action}?${new URLSearchParams(fields).toString()}`);
+  }
+
+  it("takes a code typed by hand on /activate to the same screen the ?code= link shows", async () => {
+    const started = (await startDevice({ install_id: "install-typed-00001" })).json<{ user_code: string }>();
+    const { agent, codeScreen } = await signedInAtActivate();
+
+    const typed = await typeDeviceCode(agent, codeScreen.text, started.user_code);
+    const linked = await agent.get(`/activate?code=${started.user_code}`);
+
+    expect(typed.headers.get("content-type")).toContain("text/html");
+    expect(typed.status).toBe(linked.status);
+    expect(typed.text).toBe(linked.text);
+    expect(typed.text).toContain("Approve this device?");
+    expect(typed.text).toContain(started.user_code);
+  });
+
+  it("answers an unknown typed code with the unknown-code page, not JSON", async () => {
+    const { agent, codeScreen } = await signedInAtActivate();
+
+    const typed = await typeDeviceCode(agent, codeScreen.text, "ZZZZ-ZZZZ");
+
+    expect(typed.status).toBe(400);
+    expect(typed.headers.get("content-type")).toContain("text/html");
+    expect(typed.text).toContain("That code is not valid any more. Start the sign-in again on the device.");
+    expect(typed.text).not.toContain("method_not_allowed");
+  });
+
   it("refuses an approve with no portal session cookie", async () => {
     const started = (await startDevice({ install_id: "install-nosession-1" })).json<{
       user_code: string;

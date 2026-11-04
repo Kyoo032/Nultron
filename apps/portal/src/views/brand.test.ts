@@ -90,7 +90,7 @@ function everyScreen(locale: PortalLocale): Array<{ label: string; html: string 
     },
     {
       label: `userCode(${locale})`,
-      html: userCodePage({ ...base, action: "/activate", csrfToken: "tok" }),
+      html: userCodePage({ ...base, action: "/activate" }),
     },
     {
       label: `approve(${locale})`,
