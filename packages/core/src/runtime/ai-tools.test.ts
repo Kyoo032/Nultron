@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ToolBindingRecord } from "../agents/service";
-import type { RunBudget } from "../harness/spec";
 import { defineTool, type ToolTrust } from "../tools/define-tool";
 import { registerTool, resetToolRegistry } from "../tools/registry";
 import { runWithToolSecrets } from "../tools/secret-scope";
@@ -71,76 +70,12 @@ describe("buildAiTools", () => {
     expect(Object.keys(set.tools)).toEqual(["echo"]);
   });
 
-  it("keeps a disabled tool in the map so a call to it can be refused, but does not offer it", async () => {
-    let ran = 0;
+  it("leaves a disabled tool out of the map, so the model is neither offered it nor able to run it", () => {
     register("echo", async ({ x }) => ({ echoed: x }));
-    register("run_code", async () => {
-      ran += 1;
-      return { ok: true };
-    });
+    register("run_code", async () => ({ ok: true }));
     const set = build({ bindings: [binding("echo"), binding("run_code")], disabled: ["run_code"] });
     expect(set.offered).toEqual(["echo"]);
-    expect(Object.keys(set.tools).sort()).toEqual(["echo", "run_code"]);
-    const result = await call(set, "run_code", { language: "python", code: "print(1)" });
-    expect(ran).toBe(0);
-    expect(result).toEqual({ success: false, error: "Tool run_code is disabled on this machine." });
-  });
-
-  describe("a call to a disabled tool spends the run's budget like any other call", () => {
-    function withBudget(budget: RunBudget) {
-      let ran = 0;
-      register("echo", async ({ x }) => ({ echoed: x }));
-      register("run_code", async () => {
-        ran += 1;
-        return { ok: true };
-      });
-      const set = buildAiTools({
-        bindings: [binding("echo"), binding("run_code")],
-        tenant,
-        budget: createToolBudget(budget),
-        egress: createEgressGuard({ userText: [] }),
-        disabled: new Set(["run_code"]),
-      });
-      return { set, ran: () => ran };
-    }
-
-    it("counts toward the tool's own cap, then answers with the budget refusal", async () => {
-      const { set, ran } = withBudget({ maxSteps: 6, maxToolCalls: 10, perTool: { run_code: 2 } });
-      const outputs = [];
-      for (let i = 0; i < 4; i += 1) {
-        outputs.push(await call(set, "run_code", { language: "python", code: "1" }));
-      }
-      const disabled = { success: false, error: "Tool run_code is disabled on this machine." };
-      expect(outputs.slice(0, 2)).toEqual([disabled, disabled]);
-      expect(outputs[2]).toMatchObject({ ok: false, reason: "budget" });
-      expect(outputs[3]).toMatchObject({ ok: false, reason: "budget" });
-      expect(ran()).toBe(0);
-    });
-
-    it("counts toward the run total, so refusals use up the calls a working tool could have had", async () => {
-      const { set } = withBudget({ maxSteps: 6, maxToolCalls: 3 });
-      await call(set, "run_code", { x: 1 });
-      await call(set, "run_code", { x: 1 });
-      const third = await call(set, "echo", { x: 1 });
-      const fourth = await call(set, "echo", { x: 2 });
-      expect(third).toEqual({ echoed: 1 });
-      expect(fourth).toMatchObject({ ok: false, reason: "budget" });
-    });
-
-    it("does not count a call the budget already refused", async () => {
-      const { set } = withBudget({ maxSteps: 6, maxToolCalls: 1 });
-      expect(await call(set, "run_code", { x: 1 })).toMatchObject({ success: false });
-      expect(await call(set, "run_code", { x: 1 })).toMatchObject({ reason: "budget" });
-      expect(await call(set, "echo", { x: 1 })).toMatchObject({ reason: "budget" });
-    });
-  });
-
-  it("accepts any arguments for a disabled tool, so a wrong call is refused and never ends the run", () => {
-    register("run_code", async () => ({}));
-    const set = build({ bindings: [binding("run_code")], disabled: ["run_code"] });
-    const parameters = set.tools.run_code?.parameters as z.ZodTypeAny;
-    expect(parameters.safeParse({ anything: [1, 2] }).success).toBe(true);
-    expect(parameters.safeParse("not an object").success).toBe(true);
+    expect(Object.keys(set.tools)).toEqual(["echo"]);
   });
 
   it("offers nothing when every bound tool is disabled", () => {

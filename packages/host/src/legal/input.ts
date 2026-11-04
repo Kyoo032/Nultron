@@ -35,7 +35,7 @@ const optionalId = z.string().trim().min(1, "is required").max(ID_MAX, "is malfo
 /** A new matter may have no parties yet: the documents say who they are, and the owner can answer later. */
 const createSideSchema = z
   .object({ role: optionalText.default(""), party: optionalText.default(""), counterparty: optionalText.default("") })
-  .default({ role: "", party: "", counterparty: "" });
+  .prefault({ role: "", party: "", counterparty: "" });
 
 /** Setting the side (the answer to the side question) needs at least a party; the others may stay empty. */
 const sideSchema = z.object({ role: optionalText.default(""), party: shortText, counterparty: optionalText.default("") });
