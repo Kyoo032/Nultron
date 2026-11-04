@@ -225,6 +225,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-188](#sr-188) | Info | Tester: `finance_task` refuses a figures file the model wrote, and asks again for a number the owner did not type | Checked, not an issue (2026-10-20) | — |
 | [SR-189](#sr-189) | Low | Tester: a `finance_task` report made from one person's private attachment is a desk-wide artifact and a desk-wide Knowledge Base card | Open (2026-10-20): acceptable while a desk has one owner (OPC) | Before a hosted desk has a second person |
 | [SR-190](#sr-190) | Medium | Chat's `image_generate` and `video_generate` sent any model id and any source-image address the model wrote to the gateway, which fetches that address | Model half merged to `main` (#183, 2026-10-21), unit-tested, not driven; the address half is `fix/safe-web-search`'s `judgeMediaUrl` (the egress-guard copy from #183 was dropped when that branch took `main`) | PR merge of `fix/safe-web-search` to `main` |
+| [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | `body-parser` and the `zod` 4 copy fixed in tree (2026-11-03, overrides); `zod` 3.25.76 open, no patched 3.x, needs Rizky's decision | `audit:deployed` stays red until the `zod` 3 decision lands |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -6426,6 +6427,53 @@ Residual:
   model-id half stays.
 
 Gate: PR merge to `main`.
+
+### SR-196 {#sr-196}
+
+**Two HIGH advisories reach the hosted image: `zod` and `body-parser`.**
+Raised 2026-11-03 by `ci:local` on `main` at `b79a5275` (`audit:deployed` red). Medium. SR-196 because SR-191 to
+SR-195 are taken on other branches.
+
+Evidence (`scripts/audit-deployed.mjs --level high`):
+
+- **`body-parser` 2.3.0**, GHSA-27r3-jxmh-p828 (denial of service through trailing bytes after a compressed body),
+  fixed in 2.4.0. It comes in through `express` 5.3.0 (`apps/web/package.json:16`) and through `yahoo-finance2` >
+  `@modelcontextprotocol/sdk`. The host reads request bodies itself (`MAX_BODY_BYTES`,
+  `packages/host/src/http-adapter.ts:43`, `:240`) and no `express.json()` or `bodyParser` is mounted, so the
+  affected parser is loaded but not on our path.
+- **`zod` 4.6.5**, GHSA-mrhx-c7xc-m3w5 (an array schema with no length cap collects one issue per failing element,
+  so a large array exhausts memory), fixed in 4.6.6. It comes in only through `yahoo-finance2` 4.0.3
+  (`npm:zod@^4.6.5`).
+- **`zod` 3.25.76**, the same advisory: every version below 4.6.6 is affected and **there is no patched 3.x**.
+  It is the product's own `zod` (`packages/core`, `packages/host`, `apps/web`, `packages/university`, all `^3.24.2`)
+  and the one `ai` 4.3.19 and the `@ai-sdk/*` 1.x providers need (peer `^3.23.8`). Reachable: a request body is
+  parsed with an uncapped array schema, for example `flagged` in `exportRequestSchema`
+  (`packages/host/src/handlers/finance-export.ts:17`, parsed at `:48`), under a 26 MB body cap. Only a signed-in
+  person (session plus CSRF) can post it, and the cost is the one host process. The advisory names v4 internals,
+  but the v3 API we import grows the same way: measured 2026-11-03 on Node 22 with 3.25.76,
+  `z.array(z.string()).safeParse(new Array(n).fill(1))` gave n issues and about 52 MB of heap at n = 100,000 and
+  about 304 MB at n = 1,000,000. A 26 MB body holds about 13 million such elements, enough to end the process.
+  Neither `ai` 4.3.19 nor `@ai-sdk/provider-utils` 2.2.8 imports `zod/v4`.
+
+Fix (2026-11-03, branch `fix/ci-local-reds`): `pnpm.overrides` in the root `package.json` pin `body-parser@2` to
+2.4.0 and `yahoo-finance2>zod` to `npm:zod@^4.6.6` (4.6.7 resolves; no peer warning). `audit:deployed` then lists
+the `zod` 3 finding alone.
+
+Residual, needs Rizky's decision:
+
+- **`zod` 3 has no fix in its line.** The ways out are (1) move the AI SDK to a major that takes `zod` 4 and move
+  the product's schemas to `zod` 4 (a migration across core, host and web, not a patch); (2) cap every array schema
+  that reads a request body with `.max()` and teach `scripts/audit-deployed.mjs` an accepted-risk entry for this
+  advisory (the script has none today, and AGENTS.md forbids inventing a bypass); (3) leave the gate red. A fourth
+  route was found by a sibling session the same day (corrected 2026-11-03; an earlier wording here said it could not
+  work): override every `zod` below 4.6.6 to 4.6.7 and import `zod/v3`, which 4.6.7 still ships. That turns the gate
+  green, but the upstream fix touches only the v4 core, so our schemas would still run the unfixed v3 parser.
+  Rizky chose (1) on 2026-11-03; it is being built on `fix/zod-4`.
+- **Not driven.** Nothing was booted from this tree; the unit suites and `ci:local` ran, and `express` and
+  `yahoo-finance2` import from `apps/web` against the new lock.
+
+Gate: `audit:deployed` (a required `ci:local` step) until the `zod` 3 decision. The fixed half ships with the
+`fix/ci-local-reds` pull request.
 
 ## Must be true before the Tencent Cloud deploy
 
