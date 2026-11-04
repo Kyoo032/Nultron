@@ -51,7 +51,7 @@ export const ratiosParamsSchema = z
 
 export const ratiosInputSchema = z.object({
   items: lineItemsSchema,
-  params: ratiosParamsSchema.default({}),
+  params: ratiosParamsSchema.prefault({}),
   /** The language the answer was asked for, when the caller says so. */
   locale: z.enum(["id", "en"]).optional(),
 });

@@ -29,7 +29,7 @@ export const financeBriefSchema = z.object({
   title: z.string().min(1),
   sections: z.array(financeSectionSchema).min(1),
   assumptions: z.array(z.string()).default([]),
-  computed: financeComputedSchema.default({ metrics: [], tables: [] }),
+  computed: financeComputedSchema.prefault({ metrics: [], tables: [] }),
 });
 
 export type FinanceMetric = z.infer<typeof financeMetricSchema>;
