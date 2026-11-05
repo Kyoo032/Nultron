@@ -321,7 +321,7 @@ flowchart LR
     CA["Customer answers<br/>answer cache, retrieval, checker"]
     TH["Threads and inbox<br/>every turn saved as text"]
   end
-  GW[(Model gateway, pinned origin)]
+  GW[("Model gateway, pinned origin")]
   CC <--> E
   M --> CC
   VN -->|webhook, batch transcription| TH
