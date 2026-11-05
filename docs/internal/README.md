@@ -51,6 +51,7 @@ Engineering and research notes. Not part of the closed-beta tester surface.
 |------|---------|
 | [`research-dossier-analyst-modes-plan.md`](research-dossier-analyst-modes-plan.md) | Research dossier plus Data / Finance analyst modes |
 | [`market-mode-plan.md`](market-mode-plan.md) | Market Watch mode |
+| [`voice-mode-plan.md`](voice-mode-plan.md) | Voice mode: live talk inside Nultron built in one week (host relay to the gateway's realtime model, workflows, endpoints, acceptance tests), with customer voice as a separate project |
 | [`legal-mode-flow.md`](legal-mode-flow.md) | Legal mode run flow |
 | [`legal-mode-contracts.md`](legal-mode-contracts.md) | Legal mode data contracts |
 | [`weknora-kb-plan.md`](weknora-kb-plan.md) | Knowledge Base plan (builtin path shipped; WeKnora sidecar not used) |
