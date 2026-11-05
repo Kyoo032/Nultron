@@ -39,6 +39,7 @@ apps/desktop/resources/examples/videos/*.mp4
 *.tsbuildinfo
 .claude/*
 !.claude/rules/
+!.claude/skills/
 _ref/
 
 # Python bytecode from the mac build tooling
