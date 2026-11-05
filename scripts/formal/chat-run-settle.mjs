@@ -224,7 +224,7 @@ function main() {
     if (error instanceof Drift) {
       console.error(`DRIFT: ${error.message}`);
       console.error(
-        "The covered code changed shape. Re-derive the model from the code (.claude/skills/chat-run-settle/SKILL.md).",
+        "The covered code changed shape. Re-derive the model from the code (.cursor/skills/chat-run-settle/SKILL.md).",
       );
       process.exit(2);
     }
