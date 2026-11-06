@@ -181,7 +181,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-77](#sr-77) | Medium | A "Start over" wipe that failed part-way deleted its own marker, so the rest never ran | Fixed, not driven (2026-09-23) | Blocks the next Personal cut |
 | [SR-79](#sr-79) | Medium | Per-IP limits key on the full IPv6 address, so one IPv6 client has a bucket per request | Mitigated (2026-10-01): the pilot stack binds IPv4 only; the code still keys on the full address | Blocks Tencent deploy if it is reachable over IPv6 |
 | [SR-80](#sr-80) | Medium | CI and the dependency-audit gate run only when someone runs `pnpm ci:local`; nothing checks a push on its own | Open — accepted by design (2026-09-24) | Blocks PR merge without a pasted `ci:local` summary |
-| [SR-85](#sr-85) | Medium | The packaged app never set `AGENTFORGE_PACKAGED`, so the dev endpoint hooks (gateway, Telegram) were not ignored in it | Fixed in the working tree, not committed (2026-10-01); not driven on a packed installer, the bundle was driven in plain Node | Blocks the next Personal cut until a packed public build and a packed flavor are driven |
+| [SR-85](#sr-85) | Medium | The packaged app never set `AGENTFORGE_PACKAGED`, so the dev endpoint hooks (gateway, Telegram) were not ignored in it | Fixed, committed in `5fc00596` (2026-10-05) and carried by the 0.16.0 pack; the two packed drives were never done, and the desktop was retired 2026-10-14 | None while the desktop is retired. If a desktop build is revived, the packed public build and a packed flavor must be driven before that cut |
 | [SR-84](#sr-84) | Medium | New `brace-expansion` advisories reached the hosted image through `exceljs` | Fixed in `388d6cb` (2026-09-30); `audit:deployed` passes since (`ci:local` 2026-10-01) | — |
 | [SR-87](#sr-87) | Medium | The proxy's access log kept the sign-in authorization code in the portal's redirect `Location` header | Fixed in `webapp-deploy/Caddyfile` and the k8s copy; driven on the local compose and Kubernetes rehearsals (2026-10-01); not hosted | Blocks Tencent deploy until a hosted Caddy is checked |
 | [SR-90](#sr-90) | Medium | Restarting or recreating `app` alone leaves the proxy answering nothing | Docs and scripts fixed (2026-10-01); the trap remains | Operator rule: restart `app proxy` together |
@@ -2551,8 +2551,9 @@ Gate: was **blocks PR merge** (`audit:deployed` is a required `ci:local` step); 
 ### SR-85 {#sr-85}
 
 **The packaged app never set `AGENTFORGE_PACKAGED`, so the dev endpoint hooks were not ignored in it.**
-Personal. Raised 2026-09-30 by the verify-skill pass, fixed 2026-10-01 in the working tree, not
-committed. Fixed, not driven on a packed installer.
+Personal. Raised 2026-09-30 by the verify-skill pass, fixed 2026-10-01 in the working tree and
+committed in `5fc00596` (2026-10-05). Fixed, not driven on a packed installer. Moot while the desktop
+is retired (2026-10-14); see "Status, 2026-11-06" below.
 
 Evidence, before the fix:
 
@@ -2587,15 +2588,15 @@ sent to the Toko Token gateway.
 
 Fixed 2026-10-01, in one change:
 
-- `apps/desktop/main.cjs` `bootstrapPackaged` (`:660-667`) sets `AGENTFORGE_PACKAGED=1`, deletes any
-  inherited `AGENTFORGE_GATEWAY_URL`, and sets or deletes `AGENTFORGE_BRAND_GATEWAY_URL` from
-  `brandGatewayOverride(brand)`, all before `require("./host.cjs")` (`:669`). The module-level
-  assignment of the dev hook is gone (`:86`).
+- `apps/desktop/main.cjs` `bootstrapPackaged` (`:673-680` at `39cd5f0c`) sets `AGENTFORGE_PACKAGED=1`,
+  deletes any inherited `AGENTFORGE_GATEWAY_URL`, and sets or deletes `AGENTFORGE_BRAND_GATEWAY_URL` from
+  `brandGatewayOverride(brand)`, all before `require("./host.cjs")` (`:682`). The module-level
+  assignment of the dev hook is gone.
 - `apps/desktop/brand-read.cjs` `brandGatewayOverride` (`:39`) is empty for the public build whatever
   its `brand.json` says, and is the flavor's `gatewayBaseUrl` otherwise.
 - `packages/core/src/gateway/pinned.ts` `gatewayUrlOverride()` (`:72`): packaged reads only the brand
   channel (https, no credentials, else ignored); anything else reads the dev hook unless
-  `NODE_ENV=production`. `resolvedGatewayBaseUrl()` (`packages/core/src/gateway.ts:37`) calls it.
+  `NODE_ENV=production`. `resolvedGatewayBaseUrl()` (`packages/core/src/gateway.ts:47`) calls it.
   `gatewayUrlOverrideAllowed()` (`:38`) is unchanged, so the Telegram origin is now pinned in a
   packaged build without touching `channels/pinned.ts`.
 - Tests: `packages/core/src/gateway/pinned.test.ts` (dev, production and packaged cases, both
@@ -2623,8 +2624,13 @@ Metranet window must report `https://aihub.metranet.co.id/v1`. The hosted app is
 `NODE_ENV=production` (`webapp-deploy/Dockerfile:157`, `webapp-deploy/compose.yml:29`) and never sets the
 packaged marker.
 
-Gate: **blocks the next Personal cut** until those two drives are done. A regression here is silent
-and sends a flavor user's key to the wrong gateway.
+**Status, 2026-11-06.** The fix is on `main` (`apps/desktop/main.cjs:673`), committed in `5fc00596`
+(2026-10-05). Both 0.16.0 pack commits, `4dd33fa` and `e7a17c2`, contain it, and that pack checked it
+only through `doctor --desktop` (`docs/internal/0.16.0-changelog.md:81`). So the two drives above were
+never done. The desktop app was retired on 2026-10-14 (Rizky), and no Personal cut follows.
+
+Gate: none while the desktop is retired. If a desktop build is revived, those two drives block its
+cut. A regression here is silent and sends a flavor user's key to the wrong gateway.
 
 ### SR-87 {#sr-87}
 
