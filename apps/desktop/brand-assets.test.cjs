@@ -7,7 +7,9 @@
  * that copies one file and forgets a twin passes every type check, so this reads them.
  */
 const assert = require("node:assert/strict");
+const { spawnSync } = require("node:child_process");
 const fs = require("node:fs");
+const os = require("node:os");
 const { join } = require("node:path");
 
 const PNG_MAGIC = "89504e470d0a1a0a";
@@ -136,6 +138,35 @@ assert.deepEqual(pngSize(read(join(buildDir, "icon.png")), "icon.png"), { width:
     packer.includes(`color: ${blue};`) && packer.includes(`${cyan} 100%)`),
     "the generator carries the same stops",
   );
+}
+
+{
+  const source = fs.readFileSync(join(__dirname, "scripts", "pack-brand.mjs"), "utf8");
+  const guard = source.indexOf("existsSync(publicBrandFile)");
+  const firstWrite = source.indexOf("mkdirSync(buildDir");
+  assert.ok(guard > -1, "pack-brand.mjs checks for the public brand.json");
+  assert.ok(firstWrite > -1 && guard < firstWrite, "the check comes before the first write");
+}
+
+{
+  const root = fs.mkdtempSync(join(os.tmpdir(), "pack-brand-guard-"));
+  try {
+    fs.mkdirSync(join(root, "scripts"));
+    fs.copyFileSync(join(__dirname, "scripts", "pack-brand.mjs"), join(root, "scripts", "pack-brand.mjs"));
+    fs.mkdirSync(join(root, "branding", "kemenkeu"), { recursive: true });
+    fs.writeFileSync(join(root, "branding", "kemenkeu", "brand.json"), JSON.stringify({ productName: "Kemenkeu AI" }));
+    const before = fs.readdirSync(root).sort();
+    const result = spawnSync(process.execPath, [join(root, "scripts", "pack-brand.mjs")], {
+      cwd: root,
+      encoding: "utf8",
+      env: { ...process.env, AGENTFORGE_BRAND: "kemenkeu" },
+    });
+    assert.equal(result.status, 1, "a flavor pack without the public kit exits 1");
+    assert.match(result.stderr, /branding[\\/]agentforge[\\/]brand\.json/);
+    assert.deepEqual(fs.readdirSync(root).sort(), before, "it writes nothing before it stops");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
+  }
 }
 
 console.log("brand-assets.test.cjs: ok");
