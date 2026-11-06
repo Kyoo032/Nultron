@@ -2,7 +2,7 @@
 
 Product: both · Instance: hosted servers, not :3000
 
-Last verified: 2026-10-16 on `chore/nultron-only`, for `portal.env.example` (one comment reworded to name only Nultron Enterprise; no variable changed). Before that: 2026-10-14 at 73db3c3 + the uncommitted `fix/hosted-downloads` tree, for the `encode` match on the app and portal sites (`webapp-deploy/Caddyfile`, and the k8s copy in `k8s/base/caddy/security.caddy`, which the rehearsal does not parse for it). Read against the file; Caddy itself not run on this box, so the syntax is unvalidated. Before that: 2026-10-05 at 0b61a29 + the uncommitted working tree, except one gotcha corrected on 2026-10-07 (ffmpeg is in the image since `5bec532`; the bullet under Gotchas was written before that). Re-read that day: the build and runtime
+Last verified: 2026-11-06 on branch `fix/backup-missed-run-alert`, cut from 39cd5f0c, for the `backup.sh` row and failure-modes paragraph only (the heartbeat ping; driven against a local stub with a fake `docker`, not on a server). Before that: 2026-10-16 on `chore/nultron-only`, for `portal.env.example` (one comment reworded to name only Nultron Enterprise; no variable changed). Before that: 2026-10-14 at 73db3c3 + the uncommitted `fix/hosted-downloads` tree, for the `encode` match on the app and portal sites (`webapp-deploy/Caddyfile`, and the k8s copy in `k8s/base/caddy/security.caddy`, which the rehearsal does not parse for it). Read against the file; Caddy itself not run on this box, so the syntax is unvalidated. Before that: 2026-10-05 at 0b61a29 + the uncommitted working tree, except one gotcha corrected on 2026-10-07 (ffmpeg is in the image since `5bec532`; the bullet under Gotchas was written before that). Re-read that day: the build and runtime
 description, the HEALTHCHECK paragraph, the components-check cites, the ignore-file rows and the
 dependencies gotcha, against `webapp-deploy/Dockerfile` as it stands after the SR-113 change. The rest
 of the page keeps the caveat in the note below. On 2026-10-11 the *Run: five services* sentence about `portal-entry.sh` was re-read against the script at 2df34be plus the SH-005 fix on branch `fix/sh-005-portal-entry-exit-code` (2026-10-11 at 2df34be, before merge); nothing else on the page changed that day.
@@ -187,14 +187,14 @@ for the portal as well, and `cos_upload` moved into `_common.sh`.
 |---|---|
 | `build.sh` | `dc build app`, then prints the image size |
 | `deploy.sh` | With `USE_SSM=1`, reads the wrap key and `BACKUP_KEY` from Secrets Manager with the instance role and exports them for that process only; `git pull --ff-only`; build; `up -d`; polls the container health for up to five minutes; appends a row to `DEPLOY-LOG.md` |
-| `backup.sh` | Consistent SQLite snapshot via `VACUUM INTO`; tar of `/data` minus `components/`, `logs/` and `.master-key`; `openssl enc -aes-256-cbc -pbkdf2 -iter 200000` before the bytes leave the host; decrypt-and-list verification; upload with `coscli`, else `tccli cos`, else a loud warning; local retention prune |
+| `backup.sh` | Consistent SQLite snapshot via `VACUUM INTO`; tar of `/data` minus `components/`, `logs/` and `.master-key`; `openssl enc -aes-256-cbc -pbkdf2 -iter 200000` before the bytes leave the host; decrypt-and-list verification; upload with `coscli`, else `tccli cos`, else a loud warning; local retention prune. An `EXIT` trap sends the optional missed-run ping (`BACKUP_HEARTBEAT_URL`): `GET <url>` on exit 0, `GET <url>/fail` otherwise, via `heartbeat_ping` in the sourced `_heartbeat.sh`, which never fails the run and never prints the URL |
 | `restore.sh` | Checks the archive decrypts **before** deleting anything; stops both services; empties `/data`; unpacks; promotes the consistent snapshot over `agentforge.sqlite` and drops the stale `-wal`/`-shm`; starts back up |
 | `logs.sh` | Prints container health, then follows logs for one or both services |
 | `components.sh` | Phase 7. `status` / `check` / `install` against the running container, through `dc exec -T app ./node_modules/.bin/tsx ../../scripts/components.ts` (`webapp-deploy/scripts/components.sh:54-55`). Nothing here reaches the install HTTP route, which answers `403 install_disabled` on a server for every caller |
 
 Failure modes worth knowing: `deploy.sh` exits non-zero and dumps 80 log lines if health does not go
 green in five minutes; `backup.sh` refuses to run at all with an empty `BACKUP_KEY` rather than writing
-a plaintext archive; `restore.sh` is destructive and prompts unless given `--yes`.
+a plaintext archive; `restore.sh` is destructive and prompts unless given `--yes`. A run that never starts (cron or the box stopped) sends no ping, so the external monitor's grace window is what alerts (`webapp-deploy/README.md`, "Backup alert"); `scripts/backup-heartbeat.test.mjs` drives `backup.sh` end to end for that.
 
 ## Where things live
 
