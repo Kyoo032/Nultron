@@ -3256,8 +3256,8 @@ Reopen when an org gets a second member. Nothing on `main` prevents that:
 
 So an operator who follows the bundle's own steps meets the reopen trigger. The fix plan on the SEC-003 card is
 owner-only reads, lists and inline reads in server mode, and delete by the maker or an owner or admin. No
-visibility column is needed, because Workspaces and team sharing are gone. For media no owner column is needed
-either: `media.user_id` is NOT NULL (`packages/db/src/schema.ts:714`). Artifacts need an owner column first.
+visibility column is needed, because Workspaces and team sharing are gone. Media needs no owner column
+either, because `media.user_id` is NOT NULL (`packages/db/src/schema.ts:714`). Artifacts need an owner column first.
 The `artifacts` table has none (`packages/db/src/schema.ts:852-868`), and list, get and delete filter on
 `workspace_id` only (`packages/host/src/artifacts.ts:147-177`).
 
