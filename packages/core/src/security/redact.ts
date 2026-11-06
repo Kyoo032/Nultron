@@ -22,8 +22,30 @@ const PRIVATE_KEY_BLOCK_RE =
 /** The user and password of a URL (`postgres://user:pass@host`, `https://token@host`); the scheme and host stay. */
 const URL_USERINFO_RE = /(?<=\b[a-z][a-z0-9+.-]*:\/\/)[^\s/@?#()[\]<>"'`]+@/gi;
 
-/** A JWT: three dot-separated base64url parts, the first of which is a JSON header (`{"` encodes to `eyJ`). */
-const JWT_RE = /\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g;
+const JWT_CHAIN_RE = /(?<![A-Za-z0-9_.-])[A-Za-z0-9_.-]*eyJ[A-Za-z0-9_.-]*/g;
+const JWT_HEADER_RE = /(?<![A-Za-z0-9_])eyJ(?=[A-Za-z0-9_-]{8})/;
+const JWT_PART_MIN_LENGTH = 8;
+
+function maskJwts(chain: string): string {
+  const parts = chain.split(".");
+  const kept: string[] = [];
+  let index = 0;
+  while (index < parts.length) {
+    const header = parts[index].search(JWT_HEADER_RE);
+    const hasTwoMoreParts =
+      index + 2 < parts.length &&
+      parts[index + 1].length >= JWT_PART_MIN_LENGTH &&
+      parts[index + 2].length >= JWT_PART_MIN_LENGTH;
+    if (header >= 0 && hasTwoMoreParts) {
+      kept.push(`${parts[index].slice(0, header)}[REDACTED]`);
+      index += 3;
+    } else {
+      kept.push(parts[index]);
+      index += 1;
+    }
+  }
+  return kept.join(".");
+}
 
 /** A Telegram bot token: the bot id, a colon, 35 characters that include at least one letter. */
 const TELEGRAM_TOKEN_RE = /(?<![0-9])\d{6,12}:(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/g;
@@ -55,15 +77,6 @@ function maskEnvAssignment(match: string, head: string, name: string, equals: st
 /** Min length for a standalone base64-like token to be treated as sensitive. */
 const BASE64_RE = /\b[A-Za-z0-9+/]{32,}={0,2}\b/g;
 
-/**
- * Masks what is shaped like a credential: a bearer token, a Basic credential in an Authorization header, a key
- * with a known prefix (including GitHub and Slack tokens), a JWT, a Telegram bot token, an AWS access key id, a
- * PEM private key block, the user and password of a URL, a cookie header, or the value of an upper-case `.env`
- * line whose name has a KEY, SECRET, TOKEN or PASSWORD part.
- * It leaves long opaque runs alone, so a content hash, a signed link or a long identifier stays readable.
- * Use it where the text is data a person or a program reads back (a tool's input or output); use
- * `redactSecrets` for a message that is only ever shown.
- */
 export function redactCredentials(text: string): string {
   if (!text) {
     return text;
@@ -72,7 +85,7 @@ export function redactCredentials(text: string): string {
     .replace(PRIVATE_KEY_BLOCK_RE, "[REDACTED]")
     .replace(URL_USERINFO_RE, "[REDACTED]@")
     .replace(COOKIE_HEADER_RE, maskCookieHeader)
-    .replace(JWT_RE, "[REDACTED]")
+    .replace(JWT_CHAIN_RE, maskJwts)
     .replace(TELEGRAM_TOKEN_RE, "[REDACTED]")
     .replace(AWS_ACCESS_KEY_ID_RE, "[REDACTED]")
     .replace(BEARER_RE, "Bearer [REDACTED]")

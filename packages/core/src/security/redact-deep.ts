@@ -7,11 +7,6 @@ const TOO_DEEP = "[too deep]";
 /** Deeper than any tool result is nested; what is past it is replaced, never passed on unread. */
 export const REDACT_MAX_DEPTH = 32;
 
-/**
- * A key that holds a credential whatever the value looks like. Exact names, or a name that ends in one of
- * `SECRET_KEY_ENDING` after a `_`, a `-` or a camel-case boundary (`DB_PASSWORD`, `githubToken`), all
- * case-insensitive, so a field called `max_tokens`, `cache_key` or a sentence that says "token" is left alone.
- */
 const SECRET_KEY =
   /^(?:authorization|proxy-authorization|x-api-key|api[-_]?key|secret|client[-_]?secret|password|passwd|token|access[-_]?token|refresh[-_]?token|id[-_]?token|auth[-_]?token|bearer|(?:telegram[-_]?)?bot[-_]?token|cookie|set-cookie|private[-_]?key|secret[-_]?key|access[-_]?key|credentials?)$/i;
 const SECRET_KEY_ENDING =
