@@ -16,9 +16,12 @@ const HOSTILE: ReadonlyArray<readonly [string, string]> = [
   ["a cookie header followed by spaces and a word with no equals sign", `cookie:${" ".repeat(100_000)}x`],
   ["the word cookie and a colon repeated 15k times on one line", "cookie:".repeat(15_000)],
   ["a spaced cookie header repeated on one line", "cookie : ".repeat(11_000)],
+  ["a long dotted run that is not a URL scheme", "a.".repeat(20_000)],
+  ["a long hyphenated run that is not a URL scheme", "a-".repeat(20_000)],
+  ["a scheme separator repeated with no address after it", "a://".repeat(25_000)],
 ];
 
-describe("redactCredentials: a cookie header cannot be turned into a slow input", () => {
+describe("redactCredentials: hostile input stays fast", () => {
   it.each(HOSTILE)("%s", (_name, input) => {
     const { value, ms } = timed(() => redactCredentials(input));
     expect(value).toBe(input);
@@ -38,6 +41,13 @@ describe("redactCredentials: a cookie header cannot be turned into a slow input"
     const padding = " ".repeat(100_000);
     const { value, ms } = timed(() => redactCredentials(`Cookie:${padding}sid=abc123; theme=dark\nnext line`));
     expect(value).toBe(`Cookie:${padding}[REDACTED]\nnext line`);
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+
+  it("still masks the user and password of a URL that follows a long hyphenated run", () => {
+    const run = "a-".repeat(50_000);
+    const { value, ms } = timed(() => redactCredentials(`${run}http://user:pw@host/x`));
+    expect(value).toBe(`${run}http://[REDACTED]@host/x`);
     expect(ms).toBeLessThan(BUDGET_MS);
   });
 
