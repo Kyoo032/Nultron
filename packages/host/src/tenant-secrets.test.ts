@@ -24,11 +24,13 @@ import {
   wrappingKeyFromSecret,
 } from "@agentforge/core";
 import { ensureSchema } from "@agentforge/db/ensure-schema";
+import { SERVER_VAULT_KEY_NOT_RANDOM } from "@agentforge/db/vault-key";
 
 const dataDir = mkdtempSync(path.join(tmpdir(), "agentforge-phase4-"));
 process.env.AGENTFORGE_DATA_DIR = dataDir;
 /** Server mode demands a real wrap key (`vault-key.ts`, row S1). Generated, not typed. */
 const WRAP_KEY = "7b1d0c9e42a5f38614bd7c02e9f5a831d64c7fe20b93a15c8e7d4620fa31c95b";
+const OTHER_WRAP_KEY = "2e94a7c05b1f836d4a0c97e1b3d5f2084c6a9e1d7b30f5a28c4e6091d7b3a5f8";
 process.env.AGENTFORGE_SECRETS_KEY = WRAP_KEY;
 delete process.env.AGENTFORGE_SERVER;
 delete process.env.AGENTFORGE_RUNTIME;
@@ -495,13 +497,30 @@ describe("a payload that will not decrypt is not thrown away on the server", () 
     hosted();
     settingsStore.saveSettings({ openaiApiKey: KEY_A }, A);
     settingsStore.resetSettingsCacheForTests();
-    process.env.AGENTFORGE_SECRETS_KEY = `${"c".repeat(63)}d`;
+    process.env.AGENTFORGE_SECRETS_KEY = OTHER_WRAP_KEY;
 
     try {
       // The bytes are every key this tenant ever saved and they come back with the right wrap key,
       // so "cannot open it" must never mean "delete it". One wrong environment variable would
       // otherwise sweep every tenant's vault aside on the next boot.
       expect(() => settingsStore.loadSettings(A)).toThrow(/settings_unreadable|could not be decrypted/);
+      expect(stateRows()).toEqual([{ tenant_id: A.tenantId, key: "settings" }]);
+    } finally {
+      process.env.AGENTFORGE_SECRETS_KEY = WRAP_KEY;
+    }
+
+    settingsStore.resetSettingsCacheForTests();
+    expect(settingsStore.loadSettings(A).openaiApiKey).toBe(KEY_A);
+  });
+
+  it("surfaces a refused wrap key as itself and leaves the row where it is", () => {
+    hosted();
+    settingsStore.saveSettings({ openaiApiKey: KEY_A }, A);
+    settingsStore.resetSettingsCacheForTests();
+    process.env.AGENTFORGE_SECRETS_KEY = `${"c".repeat(63)}d`;
+
+    try {
+      expect(() => settingsStore.loadSettings(A)).toThrow(SERVER_VAULT_KEY_NOT_RANDOM);
       expect(stateRows()).toEqual([{ tenant_id: A.tenantId, key: "settings" }]);
     } finally {
       process.env.AGENTFORGE_SECRETS_KEY = WRAP_KEY;
