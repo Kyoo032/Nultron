@@ -19,7 +19,52 @@ const SLACK_TOKENS = [
   join("xoxp", "-", "123456789012", "-", "123456789012", "-", "1234567890123", "-", "0123456789abcdef0123456789abcdef"),
   join("xoxa", "-", "2", "-", "123456789012", "-", "abcdefghijklmnop"),
   join("xoxs", "-", "123456789012", "-", "abcdefghijklmnop"),
+  join("xoxe", "-", "1", "-", "My0xLTEyMzQ1Njc4OTAtMTIzNDU2Nzg5MDEyMy0xMjM0"),
+  join("xapp", "-", "1", "-", "A0123456789", "-", "1234567890123", "-", "abcdef0123456789abcdef0123456789"),
 ];
+
+const STRIPE_KEYS = [
+  join("sk", "_live_", "0123456789abcdefghijABCD"),
+  join("rk", "_live_", "0123456789abcdefghijABCD"),
+];
+
+describe("redactCredentials: Stripe live keys", () => {
+  it.each(STRIPE_KEYS.map((key) => [key.slice(0, 8), key]))("masks a key that starts %s", (_prefix, key) => {
+    expect(redactCredentials(`charge with ${key} now`)).toBe("charge with [REDACTED] now");
+    expect(redactCredentials(`STRIPE_KEY=${key}`)).not.toContain(key);
+  });
+
+  it("keeps prose that only names the prefix, and a key that is too short", () => {
+    const kept = [
+      "a live secret key starts with sk_live_ and a restricted one with rk_live_",
+      "sk_live_short",
+      "task_live_0123456789abcdefghijABCD",
+    ];
+    for (const text of kept) {
+      expect(redactCredentials(text), text).toBe(text);
+    }
+  });
+});
+
+describe("redactCredentials: an X-Api-Key header in text", () => {
+  it("masks the value after the header name, in a curl line, a header dump and JSON", () => {
+    expect(redactCredentials("X-Api-Key: 9f8e7d6c5b4a39281706")).toBe("X-Api-Key: [REDACTED]");
+    expect(redactCredentials('curl -H "x-api-key: 9f8e7d6c5b4a39281706" https://api.example.com')).toBe(
+      'curl -H "x-api-key: [REDACTED]" https://api.example.com',
+    );
+    expect(redactCredentials('{"X-Api-Key":"9f8e7d6c5b4a39281706","Accept":"text/html"}')).toBe(
+      '{"X-Api-Key":"[REDACTED]","Accept":"text/html"}',
+    );
+    expect(redactCredentials("X-API-KEY=9f8e7d6c5b4a39281706")).toBe("X-API-KEY=[REDACTED]");
+  });
+
+  it("keeps a sentence that names the header and a value too short to be a key", () => {
+    const kept = ["the X-Api-Key header is required", "X-Api-Key: none", "send an X-Api-Key: header with every call"];
+    for (const text of kept) {
+      expect(redactCredentials(text), text).toBe(text);
+    }
+  });
+});
 
 describe("redactCredentials: GitHub and Slack tokens", () => {
   it.each(GITHUB_TOKENS.map((token) => [token.slice(0, 4), token]))(
