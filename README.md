@@ -41,7 +41,7 @@ The hosted app runs every harness below. Node and pnpm are not required to use i
 | **Edit** | A timeline cut you export |
 | **Presentation** | An outline, an HTML preview, and a PPTX |
 
-Both products also have Knowledge Base, Channels, Workspaces, Usage, and Settings. Those belong to the desk. Workspaces are optional extra desks (Legal, Marketing, Students, or your own set of harnesses). The default desk already includes every harness.
+Both products also have Knowledge Base, Channels, Workspaces, Usage, and Settings. Those belong to the desk. Workspaces are optional extra desks (Legal, Marketing, Students, or your own set of harnesses). A fresh desk starts with Chat alone, and Chat handles specialist work inline. The owner adds other harnesses to a desk from the Workspace catalog (`/workspace`).
 
 With no gateway key and no portal session, Chat stays in demo mode.
 
