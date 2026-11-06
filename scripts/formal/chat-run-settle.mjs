@@ -90,6 +90,12 @@ function readCode() {
   if (!runs.includes("const persistAssistant = async () => {")) {
     throw new Drift('persistAssistant: cannot find "const persistAssistant = async () => {"');
   }
+  const persistCalls = (runs.match(/persistAssistant\(\)/g) ?? []).length;
+  if (persistCalls !== 3) {
+    throw new Drift(
+      `persistAssistant: expected 3 call sites (run.completed handler, after the model call, catch path), found ${persistCalls}; model the new one before trusting a PASS`,
+    );
+  }
   const meter = between(
     runs,
     "const meterSettledRun = () => {",
@@ -154,7 +160,8 @@ function readCode() {
     MeterAfterAttempt: afterAttempt.includes("meterSettledRun();"),
     ClaimOnPersist: claimFirst && awaitsBeforeClaim.length === 0,
     CancelYieldsToClaim:
-      onStall.includes("if (queueClosed || finishing) {") && onClientAbort.includes("if (queueClosed || finishing) {"),
+      /if \(queueClosed \|\| finishing\) \{\s*return;/.test(onStall) &&
+      /if \(queueClosed \|\| finishing\) \{\s*return;/.test(onClientAbort),
   };
   return { switches, notes };
 }
