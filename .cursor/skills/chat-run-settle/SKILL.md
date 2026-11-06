@@ -85,7 +85,7 @@ The switches the script reads, and where:
 | `MeterOnFinish` | `recordChatRunUsage(options.tenant, run.id, finished, runUsage)` follows `finishRun(..., "completed")` (`:688`) |
 | `MeterOnSettledCompletion` | The settled branch of the `run.completed` handler calls `meterSettledRun();` (`:590`) |
 | `MeterAfterAttempt` | The `if (settled)` after the model call calls `meterSettledRun();` (`:680`) |
-| `ClaimOnPersist` | `finishing = true;` comes before the first `await` in `persistAssistant` |
+| `ClaimOnPersist` | `finishing = true;` is the first statement of `persistAssistant`, and no `await` sits between each `if (settled) {` and its `persistAssistant()` call: the `run.completed` handler (`:587`→`:593`), after the model call (`:678`→`:683`) and the catch path (`:730`→`:735`). The script prints which part made it false. |
 | `CancelYieldsToClaim` | Both `onStall` and `onClientAbort` start with `if (queueClosed \|\| finishing) {`. One handler alone is not enough, so the switch is false unless both do. |
 
 `:590` and `:680` back each other up. Removing either one alone still passes, and removing both breaks `BilledIsMetered`.
@@ -102,6 +102,8 @@ Each property fails when the code it guards is broken:
 | `--hazard` | Nothing. `PASS: nothing breaks`. |
 | `--hazard --break ClaimOnPersist`, `--hazard --break CancelYieldsToClaim` | `FailedRowHasNoAnswer`, `NoFailureAfterSuccess`, `BilledIsMetered` |
 
+The same three fail under `--hazard` when the code itself loses the claim's position: `finishing = true;` moved inside `if (persisted) {`, or an `await` added before `persistAssistant()` at any of the three call sites. Each makes `ClaimOnPersist` false.
+
 `ClaimOnPersist` and `CancelYieldsToClaim` matter only under `--hazard`. With `better-sqlite3` nothing can cut in once the save starts, so breaking either one without `--hazard` still passes. For the same reason `NoFailureAfterSuccess` fails only under `--hazard` with one of them broken.
 
 ## Why it holds on both drivers
@@ -112,10 +114,12 @@ A driver that yields (`--hazard`), such as Postgres, lets the watchdog and a clo
 
 What `--hazard` still assumes is that every database write finishes, because `Termination` rests on weak fairness for `Work`. After the claim, the watchdog no longer ends the run, so a write that never returns keeps the stream and its run slot open. `better-sqlite3` cannot hang that way. A move off SQLite (open decision 1, K-D9 in `AGENTS.md`) must give each write a timeout.
 
+A write that rejects after the claim is not modeled either. The catch path calls `persistAssistant` again, which can send the closing sentence a second time. If that retry also rejects, the run leaves the catch with no `finishRun`, so the row stays `streaming` and the person gets no terminal frame. That was already true before the claim on `better-sqlite3`, where the same write throws.
+
 ## What it does not cover
 
 - The fallback retry on a second model (`heldNext`, `:666`) is folded into the one `"model"` wait.
-- A database write that never returns (see above).
+- A database write that never returns, and a write that rejects after the claim, which can send the closing sentence twice or leave the row `streaming` with no terminal frame (see above).
 - The usage writes (`recordChatRunUsage`, `meterSettledRun`) are synchronous today and are modeled as part of the step that calls them. On a driver that yields, each becomes a wait of its own. The claim, and `settledRunMetered` being set before the write, should keep the properties, but that is argued here, not checked.
 - A model that streamed part of an answer and then failed reaches `CatchFinish` with text to save. The model has no such outcome, so it does not show the claim is needed on the catch path. The claim there is the same line in `persistAssistant`, and `packages/host/src/runs-settle-async-db.test.ts` drives that path with a held write.
 - Tool calls, media mirroring, tool invocation rows, knowledge ingestion and retrieval counts are left out.

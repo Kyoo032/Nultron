@@ -87,7 +87,9 @@ function readCode() {
     'options.abortSignal?.addEventListener("abort", onClientAbort',
     "onClientAbort",
   );
-  const persistHead = between(runs, "const persistAssistant = async () => {", "await ", "persistAssistant");
+  if (!runs.includes("const persistAssistant = async () => {")) {
+    throw new Drift('persistAssistant: cannot find "const persistAssistant = async () => {"');
+  }
   const meter = between(
     runs,
     "const meterSettledRun = () => {",
@@ -122,7 +124,22 @@ function readCode() {
   if (!runs.includes("runId = run.id;")) {
     throw new Drift('insertRun: cannot find "runId = run.id;"');
   }
-  return {
+  const claimFirst = /const persistAssistant = async \(\) => \{\n\s*finishing = true;/.test(runs);
+  const awaitsBeforeClaim = [
+    ["the run.completed handler", onCompleted],
+    ["the code after the model call", afterAttempt],
+    ["the catch path", inCatch],
+  ]
+    .filter(([, slice]) => awaitBetweenGuardAndPersist(slice))
+    .map(([label]) => label);
+  const notes = [];
+  if (!claimFirst) {
+    notes.push("ClaimOnPersist is false: `finishing = true;` is not the first statement of persistAssistant.");
+  }
+  for (const label of awaitsBeforeClaim) {
+    notes.push(`ClaimOnPersist is false: an await sits between \`if (settled) {\` and persistAssistant() in ${label}.`);
+  }
+  const switches = {
     DbYields: !client.includes('from "drizzle-orm/better-sqlite3"'),
     StallGuard: runs.includes("armRunStallGuard({") && onStall.includes("settleRun(message)"),
     GuardAfterInsert: /runId = run\.id;\s*\n\s*if \(settled\) \{/.test(runs),
@@ -135,10 +152,20 @@ function readCode() {
     MeterOnFinish: finishTail.includes("recordChatRunUsage(options.tenant, run.id, finished, runUsage)"),
     MeterOnSettledCompletion: onCompleted.includes("meterSettledRun();"),
     MeterAfterAttempt: afterAttempt.includes("meterSettledRun();"),
-    ClaimOnPersist: persistHead.includes("finishing = true;"),
+    ClaimOnPersist: claimFirst && awaitsBeforeClaim.length === 0,
     CancelYieldsToClaim:
       onStall.includes("if (queueClosed || finishing) {") && onClientAbort.includes("if (queueClosed || finishing) {"),
   };
+  return { switches, notes };
+}
+
+function awaitBetweenGuardAndPersist(slice) {
+  const guard = slice.indexOf("if (settled) {");
+  if (guard < 0) {
+    return false;
+  }
+  const call = slice.lastIndexOf("await persistAssistant()");
+  return /\bawait\b/.test(slice.slice(guard, call > guard ? call : slice.length));
 }
 
 function parseArgs(argv) {
@@ -230,8 +257,9 @@ function check(jar, values, invariants, properties) {
 function main() {
   const args = parseArgs(process.argv.slice(2));
   let code;
+  let notes;
   try {
-    code = readCode();
+    ({ switches: code, notes } = readCode());
   } catch (error) {
     if (error instanceof Drift) {
       console.error(`DRIFT: ${error.message}`);
@@ -253,6 +281,9 @@ function main() {
   for (const name of SWITCHES) {
     const forced = values[name] !== code[name] ? `  (forced from ${code[name]})` : "";
     console.log(`  ${name.padEnd(24)} ${values[name]}${forced}`);
+  }
+  for (const note of notes) {
+    console.log(note);
   }
   const jar = jarPath();
   if (args.hazard) {
