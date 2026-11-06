@@ -116,7 +116,7 @@ Last updated: 2026-11-06 (`Kyoo032/Nultron` `main` at `39cd5f0c`). The hex colou
   - `Kyoo032/Nultron-Releases` has no GitHub Release, and its last push was on 2026-09-25;
   - `docs/public/ent-2026.10.02-notes.md` was written and never published.
 
-  The Tencent deploy planned for Thursday 8 October 2026 is in neither log, so it did not happen. Whether a `ghcr.io/kyoo032/nultron-ent` image was ever pushed was not checked: the lookup needs a token with package access.
+  The Tencent deploy planned for Thursday 8 October 2026 is in neither log, so it did not happen. Whether a `ghcr.io/kyoo032/nultron-ent` image was ever pushed is unknown. The ghcr lookup answered 404, and the token used for it may lack package access.
 - **Focus now:**
   1. Build the image, driven with a real hosted Chat.
   2. Dry run of the release.
