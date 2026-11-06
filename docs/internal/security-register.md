@@ -209,8 +209,8 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-172](#sr-172) | Low | HYP AI behind Cloudflare: Cloudflare reads sign-in passwords, cookies and pasted keys in clear (Full mode), and the origin still answers around Cloudflare on 80, 443 and 8443 | Recorded as known in the HYP AI deploy README (2026-10-08); restricting the origin is optional there; needs the owner's call | HYP AI only; Nultron does not use Cloudflare |
 | [SR-173](#sr-173) | Info | The wrap key becomes the AES key through one unsalted SHA-256 | Checked, not an issue (2026-10-13) | — |
 | [SR-174](#sr-174) | Low | Caddy compresses every `text/*` response, `text/event-stream` included, which can hold live-update frames back | Fixed on `main` (PR #167, 2026-10-14): `encode` matches text types only, without `text/event-stream`, video or audio; unit-tested, Caddy syntax not validated, not driven | Before the team board (tester) is deployed behind Caddy |
-| [SR-175](#sr-175) | Medium | Hosted: a file one person generates on their own (artifacts, media, desk files outside their private folder) is listed and downloadable by every member of the company | Accepted for the OPC (Rizky, 2026-11-06): a Nultron org has one owner. The earlier "not applicable" was wrong for `main`: the tester's strip removed the tester's owner check, and `main` still reads by organization or desk only | Reopen if a second member can join an org |
-| [SR-176](#sr-176) | High | Hosted: any member of a company can delete any other member's generated media and artifacts | Accepted for the OPC (Rizky, 2026-11-06): a Nultron org has one owner. The earlier "not applicable" was wrong for `main`: the tester's strip removed the tester's owner check, and `main` still deletes by organization or desk only | Reopen if a second member can join an org |
+| [SR-175](#sr-175) | Medium | Hosted: a file one person generates on their own (artifacts, media, desk files outside their private folder) is listed and downloadable by every member of the company | Accepted for the OPC (Rizky, 2026-11-06): a Nultron org has one owner. The earlier "not applicable" was wrong for `main`. The tester's strip removed the tester's owner check, and `main` still reads by organization or desk only | Reopen if a second member can join an org |
+| [SR-176](#sr-176) | High | Hosted: any member of a company can delete any other member's generated media and artifacts | Accepted for the OPC (Rizky, 2026-11-06): a Nultron org has one owner. The earlier "not applicable" was wrong for `main`. The tester's strip removed the tester's owner check, and `main` still deletes by organization or desk only | Reopen if a second member can join an org |
 | [SR-178](#sr-178) | Medium | Hosted (tester): a Workspace switched to "workspace" is readable by the whole company, not only its members (K-D22) | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
 | [SR-179](#sr-179) | Medium | Hosted (tester): a member removed from a Workspace keeps reading, listing and deleting the files and media they put into it | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
 | [SR-180](#sr-180) | Medium | Hosted (tester): document versions are not counted against a tenant's storage, and the cap keeps every version from the last 30 days with no count limit, so a busy document can fill the one disk | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
@@ -2555,7 +2555,7 @@ Gate: was **blocks PR merge** (`audit:deployed` is a required `ci:local` step); 
 **The packaged app never set `AGENTFORGE_PACKAGED`, so the dev endpoint hooks were not ignored in it.**
 Personal. Raised 2026-09-30 by the verify-skill pass, fixed 2026-10-01 in the working tree and
 committed in `5fc00596` (2026-10-05). Fixed, not driven on a packed installer. Moot while the desktop
-is retired (2026-10-14); see "Status, 2026-11-06" below.
+is retired (2026-10-14). See "Status, 2026-11-06" below.
 
 Evidence, before the fix:
 
@@ -3245,7 +3245,7 @@ been driven on the hosted compose rehearsal.
 changed, on purpose.**
 
 **Accepted for the OPC (Rizky, 2026-11-06).** A Nultron org has one owner, so there is no colleague to read,
-list or delete another person's media. The code is unchanged: at `39cd5f0c` the lookups still filter by
+list or delete another person's media. The code is unchanged. At `39cd5f0c` the lookups still filter by
 organization only (`packages/host/src/handlers/media.ts:32`, `:89`, `:97`; `packages/host/src/media.ts:48`,
 `:138`). This also decides [SR-175](#sr-175) and [SR-176](#sr-176), and the security tester's SEC-003 (Notion Dev
 Findings, BUG-33).
@@ -6085,7 +6085,7 @@ Gate: reopen if a second member can join an org. Not fixed.
 
 **Hosted: any member of a company can delete another member's files.**
 
-**Accepted for the OPC (Rizky, 2026-11-06).** A Nultron org has one owner, so this needs a second member in one org. Reopen if a second member can join an org; [SR-157](#sr-157) says why that can still happen on `main`. The note it replaces said "Not applicable since 2026-10-16", which was wrong for `main`: the tester's OPC strip (P5b, `18886fbf`) deleted the tester's delete gate, not the deletes on `main`. At `39cd5f0c` those still select and delete by organization or desk only: media (`packages/host/src/handlers/media.ts:89`, `:97`), artifacts (`packages/host/src/artifacts.ts:175`). The SEC-003 card suggests this delete gate as the first piece to ship if the trigger is met: it needs no schema change.
+**Accepted for the OPC (Rizky, 2026-11-06).** A Nultron org has one owner, so this needs a second member in one org. Reopen if a second member can join an org; [SR-157](#sr-157) says why that can still happen on `main`. The note it replaces said "Not applicable since 2026-10-16", which was wrong for `main`. The tester's OPC strip (P5b, `18886fbf`) deleted the tester's delete gate, not the deletes on `main`. At `39cd5f0c` those still select and delete by organization or desk only: media (`packages/host/src/handlers/media.ts:89`, `:97`), artifacts (`packages/host/src/artifacts.ts:175`). The SEC-003 card suggests this delete gate as the first piece to ship if the trigger is met: it needs no schema change.
 
 Raised 2026-10-14. High. Open until 2026-11-06, then accepted for the OPC. Found by the W1b worker in the tester and checked on `main` by the orchestrator.
 
@@ -6574,8 +6574,8 @@ Evidence (at `39cd5f0c`):
   the host as the owner. A renderer exploit that escapes the JavaScript isolate runs outside the OS sandbox, in
   a process with Node linked.
 
-Why Won't fix: the desktop app was retired on 2026-10-14 (AGENTS.md). Nothing packs or ships `apps/desktop`:
-the hosted image's install skips it (`webapp-deploy/Dockerfile:70-73`), and its release repo
+Why Won't fix: the desktop app was retired on 2026-10-14 (AGENTS.md). Nothing packs or ships `apps/desktop`.
+The hosted image's install skips it (`webapp-deploy/Dockerfile:70-73`), and its release repo
 `Kyoo032/Nultron-Desktop` is archived. The exposure is a local desktop build made against that rule.
 
 Reopen trigger: a desktop build is revived. Then, before that cut:
@@ -6585,10 +6585,10 @@ Reopen trigger: a desktop build is revived. Then, before that cut:
   `isTrustedSender` (the main frame, `apps/desktop/navigation.cjs:109`), with a frozen, versioned payload
   `{ schema: 1, brand, brandLogo, updatesSupported }`. The renderer still reads `window.agentforge.brand` at
   startup, so first paint is unchanged.
-- The preload then requires no local module and no `fs`. Remove `sandbox: false`: Electron 35
+- The preload then requires no local module and no `fs`. Remove `sandbox: false`, because Electron 35
   (`apps/desktop/package.json:30`) sandboxes by default. Keep `contextIsolation: true` and `nodeIntegration: false`.
-- Not `additionalArguments`: the base64 logo is about 146,000 characters, past the 32,767-character Windows
-  command line.
+- Do not use `additionalArguments`. The base64 logo is about 146,000 characters (the 109,815-byte `logo.png`
+  measured on 2026-11-06), past the 32,767-character Windows command line.
 - E18 (permission handlers that deny by default, but still allow `media` and `display-capture` for Meeting) and
   E19 (`web-contents-created` applying `hardenNavigation` to every contents) go in separate PRs, in the same
   release. Do not change Electron fuses in the same change ([SR-120](#sr-120)).

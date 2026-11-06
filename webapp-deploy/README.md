@@ -42,8 +42,8 @@ webapp-deploy/
 ├─ portal.env.example         the PORTAL's env: signing key, database passwords, sign-in mode (password by default), Tencent SES login (code mode only)
 ├─ DEPLOY-LOG.md              date | sha | env | who | notes
 ├─ k8s/                       the Kubernetes rehearsal (a second deploy path; its own README)
-├─ sites/                     the DPS corporate sites on the same box (dpscloud, tokotoken): static, off unless
-│                             DPS_DOMAIN / TOKOTOKEN_DOMAIN is set (enable-sites.sh); not Nultron product code
+├─ sites/                     the DPS corporate sites on the same box (dpscloud, tokotoken), static, each off
+│                             unless DPS_DOMAIN or TOKOTOKEN_DOMAIN is set (enable-sites.sh). Not Nultron code
 └─ scripts/
    ├─ _common.sh              shared helpers (sourced, not run)
    ├─ build.sh                build the app and portal images, print their sizes
@@ -678,10 +678,9 @@ docker compose -f compose.yml up -d --no-build --force-recreate app proxy portal
 git -C .. checkout <previous-sha>        # run on the server, by hand
 sh webapp-deploy/scripts/deploy.sh --no-pull
 
-# code, a server that runs the released bundle instead: pin the previous release (in the bundle folder)
+# code, a server that runs the released bundle instead (in the bundle folder), as its DEPLOY.md says
 git checkout <previous-ent-tag>          # its compose.yml pins both ghcr images to that tag
-docker compose pull app portal
-docker compose up -d --force-recreate app proxy portal
+docker compose up -d                     # DEPLOY.md step 6
 ```
 
 `restore.sh` stops both services, empties the volume, unpacks the tarball, promotes the
@@ -696,10 +695,10 @@ older sha here is a rebuild.
 The released bundle is the path with a registry. Every release from `scripts/release-web.mjs` pushes
 `ghcr.io/kyoo032/nultron-ent:<tag>` and `ghcr.io/kyoo032/nultron-portal:<tag>` and commits a bundle
 whose `compose.yml` pins both images to that tag (`release-web.mjs:19-26`). A server that runs the
-bundle rolls back by checking out the previous release tag of the release repo and starting the
-stack again, as the bundle's own `DEPLOY.md` says (`scripts/release-web-docs.mjs:173-175`). The
-proxy is recreated with the app, never on its own. No release has been cut yet:
-`Kyoo032/Nultron-Releases` had no GitHub Release on 2026-11-06, so there is no older tag to pull.
+bundle rolls back the way the bundle's own `DEPLOY.md` says (`scripts/release-web-docs.mjs:173-175`).
+Check out the previous release tag of the release repo, then repeat its step 6, `docker compose up -d`.
+No release has been cut yet. `Kyoo032/Nultron-Releases` had no GitHub Release on 2026-11-06, so there
+is no older tag to pull.
 
 The restore above brings back the data, not the code. A migration that ran is not undone.
 

@@ -62,7 +62,7 @@ Closed beta. Sharp edges, APIs that may change, invite-only access. Feedback fro
 
 ## Develop
 
-Repo and agent rules: [`AGENTS.md`](AGENTS.md). That file opens with "Where am I?" and "Where a change goes". Read it first: those two tables say which folder, branch and pull request a change belongs to.
+Repo and agent rules: [`AGENTS.md`](AGENTS.md). That file opens with "Where am I?" and "Where a change goes". Read it first. Those two tables say which folder, branch and pull request a change belongs to.
 
 ```
 pnpm install

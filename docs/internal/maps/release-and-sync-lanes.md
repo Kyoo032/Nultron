@@ -4,7 +4,7 @@ Product: both · Instance: every checkout (main, tester); no app drive
 
 Last verified: 2026-11-06 at 39cd5f0c
 
-Re-read on 2026-11-06: the overview, the repo names, the lanes table, the steps after a merge, the Guards section and the "Where things live" table. The never-promote bullet was last read on 2026-10-22 at 7c44963 and the brand-rule bullet on 2026-10-17 at 07cb099. The "Chat-first shell" section was read on 2026-10-12 at e8a7eca8, against the tester branch, before PR #157 promoted it to `main`.
+Re-read on 2026-11-06: the overview, the repo names, the steps after a merge, the Guards section and the `pnpm where` row of "Where things live". The folder names in the lanes table were left as they are, though they no longer match the disk. On 2026-11-06 `C:\Users\rizky\agentforge-chat` was not a git checkout, and `tester/chat-first` was checked out in the worktree `C:\Users\rizky\agentforge-tester-sync`. `scripts/where-am-i.mjs` and the `AGENTS.md` tables use those names, so changing them is Rizky's call. The never-promote bullet was last read on 2026-10-22 at 7c44963 and the brand-rule bullet on 2026-10-17 at 07cb099. The "Chat-first shell" section was read on 2026-10-12 at e8a7eca8, against the tester branch, before PR #157 promoted it to `main`.
 
 ## Overview
 
@@ -16,7 +16,7 @@ One source repo (`Kyoo032/Nultron`, branch `main`) is the one place a fix is mad
 
 The rules for where a change is cut and made are the tables at the top of `AGENTS.md`, "Where am I?" and "Where a change goes". The rules behind them are in `AGENTS.md`, "Lanes". This page is the working form of those rules: how a change reaches each lane, and what must be true before a lane counts as fixed. The longer story of the tester split is in Rizky's vault note `40-Dev/nultron-two-codes-map.md`. This page does not cover how a release is cut (see the "Web release" section of `AGENTS.md`).
 
-Repo names: the Enterprise release repo is `Kyoo032/Nultron-Releases` (`RELEASE_REPO`, `scripts/release-web.mjs:65`; it was `Kyoo032/Nultron` until the rename of 2026-10-15, and `Kyoo032/NultronEnt` until 2026-10-14). After that rename the source repo `Kyoo032/agentforge` was renamed `Kyoo032/Nultron`; local folders keep the `agentforge` names. The retired Personal release repo is `Kyoo032/Nultron-Desktop`, archived.
+The Enterprise release repo is `Kyoo032/Nultron-Releases` (`RELEASE_REPO`, `scripts/release-web.mjs:65`; it was `Kyoo032/Nultron` until the rename of 2026-10-15, and `Kyoo032/NultronEnt` until 2026-10-14). After that rename the source repo `Kyoo032/agentforge` was renamed `Kyoo032/Nultron`. The retired Personal release repo is `Kyoo032/Nultron-Desktop`, archived.
 
 ## Lanes
 
@@ -37,7 +37,7 @@ PR #157 (merge `b14faa1a`) promoted the chat-first shell to `main`. So those fil
 Run these in order. A fix is not done for a lane until its step has run. The pull request says which lanes are still owed.
 
 1. **Tester.** In `C:\Users\rizky\agentforge-chat`: `git status` clean, `git fetch origin`, `git merge origin/main`, `pnpm install --frozen-lockfile`, `ci:local`. On a conflict keep the `main` side of any fix. If both cannot be kept, `git merge --abort` and ask Rizky.
-2. **Enterprise.** Only when Rizky says release (`node scripts/release-web.mjs`). A release is a separate step Rizky asks for: merging `main` into the tester never implies one.
+2. **Enterprise.** Only when Rizky says release (`node scripts/release-web.mjs`). A release is a separate step that Rizky asks for. Merging `main` into the tester never implies one.
 
 ## Guards
 

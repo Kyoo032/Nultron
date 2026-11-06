@@ -15,9 +15,9 @@ Last updated: 2026-11-06 (`Kyoo032/Nultron` `main` at `39cd5f0c`). The hex colou
 | Target | Type | Company | Product name | Gateway users see | Status | Focus now |
 |---|---|---|---|---|---|---|
 | [`nultron-personal`](#nultron-personal) | Desktop app | Public (retired) | Nultron | Toko Token | Retired 2026-10-14. Last release v0.15.1 (2026-09-28). 0.16.0 was packed on 2026-10-06 and never published. Repo `Kyoo032/Nultron-Desktop` archived | None. The app is merged into the web app; no new cut |
-| [`nultron-enterprise`](#nultron-enterprise) | Hosted web app | Nultron Enterprise customers (via DPS) | Nultron | Toko Token + BYOK | Pilot, never released or deployed (checked 2026-11-06). A password-gated single-desk preview (one private desk per tester) was put up at app.nultron-ai.xyz on 2026-10-06; it is not an Enterprise deploy. Release repo is `Kyoo032/Nultron-Releases` (renamed from `Kyoo032/Nultron` on 2026-10-15) | The first release and Tencent deploy, when Rizky says go. It was planned for Thu 8 Oct 2026 and did not happen |
-| [`kemenkeu-ai`](#kemenkeu-ai) | Desktop flavor | Kemenkeu (Ministry of Finance) | Kemenkeu AI | AIHub | Retired 2026-10-14 with the desktop app. Was built locally; its brand folder is gitignored | None |
-| [`aihub-metranet`](#aihub-metranet) | Desktop flavor | Metranet (Telkom Indonesia) | AIHub Metranet | AIHub | Retired 2026-10-14 with the desktop app. Was built locally; its brand folder is gitignored | None |
+| [`nultron-enterprise`](#nultron-enterprise) | Hosted web app | Nultron Enterprise customers (via DPS) | Nultron | Toko Token + BYOK | Pilot, never released or deployed (checked 2026-11-06). A password-gated single-desk preview (one private desk per tester) was put up at app.nultron-ai.xyz on 2026-10-06. It is not an Enterprise deploy. Release repo is `Kyoo032/Nultron-Releases` (renamed from `Kyoo032/Nultron` on 2026-10-15) | The first release and Tencent deploy, when Rizky says go. It was planned for Thu 8 Oct 2026 and did not happen |
+| [`kemenkeu-ai`](#kemenkeu-ai) | Desktop flavor | Kemenkeu (Ministry of Finance) | Kemenkeu AI | AIHub | Retired 2026-10-14 with the desktop app. Was built locally. Its brand folder is gitignored | None |
+| [`aihub-metranet`](#aihub-metranet) | Desktop flavor | Metranet (Telkom Indonesia) | AIHub Metranet | AIHub | Retired 2026-10-14 with the desktop app. Was built locally. Its brand folder is gitignored | None |
 
 ## Which targets a change touches
 
@@ -25,7 +25,7 @@ Last updated: 2026-11-06 (`Kyoo032/Nultron` `main` at `39cd5f0c`). The hex colou
 |---|---|
 | `apps/web/**`, `packages/**` | Every target built from here. The renderer and host are shared. |
 | Code behind `isServerMode()` / `isHostedBuild()` | `nultron-enterprise`. Personal must stay identical, proven by a parity test. |
-| `apps/desktop/**` | `nultron-personal`, `kemenkeu-ai`, `aihub-metranet`, all retired: nothing ships from it |
+| `apps/desktop/**` | `nultron-personal`, `kemenkeu-ai`, `aihub-metranet`, all retired. Nothing ships from it. |
 | `apps/desktop/branding/<id>/**` | That one desktop target only |
 | `apps/portal/**`, `webapp-deploy/**`, `scripts/release-web.mjs` | `nultron-enterprise` |
 | `apps/mobile/**` | None. It holds rules only, and nothing ships from it. |
@@ -103,7 +103,7 @@ Last updated: 2026-11-06 (`Kyoo032/Nultron` `main` at `39cd5f0c`). The hex colou
   |---|---|
   | `app` | `ghcr.io/kyoo032/nultron-ent`, production dependencies only |
   | `proxy` | Caddy 2.11, TLS and `sign_in_filters`. Restart it together with `app`. |
-  | `portal` | `ghcr.io/kyoo032/nultron-portal`, the sign-in: a username and password in this bundle (`PORTAL_SIGNIN_MODE=password`), or the e-mailed one-time code, the portal's own default |
+  | `portal` | `ghcr.io/kyoo032/nultron-portal`, the sign-in. This bundle uses a username and password (`PORTAL_SIGNIN_MODE=password`). The e-mailed one-time code is the portal's own default. |
   | `portal-db` | Postgres 16 |
   | `portal-prepare` | one-shot migrations |
 
@@ -112,8 +112,8 @@ Last updated: 2026-11-06 (`Kyoo032/Nultron` `main` at `39cd5f0c`). The hex colou
 - **Ships by:** `node scripts/release-web.mjs --tag <tag> --sha <sha>`, with `--dry-run` first. It pushes both images, plus a deploy bundle to `Kyoo032/Nultron-Releases` (the release repo, renamed from `Kyoo032/Nultron` on 2026-10-15 and from `Kyoo032/NultronEnt` on 2026-10-14).
 - **Tag:** `ent-YYYY.MM.DD`. Every deploy is logged by sha.
 - **Current:** nothing has been released or deployed. Checked 2026-11-06:
-  - the deploy log in [`web-pivot-2026-09-18.md`](web-pivot-2026-09-18.md#deploy-log) and [`webapp-deploy/DEPLOY-LOG.md`](../../webapp-deploy/DEPLOY-LOG.md) have no row;
-  - `Kyoo032/Nultron-Releases` has no GitHub Release, and its last push was on 2026-09-25;
+  - The deploy logs in [`web-pivot-2026-09-18.md`](web-pivot-2026-09-18.md#deploy-log) and [`webapp-deploy/DEPLOY-LOG.md`](../../webapp-deploy/DEPLOY-LOG.md) have no row.
+  - `Kyoo032/Nultron-Releases` has no GitHub Release, and its last push was on 2026-09-25.
   - `docs/public/ent-2026.10.02-notes.md` was written and never published.
 
   The Tencent deploy planned for Thursday 8 October 2026 is in neither log, so it did not happen. Whether a `ghcr.io/kyoo032/nultron-ent` image was ever pushed is unknown. The ghcr lookup answered 404, and the token used for it may lack package access.

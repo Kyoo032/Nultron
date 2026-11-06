@@ -217,7 +217,7 @@ Until Rizky lifts it, work is limited to three things, in this order:
 - Nultron keeps Toko Token.
 - Hosting (to learn, then try): one Tencent Lighthouse in Jakarta hosting dpscloud.co.id (the parent site), nultron-ai.xyz (app) with portal.nultron-ai.xyz, and tokotokenai.com.
   - Keep the DNS for `api.tokotokenai.com` untouched.
-  - Company mailboxes are self-hosted on the same box (Stalwart), sending through Tencent SES; see "Tencent hosting" below. Nultron's sign-in codes go through SES from `mail.dpscloud.co.id`. **Superseded on 2026-10-06:** company mailboxes moved to Lark custom-domain mail and the Stalwart kit is shelved (see "Mail" below).
+  - Company mailboxes are self-hosted on the same box (Stalwart), sending through Tencent SES; see "Tencent hosting" below. Nultron's sign-in codes go through SES from `mail.dpscloud.co.id`. **Superseded on 2026-10-06.** Company mailboxes moved to Lark custom-domain mail and the Stalwart kit is shelved (see "Mail" below).
   - Guide: `nultron-files/deploy/hosting-guide.html`.
 - Nultron motion: smooth in browsers, stepped in the packed app. The CPU trade-off is still open; Rizky has not chosen between capping the background at 20 fps or keeping 60.
 
@@ -383,7 +383,7 @@ pstack `how` and `why` print to the chat and write nothing to disk. The map for 
 
 ### 3. Repack skill — `pack-nultron` becomes the Windows + macOS repack route
 
-**The pack skill served the Personal app, and is retired with it (2026-10-14): do not run it.** It applied to the Mac/Windows Nultron app, whose last published installer is `0.15.1`. It never packs the hosted web app. That app ships as a container image and a deploy bundle through `scripts/release-web.mjs` (see **Web release (hosted)**).
+**The pack skill served the Personal app and is retired with it (2026-10-14). Do not run it.** It applied to the Mac/Windows Nultron app, whose last published installer is `0.15.1`. It never packs the hosted web app. That app ships as a container image and a deploy bundle through `scripts/release-web.mjs` (see **Web release (hosted)**).
 
 Today’s skill packs once from HEAD. A repack (same version, after a fix) must be a documented route in that skill, not improvisation:
 
@@ -479,7 +479,7 @@ The product is the existing **Express host** (`apps/web/server.ts`) serving the 
 
 ### Desktop (Personal product; retired 2026-10-14)
 
-Installer (**Electron**) + **SQLite** in the user data dir. No Docker Postgres. **Retired on 2026-10-14 (Rizky)**: 0.15.1 (2026-09-28) is the last published installer, 0.16.0 was packed on 2026-10-06 and never published, and no new cut is made. The code stays in the tree. Before that it was under active development from 2026-09-23 (0.15.0 was a product release), and maintenance-only from 2026-09-18 to 2026-09-22 (frozen at 0.14.27).
+Installer (**Electron**) + **SQLite** in the user data dir. No Docker Postgres. **Retired on 2026-10-14 (Rizky).** 0.15.1 (2026-09-28) is the last published installer, 0.16.0 was packed on 2026-10-06 and never published, and no new cut is made. The code stays in the tree. Before that it was under active development from 2026-09-23 (0.15.0 was a product release), and maintenance-only from 2026-09-18 to 2026-09-22 (frozen at 0.14.27).
 
 ### What to keep from this repo
 
@@ -583,7 +583,7 @@ SQLite file: `data/agentforge.sqlite` (or `AGENTFORGE_DATA_DIR`). **SQLite until
 
 Rizky decided on 2026-09-23: one private source repo, one public release repo per product. The record is the "Three repos" entry in [`docs/internal/web-pivot-2026-09-18.md`](docs/internal/web-pivot-2026-09-18.md).
 
-**Changed 2026-10-14 and 2026-10-15 (Rizky): the repos today.** The source repo is `Kyoo032/Nultron` (private, renamed from `Kyoo032/agentforge`). Web releases go to `Kyoo032/Nultron-Releases` (private, `RELEASE_REPO` in `scripts/release-web.mjs`), which was `Kyoo032/NultronEnt` and then `Kyoo032/Nultron`. The desktop release repo is `Kyoo032/Nultron-Desktop` (was `Kyoo032/Nultron`), archived with the retired desktop app. The bullets below are the 2026-09-23 to 2026-09-25 record: read their `Kyoo032/Nultron` as the desktop repo and their `Kyoo032/NultronEnt` as the web release repo. Their rules still hold: no source and no AI marks in a release repo, publishing only by the release script, and the NDA terms check.
+**Changed 2026-10-14 and 2026-10-15 (Rizky): the repos today.** The source repo is `Kyoo032/Nultron` (private, renamed from `Kyoo032/agentforge`). Web releases go to `Kyoo032/Nultron-Releases` (private, `RELEASE_REPO` in `scripts/release-web.mjs`), which was `Kyoo032/NultronEnt` and then `Kyoo032/Nultron`. The desktop release repo is `Kyoo032/Nultron-Desktop` (was `Kyoo032/Nultron`), archived with the retired desktop app. The bullets below are the 2026-09-23 to 2026-09-25 record: read their `Kyoo032/Nultron` as the desktop repo and their `Kyoo032/NultronEnt` as the web release repo. Their rules still hold. A release repo gets no source and no AI marks, only the release script publishes to it, and the NDA terms check applies.
 
 - **`Kyoo032/agentforge` (private, this repo)** is the only source repo for both products: all code, docs, branches, webdev, packing, and the full verify pass. Nothing is released until it is proven here. For a Personal cut that means staged into `host.cjs` + renderer, packed, installed, and driven on the packaged app (`doctor --desktop`). For an Enterprise release it means deployed to the hosted environment, driven there, and logged by sha.
 - **`Kyoo032/Nultron` (public; renamed from `Kyoo032/DPSBuddy` on 2026-09-25)** is Personal releases only: README + `Nultron Setup <v>.exe` + `.blockmap` + `latest.yml` + the mac dmg/zip, published with `pnpm desktop:release`. From 0.15.1 the packaged app's updater requests `Kyoo032/Nultron` (`brand.json` `updates.repo`). Installs from 0.15.0 and earlier still request `Kyoo032/DPSBuddy`, and GitHub redirects that name. Release notes come from `docs/public/<version>-notes.md`. Nothing about the hosted web app is published there. The README was set to the Nultron text in `620689f`, outside a release.
