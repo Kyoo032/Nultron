@@ -43,8 +43,13 @@ const BASIC_AUTH_RE = /\b((?:proxy-)?authorization["']?[ \t]*[:=][ \t]*["']?Basi
 const ENV_ASSIGNMENT_RE = /^([ \t]*(?:export[ \t]+)?)([A-Z][A-Z0-9_]*)([ \t]*=[ \t]*)(\S[^\r\n]*)/gm;
 const SECRET_NAME_PART_RE = /(?:^|_)(?:KEY|SECRET|TOKEN|PASSWORD|PASSWD)(?:_|$)/;
 
-function maskEnvAssignment(match: string, head: string, name: string, equals: string): string {
-  return SECRET_NAME_PART_RE.test(name) ? `${head}${name}${equals}[REDACTED]` : match;
+const PLAIN_SETTING_VALUE_RE = /^["']?(?:\d+(?:\.\d+)?|true|false)["']?\s*$/i;
+
+function maskEnvAssignment(match: string, head: string, name: string, equals: string, value: string): string {
+  if (!SECRET_NAME_PART_RE.test(name) || PLAIN_SETTING_VALUE_RE.test(value)) {
+    return match;
+  }
+  return `${head}${name}${equals}[REDACTED]`;
 }
 
 /** Min length for a standalone base64-like token to be treated as sensitive. */
