@@ -13,7 +13,7 @@ pstack stays in the Cursor plugin. Call it by path, never copy it: `~/.cursor/pl
 
 ## Step 0: where am I, and which row
 
-Run `pnpm where` (`scripts/where-am-i.mjs`, added on branch `chore/agent-guardrails`). Until it lands, run `git rev-parse --show-toplevel` and `git branch --show-current`. The folder and branch must match a row in `AGENTS.md` "Where am I?". If they match none, stop and ask Rizky.
+Run `pnpm where` (`scripts/where-am-i.mjs`, on `main`). On an older branch without it, run `git rev-parse --show-toplevel` and `git branch --show-current`. The folder and branch must match a row in `AGENTS.md` "Where am I?". If they match none, stop and ask Rizky.
 
 Then pick the row in `AGENTS.md` "Where a change goes" that fits the change. Short form:
 

@@ -689,12 +689,14 @@ can never be replayed on top of it), and starts back up. It asks for confirmatio
 you pass `--yes`.
 
 `:previous` holds the images from before the **last** deploy only, so it is one step back. This
-source stack (`scripts/deploy.sh`) builds `nultron-web:local` on the server and pulls nothing, so an
-older sha here is a rebuild.
+source stack (`scripts/deploy.sh`) builds `nultron-web:local` and `nultron-portal:local` on the server and
+pulls no Nultron image, so an older sha here is a rebuild. It still runs `git pull --ff-only`
+(`scripts/deploy.sh:234-235`), and compose pulls the stock `caddy` and `postgres` images (`compose.yml:153`,
+`:225`).
 
 The released bundle is the path with a registry. Every release from `scripts/release-web.mjs` pushes
 `ghcr.io/kyoo032/nultron-ent:<tag>` and `ghcr.io/kyoo032/nultron-portal:<tag>` and commits a bundle
-whose `compose.yml` pins both images to that tag (`release-web.mjs:19-26`). A server that runs the
+whose `compose.yml` pins both images to that tag (`scripts/release-web.mjs:19-26` at the repo root). A server that runs the
 bundle rolls back the way the bundle's own `DEPLOY.md` says (`scripts/release-web-docs.mjs:173-175`).
 Check out the previous release tag of the release repo, then repeat its step 6, `docker compose up -d`.
 No release has been cut yet. `Kyoo032/Nultron-Releases` had no GitHub Release on 2026-11-06, so there
