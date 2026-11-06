@@ -18,7 +18,9 @@ describe("sealed thread messages under a refused wrap key", () => {
     sql.close();
   });
 
-  it("throws instead of handing the sealed envelope back as the message", { timeout: ROUTER_IMPORT_BUDGET_MS }, async () => {
+  it("throws instead of handing the sealed envelope back as the message", {
+    timeout: ROUTER_IMPORT_BUDGET_MS,
+  }, async () => {
     const { agentService, getTenant } = await import("./tenant");
     const { createThread, insertMessage, listMessages } = await import("./threads");
     const tenant = await getTenant();

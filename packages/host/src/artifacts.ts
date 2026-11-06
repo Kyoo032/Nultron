@@ -99,8 +99,9 @@ function validateInput(input: CreateArtifactInput): CreateArtifactInput {
 export function createArtifactStore(db: Database.Database, keyProvider: () => Buffer): ArtifactStore {
   const seal = (body: string): string => JSON.stringify(sealPayload(body, keyProvider()));
   const open = (stored: string): string => {
+    const key = keyProvider();
     try {
-      const value = openPayload<unknown>(JSON.parse(stored), keyProvider());
+      const value = openPayload<unknown>(JSON.parse(stored), key);
       return typeof value === "string" ? value : stored;
     } catch {
       return stored;

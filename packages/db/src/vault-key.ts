@@ -111,21 +111,15 @@ function withoutPadding(value: string): string {
  * the same string back refuses every one of those: a wrong alphabet, a bad length, or trailing bits
  * no encoder would have set.
  *
- * KNOWN LIMIT — this is a syntax check, not a randomness test. A 43-character alphanumeric string is
- * a valid base64 encoding of 32 bytes, so a passphrase of exactly that shape is indistinguishable
- * from a generated key and passes. Hex-only would be the airtight rule, at the cost of refusing the
- * base64 a secrets manager hands out.
+ * KNOWN LIMIT (SR-203) — this is a syntax check, not a randomness test. Every 44-character string over
+ * the base64 alphabet is a canonical encoding of 33 bytes, so a typed passphrase of exactly that shape
+ * is indistinguishable from a generated key and passes. Hex-only would be the airtight rule, at the
+ * cost of refusing the base64 a secrets manager hands out.
  */
 function isCanonical(value: string, encoding: Base64Encoding): boolean {
   return withoutPadding(Buffer.from(value, encoding).toString(encoding)) === withoutPadding(value);
 }
 
-/**
- * How many random bytes a wrap key secret carries, in the shapes a key generator produces: hex (what
- * `.master-key` holds) and canonical base64 / base64url (what a secrets manager hands out). Anything
- * else — a passphrase, a sentence, a truncated blob — is unmeasurable, so it counts as 0 and
- * `getLocalVaultKey` refuses it, on a desk as well as on the server.
- */
 export function vaultKeyEntropyBytes(secret: string): number {
   return decodeVaultKey(secret).length;
 }
@@ -180,12 +174,20 @@ function readOrCreateMasterKeyFile(env: EnvLike): string {
   return secret;
 }
 
+export function assertDeskVaultKeyUsable(env: EnvLike = process.env): void {
+  if (isServerMode(env)) {
+    return;
+  }
+  const fromEnv = env.AGENTFORGE_SECRETS_KEY?.trim();
+  if (fromEnv && vaultKeyEntropyBytes(fromEnv) < MIN_VAULT_KEY_BYTES) {
+    throw new Error(DESK_VAULT_KEY_TOO_WEAK);
+  }
+}
+
 export function getLocalVaultKey(env: EnvLike = process.env): Buffer {
   const fromEnv = env.AGENTFORGE_SECRETS_KEY?.trim();
   if (!isServerMode(env)) {
-    if (fromEnv && vaultKeyEntropyBytes(fromEnv) < MIN_VAULT_KEY_BYTES) {
-      throw new Error(DESK_VAULT_KEY_TOO_WEAK);
-    }
+    assertDeskVaultKeyUsable(env);
     return wrappingKeyFromSecret(fromEnv || readOrCreateMasterKeyFile(env));
   }
   if (!fromEnv) {
