@@ -228,6 +228,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual: request-body arrays with no `.max()` still cost one issue per bad element | Residual: none blocks; capping the request-body arrays is a follow-up |
 | [SR-197](#sr-197) | Medium | AI SDK 5's `streamText` prints every stream error to the console by default, and an `APICallError` carries the request body (the prompt) and the gateway's error body | Fixed in tree (2026-11-04, `fix/zod-4`): the runtime passes a silent `onError`; tested, not driven | PR merge of the AI SDK 5 move |
 | [SR-198](#sr-198) | Medium | AI SDK 5 brings `undici` 5.29.0 and `@fastify/busboy` into the hosted image, with five HIGH `undici` advisories and one `busboy` advisory | Fixed in tree (2026-11-04, `fix/zod-4`): scoped override to `undici` 6.29.1, which drops `busboy`; the SDK's guarded download fetch checked on it; not driven | PR merge of the AI SDK 5 move |
+| [SR-199](#sr-199) | Medium | The credential redactor ran two of its regular expressions in quadratic time: a cookie header followed by a long run of spaces, and a long dotted or hyphenated run (100k characters took 17.7 s and 62 s), so crafted page or upstream text could block the host event loop | Fixed in tree (2026-11-06, `fix/redactor-gaps`): the cookie rule tests its line for `=` in a replacer and the URL rule takes its scheme in a lookbehind; `redact-redos.test.ts` red before, green after; not driven | PR merge of `fix/redactor-gaps` to `main` |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -6531,6 +6532,38 @@ lookup was called. `audit:deployed` passes.
 Residual: not driven on a hosted server; the override has to be dropped once the SDK moves to `undici` 6 itself.
 
 Gate: PR merge of the AI SDK 5 move.
+
+### SR-199 {#sr-199}
+
+**The credential redactor ran two of its regular expressions in quadratic time.**
+Raised 2026-10-11 by the PR #152 security sign-off (finding F-152-1, board card BUG-21). Re-checked open on `main`
+at `39cd5f0c` on 2026-11-06. Medium. Both products.
+
+Evidence before: `COOKIE_HEADER_RE` (`packages/core/src/security/redact.ts:32`, added in `c04898a4` on 2026-10-07)
+re-ran its `=` lookahead at every backtrack position of the space run after `cookie:`. The word `cookie:` followed by
+100,000 spaces took 17.7 s in `redactCredentials` on this machine (26.6 s with tabs, 19.5 s with spaces and a word).
+The sign-off measured 12 s at 80,000 spaces through `redactSecretsDeep`. The word and colon repeated 15,000 times on
+one line took 3 s, and the lookahead the card suggests leaves that shape quadratic (1.7 s at 98,000 characters,
+timed with the card's pattern outside the repo). `URL_USERINFO_RE` (`:20`) is the same class and the card did not
+probe it. It started a scan at every word boundary inside a long run of scheme characters, and each scan ran to the
+end of the run. A dotted run of 100,000 characters (`a.a.a.`) took 62 s and a hyphenated run 17 s. Every Edit tool
+output, every Chat tool frame and every job error passes through `redactCredentials`, so text from a web page or an
+upstream error could block the host event loop.
+
+Fix: the cookie rule matches the header and the rest of its line, then tests the line for `=` in a replacer
+(`maskCookieHeader`, `redact.ts:34`), so no match depends on a lookahead. The URL rule matches only the userinfo and
+reads the scheme in a lookbehind (`:20`), so a scan starts at a `://` and not at every boundary. The masked text is
+the same as before. Tests: `packages/core/src/security/redact-redos.test.ts` (inputs of 40,000 to 100,000 characters
+must redact in under 250 ms, and a long cookie header and a URL after a long run must still mask). Six of the first
+eight tests were red on `39cd5f0c` (17.7 s to 26.6 s for the cookie cases), the two run-shaped URL cases were red at
+40,000 characters (1.9 s and 2.2 s), and all are green after. The existing `redact*.test.ts` files stay green. A probe of
+34 hostile shapes at 100,000 characters (every rule's prefix repeated, spaces after each keyword, long runs) through
+`redactCredentials`, `redactSecrets` and `redactSecretsDeep` found a worst case of 21 ms after the fix.
+
+Residual: a string is not capped in length before redaction, so linear cost still grows with the input. Not driven on
+a live host.
+
+Gate: PR merge of `fix/redactor-gaps` to `main`.
 
 ## Must be true before the Tencent Cloud deploy
 
