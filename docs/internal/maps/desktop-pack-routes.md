@@ -6,7 +6,7 @@ Product: retired-desktop · Instance: none (Personal desktop retired 2026-10-14)
 > **Enterprise** is the hosted multi-user web app. Its release repo is `Kyoo032/Nultron-Releases`.
 > Decision record: [`web-pivot-2026-09-18.md`](../web-pivot-2026-09-18.md).
 
-Last verified: 2026-11-06 at 39cd5f0c + working tree, for the brand-kit removal only: the kit `apps/desktop/branding/agentforge/` and `apps/desktop/resources/brand/` is deleted, so `pack-brand.mjs` exits with "Missing ... brand.json" and the Windows NSIS route and the mac routes below stop until the kit is restored from git history (`git show 39cd5f0c:apps/desktop/branding/agentforge/brand.json`); `release-desktop.mjs` reads the releases repo from `package.json` `build.publish` only; nothing else on the page was re-read that day. Before that: 2026-10-29 at 464b00c5 (Biome optional-chaining cleanup in `apps/desktop/main.cjs` and `apps/desktop/lifecycle.cjs` at `92bde965`; retired-desktop record unchanged; before that: 2026-09-28 at 7a281ad)
+Last verified: 2026-11-06 at 39cd5f0c + working tree, for the brand-kit removal only: the kit `apps/desktop/branding/agentforge/` and `apps/desktop/resources/brand/` is deleted, so `pack-brand.mjs` exits with "Missing ... brand.json" before it writes anything (a check ahead of its first `mkdirSync`, for every flavor and for `--restore-public`) and the Windows NSIS route and the mac routes below stop until the commits of PR #209 are reverted (that brings back the kit, `resources/brand`, the `extraResources` entry and the `brand-icons.mjs` rows together); `release-desktop.mjs` reads the releases repo from `package.json` `build.publish` only; nothing else on the page was re-read that day. Before that: 2026-10-29 at 464b00c5 (Biome optional-chaining cleanup in `apps/desktop/main.cjs` and `apps/desktop/lifecycle.cjs` at `92bde965`; retired-desktop record unchanged; before that: 2026-09-28 at 7a281ad)
 
 Retirement noted 2026-10-14 (repo rename, branch `chore/release-repo-rename`): the Release table's repo names and the updater posture were changed. Every other citation on this page is still as of 7a281ad.
 
@@ -102,7 +102,7 @@ Gates in `apps/desktop/scripts/release-desktop.mjs`, in order:
 | 5 | `latest.yml` version matches; exe size matches; exe sha512 matches in both the file entry and top level; `url` and `path` equal the hyphenated exe name | `:159-175` |
 | 6 | Refuses to publish `docs/internal/` notes to the public repo | `:177-188` |
 | 7 | Stages hyphenated copies (electron-updater's GitHub provider expects hyphens, not spaces) | `:190-210` |
-| 8 | `gh release create` uses `build.publish` `repo` (`Nultron-Desktop` since 2026-10-14, archived; `Nultron` for 0.15.1 and earlier) | `:258-268` |
+| 8 | `gh release create` uses `build.publish` `repo` (`Nultron-Desktop` since 2026-10-14, archived; `Nultron` for 0.15.1 and earlier) | `:259-273` |
 | 9 | Post-upload, re-reads the release and fails unless the asset-name set matches exactly | `:220-241`, `:287` |
 
 `--attach-mac` adds mac artifacts to an already-published Windows release without touching the exe, blockmap or `latest.yml` (`:243-268`), refusing to silently replace an asset that already exists.
