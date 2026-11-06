@@ -4841,7 +4841,14 @@ Residual:
   cursor under `nextPageToken` or `page_token` and a `csrf_token`, which the display then shows as `[REDACTED]`. The
   `.env` rule is upper-case and line-anchored, so `password = input()` in code, a lowercase INI line such as
   `aws_secret_access_key = ...` and an assignment in the middle of a line (`docker run -e DB_PASSWORD=...`) are not
-  masked. Still open from the same sign-off: a JSON-escaped `sk-...` token, a key split across two fields, an `sk-`
+  masked. A value that is only a number or `true` or `false`, quoted or not, is left alone so that `TOKEN_TTL=3600`,
+  `KEY_SIZE=2048` and `PASSWORD_MIN_LENGTH=12` stay readable; the cost is that a password made of digits only on a
+  `.env` line stays visible. An upper-case constant in code, such as `API_KEY = os.environ["X"]` in a settings file
+  that `read_file` returns, is masked in the display and the stored copy (the model still reads the real result).
+  Checked for the key-name ending: a `git grep` of `apps/web`, `packages/core/src/tools`, `packages/core/src/runtime`
+  and `packages/host/src/{workers,delegation,edit}` found no tool output field whose name ends in `Token`, `Secret` or
+  `Password` that the renderer reads back, and no file under `apps/` imports the core redactor (`apps/portal` has its
+  own `redactSecrets`). Still open from the same sign-off: a JSON-escaped `sk-...` token, a key split across two fields, an `sk-`
   token with fewer than eight characters after the prefix, a JSON document inside a string (the walker does not parse
   it), and a 40-character AWS secret access key in free text in deep mode.
 - The model reads the raw tool result, so a secret it repeats lands unredacted in the assistant text, the saved `text`
@@ -4860,11 +4867,19 @@ Residual:
   `edit_jobs.error` and streamed on `job.done`. It is now redacted where it is stored, in `failJob`
   (`packages/host/src/edit/jobs.ts:409`, `redactSecrets`), so `job.done` (`jobs.ts:403`, `:423`), the project
   bundle (`packages/host/src/edit/projects.ts:136-150`) and the job read carry the redacted copy. Rows stored
-  before this change keep the upstream text.
+  before this change keep the upstream text in the database. Closed on the way out under F-152-3 (2026-11-06,
+  `fix/redactor-gaps`, tested, not driven): `mapJob` (`projects.ts:172`) masks `error` with `redactSecrets` on every
+  read, so the bundle, the job read and `job.done` carry a masked copy for those rows too. The rule is idempotent, so
+  a row masked on write reads back unchanged. Test: `packages/host/src/edit/job-error-legacy-row.test.ts` (3 of 4 red
+  before, green after). Every client-facing job answer goes through `mapJob`; no other reader of `edit_jobs` was found.
   Not screened, and not a leak of the tool's output: the project event stream's ops and unplaced items
   (`packages/host/src/edit/ops.ts:356`, `jobs.ts:382`) hold the person's own text and the agent's arguments. A secret
-  with no known prefix under a non-secret name is not caught there, as in Chat. A job's `onEvent` hands raw events to
-  job code (`packages/host/src/job-regen.ts:299`); it does not write `tool_invocations`.
+  with no known prefix under a non-secret name is not caught there, as in Chat. Left unscreened on purpose under
+  F-152-3: `ops.appended` is the document stream the renderer folds by sequence number, so a masked frame would change
+  the op the renderer applies and let the timeline on screen differ from the stored one, and `unplaced.landed` carries
+  the person's own generation prompt. `card.updated` and `job.progress` carry no free text beyond the model's card
+  wording and a number. A job's `onEvent` hands raw events to job code
+  (`packages/host/src/job-regen.ts:299`); it does not write `tool_invocations`.
 - Rows and messages written before the change keep what they hold.
 - No Chat code path was found that logs a tool's input or output; that is read, not proven by a log capture.
 
