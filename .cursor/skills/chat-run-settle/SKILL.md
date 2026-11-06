@@ -114,12 +114,12 @@ A driver that yields (`--hazard`), such as Postgres, lets the watchdog and a clo
 
 What `--hazard` still assumes is that every database write finishes, because `Termination` rests on weak fairness for `Work`. After the claim, the watchdog no longer ends the run, so a write that never returns keeps the stream and its run slot open. `better-sqlite3` cannot hang that way. A move off SQLite (open decision 1, K-D9 in `AGENTS.md`) must give each write a timeout.
 
-A write that rejects after the claim is not modeled either. The catch path calls `persistAssistant` again, which can send the closing sentence a second time. If that retry also rejects, the run leaves the catch with no `finishRun`, so the row stays `streaming` and the person gets no terminal frame. That was already true before the claim on `better-sqlite3`, where the same write throws.
+A write that rejects after the claim is not modeled either. The catch path calls `persistAssistant` again. The retry does not send the closing sentence twice, because `assistantText` already holds it and `settleChatTurn` appends a note only when the text lacks it (`withClosingNote`, `packages/core/src/agents/chat-turn.ts:256`). If that retry also rejects, the run leaves the catch with no `finishRun`, so the row stays `streaming` and the person gets no terminal frame. That was already true before the claim on `better-sqlite3`, where the same write throws.
 
 ## What it does not cover
 
 - The fallback retry on a second model (`heldNext`, `:666`) is folded into the one `"model"` wait.
-- A database write that never returns, and a write that rejects after the claim, which can send the closing sentence twice or leave the row `streaming` with no terminal frame (see above).
+- A database write that never returns, and a write that rejects after the claim twice, which leaves the row `streaming` with no terminal frame (see above).
 - The usage writes (`recordChatRunUsage`, `meterSettledRun`) are synchronous today and are modeled as part of the step that calls them. On a driver that yields, each becomes a wait of its own. The claim, and `settledRunMetered` being set before the write, should keep the properties, but that is argued here, not checked.
 - A model that streamed part of an answer and then failed reaches `CatchFinish` with text to save. The model has no such outcome, so it does not show the claim is needed on the catch path. The claim there is the same line in `persistAssistant`, and `packages/host/src/runs-settle-async-db.test.ts` drives that path with a held write.
 - Tool calls, media mirroring, tool invocation rows, knowledge ingestion and retrieval counts are left out.
