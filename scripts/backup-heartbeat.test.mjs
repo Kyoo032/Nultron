@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -16,6 +16,7 @@ const DEAD_MONITOR = `http://127.0.0.1:9${SECRET_PATH}`;
 
 let server;
 let base;
+let hostPort;
 let sandbox;
 let hits = [];
 
@@ -25,7 +26,8 @@ before(async () => {
     res.end("OK");
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  base = `http://127.0.0.1:${server.address().port}${SECRET_PATH}`;
+  hostPort = `127.0.0.1:${server.address().port}`;
+  base = `http://${hostPort}${SECRET_PATH}`;
   sandbox = mkdtempSync(join(tmpdir(), "backup-heartbeat-"));
 });
 
@@ -74,11 +76,18 @@ test("an unset URL pings nothing", async () => {
 
 test("a malformed URL pings nothing and still returns 0", async () => {
   hits = [];
-  for (const bad of ["ftp://x/y", 'http://127.0.0.1/a"b', "http://127.0.0.1/a b"]) {
+  const malformed = {
+    "no scheme": `${hostPort}/x`,
+    "double quote": `http://${hostPort}/a"b`,
+    space: `http://${hostPort}/a b`,
+    tab: `http://${hostPort}/a\tb`,
+    backslash: `http://${hostPort}/a\\b`,
+  };
+  for (const [name, bad] of Object.entries(malformed)) {
     const result = await ping(bad, 0);
-    assert.equal(result.status, 0);
+    assert.equal(result.status, 0, name);
+    assert.deepEqual(hits, [], `${name} reached the monitor`);
   }
-  assert.deepEqual(hits, []);
 });
 
 test("a dead monitor never fails the caller and never prints the URL", async () => {
@@ -112,13 +121,13 @@ exit 0
   return toPosix(bin);
 }
 
-function runBackup(name, { appRunning, heartbeat }) {
+function runBackup(name, { appRunning, heartbeat, scripts = scriptsPosix }) {
   const dir = join(sandbox, name);
   mkdirSync(dir, { recursive: true });
   const bin = fakeDocker(dir, appRunning);
   const out = toPosix(join(dir, "out"));
   return run(
-    [`${scriptsPosix}backup.sh`, out],
+    [`${scripts}backup.sh`, out],
     {
       ...process.env,
       PATH: `${bin}:${process.env.PATH}`,
@@ -160,7 +169,26 @@ test("backup.sh end to end: an unreachable monitor does not fail a good backup",
   assert.equal(result.status, 0, result.stderr + result.stdout);
 });
 
-test("the heartbeat variable is documented in .env.example", () => {
+test("backup.sh never reads the heartbeat URL from .env", async () => {
+  hits = [];
+  const deployDir = join(sandbox, "deploy-copy");
+  const scriptsCopy = join(deployDir, "scripts");
+  mkdirSync(scriptsCopy, { recursive: true });
+  for (const file of ["backup.sh", "_common.sh", "_heartbeat.sh"]) {
+    cpSync(join(scriptsDir, file), join(scriptsCopy, file));
+  }
+  writeFileSync(join(deployDir, ".env"), `BACKUP_HEARTBEAT_URL=${base}\n`);
+  const result = await runBackup("dotenv-url", {
+    appRunning: true,
+    heartbeat: "",
+    scripts: `${toPosix(scriptsCopy)}/`,
+  });
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  assert.deepEqual(hits, []);
+});
+
+test(".env.example sets no heartbeat URL and points at the README", () => {
   const example = readFileSync(join(scriptsDir, "..", ".env.example"), "utf8");
-  assert.match(example, /^#?\s*BACKUP_HEARTBEAT_URL=/m);
+  assert.doesNotMatch(example, /^\s*#?\s*BACKUP_HEARTBEAT_URL\s*=/m);
+  assert.match(example, /BACKUP_HEARTBEAT_URL[\s\S]*Backup alert/);
 });

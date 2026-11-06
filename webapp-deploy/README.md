@@ -669,8 +669,18 @@ A check on the same box cannot report that the box stopped, and a cron job that 
 nothing to its log. So the alert runs the other way round. `backup.sh` pings an external monitor, and
 the monitor raises the alarm when the pings stop.
 
-Set `BACKUP_HEARTBEAT_URL` in `.env` to the ping URL of a check at a monitor you choose
-(healthchecks.io, or a self-hosted instance of it). The crontab line does not change.
+Set `BACKUP_HEARTBEAT_URL` to the ping URL of a check at a monitor you choose (healthchecks.io, or a
+self-hosted instance of it). `backup.sh` reads it from the process environment only, never from `.env`.
+`.env` is loaded into the `app` container, so a URL kept there would let anyone running code in the app
+send fake success pings and hide a dead backup. Set it on the cron line next to `BACKUP_KEY`, fetched
+from Secrets Manager the same way:
+
+```cron
+17 * * * * BACKUP_KEY="$(tccli ssm get-secret-value ... backup-key ...)" BACKUP_HEARTBEAT_URL="$(tccli ssm get-secret-value ... backup-heartbeat-url ...)" /bin/sh /srv/nultron/webapp-deploy/scripts/backup.sh >> /var/log/nultron-backup.log 2>&1
+```
+
+A file that only the deploy user can read also works: `BACKUP_HEARTBEAT_URL="$(cat ~/.backup-heartbeat-url)"`
+with the file at mode 0600.
 
 | What happened | What `backup.sh` sends | What the monitor does |
 |---|---|---|
@@ -685,17 +695,24 @@ Create the check like this:
    minutes, so 30 minutes of grace absorbs a slow run and a missed hour still alarms about 90 minutes
    after the last good one.
 2. Point its alert at a channel you read (e-mail or Lark).
-3. Copy the ping URL into `BACKUP_HEARTBEAT_URL` in `.env` on the box.
-4. Run `sh webapp-deploy/scripts/backup.sh` once by hand and watch the check turn up.
+3. Store the ping URL where the cron line fetches it (Secrets Manager, or the 0600 file). Never in `.env`.
+4. Run `backup.sh` once by hand with `BACKUP_KEY` and `BACKUP_HEARTBEAT_URL` exported, exactly as the
+   cron line sets them, and watch the check turn up. Without `BACKUP_KEY` the script exits 1 and sends
+   `/fail`.
 
-The ping cannot make a good backup fail. It has a 10 second timeout, retries twice, ignores every error
-and does nothing when `curl` is missing or the value is not an `http://` or `https://` URL. The URL
-is the monitor's secret. The script never prints it and hands it to `curl` on stdin, so it stays out of
-the log and the process list. Keep it out of the crontab line for the same reason. A monitor without a
-`/fail` endpoint still gets the success ping, and a failed run then shows up as a missed one.
+The ping cannot make a good backup fail. Each attempt has a 10 second timeout and it retries twice, so a
+dead monitor costs about 30 seconds at most. It ignores every error and does nothing when `curl` is
+missing or the value is not an `http://` or `https://` URL. The URL is the monitor's secret. The script
+never prints it and hands it to `curl` on stdin, so it stays out of the log and the process list. A
+monitor without a `/fail` endpoint still gets the success ping, and a failed run then shows up as a missed
+one.
 
-Changing the box is a separate step that Rizky runs: pull the scripts, add the variable to `.env`, create
-the check. Nothing here has been deployed.
+Two cases send no `/fail`. The `EXIT` trap is set after `_common.sh` and `_heartbeat.sh` are sourced, so
+an exit before that point (either file missing or failing to load) is silent, and so is a signal kill
+under `dash`. Both show up as a missed run once the grace window passes.
+
+Changing the box is a separate step that Rizky runs: pull the scripts, set the variable on the cron line,
+create the check. Nothing here has been deployed.
 
 ## Restore / roll back
 

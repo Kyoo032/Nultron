@@ -19,6 +19,6 @@ heartbeat_ping() {
 		_hb_url="$_hb_base/fail"
 	fi
 	printf 'url = "%s"\n' "$_hb_url" |
-		curl -s -o /dev/null --max-time 10 --retry 2 --retry-max-time 20 -K - >/dev/null 2>&1 || true
+		curl -q -s --globoff -o /dev/null --max-time 10 --retry 2 --retry-max-time 20 -K - >/dev/null 2>&1 || true
 	return 0
 }

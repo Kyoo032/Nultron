@@ -24,7 +24,7 @@ set -eu
 . "$(dirname "$0")/_common.sh"
 . "$(dirname "$0")/_heartbeat.sh"
 
-HEARTBEAT_URL="$(setting BACKUP_HEARTBEAT_URL)"
+HEARTBEAT_URL="${BACKUP_HEARTBEAT_URL:-}"
 trap '_rc=$?; trap - EXIT; heartbeat_ping "$HEARTBEAT_URL" "$_rc"; exit "$_rc"' EXIT
 
 OUT_DIR="${1:-$DEPLOY_DIR/backups}"
