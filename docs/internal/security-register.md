@@ -225,7 +225,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-188](#sr-188) | Info | Tester: `finance_task` refuses a figures file the model wrote, and asks again for a number the owner did not type | Checked, not an issue (2026-10-20) | — |
 | [SR-189](#sr-189) | Low | Tester: a `finance_task` report made from one person's private attachment is a desk-wide artifact and a desk-wide Knowledge Base card | Open (2026-10-20): acceptable while a desk has one owner (OPC) | Before a hosted desk has a second person |
 | [SR-190](#sr-190) | Medium | Chat's `image_generate` and `video_generate` sent any model id and any source-image address the model wrote to the gateway, which fetches that address | Model half merged to `main` (#183, 2026-10-21), unit-tested, not driven; the address half is `fix/safe-web-search`'s `judgeMediaUrl` (the egress-guard copy from #183 was dropped when that branch took `main`) | PR merge of `fix/safe-web-search` to `main` |
-| [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual: request-body arrays with no `.max()` still cost one issue per bad element | Residual: none blocks; capping the request-body arrays is a follow-up |
+| [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual closed 2026-11-06 (`fix/request-array-caps`): request-body arrays are capped at 10,000 items before a schema reads them | None |
 | [SR-197](#sr-197) | Medium | AI SDK 5's `streamText` prints every stream error to the console by default, and an `APICallError` carries the request body (the prompt) and the gateway's error body | Fixed in tree (2026-11-04, `fix/zod-4`): the runtime passes a silent `onError`; tested, not driven | PR merge of the AI SDK 5 move |
 | [SR-198](#sr-198) | Medium | AI SDK 5 brings `undici` 5.29.0 and `@fastify/busboy` into the hosted image, with five HIGH `undici` advisories and one `busboy` advisory | Fixed in tree (2026-11-04, `fix/zod-4`): scoped override to `undici` 6.29.1, which drops `busboy`; the SDK's guarded download fetch checked on it; not driven | PR merge of the AI SDK 5 move |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
@@ -6488,7 +6488,33 @@ Residual: a request-body array with no `.max()` (`flagged`, `packages/host/src/h
 others) can still cost a signed-in caller's request a few hundred megabytes under the 26 MB body cap. Capping them
 is a follow-up, not part of the move.
 
-Gate: none left on the advisory; the follow-up gates nothing.
+Residual closed 2026-11-06 on `fix/request-array-caps`. `zod` 4.6.7 stops a capped array at the length check: a
+probe on Node 22 gave 1 issue in 2 ms for 100,000 failing elements under `.max(10)`, against 200,000 issues in about
+900 ms with no cap. Two kinds of cap went in, both sized from `REQUEST_ARRAY_MAX` (10,000, twice the 5,000-row import
+cap `FINANCE_IMPORT_MAX_ROWS`, `packages/host/src/request-limits.ts:4`):
+
+- **A `.max()` on the host-only request schemas.** `flagged` (`finance-export.ts:18`, 10,000) and the legal matter
+  `deliverables` list (`packages/host/src/legal/input.ts:43`, `DELIVERABLE_KINDS.length * 4`; the list is de-duplicated
+  after the check).
+- **`assertArraysWithin` before the shared schemas.** `financeBriefSchema` also reads stored briefs
+  (`finance-artifact.ts:57`) and the Market and document and presentation schemas read model output, so none was
+  tightened. The handler walks the posted value first (an iterative walk, so a deep or wide body cannot overflow the
+  stack) and answers `400 invalid_request` naming the cap. It runs on the finance export brief and `result.brief`
+  (`finance-export.ts:50-51`), the finance run, stream, parse and regenerate bodies and the brief Word export
+  (`handlers/finance.ts:17`, `:100`), the Market Word export (`handlers/market.ts:69`), the document Word export
+  and overlap check (`handlers/jobs.ts:221`, `handlers/documents-check.ts:16`), the document and presentation
+  regenerates (`document-generate.ts:379`, `presentation-generate.ts:490`) and the PowerPoint export
+  (`handlers/jobs.ts:280`).
+
+The 26 MB body cap (`MAX_BODY_BYTES`, `http-adapter.ts:43`, enforced while streaming at `:240`) still bounds the
+raw read and `JSON.parse`; the array caps bound what a schema and a renderer do with a posted value after that.
+
+Checked, not capped: the readers that do not use `zod` (`edit.ts` `ops` and `targetClipIds`, `knowledge.ts` `rules`,
+`agents.ts` `inputModalities` and `toolKeys`). They build no issue list, so the advisory's amplification does not
+apply to them, and their cost stays bounded by the 26 MB cap. A stored-record schema (`channels/records.ts`,
+`meeting/records.ts`, `legal/records.ts`) never reads a request body.
+
+Gate: none.
 
 ### SR-197 {#sr-197}
 

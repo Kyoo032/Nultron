@@ -9,7 +9,14 @@ import { generateFinanceBrief, regenerateFinanceSection } from "../finance-gener
 import { requireFinanceTask } from "../finance-task";
 import { financeTaskParser } from "../finance-tasks/parsers";
 import { streamJob } from "../job-stream";
+import { assertArraysWithin } from "../request-limits";
 import { withRunSlot } from "../run-limits";
+
+function runBody(request: HostRequest): unknown {
+  const body = request.body ?? null;
+  assertArraysWithin(body, "Request body");
+  return body;
+}
 
 export async function handlePostFinance(request: HostRequest): Promise<HostResult> {
   try {
@@ -18,9 +25,10 @@ export async function handlePostFinance(request: HostRequest): Promise<HostResul
     requireGatewayAllowedFor(tenant);
     // `task` is validated before anything reaches the gateway: a task that ships
     // later is a 400 here, not a half-run pipeline.
+    const body = runBody(request);
     return await withRunSlot(tenant, async () => {
-      requireFinanceTask(request.body ?? null);
-      return jsonOk(await generateFinanceBrief(tenant, request.body ?? null, undefined, request.abortSignal));
+      requireFinanceTask(body);
+      return jsonOk(await generateFinanceBrief(tenant, body, undefined, request.abortSignal));
     });
   } catch (error) {
     return jsonError(error);
@@ -33,8 +41,9 @@ export async function handlePostFinanceStream(request: HostRequest): Promise<Hos
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
-    requireFinanceTask(request.body ?? null);
-    return streamJob((emit, abortSignal) => generateFinanceBrief(tenant, request.body ?? null, emit, abortSignal), {
+    const body = runBody(request);
+    requireFinanceTask(body);
+    return streamJob((emit, abortSignal) => generateFinanceBrief(tenant, body, emit, abortSignal), {
       abortSignal: request.abortSignal,
       tenant,
     });
@@ -54,9 +63,10 @@ export async function handlePostFinanceParse(request: HostRequest): Promise<Host
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
+    const body = runBody(request);
     return await withRunSlot(tenant, async () => {
-      const task = requireFinanceTask(request.body ?? null);
-      return jsonOk(await financeTaskParser(task)(tenant, request.body ?? null, request.abortSignal));
+      const task = requireFinanceTask(body);
+      return jsonOk(await financeTaskParser(task)(tenant, body, request.abortSignal));
     });
   } catch (error) {
     return jsonError(error);
@@ -68,9 +78,10 @@ export async function handlePostFinanceRegen(request: HostRequest): Promise<Host
     const tenant = await getTenant(request);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
+    const body = runBody(request);
     return await withRunSlot(tenant, async () => {
-      requireFinanceTask(request.body ?? null);
-      return jsonOk(await regenerateFinanceSection(tenant, request.body ?? null, request.abortSignal));
+      requireFinanceTask(body);
+      return jsonOk(await regenerateFinanceSection(tenant, body, request.abortSignal));
     });
   } catch (error) {
     return jsonError(error);
@@ -85,7 +96,9 @@ export async function handlePostFinanceRegen(request: HostRequest): Promise<Host
  */
 export async function handlePostFinanceDocx(request: HostRequest): Promise<HostResult> {
   try {
-    const parsed = financeBriefSchema.safeParse((request.body as { brief?: unknown } | null)?.brief ?? request.body);
+    const subject = (request.body as { brief?: unknown } | null)?.brief ?? request.body;
+    assertArraysWithin(subject, "brief");
+    const parsed = financeBriefSchema.safeParse(subject);
     if (!parsed.success) {
       throw new ApiError("invalid_request", "brief is missing or malformed", 400);
     }

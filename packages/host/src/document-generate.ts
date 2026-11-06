@@ -45,6 +45,7 @@ import { artifactStore } from "./artifacts";
 import { upsertWorkSource } from "./knowledge-ingest";
 import { artifactWorkCard, documentDraftMarkdown } from "./work-cards";
 import { log } from "./log";
+import { assertArraysWithin } from "./request-limits";
 
 const FINANCE_SYSTEM = `You draft finished finance documents for Nultron — not skeletons.
 Return ONLY valid JSON (no markdown fences, no commentary) with this exact shape:
@@ -375,6 +376,7 @@ export async function regenerateDocumentSection(
   if (!body || typeof body !== "object") {
     throw new ApiError("invalid_request", "Request body must be a JSON object", 400);
   }
+  assertArraysWithin((body as { draft?: unknown }).draft, "Document draft");
   const draft = parseDocumentDraftBody((body as { draft?: unknown }).draft);
   const index = readSectionIndex(body, draft.sections.length);
   const topic =

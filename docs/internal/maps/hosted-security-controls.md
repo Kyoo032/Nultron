@@ -2,7 +2,7 @@
 
 Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
 
-Last verified: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-06, branch `feat/hosted-run-limits` over 6105c5c, not committed, for the run-limits subsection of § 5 and its row in the file table; nothing else on the page was re-read. Before that: 2026-10-05, working tree over 0b61a29, not committed, for two lines only (the `audit-deployed.mjs` row of the file table and the audit-gate gotcha, which now describe the production closure after SR-113); nothing else on the page was re-read. Before that: 2026-10-02, working tree over 0b61a29, not committed, for one row (the operator-fields row of § 8, which now says who may write a provider key: M4, an owner or an admin, a member is answered `403 settings_key_forbidden`); nothing else on the page was re-read. Before that: 2026-10-01, working tree over 0b61a29, not committed, for two rows only: the `ci-local.mjs` row of the tests table (a vitest step now needs its `Tests N passed` summary, not just exit 0) and the per-tenant model cache bullet of § 10 (the background refill and its log line). Before that, the same day, for the new § 10 (where a tenant's provider key may go: Enterprise BYOK Phase A) and the corrected operator-keys row of § 8, whose "provider keys" claim was wrong before it (`requestsOperatorOnlySettings` lists `toolKeys`, `toolBackends` and `injectionGuardBypass` only). Nothing else on the page was re-read that day. Before that: 2026-09-23 at d4561b8 + working tree for sections 1-4 and every
+Last verified: 2026-11-06 at 39cd5f0c plus the working tree on `fix/request-array-caps`, for the request list caps subsection of § 5 and its file row only; nothing else on the page was re-read. Before that: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-06, branch `feat/hosted-run-limits` over 6105c5c, not committed, for the run-limits subsection of § 5 and its row in the file table; nothing else on the page was re-read. Before that: 2026-10-05, working tree over 0b61a29, not committed, for two lines only (the `audit-deployed.mjs` row of the file table and the audit-gate gotcha, which now describe the production closure after SR-113); nothing else on the page was re-read. Before that: 2026-10-02, working tree over 0b61a29, not committed, for one row (the operator-fields row of § 8, which now says who may write a provider key: M4, an owner or an admin, a member is answered `403 settings_key_forbidden`); nothing else on the page was re-read. Before that: 2026-10-01, working tree over 0b61a29, not committed, for two rows only: the `ci-local.mjs` row of the tests table (a vitest step now needs its `Tests N passed` summary, not just exit 0) and the per-tenant model cache bullet of § 10 (the background refill and its log line). Before that, the same day, for the new § 10 (where a tenant's provider key may go: Enterprise BYOK Phase A) and the corrected operator-keys row of § 8, whose "provider keys" claim was wrong before it (`requestsOperatorOnlySettings` lists `toolKeys`, `toolBackends` and `injectionGuardBypass` only). Nothing else on the page was re-read that day. Before that: 2026-09-23 at d4561b8 + working tree for sections 1-4 and every
 `http-adapter.ts` citation on this page (the auth pass: the production https rule for the portal
 URL, the malformed Host / request-target 400, the gate's portal re-check, digest session ids). The
 response headers, the ffmpeg failure detail and the top-up link keep their 2026-09-21 reading at
@@ -217,6 +217,15 @@ flight instead, server mode only:
   header field. The 503 keeps its code through error masking (`maskServerError`) and the renderer puts
   the catalog sentence in at `apiFetch` (`apps/web/lib/run-limit-copy.ts`), for both codes.
 
+#### Request list caps (SR-196 residual, 2026-11-06)
+
+The body is read whole up to `MAX_BODY_BYTES` (26 MB, `http-adapter.ts:43`, `:240`) and then `JSON.parse`d, so the byte cap is the only bound on the read. `packages/host/src/request-limits.ts` bounds what happens after: `REQUEST_ARRAY_MAX` is 10 000 (twice `FINANCE_IMPORT_MAX_ROWS`), and `assertArraysWithin` walks a posted value without recursion and answers `400 invalid_request` naming the cap when any list in it is longer. Two kinds of cap:
+
+- **A `.max(REQUEST_ARRAY_MAX)` on a request-only schema**: `flagged` in `handlers/finance-export.ts`, and the legal `deliverables` list in `legal/input.ts`.
+- **`assertArraysWithin` ahead of a shared schema**: the schemas `financeBriefSchema`, `marketBriefingSchema`, `documentDraftSchema` and `presentationOutlineSchema` also read stored or model-written data, so they are left alone and the handler checks the posted value first. Call sites are listed in SR-196 in the security register.
+
+The hand-written body readers (`edit.ts`, `knowledge.ts`, `agents.ts`) are not covered. `zod` 4.6.7 stops a capped array at the length check (1 issue for 100 000 failing elements); an uncapped one costs an issue per element.
+
 ### 6. What goes back out
 
 - **Headers.** `packages/host/src/security-headers.ts` writes CSP, HSTS, `X-Frame-Options: DENY`,
@@ -314,6 +323,7 @@ Not a request-admission control; what the host does with a key once it has one. 
 | `packages/host/src/csrf.ts` | Double-submit token mint and check |
 | `packages/host/src/rate-limit.ts` | The three token buckets |
 | `packages/host/src/run-limits.ts` | The in-flight run caps and the exactly-once slot (§ 5, SR-138) |
+| `packages/host/src/request-limits.ts` | `REQUEST_ARRAY_MAX` and `assertArraysWithin`, the list cap on posted values (§ 5, SR-196) |
 | `packages/host/src/auth/session.ts` | Opaque session ids, expiry, cookie names |
 | `packages/host/src/auth/routes.ts` | `requireSessionFor`, the sign-in routes |
 | `packages/host/src/router.ts` | `gate()` — the session check, ahead of the route table |

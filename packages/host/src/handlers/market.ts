@@ -8,6 +8,7 @@ import { buildMarketBoard } from "../market-board";
 import { assertBriefingHasNoAdvice } from "../market-briefing-build";
 import { buildMarketBriefingDocx } from "../market-docx";
 import { generateMarketBriefing, regenerateBriefingSection } from "../market-generate";
+import { assertArraysWithin } from "../request-limits";
 import { getTenant } from "../tenant";
 import type { HostRequest, HostResult } from "../types";
 
@@ -64,9 +65,9 @@ export async function handlePostMarketRegen(request: HostRequest): Promise<HostR
 /** `POST /api/v1/market/docx` — body: { briefing } (or the briefing itself); result: the .docx bytes. */
 export async function handlePostMarketDocx(request: HostRequest): Promise<HostResult> {
   try {
-    const parsed = marketBriefingSchema.safeParse(
-      (request.body as { briefing?: unknown } | null)?.briefing ?? request.body,
-    );
+    const subject = (request.body as { briefing?: unknown } | null)?.briefing ?? request.body;
+    assertArraysWithin(subject, "briefing");
+    const parsed = marketBriefingSchema.safeParse(subject);
     if (!parsed.success) {
       throw new ApiError("invalid_request", "briefing is missing or malformed", 400);
     }
