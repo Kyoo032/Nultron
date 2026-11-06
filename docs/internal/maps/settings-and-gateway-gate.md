@@ -87,7 +87,7 @@ The literal `"__default__"` appears exactly once in the repo, at `:30`.
 **`injectionGuardBypass` is the one field of a slice that is not saved (SR-202, 2026-11-06).** The sealed payload
 never holds it, on a desk or on the server. `mergeSecrets` ignores it and `normalizeSecrets` does not read it
 (`packages/host/src/settings-store.ts:112`), and a slice that still carries the key is rewritten without it as soon as
-the payload loads (`carriesStoredBypass` `injection-guard-bypass.ts:23`, `clearStoredBypass` `:447`, `loadSettingsFile` `:481`, one log line
+the payload loads (`carriesStoredBypass` `injection-guard-bypass.ts:23`, `clearStoredBypass` `settings-store.ts:447`, `loadSettingsFile` `settings-store.ts:481`, one log line
 with the tenant id). Off server mode `saveSettings` records a boolean patch in a per-desk set in host memory
 (`packages/host/src/injection-guard-bypass.ts`; `settings-store.ts:531`) and `loadSettings` / `saveSettings` layer
 it onto what they return (`withInjectionGuardBypass`, `injection-guard-bypass.ts:17`), so `maskSecrets` reports it and every reader sees it

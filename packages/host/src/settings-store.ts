@@ -654,6 +654,7 @@ export function dropWorkspaceSettings(workspaceId: string, scope?: SettingsScope
     return;
   }
   const { tenantId } = resolveSettingsScope(scope ?? workspaceId);
+  setInjectionGuardBypass(tenantId, id, false);
   const file = loadSettingsFile(tenantId);
   if (!file.workspaces[id]) {
     return;

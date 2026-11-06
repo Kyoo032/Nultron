@@ -8,7 +8,6 @@ export const SOURCE_MATERIAL_RULE =
   "When source material is supplied, use only that material for facts, figures, names, and quotes. Do not add facts from memory. If the material does not cover something the user asked for, say so in the text instead of inventing it.";
 
 export type SourceTextOptions = {
-  /** Mirrors the chat attachment guard: a desk may switch it off until the host restarts. */
   injectionGuardBypass?: boolean;
 };
 

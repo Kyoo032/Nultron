@@ -6544,7 +6544,7 @@ Evidence before the fix: off server mode `POST /api/v1/settings { "injectionGuar
 `packages/host/src/settings-store.ts:135`). Every reader then skipped the scan: Chat attachments
 (`packages/host/src/runs.ts:160`), every job's `readSourceText` (`job-source.ts:24`), Knowledge ingest
 (`knowledge.ts:473`, `knowledge-ingest.ts:23`), and tool arguments and outputs (`credentials.ts:371` into
-`secret-scope.ts:62` into `invoke-guarded.ts:50`, `:71`). It survived a restart, and `false` was the only way back. On
+`secret-scope.ts:62` into `invoke-guarded.ts:64`, `:86`). It survived a restart, and `false` was the only way back. On
 the hosted server the write is refused (`handlers/settings.ts:348-349`, `:381`), but a `true` already in the tenant's
 row was still read and honoured, and the hosted patch passes `undefined`, so no save could clear it. A desk that had
 the flag and then moved onto a hosted data dir stayed disarmed. Nothing in the UI shows it: the Settings page has no

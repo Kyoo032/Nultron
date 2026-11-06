@@ -49,7 +49,7 @@ There is no separate list route; listing rides on `GET /api/v1/knowledge`. `POST
 
 On a hit it **does not strip or sanitize**. It refuses to index and writes a `Failed` source row whose `error` is `injection_blocked (rule: <rule>)` (`packages/host/src/knowledge.ts:440-443`, `packages/host/src/knowledge-ingest.ts:63-70`).
 
-**The bypass** is the `injectionGuardBypass` boolean on `StoredSecrets` (`packages/core/src/secrets.ts:34`, `:80`), set through `POST /api/v1/settings` (`requestsOperatorOnlySettings`, `packages/host/src/handlers/settings.ts:176-184`), never persisted (SR-202: a per-desk switch in host memory off server mode, see [`settings-and-gateway-gate.md`](settings-and-gateway-gate.md)), read through `loadSettings` at `packages/host/src/knowledge.ts:408-414` and `knowledge-ingest.ts:94-100`. When true the scan is skipped outright — `bypass ? null : scanInjection(...)`.
+**The bypass** is the `injectionGuardBypass` boolean on `StoredSecrets` (`packages/core/src/secrets.ts:34`, `:80`), set through `POST /api/v1/settings` (`requestsOperatorOnlySettings`, `packages/host/src/handlers/settings.ts:176-184`), never persisted (SR-202: a per-desk switch in host memory off server mode, see [`settings-and-gateway-gate.md`](settings-and-gateway-gate.md)), read through `loadSettings` at `packages/host/src/knowledge.ts:456-462` and `knowledge-ingest.ts:89-95`. When true the scan is skipped outright — `bypass ? null : scanInjection(...)`.
 
 Source **names** get the same treatment, deliberately: an upload filename or a remote `<title>` is attacker-controlled the same way body text is, so `sanitizeSourceName` runs at index time and again at render time (`packages/host/src/knowledge.ts:367`, `:860`).
 
