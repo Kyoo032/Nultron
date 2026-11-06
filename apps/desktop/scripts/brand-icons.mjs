@@ -13,7 +13,7 @@
 //
 // PNG source mode (the app logo), the default:
 //   node apps/desktop/scripts/brand-icons.mjs --out <dir> [--png-src <dir>] [--src <dir with the wordmark SVGs>]
-// --png-src defaults to docs/internal/brand/nultron/reference. It must hold app-logo-cut.png (the logo tile with transparent
+// --png-src must hold app-logo-cut.png (the logo tile with transparent
 // corners, square, at least 1024 px) or, when that is absent, app-logo.webp: Rizky's 1600 px master, which Electron decodes and
 // brand-logo-cut.mjs cuts out of its white corners (the cut is written to <out>/source/app-logo-cut.png). It may also hold
 // icon-<n>.png (an exact-size picture that wins over resizing). Everything is derived from the one file: the Windows and
@@ -281,8 +281,17 @@ export function plan(smallMax = SMALL_MAX) {
 export const LOGO_SOURCE = "app-logo-cut.png";
 /** The master the cut is made from: Rizky's painted logo, 1600 px, no alpha, white corners. */
 export const LOGO_MASTER = "app-logo.webp";
-/** Where --png-src points when it is not given: the folder that holds the master. */
-export const DEFAULT_PNG_SRC = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "docs", "internal", "brand", "nultron", "reference");
+export const DEFAULT_PNG_SRC = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "..",
+  "docs",
+  "internal",
+  "brand",
+  "nultron",
+  "reference",
+);
 export const MARK_SIZES = [24, 32, 48, 64, 128, 256];
 // The tile is a superellipse |x/a|^n + |y/a|^n = 1, fitted to the artwork's own edge (n 4.67, a 807 px on the 1600 px
 // canvas, so the source image crops the tile by a few px per side). `half` is a as a fraction of the canvas width.

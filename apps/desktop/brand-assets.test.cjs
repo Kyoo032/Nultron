@@ -46,8 +46,6 @@ function icnsEntries(bytes, label) {
   return entries;
 }
 
-// ---------- Windows: icon.ico, one file in two places ----------
-
 {
   const source = read(join(buildDir, "icon.ico"));
   assert.ok(read(join(splashDir, "icon.ico")).equals(source), "splash/icon.ico is the build copy");
@@ -83,11 +81,7 @@ function icnsEntries(bytes, label) {
   assert.match(source, /unlinkSync\(buildIcns\)/);
 }
 
-// ---------- icon source: 1024 px ----------
-
 assert.deepEqual(pngSize(read(join(buildDir, "icon.png")), "icon.png"), { width: 1024, height: 1024 });
-
-// ---------- display logo: small, and the same file as the web app's ----------
 
 {
   const source = read(join(splashDir, "logo.png"));

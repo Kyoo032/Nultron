@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Publish the packed Nultron Setup exe, its blockmap and latest.yml to the public
- * releases repo named in package.json build.publish (Kyoo032/Nultron-Desktop).
+ * releases repo.
  * Run after `pnpm desktop:build`. Uploaded asset names are hyphenated (what electron-updater's
  * GitHub provider requests); the local files keep the spaced artifactName.
  *

@@ -406,7 +406,7 @@ describe("palette contrast (WCAG 2.1)", () => {
 
 describe("Nultron IP colours", () => {
   // Sampled 2026-10-01 from the art: a k-means pass over the opaque pixels of
-  // `docs/internal/brand/nultron/reference/app-logo.webp` and of `components/nultron/images/full/*.webp`.
+  // `components/nultron/images/full/*.webp`.
   // Changing one is a change to the brand, so it is made here, in the same commit as the token.
   const SAMPLED = {
     "--nultron-blue": "#1277c8",
