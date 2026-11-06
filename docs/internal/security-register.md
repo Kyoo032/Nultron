@@ -6491,7 +6491,12 @@ is a follow-up, not part of the move.
 Residual closed 2026-11-06 on `fix/request-array-caps`. `zod` 4.6.7 stops a capped array at the length check: a
 probe on Node 22 gave 1 issue in 2 ms for 100,000 failing elements under `.max(10)`, against 200,000 issues in about
 900 ms with no cap. Two kinds of cap went in, both sized from `REQUEST_ARRAY_MAX` (10,000, twice the 5,000-row import
-cap `FINANCE_IMPORT_MAX_ROWS`, `packages/host/src/request-limits.ts:4`):
+cap `FINANCE_IMPORT_MAX_ROWS`, `packages/host/src/request-limits.ts:4`), plus a total budget `REQUEST_ITEMS_MAX` (250,000 list
+items in one posted value, `:5`). One cap per list is not enough on its own: measured 2026-11-06 on Node 22 with
+`zod` 4.6.7, 200 sections each holding a 10,000-item `metrics` list of numbers where strings are expected (a 4 MB
+body, every list under the cap) gave 2,000,000 issues, about 918 MB of heap and 13.6 s. The walker counts every
+list item as it goes and refuses past the budget, so a posted value cannot hold more failing leaves than the budget allows.
+
 
 - **A `.max()` on the host-only request schemas.** `flagged` (`finance-export.ts:18`, 10,000) and the legal matter
   `deliverables` list (`packages/host/src/legal/input.ts:43`, `DELIVERABLE_KINDS.length * 4`; the list is de-duplicated
@@ -6503,11 +6508,14 @@ cap `FINANCE_IMPORT_MAX_ROWS`, `packages/host/src/request-limits.ts:4`):
   (`finance-export.ts:50-51`), the finance run, stream, parse and regenerate bodies and the brief Word export
   (`handlers/finance.ts:17`, `:100`), the Market Word export (`handlers/market.ts:69`), the document Word export
   and overlap check (`handlers/jobs.ts:221`, `handlers/documents-check.ts:16`), the document and presentation
-  regenerates (`document-generate.ts:379`, `presentation-generate.ts:490`) and the PowerPoint export
-  (`handlers/jobs.ts:280`).
+  regenerates (`document-generate.ts:379`, `presentation-generate.ts:490`), the PowerPoint export
+  (`handlers/jobs.ts:280`) and the Edit ops route, whose op payloads hold uncapped clip and track lists
+  (`handlers/edit.ts`, `handlePostEditOps`).
 
 The 26 MB body cap (`MAX_BODY_BYTES`, `http-adapter.ts:43`, enforced while streaming at `:240`) still bounds the
 raw read and `JSON.parse`; the array caps bound what a schema and a renderer do with a posted value after that.
+
+Audit: every `z.array(` without a `.max(` in `packages/core/src` and `packages/host/src` (89 lines in 33 files) was traced to its callers on 2026-11-06. The request-reachable ones are the finance brief and its tables, the finance task inputs (ratios, budget, cash flow, appraisal, line items), the Market packet, the document draft, the presentation outline, the legal deliverables list, the export `flagged` list and the Edit op payloads; all are covered above. The rest are parsed from values the host builds itself, from model output or from stored records (dossier, research notes, Data analysis, artifact meta, meeting minutes, legal facts, the deck tool schema), or are already capped on a later line of the same schema.
 
 Checked, not capped: the readers that do not use `zod` (`edit.ts` `ops` and `targetClipIds`, `knowledge.ts` `rules`,
 `agents.ts` `inputModalities` and `toolKeys`). They build no issue list, so the advisory's amplification does not

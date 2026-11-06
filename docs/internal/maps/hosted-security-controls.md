@@ -219,7 +219,7 @@ flight instead, server mode only:
 
 #### Request list caps (SR-196 residual, 2026-11-06)
 
-The body is read whole up to `MAX_BODY_BYTES` (26 MB, `http-adapter.ts:43`, `:240`) and then `JSON.parse`d, so the byte cap is the only bound on the read. `packages/host/src/request-limits.ts` bounds what happens after: `REQUEST_ARRAY_MAX` is 10 000 (twice `FINANCE_IMPORT_MAX_ROWS`), and `assertArraysWithin` walks a posted value without recursion and answers `400 invalid_request` naming the cap when any list in it is longer. Two kinds of cap:
+The body is read whole up to `MAX_BODY_BYTES` (26 MB, `http-adapter.ts:43`, `:240`) and then `JSON.parse`d, so the byte cap is the only bound on the read. `packages/host/src/request-limits.ts` bounds what happens after: `REQUEST_ARRAY_MAX` is 10 000 (twice `FINANCE_IMPORT_MAX_ROWS`) per list and `REQUEST_ITEMS_MAX` is 250 000 list items in all. `assertArraysWithin` walks a posted value without recursion and answers `400 invalid_request` naming the cap when any list is longer or the total passes the budget. The total matters because `zod` records one issue per failing leaf: 200 lists of 10 000 bad items (a 4 MB body) cost 2 000 000 issues and about 900 MB. Two kinds of cap:
 
 - **A `.max(REQUEST_ARRAY_MAX)` on a request-only schema**: `flagged` in `handlers/finance-export.ts`, and the legal `deliverables` list in `legal/input.ts`.
 - **`assertArraysWithin` ahead of a shared schema**: the schemas `financeBriefSchema`, `marketBriefingSchema`, `documentDraftSchema` and `presentationOutlineSchema` also read stored or model-written data, so they are left alone and the handler checks the posted value first. Call sites are listed in SR-196 in the security register.

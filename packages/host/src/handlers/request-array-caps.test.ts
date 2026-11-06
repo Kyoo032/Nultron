@@ -143,6 +143,26 @@ describe("request arrays are capped before they are parsed", () => {
     expect(errorOf(result).message).toContain(String(limits.REQUEST_ARRAY_MAX));
   });
 
+  it("refuses many lists that are each under the cap but together over the item budget", async () => {
+    const lists = Math.ceil(limits.REQUEST_ITEMS_MAX / limits.REQUEST_ARRAY_MAX) + 1;
+    const sections = many(lists, () => ({
+      heading: "h",
+      body: "b",
+      metrics: many(limits.REQUEST_ARRAY_MAX, () => 1),
+    }));
+    const result = await post("/api/v1/finance/docx", { brief: { ...brief, sections } });
+    expect(status(result)).toBe(400);
+    expect(errorOf(result).message).toContain(String(limits.REQUEST_ITEMS_MAX));
+  });
+
+  it("refuses an oversized clip list inside an edit op", async () => {
+    const clips = many(limits.REQUEST_ARRAY_MAX + 1, () => ({}));
+    const ops = [{ type: "add_track", payload: { track: {}, clips } }];
+    const result = await post("/api/v1/edit/projects/nope/ops", { ops });
+    expect(status(result)).toBe(400);
+    expect(errorOf(result).message).toContain(String(limits.REQUEST_ARRAY_MAX));
+  });
+
   it("refuses an oversized legal deliverables list", async () => {
     const result = await post("/api/v1/legal/matters", {
       title: "NDA",
@@ -160,6 +180,23 @@ describe("assertArraysWithin", () => {
     expect(() =>
       limits.assertArraysWithin({ a: [{ b: [many(limits.REQUEST_ARRAY_MAX + 1, () => 0)] }] }, "body"),
     ).toThrow(/body/);
+  });
+
+  it("counts every list together, not only each one", () => {
+    const each = many(limits.REQUEST_ARRAY_MAX, () => 0);
+    const lists = Math.floor(limits.REQUEST_ITEMS_MAX / limits.REQUEST_ARRAY_MAX);
+    expect(() =>
+      limits.assertArraysWithin(
+        many(lists, () => each),
+        "body",
+      ),
+    ).toThrow(/in all/);
+    expect(() =>
+      limits.assertArraysWithin(
+        many(lists - 1, () => each),
+        "body",
+      ),
+    ).not.toThrow();
   });
 
   it("ignores scalars, null and undefined", () => {
