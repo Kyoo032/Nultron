@@ -6553,7 +6553,7 @@ and a missing Host is refused: 403 `forbidden`. In server mode it must be a host
 (`:620`), so the container healthcheck, Caddy's `health_uri` and the k8s probes are untouched. The billing
 webhook path skips it as it skips CSRF. In server mode the HTTPS rule and the request filter still come first,
 so a plaintext GET is `https_required`. Tests: `http-adapter.test.ts` "handleNodeRequest Host guard on safe
-methods" (nine cases); five failed before the fix, none after. `http-adapter-socket.test.ts` repeats the rule over a real `node:http` socket with an explicit Host header (three cases, passing).
+methods" (ten cases); five failed before the fix, none after. `http-adapter-socket.test.ts` repeats the rule over a real `node:http` socket with an explicit Host header (three cases, passing).
 
 Residual: driven over a loopback socket in a test, not against a hosted server or webdev in a browser. An unusual local setup that reaches
 webdev by another name now gets 403; the bind host is loopback-only off server mode, so that means a

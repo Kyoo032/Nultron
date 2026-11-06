@@ -2,7 +2,7 @@
 
 Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
 
-Last verified: 2026-11-06 at ed5bdbcd + working tree for the Host rule only (the paragraph before section 2 and step 10 of the request walk). Before that: 2026-10-11 at 2df34be (fix branch, before merge) (SH-001: section 0, the Node 22 boot check). Before that: 2026-09-21 at 4938747 + working tree; four citations re-anchored and the
+Last verified: 2026-11-06 at 01a88fba for the Host rule only (the paragraph before section 2 and step 10 of the request walk). Before that: 2026-10-11 at 2df34be (fix branch, before merge) (SH-001: section 0, the Node 22 boot check). Before that: 2026-09-21 at 4938747 + working tree; four citations re-anchored and the
 review-instance section added, then the boot-guard path re-checked after the fix pass of the same
 day (the guards moved from `apps/web/lib/` to `apps/web/server/`, because `lib` is the renderer's
 namespace and that module re-exports `@agentforge/host`). The rest was last read at c204e5e /
@@ -42,12 +42,12 @@ Since 2026-11-06 (SR-200) the Host half of both rules also runs on GET, HEAD and
 
 `mutatingRejection` (`packages/host/src/http-adapter.ts:539-568`) is the one place the two are chosen between, on `csrfMode.secure` — which *is* `serverMode` (`:526`, set at `:387`).
 
-**Off server mode (the rule that was always there).** `isAllowedMutatingApiRequest(origin)` (`packages/host/src/local-request.ts:80-89`): a **missing Origin is allowed**, because curl, native tooling and same-origin GETs honestly have none; a present Origin must resolve to `localhost`, `127.0.0.1` or `::1` (`isLocalRequestUrl`, `:32-37` → `isLocalRequestHost`, `:20-29`). The `referer` argument is accepted and ignored (`:82`) — a remote Origin is never rescued by a local Referer. `isLoopbackHostHeader(host)` (`:66-73`) is the second half, and a **missing Host is rejected** (reasoning in the comment at `:56-65`). Failure is `403 { code: "forbidden", message: "Local requests only" }` (`http-adapter.ts:536-538`, `:26`).
+**Off server mode (the rule that was always there).** `isAllowedMutatingApiRequest(origin)` (`packages/host/src/local-request.ts:80-89`): a **missing Origin is allowed**, because curl, native tooling and same-origin GETs honestly have none; a present Origin must resolve to `localhost`, `127.0.0.1` or `::1` (`isLocalRequestUrl`, `:32-37` → `isLocalRequestHost`, `:20-29`). The `referer` argument is accepted and ignored (`:82`) — a remote Origin is never rescued by a local Referer. `isLoopbackHostHeader(host)` (`:66-73`) is no longer part of the mutating rule: since SR-200 `hostRejection` checks it on every `/api` request, GET, HEAD and OPTIONS included, and a **missing Host is rejected** (reasoning in the comment at `:56-65`). Failure is `403 { code: "forbidden", message: "Local requests only" }` (`http-adapter.ts:536-538`, `:26`).
 
 **In server mode (the hosted rule).** Both halves are checked against `trustedOrigins()` (`http-adapter.ts:527-531`):
 
 - `isAllowedWebOrigin(origin, allowlist)` (`local-request.ts:99-105`) — a **missing Origin is now rejected** (`:101-103`), and the match is on the whole normalised `scheme://host[:port]`, so a different scheme or port is a different origin. An empty allowlist matches nothing.
-- `isAllowedWebHostHeader(host, allowlist)` (`:113-119`) — the public host the proxy forwards. `allowedHostHeaders` (`:123-137`) builds the accepted set from the allowlist's origins and additionally accepts the explicit default port (`app.example.com:443` for an https origin, `DEFAULT_PORTS` at `:121`).
+- `isAllowedWebHostHeader(host, allowlist)` (`:113-119`) — the public host the proxy forwards. Since SR-200 `hostRejection` checks it on every `/api` request, not only on mutating ones; `mutatingRejection` keeps the Origin, CSRF and transport checks. `allowedHostHeaders` (`:123-137`) builds the accepted set from the allowlist's origins and additionally accepts the explicit default port (`app.example.com:443` for an https origin, `DEFAULT_PORTS` at `:121`).
 
 Either failing is `403 { code: "origin_forbidden", message: "Origin is not allowed to call this server" }` (`http-adapter.ts:529-531`, `:28`).
 

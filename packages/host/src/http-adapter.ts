@@ -194,8 +194,8 @@ function hasNonAuthorityCharacter(value: string): boolean {
 /**
  * True when a Host header is present and is not `host[:port]`.
  *
- * Absent is a different question and is not answered here: HTTP/1.0 may omit it, and the mutating
- * rules below already refuse a write that carries none. Present and empty, present with a space, a
+ * Absent is a different question and is not answered here: HTTP/1.0 may omit it, and `hostRejection`
+ * below already refuses any `/api` request that carries none. Present and empty, present with a space, a
  * slash, userinfo, an unclosed `[` or a port past 65535 is malformed. The character set is left to
  * the URL parser rather than a hand-written grammar, so a Docker service name such as `my_service`
  * still passes.
@@ -754,14 +754,6 @@ function logAuthFailure(result: HostResult, context: RequestContext): void {
 
 type Rejection = { readonly code: string; readonly message: string };
 
-/**
- * The one place the two rules are chosen between (docs/internal/web-migration-plan.md Phase 1).
- *
- * Off server mode: the local rule, unchanged — a missing Origin is same-machine and the Host must be
- * loopback. In server mode: the Origin must be on the configured allowlist (a missing one is
- * rejected), the Host must be one of those origins' hosts, and the double-submit CSRF token must
- * match. The `x-agentforge-transport` requirement on the destructive routes is unchanged in both.
- */
 /**
  * Phase 5 lane B: paths a mutating request may reach without an Origin on the allowlist and
  * without a CSRF token (decision doc §3(c), the first of the webhook's three exemptions).

@@ -944,7 +944,11 @@ describe("handleNodeRequest path normalisation", () => {
     useLocalMode();
     const captured = fakeResponse();
     await handleNodeRequest(
-      fakeRequest({ method: "get", url: "/api/v1/ping", headers: { host: LOOPBACK_HOST } }),
+      fakeRequest({
+        method: "get",
+        url: "/api/v1/ping",
+        headers: { host: LOOPBACK_HOST, origin: "https://evil.example" },
+      }),
       captured.res,
     );
     expect(captured.status()).toBe(200);
