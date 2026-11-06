@@ -8,14 +8,14 @@ This file lists every product built from this repo, one card per target, coverin
 
 **Agents read this file before starting any task.** Name the target your task serves, then keep the change inside it. If the change lands on another target, stop and say so.
 
-Last updated: 2026-10-15 (base agentforge `main` at `8a42aaed`). The hex colours below were sampled from each brand's own logo file.
+Last updated: 2026-11-06 (`Kyoo032/Nultron` `main` at `39cd5f0c`). The hex colours below were sampled from each brand's own logo file.
 
 ## At a glance
 
 | Target | Type | Company | Product name | Gateway users see | Status | Focus now |
 |---|---|---|---|---|---|---|
-| [`nultron-personal`](#nultron-personal) | Desktop app | Public (retired) | Nultron | Toko Token | Retired 2026-10-14. Last release v0.15.1. Repo `Kyoo032/Nultron-Desktop` archived | None. The app is merged into the web app; no new cut |
-| [`nultron-enterprise`](#nultron-enterprise) | Hosted web app | Nultron Enterprise customers (via DPS) | Nultron | Toko Token + BYOK | Pilot, not deployed. A password-gated single-desk preview (one private desk per tester) runs at app.nultron-ai.xyz since 2026-10-06. Release repo is `Kyoo032/Nultron-Releases` (renamed from `Kyoo032/Nultron` on 2026-10-15) | First Tencent Enterprise deploy, Thu 8 Oct; it replaces the preview |
+| [`nultron-personal`](#nultron-personal) | Desktop app | Public (retired) | Nultron | Toko Token | Retired 2026-10-14. Last release v0.15.1 (2026-09-28). 0.16.0 was packed on 2026-10-06 and never published. Repo `Kyoo032/Nultron-Desktop` archived | None. The app is merged into the web app; no new cut |
+| [`nultron-enterprise`](#nultron-enterprise) | Hosted web app | Nultron Enterprise customers (via DPS) | Nultron | Toko Token + BYOK | Pilot, never released or deployed (checked 2026-11-06). A password-gated single-desk preview (one private desk per tester) was put up at app.nultron-ai.xyz on 2026-10-06; it is not an Enterprise deploy. Release repo is `Kyoo032/Nultron-Releases` (renamed from `Kyoo032/Nultron` on 2026-10-15) | The first release and Tencent deploy, when Rizky says go. It was planned for Thu 8 Oct 2026 and did not happen |
 | [`kemenkeu-ai`](#kemenkeu-ai) | Desktop flavor | Kemenkeu (Ministry of Finance) | Kemenkeu AI | AIHub | Built locally | Later, after Nultron |
 | [`aihub-metranet`](#aihub-metranet) | Desktop flavor | Metranet (Telkom Indonesia) | AIHub Metranet | AIHub | Built locally | Later, after Nultron |
 
@@ -111,12 +111,17 @@ Last updated: 2026-10-15 (base agentforge `main` at `8a42aaed`). The hex colours
 - **Where it runs (updated 2026-10-05):** Phase 0 is one Tencent Lighthouse box in Jakarta that will also host dpscloud.co.id (the parent site) and tokotokenai.com. Nultron goes on **nultron-ai.xyz**, with sign-in on **portal.nultron-ai.xyz**. **Never point api.tokotokenai.com at it.** Email is Tencent SES only, for the sign-in codes: "Nultron <no-reply@mail.dpscloud.co.id>", no mailboxes. After a 1-month test, move to a bigger Tencent CVM by sharing a Lighthouse custom image to CVM (same region), restoring the newer data, and switching DNS. Multi-site build: branch `feat/multi-site-edge`. Guide: `nultron-files/deploy/hosting-guide.html`. Before that, Phase 0 was one Tencent Lighthouse box in Jakarta. Phase 1 is TKE; its manifests are in `webapp-deploy/k8s/`, not yet applied.
 - **Ships by:** `node scripts/release-web.mjs --tag <tag> --sha <sha>`, with `--dry-run` first. It pushes both images, plus a deploy bundle to `Kyoo032/Nultron-Releases` (the release repo, renamed from `Kyoo032/Nultron` on 2026-10-15 and from `Kyoo032/NultronEnt` on 2026-10-14).
 - **Tag:** `ent-YYYY.MM.DD`. Every deploy is logged by sha.
-- **Current:** as of 2026-10-05, nothing was released or deployed, and the deploy log was empty. Not re-checked on 2026-10-14.
+- **Current:** nothing has been released or deployed. Checked 2026-11-06:
+  - the deploy log in [`web-pivot-2026-09-18.md`](web-pivot-2026-09-18.md#deploy-log) and [`webapp-deploy/DEPLOY-LOG.md`](../../webapp-deploy/DEPLOY-LOG.md) have no row;
+  - `Kyoo032/Nultron-Releases` has no GitHub Release, and its last push was on 2026-09-25;
+  - `docs/public/ent-2026.10.02-notes.md` was written and never published.
+
+  The Tencent deploy planned for Thursday 8 October 2026 is in neither log, so it did not happen. Whether a `ghcr.io/kyoo032/nultron-ent` image was ever pushed was not checked: the lookup needs a token with package access.
 - **Focus now:**
   1. Build the image, driven with a real hosted Chat.
   2. Dry run of the release.
   3. Release, after Rizky confirms at that moment.
-  4. Tencent deploy on Thursday 8 October, logged by sha.
+  4. The first Tencent deploy, logged by sha. No date is recorded since the 8 October plan lapsed.
 - **Logs:**
   - [Deploy log](web-pivot-2026-09-18.md#deploy-log).
   - [`security-register.md`](security-register.md), the deploy gate.
