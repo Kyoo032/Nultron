@@ -29,6 +29,9 @@ const HOSTILE: ReadonlyArray<readonly [string, string]> = [
   ["a secret-named assignment with a blank value, repeated", "API_KEY=\n".repeat(11_000)],
   ["a secret-named assignment followed by spaces", `API_KEY=${" ".repeat(100_000)}`],
   ["a Stripe key prefix repeated", "sk_live_".repeat(12_500)],
+  ["a Slack token prefix repeated", "xoxb-".repeat(20_000)],
+  ["a Slack app token prefix repeated", "xapp-".repeat(20_000)],
+  ["a Slack rotating token prefix repeated", "xoxe-".repeat(20_000)],
   ["an X-Api-Key header name followed by spaces", `X-Api-Key${" ".repeat(100_000)}`],
   ["an X-Api-Key header name and colon followed by spaces", `X-Api-Key:${" ".repeat(100_000)}`],
   ["an X-Api-Key header name and colon followed by a quote and spaces", `x-api-key:"${" ".repeat(100_000)}`],
@@ -40,11 +43,11 @@ const HOSTILE: ReadonlyArray<readonly [string, string]> = [
 ];
 
 const HOSTILE_AND_MASKED: ReadonlyArray<readonly [string, string]> = [
-  ["a Slack token prefix repeated", "xoxb-".repeat(20_000)],
   ["a long run after a GitHub token prefix", `ghp_${"a".repeat(100_000)}`],
+  ["a Slack bot token shape repeated", "xoxb-1-".repeat(15_000)],
+  ["a Slack app token shape repeated", "xapp-1-".repeat(15_000)],
+  ["a Slack rotating token shape repeated", "xoxe-1-".repeat(15_000)],
   ["an encoded bearer prefix repeated", "Bearer%20".repeat(11_000)],
-  ["a Slack app token prefix repeated", "xapp-".repeat(20_000)],
-  ["a Slack rotating token prefix repeated", "xoxe-".repeat(20_000)],
   ["a long run after a Stripe key prefix", `sk_live_${"a".repeat(100_000)}`],
   ["an X-Api-Key header name and colon repeated", "x-api-key:".repeat(10_000)],
   ["a JWT header prefix and a hyphen repeated, then a whole dotted tail", `${"eyJ-".repeat(25_000)}.aaaaaaaa.aaaaaaaa`],

@@ -7,8 +7,9 @@ const KEY_PATTERNS = [
   /\bAIza[A-Za-z0-9\-_]{10,}/g,
   /\bgh[pousr]_[A-Za-z0-9]{20,}/g,
   /\bgithub_pat_[A-Za-z0-9_]{20,}/g,
-  /\bxox[abeprs]-[A-Za-z0-9-]{10,}/g,
-  /\bxapp-[A-Za-z0-9-]{10,}/g,
+  /\bxox[abprs]-\d+-[A-Za-z0-9-]{8,}/g,
+  /\bxoxe(?:-\d-|\.xox[a-z]-\d-)[A-Za-z0-9-]{10,}/g,
+  /\bxapp-\d-[A-Za-z0-9-]{10,}/g,
   /\b[sr]k_live_[A-Za-z0-9]{10,}/g,
 ];
 
@@ -64,7 +65,7 @@ function maskCookieHeader(match: string, head: string, value: string): string {
 
 const BASIC_AUTH_RE = /\b((?:proxy-)?authorization["']?[ \t]*[:=][ \t]*["']?Basic[ \t]+)[A-Za-z0-9+/]{8,}={0,2}/gi;
 
-const API_KEY_HEADER_RE = /\b(x-api-key["']?[ \t]*[:=][ \t]*["']?)[^\s"',;]{8,}/gi;
+const API_KEY_HEADER_RE = /\b(x-api-key["']?[ \t]*[:=][ \t]*["']?)[^\s"',;&#)}\]>]{8,}/gi;
 
 const ENV_ASSIGNMENT_RE = /^([ \t]*(?:export[ \t]+)?)([A-Z][A-Z0-9_]*)([ \t]*=[ \t]*)(\S[^\r\n]*)/gm;
 const SECRET_NAME_ENDING_RE = /(?:PASSWORD|PASSWD|APIKEY)$|(?:^|_)(?:KEY|SECRET|TOKEN|PASS|SECRET_KEY_BASE)$|_PWD$/;

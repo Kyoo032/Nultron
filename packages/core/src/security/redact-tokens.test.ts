@@ -64,6 +64,14 @@ describe("redactCredentials: an X-Api-Key header in text", () => {
       expect(redactCredentials(text), text).toBe(text);
     }
   });
+
+  it("stops the value at a query separator or a closing bracket", () => {
+    expect(redactCredentials("/v1/items?x-api-key=9f8e7d6c5b4a39281706&page=2&limit=50")).toBe(
+      "/v1/items?x-api-key=[REDACTED]&page=2&limit=50",
+    );
+    expect(redactCredentials("(x-api-key: abcdefgh12345)")).toBe("(x-api-key: [REDACTED])");
+    expect(redactCredentials("{x-api-key: abcdefgh12345}")).toBe("{x-api-key: [REDACTED]}");
+  });
 });
 
 describe("redactCredentials: GitHub and Slack tokens", () => {
@@ -95,6 +103,9 @@ describe("redactCredentials: GitHub and Slack tokens", () => {
       "ghost_writer_2026 and ghp_short",
       "the github_pat_ prefix marks a fine-grained token",
       "xoxo and xox-ray",
+      "deploy xapp-production-cluster now",
+      "restart xoxe-mail-forwarder-service tonight",
+      "the xoxb-integration-test-runner job",
     ];
     for (const text of kept) {
       expect(redactCredentials(text), text).toBe(text);

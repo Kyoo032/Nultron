@@ -4830,14 +4830,18 @@ Residual:
   database password outside a URL and outside an upper-case `.env` line) is stored and shown as it came.
 - Closed under F-152-2 (2026-11-06, `fix/redactor-gaps`, tested, not driven). `redactCredentials`
   (`packages/core/src/security/redact.ts`) now masks GitHub tokens (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`,
-  `github_pat_`), Slack tokens (`xoxb-`, `xoxp-`, `xoxa-`, `xoxe-`, `xoxs-`, `xoxr-`, `xapp-`), Stripe live keys
+  `github_pat_`), Slack tokens (`xoxb-`, `xoxp-`, `xoxa-`, `xoxe-`, `xoxs-`, `xoxr-`, `xapp-`) in their real shapes, with a digit group after the prefix, so a hyphenated name such as
+  `xapp-production-cluster` stays readable and is not refused by the outbound guard), Stripe live keys
   (`sk_live_`, `rk_live_`), a `Basic` credential after an `Authorization` or `Proxy-Authorization` name, the value
-  after an `X-Api-Key` name when it has eight or more characters, a bearer token after a percent-encoded space, and the
+  after an `X-Api-Key` name when it has eight or more characters (it stops at whitespace, a quote, `,`, `;`, `&`,
+  `#` or a closing bracket, so a query string keeps its other parameters), a bearer token after a percent-encoded space, and the
   value of an upper-case `NAME=value` line (a `.env` file or an `export`) when the last `_` part of the name is KEY,
   SECRET, TOKEN or PASS, when the name ends in PASSWORD, PASSWD or APIKEY (`PGPASSWORD`, `OPENAI_APIKEY`) or in `_PWD`
   (`MYSQL_PWD`), or when it is `SECRET_KEY_BASE`. `redactSecretsDeep` (`redact-deep.ts`) also masks the value under a
   key that ends in a secret name after `_`, `-` or a camel-case boundary (`OPENAI_API_KEY`, `DB_PASSWORD`,
-  `aws_secret_access_key`, `githubToken`). Tests: `redact-tokens.test.ts` and `redact-deep.test.ts`, 31 of 61 red
+  `aws_secret_access_key`, `githubToken`). Deep mode does not use the `.env` endings `PASS`, `_PWD` or an unseparated
+  `PASSWORD`, so `PGPASSWORD`, `dbPass`, `DB_PASS` and `MYSQL_PWD` as object keys stay readable while the same names on
+  a `.env` line are masked. Tests: `redact-tokens.test.ts` and `redact-deep.test.ts`, 31 of 61 red
   before the first fix; the `.env` name and figure cases (3 red) and the Stripe, Slack and `X-Api-Key` cases (5 red)
   were added in the review round, red before their fix and green after.
   Trade-offs chosen on purpose. A bare `Basic <word>` is prose ("Basic principles of accounting"), so the Authorization
