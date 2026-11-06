@@ -2,7 +2,7 @@
 
 Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
 
-Last verified: 2026-10-11 at 2df34be (fix branch, before merge) (SH-001: section 0, the Node 22 boot check). Before that: 2026-09-21 at 4938747 + working tree; four citations re-anchored and the
+Last verified: 2026-11-06 at f6c9acc1 for the wrap-key paragraph of section 10 only (SR-203). Before that: 2026-10-11 at 2df34be (fix branch, before merge) (SH-001: section 0, the Node 22 boot check). Before that: 2026-09-21 at 4938747 + working tree; four citations re-anchored and the
 review-instance section added, then the boot-guard path re-checked after the fix pass of the same
 day (the guards moved from `apps/web/lib/` to `apps/web/server/`, because `lib` is the renderer's
 namespace and that module re-exports `@agentforge/host`). The rest was last read at c204e5e /
@@ -171,7 +171,7 @@ The `request_filtered` line is the one the transport rules write (`FILTERED_EVEN
 
 ### 10. What else server mode changes
 
-**The wrap key becomes mandatory.** `getLocalVaultKey(env)` (`packages/db/src/vault-key.ts:123-135`): off server mode, `AGENTFORGE_SECRETS_KEY` if set, else the self-creating `.master-key` file (`:107-114`, `MASTER_KEY_FILE` at `:37`) — unchanged. In server mode the env key is required (`SERVER_VAULT_KEY_REQUIRED`, `:46-49`) and must measure at least `MIN_VAULT_KEY_BYTES = 32` (`:40`) through `vaultKeyEntropyBytes` (`:90-105`), else `SERVER_VAULT_KEY_TOO_WEAK` (`:51-54`). The file fallback is not reached at all. `vaultKeyEntropyBytes` counts only hex (even digit count) and *canonical* base64/base64url — it re-encodes the decoded bytes and demands the same string back (`isCanonical`, `:80-82`), which refuses a passphrase that merely happened to be long enough. The file names its own limit at `:75-78`: a 43-character alphanumeric string is a valid base64 encoding of 32 bytes and passes.
+**The wrap key becomes mandatory.** `getLocalVaultKey(env)` (`packages/db/src/vault-key.ts:187-205`): off server mode, `AGENTFORGE_SECRETS_KEY` if set, else the self-creating `.master-key` file (`:164-175`, `MASTER_KEY_FILE` at `:37`). A desk key under 32 bytes is refused first (`assertDeskVaultKeyUsable`, `:177-185`), and `apps/web/server-env.ts` runs the same check at boot, so a desk with a passphrase in the environment stops before it creates the data dir (SR-203). In server mode the env key is required (`SERVER_VAULT_KEY_REQUIRED`, `:46-49`) and must measure at least `MIN_VAULT_KEY_BYTES = 32` (`:40`) through `vaultKeyEntropyBytes` (`:123-125`), else `SERVER_VAULT_KEY_TOO_WEAK` (`:51-54`), then pass the variety check. The file fallback is not reached at all. `vaultKeyEntropyBytes` counts only hex (even digit count) and *canonical* base64/base64url — it re-encodes the decoded bytes and demands the same string back (`isCanonical`, `:119-121`), which refuses a passphrase that merely happened to be long enough. The file names its own limit above `isCanonical` (`:114-117`): every 44-character string over the base64 alphabet is a valid base64 encoding of 33 bytes and passes.
 
 **The gateway gate fails closed.** `deriveGatewayGate` (`packages/host/src/gateway-gate.ts:269-297`) reads `isServerMode(input.env ?? process.env)` at `:275` and changes two rules:
 - `envRuntime === "stub"` opens the gate on a desk but falls through to `needs_key` on the server (`:278-283`) — a stub runtime is a hosted misconfiguration, never an open gate.
