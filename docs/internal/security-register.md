@@ -197,7 +197,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-133](#sr-133) | Medium | The app.nultron-ai.xyz preview runs production without server mode, behind Basic Auth and a Caddy Origin rule | Accepted by the owner (2026-10-06): password-gated shared desk | Preview only |
 | [SR-138](#sr-138) | Medium | One signed-in account could hold any number of model runs open: the limiters count requests, nothing counted runs | Fixed in tree (2026-10-06), tested through the router and the HTTP adapter: every gateway-calling route holds a slot or is on a written list; in memory, per process; not driven on a hosted instance | Blocks Tencent deploy until driven there |
 | [SR-156](#sr-156) | Medium | Hosted: any signed-in member could delete a desk of the company, and with it every person's chats and the desk's Knowledge Base | Fixed in tree (2026-10-07), tested, renderer hides the button; not driven | Blocks a multi-person hosted pilot until driven |
-| [SR-157](#sr-157) | Medium | Hosted: stored media (pictures, clips, audio) is read, listed and deleted by company, not by person, so a colleague's picture can be fetched by its id, listed in the Images and Videos galleries, and sent to a model by a job | Open: nothing changed, because scoping by person breaks shared reads the product relies on; needs an owner decision (2026-10-07) | Blocks "Chat attachments are private to the person who attached them" |
+| [SR-157](#sr-157) | Medium | Hosted: stored media (pictures, clips, audio) is read, listed and deleted by company, not by person, so a colleague's picture can be fetched by its id, listed in the Images and Videos galleries, and sent to a model by a job | Accepted for the OPC (Rizky, 2026-11-06): a Nultron org has one owner. The code is unchanged: `main` still reads, lists and deletes media by organization only | Reopen if a second member can join an org. Until then it blocks the sentence "Chat attachments are private to the person who attached them" |
 | [SR-165](#sr-165) | Medium | Hosted portal: `PORTAL_SIGNIN_MODE=password` gives HYP AI, and since 2026-10-09 the Nultron Enterprise release bundle's default, a username-and-password sign-in with no second factor, in place of the e-mailed code; the portal's own default when the variable is absent is still `code`, and `code` stays selectable | Built in tree, tested over a real Postgres; not driven in a browser or on a server (2026-10-07; the Enterprise bundle default is template and docs only, nothing deployed or driven, 2026-10-09). Independent review found no critical or high issue; its findings (M1, M2, L1 to L3, N1, N2) are fixed and merged (`e8a069c9`). The owner's decision, and on 2026-10-09 he accepted password-only sign-in as the Enterprise bundle default with residuals 1 to 13 as recorded; a second independent review of that default found no critical or high issue | None beyond the owner's acceptance; open until the second factor (being designed) ships |
 | [SR-166](#sr-166) | Medium | On `main` since the chat-first promotion (PR #157, 2026-10-12; was tester only): every virtual agent reads the desk's Knowledge Base and its earlier chats and can send a question to the web; the egress guard stops `web_fetch` only and never sees what entered through the prompt | Open: same exposure Chat has on `main` (SR-112's residual), new for the twelve mode agents; read from the code, not driven (2026-10-09). The promotion merged with no ruling recorded (2026-10-13). Owner ruled 2026-10-13: search stays on; the fix is the outbound guard (see SR-112), in a pull request to `main` since 2026-10-21, not merged, not driven | Blocks the next Enterprise release that carries the chat-first shell, until the outbound guard merges and the owner accepts its residual (a model restating private text in its own words) |
 | [SR-167](#sr-167) | Medium | On `main` since PR #157 (was tester only): a model can start paid pictures and clips from any agent's chat; `main` still holds only a per-turn ceiling | Fixed in the tester tree (2026-10-22): `image_generate` and `video_generate` do not run until the person presses Run on a card that shows the request and its list price; unit-tested, and the card driven in Chromium on a stub desk; the live model round trip not driven; no paid media was run | Lifts when the tester change is promoted to `main` and one Run press has been driven live |
@@ -209,8 +209,8 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-172](#sr-172) | Low | HYP AI behind Cloudflare: Cloudflare reads sign-in passwords, cookies and pasted keys in clear (Full mode), and the origin still answers around Cloudflare on 80, 443 and 8443 | Recorded as known in the HYP AI deploy README (2026-10-08); restricting the origin is optional there; needs the owner's call | HYP AI only; Nultron does not use Cloudflare |
 | [SR-173](#sr-173) | Info | The wrap key becomes the AES key through one unsalted SHA-256 | Checked, not an issue (2026-10-13) | — |
 | [SR-174](#sr-174) | Low | Caddy compresses every `text/*` response, `text/event-stream` included, which can hold live-update frames back | Fixed on `main` (PR #167, 2026-10-14): `encode` matches text types only, without `text/event-stream`, video or audio; unit-tested, Caddy syntax not validated, not driven | Before the team board (tester) is deployed behind Caddy |
-| [SR-175](#sr-175) | Medium | Hosted: a file one person generates on their own (artifacts, media, desk files outside their private folder) is listed and downloadable by every member of the company | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
-| [SR-176](#sr-176) | High | Hosted: any member of a company can delete any other member's generated media and artifacts | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
+| [SR-175](#sr-175) | Medium | Hosted: a file one person generates on their own (artifacts, media, desk files outside their private folder) is listed and downloadable by every member of the company | Accepted for the OPC (Rizky, 2026-11-06): a Nultron org has one owner. The earlier "not applicable" was wrong for `main`: the tester's strip removed the tester's owner check, and `main` still reads by organization or desk only | Reopen if a second member can join an org |
+| [SR-176](#sr-176) | High | Hosted: any member of a company can delete any other member's generated media and artifacts | Accepted for the OPC (Rizky, 2026-11-06): a Nultron org has one owner. The earlier "not applicable" was wrong for `main`: the tester's strip removed the tester's owner check, and `main` still deletes by organization or desk only | Reopen if a second member can join an org |
 | [SR-178](#sr-178) | Medium | Hosted (tester): a Workspace switched to "workspace" is readable by the whole company, not only its members (K-D22) | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
 | [SR-179](#sr-179) | Medium | Hosted (tester): a member removed from a Workspace keeps reading, listing and deleting the files and media they put into it | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
 | [SR-180](#sr-180) | Medium | Hosted (tester): document versions are not counted against a tenant's storage, and the cap keeps every version from the last 30 days with no count limit, so a busy document can fill the one disk | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
@@ -3241,7 +3241,23 @@ been driven on the hosted compose rehearsal.
 ### SR-157 {#sr-157}
 
 **Stored media is read, listed and deleted by company, not by person.** Hosted (Enterprise). Raised in the
-2026-10-06 review and confirmed in the code on 2026-10-07. **Open. Nothing was changed, on purpose.**
+2026-10-06 review and confirmed in the code on 2026-10-07. **Accepted for the OPC on 2026-11-06. Nothing was
+changed, on purpose.**
+
+**Accepted for the OPC (Rizky, 2026-11-06).** A Nultron org has one owner, so there is no colleague to read,
+list or delete another person's media. The code is unchanged: at `39cd5f0c` the lookups still filter by
+organization only (`packages/host/src/handlers/media.ts:32`, `:89`, `:97`; `packages/host/src/media.ts:48`,
+`:138`). This also decides [SR-175](#sr-175) and [SR-176](#sr-176), and the security tester's SEC-003 (Notion Dev
+Findings, BUG-33).
+
+Reopen if a second member can join an org. That can still happen on `main`:
+- the membership table exists (`organization_members`, `packages/db/src/schema.ts:289-302`);
+- the release bundle's `DEPLOY.md` tells the operator to add `admin` and `member` accounts up to the seat cap
+  (`scripts/release-web-docs.mjs:156`).
+
+So an operator who follows the bundle's own steps meets the reopen trigger. The fix plan on the SEC-003 card is
+owner-only reads, lists and inline reads in server mode, and delete by the maker or an owner or admin. It needs
+no new column, because Workspaces and team sharing are gone.
 
 Evidence:
 - The row records its owner and nothing else about its use. `media.user_id` is NOT NULL
@@ -3282,7 +3298,8 @@ Chat attachments by person: this is what "a document attached in Chat is private
 it" needs, and it is the smallest change. (3) Leave media company-wide and record that a Chat attachment is
 shared inside a company. Option 2 is not built; the document-attach work is a separate lane.
 
-Gate: blocks the sentence "a Chat attachment is private to the person who attached it" until one is chosen.
+Gate: reopen if a second member can join an org. Until one option is chosen, nothing may claim that "a Chat
+attachment is private to the person who attached it".
 
 ### SR-165 {#sr-165}
 
@@ -6034,9 +6051,9 @@ Gate: before the team board is deployed behind Caddy. Not driven.
 
 **Hosted: a person's own generated files are visible to the whole company.**
 
-**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+**Accepted for the OPC (Rizky, 2026-11-06).** A Nultron org has one owner, so this needs a second member in one org. Reopen if a second member can join an org; [SR-157](#sr-157) says why that can still happen on `main`. The note it replaces said "Not applicable since 2026-10-16", which was wrong for `main`. The tester's OPC strip (P5b, `18886fbf`) deleted the tester's owner check (`packages/host/src/media-visibility.ts`), not the reads on `main`. At `39cd5f0c` those still filter by organization or desk only: media by organization (`packages/host/src/handlers/media.ts:32`, `packages/host/src/media.ts:48`), artifacts by desk (`packages/host/src/artifacts.ts:147-177`).
 
-Raised 2026-10-14. Medium. Open. Found by read-only scouts of the tester code (`agentforge-chat`, which carries
+Raised 2026-10-14. Medium. Open until 2026-11-06, then accepted for the OPC. Found by read-only scouts of the tester code (`agentforge-chat`, which carries
 the same stores as `main`) while planning the team board's files phase.
 
 Rule (Rizky, 2026-10-14): a file a person makes on their own is visible only to them; a file put into a
@@ -6061,16 +6078,16 @@ to its owner or when it is shared; two people of one company plus one of another
 router. Legacy rows with no owner: decide with Rizky (draft: stay company-visible, since that is how they were
 made).
 
-Gate: before a second person of one company uses the hosted app for their own work. Not fixed.
+Gate: reopen if a second member can join an org. Not fixed.
 
 
 ### SR-176 {#sr-176}
 
 **Hosted: any member of a company can delete another member's files.**
 
-**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+**Accepted for the OPC (Rizky, 2026-11-06).** A Nultron org has one owner, so this needs a second member in one org. Reopen if a second member can join an org; [SR-157](#sr-157) says why that can still happen on `main`. The note it replaces said "Not applicable since 2026-10-16", which was wrong for `main`: the tester's OPC strip (P5b, `18886fbf`) deleted the tester's delete gate, not the deletes on `main`. At `39cd5f0c` those still select and delete by organization or desk only: media (`packages/host/src/handlers/media.ts:89`, `:97`), artifacts (`packages/host/src/artifacts.ts:175`). The SEC-003 card suggests this delete gate as the first piece to ship if the trigger is met: it needs no schema change.
 
-Raised 2026-10-14. High. Open. Found by the W1b worker in the tester and checked on `main` by the orchestrator.
+Raised 2026-10-14. High. Open until 2026-11-06, then accepted for the OPC. Found by the W1b worker in the tester and checked on `main` by the orchestrator.
 
 Evidence (`main`):
 - `DELETE /api/v1/media/:mediaId` (`packages/host/src/handlers/media.ts:82-107`) selects and deletes on `organization_id` and the id only. It never compares `media.user_id` with the caller, so any signed-in member removes a colleague's image or video and its stored file.
@@ -6080,7 +6097,7 @@ Why High and not Medium like SR-175: SR-175 leaks a read; this destroys another 
 
 Fix (tester first, server mode only, Personal unchanged with a parity test): a delete succeeds only for the row's owner, or for a company owner or admin (who may delete and never read, the leaver rule of 2026-10-06). Taking a file out of a Workspace clears `project_id` and deletes nothing. Two people of one company plus one of another through the real router.
 
-Gate: before a second person of one company uses the hosted app for their own work. Not fixed.
+Gate: reopen if a second member can join an org. Not fixed.
 
 ### SR-177 {#sr-177}
 
@@ -6765,7 +6782,8 @@ Added 2026-10-07:
   `DELETE /api/v1/workspaces/:id` from a member answers `403 workspace_delete_forbidden` with the desk
   left. ([SR-156](#sr-156)) — tested, not driven.
 - [ ] The owner has chosen how stored media is scoped between the people of a company, before anyone says a
-  Chat attachment is private. ([SR-157](#sr-157))
+  Chat attachment is private. ([SR-157](#sr-157)) On 2026-11-06 Rizky accepted the risk for the OPC, because
+  a Nultron org has one owner. That holds only while no second member joins an org, so the box stays open.
 
 Added 2026-10-13:
 
