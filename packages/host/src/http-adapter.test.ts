@@ -351,6 +351,121 @@ describe("handleNodeRequest Host guard", () => {
   });
 });
 
+describe("handleNodeRequest Host guard on safe methods", () => {
+  const WORKSPACES_PATH = "/api/v1/workspaces";
+
+  it("rejects a GET whose Host is not loopback, so a rebound name cannot read the API", async () => {
+    useLocalMode();
+    const captured = fakeResponse();
+    await handleNodeRequest(
+      fakeRequest({ method: "GET", url: WORKSPACES_PATH, headers: { host: "evil.example" } }),
+      captured.res,
+    );
+    expect(captured.status()).toBe(403);
+    expect(captured.json().error?.code).toBe("forbidden");
+    expect(dispatched).toHaveLength(0);
+  });
+
+  it("rejects a rebound name that keeps the dev port", async () => {
+    useLocalMode();
+    const captured = fakeResponse();
+    await handleNodeRequest(
+      fakeRequest({ method: "GET", url: WORKSPACES_PATH, headers: { host: "rebind.example:3000" } }),
+      captured.res,
+    );
+    expect(captured.status()).toBe(403);
+    expect(dispatched).toHaveLength(0);
+  });
+
+  it("rejects HEAD and OPTIONS on a foreign Host too", async () => {
+    useLocalMode();
+    for (const method of ["HEAD", "OPTIONS"]) {
+      const captured = fakeResponse();
+      await handleNodeRequest(
+        fakeRequest({ method, url: WORKSPACES_PATH, headers: { host: "evil.example" } }),
+        captured.res,
+      );
+      expect(captured.status()).toBe(403);
+    }
+    expect(dispatched).toHaveLength(0);
+  });
+
+  it("rejects a GET with no Host header", async () => {
+    useLocalMode();
+    const captured = fakeResponse();
+    await handleNodeRequest(fakeRequest({ method: "GET", url: WORKSPACES_PATH }), captured.res);
+    expect(captured.status()).toBe(403);
+    expect(dispatched).toHaveLength(0);
+  });
+
+  it("still serves a GET on each loopback spelling, with no Origin", async () => {
+    useLocalMode();
+    for (const host of [LOOPBACK_HOST, "localhost:3000", "[::1]:3000", "127.0.0.1"]) {
+      const captured = fakeResponse();
+      await handleNodeRequest(fakeRequest({ method: "GET", url: WORKSPACES_PATH, headers: { host } }), captured.res);
+      expect(captured.status()).toBe(200);
+    }
+    expect(dispatched).toHaveLength(4);
+  });
+
+  it("answers the liveness probe on a foreign Host, off server mode", async () => {
+    useLocalMode();
+    const captured = fakeResponse();
+    const handled = await handleNodeRequest(
+      fakeRequest({ method: "GET", url: "/healthz", headers: { host: "evil.example" } }),
+      captured.res,
+    );
+    expect(handled).toBe(true);
+    expect(captured.status()).toBe(200);
+  });
+
+  it("answers the liveness probe on a foreign Host, in server mode", async () => {
+    useServerMode();
+    const captured = fakeResponse();
+    const handled = await handleNodeRequest(
+      fakeRequest({ method: "GET", url: "/healthz", headers: { host: "127.0.0.1:3000" }, forwardedProto: null }),
+      captured.res,
+    );
+    expect(handled).toBe(true);
+    expect(captured.status()).toBe(200);
+  });
+
+  it("rejects a GET whose Host is not on the allowlist, in server mode", async () => {
+    useServerMode();
+    const captured = fakeResponse();
+    await handleNodeRequest(
+      fakeRequest({ method: "GET", url: WORKSPACES_PATH, headers: { host: "rebind.example" } }),
+      captured.res,
+    );
+    expect(captured.status()).toBe(403);
+    expect(captured.json().error?.code).toBe("origin_forbidden");
+    expect(dispatched).toHaveLength(0);
+  });
+
+  it("serves a GET on the allowlisted Host with no Origin, in server mode", async () => {
+    useServerMode();
+    for (const method of ["GET", "HEAD"]) {
+      const captured = fakeResponse();
+      await handleNodeRequest(
+        fakeRequest({ method, url: WORKSPACES_PATH, headers: { host: WEB_HOST } }),
+        captured.res,
+      );
+      expect(captured.status()).toBe(200);
+    }
+    expect(dispatched).toHaveLength(2);
+  });
+
+  it("asks for https before it judges the Host of a GET, in server mode", async () => {
+    useServerMode();
+    const captured = fakeResponse();
+    await handleNodeRequest(
+      fakeRequest({ method: "GET", url: WORKSPACES_PATH, headers: { host: "rebind.example" }, forwardedProto: null }),
+      captured.res,
+    );
+    expect(captured.json().error?.code).toBe("https_required");
+  });
+});
+
 describe("handleNodeRequest safe methods", () => {
   it("leaves GET untouched by the Host and transport guards", async () => {
     const captured = fakeResponse();
