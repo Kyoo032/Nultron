@@ -182,7 +182,7 @@
   --rail-accent: #0e58f0;
 
   /* The Nultron IP colours (2026-10-01), sampled from the art rather than guessed. A k-means pass over
-     the opaque pixels of the logo master (`apps/desktop/branding/agentforge/source/app-logo.webp`, the
+     the opaque pixels of the logo master (`docs/internal/brand/nultron/reference/app-logo.webp`, the
      painted head that is `public/brand/logo.png`) and over the 3D renders in
      `components/nultron/images/full/` gives: blue, the helmet and the logo tile (#1277c8; the render's
      shaded helmet reads #1f69a8 to #397dbb); cyan, the swirl gem's body (#19bddc, its glow runs to

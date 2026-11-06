@@ -1,6 +1,5 @@
 const assert = require("node:assert/strict");
-const { join } = require("node:path");
-const { parseBrand, loadBrandFromResources, brandGatewayOverride, DEFAULT_BRAND } = require("./brand-read.cjs");
+const { parseBrand, brandGatewayOverride, DEFAULT_BRAND } = require("./brand-read.cjs");
 
 const kemenkeu = parseBrand({
   productName: "Kemenkeu AI",
@@ -21,10 +20,6 @@ assert.equal(metranet.productName, "AIHub Metranet");
 const empty = parseBrand({}, DEFAULT_BRAND);
 assert.equal(empty.productName, "Nultron");
 assert.equal(empty.gatewayName, "Toko Token");
-
-const fromDisk = loadBrandFromResources(join(__dirname, "resources"), __dirname);
-assert.equal(fromDisk.productName, "Nultron");
-assert.equal(fromDisk.gatewayName, "Toko Token");
 
 // ---------- brandGatewayOverride: which gateway a packaged build may use instead of the pinned one ----------
 //

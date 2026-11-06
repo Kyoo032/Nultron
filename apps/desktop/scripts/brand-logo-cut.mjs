@@ -1,5 +1,5 @@
 // Cuts the Nultron app logo tile out of its white corners: the step between the master (Rizky's painted logo,
-// branding/agentforge/source/app-logo.webp, 1600 px, no alpha) and app-logo-cut.png (the same picture as RGBA with transparent
+// docs/internal/brand/nultron/reference/app-logo.webp, 1600 px, no alpha) and app-logo-cut.png (the same picture as RGBA with transparent
 // corners) that brand-icons.mjs derives every icon from. Pure function on RGBA bytes, so it runs under plain node.
 //
 // Shape. The tile's white corners are not a circular radius. Fitting the source's own edge gave a superellipse

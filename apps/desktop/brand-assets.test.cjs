@@ -13,10 +13,9 @@ const { join } = require("node:path");
 const PNG_MAGIC = "89504e470d0a1a0a";
 const MAX_DISPLAY_LOGO_BYTES = 200 * 1024;
 
-const brandDir = join(__dirname, "branding", "agentforge");
 const buildDir = join(__dirname, "build");
 const splashDir = join(__dirname, "splash");
-const resourceDir = join(__dirname, "resources", "brand");
+const webBrandDir = join(__dirname, "..", "web", "public", "brand");
 
 const read = (file) => fs.readFileSync(file);
 
@@ -45,21 +44,18 @@ function icnsEntries(bytes, label) {
   return entries;
 }
 
-// ---------- Windows: icon.ico, one file in three places ----------
+// ---------- Windows: icon.ico, one file in two places ----------
 
 {
-  const source = read(join(brandDir, "icon.ico"));
-  for (const dir of [buildDir, splashDir]) {
-    assert.ok(read(join(dir, "icon.ico")).equals(source), `${dir}/icon.ico is the branding copy`);
-  }
+  const source = read(join(buildDir, "icon.ico"));
+  assert.ok(read(join(splashDir, "icon.ico")).equals(source), "splash/icon.ico is the build copy");
   assert.deepEqual(icoSizes(source, "icon.ico"), [16, 24, 32, 48, 64, 128, 256]);
 }
 
 // ---------- macOS: icon.icns, the file electron-builder's mac.icon names ----------
 
 {
-  const source = read(join(brandDir, "icon.icns"));
-  assert.ok(read(join(buildDir, "icon.icns")).equals(source), "build/icon.icns is the branding copy");
+  const source = read(join(buildDir, "icon.icns"));
   const entries = icnsEntries(source, "icon.icns");
   assert.deepEqual(
     entries.map((entry) => entry.type),
@@ -85,22 +81,15 @@ function icnsEntries(bytes, label) {
   assert.match(source, /unlinkSync\(buildIcns\)/);
 }
 
-// ---------- icon sources: 1024 px, the same file for build/ and the branding source ----------
+// ---------- icon source: 1024 px ----------
+
+assert.deepEqual(pngSize(read(join(buildDir, "icon.png")), "icon.png"), { width: 1024, height: 1024 });
+
+// ---------- display logo: small, and the same file as the web app's ----------
 
 {
-  const source = read(join(brandDir, "icon.png"));
-  assert.deepEqual(pngSize(source, "icon.png"), { width: 1024, height: 1024 });
-  assert.ok(read(join(buildDir, "icon.png")).equals(source), "build/icon.png is the branding copy");
-  assert.deepEqual(pngSize(read(join(brandDir, "mark.png")), "mark.png"), { width: 1024, height: 1024 });
-}
-
-// ---------- display logo: small, and one file for the splash, the preload and the source ----------
-
-{
-  const source = read(join(brandDir, "logo.png"));
-  for (const dir of [splashDir, resourceDir]) {
-    assert.ok(read(join(dir, "logo.png")).equals(source), `${dir}/logo.png is the branding copy`);
-  }
+  const source = read(join(splashDir, "logo.png"));
+  assert.ok(read(join(webBrandDir, "logo.png")).equals(source), "splash/logo.png is the web app's logo.png");
   const { width, height } = pngSize(source, "logo.png");
   assert.equal(width, height, "logo.png is square");
   assert.ok(width >= 128 && width <= 512, `logo.png is ${width} px; the splash shows it at 88 CSS px`);

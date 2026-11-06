@@ -449,13 +449,6 @@
     },
 
     {
-      "glob": "apps/desktop/branding/**",
-      "map": "docs/internal/maps/mascot-and-brand.md",
-      "lanes": ["personal"],
-      "protected": false,
-      "note": "Per-brand brand.json, icons and installer identity. Brand content, not shared code."
-    },
-    {
       "glob": "apps/desktop/scripts/release-*.mjs",
       "map": "docs/internal/maps/release-and-sync-lanes.md",
       "lanes": ["personal"],

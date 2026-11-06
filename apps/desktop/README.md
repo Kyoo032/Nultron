@@ -44,9 +44,9 @@ pnpm desktop:build
 # default public flavor: AGENTFORGE_BRAND=agentforge pnpm --filter @agentforge/desktop desktop-pack
 ```
 
-Builds the Vite renderer, esbuild-bundles `host.cjs` (externals: `better-sqlite3`, `keytar`), copies drizzle migrations, then packages Electron. Output: `apps/desktop/dist/` (NSIS, current user). Git has `branding/agentforge/` (Toko Token, `appId` `com.tokotoken.agentforge`). Extra local flavors under `branding/` are gitignored and must not be committed or uploaded.
+Builds the Vite renderer, esbuild-bundles `host.cjs` (externals: `better-sqlite3`, `keytar`), copies drizzle migrations, then packages Electron. Output: `apps/desktop/dist/` (NSIS, current user). The brand kit `branding/agentforge/` (Toko Token, `appId` `com.tokotoken.agentforge`) and `resources/brand/` were deleted on 2026-11-06 (Rizky, DEC-0020), so `pack-brand.mjs` stops at "Missing ... brand.json" and no pack script runs until they are restored from git history (`git show 39cd5f0c:apps/desktop/branding/agentforge/brand.json`, and the siblings beside it). Extra local flavors under `branding/` are gitignored and must not be committed or uploaded.
 
-In-app rail name and logo come from extraResources `brand/brand.json` + `brand/logo.png` via preload (`window.agentforge.brand`). Changing splash/exe names alone is not enough.
+In-app rail name and logo come from `brand/brand.json` + `brand/logo.png` under the app's resources via preload (`window.agentforge.brand`). The `resources/brand` extraResources entry was removed with the kit, so a build without it falls back to `DEFAULT_BRAND` and `splash/logo.png`. Changing splash/exe names alone is not enough.
 
 Native modules must be rebuilt for Electron’s Node **on Windows**:
 
@@ -80,7 +80,7 @@ Never commit `.env`, `data/settings.enc`, or `data/.master-key`.
 
 A packaged build from this tree checks [GitHub Releases](https://github.com/Kyoo032/Nultron-Desktop/releases) in `Kyoo032/Nultron-Desktop` (the repo `brand.json` names) from Settings → **Check for updates**. That repo is archived and gets no new releases. Copies installed from 0.15.1 check `Kyoo032/Nultron` instead, which now belongs to the Enterprise repo, so their check fails with an error (2026-10-14). Kemenkeu / Metranet builds do not get this button. The source repo (`Kyoo032/agentforge`) stays private: electron-updater's GitHub provider is unauthenticated, so release assets have to live somewhere public.
 
-The update target is written in two places that must agree: `branding/agentforge/brand.json` `updates` (read by `scripts/pack-brand.mjs`, which is what `pnpm desktop:build` runs) and `package.json` `build.publish` (used by the plain `electron-builder --dir/--mac/--linux` scripts). `pnpm desktop:release` refuses to run when they differ. The version comes from `package.json` `version` only.
+The update target is `package.json` `build.publish`, which `pnpm desktop:release` reads and the plain `electron-builder --dir/--mac/--linux` scripts use. A restored kit's `brand.json` `updates` (read by `scripts/pack-brand.mjs`) must name the same repo. The version comes from `package.json` `version` only.
 
 Cut a release:
 
@@ -102,7 +102,7 @@ pnpm desktop:build:linux
 
 `desktop:build:mac:dir` writes an unpacked `.app` (same idea as `win-unpacked`). `pnpm desktop:mac` launches it with CDP `9222`. Both require **macOS**. This Windows checkout cannot run Apple’s Simulator or a `.app` — use WinApp F5 here. iOS Simulator / Expo stay parked.
 
-The mac scripts run `pack-brand.mjs --restore-public` before electron-builder, so the splash, `resources/brand/brand.json`, `build/icon.png` (1024²) and `build/icon.icns` (`build.mac.icon`) are always the public Nultron flavor. Output: `Nultron-<version>-mac-x64.dmg|zip` and `-arm64`. Native modules are rebuilt per arch by electron-builder; bundled ffmpeg goes in `resources/ffmpeg/` per [`resources/ffmpeg/README.md`](resources/ffmpeg/README.md).
+The mac scripts run `pack-brand.mjs --restore-public` before electron-builder, so the splash, `build/icon.png` (1024²) and `build/icon.icns` (`build.mac.icon`) are always the public Nultron flavor. Output: `Nultron-<version>-mac-x64.dmg|zip` and `-arm64`. Native modules are rebuilt per arch by electron-builder; bundled ffmpeg goes in `resources/ffmpeg/` per [`resources/ffmpeg/README.md`](resources/ffmpeg/README.md).
 
 **No Mac?** `pnpm desktop:build:mac:docker` builds the same four files on this Windows box inside a Linux container (Docker Desktop must be running): electron-builder packs the `.app` on Linux, `rcodesign` ad-hoc signs it, libdmg-hfsplus writes the dmg, and `verify-bundle.py` checks arch, natives, symlinks, plist, asar and signatures before anything lands in `dist/`. Details and limits in [`platform/macos/AGENTS.md`](platform/macos/AGENTS.md). First run builds the image (a few minutes); later runs reuse the cache volume.
 
