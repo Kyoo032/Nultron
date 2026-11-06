@@ -53,7 +53,7 @@ The second kind, from branch `chore/agent-guardrails`:
 
 - `scripts/where-am-i.mjs` (`pnpm where`): prints the folder, branch and lane, and matches them to a row in `AGENTS.md` "Where am I?". On an older branch without it, the two git commands `git rev-parse --show-toplevel` and `git branch --show-current` do the same check by hand.
 - `lanes.json`, never-promote list: paths that exist only in the tester and must not appear in a diff to `main`. `scripts/lane-guard.mjs` reads it. `.claude/rules/` is the one part of `.claude/` that is tracked on `main` (the pstack model rule, `.gitignore` un-ignores it), so the list names every other part of `.claude/` instead of the whole folder; `scripts/lane-guard.test.mjs` fails if a listed glob matches any file tracked on `main`.
-- `scripts/lane-guard.mjs` strict rules: the never-promote list, the `Lanes:` line on protected files, and brand literals in shared code. Read the script for the exact rule.
+- `scripts/lane-guard.mjs` blocking rules: the never-promote list, the `Lanes:` line on protected files, and brand literals in shared code. Read the script for the exact rule.
 - `scripts/hooks/pre-push`, installed by `scripts/install-hooks.mjs`: a git pre-push hook. Read the hook for its exact checks.
 - `scripts/release-web.mjs` and `apps/desktop/scripts/release-desktop.mjs` refuse to run from any branch other than `main`.
 
