@@ -228,6 +228,8 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual: request-body arrays with no `.max()` still cost one issue per bad element | Residual: none blocks; capping the request-body arrays is a follow-up |
 | [SR-197](#sr-197) | Medium | AI SDK 5's `streamText` prints every stream error to the console by default, and an `APICallError` carries the request body (the prompt) and the gateway's error body | Fixed in tree (2026-11-04, `fix/zod-4`): the runtime passes a silent `onError`; tested, not driven | PR merge of the AI SDK 5 move |
 | [SR-198](#sr-198) | Medium | AI SDK 5 brings `undici` 5.29.0 and `@fastify/busboy` into the hosted image, with five HIGH `undici` advisories and one `busboy` advisory | Fixed in tree (2026-11-04, `fix/zod-4`): scoped override to `undici` 6.29.1, which drops `busboy`; the SDK's guarded download fetch checked on it; not driven | PR merge of the AI SDK 5 move |
+| [SR-204](#sr-204) | Medium | Personal (retired): the Electron product window sets `sandbox: false`, because its preload reads the brand files with `fs` | Won't fix, moot (Rizky, 2026-11-06): the desktop app was retired on 2026-10-14, and nothing packs or ships `apps/desktop` | None while the desktop is retired. Reopen if a desktop build is revived, and fix before that cut |
+| [SR-205](#sr-205) | Low | Personal (retired): `wrapKey` returns an unstored random wrap key when keytar fails, so settings sealed in that session do not open on the next launch | Won't fix, moot (Rizky, 2026-11-06): the desktop app was retired on 2026-10-14 | None while the desktop is retired. Reopen if a desktop build is revived, and fix before that cut |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -6537,6 +6539,79 @@ lookup was called. `audit:deployed` passes.
 Residual: not driven on a hosted server; the override has to be dropped once the SDK moves to `undici` 6 itself.
 
 Gate: PR merge of the AI SDK 5 move.
+
+### SR-204 {#sr-204}
+
+**Personal (retired): the Electron product window sets `sandbox: false`.**
+Raised 2026-10-15 by the security tester as SEC-007 (Notion Dev Findings, BUG-37). Medium. Won't fix, moot
+(Rizky, 2026-11-06). The card proposed SR-189, which the tester had already taken, so this is SR-204.
+
+Evidence (at `39cd5f0c`):
+- The only product `BrowserWindow` (`apps/desktop/main.cjs:402-414`) has `nodeIntegration: false` and
+  `contextIsolation: true` (`:411-412`), and `sandbox: false` (`:413`).
+- The preload needs Node `fs` when it loads. It requires `./brand-read.cjs` (`apps/desktop/preload.cjs:2`) and
+  reads the brand and the logo at once (`:4-5`). `brand-read.cjs` requires `node:fs` (`:1`) and calls
+  `readFileSync` (`:57`, `:76`). A sandboxed preload cannot require a local module, so the flag cannot change
+  until those reads move. The backlog row is E17 (`docs/internal/blockers-2026-09-15.md:137`).
+- Impact: an XSS in the packaged renderer reaches only the `contextBridge` surface, which already lets it call
+  the host as the owner. A renderer exploit that escapes the JavaScript isolate runs outside the OS sandbox, in
+  a process with Node linked.
+
+Why Won't fix: the desktop app was retired on 2026-10-14 (AGENTS.md). Nothing packs or ships `apps/desktop`:
+the hosted image's install skips it (`webapp-deploy/Dockerfile:70-73`), and its release repo
+`Kyoo032/Nultron-Desktop` is archived. The exposure is a local desktop build made against that rule.
+
+Reopen trigger: a desktop build is revived. Then, before that cut:
+- The main process loads the brand and the logo once. It already requires `brand-read.cjs` (`main.cjs:3`), so it
+  can call `loadBrandFromResources` and `loadBrandLogo` itself.
+- The preload gets them with one `ipcRenderer.sendSync("brand:get")`. Main answers only a sender that passes
+  `isTrustedSender` (the main frame, `apps/desktop/navigation.cjs:109`), with a frozen, versioned payload
+  `{ schema: 1, brand, brandLogo, updatesSupported }`. The renderer still reads `window.agentforge.brand` at
+  startup, so first paint is unchanged.
+- The preload then requires no local module and no `fs`. Remove `sandbox: false`: Electron 35
+  (`apps/desktop/package.json:30`) sandboxes by default. Keep `contextIsolation: true` and `nodeIntegration: false`.
+- Not `additionalArguments`: the base64 logo is about 146,000 characters, past the 32,767-character Windows
+  command line.
+- E18 (permission handlers that deny by default, but still allow `media` and `display-capture` for Meeting) and
+  E19 (`web-contents-created` applying `hardenNavigation` to every contents) go in separate PRs, in the same
+  release. Do not change Electron fuses in the same change ([SR-120](#sr-120)).
+- Tests, failing first: `apps/desktop/navigation.test.cjs` asserts `sandbox: true` and a preload with no
+  `require("./`, no `node:fs` and no `readFileSync`; the brand handler refuses a sender that is not the main
+  frame. Then a packed smoke on Windows: the window paints, the brand and logo show, and `doctor --desktop`
+  passes.
+
+Gate: none while the desktop is retired.
+
+### SR-205 {#sr-205}
+
+**Personal (retired): `wrapKey` returns an unstored random key when keytar fails.**
+Raised 2026-10-16 by the security tester as SEC-008 (Notion Dev Findings, BUG-41), split out of SEC-006. Low.
+Won't fix, moot (Rizky, 2026-11-06). The card proposed SR-190, which `main` had already taken, so this is SR-205.
+
+Evidence (at `39cd5f0c`):
+- `wrapKey` (`apps/desktop/main.cjs:287-302`) reaches `return crypto.randomBytes(32).toString("hex")` (`:302`)
+  on two paths: `loadKeytar()` (`:268`) yields no module, or `getPassword` or `setPassword` throws and the
+  `catch` only warns (`:298-299`).
+- `bootstrapPackaged` puts that string in `AGENTFORGE_SECRETS_KEY` (`:659`) and stores it nowhere. The next
+  launch that takes the same path draws a different key.
+- Impact: lost data, not a leak. Settings and the gateway key sealed in that session do not open on the next
+  launch, and what was sealed earlier under the keychain key does not open in that session. The key is 32
+  random bytes, not a weak one. `apps/desktop/platform/windows/AGENTS.md:13` already documents the behaviour
+  and calls a keytar load failure a packaging bug.
+
+Why Won't fix: as for [SR-204](#sr-204), the desktop app was retired on 2026-10-14 and nothing packs or ships
+`apps/desktop`.
+
+Reopen trigger: a desktop build is revived. Then, before that cut:
+- `wrapKey` fails closed. When keytar cannot load, or `getPassword` or `setPassword` throws, the app shows a
+  startup error and stops. It never returns a random key.
+- A persisted key file (mode 0600) as a fallback is a security trade-off for Rizky to decide.
+- The envelope format and `wrappingKeyFromSecret` stay as they are.
+- Test first, in plain Node like `navigation.test.cjs`: a fake keytar whose `getPassword` or `setPassword`
+  rejects, and a run where `loadKeytar()` yields no module. `wrapKey` must throw or refuse. Today it returns a
+  64-character hex key.
+
+Gate: none while the desktop is retired.
 
 ## Must be true before the Tencent Cloud deploy
 
