@@ -1120,3 +1120,12 @@ Lanes: tester.
 - **Finding: the figures gate keeps almost any table of amounts.** A probe of `readFinanceFigures` (`packages/host/src/finance-figures/figures.ts`) on 2026-10-20 with Word-file tables: a contract fee schedule (`Biaya jasa | 50.000.000`, PPN, total), a payment-term table, an invoice and an English fee table each kept a figures file. Only a contract whose amounts sit in prose (`Nilai kontrak sebesar Rp 50.000.000 …`) was skipped as `no_table`. So a Legal or invoice attachment also carries the `[Figures kept: …]` note, and every agent sees a path it may pass to `finance_task`. The worker sentence limits the call to a question about those figures, which is an instruction to the model, not a rule the host enforces. Whether the gate should demand a statement-shaped table is the owner's call.
 - **Not yet checked.** Re-attaching a file of the same name that no longer holds a table leaves the older figures file on the desk; read from the code (`saveDeskFigures` writes only when figures exist), not run. `docs/internal/maps/research-dossier.md` repeats some of its sections.
 - **Security.** SR-187 (the figures file keeps amounts the chat mask hides, and a headerless NIK was missed) and SR-189 (the report and its Knowledge Base card are desk-wide) are open, gated on a hosted desk getting a second person. SR-188 is checked, with residual risks.
+
+## 2026-11-06: every /api request needs a trusted Host (SEC-004 4b, SR-200)
+
+Lanes: enterprise, tester.
+
+- **What.** The Host check used to run only on mutating `/api` requests, so a DNS-rebinding page could read the API with a GET. `hostRejection` (`packages/host/src/http-adapter.ts`) now runs for GET, HEAD and OPTIONS too: a loopback Host off server mode, an allowlisted Host in server mode, and a missing Host is refused. `/healthz` is exempt. Origin stays optional on a GET. The error codes are unchanged: `forbidden` off server mode, `origin_forbidden` in server mode. Maps: `hosted-security-controls.md` § 3 and row 6a, `hosted-server-mode.md` step 10.
+- **Shared files.** `http-adapter.ts` and its test exist on the tester too, so a merge from `main` carries the rule across.
+- **Proof.** `http-adapter.test.ts`: nine new cases, five failing before the fix, plus `http-adapter-socket.test.ts` (three cases over a real socket). Not driven against webdev in a browser or on a hosted server.
+- **Not done here.** The lookup-error fail-open and the DNS rebinding pin are SEC-004 4a, in `safe-fetch.ts`.

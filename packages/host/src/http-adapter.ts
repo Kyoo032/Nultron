@@ -629,6 +629,12 @@ export async function handleNodeRequest(req: IncomingMessage, res: ServerRespons
     const { handleBootEditJobs } = await import("./handlers/edit");
     void handleBootEditJobs();
   }
+  if (!CSRF_EXEMPT_PATHS.has(path)) {
+    const rejection = hostRejection(header(req, "host"), serverMode);
+    if (rejection) {
+      return respondRejection(res, { status: 403, ...rejection }, context);
+    }
+  }
   if (!SAFE_METHODS.has(method) && !CSRF_EXEMPT_PATHS.has(path)) {
     const rejection = mutatingRejection(req, path, cookies, csrfMode, presentedSessionId);
     if (rejection) {
@@ -769,6 +775,15 @@ type Rejection = { readonly code: string; readonly message: string };
  */
 const CSRF_EXEMPT_PATHS: ReadonlySet<string> = new Set(["/api/v1/billing/webhook"]);
 
+function hostRejection(host: string | undefined, serverMode: boolean): Rejection | null {
+  if (serverMode) {
+    return isAllowedWebHostHeader(host, trustedOrigins())
+      ? null
+      : { code: "origin_forbidden", message: ORIGIN_FORBIDDEN_MESSAGE };
+  }
+  return isLoopbackHostHeader(host) ? null : { code: "forbidden", message: LOCAL_ONLY_MESSAGE };
+}
+
 function mutatingRejection(
   req: IncomingMessage,
   path: string,
@@ -777,20 +792,18 @@ function mutatingRejection(
   sessionId: string | null,
 ): Rejection | null {
   const origin = header(req, "origin");
-  const host = header(req, "host");
   // The hosted deployment is the HTTPS one, so one flag carries both meanings: it selects the web
   // rules here and the `Secure` / `__Host-` cookie those rules check.
   const serverMode = csrfMode.secure;
   if (serverMode) {
-    const allowlist = trustedOrigins();
-    if (!isAllowedWebOrigin(origin, allowlist) || !isAllowedWebHostHeader(host, allowlist)) {
+    if (!isAllowedWebOrigin(origin, trustedOrigins())) {
       return { code: "origin_forbidden", message: ORIGIN_FORBIDDEN_MESSAGE };
     }
     const csrf = checkCsrfToken(cookies, header(req, CSRF_HEADER), csrfMode, sessionId);
     if (!csrf.ok) {
       return { code: csrf.code, message: csrf.message };
     }
-  } else if (!isAllowedMutatingApiRequest(origin, header(req, "referer")) || !isLoopbackHostHeader(host)) {
+  } else if (!isAllowedMutatingApiRequest(origin, header(req, "referer"))) {
     return { code: "forbidden", message: LOCAL_ONLY_MESSAGE };
   }
   // The reset routes wipe local data, so they also demand a header no cross-site HTML form can send.

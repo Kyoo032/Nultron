@@ -228,6 +228,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual: request-body arrays with no `.max()` still cost one issue per bad element | Residual: none blocks; capping the request-body arrays is a follow-up |
 | [SR-197](#sr-197) | Medium | AI SDK 5's `streamText` prints every stream error to the console by default, and an `APICallError` carries the request body (the prompt) and the gateway's error body | Fixed in tree (2026-11-04, `fix/zod-4`): the runtime passes a silent `onError`; tested, not driven | PR merge of the AI SDK 5 move |
 | [SR-198](#sr-198) | Medium | AI SDK 5 brings `undici` 5.29.0 and `@fastify/busboy` into the hosted image, with five HIGH `undici` advisories and one `busboy` advisory | Fixed in tree (2026-11-04, `fix/zod-4`): scoped override to `undici` 6.29.1, which drops `busboy`; the SDK's guarded download fetch checked on it; not driven | PR merge of the AI SDK 5 move |
+| [SR-200](#sr-200) | Medium | The Host check ran only on mutating `/api` requests, so a DNS-rebinding page could `GET` the API (media, threads, masked settings) from unauthenticated webdev, and a GET in server mode was not checked against the Host allowlist (SEC-004 4b) | Fixed in tree (2026-11-06, `fix/sec-004b-get-host-check`): every `/api` request needs a trusted Host, `/healthz` exempt; unit-tested through the real adapter, not driven | PR merge |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -6531,6 +6532,35 @@ lookup was called. `audit:deployed` passes.
 Residual: not driven on a hosted server; the override has to be dropped once the SDK moves to `undici` 6 itself.
 
 Gate: PR merge of the AI SDK 5 move.
+
+### SR-200 {#sr-200}
+
+**A GET to `/api` skipped the Host check.**
+Raised 2026-10-15 by the security re-verify of SEC-004 (Notion Dev Findings, 4b); fixed 2026-11-06. Medium. The card proposed SR-186 for this and that number is taken on another branch.
+
+Evidence: `SAFE_METHODS` (`packages/host/src/http-adapter.ts:31`) kept GET, HEAD and OPTIONS out of
+`mutatingRejection`, the only caller of `isLoopbackHostHeader` and `isAllowedWebHostHeader`. A page on a
+rebound name (`http://evil.example:3000`, answered first by the attacker and then by `127.0.0.1`) could
+`GET` `/api/v1/workspaces`, `/api/v1/media/<id>/file` and the masked settings of an unauthenticated webdev,
+with `Host: evil.example:3000`. In server mode a GET was not checked against `trustedOrigins()` either; that
+does not bypass the session cookie's host scope, but it left the allowlist half-applied. The packaged desktop
+app has no HTTP server and is not affected.
+
+Fix: `hostRejection` (`http-adapter.ts:778`) runs for every `/api` request before the `SAFE_METHODS`
+branch (`:633`). Off server mode the Host must be `localhost`, `127.0.0.1` or `::1`, with or without a port,
+and a missing Host is refused: 403 `forbidden`. In server mode it must be a host of the allowlisted origins:
+403 `origin_forbidden`. A missing Origin stays allowed on a GET. `/healthz` is answered before the check
+(`:620`), so the container healthcheck, Caddy's `health_uri` and the k8s probes are untouched. The billing
+webhook path skips it as it skips CSRF. In server mode the HTTPS rule and the request filter still come first,
+so a plaintext GET is `https_required`. Tests: `http-adapter.test.ts` "handleNodeRequest Host guard on safe
+methods" (nine cases); five failed before the fix, none after. `http-adapter-socket.test.ts` repeats the rule over a real `node:http` socket with an explicit Host header (three cases, passing).
+
+Residual: driven over a loopback socket in a test, not against a hosted server or webdev in a browser. An unusual local setup that reaches
+webdev by another name now gets 403; the bind host is loopback-only off server mode, so that means a
+hand-edited hosts file or a tunnel. The lookup-error fail-open of the same card is in `safe-fetch.ts` and is
+SEC-004 4a, not this row. The rebinding pin (4a) and the egress deny stay open under SR-16 (A10-6) and SR-97.
+
+Gate: PR merge.
 
 ## Must be true before the Tencent Cloud deploy
 

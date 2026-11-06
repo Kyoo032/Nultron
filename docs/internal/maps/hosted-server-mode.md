@@ -2,7 +2,7 @@
 
 Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
 
-Last verified: 2026-10-11 at 2df34be (fix branch, before merge) (SH-001: section 0, the Node 22 boot check). Before that: 2026-09-21 at 4938747 + working tree; four citations re-anchored and the
+Last verified: 2026-11-06 at ed5bdbcd + working tree for the Host rule only (the paragraph before section 2 and step 10 of the request walk). Before that: 2026-10-11 at 2df34be (fix branch, before merge) (SH-001: section 0, the Node 22 boot check). Before that: 2026-09-21 at 4938747 + working tree; four citations re-anchored and the
 review-instance section added, then the boot-guard path re-checked after the fix pass of the same
 day (the guards moved from `apps/web/lib/` to `apps/web/server/`, because `lib` is the renderer's
 namespace and that module re-exports `@agentforge/host`). The rest was last read at c204e5e /
@@ -37,6 +37,8 @@ What this page is **not**: the desktop or webdev path. Every rule below is a bra
 `normaliseOrigin(value)` (`:58-73`) is the comparison unit everywhere below: `new URL(value).origin` lower-cased, `null` for anything that is not an `http:`/`https:` URL.
 
 ### 2. The two mutating rules — loopback, and the web allowlist
+
+Since 2026-11-06 (SR-200) the Host half of both rules also runs on GET, HEAD and OPTIONS: `hostRejection` (`packages/host/src/http-adapter.ts:778`, called at `:633`) is applied to every `/api` request, and `/healthz` stays exempt. `mutatingRejection` (`:787`) keeps the Origin, CSRF and transport halves for non-safe methods. The line numbers below predate that and have shifted.
 
 `mutatingRejection` (`packages/host/src/http-adapter.ts:539-568`) is the one place the two are chosen between, on `csrfMode.secure` — which *is* `serverMode` (`:526`, set at `:387`).
 
@@ -80,7 +82,7 @@ Where the renderer sends it: `apps/web/lib/api-client.ts`. `withMutatingHeaders`
    - `checkRequestRate({ serverMode: true, path, ip, sessionKey })` (`:329`), with the session key hashed off the mode's session cookie (`:408`; `sessionCookieName` at `packages/host/src/auth/session.ts:36-38`).
    Any rejection goes through `respondRejection` (`:281-299`): the `{error:{code,message}}` envelope, `X-Content-Type-Options: nosniff`, `Retry-After` when there is one, and — **in server mode only** — one `log.warn("request_filtered", …)` line.
 9. Non-`/api` requests that survived fall through to the web server (`:415-417`).
-10. `SAFE_METHODS` (GET/HEAD/OPTIONS, `:18`) skip `mutatingRejection`; everything else runs it, and any rejection is answered `403` whatever the code (`:423-428`).
+10. `hostRejection` runs for every `/api` method (SR-200); `SAFE_METHODS` (GET/HEAD/OPTIONS, `:18`) skip `mutatingRejection`; everything else runs it, and any rejection is answered `403` whatever the code (`:423-428`).
 11. CSRF cookie minted if needed (`:431-432`).
 12. Body read (`:434-445`): `MAX_BODY_BYTES = 26 * 1024 * 1024` enforced on the bytes actually read (`:30`, `:134-137`) → `413 payload_too_large`; a JSON parse failure → `400 invalid_json` (`:440-443`). Multipart is parsed by hand (`:161-194`).
 13. An abort controller wired to `res.on("close")` so a client that walks away cancels the run (`:449-454`).
