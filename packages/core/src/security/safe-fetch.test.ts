@@ -1,6 +1,15 @@
+import { createServer } from "node:http";
+import type { AddressInfo, LookupFunction } from "node:net";
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../errors";
-import { assertPublicHttpsUrl, assertResolvesPublic, fetchPublicHttps, nextHopUrl } from "./safe-fetch";
+import {
+  assertPublicHttpsUrl,
+  assertResolvesPublic,
+  fetchPublicHttps,
+  nextHopUrl,
+  pinnedAgent,
+  pinnedLookup,
+} from "./safe-fetch";
 import type { HostLookup } from "./safe-fetch";
 
 type Step = { status: number; headers?: Record<string, string>; body?: string };
@@ -362,5 +371,99 @@ describe("fetchPublicHttps resolves every hop", () => {
       expect(dispatcher).toBeDefined();
     }
     expect(dispatchers[0]).not.toBe(dispatchers[1]);
+  });
+});
+
+describe("fetchPublicHttps never asks twice", () => {
+  it("does not resolve a hop again after its answer was judged, so a later private answer is never seen", async () => {
+    let asked = 0;
+    const rebinding: HostLookup = async () => {
+      asked += 1;
+      return asked === 1 ? [{ address: "93.184.216.34" }] : [{ address: "169.254.169.254" }];
+    };
+    const result = await fetchPublicHttps("https://rebind.example/x", {
+      lookupImpl: rebinding,
+      fetchImpl: fakeFetch({ "https://rebind.example/x": { status: 200, body: "ok" } }, []),
+    });
+    expect(result.status).toBe(200);
+    expect(asked).toBe(1);
+  });
+});
+
+type LookupOptions = Parameters<LookupFunction>[1];
+
+function ask(lookup: LookupFunction, hostname: string, options: LookupOptions) {
+  return new Promise<{ error: unknown; address: unknown; family: number | undefined }>((resolve) => {
+    lookup(hostname, options, (error, address, family) => resolve({ error, address, family }));
+  });
+}
+
+describe("pinnedLookup", () => {
+  const lookup = pinnedLookup("a.test", [{ address: "93.184.216.34" }, { address: "2606:2800:220:1::1" }]);
+
+  it("hands back every vetted address when the connector asks for all of them", async () => {
+    const answer = await ask(lookup, "a.test", { all: true });
+    expect(answer.error).toBeNull();
+    expect(answer.address).toEqual([
+      { address: "93.184.216.34", family: 4 },
+      { address: "2606:2800:220:1::1", family: 6 },
+    ]);
+  });
+
+  it("hands back the first vetted address, with its family, when the connector asks for one", async () => {
+    const answer = await ask(lookup, "a.test", {});
+    expect(answer).toMatchObject({ error: null, address: "93.184.216.34", family: 4 });
+  });
+
+  it("honours a family filter without leaving the vetted set", async () => {
+    const answer = await ask(lookup, "a.test", { family: 6, all: true });
+    expect(answer.address).toEqual([{ address: "2606:2800:220:1::1", family: 6 }]);
+    const none = await ask(pinnedLookup("a.test", [{ address: "93.184.216.34" }]), "a.test", { family: 6, all: true });
+    expect(none.error).toMatchObject({ code: "ENOTFOUND" });
+  });
+
+  it("answers for its own host only, whatever the case", async () => {
+    expect((await ask(lookup, "A.TEST", {})).error).toBeNull();
+    expect((await ask(lookup, "b.test", {})).error).toMatchObject({ code: "ENOTFOUND" });
+  });
+});
+
+describe("pinnedAgent", () => {
+  async function listen() {
+    const hosts: string[] = [];
+    const server = createServer((request, response) => {
+      hosts.push(request.headers.host ?? "");
+      response.end("pinned");
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+    return { port, hosts, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
+  }
+
+  it("connects the socket to the pinned address for a name no resolver could answer", async () => {
+    const listener = await listen();
+    const agent = pinnedAgent("rebind.test", [{ address: "127.0.0.1" }]);
+    try {
+      const response = await fetch(`http://rebind.test:${listener.port}/`, { dispatcher: agent } as RequestInit);
+      expect(await response.text()).toBe("pinned");
+      expect(listener.hosts).toEqual([`rebind.test:${listener.port}`]);
+    } finally {
+      await agent.destroy();
+      await listener.close();
+    }
+  });
+
+  it("does not connect to a name it was not pinned for", async () => {
+    const listener = await listen();
+    const agent = pinnedAgent("rebind.test", [{ address: "127.0.0.1" }]);
+    try {
+      await expect(
+        fetch(`http://other.test:${listener.port}/`, { dispatcher: agent } as RequestInit),
+      ).rejects.toThrow();
+      expect(listener.hosts).toEqual([]);
+    } finally {
+      await agent.destroy();
+      await listener.close();
+    }
   });
 });

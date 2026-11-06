@@ -9,6 +9,11 @@ import { componentManifest } from "./manifest";
 import { downloadPackage, verifyIntegrity } from "./download";
 import { ComponentError } from "./types";
 
+vi.mock("node:dns/promises", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("node:dns/promises")>()),
+  lookup: vi.fn(async () => [{ address: "104.16.0.35", family: 4 }]),
+}));
+
 const PACKAGE = componentManifest("anydoc").main;
 
 function integrityOf(bytes: Buffer): string {

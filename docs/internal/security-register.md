@@ -228,6 +228,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual: request-body arrays with no `.max()` still cost one issue per bad element | Residual: none blocks; capping the request-body arrays is a follow-up |
 | [SR-197](#sr-197) | Medium | AI SDK 5's `streamText` prints every stream error to the console by default, and an `APICallError` carries the request body (the prompt) and the gateway's error body | Fixed in tree (2026-11-04, `fix/zod-4`): the runtime passes a silent `onError`; tested, not driven | PR merge of the AI SDK 5 move |
 | [SR-198](#sr-198) | Medium | AI SDK 5 brings `undici` 5.29.0 and `@fastify/busboy` into the hosted image, with five HIGH `undici` advisories and one `busboy` advisory | Fixed in tree (2026-11-04, `fix/zod-4`): scoped override to `undici` 6.29.1, which drops `busboy`; the SDK's guarded download fetch checked on it; not driven | PR merge of the AI SDK 5 move |
+| [SR-201](#sr-201) | Medium | The SSRF guard resolved a name, then let `fetch` resolve it again to connect (DNS rebinding), and let a connection through when its own lookup failed | Fixed in tree (2026-11-06, `fix/sec-004a-dns-pinning`): one lookup per hop, refused when it fails or answers privately, then the socket is pinned to that answer; driven on Node 24 against a loopback listener and real DNS and TLS; not run on Node 22 or on a hosted server | PR merge |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -1617,11 +1618,11 @@ fixed, two were fixed on `main` afterwards, and four remain. All six re-read her
 | A06-1, nothing runs the tests | **Moved to the local gate, 2026-09-24** | `.github/workflows/` is deleted. `scripts/ci-local.mjs` (`pnpm ci:local`) runs lint, tsc, every unit suite and `node scripts/audit-deployed.mjs --level high`. It runs only when someone runs it: [SR-80](#sr-80). See [SR-12](#sr-12) |
 | A06-2, the image ships devDependencies | **Fixed, 2026-10-05** | The `prod` stage installs with `--prod` (`webapp-deploy/Dockerfile:113`) and the runtime copies that tree (`:167`); `tsx` moved to `dependencies` (`apps/web/package.json:20`). [SR-113](#sr-113) |
 | A08-1, actions pinned to mutable tags | **Closed by removal, 2026-09-24** | The three workflows and their 15 `@v4` `uses:` lines are deleted; the repo has no `.github/workflows/`. [SR-80](#sr-80) |
-| A10-6, DNS rebinding | **Open by nature** | `packages/core/src/security/safe-fetch.ts:102` states it: closing it needs a custom undici dispatcher with a pinned `lookup` |
+| A10-6, DNS rebinding | **Fixed in tree, 2026-11-06** | `packages/core/src/security/safe-fetch.ts:104-126` resolves once per hop and fails closed, and `:145` and `:172` pin the undici agent's `lookup` to that answer. [SR-201](#sr-201) |
 
 Required action: A06-1 is the one that matters, because it is why every other row in this register
 is proved by hand. Since 2026-09-24 its answer is the local gate, and what remains of it is
-[SR-80](#sr-80). A08-1 went with the workflows. A06-2 is a migration item. A10-6 stays recorded.
+[SR-80](#sr-80). A08-1 went with the workflows. A06-2 is a migration item. A10-6 was closed in tree on 2026-11-06 by [SR-201](#sr-201).
 
 Gate: **blocks Tencent deploy** for A06-1. The other three are recorded and accepted.
 
@@ -6531,6 +6532,54 @@ lookup was called. `audit:deployed` passes.
 Residual: not driven on a hosted server; the override has to be dropped once the SDK moves to `undici` 6 itself.
 
 Gate: PR merge of the AI SDK 5 move.
+
+### SR-201 {#sr-201}
+
+**The SSRF guard resolved a name, then let `fetch` resolve it again to connect, and let a connection through when its own lookup failed.**
+Raised 2026-10-15 by the security tester as SEC-004 part 4a, re-read 2026-10-16 against `Kyoo032/Nultron` `07cb099`
+(OWASP A10-6 in [the pass](security-owasp-2026-09.md), recorded there as open by nature). Medium. Fixed in tree
+2026-11-06 on `fix/sec-004a-dns-pinning`.
+
+Evidence before the fix: `assertResolvesPublic` judged one lookup, then `fetchImpl(current, ...)` made a second one
+inside `fetch`. A DNS server the attacker runs can answer a public address first and a loopback, RFC 1918,
+link-local or CGNAT address second, and Node connects to the second. The `catch { return; }` in the same function let
+`fetch` connect after a failed lookup. Callers of `fetchPublicHttps`: Knowledge URL ingest (`knowledge.ts:615`),
+`web_fetch` and the Research reader (`tools/platform/web-fetch.ts:36`), the media mirror (`media-download.ts:44`) and the
+component download (`components/download.ts:72`). The Knowledge path stores the body and shows it back, so a reachable
+private host is a read, not only a blind connect. The architect's reading (2026-10-16) is that cloud metadata is plain
+HTTP and this guard is HTTPS only with certificate checks, so it does not leak metadata; what remains is a connect or
+probe of private hosts and ports. That is a protocol argument, not a test.
+
+Fix (`packages/core/src/security/safe-fetch.ts`): per hop, `resolvePublicAddresses` (`:104-126`) resolves the host once
+and refuses a failed lookup, an empty answer, an answer that is not an IP address and any private answer, all
+`400 invalid_endpoint`, with "Could not resolve this URL's host" for the first two and "URL must point at a public host"
+for the others. `pinnedAgent` (`:172`) then builds an undici `Agent` whose `connect.lookup` (`pinnedLookup`, `:145`)
+returns only that vetted list and answers for that host only, and `fetchPublicHttps` passes it as `dispatcher` (`:248`).
+The socket never asks DNS. The agent is per hop and destroyed after the body is read. IP literals stay on the lexical
+check, because undici does not call `lookup` for a literal. `lookupImpl` stays the test seam. `@agentforge/core` gains a
+direct dependency on `undici` 6.29.1, the version SR-198 already pins, so the deployed closure holds no new package;
+the lockfile gains one importer line.
+
+Proof: `safe-fetch.test.ts` (32 passed). Before the fix, 5 of 25 failed: the unresolvable-name case in
+`assertResolvesPublic` and in `fetchPublicHttps` (the fake fetch was called), the empty answer, the non-IP answer and
+the missing dispatcher. After it: a resolver that answers public once and private afterwards is asked once per hop; a
+`pinnedAgent` for `rebind.test` reaches a listener on 127.0.0.1 although the system resolver cannot answer that name
+(so the pin reached the socket), and refuses another name; `pinnedLookup` answers in both connector shapes and honours a
+family filter. The caller suites that reach the guard pass (`web-fetch`, `outbound-guard`, `media-download`,
+`components/download`, `components/install`); the last two now mock `node:dns/promises`, because they used the real
+resolver and relied on the old fail-open. A one-off script on 2026-11-06 ran `fetchPublicHttps` with the real
+resolver: `https://example.com/` answered 200 over TLS (SNI and certificate check work through the pin),
+`https://localtest.me/` was refused as a private answer, and an `.invalid` name was refused as unresolvable.
+
+Residual: (1) Not run on Node 22, the image's runtime; the local runtime is Node 24, whose bundled undici is a
+different major than the 6.29.1 agent, and the loopback test is what would catch a Node where the two do not fit.
+(2) Not driven on a hosted server. (3) A transient DNS failure is now a 400 instead of a network error, on purpose.
+(4) The port is not checked: `https://host:6379/` is allowed. Whether to allow 443 only, a list or refuse known
+internal ports is Rizky's call. (5) Egress filtering of `169.254.0.0/16` and `100.64.0.0/10` for the app pod is
+infrastructure and belongs to [SR-97](#sr-97); this change does not replace it. (6) `assertResolvesPublic` is kept
+as a thin wrapper over the same resolver and has no production caller.
+
+Gate: PR merge.
 
 ## Must be true before the Tencent Cloud deploy
 
