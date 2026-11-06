@@ -10,15 +10,12 @@ import { readStoredFinanceReport } from "../finance-tasks/persist";
 import { financeReportSchema, readPostedFinanceReport } from "../finance-tasks/report-schema";
 import { DEFAULT_REPORT_FORMAT, renderReport } from "../renderers/registry";
 import { REPORT_FORMATS } from "../renderers/types";
-import { REQUEST_ARRAY_MAX, assertArraysWithin } from "../request-limits";
+import { assertRequestWithin } from "../request-limits";
 import { localeForRun } from "../run-context";
 import { getTenant } from "../tenant";
 
 const guardSchema = z.object({
-  flagged: z
-    .array(z.object({ section: z.number().int(), text: z.string() }))
-    .max(REQUEST_ARRAY_MAX)
-    .default([]),
+  flagged: z.array(z.object({ section: z.number().int(), text: z.string() })).default([]),
   total: z.number().int().default(0),
 });
 
@@ -31,7 +28,7 @@ const guardSchema = z.object({
  * has no `FinanceBrief` behind it. It is untrusted input, so it is shaped and size-capped before a
  * renderer sees it.
  */
-export const exportRequestSchema = z.object({
+const exportRequestSchema = z.object({
   artifactId: z.string().trim().min(1).optional(),
   brief: financeBriefSchema.optional(),
   report: financeReportSchema.optional(),
@@ -44,14 +41,12 @@ export const exportRequestSchema = z.object({
 type ExportRequest = z.infer<typeof exportRequestSchema>;
 
 function readRequest(body: unknown): ExportRequest {
+  assertRequestWithin(body, "Export request");
   // Size first: a malformed 40 MB report should be refused, not shaped.
   const posted = (body as { report?: unknown } | null)?.report;
   if (posted !== undefined) {
     readPostedFinanceReport(posted);
   }
-  const shape = body as { brief?: unknown; result?: { brief?: unknown } | null } | null;
-  assertArraysWithin(shape?.brief, "brief");
-  assertArraysWithin(shape?.result?.brief, "result.brief");
   const parsed = exportRequestSchema.safeParse(body ?? {});
   if (!parsed.success) {
     throw new ApiError("invalid_request", "Export request is missing or malformed", 400);

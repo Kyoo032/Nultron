@@ -9,12 +9,12 @@ import { generateFinanceBrief, regenerateFinanceSection } from "../finance-gener
 import { requireFinanceTask } from "../finance-task";
 import { financeTaskParser } from "../finance-tasks/parsers";
 import { streamJob } from "../job-stream";
-import { assertArraysWithin } from "../request-limits";
+import { assertRequestWithin } from "../request-limits";
 import { withRunSlot } from "../run-limits";
 
 function runBody(request: HostRequest): unknown {
   const body = request.body ?? null;
-  assertArraysWithin(body, "Request body");
+  assertRequestWithin(body, "Request body");
   return body;
 }
 
@@ -97,7 +97,7 @@ export async function handlePostFinanceRegen(request: HostRequest): Promise<Host
 export async function handlePostFinanceDocx(request: HostRequest): Promise<HostResult> {
   try {
     const subject = (request.body as { brief?: unknown } | null)?.brief ?? request.body;
-    assertArraysWithin(subject, "brief");
+    assertRequestWithin(subject, "brief");
     const parsed = financeBriefSchema.safeParse(subject);
     if (!parsed.success) {
       throw new ApiError("invalid_request", "brief is missing or malformed", 400);

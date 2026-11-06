@@ -48,7 +48,7 @@ import {
   type PresentationLocale,
 } from "./presentation-locale";
 import { log } from "./log";
-import { assertArraysWithin } from "./request-limits";
+import { assertRequestWithin } from "./request-limits";
 import { runChecked } from "./harness/run-checked";
 import {
   MAX_REQUESTED_SLIDES,
@@ -487,7 +487,7 @@ export async function regeneratePresentationSlide(
   if (!body || typeof body !== "object") {
     throw new ApiError("invalid_request", "Request body must be a JSON object", 400);
   }
-  assertArraysWithin((body as { outline?: unknown }).outline, "Presentation outline");
+  assertRequestWithin((body as { outline?: unknown }).outline, "Presentation outline");
   const outline = parsePresentationOutlineBody((body as { outline?: unknown }).outline);
   const index = readSlideIndex(body, outline.slides.length);
   const topic =

@@ -101,10 +101,10 @@ describe("request arrays are capped before they are parsed", () => {
 
   it("refuses an oversized array on the Market Word export", async () => {
     const result = await post("/api/v1/market/docx", {
-      briefing: { failures: many(limits.REQUEST_ARRAY_MAX + 1, () => "x") },
+      briefing: { failures: many(limits.BRIEFING_LIMITS.list + 1, () => "x") },
     });
     expect(status(result)).toBe(400);
-    expect(errorOf(result).message).toContain(String(limits.REQUEST_ARRAY_MAX));
+    expect(errorOf(result).message).toContain(String(limits.BRIEFING_LIMITS.list));
   });
 
   it("refuses an oversized array on a finance section regenerate", async () => {
@@ -135,8 +135,8 @@ describe("request arrays are capped before they are parsed", () => {
     expect(errorOf(result).message).toContain(String(limits.REQUEST_ARRAY_MAX));
   });
 
-  it("refuses many lists that are each under the cap but together over the item budget", async () => {
-    const lists = Math.ceil(limits.REQUEST_ITEMS_MAX / limits.REQUEST_ARRAY_MAX) + 1;
+  it("refuses many lists that are each under the cap but together over the cost budget", async () => {
+    const lists = Math.ceil(limits.REQUEST_COST_MAX / limits.REQUEST_ARRAY_MAX) + 1;
     const sections = many(lists, () => ({
       heading: "h",
       body: "b",
@@ -144,7 +144,7 @@ describe("request arrays are capped before they are parsed", () => {
     }));
     const result = await post("/api/v1/finance/docx", { brief: { ...brief, sections } });
     expect(status(result)).toBe(400);
-    expect(errorOf(result).message).toContain(String(limits.REQUEST_ITEMS_MAX));
+    expect(errorOf(result).message).toContain(String(limits.REQUEST_COST_MAX));
   });
 
   it("refuses an oversized clip list inside an edit op", async () => {
@@ -177,7 +177,7 @@ function deckOfEmptyShapes(slideCount: number): unknown {
 }
 
 function briefWithKeyLists(): unknown {
-  const sections = many(3, () => ({ heading: "h", body: "b", metrics: many(9_000, () => "k") }));
+  const sections = many(4, () => ({ heading: "h", body: "b", metrics: many(9_000, () => "k") }));
   return { ...brief, sections };
 }
 
@@ -214,10 +214,10 @@ describe("one empty object can fail many fields, so a failing body is bounded by
 
 describe("routes that parsed a request list with no cap now refuse an oversized one", () => {
   it("refuses a Market briefing whose notes list is over the cap before rewriting a section", async () => {
-    const failures = many(1_001, () => 1);
+    const failures = many(limits.BRIEFING_LIMITS.list + 1, () => 1);
     const result = await post("/api/v1/market/regenerate", { briefing: { packet: { macro: { failures } } }, section: 0 });
     expect(status(result)).toBe(400);
-    expect(errorOf(result).message).toContain("1000");
+    expect(errorOf(result).message).toContain(String(limits.BRIEFING_LIMITS.list));
   });
 
   it("saves a normal deck", async () => {
@@ -246,34 +246,58 @@ describe("routes that parsed a request list with no cap now refuse an oversized 
   });
 });
 
-describe("assertArraysWithin", () => {
-  it("passes a value at the cap and refuses one past it, at any depth", () => {
-    expect(() => limits.assertArraysWithin({ a: many(limits.REQUEST_ARRAY_MAX, () => 0) }, "body")).not.toThrow();
+describe("assertRequestWithin", () => {
+  it("passes a list at the cap and refuses one past it, at any depth", () => {
+    expect(() => limits.assertRequestWithin({ a: many(limits.REQUEST_ARRAY_MAX, () => 0) }, "body")).not.toThrow();
     expect(() =>
-      limits.assertArraysWithin({ a: [{ b: [many(limits.REQUEST_ARRAY_MAX + 1, () => 0)] }] }, "body"),
-    ).toThrow(/body/);
+      limits.assertRequestWithin({ a: [{ b: [many(limits.REQUEST_ARRAY_MAX + 1, () => 0)] }] }, "body"),
+    ).toThrow(/body has a list over/);
   });
 
-  it("counts every list together, not only each one", () => {
-    const each = many(limits.REQUEST_ARRAY_MAX, () => 0);
-    const lists = Math.floor(limits.REQUEST_ITEMS_MAX / limits.REQUEST_ARRAY_MAX);
-    expect(() =>
-      limits.assertArraysWithin(
-        many(lists, () => each),
-        "body",
-      ),
-    ).toThrow(/in all/);
-    expect(() =>
-      limits.assertArraysWithin(
-        many(lists - 1, () => each),
-        "body",
-      ),
-    ).not.toThrow();
+  it("charges an object or a list the container cost and any other value one", () => {
+    const fits = Math.floor((limits.REQUEST_COST_MAX - limits.CONTAINER_COST) / limits.CONTAINER_COST);
+    expect(() => limits.assertRequestWithin(many(fits, () => ({})), "body")).not.toThrow();
+    expect(() => limits.assertRequestWithin(many(fits + 1, () => ({})), "body")).toThrow(/larger than a request/);
+    expect(() => limits.assertRequestWithin(many(limits.REQUEST_ARRAY_MAX, () => 0), "body")).not.toThrow();
+  });
+
+  it("counts object values as well as list items", () => {
+    const tight = { list: 10, cost: limits.CONTAINER_COST + 2 };
+    expect(() => limits.assertRequestWithin({ a: 1, b: 2 }, "body", tight)).not.toThrow();
+    expect(() => limits.assertRequestWithin({ a: 1, b: 2, c: 3 }, "body", tight)).toThrow(/larger than a request/);
+  });
+
+  it("holds a body of empty objects to the number of fields they can fail, not to the number of objects", () => {
+    const shapesPerSlide = 24;
+    const slideCost = limits.CONTAINER_COST + limits.CONTAINER_COST + shapesPerSlide * limits.CONTAINER_COST;
+    const slides = Math.floor(limits.REQUEST_COST_MAX / slideCost);
+    const body = (count: number) => ({ slides: many(count, () => ({ shapes: many(shapesPerSlide, () => ({})) })) });
+    expect(() => limits.assertRequestWithin(body(slides - 1), "body")).not.toThrow();
+    expect(() => limits.assertRequestWithin(body(slides + 1), "body")).toThrow(/larger than a request/);
+  });
+
+  it("admits a Market briefing of a full watchlist with full price history, which the default budget refuses", () => {
+    const bar = { date: "2026-01-01", open: 1, high: 1, low: 1, close: 1, volume: 1 };
+    const ticker = {
+      history: { symbol: "X", bars: many(756, () => bar) },
+      chart: { x: { values: many(120, () => "d") }, series: many(4, () => ({ name: "s", values: many(120, () => 1) })) },
+      news: many(8, () => ({ title: "t", link: "l" })),
+      insiders: many(200, () => ({ a: 1, b: 2, c: 3, d: 4, e: 5, f: 6 })),
+    };
+    const briefingBody = { packet: { tickers: many(15, () => ticker) }, sources: many(200, () => ({ label: "l", url: "u" })) };
+    expect(() => limits.assertRequestWithin(briefingBody, "briefing", limits.BRIEFING_LIMITS)).not.toThrow();
+    expect(() => limits.assertRequestWithin(briefingBody, "briefing")).toThrow(/larger than a request/);
+  });
+
+  it("refuses a Market list over the briefing cap that the default cap would allow", () => {
+    const list = many(limits.BRIEFING_LIMITS.list + 1, () => 0);
+    expect(() => limits.assertRequestWithin(list, "briefing", limits.BRIEFING_LIMITS)).toThrow(/list over/);
+    expect(() => limits.assertRequestWithin(list, "briefing")).not.toThrow();
   });
 
   it("ignores scalars, null and undefined", () => {
     for (const value of [undefined, null, "text", 4, true]) {
-      expect(() => limits.assertArraysWithin(value, "body")).not.toThrow();
+      expect(() => limits.assertRequestWithin(value, "body")).not.toThrow();
     }
   });
 });

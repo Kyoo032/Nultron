@@ -3,6 +3,7 @@ import { jsonError, jsonOk } from "../errors";
 import { getTenant } from "../tenant";
 import type { HostRequest, HostResult } from "../types";
 import { parsePresentationOutlineBody } from "../presentation-outline";
+import { assertRequestWithin } from "../request-limits";
 import { listPresentationDecks, readPresentationDeck, savePresentationDeck } from "../presentation-decks";
 
 /** Saved decks are local files. They do not call the gateway. */
@@ -28,6 +29,7 @@ export async function handlePostPresentationDeck(request: HostRequest): Promise<
     const tenant = await getTenant(request);
     const body = request.body;
     const record = body && typeof body === "object" ? (body as { id?: unknown; outline?: unknown }) : {};
+    assertRequestWithin(record.outline, "Presentation outline");
     const outline = parsePresentationOutlineBody(record.outline);
     const id = typeof record.id === "string" && record.id.trim() ? record.id.trim() : undefined;
     const deck = savePresentationDeck(tenant.workspaceId, outline, id);

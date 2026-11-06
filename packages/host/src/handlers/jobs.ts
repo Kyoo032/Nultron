@@ -35,7 +35,7 @@ import { buildPresentationPptx } from "../presentation-pptx";
 import { presentationLocale } from "../presentation-locale";
 import { generateResearchNotes } from "../research-generate";
 import { streamJob } from "../job-stream";
-import { assertArraysWithin } from "../request-limits";
+import { assertRequestWithin } from "../request-limits";
 import { withRunSlot } from "../run-limits";
 import { analyzeDataset } from "../data-generate";
 
@@ -218,7 +218,7 @@ export async function handlePostDocumentsRegen(request: HostRequest): Promise<Ho
 
 export async function handlePostDocumentsDocx(request: HostRequest): Promise<HostResult> {
   try {
-    assertArraysWithin(request.body, "Document draft");
+    assertRequestWithin(request.body, "Document draft");
     const draft = parseDocumentDraftBody(request.body ?? null);
     const { buffer, filename } = await buildDocumentDocx(draft);
     return {
@@ -277,7 +277,7 @@ export async function handlePostPresentationsRegen(request: HostRequest): Promis
 
 export async function handlePostPresentationsPptx(request: HostRequest): Promise<HostResult> {
   try {
-    assertArraysWithin(request.body, "Presentation outline");
+    assertRequestWithin(request.body, "Presentation outline");
     const outline = parsePresentationOutlineBody(request.body ?? null);
     const locale = presentationLocale();
     const { buffer, filename } = await buildPresentationPptx(outline, { locale });

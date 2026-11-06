@@ -8,7 +8,7 @@ import { buildMarketBoard } from "../market-board";
 import { assertBriefingHasNoAdvice } from "../market-briefing-build";
 import { buildMarketBriefingDocx } from "../market-docx";
 import { generateMarketBriefing, regenerateBriefingSection } from "../market-generate";
-import { assertArraysWithin } from "../request-limits";
+import { BRIEFING_LIMITS, assertRequestWithin } from "../request-limits";
 import { getTenant } from "../tenant";
 import type { HostRequest, HostResult } from "../types";
 
@@ -54,6 +54,7 @@ export async function handlePostMarketStream(request: HostRequest): Promise<Host
 export async function handlePostMarketRegen(request: HostRequest): Promise<HostResult> {
   try {
     const tenant = await getTenant(request);
+    assertRequestWithin(request.body, "Request body", BRIEFING_LIMITS);
     // Every path below reaches the gateway, so a closed gate is a 403 here and not a failed call.
     requireGatewayAllowedFor(tenant);
     return jsonOk(await withRunSlot(tenant, () => regenerateBriefingSection(tenant, request.body ?? null)));
@@ -66,7 +67,7 @@ export async function handlePostMarketRegen(request: HostRequest): Promise<HostR
 export async function handlePostMarketDocx(request: HostRequest): Promise<HostResult> {
   try {
     const subject = (request.body as { briefing?: unknown } | null)?.briefing ?? request.body;
-    assertArraysWithin(subject, "briefing");
+    assertRequestWithin(subject, "briefing", BRIEFING_LIMITS);
     const parsed = marketBriefingSchema.safeParse(subject);
     if (!parsed.success) {
       throw new ApiError("invalid_request", "briefing is missing or malformed", 400);
