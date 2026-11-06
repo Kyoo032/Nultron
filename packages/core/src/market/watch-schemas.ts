@@ -44,7 +44,8 @@ export const SIGNAL_NOTE_MAX = 120;
 export const ROTATION_MAX = WATCHLIST_MAX;
 export const PACKET_NOTES_MAX = 100;
 export const MACRO_QUOTES_MAX = 100;
-export const CHART_SERIES_MAX = 8;
+export const CHART_SERIES_MAX = 3;
+export const PRICE_CHART_POINTS_MAX = 504;
 
 export const MARKET_STATES = ["PRE", "REGULAR", "POST", "CLOSED", "UNKNOWN"] as const;
 export type MarketState = (typeof MARKET_STATES)[number];
@@ -169,10 +170,10 @@ export type TickerCrypto = z.infer<typeof tickerCryptoSchema>;
 
 const priceChartSchema = dataChartSchema.extend({
   x: dataChartSchema.shape.x.extend({
-    values: z.array(z.union([z.string(), z.number()])).max(HISTORY_BARS_MAX),
+    values: z.array(z.union([z.string(), z.number()])).max(PRICE_CHART_POINTS_MAX),
   }),
   series: z
-    .array(dataChartSchema.shape.series.element.extend({ values: z.array(z.number()).max(HISTORY_BARS_MAX) }))
+    .array(dataChartSchema.shape.series.element.extend({ values: z.array(z.number()).max(PRICE_CHART_POINTS_MAX) }))
     .min(1)
     .max(CHART_SERIES_MAX),
 });
