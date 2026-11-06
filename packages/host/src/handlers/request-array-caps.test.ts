@@ -62,25 +62,17 @@ describe("request arrays are capped before they are parsed", () => {
     expect(result.type).toBe("bytes");
   });
 
-  it("refuses 100,001 well-formed flagged figures with a 400", async () => {
-    const flagged = many(100_001, () => ({ section: 0, text: "1" }));
+  it("refuses a flagged list one past the cap with a 400", async () => {
+    const flagged = many(limits.REQUEST_ARRAY_MAX + 1, () => ({ section: 0, text: "1" }));
     const result = await post("/api/v1/finance/export", { result: { brief, guard: { flagged, total: 1 } } });
     expect(status(result)).toBe(400);
     expect(errorOf(result).code).toBe("invalid_request");
   });
 
-  it("refuses 100,001 malformed flagged figures with a 400", async () => {
-    const flagged = many(100_001, () => ({}));
+  it("refuses a malformed flagged list one past the cap with a 400", async () => {
+    const flagged = many(limits.REQUEST_ARRAY_MAX + 1, () => ({}));
     const result = await post("/api/v1/finance/export", { result: { brief, guard: { flagged, total: 1 } } });
     expect(status(result)).toBe(400);
-  });
-
-  it("stops the export schema at the length check instead of collecting an issue per element", async () => {
-    const { exportRequestSchema } = await import("./finance-export");
-    const flagged = many(100_001, () => ({}));
-    const parsed = exportRequestSchema.safeParse({ result: { brief, guard: { flagged, total: 1 } } });
-    expect(parsed.success).toBe(false);
-    expect(parsed.success ? 0 : parsed.error.issues.length).toBeLessThan(10);
   });
 
   it("refuses an export whose brief has too many sections, naming the cap", async () => {
@@ -168,9 +160,89 @@ describe("request arrays are capped before they are parsed", () => {
       title: "NDA",
       side: { role: "", party: "Acme", counterparty: "" },
       workType: "review",
-      deliverables: many(100_001, () => "redline"),
+      deliverables: many(limits.REQUEST_ARRAY_MAX + 1, () => "redline"),
     });
     expect(status(result)).toBe(400);
+  });
+});
+
+const MESSAGE_CHARS_MAX = 2_000;
+
+function emptyShapes(): unknown[] {
+  return many(24, () => ({}));
+}
+
+function deckOfEmptyShapes(slideCount: number): unknown {
+  return { title: "Deck", slides: many(slideCount, () => ({ shapes: emptyShapes() })) };
+}
+
+function briefWithKeyLists(): unknown {
+  const sections = many(3, () => ({ heading: "h", body: "b", metrics: many(9_000, () => "k") }));
+  return { ...brief, sections };
+}
+
+describe("one empty object can fail many fields, so a failing body is bounded by cost, not by item count", () => {
+  it("answers a small deck of empty shapes with a short message", async () => {
+    const result = await post("/api/v1/presentations/pptx", deckOfEmptyShapes(14));
+    expect(status(result)).toBe(400);
+    expect(errorOf(result).message.length).toBeLessThan(MESSAGE_CHARS_MAX);
+  });
+
+  it("refuses a 2,000-slide deck of empty shapes with a short message", async () => {
+    const result = await post("/api/v1/presentations/pptx", deckOfEmptyShapes(2_000));
+    expect(status(result)).toBe(400);
+    expect(errorOf(result).message.length).toBeLessThan(MESSAGE_CHARS_MAX);
+  });
+
+  it("answers a document draft of empty sections with a short message", async () => {
+    const result = await post("/api/v1/documents/docx", { title: "Memo", sections: many(500, () => ({})) });
+    expect(status(result)).toBe(400);
+    expect(errorOf(result).message.length).toBeLessThan(MESSAGE_CHARS_MAX);
+  });
+
+  it("charges a brief and its copy in result.brief to one budget", async () => {
+    const one = await post("/api/v1/finance/export", { brief: briefWithKeyLists() });
+    expect(status(one)).toBe(200);
+    const both = await post("/api/v1/finance/export", {
+      brief: briefWithKeyLists(),
+      result: { brief: briefWithKeyLists() },
+    });
+    expect(status(both)).toBe(400);
+    expect(errorOf(both).code).toBe("invalid_request");
+  });
+});
+
+describe("routes that parsed a request list with no cap now refuse an oversized one", () => {
+  it("refuses a Market briefing whose notes list is over the cap before rewriting a section", async () => {
+    const failures = many(1_001, () => 1);
+    const result = await post("/api/v1/market/regenerate", { briefing: { packet: { macro: { failures } } }, section: 0 });
+    expect(status(result)).toBe(400);
+    expect(errorOf(result).message).toContain("1000");
+  });
+
+  it("saves a normal deck", async () => {
+    const slides = many(14, () => ({ heading: "h", bullets: many(12, () => "b"), shapes: [] }));
+    const result = await post("/api/v1/presentations/decks", { outline: { title: "Deck", slides } });
+    expect(status(result)).toBe(200);
+  });
+
+  it("refuses to save a deck with far more slides than the builder makes", async () => {
+    const slides = many(2_000, () => ({ heading: "h" }));
+    const result = await post("/api/v1/presentations/decks", { outline: { title: "Deck", slides } });
+    expect(status(result)).toBe(400);
+  });
+
+  it("refuses to save a slide with thousands of bullets", async () => {
+    const result = await post("/api/v1/presentations/decks", {
+      outline: { title: "Deck", slides: [{ heading: "h", bullets: many(5_000, () => "b") }] },
+    });
+    expect(status(result)).toBe(400);
+  });
+
+  it("refuses to save a deck of empty shapes with a short message", async () => {
+    const result = await post("/api/v1/presentations/decks", { outline: deckOfEmptyShapes(2_000) });
+    expect(status(result)).toBe(400);
+    expect(errorOf(result).message.length).toBeLessThan(MESSAGE_CHARS_MAX);
   });
 });
 
