@@ -162,6 +162,73 @@ describe("redactCredentials: environment lines", () => {
     }
   });
 
+  it("keeps a signed number, a number with thousands separators and a trailing comment on a name that ends in a secret word", () => {
+    const kept = [
+      "MAX_TOKEN=2048 # bits",
+      "MAX_TOKEN=1,234",
+      "MAX_TOKEN=1,234,567",
+      "MIN_PASSWORD=-1",
+      "MIN_PASSWORD=+5",
+      "ACCESS_TOKEN=true # on",
+      "API_KEY=false   # disabled",
+      'ROTATE_SECRET="30" # days',
+    ];
+    for (const text of kept) {
+      expect(redactCredentials(text), text).toBe(text);
+    }
+  });
+
+  it("still masks a value that is not wholly a number, however it is written", () => {
+    expect(redactCredentials("API_KEY=1,23")).toBe("API_KEY=[REDACTED]");
+    expect(redactCredentials("API_KEY=1,2345")).toBe("API_KEY=[REDACTED]");
+    expect(redactCredentials("API_KEY=123#abc")).toBe("API_KEY=[REDACTED]");
+    expect(redactCredentials("API_KEY=-")).toBe("API_KEY=[REDACTED]");
+    expect(redactCredentials("API_KEY=12 34 # note")).toBe("API_KEY=[REDACTED]");
+  });
+
+  it("masks a name that ends in a secret word, including the shapes databases and mailers use", () => {
+    const masked = [
+      "OPENAI_APIKEY=opaque-not-prefixed",
+      "APIKEY=abcdefghijkl",
+      "DB_PASS=hunter2xyz",
+      "SMTP_PASS=hunter2xyz",
+      "PASS=hunter2xyz",
+      "MYSQL_PWD=hunter2xyz",
+      "PGPASSWORD=hunter2xyz",
+      "STRIPE_SECRET_KEY=opaque-not-prefixed",
+      "GITHUB_TOKEN_SECRET=opaque-not-prefixed",
+      "SECRET_KEY_BASE=abc123",
+    ];
+    for (const text of masked) {
+      const name = text.split("=")[0];
+      expect(redactCredentials(text), text).toBe(`${name}=[REDACTED]`);
+    }
+  });
+
+  it("keeps a setting whose name only contains a secret word before its last part", () => {
+    const kept = [
+      "TOKEN_ENDPOINT=https://oauth2.googleapis.com/token",
+      'KEY_COLUMNS = ["id", "name"]',
+      'PASSWORD_REGEX = r"^[a-z]+$"',
+      "KEY_SIZE=2048 # bits",
+      "TOKEN_COUNT=1,234",
+      "PASSWORD_MIN_LENGTH=-1",
+      "SECRET_ROTATION_DAYS=30",
+      "TOKEN_TTL=soon",
+      "KEY_FILE_PATH=/etc/app/key.pem",
+    ];
+    for (const text of kept) {
+      expect(redactCredentials(text), text).toBe(text);
+    }
+  });
+
+  it("keeps a working directory and names that only end in the letters of a secret word", () => {
+    const kept = ["PWD=/home/rizky/app", "OLDPWD=/home/rizky", "BYPASS=1", "COMPASS=north", "TURKEY=Ankara", "MONKEY=see"];
+    for (const text of kept) {
+      expect(redactCredentials(text), text).toBe(text);
+    }
+  });
+
   it("still masks a value that only starts like a number or a boolean", () => {
     expect(redactCredentials("API_KEY=0a1b2c3d4e")).toBe("API_KEY=[REDACTED]");
     expect(redactCredentials("SECRET=falsehood")).toBe("SECRET=[REDACTED]");
