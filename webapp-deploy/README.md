@@ -675,6 +675,11 @@ docker compose -f compose.yml up -d --no-build --force-recreate app proxy portal
 # code, an older sha: a rebuild, since no image is kept for it
 git -C .. checkout <previous-sha>        # run on the server, by hand
 sh webapp-deploy/scripts/deploy.sh --no-pull
+
+# code, a server that runs the released bundle instead: pin the previous release (in the bundle folder)
+git checkout <previous-ent-tag>          # its compose.yml pins both ghcr images to that tag
+docker compose pull app portal
+docker compose up -d --force-recreate app proxy portal
 ```
 
 `restore.sh` stops both services, empties the volume, unpacks the tarball, promotes the
@@ -682,10 +687,19 @@ consistent snapshot over `agentforge.sqlite` (dropping the stale `-wal`/`-shm` s
 can never be replayed on top of it), and starts back up. It asks for confirmation unless
 you pass `--yes`.
 
-`:previous` holds the images from before the **last** deploy only, so it is one step back. An older
-sha is a rebuild. There is no image registry yet, so there is no `docker pull <old-tag>` path;
-adding one is a migration-plan item. The restore above brings back the data, not the code. A
-migration that ran is not undone.
+`:previous` holds the images from before the **last** deploy only, so it is one step back. This
+source stack (`scripts/deploy.sh`) builds `nultron-web:local` on the server and pulls nothing, so an
+older sha here is a rebuild.
+
+The released bundle is the path with a registry. Every release from `scripts/release-web.mjs` pushes
+`ghcr.io/kyoo032/nultron-ent:<tag>` and `ghcr.io/kyoo032/nultron-portal:<tag>` and commits a bundle
+whose `compose.yml` pins both images to that tag (`release-web.mjs:19-26`). A server that runs the
+bundle rolls back by checking out the previous release tag of the release repo and starting the
+stack again, as the bundle's own `DEPLOY.md` says (`scripts/release-web-docs.mjs:173-175`). The
+proxy is recreated with the app, never on its own. No release has been cut yet:
+`Kyoo032/Nultron-Releases` had no GitHub Release on 2026-11-06, so there is no older tag to pull.
+
+The restore above brings back the data, not the code. A migration that ran is not undone.
 
 ## Migrating from the DPSBuddy names
 
