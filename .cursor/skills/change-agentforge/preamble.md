@@ -1,6 +1,6 @@
 # Subagent preamble (paste at the top of every worker prompt)
 
-Where am I: run `pnpm where` (`scripts/where-am-i.mjs`, added on branch `chore/agent-guardrails`). Until it lands, run `git rev-parse --show-toplevel` and `git branch --show-current`. The folder and branch must match a row in `AGENTS.md` "Where am I?". If they match none, stop and report.
+Where am I: run `pnpm where` (`scripts/where-am-i.mjs`, on `main`). On an older branch without it, run `git rev-parse --show-toplevel` and `git branch --show-current`. The folder and branch must match a row in `AGENTS.md` "Where am I?". If they match none, stop and report.
 
 Your task names the folder, the branch and the pull request target (a row in `AGENTS.md` "Where a change goes"). Follow `.cursor/skills/change-agentforge/SKILL.md`. Your lanes: <enterprise / tester, as the task says>. `personal` is retired.
 

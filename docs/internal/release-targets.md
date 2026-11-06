@@ -16,8 +16,8 @@ Last updated: 2026-11-06 (`Kyoo032/Nultron` `main` at `39cd5f0c`). The hex colou
 |---|---|---|---|---|---|---|
 | [`nultron-personal`](#nultron-personal) | Desktop app | Public (retired) | Nultron | Toko Token | Retired 2026-10-14. Last release v0.15.1 (2026-09-28). 0.16.0 was packed on 2026-10-06 and never published. Repo `Kyoo032/Nultron-Desktop` archived | None. The app is merged into the web app; no new cut |
 | [`nultron-enterprise`](#nultron-enterprise) | Hosted web app | Nultron Enterprise customers (via DPS) | Nultron | Toko Token + BYOK | Pilot, never released or deployed (checked 2026-11-06). A password-gated single-desk preview (one private desk per tester) was put up at app.nultron-ai.xyz on 2026-10-06; it is not an Enterprise deploy. Release repo is `Kyoo032/Nultron-Releases` (renamed from `Kyoo032/Nultron` on 2026-10-15) | The first release and Tencent deploy, when Rizky says go. It was planned for Thu 8 Oct 2026 and did not happen |
-| [`kemenkeu-ai`](#kemenkeu-ai) | Desktop flavor | Kemenkeu (Ministry of Finance) | Kemenkeu AI | AIHub | Built locally | Later, after Nultron |
-| [`aihub-metranet`](#aihub-metranet) | Desktop flavor | Metranet (Telkom Indonesia) | AIHub Metranet | AIHub | Built locally | Later, after Nultron |
+| [`kemenkeu-ai`](#kemenkeu-ai) | Desktop flavor | Kemenkeu (Ministry of Finance) | Kemenkeu AI | AIHub | Retired 2026-10-14 with the desktop app. Was built locally; its brand folder is gitignored | None |
+| [`aihub-metranet`](#aihub-metranet) | Desktop flavor | Metranet (Telkom Indonesia) | AIHub Metranet | AIHub | Retired 2026-10-14 with the desktop app. Was built locally; its brand folder is gitignored | None |
 
 ## Which targets a change touches
 
@@ -25,7 +25,7 @@ Last updated: 2026-11-06 (`Kyoo032/Nultron` `main` at `39cd5f0c`). The hex colou
 |---|---|
 | `apps/web/**`, `packages/**` | Every target built from here. The renderer and host are shared. |
 | Code behind `isServerMode()` / `isHostedBuild()` | `nultron-enterprise`. Personal must stay identical, proven by a parity test. |
-| `apps/desktop/**` | `nultron-personal`, `kemenkeu-ai`, `aihub-metranet` |
+| `apps/desktop/**` | `nultron-personal`, `kemenkeu-ai`, `aihub-metranet`, all retired: nothing ships from it |
 | `apps/desktop/branding/<id>/**` | That one desktop target only |
 | `apps/portal/**`, `webapp-deploy/**`, `scripts/release-web.mjs` | `nultron-enterprise` |
 | `apps/mobile/**` | None. It holds rules only, and nothing ships from it. |
@@ -75,7 +75,7 @@ Last updated: 2026-11-06 (`Kyoo032/Nultron` `main` at `39cd5f0c`). The hex colou
 - **Services:**
   - Windows NSIS installer.
   - macOS dmg/zip, still a preview: nobody has smoke-tested it on a Mac yet.
-  - In-app updater: this tree's `brand.json` names `Kyoo032/Nultron-Desktop` (archived). Installed 0.15.1 copies still read `Kyoo032/Nultron`, which is now the Enterprise repo, so their check errors.
+  - In-app updater: this tree's `brand.json` names `Kyoo032/Nultron-Desktop` (archived). Installed 0.15.1 copies still read `Kyoo032/Nultron`, which has been the private source repo since 2026-10-15, so their check finds no desktop release there and fails.
 - **Ships by:** nothing now. The [pack skill](../../.cursor/skills/pack-nultron/SKILL.md) and `pnpm desktop:release` are retired with the repo.
 - **Versions:** semver. Published `v0.15.1` (2026-09-28), the last release. `0.16.0` was packed on 2026-10-06 (branch `chore/release-0.16.0`, [`0.16.0-changelog.md`](0.16.0-changelog.md)) and was never published. It will not be published.
 - **Focus now:** none. Do not drive the packed app or cut a release for it.
@@ -103,7 +103,7 @@ Last updated: 2026-11-06 (`Kyoo032/Nultron` `main` at `39cd5f0c`). The hex colou
   |---|---|
   | `app` | `ghcr.io/kyoo032/nultron-ent`, production dependencies only |
   | `proxy` | Caddy 2.11, TLS and `sign_in_filters`. Restart it together with `app`. |
-  | `portal` | `ghcr.io/kyoo032/nultron-portal`, the one-time-code sign-in |
+  | `portal` | `ghcr.io/kyoo032/nultron-portal`, the sign-in: a username and password in this bundle (`PORTAL_SIGNIN_MODE=password`), or the e-mailed one-time code, the portal's own default |
   | `portal-db` | Postgres 16 |
   | `portal-prepare` | one-shot migrations |
 
@@ -128,7 +128,7 @@ Last updated: 2026-11-06 (`Kyoo032/Nultron` `main` at `39cd5f0c`). The hex colou
 
 ## kemenkeu-ai
 
-<img src="../../apps/desktop/branding/kemenkeu/logo.png" alt="Kemenkeu emblem" width="96">
+**Retired with the desktop app (2026-10-14).** Do not pack it. Its brand folder `apps/desktop/branding/kemenkeu/` is gitignored (`.gitignore:23`) and exists only on the operator's machine, so none of the files named below is in this repo.
 
 **Identity**
 
@@ -154,12 +154,12 @@ Last updated: 2026-11-06 (`Kyoo032/Nultron` `main` at `39cd5f0c`). The hex colou
 - **Gateway:** AIHub, `https://aihub.metranet.co.id/v1`. Metranet runs this gateway.
 - **Services:** the installer only. There is no updater, because `updates` is not set.
 - **Ships by:** a local pack on Rizky's machine. There is no public release repo.
-- **Current:** not recorded. Record the next pack's version, sha and date here.
-- **Focus now:** none. Only re-pack when a desktop release needs it.
+- **Current:** retired. No pack was recorded.
+- **Focus now:** none.
 
 ## aihub-metranet
 
-<img src="../../apps/desktop/branding/metranet/logo.png" alt="Metranet logo, by Telkom Indonesia" width="160">
+**Retired with the desktop app (2026-10-14).** Do not pack it. Its brand folder `apps/desktop/branding/metranet/` is gitignored (`.gitignore:24`) and exists only on the operator's machine, so none of the files named below is in this repo.
 
 **Identity**
 
@@ -185,7 +185,7 @@ Last updated: 2026-11-06 (`Kyoo032/Nultron` `main` at `39cd5f0c`). The hex colou
 - **Gateway:** AIHub, `https://aihub.metranet.co.id/v1`.
 - **Services:** the installer only, with no updater.
 - **Ships by:** a local pack on Rizky's machine. There is no public release repo.
-- **Current:** not recorded. Record the next pack's version, sha and date here.
+- **Current:** retired. No pack was recorded.
 - **Focus now:** none.
 
 ---
