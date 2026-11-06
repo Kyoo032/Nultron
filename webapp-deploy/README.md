@@ -673,11 +673,16 @@ Set `BACKUP_HEARTBEAT_URL` to the ping URL of a check at a monitor you choose (h
 self-hosted instance of it). `backup.sh` reads it from the process environment only, never from `.env`.
 `.env` is loaded into the `app` container, so a URL kept there would let anyone running code in the app
 send fake success pings and hide a dead backup. Set it on the cron line next to `BACKUP_KEY`, fetched
-from Secrets Manager the same way:
+from Secrets Manager the same way. Store it as the secret `nultron/prod/backup-heartbeat-url`, then
+replace the cron line above with this one:
 
 ```cron
-17 * * * * BACKUP_KEY="$(tccli ssm get-secret-value ... backup-key ...)" BACKUP_HEARTBEAT_URL="$(tccli ssm get-secret-value ... backup-heartbeat-url ...)" /bin/sh /srv/nultron/webapp-deploy/scripts/backup.sh >> /var/log/nultron-backup.log 2>&1
+17 * * * * BACKUP_KEY="$(tccli ssm get-secret-value --region ap-jakarta --SecretName nultron/prod/backup-key --VersionStage SSMCurrent | python3 -c 'import json,sys;print(json.load(sys.stdin)["SecretString"],end="")')" BACKUP_HEARTBEAT_URL="$(tccli ssm get-secret-value --region ap-jakarta --SecretName nultron/prod/backup-heartbeat-url --VersionStage SSMCurrent | python3 -c 'import json,sys;print(json.load(sys.stdin)["SecretString"],end="")')" /bin/sh /srv/nultron/webapp-deploy/scripts/backup.sh >> /var/log/nultron-backup.log 2>&1
 ```
+
+`tccli` prints JSON, so each value goes through the same `SecretString` extraction. Without it the
+value holds quotes and spaces, the guard refuses it, no ping is sent, and a check that never got its
+first ping never alarms.
 
 A file that only the deploy user can read also works: `BACKUP_HEARTBEAT_URL="$(cat ~/.backup-heartbeat-url)"`
 with the file at mode 0600.
