@@ -14,12 +14,12 @@ Nultron was two products from this one repository. They shared the same app and 
 |---|---|---|
 | What it is | The Mac/Windows desktop app | The hosted web app |
 | Where your work lives | On your own computer | In your organisation's tenant on the server |
-| How you get in | Was: install it and paste a gateway key | Ask for an invite, then sign in with a one-time code |
+| How you get in | Was: install it and paste a gateway key | Ask the operator for an account, then sign in with a username and password (or an e-mailed one-time code, if the operator chose it) |
 | Ships as | Last cut 0.15.1 (`Nultron Setup <version>.exe`, macOS `.dmg`); no new cut | A hosted URL |
 
 **Personal — the Mac/Windows desktop app (retired).** The last release was 0.15.1. No new desktop build is published. The code stays in this repo until it is merged into the web app.
 
-**Enterprise — the hosted web app.** Ask the operator for an invite, open the hosted URL, and sign in through the portal with a one-time code. Your work stays in your tenant on the server. A pasted gateway key still works here as the floor for model calls; the portal sign-in is the account.
+**Enterprise — the hosted web app.** Ask the operator for an account, open the hosted URL, and sign in through the portal. The deploy bundle signs people in with a username and a password the operator creates. An operator can switch the portal to an e-mailed one-time code instead, which is the portal's own default. Your work stays in your tenant on the server. A pasted gateway key still works here as the floor for model calls; the portal sign-in is the account.
 
 **Enterprise — the hosted web app.** Ask the operator for an invite, open the hosted URL, and sign in through the portal with a one-time code. Your work stays in your tenant on the server. A pasted gateway key still works here as the floor for model calls; the portal sign-in is the account.
 
