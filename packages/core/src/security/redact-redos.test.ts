@@ -19,12 +19,33 @@ const HOSTILE: ReadonlyArray<readonly [string, string]> = [
   ["a long dotted run that is not a URL scheme", "a.".repeat(20_000)],
   ["a long hyphenated run that is not a URL scheme", "a-".repeat(20_000)],
   ["a scheme separator repeated with no address after it", "a://".repeat(25_000)],
+  ["an Authorization header name followed by spaces", `Authorization${" ".repeat(100_000)}`],
+  ["an Authorization header name repeated on one line", "authorization:".repeat(7_000)],
+  ["an Authorization Basic header followed by spaces", `Authorization: Basic${" ".repeat(100_000)}`],
+  ["a GitHub token prefix repeated", "ghp_".repeat(25_000)],
+  ["a long upper-case name with no equals sign", "A".repeat(100_000)],
+  ["a long upper-case name followed by spaces", `TOKEN${" ".repeat(100_000)}`],
+  ["export followed by spaces", `export${" ".repeat(100_000)}`],
+  ["a secret-named assignment with a blank value, repeated", "API_KEY=\n".repeat(11_000)],
+  ["a secret-named assignment followed by spaces", `API_KEY=${" ".repeat(100_000)}`],
+];
+
+const HOSTILE_AND_MASKED: ReadonlyArray<readonly [string, string]> = [
+  ["a Slack token prefix repeated", "xoxb-".repeat(20_000)],
+  ["a long run after a GitHub token prefix", `ghp_${"a".repeat(100_000)}`],
+  ["an encoded bearer prefix repeated", "Bearer%20".repeat(11_000)],
 ];
 
 describe("redactCredentials: hostile input stays fast", () => {
   it.each(HOSTILE)("%s", (_name, input) => {
     const { value, ms } = timed(() => redactCredentials(input));
     expect(value).toBe(input);
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+
+  it.each(HOSTILE_AND_MASKED)("%s", (_name, input) => {
+    const { value, ms } = timed(() => redactCredentials(input));
+    expect(value).toContain("[REDACTED]");
     expect(ms).toBeLessThan(BUDGET_MS);
   });
 

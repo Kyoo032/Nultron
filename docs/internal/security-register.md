@@ -4791,7 +4791,7 @@ text inside them was protected at rest and not masked. `redactSecrets` covered o
 model passed to a tool, a page that `web_fetch` read and that echoed a header, a desk file that held a key, and a
 tool error that quoted a header.
 
-Fix: `redactSecretsDeep` (`packages/core/src/security/redact-deep.ts:70`) masks credential-shaped text at any depth and
+Fix: `redactSecretsDeep` (`packages/core/src/security/redact-deep.ts:76`) masks credential-shaped text at any depth and
 the value of a key named like a secret. The text shapes are a bearer token; `sk-`, `sk-ant-`, `tvly-` and `AIza` keys;
 a JWT (the portal's own tokens); a Telegram bot token (`telegramBotToken` is stored in settings); an AWS access key id;
 a PEM private key block; the user and password of a URL (`postgres://u:p@h`, `https://user:pass@host`); and a
@@ -4827,7 +4827,23 @@ reply through `redactCredentials` before the card is indexed, listed as a source
 Residual:
 - The opaque-token rule of `redactSecrets` is not applied: it would erase content hashes, signed media links and long
   identifiers the renderer needs. A secret with no known prefix and no secret-looking key name (a bare random token, a
-  GitHub or Slack token, a Basic-auth string, a database password outside a URL) is stored and shown as it came.
+  database password outside a URL and outside an upper-case `.env` line) is stored and shown as it came.
+- Closed under F-152-2 (2026-11-06, `fix/redactor-gaps`, tested, not driven). `redactCredentials`
+  (`packages/core/src/security/redact.ts`) now masks GitHub tokens (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`,
+  `github_pat_`), Slack tokens (`xoxb-`, `xoxp-`, `xoxa-`, `xoxs-`, `xoxr-`), a `Basic` credential after an
+  `Authorization` or `Proxy-Authorization` name, a bearer token after a percent-encoded space, and the value of an
+  upper-case `NAME=value` line (a `.env` file or an `export`) when a whole `_` part of the name is KEY, SECRET, TOKEN,
+  PASSWORD or PASSWD. `redactSecretsDeep` (`redact-deep.ts`) also masks the value under a key that ends in a secret
+  name after `_`, `-` or a camel-case boundary (`OPENAI_API_KEY`, `DB_PASSWORD`, `aws_secret_access_key`,
+  `githubToken`). Tests: `redact-tokens.test.ts` and `redact-deep.test.ts`, 31 of 61 red before the fix, green after.
+  Trade-offs chosen on purpose. A bare `Basic <word>` is prose ("Basic principles of accounting"), so the Authorization
+  name is required and a Basic string outside a header stays unmasked. The key-name ending also masks a pagination
+  cursor under `nextPageToken` or `page_token` and a `csrf_token`, which the display then shows as `[REDACTED]`. The
+  `.env` rule is upper-case and line-anchored, so `password = input()` in code, a lowercase INI line such as
+  `aws_secret_access_key = ...` and an assignment in the middle of a line (`docker run -e DB_PASSWORD=...`) are not
+  masked. Still open from the same sign-off: a JSON-escaped `sk-...` token, a key split across two fields, an `sk-`
+  token with fewer than eight characters after the prefix, a JSON document inside a string (the walker does not parse
+  it), and a 40-character AWS secret access key in free text in deep mode.
 - The model reads the raw tool result, so a secret it repeats lands unredacted in the assistant text, the saved `text`
   part and the streamed deltas of that thread (the decision above). It no longer reaches the Knowledge Base card.
 - A secret the person types into their own message is not touched in the thread.
@@ -6551,8 +6567,8 @@ output, every Chat tool frame and every job error passes through `redactCredenti
 upstream error could block the host event loop.
 
 Fix: the cookie rule matches the header and the rest of its line, then tests the line for `=` in a replacer
-(`maskCookieHeader`, `redact.ts:34`), so no match depends on a lookahead. The URL rule matches only the userinfo and
-reads the scheme in a lookbehind (`:20`), so a scan starts at a `://` and not at every boundary. The masked text is
+(`maskCookieHeader`, `redact.ts:37`), so no match depends on a lookahead. The URL rule matches only the userinfo and
+reads the scheme in a lookbehind (`redact.ts:23`), so a scan starts at a `://` and not at every boundary. The masked text is
 the same as before. Tests: `packages/core/src/security/redact-redos.test.ts` (inputs of 40,000 to 100,000 characters
 must redact in under 250 ms, and a long cookie header and a URL after a long run must still mask). Six of the first
 eight tests were red on `39cd5f0c` (17.7 s to 26.6 s for the cookie cases), the two run-shaped URL cases were red at

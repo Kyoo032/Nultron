@@ -1126,3 +1126,10 @@ Lanes: tester.
 - **What.** `redactCredentials` (and so `redactSecrets` and `redactSecretsDeep`) took 17.7 s on `cookie:` followed by 100,000 spaces and 62 s on a 100,000-character run like `a.a.a.`. The cookie rule now captures the header line and tests it for `=` in a replacer, and the URL userinfo rule reads its scheme in a lookbehind. Output for every existing case is unchanged. Test: `packages/core/src/security/redact-redos.test.ts`.
 - **Lanes.** `enterprise`, `tester`.
 - **Not driven.** A live host. The card's suggested lookahead alone would have left a repeated `cookie:` quadratic (1.7 s at 98,000 characters), so it was not used.
+
+## The core redactor masks GitHub and Slack tokens, Basic credentials, `.env` lines and keys ending in a secret name, 2026-11-06 (branch `fix/redactor-gaps`, SR-136 residual)
+
+- **What.** `redactCredentials` now masks `ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_` and `github_pat_` tokens, `xoxb-`, `xoxp-`, `xoxa-`, `xoxs-` and `xoxr-` tokens, a `Basic` credential after an `Authorization` or `Proxy-Authorization` name, a bearer token after `%20`, and the value of an upper-case `.env` or `export` line whose name has a KEY, SECRET, TOKEN or PASSWORD part. `redactSecretsDeep` masks the value under a key that ends in a secret name (`OPENAI_API_KEY`, `DB_PASSWORD`, `aws_secret_access_key`, `githubToken`). Tests: `redact-tokens.test.ts`, `redact-deep.test.ts`.
+- **Lanes.** `enterprise`, `tester`.
+- **Trade-offs.** A bare `Basic <word>` is not masked, because `Basic principles` is prose. A key that ends in `token` also masks a pagination cursor such as `nextPageToken` in a tool result frame. The model still reads the real result.
+- **Not done (F-152-2).** A JSON-escaped token, a key split across two fields, an `sk-` token with fewer than eight characters after the prefix, a JSON document inside a string, and a 40-character AWS secret access key in free text in deep mode.

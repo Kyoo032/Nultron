@@ -1,10 +1,13 @@
-const BEARER_RE = /\bBearer\s+[A-Za-z0-9\-._~+/]{8,}/g;
+const BEARER_RE = /\bBearer(?:\s+|%20)[A-Za-z0-9\-._~+/%]{8,}/g;
 
 const KEY_PATTERNS = [
   /\bsk-ant-[A-Za-z0-9\-_]{8,}/g,
   /\bsk-[A-Za-z0-9\-_]{8,}/g,
   /\btvly-[A-Za-z0-9\-_]{8,}/g,
   /\bAIza[A-Za-z0-9\-_]{10,}/g,
+  /\bgh[pousr]_[A-Za-z0-9]{20,}/g,
+  /\bgithub_pat_[A-Za-z0-9_]{20,}/g,
+  /\bxox[abprs]-[A-Za-z0-9-]{10,}/g,
 ];
 
 /**
@@ -35,12 +38,23 @@ function maskCookieHeader(match: string, head: string, value: string): string {
   return value.includes("=") ? `${head}[REDACTED]` : match;
 }
 
+const BASIC_AUTH_RE = /\b((?:proxy-)?authorization["']?[ \t]*[:=][ \t]*["']?Basic[ \t]+)[A-Za-z0-9+/]{8,}={0,2}/gi;
+
+const ENV_ASSIGNMENT_RE = /^([ \t]*(?:export[ \t]+)?)([A-Z][A-Z0-9_]*)([ \t]*=[ \t]*)(\S[^\r\n]*)/gm;
+const SECRET_NAME_PART_RE = /(?:^|_)(?:KEY|SECRET|TOKEN|PASSWORD|PASSWD)(?:_|$)/;
+
+function maskEnvAssignment(match: string, head: string, name: string, equals: string): string {
+  return SECRET_NAME_PART_RE.test(name) ? `${head}${name}${equals}[REDACTED]` : match;
+}
+
 /** Min length for a standalone base64-like token to be treated as sensitive. */
 const BASE64_RE = /\b[A-Za-z0-9+/]{32,}={0,2}\b/g;
 
 /**
- * Masks what is shaped like a credential: a bearer token, a key with a known prefix, a JWT, a Telegram bot
- * token, an AWS access key id, a PEM private key block, the user and password of a URL, or a cookie header.
+ * Masks what is shaped like a credential: a bearer token, a Basic credential in an Authorization header, a key
+ * with a known prefix (including GitHub and Slack tokens), a JWT, a Telegram bot token, an AWS access key id, a
+ * PEM private key block, the user and password of a URL, a cookie header, or the value of an upper-case `.env`
+ * line whose name has a KEY, SECRET, TOKEN or PASSWORD part.
  * It leaves long opaque runs alone, so a content hash, a signed link or a long identifier stays readable.
  * Use it where the text is data a person or a program reads back (a tool's input or output); use
  * `redactSecrets` for a message that is only ever shown.
@@ -56,7 +70,9 @@ export function redactCredentials(text: string): string {
     .replace(JWT_RE, "[REDACTED]")
     .replace(TELEGRAM_TOKEN_RE, "[REDACTED]")
     .replace(AWS_ACCESS_KEY_ID_RE, "[REDACTED]")
-    .replace(BEARER_RE, "Bearer [REDACTED]");
+    .replace(BEARER_RE, "Bearer [REDACTED]")
+    .replace(BASIC_AUTH_RE, "$1[REDACTED]")
+    .replace(ENV_ASSIGNMENT_RE, maskEnvAssignment);
   for (const pattern of KEY_PATTERNS) {
     pattern.lastIndex = 0;
     result = result.replace(pattern, "[REDACTED]");
