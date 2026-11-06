@@ -228,6 +228,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual: request-body arrays with no `.max()` still cost one issue per bad element | Residual: none blocks; capping the request-body arrays is a follow-up |
 | [SR-197](#sr-197) | Medium | AI SDK 5's `streamText` prints every stream error to the console by default, and an `APICallError` carries the request body (the prompt) and the gateway's error body | Fixed in tree (2026-11-04, `fix/zod-4`): the runtime passes a silent `onError`; tested, not driven | PR merge of the AI SDK 5 move |
 | [SR-198](#sr-198) | Medium | AI SDK 5 brings `undici` 5.29.0 and `@fastify/busboy` into the hosted image, with five HIGH `undici` advisories and one `busboy` advisory | Fixed in tree (2026-11-04, `fix/zod-4`): scoped override to `undici` 6.29.1, which drops `busboy`; the SDK's guarded download fetch checked on it; not driven | PR merge of the AI SDK 5 move |
+| [SR-202](#sr-202) | Medium | `injectionGuardBypass` was saved in `settings.enc`: one `POST /api/v1/settings` off server mode switched the prompt-injection guard off for good, and a stored `true` was honoured on a hosted desk and could not be cleared | Fixed in tree (2026-11-06, `fix/sec-005-guard-bypass-not-persisted`): the flag is never written, a stored `true` is ignored and removed on load, a hosted desk always runs the guard; tested, not driven on a hosted server | PR merge of `fix/sec-005-guard-bypass-not-persisted` |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -6531,6 +6532,51 @@ lookup was called. `audit:deployed` passes.
 Residual: not driven on a hosted server; the override has to be dropped once the SDK moves to `undici` 6 itself.
 
 Gate: PR merge of the AI SDK 5 move.
+
+### SR-202 {#sr-202}
+
+**The prompt-injection bypass is a switch for the running process, never a saved setting.**
+Raised 2026-10-15 by the Security tester (Notion SEC-005, BUG-35); Rizky decided the fix on 2026-11-06. Medium. The
+card proposed SR-187 provisionally; Rizky assigned SR-202.
+
+Evidence before the fix: off server mode `POST /api/v1/settings { "injectionGuardBypass": true }` answered 200 and
+`mergeSecrets` wrote the flag into the desk's sealed slice (`packages/core/src/secrets.ts:231-237`, read back at
+`packages/host/src/settings-store.ts:135`). Every reader then skipped the scan: Chat attachments
+(`packages/host/src/runs.ts:160`), every job's `readSourceText` (`job-source.ts:24`), Knowledge ingest
+(`knowledge.ts:473`, `knowledge-ingest.ts:23`), and tool arguments and outputs (`credentials.ts:371` into
+`secret-scope.ts:62` into `invoke-guarded.ts:50`, `:71`). It survived a restart, and `false` was the only way back. On
+the hosted server the write is refused (`handlers/settings.ts:348-349`, `:381`), but a `true` already in the tenant's
+row was still read and honoured, and the hosted patch passes `undefined`, so no save could clear it. A desk that had
+the flag and then moved onto a hosted data dir stayed disarmed. Nothing in the UI shows it: the Settings page has no
+control for it (`apps/web/tests/e2e/foundation.spec.ts:112` asserts none), so only an API caller could set it.
+
+Fix: `mergeSecrets` no longer merges the field. `normalizeSecrets` no longer reads it, so a stored `true` never reaches
+a caller (`settings-store.ts:112`). `loadSettingsFile` finds a slice that still carries the key
+(`carriesStoredBypass`, `injection-guard-bypass.ts:23`), rewrites the payload without it at once and logs one line with the tenant id and no
+text (`clearStoredBypass`, `settings-store.ts:447`, `:481`); every save rewrites from the same cleaned payload. Off server mode the flag
+lives in a `Set` keyed by tenant and desk in the host process (`packages/host/src/injection-guard-bypass.ts`).
+`saveSettings` records a boolean there (`settings-store.ts:531`) and `loadSettings` layers it onto what it returns
+(`withInjectionGuardBypass`, `injection-guard-bypass.ts:17`); a restart empties it. In server mode `setInjectionGuardBypass` and `withInjectionGuardBypass` ignore it, so a
+hosted desk always runs the guard whichever handler calls the store. Tests, which fail without the fix:
+`settings-guard-bypass-desk.test.ts` (POST then allowed for this process, then a restart: guard on and the decrypted
+`settings.enc` free of the field; an older file holding `true`) and `settings-guard-bypass-hosted.test.ts` (a
+`tenant_state` row holding `true`: guard on, row cleaned on load and on save, a save cannot turn it on).
+
+Checked, not an issue: `POST /api/v1/documents/check` passes the bypass `true` on every call
+(`handlers/documents-check.ts:18-22`) and does not need the guard. The assembled text reaches only
+`checkDraftAgainstSource` (`:23`), which is word and number overlap with no model call
+(`packages/core/src/documents/source-check.ts:69-92`), and the answer carries draft sentences, not source text.
+
+Residual:
+- Any process that can call `POST /api/v1/settings` on a desk (webdev, a local script) can still switch the guard off
+  until the next restart (blockers b7 and b12), and the switch leaves no audit line (blockers P10). The scope is one
+  desk, not the machine.
+- The guard is five regular expressions (`injection-guard.ts:19-48`); wording they miss passes with the flag off. That
+  is a separate, narrower hole.
+- Driven only through unit tests and the in-memory row backend; the hosted server and an installed app were not driven.
+- `Kyoo032/hyp-ai` is a separate codebase and needs the same fix made by hand.
+
+Gate: PR merge of `fix/sec-005-guard-bypass-not-persisted`.
 
 ## Must be true before the Tencent Cloud deploy
 

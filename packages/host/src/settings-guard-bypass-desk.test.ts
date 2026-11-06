@@ -102,16 +102,25 @@ describe("the injection-guard bypass on a desk", () => {
       closeDb = () => db.sql.close();
 
       const post = async (body: Record<string, unknown>) => {
-        const request: HostRequest = { method: "POST", path: "/api/v1/settings", query: {}, params: {}, headers: {}, body };
+        const request: HostRequest = {
+          method: "POST",
+          path: "/api/v1/settings",
+          query: {},
+          params: {},
+          headers: {},
+          body,
+        };
         return handlePostSettings(request, DESK);
       };
-      const tenant = await getTenant({ method: "GET", path: "/api/v1/settings", query: {}, params: {}, headers: {} });
+      const tenant = await getTenant({});
 
       expect(() => first.readMeetingRequest({ prompt: HOSTILE }, tenant)).toThrow(/injection guard/);
 
       const saved = await post({ injectionGuardBypass: true });
       expect(saved.type === "json" && saved.status).toBe(200);
-      expect(saved.type === "json" && (saved.body as { injectionGuardBypass: boolean }).injectionGuardBypass).toBe(true);
+      expect(saved.type === "json" && (saved.body as { injectionGuardBypass: boolean }).injectionGuardBypass).toBe(
+        true,
+      );
       expect(first.readMeetingRequest({ prompt: HOSTILE }, tenant)).toBe(HOSTILE);
       expect(sealedFileHoldsTheFlag()).toBe(false);
 

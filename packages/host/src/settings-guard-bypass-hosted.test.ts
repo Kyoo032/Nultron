@@ -63,9 +63,9 @@ function seedRowWithStoredBypass(): void {
 }
 
 function rowHoldsTheFlag(): boolean {
-  const row = sqlite.prepare("SELECT value FROM tenant_state WHERE tenant_id = ? AND key = 'settings'").get(
-    TENANT.tenantId,
-  ) as { value: string };
+  const row = sqlite
+    .prepare("SELECT value FROM tenant_state WHERE tenant_id = ? AND key = 'settings'")
+    .get(TENANT.tenantId) as { value: string };
   const payload = decryptJson<{ workspaces: Record<string, Record<string, unknown>> }>(
     JSON.parse(row.value),
     wrappingKeyFromSecret(WRAP_KEY),

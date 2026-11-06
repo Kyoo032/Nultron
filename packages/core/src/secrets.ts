@@ -228,13 +228,6 @@ export function mergeSecrets(current: StoredSecrets, patch: SecretPatch): Stored
       ? patch.disabledTools.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim())
       : [];
   }
-  if (typeof patch.injectionGuardBypass === "boolean") {
-    if (patch.injectionGuardBypass) {
-      next.injectionGuardBypass = true;
-    } else {
-      delete next.injectionGuardBypass;
-    }
-  }
   if (patch.editTurnCapUsd !== undefined) {
     const raw =
       typeof patch.editTurnCapUsd === "number"
