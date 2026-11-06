@@ -45,8 +45,8 @@ Two kinds of guard, both on `main`. The second came from branch `chore/agent-gua
 
 The first kind:
 
-- `scripts/lane-guard.mjs` (`pnpm lane-guard`) reads `lanes.json` and prints three kinds of warning: `map` (code under a `lanes.json` glob changed, and none of its map pages did), `protected` (a protected file changed and no commit in the range has a `Lanes:` line), `brand` (a brand literal rose in shared code past `scripts/lane-guard.baseline.json`). It exits 0 unless `--strict`.
-- `ci:local` runs `lane-guard` with `--strict` as an advisory step (`scripts/ci-local.mjs`). A warning shows in the table as `warn` and never fails the run.
+- `scripts/lane-guard.mjs` (`pnpm lane-guard`) reads `lanes.json` and checks four rules. Three block, and exit 1 with or without `--strict` (`scripts/lane-guard.mjs:19-28`): `never-promote` (a diff to `main` adds or changes a path on the never-promote list), `protected` (a protected file changed and no commit in the range has a `Lanes:` line), `brand` (a brand literal rose in shared code past `scripts/lane-guard.baseline.json`). One is advisory, and exits 1 only under `--strict` (`:30-32`): `map` (code under a `lanes.json` glob changed, and none of its map pages did).
+- `ci:local` runs it twice. The required step `lane-guard` runs it without `--strict`, so a blocking rule fails the run (`scripts/ci-local.mjs:342`). The advisory step `lane-guard:map` runs it with `--strict`, so a `map` warning shows in the table as `warn` and never fails the run (`:345`).
 - `scripts/map-rot.mjs` (`pnpm maps:check`) checks that cited `file:line` paths exist.
 
 The second kind, from branch `chore/agent-guardrails`:

@@ -13,4 +13,4 @@ Your task names the folder, the branch and the pull request target (a row in `AG
 - Windows shell traps: never pipe a heredoc into `python3` (it hangs); Bash heredocs collapse `\\`, so write files with a file tool, not `cat <<EOF`, when they hold Windows paths or backslashes. Use forward slashes in commands.
 - Prove it: run the test or drive the recipe and report real output. Say "not driven" when you did not. Cite `file:line`.
 - Docs: refresh the map page (`Last verified` line) and the `features/` recipe; log in `docs/internal/unreleased.md` naming the lanes.
-- Before you finish: `pnpm lane-guard` (advisory), and the package tests you touched. Report files changed and what you did not verify.
+- Before you finish: `pnpm lane-guard` (exit 1 is a blocking rule; a map warning is advisory), and the package tests you touched. Report files changed and what you did not verify.
