@@ -1,12 +1,3 @@
-/**
- * SEC-005. The prompt-injection guard's bypass is a switch for the running process, never a saved
- * setting. Off server mode a caller can still turn it on with one `POST /api/v1/settings`, and it
- * holds until the host restarts; the sealed `settings.enc` never records it, and a `true` an older
- * build left in the file is dropped on load.
- *
- * A restart is simulated the way one happens: every module is dropped and imported again, so the
- * process memory is empty and the only thing left is what reached the disk.
- */
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";

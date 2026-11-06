@@ -1,12 +1,3 @@
-/**
- * SEC-005, hosted half. A hosted desk always runs the prompt-injection guard. The handler already
- * refuses a request that turns the bypass on (`settings.test.ts`), but it could not clear a `true`
- * already in the tenant's sealed row, and every reader honoured it. A stored `true` is ignored on
- * load and removed from the row, whether the next thing to happen is a read or a save.
- *
- * Runs against the row backend a hosted tenant is actually served from, on a throwaway in-memory
- * database, as `tenant-secrets.test.ts` does.
- */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
