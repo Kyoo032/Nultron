@@ -223,7 +223,14 @@ describe("redactCredentials: environment lines", () => {
   });
 
   it("keeps a working directory and names that only end in the letters of a secret word", () => {
-    const kept = ["PWD=/home/rizky/app", "OLDPWD=/home/rizky", "BYPASS=1", "COMPASS=north", "TURKEY=Ankara", "MONKEY=see"];
+    const kept = [
+      "PWD=/home/rizky/app",
+      "OLDPWD=/home/rizky",
+      "BYPASS=1",
+      "COMPASS=north",
+      "TURKEY=Ankara",
+      "MONKEY=see",
+    ];
     for (const text of kept) {
       expect(redactCredentials(text), text).toBe(text);
     }

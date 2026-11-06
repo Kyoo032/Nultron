@@ -63,12 +63,13 @@ function maskCookieHeader(match: string, head: string, value: string): string {
 const BASIC_AUTH_RE = /\b((?:proxy-)?authorization["']?[ \t]*[:=][ \t]*["']?Basic[ \t]+)[A-Za-z0-9+/]{8,}={0,2}/gi;
 
 const ENV_ASSIGNMENT_RE = /^([ \t]*(?:export[ \t]+)?)([A-Z][A-Z0-9_]*)([ \t]*=[ \t]*)(\S[^\r\n]*)/gm;
-const SECRET_NAME_PART_RE = /(?:^|_)(?:KEY|SECRET|TOKEN|PASSWORD|PASSWD)(?:_|$)/;
+const SECRET_NAME_ENDING_RE = /(?:PASSWORD|PASSWD|APIKEY)$|(?:^|_)(?:KEY|SECRET|TOKEN|PASS|SECRET_KEY_BASE)$|_PWD$/;
 
-const PLAIN_SETTING_VALUE_RE = /^["']?(?:\d+(?:\.\d+)?|true|false)["']?\s*$/i;
+const PLAIN_SETTING_VALUE_RE =
+  /^["']?(?:[+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|true|false)["']?(?:[ \t]+#.*)?[ \t]*$/i;
 
 function maskEnvAssignment(match: string, head: string, name: string, equals: string, value: string): string {
-  if (!SECRET_NAME_PART_RE.test(name) || PLAIN_SETTING_VALUE_RE.test(value)) {
+  if (!SECRET_NAME_ENDING_RE.test(name) || PLAIN_SETTING_VALUE_RE.test(value)) {
     return match;
   }
   return `${head}${name}${equals}[REDACTED]`;
