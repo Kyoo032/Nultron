@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { wrappingKeyFromSecret } from "@agentforge/core";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import {
+  DESK_VAULT_KEY_TOO_WEAK,
   getLocalVaultKey,
   hasKeyLikeVariety,
   MASTER_KEY_FILE,
@@ -240,9 +241,49 @@ describe("getLocalVaultKey outside server mode", () => {
     expect(getLocalVaultKey(env)).toEqual(first);
   });
 
-  it("still accepts a short env key on a desk", () => {
-    const env = { AGENTFORGE_DATA_DIR: dataDir(), AGENTFORGE_SECRETS_KEY: "hunter2" };
-    expect(getLocalVaultKey(env)).toEqual(wrappingKeyFromSecret("hunter2"));
+  it("refuses a passphrase in AGENTFORGE_SECRETS_KEY on a desk, without printing it or writing a file", () => {
+    const dir = dataDir();
+    for (const passphrase of ["hunter2", "correct horse battery staple correct horse!!", "phase3-seal-regression-key"]) {
+      const env = { AGENTFORGE_DATA_DIR: dir, AGENTFORGE_SECRETS_KEY: passphrase };
+      let message = "";
+      try {
+        getLocalVaultKey(env);
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error);
+      }
+      expect(message, passphrase).toBe(DESK_VAULT_KEY_TOO_WEAK);
+      expect(message).toContain("AGENTFORGE_SECRETS_KEY");
+      expect(message).toContain("openssl rand -hex 32");
+      expect(message).not.toContain(passphrase);
+    }
+    expect(existsSync(join(dir, MASTER_KEY_FILE))).toBe(false);
+  });
+
+  it("refuses a real but short key on a desk, in either encoding", () => {
+    const short = randomBytes(31);
+    for (const encoded of [short.toString("hex"), short.toString("base64"), short.toString("base64url")]) {
+      const env = { AGENTFORGE_DATA_DIR: dataDir(), AGENTFORGE_SECRETS_KEY: encoded };
+      expect(() => getLocalVaultKey(env)).toThrow(DESK_VAULT_KEY_TOO_WEAK);
+    }
+  });
+
+  it("accepts a generated key on a desk in hex, base64 and base64url, and writes no .master-key", () => {
+    const key = randomBytes(32);
+    for (const encoded of [key.toString("hex"), key.toString("base64"), key.toString("base64url")]) {
+      const dir = dataDir();
+      const env = { AGENTFORGE_DATA_DIR: dir, AGENTFORGE_SECRETS_KEY: ` ${encoded} ` };
+      expect(getLocalVaultKey(env)).toEqual(wrappingKeyFromSecret(encoded));
+      expect(existsSync(join(dir, MASTER_KEY_FILE))).toBe(false);
+    }
+  });
+
+  it("treats a blank AGENTFORGE_SECRETS_KEY as unset and falls back to .master-key", () => {
+    for (const blank of ["", "   "]) {
+      const dir = dataDir();
+      const key = getLocalVaultKey({ AGENTFORGE_DATA_DIR: dir, AGENTFORGE_SECRETS_KEY: blank });
+      expect(key).toHaveLength(32);
+      expect(existsSync(join(dir, MASTER_KEY_FILE))).toBe(true);
+    }
   });
 
   /**
