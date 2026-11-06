@@ -100,6 +100,18 @@ describe("downloadPackage", () => {
     expect((await failureOf(downloadPackage(PACKAGE, { fetchImpl, backoffMs: 0 }))).code).toBe("offline");
   });
 
+  it("reports offline when the host name does not resolve", async () => {
+    const { lookup } = await import("node:dns/promises");
+    const notFound = Object.assign(new Error("getaddrinfo ENOTFOUND"), { code: "ENOTFOUND" });
+    vi.mocked(lookup).mockRejectedValue(notFound);
+    try {
+      const fetchImpl = vi.fn() as never;
+      expect((await failureOf(downloadPackage(PACKAGE, { fetchImpl, backoffMs: 0 }))).code).toBe("offline");
+    } finally {
+      vi.mocked(lookup).mockImplementation((async () => [{ address: "104.16.0.35", family: 4 }]) as never);
+    }
+  });
+
   it("reports progress as bytes received", async () => {
     const body = Buffer.from("0123456789");
     const seen: number[] = [];

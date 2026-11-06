@@ -228,7 +228,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual: request-body arrays with no `.max()` still cost one issue per bad element | Residual: none blocks; capping the request-body arrays is a follow-up |
 | [SR-197](#sr-197) | Medium | AI SDK 5's `streamText` prints every stream error to the console by default, and an `APICallError` carries the request body (the prompt) and the gateway's error body | Fixed in tree (2026-11-04, `fix/zod-4`): the runtime passes a silent `onError`; tested, not driven | PR merge of the AI SDK 5 move |
 | [SR-198](#sr-198) | Medium | AI SDK 5 brings `undici` 5.29.0 and `@fastify/busboy` into the hosted image, with five HIGH `undici` advisories and one `busboy` advisory | Fixed in tree (2026-11-04, `fix/zod-4`): scoped override to `undici` 6.29.1, which drops `busboy`; the SDK's guarded download fetch checked on it; not driven | PR merge of the AI SDK 5 move |
-| [SR-201](#sr-201) | Medium | The SSRF guard resolved a name, then let `fetch` resolve it again to connect (DNS rebinding), and let a connection through when its own lookup failed | Fixed in tree (2026-11-06, `fix/sec-004a-dns-pinning`): one lookup per hop, refused when it fails or answers privately, then the socket is pinned to that answer; driven on Node 24 against a loopback listener and real DNS and TLS; not run on Node 22 or on a hosted server | PR merge |
+| [SR-201](#sr-201) | Medium | The SSRF guard resolved a name, then let `fetch` resolve it again to connect (DNS rebinding), and let a connection through when its own lookup failed | Fixed in tree (2026-11-06, `fix/sec-004a-dns-pinning`): one lookup per hop, refused when it fails or answers privately, then the socket is pinned to that answer; driven on Node 24 and on Node 22.23.4 (the image's runtime) against a loopback listener and real DNS and TLS; not run on a hosted server | PR merge |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -6571,9 +6571,18 @@ resolver and relied on the old fail-open. A one-off script on 2026-11-06 ran `fe
 resolver: `https://example.com/` answered 200 over TLS (SNI and certificate check work through the pin),
 `https://localtest.me/` was refused as a private answer, and an `.invalid` name was refused as unresolvable.
 
-Residual: (1) Not run on Node 22, the image's runtime; the local runtime is Node 24, whose bundled undici is a
-different major than the 6.29.1 agent, and the loopback test is what would catch a Node where the two do not fit.
+Node 22: the PR review ran the pin on Node 22.23.4, the exact build `webapp-deploy/Dockerfile:28` pins, which
+bundles undici 6.29.1 (no version skew). A pinned name DNS cannot answer reached a loopback listener over HTTP; over
+HTTPS the pinned lookup was honoured with `all: true` and the certificate was still checked against the hostname;
+`fetchPublicHttps` returned 200 for `https://example.com/` and refused `localtest.me` and an `.invalid` name.
+
+Residual: (1) The unit tests run on the developer machine's Node, never the image's, so a future `NODE_VERSION`
+bump in the Dockerfile is not checked by them; re-run the pin check on the new version when it changes.
 (2) Not driven on a hosted server. (3) A transient DNS failure is now a 400 instead of a network error, on purpose.
+The refusal carries the lookup error as its `cause`, so the component installer still reports `offline` for
+ENOTFOUND and EAI_AGAIN (`download.test.ts`, "reports offline when the host name does not resolve"). (7) The DNS
+lookup itself is not bounded by `timeoutMs` or the abort signal; that was true before this change, but the guard
+now waits on it.
 (4) The port is not checked: `https://host:6379/` is allowed. Whether to allow 443 only, a list or refuse known
 internal ports is Rizky's call. (5) Egress filtering of `169.254.0.0/16` and `100.64.0.0/10` for the app pod is
 infrastructure and belongs to [SR-97](#sr-97); this change does not replace it. (6) `assertResolvesPublic` is kept

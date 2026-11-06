@@ -62,12 +62,6 @@ function isPrivateHost(hostname: string): boolean {
 
 /**
  * Public HTTPS only: no credentials, no loopback, no private ranges. Applied to every redirect hop.
- *
- * LEXICAL ONLY. A hostname that *resolves* to a private address passes this — `localtest.me`,
- * `<anything>.nip.io`, or an attacker's own domain with an A record of 169.254.169.254. The name
- * has to be resolved for that, which is asynchronous, so `fetchPublicHttps` does it separately in
- * `assertResolvesPublic` below and this function stays synchronous for the callers that use it as
- * an early, cheap rejection.
  */
 export function assertPublicHttpsUrl(url: string): URL {
   let parsed: URL;
@@ -111,8 +105,10 @@ export async function resolvePublicAddresses(
   let resolved: readonly ResolvedAddress[];
   try {
     resolved = await lookupImpl(hostname);
-  } catch {
-    throw new ApiError("invalid_endpoint", UNRESOLVED_MESSAGE, 400);
+  } catch (lookupError) {
+    const refusal = new ApiError("invalid_endpoint", UNRESOLVED_MESSAGE, 400);
+    refusal.cause = lookupError;
+    throw refusal;
   }
   if (resolved.length === 0) {
     throw new ApiError("invalid_endpoint", UNRESOLVED_MESSAGE, 400);
@@ -265,7 +261,7 @@ export async function fetchPublicHttps(url: string, options: SafeFetchOptions = 
           truncated: read.truncated,
         };
       } finally {
-        await agent.destroy();
+        await agent.destroy().catch(() => undefined);
       }
     }
     throw new ApiError("invalid_request", `Too many redirects (more than ${maxHops})`, 400);

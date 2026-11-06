@@ -2,12 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@agentforge/core";
 import { GENERATED_IMAGE_MAX_BYTES, GENERATED_VIDEO_MAX_BYTES, downloadGeneratedMedia } from "./media-download";
 
-/**
- * `fetchPublicHttps` resolves every hop's hostname before it fetches, and `downloadGeneratedMedia`
- * takes no resolver of its own. Left to the system resolver, `cdn.example` takes about 11 s to come
- * back ENOTFOUND on Windows, and every case that got past the https check timed out, so the resolver
- * is replaced here. It answers with a public address unless a case says otherwise.
- */
 const { lookup } = vi.hoisted(() => ({ lookup: vi.fn() }));
 vi.mock("node:dns/promises", async (importOriginal) => ({
   ...(await importOriginal<typeof import("node:dns/promises")>()),
