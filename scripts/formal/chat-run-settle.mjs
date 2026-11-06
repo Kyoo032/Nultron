@@ -40,6 +40,8 @@ const SWITCHES = [
   "MeterOnFinish",
   "MeterOnSettledCompletion",
   "MeterAfterAttempt",
+  "ClaimOnPersist",
+  "CancelYieldsToClaim",
 ];
 
 class Drift extends Error {}
@@ -79,6 +81,13 @@ function readCode() {
     "settleRun",
   );
   const onStall = between(runs, "onStall: (message) => {", "const onClientAbort = () => {", "onStall");
+  const onClientAbort = between(
+    runs,
+    "const onClientAbort = () => {",
+    'options.abortSignal?.addEventListener("abort", onClientAbort',
+    "onClientAbort",
+  );
+  const persistHead = between(runs, "const persistAssistant = async () => {", "await ", "persistAssistant");
   const meter = between(
     runs,
     "const meterSettledRun = () => {",
@@ -126,6 +135,9 @@ function readCode() {
     MeterOnFinish: finishTail.includes("recordChatRunUsage(options.tenant, run.id, finished, runUsage)"),
     MeterOnSettledCompletion: onCompleted.includes("meterSettledRun();"),
     MeterAfterAttempt: afterAttempt.includes("meterSettledRun();"),
+    ClaimOnPersist: persistHead.includes("finishing = true;"),
+    CancelYieldsToClaim:
+      onStall.includes("if (queueClosed || finishing) {") && onClientAbort.includes("if (queueClosed || finishing) {"),
   };
 }
 

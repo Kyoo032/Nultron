@@ -30,7 +30,7 @@ It needs Java 11 or later and TLC 1.7.4, pinned by sha256 in the script. The scr
 
 GitHub publishes no digest for that release asset, so the pinned hash is from the copy this check was built with. Its size matches the v1.7.4 release asset (2,274,532 bytes), and its banner reads `TLC2 Version 2.19 of 08 August 2024 (rev: 5a47802)`. If a fresh download hashes differently, stop and find out why before you change the pin.
 
-The script first reads the covered code and prints twelve switches, one per guard or call the model depends on, then runs TLC with those values. So when a change removes one of those twelve sites, the check runs as if it were removed, with no edit to the model. A change anywhere else in the covered code is not read, so check it against the table below by hand.
+The script first reads the covered code and prints fourteen switches, one per guard or call the model depends on, then runs TLC with those values. So when a change removes one of those fourteen sites, the check runs as if it were removed, with no edit to the model. A change anywhere else in the covered code is not read, so check it against the table below by hand.
 
 - `PASS`: every property holds for every order of events in the model.
 - `FAIL: <names>`: TLC found an order of events that breaks those properties. The counterexample is printed above the line.
@@ -39,7 +39,7 @@ The script first reads the covered code and prints twelve switches, one per guar
 Two more modes:
 
 - `--break <Switch>` forces one guard off, to show the check can still fail. Use it after every update to the model.
-- `--hazard` assumes a database driver whose calls yield to timers and sockets, such as Postgres. It checks each property in its own run and lists the ones that break. Run it before any move off `better-sqlite3`.
+- `--hazard` assumes a database driver whose calls yield to timers and sockets, such as Postgres. It checks each property in its own run and lists the ones that break. Run it before any move off `better-sqlite3`, and after every change to covered code. Since 2026-11-06 it prints `PASS: nothing breaks`.
 
 ## Reading a failure
 
@@ -53,18 +53,19 @@ Line numbers are as of the sync commit below.
 
 | Model | Code |
 | --- | --- |
-| `Settle` (watchdog or closed connection) | `onStall` at `packages/host/src/runs.ts:270` and `onClientAbort` at `:281`, both calling `settleRun` at `:256`. The abort that landed before the listener existed is `:295`, the `Settle` from `"start"`. |
+| `Settle` (watchdog or closed connection) | `onStall` at `packages/host/src/runs.ts:271` and `onClientAbort` at `:282`, both calling `settleRun` at `:257`. The abort that landed before the listener existed is `:296`, the `Settle` from `"start"`. Both handlers return while `finishing` is set (`:272`, `:283`), which is the `~(CancelYieldsToClaim /\ finishing)` conjunct. |
 | `settled`, `queueClosed` | The flags set by `settleRun` and `closeQueue` in `runs.ts` |
+| `finishing`, `Claim` | `finishing = true`, the first statement of `persistAssistant` (`:332`). Each call of `persistAssistant` follows an `if (settled)` check with no `await` between them, so the claim is taken in the same step as that check: the not-settled branch of `ModelAnswers`, `AfterAttempt` and `Catch`. |
 | `CancelFinish` | The fire-and-forget `finishRun(..., "failed")` inside `settleRun`. It is its own step only when `DbYields` is true. |
-| `StoreUser`, `InsertRun` | `insertMessage(..., "user", ...)` at `:382` and `insertRun` at `:390`, then the `if (settled)` at `:392` |
-| `FinishAfterInsert` | `finishRun(..., "failed")` at `:394` |
-| `"model"` with `ModelAnswers`, `ModelFails`, `ModelAborted` | `runtime.execute` inside `attempt()`, awaited at `:658`, and its `run.completed` and `run.failed` events. `ModelAborted` is `modelAbort.abort()` making the call reject. |
-| `ModelAnswers` when settled | The `if (settled)` in the `run.completed` handler at `:581`, which meters and drops the answer |
+| `StoreUser`, `InsertRun` | `insertMessage(..., "user", ...)` at `:384` and `insertRun` at `:392`, then the `if (settled)` at `:394` |
+| `FinishAfterInsert` | `finishRun(..., "failed")` at `:396` |
+| `"model"` with `ModelAnswers`, `ModelFails`, `ModelAborted` | `runtime.execute` inside `attempt()`, awaited at `:660`, and its `run.completed` and `run.failed` events. `ModelAborted` is `modelAbort.abort()` making the call reject. The runtime emits `run.completed` as its last act (`packages/core/src/runtime/ai-sdk-runtime.ts:668`), so a claim taken in that handler leaves no network wait unguarded. |
+| `ModelAnswers` when settled | The `if (settled)` in the `run.completed` handler at `:587`, which meters and drops the answer |
 | `PersistEv` | `await persistAssistant()` and `send(event)` in the same handler |
-| `AfterAttempt` | The `if (settled)` between the last `await attempt()` (`:674`) and `finishRun(..., "completed")` (`:682`) |
-| `PersistFinal`, `FinishCompleted`, `AfterFinish` | `persistAssistant()`, `finishRun(..., "completed")` at `:682` with `recordChatRunUsage`, then the knowledge tail before the `finally` at `:762` |
-| `Catch`, `CatchFinish` | The `catch` at `:727` with its `if (settled)`, then `persistAssistant()` at `:733` and `finishRun` with `status` |
-| `MeterOk` | `meterSettledRun` at `:323` and its `settledRunMetered` flag |
+| `AfterAttempt` | The `if (settled)` between the last `await attempt()` (`:676`) and `finishRun(..., "completed")` (`:684`) |
+| `PersistFinal`, `FinishCompleted`, `AfterFinish` | `persistAssistant()`, `finishRun(..., "completed")` at `:684` with `recordChatRunUsage`, then the knowledge tail before the `finally` at `:764` |
+| `Catch`, `CatchFinish` | The `catch` at `:729` with its `if (settled)`, then `persistAssistant()` at `:735` and `finishRun` with `status` |
+| `MeterOk` | `meterSettledRun` at `:324` and its `settledRunMetered` flag |
 | `Applies`, `FinishTo` | `finishRun` at `packages/host/src/threads.ts:311`, which updates only a `streaming` row (`:326`) |
 | `metered` | `recordChatRunUsage` at `packages/host/src/usage-record.ts:259`, which writes only when `finished` |
 
@@ -81,11 +82,13 @@ The switches the script reads, and where:
 | `SettleFinishes` | `settleRun` calls `finishRun(options.tenant, runId, "failed"` |
 | `FinishOnlyFromStreaming` | `finishRun` filters on `eq(runs.status, "streaming")` |
 | `MeterOnce` | `meterSettledRun` checks and sets `settledRunMetered` |
-| `MeterOnFinish` | `recordChatRunUsage(options.tenant, run.id, finished, runUsage)` follows `finishRun(..., "completed")` (`:686`) |
-| `MeterOnSettledCompletion` | The settled branch of the `run.completed` handler calls `meterSettledRun();` (`:588`) |
-| `MeterAfterAttempt` | The `if (settled)` after the model call calls `meterSettledRun();` (`:678`) |
+| `MeterOnFinish` | `recordChatRunUsage(options.tenant, run.id, finished, runUsage)` follows `finishRun(..., "completed")` (`:688`) |
+| `MeterOnSettledCompletion` | The settled branch of the `run.completed` handler calls `meterSettledRun();` (`:590`) |
+| `MeterAfterAttempt` | The `if (settled)` after the model call calls `meterSettledRun();` (`:680`) |
+| `ClaimOnPersist` | `finishing = true;` comes before the first `await` in `persistAssistant` |
+| `CancelYieldsToClaim` | Both `onStall` and `onClientAbort` start with `if (queueClosed \|\| finishing) {`. One handler alone is not enough, so the switch is false unless both do. |
 
-`:588` and `:678` back each other up. Removing either one alone still passes, and removing both breaks `BilledIsMetered`.
+`:590` and `:680` back each other up. Removing either one alone still passes, and removing both breaks `BilledIsMetered`.
 
 Each property fails when the code it guards is broken:
 
@@ -96,36 +99,42 @@ Each property fails when the code it guards is broken:
 | `MeterOnce` | `AtMostOneUsageRow` |
 | `MeterOnFinish`, or both `MeterOnSettledCompletion` and `MeterAfterAttempt` | `BilledIsMetered` |
 | `StallGuard` | `Termination` |
-| `--hazard` | `FailedRowHasNoAnswer`, `NoFailureAfterSuccess`, `BilledIsMetered` |
+| `--hazard` | Nothing. `PASS: nothing breaks`. |
+| `--hazard --break ClaimOnPersist`, `--hazard --break CancelYieldsToClaim` | `FailedRowHasNoAnswer`, `NoFailureAfterSuccess`, `BilledIsMetered` |
 
-`NoFailureAfterSuccess` fails only under `--hazard`, because with today's driver nothing can cut in between the success end and the end of the run.
+`ClaimOnPersist` and `CancelYieldsToClaim` matter only under `--hazard`. With `better-sqlite3` nothing can cut in once the save starts, so breaking either one without `--hazard` still passes. For the same reason `NoFailureAfterSuccess` fails only under `--hazard` with one of them broken.
 
-## The assumption that makes it hold
+## Why it holds on both drivers
 
 The product database uses `better-sqlite3`, so every `await db...` finishes in microtasks, before any timer or socket event can run. The watchdog and a closed connection can therefore cut in only while the run waits on the network: before the work starts, or during the model call. The model encodes this. `Settle` is enabled only at `"start"` and `"model"`, unless `DbYields` is true.
 
-With a driver that yields (`--hazard`), three properties break: `FailedRowHasNoAnswer`, `NoFailureAfterSuccess` and `BilledIsMetered`. The shortest break is this: the model answers, the host starts saving it, the watchdog fires during the save, the row is marked `failed`, and the save then lands. Moving the product database off SQLite (open decision 1, K-D9 in `AGENTS.md`) must fix these first, for example by re-checking `settled` after each awaited write or by moving the decision into one database transaction.
+A driver that yields (`--hazard`), such as Postgres, lets the watchdog and a closed connection cut in during any database write. Before 2026-11-06 that broke `FailedRowHasNoAnswer`, `NoFailureAfterSuccess` and `BilledIsMetered`. The shortest break was this: the model answers, the host starts saving it, the watchdog fires during the save, the row is marked `failed`, and the save then lands. Now the run claims its end before it saves (`finishing`), and both handlers stand down once it has. A re-check of `settled` after each write could not fix this, because the answer has already landed by then. The claim decides who ends the run before the first write, and JavaScript runs the check and the claim with nothing in between.
+
+What `--hazard` still assumes is that every database write finishes, because `Termination` rests on weak fairness for `Work`. After the claim, the watchdog no longer ends the run, so a write that never returns keeps the stream and its run slot open. `better-sqlite3` cannot hang that way. A move off SQLite (open decision 1, K-D9 in `AGENTS.md`) must give each write a timeout.
 
 ## What it does not cover
 
-- The fallback retry on a second model (`heldNext`, `:664`) is folded into the one `"model"` wait.
+- The fallback retry on a second model (`heldNext`, `:666`) is folded into the one `"model"` wait.
+- A database write that never returns (see above).
+- The usage writes (`recordChatRunUsage`, `meterSettledRun`) are synchronous today and are modeled as part of the step that calls them. On a driver that yields, each becomes a wait of its own. The claim, and `settledRunMetered` being set before the write, should keep the properties, but that is argued here, not checked.
+- A model that streamed part of an answer and then failed reaches `CatchFinish` with text to save. The model has no such outcome, so it does not show the claim is needed on the catch path. The claim there is the same line in `persistAssistant`, and `packages/host/src/runs-settle-async-db.test.ts` drives that path with a held write.
 - Tool calls, media mirroring, tool invocation rows, knowledge ingestion and retrieval counts are left out.
 - Frames are reduced to `failed`, the success end `ok`, and the closing `end`. Deltas and thinking frames are not modeled.
 - A run that broke after saving partial text and ends `completed` is modeled for the `answer` outcome only.
 - `FinishOnlyFromStreaming` is mirrored, but no property fails when only it is removed, in either database mode. Its job is defense in depth.
-- The meter calls on the catch path (`:729` and `:739`) are not modeled. No modeled path reaches the catch with a billed call, because a billed call ends in `run.completed`.
+- The meter calls on the catch path (`:731` and `:741`) are not modeled. No modeled path reaches the catch with a billed call, because a billed call ends in `run.completed`.
 - The hosted run cap (`packages/host/src/run-limits.ts`) and the desktop IPC transport are out of scope, though both reach this same code.
 
 ## Keep it in step with the code
 
 Coverage: `startModalityRun` in `packages/host/src/runs.ts`, `finishRun` in `packages/host/src/threads.ts`, `recordChatRunUsage` in `packages/host/src/usage-record.ts`, and the driver import in `packages/db/src/client.ts`.
 
-Sync commit: `b826a870`. At this commit the model was confirmed to describe the covered code. The covered files last changed at `464b00c5`.
+Sync commit: `5448c4f9`. At this commit the model was confirmed to describe the covered code. The covered files last changed at `5448c4f9`, which added the claim (`finishing`).
 
 To check whether the verification needs another look:
 
 ```bash
-git log --oneline b826a870..HEAD -- packages/host/src/runs.ts packages/host/src/threads.ts packages/host/src/usage-record.ts packages/db/src/client.ts
+git log --oneline 5448c4f9..HEAD -- packages/host/src/runs.ts packages/host/src/threads.ts packages/host/src/usage-record.ts packages/db/src/client.ts
 ```
 
 When a change to covered code is intended:
