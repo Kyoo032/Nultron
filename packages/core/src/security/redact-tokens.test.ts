@@ -146,6 +146,28 @@ describe("redactCredentials: environment lines", () => {
     }
   });
 
+  it("keeps a number or a boolean under a secret-named setting, quoted or not", () => {
+    const kept = [
+      "TOKEN_TTL=3600",
+      "KEY_SIZE=2048",
+      "PASSWORD_MIN_LENGTH=12",
+      "MAX_TOKEN=4096",
+      'SECRET_ROTATION_DAYS="30"',
+      "SECRET_ROTATION_ENABLED=true",
+      "API_KEY_REQUIRED=False",
+      "TOKEN_RATE=0.5",
+    ];
+    for (const text of kept) {
+      expect(redactCredentials(text), text).toBe(text);
+    }
+  });
+
+  it("still masks a value that only starts like a number or a boolean", () => {
+    expect(redactCredentials("API_KEY=0a1b2c3d4e")).toBe("API_KEY=[REDACTED]");
+    expect(redactCredentials("SECRET=falsehood")).toBe("SECRET=[REDACTED]");
+    expect(redactCredentials("DB_PASSWORD=12 345")).toBe("DB_PASSWORD=[REDACTED]");
+  });
+
   it("is idempotent, so a value redacted once is the same when redacted again", () => {
     const once = redactCredentials(ENV);
     expect(redactCredentials(once)).toBe(once);
