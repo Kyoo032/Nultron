@@ -267,13 +267,30 @@ describe("assertResolvesPublic", () => {
     expect(called).toBe(false);
   });
 
-  it("treats a resolution failure as nothing to protect against, not as a refusal", async () => {
-    // `fetch` would fail to resolve it too, so refusing here would only turn every offline test and
-    // every transient DNS blip into an invalid_endpoint error.
+  it("refuses a name that does not resolve, and says so differently from a private answer", async () => {
     const failing: HostLookup = async () => {
       throw Object.assign(new Error("getaddrinfo ENOTFOUND"), { code: "ENOTFOUND" });
     };
-    await expect(assertResolvesPublic("nothing.invalid", failing)).resolves.toBeUndefined();
+    await expect(assertResolvesPublic("nothing.invalid", failing)).rejects.toMatchObject({
+      code: "invalid_endpoint",
+      status: 400,
+      message: "Could not resolve this URL's host",
+    });
+  });
+
+  it("refuses an empty answer", async () => {
+    await expect(assertResolvesPublic("nothing.invalid", lookupReturning())).rejects.toMatchObject({
+      code: "invalid_endpoint",
+      status: 400,
+      message: "Could not resolve this URL's host",
+    });
+  });
+
+  it("refuses an answer that is not an IP address", async () => {
+    await expect(assertResolvesPublic("odd.example", lookupReturning("not-an-address"))).rejects.toMatchObject({
+      code: "invalid_endpoint",
+      status: 400,
+    });
   });
 });
 
@@ -306,5 +323,44 @@ describe("fetchPublicHttps resolves every hop", () => {
       }),
     ).rejects.toThrow(/public host/);
     expect(seen).toEqual(["https://a.test/start"]);
+  });
+
+  it("fails closed when the name does not resolve, before any request is made", async () => {
+    const seen: string[] = [];
+    const failing: HostLookup = async () => {
+      throw Object.assign(new Error("getaddrinfo EAI_AGAIN"), { code: "EAI_AGAIN" });
+    };
+    await expect(
+      fetchPublicHttps("https://flaky.example/x", {
+        lookupImpl: failing,
+        fetchImpl: fakeFetch({ "https://flaky.example/x": { status: 200, body: "reachable" } }, seen),
+      }),
+    ).rejects.toMatchObject({ code: "invalid_endpoint", status: 400, message: "Could not resolve this URL's host" });
+    expect(seen).toEqual([]);
+  });
+
+  it("resolves each hop once and hands the request a dispatcher pinned to that answer", async () => {
+    const resolved: string[] = [];
+    const dispatchers: unknown[] = [];
+    const lookupImpl: HostLookup = async (hostname) => {
+      resolved.push(hostname);
+      return [{ address: "93.184.216.34" }];
+    };
+    const plan: Record<string, Step> = {
+      "https://a.test/start": { status: 302, headers: { location: "https://b.test/final" } },
+      "https://b.test/final": { status: 200, body: "ok" },
+    };
+    const recordingFetch = (async (input: string, init?: RequestInit & { dispatcher?: unknown }) => {
+      dispatchers.push(init?.dispatcher);
+      const step = plan[input] as Step;
+      return new Response(step.body ?? "", { status: step.status, headers: step.headers ?? {} });
+    }) as unknown as typeof fetch;
+    await fetchPublicHttps("https://a.test/start", { lookupImpl, fetchImpl: recordingFetch });
+    expect(resolved).toEqual(["a.test", "b.test"]);
+    expect(dispatchers).toHaveLength(2);
+    for (const dispatcher of dispatchers) {
+      expect(dispatcher).toBeDefined();
+    }
+    expect(dispatchers[0]).not.toBe(dispatchers[1]);
   });
 });
