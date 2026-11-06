@@ -8,6 +8,7 @@
  * the disclaimer is stamped by code; the model may rank and read sentiment but
  * may not issue an imperative directive (see advice-guard).
  */
+import { CHART_SMA_PERIODS } from "./chart-builder";
 import { z } from "zod";
 import { dataChartSchema } from "../artifacts/data-analysis";
 import { httpUrlSchema } from "./schemas";
@@ -44,7 +45,7 @@ export const SIGNAL_NOTE_MAX = 120;
 export const ROTATION_MAX = WATCHLIST_MAX;
 export const PACKET_NOTES_MAX = 100;
 export const MACRO_QUOTES_MAX = 100;
-export const CHART_SERIES_MAX = 3;
+export const CHART_SERIES_MAX = 1 + CHART_SMA_PERIODS.length;
 export const PRICE_CHART_POINTS_MAX = 504;
 
 export const MARKET_STATES = ["PRE", "REGULAR", "POST", "CLOSED", "UNKNOWN"] as const;
