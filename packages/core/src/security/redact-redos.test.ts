@@ -28,12 +28,19 @@ const HOSTILE: ReadonlyArray<readonly [string, string]> = [
   ["export followed by spaces", `export${" ".repeat(100_000)}`],
   ["a secret-named assignment with a blank value, repeated", "API_KEY=\n".repeat(11_000)],
   ["a secret-named assignment followed by spaces", `API_KEY=${" ".repeat(100_000)}`],
+  ["a JWT header prefix and a hyphen repeated", "eyJ-".repeat(25_000)],
+  ["a JWT header prefix and a hyphen repeated, then two short dotted parts", `${"eyJ-".repeat(25_000)}.aaaaaaaa.`],
+  ["a JWT header prefix and an underscore repeated", "eyJ_".repeat(25_000)],
+  ["a long dotted run that ends in a JWT header prefix", `${"a.".repeat(50_000)}eyJ`],
+  ["a JWT header and a first part repeated with no third part", "eyJaaaaaaaa.bbbbbbbb ".repeat(5_000)],
 ];
 
 const HOSTILE_AND_MASKED: ReadonlyArray<readonly [string, string]> = [
   ["a Slack token prefix repeated", "xoxb-".repeat(20_000)],
   ["a long run after a GitHub token prefix", `ghp_${"a".repeat(100_000)}`],
   ["an encoded bearer prefix repeated", "Bearer%20".repeat(11_000)],
+  ["a JWT header prefix and a hyphen repeated, then a whole dotted tail", `${"eyJ-".repeat(25_000)}.aaaaaaaa.aaaaaaaa`],
+  ["a three-part JWT repeated", "eyJaaaaaaaa.eyJaaaaaaaa.eyJaaaaaaaa.".repeat(2_700)],
 ];
 
 describe("redactCredentials: hostile input stays fast", () => {
@@ -56,6 +63,14 @@ describe("redactCredentials: hostile input stays fast", () => {
     expect(shallow.ms).toBeLessThan(BUDGET_MS);
     expect(deep.ms).toBeLessThan(BUDGET_MS);
     expect(deep.value).toEqual({ output: { page: input } });
+  });
+
+  it("is as fast on a repeated JWT header prefix through redactSecrets and redactSecretsDeep", () => {
+    const input = `${"eyJ-".repeat(25_000)}.aaaaaaaa.`;
+    const shallow = timed(() => redactSecrets(input));
+    const deep = timed(() => redactSecretsDeep({ output: { page: input } }));
+    expect(shallow.ms).toBeLessThan(BUDGET_MS);
+    expect(deep.ms).toBeLessThan(BUDGET_MS);
   });
 
   it("still masks a long cookie header that holds a name=value pair", () => {
