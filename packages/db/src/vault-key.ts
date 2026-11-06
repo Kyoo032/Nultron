@@ -53,6 +53,12 @@ export const SERVER_VAULT_KEY_TOO_WEAK =
   "key generator produces them (`openssl rand -hex 32`). A passphrase, or anything else that is not " +
   "a canonical encoding of at least 32 bytes, is refused in server mode.";
 
+export const DESK_VAULT_KEY_TOO_WEAK =
+  "AGENTFORGE_SECRETS_KEY is set but is not at least 32 random bytes written as hex or base64, so it " +
+  "would become a guessable wrap key for every sealed envelope. Generate one with `openssl rand -hex 32`, " +
+  "or unset the variable to use the auto-created .master-key file. A new key cannot open data sealed " +
+  "under the old one.";
+
 /**
  * A key that is the right LENGTH but plainly not random: `"a".repeat(64)`, `0000…`, `deadbeef`
  * repeated. Every one of those satisfies the hex rule below and measures as 32 bytes, so the length
@@ -117,8 +123,8 @@ function isCanonical(value: string, encoding: Base64Encoding): boolean {
 /**
  * How many random bytes a wrap key secret carries, in the shapes a key generator produces: hex (what
  * `.master-key` holds) and canonical base64 / base64url (what a secrets manager hands out). Anything
- * else — a passphrase, a sentence, a truncated blob — is unmeasurable, so it counts as 0 and the
- * server refuses it. A desk is unaffected: `getLocalVaultKey` only measures in server mode.
+ * else — a passphrase, a sentence, a truncated blob — is unmeasurable, so it counts as 0 and
+ * `getLocalVaultKey` refuses it, on a desk as well as on the server.
  */
 export function vaultKeyEntropyBytes(secret: string): number {
   return decodeVaultKey(secret).length;
@@ -174,16 +180,12 @@ function readOrCreateMasterKeyFile(env: EnvLike): string {
   return secret;
 }
 
-/**
- * The wrap key for every envelope on this install.
- *
- * On a desk nothing changed: `AGENTFORGE_SECRETS_KEY` when set, else the `.master-key` file, created
- * on first use. In server mode the env key is mandatory and must be strong enough, and the file
- * fallback throws instead of self-creating (docs/internal/web-security-spec.md, row S1).
- */
 export function getLocalVaultKey(env: EnvLike = process.env): Buffer {
   const fromEnv = env.AGENTFORGE_SECRETS_KEY?.trim();
   if (!isServerMode(env)) {
+    if (fromEnv && vaultKeyEntropyBytes(fromEnv) < MIN_VAULT_KEY_BYTES) {
+      throw new Error(DESK_VAULT_KEY_TOO_WEAK);
+    }
     return wrappingKeyFromSecret(fromEnv || readOrCreateMasterKeyFile(env));
   }
   if (!fromEnv) {

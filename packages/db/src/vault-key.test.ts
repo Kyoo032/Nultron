@@ -243,7 +243,11 @@ describe("getLocalVaultKey outside server mode", () => {
 
   it("refuses a passphrase in AGENTFORGE_SECRETS_KEY on a desk, without printing it or writing a file", () => {
     const dir = dataDir();
-    for (const passphrase of ["hunter2", "correct horse battery staple correct horse!!", "phase3-seal-regression-key"]) {
+    for (const passphrase of [
+      "hunter2",
+      "correct horse battery staple correct horse!!",
+      "phase3-seal-regression-key",
+    ]) {
       const env = { AGENTFORGE_DATA_DIR: dir, AGENTFORGE_SECRETS_KEY: passphrase };
       let message = "";
       try {

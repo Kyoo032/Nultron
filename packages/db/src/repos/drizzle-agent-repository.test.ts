@@ -8,7 +8,7 @@ import { agentVersions, agents, messages, organizations, threads, workspaces } f
 import { getLocalVaultKey } from "../vault-key";
 import { DrizzleAgentRepository } from "./drizzle-agent-repository";
 
-const SECRET = "phase3-seal-regression-key";
+const SECRET = "2f6b0d93a7c1485e9b3d7f0a1c5e8264d0b9a3f7c1e5824b6d0a9c3e7f1b5d84";
 const SYSTEM_PROMPT = "You are a private desk agent. Never echo the owner's gateway key.";
 const MESSAGE_TEXT = "Draft the meeting note with the private budget number 1842.";
 

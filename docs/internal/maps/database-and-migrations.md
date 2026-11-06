@@ -2,7 +2,7 @@
 
 Product: both · Instance: main :3000
 
-Last verified: 2026-10-29 at 464b00c5 for the 2026-10-21 one-agent first-desk comments in `packages/db/src/ensure-local-owner.ts` (`FIRST_RUN_MODES`) and `packages/db/src/portal-owner.ts` (`HOSTED_FIRST_DESK_MODES`). Before that: 2026-10-21 at 8953014 for the test-limit sentence above the unit-suite table. Before that: 2026-09-29 for the three `apps/desktop/main.cjs` citations (`bootstrapPackaged` lines), re-anchored in the
+Last verified: 2026-11-06 at 474607a1 for the desk wrap-key floor paragraph (SR-203). Before that: 2026-10-29 at 464b00c5 for the 2026-10-21 one-agent first-desk comments in `packages/db/src/ensure-local-owner.ts` (`FIRST_RUN_MODES`) and `packages/db/src/portal-owner.ts` (`HOSTED_FIRST_DESK_MODES`). Before that: 2026-10-21 at 8953014 for the test-limit sentence above the unit-suite table. Before that: 2026-09-29 for the three `apps/desktop/main.cjs` citations (`bootstrapPackaged` lines), re-anchored in the
 working tree, not committed, after the ffmpeg probe moved behind the first paint. Before that: 2026-09-23 at d4561b8 + uncommitted tree for the migrations table and the numbering note (now
 through `0021`), the `auth_sessions` row of the schema families, "Start over, applied at next boot" (every
 `reset.ts` citation, and the partial-failure retry) and the drizzle row of Where things live. Not driven:
@@ -383,10 +383,11 @@ one as a finding, not a flake.
 import of a fresh module graph opens a new handle — and skips the reset hook, which is gated on the
 cache being empty (`:35`).
 
-**The desk path applies no key strength check at all.** `getLocalVaultKey` measures entropy only in
-server mode (`packages/db/src/vault-key.ts:125-133`), so `AGENTFORGE_SECRETS_KEY=x` is accepted on a
-desk and `wrappingKeyFromSecret` will happily hash it into 32 bytes
-(`packages/core/src/crypto/envelope.ts:14-16`).
+**The desk path applies the 32-byte floor, and only the floor.** `getLocalVaultKey` throws
+`DESK_VAULT_KEY_TOO_WEAK` when `AGENTFORGE_SECRETS_KEY` is set and `vaultKeyEntropyBytes` is under 32
+(`packages/db/src/vault-key.ts`, the `!isServerMode` branch), so `AGENTFORGE_SECRETS_KEY=x` is refused
+before `wrappingKeyFromSecret` (`packages/core/src/crypto/envelope.ts:14-16`) can hash it. Server mode
+adds the variety check; a desk does not. A blank value falls back to `.master-key` (SR-203).
 
 **`docs/internal/web-security-spec.md:74` is stale on this subsystem.** Row S1 says the `.master-key`
 fallback "throws when `NODE_ENV=production`" and cites `packages/db/src/vault-key.ts:37-51`. The code

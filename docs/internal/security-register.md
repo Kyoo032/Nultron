@@ -228,6 +228,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual: request-body arrays with no `.max()` still cost one issue per bad element | Residual: none blocks; capping the request-body arrays is a follow-up |
 | [SR-197](#sr-197) | Medium | AI SDK 5's `streamText` prints every stream error to the console by default, and an `APICallError` carries the request body (the prompt) and the gateway's error body | Fixed in tree (2026-11-04, `fix/zod-4`): the runtime passes a silent `onError`; tested, not driven | PR merge of the AI SDK 5 move |
 | [SR-198](#sr-198) | Medium | AI SDK 5 brings `undici` 5.29.0 and `@fastify/busboy` into the hosted image, with five HIGH `undici` advisories and one `busboy` advisory | Fixed in tree (2026-11-04, `fix/zod-4`): scoped override to `undici` 6.29.1, which drops `busboy`; the SDK's guarded download fetch checked on it; not driven | PR merge of the AI SDK 5 move |
+| [SR-203](#sr-203) | Low | A desk's `AGENTFORGE_SECRETS_KEY` was never measured, so a passphrase became the wrap key through one unsalted SHA-256 and a copied `settings.enc` could be guessed offline | Fixed in tree (2026-11-06, `fix/sec-006-secrets-key-floor`): `getLocalVaultKey` refuses a desk key under 32 bytes, floor only; unit-tested, not driven on a desk with data | PR merge |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -6531,6 +6532,19 @@ lookup was called. `audit:deployed` passes.
 Residual: not driven on a hosted server; the override has to be dropped once the SDK moves to `undici` 6 itself.
 
 Gate: PR merge of the AI SDK 5 move.
+
+### SR-203 {#sr-203}
+
+**A desk's `AGENTFORGE_SECRETS_KEY` was never measured.**
+Raised 2026-10-15 as SEC-006 by the security tester, fixed 2026-11-06. Low. Extends [SR-173](#sr-173), whose "checked, not an issue" held for the server only. The tester's provisional SR-188 is this row.
+
+Evidence: off server mode `getLocalVaultKey` returned `wrappingKeyFromSecret(fromEnv || readOrCreateMasterKeyFile(env))` with no check on `fromEnv` (`packages/db/src/vault-key.ts`, desk branch). `wrappingKeyFromSecret` is one unsalted SHA-256 (`packages/core/src/crypto/envelope.ts:14-16`), so `AGENTFORGE_SECRETS_KEY=hunter2` gave an AES key anyone with a copy of `settings.enc` could guess offline, and a hit opens every envelope on the install. The auto-created `.master-key` is `randomBytes(32)` hex and was never the problem (b13 in `docs/internal/blockers-2026-09-15.md`).
+
+Fix: the desk branch throws `DESK_VAULT_KEY_TOO_WEAK` when the variable is set and `vaultKeyEntropyBytes` is under 32. Floor only, as the server's first check: no variety test, because the repo's own fixtures are 64-digit hex. A blank value still falls back to `.master-key`. The message is fixed text, names the variable and `openssl rand -hex 32`, and never contains the value. Refused now, not warned first. Every documented generator already yields 32 bytes or more: `openssl rand -hex 32` in `webapp-deploy/README.md`, `webapp-deploy/.env.example` and `scripts/release-web.mjs`, `randomBytes(32)` hex in `webapp-deploy/pilot-local.mjs`, `webapp-deploy/k8s/local-lib.mjs`, `scripts/review-instance.ps1` and `apps/desktop/main.cjs`; the root `.env.example` leaves it empty; the preview desks' provisioning script refuses a key that is not 64 hex digits; the webdev `.env` files set no key and use `.master-key`. Proven by `packages/db/src/vault-key.test.ts` (desk passphrase refused, message free of the value, no `.master-key` written, hex, base64 and base64url accepted, blank falls back) and by the db and host suites.
+
+Residual: a desk already sealed under a passphrase can no longer boot, and has no re-seal path. `rotateWrapKey` refuses a `from` key under 32 bytes (`packages/host/src/wrap-key-rotation.ts`, `assertUsableSecret`) and re-seals only settings, not sealed thread bodies or other envelopes. No such install is documented anywhere and the owner's webdev has none, so no tool is built; if one turns up, the data is recoverable only by booting an older build with the old passphrase. Not driven on a desk with existing data. The packaged app's keytar fallback (SEC-008) is separate and stays moot while the desktop is retired.
+
+Gate: PR merge.
 
 ## Must be true before the Tencent Cloud deploy
 
