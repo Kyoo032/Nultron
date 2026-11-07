@@ -228,6 +228,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual: request-body arrays with no `.max()` still cost one issue per bad element | Residual: none blocks; capping the request-body arrays is a follow-up |
 | [SR-197](#sr-197) | Medium | AI SDK 5's `streamText` prints every stream error to the console by default, and an `APICallError` carries the request body (the prompt) and the gateway's error body | Fixed in tree (2026-11-04, `fix/zod-4`): the runtime passes a silent `onError`; tested, not driven | PR merge of the AI SDK 5 move |
 | [SR-198](#sr-198) | Medium | AI SDK 5 brings `undici` 5.29.0 and `@fastify/busboy` into the hosted image, with five HIGH `undici` advisories and one `busboy` advisory | Fixed in tree (2026-11-04, `fix/zod-4`): scoped override to `undici` 6.29.1, which drops `busboy`; the SDK's guarded download fetch checked on it; not driven | PR merge of the AI SDK 5 move |
+| [SR-199](#sr-199) | Low | nixpkgs marks pnpm 9.15.9, the version the repo pins, insecure (twelve CVEs, no fix on 9.x); the Nix build permits that one version by name | Accepted for the Nix migration (2026-11-07): build-time only, no git dependencies in the lock, the Nix store pins every tarball by hash. Moving to pnpm 10 is a separate change | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -6531,6 +6532,34 @@ lookup was called. `audit:deployed` passes.
 Residual: not driven on a hosted server; the override has to be dropped once the SDK moves to `undici` 6 itself.
 
 Gate: PR merge of the AI SDK 5 move.
+
+### SR-199 {#sr-199}
+
+**nixpkgs marks pnpm 9.15.9 insecure, and the Nix build permits it by name.**
+Raised 2026-11-07 by rung 1 of the Nix migration ([`nix-migration.md`](nix-migration.md)). Low.
+
+Evidence: nixos-26.05 at `c56a87d8` lists twelve CVEs on `pnpm_9` (CVE-2026-48995, -50014 to -50017, -50573,
+-55699, -59194 to -59196, -82392, -82393; `pkgs/development/tools/pnpm/default.nix`), so evaluation refuses it
+unless it is permitted. 9.15.9 is the version `package.json` `packageManager` pins and both Dockerfiles install
+through corepack. The two checked upstream: CVE-2026-48995 (the tarball hash of a GitHub git dependency is not
+kept in the lockfile, so a hostile codeload server could swap it; fixed in 10.33.4 and 11.0.7) and
+CVE-2026-50014 (`--upload-pack` command execution through a git dependency; fixed in 10.34.0 and 11.4.0). No
+9.x release fixes either.
+
+Why it is accepted for now:
+- It is what the Docker build already runs. The Nix build does not add it; it names it. The Docker runtime image
+  also carries this pnpm in `/opt/corepack`, because `runtime` is `FROM base`; the Nix images carry no package
+  manager.
+- `pnpm-lock.yaml` has no git dependency. Its one URL dependency, `xlsx` from `cdn.sheetjs.com`, has no
+  `integrity` field, which is the shape CVE-2026-48995 is about. Under Nix the whole pnpm store is one
+  fixed-output derivation, so a changed tarball changes the output hash and the build fails.
+- The permission is one exact name, `pnpm-9.15.9`, in `flake.nix`'s `permittedInsecurePackages`; any other
+  insecure package still refuses to evaluate.
+
+Residual: the Docker build installs `xlsx` with nothing pinning its bytes. Moving the repo to pnpm 10 (lockfile
+format 9.0 stays) closes the CVEs; it is a separate change with its own `ci:local` run.
+
+Gate: none.
 
 ## Must be true before the Tencent Cloud deploy
 

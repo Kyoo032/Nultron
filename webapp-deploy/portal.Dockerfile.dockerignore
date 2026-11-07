@@ -38,3 +38,9 @@
 **/*.sqlite
 **/*.sqlite-*
 **/*.log
+
+# The Nix build (docs/internal/nix-migration.md). `*` already keeps it out; these lines keep it out if an allow
+# line above is ever widened.
+flake.nix
+flake.lock
+nix
