@@ -248,20 +248,24 @@ Not wrapped, because a sandbox cannot have what they need: `where-am-i`, `lane-g
 history and `origin/main`), `audit:deployed`, `audit:workspace` (the registry's advisory API), `install`
 (`workspace.nix` is that install), `e2e` (a browser).
 
-Results on 2026-11-07, every check built from scratch:
+Results on 2026-11-07, every check built from scratch, `nix flake check -L --keep-going` on 4 cores:
 
 | Check | Result |
 |---|---|
 | `pins`, `images` | pass |
 | `ci-lint` | pass (biome 2.5.12) |
 | `ci-tsc` | pass, 8 of 8 workspaces |
-| `ci-test-apps-web`, `-packages-db`, `-packages-legal`, `-packages-marketing`, `-packages-university` | pass |
-| `ci-test-packages-host` | still running when this was committed; the result is in the rung 5 pull request |
+| `ci-test-apps-web`, `-packages-db`, `-packages-host`, `-packages-legal`, `-packages-marketing`, `-packages-university` | pass (host: 5,531 tests) |
 | `ci-sandbox` | pass: `sandbox:manifest`, and `sandbox:integration` against the real engines (1 min 14 s) |
 | `ci-docs` | pass, with `edit:starters:check` warning (its media are gitignored) |
 | `ci-test-packages-core` | **fail**: 1 of 4,325, the golden recording below |
 | `ci-node-test` | **fail**: 321 pass, 4 fail, the `pre-push` tests below; `node-test:apps/desktop` passes |
-| `ci-test-apps-portal` | **fail**: 735 of 735 tests pass, plus one unhandled error, below |
+| `ci-test-apps-portal` | **fail under load**: 735 of 735 tests pass, plus unhandled errors, below. Passes when built on its own |
+
+The first run also failed two host tests, and that one was the check's fault: the workspace copy sat inside the
+sandbox's TMPDIR, so `<repo>/data` counted as a throwaway desk
+(`packages/host/src/__fixtures__/throwaway-desk.ts`). The copy and the temp folder now sit side by side, as a
+checkout and `/tmp` do on a machine.
 
 Findings these checks surfaced. None is caused by Nix, and none is fixed here:
 
@@ -273,9 +277,13 @@ Findings these checks surfaced. None is caused by Nix, and none is fixed here:
   the variable, 1 fails without it. The test should pin the variable or the base URL itself.
 - **Four `pre-push` tests fail on Linux** (`scripts/pre-push.test.mjs`, tests 205 to 208): they copy the hook
   with mode 0644, and Git on Linux ignores a hook that is not executable. Same in the devShell (rung 2).
-- **The portal suite reports one unhandled error after 735 passed tests**: a pooled connection receives
-  `57P01` (terminating connection due to administrator command) when a test database is dropped at teardown, and
-  vitest counts the unhandled error as a failure. It did not happen against the same Postgres on the host (rung 2); a re-run of the check alone is in the pull request.
+- **The portal suite has a teardown race.** `drop()` in `apps/portal/src/testing/pg.ts` terminates every backend
+  of a test database before dropping it. When a test's pool is still closing (the client in the error is
+  `portal_app_test` with `_ending: true`), its socket receives `57P01` (terminating connection due to
+  administrator command) on a client with no error listener, and vitest counts the unhandled error as a failure
+  although every test passed. Under the full `nix flake check` it happened in both runs (one error, then three);
+  the same check built on its own passed, as did the suite on the host (rung 2). Awaiting each pool's `end()`
+  before `drop()`, or an error listener on the pool, would close it.
 
 ## Running it
 
