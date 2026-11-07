@@ -31,7 +31,9 @@ let
   callEach = dir: lib.mapAttrs (_: file: scope.callPackage file { }) (unitsIn dir);
 in
 {
-  inherit scope;
+  # Without makeScope's own `packages` function: it would answer `nix build .#packages.<system>.<name>` with
+  # "not an attribute set" before Nix tries the flake's real packages output.
+  scope = removeAttrs scope [ "packages" ];
   packages = lib.filterAttrs (_: lib.isDerivation) (lib.getAttrs (lib.attrNames pkgUnits) scope);
   checks = callEach ./checks;
   devShells = callEach ./shells;

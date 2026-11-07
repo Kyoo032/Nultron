@@ -100,3 +100,7 @@ vendor/.sandbox-cache/
 apps/desktop/resources/ffmpeg/*
 !apps/desktop/resources/ffmpeg/README.md
 vendor/.ffmpeg-cache/
+
+# Nix build outputs (nix build writes these symlinks into the working directory).
+/result
+/result-*
