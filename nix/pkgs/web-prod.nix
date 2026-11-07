@@ -8,6 +8,7 @@
   gnumake,
   removeReferencesTo,
   nodejs,
+  nodejs-slim,
   pnpm,
   docker-context,
   pnpm-offline-install,
@@ -63,7 +64,7 @@ stdenv.mkDerivation {
     # metadata the runtime never reads; keep them, without the store paths that would pull the toolchain into
     # the image.
     find node_modules -path '*/better-sqlite3/build/*' -type f -print0 \
-      | xargs -0 --no-run-if-empty remove-references-to -t ${python3} -t ${gnumake} -t ${stdenv.cc} -t ${pnpm} -t ${nodejs}
+      | xargs -0 --no-run-if-empty remove-references-to -t ${python3} -t ${gnumake} -t ${stdenv.cc} -t ${pnpm} -t ${nodejs} -t ${nodejs-slim}
 
     mkdir -p "$out"
     cp -a . "$out/"
@@ -74,12 +75,7 @@ stdenv.mkDerivation {
   # and prebuilt binaries are not stripped or patched.
   dontFixup = true;
 
-  # The runtime closure is the pinned Node and this tree; no compiler, Python, make or package manager.
-  disallowedReferences = [
-    python3
-    gnumake
-    stdenv.cc
-    pnpm
-    nodejs
-  ];
+  # The tree refers to no store path at all: the image adds its Node (node-runtime.nix), and no compiler,
+  # Python, make, package manager or build-time Node can leak in.
+  allowedReferences = [ ];
 }

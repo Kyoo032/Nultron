@@ -157,8 +157,69 @@ runs; that is a separate decision, not a strangler step.
 tarball, same version line (`ffmpeg version n8.1.3-9-g29e619e767-20260930`), different ELF interpreter and
 RUNPATH.
 
-**Closures.** `web-prod` refers to the pinned Node and its libraries only; `disallowedReferences` fails the build
-if Python, make, the compiler, pnpm or the full Node package leak in. `portal-tree` refers to nothing.
+**Closures.** Neither tree refers to any store path (`allowedReferences = [ ]`): the image adds its Node, and
+Python, make, the compiler, pnpm or a build-time Node cannot leak in.
+
+## Rung 4: the images
+
+`nix build .#web-image` and `nix build .#portal-image` give `nultron-web:local` and `nultron-portal:local`, the
+refs `compose.yml` uses, as `dockerTools.buildLayeredImage` tarballs for `docker load`. The k8s rehearsal and the
+release call the same image `nultron-ent:<tag>`; `docker tag` it.
+
+| Unit | What it is |
+|---|---|
+| `dockerfile-runtime.nix` | Reads the last stage of a Dockerfile: ENV (in order), WORKDIR, USER, EXPOSE, VOLUME, HEALTHCHECK, CMD. The image configs come from it, so they cannot drift from the Dockerfiles |
+| `image-base.nix` | What both images take from `node:22.23.4-bookworm-slim`: `root` and `node` (1000:1000), `/bin/sh` as dash, the base image's `docker-entrypoint.sh` verbatim, `/usr/local/bin/node`, and the tools the deploy scripts run inside a container |
+| `node-runtime.nix` | The pinned Node binary alone. nixpkgs' Node carries its dependencies' `-dev` outputs through `process.config` strings (223 MiB); with those strings blanked the closure is the libraries (186 MiB, of which the binary is 70) |
+| `web-image.nix`, `portal-image.nix` | The runtime stages: `/app` from the trees, the sandbox root-owned and read-only, ffmpeg in `/usr/local/bin`, `/data` and `/opt/agentforge/components` owned by `node` |
+
+Image config, Docker (`<`) against Nix (`>`), both images; nothing else differs:
+
+```
+<         "PATH=/pnpm:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+>         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+<         "YARN_VERSION=1.22.22",
+<         "COREPACK_ENABLE_DOWNLOAD_PROMPT=0",
+<         "COREPACK_HOME=/opt/corepack",
+<         "PNPM_HOME=/pnpm",
+<     "ArgsEscaped": true,
+```
+
+The removed variables belong to the package managers the Nix images do not carry. `ArgsEscaped` is a Windows-only
+field Docker writes for a shell-form instruction.
+
+Every other difference from the Docker images:
+
+| | Docker | Nix | Why |
+|---|---|---|---|
+| Package managers | npm, npx, corepack, pnpm, yarn in `/usr/local/bin` | none | "No package manager inside a runtime image" |
+| Shell and tools | Debian bookworm: bash, apt, dpkg, grep, findutils and the rest | dash as `/bin/sh`, coreutils, tar, gzip, sed | What the healthcheck, `portal-entry.sh`, `backup.sh`, `restore.sh` and pnpm's bin shims run. `sed` was found missing by booting the image: every pnpm shim, the `tsx` entrypoint among them, calls it. No `grep`: nothing run inside the containers uses it |
+| Login shell of `root` and `node` | `/bin/bash` | `/bin/sh` | No bash in the image |
+| `/etc/ssl/certs/ca-certificates.crt` | absent | Mozilla bundle | Node trusts its 116 compiled-in roots in both images and reads no bundle. The file serves other programs |
+| Node binary | the official build | built by nixpkgs, same version, linked against nixpkgs' shared libraries (zlib, openssl, icu, libuv and others) | |
+| ffmpeg | BtbN's binaries as downloaded | the same, with the ELF interpreter and RUNPATH pointed at the image's glibc | rung 3 |
+| Timestamps and modes | build time; source files 664 (`git archive`'s umask) | 1980-01-01 for the image's own files; source files 644 | Nix normalises both |
+| Layers | 16 | 38 | `buildLayeredImage` puts each store path in its own layer so they are shared between images |
+| Unpacked size (`du -x /`) | app 964 MB, portal 552 MB | app 949 MB, portal 521 MB | `docker images` shows the Nix images larger only because a `docker load`ed image keeps its layers uncompressed in containerd's store |
+
+Proved on 2026-11-07, with `docker load`:
+
+- Both app images boot read-only with `/tmp` as tmpfs, `--cap-drop ALL`, `no-new-privileges` and compose's
+  server-mode variables, run as `uid=1000(node)`, reach `healthy` through the Dockerfile's own healthcheck, answer
+  `GET /healthz` 200 `{"status":"ok"}`, and print `ffmpeg version n8.1.3-9-g29e619e767-20260930`.
+- `webapp-deploy/pilot-local.mjs`, the compose rehearsal, run unchanged on the Nix images (tagged
+  `nultron-ent:pilot-local` and `nultron-portal:pilot-local`, `up --skip-build`): `portal-prepare` migrates through
+  `portal-entry.sh`, the seed runs inside the portal image, and `drive` passes every step up to the restart. That
+  covers health through Caddy, the security headers, the four webhook 404s, sign-in with a code e-mailed over
+  implicit TLS, landing on `/chat`, and `GET /api/v1/auth/session` 200.
+- The restart step (`docker compose restart app proxy`) fails on this machine for **both** image sets with the same
+  runc error: the proxy tries to join the old network namespace of the app it shares one with. It is Docker 29 and
+  compose here, not the images.
+
+Two things on the cloud machine were not the repo's and were worked around without changing it: Docker Hub
+answered 429 to anonymous pulls, so `postgres:16`, `caddy:2.11-alpine` and `axllent/mailpit:v1.31.2` came through
+`mirror.gcr.io` and were tagged with their usual names; and the repo's Playwright wanted another Chromium build,
+so `PLAYWRIGHT_BROWSERS_PATH` pointed at the installed one, with `*.localhost` added to `/etc/hosts` for Node.
 
 ## Running it
 
@@ -172,6 +233,10 @@ nix build .#pnpm
 
 ```bash
 nix develop
+```
+
+```bash
+nix build .#web-image && docker load < result
 ```
 
 When `pnpm-lock.yaml` changes, `nix/pkgs/pnpm-deps.nix` needs its new hash: set `hash = "";`, run

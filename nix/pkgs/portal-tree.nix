@@ -5,8 +5,6 @@
 {
   stdenv,
   removeReferencesTo,
-  nodejs,
-  pnpm,
   docker-context,
   pnpm-offline-install,
 }:
@@ -41,9 +39,6 @@ stdenv.mkDerivation {
 
   dontFixup = true;
 
-  disallowedReferences = [
-    stdenv.cc
-    pnpm
-    nodejs
-  ];
+  # The tree refers to no store path; the image adds its Node (node-runtime.nix).
+  allowedReferences = [ ];
 }
