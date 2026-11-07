@@ -49,7 +49,7 @@ bump in one place without the other cannot build.
 | 3. Workspace derivations | yes | the pnpm store as one fixed-output derivation; the build tree and the production tree the Dockerfile makes, with its guards | the Dockerfile's trees |
 | 4. Images | yes, both | `dockerTools.buildLayeredImage` for `nultron-web:local` and `nultron-portal:local` | refs, tags and the image config, field by field |
 | 5. Checks | yes | `nix flake check` wrapping the `ci-local.mjs` steps; `pnpm ci:nix` | `ci-local.mjs` and its steps |
-| 6. k8s | partly | kustomize pinned by Nix; a check that renders each overlay and validates it with kubeconform | every manifest |
+| 6. k8s | partly | kustomize pinned by Nix; a check that renders each overlay and validates it with kubeconform against pinned schemas | every manifest |
 | 6b. k3s VM test | no | — | — |
 
 Rungs that do not apply, and why:
@@ -276,6 +276,38 @@ Findings these checks surfaced. None is caused by Nix, and none is fixed here:
 - **The portal suite reports one unhandled error after 735 passed tests**: a pooled connection receives
   `57P01` (terminating connection due to administrator command) when a test database is dropped at teardown, and
   vitest counts the unhandled error as a failure. It did not happen against the same Postgres on the host (rung 2); a re-run of the check alone is in the pull request.
+
+## Rung 6: the k8s manifests
+
+kustomize is pinned by Nix: 5.8.1 in the devShell (rung 2) and in the check. `checks.k8s-manifests` renders
+`base`, `overlays/local` and `overlays/production` from the committed files and validates every object with
+kubeconform 0.7.0 in strict mode, against the Kubernetes 1.34 schemas (the rehearsal was driven on 1.34.1),
+fetched once per kind and pinned by hash in `nix/pkgs/k8s-schemas.nix`. No manifest changed.
+
+```bash
+nix build .#checks.x86_64-linux.k8s-manifests -L
+```
+
+```
+== base: 21 objects
+Summary: 21 resources found in 1 file - Valid: 21, Invalid: 0, Errors: 0, Skipped: 0
+== overlays/local: 28 objects
+Summary: 28 resources found in 1 file - Valid: 28, Invalid: 0, Errors: 0, Skipped: 0
+== overlays/production: 24 objects
+Summary: 24 resources found in 1 file - Valid: 24, Invalid: 0, Errors: 0, Skipped: 0
+```
+
+It catches a real mistake: with `replicas: "one"` in the rendered production overlay, kubeconform reports
+`Deployment nultron-app is invalid ... at '/spec/replicas': got string, want null or integer` and `Invalid: 3`.
+
+What the check supplies, because git never holds it: each overlay's `secrets.env` is its committed
+`secrets.env.example`, and the local overlay's `pki/` is three self-signed certificates made in the check. The
+local overlay is rendered as committed, with the base's image names; the rehearsal applies a generated overlay
+around it that pins the local tags, and the check does not reproduce that wrapper.
+
+**Not done: a NixOS VM test with k3s.** It needs KVM, and the cloud machine had no `/dev/kvm`. A
+`nixosTest` that boots k3s, loads both Nix images and applies `overlays/local` is the next step on a machine
+with KVM.
 
 ## Running it
 
