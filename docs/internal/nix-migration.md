@@ -221,10 +221,70 @@ answered 429 to anonymous pulls, so `postgres:16`, `caddy:2.11-alpine` and `axll
 `mirror.gcr.io` and were tagged with their usual names; and the repo's Playwright wanted another Chromium build,
 so `PLAYWRIGHT_BROWSERS_PATH` pointed at the installed one, with `*.localhost` added to `/etc/hosts` for Node.
 
+## Rung 5: flake checks and `ci:nix`
+
+`pnpm ci:nix` is `nix flake check -L --keep-going`, beside `pnpm ci:local`. The checks run
+`scripts/ci-local.mjs` itself, unchanged, inside the Nix sandbox, one check per step group, so a red check
+names the group and its log names the step:
+
+| Check | Runs | Extra the sandbox needs |
+|---|---|---|
+| `ci-lint` | `--only lint` | biome (glibc from npm) patched with `autoPatchelf` |
+| `ci-tsc` | `--only tsc`, 8 workspaces | |
+| `ci-test-<package>` (8) | `--only test:<package>` | the portal one starts a Postgres 16 and passes `PORTAL_TEST_DATABASE_URL`, the suite's own route; embedded-postgres is a glibc download |
+| `ci-node-test` | `--only node-test` | git: a throwaway repo of the copy, for tests that list tracked files |
+| `ci-sandbox` | `--only sandbox` | `web-build.nix`'s sandbox folder at `vendor/sandbox-runtime`, so `sandbox:integration` runs the real Pyodide and QuickJS |
+| `ci-docs` | `--only maps --only media` | advisory; never fails |
+| `images` | builds both images | |
+| `pins` | rung 1 | |
+
+They run on `workspace.nix`: the whole workspace installed offline, dev dependencies included, from the same
+pnpm store. Its install scripts run as on a developer's machine. keytar, whose prebuild download fails offline,
+compiles from source against libsecret and the pinned Node's headers. Two things had to be supplied:
+`pnpm rebuild --pending` needs `--recursive` when no filter is given, and the hoisted node-gyp 9.4.1 imports
+`distutils`, so its Python carries setuptools (Debian bookworm's Python 3.11 still had it).
+
+Not wrapped, because a sandbox cannot have what they need: `where-am-i`, `lane-guard`, `lane-guard:map` (git
+history and `origin/main`), `audit:deployed`, `audit:workspace` (the registry's advisory API), `install`
+(`workspace.nix` is that install), `e2e` (a browser).
+
+Results on 2026-11-07, every check built from scratch:
+
+| Check | Result |
+|---|---|
+| `pins`, `images` | pass |
+| `ci-lint` | pass (biome 2.5.12) |
+| `ci-tsc` | pass, 8 of 8 workspaces |
+| `ci-test-apps-web`, `-packages-db`, `-packages-legal`, `-packages-marketing`, `-packages-university` | pass |
+| `ci-test-packages-host` | still running when this was committed; the result is in the rung 5 pull request |
+| `ci-sandbox` | pass: `sandbox:manifest`, and `sandbox:integration` against the real engines (1 min 14 s) |
+| `ci-docs` | pass, with `edit:starters:check` warning (its media are gitignored) |
+| `ci-test-packages-core` | **fail**: 1 of 4,325, the golden recording below |
+| `ci-node-test` | **fail**: 321 pass, 4 fail, the `pre-push` tests below; `node-test:apps/desktop` passes |
+| `ci-test-apps-portal` | **fail**: 735 of 735 tests pass, plus one unhandled error, below |
+
+Findings these checks surfaced. None is caused by Nix, and none is fixed here:
+
+- **`packages/core` golden recording depends on the caller's environment.**
+  `src/runtime/ai-sdk-runtime-recording.test.ts` compares requests with a committed golden whose Anthropic URL is
+  `https://api.anthropic.com/messages`. The AI SDK builds that URL from `ANTHROPIC_BASE_URL` when it is set;
+  Claude Code sessions set it to `https://api.anthropic.com`. Without it the URL is
+  `https://api.anthropic.com/v1/messages` and the test fails. Run outside Nix on the same machine: 21 pass with
+  the variable, 1 fails without it. The test should pin the variable or the base URL itself.
+- **Four `pre-push` tests fail on Linux** (`scripts/pre-push.test.mjs`, tests 205 to 208): they copy the hook
+  with mode 0644, and Git on Linux ignores a hook that is not executable. Same in the devShell (rung 2).
+- **The portal suite reports one unhandled error after 735 passed tests**: a pooled connection receives
+  `57P01` (terminating connection due to administrator command) when a test database is dropped at teardown, and
+  vitest counts the unhandled error as a failure. It did not happen against the same Postgres on the host (rung 2); a re-run of the check alone is in the pull request.
+
 ## Running it
 
 ```bash
 nix flake check -L
+```
+
+```bash
+pnpm ci:nix
 ```
 
 ```bash
