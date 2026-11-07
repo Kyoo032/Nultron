@@ -46,11 +46,14 @@ stdenvNoCC.mkDerivation {
 
   buildPhase = ''
     runHook preBuild
-    export HOME="$TMPDIR"
+    # The copy and the temp folder sit side by side, as a checkout and /tmp do on a machine. With the copy inside
+    # TMPDIR, `<repo>/data` would count as a throwaway desk (packages/host/src/__fixtures__/throwaway-desk.ts).
+    mkdir -p "$NIX_BUILD_TOP/tmp" "$NIX_BUILD_TOP/home"
+    export TMPDIR="$NIX_BUILD_TOP/tmp" HOME="$NIX_BUILD_TOP/home"
 
-    cp -a ${workspace} ws
-    chmod -R u+w ws
-    cd ws
+    cp -a ${workspace} "$NIX_BUILD_TOP/ws"
+    chmod -R u+w "$NIX_BUILD_TOP/ws"
+    cd "$NIX_BUILD_TOP/ws"
 
     git init -q
     git add -A
