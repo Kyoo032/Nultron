@@ -59,13 +59,13 @@ empty (`:7`, `:14`).
 
 ### The wrap key
 
-`getLocalVaultKey(env)` (`packages/db/src/vault-key.ts:187-205`) returns the AES-256 wrapping key for
+`getLocalVaultKey(env)` (`packages/db/src/vault-key.ts:190-205`) returns the AES-256 wrapping key for
 every sealed envelope on the install. Its behaviour splits on `isServerMode(env)`, which is
 `AGENTFORGE_SERVER` being `1` or `true` (`packages/core/src/server-mode.ts:12-15`):
 
 - **On a desk** (not server mode, `:189-192`): `AGENTFORGE_SECRETS_KEY` when set, else the
   `.master-key` file. A set key under 32 bytes is derived all the same and warned about once, by `warnWeakDeskVaultKey`
-  (`:178-190`, SR-203). `readOrCreateMasterKeyFile` (`:164-175`) creates the data dir, and on first use
+  (`:178-187`, SR-203). `readOrCreateMasterKeyFile` (`:164-175`) creates the data dir, and on first use
   writes 32 random bytes as hex with mode `0o600` (`:168`), then reads it back trimmed (`:170`). A
   desk measures the floor for the warning and nothing else.
 - **In server mode** (`:193-204`): the env key is mandatory (`:193-195`, message at `:46-49`), and it
@@ -386,8 +386,8 @@ import of a fresh module graph opens a new handle — and skips the reset hook, 
 cache being empty (`:35`).
 
 **The desk path measures the 32-byte floor, and only warns.** `warnWeakDeskVaultKey`
-(`packages/db/src/vault-key.ts:178-190`) logs `DESK_VAULT_KEY_WEAK_WARNING` once per process when
-`AGENTFORGE_SECRETS_KEY` is set and `vaultKeyEntropyBytes` is under 32. `getLocalVaultKey` calls it first on a desk (`:195`) and
+(`packages/db/src/vault-key.ts:178-187`) logs `DESK_VAULT_KEY_WEAK_WARNING` once per process when
+`AGENTFORGE_SECRETS_KEY` is set and `vaultKeyEntropyBytes` is under 32. `getLocalVaultKey` calls it first on a desk (`:192`) and
 the web server calls it at boot, but the key is still hashed by `wrappingKeyFromSecret`
 (`packages/core/src/crypto/envelope.ts:14-16`) exactly as before, because refusing it locked out a desk
 with data already sealed under it. Server mode refuses instead and adds

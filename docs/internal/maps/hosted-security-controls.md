@@ -80,7 +80,7 @@ message names every broken variable at once and never prints a value. It lives i
 rather than in `apps/web` because those rules sit in three packages and `apps/web` can see only
 two; `apps/web/server/hosted-mode-guard.ts:28` re-exports it so `server.ts` reaches both guards
 through one module. Off server mode both calls return immediately. A third call, `warnWeakDeskVaultKey`
-(`packages/db/src/vault-key.ts:178-190`, re-exported by `hosted-env.ts` and run from
+(`packages/db/src/vault-key.ts:178-187`, re-exported by `hosted-env.ts` and run from
 `apps/web/server-env.ts` and `main()`), is the one check a desk meets: it warns once about an
 `AGENTFORGE_SECRETS_KEY` under 32 bytes, refuses nothing and reads no file ([SR-203](../security-register.md#sr-203)).
 Webdev and the e2e run set no key, so they are untouched, and `hostedEnvProblems` still returns an empty
