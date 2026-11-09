@@ -1148,6 +1148,17 @@ Lanes: enterprise, tester.
 - **Proof.** `safe-fetch.test.ts`: 5 of 25 failed before the fix, 32 of 32 pass after. A `pinnedAgent` for a name no resolver can answer reached a loopback listener, so the pin reaches the socket on Node 24 with the global `fetch`. A one-off run with real DNS and TLS: `https://example.com/` 200, `https://localtest.me/` refused as private, an `.invalid` name refused as unresolvable. Map: `maps/hosted-security-controls.md` § 7. Register: SR-201; OWASP A10-3 and A10-6 updated.
 - **Not driven.** Node 22 (the image) and a hosted server. The port policy (443 only, a list, or refuse known internal ports) is not decided. Egress filtering is SR-97.
 
+## 2026-11-06: the injection-guard bypass is never saved (SEC-005, SR-202)
+
+Lanes: enterprise, tester.
+
+- **What.** Rizky, 2026-11-06. `injectionGuardBypass` is a switch for the running host process and is never written to `settings.enc` or to a hosted tenant's `tenant_state` row. A hosted desk always runs the injection guard: a `true` left in the sealed payload is ignored on load and rewritten out at once, and `saveSettings` cannot turn the bypass on in server mode. Off server mode, `POST /api/v1/settings { "injectionGuardBypass": true }` still works for the current process, per desk, and a host restart switches the guard back on. The file never holds the flag, and an older file's `true` is dropped on load. `mergeSecrets` no longer merges the field.
+- **User-visible.** None on the hosted app. The Settings page never had a control for the flag, so nothing in the renderer changes beyond deleting its unused state. The injection-blocked message no longer tells the person to "turn the guard off in Settings", which was never possible.
+- **Files.** `packages/core/src/secrets.ts`, `packages/host/src/settings-store.ts`, `packages/host/src/injection-guard-bypass.ts` (new), `packages/host/src/job-source.ts` (message), `apps/web/components/settings-page.tsx` (dead state), four stale comments trimmed. Tests: `settings-guard-bypass-desk.test.ts`, `settings-guard-bypass-hosted.test.ts`, `secrets.test.ts`.
+- **Shared files.** `secrets.ts`, `settings-store.ts`, `job-source.ts` and `settings-page.tsx` exist on `main` and the tester, so a merge from `main` into `tester/chat-first` may conflict on the last.
+- **Checked, not changed.** `documents-check.ts` hard-codes the bypass, and its assembled text reaches only the pure overlap check (`checkDraftAgainstSource`, no model call). Recorded in SR-202.
+- **Not driven.** Unit tests and the in-memory row backend only; no hosted server, no `:3000` restart. `Kyoo032/hyp-ai` needs the same fix by hand.
+
 ## The portal keeps serving when Postgres ends an idle pool connection, 2026-11-09 (branch `claude/fix-portal-test-teardown`, SR-200)
 
 Lanes: enterprise.
