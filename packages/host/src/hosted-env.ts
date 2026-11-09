@@ -29,6 +29,7 @@
  */
 import { isServerMode, trustedOrigins, type EnvLike } from "@agentforge/core";
 import { getLocalVaultKey } from "@agentforge/db/vault-key";
+export { warnWeakDeskVaultKey } from "@agentforge/db/vault-key";
 import { BILLING_SECRET_ENV } from "./billing/authenticate";
 import { TOPUP_URL_ENV, TOPUP_URL_INVALID_WARNING, topUpUrlMisconfigured } from "./billing/topup-url";
 import { portalBaseUrl, PORTAL_URL_ENV } from "./auth/portal-client";

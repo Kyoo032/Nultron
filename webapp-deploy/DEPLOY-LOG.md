@@ -8,7 +8,7 @@ Write the row in both places; the decision record is the one of record.
 
 `sha` is the full commit sha the image was built from — `scripts/deploy.sh` prints it
 and a ready-made row when the healthcheck goes green. Web deploys are not versioned;
-`0.14.2x` belongs to desktop maintenance cuts only.
+`0.14.2x` belonged to desktop maintenance cuts only (the desktop app is retired).
 
 | Date (UTC) | sha | env | who | notes |
 |---|---|---|---|---|

@@ -1,7 +1,23 @@
-import { describe, expect, it } from "vitest";
+import { createServer } from "node:http";
+import type { AddressInfo, LookupFunction } from "node:net";
+import { Agent, fetch as undiciFetch } from "undici";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../errors";
-import { assertPublicHttpsUrl, assertResolvesPublic, fetchPublicHttps, nextHopUrl } from "./safe-fetch";
+import {
+  assertPublicHttpsUrl,
+  assertResolvesPublic,
+  defaultFetch,
+  fetchPublicHttps,
+  nextHopUrl,
+  pinnedAgent,
+  pinnedLookup,
+} from "./safe-fetch";
 import type { HostLookup } from "./safe-fetch";
+
+vi.mock("undici", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("undici")>();
+  return { ...actual, fetch: vi.fn(actual.fetch) };
+});
 
 type Step = { status: number; headers?: Record<string, string>; body?: string };
 
@@ -267,13 +283,30 @@ describe("assertResolvesPublic", () => {
     expect(called).toBe(false);
   });
 
-  it("treats a resolution failure as nothing to protect against, not as a refusal", async () => {
-    // `fetch` would fail to resolve it too, so refusing here would only turn every offline test and
-    // every transient DNS blip into an invalid_endpoint error.
+  it("refuses a name that does not resolve, and says so differently from a private answer", async () => {
     const failing: HostLookup = async () => {
       throw Object.assign(new Error("getaddrinfo ENOTFOUND"), { code: "ENOTFOUND" });
     };
-    await expect(assertResolvesPublic("nothing.invalid", failing)).resolves.toBeUndefined();
+    await expect(assertResolvesPublic("nothing.invalid", failing)).rejects.toMatchObject({
+      code: "invalid_endpoint",
+      status: 400,
+      message: "Could not resolve this URL's host",
+    });
+  });
+
+  it("refuses an empty answer", async () => {
+    await expect(assertResolvesPublic("nothing.invalid", lookupReturning())).rejects.toMatchObject({
+      code: "invalid_endpoint",
+      status: 400,
+      message: "Could not resolve this URL's host",
+    });
+  });
+
+  it("refuses an answer that is not an IP address", async () => {
+    await expect(assertResolvesPublic("odd.example", lookupReturning("not-an-address"))).rejects.toMatchObject({
+      code: "invalid_endpoint",
+      status: 400,
+    });
   });
 });
 
@@ -306,5 +339,180 @@ describe("fetchPublicHttps resolves every hop", () => {
       }),
     ).rejects.toThrow(/public host/);
     expect(seen).toEqual(["https://a.test/start"]);
+  });
+
+  it("fails closed when the name does not resolve, before any request is made", async () => {
+    const seen: string[] = [];
+    const failing: HostLookup = async () => {
+      throw Object.assign(new Error("getaddrinfo EAI_AGAIN"), { code: "EAI_AGAIN" });
+    };
+    await expect(
+      fetchPublicHttps("https://flaky.example/x", {
+        lookupImpl: failing,
+        fetchImpl: fakeFetch({ "https://flaky.example/x": { status: 200, body: "reachable" } }, seen),
+      }),
+    ).rejects.toMatchObject({ code: "invalid_endpoint", status: 400, message: "Could not resolve this URL's host" });
+    expect(seen).toEqual([]);
+  });
+
+  it("resolves each hop once and hands the request a dispatcher pinned to that answer", async () => {
+    const resolved: string[] = [];
+    const dispatchers: unknown[] = [];
+    const lookupImpl: HostLookup = async (hostname) => {
+      resolved.push(hostname);
+      return [{ address: "93.184.216.34" }];
+    };
+    const plan: Record<string, Step> = {
+      "https://a.test/start": { status: 302, headers: { location: "https://b.test/final" } },
+      "https://b.test/final": { status: 200, body: "ok" },
+    };
+    const recordingFetch = (async (input: string, init?: RequestInit & { dispatcher?: unknown }) => {
+      dispatchers.push(init?.dispatcher);
+      const step = plan[input] as Step;
+      return new Response(step.body ?? "", { status: step.status, headers: step.headers ?? {} });
+    }) as unknown as typeof fetch;
+    await fetchPublicHttps("https://a.test/start", { lookupImpl, fetchImpl: recordingFetch });
+    expect(resolved).toEqual(["a.test", "b.test"]);
+    expect(dispatchers).toHaveLength(2);
+    for (const dispatcher of dispatchers) {
+      expect(dispatcher).toBeDefined();
+    }
+    expect(dispatchers[0]).not.toBe(dispatchers[1]);
+  });
+});
+
+describe("fetchPublicHttps never asks twice", () => {
+  it("does not resolve a hop again after its answer was judged, so a later private answer is never seen", async () => {
+    let asked = 0;
+    const rebinding: HostLookup = async () => {
+      asked += 1;
+      return asked === 1 ? [{ address: "93.184.216.34" }] : [{ address: "169.254.169.254" }];
+    };
+    const result = await fetchPublicHttps("https://rebind.example/x", {
+      lookupImpl: rebinding,
+      fetchImpl: fakeFetch({ "https://rebind.example/x": { status: 200, body: "ok" } }, []),
+    });
+    expect(result.status).toBe(200);
+    expect(asked).toBe(1);
+  });
+});
+
+type LookupOptions = Parameters<LookupFunction>[1];
+
+function ask(lookup: LookupFunction, hostname: string, options: LookupOptions) {
+  return new Promise<{ error: unknown; address: unknown; family: number | undefined }>((resolve) => {
+    lookup(hostname, options, (error, address, family) => resolve({ error, address, family }));
+  });
+}
+
+describe("pinnedLookup", () => {
+  const lookup = pinnedLookup("a.test", [{ address: "93.184.216.34" }, { address: "2606:2800:220:1::1" }]);
+
+  it("hands back every vetted address when the connector asks for all of them", async () => {
+    const answer = await ask(lookup, "a.test", { all: true });
+    expect(answer.error).toBeNull();
+    expect(answer.address).toEqual([
+      { address: "93.184.216.34", family: 4 },
+      { address: "2606:2800:220:1::1", family: 6 },
+    ]);
+  });
+
+  it("hands back the first vetted address, with its family, when the connector asks for one", async () => {
+    const answer = await ask(lookup, "a.test", {});
+    expect(answer).toMatchObject({ error: null, address: "93.184.216.34", family: 4 });
+  });
+
+  it("honours a family filter without leaving the vetted set", async () => {
+    const answer = await ask(lookup, "a.test", { family: 6, all: true });
+    expect(answer.address).toEqual([{ address: "2606:2800:220:1::1", family: 6 }]);
+    const none = await ask(pinnedLookup("a.test", [{ address: "93.184.216.34" }]), "a.test", { family: 6, all: true });
+    expect(none.error).toMatchObject({ code: "ENOTFOUND" });
+  });
+
+  it("answers for its own host only, whatever the case", async () => {
+    expect((await ask(lookup, "A.TEST", {})).error).toBeNull();
+    expect((await ask(lookup, "b.test", {})).error).toMatchObject({ code: "ENOTFOUND" });
+  });
+});
+
+describe("pinnedAgent", () => {
+  async function listen() {
+    const hosts: string[] = [];
+    const server = createServer((request, response) => {
+      hosts.push(request.headers.host ?? "");
+      response.end("pinned");
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    const { port } = server.address() as AddressInfo;
+    return { port, hosts, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
+  }
+
+  it("connects the socket to the pinned address for a name no resolver could answer", async () => {
+    const listener = await listen();
+    const agent = pinnedAgent("rebind.test", [{ address: "127.0.0.1" }]);
+    try {
+      const response = await defaultFetch(`http://rebind.test:${listener.port}/`, {
+        dispatcher: agent,
+      } as RequestInit);
+      expect(await response.text()).toBe("pinned");
+      expect(listener.hosts).toEqual([`rebind.test:${listener.port}`]);
+    } finally {
+      await agent.destroy();
+      await listener.close();
+    }
+  });
+
+  it("does not connect to a name it was not pinned for", async () => {
+    const listener = await listen();
+    const agent = pinnedAgent("rebind.test", [{ address: "127.0.0.1" }]);
+    try {
+      await expect(
+        defaultFetch(`http://other.test:${listener.port}/`, { dispatcher: agent } as RequestInit),
+      ).rejects.toThrow();
+      expect(listener.hosts).toEqual([]);
+    } finally {
+      await agent.destroy();
+      await listener.close();
+    }
+  });
+});
+
+describe("the default fetch", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.mocked(undiciFetch).mockClear();
+  });
+
+  it("is undici's own fetch, from the package that builds the pinning Agent", () => {
+    expect(defaultFetch).toBe(undiciFetch);
+  });
+
+  it("carries a hop through undici with the pinned Agent and never through globalThis.fetch", async () => {
+    const globalFetch = vi.fn(async () => new Response("from the global fetch"));
+    vi.stubGlobal("fetch", globalFetch);
+    vi.mocked(undiciFetch).mockImplementationOnce(
+      (async () => new Response("from undici", { status: 200 })) as unknown as typeof undiciFetch,
+    );
+    const result = await fetchPublicHttps("https://a.test/start", { lookupImpl: publicLookup });
+    expect(result.body.toString()).toBe("from undici");
+    expect(globalFetch).not.toHaveBeenCalled();
+    const [url, init] = vi.mocked(undiciFetch).mock.calls[0] ?? [];
+    expect(url).toBe("https://a.test/start");
+    expect((init as { dispatcher?: unknown }).dispatcher).toBeInstanceOf(Agent);
+  });
+
+  it("honours the pinned Agent's lookup for a name no resolver can answer", async () => {
+    const listener = createServer((_request, response) => response.end("pinned"));
+    await new Promise<void>((resolve) => listener.listen(0, "127.0.0.1", resolve));
+    const { port } = listener.address() as AddressInfo;
+    const agent = pinnedAgent("rebind.test", [{ address: "127.0.0.1" }]);
+    try {
+      const response = await defaultFetch(`http://rebind.test:${port}/`, { dispatcher: agent } as RequestInit);
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe("pinned");
+    } finally {
+      await agent.destroy();
+      await new Promise<void>((resolve) => listener.close(() => resolve()));
+    }
   });
 });

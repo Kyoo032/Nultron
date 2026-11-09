@@ -10,6 +10,11 @@ import { gzipSync } from "node:zlib";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { JobEvent } from "@agentforge/core/jobs";
 
+vi.mock("node:dns/promises", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("node:dns/promises")>()),
+  lookup: vi.fn(async () => [{ address: "104.16.0.35", family: 4 }]),
+}));
+
 // Isolation: everything this subsystem writes hangs off the data dir, so point it at a temp folder
 // before any module reads `localDataDir()`.
 const dataDir = mkdtempSync(join(tmpdir(), "agentforge-components-"));

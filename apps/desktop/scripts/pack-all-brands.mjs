@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
  * Build Vite renderer once, stage host, then pack every flavor that exists on disk.
- * Git tracks branding/agentforge only; other flavor folders are local/gitignored.
  */
 import { existsSync } from "node:fs";
 import { spawnSync } from "node:child_process";

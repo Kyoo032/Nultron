@@ -36,6 +36,14 @@ if (!brands.has(brandId)) {
   process.exit(1);
 }
 
+const publicBrandFile = join(desktopRoot, "branding", "agentforge", "brand.json");
+if (!existsSync(publicBrandFile)) {
+  console.error(
+    `Missing ${publicBrandFile}. The public brand kit was deleted on 2026-11-06 (PR #209), so no pack route can run. Revert the commits of PR #209 to restore it.`,
+  );
+  process.exit(1);
+}
+
 const buildDir = join(desktopRoot, "build");
 const splashDir = join(desktopRoot, "splash");
 const brandResourceDir = join(desktopRoot, "resources", "brand");

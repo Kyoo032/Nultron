@@ -59,6 +59,43 @@ describe("redactSecretsDeep", () => {
     });
   });
 
+  it.each([
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "DB_PASSWORD",
+    "DATABASE_PASSWD",
+    "aws_secret_access_key",
+    "AWS_SECRET_ACCESS_KEY",
+    "STRIPE_SECRET_KEY",
+    "JWT_SECRET",
+    "GITHUB_TOKEN",
+    "github-token",
+    "x-slack-bot-token",
+    "dbPassword",
+    "githubToken",
+    "openaiApiKey",
+    "awsSecretAccessKey",
+  ])("masks the value of a key that ends in a secret name: %s", (key) => {
+    expect(redactSecretsDeep({ [key]: "opaque-not-prefixed" })).toEqual({ [key]: "[REDACTED]" });
+  });
+
+  it.each([
+    "max_tokens",
+    "maxTokens",
+    "total_tokens",
+    "tokenizer",
+    "cache_key",
+    "sortKey",
+    "primary_key",
+    "password_hint",
+    "passwords_checked",
+    "secretary",
+    "keyboard",
+    "author",
+  ])("leaves a key that only contains a secret word alone: %s", (key) => {
+    expect(redactSecretsDeep({ [key]: "plain value" })).toEqual({ [key]: "plain value" });
+  });
+
   it("leaves a number or a nested object under a secret-named key to the normal walk", () => {
     expect(redactSecretsDeep({ token: 5, secret: { value: GATEWAY_KEY, count: 2 } })).toEqual({
       token: 5,
