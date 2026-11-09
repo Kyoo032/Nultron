@@ -118,7 +118,7 @@ const CHAT_TURN_COPY: Record<AppLocale, ChatTurnCopy> = {
       'Langkah-langkah alat di atas sudah berjalan, tetapi saya belum bisa menyelesaikan jawabannya.\n\nAlasan: {reason}\n\nKirim "lanjutkan" dan saya akan mencoba lagi.',
     modelFallback: "{from} tidak tersedia; jawaban ini memakai {to}.",
     saveTimeout:
-      "Penyimpanan balasan ini terlalu lama. Muat ulang percakapan sebentar lagi untuk melihat apakah balasan sudah tersimpan.",
+      "Penyimpanan balasan ini terlalu lama. Muat ulang obrolan sebentar lagi untuk melihat apakah balasan sudah tersimpan.",
   },
 };
 
