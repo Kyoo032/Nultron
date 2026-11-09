@@ -1,6 +1,6 @@
 import { lookup as dnsLookup } from "node:dns/promises";
 import { type LookupFunction, isIP } from "node:net";
-import { Agent } from "undici";
+import { Agent, fetch as undiciFetch } from "undici";
 import { ApiError } from "../errors";
 import { isPrivateHostname, isPrivateIpAddress, parseIpAddress } from "./ip-range";
 import { assertSendableUrl } from "./outbound-guard";
@@ -169,6 +169,8 @@ export function pinnedAgent(hostname: string, addresses: readonly ResolvedAddres
   return new Agent({ connect: { lookup: pinnedLookup(hostname, addresses) } });
 }
 
+export const defaultFetch = undiciFetch as unknown as typeof fetch;
+
 async function readCapped(
   response: Response,
   maxBytes: number,
@@ -226,7 +228,7 @@ export async function fetchPublicHttps(url: string, options: SafeFetchOptions = 
     // The first address only: a redirect hop is the server's answer, not text the model wrote.
     assertSendableUrl(url.trim());
   }
-  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const fetchImpl = options.fetchImpl ?? defaultFetch;
   const maxHops = options.maxHops ?? SAFE_FETCH_MAX_HOPS;
   const maxBytes = options.maxBytes ?? SAFE_FETCH_DEFAULT_MAX_BYTES;
   const { controller, dispose } = linkSignals(options);
