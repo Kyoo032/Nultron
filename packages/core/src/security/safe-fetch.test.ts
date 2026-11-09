@@ -490,8 +490,9 @@ describe("the default fetch", () => {
   it("carries a hop through undici with the pinned Agent and never through globalThis.fetch", async () => {
     const globalFetch = vi.fn(async () => new Response("from the global fetch"));
     vi.stubGlobal("fetch", globalFetch);
-    vi.mocked(undiciFetch).mockImplementationOnce((async () =>
-      new Response("from undici", { status: 200 })) as unknown as typeof undiciFetch);
+    vi.mocked(undiciFetch).mockImplementationOnce(
+      (async () => new Response("from undici", { status: 200 })) as unknown as typeof undiciFetch,
+    );
     const result = await fetchPublicHttps("https://a.test/start", { lookupImpl: publicLookup });
     expect(result.body.toString()).toBe("from undici");
     expect(globalFetch).not.toHaveBeenCalled();
