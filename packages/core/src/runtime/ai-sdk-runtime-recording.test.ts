@@ -13,6 +13,17 @@ import type { RuntimeEvent } from "./types";
 
 const GOLDEN_URL = new URL("./__fixtures__/runtime-recording-golden.json", import.meta.url);
 const RECORD = process.env.RECORD_RUNTIME_GOLDEN === "1";
+// Every variable the three AI SDK providers read from the environment. With one of them set, a recording takes the
+// caller's settings instead of the runtime's: Claude Code sessions set ANTHROPIC_BASE_URL to
+// https://api.anthropic.com, and the parked direct-Anthropic path then calls .../messages instead of the SDK's own
+// .../v1/messages. Each test runs with all of them unset, as a server does.
+const PROVIDER_ENV = [
+  "ANTHROPIC_API_KEY",
+  "ANTHROPIC_BASE_URL",
+  "GOOGLE_GENERATIVE_AI_API_KEY",
+  "OPENAI_API_KEY",
+  "OPENAI_BASE_URL",
+] as const;
 const GATEWAY = "https://gateway.test/v1";
 const OPENROUTER = "https://openrouter.ai/api/v1";
 const OFFICIAL_OPENAI = "https://api.openai.com/v1";
@@ -475,6 +486,7 @@ let replies: Reply[] = [];
 let recorded: Recorded[] = [];
 
 beforeEach(() => {
+  for (const name of PROVIDER_ENV) vi.stubEnv(name, undefined);
   resetLearnedEffortLimits();
   registerTools();
   recorded = [];
@@ -494,6 +506,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   resetToolRegistry();
