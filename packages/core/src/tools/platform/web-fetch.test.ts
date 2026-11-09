@@ -1,19 +1,18 @@
+import { fetch as undiciFetch } from "undici";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TenantContext } from "../../tenancy/types";
 import { invokeTool, type ToolDefinition } from "../define-tool";
 import { WEB_FETCH_MAX_BYTES, WEB_FETCH_MAX_CHARS_CAP, fetchPageText, webFetchTool } from "./web-fetch";
 
-/**
- * The SSRF guard resolves every hop's hostname before it fetches (`assertResolvesPublic` in
- * `security/safe-fetch.ts`). The tool gives a caller no way to hand it a resolver, so the system one
- * is replaced here: left real, `example.test` takes about 11 s to come back ENOTFOUND on Windows, and
- * every case that names a host timed out. The stand-in answers with a public address unless a case
- * says otherwise.
- */
 const { lookup } = vi.hoisted(() => ({ lookup: vi.fn() }));
 vi.mock("node:dns/promises", async (importOriginal) => ({
   ...(await importOriginal<typeof import("node:dns/promises")>()),
   lookup,
+}));
+
+vi.mock("undici", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("undici")>()),
+  fetch: vi.fn(),
 }));
 
 const PUBLIC_ANSWER = [{ address: "93.184.216.34", family: 4 }];
@@ -28,13 +27,13 @@ const tenant: TenantContext = {
 const tool = webFetchTool as unknown as ToolDefinition;
 
 function stubFetch(body: string, init: { status?: number; contentType?: string } = {}) {
-  const mock = vi.fn().mockResolvedValue(
+  const mock = vi.mocked(undiciFetch);
+  mock.mockResolvedValue(
     new Response(body, {
       status: init.status ?? 200,
       headers: { "content-type": init.contentType ?? "text/html; charset=utf-8" },
-    }),
+    }) as never,
   );
-  vi.stubGlobal("fetch", mock);
   return mock;
 }
 
@@ -45,7 +44,7 @@ describe("webFetchTool", () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    vi.mocked(undiciFetch).mockReset();
   });
 
   it("reads an html page as text with its title", async () => {
@@ -66,7 +65,6 @@ describe("webFetchTool", () => {
     });
     const [, init] = mock.mock.calls[0] as [string, RequestInit];
     expect(init.redirect).toBe("manual");
-    // Every address the name answers with is judged, not only the first one.
     expect(lookup).toHaveBeenCalledWith("example.test", { all: true });
   });
 

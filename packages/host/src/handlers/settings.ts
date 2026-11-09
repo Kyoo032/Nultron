@@ -169,9 +169,8 @@ export async function handleGetSettings(request: HostRequest, deps: ServerModeDe
  * Fields of `POST /api/v1/settings` that belong to the OPERATOR, not to the caller
  * (docs/internal/security-owasp-2026-09.md, finding A01-3).
  *
- * These three really are machine-wide, and still are after Phase 4: `toolKeys` / `toolBackends` are
- * the credentials and endpoints every tenant's tools run through, and `injectionGuardBypass`
- * switches off the prompt-injection guard for the whole process. The handler had no notion of
+ * `toolKeys` / `toolBackends` are the credentials and endpoints every tenant's tools run through.
+ * The handler had no notion of
  * privilege, so one signed-in tenant could rewrite any of them for everybody. In server mode a
  * request that carries one is refused.
  *

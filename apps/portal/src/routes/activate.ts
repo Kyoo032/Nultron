@@ -188,7 +188,6 @@ function userCodeScreen(
   context: RequestContext,
   userCode: string | null,
   cookie: string | undefined,
-  csrfToken: string,
   account: AccountBanner,
 ): PortalResponse {
   return htmlResponse(
@@ -196,7 +195,6 @@ function userCodeScreen(
       locale: context.locale,
       t: context.t,
       action: ACTIVATE_PATH,
-      csrfToken,
       userCode: userCode ?? undefined,
       error: userCode ? context.t("approve.unknownCode") : undefined,
       account,
@@ -244,7 +242,7 @@ async function getActivate(runtime: PortalRuntime, request: PortalRequest): Prom
   if (pending && pending.tenantId === context.webSession.tenantId) {
     return approveScreen(context, pending, csrf.cookie, csrf.token, account);
   }
-  return userCodeScreen(context, userCode, csrf.cookie, csrf.token, account);
+  return userCodeScreen(context, userCode, csrf.cookie, account);
 }
 
 interface ActivateFlow {
@@ -327,7 +325,7 @@ async function signedInOnActivate(
   if (pending && pending.tenantId === signedIn.tenantId) {
     return approveScreen(context, pending, cookie, csrf.token, account);
   }
-  return userCodeScreen(context, userCode, cookie, csrf.token, account);
+  return userCodeScreen(context, userCode, cookie, account);
 }
 
 /** `POST /activate/password`. */
@@ -386,7 +384,7 @@ async function postVerify(runtime: PortalRuntime, flow: ActivateFlow): Promise<P
   if (pending && pending.tenantId === verified.tenantId) {
     return approveScreen(context, pending, cookie, csrf.token, account);
   }
-  return userCodeScreen(context, userCode, cookie, csrf.token, account);
+  return userCodeScreen(context, userCode, cookie, account);
 }
 
 async function postApprove(runtime: PortalRuntime, request: PortalRequest): Promise<PortalResponse> {

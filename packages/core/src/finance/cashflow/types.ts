@@ -48,7 +48,7 @@ export const cashflowBreakdownSchema = z.object({
   variable: z.number().finite().default(0),
   fixed: z.number().finite().default(0),
   oneOff: z.number().finite().default(0),
-  roles: roleAmountsSchema.default({}),
+  roles: roleAmountsSchema.prefault({}),
 });
 
 export type CashflowBreakdown = z.infer<typeof cashflowBreakdownSchema>;

@@ -44,7 +44,7 @@ export type FinanceTaskModule<Input, Computed> = {
    * The task's confirmed input, validated at the host boundary before anything is computed. The
    * schema's own input side stays `unknown`: what arrives is a parsed request body, not `Input`.
    */
-  readonly inputSchema: z.ZodType<Input, z.ZodTypeDef, unknown>;
+  readonly inputSchema: z.ZodType<Input, unknown>;
   /** Plain arithmetic over the confirmed input. No I/O, no model, no formatting. */
   compute(input: Input): Computed;
   /** The format-neutral report the workbook, the deck, the document and the screen all read. */

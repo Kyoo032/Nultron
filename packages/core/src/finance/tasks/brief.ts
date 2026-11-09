@@ -27,7 +27,7 @@ export const briefParamsSchema = z.object({
 /** Confirmed line items plus the optional parameters. Free text never reaches a task module. */
 export const briefInputSchema = z.object({
   items: lineItemsSchema,
-  params: briefParamsSchema.default({}),
+  params: briefParamsSchema.prefault({}),
 });
 
 export type BriefTaskInput = z.infer<typeof briefInputSchema>;
