@@ -3,8 +3,10 @@
 Rizky, 2026-11-07: move the build factory of the hosted web app from Docker to Nix, strangler style. Each
 rung swaps one part of the factory and keeps its output the same; the Dockerfiles, compose, the k8s
 rehearsal and `scripts/ci-local.mjs` keep working beside it. Deleting the Docker side is a later change,
-made only after the Nix side has run the same jobs. Every rung is its own branch and draft pull request,
-stacked on the one before. Nothing here is merged, released or deployed.
+made only after the Nix side has run the same jobs. Every rung was its own branch and pull request, stacked on
+the one before. Rungs 1 to 6 merged into `main` on 2026-11-09 (#216 to #221). Nothing is released or deployed.
+The rest of the move (the Linux run, leaving Docker Desktop, a Nix-built release, deleting the Docker side) is
+[`nix-cutover.md`](nix-cutover.md).
 
 Lanes: `enterprise` (the hosted images) and `tester` (the next merge of `main` brings the flake along). No
 product code changes; `personal` is retired and owes nothing.
@@ -342,10 +344,22 @@ nix build .#web-image && docker load < result
 When `pnpm-lock.yaml` changes, `nix/pkgs/pnpm-deps.nix` needs its new hash: set `hash = "";`, run
 `nix build .#pnpm-deps`, and copy the `got:` value back.
 
+## Proof on a work machine
+
+Built on 2026-11-09 on Rizky's PC, in a `nixos/nix` container on Docker Desktop, from an LF archive of the merged
+top rung (`62e9b5f5`): `checks.x86_64-linux.pins`, `web-prod`, `portal-tree`,
+`checks.x86_64-linux.k8s-manifests`, `web-image` and `portal-image`. The pnpm-deps hash did not change when
+`main` added `undici` as a direct dependency of `packages/core`, because the lockfile already held `undici@6.29.1`
+as a transitive one.
+
+Not run yet: `nix flake metadata` against GitHub, `nix develop` with `ci-local.mjs`, `pnpm ci:nix`, the
+compose and k8s rehearsals on the Nix images, and aarch64. [`nix-cutover.md`](nix-cutover.md), phase 1, lists
+them in order. Record each result here.
+
 ## Still owed
 
-- Monday, 2026-11-09: run each rung on a work machine with flakes on, and record the result in its PR.
 - Fetching `nixpkgs` from GitHub's archive was not possible in the cloud session (its proxy refuses the GitHub
   API). The lock was written from a `git+https` fetch of the same commit; nixpkgs has no `export-ignore` or
   `export-subst` attributes, so the archive has the same content and the same `narHash`. A machine that can
-  reach GitHub verifies it on the first `nix flake metadata`.
+  reach GitHub verifies it on the first `nix flake metadata` ([`nix-cutover.md`](nix-cutover.md), phase 1).
+- The checks under "Proof on a work machine" that have not run.
