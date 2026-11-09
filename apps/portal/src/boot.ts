@@ -145,7 +145,7 @@ export async function prepareStore(config: PortalConfig, log: Logger, clock?: Cl
   const migration = await migrateAsOwner(config);
   log.info("portal_migrated", { applied: migration.applied.length, skipped: migration.skipped.length });
 
-  const store = openStore(config, clock);
+  const store = openStore(config, clock, log);
   try {
     await checkServerRole(store, config, log);
     return store;
