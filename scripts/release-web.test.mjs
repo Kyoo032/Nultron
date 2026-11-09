@@ -899,7 +899,6 @@ const DESKTOP_RELEASE_FILES = [
   "apps/desktop/scripts/release-desktop.mjs",
   "apps/desktop/scripts/release-artifacts.mjs",
   "apps/desktop/package.json",
-  "apps/desktop/branding/agentforge/brand.json",
   "scripts/release-marks.mjs",
   "scripts/where-am-i.mjs",
 ];

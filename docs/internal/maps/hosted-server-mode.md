@@ -2,7 +2,7 @@
 
 Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
 
-Last verified: 2026-10-11 at 2df34be (fix branch, before merge) (SH-001: section 0, the Node 22 boot check). Before that: 2026-09-21 at 4938747 + working tree; four citations re-anchored and the
+Last verified: 2026-11-06 at f6c9acc1 for the wrap-key paragraph of section 10 only (SR-203). Before that: 2026-11-06 at 01a88fba for the Host rule only (the paragraph before section 2 and step 10 of the request walk). Before that: 2026-10-11 at 2df34be (fix branch, before merge) (SH-001: section 0, the Node 22 boot check). Before that: 2026-09-21 at 4938747 + working tree; four citations re-anchored and the
 review-instance section added, then the boot-guard path re-checked after the fix pass of the same
 day (the guards moved from `apps/web/lib/` to `apps/web/server/`, because `lib` is the renderer's
 namespace and that module re-exports `@agentforge/host`). The rest was last read at c204e5e /
@@ -38,14 +38,16 @@ What this page is **not**: the desktop or webdev path. Every rule below is a bra
 
 ### 2. The two mutating rules — loopback, and the web allowlist
 
+Since 2026-11-06 (SR-207) the Host half of both rules also runs on GET, HEAD and OPTIONS: `hostRejection` (`packages/host/src/http-adapter.ts:778`, called at `:633`) is applied to every `/api` request, and `/healthz` stays exempt. `mutatingRejection` (`:787`) keeps the Origin, CSRF and transport halves for non-safe methods. The line numbers below predate that and have shifted.
+
 `mutatingRejection` (`packages/host/src/http-adapter.ts:539-568`) is the one place the two are chosen between, on `csrfMode.secure` — which *is* `serverMode` (`:526`, set at `:387`).
 
-**Off server mode (the rule that was always there).** `isAllowedMutatingApiRequest(origin)` (`packages/host/src/local-request.ts:80-89`): a **missing Origin is allowed**, because curl, native tooling and same-origin GETs honestly have none; a present Origin must resolve to `localhost`, `127.0.0.1` or `::1` (`isLocalRequestUrl`, `:32-37` → `isLocalRequestHost`, `:20-29`). The `referer` argument is accepted and ignored (`:82`) — a remote Origin is never rescued by a local Referer. `isLoopbackHostHeader(host)` (`:66-73`) is the second half, and a **missing Host is rejected** (reasoning in the comment at `:56-65`). Failure is `403 { code: "forbidden", message: "Local requests only" }` (`http-adapter.ts:536-538`, `:26`).
+**Off server mode (the rule that was always there).** `isAllowedMutatingApiRequest(origin)` (`packages/host/src/local-request.ts:80-89`): a **missing Origin is allowed**, because curl, native tooling and same-origin GETs honestly have none; a present Origin must resolve to `localhost`, `127.0.0.1` or `::1` (`isLocalRequestUrl`, `:32-37` → `isLocalRequestHost`, `:20-29`). The `referer` argument is accepted and ignored (`:82`) — a remote Origin is never rescued by a local Referer. `isLoopbackHostHeader(host)` (`:66-73`) is no longer part of the mutating rule: since SR-207 `hostRejection` checks it on every `/api` request, GET, HEAD and OPTIONS included, and a **missing Host is rejected** (reasoning in the comment at `:56-65`). Failure is `403 { code: "forbidden", message: "Local requests only" }` (`http-adapter.ts:536-538`, `:26`).
 
 **In server mode (the hosted rule).** Both halves are checked against `trustedOrigins()` (`http-adapter.ts:527-531`):
 
 - `isAllowedWebOrigin(origin, allowlist)` (`local-request.ts:99-105`) — a **missing Origin is now rejected** (`:101-103`), and the match is on the whole normalised `scheme://host[:port]`, so a different scheme or port is a different origin. An empty allowlist matches nothing.
-- `isAllowedWebHostHeader(host, allowlist)` (`:113-119`) — the public host the proxy forwards. `allowedHostHeaders` (`:123-137`) builds the accepted set from the allowlist's origins and additionally accepts the explicit default port (`app.example.com:443` for an https origin, `DEFAULT_PORTS` at `:121`).
+- `isAllowedWebHostHeader(host, allowlist)` (`:113-119`) — the public host the proxy forwards. Since SR-207 `hostRejection` checks it on every `/api` request, not only on mutating ones; `mutatingRejection` keeps the Origin, CSRF and transport checks. `allowedHostHeaders` (`:123-137`) builds the accepted set from the allowlist's origins and additionally accepts the explicit default port (`app.example.com:443` for an https origin, `DEFAULT_PORTS` at `:121`).
 
 Either failing is `403 { code: "origin_forbidden", message: "Origin is not allowed to call this server" }` (`http-adapter.ts:529-531`, `:28`).
 
@@ -80,7 +82,7 @@ Where the renderer sends it: `apps/web/lib/api-client.ts`. `withMutatingHeaders`
    - `checkRequestRate({ serverMode: true, path, ip, sessionKey })` (`:329`), with the session key hashed off the mode's session cookie (`:408`; `sessionCookieName` at `packages/host/src/auth/session.ts:36-38`).
    Any rejection goes through `respondRejection` (`:281-299`): the `{error:{code,message}}` envelope, `X-Content-Type-Options: nosniff`, `Retry-After` when there is one, and — **in server mode only** — one `log.warn("request_filtered", …)` line.
 9. Non-`/api` requests that survived fall through to the web server (`:415-417`).
-10. `SAFE_METHODS` (GET/HEAD/OPTIONS, `:18`) skip `mutatingRejection`; everything else runs it, and any rejection is answered `403` whatever the code (`:423-428`).
+10. `hostRejection` runs for every `/api` method (SR-207); `SAFE_METHODS` (GET/HEAD/OPTIONS, `:18`) skip `mutatingRejection`; everything else runs it, and any rejection is answered `403` whatever the code (`:423-428`).
 11. CSRF cookie minted if needed (`:431-432`).
 12. Body read (`:434-445`): `MAX_BODY_BYTES = 26 * 1024 * 1024` enforced on the bytes actually read (`:30`, `:134-137`) → `413 payload_too_large`; a JSON parse failure → `400 invalid_json` (`:440-443`). Multipart is parsed by hand (`:161-194`).
 13. An abort controller wired to `res.on("close")` so a client that walks away cancels the run (`:449-454`).
@@ -171,7 +173,7 @@ The `request_filtered` line is the one the transport rules write (`FILTERED_EVEN
 
 ### 10. What else server mode changes
 
-**The wrap key becomes mandatory.** `getLocalVaultKey(env)` (`packages/db/src/vault-key.ts:123-135`): off server mode, `AGENTFORGE_SECRETS_KEY` if set, else the self-creating `.master-key` file (`:107-114`, `MASTER_KEY_FILE` at `:37`) — unchanged. In server mode the env key is required (`SERVER_VAULT_KEY_REQUIRED`, `:46-49`) and must measure at least `MIN_VAULT_KEY_BYTES = 32` (`:40`) through `vaultKeyEntropyBytes` (`:90-105`), else `SERVER_VAULT_KEY_TOO_WEAK` (`:51-54`). The file fallback is not reached at all. `vaultKeyEntropyBytes` counts only hex (even digit count) and *canonical* base64/base64url — it re-encodes the decoded bytes and demands the same string back (`isCanonical`, `:80-82`), which refuses a passphrase that merely happened to be long enough. The file names its own limit at `:75-78`: a 43-character alphanumeric string is a valid base64 encoding of 32 bytes and passes.
+**The wrap key becomes mandatory.** `getLocalVaultKey(env)` (`packages/db/src/vault-key.ts:187-205`): off server mode, `AGENTFORGE_SECRETS_KEY` if set, else the self-creating `.master-key` file (`:164-175`, `MASTER_KEY_FILE` at `:37`). A desk key under 32 bytes is refused first (`assertDeskVaultKeyUsable`, `:177-185`), and `apps/web/server-env.ts` runs the same check at boot, so a desk with a passphrase in the environment stops before it creates the data dir (SR-203). In server mode the env key is required (`SERVER_VAULT_KEY_REQUIRED`, `:46-49`) and must measure at least `MIN_VAULT_KEY_BYTES = 32` (`:40`) through `vaultKeyEntropyBytes` (`:123-125`), else `SERVER_VAULT_KEY_TOO_WEAK` (`:51-54`), then pass the variety check. The file fallback is not reached at all. `vaultKeyEntropyBytes` counts only hex (even digit count) and *canonical* base64/base64url — it re-encodes the decoded bytes and demands the same string back (`isCanonical`, `:119-121`), which refuses a passphrase that merely happened to be long enough. The file names its own limit above `isCanonical` (`:114-117`): every 44-character string over the base64 alphabet is a valid base64 encoding of 33 bytes and passes.
 
 **The gateway gate fails closed.** `deriveGatewayGate` (`packages/host/src/gateway-gate.ts:269-297`) reads `isServerMode(input.env ?? process.env)` at `:275` and changes two rules:
 - `envRuntime === "stub"` opens the gate on a desk but falls through to `needs_key` on the server (`:278-283`) — a stub runtime is a hosted misconfiguration, never an open gate.
@@ -209,7 +211,7 @@ Off server mode nothing about either scope changed.
 
 **`MAX_BODY_BYTES` is not where the other caps are.** `MAX_REQUEST_PATH_LENGTH`, `MAX_QUERY_PARAMS` and `MAX_HEADER_BYTES` are in `local-request.ts:160-166`; the body cap is `http-adapter.ts:30` and is *passed in* as `maxBodyBytes` (`local-request.ts:187`). It is also enforced twice, for different reasons: the declared `Content-Length` is refused before a byte is read (`local-request.ts:297-300`), and the bytes actually read are counted again as they stream in (`http-adapter.ts:134-137`), because a chunked body declares no length.
 
-**The security spec is a decision record, not a citation source.** Its rows A1, T4, T8, T9 and S1 (`docs/internal/web-security-spec.md`) were still describing the pre-PR-56 tree until 2026-09-20, when they were rewritten against this commit — including S1, which said the `.master-key` fallback throws "when `NODE_ENV=production`" where the code actually keys on `isServerMode` (`packages/db/src/vault-key.ts:186`). Read those rows for *what was decided and why*; read this page or the code for where it lives.
+**The security spec is a decision record, not a citation source.** Its rows A1, T4, T8, T9 and S1 (`docs/internal/web-security-spec.md`) were still describing the pre-PR-56 tree until 2026-09-20, when they were rewritten against this commit — including S1, which said the `.master-key` fallback throws "when `NODE_ENV=production`" where the code actually keys on `isServerMode` (`packages/db/src/vault-key.ts:189`). Read those rows for *what was decided and why*; read this page or the code for where it lives.
 
 **Transport filtering runs on every path, not just `/api`.** In server mode the TLS rule, the method allowlist, the path filter, the header cap and the per-IP bucket apply to page loads, bundles and 404 probes too (`http-adapter.ts:407-413`, reasoning at `:394-406`). Only the Origin / CSRF / session rules stay `/api`-only. **This depends on `handleNodeRequest` being the first middleware in `apps/web/server.ts:66-72`.** Move that mount and the controls move with it.
 
@@ -280,7 +282,7 @@ There are no DOM testids for any of this. It is all transport; nothing on this p
 
 ## Why
 
-**Why one flag rather than per-feature configuration.** `[Direct]` The commit message of `6ae177a` opens with it: "One switch, AGENTFORGE_SERVER=1 (packages/core/src/server-mode.ts), turns on every hosted-only rule; webdev and the desktop never set it and behave as before." `[Supported]` Every consumer reads the same function rather than its own variable — `http-adapter.ts:374`, `concurrency.ts:242`, `vault-key.ts:125`, `gateway-gate.ts:275`, `router.ts:352`, `bind-host.ts:20`, `handlers/settings.ts:361`, `server.ts:25` — so there is one thing to set and one thing to get wrong. **Confidence: high.**
+**Why one flag rather than per-feature configuration.** `[Direct]` The commit message of `6ae177a` opens with it: "One switch, AGENTFORGE_SERVER=1 (packages/core/src/server-mode.ts), turns on every hosted-only rule; webdev and the desktop never set it and behave as before." `[Supported]` Every consumer reads the same function rather than its own variable — `http-adapter.ts:374`, `concurrency.ts:242`, `vault-key.ts:189`, `gateway-gate.ts:275`, `router.ts:352`, `bind-host.ts:20`, `handlers/settings.ts:361`, `server.ts:25` — so there is one thing to set and one thing to get wrong. **Confidence: high.**
 
 **Why a missing Origin is accepted on loopback and rejected on the web.** `[Direct]` `docs/internal/web-security-spec.md:42` (row A1) states the requirement: "Mutating `/api` accepts only a configured trusted-origin allowlist; a **missing Origin is rejected** on the web adapter (today it is allowed…)." The reason for the asymmetry is recorded in the same row and in the commit message ("missing Origin rejected"): on loopback the absent Origin is genuinely how curl and native tooling call, and on a public server there is no "same machine" to infer. **Confidence: high.**
 

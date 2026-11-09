@@ -5,10 +5,10 @@ import { LOCAL_TENANT_ID, isEnvelope, openPayload, sealPayload } from "@agentfor
 import { ensureSchema } from "../ensure-schema";
 import * as schema from "../schema";
 import { agentVersions, agents, messages, organizations, threads, workspaces } from "../schema";
-import { getLocalVaultKey } from "../vault-key";
+import { DESK_VAULT_KEY_TOO_WEAK, getLocalVaultKey } from "../vault-key";
 import { DrizzleAgentRepository } from "./drizzle-agent-repository";
 
-const SECRET = "phase3-seal-regression-key";
+const SECRET = "2f6b0d93a7c1485e9b3d7f0a1c5e8264d0b9a3f7c1e5824b6d0a9c3e7f1b5d84";
 const SYSTEM_PROMPT = "You are a private desk agent. Never echo the owner's gateway key.";
 const MESSAGE_TEXT = "Draft the meeting note with the private budget number 1842.";
 
@@ -117,6 +117,25 @@ describe("DrizzleAgentRepository at-rest seal", () => {
     expect(opened?.systemPrompt).toBe(SYSTEM_PROMPT);
     expect(opened?.model).toBe("gpt-4o-mini");
     expect(opened?.config).toEqual({ imageGenModel: "flux-placeholder" });
+  });
+
+  it("throws instead of returning an empty systemPrompt when the wrap key is refused", async () => {
+    const versionId = "ver-refused";
+    await repo.insertVersion({
+      id: versionId,
+      agentId,
+      organizationId: orgId,
+      version: 1,
+      systemPrompt: SYSTEM_PROMPT,
+      model: "gpt-4o-mini",
+      inputModalities: ["text"],
+      productModes: ["chat"],
+      config: {},
+      createdAt: new Date(),
+    });
+
+    process.env.AGENTFORGE_SECRETS_KEY = "hunter2";
+    await expect(repo.findVersionById(orgId, versionId)).rejects.toThrow(DESK_VAULT_KEY_TOO_WEAK);
   });
 
   it("opens a legacy plaintext systemPrompt (backward-compat)", async () => {
