@@ -228,7 +228,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual: request-body arrays with no `.max()` still cost one issue per bad element | Residual: none blocks; capping the request-body arrays is a follow-up |
 | [SR-197](#sr-197) | Medium | AI SDK 5's `streamText` prints every stream error to the console by default, and an `APICallError` carries the request body (the prompt) and the gateway's error body | Fixed in tree (2026-11-04, `fix/zod-4`): the runtime passes a silent `onError`; tested, not driven | PR merge of the AI SDK 5 move |
 | [SR-198](#sr-198) | Medium | AI SDK 5 brings `undici` 5.29.0 and `@fastify/busboy` into the hosted image, with five HIGH `undici` advisories and one `busboy` advisory | Fixed in tree (2026-11-04, `fix/zod-4`): scoped override to `undici` 6.29.1, which drops `busboy`; the SDK's guarded download fetch checked on it; not driven | PR merge of the AI SDK 5 move |
-| [SR-199](#sr-199) | Low | nixpkgs marks pnpm 9.15.9, the version the repo pins, insecure (twelve CVEs, no fix on 9.x); the Nix build permits that one version by name | Accepted for the Nix migration (2026-11-07): build-time only, no git dependencies in the lock, the Nix store pins every tarball by hash. Moving to pnpm 10 is a separate change | — |
+| [SR-208](#sr-208) | Low | nixpkgs marks pnpm 9.15.9, the version the repo pins, insecure (twelve CVEs, no fix on 9.x); the Nix build permits that one version by name | Accepted for the Nix migration (2026-11-07): build-time only, no git dependencies in the lock, the Nix store pins every tarball by hash. Moving to pnpm 10 is a separate change | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -6533,7 +6533,7 @@ Residual: not driven on a hosted server; the override has to be dropped once the
 
 Gate: PR merge of the AI SDK 5 move.
 
-### SR-199 {#sr-199}
+### SR-208 {#sr-208}
 
 **nixpkgs marks pnpm 9.15.9 insecure, and the Nix build permits it by name.**
 Raised 2026-11-07 by rung 1 of the Nix migration ([`nix-migration.md`](nix-migration.md)). Low.
