@@ -181,7 +181,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-77](#sr-77) | Medium | A "Start over" wipe that failed part-way deleted its own marker, so the rest never ran | Fixed, not driven (2026-09-23) | Blocks the next Personal cut |
 | [SR-79](#sr-79) | Medium | Per-IP limits key on the full IPv6 address, so one IPv6 client has a bucket per request | Mitigated (2026-10-01): the pilot stack binds IPv4 only; the code still keys on the full address | Blocks Tencent deploy if it is reachable over IPv6 |
 | [SR-80](#sr-80) | Medium | CI and the dependency-audit gate run only when someone runs `pnpm ci:local`; nothing checks a push on its own | Open — accepted by design (2026-09-24) | Blocks PR merge without a pasted `ci:local` summary |
-| [SR-85](#sr-85) | Medium | The packaged app never set `AGENTFORGE_PACKAGED`, so the dev endpoint hooks (gateway, Telegram) were not ignored in it | Fixed in the working tree, not committed (2026-10-01); not driven on a packed installer, the bundle was driven in plain Node | Blocks the next Personal cut until a packed public build and a packed flavor are driven |
+| [SR-85](#sr-85) | Medium | The packaged app never set `AGENTFORGE_PACKAGED`, so the dev endpoint hooks (gateway, Telegram) were not ignored in it | Fixed, committed in `5fc00596` (2026-10-05) and carried by the 0.16.0 pack; the two packed drives were never done, and the desktop was retired 2026-10-14 | None while the desktop is retired. If a desktop build is revived, the packed public build and a packed flavor must be driven before that cut |
 | [SR-84](#sr-84) | Medium | New `brace-expansion` advisories reached the hosted image through `exceljs` | Fixed in `388d6cb` (2026-09-30); `audit:deployed` passes since (`ci:local` 2026-10-01) | — |
 | [SR-87](#sr-87) | Medium | The proxy's access log kept the sign-in authorization code in the portal's redirect `Location` header | Fixed in `webapp-deploy/Caddyfile` and the k8s copy; driven on the local compose and Kubernetes rehearsals (2026-10-01); not hosted | Blocks Tencent deploy until a hosted Caddy is checked |
 | [SR-90](#sr-90) | Medium | Restarting or recreating `app` alone leaves the proxy answering nothing | Docs and scripts fixed (2026-10-01); the trap remains | Operator rule: restart `app proxy` together |
@@ -197,7 +197,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-133](#sr-133) | Medium | The app.nultron-ai.xyz preview runs production without server mode, behind Basic Auth and a Caddy Origin rule | Accepted by the owner (2026-10-06): password-gated shared desk | Preview only |
 | [SR-138](#sr-138) | Medium | One signed-in account could hold any number of model runs open: the limiters count requests, nothing counted runs | Fixed in tree (2026-10-06), tested through the router and the HTTP adapter: every gateway-calling route holds a slot or is on a written list; in memory, per process; not driven on a hosted instance | Blocks Tencent deploy until driven there |
 | [SR-156](#sr-156) | Medium | Hosted: any signed-in member could delete a desk of the company, and with it every person's chats and the desk's Knowledge Base | Fixed in tree (2026-10-07), tested, renderer hides the button; not driven | Blocks a multi-person hosted pilot until driven |
-| [SR-157](#sr-157) | Medium | Hosted: stored media (pictures, clips, audio) is read, listed and deleted by company, not by person, so a colleague's picture can be fetched by its id, listed in the Images and Videos galleries, and sent to a model by a job | Open: nothing changed, because scoping by person breaks shared reads the product relies on; needs an owner decision (2026-10-07) | Blocks "Chat attachments are private to the person who attached them" |
+| [SR-157](#sr-157) | Medium | Hosted: stored media (pictures, clips, audio) is read, listed and deleted by company, not by person, so a colleague's picture can be fetched by its id, listed in the Images and Videos galleries, and sent to a model by a job | Accepted for the OPC (Rizky, 2026-11-06): a Nultron org has one owner. The code is unchanged: `main` still reads, lists and deletes media by organization only | Reopen when an org gets a second member (the bundle's DEPLOY.md step 7 allows it today, `scripts/release-web-docs.mjs:156`). It also blocks the sentence "Chat attachments are private to the person who attached them" |
 | [SR-165](#sr-165) | Medium | Hosted portal: `PORTAL_SIGNIN_MODE=password` gives HYP AI, and since 2026-10-09 the Nultron Enterprise release bundle's default, a username-and-password sign-in with no second factor, in place of the e-mailed code; the portal's own default when the variable is absent is still `code`, and `code` stays selectable | Built in tree, tested over a real Postgres; not driven in a browser or on a server (2026-10-07; the Enterprise bundle default is template and docs only, nothing deployed or driven, 2026-10-09). Independent review found no critical or high issue; its findings (M1, M2, L1 to L3, N1, N2) are fixed and merged (`e8a069c9`). The owner's decision, and on 2026-10-09 he accepted password-only sign-in as the Enterprise bundle default with residuals 1 to 13 as recorded; a second independent review of that default found no critical or high issue | None beyond the owner's acceptance; open until the second factor (being designed) ships |
 | [SR-166](#sr-166) | Medium | On `main` since the chat-first promotion (PR #157, 2026-10-12; was tester only): every virtual agent reads the desk's Knowledge Base and its earlier chats and can send a question to the web; the egress guard stops `web_fetch` only and never sees what entered through the prompt | Open: same exposure Chat has on `main` (SR-112's residual), new for the twelve mode agents; read from the code, not driven (2026-10-09). The promotion merged with no ruling recorded (2026-10-13). Owner ruled 2026-10-13: search stays on; the fix is the outbound guard (see SR-112), in a pull request to `main` since 2026-10-21, not merged, not driven | Blocks the next Enterprise release that carries the chat-first shell, until the outbound guard merges and the owner accepts its residual (a model restating private text in its own words) |
 | [SR-167](#sr-167) | Medium | On `main` since PR #157 (was tester only): a model can start paid pictures and clips from any agent's chat; `main` still holds only a per-turn ceiling | Fixed in the tester tree (2026-10-22): `image_generate` and `video_generate` do not run until the person presses Run on a card that shows the request and its list price; unit-tested, and the card driven in Chromium on a stub desk; the live model round trip not driven; no paid media was run | Lifts when the tester change is promoted to `main` and one Run press has been driven live |
@@ -209,8 +209,8 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-172](#sr-172) | Low | HYP AI behind Cloudflare: Cloudflare reads sign-in passwords, cookies and pasted keys in clear (Full mode), and the origin still answers around Cloudflare on 80, 443 and 8443 | Recorded as known in the HYP AI deploy README (2026-10-08); restricting the origin is optional there; needs the owner's call | HYP AI only; Nultron does not use Cloudflare |
 | [SR-173](#sr-173) | Info | The wrap key becomes the AES key through one unsalted SHA-256 | Checked, not an issue (2026-10-13) | — |
 | [SR-174](#sr-174) | Low | Caddy compresses every `text/*` response, `text/event-stream` included, which can hold live-update frames back | Fixed on `main` (PR #167, 2026-10-14): `encode` matches text types only, without `text/event-stream`, video or audio; unit-tested, Caddy syntax not validated, not driven | Before the team board (tester) is deployed behind Caddy |
-| [SR-175](#sr-175) | Medium | Hosted: a file one person generates on their own (artifacts, media, desk files outside their private folder) is listed and downloadable by every member of the company | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
-| [SR-176](#sr-176) | High | Hosted: any member of a company can delete any other member's generated media and artifacts | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
+| [SR-175](#sr-175) | Medium | Hosted: a file one person generates on their own (artifacts, media, desk files outside their private folder) is listed and downloadable by every member of the company | Accepted for the OPC (Rizky, 2026-11-06): a Nultron org has one owner. The earlier "not applicable" was wrong for `main`. The tester's strip removed the tester's owner check, and `main` still reads by organization or desk only | Reopen when an org gets a second member (the bundle's DEPLOY.md step 7 allows it today, `scripts/release-web-docs.mjs:156`) |
+| [SR-176](#sr-176) | High | Hosted: any member of a company can delete any other member's generated media and artifacts | Accepted for the OPC (Rizky, 2026-11-06): a Nultron org has one owner. The earlier "not applicable" was wrong for `main`. The tester's strip removed the tester's owner check, and `main` still deletes by organization or desk only | Reopen when an org gets a second member (the bundle's DEPLOY.md step 7 allows it today, `scripts/release-web-docs.mjs:156`) |
 | [SR-178](#sr-178) | Medium | Hosted (tester): a Workspace switched to "workspace" is readable by the whole company, not only its members (K-D22) | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
 | [SR-179](#sr-179) | Medium | Hosted (tester): a member removed from a Workspace keeps reading, listing and deleting the files and media they put into it | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
 | [SR-180](#sr-180) | Medium | Hosted (tester): document versions are not counted against a tenant's storage, and the cap keeps every version from the last 30 days with no count limit, so a busy document can fill the one disk | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
@@ -230,6 +230,8 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-198](#sr-198) | Medium | AI SDK 5 brings `undici` 5.29.0 and `@fastify/busboy` into the hosted image, with five HIGH `undici` advisories and one `busboy` advisory | Fixed in tree (2026-11-04, `fix/zod-4`): scoped override to `undici` 6.29.1, which drops `busboy`; the SDK's guarded download fetch checked on it; not driven | PR merge of the AI SDK 5 move |
 | [SR-201](#sr-201) | Medium | The SSRF guard resolved a name, then let `fetch` resolve it again to connect (DNS rebinding), and let a connection through when its own lookup failed | Fixed in tree (2026-11-06, `fix/sec-004a-dns-pinning`): one lookup per hop, refused when it fails or answers privately, then the socket is pinned to that answer; driven on Node 24 and on Node 22.23.4 (the image's runtime) against a loopback listener and real DNS and TLS; not run on a hosted server | PR merge |
 | [SR-202](#sr-202) | Medium | `injectionGuardBypass` was saved in `settings.enc`: one `POST /api/v1/settings` off server mode switched the prompt-injection guard off for good, and a stored `true` was honoured on a hosted desk and could not be cleared | Fixed in tree (2026-11-06, `fix/sec-005-guard-bypass-not-persisted`): the flag is never written, a stored `true` is ignored and removed on load, a hosted desk always runs the guard; tested, not driven on a hosted server | PR merge of `fix/sec-005-guard-bypass-not-persisted` |
+| [SR-204](#sr-204) | Medium | Personal (retired): the Electron product window sets `sandbox: false`, because its preload reads the brand files with `fs` | Won't fix, moot (Rizky, 2026-11-06): the desktop app was retired on 2026-10-14, and nothing packs or ships `apps/desktop` | None while the desktop is retired. Reopen if a desktop build is revived, and fix before that cut |
+| [SR-205](#sr-205) | Low | Personal (retired): `wrapKey` returns an unstored random wrap key when keytar fails, so settings sealed in that session do not open on the next launch | Won't fix, moot (Rizky, 2026-11-06): the desktop app was retired on 2026-10-14 | None while the desktop is retired. Reopen if a desktop build is revived, and fix before that cut |
 | [SR-206](#sr-206) | Low | The backup heartbeat URL would sit in `.env`, which the `app` container loads, so code running in the app could send fake success pings and hide a dead backup | Fixed in PR #206 (2026-11-06): `backup.sh` reads it from the process environment only, set on the cron line; tested, not driven on a server | — |
 | [SR-207](#sr-207) | Medium | The Host check ran only on mutating `/api` requests, so a DNS-rebinding page could `GET` the API (media, threads, masked settings) from unauthenticated webdev, and a GET in server mode was not checked against the Host allowlist (SEC-004 4b) | Fixed in tree (2026-11-06, `fix/sec-004b-get-host-check`): every `/api` request needs a trusted Host, `/healthz` exempt; unit-tested through the real adapter, not driven | PR merge |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
@@ -2556,8 +2558,9 @@ Gate: was **blocks PR merge** (`audit:deployed` is a required `ci:local` step); 
 ### SR-85 {#sr-85}
 
 **The packaged app never set `AGENTFORGE_PACKAGED`, so the dev endpoint hooks were not ignored in it.**
-Personal. Raised 2026-09-30 by the verify-skill pass, fixed 2026-10-01 in the working tree, not
-committed. Fixed, not driven on a packed installer.
+Personal. Raised 2026-09-30 by the verify-skill pass, fixed 2026-10-01 in the working tree and
+committed in `5fc00596` (2026-10-05). Fixed, not driven on a packed installer. Moot while the desktop
+is retired (2026-10-14). See "Status, 2026-11-06" below.
 
 Evidence, before the fix:
 
@@ -2592,15 +2595,15 @@ sent to the Toko Token gateway.
 
 Fixed 2026-10-01, in one change:
 
-- `apps/desktop/main.cjs` `bootstrapPackaged` (`:660-667`) sets `AGENTFORGE_PACKAGED=1`, deletes any
-  inherited `AGENTFORGE_GATEWAY_URL`, and sets or deletes `AGENTFORGE_BRAND_GATEWAY_URL` from
-  `brandGatewayOverride(brand)`, all before `require("./host.cjs")` (`:669`). The module-level
-  assignment of the dev hook is gone (`:86`).
+- `apps/desktop/main.cjs` `bootstrapPackaged` (`:673-680` at `39cd5f0c`) sets `AGENTFORGE_PACKAGED=1`,
+  deletes any inherited `AGENTFORGE_GATEWAY_URL`, and sets or deletes `AGENTFORGE_BRAND_GATEWAY_URL` from
+  `brandGatewayOverride(brand)`, all before `require("./host.cjs")` (`:682`). The module-level
+  assignment of the dev hook is gone.
 - `apps/desktop/brand-read.cjs` `brandGatewayOverride` (`:39`) is empty for the public build whatever
   its `brand.json` says, and is the flavor's `gatewayBaseUrl` otherwise.
 - `packages/core/src/gateway/pinned.ts` `gatewayUrlOverride()` (`:72`): packaged reads only the brand
   channel (https, no credentials, else ignored); anything else reads the dev hook unless
-  `NODE_ENV=production`. `resolvedGatewayBaseUrl()` (`packages/core/src/gateway.ts:37`) calls it.
+  `NODE_ENV=production`. `resolvedGatewayBaseUrl()` (`packages/core/src/gateway.ts:47`) calls it.
   `gatewayUrlOverrideAllowed()` (`:38`) is unchanged, so the Telegram origin is now pinned in a
   packaged build without touching `channels/pinned.ts`.
 - Tests: `packages/core/src/gateway/pinned.test.ts` (dev, production and packaged cases, both
@@ -2628,8 +2631,13 @@ Metranet window must report `https://aihub.metranet.co.id/v1`. The hosted app is
 `NODE_ENV=production` (`webapp-deploy/Dockerfile:157`, `webapp-deploy/compose.yml:29`) and never sets the
 packaged marker.
 
-Gate: **blocks the next Personal cut** until those two drives are done. A regression here is silent
-and sends a flavor user's key to the wrong gateway.
+**Status, 2026-11-06.** The fix is on `main` (`apps/desktop/main.cjs:673`), committed in `5fc00596`
+(2026-10-05). Both 0.16.0 pack commits, `4dd33fa` and `e7a17c2`, contain it, and that pack checked it
+only through `doctor --desktop` (`docs/internal/0.16.0-changelog.md:81`). So the two drives above were
+never done. The desktop app was retired on 2026-10-14 (Rizky), and no Personal cut follows.
+
+Gate: none while the desktop is retired. If a desktop build is revived, those two drives block its
+cut. A regression here is silent and sends a flavor user's key to the wrong gateway.
 
 ### SR-87 {#sr-87}
 
@@ -3238,7 +3246,25 @@ been driven on the hosted compose rehearsal.
 ### SR-157 {#sr-157}
 
 **Stored media is read, listed and deleted by company, not by person.** Hosted (Enterprise). Raised in the
-2026-10-06 review and confirmed in the code on 2026-10-07. **Open. Nothing was changed, on purpose.**
+2026-10-06 review and confirmed in the code on 2026-10-07.
+
+**Accepted for the OPC (Rizky, 2026-11-06).** A Nultron org has one owner, so there is no colleague to read,
+list or delete another person's media. The code is unchanged, on purpose. At `39cd5f0c` the lookups still filter by
+organization only (`packages/host/src/handlers/media.ts:32`, `:89`, `:97`; `packages/host/src/media.ts:48`,
+`:138`). This also decides [SR-175](#sr-175) and [SR-176](#sr-176), and the security tester's SEC-003 (Notion Dev
+Findings, BUG-33).
+
+Reopen when an org gets a second member. Nothing on `main` prevents that:
+- the membership table exists (`organization_members`, `packages/db/src/schema.ts:289-302`);
+- the release bundle's `DEPLOY.md` tells the operator to add `admin` and `member` accounts up to the seat cap
+  (`scripts/release-web-docs.mjs:156`).
+
+So an operator who follows the bundle's own steps meets the reopen trigger. The fix plan on the SEC-003 card is
+owner-only reads, lists and inline reads in server mode, and delete by the maker or an owner or admin. No
+visibility column is needed, because Workspaces and team sharing are gone. Media needs no owner column
+either, because `media.user_id` is NOT NULL (`packages/db/src/schema.ts:714`). Artifacts need an owner column first.
+The `artifacts` table has none (`packages/db/src/schema.ts:852-868`), and list, get and delete filter on
+`workspace_id` only (`packages/host/src/artifacts.ts:147-177`).
 
 Evidence:
 - The row records its owner and nothing else about its use. `media.user_id` is NOT NULL
@@ -3279,7 +3305,9 @@ Chat attachments by person: this is what "a document attached in Chat is private
 it" needs, and it is the smallest change. (3) Leave media company-wide and record that a Chat attachment is
 shared inside a company. Option 2 is not built; the document-attach work is a separate lane.
 
-Gate: blocks the sentence "a Chat attachment is private to the person who attached it" until one is chosen.
+Gate: reopen when an org gets a second member (the bundle's DEPLOY.md step 7 allows it today,
+`scripts/release-web-docs.mjs:156`). Until one option is chosen, nothing may claim that "a Chat
+attachment is private to the person who attached it".
 
 ### SR-165 {#sr-165}
 
@@ -6055,9 +6083,9 @@ Gate: before the team board is deployed behind Caddy. Not driven.
 
 **Hosted: a person's own generated files are visible to the whole company.**
 
-**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+**Accepted for the OPC (Rizky, 2026-11-06).** A Nultron org has one owner, so this needs a second member in one org. Reopen when an org gets a second member; the bundle's DEPLOY.md step 7 allows it today (`scripts/release-web-docs.mjs:156`, see [SR-157](#sr-157)). The note it replaces said "Not applicable since 2026-10-16", which was wrong for `main`. The tester's OPC strip (P5b, `18886fbf`) deleted the tester's owner check (`packages/host/src/media-visibility.ts`), not the reads on `main`. At `39cd5f0c` those still filter by organization or desk only: media by organization (`packages/host/src/handlers/media.ts:32`, `packages/host/src/media.ts:48`), artifacts by desk (`packages/host/src/artifacts.ts:147-177`).
 
-Raised 2026-10-14. Medium. Open. Found by read-only scouts of the tester code (`agentforge-chat`, which carries
+Raised 2026-10-14. Medium. Open until 2026-11-06, then accepted for the OPC. Found by read-only scouts of the tester code (`agentforge-chat`, which carries
 the same stores as `main`) while planning the team board's files phase.
 
 Rule (Rizky, 2026-10-14): a file a person makes on their own is visible only to them; a file put into a
@@ -6082,16 +6110,16 @@ to its owner or when it is shared; two people of one company plus one of another
 router. Legacy rows with no owner: decide with Rizky (draft: stay company-visible, since that is how they were
 made).
 
-Gate: before a second person of one company uses the hosted app for their own work. Not fixed.
+Gate: reopen when an org gets a second member (the bundle's DEPLOY.md step 7 allows it today, `scripts/release-web-docs.mjs:156`). Not fixed.
 
 
 ### SR-176 {#sr-176}
 
 **Hosted: any member of a company can delete another member's files.**
 
-**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+**Accepted for the OPC (Rizky, 2026-11-06).** A Nultron org has one owner, so this needs a second member in one org. Reopen when an org gets a second member; the bundle's DEPLOY.md step 7 allows it today (`scripts/release-web-docs.mjs:156`, see [SR-157](#sr-157)). The note it replaces said "Not applicable since 2026-10-16", which was wrong for `main`. The tester's OPC strip (P5b, `18886fbf`) deleted the tester's delete gate, not the deletes on `main`. At `39cd5f0c` those still select and delete by organization or desk only: media (`packages/host/src/handlers/media.ts:89`, `:97`), artifacts (`packages/host/src/artifacts.ts:175`). The SEC-003 card suggests this delete gate as the first piece to ship when the trigger is met. For media it needs no schema change, because `media.user_id` is NOT NULL (`packages/db/src/schema.ts:714`). A delete by the maker for artifacts needs an owner column first, because the `artifacts` table has none (`packages/db/src/schema.ts:852-868`).
 
-Raised 2026-10-14. High. Open. Found by the W1b worker in the tester and checked on `main` by the orchestrator.
+Raised 2026-10-14. High. Open until 2026-11-06, then accepted for the OPC. Found by the W1b worker in the tester and checked on `main` by the orchestrator.
 
 Evidence (`main`):
 - `DELETE /api/v1/media/:mediaId` (`packages/host/src/handlers/media.ts:82-107`) selects and deletes on `organization_id` and the id only. It never compares `media.user_id` with the caller, so any signed-in member removes a colleague's image or video and its stored file.
@@ -6101,7 +6129,7 @@ Why High and not Medium like SR-175: SR-175 leaks a read; this destroys another 
 
 Fix (tester first, server mode only, Personal unchanged with a parity test): a delete succeeds only for the row's owner, or for a company owner or admin (who may delete and never read, the leaver rule of 2026-10-06). Taking a file out of a Workspace clears `project_id` and deletes nothing. Two people of one company plus one of another through the real router.
 
-Gate: before a second person of one company uses the hosted app for their own work. Not fixed.
+Gate: reopen when an org gets a second member (the bundle's DEPLOY.md step 7 allows it today, `scripts/release-web-docs.mjs:156`). Not fixed.
 
 ### SR-177 {#sr-177}
 
@@ -6661,6 +6689,79 @@ Residual:
 
 Gate: PR merge of `fix/sec-005-guard-bypass-not-persisted`.
 
+### SR-204 {#sr-204}
+
+**Personal (retired): the Electron product window sets `sandbox: false`.**
+Raised 2026-10-15 by the security tester as SEC-007 (Notion Dev Findings, BUG-37). Medium. Won't fix, moot
+(Rizky, 2026-11-06). The card proposed SR-189, which the tester had already taken, so this is SR-204.
+
+Evidence (at `39cd5f0c`):
+- The only product `BrowserWindow` (`apps/desktop/main.cjs:402-414`) has `nodeIntegration: false` and
+  `contextIsolation: true` (`:411-412`), and `sandbox: false` (`:413`).
+- The preload needs Node `fs` when it loads. It requires `./brand-read.cjs` (`apps/desktop/preload.cjs:2`) and
+  reads the brand and the logo at once (`:4-5`). `brand-read.cjs` requires `node:fs` (`:1`) and calls
+  `readFileSync` (`:57`, `:76`). A sandboxed preload cannot require a local module, so the flag cannot change
+  until those reads move. The backlog row is E17 (`docs/internal/blockers-2026-09-15.md:137`).
+- Impact: an XSS in the packaged renderer reaches only the `contextBridge` surface, which already lets it call
+  the host as the owner. A renderer exploit that escapes the JavaScript isolate runs outside the OS sandbox, in
+  a process with Node linked.
+
+Why Won't fix: the desktop app was retired on 2026-10-14 (AGENTS.md). Nothing packs or ships `apps/desktop`.
+The hosted image's install skips it (`webapp-deploy/Dockerfile:70-73`), and its release repo
+`Kyoo032/Nultron-Desktop` is archived. The exposure is a local desktop build made against that rule.
+
+Reopen trigger: a desktop build is revived. Then, before that cut:
+- The main process loads the brand and the logo once. It already requires `brand-read.cjs` (`main.cjs:3`), so it
+  can call `loadBrandFromResources` and `loadBrandLogo` itself.
+- The preload gets them with one `ipcRenderer.sendSync("brand:get")`. Main answers only a sender that passes
+  `isTrustedSender` (the main frame, `apps/desktop/navigation.cjs:109`), with a frozen, versioned payload
+  `{ schema: 1, brand, brandLogo, updatesSupported }`. The renderer still reads `window.agentforge.brand` at
+  startup, so first paint is unchanged.
+- The preload then requires no local module and no `fs`. Remove `sandbox: false`, because Electron 35
+  (`apps/desktop/package.json:30`) sandboxes by default. Keep `contextIsolation: true` and `nodeIntegration: false`.
+- Do not use `additionalArguments`. The base64 logo is about 146,000 characters (the 109,815-byte `logo.png`
+  measured on 2026-11-06), past the 32,767-character Windows command line.
+- E18 (permission handlers that deny by default, but still allow `media` and `display-capture` for Meeting) and
+  E19 (`web-contents-created` applying `hardenNavigation` to every contents) go in separate PRs, in the same
+  release. Do not change Electron fuses in the same change ([SR-120](#sr-120)).
+- Tests, failing first: `apps/desktop/navigation.test.cjs` asserts `sandbox: true` and a preload with no
+  `require("./`, no `node:fs` and no `readFileSync`; the brand handler refuses a sender that is not the main
+  frame. Then a packed smoke on Windows: the window paints, the brand and logo show, and `doctor --desktop`
+  passes.
+
+Gate: none while the desktop is retired.
+
+### SR-205 {#sr-205}
+
+**Personal (retired): `wrapKey` returns an unstored random key when keytar fails.**
+Raised 2026-10-16 by the security tester as SEC-008 (Notion Dev Findings, BUG-41), split out of SEC-006. Low.
+Won't fix, moot (Rizky, 2026-11-06). The card proposed SR-190, which `main` had already taken, so this is SR-205.
+
+Evidence (at `39cd5f0c`):
+- `wrapKey` (`apps/desktop/main.cjs:287-302`) reaches `return crypto.randomBytes(32).toString("hex")` (`:302`)
+  on two paths: `loadKeytar()` (`:268`) yields no module, or `getPassword` or `setPassword` throws and the
+  `catch` only warns (`:298-299`).
+- `bootstrapPackaged` puts that string in `AGENTFORGE_SECRETS_KEY` (`:659`) and stores it nowhere. The next
+  launch that takes the same path draws a different key.
+- Impact: lost data, not a leak. Settings and the gateway key sealed in that session do not open on the next
+  launch, and what was sealed earlier under the keychain key does not open in that session. The key is 32
+  random bytes, not a weak one. `apps/desktop/platform/windows/AGENTS.md:13` already documents the behaviour
+  and calls a keytar load failure a packaging bug.
+
+Why Won't fix: as for [SR-204](#sr-204), the desktop app was retired on 2026-10-14 and nothing packs or ships
+`apps/desktop`.
+
+Reopen trigger: a desktop build is revived. Then, before that cut:
+- `wrapKey` fails closed. When keytar cannot load, or `getPassword` or `setPassword` throws, the app shows a
+  startup error and stops. It never returns a random key.
+- A persisted key file (mode 0600) as a fallback is a security trade-off for Rizky to decide.
+- The envelope format and `wrappingKeyFromSecret` stay as they are.
+- Test first, in plain Node like `navigation.test.cjs`: a fake keytar whose `getPassword` or `setPassword`
+  rejects, and a run where `loadKeytar()` yields no module. `wrapKey` must throw or refuse. Today it returns a
+  64-character hex key.
+
+Gate: none while the desktop is retired.
+
 ### SR-206 {#sr-206}
 
 **The backup heartbeat URL would sit in `.env`, which the `app` container loads.**
@@ -6864,7 +6965,9 @@ Added 2026-10-07:
   `DELETE /api/v1/workspaces/:id` from a member answers `403 workspace_delete_forbidden` with the desk
   left. ([SR-156](#sr-156)) — tested, not driven.
 - [ ] The owner has chosen how stored media is scoped between the people of a company, before anyone says a
-  Chat attachment is private. ([SR-157](#sr-157))
+  Chat attachment is private. ([SR-157](#sr-157)) On 2026-11-06 Rizky accepted the risk for the OPC, because
+  a Nultron org has one owner. Reopen when an org gets a second member, which the bundle's DEPLOY.md step 7
+  allows today (`scripts/release-web-docs.mjs:156`), so the box stays open.
 
 Added 2026-10-13:
 

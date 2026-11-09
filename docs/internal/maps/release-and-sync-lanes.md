@@ -2,17 +2,13 @@
 
 Product: both · Instance: every checkout (main, tester); no app drive
 
-Last verified: 2026-10-22 at 7c44963 for the never-promote bullet under "Where things live" only. Nothing else on the page was re-read.
+Last verified: 2026-11-06 at 39cd5f0c
 
-Last verified: 2026-10-17 at 07cb099 for the brand-rule bullet only (Nultron no longer checked, Toko Token still is).
-
-Last verified: 2026-10-15 at 8a42aaed
-
-Repo names and the lane set were re-read on 2026-10-15 at 8a42aaed: the lanes are `main` and the tester, and Personal is retired. The earlier rewrite was on 2026-10-14. The "Chat-first shell" section was read on 2026-10-12 at e8a7eca8, against the tester branch, before PR #157 promoted it to `main`.
+Re-read on 2026-11-06: the overview, the repo names, the steps after a merge, the Guards section and the `pnpm where` row of "Where things live". The folder names in the lanes table were left as they are, though they no longer match the disk. On 2026-11-06 `C:\Users\rizky\agentforge-chat` was not a git checkout, and `tester/chat-first` was checked out in the worktree `C:\Users\rizky\agentforge-tester-sync`. `scripts/where-am-i.mjs` and the `AGENTS.md` tables use those names, so changing them is Rizky's call. The never-promote bullet was last read on 2026-10-22 at 7c44963 and the brand-rule bullet on 2026-10-17 at 07cb099. The "Chat-first shell" section was read on 2026-10-12 at e8a7eca8, against the tester branch, before PR #157 promoted it to `main`.
 
 ## Overview
 
-One source repo (`Kyoo032/agentforge`, branch `main`) is the one place a fix is made. The lanes are:
+One source repo (`Kyoo032/Nultron`, branch `main`) is the one place a fix is made. The lanes are:
 
 - `main` is the published code: Nultron as the OPC web app, and the Enterprise base.
 - The tester (`tester/chat-first`) is the staging code at every stage. It is never released.
@@ -20,7 +16,7 @@ One source repo (`Kyoo032/agentforge`, branch `main`) is the one place a fix is 
 
 The rules for where a change is cut and made are the tables at the top of `AGENTS.md`, "Where am I?" and "Where a change goes". The rules behind them are in `AGENTS.md`, "Lanes". This page is the working form of those rules: how a change reaches each lane, and what must be true before a lane counts as fixed. The longer story of the tester split is in Rizky's vault note `40-Dev/nultron-two-codes-map.md`. This page does not cover how a release is cut (see the "Web release" section of `AGENTS.md`).
 
-Repo names as of 2026-10-15: the Enterprise release repo is `Kyoo032/Nultron-Releases` (`RELEASE_REPO`, `scripts/release-web.mjs:63`; it was `Kyoo032/Nultron` until the rename of 2026-10-15, and `Kyoo032/NultronEnt` until 2026-10-14). The source repo `agentforge` is renamed to `Kyoo032/Nultron` after that rename. The retired Personal release repo is `Kyoo032/Nultron-Desktop`, archived.
+The Enterprise release repo is `Kyoo032/Nultron-Releases` (`RELEASE_REPO`, `scripts/release-web.mjs:65`; it was `Kyoo032/Nultron` until the rename of 2026-10-15, and `Kyoo032/NultronEnt` until 2026-10-14). After that rename the source repo `Kyoo032/agentforge` was renamed `Kyoo032/Nultron`. The retired Personal release repo is `Kyoo032/Nultron-Desktop`, archived.
 
 ## Lanes
 
@@ -41,23 +37,23 @@ PR #157 (merge `b14faa1a`) promoted the chat-first shell to `main`. So those fil
 Run these in order. A fix is not done for a lane until its step has run. The pull request says which lanes are still owed.
 
 1. **Tester.** In `C:\Users\rizky\agentforge-chat`: `git status` clean, `git fetch origin`, `git merge origin/main`, `pnpm install --frozen-lockfile`, `ci:local`. On a conflict keep the `main` side of any fix. If both cannot be kept, `git merge --abort` and ask Rizky.
-2. **Enterprise.** Only when Rizky says release (`node scripts/release-web.mjs`). Personal has no step. A release never implies a sync, and a sync never implies a release.
+2. **Enterprise.** Only when Rizky says release (`node scripts/release-web.mjs`). A release is a separate step that Rizky asks for. Merging `main` into the tester never implies one.
 
 ## Guards
 
-Two kinds of guard. The first is on `main` today. The second is added on branch `chore/agent-guardrails` and is not on `main` yet; it is named by file, not by line, because another change is writing it.
+Two kinds of guard, both on `main`. The second came from branch `chore/agent-guardrails` and is named by file, not by line.
 
-On `main` today:
+The first kind:
 
-- `scripts/lane-guard.mjs` (`pnpm lane-guard`) reads `lanes.json` and prints three kinds of warning: `map` (code under a `lanes.json` glob changed, and none of its map pages did), `protected` (a protected file changed and no commit in the range has a `Lanes:` line), `brand` (a brand literal rose in shared code past `scripts/lane-guard.baseline.json`). It exits 0 unless `--strict`.
-- `ci:local` runs `lane-guard` with `--strict` as an advisory step (`scripts/ci-local.mjs`). A warning shows in the table as `warn` and never fails the run.
+- `scripts/lane-guard.mjs` (`pnpm lane-guard`) reads `lanes.json` and checks four rules. Three block, and exit 1 with or without `--strict` (`scripts/lane-guard.mjs:19-28`): `never-promote` (a diff to `main` adds or changes a path on the never-promote list), `protected` (a protected file changed and no commit in the range has a `Lanes:` line), `brand` (a brand literal rose in shared code past `scripts/lane-guard.baseline.json`). One is advisory, and exits 1 only under `--strict` (`:30-32`): `map` (code under a `lanes.json` glob changed, and none of its map pages did).
+- `ci:local` runs it twice. The required step `lane-guard` runs it without `--strict`, so a blocking rule fails the run (`scripts/ci-local.mjs:342`). The advisory step `lane-guard:map` runs it with `--strict`, so a `map` warning shows in the table as `warn` and never fails the run (`:345`).
 - `scripts/map-rot.mjs` (`pnpm maps:check`) checks that cited `file:line` paths exist.
 
-Added on branch `chore/agent-guardrails` (not on `main` yet):
+The second kind, from branch `chore/agent-guardrails`:
 
-- `scripts/where-am-i.mjs` (`pnpm where`): prints the folder, branch and lane, and matches them to a row in `AGENTS.md` "Where am I?". Until it lands, the two git commands `git rev-parse --show-toplevel` and `git branch --show-current` do the same check by hand.
+- `scripts/where-am-i.mjs` (`pnpm where`): prints the folder, branch and lane, and matches them to a row in `AGENTS.md` "Where am I?". On an older branch without it, the two git commands `git rev-parse --show-toplevel` and `git branch --show-current` do the same check by hand.
 - `lanes.json`, never-promote list: paths that exist only in the tester and must not appear in a diff to `main`. `scripts/lane-guard.mjs` reads it. `.claude/rules/` is the one part of `.claude/` that is tracked on `main` (the pstack model rule, `.gitignore` un-ignores it), so the list names every other part of `.claude/` instead of the whole folder; `scripts/lane-guard.test.mjs` fails if a listed glob matches any file tracked on `main`.
-- `scripts/lane-guard.mjs` strict rules: the never-promote list, the `Lanes:` line on protected files, and brand literals in shared code. Read the script for the exact rule.
+- `scripts/lane-guard.mjs` blocking rules: the never-promote list, the `Lanes:` line on protected files, and brand literals in shared code. Read the script for the exact rule.
 - `scripts/hooks/pre-push`, installed by `scripts/install-hooks.mjs`: a git pre-push hook. Read the hook for its exact checks.
 - `scripts/release-web.mjs` and `apps/desktop/scripts/release-desktop.mjs` refuse to run from any branch other than `main`.
 
@@ -68,7 +64,7 @@ Added on branch `chore/agent-guardrails` (not on `main` yet):
 | The rules | `AGENTS.md`: "Where am I?", "Where a change goes", "Lanes" |
 | The sequence for any change | `.cursor/skills/change-agentforge/SKILL.md`; the worker preamble is `preamble.md` beside it |
 | Which path reaches which lane, which files the tester also edits | `lanes.json`; `scripts/lane-guard.mjs` |
-| Where am I (folder, branch, lane) | `pnpm where` (`scripts/where-am-i.mjs`, on `chore/agent-guardrails`) |
+| Where am I (folder, branch, lane) | `pnpm where` (`scripts/where-am-i.mjs`) |
 | Tester rules | `TESTER.md`, identical on `main` and `tester/chat-first`; it applies only in the tester branch |
 | The tester split in full | vault `40-Dev/nultron-two-codes-map.md` |
 | Brand of the desktop flavors | `apps/desktop/branding/<brand>/brand.json` (local and gitignored; the tracked `agentforge` kit was deleted on 2026-11-06) |

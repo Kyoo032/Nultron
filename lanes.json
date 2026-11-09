@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "about": "Ownership manifest read by scripts/lane-guard.mjs. Its never-promote (neverPromote), protected and brand rules block; the map rule only advises. Each entry maps a path glob to the map page that describes it, the lanes the path reaches, and whether it is protected. Lanes: personal (Nultron Personal, retired), enterprise (the hosted app), tester (agentforge-chat, tester/chat-first). A file may match several entries: its map pages are the union, it is protected if any match is. 'map: null' means no map check. Since the 2026-10-15 repo split this repo is Nultron only: Nultron may be named in shared code, Toko Token may not, and no downstream repo syncs from main. Plan (history): docs/internal/white-label-and-agent-guardrails-plan.md. Map: docs/internal/maps/release-and-sync-lanes.md.",
+  "about": "Ownership manifest read by scripts/lane-guard.mjs. Its never-promote (neverPromote), protected and brand rules block; the map rule only advises. Each entry maps a path glob to the map page that describes it, the lanes the path reaches, and whether it is protected. Lanes: enterprise (the hosted app, main), tester (agentforge-chat, tester/chat-first). personal (Nultron Personal, retired 2026-10-14, owes nothing) stays only on the apps/desktop entries, because it is the one lane those paths reach and every entry must name a lane. A file may match several entries: its map pages are the union, it is protected if any match is. 'map: null' means no map check. Since the 2026-10-15 repo split this repo is Nultron only: Nultron may be named in shared code, Toko Token may not, and no downstream repo syncs from main. Plan (history): docs/internal/white-label-and-agent-guardrails-plan.md. Map: docs/internal/maps/release-and-sync-lanes.md.",
   "brandLiterals": ["Toko Token"],
   "brandScope": {
     "include": ["apps/web/**", "packages/**"],
@@ -33,210 +33,210 @@
     {
       "glob": "packages/core/src/content/types.ts",
       "map": "docs/internal/maps/chat-send.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file (new message part). A change can conflict at the next merge of main into tester/chat-first."
     },
     {
       "glob": "packages/core/src/runtime/types.ts",
       "map": "docs/internal/maps/chat-send.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file (new stream event)."
     },
     {
       "glob": "packages/core/src/agents/product-modes.ts",
       "map": "docs/internal/maps/shell-rail-and-workspaces.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file (the switch that parks the modes). Also the first-desk rule: FIRST_RUN_MODES and HOSTED_FIRST_DESK_MODES."
     },
     {
       "glob": "packages/core/src/agents/default-chat.ts",
       "map": "docs/internal/maps/agent-tools-and-files.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file (the chat agent's tools and budget)."
     },
     {
       "glob": "packages/core/src/harness/modes/chat.ts",
       "map": "docs/internal/maps/agent-tools-and-files.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file (the Chat harness spec)."
     },
     {
       "glob": "packages/host/src/runs.ts",
       "map": "docs/internal/maps/chat-send.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file (the Chat run). 2026-10-09: runs a mode agent from the registry (runPolicyFor), wires the worker channel, and passes a longer idle budget to the model runtime's stream watchdog for the default agent and mode agents."
     },
     {
       "glob": "packages/host/src/register-tools.ts",
       "map": "docs/internal/maps/agent-tools-and-files.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file (tool registration)."
     },
     {
       "glob": "apps/web/components/chat-composer.tsx",
       "map": "docs/internal/maps/chat-send.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file."
     },
     {
       "glob": "apps/web/components/chat-turn.tsx",
       "map": "docs/internal/maps/chat-send.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file."
     },
     {
       "glob": "apps/web/components/chat-session.tsx",
       "map": "docs/internal/maps/chat-send.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file. 2026-10-09: gains the shell prop (an agent's header, empty state and progress lines)."
     },
     {
       "glob": "apps/web/components/app-rail.tsx",
       "map": "docs/internal/maps/chat-sessions-and-rail.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file (the rail)."
     },
     {
       "glob": "apps/web/components/model-picker.tsx",
       "map": "docs/internal/maps/chat-send.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file."
     },
     {
       "glob": "apps/web/locales/*/chat.json",
       "map": null,
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file, en and id. Add every key to both. Keep Toko Token out of them; copy that needs the product name takes {productName}."
     },
     {
       "glob": "packages/core/package.json",
       "map": null,
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file (the tester adds exports here). 2026-10-09: added the ./virtual-agents export."
     },
     {
       "glob": "packages/host/src/router.ts",
       "map": "docs/internal/maps/virtual-agents.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file. 2026-10-09: one route, GET /api/v1/virtual-agents, and its import."
     },
     {
       "glob": "packages/host/src/handlers/chat.ts",
       "map": "docs/internal/maps/virtual-agents.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file. 2026-10-09: GET /api/v1/chat leaves a virtual agent's row (slug va-<mode>) out of the specialists list."
     },
     {
       "glob": "packages/core/src/index.ts",
       "map": "docs/internal/maps/virtual-agents.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file. 2026-10-09: exports SHELL_LAYOUT and the virtual agent registry. A merge from main can conflict in the export list."
     },
     {
       "glob": "apps/web/components/app-shell.tsx",
       "map": "docs/internal/maps/virtual-agents.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file. 2026-10-09: draws AgentRail instead of AppRail when SHELL_LAYOUT is chat-first. The published rail is described in shell-rail-and-workspaces.md."
     },
     {
       "glob": "apps/web/components/chat-launcher.tsx",
       "map": "docs/internal/maps/chat-send.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file. 2026-10-09: hides the 'pick a model below' line when SHELL_LAYOUT is chat-first, because the tier is in the header there."
     },
     {
       "glob": "apps/web/src/pages/chat-page.tsx",
       "map": "docs/internal/maps/virtual-agents.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file. 2026-10-09: /chat renders AgentChatPane when SHELL_LAYOUT is chat-first. The working copy also changed from CRLF to LF line endings, so a diff shows the whole file."
     },
     {
       "glob": "apps/web/src/App.tsx",
       "map": "docs/internal/maps/virtual-agents.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file. 2026-10-09: /workspaces renders VirtualAgentsPage when SHELL_LAYOUT is chat-first."
     },
     {
       "glob": "apps/web/lib/i18n.ts",
       "map": "docs/internal/maps/locale-boot-and-run-harness.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file. 2026-10-09: registers the agents and harness namespaces. Each needs a parity test."
     },
     {
       "glob": "apps/web/lib/tool-labels.ts",
       "map": "docs/internal/maps/virtual-agents.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file. 2026-10-09: the row label and activity word for research_dossier."
     },
     {
       "glob": "apps/web/lib/message-embeds.ts",
       "map": "docs/internal/maps/virtual-agents.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file. 2026-10-09: research_dossier joins NO_EMBED_TOOLS because it draws its own card."
     },
     {
       "glob": "apps/web/locales/{en,id}/rail.json",
       "map": null,
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file, en and id. 2026-10-09: rail.workspaces now reads Virtual agents (Agen virtual). Only the published rail uses that key, so its Workspaces link changes wording too. Keep brand names out."
     },
     {
       "glob": "packages/core/src/gateway.ts",
       "map": "docs/internal/maps/virtual-agents.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file. 2026-10-09: adds resolvedAssistantName (AGENTFORGE_ASSISTANT_NAME, falling back to the product name). No brand's character is named here."
     },
     {
       "glob": "packages/host/src/handlers/misc.ts",
       "map": "docs/internal/maps/virtual-agents.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file. 2026-10-09: the ping also answers assistantName."
     },
     {
       "glob": "packages/host/src/knowledge-soul.ts",
       "map": "docs/internal/maps/virtual-agents.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file. 2026-10-09: the default Soul's name and its naming rule come from resolvedAssistantName. A desk that stored its Soul keeps the stored name."
     },
     {
       "glob": "apps/web/lib/product-brand.tsx",
       "map": "docs/internal/maps/virtual-agents.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file. 2026-10-09: ProductBrand gains assistantName and assistantNameOf, read from the ping. A packaged flavor keeps its own over the ping's."
     },
     {
       "glob": "apps/web/components/chat-hero.tsx",
       "map": "docs/internal/maps/virtual-agents.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": true,
       "note": "Tester shared file. 2026-10-09: when SHELL_LAYOUT is chat-first the greeting names the default agent through assistantNameOf. Also matches chat-*.tsx, whose map is chat-send.md."
     },
@@ -244,28 +244,28 @@
     {
       "glob": "apps/web/locales/**",
       "map": null,
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "en and id catalogs, one JSON per namespace; parity tests in apps/web/lib/*locale*.test.ts. Copy takes {productName} and never names Toko Token. See docs/internal/maps/locale-boot-and-run-harness.md."
     },
     {
       "glob": "apps/web/components/chat-*.tsx",
       "map": "docs/internal/maps/chat-send.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "Chat renderer."
     },
     {
       "glob": "apps/web/components/rail-*.tsx",
       "map": "docs/internal/maps/chat-sessions-and-rail.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "Rail submenus and recent sessions."
     },
     {
       "glob": "apps/web/components/nultron/**",
       "map": "docs/internal/maps/mascot-and-brand.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "The Nultron mascot. A new mascot state needs a manifest entry here."
     },
@@ -286,7 +286,7 @@
     {
       "glob": "apps/web/components/settings-*.tsx",
       "map": "docs/internal/maps/settings-and-gateway-gate.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "Settings cards."
     },
@@ -307,7 +307,7 @@
     {
       "glob": "apps/web/**",
       "map": null,
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "The shared renderer. A UI change usually lands on both products; find the page for the mode in docs/internal/maps/README.md."
     },
@@ -337,7 +337,7 @@
     {
       "glob": "packages/host/src/{gateway-gate,settings-store}.ts",
       "map": "docs/internal/maps/settings-and-gateway-gate.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "The advisory gateway gate and the sealed settings file."
     },
@@ -365,28 +365,28 @@
     {
       "glob": "packages/host/src/{job-regen,job-stream,job-source,job-model-fallback}.ts",
       "map": "docs/internal/maps/agent-tools-and-files.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "The job harness: every mode run is enforced here (tools, budget)."
     },
     {
       "glob": "packages/host/src/code-runner/**",
       "map": "docs/internal/maps/agent-tools-and-files.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "run_code sandbox. Hosted run_code is off unless AGENTFORGE_CODE_RUNS=on."
     },
     {
       "glob": "packages/host/src/components/**",
       "map": "docs/internal/maps/component-installer.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "First-run component installer; URLs and hashes only from manifest.ts."
     },
     {
       "glob": "packages/host/src/channels/**",
       "map": "docs/internal/maps/channels.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "Telegram channels."
     },
@@ -400,7 +400,7 @@
     {
       "glob": "packages/host/**",
       "map": null,
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "The host. Find the subsystem page in docs/internal/maps/README.md."
     },
@@ -408,14 +408,14 @@
     {
       "glob": "packages/core/src/harness/**",
       "map": "docs/internal/maps/agent-tools-and-files.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "One harness spec per mode."
     },
     {
       "glob": "packages/core/src/models/**",
       "map": "docs/internal/maps/model-policy.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "Model policy and fallback."
     },
@@ -429,21 +429,21 @@
     {
       "glob": "packages/core/src/security/**",
       "map": "docs/internal/maps/pii-and-key-security.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "PII masking. Redaction may hide an identifier, never a figure."
     },
     {
       "glob": "packages/core/**",
       "map": null,
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "Core. Prompts and error strings read productName and gatewayName, never a brand name."
     },
     {
       "glob": "packages/db/**",
       "map": "docs/internal/maps/database-and-migrations.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "Schema and ensureSchema. Product database is SQLite; the portal's Postgres is separate."
     },
@@ -480,14 +480,14 @@
     {
       "glob": "scripts/{ci-local,lane-guard,map-rot,map-drift}.mjs",
       "map": "docs/internal/maps/release-and-sync-lanes.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "Harness only, never ships. Local CI and the advisory checks."
     },
     {
       "glob": "lanes.json",
       "map": "docs/internal/maps/release-and-sync-lanes.md",
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "This manifest. When the tester branch starts editing another shared file, add it here in the same session."
     },
@@ -495,14 +495,14 @@
     {
       "glob": "docs/internal/maps/**",
       "map": null,
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "Map pages, read by the map rule. Every checkout keeps them."
     },
     {
       "glob": ".cursor/skills/**",
       "map": null,
-      "lanes": ["personal", "enterprise", "tester"],
+      "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "Agent guardrails (verify, pack, change). Harness only, never ships."
     }

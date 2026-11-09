@@ -11,8 +11,8 @@ Lighthouse box with this compose stack.** The way to run it is [Phase 0 pilot
 (compose)](#phase-0-pilot-compose); the rest of this file is the reference it leans on.
 
 This folder is **additive**. Nothing in `apps/`, `packages/`, the root `package.json`,
-`pnpm-workspace.yaml` or `turbo.json` is touched, so the Electron desktop app (frozen at
-0.14.27) and the mobile app keep building exactly as they did.
+`pnpm-workspace.yaml` or `turbo.json` is touched, so the Electron desktop app (retired
+2026-10-14; its code stays in the tree) and the mobile app keep building exactly as they did.
 
 The decision behind it is [`docs/internal/web-pivot-2026-09-18.md`](../docs/internal/web-pivot-2026-09-18.md).
 The step-by-step path from here to a safe public deployment is
@@ -42,6 +42,8 @@ webapp-deploy/
 ├─ portal.env.example         the PORTAL's env: signing key, database passwords, sign-in mode (password by default), Tencent SES login (code mode only)
 ├─ DEPLOY-LOG.md              date | sha | env | who | notes
 ├─ k8s/                       the Kubernetes rehearsal (a second deploy path; its own README)
+├─ sites/                     the DPS corporate sites on the same box (dpscloud, tokotoken), static, each off
+│                             unless DPS_DOMAIN or TOKOTOKEN_DOMAIN is set (enable-sites.sh). Not Nultron code
 └─ scripts/
    ├─ _common.sh              shared helpers (sourced, not run)
    ├─ build.sh                build the app and portal images, print their sizes
@@ -80,7 +82,7 @@ the pilot's second env file. The release path never builds from a checkout anywa
 - pnpm `9.15.9` via corepack, matching the root `packageManager` field.
 - Two installs, in two build stages. The `build` stage runs
   `pnpm install --frozen-lockfile --filter "@agentforge/web..."` (the web app and its
-  workspace dependencies only; `apps/desktop` — Electron, electron-builder, keytar — and
+  workspace dependencies only; `apps/desktop`, the retired Electron app (Electron, electron-builder, keytar), and
   `apps/mobile` are never installed) and then `pnpm --filter @agentforge/web build` →
   `vite build` → `apps/web/dist`, which `server.ts` serves statically when
   `NODE_ENV=production`. The `prod` stage runs the same install with `--prod`, copies in
@@ -733,6 +735,10 @@ docker compose -f compose.yml up -d --no-build --force-recreate app proxy portal
 # code, an older sha: a rebuild, since no image is kept for it
 git -C .. checkout <previous-sha>        # run on the server, by hand
 sh webapp-deploy/scripts/deploy.sh --no-pull
+
+# code, a server that runs the released bundle instead (in the bundle folder), as its DEPLOY.md says
+git checkout <previous-ent-tag>          # its compose.yml pins both ghcr images to that tag
+docker compose up -d                     # DEPLOY.md step 6
 ```
 
 `restore.sh` stops both services, empties the volume, unpacks the tarball, promotes the
@@ -740,10 +746,21 @@ consistent snapshot over `agentforge.sqlite` (dropping the stale `-wal`/`-shm` s
 can never be replayed on top of it), and starts back up. It asks for confirmation unless
 you pass `--yes`.
 
-`:previous` holds the images from before the **last** deploy only, so it is one step back. An older
-sha is a rebuild. There is no image registry yet, so there is no `docker pull <old-tag>` path;
-adding one is a migration-plan item. The restore above brings back the data, not the code. A
-migration that ran is not undone.
+`:previous` holds the images from before the **last** deploy only, so it is one step back. This
+source stack (`scripts/deploy.sh`) builds `nultron-web:local` and `nultron-portal:local` on the server and
+pulls no Nultron image, so an older sha here is a rebuild. It still runs `git pull --ff-only`
+(`scripts/deploy.sh:234-235`), and compose pulls the stock `caddy` and `postgres` images (`compose.yml:153`,
+`:225`).
+
+The released bundle is the path with a registry. Every release from `scripts/release-web.mjs` pushes
+`ghcr.io/kyoo032/nultron-ent:<tag>` and `ghcr.io/kyoo032/nultron-portal:<tag>` and commits a bundle
+whose `compose.yml` pins both images to that tag (`scripts/release-web.mjs:19-26` at the repo root). A server that runs the
+bundle rolls back the way the bundle's own `DEPLOY.md` says (`scripts/release-web-docs.mjs:173-175`).
+Check out the previous release tag of the release repo, then repeat its step 6, `docker compose up -d`.
+No release has been cut yet. `Kyoo032/Nultron-Releases` had no GitHub Release on 2026-11-06, so there
+is no older tag to pull.
+
+The restore above brings back the data, not the code. A migration that ran is not undone.
 
 ## Migrating from the DPSBuddy names
 
@@ -875,8 +892,8 @@ curl -sI https://$NULTRON_DOMAIN | grep -iE 'strict-transport|content-security|x
 
 ## Transport filtering
 
-Everything below is **server mode only** (`AGENTFORGE_SERVER=1`). Webdev (`:3000`) and the
-desktop keep the loopback rule they have always had: no filter, no limiter, no masking of
+Everything below is **server mode only** (`AGENTFORGE_SERVER=1`). Off server mode, webdev
+(`:3000`) keeps the loopback rule it has always had: no filter, no limiter, no masking of
 error text. Every rejection is the same JSON envelope, `{"error":{"code":"...","message":"..."}}`,
 with `X-Content-Type-Options: nosniff`, and is written to stdout as one
 `{"event":"request_filtered", ...}` line carrying the code, the method, the *length* of the

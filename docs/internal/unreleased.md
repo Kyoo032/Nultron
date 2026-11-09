@@ -1179,6 +1179,13 @@ Lanes: enterprise, tester. No shipped behaviour of the web app changes.
 - **Proof.** `pnpm --filter @agentforge/desktop test` and `node --test scripts/*.test.mjs` (327 passed) and `brand-icons.test.mjs` with `brand-logo-cut.test.mjs` (36 passed) pass with the folders deleted.
 - **Not touched.** The deploy `.dockerignore` lines and `.gitignore` entries for `apps/desktop/branding` stay: the local kemenkeu and metranet folders still live there. `verify-bundle.py` still lists `Contents/Resources/brand/brand.json`, which only a restored kit produces.
 
+## 2026-11-06: SR-157, SR-175 and SR-176 accepted for the OPC (docs only)
+
+Lanes: enterprise, tester. Register only, no code changed.
+
+- **Accepted for the OPC (Rizky, 2026-11-06).** A Nultron org has one owner, so the security tester's SEC-003 is accepted for the OPC. [SR-157](security-register.md#sr-157) (media read by company) and [SR-175](security-register.md#sr-175) and [SR-176](security-register.md#sr-176) (a colleague's generated files readable and deletable) moved from "not applicable" or "open" to "accepted for the OPC". The earlier "not applicable since 2026-10-16" was wrong for `main`: the tester's strip removed the tester's owner check, and `main` still reads and deletes media by organization and artifacts by desk.
+- **Reopen trigger.** All three reopen when an org gets a second member. The release bundle's DEPLOY.md step 7 already lets an operator add `admin` and `member` accounts (`scripts/release-web-docs.mjs:156`), so the trigger is reachable today. A media fix needs no schema change (`media.user_id` is NOT NULL); an artifact fix needs an owner column first.
+
 ## The portal keeps serving when Postgres ends an idle pool connection, 2026-11-09 (branch `claude/fix-portal-test-teardown`, SR-200)
 
 Lanes: enterprise.
