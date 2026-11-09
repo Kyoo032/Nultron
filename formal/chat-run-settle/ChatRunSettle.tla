@@ -5,19 +5,22 @@ CONSTANTS DbYields, StallGuard, GuardAfterInsert, GuardOnCompleted,
           GuardAfterAttempt, GuardInCatch, SettleFinishes,
           FinishOnlyFromStreaming, MeterOnce, MeterOnFinish,
           MeterOnSettledCompletion, MeterAfterAttempt, ClaimOnPersist,
-          CancelYieldsToClaim
+          CancelYieldsToClaim, StreamBound, QuietOnceSaved
 
 VARIABLES pc, outcome, settled, queueClosed, runIdSet, row, msg, persisted,
-          billed, metered, settledMetered, cancelPending, seen, finishing
+          billed, metered, settledMetered, cancelPending, seen, finishing,
+          hangAt
 
 vars == <<pc, outcome, settled, queueClosed, runIdSet, row, msg, persisted,
-          billed, metered, settledMetered, cancelPending, seen, finishing>>
+          billed, metered, settledMetered, cancelPending, seen, finishing,
+          hangAt>>
 
 Outcomes == {"answer", "fail", "hang"}
 NetWaits == {"start", "model"}
 DbWaits == {"storeUser", "insertRun", "finishAfterInsert", "persistEv",
             "persistFinal", "finishCompleted", "tail", "catchFinish"}
 Labels == NetWaits \cup DbWaits \cup {"afterAttempt", "catch", "done"}
+HangPoints == {"none"} \cup DbWaits
 RowStates == {"none", "streaming", "completed", "failed"}
 Frames == {"failed", "end", "ok"}
 
@@ -42,6 +45,7 @@ TypeOK ==
     /\ cancelPending \in BOOLEAN
     /\ seen \in Seq(Frames)
     /\ finishing \in BOOLEAN
+    /\ hangAt \in HangPoints
 
 Init ==
     /\ pc = "start"
@@ -58,6 +62,7 @@ Init ==
     /\ cancelPending = FALSE
     /\ seen = <<>>
     /\ finishing = FALSE
+    /\ hangAt \in IF DbYields THEN HangPoints ELSE {"none"}
 
 Settle ==
     /\ ~settled
@@ -73,14 +78,29 @@ Settle ==
          ELSE /\ row' = IF runIdSet /\ SettleFinishes THEN FinishTo("failed") ELSE row
               /\ UNCHANGED cancelPending
     /\ UNCHANGED <<pc, outcome, runIdSet, msg, persisted, billed, metered, settledMetered,
-                   finishing>>
+                   finishing, hangAt>>
 
 CancelFinish ==
     /\ cancelPending
     /\ cancelPending' = FALSE
     /\ row' = FinishTo("failed")
     /\ UNCHANGED <<pc, outcome, settled, queueClosed, runIdSet, msg, persisted,
-                   billed, metered, settledMetered, seen, finishing>>
+                   billed, metered, settledMetered, seen, finishing, hangAt>>
+
+StandDown ==
+    /\ StallGuard
+    /\ StreamBound
+    /\ CancelYieldsToClaim
+    /\ finishing
+    /\ ~queueClosed
+    /\ DbYields
+    /\ pc \in DbWaits
+    /\ queueClosed' = TRUE
+    /\ seen' = IF persisted /\ QuietOnceSaved THEN seen
+               ELSE IF outcome = "fail" THEN Append(seen, "end")
+               ELSE seen \o <<"failed", "end">>
+    /\ UNCHANGED <<pc, outcome, settled, runIdSet, row, msg, persisted, billed, metered,
+                   settledMetered, cancelPending, finishing, hangAt>>
 
 Start ==
     /\ pc = "start"
@@ -217,19 +237,21 @@ CatchFinish ==
                    finishing>>
 
 Work ==
-    \/ Start \/ StoreUser \/ InsertRun \/ FinishAfterInsert
-    \/ ModelAnswers \/ ModelFails \/ ModelAborted \/ PersistEv
-    \/ AfterAttempt \/ PersistFinal \/ FinishCompleted \/ AfterFinish
-    \/ Catch \/ CatchFinish
+    /\ pc # hangAt
+    /\ UNCHANGED hangAt
+    /\ \/ Start \/ StoreUser \/ InsertRun \/ FinishAfterInsert
+       \/ ModelAnswers \/ ModelFails \/ ModelAborted \/ PersistEv
+       \/ AfterAttempt \/ PersistFinal \/ FinishCompleted \/ AfterFinish
+       \/ Catch \/ CatchFinish
 
-Next == Work \/ Settle \/ CancelFinish
+Next == Work \/ Settle \/ CancelFinish \/ StandDown
 
 Spec ==
     /\ Init
     /\ [][Next]_vars
     /\ WF_vars(Work)
     /\ WF_vars(CancelFinish)
-    /\ IF StallGuard THEN WF_vars(Settle) ELSE TRUE
+    /\ IF StallGuard THEN WF_vars(Settle) /\ WF_vars(StandDown) ELSE TRUE
 
 FailedRowHasNoAnswer == row = "failed" => ~msg
 
@@ -245,5 +267,7 @@ EndsSettled == Quiet => (runIdSet => row \in {"completed", "failed"})
 
 BilledIsMetered == Quiet => (billed => metered = 1)
 
-Termination == <>(pc = "done")
+Termination == hangAt = "none" => <>(pc = "done")
+
+StreamEnds == <>queueClosed
 =============================================================================
