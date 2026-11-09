@@ -19,6 +19,7 @@ import {
 } from "@agentforge/core";
 import { getLocalVaultKey } from "@agentforge/db/vault-key";
 import { withCodeRunPolicy } from "./code-runner/enabled";
+import { carriesStoredBypass, setInjectionGuardBypass, withInjectionGuardBypass } from "./injection-guard-bypass";
 import { parseKeyLaterRecord, type KeyLaterRecord } from "./key-later";
 import { readSelectedWorkspaceId } from "./workspace";
 import { assertTenantId, tenantDataDir } from "./tenant-paths";
@@ -132,7 +133,6 @@ function normalizeSecrets(parsed: StoredSecrets): StoredSecrets {
     researchGenModel: readString(parsed.researchGenModel),
     presentationGenModel: readString(parsed.presentationGenModel),
     disabledTools,
-    injectionGuardBypass: parsed.injectionGuardBypass === true ? true : undefined,
     editTurnCapUsd:
       typeof parsed.editTurnCapUsd === "number" && Number.isFinite(parsed.editTurnCapUsd)
         ? Math.min(50, Math.max(0.5, parsed.editTurnCapUsd))
@@ -269,7 +269,9 @@ function usersMap(value: unknown): Record<string, UserPrefs> | undefined {
   return Object.keys(next).length > 0 ? next : undefined;
 }
 
-function parseSettingsFile(decrypted: unknown): { file: SettingsFileV2; migrated: boolean } {
+type ParsedSettingsFile = { file: SettingsFileV2; migrated: boolean; droppedBypass: boolean };
+
+function parseSettingsFile(decrypted: unknown): ParsedSettingsFile {
   if (isSettingsFileV2(decrypted)) {
     const source = decrypted as SettingsFileV2;
     const users = usersMap(source.users);
@@ -281,15 +283,17 @@ function parseSettingsFile(decrypted: unknown): { file: SettingsFileV2; migrated
         workspaces: secretsMap(decrypted.workspaces as Record<string, unknown>),
       },
       migrated: false,
+      droppedBypass: carriesStoredBypass(decrypted.workspaces),
     };
   }
   if (decrypted && typeof decrypted === "object") {
     return {
       file: { version: 2, workspaces: { [LEGACY_SETTINGS_WORKSPACE]: normalizeSecrets(decrypted as StoredSecrets) } },
       migrated: true,
+      droppedBypass: false,
     };
   }
-  return { file: emptySettingsFile(), migrated: false };
+  return { file: emptySettingsFile(), migrated: false, droppedBypass: false };
 }
 
 function persistEncrypted(tenantId: string, file: SettingsFileV2): void {
@@ -441,6 +445,20 @@ function withGatewayDefault(secrets: StoredSecrets): StoredSecrets {
   return { ...secrets, openaiBaseUrl: resolvedGatewayBaseUrl() };
 }
 
+function clearStoredBypass(tenantId: string, file: SettingsFileV2): boolean {
+  try {
+    persistEncrypted(tenantId, file);
+  } catch (error) {
+    log.warn("settings_injection_guard_bypass_not_cleared", {
+      tenantId,
+      detail: error instanceof Error ? error.message : String(error),
+    });
+    return false;
+  }
+  log.warn("settings_injection_guard_bypass_dropped", { tenantId });
+  return true;
+}
+
 function loadSettingsFile(tenantId: string): SettingsFileV2 {
   const backend = tenantStateBackend();
   const slot = backend.describe(tenantId, SETTINGS_KEY);
@@ -459,6 +477,9 @@ function loadSettingsFile(tenantId: string): SettingsFileV2 {
         // stamp, so the cache is populated by the next read rather than from a token that is
         // already stale.
         persistEncrypted(tenantId, parsed.file);
+        return parsed.file;
+      }
+      if (parsed.droppedBypass && clearStoredBypass(tenantId, parsed.file)) {
         return parsed.file;
       }
       payloadCache.set(slot, { stamp: stored.stamp, file: parsed.file });
@@ -489,7 +510,11 @@ function loadSettingsFile(tenantId: string): SettingsFileV2 {
  */
 export function loadSettings(scope?: SettingsScope): StoredSecrets {
   const { tenantId, workspaceId } = resolveSettingsScope(scope);
-  return withCodeRunPolicy(withGatewayDefault(sliceFor(loadSettingsFile(tenantId), workspaceId)));
+  return withInjectionGuardBypass(
+    withCodeRunPolicy(withGatewayDefault(sliceFor(loadSettingsFile(tenantId), workspaceId))),
+    tenantId,
+    workspaceId,
+  );
 }
 
 export function saveSettings(patch: SecretPatch, scope?: SettingsScope): StoredSecrets {
@@ -503,7 +528,10 @@ export function saveSettings(patch: SecretPatch, scope?: SettingsScope): StoredS
     workspaces: { ...file.workspaces, [workspaceId]: next },
   });
   tryDeleteLegacyPlaintext(tenantId);
-  return next;
+  if (typeof patch.injectionGuardBypass === "boolean") {
+    setInjectionGuardBypass(tenantId, workspaceId, patch.injectionGuardBypass);
+  }
+  return withInjectionGuardBypass(next, tenantId, workspaceId);
 }
 
 /** The provider key fields a hosted save carries to a company's other desks (SR-163). Nothing else travels. */
@@ -627,6 +655,7 @@ export function dropWorkspaceSettings(workspaceId: string, scope?: SettingsScope
     return;
   }
   const { tenantId } = resolveSettingsScope(scope ?? workspaceId);
+  setInjectionGuardBypass(tenantId, id, false);
   const file = loadSettingsFile(tenantId);
   if (!file.workspaces[id]) {
     return;

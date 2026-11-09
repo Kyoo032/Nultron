@@ -80,13 +80,10 @@ describe("mergeSecrets", () => {
     expect(untouched.disabledTools).toEqual(["image_generate", "web_search"]);
   });
 
-  it("stores injectionGuardBypass only when true (default absent = protected)", () => {
-    const enabled = mergeSecrets({}, { injectionGuardBypass: true });
-    expect(enabled.injectionGuardBypass).toBe(true);
-    const cleared = mergeSecrets(enabled, { injectionGuardBypass: false });
-    expect(cleared.injectionGuardBypass).toBeUndefined();
-    const untouched = mergeSecrets(enabled, { openaiApiKey: "sk-x" });
-    expect(untouched.injectionGuardBypass).toBe(true);
+  it("never merges injectionGuardBypass, so a patch cannot put it in a saved file", () => {
+    expect(mergeSecrets({}, { injectionGuardBypass: true }).injectionGuardBypass).toBeUndefined();
+    expect(mergeSecrets({}, { injectionGuardBypass: false }).injectionGuardBypass).toBeUndefined();
+    expect(mergeSecrets({ openaiApiKey: "sk-x" }, { injectionGuardBypass: true })).toEqual({ openaiApiKey: "sk-x" });
   });
 
   it("clamps editTurnCapUsd to 0.5–50 and leaves it absent when unpatched", () => {

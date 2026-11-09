@@ -55,11 +55,11 @@ now rather than a reason not to.
 | A09-2 | Medium | Authentication failures were not logged at all | `packages/host/src/http-adapter.ts:582-593` | Fixed |
 | A10-1 | **High** | The private-range check missed most of IPv4 and nearly all of IPv6 | `packages/core/src/security/ip-range.ts` | Fixed |
 | A10-2 | **High** | IPv4-mapped, 6to4 and NAT64 IPv6 forms bypassed the check entirely | `packages/core/src/security/ip-range.ts:174-246` | Fixed |
-| A10-3 | **High** | A public hostname resolving to a private address passed | `packages/core/src/security/safe-fetch.ts:110-128` | Fixed |
+| A10-3 | **High** | A public hostname resolving to a private address passed | `packages/core/src/security/safe-fetch.ts:104-126` | Fixed |
 | A10-4 | **High** | Key-bearing outbound calls followed redirects, carrying the key | `packages/host/src/edit/asr.ts:31-39` and three others | Fixed |
 | A10-5 | Medium | fal.ai poll URLs were taken from the response body unvalidated | `packages/core/src/tools/platform/fal-queue.ts:25-37` | Fixed |
 
-Plus one open by nature rather than by choice, A10-6 (DNS rebinding), at the end.
+Plus one that was open by nature rather than by choice, A10-6 (DNS rebinding), at the end. It is fixed in tree (SR-201).
 
 ## A01 — Broken access control
 
@@ -496,12 +496,13 @@ theoretical ones. `packages/core/src/security/ip-range.ts` recurses onto the emb
 ### A10-3 — DNS was never consulted
 
 The check ran on the literal hostname. `metadata.attacker.example` resolving to `169.254.169.254`
-passed every test and then connected to the metadata service. `assertResolvesPublic`
-(`packages/core/src/security/safe-fetch.ts:110-128`) resolves the name and refuses any private answer, and is called **per
-redirect hop** (`:181`), not once at the start.
+passed every test and then connected to the metadata service. `resolvePublicAddresses`
+(`packages/core/src/security/safe-fetch.ts:104-126`) resolves the name and refuses any private answer, and is called **per
+redirect hop** (`:241`), not once at the start.
 
-It fails *open* on a resolution error, deliberately: an offline test with a stubbed `fetchImpl`
-must still pass, and a name that does not resolve cannot be connected to anyway.
+It used to fail *open* on a resolution error, on the reasoning that a name that does not resolve for
+the check will not resolve for `fetch` either. That was wrong, and it is closed by [SR-201](security-register.md#sr-201):
+a failed or empty lookup now refuses with `400 invalid_endpoint`.
 
 ### A10-4 — Key-bearing calls followed redirects
 
@@ -518,12 +519,16 @@ same change added timeouts (`AbortSignal.timeout`), which none of them had.
 without checking where they pointed. `assertQueueUrl` (`:25-37`) now requires them to be on
 `QUEUE_ORIGIN` or `https://fal.run` before the first poll.
 
-### A10-6 — DNS rebinding *(open by nature)*
+### A10-6 — DNS rebinding *(fixed in tree 2026-11-06, SR-201)*
 
-`assertResolvesPublic` resolves the name, and then `fetch` resolves it again to connect. A record
-with a one-second TTL can differ between the two. Closing this needs a custom undici dispatcher
-that connects to the address already validated rather than re-resolving. Recorded here rather than
-attempted, because a half-done version of that is worse than none.
+The check resolved the name, and then `fetch` resolved it again to connect. A record with a
+one-second TTL can differ between the two. It was recorded here as open because closing it needs a
+custom undici dispatcher that connects to the address already validated.
+
+That is what `fetchPublicHttps` does now (`packages/core/src/security/safe-fetch.ts`): it resolves
+each hop once, refuses a private, empty or failed answer, and passes `fetch` an undici `Agent`
+whose `connect.lookup` returns only that vetted list. The connection never asks DNS again. See
+[SR-201](security-register.md#sr-201) for the proof and what is not driven.
 
 ## Two test fixes that this work depended on
 
