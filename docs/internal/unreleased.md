@@ -1129,6 +1129,15 @@ Lanes: enterprise.
 - **Proof.** `node --test scripts/backup-heartbeat.test.mjs`: 11 tests against a local stub HTTP server. Five drive `heartbeat_ping` alone (success, `/fail`, unset, malformed URLs built from the stub's own host and port, dead monitor). Five run the real `backup.sh` with a fake `docker` on `PATH` (good run pings once and exits 0, failed run pings `/fail` once and exits 1, unset pings nothing, an unreachable monitor does not fail a good backup, and a URL placed in a `.env` beside a copy of the scripts is ignored). One checks that `.env.example` sets no heartbeat URL. The URL reaches each child through its environment only. Deleting the malformed-URL guard in `_heartbeat.sh` makes the malformed-URL test fail.
 - **Not deployed.** Nothing was changed on the box. Rizky pulls the scripts there, sets the variable on the cron line and creates the check; that step is his. Not driven against a real monitor.
 
+## 2026-11-06: every /api request needs a trusted Host (SEC-004 4b, SR-207)
+
+Lanes: enterprise, tester.
+
+- **What.** The Host check used to run only on mutating `/api` requests, so a DNS-rebinding page could read the API with a GET. `hostRejection` (`packages/host/src/http-adapter.ts`) now runs for GET, HEAD and OPTIONS too: a loopback Host off server mode, an allowlisted Host in server mode, and a missing Host is refused. `/healthz` is exempt. Origin stays optional on a GET. The error codes are unchanged: `forbidden` off server mode, `origin_forbidden` in server mode. Maps: `hosted-security-controls.md` § 3 and row 6a, `hosted-server-mode.md` step 10.
+- **Shared files.** `http-adapter.ts` and its test exist on the tester too, so a merge from `main` carries the rule across.
+- **Proof.** `http-adapter.test.ts`: ten new cases, five failing before the fix, plus `http-adapter-socket.test.ts` (three cases over a real socket). Not driven against webdev in a browser or on a hosted server.
+- **Not done here.** The lookup-error fail-open and the DNS rebinding pin are SEC-004 4a, in `safe-fetch.ts`.
+
 ## The portal keeps serving when Postgres ends an idle pool connection, 2026-11-09 (branch `claude/fix-portal-test-teardown`, SR-200)
 
 Lanes: enterprise.
