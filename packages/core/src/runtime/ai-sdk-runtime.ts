@@ -596,6 +596,7 @@ export class AiSdkRuntime implements AgentRuntime {
       text: first.text,
       failed: first.failed,
       tooled: first.tooled,
+      thinking: hasVisibleText(first.thinking),
     });
     let result = shouldRetryBare
       ? await consumeOnce(activeModel, undefined, {
@@ -619,6 +620,7 @@ export class AiSdkRuntime implements AgentRuntime {
             : ""),
         text: result.text,
         tooled: result.tooled,
+        thinking: hasVisibleText(result.thinking),
         attempts: contactAttempts,
       })
     ) {

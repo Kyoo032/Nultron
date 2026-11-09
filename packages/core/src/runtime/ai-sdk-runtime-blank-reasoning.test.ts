@@ -1,7 +1,10 @@
+import { z } from "zod";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AiSdkRuntime } from "./ai-sdk-runtime";
 import { resetLearnedEffortLimits } from "./effort-selfheal";
-import type { AgentVersionRecord } from "../agents/service";
+import type { AgentVersionRecord, ToolBindingRecord } from "../agents/service";
+import { defineTool } from "../tools/define-tool";
+import { registerTool, resetToolRegistry } from "../tools/registry";
 import type { TenantContext } from "../tenancy/types";
 import type { RuntimeEvent } from "./types";
 
@@ -98,7 +101,29 @@ function gateway(replies: Array<() => Response>): () => number {
   return () => sent;
 }
 
-async function run(): Promise<{ events: RuntimeEvent[]; failed: unknown }> {
+const echoBinding: ToolBindingRecord = {
+  id: "b1",
+  agentVersionId: "v",
+  organizationId: "org",
+  toolKey: "echo",
+  config: {},
+  enabled: true,
+};
+
+function registerEcho() {
+  resetToolRegistry();
+  registerTool(
+    defineTool({
+      key: "echo",
+      name: "Echo",
+      description: "Echo a number.",
+      schema: z.object({ x: z.number() }),
+      execute: async (args) => ({ echoed: args.x }),
+    }),
+  );
+}
+
+async function run(bindings: ToolBindingRecord[] = []): Promise<{ events: RuntimeEvent[]; failed: unknown }> {
   const events: RuntimeEvent[] = [];
   let failed: unknown;
   try {
@@ -107,7 +132,7 @@ async function run(): Promise<{ events: RuntimeEvent[]; failed: unknown }> {
       runId: "run-blank-reasoning",
       modality: "text",
       version,
-      bindings: [],
+      bindings,
       history: [{ role: "user", parts: [{ type: "text", text: "Say ok." }] }],
       thinking: true,
       reasoningEffort: "medium",
@@ -131,6 +156,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  resetToolRegistry();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   resetLearnedEffortLimits();
@@ -162,16 +188,58 @@ describe("reasoning that is only whitespace, with no answer text", () => {
   });
 });
 
+const thinkingEvents = (events: RuntimeEvent[]) => events.filter((event) => event.type === "assistant.thinking");
+const probes = (events: RuntimeEvent[]) => events.filter((event) => event.type === "run.probing");
+
 describe("reasoning that is readable, with no answer text", () => {
-  it("still completes, so the thinking is saved as the turn", async () => {
-    gateway(
-      Array.from({ length: 3 }, () => () => named([created, ...reasoning("Weighing the options."), completedFrame])),
-    );
+  it("completes on the first reply, so the thinking is saved as the turn and the model is asked once", async () => {
+    const sent = gateway([() => named([created, ...reasoning("Weighing the options."), completedFrame])]);
     const { events, failed } = await run();
 
     expect(failed).toBeUndefined();
-    expect(events).toContainEqual({ type: "assistant.thinking", text: "Weighing the options." });
+    expect(sent()).toBe(1);
+    expect(thinkingEvents(events)).toEqual([{ type: "assistant.thinking", text: "Weighing the options." }]);
+    expect(probes(events)).toHaveLength(1);
     expect(completed(events)).toHaveLength(1);
     expect(failedEvents(events)).toHaveLength(0);
+  });
+
+  it("is not given the tool-less retry either when tools are bound", async () => {
+    registerEcho();
+    const sent = gateway([() => named([created, ...reasoning("Weighing the options."), completedFrame])]);
+    const { events, failed } = await run([echoBinding]);
+
+    expect(failed).toBeUndefined();
+    expect(sent()).toBe(1);
+    expect(thinkingEvents(events)).toHaveLength(1);
+    expect(completed(events)).toHaveLength(1);
+    expect(failedEvents(events)).toHaveLength(0);
+  });
+});
+
+describe("a call that streamed nothing", () => {
+  it("is asked three times when the connection drops, one probe each, then fails", async () => {
+    let sent = 0;
+    vi.stubGlobal("fetch", async () => {
+      sent += 1;
+      throw new TypeError("fetch failed");
+    });
+    const { events, failed } = await run();
+
+    expect(sent).toBe(3);
+    expect(probes(events)).toHaveLength(3);
+    expect(thinkingEvents(events)).toHaveLength(0);
+    expect(failedEvents(events)).toHaveLength(1);
+    expect(String((failed as Error).message)).toMatch(/after 3 tries/);
+  });
+
+  it("is one failed request, not a retry, when the reply has no events and no error", async () => {
+    const sent = gateway([() => named([created, completedFrame])]);
+    const { events, failed } = await run();
+
+    expect(sent()).toBe(1);
+    expect(failedEvents(events)).toHaveLength(1);
+    expect(completed(events)).toHaveLength(0);
+    expect(String((failed as Error).message)).toMatch(/returned no text/);
   });
 });
