@@ -10,6 +10,7 @@ import { readStoredFinanceReport } from "../finance-tasks/persist";
 import { financeReportSchema, readPostedFinanceReport } from "../finance-tasks/report-schema";
 import { DEFAULT_REPORT_FORMAT, renderReport } from "../renderers/registry";
 import { REPORT_FORMATS } from "../renderers/types";
+import { assertRequestWithin } from "../request-limits";
 import { localeForRun } from "../run-context";
 import { getTenant } from "../tenant";
 
@@ -40,6 +41,7 @@ const exportRequestSchema = z.object({
 type ExportRequest = z.infer<typeof exportRequestSchema>;
 
 function readRequest(body: unknown): ExportRequest {
+  assertRequestWithin(body, "Export request");
   // Size first: a malformed 40 MB report should be refused, not shaped.
   const posted = (body as { report?: unknown } | null)?.report;
   if (posted !== undefined) {

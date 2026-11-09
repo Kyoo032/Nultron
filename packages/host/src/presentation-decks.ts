@@ -3,6 +3,7 @@ import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { localDataDir } from "@agentforge/db/vault-key";
 import { ApiError } from "@agentforge/core";
+import { MAX_OUTLINE_SLIDES } from "./presentation-checks";
 import { parsePresentationOutlineBody, type PresentationOutline } from "./presentation-outline";
 
 export type SavedDeck = {
@@ -16,6 +17,9 @@ export type SavedDeckSummary = {
   savedAt: string;
   title: string;
 };
+
+export const SAVED_DECK_SLIDES_MAX = MAX_OUTLINE_SLIDES * 2;
+export const SAVED_DECK_BULLETS_MAX = 50;
 
 const DECK_ID = /^deck_[a-f0-9]{8}$/;
 
@@ -34,7 +38,17 @@ function assertDeckId(id: string): string {
   return id;
 }
 
+function assertDeckSize(outline: PresentationOutline): void {
+  if (outline.slides.length > SAVED_DECK_SLIDES_MAX) {
+    throw new ApiError("invalid_request", `A deck holds at most ${SAVED_DECK_SLIDES_MAX} slides`, 400);
+  }
+  if (outline.slides.some((slide) => slide.bullets.length > SAVED_DECK_BULLETS_MAX)) {
+    throw new ApiError("invalid_request", `A slide holds at most ${SAVED_DECK_BULLETS_MAX} bullets`, 400);
+  }
+}
+
 export function savePresentationDeck(workspaceId: string, outline: PresentationOutline, id?: string): SavedDeck {
+  assertDeckSize(outline);
   const folder = workspaceFolder(workspaceId);
   mkdirSync(folder, { recursive: true });
   const deckId = id ? assertDeckId(id) : `deck_${randomBytes(4).toString("hex")}`;

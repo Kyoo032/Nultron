@@ -47,6 +47,7 @@
     "./jobs": "./src/jobs/index.ts",
     "./finance": "./src/finance/index.ts",
     "./market": "./src/market/index.ts",
+    "./market/test-fixtures": "./src/market/watch-fixtures.ts",
     "./docx": "./src/docx/index.ts",
     "./docx/test-fixtures": "./src/docx/__fixtures__/build-zip.ts",
     "./pdf": "./src/pdf/index.ts",
