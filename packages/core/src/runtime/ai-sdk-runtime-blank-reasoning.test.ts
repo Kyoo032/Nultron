@@ -85,7 +85,7 @@ function reasoning(summary: string): Frame[] {
   ];
 }
 
-function gateway(replies: Array<() => Response>): void {
+function gateway(replies: Array<() => Response>): () => number {
   let sent = 0;
   vi.stubGlobal("fetch", async () => {
     sent += 1;
@@ -95,6 +95,7 @@ function gateway(replies: Array<() => Response>): void {
     }
     return reply();
   });
+  return () => sent;
 }
 
 async function run(): Promise<{ events: RuntimeEvent[]; failed: unknown }> {
@@ -137,8 +138,11 @@ afterEach(() => {
 
 describe("reasoning that is only whitespace, with no answer text", () => {
   it("is an empty reply: one run.failed, no run.completed", async () => {
-    gateway(Array.from({ length: 3 }, () => () => named([created, ...reasoning(" "), completedFrame])));
+    const sent = gateway(Array.from({ length: 3 }, () => () => named([created, ...reasoning(" "), completedFrame])));
     const { events, failed } = await run();
+
+    expect(events.some((event) => event.type === "assistant.thinking")).toBe(true);
+    expect(sent()).toBe(1);
 
     expect(failedEvents(events)).toHaveLength(1);
     expect(completed(events)).toHaveLength(0);
@@ -146,8 +150,11 @@ describe("reasoning that is only whitespace, with no answer text", () => {
   });
 
   it("is the same for newlines and mixed blanks", async () => {
-    gateway(Array.from({ length: 3 }, () => () => named([created, ...reasoning(" \n\n\t"), completedFrame])));
+    const sent = gateway(Array.from({ length: 3 }, () => () => named([created, ...reasoning(" \n\n\t"), completedFrame])));
     const { events, failed } = await run();
+
+    expect(events.some((event) => event.type === "assistant.thinking")).toBe(true);
+    expect(sent()).toBe(1);
 
     expect(failedEvents(events)).toHaveLength(1);
     expect(completed(events)).toHaveLength(0);
