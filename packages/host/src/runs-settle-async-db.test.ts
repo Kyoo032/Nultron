@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentRuntime, TenantContext } from "@agentforge/core";
 import { ROUTER_IMPORT_BUDGET_MS } from "./__fixtures__/test-budgets";
 import type { HostRequest, HostResult } from "./types";
@@ -138,6 +138,44 @@ async function drain(events: AsyncIterable<string>): Promise<Array<{ type: strin
 
 const nextTick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 const SLOW_DESK = { timeout: 20_000 };
+const OPEN_FOR_MS = 1_000;
+const WATCHDOG_TEXT = "No stream events from gpt-5.6-sol for 120s after it started (timeout).";
+
+type Frame = { type: string; message?: string };
+
+async function readWhileHeld(events: AsyncIterable<string>) {
+  const seen: Frame[] = [];
+  const iterator = events[Symbol.asyncIterator]();
+  const reading = (async () => {
+    for (;;) {
+      const step = await iterator.next();
+      if (step.done) {
+        return true;
+      }
+      const line = step.value.split("\n").find((entry) => entry.startsWith("data:"));
+      if (line) {
+        seen.push(JSON.parse(line.slice("data:".length).trim()) as Frame);
+      }
+    }
+  })();
+  const open = new Promise<boolean>((resolve) => setTimeout(() => resolve(false), OPEN_FOR_MS));
+  const ended = await Promise.race([reading, open]);
+  return { ended, seen, next: () => iterator.next() };
+}
+
+async function runStatus(threadId: string) {
+  const { db, runs } = await import("@agentforge/db");
+  const [run] = await db.select().from(runs).where(eq(runs.threadId, threadId));
+  return run?.status;
+}
+
+async function heldPastWatchdog(threadId: string, events: AsyncIterable<string>, before: () => void = () => {}) {
+  await vi.waitFor(() => expect(hold.reached).toBe(true), SLOW_DESK);
+  before();
+  stallCallbacks[0]?.(WATCHDOG_TEXT);
+  const stream = await readWhileHeld(events);
+  return { ...stream, passed: hold.passed, statusWhileHeld: await runStatus(threadId) };
+}
 
 async function cancelDuringHeldWrite(cancel: () => void): Promise<void> {
   await vi.waitFor(() => expect(hold.reached).toBe(true), SLOW_DESK);
@@ -175,6 +213,10 @@ beforeEach(() => {
   script = "answer";
   hold = holdFor(null);
   stallCallbacks.length = 0;
+});
+
+afterEach(() => {
+  hold.release();
 });
 
 afterAll(async () => {
@@ -230,6 +272,82 @@ describe("a database write that yields while a Chat run is ending", () => {
       status: "completed",
       answers: 1,
       usageRows: 0,
+      failedFrames: 1,
+    });
+  });
+});
+
+describe("a database write that outlasts the watchdog while a Chat run is ending", () => {
+  it("ends the stream with a saving-too-long failure, then keeps the answer once the save lands", async () => {
+    hold = holdFor("assistantSave");
+    const threadId = await newThread();
+    const events = await openRun(threadId);
+
+    const held = await heldPastWatchdog(threadId, events);
+
+    expect({ ended: held.ended, passed: held.passed, status: held.statusWhileHeld }).toEqual({
+      ended: true,
+      passed: false,
+      status: "streaming",
+    });
+    expect(held.seen.slice(-2).map((frame) => frame.type)).toEqual(["run.failed", "run.completed"]);
+    expect(held.seen.find((frame) => frame.type === "run.failed")?.message).toMatch(
+      /^Saving this reply is taking too long\./,
+    );
+
+    hold.release();
+    expect(await outcome(threadId, held.seen)).toEqual({
+      status: "completed",
+      answers: 1,
+      usageRows: 1,
+      failedFrames: 1,
+    });
+    expect(await held.next()).toEqual({ done: true, value: undefined });
+  });
+
+  it("closes the stream with no failure when the answer already went out and closing the run row hangs", async () => {
+    hold = holdFor("completedFinish");
+    const threadId = await newThread();
+    const events = await openRun(threadId);
+
+    const held = await heldPastWatchdog(threadId, events);
+
+    expect({ ended: held.ended, passed: held.passed, status: held.statusWhileHeld }).toEqual({
+      ended: true,
+      passed: false,
+      status: "streaming",
+    });
+    expect(held.seen.at(-1)?.type).toBe("run.completed");
+
+    hold.release();
+    expect(await outcome(threadId, held.seen)).toEqual({
+      status: "completed",
+      answers: 1,
+      usageRows: 1,
+      failedFrames: 0,
+    });
+    expect(await held.next()).toEqual({ done: true, value: undefined });
+  });
+
+  it("still ends the stream at the watchdog when the person left while the answer was being saved", async () => {
+    hold = holdFor("assistantSave");
+    const threadId = await newThread();
+    const client = new AbortController();
+    const events = await openRun(threadId, client.signal);
+
+    const held = await heldPastWatchdog(threadId, events, () => client.abort(new Error("client left")));
+
+    expect({ ended: held.ended, passed: held.passed, status: held.statusWhileHeld }).toEqual({
+      ended: true,
+      passed: false,
+      status: "streaming",
+    });
+
+    hold.release();
+    expect(await outcome(threadId, held.seen)).toEqual({
+      status: "completed",
+      answers: 1,
+      usageRows: 1,
       failedFrames: 1,
     });
   });
