@@ -8,6 +8,8 @@
 #
 # What the sandbox lacks, it gets here, not in the script:
 #   git          a throwaway repo of the copy, for the tests that list tracked files or make repos of their own
+#   curl, openssl  what webapp-deploy/scripts/backup.sh and _heartbeat.sh call, as a server has them; the backup and
+#                heartbeat tests run those scripts (without curl the ping is skipped, without openssl the backup stops)
 #   pnpm         through CI_LOCAL_PNPM, as in the devShell, so the script never reaches for npx
 #   postgres     (postgres = true) a local Postgres 16 for the portal suite, through PORTAL_TEST_DATABASE_URL, the
 #                suite's own documented route; its embedded Postgres is a glibc download from npm
@@ -22,6 +24,8 @@
   nodejs,
   pnpm,
   git,
+  curl,
+  openssl,
   postgresql_16,
   workspace,
   web-build,
@@ -39,6 +43,8 @@ stdenvNoCC.mkDerivation {
   nativeBuildInputs = [
     nodejs
     git
+    curl
+    openssl
   ]
   ++ lib.optional postgres postgresql_16;
 
