@@ -449,6 +449,8 @@ Hourly, as the deploy user (`crontab -e`); the passphrase is fetched with the in
 17 * * * * BACKUP_KEY="$(tccli ssm get-secret-value ...)" /bin/sh /srv/nultron/webapp-deploy/scripts/backup.sh >> /var/log/nultron-backup.log 2>&1
 ```
 
+A missed or failed run raises an alert only when `BACKUP_HEARTBEAT_URL` is set: see [Backup alert](#backup-alert).
+
 **Restore drill, monthly (and once before the first tester).** On a scratch box, never the pilot box:
 `restore.sh <data archive> --yes` as before, then `restore-portal.sh <portal dump> --scratch`, which restores the
 dump into a throwaway database beside the live one, prints the row count of every table in both, refuses a dump
@@ -660,8 +662,64 @@ RPO is one hour (placement doc section 5). Install on the CVM as the deploy user
 ```
 
 The passphrase is fetched with the instance role at each run and never lands in the
-crontab or on disk. Spec L3 wants an alert when this job misses; wire the log file, or a
-Cloud Monitor custom metric, to that alarm.
+crontab or on disk. Spec L3 wants an alert when this job misses; [Backup alert](#backup-alert)
+below sets it up.
+
+### Backup alert
+
+A check on the same box cannot report that the box stopped, and a cron job that never fires writes
+nothing to its log. So the alert runs the other way round. `backup.sh` pings an external monitor, and
+the monitor raises the alarm when the pings stop.
+
+Set `BACKUP_HEARTBEAT_URL` to the ping URL of a check at a monitor you choose (healthchecks.io, or a
+self-hosted instance of it). `backup.sh` reads it from the process environment only, never from `.env`.
+`.env` is loaded into the `app` container, so a URL kept there would let anyone running code in the app
+send fake success pings and hide a dead backup. Set it on the cron line next to `BACKUP_KEY`, fetched
+from Secrets Manager the same way. Store it as the secret `nultron/prod/backup-heartbeat-url`, then
+replace the cron line above with this one:
+
+```cron
+17 * * * * BACKUP_KEY="$(tccli ssm get-secret-value --region ap-jakarta --SecretName nultron/prod/backup-key --VersionStage SSMCurrent | python3 -c 'import json,sys;print(json.load(sys.stdin)["SecretString"],end="")')" BACKUP_HEARTBEAT_URL="$(tccli ssm get-secret-value --region ap-jakarta --SecretName nultron/prod/backup-heartbeat-url --VersionStage SSMCurrent | python3 -c 'import json,sys;print(json.load(sys.stdin)["SecretString"],end="")')" /bin/sh /srv/nultron/webapp-deploy/scripts/backup.sh >> /var/log/nultron-backup.log 2>&1
+```
+
+`tccli` prints JSON, so each value goes through the same `SecretString` extraction. Without it the
+value holds quotes and spaces, the guard refuses it, no ping is sent, and a check that never got its
+first ping never alarms.
+
+A file that only the deploy user can read also works: `BACKUP_HEARTBEAT_URL="$(cat ~/.backup-heartbeat-url)"`
+with the file at mode 0600.
+
+| What happened | What `backup.sh` sends | What the monitor does |
+|---|---|---|
+| The run exited 0 | `GET <url>` | Marks the check up and restarts the clock |
+| The run exited non-zero | `GET <url>/fail` | Alarms at once |
+| Cron or the box stopped | Nothing | Alarms when the period and the grace window run out |
+| `BACKUP_HEARTBEAT_URL` is empty | Nothing | Not applicable. The script behaves as it did before |
+
+Create the check like this:
+
+1. New check, **period 1 hour**, **grace 30 minutes**. The job runs at minute 17 and a run takes
+   minutes, so 30 minutes of grace absorbs a slow run and a missed hour still alarms about 90 minutes
+   after the last good one.
+2. Point its alert at a channel you read (e-mail or Lark).
+3. Store the ping URL where the cron line fetches it (Secrets Manager, or the 0600 file). Never in `.env`.
+4. Run `backup.sh` once by hand with `BACKUP_KEY` and `BACKUP_HEARTBEAT_URL` exported, exactly as the
+   cron line sets them, and watch the check turn up. Without `BACKUP_KEY` the script exits 1 and sends
+   `/fail`.
+
+The ping cannot make a good backup fail. Each attempt has a 10 second timeout and it retries twice, so a
+dead monitor costs about 30 seconds at most. It ignores every error and does nothing when `curl` is
+missing or the value is not an `http://` or `https://` URL. The URL is the monitor's secret. The script
+never prints it and hands it to `curl` on stdin, so it stays out of the log and the process list. A
+monitor without a `/fail` endpoint still gets the success ping, and a failed run then shows up as a missed
+one.
+
+Two cases send no `/fail`. The `EXIT` trap is set after `_common.sh` and `_heartbeat.sh` are sourced, so
+an exit before that point (either file missing or failing to load) is silent, and so is a signal kill
+under `dash`. Both show up as a missed run once the grace window passes.
+
+Changing the box is a separate step that Rizky runs: pull the scripts, set the variable on the cron line,
+create the check. Nothing here has been deployed.
 
 ## Restore / roll back
 

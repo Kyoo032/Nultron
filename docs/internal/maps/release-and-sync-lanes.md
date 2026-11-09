@@ -67,7 +67,7 @@ The second kind, from branch `chore/agent-guardrails`:
 | Where am I (folder, branch, lane) | `pnpm where` (`scripts/where-am-i.mjs`) |
 | Tester rules | `TESTER.md`, identical on `main` and `tester/chat-first`; it applies only in the tester branch |
 | The tester split in full | vault `40-Dev/nultron-two-codes-map.md` |
-| Brand of the desktop flavors | `apps/desktop/branding/<brand>/brand.json` |
+| Brand of the desktop flavors | `apps/desktop/branding/<brand>/brand.json` (local and gitignored; the tracked `agentforge` kit was deleted on 2026-11-06) |
 | Hosted differences by setting | `PORTAL_SIGNIN_MODE` (portal) |
 | Preview safe update | `nultron-files/deploy/tencent/README.md`, "Update the app image only: the safe route" |
 

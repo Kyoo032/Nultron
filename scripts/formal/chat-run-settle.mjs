@@ -40,6 +40,8 @@ const SWITCHES = [
   "MeterOnFinish",
   "MeterOnSettledCompletion",
   "MeterAfterAttempt",
+  "ClaimOnPersist",
+  "CancelYieldsToClaim",
 ];
 
 class Drift extends Error {}
@@ -79,6 +81,21 @@ function readCode() {
     "settleRun",
   );
   const onStall = between(runs, "onStall: (message) => {", "const onClientAbort = () => {", "onStall");
+  const onClientAbort = between(
+    runs,
+    "const onClientAbort = () => {",
+    'options.abortSignal?.addEventListener("abort", onClientAbort',
+    "onClientAbort",
+  );
+  if (!runs.includes("const persistAssistant = async () => {")) {
+    throw new Drift('persistAssistant: cannot find "const persistAssistant = async () => {"');
+  }
+  const persistCalls = (runs.match(/persistAssistant\(\)/g) ?? []).length;
+  if (persistCalls !== 3) {
+    throw new Drift(
+      `persistAssistant: expected 3 call sites (run.completed handler, after the model call, catch path), found ${persistCalls}; model the new one before trusting a PASS`,
+    );
+  }
   const meter = between(
     runs,
     "const meterSettledRun = () => {",
@@ -113,7 +130,22 @@ function readCode() {
   if (!runs.includes("runId = run.id;")) {
     throw new Drift('insertRun: cannot find "runId = run.id;"');
   }
-  return {
+  const claimFirst = /const persistAssistant = async \(\) => \{\n\s*finishing = true;/.test(runs);
+  const awaitsBeforeClaim = [
+    ["the run.completed handler", onCompleted],
+    ["the code after the model call", afterAttempt],
+    ["the catch path", inCatch],
+  ]
+    .filter(([, slice]) => awaitBetweenGuardAndPersist(slice))
+    .map(([label]) => label);
+  const notes = [];
+  if (!claimFirst) {
+    notes.push("ClaimOnPersist is false: `finishing = true;` is not the first statement of persistAssistant.");
+  }
+  for (const label of awaitsBeforeClaim) {
+    notes.push(`ClaimOnPersist is false: an await sits between \`if (settled) {\` and persistAssistant() in ${label}.`);
+  }
+  const switches = {
     DbYields: !client.includes('from "drizzle-orm/better-sqlite3"'),
     StallGuard: runs.includes("armRunStallGuard({") && onStall.includes("settleRun(message)"),
     GuardAfterInsert: /runId = run\.id;\s*\n\s*if \(settled\) \{/.test(runs),
@@ -126,7 +158,21 @@ function readCode() {
     MeterOnFinish: finishTail.includes("recordChatRunUsage(options.tenant, run.id, finished, runUsage)"),
     MeterOnSettledCompletion: onCompleted.includes("meterSettledRun();"),
     MeterAfterAttempt: afterAttempt.includes("meterSettledRun();"),
+    ClaimOnPersist: claimFirst && awaitsBeforeClaim.length === 0,
+    CancelYieldsToClaim:
+      /if \(queueClosed \|\| finishing\) \{\s*return;/.test(onStall) &&
+      /if \(queueClosed \|\| finishing\) \{\s*return;/.test(onClientAbort),
   };
+  return { switches, notes };
+}
+
+function awaitBetweenGuardAndPersist(slice) {
+  const guard = slice.indexOf("if (settled) {");
+  if (guard < 0) {
+    return false;
+  }
+  const call = slice.lastIndexOf("await persistAssistant()");
+  return /\bawait\b/.test(slice.slice(guard, call > guard ? call : slice.length));
 }
 
 function parseArgs(argv) {
@@ -218,8 +264,9 @@ function check(jar, values, invariants, properties) {
 function main() {
   const args = parseArgs(process.argv.slice(2));
   let code;
+  let notes;
   try {
-    code = readCode();
+    ({ switches: code, notes } = readCode());
   } catch (error) {
     if (error instanceof Drift) {
       console.error(`DRIFT: ${error.message}`);
@@ -241,6 +288,9 @@ function main() {
   for (const name of SWITCHES) {
     const forced = values[name] !== code[name] ? `  (forced from ${code[name]})` : "";
     console.log(`  ${name.padEnd(24)} ${values[name]}${forced}`);
+  }
+  for (const note of notes) {
+    console.log(note);
   }
   const jar = jarPath();
   if (args.hazard) {

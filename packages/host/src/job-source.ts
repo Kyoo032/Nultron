@@ -8,7 +8,6 @@ export const SOURCE_MATERIAL_RULE =
   "When source material is supplied, use only that material for facts, figures, names, and quotes. Do not add facts from memory. If the material does not cover something the user asked for, say so in the text instead of inventing it.";
 
 export type SourceTextOptions = {
-  /** Mirrors the chat attachment guard: owner may switch it off in Settings. */
   injectionGuardBypass?: boolean;
 };
 
@@ -28,7 +27,7 @@ export function assertSafeSourceText(text: string, options: SourceTextOptions = 
   if (hit) {
     throw new ApiError(
       "injection_blocked",
-      `Source material was blocked by the injection guard (rule: ${hit.rule}). Remove the flagged instructions, or turn the guard off in Settings.`,
+      `Source material was blocked by the injection guard (rule: ${hit.rule}). Remove the flagged instructions and try again.`,
       400,
     );
   }
