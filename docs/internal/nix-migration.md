@@ -232,7 +232,7 @@ names the group and its log names the step:
 | `ci-lint` | `--only lint` | biome (glibc from npm) patched with `autoPatchelf` |
 | `ci-tsc` | `--only tsc`, 8 workspaces | |
 | `ci-test-<package>` (8) | `--only test:<package>` | the portal one starts a Postgres 16 and passes `PORTAL_TEST_DATABASE_URL`, the suite's own route; embedded-postgres is a glibc download |
-| `ci-node-test` | `--only node-test` | git: a throwaway repo of the copy, for tests that list tracked files |
+| `ci-node-test` | `--only node-test` | git: a throwaway repo of the copy, for tests that list tracked files; curl and openssl, which the backup and heartbeat scripts the tests run call |
 | `ci-sandbox` | `--only sandbox` | `web-build.nix`'s sandbox folder at `vendor/sandbox-runtime`, so `sandbox:integration` runs the real Pyodide and QuickJS |
 | `ci-docs` | `--only maps --only media` | advisory; never fails |
 | `images` | builds both images | |
@@ -267,7 +267,9 @@ sandbox's TMPDIR, so `<repo>/data` counted as a throwaway desk
 (`packages/host/src/__fixtures__/throwaway-desk.ts`). The copy and the temp folder now sit side by side, as a
 checkout and `/tmp` do on a machine.
 
-Findings these checks surfaced. None is caused by Nix, and none is fixed here:
+**2026-11-09, on `main`:** with the three findings below fixed (Kyoo032/Nultron#222, #223, #224) and the checks given curl and openssl for the backup heartbeat tests that landed meanwhile (SR-206), `nix flake check -L --keep-going` reports `all checks passed!`.
+
+Findings these checks surfaced on 2026-11-07. None was caused by Nix; all three are fixed on `main` since 2026-11-09:
 
 - **`packages/core` golden recording depends on the caller's environment.**
   `src/runtime/ai-sdk-runtime-recording.test.ts` compares requests with a committed golden whose Anthropic URL is
