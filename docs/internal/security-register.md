@@ -306,6 +306,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-161](#sr-161) | Info | Design only, not being built this round (Rizky, 2026-10-06): a person's own Knowledge Base private by person, sharing through a bot, and what an owner or admin may do when a person leaves | Not built | Blocks nothing now; blocks promising any of it |
 | [SR-162](#sr-162) | Info | What the hosted team-privacy review opened and found sound | Checked, not an issue (2026-10-07) | None |
 | [SR-164](#sr-164) | Low | The SSH private key of the HYP AI production server was attached to an agent conversation, so it is in that transcript | Open (2026-10-07); key moved to `~/.ssh`, owner-only; replace it before handover | Blocks handing the server to Hypernet |
+| [SR-200](#sr-200) | Low | The portal exited when Postgres ended a connection idle in its pool (restart, failover, `idle_session_timeout`): the pool's `error` event had no listener, so Node threw it and the process guard exited | Fixed in tree (2026-11-09), tested against Postgres 16; not driven on a hosted server | — |
 
 Status values: `open`, `fix in progress — lane X`, `fixed-unverified` (the code is in the tree and
 its test passes, nothing has been driven), `fixed, not driven` (2026-09-23 rows: the code and its
@@ -5106,6 +5107,30 @@ what was opened, not a map of the whole product (`AGENTS.md` says that map is st
   when the card was indexed.
 
 Gate: none. Decide item by item when the per-person Knowledge Base is designed ([SR-161](#sr-161)).
+
+### SR-200 {#sr-200}
+
+**The portal exited when Postgres ended a connection that sat idle in its pool.**
+Raised 2026-11-09 by the Nix migration's flake checks (`docs/internal/nix-migration.md`, rung 5), where the portal
+suite reported `57P01` as an unhandled error after every test had passed. Low. Hosted (Enterprise), portal only.
+
+Evidence: `openPostgresStore` (`apps/portal/src/store/postgres/index.ts`) created a `pg.Pool` with no `error`
+listener. pg-pool 3.14.0 re-emits an idle client's error on the pool (`makeIdleListener`, `pool.emit('error', err,
+client)`), and an `error` event with no listener is thrown. `installProcessGuards` (`apps/portal/src/process-guards.ts`)
+turns the uncaught exception into `portal_uncaught_exception` and `exit(1)`. So any session Postgres ends while it is
+idle in the pool (a restart, a TencentDB failover or maintenance, `idle_session_timeout`, an operator's
+`pg_terminate_backend`) stopped the portal until compose or Kubernetes restarted it, and the in-process limiters and
+the refresh lock (SR-29, SR-66) started over with it. Not triggerable by a client request.
+
+Fix: the store always listens for the pool's `error` event; the pool has already dropped the connection and opens a
+new one for the next query. `openStore` passes a callback that logs `portal_db_idle_connection_lost` with the SQLSTATE
+only, from `prepareStore` (`apps/portal/src/boot.ts`). `src/store/postgres/idle-connection.test.ts` terminates an idle
+session with `pg_terminate_backend` and checks the store reports `57P01` and serves the next query; against the store
+as it was, the same test fails with the unhandled `57P01` the flake checks saw.
+
+Residual: not driven against a hosted Postgres restart.
+
+Gate: none.
 
 ## Info and checked-not-an-issue
 
