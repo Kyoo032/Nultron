@@ -1131,3 +1131,10 @@ Lanes: enterprise, tester.
 - **Shared files.** `secrets.ts`, `settings-store.ts`, `job-source.ts` and `settings-page.tsx` exist on `main` and the tester, so a merge from `main` into `tester/chat-first` may conflict on the last.
 - **Checked, not changed.** `documents-check.ts` hard-codes the bypass, and its assembled text reaches only the pure overlap check (`checkDraftAgainstSource`, no model call). Recorded in SR-202.
 - **Not driven.** Unit tests and the in-memory row backend only; no hosted server, no `:3000` restart. `Kyoo032/hyp-ai` needs the same fix by hand.
+
+## The portal keeps serving when Postgres ends an idle pool connection, 2026-11-09 (branch `claude/fix-portal-test-teardown`, SR-200)
+
+Lanes: enterprise.
+
+- **What.** The portal's `pg.Pool` had no `error` listener, so a connection Postgres ended while it sat idle (a restart, a failover, `idle_session_timeout`, `pg_terminate_backend`) became an uncaught exception, and `process-guards.ts` exited the portal. `openPostgresStore` (`apps/portal/src/store/postgres/index.ts`) now always listens; the pool opens a new connection for the next query, and the server logs `portal_db_idle_connection_lost` with the SQLSTATE only (`openStore`, `apps/portal/src/store/index.ts`, given the logger by `prepareStore` in `boot.ts`). The test helper's `drop()` (`apps/portal/src/testing/pg.ts`) lets a database's sessions leave on their own for up to 2 s before terminating the rest. Found by the Nix migration's flake checks, where the portal suite reported `57P01` as unhandled errors after every test passed.
+- **Proof.** `apps/portal/src/store/postgres/idle-connection.test.ts` terminates an idle session and checks the store reports `57P01` and serves the next query; against the store as it was, the same test fails with the unhandled `57P01`. Portal suite 737 of 737, alone and beside the host and core suites. **Not driven:** a Postgres restart under a running hosted portal.
