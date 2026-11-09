@@ -2,7 +2,7 @@
 
 Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
 
-Last verified: 2026-11-06 at 39cd5f0c plus the working tree on `fix/request-array-caps`, for the request cost caps subsection of § 5 and its file row only; nothing else on the page was re-read. Before that: 2026-11-06 at f6c9acc1 for the desk wrap-key check at the end of section 1 only (SR-203). Before that: 2026-11-06 at 30f92eab for § 7 (the SSRF guard), the resolution gotcha and the `safe-fetch.test.ts` row only; the new code was read at the lines cited and driven once against a loopback listener and against real DNS and TLS (SR-201). Nothing else on the page was re-read. Before that: 2026-11-06 at 01a88fba, for the Host rule only (row 6a of the admission table and § 3; the other `http-adapter.ts` line numbers on this page are from 2026-09-23 and have shifted six lines below `:632`). Before that: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-06, branch `feat/hosted-run-limits` over 6105c5c, not committed, for the run-limits subsection of § 5 and its row in the file table; nothing else on the page was re-read. Before that: 2026-10-05, working tree over 0b61a29, not committed, for two lines only (the `audit-deployed.mjs` row of the file table and the audit-gate gotcha, which now describe the production closure after SR-113); nothing else on the page was re-read. Before that: 2026-10-02, working tree over 0b61a29, not committed, for one row (the operator-fields row of § 8, which now says who may write a provider key: M4, an owner or an admin, a member is answered `403 settings_key_forbidden`); nothing else on the page was re-read. Before that: 2026-10-01, working tree over 0b61a29, not committed, for two rows only: the `ci-local.mjs` row of the tests table (a vitest step now needs its `Tests N passed` summary, not just exit 0) and the per-tenant model cache bullet of § 10 (the background refill and its log line). Before that, the same day, for the new § 10 (where a tenant's provider key may go: Enterprise BYOK Phase A) and the corrected operator-keys row of § 8, whose "provider keys" claim was wrong before it (`requestsOperatorOnlySettings` lists `toolKeys`, `toolBackends` and `injectionGuardBypass` only). Nothing else on the page was re-read that day. Before that: 2026-09-23 at d4561b8 + working tree for sections 1-4 and every
+Last verified: 2026-11-09 at 6080cbba plus the working tree on `fix/safe-fetch-undici-fetch`, for § 7 (the default fetch of the SSRF guard) only; the `safe-fetch.ts` lines cited there were re-read and the guard was driven on Node 22.23.4 and 24.13.0 (SR-201). Nothing else on the page was re-read. Before that: 2026-11-06 at 39cd5f0c plus the working tree on `fix/request-array-caps`, for the request cost caps subsection of § 5 and its file row only; nothing else on the page was re-read. Before that: 2026-11-06 at f6c9acc1 for the desk wrap-key check at the end of section 1 only (SR-203). Before that: 2026-11-06 at 30f92eab for § 7 (the SSRF guard), the resolution gotcha and the `safe-fetch.test.ts` row only; the new code was read at the lines cited and driven once against a loopback listener and against real DNS and TLS (SR-201). Nothing else on the page was re-read. Before that: 2026-11-06 at 01a88fba, for the Host rule only (row 6a of the admission table and § 3; the other `http-adapter.ts` line numbers on this page are from 2026-09-23 and have shifted six lines below `:632`). Before that: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-06, branch `feat/hosted-run-limits` over 6105c5c, not committed, for the run-limits subsection of § 5 and its row in the file table; nothing else on the page was re-read. Before that: 2026-10-05, working tree over 0b61a29, not committed, for two lines only (the `audit-deployed.mjs` row of the file table and the audit-gate gotcha, which now describe the production closure after SR-113); nothing else on the page was re-read. Before that: 2026-10-02, working tree over 0b61a29, not committed, for one row (the operator-fields row of § 8, which now says who may write a provider key: M4, an owner or an admin, a member is answered `403 settings_key_forbidden`); nothing else on the page was re-read. Before that: 2026-10-01, working tree over 0b61a29, not committed, for two rows only: the `ci-local.mjs` row of the tests table (a vitest step now needs its `Tests N passed` summary, not just exit 0) and the per-tenant model cache bullet of § 10 (the background refill and its log line). Before that, the same day, for the new § 10 (where a tenant's provider key may go: Enterprise BYOK Phase A) and the corrected operator-keys row of § 8, whose "provider keys" claim was wrong before it (`requestsOperatorOnlySettings` lists `toolKeys`, `toolBackends` and `injectionGuardBypass` only). Nothing else on the page was re-read that day. Before that: 2026-09-23 at d4561b8 + working tree for sections 1-4 and every
 `http-adapter.ts` citation on this page (the auth pass: the production https rule for the portal
 URL, the malformed Host / request-target 400, the gate's portal re-check, digest session ids). The
 response headers, the ffmpeg failure detail and the top-up link keep their 2026-09-21 reading at
@@ -289,28 +289,30 @@ The hand-written body readers (`edit.ts` `targetClipIds`, `knowledge.ts`, `agent
 
 `packages/core/src/security/safe-fetch.ts`. Any fetch to a caller-supplied URL goes through
 `assertPublicHttpsUrl` (HTTPS only, no credentials in the URL, host not private) and
-`fetchPublicHttps` (`:228`), which re-checks **per redirect hop** (`:241-269`).
+`fetchPublicHttps` (`:226`), which re-checks **per redirect hop** (`:238-269`).
 
 `packages/core/src/security/ip-range.ts` is the address half: it parses to bytes and compares CIDR
 prefixes, covering the ranges a string match misses — `100.64.0.0/10` CGNAT, `198.18.0.0/15`, the
 TEST-NETs, multicast, and the IPv6 blocks including the whole of `fe80::/10`. Addresses that carry
 an IPv4 inside an IPv6 (`::ffff:`, 6to4, NAT64) recurse onto the embedded address (`:225-246`).
 
-Per hop, `resolvePublicAddresses` (`packages/core/src/security/safe-fetch.ts:104-126`) resolves the hostname once
+Per hop, `resolvePublicAddresses` (`packages/core/src/security/safe-fetch.ts:98-123`) resolves the hostname once
 and refuses the whole name when the lookup fails, answers nothing, answers something that is not an IP address, or
 answers any private address, so a public name pointing at `169.254.169.254` does not pass. A failed lookup is
 `400 invalid_endpoint` "Could not resolve this URL's host", a private answer "URL must point at a public host". The
 address is never in the message. An IP literal is not resolved; the lexical check already judged its bytes.
 
-The connection is then pinned to that answer. `pinnedAgent` (`:172`) builds an undici `Agent` whose `connect.lookup`
-(`pinnedLookup`, `:145`) returns only the vetted list, in the shape the connector asked for (`all: true` gives an
+The connection is then pinned to that answer. `pinnedAgent` (`:168`) builds an undici `Agent` whose `connect.lookup`
+(`pinnedLookup`, `:141`) returns only the vetted list, in the shape the connector asked for (`all: true` gives an
 array, otherwise the first address with its family, and a `family` filter narrows the list), and answers for that one
-host only. `fetchPublicHttps` passes it to `fetch` as `dispatcher` (`:248`), so the socket never asks DNS and a
+host only. `fetchPublicHttps` passes it to `fetch` as `dispatcher` (`:246`), so the socket never asks DNS and a
 resolver that answers differently the second time (DNS rebinding) is never consulted. Each hop gets its own agent,
-destroyed after the body is read (`:268`). The default `fetch` is still `globalThis.fetch`, and the agent comes from
-the `undici` 6.29.1 package that `@agentforge/core` now depends on (the version SR-198 pins); `safe-fetch.test.ts`
-drives that pair against a loopback listener on every run, so a Node whose bundled undici cannot take the agent fails
-there. `assertResolvesPublic` (`:129`) is kept as a thin wrapper over the same resolver and has no production caller.
+destroyed after the body is read (`:266`). The default `fetch` is `defaultFetch` (`:172`), the `fetch` export of the
+same `undici` 6.29.1 package that builds the agent (the version SR-198 pins), not `globalThis.fetch`, so the dispatcher
+and the fetch are one version whatever undici the running Node bundles. `safe-fetch.test.ts` asserts the default is
+undici's own, that a hop with no `fetchImpl` never reaches `globalThis.fetch`, and drives the pinned lookup against a
+loopback listener on every run. A test that wants to stand in for the network injects `fetchImpl` or mocks `undici`'s
+`fetch`; stubbing `globalThis.fetch` no longer reaches a guarded fetch. `assertResolvesPublic` (`:125`) is kept as a thin wrapper over the same resolver and has no production caller.
 Not covered: the port (`https://host:6379/` is allowed; a policy is Rizky's call) and egress filtering ([SR-97](../security-register.md#sr-97), infra).
 
 ### 8. Routes that are off in server mode

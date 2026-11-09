@@ -1,16 +1,23 @@
 import { createServer } from "node:http";
 import type { AddressInfo, LookupFunction } from "node:net";
-import { describe, expect, it } from "vitest";
+import { Agent, fetch as undiciFetch } from "undici";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../errors";
 import {
   assertPublicHttpsUrl,
   assertResolvesPublic,
+  defaultFetch,
   fetchPublicHttps,
   nextHopUrl,
   pinnedAgent,
   pinnedLookup,
 } from "./safe-fetch";
 import type { HostLookup } from "./safe-fetch";
+
+vi.mock("undici", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("undici")>();
+  return { ...actual, fetch: vi.fn(actual.fetch) };
+});
 
 type Step = { status: number; headers?: Record<string, string>; body?: string };
 
@@ -444,7 +451,9 @@ describe("pinnedAgent", () => {
     const listener = await listen();
     const agent = pinnedAgent("rebind.test", [{ address: "127.0.0.1" }]);
     try {
-      const response = await fetch(`http://rebind.test:${listener.port}/`, { dispatcher: agent } as RequestInit);
+      const response = await defaultFetch(`http://rebind.test:${listener.port}/`, {
+        dispatcher: agent,
+      } as RequestInit);
       expect(await response.text()).toBe("pinned");
       expect(listener.hosts).toEqual([`rebind.test:${listener.port}`]);
     } finally {
@@ -458,12 +467,52 @@ describe("pinnedAgent", () => {
     const agent = pinnedAgent("rebind.test", [{ address: "127.0.0.1" }]);
     try {
       await expect(
-        fetch(`http://other.test:${listener.port}/`, { dispatcher: agent } as RequestInit),
+        defaultFetch(`http://other.test:${listener.port}/`, { dispatcher: agent } as RequestInit),
       ).rejects.toThrow();
       expect(listener.hosts).toEqual([]);
     } finally {
       await agent.destroy();
       await listener.close();
+    }
+  });
+});
+
+describe("the default fetch", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.mocked(undiciFetch).mockClear();
+  });
+
+  it("is undici's own fetch, from the package that builds the pinning Agent", () => {
+    expect(defaultFetch).toBe(undiciFetch);
+  });
+
+  it("carries a hop through undici with the pinned Agent and never through globalThis.fetch", async () => {
+    const globalFetch = vi.fn(async () => new Response("from the global fetch"));
+    vi.stubGlobal("fetch", globalFetch);
+    vi.mocked(undiciFetch).mockImplementationOnce(
+      (async () => new Response("from undici", { status: 200 })) as unknown as typeof undiciFetch,
+    );
+    const result = await fetchPublicHttps("https://a.test/start", { lookupImpl: publicLookup });
+    expect(result.body.toString()).toBe("from undici");
+    expect(globalFetch).not.toHaveBeenCalled();
+    const [url, init] = vi.mocked(undiciFetch).mock.calls[0] ?? [];
+    expect(url).toBe("https://a.test/start");
+    expect((init as { dispatcher?: unknown }).dispatcher).toBeInstanceOf(Agent);
+  });
+
+  it("honours the pinned Agent's lookup for a name no resolver can answer", async () => {
+    const listener = createServer((_request, response) => response.end("pinned"));
+    await new Promise<void>((resolve) => listener.listen(0, "127.0.0.1", resolve));
+    const { port } = listener.address() as AddressInfo;
+    const agent = pinnedAgent("rebind.test", [{ address: "127.0.0.1" }]);
+    try {
+      const response = await defaultFetch(`http://rebind.test:${port}/`, { dispatcher: agent } as RequestInit);
+      expect(response.status).toBe(200);
+      expect(await response.text()).toBe("pinned");
+    } finally {
+      await agent.destroy();
+      await new Promise<void>((resolve) => listener.close(() => resolve()));
     }
   });
 });
