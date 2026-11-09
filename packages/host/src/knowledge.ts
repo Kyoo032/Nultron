@@ -464,7 +464,7 @@ function injectionGuardBypass(tenant: TenantContext): boolean {
 /**
  * Manual sources (paste, upload, URL) go through the same injection guard as auto-ingested cards:
  * anything indexed here is served back as trusted `## Retrieved sources` to every later Chat. A hit
- * records a `Failed` row with the rule instead of indexing; the owner bypass in Settings still applies.
+ * records a `Failed` row with the rule instead of indexing.
  *
  * The name is scanned too: it becomes the `[n] <name>` citation line, and an upload filename or a
  * remote `<title>` is attacker-controlled in exactly the same way the body is.

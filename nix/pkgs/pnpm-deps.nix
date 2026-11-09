@@ -1,7 +1,7 @@
 # Every package pnpm-lock.yaml names, for every platform, as one fixed-output derivation: the only step of the
 # Nix build that reaches the network. Its inputs are the lockfile and the workspace manifests, so a source
 # edit does not refetch it, and its hash pins every tarball byte, the `xlsx` tarball from cdn.sheetjs.com
-# included, which the lockfile itself records without an integrity field (SR-199).
+# included, which the lockfile itself records without an integrity field (SR-208).
 #
 # When pnpm-lock.yaml changes, this hash changes: set it to "", build, and copy the `got:` value back.
 {

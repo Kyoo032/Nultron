@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ApiError } from "@agentforge/core";
+import { ApiError, summarizeIssues } from "@agentforge/core";
 import { stripXmlIllegalChars } from "./xml-text";
 
 /**
@@ -145,7 +145,7 @@ export function parsePresentationOutline(raw: unknown): PresentationOutline {
   if (!result.success) {
     throw new ApiError(
       "invalid_outline",
-      `Presentation outline failed validation: ${result.error.issues.map((i) => i.message).join("; ")}`,
+      `Presentation outline failed validation: ${summarizeIssues(result.error.issues)}`,
       502,
     );
   }
@@ -167,7 +167,7 @@ export function parsePresentationSlide(raw: unknown): PresentationSlide {
   if (!result.success) {
     throw new ApiError(
       "invalid_outline",
-      `Presentation slide failed validation: ${result.error.issues.map((i) => i.message).join("; ")}`,
+      `Presentation slide failed validation: ${summarizeIssues(result.error.issues)}`,
       502,
     );
   }
@@ -191,7 +191,7 @@ export function parsePresentationOutlineBody(body: unknown): PresentationOutline
   if (!result.success) {
     throw new ApiError(
       "invalid_request",
-      `Invalid presentation outline: ${result.error.issues.map((i) => i.message).join("; ")}`,
+      `Invalid presentation outline: ${summarizeIssues(result.error.issues)}`,
       400,
     );
   }

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ApiError } from "@agentforge/core";
+import { ApiError, summarizeIssues } from "@agentforge/core";
 import { extractJsonObject } from "./presentation-outline";
 
 export const documentSectionSchema = z.object({
@@ -30,7 +30,7 @@ export function parseDocumentDraft(raw: unknown): DocumentDraft {
   if (!result.success) {
     throw new ApiError(
       "invalid_document",
-      `Document draft failed validation: ${result.error.issues.map((issue) => issue.message).join("; ")}`,
+      `Document draft failed validation: ${summarizeIssues(result.error.issues)}`,
       502,
     );
   }
@@ -52,7 +52,7 @@ export function parseDocumentSection(raw: unknown): DocumentSection {
   if (!result.success) {
     throw new ApiError(
       "invalid_document",
-      `Document section failed validation: ${result.error.issues.map((issue) => issue.message).join("; ")}`,
+      `Document section failed validation: ${summarizeIssues(result.error.issues)}`,
       502,
     );
   }
@@ -72,7 +72,7 @@ export function parseDocumentDraftBody(body: unknown): DocumentDraft {
   if (!result.success) {
     throw new ApiError(
       "invalid_request",
-      `Invalid document draft: ${result.error.issues.map((issue) => issue.message).join("; ")}`,
+      `Invalid document draft: ${summarizeIssues(result.error.issues)}`,
       400,
     );
   }

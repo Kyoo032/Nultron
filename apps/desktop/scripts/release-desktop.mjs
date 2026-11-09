@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Publish the packed Nultron Setup exe, its blockmap and latest.yml to the public
- * releases repo named in branding/agentforge/brand.json "updates" (Kyoo032/Nultron-Desktop).
+ * releases repo.
  * Run after `pnpm desktop:build`. Uploaded asset names are hyphenated (what electron-updater's
  * GitHub provider requests); the local files keep the spaced artifactName.
  *
@@ -99,22 +99,17 @@ function parseArgs(argv) {
 
 function readTarget() {
   const pkg = JSON.parse(readFileSync(join(desktopRoot, "package.json"), "utf8"));
-  const brand = JSON.parse(readFileSync(join(desktopRoot, "branding", "agentforge", "brand.json"), "utf8"));
   const version = typeof pkg.version === "string" ? pkg.version.trim() : "";
   if (!/^\d+\.\d+\.\d+/.test(version)) fail("package.json version is not semver");
   const extraVersion = pkg.build?.extraMetadata?.version;
   if (extraVersion !== undefined && extraVersion !== version) {
     fail(`build.extraMetadata.version ${extraVersion} disagrees with version ${version}`);
   }
-  const updates = brand.updates ?? {};
-  if (updates.provider !== "github" || !updates.owner || !updates.repo) {
-    fail('brand.json "updates" must be { provider: "github", owner, repo }');
-  }
   const publish = pkg.build?.publish ?? {};
-  if (publish.owner !== updates.owner || publish.repo !== updates.repo) {
-    fail("package.json build.publish and brand.json updates name different repos");
+  if (publish.provider !== "github" || !publish.owner || !publish.repo) {
+    fail('package.json build.publish must be { provider: "github", owner, repo }');
   }
-  return { version, owner: updates.owner, repo: updates.repo };
+  return { version, owner: publish.owner, repo: publish.repo };
 }
 
 /** Minimal line parser for electron-builder's latest.yml (top-level keys + files[]). */

@@ -1,4 +1,6 @@
 import { lookup as dnsLookup } from "node:dns/promises";
+import { type LookupFunction, isIP } from "node:net";
+import { Agent, fetch as undiciFetch } from "undici";
 import { ApiError } from "../errors";
 import { isPrivateHostname, isPrivateIpAddress, parseIpAddress } from "./ip-range";
 import { assertSendableUrl } from "./outbound-guard";
@@ -18,7 +20,6 @@ export type HostLookup = (hostname: string) => Promise<readonly ResolvedAddress[
 
 export type SafeFetchOptions = {
   fetchImpl?: typeof fetch;
-  /** Resolver used for the private-address check; defaults to the system one. */
   lookupImpl?: HostLookup;
   maxHops?: number;
   maxBytes?: number;
@@ -61,12 +62,6 @@ function isPrivateHost(hostname: string): boolean {
 
 /**
  * Public HTTPS only: no credentials, no loopback, no private ranges. Applied to every redirect hop.
- *
- * LEXICAL ONLY. A hostname that *resolves* to a private address passes this — `localtest.me`,
- * `<anything>.nip.io`, or an attacker's own domain with an A record of 169.254.169.254. The name
- * has to be resolved for that, which is asynchronous, so `fetchPublicHttps` does it separately in
- * `assertResolvesPublic` below and this function stays synchronous for the callers that use it as
- * an early, cheap rejection.
  */
 export function assertPublicHttpsUrl(url: string): URL {
   let parsed: URL;
@@ -97,46 +92,84 @@ export function nextHopUrl(from: string, location: string | null): string | null
 
 const defaultLookup: HostLookup = (hostname) => dnsLookup(hostname, { all: true });
 
-/**
- * The resolving half of the check: every address this hostname answers with must be public.
- *
- * WHAT THIS CLOSES. `assertPublicHttpsUrl` reads the hostname as text, so a name that resolves to a
- * private address sailed through it: `localtest.me` (public DNS, answers 127.0.0.1), any
- * `<ip>.nip.io`, or simply an attacker's own domain with an A record of 169.254.169.254 — the
- * metadata service of the VM this runs on. `POST /api/v1/knowledge/sources/url` stores and shows the
- * fetched body back, so that was a read primitive against the box's own network, not a blind one.
- *
- * WHAT THIS DOES NOT CLOSE, stated plainly. The address is validated here and the URL is then handed
- * to `fetch`, which resolves the name a second time. A resolver the attacker controls can answer
- * differently on the two calls (DNS rebinding). Closing that needs the socket's own address, i.e. a
- * custom `undici` dispatcher with a pinned `lookup`, which is a dependency this package does not
- * have. Recorded as an open finding rather than papered over.
- *
- * A resolution FAILURE is not a refusal: if the name does not resolve for us it will not resolve for
- * `fetch` either, so there is nothing to protect against, and failing closed here would make every
- * offline test and every transient DNS blip an `invalid_endpoint` error instead of a network error.
- * Only a successful resolution to a private address refuses.
- */
-export async function assertResolvesPublic(hostname: string, lookupImpl: HostLookup = defaultLookup): Promise<void> {
-  // An IP literal has no name to resolve; `assertPublicHttpsUrl` already judged it on its bytes.
+const UNRESOLVED_MESSAGE = "Could not resolve this URL's host";
+const NOT_PUBLIC_MESSAGE = "URL must point at a public host";
+
+export async function resolvePublicAddresses(
+  hostname: string,
+  lookupImpl: HostLookup = defaultLookup,
+): Promise<readonly ResolvedAddress[]> {
   if (parseIpAddress(hostname)) {
-    return;
+    return [];
   }
   let resolved: readonly ResolvedAddress[];
   try {
     resolved = await lookupImpl(hostname);
-  } catch {
-    return;
+  } catch (lookupError) {
+    const refusal = new ApiError("invalid_endpoint", UNRESOLVED_MESSAGE, 400);
+    refusal.cause = lookupError;
+    throw refusal;
+  }
+  if (resolved.length === 0) {
+    throw new ApiError("invalid_endpoint", UNRESOLVED_MESSAGE, 400);
   }
   for (const { address } of resolved) {
     const parsed = parseIpAddress(address);
-    if (parsed && isPrivateIpAddress(parsed)) {
-      // The address is deliberately NOT in the message: it is the one piece of the answer an
-      // attacker probing internal ranges would want back.
-      throw new ApiError("invalid_endpoint", "URL must point at a public host", 400);
+    if (!parsed || isPrivateIpAddress(parsed)) {
+      throw new ApiError("invalid_endpoint", NOT_PUBLIC_MESSAGE, 400);
     }
   }
+  return resolved;
 }
+
+export async function assertResolvesPublic(hostname: string, lookupImpl: HostLookup = defaultLookup): Promise<void> {
+  await resolvePublicAddresses(hostname, lookupImpl);
+}
+
+type PinnedAnswer = { readonly address: string; readonly family: 4 | 6 };
+
+function wantedFamily(family: unknown): 4 | 6 | null {
+  if (family === 4 || family === "IPv4") {
+    return 4;
+  }
+  if (family === 6 || family === "IPv6") {
+    return 6;
+  }
+  return null;
+}
+
+export function pinnedLookup(pinnedHost: string, addresses: readonly ResolvedAddress[]): LookupFunction {
+  const answers: readonly PinnedAnswer[] = addresses.map(({ address }) => ({
+    address,
+    family: isIP(address) === 4 ? 4 : 6,
+  }));
+  return (hostname, options, callback) => {
+    const family = wantedFamily(options.family);
+    const matching =
+      hostname.toLowerCase() === pinnedHost.toLowerCase()
+        ? answers.filter((answer) => family === null || answer.family === family)
+        : [];
+    const first = matching[0];
+    if (!first) {
+      callback(Object.assign(new Error(`getaddrinfo ENOTFOUND ${hostname}`), { code: "ENOTFOUND" }), "");
+      return;
+    }
+    if (options.all) {
+      callback(
+        null,
+        matching.map(({ address, family: answerFamily }) => ({ address, family: answerFamily })),
+      );
+      return;
+    }
+    callback(null, first.address, first.family);
+  };
+}
+
+export function pinnedAgent(hostname: string, addresses: readonly ResolvedAddress[]): Agent {
+  return new Agent({ connect: { lookup: pinnedLookup(hostname, addresses) } });
+}
+
+export const defaultFetch = undiciFetch as unknown as typeof fetch;
 
 async function readCapped(
   response: Response,
@@ -195,7 +228,7 @@ export async function fetchPublicHttps(url: string, options: SafeFetchOptions = 
     // The first address only: a redirect hop is the server's answer, not text the model wrote.
     assertSendableUrl(url.trim());
   }
-  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const fetchImpl = options.fetchImpl ?? defaultFetch;
   const maxHops = options.maxHops ?? SAFE_FETCH_MAX_HOPS;
   const maxBytes = options.maxBytes ?? SAFE_FETCH_DEFAULT_MAX_BYTES;
   const { controller, dispose } = linkSignals(options);
@@ -203,30 +236,35 @@ export async function fetchPublicHttps(url: string, options: SafeFetchOptions = 
     let parsed = assertPublicHttpsUrl(url.trim());
     let current = parsed.toString();
     for (let hop = 0; hop <= maxHops; hop += 1) {
-      // Per hop, not once: a redirect names a new host, and that host gets resolved and judged too.
-      await assertResolvesPublic(parsed.hostname, options.lookupImpl);
-      const response = await fetchImpl(current, {
-        redirect: "manual",
-        signal: controller.signal,
-        headers: { "User-Agent": USER_AGENT, ...options.headers },
-      });
-      if (REDIRECT_STATUSES.has(response.status)) {
-        const next = nextHopUrl(current, response.headers.get("location"));
-        if (!next) {
-          throw new ApiError("invalid_request", `Redirect without a location (${response.status})`, 400);
+      const addresses = await resolvePublicAddresses(parsed.hostname, options.lookupImpl);
+      const agent = pinnedAgent(parsed.hostname, addresses);
+      try {
+        const response = await fetchImpl(current, {
+          redirect: "manual",
+          signal: controller.signal,
+          headers: { "User-Agent": USER_AGENT, ...options.headers },
+          dispatcher: agent,
+        } as RequestInit);
+        if (REDIRECT_STATUSES.has(response.status)) {
+          const next = nextHopUrl(current, response.headers.get("location"));
+          if (!next) {
+            throw new ApiError("invalid_request", `Redirect without a location (${response.status})`, 400);
+          }
+          current = next;
+          parsed = new URL(next);
+          continue;
         }
-        current = next;
-        parsed = new URL(next);
-        continue;
+        const read = await readCapped(response, maxBytes, options.oversize ?? "throw");
+        return {
+          finalUrl: current,
+          status: response.status,
+          contentType: response.headers.get("content-type") ?? "",
+          body: read.body,
+          truncated: read.truncated,
+        };
+      } finally {
+        await agent.destroy().catch(() => undefined);
       }
-      const read = await readCapped(response, maxBytes, options.oversize ?? "throw");
-      return {
-        finalUrl: current,
-        status: response.status,
-        contentType: response.headers.get("content-type") ?? "",
-        body: read.body,
-        truncated: read.truncated,
-      };
     }
     throw new ApiError("invalid_request", `Too many redirects (more than ${maxHops})`, 400);
   } catch (error) {
