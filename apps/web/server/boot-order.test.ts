@@ -140,6 +140,31 @@ describe("a refused hosted boot writes nothing", () => {
   );
 
   it(
+    "refuses a desk whose AGENTFORGE_SECRETS_KEY is a passphrase before it touches the data dir (SR-203)",
+    async () => {
+      const result = await boot(
+        "desk-weak-key",
+        { AGENTFORGE_SECRETS_KEY: "hunter2", PORT: "39143", BIND_HOST: "127.0.0.1" },
+        (dataDir) => {
+          mkdirSync(dataDir, { recursive: true });
+          writeFileSync(path.join(dataDir, "settings.enc"), "sealed-bytes");
+          writeFileSync(
+            path.join(dataDir, "reset-pending.json"),
+            JSON.stringify({ version: 1, requestedAt: new Date(0).toISOString(), entries: ["settings.enc"] }),
+          );
+        },
+      );
+
+      refused(result);
+      expect(result.stderr).toContain("AGENTFORGE_SECRETS_KEY");
+      expect(result.stderr).toContain("openssl rand -hex 32");
+      expect(result.stderr).not.toContain("hunter2");
+      expect(readdirSync(result.dataDir).sort()).toEqual(["reset-pending.json", "settings.enc"]);
+    },
+    BOOT_BUDGET_MS + 10_000,
+  );
+
+  it(
     "leaves a queued Start over wipe and every file in the data dir alone",
     async () => {
       const { AGENTFORGE_SECRETS_KEY: _omitted, ...withoutKey } = hostedEnv();

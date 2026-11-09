@@ -2,7 +2,7 @@
 
 Product: both · Instance: main :3000
 
-Last verified: 2026-10-29 at 464b00c5 (Biome cleanup in `apps/web/components/settings-page.tsx` and `packages/host/src/settings-store.ts` at `92bde965`; before that: 2026-10-11 at 2df34be, fix branch, before merge). Only "What a save does besides saving" and "What the answer carries" were re-checked; the other cites on this page are unchanged, and some were already stale.
+Last verified: 2026-11-06 at f6c9acc1 for the "Sealed settings that will not open" row of Failure modes only (SR-203). Before that: 2026-11-06 at 39cd5f0c plus the working tree of `fix/sec-005-guard-bypass-not-persisted` (SR-202), for the paragraph on `injectionGuardBypass` in "Settings per desk" only; nothing else on the page was re-read. Before that: 2026-10-29 at 464b00c5 (Biome cleanup in `apps/web/components/settings-page.tsx` and `packages/host/src/settings-store.ts` at `92bde965`; before that: 2026-10-11 at 2df34be, fix branch, before merge). Only "What a save does besides saving" and "What the answer carries" were re-checked; the other cites on this page are unchanged, and some were already stale.
 
 > **Two products, one repo.** **Personal** is the Mac/Windows Nultron app (current cut `0.15.0`); **Enterprise** is the hosted web app.
 > The host-decides/renderer-displays rule below is unchanged and applies to both; the Electron-only transport and wipe details are the Personal app's.
@@ -83,6 +83,16 @@ goes through `resolveSettingsWorkspaceId` (`:293-299`): explicit id → `readSel
 The two sentinels are string constants, not magic literals scattered around:
 `LEGACY_SETTINGS_WORKSPACE = "__legacy__"` (`:28`) and `FALLBACK_SETTINGS_WORKSPACE = "__default__"` (`:30`).
 The literal `"__default__"` appears exactly once in the repo, at `:30`.
+
+**`injectionGuardBypass` is the one field of a slice that is not saved (SR-202, 2026-11-06).** The sealed payload
+never holds it, on a desk or on the server. `mergeSecrets` ignores it and `normalizeSecrets` does not read it
+(`packages/host/src/settings-store.ts:112`), and a slice that still carries the key is rewritten without it as soon as
+the payload loads (`carriesStoredBypass` `injection-guard-bypass.ts:23`, `clearStoredBypass` `settings-store.ts:447`, `loadSettingsFile` `settings-store.ts:481`, one log line
+with the tenant id). Off server mode `saveSettings` records a boolean patch in a per-desk set in host memory
+(`packages/host/src/injection-guard-bypass.ts`; `settings-store.ts:531`) and `loadSettings` / `saveSettings` layer
+it onto what they return (`withInjectionGuardBypass`, `injection-guard-bypass.ts:17`), so `maskSecrets` reports it and every reader sees it
+until the host restarts. In server mode the set refuses to hold it. The Settings page sends no such field and has no
+control for it. Tests: `settings-guard-bypass-desk.test.ts`, `settings-guard-bypass-hosted.test.ts`.
 
 **The UI locale is not in a desk slice and is not the tenant's either.** Phase 4 made it per *user*:
 `loadUserLocale(scope)` / `saveUserLocale(scope, locale)` (`:594-600`, `:626-639`) take a `UserScope` —
@@ -576,7 +586,7 @@ installing an update or already exiting), races `clearRendererState()` — `clea
 | Save with an empty key string | A no-op for the key, on the desk and on the server (since 2026-10-06): the renderer leaves a blank field out of the body (`settingsSaveBody`, `apps/web/components/settings-page.tsx:107`, used at `:300`), the host drops a blank anyway (`keyFieldValue`, `packages/host/src/handlers/settings.ts:227-232`), and the verdict is left alone (`refreshGatewayGateAfterSave` returns early, `:404`). The rest of the body (the Edit cap) still saves. A key is forgotten only through `scope: "key"` (`resetGatewayKey`, `:482`). Before: off server mode a blank went to `mergeSecrets`, which deleted the key, and `refreshGatewayGateAfterSave` cleared the verdict on both products, so a save made only to change the Edit cap signed a desk out of the gateway (2026-10-05 verify-pass finding). Tests: `packages/host/src/handlers/settings.test.ts:290` (key and verdict kept), `:306` (`scope: "key"` forgets both), `:376` (desk blank and whitespace), `apps/web/lib/settings-save.test.ts:158` (`settingsSaveBody`) |
 | Save a key, or forget it, as a hosted member or builder | `403 settings_key_forbidden` before anything is written (`requestsKeyWrite`, `assertMayChangeCompanyKey`, `packages/host/src/handlers/settings.ts:266-275`, `:290`, `:574-579`); the stored key and verdict are untouched |
 | Server mode, no database connection installed | `tenantStateBackend()` throws `tenant_state_backend_missing` (500) on the first read or write (`packages/host/src/tenant-state-store.ts:298-308`). Fail closed and loud, never a silent fall back to the desktop's files — see [`tenant-secrets-backend.md`](tenant-secrets-backend.md) |
-| Sealed settings that will not open with the current wrap key | server mode refuses the request (`settings_unreadable`, 500) and leaves the payload untouched; a desk quarantines and starts fresh, exactly as before (`onUndecryptableSettings`, `packages/host/src/settings-store.ts:373-385`) |
+| Sealed settings that will not open with the current wrap key | server mode refuses the request (`settings_unreadable`, 500) and leaves the payload untouched; a desk quarantines and starts fresh, exactly as before (`onUndecryptableSettings`, `packages/host/src/settings-store.ts:386-398`). A wrap key that is *refused* is neither: `decodeStoredPayload` resolves the key before it reads the payload (`:402`), so a desk key under 32 bytes throws `DESK_VAULT_KEY_TOO_WEAK` out of `loadSettings` and `saveSettings` and `settings.enc` is not renamed (SR-203) |
 | Reset queued, app killed before reboot | `reset-pending.json` persists; the wipe applies on the next boot regardless of how the process died |
 | Reset while runs are in flight | only *tracked* ffmpeg/ffprobe children are signalled (`packages/host/src/child-processes.ts:42-55`); an in-flight chat turn or embed job is simply cut off at exit. No coverage |
 | Partial removal | since 2026-09-23 the marker is kept, rewritten to what is left, and the next launch retries it; the outcome says `applied: false` and the boot line warns (`keepForRetry`, `packages/db/src/reset.ts:276-289`). Before, `dropMarker()` ran anyway and the result said applied |
@@ -588,6 +598,7 @@ installing an update or already exiting), races `clearRendererState()` — `clea
 | File | Role |
 |---|---|
 | `packages/host/src/settings-store.ts` | The encrypted store, one payload per tenant; `SettingsScope`, `resolveSettingsScope`, `resolveSettingsWorkspaceId`, `sliceFor`, `clearGatewayKeyEverywhere`, `loadUserLocale` / `saveUserLocale`, `loadOwnerLocale` / `saveOwnerLocale` |
+| `packages/host/src/injection-guard-bypass.ts` | **SR-202.** The per-desk set in host memory that holds the injection-guard bypass off server mode; `setInjectionGuardBypass`, `withInjectionGuardBypass`, `carriesStoredBypass`. Nothing is saved; in server mode it holds nothing. |
 | `packages/host/src/tenant-state-store.ts` | **Phase 4.** The backend the two payloads go through: `TenantStateBackend`, the file and row implementations, `TENANT_STATE_FILENAMES`, legacy-file adoption — see [`tenant-secrets-backend.md`](tenant-secrets-backend.md) |
 | `packages/host/src/tenant-state-db.ts` | Three lines; the only place the row backend is handed a connection, imported from `router.ts` |
 | `packages/core/src/tenancy/state-keys.ts` | `TENANT_STATE_KEYS` — `settings`, `gateway_gate` and (hosted only, 2026-10-01) `model_cache`, the names both backends key on |

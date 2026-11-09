@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { wrappingKeyFromSecret } from "@agentforge/core";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import {
+  assertDeskVaultKeyUsable,
+  DESK_VAULT_KEY_TOO_WEAK,
   getLocalVaultKey,
   hasKeyLikeVariety,
   MASTER_KEY_FILE,
@@ -240,9 +242,78 @@ describe("getLocalVaultKey outside server mode", () => {
     expect(getLocalVaultKey(env)).toEqual(first);
   });
 
-  it("still accepts a short env key on a desk", () => {
-    const env = { AGENTFORGE_DATA_DIR: dataDir(), AGENTFORGE_SECRETS_KEY: "hunter2" };
-    expect(getLocalVaultKey(env)).toEqual(wrappingKeyFromSecret("hunter2"));
+  it("refuses a passphrase in AGENTFORGE_SECRETS_KEY on a desk, without printing it or writing a file", () => {
+    const dir = dataDir();
+    for (const passphrase of [
+      "hunter2",
+      "correct horse battery staple correct horse!!",
+      "phase3-seal-regression-key",
+    ]) {
+      const env = { AGENTFORGE_DATA_DIR: dir, AGENTFORGE_SECRETS_KEY: passphrase };
+      let message = "";
+      try {
+        getLocalVaultKey(env);
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error);
+      }
+      expect(message, passphrase).toBe(DESK_VAULT_KEY_TOO_WEAK);
+      expect(message).toContain("AGENTFORGE_SECRETS_KEY");
+      expect(message).toContain("openssl rand -hex 32");
+      expect(message).not.toContain(passphrase);
+    }
+    expect(existsSync(join(dir, MASTER_KEY_FILE))).toBe(false);
+  });
+
+  it("refuses a real but short key on a desk, in either encoding", () => {
+    const short = randomBytes(31);
+    for (const encoded of [short.toString("hex"), short.toString("base64"), short.toString("base64url")]) {
+      const env = { AGENTFORGE_DATA_DIR: dataDir(), AGENTFORGE_SECRETS_KEY: encoded };
+      expect(() => getLocalVaultKey(env)).toThrow(DESK_VAULT_KEY_TOO_WEAK);
+    }
+  });
+
+  it("accepts a generated key on a desk in hex, base64 and base64url, and writes no .master-key", () => {
+    const key = randomBytes(32);
+    for (const encoded of [key.toString("hex"), key.toString("base64"), key.toString("base64url")]) {
+      const dir = dataDir();
+      const env = { AGENTFORGE_DATA_DIR: dir, AGENTFORGE_SECRETS_KEY: ` ${encoded} ` };
+      expect(getLocalVaultKey(env)).toEqual(wrappingKeyFromSecret(encoded));
+      expect(existsSync(join(dir, MASTER_KEY_FILE))).toBe(false);
+    }
+  });
+
+  it("treats a blank AGENTFORGE_SECRETS_KEY as unset and falls back to .master-key", () => {
+    for (const blank of ["", "   "]) {
+      const dir = dataDir();
+      const key = getLocalVaultKey({ AGENTFORGE_DATA_DIR: dir, AGENTFORGE_SECRETS_KEY: blank });
+      expect(key).toHaveLength(32);
+      expect(existsSync(join(dir, MASTER_KEY_FILE))).toBe(true);
+    }
+  });
+
+  it("accepts what looks like a key without judging how random it is, which is how the desk fixtures work", () => {
+    const patterns = ["d".repeat(64), "0".repeat(64), "password".repeat(8)];
+    for (const pattern of patterns) {
+      const env = { AGENTFORGE_DATA_DIR: dataDir(), AGENTFORGE_SECRETS_KEY: pattern };
+      expect(getLocalVaultKey(env), pattern).toEqual(wrappingKeyFromSecret(pattern));
+      expect(() => getLocalVaultKey({ ...env, AGENTFORGE_SERVER: "1" }), pattern).toThrow(SERVER_VAULT_KEY_NOT_RANDOM);
+    }
+  });
+
+  it("accepts a typed passphrase of 44 base64-alphabet characters, because it is a canonical encoding of 33 bytes", () => {
+    const passphrases = [
+      "correcthorsebatterystaplecorrecthorsebattery",
+      "MyCompanyNultronDeskPasswordForTheOffice2026",
+    ];
+    for (const passphrase of passphrases) {
+      expect(passphrase).toHaveLength(44);
+      expect(vaultKeyEntropyBytes(passphrase), passphrase).toBe(33);
+      const env = { AGENTFORGE_DATA_DIR: dataDir(), AGENTFORGE_SECRETS_KEY: passphrase };
+      expect(getLocalVaultKey(env), passphrase).toEqual(wrappingKeyFromSecret(passphrase));
+      expect(getLocalVaultKey({ ...env, AGENTFORGE_SERVER: "1" }), passphrase).toEqual(
+        wrappingKeyFromSecret(passphrase),
+      );
+    }
   });
 
   /**
@@ -273,5 +344,45 @@ describe("getLocalVaultKey outside server mode", () => {
     const written = randomBytes(32).toString("hex");
     writeFileSync(join(dir, MASTER_KEY_FILE), `${written}\n`, "utf8");
     expect(getLocalVaultKey({ AGENTFORGE_DATA_DIR: dir })).toEqual(wrappingKeyFromSecret(written));
+  });
+});
+
+describe("assertDeskVaultKeyUsable", () => {
+  const absent = join(tmpdir(), "agentforge-vault-key-never-created");
+
+  it("throws the fixed refusal for a passphrase and a short key, and never prints the value", () => {
+    for (const weak of ["hunter2", randomBytes(31).toString("hex"), randomBytes(31).toString("base64")]) {
+      let message = "";
+      try {
+        assertDeskVaultKeyUsable({ AGENTFORGE_DATA_DIR: absent, AGENTFORGE_SECRETS_KEY: weak });
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error);
+      }
+      expect(message, weak).toBe(DESK_VAULT_KEY_TOO_WEAK);
+      expect(message).not.toContain(weak);
+    }
+  });
+
+  it("is silent for a usable key, an unset variable and a blank one", () => {
+    const usable = randomBytes(32).toString("hex");
+    for (const value of [usable, ` ${usable} `, undefined, "", "   "]) {
+      expect(() =>
+        assertDeskVaultKeyUsable({ AGENTFORGE_DATA_DIR: absent, AGENTFORGE_SECRETS_KEY: value }),
+      ).not.toThrow();
+    }
+  });
+
+  it("reads the environment only: no data dir, no .master-key", () => {
+    for (const value of [randomBytes(32).toString("hex"), undefined]) {
+      assertDeskVaultKeyUsable({ AGENTFORGE_DATA_DIR: absent, AGENTFORGE_SECRETS_KEY: value });
+    }
+    expect(() => assertDeskVaultKeyUsable({ AGENTFORGE_DATA_DIR: absent, AGENTFORGE_SECRETS_KEY: "hunter2" })).toThrow(
+      DESK_VAULT_KEY_TOO_WEAK,
+    );
+    expect(existsSync(absent)).toBe(false);
+  });
+
+  it("leaves server mode to getLocalVaultKey", () => {
+    expect(() => assertDeskVaultKeyUsable({ AGENTFORGE_SERVER: "1", AGENTFORGE_SECRETS_KEY: "hunter2" })).not.toThrow();
   });
 });
