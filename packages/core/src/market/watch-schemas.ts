@@ -8,6 +8,7 @@
  * the disclaimer is stamped by code; the model may rank and read sentiment but
  * may not issue an imperative directive (see advice-guard).
  */
+import { CHART_SMA_PERIODS } from "./chart-builder";
 import { z } from "zod";
 import { dataChartSchema } from "../artifacts/data-analysis";
 import { httpUrlSchema } from "./schemas";
@@ -42,6 +43,10 @@ export const SIGNALS_MAX = WATCHLIST_MAX * SIGNAL_KINDS_MAX;
 export const SIGNAL_NOTE_MAX = 120;
 /** One rotation row per watchlist entry. */
 export const ROTATION_MAX = WATCHLIST_MAX;
+export const PACKET_NOTES_MAX = 100;
+export const MACRO_QUOTES_MAX = 100;
+export const CHART_SERIES_MAX = 1 + CHART_SMA_PERIODS.length;
+export const PRICE_CHART_POINTS_MAX = 504;
 
 export const MARKET_STATES = ["PRE", "REGULAR", "POST", "CLOSED", "UNKNOWN"] as const;
 export type MarketState = (typeof MARKET_STATES)[number];
@@ -164,13 +169,23 @@ export const tickerCryptoSchema = z.object({
 });
 export type TickerCrypto = z.infer<typeof tickerCryptoSchema>;
 
+const priceChartSchema = dataChartSchema.extend({
+  x: dataChartSchema.shape.x.extend({
+    values: z.array(z.union([z.string(), z.number()])).max(PRICE_CHART_POINTS_MAX),
+  }),
+  series: z
+    .array(dataChartSchema.shape.series.element.extend({ values: z.array(z.number()).max(PRICE_CHART_POINTS_MAX) }))
+    .min(1)
+    .max(CHART_SERIES_MAX),
+});
+
 /** Everything fetched for one watchlist entry. Null sections mean "not available"; `failures` says why. */
 export const tickerPacketSchema = z.object({
   symbol: resolvedSymbolSchema,
   quote: quoteSchema.nullable().default(null),
   technical: technicalSchema.nullable().default(null),
   history: priceHistorySchema.nullable().default(null),
-  chart: dataChartSchema.nullable().default(null),
+  chart: priceChartSchema.nullable().default(null),
   news: z.array(watchNewsItemSchema).max(NEWS_PER_TICKER_MAX).default([]),
   /** Pivot highs/lows from the daily bars. Absent when the host did not compute them. */
   swings: z.array(swingPointSchema).max(SWING_POINTS_MAX).optional(),
@@ -182,7 +197,7 @@ export const tickerPacketSchema = z.object({
   insiders: tickerInsidersSchema.optional(),
   /** The crowd read from the public social venues. */
   sentiment: tickerSentimentSchema.optional(),
-  failures: z.array(z.string()).default([]),
+  failures: z.array(z.string()).max(PACKET_NOTES_MAX).default([]),
 });
 export type TickerPacket = z.infer<typeof tickerPacketSchema>;
 
@@ -200,8 +215,11 @@ export const MACRO_SYMBOLS = [
 ] as const;
 
 export const macroSnapshotSchema = z.object({
-  quotes: z.array(quoteSchema.extend({ label: z.string().default("") })).default([]),
-  failures: z.array(z.string()).default([]),
+  quotes: z
+    .array(quoteSchema.extend({ label: z.string().default("") }))
+    .max(MACRO_QUOTES_MAX)
+    .default([]),
+  failures: z.array(z.string()).max(PACKET_NOTES_MAX).default([]),
 });
 export type MacroSnapshot = z.infer<typeof macroSnapshotSchema>;
 

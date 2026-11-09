@@ -250,6 +250,7 @@ export async function* startModalityRun(options: {
   // model answer that arrives later is dropped instead of being persisted as a completed turn.
   let settled = false;
   let settledMessage = "";
+  let finishing = false;
   // The model call's own cancel. The watchdog and a client that left both tell the person the run
   // failed; this is what makes the request in flight stop, so a run nobody is waiting for stops billing.
   const modelAbort = new AbortController();
@@ -268,7 +269,7 @@ export async function* startModalityRun(options: {
     model,
     locale,
     onStall: (message) => {
-      if (queueClosed) {
+      if (queueClosed || finishing) {
         return;
       }
       send({ type: "run.failed", message });
@@ -279,7 +280,7 @@ export async function* startModalityRun(options: {
     },
   });
   const onClientAbort = () => {
-    if (queueClosed) {
+    if (queueClosed || finishing) {
       return;
     }
     const message = abortErrorMessage(options.abortSignal?.reason, locale);
@@ -328,6 +329,7 @@ export async function* startModalityRun(options: {
       recordChatRunUsage(options.tenant, runId, true, runUsage);
     };
     const persistAssistant = async () => {
+      finishing = true;
       if (persisted) {
         return true;
       }

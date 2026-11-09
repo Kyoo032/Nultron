@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { encryptJson, wrappingKeyFromSecret } from "@agentforge/core";
+import { DESK_VAULT_KEY_TOO_WEAK } from "@agentforge/db/vault-key";
 import {
   loadSettings,
   saveSettings,
@@ -77,6 +78,29 @@ describe("settings-store", () => {
     expect(existsSync(join(dir, "settings.enc"))).toBe(false);
     expect(existsSync(join(dir, "settings.enc.unreadable"))).toBe(true);
     expect(readFileSync(join(dir, "settings.enc.unreadable"), "utf8")).not.toContain(PLAIN_KEY);
+  });
+
+  it("refuses a weak AGENTFORGE_SECRETS_KEY and leaves settings.enc where it is", () => {
+    const encPath = join(dir, "settings.enc");
+    const envelope = encryptJson({ openaiApiKey: PLAIN_KEY }, wrappingKeyFromSecret(SECRET));
+    writeFileSync(encPath, `${JSON.stringify(envelope)}\n`, "utf8");
+    const before = readFileSync(encPath, "utf8");
+    process.env.AGENTFORGE_SECRETS_KEY = "hunter2";
+
+    expect(() => loadSettings()).toThrow(DESK_VAULT_KEY_TOO_WEAK);
+    expect(() => saveSettings({ openaiApiKey: "sk-after-refusal" })).toThrow(DESK_VAULT_KEY_TOO_WEAK);
+    expect(existsSync(`${encPath}.unreadable`)).toBe(false);
+    expect(readFileSync(encPath, "utf8")).toBe(before);
+  });
+
+  it("refuses a weak AGENTFORGE_SECRETS_KEY before it judges what the file holds", () => {
+    const encPath = join(dir, "settings.enc");
+    writeFileSync(encPath, "not json at all", "utf8");
+    process.env.AGENTFORGE_SECRETS_KEY = "hunter2";
+
+    expect(() => loadSettings()).toThrow(DESK_VAULT_KEY_TOO_WEAK);
+    expect(existsSync(`${encPath}.unreadable`)).toBe(false);
+    expect(readFileSync(encPath, "utf8")).toBe("not json at all");
   });
 
   it("keeps gateway keys isolated per workspace", () => {

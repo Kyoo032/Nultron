@@ -2,7 +2,7 @@
 
 Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
 
-Last verified: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-06, branch `feat/hosted-run-limits` over 6105c5c, not committed, for the run-limits subsection of § 5 and its row in the file table; nothing else on the page was re-read. Before that: 2026-10-05, working tree over 0b61a29, not committed, for two lines only (the `audit-deployed.mjs` row of the file table and the audit-gate gotcha, which now describe the production closure after SR-113); nothing else on the page was re-read. Before that: 2026-10-02, working tree over 0b61a29, not committed, for one row (the operator-fields row of § 8, which now says who may write a provider key: M4, an owner or an admin, a member is answered `403 settings_key_forbidden`); nothing else on the page was re-read. Before that: 2026-10-01, working tree over 0b61a29, not committed, for two rows only: the `ci-local.mjs` row of the tests table (a vitest step now needs its `Tests N passed` summary, not just exit 0) and the per-tenant model cache bullet of § 10 (the background refill and its log line). Before that, the same day, for the new § 10 (where a tenant's provider key may go: Enterprise BYOK Phase A) and the corrected operator-keys row of § 8, whose "provider keys" claim was wrong before it (`requestsOperatorOnlySettings` lists `toolKeys`, `toolBackends` and `injectionGuardBypass` only). Nothing else on the page was re-read that day. Before that: 2026-09-23 at d4561b8 + working tree for sections 1-4 and every
+Last verified: 2026-11-06 at 39cd5f0c plus the working tree on `fix/request-array-caps`, for the request cost caps subsection of § 5 and its file row only; nothing else on the page was re-read. Before that: 2026-11-06 at f6c9acc1 for the desk wrap-key check at the end of section 1 only (SR-203). Before that: 2026-11-06 at 30f92eab for § 7 (the SSRF guard), the resolution gotcha and the `safe-fetch.test.ts` row only; the new code was read at the lines cited and driven once against a loopback listener and against real DNS and TLS (SR-201). Nothing else on the page was re-read. Before that: 2026-11-06 at 01a88fba, for the Host rule only (row 6a of the admission table and § 3; the other `http-adapter.ts` line numbers on this page are from 2026-09-23 and have shifted six lines below `:632`). Before that: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-06, branch `feat/hosted-run-limits` over 6105c5c, not committed, for the run-limits subsection of § 5 and its row in the file table; nothing else on the page was re-read. Before that: 2026-10-05, working tree over 0b61a29, not committed, for two lines only (the `audit-deployed.mjs` row of the file table and the audit-gate gotcha, which now describe the production closure after SR-113); nothing else on the page was re-read. Before that: 2026-10-02, working tree over 0b61a29, not committed, for one row (the operator-fields row of § 8, which now says who may write a provider key: M4, an owner or an admin, a member is answered `403 settings_key_forbidden`); nothing else on the page was re-read. Before that: 2026-10-01, working tree over 0b61a29, not committed, for two rows only: the `ci-local.mjs` row of the tests table (a vitest step now needs its `Tests N passed` summary, not just exit 0) and the per-tenant model cache bullet of § 10 (the background refill and its log line). Before that, the same day, for the new § 10 (where a tenant's provider key may go: Enterprise BYOK Phase A) and the corrected operator-keys row of § 8, whose "provider keys" claim was wrong before it (`requestsOperatorOnlySettings` lists `toolKeys`, `toolBackends` and `injectionGuardBypass` only). Nothing else on the page was re-read that day. Before that: 2026-09-23 at d4561b8 + working tree for sections 1-4 and every
 `http-adapter.ts` citation on this page (the auth pass: the production https rule for the portal
 URL, the malformed Host / request-target 400, the gate's portal re-check, digest session ids). The
 response headers, the ffmpeg failure detail and the top-up link keep their 2026-09-21 reading at
@@ -79,8 +79,12 @@ until it is given an https portal origin. The
 message names every broken variable at once and never prints a value. It lives in the host package
 rather than in `apps/web` because those rules sit in three packages and `apps/web` can see only
 two; `apps/web/server/hosted-mode-guard.ts:28` re-exports it so `server.ts` reaches both guards
-through one module. Off server mode both calls return immediately, so webdev, the e2e run and the
-desktop are untouched.
+through one module. Off server mode both calls return immediately. A third call, `assertDeskVaultKeyUsable`
+(`packages/db/src/vault-key.ts:177-185`, re-exported by `hosted-env.ts` and run from
+`apps/web/server-env.ts` and `main()`), is the one check a desk meets: it refuses an
+`AGENTFORGE_SECRETS_KEY` under 32 bytes and reads no file ([SR-203](../security-register.md#sr-203)).
+Webdev and the e2e run set no key, so they are untouched, and `hostedEnvProblems` still returns an empty
+list off server mode.
 
 ### 2. Admission — the order in `handleNodeRequest`
 
@@ -96,7 +100,8 @@ load-bearing; if that mount ever moves, the controls move with it.
 | 3 | `:612` | `transportRejection` — TLS, method allowlist, path filter, header cap, per-IP and per-session buckets | **every** request, not only `/api` |
 | 4 | `:617` | a request target that will not parse → 400 `invalid_path`; a `Host` that is not `host[:port]` → 400 `invalid_host` | **every** request, in both modes (decided at `:556`, before the page / API split at `:562`) |
 | 5 | `:624` | non-`/api` paths return `false`; Express serves the page | — |
-| 6 | `:633` | `mutatingRejection` — Origin/Host allowlist, double-submit CSRF, `x-agentforge-transport` | non-safe methods on `/api` |
+| 6a | `:633` | `hostRejection` — loopback `Host` off server mode, allowlisted `Host` in server mode; a missing `Host` is refused | **every** method on `/api` (GET, HEAD and OPTIONS included), minus the billing webhook path; `/healthz` is answered before it |
+| 6 | `:639` | `mutatingRejection` — Origin allowlist, double-submit CSRF, `x-agentforge-transport` | non-safe methods on `/api` |
 | 7 | `packages/host/src/router.ts:456` | `gate` → `requireSessionFor` — the session row, then the portal re-check on a due session, before the route table | `/api` minus the exempt paths |
 | 8 | `:706` | `logAuthFailure` | a 401 coming back out |
 | 9 | `:495` | `maskServerError` | any 5xx, in server mode |
@@ -119,13 +124,19 @@ the TLS rule and the buckets, so a malformed request is still counted and a plai
 
 ### 3. Origin, Host and CSRF
 
-`mutatingRejection` (`packages/host/src/http-adapter.ts:768`) chooses between two rules — the
-hosted branch at `:780-788` and the desk branch at `:789`:
+`hostRejection` (`packages/host/src/http-adapter.ts:778`, called at `:633`) runs for every `/api`
+request, GET, HEAD and OPTIONS included (SR-207, 2026-11-06; before that only a mutating request was
+checked, so a DNS-rebinding page could read the API). It answers 403 `forbidden` off server mode when
+the `Host` is not loopback or is absent, and 403 `origin_forbidden` in server mode when it is not one of
+the allowlisted origins' hosts. `/healthz` never reaches it (answered at `:620`), and the billing
+webhook path is skipped as it is for CSRF. In server mode the TLS rule and the buckets still run first.
 
-- **Off server mode**, unchanged from the desk: a missing `Origin` means same-machine, and `Host`
-  must be loopback.
-- **In server mode**: `Origin` must be on the allowlist and a missing one is refused; `Host` must
-  be one of those origins' hosts; and the double-submit CSRF token must match — cookie
+`mutatingRejection` (`:787`) then chooses between two rules for non-safe methods:
+
+- **Off server mode**, unchanged from the desk: a missing `Origin` means same-machine, and a present
+  one must be loopback.
+- **In server mode**: `Origin` must be on the allowlist and a missing one is refused; and the
+  double-submit CSRF token must match — cookie
   `__Host-agentforge_csrf` against header `x-agentforge-csrf` (`packages/host/src/csrf.ts`).
 
 HTTPS is required via `X-Forwarded-Proto` (`:62-64`, `HTTPS_REQUIRED` at `:100`); a direct hit on
@@ -217,6 +228,17 @@ flight instead, server mode only:
   header field. The 503 keeps its code through error masking (`maskServerError`) and the renderer puts
   the catalog sentence in at `apiFetch` (`apps/web/lib/run-limit-copy.ts`), for both codes.
 
+#### Request cost caps (SR-196 residual, 2026-11-06)
+
+The body is read whole up to `MAX_BODY_BYTES` (26 MB, `http-adapter.ts:43`, `:240`) and then `JSON.parse`d, so the byte cap is the only bound on the read. `packages/host/src/request-limits.ts` bounds what a schema does with the parsed value. `assertRequestWithin` (`:18`) walks it without recursion and charges every value: an object or list `CONTAINER_COST` (6, `:9`), any other value 1. It answers `400 invalid_request` past a per-list length or past the cost budget. The cost, not the item count, is what limits `zod`, because `zod` records one issue per failing leaf and an empty object fails every required field (up to 6 on the request schemas, 12 for an Edit title style). Two profiles (`:11-12`): `REQUEST_LIMITS` (60,000 cost, lists of 10,000) for every route, and `BRIEFING_LIMITS` (250,000 cost, lists of 1,000) for the two Market routes that take a briefing, whose honest body is about 156,000. The worst failing body each profile admits was measured at about 56,000 issues and 60 MB (default) and about 102,000 issues and 71 MB (briefing, after the price chart caps dropped to 504 points and 3 series); SR-196 has the table.
+
+- **Walked once per request**, before any schema: the finance export body (`handlers/finance-export.ts:44`, so `brief`, `result.brief` and `report` share one budget), the finance run, stream, parse, regenerate and Word export bodies (`handlers/finance.ts:17`, `:100`), the document and presentation Word, PowerPoint, check and regenerate bodies (`handlers/jobs.ts:221`, `:280`, `handlers/documents-check.ts:16`, `document-generate.ts:379`, `presentation-generate.ts:490`), saved decks (`handlers/presentation-decks.ts:32`), the Edit ops body (`handlers/edit.ts:165`), and the Market regenerate and Word export bodies with the briefing profile (`handlers/market.ts:57`, `:70`).
+- **A `.max()` in the schema** where the data is host-built: the legal `deliverables` list (`legal/input.ts:43-48`), and the six Market packet lists that had none (a ticker's and the macro `failures`, the macro `quotes`, a chart's series and its two value lists; `packages/core/src/market/watch-schemas.ts:46-49`, `:172-180`, `:200`, `:218-222`). The shared finance, document, presentation and Edit schemas also read stored or model-written data, so they are left alone and the walker is their cap.
+- **Saved decks** also refuse more than 28 slides or 50 bullets on a slide (`presentation-decks.ts:21-22`, `:41`), in the save so an older deck still opens.
+- **Error text** built from `zod` issues is cut to the first 20, each at most 300 characters, by `summarizeIssues` (`packages/core/src/errors.ts:22`): the presentation and document parse helpers and `parseOpPayload`.
+
+The hand-written body readers (`edit.ts` `targetClipIds`, `knowledge.ts`, `agents.ts`) build no issue list and are not covered. `defineTool` (`packages/core/src/tools/define-tool.ts:23-54`) still returns `zod`'s whole message, but takes a model's tool call, not a request body.
+
 ### 6. What goes back out
 
 - **Headers.** `packages/host/src/security-headers.ts` writes CSP, HSTS, `X-Frame-Options: DENY`,
@@ -267,15 +289,29 @@ flight instead, server mode only:
 
 `packages/core/src/security/safe-fetch.ts`. Any fetch to a caller-supplied URL goes through
 `assertPublicHttpsUrl` (HTTPS only, no credentials in the URL, host not private) and
-`fetchPublicHttps`, which re-checks **per redirect hop** (`:179-203`).
+`fetchPublicHttps` (`:228`), which re-checks **per redirect hop** (`:241-269`).
 
 `packages/core/src/security/ip-range.ts` is the address half: it parses to bytes and compares CIDR
 prefixes, covering the ranges a string match misses — `100.64.0.0/10` CGNAT, `198.18.0.0/15`, the
 TEST-NETs, multicast, and the IPv6 blocks including the whole of `fe80::/10`. Addresses that carry
 an IPv4 inside an IPv6 (`::ffff:`, 6to4, NAT64) recurse onto the embedded address (`:225-246`).
 
-`assertResolvesPublic` (`packages/core/src/security/safe-fetch.ts:110-128`) resolves the hostname and refuses a private
-answer, so a public name pointing at `169.254.169.254` does not pass.
+Per hop, `resolvePublicAddresses` (`packages/core/src/security/safe-fetch.ts:104-126`) resolves the hostname once
+and refuses the whole name when the lookup fails, answers nothing, answers something that is not an IP address, or
+answers any private address, so a public name pointing at `169.254.169.254` does not pass. A failed lookup is
+`400 invalid_endpoint` "Could not resolve this URL's host", a private answer "URL must point at a public host". The
+address is never in the message. An IP literal is not resolved; the lexical check already judged its bytes.
+
+The connection is then pinned to that answer. `pinnedAgent` (`:172`) builds an undici `Agent` whose `connect.lookup`
+(`pinnedLookup`, `:145`) returns only the vetted list, in the shape the connector asked for (`all: true` gives an
+array, otherwise the first address with its family, and a `family` filter narrows the list), and answers for that one
+host only. `fetchPublicHttps` passes it to `fetch` as `dispatcher` (`:248`), so the socket never asks DNS and a
+resolver that answers differently the second time (DNS rebinding) is never consulted. Each hop gets its own agent,
+destroyed after the body is read (`:268`). The default `fetch` is still `globalThis.fetch`, and the agent comes from
+the `undici` 6.29.1 package that `@agentforge/core` now depends on (the version SR-198 pins); `safe-fetch.test.ts`
+drives that pair against a loopback listener on every run, so a Node whose bundled undici cannot take the agent fails
+there. `assertResolvesPublic` (`:129`) is kept as a thin wrapper over the same resolver and has no production caller.
+Not covered: the port (`https://host:6379/` is allowed; a policy is Rizky's call) and egress filtering ([SR-97](../security-register.md#sr-97), infra).
 
 ### 8. Routes that are off in server mode
 
@@ -314,6 +350,7 @@ Not a request-admission control; what the host does with a key once it has one. 
 | `packages/host/src/csrf.ts` | Double-submit token mint and check |
 | `packages/host/src/rate-limit.ts` | The three token buckets |
 | `packages/host/src/run-limits.ts` | The in-flight run caps and the exactly-once slot (§ 5, SR-138) |
+| `packages/host/src/request-limits.ts` | `REQUEST_LIMITS`, `BRIEFING_LIMITS` and `assertRequestWithin`, the cost cap on posted values (§ 5, SR-196) |
 | `packages/host/src/auth/session.ts` | Opaque session ids, expiry, cookie names |
 | `packages/host/src/auth/routes.ts` | `requireSessionFor`, the sign-in routes |
 | `packages/host/src/router.ts` | `gate()` — the session check, ahead of the route table |
@@ -368,10 +405,14 @@ Read before editing a hosted control. Lanes: Enterprise (the hosted app). Person
   given.
 - **The health check is not a security check.** It passed in every misconfiguration this pass
   found, including the one where every control was off.
-- **`assertResolvesPublic` fails open on a resolution error.** Deliberate: an offline suite with a
-  stubbed `fetchImpl` must still pass, and a name that does not resolve cannot be connected to.
-  It does *not* close DNS rebinding — the name is resolved again by `fetch` to connect. See
-  `../security-owasp-2026-09.md`, A10-6.
+- **The SSRF guard fails closed on a resolution error (SR-201).** It used to return, on the reasoning
+  that an unresolvable name could not be connected to; `fetch` resolves on its own, so that let a
+  connection through. Now a failed or empty lookup is `400 invalid_endpoint`. The cost is that a test
+  which reaches `fetchPublicHttps` with a fake `fetchImpl` and no `lookupImpl` does a real DNS lookup
+  and fails offline: give it a `lookupImpl`, or mock `node:dns/promises` the way `web-fetch.test.ts`,
+  `media-download.test.ts`, `components/download.test.ts` and `components/install.test.ts` do. A fake
+  `fetchImpl` never runs the pinned agent; the property is proved by `pinnedAgent` and `pinnedLookup`
+  cases in `safe-fetch.test.ts`. See `../security-owasp-2026-09.md`, A10-3 and A10-6.
 - **`getTenant` is not this page's job.** Being admitted says nothing about which rows a request
   may touch. Phase 3 owns that, and `../security-owasp-2026-09.md` A01-1 and A01-2 record where it
   is currently thin.
@@ -385,7 +426,7 @@ Automated, and these are what actually prove this page:
 | `packages/host/src/http-adapter.test.ts` (131, run 2026-09-23) | admission order, Origin/Host/CSRF, rate limits, masking, request id, `auth_failed`, and a malformed `Host` or unparseable target answered 400 in both modes rather than thrown |
 | `packages/host/src/security-headers.test.ts` (14) | the header set, the exact `Permissions-Policy` string, and Caddyfile parity |
 | `packages/core/src/security/ip-range.test.ts` (14) | CIDR membership, the v4-in-v6 forms |
-| `packages/core/src/security/safe-fetch.test.ts` (19) | scheme, credentials, per-hop redirects, DNS resolution |
+| `packages/core/src/security/safe-fetch.test.ts` (32, run 2026-11-06) | scheme, credentials, per-hop redirects, fail-closed DNS resolution, one lookup per hop, and the pinned agent reaching a loopback listener for a name no resolver can answer |
 | `packages/db/src/vault-key.test.ts` (26) | length and randomness floors, `.master-key` corruption |
 | `apps/web/server/hosted-mode-guard.test.ts` (13) | the production-build refusal, that compose still pins the flag, and that both boot guards run before `server.listen` |
 | `packages/host/src/hosted-env.test.ts` (48, run 2026-09-23) | one row per hosted variable, the aggregated message, that no value is printed, that local mode is untouched, and SR-26: a loopback http portal URL refused on `NODE_ENV=production` and kept everywhere else |

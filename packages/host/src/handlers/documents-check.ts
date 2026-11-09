@@ -2,6 +2,7 @@ import { checkDraftAgainstSource } from "@agentforge/core";
 import { jsonError, jsonOk } from "../errors";
 import { parseDocumentDraftBody } from "../document-outline";
 import { assembleDeskSource } from "../desk-sources";
+import { assertRequestWithin } from "../request-limits";
 import { getTenant } from "../tenant";
 import type { HostRequest, HostResult } from "../types";
 
@@ -12,6 +13,7 @@ export async function handlePostDocumentsCheck(request: HostRequest): Promise<Ho
       request.body && typeof request.body === "object"
         ? (request.body as { draft?: unknown; sourceText?: unknown; sourceFiles?: unknown })
         : {};
+    assertRequestWithin(body.draft, "Document draft");
     const draft = parseDocumentDraftBody(body.draft);
     const tenant = await getTenant(request);
     // No model reads this text, so the injection guard has nothing to protect here.

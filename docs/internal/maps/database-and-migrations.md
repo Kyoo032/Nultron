@@ -2,7 +2,7 @@
 
 Product: both · Instance: main :3000
 
-Last verified: 2026-10-29 at 464b00c5 for the 2026-10-21 one-agent first-desk comments in `packages/db/src/ensure-local-owner.ts` (`FIRST_RUN_MODES`) and `packages/db/src/portal-owner.ts` (`HOSTED_FIRST_DESK_MODES`). Before that: 2026-10-21 at 8953014 for the test-limit sentence above the unit-suite table. Before that: 2026-09-29 for the three `apps/desktop/main.cjs` citations (`bootstrapPackaged` lines), re-anchored in the
+Last verified: 2026-11-06 at f6c9acc1 for the desk wrap-key floor paragraph (SR-203). Before that: 2026-10-29 at 464b00c5 for the 2026-10-21 one-agent first-desk comments in `packages/db/src/ensure-local-owner.ts` (`FIRST_RUN_MODES`) and `packages/db/src/portal-owner.ts` (`HOSTED_FIRST_DESK_MODES`). Before that: 2026-10-21 at 8953014 for the test-limit sentence above the unit-suite table. Before that: 2026-09-29 for the three `apps/desktop/main.cjs` citations (`bootstrapPackaged` lines), re-anchored in the
 working tree, not committed, after the ffmpeg probe moved behind the first paint. Before that: 2026-09-23 at d4561b8 + uncommitted tree for the migrations table and the numbering note (now
 through `0021`), the `auth_sessions` row of the schema families, "Start over, applied at next boot" (every
 `reset.ts` citation, and the partial-failure retry) and the drizzle row of Where things live. Not driven:
@@ -59,25 +59,27 @@ empty (`:7`, `:14`).
 
 ### The wrap key
 
-`getLocalVaultKey(env)` (`packages/db/src/vault-key.ts:123-135`) returns the AES-256 wrapping key for
+`getLocalVaultKey(env)` (`packages/db/src/vault-key.ts:187-205`) returns the AES-256 wrapping key for
 every sealed envelope on the install. Its behaviour splits on `isServerMode(env)`, which is
 `AGENTFORGE_SERVER` being `1` or `true` (`packages/core/src/server-mode.ts:12-15`):
 
-- **On a desk** (not server mode, `:125-127`): `AGENTFORGE_SECRETS_KEY` when set, else the
-  `.master-key` file. `readOrCreateMasterKeyFile` (`:107-114`) creates the data dir, and on first use
-  writes 32 random bytes as hex with mode `0o600` (`:111`), then reads it back trimmed (`:113`). No
-  strength check is applied on a desk at all — a one-character `AGENTFORGE_SECRETS_KEY` is accepted.
-- **In server mode** (`:128-134`): the env key is mandatory (`:128-130`, message at `:76-79`), and it
-  must measure at least `MIN_VAULT_KEY_BYTES` = 32 (`:40`, checked at `:131-133`). The `.master-key`
-  fallback is never reached, because a file invented on a container layer disappears with the
-  container and takes every sealed envelope with it.
+- **On a desk** (not server mode, `:189-192`): `AGENTFORGE_SECRETS_KEY` when set, else the
+  `.master-key` file. A set key under 32 bytes is refused first, by `assertDeskVaultKeyUsable`
+  (`:177-185`, SR-203). `readOrCreateMasterKeyFile` (`:164-175`) creates the data dir, and on first use
+  writes 32 random bytes as hex with mode `0o600` (`:168`), then reads it back trimmed (`:170`). A
+  desk applies the floor and nothing else.
+- **In server mode** (`:193-204`): the env key is mandatory (`:193-195`, message at `:46-49`), and it
+  must measure at least `MIN_VAULT_KEY_BYTES` = 32 (`:40`, checked at `:196-198`), then pass the
+  variety check (`:201-203`). The `.master-key` fallback is never reached, because a file invented on a
+  container layer disappears with the container and takes every sealed envelope with it.
 
-`vaultKeyEntropyBytes(secret)` (`:90-105`) is the measurement: hex with an even digit count counts
-half its length (`:95-98`), canonical base64 / base64url counts its decoded length (`:99-104`), and
-everything else counts **zero**. "Canonical" means re-encoding the decoded bytes reproduces the same
-string modulo padding (`isCanonical`, `:80-82`) — that is what stops `Buffer.from(x, "base64")` from
-laundering a typed passphrase into "32 bytes". The known limit is written down at `:75-78`: a
-43-character alphanumeric passphrase *is* valid base64 of 32 bytes and passes.
+`vaultKeyEntropyBytes(secret)` (`:123-125`, over `decodeVaultKey`, `:132-147`) is the measurement: hex
+with an even digit count counts half its length, canonical base64 / base64url counts its decoded
+length, and everything else counts **zero**. "Canonical" means re-encoding the decoded bytes
+reproduces the same string modulo padding (`isCanonical`, `:119-121`) — that is what stops
+`Buffer.from(x, "base64")` from laundering a typed passphrase into "32 bytes". The known limit is
+written down above `isCanonical` (`:114-117`): every 44-character string over the base64 alphabet is
+valid base64 of 33 bytes and passes.
 
 Whatever comes back is hashed, not used raw: `wrappingKeyFromSecret` is
 `sha256(secret)` (`packages/core/src/crypto/envelope.ts:14-16`), so any secret length produces a
@@ -383,15 +385,18 @@ one as a finding, not a flake.
 import of a fresh module graph opens a new handle — and skips the reset hook, which is gated on the
 cache being empty (`:35`).
 
-**The desk path applies no key strength check at all.** `getLocalVaultKey` measures entropy only in
-server mode (`packages/db/src/vault-key.ts:125-133`), so `AGENTFORGE_SECRETS_KEY=x` is accepted on a
-desk and `wrappingKeyFromSecret` will happily hash it into 32 bytes
-(`packages/core/src/crypto/envelope.ts:14-16`).
+**The desk path applies the 32-byte floor, and only the floor.** `assertDeskVaultKeyUsable`
+(`packages/db/src/vault-key.ts:177-185`) throws `DESK_VAULT_KEY_TOO_WEAK` when `AGENTFORGE_SECRETS_KEY`
+is set and `vaultKeyEntropyBytes` is under 32. `getLocalVaultKey` calls it first on a desk (`:190`) and
+the web server calls it at boot, so `AGENTFORGE_SECRETS_KEY=x` is refused before
+`wrappingKeyFromSecret` (`packages/core/src/crypto/envelope.ts:14-16`) can hash it. Server mode adds
+the variety check; a desk does not, so `"0".repeat(64)` and a typed 44-character base64-alphabet
+passphrase still pass a desk. A blank value falls back to `.master-key` (SR-203).
 
 **`docs/internal/web-security-spec.md:74` is stale on this subsystem.** Row S1 says the `.master-key`
 fallback "throws when `NODE_ENV=production`" and cites `packages/db/src/vault-key.ts:37-51`. The code
 gates on `isServerMode` — `AGENTFORGE_SERVER` being `1`/`true`
-(`packages/db/src/vault-key.ts:125`, `packages/core/src/server-mode.ts:12-15`) — and `NODE_ENV`
+(`packages/db/src/vault-key.ts:189`, `packages/core/src/server-mode.ts:12-15`) — and `NODE_ENV`
 appears nowhere in the file; lines `37-51` are the constant declarations. Read the code, not the row.
 
 **`seed.ts` prints the wrong desk name.** Its success line says "Seeded local owner, Default
