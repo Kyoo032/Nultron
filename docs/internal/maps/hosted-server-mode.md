@@ -38,16 +38,16 @@ What this page is **not**: the desktop or webdev path. Every rule below is a bra
 
 ### 2. The two mutating rules — loopback, and the web allowlist
 
-Since 2026-11-06 (SR-200) the Host half of both rules also runs on GET, HEAD and OPTIONS: `hostRejection` (`packages/host/src/http-adapter.ts:778`, called at `:633`) is applied to every `/api` request, and `/healthz` stays exempt. `mutatingRejection` (`:787`) keeps the Origin, CSRF and transport halves for non-safe methods. The line numbers below predate that and have shifted.
+Since 2026-11-06 (SR-207) the Host half of both rules also runs on GET, HEAD and OPTIONS: `hostRejection` (`packages/host/src/http-adapter.ts:778`, called at `:633`) is applied to every `/api` request, and `/healthz` stays exempt. `mutatingRejection` (`:787`) keeps the Origin, CSRF and transport halves for non-safe methods. The line numbers below predate that and have shifted.
 
 `mutatingRejection` (`packages/host/src/http-adapter.ts:539-568`) is the one place the two are chosen between, on `csrfMode.secure` — which *is* `serverMode` (`:526`, set at `:387`).
 
-**Off server mode (the rule that was always there).** `isAllowedMutatingApiRequest(origin)` (`packages/host/src/local-request.ts:80-89`): a **missing Origin is allowed**, because curl, native tooling and same-origin GETs honestly have none; a present Origin must resolve to `localhost`, `127.0.0.1` or `::1` (`isLocalRequestUrl`, `:32-37` → `isLocalRequestHost`, `:20-29`). The `referer` argument is accepted and ignored (`:82`) — a remote Origin is never rescued by a local Referer. `isLoopbackHostHeader(host)` (`:66-73`) is no longer part of the mutating rule: since SR-200 `hostRejection` checks it on every `/api` request, GET, HEAD and OPTIONS included, and a **missing Host is rejected** (reasoning in the comment at `:56-65`). Failure is `403 { code: "forbidden", message: "Local requests only" }` (`http-adapter.ts:536-538`, `:26`).
+**Off server mode (the rule that was always there).** `isAllowedMutatingApiRequest(origin)` (`packages/host/src/local-request.ts:80-89`): a **missing Origin is allowed**, because curl, native tooling and same-origin GETs honestly have none; a present Origin must resolve to `localhost`, `127.0.0.1` or `::1` (`isLocalRequestUrl`, `:32-37` → `isLocalRequestHost`, `:20-29`). The `referer` argument is accepted and ignored (`:82`) — a remote Origin is never rescued by a local Referer. `isLoopbackHostHeader(host)` (`:66-73`) is no longer part of the mutating rule: since SR-207 `hostRejection` checks it on every `/api` request, GET, HEAD and OPTIONS included, and a **missing Host is rejected** (reasoning in the comment at `:56-65`). Failure is `403 { code: "forbidden", message: "Local requests only" }` (`http-adapter.ts:536-538`, `:26`).
 
 **In server mode (the hosted rule).** Both halves are checked against `trustedOrigins()` (`http-adapter.ts:527-531`):
 
 - `isAllowedWebOrigin(origin, allowlist)` (`local-request.ts:99-105`) — a **missing Origin is now rejected** (`:101-103`), and the match is on the whole normalised `scheme://host[:port]`, so a different scheme or port is a different origin. An empty allowlist matches nothing.
-- `isAllowedWebHostHeader(host, allowlist)` (`:113-119`) — the public host the proxy forwards. Since SR-200 `hostRejection` checks it on every `/api` request, not only on mutating ones; `mutatingRejection` keeps the Origin, CSRF and transport checks. `allowedHostHeaders` (`:123-137`) builds the accepted set from the allowlist's origins and additionally accepts the explicit default port (`app.example.com:443` for an https origin, `DEFAULT_PORTS` at `:121`).
+- `isAllowedWebHostHeader(host, allowlist)` (`:113-119`) — the public host the proxy forwards. Since SR-207 `hostRejection` checks it on every `/api` request, not only on mutating ones; `mutatingRejection` keeps the Origin, CSRF and transport checks. `allowedHostHeaders` (`:123-137`) builds the accepted set from the allowlist's origins and additionally accepts the explicit default port (`app.example.com:443` for an https origin, `DEFAULT_PORTS` at `:121`).
 
 Either failing is `403 { code: "origin_forbidden", message: "Origin is not allowed to call this server" }` (`http-adapter.ts:529-531`, `:28`).
 
@@ -82,7 +82,7 @@ Where the renderer sends it: `apps/web/lib/api-client.ts`. `withMutatingHeaders`
    - `checkRequestRate({ serverMode: true, path, ip, sessionKey })` (`:329`), with the session key hashed off the mode's session cookie (`:408`; `sessionCookieName` at `packages/host/src/auth/session.ts:36-38`).
    Any rejection goes through `respondRejection` (`:281-299`): the `{error:{code,message}}` envelope, `X-Content-Type-Options: nosniff`, `Retry-After` when there is one, and — **in server mode only** — one `log.warn("request_filtered", …)` line.
 9. Non-`/api` requests that survived fall through to the web server (`:415-417`).
-10. `hostRejection` runs for every `/api` method (SR-200); `SAFE_METHODS` (GET/HEAD/OPTIONS, `:18`) skip `mutatingRejection`; everything else runs it, and any rejection is answered `403` whatever the code (`:423-428`).
+10. `hostRejection` runs for every `/api` method (SR-207); `SAFE_METHODS` (GET/HEAD/OPTIONS, `:18`) skip `mutatingRejection`; everything else runs it, and any rejection is answered `403` whatever the code (`:423-428`).
 11. CSRF cookie minted if needed (`:431-432`).
 12. Body read (`:434-445`): `MAX_BODY_BYTES = 26 * 1024 * 1024` enforced on the bytes actually read (`:30`, `:134-137`) → `413 payload_too_large`; a JSON parse failure → `400 invalid_json` (`:440-443`). Multipart is parsed by hand (`:161-194`).
 13. An abort controller wired to `res.on("close")` so a client that walks away cancels the run (`:449-454`).

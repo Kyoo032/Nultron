@@ -121,7 +121,7 @@ the TLS rule and the buckets, so a malformed request is still counted and a plai
 ### 3. Origin, Host and CSRF
 
 `hostRejection` (`packages/host/src/http-adapter.ts:778`, called at `:633`) runs for every `/api`
-request, GET, HEAD and OPTIONS included (SR-200, 2026-11-06; before that only a mutating request was
+request, GET, HEAD and OPTIONS included (SR-207, 2026-11-06; before that only a mutating request was
 checked, so a DNS-rebinding page could read the API). It answers 403 `forbidden` off server mode when
 the `Host` is not loopback or is absent, and 403 `origin_forbidden` in server mode when it is not one of
 the allowlisted origins' hosts. `/healthz` never reaches it (answered at `:620`), and the billing

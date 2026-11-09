@@ -1121,7 +1121,7 @@ Lanes: tester.
 - **Not yet checked.** Re-attaching a file of the same name that no longer holds a table leaves the older figures file on the desk; read from the code (`saveDeskFigures` writes only when figures exist), not run. `docs/internal/maps/research-dossier.md` repeats some of its sections.
 - **Security.** SR-187 (the figures file keeps amounts the chat mask hides, and a headerless NIK was missed) and SR-189 (the report and its Knowledge Base card are desk-wide) are open, gated on a hosted desk getting a second person. SR-188 is checked, with residual risks.
 
-## 2026-11-06: every /api request needs a trusted Host (SEC-004 4b, SR-200)
+## 2026-11-06: every /api request needs a trusted Host (SEC-004 4b, SR-207)
 
 Lanes: enterprise, tester.
 
