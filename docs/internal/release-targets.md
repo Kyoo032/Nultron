@@ -42,7 +42,7 @@ Last updated: 2026-10-15 (base agentforge `main` at `8a42aaed`). The hex colours
 
 ## nultron-personal
 
-<img src="../../apps/desktop/branding/agentforge/logo.png" alt="Nultron app logo" width="96">
+<img src="../../apps/web/public/brand/logo.png" alt="Nultron app logo" width="96">
 
 **Retired (Rizky, 2026-10-14).** Nultron Personal is being merged into the web app. Its release repo `Kyoo032/Nultron-Desktop` is archived and gets no new releases. Do not pack or publish a desktop cut. The code and the identity below stay in the tree until the merge.
 
@@ -50,8 +50,8 @@ Last updated: 2026-10-15 (base agentforge `main` at `8a42aaed`). The hex colours
 
 | Element | Value | Files |
 |---|---|---|
-| Name | Nultron | `apps/desktop/branding/agentforge/brand.json` (`productName`) |
-| Logo | Nultron's painted head on a blue tile | master `apps/desktop/branding/agentforge/source/app-logo.webp`; `logo.png` (256 px, under 200 KB); `icon.ico`, `icon.icns`; favicons in `apps/web/public/brand/`; rail marks `apps/web/components/brand-art/mark-{24,32,48,64}.png` |
+| Name | Nultron | `DEFAULT_BRAND` in `apps/desktop/brand-read.cjs` (`productName`) |
+| Logo | Nultron's painted head on a blue tile | master `docs/internal/brand/nultron/reference/app-logo.webp`; `logo.png` (256 px, under 200 KB); `icon.ico`, `icon.icns` in `apps/desktop/build`; favicons in `apps/web/public/brand/`; rail marks `apps/web/components/brand-art/mark-{24,32,48,64}.png` |
 | Mascot | Nultron, a 3D robot with a glowing antenna, in 21 states | renders in `apps/web/components/nultron/images/` (`full`, `head`, `clips`, `loops`, `manifest.json`); state table `apps/web/lib/mascot-states.ts`; render scene `tools/nultron-3d` |
 | Wordmark | Gradient blue → cyan, rail only (`.wordmark-nultron`) | `apps/web/app/globals.css:2259`, `apps/web/lib/product-brand.tsx` |
 | Type | DM Sans (UI) and Source Serif 4 (display), bundled locally | `apps/web/app/globals.css:1-30` |
