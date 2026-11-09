@@ -5,7 +5,7 @@ import { LOCAL_TENANT_ID, isEnvelope, openPayload, sealPayload } from "@agentfor
 import { ensureSchema } from "../ensure-schema";
 import * as schema from "../schema";
 import { agentVersions, agents, messages, organizations, threads, workspaces } from "../schema";
-import { DESK_VAULT_KEY_TOO_WEAK, getLocalVaultKey } from "../vault-key";
+import { SERVER_VAULT_KEY_TOO_WEAK, getLocalVaultKey } from "../vault-key";
 import { DrizzleAgentRepository } from "./drizzle-agent-repository";
 
 const SECRET = "2f6b0d93a7c1485e9b3d7f0a1c5e8264d0b9a3f7c1e5824b6d0a9c3e7f1b5d84";
@@ -39,12 +39,14 @@ describe("DrizzleAgentRepository at-rest seal", () => {
   let db: ReturnType<typeof drizzle<typeof schema>>;
   let repo: DrizzleAgentRepository;
   let previousKey: string | undefined;
+  let previousServer: string | undefined;
   const orgId = "org-seal";
   const workspaceId = "ws-seal";
   const agentId = "agent-seal";
 
   beforeEach(async () => {
     previousKey = process.env.AGENTFORGE_SECRETS_KEY;
+    previousServer = process.env.AGENTFORGE_SERVER;
     process.env.AGENTFORGE_SECRETS_KEY = SECRET;
     sqlite = new Database(":memory:");
     sqlite.pragma("foreign_keys = ON");
@@ -88,6 +90,11 @@ describe("DrizzleAgentRepository at-rest seal", () => {
       delete process.env.AGENTFORGE_SECRETS_KEY;
     } else {
       process.env.AGENTFORGE_SECRETS_KEY = previousKey;
+    }
+    if (previousServer === undefined) {
+      delete process.env.AGENTFORGE_SERVER;
+    } else {
+      process.env.AGENTFORGE_SERVER = previousServer;
     }
   });
 
@@ -134,8 +141,9 @@ describe("DrizzleAgentRepository at-rest seal", () => {
       createdAt: new Date(),
     });
 
+    process.env.AGENTFORGE_SERVER = "1";
     process.env.AGENTFORGE_SECRETS_KEY = "hunter2";
-    await expect(repo.findVersionById(orgId, versionId)).rejects.toThrow(DESK_VAULT_KEY_TOO_WEAK);
+    await expect(repo.findVersionById(orgId, versionId)).rejects.toThrow(SERVER_VAULT_KEY_TOO_WEAK);
   });
 
   it("opens a legacy plaintext systemPrompt (backward-compat)", async () => {

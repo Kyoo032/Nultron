@@ -106,6 +106,64 @@ function boot(name: string, env: Record<string, string>, prepare?: (dataDir: str
   });
 }
 
+async function killTree(pid: number | undefined): Promise<void> {
+  if (pid === undefined) {
+    return;
+  }
+  if (process.platform === "win32") {
+    await new Promise<void>((resolve) => {
+      spawn("taskkill", ["/pid", String(pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" }).on("close", () =>
+        resolve(),
+      );
+    });
+    await new Promise<void>((resolve) => setTimeout(resolve, 1_500));
+    return;
+  }
+  process.kill(pid, "SIGKILL");
+}
+
+function bootUntilListening(name: string, env: Record<string, string>): Promise<Boot> {
+  const dataDir = path.join(scratch, name, "data");
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [TSX_CLI, SERVER_ENTRY], {
+      cwd: WEB,
+      windowsHide: true,
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...inheritedEnv(), ...env, AGENTFORGE_DATA_DIR: dataDir },
+    });
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    const finish = async (error?: Error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      await killTree(child.pid);
+      if (error) {
+        reject(error);
+      } else {
+        resolve({ status: null, stdout, stderr, dataDir });
+      }
+    };
+    const timer = setTimeout(() => {
+      void finish(new Error(`server.ts never reported listening within ${BOOT_BUDGET_MS} ms.\n${stderr}`));
+    }, BOOT_BUDGET_MS);
+    child.stdout.setEncoding("utf8").on("data", (chunk: string) => {
+      stdout += chunk;
+      if (stdout.includes("listening on")) {
+        void finish();
+      }
+    });
+    child.stderr.setEncoding("utf8").on("data", (chunk: string) => (stderr += chunk));
+    child.on("error", (error) => void finish(error));
+    child.on("close", (status) => {
+      void finish(new Error(`server.ts exited with ${status} before it listened.\n${stderr}`));
+    });
+  });
+}
+
 function refused(result: Boot): void {
   expect(result.status, `exit status; stderr was:\n${result.stderr}`).not.toBeNull();
   expect(result.status).not.toBe(0);
@@ -140,26 +198,15 @@ describe("a refused hosted boot writes nothing", () => {
   );
 
   it(
-    "refuses a desk whose AGENTFORGE_SECRETS_KEY is a passphrase before it touches the data dir (SR-203)",
+    "refuses a hosted process whose AGENTFORGE_SECRETS_KEY is a passphrase before it creates the data dir (SR-203)",
     async () => {
-      const result = await boot(
-        "desk-weak-key",
-        { AGENTFORGE_SECRETS_KEY: "hunter2", PORT: "39143", BIND_HOST: "127.0.0.1" },
-        (dataDir) => {
-          mkdirSync(dataDir, { recursive: true });
-          writeFileSync(path.join(dataDir, "settings.enc"), "sealed-bytes");
-          writeFileSync(
-            path.join(dataDir, "reset-pending.json"),
-            JSON.stringify({ version: 1, requestedAt: new Date(0).toISOString(), entries: ["settings.enc"] }),
-          );
-        },
-      );
+      const result = await boot("server-weak-key", { ...hostedEnv(), AGENTFORGE_SECRETS_KEY: "hunter2" });
 
       refused(result);
+      expect(result.stderr).toContain("Hosted mode (AGENTFORGE_SERVER=1) refuses to start");
       expect(result.stderr).toContain("AGENTFORGE_SECRETS_KEY");
-      expect(result.stderr).toContain("openssl rand -hex 32");
       expect(result.stderr).not.toContain("hunter2");
-      expect(readdirSync(result.dataDir).sort()).toEqual(["reset-pending.json", "settings.enc"]);
+      expect(existsSync(result.dataDir), "the data dir must not exist after a refused boot").toBe(false);
     },
     BOOT_BUDGET_MS + 10_000,
   );
@@ -181,6 +228,26 @@ describe("a refused hosted boot writes nothing", () => {
       expect(result.stderr).toContain("AGENTFORGE_SECRETS_KEY");
       // The wipe deletes `settings.enc` and the marker, and opening SQLite adds the database trio.
       expect(readdirSync(result.dataDir).sort()).toEqual(["reset-pending.json", "settings.enc"]);
+    },
+    BOOT_BUDGET_MS + 10_000,
+  );
+});
+
+describe("a desk with a short AGENTFORGE_SECRETS_KEY still boots (SR-203)", () => {
+  it(
+    "warns once, names the variable and the generator, never prints the value, and listens",
+    async () => {
+      const result = await bootUntilListening("desk-weak-key", {
+        AGENTFORGE_SECRETS_KEY: "hunter2",
+        PORT: "39143",
+        BIND_HOST: "127.0.0.1",
+      });
+
+      expect(result.stdout).toContain("listening on 127.0.0.1:39143");
+      const warning = "AGENTFORGE_SECRETS_KEY is set but is not at least 32 random bytes";
+      expect(result.stderr.split(warning)).toHaveLength(2);
+      expect(result.stderr).toContain("openssl rand -hex 32");
+      expect(result.stderr).not.toContain("hunter2");
     },
     BOOT_BUDGET_MS + 10_000,
   );
