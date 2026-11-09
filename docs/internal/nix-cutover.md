@@ -20,18 +20,37 @@ changes). No product code changes until phase 4.
   working and the scripts do not change.
 - **Docker workflows move from Windows into WSL.** These scripts call `docker` from Windows Node or PowerShell
   today, and find nothing once Docker Desktop is gone. Run them from the clone inside WSL instead:
-  `webapp-deploy/pilot-local.mjs`, `scripts/deploy-preflight.mjs`, `scripts/release-web.mjs`,
-  `webapp-deploy/k8s/local-images.mjs` and `scripts/review-instance.ps1`.
+  `webapp-deploy/pilot-local.mjs`, `scripts/deploy-preflight.mjs`, `webapp-deploy/k8s/local-images.mjs` and
+  `scripts/review-instance.ps1`. Releases need a decision first (see "Decide before phase 1").
 - **Webdev `:3000` and `ci:local` stay on Windows.** Neither calls Docker.
-- **Servers keep Docker Engine and compose.** `webapp-deploy/scripts/deploy.sh` does not change. From phase 4 on,
-  the image it runs is built by Nix. Moving a server to NixOS is not part of this plan.
-- **The Dockerfiles go last**, after production has run a Nix-built image (phase 5).
+- **Servers keep Docker Engine and compose, but how they get images changes.** Today
+  `webapp-deploy/scripts/deploy.sh` pulls the checkout on the Jakarta box and rebuilds both images there from
+  the Dockerfiles (`build.sh`, `docker compose build`). The released bundle, whose `compose.yml` pulls a pinned
+  image from ghcr, exists (`scripts/release-web.mjs`), but the box does not use it yet. The box moves to the
+  bundle before any Nix-built image reaches production (phase 4). Moving a server to NixOS is not part of this
+  plan.
+- **The Dockerfiles go last**, after production runs Nix-built images from the bundle (phase 5).
+
+## Decide before phase 1
+
+Defaults are in brackets. Each is Rizky's call.
+
+1. **Where releases and deploys run once Docker Desktop is gone.** [A clone named `nultron` inside the WSL
+	distro, on `main`.] `scripts/where-am-i.mjs` places a folder by its name, so that clone already reads as the
+	`main` row. `release-web.mjs` still refuses to run, dry runs included, without the gitignored
+	`nultron-files/release/nda-terms.txt`. The preview runbook and the Lighthouse SSH key also live only on the
+	Windows side today. The default therefore needs those copied into the distro, `gh` and GHCR logins there, and
+	a row for the folder in AGENTS.md "Where am I?". The other option is to keep Docker Desktop until releases
+	build with Nix, and run them from the Windows checkout as today.
+2. **Moving the Jakarta box to the released bundle.** [Yes, as the first step of phase 4.] It changes the deploy
+	path, so it needs Rizky's word, and phase 5 cannot start without it.
 
 ## Gates
 
 Each of these needs Rizky's go at that moment, as AGENTS.md requires for releases and deploys:
 
 - uninstalling Docker Desktop (phase 3)
+- moving the Jakarta box to the released bundle (phase 4)
 - the first Nix-built image on the preview desks, and the first Nix-built release (phase 4)
 - deleting the Docker build side (phase 5).
 
@@ -48,7 +67,8 @@ from the desk runbook.
 
 Work in a clone on the distro's own filesystem, not under `/mnt/c`, with `core.autocrlf` off. A Windows
 checkout gives `webapp-deploy/portal.Dockerfile` CRLF line endings (`.gitattributes` covers files named exactly
-`Dockerfile`), and `pins` then fails to evaluate.
+`Dockerfile`), and `pins` then fails to evaluate. Name the clone's folder `nultron` and keep it on `main` or a
+branch cut from it, so the `where-am-i` step of `ci:local` passes.
 
 1. Verify the nixpkgs lock, which the cloud session could not fetch from GitHub's archive:
 
@@ -121,8 +141,9 @@ Each item is its own pull request to `main`, driven before phase 3.
 3. **Pin LF for every Dockerfile** until phase 5 deletes them: add `*.Dockerfile text eol=lf` to
 	`.gitattributes`, so a Windows checkout and `git archive` stop producing a CRLF `portal.Dockerfile`.
 
-Nothing else needs a code change to leave Docker Desktop. `pilot-local.mjs`, `deploy-preflight.mjs` and
-`release-web.mjs` run unchanged from the WSL clone against Docker Engine.
+No other code changes. `pilot-local.mjs` and `deploy-preflight.mjs` run unchanged from the WSL clone against
+Docker Engine. `release-web.mjs` also runs unchanged there, once decision 1 puts releases in the distro and its
+gitignored inputs are copied in.
 
 ## Phase 3: leave Docker Desktop
 
@@ -130,28 +151,35 @@ Follow the desk runbook. The repo's part is the check afterwards, from the WSL c
 
 - Phase 1, step 4 still passes on Docker Engine in WSL.
 - The kind rehearsal from phase 2 passes.
-- `node scripts/release-web.mjs --tag <tag> --sha <sha> --dry-run` passes from WSL.
+- If decision 1 put releases in the distro, `node scripts/release-web.mjs --tag <tag> --sha <sha> --dry-run`
+	passes there.
 - Webdev `:3000` and `npx pnpm@9.15.9 ci:local` still pass on Windows.
 
 ## Phase 4: ship a Nix-built image
 
-1. **Preview desks first.** Build `web-image` from `git archive <sha>` in WSL, and follow the safe update route
+1. **Move the Jakarta box to the released bundle.** Today `deploy.sh` rebuilds the images on the box from the
+	Dockerfiles, so a Nix-built release would never reach it. Switch the box to the bundle that
+	`release-web.mjs` publishes on `Kyoo032/Nultron-Releases` (`compose.yml` pinned to the ghcr image), with a
+	release built by the current Docker route first, so only one thing changes at a time. Write the switch and
+	its rollback into `webapp-deploy/README.md`. This changes the deploy path and needs Rizky's word.
+2. **Preview desks next.** Build `web-image` from `git archive <sha>` in WSL, and follow the safe update route
 	for the preview (`nultron-files/deploy/tencent/README.md`, section "Update the app image only: the safe
 	route"): send the image with `docker save | ssh docker load`, change only `app/app-image.env`, and recreate
 	the desks one at a time, a tester desk first. Rizky says go for each deploy.
-2. **Then the release path.** `scripts/release-web.mjs` builds both images with `docker build` from
+3. **Then the release path.** `scripts/release-web.mjs` builds both images with `docker build` from
 	`git archive <sha>` and pushes them to `ghcr.io/kyoo032/nultron-ent` and `ghcr.io/kyoo032/nultron-portal`.
 	Add a Nix route beside it that builds `.#web-image` and `.#portal-image` from the same archive and pushes each
 	`result` tarball, for example with
 	`skopeo copy docker-archive:result docker://ghcr.io/kyoo032/nultron-ent:<tag>` and a GHCR token that has
 	`write:packages`. Keep `docker build` as the default until one Nix-built release has run on production.
 	This is a release script, so the change needs Rizky's word before it is written.
-3. **Then production.** Cut `ent-YYYY.MM.DD` through the Nix route, deploy it with the unchanged `deploy.sh`,
-	and log it in the deploy log in `web-pivot-2026-09-18.md` as built by Nix.
+4. **Then production.** Cut `ent-YYYY.MM.DD` through the Nix route, deploy it to the box through the bundle
+	from step 1, and log it in the deploy log in `web-pivot-2026-09-18.md` as built by Nix.
 
 ## Phase 5: delete the Docker build side
 
-Start only after production has run a Nix-built image for a period Rizky sets.
+Start only when the box deploys from the bundle (phase 4, step 1), and production has run a Nix-built image for
+a period Rizky sets.
 
 The flake still reads Docker files today, so delete them in this order:
 
@@ -161,7 +189,8 @@ The flake still reads Docker files today, so delete them in this order:
 	- `nix/pkgs/ffmpeg-static.nix` reads the ffmpeg URLs and hashes from the Dockerfile's `ADD --checksum` lines.
 	- `nix/pkgs/docker-context.nix` filters the source with the Docker ignore files.
 2. Delete `webapp-deploy/Dockerfile`, `webapp-deploy/portal.Dockerfile`, the three ignore files, the
-	`docker build` route in `release-web.mjs` and `k8s/local-images.mjs`, and `webapp-deploy/scripts/build.sh`.
+	`docker build` route in `release-web.mjs` and `k8s/local-images.mjs`, `webapp-deploy/scripts/build.sh`, and
+	the rebuild in `webapp-deploy/scripts/deploy.sh` (or `deploy.sh` itself, if the bundle replaced it).
 	Ask Rizky whether the retired Personal app's mac build machine goes too
 	(`apps/desktop/platform/macos/docker/`, `apps/desktop/scripts/mac-build-docker.mjs`).
 3. Update what describes the Docker build: the "Web release (hosted)" section of `AGENTS.md`,
