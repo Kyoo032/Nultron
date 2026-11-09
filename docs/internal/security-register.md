@@ -6582,6 +6582,8 @@ Residual:
 - **One app secret per install.** Every company's number is a customer of the same Meta app, so the secret is the operator's; a leak lets someone sign for any connected number. It lives in the server's environment only, never a file in the repo.
 - **Meta's source addresses are not checked.** The signature is the only gate. Phase 3 should decide whether the proxy also limits the route to Meta's published ranges.
 - **Hosted rate limit.** Meta's deliveries may arrive from few addresses behind the proxy; the per-IP bucket (600 per minute, burst 100) should be checked against a real busy number in Phase 3.
+- **A disconnected number stays claimed.** `connectEndpoint` refuses a number to any other desk while any `channel_endpoints` row for it exists, whatever its status (`packages/host/src/inbox/store.ts:193-199`). After desk A disconnects, desk B gets 409 until desk A is deleted, and nothing releases the number. Found by the 2026-11-09 review of PR #198; not fixed.
+- **The Graph call has no deadline on the body.** The timeout is cleared once the response headers arrive (`packages/host/src/inbox/whatsapp.ts:399-401`), so `readCapped` (`:405`) reads up to 1 MB with no time limit. Low: the host is pinned to `graph.facebook.com`. Found by the same review; not fixed.
 
 Gate: before the route is exposed on any server.
 
