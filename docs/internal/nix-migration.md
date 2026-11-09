@@ -80,6 +80,33 @@ pinned pnpm on that Node, wherever a unit asks for them.
 The flake builds what git has committed. A file that is not tracked does not exist to `nix build`; stage it
 before you build. Never build through a `path:` flake.
 
+## Rung 2: `ci-local.mjs` inside `nix develop`
+
+Run on 2026-11-07 on the cloud machine (Ubuntu 24.04, root, 4 cores), script unchanged:
+
+```bash
+nix develop -c pnpm install --frozen-lockfile
+```
+
+```bash
+nix develop -c node scripts/ci-local.mjs
+```
+
+Every step passed except these four. None of them is caused by the shell: each fails the same way outside it.
+
+| Step | Kind | Result | Cause |
+|---|---|---|---|
+| `test:apps/portal` | required | fail as root; **735 of 735 pass** against the shell's Postgres 16 | Run as root, `embedded-postgres` hands initdb to a `postgres` user that cannot read the root-owned temp folders it was given. The same happens without Nix. The suite's own way round it, `PORTAL_TEST_DATABASE_URL`, passes against a server started from the shell's `postgresql_16` with password auth. A non-root user does not hit this. |
+| `node-test:scripts` | required | 323 pass, 4 fail | The four `pre-push` tests copy the hook into a temp repo with `writeFileSync`, mode 0644. Git on Linux ignores a hook that is not executable ("hook was ignored because it's not set as executable"); Git for Windows does not check. Same four fail without Nix. Not fixed here. |
+| `audit:workspace` | advisory | 106 advisories | The whole workspace, dev tools included. Same without Nix. The required gate, `audit:deployed`, passes. |
+| `edit:starters:check` | advisory | 7 files missing | The Edit starter media are generated and gitignored, so a fresh clone has none. |
+
+One more thing the first run showed: `node scripts/ci-local.mjs --install` on a fresh clone reports every lint, `tsc` and vitest step as "not installed", because the script looks the tools up before its own install step runs. Install first, then run it.
+
+What the shell sets: `CI_LOCAL_PNPM`, so the script runs this pnpm instead of fetching one with `npx`, and `npm_config_nodedir`, so node-gyp reads the pinned Node's headers.
+
+On NixOS there is no `/lib64/ld-linux-x86-64.so.2`, so the glibc binaries npm ships (biome, esbuild, embedded-postgres) do not start from `node_modules` there. The flake checks of rung 5 run those steps inside Nix instead.
+
 ## Running it
 
 ```bash
@@ -88,6 +115,10 @@ nix flake check -L
 
 ```bash
 nix build .#pnpm
+```
+
+```bash
+nix develop
 ```
 
 ## Still owed
