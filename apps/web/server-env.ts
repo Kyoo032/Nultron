@@ -34,8 +34,8 @@
  *    Nothing is hidden by this: a refusal is a thrown error, and warnings only exist on the path
  *    where the check passes.
  *
- *    Webdev and the desktop are unaffected: with `AGENTFORGE_SERVER` off both calls return before
- *    they read anything but the mode.
+ *    With `AGENTFORGE_SERVER` off, `assertDeskVaultKeyUsable` is the one check that runs: it reads
+ *    `AGENTFORGE_SECRETS_KEY` and nothing else, and touches no file (SR-203).
  *
  * 2. **Opt this process in to applying a queued "Start over" wipe.** `client.ts` applies one at
  *    boot, but only for a process that set `AGENTFORGE_APPLY_PENDING_RESET=1` — importing the
@@ -46,9 +46,14 @@
  *    evaluated, which is why this is a module of its own.
  */
 import "./lib/node-version-boot";
-import { assertHostedEnvComplete, assertHostedModeCoherent } from "./server/hosted-mode-guard";
+import {
+  assertDeskVaultKeyUsable,
+  assertHostedEnvComplete,
+  assertHostedModeCoherent,
+} from "./server/hosted-mode-guard";
 
 assertHostedModeCoherent(process.env);
 assertHostedEnvComplete(process.env, () => {});
+assertDeskVaultKeyUsable(process.env);
 
 process.env.AGENTFORGE_APPLY_PENDING_RESET = "1";

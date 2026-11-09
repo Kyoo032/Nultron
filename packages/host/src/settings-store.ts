@@ -403,6 +403,7 @@ function onUndecryptableSettings(tenantId: string, backend: TenantStateBackend, 
 
 /** The decrypted payload, or null when there is nothing usable to read. */
 function decodeStoredPayload(tenantId: string, backend: TenantStateBackend, raw: string): unknown | null {
+  const key = getLocalVaultKey();
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -415,7 +416,7 @@ function decodeStoredPayload(tenantId: string, backend: TenantStateBackend, raw:
     return null;
   }
   try {
-    return decryptJson<unknown>(parsed, getLocalVaultKey());
+    return decryptJson<unknown>(parsed, key);
   } catch (error) {
     return onUndecryptableSettings(tenantId, backend, error);
   }
