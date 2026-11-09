@@ -162,6 +162,18 @@ describe("op guards", () => {
     }
   });
 
+  it("names the first few problems of a payload full of empty clips, not every one", () => {
+    const clips = Array.from({ length: 300 }, () => ({}));
+    try {
+      parseOpPayload("restore_timeline", { snapshot: { tracks: [], clips } });
+      throw new Error("expected throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(ApiError);
+      expect((error as ApiError).code).toBe("invalid_op");
+      expect((error as ApiError).message.length).toBeLessThan(2_000);
+    }
+  });
+
   it("rejects move across the wrong track kind", () => {
     let doc = withAsset(baseDoc(), videoAsset());
     doc = applyOp(doc, { type: "add_clip", payload: { clip: videoClip() } });

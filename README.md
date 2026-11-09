@@ -14,14 +14,12 @@ Nultron was two products from this one repository. They shared the same app and 
 |---|---|---|
 | What it is | The Mac/Windows desktop app | The hosted web app |
 | Where your work lives | On your own computer | In your organisation's tenant on the server |
-| How you get in | Was: install it and paste a gateway key | Ask for an invite, then sign in with a one-time code |
-| Ships as | Last cut 0.15.1 (`Nultron Setup <version>.exe`, macOS `.dmg`); no new cut | A hosted URL |
+| How you get in | Was: install it and paste a gateway key | Ask the operator for an account, then sign in with a username and password (or an e-mailed one-time code, if the operator chose it) |
+| Ships as | Last release 0.15.1 (`Nultron Setup <version>.exe`, macOS `.dmg`); no new cut | A hosted URL |
 
 **Personal — the Mac/Windows desktop app (retired).** The last release was 0.15.1. No new desktop build is published. The code stays in this repo until it is merged into the web app.
 
-**Enterprise — the hosted web app.** Ask the operator for an invite, open the hosted URL, and sign in through the portal with a one-time code. Your work stays in your tenant on the server. A pasted gateway key still works here as the floor for model calls; the portal sign-in is the account.
-
-**Enterprise — the hosted web app.** Ask the operator for an invite, open the hosted URL, and sign in through the portal with a one-time code. Your work stays in your tenant on the server. A pasted gateway key still works here as the floor for model calls; the portal sign-in is the account.
+**Enterprise — the hosted web app.** Ask the operator for an account, open the hosted URL, and sign in through the portal. The deploy bundle signs people in with a username and a password the operator creates. An operator can switch the portal to an e-mailed one-time code instead, which is the portal's own default. Your work stays in your tenant on the server. A pasted gateway key still works here as the floor for model calls; the portal sign-in is the account.
 
 The hosted app runs every harness below. Node and pnpm are not required to use it.
 
@@ -43,7 +41,7 @@ The hosted app runs every harness below. Node and pnpm are not required to use i
 | **Edit** | A timeline cut you export |
 | **Presentation** | An outline, an HTML preview, and a PPTX |
 
-Both products also have Knowledge Base, Channels, Workspaces, Usage, and Settings. Those belong to the desk. Workspaces are optional extra desks (Legal, Marketing, Students, or your own set of harnesses). The default desk already includes every harness.
+Both products also have Knowledge Base, Channels, Virtual agents, Usage, and Settings. Those belong to the desk. A fresh desk starts with Chat alone, and Chat handles specialist work inline. The owner hires other agents onto the desk, or lets them go, on the Virtual agents page (`/workspaces`).
 
 With no gateway key and no portal session, Chat stays in demo mode.
 
@@ -64,7 +62,7 @@ Closed beta. Sharp edges, APIs that may change, invite-only access. Feedback fro
 
 ## Develop
 
-Repo and agent rules: [`AGENTS.md`](AGENTS.md). That file opens with the Personal/Enterprise split — read it first, because a change to packaging, identity or the deploy path lands on only one of the two products.
+Repo and agent rules: [`AGENTS.md`](AGENTS.md). That file opens with "Where am I?" and "Where a change goes". Read it first. Those two tables say which folder, branch and pull request a change belongs to.
 
 ```
 pnpm install

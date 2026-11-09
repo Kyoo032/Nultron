@@ -26,7 +26,7 @@ const INVARIANTS = [
   "EndsSettled",
   "BilledIsMetered",
 ];
-const PROPERTIES = ["Termination"];
+const PROPERTIES = ["Termination", "StreamEnds"];
 const SWITCHES = [
   "DbYields",
   "StallGuard",
@@ -40,6 +40,10 @@ const SWITCHES = [
   "MeterOnFinish",
   "MeterOnSettledCompletion",
   "MeterAfterAttempt",
+  "ClaimOnPersist",
+  "CancelYieldsToClaim",
+  "StreamBound",
+  "QuietOnceSaved",
 ];
 
 class Drift extends Error {}
@@ -68,6 +72,43 @@ function before(text, anchorNeedle, openerNeedle, label) {
   return text.slice(opener, anchor);
 }
 
+function blockAfter(text, opener) {
+  const start = text.indexOf(opener);
+  if (start < 0) {
+    return null;
+  }
+  let depth = 0;
+  for (let i = start + opener.length - 1; i < text.length; i += 1) {
+    if (text[i] === "{") {
+      depth += 1;
+    } else if (text[i] === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return text.slice(start + opener.length, i);
+      }
+    }
+  }
+  return null;
+}
+
+function readStallWhileSaving(onStall) {
+  const opener = "if (finishing) {";
+  const branch = blockAfter(onStall, opener);
+  if (branch === null || onStall.indexOf(opener) > onStall.indexOf("settleRun(message)")) {
+    return { standsDown: false, closesStream: false, quietOnceSaved: false };
+  }
+  const unsaved = blockAfter(branch, "if (!persisted) {");
+  const outsideUnsaved = unsaved === null ? branch : branch.replace(`if (!persisted) {${unsaved}}`, "");
+  return {
+    standsDown: /return;\s*$/.test(branch) && !/settleRun|finishRun|modelAbort/.test(branch),
+    closesStream:
+      unsaved === null
+        ? /closeQueue\(\);\s*return;\s*$/.test(branch)
+        : /\}\s*closeQueue\(\);\s*return;\s*$/.test(branch) && !outsideUnsaved.replace(/closeQueue\(\);\s*return;\s*$/, "").includes("closeQueue"),
+    quietOnceSaved: unsaved !== null && !outsideUnsaved.includes("send("),
+  };
+}
+
 function readCode() {
   const runs = readFileSync(RUNS, "utf8").replace(/\r\n/g, "\n");
   const threads = readFileSync(THREADS, "utf8").replace(/\r\n/g, "\n");
@@ -79,6 +120,21 @@ function readCode() {
     "settleRun",
   );
   const onStall = between(runs, "onStall: (message) => {", "const onClientAbort = () => {", "onStall");
+  const onClientAbort = between(
+    runs,
+    "const onClientAbort = () => {",
+    'options.abortSignal?.addEventListener("abort", onClientAbort',
+    "onClientAbort",
+  );
+  if (!runs.includes("const persistAssistant = async () => {")) {
+    throw new Drift('persistAssistant: cannot find "const persistAssistant = async () => {"');
+  }
+  const persistCalls = (runs.match(/persistAssistant\(\)/g) ?? []).length;
+  if (persistCalls !== 3) {
+    throw new Drift(
+      `persistAssistant: expected 3 call sites (run.completed handler, after the model call, catch path), found ${persistCalls}; model the new one before trusting a PASS`,
+    );
+  }
   const meter = between(
     runs,
     "const meterSettledRun = () => {",
@@ -113,7 +169,24 @@ function readCode() {
   if (!runs.includes("runId = run.id;")) {
     throw new Drift('insertRun: cannot find "runId = run.id;"');
   }
-  return {
+  const claimFirst = /const persistAssistant = async \(\) => \{\n\s*finishing = true;/.test(runs);
+  const awaitsBeforeClaim = [
+    ["the run.completed handler", onCompleted],
+    ["the code after the model call", afterAttempt],
+    ["the catch path", inCatch],
+  ]
+    .filter(([, slice]) => awaitBetweenGuardAndPersist(slice))
+    .map(([label]) => label);
+  const whileSaving = readStallWhileSaving(onStall);
+  const yieldsToClaim = /if \(queueClosed \|\| finishing\) \{\s*return;/;
+  const notes = [];
+  if (!claimFirst) {
+    notes.push("ClaimOnPersist is false: `finishing = true;` is not the first statement of persistAssistant.");
+  }
+  for (const label of awaitsBeforeClaim) {
+    notes.push(`ClaimOnPersist is false: an await sits between \`if (settled) {\` and persistAssistant() in ${label}.`);
+  }
+  const switches = {
     DbYields: !client.includes('from "drizzle-orm/better-sqlite3"'),
     StallGuard: runs.includes("armRunStallGuard({") && onStall.includes("settleRun(message)"),
     GuardAfterInsert: /runId = run\.id;\s*\n\s*if \(settled\) \{/.test(runs),
@@ -126,7 +199,21 @@ function readCode() {
     MeterOnFinish: finishTail.includes("recordChatRunUsage(options.tenant, run.id, finished, runUsage)"),
     MeterOnSettledCompletion: onCompleted.includes("meterSettledRun();"),
     MeterAfterAttempt: afterAttempt.includes("meterSettledRun();"),
+    ClaimOnPersist: claimFirst && awaitsBeforeClaim.length === 0,
+    CancelYieldsToClaim: (yieldsToClaim.test(onStall) || whileSaving.standsDown) && yieldsToClaim.test(onClientAbort),
+    StreamBound: whileSaving.closesStream,
+    QuietOnceSaved: whileSaving.quietOnceSaved,
   };
+  return { switches, notes };
+}
+
+function awaitBetweenGuardAndPersist(slice) {
+  const guard = slice.indexOf("if (settled) {");
+  if (guard < 0) {
+    return false;
+  }
+  const call = slice.lastIndexOf("await persistAssistant()");
+  return /\bawait\b/.test(slice.slice(guard, call > guard ? call : slice.length));
 }
 
 function parseArgs(argv) {
@@ -205,7 +292,7 @@ function check(jar, values, invariants, properties) {
     const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
     const violations = [...output.matchAll(/Invariant (\S+) is violated/g)].map((m) => m[1].replace(/\.$/, ""));
     if (output.includes("Temporal properties were violated")) {
-      violations.push("Termination");
+      violations.push("a temporal property (Termination or StreamEnds)");
     }
     const passed = violations.length === 0 && output.includes("Model checking completed. No error has been found.");
     const states = output.match(/(\d+) distinct states found/);
@@ -218,8 +305,9 @@ function check(jar, values, invariants, properties) {
 function main() {
   const args = parseArgs(process.argv.slice(2));
   let code;
+  let notes;
   try {
-    code = readCode();
+    ({ switches: code, notes } = readCode());
   } catch (error) {
     if (error instanceof Drift) {
       console.error(`DRIFT: ${error.message}`);
@@ -242,6 +330,9 @@ function main() {
     const forced = values[name] !== code[name] ? `  (forced from ${code[name]})` : "";
     console.log(`  ${name.padEnd(24)} ${values[name]}${forced}`);
   }
+  for (const note of notes) {
+    console.log(note);
+  }
   const jar = jarPath();
   if (args.hazard) {
     const broken = [];
@@ -258,7 +349,7 @@ function main() {
   }
   const run = check(jar, values, INVARIANTS, PROPERTIES);
   if (run.passed) {
-    console.log(`PASS: every invariant and Termination hold (${run.states} distinct states).`);
+    console.log(`PASS: every invariant, Termination and StreamEnds hold (${run.states} distinct states).`);
     process.exit(0);
   }
   console.log(run.output);

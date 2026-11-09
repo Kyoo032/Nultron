@@ -371,6 +371,7 @@
     "stepLimitEmpty": "Tidak ada alat yang selesai, tetapi jawabannya belum. Minta saya untuk melanjutkan, dan saya akan meneruskannya dari titik terakhir.",
     "stepLimitAnd": "dan",
     "interrupted": "Langkah alat di atas sudah berjalan, tetapi saya tidak dapat menyelesaikan jawabannya.\n\nAlasan: {reason}\n\nKirim \"lanjutkan\" dan saya akan mencoba lagi.",
-    "modelFallback": "{from} tidak tersedia; menggunakan {to} untuk jawaban ini."
+    "modelFallback": "{from} tidak tersedia; menggunakan {to} untuk jawaban ini.",
+    "saveTimeout": "Penyimpanan balasan ini terlalu lama. Muat ulang percakapan sebentar lagi untuk melihat apakah balasan sudah tersimpan."
   }
 }

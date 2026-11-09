@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ApiError } from "../errors";
+import { ApiError, summarizeIssues } from "../errors";
 import {
   assetSchema,
   clipSchema,
@@ -253,7 +253,7 @@ export function assertAgentOpHasCard(op: Pick<EditOp, "actor" | "cardId">): void
 export function parseOpPayload<T extends OpType>(type: T, payload: unknown): z.infer<(typeof OP_PAYLOAD_SCHEMAS)[T]> {
   const parsed = OP_PAYLOAD_SCHEMAS[type].safeParse(payload);
   if (!parsed.success) {
-    throw new ApiError("invalid_op", parsed.error.message, 400);
+    throw new ApiError("invalid_op", summarizeIssues(parsed.error.issues), 400);
   }
   return parsed.data as z.infer<(typeof OP_PAYLOAD_SCHEMAS)[T]>;
 }

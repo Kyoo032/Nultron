@@ -89,12 +89,13 @@ export function shouldRetryModelContact(options: {
   failed: string;
   text: boolean;
   tooled: boolean;
+  thinking: boolean;
   attempts: number;
 }): boolean {
   if (options.attempts >= MODEL_CONTACT_ATTEMPTS) {
     return false;
   }
-  if (options.text || options.tooled) {
+  if (options.text || options.tooled || options.thinking) {
     return false;
   }
   return isRetryableModelFailure(options.failed);
@@ -134,8 +135,9 @@ export function shouldRetryWithoutTools(options: {
   text: boolean;
   failed: string;
   tooled: boolean;
+  thinking: boolean;
 }): boolean {
-  if (!options.hasTools || options.tooled) {
+  if (!options.hasTools || options.tooled || options.thinking) {
     return false;
   }
   if (!options.text && !options.failed) {

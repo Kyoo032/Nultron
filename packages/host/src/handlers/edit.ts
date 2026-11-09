@@ -6,6 +6,7 @@ import { jsonError, jsonOk } from "../errors";
 import { requireGatewayAllowedFor } from "../gateway-gate";
 import type { Release } from "../concurrency";
 import { admitRun, guardRunStream } from "../run-limits";
+import { assertRequestWithin } from "../request-limits";
 import { getTenant } from "../tenant";
 import { rangedFileResult } from "../file-bytes";
 import { mediaRelativePath } from "../media-root";
@@ -161,6 +162,7 @@ export async function handleGetEditProject(request: HostRequest): Promise<HostRe
 export async function handlePostEditOps(request: HostRequest): Promise<HostResult> {
   try {
     const tenant = await getTenant(request);
+    assertRequestWithin(request.body, "Edit ops");
     await foldProject(request.params.projectId, tenant.workspaceId);
     const body = asRecord(request.body);
     const ops = Array.isArray(body.ops) ? body.ops : [];
