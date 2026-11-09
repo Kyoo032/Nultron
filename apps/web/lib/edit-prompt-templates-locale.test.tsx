@@ -32,16 +32,16 @@ describe("prompt template panel locale", () => {
       return;
     }
 
-    expect(t("edit.templates.heading")).toBe("Mulai dari templat prompt");
-    expect(html).toContain("Mulai dari templat prompt");
+    expect(t("edit.templates.heading")).toBe("Mulai dari template prompt");
+    expect(html).toContain("Mulai dari template prompt");
     expect(html).toContain("Semua");
     expect(html).toContain("Promo produk");
     expect(html).toContain("Talking head");
     expect(html).toContain("Reel vertikal");
-    expect(html).toContain("Sosial persegi");
+    expect(html).toContain("Media sosial persegi");
     expect(html).toContain("Produk di meja batu");
     expect(html).toContain("Aturan prompt");
-    expect(html).toContain("Mulai dari subjek dan aksi; urutkan beberapa aksi sesuai linimasa.");
+    expect(html).toContain("Mulai dari subjek dan aksi; urutkan beberapa aksi menurut urutan waktunya.");
     expect(html).toContain(
       t("edit.templates.fromSource", { site: template.source.site, title: template.source.title }),
     );

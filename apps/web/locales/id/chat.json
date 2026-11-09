@@ -1,70 +1,70 @@
 {
   "title": "Chat",
   "agent": "Agen",
-  "newChat": "Chat baru",
-  "starting": "Menyiapkan chat…",
-  "deleteSession": "Hapus sesi",
-  "deleteConfirm": "Hapus \"{title}\"? Tindakan ini tidak dapat dibatalkan.",
+  "newChat": "Obrolan baru",
+  "starting": "Menyiapkan obrolan…",
+  "deleteSession": "Hapus obrolan",
+  "deleteConfirm": "Hapus \"{title}\"? Tindakan ini tidak bisa dibatalkan.",
   "deleteAria": "Hapus {title}",
   "removeAttachment": "Hapus {name}",
   "document": {
     "reading": "Membaca {name}…",
     "readingShort": "Membaca…",
-    "cut": "Hanya {sent} dari {total} karakter pertama yang dikirim.",
+    "cut": "Hanya {sent} karakter pertama dari {total} yang dikirim.",
     "masked": "{n} data pribadi disembunyikan sebelum dikirim.",
     "maskedOne": "1 data pribadi disembunyikan sebelum dikirim.",
-    "originalSkipped": "Hanya teksnya yang disimpan, bukan berkas aslinya.",
+    "originalSkipped": "Hanya teksnya yang disimpan, bukan file aslinya.",
     "retry": "Coba lagi",
     "retryAria": "Coba baca {name} lagi",
-    "tooMany": "Satu pesan dapat membawa hingga {n} dokumen.",
-    "mustFinish": "Tunggu dokumen selesai dibaca, atau hapus yang gagal.",
+    "tooMany": "Satu pesan maksimal berisi {n} dokumen.",
+    "mustFinish": "Tunggu sampai semua dokumen selesai dibaca, atau hapus dokumen yang gagal.",
     "errors": {
-      "too_large": "Berkas ini melebihi batas {mb} MB. Lampirkan yang lebih kecil.",
-      "unsupported": "Jenis berkas ini tidak dapat dibaca di sini.",
-      "mismatch": "Berkas ini sebenarnya bukan jenis yang disebut namanya. Periksa lalu coba lagi.",
-      "needs_ocr": "PDF ini hasil pindai dan tidak punya teks untuk dibaca. Tidak ada yang dikirim ke mana pun. Lampirkan versi dengan teks yang bisa dipilih.",
-      "encrypted": "Berkas ini dilindungi kata sandi. Hapus kata sandinya lalu lampirkan lagi.",
-      "empty": "Tidak ada teks di berkas ini.",
-      "unreadable": "Berkas ini tidak dapat dibaca. Mungkin rusak.",
-      "slow": "Berkas ini terlalu lama dibaca. Coba yang lebih kecil.",
-      "busy": "Nultron sedang membaca berkas lain. Coba lagi sebentar.",
-      "failed": "Berkas ini tidak dapat dibaca. Periksa koneksi lalu coba lagi.",
-      "send": "Berkas ini tidak dapat disiapkan untuk dikirim, jadi pesan belum terkirim. Periksa koneksi lalu coba lagi."
+      "too_large": "File ini melebihi batas {mb} MB. Lampirkan file yang lebih kecil.",
+      "unsupported": "Jenis file ini belum bisa dibaca di sini.",
+      "mismatch": "Isi file ini tidak cocok dengan jenis yang tertulis di namanya. Periksa dulu, lalu coba lagi.",
+      "needs_ocr": "PDF ini hasil pindaian dan tidak berisi teks yang bisa dibaca. Tidak ada yang dikirim ke mana pun. Lampirkan versi yang teksnya bisa dipilih.",
+      "encrypted": "File ini dilindungi kata sandi. Hapus kata sandinya lalu lampirkan lagi.",
+      "empty": "File ini tidak berisi teks.",
+      "unreadable": "File ini tidak bisa dibaca. Mungkin rusak.",
+      "slow": "File ini terlalu lama diproses. Coba file yang lebih kecil.",
+      "busy": "Nultron masih membaca file lain. Coba lagi sebentar lagi.",
+      "failed": "File ini tidak bisa dibaca. Periksa koneksi, lalu coba lagi.",
+      "send": "File ini gagal disiapkan, jadi pesan belum terkirim. Periksa koneksi, lalu coba lagi."
     }
   },
   "empty": {
-    "hello": "Hai, aku Nultron.",
+    "hello": "Hai, saya Nultron.",
     "headline": "Hari ini kita kerjakan apa?",
     "settingsLink": "Pengaturan",
     "statusConnected": "Kunci model terhubung",
     "statusSignedIn": "Sudah masuk",
     "statusReady": "Siap bekerja",
     "statusNeedsKey": "Hubungkan kunci agar aktif",
-    "statusGrace": "Kunci model terhubung (luring, terakhir dicek {date})",
+    "statusGrace": "Kunci model terhubung (offline, terakhir diperiksa {date})",
     "whatsThis": "Apa ini?",
-    "whatsThisBody": "Kunci gateway menghubungkan meja ini ke model di akun Anda. Tempel sekali di Pengaturan. Kunci tetap di meja ini dan tidak ditampilkan lagi.",
-    "pickModel": "Pilih model di bawah, lalu tulis.",
+    "whatsThisBody": "Kunci gateway menghubungkan meja kerja ini dengan model di akun Anda. Tempel sekali di Pengaturan. Kunci tetap berada di meja kerja ini dan tidak akan ditampilkan lagi.",
+    "pickModel": "Pilih model di bawah, lalu mulai menulis.",
     "ideas": {
       "title": "Mulai dari satu ide",
       "plan": {
         "label": "Susun rencana",
-        "hint": "Ubah catatan kasar jadi draf langkah pertama.",
-        "prompt": "Ubah catatan ini jadi rencana langkah demi langkah:\n\n"
+        "hint": "Ubah catatan kasar menjadi draft langkah-langkah awal.",
+        "prompt": "Ubah catatan ini menjadi rencana langkah demi langkah:\n\n"
       },
       "summarise": {
         "label": "Ringkas sesuatu",
-        "hint": "Tempel dokumen, utas, atau transkrip dan ambil poin yang penting.",
-        "prompt": "Ringkas poin dan keputusan utama dari ini:\n\n"
+        "hint": "Tempel dokumen, percakapan, atau transkrip, lalu dapatkan poin-poin pentingnya.",
+        "prompt": "Ringkas poin-poin utama dan keputusan dari teks berikut:\n\n"
       },
       "rewrite": {
         "label": "Tulis ulang untuk pembaca",
-        "hint": "Beri draf Anda dan untuk siapa; bahasanya akan dipertajam.",
-        "prompt": "Tulis ulang ini untuk pembaca tertentu — pertahankan maknanya, pertajam kalimatnya:\n\n"
+        "hint": "Kirim draft Anda dan sebutkan siapa pembacanya; bahasanya akan dipertajam.",
+        "prompt": "Tulis ulang teks ini untuk pembaca tertentu. Pertahankan maknanya dan pertajam pilihan katanya:\n\n"
       },
       "decide": {
-        "label": "Pikirkan satu keputusan",
-        "hint": "Taruh opsi di meja dan bahas kedua sisinya.",
-        "prompt": "Bantu saya memilih di antara opsi ini. Jabarkan trade-off-nya, lalu rekomendasikan satu:\n\n"
+        "label": "Timbang sebuah keputusan",
+        "hint": "Paparkan pilihan-pilihannya, lalu timbang dari kedua sisi.",
+        "prompt": "Bantu saya memilih di antara opsi berikut. Jabarkan untung ruginya, lalu rekomendasikan satu:\n\n"
       },
       "fillsComposer": "Mengisi kotak dengan prompt awal."
     },
@@ -78,7 +78,7 @@
     "label": "Akun"
   },
   "composer": {
-    "placeholder": "Tanyakan apa saja, atau lepas tangkapan layar, klip, atau dokumen",
+    "placeholder": "Tanyakan apa saja, atau seret tangkapan layar, klip, atau dokumen ke sini",
     "modelPrefix": "Model",
     "thinkingPrefix": "Berpikir",
     "attach": "Lampirkan",
@@ -88,15 +88,15 @@
     "imageCaption": "Apa yang ada di gambar ini?",
     "videoCaption": "Ringkas video ini.",
     "imageNote": {
-      "no": "{model} tidak dapat membaca gambar. Ganti ke model yang bisa, atau hapus gambarnya.",
-      "unknown": "Kami belum bisa memastikan {model} membaca gambar. Gambar tetap dikirim. Jika {model} tidak bisa membacanya, Anda akan melihat pesan kesalahan.",
+      "no": "{model} tidak bisa membaca gambar. Pakai model lain yang bisa membaca gambar, atau hapus gambarnya.",
+      "unknown": "Kami belum bisa memastikan {model} bisa membaca gambar. Gambar tetap dikirim; jika {model} tidak bisa membacanya, Anda akan melihat pesan kesalahan.",
       "switch": "Pakai {model}"
     },
-    "videoNote": "Model belum bisa menonton video di Chat. Video tetap ada di obrolan ini, tetapi hanya tulisan Anda yang dikirim ke model.",
-    "needsKey": "Tempel kunci di Pengaturan sebelum ini bisa jalan."
+    "videoNote": "Model belum bisa menonton video di Chat. Video tetap ada di obrolan ini, tetapi hanya teks Anda yang dikirim ke model.",
+    "needsKey": "Tempel kunci di Pengaturan dulu agar fitur ini bisa dipakai."
   },
   "thinking": {
-    "none": "Mati",
+    "none": "Nonaktif",
     "low": "Ringan",
     "medium": "Normal",
     "high": "Dalam",
@@ -111,19 +111,19 @@
     "retry": "Coba lagi"
   },
   "mascot": {
-    "idle": "Siap bila Anda siap",
-    "thinking": "Sedang memikirkan ini",
-    "answering": "Sedang menulis jawaban",
-    "error": "Ada yang perlu dilihat"
+    "idle": "Siap kapan saja",
+    "thinking": "Sedang memikirkannya",
+    "answering": "Sedang menyusun balasan",
+    "error": "Ada yang perlu diperiksa"
   },
   "embed": {
-    "link": "Tautan",
-    "file": "Berkas",
+    "link": "Link",
+    "file": "File",
     "image": "Gambar",
     "video": "Video",
     "job": "Hasil",
     "open": "Buka",
-    "preview": "Lihat isi berkas"
+    "preview": "Lihat isi file"
   },
   "context": {
     "meter": "Konteks: {used} dari {window}",
@@ -131,118 +131,118 @@
     "left": "{n} tersisa",
     "used": "{n} terpakai",
     "window": "Jendela konteks",
-    "titleWithWindow": "Sekitar {used} token dalam chat ini dari {window} konteks",
-    "title": "Sekitar {used} token dalam chat ini",
+    "titleWithWindow": "Sekitar {used} token dalam obrolan ini, dari jendela konteks {window}",
+    "title": "Sekitar {used} token dalam obrolan ini",
     "conversation": "Percakapan",
-    "conversationDetail": "pesan dalam utas ini",
+    "conversationDetail": "pesan dalam obrolan ini",
     "attachments": "Lampiran",
     "attachmentsDetail": "file pada giliran ini",
     "knowledge": "Pengetahuan",
-    "knowledgeDetail": "tersemat + diambil",
+    "knowledgeDetail": "disematkan + diambil",
     "pinnedDetail": "{n} tersemat",
     "soul": "Soul",
     "memories": "Memori",
     "sources": "Sumber",
-    "free": "Tersedia",
+    "free": "Kosong",
     "approaching": "Mendekati batas konteks.",
-    "estimate": "Perkiraan sekitar empat karakter per token."
+    "estimate": "Diperkirakan sekitar empat karakter per token."
   },
   "usage": {
     "connectKey": "Pemakaian · hubungkan kunci",
-    "planSeats": "{plan} · {used} dari {cap} kursi",
+    "planSeats": "{plan} · {used} dari {cap} seat",
     "planName": "Paket: {plan}",
     "unlimited": "Pemakaian · Tanpa batas",
     "remaining": "Pemakaian · {left}",
     "error": "Pemakaian tidak tersedia"
   },
   "enhance": {
-    "busy": "Batalkan peningkatan",
+    "busy": "Batalkan penyempurnaan",
     "revert": "Kembalikan prompt",
-    "idle": "Tingkatkan prompt",
-    "failed": "Tidak dapat meningkatkan prompt"
+    "idle": "Sempurnakan prompt",
+    "failed": "Prompt belum bisa disempurnakan"
   },
   "tool": {
     "working": "Bekerja…",
     "searching": "Mencari…",
     "fetching": "Sedang membuka halaman…",
-    "fetchFailed": "Tidak dapat membuka halaman",
+    "fetchFailed": "Gagal membuka halaman",
     "creatingImage": "Membuat gambar…",
     "creatingVideo": "Membuat video…",
-    "pastChats": "Mencari chat sebelumnya…",
+    "pastChats": "Mencari obrolan sebelumnya…",
     "calculating": "Menghitung…",
     "clock": "Membaca jam…",
     "search": "Pencarian",
     "fetch": "Halaman web",
     "image": "Gambar",
     "video": "Video",
-    "pastSessions": "Chat sebelumnya",
+    "pastSessions": "Obrolan sebelumnya",
     "calculator": "Kalkulator",
     "datetime": "Jam",
-    "selfChecking": "Memeriksa meja ini…",
-    "selfCheck": "Pemeriksaan meja",
-    "imageAsk": "Gambar menunggu persetujuan",
-    "videoAsk": "Klip menunggu persetujuan"
+    "selfChecking": "Memeriksa meja kerja ini…",
+    "selfCheck": "Pemeriksaan meja kerja",
+    "imageAsk": "Gambar menunggu persetujuan Anda",
+    "videoAsk": "Klip menunggu persetujuan Anda"
   },
   "tools": {
     "name": {
-      "list_files": "Daftar berkas",
-      "read_file": "Baca berkas",
-      "write_file": "Tulis berkas",
-      "edit_file": "Ubah berkas",
-      "search_files": "Cari berkas",
-      "delete_file": "Hapus berkas",
+      "list_files": "Daftar file",
+      "read_file": "Baca file",
+      "write_file": "Tulis file",
+      "edit_file": "Ubah file",
+      "search_files": "Cari file",
+      "delete_file": "Hapus file",
       "knowledge_search": "Pencarian pengetahuan",
       "run_code": "Jalankan kode",
       "build_deck": "Buat deck"
     },
     "doing": {
-      "list_files": "Menampilkan daftar berkas di {dir}…",
-      "list_files_top": "Menampilkan daftar berkas Anda…",
+      "list_files": "Menampilkan daftar file di {dir}…",
+      "list_files_top": "Menampilkan daftar file Anda…",
       "read_file": "Sedang membaca {path}…",
       "write_file": "Sedang menulis {path}…",
       "edit_file": "Sedang mengubah {path}…",
-      "search_files": "Mencari “{query}” di berkas…",
+      "search_files": "Mencari “{query}” di file…",
       "delete_file": "Sedang menghapus {path}…",
-      "knowledge_search": "Mencari “{query}” di basis pengetahuan Anda…",
+      "knowledge_search": "Mencari “{query}” di Knowledge Base Anda…",
       "run_code": "Sedang menjalankan {language}…",
       "build_deck": "Sedang menyusun “{title}”…",
       "web_fetch": "Sedang membuka {host}…"
     },
     "done": {
-      "list_files": "Daftar berkas di {dir}",
-      "list_files_top": "Daftar berkas Anda",
+      "list_files": "Daftar file di {dir}",
+      "list_files_top": "Daftar file Anda",
       "read_file": "Membaca {path}",
       "write_file": "Menulis {path}",
       "edit_file": "Mengubah {path}",
-      "search_files": "Pencarian “{query}” di berkas",
+      "search_files": "Pencarian “{query}” di file",
       "delete_file": "Menghapus {path}",
-      "knowledge_search": "Pencarian “{query}” di basis pengetahuan Anda",
+      "knowledge_search": "Pencarian “{query}” di Knowledge Base Anda",
       "run_code": "Menjalankan {language}",
       "build_deck": "Menyusun “{title}”",
       "web_fetch": "Membuka {host}"
     },
     "failed": {
-      "list_files": "Tidak dapat menampilkan daftar berkas",
-      "read_file": "Tidak dapat membaca {path}",
-      "write_file": "Tidak dapat menulis {path}",
-      "edit_file": "Tidak dapat mengubah {path}",
-      "search_files": "Tidak dapat mencari “{query}” di berkas",
-      "delete_file": "Tidak dapat menghapus {path}",
-      "knowledge_search": "Tidak dapat mencari di basis pengetahuan Anda",
-      "run_code": "Menjalankan {language} gagal",
-      "build_deck": "Tidak dapat membuat deck",
-      "web_fetch": "Tidak dapat membuka {host}"
+      "list_files": "Gagal menampilkan daftar file",
+      "read_file": "Gagal membaca {path}",
+      "write_file": "Gagal menulis {path}",
+      "edit_file": "Gagal mengubah {path}",
+      "search_files": "Gagal mencari “{query}” di file",
+      "delete_file": "Gagal menghapus {path}",
+      "knowledge_search": "Gagal mencari di Knowledge Base Anda",
+      "run_code": "Gagal menjalankan {language}",
+      "build_deck": "Gagal membuat deck",
+      "web_fetch": "Gagal membuka {host}"
     },
     "pending": {
-      "write_file": "Mengusulkan penulisan berkas",
-      "edit_file": "Mengusulkan perubahan berkas",
-      "delete_file": "Mengusulkan penghapusan berkas"
+      "write_file": "Mengusulkan penulisan file",
+      "edit_file": "Mengusulkan perubahan file",
+      "delete_file": "Mengusulkan penghapusan file"
     },
     "detail": {
       "none": "Tidak ada hasil",
       "more": "sisanya tidak ditampilkan",
-      "files": "{n} berkas",
-      "filesOne": "1 berkas",
+      "files": "{n} file",
+      "filesOne": "1 file",
       "matches": "{n} kecocokan",
       "matchesOne": "1 kecocokan",
       "excerpts": "{n} kutipan",
@@ -253,7 +253,7 @@
       "slidesOne": "Satu slide"
     },
     "open": "Buka",
-    "openAria": "Buka {path} di Basis Pengetahuan",
+    "openAria": "Buka {path} di Knowledge Base",
     "pendingTitle": "Menunggu persetujuan Anda",
     "review": "Tinjau",
     "reviewMissing": "Buka panel perubahan folder untuk meninjaunya.",
@@ -265,12 +265,12 @@
       "stderr": "Kesalahan",
       "noOutput": "Kode berjalan dan tidak mencetak apa pun.",
       "cut": "Dipersingkat di sini.",
-      "filesWritten": "Berkas tersimpan",
+      "filesWritten": "File tersimpan",
       "reason": {
-        "timeout": "Berjalan terlalu lama sehingga dihentikan.",
-        "memory": "Membutuhkan memori melebihi batas sehingga dihentikan.",
-        "syntax": "Kode memiliki kesalahan sintaks, jadi tidak dijalankan.",
-        "runtime": "Kode berhenti dengan kesalahan saat berjalan.",
+        "timeout": "Berjalan terlalu lama, jadi dihentikan.",
+        "memory": "Memori yang dipakai melebihi batas, jadi dihentikan.",
+        "syntax": "Kode punya kesalahan sintaks, jadi tidak dijalankan.",
+        "runtime": "Kode berhenti karena kesalahan saat berjalan.",
         "too_large": "Kode atau keluarannya terlalu besar.",
         "busy": "Proses lain sedang berjalan. Coba lagi sebentar lagi.",
         "unavailable": "Menjalankan kode belum tersedia saat ini.",
@@ -287,19 +287,19 @@
     "download": "Unduh",
     "downloading": "Mengunduh…",
     "downloadAria": "Unduh {title} sebagai {filename}",
-    "downloadFailed": "Tidak bisa mengunduh deck. Coba lagi.",
-    "noPreview": "Slide tidak bisa ditampilkan di sini, tetapi berkasnya siap diunduh.",
+    "downloadFailed": "Deck gagal diunduh. Coba lagi.",
+    "noPreview": "Slide belum bisa ditampilkan di sini, tetapi file-nya siap diunduh.",
     "outlineAria": "Slide dalam deck ini",
-    "previewAria": "Pratinjau slide {title}"
+    "previewAria": "Preview slide {title}"
   },
   "media": {
     "label": "Perlu persetujuan",
     "imageTitle": "Buat gambar",
     "videoTitle": "Buat klip",
-    "spends": "Ini memakai kredit pada kunci yang dipakai. Tidak ada yang mulai sebelum Jalankan ditekan.",
-    "priceImage": "Sekitar {usd} per gambar (harga daftar, bukan penawaran)",
-    "priceClip": "Sekitar {usd} untuk {seconds} dtk pada {resolution} (harga daftar, bukan penawaran)",
-    "priceUnknown": "Harga belum diketahui sebelum dijalankan.",
+    "spends": "Ini memakai kredit dari kunci yang sedang dipakai. Tidak ada yang dimulai sebelum Anda menekan Jalankan.",
+    "priceImage": "Sekitar {usd} per gambar (harga resmi, bukan penawaran)",
+    "priceClip": "Sekitar {usd} untuk {seconds} dtk pada {resolution} (harga resmi, bukan penawaran)",
+    "priceUnknown": "Harganya belum diketahui sebelum proses berjalan.",
     "model": "Memakai model {model}",
     "defaultModel": "Model bawaan: {model}",
     "run": "Jalankan",
@@ -310,22 +310,22 @@
   },
   "error": {
     "loading": "Chat masih dimuat",
-    "start": "Tidak dapat memulai chat",
-    "open": "Tidak dapat membuka chat",
+    "start": "Gagal memulai obrolan",
+    "open": "Gagal membuka obrolan",
     "agentMissing": "Agen tidak ditemukan",
-    "threadMissing": "Utas tidak ditemukan",
+    "threadMissing": "Obrolan tidak ditemukan",
     "upload": "Unggahan gagal",
-    "noStream": "Tidak ada aliran",
-    "runFailed": "Jalankan gagal",
-    "deleteSession": "Tidak dapat menghapus sesi",
-    "loadSessions": "Tidak dapat memuat sesi",
-    "noImageInput": "Agen atau model ini tidak menerima masukan gambar",
-    "noVideoInput": "Agen atau model ini tidak menerima masukan video",
-    "emptySend": "Ketik pesan atau lampirkan berkas",
-    "fileTooLarge": "Berkas itu melebihi batas ukuran",
-    "unsupportedFile": "Jenis berkas tidak didukung",
+    "noStream": "Tidak ada respons dari server",
+    "runFailed": "Proses gagal dijalankan",
+    "deleteSession": "Gagal menghapus obrolan",
+    "loadSessions": "Gagal memuat daftar obrolan",
+    "noImageInput": "Agen atau model ini tidak bisa menerima gambar",
+    "noVideoInput": "Agen atau model ini tidak bisa menerima video",
+    "emptySend": "Ketik pesan atau lampirkan file",
+    "fileTooLarge": "File itu melebihi batas ukuran",
+    "unsupportedFile": "Jenis file tidak didukung",
     "mixedMedia": "Kirim lampiran gambar dan video secara terpisah",
-    "couldNotReach": "Tidak dapat menghubungi {model} setelah {tries} percobaan"
+    "couldNotReach": "Gagal menghubungi {model} setelah {tries} kali mencoba"
   },
   "models": {
     "searchPlaceholder": "Cari model",
@@ -345,33 +345,33 @@
     "unavailable": "Tidak tersedia",
     "daily": {
       "label": "Harian",
-      "hint": "Jawaban yang baik dengan kecepatan yang wajar"
+      "hint": "Jawaban bagus dengan kecepatan yang pas"
     },
     "fast": {
       "label": "Tercepat",
-      "hint": "Menjawab lebih dulu, untuk pertanyaan singkat dan draf"
+      "hint": "Jawaban paling cepat, cocok untuk pertanyaan singkat dan draft"
     },
     "reasoning": {
       "label": "Penalaran",
-      "hint": "Berpikir dulu sebelum menjawab, untuk masalah yang sulit"
+      "hint": "Berpikir dulu sebelum menjawab, untuk persoalan yang rumit"
     }
   },
   "errors": {
     "tierUnavailable": "Pilihan itu sedang tidak tersedia. Pilih yang lain lalu kirim lagi."
   },
   "harness": {
-    "thinkPast": "Saya akan meninjau percakapan sebelumnya, lalu menjawab dari yang saya temukan.",
-    "thinkDesk": "Saya akan menjawab dari catatan meja.",
-    "lookingAttached": "Melihat yang Anda lampirkan.",
-    "pastNone": "Tidak ada percakapan sebelumnya di meja ini yang cocok.",
-    "pastOne": "Percakapan sebelumnya berjudul \"{title}\".",
-    "pastMany": "Percakapan sebelumnya mencakup \"{title}\".",
-    "noSource": "Meja ini tidak punya sumber untuk itu.",
-    "stepLimit": "{tools} sudah selesai, tetapi jawabannya belum. Minta saya untuk melanjutkan, dan saya akan meneruskannya dari titik terakhir.",
-    "stepLimitEmpty": "Tidak ada alat yang selesai, tetapi jawabannya belum. Minta saya untuk melanjutkan, dan saya akan meneruskannya dari titik terakhir.",
+    "thinkPast": "Saya akan menelusuri obrolan sebelumnya, lalu menjawab berdasarkan temuan saya.",
+    "thinkDesk": "Saya akan menjawab berdasarkan catatan meja kerja.",
+    "lookingAttached": "Melihat lampiran Anda.",
+    "pastNone": "Tidak ada obrolan sebelumnya di meja kerja ini yang cocok.",
+    "pastOne": "Obrolan sebelumnya berjudul \"{title}\".",
+    "pastMany": "Obrolan sebelumnya antara lain \"{title}\".",
+    "noSource": "Meja kerja ini tidak memiliki sumber untuk itu.",
+    "stepLimit": "{tools} sudah selesai, tetapi jawabannya belum. Minta saya melanjutkan, dan saya akan meneruskan dari titik terakhir.",
+    "stepLimitEmpty": "Tidak ada alat yang selesai, tetapi jawabannya belum. Minta saya melanjutkan, dan saya akan meneruskan dari titik terakhir.",
     "stepLimitAnd": "dan",
-    "interrupted": "Langkah alat di atas sudah berjalan, tetapi saya tidak dapat menyelesaikan jawabannya.\n\nAlasan: {reason}\n\nKirim \"lanjutkan\" dan saya akan mencoba lagi.",
-    "modelFallback": "{from} tidak tersedia; menggunakan {to} untuk jawaban ini.",
-    "saveTimeout": "Penyimpanan balasan ini terlalu lama. Muat ulang percakapan sebentar lagi untuk melihat apakah balasan sudah tersimpan."
+    "interrupted": "Langkah-langkah alat di atas sudah berjalan, tetapi saya belum bisa menyelesaikan jawabannya.\n\nAlasan: {reason}\n\nKirim \"lanjutkan\" dan saya akan mencoba lagi.",
+    "modelFallback": "{from} tidak tersedia; jawaban ini memakai {to}.",
+    "saveTimeout": "Penyimpanan balasan ini terlalu lama. Muat ulang obrolan sebentar lagi untuk melihat apakah balasan sudah tersimpan."
   }
 }

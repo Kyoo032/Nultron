@@ -1,33 +1,33 @@
 {
   "title": "Video",
-  "expectedInputs": "Anda dapat: klip yang dibuat, tersimpan di galeri di bawah dan dapat diunduh.",
-  "needsKey": "Tambahkan kunci gateway {gateway} di {settings} untuk membuat video.",
+  "expectedInputs": "Hasil: klip yang dibuat, tersimpan di galeri di bawah dan bisa diunduh.",
+  "needsKey": "Tambahkan kunci gateway {gateway} di {settings} agar bisa membuat video.",
   "noModels": {
-    "title": "Tidak ada model video di kunci ini",
-    "body": "Kunci gateway {gateway} ini tidak mencantumkan model video, jadi tidak ada yang bisa dibuat di sini. Periksa kunci di {settings}."
+    "title": "Kunci ini tidak punya model video",
+    "body": "Kunci gateway {gateway} ini tidak memuat model video, jadi belum ada yang bisa dibuat di sini. Periksa kuncinya di {settings}."
   },
   "settingsLink": "Pengaturan",
-  "loadError": "Studio video tidak dapat dimuat",
+  "loadError": "Studio video gagal dimuat",
   "generateError": "Pembuatan video gagal",
-  "clipRejected": "Render tidak mengembalikan berkas video.",
-  "modelNotOnKey": "{model} tidak tersedia pada kunci ini. Coba {suggestion}.",
-  "modelNotOnKeyNoAlt": "{model} tidak tersedia pada kunci ini. Segarkan model di Pengaturan dan pilih salah satu yang tercantum pada kunci ini.",
+  "clipRejected": "Hasil render tidak berisi file video.",
+  "modelNotOnKey": "{model} tidak tersedia di kunci ini. Coba {suggestion}.",
+  "modelNotOnKeyNoAlt": "{model} tidak tersedia di kunci ini. Segarkan daftar model di Pengaturan, lalu pilih salah satu yang tercantum untuk kunci ini.",
   "stillUnsupported": "Model ini tidak menerima gambar diam",
-  "hostNeedsKey": "Tambahkan kunci gateway Toko Token di Pengaturan untuk membuat video.",
+  "hostNeedsKey": "Tambahkan kunci gateway Toko Token di Pengaturan agar bisa membuat video.",
   "textToVideoOnly": "Model ini hanya mendukung teks-ke-video",
-  "stillPlaceholder": "URL gambar diam opsional…",
+  "stillPlaceholder": "URL gambar diam (opsional)…",
   "savedPicture": {
     "open": "Pakai gambar tersimpan",
     "close": "Sembunyikan gambar tersimpan",
     "loading": "Memuat gambar tersimpan…",
-    "loadError": "Gagal memuat gambar tersimpan",
-    "empty": "Belum ada gambar tersimpan. Buat atau unggah dulu, lalu pilih di sini.",
+    "loadError": "Gambar tersimpan gagal dimuat",
+    "empty": "Belum ada gambar tersimpan. Buat atau unggah satu dulu, lalu pilih di sini.",
     "optionAlt": "Gambar tersimpan",
     "chosen": "Gambar tersimpan dipakai sebagai gambar diam",
     "remove": "Lepas",
     "unusable": "Gambar tersimpan ini tidak bisa dipakai di sini. Pilih yang lain, atau tempel URL."
   },
-  "promptPlaceholder": "Dorongan kamera perlahan ke cangkir keramik saat cahaya jendela bergerak di meja",
+  "promptPlaceholder": "Kamera bergerak maju perlahan ke arah cangkir keramik saat cahaya jendela bergeser melintasi meja",
   "generate": "Buat",
   "generating": "Membuat…",
   "advanced": "Lanjutan",
@@ -36,57 +36,57 @@
   "emptyBody": "Buat video untuk mengisi galeri ini.",
   "download": "Unduh",
   "seconds": "{n}s",
-  "examplesHeading": "Mulai dari templat",
-  "examplesHint": "Klik kartu untuk memuat brief lengkap. Ganti detail contoh, lalu buat.",
+  "examplesHeading": "Mulai dari template",
+  "examplesHint": "Klik salah satu kartu untuk memuat brief lengkapnya. Ganti detail contohnya, lalu buat videonya.",
   "clipsHeading": "Contoh klip",
-  "clipsHint": "Dihasilkan dari templat prompt di bawah dan disertakan dalam aplikasi. Klik salah satu untuk memuat promptnya.",
-  "clipsLoadError": "Contoh klip tidak dapat dimuat",
+  "clipsHint": "Dibuat dari template prompt di bawah dan sudah termasuk dalam aplikasi. Klik salah satu untuk memuat promptnya.",
+  "clipsLoadError": "Contoh klip gagal dimuat",
   "usePrompt": "Gunakan prompt ini",
-  "outputTextLanguage": "Dialog, narasi, dan teks di layar pada klip ini harus dalam bahasa Indonesia, kecuali prompt sudah menyebut bahasa lain.",
+  "outputTextLanguage": "Dialog, narasi, dan teks di layar pada klip ini harus berbahasa Indonesia, kecuali prompt sudah menyebut bahasa lain.",
   "estimate": {
     "forClip": "{usd} untuk {seconds} dtk pada {resolution}",
     "perSecond": "{usd}/dtk",
-    "source": "Harga resmi {vendor}, dicek {date}",
-    "sourceThirdParty": "Harga {vendor}, angka pihak ketiga, dicek {date}",
-    "sourceUnverified": "Perkiraan belum terverifikasi, tanpa halaman resmi vendor",
-    "sourceGateway": "Harga gateway, dicek {date}",
+    "source": "Harga resmi {vendor}, diperiksa {date}",
+    "sourceThirdParty": "Harga {vendor} dari pihak ketiga, diperiksa {date}",
+    "sourceUnverified": "Perkiraan, belum terverifikasi karena vendor tidak punya halaman harga resmi",
+    "sourceGateway": "Harga gateway, diperiksa {date}",
     "tier": {
       "cheapest": "termurah",
       "cheap": "murah",
       "mid": "menengah",
-      "premium": "mahal"
+      "premium": "premium"
     },
     "compareCheaper": "Sekitar {factor}× lebih murah dari {model}",
     "compareMore": "Sekitar {factor}× lebih mahal dari {model}",
     "compareCheapest": "Model video termurah di sini",
-    "unknown": "Belum ada harga resmi untuk model ini",
+    "unknown": "Model ini belum punya harga resmi",
     "unverified": "(belum terverifikasi)",
     "hint": "{usd}/dtk"
   },
   "templates": {
     "product-page-turntable": {
-      "title": "Turntable halaman produk",
-      "resultSummary": "Putaran 360 yang siap jual, dengan rencana pencahayaan dan tahan di akhir — layak dipakai di halaman produk."
+      "title": "Putaran produk di halaman produk",
+      "resultSummary": "Putaran 360° siap jual, dengan rencana pencahayaan dan jeda di akhir. Layak dipasang di halaman produk."
     },
     "feature-walkthrough-open": {
       "title": "Pembuka walkthrough fitur",
-      "resultSummary": "Pembuka sinematik yang mendarat di UI yang terasa nyata, bukan bumper logo."
+      "resultSummary": "Pembuka sinematik yang berpijak pada UI yang tampak nyata, bukan sekadar bumper logo."
     },
     "before-after-process": {
       "title": "Proses sebelum / sesudah",
-      "resultSummary": "Sebelum/sesudah yang terbaca dengan wipe berwaktu — bukan transisi meme."
+      "resultSummary": "Perbandingan sebelum/sesudah yang terbaca jelas dengan wipe berwaktu — bukan transisi ala meme."
     },
     "seamless-social-loop": {
-      "title": "Loop sosial tanpa sambungan",
-      "resultSummary": "Loop sungguhan dengan bingkai awal/akhir yang cocok — siap di bawah teks, bukan lelucon sekali putar."
+      "title": "Loop media sosial yang mulus",
+      "resultSummary": "Loop sungguhan dengan frame awal dan akhir yang cocok, layak diberi teks, bukan lelucon sekali putar."
     },
     "night-rain-hold": {
-      "title": "Tahan hujan malam",
-      "resultSummary": "Plat hujan yang bisa di-loop dengan gerak rack-focus — tahan intro, bukan B-roll cuaca."
+      "title": "Jeda hujan malam",
+      "resultSummary": "Plat hujan yang bisa di-loop dengan gerakan rack-focus. Jeda untuk intro, bukan B-roll cuaca."
     },
     "kitchen-pour-insert": {
-      "title": "Sisipan tuang dapur",
-      "resultSummary": "Tuang berwaktu yang berakhir pada still yang bisa dipakai — sisipan, bukan iklan kopi."
+      "title": "Sisipan menuang di dapur",
+      "resultSummary": "Scene menuang berwaktu yang berakhir pada still yang bisa dipakai. Sebuah sisipan, bukan iklan kopi."
     }
   },
   "exampleClips": {
@@ -100,7 +100,7 @@
       "title": "Drone menembus rintangan"
     },
     "talk-calm-line": {
-      "title": "Kalimat sulih suara tenang"
+      "title": "Kalimat voice over tenang"
     },
     "talk-keyboard-review": {
       "title": "Ulasan keyboard"

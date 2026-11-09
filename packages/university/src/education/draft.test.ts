@@ -36,7 +36,7 @@ describe("education drafts", () => {
     const lesson = draftLesson("id", "pasang");
     const plan = draftPresenter("id", lesson);
     expect(plan.rendered).toBe(false);
-    expect(plan.avatar.label).toBe("Penyaji");
+    expect(plan.avatar.label).toBe("Presenter");
     expect(plan.avatar.placements).toHaveLength(lesson.slides.length);
     expect(plan.avatar.placements[0]?.motion).toBe("enter-from-left");
     expect(plan.avatar.placements[1]?.x).toBeGreaterThan(0);

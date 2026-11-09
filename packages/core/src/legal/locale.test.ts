@@ -22,7 +22,7 @@ describe("legalUserFacingLanguageInstruction", () => {
 describe("legalOutputCopy", () => {
   it("keeps English chrome and translates Indonesian chrome", () => {
     expect(legalOutputCopy("en").stubError).toMatch(/live gateway/);
-    expect(legalOutputCopy("id").stubError).toMatch(/gerbang yang aktif/);
+    expect(legalOutputCopy("id").stubError).toMatch(/gateway yang aktif/);
     expect(legalOutputCopy("id").phase.classify).toBe("Mengklasifikasi dokumen");
     expect(legalOutputCopy("id").phase.position).toBe("Memilih kedudukan");
     expect(legalOutputCopy("en").usingPlaybook).toContain("{title}");

@@ -202,7 +202,7 @@ describe("the card in Indonesian", () => {
   it("is written from the id catalog", () => {
     applyLocale("id");
     const html = card();
-    expect(html).toContain("Dosir riset");
+    expect(html).toContain("Laporan riset");
     expect(html).toContain("12 sumber · 5 bagian");
     expect(html).toContain(">Buka</button>");
     expect(html).toContain("Setiap temuan menyebut sumber");

@@ -62,7 +62,7 @@ describe("imagePartForProvider", () => {
 
   it("says so in the desk's language", () => {
     expect(() => imagePartForProvider("/api/v1/media/f66a438a-781a-478b-8e67-c19be7771c20/file", "id")).toThrow(
-      /tidak dapat dibaca/,
+      /tidak bisa dibaca/,
     );
   });
 });

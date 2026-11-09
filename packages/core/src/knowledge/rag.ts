@@ -134,7 +134,7 @@ export function stubKnowledgeMap(
         ? `Peta stub dari ${sources.length} sumber. Pemetaan live memakai brain dan verifier yang Anda pilih.`
         : `Stub map of ${sources.length} source${sources.length === 1 ? "" : "s"}. Live mapping uses the brain and verifier you pick.`
       : id
-        ? "Belum ada sumber untuk dipetakan. Tambah catatan, berkas, atau URL dulu."
+        ? "Belum ada sumber untuk dipetakan. Tambah catatan, file, atau URL dulu."
         : "No sources to map yet. Add a note, file, or URL first.",
     topics: sources.slice(0, 8).map((source) => ({
       title: source.name,

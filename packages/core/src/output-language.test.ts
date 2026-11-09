@@ -93,7 +93,7 @@ describe("gateway required copy", () => {
   });
 
   it("writes Indonesian for id and falls back to English for an unknown locale", () => {
-    expect(gatewayRequiredMessage("data", "id")).toContain("gerbang yang aktif");
+    expect(gatewayRequiredMessage("data", "id")).toContain("gateway yang aktif");
     expect(gatewayRequiredMessage("videos", "id")).toContain("membuat video");
     expect(gatewayRequiredMessage("finance", "de" as never)).toBe(gatewayRequiredMessage("finance", "en"));
   });

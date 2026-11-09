@@ -124,7 +124,7 @@ describe("Run", () => {
     const out = html();
     expect(out).toContain("Apa yang Anda butuhkan dari rapat ini?");
     expect(out).toContain("Jalankan");
-    expect(out).toContain("Jalankan adalah langkah berbayar");
+    expect(out).toContain("Tombol Jalankan berbayar");
     expect(out).not.toContain("meeting.");
   });
 });

@@ -37,7 +37,7 @@ export function earlierImageNote(mediaId?: string | null): string {
 
 const UNREADABLE_COPY: Record<AppLocale, string> = {
   en: "An image you attached could not be read from this app, so nothing was sent. Attach it again.",
-  id: "Gambar yang Anda lampirkan tidak dapat dibaca dari aplikasi ini, jadi tidak ada yang dikirim. Lampirkan lagi.",
+  id: "Gambar yang Anda lampirkan tidak bisa dibaca dari aplikasi ini, jadi tidak ada yang dikirim. Lampirkan lagi.",
 };
 
 export function imageUnreadableMessage(locale: AppLocale = "en"): string {
@@ -46,7 +46,7 @@ export function imageUnreadableMessage(locale: AppLocale = "en"): string {
 
 const REMOTE_LINK_COPY: Record<AppLocale, string> = {
   en: "A web link to an image can't be sent to the model. Attach the image itself.",
-  id: "Tautan web ke gambar tidak dapat dikirim ke model. Lampirkan gambar itu sendiri.",
+  id: "Link web ke gambar tidak bisa dikirim ke model. Lampirkan gambar itu sendiri.",
 };
 
 /**
@@ -73,7 +73,7 @@ const REJECTED_COPY: Record<AppLocale, (status: number) => string> = {
   en: (status) =>
     `The model could not accept the image you attached (status_code=${status}). It may not read images, or the file is too large. Choose a model that reads images, or attach a smaller image.`,
   id: (status) =>
-    `Model tidak dapat menerima gambar yang Anda lampirkan (status_code=${status}). Model ini mungkin tidak membaca gambar, atau berkasnya terlalu besar. Pilih model yang membaca gambar, atau lampirkan gambar yang lebih kecil.`,
+    `Model tidak bisa menerima gambar yang Anda lampirkan (status_code=${status}). Model ini mungkin tidak membaca gambar, atau file-nya terlalu besar. Pilih model yang membaca gambar, atau lampirkan gambar yang lebih kecil.`,
 };
 
 /**

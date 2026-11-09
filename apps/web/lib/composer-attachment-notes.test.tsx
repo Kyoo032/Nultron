@@ -74,7 +74,7 @@ describe("ComposerAttachmentNotes", () => {
   it("says it in Bahasa Indonesia", () => {
     applyLocale("id");
     const html = note(["image"], "glm-5.3");
-    expect(html).toContain("GLM 5.3 tidak dapat membaca gambar. Ganti ke model yang bisa, atau hapus gambarnya.");
+    expect(html).toContain("GLM 5.3 tidak bisa membaca gambar. Pakai model lain yang bisa membaca gambar, atau hapus gambarnya.");
     expect(html).toContain("Pakai GPT-6 Luna");
   });
 

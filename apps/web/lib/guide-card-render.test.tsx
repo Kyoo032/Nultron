@@ -144,12 +144,12 @@ describe("the guide card", () => {
       />,
     );
 
-    expect(markup).toContain("Agen Anda ada di sini");
+    expect(markup).toContain("Di sinilah agen Anda berada");
     expect(markup).toContain("Langkah 1 dari 5");
     expect(markup).toContain(">Lewati<");
-    expect(markup).toContain(">Lanjut<");
+    expect(markup).toContain(">Berikutnya<");
     expect(markup).toContain('aria-label="Tutup panduan"');
-    expect(markup).toContain('aria-label="Tur singkat Nultron"');
+    expect(markup).toContain('aria-label="Tur singkat mengenal Nultron"');
   });
 });
 

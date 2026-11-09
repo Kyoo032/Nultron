@@ -124,7 +124,7 @@ describe("MeetingChecksNote", () => {
     applyLocale("id");
     const html = renderToStaticMarkup(<MeetingChecksNote note={{ failed: ["owners", "dates", "summary", "shape"] }} />);
     expect(html).toContain("Notulen ini mungkin perlu diperiksa lagi");
-    expect(html).toContain("Notulen tersimpan.");
+    expect(html).toContain("Notulen sudah tersimpan.");
     expect(html).toContain("Jalankan lagi");
     expect(html).toContain("tidak pernah disebut");
     expect(html).not.toContain("meeting.checks");

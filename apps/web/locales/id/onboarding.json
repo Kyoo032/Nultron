@@ -1,36 +1,36 @@
 {
   "welcome": "Selamat datang di {productName}",
-  "intro": "Ajukan pertanyaan, riset sebuah topik, buat gambar atau video, atau susun presentasi.",
-  "next": "Lanjut",
+  "intro": "Tanya apa saja, riset suatu topik, buat gambar atau video, atau susun presentasi.",
+  "next": "Lanjutkan",
   "back": "Kembali",
-  "stepsLabel": "Langkah penyiapan",
+  "stepsLabel": "Langkah setup",
   "steps": {
     "welcome": "Halo",
     "key": "Kunci Anda",
     "try": "Coba"
   },
   "setupCheck": "Menyiapkan pembaca dokumen",
-  "ffmpegLater": "Anda dapat lanjut sekarang dan memasang ffmpeg nanti. Layar Edit menampilkan panduan yang sama sampai ffmpeg ditemukan.",
-  "ffmpegBundledLater": "Anda dapat lanjut sekarang. Penyuntingan video dan pembacaan rekaman rapat tetap nonaktif sampai {productName} dipasang ulang.",
+  "ffmpegLater": "Anda bisa lanjut sekarang dan memasang ffmpeg nanti. Panduan yang sama akan tampil di layar Edit sampai ffmpeg ditemukan.",
+  "ffmpegBundledLater": "Anda bisa lanjut sekarang. Fitur penyuntingan video dan pembacaan rekaman rapat baru aktif setelah {productName} dipasang ulang.",
   "keyTitle": "Tempel kunci {gatewayName} Anda",
-  "keyHelp": "Buka {gatewayName}, salin kunci, lalu tempel di sini. Kunci tetap di komputer ini.",
+  "keyHelp": "Buka {gatewayName}, salin kunci, lalu tempel di sini. Kunci hanya disimpan di komputer ini.",
   "keyLabel": "Kunci Anda",
   "keyPlaceholder": "Tempel di sini",
   "continue": "Periksa kunci ini",
   "recheck": "Periksa lagi",
-  "keySuccess": "Kunci ini berhasil.",
-  "tryTitle": "Coba salah satu",
-  "tryIntro": "Mulai di Chat. Yang lain tetap di menu.",
-  "tryStart": "Mulai di Chat",
+  "keySuccess": "Kunci ini berfungsi.",
+  "tryTitle": "Coba salah satunya",
+  "tryIntro": "Mulai dari Chat. Lainnya tetap ada di menu.",
+  "tryStart": "Mulai dari Chat",
   "tourNext": "Tur singkat menyusul. Anda bisa melewatinya.",
   "examples": {
     "chat": {
       "title": "Tanyakan sesuatu",
-      "hint": "Rencana, pertanyaan, atau balasan yang perlu Anda kirim."
+      "hint": "Untuk rencana, pertanyaan, atau balasan yang perlu Anda kirim."
     },
     "research": {
-      "title": "Riset sebuah topik",
-      "hint": "Catatan bersumber untuk pertanyaan apa pun."
+      "title": "Riset satu topik",
+      "hint": "Catatan lengkap dengan sumber untuk pertanyaan apa pun."
     },
     "images": {
       "title": "Buat gambar",
@@ -42,17 +42,17 @@
     }
   },
   "gate": {
-    "invalidKey": "Kunci itu tidak diterima. Periksa di {gatewayName}, lalu tempel lagi.",
-    "unreachable": "Kami tidak dapat menghubungi {gatewayName}. Periksa koneksi internet Anda, lalu coba lagi.",
-    "error": "Ada yang salah. Tunggu sebentar, lalu coba lagi."
+    "invalidKey": "Kunci itu tidak berfungsi. Periksa kembali di {gatewayName}, lalu tempel ulang.",
+    "unreachable": "Kami tidak bisa terhubung ke {gatewayName}. Periksa koneksi internet Anda, lalu coba lagi.",
+    "error": "Terjadi kesalahan. Tunggu sebentar, lalu coba lagi."
   },
   "desks": {
-    "title": "Atau buka meja lain",
-    "failed": "Tidak dapat membuka meja itu. Coba lagi."
+    "title": "Atau buka meja kerja lain",
+    "failed": "Tidak bisa membuka meja kerja itu. Coba lagi."
   },
   "components": {
     "title": "Menyiapkan {productName}",
-    "description": "Menambahkan pembaca lokal untuk berkas PDF, Word, PowerPoint, Excel, dan e-book. Setiap dokumen dibaca di mesin ini; tidak ada yang diunggah.",
+    "description": "Menambahkan pembaca lokal untuk file PDF, Word, PowerPoint, Excel, dan e-book. Setiap dokumen dibaca di komputer ini; tidak ada yang diunggah.",
     "size": "Unduhan sekali saja, sekitar {mb} MB.",
     "progress": "{done} dari {total} langkah · {percent}%",
     "duration": "{seconds} dtk",
@@ -60,28 +60,28 @@
       "check": "Memeriksa yang sudah tersedia",
       "download": "Mengunduh pembaca",
       "verify": "Memverifikasi unduhan",
-      "unpack": "Membongkar berkas",
+      "unpack": "Mengekstrak file",
       "probe": "Memuat pembaca",
-      "marker": "Merampungkan"
+      "marker": "Menyelesaikan setup"
     },
     "done": "Pembaca dokumen lokal sudah siap.",
     "alreadyRunning": "Jendela lain sedang menyiapkannya; proses itu akan selesai dengan sendirinya.",
     "retry": "Coba lagi",
-    "worksWithout": "{productName} tetap berjalan tanpanya — dokumen dibaca oleh pembaca lokal yang lebih sederhana sampai pembaca ini terpasang.",
+    "worksWithout": "{productName} tetap berjalan tanpanya. Sementara itu, dokumen dibaca oleh pembaca lokal yang lebih sederhana sampai pembaca ini terpasang.",
     "errors": {
-      "offline": "Tidak ada koneksi, sehingga pembaca tidak dapat diunduh.",
+      "offline": "Tidak ada koneksi, sehingga pembaca tidak bisa diunduh.",
       "download_failed": "Unduhan tidak selesai.",
-      "integrity_mismatch": "Unduhan tidak cocok dengan checksum-nya, jadi berkas itu dibuang.",
-      "unpack_failed": "Unduhan tidak dapat dibongkar.",
-      "probe_failed": "Pembaca sudah terpasang tetapi tidak mau dimuat.",
+      "integrity_mismatch": "Unduhan tidak cocok dengan checksum-nya, jadi file-nya dibuang.",
+      "unpack_failed": "Unduhan gagal diekstrak.",
+      "probe_failed": "Pembaca sudah terpasang tetapi gagal dimuat.",
       "unsupported_platform": "Tidak ada versi pembaca untuk sistem operasi ini.",
       "busy": "Jendela lain sedang menyiapkannya.",
-      "unknown": "Penyiapan pembaca tidak selesai."
+      "unknown": "Setup pembaca tidak selesai."
     }
   },
   "later": "Tambahkan nanti",
   "laterHint": "Anda bisa menempelkan kunci kapan saja di Pengaturan. Model tetap nonaktif sampai saat itu.",
   "keyTitleRestricted": "Kunci perusahaan Anda belum disiapkan",
   "keyHelpRestricted": "Pemilik atau admin menambahkan kunci perusahaan satu kali, dan semua orang di perusahaan memakainya.",
-  "keyRestricted": "Hanya pemilik atau admin yang dapat menambahkan kunci {gatewayName} perusahaan Anda. Minta salah satunya menambahkannya, lalu tekan Periksa lagi. Sementara itu Anda bisa melihat-lihat."
+  "keyRestricted": "Hanya pemilik atau admin yang bisa menambahkan kunci {gatewayName} perusahaan Anda. Minta salah satu dari mereka menambahkannya, lalu tekan Periksa lagi. Sementara itu, Anda bisa melihat-lihat dulu."
 }

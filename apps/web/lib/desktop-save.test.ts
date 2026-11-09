@@ -58,7 +58,7 @@ describe("throwIfSaveFailed", () => {
     try {
       throwIfSaveFailed({ ok: false, reason: "write-failed" });
     } catch (error) {
-      expect((error as Error).message).toMatch(/tidak dapat ditulis/i);
+      expect((error as Error).message).toMatch(/tidak bisa disimpan/i);
       return;
     }
     throw new Error("expected a refusal");

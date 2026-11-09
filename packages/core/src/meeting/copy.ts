@@ -73,21 +73,21 @@ export type TranscriptFileProblem =
 const TRANSCRIPT_FILE_PROBLEM: Record<TranscriptFileProblem, Record<AppLocale, string>> = {
   missing: {
     en: 'Attach one transcript file under the field "file".',
-    id: 'Lampirkan satu berkas transkrip pada kolom "file".',
+    id: 'Lampirkan satu file transkrip pada kolom "file".',
   },
   type: {
     en: "That file type is not a transcript. Use .txt, .md, .vtt, .srt, .docx or .pdf.",
-    id: "Jenis berkas itu bukan transkrip. Gunakan .txt, .md, .vtt, .srt, .docx, atau .pdf.",
+    id: "Jenis file itu bukan transkrip. Gunakan .txt, .md, .vtt, .srt, .docx, atau .pdf.",
   },
-  empty: { en: "That file is empty.", id: "Berkas itu kosong." },
-  no_text: { en: "No text could be read from that file.", id: "Tidak ada teks yang bisa dibaca dari berkas itu." },
+  empty: { en: "That file is empty.", id: "File itu kosong." },
+  no_text: { en: "No text could be read from that file.", id: "Tidak ada teks yang bisa dibaca dari file itu." },
   too_large: {
     en: "That transcript is too long. A transcript is capped at {max} characters.",
     id: "Transkrip itu terlalu panjang. Transkrip dibatasi {max} karakter.",
   },
   encoding: {
     en: "That text file is not UTF-8. Save it as UTF-8 and try again.",
-    id: "Berkas teks itu bukan UTF-8. Simpan sebagai UTF-8 lalu coba lagi.",
+    id: "File teks itu bukan UTF-8. Simpan sebagai UTF-8 lalu coba lagi.",
   },
   needs_ocr: {
     en: "This PDF is scanned, so it has no text to read. OCR is not available here, and nothing was sent anywhere.",
@@ -95,13 +95,13 @@ const TRANSCRIPT_FILE_PROBLEM: Record<TranscriptFileProblem, Record<AppLocale, s
   },
   encrypted: {
     en: "That file is password protected. Remove the password and try again.",
-    id: "Berkas itu dilindungi kata sandi. Hapus kata sandinya lalu coba lagi.",
+    id: "File itu dilindungi kata sandi. Hapus kata sandinya lalu coba lagi.",
   },
   unreadable: {
     en: "That file could not be read. It may be damaged.",
-    id: "Berkas itu tidak bisa dibaca. Mungkin rusak.",
+    id: "File itu tidak bisa dibaca. Mungkin rusak.",
   },
-  timeout: { en: "That file took too long to read.", id: "Berkas itu terlalu lama dibaca." },
+  timeout: { en: "That file took too long to read.", id: "File itu terlalu lama dibaca." },
 };
 
 /** The sentence the desk shows for a transcript file that was refused. Follows the desk locale. */

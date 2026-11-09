@@ -266,7 +266,7 @@ describe("2. invited, not yet activated", () => {
     const page = await emailStep(browserAt(portal), "s2-h", email, {}, "/authorize/email?lang=id");
 
     expect(words(page.text)).toContain(`Masukkan kode undangan yang kami kirim ke ${email}.`);
-    expect(page.text).toContain("Kirim ulang undangan ke e-mail saya");
+    expect(page.text).toContain("Kirim ulang undangan ke email saya");
   });
 });
 

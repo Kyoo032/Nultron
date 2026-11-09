@@ -323,7 +323,7 @@ describe("prepareChatImageHistory", () => {
         "A web link to an image can't be sent to the model. Attach the image itself.",
       );
       await expect(prepareChatImageHistory(tenant, history, gpt(media, { locale: "id" }))).rejects.toThrow(
-        "Tautan web ke gambar tidak dapat dikirim ke model. Lampirkan gambar itu sendiri.",
+        "Link web ke gambar tidak bisa dikirim ke model. Lampirkan gambar itu sendiri.",
       );
       expect(media.read).not.toHaveBeenCalled();
     });

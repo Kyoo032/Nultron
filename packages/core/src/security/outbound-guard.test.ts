@@ -145,7 +145,7 @@ describe("outbound guard: refusals", () => {
       reason: "outbound",
       kind: "private",
       message:
-        "Tidak dikirim: pencarian atau alamat halaman ini memuat data pribadi orang ini (frasa, angka, atau kode dari berkas, basis pengetahuan, atau obrolan sebelumnya). Cari lagi dengan istilah umum, tanpa data pribadi orang ini.",
+        "Tidak dikirim: pencarian atau alamat halaman ini memuat data pribadi orang ini (frasa, angka, atau kode dari file, Knowledge Base, atau obrolan sebelumnya). Cari lagi dengan istilah umum, tanpa data pribadi orang ini.",
     });
   });
 

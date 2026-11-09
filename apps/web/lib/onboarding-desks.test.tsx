@@ -136,7 +136,7 @@ describe("OnboardingDesks", () => {
     const markup = renderToStaticMarkup(
       <OnboardingDesks desks={[{ id: "ws-home", name: "Default" }]} busy={false} onOpen={() => {}} />,
     );
-    expect(markup).toContain("Atau buka meja lain");
+    expect(markup).toContain("Atau buka meja kerja lain");
   });
 
   it("disables the desks while a call is in flight", () => {

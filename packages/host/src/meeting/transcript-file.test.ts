@@ -56,7 +56,7 @@ describe("readTranscriptFile: text", () => {
     expect(english).toMatchObject({ code: "invalid_request", status: 400 });
     expect(english.message).toBe("That text file is not UTF-8. Save it as UTF-8 and try again.");
     const indonesian = await refusal(readTranscriptFile(file("talk.txt", bytes), "id"));
-    expect(indonesian.message).toBe("Berkas teks itu bukan UTF-8. Simpan sebagai UTF-8 lalu coba lagi.");
+    expect(indonesian.message).toBe("File teks itu bukan UTF-8. Simpan sebagai UTF-8 lalu coba lagi.");
   });
 
   it("refuses a file with no text in it, and an empty file", async () => {
@@ -150,7 +150,7 @@ describe("readTranscriptFile: what is refused before reading", () => {
     expect(mp3).toMatchObject({ code: "unsupported_content_type", status: 400 });
     expect(mp3.message).toBe("That file type is not a transcript. Use .txt, .md, .vtt, .srt, .docx or .pdf.");
     expect((await refusal(readTranscriptFile(file("talk.mp3", new Uint8Array([1])), "id"))).message).toBe(
-      "Jenis berkas itu bukan transkrip. Gunakan .txt, .md, .vtt, .srt, .docx, atau .pdf.",
+      "Jenis file itu bukan transkrip. Gunakan .txt, .md, .vtt, .srt, .docx, atau .pdf.",
     );
   });
 });
