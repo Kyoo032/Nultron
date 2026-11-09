@@ -26,7 +26,7 @@ const INVARIANTS = [
   "EndsSettled",
   "BilledIsMetered",
 ];
-const PROPERTIES = ["Termination"];
+const PROPERTIES = ["Termination", "StreamEnds"];
 const SWITCHES = [
   "DbYields",
   "StallGuard",
@@ -42,6 +42,8 @@ const SWITCHES = [
   "MeterAfterAttempt",
   "ClaimOnPersist",
   "CancelYieldsToClaim",
+  "StreamBound",
+  "QuietOnceSaved",
 ];
 
 class Drift extends Error {}
@@ -68,6 +70,40 @@ function before(text, anchorNeedle, openerNeedle, label) {
     throw new Drift(`${label}: cannot find "${openerNeedle}" before "${anchorNeedle}"`);
   }
   return text.slice(opener, anchor);
+}
+
+function blockAfter(text, opener) {
+  const start = text.indexOf(opener);
+  if (start < 0) {
+    return null;
+  }
+  let depth = 0;
+  for (let i = start + opener.length - 1; i < text.length; i += 1) {
+    if (text[i] === "{") {
+      depth += 1;
+    } else if (text[i] === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        return text.slice(start + opener.length, i);
+      }
+    }
+  }
+  return null;
+}
+
+function readStallWhileSaving(onStall) {
+  const opener = "if (finishing) {";
+  const branch = blockAfter(onStall, opener);
+  if (branch === null || onStall.indexOf(opener) > onStall.indexOf("settleRun(message)")) {
+    return { standsDown: false, closesStream: false, quietOnceSaved: false };
+  }
+  const unsaved = blockAfter(branch, "if (!persisted) {");
+  const outsideUnsaved = unsaved === null ? branch : branch.replace(`if (!persisted) {${unsaved}}`, "");
+  return {
+    standsDown: /return;\s*$/.test(branch) && !/settleRun|finishRun/.test(branch),
+    closesStream: branch.includes("closeQueue();"),
+    quietOnceSaved: unsaved !== null && !outsideUnsaved.includes("send("),
+  };
 }
 
 function readCode() {
@@ -138,6 +174,8 @@ function readCode() {
   ]
     .filter(([, slice]) => awaitBetweenGuardAndPersist(slice))
     .map(([label]) => label);
+  const whileSaving = readStallWhileSaving(onStall);
+  const yieldsToClaim = /if \(queueClosed \|\| finishing\) \{\s*return;/;
   const notes = [];
   if (!claimFirst) {
     notes.push("ClaimOnPersist is false: `finishing = true;` is not the first statement of persistAssistant.");
@@ -159,9 +197,9 @@ function readCode() {
     MeterOnSettledCompletion: onCompleted.includes("meterSettledRun();"),
     MeterAfterAttempt: afterAttempt.includes("meterSettledRun();"),
     ClaimOnPersist: claimFirst && awaitsBeforeClaim.length === 0,
-    CancelYieldsToClaim:
-      /if \(queueClosed \|\| finishing\) \{\s*return;/.test(onStall) &&
-      /if \(queueClosed \|\| finishing\) \{\s*return;/.test(onClientAbort),
+    CancelYieldsToClaim: (yieldsToClaim.test(onStall) || whileSaving.standsDown) && yieldsToClaim.test(onClientAbort),
+    StreamBound: whileSaving.closesStream,
+    QuietOnceSaved: whileSaving.quietOnceSaved,
   };
   return { switches, notes };
 }
@@ -308,7 +346,7 @@ function main() {
   }
   const run = check(jar, values, INVARIANTS, PROPERTIES);
   if (run.passed) {
-    console.log(`PASS: every invariant and Termination hold (${run.states} distinct states).`);
+    console.log(`PASS: every invariant, Termination and StreamEnds hold (${run.states} distinct states).`);
     process.exit(0);
   }
   console.log(run.output);
