@@ -59,13 +59,13 @@ empty (`:7`, `:14`).
 
 ### The wrap key
 
-`getLocalVaultKey(env)` (`packages/db/src/vault-key.ts:190-205`) returns the AES-256 wrapping key for
+`getLocalVaultKey(env)` (`packages/db/src/vault-key.ts:189-207`) returns the AES-256 wrapping key for
 every sealed envelope on the install. Its behaviour splits on `isServerMode(env)`, which is
 `AGENTFORGE_SERVER` being `1` or `true` (`packages/core/src/server-mode.ts:12-15`):
 
 - **On a desk** (not server mode, `:189-192`): `AGENTFORGE_SECRETS_KEY` when set, else the
   `.master-key` file. A set key under 32 bytes is derived all the same and warned about once, by `warnWeakDeskVaultKey`
-  (`:178-187`, SR-203). `readOrCreateMasterKeyFile` (`:164-175`) creates the data dir, and on first use
+  (`:178-187`, SR-203). `readOrCreateMasterKeyFile` (`:163-174`) creates the data dir, and on first use
   writes 32 random bytes as hex with mode `0o600` (`:168`), then reads it back trimmed (`:170`). A
   desk measures the floor for the warning and nothing else.
 - **In server mode** (`:193-204`): the env key is mandatory (`:193-195`, message at `:46-49`), and it
@@ -73,12 +73,12 @@ every sealed envelope on the install. Its behaviour splits on `isServerMode(env)
   variety check (`:201-203`). The `.master-key` fallback is never reached, because a file invented on a
   container layer disappears with the container and takes every sealed envelope with it.
 
-`vaultKeyEntropyBytes(secret)` (`:123-125`, over `decodeVaultKey`, `:132-147`) is the measurement: hex
+`vaultKeyEntropyBytes(secret)` (`:122-124`, over `decodeVaultKey`, `:132-147`) is the measurement: hex
 with an even digit count counts half its length, canonical base64 / base64url counts its decoded
 length, and everything else counts **zero**. "Canonical" means re-encoding the decoded bytes
-reproduces the same string modulo padding (`isCanonical`, `:119-121`) — that is what stops
+reproduces the same string modulo padding (`isCanonical`, `:118-120`) — that is what stops
 `Buffer.from(x, "base64")` from laundering a typed passphrase into "32 bytes". The known limit is
-written down above `isCanonical` (`:114-117`): every 44-character string over the base64 alphabet is
+written down above `isCanonical` (`:113-116`): every 44-character string over the base64 alphabet is
 valid base64 of 33 bytes and passes.
 
 Whatever comes back is hashed, not used raw: `wrappingKeyFromSecret` is
