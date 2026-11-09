@@ -1138,6 +1138,16 @@ Lanes: enterprise, tester.
 - **Proof.** `http-adapter.test.ts`: ten new cases, five failing before the fix, plus `http-adapter-socket.test.ts` (three cases over a real socket). Not driven against webdev in a browser or on a hosted server.
 - **Not done here.** The lookup-error fail-open and the DNS rebinding pin are SEC-004 4a, in `safe-fetch.ts`.
 
+## 2026-11-06: the SSRF guard pins the connection to the address it checked (SEC-004 part 4a)
+
+Lanes: enterprise, tester.
+
+- **What.** `fetchPublicHttps` resolved a hostname, judged the answer, and then `fetch` resolved the name a second time to connect. A DNS answer that changes between the two lookups (rebinding) could send the connection to a loopback, private, link-local or CGNAT address, and a lookup that threw was waved through. Now each hop is resolved once, a failed, empty, non-IP or private answer is refused with `400 invalid_endpoint`, and the request carries an undici `Agent` whose `connect.lookup` returns only that vetted list. The socket never asks DNS. Knowledge URL ingest, `web_fetch` and Research, the media mirror and the component download all go through it and keep their signatures.
+- **Behaviour change.** A name that does not resolve is now a 400 "Could not resolve this URL's host" instead of a network error from `fetch`. The sentence is English only, like the private-address sentence beside it, because both are server error text and not catalog copy. A test that reaches the guard with a fake `fetchImpl` and no `lookupImpl` now needs a `lookupImpl` or a `node:dns/promises` mock; `components/download.test.ts` and `components/install.test.ts` got the mock.
+- **Dependency.** `undici` 6.29.1 is a direct dependency of `@agentforge/core`, the version SR-198 already pins. The lockfile gains one importer line.
+- **Proof.** `safe-fetch.test.ts`: 5 of 25 failed before the fix, 32 of 32 pass after. A `pinnedAgent` for a name no resolver can answer reached a loopback listener, so the pin reaches the socket on Node 24 with the global `fetch`. A one-off run with real DNS and TLS: `https://example.com/` 200, `https://localtest.me/` refused as private, an `.invalid` name refused as unresolvable. Map: `maps/hosted-security-controls.md` § 7. Register: SR-201; OWASP A10-3 and A10-6 updated.
+- **Not driven.** Node 22 (the image) and a hosted server. The port policy (443 only, a list, or refuse known internal ports) is not decided. Egress filtering is SR-97.
+
 ## The portal keeps serving when Postgres ends an idle pool connection, 2026-11-09 (branch `claude/fix-portal-test-teardown`, SR-200)
 
 Lanes: enterprise.
