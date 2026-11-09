@@ -1,9 +1,11 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import Database from "better-sqlite3";
 import { encryptJson, wrappingKeyFromSecret } from "@agentforge/core";
-import { DESK_VAULT_KEY_TOO_WEAK } from "@agentforge/db/vault-key";
+import { ensureSchema } from "@agentforge/db/ensure-schema";
+import { SERVER_VAULT_KEY_TOO_WEAK } from "@agentforge/db/vault-key";
 import {
   loadSettings,
   saveSettings,
@@ -13,6 +15,11 @@ import {
   saveOwnerLocale,
   clearGatewayKeyEverywhere,
 } from "./settings-store";
+import {
+  registerTenantStateSql,
+  resetTenantStateAdoptionForTests,
+  resetTenantStateSqlForTests,
+} from "./tenant-state-store";
 
 const SECRET = "a".repeat(64);
 const PLAIN_KEY = "sk-test-plaintext-should-not-appear";
@@ -21,11 +28,13 @@ describe("settings-store", () => {
   let dir: string;
   let previousPath: string | undefined;
   let previousKey: string | undefined;
+  let previousServer: string | undefined;
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), "af-settings-"));
     previousPath = process.env.AGENTFORGE_SETTINGS_PATH;
     previousKey = process.env.AGENTFORGE_SECRETS_KEY;
+    previousServer = process.env.AGENTFORGE_SERVER;
     process.env.AGENTFORGE_SETTINGS_PATH = dir;
     process.env.AGENTFORGE_SECRETS_KEY = SECRET;
   });
@@ -41,6 +50,12 @@ describe("settings-store", () => {
     } else {
       process.env.AGENTFORGE_SECRETS_KEY = previousKey;
     }
+    if (previousServer === undefined) {
+      delete process.env.AGENTFORGE_SERVER;
+    } else {
+      process.env.AGENTFORGE_SERVER = previousServer;
+    }
+    vi.restoreAllMocks();
     rmSync(dir, { recursive: true, force: true });
   });
 
@@ -80,27 +95,73 @@ describe("settings-store", () => {
     expect(readFileSync(join(dir, "settings.enc.unreadable"), "utf8")).not.toContain(PLAIN_KEY);
   });
 
-  it("refuses a weak AGENTFORGE_SECRETS_KEY and leaves settings.enc where it is", () => {
+  it("opens settings.enc sealed under a short AGENTFORGE_SECRETS_KEY on a desk, warns, and keeps saving", () => {
     const encPath = join(dir, "settings.enc");
-    const envelope = encryptJson({ openaiApiKey: PLAIN_KEY }, wrappingKeyFromSecret(SECRET));
+    const short = "short-pass";
+    const envelope = encryptJson({ openaiApiKey: PLAIN_KEY }, wrappingKeyFromSecret(short));
     writeFileSync(encPath, `${JSON.stringify(envelope)}\n`, "utf8");
-    const before = readFileSync(encPath, "utf8");
-    process.env.AGENTFORGE_SECRETS_KEY = "hunter2";
+    process.env.AGENTFORGE_SECRETS_KEY = short;
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    expect(() => loadSettings()).toThrow(DESK_VAULT_KEY_TOO_WEAK);
-    expect(() => saveSettings({ openaiApiKey: "sk-after-refusal" })).toThrow(DESK_VAULT_KEY_TOO_WEAK);
+    expect(loadSettings().openaiApiKey).toBe(PLAIN_KEY);
+    saveSettings({ openaiApiKey: "sk-after-warning" });
+    expect(loadSettings().openaiApiKey).toBe("sk-after-warning");
     expect(existsSync(`${encPath}.unreadable`)).toBe(false);
-    expect(readFileSync(encPath, "utf8")).toBe(before);
+    expect(readFileSync(encPath, "utf8")).not.toContain("sk-after-warning");
+    expect(warn.mock.calls.length).toBeLessThanOrEqual(1);
+    for (const call of warn.mock.calls) {
+      expect(String(call[0])).not.toContain(short);
+    }
   });
 
-  it("refuses a weak AGENTFORGE_SECRETS_KEY before it judges what the file holds", () => {
-    const encPath = join(dir, "settings.enc");
-    writeFileSync(encPath, "not json at all", "utf8");
-    process.env.AGENTFORGE_SECRETS_KEY = "hunter2";
+  describe("in server mode", () => {
+    let sqlite: Database.Database;
+    const scope = { tenantId: "local-tenant", workspaceId: "ws-home" };
 
-    expect(() => loadSettings()).toThrow(DESK_VAULT_KEY_TOO_WEAK);
-    expect(existsSync(`${encPath}.unreadable`)).toBe(false);
-    expect(readFileSync(encPath, "utf8")).toBe("not json at all");
+    function seed(value: string) {
+      sqlite
+        .prepare("INSERT OR IGNORE INTO tenants (id, slug, name, status, created_at) VALUES (?, ?, ?, ?, ?)")
+        .run(scope.tenantId, scope.tenantId, scope.tenantId, "active", Date.now());
+      sqlite
+        .prepare("INSERT INTO tenant_state (tenant_id, key, value, updated_at) VALUES (?, 'settings', ?, ?)")
+        .run(scope.tenantId, value, Date.now());
+    }
+
+    function stored(): string {
+      return (
+        sqlite.prepare("SELECT value FROM tenant_state WHERE tenant_id = ?").get(scope.tenantId) as { value: string }
+      ).value;
+    }
+
+    beforeEach(() => {
+      sqlite = new Database(":memory:");
+      ensureSchema(sqlite);
+      registerTenantStateSql(sqlite as unknown as Parameters<typeof registerTenantStateSql>[0]);
+      resetTenantStateAdoptionForTests();
+      process.env.AGENTFORGE_SERVER = "1";
+      process.env.AGENTFORGE_SECRETS_KEY = "hunter2";
+    });
+
+    afterEach(() => {
+      resetTenantStateSqlForTests();
+      sqlite.close();
+    });
+
+    it("still refuses a weak AGENTFORGE_SECRETS_KEY and leaves the sealed settings where they are", () => {
+      seed(`${JSON.stringify(encryptJson({ openaiApiKey: PLAIN_KEY }, wrappingKeyFromSecret(SECRET)))}\n`);
+      const before = stored();
+
+      expect(() => loadSettings(scope)).toThrow(SERVER_VAULT_KEY_TOO_WEAK);
+      expect(() => saveSettings({ openaiApiKey: "sk-after-refusal" }, scope)).toThrow(SERVER_VAULT_KEY_TOO_WEAK);
+      expect(stored()).toBe(before);
+    });
+
+    it("refuses a weak key before it judges what is stored", () => {
+      seed("not json at all");
+
+      expect(() => loadSettings(scope)).toThrow(SERVER_VAULT_KEY_TOO_WEAK);
+      expect(stored()).toBe("not json at all");
+    });
   });
 
   it("keeps gateway keys isolated per workspace", () => {

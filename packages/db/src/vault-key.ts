@@ -53,11 +53,10 @@ export const SERVER_VAULT_KEY_TOO_WEAK =
   "key generator produces them (`openssl rand -hex 32`). A passphrase, or anything else that is not " +
   "a canonical encoding of at least 32 bytes, is refused in server mode.";
 
-export const DESK_VAULT_KEY_TOO_WEAK =
-  "AGENTFORGE_SECRETS_KEY is set but is not at least 32 random bytes written as hex or base64, so it " +
-  "would become a guessable wrap key for every sealed envelope. Generate one with `openssl rand -hex 32`, " +
-  "or unset the variable to use the auto-created .master-key file. A new key cannot open data sealed " +
-  "under the old one.";
+export const DESK_VAULT_KEY_WEAK_WARNING =
+  "AGENTFORGE_SECRETS_KEY is set but is not at least 32 random bytes written as hex or base64, so the wrap " +
+  "key for every sealed envelope on this desk is guessable. Generate one with `openssl rand -hex 32`. A new " +
+  "key cannot open data sealed under the old one, so keep this value until a re-key path exists.";
 
 /**
  * A key that is the right LENGTH but plainly not random: `"a".repeat(64)`, `0000…`, `deadbeef`
@@ -174,20 +173,23 @@ function readOrCreateMasterKeyFile(env: EnvLike): string {
   return secret;
 }
 
-export function assertDeskVaultKeyUsable(env: EnvLike = process.env): void {
-  if (isServerMode(env)) {
+let weakDeskKeyWarned = false;
+
+export function warnWeakDeskVaultKey(env: EnvLike = process.env, warn: (message: string) => void = console.warn): void {
+  if (weakDeskKeyWarned || isServerMode(env)) {
     return;
   }
   const fromEnv = env.AGENTFORGE_SECRETS_KEY?.trim();
   if (fromEnv && vaultKeyEntropyBytes(fromEnv) < MIN_VAULT_KEY_BYTES) {
-    throw new Error(DESK_VAULT_KEY_TOO_WEAK);
+    weakDeskKeyWarned = true;
+    warn(DESK_VAULT_KEY_WEAK_WARNING);
   }
 }
 
 export function getLocalVaultKey(env: EnvLike = process.env): Buffer {
   const fromEnv = env.AGENTFORGE_SECRETS_KEY?.trim();
   if (!isServerMode(env)) {
-    assertDeskVaultKeyUsable(env);
+    warnWeakDeskVaultKey(env);
     return wrappingKeyFromSecret(fromEnv || readOrCreateMasterKeyFile(env));
   }
   if (!fromEnv) {
