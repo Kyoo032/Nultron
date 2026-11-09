@@ -34,7 +34,7 @@ No `act` wrapper exists, because no workflow exists to run.
 |---|---|---|---|
 | nixpkgs | — | `nixos-26.05` at `c56a87d8` (2026-11-05), in `flake.lock` | — |
 | Node | `node:22.23.4-bookworm-slim` | `nodejs_22` / `nodejs-slim_22` 22.23.4 | yes, version; built from source instead of the official binary |
-| pnpm | 9.15.9 through corepack | `pnpm_9` 9.15.9, shebang moved onto Node 22 | yes. nixpkgs marks 9.15.9 insecure; permitted by exact name only ([SR-199](security-register.md#sr-199)) |
+| pnpm | 9.15.9 through corepack | `pnpm_9` 9.15.9, shebang moved onto Node 22 | yes. nixpkgs marks 9.15.9 insecure; permitted by exact name only ([SR-208](security-register.md#sr-208)) |
 
 `nix/pkgs/pins.nix` reads `ARG NODE_VERSION` and `ARG PNPM_VERSION` from both Dockerfiles and
 `packageManager` from `package.json`. Evaluation fails if they disagree with each other or with nixpkgs, so a

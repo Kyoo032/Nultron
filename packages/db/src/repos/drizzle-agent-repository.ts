@@ -24,8 +24,9 @@ function openText(value: string): string {
   } catch {
     candidate = value;
   }
+  const key = getLocalVaultKey();
   try {
-    const opened = openPayload<unknown>(candidate, getLocalVaultKey());
+    const opened = openPayload<unknown>(candidate, key);
     return typeof opened === "string" ? opened : value;
   } catch {
     return "";

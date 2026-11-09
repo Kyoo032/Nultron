@@ -371,6 +371,7 @@
     "stepLimitEmpty": "No tool finished, but the answer didn't. Ask me to continue and I will pick up from where I stopped.",
     "stepLimitAnd": "and",
     "interrupted": "The tool steps above ran, but I could not finish the answer.\n\nReason: {reason}\n\nSend \"continue\" and I will try again.",
-    "modelFallback": "{from} is unavailable; used {to} for this answer."
+    "modelFallback": "{from} is unavailable; used {to} for this answer.",
+    "saveTimeout": "Saving this reply is taking too long. Reload the chat in a minute to see whether it was kept."
   }
 }

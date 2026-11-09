@@ -24,6 +24,27 @@ describe("redactCredentials: the shapes this app handles", () => {
     expect(out).toBe("session [REDACTED] ends");
   });
 
+  it("masks a JWT after a hyphen, after a long dotted prefix and after dots, and in a header line", () => {
+    expect(redactCredentials(`x-${JWT}`)).toBe("x-[REDACTED]");
+    expect(redactCredentials(`abcdefghijkl.${JWT}`)).toBe("abcdefghijkl.[REDACTED]");
+    expect(redactCredentials(`token...${JWT}`)).toBe("token...[REDACTED]");
+    expect(redactCredentials(`?token=${JWT}&x=1`)).toBe("?token=[REDACTED]&x=1");
+    expect(redactCredentials(`"id_token":"${JWT}"`)).toBe(`"id_token":"[REDACTED]"`);
+    expect(redactCredentials(`Bearer ${JWT}`)).toBe("Bearer [REDACTED]");
+  });
+
+  it("masks a JWT that follows a header-like prefix whose own part is too short to be one", () => {
+    expect(redactCredentials(`eyJabc.${JWT}`)).toBe("eyJabc.[REDACTED]");
+    expect(redactCredentials(`${JWT}.tail`)).toBe("[REDACTED].tail");
+  });
+
+  it("leaves a header that sits inside a word, or has too few parts, alone", () => {
+    const kept = [`a_${JWT}`, `abc${JWT}`, "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0", "eyJabc.def.ghi"];
+    for (const text of kept) {
+      expect(redactCredentials(text), text).toBe(text);
+    }
+  });
+
   it("masks a Telegram bot token", () => {
     expect(redactCredentials(`bot ${TELEGRAM} here`)).toBe("bot [REDACTED] here");
     expect(redactCredentials(`https://api.telegram.org/bot${TELEGRAM}/getUpdates`)).not.toContain(TELEGRAM);

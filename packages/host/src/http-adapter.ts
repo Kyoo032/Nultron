@@ -194,8 +194,8 @@ function hasNonAuthorityCharacter(value: string): boolean {
 /**
  * True when a Host header is present and is not `host[:port]`.
  *
- * Absent is a different question and is not answered here: HTTP/1.0 may omit it, and the mutating
- * rules below already refuse a write that carries none. Present and empty, present with a space, a
+ * Absent is a different question and is not answered here: HTTP/1.0 may omit it, and `hostRejection`
+ * below already refuses any `/api` request that carries none. Present and empty, present with a space, a
  * slash, userinfo, an unclosed `[` or a port past 65535 is malformed. The character set is left to
  * the URL parser rather than a hand-written grammar, so a Docker service name such as `my_service`
  * still passes.
@@ -629,6 +629,12 @@ export async function handleNodeRequest(req: IncomingMessage, res: ServerRespons
     const { handleBootEditJobs } = await import("./handlers/edit");
     void handleBootEditJobs();
   }
+  if (!CSRF_EXEMPT_PATHS.has(path)) {
+    const rejection = hostRejection(header(req, "host"), serverMode);
+    if (rejection) {
+      return respondRejection(res, { status: 403, ...rejection }, context);
+    }
+  }
   if (!SAFE_METHODS.has(method) && !CSRF_EXEMPT_PATHS.has(path)) {
     const rejection = mutatingRejection(req, path, cookies, csrfMode, presentedSessionId);
     if (rejection) {
@@ -749,14 +755,6 @@ function logAuthFailure(result: HostResult, context: RequestContext): void {
 type Rejection = { readonly code: string; readonly message: string };
 
 /**
- * The one place the two rules are chosen between (docs/internal/web-migration-plan.md Phase 1).
- *
- * Off server mode: the local rule, unchanged — a missing Origin is same-machine and the Host must be
- * loopback. In server mode: the Origin must be on the configured allowlist (a missing one is
- * rejected), the Host must be one of those origins' hosts, and the double-submit CSRF token must
- * match. The `x-agentforge-transport` requirement on the destructive routes is unchanged in both.
- */
-/**
  * Phase 5 lane B: paths a mutating request may reach without an Origin on the allowlist and
  * without a CSRF token (decision doc §3(c), the first of the webhook's three exemptions).
  *
@@ -769,6 +767,15 @@ type Rejection = { readonly code: string; readonly message: string };
  */
 const CSRF_EXEMPT_PATHS: ReadonlySet<string> = new Set(["/api/v1/billing/webhook"]);
 
+function hostRejection(host: string | undefined, serverMode: boolean): Rejection | null {
+  if (serverMode) {
+    return isAllowedWebHostHeader(host, trustedOrigins())
+      ? null
+      : { code: "origin_forbidden", message: ORIGIN_FORBIDDEN_MESSAGE };
+  }
+  return isLoopbackHostHeader(host) ? null : { code: "forbidden", message: LOCAL_ONLY_MESSAGE };
+}
+
 function mutatingRejection(
   req: IncomingMessage,
   path: string,
@@ -777,20 +784,18 @@ function mutatingRejection(
   sessionId: string | null,
 ): Rejection | null {
   const origin = header(req, "origin");
-  const host = header(req, "host");
   // The hosted deployment is the HTTPS one, so one flag carries both meanings: it selects the web
   // rules here and the `Secure` / `__Host-` cookie those rules check.
   const serverMode = csrfMode.secure;
   if (serverMode) {
-    const allowlist = trustedOrigins();
-    if (!isAllowedWebOrigin(origin, allowlist) || !isAllowedWebHostHeader(host, allowlist)) {
+    if (!isAllowedWebOrigin(origin, trustedOrigins())) {
       return { code: "origin_forbidden", message: ORIGIN_FORBIDDEN_MESSAGE };
     }
     const csrf = checkCsrfToken(cookies, header(req, CSRF_HEADER), csrfMode, sessionId);
     if (!csrf.ok) {
       return { code: csrf.code, message: csrf.message };
     }
-  } else if (!isAllowedMutatingApiRequest(origin, header(req, "referer")) || !isLoopbackHostHeader(host)) {
+  } else if (!isAllowedMutatingApiRequest(origin, header(req, "referer"))) {
     return { code: "forbidden", message: LOCAL_ONLY_MESSAGE };
   }
   // The reset routes wipe local data, so they also demand a header no cross-site HTML form can send.

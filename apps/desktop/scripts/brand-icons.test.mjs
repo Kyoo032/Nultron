@@ -387,16 +387,12 @@ test("plan: the ladder, the small/master split and the replacement files", () =>
   // every repo path from the brief maps to a file, at the size that path has today
   const byPath = Object.fromEntries(REPLACEMENTS.map((r) => [r.repo, r]));
   const png1024 = [
-    "apps/desktop/branding/agentforge/icon.png",
-    "apps/desktop/branding/agentforge/mark.png",
     "apps/desktop/build/icon.png",
   ];
   for (const path of png1024) assert.deepEqual([byPath[path].width, byPath[path].height], [1024, 1024], path);
   // the display logo is the tile at 256 px (the packaged preload inlines it as base64 at every launch), kit file mark-256
   for (const path of [
     "apps/web/public/brand/logo.png",
-    "apps/desktop/resources/brand/logo.png",
-    "apps/desktop/branding/agentforge/logo.png",
     "apps/desktop/splash/logo.png",
     "apps/portal/assets/logo.png",
   ]) {
@@ -407,18 +403,11 @@ test("plan: the ladder, the small/master split and the replacement files", () =>
   }
   assert.equal(byPath["apps/web/public/brand/favicon-180.png"].file, "favicon-180.png");
   assert.equal(byPath["apps/web/public/brand/favicon.ico"].file, "favicon.ico");
-  for (const path of ["apps/desktop/branding/agentforge/icon.icns", "apps/desktop/build/icon.icns"]) {
-    assert.equal(byPath[path].file, "icon.icns", path);
-  }
+  assert.equal(byPath["apps/desktop/build/icon.icns"].file, "icon.icns");
   assert.deepEqual([byPath["apps/desktop/logo.png"].width, byPath["apps/desktop/logo.png"].height], [160, 160]);
-  for (const path of [
-    "apps/desktop/branding/agentforge/icon.ico",
-    "apps/desktop/build/icon.ico",
-    "apps/desktop/splash/icon.ico",
-  ]) {
+  for (const path of ["apps/desktop/build/icon.ico", "apps/desktop/splash/icon.ico"]) {
     assert.equal(byPath[path].file, "icon.ico", path);
   }
-  assert.equal(byPath["apps/desktop/branding/agentforge/mark.png"].art, "mark", "the mark PNG is drawn from mark.svg");
   assert.equal(new Set(p.replacements.map((r) => r.file)).size, p.replacements.length, "shared files render once");
 });
 
@@ -646,7 +635,6 @@ test("buildIconSet: every file, PNG sizes, which master each size comes from", (
     ...MARK_SIZES.map((s) => `mark/mark-${s}.png`),
     "replace/logo-1024.png",
     "replace/logo-160.png",
-    "replace/mark-1024.png",
   ];
   assert.deepEqual([...files.keys()].sort(), expected.sort());
 
@@ -762,12 +750,6 @@ test("buildIconSet: apple-touch icon is opaque in the rim colour, marks are the 
   assert.deepEqual([logo1024.width, logo1024.height], [1024, 1024]);
   assert.equal(logo1024.rgba[3], 0, "transparent corners");
   assert.equal(pixel(logo1024, 512, 0)[3], 255, "and the tile is edge to edge, like the file it replaces");
-  const mark = decodeFile(files, "replace/mark-1024.png");
-  const box = alphaBounds(mark.rgba, 1024, 1024, 200);
-  assert.ok(
-    Math.abs(box.width - Math.round(1024 * 0.64)) <= 3,
-    `mark.png stand-in holds the tile at 64% (${box.width})`,
-  );
 });
 
 test("buildIconSet: exact-size overrides win, bad inputs are refused", () => {
@@ -871,10 +853,10 @@ test("parseArgs", () => {
   assert.throws(() => parseArgs(["--src", "a", "--out", "b", "--small-max", "big"]), /whole number/);
 });
 
-test("parseArgs: with neither --src nor --png-src the PNG source is the master next to the brand", () => {
+test("parseArgs: with neither --src nor --png-src the PNG source is the folder that holds the master", () => {
   const def = parseArgs(["--out", "out"]);
   assert.equal(def.pngSrc, DEFAULT_PNG_SRC);
-  assert.match(DEFAULT_PNG_SRC.replace(/\\/g, "/"), /apps\/desktop\/branding\/agentforge\/source$/);
+  assert.match(DEFAULT_PNG_SRC.replace(/\\/g, "/"), /docs\/internal\/brand\/nultron\/reference$/);
   assert.equal(def.src, "");
   assert.equal(def.apply, false);
   assert.equal(def.check, false);

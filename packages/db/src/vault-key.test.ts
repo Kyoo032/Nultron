@@ -3,7 +3,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { wrappingKeyFromSecret } from "@agentforge/core";
-import { afterAll, afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import {
   getLocalVaultKey,
   hasKeyLikeVariety,
@@ -240,9 +240,69 @@ describe("getLocalVaultKey outside server mode", () => {
     expect(getLocalVaultKey(env)).toEqual(first);
   });
 
-  it("still accepts a short env key on a desk", () => {
-    const env = { AGENTFORGE_DATA_DIR: dataDir(), AGENTFORGE_SECRETS_KEY: "hunter2" };
-    expect(getLocalVaultKey(env)).toEqual(wrappingKeyFromSecret("hunter2"));
+  it("derives the wrap key from a passphrase in AGENTFORGE_SECRETS_KEY on a desk exactly as before, and writes no file", () => {
+    const dir = dataDir();
+    for (const passphrase of [
+      "hunter2",
+      "correct horse battery staple correct horse!!",
+      "phase3-seal-regression-key",
+    ]) {
+      const env = { AGENTFORGE_DATA_DIR: dir, AGENTFORGE_SECRETS_KEY: passphrase };
+      expect(getLocalVaultKey(env), passphrase).toEqual(wrappingKeyFromSecret(passphrase));
+    }
+    expect(existsSync(join(dir, MASTER_KEY_FILE))).toBe(false);
+  });
+
+  it("derives the wrap key from a real but short key on a desk, in either encoding", () => {
+    const short = randomBytes(31);
+    for (const encoded of [short.toString("hex"), short.toString("base64"), short.toString("base64url")]) {
+      const env = { AGENTFORGE_DATA_DIR: dataDir(), AGENTFORGE_SECRETS_KEY: encoded };
+      expect(getLocalVaultKey(env)).toEqual(wrappingKeyFromSecret(encoded));
+    }
+  });
+
+  it("accepts a generated key on a desk in hex, base64 and base64url, and writes no .master-key", () => {
+    const key = randomBytes(32);
+    for (const encoded of [key.toString("hex"), key.toString("base64"), key.toString("base64url")]) {
+      const dir = dataDir();
+      const env = { AGENTFORGE_DATA_DIR: dir, AGENTFORGE_SECRETS_KEY: ` ${encoded} ` };
+      expect(getLocalVaultKey(env)).toEqual(wrappingKeyFromSecret(encoded));
+      expect(existsSync(join(dir, MASTER_KEY_FILE))).toBe(false);
+    }
+  });
+
+  it("treats a blank AGENTFORGE_SECRETS_KEY as unset and falls back to .master-key", () => {
+    for (const blank of ["", "   "]) {
+      const dir = dataDir();
+      const key = getLocalVaultKey({ AGENTFORGE_DATA_DIR: dir, AGENTFORGE_SECRETS_KEY: blank });
+      expect(key).toHaveLength(32);
+      expect(existsSync(join(dir, MASTER_KEY_FILE))).toBe(true);
+    }
+  });
+
+  it("accepts what looks like a key without judging how random it is, which is how the desk fixtures work", () => {
+    const patterns = ["d".repeat(64), "0".repeat(64), "password".repeat(8)];
+    for (const pattern of patterns) {
+      const env = { AGENTFORGE_DATA_DIR: dataDir(), AGENTFORGE_SECRETS_KEY: pattern };
+      expect(getLocalVaultKey(env), pattern).toEqual(wrappingKeyFromSecret(pattern));
+      expect(() => getLocalVaultKey({ ...env, AGENTFORGE_SERVER: "1" }), pattern).toThrow(SERVER_VAULT_KEY_NOT_RANDOM);
+    }
+  });
+
+  it("accepts a typed passphrase of 44 base64-alphabet characters, because it is a canonical encoding of 33 bytes", () => {
+    const passphrases = [
+      "correcthorsebatterystaplecorrecthorsebattery",
+      "MyCompanyNultronDeskPasswordForTheOffice2026",
+    ];
+    for (const passphrase of passphrases) {
+      expect(passphrase).toHaveLength(44);
+      expect(vaultKeyEntropyBytes(passphrase), passphrase).toBe(33);
+      const env = { AGENTFORGE_DATA_DIR: dataDir(), AGENTFORGE_SECRETS_KEY: passphrase };
+      expect(getLocalVaultKey(env), passphrase).toEqual(wrappingKeyFromSecret(passphrase));
+      expect(getLocalVaultKey({ ...env, AGENTFORGE_SERVER: "1" }), passphrase).toEqual(
+        wrappingKeyFromSecret(passphrase),
+      );
+    }
   });
 
   /**
@@ -273,5 +333,86 @@ describe("getLocalVaultKey outside server mode", () => {
     const written = randomBytes(32).toString("hex");
     writeFileSync(join(dir, MASTER_KEY_FILE), `${written}\n`, "utf8");
     expect(getLocalVaultKey({ AGENTFORGE_DATA_DIR: dir })).toEqual(wrappingKeyFromSecret(written));
+  });
+});
+
+describe("warnWeakDeskVaultKey", () => {
+  const absent = join(tmpdir(), "agentforge-vault-key-never-created");
+
+  async function freshModule() {
+    vi.resetModules();
+    return import("./vault-key");
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("warns for a passphrase and a short key, names the variable and the generator, and never prints the value", async () => {
+    for (const weak of ["hunter2", randomBytes(31).toString("hex"), randomBytes(31).toString("base64")]) {
+      const { warnWeakDeskVaultKey, DESK_VAULT_KEY_WEAK_WARNING } = await freshModule();
+      const lines: string[] = [];
+      warnWeakDeskVaultKey({ AGENTFORGE_DATA_DIR: absent, AGENTFORGE_SECRETS_KEY: weak }, (line) => lines.push(line));
+      expect(lines, weak).toEqual([DESK_VAULT_KEY_WEAK_WARNING]);
+      expect(lines[0]).toContain("AGENTFORGE_SECRETS_KEY");
+      expect(lines[0]).toContain("guessable");
+      expect(lines[0]).toContain("openssl rand -hex 32");
+      expect(lines[0]).toContain("cannot open data sealed under the old one");
+      expect(lines[0]).not.toContain(weak);
+    }
+  });
+
+  it("warns once per process however many times it is asked", async () => {
+    const { warnWeakDeskVaultKey } = await freshModule();
+    const lines: string[] = [];
+    const env = { AGENTFORGE_DATA_DIR: absent, AGENTFORGE_SECRETS_KEY: "hunter2" };
+    for (let i = 0; i < 5; i += 1) {
+      warnWeakDeskVaultKey(env, (line) => lines.push(line));
+    }
+    expect(lines).toHaveLength(1);
+  });
+
+  it("is silent for a usable key, an unset variable and a blank one", async () => {
+    const { warnWeakDeskVaultKey } = await freshModule();
+    const usable = randomBytes(32).toString("hex");
+    const lines: string[] = [];
+    for (const value of [usable, ` ${usable} `, undefined, "", "   "]) {
+      warnWeakDeskVaultKey({ AGENTFORGE_DATA_DIR: absent, AGENTFORGE_SECRETS_KEY: value }, (line) => lines.push(line));
+    }
+    expect(lines).toEqual([]);
+  });
+
+  it("reads the environment only: no data dir, no .master-key", async () => {
+    const { warnWeakDeskVaultKey } = await freshModule();
+    warnWeakDeskVaultKey({ AGENTFORGE_DATA_DIR: absent, AGENTFORGE_SECRETS_KEY: "hunter2" }, () => {});
+    expect(existsSync(absent)).toBe(false);
+  });
+
+  it("stays silent in server mode, where getLocalVaultKey refuses the key instead", async () => {
+    const { warnWeakDeskVaultKey, getLocalVaultKey: derive, SERVER_VAULT_KEY_TOO_WEAK: refusal } = await freshModule();
+    const lines: string[] = [];
+    const env = { AGENTFORGE_SERVER: "1", AGENTFORGE_SECRETS_KEY: "hunter2" };
+    warnWeakDeskVaultKey(env, (line) => lines.push(line));
+    expect(lines).toEqual([]);
+    expect(() => derive(env)).toThrow(refusal);
+  });
+
+  it("is what getLocalVaultKey logs on a desk, once, through console.warn", async () => {
+    const { getLocalVaultKey: derive } = await freshModule();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const env = { AGENTFORGE_DATA_DIR: dataDir(), AGENTFORGE_SECRETS_KEY: "hunter2" };
+    derive(env);
+    derive(env);
+    derive(env);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0]?.[0])).not.toContain("hunter2");
+  });
+
+  it("does not warn when getLocalVaultKey derives a usable desk key", async () => {
+    const { getLocalVaultKey: derive } = await freshModule();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    derive({ AGENTFORGE_DATA_DIR: dataDir(), AGENTFORGE_SECRETS_KEY: randomBytes(32).toString("hex") });
+    derive({ AGENTFORGE_DATA_DIR: dataDir() });
+    expect(warn).not.toHaveBeenCalled();
   });
 });
