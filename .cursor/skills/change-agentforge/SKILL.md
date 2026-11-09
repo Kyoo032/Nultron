@@ -13,7 +13,7 @@ pstack stays in the Cursor plugin. Call it by path, never copy it: `~/.cursor/pl
 
 ## Step 0: where am I, and which row
 
-Run `pnpm where` (`scripts/where-am-i.mjs`, added on branch `chore/agent-guardrails`). Until it lands, run `git rev-parse --show-toplevel` and `git branch --show-current`. The folder and branch must match a row in `AGENTS.md` "Where am I?". If they match none, stop and ask Rizky.
+Run `pnpm where` (`scripts/where-am-i.mjs`, on `main`). On an older branch without it, run `git rev-parse --show-toplevel` and `git branch --show-current`. The folder and branch must match a row in `AGENTS.md` "Where am I?". If they match none, stop and ask Rizky.
 
 Then pick the row in `AGENTS.md` "Where a change goes" that fits the change. Short form:
 
@@ -38,7 +38,7 @@ Then pick the row in `AGENTS.md` "Where a change goes" that fits the change. Sho
 6. **Prove it by driving.** A green `tsc` or a worker summary is not proof. Follow [`verify-agentforge`](../verify-agentforge/SKILL.md): doctor, drive the recipe, keep evidence. A tester change is driven on the staging instance (the tester's staging subdomain, name pending). Say "not driven" when you did not.
 7. **Refresh the docs in the same change.** Rewrite the affected section of the map page and bump its `Last verified: <date> at <sha>` line; update the matching `.cursor/skills/verify-agentforge/features/<feature>.md`; append to `docs/internal/unreleased.md` and name the lanes. If you touched a tester shared file or added one, update `lanes.json` and the vault note in the same session.
 8. **Commit by path, with the lanes.** `git add <path> ...`, never `git add -A` or `.`. Conventional message, then a `Lanes: enterprise, tester` line (name only the lanes you touch; `personal` is retired). No `git stash`, `checkout`, `restore` or `reset`.
-9. **Run the guards.** `pnpm lane-guard` (map page not refreshed, protected file without a `Lanes:` line, a new brand literal), `pnpm maps:check`, then `pnpm ci:local`. Paste the `ci:local` summary table into the PR. `lane-guard` only warns; read each warning and fix it or say why it is wrong.
+9. **Run the guards.** `pnpm lane-guard` (a never-promote path, a protected file without a `Lanes:` line, a new brand literal, a map page not refreshed), `pnpm maps:check`, then `pnpm ci:local`. Paste the `ci:local` summary table into the PR. The first three `lane-guard` rules block and fail `ci:local`, so fix them. The map rule only warns. Fix it or say why it is wrong.
 10. **Pull request, only where the row names one.** For a row that goes to `main`, open it only when Rizky asks, from the branch off `main`. The body lists the lanes and the lanes still owed their sync step. A tester change has no pull request until Rizky approves a promotion.
 11. **After a pull request merges to `main`, the sync steps, in this order:**
     1. **Tester.** In `C:\Users\rizky\agentforge-chat`: clean tree, `git fetch origin`, `git merge origin/main`, `pnpm install --frozen-lockfile`, `ci:local`. On a conflict keep the `main` side of any fix; if both cannot be kept, `git merge --abort` and ask Rizky.

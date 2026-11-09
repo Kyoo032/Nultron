@@ -97,6 +97,34 @@ describe("v2 array bounds at the API boundary", () => {
   });
 });
 
+describe("v2 packet lists that nothing else bounded", () => {
+  const issuesOf = (result: { success: boolean; error?: { issues: unknown[] } }) =>
+    result.success ? 0 : (result.error?.issues.length ?? 0);
+
+  it("stops a macro or ticker notes list at the length check", () => {
+    const notes = Array.from({ length: watch.PACKET_NOTES_MAX + 1 }, () => 1);
+    expect(issuesOf(watch.macroSnapshotSchema.safeParse({ failures: notes }))).toBe(1);
+    expect(issuesOf(watch.tickerPacketSchema.shape.failures.safeParse(notes))).toBe(1);
+    expect(watch.macroSnapshotSchema.safeParse({ failures: notes.slice(1).map(String) }).success).toBe(true);
+  });
+
+  it("stops the macro quotes list at the length check", () => {
+    const quotes = Array.from({ length: watch.MACRO_QUOTES_MAX + 1 }, () => ({}));
+    expect(issuesOf(watch.macroSnapshotSchema.safeParse({ quotes }))).toBe(1);
+  });
+
+  it("stops a price chart with too many series, or a series or axis longer than the longest history", () => {
+    const chart = watch.tickerPacketSchema.shape.chart;
+    const line = (series: unknown[], axis: unknown[] = ["d"]) => ({ type: "line", x: { values: axis }, series });
+    const one = { name: "close", values: [1] };
+    expect(chart.safeParse(line([one])).success).toBe(true);
+    expect(issuesOf(chart.safeParse(line(Array.from({ length: watch.CHART_SERIES_MAX + 1 }, () => one))))).toBe(1);
+    const longValues = Array.from({ length: watch.HISTORY_BARS_MAX + 1 }, () => 1);
+    expect(issuesOf(chart.safeParse(line([{ name: "close", values: longValues }])))).toBe(1);
+    expect(issuesOf(chart.safeParse(line([one], longValues)))).toBe(1);
+  });
+});
+
 describe("marketWatchRequestSchema modelPinned", () => {
   const base = { prompt: "p", tickers: ["MU"], model: "gpt-5.6-sol" };
 

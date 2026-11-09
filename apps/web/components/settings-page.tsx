@@ -71,7 +71,6 @@ export type SettingsPayload = {
   presentationGenModel?: string;
   editTurnCapUsd?: number;
   disabledTools?: string[];
-  injectionGuardBypass?: boolean;
   defaults?: {
     image?: string;
     video?: string;
@@ -168,7 +167,6 @@ export function SettingsPage() {
   const [, setFalKey] = useState("");
   const [, setToolBackends] = useState<Record<string, string>>({});
   const [, setDisabledTools] = useState<string[]>([]);
-  const [, setInjectionGuardBypass] = useState(false);
   const [, setImageGenModel] = useState(DEFAULT_GATEWAY_IMAGE_MODEL);
   const [, setVideoGenModel] = useState(DEFAULT_GATEWAY_VIDEO_MODEL);
   const [, setDocumentGenModel] = useState("");
@@ -218,7 +216,6 @@ export function SettingsPage() {
     setVolcengineBaseUrl(typeof payload.volcengineBaseUrl === "string" ? payload.volcengineBaseUrl : "");
     setToolBackends(payload.toolBackends ?? {});
     setDisabledTools(Array.isArray(payload.disabledTools) ? payload.disabledTools : []);
-    setInjectionGuardBypass(payload.injectionGuardBypass === true);
     setImageGenModel(
       typeof payload.imageGenModel === "string" && payload.imageGenModel.trim()
         ? payload.imageGenModel.trim()

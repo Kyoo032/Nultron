@@ -25,7 +25,7 @@
             inherit system;
             # nixpkgs marks pnpm 9.15.9 insecure (twelve CVEs). It is the version package.json pins and the
             # Dockerfile installs, so it is permitted by exact name and nothing else is.
-            # docs/internal/security-register.md, SR-199.
+            # docs/internal/security-register.md, SR-208.
             config.permittedInsecurePackages = [ "pnpm-9.15.9" ];
           };
           src = ./.;
