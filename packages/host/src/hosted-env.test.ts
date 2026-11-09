@@ -8,13 +8,13 @@
  */
 import { describe, expect, it } from "vitest";
 import type { EnvLike } from "@agentforge/core";
-import { DESK_VAULT_KEY_TOO_WEAK } from "@agentforge/db/vault-key";
+import { DESK_VAULT_KEY_WEAK_WARNING } from "@agentforge/db/vault-key";
 import {
-  assertDeskVaultKeyUsable,
   assertHostedEnvComplete,
   BILLING_SECRET_MISSING_WARNING,
   hostedEnvProblems,
   HOSTED_ENV_INCOMPLETE,
+  warnWeakDeskVaultKey,
 } from "./hosted-env";
 import { TOPUP_URL_INVALID_WARNING } from "./billing/topup-url";
 
@@ -325,23 +325,19 @@ describe("local mode is untouched", () => {
       const warnings: string[] = [];
       expect(hostedEnvProblems(env)).toEqual([]);
       expect(() => assertHostedEnvComplete(env, (line) => warnings.push(line))).not.toThrow();
-      expect(() => assertDeskVaultKeyUsable(env)).not.toThrow();
+      expect(() => warnWeakDeskVaultKey(env, (line) => warnings.push(line))).not.toThrow();
       expect(warnings).toEqual([]);
     });
   }
 
-  it("leaves a desk's weak key to assertDeskVaultKeyUsable, which refuses it without printing it", () => {
+  it("lets a desk with a weak key through the hosted checks and warns about it without printing it", () => {
     const env: EnvLike = { AGENTFORGE_SECRETS_KEY: "hunter2" };
     expect(hostedEnvProblems(env)).toEqual([]);
     expect(() => assertHostedEnvComplete(env, () => {})).not.toThrow();
-    let message = "";
-    try {
-      assertDeskVaultKeyUsable(env);
-    } catch (error) {
-      message = error instanceof Error ? error.message : String(error);
-    }
-    expect(message).toBe(DESK_VAULT_KEY_TOO_WEAK);
-    expect(message).toContain("AGENTFORGE_SECRETS_KEY");
-    expect(message).not.toContain("hunter2");
+    const lines: string[] = [];
+    expect(() => warnWeakDeskVaultKey(env, (line) => lines.push(line))).not.toThrow();
+    expect(lines).toEqual([DESK_VAULT_KEY_WEAK_WARNING]);
+    expect(lines[0]).toContain("AGENTFORGE_SECRETS_KEY");
+    expect(lines[0]).not.toContain("hunter2");
   });
 });

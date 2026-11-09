@@ -127,7 +127,7 @@ describe("the guards also run from server-env.ts, ahead of the host and the data
   });
 
   it("checks a desk's wrap key after the hosted guards and before the wipe opt-in (SR-203)", () => {
-    const desk = envSource.indexOf("assertDeskVaultKeyUsable(process.env);");
+    const desk = envSource.indexOf("warnWeakDeskVaultKey(process.env);");
     expect(desk).toBeGreaterThan(envSource.indexOf("assertHostedEnvComplete(process.env,"));
     expect(desk).toBeLessThan(envSource.indexOf('process.env.AGENTFORGE_APPLY_PENDING_RESET = "1"'));
   });
@@ -135,8 +135,8 @@ describe("the guards also run from server-env.ts, ahead of the host and the data
   it("keeps the main() calls, which cover what a dotenv file supplies and print the warnings once", () => {
     expect(serverSource).toContain("assertHostedModeCoherent(process.env)");
     expect(serverSource).toContain("assertHostedEnvComplete(process.env)");
-    expect(serverSource).toContain("assertDeskVaultKeyUsable(process.env)");
-    expect(serverSource.indexOf("assertDeskVaultKeyUsable(process.env)")).toBeLessThan(
+    expect(serverSource).toContain("warnWeakDeskVaultKey(process.env)");
+    expect(serverSource.indexOf("warnWeakDeskVaultKey(process.env)")).toBeLessThan(
       serverSource.indexOf("server.listen("),
     );
   });

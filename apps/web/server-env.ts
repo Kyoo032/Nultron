@@ -34,8 +34,9 @@
  *    Nothing is hidden by this: a refusal is a thrown error, and warnings only exist on the path
  *    where the check passes.
  *
- *    With `AGENTFORGE_SERVER` off, `assertDeskVaultKeyUsable` is the one check that runs: it reads
- *    `AGENTFORGE_SECRETS_KEY` and nothing else, and touches no file (SR-203).
+ *    With `AGENTFORGE_SERVER` off, `warnWeakDeskVaultKey` is the one check that runs: it reads
+ *    `AGENTFORGE_SECRETS_KEY` and nothing else, touches no file, and only warns, once per process, so a
+ *    desk that already sealed data under a short key keeps opening it (SR-203).
  *
  * 2. **Opt this process in to applying a queued "Start over" wipe.** `client.ts` applies one at
  *    boot, but only for a process that set `AGENTFORGE_APPLY_PENDING_RESET=1` — importing the
@@ -46,14 +47,10 @@
  *    evaluated, which is why this is a module of its own.
  */
 import "./lib/node-version-boot";
-import {
-  assertDeskVaultKeyUsable,
-  assertHostedEnvComplete,
-  assertHostedModeCoherent,
-} from "./server/hosted-mode-guard";
+import { assertHostedEnvComplete, assertHostedModeCoherent, warnWeakDeskVaultKey } from "./server/hosted-mode-guard";
 
 assertHostedModeCoherent(process.env);
 assertHostedEnvComplete(process.env, () => {});
-assertDeskVaultKeyUsable(process.env);
+warnWeakDeskVaultKey(process.env);
 
 process.env.AGENTFORGE_APPLY_PENDING_RESET = "1";
