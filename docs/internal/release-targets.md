@@ -8,16 +8,16 @@ This file lists every product built from this repo, one card per target, coverin
 
 **Agents read this file before starting any task.** Name the target your task serves, then keep the change inside it. If the change lands on another target, stop and say so.
 
-Last updated: 2026-10-15 (base agentforge `main` at `8a42aaed`). The hex colours below were sampled from each brand's own logo file.
+Last updated: 2026-11-06 (`Kyoo032/Nultron` `main` at `39cd5f0c`). The hex colours below were sampled from each brand's own logo file.
 
 ## At a glance
 
 | Target | Type | Company | Product name | Gateway users see | Status | Focus now |
 |---|---|---|---|---|---|---|
-| [`nultron-personal`](#nultron-personal) | Desktop app | Public (retired) | Nultron | Toko Token | Retired 2026-10-14. Last release v0.15.1. Repo `Kyoo032/Nultron-Desktop` archived | None. The app is merged into the web app; no new cut |
-| [`nultron-enterprise`](#nultron-enterprise) | Hosted web app | Nultron Enterprise customers (via DPS) | Nultron | Toko Token + BYOK | Pilot, not deployed. A password-gated single-desk preview (one private desk per tester) runs at app.nultron-ai.xyz since 2026-10-06. Release repo is `Kyoo032/Nultron-Releases` (renamed from `Kyoo032/Nultron` on 2026-10-15) | First Tencent Enterprise deploy, Thu 8 Oct; it replaces the preview |
-| [`kemenkeu-ai`](#kemenkeu-ai) | Desktop flavor | Kemenkeu (Ministry of Finance) | Kemenkeu AI | AIHub | Built locally | Later, after Nultron |
-| [`aihub-metranet`](#aihub-metranet) | Desktop flavor | Metranet (Telkom Indonesia) | AIHub Metranet | AIHub | Built locally | Later, after Nultron |
+| [`nultron-personal`](#nultron-personal) | Desktop app | Public (retired) | Nultron | Toko Token | Retired 2026-10-14. Last release v0.15.1 (2026-09-28). 0.16.0 was packed on 2026-10-06 and never published. Repo `Kyoo032/Nultron-Desktop` archived | None. The app is merged into the web app; no new cut |
+| [`nultron-enterprise`](#nultron-enterprise) | Hosted web app | Nultron Enterprise customers (via DPS) | Nultron | Toko Token + BYOK | Pilot, never released or deployed (checked 2026-11-06). A password-gated single-desk preview (one private desk per tester) runs at app.nultron-ai.xyz since 2026-10-06; its last logged image is `a8866263` (2026-10-19), and its Caddy answered `401` Basic Auth on 2026-11-06 (the app behind it was not checked). It is not an Enterprise deploy. Release repo is `Kyoo032/Nultron-Releases` (renamed from `Kyoo032/Nultron` on 2026-10-15) | The first release and Tencent deploy, when Rizky says go. It was planned for Thu 8 Oct 2026 and did not happen |
+| [`kemenkeu-ai`](#kemenkeu-ai) | Desktop flavor | Kemenkeu (Ministry of Finance) | Kemenkeu AI | AIHub | Retired 2026-10-14 with the desktop app. Was built locally. Its brand folder is gitignored | None |
+| [`aihub-metranet`](#aihub-metranet) | Desktop flavor | Metranet (Telkom Indonesia) | AIHub Metranet | AIHub | Retired 2026-10-14 with the desktop app. Was built locally. Its brand folder is gitignored | None |
 
 ## Which targets a change touches
 
@@ -25,7 +25,7 @@ Last updated: 2026-10-15 (base agentforge `main` at `8a42aaed`). The hex colours
 |---|---|
 | `apps/web/**`, `packages/**` | Every target built from here. The renderer and host are shared. |
 | Code behind `isServerMode()` / `isHostedBuild()` | `nultron-enterprise`. Personal must stay identical, proven by a parity test. |
-| `apps/desktop/**` | `nultron-personal`, `kemenkeu-ai`, `aihub-metranet` |
+| `apps/desktop/**` | `nultron-personal`, `kemenkeu-ai`, `aihub-metranet`, all retired. Nothing ships from it. |
 | `apps/desktop/branding/<id>/**` | That one desktop target only |
 | `apps/portal/**`, `webapp-deploy/**`, `scripts/release-web.mjs` | `nultron-enterprise` |
 | `apps/mobile/**` | None. It holds rules only, and nothing ships from it. |
@@ -42,7 +42,7 @@ Last updated: 2026-10-15 (base agentforge `main` at `8a42aaed`). The hex colours
 
 ## nultron-personal
 
-<img src="../../apps/desktop/branding/agentforge/logo.png" alt="Nultron app logo" width="96">
+<img src="../../apps/web/public/brand/logo.png" alt="Nultron app logo" width="96">
 
 **Retired (Rizky, 2026-10-14).** Nultron Personal is being merged into the web app. Its release repo `Kyoo032/Nultron-Desktop` is archived and gets no new releases. Do not pack or publish a desktop cut. The code and the identity below stay in the tree until the merge.
 
@@ -50,8 +50,8 @@ Last updated: 2026-10-15 (base agentforge `main` at `8a42aaed`). The hex colours
 
 | Element | Value | Files |
 |---|---|---|
-| Name | Nultron | `apps/desktop/branding/agentforge/brand.json` (`productName`) |
-| Logo | Nultron's painted head on a blue tile | master `apps/desktop/branding/agentforge/source/app-logo.webp`; `logo.png` (256 px, under 200 KB); `icon.ico`, `icon.icns`; favicons in `apps/web/public/brand/`; rail marks `apps/web/components/brand-art/mark-{24,32,48,64}.png` |
+| Name | Nultron | `DEFAULT_BRAND` in `apps/desktop/brand-read.cjs` (`productName`) |
+| Logo | Nultron's painted head on a blue tile | master `docs/internal/brand/nultron/reference/app-logo.webp`; `logo.png` (256 px, under 200 KB); `icon.ico`, `icon.icns` in `apps/desktop/build`; favicons in `apps/web/public/brand/`; rail marks `apps/web/components/brand-art/mark-{24,32,48,64}.png` |
 | Mascot | Nultron, a 3D robot with a glowing antenna, in 21 states | renders in `apps/web/components/nultron/images/` (`full`, `head`, `clips`, `loops`, `manifest.json`); state table `apps/web/lib/mascot-states.ts`; render scene `tools/nultron-3d` |
 | Wordmark | Gradient blue → cyan, rail only (`.wordmark-nultron`) | `apps/web/app/globals.css:2259`, `apps/web/lib/product-brand.tsx` |
 | Type | DM Sans (UI) and Source Serif 4 (display), bundled locally | `apps/web/app/globals.css:1-30` |
@@ -75,7 +75,7 @@ Last updated: 2026-10-15 (base agentforge `main` at `8a42aaed`). The hex colours
 - **Services:**
   - Windows NSIS installer.
   - macOS dmg/zip, still a preview: nobody has smoke-tested it on a Mac yet.
-  - In-app updater: this tree's `brand.json` names `Kyoo032/Nultron-Desktop` (archived). Installed 0.15.1 copies still read `Kyoo032/Nultron`, which is now the Enterprise repo, so their check errors.
+  - In-app updater: this tree's `brand.json` names `Kyoo032/Nultron-Desktop` (archived). Installed 0.15.1 copies still read `Kyoo032/Nultron`, which has been the private source repo since 2026-10-15. The 0.15.1 build's `publish` block names provider, owner, repo and release type, with no `private` flag and no token (`apps/desktop/package.json:157-162` at `43c1de3`, the 0.15.1 pack commit), so the updater asks without auth. A private repo answers an unauthenticated request with `404` (measured 2026-11-06 on the repo and its `releases/latest`), so the check fails with the app's "Update feed not found (404)" message (`apps/desktop/auto-update.cjs:12`).
 - **Ships by:** nothing now. The [pack skill](../../.cursor/skills/pack-nultron/SKILL.md) and `pnpm desktop:release` are retired with the repo.
 - **Versions:** semver. Published `v0.15.1` (2026-09-28), the last release. `0.16.0` was packed on 2026-10-06 (branch `chore/release-0.16.0`, [`0.16.0-changelog.md`](0.16.0-changelog.md)) and was never published. It will not be published.
 - **Focus now:** none. Do not drive the packed app or cut a release for it.
@@ -103,27 +103,32 @@ Last updated: 2026-10-15 (base agentforge `main` at `8a42aaed`). The hex colours
   |---|---|
   | `app` | `ghcr.io/kyoo032/nultron-ent`, production dependencies only |
   | `proxy` | Caddy 2.11, TLS and `sign_in_filters`. Restart it together with `app`. |
-  | `portal` | `ghcr.io/kyoo032/nultron-portal`, the one-time-code sign-in |
+  | `portal` | `ghcr.io/kyoo032/nultron-portal`, the sign-in. This bundle uses a username and password (`PORTAL_SIGNIN_MODE=password`). The e-mailed one-time code is the portal's own default. |
   | `portal-db` | Postgres 16 |
   | `portal-prepare` | one-shot migrations |
 
-- **Live on the box (2026-10-06):** dpscloud.co.id, tokotokenai.com and nultron-ai.xyz are live static sites. app.nultron-ai.xyz is the preview: off server mode, Basic Auth, 11 private desks (security register SR-133). Company mailboxes moved to Lark; SES stays for the sign-in codes. Runbook: `nultron-files/deploy/tencent/README.md`.
-- **Where it runs (updated 2026-10-05):** Phase 0 is one Tencent Lighthouse box in Jakarta that will also host dpscloud.co.id (the parent site) and tokotokenai.com. Nultron goes on **nultron-ai.xyz**, with sign-in on **portal.nultron-ai.xyz**. **Never point api.tokotokenai.com at it.** Email is Tencent SES only, for the sign-in codes: "Nultron <no-reply@mail.dpscloud.co.id>", no mailboxes. After a 1-month test, move to a bigger Tencent CVM by sharing a Lighthouse custom image to CVM (same region), restoring the newer data, and switching DNS. Multi-site build: branch `feat/multi-site-edge`. Guide: `nultron-files/deploy/hosting-guide.html`. Before that, Phase 0 was one Tencent Lighthouse box in Jakarta. Phase 1 is TKE; its manifests are in `webapp-deploy/k8s/`, not yet applied.
+- **Live on the box (2026-10-06):** dpscloud.co.id, tokotokenai.com and nultron-ai.xyz are live static sites. app.nultron-ai.xyz is the preview: off server mode, Basic Auth, 11 private desks (security register SR-133). Company mailboxes moved to Lark; SES stays for sign-in codes and invites, which the portal sends only under `PORTAL_SIGNIN_MODE=code`. Runbook: `nultron-files/deploy/tencent/README.md`.
+- **Where it runs (updated 2026-10-05):** Phase 0 is one Tencent Lighthouse box in Jakarta that will also host dpscloud.co.id (the parent site) and tokotokenai.com. Nultron goes on **nultron-ai.xyz**, with sign-in on **portal.nultron-ai.xyz**. **Never point api.tokotokenai.com at it.** Email is Tencent SES only, for sign-in codes and invites: "Nultron <no-reply@mail.dpscloud.co.id>", no mailboxes. Both go through the portal's one mailer (`apps/portal/src/main.ts:28`), which sends only under `PORTAL_SIGNIN_MODE=code`. Under the bundle's `password` default the mailer refuses every message (`apps/portal/src/mail/index.ts:18`, `apps/portal/src/config.ts:291-294`), so the portal would send nothing through SES. After a 1-month test, move to a bigger Tencent CVM by sharing a Lighthouse custom image to CVM (same region), restoring the newer data, and switching DNS. Multi-site build: branch `feat/multi-site-edge`. Guide: `nultron-files/deploy/hosting-guide.html`. Before that, Phase 0 was one Tencent Lighthouse box in Jakarta. Phase 1 is TKE; its manifests are in `webapp-deploy/k8s/`, not yet applied.
 - **Ships by:** `node scripts/release-web.mjs --tag <tag> --sha <sha>`, with `--dry-run` first. It pushes both images, plus a deploy bundle to `Kyoo032/Nultron-Releases` (the release repo, renamed from `Kyoo032/Nultron` on 2026-10-15 and from `Kyoo032/NultronEnt` on 2026-10-14).
 - **Tag:** `ent-YYYY.MM.DD`. Every deploy is logged by sha.
-- **Current:** as of 2026-10-05, nothing was released or deployed, and the deploy log was empty. Not re-checked on 2026-10-14.
+- **Current:** nothing has been released or deployed. Checked 2026-11-06:
+  - The deploy logs in [`web-pivot-2026-09-18.md`](web-pivot-2026-09-18.md#deploy-log) and [`webapp-deploy/DEPLOY-LOG.md`](../../webapp-deploy/DEPLOY-LOG.md) have no row.
+  - `Kyoo032/Nultron-Releases` has no GitHub Release, and its last push was on 2026-09-25.
+  - `docs/public/ent-2026.10.02-notes.md` was written and never published.
+
+  The Tencent deploy planned for Thursday 8 October 2026 is in neither log, so it did not happen. Whether a `ghcr.io/kyoo032/nultron-ent` image was ever pushed is unknown. The ghcr lookup answered 404, and the token used for it may lack package access.
 - **Focus now:**
   1. Build the image, driven with a real hosted Chat.
   2. Dry run of the release.
   3. Release, after Rizky confirms at that moment.
-  4. Tencent deploy on Thursday 8 October, logged by sha.
+  4. The first Tencent deploy, logged by sha. No date is recorded since the 8 October plan lapsed.
 - **Logs:**
   - [Deploy log](web-pivot-2026-09-18.md#deploy-log).
   - [`security-register.md`](security-register.md), the deploy gate.
 
 ## kemenkeu-ai
 
-<img src="../../apps/desktop/branding/kemenkeu/logo.png" alt="Kemenkeu emblem" width="96">
+**Retired with the desktop app (2026-10-14).** Do not pack it. Its brand folder `apps/desktop/branding/kemenkeu/` is gitignored (`.gitignore:23`) and exists only on the operator's machine, so none of the files named below is in this repo.
 
 **Identity**
 
@@ -149,12 +154,12 @@ Last updated: 2026-10-15 (base agentforge `main` at `8a42aaed`). The hex colours
 - **Gateway:** AIHub, `https://aihub.metranet.co.id/v1`. Metranet runs this gateway.
 - **Services:** the installer only. There is no updater, because `updates` is not set.
 - **Ships by:** a local pack on Rizky's machine. There is no public release repo.
-- **Current:** not recorded. Record the next pack's version, sha and date here.
-- **Focus now:** none. Only re-pack when a desktop release needs it.
+- **Current:** retired. No pack was recorded.
+- **Focus now:** none.
 
 ## aihub-metranet
 
-<img src="../../apps/desktop/branding/metranet/logo.png" alt="Metranet logo, by Telkom Indonesia" width="160">
+**Retired with the desktop app (2026-10-14).** Do not pack it. Its brand folder `apps/desktop/branding/metranet/` is gitignored (`.gitignore:24`) and exists only on the operator's machine, so none of the files named below is in this repo.
 
 **Identity**
 
@@ -180,7 +185,7 @@ Last updated: 2026-10-15 (base agentforge `main` at `8a42aaed`). The hex colours
 - **Gateway:** AIHub, `https://aihub.metranet.co.id/v1`.
 - **Services:** the installer only, with no updater.
 - **Ships by:** a local pack on Rizky's machine. There is no public release repo.
-- **Current:** not recorded. Record the next pack's version, sha and date here.
+- **Current:** retired. No pack was recorded.
 - **Focus now:** none.
 
 ---

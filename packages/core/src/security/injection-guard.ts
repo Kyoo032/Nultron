@@ -124,8 +124,7 @@ export function normalizeForScan(text: string): string {
 /**
  * Rule match on the normalized text. There is deliberately no text-wide "this looks like a security
  * discussion / base64 blob, skip it" shortcut: any such shortcut is a one-line bypass (append
- * `notes.txt` and a base64 run, or the words "false positive"). Owners who paste legitimate material
- * that trips a rule use the injectionGuardBypass setting.
+ * `notes.txt` and a base64 run, or the words "false positive").
  */
 export function scanInjection(text: string): InjectionHit | null {
   if (!text) {

@@ -10,14 +10,28 @@
  * nothing else. `src/boot.ts` opens it, migrates and closes it before anything listens.
  */
 import type { PortalConfig } from "../config";
+import type { Logger } from "../log";
 import { openPostgresStore } from "./postgres";
 import type { Clock, PortalStore } from "./types";
 
 export { openPostgresStore } from "./postgres";
 export * from "./types";
 
-export function openStore(config: PortalConfig, clock?: Clock): PortalStore {
-  return openPostgresStore({ databaseUrl: config.databaseUrl, clock });
+export function openStore(config: PortalConfig, clock?: Clock, log?: Logger): PortalStore {
+  return openPostgresStore({
+    databaseUrl: config.databaseUrl,
+    clock,
+    // The SQLSTATE only (57P01 a terminated session, 57P02 and 57P03 a server going down or not up yet); the
+    // message can name the database and the role.
+    onIdleClientError: log
+      ? (error) => log.warn("portal_db_idle_connection_lost", { code: sqlState(error) })
+      : undefined,
+  });
+}
+
+function sqlState(error: Error): string {
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" ? code : "unknown";
 }
 
 /** The schema owner's connection. One connection is all a migration run uses. */

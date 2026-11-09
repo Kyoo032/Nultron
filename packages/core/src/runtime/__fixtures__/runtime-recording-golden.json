@@ -1,0 +1,2120 @@
+{
+  "scenarios": {
+    "official OpenAI Completions with a tool": {
+      "requests": [
+        {
+          "url": "https://api.openai.com/v1/chat/completions",
+          "body": {
+            "model": "gpt-4o",
+            "temperature": 0,
+            "reasoning_effort": "medium",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": "Say hi."
+              }
+            ],
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "echo",
+                  "description": "Echo a number.",
+                  "parameters": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "strict": false
+                }
+              }
+            ],
+            "tool_choice": "auto",
+            "stream": true,
+            "stream_options": {
+              "include_usage": true
+            },
+            "store": false
+          }
+        },
+        {
+          "url": "https://api.openai.com/v1/chat/completions",
+          "body": {
+            "model": "gpt-4o",
+            "temperature": 0,
+            "reasoning_effort": "medium",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": "Say hi."
+              },
+              {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                  {
+                    "id": "call_echo",
+                    "type": "function",
+                    "function": {
+                      "name": "echo",
+                      "arguments": "{\"x\":4}"
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "tool",
+                "tool_call_id": "call_echo",
+                "content": "{\"echoed\":4}"
+              }
+            ],
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "echo",
+                  "description": "Echo a number.",
+                  "parameters": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "strict": false
+                }
+              }
+            ],
+            "tool_choice": "auto",
+            "stream": true,
+            "stream_options": {
+              "include_usage": true
+            },
+            "store": false
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "gpt-4o",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing gpt-4o · 1st try"
+        },
+        {
+          "type": "tool.started",
+          "toolKey": "echo",
+          "input": {
+            "x": 4
+          }
+        },
+        {
+          "type": "tool.completed",
+          "toolKey": "echo",
+          "output": {
+            "echoed": 4
+          }
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Four."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "gpt-4o",
+            "inputTokens": 22,
+            "outputTokens": 14
+          }
+        }
+      ],
+      "threw": null
+    },
+    "official OpenAI Responses": {
+      "requests": [
+        {
+          "url": "https://api.openai.com/v1/responses",
+          "body": {
+            "model": "gpt-5.6",
+            "input": [
+              {
+                "role": "developer",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "input_text",
+                    "text": "Say hi."
+                  }
+                ]
+              }
+            ],
+            "store": false,
+            "reasoning": {
+              "effort": "low",
+              "summary": "auto"
+            },
+            "stream": true
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "gpt-5.6",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing gpt-5.6 · 1st try"
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Hi."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "gpt-5.6",
+            "inputTokens": 21,
+            "outputTokens": 9
+          }
+        }
+      ],
+      "threw": null
+    },
+    "direct Anthropic key on a Completions-routed Claude": {
+      "requests": [
+        {
+          "url": "https://api.anthropic.com/v1/messages",
+          "body": {
+            "model": "claude-haiku-4-5",
+            "max_tokens": 64000,
+            "temperature": 0,
+            "system": [
+              {
+                "type": "text",
+                "text": "You are helpful."
+              }
+            ],
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Say hi."
+                  }
+                ]
+              }
+            ],
+            "tools": [
+              {
+                "name": "echo",
+                "description": "Echo a number.",
+                "input_schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "x"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "tool_choice": {
+              "type": "auto"
+            },
+            "stream": true
+          }
+        },
+        {
+          "url": "https://api.anthropic.com/v1/messages",
+          "body": {
+            "model": "claude-haiku-4-5",
+            "max_tokens": 64000,
+            "temperature": 0,
+            "system": [
+              {
+                "type": "text",
+                "text": "You are helpful."
+              }
+            ],
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Say hi."
+                  }
+                ]
+              },
+              {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "tool_use",
+                    "id": "toolu_1",
+                    "name": "echo",
+                    "input": {
+                      "x": 8
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "tool_result",
+                    "tool_use_id": "toolu_1",
+                    "content": "{\"echoed\":8}"
+                  }
+                ]
+              }
+            ],
+            "tools": [
+              {
+                "name": "echo",
+                "description": "Echo a number.",
+                "input_schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "x"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "tool_choice": {
+              "type": "auto"
+            },
+            "stream": true
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "claude-haiku-4-5",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing claude-haiku-4-5 · 1st try"
+        },
+        {
+          "type": "tool.started",
+          "toolKey": "echo",
+          "input": {
+            "x": 8
+          }
+        },
+        {
+          "type": "tool.completed",
+          "toolKey": "echo",
+          "output": {
+            "echoed": 8
+          }
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Eight."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "claude-haiku-4-5",
+            "inputTokens": 62,
+            "outputTokens": 24
+          }
+        }
+      ],
+      "threw": null
+    },
+    "direct Google key on a gemma id": {
+      "requests": [
+        {
+          "url": "https://generativelanguage.googleapis.com/v1beta/models/gemma-3-27b:streamGenerateContent?alt=sse",
+          "body": {
+            "generationConfig": {
+              "temperature": 0
+            },
+            "contents": [
+              {
+                "role": "user",
+                "parts": [
+                  {
+                    "text": "You are helpful.\n\n"
+                  },
+                  {
+                    "text": "Say hi."
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "gemma-3-27b",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing gemma-3-27b · 1st try"
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Hi from Gemma."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "gemma-3-27b",
+            "inputTokens": 17,
+            "outputTokens": 5
+          }
+        }
+      ],
+      "threw": null
+    },
+    "Ark key on a doubao id": {
+      "requests": [
+        {
+          "url": "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+          "body": {
+            "model": "doubao-seed-2-0",
+            "temperature": 0,
+            "reasoning_effort": "medium",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": "Say hi."
+              }
+            ],
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "echo",
+                  "description": "Echo a number.",
+                  "parameters": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "strict": false
+                }
+              }
+            ],
+            "tool_choice": "auto",
+            "stream": true,
+            "stream_options": {
+              "include_usage": true
+            }
+          }
+        },
+        {
+          "url": "https://ark.cn-beijing.volces.com/api/v3/chat/completions",
+          "body": {
+            "model": "doubao-seed-2-0",
+            "temperature": 0,
+            "reasoning_effort": "medium",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": "Say hi."
+              },
+              {
+                "role": "assistant",
+                "content": null,
+                "tool_calls": [
+                  {
+                    "id": "call_echo",
+                    "type": "function",
+                    "function": {
+                      "name": "echo",
+                      "arguments": "{\"x\":6}"
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "tool",
+                "tool_call_id": "call_echo",
+                "content": "{\"echoed\":6}"
+              }
+            ],
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "echo",
+                  "description": "Echo a number.",
+                  "parameters": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "strict": false
+                }
+              }
+            ],
+            "tool_choice": "auto",
+            "stream": true,
+            "stream_options": {
+              "include_usage": true
+            }
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "doubao-seed-2-0",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing doubao-seed-2-0 · 1st try"
+        },
+        {
+          "type": "tool.started",
+          "toolKey": "echo",
+          "input": {
+            "x": 6
+          }
+        },
+        {
+          "type": "tool.completed",
+          "toolKey": "echo",
+          "output": {
+            "echoed": 6
+          }
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Six."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "doubao-seed-2-0",
+            "inputTokens": 22,
+            "outputTokens": 14
+          }
+        }
+      ],
+      "threw": null
+    },
+    "chat text, two turns of history": {
+      "requests": [
+        {
+          "url": "https://gateway.test/v1/chat/completions",
+          "body": {
+            "model": "deepseek-v4-flash",
+            "temperature": 0,
+            "reasoning_effort": "medium",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": "Remember 7."
+              },
+              {
+                "role": "assistant",
+                "content": "Noted: 7."
+              },
+              {
+                "role": "user",
+                "content": "What number?"
+              }
+            ],
+            "stream": true,
+            "store": false
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "deepseek-v4-flash",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing deepseek-v4-flash · 1st try"
+        },
+        {
+          "type": "assistant.delta",
+          "text": "It "
+        },
+        {
+          "type": "assistant.delta",
+          "text": "was 7."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "deepseek-v4-flash",
+            "inputTokens": 11,
+            "outputTokens": 7
+          }
+        }
+      ],
+      "threw": null
+    },
+    "chat tools, explicit high effort": {
+      "requests": [
+        {
+          "url": "https://gateway.test/v1/chat/completions",
+          "body": {
+            "model": "deepseek-v4-flash",
+            "temperature": 0,
+            "reasoning_effort": "high",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": "Say hi."
+              }
+            ],
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "probe",
+                  "description": "Exercise every schema feature the tools use.",
+                  "parameters": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "query": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200,
+                        "description": "What to look up"
+                      },
+                      "limit": {
+                        "default": 10,
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 50
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "fast",
+                          "deep"
+                        ]
+                      },
+                      "shots": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "const": 4
+                          },
+                          {
+                            "type": "number",
+                            "const": 6
+                          }
+                        ]
+                      },
+                      "tags": {
+                        "default": [],
+                        "maxItems": 5,
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "filters": {
+                        "maxItems": 3,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "field": {
+                              "type": "string"
+                            },
+                            "value": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "field",
+                            "value"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "weights": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "number"
+                        }
+                      },
+                      "nested": {
+                        "type": "object",
+                        "properties": {
+                          "on": {
+                            "default": false,
+                            "type": "boolean"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    },
+                    "required": [
+                      "query"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "strict": false
+                }
+              },
+              {
+                "type": "function",
+                "function": {
+                  "name": "echo",
+                  "description": "Echo a number.",
+                  "parameters": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "strict": false
+                }
+              }
+            ],
+            "tool_choice": "auto",
+            "stream": true,
+            "store": false
+          }
+        },
+        {
+          "url": "https://gateway.test/v1/chat/completions",
+          "body": {
+            "model": "deepseek-v4-flash",
+            "temperature": 0,
+            "reasoning_effort": "high",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": "Say hi."
+              },
+              {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                  {
+                    "id": "call_probe",
+                    "type": "function",
+                    "function": {
+                      "name": "probe",
+                      "arguments": "{\"query\":\"tides\",\"limit\":10,\"tags\":[],\"filters\":[{\"field\":\"a\",\"value\":null}],\"nested\":{\"on\":false}}"
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "tool",
+                "tool_call_id": "call_probe",
+                "content": "{\"received\":{\"query\":\"tides\",\"limit\":10,\"tags\":[],\"filters\":[{\"field\":\"a\",\"value\":null}],\"nested\":{\"on\":false}}}"
+              }
+            ],
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "probe",
+                  "description": "Exercise every schema feature the tools use.",
+                  "parameters": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "query": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200,
+                        "description": "What to look up"
+                      },
+                      "limit": {
+                        "default": 10,
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 50
+                      },
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "fast",
+                          "deep"
+                        ]
+                      },
+                      "shots": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "const": 4
+                          },
+                          {
+                            "type": "number",
+                            "const": 6
+                          }
+                        ]
+                      },
+                      "tags": {
+                        "default": [],
+                        "maxItems": 5,
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "filters": {
+                        "maxItems": 3,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "field": {
+                              "type": "string"
+                            },
+                            "value": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "field",
+                            "value"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "weights": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "number"
+                        }
+                      },
+                      "nested": {
+                        "type": "object",
+                        "properties": {
+                          "on": {
+                            "default": false,
+                            "type": "boolean"
+                          },
+                          "label": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "session_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                      },
+                      "url": {
+                        "type": "string",
+                        "format": "uri"
+                      }
+                    },
+                    "required": [
+                      "query"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "strict": false
+                }
+              },
+              {
+                "type": "function",
+                "function": {
+                  "name": "echo",
+                  "description": "Echo a number.",
+                  "parameters": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "strict": false
+                }
+              }
+            ],
+            "tool_choice": "auto",
+            "stream": true,
+            "store": false
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "deepseek-v4-flash",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing deepseek-v4-flash · 1st try"
+        },
+        {
+          "type": "tool.started",
+          "toolKey": "probe",
+          "input": {
+            "query": "tides",
+            "limit": 10,
+            "tags": [],
+            "filters": [
+              {
+                "field": "a",
+                "value": null
+              }
+            ],
+            "nested": {
+              "on": false
+            }
+          }
+        },
+        {
+          "type": "tool.completed",
+          "toolKey": "probe",
+          "output": {
+            "received": {
+              "query": "tides",
+              "limit": 10,
+              "tags": [],
+              "filters": [
+                {
+                  "field": "a",
+                  "value": null
+                }
+              ],
+              "nested": {
+                "on": false
+              }
+            }
+          }
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Done."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "deepseek-v4-flash",
+            "inputTokens": 22,
+            "outputTokens": 14
+          }
+        }
+      ],
+      "threw": null
+    },
+    "chat repairs a call to an unknown tool": {
+      "requests": [
+        {
+          "url": "https://gateway.test/v1/chat/completions",
+          "body": {
+            "model": "deepseek-v4-flash",
+            "temperature": 0,
+            "reasoning_effort": "medium",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": "Say hi."
+              }
+            ],
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "echo",
+                  "description": "Echo a number.",
+                  "parameters": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "strict": false
+                }
+              }
+            ],
+            "tool_choice": "auto",
+            "stream": true,
+            "store": false
+          }
+        },
+        {
+          "url": "https://gateway.test/v1/chat/completions",
+          "body": {
+            "model": "deepseek-v4-flash",
+            "temperature": 0,
+            "reasoning_effort": "medium",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": "Say hi."
+              },
+              {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                  {
+                    "id": "call_nope",
+                    "type": "function",
+                    "function": {
+                      "name": "nope",
+                      "arguments": "{}"
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "tool",
+                "tool_call_id": "call_nope",
+                "content": "Model tried to call unavailable tool 'nope'. Available tools: echo."
+              }
+            ],
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "echo",
+                  "description": "Echo a number.",
+                  "parameters": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "strict": false
+                }
+              }
+            ],
+            "tool_choice": "auto",
+            "stream": true,
+            "store": false
+          }
+        },
+        {
+          "url": "https://gateway.test/v1/chat/completions",
+          "body": {
+            "model": "deepseek-v4-flash",
+            "temperature": 0,
+            "reasoning_effort": "medium",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": "Say hi."
+              },
+              {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                  {
+                    "id": "call_nope",
+                    "type": "function",
+                    "function": {
+                      "name": "nope",
+                      "arguments": "{}"
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "tool",
+                "tool_call_id": "call_nope",
+                "content": "Model tried to call unavailable tool 'nope'. Available tools: echo."
+              },
+              {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                  {
+                    "id": "call_echo",
+                    "type": "function",
+                    "function": {
+                      "name": "echo",
+                      "arguments": "{\"x\":3}"
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "tool",
+                "tool_call_id": "call_echo",
+                "content": "{\"echoed\":3}"
+              }
+            ],
+            "tools": [
+              {
+                "type": "function",
+                "function": {
+                  "name": "echo",
+                  "description": "Echo a number.",
+                  "parameters": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "strict": false
+                }
+              }
+            ],
+            "tool_choice": "auto",
+            "stream": true,
+            "store": false
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "deepseek-v4-flash",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing deepseek-v4-flash · 1st try"
+        },
+        {
+          "type": "tool.started",
+          "toolKey": "echo",
+          "input": {
+            "x": 3
+          }
+        },
+        {
+          "type": "tool.completed",
+          "toolKey": "echo",
+          "output": {
+            "echoed": 3
+          }
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Three."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "deepseek-v4-flash",
+            "inputTokens": 33,
+            "outputTokens": 21
+          }
+        }
+      ],
+      "threw": null
+    },
+    "chat reasoning_content deltas": {
+      "requests": [
+        {
+          "url": "https://gateway.test/v1/chat/completions",
+          "body": {
+            "model": "deepseek-v4-flash",
+            "temperature": 0,
+            "reasoning_effort": "medium",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": "Say hi."
+              }
+            ],
+            "stream": true,
+            "store": false
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "deepseek-v4-flash",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing deepseek-v4-flash · 1st try"
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Hi."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "deepseek-v4-flash",
+            "inputTokens": 11,
+            "outputTokens": 7
+          }
+        }
+      ],
+      "threw": null
+    },
+    "minimax think tags and reasoning_details": {
+      "requests": [
+        {
+          "url": "https://gateway.test/v1/chat/completions",
+          "body": {
+            "model": "minimax-m3",
+            "temperature": 0,
+            "reasoning_effort": "medium",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": "Say hi."
+              }
+            ],
+            "stream": true,
+            "store": false,
+            "reasoning_split": true
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "minimax-m3",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing minimax-m3 · 1st try"
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Plan a greeting."
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Hello!"
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "minimax-m3",
+            "inputTokens": 11,
+            "outputTokens": 7
+          }
+        }
+      ],
+      "threw": null
+    },
+    "openrouter zero retention": {
+      "requests": [
+        {
+          "url": "https://openrouter.ai/api/v1/chat/completions",
+          "body": {
+            "model": "glm-5",
+            "temperature": 0,
+            "reasoning_effort": "medium",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": "Say hi."
+              }
+            ],
+            "stream": true,
+            "store": false,
+            "provider": {
+              "zdr": true
+            }
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "glm-5",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing glm-5 · 1st try"
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Hi from OpenRouter."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "glm-5",
+            "inputTokens": 11,
+            "outputTokens": 7
+          }
+        }
+      ],
+      "threw": null
+    },
+    "chat image in history": {
+      "requests": [
+        {
+          "url": "https://gateway.test/v1/chat/completions",
+          "body": {
+            "model": "gpt-4o",
+            "temperature": 0,
+            "reasoning_effort": "medium",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "What is this?"
+                  },
+                  {
+                    "type": "image_url",
+                    "image_url": {
+                      "url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+                    }
+                  }
+                ]
+              }
+            ],
+            "stream": true,
+            "store": false
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "gpt-4o",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing gpt-4o · 1st try"
+        },
+        {
+          "type": "assistant.delta",
+          "text": "A pixel."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "gpt-4o",
+            "inputTokens": 11,
+            "outputTokens": 7
+          }
+        }
+      ],
+      "threw": null
+    },
+    "chat HTTP 400": {
+      "requests": [
+        {
+          "url": "https://gateway.test/v1/chat/completions",
+          "body": {
+            "model": "deepseek-v4-flash",
+            "temperature": 0,
+            "reasoning_effort": "medium",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": "Say hi."
+              }
+            ],
+            "stream": true,
+            "store": false
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "deepseek-v4-flash",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing deepseek-v4-flash · 1st try"
+        },
+        {
+          "type": "run.failed",
+          "message": "The gateway rejected this request (status_code=400). Try another model, or send again with a shorter prompt."
+        }
+      ],
+      "threw": "The gateway rejected this request (status_code=400). Try another model, or send again with a shorter prompt."
+    },
+    "chat error frame mid-stream": {
+      "requests": [
+        {
+          "url": "https://gateway.test/v1/chat/completions",
+          "body": {
+            "model": "deepseek-v4-flash",
+            "temperature": 0,
+            "reasoning_effort": "medium",
+            "messages": [
+              {
+                "role": "system",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": "Say hi."
+              }
+            ],
+            "stream": true,
+            "store": false
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "deepseek-v4-flash",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing deepseek-v4-flash · 1st try"
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Partial "
+        },
+        {
+          "type": "run.failed",
+          "message": "Could not reach deepseek-v4-flash after 1 try. upstream overloaded"
+        }
+      ],
+      "threw": "Could not reach deepseek-v4-flash after 1 try. upstream overloaded"
+    },
+    "responses tools with reasoning summary": {
+      "requests": [
+        {
+          "url": "https://gateway.test/v1/responses",
+          "body": {
+            "model": "gpt-5.6",
+            "input": [
+              {
+                "role": "developer",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "input_text",
+                    "text": "Say hi."
+                  }
+                ]
+              }
+            ],
+            "store": false,
+            "reasoning": {
+              "effort": "medium",
+              "summary": "auto"
+            },
+            "tools": [
+              {
+                "type": "function",
+                "name": "echo",
+                "description": "Echo a number.",
+                "parameters": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "x"
+                  ],
+                  "additionalProperties": false
+                },
+                "strict": false
+              }
+            ],
+            "tool_choice": "auto",
+            "stream": true
+          }
+        },
+        {
+          "url": "https://gateway.test/v1/responses",
+          "body": {
+            "model": "gpt-5.6",
+            "input": [
+              {
+                "role": "developer",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "input_text",
+                    "text": "Say hi."
+                  }
+                ]
+              },
+              {
+                "type": "function_call",
+                "call_id": "call_echo",
+                "name": "echo",
+                "arguments": "{\"x\":5}"
+              },
+              {
+                "type": "function_call_output",
+                "call_id": "call_echo",
+                "output": "{\"echoed\":5}"
+              }
+            ],
+            "store": false,
+            "reasoning": {
+              "effort": "medium",
+              "summary": "auto"
+            },
+            "tools": [
+              {
+                "type": "function",
+                "name": "echo",
+                "description": "Echo a number.",
+                "parameters": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "x"
+                  ],
+                  "additionalProperties": false
+                },
+                "strict": false
+              }
+            ],
+            "tool_choice": "auto",
+            "stream": true
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "gpt-5.6",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing gpt-5.6 · 1st try"
+        },
+        {
+          "type": "assistant.thinking",
+          "text": "Need the echo tool."
+        },
+        {
+          "type": "tool.started",
+          "toolKey": "echo",
+          "input": {
+            "x": 5
+          }
+        },
+        {
+          "type": "tool.completed",
+          "toolKey": "echo",
+          "output": {
+            "echoed": 5
+          }
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Five."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "gpt-5.6",
+            "inputTokens": 42,
+            "outputTokens": 18
+          }
+        }
+      ],
+      "threw": null
+    },
+    "responses image and high effort on an id the SDK does not know": {
+      "requests": [
+        {
+          "url": "https://gateway.test/v1/responses",
+          "body": {
+            "model": "gpt-6-luna",
+            "input": [
+              {
+                "role": "developer",
+                "content": "You are helpful."
+              },
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "input_text",
+                    "text": "Describe."
+                  },
+                  {
+                    "type": "input_image",
+                    "image_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+                  }
+                ]
+              }
+            ],
+            "store": false,
+            "reasoning": {
+              "effort": "high",
+              "summary": "auto"
+            },
+            "stream": true
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "gpt-6-luna",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing gpt-6-luna · 1st try"
+        },
+        {
+          "type": "assistant.delta",
+          "text": "One pixel."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "gpt-6-luna",
+            "inputTokens": 21,
+            "outputTokens": 9
+          }
+        }
+      ],
+      "threw": null
+    },
+    "messages signed thinking then a tool": {
+      "requests": [
+        {
+          "url": "https://gateway.test/v1/messages",
+          "body": {
+            "model": "claude-sonnet-5-5",
+            "max_tokens": 16384,
+            "system": [
+              {
+                "type": "text",
+                "text": "You are helpful."
+              }
+            ],
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Say hi."
+                  }
+                ]
+              }
+            ],
+            "tools": [
+              {
+                "name": "echo",
+                "description": "Echo a number.",
+                "input_schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "x"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "tool_choice": {
+              "type": "auto"
+            },
+            "stream": true,
+            "thinking": {
+              "type": "adaptive"
+            },
+            "output_config": {
+              "effort": "medium"
+            }
+          }
+        },
+        {
+          "url": "https://gateway.test/v1/messages",
+          "body": {
+            "model": "claude-sonnet-5-5",
+            "max_tokens": 16384,
+            "system": [
+              {
+                "type": "text",
+                "text": "You are helpful."
+              }
+            ],
+            "messages": [
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Say hi."
+                  }
+                ]
+              },
+              {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "thinking",
+                    "thinking": "Use echo.",
+                    "signature": "sig-1"
+                  },
+                  {
+                    "type": "tool_use",
+                    "id": "toolu_1",
+                    "name": "echo",
+                    "input": {
+                      "x": 9
+                    }
+                  }
+                ]
+              },
+              {
+                "role": "user",
+                "content": [
+                  {
+                    "type": "tool_result",
+                    "tool_use_id": "toolu_1",
+                    "content": "{\"echoed\":9}"
+                  }
+                ]
+              }
+            ],
+            "tools": [
+              {
+                "name": "echo",
+                "description": "Echo a number.",
+                "input_schema": {
+                  "$schema": "http://json-schema.org/draft-07/schema#",
+                  "type": "object",
+                  "properties": {
+                    "x": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "x"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            ],
+            "tool_choice": {
+              "type": "auto"
+            },
+            "stream": true,
+            "thinking": {
+              "type": "adaptive"
+            },
+            "output_config": {
+              "effort": "medium"
+            }
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "claude-sonnet-5-5",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing claude-sonnet-5-5 · 1st try"
+        },
+        {
+          "type": "assistant.thinking",
+          "text": "Use echo."
+        },
+        {
+          "type": "tool.started",
+          "toolKey": "echo",
+          "input": {
+            "x": 9
+          }
+        },
+        {
+          "type": "tool.completed",
+          "toolKey": "echo",
+          "output": {
+            "echoed": 9
+          }
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Nine."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "claude-sonnet-5-5",
+            "inputTokens": 62,
+            "outputTokens": 24
+          }
+        }
+      ],
+      "threw": null
+    },
+    "generateContent tool then thought and text": {
+      "requests": [
+        {
+          "url": "https://gateway.test/v1beta/models/gemini-3-pro:streamGenerateContent?alt=sse",
+          "body": {
+            "generationConfig": {
+              "temperature": 0,
+              "thinkingConfig": {
+                "thinkingBudget": 4096,
+                "includeThoughts": true
+              }
+            },
+            "contents": [
+              {
+                "role": "user",
+                "parts": [
+                  {
+                    "text": "Say hi."
+                  }
+                ]
+              }
+            ],
+            "systemInstruction": {
+              "parts": [
+                {
+                  "text": "You are helpful."
+                }
+              ]
+            },
+            "tools": [
+              {
+                "functionDeclarations": [
+                  {
+                    "name": "echo",
+                    "description": "Echo a number.",
+                    "parameters": {
+                      "required": [
+                        "x"
+                      ],
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "toolConfig": {
+              "functionCallingConfig": {
+                "mode": "AUTO"
+              }
+            }
+          }
+        },
+        {
+          "url": "https://gateway.test/v1beta/models/gemini-3-pro:streamGenerateContent?alt=sse",
+          "body": {
+            "generationConfig": {
+              "temperature": 0,
+              "thinkingConfig": {
+                "thinkingBudget": 4096,
+                "includeThoughts": true
+              }
+            },
+            "contents": [
+              {
+                "role": "user",
+                "parts": [
+                  {
+                    "text": "Say hi."
+                  }
+                ]
+              },
+              {
+                "role": "model",
+                "parts": [
+                  {
+                    "functionCall": {
+                      "id": "<generated>",
+                      "name": "echo",
+                      "args": {
+                        "x": 2
+                      }
+                    },
+                    "thoughtSignature": "skip_thought_signature_validator"
+                  }
+                ]
+              },
+              {
+                "role": "user",
+                "parts": [
+                  {
+                    "functionResponse": {
+                      "id": "<generated>",
+                      "name": "echo",
+                      "response": {
+                        "name": "echo",
+                        "content": {
+                          "echoed": 2
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "systemInstruction": {
+              "parts": [
+                {
+                  "text": "You are helpful."
+                }
+              ]
+            },
+            "tools": [
+              {
+                "functionDeclarations": [
+                  {
+                    "name": "echo",
+                    "description": "Echo a number.",
+                    "parameters": {
+                      "required": [
+                        "x"
+                      ],
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            ],
+            "toolConfig": {
+              "functionCallingConfig": {
+                "mode": "AUTO"
+              }
+            }
+          }
+        }
+      ],
+      "events": [
+        {
+          "type": "run.probing",
+          "model": "gemini-3-pro",
+          "attempt": 1,
+          "attempts": 3,
+          "message": "Probing gemini-3-pro · 1st try"
+        },
+        {
+          "type": "tool.started",
+          "toolKey": "echo",
+          "input": {
+            "x": 2
+          }
+        },
+        {
+          "type": "tool.completed",
+          "toolKey": "echo",
+          "output": {
+            "echoed": 2
+          }
+        },
+        {
+          "type": "assistant.thinking",
+          "text": "Weighing it."
+        },
+        {
+          "type": "assistant.delta",
+          "text": "Two."
+        },
+        {
+          "type": "run.completed",
+          "runId": "run-recording",
+          "usage": {
+            "model": "gemini-3-pro",
+            "inputTokens": 34,
+            "outputTokens": 10
+          }
+        }
+      ],
+      "threw": null
+    }
+  }
+}

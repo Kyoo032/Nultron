@@ -27,7 +27,7 @@ describe("formatContactProbe", () => {
 
 describe("shouldRetryWithoutTools", () => {
   it("retries when tools were sent and the reply was empty", () => {
-    expect(shouldRetryWithoutTools({ hasTools: true, text: false, failed: "", tooled: false })).toBe(true);
+    expect(shouldRetryWithoutTools({ hasTools: true, text: false, failed: "", tooled: false, thinking: false })).toBe(true);
   });
 
   it("retries when the gateway rejects tools on reasoning models", () => {
@@ -37,6 +37,7 @@ describe("shouldRetryWithoutTools", () => {
         text: false,
         failed: "Function tools with reasoning_effort are not supported for gpt-5.6-sol",
         tooled: false,
+        thinking: false,
       }),
     ).toBe(true);
   });
@@ -48,18 +49,23 @@ describe("shouldRetryWithoutTools", () => {
         text: false,
         failed: "'temperature' must be omitted or set to 1 for claude-sonnet-5 (status_code=400)",
         tooled: false,
+        thinking: false,
       }),
     ).toBe(false);
   });
 
   it("does not retry after a real tool call or a channel error", () => {
-    expect(shouldRetryWithoutTools({ hasTools: true, text: false, failed: "", tooled: true })).toBe(false);
+    expect(shouldRetryWithoutTools({ hasTools: true, text: false, failed: "", tooled: true, thinking: false })).toBe(false);
+    expect(
+      shouldRetryWithoutTools({ hasTools: true, text: false, failed: "", tooled: false, thinking: true }),
+    ).toBe(false);
     expect(
       shouldRetryWithoutTools({
         hasTools: true,
         text: false,
         failed: "No available channel for model deepseek-v4-pro",
         tooled: false,
+        thinking: false,
       }),
     ).toBe(false);
   });
@@ -108,6 +114,7 @@ describe("shouldRetryModelContact", () => {
         failed: "No available channel for model gpt-5.6-sol",
         text: false,
         tooled: false,
+        thinking: false,
         attempts: 1,
       }),
     ).toBe(true);
@@ -116,6 +123,7 @@ describe("shouldRetryModelContact", () => {
         failed: "No available channel for model gpt-5.6-sol",
         text: false,
         tooled: false,
+        thinking: false,
         attempts: 3,
       }),
     ).toBe(false);
@@ -134,7 +142,7 @@ describe("shouldRetryModelContact", () => {
     expect(en).toMatch(/^No response within 45s from gpt-6-luna/);
     expect(isRetryableModelFailure(en)).toBe(false);
     expect(isRetryableModelFailure(id)).toBe(false);
-    expect(shouldRetryModelContact({ failed: en, text: false, tooled: false, attempts: 1 })).toBe(false);
+    expect(shouldRetryModelContact({ failed: en, text: false, tooled: false, thinking: false, attempts: 1 })).toBe(false);
     // A refused or dropped connection is not a wait, and is still retried.
     expect(isRetryableModelFailure("fetch failed")).toBe(true);
   });
@@ -155,8 +163,18 @@ describe("shouldRetryModelContact", () => {
       ),
     ).toBe(false);
     expect(
-      shouldRetryModelContact({ failed: "fetch failed", text: true, tooled: false, attempts: 1 }),
+      shouldRetryModelContact({ failed: "fetch failed", text: true, tooled: false, thinking: false, attempts: 1 }),
     ).toBe(false);
+  });
+
+  it("does not retry an attempt that already streamed readable thinking, failed or not", () => {
+    expect(shouldRetryModelContact({ failed: "", text: false, tooled: false, thinking: true, attempts: 1 })).toBe(false);
+    expect(
+      shouldRetryModelContact({ failed: "fetch failed", text: false, tooled: false, thinking: true, attempts: 1 }),
+    ).toBe(false);
+    expect(
+      shouldRetryModelContact({ failed: "fetch failed", text: false, tooled: false, thinking: false, attempts: 1 }),
+    ).toBe(true);
   });
 
   it("names the model after the last failed try", () => {

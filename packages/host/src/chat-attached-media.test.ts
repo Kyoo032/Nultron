@@ -36,8 +36,8 @@ vi.mock("@agentforge/core", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@agentforge/core")>();
   return {
     ...actual,
-    createRuntime: (settings: Parameters<typeof actual.createRuntime>[0]) =>
-      swap.runtime ?? actual.createRuntime(settings),
+    createRuntime: (...args: Parameters<typeof actual.createRuntime>) =>
+      swap.runtime ?? actual.createRuntime(...args),
   };
 });
 

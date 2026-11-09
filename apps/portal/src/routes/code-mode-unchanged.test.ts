@@ -6,7 +6,7 @@
  * Four kinds of proof, because no one of them is enough:
  *
  *   - **The screens**, byte for byte: eighteen of them, rendered from fixed inputs, hashed, and compared
- *     with hashes made by the SAME function fed the view code from `main` (`9aba37e`).
+ *     with hashes made by the SAME function fed the view code from `main` (`9aba37e`; the two `userCode` screens since 2026-11-03).
  *   - **The route table**, as an exact list: a route added to the default mode is a failure here.
  *   - **The wire**: the password routes and the discovery route are the server's own 404 in the default
  *     mode, and the code routes still answer.
@@ -24,9 +24,10 @@ import { translator } from "../views/i18n";
 import { portalRoutes } from "./index";
 
 /**
- * Produced by `renderCodeModePages` over the views of `main` at `9aba37e`. The `id.*` entries were
- * produced again by the same function on 2026-11-03, when the Indonesian catalog was revised; the views
- * had not changed, and the `en.*` entries did not move.
+ * Produced by `renderCodeModePages` over the views of `main` at `9aba37e`; the two `userCode` screens since the
+ * typed-code fix of 2026-11-03, whose form is a GET to `/activate?code=`. The `id.*` entries were produced again
+ * by the same function on 2026-11-03, when the Indonesian catalog was revised, and `id.userCode` once more on
+ * 2026-11-09, when that revision met the typed-code fix. The `en.*` entries did not move.
  */
 const GOLDEN: Readonly<Record<string, string>> = {
   "en.signIn": "569f1f42a9868e94ba34c64af589dce01d892212ae02deb533c6699f4cae03d1",
@@ -34,7 +35,7 @@ const GOLDEN: Readonly<Record<string, string>> = {
   "en.enterCode": "f810f49131ec216f02aad943b7fde20bf01e4d7c185fd701d9c881770bdf4a88",
   "en.invite": "7b99a83ac26fd495441d477645517601035110393272892605ef74616d886647",
   "en.state": "790689fdee432252830f0241c63c63b1e43faf2b32b4d2e6ef5fab1dd32bbefc",
-  "en.userCode": "c03155e8f3bbeb995ebc6cbc06ea2ab391df3ac45a767947668faff9127c22ef",
+  "en.userCode": "2841901e5d2859eff7c29decedca58ec31effb239b5f4bc79d8a3cec2c45b558",
   "en.approve": "f37d934f52f6add3746dc66ceac2f9398826b88c1fcfd401c1e0b1a9ff1735d6",
   "en.signedOut": "e43360de1cadeaa4e1f739ff157810beb2cc02a6b9c56e3d2da1f2061c602f37",
   "en.error": "ade7dd40024801ef9ae291db0d1c5651cc9b2094de164456465e9eb84496b679",
@@ -43,7 +44,7 @@ const GOLDEN: Readonly<Record<string, string>> = {
   "id.enterCode": "1cf7931c5ab94c288bcdfdf1f5bf78193222effda9aac80cee8f04eab0988706",
   "id.invite": "6ad33a4100f5a524c0d1c27ed82814e67c42a91cf4e2309d90ae4d739209ea56",
   "id.state": "c9cd267aa5348677e2fddcc9c8c0be07ab690b3a1d04ef663364e9ead641b95a",
-  "id.userCode": "6d314c64fea4c385605251f9de468645a54ac8ca0881bb5c7cacdd74956af138",
+  "id.userCode": "d3d3e59a512d4ccdfcb58a2fe0b0f94eb28cc8ae56cb5ac9d052627370ab2c87",
   "id.approve": "baebcb2a9b6e40e8548b9295712be97579594b5c2bb5787297656b3f9c85058e",
   "id.signedOut": "6f7a8eb1464e0ba53bfa601cd9e755708d7d6a7e50852c066633cd1e1ca713a8",
   "id.error": "ae496c6a44fa2c07f7489fd1f8f348e8d6395984aea47c141e70b0ba704e3922",

@@ -25,8 +25,9 @@ function openJson(value: unknown): unknown {
   if (value == null) {
     return value;
   }
+  const key = getLocalVaultKey();
   try {
-    return openPayload(value, getLocalVaultKey());
+    return openPayload(value, key);
   } catch {
     return value;
   }

@@ -4,7 +4,7 @@ import { createStepTracker } from "./step-tracker";
 const call = { type: "tool-call", toolName: "echo" };
 const result = { type: "tool-result", toolName: "echo" };
 const delta = { type: "text-delta", textDelta: "hi" };
-const stepFinish = { type: "step-finish", finishReason: "stop" };
+const stepFinish = { type: "finish-step", finishReason: "stop" };
 
 function feed(parts: unknown[]) {
   const tracker = createStepTracker();

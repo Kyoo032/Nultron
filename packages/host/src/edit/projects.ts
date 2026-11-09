@@ -5,6 +5,7 @@ import {
   applyOp,
   emptyProject,
   DEFAULT_TITLE_STYLE,
+  redactSecrets,
   type AspectRatio,
   type TenantContext,
 } from "@agentforge/core";
@@ -183,7 +184,7 @@ export function mapJob(row: typeof editJobs.$inferSelect) {
     actualUsd: row.actualUsd,
     progress: row.progress,
     outputAssetIds: row.outputAssetIdsJson,
-    error: row.error,
+    error: row.error === null ? null : redactSecrets(row.error),
     createdAt: row.createdAt,
     startedAt: row.startedAt,
     finishedAt: row.finishedAt,

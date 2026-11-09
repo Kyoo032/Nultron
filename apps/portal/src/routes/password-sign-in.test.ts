@@ -780,7 +780,8 @@ describe("the device-code approval page", () => {
       }),
     );
     expect(signedIn.status).toBe(200);
-    expect(signedIn.text).toContain('name="user_code"');
+    expect(signedIn.text).toContain('<form method="get" action="/activate">');
+    expect(signedIn.text).toContain('id="user_code" name="code"');
     expect(signedIn.text).toContain(person.email);
     expect(agent.cookies.has(pilot.portal.runtime.cookies.session)).toBe(true);
   }, 60_000);

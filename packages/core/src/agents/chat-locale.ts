@@ -78,6 +78,7 @@ export type ChatTurnCopy = {
   interrupted: string;
   /** The model asked for could not be reached before it answered, so the turn ran on another (`{from}`, `{to}`). */
   modelFallback: string;
+  saveTimeout: string;
 };
 
 const CHAT_TURN_COPY: Record<AppLocale, ChatTurnCopy> = {
@@ -97,6 +98,7 @@ const CHAT_TURN_COPY: Record<AppLocale, ChatTurnCopy> = {
     interrupted:
       'The tool steps above ran, but I could not finish the answer.\n\nReason: {reason}\n\nSend "continue" and I will try again.',
     modelFallback: "{from} is unavailable; used {to} for this answer.",
+    saveTimeout: "Saving this reply is taking too long. Reload the chat in a minute to see whether it was kept.",
   },
   id: {
     thinkPast: "Saya akan menelusuri obrolan sebelumnya, lalu menjawab berdasarkan temuan saya.",
@@ -115,6 +117,8 @@ const CHAT_TURN_COPY: Record<AppLocale, ChatTurnCopy> = {
     interrupted:
       'Langkah-langkah alat di atas sudah berjalan, tetapi saya belum bisa menyelesaikan jawabannya.\n\nAlasan: {reason}\n\nKirim "lanjutkan" dan saya akan mencoba lagi.',
     modelFallback: "{from} tidak tersedia; jawaban ini memakai {to}.",
+    saveTimeout:
+      "Penyimpanan balasan ini terlalu lama. Muat ulang percakapan sebentar lagi untuk melihat apakah balasan sudah tersimpan.",
   },
 };
 
