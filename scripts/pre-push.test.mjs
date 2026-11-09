@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -191,6 +191,10 @@ function makeProject(folder) {
   for (const file of ["hooks/pre-push", "hooks/pre-push.mjs", "lane-guard.mjs", "where-am-i.mjs"]) {
     put(root, `scripts/${file}`, readFileSync(path.join(REPO, "scripts", file)));
   }
+  // Git on Linux and macOS runs a hook only when it is executable, as the committed shim is (100755); a copy
+  // written with the default mode is skipped with "hook was ignored", and every push then goes through unjudged.
+  // Git for Windows does not check the bit, which is why these tests passed there.
+  chmodSync(path.join(root, "scripts", "hooks", "pre-push"), 0o755);
   put(
     root,
     "lanes.json",
