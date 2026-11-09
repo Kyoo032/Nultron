@@ -215,7 +215,6 @@ describe("reasoning that is readable, with no answer text", () => {
     expect(completed(events)).toHaveLength(1);
     expect(failedEvents(events)).toHaveLength(0);
   });
-
 });
 
 describe("a call that streamed nothing", () => {
