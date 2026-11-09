@@ -225,6 +225,10 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-188](#sr-188) | Info | Tester: `finance_task` refuses a figures file the model wrote, and asks again for a number the owner did not type | Checked, not an issue (2026-10-20) | — |
 | [SR-189](#sr-189) | Low | Tester: a `finance_task` report made from one person's private attachment is a desk-wide artifact and a desk-wide Knowledge Base card | Open (2026-10-20): acceptable while a desk has one owner (OPC) | Before a hosted desk has a second person |
 | [SR-190](#sr-190) | Medium | Chat's `image_generate` and `video_generate` sent any model id and any source-image address the model wrote to the gateway, which fetches that address | Model half merged to `main` (#183, 2026-10-21), unit-tested, not driven; the address half is `fix/safe-web-search`'s `judgeMediaUrl` (the egress-guard copy from #183 was dropped when that branch took `main`) | PR merge of `fix/safe-web-search` to `main` |
+| [SR-191](#sr-191) | High | The WhatsApp webhook (`/api/v1/channels/whatsapp/webhook`) is the first route that is open to the internet and writes into a desk: anybody who can reach it could put text into a company's customer inbox, or into another company's | Built in tree (2026-11-02): the signature is checked over the exact bytes before anything is parsed, fail closed with no app secret, the desk comes from the connected-number row and never from the payload, a number is claimed only with a token that can read it; unit-tested through the real router with two desks and through the hosted adapter's own admission (no Origin or CSRF needed, 1 MB cap, neighbouring paths still refused), and driven in Chromium against the local sandbox. **Not driven with Meta, not deployed, no Caddy rule written** | Before the route is exposed on any server (Phase 3): the two env vars, the proxy rule, the preview-box gate, one live drive with Meta's test number |
+| [SR-192](#sr-192) | Medium | WhatsApp delivers at least once and in no fixed order, so a redelivered, replayed or late event could double a customer's message or undo a "read" tick | Built in tree (2026-11-02): unique partial index on `(conversation_id, direction, external_id)` with `INSERT OR IGNORE`, delivery words move forward only; unit-tested and mutation-checked on the index and the ordering; not driven with Meta | Phase 3 live drive |
+| [SR-193](#sr-193) | Medium | Customers' phone numbers, profile names and message text are personal data kept in the desk's database in the clear, readable by every member of the company, kept with no time limit, so an owner must be able to erase one customer | Retention decided by Rizky 2026-11-03: **no time limit, kept so agents can pull up older threads, deleted when the customer asks.** Built in tree: owner-only "Erase this customer" (the conversation and every message, hard delete), no expiry, no trim; logs carry counts only; a desk's delete purges all three tables. Driven in Chromium against the sandbox; not on a hosted server | Before a real customer's number is connected on a hosted desk |
+| [SR-194](#sr-194) | Low | Meta's rules and API move under the feature: the 24-hour window, per-message pricing, the ban on general-purpose AI bots (from 2026-01-15) and the Graph version | Recorded (2026-11-02): the Graph version is one constant, the window one function, and Phase 1 sends only what the owner writes | Re-read Meta's terms and changelog before Phase 2 (an agent that answers) and before the live number |
 | [SR-195](#sr-195) | Low | Two different paid media requests can share a grant key (`fingerprint` is a 64-bit non-security hash), so a Run press for a cheap clip can start a dear one | Open (2026-11-03): pinned as two `it.fails` tests, fix not applied | Next release that carries the chat-first shell |
 | [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual bounded 2026-11-06 (`fix/request-array-caps`): a posted body is charged by cost (an object or list 6, any other value 1) against 60,000, or 250,000 for a Market briefing, before a schema reads it, and error text built from `zod` issues is cut to 20; the worst failing body measured gives about 56,000 issues and 60 MB on the default profile and about 102,000 issues and 71 MB on the briefing profile | None |
 | [SR-197](#sr-197) | Medium | AI SDK 5's `streamText` prints every stream error to the console by default, and an `APICallError` carries the request body (the prompt) and the gateway's error body | Fixed in tree (2026-11-04, `fix/zod-4`): the runtime passes a silent `onError`; tested, not driven | PR merge of the AI SDK 5 move |
@@ -6556,6 +6560,74 @@ Residual:
 
 Gate: PR merge to `main`.
 
+### SR-191 {#sr-191}
+
+**The WhatsApp webhook is a public route that writes into a desk.**
+Raised 2026-11-02 by the customer inbox, Phase 1 ([map](maps/customer-inbox.md), [plan](whatsapp-omnichannel-plan.md)). High.
+
+Every other route writes as the signed-in tenant, and `getTenant` fails closed without a session. Meta has no session, so the webhook is exempt from the session gate and CSRF (`UNGATED_GETS` / `UNGATED_POSTS`, `packages/host/src/auth/routes.ts:81,98`; `CSRF_EXEMPT_PATHS`, `packages/host/src/http-adapter.ts:793`), the same shape the billing webhook has.
+
+Controls:
+- **Signature before anything else.** `verifySignature` (`packages/host/src/inbox/whatsapp.ts:59`): HMAC-SHA256 of the raw bytes under `AGENTFORGE_WHATSAPP_APP_SECRET`, constant-time compare, run before the JSON is parsed. The body is read raw under a 1 MB cap (`http-adapter.ts:247`).
+- **Fail closed.** No app secret set is a 503, not an open route; the verify-token handshake is 503 the same way and 403 on a wrong token.
+- **The payload cannot name a desk.** The write scope is the `organization_id` and `workspace_id` of the `channel_endpoints` row found by the event's `phone_number_id` (`webhook.ts:67`). An unknown or disconnected number is counted and dropped (200, so Meta does not retry).
+- **A number is claimed only with proof.** `handlePostWhatsApp` asks Graph to read the number with the pasted token before it writes anything (`handlers/customers.ts:124`), and `(kind, external_id)` is unique across the install, so a second desk's claim is a 409. Without this a desk could register another company's number id and be sent its customers.
+- **The token** sits in `settings.enc` beside the gateway key, goes only in an `Authorization` header, is redacted from every error string, and the renderer sees a fingerprint.
+- **Unauthenticated cost** is one HMAC over at most 1 MB per request, behind the hosted per-IP rate limit.
+
+Evidence: `packages/host/src/handlers/customers.test.ts` drives the real router with no cookie: unsigned, wrongly signed and tampered bodies are 401 and store nothing; a signed body for an unconnected number stores nothing; a forged `workspace_id` / `organization_id` in the payload is ignored; two desks each see only their own number's customers and a conversation id from the other desk is a 404 on every route. `whatsapp.test.ts` covers the verdicts. `packages/host/src/http-adapter.test.ts` ("the WhatsApp webhook on the hosted server") drives the hosted adapter, which router tests bypass: the POST reaches the handler with no Origin, cookie or CSRF token and with the body untouched and the signature header forwarded; a body over 1 MB is a 413 and never dispatched; `/webhook/extra`, the owner's `/api/v1/customers/*` routes and the reply route still get `origin_forbidden`; a hit without `X-Forwarded-Proto: https` is refused; the signature header is passed on that path and no other. Driven in Chromium against `scripts/whatsapp-sandbox.ts` (stub runtime, 2026-11-02): a signed delivery arrives, an unsigned one is refused.
+
+Residual:
+- **Not driven with Meta or on a hosted server.** Phase 1 has no Meta account; the sandbox signs the way Meta documents, which is not the same as Meta's real traffic.
+- **One app secret per install.** Every company's number is a customer of the same Meta app, so the secret is the operator's; a leak lets someone sign for any connected number. It lives in the server's environment only, never a file in the repo.
+- **Meta's source addresses are not checked.** The signature is the only gate. Phase 3 should decide whether the proxy also limits the route to Meta's published ranges.
+- **Hosted rate limit.** Meta's deliveries may arrive from few addresses behind the proxy; the per-IP bucket (600 per minute, burst 100) should be checked against a real busy number in Phase 3.
+
+Gate: before the route is exposed on any server.
+
+### SR-192 {#sr-192}
+
+**Redelivered, replayed and late WhatsApp events.**
+Raised 2026-11-02 by the customer inbox, Phase 1. Medium.
+
+Meta retries any non-2xx and may send the same event twice or out of order. Controls: the unique partial index `customer_messages (conversation_id, direction, external_id) WHERE external_id IS NOT NULL` with `INSERT OR IGNORE` inside the `recordInbound` transaction (`packages/host/src/inbox/store.ts:267`), so a duplicate is counted and not stored even under a race; `nextDeliveryStatus` (`packages/core/src/inbox/index.ts`) never moves a delivery word backwards, and a `failed` after `delivered` or `read` is ignored (`applyStatus`, `store.ts:376`); a report for a message the desk does not hold is counted and dropped. There is no count cap any more (see SR-193): the first build trimmed to 500 conversations and 200 messages, and that was removed on 2026-11-03 because Rizky wants customer messages kept. What bounds growth now is that only Meta-signed deliveries write, the unique index drops duplicates, and the per-IP rate limit sits in front of the route.
+
+Evidence: `store.test.ts` (28) and `migrate-0023.test.ts` (15), including a redelivery, a late `sent` after `read`, a status for a stranger's message id, and that nothing is trimmed (600 messages in one thread and 120 conversations all stay stored).
+
+Residual: storage grows with a desk's customers and has no ceiling until the owner erases someone (SR-193). Fine at one number's volume; revisit with Phase 2, when agents read the history. Not driven with Meta.
+
+Gate: Phase 3 live drive.
+
+### SR-193 {#sr-193}
+
+**Customers' numbers, names and messages are personal data in the desk's database.**
+Raised 2026-11-02 by the customer inbox, Phase 1. Medium.
+
+Phase 1 stores a customer's WhatsApp number, the profile name they chose and the text of their messages (other types are stored as a fixed label such as `[image]`; a caption or media id is never copied), and the owner's replies. They are in SQLite in the clear like every other desk row, and they are visible to every member of the company (SR-169: a desk is company-wide by design). Indonesia's personal data protection law applies to the company that owns the number; this product is its processor.
+
+**Retention, decided by Rizky on 2026-11-03:** there is no time limit. Messages are kept so that agents can pull up older threads, and they are deleted only when the customer asks. So nothing expires and nothing is trimmed (the first build's 500-conversation and 200-message caps were removed), and the only way a message goes is **Erase this customer**: `DELETE /api/v1/customers/conversations/:id` (`handleDeleteConversation`, `handlers/customers.ts`), owner or admin only, which deletes the conversation and every message in it in one transaction (`eraseConversation`, `store.ts`). It is a hard delete. The page asks first ("Erase for good" / "Keep") and the control sits at the foot of the thread. A member of the desk can read but gets a 403; another desk's id is a 404 and erases nothing; the harness checks that tenant A's conversation survives tenant B's attempt.
+
+Controls: log lines carry counts only (no number, name or text; the logger also drops fields named `messages`, `text`, `body`); a desk's delete purges all three tables (`purgeDesk`, `handlers/workspaces.ts:220`) and the tenant purge covers them (`packages/db/src/tenant-purge.ts`); disconnecting forgets the token but keeps the conversations, on purpose.
+
+Evidence: `store.test.ts` (nothing is trimmed; an erase removes the thread and leaves the other customer; another desk's id and a second erase are false; the same customer writing again starts a clean thread; a late report for an erased message is dropped), `customers.test.ts` (erase through the real router, a year-old thread is still there, member 403, other company 404, signed-out 401), `tenancy-harness.test.ts` (the by-id table and the survivor read), `customers-client.test.ts` and `customers-parts.test.tsx`, and a Chromium drive against the sandbox on 2026-11-03 (ask, Keep, switch customer, Erase for good, 404 on the old id, a fresh thread when the customer writes again, no sideways scroll at 390 px).
+
+Residual, stated plainly:
+- **Erase reaches this database only.** Copies in a backup or snapshot of the desk's data volume are outside it.
+- **A late redelivery can re-file one message.** Meta retries a failed delivery for up to seven days. If the same message is delivered again after the customer was erased, it is filed as a new conversation. The store keeps no tombstone on purpose (a tombstone is itself a record of the customer). The owner can erase again.
+- **Phase 2 widens this.** Anything an agent derives from a thread (a summary, a Knowledge Base entry, a note) is a copy of the same personal data, and erasing the customer must reach it. That is a gate on Phase 2, not a thing Phase 1 can do.
+- **No per-customer export** yet, if a customer asks for their data rather than its deletion.
+- Storage has no ceiling until an owner erases someone; see SR-192.
+
+Gate: before a real customer's number is connected on a hosted desk.
+
+### SR-194 {#sr-194}
+
+**Meta's rules and API move under the feature.**
+Raised 2026-11-02 by the customer inbox, Phase 1. Low.
+
+WhatsApp changes: the 24-hour customer service window, per-message pricing (since 2025-07-01), the ban on general-purpose AI bots in the Business API (from 2026-01-15; narrow customer support bots stay allowed) and the Graph API version. Controls: the version is one constant (`WHATSAPP_GRAPH_VERSION`, `packages/core/src/inbox/pinned.ts`), the window is one function (`whatsappReplyWindow`), and Phase 1 sends only what the owner typed. Read from Meta's published terms on 2026-11-02, not from a live number.
+
+Gate: re-read Meta's terms and changelog before Phase 2 (an agent that answers) and before the live number.
 ### SR-195 {#sr-195}
 
 **Two different paid media requests can share a grant key, so a Run press for one lets the other start.**

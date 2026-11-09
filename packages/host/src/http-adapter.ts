@@ -2,6 +2,11 @@ import { randomBytes } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { isServerMode, trustedOrigins, WORKSPACE_COOKIE } from "@agentforge/core";
 import { BILLING_TOKEN_HEADER } from "./billing/authenticate";
+import {
+  WHATSAPP_SIGNATURE_HEADER,
+  WHATSAPP_WEBHOOK_MAX_BODY_BYTES,
+  WHATSAPP_WEBHOOK_PATH,
+} from "./inbox/webhook-path";
 import { contentDispositionAttachment } from "./content-disposition";
 import {
   checkCsrfToken,
@@ -227,23 +232,37 @@ export function normaliseApiPath(raw: string): string {
   return raw.replace(/\/{2,}/g, "/").replace(/\/+$/, "") || "/";
 }
 
-async function readBody(req: IncomingMessage, method: string): Promise<{ body?: unknown; files?: HostFile[] }> {
+async function readBody(
+  req: IncomingMessage,
+  method: string,
+  path = "",
+): Promise<{ body?: unknown; files?: HostFile[]; rawBody?: Uint8Array }> {
   const contentType = header(req, "content-type") ?? "";
   if (method === "GET" || method === "HEAD") {
     return {};
   }
+  // The WhatsApp webhook authenticates by a signature over the exact bytes, and it is open to the
+  // internet before it has authenticated anyone. So its body is read under a small cap, handed over
+  // raw, and not parsed here: the handler parses only what has passed the signature.
+  const isWebhook = path === WHATSAPP_WEBHOOK_PATH;
+  const cap = isWebhook ? WHATSAPP_WEBHOOK_MAX_BODY_BYTES : MAX_BODY_BYTES;
   const chunks: Buffer[] = [];
   let total = 0;
   for await (const chunk of req) {
     const piece = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     total += piece.byteLength;
-    if (total > MAX_BODY_BYTES) {
+    if (total > cap) {
       req.destroy();
-      throw new BodyTooLarge("Request body exceeds the 26 MB cap");
+      throw new BodyTooLarge(
+        isWebhook ? "Request body exceeds the 1 MB cap" : "Request body exceeds the 26 MB cap",
+      );
     }
     chunks.push(piece);
   }
   const buffer = Buffer.concat(chunks);
+  if (isWebhook) {
+    return { rawBody: new Uint8Array(buffer) };
+  }
   if (buffer.length === 0) {
     return {};
   }
@@ -651,9 +670,9 @@ export async function handleNodeRequest(req: IncomingMessage, res: ServerRespons
   const csrfNeedsMint = !csrfCookie || !csrfTokenMatchesSession(csrfCookie, presentedSessionId);
   const mintedCookies =
     method === "GET" && csrfNeedsMint ? [csrfSetCookie(mintCsrfTokenFor(presentedSessionId), csrfMode)] : ([] as const);
-  let parsed: { body?: unknown; files?: HostFile[] };
+  let parsed: { body?: unknown; files?: HostFile[]; rawBody?: Uint8Array };
   try {
-    parsed = await readBody(req, method);
+    parsed = await readBody(req, method, path);
   } catch (error) {
     if (error instanceof BodyTooLarge) {
       return respondRejection(res, { status: 413, code: "payload_too_large", message: error.message }, context);
@@ -664,7 +683,7 @@ export async function handleNodeRequest(req: IncomingMessage, res: ServerRespons
     }
     throw error;
   }
-  const { body, files } = parsed;
+  const { body, files, rawBody } = parsed;
   // A client that goes away mid-stream aborts the run (same as the desktop IPC path), so a live model
   // call is not left running for nobody and `res.write` never hits a destroyed socket.
   const abort = new AbortController();
@@ -688,6 +707,12 @@ export async function handleNodeRequest(req: IncomingMessage, res: ServerRespons
       // read from the raw request inside the handler, so the handler stays adapter-agnostic and
       // the desktop IPC path — which never carries it — reads `undefined` and refuses.
       [BILLING_TOKEN_HEADER]: header(req, BILLING_TOKEN_HEADER),
+      // The WhatsApp webhook's signature, forwarded for the same reason: the handler stays
+      // adapter-agnostic, and the desktop IPC path never carries it. Only on that path, so every
+      // other request keeps exactly the header set it always had.
+      ...(path === WHATSAPP_WEBHOOK_PATH
+        ? { [WHATSAPP_SIGNATURE_HEADER]: header(req, WHATSAPP_SIGNATURE_HEADER) }
+        : {}),
       // Hosted only: the browser's language, for a person who never chose one (`./locale-boot.ts`).
       // Off server mode the request carries exactly the headers it always did, so the desk's boot
       // locale is the only locale there is.
@@ -695,6 +720,7 @@ export async function handleNodeRequest(req: IncomingMessage, res: ServerRespons
       "x-agentforge-transport": "http",
     },
     body,
+    rawBody,
     files,
     workspaceId: cookies[WORKSPACE_COOKIE] || readSelectedWorkspaceId() || null,
     abortSignal: abort.signal,
@@ -765,7 +791,7 @@ type Rejection = { readonly code: string; readonly message: string };
  * accepting anything. One literal path, never a prefix: `/api/v1/billing/top-up` is a browser
  * call and keeps every rule.
  */
-const CSRF_EXEMPT_PATHS: ReadonlySet<string> = new Set(["/api/v1/billing/webhook"]);
+const CSRF_EXEMPT_PATHS: ReadonlySet<string> = new Set(["/api/v1/billing/webhook", WHATSAPP_WEBHOOK_PATH]);
 
 function hostRejection(host: string | undefined, serverMode: boolean): Rejection | null {
   if (serverMode) {

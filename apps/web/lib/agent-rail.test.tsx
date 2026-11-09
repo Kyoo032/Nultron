@@ -137,7 +137,7 @@ describe("AgentRailView before the host answers", () => {
 });
 
 describe("AgentRailView account group", () => {
-  it("lists the five account pages in order with the published test ids", () => {
+  it("lists the six account pages in order with the published test ids", () => {
     const html = markup({ pathname: "/settings", activeId: null });
     const group = html.slice(
       html.indexOf('data-testid="rail-account-group"'),
@@ -147,6 +147,7 @@ describe("AgentRailView account group", () => {
     expect(tags.map((tag) => attr(tag, "data-testid"))).toEqual([
       "mode-knowledge",
       "channels-link",
+      "customers-link",
       "workspaces-link",
       "usage-link",
       "settings-link",
@@ -154,6 +155,7 @@ describe("AgentRailView account group", () => {
     expect(tags.map((tag) => attr(tag, "href"))).toEqual([
       "/knowledge",
       "/channels",
+      "/customers",
       "/workspaces",
       "/usage",
       "/settings",

@@ -142,6 +142,14 @@ webhook path is skipped as it is for CSRF. In server mode the TLS rule and the b
 HTTPS is required via `X-Forwarded-Proto` (`:62-64`, `HTTPS_REQUIRED` at `:100`); a direct hit on
 the app's own loopback port with no such header is refused in server mode.
 
+**Two routes are exempt from the session gate and from CSRF**, because their caller is a machine with no
+cookie: the billing webhook and, since 2026-11-02, the WhatsApp webhook `/api/v1/channels/whatsapp/webhook`
+(`CSRF_EXEMPT_PATHS`, `http-adapter.ts:793`; `UNGATED_GETS` / `UNGATED_POSTS`, `auth/routes.ts:81,98`). Each
+authenticates by its own secret instead, and each is a literal path, never a prefix. The WhatsApp one reads
+its body raw under a 1 MB cap (`readBody`, `:247`) so its HMAC is checked over the exact bytes before
+anything is parsed, and forwards the `x-hub-signature-256` header on that path only. Its map is
+[`customer-inbox.md`](customer-inbox.md); the risk is [SR-191](../security-register.md#sr-191).
+
 ### 4. Sessions
 
 `packages/host/src/auth/session.ts`. Opaque 32-byte ids (`SESSION_ID_BYTES` at `:16`) — no JWT,

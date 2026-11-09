@@ -135,6 +135,7 @@
   --mode-education: #0f766e;
   --mode-knowledge: #0c8378;
   --mode-channels: #2563eb;
+  --mode-customers: #15803d;
   --mode-workspaces: #6063f1;
   --mode-usage: #04855d;
   --mode-settings: #64748b;
@@ -363,6 +364,7 @@ html[data-shell="desktop"] {
   --mode-education: #16aca1;
   --mode-knowledge: #0fab9e;
   --mode-channels: #7098f2;
+  --mode-customers: #3fb86a;
   --mode-workspaces: #8d8ff5;
   --mode-usage: #06af7a;
   --mode-settings: #8e9bae;
@@ -1217,6 +1219,7 @@ h6 {
 .desk-canvas:has(main[data-mode="education"]:not([hidden] *)) { --page-mode: var(--mode-education); }
 .desk-canvas:has(main[data-mode="knowledge"]:not([hidden] *)) { --page-mode: var(--mode-knowledge); }
 .desk-canvas:has(main[data-mode="channels"]:not([hidden] *)) { --page-mode: var(--mode-channels); }
+.desk-canvas:has(main[data-mode="customers"]:not([hidden] *)) { --page-mode: var(--mode-customers); }
 .desk-canvas:has(main[data-mode="workspaces"]:not([hidden] *)) { --page-mode: var(--mode-workspaces); }
 .desk-canvas:has(main[data-mode="usage"]:not([hidden] *)) { --page-mode: var(--mode-usage); }
 .desk-canvas:has(main[data-mode="settings"]:not([hidden] *)) { --page-mode: var(--mode-settings); }
@@ -2154,6 +2157,7 @@ aside nav > p {
 [data-mode="education"] { --mode: var(--mode-education); }
 [data-mode="knowledge"] { --mode: var(--mode-knowledge); }
 [data-mode="channels"] { --mode: var(--mode-channels); }
+[data-mode="customers"] { --mode: var(--mode-customers); }
 [data-mode="workspaces"] { --mode: var(--mode-workspaces); }
 [data-mode="usage"] { --mode: var(--mode-usage); }
 [data-mode="settings"] { --mode: var(--mode-settings); }

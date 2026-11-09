@@ -66,6 +66,7 @@ export type AgentRailViewProps = {
 const ACCOUNT_LINKS: ReadonlyArray<{ href: string; icon: ModeIconName; testId: string; labelKey: string }> = [
   { href: "/knowledge", icon: "knowledge", testId: "mode-knowledge", labelKey: "rail.knowledge" },
   { href: "/channels", icon: "channels", testId: "channels-link", labelKey: "rail.channels" },
+  { href: "/customers", icon: "customers", testId: "customers-link", labelKey: "rail.customers" },
   { href: "/workspaces", icon: "workspaces", testId: "workspaces-link", labelKey: "agents.rail.manage" },
   { href: "/usage", icon: "usage", testId: "usage-link", labelKey: "rail.usage" },
   { href: "/settings", icon: "settings", testId: "settings-link", labelKey: "rail.settings" },

@@ -98,6 +98,7 @@ Every page names its product. The first line under the H1 says `Product: … · 
 | Page | Product | Subsystem | Verified by |
 |---|---|---|---|
 | [`channels.md`](channels.md) | both | Channels: Telegram bot token, desk channel store, send and poll, pinned egress | `features/channels.md` |
+| [`customer-inbox.md`](customer-inbox.md) | both | Customer inbox (WhatsApp), Phase 1: the signed public webhook, the desk-scoped store, the owner's Customers page and the 24-hour reply window, and the local sandbox that stands in for Meta | `features/customers.md` |
 | [`chat-send.md`](chat-send.md) | both | Chat send: composer → transport → run route → runtime → SSE → rendered message | `features/chat.md` |
 | [`chat-documents.md`](chat-documents.md) | both | Documents in the Chat composer: one format table, three doors, the local read route, the masked and cut text, the save on send with the host's notes, the private `uploads/~<user>/` desk copy, and the reload | `features/chat.md` |
 | [`model-policy.md`](model-policy.md) | both | How each gateway model is called: the policy table (wire, Thinking levels, Off, job knob, tier), the run's effort plan, and the one retry when a call's Thinking parameter is refused; since the second pass also the Responses `reasoning` block for GPT-6, Chat sending a level only once picked, and the dev-only `catalog-diff` and `probe` tools; since the third pass (2026-09-30) also the recommendation lists (Chat default `gpt-6-luna`, the Recommended set, per-mode and outage lists, the video order) | `features/models.md` |
