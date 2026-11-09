@@ -612,7 +612,7 @@ export class AiSdkRuntime implements AgentRuntime {
           result.failed ||
           (shouldFailEmptyAssistant({
             text: result.text,
-            thinking: Boolean(result.thinking),
+            thinking: hasVisibleText(result.thinking),
             tooled: result.tooled,
           })
             ? "The model returned no text"
@@ -651,7 +651,7 @@ export class AiSdkRuntime implements AgentRuntime {
       throw new Error(message);
     }
     // Tool-only or thinking-only success must still complete so the transcript persists.
-    if (shouldFailEmptyAssistant({ text: result.text, thinking: Boolean(result.thinking), tooled: result.tooled })) {
+    if (shouldFailEmptyAssistant({ text: result.text, thinking: hasVisibleText(result.thinking), tooled: result.tooled })) {
       const message = formatModelContactError(
         input.version.model,
         contactAttempts,
