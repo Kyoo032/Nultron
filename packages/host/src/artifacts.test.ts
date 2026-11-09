@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ApiError, wrappingKeyFromSecret, type TenantContext } from "@agentforge/core";
 import { ensureSchema } from "@agentforge/db/ensure-schema";
-import { DESK_VAULT_KEY_TOO_WEAK } from "@agentforge/db/vault-key";
+import { SERVER_VAULT_KEY_TOO_WEAK } from "@agentforge/db/vault-key";
 import { ARTIFACT_BODY_MAX_BYTES, createArtifactStore, type ArtifactStore } from "./artifacts";
 
 const KEY = wrappingKeyFromSecret("b".repeat(64));
@@ -67,7 +67,7 @@ describe("artifact store", () => {
     expect(store.remove(otherDesk, created.id)).toBe(false);
   });
 
-  it("throws instead of returning the stored envelope as the body when the wrap key is refused", () => {
+  it("throws instead of returning the stored envelope as the body when the server refuses the wrap key", () => {
     const created = store.create(tenant, {
       mode: "data",
       kind: "analysis",
@@ -76,9 +76,9 @@ describe("artifact store", () => {
       body: "secret numbers 12000",
     });
     const refused = createArtifactStore(db, () => {
-      throw new Error(DESK_VAULT_KEY_TOO_WEAK);
+      throw new Error(SERVER_VAULT_KEY_TOO_WEAK);
     });
-    expect(() => refused.get(tenant, created.id)).toThrow(DESK_VAULT_KEY_TOO_WEAK);
+    expect(() => refused.get(tenant, created.id)).toThrow(SERVER_VAULT_KEY_TOO_WEAK);
   });
 
   it("orders newest first and lists every mode when none is given", () => {

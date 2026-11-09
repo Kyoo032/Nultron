@@ -225,17 +225,19 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-188](#sr-188) | Info | Tester: `finance_task` refuses a figures file the model wrote, and asks again for a number the owner did not type | Checked, not an issue (2026-10-20) | — |
 | [SR-189](#sr-189) | Low | Tester: a `finance_task` report made from one person's private attachment is a desk-wide artifact and a desk-wide Knowledge Base card | Open (2026-10-20): acceptable while a desk has one owner (OPC) | Before a hosted desk has a second person |
 | [SR-190](#sr-190) | Medium | Chat's `image_generate` and `video_generate` sent any model id and any source-image address the model wrote to the gateway, which fetches that address | Model half merged to `main` (#183, 2026-10-21), unit-tested, not driven; the address half is `fix/safe-web-search`'s `judgeMediaUrl` (the egress-guard copy from #183 was dropped when that branch took `main`) | PR merge of `fix/safe-web-search` to `main` |
+| [SR-195](#sr-195) | Low | Two different paid media requests can share a grant key (`fingerprint` is a 64-bit non-security hash), so a Run press for a cheap clip can start a dear one | Open (2026-11-03): pinned as two `it.fails` tests, fix not applied | Next release that carries the chat-first shell |
 | [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual bounded 2026-11-06 (`fix/request-array-caps`): a posted body is charged by cost (an object or list 6, any other value 1) against 60,000, or 250,000 for a Market briefing, before a schema reads it, and error text built from `zod` issues is cut to 20; the worst failing body measured gives about 56,000 issues and 60 MB on the default profile and about 102,000 issues and 71 MB on the briefing profile | None |
 | [SR-197](#sr-197) | Medium | AI SDK 5's `streamText` prints every stream error to the console by default, and an `APICallError` carries the request body (the prompt) and the gateway's error body | Fixed in tree (2026-11-04, `fix/zod-4`): the runtime passes a silent `onError`; tested, not driven | PR merge of the AI SDK 5 move |
 | [SR-198](#sr-198) | Medium | AI SDK 5 brings `undici` 5.29.0 and `@fastify/busboy` into the hosted image, with five HIGH `undici` advisories and one `busboy` advisory | Fixed in tree (2026-11-04, `fix/zod-4`): scoped override to `undici` 6.29.1, which drops `busboy`; the SDK's guarded download fetch checked on it; not driven | PR merge of the AI SDK 5 move |
 | [SR-199](#sr-199) | Medium | The credential redactor ran three of its regular expressions in quadratic time: a cookie header followed by a long run of spaces, a long dotted or hyphenated run (100k characters took 17.7 s and 62 s), and a run of `eyJ-` JWT header prefixes (100k characters took 12 s to 18 s in `redactCredentials`, 25 s through `redactSecrets` and `redactSecretsDeep` together), so crafted page or upstream text could block the host event loop | Fixed in tree (2026-11-06, `fix/redactor-gaps`): the cookie rule tests its line for `=` in a replacer, the URL rule takes its scheme in a lookbehind, and the JWT rule finds each dotted run that holds an `eyJ` once and masks inside it in a replacer; `redact-redos.test.ts` red before, green after; not driven | PR merge of `fix/redactor-gaps` to `main` |
 | [SR-201](#sr-201) | Medium | The SSRF guard resolved a name, then let `fetch` resolve it again to connect (DNS rebinding), and let a connection through when its own lookup failed | Fixed in tree (2026-11-06, `fix/sec-004a-dns-pinning`): one lookup per hop, refused when it fails or answers privately, then the socket is pinned to that answer; driven on Node 24 and on Node 22.23.4 (the image's runtime) against a loopback listener and real DNS and TLS; not run on a hosted server | PR merge |
 | [SR-202](#sr-202) | Medium | `injectionGuardBypass` was saved in `settings.enc`: one `POST /api/v1/settings` off server mode switched the prompt-injection guard off for good, and a stored `true` was honoured on a hosted desk and could not be cleared | Fixed in tree (2026-11-06, `fix/sec-005-guard-bypass-not-persisted`): the flag is never written, a stored `true` is ignored and removed on load, a hosted desk always runs the guard; tested, not driven on a hosted server | PR merge of `fix/sec-005-guard-bypass-not-persisted` |
-| [SR-203](#sr-203) | Low | A desk's `AGENTFORGE_SECRETS_KEY` was never measured, so a passphrase became the wrap key through one unsalted SHA-256 and a copied `settings.enc` could be guessed offline | Fixed in tree (2026-11-06, `fix/sec-006-secrets-key-floor`): a desk key under 32 bytes is refused at boot and by `getLocalVaultKey`, floor only, and a refused key no longer quarantines `settings.enc`; unit-tested and boot-tested, not driven on a desk with data. Residual: a typed 44-character passphrase still passes | PR merge |
+| [SR-203](#sr-203) | Low | A desk's `AGENTFORGE_SECRETS_KEY` was never measured, so a passphrase became the wrap key through one unsalted SHA-256 and a copied `settings.enc` could be guessed offline | Partly fixed in tree (server refuses, desk warns; 2026-11-06, `fix/sec-006-secrets-key-floor`, then changed 2026-11-09, `fix/desk-key-warn`): the server refuses a key under 32 bytes at boot and in `getLocalVaultKey`; a desk only warns, once per process, because refusing locked out any desk that had already sealed data under a short key, and a refused key no longer quarantines `settings.enc`. Unit-tested and boot-tested, not driven on a desk with data. Residual: a desk can still run a guessable key until a re-key path exists, and a typed 44-character passphrase still passes | PR merge |
 | [SR-204](#sr-204) | Medium | Personal (retired): the Electron product window sets `sandbox: false`, because its preload reads the brand files with `fs` | Won't fix, moot (Rizky, 2026-11-06): the desktop app was retired on 2026-10-14, and nothing packs or ships `apps/desktop` | None while the desktop is retired. Reopen if a desktop build is revived, and fix before that cut |
 | [SR-205](#sr-205) | Low | Personal (retired): `wrapKey` returns an unstored random wrap key when keytar fails, so settings sealed in that session do not open on the next launch | Won't fix, moot (Rizky, 2026-11-06): the desktop app was retired on 2026-10-14 | None while the desktop is retired. Reopen if a desktop build is revived, and fix before that cut |
 | [SR-206](#sr-206) | Low | The backup heartbeat URL would sit in `.env`, which the `app` container loads, so code running in the app could send fake success pings and hide a dead backup | Fixed in PR #206 (2026-11-06): `backup.sh` reads it from the process environment only, set on the cron line; tested, not driven on a server | — |
 | [SR-207](#sr-207) | Medium | The Host check ran only on mutating `/api` requests, so a DNS-rebinding page could `GET` the API (media, threads, masked settings) from unauthenticated webdev, and a GET in server mode was not checked against the Host allowlist (SEC-004 4b) | Fixed in tree (2026-11-06, `fix/sec-004b-get-host-check`): every `/api` request needs a trusted Host, `/healthz` exempt; unit-tested through the real adapter, not driven | PR merge |
+| [SR-208](#sr-208) | Low | nixpkgs marks pnpm 9.15.9, the version the repo pins, insecure (twelve CVEs, no fix on 9.x); the Nix build permits that one version by name | Accepted for the Nix migration (2026-11-07): build-time only, no git dependencies in the lock, the Nix store pins every tarball by hash. Moving to pnpm 10 is a separate change | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -1626,7 +1628,7 @@ fixed, two were fixed on `main` afterwards, and four remain. All six re-read her
 | A06-1, nothing runs the tests | **Moved to the local gate, 2026-09-24** | `.github/workflows/` is deleted. `scripts/ci-local.mjs` (`pnpm ci:local`) runs lint, tsc, every unit suite and `node scripts/audit-deployed.mjs --level high`. It runs only when someone runs it: [SR-80](#sr-80). See [SR-12](#sr-12) |
 | A06-2, the image ships devDependencies | **Fixed, 2026-10-05** | The `prod` stage installs with `--prod` (`webapp-deploy/Dockerfile:113`) and the runtime copies that tree (`:167`); `tsx` moved to `dependencies` (`apps/web/package.json:20`). [SR-113](#sr-113) |
 | A08-1, actions pinned to mutable tags | **Closed by removal, 2026-09-24** | The three workflows and their 15 `@v4` `uses:` lines are deleted; the repo has no `.github/workflows/`. [SR-80](#sr-80) |
-| A10-6, DNS rebinding | **Fixed in tree, 2026-11-06** | `packages/core/src/security/safe-fetch.ts:104-126` resolves once per hop and fails closed, and `:145` and `:172` pin the undici agent's `lookup` to that answer. [SR-201](#sr-201) |
+| A10-6, DNS rebinding | **Fixed in tree, 2026-11-06** | `packages/core/src/security/safe-fetch.ts:98-123` resolves once per hop and fails closed, and `:141` and `:168` pin the undici agent's `lookup` to that answer. [SR-201](#sr-201) |
 
 Required action: A06-1 is the one that matters, because it is why every other row in this register
 is proved by hand. Since 2026-09-24 its answer is the local gate, and what remains of it is
@@ -6004,6 +6006,12 @@ thread" is deliberately not built (`docs/internal/chat-computer-spec.md` Layer 2
 the card was driven in Chromium on a stub desk (Run, Not now, 390 px). The first live try (2026-10-23, a Daily-tier chat model on the owner's PC) held the picture back as designed and billed nothing, then showed that the model fills optional fields with placeholders (`model: "default"`, `image_url: "https://example.com"`), so the Run turn's call no longer matched its grant and a second card appeared. Fixed in the same branch: placeholders are dropped from the request, and a granted call runs with the card's own fields, never the model's extras. The live retest is still owed, so no paid media has been made yet. New gate: lifts when the tester change is promoted to
 `main` and one Run press has been driven live.
 
+Update 2026-11-03: the gate now has a formal check, the project skill `.cursor/skills/verify-paid-media-gate`
+(`pnpm verify:paid-gate`). It checks the real gate against a specification for every call sequence up to 3 against
+every grant list up to 2, accounts for every `.execute({ bindings })` call in the host, and proves with `--teeth`
+that it goes red when the code is broken. It found [SR-195](#sr-195). It does not replace the live Run press this
+row still owes.
+
 ### SR-168 {#sr-168}
 
 **Tester code only: the research worker's answer to the model was not scanned for injection.**
@@ -6120,8 +6128,8 @@ A salt and a slow KDF protect a guessable secret, such as a password. This secre
 host refuses to start unless `AGENTFORGE_SECRETS_KEY` carries at least 32 random bytes (`packages/db/src/vault-key.ts`,
 `MIN_VAULT_KEY_BYTES` and `SERVER_VAULT_KEY_TOO_WEAK`), and the deploy docs generate it with `openssl rand -hex 32`
 (`webapp-deploy/README.md:287,508`). Hashing 256 random bits gives a 256-bit key. Recorded so nobody chases it twice.
-That held for the server only: a desk measured nothing until [SR-203](#sr-203), which also records the human-chosen
-keys that still pass the floor.
+That held for the server only: a desk measured nothing until [SR-203](#sr-203), which makes a desk warn about a short key
+and records the human-chosen keys that still pass the floor.
 
 ### SR-174 {#sr-174}
 
@@ -6548,6 +6556,28 @@ Residual:
 
 Gate: PR merge to `main`.
 
+### SR-195 {#sr-195}
+
+**Two different paid media requests can share a grant key, so a Run press for one lets the other start.**
+Raised 2026-11-03 by the formal check of the paid media gate (finding F1). Low. Open. SR-195 because SR-191 to
+SR-194 are taken by the WhatsApp branch (PR #198).
+
+Evidence: a grant is filed under `mediaRequestKey`, which is `fingerprint(...)` of the canonical request text
+(`packages/core/src/runtime/media-permission.ts:121`, `:133-138` at `b79a527`). `fingerprint` is two 32-bit
+passes, and its own note says it is not a security hash. `.cursor/skills/verify-paid-media-gate/scripts/find-collision.mjs`
+found a pair of 12-second clips with the same key `a64e1d812a3b147e`: one on `veo-3.1-lite`, one on `veo_3_1`,
+with different prompt tails. The second model lists at 8x the price per second (`media-pricing.ts`: 0.05 against
+0.40 USD/s at 720p). A grant for the cheap clip lets the dear clip start, and `argsToRun` runs the dear request's
+own fields: $4.80 billed where the card showed $0.60. Pinned as two `it.fails` tests in
+`packages/core/src/runtime/media-permission.property.test.ts`.
+
+What it takes: someone who controls what the model writes (text in a page or a file) and a pair computed ahead of
+time, about five minutes on four cores. The person must still press Run on the cheap card.
+
+Fix: key grants by the canonical text itself (`${tool}\n${lines}`, already unambiguous) and delete `fingerprint`.
+Then change the two `it.fails` tests to `it`. Not applied: the check that found it does not edit product code.
+
+Gate: the same as [SR-167](#sr-167), the next release that carries the chat-first shell.
 ### SR-196 {#sr-196}
 
 **Two HIGH advisories reach the hosted image: `zod` and `body-parser`.**
@@ -6739,13 +6769,15 @@ private host is a read, not only a blind connect. The architect's reading (2026-
 HTTP and this guard is HTTPS only with certificate checks, so it does not leak metadata; what remains is a connect or
 probe of private hosts and ports. That is a protocol argument, not a test.
 
-Fix (`packages/core/src/security/safe-fetch.ts`): per hop, `resolvePublicAddresses` (`:104-126`) resolves the host once
+Fix (`packages/core/src/security/safe-fetch.ts`): per hop, `resolvePublicAddresses` (`:98-123`) resolves the host once
 and refuses a failed lookup, an empty answer, an answer that is not an IP address and any private answer, all
 `400 invalid_endpoint`, with "Could not resolve this URL's host" for the first two and "URL must point at a public host"
-for the others. `pinnedAgent` (`:172`) then builds an undici `Agent` whose `connect.lookup` (`pinnedLookup`, `:145`)
-returns only that vetted list and answers for that host only, and `fetchPublicHttps` passes it as `dispatcher` (`:248`).
+for the others. `pinnedAgent` (`:168`) then builds an undici `Agent` whose `connect.lookup` (`pinnedLookup`, `:141`)
+returns only that vetted list and answers for that host only, and `fetchPublicHttps` passes it as `dispatcher` (`:246`).
 The socket never asks DNS. The agent is per hop and destroyed after the body is read. IP literals stay on the lexical
-check, because undici does not call `lookup` for a literal. `lookupImpl` stays the test seam. `@agentforge/core` gains a
+check, because undici does not call `lookup` for a literal. `lookupImpl` stays the test seam. The default `fetchImpl`
+is `defaultFetch` (`:172`), undici's own `fetch` from the package that builds the Agent, not `globalThis.fetch` (Notion
+BUG-63, below). `@agentforge/core` gains a
 direct dependency on `undici` 6.29.1, the version SR-198 already pins, so the deployed closure holds no new package;
 the lockfile gains one importer line.
 
@@ -6765,8 +6797,25 @@ bundles undici 6.29.1 (no version skew). A pinned name DNS cannot answer reached
 HTTPS the pinned lookup was honoured with `all: true` and the certificate was still checked against the hostname;
 `fetchPublicHttps` returned 200 for `https://example.com/` and refused `localtest.me` and an `.invalid` name.
 
-Residual: (1) The unit tests run on the developer machine's Node, never the image's, so a future `NODE_VERSION`
-bump in the Dockerfile is not checked by them; re-run the pin check on the new version when it changes.
+Version skew (Notion BUG-63, fixed in tree 2026-11-09 on `fix/safe-fetch-undici-fetch`): the first version of this fix
+handed an `undici` 6.29.1 `Agent` to `globalThis.fetch`, which is whatever undici the running Node bundles (6.29.1 on
+the image's 22.23.4, 7.x on Node 24). That pair worked on both, but by luck: `engines` is `node >=22`, and a Node
+whose bundled undici rejected the dispatcher would have failed every guarded fetch, or ignored the pin. The default is
+now `defaultFetch` (`safe-fetch.ts:172`), the `fetch` export of the same `undici` package as `pinnedAgent`, so the
+dispatcher and the fetch are one version on any Node. `safe-fetch.test.ts` asserts the default is undici's own and that
+a hop with no `fetchImpl` goes through it with the pinned Agent and never through `globalThis.fetch` (three new tests; five of the file's 35 failed before the change: `defaultFetch is not a function` where the tests use it, and a
+hop with no `fetchImpl` read the stubbed global's body). Driven on 2026-11-09 with no `fetchImpl` on
+Node 22.23.4 (bundled undici 6.29.1) and Node 24.13.0 (bundled undici 7.18.2): `https://example.com/` answered 200 over
+TLS, a real 302 to it was followed by hand, `localtest.me` and an `.invalid` name were refused, and the byte cap,
+truncation, abort and timeout paths behaved. `audit:deployed` is unchanged (`undici` was already in the closure).
+
+The host test setup guards undici's `fetch` as well as `globalThis.fetch` (`packages/host/test/setup.ts`,
+`network-tripwire.test.ts`), so a host test that reaches the internet through a guarded fetch still fails; with the
+undici guard removed the tripwire test times out on a real connection instead.
+
+Residual: (1) The unit tests run on the developer machine's Node, never the image's. With the default fetch and the
+Agent from one package the pin no longer depends on Node's bundled undici, but re-run `safe-fetch.test.ts` on the new
+Node after a `NODE_VERSION` bump.
 (2) Not driven on a hosted server. (3) A transient DNS failure is now a 400 instead of a network error, on purpose.
 The refusal carries the lookup error as its `cause`, so the component installer still reports `offline` for
 ENOTFOUND and EAI_AGAIN (`download.test.ts`, "reports offline when the host name does not resolve"). (7) The DNS
@@ -6829,16 +6878,16 @@ Raised 2026-10-15 as SEC-006 by the security tester, fixed 2026-11-06. Low. Exte
 
 Evidence: off server mode `getLocalVaultKey` returned `wrappingKeyFromSecret(fromEnv || readOrCreateMasterKeyFile(env))` with no check on `fromEnv` (`packages/db/src/vault-key.ts`, desk branch). `wrappingKeyFromSecret` is one unsalted SHA-256 (`packages/core/src/crypto/envelope.ts:14-16`), so `AGENTFORGE_SECRETS_KEY=hunter2` gave an AES key anyone with a copy of `settings.enc` could guess offline, and a hit opens every envelope on the install. The auto-created `.master-key` is `randomBytes(32)` hex and was never the problem (b13 in `docs/internal/blockers-2026-09-15.md`).
 
-Fix: `assertDeskVaultKeyUsable` (`packages/db/src/vault-key.ts`, a pure check of the variable that reads no file) throws `DESK_VAULT_KEY_TOO_WEAK` when the variable is set and `vaultKeyEntropyBytes` is under 32. `getLocalVaultKey` calls it first on a desk, and the web server calls it at boot: from `apps/web/server-env.ts`, ahead of the host and the database, and again in `main()` of `server.ts` for a value that only a `.env` file supplies. Floor only, as the server's first check, with no variety test. The reason is the fixtures: 40 test and script files under `packages`, `apps` and `scripts` set a desk `AGENTFORGE_SECRETS_KEY` made of one repeated character, such as `"d".repeat(64)`, which the server's variety check refuses (`git grep` for `SECRETS_KEY` within 40 characters of `.repeat(`). A blank value still falls back to `.master-key`.
+Fix (changed 2026-11-09, `fix/desk-key-warn`; the first version, 2026-11-06, refused on a desk): `warnWeakDeskVaultKey` (`packages/db/src/vault-key.ts:178-187`, a pure check of the variable that reads no file) logs `DESK_VAULT_KEY_WEAK_WARNING` through `console.warn` when the variable is set off server mode and `vaultKeyEntropyBytes` is under 32, once per process (`weakDeskKeyWarned`, `:176`). The text names the variable, says the key is guessable, gives `openssl rand -hex 32`, says a new key cannot open data sealed under the old one, and never contains the value. `getLocalVaultKey` calls it first on a desk (`:192`) and then derives the key exactly as it did before the first fix, so sealed data keeps opening. The web server calls it at boot: from `apps/web/server-env.ts`, ahead of the host and the database, and again in `main()` of `server.ts` for a value that only a `.env` file supplies. The server is unchanged: `getLocalVaultKey` still throws `SERVER_VAULT_KEY_TOO_WEAK` (`:199`) and `SERVER_VAULT_KEY_NOT_RANDOM` (`:204`), and `assertHostedEnvComplete` refuses at boot before anything is written. Floor only, with no variety test on a desk. The reason is the fixtures: 40 test and script files under `packages`, `apps` and `scripts` set a desk `AGENTFORGE_SECRETS_KEY` made of one repeated character, such as `"d".repeat(64)`, which the server's variety check refuses (`git grep` for `SECRETS_KEY` within 40 characters of `.repeat(`). A blank value still falls back to `.master-key`.
 
-A refused key is a hard error, not a wrong key. The independent review found that `decodeStoredPayload` (`packages/host/src/settings-store.ts`) called `getLocalVaultKey()` inside the `try` around the decrypt, so on a desk `DESK_VAULT_KEY_TOO_WEAK` was read as "settings.enc will not decrypt" and `quarantineUnreadableSettings` renamed the file to `settings.enc.unreadable`; the desk then looked fresh and every save threw. The key is now resolved before the `try`, and the same one-line move is made in the three other readers that swallowed it: `openJson` in `packages/host/src/threads.ts` (returned the raw envelope as the message), `openText` in `packages/db/src/repos/drizzle-agent-repository.ts` (returned an empty system prompt) and `open` in `packages/host/src/artifacts.ts` (returned the stored envelope as the body). Left alone: `readText` in `packages/host/src/desk-files/file-store.ts` already fails closed with a fixed `root_unavailable` and its messages reach the model, and `createSessionSecrets` and the portal sign-out in `tenant-reset.ts` are server-only, where the boot check has already proved the key. The message is fixed text, names the variable and `openssl rand -hex 32`, and never contains the value. Refused now, not warned first. Every documented generator already yields 32 bytes or more: `openssl rand -hex 32` in `webapp-deploy/README.md`, `webapp-deploy/.env.example` and `scripts/release-web.mjs`, `randomBytes(32)` hex in `webapp-deploy/pilot-local.mjs`, `webapp-deploy/k8s/local-lib.mjs`, `scripts/review-instance.ps1` and `apps/desktop/main.cjs`; the root `.env.example` leaves it empty; the preview desks' provisioning script refuses a key that is not 64 hex digits; the webdev `.env` files set no key and use `.master-key`. Proven by `packages/db/src/vault-key.test.ts` (desk passphrase refused, message free of the value, no `.master-key` written, hex, base64 and base64url accepted, blank falls back, `assertDeskVaultKeyUsable` reads no file), by one test per swallowing reader (`settings-store.test.ts`, `threads-vault-key.test.ts`, `drizzle-agent-repository.test.ts`, `artifacts.test.ts`), by `hosted-env.test.ts` and `hosted-mode-guard.test.ts`, and by `apps/web/server/boot-order.test.ts`, which starts the real `server.ts` on a desk with `AGENTFORGE_SECRETS_KEY=hunter2` and a queued wipe and finds it refused with the data dir untouched.
+A refused key is a hard error, not a wrong key. This now concerns the server, the only mode that refuses. The independent review of the first version, which also refused on a desk, found that `decodeStoredPayload` (`packages/host/src/settings-store.ts`) called `getLocalVaultKey()` inside the `try` around the decrypt, so the refusal was read as "settings.enc will not decrypt" and `quarantineUnreadableSettings` renamed the file to `settings.enc.unreadable`; the desk then looked fresh and every save threw. The key is still resolved before the `try`, and the same one-line move is made in the three other readers that swallowed it: `openJson` in `packages/host/src/threads.ts` (returned the raw envelope as the message), `openText` in `packages/db/src/repos/drizzle-agent-repository.ts` (returned an empty system prompt) and `open` in `packages/host/src/artifacts.ts` (returned the stored envelope as the body). Left alone: `readText` in `packages/host/src/desk-files/file-store.ts` already fails closed with a fixed `root_unavailable` and its messages reach the model, and `createSessionSecrets` and the portal sign-out in `tenant-reset.ts` are server-only, where the boot check has already proved the key. The message is fixed text, names the variable and `openssl rand -hex 32`, and never contains the value. A desk was refused first and now warns first (the lead's decision, 2026-11-09, as the original plan said and as `Kyoo032/hyp-ai` shipped), because a desk that had set a passphrase could not boot, and unsetting the variable switched it to `.master-key`, a different key that cannot open the sealed settings, threads and artifacts. Every documented generator already yields 32 bytes or more: `openssl rand -hex 32` in `webapp-deploy/README.md`, `webapp-deploy/.env.example` and `scripts/release-web.mjs`, `randomBytes(32)` hex in `webapp-deploy/pilot-local.mjs`, `webapp-deploy/k8s/local-lib.mjs`, `scripts/review-instance.ps1` and `apps/desktop/main.cjs`; the root `.env.example` leaves it empty; the preview desks' provisioning script refuses a key that is not 64 hex digits; the webdev `.env` files set no key and use `.master-key`. Proven by `packages/db/src/vault-key.test.ts` (a desk passphrase and a short key derive the same wrap key as before, no `.master-key` written; `warnWeakDeskVaultKey` warns once, never prints the value, reads no file and is silent in server mode, where `getLocalVaultKey` still throws; hex, base64 and base64url accepted, blank falls back), by `settings-store.test.ts` (a desk opens `settings.enc` sealed under `short-pass` and saves, and in server mode the refusal reaches the caller and the stored row is not touched), by `threads-vault-key.test.ts`, `drizzle-agent-repository.test.ts` and `artifacts.test.ts` (a server refusal is not read as a wrong key), by `hosted-env.test.ts` and `hosted-mode-guard.test.ts`, and by `apps/web/server/boot-order.test.ts`, which starts the real `server.ts` on a desk with `AGENTFORGE_SECRETS_KEY=hunter2` and finds it listening after one warning that does not contain the value, and starts it in server mode with the same key and finds it refused with the data dir not created.
 
 Which human-chosen keys still pass. The floor measures the encoding, not the randomness, so it stops `hunter2` and a sentence with spaces, not a determined human choice.
 - Any 44-character string over the base64 alphabet is a canonical encoding of 33 bytes, so `correcthorsebatterystaplecorrecthorsebattery` and `MyCompanyNultronDeskPasswordForTheOffice2026` are accepted on a desk and on the server. So is any longer string whose length is a multiple of four.
 - `"password".repeat(8)` (canonical base64 for 48 bytes) and `"0".repeat(64)` (32 zero bytes) are accepted on a desk and refused on the server by the variety check (`SERVER_VAULT_KEY_NOT_RANDOM`).
 - Each is pinned by a case in `vault-key.test.ts`, so tightening the rule is a deliberate edit of that test. Telling a typed 44-character passphrase from a generated key needs a randomness test that could refuse a real key, or a hex-only rule that refuses the base64 a secrets manager hands out. Neither was chosen.
 
-Residual: a desk already sealed under a passphrase of under 32 bytes no longer starts. With the variable in the process environment the refusal is thrown from `server-env.ts` before the data dir is created. With it only in `.env`, `main()` throws the same refusal after `@agentforge/db` has loaded `.env`, opened SQLite and run migrations, and before the listener opens. Nothing is moved or rewritten: `settings.enc` stays where it is and every reader above throws instead of treating the refused key as a wrong one. There is still no re-seal path. `rotateWrapKey` refuses a `from` key under 32 bytes (`packages/host/src/wrap-key-rotation.ts`, `assertUsableSecret`) and re-seals only settings, not sealed thread bodies or other envelopes. Recovery is to start an older build with the old passphrase; unsetting the variable instead makes the new key unable to open the old file, and a desk quarantines such a file. No such install is documented anywhere and the owner's webdev has none, so no tool is built. Not driven on a desk with existing data. The packaged app's keytar fallback (SEC-008) is separate and stays moot while the desktop is retired.
+Residual: a desk can still run a guessable wrap key, and a copy of its `settings.enc` can still be guessed offline, until a re-key path exists. The desk only warns, so a desk already sealed under a passphrase of under 32 bytes keeps booting and keeps opening its data. There is no re-seal path: `rotateWrapKey` refuses a `from` key under 32 bytes (`packages/host/src/wrap-key-rotation.ts`, `assertUsableSecret`) and re-seals only settings, not sealed thread bodies or other envelopes, and a new key cannot open data sealed under the old one. The trigger to switch the desk from warn to refuse is the day a re-key tool for settings, threads, agent prompts and artifacts exists. Until then the warning is the whole control. Not driven on a desk with existing data. The packaged app's keytar fallback (SEC-008) is separate and stays moot while the desktop is retired.
 
 ### SR-204 {#sr-204}
 
@@ -6963,6 +7012,33 @@ hand-edited hosts file or a tunnel. The lookup-error fail-open of the same card 
 SEC-004 4a, not this row. The rebinding pin (4a) and the egress deny stay open under SR-16 (A10-6) and SR-97.
 
 Gate: PR merge.
+### SR-208 {#sr-208}
+
+**nixpkgs marks pnpm 9.15.9 insecure, and the Nix build permits it by name.**
+Raised 2026-11-07 by rung 1 of the Nix migration ([`nix-migration.md`](nix-migration.md)). Low.
+
+Evidence: nixos-26.05 at `c56a87d8` lists twelve CVEs on `pnpm_9` (CVE-2026-48995, -50014 to -50017, -50573,
+-55699, -59194 to -59196, -82392, -82393; `pkgs/development/tools/pnpm/default.nix`), so evaluation refuses it
+unless it is permitted. 9.15.9 is the version `package.json` `packageManager` pins and both Dockerfiles install
+through corepack. The two checked upstream: CVE-2026-48995 (the tarball hash of a GitHub git dependency is not
+kept in the lockfile, so a hostile codeload server could swap it; fixed in 10.33.4 and 11.0.7) and
+CVE-2026-50014 (`--upload-pack` command execution through a git dependency; fixed in 10.34.0 and 11.4.0). No
+9.x release fixes either.
+
+Why it is accepted for now:
+- It is what the Docker build already runs. The Nix build does not add it; it names it. The Docker runtime image
+  also carries this pnpm in `/opt/corepack`, because `runtime` is `FROM base`; the Nix images carry no package
+  manager.
+- `pnpm-lock.yaml` has no git dependency. Its one URL dependency, `xlsx` from `cdn.sheetjs.com`, has no
+  `integrity` field, which is the shape CVE-2026-48995 is about. Under Nix the whole pnpm store is one
+  fixed-output derivation, so a changed tarball changes the output hash and the build fails.
+- The permission is one exact name, `pnpm-9.15.9`, in `flake.nix`'s `permittedInsecurePackages`; any other
+  insecure package still refuses to evaluate.
+
+Residual: the Docker build installs `xlsx` with nothing pinning its bytes. Moving the repo to pnpm 10 (lockfile
+format 9.0 stays) closes the CVEs; it is a separate change with its own `ci:local` run.
+
+Gate: none.
 
 ## Must be true before the Tencent Cloud deploy
 

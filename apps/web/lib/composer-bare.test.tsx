@@ -128,7 +128,7 @@ describe("the plus", () => {
     applyLocale("id");
     const html = markup();
     expect(html).toMatch(/data-testid="composer-plus"[^>]*aria-label="Tambah"/);
-    expect(html).toContain("<span>Tambah berkas</span>");
+    expect(html).toContain("<span>Tambah file</span>");
   });
 });
 

@@ -26,7 +26,7 @@ describe("legal locale catalogs", () => {
   it("translates Indonesian Legal chrome without dropping keys", () => {
     expect(id.studio.lede).toMatch(/perkara/);
     expect(id.studio.run).toBe("Jalankan perkara");
-    expect(id.errors.stub).toMatch(/gerbang yang aktif/);
+    expect(id.errors.stub).toMatch(/gateway yang aktif/);
     expect(id.errors.stub).toContain("Pengaturan");
   });
 

@@ -9,7 +9,7 @@ describe("Chat turn check", () => {
 
   it("says the desk had no such source when every marker was invented", () => {
     expect(repairUnresolvedCites("See [9].", 0, "en")).toBe("See.\n\nThis desk did not have a source for that.");
-    expect(repairUnresolvedCites("Lihat [9].", 0, "id")).toContain("Meja ini tidak punya sumber untuk itu.");
+    expect(repairUnresolvedCites("Lihat [9].", 0, "id")).toContain("Meja kerja ini tidak memiliki sumber untuk itu.");
   });
 
   it("leaves a marker inside a fence", () => {
@@ -48,7 +48,7 @@ describe("Chat turn check", () => {
         },
       ],
     });
-    expect(settled.text).toBe('Percakapan sebelumnya berjudul "Budget decision".');
+    expect(settled.text).toBe('Obrolan sebelumnya berjudul "Budget decision".');
   });
 
   describe("a run that ended at its step limit", () => {
@@ -94,7 +94,7 @@ describe("Chat turn check", () => {
       expect(en.text).not.toContain("read_file");
       const id = settleChatTurn({ text: "", offeredSources: 0, locale: "id", tools, stepLimit: true });
       expect(id.text).toBe(
-        "list_files dan web_search sudah selesai, tetapi jawabannya belum. Minta saya untuk melanjutkan, dan saya akan meneruskannya dari titik terakhir.",
+        "list_files dan web_search sudah selesai, tetapi jawabannya belum. Minta saya melanjutkan, dan saya akan meneruskan dari titik terakhir.",
       );
       expect(id.text).not.toMatch(/answer didn't/i);
       expect(id.stepLimit).toEqual({ tools: ["list_files", "web_search"] });
@@ -206,7 +206,7 @@ describe("Chat turn check", () => {
       const settled = settleChatTurn({ text: "", offeredSources: 0, locale: "id", tools: [], interrupted: idReason });
       expect(settled.text).toContain(idReason);
       expect(settled.text).toMatch(/lanjutkan/);
-      expect(settled.text).toMatch(/Langkah alat di atas/);
+      expect(settled.text).toMatch(/Langkah-langkah alat di atas/);
       expect(settled.text).not.toMatch(/tool steps above/i);
     });
 

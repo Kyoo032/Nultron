@@ -21,7 +21,7 @@ export function presentationKicker(locale: PresentationLocale): string {
 
 export function presentationGatewayMessage(locale: PresentationLocale): string {
   if (locale === "id") {
-    return "Pembuatan presentasi membutuhkan gateway yang aktif. Tempel kunci API Toko Token di Pengaturan, lalu coba lagi.";
+    return "Presentasi butuh gateway yang aktif. Tempel kunci API Toko Token di Pengaturan, lalu coba lagi.";
   }
   return "Presentation generation needs a live gateway. Paste a Toko Token API key in Settings, then try again.";
 }

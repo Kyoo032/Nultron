@@ -133,7 +133,7 @@ describe("data harness skills on stub", () => {
       answer: async () => ({ text: INVENTED, model: "stub-model" }),
     });
     expect(result.retried).toBe(true);
-    expect(result.analysis.summary).toContain("tidak bisa meramalkan");
+    expect(result.analysis.summary).toContain("tidak bisa dipakai untuk meramal");
     expect(JSON.stringify(result.analysis)).not.toContain("99");
     expect(result.analysis.findings.some((finding) => finding.heading.includes("menurut"))).toBe(true);
     expect(result.analysis.findings.some((finding) => finding.body.includes("15000"))).toBe(true);

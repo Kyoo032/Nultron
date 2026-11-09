@@ -48,6 +48,6 @@ describe("JobProgressList elapsed line", () => {
 
   it("uses the Indonesian catalog on an id desk", () => {
     applyLocale("id");
-    expect(render(true, true)).toContain("0:00 berlalu");
+    expect(render(true, true)).toContain("0:00 berjalan");
   });
 });

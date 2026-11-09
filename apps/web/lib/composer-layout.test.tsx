@@ -179,8 +179,8 @@ describe("composer markup", () => {
     applyLocale("id");
     const html = composerMarkup();
     expect(html).toMatch(/<button[^>]*aria-label="Gaya jawaban: Harian"[^>]*>/);
-    expect(html).toMatch(/<button[^>]*aria-label="Tingkatkan prompt"/);
-    expect(html).toContain("<span>Tambah berkas</span>");
+    expect(html).toMatch(/<button[^>]*aria-label="Sempurnakan prompt"/);
+    expect(html).toContain("<span>Tambah file</span>");
     expect(html).toMatch(/data-testid="composer-plus"[^>]*aria-label="Tambah"/);
     expect(html).toMatch(/<button[^>]*aria-label="Kirim"[^>]*data-testid="composer-send"/);
   });

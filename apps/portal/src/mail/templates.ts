@@ -61,8 +61,8 @@ const COPY = {
     lines: [
       `Kode masuk ${product} Anda adalah ${code}.`,
       ``,
-      `Kode ini kedaluwarsa dalam ${minutes} menit dan hanya dapat dipakai sekali.`,
-      `Jika Anda tidak memulai proses masuk, abaikan pesan ini — kode tidak dapat dipakai tanpa Anda.`,
+      `Kode ini berlaku selama ${minutes} menit dan cuma bisa dipakai sekali.`,
+      `Kalau Anda tidak sedang masuk, abaikan saja email ini. Kodenya tidak bisa dipakai orang lain tanpa akses ke email Anda.`,
     ],
   }),
 } as const;
@@ -114,10 +114,10 @@ const INVITE_COPY = {
       ``,
       `Kode undangan Anda: ${code}`,
       ``,
-      `Kode ini hanya berlaku untuk ${to}, sekali pakai, dan tidak berlaku lagi setelah ${date} (UTC).`,
-      `Untuk masuk pertama kali, buka ${product}, masukkan alamat e-mail ini, lalu kode undangan ini.`,
-      `Kami lalu mengirim kode enam digit ke e-mail Anda untuk memastikan itu kotak masuk Anda. Masuk berikutnya cukup dengan kode e-mail itu.`,
-      `Jika Anda tidak mengharapkan pesan ini, abaikan saja — kode ini tidak berguna tanpa kotak masuk Anda.`,
+      `Kode ini cuma berlaku untuk ${to}, bisa dipakai sekali, dan kedaluwarsa setelah ${date} (UTC).`,
+      `Untuk masuk pertama kali, buka ${product}, masukkan alamat email ini, lalu kode undangan ini.`,
+      `Setelah itu kami kirim kode enam digit ke email Anda, untuk memastikan kotak masuk itu milik Anda. Untuk masuk berikutnya, cukup pakai kode dari email itu.`,
+      `Kalau Anda tidak merasa diundang, abaikan saja email ini. Kodenya tidak berguna tanpa akses ke kotak masuk Anda.`,
     ],
   }),
 } as const;

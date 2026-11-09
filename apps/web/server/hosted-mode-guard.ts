@@ -25,7 +25,7 @@ import { isServerMode, type EnvLike } from "@agentforge/core";
  * the check itself lives at `packages/host/src/hosted-env.ts`, where all three are in scope, and
  * `server.ts` reaches both guards through this one module.
  */
-export { assertDeskVaultKeyUsable, assertHostedEnvComplete, HOSTED_ENV_INCOMPLETE } from "@agentforge/host/hosted-env";
+export { assertHostedEnvComplete, HOSTED_ENV_INCOMPLETE, warnWeakDeskVaultKey } from "@agentforge/host/hosted-env";
 
 /**
  * Refuses to boot a production build that is not in server mode

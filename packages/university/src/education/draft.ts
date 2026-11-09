@@ -28,7 +28,7 @@ const LESSON = {
   id: {
     title: (topic: string) => (topic.trim() ? `Pelajaran: ${topic.trim()}` : "Pelajaran"),
     aimHeading: "Untuk apa pelajaran ini",
-    aimBullet: "Sebutkan satu gagasan yang harus dapat diulang oleh ruangan.",
+    aimBullet: "Sebutkan satu gagasan yang harus bisa diulang oleh ruangan.",
     exampleHeading: "Satu contoh yang dikerjakan",
     exampleBullet: "Bahas satu kasus sebelum menambah kasus kedua.",
     checkHeading: "Periksa pemahaman Anda",
@@ -221,7 +221,7 @@ const PRESENTER = {
     line: (text: string) => text,
   },
   id: {
-    label: "Penyaji",
+    label: "Presenter",
     slide: (index: number, heading: string) => `Slide ${index + 1}. ${heading}`,
     line: (text: string) => text,
   },
@@ -285,7 +285,7 @@ const BOOK = {
     unsupported: "This reader takes a PNG page or a PDF. Nothing was sent away.",
   },
   id: {
-    "text-layer": "Dibaca dari teks yang sudah ada di berkas. Tidak ada yang dikirim ke luar.",
+    "text-layer": "Dibaca dari teks yang sudah ada di file. Tidak ada yang dikirim ke luar.",
     "local-ocr": "Dibaca di mesin ini dari gambar halaman.",
     "local-ocr-empty":
       "Pindaian tetap di mesin ini. Pembacaan lokal tidak menemukan huruf pada wajah halaman. Tidak ada yang dikirim ke luar.",

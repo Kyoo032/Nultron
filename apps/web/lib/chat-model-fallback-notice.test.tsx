@@ -28,7 +28,7 @@ describe("ChatModelFallbackNotice", () => {
     const html = renderToStaticMarkup(
       <ChatModelFallbackNotice notice={{ from: "gpt-6-luna", to: "glm-5.3", message: "host sentence" }} />,
     );
-    expect(html).toContain("gpt-6-luna tidak tersedia; menggunakan glm-5.3 untuk jawaban ini.");
+    expect(html).toContain("gpt-6-luna tidak tersedia; jawaban ini memakai glm-5.3.");
   });
 
   it("falls back to the host's sentence when a frame names no models", () => {

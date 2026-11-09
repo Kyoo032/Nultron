@@ -84,3 +84,8 @@ webapp-deploy/.multisite-local
 # The company sites (placeholder pages, their Caddy files and the switch script) are mounted into the PROXY
 # only. The app image has no use for them.
 webapp-deploy/sites
+# The Nix build (flake.nix, flake.lock, nix/; docs/internal/nix-migration.md). Nothing in the image reads them, and
+# keeping them out means the image built after the flake landed is the image built before it.
+flake.nix
+flake.lock
+nix

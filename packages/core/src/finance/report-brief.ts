@@ -79,7 +79,7 @@ export type GuardFlags = {
  */
 export const REMOVED_SENTENCE_FLAG: Record<ReportLocale, string> = {
   en: "One sentence was removed because its figure could not be traced.",
-  id: "Satu kalimat dihapus karena angkanya tidak bisa ditelusuri.",
+  id: "Satu kalimat dihapus karena angkanya tidak bisa dilacak.",
 };
 
 export const DIRECTION_SENTENCE_FLAG: Record<ReportLocale, string> = {

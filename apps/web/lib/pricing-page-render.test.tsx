@@ -132,11 +132,11 @@ describe("the price list", () => {
     expect(markup).toContain("berbasis web");
     expect(markup).toContain("Hubungi DPS");
     expect(markup).toContain("pembelian mandiri");
-    expect(markup).toContain("basis pengetahuan terpadu");
+    expect(markup).toContain("Knowledge Base terpadu");
     expect(markup).toContain("lalu lintas");
     expect(markup).toContain("implementasi dan pemeliharaan");
     expect(markup).toContain("Kursi dan token ditagih secara terpisah");
-    expect(markup).not.toContain("Satu kursi");
+    expect(markup).not.toContain("Satu seat");
   });
 
   it("lists every feature the catalog gives a tier", () => {

@@ -39,7 +39,7 @@ const RULE: Record<OutputLanguageSurface, Record<AppLocale, string>> = {
   },
   videos: {
     en: "Spoken dialogue, narration, and any on-screen text in this clip must be in English unless the prompt already names another language.",
-    id: "Dialog, narasi, dan teks di layar pada klip ini harus dalam bahasa Indonesia, kecuali prompt sudah menyebut bahasa lain.",
+    id: "Dialog, narasi, dan teks di layar pada klip ini harus berbahasa Indonesia, kecuali prompt sudah menyebut bahasa lain.",
   },
   music: {
     en: "Write the lyrics, the title, and any spoken or sung words in English unless the prompt already names another language. Leave style and genre tags in English.",
@@ -47,7 +47,7 @@ const RULE: Record<OutputLanguageSurface, Record<AppLocale, string>> = {
   },
   edit: {
     en: "Write user-facing Edit text (card verbs, titles, captions, assistant replies, and any on-image or on-video words) in English. Keep tool names and JSON keys in English.",
-    id: "Tulis teks Edit yang dilihat pengguna (kata kerja kartu, judul, teks overlay, balasan asisten, dan kata pada gambar atau video) dalam bahasa Indonesia. Pertahankan nama alat dan kunci JSON dalam bahasa Inggris.",
+    id: "Tulis teks Edit yang dilihat pengguna (kata kerja kartu, judul, caption, balasan asisten, dan kata pada gambar atau video) dalam bahasa Indonesia. Pertahankan nama alat dan kunci JSON dalam bahasa Inggris.",
   },
   meeting: {
     en: "Write the minutes — title, summary, decisions, action items, risks, and open questions — in English. Keep every person's name, figure, date, and product name exactly as the transcript said it. Keep JSON keys in English.",
@@ -59,7 +59,7 @@ const RULE: Record<OutputLanguageSurface, Record<AppLocale, string>> = {
   },
   education: {
     en: "Write every lesson title, slide heading, exam prompt, citation label, subtitle cue, and dub line in English. Keep JSON keys in English.",
-    id: "Tulis setiap judul pelajaran, heading slide, prompt ujian, label kutipan, teks subtitle, dan baris sulih suara dalam Bahasa Indonesia profesional (sapaan Anda). Kunci JSON tetap bahasa Inggris.",
+    id: "Tulis setiap judul pelajaran, heading slide, prompt ujian, label kutipan, teks subtitle, dan baris voice over dalam Bahasa Indonesia profesional (sapaan Anda). Kunci JSON tetap bahasa Inggris.",
   },
   presentations: {
     en: "Write every user-facing string (deck title, block text, and speaker notes) in English. Keep JSON keys, page role names, and the engine name in English.",
@@ -73,8 +73,8 @@ const EDIT_STUB: Record<AppLocale, { help: string; undo: string }> = {
     undo: "Undo is available on the last card.",
   },
   id: {
-    help: "Saya dapat membantu memangkas, memotong, menambahkan teks overlay, dan memberi judul pada linimasa ini.",
-    undo: "Urungkan tersedia pada kartu terakhir.",
+    help: "Saya bisa membantu memangkas, memotong, menambahkan caption, dan memberi judul pada timeline ini.",
+    undo: "Kartu terakhir bisa diurungkan.",
   },
 };
 
@@ -112,31 +112,31 @@ export type EditHarnessLineKey =
 const EDIT_HARNESS_LINES: Record<EditHarnessLineKey, Record<AppLocale, string>> = {
   liftDeadAirRan: {
     en: "Lifted the dead air.",
-    id: "Jeda sunyi diangkat.",
+    id: "Jeda sunyi dihilangkan.",
   },
   liftDeadAirEmpty: {
     en: "No dead air to lift on this timeline.",
-    id: "Tidak ada jeda sunyi untuk diangkat pada linimasa ini.",
+    id: "Tidak ada jeda sunyi yang perlu dihilangkan di timeline ini.",
   },
   cutOnShotsRan: {
     en: "Cut where the picture changes.",
-    id: "Dipotong di tempat gambar berubah.",
+    id: "Dipotong di setiap pergantian gambar.",
   },
   cutOnShotsEmpty: {
     en: "No shot change to cut on.",
-    id: "Tidak ada pergantian gambar untuk dipotong.",
+    id: "Tidak ada pergantian gambar yang bisa dijadikan titik potong.",
   },
   wordsOnPictureRan: {
     en: "Put the words on the picture.",
-    id: "Kata-kata diletakkan pada gambar.",
+    id: "Kata-kata sudah ditempatkan pada gambar.",
   },
   wordsOnPictureEmpty: {
     en: "Say the words to put on the picture.",
-    id: "Sebutkan kata yang ingin diletakkan pada gambar.",
+    id: "Sebutkan kata yang ingin ditempatkan pada gambar.",
   },
   placeMadeShotRan: {
     en: "Placed a made shot on the timeline.",
-    id: "Gambar atau klip buatan diletakkan pada linimasa.",
+    id: "Gambar atau klip buatan sudah ditempatkan di timeline.",
   },
   placeMadeShotEmpty: {
     en: "Say what still or clip to make.",
@@ -144,19 +144,19 @@ const EDIT_HARNESS_LINES: Record<EditHarnessLineKey, Record<AppLocale, string>> 
   },
   placeMadeShotBlocked: {
     en: "This shot waits on a plan. Nothing was generated.",
-    id: "Gambar ini menunggu rencana. Tidak ada yang dibuat.",
+    id: "Shot ini menunggu rencana. Tidak ada yang dibuat.",
   },
   handBackFileRan: {
     en: "Handing back the file.",
-    id: "Berkas sedang disiapkan.",
+    id: "File sedang dikembalikan ke Anda.",
   },
   handBackFileBlocked: {
     en: "Confirm the timeline before the file can be handed back.",
-    id: "Konfirmasi linimasa sebelum berkas dapat diserahkan.",
+    id: "Konfirmasi timeline sebelum file bisa diserahkan.",
   },
   handBackFileFailed: {
     en: "The file could not be started.",
-    id: "Berkas tidak dapat dimulai.",
+    id: "Proses file tidak bisa dimulai.",
   },
 };
 
@@ -184,35 +184,35 @@ export type GatewayRequiredSurface = (typeof GATEWAY_REQUIRED_SURFACES)[number];
 const GATEWAY_REQUIRED: Record<GatewayRequiredSurface, Record<AppLocale, string>> = {
   documents: {
     en: "Document generation needs a live gateway. Paste a Toko Token API key in Settings, then try again.",
-    id: "Pembuatan dokumen memerlukan gerbang yang aktif. Tempel kunci API Toko Token di Settings, lalu coba lagi.",
+    id: "Dokumen butuh gateway yang aktif. Tempel kunci API Toko Token di Pengaturan, lalu coba lagi.",
   },
   research: {
     en: "Research needs a live gateway. Paste a Toko Token API key in Settings, then try again.",
-    id: "Research memerlukan gerbang yang aktif. Tempel kunci API Toko Token di Settings, lalu coba lagi.",
+    id: "Riset butuh gateway yang aktif. Tempel kunci API Toko Token di Pengaturan, lalu coba lagi.",
   },
   finance: {
     en: "Finance needs a live gateway. Paste a Toko Token API key in Settings, then try again.",
-    id: "Finance memerlukan gerbang yang aktif. Tempel kunci API Toko Token di Settings, lalu coba lagi.",
+    id: "Keuangan butuh gateway yang aktif. Tempel kunci API Toko Token di Pengaturan, lalu coba lagi.",
   },
   data: {
     en: "Data analysis needs a live gateway. Paste a Toko Token API key in Settings, then try again.",
-    id: "Analisis data memerlukan gerbang yang aktif. Tempel kunci API Toko Token di Settings, lalu coba lagi.",
+    id: "Analisis data butuh gateway yang aktif. Tempel kunci API Toko Token di Pengaturan, lalu coba lagi.",
   },
   market: {
     en: "Market needs a live gateway. Paste a Toko Token API key in Settings, then try again.",
-    id: "Market memerlukan gerbang yang aktif. Tempel kunci API Toko Token di Settings, lalu coba lagi.",
+    id: "Market butuh gateway yang aktif. Tempel kunci API Toko Token di Pengaturan, lalu coba lagi.",
   },
   videos: {
     en: "Add a Toko Token gateway key in Settings to generate videos.",
-    id: "Tambahkan kunci gerbang Toko Token di Settings untuk membuat video.",
+    id: "Tambahkan kunci gateway Toko Token di Pengaturan agar bisa membuat video.",
   },
   meeting: {
     en: "Meeting minutes need a live gateway. Paste a Toko Token API key in Settings, then try again.",
-    id: "Notulen rapat memerlukan gerbang yang aktif. Tempel kunci API Toko Token di Settings, lalu coba lagi.",
+    id: "Notulen rapat butuh gateway yang aktif. Tempel kunci API Toko Token di Pengaturan, lalu coba lagi.",
   },
   music: {
     en: "Add a Toko Token gateway key in Settings to generate music.",
-    id: "Tambahkan kunci gerbang Toko Token di Settings untuk membuat musik.",
+    id: "Tambahkan kunci gateway Toko Token di Pengaturan agar bisa membuat musik.",
   },
 };
 

@@ -51,6 +51,8 @@ describe("edit harness skills", () => {
     expect(matchEditHarnessSkill("Hand me the file")).toBe("hand-back-file");
     expect(matchEditHarnessSkill("export")).toBe("hand-back-file");
     expect(matchEditHarnessSkill("Ekspor berkas")).toBe("hand-back-file");
+    expect(matchEditHarnessSkill("Ekspor file")).toBe("hand-back-file");
+    expect(matchEditHarnessSkill("Berikan file-nya")).toBe("hand-back-file");
     for (const sentence of SCRIPTED) {
       expect(matchEditHarnessSkill(sentence), sentence).toBeNull();
       const scripted =

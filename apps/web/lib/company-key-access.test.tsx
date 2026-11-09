@@ -195,7 +195,7 @@ describe("Settings", () => {
 
     expect(markup).toContain('data-testid="settings-key-restricted"');
     expect(markup).toContain(t("settings.keyRestricted"));
-    expect(t("settings.keyRestricted")).toBe("Hanya pemilik atau admin yang dapat mengubah kunci perusahaan.");
+    expect(t("settings.keyRestricted")).toBe("Hanya pemilik atau admin yang bisa mengubah kunci perusahaan.");
   });
 
   it("renders sentences, not raw catalog keys", async () => {

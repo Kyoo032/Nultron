@@ -1,51 +1,51 @@
 {
-  "title": "Berkas",
-  "intro": "Catatan dan dokumen yang dibuat agen Anda di meja ini. Setiap perubahan disimpan sebagai versi, jadi Anda bisa melihat ke belakang dan memulihkannya.",
-  "count": "{count} berkas",
-  "countOne": "1 berkas",
+  "title": "File",
+  "intro": "Catatan dan dokumen yang dibuat agen Anda di meja kerja ini. Setiap perubahan disimpan sebagai versi, jadi Anda bisa melihat kembali dan memulihkannya.",
+  "count": "{count} file",
+  "countOne": "1 file",
   "list": {
-    "aria": "Berkas di meja ini",
+    "aria": "File di meja kerja ini",
     "topLevel": "Tingkat atas",
-    "loading": "Memuat berkas…",
+    "loading": "Memuat file…",
     "retry": "Coba lagi",
     "open": "Buka {path}",
     "version": "v{version}",
     "updated": "Diperbarui {when}"
   },
   "empty": {
-    "title": "Belum ada berkas",
-    "body": "Berkas yang dibuat agen Anda muncul di sini, lengkap dengan setiap versinya. Anda juga bisa menambah berkas teks sendiri."
+    "title": "Belum ada file",
+    "body": "File yang dibuat agen Anda akan muncul di sini, lengkap dengan setiap versinya. Anda juga bisa menambahkan file teks sendiri."
   },
   "new": {
-    "open": "Berkas baru",
-    "formAria": "Berkas baru",
-    "pathLabel": "Jalur berkas",
+    "open": "File baru",
+    "formAria": "File baru",
+    "pathLabel": "Jalur file",
     "pathPlaceholder": "catatan/rencana.md",
     "pathHint": "Pakai / di antara folder, seperti catatan/rencana.md.",
     "contentLabel": "Teks",
-    "contentPlaceholder": "Ketik atau tempel teks berkas…",
-    "save": "Simpan berkas",
+    "contentPlaceholder": "Ketik atau tempel teks file…",
+    "save": "Simpan file",
     "saving": "Menyimpan…",
     "cancel": "Batal"
   },
   "upload": {
-    "button": "Unggah berkas teks",
-    "hint": "Hanya berkas teks, sampai {max}. Disimpan di tingkat atas dengan nama berkasnya sendiri.",
-    "tooLarge": "{name} lebih besar dari {max}, jadi tidak diunggah.",
-    "binary": "{name} bukan berkas teks, jadi tidak diunggah.",
-    "readFailed": "{name} tidak dapat dibaca."
+    "button": "Unggah file teks",
+    "hint": "Hanya file teks, maksimal {max}. Disimpan di tingkat atas dengan nama file aslinya.",
+    "tooLarge": "{name} melebihi {max}, jadi tidak diunggah.",
+    "binary": "{name} bukan file teks, jadi tidak diunggah.",
+    "readFailed": "{name} gagal dibaca."
   },
   "viewer": {
-    "aria": "Penampil berkas",
+    "aria": "Penampil file",
     "close": "Tutup",
-    "loading": "Membuka berkas…",
+    "loading": "Membuka file…",
     "textAria": "Teks {path}",
-    "empty": "Berkas ini kosong.",
+    "empty": "File ini kosong.",
     "truncated": "Menampilkan {shown} baris pertama dari {total}.",
     "latest": "Versi terbaru",
     "oldVersion": "Versi {version}, bukan yang terbaru",
     "viewing": "Melihat versi {version} dari {total}",
-    "missing": "Berkas itu tidak ada di meja ini, atau sudah dihapus.",
+    "missing": "File itu tidak ada di meja kerja ini, atau sudah dihapus.",
     "versionLoading": "Memuat versi {version}…"
   },
   "versions": {
@@ -63,7 +63,7 @@
   "restore": {
     "button": "Pulihkan versi ini",
     "title": "Pulihkan versi {version}?",
-    "body": "Teks versi {version} disimpan sebagai versi terbaru yang baru. Tidak ada yang hilang: versi sesudahnya tetap ada di riwayat.",
+    "body": "Teks versi {version} akan disimpan sebagai versi terbaru yang baru. Tidak ada yang hilang: versi sesudahnya tetap ada di riwayat.",
     "confirm": "Pulihkan",
     "working": "Memulihkan…",
     "done": "Versi {from} dipulihkan sebagai versi {to}."
@@ -71,48 +71,48 @@
   "download": {
     "button": "Unduh",
     "working": "Mengunduh…",
-    "failed": "Tidak bisa mengunduh. Coba lagi.",
+    "failed": "Gagal mengunduh. Coba lagi.",
     "aria": "Unduh {path} ke komputer Anda"
   },
   "delete": {
     "button": "Hapus",
     "title": "Hapus {path}?",
-    "body": "Berkas hilang dari daftar ini dan agen tidak bisa lagi membacanya. Menghapus tidak mengosongkan ruang penyimpanan.",
-    "confirm": "Hapus berkas",
+    "body": "File akan hilang dari daftar ini dan tidak bisa lagi dibaca oleh agen. Menghapus tidak mengosongkan ruang penyimpanan.",
+    "confirm": "Hapus file",
     "working": "Menghapus…",
     "done": "{path} dihapus."
   },
   "saved": "{path} disimpan sebagai versi {version}.",
   "cancel": "Batal",
   "errors": {
-    "generic": "Ada yang salah dengan berkas. Coba lagi.",
-    "network": "Berkas tidak dapat dijangkau. Periksa koneksi lalu coba lagi.",
-    "notFound": "Berkas itu tidak ada di meja ini.",
+    "generic": "Terjadi kesalahan pada file. Coba lagi.",
+    "network": "File tidak bisa diakses. Periksa koneksi, lalu coba lagi.",
+    "notFound": "File itu tidak ada di meja kerja ini.",
     "tooLarge": "Teks itu lebih besar dari 2 MB.",
-    "tooMany": "Meja ini sudah menyimpan berkas sebanyak yang bisa ditampung. Hapus beberapa dulu.",
-    "denied": "Berkas hanya berisi teks biasa. Isi itu bukan teks yang valid.",
-    "badPath": "Jalur berkas itu tidak diizinkan.",
-    "quota": "Akun ini kehabisan ruang penyimpanan. Setiap versi yang tersimpan dihitung.",
-    "unavailable": "Penyimpanan berkas sedang tidak tersedia. Coba lagi nanti.",
-    "badResponse": "Berkas menjawab dengan cara yang tidak dipahami aplikasi ini.",
-    "saveFailed": "Berkas tidak dapat disimpan ke komputer Anda. Periksa lokasinya, lalu coba lagi."
+    "tooMany": "Jumlah file di meja kerja ini sudah mencapai batas. Hapus beberapa dulu.",
+    "denied": "File hanya boleh berisi teks biasa, dan isi ini bukan teks yang valid.",
+    "badPath": "Jalur file itu tidak diizinkan.",
+    "quota": "Akun ini kehabisan ruang penyimpanan. Setiap versi yang tersimpan ikut dihitung.",
+    "unavailable": "Penyimpanan file sedang tidak tersedia. Coba lagi nanti.",
+    "badResponse": "Aplikasi tidak bisa memahami respons dari penyimpanan file.",
+    "saveFailed": "File gagal disimpan ke komputer Anda. Periksa lokasinya, lalu coba lagi."
   },
   "pathErrors": {
-    "empty": "Beri berkas sebuah jalur, seperti catatan/rencana.md.",
-    "absolute": "Mulai jalur dari atas, tanpa / di depan.",
+    "empty": "Beri file sebuah jalur, seperti catatan/rencana.md.",
+    "absolute": "Mulai jalur dari tingkat atas, tanpa tanda / di depan.",
     "backslash": "Pakai / di antara folder, bukan garis miring terbalik.",
     "dots": "Bagian bernama . atau .. tidak diizinkan.",
-    "emptyPart": "Jalur punya bagian kosong (/ ganda atau di akhir).",
+    "emptyPart": "Jalur memiliki bagian kosong (tanda / ganda atau di akhir).",
     "tooLong": "Jalur lebih panjang dari 240 karakter.",
-    "tooDeep": "Jalur punya lebih dari 8 bagian (folder ditambah nama berkas)."
+    "tooDeep": "Jalur punya lebih dari 8 bagian (folder ditambah nama file)."
   },
   "deskSources": {
-    "add": "Tambah dari berkas meja",
-    "limit": "Maksimal {max} berkas",
-    "full": "{max} berkas dipilih, jumlah terbanyak. Hapus satu untuk menambah yang lain.",
-    "chips": "Berkas meja yang dipakai sebagai sumber",
-    "listAria": "Berkas meja",
+    "add": "Tambah dari file meja kerja",
+    "limit": "Maksimal {max} file",
+    "full": "{max} file sudah dipilih, ini batas maksimum. Hapus satu untuk menambah yang lain.",
+    "chips": "File meja kerja yang dipakai sebagai sumber",
+    "listAria": "File meja kerja",
     "remove": "Hapus {name}",
-    "tooLarge": "Berkas ini dan teks yang ditempel melebihi batas sumber, jadi hanya bagian awal yang dipakai."
+    "tooLarge": "File ini dan teks yang ditempel melebihi batas sumber, jadi hanya bagian awal yang dipakai."
   }
 }

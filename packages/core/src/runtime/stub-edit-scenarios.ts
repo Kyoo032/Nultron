@@ -36,7 +36,7 @@ export const STUB_EDIT_SCENARIOS: StubEditScenario[] = [
     args: { frames: [450, 900] },
     cardVerb: "Split at scenes",
     cardObject: "v1",
-    cardVerbId: "Potong di pergantian adegan",
+    cardVerbId: "Potong di pergantian scene",
     cardObjectId: "v1",
   },
   {
@@ -46,7 +46,7 @@ export const STUB_EDIT_SCENARIOS: StubEditScenario[] = [
     args: { source: "script" },
     cardVerb: "Add captions",
     cardObject: "script",
-    cardVerbId: "Tambahkan teks overlay",
+    cardVerbId: "Tambahkan takarir",
     cardObjectId: "naskah",
   },
   {
@@ -66,7 +66,7 @@ export const STUB_EDIT_SCENARIOS: StubEditScenario[] = [
     args: { aspect: "9:16", mode: "pad", confirm: true },
     cardVerb: "Reframe",
     cardObject: "9:16",
-    cardVerbId: "Ubah bingkai",
+    cardVerbId: "Ubah frame",
     cardObjectId: "9:16",
   },
   {
@@ -106,7 +106,7 @@ export const STUB_EDIT_SCENARIOS: StubEditScenario[] = [
     args: {},
     cardVerb: "Clear timeline",
     cardObject: "all clips",
-    cardVerbId: "Kosongkan linimasa",
+    cardVerbId: "Kosongkan timeline",
     cardObjectId: "semua klip",
   },
   {

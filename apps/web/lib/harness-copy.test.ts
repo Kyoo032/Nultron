@@ -64,7 +64,7 @@ describe("skillLabel", () => {
     applyLocale("en");
     expect(skillLabel("research", { id: "write-dossier", name: "Write the dossier" })).toBe("Write the dossier");
     applyLocale("id");
-    expect(skillLabel("research", { id: "write-dossier", name: "Write the dossier" })).toBe("Menulis dosir");
+    expect(skillLabel("research", { id: "write-dossier", name: "Write the dossier" })).toBe("Menulis laporan");
   });
 
   it("falls back to the host's name for a skill the catalog lacks", () => {
