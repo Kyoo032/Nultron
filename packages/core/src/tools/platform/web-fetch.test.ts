@@ -3,13 +3,6 @@ import type { TenantContext } from "../../tenancy/types";
 import { invokeTool, type ToolDefinition } from "../define-tool";
 import { WEB_FETCH_MAX_BYTES, WEB_FETCH_MAX_CHARS_CAP, fetchPageText, webFetchTool } from "./web-fetch";
 
-/**
- * The SSRF guard resolves every hop's hostname before it fetches (`assertResolvesPublic` in
- * `security/safe-fetch.ts`). The tool gives a caller no way to hand it a resolver, so the system one
- * is replaced here: left real, `example.test` takes about 11 s to come back ENOTFOUND on Windows, and
- * every case that names a host timed out. The stand-in answers with a public address unless a case
- * says otherwise.
- */
 const { lookup } = vi.hoisted(() => ({ lookup: vi.fn() }));
 vi.mock("node:dns/promises", async (importOriginal) => ({
   ...(await importOriginal<typeof import("node:dns/promises")>()),
