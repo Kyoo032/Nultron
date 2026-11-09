@@ -211,7 +211,7 @@
     "direct Anthropic key on a Completions-routed Claude": {
       "requests": [
         {
-          "url": "https://api.anthropic.com/messages",
+          "url": "https://api.anthropic.com/v1/messages",
           "body": {
             "model": "claude-haiku-4-5",
             "max_tokens": 64000,
@@ -259,7 +259,7 @@
           }
         },
         {
-          "url": "https://api.anthropic.com/messages",
+          "url": "https://api.anthropic.com/v1/messages",
           "body": {
             "model": "claude-haiku-4-5",
             "max_tokens": 64000,

@@ -2,7 +2,7 @@
 
 Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
 
-Last verified: 2026-11-03 at b79a5275 for the `GET /activate` row, the typed-code row of the Verify table and the `api.test.ts` count only (the form on the code screen is a GET to `?code=`). Before that: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-07 at 9aba37e + working tree for section 8 (password sign-in), Where things live, the
+Last verified: 2026-11-09 on `claude/fix-portal-test-teardown` (from `39cd5f0`), for the idle-connection row of section 6 and the `testing/pg.ts` anchors of section 7 only (SR-200). Before that: 2026-11-03 at b79a5275 for the `GET /activate` row, the typed-code row of the Verify table and the `api.test.ts` count only (the form on the code screen is a GET to `?code=`). Before that: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-07 at 9aba37e + working tree for section 8 (password sign-in), Where things live, the
 Verify table's last four rows and one Why bullet, written the day the mode was built; the rest of the page keeps
 its reading below. Earlier: 2026-10-01 at 0b61a29 + working tree, by the sign-in-codes pass (four fixes found by driving
 the pilot: a replaced code no longer signs in, one request is one code, the fifth wrong invite code is the
@@ -351,14 +351,17 @@ max-age=3600`.
 | a request target the URL parser refuses (`GET //x:99999/healthz`) is a `400` with the standard error body. It is parsed against a fixed base inside the handler's try, and the Host header is never read. It used to be parsed against `http://<Host>` outside the try, so `Host: a b` or that target was an unhandled rejection and the process exited | `BAD_TARGET` / `REQUEST_BASE` / `parseTarget`, `server.ts:90-107` | `server.test.ts` "a request whose target or Host header is not a URL" (4 cases, raw socket, whole portal) |
 | every request promise ends in a `.catch`, so a failure inside the error path itself (a logger that throws) still answers `500` and never becomes an unhandled rejection | `abandon`, `server.ts:151,251` | `server.test.ts` "contains a failure inside its own error handling, so a request never becomes an unhandled rejection" |
 | an unhandled rejection or uncaught exception is written through the portal logger (so it is redacted like every line) and the process then exits 1 for the supervisor to restart it | `installProcessGuards`, `process-guards.ts:42`, installed first thing in `main.ts:15` | `process-guards.test.ts` (6) |
+| Postgres ending a connection that sits idle in the pool (a restart, a failover, `idle_session_timeout`) does not stop the portal: the pool's `error` event has a listener, the pool opens a new connection for the next query, and the server logs `portal_db_idle_connection_lost` with the SQLSTATE only (SR-200) | `pool.on("error")`, `store/postgres/index.ts:67`; the log callback, `store/index.ts:26`, passed from `boot.ts:148` | `idle-connection.test.ts` (2) |
 | the server connects as a plain member of `portal_app`; migrations run as the owner on their own connection, closed before anything listens. Production refuses to boot if the server role is superuser, has `BYPASSRLS`, is in `portal_admin`, can `SET ROLE` to a role that is, or is not in `portal_app` | `prepareStore` / `checkServerRole` / `serverRoleProblems`, `boot.ts:144,126,34`; `readConnectionRole`, `store/postgres/roles.ts:43`; `PORTAL_MIGRATE_DATABASE_URL`, `config.ts:188`; `migrations/0010_app_login_role.sql` | `boot.test.ts` (17), `config.test.ts` "PORTAL_MIGRATE_DATABASE_URL", `store/postgres/migrate.test.ts` "creates portal_app_login as 0001 describes it", "puts no password in a migration file" |
 
 ### 7. Tests connect as `portal_app_test`, not as a superuser
 
-`createTestStore` (`apps/portal/src/testing/pg.ts:163`) opens the store as `portal_app_test`, a
-plain LOGIN role whose only privilege is membership of `portal_app` (`APP_ROLE`, `:86`;
-`asAppRole`, `:135`). Migrations still run as the admin, because `0004` re-owns every table to
-`portal_admin` and `0007` creates `SECURITY DEFINER` functions.
+`createTestStore` (`apps/portal/src/testing/pg.ts:186`) opens the store as `portal_app_test`, a
+plain LOGIN role whose only privilege is membership of `portal_app` (`APP_ROLE`, `:109`;
+`asAppRole`, `:158`). Migrations still run as the admin, because `0004` re-owns every table to
+`portal_admin` and `0007` creates `SECURITY DEFINER` functions. A test database's `drop()` lets its sessions leave on
+their own for up to 2 s (`waitForSessionsToLeave`, `:52`) before terminating the rest: `pool.end()` resolves before a
+pool's sessions have left the server, and terminating a closing session raised `57P01` after every test had passed.
 
 This matters more than it sounds: a superuser **bypasses row-level security**, so the whole suite
 would pass with every policy dropped. `apps/portal/src/security/rls.test.ts` asserts the role is
