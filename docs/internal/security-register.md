@@ -237,6 +237,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-205](#sr-205) | Low | Personal (retired): `wrapKey` returns an unstored random wrap key when keytar fails, so settings sealed in that session do not open on the next launch | Won't fix, moot (Rizky, 2026-11-06): the desktop app was retired on 2026-10-14 | None while the desktop is retired. Reopen if a desktop build is revived, and fix before that cut |
 | [SR-206](#sr-206) | Low | The backup heartbeat URL would sit in `.env`, which the `app` container loads, so code running in the app could send fake success pings and hide a dead backup | Fixed in PR #206 (2026-11-06): `backup.sh` reads it from the process environment only, set on the cron line; tested, not driven on a server | — |
 | [SR-207](#sr-207) | Medium | The Host check ran only on mutating `/api` requests, so a DNS-rebinding page could `GET` the API (media, threads, masked settings) from unauthenticated webdev, and a GET in server mode was not checked against the Host allowlist (SEC-004 4b) | Fixed in tree (2026-11-06, `fix/sec-004b-get-host-check`): every `/api` request needs a trusted Host, `/healthz` exempt; unit-tested through the real adapter, not driven | PR merge |
+| [SR-208](#sr-208) | Low | nixpkgs marks pnpm 9.15.9, the version the repo pins, insecure (twelve CVEs, no fix on 9.x); the Nix build permits that one version by name | Accepted for the Nix migration (2026-11-07): build-time only, no git dependencies in the lock, the Nix store pins every tarball by hash. Moving to pnpm 10 is a separate change | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -7011,6 +7012,33 @@ hand-edited hosts file or a tunnel. The lookup-error fail-open of the same card 
 SEC-004 4a, not this row. The rebinding pin (4a) and the egress deny stay open under SR-16 (A10-6) and SR-97.
 
 Gate: PR merge.
+### SR-208 {#sr-208}
+
+**nixpkgs marks pnpm 9.15.9 insecure, and the Nix build permits it by name.**
+Raised 2026-11-07 by rung 1 of the Nix migration ([`nix-migration.md`](nix-migration.md)). Low.
+
+Evidence: nixos-26.05 at `c56a87d8` lists twelve CVEs on `pnpm_9` (CVE-2026-48995, -50014 to -50017, -50573,
+-55699, -59194 to -59196, -82392, -82393; `pkgs/development/tools/pnpm/default.nix`), so evaluation refuses it
+unless it is permitted. 9.15.9 is the version `package.json` `packageManager` pins and both Dockerfiles install
+through corepack. The two checked upstream: CVE-2026-48995 (the tarball hash of a GitHub git dependency is not
+kept in the lockfile, so a hostile codeload server could swap it; fixed in 10.33.4 and 11.0.7) and
+CVE-2026-50014 (`--upload-pack` command execution through a git dependency; fixed in 10.34.0 and 11.4.0). No
+9.x release fixes either.
+
+Why it is accepted for now:
+- It is what the Docker build already runs. The Nix build does not add it; it names it. The Docker runtime image
+  also carries this pnpm in `/opt/corepack`, because `runtime` is `FROM base`; the Nix images carry no package
+  manager.
+- `pnpm-lock.yaml` has no git dependency. Its one URL dependency, `xlsx` from `cdn.sheetjs.com`, has no
+  `integrity` field, which is the shape CVE-2026-48995 is about. Under Nix the whole pnpm store is one
+  fixed-output derivation, so a changed tarball changes the output hash and the build fails.
+- The permission is one exact name, `pnpm-9.15.9`, in `flake.nix`'s `permittedInsecurePackages`; any other
+  insecure package still refuses to evaluate.
+
+Residual: the Docker build installs `xlsx` with nothing pinning its bytes. Moving the repo to pnpm 10 (lockfile
+format 9.0 stays) closes the CVEs; it is a separate change with its own `ci:local` run.
+
+Gate: none.
 
 ## Must be true before the Tencent Cloud deploy
 
