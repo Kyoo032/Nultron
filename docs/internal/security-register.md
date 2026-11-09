@@ -228,6 +228,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual: request-body arrays with no `.max()` still cost one issue per bad element | Residual: none blocks; capping the request-body arrays is a follow-up |
 | [SR-197](#sr-197) | Medium | AI SDK 5's `streamText` prints every stream error to the console by default, and an `APICallError` carries the request body (the prompt) and the gateway's error body | Fixed in tree (2026-11-04, `fix/zod-4`): the runtime passes a silent `onError`; tested, not driven | PR merge of the AI SDK 5 move |
 | [SR-198](#sr-198) | Medium | AI SDK 5 brings `undici` 5.29.0 and `@fastify/busboy` into the hosted image, with five HIGH `undici` advisories and one `busboy` advisory | Fixed in tree (2026-11-04, `fix/zod-4`): scoped override to `undici` 6.29.1, which drops `busboy`; the SDK's guarded download fetch checked on it; not driven | PR merge of the AI SDK 5 move |
+| [SR-206](#sr-206) | Low | The backup heartbeat URL would sit in `.env`, which the `app` container loads, so code running in the app could send fake success pings and hide a dead backup | Fixed in PR #206 (2026-11-06): `backup.sh` reads it from the process environment only, set on the cron line; tested, not driven on a server | — |
 | [SR-207](#sr-207) | Medium | The Host check ran only on mutating `/api` requests, so a DNS-rebinding page could `GET` the API (media, threads, masked settings) from unauthenticated webdev, and a GET in server mode was not checked against the Host allowlist (SEC-004 4b) | Fixed in tree (2026-11-06, `fix/sec-004b-get-host-check`): every `/api` request needs a trusted Host, `/healthz` exempt; unit-tested through the real adapter, not driven | PR merge |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
@@ -6557,6 +6558,28 @@ lookup was called. `audit:deployed` passes.
 Residual: not driven on a hosted server; the override has to be dropped once the SDK moves to `undici` 6 itself.
 
 Gate: PR merge of the AI SDK 5 move.
+
+### SR-206 {#sr-206}
+
+**The backup heartbeat URL would sit in `.env`, which the `app` container loads.**
+Raised 2026-11-06 by the independent review of PR #206 (`fix/backup-missed-run-alert`). Low.
+
+Evidence: `webapp-deploy/compose.yml:38-41` loads all of `.env` into the `app` container, and its header says `.env`
+holds non-secret settings only (`compose.yml:22`, `:39`). The first cut of the missed-run alert read
+`BACKUP_HEARTBEAT_URL` through `setting`, which falls back to `.env`, and `.env.example` listed the variable. Anyone
+running code in the app could then read the URL and send fake success pings, so a dead backup would look alive.
+The same rule is why `BACKUP_KEY` stays out of `.env` (`webapp-deploy/.env.example:147`, `:170`).
+
+Fix: `backup.sh` reads `BACKUP_HEARTBEAT_URL` from the process environment only
+(`webapp-deploy/scripts/backup.sh:27`), `.env.example` carries a note instead of the variable (`:181-184`), and
+the README's "Backup alert" section sets it on the cron line next to `BACKUP_KEY`, from Secrets Manager or a 0600
+file only the deploy user reads. `scripts/backup-heartbeat.test.mjs` "backup.sh never reads the heartbeat URL from
+.env" fails if the read goes back through `setting`.
+
+Residual: not driven on a hosted server. A monitor URL is a bearer secret: a leak from the cron line's source
+(Secrets Manager, the 0600 file) has the same effect, and the monitor cannot tell a forged ping from a real one.
+
+Gate: none; fixed in PR #206.
 
 ### SR-207 {#sr-207}
 
