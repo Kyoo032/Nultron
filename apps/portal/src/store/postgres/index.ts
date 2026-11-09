@@ -45,6 +45,12 @@ export interface OpenPostgresStoreOptions {
   /** Small on purpose: the portal is not the hot path, the gateway is. */
   readonly maxConnections?: number;
   readonly connectionTimeoutMs?: number;
+  /**
+   * Postgres ended a connection while it sat idle in the pool: a restart, a failover, `idle_session_timeout`, an
+   * operator's `pg_terminate_backend`. The pool has already dropped that connection and opens a new one for the
+   * next query, so this is for the log, not for recovery.
+   */
+  readonly onIdleClientError?: (error: Error) => void;
 }
 
 const systemClock: Clock = { now: () => new Date() };
@@ -56,6 +62,9 @@ export function openPostgresStore(options: OpenPostgresStoreOptions): PortalStor
     max: options.maxConnections ?? 8,
     connectionTimeoutMillis: options.connectionTimeoutMs ?? 10_000,
   });
+  // pg-pool re-emits an idle connection's error as an `error` event on the pool. With no listener Node throws
+  // it, and process-guards.ts then exits the portal: one connection lost while idle would stop the server.
+  pool.on("error", (error) => options.onIdleClientError?.(error));
 
   const resolve = createResolvers(pool);
 
