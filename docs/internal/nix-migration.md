@@ -105,7 +105,60 @@ One more thing the first run showed: `node scripts/ci-local.mjs --install` on a 
 
 What the shell sets: `CI_LOCAL_PNPM`, so the script runs this pnpm instead of fetching one with `npx`, and `npm_config_nodedir`, so node-gyp reads the pinned Node's headers.
 
-On NixOS there is no `/lib64/ld-linux-x86-64.so.2`, so the glibc binaries npm ships (biome, esbuild, embedded-postgres) do not start from `node_modules` there. The flake checks of rung 5 run those steps inside Nix instead.
+On NixOS there is no `/lib64/ld-linux-x86-64.so.2`, so the glibc programs npm ships (biome, embedded-postgres's
+`postgres` and `initdb`) do not start from `node_modules` there. esbuild is a static Go binary and starts
+anywhere. The flake checks of rung 5 run those steps inside Nix instead.
+
+## Rung 3: the workspace as derivations
+
+One unit per Dockerfile stage, plus the parts they share:
+
+| Unit | Docker equivalent | What it does |
+|---|---|---|
+| `docker-context.nix` | BuildKit's context | Reads an ignore file with BuildKit's rules (last match wins, a match on a parent folder counts, `**`, `!`) and returns the files it keeps. Checked against both reference images: the portal context is the same 185 files, and the app context differs only by `apps/web/dist/` and `sandbox/`, which the build stage adds |
+| `pnpm-deps.nix` | the downloads inside `pnpm install` | `fetchPnpmDeps` over the whole lockfile, every platform, as one fixed-output derivation. Its inputs are the manifests and the lockfile only. Its hash pins every tarball, `xlsx` included |
+| `pnpm-offline-install.nix` | `pnpm install --frozen-lockfile` | A setup hook: install offline with `--ignore-scripts`, then `pnpm rebuild --pending`, because pnpm refuses an offline scripted install of `xlsx` (`ERR_PNPM_NO_OFFLINE_TARBALL`, reproduced here) |
+| `sandbox-cache.nix` | the wheel downloads of `build-sandbox-runtime.mjs` | Each wheel in `scripts/sandbox-runtime.lock.json` as a `fetchurl` with the lock's URL and sha256 |
+| `web-build.nix` | stage `build` | The filtered install, `vite build`, and the sandbox folder with `--offline` |
+| `web-prod.nix` | stage `prod` | `--prod` install, the renderer, and both load checks the Dockerfile runs |
+| `ffmpeg-static.nix` | stages `ffmpeg-amd64` / `ffmpeg-arm64` | The URL and sha256 are read from the Dockerfile's `ADD --checksum` lines, so the bytes are the same; the encoder checks of the runtime stage run here |
+| `portal-tree.nix` | `portal.Dockerfile` stage `build` | `pnpm install --filter "@agentforge/portal..."` from the allowlisted context |
+
+```bash
+nix build .#web-prod .#portal-tree .#ffmpeg-static
+```
+
+Compared on 2026-11-07, file by file by sha256, with Docker images built from the rung-1 commit:
+
+| Tree | Same | Different, and why |
+|---|---|---|
+| `apps/web/dist` | 77 of 77 | none |
+| sandbox runtime | 35 of 38 | `pyc-cache.json.gz` and the two manifests that hash it. The JSON inside is byte-identical; the gzip bytes are not, because nixpkgs' Node links the system zlib and the official Node binary carries Chromium's, which deflates differently at level 9 |
+| app `/app` (17,397 files in Docker) | 17,380 | `.gitignore` (this rung adds `/result`). `node_modules/.modules.yaml` (the store folder and a timestamp). better-sqlite3's `build/Makefile` and `build/config.gypi` (node-gyp's record of the toolchain; store paths removed so the toolchain stays out of the image). 13 dependency bin shims: `pnpm rebuild` writes them through the package symlink and without the `NODE_PATH` hint; they start the same programs. `node_modules/.bin/esbuild`: linked before esbuild's postinstall swapped its launcher for the native binary, so this one shim calls `node` on the binary. Nothing in the server runs it; tsx calls esbuild's API, which starts the binary itself. One shim Docker has is absent (`esbuild/node_modules/.bin/esbuild`) |
+| portal `/app` (2,687 files) | 2,673 | `.modules.yaml`, 11 dependency shims and the two esbuild shims, for the same reasons |
+
+The entrypoint shims, `apps/web/node_modules/.bin/tsx` and `apps/portal/node_modules/.bin/tsx`, are identical.
+A second relinking pass was tried to make the esbuild shim match; it rewrote the entrypoint shims instead, so
+it was dropped.
+
+Both of the Dockerfile's guards run inside `web-prod.nix` with the same output as in Docker:
+`ok anydoc@0.2.4 — bundled with the app (the container image, on a server)` and
+`host loads from the production tree: 7 exports`.
+
+**Native modules.** Nothing in either production tree is compiled. better-sqlite3 13.0.3 ships N-API prebuilds
+for every platform and loads `prebuilds/linux-x64.node`; its `binding.gyp` targets are `type: none` on Linux,
+so node-gyp only writes stamps. N-API does not depend on the Node ABI, so the Node 24 shebang problem cannot
+reach it, but the pnpm override stays: anything that does compile would hit it. anydoc is a napi-rs prebuild
+and esbuild a static Go binary. Building better-sqlite3 from source would replace the binary the Docker image
+runs; that is a separate decision, not a strangler step.
+
+**ffmpeg.** BtbN's "static" build still links glibc dynamically and asks for `/lib64/ld-linux-x86-64.so.2`.
+`autoPatchelf` points both programs at the glibc and libgcc_s the image already carries for Node. Same
+tarball, same version line (`ffmpeg version n8.1.3-9-g29e619e767-20260930`), different ELF interpreter and
+RUNPATH.
+
+**Closures.** `web-prod` refers to the pinned Node and its libraries only; `disallowedReferences` fails the build
+if Python, make, the compiler, pnpm or the full Node package leak in. `portal-tree` refers to nothing.
 
 ## Running it
 
@@ -120,6 +173,9 @@ nix build .#pnpm
 ```bash
 nix develop
 ```
+
+When `pnpm-lock.yaml` changes, `nix/pkgs/pnpm-deps.nix` needs its new hash: set `hash = "";`, run
+`nix build .#pnpm-deps`, and copy the `got:` value back.
 
 ## Still owed
 
