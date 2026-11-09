@@ -209,6 +209,6 @@ describe("component setup locale catalog", () => {
 
   it("says the reading happens on this machine, in both locales", () => {
     expect(components(enOnboarding).description).toMatch(/this machine/i);
-    expect(components(idOnboarding).description).toMatch(/mesin ini/i);
+    expect(components(idOnboarding).description).toMatch(/komputer ini/i);
   });
 });

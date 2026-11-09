@@ -47,6 +47,7 @@
     "./jobs": "./src/jobs/index.ts",
     "./finance": "./src/finance/index.ts",
     "./market": "./src/market/index.ts",
+    "./market/test-fixtures": "./src/market/watch-fixtures.ts",
     "./docx": "./src/docx/index.ts",
     "./docx/test-fixtures": "./src/docx/__fixtures__/build-zip.ts",
     "./pdf": "./src/pdf/index.ts",
@@ -70,15 +71,16 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@ai-sdk/anthropic": "^1.2.12",
-    "@ai-sdk/google": "^1.2.18",
-    "@ai-sdk/openai": "^1.3.22",
+    "@ai-sdk/anthropic": "^2.0.109",
+    "@ai-sdk/google": "^2.0.104",
+    "@ai-sdk/openai": "^2.0.135",
     "@xmldom/xmldom": "^0.9.12",
-    "ai": "^4.3.16",
+    "ai": "^5.0.278",
     "jszip": "^3.10.1",
     "pdfjs-dist": "^6.3.289",
+    "undici": "6.29.1",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
-    "zod": "^3.24.2"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^24.2.0",

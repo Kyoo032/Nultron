@@ -215,7 +215,7 @@ const COPY: Readonly<
   not_enough_rows: {
     en: () => "The figures were read, but there is too little to preview. Add more rows or check the figures.",
     id: () =>
-      "Angka sudah dibaca, tetapi terlalu sedikit untuk dibuat pratinjau. Tambahkan baris atau periksa angkanya.",
+      "Angka sudah dibaca, tetapi terlalu sedikit untuk dibuat preview. Tambahkan baris atau periksa angkanya.",
   },
   input_rejected: {
     en: (detail) =>

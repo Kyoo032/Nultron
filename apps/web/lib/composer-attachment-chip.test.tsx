@@ -169,7 +169,7 @@ describe("in Bahasa Indonesia", () => {
   it("says that only the text was kept in Indonesian", () => {
     applyLocale("id");
     const html = chip("document", "a.docx", { status: "ready", result: { ...READY, originalSkipped: "quota" } });
-    expect(html).toContain("Hanya teksnya yang disimpan, bukan berkas aslinya.");
+    expect(html).toContain("Hanya teksnya yang disimpan, bukan file aslinya.");
   });
 
   it("says the cut in Indonesian", () => {
@@ -178,6 +178,6 @@ describe("in Bahasa Indonesia", () => {
       status: "ready",
       result: { ...READY, chars: 340_000, sentChars: 60_000, truncated: true },
     });
-    expect(html).toContain("karakter pertama yang dikirim");
+    expect(html).toContain("karakter pertama dari");
   });
 });

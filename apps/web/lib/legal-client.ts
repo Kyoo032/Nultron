@@ -259,7 +259,7 @@ async function readJson(res: Response, fallback: string): Promise<unknown> {
   return data;
 }
 
-function parseWith<T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>, data: unknown, what: string): T {
+function parseWith<T>(schema: z.ZodType<T, unknown>, data: unknown, what: string): T {
   const result = schema.safeParse(data);
   if (!result.success) {
     throw new Error(`The host returned an unexpected ${what}. Refresh and try again.`);

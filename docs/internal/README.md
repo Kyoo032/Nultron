@@ -8,6 +8,7 @@ Engineering and research notes. Not part of the closed-beta tester surface.
 |------|---------|
 | [`web-pivot-2026-09-18.md`](web-pivot-2026-09-18.md) | **Direction change (2026-09-18):** DPSBuddy becomes a hosted multi-user web app. Re-scoped 2026-09-23 into two products (Personal desktop `0.15.0` + Enterprise web). Decision, rule changes, open decisions, deploy log |
 | [`web-migration-plan.md`](web-migration-plan.md) | How to get there: the inventory of local-based assumptions and Phases 0-8 |
+| [`nix-migration.md`](nix-migration.md) | **Build factory move (2026-11-07):** Docker to Nix, strangler style. The ladder, which rung applies and which does not, pins, and what each rung keeps the same |
 | [`web-security-spec.md`](web-security-spec.md) | Security requirements for the hosted app, with the before-traffic acceptance list |
 | [`security-register.md`](security-register.md) | **Living register:** every security flag raised in a session, with evidence, severity, status and the gate it blocks. Ends with the must-be-true checklist for the Tencent deploy |
 | [`web-data-placement-tencent.md`](web-data-placement-tencent.md) | Where each kind of data lives on Tencent Cloud, by migration phase; sizing, backup targets and the price tables |
@@ -51,6 +52,7 @@ Engineering and research notes. Not part of the closed-beta tester surface.
 |------|---------|
 | [`research-dossier-analyst-modes-plan.md`](research-dossier-analyst-modes-plan.md) | Research dossier plus Data / Finance analyst modes |
 | [`market-mode-plan.md`](market-mode-plan.md) | Market Watch mode |
+| [`voice-mode-plan.md`](voice-mode-plan.md) | Voice mode: live talk inside Nultron built in one week (host relay to the gateway's realtime model, workflows, endpoints, acceptance tests), with customer voice as a separate project |
 | [`legal-mode-flow.md`](legal-mode-flow.md) | Legal mode run flow |
 | [`legal-mode-contracts.md`](legal-mode-contracts.md) | Legal mode data contracts |
 | [`weknora-kb-plan.md`](weknora-kb-plan.md) | Knowledge Base plan (builtin path shipped; WeKnora sidecar not used) |

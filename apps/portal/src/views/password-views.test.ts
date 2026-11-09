@@ -63,7 +63,7 @@ describe("the password sign-in page", () => {
   it("is in Indonesian too, with no English left on the form", () => {
     const markup = screen("id");
     expect(markup).toContain('<html lang="id">');
-    expect(markup).toContain("Nama pengguna atau e-mail");
+    expect(markup).toContain("Nama pengguna atau email");
     expect(markup).toContain("Kata sandi");
     expect(markup).not.toContain("Username or e-mail");
     expect(markup).not.toMatch(/\{\w+\}/);

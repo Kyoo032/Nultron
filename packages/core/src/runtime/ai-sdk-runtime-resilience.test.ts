@@ -142,6 +142,10 @@ async function run(options: {
 const toolOutputs = (events: RuntimeEvent[]) =>
   events.flatMap((event) => (event.type === "tool.completed" ? [event.output] : []));
 
+function toolTexts(request: Captured): string[] {
+  return (request.body.messages ?? []).filter((message) => message.role === "tool").map((message) => String(message.content));
+}
+
 function toolMessages(request: Captured): Array<Record<string, unknown>> {
   return (request.body.messages ?? [])
     .filter((message) => message.role === "tool")
@@ -225,7 +229,7 @@ describe("a call to a tool the run does not offer", () => {
     expect(offered(seen[0] as Captured)).toEqual(["echo"]);
   });
 
-  it("gets the disabled refusal, never runs, and does not end the run", async () => {
+  it("comes back to the model as an error naming the tool, never runs, shows no row, and does not end the run", async () => {
     let ran = 0;
     register("echo", async ({ x }) => ({ echoed: x }));
     register("run_code", async () => {
@@ -242,30 +246,37 @@ describe("a call to a tool the run does not offer", () => {
     expect(failed).toBeUndefined();
     expect(ran).toBe(0);
     expect(types(events)).not.toContain("run.failed");
-    expect(toolOutputs(events)).toEqual([{ success: false, error: "Tool run_code is disabled on this machine." }]);
+    expect(types(events)).not.toContain("tool.started");
+    expect(toolOutputs(events)).toEqual([]);
     expect(seen).toHaveLength(2);
-    expect(toolMessages(seen[1] as Captured)).toEqual([
-      { success: false, error: "Tool run_code is disabled on this machine." },
-    ]);
+    const texts = toolTexts(seen[1] as Captured);
+    expect(texts).toHaveLength(1);
+    expect(texts[0]).toContain("run_code");
+    expect(texts[0]).toContain("Available tools: echo.");
     expect(events.filter((event) => event.type === "run.completed")).toHaveLength(1);
   });
 
-  it("counts every refused call toward the run's budget, so parallel calls cannot run without limit", async () => {
+  it("refuses every one of many parallel calls without running any or showing a row", async () => {
+    let ran = 0;
     register("echo", async ({ x }) => ({ echoed: x }));
-    register("run_code", async () => ({ ok: true }));
+    register("run_code", async () => {
+      ran += 1;
+      return { ok: true };
+    });
     const calls = Array.from({ length: 5 }, (_, i) => ({
       name: "run_code",
       args: `{"language":"python","code":"${i}"}`,
     }));
-    gateway((request) => (request === 1 ? callsStream(calls, 1) : textStream("done")));
+    const seen = gateway((request) => (request === 1 ? callsStream(calls, 1) : textStream("done")));
     const { events, failed } = await run({
       tools: ["echo", "run_code"],
       disabled: ["run_code"],
       budget: { maxSteps: 6, maxToolCalls: 5, perTool: { run_code: 2 } },
     });
     expect(failed).toBeUndefined();
-    const reasons = toolOutputs(events).map((output) => (output as { reason?: string }).reason);
-    expect(reasons).toEqual([undefined, undefined, "budget", "budget", "budget"]);
+    expect(ran).toBe(0);
+    expect(types(events)).not.toContain("tool.started");
+    expect(toolTexts(seen[1] as Captured)).toHaveLength(5);
   });
 
   it("sends no tool list at all when every bound tool is disabled, as before", async () => {

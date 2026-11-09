@@ -112,7 +112,7 @@ describe("GET /authorize in password mode", () => {
         }).toString(),
       { headers: { "accept-language": "id-ID,id;q=0.9" } },
     );
-    expect(reply.text).toContain("Nama pengguna atau e-mail");
+    expect(reply.text).toContain("Nama pengguna atau email");
     expect(reply.text).toContain("Kata sandi");
     expect(reply.text).toContain("Jangan pernah membagikan kata sandi Anda kepada siapa pun.");
     expect(reply.text).not.toContain("kode masuk");
@@ -780,7 +780,8 @@ describe("the device-code approval page", () => {
       }),
     );
     expect(signedIn.status).toBe(200);
-    expect(signedIn.text).toContain('name="user_code"');
+    expect(signedIn.text).toContain('<form method="get" action="/activate">');
+    expect(signedIn.text).toContain('id="user_code" name="code"');
     expect(signedIn.text).toContain(person.email);
     expect(agent.cookies.has(pilot.portal.runtime.cookies.session)).toBe(true);
   }, 60_000);

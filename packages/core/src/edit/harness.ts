@@ -41,7 +41,7 @@ const SKILL_PATTERNS: Array<{ skill: EditHarnessSkill; match: RegExp }> = [
   { skill: "place-made-shot", match: /make a still of|make a clip of|buat gambar|buat klip/i },
   {
     skill: "hand-back-file",
-    match: /hand(?: me| back)? the file|export this|ekspor berkas|berikan berkasnya|^\s*export\s*$|^\s*ekspor\s*$/i,
+    match: /hand(?: me| back)? the file|export this|ekspor (?:berkas|file)|berikan (?:berkas|file-?)nya|^\s*export\s*$|^\s*ekspor\s*$/i,
   },
 ];
 

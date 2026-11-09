@@ -1,6 +1,6 @@
 {
   "title": "Pemakaian",
-  "intro": "Yang sudah dibelanjakan meja ini dan kunci ini pada rentang yang dipilih.",
+  "intro": "Biaya yang sudah keluar untuk meja kerja ini dan kunci ini pada rentang yang dipilih.",
   "rangeAria": "Rentang pemakaian",
   "range": {
     "day": "Hari",
@@ -9,25 +9,25 @@
   },
   "thisKey": {
     "label": "Kunci ini",
-    "needsKey": "Tempel kunci gateway untuk melihat pemakaian.",
+    "needsKey": "Tempelkan kunci gateway untuk melihat pengeluaran.",
     "unlimited": "{used} terpakai · Tanpa batas",
     "metered": "{used} terpakai · sisa {left}",
-    "meterUnlimited": "Kunci ini memakai {used}, sisa tanpa batas",
-    "meterLimited": "Kunci ini memakai {used} dari {total}"
+    "meterUnlimited": "Kunci ini sudah memakai {used}; tidak ada batasnya",
+    "meterLimited": "Kunci ini sudah memakai {used} dari {total}"
   },
   "desk": {
-    "label": "Meja ini",
+    "label": "Meja kerja ini",
     "summary": "{display} · {count} model",
     "summaryOne": "{display} · {count} model",
-    "priced": "{count} proses berharga dalam rentang ini.",
-    "pricedOne": "{count} proses berharga dalam rentang ini.",
-    "fetching": "Mengambil belanja meja…"
+    "priced": "{count} proses yang sudah dihitung biayanya dalam rentang ini.",
+    "pricedOne": "{count} proses yang sudah dihitung biayanya dalam rentang ini.",
+    "fetching": "Mengambil biaya meja kerja…"
   },
   "chart": {
-    "label": "Belanja dari waktu ke waktu",
-    "aria": "Belanja per model dari waktu ke waktu",
+    "label": "Biaya dari waktu ke waktu",
+    "aria": "Biaya per model dari waktu ke waktu",
     "empty": "Tidak ada proses {productName} dalam rentang ini.",
-    "unpriced": "Proses dalam rentang ini belum diberi harga.",
+    "unpriced": "Proses dalam rentang ini belum dihitung biayanya.",
     "barTitle": "{label}: {model} · ${usd}",
     "window": {
       "day": "Satu batang per hari · {count} hari terakhir · {span}",
@@ -36,7 +36,7 @@
     }
   },
   "byModel": {
-    "label": "Belanja per model",
+    "label": "Biaya per model",
     "empty": "Tidak ada proses {productName} dalam rentang ini.",
     "row": "{runs} proses · {input} masuk · {output} keluar",
     "rowOne": "{runs} proses · {input} masuk · {output} keluar",
@@ -46,11 +46,11 @@
     "unpricedKnownOne": "{model}: {display} · {runs} proses"
   },
   "loading": "Memuat…",
-  "footer": "Perkiraan meja memakai token masuk dan keluar {productName} serta harga katalog {gatewayName}. Belanja dompet kunci ini mencakup aplikasi lain pada kunci yang sama dan tidak akan sama dengan total meja.",
+  "footer": "Perkiraan untuk meja kerja dihitung dari token masuk dan keluar {productName} dan harga katalog {gatewayName}. Pengeluaran kunci ini mencakup aplikasi lain yang memakai kunci yang sama, jadi bisa berbeda dari total meja kerja.",
   "errors": {
     "unavailable": "Pemakaian belum tersedia.",
-    "loadStatus": "Pemakaian tidak dapat dimuat ({status}).",
+    "loadStatus": "Pemakaian gagal dimuat ({status}).",
     "incomplete": "Respons pemakaian tidak lengkap.",
-    "load": "Pemakaian tidak dapat dimuat."
+    "load": "Pemakaian gagal dimuat."
   }
 }

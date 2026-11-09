@@ -141,7 +141,7 @@ export {
   formatBytes,
 } from "./storage/quota";
 export type { StorageBlock, StorageWarning, TenantStorageUse, TenantStorageReport } from "./storage/quota";
-export { ApiError, ContentParseError } from "./errors";
+export { ApiError, ContentParseError, summarizeIssues } from "./errors";
 export {
   wrappingKeyFromSecret,
   encryptJson,

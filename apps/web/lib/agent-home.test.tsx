@@ -131,7 +131,7 @@ describe("AgentHome", () => {
   it("speaks Indonesian when the desk does", () => {
     applyLocale("id");
     const html = renderToStaticMarkup(<AgentHome agent={RESEARCH} name="Riset" />);
-    expect(html).toContain("Menulis dosir");
+    expect(html).toContain("Menulis laporan");
   });
 
   it("draws the generalist with the chat icon without throwing", () => {

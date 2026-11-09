@@ -19,6 +19,8 @@ import { bareModelId } from "../models/request-constraints";
 
 export type OpenAiWire = "responses" | "chat_completions";
 
+const SDK_COMPLETIONS_EFFORTS: ReadonlySet<string> = new Set(["none", "minimal", "low", "medium", "high", "xhigh", "max"]);
+
 /** The name rule the code always had: o-series and GPT-5 or newer, except gpt-5-mini. */
 export function nameSuggestsResponsesApi(modelId: string): boolean {
   const id = bareModelId(modelId);
@@ -82,15 +84,20 @@ export function openaiCompatProviderOptions(options: {
   if (!options.responses && !effort) {
     return undefined;
   }
-  const providerEffort = effort
+  const wireEffort = effort
     ? toWireReasoningEffort(effort, {
         officialOpenAI: options.officialOpenAI,
         responses: options.responses,
       })
     : effort;
+  const providerEffort =
+    wireEffort && (options.responses || SDK_COMPLETIONS_EFFORTS.has(wireEffort)) ? wireEffort : undefined;
+  if (!options.responses && !providerEffort) {
+    return undefined;
+  }
   return {
     openai: {
-      ...(options.responses ? { strictSchemas: false } : {}),
+      ...(options.responses ? { strictJsonSchema: false, store: false } : {}),
       ...(providerEffort
         ? {
             reasoningEffort: providerEffort,

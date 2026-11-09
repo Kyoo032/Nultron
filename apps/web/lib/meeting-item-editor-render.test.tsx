@@ -121,7 +121,7 @@ describe("ActionEditor", () => {
     const html = renderToStaticMarkup(<ActionEditor index={1} item={action} clearsTranslation {...handlers} />);
     expect(html).toContain("Penanggung jawab");
     expect(html).toContain("Simpan");
-    expect(html).toContain("Menyimpan menghapus terjemahan");
+    expect(html).toContain("Menyimpan perubahan akan menghapus terjemahan");
     expect(html).not.toContain("meeting.edit");
   });
 });

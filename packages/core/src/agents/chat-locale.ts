@@ -78,6 +78,7 @@ export type ChatTurnCopy = {
   interrupted: string;
   /** The model asked for could not be reached before it answered, so the turn ran on another (`{from}`, `{to}`). */
   modelFallback: string;
+  saveTimeout: string;
 };
 
 const CHAT_TURN_COPY: Record<AppLocale, ChatTurnCopy> = {
@@ -97,24 +98,27 @@ const CHAT_TURN_COPY: Record<AppLocale, ChatTurnCopy> = {
     interrupted:
       'The tool steps above ran, but I could not finish the answer.\n\nReason: {reason}\n\nSend "continue" and I will try again.',
     modelFallback: "{from} is unavailable; used {to} for this answer.",
+    saveTimeout: "Saving this reply is taking too long. Reload the chat in a minute to see whether it was kept.",
   },
   id: {
-    thinkPast: "Saya akan meninjau percakapan sebelumnya, lalu menjawab dari yang saya temukan.",
-    thinkDesk: "Saya akan menjawab dari catatan meja.",
-    lookingAttached: "Melihat yang Anda lampirkan.",
-    pastNone: "Tidak ada percakapan sebelumnya di meja ini yang cocok.",
-    pastOne: 'Percakapan sebelumnya berjudul "{title}".',
-    pastMany: 'Percakapan sebelumnya mencakup "{title}".',
+    thinkPast: "Saya akan menelusuri obrolan sebelumnya, lalu menjawab berdasarkan temuan saya.",
+    thinkDesk: "Saya akan menjawab berdasarkan catatan meja kerja.",
+    lookingAttached: "Melihat lampiran Anda.",
+    pastNone: "Tidak ada obrolan sebelumnya di meja kerja ini yang cocok.",
+    pastOne: 'Obrolan sebelumnya berjudul "{title}".',
+    pastMany: 'Obrolan sebelumnya antara lain "{title}".',
     deskCite: "Dari meja [1] [99].",
-    noSource: "Meja ini tidak punya sumber untuk itu.",
+    noSource: "Meja kerja ini tidak memiliki sumber untuk itu.",
     stepLimit:
-      "{tools} sudah selesai, tetapi jawabannya belum. Minta saya untuk melanjutkan, dan saya akan meneruskannya dari titik terakhir.",
+      "{tools} sudah selesai, tetapi jawabannya belum. Minta saya melanjutkan, dan saya akan meneruskan dari titik terakhir.",
     stepLimitEmpty:
-      "Tidak ada alat yang selesai, tetapi jawabannya belum. Minta saya untuk melanjutkan, dan saya akan meneruskannya dari titik terakhir.",
+      "Tidak ada alat yang selesai, tetapi jawabannya belum. Minta saya melanjutkan, dan saya akan meneruskan dari titik terakhir.",
     stepLimitAnd: "dan",
     interrupted:
-      'Langkah alat di atas sudah berjalan, tetapi saya tidak dapat menyelesaikan jawabannya.\n\nAlasan: {reason}\n\nKirim "lanjutkan" dan saya akan mencoba lagi.',
-    modelFallback: "{from} tidak tersedia; menggunakan {to} untuk jawaban ini.",
+      'Langkah-langkah alat di atas sudah berjalan, tetapi saya belum bisa menyelesaikan jawabannya.\n\nAlasan: {reason}\n\nKirim "lanjutkan" dan saya akan mencoba lagi.',
+    modelFallback: "{from} tidak tersedia; jawaban ini memakai {to}.",
+    saveTimeout:
+      "Penyimpanan balasan ini terlalu lama. Muat ulang obrolan sebentar lagi untuk melihat apakah balasan sudah tersimpan.",
   },
 };
 

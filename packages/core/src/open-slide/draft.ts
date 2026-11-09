@@ -106,7 +106,7 @@ const COPY: Record<AppLocale, Copy> = {
     bigLabel: "Tidak ada angka",
     bigCaption: "Halaman ini tidak diisi statistik yang dikarang.",
     quote: "Pakai hanya yang sudah Anda serahkan.",
-    quoteBy: "Meja ini",
+    quoteBy: "Meja kerja ini",
     compareLeft: "Di halaman ini",
     compareRight: "Dibiarkan nanti",
     compareLeftLines: ["Satu klaim.", "Kata yang bisa Anda tunjuk."],

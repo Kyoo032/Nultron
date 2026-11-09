@@ -11,8 +11,7 @@ const AGENTS_NONE_AVAILABLE = agentsCopy.page.noneAvailable;
 const AGENTS_KIND_CHAT = agentsCopy.page.converses;
 const AGENTS_KIND_STUDIO = agentsCopy.page.studio;
 
-/** Chat and Research run their harness in chat. Every other agent keeps its checked run in a studio. */
-const HARNESS_IN_CHAT = new Set(["chat", "research"]);
+const HARNESS_IN_CHAT = new Set(["chat", "research", "finance"]);
 
 function agentCard(page: Page, mode: string) {
   return page.locator(`[data-testid="agent-card"][data-agent="${mode}"]`);

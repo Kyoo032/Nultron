@@ -1,62 +1,62 @@
 {
   "title": "Riset",
-  "expectedInputs": "Anda dapat: dosir bersitasi — Pertanyaan, Temuan, Sumber — yang dapat dibuka kembali, diunduh, atau dikirim ke Dokumen, Presentasi, atau Basis Pengetahuan.",
+  "expectedInputs": "Hasil: laporan bersitasi (Pertanyaan, Temuan, Sumber) yang bisa dibuka lagi, diunduh, atau dikirim ke Dokumen, Presentasi, atau Knowledge Base.",
   "reopenSaved": "Buka riset tersimpan…",
   "openSettings": "Buka Pengaturan.",
   "tabNotes": "Catatan",
-  "tabDossier": "Dosir",
-  "emptyTitle": "Belum ada dosir",
-  "emptyBody": "Masukkan pertanyaan di bawah. Halaman dibaca lewat HTTPS.",
-  "promptPlaceholder": "Apa yang berubah pada aturan pencatatan IDX tahun ini?",
+  "tabDossier": "Laporan",
+  "emptyTitle": "Belum ada laporan",
+  "emptyBody": "Ketik pertanyaan di bawah. Halaman web dibaca lewat HTTPS.",
+  "promptPlaceholder": "Apa yang berubah dalam aturan pencatatan IDX tahun ini?",
   "promptAria": "Pertanyaan riset",
   "cancel": "Batal",
-  "generate": "Hasilkan",
-  "working": "Memproses…",
+  "generate": "Mulai riset",
+  "working": "Sedang bekerja…",
   "previewKicker": "Riset",
-  "examplesHeading": "Mulai dari templat",
-  "examplesHint": "Klik kartu untuk memuat brief lengkap. Ganti detail contoh, lalu hasilkan.",
+  "examplesHeading": "Mulai dari template",
+  "examplesHint": "Klik salah satu kartu untuk memuat brief lengkapnya. Ganti detail contohnya, lalu mulai riset.",
   "templates": {
     "competitive-landscape": {
       "title": "Peta persaingan",
-      "resultSummary": "Peta bersumber dengan pekerjaan pembeli, tiga produk nyata, dan perubahan bertanggal — bukan tiga kata sifat."
+      "resultSummary": "Peta persaingan bersumber: pekerjaan yang ingin diselesaikan pembeli, tiga produk nyata, dan perubahan bertanggal, bukan deretan kata sifat."
     },
     "source-synthesis": {
       "title": "Sintesis sumber",
-      "resultSummary": "Peta tema dengan ketidaksepakatan dan kriteria batal — bukan ringkasan bertumpuk dari satu pendapat."
+      "resultSummary": "Peta tema lengkap dengan perbedaan pendapat dan kriteria yang bisa membatalkan kesimpulan, bukan ringkasan bertumpuk dari satu sudut pandang."
     },
     "question-backlog": {
-      "title": "Antrean pertanyaan",
-      "resultSummary": "Dua belas pertanyaan terurut dengan metode dan tolok ukur selesai — bukan curah pendapat."
+      "title": "Daftar pertanyaan",
+      "resultSummary": "Dua belas pertanyaan berurutan lengkap dengan metode dan tanda selesai, bukan sekadar curah gagasan."
     },
     "claim-check": {
       "title": "Uji klaim",
-      "resultSummary": "Putusan atas satu klaim dengan syarat pembalik — bukan paragraf kedua belah pihak."
+      "resultSummary": "Putusan atas satu klaim, plus syarat yang bisa membalikkannya, bukan paragraf yang membela kedua sisi."
     },
     "options-matrix": {
       "title": "Matriks opsi",
-      "resultSummary": "Kisi opsi berskor dengan ketidaktahuan eksplisit dan metrik batal minggu pertama."
+      "resultSummary": "Tabel opsi berskor, dengan hal-hal yang belum diketahui disebut terang-terangan, plus metrik pembatalan untuk minggu pertama."
     },
     "vendor-diligence": {
       "title": "Uji tuntas vendor",
-      "resultSummary": "Catatan uji tuntas bersumber dengan putusan kecocokan dan celah ‘tidak dipublikasikan’ — bukan brosur."
+      "resultSummary": "Catatan uji tuntas bersumber dengan putusan kecocokan dan celah “tidak dipublikasikan”, bukan tulisan ulang brosur."
     }
   },
-  "errorGateway": "Riset memerlukan gateway aktif. Tempel kunci API Toko Token di Settings, lalu coba lagi.",
-  "errorSearch": "Pencarian web tidak mengembalikan hasil. Coba lagi sebentar lagi.",
-  "errorNoHttps": "Pencarian tidak mengembalikan hasil HTTPS yang dapat dibaca untuk pertanyaan ini",
-  "errorNoPassage": "Tidak ada halaman yang menyimpan kalimat yang dapat dikutip.",
+  "errorGateway": "Riset butuh gateway yang aktif. Tempel kunci API Toko Token di Pengaturan, lalu coba lagi.",
+  "errorSearch": "Pencarian web tidak membuahkan hasil. Coba lagi sebentar lagi.",
+  "errorNoHttps": "Tidak ada hasil HTTPS yang bisa dibaca untuk pertanyaan ini",
+  "errorNoPassage": "Tidak ada halaman yang memuat kalimat yang bisa dikutip.",
   "citeGap": "Tidak ada kutipan yang tersimpan untuk: {heading}",
   "verdictAgree": "Sumber sepakat",
   "verdictContradict": "Sumber bertentangan",
   "verdictOnly": "Hanya satu sumber yang menyebutnya",
   "headingComparison": "## Perbandingan",
-  "phasePlanning": "Merencanakan sub-kueri",
+  "phasePlanning": "Merencanakan kueri pencarian",
   "phaseSearching": "Mencari di web",
   "phaseReading": "Membaca halaman",
   "phaseComparing": "Membandingkan sumber",
   "phaseDrafting": "Menyusun temuan",
   "phaseChecking": "Memeriksa kutipan",
-  "phaseSaving": "Menyimpan dosir",
+  "phaseSaving": "Menyimpan laporan",
   "headingQuestion": "## Pertanyaan",
   "headingQueries": "## Kueri yang dijalankan",
   "headingSources": "## Sumber",
@@ -64,10 +64,10 @@
   "headingContradictions": "## Kontradiksi",
   "headingOpenQuestions": "## Pertanyaan terbuka",
   "notesSources": "Sumber:",
-  "fallbackTitle": "Dosir riset",
+  "fallbackTitle": "Laporan riset",
   "fallbackSummary": "Temuan dari {count} sumber.",
-  "unreadPage": "Halaman tidak dapat dibaca: {reason}. Cuplikan pencarian disimpan di atas.",
-  "noneRecorded": "Tidak ada yang tercatat.",
+  "unreadPage": "Halaman gagal dibaca: {reason}. Cuplikan hasil pencarian disimpan di atas.",
+  "noneRecorded": "Belum ada yang tercatat.",
   "untitled": "Tanpa judul",
   "urlNone": "(tidak ada)",
   "unknown": "(tidak diketahui)",
@@ -79,11 +79,11 @@
   "statusLabel": "Status",
   "languageRule": "Tulis setiap string yang dilihat pengguna (title, summary, judul dan isi temuan, contradictions, openQuestions, dan catatan sumber) dalam Bahasa Indonesia profesional (Anda / infinitif). Pertahankan kunci JSON, id sumber seperti [S1], URL, dan kutipan verbatim. Jangan mencampur heading bahasa Inggris ke dalam temuan.",
   "checks": {
-    "title": "Beberapa bagian dosir ini belum sepenuhnya didukung sumber",
-    "uncited": "Beberapa temuan tidak mencantumkan sumber.",
-    "unknownSources": "Beberapa kutipan menunjuk ke sumber yang tidak dibaca dalam proses ini.",
-    "emptySections": "Beberapa bagian kosong.",
-    "hint": "Dosir sudah tersimpan. Buka sumbernya sebelum mengandalkan sebuah temuan, atau jalankan pertanyaannya lagi.",
+    "title": "Sebagian isi laporan ini belum sepenuhnya didukung sumber",
+    "uncited": "Sebagian temuan tidak mencantumkan sumber.",
+    "unknownSources": "Sebagian kutipan mengacu ke sumber yang tidak dibaca dalam proses ini.",
+    "emptySections": "Sebagian bagian masih kosong.",
+    "hint": "Laporan sudah tersimpan. Buka sumbernya sebelum mengandalkan sebuah temuan, atau jalankan ulang pertanyaannya.",
     "listAria": "Hasil pemeriksaan"
   }
 }

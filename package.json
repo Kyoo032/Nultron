@@ -11,6 +11,7 @@
     "lint:fix": "biome check --write .",
     "test:e2e": "pnpm --filter @agentforge/web test:e2e",
     "ci:local": "node scripts/ci-local.mjs",
+    "ci:nix": "nix flake check -L --keep-going",
     "db:push": "pnpm --filter @agentforge/db push",
     "db:seed": "pnpm --filter @agentforge/db seed",
     "db:studio": "pnpm --filter @agentforge/db studio",
@@ -20,6 +21,7 @@
     "portal:invite": "pnpm --filter @agentforge/portal exec tsx scripts/invite.ts",
     "portal:account": "pnpm --filter @agentforge/portal exec tsx scripts/account.ts",
     "maps:check": "node scripts/map-rot.mjs",
+    "verify:paid-gate": "node .cursor/skills/verify-paid-media-gate/scripts/check.mjs",
     "lane-guard": "node scripts/lane-guard.mjs",
     "where": "node scripts/where-am-i.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",
@@ -46,7 +48,9 @@
       "image-size@<2.0.3": ">=2.0.3",
       "brace-expansion@1": "1.1.21",
       "brace-expansion@2": "2.1.7",
-      "brace-expansion@5": "5.0.12"
+      "brace-expansion@5": "5.0.12",
+      "body-parser@2": "2.4.0",
+      "@ai-sdk/provider-utils>undici": "6.29.1"
     }
   },
   "devDependencies": {

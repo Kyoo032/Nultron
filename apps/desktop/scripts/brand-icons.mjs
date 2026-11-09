@@ -13,7 +13,7 @@
 //
 // PNG source mode (the app logo), the default:
 //   node apps/desktop/scripts/brand-icons.mjs --out <dir> [--png-src <dir>] [--src <dir with the wordmark SVGs>]
-// --png-src defaults to apps/desktop/branding/agentforge/source. It must hold app-logo-cut.png (the logo tile with transparent
+// --png-src must hold app-logo-cut.png (the logo tile with transparent
 // corners, square, at least 1024 px) or, when that is absent, app-logo.webp: Rizky's 1600 px master, which Electron decodes and
 // brand-logo-cut.mjs cuts out of its white corners (the cut is written to <out>/source/app-logo-cut.png). It may also hold
 // icon-<n>.png (an exact-size picture that wins over resizing). Everything is derived from the one file: the Windows and
@@ -57,20 +57,15 @@ export const FAVICON_SVG = "favicon.svg";
 // docs/internal/maps/mascot-and-brand.md, "Regenerating".
 const LOGO = { file: "replace/logo-1024.png", width: 1024, height: 1024, art: "icon" };
 const LOGO_SMALL = { file: "replace/logo-160.png", width: 160, height: 160, art: "icon", optional: true };
-const MARK = { file: "replace/mark-1024.png", width: 1024, height: 1024, art: "mark", fit: 0.64 };
 // The display logo is the same tile at 256 px (110 KB): the packaged preload inlines it as base64 at every launch.
 const LOGO_DISPLAY = { file: "mark/mark-256.png", width: 256, height: 256, art: "icon" };
 const railMark = (size) => ({ file: `mark/mark-${size}.png`, width: size, height: size, art: "icon" });
 export const REPLACEMENTS = [
   { repo: "apps/web/public/brand/logo.png", ...LOGO_DISPLAY },
   { repo: "apps/portal/assets/logo.png", ...LOGO_DISPLAY },
-  { repo: "apps/desktop/resources/brand/logo.png", ...LOGO_DISPLAY },
-  { repo: "apps/desktop/branding/agentforge/logo.png", ...LOGO_DISPLAY },
   { repo: "apps/desktop/splash/logo.png", ...LOGO_DISPLAY },
   { repo: "apps/desktop/logo.png", ...LOGO_SMALL },
-  { repo: "apps/desktop/branding/agentforge/icon.png", ...LOGO },
   { repo: "apps/desktop/build/icon.png", ...LOGO },
-  { repo: "apps/desktop/branding/agentforge/mark.png", ...MARK },
   { repo: "apps/web/components/brand-art/mark-24.png", ...railMark(24) },
   { repo: "apps/web/components/brand-art/mark-32.png", ...railMark(32) },
   { repo: "apps/web/components/brand-art/mark-48.png", ...railMark(48) },
@@ -78,10 +73,8 @@ export const REPLACEMENTS = [
   { repo: "apps/web/public/brand/favicon-32.png", file: "favicon-32.png", width: 32, height: 32, art: "icon" },
   { repo: "apps/web/public/brand/favicon-180.png", file: "favicon-180.png", width: 180, height: 180, art: "icon" },
   { repo: "apps/web/public/brand/favicon.ico", file: "favicon.ico", ico: true },
-  { repo: "apps/desktop/branding/agentforge/icon.ico", file: "icon.ico", ico: true },
   { repo: "apps/desktop/build/icon.ico", file: "icon.ico", ico: true },
   { repo: "apps/desktop/splash/icon.ico", file: "icon.ico", ico: true },
-  { repo: "apps/desktop/branding/agentforge/icon.icns", file: "icon.icns", ico: true },
   { repo: "apps/desktop/build/icon.icns", file: "icon.icns", ico: true },
 ];
 
@@ -288,8 +281,17 @@ export function plan(smallMax = SMALL_MAX) {
 export const LOGO_SOURCE = "app-logo-cut.png";
 /** The master the cut is made from: Rizky's painted logo, 1600 px, no alpha, white corners. */
 export const LOGO_MASTER = "app-logo.webp";
-/** Where --png-src points when it is not given: the master lives next to the brand it belongs to. */
-export const DEFAULT_PNG_SRC = resolve(dirname(fileURLToPath(import.meta.url)), "..", "branding", "agentforge", "source");
+export const DEFAULT_PNG_SRC = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "..",
+  "docs",
+  "internal",
+  "brand",
+  "nultron",
+  "reference",
+);
 export const MARK_SIZES = [24, 32, 48, 64, 128, 256];
 // The tile is a superellipse |x/a|^n + |y/a|^n = 1, fitted to the artwork's own edge (n 4.67, a 807 px on the 1600 px
 // canvas, so the source image crops the tile by a few px per side). `half` is a as a fraction of the canvas width.
@@ -766,12 +768,7 @@ export function buildIconSet({ cut, overrides = new Map() }) {
 
   for (const r of REPLACEMENTS.filter((entry) => !entry.ico)) {
     if (files.has(r.file)) continue;
-    if (r.art === "mark") {
-      const inner = Math.round(r.width * r.fit);
-      files.set(r.file, png(centred(r.width, scaleImage(full, inner, inner))));
-    } else {
-      files.set(r.file, png(scaleImage(full, r.width, r.height, r.width <= 160 ? 0.15 : 0)));
-    }
+    files.set(r.file, png(scaleImage(full, r.width, r.height, r.width <= 160 ? 0.15 : 0)));
   }
   return files;
 }
@@ -863,7 +860,7 @@ export function svgAspect(text) {
 const USAGE = [
   "usage: brand-icons.mjs --out <dir> [--png-src <dir with app-logo.webp or app-logo-cut.png [icon-<n>.png]>]",
   "                       [--src <dir with wordmark.svg wordmark-light.svg>, for the lockups] [--repo <dir>]",
-  "         (--png-src defaults to apps/desktop/branding/agentforge/source)",
+  "         (--png-src defaults to docs/internal/brand/nultron/reference)",
   "                       [--check] exit 1 when a file the repo has differs from the kit's;  [--apply] write the kit's files over the repo's",
   "       brand-icons.mjs --src <dir with icon-master.svg icon-small.svg mark.svg> --out <dir> [--small-max <px>] [--repo <dir>]",
   "         (SVG mode: --src without --png-src)",

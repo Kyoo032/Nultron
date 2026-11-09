@@ -1,0 +1,9754 @@
+{
+ "packages/core/src/artifacts/artifact-meta.ts#artifactMetaSchema": {
+  "inputs": [
+   {
+    "model": "not-valid-at-all",
+    "models": "not-valid-at-all",
+    "question": "not-valid-at-all",
+    "queries": "not-valid-at-all",
+    "sourceCount": "not-valid-at-all",
+    "parentArtifactId": "not-valid-at-all",
+    "datasetId": "not-valid-at-all"
+   },
+   {
+    "model": "x",
+    "models": [
+     "x"
+    ],
+    "question": "x",
+    "queries": [
+     "x"
+    ],
+    "sourceCount": 1,
+    "parentArtifactId": "x",
+    "datasetId": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "model": "not-valid-at-all",
+    "question": "not-valid-at-all",
+    "parentArtifactId": "not-valid-at-all",
+    "datasetId": "not-valid-at-all"
+   },
+   {
+    "model": "x",
+    "models": [
+     "x"
+    ],
+    "question": "x",
+    "queries": [
+     "x"
+    ],
+    "sourceCount": 1,
+    "parentArtifactId": "x",
+    "datasetId": "x"
+   }
+  ]
+ },
+ "packages/core/src/artifacts/finance-brief.ts#financeBriefSchema": {
+  "inputs": [
+   {
+    "title": "x",
+    "sections": [
+     {
+      "heading": "x",
+      "body": "x"
+     }
+    ]
+   },
+   {
+    "title": "x",
+    "sections": [
+     {
+      "heading": "x",
+      "body": "x",
+      "tables": [
+       {
+        "columns": [
+         "x"
+        ],
+        "rows": [
+         [
+          "x"
+         ]
+        ]
+       }
+      ],
+      "metrics": [
+       "x"
+      ]
+     }
+    ],
+    "assumptions": [
+     "x"
+    ],
+    "computed": {
+     "metrics": [
+      {
+       "key": "x",
+       "label": "x",
+       "value": 1,
+       "unit": "x",
+       "period": "x",
+       "formula": "x"
+      }
+     ],
+     "tables": [
+      {
+       "columns": [
+        "x"
+       ],
+       "rows": [
+        [
+         "x"
+        ]
+       ],
+       "name": "x"
+      }
+     ]
+    }
+   }
+  ],
+  "outputs": [
+   {
+    "title": "x",
+    "sections": [
+     {
+      "heading": "x",
+      "body": "x",
+      "tables": [],
+      "metrics": []
+     }
+    ],
+    "assumptions": [],
+    "computed": {
+     "metrics": [],
+     "tables": []
+    }
+   },
+   {
+    "title": "x",
+    "sections": [
+     {
+      "heading": "x",
+      "body": "x",
+      "tables": [
+       {
+        "columns": [
+         "x"
+        ],
+        "rows": [
+         [
+          "x"
+         ]
+        ]
+       }
+      ],
+      "metrics": [
+       "x"
+      ]
+     }
+    ],
+    "assumptions": [
+     "x"
+    ],
+    "computed": {
+     "metrics": [
+      {
+       "key": "x",
+       "label": "x",
+       "value": 1,
+       "unit": "x",
+       "period": "x",
+       "formula": "x"
+      }
+     ],
+     "tables": [
+      {
+       "columns": [
+        "x"
+       ],
+       "rows": [
+        [
+         "x"
+        ]
+       ],
+       "name": "x"
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "packages/core/src/artifacts/finance-brief.ts#financeComputedSchema": {
+  "inputs": [
+   {},
+   {
+    "metrics": [
+     {
+      "key": "x",
+      "label": "x",
+      "value": 1,
+      "unit": "x",
+      "period": "x",
+      "formula": "x"
+     }
+    ],
+    "tables": [
+     {
+      "columns": [
+       "x"
+      ],
+      "rows": [
+       [
+        "x"
+       ]
+      ],
+      "name": "x"
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "metrics": [],
+    "tables": []
+   },
+   {
+    "metrics": [
+     {
+      "key": "x",
+      "label": "x",
+      "value": 1,
+      "unit": "x",
+      "period": "x",
+      "formula": "x"
+     }
+    ],
+    "tables": [
+     {
+      "columns": [
+       "x"
+      ],
+      "rows": [
+       [
+        "x"
+       ]
+      ],
+      "name": "x"
+     }
+    ]
+   }
+  ]
+ },
+ "packages/core/src/artifacts/finance-brief.ts#financeMetricSchema": {
+  "inputs": [
+   {
+    "key": "x",
+    "label": "x",
+    "value": null
+   },
+   {
+    "key": "x",
+    "label": "x",
+    "value": 1,
+    "unit": "x",
+    "period": "x",
+    "formula": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "key": "x",
+    "label": "x",
+    "value": null,
+    "unit": "",
+    "period": "",
+    "formula": ""
+   },
+   {
+    "key": "x",
+    "label": "x",
+    "value": 1,
+    "unit": "x",
+    "period": "x",
+    "formula": "x"
+   }
+  ]
+ },
+ "packages/core/src/artifacts/finance-brief.ts#financeSectionSchema": {
+  "inputs": [
+   {
+    "heading": "x",
+    "body": "x"
+   },
+   {
+    "heading": "x",
+    "body": "x",
+    "tables": [
+     {
+      "columns": [
+       "x"
+      ],
+      "rows": [
+       [
+        "x"
+       ]
+      ]
+     }
+    ],
+    "metrics": [
+     "x"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "heading": "x",
+    "body": "x",
+    "tables": [],
+    "metrics": []
+   },
+   {
+    "heading": "x",
+    "body": "x",
+    "tables": [
+     {
+      "columns": [
+       "x"
+      ],
+      "rows": [
+       [
+        "x"
+       ]
+      ]
+     }
+    ],
+    "metrics": [
+     "x"
+    ]
+   }
+  ]
+ },
+ "packages/core/src/artifacts/market-briefing.ts#briefingSectionSchema": {
+  "inputs": [
+   {
+    "heading": "x",
+    "body": "x"
+   },
+   {
+    "heading": "x",
+    "body": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "heading": "x",
+    "body": "x"
+   },
+   {
+    "heading": "x",
+    "body": "x"
+   }
+  ]
+ },
+ "packages/core/src/artifacts/market-briefing.ts#briefingSourceSchema": {
+  "inputs": [
+   {
+    "label": "x",
+    "url": "https://example.test/a",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "label": "x",
+    "url": "https://example.test/a",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ],
+  "outputs": [
+   {
+    "label": "x",
+    "url": "https://example.test/a",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "label": "x",
+    "url": "https://example.test/a",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ]
+ },
+ "packages/core/src/artifacts/market-briefing.ts#marketBriefingSchema": {
+  "inputs": [
+   {
+    "title": "x",
+    "generatedAt": "2026-09-09T10:00:00Z",
+    "sections": [
+     {
+      "heading": "x",
+      "body": "x"
+     }
+    ],
+    "packet": {
+     "tickers": [],
+     "macro": {},
+     "clock": {
+      "runAt": "2026-09-09T10:00:00Z",
+      "usSession": "pre"
+     }
+    },
+    "disclaimer": "x"
+   },
+   {
+    "title": "x",
+    "language": "id",
+    "specialist": "saham",
+    "depth": "quick",
+    "generatedAt": "2026-09-09T10:00:00Z",
+    "sections": [
+     {
+      "heading": "x",
+      "body": "x"
+     }
+    ],
+    "packet": {
+     "tickers": [
+      {
+       "symbol": {
+        "input": "x",
+        "yahoo": "x",
+        "tradingview": "x",
+        "name": "x",
+        "exchange": "x",
+        "currency": "x"
+       },
+       "quote": {
+        "symbol": "x",
+        "name": "x",
+        "price": 1,
+        "changePercent": 1,
+        "previousClose": 1,
+        "preMarketPrice": 1,
+        "preMarketChangePercent": 1,
+        "postMarketPrice": 1,
+        "postMarketChangePercent": 1,
+        "volume": 1,
+        "marketCap": 1,
+        "marketState": "PRE",
+        "currency": "x",
+        "exchange": "x",
+        "ref": {
+         "source": "yahoo",
+         "sourceUrl": "https://example.test/a",
+         "observedAt": "2026-09-09T10:00:00Z"
+        }
+       },
+       "technical": {
+        "symbol": "x",
+        "tradingview": {
+         "summary": 1,
+         "movingAverages": 1,
+         "oscillators": 1,
+         "label": "x"
+        },
+        "rsi14": 1,
+        "sma50": 1,
+        "sma200": 1,
+        "ema200": 1,
+        "macd": 1,
+        "macdSignal": 1,
+        "change1dPercent": 1,
+        "change5dPercent": 1,
+        "change1mPercent": 1,
+        "high52w": 1,
+        "low52w": 1,
+        "ref": {
+         "source": "yahoo",
+         "sourceUrl": "https://example.test/a",
+         "observedAt": "2026-09-09T10:00:00Z"
+        }
+       },
+       "history": {
+        "symbol": "x",
+        "interval": "1d",
+        "bars": [
+         {
+          "date": "2026-09-09",
+          "open": 1,
+          "high": 1,
+          "low": 1,
+          "close": 1,
+          "volume": 1
+         }
+        ],
+        "ref": {
+         "source": "yahoo",
+         "sourceUrl": "https://example.test/a",
+         "observedAt": "2026-09-09T10:00:00Z"
+        }
+       },
+       "chart": {
+        "type": "bar",
+        "title": "x",
+        "x": {
+         "label": "x",
+         "values": [
+          "x"
+         ]
+        },
+        "series": [
+         {
+          "name": "x",
+          "values": [
+           1
+          ]
+         }
+        ]
+       },
+       "news": [
+        {
+         "title": "x",
+         "summary": "x",
+         "link": "https://example.test/a",
+         "publisher": "x",
+         "publishedAt": "2026-09-09T10:00:00Z",
+         "ref": {
+          "source": "yahoo",
+          "sourceUrl": "https://example.test/a",
+          "observedAt": "2026-09-09T10:00:00Z"
+         },
+         "injectionSuspect": true
+        }
+       ],
+       "swings": [
+        {
+         "date": "2026-09-09",
+         "price": 1,
+         "kind": "high"
+        }
+       ],
+       "crypto": {
+        "marketCapUsd": 1,
+        "volume24hUsd": 1,
+        "change7dPct": 1,
+        "dominancePct": 1,
+        "fundingRatePct": 1,
+        "source": "yahoo",
+        "observedAt": "2026-09-09T10:00:00Z"
+       },
+       "fundamentals": {
+        "sector": "x",
+        "industry": "x",
+        "marketCap": 1,
+        "trailingPe": 1,
+        "forwardPe": 1,
+        "peg": 1,
+        "priceToBook": 1,
+        "epsTrailing": 1,
+        "epsForward": 1,
+        "dividendYieldPct": 1,
+        "beta": 1,
+        "revenueTtm": 1,
+        "grossMarginPct": 1,
+        "operatingMarginPct": 1,
+        "profitMarginPct": 1,
+        "roePct": 1,
+        "roaPct": 1,
+        "debtToEquity": 1,
+        "currentRatio": 1,
+        "freeCashflow": 1,
+        "source": "yahoo",
+        "observedAt": "2026-09-09T10:00:00Z"
+       },
+       "insiders": {
+        "window": "90d",
+        "buys": 1,
+        "sells": 1,
+        "netShares": 1,
+        "source": "yahoo",
+        "observedAt": "2026-09-09T10:00:00Z"
+       },
+       "sentiment": {
+        "stocktwits": {
+         "total": 1,
+         "bullish": 1,
+         "bearish": 1,
+         "sampled": 1
+        },
+        "reddit": {
+         "posts": 1,
+         "subreddits": [
+          "x"
+         ]
+        },
+        "samples": [
+         {
+          "source": "stocktwits",
+          "title": "x",
+          "at": "2026-09-09T10:00:00Z"
+         }
+        ],
+        "observedAt": "2026-09-09T10:00:00Z"
+       },
+       "failures": [
+        "x"
+       ]
+      }
+     ],
+     "macro": {
+      "quotes": [
+       {
+        "symbol": "x",
+        "name": "x",
+        "price": 1,
+        "changePercent": 1,
+        "previousClose": 1,
+        "preMarketPrice": 1,
+        "preMarketChangePercent": 1,
+        "postMarketPrice": 1,
+        "postMarketChangePercent": 1,
+        "volume": 1,
+        "marketCap": 1,
+        "marketState": "PRE",
+        "currency": "x",
+        "exchange": "x",
+        "ref": {
+         "source": "yahoo",
+         "sourceUrl": "https://example.test/a",
+         "observedAt": "2026-09-09T10:00:00Z"
+        },
+        "label": "x"
+       }
+      ],
+      "failures": [
+       "x"
+      ]
+     },
+     "clock": {
+      "runAt": "2026-09-09T10:00:00Z",
+      "usSession": "pre",
+      "note": "x"
+     },
+     "cryptoGlobal": {
+      "totalMarketCapUsd": 1,
+      "btcDominancePct": 1,
+      "ethDominancePct": 1,
+      "source": "yahoo",
+      "observedAt": "2026-09-09T10:00:00Z"
+     },
+     "metals": {
+      "dxy": 1,
+      "us10y": 1,
+      "goldSilverRatio": 1,
+      "goldFuturesVsSpotPct": 1,
+      "goldFuturesVsGldPct": 1,
+      "source": "yahoo",
+      "observedAt": "2026-09-09T10:00:00Z"
+     },
+     "signals": [
+      {
+       "ticker": "x",
+       "kind": "rsi-oversold",
+       "value": 1,
+       "note": "x"
+      }
+     ],
+     "rotation": [
+      {
+       "ticker": "x",
+       "ret1dPct": 1,
+       "ret5dPct": 1,
+       "ret1mPct": 1,
+       "ret6mPct": 1,
+       "rank1m": 1
+      }
+     ],
+     "sessions": [
+      {
+       "exchange": "IDX",
+       "state": "pre",
+       "nextChangeAt": "2026-09-09T10:00:00Z"
+      }
+     ],
+     "globalNews": [
+      {
+       "title": "x",
+       "publisher": "x",
+       "at": "2026-09-09T10:00:00Z",
+       "query": "x"
+      }
+     ],
+     "positionContext": "x"
+    },
+    "sources": [
+     {
+      "label": "x",
+      "url": "https://example.test/a",
+      "observedAt": "2026-09-09T10:00:00Z"
+     }
+    ],
+    "team": {
+     "analysts": [
+      {
+       "analyst": "technical",
+       "summary": "x",
+       "keyPoints": [
+        "x"
+       ],
+       "confidence": "low"
+      }
+     ],
+     "bull": {
+      "stance": "bull",
+      "thesis": "x",
+      "points": [
+       "x"
+      ],
+      "rebuttals": [
+       "x"
+      ]
+     },
+     "bear": {
+      "stance": "bull",
+      "thesis": "x",
+      "points": [
+       "x"
+      ],
+      "rebuttals": [
+       "x"
+      ]
+     },
+     "risk": {
+      "lenses": [
+       {
+        "lens": "aggressive",
+        "view": "x",
+        "keyRisks": [
+         "x"
+        ]
+       },
+       {
+        "lens": "aggressive",
+        "view": "x",
+        "keyRisks": [
+         "x"
+        ]
+       },
+       {
+        "lens": "aggressive",
+        "view": "x",
+        "keyRisks": [
+         "x"
+        ]
+       }
+      ],
+      "volatility": "x",
+      "liquidity": "x"
+     },
+     "rounds": 1
+    },
+    "guardedSections": 1,
+    "disclaimer": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "title": "x",
+    "language": "id",
+    "specialist": "saham",
+    "depth": "quick",
+    "generatedAt": "2026-09-09T10:00:00Z",
+    "sections": [
+     {
+      "heading": "x",
+      "body": "x"
+     }
+    ],
+    "packet": {
+     "tickers": [],
+     "macro": {
+      "quotes": [],
+      "failures": []
+     },
+     "clock": {
+      "runAt": "2026-09-09T10:00:00Z",
+      "usSession": "pre",
+      "note": ""
+     },
+     "positionContext": ""
+    },
+    "sources": [],
+    "guardedSections": 0,
+    "disclaimer": "x"
+   },
+   {
+    "title": "x",
+    "language": "id",
+    "specialist": "saham",
+    "depth": "quick",
+    "generatedAt": "2026-09-09T10:00:00Z",
+    "sections": [
+     {
+      "heading": "x",
+      "body": "x"
+     }
+    ],
+    "packet": {
+     "tickers": [
+      {
+       "symbol": {
+        "input": "x",
+        "yahoo": "x",
+        "tradingview": "x",
+        "name": "x",
+        "exchange": "x",
+        "currency": "x"
+       },
+       "quote": {
+        "symbol": "x",
+        "name": "x",
+        "price": 1,
+        "changePercent": 1,
+        "previousClose": 1,
+        "preMarketPrice": 1,
+        "preMarketChangePercent": 1,
+        "postMarketPrice": 1,
+        "postMarketChangePercent": 1,
+        "volume": 1,
+        "marketCap": 1,
+        "marketState": "PRE",
+        "currency": "x",
+        "exchange": "x",
+        "ref": {
+         "source": "yahoo",
+         "sourceUrl": "https://example.test/a",
+         "observedAt": "2026-09-09T10:00:00Z"
+        }
+       },
+       "technical": {
+        "symbol": "x",
+        "tradingview": {
+         "summary": 1,
+         "movingAverages": 1,
+         "oscillators": 1,
+         "label": "x"
+        },
+        "rsi14": 1,
+        "sma50": 1,
+        "sma200": 1,
+        "ema200": 1,
+        "macd": 1,
+        "macdSignal": 1,
+        "change1dPercent": 1,
+        "change5dPercent": 1,
+        "change1mPercent": 1,
+        "high52w": 1,
+        "low52w": 1,
+        "ref": {
+         "source": "yahoo",
+         "sourceUrl": "https://example.test/a",
+         "observedAt": "2026-09-09T10:00:00Z"
+        }
+       },
+       "history": {
+        "symbol": "x",
+        "interval": "1d",
+        "bars": [
+         {
+          "date": "2026-09-09",
+          "open": 1,
+          "high": 1,
+          "low": 1,
+          "close": 1,
+          "volume": 1
+         }
+        ],
+        "ref": {
+         "source": "yahoo",
+         "sourceUrl": "https://example.test/a",
+         "observedAt": "2026-09-09T10:00:00Z"
+        }
+       },
+       "chart": {
+        "type": "bar",
+        "title": "x",
+        "x": {
+         "label": "x",
+         "values": [
+          "x"
+         ]
+        },
+        "series": [
+         {
+          "name": "x",
+          "values": [
+           1
+          ]
+         }
+        ]
+       },
+       "news": [
+        {
+         "title": "x",
+         "summary": "x",
+         "link": "https://example.test/a",
+         "publisher": "x",
+         "publishedAt": "2026-09-09T10:00:00Z",
+         "ref": {
+          "source": "yahoo",
+          "sourceUrl": "https://example.test/a",
+          "observedAt": "2026-09-09T10:00:00Z"
+         },
+         "injectionSuspect": true
+        }
+       ],
+       "swings": [
+        {
+         "date": "2026-09-09",
+         "price": 1,
+         "kind": "high"
+        }
+       ],
+       "crypto": {
+        "marketCapUsd": 1,
+        "volume24hUsd": 1,
+        "change7dPct": 1,
+        "dominancePct": 1,
+        "fundingRatePct": 1,
+        "source": "yahoo",
+        "observedAt": "2026-09-09T10:00:00Z"
+       },
+       "fundamentals": {
+        "sector": "x",
+        "industry": "x",
+        "marketCap": 1,
+        "trailingPe": 1,
+        "forwardPe": 1,
+        "peg": 1,
+        "priceToBook": 1,
+        "epsTrailing": 1,
+        "epsForward": 1,
+        "dividendYieldPct": 1,
+        "beta": 1,
+        "revenueTtm": 1,
+        "grossMarginPct": 1,
+        "operatingMarginPct": 1,
+        "profitMarginPct": 1,
+        "roePct": 1,
+        "roaPct": 1,
+        "debtToEquity": 1,
+        "currentRatio": 1,
+        "freeCashflow": 1,
+        "source": "yahoo",
+        "observedAt": "2026-09-09T10:00:00Z"
+       },
+       "insiders": {
+        "window": "90d",
+        "buys": 1,
+        "sells": 1,
+        "netShares": 1,
+        "source": "yahoo",
+        "observedAt": "2026-09-09T10:00:00Z"
+       },
+       "sentiment": {
+        "stocktwits": {
+         "total": 1,
+         "bullish": 1,
+         "bearish": 1,
+         "sampled": 1
+        },
+        "reddit": {
+         "posts": 1,
+         "subreddits": [
+          "x"
+         ]
+        },
+        "samples": [
+         {
+          "source": "stocktwits",
+          "title": "x",
+          "at": "2026-09-09T10:00:00Z"
+         }
+        ],
+        "observedAt": "2026-09-09T10:00:00Z"
+       },
+       "failures": [
+        "x"
+       ]
+      }
+     ],
+     "macro": {
+      "quotes": [
+       {
+        "symbol": "x",
+        "name": "x",
+        "price": 1,
+        "changePercent": 1,
+        "previousClose": 1,
+        "preMarketPrice": 1,
+        "preMarketChangePercent": 1,
+        "postMarketPrice": 1,
+        "postMarketChangePercent": 1,
+        "volume": 1,
+        "marketCap": 1,
+        "marketState": "PRE",
+        "currency": "x",
+        "exchange": "x",
+        "ref": {
+         "source": "yahoo",
+         "sourceUrl": "https://example.test/a",
+         "observedAt": "2026-09-09T10:00:00Z"
+        },
+        "label": "x"
+       }
+      ],
+      "failures": [
+       "x"
+      ]
+     },
+     "clock": {
+      "runAt": "2026-09-09T10:00:00Z",
+      "usSession": "pre",
+      "note": "x"
+     },
+     "cryptoGlobal": {
+      "totalMarketCapUsd": 1,
+      "btcDominancePct": 1,
+      "ethDominancePct": 1,
+      "source": "yahoo",
+      "observedAt": "2026-09-09T10:00:00Z"
+     },
+     "metals": {
+      "dxy": 1,
+      "us10y": 1,
+      "goldSilverRatio": 1,
+      "goldFuturesVsSpotPct": 1,
+      "goldFuturesVsGldPct": 1,
+      "source": "yahoo",
+      "observedAt": "2026-09-09T10:00:00Z"
+     },
+     "signals": [
+      {
+       "ticker": "x",
+       "kind": "rsi-oversold",
+       "value": 1,
+       "note": "x"
+      }
+     ],
+     "rotation": [
+      {
+       "ticker": "x",
+       "ret1dPct": 1,
+       "ret5dPct": 1,
+       "ret1mPct": 1,
+       "ret6mPct": 1,
+       "rank1m": 1
+      }
+     ],
+     "sessions": [
+      {
+       "exchange": "IDX",
+       "state": "pre",
+       "nextChangeAt": "2026-09-09T10:00:00Z"
+      }
+     ],
+     "globalNews": [
+      {
+       "title": "x",
+       "publisher": "x",
+       "at": "2026-09-09T10:00:00Z",
+       "query": "x"
+      }
+     ],
+     "positionContext": "x"
+    },
+    "sources": [
+     {
+      "label": "x",
+      "url": "https://example.test/a",
+      "observedAt": "2026-09-09T10:00:00Z"
+     }
+    ],
+    "team": {
+     "analysts": [
+      {
+       "analyst": "technical",
+       "summary": "x",
+       "keyPoints": [
+        "x"
+       ],
+       "confidence": "low"
+      }
+     ],
+     "bull": {
+      "stance": "bull",
+      "thesis": "x",
+      "points": [
+       "x"
+      ],
+      "rebuttals": [
+       "x"
+      ]
+     },
+     "bear": {
+      "stance": "bull",
+      "thesis": "x",
+      "points": [
+       "x"
+      ],
+      "rebuttals": [
+       "x"
+      ]
+     },
+     "risk": {
+      "lenses": [
+       {
+        "lens": "aggressive",
+        "view": "x",
+        "keyRisks": [
+         "x"
+        ]
+       },
+       {
+        "lens": "aggressive",
+        "view": "x",
+        "keyRisks": [
+         "x"
+        ]
+       },
+       {
+        "lens": "aggressive",
+        "view": "x",
+        "keyRisks": [
+         "x"
+        ]
+       }
+      ],
+      "volatility": "x",
+      "liquidity": "x"
+     },
+     "rounds": 1
+    },
+    "guardedSections": 1,
+    "disclaimer": "x"
+   }
+  ]
+ },
+ "packages/core/src/artifacts/dossier.ts#comparisonRowSchema": {
+  "inputs": [
+   {
+    "claim": "x",
+    "verdict": "agree",
+    "sources": [
+     "S1"
+    ]
+   },
+   {
+    "claim": "x",
+    "verdict": "agree",
+    "sources": [
+     "S1"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "claim": "x",
+    "verdict": "agree",
+    "sources": [
+     "S1"
+    ]
+   },
+   {
+    "claim": "x",
+    "verdict": "agree",
+    "sources": [
+     "S1"
+    ]
+   }
+  ]
+ },
+ "packages/core/src/artifacts/dossier.ts#dossierFindingSchema": {
+  "inputs": [
+   {
+    "heading": "x",
+    "body": "x"
+   },
+   {
+    "heading": "x",
+    "body": "x",
+    "sources": [
+     "S1"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "heading": "x",
+    "body": "x",
+    "sources": []
+   },
+   {
+    "heading": "x",
+    "body": "x",
+    "sources": [
+     "S1"
+    ]
+   }
+  ]
+ },
+ "packages/core/src/artifacts/dossier.ts#dossierSchema": {
+  "inputs": [
+   {
+    "title": "x",
+    "question": "x",
+    "created": "x"
+   },
+   {
+    "title": "x",
+    "question": "x",
+    "created": "x",
+    "models": [
+     "x"
+    ],
+    "queries": [
+     "x"
+    ],
+    "sources": [
+     {
+      "id": "S1",
+      "title": "x",
+      "url": "x",
+      "retrievedAt": "x",
+      "foundBy": "x",
+      "status": "read",
+      "passages": [
+       "x"
+      ],
+      "notes": "x"
+     }
+    ],
+    "findings": [
+     {
+      "heading": "x",
+      "body": "x",
+      "sources": [
+       "S1"
+      ]
+     }
+    ],
+    "comparison": [
+     {
+      "claim": "x",
+      "verdict": "agree",
+      "sources": [
+       "S1"
+      ]
+     }
+    ],
+    "contradictions": [
+     "x"
+    ],
+    "openQuestions": [
+     "x"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "title": "x",
+    "question": "x",
+    "created": "x",
+    "models": [],
+    "queries": [],
+    "sources": [],
+    "findings": [],
+    "comparison": [],
+    "contradictions": [],
+    "openQuestions": []
+   },
+   {
+    "title": "x",
+    "question": "x",
+    "created": "x",
+    "models": [
+     "x"
+    ],
+    "queries": [
+     "x"
+    ],
+    "sources": [
+     {
+      "id": "S1",
+      "title": "x",
+      "url": "x",
+      "retrievedAt": "x",
+      "foundBy": "x",
+      "status": "read",
+      "passages": [
+       "x"
+      ],
+      "notes": "x"
+     }
+    ],
+    "findings": [
+     {
+      "heading": "x",
+      "body": "x",
+      "sources": [
+       "S1"
+      ]
+     }
+    ],
+    "comparison": [
+     {
+      "claim": "x",
+      "verdict": "agree",
+      "sources": [
+       "S1"
+      ]
+     }
+    ],
+    "contradictions": [
+     "x"
+    ],
+    "openQuestions": [
+     "x"
+    ]
+   }
+  ]
+ },
+ "packages/core/src/artifacts/dossier.ts#dossierSourceSchema": {
+  "inputs": [
+   {
+    "id": "S1"
+   },
+   {
+    "id": "S1",
+    "title": "x",
+    "url": "x",
+    "retrievedAt": "x",
+    "foundBy": "x",
+    "status": "read",
+    "passages": [
+     "x"
+    ],
+    "notes": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "id": "S1",
+    "title": "",
+    "url": "",
+    "retrievedAt": "",
+    "foundBy": "",
+    "status": "snippet",
+    "passages": [],
+    "notes": ""
+   },
+   {
+    "id": "S1",
+    "title": "x",
+    "url": "x",
+    "retrievedAt": "x",
+    "foundBy": "x",
+    "status": "read",
+    "passages": [
+     "x"
+    ],
+    "notes": "x"
+   }
+  ]
+ },
+ "packages/core/src/artifacts/data-analysis.ts#dataAnalysisSchema": {
+  "inputs": [
+   {
+    "title": "x",
+    "summary": "x",
+    "findings": [
+     {
+      "heading": "x",
+      "body": "x"
+     }
+    ]
+   },
+   {
+    "title": "x",
+    "summary": "x",
+    "findings": [
+     {
+      "heading": "x",
+      "body": "x",
+      "evidence": {
+       "sql": "x",
+       "table": {
+        "columns": [
+         "x"
+        ],
+        "rows": [
+         [
+          "x"
+         ]
+        ]
+       }
+      }
+     }
+    ],
+    "tables": [
+     {
+      "columns": [
+       "x"
+      ],
+      "rows": [
+       [
+        "x"
+       ]
+      ],
+      "name": "x"
+     }
+    ],
+    "charts": [
+     {
+      "type": "bar",
+      "title": "x",
+      "x": {
+       "label": "x",
+       "values": [
+        "x"
+       ]
+      },
+      "series": [
+       {
+        "name": "x",
+        "values": [
+         1
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "title": "x",
+    "summary": "x",
+    "findings": [
+     {
+      "heading": "x",
+      "body": "x"
+     }
+    ],
+    "tables": [],
+    "charts": []
+   },
+   {
+    "title": "x",
+    "summary": "x",
+    "findings": [
+     {
+      "heading": "x",
+      "body": "x",
+      "evidence": {
+       "sql": "x",
+       "table": {
+        "columns": [
+         "x"
+        ],
+        "rows": [
+         [
+          "x"
+         ]
+        ]
+       }
+      }
+     }
+    ],
+    "tables": [
+     {
+      "columns": [
+       "x"
+      ],
+      "rows": [
+       [
+        "x"
+       ]
+      ],
+      "name": "x"
+     }
+    ],
+    "charts": [
+     {
+      "type": "bar",
+      "title": "x",
+      "x": {
+       "label": "x",
+       "values": [
+        "x"
+       ]
+      },
+      "series": [
+       {
+        "name": "x",
+        "values": [
+         1
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "packages/core/src/artifacts/data-analysis.ts#dataChartSchema": {
+  "inputs": [
+   {
+    "type": "bar",
+    "x": {
+     "values": []
+    },
+    "series": [
+     {
+      "name": "x",
+      "values": []
+     }
+    ]
+   },
+   {
+    "type": "bar",
+    "title": "x",
+    "x": {
+     "label": "x",
+     "values": [
+      "x"
+     ]
+    },
+    "series": [
+     {
+      "name": "x",
+      "values": [
+       1
+      ]
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "type": "bar",
+    "title": "",
+    "x": {
+     "label": "",
+     "values": []
+    },
+    "series": [
+     {
+      "name": "x",
+      "values": []
+     }
+    ]
+   },
+   {
+    "type": "bar",
+    "title": "x",
+    "x": {
+     "label": "x",
+     "values": [
+      "x"
+     ]
+    },
+    "series": [
+     {
+      "name": "x",
+      "values": [
+       1
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "packages/core/src/artifacts/data-analysis.ts#dataFindingSchema": {
+  "inputs": [
+   {
+    "heading": "x",
+    "body": "x"
+   },
+   {
+    "heading": "x",
+    "body": "x",
+    "evidence": {
+     "sql": "x",
+     "table": {
+      "columns": [
+       "x"
+      ],
+      "rows": [
+       [
+        "x"
+       ]
+      ]
+     }
+    }
+   }
+  ],
+  "outputs": [
+   {
+    "heading": "x",
+    "body": "x"
+   },
+   {
+    "heading": "x",
+    "body": "x",
+    "evidence": {
+     "sql": "x",
+     "table": {
+      "columns": [
+       "x"
+      ],
+      "rows": [
+       [
+        "x"
+       ]
+      ]
+     }
+    }
+   }
+  ]
+ },
+ "packages/core/src/artifacts/data-analysis.ts#evidenceTableSchema": {
+  "inputs": [
+   {
+    "columns": [
+     "x"
+    ]
+   },
+   {
+    "columns": [
+     "x"
+    ],
+    "rows": [
+     [
+      "x"
+     ]
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "columns": [
+     "x"
+    ],
+    "rows": []
+   },
+   {
+    "columns": [
+     "x"
+    ],
+    "rows": [
+     [
+      "x"
+     ]
+    ]
+   }
+  ]
+ },
+ "packages/core/src/artifacts/data-analysis.ts#namedTableSchema": {
+  "inputs": [
+   {
+    "columns": [
+     "x"
+    ],
+    "name": "x"
+   },
+   {
+    "columns": [
+     "x"
+    ],
+    "rows": [
+     [
+      "x"
+     ]
+    ],
+    "name": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "columns": [
+     "x"
+    ],
+    "rows": [],
+    "name": "x"
+   },
+   {
+    "columns": [
+     "x"
+    ],
+    "rows": [
+     [
+      "x"
+     ]
+    ],
+    "name": "x"
+   }
+  ]
+ },
+ "packages/core/src/artifacts/research-notes.ts#researchNoteSchema": {
+  "inputs": [
+   {
+    "heading": "x",
+    "body": "x"
+   },
+   {
+    "heading": "x",
+    "body": "x",
+    "sources": [
+     {
+      "title": "x",
+      "url": "x"
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "heading": "x",
+    "body": "x",
+    "sources": []
+   },
+   {
+    "heading": "x",
+    "body": "x",
+    "sources": [
+     {
+      "title": "x",
+      "url": "x"
+     }
+    ]
+   }
+  ]
+ },
+ "packages/core/src/artifacts/research-notes.ts#researchNotesSchema": {
+  "inputs": [
+   {
+    "title": "x",
+    "summary": "x",
+    "notes": [
+     {
+      "heading": "x",
+      "body": "x"
+     }
+    ]
+   },
+   {
+    "title": "x",
+    "summary": "x",
+    "notes": [
+     {
+      "heading": "x",
+      "body": "x",
+      "sources": [
+       {
+        "title": "x",
+        "url": "x"
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "title": "x",
+    "summary": "x",
+    "notes": [
+     {
+      "heading": "x",
+      "body": "x",
+      "sources": []
+     }
+    ]
+   },
+   {
+    "title": "x",
+    "summary": "x",
+    "notes": [
+     {
+      "heading": "x",
+      "body": "x",
+      "sources": [
+       {
+        "title": "x",
+        "url": "x"
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "packages/core/src/artifacts/research-notes.ts#researchSourceSchema": {
+  "inputs": [
+   {},
+   {
+    "title": "x",
+    "url": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "title": "",
+    "url": ""
+   },
+   {
+    "title": "x",
+    "url": "x"
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalAskCitationSchema": {
+  "inputs": [
+   {
+    "docId": "x",
+    "quote": "x",
+    "anchor": "x",
+    "clauseId": null,
+    "page": null
+   },
+   {
+    "docId": "x",
+    "quote": "x",
+    "anchor": "x",
+    "clauseId": "x",
+    "page": 1
+   }
+  ],
+  "outputs": [
+   {
+    "docId": "x",
+    "quote": "x",
+    "anchor": "x",
+    "clauseId": null,
+    "page": null
+   },
+   {
+    "docId": "x",
+    "quote": "x",
+    "anchor": "x",
+    "clauseId": "x",
+    "page": 1
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalAskModelSchema": {
+  "inputs": [
+   {
+    "answer": "x",
+    "notInDocuments": true
+   },
+   {
+    "answer": "x",
+    "citations": [
+     {
+      "docId": "x",
+      "quote": "x"
+     }
+    ],
+    "notInDocuments": true
+   }
+  ],
+  "outputs": [
+   {
+    "answer": "x",
+    "citations": [],
+    "notInDocuments": true
+   },
+   {
+    "answer": "x",
+    "citations": [
+     {
+      "docId": "x",
+      "quote": "x"
+     }
+    ],
+    "notInDocuments": true
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalAskRecordSchema": {
+  "inputs": [
+   {
+    "id": "x",
+    "question": "x",
+    "answer": "x",
+    "status": "verified",
+    "notInDocuments": true,
+    "citations": [],
+    "askedAt": 1,
+    "model": "x",
+    "read": {
+     "calls": 1,
+     "repairs": 1,
+     "files": [],
+     "partialDocs": []
+    },
+    "checks": {
+     "passed": true,
+     "rounds": 1,
+     "verdicts": []
+    }
+   },
+   {
+    "id": "x",
+    "question": "x",
+    "answer": "x",
+    "status": "verified",
+    "notInDocuments": true,
+    "citations": [
+     {
+      "docId": "x",
+      "quote": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1
+     }
+    ],
+    "askedAt": 1,
+    "model": "x",
+    "read": {
+     "calls": 1,
+     "repairs": 1,
+     "files": [
+      {
+       "docId": "x",
+       "name": "x",
+       "sha256": "x",
+       "chars": 1,
+       "chunks": {
+        "read": 1,
+        "total": 1
+       },
+       "status": "read"
+      }
+     ],
+     "partialDocs": [
+      "x"
+     ]
+    },
+    "checks": {
+     "passed": true,
+     "rounds": 1,
+     "verdicts": [
+      {
+       "check": "x",
+       "ok": true
+      }
+     ]
+    }
+   }
+  ],
+  "outputs": [
+   {
+    "id": "x",
+    "question": "x",
+    "answer": "x",
+    "status": "verified",
+    "notInDocuments": true,
+    "citations": [],
+    "askedAt": 1,
+    "model": "x",
+    "read": {
+     "calls": 1,
+     "repairs": 1,
+     "files": [],
+     "partialDocs": []
+    },
+    "checks": {
+     "passed": true,
+     "rounds": 1,
+     "verdicts": []
+    }
+   },
+   {
+    "id": "x",
+    "question": "x",
+    "answer": "x",
+    "status": "verified",
+    "notInDocuments": true,
+    "citations": [
+     {
+      "docId": "x",
+      "quote": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1
+     }
+    ],
+    "askedAt": 1,
+    "model": "x",
+    "read": {
+     "calls": 1,
+     "repairs": 1,
+     "files": [
+      {
+       "docId": "x",
+       "name": "x",
+       "sha256": "x",
+       "chars": 1,
+       "chunks": {
+        "read": 1,
+        "total": 1
+       },
+       "status": "read"
+      }
+     ],
+     "partialDocs": [
+      "x"
+     ]
+    },
+    "checks": {
+     "passed": true,
+     "rounds": 1,
+     "verdicts": [
+      {
+       "check": "x",
+       "ok": true
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalAskResultSchema": {
+  "inputs": [
+   {
+    "ask": {
+     "id": "x",
+     "question": "x",
+     "answer": "x",
+     "status": "verified",
+     "notInDocuments": true,
+     "citations": [],
+     "askedAt": 1,
+     "model": "x",
+     "read": {
+      "calls": 1,
+      "repairs": 1,
+      "files": [],
+      "partialDocs": []
+     },
+     "checks": {
+      "passed": true,
+      "rounds": 1,
+      "verdicts": []
+     }
+    }
+   },
+   {
+    "ask": {
+     "id": "x",
+     "question": "x",
+     "answer": "x",
+     "status": "verified",
+     "notInDocuments": true,
+     "citations": [
+      {
+       "docId": "x",
+       "quote": "x",
+       "anchor": "x",
+       "clauseId": "x",
+       "page": 1
+      }
+     ],
+     "askedAt": 1,
+     "model": "x",
+     "read": {
+      "calls": 1,
+      "repairs": 1,
+      "files": [
+       {
+        "docId": "x",
+        "name": "x",
+        "sha256": "x",
+        "chars": 1,
+        "chunks": {
+         "read": 1,
+         "total": 1
+        },
+        "status": "read"
+       }
+      ],
+      "partialDocs": [
+       "x"
+      ]
+     },
+     "checks": {
+      "passed": true,
+      "rounds": 1,
+      "verdicts": [
+       {
+        "check": "x",
+        "ok": true
+       }
+      ]
+     }
+    }
+   }
+  ],
+  "outputs": [
+   {
+    "ask": {
+     "id": "x",
+     "question": "x",
+     "answer": "x",
+     "status": "verified",
+     "notInDocuments": true,
+     "citations": [],
+     "askedAt": 1,
+     "model": "x",
+     "read": {
+      "calls": 1,
+      "repairs": 1,
+      "files": [],
+      "partialDocs": []
+     },
+     "checks": {
+      "passed": true,
+      "rounds": 1,
+      "verdicts": []
+     }
+    }
+   },
+   {
+    "ask": {
+     "id": "x",
+     "question": "x",
+     "answer": "x",
+     "status": "verified",
+     "notInDocuments": true,
+     "citations": [
+      {
+       "docId": "x",
+       "quote": "x",
+       "anchor": "x",
+       "clauseId": "x",
+       "page": 1
+      }
+     ],
+     "askedAt": 1,
+     "model": "x",
+     "read": {
+      "calls": 1,
+      "repairs": 1,
+      "files": [
+       {
+        "docId": "x",
+        "name": "x",
+        "sha256": "x",
+        "chars": 1,
+        "chunks": {
+         "read": 1,
+         "total": 1
+        },
+        "status": "read"
+       }
+      ],
+      "partialDocs": [
+       "x"
+      ]
+     },
+     "checks": {
+      "passed": true,
+      "rounds": 1,
+      "verdicts": [
+       {
+        "check": "x",
+        "ok": true
+       }
+      ]
+     }
+    }
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalAsksFileSchema": {
+  "inputs": [
+   {
+    "version": 1,
+    "asks": []
+   },
+   {
+    "version": 1,
+    "asks": [
+     {
+      "id": "x",
+      "question": "x",
+      "answer": "x",
+      "status": "verified",
+      "notInDocuments": true,
+      "citations": [
+       {
+        "docId": "x",
+        "quote": "x",
+        "anchor": "x",
+        "clauseId": "x",
+        "page": 1
+       }
+      ],
+      "askedAt": 1,
+      "model": "x",
+      "read": {
+       "calls": 1,
+       "repairs": 1,
+       "files": [
+        {
+         "docId": "x",
+         "name": "x",
+         "sha256": "x",
+         "chars": 1,
+         "chunks": {
+          "read": 1,
+          "total": 1
+         },
+         "status": "read"
+        }
+       ],
+       "partialDocs": [
+        "x"
+       ]
+      },
+      "checks": {
+       "passed": true,
+       "rounds": 1,
+       "verdicts": [
+        {
+         "check": "x",
+         "ok": true
+        }
+       ]
+      }
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "version": 1,
+    "asks": []
+   },
+   {
+    "version": 1,
+    "asks": [
+     {
+      "id": "x",
+      "question": "x",
+      "answer": "x",
+      "status": "verified",
+      "notInDocuments": true,
+      "citations": [
+       {
+        "docId": "x",
+        "quote": "x",
+        "anchor": "x",
+        "clauseId": "x",
+        "page": 1
+       }
+      ],
+      "askedAt": 1,
+      "model": "x",
+      "read": {
+       "calls": 1,
+       "repairs": 1,
+       "files": [
+        {
+         "docId": "x",
+         "name": "x",
+         "sha256": "x",
+         "chars": 1,
+         "chunks": {
+          "read": 1,
+          "total": 1
+         },
+         "status": "read"
+        }
+       ],
+       "partialDocs": [
+        "x"
+       ]
+      },
+      "checks": {
+       "passed": true,
+       "rounds": 1,
+       "verdicts": [
+        {
+         "check": "x",
+         "ok": true
+        }
+       ]
+      }
+     }
+    ]
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalAsksResponseSchema": {
+  "inputs": [
+   {
+    "asks": []
+   },
+   {
+    "asks": [
+     {
+      "id": "x",
+      "question": "x",
+      "answer": "x",
+      "status": "verified",
+      "notInDocuments": true,
+      "citations": [
+       {
+        "docId": "x",
+        "quote": "x",
+        "anchor": "x",
+        "clauseId": "x",
+        "page": 1
+       }
+      ],
+      "askedAt": 1,
+      "model": "x",
+      "read": {
+       "calls": 1,
+       "repairs": 1,
+       "files": [
+        {
+         "docId": "x",
+         "name": "x",
+         "sha256": "x",
+         "chars": 1,
+         "chunks": {
+          "read": 1,
+          "total": 1
+         },
+         "status": "read"
+        }
+       ],
+       "partialDocs": [
+        "x"
+       ]
+      },
+      "checks": {
+       "passed": true,
+       "rounds": 1,
+       "verdicts": [
+        {
+         "check": "x",
+         "ok": true
+        }
+       ]
+      }
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "asks": []
+   },
+   {
+    "asks": [
+     {
+      "id": "x",
+      "question": "x",
+      "answer": "x",
+      "status": "verified",
+      "notInDocuments": true,
+      "citations": [
+       {
+        "docId": "x",
+        "quote": "x",
+        "anchor": "x",
+        "clauseId": "x",
+        "page": 1
+       }
+      ],
+      "askedAt": 1,
+      "model": "x",
+      "read": {
+       "calls": 1,
+       "repairs": 1,
+       "files": [
+        {
+         "docId": "x",
+         "name": "x",
+         "sha256": "x",
+         "chars": 1,
+         "chunks": {
+          "read": 1,
+          "total": 1
+         },
+         "status": "read"
+        }
+       ],
+       "partialDocs": [
+        "x"
+       ]
+      },
+      "checks": {
+       "passed": true,
+       "rounds": 1,
+       "verdicts": [
+        {
+         "check": "x",
+         "ok": true
+        }
+       ]
+      }
+     }
+    ]
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalChecksSchema": {
+  "inputs": [
+   {
+    "passed": true,
+    "rounds": 1,
+    "verdicts": []
+   },
+   {
+    "passed": true,
+    "rounds": 1,
+    "verdicts": [
+     {
+      "check": "x",
+      "ok": true
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "passed": true,
+    "rounds": 1,
+    "verdicts": []
+   },
+   {
+    "passed": true,
+    "rounds": 1,
+    "verdicts": [
+     {
+      "check": "x",
+      "ok": true
+     }
+    ]
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalConflictRecordSchema": {
+  "inputs": [
+   {
+    "field": "parties",
+    "kind": "amount",
+    "values": [
+     {
+      "value": "x",
+      "docIds": [],
+      "itemIds": []
+     },
+     {
+      "value": "x",
+      "docIds": [],
+      "itemIds": []
+     }
+    ]
+   },
+   {
+    "field": "parties",
+    "kind": "amount",
+    "values": [
+     {
+      "value": "x",
+      "docIds": [
+       "x"
+      ],
+      "itemIds": [
+       "x"
+      ]
+     },
+     {
+      "value": "x",
+      "docIds": [
+       "x"
+      ],
+      "itemIds": [
+       "x"
+      ]
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "field": "parties",
+    "kind": "amount",
+    "values": [
+     {
+      "value": "x",
+      "docIds": [],
+      "itemIds": []
+     },
+     {
+      "value": "x",
+      "docIds": [],
+      "itemIds": []
+     }
+    ]
+   },
+   {
+    "field": "parties",
+    "kind": "amount",
+    "values": [
+     {
+      "value": "x",
+      "docIds": [
+       "x"
+      ],
+      "itemIds": [
+       "x"
+      ]
+     },
+     {
+      "value": "x",
+      "docIds": [
+       "x"
+      ],
+      "itemIds": [
+       "x"
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalCoverageSchema": {
+  "inputs": [
+   {
+    "field": "parties",
+    "state": "stated"
+   },
+   {
+    "field": "parties",
+    "state": "stated"
+   }
+  ],
+  "outputs": [
+   {
+    "field": "parties",
+    "state": "stated"
+   },
+   {
+    "field": "parties",
+    "state": "stated"
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalExtractCommentSchema": {
+  "inputs": [
+   {
+    "id": "x",
+    "itemId": "x",
+    "text": "x",
+    "at": 1,
+    "by": "x"
+   },
+   {
+    "id": "x",
+    "itemId": "x",
+    "text": "x",
+    "at": 1,
+    "by": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "id": "x",
+    "itemId": "x",
+    "text": "x",
+    "at": 1,
+    "by": "x"
+   },
+   {
+    "id": "x",
+    "itemId": "x",
+    "text": "x",
+    "at": 1,
+    "by": "x"
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalExtractEditSchema": {
+  "inputs": [
+   {
+    "itemId": "x",
+    "value": "x",
+    "editedAt": 1,
+    "editedBy": "x"
+   },
+   {
+    "itemId": "x",
+    "value": "x",
+    "editedAt": 1,
+    "editedBy": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "itemId": "x",
+    "value": "x",
+    "editedAt": 1,
+    "editedBy": "x"
+   },
+   {
+    "itemId": "x",
+    "value": "x",
+    "editedAt": 1,
+    "editedBy": "x"
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalExtractEditsFileSchema": {
+  "inputs": [
+   {
+    "version": 1,
+    "edits": [],
+    "comments": []
+   },
+   {
+    "version": 1,
+    "edits": [
+     {
+      "itemId": "x",
+      "value": "x",
+      "editedAt": 1,
+      "editedBy": "x"
+     }
+    ],
+    "comments": [
+     {
+      "id": "x",
+      "itemId": "x",
+      "text": "x",
+      "at": 1,
+      "by": "x"
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "version": 1,
+    "edits": [],
+    "comments": []
+   },
+   {
+    "version": 1,
+    "edits": [
+     {
+      "itemId": "x",
+      "value": "x",
+      "editedAt": 1,
+      "editedBy": "x"
+     }
+    ],
+    "comments": [
+     {
+      "id": "x",
+      "itemId": "x",
+      "text": "x",
+      "at": 1,
+      "by": "x"
+     }
+    ]
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalExtractModelSchema": {
+  "inputs": [
+   {},
+   {
+    "documentType": "x",
+    "parties": [
+     {
+      "name": "x",
+      "role": "x",
+      "quote": "x",
+      "docId": "x"
+     }
+    ],
+    "files": [
+     {
+      "docId": "x",
+      "role": "draft",
+      "reason": "x"
+     }
+    ],
+    "side": {
+     "party": "x",
+     "confidence": "high",
+     "quote": "x"
+    },
+    "facts": [
+     {
+      "field": "parties",
+      "label": "x",
+      "value": "x",
+      "status": "found",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x"
+     }
+    ],
+    "redFlags": [
+     {
+      "title": "x",
+      "why": "x",
+      "severity": "high",
+      "against": "x",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x"
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "documentType": "",
+    "parties": [],
+    "files": [],
+    "side": null,
+    "facts": [],
+    "redFlags": []
+   },
+   {
+    "documentType": "x",
+    "parties": [
+     {
+      "name": "x",
+      "role": "x",
+      "quote": "x",
+      "docId": "x"
+     }
+    ],
+    "files": [
+     {
+      "docId": "x",
+      "role": "draft",
+      "reason": "x"
+     }
+    ],
+    "side": {
+     "party": "x",
+     "confidence": "high",
+     "quote": "x"
+    },
+    "facts": [
+     {
+      "field": "parties",
+      "label": "x",
+      "value": "x",
+      "status": "found",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x"
+     }
+    ],
+    "redFlags": [
+     {
+      "title": "x",
+      "why": "x",
+      "severity": "high",
+      "against": "x",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x"
+     }
+    ]
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalExtractRecordSchema": {
+  "inputs": [
+   {
+    "version": 1,
+    "matterId": "x",
+    "createdAt": 1,
+    "model": "x",
+    "locale": "en",
+    "documentType": "x",
+    "read": {
+     "calls": 1,
+     "repairs": 1,
+     "files": [],
+     "partialDocs": []
+    },
+    "files": [],
+    "parties": [],
+    "facts": [],
+    "redFlags": [],
+    "conflicts": [],
+    "coverage": [],
+    "checks": {
+     "passed": true,
+     "rounds": 1,
+     "verdicts": []
+    },
+    "side": {
+     "party": null,
+     "ask": true,
+     "candidates": [],
+     "source": "matter"
+    }
+   },
+   {
+    "version": 1,
+    "matterId": "x",
+    "createdAt": 1,
+    "model": "x",
+    "locale": "en",
+    "prompt": "x",
+    "documentType": "x",
+    "read": {
+     "calls": 1,
+     "repairs": 1,
+     "files": [
+      {
+       "docId": "x",
+       "name": "x",
+       "sha256": "x",
+       "chars": 1,
+       "chunks": {
+        "read": 1,
+        "total": 1
+       },
+       "status": "read"
+      }
+     ],
+     "partialDocs": [
+      "x"
+     ]
+    },
+    "files": [
+     {
+      "docId": "x",
+      "intakeRole": "draft",
+      "reason": "x",
+      "appliedRole": "counterparty-draft"
+     }
+    ],
+    "parties": [
+     {
+      "name": "x",
+      "role": "x",
+      "status": "verified",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1
+     }
+    ],
+    "facts": [
+     {
+      "id": "x",
+      "field": "parties",
+      "label": "x",
+      "value": "x",
+      "status": "verified",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1
+     }
+    ],
+    "redFlags": [
+     {
+      "id": "x",
+      "title": "x",
+      "why": "x",
+      "severity": "high",
+      "against": "you",
+      "againstParty": "x",
+      "status": "verified",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1
+     }
+    ],
+    "conflicts": [
+     {
+      "field": "parties",
+      "kind": "amount",
+      "values": [
+       {
+        "value": "x",
+        "docIds": [
+         "x"
+        ],
+        "itemIds": [
+         "x"
+        ]
+       },
+       {
+        "value": "x",
+        "docIds": [
+         "x"
+        ],
+        "itemIds": [
+         "x"
+        ]
+       }
+      ]
+     }
+    ],
+    "coverage": [
+     {
+      "field": "parties",
+      "state": "stated"
+     }
+    ],
+    "checks": {
+     "passed": true,
+     "rounds": 1,
+     "verdicts": [
+      {
+       "check": "x",
+       "ok": true
+      }
+     ]
+    },
+    "side": {
+     "party": "x",
+     "ask": true,
+     "candidates": [
+      {
+       "party": "x",
+       "role": "x",
+       "counterparty": "x"
+      }
+     ],
+     "source": "matter"
+    }
+   }
+  ],
+  "outputs": [
+   {
+    "version": 1,
+    "matterId": "x",
+    "createdAt": 1,
+    "model": "x",
+    "locale": "en",
+    "prompt": "",
+    "documentType": "x",
+    "read": {
+     "calls": 1,
+     "repairs": 1,
+     "files": [],
+     "partialDocs": []
+    },
+    "files": [],
+    "parties": [],
+    "facts": [],
+    "redFlags": [],
+    "conflicts": [],
+    "coverage": [],
+    "checks": {
+     "passed": true,
+     "rounds": 1,
+     "verdicts": []
+    },
+    "side": {
+     "party": null,
+     "ask": true,
+     "candidates": [],
+     "source": "matter"
+    }
+   },
+   {
+    "version": 1,
+    "matterId": "x",
+    "createdAt": 1,
+    "model": "x",
+    "locale": "en",
+    "prompt": "x",
+    "documentType": "x",
+    "read": {
+     "calls": 1,
+     "repairs": 1,
+     "files": [
+      {
+       "docId": "x",
+       "name": "x",
+       "sha256": "x",
+       "chars": 1,
+       "chunks": {
+        "read": 1,
+        "total": 1
+       },
+       "status": "read"
+      }
+     ],
+     "partialDocs": [
+      "x"
+     ]
+    },
+    "files": [
+     {
+      "docId": "x",
+      "intakeRole": "draft",
+      "reason": "x",
+      "appliedRole": "counterparty-draft"
+     }
+    ],
+    "parties": [
+     {
+      "name": "x",
+      "role": "x",
+      "status": "verified",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1
+     }
+    ],
+    "facts": [
+     {
+      "id": "x",
+      "field": "parties",
+      "label": "x",
+      "value": "x",
+      "status": "verified",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1
+     }
+    ],
+    "redFlags": [
+     {
+      "id": "x",
+      "title": "x",
+      "why": "x",
+      "severity": "high",
+      "against": "you",
+      "againstParty": "x",
+      "status": "verified",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1
+     }
+    ],
+    "conflicts": [
+     {
+      "field": "parties",
+      "kind": "amount",
+      "values": [
+       {
+        "value": "x",
+        "docIds": [
+         "x"
+        ],
+        "itemIds": [
+         "x"
+        ]
+       },
+       {
+        "value": "x",
+        "docIds": [
+         "x"
+        ],
+        "itemIds": [
+         "x"
+        ]
+       }
+      ]
+     }
+    ],
+    "coverage": [
+     {
+      "field": "parties",
+      "state": "stated"
+     }
+    ],
+    "checks": {
+     "passed": true,
+     "rounds": 1,
+     "verdicts": [
+      {
+       "check": "x",
+       "ok": true
+      }
+     ]
+    },
+    "side": {
+     "party": "x",
+     "ask": true,
+     "candidates": [
+      {
+       "party": "x",
+       "role": "x",
+       "counterparty": "x"
+      }
+     ],
+     "source": "matter"
+    }
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalExtractResponseSchema": {
+  "inputs": [
+   {
+    "extract": null
+   },
+   {
+    "extract": {
+     "version": 1,
+     "matterId": "x",
+     "createdAt": 1,
+     "model": "x",
+     "locale": "en",
+     "prompt": "x",
+     "documentType": "x",
+     "read": {
+      "calls": 1,
+      "repairs": 1,
+      "files": [
+       {
+        "docId": "x",
+        "name": "x",
+        "sha256": "x",
+        "chars": 1,
+        "chunks": {
+         "read": 1,
+         "total": 1
+        },
+        "status": "read"
+       }
+      ],
+      "partialDocs": [
+       "x"
+      ]
+     },
+     "files": [
+      {
+       "docId": "x",
+       "intakeRole": "draft",
+       "reason": "x",
+       "appliedRole": "counterparty-draft"
+      }
+     ],
+     "parties": [
+      {
+       "name": "x",
+       "role": "x",
+       "status": "verified",
+       "quote": "x",
+       "docId": "x",
+       "anchor": "x",
+       "clauseId": "x",
+       "page": 1
+      }
+     ],
+     "conflicts": [
+      {
+       "field": "parties",
+       "kind": "amount",
+       "values": [
+        {
+         "value": "x",
+         "docIds": [
+          "x"
+         ],
+         "itemIds": [
+          "x"
+         ]
+        },
+        {
+         "value": "x",
+         "docIds": [
+          "x"
+         ],
+         "itemIds": [
+          "x"
+         ]
+        }
+       ]
+      }
+     ],
+     "coverage": [
+      {
+       "field": "parties",
+       "state": "stated"
+      }
+     ],
+     "checks": {
+      "passed": true,
+      "rounds": 1,
+      "verdicts": [
+       {
+        "check": "x",
+        "ok": true
+       }
+      ]
+     },
+     "side": {
+      "party": "x",
+      "ask": true,
+      "candidates": [
+       {
+        "party": "x",
+        "role": "x",
+        "counterparty": "x"
+       }
+      ],
+      "source": "matter"
+     },
+     "facts": [
+      {
+       "id": "x",
+       "field": "parties",
+       "label": "x",
+       "value": "x",
+       "status": "verified",
+       "quote": "x",
+       "docId": "x",
+       "anchor": "x",
+       "clauseId": "x",
+       "page": 1,
+       "edited": true,
+       "originalValue": "x",
+       "editedAt": 1,
+       "editedBy": "x"
+      }
+     ],
+     "redFlags": [
+      {
+       "id": "x",
+       "title": "x",
+       "why": "x",
+       "severity": "high",
+       "against": "you",
+       "againstParty": "x",
+       "status": "verified",
+       "quote": "x",
+       "docId": "x",
+       "anchor": "x",
+       "clauseId": "x",
+       "page": 1,
+       "edited": true,
+       "originalValue": "x",
+       "editedAt": 1,
+       "editedBy": "x"
+      }
+     ],
+     "comments": [
+      {
+       "id": "x",
+       "itemId": "x",
+       "text": "x",
+       "at": 1,
+       "by": "x"
+      }
+     ],
+     "stale": true,
+     "orphanedEdits": [
+      "x"
+     ]
+    }
+   }
+  ],
+  "outputs": [
+   {
+    "extract": null
+   },
+   {
+    "extract": {
+     "version": 1,
+     "matterId": "x",
+     "createdAt": 1,
+     "model": "x",
+     "locale": "en",
+     "prompt": "x",
+     "documentType": "x",
+     "read": {
+      "calls": 1,
+      "repairs": 1,
+      "files": [
+       {
+        "docId": "x",
+        "name": "x",
+        "sha256": "x",
+        "chars": 1,
+        "chunks": {
+         "read": 1,
+         "total": 1
+        },
+        "status": "read"
+       }
+      ],
+      "partialDocs": [
+       "x"
+      ]
+     },
+     "files": [
+      {
+       "docId": "x",
+       "intakeRole": "draft",
+       "reason": "x",
+       "appliedRole": "counterparty-draft"
+      }
+     ],
+     "parties": [
+      {
+       "name": "x",
+       "role": "x",
+       "status": "verified",
+       "quote": "x",
+       "docId": "x",
+       "anchor": "x",
+       "clauseId": "x",
+       "page": 1
+      }
+     ],
+     "conflicts": [
+      {
+       "field": "parties",
+       "kind": "amount",
+       "values": [
+        {
+         "value": "x",
+         "docIds": [
+          "x"
+         ],
+         "itemIds": [
+          "x"
+         ]
+        },
+        {
+         "value": "x",
+         "docIds": [
+          "x"
+         ],
+         "itemIds": [
+          "x"
+         ]
+        }
+       ]
+      }
+     ],
+     "coverage": [
+      {
+       "field": "parties",
+       "state": "stated"
+      }
+     ],
+     "checks": {
+      "passed": true,
+      "rounds": 1,
+      "verdicts": [
+       {
+        "check": "x",
+        "ok": true
+       }
+      ]
+     },
+     "side": {
+      "party": "x",
+      "ask": true,
+      "candidates": [
+       {
+        "party": "x",
+        "role": "x",
+        "counterparty": "x"
+       }
+      ],
+      "source": "matter"
+     },
+     "facts": [
+      {
+       "id": "x",
+       "field": "parties",
+       "label": "x",
+       "value": "x",
+       "status": "verified",
+       "quote": "x",
+       "docId": "x",
+       "anchor": "x",
+       "clauseId": "x",
+       "page": 1,
+       "edited": true,
+       "originalValue": "x",
+       "editedAt": 1,
+       "editedBy": "x"
+      }
+     ],
+     "redFlags": [
+      {
+       "id": "x",
+       "title": "x",
+       "why": "x",
+       "severity": "high",
+       "against": "you",
+       "againstParty": "x",
+       "status": "verified",
+       "quote": "x",
+       "docId": "x",
+       "anchor": "x",
+       "clauseId": "x",
+       "page": 1,
+       "edited": true,
+       "originalValue": "x",
+       "editedAt": 1,
+       "editedBy": "x"
+      }
+     ],
+     "comments": [
+      {
+       "id": "x",
+       "itemId": "x",
+       "text": "x",
+       "at": 1,
+       "by": "x"
+      }
+     ],
+     "stale": true,
+     "orphanedEdits": [
+      "x"
+     ]
+    }
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalExtractViewSchema": {
+  "inputs": [
+   {
+    "version": 1,
+    "matterId": "x",
+    "createdAt": 1,
+    "model": "x",
+    "locale": "en",
+    "documentType": "x",
+    "read": {
+     "calls": 1,
+     "repairs": 1,
+     "files": [],
+     "partialDocs": []
+    },
+    "files": [],
+    "parties": [],
+    "conflicts": [],
+    "coverage": [],
+    "checks": {
+     "passed": true,
+     "rounds": 1,
+     "verdicts": []
+    },
+    "side": {
+     "party": null,
+     "ask": true,
+     "candidates": [],
+     "source": "matter"
+    },
+    "facts": [],
+    "redFlags": [],
+    "comments": [],
+    "stale": true,
+    "orphanedEdits": []
+   },
+   {
+    "version": 1,
+    "matterId": "x",
+    "createdAt": 1,
+    "model": "x",
+    "locale": "en",
+    "prompt": "x",
+    "documentType": "x",
+    "read": {
+     "calls": 1,
+     "repairs": 1,
+     "files": [
+      {
+       "docId": "x",
+       "name": "x",
+       "sha256": "x",
+       "chars": 1,
+       "chunks": {
+        "read": 1,
+        "total": 1
+       },
+       "status": "read"
+      }
+     ],
+     "partialDocs": [
+      "x"
+     ]
+    },
+    "files": [
+     {
+      "docId": "x",
+      "intakeRole": "draft",
+      "reason": "x",
+      "appliedRole": "counterparty-draft"
+     }
+    ],
+    "parties": [
+     {
+      "name": "x",
+      "role": "x",
+      "status": "verified",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1
+     }
+    ],
+    "conflicts": [
+     {
+      "field": "parties",
+      "kind": "amount",
+      "values": [
+       {
+        "value": "x",
+        "docIds": [
+         "x"
+        ],
+        "itemIds": [
+         "x"
+        ]
+       },
+       {
+        "value": "x",
+        "docIds": [
+         "x"
+        ],
+        "itemIds": [
+         "x"
+        ]
+       }
+      ]
+     }
+    ],
+    "coverage": [
+     {
+      "field": "parties",
+      "state": "stated"
+     }
+    ],
+    "checks": {
+     "passed": true,
+     "rounds": 1,
+     "verdicts": [
+      {
+       "check": "x",
+       "ok": true
+      }
+     ]
+    },
+    "side": {
+     "party": "x",
+     "ask": true,
+     "candidates": [
+      {
+       "party": "x",
+       "role": "x",
+       "counterparty": "x"
+      }
+     ],
+     "source": "matter"
+    },
+    "facts": [
+     {
+      "id": "x",
+      "field": "parties",
+      "label": "x",
+      "value": "x",
+      "status": "verified",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1,
+      "edited": true,
+      "originalValue": "x",
+      "editedAt": 1,
+      "editedBy": "x"
+     }
+    ],
+    "redFlags": [
+     {
+      "id": "x",
+      "title": "x",
+      "why": "x",
+      "severity": "high",
+      "against": "you",
+      "againstParty": "x",
+      "status": "verified",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1,
+      "edited": true,
+      "originalValue": "x",
+      "editedAt": 1,
+      "editedBy": "x"
+     }
+    ],
+    "comments": [
+     {
+      "id": "x",
+      "itemId": "x",
+      "text": "x",
+      "at": 1,
+      "by": "x"
+     }
+    ],
+    "stale": true,
+    "orphanedEdits": [
+     "x"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "version": 1,
+    "matterId": "x",
+    "createdAt": 1,
+    "model": "x",
+    "locale": "en",
+    "prompt": "",
+    "documentType": "x",
+    "read": {
+     "calls": 1,
+     "repairs": 1,
+     "files": [],
+     "partialDocs": []
+    },
+    "files": [],
+    "parties": [],
+    "conflicts": [],
+    "coverage": [],
+    "checks": {
+     "passed": true,
+     "rounds": 1,
+     "verdicts": []
+    },
+    "side": {
+     "party": null,
+     "ask": true,
+     "candidates": [],
+     "source": "matter"
+    },
+    "facts": [],
+    "redFlags": [],
+    "comments": [],
+    "stale": true,
+    "orphanedEdits": []
+   },
+   {
+    "version": 1,
+    "matterId": "x",
+    "createdAt": 1,
+    "model": "x",
+    "locale": "en",
+    "prompt": "x",
+    "documentType": "x",
+    "read": {
+     "calls": 1,
+     "repairs": 1,
+     "files": [
+      {
+       "docId": "x",
+       "name": "x",
+       "sha256": "x",
+       "chars": 1,
+       "chunks": {
+        "read": 1,
+        "total": 1
+       },
+       "status": "read"
+      }
+     ],
+     "partialDocs": [
+      "x"
+     ]
+    },
+    "files": [
+     {
+      "docId": "x",
+      "intakeRole": "draft",
+      "reason": "x",
+      "appliedRole": "counterparty-draft"
+     }
+    ],
+    "parties": [
+     {
+      "name": "x",
+      "role": "x",
+      "status": "verified",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1
+     }
+    ],
+    "conflicts": [
+     {
+      "field": "parties",
+      "kind": "amount",
+      "values": [
+       {
+        "value": "x",
+        "docIds": [
+         "x"
+        ],
+        "itemIds": [
+         "x"
+        ]
+       },
+       {
+        "value": "x",
+        "docIds": [
+         "x"
+        ],
+        "itemIds": [
+         "x"
+        ]
+       }
+      ]
+     }
+    ],
+    "coverage": [
+     {
+      "field": "parties",
+      "state": "stated"
+     }
+    ],
+    "checks": {
+     "passed": true,
+     "rounds": 1,
+     "verdicts": [
+      {
+       "check": "x",
+       "ok": true
+      }
+     ]
+    },
+    "side": {
+     "party": "x",
+     "ask": true,
+     "candidates": [
+      {
+       "party": "x",
+       "role": "x",
+       "counterparty": "x"
+      }
+     ],
+     "source": "matter"
+    },
+    "facts": [
+     {
+      "id": "x",
+      "field": "parties",
+      "label": "x",
+      "value": "x",
+      "status": "verified",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1,
+      "edited": true,
+      "originalValue": "x",
+      "editedAt": 1,
+      "editedBy": "x"
+     }
+    ],
+    "redFlags": [
+     {
+      "id": "x",
+      "title": "x",
+      "why": "x",
+      "severity": "high",
+      "against": "you",
+      "againstParty": "x",
+      "status": "verified",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1,
+      "edited": true,
+      "originalValue": "x",
+      "editedAt": 1,
+      "editedBy": "x"
+     }
+    ],
+    "comments": [
+     {
+      "id": "x",
+      "itemId": "x",
+      "text": "x",
+      "at": 1,
+      "by": "x"
+     }
+    ],
+    "stale": true,
+    "orphanedEdits": [
+     "x"
+    ]
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalFactRecordSchema": {
+  "inputs": [
+   {
+    "id": "x",
+    "field": "parties",
+    "label": "x",
+    "value": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": null,
+    "page": null
+   },
+   {
+    "id": "x",
+    "field": "parties",
+    "label": "x",
+    "value": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": "x",
+    "page": 1
+   }
+  ],
+  "outputs": [
+   {
+    "id": "x",
+    "field": "parties",
+    "label": "x",
+    "value": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": null,
+    "page": null
+   },
+   {
+    "id": "x",
+    "field": "parties",
+    "label": "x",
+    "value": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": "x",
+    "page": 1
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalFactViewSchema": {
+  "inputs": [
+   {
+    "id": "x",
+    "field": "parties",
+    "label": "x",
+    "value": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": null,
+    "page": null,
+    "edited": true,
+    "originalValue": null,
+    "editedAt": null,
+    "editedBy": null
+   },
+   {
+    "id": "x",
+    "field": "parties",
+    "label": "x",
+    "value": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": "x",
+    "page": 1,
+    "edited": true,
+    "originalValue": "x",
+    "editedAt": 1,
+    "editedBy": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "id": "x",
+    "field": "parties",
+    "label": "x",
+    "value": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": null,
+    "page": null,
+    "edited": true,
+    "originalValue": null,
+    "editedAt": null,
+    "editedBy": null
+   },
+   {
+    "id": "x",
+    "field": "parties",
+    "label": "x",
+    "value": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": "x",
+    "page": 1,
+    "edited": true,
+    "originalValue": "x",
+    "editedAt": 1,
+    "editedBy": "x"
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalFileRecordSchema": {
+  "inputs": [
+   {
+    "docId": "x",
+    "intakeRole": null,
+    "reason": "x",
+    "appliedRole": null
+   },
+   {
+    "docId": "x",
+    "intakeRole": "draft",
+    "reason": "x",
+    "appliedRole": "counterparty-draft"
+   }
+  ],
+  "outputs": [
+   {
+    "docId": "x",
+    "intakeRole": null,
+    "reason": "x",
+    "appliedRole": null
+   },
+   {
+    "docId": "x",
+    "intakeRole": "draft",
+    "reason": "x",
+    "appliedRole": "counterparty-draft"
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalPartyRecordSchema": {
+  "inputs": [
+   {
+    "name": "x",
+    "role": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": null,
+    "page": null
+   },
+   {
+    "name": "x",
+    "role": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": "x",
+    "page": 1
+   }
+  ],
+  "outputs": [
+   {
+    "name": "x",
+    "role": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": null,
+    "page": null
+   },
+   {
+    "name": "x",
+    "role": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": "x",
+    "page": 1
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalReadSchema": {
+  "inputs": [
+   {
+    "calls": 1,
+    "repairs": 1,
+    "files": [],
+    "partialDocs": []
+   },
+   {
+    "calls": 1,
+    "repairs": 1,
+    "files": [
+     {
+      "docId": "x",
+      "name": "x",
+      "sha256": "x",
+      "chars": 1,
+      "chunks": {
+       "read": 1,
+       "total": 1
+      },
+      "status": "read"
+     }
+    ],
+    "partialDocs": [
+     "x"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "calls": 1,
+    "repairs": 1,
+    "files": [],
+    "partialDocs": []
+   },
+   {
+    "calls": 1,
+    "repairs": 1,
+    "files": [
+     {
+      "docId": "x",
+      "name": "x",
+      "sha256": "x",
+      "chars": 1,
+      "chunks": {
+       "read": 1,
+       "total": 1
+      },
+      "status": "read"
+     }
+    ],
+    "partialDocs": [
+     "x"
+    ]
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalRedFlagRecordSchema": {
+  "inputs": [
+   {
+    "id": "x",
+    "title": "x",
+    "why": "x",
+    "severity": "high",
+    "against": "you",
+    "againstParty": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": null,
+    "page": null
+   },
+   {
+    "id": "x",
+    "title": "x",
+    "why": "x",
+    "severity": "high",
+    "against": "you",
+    "againstParty": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": "x",
+    "page": 1
+   }
+  ],
+  "outputs": [
+   {
+    "id": "x",
+    "title": "x",
+    "why": "x",
+    "severity": "high",
+    "against": "you",
+    "againstParty": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": null,
+    "page": null
+   },
+   {
+    "id": "x",
+    "title": "x",
+    "why": "x",
+    "severity": "high",
+    "against": "you",
+    "againstParty": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": "x",
+    "page": 1
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalRedFlagViewSchema": {
+  "inputs": [
+   {
+    "id": "x",
+    "title": "x",
+    "why": "x",
+    "severity": "high",
+    "against": "you",
+    "againstParty": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": null,
+    "page": null,
+    "edited": true,
+    "originalValue": null,
+    "editedAt": null,
+    "editedBy": null
+   },
+   {
+    "id": "x",
+    "title": "x",
+    "why": "x",
+    "severity": "high",
+    "against": "you",
+    "againstParty": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": "x",
+    "page": 1,
+    "edited": true,
+    "originalValue": "x",
+    "editedAt": 1,
+    "editedBy": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "id": "x",
+    "title": "x",
+    "why": "x",
+    "severity": "high",
+    "against": "you",
+    "againstParty": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": null,
+    "page": null,
+    "edited": true,
+    "originalValue": null,
+    "editedAt": null,
+    "editedBy": null
+   },
+   {
+    "id": "x",
+    "title": "x",
+    "why": "x",
+    "severity": "high",
+    "against": "you",
+    "againstParty": "x",
+    "status": "verified",
+    "quote": "x",
+    "docId": "x",
+    "anchor": "x",
+    "clauseId": "x",
+    "page": 1,
+    "edited": true,
+    "originalValue": "x",
+    "editedAt": 1,
+    "editedBy": "x"
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalSideCandidateSchema": {
+  "inputs": [
+   {
+    "party": "x",
+    "role": "x",
+    "counterparty": "x"
+   },
+   {
+    "party": "x",
+    "role": "x",
+    "counterparty": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "party": "x",
+    "role": "x",
+    "counterparty": "x"
+   },
+   {
+    "party": "x",
+    "role": "x",
+    "counterparty": "x"
+   }
+  ]
+ },
+ "packages/core/src/legal/facts.ts#legalSideResolutionSchema": {
+  "inputs": [
+   {
+    "party": null,
+    "ask": true,
+    "candidates": [],
+    "source": "matter"
+   },
+   {
+    "party": "x",
+    "ask": true,
+    "candidates": [
+     {
+      "party": "x",
+      "role": "x",
+      "counterparty": "x"
+     }
+    ],
+    "source": "matter"
+   }
+  ],
+  "outputs": [
+   {
+    "party": null,
+    "ask": true,
+    "candidates": [],
+    "source": "matter"
+   },
+   {
+    "party": "x",
+    "ask": true,
+    "candidates": [
+     {
+      "party": "x",
+      "role": "x",
+      "counterparty": "x"
+     }
+    ],
+    "source": "matter"
+   }
+  ]
+ },
+ "packages/core/src/legal/schemas.ts#checklistVerdictSchema": {
+  "inputs": [
+   {
+    "itemId": "x",
+    "pass": true
+   },
+   {
+    "itemId": "x",
+    "pass": true,
+    "reason": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "itemId": "x",
+    "pass": true,
+    "reason": ""
+   },
+   {
+    "itemId": "x",
+    "pass": true,
+    "reason": "x"
+   }
+  ]
+ },
+ "packages/core/src/legal/schemas.ts#checklistVerifyResponseSchema": {
+  "inputs": [
+   {
+    "verdicts": []
+   },
+   {
+    "verdicts": [
+     {
+      "itemId": "x",
+      "pass": true,
+      "reason": "x"
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "verdicts": []
+   },
+   {
+    "verdicts": [
+     {
+      "itemId": "x",
+      "pass": true,
+      "reason": "x"
+     }
+    ]
+   }
+  ]
+ },
+ "packages/core/src/legal/schemas.ts#citationSchema": {
+  "inputs": [
+   {
+    "doc": "x",
+    "ref": "x"
+   },
+   {
+    "doc": "x",
+    "ref": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "doc": "x",
+    "ref": "x"
+   },
+   {
+    "doc": "x",
+    "ref": "x"
+   }
+  ]
+ },
+ "packages/core/src/legal/schemas.ts#classifyResponseSchema": {
+  "inputs": [
+   {
+    "docs": []
+   },
+   {
+    "docs": [
+     {
+      "id": "x",
+      "role": "counterparty-draft",
+      "reason": "x"
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "docs": []
+   },
+   {
+    "docs": [
+     {
+      "id": "x",
+      "role": "counterparty-draft",
+      "reason": "x"
+     }
+    ]
+   }
+  ]
+ },
+ "packages/core/src/legal/schemas.ts#clauseOkSchema": {
+  "inputs": [
+   {
+    "kind": "ok"
+   },
+   {
+    "kind": "ok",
+    "clause": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "kind": "ok"
+   },
+   {
+    "kind": "ok",
+    "clause": "x"
+   }
+  ]
+ },
+ "packages/core/src/legal/schemas.ts#concessionSchema": {
+  "inputs": [
+   {
+    "clause": "x",
+    "detail": "x"
+   },
+   {
+    "clause": "x",
+    "detail": "x",
+    "disposition": "fix"
+   }
+  ],
+  "outputs": [
+   {
+    "clause": "x",
+    "detail": "x",
+    "disposition": "fix"
+   },
+   {
+    "clause": "x",
+    "detail": "x",
+    "disposition": "fix"
+   }
+  ]
+ },
+ "packages/core/src/legal/schemas.ts#findingDraftSchema": {
+  "inputs": [
+   {
+    "kind": "adverse",
+    "clause": "x",
+    "title": "x"
+   },
+   {
+    "kind": "adverse",
+    "clause": "x",
+    "quote": "x",
+    "title": "x",
+    "why": "x",
+    "severity": "high",
+    "negotiability": "preferred",
+    "proposedText": "x",
+    "basis": [
+     {
+      "doc": "x",
+      "ref": "x"
+     }
+    ],
+    "reservedFor": "x",
+    "checklist": [
+     "x"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "kind": "adverse",
+    "clause": "x",
+    "quote": "",
+    "title": "x",
+    "why": "",
+    "severity": "low",
+    "negotiability": "fallback",
+    "proposedText": null,
+    "basis": [],
+    "reservedFor": null,
+    "checklist": []
+   },
+   {
+    "kind": "adverse",
+    "clause": "x",
+    "quote": "x",
+    "title": "x",
+    "why": "x",
+    "severity": "high",
+    "negotiability": "preferred",
+    "proposedText": "x",
+    "basis": [
+     {
+      "doc": "x",
+      "ref": "x"
+     }
+    ],
+    "reservedFor": "x",
+    "checklist": [
+     "x"
+    ]
+   }
+  ]
+ },
+ "packages/core/src/legal/schemas.ts#findingEditResponseSchema": {
+  "inputs": [
+   {},
+   {
+    "quote": "x",
+    "proposedText": "x",
+    "why": "x"
+   }
+  ],
+  "outputs": [
+   {},
+   {
+    "quote": "x",
+    "proposedText": "x",
+    "why": "x"
+   }
+  ]
+ },
+ "packages/core/src/legal/schemas.ts#interactionResponseSchema": {
+  "inputs": [
+   {
+    "compounds": true
+   },
+   {
+    "compounds": true,
+    "clause": "x",
+    "why": "x",
+    "severity": "high",
+    "quote": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "compounds": true,
+    "clause": "",
+    "why": "",
+    "severity": "medium",
+    "quote": ""
+   },
+   {
+    "compounds": true,
+    "clause": "x",
+    "why": "x",
+    "severity": "high",
+    "quote": "x"
+   }
+  ]
+ },
+ "packages/core/src/legal/schemas.ts#memoOutlineSchema": {
+  "inputs": [
+   {
+    "to": "x",
+    "from": "x",
+    "date": "x",
+    "re": "x",
+    "sections": [
+     {
+      "heading": "x",
+      "paragraphs": []
+     }
+    ]
+   },
+   {
+    "to": "x",
+    "from": "x",
+    "date": "x",
+    "re": "x",
+    "privileged": true,
+    "sections": [
+     {
+      "heading": "x",
+      "paragraphs": [
+       "x"
+      ],
+      "findingsTable": [
+       "x"
+      ]
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "to": "x",
+    "from": "x",
+    "date": "x",
+    "re": "x",
+    "privileged": true,
+    "sections": [
+     {
+      "heading": "x",
+      "paragraphs": []
+     }
+    ]
+   },
+   {
+    "to": "x",
+    "from": "x",
+    "date": "x",
+    "re": "x",
+    "privileged": true,
+    "sections": [
+     {
+      "heading": "x",
+      "paragraphs": [
+       "x"
+      ],
+      "findingsTable": [
+       "x"
+      ]
+     }
+    ]
+   }
+  ]
+ },
+ "packages/core/src/legal/schemas.ts#memoSectionSchema": {
+  "inputs": [
+   {
+    "heading": "x",
+    "paragraphs": []
+   },
+   {
+    "heading": "x",
+    "paragraphs": [
+     "x"
+    ],
+    "findingsTable": [
+     "x"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "heading": "x",
+    "paragraphs": []
+   },
+   {
+    "heading": "x",
+    "paragraphs": [
+     "x"
+    ],
+    "findingsTable": [
+     "x"
+    ]
+   }
+  ]
+ },
+ "packages/core/src/legal/schemas.ts#missingConfirmSchema": {
+  "inputs": [
+   {
+    "itemId": "x",
+    "absent": true
+   }
+  ],
+  "outputs": [
+   {
+    "itemId": "x",
+    "absent": true,
+    "foundIn": null,
+    "reason": ""
+   }
+  ]
+ },
+ "packages/core/src/legal/schemas.ts#opposingCounselResponseSchema": {
+  "inputs": [
+   {
+    "concessions": []
+   },
+   {
+    "concessions": [
+     {
+      "clause": "x",
+      "detail": "x",
+      "disposition": "fix"
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "concessions": []
+   },
+   {
+    "concessions": [
+     {
+      "clause": "x",
+      "detail": "x",
+      "disposition": "fix"
+     }
+    ]
+   }
+  ]
+ },
+ "packages/core/src/legal/schemas.ts#quoteRetrySchema": {
+  "inputs": [
+   {
+    "quote": "x"
+   },
+   {
+    "quote": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "quote": "x"
+   },
+   {
+    "quote": "x"
+   }
+  ]
+ },
+ "packages/core/src/legal/schemas.ts#reviewResponseSchema": {
+  "inputs": [
+   {
+    "kind": "ok"
+   },
+   {
+    "kind": "ok",
+    "clause": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "kind": "ok"
+   },
+   {
+    "kind": "ok",
+    "clause": "x"
+   }
+  ]
+ },
+ "packages/core/src/legal/schemas.ts#sectionEditResponseSchema": {
+  "inputs": [
+   {
+    "section": {
+     "heading": "x",
+     "paragraphs": []
+    }
+   },
+   {
+    "section": {
+     "heading": "x",
+     "paragraphs": [
+      "x"
+     ],
+     "findingsTable": [
+      "x"
+     ]
+    }
+   }
+  ],
+  "outputs": [
+   {
+    "section": {
+     "heading": "x",
+     "paragraphs": []
+    }
+   },
+   {
+    "section": {
+     "heading": "x",
+     "paragraphs": [
+      "x"
+     ],
+     "findingsTable": [
+      "x"
+     ]
+    }
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#cryptoGlobalSchema": {
+  "inputs": [
+   {
+    "totalMarketCapUsd": 1,
+    "btcDominancePct": 1,
+    "ethDominancePct": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "totalMarketCapUsd": 1,
+    "btcDominancePct": 1,
+    "ethDominancePct": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ],
+  "outputs": [
+   {
+    "totalMarketCapUsd": 1,
+    "btcDominancePct": 1,
+    "ethDominancePct": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "totalMarketCapUsd": 1,
+    "btcDominancePct": 1,
+    "ethDominancePct": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#globalNewsItemSchema": {
+  "inputs": [
+   {
+    "title": "x",
+    "query": "x"
+   },
+   {
+    "title": "x",
+    "publisher": "x",
+    "at": "2026-09-09T10:00:00Z",
+    "query": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "title": "x",
+    "query": "x"
+   },
+   {
+    "title": "x",
+    "publisher": "x",
+    "at": "2026-09-09T10:00:00Z",
+    "query": "x"
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#macroSnapshotSchema": {
+  "inputs": [
+   {},
+   {
+    "quotes": [
+     {
+      "symbol": "x",
+      "name": "x",
+      "price": 1,
+      "changePercent": 1,
+      "previousClose": 1,
+      "preMarketPrice": 1,
+      "preMarketChangePercent": 1,
+      "postMarketPrice": 1,
+      "postMarketChangePercent": 1,
+      "volume": 1,
+      "marketCap": 1,
+      "marketState": "PRE",
+      "currency": "x",
+      "exchange": "x",
+      "ref": {
+       "source": "yahoo",
+       "sourceUrl": "https://example.test/a",
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "label": "x"
+     }
+    ],
+    "failures": [
+     "x"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "quotes": [],
+    "failures": []
+   },
+   {
+    "quotes": [
+     {
+      "symbol": "x",
+      "name": "x",
+      "price": 1,
+      "changePercent": 1,
+      "previousClose": 1,
+      "preMarketPrice": 1,
+      "preMarketChangePercent": 1,
+      "postMarketPrice": 1,
+      "postMarketChangePercent": 1,
+      "volume": 1,
+      "marketCap": 1,
+      "marketState": "PRE",
+      "currency": "x",
+      "exchange": "x",
+      "ref": {
+       "source": "yahoo",
+       "sourceUrl": "https://example.test/a",
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "label": "x"
+     }
+    ],
+    "failures": [
+     "x"
+    ]
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#marketBoardRequestSchema": {
+  "inputs": [
+   {
+    "tickers": [
+     "x"
+    ]
+   },
+   {
+    "tickers": [
+     "x"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "tickers": [
+     "x"
+    ]
+   },
+   {
+    "tickers": [
+     "x"
+    ]
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#marketBoardSchema": {
+  "inputs": [
+   {
+    "tickers": [],
+    "clock": {
+     "runAt": "2026-09-09T10:00:00Z",
+     "usSession": "pre"
+    }
+   },
+   {
+    "tickers": [
+     {
+      "symbol": {
+       "input": "x",
+       "yahoo": "x",
+       "tradingview": "x",
+       "name": "x",
+       "exchange": "x",
+       "currency": "x"
+      },
+      "quote": {
+       "symbol": "x",
+       "name": "x",
+       "price": 1,
+       "changePercent": 1,
+       "previousClose": 1,
+       "preMarketPrice": 1,
+       "preMarketChangePercent": 1,
+       "postMarketPrice": 1,
+       "postMarketChangePercent": 1,
+       "volume": 1,
+       "marketCap": 1,
+       "marketState": "PRE",
+       "currency": "x",
+       "exchange": "x",
+       "ref": {
+        "source": "yahoo",
+        "sourceUrl": "https://example.test/a",
+        "observedAt": "2026-09-09T10:00:00Z"
+       }
+      },
+      "technical": {
+       "symbol": "x",
+       "tradingview": {
+        "summary": 1,
+        "movingAverages": 1,
+        "oscillators": 1,
+        "label": "x"
+       },
+       "rsi14": 1,
+       "sma50": 1,
+       "sma200": 1,
+       "ema200": 1,
+       "macd": 1,
+       "macdSignal": 1,
+       "change1dPercent": 1,
+       "change5dPercent": 1,
+       "change1mPercent": 1,
+       "high52w": 1,
+       "low52w": 1,
+       "ref": {
+        "source": "yahoo",
+        "sourceUrl": "https://example.test/a",
+        "observedAt": "2026-09-09T10:00:00Z"
+       }
+      },
+      "history": {
+       "symbol": "x",
+       "interval": "1d",
+       "bars": [
+        {
+         "date": "2026-09-09",
+         "open": 1,
+         "high": 1,
+         "low": 1,
+         "close": 1,
+         "volume": 1
+        }
+       ],
+       "ref": {
+        "source": "yahoo",
+        "sourceUrl": "https://example.test/a",
+        "observedAt": "2026-09-09T10:00:00Z"
+       }
+      },
+      "chart": {
+       "type": "bar",
+       "title": "x",
+       "x": {
+        "label": "x",
+        "values": [
+         "x"
+        ]
+       },
+       "series": [
+        {
+         "name": "x",
+         "values": [
+          1
+         ]
+        }
+       ]
+      },
+      "news": [
+       {
+        "title": "x",
+        "summary": "x",
+        "link": "https://example.test/a",
+        "publisher": "x",
+        "publishedAt": "2026-09-09T10:00:00Z",
+        "ref": {
+         "source": "yahoo",
+         "sourceUrl": "https://example.test/a",
+         "observedAt": "2026-09-09T10:00:00Z"
+        },
+        "injectionSuspect": true
+       }
+      ],
+      "swings": [
+       {
+        "date": "2026-09-09",
+        "price": 1,
+        "kind": "high"
+       }
+      ],
+      "crypto": {
+       "marketCapUsd": 1,
+       "volume24hUsd": 1,
+       "change7dPct": 1,
+       "dominancePct": 1,
+       "fundingRatePct": 1,
+       "source": "yahoo",
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "fundamentals": {
+       "sector": "x",
+       "industry": "x",
+       "marketCap": 1,
+       "trailingPe": 1,
+       "forwardPe": 1,
+       "peg": 1,
+       "priceToBook": 1,
+       "epsTrailing": 1,
+       "epsForward": 1,
+       "dividendYieldPct": 1,
+       "beta": 1,
+       "revenueTtm": 1,
+       "grossMarginPct": 1,
+       "operatingMarginPct": 1,
+       "profitMarginPct": 1,
+       "roePct": 1,
+       "roaPct": 1,
+       "debtToEquity": 1,
+       "currentRatio": 1,
+       "freeCashflow": 1,
+       "source": "yahoo",
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "insiders": {
+       "window": "90d",
+       "buys": 1,
+       "sells": 1,
+       "netShares": 1,
+       "source": "yahoo",
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "sentiment": {
+       "stocktwits": {
+        "total": 1,
+        "bullish": 1,
+        "bearish": 1,
+        "sampled": 1
+       },
+       "reddit": {
+        "posts": 1,
+        "subreddits": [
+         "x"
+        ]
+       },
+       "samples": [
+        {
+         "source": "stocktwits",
+         "title": "x",
+         "at": "2026-09-09T10:00:00Z"
+        }
+       ],
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "failures": [
+       "x"
+      ]
+     }
+    ],
+    "clock": {
+     "runAt": "2026-09-09T10:00:00Z",
+     "usSession": "pre",
+     "note": "x"
+    },
+    "failures": [
+     "x"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "tickers": [],
+    "clock": {
+     "runAt": "2026-09-09T10:00:00Z",
+     "usSession": "pre",
+     "note": ""
+    },
+    "failures": []
+   },
+   {
+    "tickers": [
+     {
+      "symbol": {
+       "input": "x",
+       "yahoo": "x",
+       "tradingview": "x",
+       "name": "x",
+       "exchange": "x",
+       "currency": "x"
+      },
+      "quote": {
+       "symbol": "x",
+       "name": "x",
+       "price": 1,
+       "changePercent": 1,
+       "previousClose": 1,
+       "preMarketPrice": 1,
+       "preMarketChangePercent": 1,
+       "postMarketPrice": 1,
+       "postMarketChangePercent": 1,
+       "volume": 1,
+       "marketCap": 1,
+       "marketState": "PRE",
+       "currency": "x",
+       "exchange": "x",
+       "ref": {
+        "source": "yahoo",
+        "sourceUrl": "https://example.test/a",
+        "observedAt": "2026-09-09T10:00:00Z"
+       }
+      },
+      "technical": {
+       "symbol": "x",
+       "tradingview": {
+        "summary": 1,
+        "movingAverages": 1,
+        "oscillators": 1,
+        "label": "x"
+       },
+       "rsi14": 1,
+       "sma50": 1,
+       "sma200": 1,
+       "ema200": 1,
+       "macd": 1,
+       "macdSignal": 1,
+       "change1dPercent": 1,
+       "change5dPercent": 1,
+       "change1mPercent": 1,
+       "high52w": 1,
+       "low52w": 1,
+       "ref": {
+        "source": "yahoo",
+        "sourceUrl": "https://example.test/a",
+        "observedAt": "2026-09-09T10:00:00Z"
+       }
+      },
+      "history": {
+       "symbol": "x",
+       "interval": "1d",
+       "bars": [
+        {
+         "date": "2026-09-09",
+         "open": 1,
+         "high": 1,
+         "low": 1,
+         "close": 1,
+         "volume": 1
+        }
+       ],
+       "ref": {
+        "source": "yahoo",
+        "sourceUrl": "https://example.test/a",
+        "observedAt": "2026-09-09T10:00:00Z"
+       }
+      },
+      "chart": {
+       "type": "bar",
+       "title": "x",
+       "x": {
+        "label": "x",
+        "values": [
+         "x"
+        ]
+       },
+       "series": [
+        {
+         "name": "x",
+         "values": [
+          1
+         ]
+        }
+       ]
+      },
+      "news": [
+       {
+        "title": "x",
+        "summary": "x",
+        "link": "https://example.test/a",
+        "publisher": "x",
+        "publishedAt": "2026-09-09T10:00:00Z",
+        "ref": {
+         "source": "yahoo",
+         "sourceUrl": "https://example.test/a",
+         "observedAt": "2026-09-09T10:00:00Z"
+        },
+        "injectionSuspect": true
+       }
+      ],
+      "swings": [
+       {
+        "date": "2026-09-09",
+        "price": 1,
+        "kind": "high"
+       }
+      ],
+      "crypto": {
+       "marketCapUsd": 1,
+       "volume24hUsd": 1,
+       "change7dPct": 1,
+       "dominancePct": 1,
+       "fundingRatePct": 1,
+       "source": "yahoo",
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "fundamentals": {
+       "sector": "x",
+       "industry": "x",
+       "marketCap": 1,
+       "trailingPe": 1,
+       "forwardPe": 1,
+       "peg": 1,
+       "priceToBook": 1,
+       "epsTrailing": 1,
+       "epsForward": 1,
+       "dividendYieldPct": 1,
+       "beta": 1,
+       "revenueTtm": 1,
+       "grossMarginPct": 1,
+       "operatingMarginPct": 1,
+       "profitMarginPct": 1,
+       "roePct": 1,
+       "roaPct": 1,
+       "debtToEquity": 1,
+       "currentRatio": 1,
+       "freeCashflow": 1,
+       "source": "yahoo",
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "insiders": {
+       "window": "90d",
+       "buys": 1,
+       "sells": 1,
+       "netShares": 1,
+       "source": "yahoo",
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "sentiment": {
+       "stocktwits": {
+        "total": 1,
+        "bullish": 1,
+        "bearish": 1,
+        "sampled": 1
+       },
+       "reddit": {
+        "posts": 1,
+        "subreddits": [
+         "x"
+        ]
+       },
+       "samples": [
+        {
+         "source": "stocktwits",
+         "title": "x",
+         "at": "2026-09-09T10:00:00Z"
+        }
+       ],
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "failures": [
+       "x"
+      ]
+     }
+    ],
+    "clock": {
+     "runAt": "2026-09-09T10:00:00Z",
+     "usSession": "pre",
+     "note": "x"
+    },
+    "failures": [
+     "x"
+    ]
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#marketClockSchema": {
+  "inputs": [
+   {
+    "runAt": "2026-09-09T10:00:00Z",
+    "usSession": "pre"
+   },
+   {
+    "runAt": "2026-09-09T10:00:00Z",
+    "usSession": "pre",
+    "note": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "runAt": "2026-09-09T10:00:00Z",
+    "usSession": "pre",
+    "note": ""
+   },
+   {
+    "runAt": "2026-09-09T10:00:00Z",
+    "usSession": "pre",
+    "note": "x"
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#marketSessionSchema": {
+  "inputs": [
+   {
+    "exchange": "IDX",
+    "state": "pre"
+   },
+   {
+    "exchange": "IDX",
+    "state": "pre",
+    "nextChangeAt": "2026-09-09T10:00:00Z"
+   }
+  ],
+  "outputs": [
+   {
+    "exchange": "IDX",
+    "state": "pre",
+    "nextChangeAt": null
+   },
+   {
+    "exchange": "IDX",
+    "state": "pre",
+    "nextChangeAt": "2026-09-09T10:00:00Z"
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#marketSignalSchema": {
+  "inputs": [
+   {
+    "ticker": "x",
+    "kind": "rsi-oversold",
+    "value": 1
+   },
+   {
+    "ticker": "x",
+    "kind": "rsi-oversold",
+    "value": 1,
+    "note": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "ticker": "x",
+    "kind": "rsi-oversold",
+    "value": 1,
+    "note": ""
+   },
+   {
+    "ticker": "x",
+    "kind": "rsi-oversold",
+    "value": 1,
+    "note": "x"
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#marketWatchPacketSchema": {
+  "inputs": [
+   {
+    "tickers": [],
+    "macro": {},
+    "clock": {
+     "runAt": "2026-09-09T10:00:00Z",
+     "usSession": "pre"
+    }
+   },
+   {
+    "tickers": [
+     {
+      "symbol": {
+       "input": "x",
+       "yahoo": "x",
+       "tradingview": "x",
+       "name": "x",
+       "exchange": "x",
+       "currency": "x"
+      },
+      "quote": {
+       "symbol": "x",
+       "name": "x",
+       "price": 1,
+       "changePercent": 1,
+       "previousClose": 1,
+       "preMarketPrice": 1,
+       "preMarketChangePercent": 1,
+       "postMarketPrice": 1,
+       "postMarketChangePercent": 1,
+       "volume": 1,
+       "marketCap": 1,
+       "marketState": "PRE",
+       "currency": "x",
+       "exchange": "x",
+       "ref": {
+        "source": "yahoo",
+        "sourceUrl": "https://example.test/a",
+        "observedAt": "2026-09-09T10:00:00Z"
+       }
+      },
+      "technical": {
+       "symbol": "x",
+       "tradingview": {
+        "summary": 1,
+        "movingAverages": 1,
+        "oscillators": 1,
+        "label": "x"
+       },
+       "rsi14": 1,
+       "sma50": 1,
+       "sma200": 1,
+       "ema200": 1,
+       "macd": 1,
+       "macdSignal": 1,
+       "change1dPercent": 1,
+       "change5dPercent": 1,
+       "change1mPercent": 1,
+       "high52w": 1,
+       "low52w": 1,
+       "ref": {
+        "source": "yahoo",
+        "sourceUrl": "https://example.test/a",
+        "observedAt": "2026-09-09T10:00:00Z"
+       }
+      },
+      "history": {
+       "symbol": "x",
+       "interval": "1d",
+       "bars": [
+        {
+         "date": "2026-09-09",
+         "open": 1,
+         "high": 1,
+         "low": 1,
+         "close": 1,
+         "volume": 1
+        }
+       ],
+       "ref": {
+        "source": "yahoo",
+        "sourceUrl": "https://example.test/a",
+        "observedAt": "2026-09-09T10:00:00Z"
+       }
+      },
+      "chart": {
+       "type": "bar",
+       "title": "x",
+       "x": {
+        "label": "x",
+        "values": [
+         "x"
+        ]
+       },
+       "series": [
+        {
+         "name": "x",
+         "values": [
+          1
+         ]
+        }
+       ]
+      },
+      "news": [
+       {
+        "title": "x",
+        "summary": "x",
+        "link": "https://example.test/a",
+        "publisher": "x",
+        "publishedAt": "2026-09-09T10:00:00Z",
+        "ref": {
+         "source": "yahoo",
+         "sourceUrl": "https://example.test/a",
+         "observedAt": "2026-09-09T10:00:00Z"
+        },
+        "injectionSuspect": true
+       }
+      ],
+      "swings": [
+       {
+        "date": "2026-09-09",
+        "price": 1,
+        "kind": "high"
+       }
+      ],
+      "crypto": {
+       "marketCapUsd": 1,
+       "volume24hUsd": 1,
+       "change7dPct": 1,
+       "dominancePct": 1,
+       "fundingRatePct": 1,
+       "source": "yahoo",
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "fundamentals": {
+       "sector": "x",
+       "industry": "x",
+       "marketCap": 1,
+       "trailingPe": 1,
+       "forwardPe": 1,
+       "peg": 1,
+       "priceToBook": 1,
+       "epsTrailing": 1,
+       "epsForward": 1,
+       "dividendYieldPct": 1,
+       "beta": 1,
+       "revenueTtm": 1,
+       "grossMarginPct": 1,
+       "operatingMarginPct": 1,
+       "profitMarginPct": 1,
+       "roePct": 1,
+       "roaPct": 1,
+       "debtToEquity": 1,
+       "currentRatio": 1,
+       "freeCashflow": 1,
+       "source": "yahoo",
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "insiders": {
+       "window": "90d",
+       "buys": 1,
+       "sells": 1,
+       "netShares": 1,
+       "source": "yahoo",
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "sentiment": {
+       "stocktwits": {
+        "total": 1,
+        "bullish": 1,
+        "bearish": 1,
+        "sampled": 1
+       },
+       "reddit": {
+        "posts": 1,
+        "subreddits": [
+         "x"
+        ]
+       },
+       "samples": [
+        {
+         "source": "stocktwits",
+         "title": "x",
+         "at": "2026-09-09T10:00:00Z"
+        }
+       ],
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "failures": [
+       "x"
+      ]
+     }
+    ],
+    "macro": {
+     "quotes": [
+      {
+       "symbol": "x",
+       "name": "x",
+       "price": 1,
+       "changePercent": 1,
+       "previousClose": 1,
+       "preMarketPrice": 1,
+       "preMarketChangePercent": 1,
+       "postMarketPrice": 1,
+       "postMarketChangePercent": 1,
+       "volume": 1,
+       "marketCap": 1,
+       "marketState": "PRE",
+       "currency": "x",
+       "exchange": "x",
+       "ref": {
+        "source": "yahoo",
+        "sourceUrl": "https://example.test/a",
+        "observedAt": "2026-09-09T10:00:00Z"
+       },
+       "label": "x"
+      }
+     ],
+     "failures": [
+      "x"
+     ]
+    },
+    "clock": {
+     "runAt": "2026-09-09T10:00:00Z",
+     "usSession": "pre",
+     "note": "x"
+    },
+    "cryptoGlobal": {
+     "totalMarketCapUsd": 1,
+     "btcDominancePct": 1,
+     "ethDominancePct": 1,
+     "source": "yahoo",
+     "observedAt": "2026-09-09T10:00:00Z"
+    },
+    "metals": {
+     "dxy": 1,
+     "us10y": 1,
+     "goldSilverRatio": 1,
+     "goldFuturesVsSpotPct": 1,
+     "goldFuturesVsGldPct": 1,
+     "source": "yahoo",
+     "observedAt": "2026-09-09T10:00:00Z"
+    },
+    "signals": [
+     {
+      "ticker": "x",
+      "kind": "rsi-oversold",
+      "value": 1,
+      "note": "x"
+     }
+    ],
+    "rotation": [
+     {
+      "ticker": "x",
+      "ret1dPct": 1,
+      "ret5dPct": 1,
+      "ret1mPct": 1,
+      "ret6mPct": 1,
+      "rank1m": 1
+     }
+    ],
+    "sessions": [
+     {
+      "exchange": "IDX",
+      "state": "pre",
+      "nextChangeAt": "2026-09-09T10:00:00Z"
+     }
+    ],
+    "globalNews": [
+     {
+      "title": "x",
+      "publisher": "x",
+      "at": "2026-09-09T10:00:00Z",
+      "query": "x"
+     }
+    ],
+    "positionContext": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "tickers": [],
+    "macro": {
+     "quotes": [],
+     "failures": []
+    },
+    "clock": {
+     "runAt": "2026-09-09T10:00:00Z",
+     "usSession": "pre",
+     "note": ""
+    },
+    "positionContext": ""
+   },
+   {
+    "tickers": [
+     {
+      "symbol": {
+       "input": "x",
+       "yahoo": "x",
+       "tradingview": "x",
+       "name": "x",
+       "exchange": "x",
+       "currency": "x"
+      },
+      "quote": {
+       "symbol": "x",
+       "name": "x",
+       "price": 1,
+       "changePercent": 1,
+       "previousClose": 1,
+       "preMarketPrice": 1,
+       "preMarketChangePercent": 1,
+       "postMarketPrice": 1,
+       "postMarketChangePercent": 1,
+       "volume": 1,
+       "marketCap": 1,
+       "marketState": "PRE",
+       "currency": "x",
+       "exchange": "x",
+       "ref": {
+        "source": "yahoo",
+        "sourceUrl": "https://example.test/a",
+        "observedAt": "2026-09-09T10:00:00Z"
+       }
+      },
+      "technical": {
+       "symbol": "x",
+       "tradingview": {
+        "summary": 1,
+        "movingAverages": 1,
+        "oscillators": 1,
+        "label": "x"
+       },
+       "rsi14": 1,
+       "sma50": 1,
+       "sma200": 1,
+       "ema200": 1,
+       "macd": 1,
+       "macdSignal": 1,
+       "change1dPercent": 1,
+       "change5dPercent": 1,
+       "change1mPercent": 1,
+       "high52w": 1,
+       "low52w": 1,
+       "ref": {
+        "source": "yahoo",
+        "sourceUrl": "https://example.test/a",
+        "observedAt": "2026-09-09T10:00:00Z"
+       }
+      },
+      "history": {
+       "symbol": "x",
+       "interval": "1d",
+       "bars": [
+        {
+         "date": "2026-09-09",
+         "open": 1,
+         "high": 1,
+         "low": 1,
+         "close": 1,
+         "volume": 1
+        }
+       ],
+       "ref": {
+        "source": "yahoo",
+        "sourceUrl": "https://example.test/a",
+        "observedAt": "2026-09-09T10:00:00Z"
+       }
+      },
+      "chart": {
+       "type": "bar",
+       "title": "x",
+       "x": {
+        "label": "x",
+        "values": [
+         "x"
+        ]
+       },
+       "series": [
+        {
+         "name": "x",
+         "values": [
+          1
+         ]
+        }
+       ]
+      },
+      "news": [
+       {
+        "title": "x",
+        "summary": "x",
+        "link": "https://example.test/a",
+        "publisher": "x",
+        "publishedAt": "2026-09-09T10:00:00Z",
+        "ref": {
+         "source": "yahoo",
+         "sourceUrl": "https://example.test/a",
+         "observedAt": "2026-09-09T10:00:00Z"
+        },
+        "injectionSuspect": true
+       }
+      ],
+      "swings": [
+       {
+        "date": "2026-09-09",
+        "price": 1,
+        "kind": "high"
+       }
+      ],
+      "crypto": {
+       "marketCapUsd": 1,
+       "volume24hUsd": 1,
+       "change7dPct": 1,
+       "dominancePct": 1,
+       "fundingRatePct": 1,
+       "source": "yahoo",
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "fundamentals": {
+       "sector": "x",
+       "industry": "x",
+       "marketCap": 1,
+       "trailingPe": 1,
+       "forwardPe": 1,
+       "peg": 1,
+       "priceToBook": 1,
+       "epsTrailing": 1,
+       "epsForward": 1,
+       "dividendYieldPct": 1,
+       "beta": 1,
+       "revenueTtm": 1,
+       "grossMarginPct": 1,
+       "operatingMarginPct": 1,
+       "profitMarginPct": 1,
+       "roePct": 1,
+       "roaPct": 1,
+       "debtToEquity": 1,
+       "currentRatio": 1,
+       "freeCashflow": 1,
+       "source": "yahoo",
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "insiders": {
+       "window": "90d",
+       "buys": 1,
+       "sells": 1,
+       "netShares": 1,
+       "source": "yahoo",
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "sentiment": {
+       "stocktwits": {
+        "total": 1,
+        "bullish": 1,
+        "bearish": 1,
+        "sampled": 1
+       },
+       "reddit": {
+        "posts": 1,
+        "subreddits": [
+         "x"
+        ]
+       },
+       "samples": [
+        {
+         "source": "stocktwits",
+         "title": "x",
+         "at": "2026-09-09T10:00:00Z"
+        }
+       ],
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "failures": [
+       "x"
+      ]
+     }
+    ],
+    "macro": {
+     "quotes": [
+      {
+       "symbol": "x",
+       "name": "x",
+       "price": 1,
+       "changePercent": 1,
+       "previousClose": 1,
+       "preMarketPrice": 1,
+       "preMarketChangePercent": 1,
+       "postMarketPrice": 1,
+       "postMarketChangePercent": 1,
+       "volume": 1,
+       "marketCap": 1,
+       "marketState": "PRE",
+       "currency": "x",
+       "exchange": "x",
+       "ref": {
+        "source": "yahoo",
+        "sourceUrl": "https://example.test/a",
+        "observedAt": "2026-09-09T10:00:00Z"
+       },
+       "label": "x"
+      }
+     ],
+     "failures": [
+      "x"
+     ]
+    },
+    "clock": {
+     "runAt": "2026-09-09T10:00:00Z",
+     "usSession": "pre",
+     "note": "x"
+    },
+    "cryptoGlobal": {
+     "totalMarketCapUsd": 1,
+     "btcDominancePct": 1,
+     "ethDominancePct": 1,
+     "source": "yahoo",
+     "observedAt": "2026-09-09T10:00:00Z"
+    },
+    "metals": {
+     "dxy": 1,
+     "us10y": 1,
+     "goldSilverRatio": 1,
+     "goldFuturesVsSpotPct": 1,
+     "goldFuturesVsGldPct": 1,
+     "source": "yahoo",
+     "observedAt": "2026-09-09T10:00:00Z"
+    },
+    "signals": [
+     {
+      "ticker": "x",
+      "kind": "rsi-oversold",
+      "value": 1,
+      "note": "x"
+     }
+    ],
+    "rotation": [
+     {
+      "ticker": "x",
+      "ret1dPct": 1,
+      "ret5dPct": 1,
+      "ret1mPct": 1,
+      "ret6mPct": 1,
+      "rank1m": 1
+     }
+    ],
+    "sessions": [
+     {
+      "exchange": "IDX",
+      "state": "pre",
+      "nextChangeAt": "2026-09-09T10:00:00Z"
+     }
+    ],
+    "globalNews": [
+     {
+      "title": "x",
+      "publisher": "x",
+      "at": "2026-09-09T10:00:00Z",
+      "query": "x"
+     }
+    ],
+    "positionContext": "x"
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#marketWatchRequestSchema": {
+  "inputs": [
+   {
+    "prompt": "x",
+    "tickers": [
+     "x"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "prompt": "x",
+    "tickers": [
+     "x"
+    ],
+    "positionContext": "",
+    "language": "id",
+    "maxChars": 6000,
+    "specialist": "saham",
+    "depth": "quick"
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#metalsContextSchema": {
+  "inputs": [
+   {
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "dxy": 1,
+    "us10y": 1,
+    "goldSilverRatio": 1,
+    "goldFuturesVsSpotPct": 1,
+    "goldFuturesVsGldPct": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ],
+  "outputs": [
+   {
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "dxy": 1,
+    "us10y": 1,
+    "goldSilverRatio": 1,
+    "goldFuturesVsSpotPct": 1,
+    "goldFuturesVsGldPct": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#priceHistorySchema": {
+  "inputs": [
+   {
+    "symbol": "x",
+    "bars": [],
+    "ref": {
+     "source": "yahoo",
+     "sourceUrl": "https://example.test/a",
+     "observedAt": "2026-09-09T10:00:00Z"
+    }
+   },
+   {
+    "symbol": "x",
+    "interval": "1d",
+    "bars": [
+     {
+      "date": "2026-09-09",
+      "open": 1,
+      "high": 1,
+      "low": 1,
+      "close": 1,
+      "volume": 1
+     }
+    ],
+    "ref": {
+     "source": "yahoo",
+     "sourceUrl": "https://example.test/a",
+     "observedAt": "2026-09-09T10:00:00Z"
+    }
+   }
+  ],
+  "outputs": [
+   {
+    "symbol": "x",
+    "interval": "1d",
+    "bars": [],
+    "ref": {
+     "source": "yahoo",
+     "sourceUrl": "https://example.test/a",
+     "observedAt": "2026-09-09T10:00:00Z"
+    }
+   },
+   {
+    "symbol": "x",
+    "interval": "1d",
+    "bars": [
+     {
+      "date": "2026-09-09",
+      "open": 1,
+      "high": 1,
+      "low": 1,
+      "close": 1,
+      "volume": 1
+     }
+    ],
+    "ref": {
+     "source": "yahoo",
+     "sourceUrl": "https://example.test/a",
+     "observedAt": "2026-09-09T10:00:00Z"
+    }
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#quoteSchema": {
+  "inputs": [
+   {
+    "symbol": "x",
+    "ref": {
+     "source": "yahoo",
+     "sourceUrl": "https://example.test/a",
+     "observedAt": "2026-09-09T10:00:00Z"
+    }
+   },
+   {
+    "symbol": "x",
+    "name": "x",
+    "price": 1,
+    "changePercent": 1,
+    "previousClose": 1,
+    "preMarketPrice": 1,
+    "preMarketChangePercent": 1,
+    "postMarketPrice": 1,
+    "postMarketChangePercent": 1,
+    "volume": 1,
+    "marketCap": 1,
+    "marketState": "PRE",
+    "currency": "x",
+    "exchange": "x",
+    "ref": {
+     "source": "yahoo",
+     "sourceUrl": "https://example.test/a",
+     "observedAt": "2026-09-09T10:00:00Z"
+    }
+   }
+  ],
+  "outputs": [
+   {
+    "symbol": "x",
+    "name": "",
+    "price": null,
+    "changePercent": null,
+    "previousClose": null,
+    "preMarketPrice": null,
+    "preMarketChangePercent": null,
+    "postMarketPrice": null,
+    "postMarketChangePercent": null,
+    "volume": null,
+    "marketCap": null,
+    "marketState": "UNKNOWN",
+    "currency": "",
+    "exchange": "",
+    "ref": {
+     "source": "yahoo",
+     "sourceUrl": "https://example.test/a",
+     "observedAt": "2026-09-09T10:00:00Z"
+    }
+   },
+   {
+    "symbol": "x",
+    "name": "x",
+    "price": 1,
+    "changePercent": 1,
+    "previousClose": 1,
+    "preMarketPrice": 1,
+    "preMarketChangePercent": 1,
+    "postMarketPrice": 1,
+    "postMarketChangePercent": 1,
+    "volume": 1,
+    "marketCap": 1,
+    "marketState": "PRE",
+    "currency": "x",
+    "exchange": "x",
+    "ref": {
+     "source": "yahoo",
+     "sourceUrl": "https://example.test/a",
+     "observedAt": "2026-09-09T10:00:00Z"
+    }
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#resolvedSymbolSchema": {
+  "inputs": [
+   {
+    "input": "x",
+    "yahoo": "x"
+   },
+   {
+    "input": "x",
+    "yahoo": "x",
+    "tradingview": "x",
+    "name": "x",
+    "exchange": "x",
+    "currency": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "input": "x",
+    "yahoo": "x",
+    "tradingview": null,
+    "name": "",
+    "exchange": "",
+    "currency": ""
+   },
+   {
+    "input": "x",
+    "yahoo": "x",
+    "tradingview": "x",
+    "name": "x",
+    "exchange": "x",
+    "currency": "x"
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#rotationRowSchema": {
+  "inputs": [
+   {
+    "ticker": "x",
+    "rank1m": 1
+   },
+   {
+    "ticker": "x",
+    "ret1dPct": 1,
+    "ret5dPct": 1,
+    "ret1mPct": 1,
+    "ret6mPct": 1,
+    "rank1m": 1
+   }
+  ],
+  "outputs": [
+   {
+    "ticker": "x",
+    "ret1dPct": null,
+    "ret5dPct": null,
+    "ret1mPct": null,
+    "ret6mPct": null,
+    "rank1m": 1
+   },
+   {
+    "ticker": "x",
+    "ret1dPct": 1,
+    "ret5dPct": 1,
+    "ret1mPct": 1,
+    "ret6mPct": 1,
+    "rank1m": 1
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#sentimentSampleSchema": {
+  "inputs": [
+   {
+    "source": "stocktwits",
+    "title": "x"
+   },
+   {
+    "source": "stocktwits",
+    "title": "x",
+    "at": "2026-09-09T10:00:00Z"
+   }
+  ],
+  "outputs": [
+   {
+    "source": "stocktwits",
+    "title": "x"
+   },
+   {
+    "source": "stocktwits",
+    "title": "x",
+    "at": "2026-09-09T10:00:00Z"
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#swingPointSchema": {
+  "inputs": [
+   {
+    "date": "2026-09-09",
+    "price": 1,
+    "kind": "high"
+   },
+   {
+    "date": "2026-09-09",
+    "price": 1,
+    "kind": "high"
+   }
+  ],
+  "outputs": [
+   {
+    "date": "2026-09-09",
+    "price": 1,
+    "kind": "high"
+   },
+   {
+    "date": "2026-09-09",
+    "price": 1,
+    "kind": "high"
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#technicalSchema": {
+  "inputs": [
+   {
+    "symbol": "x",
+    "ref": {
+     "source": "yahoo",
+     "sourceUrl": "https://example.test/a",
+     "observedAt": "2026-09-09T10:00:00Z"
+    }
+   },
+   {
+    "symbol": "x",
+    "tradingview": {
+     "summary": 1,
+     "movingAverages": 1,
+     "oscillators": 1,
+     "label": "x"
+    },
+    "rsi14": 1,
+    "sma50": 1,
+    "sma200": 1,
+    "ema200": 1,
+    "macd": 1,
+    "macdSignal": 1,
+    "change1dPercent": 1,
+    "change5dPercent": 1,
+    "change1mPercent": 1,
+    "high52w": 1,
+    "low52w": 1,
+    "ref": {
+     "source": "yahoo",
+     "sourceUrl": "https://example.test/a",
+     "observedAt": "2026-09-09T10:00:00Z"
+    }
+   }
+  ],
+  "outputs": [
+   {
+    "symbol": "x",
+    "tradingview": null,
+    "rsi14": null,
+    "sma50": null,
+    "sma200": null,
+    "ema200": null,
+    "macd": null,
+    "macdSignal": null,
+    "change1dPercent": null,
+    "change5dPercent": null,
+    "change1mPercent": null,
+    "high52w": null,
+    "low52w": null,
+    "ref": {
+     "source": "yahoo",
+     "sourceUrl": "https://example.test/a",
+     "observedAt": "2026-09-09T10:00:00Z"
+    }
+   },
+   {
+    "symbol": "x",
+    "tradingview": {
+     "summary": 1,
+     "movingAverages": 1,
+     "oscillators": 1,
+     "label": "x"
+    },
+    "rsi14": 1,
+    "sma50": 1,
+    "sma200": 1,
+    "ema200": 1,
+    "macd": 1,
+    "macdSignal": 1,
+    "change1dPercent": 1,
+    "change5dPercent": 1,
+    "change1mPercent": 1,
+    "high52w": 1,
+    "low52w": 1,
+    "ref": {
+     "source": "yahoo",
+     "sourceUrl": "https://example.test/a",
+     "observedAt": "2026-09-09T10:00:00Z"
+    }
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#tickerCryptoSchema": {
+  "inputs": [
+   {
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "marketCapUsd": 1,
+    "volume24hUsd": 1,
+    "change7dPct": 1,
+    "dominancePct": 1,
+    "fundingRatePct": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ],
+  "outputs": [
+   {
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "marketCapUsd": 1,
+    "volume24hUsd": 1,
+    "change7dPct": 1,
+    "dominancePct": 1,
+    "fundingRatePct": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#tickerFundamentalsSchema": {
+  "inputs": [
+   {
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "sector": "x",
+    "industry": "x",
+    "marketCap": 1,
+    "trailingPe": 1,
+    "forwardPe": 1,
+    "peg": 1,
+    "priceToBook": 1,
+    "epsTrailing": 1,
+    "epsForward": 1,
+    "dividendYieldPct": 1,
+    "beta": 1,
+    "revenueTtm": 1,
+    "grossMarginPct": 1,
+    "operatingMarginPct": 1,
+    "profitMarginPct": 1,
+    "roePct": 1,
+    "roaPct": 1,
+    "debtToEquity": 1,
+    "currentRatio": 1,
+    "freeCashflow": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ],
+  "outputs": [
+   {
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "sector": "x",
+    "industry": "x",
+    "marketCap": 1,
+    "trailingPe": 1,
+    "forwardPe": 1,
+    "peg": 1,
+    "priceToBook": 1,
+    "epsTrailing": 1,
+    "epsForward": 1,
+    "dividendYieldPct": 1,
+    "beta": 1,
+    "revenueTtm": 1,
+    "grossMarginPct": 1,
+    "operatingMarginPct": 1,
+    "profitMarginPct": 1,
+    "roePct": 1,
+    "roaPct": 1,
+    "debtToEquity": 1,
+    "currentRatio": 1,
+    "freeCashflow": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#tickerInsidersSchema": {
+  "inputs": [
+   {
+    "buys": 1,
+    "sells": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "window": "90d",
+    "buys": 1,
+    "sells": 1,
+    "netShares": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ],
+  "outputs": [
+   {
+    "window": "90d",
+    "buys": 1,
+    "sells": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "window": "90d",
+    "buys": 1,
+    "sells": 1,
+    "netShares": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#tickerListSchema": {
+  "inputs": [
+   [
+    "x"
+   ],
+   [
+    "x"
+   ]
+  ],
+  "outputs": [
+   [
+    "x"
+   ],
+   [
+    "x"
+   ]
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#tickerPacketSchema": {
+  "inputs": [
+   {
+    "symbol": {
+     "input": "x",
+     "yahoo": "x"
+    }
+   },
+   {
+    "symbol": {
+     "input": "x",
+     "yahoo": "x",
+     "tradingview": "x",
+     "name": "x",
+     "exchange": "x",
+     "currency": "x"
+    },
+    "quote": {
+     "symbol": "x",
+     "name": "x",
+     "price": 1,
+     "changePercent": 1,
+     "previousClose": 1,
+     "preMarketPrice": 1,
+     "preMarketChangePercent": 1,
+     "postMarketPrice": 1,
+     "postMarketChangePercent": 1,
+     "volume": 1,
+     "marketCap": 1,
+     "marketState": "PRE",
+     "currency": "x",
+     "exchange": "x",
+     "ref": {
+      "source": "yahoo",
+      "sourceUrl": "https://example.test/a",
+      "observedAt": "2026-09-09T10:00:00Z"
+     }
+    },
+    "technical": {
+     "symbol": "x",
+     "tradingview": {
+      "summary": 1,
+      "movingAverages": 1,
+      "oscillators": 1,
+      "label": "x"
+     },
+     "rsi14": 1,
+     "sma50": 1,
+     "sma200": 1,
+     "ema200": 1,
+     "macd": 1,
+     "macdSignal": 1,
+     "change1dPercent": 1,
+     "change5dPercent": 1,
+     "change1mPercent": 1,
+     "high52w": 1,
+     "low52w": 1,
+     "ref": {
+      "source": "yahoo",
+      "sourceUrl": "https://example.test/a",
+      "observedAt": "2026-09-09T10:00:00Z"
+     }
+    },
+    "history": {
+     "symbol": "x",
+     "interval": "1d",
+     "bars": [
+      {
+       "date": "2026-09-09",
+       "open": 1,
+       "high": 1,
+       "low": 1,
+       "close": 1,
+       "volume": 1
+      }
+     ],
+     "ref": {
+      "source": "yahoo",
+      "sourceUrl": "https://example.test/a",
+      "observedAt": "2026-09-09T10:00:00Z"
+     }
+    },
+    "chart": {
+     "type": "bar",
+     "title": "x",
+     "x": {
+      "label": "x",
+      "values": [
+       "x"
+      ]
+     },
+     "series": [
+      {
+       "name": "x",
+       "values": [
+        1
+       ]
+      }
+     ]
+    },
+    "news": [
+     {
+      "title": "x",
+      "summary": "x",
+      "link": "https://example.test/a",
+      "publisher": "x",
+      "publishedAt": "2026-09-09T10:00:00Z",
+      "ref": {
+       "source": "yahoo",
+       "sourceUrl": "https://example.test/a",
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "injectionSuspect": true
+     }
+    ],
+    "swings": [
+     {
+      "date": "2026-09-09",
+      "price": 1,
+      "kind": "high"
+     }
+    ],
+    "crypto": {
+     "marketCapUsd": 1,
+     "volume24hUsd": 1,
+     "change7dPct": 1,
+     "dominancePct": 1,
+     "fundingRatePct": 1,
+     "source": "yahoo",
+     "observedAt": "2026-09-09T10:00:00Z"
+    },
+    "fundamentals": {
+     "sector": "x",
+     "industry": "x",
+     "marketCap": 1,
+     "trailingPe": 1,
+     "forwardPe": 1,
+     "peg": 1,
+     "priceToBook": 1,
+     "epsTrailing": 1,
+     "epsForward": 1,
+     "dividendYieldPct": 1,
+     "beta": 1,
+     "revenueTtm": 1,
+     "grossMarginPct": 1,
+     "operatingMarginPct": 1,
+     "profitMarginPct": 1,
+     "roePct": 1,
+     "roaPct": 1,
+     "debtToEquity": 1,
+     "currentRatio": 1,
+     "freeCashflow": 1,
+     "source": "yahoo",
+     "observedAt": "2026-09-09T10:00:00Z"
+    },
+    "insiders": {
+     "window": "90d",
+     "buys": 1,
+     "sells": 1,
+     "netShares": 1,
+     "source": "yahoo",
+     "observedAt": "2026-09-09T10:00:00Z"
+    },
+    "sentiment": {
+     "stocktwits": {
+      "total": 1,
+      "bullish": 1,
+      "bearish": 1,
+      "sampled": 1
+     },
+     "reddit": {
+      "posts": 1,
+      "subreddits": [
+       "x"
+      ]
+     },
+     "samples": [
+      {
+       "source": "stocktwits",
+       "title": "x",
+       "at": "2026-09-09T10:00:00Z"
+      }
+     ],
+     "observedAt": "2026-09-09T10:00:00Z"
+    },
+    "failures": [
+     "x"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "symbol": {
+     "input": "x",
+     "yahoo": "x",
+     "tradingview": null,
+     "name": "",
+     "exchange": "",
+     "currency": ""
+    },
+    "quote": null,
+    "technical": null,
+    "history": null,
+    "chart": null,
+    "news": [],
+    "failures": []
+   },
+   {
+    "symbol": {
+     "input": "x",
+     "yahoo": "x",
+     "tradingview": "x",
+     "name": "x",
+     "exchange": "x",
+     "currency": "x"
+    },
+    "quote": {
+     "symbol": "x",
+     "name": "x",
+     "price": 1,
+     "changePercent": 1,
+     "previousClose": 1,
+     "preMarketPrice": 1,
+     "preMarketChangePercent": 1,
+     "postMarketPrice": 1,
+     "postMarketChangePercent": 1,
+     "volume": 1,
+     "marketCap": 1,
+     "marketState": "PRE",
+     "currency": "x",
+     "exchange": "x",
+     "ref": {
+      "source": "yahoo",
+      "sourceUrl": "https://example.test/a",
+      "observedAt": "2026-09-09T10:00:00Z"
+     }
+    },
+    "technical": {
+     "symbol": "x",
+     "tradingview": {
+      "summary": 1,
+      "movingAverages": 1,
+      "oscillators": 1,
+      "label": "x"
+     },
+     "rsi14": 1,
+     "sma50": 1,
+     "sma200": 1,
+     "ema200": 1,
+     "macd": 1,
+     "macdSignal": 1,
+     "change1dPercent": 1,
+     "change5dPercent": 1,
+     "change1mPercent": 1,
+     "high52w": 1,
+     "low52w": 1,
+     "ref": {
+      "source": "yahoo",
+      "sourceUrl": "https://example.test/a",
+      "observedAt": "2026-09-09T10:00:00Z"
+     }
+    },
+    "history": {
+     "symbol": "x",
+     "interval": "1d",
+     "bars": [
+      {
+       "date": "2026-09-09",
+       "open": 1,
+       "high": 1,
+       "low": 1,
+       "close": 1,
+       "volume": 1
+      }
+     ],
+     "ref": {
+      "source": "yahoo",
+      "sourceUrl": "https://example.test/a",
+      "observedAt": "2026-09-09T10:00:00Z"
+     }
+    },
+    "chart": {
+     "type": "bar",
+     "title": "x",
+     "x": {
+      "label": "x",
+      "values": [
+       "x"
+      ]
+     },
+     "series": [
+      {
+       "name": "x",
+       "values": [
+        1
+       ]
+      }
+     ]
+    },
+    "news": [
+     {
+      "title": "x",
+      "summary": "x",
+      "link": "https://example.test/a",
+      "publisher": "x",
+      "publishedAt": "2026-09-09T10:00:00Z",
+      "ref": {
+       "source": "yahoo",
+       "sourceUrl": "https://example.test/a",
+       "observedAt": "2026-09-09T10:00:00Z"
+      },
+      "injectionSuspect": true
+     }
+    ],
+    "swings": [
+     {
+      "date": "2026-09-09",
+      "price": 1,
+      "kind": "high"
+     }
+    ],
+    "crypto": {
+     "marketCapUsd": 1,
+     "volume24hUsd": 1,
+     "change7dPct": 1,
+     "dominancePct": 1,
+     "fundingRatePct": 1,
+     "source": "yahoo",
+     "observedAt": "2026-09-09T10:00:00Z"
+    },
+    "fundamentals": {
+     "sector": "x",
+     "industry": "x",
+     "marketCap": 1,
+     "trailingPe": 1,
+     "forwardPe": 1,
+     "peg": 1,
+     "priceToBook": 1,
+     "epsTrailing": 1,
+     "epsForward": 1,
+     "dividendYieldPct": 1,
+     "beta": 1,
+     "revenueTtm": 1,
+     "grossMarginPct": 1,
+     "operatingMarginPct": 1,
+     "profitMarginPct": 1,
+     "roePct": 1,
+     "roaPct": 1,
+     "debtToEquity": 1,
+     "currentRatio": 1,
+     "freeCashflow": 1,
+     "source": "yahoo",
+     "observedAt": "2026-09-09T10:00:00Z"
+    },
+    "insiders": {
+     "window": "90d",
+     "buys": 1,
+     "sells": 1,
+     "netShares": 1,
+     "source": "yahoo",
+     "observedAt": "2026-09-09T10:00:00Z"
+    },
+    "sentiment": {
+     "stocktwits": {
+      "total": 1,
+      "bullish": 1,
+      "bearish": 1,
+      "sampled": 1
+     },
+     "reddit": {
+      "posts": 1,
+      "subreddits": [
+       "x"
+      ]
+     },
+     "samples": [
+      {
+       "source": "stocktwits",
+       "title": "x",
+       "at": "2026-09-09T10:00:00Z"
+      }
+     ],
+     "observedAt": "2026-09-09T10:00:00Z"
+    },
+    "failures": [
+     "x"
+    ]
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#tickerSentimentSchema": {
+  "inputs": [
+   {
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "stocktwits": {
+     "total": 1,
+     "bullish": 1,
+     "bearish": 1,
+     "sampled": 1
+    },
+    "reddit": {
+     "posts": 1,
+     "subreddits": [
+      "x"
+     ]
+    },
+    "samples": [
+     {
+      "source": "stocktwits",
+      "title": "x",
+      "at": "2026-09-09T10:00:00Z"
+     }
+    ],
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ],
+  "outputs": [
+   {
+    "samples": [],
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "stocktwits": {
+     "total": 1,
+     "bullish": 1,
+     "bearish": 1,
+     "sampled": 1
+    },
+    "reddit": {
+     "posts": 1,
+     "subreddits": [
+      "x"
+     ]
+    },
+    "samples": [
+     {
+      "source": "stocktwits",
+      "title": "x",
+      "at": "2026-09-09T10:00:00Z"
+     }
+    ],
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#tradingViewRatingSchema": {
+  "inputs": [
+   {},
+   {
+    "summary": 1,
+    "movingAverages": 1,
+    "oscillators": 1,
+    "label": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "summary": null,
+    "movingAverages": null,
+    "oscillators": null,
+    "label": ""
+   },
+   {
+    "summary": 1,
+    "movingAverages": 1,
+    "oscillators": 1,
+    "label": "x"
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#watchNewsItemSchema": {
+  "inputs": [
+   {
+    "title": "x",
+    "link": "https://example.test/a",
+    "ref": {
+     "source": "yahoo",
+     "sourceUrl": "https://example.test/a",
+     "observedAt": "2026-09-09T10:00:00Z"
+    }
+   },
+   {
+    "title": "x",
+    "summary": "x",
+    "link": "https://example.test/a",
+    "publisher": "x",
+    "publishedAt": "2026-09-09T10:00:00Z",
+    "ref": {
+     "source": "yahoo",
+     "sourceUrl": "https://example.test/a",
+     "observedAt": "2026-09-09T10:00:00Z"
+    },
+    "injectionSuspect": true
+   }
+  ],
+  "outputs": [
+   {
+    "title": "x",
+    "summary": "",
+    "link": "https://example.test/a",
+    "publisher": "",
+    "publishedAt": null,
+    "ref": {
+     "source": "yahoo",
+     "sourceUrl": "https://example.test/a",
+     "observedAt": "2026-09-09T10:00:00Z"
+    },
+    "injectionSuspect": false
+   },
+   {
+    "title": "x",
+    "summary": "x",
+    "link": "https://example.test/a",
+    "publisher": "x",
+    "publishedAt": "2026-09-09T10:00:00Z",
+    "ref": {
+     "source": "yahoo",
+     "sourceUrl": "https://example.test/a",
+     "observedAt": "2026-09-09T10:00:00Z"
+    },
+    "injectionSuspect": true
+   }
+  ]
+ },
+ "packages/core/src/market/watch-schemas.ts#watchRefSchema": {
+  "inputs": [
+   {
+    "source": "yahoo",
+    "sourceUrl": "https://example.test/a",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "source": "yahoo",
+    "sourceUrl": "https://example.test/a",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ],
+  "outputs": [
+   {
+    "source": "yahoo",
+    "sourceUrl": "https://example.test/a",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "source": "yahoo",
+    "sourceUrl": "https://example.test/a",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ]
+ },
+ "packages/core/src/market/team-source-schemas.ts#globalNewsItemSchema": {
+  "inputs": [
+   {
+    "title": "x",
+    "query": "x"
+   },
+   {
+    "title": "x",
+    "publisher": "x",
+    "at": "2026-09-09T10:00:00Z",
+    "query": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "title": "x",
+    "query": "x"
+   },
+   {
+    "title": "x",
+    "publisher": "x",
+    "at": "2026-09-09T10:00:00Z",
+    "query": "x"
+   }
+  ]
+ },
+ "packages/core/src/market/team-source-schemas.ts#sentimentSampleSchema": {
+  "inputs": [
+   {
+    "source": "stocktwits",
+    "title": "x"
+   },
+   {
+    "source": "stocktwits",
+    "title": "x",
+    "at": "2026-09-09T10:00:00Z"
+   }
+  ],
+  "outputs": [
+   {
+    "source": "stocktwits",
+    "title": "x"
+   },
+   {
+    "source": "stocktwits",
+    "title": "x",
+    "at": "2026-09-09T10:00:00Z"
+   }
+  ]
+ },
+ "packages/core/src/market/team-source-schemas.ts#tickerFundamentalsSchema": {
+  "inputs": [
+   {
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "sector": "x",
+    "industry": "x",
+    "marketCap": 1,
+    "trailingPe": 1,
+    "forwardPe": 1,
+    "peg": 1,
+    "priceToBook": 1,
+    "epsTrailing": 1,
+    "epsForward": 1,
+    "dividendYieldPct": 1,
+    "beta": 1,
+    "revenueTtm": 1,
+    "grossMarginPct": 1,
+    "operatingMarginPct": 1,
+    "profitMarginPct": 1,
+    "roePct": 1,
+    "roaPct": 1,
+    "debtToEquity": 1,
+    "currentRatio": 1,
+    "freeCashflow": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ],
+  "outputs": [
+   {
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "sector": "x",
+    "industry": "x",
+    "marketCap": 1,
+    "trailingPe": 1,
+    "forwardPe": 1,
+    "peg": 1,
+    "priceToBook": 1,
+    "epsTrailing": 1,
+    "epsForward": 1,
+    "dividendYieldPct": 1,
+    "beta": 1,
+    "revenueTtm": 1,
+    "grossMarginPct": 1,
+    "operatingMarginPct": 1,
+    "profitMarginPct": 1,
+    "roePct": 1,
+    "roaPct": 1,
+    "debtToEquity": 1,
+    "currentRatio": 1,
+    "freeCashflow": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ]
+ },
+ "packages/core/src/market/team-source-schemas.ts#tickerInsidersSchema": {
+  "inputs": [
+   {
+    "buys": 1,
+    "sells": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "window": "90d",
+    "buys": 1,
+    "sells": 1,
+    "netShares": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ],
+  "outputs": [
+   {
+    "window": "90d",
+    "buys": 1,
+    "sells": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "window": "90d",
+    "buys": 1,
+    "sells": 1,
+    "netShares": 1,
+    "source": "yahoo",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ]
+ },
+ "packages/core/src/market/team-source-schemas.ts#tickerSentimentSchema": {
+  "inputs": [
+   {
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "stocktwits": {
+     "total": 1,
+     "bullish": 1,
+     "bearish": 1,
+     "sampled": 1
+    },
+    "reddit": {
+     "posts": 1,
+     "subreddits": [
+      "x"
+     ]
+    },
+    "samples": [
+     {
+      "source": "stocktwits",
+      "title": "x",
+      "at": "2026-09-09T10:00:00Z"
+     }
+    ],
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ],
+  "outputs": [
+   {
+    "samples": [],
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "stocktwits": {
+     "total": 1,
+     "bullish": 1,
+     "bearish": 1,
+     "sampled": 1
+    },
+    "reddit": {
+     "posts": 1,
+     "subreddits": [
+      "x"
+     ]
+    },
+    "samples": [
+     {
+      "source": "stocktwits",
+      "title": "x",
+      "at": "2026-09-09T10:00:00Z"
+     }
+    ],
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ]
+ },
+ "packages/core/src/market/watch-refs.ts#watchRefSchema": {
+  "inputs": [
+   {
+    "source": "yahoo",
+    "sourceUrl": "https://example.test/a",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "source": "yahoo",
+    "sourceUrl": "https://example.test/a",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ],
+  "outputs": [
+   {
+    "source": "yahoo",
+    "sourceUrl": "https://example.test/a",
+    "observedAt": "2026-09-09T10:00:00Z"
+   },
+   {
+    "source": "yahoo",
+    "sourceUrl": "https://example.test/a",
+    "observedAt": "2026-09-09T10:00:00Z"
+   }
+  ]
+ },
+ "packages/core/src/market/team.ts#analystNoteSchema": {
+  "inputs": [
+   {
+    "analyst": "technical",
+    "summary": "x",
+    "confidence": "low"
+   },
+   {
+    "analyst": "technical",
+    "summary": "x",
+    "keyPoints": [
+     "x"
+    ],
+    "confidence": "low"
+   }
+  ],
+  "outputs": [
+   {
+    "analyst": "technical",
+    "summary": "x",
+    "keyPoints": [],
+    "confidence": "low"
+   },
+   {
+    "analyst": "technical",
+    "summary": "x",
+    "keyPoints": [
+     "x"
+    ],
+    "confidence": "low"
+   }
+  ]
+ },
+ "packages/core/src/market/team.ts#debateSideSchema": {
+  "inputs": [
+   {
+    "stance": "bull",
+    "thesis": "x"
+   },
+   {
+    "stance": "bull",
+    "thesis": "x",
+    "points": [
+     "x"
+    ],
+    "rebuttals": [
+     "x"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "stance": "bull",
+    "thesis": "x",
+    "points": [],
+    "rebuttals": []
+   },
+   {
+    "stance": "bull",
+    "thesis": "x",
+    "points": [
+     "x"
+    ],
+    "rebuttals": [
+     "x"
+    ]
+   }
+  ]
+ },
+ "packages/core/src/market/team.ts#riskLensSchema": {
+  "inputs": [
+   {
+    "lens": "aggressive",
+    "view": "x"
+   },
+   {
+    "lens": "aggressive",
+    "view": "x",
+    "keyRisks": [
+     "x"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "lens": "aggressive",
+    "view": "x",
+    "keyRisks": []
+   },
+   {
+    "lens": "aggressive",
+    "view": "x",
+    "keyRisks": [
+     "x"
+    ]
+   }
+  ]
+ },
+ "packages/core/src/market/team.ts#riskReadSchema": {
+  "inputs": [
+   {
+    "lenses": [
+     {
+      "lens": "aggressive",
+      "view": "x"
+     },
+     {
+      "lens": "aggressive",
+      "view": "x"
+     },
+     {
+      "lens": "aggressive",
+      "view": "x"
+     }
+    ],
+    "volatility": "x",
+    "liquidity": "x"
+   },
+   {
+    "lenses": [
+     {
+      "lens": "aggressive",
+      "view": "x",
+      "keyRisks": [
+       "x"
+      ]
+     },
+     {
+      "lens": "aggressive",
+      "view": "x",
+      "keyRisks": [
+       "x"
+      ]
+     },
+     {
+      "lens": "aggressive",
+      "view": "x",
+      "keyRisks": [
+       "x"
+      ]
+     }
+    ],
+    "volatility": "x",
+    "liquidity": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "lenses": [
+     {
+      "lens": "aggressive",
+      "view": "x",
+      "keyRisks": []
+     },
+     {
+      "lens": "aggressive",
+      "view": "x",
+      "keyRisks": []
+     },
+     {
+      "lens": "aggressive",
+      "view": "x",
+      "keyRisks": []
+     }
+    ],
+    "volatility": "x",
+    "liquidity": "x"
+   },
+   {
+    "lenses": [
+     {
+      "lens": "aggressive",
+      "view": "x",
+      "keyRisks": [
+       "x"
+      ]
+     },
+     {
+      "lens": "aggressive",
+      "view": "x",
+      "keyRisks": [
+       "x"
+      ]
+     },
+     {
+      "lens": "aggressive",
+      "view": "x",
+      "keyRisks": [
+       "x"
+      ]
+     }
+    ],
+    "volatility": "x",
+    "liquidity": "x"
+   }
+  ]
+ },
+ "packages/core/src/market/team.ts#teamNotesSchema": {
+  "inputs": [
+   {
+    "bull": {
+     "stance": "bull",
+     "thesis": "x"
+    },
+    "bear": {
+     "stance": "bull",
+     "thesis": "x"
+    },
+    "risk": {
+     "lenses": [
+      {
+       "lens": "aggressive",
+       "view": "x"
+      },
+      {
+       "lens": "aggressive",
+       "view": "x"
+      },
+      {
+       "lens": "aggressive",
+       "view": "x"
+      }
+     ],
+     "volatility": "x",
+     "liquidity": "x"
+    }
+   },
+   {
+    "analysts": [
+     {
+      "analyst": "technical",
+      "summary": "x",
+      "keyPoints": [
+       "x"
+      ],
+      "confidence": "low"
+     }
+    ],
+    "bull": {
+     "stance": "bull",
+     "thesis": "x",
+     "points": [
+      "x"
+     ],
+     "rebuttals": [
+      "x"
+     ]
+    },
+    "bear": {
+     "stance": "bull",
+     "thesis": "x",
+     "points": [
+      "x"
+     ],
+     "rebuttals": [
+      "x"
+     ]
+    },
+    "risk": {
+     "lenses": [
+      {
+       "lens": "aggressive",
+       "view": "x",
+       "keyRisks": [
+        "x"
+       ]
+      },
+      {
+       "lens": "aggressive",
+       "view": "x",
+       "keyRisks": [
+        "x"
+       ]
+      },
+      {
+       "lens": "aggressive",
+       "view": "x",
+       "keyRisks": [
+        "x"
+       ]
+      }
+     ],
+     "volatility": "x",
+     "liquidity": "x"
+    },
+    "rounds": 1
+   }
+  ],
+  "outputs": [
+   {
+    "analysts": [],
+    "bull": {
+     "stance": "bull",
+     "thesis": "x",
+     "points": [],
+     "rebuttals": []
+    },
+    "bear": {
+     "stance": "bull",
+     "thesis": "x",
+     "points": [],
+     "rebuttals": []
+    },
+    "risk": {
+     "lenses": [
+      {
+       "lens": "aggressive",
+       "view": "x",
+       "keyRisks": []
+      },
+      {
+       "lens": "aggressive",
+       "view": "x",
+       "keyRisks": []
+      },
+      {
+       "lens": "aggressive",
+       "view": "x",
+       "keyRisks": []
+      }
+     ],
+     "volatility": "x",
+     "liquidity": "x"
+    },
+    "rounds": 1
+   },
+   {
+    "analysts": [
+     {
+      "analyst": "technical",
+      "summary": "x",
+      "keyPoints": [
+       "x"
+      ],
+      "confidence": "low"
+     }
+    ],
+    "bull": {
+     "stance": "bull",
+     "thesis": "x",
+     "points": [
+      "x"
+     ],
+     "rebuttals": [
+      "x"
+     ]
+    },
+    "bear": {
+     "stance": "bull",
+     "thesis": "x",
+     "points": [
+      "x"
+     ],
+     "rebuttals": [
+      "x"
+     ]
+    },
+    "risk": {
+     "lenses": [
+      {
+       "lens": "aggressive",
+       "view": "x",
+       "keyRisks": [
+        "x"
+       ]
+      },
+      {
+       "lens": "aggressive",
+       "view": "x",
+       "keyRisks": [
+        "x"
+       ]
+      },
+      {
+       "lens": "aggressive",
+       "view": "x",
+       "keyRisks": [
+        "x"
+       ]
+      }
+     ],
+     "volatility": "x",
+     "liquidity": "x"
+    },
+    "rounds": 1
+   }
+  ]
+ },
+ "packages/core/src/meeting/minutes.ts#meetingActionItemSchema": {
+  "inputs": [
+   {
+    "task": "x",
+    "owner": "x"
+   },
+   {
+    "task": "x",
+    "owner": "x",
+    "due": "x",
+    "firstStep": "x",
+    "quote": "x",
+    "evidence": "verified",
+    "edited": true
+   }
+  ],
+  "outputs": [
+   {
+    "task": "x",
+    "owner": "x",
+    "due": "",
+    "firstStep": "",
+    "quote": ""
+   },
+   {
+    "task": "x",
+    "owner": "x",
+    "due": "x",
+    "firstStep": "x",
+    "quote": "x",
+    "evidence": "verified",
+    "edited": true
+   }
+  ]
+ },
+ "packages/core/src/meeting/minutes.ts#meetingAttendeeSchema": {
+  "inputs": [
+   {
+    "name": "x"
+   },
+   {
+    "name": "x",
+    "role": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "name": "x",
+    "role": ""
+   },
+   {
+    "name": "x",
+    "role": "x"
+   }
+  ]
+ },
+ "packages/core/src/meeting/minutes.ts#meetingDecisionSchema": {
+  "inputs": [
+   {
+    "statement": "x"
+   },
+   {
+    "statement": "x",
+    "provisional": true,
+    "context": "x",
+    "quote": "x",
+    "evidence": "verified",
+    "edited": true
+   }
+  ],
+  "outputs": [
+   {
+    "statement": "x",
+    "provisional": false,
+    "context": "",
+    "quote": ""
+   },
+   {
+    "statement": "x",
+    "provisional": true,
+    "context": "x",
+    "quote": "x",
+    "evidence": "verified",
+    "edited": true
+   }
+  ]
+ },
+ "packages/core/src/meeting/minutes.ts#meetingMinutesSchema": {
+  "inputs": [
+   {
+    "title": "x",
+    "summary": "x"
+   },
+   {
+    "title": "x",
+    "heldOn": "x",
+    "summary": "x",
+    "attendees": [
+     {
+      "name": "x",
+      "role": "x"
+     }
+    ],
+    "decisions": [
+     {
+      "statement": "x",
+      "provisional": true,
+      "context": "x",
+      "quote": "x",
+      "evidence": "verified",
+      "edited": true
+     }
+    ],
+    "actionItems": [
+     {
+      "task": "x",
+      "owner": "x",
+      "due": "x",
+      "firstStep": "x",
+      "quote": "x",
+      "evidence": "verified",
+      "edited": true
+     }
+    ],
+    "risks": [
+     "x"
+    ],
+    "openQuestions": [
+     "x"
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "title": "x",
+    "heldOn": "",
+    "summary": "x",
+    "attendees": [],
+    "decisions": [],
+    "actionItems": [],
+    "risks": [],
+    "openQuestions": []
+   },
+   {
+    "title": "x",
+    "heldOn": "x",
+    "summary": "x",
+    "attendees": [
+     {
+      "name": "x",
+      "role": "x"
+     }
+    ],
+    "decisions": [
+     {
+      "statement": "x",
+      "provisional": true,
+      "context": "x",
+      "quote": "x",
+      "evidence": "verified",
+      "edited": true
+     }
+    ],
+    "actionItems": [
+     {
+      "task": "x",
+      "owner": "x",
+      "due": "x",
+      "firstStep": "x",
+      "quote": "x",
+      "evidence": "verified",
+      "edited": true
+     }
+    ],
+    "risks": [
+     "x"
+    ],
+    "openQuestions": [
+     "x"
+    ]
+   }
+  ]
+ },
+ "packages/core/src/meeting/minutes.ts#minutesEvidenceSchema": {
+  "inputs": [
+   "verified",
+   "verified"
+  ],
+  "outputs": [
+   "verified",
+   "verified"
+  ]
+ },
+ "packages/core/src/meeting/transcript.ts#meetingTranscriptSchema": {
+  "inputs": [
+   {},
+   {
+    "text": "x",
+    "segments": [
+     {
+      "startSeconds": 1,
+      "speaker": "x",
+      "text": "x"
+     }
+    ],
+    "language": "x",
+    "source": "gateway",
+    "model": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "text": "",
+    "segments": [],
+    "language": "",
+    "source": "pasted",
+    "model": ""
+   },
+   {
+    "text": "x",
+    "segments": [
+     {
+      "startSeconds": 1,
+      "speaker": "x",
+      "text": "x"
+     }
+    ],
+    "language": "x",
+    "source": "gateway",
+    "model": "x"
+   }
+  ]
+ },
+ "packages/core/src/meeting/transcript.ts#transcriptSegmentSchema": {
+  "inputs": [
+   {
+    "text": "x"
+   },
+   {
+    "startSeconds": 1,
+    "speaker": "x",
+    "text": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "speaker": "",
+    "text": "x"
+   },
+   {
+    "startSeconds": 1,
+    "speaker": "x",
+    "text": "x"
+   }
+  ]
+ },
+ "packages/host/src/channels/records.ts#botIdentitySchema": {
+  "inputs": [
+   {
+    "id": "x",
+    "username": "x",
+    "name": "x",
+    "connectedAt": 1
+   },
+   {
+    "id": "x",
+    "username": "x",
+    "name": "x",
+    "connectedAt": 1
+   }
+  ],
+  "outputs": [
+   {
+    "id": "x",
+    "username": "x",
+    "name": "x",
+    "connectedAt": 1
+   },
+   {
+    "id": "x",
+    "username": "x",
+    "name": "x",
+    "connectedAt": 1
+   }
+  ]
+ },
+ "packages/host/src/channels/records.ts#channelMessageSchema": {
+  "inputs": [
+   {
+    "id": "x",
+    "channelId": "x",
+    "direction": "in",
+    "externalId": "x",
+    "author": "x",
+    "text": "x",
+    "at": 1
+   },
+   {
+    "id": "x",
+    "channelId": "x",
+    "direction": "in",
+    "externalId": "x",
+    "author": "x",
+    "text": "x",
+    "at": 1
+   }
+  ],
+  "outputs": [
+   {
+    "id": "x",
+    "channelId": "x",
+    "direction": "in",
+    "externalId": "x",
+    "author": "x",
+    "text": "x",
+    "at": 1
+   },
+   {
+    "id": "x",
+    "channelId": "x",
+    "direction": "in",
+    "externalId": "x",
+    "author": "x",
+    "text": "x",
+    "at": 1
+   }
+  ]
+ },
+ "packages/host/src/channels/records.ts#channelRecordSchema": {
+  "inputs": [
+   {
+    "id": "x",
+    "organizationId": "x",
+    "workspaceId": "x",
+    "transport": "telegram",
+    "chatTarget": "x",
+    "chatId": "x",
+    "title": "x",
+    "chatType": "channel",
+    "createdAt": 1,
+    "updatedAt": 1,
+    "lastSentAt": null,
+    "lastReceivedAt": null
+   },
+   {
+    "id": "x",
+    "organizationId": "x",
+    "workspaceId": "x",
+    "transport": "telegram",
+    "chatTarget": "x",
+    "chatId": "x",
+    "title": "x",
+    "chatType": "channel",
+    "createdAt": 1,
+    "updatedAt": 1,
+    "lastSentAt": 1,
+    "lastReceivedAt": 1
+   }
+  ],
+  "outputs": [
+   {
+    "id": "x",
+    "organizationId": "x",
+    "workspaceId": "x",
+    "transport": "telegram",
+    "chatTarget": "x",
+    "chatId": "x",
+    "title": "x",
+    "chatType": "channel",
+    "createdAt": 1,
+    "updatedAt": 1,
+    "lastSentAt": null,
+    "lastReceivedAt": null
+   },
+   {
+    "id": "x",
+    "organizationId": "x",
+    "workspaceId": "x",
+    "transport": "telegram",
+    "chatTarget": "x",
+    "chatId": "x",
+    "title": "x",
+    "chatType": "channel",
+    "createdAt": 1,
+    "updatedAt": 1,
+    "lastSentAt": 1,
+    "lastReceivedAt": 1
+   }
+  ]
+ },
+ "packages/host/src/channels/records.ts#channelStateSchema": {
+  "inputs": [
+   {
+    "version": 1,
+    "updateOffset": null
+   },
+   {
+    "version": 1,
+    "updateOffset": 1
+   }
+  ],
+  "outputs": [
+   {
+    "version": 1,
+    "updateOffset": null
+   },
+   {
+    "version": 1,
+    "updateOffset": 1
+   }
+  ]
+ },
+ "packages/host/src/channels/records.ts#channelsFileSchema": {
+  "inputs": [
+   {
+    "version": 1,
+    "channels": []
+   },
+   {
+    "version": 1,
+    "channels": [
+     {
+      "id": "x",
+      "organizationId": "x",
+      "workspaceId": "x",
+      "transport": "telegram",
+      "chatTarget": "x",
+      "chatId": "x",
+      "title": "x",
+      "chatType": "channel",
+      "createdAt": 1,
+      "updatedAt": 1,
+      "lastSentAt": 1,
+      "lastReceivedAt": 1
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "version": 1,
+    "channels": []
+   },
+   {
+    "version": 1,
+    "channels": [
+     {
+      "id": "x",
+      "organizationId": "x",
+      "workspaceId": "x",
+      "transport": "telegram",
+      "chatTarget": "x",
+      "chatId": "x",
+      "title": "x",
+      "chatType": "channel",
+      "createdAt": 1,
+      "updatedAt": 1,
+      "lastSentAt": 1,
+      "lastReceivedAt": 1
+     }
+    ]
+   }
+  ]
+ },
+ "packages/host/src/channels/records.ts#messagesFileSchema": {
+  "inputs": [
+   {
+    "version": 1,
+    "messages": []
+   },
+   {
+    "version": 1,
+    "messages": [
+     {
+      "id": "x",
+      "channelId": "x",
+      "direction": "in",
+      "externalId": "x",
+      "author": "x",
+      "text": "x",
+      "at": 1
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "version": 1,
+    "messages": []
+   },
+   {
+    "version": 1,
+    "messages": [
+     {
+      "id": "x",
+      "channelId": "x",
+      "direction": "in",
+      "externalId": "x",
+      "author": "x",
+      "text": "x",
+      "at": 1
+     }
+    ]
+   }
+  ]
+ },
+ "packages/host/src/meeting/records.ts#meetingMinutesRecordSchema": {
+  "inputs": [
+   {
+    "locale": "en",
+    "minutes": {
+     "title": "x",
+     "summary": "x"
+    }
+   },
+   {
+    "locale": "en",
+    "minutes": {
+     "title": "x",
+     "heldOn": "x",
+     "summary": "x",
+     "attendees": [
+      {
+       "name": "x",
+       "role": "x"
+      }
+     ],
+     "decisions": [
+      {
+       "statement": "x",
+       "provisional": true,
+       "context": "x",
+       "quote": "x",
+       "evidence": "verified",
+       "edited": true
+      }
+     ],
+     "actionItems": [
+      {
+       "task": "x",
+       "owner": "x",
+       "due": "x",
+       "firstStep": "x",
+       "quote": "x",
+       "evidence": "verified",
+       "edited": true
+      }
+     ],
+     "risks": [
+      "x"
+     ],
+     "openQuestions": [
+      "x"
+     ]
+    },
+    "artifactId": "x",
+    "model": "x",
+    "unverifiedNames": [
+     "x"
+    ],
+    "checks": {
+     "passed": true,
+     "rounds": 1,
+     "verdicts": [
+      {
+       "check": "x",
+       "ok": true
+      }
+     ]
+    }
+   }
+  ],
+  "outputs": [
+   {
+    "locale": "en",
+    "minutes": {
+     "title": "x",
+     "heldOn": "",
+     "summary": "x",
+     "attendees": [],
+     "decisions": [],
+     "actionItems": [],
+     "risks": [],
+     "openQuestions": []
+    },
+    "artifactId": "",
+    "model": "",
+    "unverifiedNames": [],
+    "checks": null
+   },
+   {
+    "locale": "en",
+    "minutes": {
+     "title": "x",
+     "heldOn": "x",
+     "summary": "x",
+     "attendees": [
+      {
+       "name": "x",
+       "role": "x"
+      }
+     ],
+     "decisions": [
+      {
+       "statement": "x",
+       "provisional": true,
+       "context": "x",
+       "quote": "x",
+       "evidence": "verified",
+       "edited": true
+      }
+     ],
+     "actionItems": [
+      {
+       "task": "x",
+       "owner": "x",
+       "due": "x",
+       "firstStep": "x",
+       "quote": "x",
+       "evidence": "verified",
+       "edited": true
+      }
+     ],
+     "risks": [
+      "x"
+     ],
+     "openQuestions": [
+      "x"
+     ]
+    },
+    "artifactId": "x",
+    "model": "x",
+    "unverifiedNames": [
+     "x"
+    ],
+    "checks": {
+     "passed": true,
+     "rounds": 1,
+     "verdicts": [
+      {
+       "check": "x",
+       "ok": true
+      }
+     ]
+    }
+   }
+  ]
+ },
+ "packages/host/src/meeting/records.ts#meetingRecordSchema": {
+  "inputs": [
+   {
+    "id": "x",
+    "workspaceId": "x",
+    "title": "x",
+    "locale": "en",
+    "createdAt": 1,
+    "updatedAt": 1
+   },
+   {
+    "id": "x",
+    "workspaceId": "x",
+    "title": "x",
+    "locale": "en",
+    "status": "new",
+    "createdAt": 1,
+    "updatedAt": 1,
+    "recording": {
+     "name": "x",
+     "path": "x",
+     "mime": "x",
+     "bytes": 1,
+     "sha256": "x",
+     "durationSeconds": 1
+    },
+    "transcript": {
+     "text": "x",
+     "segments": [
+      {
+       "startSeconds": 1,
+       "speaker": "x",
+       "text": "x"
+      }
+     ],
+     "language": "x",
+     "source": "gateway",
+     "model": "x"
+    },
+    "transcriptArtifactId": "x",
+    "minutes": {
+     "locale": "en",
+     "minutes": {
+      "title": "x",
+      "heldOn": "x",
+      "summary": "x",
+      "attendees": [
+       {
+        "name": "x",
+        "role": "x"
+       }
+      ],
+      "decisions": [
+       {
+        "statement": "x",
+        "provisional": true,
+        "context": "x",
+        "quote": "x",
+        "evidence": "verified",
+        "edited": true
+       }
+      ],
+      "actionItems": [
+       {
+        "task": "x",
+        "owner": "x",
+        "due": "x",
+        "firstStep": "x",
+        "quote": "x",
+        "evidence": "verified",
+        "edited": true
+       }
+      ],
+      "risks": [
+       "x"
+      ],
+      "openQuestions": [
+       "x"
+      ]
+     },
+     "artifactId": "x",
+     "model": "x",
+     "unverifiedNames": [
+      "x"
+     ],
+     "checks": {
+      "passed": true,
+      "rounds": 1,
+      "verdicts": [
+       {
+        "check": "x",
+        "ok": true
+       }
+      ]
+     }
+    },
+    "translation": {
+     "locale": "en",
+     "minutes": {
+      "title": "x",
+      "heldOn": "x",
+      "summary": "x",
+      "attendees": [
+       {
+        "name": "x",
+        "role": "x"
+       }
+      ],
+      "decisions": [
+       {
+        "statement": "x",
+        "provisional": true,
+        "context": "x",
+        "quote": "x",
+        "evidence": "verified",
+        "edited": true
+       }
+      ],
+      "actionItems": [
+       {
+        "task": "x",
+        "owner": "x",
+        "due": "x",
+        "firstStep": "x",
+        "quote": "x",
+        "evidence": "verified",
+        "edited": true
+       }
+      ],
+      "risks": [
+       "x"
+      ],
+      "openQuestions": [
+       "x"
+      ]
+     },
+     "artifactId": "x",
+     "model": "x",
+     "unverifiedNames": [
+      "x"
+     ],
+     "checks": {
+      "passed": true,
+      "rounds": 1,
+      "verdicts": [
+       {
+        "check": "x",
+        "ok": true
+       }
+      ]
+     }
+    }
+   }
+  ],
+  "outputs": [
+   {
+    "id": "x",
+    "workspaceId": "x",
+    "title": "x",
+    "locale": "en",
+    "status": "new",
+    "createdAt": 1,
+    "updatedAt": 1,
+    "recording": null,
+    "transcript": null,
+    "transcriptArtifactId": "",
+    "minutes": null,
+    "translation": null
+   },
+   {
+    "id": "x",
+    "workspaceId": "x",
+    "title": "x",
+    "locale": "en",
+    "status": "new",
+    "createdAt": 1,
+    "updatedAt": 1,
+    "recording": {
+     "name": "x",
+     "path": "x",
+     "mime": "x",
+     "bytes": 1,
+     "sha256": "x",
+     "durationSeconds": 1
+    },
+    "transcript": {
+     "text": "x",
+     "segments": [
+      {
+       "startSeconds": 1,
+       "speaker": "x",
+       "text": "x"
+      }
+     ],
+     "language": "x",
+     "source": "gateway",
+     "model": "x"
+    },
+    "transcriptArtifactId": "x",
+    "minutes": {
+     "locale": "en",
+     "minutes": {
+      "title": "x",
+      "heldOn": "x",
+      "summary": "x",
+      "attendees": [
+       {
+        "name": "x",
+        "role": "x"
+       }
+      ],
+      "decisions": [
+       {
+        "statement": "x",
+        "provisional": true,
+        "context": "x",
+        "quote": "x",
+        "evidence": "verified",
+        "edited": true
+       }
+      ],
+      "actionItems": [
+       {
+        "task": "x",
+        "owner": "x",
+        "due": "x",
+        "firstStep": "x",
+        "quote": "x",
+        "evidence": "verified",
+        "edited": true
+       }
+      ],
+      "risks": [
+       "x"
+      ],
+      "openQuestions": [
+       "x"
+      ]
+     },
+     "artifactId": "x",
+     "model": "x",
+     "unverifiedNames": [
+      "x"
+     ],
+     "checks": {
+      "passed": true,
+      "rounds": 1,
+      "verdicts": [
+       {
+        "check": "x",
+        "ok": true
+       }
+      ]
+     }
+    },
+    "translation": {
+     "locale": "en",
+     "minutes": {
+      "title": "x",
+      "heldOn": "x",
+      "summary": "x",
+      "attendees": [
+       {
+        "name": "x",
+        "role": "x"
+       }
+      ],
+      "decisions": [
+       {
+        "statement": "x",
+        "provisional": true,
+        "context": "x",
+        "quote": "x",
+        "evidence": "verified",
+        "edited": true
+       }
+      ],
+      "actionItems": [
+       {
+        "task": "x",
+        "owner": "x",
+        "due": "x",
+        "firstStep": "x",
+        "quote": "x",
+        "evidence": "verified",
+        "edited": true
+       }
+      ],
+      "risks": [
+       "x"
+      ],
+      "openQuestions": [
+       "x"
+      ]
+     },
+     "artifactId": "x",
+     "model": "x",
+     "unverifiedNames": [
+      "x"
+     ],
+     "checks": {
+      "passed": true,
+      "rounds": 1,
+      "verdicts": [
+       {
+        "check": "x",
+        "ok": true
+       }
+      ]
+     }
+    }
+   }
+  ]
+ },
+ "packages/host/src/meeting/records.ts#meetingRecordingSchema": {
+  "inputs": [
+   {
+    "name": "x",
+    "path": "x",
+    "mime": "x",
+    "bytes": 1,
+    "sha256": "x"
+   },
+   {
+    "name": "x",
+    "path": "x",
+    "mime": "x",
+    "bytes": 1,
+    "sha256": "x",
+    "durationSeconds": 1
+   }
+  ],
+  "outputs": [
+   {
+    "name": "x",
+    "path": "x",
+    "mime": "x",
+    "bytes": 1,
+    "sha256": "x"
+   },
+   {
+    "name": "x",
+    "path": "x",
+    "mime": "x",
+    "bytes": 1,
+    "sha256": "x",
+    "durationSeconds": 1
+   }
+  ]
+ },
+ "packages/host/src/meeting/records.ts#minutesChecksRecordSchema": {
+  "inputs": [
+   {
+    "passed": true,
+    "rounds": 1,
+    "verdicts": []
+   },
+   {
+    "passed": true,
+    "rounds": 1,
+    "verdicts": [
+     {
+      "check": "x",
+      "ok": true
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "passed": true,
+    "rounds": 1,
+    "verdicts": []
+   },
+   {
+    "passed": true,
+    "rounds": 1,
+    "verdicts": [
+     {
+      "check": "x",
+      "ok": true
+     }
+    ]
+   }
+  ]
+ },
+ "packages/host/src/legal/records.ts#legalAsksFileSchema": {
+  "inputs": [
+   {
+    "version": 1,
+    "asks": []
+   },
+   {
+    "version": 1,
+    "asks": [
+     {
+      "id": "x",
+      "question": "x",
+      "answer": "x",
+      "status": "verified",
+      "notInDocuments": true,
+      "citations": [
+       {
+        "docId": "x",
+        "quote": "x",
+        "anchor": "x",
+        "clauseId": "x",
+        "page": 1
+       }
+      ],
+      "askedAt": 1,
+      "model": "x",
+      "read": {
+       "calls": 1,
+       "repairs": 1,
+       "files": [
+        {
+         "docId": "x",
+         "name": "x",
+         "sha256": "x",
+         "chars": 1,
+         "chunks": {
+          "read": 1,
+          "total": 1
+         },
+         "status": "read"
+        }
+       ],
+       "partialDocs": [
+        "x"
+       ]
+      },
+      "checks": {
+       "passed": true,
+       "rounds": 1,
+       "verdicts": [
+        {
+         "check": "x",
+         "ok": true
+        }
+       ]
+      }
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "version": 1,
+    "asks": []
+   },
+   {
+    "version": 1,
+    "asks": [
+     {
+      "id": "x",
+      "question": "x",
+      "answer": "x",
+      "status": "verified",
+      "notInDocuments": true,
+      "citations": [
+       {
+        "docId": "x",
+        "quote": "x",
+        "anchor": "x",
+        "clauseId": "x",
+        "page": 1
+       }
+      ],
+      "askedAt": 1,
+      "model": "x",
+      "read": {
+       "calls": 1,
+       "repairs": 1,
+       "files": [
+        {
+         "docId": "x",
+         "name": "x",
+         "sha256": "x",
+         "chars": 1,
+         "chunks": {
+          "read": 1,
+          "total": 1
+         },
+         "status": "read"
+        }
+       ],
+       "partialDocs": [
+        "x"
+       ]
+      },
+      "checks": {
+       "passed": true,
+       "rounds": 1,
+       "verdicts": [
+        {
+         "check": "x",
+         "ok": true
+        }
+       ]
+      }
+     }
+    ]
+   }
+  ]
+ },
+ "packages/host/src/legal/records.ts#legalExtractEditsFileSchema": {
+  "inputs": [
+   {
+    "version": 1,
+    "edits": [],
+    "comments": []
+   },
+   {
+    "version": 1,
+    "edits": [
+     {
+      "itemId": "x",
+      "value": "x",
+      "editedAt": 1,
+      "editedBy": "x"
+     }
+    ],
+    "comments": [
+     {
+      "id": "x",
+      "itemId": "x",
+      "text": "x",
+      "at": 1,
+      "by": "x"
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "version": 1,
+    "edits": [],
+    "comments": []
+   },
+   {
+    "version": 1,
+    "edits": [
+     {
+      "itemId": "x",
+      "value": "x",
+      "editedAt": 1,
+      "editedBy": "x"
+     }
+    ],
+    "comments": [
+     {
+      "id": "x",
+      "itemId": "x",
+      "text": "x",
+      "at": 1,
+      "by": "x"
+     }
+    ]
+   }
+  ]
+ },
+ "packages/host/src/legal/records.ts#legalExtractRecordSchema": {
+  "inputs": [
+   {
+    "version": 1,
+    "matterId": "x",
+    "createdAt": 1,
+    "model": "x",
+    "locale": "en",
+    "documentType": "x",
+    "read": {
+     "calls": 1,
+     "repairs": 1,
+     "files": [],
+     "partialDocs": []
+    },
+    "files": [],
+    "parties": [],
+    "facts": [],
+    "redFlags": [],
+    "conflicts": [],
+    "coverage": [],
+    "checks": {
+     "passed": true,
+     "rounds": 1,
+     "verdicts": []
+    },
+    "side": {
+     "party": null,
+     "ask": true,
+     "candidates": [],
+     "source": "matter"
+    }
+   },
+   {
+    "version": 1,
+    "matterId": "x",
+    "createdAt": 1,
+    "model": "x",
+    "locale": "en",
+    "prompt": "x",
+    "documentType": "x",
+    "read": {
+     "calls": 1,
+     "repairs": 1,
+     "files": [
+      {
+       "docId": "x",
+       "name": "x",
+       "sha256": "x",
+       "chars": 1,
+       "chunks": {
+        "read": 1,
+        "total": 1
+       },
+       "status": "read"
+      }
+     ],
+     "partialDocs": [
+      "x"
+     ]
+    },
+    "files": [
+     {
+      "docId": "x",
+      "intakeRole": "draft",
+      "reason": "x",
+      "appliedRole": "counterparty-draft"
+     }
+    ],
+    "parties": [
+     {
+      "name": "x",
+      "role": "x",
+      "status": "verified",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1
+     }
+    ],
+    "facts": [
+     {
+      "id": "x",
+      "field": "parties",
+      "label": "x",
+      "value": "x",
+      "status": "verified",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1
+     }
+    ],
+    "redFlags": [
+     {
+      "id": "x",
+      "title": "x",
+      "why": "x",
+      "severity": "high",
+      "against": "you",
+      "againstParty": "x",
+      "status": "verified",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1
+     }
+    ],
+    "conflicts": [
+     {
+      "field": "parties",
+      "kind": "amount",
+      "values": [
+       {
+        "value": "x",
+        "docIds": [
+         "x"
+        ],
+        "itemIds": [
+         "x"
+        ]
+       },
+       {
+        "value": "x",
+        "docIds": [
+         "x"
+        ],
+        "itemIds": [
+         "x"
+        ]
+       }
+      ]
+     }
+    ],
+    "coverage": [
+     {
+      "field": "parties",
+      "state": "stated"
+     }
+    ],
+    "checks": {
+     "passed": true,
+     "rounds": 1,
+     "verdicts": [
+      {
+       "check": "x",
+       "ok": true
+      }
+     ]
+    },
+    "side": {
+     "party": "x",
+     "ask": true,
+     "candidates": [
+      {
+       "party": "x",
+       "role": "x",
+       "counterparty": "x"
+      }
+     ],
+     "source": "matter"
+    }
+   }
+  ],
+  "outputs": [
+   {
+    "version": 1,
+    "matterId": "x",
+    "createdAt": 1,
+    "model": "x",
+    "locale": "en",
+    "prompt": "",
+    "documentType": "x",
+    "read": {
+     "calls": 1,
+     "repairs": 1,
+     "files": [],
+     "partialDocs": []
+    },
+    "files": [],
+    "parties": [],
+    "facts": [],
+    "redFlags": [],
+    "conflicts": [],
+    "coverage": [],
+    "checks": {
+     "passed": true,
+     "rounds": 1,
+     "verdicts": []
+    },
+    "side": {
+     "party": null,
+     "ask": true,
+     "candidates": [],
+     "source": "matter"
+    }
+   },
+   {
+    "version": 1,
+    "matterId": "x",
+    "createdAt": 1,
+    "model": "x",
+    "locale": "en",
+    "prompt": "x",
+    "documentType": "x",
+    "read": {
+     "calls": 1,
+     "repairs": 1,
+     "files": [
+      {
+       "docId": "x",
+       "name": "x",
+       "sha256": "x",
+       "chars": 1,
+       "chunks": {
+        "read": 1,
+        "total": 1
+       },
+       "status": "read"
+      }
+     ],
+     "partialDocs": [
+      "x"
+     ]
+    },
+    "files": [
+     {
+      "docId": "x",
+      "intakeRole": "draft",
+      "reason": "x",
+      "appliedRole": "counterparty-draft"
+     }
+    ],
+    "parties": [
+     {
+      "name": "x",
+      "role": "x",
+      "status": "verified",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1
+     }
+    ],
+    "facts": [
+     {
+      "id": "x",
+      "field": "parties",
+      "label": "x",
+      "value": "x",
+      "status": "verified",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1
+     }
+    ],
+    "redFlags": [
+     {
+      "id": "x",
+      "title": "x",
+      "why": "x",
+      "severity": "high",
+      "against": "you",
+      "againstParty": "x",
+      "status": "verified",
+      "quote": "x",
+      "docId": "x",
+      "anchor": "x",
+      "clauseId": "x",
+      "page": 1
+     }
+    ],
+    "conflicts": [
+     {
+      "field": "parties",
+      "kind": "amount",
+      "values": [
+       {
+        "value": "x",
+        "docIds": [
+         "x"
+        ],
+        "itemIds": [
+         "x"
+        ]
+       },
+       {
+        "value": "x",
+        "docIds": [
+         "x"
+        ],
+        "itemIds": [
+         "x"
+        ]
+       }
+      ]
+     }
+    ],
+    "coverage": [
+     {
+      "field": "parties",
+      "state": "stated"
+     }
+    ],
+    "checks": {
+     "passed": true,
+     "rounds": 1,
+     "verdicts": [
+      {
+       "check": "x",
+       "ok": true
+      }
+     ]
+    },
+    "side": {
+     "party": "x",
+     "ask": true,
+     "candidates": [
+      {
+       "party": "x",
+       "role": "x",
+       "counterparty": "x"
+      }
+     ],
+     "source": "matter"
+    }
+   }
+  ]
+ },
+ "packages/host/src/legal/records.ts#legalMatterRecordSchema": {
+  "inputs": [
+   {
+    "id": "x",
+    "workspaceId": "x",
+    "title": "x",
+    "createdAt": 1,
+    "updatedAt": 1,
+    "side": {
+     "role": "x",
+     "party": "x",
+     "counterparty": "x"
+    },
+    "workType": "review",
+    "deliverables": [],
+    "instructions": "x",
+    "playbookId": null,
+    "author": "x",
+    "addressee": "x",
+    "firm": "x",
+    "docs": [],
+    "priorMatterId": null,
+    "lastRunId": null
+   },
+   {
+    "id": "x",
+    "workspaceId": "x",
+    "title": "x",
+    "createdAt": 1,
+    "updatedAt": 1,
+    "side": {
+     "role": "x",
+     "party": "x",
+     "counterparty": "x"
+    },
+    "workType": "review",
+    "deliverables": [
+     "issues-memo"
+    ],
+    "instructions": "x",
+    "playbookId": "x",
+    "author": "x",
+    "addressee": "x",
+    "firm": "x",
+    "docs": [
+     {
+      "id": "x",
+      "name": "x",
+      "path": "x",
+      "mime": "x",
+      "bytes": 1,
+      "sha256": "x",
+      "role": "counterparty-draft",
+      "status": "read",
+      "skipReason": "x",
+      "paragraphs": 1,
+      "words": 1,
+      "insertions": 1,
+      "deletions": 1,
+      "definedTerms": 1,
+      "preview": "x"
+     }
+    ],
+    "priorMatterId": "x",
+    "lastRunId": "x",
+    "sideDeclined": true,
+    "docSeq": 1
+   }
+  ],
+  "outputs": [
+   {
+    "id": "x",
+    "workspaceId": "x",
+    "title": "x",
+    "createdAt": 1,
+    "updatedAt": 1,
+    "side": {
+     "role": "x",
+     "party": "x",
+     "counterparty": "x"
+    },
+    "workType": "review",
+    "deliverables": [],
+    "instructions": "x",
+    "playbookId": null,
+    "author": "x",
+    "addressee": "x",
+    "firm": "x",
+    "docs": [],
+    "priorMatterId": null,
+    "lastRunId": null
+   },
+   {
+    "id": "x",
+    "workspaceId": "x",
+    "title": "x",
+    "createdAt": 1,
+    "updatedAt": 1,
+    "side": {
+     "role": "x",
+     "party": "x",
+     "counterparty": "x"
+    },
+    "workType": "review",
+    "deliverables": [
+     "issues-memo"
+    ],
+    "instructions": "x",
+    "playbookId": "x",
+    "author": "x",
+    "addressee": "x",
+    "firm": "x",
+    "docs": [
+     {
+      "id": "x",
+      "name": "x",
+      "path": "x",
+      "mime": "x",
+      "bytes": 1,
+      "sha256": "x",
+      "role": "counterparty-draft",
+      "status": "read",
+      "skipReason": "x",
+      "paragraphs": 1,
+      "words": 1,
+      "insertions": 1,
+      "deletions": 1,
+      "definedTerms": 1,
+      "preview": "x"
+     }
+    ],
+    "priorMatterId": "x",
+    "lastRunId": "x",
+    "sideDeclined": true,
+    "docSeq": 1
+   }
+  ]
+ },
+ "packages/host/src/legal/records.ts#matterDocCardSchema": {
+  "inputs": [
+   {
+    "id": "x",
+    "name": "x",
+    "path": "x",
+    "mime": "x",
+    "bytes": 1,
+    "sha256": "x",
+    "role": "counterparty-draft",
+    "status": "read",
+    "paragraphs": 1,
+    "words": 1,
+    "insertions": 1,
+    "deletions": 1,
+    "definedTerms": 1,
+    "preview": "x"
+   },
+   {
+    "id": "x",
+    "name": "x",
+    "path": "x",
+    "mime": "x",
+    "bytes": 1,
+    "sha256": "x",
+    "role": "counterparty-draft",
+    "status": "read",
+    "skipReason": "x",
+    "paragraphs": 1,
+    "words": 1,
+    "insertions": 1,
+    "deletions": 1,
+    "definedTerms": 1,
+    "preview": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "id": "x",
+    "name": "x",
+    "path": "x",
+    "mime": "x",
+    "bytes": 1,
+    "sha256": "x",
+    "role": "counterparty-draft",
+    "status": "read",
+    "paragraphs": 1,
+    "words": 1,
+    "insertions": 1,
+    "deletions": 1,
+    "definedTerms": 1,
+    "preview": "x"
+   },
+   {
+    "id": "x",
+    "name": "x",
+    "path": "x",
+    "mime": "x",
+    "bytes": 1,
+    "sha256": "x",
+    "role": "counterparty-draft",
+    "status": "read",
+    "skipReason": "x",
+    "paragraphs": 1,
+    "words": 1,
+    "insertions": 1,
+    "deletions": 1,
+    "definedTerms": 1,
+    "preview": "x"
+   }
+  ]
+ },
+ "packages/host/src/finance-tasks/report-schema.ts#financeReportSchema": {
+  "inputs": [
+   {
+    "task": "x",
+    "title": "x",
+    "locale": "id",
+    "summary": [],
+    "tables": [],
+    "charts": [],
+    "flags": [],
+    "notes": []
+   },
+   {
+    "task": "x",
+    "title": "x",
+    "subtitle": "x",
+    "locale": "id",
+    "currency": "x",
+    "summary": [
+     {
+      "label": "x",
+      "value": 1,
+      "unit": "x",
+      "flag": "good"
+     }
+    ],
+    "tables": [
+     {
+      "id": "x",
+      "title": "x",
+      "columns": [
+       "x"
+      ],
+      "rows": [
+       [
+        "x"
+       ]
+      ],
+      "formulas": [
+       [
+        "x"
+       ]
+      ]
+     }
+    ],
+    "charts": [
+     {
+      "id": "x",
+      "title": "x",
+      "kind": "line",
+      "categories": [
+       "x"
+      ],
+      "series": [
+       {
+        "name": "x",
+        "values": [
+         1
+        ]
+       }
+      ],
+      "note": "x"
+     }
+    ],
+    "flags": [
+     {
+      "level": "good",
+      "text": "x"
+     }
+    ],
+    "notes": [
+     {
+      "heading": "x",
+      "body": "x"
+     }
+    ]
+   }
+  ],
+  "outputs": [
+   {
+    "task": "x",
+    "title": "x",
+    "locale": "id",
+    "summary": [],
+    "tables": [],
+    "charts": [],
+    "flags": [],
+    "notes": []
+   },
+   {
+    "task": "x",
+    "title": "x",
+    "subtitle": "x",
+    "locale": "id",
+    "currency": "x",
+    "summary": [
+     {
+      "label": "x",
+      "value": 1,
+      "unit": "x",
+      "flag": "good"
+     }
+    ],
+    "tables": [
+     {
+      "id": "x",
+      "title": "x",
+      "columns": [
+       "x"
+      ],
+      "rows": [
+       [
+        "x"
+       ]
+      ],
+      "formulas": [
+       [
+        "x"
+       ]
+      ]
+     }
+    ],
+    "charts": [
+     {
+      "id": "x",
+      "title": "x",
+      "kind": "line",
+      "categories": [
+       "x"
+      ],
+      "series": [
+       {
+        "name": "x",
+        "values": [
+         1
+        ]
+       }
+      ],
+      "note": "x"
+     }
+    ],
+    "flags": [
+     {
+      "level": "good",
+      "text": "x"
+     }
+    ],
+    "notes": [
+     {
+      "heading": "x",
+      "body": "x"
+     }
+    ]
+   }
+  ]
+ },
+ "packages/host/src/finance-stated.ts#statedFactSchema": {
+  "inputs": [
+   {
+    "value": 1
+   },
+   {
+    "id": "x",
+    "label": "x",
+    "sentence": "x",
+    "value": 1,
+    "unit": "currency",
+    "currency": "x"
+   }
+  ],
+  "outputs": [
+   {
+    "id": "",
+    "label": "",
+    "sentence": "",
+    "value": 1,
+    "unit": "number",
+    "currency": ""
+   },
+   {
+    "id": "x",
+    "label": "x",
+    "sentence": "x",
+    "value": 1,
+    "unit": "currency",
+    "currency": "x"
+   }
+  ]
+ },
+ "packages/host/src/finance-stated.ts#statedFactsSchema": {
+  "inputs": [
+   [],
+   [
+    {
+     "id": "x",
+     "label": "x",
+     "sentence": "x",
+     "value": 1,
+     "unit": "currency",
+     "currency": "x"
+    }
+   ]
+  ],
+  "outputs": [
+   [],
+   [
+    {
+     "id": "x",
+     "label": "x",
+     "sentence": "x",
+     "value": 1,
+     "unit": "currency",
+     "currency": "x"
+    }
+   ]
+  ]
+ },
+ "packages/host/src/legal/records.ts#legalRunRecordSchema": {
+  "inputs": [
+   {
+    "id": "r1",
+    "matterId": "m1",
+    "startedAt": 1,
+    "finishedAt": null,
+    "manifest": {},
+    "findings": [],
+    "verify": null,
+    "artifacts": [],
+    "error": null
+   },
+   {
+    "id": "r1",
+    "matterId": "m1",
+    "startedAt": 1,
+    "finishedAt": 2,
+    "manifest": {
+     "docs": []
+    },
+    "findings": [
+     {
+      "id": "f1"
+     }
+    ],
+    "verify": {
+     "ok": true
+    },
+    "artifacts": [
+     {
+      "kind": "issues-memo",
+      "artifactId": "a1",
+      "filename": "memo.docx"
+     }
+    ],
+    "error": {
+     "code": "x",
+     "message": "y"
+    }
+   }
+  ],
+  "outputs": [
+   {
+    "id": "r1",
+    "matterId": "m1",
+    "startedAt": 1,
+    "finishedAt": null,
+    "manifest": {},
+    "findings": [],
+    "verify": null,
+    "artifacts": [],
+    "error": null
+   },
+   {
+    "id": "r1",
+    "matterId": "m1",
+    "startedAt": 1,
+    "finishedAt": 2,
+    "manifest": {
+     "docs": []
+    },
+    "findings": [
+     {
+      "id": "f1"
+     }
+    ],
+    "verify": {
+     "ok": true
+    },
+    "artifacts": [
+     {
+      "kind": "issues-memo",
+      "artifactId": "a1",
+      "filename": "memo.docx"
+     }
+    ],
+    "error": {
+     "code": "x",
+     "message": "y"
+    }
+   }
+  ]
+ }
+}

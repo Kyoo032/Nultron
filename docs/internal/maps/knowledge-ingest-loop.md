@@ -2,7 +2,7 @@
 
 Product: both · Instance: main :3000
 
-Last verified: 2026-10-22 on `fix/sh-014` from `7c44963`, for the stub word gate on vector hits (SH-014). `MIN_COSINE` stays 0.12 (`knowledge-embed.ts:311`). A `stub-fnv-32` hit also needs a shared word (`STUB_TERM_MIN`, `:317`; filter `:422`). Live-model rows do not. Not driven on `:3000`. Before that: 2026-09-28 for the retrieve miss and the map-id check. A non-empty question with no chunk still writes `## Retrieved sources` (the miss line). A live map that is not JSON is asked once more, then grounded to indexed ids (`takeKnowledgeMapText`, `groundKnowledgeMap`). Earlier: 2026-09-20 at 6984d84; citations re-anchored at e37b3a1.
+Last verified: 2026-11-06 at 39cd5f0c plus `fix/sec-005-guard-bypass-not-persisted` (SR-202), for the one sentence on how the bypass is held ("The bypass" paragraph of the injection scan); nothing else on the page was re-read. Before that: 2026-10-22 on `fix/sh-014` from `7c44963`, for the stub word gate on vector hits (SH-014). `MIN_COSINE` stays 0.12 (`knowledge-embed.ts:311`). A `stub-fnv-32` hit also needs a shared word (`STUB_TERM_MIN`, `:317`; filter `:422`). Live-model rows do not. Not driven on `:3000`. Before that: 2026-09-28 for the retrieve miss and the map-id check. A non-empty question with no chunk still writes `## Retrieved sources` (the miss line). A live map that is not JSON is asked once more, then grounded to indexed ids (`takeKnowledgeMapText`, `groundKnowledgeMap`). Earlier: 2026-09-20 at 6984d84; citations re-anchored at e37b3a1.
 
 > **`knowledge.ts` and `knowledge-extract.ts` move often.** Every line number below was re-read at `b482611`, but these two files are rewritten frequently; if a number looks wrong, grep the function name rather than trusting it.
 
@@ -49,7 +49,7 @@ There is no separate list route; listing rides on `GET /api/v1/knowledge`. `POST
 
 On a hit it **does not strip or sanitize**. It refuses to index and writes a `Failed` source row whose `error` is `injection_blocked (rule: <rule>)` (`packages/host/src/knowledge.ts:440-443`, `packages/host/src/knowledge-ingest.ts:63-70`).
 
-**The bypass** is the `injectionGuardBypass` boolean on `StoredSecrets` (`packages/core/src/secrets.ts:34`, `:80`), set through `POST /api/v1/settings` (`requestsOperatorOnlySettings`, `packages/host/src/handlers/settings.ts:176-184`), persisted per workspace in the encrypted settings file, read back at `packages/host/src/knowledge.ts:408-414` and `knowledge-ingest.ts:94-100`. When true the scan is skipped outright — `bypass ? null : scanInjection(...)`.
+**The bypass** is the `injectionGuardBypass` boolean on `StoredSecrets` (`packages/core/src/secrets.ts:34`, `:80`), set through `POST /api/v1/settings` (`requestsOperatorOnlySettings`, `packages/host/src/handlers/settings.ts:176-184`), never persisted (SR-202: a per-desk switch in host memory off server mode, see [`settings-and-gateway-gate.md`](settings-and-gateway-gate.md)), read through `loadSettings` at `packages/host/src/knowledge.ts:456-462` and `knowledge-ingest.ts:89-95`. When true the scan is skipped outright — `bypass ? null : scanInjection(...)`.
 
 Source **names** get the same treatment, deliberately: an upload filename or a remote `<title>` is attacker-controlled the same way body text is, so `sanitizeSourceName` runs at index time and again at render time (`packages/host/src/knowledge.ts:367`, `:860`).
 

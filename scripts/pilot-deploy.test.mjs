@@ -377,6 +377,17 @@ test("the app image's context keeps every tracked source folder named data", () 
   }
 });
 
+test("no Docker build context takes the Nix build files", () => {
+  // The flake sits beside the Dockerfiles (docs/internal/nix-migration.md, rung 1); an image built after it landed
+  // must be the image built before it.
+  for (const file of ["Dockerfile.dockerignore", ".dockerignore", "portal.Dockerfile.dockerignore"]) {
+    const rules = read("webapp-deploy", file).split("\n");
+    for (const line of ["flake.nix", "flake.lock", "nix"]) {
+      assert.ok(rules.includes(line), `webapp-deploy/${file} must exclude ${line}`);
+    }
+  }
+});
+
 test("webapp-deploy/.dockerignore stays a byte-for-byte copy of Dockerfile.dockerignore", () => {
   // It drifted once (2026-10-01): the copy lacked the *.enc, .master-key, sqlite, k8s and pki lines,
   // so a build with webapp-deploy/ as its context would have re-opened SR-49.

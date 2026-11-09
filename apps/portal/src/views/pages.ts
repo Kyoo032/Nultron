@@ -353,7 +353,6 @@ ${hiddenFields({ ...screen.hidden, csrf_token: screen.csrfToken, restart: "1" })
 
 export interface UserCodeScreen extends ScreenBase {
   readonly action: string;
-  readonly csrfToken: string;
   readonly userCode?: string;
   readonly error?: string;
   readonly account?: AccountBanner;
@@ -370,10 +369,9 @@ export function userCodePage(screen: UserCodeScreen): string {
     body: html`${accountBanner(t, screen.account)}<h1>${t("approve.title")}</h1>
 <p class="lead">${t("approve.codeIntro")}</p>
 ${errorLine(screen.error)}
-<form method="post" action="${screen.action}">
-${hiddenFields({ csrf_token: screen.csrfToken })}
+<form method="get" action="${screen.action}">
 <label for="user_code">${t("approve.codeLabel")}</label>
-<input id="user_code" name="user_code" type="text" maxlength="9" autocomplete="off"
+<input id="user_code" name="code" type="text" maxlength="9" autocomplete="off"
  spellcheck="false" required autofocus value="${screen.userCode ?? ""}">
 <button type="submit">${t("approve.codeSubmit")}</button>
 </form>`,

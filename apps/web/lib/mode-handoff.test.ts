@@ -52,7 +52,7 @@ describe("mode handoff", () => {
   it("hands off an Indonesian prompt when the owner's locale is id", () => {
     applyLocale("id");
     expect(suggestedHandoffPrompt("documents", "Lithium")).toBe(
-      'Tulis memo dari "Lithium". Gunakan hanya materi sumber dan kutip sumber-sumbernya.',
+      'Tulis memo berdasarkan "Lithium". Gunakan hanya materi sumber dan sebutkan sumbernya.',
     );
     expect(suggestedHandoffPrompt("presentations", "  ")).toMatch(/^Ubah "materi sumber" menjadi presentasi/);
   });

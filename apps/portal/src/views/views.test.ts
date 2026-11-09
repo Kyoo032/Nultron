@@ -103,7 +103,7 @@ describe("copy", () => {
   it("carries the reason-code copy device-code-login.md freezes, in both locales", () => {
     expect(copyPair("reason.seat_cap_reached")).toEqual({
       en: "No seats left in your organisation.",
-      id: "Tidak ada kursi tersisa di organisasi Anda.",
+      id: "Semua seat di organisasi Anda sudah terpakai.",
     });
     expect(copyPair("reason.org_past_due").id).toBe("Pembayaran organisasi Anda tertunggak.");
   });
@@ -245,7 +245,7 @@ describe("pages", () => {
   it("greets a signed-in person by address on the device screens, with a way out, and escapes it", () => {
     for (const payload of INJECTIONS) {
       const account = { email: payload, signOutAction: "/logout", csrfToken: "tok" };
-      const page = userCodePage({ ...base, action: "/activate", csrfToken: "tok", account });
+      const page = userCodePage({ ...base, action: "/activate", account });
       expectNoInjectedMarkup(page, payload);
       expect(page).toContain("Not you? Sign out");
     }
@@ -292,7 +292,7 @@ describe("pages", () => {
   });
 
   it("prefills an injected ?code= on the activate form without executing it", () => {
-    const page = userCodePage({ ...base, action: "/activate", csrfToken: "tok", userCode: INJECTIONS[0] });
+    const page = userCodePage({ ...base, action: "/activate", userCode: INJECTIONS[0] });
     expect(page).not.toContain(INJECTIONS[0]);
     expect(page).toContain("&quot;&gt;&lt;script&gt;");
   });

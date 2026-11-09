@@ -64,7 +64,7 @@ const RESEARCH_HOST_COPY: Record<
   id: {
     checking: "Memeriksa kutipan",
     comparing: "Membandingkan sumber",
-    noPassage: "Tidak ada halaman yang menyimpan kalimat yang dapat dikutip.",
+    noPassage: "Tidak ada halaman yang memuat kalimat yang bisa dikutip.",
     citeGap: (heading) => `Tidak ada kutipan yang tersimpan untuk: ${heading}`,
   },
 };

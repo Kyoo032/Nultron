@@ -103,6 +103,6 @@ describe("putMinutesEdit", () => {
     const fetcher: MeetingApiFetch = async () => answer(500, null, true);
     const outcome = await putMinutesEdit("m1", edit, fetcher);
     expect(outcome.ok).toBe(false);
-    expect(outcome.ok === false && outcome.message).toBe("Perubahan itu tidak dapat disimpan.");
+    expect(outcome.ok === false && outcome.message).toBe("Perubahan itu gagal disimpan.");
   });
 });

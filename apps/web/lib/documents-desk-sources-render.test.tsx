@@ -50,7 +50,7 @@ describe("DocumentChecksNote", () => {
     );
     applyLocale("id");
     const id = renderToStaticMarkup(<DocumentChecksNote note={{ kind: "grounding", headings: ["A", "B", "C"] }} />);
-    expect(id).toContain("3 bagian mungkin tidak mengikuti sumber");
+    expect(id).toContain("3 bagian mungkin menyimpang dari sumber");
     expect(id).toContain("Periksa terhadap sumber");
   });
 });

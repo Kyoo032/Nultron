@@ -121,5 +121,5 @@ the repo's Electron.
 ## Logo
 
 The app logo (rail mark, favicon, Windows and macOS icons, the display `logo.png`) is Rizky's painted head in a blue tile. It is
-not a 3D render and does not come from here. Its master is `apps/desktop/branding/agentforge/source/app-logo.webp` (1600 px)
+not a 3D render and does not come from here. Its master is `docs/internal/brand/nultron/reference/app-logo.webp` (1600 px)
 and `apps/desktop/scripts/brand-icons.mjs` regenerates every file from it; see "Regenerating" in the map page above.

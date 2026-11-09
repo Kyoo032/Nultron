@@ -70,7 +70,7 @@ export const OUTBOUND_REFUSALS_MAX = 2;
 const REFUSAL_COPY: Record<RefusalKind, Record<AppLocale, string>> = {
   private: {
     en: "Not sent: this search or page address carries the person's private details (a phrase, number or code from their files, knowledge or earlier chats). Search again in general terms, without the person's details.",
-    id: "Tidak dikirim: pencarian atau alamat halaman ini memuat data pribadi orang ini (frasa, angka, atau kode dari berkas, basis pengetahuan, atau obrolan sebelumnya). Cari lagi dengan istilah umum, tanpa data pribadi orang ini.",
+    id: "Tidak dikirim: pencarian atau alamat halaman ini memuat data pribadi orang ini (frasa, angka, atau kode dari file, Knowledge Base, atau obrolan sebelumnya). Cari lagi dengan istilah umum, tanpa data pribadi orang ini.",
   },
   too_long: {
     en: "Not sent: this search is longer than 300 characters. Search again with a short query in general terms.",
@@ -98,7 +98,7 @@ const REFUSAL_COPY: Record<RefusalKind, Record<AppLocale, string>> = {
   },
   unguarded: {
     en: "Not sent: this run cannot send text to the web. Answer from what you have.",
-    id: "Tidak dikirim: proses ini tidak dapat mengirim teks ke web. Jawab dari yang sudah ada.",
+    id: "Tidak dikirim: proses ini tidak bisa mengirim teks ke web. Jawab dari yang sudah ada.",
   },
   stopped: {
     en: "Web search is stopped for this turn: two searches carried the person's private details. Do not search again; answer from what you have and tell the person a search was held back.",
