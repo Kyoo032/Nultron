@@ -289,7 +289,7 @@ The hand-written body readers (`edit.ts` `targetClipIds`, `knowledge.ts`, `agent
 
 `packages/core/src/security/safe-fetch.ts`. Any fetch to a caller-supplied URL goes through
 `assertPublicHttpsUrl` (HTTPS only, no credentials in the URL, host not private) and
-`fetchPublicHttps` (`:230`), which re-checks **per redirect hop** (`:242-273`).
+`fetchPublicHttps` (`:226`), which re-checks **per redirect hop** (`:238-269`).
 
 `packages/core/src/security/ip-range.ts` is the address half: it parses to bytes and compares CIDR
 prefixes, covering the ranges a string match misses — `100.64.0.0/10` CGNAT, `198.18.0.0/15`, the
@@ -302,17 +302,17 @@ answers any private address, so a public name pointing at `169.254.169.254` does
 `400 invalid_endpoint` "Could not resolve this URL's host", a private answer "URL must point at a public host". The
 address is never in the message. An IP literal is not resolved; the lexical check already judged its bytes.
 
-The connection is then pinned to that answer. `pinnedAgent` (`:172`) builds an undici `Agent` whose `connect.lookup`
-(`pinnedLookup`, `:145`) returns only the vetted list, in the shape the connector asked for (`all: true` gives an
+The connection is then pinned to that answer. `pinnedAgent` (`:168`) builds an undici `Agent` whose `connect.lookup`
+(`pinnedLookup`, `:141`) returns only the vetted list, in the shape the connector asked for (`all: true` gives an
 array, otherwise the first address with its family, and a `family` filter narrows the list), and answers for that one
-host only. `fetchPublicHttps` passes it to `fetch` as `dispatcher` (`:250`), so the socket never asks DNS and a
+host only. `fetchPublicHttps` passes it to `fetch` as `dispatcher` (`:246`), so the socket never asks DNS and a
 resolver that answers differently the second time (DNS rebinding) is never consulted. Each hop gets its own agent,
-destroyed after the body is read (`:270`). The default `fetch` is `defaultFetch` (`:176`), the `fetch` export of the
+destroyed after the body is read (`:266`). The default `fetch` is `defaultFetch` (`:172`), the `fetch` export of the
 same `undici` 6.29.1 package that builds the agent (the version SR-198 pins), not `globalThis.fetch`, so the dispatcher
 and the fetch are one version whatever undici the running Node bundles. `safe-fetch.test.ts` asserts the default is
 undici's own, that a hop with no `fetchImpl` never reaches `globalThis.fetch`, and drives the pinned lookup against a
 loopback listener on every run. A test that wants to stand in for the network injects `fetchImpl` or mocks `undici`'s
-`fetch`; stubbing `globalThis.fetch` no longer reaches a guarded fetch. `assertResolvesPublic` (`:129`) is kept as a thin wrapper over the same resolver and has no production caller.
+`fetch`; stubbing `globalThis.fetch` no longer reaches a guarded fetch. `assertResolvesPublic` (`:125`) is kept as a thin wrapper over the same resolver and has no production caller.
 Not covered: the port (`https://host:6379/` is allowed; a policy is Rizky's call) and egress filtering ([SR-97](../security-register.md#sr-97), infra).
 
 ### 8. Routes that are off in server mode

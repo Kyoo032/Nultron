@@ -169,10 +169,6 @@ export function pinnedAgent(hostname: string, addresses: readonly ResolvedAddres
   return new Agent({ connect: { lookup: pinnedLookup(hostname, addresses) } });
 }
 
-/**
- * The fetch that carries a guarded hop. It comes from the same `undici` package as `pinnedAgent`, so the
- * `dispatcher` it receives is always one its own version built, whatever undici the running Node bundles.
- */
 export const defaultFetch = undiciFetch as unknown as typeof fetch;
 
 async function readCapped(

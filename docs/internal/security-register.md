@@ -6742,11 +6742,11 @@ probe of private hosts and ports. That is a protocol argument, not a test.
 Fix (`packages/core/src/security/safe-fetch.ts`): per hop, `resolvePublicAddresses` (`:104-126`) resolves the host once
 and refuses a failed lookup, an empty answer, an answer that is not an IP address and any private answer, all
 `400 invalid_endpoint`, with "Could not resolve this URL's host" for the first two and "URL must point at a public host"
-for the others. `pinnedAgent` (`:172`) then builds an undici `Agent` whose `connect.lookup` (`pinnedLookup`, `:145`)
-returns only that vetted list and answers for that host only, and `fetchPublicHttps` passes it as `dispatcher` (`:250`).
+for the others. `pinnedAgent` (`:168`) then builds an undici `Agent` whose `connect.lookup` (`pinnedLookup`, `:141`)
+returns only that vetted list and answers for that host only, and `fetchPublicHttps` passes it as `dispatcher` (`:246`).
 The socket never asks DNS. The agent is per hop and destroyed after the body is read. IP literals stay on the lexical
 check, because undici does not call `lookup` for a literal. `lookupImpl` stays the test seam. The default `fetchImpl`
-is `defaultFetch` (`:176`), undici's own `fetch` from the package that builds the Agent, not `globalThis.fetch` (Notion
+is `defaultFetch` (`:172`), undici's own `fetch` from the package that builds the Agent, not `globalThis.fetch` (Notion
 BUG-63, below). `@agentforge/core` gains a
 direct dependency on `undici` 6.29.1, the version SR-198 already pins, so the deployed closure holds no new package;
 the lockfile gains one importer line.
@@ -6771,17 +6771,21 @@ Version skew (Notion BUG-63, fixed in tree 2026-11-09 on `fix/safe-fetch-undici-
 handed an `undici` 6.29.1 `Agent` to `globalThis.fetch`, which is whatever undici the running Node bundles (6.29.1 on
 the image's 22.23.4, 7.x on Node 24). That pair worked on both, but by luck: `engines` is `node >=22`, and a Node
 whose bundled undici rejected the dispatcher would have failed every guarded fetch, or ignored the pin. The default is
-now `defaultFetch` (`safe-fetch.ts:176`), the `fetch` export of the same `undici` package as `pinnedAgent`, so the
+now `defaultFetch` (`safe-fetch.ts:172`), the `fetch` export of the same `undici` package as `pinnedAgent`, so the
 dispatcher and the fetch are one version on any Node. `safe-fetch.test.ts` asserts the default is undici's own and that
-a hop with no `fetchImpl` goes through it with the pinned Agent and never through `globalThis.fetch` (3 tests; the
-second failed before the change: the body read was the global stub's). Driven on 2026-11-09 with no `fetchImpl` on
+a hop with no `fetchImpl` goes through it with the pinned Agent and never through `globalThis.fetch` (three new tests; five of the file's 35 failed before the change: `defaultFetch is not a function` where the tests use it, and a
+hop with no `fetchImpl` read the stubbed global's body). Driven on 2026-11-09 with no `fetchImpl` on
 Node 22.23.4 (bundled undici 6.29.1) and Node 24.13.0 (bundled undici 7.18.2): `https://example.com/` answered 200 over
 TLS, a real 302 to it was followed by hand, `localtest.me` and an `.invalid` name were refused, and the byte cap,
 truncation, abort and timeout paths behaved. `audit:deployed` is unchanged (`undici` was already in the closure).
 
+The host test setup guards undici's `fetch` as well as `globalThis.fetch` (`packages/host/test/setup.ts`,
+`network-tripwire.test.ts`), so a host test that reaches the internet through a guarded fetch still fails; with the
+undici guard removed the tripwire test times out on a real connection instead.
+
 Residual: (1) The unit tests run on the developer machine's Node, never the image's. With the default fetch and the
-Agent from one package this no longer depends on the Node version, so a `NODE_VERSION` bump needs no re-check of the
-pin; it still matters for the rest of the stack.
+Agent from one package the pin no longer depends on Node's bundled undici, but re-run `safe-fetch.test.ts` on the new
+Node after a `NODE_VERSION` bump.
 (2) Not driven on a hosted server. (3) A transient DNS failure is now a 400 instead of a network error, on purpose.
 The refusal carries the lookup error as its `cause`, so the component installer still reports `offline` for
 ENOTFOUND and EAI_AGAIN (`download.test.ts`, "reports offline when the host name does not resolve"). (7) The DNS
