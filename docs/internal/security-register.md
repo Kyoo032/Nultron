@@ -1626,7 +1626,7 @@ fixed, two were fixed on `main` afterwards, and four remain. All six re-read her
 | A06-1, nothing runs the tests | **Moved to the local gate, 2026-09-24** | `.github/workflows/` is deleted. `scripts/ci-local.mjs` (`pnpm ci:local`) runs lint, tsc, every unit suite and `node scripts/audit-deployed.mjs --level high`. It runs only when someone runs it: [SR-80](#sr-80). See [SR-12](#sr-12) |
 | A06-2, the image ships devDependencies | **Fixed, 2026-10-05** | The `prod` stage installs with `--prod` (`webapp-deploy/Dockerfile:113`) and the runtime copies that tree (`:167`); `tsx` moved to `dependencies` (`apps/web/package.json:20`). [SR-113](#sr-113) |
 | A08-1, actions pinned to mutable tags | **Closed by removal, 2026-09-24** | The three workflows and their 15 `@v4` `uses:` lines are deleted; the repo has no `.github/workflows/`. [SR-80](#sr-80) |
-| A10-6, DNS rebinding | **Fixed in tree, 2026-11-06** | `packages/core/src/security/safe-fetch.ts:104-126` resolves once per hop and fails closed, and `:145` and `:172` pin the undici agent's `lookup` to that answer. [SR-201](#sr-201) |
+| A10-6, DNS rebinding | **Fixed in tree, 2026-11-06** | `packages/core/src/security/safe-fetch.ts:98-123` resolves once per hop and fails closed, and `:141` and `:168` pin the undici agent's `lookup` to that answer. [SR-201](#sr-201) |
 
 Required action: A06-1 is the one that matters, because it is why every other row in this register
 is proved by hand. Since 2026-09-24 its answer is the local gate, and what remains of it is
@@ -6739,7 +6739,7 @@ private host is a read, not only a blind connect. The architect's reading (2026-
 HTTP and this guard is HTTPS only with certificate checks, so it does not leak metadata; what remains is a connect or
 probe of private hosts and ports. That is a protocol argument, not a test.
 
-Fix (`packages/core/src/security/safe-fetch.ts`): per hop, `resolvePublicAddresses` (`:104-126`) resolves the host once
+Fix (`packages/core/src/security/safe-fetch.ts`): per hop, `resolvePublicAddresses` (`:98-123`) resolves the host once
 and refuses a failed lookup, an empty answer, an answer that is not an IP address and any private answer, all
 `400 invalid_endpoint`, with "Could not resolve this URL's host" for the first two and "URL must point at a public host"
 for the others. `pinnedAgent` (`:168`) then builds an undici `Agent` whose `connect.lookup` (`pinnedLookup`, `:141`)

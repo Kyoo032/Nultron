@@ -296,7 +296,7 @@ prefixes, covering the ranges a string match misses — `100.64.0.0/10` CGNAT, `
 TEST-NETs, multicast, and the IPv6 blocks including the whole of `fe80::/10`. Addresses that carry
 an IPv4 inside an IPv6 (`::ffff:`, 6to4, NAT64) recurse onto the embedded address (`:225-246`).
 
-Per hop, `resolvePublicAddresses` (`packages/core/src/security/safe-fetch.ts:104-126`) resolves the hostname once
+Per hop, `resolvePublicAddresses` (`packages/core/src/security/safe-fetch.ts:98-123`) resolves the hostname once
 and refuses the whole name when the lookup fails, answers nothing, answers something that is not an IP address, or
 answers any private address, so a public name pointing at `169.254.169.254` does not pass. A failed lookup is
 `400 invalid_endpoint` "Could not resolve this URL's host", a private answer "URL must point at a public host". The
