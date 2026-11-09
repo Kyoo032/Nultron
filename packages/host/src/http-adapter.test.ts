@@ -351,23 +351,128 @@ describe("handleNodeRequest Host guard", () => {
   });
 });
 
-describe("handleNodeRequest safe methods", () => {
-  it("leaves GET untouched by the Host and transport guards", async () => {
+describe("handleNodeRequest Host guard on safe methods", () => {
+  const WORKSPACES_PATH = "/api/v1/workspaces";
+
+  it("rejects a GET whose Host is not loopback, so a rebound name cannot read the API", async () => {
+    useLocalMode();
     const captured = fakeResponse();
     await handleNodeRequest(
-      fakeRequest({ method: "GET", url: `${RESET_PATH}?scope=all`, headers: { host: "attacker.example" } }),
+      fakeRequest({ method: "GET", url: WORKSPACES_PATH, headers: { host: "evil.example" } }),
+      captured.res,
+    );
+    expect(captured.status()).toBe(403);
+    expect(captured.json().error?.code).toBe("forbidden");
+    expect(dispatched).toHaveLength(0);
+  });
+
+  it("rejects a rebound name that keeps the dev port", async () => {
+    useLocalMode();
+    const captured = fakeResponse();
+    await handleNodeRequest(
+      fakeRequest({ method: "GET", url: WORKSPACES_PATH, headers: { host: "rebind.example:3000" } }),
+      captured.res,
+    );
+    expect(captured.status()).toBe(403);
+    expect(dispatched).toHaveLength(0);
+  });
+
+  it("rejects HEAD and OPTIONS on a foreign Host too", async () => {
+    useLocalMode();
+    for (const method of ["HEAD", "OPTIONS"]) {
+      const captured = fakeResponse();
+      await handleNodeRequest(
+        fakeRequest({ method, url: WORKSPACES_PATH, headers: { host: "evil.example" } }),
+        captured.res,
+      );
+      expect(captured.status()).toBe(403);
+    }
+    expect(dispatched).toHaveLength(0);
+  });
+
+  it("rejects a GET with no Host header", async () => {
+    useLocalMode();
+    const captured = fakeResponse();
+    await handleNodeRequest(fakeRequest({ method: "GET", url: WORKSPACES_PATH }), captured.res);
+    expect(captured.status()).toBe(403);
+    expect(dispatched).toHaveLength(0);
+  });
+
+  it("still serves a GET on each loopback spelling, with no Origin", async () => {
+    useLocalMode();
+    for (const host of [LOOPBACK_HOST, "localhost:3000", "[::1]:3000", "127.0.0.1"]) {
+      const captured = fakeResponse();
+      await handleNodeRequest(fakeRequest({ method: "GET", url: WORKSPACES_PATH, headers: { host } }), captured.res);
+      expect(captured.status()).toBe(200);
+    }
+    expect(dispatched).toHaveLength(4);
+  });
+
+  it("answers the liveness probe on a foreign Host, off server mode", async () => {
+    useLocalMode();
+    const captured = fakeResponse();
+    const handled = await handleNodeRequest(
+      fakeRequest({ method: "GET", url: "/healthz", headers: { host: "evil.example" } }),
+      captured.res,
+    );
+    expect(handled).toBe(true);
+    expect(captured.status()).toBe(200);
+  });
+
+  it("answers the liveness probe on a foreign Host, in server mode", async () => {
+    useServerMode();
+    const captured = fakeResponse();
+    const handled = await handleNodeRequest(
+      fakeRequest({ method: "GET", url: "/healthz", headers: { host: "127.0.0.1:3000" }, forwardedProto: null }),
+      captured.res,
+    );
+    expect(handled).toBe(true);
+    expect(captured.status()).toBe(200);
+  });
+
+  it("rejects a GET whose Host is not on the allowlist, in server mode", async () => {
+    useServerMode();
+    const captured = fakeResponse();
+    await handleNodeRequest(
+      fakeRequest({ method: "GET", url: WORKSPACES_PATH, headers: { host: "rebind.example" } }),
+      captured.res,
+    );
+    expect(captured.status()).toBe(403);
+    expect(captured.json().error?.code).toBe("origin_forbidden");
+    expect(dispatched).toHaveLength(0);
+  });
+
+  it("serves a GET on the allowlisted Host with no Origin, in server mode", async () => {
+    useServerMode();
+    for (const method of ["GET", "HEAD"]) {
+      const captured = fakeResponse();
+      await handleNodeRequest(fakeRequest({ method, url: WORKSPACES_PATH, headers: { host: WEB_HOST } }), captured.res);
+      expect(captured.status()).toBe(200);
+    }
+    expect(dispatched).toHaveLength(2);
+  });
+
+  it("asks for https before it judges the Host of a GET, in server mode", async () => {
+    useServerMode();
+    const captured = fakeResponse();
+    await handleNodeRequest(
+      fakeRequest({ method: "GET", url: WORKSPACES_PATH, headers: { host: "rebind.example" }, forwardedProto: null }),
+      captured.res,
+    );
+    expect(captured.json().error?.code).toBe("https_required");
+  });
+});
+
+describe("handleNodeRequest safe methods", () => {
+  it("leaves GET untouched by the transport guard", async () => {
+    const captured = fakeResponse();
+    await handleNodeRequest(
+      fakeRequest({ method: "GET", url: `${RESET_PATH}?scope=all`, headers: { host: LOOPBACK_HOST } }),
       captured.res,
     );
     expect(captured.status()).toBe(200);
     expect(dispatched).toHaveLength(1);
     expect(dispatched[0]).toMatchObject({ method: "GET", path: RESET_PATH, query: { scope: "all" } });
-  });
-
-  it("leaves a GET with no Host header untouched", async () => {
-    const captured = fakeResponse();
-    await handleNodeRequest(fakeRequest({ method: "GET", url: "/api/v1/ping" }), captured.res);
-    expect(captured.status()).toBe(200);
-    expect(dispatched).toHaveLength(1);
   });
 
   it("ignores non-/api paths", async () => {
@@ -571,7 +676,10 @@ describe("handleNodeRequest CSRF cookie minting", () => {
   it("mints the cookie on a GET that carries none, readable by the renderer", async () => {
     useLocalMode();
     const captured = fakeResponse();
-    await handleNodeRequest(fakeRequest({ method: "GET", url: "/api/v1/ping" }), captured.res);
+    await handleNodeRequest(
+      fakeRequest({ method: "GET", url: "/api/v1/ping", headers: { host: LOOPBACK_HOST } }),
+      captured.res,
+    );
     const cookie = captured.headerValues("set-cookie").find((value) => value.startsWith(`${CSRF_COOKIE}=`));
     expect(cookie).toBeDefined();
     expect(cookie).toContain("Path=/");
@@ -584,7 +692,10 @@ describe("handleNodeRequest CSRF cookie minting", () => {
   it("mints the __Host- prefixed, Secure cookie in server mode", async () => {
     useServerMode();
     const captured = fakeResponse();
-    await handleNodeRequest(fakeRequest({ method: "GET", url: "/api/v1/ping" }), captured.res);
+    await handleNodeRequest(
+      fakeRequest({ method: "GET", url: "/api/v1/ping", headers: { host: WEB_HOST } }),
+      captured.res,
+    );
     const cookie = captured.headerValues("set-cookie").find((value) => value.startsWith(`${CSRF_COOKIE_SECURE}=`));
     expect(cookie).toContain("; Secure");
     expect(cookie).toContain("Path=/");
@@ -595,9 +706,14 @@ describe("handleNodeRequest CSRF cookie minting", () => {
     useServerMode();
     const captured = fakeResponse();
     await handleNodeRequest(
-      fakeRequest({ method: "GET", url: "/api/v1/ping", headers: { cookie: `${CSRF_COOKIE}=${mintCsrfToken()}` } }),
+      fakeRequest({
+        method: "GET",
+        url: "/api/v1/ping",
+        headers: { host: WEB_HOST, cookie: `${CSRF_COOKIE}=${mintCsrfToken()}` },
+      }),
       captured.res,
     );
+    expect(captured.status()).toBe(200);
     expect(captured.headerValues("set-cookie").some((value) => value.startsWith(`${CSRF_COOKIE_SECURE}=`))).toBe(true);
   });
 
@@ -610,7 +726,10 @@ describe("handleNodeRequest CSRF cookie minting", () => {
       fakeRequest({
         method: "GET",
         url: "/api/v1/ping",
-        headers: { cookie: `${CSRF_COOKIE_SECURE}=${mintCsrfTokenFor(null)}; ${SESSION_COOKIE_SECURE}=sid-1` },
+        headers: {
+          host: WEB_HOST,
+          cookie: `${CSRF_COOKIE_SECURE}=${mintCsrfTokenFor(null)}; ${SESSION_COOKIE_SECURE}=sid-1`,
+        },
       }),
       captured.res,
     );
@@ -624,7 +743,10 @@ describe("handleNodeRequest CSRF cookie minting", () => {
       fakeRequest({
         method: "GET",
         url: "/api/v1/ping",
-        headers: { cookie: `${CSRF_COOKIE_SECURE}=${mintCsrfTokenFor("sid-other")}; ${SESSION_COOKIE_SECURE}=sid-1` },
+        headers: {
+          host: WEB_HOST,
+          cookie: `${CSRF_COOKIE_SECURE}=${mintCsrfTokenFor("sid-other")}; ${SESSION_COOKIE_SECURE}=sid-1`,
+        },
       }),
       captured.res,
     );
@@ -638,19 +760,28 @@ describe("handleNodeRequest CSRF cookie minting", () => {
       fakeRequest({
         method: "GET",
         url: "/api/v1/ping",
-        headers: { cookie: `${CSRF_COOKIE_SECURE}=${mintCsrfTokenFor("sid-1")}; ${SESSION_COOKIE_SECURE}=sid-1` },
+        headers: {
+          host: WEB_HOST,
+          cookie: `${CSRF_COOKIE_SECURE}=${mintCsrfTokenFor("sid-1")}; ${SESSION_COOKIE_SECURE}=sid-1`,
+        },
       }),
       captured.res,
     );
+    expect(captured.status()).toBe(200);
     expect(captured.headerValues("set-cookie").some((value) => value.startsWith(`${CSRF_COOKIE_SECURE}=`))).toBe(false);
   });
 
   it("does not re-mint when the request already carries a token", async () => {
     const captured = fakeResponse();
     await handleNodeRequest(
-      fakeRequest({ method: "GET", url: "/api/v1/ping", headers: { cookie: `${CSRF_COOKIE}=${mintCsrfToken()}` } }),
+      fakeRequest({
+        method: "GET",
+        url: "/api/v1/ping",
+        headers: { host: LOOPBACK_HOST, cookie: `${CSRF_COOKIE}=${mintCsrfToken()}` },
+      }),
       captured.res,
     );
+    expect(captured.status()).toBe(200);
     expect(captured.headerValues("set-cookie")).toHaveLength(0);
   });
 
@@ -721,7 +852,11 @@ describe("handleNodeRequest forwards the raw cookie header", () => {
     useLocalMode();
     const captured = fakeResponse();
     await handleNodeRequest(
-      fakeRequest({ method: "GET", url: "/api/v1/ping", headers: { cookie: "agentforge_session=s1; other=2" } }),
+      fakeRequest({
+        method: "GET",
+        url: "/api/v1/ping",
+        headers: { host: LOOPBACK_HOST, cookie: "agentforge_session=s1; other=2" },
+      }),
       captured.res,
     );
     expect(dispatched[0]?.headers.cookie).toBe("agentforge_session=s1; other=2");
@@ -809,7 +944,11 @@ describe("handleNodeRequest path normalisation", () => {
     useLocalMode();
     const captured = fakeResponse();
     await handleNodeRequest(
-      fakeRequest({ method: "get", url: "/api/v1/ping", headers: { host: "attacker.example" } }),
+      fakeRequest({
+        method: "get",
+        url: "/api/v1/ping",
+        headers: { host: LOOPBACK_HOST, origin: "https://evil.example" },
+      }),
       captured.res,
     );
     expect(captured.status()).toBe(200);
@@ -953,7 +1092,7 @@ describe("handleNodeRequest malformed Cookie header", () => {
     useLocalMode();
     const captured = fakeResponse();
     await handleNodeRequest(
-      fakeRequest({ method: "GET", url: "/api/v1/ping", headers: { cookie: "junk=%zz" } }),
+      fakeRequest({ method: "GET", url: "/api/v1/ping", headers: { host: LOOPBACK_HOST, cookie: "junk=%zz" } }),
       captured.res,
     );
     expect(captured.status()).toBe(200);
@@ -1917,8 +2056,8 @@ describe("handleNodeRequest malformed Host header or request target", () => {
     expect(dispatched).toHaveLength(0);
   });
 
-  it("parses the path without the Host, so a well-formed but unusual Host still reaches the router", async () => {
-    for (const host of ["my_service:3000", "Example.COM:443", "[::1]:3000", "app.example.com."]) {
+  it("parses the path without the Host, so a well-formed Host still reaches the router", async () => {
+    for (const host of ["LOCALHOST:3000", "127.0.0.1:443", "[::1]:3000", "localhost"]) {
       dispatched.length = 0;
       const { captured } = await send({ method: "GET", url: "/api/v1/ping?x=1", headers: { host } });
       expect(captured.status(), host).toBe(200);
@@ -1926,10 +2065,20 @@ describe("handleNodeRequest malformed Host header or request target", () => {
     }
   });
 
-  it("still treats an absent Host as absent, not malformed", async () => {
+  it("still treats an absent Host as absent, not malformed, and refuses it as not loopback", async () => {
     const { captured } = await send({ method: "GET", url: "/api/v1/ping" });
-    expect(captured.status()).toBe(200);
-    expect(dispatched).toHaveLength(1);
+    expect(captured.status()).toBe(403);
+    expect(captured.json().error?.code).toBe("forbidden");
+    expect(dispatched).toHaveLength(0);
+  });
+
+  it("refuses a well-formed Host that names another machine, off server mode", async () => {
+    for (const host of ["my_service:3000", "Example.COM:443", "app.example.com."]) {
+      const { captured } = await send({ method: "GET", url: "/api/v1/ping", headers: { host } });
+      expect(captured.status(), host).toBe(403);
+      expect(captured.json().error?.code, host).toBe("forbidden");
+    }
+    expect(dispatched).toHaveLength(0);
   });
 });
 

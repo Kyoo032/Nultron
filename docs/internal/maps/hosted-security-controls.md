@@ -2,7 +2,7 @@
 
 Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
 
-Last verified: 2026-11-06 at 39cd5f0c + working tree on `fix/sec-004a-dns-pinning`, not committed, for § 7 (the SSRF guard), the resolution gotcha and the `safe-fetch.test.ts` row only; the new code was read at the lines cited and driven once against a loopback listener and against real DNS and TLS (SR-201). Nothing else on the page was re-read. Before that: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-06, branch `feat/hosted-run-limits` over 6105c5c, not committed, for the run-limits subsection of § 5 and its row in the file table; nothing else on the page was re-read. Before that: 2026-10-05, working tree over 0b61a29, not committed, for two lines only (the `audit-deployed.mjs` row of the file table and the audit-gate gotcha, which now describe the production closure after SR-113); nothing else on the page was re-read. Before that: 2026-10-02, working tree over 0b61a29, not committed, for one row (the operator-fields row of § 8, which now says who may write a provider key: M4, an owner or an admin, a member is answered `403 settings_key_forbidden`); nothing else on the page was re-read. Before that: 2026-10-01, working tree over 0b61a29, not committed, for two rows only: the `ci-local.mjs` row of the tests table (a vitest step now needs its `Tests N passed` summary, not just exit 0) and the per-tenant model cache bullet of § 10 (the background refill and its log line). Before that, the same day, for the new § 10 (where a tenant's provider key may go: Enterprise BYOK Phase A) and the corrected operator-keys row of § 8, whose "provider keys" claim was wrong before it (`requestsOperatorOnlySettings` lists `toolKeys`, `toolBackends` and `injectionGuardBypass` only). Nothing else on the page was re-read that day. Before that: 2026-09-23 at d4561b8 + working tree for sections 1-4 and every
+Last verified: 2026-11-06 at 30f92eab for § 7 (the SSRF guard), the resolution gotcha and the `safe-fetch.test.ts` row only; the new code was read at the lines cited and driven once against a loopback listener and against real DNS and TLS (SR-201). Nothing else on the page was re-read. Before that: 2026-11-06 at 01a88fba, for the Host rule only (row 6a of the admission table and § 3; the other `http-adapter.ts` line numbers on this page are from 2026-09-23 and have shifted six lines below `:632`). Before that: 2026-10-09 at 9121f295 for the new Touches / Do not touch section only (file lists checked against the tree and the imports named there; nothing else re-read). Before that: 2026-10-06, branch `feat/hosted-run-limits` over 6105c5c, not committed, for the run-limits subsection of § 5 and its row in the file table; nothing else on the page was re-read. Before that: 2026-10-05, working tree over 0b61a29, not committed, for two lines only (the `audit-deployed.mjs` row of the file table and the audit-gate gotcha, which now describe the production closure after SR-113); nothing else on the page was re-read. Before that: 2026-10-02, working tree over 0b61a29, not committed, for one row (the operator-fields row of § 8, which now says who may write a provider key: M4, an owner or an admin, a member is answered `403 settings_key_forbidden`); nothing else on the page was re-read. Before that: 2026-10-01, working tree over 0b61a29, not committed, for two rows only: the `ci-local.mjs` row of the tests table (a vitest step now needs its `Tests N passed` summary, not just exit 0) and the per-tenant model cache bullet of § 10 (the background refill and its log line). Before that, the same day, for the new § 10 (where a tenant's provider key may go: Enterprise BYOK Phase A) and the corrected operator-keys row of § 8, whose "provider keys" claim was wrong before it (`requestsOperatorOnlySettings` lists `toolKeys`, `toolBackends` and `injectionGuardBypass` only). Nothing else on the page was re-read that day. Before that: 2026-09-23 at d4561b8 + working tree for sections 1-4 and every
 `http-adapter.ts` citation on this page (the auth pass: the production https rule for the portal
 URL, the malformed Host / request-target 400, the gate's portal re-check, digest session ids). The
 response headers, the ffmpeg failure detail and the top-up link keep their 2026-09-21 reading at
@@ -96,7 +96,8 @@ load-bearing; if that mount ever moves, the controls move with it.
 | 3 | `:612` | `transportRejection` — TLS, method allowlist, path filter, header cap, per-IP and per-session buckets | **every** request, not only `/api` |
 | 4 | `:617` | a request target that will not parse → 400 `invalid_path`; a `Host` that is not `host[:port]` → 400 `invalid_host` | **every** request, in both modes (decided at `:556`, before the page / API split at `:562`) |
 | 5 | `:624` | non-`/api` paths return `false`; Express serves the page | — |
-| 6 | `:633` | `mutatingRejection` — Origin/Host allowlist, double-submit CSRF, `x-agentforge-transport` | non-safe methods on `/api` |
+| 6a | `:633` | `hostRejection` — loopback `Host` off server mode, allowlisted `Host` in server mode; a missing `Host` is refused | **every** method on `/api` (GET, HEAD and OPTIONS included), minus the billing webhook path; `/healthz` is answered before it |
+| 6 | `:639` | `mutatingRejection` — Origin allowlist, double-submit CSRF, `x-agentforge-transport` | non-safe methods on `/api` |
 | 7 | `packages/host/src/router.ts:456` | `gate` → `requireSessionFor` — the session row, then the portal re-check on a due session, before the route table | `/api` minus the exempt paths |
 | 8 | `:706` | `logAuthFailure` | a 401 coming back out |
 | 9 | `:495` | `maskServerError` | any 5xx, in server mode |
@@ -119,13 +120,19 @@ the TLS rule and the buckets, so a malformed request is still counted and a plai
 
 ### 3. Origin, Host and CSRF
 
-`mutatingRejection` (`packages/host/src/http-adapter.ts:768`) chooses between two rules — the
-hosted branch at `:780-788` and the desk branch at `:789`:
+`hostRejection` (`packages/host/src/http-adapter.ts:778`, called at `:633`) runs for every `/api`
+request, GET, HEAD and OPTIONS included (SR-207, 2026-11-06; before that only a mutating request was
+checked, so a DNS-rebinding page could read the API). It answers 403 `forbidden` off server mode when
+the `Host` is not loopback or is absent, and 403 `origin_forbidden` in server mode when it is not one of
+the allowlisted origins' hosts. `/healthz` never reaches it (answered at `:620`), and the billing
+webhook path is skipped as it is for CSRF. In server mode the TLS rule and the buckets still run first.
 
-- **Off server mode**, unchanged from the desk: a missing `Origin` means same-machine, and `Host`
-  must be loopback.
-- **In server mode**: `Origin` must be on the allowlist and a missing one is refused; `Host` must
-  be one of those origins' hosts; and the double-submit CSRF token must match — cookie
+`mutatingRejection` (`:787`) then chooses between two rules for non-safe methods:
+
+- **Off server mode**, unchanged from the desk: a missing `Origin` means same-machine, and a present
+  one must be loopback.
+- **In server mode**: `Origin` must be on the allowlist and a missing one is refused; and the
+  double-submit CSRF token must match — cookie
   `__Host-agentforge_csrf` against header `x-agentforge-csrf` (`packages/host/src/csrf.ts`).
 
 HTTPS is required via `X-Forwarded-Proto` (`:62-64`, `HTTPS_REQUIRED` at `:100`); a direct hit on

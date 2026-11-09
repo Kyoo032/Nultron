@@ -229,6 +229,8 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-197](#sr-197) | Medium | AI SDK 5's `streamText` prints every stream error to the console by default, and an `APICallError` carries the request body (the prompt) and the gateway's error body | Fixed in tree (2026-11-04, `fix/zod-4`): the runtime passes a silent `onError`; tested, not driven | PR merge of the AI SDK 5 move |
 | [SR-198](#sr-198) | Medium | AI SDK 5 brings `undici` 5.29.0 and `@fastify/busboy` into the hosted image, with five HIGH `undici` advisories and one `busboy` advisory | Fixed in tree (2026-11-04, `fix/zod-4`): scoped override to `undici` 6.29.1, which drops `busboy`; the SDK's guarded download fetch checked on it; not driven | PR merge of the AI SDK 5 move |
 | [SR-201](#sr-201) | Medium | The SSRF guard resolved a name, then let `fetch` resolve it again to connect (DNS rebinding), and let a connection through when its own lookup failed | Fixed in tree (2026-11-06, `fix/sec-004a-dns-pinning`): one lookup per hop, refused when it fails or answers privately, then the socket is pinned to that answer; driven on Node 24 and on Node 22.23.4 (the image's runtime) against a loopback listener and real DNS and TLS; not run on a hosted server | PR merge |
+| [SR-206](#sr-206) | Low | The backup heartbeat URL would sit in `.env`, which the `app` container loads, so code running in the app could send fake success pings and hide a dead backup | Fixed in PR #206 (2026-11-06): `backup.sh` reads it from the process environment only, set on the cron line; tested, not driven on a server | — |
+| [SR-207](#sr-207) | Medium | The Host check ran only on mutating `/api` requests, so a DNS-rebinding page could `GET` the API (media, threads, masked settings) from unauthenticated webdev, and a GET in server mode was not checked against the Host allowlist (SEC-004 4b) | Fixed in tree (2026-11-06, `fix/sec-004b-get-host-check`): every `/api` request needs a trusted Host, `/healthz` exempt; unit-tested through the real adapter, not driven | PR merge |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -6612,6 +6614,55 @@ now waits on it.
 internal ports is Rizky's call. (5) Egress filtering of `169.254.0.0/16` and `100.64.0.0/10` for the app pod is
 infrastructure and belongs to [SR-97](#sr-97); this change does not replace it. (6) `assertResolvesPublic` is kept
 as a thin wrapper over the same resolver and has no production caller.
+
+### SR-206 {#sr-206}
+
+**The backup heartbeat URL would sit in `.env`, which the `app` container loads.**
+Raised 2026-11-06 by the independent review of PR #206 (`fix/backup-missed-run-alert`). Low.
+
+Evidence: `webapp-deploy/compose.yml:38-41` loads all of `.env` into the `app` container, and its header says `.env`
+holds non-secret settings only (`compose.yml:22`, `:39`). The first cut of the missed-run alert read
+`BACKUP_HEARTBEAT_URL` through `setting`, which falls back to `.env`, and `.env.example` listed the variable. Anyone
+running code in the app could then read the URL and send fake success pings, so a dead backup would look alive.
+The same rule is why `BACKUP_KEY` stays out of `.env` (`webapp-deploy/.env.example:147`, `:170`).
+
+Fix: `backup.sh` reads `BACKUP_HEARTBEAT_URL` from the process environment only
+(`webapp-deploy/scripts/backup.sh:27`), `.env.example` carries a note instead of the variable (`:181-184`), and
+the README's "Backup alert" section sets it on the cron line next to `BACKUP_KEY`, from Secrets Manager or a 0600
+file only the deploy user reads. `scripts/backup-heartbeat.test.mjs` "backup.sh never reads the heartbeat URL from
+.env" fails if the read goes back through `setting`.
+
+Residual: not driven on a hosted server. A monitor URL is a bearer secret: a leak from the cron line's source
+(Secrets Manager, the 0600 file) has the same effect, and the monitor cannot tell a forged ping from a real one.
+
+Gate: none; fixed in PR #206.
+
+### SR-207 {#sr-207}
+
+**A GET to `/api` skipped the Host check.**
+Raised 2026-10-15 by the security re-verify of SEC-004 (Notion Dev Findings, 4b); fixed 2026-11-06. Medium. The card proposed SR-186 for this and that number is taken on another branch.
+
+Evidence: `SAFE_METHODS` (`packages/host/src/http-adapter.ts:31`) kept GET, HEAD and OPTIONS out of
+`mutatingRejection`, the only caller of `isLoopbackHostHeader` and `isAllowedWebHostHeader`. A page on a
+rebound name (`http://evil.example:3000`, answered first by the attacker and then by `127.0.0.1`) could
+`GET` `/api/v1/workspaces`, `/api/v1/media/<id>/file` and the masked settings of an unauthenticated webdev,
+with `Host: evil.example:3000`. In server mode a GET was not checked against `trustedOrigins()` either; that
+does not bypass the session cookie's host scope, but it left the allowlist half-applied. The packaged desktop
+app has no HTTP server and is not affected.
+
+Fix: `hostRejection` (`http-adapter.ts:778`) runs for every `/api` request before the `SAFE_METHODS`
+branch (`:633`). Off server mode the Host must be `localhost`, `127.0.0.1` or `::1`, with or without a port,
+and a missing Host is refused: 403 `forbidden`. In server mode it must be a host of the allowlisted origins:
+403 `origin_forbidden`. A missing Origin stays allowed on a GET. `/healthz` is answered before the check
+(`:620`), so the container healthcheck, Caddy's `health_uri` and the k8s probes are untouched. The billing
+webhook path skips it as it skips CSRF. In server mode the HTTPS rule and the request filter still come first,
+so a plaintext GET is `https_required`. Tests: `http-adapter.test.ts` "handleNodeRequest Host guard on safe
+methods" (ten cases); five failed before the fix, none after. `http-adapter-socket.test.ts` repeats the rule over a real `node:http` socket with an explicit Host header (three cases, passing).
+
+Residual: driven over a loopback socket in a test, not against a hosted server or webdev in a browser. An unusual local setup that reaches
+webdev by another name now gets 403; the bind host is loopback-only off server mode, so that means a
+hand-edited hosts file or a tunnel. The lookup-error fail-open of the same card is in `safe-fetch.ts` and is
+SEC-004 4a, not this row. The rebinding pin (4a) and the egress deny stay open under SR-16 (A10-6) and SR-97.
 
 Gate: PR merge.
 
