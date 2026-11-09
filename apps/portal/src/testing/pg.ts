@@ -42,6 +42,28 @@ export interface TestDatabase {
 }
 
 /**
+ * `pool.end()` resolves once pg-pool has told its connections to close, before their sessions have left the
+ * server. Terminating one of those sessions lands 57P01 on a connection that is already closing, and a pool with
+ * no `error` listener turns that into an unhandled error after every test in the file has passed. So a dropped
+ * database's sessions get a moment to leave on their own, and only what is still there afterwards is terminated.
+ */
+const SESSION_GRACE_MS = 2_000;
+
+async function waitForSessionsToLeave(client: pg.Client, database: string): Promise<void> {
+  const deadline = Date.now() + SESSION_GRACE_MS;
+  for (;;) {
+    const { rows } = await client.query<{ sessions: number }>(
+      "SELECT count(*)::int AS sessions FROM pg_stat_activity WHERE datname = $1 AND pid <> pg_backend_pid()",
+      [database],
+    );
+    if ((rows[0]?.sessions ?? 0) === 0 || Date.now() >= deadline) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
+
+/**
  * A fresh database. `fromTemplate: false` gives an empty one, which is what the migration test
  * needs — everything else wants the migrations already applied.
  */
@@ -65,6 +87,7 @@ export async function createTestDatabase(options: { fromTemplate?: boolean } = {
       const cleanup = new pg.Client({ connectionString: adminUrl });
       await cleanup.connect();
       try {
+        await waitForSessionsToLeave(cleanup, name);
         await cleanup.query(
           `SELECT pg_terminate_backend(pid) FROM pg_stat_activity
             WHERE datname = $1 AND pid <> pg_backend_pid()`,

@@ -7,12 +7,15 @@ const TOO_DEEP = "[too deep]";
 /** Deeper than any tool result is nested; what is past it is replaced, never passed on unread. */
 export const REDACT_MAX_DEPTH = 32;
 
-/**
- * A key that holds a credential whatever the value looks like. Exact names, case-insensitive, so a field
- * called `max_tokens` or a sentence that says "token" is left alone.
- */
 const SECRET_KEY =
   /^(?:authorization|proxy-authorization|x-api-key|api[-_]?key|secret|client[-_]?secret|password|passwd|token|access[-_]?token|refresh[-_]?token|id[-_]?token|auth[-_]?token|bearer|(?:telegram[-_]?)?bot[-_]?token|cookie|set-cookie|private[-_]?key|secret[-_]?key|access[-_]?key|credentials?)$/i;
+const SECRET_KEY_ENDING =
+  /(?:^|[-_])(?:api[-_]?key|secret[-_]?key|secret[-_]?access[-_]?key|access[-_]?key|private[-_]?key|client[-_]?secret|password|passwd|token|secret)$/i;
+const CAMEL_CASE_BOUNDARY = /([a-z0-9])([A-Z])/g;
+
+function isSecretKey(key: string): boolean {
+  return SECRET_KEY.test(key) || SECRET_KEY_ENDING.test(key.replace(CAMEL_CASE_BOUNDARY, "$1_$2"));
+}
 
 function isLeaf(value: object): boolean {
   return (
@@ -45,9 +48,7 @@ function walk(value: unknown, depth: number, ancestors: Set<object>): unknown {
     return Object.fromEntries(
       Object.entries(value).map(([key, item]) => [
         key,
-        typeof item === "string" && item.length > 0 && SECRET_KEY.test(key)
-          ? REDACTED
-          : walk(item, depth + 1, ancestors),
+        typeof item === "string" && item.length > 0 && isSecretKey(key) ? REDACTED : walk(item, depth + 1, ancestors),
       ]),
     );
   } finally {

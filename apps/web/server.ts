@@ -12,7 +12,7 @@ import { isServerMode } from "@agentforge/core";
 import express from "express";
 import { handleNodeRequest } from "@agentforge/host/http";
 import { resolveBindHost } from "./lib/bind-host";
-import { assertHostedEnvComplete, assertHostedModeCoherent } from "./server/hosted-mode-guard";
+import { assertHostedEnvComplete, assertHostedModeCoherent, warnWeakDeskVaultKey } from "./server/hosted-mode-guard";
 import { injectHostedMarker, rootRelativeAssets } from "./lib/hosted-build";
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
@@ -62,6 +62,7 @@ async function main() {
   // fail for the first person who signed in, so it names every missing variable and refuses too.
   // Local mode is untouched: both calls return immediately. See ./server/hosted-mode-guard.
   assertHostedEnvComplete(process.env);
+  warnWeakDeskVaultKey(process.env);
   const app = express();
   // Identity masking: Express stamps `X-Powered-By: Express` from its init middleware on every
   // response, before any handler of ours runs. Nothing about the software answering should be on the

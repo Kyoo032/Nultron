@@ -250,6 +250,9 @@ export async function* startModalityRun(options: {
   // model answer that arrives later is dropped instead of being persisted as a completed turn.
   let settled = false;
   let settledMessage = "";
+  let finishing = false;
+  let persisted = false;
+  let failedMessage = "";
   // The model call's own cancel. The watchdog and a client that left both tell the person the run
   // failed; this is what makes the request in flight stop, so a run nobody is waiting for stops billing.
   const modelAbort = new AbortController();
@@ -271,6 +274,16 @@ export async function* startModalityRun(options: {
       if (queueClosed) {
         return;
       }
+      if (finishing) {
+        if (!persisted) {
+          if (!failedMessage) {
+            send({ type: "run.failed", message: chatTurnCopy(locale).saveTimeout });
+          }
+          send({ type: "run.completed", runId: runId ?? "unknown" });
+        }
+        closeQueue();
+        return;
+      }
       send({ type: "run.failed", message });
       send({ type: "run.completed", runId: runId ?? "unknown" });
       closeQueue();
@@ -279,7 +292,7 @@ export async function* startModalityRun(options: {
     },
   });
   const onClientAbort = () => {
-    if (queueClosed) {
+    if (queueClosed || finishing) {
       return;
     }
     const message = abortErrorMessage(options.abortSignal?.reason, locale);
@@ -305,10 +318,8 @@ export async function* startModalityRun(options: {
     // They are shown live, and saved only beside something the model produced: on their own they are not
     // an answer, and a thinking-only message would mark a failed run as completed.
     let hostThinking = "";
-    let failedMessage = "";
     const mediaParts: ContentPart[] = [];
     const toolTrace: ToolCallPart[] = [];
-    let persisted = false;
     // Set when the runtime says the tool loop used every step and the last one was still working.
     let stepLimitReached = false;
     // Set when a model call failed after a tool had completed: the turn is kept, and this is the reason.
@@ -328,6 +339,7 @@ export async function* startModalityRun(options: {
       recordChatRunUsage(options.tenant, runId, true, runUsage);
     };
     const persistAssistant = async () => {
+      finishing = true;
       if (persisted) {
         return true;
       }

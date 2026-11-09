@@ -181,7 +181,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-77](#sr-77) | Medium | A "Start over" wipe that failed part-way deleted its own marker, so the rest never ran | Fixed, not driven (2026-09-23) | Blocks the next Personal cut |
 | [SR-79](#sr-79) | Medium | Per-IP limits key on the full IPv6 address, so one IPv6 client has a bucket per request | Mitigated (2026-10-01): the pilot stack binds IPv4 only; the code still keys on the full address | Blocks Tencent deploy if it is reachable over IPv6 |
 | [SR-80](#sr-80) | Medium | CI and the dependency-audit gate run only when someone runs `pnpm ci:local`; nothing checks a push on its own | Open — accepted by design (2026-09-24) | Blocks PR merge without a pasted `ci:local` summary |
-| [SR-85](#sr-85) | Medium | The packaged app never set `AGENTFORGE_PACKAGED`, so the dev endpoint hooks (gateway, Telegram) were not ignored in it | Fixed in the working tree, not committed (2026-10-01); not driven on a packed installer, the bundle was driven in plain Node | Blocks the next Personal cut until a packed public build and a packed flavor are driven |
+| [SR-85](#sr-85) | Medium | The packaged app never set `AGENTFORGE_PACKAGED`, so the dev endpoint hooks (gateway, Telegram) were not ignored in it | Fixed, committed in `5fc00596` (2026-10-05) and carried by the 0.16.0 pack; the two packed drives were never done, and the desktop was retired 2026-10-14 | None while the desktop is retired. If a desktop build is revived, the packed public build and a packed flavor must be driven before that cut |
 | [SR-84](#sr-84) | Medium | New `brace-expansion` advisories reached the hosted image through `exceljs` | Fixed in `388d6cb` (2026-09-30); `audit:deployed` passes since (`ci:local` 2026-10-01) | — |
 | [SR-87](#sr-87) | Medium | The proxy's access log kept the sign-in authorization code in the portal's redirect `Location` header | Fixed in `webapp-deploy/Caddyfile` and the k8s copy; driven on the local compose and Kubernetes rehearsals (2026-10-01); not hosted | Blocks Tencent deploy until a hosted Caddy is checked |
 | [SR-90](#sr-90) | Medium | Restarting or recreating `app` alone leaves the proxy answering nothing | Docs and scripts fixed (2026-10-01); the trap remains | Operator rule: restart `app proxy` together |
@@ -197,7 +197,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-133](#sr-133) | Medium | The app.nultron-ai.xyz preview runs production without server mode, behind Basic Auth and a Caddy Origin rule | Accepted by the owner (2026-10-06): password-gated shared desk | Preview only |
 | [SR-138](#sr-138) | Medium | One signed-in account could hold any number of model runs open: the limiters count requests, nothing counted runs | Fixed in tree (2026-10-06), tested through the router and the HTTP adapter: every gateway-calling route holds a slot or is on a written list; in memory, per process; not driven on a hosted instance | Blocks Tencent deploy until driven there |
 | [SR-156](#sr-156) | Medium | Hosted: any signed-in member could delete a desk of the company, and with it every person's chats and the desk's Knowledge Base | Fixed in tree (2026-10-07), tested, renderer hides the button; not driven | Blocks a multi-person hosted pilot until driven |
-| [SR-157](#sr-157) | Medium | Hosted: stored media (pictures, clips, audio) is read, listed and deleted by company, not by person, so a colleague's picture can be fetched by its id, listed in the Images and Videos galleries, and sent to a model by a job | Open: nothing changed, because scoping by person breaks shared reads the product relies on; needs an owner decision (2026-10-07) | Blocks "Chat attachments are private to the person who attached them" |
+| [SR-157](#sr-157) | Medium | Hosted: stored media (pictures, clips, audio) is read, listed and deleted by company, not by person, so a colleague's picture can be fetched by its id, listed in the Images and Videos galleries, and sent to a model by a job | Accepted for the OPC (Rizky, 2026-11-06): a Nultron org has one owner. The code is unchanged: `main` still reads, lists and deletes media by organization only | Reopen when an org gets a second member (the bundle's DEPLOY.md step 7 allows it today, `scripts/release-web-docs.mjs:156`). It also blocks the sentence "Chat attachments are private to the person who attached them" |
 | [SR-165](#sr-165) | Medium | Hosted portal: `PORTAL_SIGNIN_MODE=password` gives HYP AI, and since 2026-10-09 the Nultron Enterprise release bundle's default, a username-and-password sign-in with no second factor, in place of the e-mailed code; the portal's own default when the variable is absent is still `code`, and `code` stays selectable | Built in tree, tested over a real Postgres; not driven in a browser or on a server (2026-10-07; the Enterprise bundle default is template and docs only, nothing deployed or driven, 2026-10-09). Independent review found no critical or high issue; its findings (M1, M2, L1 to L3, N1, N2) are fixed and merged (`e8a069c9`). The owner's decision, and on 2026-10-09 he accepted password-only sign-in as the Enterprise bundle default with residuals 1 to 13 as recorded; a second independent review of that default found no critical or high issue | None beyond the owner's acceptance; open until the second factor (being designed) ships |
 | [SR-166](#sr-166) | Medium | On `main` since the chat-first promotion (PR #157, 2026-10-12; was tester only): every virtual agent reads the desk's Knowledge Base and its earlier chats and can send a question to the web; the egress guard stops `web_fetch` only and never sees what entered through the prompt | Open: same exposure Chat has on `main` (SR-112's residual), new for the twelve mode agents; read from the code, not driven (2026-10-09). The promotion merged with no ruling recorded (2026-10-13). Owner ruled 2026-10-13: search stays on; the fix is the outbound guard (see SR-112), in a pull request to `main` since 2026-10-21, not merged, not driven | Blocks the next Enterprise release that carries the chat-first shell, until the outbound guard merges and the owner accepts its residual (a model restating private text in its own words) |
 | [SR-167](#sr-167) | Medium | On `main` since PR #157 (was tester only): a model can start paid pictures and clips from any agent's chat; `main` still holds only a per-turn ceiling | Fixed in the tester tree (2026-10-22): `image_generate` and `video_generate` do not run until the person presses Run on a card that shows the request and its list price; unit-tested, and the card driven in Chromium on a stub desk; the live model round trip not driven; no paid media was run | Lifts when the tester change is promoted to `main` and one Run press has been driven live |
@@ -207,10 +207,10 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-170](#sr-170) | Medium | The TKE production overlay builds the app's k8s Secret (wrap key included) from a plaintext `secrets.env` on the operator's machine; no Tencent Secrets Manager or KMS, and etcd encryption is not confirmed | Open (2026-10-13) | Blocks Tencent TKE |
 | [SR-171](#sr-171) | Medium | The k8s backup CronJob is suspended, its archive is AES-256-CBC with no authentication, and nothing leaves the cluster | Open (2026-10-13) | Before the first company keeps work it cannot lose on TKE |
 | [SR-172](#sr-172) | Low | HYP AI behind Cloudflare: Cloudflare reads sign-in passwords, cookies and pasted keys in clear (Full mode), and the origin still answers around Cloudflare on 80, 443 and 8443 | Recorded as known in the HYP AI deploy README (2026-10-08); restricting the origin is optional there; needs the owner's call | HYP AI only; Nultron does not use Cloudflare |
-| [SR-173](#sr-173) | Info | The wrap key becomes the AES key through one unsalted SHA-256 | Checked, not an issue (2026-10-13) | — |
+| [SR-173](#sr-173) | Info | The wrap key becomes the AES key through one unsalted SHA-256 | Checked, not an issue (2026-10-13) for the server; the desk gap is [SR-203](#sr-203) | — |
 | [SR-174](#sr-174) | Low | Caddy compresses every `text/*` response, `text/event-stream` included, which can hold live-update frames back | Fixed on `main` (PR #167, 2026-10-14): `encode` matches text types only, without `text/event-stream`, video or audio; unit-tested, Caddy syntax not validated, not driven | Before the team board (tester) is deployed behind Caddy |
-| [SR-175](#sr-175) | Medium | Hosted: a file one person generates on their own (artifacts, media, desk files outside their private folder) is listed and downloadable by every member of the company | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
-| [SR-176](#sr-176) | High | Hosted: any member of a company can delete any other member's generated media and artifacts | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
+| [SR-175](#sr-175) | Medium | Hosted: a file one person generates on their own (artifacts, media, desk files outside their private folder) is listed and downloadable by every member of the company | Accepted for the OPC (Rizky, 2026-11-06): a Nultron org has one owner. The earlier "not applicable" was wrong for `main`. The tester's strip removed the tester's owner check, and `main` still reads by organization or desk only | Reopen when an org gets a second member (the bundle's DEPLOY.md step 7 allows it today, `scripts/release-web-docs.mjs:156`) |
+| [SR-176](#sr-176) | High | Hosted: any member of a company can delete any other member's generated media and artifacts | Accepted for the OPC (Rizky, 2026-11-06): a Nultron org has one owner. The earlier "not applicable" was wrong for `main`. The tester's strip removed the tester's owner check, and `main` still deletes by organization or desk only | Reopen when an org gets a second member (the bundle's DEPLOY.md step 7 allows it today, `scripts/release-web-docs.mjs:156`) |
 | [SR-178](#sr-178) | Medium | Hosted (tester): a Workspace switched to "workspace" is readable by the whole company, not only its members (K-D22) | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
 | [SR-179](#sr-179) | Medium | Hosted (tester): a member removed from a Workspace keeps reading, listing and deleting the files and media they put into it | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
 | [SR-180](#sr-180) | Medium | Hosted (tester): document versions are not counted against a tenant's storage, and the cap keeps every version from the last 30 days with no count limit, so a busy document can fill the one disk | Not applicable since 2026-10-16: the tester's OPC strip (P5b) removed the code | — |
@@ -225,10 +225,18 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-188](#sr-188) | Info | Tester: `finance_task` refuses a figures file the model wrote, and asks again for a number the owner did not type | Checked, not an issue (2026-10-20) | — |
 | [SR-189](#sr-189) | Low | Tester: a `finance_task` report made from one person's private attachment is a desk-wide artifact and a desk-wide Knowledge Base card | Open (2026-10-20): acceptable while a desk has one owner (OPC) | Before a hosted desk has a second person |
 | [SR-190](#sr-190) | Medium | Chat's `image_generate` and `video_generate` sent any model id and any source-image address the model wrote to the gateway, which fetches that address | Model half merged to `main` (#183, 2026-10-21), unit-tested, not driven; the address half is `fix/safe-web-search`'s `judgeMediaUrl` (the egress-guard copy from #183 was dropped when that branch took `main`) | PR merge of `fix/safe-web-search` to `main` |
-| [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual: request-body arrays with no `.max()` still cost one issue per bad element | Residual: none blocks; capping the request-body arrays is a follow-up |
+| [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual bounded 2026-11-06 (`fix/request-array-caps`): a posted body is charged by cost (an object or list 6, any other value 1) against 60,000, or 250,000 for a Market briefing, before a schema reads it, and error text built from `zod` issues is cut to 20; the worst failing body measured gives about 56,000 issues and 60 MB on the default profile and about 102,000 issues and 71 MB on the briefing profile | None |
 | [SR-197](#sr-197) | Medium | AI SDK 5's `streamText` prints every stream error to the console by default, and an `APICallError` carries the request body (the prompt) and the gateway's error body | Fixed in tree (2026-11-04, `fix/zod-4`): the runtime passes a silent `onError`; tested, not driven | PR merge of the AI SDK 5 move |
 | [SR-198](#sr-198) | Medium | AI SDK 5 brings `undici` 5.29.0 and `@fastify/busboy` into the hosted image, with five HIGH `undici` advisories and one `busboy` advisory | Fixed in tree (2026-11-04, `fix/zod-4`): scoped override to `undici` 6.29.1, which drops `busboy`; the SDK's guarded download fetch checked on it; not driven | PR merge of the AI SDK 5 move |
-| [SR-199](#sr-199) | Low | nixpkgs marks pnpm 9.15.9, the version the repo pins, insecure (twelve CVEs, no fix on 9.x); the Nix build permits that one version by name | Accepted for the Nix migration (2026-11-07): build-time only, no git dependencies in the lock, the Nix store pins every tarball by hash. Moving to pnpm 10 is a separate change | — |
+| [SR-199](#sr-199) | Medium | The credential redactor ran three of its regular expressions in quadratic time: a cookie header followed by a long run of spaces, a long dotted or hyphenated run (100k characters took 17.7 s and 62 s), and a run of `eyJ-` JWT header prefixes (100k characters took 12 s to 18 s in `redactCredentials`, 25 s through `redactSecrets` and `redactSecretsDeep` together), so crafted page or upstream text could block the host event loop | Fixed in tree (2026-11-06, `fix/redactor-gaps`): the cookie rule tests its line for `=` in a replacer, the URL rule takes its scheme in a lookbehind, and the JWT rule finds each dotted run that holds an `eyJ` once and masks inside it in a replacer; `redact-redos.test.ts` red before, green after; not driven | PR merge of `fix/redactor-gaps` to `main` |
+| [SR-201](#sr-201) | Medium | The SSRF guard resolved a name, then let `fetch` resolve it again to connect (DNS rebinding), and let a connection through when its own lookup failed | Fixed in tree (2026-11-06, `fix/sec-004a-dns-pinning`): one lookup per hop, refused when it fails or answers privately, then the socket is pinned to that answer; driven on Node 24 and on Node 22.23.4 (the image's runtime) against a loopback listener and real DNS and TLS; not run on a hosted server | PR merge |
+| [SR-202](#sr-202) | Medium | `injectionGuardBypass` was saved in `settings.enc`: one `POST /api/v1/settings` off server mode switched the prompt-injection guard off for good, and a stored `true` was honoured on a hosted desk and could not be cleared | Fixed in tree (2026-11-06, `fix/sec-005-guard-bypass-not-persisted`): the flag is never written, a stored `true` is ignored and removed on load, a hosted desk always runs the guard; tested, not driven on a hosted server | PR merge of `fix/sec-005-guard-bypass-not-persisted` |
+| [SR-203](#sr-203) | Low | A desk's `AGENTFORGE_SECRETS_KEY` was never measured, so a passphrase became the wrap key through one unsalted SHA-256 and a copied `settings.enc` could be guessed offline | Partly fixed in tree (server refuses, desk warns; 2026-11-06, `fix/sec-006-secrets-key-floor`, then changed 2026-11-09, `fix/desk-key-warn`): the server refuses a key under 32 bytes at boot and in `getLocalVaultKey`; a desk only warns, once per process, because refusing locked out any desk that had already sealed data under a short key, and a refused key no longer quarantines `settings.enc`. Unit-tested and boot-tested, not driven on a desk with data. Residual: a desk can still run a guessable key until a re-key path exists, and a typed 44-character passphrase still passes | PR merge |
+| [SR-204](#sr-204) | Medium | Personal (retired): the Electron product window sets `sandbox: false`, because its preload reads the brand files with `fs` | Won't fix, moot (Rizky, 2026-11-06): the desktop app was retired on 2026-10-14, and nothing packs or ships `apps/desktop` | None while the desktop is retired. Reopen if a desktop build is revived, and fix before that cut |
+| [SR-205](#sr-205) | Low | Personal (retired): `wrapKey` returns an unstored random wrap key when keytar fails, so settings sealed in that session do not open on the next launch | Won't fix, moot (Rizky, 2026-11-06): the desktop app was retired on 2026-10-14 | None while the desktop is retired. Reopen if a desktop build is revived, and fix before that cut |
+| [SR-206](#sr-206) | Low | The backup heartbeat URL would sit in `.env`, which the `app` container loads, so code running in the app could send fake success pings and hide a dead backup | Fixed in PR #206 (2026-11-06): `backup.sh` reads it from the process environment only, set on the cron line; tested, not driven on a server | — |
+| [SR-207](#sr-207) | Medium | The Host check ran only on mutating `/api` requests, so a DNS-rebinding page could `GET` the API (media, threads, masked settings) from unauthenticated webdev, and a GET in server mode was not checked against the Host allowlist (SEC-004 4b) | Fixed in tree (2026-11-06, `fix/sec-004b-get-host-check`): every `/api` request needs a trusted Host, `/healthz` exempt; unit-tested through the real adapter, not driven | PR merge |
+| [SR-208](#sr-208) | Low | nixpkgs marks pnpm 9.15.9, the version the repo pins, insecure (twelve CVEs, no fix on 9.x); the Nix build permits that one version by name | Accepted for the Nix migration (2026-11-07): build-time only, no git dependencies in the lock, the Nix store pins every tarball by hash. Moving to pnpm 10 is a separate change | — |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -306,6 +314,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-161](#sr-161) | Info | Design only, not being built this round (Rizky, 2026-10-06): a person's own Knowledge Base private by person, sharing through a bot, and what an owner or admin may do when a person leaves | Not built | Blocks nothing now; blocks promising any of it |
 | [SR-162](#sr-162) | Info | What the hosted team-privacy review opened and found sound | Checked, not an issue (2026-10-07) | None |
 | [SR-164](#sr-164) | Low | The SSH private key of the HYP AI production server was attached to an agent conversation, so it is in that transcript | Open (2026-10-07); key moved to `~/.ssh`, owner-only; replace it before handover | Blocks handing the server to Hypernet |
+| [SR-200](#sr-200) | Low | The portal exited when Postgres ended a connection idle in its pool (restart, failover, `idle_session_timeout`): the pool's `error` event had no listener, so Node threw it and the process guard exited | Fixed in tree (2026-11-09), tested against Postgres 16; not driven on a hosted server | — |
 
 Status values: `open`, `fix in progress — lane X`, `fixed-unverified` (the code is in the tree and
 its test passes, nothing has been driven), `fixed, not driven` (2026-09-23 rows: the code and its
@@ -1618,11 +1627,11 @@ fixed, two were fixed on `main` afterwards, and four remain. All six re-read her
 | A06-1, nothing runs the tests | **Moved to the local gate, 2026-09-24** | `.github/workflows/` is deleted. `scripts/ci-local.mjs` (`pnpm ci:local`) runs lint, tsc, every unit suite and `node scripts/audit-deployed.mjs --level high`. It runs only when someone runs it: [SR-80](#sr-80). See [SR-12](#sr-12) |
 | A06-2, the image ships devDependencies | **Fixed, 2026-10-05** | The `prod` stage installs with `--prod` (`webapp-deploy/Dockerfile:113`) and the runtime copies that tree (`:167`); `tsx` moved to `dependencies` (`apps/web/package.json:20`). [SR-113](#sr-113) |
 | A08-1, actions pinned to mutable tags | **Closed by removal, 2026-09-24** | The three workflows and their 15 `@v4` `uses:` lines are deleted; the repo has no `.github/workflows/`. [SR-80](#sr-80) |
-| A10-6, DNS rebinding | **Open by nature** | `packages/core/src/security/safe-fetch.ts:102` states it: closing it needs a custom undici dispatcher with a pinned `lookup` |
+| A10-6, DNS rebinding | **Fixed in tree, 2026-11-06** | `packages/core/src/security/safe-fetch.ts:98-123` resolves once per hop and fails closed, and `:141` and `:168` pin the undici agent's `lookup` to that answer. [SR-201](#sr-201) |
 
 Required action: A06-1 is the one that matters, because it is why every other row in this register
 is proved by hand. Since 2026-09-24 its answer is the local gate, and what remains of it is
-[SR-80](#sr-80). A08-1 went with the workflows. A06-2 is a migration item. A10-6 stays recorded.
+[SR-80](#sr-80). A08-1 went with the workflows. A06-2 is a migration item. A10-6 was closed in tree on 2026-11-06 by [SR-201](#sr-201).
 
 Gate: **blocks Tencent deploy** for A06-1. The other three are recorded and accepted.
 
@@ -2552,8 +2561,9 @@ Gate: was **blocks PR merge** (`audit:deployed` is a required `ci:local` step); 
 ### SR-85 {#sr-85}
 
 **The packaged app never set `AGENTFORGE_PACKAGED`, so the dev endpoint hooks were not ignored in it.**
-Personal. Raised 2026-09-30 by the verify-skill pass, fixed 2026-10-01 in the working tree, not
-committed. Fixed, not driven on a packed installer.
+Personal. Raised 2026-09-30 by the verify-skill pass, fixed 2026-10-01 in the working tree and
+committed in `5fc00596` (2026-10-05). Fixed, not driven on a packed installer. Moot while the desktop
+is retired (2026-10-14). See "Status, 2026-11-06" below.
 
 Evidence, before the fix:
 
@@ -2588,15 +2598,15 @@ sent to the Toko Token gateway.
 
 Fixed 2026-10-01, in one change:
 
-- `apps/desktop/main.cjs` `bootstrapPackaged` (`:660-667`) sets `AGENTFORGE_PACKAGED=1`, deletes any
-  inherited `AGENTFORGE_GATEWAY_URL`, and sets or deletes `AGENTFORGE_BRAND_GATEWAY_URL` from
-  `brandGatewayOverride(brand)`, all before `require("./host.cjs")` (`:669`). The module-level
-  assignment of the dev hook is gone (`:86`).
+- `apps/desktop/main.cjs` `bootstrapPackaged` (`:673-680` at `39cd5f0c`) sets `AGENTFORGE_PACKAGED=1`,
+  deletes any inherited `AGENTFORGE_GATEWAY_URL`, and sets or deletes `AGENTFORGE_BRAND_GATEWAY_URL` from
+  `brandGatewayOverride(brand)`, all before `require("./host.cjs")` (`:682`). The module-level
+  assignment of the dev hook is gone.
 - `apps/desktop/brand-read.cjs` `brandGatewayOverride` (`:39`) is empty for the public build whatever
   its `brand.json` says, and is the flavor's `gatewayBaseUrl` otherwise.
 - `packages/core/src/gateway/pinned.ts` `gatewayUrlOverride()` (`:72`): packaged reads only the brand
   channel (https, no credentials, else ignored); anything else reads the dev hook unless
-  `NODE_ENV=production`. `resolvedGatewayBaseUrl()` (`packages/core/src/gateway.ts:37`) calls it.
+  `NODE_ENV=production`. `resolvedGatewayBaseUrl()` (`packages/core/src/gateway.ts:47`) calls it.
   `gatewayUrlOverrideAllowed()` (`:38`) is unchanged, so the Telegram origin is now pinned in a
   packaged build without touching `channels/pinned.ts`.
 - Tests: `packages/core/src/gateway/pinned.test.ts` (dev, production and packaged cases, both
@@ -2624,8 +2634,13 @@ Metranet window must report `https://aihub.metranet.co.id/v1`. The hosted app is
 `NODE_ENV=production` (`webapp-deploy/Dockerfile:157`, `webapp-deploy/compose.yml:29`) and never sets the
 packaged marker.
 
-Gate: **blocks the next Personal cut** until those two drives are done. A regression here is silent
-and sends a flavor user's key to the wrong gateway.
+**Status, 2026-11-06.** The fix is on `main` (`apps/desktop/main.cjs:673`), committed in `5fc00596`
+(2026-10-05). Both 0.16.0 pack commits, `4dd33fa` and `e7a17c2`, contain it, and that pack checked it
+only through `doctor --desktop` (`docs/internal/0.16.0-changelog.md:81`). So the two drives above were
+never done. The desktop app was retired on 2026-10-14 (Rizky), and no Personal cut follows.
+
+Gate: none while the desktop is retired. If a desktop build is revived, those two drives block its
+cut. A regression here is silent and sends a flavor user's key to the wrong gateway.
 
 ### SR-87 {#sr-87}
 
@@ -3234,7 +3249,25 @@ been driven on the hosted compose rehearsal.
 ### SR-157 {#sr-157}
 
 **Stored media is read, listed and deleted by company, not by person.** Hosted (Enterprise). Raised in the
-2026-10-06 review and confirmed in the code on 2026-10-07. **Open. Nothing was changed, on purpose.**
+2026-10-06 review and confirmed in the code on 2026-10-07.
+
+**Accepted for the OPC (Rizky, 2026-11-06).** A Nultron org has one owner, so there is no colleague to read,
+list or delete another person's media. The code is unchanged, on purpose. At `39cd5f0c` the lookups still filter by
+organization only (`packages/host/src/handlers/media.ts:32`, `:89`, `:97`; `packages/host/src/media.ts:48`,
+`:138`). This also decides [SR-175](#sr-175) and [SR-176](#sr-176), and the security tester's SEC-003 (Notion Dev
+Findings, BUG-33).
+
+Reopen when an org gets a second member. Nothing on `main` prevents that:
+- the membership table exists (`organization_members`, `packages/db/src/schema.ts:289-302`);
+- the release bundle's `DEPLOY.md` tells the operator to add `admin` and `member` accounts up to the seat cap
+  (`scripts/release-web-docs.mjs:156`).
+
+So an operator who follows the bundle's own steps meets the reopen trigger. The fix plan on the SEC-003 card is
+owner-only reads, lists and inline reads in server mode, and delete by the maker or an owner or admin. No
+visibility column is needed, because Workspaces and team sharing are gone. Media needs no owner column
+either, because `media.user_id` is NOT NULL (`packages/db/src/schema.ts:714`). Artifacts need an owner column first.
+The `artifacts` table has none (`packages/db/src/schema.ts:852-868`), and list, get and delete filter on
+`workspace_id` only (`packages/host/src/artifacts.ts:147-177`).
 
 Evidence:
 - The row records its owner and nothing else about its use. `media.user_id` is NOT NULL
@@ -3275,7 +3308,9 @@ Chat attachments by person: this is what "a document attached in Chat is private
 it" needs, and it is the smallest change. (3) Leave media company-wide and record that a Chat attachment is
 shared inside a company. Option 2 is not built; the document-attach work is a separate lane.
 
-Gate: blocks the sentence "a Chat attachment is private to the person who attached it" until one is chosen.
+Gate: reopen when an org gets a second member (the bundle's DEPLOY.md step 7 allows it today,
+`scripts/release-web-docs.mjs:156`). Until one option is chosen, nothing may claim that "a Chat
+attachment is private to the person who attached it".
 
 ### SR-165 {#sr-165}
 
@@ -4791,7 +4826,7 @@ text inside them was protected at rest and not masked. `redactSecrets` covered o
 model passed to a tool, a page that `web_fetch` read and that echoed a header, a desk file that held a key, and a
 tool error that quoted a header.
 
-Fix: `redactSecretsDeep` (`packages/core/src/security/redact-deep.ts:70`) masks credential-shaped text at any depth and
+Fix: `redactSecretsDeep` (`packages/core/src/security/redact-deep.ts:71`) masks credential-shaped text at any depth and
 the value of a key named like a secret. The text shapes are a bearer token; `sk-`, `sk-ant-`, `tvly-` and `AIza` keys;
 a JWT (the portal's own tokens); a Telegram bot token (`telegramBotToken` is stored in settings); an AWS access key id;
 a PEM private key block; the user and password of a URL (`postgres://u:p@h`, `https://user:pass@host`); and a
@@ -4827,7 +4862,51 @@ reply through `redactCredentials` before the card is indexed, listed as a source
 Residual:
 - The opaque-token rule of `redactSecrets` is not applied: it would erase content hashes, signed media links and long
   identifiers the renderer needs. A secret with no known prefix and no secret-looking key name (a bare random token, a
-  GitHub or Slack token, a Basic-auth string, a database password outside a URL) is stored and shown as it came.
+  database password outside a URL and outside an upper-case `.env` line) is stored and shown as it came.
+- Closed under F-152-2 (2026-11-06, `fix/redactor-gaps`, tested, not driven). `redactCredentials`
+  (`packages/core/src/security/redact.ts`) now masks GitHub tokens (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`,
+  `github_pat_`), Slack tokens (`xoxb-`, `xoxp-`, `xoxa-`, `xoxe-`, `xoxs-`, `xoxr-`, `xapp-`) in their real shapes, with a digit group after the prefix, so a hyphenated name such as
+  `xapp-production-cluster` stays readable and is not refused by the outbound guard), Stripe live keys
+  (`sk_live_`, `rk_live_`), a `Basic` credential after an `Authorization` or `Proxy-Authorization` name, the value
+  after an `X-Api-Key` name when it has eight or more characters (it stops at whitespace, a quote, `,`, `;`, `&`,
+  `#` or a closing bracket, so a query string keeps its other parameters), a bearer token after a percent-encoded space, and the
+  value of an upper-case `NAME=value` line (a `.env` file or an `export`) when the last `_` part of the name is KEY,
+  SECRET, TOKEN or PASS, when the name ends in PASSWORD, PASSWD or APIKEY (`PGPASSWORD`, `OPENAI_APIKEY`) or in `_PWD`
+  (`MYSQL_PWD`), or when it is `SECRET_KEY_BASE`. `redactSecretsDeep` (`redact-deep.ts`) also masks the value under a
+  key that ends in a secret name after `_`, `-` or a camel-case boundary (`OPENAI_API_KEY`, `DB_PASSWORD`,
+  `aws_secret_access_key`, `githubToken`). Deep mode does not use the `.env` endings `PASS`, `_PWD` or an unseparated
+  `PASSWORD`, so `PGPASSWORD`, `dbPass`, `DB_PASS` and `MYSQL_PWD` as object keys stay readable while the same names on
+  a `.env` line are masked. Tests: `redact-tokens.test.ts` and `redact-deep.test.ts`, 31 of 61 red
+  before the first fix; the `.env` name and figure cases (3 red) and the Stripe, Slack and `X-Api-Key` cases (5 red)
+  were added in the review round, red before their fix and green after.
+  Trade-offs chosen on purpose. A bare `Basic <word>` is prose ("Basic principles of accounting"), so the Authorization
+  name is required and a Basic string outside a header stays unmasked. The key-name ending in deep mode also masks
+  values that are not credentials, which the display then shows as `[REDACTED]`: a pagination cursor under
+  `nextPageToken` or `page_token`, a `csrf_token`, a tokenizer's `stopToken`, `eos_token` and `pad_token`, a
+  `cachedToken`, and a `sessionToken`, `continuationToken` or `syncToken` that is only an id, and any key that ends in
+  `secret`, such as `hasSecret` and `top_secret` (run on 2026-11-06 against `redactSecretsDeep`). The `.env` rule is
+  upper-case and line-anchored, so `password = input()` in code, a lowercase INI line such as
+  `aws_secret_access_key = ...` and an assignment in the middle of a line (`docker run -e DB_PASSWORD=...`) are not
+  masked. It reads the last `_` part of the name, so `TOKEN_ENDPOINT`, `KEY_COLUMNS`, `PASSWORD_REGEX`, `KEY_SIZE`,
+  `TOKEN_COUNT`, `PASSWORD_MIN_LENGTH` and a bare `PWD` (a working directory) stay readable; the cost is that a secret
+  under a name that does not end in a secret word (`DB_PASSWORD_PROD`, `AUTH_TOKEN_VALUE`) is not masked. A value that is
+  only a number (with an optional sign and thousands separators) or `true` or `false`, quoted or not and optionally
+  followed by a `# comment`, is left alone so that `MAX_TOKEN=4096` stays readable; the cost is that a password made of
+  digits only on a `.env` line stays visible (`DB_PASSWORD=123456`). An upper-case constant in code, such as
+  `API_KEY = os.environ["X"]` in a settings file that `read_file` returns, is masked in the display and the stored
+  copy. The model reads the real result in the turn the tool ran. The next turn reads the stored, masked copy: its
+  `toolResultNote` (`packages/core/src/content/transcript.ts:89`, called through `historyToolNote`,
+  `packages/host/src/chat-history-note.ts:11`) quotes the stored output of a tool whose trust is not `user_content`, and
+  names a `user_content` tool as having run and nothing more. Every added rule also widens what the outbound guard
+  refuses. `hasCredential` is `redactCredentials(text) !== text` (`outbound-match.ts:250`) and is used for a model-written
+  prompt (`outbound-guard.ts:267`), a search query (`outbound-match.ts:282`) and a page address (`:305`), so text
+  that matches one of the new rules, and that the person did not type, is now refused as `credential`.
+  Checked for the key-name ending: a `git grep` of `apps/web`, `packages/core/src/tools`, `packages/core/src/runtime`
+  and `packages/host/src/{workers,delegation,edit}` found no tool output field whose name ends in `Token`, `Secret` or
+  `Password` that the renderer reads back, and no file under `apps/` imports the core redactor (`apps/portal` has its
+  own `redactSecrets`). Still open from the same sign-off: a JSON-escaped `sk-...` token, a key split across two fields, an `sk-`
+  token with fewer than eight characters after the prefix, a JSON document inside a string (the walker does not parse
+  it), and a 40-character AWS secret access key in free text in deep mode.
 - The model reads the raw tool result, so a secret it repeats lands unredacted in the assistant text, the saved `text`
   part and the streamed deltas of that thread (the decision above). It no longer reaches the Knowledge Base card.
 - A secret the person types into their own message is not touched in the thread.
@@ -4842,13 +4921,26 @@ Residual:
   budget refusal case is a coverage case) and `packages/host/src/edit/job-error-screen.test.ts`.
   A job's error text is upstream text (a provider can echo the key it was sent). It was stored unredacted on
   `edit_jobs.error` and streamed on `job.done`. It is now redacted where it is stored, in `failJob`
-  (`packages/host/src/edit/jobs.ts:409`, `redactSecrets`), so `job.done` (`jobs.ts:403`, `:423`), the project
-  bundle (`packages/host/src/edit/projects.ts:136-150`) and the job read carry the redacted copy. Rows stored
-  before this change keep the upstream text.
-  Not screened, and not a leak of the tool's output: the project event stream's ops and unplaced items
-  (`packages/host/src/edit/ops.ts:356`, `jobs.ts:382`) hold the person's own text and the agent's arguments. A secret
-  with no known prefix under a non-secret name is not caught there, as in Chat. A job's `onEvent` hands raw events to
-  job code (`packages/host/src/job-regen.ts:299`); it does not write `tool_invocations`.
+  (`packages/host/src/edit/jobs.ts:407`, `redactSecrets` at `:410`), so `job.done` (`jobs.ts:404`, `:424`), the project
+  bundle (`packages/host/src/edit/projects.ts:137-151`) and the job read carry the redacted copy. Rows stored
+  before this change keep the upstream text in the database. Closed on the way out under F-152-3 (2026-11-06,
+  `fix/redactor-gaps`, tested, not driven): `mapJob` (`projects.ts:172`) masks `error` with `redactSecrets` on every
+  read, so the bundle, the job read and `job.done` carry a masked copy for those rows too. The rule is idempotent, so
+  a row masked on write reads back unchanged. Test: `packages/host/src/edit/job-error-legacy-row.test.ts` (3 of 4 red
+  before, green after). Every client-facing job answer goes through `mapJob`; no other reader of `edit_jobs` was found.
+  Not screened, and not a leak of the tool's output. The project event stream (`handleGetEditEvents`,
+  `packages/host/src/handlers/edit.ts:438`) goes only to the desk that owns the project; the desk check runs before the
+  first frame (`:442-443`). The project read returns the same ops, cards and `unplaced.prompt` as stored, unmasked
+  (`handleGetEditProject`, `edit.ts:155`, into `getEditProjectBundle`, `projects.ts:137-151`; `mapUnplaced` returns
+  `prompt` as stored, `projects.ts:201`). The only upstream error text on the stream is the job's `error` on `job.done`
+  (`jobs.ts:404`, `:424`), which `mapJob` now masks. Tool output reaches an op only as an asset id or a clip status
+  that a finished job writes (`jobs.ts:363-367`, `:439`) or as text the model chose to put in a tool argument
+  (`backend.ts:141`). `job.progress` is a number (`jobs.ts:485`), and `job.cancelled` carries the fixed word `cancel`
+  or `undo` (`jobs.ts:539`, `undo.ts:49`). So screening only the stream would protect nothing the project read does
+  not already hand to the same person. The real fix would be to mask agent-written op and card text when it is
+  stored, which changes the ops the renderer folds; that is a separate design, and it is the residual here. A secret
+  with no known prefix under a non-secret name is not caught on the stream, as in Chat. A job's `onEvent` hands raw
+  events to job code (`packages/host/src/job-regen.ts:299`); it does not write `tool_invocations`.
 - Rows and messages written before the change keep what they hold.
 - No Chat code path was found that logs a tool's input or output; that is read, not proven by a log capture.
 
@@ -5106,6 +5198,30 @@ what was opened, not a map of the whole product (`AGENTS.md` says that map is st
   when the card was indexed.
 
 Gate: none. Decide item by item when the per-person Knowledge Base is designed ([SR-161](#sr-161)).
+
+### SR-200 {#sr-200}
+
+**The portal exited when Postgres ended a connection that sat idle in its pool.**
+Raised 2026-11-09 by the Nix migration's flake checks (`docs/internal/nix-migration.md`, rung 5), where the portal
+suite reported `57P01` as an unhandled error after every test had passed. Low. Hosted (Enterprise), portal only.
+
+Evidence: `openPostgresStore` (`apps/portal/src/store/postgres/index.ts`) created a `pg.Pool` with no `error`
+listener. pg-pool 3.14.0 re-emits an idle client's error on the pool (`makeIdleListener`, `pool.emit('error', err,
+client)`), and an `error` event with no listener is thrown. `installProcessGuards` (`apps/portal/src/process-guards.ts`)
+turns the uncaught exception into `portal_uncaught_exception` and `exit(1)`. So any session Postgres ends while it is
+idle in the pool (a restart, a TencentDB failover or maintenance, `idle_session_timeout`, an operator's
+`pg_terminate_backend`) stopped the portal until compose or Kubernetes restarted it, and the in-process limiters and
+the refresh lock (SR-29, SR-66) started over with it. Not triggerable by a client request.
+
+Fix: the store always listens for the pool's `error` event; the pool has already dropped the connection and opens a
+new one for the next query. `openStore` passes a callback that logs `portal_db_idle_connection_lost` with the SQLSTATE
+only, from `prepareStore` (`apps/portal/src/boot.ts`). `src/store/postgres/idle-connection.test.ts` terminates an idle
+session with `pg_terminate_backend` and checks the store reports `57P01` and serves the next query; against the store
+as it was, the same test fails with the unhandled `57P01` the flake checks saw.
+
+Residual: not driven against a hosted Postgres restart.
+
+Gate: none.
 
 ## Info and checked-not-an-issue
 
@@ -6005,6 +6121,8 @@ A salt and a slow KDF protect a guessable secret, such as a password. This secre
 host refuses to start unless `AGENTFORGE_SECRETS_KEY` carries at least 32 random bytes (`packages/db/src/vault-key.ts`,
 `MIN_VAULT_KEY_BYTES` and `SERVER_VAULT_KEY_TOO_WEAK`), and the deploy docs generate it with `openssl rand -hex 32`
 (`webapp-deploy/README.md:287,508`). Hashing 256 random bits gives a 256-bit key. Recorded so nobody chases it twice.
+That held for the server only: a desk measured nothing until [SR-203](#sr-203), which makes a desk warn about a short key
+and records the human-chosen keys that still pass the floor.
 
 ### SR-174 {#sr-174}
 
@@ -6027,9 +6145,9 @@ Gate: before the team board is deployed behind Caddy. Not driven.
 
 **Hosted: a person's own generated files are visible to the whole company.**
 
-**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+**Accepted for the OPC (Rizky, 2026-11-06).** A Nultron org has one owner, so this needs a second member in one org. Reopen when an org gets a second member; the bundle's DEPLOY.md step 7 allows it today (`scripts/release-web-docs.mjs:156`, see [SR-157](#sr-157)). The note it replaces said "Not applicable since 2026-10-16", which was wrong for `main`. The tester's OPC strip (P5b, `18886fbf`) deleted the tester's owner check (`packages/host/src/media-visibility.ts`), not the reads on `main`. At `39cd5f0c` those still filter by organization or desk only: media by organization (`packages/host/src/handlers/media.ts:32`, `packages/host/src/media.ts:48`), artifacts by desk (`packages/host/src/artifacts.ts:147-177`).
 
-Raised 2026-10-14. Medium. Open. Found by read-only scouts of the tester code (`agentforge-chat`, which carries
+Raised 2026-10-14. Medium. Open until 2026-11-06, then accepted for the OPC. Found by read-only scouts of the tester code (`agentforge-chat`, which carries
 the same stores as `main`) while planning the team board's files phase.
 
 Rule (Rizky, 2026-10-14): a file a person makes on their own is visible only to them; a file put into a
@@ -6054,16 +6172,16 @@ to its owner or when it is shared; two people of one company plus one of another
 router. Legacy rows with no owner: decide with Rizky (draft: stay company-visible, since that is how they were
 made).
 
-Gate: before a second person of one company uses the hosted app for their own work. Not fixed.
+Gate: reopen when an org gets a second member (the bundle's DEPLOY.md step 7 allows it today, `scripts/release-web-docs.mjs:156`). Not fixed.
 
 
 ### SR-176 {#sr-176}
 
 **Hosted: any member of a company can delete another member's files.**
 
-**Not applicable since 2026-10-16.** The tester's OPC strip (P5b) removed the code this entry is about. Its tables stay orphaned in databases written before the strip, and nothing reads or writes them. Kept as history.
+**Accepted for the OPC (Rizky, 2026-11-06).** A Nultron org has one owner, so this needs a second member in one org. Reopen when an org gets a second member; the bundle's DEPLOY.md step 7 allows it today (`scripts/release-web-docs.mjs:156`, see [SR-157](#sr-157)). The note it replaces said "Not applicable since 2026-10-16", which was wrong for `main`. The tester's OPC strip (P5b, `18886fbf`) deleted the tester's delete gate, not the deletes on `main`. At `39cd5f0c` those still select and delete by organization or desk only: media (`packages/host/src/handlers/media.ts:89`, `:97`), artifacts (`packages/host/src/artifacts.ts:175`). The SEC-003 card suggests this delete gate as the first piece to ship when the trigger is met. For media it needs no schema change, because `media.user_id` is NOT NULL (`packages/db/src/schema.ts:714`). A delete by the maker for artifacts needs an owner column first, because the `artifacts` table has none (`packages/db/src/schema.ts:852-868`).
 
-Raised 2026-10-14. High. Open. Found by the W1b worker in the tester and checked on `main` by the orchestrator.
+Raised 2026-10-14. High. Open until 2026-11-06, then accepted for the OPC. Found by the W1b worker in the tester and checked on `main` by the orchestrator.
 
 Evidence (`main`):
 - `DELETE /api/v1/media/:mediaId` (`packages/host/src/handlers/media.ts:82-107`) selects and deletes on `organization_id` and the id only. It never compares `media.user_id` with the caller, so any signed-in member removes a colleague's image or video and its stored file.
@@ -6073,7 +6191,7 @@ Why High and not Medium like SR-175: SR-175 leaks a read; this destroys another 
 
 Fix (tester first, server mode only, Personal unchanged with a parity test): a delete succeeds only for the row's owner, or for a company owner or admin (who may delete and never read, the leaver rule of 2026-10-06). Taking a file out of a Workspace clears `project_id` and deletes nothing. Two people of one company plus one of another through the real router.
 
-Gate: before a second person of one company uses the hosted app for their own work. Not fixed.
+Gate: reopen when an org gets a second member (the bundle's DEPLOY.md step 7 allows it today, `scripts/release-web-docs.mjs:156`). Not fixed.
 
 ### SR-177 {#sr-177}
 
@@ -6257,7 +6375,7 @@ How it is used:
 - Erasing the organization removes its rows: the table is in `CASCADED_TABLES` (`packages/db/src/tenant-purge.ts:97`) and its foreign key cascades (`packages/db/src/gateway-tokens-schema.ts:8`).
 
 Leak checks, all in the tester:
-- `packages/host/src/gateway-tokens/check.test.ts` ("the token is a value redaction leaves alone"): `redactSecrets` does not hide this token, so a log that carried it would not be cleaned up. The rule is that no log line carries a request body. `redactSecrets` (`packages/core/src/security/redact.ts:63-67`) matches credentials and base64-like text only.
+- `packages/host/src/gateway-tokens/check.test.ts` ("the token is a value redaction leaves alone"): `redactSecrets` does not hide this token, so a log that carried it would not be cleaned up. The rule is that no log line carries a request body. `redactSecrets` (`packages/core/src/security/redact.ts:107-112`) matches credentials and base64-like text only.
 - The HTTP adapter logs the path length, method, IP and the error object on a 500 (`packages/host/src/http-adapter.ts:745-751`). It never logs a request body (`respondRejection`, `:443-455`).
 - `company-gateway-admin.test.ts`, "nothing a caller sees carries the token": every answer and every console line across a full save, read and clear.
 - `adapter.test.ts`, "never puts the management token or a gateway key into an error".
@@ -6489,7 +6607,31 @@ Residual: a request-body array with no `.max()` (`flagged`, `packages/host/src/h
 others) can still cost a signed-in caller's request a few hundred megabytes under the 26 MB body cap. Capping them
 is a follow-up, not part of the move.
 
-Gate: none left on the advisory; the follow-up gates nothing.
+Request-body cost bounded 2026-11-06 on `fix/request-array-caps`. The first version of this fix counted list items and an independent review failed it with measurements, so the account below replaces the earlier claim that the residual was closed. The residual is bounded, not removed, and the bound is stated with what was measured.
+
+Why a count of list items does not bound `zod`. `zod` 4.6.7 records one issue per failing leaf, and an empty object `{}` is one value that fails every required field of its schema: 6 for a presentation shape, 5 for a finance table cell (a union adds nested errors), 3 for a finance metric, 12 for an Edit title style. A cap on list items therefore lets a body of `{}` through that costs several times its item count. The review's probe, 2,000 slides of 24 empty shapes (170 KB, about 52,000 list items, inside the first version's 250,000), gave 290,000 issues and 79 MB retained. Three parse helpers also joined every issue into the error text, which was 18,104,028 characters for the same shape (measured through the router) and 52,022 for 500 empty document sections. `parseOpPayload` put `zod`'s whole `error.message` in the `400`. A Market briefing with 200,006 bad entries in `packet.macro.failures` (400 KB) gave 200,006 issues and 114 MB.
+
+What went in:
+
+- **A cost walker.** `assertRequestWithin` (`packages/host/src/request-limits.ts:18`) walks a posted value without recursion and charges every value it visits: an object or list `CONTAINER_COST` (6, `:9`), any other value 1. It answers `400 invalid_request` past a cost budget or past a per-list length. Two profiles: `REQUEST_LIMITS` (60,000 cost, lists of 10,000, `:11`) and `BRIEFING_LIMITS` (250,000 cost, lists of `HISTORY_BARS_MAX + 200` = 1,000, `:12`) for a Market briefing.
+- **The budgets come from the largest honest body, measured with the walker's own cost** (2026-11-06). The finance reports and the computed brief block come from the real builders on 500 line items: a budget report 17,951 to 23,413 (157 to 187 KB), a ratios report 18,075 (155 KB, 36 periods), a cash-flow report 12,899 (86 KB), an appraisal report of 120 years 10,274 (54 KB), a finance brief 9,230, a finance task body 5,519. A posted report is capped at 256 KB (`FINANCE_REPORT_MAX_BYTES`) and the densest of those costs 0.15 per byte, so a report at the cap costs about 39,000; one made only of `null` cells, 5 bytes for 1, would cost 51,000. Built from the schema maxima: a 14-slide deck with 12 bullets and 24 shapes per slide 5,543, the saved-deck maximum 12,087, an Edit `restore_timeline` snapshot of 500 clips with titles 26,096 and of 1,000 clips 52,096, a document draft 253. A Market briefing that `marketBriefingSchema` accepts, built from the test fixtures with 15 tickers of 756 bars, a 120-point chart of 3 series, 8 headlines, 12 swing points, crypto, fundamentals, insider counts and sentiment on every ticker, 90 signals, 12 sections, 200 sources and full team notes, costs 155,891 (`packages/host/src/request-limits.test.ts` rebuilds it and asserts the briefing profile admits it). The default budget is 1.15 times the largest Edit snapshot measured and 1.5 times a report at the byte cap; the briefing budget is 1.6 times the briefing.
+- **Walked once per request.** `finance-export.ts:44` walks the whole body before `readPostedFinanceReport`, so `brief`, `result.brief` and `report` share one budget (the first version walked `brief` and `result.brief` separately, so one request carried twice the budget, and walked neither before the report was parsed).
+- **Bounded error text.** `summarizeIssues` (`packages/core/src/errors.ts:22`) keeps the first 20 issues, each cut to 300 characters, and appends `(and N more)`. It is used by `parsePresentationOutlineBody`, `parsePresentationSlide` and `parsePresentationOutline` (`presentation-outline.ts:148`, `:170`, `:194`), the three document parsers (`document-outline.ts:33`, `:55`, `:75`) and `parseOpPayload` (`packages/core/src/edit/ops.ts:256`). An issue now reads `path: message`.
+- **Market, the two routes the first version missed.** `POST /market/regenerate` walks its body with `BRIEFING_LIMITS` before `regenerateBriefingSection` parses `briefing` (`handlers/market.ts:57`), and `POST /market/docx` uses the same profile (`:70`; with the default profile an honest briefing would be refused). The six Market packet lists that had no `.max()` are capped in the schema, so the briefing no longer has an uncapped list: a ticker's `failures` and the macro `failures` at `PACKET_NOTES_MAX` 100, the macro `quotes` at `MACRO_QUOTES_MAX` 100, and a price chart's series at `CHART_SERIES_MAX` 3 (the close plus one per `CHART_SMA_PERIODS` entry) with its axis and each series at `PRICE_CHART_POINTS_MAX` 504 (`packages/core/src/market/watch-schemas.ts:46-49`, `:172-180`, `:188`, `:200`, `:218-222`). `buildMarketWatchPacket` parses its own packet with this schema (`packet.ts:1004`, `:1012`), so a cap below what the host writes would fail a whole briefing. A ticker gets at most about 17 notes (stale, history, technical, TradingView, news, fundamentals, two StockTwits, four subreddits, two settle notes), `fetchMacro` writes one note and one quote per macro symbol (10, `market/macro.ts:18-32`), and a chart is a close line with two moving averages (`CHART_SMA_PERIODS`, 120 points), so 100, 100, 3 series and 504 points refuse nothing the host wrote. Without these caps the walker alone let 15 charts of 15 series of 1,000 non-numbers through (225,244 issues, 170 MB).
+- **Saved decks.** `POST /presentations/decks` had no check, and a valid outline of any size was written and re-read on every list. It walks the outline (`handlers/presentation-decks.ts:32`) and `savePresentationDeck` refuses more than `SAVED_DECK_SLIDES_MAX` slides (28, twice the 14 the builder allows) or `SAVED_DECK_BULLETS_MAX` bullets on a slide (50, over four times the 12 the deck tool allows, since a person adds bullets by hand; `presentation-decks.ts:21-22`, `:41`). The cap is in the save, not in `presentationOutlineSchema`, so a deck saved earlier still opens.
+- **Other call sites**, unchanged except that they now share the walker: the finance run, stream, parse and regenerate bodies (`handlers/finance.ts:17`), the brief Word export (`:100`), the document Word export and overlap check (`handlers/jobs.ts:221`, `handlers/documents-check.ts:16`), the document and presentation regenerates (`document-generate.ts:379`, `presentation-generate.ts:490`), the PowerPoint export (`handlers/jobs.ts:280`) and the Edit ops route (`handlers/edit.ts:165`; its op payloads go through `zod` in `parseOpPayload`). The legal matter `deliverables` list keeps its own `.max()` (`legal/input.ts:43-48`, `DELIVERABLE_KINDS.length * 4`; the list is de-duplicated after the check). The `flagged` list in `finance-export.ts` no longer has one, since the walker covers it.
+
+Measured worst case at the cap (Node 22, `zod` 4.6.7, heap after a collection minus heap before while the result is held; the probe scripts are not in the repo). A body is built to sit just under the budget with the shape that costs the most.
+
+- **Default profile, 60,000 cost.** 384 slides of 24 empty shapes (33 KB): 55,680 issues, 41 MB, 0.12 s. 9,000 empty finance table cells: 45,000 issue objects, 56 MB, 0.12 s. 9,800 empty cells in a posted report: 49,000 objects, 60 MB, 0.14 s. 9,996 empty Edit clips: 49,980 issues, 39 MB. 2,499 Edit clips with an empty `title.style`: 29,988 issues. 54,000 numbers where strings are expected: 54,000 issues, 37 MB at most. So no body the default profile admits gives more than about 56,000 issues or 60 MB retained, and none takes more than 0.15 s to fail. The error text of a failing body is at most about 6,100 characters (20 issues of at most 300) and under 2,000 for the bodies in `request-array-caps.test.ts`, which asserts it for the deck, document and saved-deck routes.
+- **Briefing profile, 250,000 cost.** 15 tickers, each with 800 empty bars, a chart axis of 504 empty values and 3 chart series of 504 strings: 102,351 issues (117,471 issue objects), 71 MB, 0.22 s, from a 151 KB body. The PR review first measured 180,186 issues and 117 MB with an 800-point axis and 8 series; the packet chart caps then dropped to what the host writes and the browser asks for: `PRICE_CHART_POINTS_MAX` 504 points (the 2Y range, `CHART_RANGES`) and `CHART_SERIES_MAX` 3 (close plus SMA50 and SMA200, `chart-builder.ts`; the packet chart is 120 points, `packet.ts:808`). The 800 bars per ticker stay, because `yahoo.ts` fetches 504 + 199 bars. `/market/docx` has no gateway check and no run slot, so this is the worst one request there costs. With the six lists capped, the longest remaining body of the earlier shapes (macro lists, 15 charts of 13 series) fails at one issue per list.
+- **What is still unbounded.** Memory is bounded per request; the rate of failing requests is bounded only by the rate limiter. In server mode every request, on every route, passes the per-IP bucket (600 a minute, burst 100) and the per-session bucket (300 a minute, burst 50) in `packages/host/src/rate-limit.ts` (wired at `http-adapter.ts:477`); webdev and the desktop have no limiter and one user. The run slots (SR-138) cap runs in flight on the gateway routes only, so the Word and PowerPoint exports, the finance export, saved decks and Edit ops have no in-flight cap. A `zod` parse is synchronous in the one host process, so two failing parses do not overlap (inferred, not measured), but at the session bucket's 300 a minute a caller who sends the worst failing body each time (0.12 to 0.14 s) would keep that process about 70% busy (arithmetic from the measured times, not driven). That is a CPU cost of a signed-in session (session plus CSRF needed), not a memory one, and tightening the per-session bucket for these routes is the lever if it matters. The 26 MB body cap (`MAX_BODY_BYTES`, `http-adapter.ts:43`, enforced while streaming at `:240`) still bounds the raw read and `JSON.parse`. Nothing was driven on a hosted server.
+
+Inventory. The uncapped lists left in the request schemas were found by walking `z.toJSONSchema(schema, { io: "input", unrepresentable: "any" })` for `type: "array"` with no `maxItems`, on 2026-11-06 after this change: the finance brief 12 positions (`sections`, a section's `tables` and `metrics`, a table's `columns` and `rows` and each row, `assumptions`, `computed.metrics`, `computed.tables`, and their columns and rows), the presentation outline 2 (`slides`, `bullets`), the document draft 1 (`sections`), and the Edit ops 6 (`add_track` `clips` and `ingredientIds`, `add_clip` `ingredientIds`, `restore_timeline` `tracks`, `clips` and `ingredientIds`). The Market briefing has none and the posted finance report has none. Every request route that reaches one of these schemas calls `assertRequestWithin` first. A line count is a poorer guide and was only the first list: `grep -rn 'z\.array(' packages/core/src packages/host/src --include=*.ts`, test files left out, gives 161 lines in 42 files, and 73 lines in 27 files once lines holding `.max(` are dropped. It over-counts a list whose `.max(` is on a later line and misses a schema built from another, which is why the schema walk replaced it. The review reported 75 lines without `.max(` across 42 files, which is near these counts. The rest of the lists are parsed from values the host builds itself, from model output or from stored records.
+
+Checked, not changed. The readers that do not use `zod` (`edit.ts` `targetClipIds`, `knowledge.ts` `rules`, `agents.ts` `inputModalities` and `toolKeys`) build no issue list. A stored-record schema (`channels/records.ts`, `meeting/records.ts`, `legal/records.ts`) never reads a request body. `defineTool` (`packages/core/src/tools/define-tool.ts:54`) still puts `zod`'s whole message in `invalid_tool_args`, but its input is a model's tool call, not a request body. The Open Slide deck routes are capped by their schema (12 pages, 16 blocks a page, `packages/core/src/open-slide/deck.ts:135`, `:173`).
+
+Gate: none.
 
 ### SR-197 {#sr-197}
 
@@ -6534,6 +6676,314 @@ Residual: not driven on a hosted server; the override has to be dropped once the
 Gate: PR merge of the AI SDK 5 move.
 
 ### SR-199 {#sr-199}
+
+**The credential redactor ran three of its regular expressions in quadratic time.**
+Raised 2026-10-11 by the PR #152 security sign-off (finding F-152-1, board card BUG-21). Re-checked open on `main`
+at `39cd5f0c` on 2026-11-06. The independent review of the first fix found the third, the JWT rule. Medium. Both
+products.
+
+Evidence before: `COOKIE_HEADER_RE` (`packages/core/src/security/redact.ts:32`, added in `c04898a4` on 2026-10-07)
+re-ran its `=` lookahead at every backtrack position of the space run after `cookie:`. The word `cookie:` followed by
+100,000 spaces took 17.7 s in `redactCredentials` on this machine (26.6 s with tabs, 19.5 s with spaces and a word).
+The sign-off measured 12 s at 80,000 spaces through `redactSecretsDeep`. The word and colon repeated 15,000 times on
+one line took 3 s, and the lookahead the card suggests leaves that shape quadratic (1.7 s at 98,000 characters,
+timed with the card's pattern outside the repo). `URL_USERINFO_RE` (`:20`) is the same class and the card did not
+probe it. It started a scan at every word boundary inside a long run of scheme characters, and each scan ran to the
+end of the run. A dotted run of 100,000 characters (`a.a.a.`) took 62 s and a hyphenated run 17 s. `JWT_RE`
+(`redact.ts:23` on `main`) is the same class and the first fix missed it. A hyphen is in its character class but is not
+a word character, so each `eyJ` after a hyphen passed `\b` and rescanned the rest of the run: `eyJ-` repeated 25,000
+times took 12.0 s in `redactCredentials` here (the reviewer measured 18.3 s), 14.2 s with `.aaaaaaaa.` after it, and
+24.8 s for `redactSecrets` and `redactSecretsDeep` together. Every Edit tool output, every Chat tool frame and every job
+error passes through `redactCredentials`, so text from a web page or an upstream error could block the host event loop.
+
+Fix: the cookie rule matches the header and the rest of its line, then tests the line for `=` in a replacer
+(`maskCookieHeader`, `redact.ts:61`), so no match depends on a lookahead. The URL rule matches only the userinfo and
+reads the scheme in a lookbehind (`redact.ts:25`), so a scan starts at a `://` and not at every boundary. The JWT rule
+(`JWT_CHAIN_RE`, `JWT_HEADER_RE` and `maskJwts`, `redact.ts:27-50`) matches each maximal run of `[A-Za-z0-9_.-]` that
+holds an `eyJ`, with a lookbehind so a scan starts once per run. The replacer splits the run on dots and masks from the
+first `eyJ` that is not inside a word, and has eight characters after it in its part, through the end of the third part.
+That is the set the old rule masked, so a JWT after a hyphen (`x-eyJ...`), after dots (`token...eyJ...`) and after a long
+first part (`abcdefghijkl.eyJ...`) is still masked, and one inside a word (`a_eyJ...`) is still not. A differential run
+of 1.2 million random strings built from `eyJ`, hyphens, underscores, dots and spaces found no difference from the old
+regex (about 10,000 of them masked by it). The masked text of every rule is the same as before. Tests:
+`packages/core/src/security/redact-redos.test.ts` (40 cases; inputs of 40,000 to 100,000 characters must redact in under
+250 ms, and a long cookie header, a URL after a long run and the JWT shapes above must still mask). Six of the first
+eight tests were red on `39cd5f0c` (17.7 s to 26.6 s for the cookie cases), the two run-shaped URL cases were red at
+40,000 characters (1.9 s and 2.2 s), and all are green after. The three JWT cases added in the review round were red on
+the first fix (12.0 s, 14.2 s and 24.8 s) and are green on the second. Every rule added in the review round has a case
+in that file. The existing `redact*.test.ts` files stay green (153 tests in the five redactor files). A probe of 112 hostile
+shapes (106 text shapes and 6 key shapes: every rule's prefix repeated, spaces after each keyword, long runs, dotted
+chains, `.env` values and names) through `redactCredentials`, `redactSecrets` and `redactSecretsDeep` found a worst case of
+12.2 ms at 100,000 characters and 154 ms at 1,000,000 characters (a 10 times longer input cost 12.6 times as much, and
+none overflowed a regex stack). The slowest shape is 166,000 short dotted chains that each hold an `eyJ`, which calls the
+JWT replacer once per chain.
+
+Residual: a string is not capped in length before redaction, so linear cost still grows with the input. Not driven on
+a live host.
+
+Gate: PR merge of `fix/redactor-gaps` to `main`.
+
+### SR-201 {#sr-201}
+
+**The SSRF guard resolved a name, then let `fetch` resolve it again to connect, and let a connection through when its own lookup failed.**
+Raised 2026-10-15 by the security tester as SEC-004 part 4a, re-read 2026-10-16 against `Kyoo032/Nultron` `07cb099`
+(OWASP A10-6 in [the pass](security-owasp-2026-09.md), recorded there as open by nature). Medium. Fixed in tree
+2026-11-06 on `fix/sec-004a-dns-pinning`.
+
+Evidence before the fix: `assertResolvesPublic` judged one lookup, then `fetchImpl(current, ...)` made a second one
+inside `fetch`. A DNS server the attacker runs can answer a public address first and a loopback, RFC 1918,
+link-local or CGNAT address second, and Node connects to the second. The `catch { return; }` in the same function let
+`fetch` connect after a failed lookup. Callers of `fetchPublicHttps`: Knowledge URL ingest (`knowledge.ts:615`),
+`web_fetch` and the Research reader (`tools/platform/web-fetch.ts:36`), the media mirror (`media-download.ts:44`) and the
+component download (`components/download.ts:72`). The Knowledge path stores the body and shows it back, so a reachable
+private host is a read, not only a blind connect. The architect's reading (2026-10-16) is that cloud metadata is plain
+HTTP and this guard is HTTPS only with certificate checks, so it does not leak metadata; what remains is a connect or
+probe of private hosts and ports. That is a protocol argument, not a test.
+
+Fix (`packages/core/src/security/safe-fetch.ts`): per hop, `resolvePublicAddresses` (`:98-123`) resolves the host once
+and refuses a failed lookup, an empty answer, an answer that is not an IP address and any private answer, all
+`400 invalid_endpoint`, with "Could not resolve this URL's host" for the first two and "URL must point at a public host"
+for the others. `pinnedAgent` (`:168`) then builds an undici `Agent` whose `connect.lookup` (`pinnedLookup`, `:141`)
+returns only that vetted list and answers for that host only, and `fetchPublicHttps` passes it as `dispatcher` (`:246`).
+The socket never asks DNS. The agent is per hop and destroyed after the body is read. IP literals stay on the lexical
+check, because undici does not call `lookup` for a literal. `lookupImpl` stays the test seam. The default `fetchImpl`
+is `defaultFetch` (`:172`), undici's own `fetch` from the package that builds the Agent, not `globalThis.fetch` (Notion
+BUG-63, below). `@agentforge/core` gains a
+direct dependency on `undici` 6.29.1, the version SR-198 already pins, so the deployed closure holds no new package;
+the lockfile gains one importer line.
+
+Proof: `safe-fetch.test.ts` (32 passed). Before the fix, 5 of 25 failed: the unresolvable-name case in
+`assertResolvesPublic` and in `fetchPublicHttps` (the fake fetch was called), the empty answer, the non-IP answer and
+the missing dispatcher. After it: a resolver that answers public once and private afterwards is asked once per hop; a
+`pinnedAgent` for `rebind.test` reaches a listener on 127.0.0.1 although the system resolver cannot answer that name
+(so the pin reached the socket), and refuses another name; `pinnedLookup` answers in both connector shapes and honours a
+family filter. The caller suites that reach the guard pass (`web-fetch`, `outbound-guard`, `media-download`,
+`components/download`, `components/install`); the last two now mock `node:dns/promises`, because they used the real
+resolver and relied on the old fail-open. A one-off script on 2026-11-06 ran `fetchPublicHttps` with the real
+resolver: `https://example.com/` answered 200 over TLS (SNI and certificate check work through the pin),
+`https://localtest.me/` was refused as a private answer, and an `.invalid` name was refused as unresolvable.
+
+Node 22: the PR review ran the pin on Node 22.23.4, the exact build `webapp-deploy/Dockerfile:28` pins, which
+bundles undici 6.29.1 (no version skew). A pinned name DNS cannot answer reached a loopback listener over HTTP; over
+HTTPS the pinned lookup was honoured with `all: true` and the certificate was still checked against the hostname;
+`fetchPublicHttps` returned 200 for `https://example.com/` and refused `localtest.me` and an `.invalid` name.
+
+Version skew (Notion BUG-63, fixed in tree 2026-11-09 on `fix/safe-fetch-undici-fetch`): the first version of this fix
+handed an `undici` 6.29.1 `Agent` to `globalThis.fetch`, which is whatever undici the running Node bundles (6.29.1 on
+the image's 22.23.4, 7.x on Node 24). That pair worked on both, but by luck: `engines` is `node >=22`, and a Node
+whose bundled undici rejected the dispatcher would have failed every guarded fetch, or ignored the pin. The default is
+now `defaultFetch` (`safe-fetch.ts:172`), the `fetch` export of the same `undici` package as `pinnedAgent`, so the
+dispatcher and the fetch are one version on any Node. `safe-fetch.test.ts` asserts the default is undici's own and that
+a hop with no `fetchImpl` goes through it with the pinned Agent and never through `globalThis.fetch` (three new tests; five of the file's 35 failed before the change: `defaultFetch is not a function` where the tests use it, and a
+hop with no `fetchImpl` read the stubbed global's body). Driven on 2026-11-09 with no `fetchImpl` on
+Node 22.23.4 (bundled undici 6.29.1) and Node 24.13.0 (bundled undici 7.18.2): `https://example.com/` answered 200 over
+TLS, a real 302 to it was followed by hand, `localtest.me` and an `.invalid` name were refused, and the byte cap,
+truncation, abort and timeout paths behaved. `audit:deployed` is unchanged (`undici` was already in the closure).
+
+The host test setup guards undici's `fetch` as well as `globalThis.fetch` (`packages/host/test/setup.ts`,
+`network-tripwire.test.ts`), so a host test that reaches the internet through a guarded fetch still fails; with the
+undici guard removed the tripwire test times out on a real connection instead.
+
+Residual: (1) The unit tests run on the developer machine's Node, never the image's. With the default fetch and the
+Agent from one package the pin no longer depends on Node's bundled undici, but re-run `safe-fetch.test.ts` on the new
+Node after a `NODE_VERSION` bump.
+(2) Not driven on a hosted server. (3) A transient DNS failure is now a 400 instead of a network error, on purpose.
+The refusal carries the lookup error as its `cause`, so the component installer still reports `offline` for
+ENOTFOUND and EAI_AGAIN (`download.test.ts`, "reports offline when the host name does not resolve"). (7) The DNS
+lookup itself is not bounded by `timeoutMs` or the abort signal; that was true before this change, but the guard
+now waits on it.
+(4) The port is not checked: `https://host:6379/` is allowed. Whether to allow 443 only, a list or refuse known
+internal ports is Rizky's call. (5) Egress filtering of `169.254.0.0/16` and `100.64.0.0/10` for the app pod is
+infrastructure and belongs to [SR-97](#sr-97); this change does not replace it. (6) `assertResolvesPublic` is kept
+as a thin wrapper over the same resolver and has no production caller.
+
+### SR-202 {#sr-202}
+
+**The prompt-injection bypass is a switch for the running process, never a saved setting.**
+Raised 2026-10-15 by the Security tester (Notion SEC-005, BUG-35); Rizky decided the fix on 2026-11-06. Medium. The
+card proposed SR-187 provisionally; Rizky assigned SR-202.
+
+Evidence before the fix: off server mode `POST /api/v1/settings { "injectionGuardBypass": true }` answered 200 and
+`mergeSecrets` wrote the flag into the desk's sealed slice (`packages/core/src/secrets.ts:231-237`, read back at
+`packages/host/src/settings-store.ts:135`). Every reader then skipped the scan: Chat attachments
+(`packages/host/src/runs.ts:160`), every job's `readSourceText` (`job-source.ts:24`), Knowledge ingest
+(`knowledge.ts:473`, `knowledge-ingest.ts:23`), and tool arguments and outputs (`credentials.ts:371` into
+`secret-scope.ts:62` into `invoke-guarded.ts:64`, `:86`). It survived a restart, and `false` was the only way back. On
+the hosted server the write is refused (`handlers/settings.ts:348-349`, `:381`), but a `true` already in the tenant's
+row was still read and honoured, and the hosted patch passes `undefined`, so no save could clear it. A desk that had
+the flag and then moved onto a hosted data dir stayed disarmed. Nothing in the UI shows it: the Settings page has no
+control for it (`apps/web/tests/e2e/foundation.spec.ts:112` asserts none), so only an API caller could set it.
+
+Fix: `mergeSecrets` no longer merges the field. `normalizeSecrets` no longer reads it, so a stored `true` never reaches
+a caller (`settings-store.ts:112`). `loadSettingsFile` finds a slice that still carries the key
+(`carriesStoredBypass`, `injection-guard-bypass.ts:23`), rewrites the payload without it at once and logs one line with the tenant id and no
+text (`clearStoredBypass`, `settings-store.ts:447`, `:481`); every save rewrites from the same cleaned payload. Off server mode the flag
+lives in a `Set` keyed by tenant and desk in the host process (`packages/host/src/injection-guard-bypass.ts`).
+`saveSettings` records a boolean there (`settings-store.ts:531`) and `loadSettings` layers it onto what it returns
+(`withInjectionGuardBypass`, `injection-guard-bypass.ts:17`); a restart empties it. In server mode `setInjectionGuardBypass` and `withInjectionGuardBypass` ignore it, so a
+hosted desk always runs the guard whichever handler calls the store. Tests, which fail without the fix:
+`settings-guard-bypass-desk.test.ts` (POST then allowed for this process, then a restart: guard on and the decrypted
+`settings.enc` free of the field; an older file holding `true`) and `settings-guard-bypass-hosted.test.ts` (a
+`tenant_state` row holding `true`: guard on, row cleaned on load and on save, a save cannot turn it on).
+
+Checked, not an issue: `POST /api/v1/documents/check` passes the bypass `true` on every call
+(`handlers/documents-check.ts:18-22`) and does not need the guard. The assembled text reaches only
+`checkDraftAgainstSource` (`:23`), which is word and number overlap with no model call
+(`packages/core/src/documents/source-check.ts:69-92`), and the answer carries draft sentences, not source text.
+
+Residual:
+- Any process that can call `POST /api/v1/settings` on a desk (webdev, a local script) can still switch the guard off
+  until the next restart (blockers b7 and b12), and the switch leaves no audit line (blockers P10). The scope is one
+  desk, not the machine.
+- The guard is five regular expressions (`injection-guard.ts:19-48`); wording they miss passes with the flag off. That
+  is a separate, narrower hole.
+- Driven only through unit tests and the in-memory row backend; the hosted server and an installed app were not driven.
+- `Kyoo032/hyp-ai` is a separate codebase and needs the same fix made by hand.
+
+Gate: PR merge of `fix/sec-005-guard-bypass-not-persisted`.
+
+### SR-203 {#sr-203}
+
+**A desk's `AGENTFORGE_SECRETS_KEY` was never measured.**
+Raised 2026-10-15 as SEC-006 by the security tester, fixed 2026-11-06. Low. Extends [SR-173](#sr-173), whose "checked, not an issue" held for the server only. The tester numbered the finding SR-188 in its own list. That number is not the register's [SR-188](#sr-188), which is an unrelated finance row.
+
+Evidence: off server mode `getLocalVaultKey` returned `wrappingKeyFromSecret(fromEnv || readOrCreateMasterKeyFile(env))` with no check on `fromEnv` (`packages/db/src/vault-key.ts`, desk branch). `wrappingKeyFromSecret` is one unsalted SHA-256 (`packages/core/src/crypto/envelope.ts:14-16`), so `AGENTFORGE_SECRETS_KEY=hunter2` gave an AES key anyone with a copy of `settings.enc` could guess offline, and a hit opens every envelope on the install. The auto-created `.master-key` is `randomBytes(32)` hex and was never the problem (b13 in `docs/internal/blockers-2026-09-15.md`).
+
+Fix (changed 2026-11-09, `fix/desk-key-warn`; the first version, 2026-11-06, refused on a desk): `warnWeakDeskVaultKey` (`packages/db/src/vault-key.ts:178-187`, a pure check of the variable that reads no file) logs `DESK_VAULT_KEY_WEAK_WARNING` through `console.warn` when the variable is set off server mode and `vaultKeyEntropyBytes` is under 32, once per process (`weakDeskKeyWarned`, `:176`). The text names the variable, says the key is guessable, gives `openssl rand -hex 32`, says a new key cannot open data sealed under the old one, and never contains the value. `getLocalVaultKey` calls it first on a desk (`:192`) and then derives the key exactly as it did before the first fix, so sealed data keeps opening. The web server calls it at boot: from `apps/web/server-env.ts`, ahead of the host and the database, and again in `main()` of `server.ts` for a value that only a `.env` file supplies. The server is unchanged: `getLocalVaultKey` still throws `SERVER_VAULT_KEY_TOO_WEAK` (`:199`) and `SERVER_VAULT_KEY_NOT_RANDOM` (`:204`), and `assertHostedEnvComplete` refuses at boot before anything is written. Floor only, with no variety test on a desk. The reason is the fixtures: 40 test and script files under `packages`, `apps` and `scripts` set a desk `AGENTFORGE_SECRETS_KEY` made of one repeated character, such as `"d".repeat(64)`, which the server's variety check refuses (`git grep` for `SECRETS_KEY` within 40 characters of `.repeat(`). A blank value still falls back to `.master-key`.
+
+A refused key is a hard error, not a wrong key. This now concerns the server, the only mode that refuses. The independent review of the first version, which also refused on a desk, found that `decodeStoredPayload` (`packages/host/src/settings-store.ts`) called `getLocalVaultKey()` inside the `try` around the decrypt, so the refusal was read as "settings.enc will not decrypt" and `quarantineUnreadableSettings` renamed the file to `settings.enc.unreadable`; the desk then looked fresh and every save threw. The key is still resolved before the `try`, and the same one-line move is made in the three other readers that swallowed it: `openJson` in `packages/host/src/threads.ts` (returned the raw envelope as the message), `openText` in `packages/db/src/repos/drizzle-agent-repository.ts` (returned an empty system prompt) and `open` in `packages/host/src/artifacts.ts` (returned the stored envelope as the body). Left alone: `readText` in `packages/host/src/desk-files/file-store.ts` already fails closed with a fixed `root_unavailable` and its messages reach the model, and `createSessionSecrets` and the portal sign-out in `tenant-reset.ts` are server-only, where the boot check has already proved the key. The message is fixed text, names the variable and `openssl rand -hex 32`, and never contains the value. A desk was refused first and now warns first (the lead's decision, 2026-11-09, as the original plan said and as `Kyoo032/hyp-ai` shipped), because a desk that had set a passphrase could not boot, and unsetting the variable switched it to `.master-key`, a different key that cannot open the sealed settings, threads and artifacts. Every documented generator already yields 32 bytes or more: `openssl rand -hex 32` in `webapp-deploy/README.md`, `webapp-deploy/.env.example` and `scripts/release-web.mjs`, `randomBytes(32)` hex in `webapp-deploy/pilot-local.mjs`, `webapp-deploy/k8s/local-lib.mjs`, `scripts/review-instance.ps1` and `apps/desktop/main.cjs`; the root `.env.example` leaves it empty; the preview desks' provisioning script refuses a key that is not 64 hex digits; the webdev `.env` files set no key and use `.master-key`. Proven by `packages/db/src/vault-key.test.ts` (a desk passphrase and a short key derive the same wrap key as before, no `.master-key` written; `warnWeakDeskVaultKey` warns once, never prints the value, reads no file and is silent in server mode, where `getLocalVaultKey` still throws; hex, base64 and base64url accepted, blank falls back), by `settings-store.test.ts` (a desk opens `settings.enc` sealed under `short-pass` and saves, and in server mode the refusal reaches the caller and the stored row is not touched), by `threads-vault-key.test.ts`, `drizzle-agent-repository.test.ts` and `artifacts.test.ts` (a server refusal is not read as a wrong key), by `hosted-env.test.ts` and `hosted-mode-guard.test.ts`, and by `apps/web/server/boot-order.test.ts`, which starts the real `server.ts` on a desk with `AGENTFORGE_SECRETS_KEY=hunter2` and finds it listening after one warning that does not contain the value, and starts it in server mode with the same key and finds it refused with the data dir not created.
+
+Which human-chosen keys still pass. The floor measures the encoding, not the randomness, so it stops `hunter2` and a sentence with spaces, not a determined human choice.
+- Any 44-character string over the base64 alphabet is a canonical encoding of 33 bytes, so `correcthorsebatterystaplecorrecthorsebattery` and `MyCompanyNultronDeskPasswordForTheOffice2026` are accepted on a desk and on the server. So is any longer string whose length is a multiple of four.
+- `"password".repeat(8)` (canonical base64 for 48 bytes) and `"0".repeat(64)` (32 zero bytes) are accepted on a desk and refused on the server by the variety check (`SERVER_VAULT_KEY_NOT_RANDOM`).
+- Each is pinned by a case in `vault-key.test.ts`, so tightening the rule is a deliberate edit of that test. Telling a typed 44-character passphrase from a generated key needs a randomness test that could refuse a real key, or a hex-only rule that refuses the base64 a secrets manager hands out. Neither was chosen.
+
+Residual: a desk can still run a guessable wrap key, and a copy of its `settings.enc` can still be guessed offline, until a re-key path exists. The desk only warns, so a desk already sealed under a passphrase of under 32 bytes keeps booting and keeps opening its data. There is no re-seal path: `rotateWrapKey` refuses a `from` key under 32 bytes (`packages/host/src/wrap-key-rotation.ts`, `assertUsableSecret`) and re-seals only settings, not sealed thread bodies or other envelopes, and a new key cannot open data sealed under the old one. The trigger to switch the desk from warn to refuse is the day a re-key tool for settings, threads, agent prompts and artifacts exists. Until then the warning is the whole control. Not driven on a desk with existing data. The packaged app's keytar fallback (SEC-008) is separate and stays moot while the desktop is retired.
+
+### SR-204 {#sr-204}
+
+**Personal (retired): the Electron product window sets `sandbox: false`.**
+Raised 2026-10-15 by the security tester as SEC-007 (Notion Dev Findings, BUG-37). Medium. Won't fix, moot
+(Rizky, 2026-11-06). The card proposed SR-189, which the tester had already taken, so this is SR-204.
+
+Evidence (at `39cd5f0c`):
+- The only product `BrowserWindow` (`apps/desktop/main.cjs:402-414`) has `nodeIntegration: false` and
+  `contextIsolation: true` (`:411-412`), and `sandbox: false` (`:413`).
+- The preload needs Node `fs` when it loads. It requires `./brand-read.cjs` (`apps/desktop/preload.cjs:2`) and
+  reads the brand and the logo at once (`:4-5`). `brand-read.cjs` requires `node:fs` (`:1`) and calls
+  `readFileSync` (`:57`, `:76`). A sandboxed preload cannot require a local module, so the flag cannot change
+  until those reads move. The backlog row is E17 (`docs/internal/blockers-2026-09-15.md:137`).
+- Impact: an XSS in the packaged renderer reaches only the `contextBridge` surface, which already lets it call
+  the host as the owner. A renderer exploit that escapes the JavaScript isolate runs outside the OS sandbox, in
+  a process with Node linked.
+
+Why Won't fix: the desktop app was retired on 2026-10-14 (AGENTS.md). Nothing packs or ships `apps/desktop`.
+The hosted image's install skips it (`webapp-deploy/Dockerfile:70-73`), and its release repo
+`Kyoo032/Nultron-Desktop` is archived. The exposure is a local desktop build made against that rule.
+
+Reopen trigger: a desktop build is revived. Then, before that cut:
+- The main process loads the brand and the logo once. It already requires `brand-read.cjs` (`main.cjs:3`), so it
+  can call `loadBrandFromResources` and `loadBrandLogo` itself.
+- The preload gets them with one `ipcRenderer.sendSync("brand:get")`. Main answers only a sender that passes
+  `isTrustedSender` (the main frame, `apps/desktop/navigation.cjs:109`), with a frozen, versioned payload
+  `{ schema: 1, brand, brandLogo, updatesSupported }`. The renderer still reads `window.agentforge.brand` at
+  startup, so first paint is unchanged.
+- The preload then requires no local module and no `fs`. Remove `sandbox: false`, because Electron 35
+  (`apps/desktop/package.json:30`) sandboxes by default. Keep `contextIsolation: true` and `nodeIntegration: false`.
+- Do not use `additionalArguments`. The base64 logo is about 146,000 characters (the 109,815-byte `logo.png`
+  measured on 2026-11-06), past the 32,767-character Windows command line.
+- E18 (permission handlers that deny by default, but still allow `media` and `display-capture` for Meeting) and
+  E19 (`web-contents-created` applying `hardenNavigation` to every contents) go in separate PRs, in the same
+  release. Do not change Electron fuses in the same change ([SR-120](#sr-120)).
+- Tests, failing first: `apps/desktop/navigation.test.cjs` asserts `sandbox: true` and a preload with no
+  `require("./`, no `node:fs` and no `readFileSync`; the brand handler refuses a sender that is not the main
+  frame. Then a packed smoke on Windows: the window paints, the brand and logo show, and `doctor --desktop`
+  passes.
+
+Gate: none while the desktop is retired.
+
+### SR-205 {#sr-205}
+
+**Personal (retired): `wrapKey` returns an unstored random key when keytar fails.**
+Raised 2026-10-16 by the security tester as SEC-008 (Notion Dev Findings, BUG-41), split out of SEC-006. Low.
+Won't fix, moot (Rizky, 2026-11-06). The card proposed SR-190, which `main` had already taken, so this is SR-205.
+
+Evidence (at `39cd5f0c`):
+- `wrapKey` (`apps/desktop/main.cjs:287-302`) reaches `return crypto.randomBytes(32).toString("hex")` (`:302`)
+  on two paths: `loadKeytar()` (`:268`) yields no module, or `getPassword` or `setPassword` throws and the
+  `catch` only warns (`:298-299`).
+- `bootstrapPackaged` puts that string in `AGENTFORGE_SECRETS_KEY` (`:659`) and stores it nowhere. The next
+  launch that takes the same path draws a different key.
+- Impact: lost data, not a leak. Settings and the gateway key sealed in that session do not open on the next
+  launch, and what was sealed earlier under the keychain key does not open in that session. The key is 32
+  random bytes, not a weak one. `apps/desktop/platform/windows/AGENTS.md:13` already documents the behaviour
+  and calls a keytar load failure a packaging bug.
+
+Why Won't fix: as for [SR-204](#sr-204), the desktop app was retired on 2026-10-14 and nothing packs or ships
+`apps/desktop`.
+
+Reopen trigger: a desktop build is revived. Then, before that cut:
+- `wrapKey` fails closed. When keytar cannot load, or `getPassword` or `setPassword` throws, the app shows a
+  startup error and stops. It never returns a random key.
+- A persisted key file (mode 0600) as a fallback is a security trade-off for Rizky to decide.
+- The envelope format and `wrappingKeyFromSecret` stay as they are.
+- Test first, in plain Node like `navigation.test.cjs`: a fake keytar whose `getPassword` or `setPassword`
+  rejects, and a run where `loadKeytar()` yields no module. `wrapKey` must throw or refuse. Today it returns a
+  64-character hex key.
+
+Gate: none while the desktop is retired.
+
+### SR-206 {#sr-206}
+
+**The backup heartbeat URL would sit in `.env`, which the `app` container loads.**
+Raised 2026-11-06 by the independent review of PR #206 (`fix/backup-missed-run-alert`). Low.
+
+Evidence: `webapp-deploy/compose.yml:38-41` loads all of `.env` into the `app` container, and its header says `.env`
+holds non-secret settings only (`compose.yml:22`, `:39`). The first cut of the missed-run alert read
+`BACKUP_HEARTBEAT_URL` through `setting`, which falls back to `.env`, and `.env.example` listed the variable. Anyone
+running code in the app could then read the URL and send fake success pings, so a dead backup would look alive.
+The same rule is why `BACKUP_KEY` stays out of `.env` (`webapp-deploy/.env.example:147`, `:170`).
+
+Fix: `backup.sh` reads `BACKUP_HEARTBEAT_URL` from the process environment only
+(`webapp-deploy/scripts/backup.sh:27`), `.env.example` carries a note instead of the variable (`:181-184`), and
+the README's "Backup alert" section sets it on the cron line next to `BACKUP_KEY`, from Secrets Manager or a 0600
+file only the deploy user reads. `scripts/backup-heartbeat.test.mjs` "backup.sh never reads the heartbeat URL from
+.env" fails if the read goes back through `setting`.
+
+Residual: not driven on a hosted server. A monitor URL is a bearer secret: a leak from the cron line's source
+(Secrets Manager, the 0600 file) has the same effect, and the monitor cannot tell a forged ping from a real one.
+
+Gate: none; fixed in PR #206.
+
+### SR-207 {#sr-207}
+
+**A GET to `/api` skipped the Host check.**
+Raised 2026-10-15 by the security re-verify of SEC-004 (Notion Dev Findings, 4b); fixed 2026-11-06. Medium. The card proposed SR-186 for this and that number is taken on another branch.
+
+Evidence: `SAFE_METHODS` (`packages/host/src/http-adapter.ts:31`) kept GET, HEAD and OPTIONS out of
+`mutatingRejection`, the only caller of `isLoopbackHostHeader` and `isAllowedWebHostHeader`. A page on a
+rebound name (`http://evil.example:3000`, answered first by the attacker and then by `127.0.0.1`) could
+`GET` `/api/v1/workspaces`, `/api/v1/media/<id>/file` and the masked settings of an unauthenticated webdev,
+with `Host: evil.example:3000`. In server mode a GET was not checked against `trustedOrigins()` either; that
+does not bypass the session cookie's host scope, but it left the allowlist half-applied. The packaged desktop
+app has no HTTP server and is not affected.
+
+Fix: `hostRejection` (`http-adapter.ts:778`) runs for every `/api` request before the `SAFE_METHODS`
+branch (`:633`). Off server mode the Host must be `localhost`, `127.0.0.1` or `::1`, with or without a port,
+and a missing Host is refused: 403 `forbidden`. In server mode it must be a host of the allowlisted origins:
+403 `origin_forbidden`. A missing Origin stays allowed on a GET. `/healthz` is answered before the check
+(`:620`), so the container healthcheck, Caddy's `health_uri` and the k8s probes are untouched. The billing
+webhook path skips it as it skips CSRF. In server mode the HTTPS rule and the request filter still come first,
+so a plaintext GET is `https_required`. Tests: `http-adapter.test.ts` "handleNodeRequest Host guard on safe
+methods" (ten cases); five failed before the fix, none after. `http-adapter-socket.test.ts` repeats the rule over a real `node:http` socket with an explicit Host header (three cases, passing).
+
+Residual: driven over a loopback socket in a test, not against a hosted server or webdev in a browser. An unusual local setup that reaches
+webdev by another name now gets 403; the bind host is loopback-only off server mode, so that means a
+hand-edited hosts file or a tunnel. The lookup-error fail-open of the same card is in `safe-fetch.ts` and is
+SEC-004 4a, not this row. The rebinding pin (4a) and the egress deny stay open under SR-16 (A10-6) and SR-97.
+
+Gate: PR merge.
+### SR-208 {#sr-208}
 
 **nixpkgs marks pnpm 9.15.9 insecure, and the Nix build permits it by name.**
 Raised 2026-11-07 by rung 1 of the Nix migration ([`nix-migration.md`](nix-migration.md)). Low.
@@ -6713,7 +7163,9 @@ Added 2026-10-07:
   `DELETE /api/v1/workspaces/:id` from a member answers `403 workspace_delete_forbidden` with the desk
   left. ([SR-156](#sr-156)) — tested, not driven.
 - [ ] The owner has chosen how stored media is scoped between the people of a company, before anyone says a
-  Chat attachment is private. ([SR-157](#sr-157))
+  Chat attachment is private. ([SR-157](#sr-157)) On 2026-11-06 Rizky accepted the risk for the OPC, because
+  a Nultron org has one owner. Reopen when an org gets a second member, which the bundle's DEPLOY.md step 7
+  allows today (`scripts/release-web-docs.mjs:156`), so the box stays open.
 
 Added 2026-10-13:
 
