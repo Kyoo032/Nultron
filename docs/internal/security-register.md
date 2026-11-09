@@ -228,6 +228,7 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual: request-body arrays with no `.max()` still cost one issue per bad element | Residual: none blocks; capping the request-body arrays is a follow-up |
 | [SR-197](#sr-197) | Medium | AI SDK 5's `streamText` prints every stream error to the console by default, and an `APICallError` carries the request body (the prompt) and the gateway's error body | Fixed in tree (2026-11-04, `fix/zod-4`): the runtime passes a silent `onError`; tested, not driven | PR merge of the AI SDK 5 move |
 | [SR-198](#sr-198) | Medium | AI SDK 5 brings `undici` 5.29.0 and `@fastify/busboy` into the hosted image, with five HIGH `undici` advisories and one `busboy` advisory | Fixed in tree (2026-11-04, `fix/zod-4`): scoped override to `undici` 6.29.1, which drops `busboy`; the SDK's guarded download fetch checked on it; not driven | PR merge of the AI SDK 5 move |
+| [SR-199](#sr-199) | Medium | The credential redactor ran three of its regular expressions in quadratic time: a cookie header followed by a long run of spaces, a long dotted or hyphenated run (100k characters took 17.7 s and 62 s), and a run of `eyJ-` JWT header prefixes (100k characters took 12 s to 18 s in `redactCredentials`, 25 s through `redactSecrets` and `redactSecretsDeep` together), so crafted page or upstream text could block the host event loop | Fixed in tree (2026-11-06, `fix/redactor-gaps`): the cookie rule tests its line for `=` in a replacer, the URL rule takes its scheme in a lookbehind, and the JWT rule finds each dotted run that holds an `eyJ` once and masks inside it in a replacer; `redact-redos.test.ts` red before, green after; not driven | PR merge of `fix/redactor-gaps` to `main` |
 | [SR-201](#sr-201) | Medium | The SSRF guard resolved a name, then let `fetch` resolve it again to connect (DNS rebinding), and let a connection through when its own lookup failed | Fixed in tree (2026-11-06, `fix/sec-004a-dns-pinning`): one lookup per hop, refused when it fails or answers privately, then the socket is pinned to that answer; driven on Node 24 and on Node 22.23.4 (the image's runtime) against a loopback listener and real DNS and TLS; not run on a hosted server | PR merge |
 | [SR-202](#sr-202) | Medium | `injectionGuardBypass` was saved in `settings.enc`: one `POST /api/v1/settings` off server mode switched the prompt-injection guard off for good, and a stored `true` was honoured on a hosted desk and could not be cleared | Fixed in tree (2026-11-06, `fix/sec-005-guard-bypass-not-persisted`): the flag is never written, a stored `true` is ignored and removed on load, a hosted desk always runs the guard; tested, not driven on a hosted server | PR merge of `fix/sec-005-guard-bypass-not-persisted` |
 | [SR-203](#sr-203) | Low | A desk's `AGENTFORGE_SECRETS_KEY` was never measured, so a passphrase became the wrap key through one unsalted SHA-256 and a copied `settings.enc` could be guessed offline | Fixed in tree (2026-11-06, `fix/sec-006-secrets-key-floor`): a desk key under 32 bytes is refused at boot and by `getLocalVaultKey`, floor only, and a refused key no longer quarantines `settings.enc`; unit-tested and boot-tested, not driven on a desk with data. Residual: a typed 44-character passphrase still passes | PR merge |
@@ -4824,7 +4825,7 @@ text inside them was protected at rest and not masked. `redactSecrets` covered o
 model passed to a tool, a page that `web_fetch` read and that echoed a header, a desk file that held a key, and a
 tool error that quoted a header.
 
-Fix: `redactSecretsDeep` (`packages/core/src/security/redact-deep.ts:70`) masks credential-shaped text at any depth and
+Fix: `redactSecretsDeep` (`packages/core/src/security/redact-deep.ts:71`) masks credential-shaped text at any depth and
 the value of a key named like a secret. The text shapes are a bearer token; `sk-`, `sk-ant-`, `tvly-` and `AIza` keys;
 a JWT (the portal's own tokens); a Telegram bot token (`telegramBotToken` is stored in settings); an AWS access key id;
 a PEM private key block; the user and password of a URL (`postgres://u:p@h`, `https://user:pass@host`); and a
@@ -4860,7 +4861,51 @@ reply through `redactCredentials` before the card is indexed, listed as a source
 Residual:
 - The opaque-token rule of `redactSecrets` is not applied: it would erase content hashes, signed media links and long
   identifiers the renderer needs. A secret with no known prefix and no secret-looking key name (a bare random token, a
-  GitHub or Slack token, a Basic-auth string, a database password outside a URL) is stored and shown as it came.
+  database password outside a URL and outside an upper-case `.env` line) is stored and shown as it came.
+- Closed under F-152-2 (2026-11-06, `fix/redactor-gaps`, tested, not driven). `redactCredentials`
+  (`packages/core/src/security/redact.ts`) now masks GitHub tokens (`ghp_`, `gho_`, `ghu_`, `ghs_`, `ghr_`,
+  `github_pat_`), Slack tokens (`xoxb-`, `xoxp-`, `xoxa-`, `xoxe-`, `xoxs-`, `xoxr-`, `xapp-`) in their real shapes, with a digit group after the prefix, so a hyphenated name such as
+  `xapp-production-cluster` stays readable and is not refused by the outbound guard), Stripe live keys
+  (`sk_live_`, `rk_live_`), a `Basic` credential after an `Authorization` or `Proxy-Authorization` name, the value
+  after an `X-Api-Key` name when it has eight or more characters (it stops at whitespace, a quote, `,`, `;`, `&`,
+  `#` or a closing bracket, so a query string keeps its other parameters), a bearer token after a percent-encoded space, and the
+  value of an upper-case `NAME=value` line (a `.env` file or an `export`) when the last `_` part of the name is KEY,
+  SECRET, TOKEN or PASS, when the name ends in PASSWORD, PASSWD or APIKEY (`PGPASSWORD`, `OPENAI_APIKEY`) or in `_PWD`
+  (`MYSQL_PWD`), or when it is `SECRET_KEY_BASE`. `redactSecretsDeep` (`redact-deep.ts`) also masks the value under a
+  key that ends in a secret name after `_`, `-` or a camel-case boundary (`OPENAI_API_KEY`, `DB_PASSWORD`,
+  `aws_secret_access_key`, `githubToken`). Deep mode does not use the `.env` endings `PASS`, `_PWD` or an unseparated
+  `PASSWORD`, so `PGPASSWORD`, `dbPass`, `DB_PASS` and `MYSQL_PWD` as object keys stay readable while the same names on
+  a `.env` line are masked. Tests: `redact-tokens.test.ts` and `redact-deep.test.ts`, 31 of 61 red
+  before the first fix; the `.env` name and figure cases (3 red) and the Stripe, Slack and `X-Api-Key` cases (5 red)
+  were added in the review round, red before their fix and green after.
+  Trade-offs chosen on purpose. A bare `Basic <word>` is prose ("Basic principles of accounting"), so the Authorization
+  name is required and a Basic string outside a header stays unmasked. The key-name ending in deep mode also masks
+  values that are not credentials, which the display then shows as `[REDACTED]`: a pagination cursor under
+  `nextPageToken` or `page_token`, a `csrf_token`, a tokenizer's `stopToken`, `eos_token` and `pad_token`, a
+  `cachedToken`, and a `sessionToken`, `continuationToken` or `syncToken` that is only an id, and any key that ends in
+  `secret`, such as `hasSecret` and `top_secret` (run on 2026-11-06 against `redactSecretsDeep`). The `.env` rule is
+  upper-case and line-anchored, so `password = input()` in code, a lowercase INI line such as
+  `aws_secret_access_key = ...` and an assignment in the middle of a line (`docker run -e DB_PASSWORD=...`) are not
+  masked. It reads the last `_` part of the name, so `TOKEN_ENDPOINT`, `KEY_COLUMNS`, `PASSWORD_REGEX`, `KEY_SIZE`,
+  `TOKEN_COUNT`, `PASSWORD_MIN_LENGTH` and a bare `PWD` (a working directory) stay readable; the cost is that a secret
+  under a name that does not end in a secret word (`DB_PASSWORD_PROD`, `AUTH_TOKEN_VALUE`) is not masked. A value that is
+  only a number (with an optional sign and thousands separators) or `true` or `false`, quoted or not and optionally
+  followed by a `# comment`, is left alone so that `MAX_TOKEN=4096` stays readable; the cost is that a password made of
+  digits only on a `.env` line stays visible (`DB_PASSWORD=123456`). An upper-case constant in code, such as
+  `API_KEY = os.environ["X"]` in a settings file that `read_file` returns, is masked in the display and the stored
+  copy. The model reads the real result in the turn the tool ran. The next turn reads the stored, masked copy: its
+  `toolResultNote` (`packages/core/src/content/transcript.ts:89`, called through `historyToolNote`,
+  `packages/host/src/chat-history-note.ts:11`) quotes the stored output of a tool whose trust is not `user_content`, and
+  names a `user_content` tool as having run and nothing more. Every added rule also widens what the outbound guard
+  refuses. `hasCredential` is `redactCredentials(text) !== text` (`outbound-match.ts:250`) and is used for a model-written
+  prompt (`outbound-guard.ts:267`), a search query (`outbound-match.ts:282`) and a page address (`:305`), so text
+  that matches one of the new rules, and that the person did not type, is now refused as `credential`.
+  Checked for the key-name ending: a `git grep` of `apps/web`, `packages/core/src/tools`, `packages/core/src/runtime`
+  and `packages/host/src/{workers,delegation,edit}` found no tool output field whose name ends in `Token`, `Secret` or
+  `Password` that the renderer reads back, and no file under `apps/` imports the core redactor (`apps/portal` has its
+  own `redactSecrets`). Still open from the same sign-off: a JSON-escaped `sk-...` token, a key split across two fields, an `sk-`
+  token with fewer than eight characters after the prefix, a JSON document inside a string (the walker does not parse
+  it), and a 40-character AWS secret access key in free text in deep mode.
 - The model reads the raw tool result, so a secret it repeats lands unredacted in the assistant text, the saved `text`
   part and the streamed deltas of that thread (the decision above). It no longer reaches the Knowledge Base card.
 - A secret the person types into their own message is not touched in the thread.
@@ -4875,13 +4920,26 @@ Residual:
   budget refusal case is a coverage case) and `packages/host/src/edit/job-error-screen.test.ts`.
   A job's error text is upstream text (a provider can echo the key it was sent). It was stored unredacted on
   `edit_jobs.error` and streamed on `job.done`. It is now redacted where it is stored, in `failJob`
-  (`packages/host/src/edit/jobs.ts:409`, `redactSecrets`), so `job.done` (`jobs.ts:403`, `:423`), the project
-  bundle (`packages/host/src/edit/projects.ts:136-150`) and the job read carry the redacted copy. Rows stored
-  before this change keep the upstream text.
-  Not screened, and not a leak of the tool's output: the project event stream's ops and unplaced items
-  (`packages/host/src/edit/ops.ts:356`, `jobs.ts:382`) hold the person's own text and the agent's arguments. A secret
-  with no known prefix under a non-secret name is not caught there, as in Chat. A job's `onEvent` hands raw events to
-  job code (`packages/host/src/job-regen.ts:299`); it does not write `tool_invocations`.
+  (`packages/host/src/edit/jobs.ts:407`, `redactSecrets` at `:410`), so `job.done` (`jobs.ts:404`, `:424`), the project
+  bundle (`packages/host/src/edit/projects.ts:137-151`) and the job read carry the redacted copy. Rows stored
+  before this change keep the upstream text in the database. Closed on the way out under F-152-3 (2026-11-06,
+  `fix/redactor-gaps`, tested, not driven): `mapJob` (`projects.ts:172`) masks `error` with `redactSecrets` on every
+  read, so the bundle, the job read and `job.done` carry a masked copy for those rows too. The rule is idempotent, so
+  a row masked on write reads back unchanged. Test: `packages/host/src/edit/job-error-legacy-row.test.ts` (3 of 4 red
+  before, green after). Every client-facing job answer goes through `mapJob`; no other reader of `edit_jobs` was found.
+  Not screened, and not a leak of the tool's output. The project event stream (`handleGetEditEvents`,
+  `packages/host/src/handlers/edit.ts:438`) goes only to the desk that owns the project; the desk check runs before the
+  first frame (`:442-443`). The project read returns the same ops, cards and `unplaced.prompt` as stored, unmasked
+  (`handleGetEditProject`, `edit.ts:155`, into `getEditProjectBundle`, `projects.ts:137-151`; `mapUnplaced` returns
+  `prompt` as stored, `projects.ts:201`). The only upstream error text on the stream is the job's `error` on `job.done`
+  (`jobs.ts:404`, `:424`), which `mapJob` now masks. Tool output reaches an op only as an asset id or a clip status
+  that a finished job writes (`jobs.ts:363-367`, `:439`) or as text the model chose to put in a tool argument
+  (`backend.ts:141`). `job.progress` is a number (`jobs.ts:485`), and `job.cancelled` carries the fixed word `cancel`
+  or `undo` (`jobs.ts:539`, `undo.ts:49`). So screening only the stream would protect nothing the project read does
+  not already hand to the same person. The real fix would be to mask agent-written op and card text when it is
+  stored, which changes the ops the renderer folds; that is a separate design, and it is the residual here. A secret
+  with no known prefix under a non-secret name is not caught on the stream, as in Chat. A job's `onEvent` hands raw
+  events to job code (`packages/host/src/job-regen.ts:299`); it does not write `tool_invocations`.
 - Rows and messages written before the change keep what they hold.
 - No Chat code path was found that logs a tool's input or output; that is read, not proven by a log capture.
 
@@ -6316,7 +6374,7 @@ How it is used:
 - Erasing the organization removes its rows: the table is in `CASCADED_TABLES` (`packages/db/src/tenant-purge.ts:97`) and its foreign key cascades (`packages/db/src/gateway-tokens-schema.ts:8`).
 
 Leak checks, all in the tester:
-- `packages/host/src/gateway-tokens/check.test.ts` ("the token is a value redaction leaves alone"): `redactSecrets` does not hide this token, so a log that carried it would not be cleaned up. The rule is that no log line carries a request body. `redactSecrets` (`packages/core/src/security/redact.ts:63-67`) matches credentials and base64-like text only.
+- `packages/host/src/gateway-tokens/check.test.ts` ("the token is a value redaction leaves alone"): `redactSecrets` does not hide this token, so a log that carried it would not be cleaned up. The rule is that no log line carries a request body. `redactSecrets` (`packages/core/src/security/redact.ts:107-112`) matches credentials and base64-like text only.
 - The HTTP adapter logs the path length, method, IP and the error object on a 500 (`packages/host/src/http-adapter.ts:745-751`). It never logs a request body (`respondRejection`, `:443-455`).
 - `company-gateway-admin.test.ts`, "nothing a caller sees carries the token": every answer and every console line across a full save, read and clear.
 - `adapter.test.ts`, "never puts the management token or a gateway key into an error".
@@ -6591,6 +6649,54 @@ lookup was called. `audit:deployed` passes.
 Residual: not driven on a hosted server; the override has to be dropped once the SDK moves to `undici` 6 itself.
 
 Gate: PR merge of the AI SDK 5 move.
+
+### SR-199 {#sr-199}
+
+**The credential redactor ran three of its regular expressions in quadratic time.**
+Raised 2026-10-11 by the PR #152 security sign-off (finding F-152-1, board card BUG-21). Re-checked open on `main`
+at `39cd5f0c` on 2026-11-06. The independent review of the first fix found the third, the JWT rule. Medium. Both
+products.
+
+Evidence before: `COOKIE_HEADER_RE` (`packages/core/src/security/redact.ts:32`, added in `c04898a4` on 2026-10-07)
+re-ran its `=` lookahead at every backtrack position of the space run after `cookie:`. The word `cookie:` followed by
+100,000 spaces took 17.7 s in `redactCredentials` on this machine (26.6 s with tabs, 19.5 s with spaces and a word).
+The sign-off measured 12 s at 80,000 spaces through `redactSecretsDeep`. The word and colon repeated 15,000 times on
+one line took 3 s, and the lookahead the card suggests leaves that shape quadratic (1.7 s at 98,000 characters,
+timed with the card's pattern outside the repo). `URL_USERINFO_RE` (`:20`) is the same class and the card did not
+probe it. It started a scan at every word boundary inside a long run of scheme characters, and each scan ran to the
+end of the run. A dotted run of 100,000 characters (`a.a.a.`) took 62 s and a hyphenated run 17 s. `JWT_RE`
+(`redact.ts:23` on `main`) is the same class and the first fix missed it. A hyphen is in its character class but is not
+a word character, so each `eyJ` after a hyphen passed `\b` and rescanned the rest of the run: `eyJ-` repeated 25,000
+times took 12.0 s in `redactCredentials` here (the reviewer measured 18.3 s), 14.2 s with `.aaaaaaaa.` after it, and
+24.8 s for `redactSecrets` and `redactSecretsDeep` together. Every Edit tool output, every Chat tool frame and every job
+error passes through `redactCredentials`, so text from a web page or an upstream error could block the host event loop.
+
+Fix: the cookie rule matches the header and the rest of its line, then tests the line for `=` in a replacer
+(`maskCookieHeader`, `redact.ts:61`), so no match depends on a lookahead. The URL rule matches only the userinfo and
+reads the scheme in a lookbehind (`redact.ts:25`), so a scan starts at a `://` and not at every boundary. The JWT rule
+(`JWT_CHAIN_RE`, `JWT_HEADER_RE` and `maskJwts`, `redact.ts:27-50`) matches each maximal run of `[A-Za-z0-9_.-]` that
+holds an `eyJ`, with a lookbehind so a scan starts once per run. The replacer splits the run on dots and masks from the
+first `eyJ` that is not inside a word, and has eight characters after it in its part, through the end of the third part.
+That is the set the old rule masked, so a JWT after a hyphen (`x-eyJ...`), after dots (`token...eyJ...`) and after a long
+first part (`abcdefghijkl.eyJ...`) is still masked, and one inside a word (`a_eyJ...`) is still not. A differential run
+of 1.2 million random strings built from `eyJ`, hyphens, underscores, dots and spaces found no difference from the old
+regex (about 10,000 of them masked by it). The masked text of every rule is the same as before. Tests:
+`packages/core/src/security/redact-redos.test.ts` (40 cases; inputs of 40,000 to 100,000 characters must redact in under
+250 ms, and a long cookie header, a URL after a long run and the JWT shapes above must still mask). Six of the first
+eight tests were red on `39cd5f0c` (17.7 s to 26.6 s for the cookie cases), the two run-shaped URL cases were red at
+40,000 characters (1.9 s and 2.2 s), and all are green after. The three JWT cases added in the review round were red on
+the first fix (12.0 s, 14.2 s and 24.8 s) and are green on the second. Every rule added in the review round has a case
+in that file. The existing `redact*.test.ts` files stay green (153 tests in the five redactor files). A probe of 112 hostile
+shapes (106 text shapes and 6 key shapes: every rule's prefix repeated, spaces after each keyword, long runs, dotted
+chains, `.env` values and names) through `redactCredentials`, `redactSecrets` and `redactSecretsDeep` found a worst case of
+12.2 ms at 100,000 characters and 154 ms at 1,000,000 characters (a 10 times longer input cost 12.6 times as much, and
+none overflowed a regex stack). The slowest shape is 166,000 short dotted chains that each hold an `eyJ`, which calls the
+JWT replacer once per chain.
+
+Residual: a string is not capped in length before redaction, so linear cost still grows with the input. Not driven on
+a live host.
+
+Gate: PR merge of `fix/redactor-gaps` to `main`.
 
 ### SR-201 {#sr-201}
 
