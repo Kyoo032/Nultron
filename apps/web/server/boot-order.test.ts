@@ -9,9 +9,9 @@
  * Source order proves nothing about evaluation order, so this runs the real entry in a real process
  * and looks at the disk afterwards.
  *
- * What it cannot do is bind a port or reach a network: every case here is refused by a guard before
- * `server.listen`, and the guards read only the environment (no DNS, no portal call). The per-case
- * timeout is the backstop if that ever stops being true.
+ * No case reaches a network. Every refusal case is stopped by a guard before `server.listen`, and the
+ * guards read only the environment (no DNS, no portal call). The one desk case that does boot listens
+ * on loopback and is killed as soon as it reports the port. The per-case timeout is the backstop.
  *
  * A passing case needs BOTH halves — the refusal text on stderr (so the process really reached the
  * guard, rather than dying on a bad import) and an untouched disk (so nothing ran ahead of it).
@@ -106,6 +106,8 @@ function boot(name: string, env: Record<string, string>, prepare?: (dataDir: str
   });
 }
 
+const KILL_WAIT_MS = 10_000;
+
 async function killTree(pid: number | undefined): Promise<void> {
   if (pid === undefined) {
     return;
@@ -116,10 +118,13 @@ async function killTree(pid: number | undefined): Promise<void> {
         resolve(),
       );
     });
-    await new Promise<void>((resolve) => setTimeout(resolve, 1_500));
     return;
   }
-  process.kill(pid, "SIGKILL");
+  try {
+    process.kill(-pid, "SIGKILL");
+  } catch {
+    process.kill(pid, "SIGKILL");
+  }
 }
 
 function bootUntilListening(name: string, env: Record<string, string>): Promise<Boot> {
@@ -127,10 +132,12 @@ function bootUntilListening(name: string, env: Record<string, string>): Promise<
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [TSX_CLI, SERVER_ENTRY], {
       cwd: WEB,
+      detached: process.platform !== "win32",
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...inheritedEnv(), ...env, AGENTFORGE_DATA_DIR: dataDir },
     });
+    const closed = new Promise<void>((done) => child.once("close", () => done()));
     let stdout = "";
     let stderr = "";
     let settled = false;
@@ -141,6 +148,7 @@ function bootUntilListening(name: string, env: Record<string, string>): Promise<
       settled = true;
       clearTimeout(timer);
       await killTree(child.pid);
+      await Promise.race([closed, new Promise<void>((done) => setTimeout(done, KILL_WAIT_MS))]);
       if (error) {
         reject(error);
       } else {
