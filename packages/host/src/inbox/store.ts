@@ -34,7 +34,11 @@ import {
 } from "@agentforge/core/inbox";
 import type { InboundMessage, InboundStatus } from "./whatsapp";
 
-export type InboxSql = Pick<Database.Database, "prepare" | "transaction">;
+type TransactionBody = Parameters<Database.Database["transaction"]>[0];
+
+export type InboxSql = Pick<Database.Database, "prepare"> & {
+  transaction<F extends TransactionBody>(fn: F): Database.Transaction<F>;
+};
 
 export type DeskScope = { organizationId: string; workspaceId: string };
 
