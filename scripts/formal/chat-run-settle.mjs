@@ -100,8 +100,11 @@ function readStallWhileSaving(onStall) {
   const unsaved = blockAfter(branch, "if (!persisted) {");
   const outsideUnsaved = unsaved === null ? branch : branch.replace(`if (!persisted) {${unsaved}}`, "");
   return {
-    standsDown: /return;\s*$/.test(branch) && !/settleRun|finishRun/.test(branch),
-    closesStream: branch.includes("closeQueue();"),
+    standsDown: /return;\s*$/.test(branch) && !/settleRun|finishRun|modelAbort/.test(branch),
+    closesStream:
+      unsaved === null
+        ? /closeQueue\(\);\s*return;\s*$/.test(branch)
+        : /\}\s*closeQueue\(\);\s*return;\s*$/.test(branch) && !outsideUnsaved.replace(/closeQueue\(\);\s*return;\s*$/, "").includes("closeQueue"),
     quietOnceSaved: unsaved !== null && !outsideUnsaved.includes("send("),
   };
 }
@@ -289,7 +292,7 @@ function check(jar, values, invariants, properties) {
     const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
     const violations = [...output.matchAll(/Invariant (\S+) is violated/g)].map((m) => m[1].replace(/\.$/, ""));
     if (output.includes("Temporal properties were violated")) {
-      violations.push("Termination");
+      violations.push("a temporal property (Termination or StreamEnds)");
     }
     const passed = violations.length === 0 && output.includes("Model checking completed. No error has been found.");
     const states = output.match(/(\d+) distinct states found/);
