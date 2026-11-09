@@ -9,6 +9,7 @@
  * `localDataDir()` / `mediaRoot()`, so pointing the env at a throwaway directory here
  * is enough — nothing caches the path at import time.
  */
+import { vi } from "vitest";
 import { mkdirSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -48,26 +49,43 @@ process.env.AGENTFORGE_RUNTIME = "stub";
  * http-adapter / media-download / still-source tests drive real local servers, and a
  * test that stubs `fetch` itself replaces this wrapper for its own scope.
  */
-const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]", "::1", "0.0.0.0"]);
+const { refuseNonLoopback } = vi.hoisted(() => {
+  const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]", "::1", "0.0.0.0"]);
+  return {
+    refuseNonLoopback(input: RequestInfo | URL): void {
+      const raw = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      let host: string | null = null;
+      try {
+        const url = new URL(raw);
+        if (url.protocol === "http:" || url.protocol === "https:") {
+          host = url.hostname;
+        }
+      } catch {
+        host = null;
+      }
+      if (host !== null && !LOOPBACK.has(host)) {
+        throw new Error(
+          `Host vitest tried to reach ${host} (${raw}). Unit tests must not call out; stub the runtime or mock fetch.`,
+        );
+      }
+    },
+  };
+});
+
+vi.mock("undici", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("undici")>();
+  const guardedFetch = (async (...args: Parameters<typeof actual.fetch>) => {
+    refuseNonLoopback(args[0] as RequestInfo | URL);
+    return actual.fetch(...args);
+  }) as typeof actual.fetch;
+  return { ...actual, fetch: guardedFetch };
+});
+
 const realFetch = globalThis.fetch;
 
 if (typeof realFetch === "function") {
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    const raw = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-    let host: string | null = null;
-    try {
-      const url = new URL(raw);
-      if (url.protocol === "http:" || url.protocol === "https:") {
-        host = url.hostname;
-      }
-    } catch {
-      host = null; // relative / data: / file: — nothing leaves the machine.
-    }
-    if (host !== null && !LOOPBACK.has(host)) {
-      throw new Error(
-        `Host vitest tried to reach ${host} (${raw}). Unit tests must not call out; stub the runtime or mock fetch.`,
-      );
-    }
+    refuseNonLoopback(input);
     return realFetch(input as RequestInfo, init);
   }) as typeof fetch;
 }
