@@ -915,6 +915,61 @@ describe("voice relay", () => {
     expect(talker.sessions.at(-1)?.calls[0]?.signal.aborted).toBe(false);
   });
 
+  it("counts the speech itself over the reply: a 0.55 s 'iya' is a backchannel, not an interruption", async () => {
+    // The eval's `backchannel.wav` is 0.55 s of speech. The audio the host keeps from before the detector was
+    // sure (200 ms) and the quiet it waits out afterwards (300 ms) are not speech, and counted as it was they
+    // carried a 0.55 s sound past the 700 ms line.
+    talker = new FakeTalker();
+    talker.hear = async () => "iya";
+    talker.script = async function* (call) {
+      await Promise.resolve();
+      if (call.signal.aborted) return;
+      yield { type: "text", delta: ANSWER };
+      yield { type: "audio", pcm: tone(3000) };
+      yield { type: "usage", usage: USAGE };
+      yield { type: "done" };
+    };
+    transcriber = transcribeOk();
+    armWiring();
+    const { ws, box } = await openReady();
+    sendPcm(ws, pcm(tone(200), silence(800)));
+    await until(() => states(box).includes("speaking"), "speaking");
+    sendPcm(ws, pcm(tone(550), silence(500)));
+    await until(() => box.frames.some((frame) => frame.type === "resume_audio"), "resume");
+    expect(box.frames.some((frame) => frame.type === "stop_audio")).toBe(false);
+    expect(talker.sessions[0]?.calls[0]?.signal.aborted).toBe(false);
+  });
+
+  it("interrupts when the speech itself passes 700 ms, while the person is still speaking", async () => {
+    talker = new FakeTalker();
+    talker.script = async function* (call) {
+      await Promise.resolve();
+      if (call.signal.aborted) return;
+      yield { type: "text", delta: ANSWER };
+      yield { type: "audio", pcm: tone(3000) };
+      yield { type: "usage", usage: USAGE };
+      await new Promise<void>((resolve) => {
+        if (call.signal.aborted) {
+          resolve();
+          return;
+        }
+        call.signal.addEventListener("abort", () => resolve(), { once: true });
+      });
+    };
+    transcriber = transcribeOk();
+    armWiring();
+    const { ws, box } = await openReady();
+    sendPcm(ws, pcm(tone(200), silence(800)));
+    await until(() => states(box).includes("speaking"), "speaking");
+    // 650 ms of speech and no quiet after it: under the line, so nothing is cut yet.
+    sendPcm(ws, tone(650));
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(box.frames.some((frame) => frame.type === "stop_audio")).toBe(false);
+    // Speech that carries on past 700 ms is cut without waiting for it to end.
+    sendPcm(ws, tone(150));
+    await until(() => box.frames.some((frame) => frame.type === "stop_audio"), "stop_audio");
+  });
+
   it("lets push-to-talk ignore silence until commit", async () => {
     talker = new FakeTalker();
     transcriber = transcribeOk();

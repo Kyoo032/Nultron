@@ -507,6 +507,37 @@ describe("silenceMs, nowMs, speaking and reset", () => {
     expect(vad.silenceMs).toBe(vad.nowMs - endedAt);
   });
 
+  it("lastSpeechMs stays at the last speech through the hangover, so it measures speech without the quiet after it", () => {
+    const vad = createVad();
+    expect(vad.lastSpeechMs).toBe(0);
+    vad.push(silence(1000));
+    expect(vad.lastSpeechMs).toBe(0);
+    const started = vad.push(FIXTURE_PCM.backchannel.subarray(0, 40 * BYTES_PER_MS * 10));
+    const start = started[0];
+    expect(start?.type).toBe("speech_start");
+    // Speaking: the last speech window ended within one window (10 ms) of the audio fed.
+    expect(vad.speaking).toBe(true);
+    expect(vad.nowMs - vad.lastSpeechMs).toBeLessThanOrEqual(10);
+    const spoken = vad.lastSpeechMs;
+    // The rest of the clip, then quiet: lastSpeechMs holds at the last sound while speaking runs on.
+    vad.push(FIXTURE_PCM.backchannel.subarray(40 * BYTES_PER_MS * 10));
+    const lastSound = vad.lastSpeechMs;
+    expect(lastSound).toBeGreaterThan(spoken);
+    vad.push(silence(200));
+    expect(vad.speaking).toBe(true);
+    expect(vad.lastSpeechMs).toBe(lastSound);
+    const ended = vad.push(silence(200));
+    const end = ended[0];
+    expect(end?.type).toBe("speech_end");
+    expect(vad.lastSpeechMs).toBe(lastSound);
+    if (start?.type === "speech_start" && end?.type === "speech_end") {
+      expect(end.atMs).toBe(lastSound);
+      expect(vad.lastSpeechMs - start.atMs).toBe(end.speechMs);
+    }
+    vad.reset();
+    expect(vad.lastSpeechMs).toBe(0);
+  });
+
   it("speech_end reports the time of the last speech frame, and speechMs runs from the start", () => {
     const { events } = feed(concat(silence(1000), FIXTURE_PCM.backchannel, silence(1000)));
     const [start, end] = events;

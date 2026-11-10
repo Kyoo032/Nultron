@@ -118,7 +118,8 @@ export class VoiceRelay {
   private interruptPromise: Promise<void> | null = null;
   private overlapActive = false;
   private overlapPcm: Buffer = Buffer.alloc(0);
-  private overlapMs = 0;
+  /** Where the speech over the reply began, in the detector's own time. Null until it has started. */
+  private overlapStartMs: number | null = null;
   private judging = false;
   /** The last 200 ms, so speech that armed the overlap is kept with it. */
   private recent: Buffer = Buffer.alloc(0);
@@ -311,14 +312,13 @@ export class VoiceRelay {
     }
     const events = this.vad.push(copy);
     for (const event of events) {
-      if (event.type === "speech_start") this.onSpeechStart(prior);
+      if (event.type === "speech_start") this.onSpeechStart(prior, event.atMs);
       else if (this.overlapActive && !this.interrupting) this.onOverlapEnd();
     }
     if (this.interrupting) return;
     if (this.overlapActive && this.vad.speaking) {
       this.overlapPcm = Buffer.concat([this.overlapPcm, copy]);
-      this.overlapMs += pcmDurationMs(copy.length);
-      if (this.overlapMs >= TURN_TIMING.interruptAfterMs) {
+      if (this.overlapSpeechMs() >= TURN_TIMING.interruptAfterMs) {
         void this.interrupt();
         return;
       }
@@ -334,7 +334,7 @@ export class VoiceRelay {
     this.consider();
   }
 
-  private onSpeechStart(prior: Buffer): void {
+  private onSpeechStart(prior: Buffer, atMs: number): void {
     this.lastSpeechAt = voiceWiring().clock.now();
     this.noteActivity();
     if (!this.released) {
@@ -351,7 +351,7 @@ export class VoiceRelay {
     }
     this.armOverlap();
     this.overlapPcm = Buffer.from(prior);
-    this.overlapMs = pcmDurationMs(prior.length);
+    this.overlapStartMs = atMs;
   }
 
   private abortEarly(): void {
@@ -743,7 +743,7 @@ export class VoiceRelay {
     this.armOverlap();
     this.bargeCancel?.();
     this.bargeCancel = voiceWiring().clock.after(BARGE_SILENCE_MS, () => {
-      if (this.overlapMs === 0 && !this.vad.speaking && this.overlapActive && !this.interrupting && !this.shut) {
+      if (this.overlapStartMs === null && !this.vad.speaking && this.overlapActive && !this.interrupting && !this.shut) {
         this.clearOverlap();
         this.send({ type: "resume_audio" });
       }
@@ -754,26 +754,36 @@ export class VoiceRelay {
     if (this.overlapActive) return;
     this.overlapActive = true;
     this.overlapPcm = Buffer.alloc(0);
-    this.overlapMs = 0;
+    this.overlapStartMs = null;
+  }
+
+  /**
+   * How long the person has really spoken over the reply: from where the detector says the speech began to
+   * where it last heard speech. Not the audio kept (that starts 200 ms before the detector was sure) and not the
+   * quiet the detector is still waiting out before it calls the speech over: both would make a short "iya" of
+   * 0.55 s count past the 700 ms line.
+   */
+  private overlapSpeechMs(): number {
+    return this.overlapStartMs === null ? 0 : Math.max(0, this.vad.lastSpeechMs - this.overlapStartMs);
   }
 
   private clearOverlap(): void {
     this.overlapActive = false;
     this.overlapPcm = Buffer.alloc(0);
-    this.overlapMs = 0;
+    this.overlapStartMs = null;
     this.bargeCancel?.();
     this.bargeCancel = null;
   }
 
   private onOverlapEnd(): void {
     if (this.judging || this.interrupting) return;
-    if (this.overlapMs >= TURN_TIMING.interruptAfterMs) {
+    const speechMs = this.overlapSpeechMs();
+    if (speechMs >= TURN_TIMING.interruptAfterMs) {
       void this.interrupt();
       return;
     }
     this.judging = true;
     const pcm = Buffer.from(this.overlapPcm);
-    const speechMs = this.overlapMs;
     void this.judgeShort(pcm, speechMs);
   }
 
@@ -788,7 +798,7 @@ export class VoiceRelay {
     }
     this.judging = false;
     if (this.shut || this.interrupting || ac.signal.aborted) return;
-    if (this.overlapMs >= TURN_TIMING.interruptAfterMs || this.vad.speaking) return;
+    if (this.overlapSpeechMs() >= TURN_TIMING.interruptAfterMs || this.vad.speaking) return;
     const verdict = judgeBargeIn({ transcript, speechMs, locale: this.session.locale });
     if (verdict === "interrupt") {
       await this.interrupt();
@@ -962,7 +972,7 @@ export class VoiceRelay {
     this.transcribeStarted = false;
     this.overlapActive = false;
     this.overlapPcm = Buffer.alloc(0);
-    this.overlapMs = 0;
+    this.overlapStartMs = null;
     this.judging = false;
     this.recent = Buffer.alloc(0);
     this.playbackCancel?.();

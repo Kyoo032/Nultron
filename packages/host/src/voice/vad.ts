@@ -57,6 +57,12 @@ export type Vad = {
   readonly speaking: boolean;
   /** Milliseconds of audio since the last speech frame, 0 while speaking. */
   readonly silenceMs: number;
+  /**
+   * Where the last speech window ended, in ms of audio fed: 0 before any. While speaking it is within one window of
+   * `nowMs`, and it stays put through the hangover, so `lastSpeechMs - speech_start.atMs` is the speech so far, not
+   * the speech plus the quiet the detector is still waiting out.
+   */
+  readonly lastSpeechMs: number;
   /** Milliseconds of audio fed so far. */
   readonly nowMs: number;
   reset(): void;
@@ -309,6 +315,9 @@ export function createVad(options: Partial<VadOptions> = {}): Vad {
     },
     get silenceMs() {
       return speaking ? 0 : Math.max(0, nowMs() - lastSpeechEndMs);
+    },
+    get lastSpeechMs() {
+      return lastSpeechEndMs;
     },
     get nowMs() {
       return nowMs();
