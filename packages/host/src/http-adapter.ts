@@ -116,7 +116,8 @@ function header(req: IncomingMessage, name: string): string | undefined {
   return Array.isArray(value) ? value[0] : value;
 }
 
-function parseCookies(req: IncomingMessage): Record<string, string> {
+/** The request's cookies, decoded. Exported so the voice upgrade reads them exactly as this adapter does. */
+export function parseCookies(req: IncomingMessage): Record<string, string> {
   const raw = header(req, "cookie") ?? "";
   const out: Record<string, string> = {};
   for (const part of raw.split(";")) {
@@ -529,6 +530,15 @@ function reasonCodeOf(body: unknown): string {
   return typeof code === "string" && REASON_CODE_PATTERN.test(code) ? code : INTERNAL_ERROR_CODE;
 }
 
+/**
+ * The desk a request is about: the workspace cookie, else the desk this machine has selected (never set
+ * on the hosted server), else none. One rule for this adapter and for the voice upgrade, so the route that
+ * opens a voice session and the socket that joins it resolve the same desk.
+ */
+export function requestWorkspaceId(cookies: Readonly<Record<string, string>>): string | null {
+  return cookies[WORKSPACE_COOKIE] || readSelectedWorkspaceId() || null;
+}
+
 let editBooted = false;
 
 export async function handleNodeRequest(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
@@ -722,7 +732,7 @@ export async function handleNodeRequest(req: IncomingMessage, res: ServerRespons
     body,
     rawBody,
     files,
-    workspaceId: cookies[WORKSPACE_COOKIE] || readSelectedWorkspaceId() || null,
+    workspaceId: requestWorkspaceId(cookies),
     abortSignal: abort.signal,
   };
   const result = await dispatchMasked(request, context);

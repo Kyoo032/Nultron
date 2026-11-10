@@ -6,15 +6,15 @@
  */
 import type { Duplex } from "node:stream";
 import type { IncomingMessage, Server } from "node:http";
-import { isServerMode, trustedOrigins } from "@agentforge/core";
+import { ApiError, isServerMode, trustedOrigins } from "@agentforge/core";
 import { VOICE_MAX_AUDIO_FRAME_BYTES, VOICE_STREAM_PATH_PATTERN } from "@agentforge/core/voice";
 import { WebSocketServer } from "ws";
 import { hostPortalCheck, hostSessionStore, requireSessionFor, type PortalSessionCheck, type SessionStore } from "../auth";
 import { requireGatewayAllowedFor } from "../gateway-gate";
+import { parseCookies, requestWorkspaceId } from "../http-adapter";
 import { isAllowedMutatingApiRequest, isAllowedWebOrigin } from "../local-request";
 import { getTenant } from "../tenant";
 import type { HostRequest } from "../types";
-import { readSelectedWorkspaceId } from "../workspace";
 import { voiceSettingsFor } from "./flag";
 import { VoiceRelay } from "./relay";
 import { sameVoiceOwner, voiceSessions } from "./sessions";
@@ -94,7 +94,8 @@ export function attachVoiceUpgrade(server: Server, options: VoiceUpgradeOptions 
         origin,
         cookie: header(req, "cookie"),
       },
-      workspaceId: readSelectedWorkspaceId() ?? null,
+      // The adapter's own rule, so this resolves the desk H1 resolved: the cookie, else the machine's.
+      workspaceId: requestWorkspaceId(parseCookies(req)),
     };
     void accept(req, socket, head, request, sessionId, serverMode, options);
   });
@@ -115,6 +116,8 @@ async function accept(
         store: options.sessionStore ?? hostSessionStore(),
         now: options.now,
         portalCheck: options.portalCheck ?? hostPortalCheck(),
+        // The cookie name follows the mode the rules above ran in, not a second read of the environment.
+        serverMode,
       });
       request.session = {
         id: record.id,
@@ -123,7 +126,14 @@ async function accept(
         userId: record.userId,
       };
     }
-    const tenant = await getTenant(request);
+    let tenant: Awaited<ReturnType<typeof getTenant>>;
+    try {
+      tenant = await getTenant(request);
+    } catch (error) {
+      // A desk the person does not own, or an account that is switched off: what the router answers.
+      refuse(socket, error instanceof ApiError && (error.status === 403 || error.status === 404) ? error.status : 401);
+      return;
+    }
     const voice = voiceSessions().get(sessionId);
     if (!voice || voice.endedReason || voice.attached || !sameVoiceOwner(voice, tenant)) {
       refuse(socket, 404);

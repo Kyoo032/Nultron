@@ -5,7 +5,7 @@
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import net, { type AddressInfo, type Socket } from "node:net";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import type { TenantContext } from "@agentforge/core";
+import { WORKSPACE_COOKIE, type TenantContext } from "@agentforge/core";
 import {
   VOICE_LIMITS,
   VOICE_MAX_AUDIO_FRAME_BYTES,
@@ -15,12 +15,15 @@ import {
   type VoiceMode,
 } from "@agentforge/core/voice";
 import { WebSocket } from "ws";
+import { createSession, sessionCookieName } from "../auth/session";
 import { createMemorySessionStore } from "../auth/session-store";
 import type { PortalSessionCheck } from "../auth/portal-check";
 import type { HostJsonResult, HostResult } from "../types";
+import { readSelectedWorkspaceId, selectedWorkspacePath } from "../workspace";
 import { dispatch } from "../router";
 import { agentService, getTenant } from "../tenant";
 import { createThread, listMessages } from "../threads";
+import { rmSync } from "node:fs";
 import { listTenantUsage } from "../tenant-usage";
 import { manualClock, type ManualClock } from "./clock";
 import { outboundBacklogTooHigh, pcmDurationMs, VOICE_OUTBOUND_BACKLOG_BYTES } from "./pcm";
@@ -218,7 +221,11 @@ function armWiring(ask?: VoiceWiring["ask"]): void {
   });
 }
 
-async function postSession(body: { threadId: string; mode?: VoiceMode } = { threadId }): Promise<HostResult> {
+/** `workspaceId` is what the adapter reads from the desk cookie. */
+async function postSession(
+  body: { threadId: string; mode?: VoiceMode } = { threadId },
+  workspaceId?: string,
+): Promise<HostResult> {
   return dispatch({
     method: "POST",
     path: "/api/v1/voice/sessions",
@@ -226,7 +233,18 @@ async function postSession(body: { threadId: string; mode?: VoiceMode } = { thre
     params: {},
     headers: {},
     body,
+    ...(workspaceId ? { workspaceId } : {}),
   });
+}
+
+/**
+ * On the hosted server nothing reads the machine's selected desk (`readSelectedWorkspaceId` is empty there).
+ * These tests reach the hosted rules through the upgrade's `serverMode` option, so the environment still
+ * says desk and the selection file must go, or a request with no desk cookie would resolve through it.
+ */
+function hostedLikeNoMachineDesk(): void {
+  rmSync(selectedWorkspacePath(), { force: true });
+  expect(readSelectedWorkspaceId()).toBeUndefined();
 }
 
 async function endSession(id: string): Promise<HostResult> {
@@ -334,6 +352,7 @@ describe("voice relay", () => {
     upgradeOptions.serverMode = undefined;
     upgradeOptions.sessionStore = undefined;
     upgradeOptions.portalCheck = undefined;
+    upgradeOptions.now = undefined;
   });
 
   afterAll(async () => {
@@ -905,6 +924,95 @@ describe("voice relay", () => {
     expect(missing.status).toBe(404);
     expect(outboundBacklogTooHigh(VOICE_OUTBOUND_BACKLOG_BYTES + 1)).toBe(true);
     expect(outboundBacklogTooHigh(0)).toBe(false);
+  });
+
+  it("joins a session only on the desk it was opened on, selected by the workspace cookie (off the hosted server)", async () => {
+    talker = new FakeTalker();
+    transcriber = transcribeOk();
+    armWiring();
+    enableVoice();
+    const { db, createLocalWorkspace } = await import("@agentforge/db");
+    const second = await createLocalWorkspace(db, tenant.organizationId, "Second desk", undefined, undefined, tenant.userId);
+    const onSecond = await getTenant(second.id);
+    expect(onSecond.workspaceId).toBe(second.id);
+    expect(onSecond.workspaceId).not.toBe(tenant.workspaceId);
+    const chat = await agentService.ensureDefaultChat(onSecond);
+    const thread = await createThread(onSecond, chat.agent.id, "Voice on the second desk");
+    if (!thread) throw new Error("thread was not created");
+
+    // H1 as the adapter would call it with the desk cookie: `request.workspaceId` is the cookie's desk.
+    const created = (await postSession({ threadId: thread.id }, second.id)) as HostJsonResult;
+    expect(created.status).toBe(201);
+    const path = (created.body as { streamPath: string }).streamPath;
+
+    // No cookie falls back to the machine's selected desk, which is the first one: not this session's.
+    expect(await refused(path)).toBe(404);
+    // Another desk's cookie, and a cookie naming no desk at all.
+    expect(await refused(path, { cookie: `${WORKSPACE_COOKIE}=${tenant.workspaceId}` })).toBe(404);
+    expect(await refused(path, { cookie: `other=1; ${WORKSPACE_COOKIE}=not-a-desk-of-anyone` })).toBe(404);
+    // The cookie H1 was called with.
+    const ws = connect(path, { cookie: `theme=dark; ${WORKSPACE_COOKIE}=${second.id}` });
+    const box = collect(ws);
+    await until(() => box.frames.some((frame) => frame.type === "ready"), "ready on the cookie-selected desk");
+    ws.send(JSON.stringify({ type: "stop" }));
+    await until(() => box.frames.some((frame) => frame.type === "ended"), "ended");
+  });
+
+  it("joins a session only on the desk it was opened on, selected by the workspace cookie (hosted server)", async () => {
+    talker = new FakeTalker();
+    transcriber = transcribeOk();
+    armWiring();
+    enableVoice();
+    hostedLikeNoMachineDesk();
+    const { db, ensurePortalOwner, createLocalWorkspace, resolvePortalTenant } = await import("@agentforge/db");
+    const identity = { tenantId: "voice-cookie-tenant", orgId: "voice-cookie-org", userId: "voice-cookie-user" };
+    await ensurePortalOwner(db, { ...identity, role: "owner" });
+    const home = await resolvePortalTenant(db, identity);
+    if (!home.ok) throw new Error(`hosted person did not resolve: ${home.code}`);
+    const second = await createLocalWorkspace(db, home.tenant.organizationId, "Hosted second desk", undefined, undefined, identity.userId);
+    const onSecond = await resolvePortalTenant(db, identity, second.id);
+    if (!onSecond.ok) throw new Error(`hosted second desk did not resolve: ${onSecond.code}`);
+
+    const at = clock.now();
+    const sessions = createMemorySessionStore();
+    const signedIn = createSession({ ...identity, now: at });
+    await sessions.create(signedIn);
+    upgradeOptions.serverMode = true;
+    upgradeOptions.sessionStore = sessions;
+    upgradeOptions.portalCheck = portalCheck;
+    upgradeOptions.now = () => at;
+    process.env.AGENTFORGE_TRUSTED_ORIGINS = "https://desk.example";
+    const signIn = `${sessionCookieName({ secure: true })}=${signedIn.id}`;
+    const hosted = (cookie: string) => ({
+      origin: "https://desk.example",
+      host: "desk.example",
+      "x-forwarded-proto": "https",
+      cookie,
+    });
+
+    // What H1 would have opened for this person on the second desk.
+    const opened = voiceSessions().open({
+      tenant: onSecond.tenant,
+      threadId: "hosted-voice-thread",
+      mode: "hands_free",
+      locale: "en",
+      model: "fake-talker",
+      talker,
+      transcriber,
+    });
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) return;
+    const path = `/api/v1/voice/sessions/${opened.session.id}/stream`;
+
+    expect(await refused(path, hosted(signIn))).toBe(404);
+    expect(await refused(path, hosted(`${signIn}; ${WORKSPACE_COOKIE}=${home.tenant.workspaceId}`))).toBe(404);
+    // A desk of someone else's company is the router's own answer for it: the desk does not exist.
+    expect(await refused(path, hosted(`${signIn}; ${WORKSPACE_COOKIE}=not-a-desk-of-anyone`))).toBe(404);
+    const ws = connect(path, hosted(`${signIn}; ${WORKSPACE_COOKIE}=${second.id}`));
+    const box = collect(ws);
+    await until(() => box.frames.some((frame) => frame.type === "ready"), "ready on the cookie-selected desk");
+    ws.send(JSON.stringify({ type: "stop" }));
+    await until(() => box.frames.some((frame) => frame.type === "ended"), "ended");
   });
 
   it("keeps the gateway key out of every log line, frame, response, saved row and ledger row", async () => {
