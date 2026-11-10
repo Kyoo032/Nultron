@@ -18,6 +18,10 @@ const RUN_ENTRIES: Readonly<Record<string, Entry>> = {
     how: "gated",
     why: "Chat and every mode agent. Passes the turn's `mediaPermission`, read from the body by `readMediaPermission`, which always asks.",
   },
+  "packages/host/src/voice/ask.ts": {
+    how: "gated",
+    why: "The voice thinker. Passes the `mediaPermission` of its own Chat turn setup (`prepareChatRun`, a body with no grants, so the gate always asks). Its bindings (`voiceBindings` in `voice/ask-tools.ts`) are an allow-list of read tools plus `request_tap`; it holds neither `image_generate` nor `video_generate`.",
+  },
   "packages/host/src/delegation/run-delegation.ts": {
     how: "tools stripped",
     why: "A delegated run binds `delegateToolKeys(agent)`, which drops `image_generate` and `video_generate` (checked for every agent in core).",
