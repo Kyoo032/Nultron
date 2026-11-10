@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { CHOICE_PROFILES } from "./choice-profiles";
 import { EVERYDAY_MODEL_IDS } from "./gateway-roles";
 import { JOB_FALLBACK_TAIL } from "./job-fallback";
 import { JOB_MODE_PREFERENCES } from "./mode-defaults";
 import { MODEL_POLICY_TABLE, modelPolicy } from "./model-policy";
 import { CHAT_DEFAULT_PREFERENCES } from "./preferred";
+import { bareModelId } from "./request-constraints";
+import { isSupersededModel, SUPERSEDED_MODELS } from "./superseded";
+import { FAST_TIER_GATEWAY_IDS, REASONING_TIER_GATEWAY_IDS } from "./tiers";
 
 /**
  * Every id the product recommends, defaults to, or falls back on must be a model the policy table
@@ -19,6 +23,21 @@ const LISTS: Record<string, readonly string[]> = {
   EVERYDAY_MODEL_IDS: [...EVERYDAY_MODEL_IDS],
   JOB_FALLBACK_TAIL,
   ...Object.fromEntries(Object.entries(JOB_MODE_PREFERENCES).map(([mode, ids]) => [`JOB_MODE_PREFERENCES.${mode}`, ids])),
+  // The Fastest and Reasoning tiers (Daily is CHAT_DEFAULT_PREFERENCES above) and the choice profiles, which
+  // read the same two tier lists. Every profile, kind and provider is walked so a profile that later gets a
+  // list of its own is covered without an edit here.
+  FAST_TIER_GATEWAY_IDS: [...FAST_TIER_GATEWAY_IDS],
+  REASONING_TIER_GATEWAY_IDS: [...REASONING_TIER_GATEWAY_IDS],
+  ...Object.fromEntries(
+    Object.values(CHOICE_PROFILES).flatMap((profile) =>
+      Object.entries(profile.lists).flatMap(([kind, byProvider]) =>
+        Object.entries(byProvider).map(([provider, refs]) => [
+          `CHOICE_PROFILES.${profile.id}.${kind}.${provider}`,
+          (refs ?? []).map((ref) => ref.model),
+        ]),
+      ),
+    ),
+  ),
 };
 
 /** The ids the 2026-09-30 recommendations name that were probed live and so have an entry of their own. */
@@ -97,5 +116,69 @@ describe("the Recommended set and the Chat default list agree", () => {
 
   it("makes GPT 6 Luna the Chat default", () => {
     expect(CHAT_DEFAULT_PREFERENCES[0]).toBe("gpt-6-luna");
+  });
+});
+
+describe("no list the product walks by itself names a superseded model", () => {
+  for (const [name, ids] of Object.entries(LISTS)) {
+    it(name, () => {
+      const offenders = ids
+        .filter((id) => isSupersededModel(id))
+        .map((id) => `${name} names ${id}, superseded by ${SUPERSEDED_MODELS[bareModelId(id)]?.successor}`);
+      expect(offenders).toEqual([]);
+    });
+  }
+});
+
+describe("SUPERSEDED_MODELS", () => {
+  const entries = Object.entries(SUPERSEDED_MODELS);
+
+  it("keys every entry by a bare lower-case id, the only spelling isSupersededModel looks up", () => {
+    expect(entries.length).toBeGreaterThan(0);
+    for (const [id] of entries) {
+      expect(bareModelId(id), id).toBe(id);
+    }
+  });
+
+  it("names a successor the policy table knows, with a verified note", () => {
+    for (const [id, entry] of entries) {
+      const policy = modelPolicy(entry.successor);
+      expect(policy.known, `${id} -> ${entry.successor}`).toBe(true);
+      expect(policy.verified.trim().length, `${id} -> ${entry.successor}`).toBeGreaterThan(10);
+    }
+  });
+
+  it("never names a successor that is itself superseded, so no chain ends on an old id", () => {
+    for (const [id, entry] of entries) {
+      expect(isSupersededModel(entry.successor), `${id} -> ${entry.successor}`).toBe(false);
+      expect(bareModelId(entry.successor), id).not.toBe(id);
+    }
+  });
+
+  it("puts every successor in at least one list the product walks", () => {
+    const listed = new Set(Object.values(LISTS).flatMap((ids) => ids.map((id) => bareModelId(id))));
+    for (const [id, entry] of entries) {
+      expect(listed.has(bareModelId(entry.successor)), `${id} -> ${entry.successor} is in no list`).toBe(true);
+    }
+  });
+
+  it("is never dearer than what it replaces, on input or on output", () => {
+    for (const [id, entry] of entries) {
+      expect(entry.now[0], `${id} -> ${entry.successor}, input price`).toBeLessThanOrEqual(entry.was[0]);
+      expect(entry.now[1], `${id} -> ${entry.successor}, output price`).toBeLessThanOrEqual(entry.was[1]);
+    }
+  });
+});
+
+describe("isSupersededModel", () => {
+  it("matches whatever the case, the outer space or the vendor prefix", () => {
+    expect(isSupersededModel("gpt-5.6-luna")).toBe(true);
+    expect(isSupersededModel("GPT-5.6-Luna")).toBe(true);
+    expect(isSupersededModel(" openai/gpt-5.6-luna ")).toBe(true);
+  });
+
+  it("refuses the model that replaced it, and a name that only exists on the prototype", () => {
+    expect(isSupersededModel("gpt-6-luna")).toBe(false);
+    expect(isSupersededModel("constructor")).toBe(false);
   });
 });

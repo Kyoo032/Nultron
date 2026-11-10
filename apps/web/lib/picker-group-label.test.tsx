@@ -49,7 +49,8 @@ describe("pickerGroupLabel", () => {
 });
 
 describe("the native model select", () => {
-  const catalog = [model("gpt-5.6-sol"), model("gpt-5.2"), model("claude-sonnet-4-5"), model("omni-fast")];
+  // GPT 6 Astra is the Recommended pick here; a superseded id such as GPT 5.6 Sol would be left out.
+  const catalog = [model("gpt-6-astra"), model("gpt-5.2"), model("claude-sonnet-4-5"), model("omni-fast")];
 
   it("shows Indonesian group headings and no English literal when the desk is Indonesian", () => {
     applyLocale("id");
@@ -61,6 +62,15 @@ describe("the native model select", () => {
     // Brands are proper nouns.
     expect(html).toContain('label="GPT"');
     expect(html).toContain('label="Claude"');
+  });
+
+  it("leaves a superseded model out, unless it is the one the desk has selected", () => {
+    applyLocale("en");
+    const withOld = [...catalog, model("gpt-5.6-sol")];
+    const other = renderToStaticMarkup(<ModelSelect models={withOld} value="gpt-5.2" onChange={() => {}} />);
+    expect(other).not.toContain('value="gpt-5.6-sol"');
+    const selected = renderToStaticMarkup(<ModelSelect models={withOld} value="gpt-5.6-sol" onChange={() => {}} />);
+    expect(selected).toContain('value="gpt-5.6-sol"');
   });
 
   it("keeps the English headings on an English desk", () => {

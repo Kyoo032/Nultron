@@ -521,6 +521,8 @@ export {
   sortChatModels,
 } from "./models/preferred";
 export type { PickerGroup, PickerGroupKind } from "./models/preferred";
+export { SUPERSEDED_MODELS, isSupersededModel } from "./models/superseded";
+export type { SupersededModel } from "./models/superseded";
 export { curateModel, applyCuration, isEverydayModel, isThinkingModel } from "./models/curation";
 export type { ModelTier, CuratedModelMeta } from "./models/curation";
 export {

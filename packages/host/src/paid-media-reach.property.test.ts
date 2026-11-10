@@ -26,6 +26,10 @@ const RUN_ENTRIES: Readonly<Record<string, Entry>> = {
     how: "tools bounded by the mode spec",
     why: "A studio or worker job binds only what its mode's harness spec lists, through `toolKeysWithinSpec`; no spec but Chat's lists a paid tool (checked in core).",
   },
+  "packages/host/eval/models/run-handoff.ts": {
+    how: "tools stripped",
+    why: "The dev-only tier hand-off check (`eval:models:handoff`, never shipped) runs every turn with `bindings: []`, so no tool, paid or not, is bound.",
+  },
   "packages/host/src/edit/agent-run.ts": {
     how: "no gate: the Edit agent's own tools",
     why: "The Edit agent makes media with its own `generate_image` and `generate_video`, not the gated tools. Named residual of SR-167.",
