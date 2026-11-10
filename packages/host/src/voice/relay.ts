@@ -68,7 +68,8 @@ export class VoiceRelay {
   private readonly queued: Array<{ data: RawData; isBinary: boolean }> = [];
   private readonly queuedAudio: Buffer[] = [];
 
-  private state: VoiceState = "listening";
+  /** `connecting` until `ready` has gone out: the view starts there and only a state frame moves it on. */
+  private state: VoiceState = "connecting";
   private generation = 0;
   private errors = 0;
   private replyAbort: AbortController | null = null;

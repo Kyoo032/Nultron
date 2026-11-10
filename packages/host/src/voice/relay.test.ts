@@ -573,6 +573,17 @@ describe("voice relay", () => {
     expect(code).not.toBe(1000);
   });
 
+  it("says ready and then listening, so the view leaves connecting", async () => {
+    talker = new FakeTalker();
+    transcriber = transcribeOk();
+    armWiring();
+    const { box } = await openReady();
+    await until(() => states(box).length > 0, "the first state");
+    // The view starts in `connecting`, and `ready` does not move it: only a state frame does.
+    expect(box.frames[0]?.type).toBe("ready");
+    expect(box.frames[1]).toEqual({ type: "state", value: "listening" });
+  });
+
   it("plays a plain turn into the thread with a usage row", async () => {
     talker = new FakeTalker();
     transcriber = transcribeOk();
