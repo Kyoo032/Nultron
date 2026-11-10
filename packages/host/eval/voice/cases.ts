@@ -723,8 +723,10 @@ const backchannelResumes: VoiceCase = {
     }
     recorder.check("no stop_audio for a backchannel", stopped === undefined, stopped ? "the host cut the reply for an 'iya'" : undefined);
 
+    // From the start of the turn, not from the barge: the host sends the final caption when the talker's stream
+    // ends, and the talker speaks faster than the audio plays, so it can come before the person cuts in.
     await expectFrame(recorder, session, "the reply's final caption", isAssistantFinal, {
-      since: sinceBarge,
+      since,
       timeoutMs: TIMING.metricsMs,
     });
     await expectFrame(recorder, session, "the saved frame", isFrame("saved"), { since: sinceBarge, timeoutMs: TIMING.savedMs });

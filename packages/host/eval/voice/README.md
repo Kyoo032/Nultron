@@ -152,6 +152,8 @@ npx vitest run --root eval/voice      # the eval's own tests
 npx tsc --noEmit -p eval/voice/tsconfig.json
 ```
 
+`real-relay.test.ts` is the other half: the same cases, with the same fixtures, against the host's real routes and the real relay. It starts an `http.Server` on loopback port 0 with `handleNodeRequest` and `attachVoiceUpgrade` (as `apps/web/server.ts` mounts them), on a throwaway desk, and scripts only the two models and `askNultron`: a small-talk clip is answered, a fact or a task clip makes the talker `ask`, a sentence that stops on "yang" gets `wait`. The relay's clock and the runner's are one scaled clock. It makes no gateway call (the key it sets is a placeholder that is never sent, and `test-setup.ts` throws on any `fetch` off loopback). `VOICE_REAL_RELAY_TABLE=1` prints the runner's own table with the numbers.
+
 The package's own vitest config only includes `src/**/*.test.ts`, so `vitest run eval/voice` from the package
 root finds nothing; the `--root` form above uses this folder's `vitest.config.ts`. The tests run whole turns at
 four times real speed on a shared scaled clock, so a few of them take several seconds.
@@ -162,4 +164,4 @@ four times real speed on a shared scaled clock, so a few of them take several se
 `runner.ts` runs it. `client.ts` is the browser stand-in (HTTP, socket, timeline). `mic.ts` is the paced stream.
 `playback.ts` is what the person would have heard. `audio.ts` reads the fixtures and finds speech marks.
 `stats.ts` is percentiles. `text.ts` hides words. `report.ts` is the table, the result file and `--compare`.
-`results/` is gitignored.
+`real-relay.test.ts` runs the cases against the real relay with a scripted talker. `results/` is gitignored.
