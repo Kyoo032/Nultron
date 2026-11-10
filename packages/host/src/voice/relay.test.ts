@@ -1060,6 +1060,18 @@ describe("voice relay", () => {
       return sse(spoken(tone(2000), "hello from the desk"), usage);
     }) as typeof fetch;
 
+    // The real talker answers over several ticks, so the clock is moved a little at a time, with real
+    // pauses between, until the turn is saved. (`playOut` moves it once and can move it too early.)
+    const playThrough = async (box: Box): Promise<void> => {
+      const savedBefore = box.frames.filter((frame) => frame.type === "saved").length;
+      const startedAt = Date.now();
+      while (box.frames.filter((frame) => frame.type === "saved").length <= savedBefore) {
+        if (Date.now() - startedAt > 4000) throw new Error("timed out waiting for saved");
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        clock.advance(200);
+      }
+    };
+
     const lines: string[] = [];
     const spies = (["log", "info", "warn", "error", "debug"] as const).map((name) =>
       vi.spyOn(console, name).mockImplementation((...args: unknown[]) => {
@@ -1092,12 +1104,12 @@ describe("voice relay", () => {
       await until(() => states(box).includes("speaking"), "speaking");
       sendPcm(ws, pcm(tone(200), silence(300)));
       await until(() => box.frames.some((frame) => frame.type === "resume_audio"), "resume");
-      await playOut(box);
+      await playThrough(box);
 
       // A turn the talker sends to the desk: acknowledgement first, then the answer.
       stub.ask = true;
       sendPcm(ws, pcm(tone(200), silence(800)));
-      await playOut(box);
+      await playThrough(box);
       stub.ask = false;
 
       // A turn the gateway fails on, with the credential in its error body.
