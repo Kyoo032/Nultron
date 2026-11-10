@@ -113,6 +113,11 @@ function toModelMessages(
         .filter((part) => part.type === "text")
         .map((part) => part.text)
         .join("\n");
+      // Messages rejects a blank text block, and a thread can switch tier (and vendor) between turns. The host
+      // already skips such rows (`packages/host/src/runs.ts:416`); this is the runtime's own guard.
+      if (text.trim().length === 0) {
+        continue;
+      }
       messages.push({ role: "assistant", content: text });
       continue;
     }
