@@ -5,6 +5,7 @@
  */
 import type { TenantContext } from "@agentforge/core";
 import type { VoiceCard } from "@agentforge/core/voice";
+import type { VoiceLocale } from "./turns";
 
 export const ASK_NULTRON_TOOL_NAME = "ask_nultron";
 
@@ -31,10 +32,17 @@ export type AskInput = {
   readonly tenant: TenantContext;
   readonly threadId: string;
   readonly question: string;
+  readonly locale: VoiceLocale;
   readonly signal: AbortSignal;
 };
 
-/** Runs one thinker turn and returns what the talker should read back. Never throws. */
+/**
+ * Runs one thinker turn and returns what the talker should read back. Never throws.
+ *
+ * Usage: the thinker's own model calls are recorded by this function. The relay records only the
+ * talker and the transcriber, so nothing is counted twice. It never inserts a message into the
+ * thread: the relay saves the spoken turns.
+ */
 export async function askNultron(_input: AskInput): Promise<AskResult> {
   return { kind: "refused", reason: "failed", text: "The desk cannot answer by voice yet." };
 }
