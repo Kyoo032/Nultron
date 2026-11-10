@@ -2,14 +2,18 @@
  * Live voice in Chat (docs/internal/voice-mode-plan.md, week one). The one shape the browser, the
  * host relay and the tests share.
  *
- * Audio travels as binary WebSocket frames of 16-bit little-endian PCM, mono, at 24 kHz: the
- * OpenAI Realtime default, so the host passes it to the gateway without resampling. Everything
- * else is a JSON text frame from the two unions below, parsed at the boundary on both sides.
+ * Audio travels as binary WebSocket frames of 16-bit little-endian PCM, mono, at 24 kHz: that is
+ * what the gateway's Omni model returns, so the host relays the agent's audio without resampling.
+ * The host wraps the person's audio in a wav header for the HTTP talker. Everything else is a JSON
+ * text frame from the two unions below, parsed at the boundary on both sides.
  */
 
 export const VOICE_SAMPLE_RATE = 24_000;
 export const VOICE_CHANNELS = 1;
 export const VOICE_BYTES_PER_SAMPLE = 2;
+
+/** The size of one browser audio frame. */
+export const VOICE_FRAME_MS = 40;
 
 /** Largest binary frame either side accepts: one second of audio. The browser sends ~40 ms frames. */
 export const VOICE_MAX_AUDIO_FRAME_BYTES = VOICE_SAMPLE_RATE * VOICE_BYTES_PER_SAMPLE;
@@ -28,19 +32,28 @@ export const VOICE_LIMITS = {
   maxOpenPerOwner: 1,
   /** Open sessions in the whole process, the hosted box's guard. */
   maxOpenPerProcess: 8,
+  /** Longest single utterance the host sends to the talker. Past it the turn ends. */
+  maxUtteranceMs: 30 * 1000,
 } as const;
 
 /**
  * What the agent is doing, as the voice view and the mascot show it.
  *
- * - `connecting`: H1 answered, the gateway socket is not ready yet.
+ * - `connecting`: H1 answered, the socket is not ready yet.
  * - `listening`: waiting for the person.
- * - `hearing`: the person is speaking (the gateway reported speech).
+ * - `hearing`: the person is speaking (the host's voice detection heard speech).
  * - `thinking`: the turn is finished and an answer is being made (a reply, or `ask_nultron`).
  * - `speaking`: the agent's audio is going out.
  */
 export const VOICE_STATES = ["connecting", "listening", "hearing", "thinking", "speaking"] as const;
 export type VoiceState = (typeof VOICE_STATES)[number];
+
+/**
+ * How a turn ends. In `hands_free` the host's voice detection ends a turn; in `push_to_talk` only
+ * `commit` ends it.
+ */
+export const VOICE_MODES = ["hands_free", "push_to_talk"] as const;
+export type VoiceMode = (typeof VOICE_MODES)[number];
 
 export const VOICE_END_REASONS = ["user", "max_length", "idle", "dropped", "error", "replaced"] as const;
 export type VoiceEndReason = (typeof VOICE_END_REASONS)[number];
@@ -64,6 +77,8 @@ export type VoiceHostFrame =
       readonly id: string;
       readonly text: string;
       readonly final: boolean;
+      /** True on the final assistant caption of a reply the person cut. `text` is then what they heard. */
+      readonly interrupted?: boolean;
     }
   | { readonly type: "card"; readonly card: VoiceCard }
   /** Drop every queued agent sample now: a real interruption. */
@@ -72,6 +87,13 @@ export type VoiceHostFrame =
   | { readonly type: "resume_audio" }
   /** A turn was saved to the thread, so the transcript under the voice view can reload. */
   | { readonly type: "saved" }
+  /** One per answered turn, for the eval runner and the latency log. The view ignores it. */
+  | {
+      readonly type: "metrics";
+      readonly speechEndToFirstAudioMs: number | null;
+      readonly talkerFirstAudioMs: number | null;
+      readonly transcribeMs: number | null;
+    }
   | { readonly type: "ended"; readonly reason: VoiceEndReason; readonly message?: string };
 
 /** JSON frames from the browser to the host. */
@@ -80,8 +102,10 @@ export type VoiceBrowserFrame =
   | { readonly type: "barge_in" }
   /** How many ms of the current agent reply the person actually heard. Sent after a pause or a stop. */
   | { readonly type: "played"; readonly ms: number }
-  /** Push-to-talk released: treat what was said as a finished turn. */
+  /** The turn is finished now: push-to-talk released, or a tap on done in hands-free. */
   | { readonly type: "commit" }
+  /** Switches turn-taking for the rest of the session. A session starts in `hands_free` unless H1 said otherwise. */
+  | { readonly type: "mode"; readonly value: VoiceMode }
   | { readonly type: "stop" };
 
 /** Parses one text frame from the browser. Anything else is null, and the host drops it. */
@@ -98,7 +122,7 @@ export function parseVoiceBrowserFrame(raw: string): VoiceBrowserFrame | null {
   if (!value || typeof value !== "object") {
     return null;
   }
-  const frame = value as { type?: unknown; ms?: unknown };
+  const frame = value as { type?: unknown; ms?: unknown; value?: unknown };
   switch (frame.type) {
     case "barge_in":
     case "commit":
@@ -108,9 +132,19 @@ export function parseVoiceBrowserFrame(raw: string): VoiceBrowserFrame | null {
       return typeof frame.ms === "number" && Number.isFinite(frame.ms) && frame.ms >= 0
         ? { type: "played", ms: Math.floor(frame.ms) }
         : null;
+    case "mode":
+      return VOICE_MODES.includes(frame.value as VoiceMode) ? { type: "mode", value: frame.value as VoiceMode } : null;
     default:
       return null;
   }
+}
+
+/** A finite number, or null; `undefined` for anything else, which the caller treats as a bad frame. */
+function finiteOrNull(value: unknown): number | null | undefined {
+  if (value === null) {
+    return null;
+  }
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }
 
 /** Parses one text frame from the host. Used by the browser. Unknown frames are null. */
@@ -137,7 +171,14 @@ export function parseVoiceHostFrame(raw: string): VoiceHostFrame | null {
         typeof frame.id === "string" &&
         typeof frame.text === "string" &&
         typeof frame.final === "boolean"
-        ? { type: "caption", role: frame.role, id: frame.id, text: frame.text, final: frame.final }
+        ? {
+            type: "caption",
+            role: frame.role,
+            id: frame.id,
+            text: frame.text,
+            final: frame.final,
+            ...(typeof frame.interrupted === "boolean" ? { interrupted: frame.interrupted } : {}),
+          }
         : null;
     case "card": {
       const card = frame.card as { prompt?: unknown; summary?: unknown } | undefined;
@@ -149,6 +190,14 @@ export function parseVoiceHostFrame(raw: string): VoiceHostFrame | null {
     case "resume_audio":
     case "saved":
       return { type: frame.type };
+    case "metrics": {
+      const speechEndToFirstAudioMs = finiteOrNull(frame.speechEndToFirstAudioMs);
+      const talkerFirstAudioMs = finiteOrNull(frame.talkerFirstAudioMs);
+      const transcribeMs = finiteOrNull(frame.transcribeMs);
+      return speechEndToFirstAudioMs === undefined || talkerFirstAudioMs === undefined || transcribeMs === undefined
+        ? null
+        : { type: "metrics", speechEndToFirstAudioMs, talkerFirstAudioMs, transcribeMs };
+    }
     case "ended":
       return VOICE_END_REASONS.includes(frame.reason as VoiceEndReason)
         ? {
@@ -162,8 +211,11 @@ export function parseVoiceHostFrame(raw: string): VoiceHostFrame | null {
   }
 }
 
-/** H1 `POST /api/v1/voice/sessions` body. `threadId` is the Chat thread the turns are saved to. */
-export type VoiceSessionRequest = { readonly threadId: string };
+/**
+ * H1 `POST /api/v1/voice/sessions` body. `threadId` is the Chat thread the turns are saved to.
+ * `mode` is how turns end at the start of the session; absent means `hands_free`.
+ */
+export type VoiceSessionRequest = { readonly threadId: string; readonly mode?: VoiceMode };
 
 /** H1 success, `201`. The browser then opens `streamPath` as a WebSocket on the same origin. */
 export type VoiceSessionCreated = {
@@ -179,6 +231,8 @@ export const VOICE_REFUSALS = {
   disabled: { status: 403, code: "voice_disabled" },
   sessionLimit: { status: 429, code: "voice_session_limit" },
   modelUnavailable: { status: 503, code: "voice_model_unavailable" },
+  /** The gateway gate is closed (`GatewayBlockedError`, `gateway-gate.ts`). H1 passes the gate's own refusal through. */
+  gatewayBlocked: { status: 403, code: "gateway_blocked" },
 } as const;
 
 /** `voice` in `GET /api/v1/settings`. The mic shows only when `enabled`. */

@@ -40,6 +40,7 @@ import {
 } from "../gateway-gate";
 import { killTrackedChildren } from "../child-processes";
 import { keyLaterPayload } from "../key-later";
+import { voiceSettingsFor } from "../voice/flag";
 import { applySavedLocaleAsBoot, localePayload } from "../locale-boot";
 import { refreshModelCache, modeDefaultsFor } from "../selectable-models";
 import { clearThisKeyCache, loadAccountUsage } from "../account-usage";
@@ -141,6 +142,8 @@ async function settingsPayload(
     })),
     toolRoutes: listToolRoutes(settings),
     usage: await loadAccountUsage(settings, tenant),
+    // The mic shows only when `enabled`; H1 checks it again, so this is a hint and not the gate.
+    voice: voiceSettingsFor(tenant, process.env, serverMode),
   };
 }
 
