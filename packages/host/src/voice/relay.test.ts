@@ -19,6 +19,7 @@ import { createSession, sessionCookieName } from "../auth/session";
 import { createMemorySessionStore } from "../auth/session-store";
 import type { PortalSessionCheck } from "../auth/portal-check";
 import type { HostJsonResult, HostResult } from "../types";
+import { resetRateLimiters } from "../rate-limit";
 import { readSelectedWorkspaceId, selectedWorkspacePath } from "../workspace";
 import { dispatch } from "../router";
 import { agentService, getTenant } from "../tenant";
@@ -348,6 +349,8 @@ describe("voice relay", () => {
     setVoiceWiringForTests(null);
     delete process.env.AGENTFORGE_VOICE;
     delete process.env.AGENTFORGE_TRUSTED_ORIGINS;
+    delete process.env.AGENTFORGE_RATE_IP_RPM;
+    resetRateLimiters();
     process.env.AGENTFORGE_RUNTIME = "stub";
     upgradeOptions.serverMode = undefined;
     upgradeOptions.sessionStore = undefined;
@@ -534,9 +537,9 @@ describe("voice relay", () => {
     const secure = await postSession();
     expect(secure.status).toBe(201);
     const securePath = ((secure as HostJsonResult).body as { streamPath: string }).streamPath;
-    expect(await refused(securePath, { origin: "https://desk.example" })).toBe(403);
+    expect(await refused(securePath, { origin: "https://desk.example", host: "desk.example" })).toBe(403);
     expect(
-      await refused(securePath, { origin: "https://desk.example", "x-forwarded-proto": "https" }),
+      await refused(securePath, { origin: "https://desk.example", host: "desk.example", "x-forwarded-proto": "https" }),
     ).toBe(401);
   });
 
@@ -1013,6 +1016,104 @@ describe("voice relay", () => {
     await until(() => box.frames.some((frame) => frame.type === "ready"), "ready on the cookie-selected desk");
     ws.send(JSON.stringify({ type: "stop" }));
     await until(() => box.frames.some((frame) => frame.type === "ended"), "ended");
+  });
+
+  it("refuses an upgrade whose Host is not loopback, before it looks at anything else (off the hosted server)", async () => {
+    talker = new FakeTalker();
+    transcriber = transcribeOk();
+    armWiring();
+    enableVoice();
+    const created = (await postSession()) as HostJsonResult;
+    const path = (created.body as { streamPath: string }).streamPath;
+    // A page on another name that resolves to this machine (DNS rebinding) sends its own name as Host.
+    expect(await refused(path, { host: "evil.example" })).toBe(403);
+    expect(await refused(path, { host: `evil.example:${port}` })).toBe(403);
+    expect(await refused(path, { host: `127.0.0.1.evil.example:${port}` })).toBe(403);
+    // The same request with the loopback Host is the one that connects.
+    const ws = connect(path, { host: `localhost:${port}` });
+    const box = collect(ws);
+    await until(() => box.frames.some((frame) => frame.type === "ready"), "ready with a loopback Host");
+    ws.send(JSON.stringify({ type: "stop" }));
+    await until(() => box.frames.some((frame) => frame.type === "ended"), "ended");
+  });
+
+  it("refuses an upgrade whose Host is not a trusted host, even with a good session, Origin and https (hosted server)", async () => {
+    talker = new FakeTalker();
+    transcriber = transcribeOk();
+    armWiring();
+    enableVoice();
+    hostedLikeNoMachineDesk();
+    const { db, ensurePortalOwner, resolvePortalTenant } = await import("@agentforge/db");
+    const identity = { tenantId: "voice-host-tenant", orgId: "voice-host-org", userId: "voice-host-user" };
+    await ensurePortalOwner(db, { ...identity, role: "owner" });
+    const resolved = await resolvePortalTenant(db, identity);
+    if (!resolved.ok) throw new Error(`hosted person did not resolve: ${resolved.code}`);
+    const at = clock.now();
+    const sessions = createMemorySessionStore();
+    const signedIn = createSession({ ...identity, now: at });
+    await sessions.create(signedIn);
+    upgradeOptions.serverMode = true;
+    upgradeOptions.sessionStore = sessions;
+    upgradeOptions.portalCheck = portalCheck;
+    upgradeOptions.now = () => at;
+    process.env.AGENTFORGE_TRUSTED_ORIGINS = "https://desk.example";
+    const opened = voiceSessions().open({
+      tenant: resolved.tenant,
+      threadId: "hosted-voice-thread",
+      mode: "hands_free",
+      locale: "en",
+      model: "fake-talker",
+      talker,
+      transcriber,
+    });
+    expect(opened.ok).toBe(true);
+    if (!opened.ok) return;
+    const path = `/api/v1/voice/sessions/${opened.session.id}/stream`;
+    const cookie = `${sessionCookieName({ secure: true })}=${signedIn.id}`;
+    const good = { origin: "https://desk.example", "x-forwarded-proto": "https", cookie };
+
+    const lines: string[] = [];
+    const spy = vi.spyOn(console, "warn").mockImplementation((...args: unknown[]) => {
+      lines.push(args.map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg))).join(" "));
+    });
+    try {
+      expect(await refused(path, { ...good, host: `127.0.0.1:${port}` })).toBe(403);
+      expect(await refused(path, { ...good, host: "evil.example" })).toBe(403);
+      expect(await refused(path, { ...good, host: "desk.example.evil.example" })).toBe(403);
+    } finally {
+      spy.mockRestore();
+    }
+    // The hosted server leaves the adapter's own line for it: a reason, a status, no path, no id.
+    const filtered = lines.filter((line) => line.includes('"event":"request_filtered"'));
+    expect(filtered).toHaveLength(3);
+    expect(filtered.every((line) => line.includes('"status":403') && line.includes('"code":"origin_forbidden"'))).toBe(true);
+    expect(lines.some((line) => line.includes(opened.session.id) || line.includes(signedIn.id))).toBe(false);
+
+    // The same request with the trusted Host is the one that connects.
+    const ws = connect(path, { ...good, host: "desk.example" });
+    const box = collect(ws);
+    await until(() => box.frames.some((frame) => frame.type === "ready"), "ready with the trusted Host");
+    ws.send(JSON.stringify({ type: "stop" }));
+    await until(() => box.frames.some((frame) => frame.type === "ended"), "ended");
+  });
+
+  it("meters hosted upgrades with the adapter's per-IP bucket and answers 429 past it", async () => {
+    talker = new FakeTalker();
+    transcriber = transcribeOk();
+    armWiring();
+    enableVoice();
+    upgradeOptions.serverMode = true;
+    upgradeOptions.sessionStore = createMemorySessionStore();
+    upgradeOptions.portalCheck = portalCheck;
+    process.env.AGENTFORGE_TRUSTED_ORIGINS = "https://desk.example";
+    process.env.AGENTFORGE_RATE_IP_RPM = "3";
+    resetRateLimiters();
+    const path = `/api/v1/voice/sessions/${"a".repeat(22)}/stream`;
+    const hosted = { origin: "https://desk.example", host: "desk.example", "x-forwarded-proto": "https" };
+    const answers: number[] = [];
+    for (let i = 0; i < 5; i += 1) answers.push(await refused(path, hosted));
+    // The first three get as far as the session gate (no cookie: 401); the rest never reach it.
+    expect(answers).toEqual([401, 401, 401, 429, 429]);
   });
 
   it("keeps the gateway key out of every log line, frame, response, saved row and ledger row", async () => {

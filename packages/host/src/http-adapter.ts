@@ -69,7 +69,7 @@ const FORWARDED_FOR_HEADER = "x-forwarded-for";
 const HTTPS_PROTO = "https";
 
 /** One event name for every request the transport rules refuse, whatever refused it. */
-const FILTERED_EVENT = "request_filtered";
+export const FILTERED_EVENT = "request_filtered";
 /** Written when a handler escaped with an exception; the answer the caller gets says nothing. */
 const FAILED_EVENT = "request_failed";
 /**
@@ -479,7 +479,7 @@ function rejectPlaintext(req: IncomingMessage): HttpRejection | null {
  * the TLS hop, the shape of the request line and headers, then the rate limiters. Cheapest first,
  * and none of it reads the body.
  */
-function transportRejection(
+export function transportRejection(
   req: IncomingMessage,
   path: string,
   method: string,
@@ -803,7 +803,7 @@ type Rejection = { readonly code: string; readonly message: string };
  */
 const CSRF_EXEMPT_PATHS: ReadonlySet<string> = new Set(["/api/v1/billing/webhook", WHATSAPP_WEBHOOK_PATH]);
 
-function hostRejection(host: string | undefined, serverMode: boolean): Rejection | null {
+export function hostRejection(host: string | undefined, serverMode: boolean): Rejection | null {
   if (serverMode) {
     return isAllowedWebHostHeader(host, trustedOrigins())
       ? null
