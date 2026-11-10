@@ -4,7 +4,7 @@
  */
 import { createServer, type IncomingMessage, type Server } from "node:http";
 import net, { type AddressInfo, type Socket } from "node:net";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { TenantContext } from "@agentforge/core";
 import {
   VOICE_LIMITS,
@@ -28,6 +28,9 @@ import { resetVoiceSessionsForTests, voiceSessions } from "./sessions";
 import { TalkerError, type Talker, type TalkerEvent, type TalkerSession, type TalkerUsage, type Transcriber } from "./talker";
 import { attachVoiceUpgrade, type VoiceUpgradeOptions } from "./upgrade";
 import { setVoiceWiringForTests, type VoiceWiring } from "./wiring";
+import { VOICE_DEFAULT_VOICE } from "./flag";
+import { ACK_SENTENCE, ASK_NULTRON_NAME } from "./talker-prompt";
+import { resetTalkerCachesForTests, whenAcknowledgementSettled } from "./talker-omni-http";
 import type { AskResult } from "./ask";
 
 const USAGE: TalkerUsage = { inputTokens: 3, outputTokens: 5, inputAudioTokens: 1, outputAudioTokens: 4 };
@@ -902,5 +905,124 @@ describe("voice relay", () => {
     expect(missing.status).toBe(404);
     expect(outboundBacklogTooHigh(VOICE_OUTBOUND_BACKLOG_BYTES + 1)).toBe(true);
     expect(outboundBacklogTooHigh(0)).toBe(false);
+  });
+
+  it("keeps the gateway key out of every log line, frame, response, saved row and ledger row", async () => {
+    const SENTINEL = "voice-sentinel-key-6b1f0c9d2e47a83b";
+    const seen: Array<{ url: string; authorization: string | null; body: string }> = [];
+    const stub = { ask: false, fail: false };
+    const chunk = (delta: unknown) => ({ choices: [{ delta }] });
+    const sse = (...frames: unknown[]): Response =>
+      new Response(`${frames.map((frame) => `data: ${JSON.stringify(frame)}\n\n`).join("")}data: [DONE]\n\n`, {
+        status: 200,
+        headers: { "content-type": "text/event-stream" },
+      });
+    const spoken = (pcm: Buffer, words: string): unknown => chunk({ audio: { data: pcm.toString("base64"), transcript: words } });
+    const usage = { choices: [], usage: { prompt_tokens: 3, completion_tokens: 5 } };
+    const gateway = (async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+      const url = String(input);
+      const body = typeof init?.body === "string" ? init.body : "";
+      seen.push({ url, authorization: new Headers(init?.headers).get("authorization"), body });
+      if (url.endsWith("/audio/transcriptions")) {
+        return new Response(JSON.stringify({ text: "what is on my desk" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      const request = JSON.parse(body) as {
+        modalities?: string[];
+        messages?: Array<{ role?: string; content?: unknown }>;
+      };
+      const messages = request.messages ?? [];
+      if (messages.at(-1)?.content === ACK_SENTENCE.en) return sse(spoken(tone(120), ACK_SENTENCE.en), usage);
+      if (request.modalities?.length === 1) return sse(chunk({ content: "iya" }), usage);
+      if (messages.some((message) => message.role === "tool")) return sse(spoken(tone(300), "The desk is clear."), usage);
+      if (stub.fail) {
+        // A gateway that echoes the credential it was sent.
+        return new Response(JSON.stringify({ error: { message: `bad credential ${SENTINEL}` } }), { status: 500 });
+      }
+      if (stub.ask) {
+        return sse(
+          chunk({
+            tool_calls: [{ index: 0, id: "call-key", function: { name: ASK_NULTRON_NAME, arguments: '{"question":"What is on my desk?"}' } }],
+          }),
+          usage,
+        );
+      }
+      return sse(spoken(tone(2000), "hello from the desk"), usage);
+    }) as typeof fetch;
+
+    const lines: string[] = [];
+    const spies = (["log", "info", "warn", "error", "debug"] as const).map((name) =>
+      vi.spyOn(console, name).mockImplementation((...args: unknown[]) => {
+        lines.push(args.map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg))).join(" "));
+      }),
+    );
+    vi.stubGlobal("fetch", gateway);
+    process.env.AGENTFORGE_RUNTIME = "ai";
+    process.env.OPENAI_API_KEY = SENTINEL;
+    resetTalkerCachesForTests();
+    clock = manualClock(1_000_000);
+    // No `modelsFor`: the production wiring opens the real talker and transcriber with the key.
+    setVoiceWiringForTests({ clock, ask: async () => ({ kind: "answer", text: "The desk is clear." }) });
+    try {
+      enableVoice();
+      const created = (await postSession()) as HostJsonResult;
+      expect(created.status).toBe(201);
+      const path = (created.body as { streamPath: string }).streamPath;
+      const raw: string[] = [];
+      const ws = connect(path);
+      const box = collect(ws);
+      ws.on("message", (data, isBinary) => {
+        if (!isBinary) raw.push(data.toString());
+      });
+      await until(() => box.frames.some((frame) => frame.type === "ready"), "ready");
+      await whenAcknowledgementSettled({ model: "qwen3.5-omni-flash", voice: VOICE_DEFAULT_VOICE, locale: "en" });
+
+      // A plain turn, with a short "iya" over the reply that the host reads with `hearShort`.
+      sendPcm(ws, pcm(tone(200), silence(800)));
+      await until(() => states(box).includes("speaking"), "speaking");
+      sendPcm(ws, pcm(tone(200), silence(300)));
+      await until(() => box.frames.some((frame) => frame.type === "resume_audio"), "resume");
+      await playOut(box);
+
+      // A turn the talker sends to the desk: acknowledgement first, then the answer.
+      stub.ask = true;
+      sendPcm(ws, pcm(tone(200), silence(800)));
+      await playOut(box);
+      stub.ask = false;
+
+      // A turn the gateway fails on, with the credential in its error body.
+      stub.fail = true;
+      const listening = states(box).filter((value) => value === "listening").length;
+      sendPcm(ws, pcm(tone(200), silence(800)));
+      await until(() => states(box).filter((value) => value === "listening").length > listening, "listening after the failure");
+      stub.fail = false;
+
+      ws.send(JSON.stringify({ type: "stop" }));
+      await until(() => box.frames.some((frame) => frame.type === "ended"), "ended");
+
+      // The key reached the gateway on the transcription and on the model calls, and only in the header.
+      expect(seen.some((call) => call.url.endsWith("/audio/transcriptions") && call.authorization === `Bearer ${SENTINEL}`)).toBe(true);
+      expect(seen.some((call) => call.url.endsWith("/chat/completions") && call.authorization === `Bearer ${SENTINEL}`)).toBe(true);
+      expect(seen.every((call) => call.authorization === `Bearer ${SENTINEL}` && !call.body.includes(SENTINEL))).toBe(true);
+      expect(seen.some((call) => call.body.includes('"modalities":["text"]'))).toBe(true);
+
+      // And nowhere else.
+      expect(lines.length).toBeGreaterThan(0);
+      expect(lines.some((line) => line.includes("voice_reply_failed"))).toBe(true);
+      expect(lines.filter((line) => line.includes(SENTINEL))).toEqual([]);
+      expect(raw.length).toBeGreaterThan(0);
+      expect(raw.filter((text) => text.includes(SENTINEL))).toEqual([]);
+      expect(box.bins.some((bin) => bin.includes(SENTINEL))).toBe(false);
+      expect(JSON.stringify(created.body)).not.toContain(SENTINEL);
+      expect(JSON.stringify(await listMessages(tenant, threadId))).not.toContain(SENTINEL);
+      expect(JSON.stringify(listTenantUsage(tenant))).not.toContain(SENTINEL);
+    } finally {
+      vi.unstubAllGlobals();
+      for (const spy of spies) spy.mockRestore();
+      delete process.env.OPENAI_API_KEY;
+      resetTalkerCachesForTests();
+    }
   });
 });
