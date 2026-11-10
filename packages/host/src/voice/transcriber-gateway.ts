@@ -27,6 +27,18 @@ function openBudget(ms: number): { readonly signal: AbortSignal; cancel: () => v
   return { signal: ctrl.signal, cancel: () => clearTimeout(timer) };
 }
 
+/**
+ * The transcript as the person said it: trimmed, whitespace collapsed to single spaces, and no trailing
+ * `:` or `;`. The model sometimes ends a sentence with one (live: `berapa total penjualan saya bulan
+ * lalu?:`), also after `?`, `!` or `.`. Punctuation inside the sentence is not touched.
+ */
+function cleanTranscript(raw: string): string {
+  return raw
+    .replace(/\s+/g, " ")
+    .replace(/[\s:;]+$/, "")
+    .trim();
+}
+
 function endpoint(baseUrl: string): string {
   return `${baseUrl.trim().replace(/\/+$/, "")}/audio/transcriptions`;
 }
@@ -71,7 +83,7 @@ export function createGatewayTranscriber(options: GatewayTranscriberOptions): Tr
           return null;
         }
         const json = (await response.json()) as { text?: unknown };
-        const text = typeof json.text === "string" ? json.text.trim() : "";
+        const text = typeof json.text === "string" ? cleanTranscript(json.text) : "";
         if (!text) {
           return null;
         }

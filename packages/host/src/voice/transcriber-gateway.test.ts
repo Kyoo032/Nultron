@@ -54,6 +54,34 @@ describe("createGatewayTranscriber", () => {
     expect(result).toEqual({ text: "Berapa total?", seconds: 0 });
   });
 
+  it("drops a trailing colon or semicolon, also after ?, ! or ., and collapses whitespace", async () => {
+    const cases: ReadonlyArray<readonly [string, string]> = [
+      ["berapa total penjualan saya bulan lalu?:", "berapa total penjualan saya bulan lalu?"],
+      ["Berapa total?;", "Berapa total?"],
+      ["Stop!:", "Stop!"],
+      ["Done.;", "Done."],
+      ["Done. :", "Done."],
+      ["what is the total:", "what is the total"],
+      ["  total   penjualan \n bulan  lalu?: \n", "total penjualan bulan lalu?"],
+      ["Note: the total is 5; maybe 6?:", "Note: the total is 5; maybe 6?"],
+      ["Berapa total?", "Berapa total?"],
+    ];
+    for (const [raw, expected] of cases) {
+      const { fetchImpl } = install(() => new Response(JSON.stringify({ text: raw }), { status: 200 }));
+      const result = await transcriber(fetchImpl).transcribe(PCM, { locale: "id", signal: new AbortController().signal });
+      expect(result?.text, raw).toBe(expected);
+    }
+  });
+
+  it("returns null when the text is only stray punctuation", async () => {
+    for (const raw of [":", " ; ", ":;"]) {
+      const { fetchImpl } = install(() => new Response(JSON.stringify({ text: raw }), { status: 200 }));
+      await expect(
+        transcriber(fetchImpl).transcribe(PCM, { locale: "en", signal: new AbortController().signal }),
+      ).resolves.toBeNull();
+    }
+  });
+
   it("returns null on a failure and on empty text, and the log line has no key", async () => {
     const lines: string[] = [];
     vi.spyOn(console, "info").mockImplementation((line?: unknown) => {
