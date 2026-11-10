@@ -233,6 +233,7 @@ import {
   handleResetApp,
 } from "./handlers/settings";
 import { handleDeleteThread, handleGetThread, handleGetThreads, handlePostThreads } from "./handlers/threads";
+import { handlePostVoiceSession, handlePostVoiceSessionEnd } from "./handlers/voice";
 import { handleGetUsage } from "./handlers/usage";
 import { handleGetStorageUsage } from "./handlers/storage";
 import { handleGetVideoExampleFile, handleGetVideoExamples } from "./handlers/video-examples";
@@ -368,6 +369,8 @@ const routes: Route[] = [
   compile("POST", "/api/v1/threads", handlePostThreads),
   compile("GET", "/api/v1/threads/:threadId", handleGetThread),
   compile("DELETE", "/api/v1/threads/:threadId", handleDeleteThread),
+  compile("POST", "/api/v1/voice/sessions", handlePostVoiceSession),
+  compile("POST", "/api/v1/voice/sessions/:id/end", handlePostVoiceSessionEnd),
   compile("POST", "/api/v1/threads/:threadId/runs/text", (req) => handleRun(req, "text")),
   compile("POST", "/api/v1/threads/:threadId/runs/image", (req) => handleRun(req, "image")),
   compile("POST", "/api/v1/threads/:threadId/runs/video", (req) => handleRun(req, "video")),

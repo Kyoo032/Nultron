@@ -52,6 +52,8 @@ const LEFT_OUT: Readonly<Record<string, string>> = {
   handlePostKnowledgeSourceReindex: "re-embeds one source",
   handlePostKnowledgeBackendReindex:
     "queues a backfill and answers at once; the embedding runs in the backfill outbox, outside the request",
+  handlePostVoiceSession:
+    "checks the gate and opens an in-memory session; it never calls the gateway, and voice has its own cap",
 };
 
 /** Body a route needs before it reaches the slot, where an empty object would be refused first. */
