@@ -104,6 +104,8 @@ export class VoiceRelay {
   private lastSpeechAt: number | null = null;
   private firstForwardedAt: number | null = null;
   private forwardedAudioBytes = 0;
+  /** Of `forwardedAudioBytes`, the acknowledgement. It plays first and is not part of `assistantText`. */
+  private ackBytes = 0;
   private pendingUsage: TalkerUsage | null = null;
   private replyFinished = false;
   private saved = false;
@@ -646,6 +648,7 @@ export class VoiceRelay {
       const chunk = even.subarray(offset, end);
       if (this.ws.readyState === WebSocket.OPEN) this.ws.send(chunk);
       this.forwardedAudioBytes += chunk.length;
+      if (!fromTalker) this.ackBytes += chunk.length;
       if (this.firstForwardedAt === null) {
         this.firstForwardedAt = voiceWiring().clock.now();
         if (this.lastSpeechAt !== null && this.speechEndToFirstAudioMs === null) {
@@ -809,13 +812,18 @@ export class VoiceRelay {
     this.send({ type: "stop_audio" });
     this.generation += 1;
     this.abortWork();
-    const totalMs = pcmDurationMs(this.forwardedAudioBytes);
+    // The browser's `played` and the host's own estimate both count every millisecond of agent audio since
+    // `listening`, the acknowledgement included. `assistantText` is the answer alone, so the share of it that
+    // was heard is measured on the audio after the acknowledgement.
+    const ackMs = pcmDurationMs(this.ackBytes);
+    const allMs = pcmDurationMs(this.forwardedAudioBytes);
+    const totalMs = Math.max(0, allMs - ackMs);
     const estimate =
       this.firstForwardedAt === null
         ? 0
-        : Math.min(totalMs, Math.max(0, voiceWiring().clock.now() - this.firstForwardedAt));
+        : Math.min(allMs, Math.max(0, voiceWiring().clock.now() - this.firstForwardedAt));
     const played = await this.waitPlayed();
-    const playedMs = played ?? estimate;
+    const playedMs = Math.max(0, (played ?? estimate) - ackMs);
     const trimmed =
       totalMs > 0 ? trimToHeard({ text: this.assistantText, playedMs, totalMs }) : { text: "", interrupted: true };
     this.assistantText = trimmed.text;
@@ -944,6 +952,7 @@ export class VoiceRelay {
     this.talkerFirstAudioAt = null;
     this.firstForwardedAt = null;
     this.forwardedAudioBytes = 0;
+    this.ackBytes = 0;
     this.pendingUsage = null;
     this.replyFinished = false;
     this.saved = false;

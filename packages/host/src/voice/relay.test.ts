@@ -29,6 +29,7 @@ import { listTenantUsage } from "../tenant-usage";
 import { manualClock, type ManualClock } from "./clock";
 import { outboundBacklogTooHigh, pcmDurationMs, VOICE_OUTBOUND_BACKLOG_BYTES } from "./pcm";
 import { resetVoiceSessionsForTests, voiceSessions } from "./sessions";
+import { TURN_TIMING } from "./turns";
 import { TalkerError, type Talker, type TalkerEvent, type TalkerSession, type TalkerUsage, type Transcriber } from "./talker";
 import { attachVoiceUpgrade, type VoiceUpgradeOptions } from "./upgrade";
 import { setVoiceWiringForTests, type VoiceWiring } from "./wiring";
@@ -764,6 +765,93 @@ describe("voice relay", () => {
     sendPcm(ws, silence(800));
     await until(() => (talker.sessions[0]?.calls.length ?? 0) >= 2, "next utterance");
     expect(talker.sessions[0]?.calls[1]?.pcm.length).toBeGreaterThanOrEqual(tone(700).length);
+  });
+
+  /**
+   * An asked reply, cut while the answer is held open: `ackMs` of acknowledgement, then 2 s of answer for
+   * `ANSWER` (38 characters). `played` is what the browser reports; null means no `played` arrives and
+   * the host estimates from its own clock, `heardMs` after the first audio went out.
+   */
+  async function cutAnAskedReply(options: { ackMs: number; played: number | null; heardMs?: number }): Promise<{
+    caption: { text: string; interrupted: boolean } | null;
+    saved: string[];
+    remembered: string | undefined;
+  }> {
+    const ANSWER_MS = 2000;
+    talker = new FakeTalker();
+    if (options.ackMs > 0) talker.ack = { pcm: tone(options.ackMs), text: "Sebentar, saya cek dulu." };
+    talker.script = async function* (call) {
+      await Promise.resolve();
+      if (call.signal.aborted) return;
+      if (call.kind === "reply") {
+        yield { type: "ask", callId: "call-cut", question: "What is on my desk?" };
+        return;
+      }
+      yield { type: "text", delta: ANSWER };
+      yield { type: "audio", pcm: tone(ANSWER_MS) };
+      yield { type: "usage", usage: USAGE };
+      await new Promise<void>((resolve) => {
+        if (call.signal.aborted) {
+          resolve();
+          return;
+        }
+        call.signal.addEventListener("abort", () => resolve(), { once: true });
+      });
+    };
+    transcriber = transcribeOk();
+    armWiring(async () => ({ kind: "answer", text: ANSWER }));
+    const before = (await listMessages(tenant, threadId)).length;
+    const { ws, box } = await openReady();
+    sendPcm(ws, pcm(tone(200), silence(800)));
+    const forwarded = (options.ackMs > 0 ? tone(options.ackMs).length : 0) + tone(ANSWER_MS).length;
+    await until(() => box.bins.reduce((sum, bin) => sum + bin.length, 0) >= forwarded, "the acknowledgement and the answer");
+    if (options.heardMs) clock.advance(options.heardMs);
+    sendPcm(ws, tone(1000));
+    await until(() => box.frames.some((frame) => frame.type === "stop_audio"), "stop_audio");
+    if (options.played === null) clock.advance(TURN_TIMING.playedWaitMs);
+    else ws.send(JSON.stringify({ type: "played", ms: options.played }));
+    await until(() => box.frames.some((frame) => frame.type === "saved"), "saved");
+    const cut = box.frames.find((frame) => frame.type === "caption" && frame.role === "assistant" && frame.interrupted === true);
+    const rows = (await listMessages(tenant, threadId)).slice(before);
+    return {
+      caption: cut && cut.type === "caption" ? { text: cut.text, interrupted: cut.interrupted === true } : null,
+      saved: rows.filter((row) => row.role === "assistant").map((row) => textOf(row.content)),
+      remembered: talker.sessions[0]?.remembered.at(-1)?.assistant,
+    };
+  }
+
+  it("saves nothing of the answer when the cut lands inside the acknowledgement", async () => {
+    // 600 ms heard of a 1000 ms acknowledgement: the answer has not started to play.
+    const cut = await cutAnAskedReply({ ackMs: 1000, played: 600 });
+    expect(cut.caption).toEqual({ text: "", interrupted: true });
+    expect(cut.saved).toEqual([]);
+    expect(cut.remembered).toBe("");
+  });
+
+  it("keeps about half the answer when the cut lands halfway through it, the acknowledgement not counted", async () => {
+    // 1000 ms of acknowledgement and 1000 ms of the 2000 ms answer heard. Counting the acknowledgement
+    // in the total as well would have said 2000 of 3000 and kept "alpha bravo charlie delta".
+    const cut = await cutAnAskedReply({ ackMs: 1000, played: 2000 });
+    expect(cut.caption).toEqual({ text: "alpha bravo charlie", interrupted: true });
+    expect(cut.saved).toEqual(["alpha bravo charlie"]);
+    expect(cut.remembered).toBe("alpha bravo charlie");
+  });
+
+  it("does the same on the host's own estimate when no played frame arrives", async () => {
+    // 1500 ms since the first audio went out: 1000 of acknowledgement, then 500 of the 2000 ms answer.
+    const cut = await cutAnAskedReply({ ackMs: 1000, played: null, heardMs: 1500 });
+    expect(cut.caption).toEqual({ text: "alpha", interrupted: true });
+    expect(cut.saved).toEqual(["alpha"]);
+  });
+
+  it("is unchanged when there is no acknowledgement", async () => {
+    const half = await cutAnAskedReply({ ackMs: 0, played: 1000 });
+    expect(half.caption).toEqual({ text: "alpha bravo charlie", interrupted: true });
+    expect(half.saved).toEqual(["alpha bravo charlie"]);
+    resetVoiceSessionsForTests();
+    const estimated = await cutAnAskedReply({ ackMs: 0, played: null, heardMs: 1000 });
+    expect(estimated.caption).toEqual({ text: "alpha bravo charlie", interrupted: true });
+    expect(estimated.saved).toEqual(["alpha bravo charlie"]);
   });
 
   it("resumes on a short backchannel and on a barge with no speech", async () => {
