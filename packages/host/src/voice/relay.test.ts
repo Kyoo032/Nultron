@@ -793,6 +793,14 @@ describe("voice relay", () => {
     const saved = rows.slice(-2);
     expect(textOf(saved.find((row) => row.role === "assistant")?.content)).toBe("alpha bravo charlie");
     expect(textOf(saved.find((row) => row.role === "user")?.content)).toBe("Voice message");
+    // The browser counts a reply's heard ms from zero at `listening` and nowhere else, so a cut says it before it
+    // goes on to hearing the person: otherwise the next reply's `played` would carry this one's.
+    const cutAt = box.frames.findIndex((frame) => frame.type === "stop_audio");
+    const afterCut = box.frames
+      .slice(cutAt)
+      .filter((frame) => frame.type === "state")
+      .map((frame) => (frame.type === "state" ? frame.value : ""));
+    expect(afterCut.slice(0, 2)).toEqual(["listening", "hearing"]);
     sendPcm(ws, silence(800));
     await until(() => (talker.sessions[0]?.calls.length ?? 0) >= 2, "next utterance");
     expect(talker.sessions[0]?.calls[1]?.pcm.length).toBeGreaterThanOrEqual(tone(700).length);

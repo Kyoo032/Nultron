@@ -863,13 +863,15 @@ export class VoiceRelay {
     this.vad.reset();
     this.interrupting = false;
     this.interruptPromise = null;
+    // The agent's turn is over, and `listening` is the one frame the browser starts counting the next reply's
+    // heard milliseconds from zero on (`PlaybackQueue.endTurn`). Going straight to `hearing` would add this reply's
+    // heard time to the next one's `played`, and the next cut would keep words that were never heard.
+    this.setState("listening");
     if (overlap.length > 0) {
       this.utterance = overlap;
       this.heardSpeech = true;
       this.beginTurnIds();
       this.setState("hearing");
-    } else {
-      this.setState("listening");
     }
     const queued = this.queuedAudio.splice(0);
     for (const chunk of queued) this.feed(chunk);
