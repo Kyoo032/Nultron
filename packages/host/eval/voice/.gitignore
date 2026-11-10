@@ -1,0 +1,3 @@
+# Every run writes here: one JSON per run. It holds timings and what the desk answered, so it is local evidence
+# and never belongs in git.
+results/

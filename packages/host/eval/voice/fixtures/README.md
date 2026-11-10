@@ -34,3 +34,11 @@ not a recording of anyone. These clips are spoken by the gateway's own speech mo
   `TURN_TIMING.interruptAfterMs` (700 ms).
 - The tests treat these files as binary. They must not be edited, resampled or re-encoded: the numbers
   above and the onset and end limits in `vad.test.ts` are measured on exactly these bytes.
+
+## The eval runner and these clips
+
+`packages/host/eval/voice/` plays these seven clips into a running desk over the voice protocol
+(`audio.ts` reads them; it finds where speech really ends in each with the host's own detector, not from the
+file's length). They are a smoke set: one utterance of each kind, synthetic, enough to prove the runner and give
+first latency numbers. They are not the plan's 200-utterance recorded acceptance set, which does not exist yet.
+The runner reads these files and never writes them.
