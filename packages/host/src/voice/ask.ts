@@ -40,7 +40,10 @@ import type { VoiceLocale } from "./turns";
 
 export const ASK_NULTRON_TOOL_NAME = "ask_nultron";
 
-/** The tool as the realtime session declares it (`session.update` `tools`). */
+/**
+ * The tool's name, description and parameters. The HTTP talker wraps these in the chat-completions
+ * shape (`function` nested) in `talker-prompt.ts` (`ASK_NULTRON_GATEWAY_TOOL`).
+ */
 export const ASK_NULTRON_TOOL = {
   type: "function",
   name: ASK_NULTRON_TOOL_NAME,

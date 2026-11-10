@@ -1,7 +1,7 @@
 /**
  * The talker's fixed words. They stay short and stable so the provider can cache them.
- * Tool JSON is the chat-completions shape (`function` nested). `ask.ts` declares the same
- * tool for the realtime socket, with the name at the top level; this file does not change that.
+ * Tool JSON is the chat-completions shape (`function` nested). `ask.ts` holds the tool's name,
+ * description and parameters (`ASK_NULTRON_TOOL`); this file wraps them for the gateway.
  */
 import type { VoiceLocale } from "./turns";
 

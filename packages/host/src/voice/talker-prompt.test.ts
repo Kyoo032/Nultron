@@ -40,7 +40,7 @@ describe("talker prompt", () => {
     expect(typeof OFFER_KEEP_LISTENING.on).toBe("boolean");
   });
 
-  it("declares ask_nultron the way the gateway wants it, matching the realtime tool", () => {
+  it("declares ask_nultron the way the gateway wants it, from the name, description and parameters in ask.ts", () => {
     expect(ASK_NULTRON_GATEWAY_TOOL.type).toBe("function");
     expect(ASK_NULTRON_GATEWAY_TOOL.function.name).toBe(ASK_NULTRON_TOOL_NAME);
     expect(ASK_NULTRON_GATEWAY_TOOL.function.name).toBe(ASK_NULTRON_TOOL.name);
