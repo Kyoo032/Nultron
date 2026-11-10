@@ -1,5 +1,7 @@
 # Container and shell scripts must stay LF: they run from the read-only /src mount inside the mac builder container.
+# *.Dockerfile stays LF too: a Windows checkout otherwise writes portal.Dockerfile as CRLF, and nix/pkgs/pins.nix fails to evaluate.
 *.sh text eol=lf
 *.py text eol=lf
 Dockerfile text eol=lf
+*.Dockerfile text eol=lf
 scripts/hooks/pre-push text eol=lf
