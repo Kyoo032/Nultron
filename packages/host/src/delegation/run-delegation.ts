@@ -87,7 +87,7 @@ function clip(text: string, max: number): { text: string; truncated: boolean } {
 function delegateModel(tenant: TenantContext): { model: string; effort: ReasoningEffort; explicit: boolean } {
   const catalog = listSelectableModels(tenant);
   try {
-    const tier = chooseTierRun({ tier: DEFAULT_MODEL_TIER }, "text", catalog);
+    const tier = chooseTierRun({ tier: DEFAULT_MODEL_TIER }, "text", catalog, tenant);
     if (tier) {
       return { model: tier.model, effort: tier.reasoning.effort, explicit: tier.reasoning.explicit };
     }

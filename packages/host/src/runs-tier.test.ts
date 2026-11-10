@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentRuntime, InputModality } from "@agentforge/core";
+import type { AgentRuntime, InputModality, TenantContext } from "@agentforge/core";
 import { GATEWAY_PROVIDER_ID } from "@agentforge/core";
 import { MODEL_TIERS, TIER_DEFINITIONS, type ModelTierId } from "@agentforge/core/tiers";
 import { ROUTER_IMPORT_BUDGET_MS } from "./__fixtures__/test-budgets";
@@ -77,6 +77,8 @@ function fullCatalog(): SelectableModel[] {
 
 let dispatch: (request: HostRequest) => Promise<HostResult>;
 let threadId = "";
+/** Chat marks a model down for its own tenant (`runs.ts`), so the tests mark it the same way. */
+let tenant: TenantContext;
 
 function request(method: string, path: string, extra: Partial<HostRequest> = {}): HostRequest {
   return { method, path, query: {}, params: {}, headers: {}, ...extra };
@@ -146,6 +148,8 @@ beforeAll(async () => {
   const chat = await json<{ agent: { id: string } }>("GET", "/api/v1/chat");
   const created = await json<{ thread: { id: string } }>("POST", "/api/v1/threads", { agentId: chat.agent.id });
   threadId = created.thread.id;
+  const { getTenant } = await import("./tenant");
+  tenant = await getTenant();
 }, ROUTER_IMPORT_BUDGET_MS);
 
 beforeEach(() => {
@@ -212,7 +216,7 @@ describe("a tier with no live candidate", () => {
 
   it("answers 503 when every candidate of the tier is held down", async () => {
     for (const id of candidates("fast")) {
-      markJobModelDown(id);
+      markJobModelDown(id, Date.now(), tenant);
     }
     expect((await refused({ content: "hello", tier: "fast" })).status).toBe(503);
   });
@@ -237,10 +241,17 @@ describe("a tier that resolves", () => {
     // Held down, the first two of Fast's list: the run lands on the third, not on the default model
     // (which is the second, `gpt-6-luna`, so one held-down model would not tell the two apart).
     const [first, second, third] = candidates("fast") as [string, string, string];
-    markJobModelDown(first);
-    markJobModelDown(second);
+    markJobModelDown(first, Date.now(), tenant);
+    markJobModelDown(second, Date.now(), tenant);
     await postRun({ content: "hello", tier: "fast" });
     expect(executed[0]?.version.model).toBe(third);
+  });
+
+  it("reads only this tenant's breaker: another company's mark does not move this run", async () => {
+    const [first] = candidates("fast") as [string];
+    markJobModelDown(first, Date.now(), { tenantId: "another-company", organizationId: "another-org" });
+    await postRun({ content: "hello", tier: "fast" });
+    expect(executed[0]?.version.model).toBe(first);
   });
 
   it("maps Fast to Thinking off, as a choice", async () => {
