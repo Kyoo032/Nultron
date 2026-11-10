@@ -1,0 +1,71 @@
+{
+  "mic": {
+    "start": "Start voice",
+    "stop": "End voice",
+    "disabledHint": "Wait for the current reply to finish before starting voice."
+  },
+  "view": {
+    "title": "Live voice",
+    "close": "Close",
+    "end": "End",
+    "you": "You",
+    "assistant": "Nultron",
+    "captionsEmpty": "Go ahead and start talking.",
+    "savedNote": "Everything said here is saved in this chat as text."
+  },
+  "state": {
+    "connecting": "Connecting",
+    "listening": "Listening",
+    "hearing": "Hearing you",
+    "thinking": "Thinking",
+    "speaking": "Speaking"
+  },
+  "mode": {
+    "handsFree": "Hands-free",
+    "pushToTalk": "Push to talk",
+    "hold": "Hold to talk",
+    "release": "Release to send",
+    "switchLabel": "Talking mode"
+  },
+  "hint": {
+    "bargeIn": "Just start talking to cut in at any time."
+  },
+  "card": {
+    "label": "Needs your go-ahead",
+    "run": "Run in Chat",
+    "started": "Started in Chat"
+  },
+  "caption": {
+    "interrupted": "Cut short"
+  },
+  "ended": {
+    "user": "You ended the voice session.",
+    "max_length": "Voice ended after reaching the 15-minute session limit.",
+    "idle": "Voice ended after two minutes of silence.",
+    "dropped": "The voice connection was lost.",
+    "error": "Voice stopped because something went wrong.",
+    "replaced": "Voice ended here because it was opened somewhere else."
+  },
+  "reconnect": {
+    "button": "Talk again"
+  },
+  "phone": {
+    "backgrounded": "Voice stopped when the screen locked or you left the app; tap to talk again."
+  },
+  "error": {
+    "micDenied": "The microphone was blocked, so allow microphone access in your browser's site settings and try again.",
+    "micMissing": "No microphone was found, so plug one in and try again.",
+    "micBusy": "Another app is using the microphone, so close it and try again.",
+    "unsupported": "This browser cannot run live voice, so open this desk in a current version of Chrome, Edge, or Safari.",
+    "insecure": "Voice needs a secure HTTPS page, so open this desk over https and try again.",
+    "voice_disabled": "Voice is not turned on for this desk, so enable it in Settings first.",
+    "gateway_blocked": "This desk has no working {gatewayName} key yet, so connect one in Settings and try again.",
+    "voice_session_limit": "Too many voice sessions are open right now, so try again in a moment.",
+    "voice_model_unavailable": "The voice model is not answering right now, so try again shortly.",
+    "connect": "Could not connect to voice, so check your connection and try again.",
+    "thread": "Could not open the conversation to save these turns, so reload the chat and try again."
+  },
+  "a11y": {
+    "stateLive": "Voice is {state}."
+  }
+}

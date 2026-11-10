@@ -33,6 +33,8 @@ import {
 } from "@/lib/knowledge-context";
 import type { ContextPart } from "@/components/chat-context-chip";
 import { ChatTurn, messageHasDisplayableContent, type LiveTool } from "@/components/chat-turn";
+import { useVoiceSession } from "@/components/voice/use-voice-session";
+import { VoiceView } from "@/components/voice/voice-view";
 import { NultronMascot } from "@/components/nultron/nultron-mascot";
 import { useBuddyTakesStatus } from "@/lib/desk-buddy-store";
 import { useChatBuddyReactions } from "@/lib/use-chat-buddy-reactions";
@@ -398,6 +400,23 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
     }
   }
 
+  // Live voice: the mic in the composer and the voice view over the thread. Its turns are saved to this
+  // thread by the host; the view asks for them to be reloaded, and a card's prompt goes out through the
+  // composer's own send, so the run and its stop rules are Chat's.
+  const voice = useVoiceSession({
+    ensureThread,
+    refresh: refreshMessages,
+    sendPrompt: (text) => {
+      if (!continueSendRef.current) {
+        return false;
+      }
+      continueSendRef.current(text);
+      return true;
+    },
+    sessionKey,
+    chatRunning: running,
+  });
+
   const empty = messages.length === 0 && !streaming && !thinking && !running && tools.length === 0;
   const greeting = empty && !error && shell?.agent.generalist === true;
   const hasReply = messages.some((message) => message.role === "assistant");
@@ -500,91 +519,105 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
         </div>
       ) : null}
 
-      <div
-        key={threadId ?? "empty"}
-        ref={listRef}
-        onScroll={() => {
-          const el = listRef.current;
-          if (!el) {
-            return;
-          }
-          pinRef.current = isPinnedToEnd(el.scrollTop, el.scrollHeight, el.clientHeight);
-        }}
-        // `chat-thread-ledge` keeps the composer character's height free at the end of the thread. The
-        // chat-first shell draws no character there, so its thread ends with an ordinary gap.
-        className={`min-h-0 w-full flex-1 overflow-y-auto overscroll-y-contain px-[var(--chat-gutter)] ${empty ? "" : shell ? "space-y-4 pb-6 pt-4" : "chat-thread-ledge space-y-4 pt-4"}`}
-        data-testid="message-list"
-      >
-        {empty && !error ? (
-          shell && !shell.agent.generalist ? (
-            <AgentHome agent={shell.agent} name={shell.name} onOpenStudio={shell.onOpenStudio} />
-          ) : shell ? (
-            <ChatGreeting />
-          ) : (
-            <ChatLauncher onSuggest={setComposerDraft} />
-          )
-        ) : null}
-        {messages
-          .filter((message) => message.role === "user" || messageHasDisplayableContent(message.content))
-          .map((message, index, shown) => (
-            <ChatTurn
-              key={message.id}
-              role={message.role}
-              content={message.content}
-              continueDisabled={running}
-              // Only the newest reply may continue: an older step-limit turn was already followed up.
-              onContinue={
-                agentIdReady && mayOfferContinue(index, shown.length, message.role)
-                  ? () => {
-                      if (runningRef.current) {
-                        return;
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div
+          key={threadId ?? "empty"}
+          ref={listRef}
+          onScroll={() => {
+            const el = listRef.current;
+            if (!el) {
+              return;
+            }
+            pinRef.current = isPinnedToEnd(el.scrollTop, el.scrollHeight, el.clientHeight);
+          }}
+          // `chat-thread-ledge` keeps the composer character's height free at the end of the thread. The
+          // chat-first shell draws no character there, so its thread ends with an ordinary gap.
+          className={`min-h-0 w-full flex-1 overflow-y-auto overscroll-y-contain px-[var(--chat-gutter)] ${empty ? "" : shell ? "space-y-4 pb-6 pt-4" : "chat-thread-ledge space-y-4 pt-4"}`}
+          data-testid="message-list"
+        >
+          {empty && !error ? (
+            shell && !shell.agent.generalist ? (
+              <AgentHome agent={shell.agent} name={shell.name} onOpenStudio={shell.onOpenStudio} />
+            ) : shell ? (
+              <ChatGreeting />
+            ) : (
+              <ChatLauncher onSuggest={setComposerDraft} />
+            )
+          ) : null}
+          {messages
+            .filter((message) => message.role === "user" || messageHasDisplayableContent(message.content))
+            .map((message, index, shown) => (
+              <ChatTurn
+                key={message.id}
+                role={message.role}
+                content={message.content}
+                continueDisabled={running}
+                // Only the newest reply may continue: an older step-limit turn was already followed up.
+                onContinue={
+                  agentIdReady && mayOfferContinue(index, shown.length, message.role)
+                    ? () => {
+                        if (runningRef.current) {
+                          return;
+                        }
+                        continueSendRef.current?.(continuePrompt(getLocale()));
                       }
-                      continueSendRef.current?.(continuePrompt(getLocale()));
-                    }
-                  : undefined
-              }
-              // Same for Run on a paid picture or clip (SR-167): the newest reply's card is the one that waits.
-              onRunMedia={
-                agentIdReady && mayOfferContinue(index, shown.length, message.role)
-                  ? (requests) => {
-                      if (runningRef.current) {
-                        return;
+                    : undefined
+                }
+                // Same for Run on a paid picture or clip (SR-167): the newest reply's card is the one that waits.
+                onRunMedia={
+                  agentIdReady && mayOfferContinue(index, shown.length, message.role)
+                    ? (requests) => {
+                        if (runningRef.current) {
+                          return;
+                        }
+                        continueSendRef.current?.(t("chat.media.runPrompt"), false, requests);
                       }
-                      continueSendRef.current?.(t("chat.media.runPrompt"), false, requests);
-                    }
-                  : undefined
-              }
-            />
-          ))}
-        {running || thinking || tools.length > 0 || streaming || sendFailed ? (
-          <div data-testid="assistant-live">
-            <ChatTurn
-              role="assistant"
-              live={{
-                thinking,
-                tools,
-                streaming,
-                running,
-                thinkingEnabled: tierThinkingEnabled(tierId),
-                failed: sendFailed,
-                firstTurn: messages.every((message) => message.role !== "assistant"),
-              }}
-            />
-          </div>
+                    : undefined
+                }
+              />
+            ))}
+          {running || thinking || tools.length > 0 || streaming || sendFailed ? (
+            <div data-testid="assistant-live">
+              <ChatTurn
+                role="assistant"
+                live={{
+                  thinking,
+                  tools,
+                  streaming,
+                  running,
+                  thinkingEnabled: tierThinkingEnabled(tierId),
+                  failed: sendFailed,
+                  firstTurn: messages.every((message) => message.role !== "assistant"),
+                }}
+              />
+            </div>
+          ) : null}
+          {canOfferRetry({ failed: sendFailed, retryText, messages }) ? (
+            <div>
+              <button
+                type="button"
+                className="btn"
+                data-testid="chat-retry"
+                onClick={() => continueSendRef.current?.(retryText ?? "", true)}
+              >
+                {t("chat.turn.retry")}
+              </button>
+            </div>
+          ) : null}
+          {fallback && !sendFailed ? <ChatModelFallbackNotice notice={fallback} /> : null}
+        </div>
+        {voice.shown ? (
+          <VoiceView
+            view={voice.view}
+            assistantName={shell?.name}
+            onEnd={voice.close}
+            onReconnect={voice.reconnect}
+            onMode={voice.setMode}
+            onHoldStart={voice.holdStart}
+            onHoldEnd={voice.holdEnd}
+            onRunCard={voice.runCard}
+          />
         ) : null}
-        {canOfferRetry({ failed: sendFailed, retryText, messages }) ? (
-          <div>
-            <button
-              type="button"
-              className="btn"
-              data-testid="chat-retry"
-              onClick={() => continueSendRef.current?.(retryText ?? "", true)}
-            >
-              {t("chat.turn.retry")}
-            </button>
-          </div>
-        ) : null}
-        {fallback && !sendFailed ? <ChatModelFallbackNotice notice={fallback} /> : null}
       </div>
       {agentIdReady ? (
         <div className="chat-composer-ledge">
@@ -604,6 +637,7 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
             // In the chat-first shell the tier is chosen in the header, so the composer shows none.
             onTierChange={shell ? undefined : handleTierChange}
             placeholder={shell ? t("agents.composer.placeholder", { name: shell.name }) : undefined}
+            voice={{ available: voice.available, active: voice.shown, disabled: running, onToggle: voice.toggle }}
             onToolProgress={(event) => {
               // A worker's progress line belongs to the call of that tool that is still running.
               setTools((current) => {

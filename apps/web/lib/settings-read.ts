@@ -1,3 +1,4 @@
+import type { VoiceSettings } from "@agentforge/core/voice";
 import { apiFetch, subscribeToWrites } from "./api-client";
 import { publishGate } from "./gate-state";
 import { parseGatewayGate } from "./gateway-gate";
@@ -27,7 +28,10 @@ import { parseGatewayGate } from "./gateway-gate";
  * The body is frozen. Every caller shares one object, and a caller that wrote to it would change what
  * the others see.
  */
-export type SettingsBody = Readonly<Record<string, unknown>>;
+export type SettingsBody = Readonly<Record<string, unknown>> & {
+  /** Live voice (`VoiceSettings`, `@agentforge/core/voice`): the mic shows only when `enabled`. Absent on a host without it. */
+  readonly voice?: VoiceSettings;
+};
 
 export type SettingsRead = {
   ok: boolean;
