@@ -24,6 +24,7 @@ import {
   redactAttachedParts,
   attachmentsAsMentions,
   takeLastToolIo,
+  type AppLocale,
   type ContentPart,
   type InputModality,
   type TenantContext,
@@ -147,13 +148,20 @@ function withPastSessionsBinding(bindings: ToolBindingRecord[]): ToolBindingReco
   ];
 }
 
-export async function* startModalityRun(options: {
+/**
+ * Everything a Chat turn decides before it calls a model: which agent and model, the prompt with the
+ * earlier-chats hint, the Knowledge Base and the output language, the tools and the budget. It stores
+ * nothing. `startModalityRun` is the typed turn; voice (`voice/ask.ts`) reuses this so the thinker behind
+ * `ask_nultron` is the same one a typed turn has, and cannot drift from it. `locale` is voice's only
+ * input here: the spoken session's language in place of the person's screen language.
+ */
+export async function prepareChatRun(options: {
   tenant: TenantContext;
   threadId: string;
   modality: InputModality;
   body: unknown;
-  abortSignal?: AbortSignal;
-}): AsyncIterable<string> {
+  locale?: AppLocale;
+}) {
   ensureToolsRegistered();
   const parsed = parsers[options.modality](options.body as { content?: unknown; stream?: unknown });
   const settings = loadSettings(options.tenant);
@@ -203,7 +211,7 @@ export async function* startModalityRun(options: {
   // Hosted, the request already knows it: the person's stored choice, or the browser's language for
   // someone who never chose (`sessionLocale`), so Chat answers in the language the screen is in. Off
   // server mode no request locale is set and this is `loadUserLocale`, exactly as before.
-  const locale = hostedRequestLocale() ?? loadUserLocale(options.tenant);
+  const locale = options.locale ?? hostedRequestLocale() ?? loadUserLocale(options.tenant);
   // The model is only told about tools this run offers: a tool that is off (code runs on the hosted
   // server, or turned off in Settings) loses its sentence in the prompt, so it is not invited to call it.
   // Every virtual agent is also told about the harnesses it can run from its own chat (tester code): a
@@ -232,6 +240,109 @@ export async function* startModalityRun(options: {
   // An image goes to any model not known to be text-only; a model we have no line for is tried, and
   // refused by the gateway in words if it cannot (`chat-image-history.ts`, `image-input.ts`).
   assertChatModelAcceptsModality(version.model, options.modality);
+
+  const bindings = agentPolicy
+    ? bindingsForChatModality(agentPolicy.bindings, options.modality)
+    : bindingsForChatModality(
+        // The default agent can run every wired harness from its own chat, hired or not.
+        defaultChat
+          ? withGeneralistWorkers(withPastSessionsBinding(published.bindings))
+          : withPastSessionsBinding(published.bindings),
+        options.modality,
+      );
+  // The default agent's budget is Chat's declared one plus a ceiling for each worker; a mode
+  // agent's is its own; an agent the owner built keeps the runtime's.
+  const budget = agentPolicy ? agentPolicy.budget : defaultChat ? virtualAgentFor("chat").budget : undefined;
+  return {
+    settings,
+    userParts,
+    userText,
+    thread,
+    published,
+    catalog,
+    defaultChat,
+    agentPolicy,
+    model,
+    modelExplicit,
+    reasoningEffort,
+    reasoningEffortExplicit,
+    thinkingEnabled,
+    wire,
+    pastHint,
+    knowledge,
+    locale,
+    mediaPermission,
+    version,
+    bindings,
+    budget,
+  };
+}
+
+/**
+ * The thread's stored messages as the model reads them: tool and thinking parts folded to what a model
+ * should see, a picture reference kept, and the latest assistant turn told what its tools returned so
+ * "continue" does not run them again. Shared by the typed turn and by voice (`voice/ask.ts`).
+ */
+export function chatHistoryFromRows(historyRows: Awaited<ReturnType<typeof listMessages>>): ChatTurn[] {
+  const storedHistory: ChatTurn[] = [];
+  for (const row of historyRows) {
+    if (row.role !== "user" && row.role !== "assistant") {
+      continue;
+    }
+    const parts = row.content as ContentPart[];
+    if (row.role === "assistant" && !hasModelVisibleContent(parts)) {
+      continue;
+    }
+    const media = row.role === "assistant" ? historyMediaPart(parts) : null;
+    const modelParts = modelHistoryParts(parts);
+    storedHistory.push({
+      role: row.role as "user" | "assistant",
+      parts: media ? [...modelParts, media] : modelParts,
+    });
+  }
+  // The latest assistant turn also tells the model what its tools returned, so "continue" does not run
+  // them again. Older turns stay text only.
+  const lastAssistantRow = [...historyRows].reverse().find((row) => row.role === "assistant");
+  const lastAssistantTurn = [...storedHistory].reverse().find((turn) => turn.role === "assistant");
+  if (lastAssistantRow && lastAssistantTurn && hasModelVisibleContent(lastAssistantRow.content as ContentPart[])) {
+    const note = historyToolNote(lastAssistantRow.content as ContentPart[]);
+    if (note) {
+      lastAssistantTurn.parts = [...lastAssistantTurn.parts, { type: "text", text: note }];
+    }
+  }
+  return storedHistory;
+}
+
+export async function* startModalityRun(options: {
+  tenant: TenantContext;
+  threadId: string;
+  modality: InputModality;
+  body: unknown;
+  abortSignal?: AbortSignal;
+}): AsyncIterable<string> {
+  const {
+    settings,
+    userParts,
+    userText,
+    thread,
+    published,
+    catalog,
+    defaultChat,
+    agentPolicy,
+    model,
+    modelExplicit,
+    reasoningEffort,
+    reasoningEffortExplicit,
+    thinkingEnabled,
+    wire,
+    pastHint,
+    knowledge,
+    locale,
+    mediaPermission,
+    version,
+    bindings,
+    budget,
+  } = await prepareChatRun(options);
 
   const queue = new StringQueue();
   let queueClosed = false;
@@ -407,32 +518,7 @@ export async function* startModalityRun(options: {
         return;
       }
       const historyRows = await listMessages(options.tenant, thread.id);
-      const storedHistory: ChatTurn[] = [];
-      for (const row of historyRows) {
-        if (row.role !== "user" && row.role !== "assistant") {
-          continue;
-        }
-        const parts = row.content as ContentPart[];
-        if (row.role === "assistant" && !hasModelVisibleContent(parts)) {
-          continue;
-        }
-        const media = row.role === "assistant" ? historyMediaPart(parts) : null;
-        const modelParts = modelHistoryParts(parts);
-        storedHistory.push({
-          role: row.role as "user" | "assistant",
-          parts: media ? [...modelParts, media] : modelParts,
-        });
-      }
-      // The latest assistant turn also tells the model what its tools returned, so "continue" does not run
-      // them again. Older turns stay text only.
-      const lastAssistantRow = [...historyRows].reverse().find((row) => row.role === "assistant");
-      const lastAssistantTurn = [...storedHistory].reverse().find((turn) => turn.role === "assistant");
-      if (lastAssistantRow && lastAssistantTurn && hasModelVisibleContent(lastAssistantRow.content as ContentPart[])) {
-        const note = historyToolNote(lastAssistantRow.content as ContentPart[]);
-        if (note) {
-          lastAssistantTurn.parts = [...lastAssistantTurn.parts, { type: "text", text: note }];
-        }
-      }
+      const storedHistory = chatHistoryFromRows(historyRows);
       // Images leave as bytes, within one budget, or the person is told why they cannot. A stored
       // `/api/v1/media/...` reference is never handed on: no remote model can open it.
       const history = await prepareChatImageHistory(options.tenant, storedHistory, { model, locale });
@@ -544,22 +630,8 @@ export async function* startModalityRun(options: {
             runId: run.id,
             modality: options.modality,
             version: activeVersion,
-            bindings: agentPolicy
-              ? bindingsForChatModality(agentPolicy.bindings, options.modality)
-              : bindingsForChatModality(
-                  // The default agent can run every wired harness from its own chat, hired or not.
-                  defaultChat
-                    ? withGeneralistWorkers(withPastSessionsBinding(published.bindings))
-                    : withPastSessionsBinding(published.bindings),
-                  options.modality,
-                ),
-            // The default agent's budget is Chat's declared one plus a ceiling for each worker; a mode
-            // agent's is its own; an agent the owner built keeps the runtime's.
-            ...(agentPolicy
-              ? { budget: agentPolicy.budget }
-              : defaultChat
-                ? { budget: virtualAgentFor("chat").budget }
-                : {}),
+            bindings,
+            ...(budget ? { budget } : {}),
             history,
             mediaPermission,
             thinking: thinkingEnabled,
