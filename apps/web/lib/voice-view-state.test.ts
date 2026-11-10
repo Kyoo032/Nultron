@@ -190,8 +190,8 @@ describe("captions", () => {
     expect(state.captions[0]).toMatchObject({ id: "a1", text: "Sure, the report is ready.", final: true });
   });
 
-  it("puts a late caption by the order its id first appeared, and moves nothing already on screen", () => {
-    // The agent's reply starts before the person's own words have been transcribed.
+  it("puts the person's late words above the reply of their own turn, and revises nothing already on screen", () => {
+    // The agent's reply starts before the person's own words have been transcribed: seen live, 3 to 5 s later.
     const state = run([
       { type: "open" },
       ready,
@@ -199,8 +199,44 @@ describe("captions", () => {
       caption("user", "u1", "what day is it", true),
       caption("assistant", "a1", "It is Tuesday.", true),
     ]);
-    expect(state.captions.map((entry) => entry.id)).toEqual(["a1", "u1"]);
-    expect(state.captions[0]?.final).toBe(true);
+    expect(state.captions.map((entry) => entry.id)).toEqual(["u1", "a1"]);
+    expect(state.captions[1]?.final).toBe(true);
+  });
+
+  it("puts the words above the acknowledgement of their turn, and above only their own turn's reply", () => {
+    const state = run([
+      { type: "open" },
+      ready,
+      caption("user", "u1", "one", true),
+      caption("assistant", "a1", "uno", true),
+      caption("assistant", "ack2", "Sebentar", true),
+      caption("assistant", "a2", "dos", true),
+      caption("user", "u2", "two", true),
+    ]);
+    expect(state.captions.map((entry) => entry.id)).toEqual(["u1", "a1", "u2", "ack2", "a2"]);
+  });
+
+  it("puts the words of a cut turn above its cut reply, after the next turn has begun", () => {
+    const state = run([
+      { type: "open" },
+      ready,
+      caption("assistant", "a1", "Halo, saya", true, true),
+      caption("user", "u2", "stop", true),
+      caption("assistant", "a2", "Baik", false),
+      caption("user", "u1", "halo apa kabar", true),
+    ]);
+    expect(state.captions.map((entry) => entry.id)).toEqual(["u1", "a1", "u2", "a2"]);
+  });
+
+  it("appends a caption whose id carries no turn, or whose turn has no reply yet", () => {
+    const state = run([
+      { type: "open" },
+      ready,
+      caption("assistant", "a1", "reply", true),
+      caption("user", "voice-x", "no turn number", true),
+      caption("user", "u3", "no reply yet", true),
+    ]);
+    expect(state.captions.map((entry) => entry.id)).toEqual(["a1", "voice-x", "u3"]);
   });
 
   it("keeps a later turn after an earlier one, whatever order their revisions arrive in", () => {

@@ -99,6 +99,12 @@ export type VoiceViewAction =
   /** The person tapped the card and its prompt went to Chat. */
   | { readonly type: "card_started" };
 
+/** The turn a caption id belongs to: the host names them `u3`, `a3` and `ack3` for turn 3. Null for any other id. */
+function turnOf(id: string): number | null {
+  const match = /^(?:u|a|ack)(\d+)$/.exec(id);
+  return match ? Number(match[1]) : null;
+}
+
 /** What a person who talked and was heard has on screen: the captions, with a late or revised one handled. */
 function applyCaption(
   captions: readonly VoiceCaption[],
@@ -113,11 +119,21 @@ function applyCaption(
   };
   const at = captions.findIndex((caption) => caption.id === frame.id);
   if (at >= 0) {
-    // Replaced where it stands. A caption that arrives late is placed by when its id first appeared,
-    // and nothing already on screen moves.
+    // Replaced where it stands: a revision never moves a caption.
     const copy = captions.slice();
     copy[at] = next;
     return copy;
+  }
+  // The person's words are transcribed after the agent has begun to answer (seconds later), so they
+  // arrive second every turn. They are put above that turn's reply, where they were said. Nothing already
+  // on screen moves relative to the rest; an id with no turn number, or a turn with no reply yet, appends.
+  if (frame.role === "user") {
+    const turn = turnOf(frame.id);
+    const reply = turn === null ? -1 : captions.findIndex((caption) => caption.role === "assistant" && turnOf(caption.id) === turn);
+    if (reply >= 0) {
+      const placed = [...captions.slice(0, reply), next, ...captions.slice(reply)];
+      return placed.length > VOICE_MAX_CAPTIONS ? placed.slice(placed.length - VOICE_MAX_CAPTIONS) : placed;
+    }
   }
   const grown = [...captions, next];
   return grown.length > VOICE_MAX_CAPTIONS ? grown.slice(grown.length - VOICE_MAX_CAPTIONS) : grown;
