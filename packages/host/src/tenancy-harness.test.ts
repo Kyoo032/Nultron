@@ -234,6 +234,7 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
   // --- threads and runs ---------------------------------------------------------------------
   { method: "GET", path: "/api/v1/threads/:threadId", params: { threadId: "threadId" } },
   { method: "DELETE", path: "/api/v1/threads/:threadId", params: { threadId: "threadId" } },
+  { method: "POST", path: "/api/v1/voice/sessions/:id/end", params: { id: "unseeded" }, body: {} },
   {
     method: "POST",
     path: "/api/v1/threads/:threadId/runs/text",
