@@ -33,13 +33,15 @@ import { TURN_TIMING } from "./turns";
 import { TalkerError, type Talker, type TalkerEvent, type TalkerSession, type TalkerUsage, type Transcriber } from "./talker";
 import { attachVoiceUpgrade, type VoiceUpgradeOptions } from "./upgrade";
 import { setVoiceWiringForTests, type VoiceWiring } from "./wiring";
-import { VOICE_DEFAULT_VOICE } from "./flag";
+import { VOICE_DEFAULT_MODEL, VOICE_DEFAULT_VOICE } from "./flag";
 import { ACK_SENTENCE, ASK_NULTRON_NAME } from "./talker-prompt";
 import { resetTalkerCachesForTests, whenAcknowledgementSettled } from "./talker-omni-http";
 import type { AskResult } from "./ask";
 
 const USAGE: TalkerUsage = { inputTokens: 3, outputTokens: 5, inputAudioTokens: 1, outputAudioTokens: 4 };
 const ANSWER = "alpha bravo charlie delta echo foxtrot";
+/** Not the talker's id (`fake-talker`), so the ledger rows of the two can be told apart. */
+const TRANSCRIBER_MODEL = "fake-transcriber";
 
 type ReplyCall = {
   pcm: Buffer;
@@ -218,7 +220,7 @@ function armWiring(ask?: VoiceWiring["ask"]): void {
   clock = manualClock(1_000_000);
   setVoiceWiringForTests({
     clock,
-    modelsFor: () => ({ talker, transcriber }),
+    modelsFor: () => ({ talker, transcriber, transcriberModel: TRANSCRIBER_MODEL }),
     ...(ask ? { ask } : {}),
   });
 }
@@ -398,6 +400,7 @@ describe("voice relay", () => {
         model: "fake-talker",
         talker: dormant(),
         transcriber,
+        transcriberModel: TRANSCRIBER_MODEL,
       });
       expect(opened.ok).toBe(true);
     }
@@ -458,6 +461,7 @@ describe("voice relay", () => {
       model: "fake-talker",
       talker: dormant(),
       transcriber,
+      transcriberModel: TRANSCRIBER_MODEL,
     });
     expect(foreign.ok).toBe(true);
     if (!foreign.ok) return;
@@ -519,6 +523,7 @@ describe("voice relay", () => {
       model: "fake-talker",
       talker: dormant(),
       transcriber,
+      transcriberModel: TRANSCRIBER_MODEL,
     });
     expect(foreign.ok).toBe(true);
     if (!foreign.ok) return;
@@ -610,6 +615,32 @@ describe("voice relay", () => {
       ),
     ).toBe(true);
     expect(talker.sessions[0]?.remembered).toEqual([{ user: "hello there", assistant: "hello from the desk", interrupted: false }]);
+  });
+
+  it("records transcription seconds and session seconds under different models", async () => {
+    talker = new FakeTalker();
+    transcriber = transcribeOk();
+    armWiring();
+    const secondsOn = (model: string) =>
+      listTenantUsage(tenant).filter((row) => row.mode === "voice" && row.unit === "seconds" && row.model === model);
+    const known = new Set(listTenantUsage(tenant).map((row) => row.id));
+    const fresh = (model: string) => secondsOn(model).filter((row) => !known.has(row.id));
+    const { ws, box } = await openReady();
+    sendPcm(ws, pcm(tone(200), silence(800)));
+    await playOut(box);
+    clock.advance(60_000);
+    ws.send(JSON.stringify({ type: "stop" }));
+    await until(() => box.frames.some((frame) => frame.type === "ended"), "ended");
+
+    // The 0.4 s transcript, rounded up to a whole second, on the transcriber's own model.
+    const transcribed = fresh(TRANSCRIBER_MODEL);
+    expect(transcribed).toHaveLength(1);
+    expect(transcribed[0]).toMatchObject({ quantity: 1, unpricedReason: "no_list_price" });
+    // The time the session was open, on the model H1 opened the session with (the talker's).
+    const open = fresh(VOICE_DEFAULT_MODEL);
+    expect(open).toHaveLength(1);
+    expect(open[0]?.quantity).toBeGreaterThanOrEqual(60);
+    expect(open[0]?.model).not.toBe(transcribed[0]?.model);
   });
 
   it("aborts an early reply when speech resumes and answers the whole utterance once", async () => {
@@ -1007,6 +1038,7 @@ describe("voice relay", () => {
       model: "fake-talker",
       talker,
       transcriber,
+      transcriberModel: TRANSCRIBER_MODEL,
     });
     expect(planted.ok).toBe(true);
     if (!planted.ok) return;
@@ -1090,6 +1122,7 @@ describe("voice relay", () => {
       model: "fake-talker",
       talker,
       transcriber,
+      transcriberModel: TRANSCRIBER_MODEL,
     });
     expect(opened.ok).toBe(true);
     if (!opened.ok) return;
@@ -1153,6 +1186,7 @@ describe("voice relay", () => {
       model: "fake-talker",
       talker,
       transcriber,
+      transcriberModel: TRANSCRIBER_MODEL,
     });
     expect(opened.ok).toBe(true);
     if (!opened.ok) return;

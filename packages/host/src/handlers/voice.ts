@@ -85,6 +85,7 @@ export async function handlePostVoiceSession(request: HostRequest): Promise<Host
       model,
       talker: models.talker,
       transcriber: models.transcriber,
+      transcriberModel: models.transcriberModel,
     });
     if (!opened.ok) {
       throw new ApiError("voice_session_limit", text.limit, 429);

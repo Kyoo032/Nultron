@@ -15,9 +15,17 @@ import { type VoiceClock, systemClock } from "./clock";
 import { VOICE_DEFAULT_VOICE } from "./flag";
 import type { Talker, Transcriber } from "./talker";
 import { createOmniHttpTalker } from "./talker-omni-http";
-import { createGatewayTranscriber } from "./transcriber-gateway";
+import { createGatewayTranscriber, TRANSCRIBE_MODEL } from "./transcriber-gateway";
 
-export type VoiceModels = { readonly talker: Talker; readonly transcriber: Transcriber };
+export type VoiceModels = {
+  readonly talker: Talker;
+  readonly transcriber: Transcriber;
+  /**
+   * The model id the transcriber's seconds are recorded under. It is not the talker's, so the ledger can tell
+   * the seconds a session was open (the talker's id) from the seconds of audio that were transcribed.
+   */
+  readonly transcriberModel: string;
+};
 
 /**
  * The talker and the transcriber for this tenant, or null when this tenant has no gateway key to
@@ -48,6 +56,7 @@ export function createVoiceModels(tenant: TenantContext, model: string): VoiceMo
   return {
     talker: createOmniHttpTalker({ baseUrl, apiKey, model, voice: VOICE_DEFAULT_VOICE }),
     transcriber: createGatewayTranscriber({ baseUrl, apiKey }),
+    transcriberModel: TRANSCRIBE_MODEL,
   };
 }
 

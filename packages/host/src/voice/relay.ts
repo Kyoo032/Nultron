@@ -627,7 +627,7 @@ export class VoiceRelay {
     this.transcribeMs = Math.max(0, voiceWiring().clock.now() - started);
     if (text) {
       this.userText = text;
-      recordVoiceSeconds(this.session.tenant, this.session.model, seconds);
+      recordVoiceSeconds(this.session.tenant, this.session.transcriberModel, seconds);
     } else {
       this.userText = PLACEHOLDER[this.session.locale];
     }

@@ -22,6 +22,7 @@ const settingsStore = await import("../settings-store");
 const stateStore = await import("../tenant-state-store");
 const { createVoiceModels } = await import("./wiring");
 const { resetTalkerCachesForTests } = await import("./talker-omni-http");
+const { TRANSCRIBE_MODEL } = await import("./transcriber-gateway");
 
 const DESK_KEY = "voice-wiring-desk-key-0001";
 const ENV_KEY = "voice-wiring-env-key-0002";
@@ -111,6 +112,9 @@ describe("createVoiceModels on a desk", () => {
     expect(models).not.toBeNull();
     if (!models) return;
     expect(models.talker.model).toBe("qwen3.5-omni-flash");
+    // The transcriber's seconds are recorded under its own id, never the talker's.
+    expect(models.transcriberModel).toBe(TRANSCRIBE_MODEL);
+    expect(models.transcriberModel).not.toBe(models.talker.model);
     await touch(models);
     expect(seen.length).toBeGreaterThanOrEqual(2);
     expect(seen.every((call) => call.authorization === `Bearer ${DESK_KEY}`)).toBe(true);

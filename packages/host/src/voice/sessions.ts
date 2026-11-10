@@ -23,6 +23,8 @@ export type VoiceSession = {
   readonly model: string;
   readonly talker: Talker;
   readonly transcriber: Transcriber;
+  /** What the transcriber's seconds are recorded under; the talker's `model` is what the session's are. */
+  readonly transcriberModel: string;
   mode: VoiceMode;
   readonly createdAt: number;
   readonly endsAt: number;
@@ -43,6 +45,7 @@ export type OpenVoiceSession = {
   readonly model: string;
   readonly talker: Talker;
   readonly transcriber: Transcriber;
+  readonly transcriberModel: string;
 };
 
 function ownerKey(tenant: Pick<TenantContext, "tenantId" | "organizationId" | "userId">): string {
@@ -110,6 +113,7 @@ class SessionRegistry {
       model: input.model,
       talker: input.talker,
       transcriber: input.transcriber,
+      transcriberModel: input.transcriberModel,
       mode: input.mode,
       createdAt,
       endsAt: createdAt + VOICE_LIMITS.maxSessionMs,
