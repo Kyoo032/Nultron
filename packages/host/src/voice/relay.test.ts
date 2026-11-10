@@ -817,6 +817,157 @@ describe("voice relay", () => {
     expect(talker.sessions[0]?.calls[1]?.pcm.length).toBeGreaterThanOrEqual(tone(700).length);
   });
 
+  /** A reply that speaks `ANSWER` and then stays open until it is cut. A longer utterance is answered with "second". */
+  function holdsOpenUntilCut(): FakeTalker {
+    const held = new FakeTalker();
+    held.script = async function* (call) {
+      await Promise.resolve();
+      if (call.signal.aborted) return;
+      if (call.pcm.length > tone(500).length) {
+        yield { type: "text", delta: "second" };
+        yield { type: "audio", pcm: tone(200) };
+        yield { type: "usage", usage: USAGE };
+        yield { type: "done" };
+        return;
+      }
+      yield { type: "text", delta: ANSWER };
+      yield { type: "audio", pcm: tone(2000) };
+      yield { type: "usage", usage: USAGE };
+      await new Promise<void>((resolve) => {
+        if (call.signal.aborted) {
+          resolve();
+          return;
+        }
+        call.signal.addEventListener("abort", () => resolve(), { once: true });
+      });
+    };
+    return held;
+  }
+
+  /** A transcriber whose first answer waits for `release`; later ones are instant. */
+  function slowFirstTranscript(): { transcriber: Transcriber; release: (text: string) => void; started: () => number } {
+    let release: (text: string) => void = () => {};
+    const first = new Promise<string>((resolve) => {
+      release = resolve;
+    });
+    let calls = 0;
+    return {
+      release: (text) => release(text),
+      started: () => calls,
+      transcriber: {
+        async transcribe() {
+          calls += 1;
+          if (calls === 1) return { text: await first, seconds: 0.4 };
+          return { text: "second words", seconds: 0.4 };
+        },
+      },
+    };
+  }
+
+  function threadLines(rows: Awaited<ReturnType<typeof listMessages>>): string[] {
+    return rows.map((row) => `${row.role}:${textOf(row.content)}`);
+  }
+
+  it("saves the person's own words for a reply cut before the transcript arrived, without holding the next turn", async () => {
+    talker = holdsOpenUntilCut();
+    const slow = slowFirstTranscript();
+    transcriber = slow.transcriber;
+    armWiring();
+    const before = (await listMessages(tenant, threadId)).length;
+    const { ws, box } = await openReady();
+    sendPcm(ws, pcm(tone(200), silence(800)));
+    await until(() => states(box).includes("speaking"), "speaking");
+    await until(() => slow.started() === 1, "the transcriber has the first utterance");
+    sendPcm(ws, tone(1000));
+    await until(() => box.frames.some((frame) => frame.type === "stop_audio"), "stop_audio");
+    ws.send(JSON.stringify({ type: "played", ms: 1000 }));
+    // The words are not in, and the person is heard anyway: the next utterance goes to the talker.
+    sendPcm(ws, silence(800));
+    await until(() => (talker.sessions[0]?.calls.length ?? 0) >= 2, "the next utterance reaches the talker");
+    expect(box.frames.some((frame) => frame.type === "saved")).toBe(false);
+    expect(await listMessages(tenant, threadId)).toHaveLength(before);
+
+    slow.release("what is the date");
+    await until(() => box.frames.some((frame) => frame.type === "saved"), "saved");
+    expect(threadLines((await listMessages(tenant, threadId)).slice(before))).toEqual([
+      "user:what is the date",
+      "assistant:alpha bravo charlie",
+    ]);
+    // Its caption comes late, under the id the turn had when it was cut.
+    const late = box.frames.find(
+      (frame) => frame.type === "caption" && frame.role === "user" && frame.final && frame.text === "what is the date",
+    );
+    expect(late).toBeDefined();
+    const second = box.frames.find(
+      (frame) => frame.type === "caption" && frame.role === "user" && frame.text === "second words",
+    );
+    expect(late && late.type === "caption" ? late.id : "same").not.toBe(second && second.type === "caption" ? second.id : "same");
+    // The talker is told what it said; the cut turn's words were not known when the next turn began.
+    expect(talker.sessions[0]?.remembered[0]).toEqual({ user: null, assistant: "alpha bravo charlie", interrupted: true });
+
+    // The turn after it lands behind it in the thread.
+    await until(
+      () => box.bins.reduce((sum, bin) => sum + bin.length, 0) >= tone(2000).length + tone(200).length,
+      "the second reply",
+    );
+    clock.advance(5000);
+    await until(() => box.frames.filter((frame) => frame.type === "saved").length >= 2, "second saved");
+    expect(threadLines((await listMessages(tenant, threadId)).slice(before))).toEqual([
+      "user:what is the date",
+      "assistant:alpha bravo charlie",
+      "user:second words",
+      "assistant:second",
+    ]);
+  });
+
+  it("keeps the person's words when the session ends while the transcript is still on its way", async () => {
+    talker = holdsOpenUntilCut();
+    const slow = slowFirstTranscript();
+    transcriber = slow.transcriber;
+    armWiring();
+    const before = (await listMessages(tenant, threadId)).length;
+    const { ws, box } = await openReady();
+    sendPcm(ws, pcm(tone(200), silence(800)));
+    await until(() => states(box).includes("speaking"), "speaking");
+    await until(() => slow.started() === 1, "the transcriber has the utterance");
+    ws.send(JSON.stringify({ type: "stop" }));
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(box.frames.some((frame) => frame.type === "ended")).toBe(false);
+    slow.release("what is the date");
+    await until(() => box.frames.some((frame) => frame.type === "ended"), "ended");
+    expect(threadLines((await listMessages(tenant, threadId)).slice(before))).toEqual([
+      "user:what is the date",
+      `assistant:${ANSWER}`,
+    ]);
+  });
+
+  it("falls back to the placeholder when the words never arrive for a cut turn", async () => {
+    talker = holdsOpenUntilCut();
+    transcriber = {
+      async transcribe(_pcm, options) {
+        await new Promise<void>((resolve) => options.signal.addEventListener("abort", () => resolve(), { once: true }));
+        return null;
+      },
+    };
+    armWiring();
+    const before = (await listMessages(tenant, threadId)).length;
+    const { ws, box } = await openReady();
+    sendPcm(ws, pcm(tone(200), silence(800)));
+    await until(() => states(box).includes("speaking"), "speaking");
+    sendPcm(ws, tone(1000));
+    await until(() => box.frames.some((frame) => frame.type === "stop_audio"), "stop_audio");
+    ws.send(JSON.stringify({ type: "played", ms: 1000 }));
+    sendPcm(ws, silence(800));
+    await until(() => (talker.sessions[0]?.calls.length ?? 0) >= 2, "the next utterance reaches the talker");
+    clock.advance(20_001);
+    await until(() => box.frames.some((frame) => frame.type === "saved"), "saved");
+    expect(threadLines((await listMessages(tenant, threadId)).slice(before))).toEqual([
+      "user:Voice message",
+      "assistant:alpha bravo charlie",
+    ]);
+  });
+
   /**
    * An asked reply, cut while the answer is held open: `ackMs` of acknowledgement, then 2 s of answer for
    * `ANSWER` (38 characters). `played` is what the browser reports; null means no `played` arrives and

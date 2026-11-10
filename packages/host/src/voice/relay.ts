@@ -36,6 +36,12 @@ const SPEECH_PEAK = 0.015 * 32768;
 
 const PLACEHOLDER = { en: "Voice message", id: "Pesan suara" } as const;
 
+/**
+ * How long a turn that was cut (or ended) before its transcript arrived waits for it, before it is saved
+ * with the placeholder. The transcriber has its own 15 s limit and two tries, so this only guards a hang.
+ */
+const LATE_WORDS_WAIT_MS = 20_000;
+
 type PendingAnswer = { readonly callId: string; readonly text: string };
 
 function asBuffer(data: RawData): Buffer {
@@ -114,6 +120,14 @@ export class VoiceRelay {
   private speechEndToFirstAudioMs: number | null = null;
   private transcribeMs: number | null = null;
   private transcribeStarted = false;
+  /** The words of the turn in flight, while the transcriber is still hearing them. Never rejects. */
+  private transcriptWait: Promise<string | null> | null = null;
+  private transcribeStartedAt: number | null = null;
+  /**
+   * Saving a turn goes through here, one at a time and in order. A cut turn whose words are still being
+   * transcribed holds its place, so the turn after it cannot land in the thread ahead of it.
+   */
+  private saveChain: Promise<void> = Promise.resolve();
 
   private interrupting = false;
   private interruptPromise: Promise<void> | null = null;
@@ -189,7 +203,10 @@ export class VoiceRelay {
     if (this.shut) return;
     this.shut = true;
     this.generation += 1;
-    this.abortWork();
+    // A reply was released and its transcript is still on its way: the person's words are saved when they
+    // arrive, not replaced by the placeholder, so that transcription is not cut off with the rest.
+    const awaitingWords = this.released && !this.saved && this.userText === null && this.transcribeStarted && !this.asked;
+    this.abortWork(awaitingWords);
     this.idleCancel?.();
     this.playbackCancel?.();
     this.bargeCancel?.();
@@ -200,7 +217,7 @@ export class VoiceRelay {
       resolve(null);
     }
     const durationMs = Math.max(0, voiceWiring().clock.now() - this.session.createdAt);
-    const persist = this.released && !this.saved ? this.persistPartial() : Promise.resolve();
+    const persist = (this.released && !this.saved ? this.persistPartial() : Promise.resolve()).then(() => this.saveChain);
     void persist.finally(() => {
       this.send({ type: "ended", reason }, true);
       this.closedByUs = true;
@@ -216,10 +233,11 @@ export class VoiceRelay {
     voiceSessions().end(this.session.id, reason);
   }
 
-  private abortWork(): void {
+  /** `keepTranscribe`: the transcript of the turn being cut is still wanted, so only the rest is stopped. */
+  private abortWork(keepTranscribe = false): void {
     this.replyAbort?.abort();
     this.askAbort?.abort();
-    this.transcribeAbort?.abort();
+    if (!keepTranscribe) this.transcribeAbort?.abort();
     this.hearAbort?.abort();
   }
 
@@ -602,14 +620,20 @@ export class VoiceRelay {
     const started = voiceWiring().clock.now();
     const ac = new AbortController();
     this.transcribeAbort = ac;
-    void this.runTranscribe(pcm, gen, started, ac);
+    this.transcribeStartedAt = started;
+    this.transcriptWait = this.runTranscribe(pcm, gen, started, ac);
   }
 
-  private async runTranscribe(pcm: Buffer, gen: number, started: number, ac: AbortController): Promise<void> {
+  /**
+   * Hears the utterance. Resolves with the words (null when it could not, or was stopped) and never rejects.
+   * A turn that was cut meanwhile (`gen` moved on) still gets its words back, for its own save; they are never
+   * put on the turn now in flight.
+   */
+  private async runTranscribe(pcm: Buffer, gen: number, started: number, ac: AbortController): Promise<string | null> {
     let text: string | null = null;
     let seconds = 0;
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      if (ac.signal.aborted || gen !== this.generation || this.shut) return;
+      if (ac.signal.aborted) return null;
       try {
         const result = await this.session.transcriber.transcribe(pcm, {
           locale: this.session.locale,
@@ -624,16 +648,16 @@ export class VoiceRelay {
         text = null;
       }
     }
-    if (ac.signal.aborted || gen !== this.generation || this.shut) return;
+    if (ac.signal.aborted) return null;
+    if (text) recordVoiceSeconds(this.session.tenant, this.session.transcriberModel, seconds);
+    // The turn moved on (it was cut, or the session ended): its words go back to whoever waits for them, and
+    // are never put on the turn that is in flight now.
+    if (gen !== this.generation || this.shut) return text;
     this.transcribeMs = Math.max(0, voiceWiring().clock.now() - started);
-    if (text) {
-      this.userText = text;
-      recordVoiceSeconds(this.session.tenant, this.session.transcriberModel, seconds);
-    } else {
-      this.userText = PLACEHOLDER[this.session.locale];
-    }
+    this.userText = text ?? PLACEHOLDER[this.session.locale];
     this.send({ type: "caption", role: "user", id: this.userCaptionId, text: this.userText, final: true });
     this.tryFinalize();
+    return text;
   }
 
   private forwardPcm(pcm: Buffer, fromTalker: boolean): void {
@@ -697,7 +721,7 @@ export class VoiceRelay {
     const assistant = this.assistantText.trim();
     const metrics = this.metricsFrame();
     try {
-      await saveVoiceTurn(this.session.tenant, this.session.threadId, user, assistant);
+      await this.saveTurn(user, assistant);
     } catch {
       // The turn still closes. A ledger or thread miss must not keep the socket in `speaking`.
     }
@@ -713,7 +737,7 @@ export class VoiceRelay {
     this.setState("listening");
   }
 
-  private metricsFrame(): VoiceHostFrame {
+  private metricsFrame(): Extract<VoiceHostFrame, { type: "metrics" }> {
     const talkerFirstAudioMs =
       this.talkerStartedAt !== null && this.talkerFirstAudioAt !== null
         ? Math.max(0, this.talkerFirstAudioAt - this.talkerStartedAt)
@@ -729,10 +753,14 @@ export class VoiceRelay {
   private async persistPartial(): Promise<void> {
     if (this.saved) return;
     this.saved = true;
-    const user = this.userText?.trim() ? this.userText.trim() : this.asked ? "" : PLACEHOLDER[this.session.locale];
     const assistant = this.assistantText.trim();
+    let words = this.userText;
+    if (words === null && !this.asked && this.transcriptWait) {
+      words = await this.within(this.transcriptWait, LATE_WORDS_WAIT_MS);
+    }
+    const user = words?.trim() ? words.trim() : this.asked ? "" : PLACEHOLDER[this.session.locale];
     try {
-      await saveVoiceTurn(this.session.tenant, this.session.threadId, user, assistant);
+      await this.saveTurn(user, assistant);
     } catch {
       // Ending still closes the socket.
     }
@@ -821,8 +849,13 @@ export class VoiceRelay {
     this.playbackCancel = null;
     this.replyFinished = false;
     this.send({ type: "stop_audio" });
+    // The person's words may still be on their way: the transcriber hears the whole utterance in 3 to 5 s and a
+    // cut can come sooner. That turn is saved when they arrive, not with the placeholder.
+    const words = this.userText === null && this.transcribeStarted && !this.asked ? this.transcriptWait : null;
     this.generation += 1;
-    this.abortWork();
+    this.abortWork(words !== null);
+    // The next turn's early abort must not stop it.
+    if (words !== null) this.transcribeAbort = null;
     // The browser's `played` and the host's own estimate both count every millisecond of agent audio since
     // `listening`, the acknowledgement included. `assistantText` is the answer alone, so the share of it that
     // was heard is measured on the audio after the acknowledgement.
@@ -847,18 +880,31 @@ export class VoiceRelay {
       final: true,
       interrupted: true,
     });
-    if (this.userText === null) this.userText = PLACEHOLDER[this.session.locale];
-    const user = this.userText.trim();
     const overlap = Buffer.from(this.overlapPcm);
-    try {
-      await saveVoiceTurn(this.session.tenant, this.session.threadId, user, trimmed.text);
-    } catch {
-      // The socket still moves on to the overlapped speech.
-    }
-    this.talkerSession?.remember({ user: user || null, assistant: trimmed.text, interrupted: true });
     const metrics = this.metricsFrame();
-    this.send({ type: "saved" });
-    this.send(metrics);
+    if (words !== null && this.userText === null) {
+      // The reply stays cut and the person is heard at once; the turn is saved, and its caption and `saved` sent,
+      // when the transcript arrives. The talker is told only what it said: the words are not known yet.
+      this.talkerSession?.remember({ user: null, assistant: trimmed.text, interrupted: true });
+      this.saveCutTurnWhenHeard({
+        words,
+        userCaptionId: this.userCaptionId,
+        assistant: trimmed.text,
+        metrics,
+        startedAt: this.transcribeStartedAt,
+      });
+    } else {
+      if (this.userText === null) this.userText = PLACEHOLDER[this.session.locale];
+      const user = this.userText.trim();
+      try {
+        await this.saveTurn(user, trimmed.text);
+      } catch {
+        // The socket still moves on to the overlapped speech.
+      }
+      this.talkerSession?.remember({ user: user || null, assistant: trimmed.text, interrupted: true });
+      this.send({ type: "saved" });
+      this.send(metrics);
+    }
     this.saved = true;
     this.resetTurn();
     this.vad.reset();
@@ -876,6 +922,66 @@ export class VoiceRelay {
     }
     const queued = this.queuedAudio.splice(0);
     for (const chunk of queued) this.feed(chunk);
+  }
+
+  /** One save at a time, in the order the turns were asked to be saved. */
+  private enqueueSave<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.saveChain.then(task);
+    this.saveChain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  private saveTurn(user: string, assistant: string): Promise<void> {
+    return this.enqueueSave(() => saveVoiceTurn(this.session.tenant, this.session.threadId, user, assistant));
+  }
+
+  /** The promise's value, or null once `ms` of the session clock has passed. */
+  private within<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+    return new Promise((resolve) => {
+      let settled = false;
+      const cancel = voiceWiring().clock.after(ms, () => {
+        if (settled) return;
+        settled = true;
+        resolve(null);
+      });
+      void promise.then((value) => {
+        if (settled) return;
+        settled = true;
+        cancel();
+        resolve(value);
+      });
+    });
+  }
+
+  /**
+   * A cut turn whose words were still being transcribed. It takes its place in the save order now, so the turn
+   * after it lands behind it, and finishes when the words are in: the person's caption, the thread rows, `saved`.
+   */
+  private saveCutTurnWhenHeard(input: {
+    readonly words: Promise<string | null>;
+    readonly userCaptionId: string;
+    readonly assistant: string;
+    readonly metrics: Extract<VoiceHostFrame, { type: "metrics" }>;
+    readonly startedAt: number | null;
+  }): void {
+    const locale = this.session.locale;
+    void this.enqueueSave(async () => {
+      const heard = await this.within(input.words, LATE_WORDS_WAIT_MS);
+      const user = heard?.trim() ? heard.trim() : PLACEHOLDER[locale];
+      this.send({ type: "caption", role: "user", id: input.userCaptionId, text: user, final: true });
+      try {
+        await saveVoiceTurn(this.session.tenant, this.session.threadId, user, input.assistant);
+      } catch {
+        // The turn still closes; a thread miss must not leave the view waiting for `saved`.
+      }
+      const transcribeMs =
+        input.startedAt === null || heard === null ? null : Math.max(0, voiceWiring().clock.now() - input.startedAt);
+      this.send({ type: "saved" });
+      this.send({ ...input.metrics, transcribeMs });
+    });
   }
 
   private waitPlayed(): Promise<number | null> {
