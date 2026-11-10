@@ -58,7 +58,7 @@
     "micBusy": "Another app is using the microphone, so close it and try again.",
     "unsupported": "This browser cannot run live voice, so open this desk in a current version of Chrome, Edge, or Safari.",
     "insecure": "Voice needs a secure HTTPS page, so open this desk over https and try again.",
-    "voice_disabled": "Voice is not turned on for this desk, so enable it in Settings first.",
+    "voice_disabled": "Voice is not turned on for this desk.",
     "gateway_blocked": "This desk has no working {gatewayName} key yet, so connect one in Settings and try again.",
     "voice_session_limit": "Too many voice sessions are open right now, so try again in a moment.",
     "voice_model_unavailable": "The voice model is not answering right now, so try again shortly.",

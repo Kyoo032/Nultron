@@ -53,17 +53,17 @@
     "backgrounded": "Suara berhenti saat layar terkunci atau Anda keluar dari aplikasi; ketuk untuk bicara lagi."
   },
   "error": {
-    "micDenied": "Mikrofon diblokir, jadi izinkan akses mikrofon lewat pengaturan situs di browser Anda lalu coba lagi.",
-    "micMissing": "Mikrofon tidak ditemukan, jadi pasang mikrofon terlebih dahulu lalu coba lagi.",
-    "micBusy": "Mikrofon sedang dipakai aplikasi lain, jadi tutup aplikasi tersebut lalu coba lagi.",
-    "unsupported": "Browser ini belum mendukung suara langsung, jadi buka meja kerja ini di Chrome, Edge, atau Safari versi terbaru.",
-    "insecure": "Fitur suara membutuhkan halaman yang aman (https), jadi buka halaman ini lewat https lalu coba lagi.",
-    "voice_disabled": "Fitur suara belum diaktifkan untuk meja kerja ini, jadi aktifkan terlebih dahulu di Pengaturan.",
-    "gateway_blocked": "Meja kerja ini belum memiliki kunci {gatewayName} yang aktif, jadi hubungkan kunci di Pengaturan lalu coba lagi.",
-    "voice_session_limit": "Terlalu banyak sesi suara yang sedang terbuka saat ini, jadi coba lagi sebentar lagi.",
-    "voice_model_unavailable": "Model suara sedang tidak merespons saat ini, jadi coba lagi sebentar lagi.",
-    "connect": "Gagal terhubung ke layanan suara, jadi periksa koneksi Anda lalu coba lagi.",
-    "thread": "Gagal membuka percakapan untuk menyimpan giliran bicara ini, jadi muat ulang obrolan lalu coba lagi."
+    "micDenied": "Mikrofon diblokir. Izinkan akses mikrofon lewat pengaturan situs di browser Anda, lalu coba lagi.",
+    "micMissing": "Mikrofon tidak ditemukan. Pasang mikrofon terlebih dahulu sebelum mencoba lagi.",
+    "micBusy": "Mikrofon sedang dipakai aplikasi lain. Tutup aplikasi itu terlebih dahulu.",
+    "unsupported": "Browser ini belum mendukung obrolan suara. Pakai Chrome, Edge, atau Safari versi terbaru untuk membuka meja kerja ini.",
+    "insecure": "Obrolan suara butuh halaman yang aman (https). Buka meja kerja ini lewat https untuk memakainya.",
+    "voice_disabled": "Obrolan suara belum diaktifkan untuk meja kerja ini.",
+    "gateway_blocked": "Meja kerja ini belum punya kunci {gatewayName} yang aktif. Tempel kunci di Pengaturan dulu agar fitur ini bisa dipakai.",
+    "voice_session_limit": "Sesi suara yang sedang terbuka sudah mencapai batas. Tunggu sebentar sebelum memulai lagi.",
+    "voice_model_unavailable": "Model suara sedang tidak merespons. Coba lagi sebentar lagi.",
+    "connect": "Koneksi ke layanan suara gagal. Periksa jaringan Anda, lalu coba lagi.",
+    "thread": "Obrolan ini gagal dibuka untuk menyimpan percakapan. Muat ulang halaman ini terlebih dahulu."
   },
   "a11y": {
     "stateLive": "Status suara: {state}."
