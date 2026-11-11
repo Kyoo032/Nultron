@@ -7,11 +7,18 @@ import {
   MUSIC_TITLE_MAX,
   resolveMusicMode,
 } from "../../models/audio-capabilities";
+import { speechWireFor } from "../../models/gateway-catalog";
 import { DEFAULT_GATEWAY_LYRICS_MODEL, DEFAULT_GATEWAY_MUSIC_MODEL } from "../../models/media-kind";
+import { reportModelOutcome } from "../../models/outcome-sink";
 import { defineTool } from "../define-tool";
 import { missingToolRouteMessage, resolveToolBackend } from "../credentials";
 import { getSecret } from "../secret-scope";
-import { generateGatewayLyrics, generateGatewayMusic, generateGatewaySpeech } from "./gateway-audio";
+import {
+  generateGatewayLyrics,
+  generateGatewayMusic,
+  generateGatewayOmniSpeech,
+  generateGatewaySpeech,
+} from "./gateway-audio";
 
 const MISSING_MUSIC_ROUTE = "Add a Toko Token gateway key in Settings to generate music.";
 const MISSING_SPEECH_ROUTE = "Add a Toko Token gateway key in Settings to generate speech.";
@@ -27,14 +34,24 @@ export const musicGenerateTool = defineTool({
     "Create a song from a short description, or from your own lyrics with a style and a title. Uses the Toko Token gateway's async Suno relay (POST /suno/submit/music, then poll). Returns one entry per take.",
   capability: "music_gen",
   schema: z.object({
-    prompt: z.string().min(1).max(MUSIC_PROMPT_MAX).optional().describe("What the song should be, when the model writes the lyrics"),
-    lyrics: z.string().min(1).max(MUSIC_LYRICS_MAX).optional().describe("Your own lyrics; switches the job to custom mode"),
+    prompt: z
+      .string()
+      .min(1)
+      .max(MUSIC_PROMPT_MAX)
+      .optional()
+      .describe("What the song should be, when the model writes the lyrics"),
+    lyrics: z
+      .string()
+      .min(1)
+      .max(MUSIC_LYRICS_MAX)
+      .optional()
+      .describe("Your own lyrics; switches the job to custom mode"),
     style: z.string().max(MUSIC_STYLE_MAX).optional().describe("Genre / style tags, e.g. 'lo-fi, mellow, rhodes'"),
     title: z.string().max(MUSIC_TITLE_MAX).optional().describe("Track title, custom mode only"),
     instrumental: z.boolean().optional().describe("Render with no vocals"),
     model: z.string().min(1).optional().describe("Optional catalog music model id"),
   }),
-  execute: async ({ prompt, lyrics, style, title, instrumental, model }) => {
+  execute: async ({ prompt, lyrics, style, title, instrumental, model }, tenant) => {
     const route = resolveToolBackend("music_gen");
     if (!route.ready || !route.envVar) {
       return { success: false, error: missingToolRouteMessage(route, MISSING_MUSIC_ROUTE) };
@@ -60,6 +77,7 @@ export const musicGenerateTool = defineTool({
         title,
         instrumental,
       });
+      reportModelOutcome({ tenant, model: chosen, kind: "music", ok: true });
       return {
         success: true,
         backend: route.backend,
@@ -69,6 +87,7 @@ export const musicGenerateTool = defineTool({
         prompt: mode === "custom" ? lyrics : prompt,
       };
     } catch (error) {
+      reportModelOutcome({ tenant, model: chosen, kind: "music", ok: false, error });
       return { success: false, error: error instanceof Error ? error.message : "Music generation failed" };
     }
   },
@@ -85,7 +104,7 @@ export const lyricsWriteTool = defineTool({
     prompt: z.string().min(1).max(MUSIC_PROMPT_MAX).describe("What the lyrics should be about"),
     model: z.string().min(1).optional().describe("Optional catalog lyrics model id"),
   }),
-  execute: async ({ prompt, model }) => {
+  execute: async ({ prompt, model }, tenant) => {
     const route = resolveToolBackend("music_gen");
     if (!route.ready || !route.envVar) {
       return { success: false, error: missingToolRouteMessage(route, MISSING_MUSIC_ROUTE) };
@@ -94,15 +113,18 @@ export const lyricsWriteTool = defineTool({
     if (!apiKey) {
       return { success: false, error: `${route.envVar} is not set.` };
     }
+    const lyricsModel = model || getSecret("LYRICS_MODEL") || DEFAULT_GATEWAY_LYRICS_MODEL;
     try {
       const written = await generateGatewayLyrics({
         baseUrl: getSecret("OPENAI_BASE_URL") || resolvedGatewayBaseUrl(),
         apiKey,
-        model: model || getSecret("LYRICS_MODEL") || DEFAULT_GATEWAY_LYRICS_MODEL,
+        model: lyricsModel,
         prompt,
       });
+      reportModelOutcome({ tenant, model: lyricsModel, kind: "music", ok: true });
       return { success: true, backend: route.backend, text: written.text, title: written.title, model: written.model };
     } catch (error) {
+      reportModelOutcome({ tenant, model: lyricsModel, kind: "music", ok: false, error });
       return { success: false, error: error instanceof Error ? error.message : "Lyrics generation failed" };
     }
   },
@@ -119,7 +141,7 @@ export const speechGenerateTool = defineTool({
   key: "speech_generate",
   name: "Read text aloud",
   description:
-    "Turn text into spoken audio through the gateway's OpenAI-compatible POST /v1/audio/speech. Requires a non-realtime text-to-speech model in the live catalog.",
+    "Turn text into spoken audio. Uses the gateway's OpenAI-compatible POST /v1/audio/speech for a text-to-speech model, or the streaming chat call of an Omni model (qwen3.5-omni-flash) that answers with audio. Requires one of them in the live catalog.",
   capability: "speech_gen",
   schema: z.object({
     text: z.string().min(1).max(4_000).describe("The words to read"),
@@ -127,7 +149,7 @@ export const speechGenerateTool = defineTool({
     voice: z.string().min(1).optional().describe("Voice name the model accepts"),
     format: z.enum(["mp3", "wav", "opus"]).optional().describe("Output container"),
   }),
-  execute: async ({ text, model, voice, format }) => {
+  execute: async ({ text, model, voice, format }, tenant) => {
     const route = resolveToolBackend("speech_gen");
     if (!route.ready || !route.envVar) {
       return { success: false, error: missingToolRouteMessage(route, MISSING_SPEECH_ROUTE) };
@@ -137,16 +159,16 @@ export const speechGenerateTool = defineTool({
       return { success: false, error: `${route.envVar} is not set.` };
     }
     try {
-      const spoken = await generateGatewaySpeech({
-        baseUrl: getSecret("OPENAI_BASE_URL") || resolvedGatewayBaseUrl(),
-        apiKey,
-        model,
-        text,
-        voice,
-        format,
-      });
+      const baseUrl = getSecret("OPENAI_BASE_URL") || resolvedGatewayBaseUrl();
+      // An Omni id speaks through the chat stream; every other id goes to /v1/audio/speech.
+      const spoken =
+        speechWireFor(model)?.id === "chat_audio_stream"
+          ? await generateGatewayOmniSpeech({ baseUrl, apiKey, model, text, voice })
+          : await generateGatewaySpeech({ baseUrl, apiKey, model, text, voice, format });
+      reportModelOutcome({ tenant, model, kind: "speech", ok: true });
       return { success: true, backend: route.backend, audio: spoken.url, model: spoken.model };
     } catch (error) {
+      reportModelOutcome({ tenant, model, kind: "speech", ok: false, error });
       return { success: false, error: error instanceof Error ? error.message : "Speech generation failed" };
     }
   },

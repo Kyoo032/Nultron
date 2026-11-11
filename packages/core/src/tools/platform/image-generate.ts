@@ -5,6 +5,7 @@ import { currentOutboundGuard, mediaSendRefusal } from "../../security/outbound-
 import { defineTool } from "../define-tool";
 import { gatewayGenerateModel } from "../media-model-choice";
 import { imageInputSchema, mediaReferenceId, resolveImageInput } from "../media-reference";
+import { reportModelOutcome } from "../../models/outcome-sink";
 import { missingToolRouteMessage, resolveToolBackend } from "../credentials";
 import { getSecret } from "../secret-scope";
 import { falImageUrl, runFalQueue } from "./fal-queue";
@@ -136,6 +137,7 @@ export const imageGenerateTool = defineTool({
       return held;
     }
     const fetchImpl = globalThis.fetch;
+    const gatewayModel = gatewayGenerateModel("image", model);
     try {
       const generated = usesGatewayImages(route.backend)
         ? await generateGatewayImage({
@@ -143,12 +145,15 @@ export const imageGenerateTool = defineTool({
             aspectRatio: aspect,
             imageUrl: resolved.url,
             apiKey,
-            model: gatewayGenerateModel("image", model),
+            model: gatewayModel,
             baseUrl: getSecret("OPENAI_BASE_URL") || resolvedGatewayBaseUrl(),
             fetchImpl,
           })
         : await generateWithFal(finalPrompt, aspect, resolved.url, apiKey, fetchImpl);
       currentOutboundGuard()?.noteHostMedia([generated.url]);
+      if (route.backend === "gateway") {
+        reportModelOutcome({ tenant, model: gatewayModel, kind: "image", ok: true });
+      }
       return {
         success: true,
         backend: route.backend,
@@ -157,6 +162,9 @@ export const imageGenerateTool = defineTool({
         prompt: finalPrompt,
       };
     } catch (error) {
+      if (route.backend === "gateway") {
+        reportModelOutcome({ tenant, model: gatewayModel, kind: "image", ok: false, error });
+      }
       return { success: false, error: error instanceof Error ? error.message : "Image generation failed" };
     }
   },

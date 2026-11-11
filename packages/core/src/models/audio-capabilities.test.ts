@@ -75,15 +75,31 @@ describe("preferred audio models", () => {
 
   it("returns no speech model rather than inventing one", () => {
     // Guessing an id here would send the desk at a model the gateway does not serve.
-    expect(pickPreferredSpeechModel(LIVE_AUDIO_IDS)).toBe("");
+    expect(pickPreferredSpeechModel(["suno_music", "qwen3-tts-instruct-flash-realtime"])).toBe("");
     expect(pickPreferredSpeechModel([])).toBe("");
+  });
+
+  it("speaks through an Omni chat id when no TTS id is listed (driven 2026-11-11)", () => {
+    expect(pickPreferredSpeechModel(LIVE_AUDIO_IDS)).toBe("qwen3.5-omni-flash");
+    // The realtime spelling is WebSocket-only and never counts.
+    expect(pickPreferredSpeechModel(["qwen3.5-omni-plus-realtime"])).toBe("");
+  });
+
+  it("prefers a real TTS id over an Omni one", () => {
+    expect(pickPreferredSpeechModel(["qwen3.5-omni-flash", "tts-1"])).toBe("tts-1");
   });
 });
 
 describe("speech reachability", () => {
-  it("reports realtime_only for this gateway's live catalog", () => {
-    expect(speechReachable(LIVE_AUDIO_IDS)).toBe(false);
-    expect(speechUnavailableReason(LIVE_AUDIO_IDS)).toBe("realtime_only");
+  it("is reachable through Omni on this gateway's live catalog", () => {
+    expect(speechReachable(LIVE_AUDIO_IDS)).toBe(true);
+    expect(speechUnavailableReason(LIVE_AUDIO_IDS)).toBeNull();
+  });
+
+  it("reports realtime_only when the only speakers are WebSocket ones", () => {
+    const realtimeOnly = LIVE_AUDIO_IDS.filter((id) => id !== "qwen3.5-omni-flash");
+    expect(speechReachable(realtimeOnly)).toBe(false);
+    expect(speechUnavailableReason(realtimeOnly)).toBe("realtime_only");
   });
 
   it("reports no_audio_models when nothing audio is listed", () => {

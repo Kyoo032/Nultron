@@ -28,6 +28,8 @@
     "./virtual-agents": "./src/agents/virtual-agents.ts",
     "./video-capabilities": "./src/models/video-capabilities.ts",
     "./audio-capabilities": "./src/models/audio-capabilities.ts",
+    "./model-availability": "./src/models/availability.ts",
+    "./gateway-catalog": "./src/models/gateway-catalog.ts",
     "./media-pricing": "./src/models/media-pricing.ts",
     "./media-permission": "./src/runtime/media-permission.ts",
     "./format-bytes": "./src/storage/format-bytes.ts",

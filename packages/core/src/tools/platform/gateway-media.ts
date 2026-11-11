@@ -1,9 +1,7 @@
 import { ApiError } from "../../errors";
-import {
-  clampVideoSeconds,
-  normalizeVideoResolution,
-  usesSeedanceVideoWire,
-} from "../../models/video-capabilities";
+import { GatewayRefusalError } from "../../models/availability";
+import { videoWireFor } from "../../models/gateway-catalog";
+import { clampVideoSeconds, normalizeVideoResolution, usesSeedanceVideoWire } from "../../models/video-capabilities";
 
 export {
   GATEWAY_VIDEO_DURATION_SECONDS,
@@ -13,7 +11,8 @@ export {
 } from "../../models/video-capabilities";
 export type { GatewayVideoResolution, VideoCapabilities } from "../../models/video-capabilities";
 
-const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
+const BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
 
 export type GatewayMediaOptions = {
   baseUrl: string;
@@ -59,10 +58,10 @@ export function httpStatusForGatewayFailure(status: number): number {
 
 export function formatVideoGatewayFailure(status: number, detail: string): string {
   if (status === 503) {
-    return `${detail} This video model has no live gateway channel (HTTP 503). Prefer seedance-2.0-fast (or seedance-2.0-mini); grok-imagine-video and other catalog ids often fail on auto.`;
+    return `${detail} This video model has no live gateway channel (HTTP 503) on this key right now. Pick another video model; seedance-2.0-fast is one that ran on a prepaid key.`;
   }
   if (isPrepaidAsyncPriceError(detail)) {
-    return `${detail} Seedance video on this gateway is billed by tokens after the job finishes, not a fixed per-call price. Prepaid proxy keys (代理预付) cannot submit that async job even when the wallet has balance. Duration and resolution on the request cannot unlock it. This is not an invalid API key.`;
+    return `${detail} This video model is billed by tokens after the job finishes, and a prepaid agent account cannot submit that kind of job (HTTP 403). Other video models with a fixed price per call do run on a prepaid key, seedance-2.0-fast among them. This is not an invalid API key.`;
   }
   if (status === 401 || status === 403) {
     return `${detail} Gateway rejected the API key (HTTP ${status}). Check Settings.`;
@@ -130,7 +129,7 @@ export function readVideoJobFailure(body: Record<string, unknown>, fallback: str
   return readGatewayError(body, fallback);
 }
 
-function gatewayErrorCode(body: Record<string, unknown>): string | undefined {
+export function gatewayErrorCode(body: Record<string, unknown>): string | undefined {
   const top = asString(body.code);
   if (top && !SUCCESS_CODES.test(top)) {
     return top;
@@ -159,6 +158,11 @@ export function gatewayVideoAspect(aspectRatio?: string): "16:9" | "9:16" | "1:1
   return "16:9";
 }
 
+/** Grok takes `480p` or `720p`; the Seedance-style `1080p` is not offered by it. */
+function grokResolution(resolution?: string): "480p" | "720p" {
+  return resolution === "480p" ? "480p" : "720p";
+}
+
 export function buildGatewayVideoPayload(options: {
   model: string;
   prompt: string;
@@ -169,6 +173,22 @@ export function buildGatewayVideoPayload(options: {
 }): Record<string, unknown> {
   const aspect = gatewayVideoAspect(options.aspectRatio);
   const duration = clampVideoSeconds(options.seconds);
+  if (videoWireFor(options.model).id === "videos_json") {
+    // The documented Grok body (docs, "Grok Video Generation"). `seconds` is not sent: a number there
+    // is a 400 (it must be a string), and `video_length` is the field the docs name.
+    const grok: Record<string, unknown> = {
+      model: options.model,
+      prompt: options.prompt,
+      aspect_ratio: aspect,
+      video_length: duration,
+      resolution_name: grokResolution(options.resolution),
+      preset: "normal",
+    };
+    if (options.imageUrl) {
+      grok.image = options.imageUrl;
+    }
+    return grok;
+  }
   if (usesSeedanceVideoWire(options.model)) {
     const content: Array<Record<string, unknown>> = [{ type: "text", text: options.prompt }];
     if (options.imageUrl) {
@@ -256,13 +276,14 @@ export function extractGatewayVideoUrl(body: Record<string, unknown>): string | 
   const video = body.video;
   return looksLikeMediaUrl(
     asString(data.result_url) ??
-    asString(data.url) ??
-    asString(body.url) ??
-    asString(body.content_url) ??
-    asString(data.content_url) ??
-    asString(nested.url) ??
-    asString(metadata.url) ??
-    asString(asRecord(video).url) ??
+      asString(data.url) ??
+      asString(body.url) ??
+      asString(body.video_url) ??
+      asString(body.content_url) ??
+      asString(data.content_url) ??
+      asString(nested.url) ??
+      asString(metadata.url) ??
+      asString(asRecord(video).url) ??
       asString(asRecord(video).public_url) ??
       asString(video),
   );
@@ -390,7 +411,12 @@ export async function generateGatewayImage(options: GatewayMediaOptions): Promis
     throw new ApiError("tool_failed", "Gateway image job timed out", 504);
   }
   if (!response.ok) {
-    throw new ApiError("tool_failed", readGatewayError(body, `Gateway images returned HTTP ${response.status}`), 502);
+    const detail = readGatewayError(body, `Gateway images returned HTTP ${response.status}`);
+    throw new GatewayRefusalError("tool_failed", detail, 502, {
+      status: response.status,
+      code: gatewayErrorCode(body),
+      message: detail,
+    });
   }
   throw new ApiError("tool_failed", "Gateway returned no image data", 502);
 }
@@ -406,20 +432,21 @@ export async function generateGatewayVideo(options: GatewayMediaOptions): Promis
     seconds: options.seconds,
     resolution: options.resolution,
   });
-  const created = await fetchImpl(`${originFrom(options.baseUrl)}/video/generations`, {
+  // The route follows the model's wire: `/video/generations` for most, `/videos` for Grok (documented).
+  const route = videoWireFor(options.model).route.replace(/^\/v1/, "");
+  const created = await fetchImpl(`${originFrom(options.baseUrl)}${route}`, {
     method: "POST",
     headers: gatewayHeaders(options.apiKey),
     body: JSON.stringify(payload),
   });
   const createdBody = asRecord(await created.json().catch(() => ({})));
   if (!created.ok) {
-    throw new ApiError(
+    const detail = readGatewayError(createdBody, `Gateway video returned HTTP ${created.status}`);
+    throw new GatewayRefusalError(
       "tool_failed",
-      formatVideoGatewayFailure(
-        created.status,
-        readGatewayError(createdBody, `Gateway video returned HTTP ${created.status}`),
-      ),
+      formatVideoGatewayFailure(created.status, detail),
       httpStatusForGatewayFailure(created.status),
+      { status: created.status, code: gatewayErrorCode(createdBody), message: detail },
     );
   }
   const immediate = extractGatewayVideoUrl(createdBody);
@@ -434,7 +461,7 @@ export async function generateGatewayVideo(options: GatewayMediaOptions): Promis
   const maxPolls = options.maxPolls ?? 90;
   const pollMs = options.pollMs ?? 2_000;
   for (let attempt = 0; attempt < maxPolls; attempt += 1) {
-    const statusRes = await fetchImpl(`${originFrom(options.baseUrl)}/video/generations/${taskId}`, {
+    const statusRes = await fetchImpl(`${originFrom(options.baseUrl)}${route}/${taskId}`, {
       headers: gatewayHeaders(options.apiKey),
     });
     const statusBody = asRecord(await statusRes.json().catch(() => ({})));
@@ -444,8 +471,13 @@ export async function generateGatewayVideo(options: GatewayMediaOptions): Promis
       return { url, model: options.model };
     }
     if (isMediaFailure(status) || !statusRes.ok) {
-      const detail = formatVideoJobFailure(readVideoJobFailure(statusBody, "Gateway video job failed"));
-      throw new ApiError("tool_failed", detail, UPSTREAM_REJECTED.test(detail) ? 503 : 502);
+      const raw = readVideoJobFailure(statusBody, "Gateway video job failed");
+      const detail = formatVideoJobFailure(raw);
+      throw new GatewayRefusalError("tool_failed", detail, UPSTREAM_REJECTED.test(detail) ? 503 : 502, {
+        status: statusRes.status,
+        code: gatewayErrorCode(statusBody),
+        message: raw,
+      });
     }
     await wait(pollMs);
   }

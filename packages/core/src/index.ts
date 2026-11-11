@@ -537,6 +537,7 @@ export {
   isMusicModelId,
   isLyricsModelId,
   isSpeechModelId,
+  isOmniSpeechModelId,
   firstLiveId,
   DEFAULT_GATEWAY_IMAGE_MODEL,
   DEFAULT_GATEWAY_VIDEO_MODEL,
@@ -950,3 +951,57 @@ export type { EnhanceSurface } from "./enhance-prompt";
 // Phase 9: the placeholder plan catalog the pricing page renders (`@agentforge/core/plans`).
 export { PLAN_CATALOG_CURRENCY, PLAN_TIERS, findTier, formatPlanPrice, matchTier } from "./plans/catalog";
 export type { PlanTier } from "./plans/catalog";
+
+// Per-key model availability and the gateway catalog (2026-11-11): what a key can actually use.
+export {
+  MODEL_STATUSES,
+  STATUS_TTL_MS,
+  GatewayRefusalError,
+  classifyGatewayRefusal,
+  refusalOfError,
+  isOfferedStatus,
+  recordIsLive,
+  effectiveRecordStatus,
+  emptyStore as emptyAvailabilityStore,
+  modelKey,
+  recordsFor as availabilityRecordsFor,
+  withOutcome as withAvailabilityOutcome,
+  withoutLessons as withoutAvailabilityLessons,
+  parseAvailabilityStore,
+} from "./models/availability";
+export type {
+  AvailabilityRecord,
+  AvailabilityStore,
+  GatewayRefusal,
+  KeyAvailability,
+  LearnedStatus,
+  ModelStatus,
+} from "./models/availability";
+export { availabilityKeyId, newAvailabilitySalt } from "./models/availability-key";
+export {
+  CATALOG_SEED,
+  GATEWAY_WIRES,
+  MODEL_KINDS,
+  availabilityOf,
+  buildCatalog,
+  catalogKindOf,
+  computeAvailability,
+  kindFromEndpointTypesOf,
+  offeredIdsFor,
+  parsePricingHints,
+  speechWireFor,
+  unavailableModels,
+  videoWireFor,
+} from "./models/gateway-catalog";
+export type {
+  CatalogEntry,
+  GatewayWire,
+  ModelAvailability,
+  ModelKind,
+  PricingHints,
+  WireId,
+} from "./models/gateway-catalog";
+export { fetchPricingHints } from "./models/pricing-hints";
+export { reportModelOutcome, setModelOutcomeSink } from "./models/outcome-sink";
+export type { ModelOutcomeReport } from "./models/outcome-sink";
+export { generateGatewayOmniSpeech, omniAudioChunks, wavFromPcm16 } from "./tools/platform/gateway-audio";

@@ -17,7 +17,7 @@ describe("videoGenerateTool", () => {
     vi.unstubAllGlobals();
   });
 
-  it("uses the gateway key on /video/generations when no backend was picked", async () => {
+  it("uses the gateway key on the model's own route when no backend was picked", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({
@@ -33,13 +33,14 @@ describe("videoGenerateTool", () => {
       { secrets: { OPENAI_API_KEY: "sk-model", OPENAI_BASE_URL: "https://api.tokotokenai.com/v1" }, backends: {} },
       () => invokeTool(videoGenerateTool, { prompt: "rain on a window" }, tenant),
     );
-    expect(String(fetchMock.mock.calls[0]?.[0])).toBe("https://api.tokotokenai.com/v1/video/generations");
+    // No catalog and no pick: the fallback id is Grok, whose documented route is /v1/videos.
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe("https://api.tokotokenai.com/v1/videos");
     expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({
       model: "grok-imagine-video",
-      duration: 5,
+      video_length: 5,
     });
-    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).not.toHaveProperty("resolution");
     expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).not.toHaveProperty("ratio");
+    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).not.toHaveProperty("seconds");
     expect(result).toMatchObject({
       success: true,
       backend: "gateway",
@@ -48,7 +49,7 @@ describe("videoGenerateTool", () => {
     });
   });
 
-  it("forwards seconds and omits Seedance-only fields for grok-imagine-video", async () => {
+  it("sends the documented Grok fields, and none of the Seedance-only ones, for grok-imagine-video", async () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce({
@@ -78,8 +79,10 @@ describe("videoGenerateTool", () => {
     expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toEqual({
       model: "grok-imagine-video",
       prompt: "rain on a window",
-      duration: 8,
-      seconds: "8",
+      aspect_ratio: "9:16",
+      video_length: 8,
+      resolution_name: "720p",
+      preset: "normal",
     });
   });
 
@@ -118,7 +121,8 @@ describe("videoGenerateTool", () => {
 
     await runWithToolSecrets(
       { secrets: { FAL_KEY: "fal-test", OPENAI_API_KEY: "sk-model" }, backends: { video_gen: "fal" } },
-      () => invokeTool(videoGenerateTool, { prompt: "animate this", image_url: "https://cdn.example/still.png" }, tenant),
+      () =>
+        invokeTool(videoGenerateTool, { prompt: "animate this", image_url: "https://cdn.example/still.png" }, tenant),
     );
     expect(fetchMock.mock.calls[3]?.[0]).toBe("https://queue.fal.run/fal-ai/pixverse/v6/image-to-video");
   });
@@ -199,7 +203,10 @@ describe("videoGenerateTool model choice", () => {
 
   it("falls back to the configured video model before the catalog's pick", async () => {
     const fetchMock = stubGateway();
-    await run({ model: "sora-9" }, { video: ["seedance-2.0", "veo_3_1-fast"], secrets: { VIDEO_GEN_MODEL: "veo_3_1-fast" } });
+    await run(
+      { model: "sora-9" },
+      { video: ["seedance-2.0", "veo_3_1-fast"], secrets: { VIDEO_GEN_MODEL: "veo_3_1-fast" } },
+    );
     expect(sentModel(fetchMock)).toBe("veo_3_1-fast");
   });
 

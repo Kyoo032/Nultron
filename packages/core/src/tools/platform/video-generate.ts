@@ -6,6 +6,7 @@ import { currentOutboundGuard, mediaSendRefusal } from "../../security/outbound-
 import { defineTool } from "../define-tool";
 import { gatewayGenerateModel } from "../media-model-choice";
 import { imageInputSchema, mediaReferenceId, resolveImageInput } from "../media-reference";
+import { reportModelOutcome } from "../../models/outcome-sink";
 import { missingToolRouteMessage, resolveToolBackend } from "../credentials";
 import { getSecret } from "../secret-scope";
 import { falVideoUrl, runFalQueue } from "./fal-queue";
@@ -149,6 +150,7 @@ export const videoGenerateTool = defineTool({
     }
     const aspect = aspect_ratio ?? "16:9";
     const fetchImpl = globalThis.fetch;
+    const gatewayModel = gatewayGenerateModel("video", model);
     try {
       const generated =
         route.backend === "gateway"
@@ -159,7 +161,7 @@ export const videoGenerateTool = defineTool({
               seconds,
               resolution,
               apiKey,
-              model: gatewayGenerateModel("video", model),
+              model: gatewayModel,
               baseUrl: getSecret("OPENAI_BASE_URL") || resolvedGatewayBaseUrl(),
               fetchImpl,
             })
@@ -175,6 +177,9 @@ export const videoGenerateTool = defineTool({
               )
             : await generateWithFal(prompt, sourceImage, aspect, apiKey, fetchImpl);
       currentOutboundGuard()?.noteHostMedia([generated.url]);
+      if (route.backend === "gateway") {
+        reportModelOutcome({ tenant, model: gatewayModel, kind: "video", ok: true });
+      }
       return {
         success: true,
         backend: route.backend,
@@ -184,6 +189,9 @@ export const videoGenerateTool = defineTool({
         prompt,
       };
     } catch (error) {
+      if (route.backend === "gateway") {
+        reportModelOutcome({ tenant, model: gatewayModel, kind: "video", ok: false, error });
+      }
       return { success: false, error: error instanceof Error ? error.message : "Video generation failed" };
     }
   },

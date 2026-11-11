@@ -15,6 +15,9 @@ import "./tenant-storage-db";
 // Phase 8: installs the connection the readiness route reads. Same seam, same reason; without it
 // the database check reports "did not answer" rather than a silent ok.
 import "./health-db";
+// 2026-11-11: installs the sink the generation tools report real calls to, so a model a key was refused
+// stops being offered (`model-availability.ts`). Importing it is the install; it holds no connection.
+import "./model-availability";
 import { hostAuthRoutes, hostPortalCheck, hostSessionStore, isSessionExemptPath, requireSessionFor } from "./auth";
 import type { PortalSessionCheck, SessionStore } from "./auth";
 import { jsonError, jsonOk } from "./errors";

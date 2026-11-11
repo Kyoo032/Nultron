@@ -786,3 +786,32 @@ Owner decision, 2026-09-30: cheapest and fastest first. Each list below is the b
 - `deepseek-v4-flash` answered 503 on 2026-09-17 (the comment on `JOB_FALLBACK_TAIL` says so) and was not tried today; `deepseek-v4-1-flash` sits last in the outage tail and is a different id.
 - `claude-sonnet-5-5` with Off took 31 s to finish a 32-token answer (first token 4.1 s) in the probe. One sample, unexplained, and the other four calls finished in 2 to 3 s. It heads Legal's second place and the minutes' second place, so a repeat there would show.
 - The dated twin `deepseek-v4-1-flash-260910` has a six-digit date, so the picker and the role table do not fold it into its base id the way they do an eight-digit one.
+
+
+## 11. Update 2026-11-11 — what a prepaid agent key can actually run
+
+Measured with Rizky's key (a prepaid agent account, 代理预付) against the live gateway; the evidence is in the session scratchpad (`media-out/REPORT.md`, `probe-summary.json`, the key's `GET /v1/models` with 213 ids, the public `/api/pricing`). **The key's model list is not enough to know a model works.**
+
+| Model | Route | Result | Status the product files |
+|---|---|---|---|
+| `gpt-image-2` | `POST /v1/images/generations` | works | `available` |
+| `seedance-2.0-fast` | `POST /v1/video/generations`, Seedance `content` body | works (HTTP 200, 135 s, 2.75 MB) | `available` |
+| `qwen3.5-omni-flash` speech | `POST /v1/chat/completions`, `stream`, `modalities: ["audio","text"]`, voice `Tina` | works (4.5 s of audio in 1.3 s; PCM16 24 kHz) | `available` |
+| `muse-voice-transcribe-1.0` | `POST /v1/audio/transcriptions` | works | `available` |
+| `grok-imagine-video` | `POST /v1/videos` (its documented route), every body | 403 `prepaid_async_requires_fixed_price` | `account_blocked` |
+| `kling-v3` | `/v1/video/generations`; native `/kling/v1/videos/text2video` | 403 the same; then 503 "no available configurable resource channel" | `account_blocked`, then `no_channel` |
+| `veo_3_1-fast` | `POST /v1/video/generations`, `{duration: 8, size: "16:9"}` | 403 `bad_response_status_code` (the upstream refused) | `upstream_rejected` |
+| `tts-1` | `POST /v1/audio/speech` | `model_not_found` | `not_on_key` |
+| `gpt-4o-mini-tts` | `POST /v1/audio/speech` | 503 no channel | `no_channel` |
+| `qwen3-tts-*` | `POST /v1/audio/speech` | 500 not implemented | nothing learned |
+| `suno_music`, `suno_lyrics` | `POST /suno/submit/{music,lyrics}` | 400 `model_not_found` in every body shape | `not_on_key` |
+| the realtime WebSocket | — | refused for prepaid accounts | not learned here |
+
+What follows from it:
+
+- **A per-token model is not the same as a refused one.** `quota_type` is 0 for every Seedance id on the price list, and `seedance-2.0-fast` ran. So the refusal cannot be predicted from the price list: it has to be learned from the call. The product now does that, per key (`model-policy.md`, "Which models a key can use").
+- **NewAPI uses one code for two things.** "No channel for this model" is 503 with `model_not_found`; "not on this key" is the same code with another status. The classifier separates them by status and words.
+- **The copy that said a prepaid key cannot run Seedance was wrong**, and so was blaming Grok on "auto channel choice". Both are corrected in `formatVideoGatewayFailure`.
+- **Grok video has its own route**, `POST /v1/videos`, polled at `GET /v1/videos/{id}` (`video_url`). The docs show a multipart form; the JSON body with `aspect_ratio`, `video_length`, `resolution_name` and `preset` is accepted (the refusals above are not 400s). A JSON `seconds` must be a string, so it is not sent.
+- **Speech has a second route.** A key with no `/v1/audio/speech` model still speaks through an Omni chat id.
+- **Not measured:** Veo with another body (the documented one was refused upstream), Kling after the channel returns, the realtime route on a non-prepaid key, `seedance-2.0` and `seedance-2.5` on a prepaid key (the preference list puts the proven `seedance-2.0-fast` first for that reason).

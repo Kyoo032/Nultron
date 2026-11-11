@@ -15,7 +15,7 @@
  * model must not end a run that the tenant has already paid to encode.
  */
 
-import { ApiError, resolveProviderKeys } from "@agentforge/core";
+import { ApiError, reportModelOutcome, resolveProviderKeys, type TenantContext } from "@agentforge/core";
 import {
   isTranscriptionModelId,
   transcriptionCandidates,
@@ -24,6 +24,7 @@ import {
   type TranscriptionWire,
 } from "@agentforge/core/meeting";
 import type { MeetingTranscript, TranscriptSegment } from "@agentforge/core/meeting";
+import { dropRefusedIds } from "../model-availability";
 import { loadModelCache, modelCacheScopeOf, type ModelCacheScope } from "../model-cache";
 import { warmHostedModelCache } from "../selectable-models";
 import { loadSettings, type SettingsScope } from "../settings-store";
@@ -48,12 +49,13 @@ export function cachedModelIds(scope?: ModelCacheScope): string[] {
   // Hosted only: a tenant that upgraded with a key and no cached catalogue gets one background refill.
   warmHostedModelCache(scope);
   const cache = loadModelCache(scope);
-  return [
-    ...(cache.openai ?? []),
-    ...(cache.anthropic ?? []),
-    ...(cache.google ?? []),
-    ...(cache.volcengine ?? []),
-  ].map((model) => model.id);
+  // Models a real call has just said do not work on this key are not candidates (`model-availability.ts`).
+  return dropRefusedIds(
+    [...(cache.openai ?? []), ...(cache.anthropic ?? []), ...(cache.google ?? []), ...(cache.volcengine ?? [])].map(
+      (model) => model.id,
+    ),
+    scope,
+  );
 }
 
 /**
@@ -99,6 +101,18 @@ export type TranscribeOptions = {
 
 type ChunkAttempt = { text: string; model: string };
 
+/** Tell the availability memory what one real transcription call came to. Never throws. */
+function reportTranscriptionOutcome(
+  scope: SettingsScope,
+  model: string,
+  outcome: { ok: true } | { ok: false; error: unknown },
+): void {
+  if (typeof scope !== "object" || scope === null) {
+    return;
+  }
+  reportModelOutcome({ tenant: scope as TenantContext, model, kind: "transcription", ...outcome });
+}
+
 /** Every model that was asked and what it said, in one sentence the owner can act on. */
 function chainFailure(failures: Array<{ model: string; error: unknown }>): ApiError {
   const last = failures[failures.length - 1]?.error;
@@ -139,6 +153,7 @@ async function transcribeOneChunk(
         fetchImpl: context.options.fetchImpl ?? fetch,
       });
       if (text) {
+        reportTranscriptionOutcome(context.options.tenant, model, { ok: true });
         return { text, model };
       }
       // A 200 with no words is a refusal the gateway did not label as one. `gpt-audio` answers
@@ -150,6 +165,7 @@ async function transcribeOneChunk(
         throw error;
       }
       failures.push({ model, error });
+      reportTranscriptionOutcome(context.options.tenant, model, { ok: false, error });
       log.warn("meeting_chunk_model_failed", {
         model,
         code: error instanceof ApiError ? error.code : "internal_error",

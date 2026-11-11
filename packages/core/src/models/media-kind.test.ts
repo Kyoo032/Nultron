@@ -91,7 +91,9 @@ describe("pickPreferredVideoModel", () => {
     // The live catalogue of 2026-09-30 lists exactly these two video ids.
     expect(pickPreferredVideoModel(["seedance-2.5", "seedance-2.0"])).toBe("seedance-2.0");
     expect(pickPreferredVideoModel(["seedance-2.5"])).toBe("seedance-2.5");
-    expect(MEDIA_MODEL_PREFERENCES.video.slice(0, 3)).toEqual([
+    // 2026-11-11: the fast id leads, because it is the one driven end to end on a prepaid key.
+    expect(MEDIA_MODEL_PREFERENCES.video.slice(0, 4)).toEqual([
+      "seedance-2.0-fast",
       "seedance-2.0",
       "doubao-seedance-2-0-260128",
       "seedance-2.5",
@@ -104,13 +106,14 @@ describe("pickPreferredVideoModel", () => {
     );
   });
 
-  it("still prefers Veo fast, then cheap Grok Imagine, on a gateway that lists them and no Seedance 2.0", () => {
-    expect(
-      pickPreferredVideoModel(["mj_video", "seedance-2.0-fast", "grok-imagine-video", "veo_3_1-fast"]),
-    ).toBe("veo_3_1-fast");
-    expect(pickPreferredVideoModel(["mj_video", "seedance-2.0-fast", "grok-imagine-video"])).toBe("grok-imagine-video");
+  it("prefers the fast Seedance (proven on a prepaid key), then Veo fast, then cheap Grok Imagine", () => {
+    expect(pickPreferredVideoModel(["mj_video", "seedance-2.0-fast", "grok-imagine-video", "veo_3_1-fast"])).toBe(
+      "seedance-2.0-fast",
+    );
+    expect(pickPreferredVideoModel(["mj_video", "veo_3_1-fast", "grok-imagine-video"])).toBe("veo_3_1-fast");
+    expect(pickPreferredVideoModel(["mj_video", "grok-imagine-video"])).toBe("grok-imagine-video");
     expect(pickPreferredVideoModel(["omni-fast-v2v", "seedance-2.0-mini"])).toBe("omni-fast-v2v");
-    expect(pickPreferredVideoModel(["seedance-2.0-mini", "seedance-2.0-fast"])).toBe("seedance-2.0-mini");
+    expect(pickPreferredVideoModel(["seedance-2.0-mini", "seedance-2.0-fast"])).toBe("seedance-2.0-fast");
   });
 
   it("falls back to the kernel default", () => {
@@ -238,13 +241,20 @@ describe("MEDIA_MODEL_PREFERENCES", () => {
     expect(MEDIA_MODEL_PREFERENCES.video).toContain(DEFAULT_GATEWAY_VIDEO_MODEL);
     expect(MEDIA_MODEL_PREFERENCES.music).toContain(DEFAULT_GATEWAY_MUSIC_MODEL);
     expect(MEDIA_MODEL_PREFERENCES.embedding).toContain(DEFAULT_EMBEDDING_MODEL);
-    expect(Object.keys(MEDIA_MODEL_PREFERENCES).sort()).toEqual(
-      ["embedding", "image", "lyrics", "music", "speech", "video"],
-    );
+    expect(Object.keys(MEDIA_MODEL_PREFERENCES).sort()).toEqual([
+      "embedding",
+      "image",
+      "lyrics",
+      "music",
+      "speech",
+      "video",
+    ]);
   });
 
   it("is what the pickers rank by: the first listed id wins when it is live", () => {
-    expect(pickPreferredImageModel([...MEDIA_MODEL_PREFERENCES.image].reverse())).toBe(MEDIA_MODEL_PREFERENCES.image[0]);
+    expect(pickPreferredImageModel([...MEDIA_MODEL_PREFERENCES.image].reverse())).toBe(
+      MEDIA_MODEL_PREFERENCES.image[0],
+    );
   });
 
   it("cannot be edited from outside", () => {

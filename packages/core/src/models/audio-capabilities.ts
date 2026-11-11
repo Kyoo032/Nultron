@@ -11,6 +11,7 @@
  * subpath, the same way the Videos studio loads its own.
  */
 
+import { speechWireFor } from "./gateway-catalog";
 import { audioRole } from "./media-kind";
 
 /** How the prompt reaches a music model. */
@@ -70,16 +71,16 @@ export function resolveMusicMode(model: string, wanted?: string): MusicMode {
 }
 
 /**
- * Whether a speech model is reachable over the plain HTTP job route.
+ * Whether a speech model is reachable over a plain HTTP job route.
  *
- * On this gateway (2026-09) the answer is no for every live id: the only TTS entry is
- * `qwen3-tts-instruct-flash-realtime`, and `audioRole` returns `realtime` for it because the
- * realtime family speaks WebSocket behind its `openai` endpoint label. The Music studio reads this
- * to explain why the voice-over control is off rather than failing at submit time, and the control
- * turns itself on the day the catalog lists a non-realtime TTS id.
+ * Two routes exist. A non-realtime TTS id goes to `POST /v1/audio/speech`. On this gateway (2026-09)
+ * no live id did: the only TTS entry was `qwen3-tts-instruct-flash-realtime`, which speaks WebSocket
+ * behind its `openai` endpoint label. Since 2026-11-11 an Omni chat id (`qwen3.5-omni-flash`) also
+ * counts: its streaming chat call answers spoken audio, driven live on a prepaid key. The Music studio
+ * reads this to explain why the voice-over control is off rather than failing at submit time.
  */
 export function speechReachable(ids: readonly string[]): boolean {
-  return ids.some((id) => audioRole(id) === "speech");
+  return ids.some((id) => audioRole(id) === "speech" || speechWireFor(id) !== undefined);
 }
 
 /** Why the voice-over control is off, as a machine-readable reason the renderer maps to copy. */

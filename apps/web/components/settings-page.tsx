@@ -5,6 +5,7 @@ import { DEFAULT_GATEWAY_IMAGE_MODEL, DEFAULT_GATEWAY_VIDEO_MODEL } from "@agent
 import { AccountPlanPanel } from "./account-plan-panel";
 import { AccountSessionRow } from "./account-session-row";
 import { SettingsGuideCard } from "./settings-guide-card";
+import { availabilityFrom, SettingsModelsCard, type ModelAvailabilityWire } from "./settings-models-card";
 import { SettingsResetCard } from "./settings-reset-card";
 // Phase 8: renders only where there is a ceiling to show (hosted); null on a desk.
 import { SettingsStorageCard } from "./settings-storage-card";
@@ -63,6 +64,8 @@ export type SettingsPayload = {
   anthropicBaseUrl?: string;
   volcengineBaseUrl?: string;
   probe?: Probe;
+  /** The models this key cannot use and what each kind still offers (`settings-models-card.tsx`). */
+  modelAvailability?: unknown;
   toolBackends?: Record<string, string>;
   imageGenModel?: string;
   videoGenModel?: string;
@@ -174,6 +177,7 @@ export function SettingsPage() {
   const [, setPresentationGenModel] = useState("");
   const [editTurnCapUsd, setEditTurnCapUsd] = useState(2);
   const [probe, setProbe] = useState<Probe | null>(null);
+  const [modelAvailability, setModelAvailability] = useState<ModelAvailabilityWire | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -249,6 +253,7 @@ export function SettingsPage() {
     if (payload.probe) {
       setProbe(payload.probe);
     }
+    setModelAvailability(availabilityFrom(payload.modelAvailability));
     if (payload.usage) {
       setUsage(payload.usage);
     }
@@ -600,6 +605,7 @@ export function SettingsPage() {
         <AccountSessionRow />
       </div>
       <AccountPlanPanel />
+      <SettingsModelsCard availability={modelAvailability} onRefreshed={setModelAvailability} hasKey={hasOpenai} />
       <SettingsStorageCard />
       <SettingsResetCard resetPending={resetPending} />
     </main>

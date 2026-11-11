@@ -34,7 +34,7 @@ const MUSIC_PREF = ["suno_music"];
 export const RELAY_ONLY_MUSIC_MODEL_IDS: readonly string[] = Object.freeze([DEFAULT_GATEWAY_MUSIC_MODEL]);
 const LYRICS_PREF = ["suno_lyrics"];
 /** Non-realtime text-to-speech. Empty on this gateway today — see `speechModelRole` below. */
-const SPEECH_PREF = ["qwen-audio-3.0-tts", "tts-1-hd", "tts-1"];
+const SPEECH_PREF = ["qwen-audio-3.0-tts", "tts-1-hd", "tts-1", "qwen3.5-omni-flash", "qwen3.5-omni-plus"];
 
 /**
  * Seedance leads (2026-09-30): the live catalogue lists `seedance-2.0` and `seedance-2.5` and none of
@@ -44,6 +44,10 @@ const SPEECH_PREF = ["qwen-audio-3.0-tts", "tts-1-hd", "tts-1"];
  * `seedance-2.5` is listed but was not driven, so it sits behind the proven 2.0.
  */
 const VIDEO_PREF = [
+  // 2026-11-11: the one video id driven end to end on a prepaid agent key (HTTP 200, 135 s, 2.75 MB). The
+  // per-token ids (`grok-imagine-video`, `kling-v3`) were refused 403 / 503 on that key, and `seedance-2.0`
+  // itself was not tried, so the proven fast id leads; it is also the cheaper one. `seedance-2.0` follows.
+  "seedance-2.0-fast",
   "seedance-2.0",
   "doubao-seedance-2-0-260128",
   "seedance-2.5",
@@ -66,8 +70,7 @@ export const MEDIA_MODEL_PREFERENCES = Object.freeze({
   embedding: Object.freeze([...EMBEDDING_PREF]),
 });
 
-const OTHER =
-  /(^|\/)(text-)?embedding|babbage|davinci|computer-use|omni-moderation|text-moderation|moderation/i;
+const OTHER = /(^|\/)(text-)?embedding|babbage|davinci|computer-use|omni-moderation|text-moderation|moderation/i;
 const AUDIO = /suno_|whisper|\btts\b|tts-1|lyria|transcribe|audio-|(?:^|[-_.])asr(?:[-_.]|$)/i;
 const VIDEO =
   /seedance|veo[_-]|kling|\bsora\b|happyhorse|mj_video|grok-imagine-video|-t2v|-i2v|-r2v|-v2v|video-edit|omni-fast-v2v/i;
@@ -150,6 +153,16 @@ export function isLyricsModelId(id: string): boolean {
   return audioRole(id) === "lyrics";
 }
 
+/**
+ * A chat id that answers with spoken audio over the streaming chat call (driven 2026-11-11 with
+ * `qwen3.5-omni-flash`, voice Tina). The `-realtime` spellings are WebSocket-only and never match.
+ */
+const OMNI_SPEECH_ID = /^qwen3(?:\.\d+)?-omni-(?:flash|plus)(?:-\d{4}-\d{2}-\d{2})?$/i;
+
+export function isOmniSpeechModelId(id: string): boolean {
+  return OMNI_SPEECH_ID.test(id.trim());
+}
+
 /** Text-to-speech we can actually POST to. A WebSocket-only realtime id is deliberately excluded. */
 export function isSpeechModelId(id: string): boolean {
   return audioRole(id) === "speech";
@@ -207,7 +220,7 @@ export function pickPreferredLyricsModel(ids: string[]): string {
  * gateway does not serve, and the studio would rather say so than fail at submit time.
  */
 export function pickPreferredSpeechModel(ids: string[]): string {
-  const usable = ids.filter((id) => isSpeechModelId(id));
+  const usable = ids.filter((id) => isSpeechModelId(id) || isOmniSpeechModelId(id));
   return firstLiveId(SPEECH_PREF, usable) ?? usable[0] ?? "";
 }
 

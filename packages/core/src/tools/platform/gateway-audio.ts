@@ -20,9 +20,10 @@
  */
 
 import { ApiError } from "../../errors";
+import { GatewayRefusalError } from "../../models/availability";
 import { gatewayOriginFromBaseUrl } from "../../gateway";
 import { MUSIC_LYRICS_MAX, MUSIC_PROMPT_MAX, MUSIC_STYLE_MAX, MUSIC_TITLE_MAX } from "../../models/audio-capabilities";
-import { httpStatusForGatewayFailure, readGatewayError } from "./gateway-media";
+import { gatewayErrorCode, httpStatusForGatewayFailure, readGatewayError } from "./gateway-media";
 
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
@@ -234,11 +235,12 @@ async function submitSuno(
     if (isRelayMissing(created.status, body)) {
       throw new ApiError("tool_failed", RELAY_MISSING, 502);
     }
-    throw new ApiError(
-      "tool_failed",
-      readGatewayError(body, `Gateway Suno relay returned HTTP ${created.status}`),
-      httpStatusForGatewayFailure(created.status),
-    );
+    const detail = readGatewayError(body, `Gateway Suno relay returned HTTP ${created.status}`);
+    throw new GatewayRefusalError("tool_failed", detail, httpStatusForGatewayFailure(created.status), {
+      status: created.status,
+      code: gatewayErrorCode(body),
+      message: detail,
+    });
   }
   const taskId = sunoTaskId(body);
   if (!taskId) {
@@ -358,11 +360,12 @@ export async function generateGatewaySpeech(options: GatewaySpeechOptions): Prom
   });
   if (!response.ok) {
     const body = asRecord(await response.json().catch(() => ({})));
-    throw new ApiError(
-      "tool_failed",
-      readGatewayError(body, `Gateway speech returned HTTP ${response.status}`),
-      httpStatusForGatewayFailure(response.status),
-    );
+    const detail = readGatewayError(body, `Gateway speech returned HTTP ${response.status}`);
+    throw new GatewayRefusalError("tool_failed", detail, httpStatusForGatewayFailure(response.status), {
+      status: response.status,
+      code: gatewayErrorCode(body),
+      message: detail,
+    });
   }
   const served = response.headers.get("content-type")?.split(";")[0]?.trim().toLowerCase() ?? "";
   const mime = served.startsWith("audio/") ? served : `audio/${format === "mp3" ? "mpeg" : format}`;
@@ -375,4 +378,137 @@ export async function generateGatewaySpeech(options: GatewaySpeechOptions): Prom
     binary += String.fromCharCode(byte);
   }
   return { url: `data:${mime};base64,${btoa(binary)}`, model: options.model };
+}
+
+// --------------------------------------------------------------------------------- Omni speech
+
+/** Raw PCM from the Omni stream: signed 16-bit little-endian, mono, 24 kHz (driven 2026-11-11). */
+const OMNI_SAMPLE_RATE = 24_000;
+export const OMNI_DEFAULT_VOICE = "Tina";
+
+export type GatewayOmniSpeechOptions = {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  text: string;
+  voice?: string;
+  fetchImpl?: typeof fetch;
+};
+
+/** A 44-byte RIFF header in front of raw PCM16 mono, so a browser can play what the stream sent. */
+export function wavFromPcm16(pcm: Uint8Array, sampleRate = OMNI_SAMPLE_RATE): Uint8Array {
+  const header = new DataView(new ArrayBuffer(44));
+  const write = (offset: number, text: string) => {
+    for (let index = 0; index < text.length; index += 1) {
+      header.setUint8(offset + index, text.charCodeAt(index));
+    }
+  };
+  write(0, "RIFF");
+  header.setUint32(4, 36 + pcm.byteLength, true);
+  write(8, "WAVE");
+  write(12, "fmt ");
+  header.setUint32(16, 16, true);
+  header.setUint16(20, 1, true);
+  header.setUint16(22, 1, true);
+  header.setUint32(24, sampleRate, true);
+  header.setUint32(28, sampleRate * 2, true);
+  header.setUint16(32, 2, true);
+  header.setUint16(34, 16, true);
+  write(36, "data");
+  header.setUint32(40, pcm.byteLength, true);
+  const wav = new Uint8Array(44 + pcm.byteLength);
+  wav.set(new Uint8Array(header.buffer), 0);
+  wav.set(pcm, 44);
+  return wav;
+}
+
+function base64ToBytes(value: string): Uint8Array {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+/** The audio chunks (base64 PCM16) in an SSE body of chat-completion deltas, in order. */
+export function omniAudioChunks(sse: string): string[] {
+  const chunks: string[] = [];
+  for (const line of sse.split(/\r?\n/)) {
+    if (!line.startsWith("data:")) {
+      continue;
+    }
+    const payload = line.slice(5).trim();
+    if (!payload || payload === "[DONE]") {
+      continue;
+    }
+    let event: unknown;
+    try {
+      event = JSON.parse(payload);
+    } catch {
+      continue;
+    }
+    const choices = asRecord(event).choices;
+    const delta = Array.isArray(choices) ? asRecord(asRecord(choices[0]).delta) : {};
+    const data = asString(asRecord(delta.audio).data);
+    if (data) {
+      chunks.push(data);
+    }
+  }
+  return chunks;
+}
+
+/**
+ * Text to speech through a chat model that speaks (an Omni id), for a gateway whose `/v1/audio/speech`
+ * serves no model. Driven on 2026-11-11 with `qwen3.5-omni-flash` and voice Tina: the streaming chat
+ * call with `modalities: ["audio", "text"]` answers PCM deltas, 4.5 s of audio in 1.3 s. The result is
+ * a WAV data URL, the same shape `generateGatewaySpeech` answers, so the caller does not care which wire ran.
+ */
+export async function generateGatewayOmniSpeech(
+  options: GatewayOmniSpeechOptions,
+): Promise<{ url: string; model: string }> {
+  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const base = options.baseUrl.replace(/\/+$/, "");
+  const response = await fetchImpl(`${base}/chat/completions`, {
+    method: "POST",
+    headers: headers(options.apiKey),
+    body: JSON.stringify({
+      model: options.model,
+      stream: true,
+      modalities: ["audio", "text"],
+      audio: { voice: options.voice?.trim() || OMNI_DEFAULT_VOICE, format: "wav" },
+      messages: [
+        {
+          role: "user",
+          content: `Read the following text aloud exactly as written, and say nothing else:\n\n${options.text}`,
+        },
+      ],
+    }),
+  });
+  if (!response.ok) {
+    const body = asRecord(await response.json().catch(() => ({})));
+    const detail = readGatewayError(body, `Gateway speech returned HTTP ${response.status}`);
+    throw new GatewayRefusalError("tool_failed", detail, httpStatusForGatewayFailure(response.status), {
+      status: response.status,
+      code: gatewayErrorCode(body),
+      message: detail,
+    });
+  }
+  const chunks = omniAudioChunks(await response.text());
+  if (chunks.length === 0) {
+    throw new ApiError("tool_failed", "Gateway speech returned no audio", 502);
+  }
+  const parts = chunks.map(base64ToBytes);
+  const pcm = new Uint8Array(parts.reduce((total, part) => total + part.byteLength, 0));
+  let offset = 0;
+  for (const part of parts) {
+    pcm.set(part, offset);
+    offset += part.byteLength;
+  }
+  const wav = wavFromPcm16(pcm);
+  let binary = "";
+  for (const byte of wav) {
+    binary += String.fromCharCode(byte);
+  }
+  return { url: `data:audio/wav;base64,${btoa(binary)}`, model: options.model };
 }

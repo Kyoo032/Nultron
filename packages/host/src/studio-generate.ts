@@ -5,6 +5,7 @@ import {
   gatewayRequiredMessage,
   imageGenerateTool,
   isMusicModelId,
+  isOmniSpeechModelId,
   isSpeechModelId,
   listToolRoutes,
   lyricsWriteTool,
@@ -71,10 +72,11 @@ export type StudioKind = "image" | "video" | "audio";
 
 const httpUrlSchema = z.string().url();
 
-const studioImageSourceSchema = z.string().refine(
-  (value) => httpUrlSchema.safeParse(value).success || mediaReferenceId(value) !== null,
-  { message: "Pass an image URL, or the reference of an image you can see (/api/v1/media/<id>/file or the id)." },
-);
+const studioImageSourceSchema = z
+  .string()
+  .refine((value) => httpUrlSchema.safeParse(value).success || mediaReferenceId(value) !== null, {
+    message: "Pass an image URL, or the reference of an image you can see (/api/v1/media/<id>/file or the id).",
+  });
 
 export const imageGenerateBodySchema = z.object({
   prompt: z.string().trim().min(1, "prompt is required"),
@@ -167,11 +169,13 @@ export type StudioMusicResult = {
 // Every list below reads the catalogue of one tenant. `scope` names it (a `TenantContext` goes in as it
 // is); a desk has one catalogue and ignores it. See `ModelCacheScope`.
 export function listStudioImageModels(models?: ChatModel[], scope?: ModelCacheScope): ChatModel[] {
-  return (models ?? listImageModels(scope)).filter((model) => mediaKind(model.id) === "image");
+  // The host's own list is already the image list (by regex, or by the gateway's price list for an id no
+  // regex knows). Only a list a caller hands in is checked again.
+  return models ? models.filter((model) => mediaKind(model.id) === "image") : listImageModels(scope);
 }
 
 export function listStudioVideoModels(models?: ChatModel[], scope?: ModelCacheScope): ChatModel[] {
-  return (models ?? listProbedVideoModels(undefined, scope)).filter((model) => mediaKind(model.id) === "video");
+  return models ? models.filter((model) => mediaKind(model.id) === "video") : listProbedVideoModels(undefined, scope);
 }
 
 export function defaultStudioImageModel(models?: ChatModel[], scope?: ModelCacheScope): string {
@@ -197,15 +201,14 @@ export function defaultStudioMusicModel(models?: ChatModel[], scope?: ModelCache
  * endpoint label, so a job route cannot drive it. Reporting the reason is the whole point: the
  * studio says "this gateway serves no reachable speech model" instead of failing at submit.
  */
-export function studioSpeechUnavailable(
-  models?: ChatModel[],
-  scope?: ModelCacheScope,
-): SpeechUnavailableReason | null {
+export function studioSpeechUnavailable(models?: ChatModel[], scope?: ModelCacheScope): SpeechUnavailableReason | null {
   return speechUnavailableReason((models ?? listSpeechModels(scope)).map((model) => model.id));
 }
 
 export function listStudioSpeechModels(models?: ChatModel[], scope?: ModelCacheScope): ChatModel[] {
-  return (models ?? listSpeechModels(scope)).filter((model) => isSpeechModelId(model.id));
+  return (models ?? listSpeechModels(scope)).filter(
+    (model) => isSpeechModelId(model.id) || isOmniSpeechModelId(model.id),
+  );
 }
 
 export function parseImageGenerateBody(raw: unknown): ImageGenerateBody {
