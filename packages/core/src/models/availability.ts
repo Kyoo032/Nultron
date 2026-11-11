@@ -93,6 +93,13 @@ export type GatewayRefusal = {
   code?: string;
   /** The gateway's own words, before any copy of ours was added. */
   message: string;
+  /**
+   * Where the refusal came from. `submit` (the default) is the call that starts a job: a refusal there
+   * is about the model and the key. `poll` is a job the gateway already accepted, failing while it was
+   * watched: that is the brief or the provider behind it, not the model, so it teaches nothing. A
+   * copyright refusal on an accepted Seedance job is the measured example (2026-11-11).
+   */
+  phase?: "submit" | "poll";
 };
 
 /**
@@ -129,13 +136,27 @@ const UPSTREAM_REJECTED =
  * a timeout, a content refusal, a malformed body of ours) says nothing about whether the model is
  * usable on this key, and learning it would hide a model that works.
  *
- * Order matters. NewAPI answers "no channel for this model" with status 503 *and* the code
+ * Two hard stops come before the patterns:
+ *
+ * - **A job that failed while it was polled teaches nothing.** The gateway had already accepted the
+ *   submit; the failure is the brief (a copyright refusal on a clip, measured 2026-11-11) or the
+ *   provider behind that one job, not the model.
+ * - **A 401 and a 429 are account or transport facts.** A refused key or a rate limit says nothing
+ *   about the model, whatever words came with it.
+ *
+ * Order matters after those. NewAPI answers "no channel for this model" with status 503 *and* the code
  * `model_not_found`, so the code alone cannot separate "this key may not use the model" from "the
  * pool is empty right now"; the status and the words do.
  */
 export function classifyGatewayRefusal(
   refusal: GatewayRefusal,
 ): { status: Exclude<LearnedStatus, "available">; reason: string } | null {
+  if (refusal.phase === "poll") {
+    return null;
+  }
+  if (refusal.status === 401 || refusal.status === 429) {
+    return null;
+  }
   const text = `${refusal.code ?? ""} ${refusal.message}`;
   const code = (refusal.code ?? "").trim() || shortReason(refusal.message);
   if (PREPAID_ASYNC.test(text)) {

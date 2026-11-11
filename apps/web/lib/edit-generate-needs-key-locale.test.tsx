@@ -68,6 +68,24 @@ describe("the Edit Generate tab's needs-key line", () => {
     expect(generate(false)).not.toContain("edit-needs-key");
   });
 
+  it("disables Generate and points at the Models section when the key has no model of this kind", () => {
+    applyLocale("en");
+    const markup = generate(false);
+    expect(markup).toContain('data-testid="edit-generate-no-model"');
+    expect(markup).toContain("Models section");
+    // No stub id is invented for a key that has one: the empty catalogue is the answer.
+    expect(markup).not.toContain("grok-imagine-video");
+    expect(markup).not.toContain("gpt-image-2");
+  });
+
+  it("says the no-model line in Indonesian too", () => {
+    applyLocale("id");
+    const markup = generate(false);
+    expect(markup).toContain('data-testid="edit-generate-no-model"');
+    expect(markup).toContain("bagian Model");
+    expect(markup).not.toContain("Models section");
+  });
+
   it("is no English literal in the component any more", () => {
     const web = join(dirname(fileURLToPath(import.meta.url)), "..");
     const source = readFileSync(join(web, "components/edit-generate-tab.tsx"), "utf8");

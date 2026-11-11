@@ -85,6 +85,7 @@
     "storyboard": "Storyboard",
     "storyboardPhase": "Storyboard lands in Phase 3.",
     "needsKey": "Add a {gateway} gateway key in {settings} to generate.",
+    "noModel": "This key has no model that can generate this right now. Check the Models section in {settings}.",
     "settingsLink": "Settings",
     "animateStillClip": "Animate the image clip under the playhead",
     "stillUrlPlaceholder": "Still image URL, or move the playhead onto an image clip",

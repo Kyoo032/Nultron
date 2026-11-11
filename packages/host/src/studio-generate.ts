@@ -46,8 +46,15 @@ import {
 import { ImageModelRejectedError, runImageSkills } from "@agentforge/core/images";
 import { mediaReferenceId } from "@agentforge/core/tools/media-reference";
 import { loadSettings } from "./settings-store";
-import type { ModelCacheScope } from "./model-cache";
-import { listImageModels, listMusicModels, listProbedVideoModels, listSpeechModels } from "./selectable-models";
+import { loadModelCache, type ModelCacheScope } from "./model-cache";
+import { catalogOfCache, dropRefusedIds } from "./model-availability";
+import {
+  listImageModels,
+  listMusicModels,
+  listProbedVideoModels,
+  listSpeechModels,
+  withRelayMusicModels,
+} from "./selectable-models";
 import { mediaIdFromUrl } from "./media-id";
 import { getStudioMediaMeta, saveStudioMediaMeta, type StudioMediaMeta } from "./studio-media-meta";
 import { upsertWorkSource } from "./knowledge-ingest";
@@ -195,14 +202,44 @@ export function defaultStudioMusicModel(models?: ChatModel[], scope?: ModelCache
 }
 
 /**
+ * The Music picker: the catalog minus what this key's calls refused, plus a Settings or agent pin the
+ * catalog does not carry — unless that pin is itself refused. `defaultModel` is always an id in the
+ * list, or `""` when the list is empty, so the page can say why instead of failing on click
+ * (`musicPickerEmpty`, `apps/web/lib/music-models.ts`).
+ *
+ * The pin join is why this is not just `listStudioMusicModels`: a relay id the gateway never lists
+ * (`suno_music`) is a legal pin, and the select must be able to show what generate will send. A
+ * refused pin is the one thing that must not come back, or the empty state could never be reached.
+ */
+export function studioMusicPicker(
+  catalog: ChatModel[],
+  pinned: string,
+  scope?: ModelCacheScope,
+): { models: ChatModel[]; defaultModel: string } {
+  const asked = pinned.trim();
+  const extra = asked ? dropRefusedIds([asked], scope) : [];
+  const models = withRelayMusicModels(catalog, extra);
+  const chosen = asked ? models.find((model) => model.id.toLowerCase() === asked.toLowerCase())?.id : undefined;
+  // Non-empty, `defaultStudioMusicModel` answers an id from the list (its constant is only the empty
+  // list's last resort), so `chosen ?? fallback` is always a listed id, or "".
+  const fallback = models.length > 0 ? defaultStudioMusicModel(models, scope) : "";
+  return { models, defaultModel: chosen ?? fallback };
+}
+
+/**
  * Why the studio's voice-over control is off, or `null` when a text-to-speech model is reachable.
  *
  * The catalog's only TTS id is realtime, and a realtime id speaks WebSocket behind an `openai`
  * endpoint label, so a job route cannot drive it. Reporting the reason is the whole point: the
  * studio says "this gateway serves no reachable speech model" instead of failing at submit.
+ *
+ * The full catalog is passed beside the offered list, so a key that refused every speech model reads
+ * as `none_on_key` rather than as a gateway that has none (`speechUnavailableReason`).
  */
 export function studioSpeechUnavailable(models?: ChatModel[], scope?: ModelCacheScope): SpeechUnavailableReason | null {
-  return speechUnavailableReason((models ?? listSpeechModels(scope)).map((model) => model.id));
+  const offered = (models ?? listSpeechModels(scope)).map((model) => model.id);
+  const catalogIds = models ? offered : catalogOfCache(loadModelCache(scope)).map((entry) => entry.id);
+  return speechUnavailableReason(offered, catalogIds);
 }
 
 export function listStudioSpeechModels(models?: ChatModel[], scope?: ModelCacheScope): ChatModel[] {

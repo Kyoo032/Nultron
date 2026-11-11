@@ -37,6 +37,13 @@ import {
 } from "./selectable-models";
 import { cachedModelIds } from "./meeting/transcribe";
 import { loadSettings, saveSettings } from "./settings-store";
+import {
+  defaultStudioVideoModel,
+  listStudioMusicModels,
+  listStudioVideoModels,
+  studioMusicPicker,
+  studioSpeechUnavailable,
+} from "./studio-generate";
 
 const KEY_A = "sk-test-key-a-0123456789abcdef";
 const KEY_B = "sk-test-key-b-fedcba9876543210";
@@ -173,18 +180,92 @@ describe("a refusal from a real call", () => {
     expect(defaults.image).toBe("gpt-image-2");
   });
 
-  it("leaves music with nothing once the relay refuses, so the studio can say so", () => {
+  it("leaves every music entry point with nothing once the relay refuses, so the studio can say so", () => {
     expect(ids(listMusicModels(tenant))).toEqual(["suno_music"]);
+    const offered = studioMusicPicker(listStudioMusicModels(undefined, tenant), "suno_music", tenant);
+    expect(ids(offered.models)).toEqual(["suno_music"]);
+    expect(offered.defaultModel).toBe("suno_music");
+
     learnFromOutcome(report("suno_music", "music", refusal(400, "model_not_found", "suno_music")));
     expect(listMusicModels(tenant)).toEqual([]);
     expect(modeCatalogPayload(undefined, tenant).modes.music).toEqual([]);
     expect(modelAvailabilityBody(tenant).kinds.music).toEqual({ offered: 0 });
+
+    // The page's own list and the id its select seeds: both empty, so Generate is disabled with a reason.
+    const refused = studioMusicPicker(listStudioMusicModels(undefined, tenant), "suno_music", tenant);
+    expect(refused.models).toEqual([]);
+    expect(refused.defaultModel).toBe("");
+  });
+
+  it("works again as soon as the kind has a model, so the empty state is availability and not a dead page", () => {
+    const empty = studioMusicPicker([], "suno_music", tenant);
+    // An empty catalog with nothing refused still offers the relay model: the key never said no to it.
+    expect(ids(empty.models)).toEqual(["suno_music"]);
+    expect(empty.defaultModel).toBe("suno_music");
+  });
+
+  it("answers the Music page with nothing to pick once the relay refuses", async () => {
+    // The page reads this answer, so the fix has to land here and not only in the list helpers.
+    const { handleGetMusic } = await import("./handlers/jobs");
+    learnFromOutcome(report("suno_music", "music", refusal(400, "model_not_found", "suno_music")));
+    resetAvailabilityMemo();
+    const result = await handleGetMusic({
+      method: "GET",
+      path: "/api/v1/music",
+      query: {},
+      params: {},
+      headers: {},
+    });
+    if (result.type !== "json") {
+      throw new Error(`expected json, got ${result.type}`);
+    }
+    const body = result.body as { models: Array<{ id: string }>; defaultModel: string };
+    expect(body.models).toEqual([]);
+    expect(body.defaultModel).toBe("");
+  });
+
+  it("leaves the video page with no model when every video id was refused", () => {
+    learnTheDaysRefusals();
+    for (const id of ["seedance-2.0-fast", "seedance-2.0", "seedance-2.5"]) {
+      learnFromOutcome(report(id, "video", refusal(503, "model_not_found", "no channel")));
+    }
+    resetAvailabilityMemo();
+    expect(listStudioVideoModels(undefined, tenant)).toEqual([]);
+    expect(defaultStudioVideoModel(undefined, tenant)).toBe("");
+    expect(modelAvailabilityBody(tenant).kinds.video).toEqual({ offered: 0 });
+  });
+
+  it("learns nothing from a job that failed after the gateway accepted it", () => {
+    const before = readFileSync(cachePath(), "utf8");
+    const polled = new GatewayRefusalError("tool_failed", "may be related to copyright restrictions", 502, {
+      status: 200,
+      message: "may be related to copyright restrictions",
+      phase: "poll",
+    });
+    expect(learnFromOutcome(report("seedance-2.0-fast", "video", polled))).toBe(false);
+    expect(readFileSync(cachePath(), "utf8")).toBe(before);
+    expect(refusedModelIds(tenant).size).toBe(0);
+    expect(ids(listProbedVideoModels(undefined, tenant))).toContain("seedance-2.0-fast");
+  });
+
+  it("still files a prepaid refusal at submit time as account_blocked", () => {
+    expect(
+      learnFromOutcome(
+        report("grok-imagine-video", "video", refusal(403, "prepaid_async_requires_fixed_price", "prepaid")),
+      ),
+    ).toBe(true);
+    resetAvailabilityMemo();
+    expect(refusedModelIds(tenant).has("grok-imagine-video")).toBe(true);
+    expect(ids(listProbedVideoModels(undefined, tenant))).not.toContain("grok-imagine-video");
   });
 
   it("speaks through Omni, and stops offering it once the chat stream is refused", () => {
     expect(ids(listSpeechModels(tenant))).toEqual(["qwen3.5-omni-flash"]);
+    expect(studioSpeechUnavailable(undefined, tenant)).toBeNull();
     learnFromOutcome(report("qwen3.5-omni-flash", "speech", refusal(503, "model_not_found", "no channel")));
     expect(listSpeechModels(tenant)).toEqual([]);
+    // The catalogue still has the model; this key cannot use it, so the page says that, not "no model".
+    expect(studioSpeechUnavailable(undefined, tenant)).toBe("none_on_key");
   });
 
   it("drops a refused recogniser from the transcription chain, leaving the next", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../errors";
-import { GatewayRefusalError } from "../../models/availability";
+import { classifyGatewayRefusal, GatewayRefusalError } from "../../models/availability";
 import {
   buildGatewayVideoPayload,
   extractGatewayVideoUrl,
@@ -323,6 +323,29 @@ describe("generateGatewayImage", () => {
     expect(result).toEqual({ url: "https://cdn.example/done.png", model: "gpt-image-2" });
   });
 
+  it("tags a polled job's failure as poll, so it cannot hide the model", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ task_id: "img_1", status: "processing" }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { status: "failed", fail_reason: "bad_response_status_code" } }),
+      });
+    const error = await generateGatewayImage({
+      baseUrl: "https://api.tokotokenai.com/v1",
+      apiKey: "sk-test",
+      model: "gpt-image-2",
+      prompt: "a lantern",
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      wait: async () => undefined,
+    }).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(GatewayRefusalError);
+    expect((error as GatewayRefusalError).refusal).toMatchObject({ status: 200, phase: "poll" });
+    // The words alone would read as `upstream_rejected`; the phase is what keeps the model offered.
+    expect(classifyGatewayRefusal((error as GatewayRefusalError).refusal)).toBeNull();
+  });
+
   it("tells the caller not to retry when the fetch times out", async () => {
     const abortError = new Error("The operation was aborted");
     abortError.name = "AbortError";
@@ -469,18 +492,22 @@ describe("generateGatewayVideo", () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        status: 200,
         json: async () => ({ data: { status: "failed", fail_reason: "quota" } }),
       });
-    await expect(
-      generateGatewayVideo({
-        baseUrl: "https://api.tokotokenai.com/v1",
-        apiKey: "sk-test",
-        model: "grok-imagine-video",
-        prompt: "rain",
-        fetchImpl: failed as unknown as typeof fetch,
-        wait: async () => undefined,
-      }),
-    ).rejects.toMatchObject({ message: expect.stringMatching(/quota|failed/i) });
+    const pollFailure = await generateGatewayVideo({
+      baseUrl: "https://api.tokotokenai.com/v1",
+      apiKey: "sk-test",
+      model: "grok-imagine-video",
+      prompt: "rain",
+      fetchImpl: failed as unknown as typeof fetch,
+      wait: async () => undefined,
+    }).catch((caught: unknown) => caught);
+    expect(pollFailure).toBeInstanceOf(GatewayRefusalError);
+    expect((pollFailure as GatewayRefusalError).message).toMatch(/quota|failed/i);
+    expect((pollFailure as GatewayRefusalError).refusal).toMatchObject({ status: 200, phase: "poll" });
+    // A job the gateway accepted and then failed teaches nothing about the model.
+    expect(classifyGatewayRefusal((pollFailure as GatewayRefusalError).refusal)).toBeNull();
 
     const timedOut = vi.fn().mockResolvedValue({
       ok: true,

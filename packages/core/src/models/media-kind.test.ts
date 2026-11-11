@@ -119,6 +119,13 @@ describe("pickPreferredVideoModel", () => {
   it("falls back to the kernel default", () => {
     expect(pickPreferredVideoModel([])).toBe(DEFAULT_GATEWAY_VIDEO_MODEL);
   });
+
+  it("names the one video id a prepaid key was proven to run as the empty-catalog fallback", () => {
+    // 2026-11-11: `seedance-2.0-fast` completed end to end on a prepaid agent key (HTTP 200, 135 s,
+    // 2.75 MB); the per-token ids `grok-imagine-video` and `kling-v3` were refused 403 / 503 there.
+    expect(DEFAULT_GATEWAY_VIDEO_MODEL).toBe("seedance-2.0-fast");
+    expect(pickPreferredVideoModel([])).toBe("seedance-2.0-fast");
+  });
 });
 
 const TOKO_IMAGE_IDS = [

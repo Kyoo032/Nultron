@@ -73,6 +73,54 @@ describe("classifyGatewayRefusal", () => {
     }
   });
 
+  it("never learns from a job that failed after the gateway accepted it", () => {
+    // The measured case: Seedance accepted the submit, then the poll reported "may be related to
+    // copyright restrictions". That is the brief, not the model.
+    expect(
+      classifyGatewayRefusal({
+        status: 200,
+        message: "may be related to copyright restrictions",
+        phase: "poll",
+      }),
+    ).toBeNull();
+    // Even words the submit-time classifier would read teach nothing at poll time: the model was taken.
+    expect(
+      classifyGatewayRefusal({
+        status: 503,
+        message: "no available configurable resource channel",
+        phase: "poll",
+      }),
+    ).toBeNull();
+    expect(
+      classifyGatewayRefusal({
+        status: 403,
+        code: "prepaid_async_requires_fixed_price",
+        message: "prepaid",
+        phase: "poll",
+      }),
+    ).toBeNull();
+    // The same refusal at submit time still files a lesson; the phase is what changes the answer.
+    expect(
+      classifyGatewayRefusal({
+        status: 403,
+        code: "prepaid_async_requires_fixed_price",
+        message: "prepaid",
+        phase: "submit",
+      }),
+    ).toEqual({ status: "account_blocked", reason: "prepaid_async_requires_fixed_price" });
+  });
+
+  it("never learns from a 401 or a 429, whatever words came with them", () => {
+    // A refused key or a rate limit is an account or transport fact, not a fact about the model.
+    expect(classifyGatewayRefusal({ status: 401, code: "model_not_found", message: "model_not_found" })).toBeNull();
+    expect(
+      classifyGatewayRefusal({ status: 429, message: "no available configurable resource channel" }),
+    ).toBeNull();
+    expect(
+      classifyGatewayRefusal({ status: 429, code: "bad_response_status_code", message: "upstream rejected" }),
+    ).toBeNull();
+  });
+
   it("falls back to a short sentence of the gateway's words when it sent no code", () => {
     const learned = classifyGatewayRefusal({ status: 503, message: "No available channel for model x under group y" });
     expect(learned?.reason).toMatch(/^No available channel/);

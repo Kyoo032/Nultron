@@ -33,19 +33,21 @@ describe("videoGenerateTool", () => {
       { secrets: { OPENAI_API_KEY: "sk-model", OPENAI_BASE_URL: "https://api.tokotokenai.com/v1" }, backends: {} },
       () => invokeTool(videoGenerateTool, { prompt: "rain on a window" }, tenant),
     );
-    // No catalog and no pick: the fallback id is Grok, whose documented route is /v1/videos.
-    expect(String(fetchMock.mock.calls[0]?.[0])).toBe("https://api.tokotokenai.com/v1/videos");
+    // No catalog and no pick: the fallback id is the one video model a prepaid key was proven to run,
+    // whose wire is the Seedance body on /v1/video/generations (not Grok's /v1/videos).
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe("https://api.tokotokenai.com/v1/video/generations");
     expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({
-      model: "grok-imagine-video",
-      video_length: 5,
+      model: "seedance-2.0-fast",
+      duration: 5,
+      resolution: "720p",
+      ratio: "16:9",
     });
-    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).not.toHaveProperty("ratio");
-    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).not.toHaveProperty("seconds");
+    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).not.toHaveProperty("video_length");
     expect(result).toMatchObject({
       success: true,
       backend: "gateway",
       video: "https://cdn.example/clip.mp4",
-      model: "grok-imagine-video",
+      model: "seedance-2.0-fast",
     });
   });
 
@@ -223,7 +225,7 @@ describe("videoGenerateTool model choice", () => {
     vi.unstubAllGlobals();
     const dropped = stubGateway();
     await run({ model: "]" }, { video: [] });
-    expect(sentModel(dropped)).toBe("grok-imagine-video");
+    expect(sentModel(dropped)).toBe("seedance-2.0-fast");
   });
 
   it("sends the model as given when no catalog is in scope, as the Videos studio calls it", async () => {

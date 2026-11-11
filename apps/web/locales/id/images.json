@@ -4,7 +4,7 @@
   "needsKey": "Tambahkan kunci gateway {gateway} di {settings} agar bisa membuat gambar.",
   "noModels": {
     "title": "Kunci ini tidak punya model gambar",
-    "body": "Kunci gateway {gateway} ini tidak memuat model gambar, jadi belum ada yang bisa dibuat di sini. Periksa kuncinya di {settings}."
+    "body": "Kunci gateway {gateway} ini tidak memuat model gambar, jadi belum ada yang bisa dibuat di sini. Periksa bagian Model di {settings}."
   },
   "settingsLink": "Pengaturan",
   "loadError": "Studio gambar gagal dimuat",

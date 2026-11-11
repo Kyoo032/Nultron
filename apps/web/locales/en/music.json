@@ -31,13 +31,14 @@
   "duration": "{n}s",
   "takesNote": "One job returns two takes and is billed once. Both are saved.",
   "noModels": {
-    "title": "No music model to pick",
-    "body": "This desk was not offered a music model. Music runs on the gateway's Suno relay, which its model list does not advertise — if this persists, refresh the model list in Settings and tell the gateway operator that {gateway} is not serving the relay for this key."
+    "title": "No music model on this key",
+    "body": "This {gateway} key can't run the gateway's music model, so nothing can be generated here. Check the Models section in {settings}."
   },
   "voiceHeading": "Voice-over",
   "voiceUnavailable": {
     "realtimeOnly": "This gateway's only text-to-speech model is realtime (WebSocket), which a job route cannot reach. Voice-over turns on by itself once a standard speech model appears in the catalog.",
-    "noAudioModels": "This gateway serves no text-to-speech model. Voice-over turns on by itself once one appears in the catalog."
+    "noAudioModels": "This gateway serves no text-to-speech model. Voice-over turns on by itself once one appears in the catalog.",
+    "noneOnKey": "Every speech model this gateway offers was refused for this key, so voice-over is off. Check the Models section in {settings}."
   },
   "outputTextLanguage": "Lyrics, title, and any sung or spoken words must be in English unless the prompt already names another language.",
   "estimate": {

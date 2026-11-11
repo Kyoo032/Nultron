@@ -4,7 +4,7 @@
   "needsKey": "Add a {gateway} gateway key in {settings} to generate videos.",
   "noModels": {
     "title": "No video model on this key",
-    "body": "This {gateway} key lists no video model, so nothing can be generated here. Check the key in {settings}."
+    "body": "This {gateway} key lists no video model, so nothing can be generated here. Check the Models section in {settings}."
   },
   "settingsLink": "Settings",
   "loadError": "Could not load video studio",

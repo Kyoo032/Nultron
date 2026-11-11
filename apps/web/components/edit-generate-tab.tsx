@@ -69,8 +69,11 @@ export function EditGenerateTab({
   const [tier, setTier] = useState<(typeof TIERS)[number]>(
     tierProp === "draft" || tierProp === "cinematic" ? tierProp : "standard",
   );
-  const videoCatalog = models.length > 0 ? models : STUB_VIDEO;
-  const imageCatalog = imageModels && imageModels.length > 0 ? imageModels : STUB_IMAGE;
+  // The stub lists are a no-key desk's demo, nothing more. With a key in place an empty list means
+  // this key can run no model of that kind (`GET /api/v1/videos` and `/images` already drop what a
+  // real call refused), and the tab says so instead of offering an id that would fail on click.
+  const videoCatalog = models.length > 0 ? models : needsKey ? STUB_VIDEO : [];
+  const imageCatalog = imageModels && imageModels.length > 0 ? imageModels : needsKey ? STUB_IMAGE : [];
   const [model, setModel] = useState("");
   const [prompt, setPrompt] = useState("");
   const [stillUrl, setStillUrl] = useState("");
@@ -89,6 +92,8 @@ export function EditGenerateTab({
     () => (sub === "image" ? imageCatalog : videoCatalog).map((item) => item.id),
     [imageCatalog, sub, videoCatalog],
   );
+  /** Nothing to generate with: no model of this kind on the key (the stub lists only count with no key). */
+  const noModel = liveIds.length === 0;
   const routed = routeEditModel({
     kind: sub === "image" ? "image" : "video",
     tier,
@@ -135,7 +140,7 @@ export function EditGenerateTab({
 
   async function onSubmit(event: FormEvent) {
     event.preventDefault();
-    if (!projectId || !prompt.trim() || submitting) {
+    if (!projectId || !prompt.trim() || submitting || noModel) {
       return;
     }
     setSubmitting(true);
@@ -206,6 +211,14 @@ export function EditGenerateTab({
           id={hostedKeyMissing ? EDIT_GENERATE_NEEDS_KEY_NOTE_ID : undefined}
         >
           <SettingsLinkHint i18nKey="edit.generate.needsKey" vars={{ gateway: gatewayName }} />
+        </p>
+      ) : null}
+      {!needsKey && sub !== "storyboard" && noModel ? (
+        <p
+          className="rounded-md border border-[var(--line)] bg-[var(--line)]/30 px-2 py-2 text-xs text-[var(--text-2)]"
+          data-testid="edit-generate-no-model"
+        >
+          <SettingsLinkHint i18nKey="edit.generate.noModel" />
         </p>
       ) : null}
       {sub === "storyboard" ? (
@@ -283,7 +296,7 @@ export function EditGenerateTab({
             type="submit"
             className="btn btn-primary w-full px-2 py-1.5 text-xs"
             {...editKeyGuard(hostedKeyMissing, EDIT_GENERATE_NEEDS_KEY_NOTE_ID)}
-            disabled={needsKey || submitting || !prompt.trim() || !projectId}
+            disabled={needsKey || submitting || noModel || !prompt.trim() || !projectId}
             data-testid="edit-generate-submit"
           >
             {submitting ? "Generating…" : "Generate"}

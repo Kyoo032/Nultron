@@ -84,11 +84,29 @@ export function speechReachable(ids: readonly string[]): boolean {
 }
 
 /** Why the voice-over control is off, as a machine-readable reason the renderer maps to copy. */
-export type SpeechUnavailableReason = "no_audio_models" | "realtime_only";
+export type SpeechUnavailableReason = "no_audio_models" | "realtime_only" | "none_on_key";
 
-export function speechUnavailableReason(ids: readonly string[]): SpeechUnavailableReason | null {
+/**
+ * Why speech is unreachable, or `null` when it is.
+ *
+ * `ids` are the ids still offered (a real call has not refused them); `catalogIds` is everything the
+ * gateway offers, so a key that refused every speech model reads as `none_on_key` rather than as a
+ * gateway with no speech model at all. A refusal is the one case where the model exists and the key
+ * cannot use it, and the copy says so.
+ */
+export function speechUnavailableReason(
+  ids: readonly string[],
+  catalogIds: readonly string[] = ids,
+): SpeechUnavailableReason | null {
   if (speechReachable(ids)) {
     return null;
   }
-  return ids.some((id) => audioRole(id) === "realtime") ? "realtime_only" : "no_audio_models";
+  // The gateway serves a model a job route can reach, yet none is offered: this key's calls refused it.
+  if (catalogIds.some((id) => speechReachable([id]))) {
+    return "none_on_key";
+  }
+  if (ids.some((id) => audioRole(id) === "realtime") || catalogIds.some((id) => audioRole(id) === "realtime")) {
+    return "realtime_only";
+  }
+  return "no_audio_models";
 }

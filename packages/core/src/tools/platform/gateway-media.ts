@@ -386,25 +386,39 @@ export async function generateGatewayImage(options: GatewayMediaOptions): Promis
         return { url, model: options.model };
       }
       if (isPollEndpointMissing(statusRes.status, statusBody)) {
-        throw new ApiError(
+        throw new GatewayRefusalError(
           "tool_failed",
           "Gateway image poll endpoint not found — async status lookup is unavailable for this task",
           502,
+          {
+            status: statusRes.status,
+            code: gatewayErrorCode(statusBody),
+            message: "image poll endpoint not found",
+            phase: "poll",
+          },
         );
       }
       if (isMediaFailure(status)) {
-        throw new ApiError(
-          "tool_failed",
-          readGatewayError(statusBody, asString(asRecord(statusBody.data).fail_reason) ?? "Gateway image job failed"),
-          502,
+        const raw = readGatewayError(
+          statusBody,
+          asString(asRecord(statusBody.data).fail_reason) ?? "Gateway image job failed",
         );
+        throw new GatewayRefusalError("tool_failed", raw, 502, {
+          status: statusRes.status,
+          code: gatewayErrorCode(statusBody),
+          message: raw,
+          // Accepted at submit; the job's own failure is not a fact about the model.
+          phase: "poll",
+        });
       }
       if (!statusRes.ok && !url) {
-        throw new ApiError(
-          "tool_failed",
-          readGatewayError(statusBody, `Gateway images poll returned HTTP ${statusRes.status}`),
-          502,
-        );
+        const raw = readGatewayError(statusBody, `Gateway images poll returned HTTP ${statusRes.status}`);
+        throw new GatewayRefusalError("tool_failed", raw, 502, {
+          status: statusRes.status,
+          code: gatewayErrorCode(statusBody),
+          message: raw,
+          phase: "poll",
+        });
       }
       await wait(pollMs);
     }
@@ -477,6 +491,8 @@ export async function generateGatewayVideo(options: GatewayMediaOptions): Promis
         status: statusRes.status,
         code: gatewayErrorCode(statusBody),
         message: raw,
+        // The gateway accepted this job; its failure says nothing about the model (`availability.ts`).
+        phase: "poll",
       });
     }
     await wait(pollMs);

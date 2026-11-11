@@ -11,11 +11,19 @@
  *
  * `ModelSelect` disables itself on an empty list, which renders as a grey control with no options
  * and no reason — the owner read that as "the app does not see my gateway's model". The host now
- * merges the gateway's relay music ids into the list (`withRelayMusicModels`), so this should not
- * happen; it stays as the honest answer if it ever does.
+ * merges the gateway's relay music ids into the list (`withRelayMusicModels`), and drops a relay id a
+ * real call refused, so an empty list is usually the honest answer: this key cannot run music.
+ *
+ * Three states are not "nothing to offer": the list is still loading, the read failed (no `listed`),
+ * and a hosted desk with no key (its own needs-key note explains that one).
  */
-export function musicPickerEmpty(input: { loading: boolean; models: readonly { id: string }[] }): boolean {
-  return !input.loading && input.models.length === 0;
+export function musicPickerEmpty(input: {
+  loading: boolean;
+  models: readonly { id: string }[];
+  listed?: boolean;
+  keyMissing?: boolean;
+}): boolean {
+  return input.listed !== false && !input.loading && !input.keyMissing && input.models.length === 0;
 }
 
 function trimmed(value: unknown): string | null {

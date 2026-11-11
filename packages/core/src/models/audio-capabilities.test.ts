@@ -104,6 +104,15 @@ describe("speech reachability", () => {
 
   it("reports no_audio_models when nothing audio is listed", () => {
     expect(speechUnavailableReason(["gpt-5.6-terra"])).toBe("no_audio_models");
+    // A catalog with nothing speech-capable is the same answer.
+    expect(speechUnavailableReason([], ["gpt-5.6-terra", "gpt-image-2"])).toBe("no_audio_models");
+  });
+
+  it("reports none_on_key when the key's calls refused the only speaker the gateway offers", () => {
+    // The offered list is what is left after the refusals; the catalog is everything the gateway has.
+    expect(speechUnavailableReason([], [...LIVE_AUDIO_IDS])).toBe("none_on_key");
+    expect(speechUnavailableReason([], ["qwen3-tts-instruct-flash-realtime"])).toBe("realtime_only");
+    expect(speechUnavailableReason(["qwen3.5-omni-flash"], [...LIVE_AUDIO_IDS])).toBeNull();
   });
 
   it("turns itself on the day a plain TTS id appears", () => {

@@ -267,14 +267,24 @@ async function pollSuno<T>(options: {
     const body = asRecord(await response.json().catch(() => ({})));
     const status = sunoStatus(body);
     if (isSunoFailure(status)) {
-      throw new ApiError("tool_failed", readSunoFailure(body, `Gateway ${options.label} job failed`), 502);
+      const raw = readSunoFailure(body, `Gateway ${options.label} job failed`);
+      // The relay accepted the job; a failed render (a refused lyric, an upstream error) is not a
+      // fact about the model, so it files no lesson (`availability.ts`, `phase: "poll"`).
+      throw new GatewayRefusalError("tool_failed", raw, 502, {
+        status: response.status,
+        code: gatewayErrorCode(body),
+        message: raw,
+        phase: "poll",
+      });
     }
     if (!response.ok) {
-      throw new ApiError(
-        "tool_failed",
-        readGatewayError(body, `Gateway Suno fetch returned HTTP ${response.status}`),
-        httpStatusForGatewayFailure(response.status),
-      );
+      const raw = readGatewayError(body, `Gateway Suno fetch returned HTTP ${response.status}`);
+      throw new GatewayRefusalError("tool_failed", raw, httpStatusForGatewayFailure(response.status), {
+        status: response.status,
+        code: gatewayErrorCode(body),
+        message: raw,
+        phase: "poll",
+      });
     }
     const done = options.read(body);
     // A clip url can appear while the job still says IN_PROGRESS; that url is the streaming take and

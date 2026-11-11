@@ -5,7 +5,12 @@ export const MEDIA_KINDS: MediaKind[] = ["chat", "image", "video", "audio", "oth
 export type RoutedModels<T extends { id: string }> = Record<MediaKind, T[]>;
 
 export const DEFAULT_GATEWAY_IMAGE_MODEL = "gpt-image-2";
-export const DEFAULT_GATEWAY_VIDEO_MODEL = "grok-imagine-video";
+/**
+ * The last resort when nothing lists a video id at all. `seedance-2.0-fast` is the one video id
+ * driven end to end on a prepaid agent key (2026-11-11: HTTP 200, 135 s, 2.75 MB), where the
+ * per-token ids (`grok-imagine-video`, `kling-v3`) were refused 403 / 503 on that key.
+ */
+export const DEFAULT_GATEWAY_VIDEO_MODEL = "seedance-2.0-fast";
 export const DEFAULT_GATEWAY_MUSIC_MODEL = "suno_music";
 export const DEFAULT_GATEWAY_LYRICS_MODEL = "suno_lyrics";
 export const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";

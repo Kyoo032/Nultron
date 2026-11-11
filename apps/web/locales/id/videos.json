@@ -4,7 +4,7 @@
   "needsKey": "Tambahkan kunci gateway {gateway} di {settings} agar bisa membuat video.",
   "noModels": {
     "title": "Kunci ini tidak punya model video",
-    "body": "Kunci gateway {gateway} ini tidak memuat model video, jadi belum ada yang bisa dibuat di sini. Periksa kuncinya di {settings}."
+    "body": "Kunci gateway {gateway} ini tidak memuat model video, jadi belum ada yang bisa dibuat di sini. Periksa bagian Model di {settings}."
   },
   "settingsLink": "Pengaturan",
   "loadError": "Studio video gagal dimuat",

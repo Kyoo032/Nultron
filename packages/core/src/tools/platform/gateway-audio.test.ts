@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../errors";
+import { classifyGatewayRefusal, GatewayRefusalError } from "../../models/availability";
 import {
   buildSunoMusicPayload,
   extractSunoLyrics,
@@ -205,22 +206,24 @@ describe("generateGatewayMusic", () => {
     ).rejects.toThrow(/\/suno\/submit/);
   });
 
-  it("surfaces the job's fail reason", async () => {
+  it("surfaces the job's fail reason, without teaching anything about the model", async () => {
     const fetchImpl = vi
       .fn()
       .mockResolvedValueOnce(jsonResponse({ code: "success", data: "task-1" }))
       .mockResolvedValueOnce(jsonResponse({ code: "success", data: { status: "FAILURE", fail_reason: "no channel" } }));
-    await expect(
-      generateGatewayMusic({
-        baseUrl: BASE,
-        apiKey: KEY,
-        model: "suno_music",
-        mode: "describe",
-        prompt: "x",
-        fetchImpl: fetchImpl as unknown as typeof fetch,
-        wait: async () => {},
-      }),
-    ).rejects.toThrow("no channel");
+    const error = await generateGatewayMusic({
+      baseUrl: BASE,
+      apiKey: KEY,
+      model: "suno_music",
+      mode: "describe",
+      prompt: "x",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      wait: async () => {},
+    }).catch((caught: unknown) => caught);
+    expect((error as Error).message).toContain("no channel");
+    // The relay accepted the job; a failed render is not a fact about the model.
+    expect(error).toBeInstanceOf(GatewayRefusalError);
+    expect(classifyGatewayRefusal((error as GatewayRefusalError).refusal)).toBeNull();
   });
 
   it("gives up rather than polling forever", async () => {
