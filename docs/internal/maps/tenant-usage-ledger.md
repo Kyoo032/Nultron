@@ -90,7 +90,7 @@ completion settles first gets `true`; the others get `false` and write nothing.
 image or clip by then, so a failure to save it must not be a call that vanishes from the ledger. The
 model recorded is the one that answered (`toolModel(output, model)`), not the one that was asked
 for, and a video's billable length is the snapped one
-(`snapVideoSeconds`, `packages/core/src/models/video-capabilities.ts:76`) — a model that only does 5 s clips
+(`snapVideoSeconds`, `packages/core/src/models/video-capabilities.ts:64`) — a model that only does 5 s clips
 bills 5 s for a 4 s request.
 
 **Failure modes**
