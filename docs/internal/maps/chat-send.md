@@ -1,6 +1,8 @@
-﻿# Map â€” Chat send
+# Map — Chat send
 
-Product: both Â· Instance: main :3000
+Product: both · Instance: main :3000
+
+Last verified: 2026-11-10 at fc855d7d on `tester` for the live voice touchpoints only: `prepareChatRun` (`packages/host/src/runs.ts:158-279`) and `chatHistoryFromRows` (`packages/host/src/runs.ts:286-314`), shared with `startModalityRun` (which calls `prepareChatRun` at `runs.ts:345`) so `askNultron` (`packages/host/src/voice/ask.ts:30,229,248`) reuses the same prompt, Knowledge Base, memory, soul and tool setup (see [`voice-mode.md`](voice-mode.md)); and the voice sheet and mic button hooks in `apps/web/components/chat-session.tsx:36-37,406-418,609-620,640` and `apps/web/components/chat-composer.tsx:30,85,739`. Code-read and unit-tested (`packages/host/src/voice/ask.test.ts`); not driven on `:3000`. Nothing else on the page was re-read.
 
 Last verified: 2026-11-09 at 575da955 plus the working tree of `fix/reasoning-only-no-retry`, for the contact retry and the tool-less retry only (the two `thinking` flags at `ai-sdk-runtime.ts:599` and `:623`, the "Model returns nothing" row and the new "readable reasoning, no text" row of the failure modes). Unit-tested against the real AI SDK on the Responses wire (`ai-sdk-runtime-blank-reasoning.test.ts`, `retry.test.ts`); not driven on `:3000`. Nothing else on the page was re-read.
 

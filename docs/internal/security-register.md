@@ -242,6 +242,11 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-206](#sr-206) | Low | The backup heartbeat URL would sit in `.env`, which the `app` container loads, so code running in the app could send fake success pings and hide a dead backup | Fixed in PR #206 (2026-11-06): `backup.sh` reads it from the process environment only, set on the cron line; tested, not driven on a server | — |
 | [SR-207](#sr-207) | Medium | The Host check ran only on mutating `/api` requests, so a DNS-rebinding page could `GET` the API (media, threads, masked settings) from unauthenticated webdev, and a GET in server mode was not checked against the Host allowlist (SEC-004 4b) | Fixed in tree (2026-11-06, `fix/sec-004b-get-host-check`): every `/api` request needs a trusted Host, `/healthz` exempt; unit-tested through the real adapter, not driven | PR merge |
 | [SR-208](#sr-208) | Low | nixpkgs marks pnpm 9.15.9, the version the repo pins, insecure (twelve CVEs, no fix on 9.x); the Nix build permits that one version by name | Accepted for the Nix migration (2026-11-07): build-time only, no git dependencies in the lock, the Nix store pins every tarball by hash. Moving to pnpm 10 is a separate change | — |
+| [SR-209](#sr-209) | Medium | The live voice WebSocket upgrade skips the HTTP router, so none of its Host, transport, Origin, CSRF or session rules run on it unless `upgrade.ts` repeats them | `fixed-unverified`, not hosted (2026-11-10, `tester`; rewritten from the code 2026-11-11): `attachVoiceUpgrade` applies, in order, a path match (any other path is left untouched, so Vite's dev socket keeps working), the adapter's Host rule, on the hosted server the adapter's https, request-filter and rate rules, an Origin allowlist (a missing Origin is refused in both modes), the session cookie, the desk from the workspace cookie, the voice session's owner and state, the voice flag and the gateway gate, then `ws` with `maxPayload` 48,000 bytes; a refusal is a status line only. No CSRF token is checked, because a browser cannot set a header on a WebSocket handshake. Tested through a real socket in `packages/host/src/voice/relay.test.ts`; built on `tester`, not merged to `main`, never run on the hosted server | Merge of voice from `tester` to `main`; drive the upgrade on the hosted server before voice is switched on there |
+| [SR-210](#sr-210) | Medium | The person's raw voice (PCM in a WAV) and the model's spoken answers go to the gateway, and the text PII masker cannot see audio | Open, accepted for week one (2026-11-10, `tester`; rewritten from the code 2026-11-11): the base URL is the pinned gateway (`resolvedGatewayBaseUrl()`), voice is off unless `AGENTFORGE_VOICE` is on and, on the hosted server, the user id is on `AGENTFORGE_VOICE_OWNERS`, audio is held in memory only and only text is saved, and logs carry counts and durations. There is no disclosure or consent step before the first session: open | Decide on a disclosure before anyone but Rizky uses voice; Phase 4 customer voice design |
+| [SR-211](#sr-211) | High | A live voice session could leak the desk's gateway key to the browser | `fixed-unverified`, not hosted (2026-11-10, `tester`; rewritten from the code 2026-11-11): `createVoiceModels` reads the key on the host and puts it only in the `Authorization` header of the two gateway calls; H1 answers `{ sessionId, threadId, model, streamPath, endsAt }`; the test "keeps the gateway key out of every log line, frame, response, saved row and ledger row" (`packages/host/src/voice/relay.test.ts:1466-1595`) fails if it shows up anywhere else; built on `tester`, not merged to `main`, never run on the hosted server | Merge of voice from `tester` to `main` |
+| [SR-212](#sr-212) | Medium | A spoken, or misheard, request could make the voice thinker write a file, send something, spend money or start long work | `fixed-unverified`, not hosted (2026-11-10, `tester`; rewritten from the code 2026-11-11): the thinker is offered only the ten tools on `VOICE_READ_TOOLS` plus `request_tap`; a `request_tap` call stops the run and returns a card, and the tap ends voice and sends a normal Chat turn. `web_search` and `web_fetch` are on the list, behind the same outbound guard as Chat; whether voice may reach the web is Rizky's open decision V12. Built on `tester`, not merged to `main`, never run on the hosted server | Merge of voice from `tester` to `main`; V12 |
+| [SR-213](#sr-213) | Low | An aborted talker stream reports no usage, so the host writes no row for it, and audio has no list price, so its seconds rows are unpriced | Open, accepted for week one (2026-11-10, `tester`; rewritten from the code 2026-11-11): voice writes token rows and seconds rows under mode `voice` and the thinker's tokens under mode `chat`; a cut or abandoned talker reply, the short-speech check and the acknowledgement call write nothing; seconds rows carry `no_list_price` | An audio list price in `media-pricing.ts` and a rule for aborted calls, before any allowance or bill counts voice |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -7113,6 +7118,124 @@ Residual: the Docker build installs `xlsx` with nothing pinning its bytes. Movin
 format 9.0 stays) closes the CVEs; it is a separate change with its own `ci:local` run.
 
 Gate: none.
+
+### SR-209 {#sr-209}
+
+**The live voice WebSocket upgrade skips the HTTP router, so it carries its own guards.**
+Raised 2026-11-10 with live voice in Chat (branch `tester`); rewritten from the code 2026-11-11. Medium. Status: `fixed-unverified`, not hosted.
+
+Evidence: a browser `new WebSocket(url)` is a `GET` upgrade. `apps/web/server.ts:74` hooks it on the Node server's `upgrade` event (`attachVoiceUpgrade`, `packages/host/src/voice/upgrade.ts:92`), so it never passes `handleNodeRequest`, and none of the adapter's Host, transport, Origin, CSRF or session rules run on it. `upgrade.ts` repeats the ones that make sense on a socket. In the order the code applies them (a refusal is a bare status line; see below):
+
+1. **Path** (`packages/host/src/voice/upgrade.ts:94-102`). Only `/api/v1/voice/sessions/<id>/stream` matches (`VOICE_STREAM_PATH_PATTERN`, `packages/core/src/voice/protocol.ts:246`; the id is 8 to 64 URL-safe characters). Any other path, and a URL that does not parse, is **left untouched**: nothing is written and the socket is not destroyed. That is deliberate. Under webdev, Vite's HMR socket rides the same server (`apps/web/server.ts:120`) and has to receive its own upgrade (`upgrade.ts:6-7`); a "fix" that destroyed every other upgrade would break webdev. Do not tighten it.
+2. **Host** (`upgrade.ts:112-117`). The adapter's own `hostRejection` (`packages/host/src/http-adapter.ts:806-813`): off the hosted server the Host must be loopback, on it a host of the trusted origins. `403`, code `forbidden` off the hosted server and `origin_forbidden` on it.
+3. **Hosted transport rules** (`upgrade.ts:118-132`, hosted server only). The adapter's own `transportRejection` (`http-adapter.ts:482-507`): the https hop (`403 https_required` without `x-forwarded-proto: https`), the request filter (`filterHttpRequest`, `packages/host/src/local-request.ts:229`: a bad request target is `400`, an oversized header `431`), then the per-IP and per-session rate buckets (`429` with `Retry-After`). A socket is metered like any other request.
+4. **Origin** (`upgrade.ts:133-149`). A missing or blank Origin is `403 origin_forbidden` in **both** modes. The adapter lets a missing Origin through on a desk; a socket is only ever opened by a page, so voice does not. A present Origin must pass `isAllowedWebOrigin(origin, trustedOrigins())` on the hosted server or `isAllowedMutatingApiRequest(origin)` off it.
+5. **Session** (`upgrade.ts:177-196`, hosted server only). `requireSessionFor` on the session cookie: `401`, with the `ApiError` code or `session_invalid`. Off the hosted server there is no session; the desk is the person.
+6. **Tenant and desk** (`upgrade.ts:150-161` and `upgrade.ts:197-205`). The desk is read from the workspace cookie the way the adapter reads it (`requestWorkspaceId`, `http-adapter.ts:538-540`: the cookie, else the desk this machine selected, else none), and `getTenant` resolves it. A `403` or `404` from it passes through; anything else is `401`.
+7. **Voice session** (`upgrade.ts:206-210`). An unknown id, an ended session, a session that already has a socket, and a session opened by another person or on another desk (`sameVoiceOwner`, `packages/host/src/voice/sessions.ts:55-62`: tenant, organization, workspace and user must all match) get the same `404 not_found`, so a refusal does not say which.
+8. **Voice flag** (`upgrade.ts:211-214`). `voiceSettingsFor(tenant).enabled` (`packages/host/src/voice/flag.ts:26-38`): `403 voice_disabled`.
+9. **Gateway gate** (`upgrade.ts:215-220`). `requireGatewayAllowedFor(tenant)`: `403 gateway_blocked`.
+10. **Handshake** (`upgrade.ts:221-224`). `ws` with `maxPayload` of 48,000 bytes (`VOICE_MAX_AUDIO_FRAME_BYTES`, one second of 24 kHz 16-bit mono PCM, `protocol.ts:19`, used at `upgrade.ts:39-43`) and `perMessageDeflate` off. A frame over `maxPayload` closes the socket. A text frame over 4,096 characters, or one that does not parse, is dropped and the socket stays open (`parseVoiceBrowserFrame`, `protocol.ts:112-115`). The session's own limits (15 minutes long, 2 minutes idle, 30 seconds to connect, 1 open session per owner, 8 per process) are `VOICE_LIMITS`, `protocol.ts:24-37`.
+
+**No CSRF token is checked, on purpose.** The double-submit token travels in a request header, and a browser cannot set a header on a WebSocket handshake, so it has nowhere to ride. A browser states the page's Origin on every handshake and a page cannot forge it, so the Origin allowlist (step 4) is what stops a cross-site page from opening the socket with the person's cookies. The session cookie and the desk (steps 5 and 6) must still be right as well.
+
+**A refusal says only a status** (`refuse`, `upgrade.ts:64-86`): the status line, `Connection: close`, `Content-Length: 0` and, for `429`, `Retry-After`. No body, no code, no session id; the reason phrase is the stock one. On the hosted server it also writes the adapter's `request_filtered` event (`http-adapter.ts:72`) with `code`, `status`, `method`, `pathLength` and `ip` (`upgrade.ts:65-73`): no path, no session id, no cookie. Off the hosted server a refused upgrade logs nothing.
+
+Proof, in `packages/host/src/voice/relay.test.ts`, by title:
+- "leaves a non-voice upgrade untouched" (`relay.test.ts:477`).
+- "refuses the upgrade before any handshake" (`relay.test.ts:505`): no Origin `403`, a foreign Origin `403`, an unknown id `404`, another person's session `404`, the flag off `403`, an ended session `404`, hosted without https `403`, hosted with https and no cookie `401`.
+- "refuses a second socket and drops junk without closing" (`relay.test.ts:552`) and "closes the socket when a binary frame exceeds maxPayload" (`relay.test.ts:565`).
+- "refuses every voice route and the upgrade when the flag is unset" (`relay.test.ts:1251`).
+- "joins a session only on the desk it was opened on, selected by the workspace cookie", once off the hosted server (`relay.test.ts:1277`) and once hosted (`relay.test.ts:1309`).
+- "refuses an upgrade whose Host is not loopback, before it looks at anything else (off the hosted server)" (`relay.test.ts:1367`).
+- "refuses an upgrade whose Host is not a trusted host, even with a good session, Origin and https (hosted server)" (`relay.test.ts:1386`); it also checks that the three hosted refusals leave three `request_filtered` lines and that none holds a session id.
+- "meters hosted upgrades with the adapter's per-IP bucket and answers 429 past it" (`relay.test.ts:1447`).
+
+Not proven: no test drives a wrong (not missing) Origin on the hosted server, the request filter's refusals, or the gateway gate on the upgrade (`relay.test.ts:370` covers the gate on H1 only). The hosted rules ran in tests through the `serverMode` option; they have never run on the hosted server or behind its proxy. Off the hosted server the upgrade was driven once in a browser, in the first live run ([`voice-mode-plan.md`](voice-mode-plan.md)).
+
+Gate: merge of voice from `tester` to `main`; drive the upgrade on the hosted server before voice is switched on there.
+
+### SR-210 {#sr-210}
+
+**Raw voice and spoken answers go to the gateway unmasked.**
+Raised 2026-11-10 with live voice in Chat (branch `tester`); rewritten from the code 2026-11-11. Medium. Status: open, accepted for week one.
+
+Evidence: the person's speech leaves the host as 24 kHz 16-bit mono PCM in a WAV wrapper, to the talker (`POST <gateway>/chat/completions`, `packages/host/src/voice/talker-omni-http.ts:327-338`) and to the transcriber (`POST <gateway>/audio/transcriptions`, model `muse-voice-transcribe-1.0`, `packages/host/src/voice/transcriber-gateway.ts:63-76`). What the desk's thinker answers goes back to the talker as a tool message to be spoken (`talker-omni-http.ts:773`), and the talker's audio comes back through the host to the browser. The PII masker works on text, so it sees none of that audio.
+
+Mitigations that exist:
+- **Gateway only.** The base URL is `resolvedGatewayBaseUrl()` (`packages/host/src/voice/wiring.ts:55`; the pinned gateway, or the override `gatewayUrlOverride()` allows, `packages/core/src/gateway.ts:47-49`). Both calls use `redirect: "manual"` (`talker-omni-http.ts:337`, `transcriber-gateway.ts:74`). No other speech vendor is called. This is Rizky's rule of 2026-11-05.
+- **Who may use it.** Voice is off unless `AGENTFORGE_VOICE` is `on`, `1` or `true`; on the hosted server the person's user id must also be on `AGENTFORGE_VOICE_OWNERS` (user ids, not e-mails; an empty or unset list means nobody), and off the hosted server the flag alone is enough (`flag.ts:26-46`).
+- **Audio is held in memory only.** The utterance and the recent audio live in the relay's buffers (`packages/host/src/voice/relay.ts:86`) and are dropped when the turn resets (`relay.ts:1052-1056`). Nothing in `packages/host/src/voice` opens a file, and the only thing saved is text: one user row and one assistant row of text parts (`packages/host/src/voice/save-turns.ts:38-54`).
+- **Logs carry counts and durations.** `voice_talker` with `kind`, `outcome`, `ms`, `audioBytes`, `wordChars` and `status` (`talker-omni-http.ts:512-519`, `transcriber-gateway.ts:95-101`); `voice_open`, `voice_end` with `reason` and `durationMs` (`relay.ts:192`, `relay.ts:227`); `voice_reply_failed` with a code (`relay.ts:196`, `relay.ts:1008`); `voice_ask_failed` with an error code or class name (`packages/host/src/voice/ask.ts:302`). No words, no audio, no question.
+
+Open:
+- **There is no disclosure or consent step.** Nothing in the voice view tells the person their voice goes to the gateway, and nothing asks. (`apps/web/components/voice/` has no such code; `nultron.voice.mode` in `apps/web/lib/voice-settings.ts:26` stores the turn-taking mode, not a consent.)
+- What the gateway keeps of audio is not known from this repo.
+- A turn's transcript is saved in the thread as text, like a typed turn.
+
+Gate: decide on a disclosure before anyone but Rizky uses voice; Phase 4 customer voice design.
+
+### SR-211 {#sr-211}
+
+**The gateway key stays on the host.**
+Raised 2026-11-10 with live voice in Chat (branch `tester`); rewritten from the code 2026-11-11. High. Status: `fixed-unverified`, not hosted.
+
+Evidence: if the browser talked to the gateway itself, or any response or frame carried the desk's key, a script in the page could read it.
+
+How the code keeps it on the host:
+- `createVoiceModels` (`packages/host/src/voice/wiring.ts:45-61`) reads the key on the host, the one a Chat turn uses (`resolveProviderKeys(loadSettings(tenant)).openai`), and hands it to `createOmniHttpTalker` and `createGatewayTranscriber`. It returns null, which is H1's `503 voice_model_unavailable`, when the desk has no live key or is on the stub runtime.
+- The key is used in one place per call: the `Authorization: Bearer` header (`packages/host/src/voice/talker-omni-http.ts:331`, `packages/host/src/voice/transcriber-gateway.ts:72`).
+- H1 answers `VoiceSessionCreated`: `{ sessionId, threadId, model, streamPath, endsAt }` (`packages/core/src/voice/protocol.ts:221-227`, built at `packages/host/src/handlers/voice.ts:93-100`). The browser then opens `streamPath` on the same origin; nothing in H1 or in the host's frames (`VoiceHostFrame`, `protocol.ts:70-97`) is a gateway address or key.
+
+Proof: the test "keeps the gateway key out of every log line, frame, response, saved row and ledger row" (`packages/host/src/voice/relay.test.ts:1466-1595`). It runs the production wiring (no `modelsFor` stub) with a sentinel key in `OPENAI_API_KEY` (`relay.test.ts:1531`), a stub gateway that records every call, and one turn on which the gateway's error body echoes the credential (`relay.test.ts:1496-1499`). It drives a plain turn with a backchannel, an `ask_nultron` turn and the failed turn, then asserts the key reached the gateway only as the `Bearer` header, on both the transcription and the chat calls, and in no request body (`relay.test.ts:1574-1577`); and appears in no console line (`relay.test.ts:1582`, with the failed turn's `voice_reply_failed` among them, `relay.test.ts:1581`), no JSON frame (`relay.test.ts:1584`), no binary frame (`relay.test.ts:1585`), not H1's response body (`relay.test.ts:1586`), not the saved thread messages (`relay.test.ts:1587`) and not the usage ledger (`relay.test.ts:1588`). `packages/host/src/voice/wiring.test.ts` adds "opens each company's models with that company's own key" (`wiring.test.ts:150`) and "never hands a tenant with no key of its own the operator's key" (`wiring.test.ts:170`).
+
+Residual: tested, not driven on the hosted server. Built on `tester`, not merged to `main`.
+
+Gate: merge of voice from `tester` to `main`.
+
+### SR-212 {#sr-212}
+
+**Voice reads but does not write or spend.**
+Raised 2026-11-10 with live voice in Chat (branch `tester`); rewritten from the code 2026-11-11. Medium. Status: `fixed-unverified`, not hosted.
+
+Evidence: speech can be misheard, or come from the room, so a spoken turn must not write a file, send something, spend on media or start long work on its own.
+
+How the code holds it:
+- `askNultron` (`packages/host/src/voice/ask.ts:150`) sets the run up as a Chat turn (`prepareChatRun`, `ask.ts:229-236`, thinking off) and gives the runtime `voiceBindings(prepared.bindings)` (`ask.ts:284`).
+- `voiceBindings` (`packages/host/src/voice/ask-tools.ts:115-129`) is an allow-list: it keeps a binding only when its tool is on `VOICE_READ_TOOLS` and adds `request_tap`. A tool nobody classified is not offered (`isVoiceReadTool`, `ask-tools.ts:72-74`). `VOICE_READ_TOOLS` (`ask-tools.ts:36-47`): `calculator`, `datetime`, `knowledge_search`, `past_sessions`, `list_files`, `read_file`, `search_files`, `self_check`, `web_search`, `web_fetch`.
+- Not offered (`VOICE_TAP_TOOLS`, `ask-tools.ts:58-67`): `write_file`, `edit_file`, `delete_file`, `image_generate`, `video_generate`, `build_deck`, `run_code`, and the generalist workers and `delegate` (`GENERALIST_EXTRA_TOOLS`).
+- When the model calls `request_tap`, `askNultron` stops the run (`ask.ts:266-269`) and returns a card of the person's own words and a one-line summary (`ask.ts:310-316`). The relay sends it as a `card` frame (`packages/host/src/voice/relay.ts:606`). The tap ends voice first, then sends the card's prompt as a normal Chat turn through the composer (`apps/web/components/voice/use-voice-session.ts:149-160`, `apps/web/components/chat-session.tsx:409-415`), so the tools, approvals and stop rules there are Chat's. Voice never runs the work.
+- `web_search` and `web_fetch` are on the list. The run is wrapped in the same outbound guard a typed turn has (`createOutboundGuard`, `ask.ts:254-260`; SR-112), which checks a query or an address against the Knowledge Base text and the thread's text. **Whether voice may reach the web is Rizky's open decision** (V12 in [`voice-mode-plan.md`](voice-mode-plan.md); the plan's default is yes). It is one line to turn off: remove them from `VOICE_READ_TOOLS`.
+- The paid-media reach test lists `packages/host/src/voice/ask.ts` as `gated` (`packages/host/src/paid-media-reach.property.test.ts:21-24`): the thinker passes the `mediaPermission` of its own Chat setup, a body with no grants, so the gate always asks, and its bindings hold neither `image_generate` nor `video_generate`.
+
+Proof, by title. `packages/host/src/voice/ask-tools.test.ts`: "has a decision for every tool Chat binds" (`ask-tools.test.ts:35`, fails when Chat gains a tool on neither list), "keeps every writing, paid or long tool off the read list" (`ask-tools.test.ts:51`), "keeps every generalist worker and delegation off the read list" (`ask-tools.test.ts:58`), "treats a tool nobody has heard of as not allowed" (`ask-tools.test.ts:71`), "keeps only the read tools and adds request_tap" (`ask-tools.test.ts:80`). `packages/host/src/voice/ask.test.ts`: "offers a Knowledge Base read tool and request_tap, and no tool that writes, sends or spends" (`ask.test.ts:270`), "never runs a write tool a model asks for anyway" (`ask.test.ts:301`), "stops the run at request_tap and returns the card, with the person's own words as the prompt" (`ask.test.ts:314`).
+
+Residual: voice can read the desk's files, Knowledge Base and past sessions on a spoken or misheard request, and the thinker's model sees them through the gateway, as in Chat. Tested, not driven on the hosted server. Built on `tester`, not merged to `main`.
+
+Gate: merge of voice from `tester` to `main`; V12.
+
+### SR-213 {#sr-213}
+
+**An aborted talker stream reports no usage, and audio has no list price.**
+Raised 2026-11-10 with live voice in Chat (branch `tester`); rewritten from the code 2026-11-11. Low. Status: open, accepted for week one.
+
+Evidence: the rows voice writes, and who writes them.
+- **Talker tokens.** `recordVoiceReplyUsage` (`packages/host/src/voice/metering.ts:12-18`) writes mode `voice`, unit `tokens`, quantity input plus output, under the session's talker model (`qwen3.5-omni-flash` unless `AGENTFORGE_VOICE_MODEL` says otherwise, `packages/host/src/voice/flag.ts:16`). The relay calls it for a finished turn that was not cut (`packages/host/src/voice/relay.ts:729-731`) and for the first leg of an `ask_nultron` turn once the desk has answered (`relay.ts:602-605`). It is priced like a Chat row, from the gateway catalog when it is cached, otherwise `catalog_unavailable` (`packages/host/src/usage-record.ts:56-69`). `TalkerUsage` carries the audio-token split (`packages/host/src/voice/talker.ts:12-19`), but `recordVoiceReplyUsage` passes only the totals, so no audio rate is applied.
+- **Transcriber seconds.** `recordVoiceSeconds` (`metering.ts:25-37`) with model `muse-voice-transcribe-1.0` (`packages/host/src/voice/transcriber-gateway.ts:12`), mode `voice`, unit `seconds`, rounded up to a whole second, after each transcription that returned words (`relay.ts:652`).
+- **Session seconds.** `SessionRegistry.meter` (`packages/host/src/voice/sessions.ts:183-189`) writes the seconds from H1 to the end, once per session, under the talker's model id.
+- **Thinker tokens.** `askNultron` writes its own model run under mode `chat`, runId `voice-ask-<uuid>`, when the run completes (`ask.ts:214-225`, `ask.ts:272-274`). A run stopped after it reached the model (a tap, a cut-in, the 20 s limit) writes one row of unknown size, 0 tokens with `unknown: true` (`ask.ts:331-343`).
+- **Seconds are unpriced.** They go through `priceSecondsUsage` (`packages/host/src/usage-record.ts:102-108`), which answers `no_list_price` unless the model has a per-second entry in the media price table (`packages/core/src/models/media-pricing.ts:497`); neither `muse-voice-transcribe-1.0` nor `qwen3.5-omni-flash` is in it.
+
+Where no row is written, so voice spend is undercounted:
+- **A talker reply the host abandons.** The person cuts in, an early send is dropped because speech resumed (`abortEarly` clears the pending usage, `relay.ts:376-390`), or the session ends. The gateway reports usage only in the last chunk of a finished stream (`stream_options: { include_usage: true }`, `talker-omni-http.ts:734`; the event, `talker-omni-http.ts:248-250`), so an abandoned stream never delivers it, and the host never learns what the gateway counted for it.
+- **A reply that finished but was cut before it was saved.** `finalize(true)` skips the row (`relay.ts:729-731`).
+- **The short-speech check and the acknowledgement call.** Both ask for usage (`talker-omni-http.ts:779`, `talker-omni-http.ts:822`), and nothing reads the usage from either (`talker-omni-http.ts:666-679`, `talker-omni-http.ts:815-840`).
+
+Proof: `packages/host/src/voice/relay.test.ts` "plays a plain turn into the thread with a usage row" (`relay.test.ts:587`; a `voice` token row with the counts, and a seconds row with `no_list_price`) and "records transcription seconds and session seconds under different models" (`relay.test.ts:631`). `packages/host/src/voice/ask.test.ts` "records the run's model tokens once, as a Chat run, under the voice ask's own id" (`ask.test.ts:536`), "records a run that was stopped after it reached the model as a call of unknown size" (`ask.test.ts:548`) and "records nothing for a refusal that never reached the model" (`ask.test.ts:566`). No test asserts the gaps above.
+
+Residual: any allowance or bill that counts `voice` rows undercounts, and no seconds row has a dollar figure. Built on `tester`, not merged to `main`; never run on the hosted server.
+
+Gate: none for week one (voice is Rizky's only); before customer voice or any allowance counts voice, give audio a list price in `media-pricing.ts` and decide a rule for aborted calls.
 
 ## Must be true before the Tencent Cloud deploy
 

@@ -1,6 +1,8 @@
-﻿# Map: Virtual agents
+# Map: Virtual agents
 
 Product: both Â· Instance: main :3000
+
+Last verified: 2026-11-10 at fc855d7d (tester branch) for the two live voice routes registered in `packages/host/src/router.ts:236,372-373` only (`POST /api/v1/voice/sessions` and `POST /api/v1/voice/sessions/:id/end`, mapped by [`voice-mode.md`](voice-mode.md)). Nothing else on the page was re-read.
 
 Last verified: 2026-10-23 at 0eae7b51 for two stylesheet lines only (PR #193): the `.agent-home-tile` shadow in `agent-harness.css` reads `var(--black)` where it typed `#000000`, and `.va-tile` in `virtual-agents-page.css` reads `var(--on-mode)` without the dead `#fff` fallback. Computed style is unchanged (eight routes, light and dark, 0 of 4,060 elements differ). Nothing else on the page was re-read.
 
