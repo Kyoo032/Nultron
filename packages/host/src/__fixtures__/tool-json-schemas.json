@@ -853,6 +853,32 @@
     "description": "Optional catalog image model id",
     "type": "string",
     "minLength": 1
+   },
+   "pixels": {
+    "description": "Exact size such as 1536x1024, for a model that takes sizes",
+    "type": "string"
+   },
+   "ratio": {
+    "description": "Aspect ratio such as 3:2 or 16:9, for a model that takes ratios",
+    "type": "string"
+   },
+   "quality": {
+    "description": "Quality tier such as low, medium or high, for a model that has one",
+    "type": "string"
+   },
+   "resolution": {
+    "description": "Resolution tier such as 1k, 2k or 4k, for a model that has one",
+    "type": "string"
+   },
+   "count": {
+    "description": "How many images, for a model that makes more than one",
+    "type": "integer",
+    "minimum": 1,
+    "maximum": 4
+   },
+   "output_format": {
+    "description": "png or jpeg, for a model that takes a format",
+    "type": "string"
    }
   },
   "required": [
@@ -1658,13 +1684,8 @@
     "description": "Video prompt"
    },
    "aspect_ratio": {
-    "description": "Output aspect ratio",
-    "type": "string",
-    "enum": [
-     "16:9",
-     "9:16",
-     "1:1"
-    ]
+    "description": "Output aspect ratio such as 16:9, 9:16, 1:1, 3:4 or 4:3 (the model takes its own set)",
+    "type": "string"
    },
    "image_url": {
     "description": "Optional still image to animate: an https URL or an image reference",
@@ -1677,19 +1698,18 @@
     "minLength": 1
    },
    "seconds": {
-    "description": "Clip length in seconds (2–12)",
+    "description": "Clip length in seconds (the model takes its own range)",
     "type": "integer",
-    "minimum": 2,
-    "maximum": 12
+    "minimum": 1,
+    "maximum": 60
    },
    "resolution": {
-    "description": "Output resolution for Seedance-class models",
-    "type": "string",
-    "enum": [
-     "480p",
-     "720p",
-     "1080p"
-    ]
+    "description": "Output resolution such as 480p, 720p, 1080p or 4k (the model takes its own set)",
+    "type": "string"
+   },
+   "audio": {
+    "description": "Sound inside the clip. Off unless asked; some models cannot make sound",
+    "type": "boolean"
    }
   },
   "required": [

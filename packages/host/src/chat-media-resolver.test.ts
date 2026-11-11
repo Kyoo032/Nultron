@@ -94,8 +94,19 @@ describe("chat media reference resolver", () => {
   it("the edit tool sends the image to the gateway for its own organization", async () => {
     const fetchMock = gatewayFetch();
     const result = await editWith(orgA);
-    const init = fetchMock.mock.calls[0]?.[1] as { body: string };
-    expect(JSON.parse(init.body).image).toBe(PNG_DATA_URL);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    // A stored picture is a data URL the gateway cannot fetch, so it rides the documented edit route as a file.
+    expect(url).toBe("https://api.tokotokenai.com/v1/images/edits");
+    // Multipart, not JSON: the content type is left to fetch, which adds the boundary.
+    expect(init.body).toBeInstanceOf(FormData);
+    const form = init.body as FormData;
+    expect(new Headers(init.headers).has("content-type")).toBe(false);
+    expect(form.get("prompt")).toBe("make it blue");
+    const sent = form.get("image");
+    expect(sent).toBeInstanceOf(File);
+    expect((sent as File).type).toBe("image/png");
+    // The bytes are organization A's picture: its own image, on its own call.
+    expect(Buffer.from(await (sent as File).arrayBuffer())).toEqual(PNG);
     expect(result).toMatchObject({ success: true });
   });
 

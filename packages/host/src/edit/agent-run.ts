@@ -36,6 +36,7 @@ import { getEditDoctor, type EditDoctorReport } from "./doctor";
 import { encodeEditSse } from "./events";
 import { createTurnBudget, chargeTurnBudget, estimateEditJobUsd } from "./budget";
 import { hostEditBackend } from "./backend";
+import { defaultEditGenerateModel } from "./model-route";
 import { undoCard } from "./undo";
 import { appendEditMetric } from "./metrics";
 import { runEditHarness } from "./harness-run";
@@ -394,9 +395,7 @@ async function runStub(
     const model =
       typeof scenarioArgs.model === "string"
         ? scenarioArgs.model
-        : scenario.toolKey === "generate_image"
-          ? "gpt-image-2"
-          : "grok-imagine-video";
+        : defaultEditGenerateModel(input.tenant, scenario.toolKey === "generate_image" ? "image" : "video");
     const estimate = scenario.toolKey === "transcribe" ? 0.02 : estimateEditJobUsd(model, { seconds, count });
     const charged = chargeTurnBudget(budget, estimate);
     if (!charged.ok) {

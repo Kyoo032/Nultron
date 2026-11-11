@@ -14,6 +14,7 @@ function listedModels(): void {
   saveModelCache({
     openai: [
       { id: "grok-imagine-video", label: "Grok Imagine Video", provider: "openai", inputModalities: ["text"] },
+      { id: "seedance-2.0-fast", label: "Seedance Fast", provider: "openai", inputModalities: ["text"] },
       { id: "veo_3_1-fast", label: "Veo", provider: "openai", inputModalities: ["text"] },
       { id: "mj_video", label: "MJ Video", provider: "openai", inputModalities: ["text"] },
     ],
@@ -33,6 +34,9 @@ describe("videos harness on generate", () => {
 
   it("runs the shot, one retry, and keeps the billed clip", async () => {
     listedModels();
+    // A model whose lengths include 5 s (`media-params-table.ts`), so this case stays about the retry and
+    // the kept clip; the snapped length has its own case below (Veo asks 5 s, renders 4 s).
+    const model = "seedance-2.0-fast";
     const prompts: string[] = [];
     const options: VideoGenerateOptions = {
       renderVideo: async (call) => {
@@ -41,12 +45,12 @@ describe("videos harness on generate", () => {
           return { success: false, error: "job timed out" };
         }
         expect(call.seconds).toBe(5);
-        return { success: true, video: clip, model: "grok-imagine-video" };
+        return { success: true, video: clip, model: call.model };
       },
     };
     const result = await generateStudioVideo(
       tenant,
-      { prompt: "a cat in the rain", aspect: "16:9", model: "grok-imagine-video", seconds: 5 },
+      { prompt: "a cat in the rain", aspect: "16:9", model, seconds: 5 },
       options,
     );
     expect(prompts).toHaveLength(2);

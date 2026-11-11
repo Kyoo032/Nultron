@@ -26,6 +26,7 @@ import { localeForRun } from "../run-context";
 import { log } from "../log";
 import { chargeTurnBudget, estimateEditJobUsd, type TurnBudget } from "./budget";
 import { encodeEditSse } from "./events";
+import { defaultEditGenerateModel } from "./model-route";
 import { foldProject } from "./ops";
 import { screenToolCompleted } from "./tool-screen";
 
@@ -210,7 +211,7 @@ async function placeMadeShot(input: RunInput): Promise<void> {
     return;
   }
   const toolKey = shot.kind === "image" ? "generate_image" : "generate_video";
-  const model = shot.kind === "image" ? "gpt-image-2" : "grok-imagine-video";
+  const model = defaultEditGenerateModel(input.tenant, shot.kind);
   const seconds = shot.kind === "video" ? 4 : undefined;
   const estimate = estimateEditJobUsd(model, { seconds, count: 1 });
   const charged = chargeTurnBudget(input.budget, estimate);
