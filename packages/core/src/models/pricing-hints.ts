@@ -1,6 +1,7 @@
 import { gatewayOriginFromBaseUrl, resolvedGatewayBaseUrl } from "../gateway";
 import { assertAllowedEndpointUrl } from "../security/tls";
 import { parsePricingHints, type PricingHints } from "./gateway-catalog";
+import { parsePublishedMediaParams, type PublishedMediaMap } from "./media-params-published";
 
 /**
  * The gateway's public price list reduced to `model id -> endpoint types` (`GET <origin>/api/pricing`).
@@ -13,6 +14,17 @@ import { parsePricingHints, type PricingHints } from "./gateway-catalog";
 export async function fetchPricingHints(
   input: { baseURL?: string; fetch?: typeof fetch; timeoutMs?: number } = {},
 ): Promise<PricingHints | null> {
+  return (await fetchPricingWithMedia(input))?.hints ?? null;
+}
+
+/**
+ * The same read, plus what the list publishes for each media model (`config.parameters`: resolution
+ * enums, defaults). One request answers both, so the model cache learns the kinds and the parameters
+ * together. `media` is empty when the list publishes none; `null` is a failed read.
+ */
+export async function fetchPricingWithMedia(
+  input: { baseURL?: string; fetch?: typeof fetch; timeoutMs?: number } = {},
+): Promise<{ hints: PricingHints; media: PublishedMediaMap } | null> {
   try {
     const url = `${gatewayOriginFromBaseUrl(input.baseURL ?? resolvedGatewayBaseUrl())}/api/pricing`;
     assertAllowedEndpointUrl(url);
@@ -25,8 +37,9 @@ export async function fetchPricingHints(
     if (!response.ok) {
       return null;
     }
-    const hints = parsePricingHints(await response.json());
-    return Object.keys(hints).length > 0 ? hints : null;
+    const body: unknown = await response.json();
+    const hints = parsePricingHints(body);
+    return Object.keys(hints).length > 0 ? { hints, media: parsePublishedMediaParams(body) } : null;
   } catch {
     return null;
   }

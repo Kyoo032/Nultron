@@ -27,6 +27,20 @@ describe("mediaKind", () => {
     expect(mediaKind("whisper-1")).toBe("audio");
   });
 
+  /**
+   * The gateway lists Kling's picture models beside its video ones. `kling_image` and `kling_omni_image`
+   * start with `kling`, which the video pattern reads as video, so they used to land in the video picker
+   * and be sent a clip request.
+   */
+  it("routes Kling's picture models to image and its clip models to video", () => {
+    expect(mediaKind("kling_image")).toBe("image");
+    expect(mediaKind("kling-image")).toBe("image");
+    expect(mediaKind("kling_omni_image")).toBe("image");
+    expect(mediaKind("kling-v3")).toBe("video");
+    expect(mediaKind("kling-v3-omni")).toBe("video");
+    expect(mediaKind("kling-3.0-turbo")).toBe("video");
+  });
+
   it("does not treat a chat id that merely contains the letters asr as audio", () => {
     expect(mediaKind("qwen3-disaster-preview")).toBe("chat");
   });

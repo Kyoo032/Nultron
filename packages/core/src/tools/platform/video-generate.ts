@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { resolvedGatewayBaseUrl } from "../../gateway";
 import { clampVideoSeconds } from "../../models/video-capabilities";
+import { publishedMediaParamsFor } from "../../models/media-params-source";
 import { ApiError } from "../../errors";
 import { currentOutboundGuard, mediaSendRefusal } from "../../security/outbound-guard";
 import { defineTool } from "../define-tool";
@@ -108,19 +109,26 @@ export const videoGenerateTool = defineTool({
   key: "video_generate",
   name: "Create video",
   description:
-    "Create a video from a text prompt, or animate a still by passing image_url: an https URL, or an image reference (/api/v1/media/<id>/file or the id) for an image in this chat. Uses the gateway by default (POST /v1/video/generations, then poll). Pass model to pick a catalog video id.",
+    "Create a video from a text prompt, or animate a still by passing image_url: an https URL, or an image reference (/api/v1/media/<id>/file or the id) for an image in this chat. Uses the gateway by default (the route the model documents, then poll). Pass model to pick a catalog video id. Pass aspect_ratio, seconds, resolution and audio only when the person asked for them: each model accepts its own set (for example seedance-2.0-fast takes 480p or 720p and 4 to 15 s), a value it does not take is moved to the nearest one it does, and the result says what was sent. audio asks for sound inside the clip; it is off by default and a model with no sound switch refuses it.",
   capability: "video_gen",
   schema: z.object({
     prompt: z.string().min(1).describe("Video prompt"),
-    aspect_ratio: z.enum(["16:9", "9:16", "1:1"]).optional().describe("Output aspect ratio"),
+    aspect_ratio: z
+      .string()
+      .optional()
+      .describe("Output aspect ratio such as 16:9, 9:16, 1:1, 3:4 or 4:3 (the model takes its own set)"),
     image_url: imageInputSchema
       .optional()
       .describe("Optional still image to animate: an https URL or an image reference"),
     model: z.string().min(1).optional().describe("Optional catalog video model id"),
-    seconds: z.number().int().min(2).max(12).optional().describe("Clip length in seconds (2–12)"),
-    resolution: z.enum(["480p", "720p", "1080p"]).optional().describe("Output resolution for Seedance-class models"),
+    seconds: z.number().int().min(1).max(60).optional().describe("Clip length in seconds (the model takes its own range)"),
+    resolution: z
+      .string()
+      .optional()
+      .describe("Output resolution such as 480p, 720p, 1080p or 4k (the model takes its own set)"),
+    audio: z.boolean().optional().describe("Sound inside the clip. Off unless asked; some models cannot make sound"),
   }),
-  execute: async ({ prompt, aspect_ratio, image_url, model, seconds, resolution }, tenant) => {
+  execute: async ({ prompt, aspect_ratio, image_url, model, seconds, resolution, audio }, tenant) => {
     const route = resolveToolBackend("video_gen");
     if (!route.ready || !route.envVar) {
       return {
@@ -156,10 +164,12 @@ export const videoGenerateTool = defineTool({
         route.backend === "gateway"
           ? await generateGatewayVideo({
               prompt,
-              aspectRatio: aspect,
+              aspectRatio: aspect_ratio,
               imageUrl: sourceImage,
               seconds,
               resolution,
+              audio,
+              published: publishedMediaParamsFor(gatewayModel, tenant),
               apiKey,
               model: gatewayModel,
               baseUrl: getSecret("OPENAI_BASE_URL") || resolvedGatewayBaseUrl(),
@@ -187,6 +197,8 @@ export const videoGenerateTool = defineTool({
         model: generated.model,
         modality: sourceImage ? "image" : "text",
         prompt,
+        // What the request actually carried, and what had to be moved to get there (gateway only).
+        ...("sent" in generated ? { sent: generated.sent, adjusted: generated.adjusted } : {}),
       };
     } catch (error) {
       if (route.backend === "gateway") {

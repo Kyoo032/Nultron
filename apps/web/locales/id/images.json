@@ -91,5 +91,28 @@
       "title": "Still life objek meja",
       "resultSummary": "Studi objek yang tenang dengan rencana pencahayaan, bukan tiga properti di atas latar putih polos."
     }
-  }
+  },
+  "shapeLabel": "Ukuran",
+  "qualityLabel": "Kualitas",
+  "tierLabel": "Resolusi",
+  "countLabel": "Jumlah gambar",
+  "formatLabel": "Format file",
+  "quality": {
+    "option": {
+      "low": "Rendah",
+      "medium": "Sedang",
+      "high": "Tinggi",
+      "auto": "Otomatis"
+    }
+  },
+  "adjusted": "Disesuaikan untuk {model}: {changes}.",
+  "change": {
+    "size": "ukuran {asked} → {used}",
+    "quality": "kualitas {asked} → {used}",
+    "tier": "resolusi {asked} → {used}",
+    "count": "gambar {asked} → {used}",
+    "format": "format {asked} → {used}"
+  },
+  "sent": "Dibuat dengan {summary}.",
+  "unverified": "Sebagian nilai untuk model ini berasal dari API vendor, bukan dari gateway, dan belum diperiksa di sini."
 }

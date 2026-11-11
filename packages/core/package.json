@@ -27,6 +27,7 @@
     "./product-modes": "./src/agents/product-modes.ts",
     "./virtual-agents": "./src/agents/virtual-agents.ts",
     "./video-capabilities": "./src/models/video-capabilities.ts",
+    "./media-params": "./src/models/media-params.ts",
     "./audio-capabilities": "./src/models/audio-capabilities.ts",
     "./model-availability": "./src/models/availability.ts",
     "./gateway-catalog": "./src/models/gateway-catalog.ts",

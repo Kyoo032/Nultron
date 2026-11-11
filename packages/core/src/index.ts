@@ -295,15 +295,64 @@ export {
 export {
   usesSeedanceVideoWire,
   videoCapabilities,
+  videoCapabilitiesOf,
   clampVideoSeconds,
   allowedVideoSeconds,
   snapVideoSeconds,
-  normalizeVideoResolution,
   GATEWAY_VIDEO_DURATION_SECONDS,
   GATEWAY_VIDEO_RESOLUTION,
   imageToVideoForModel,
 } from "./models/video-capabilities";
-export type { VideoCapabilities, GatewayVideoResolution } from "./models/video-capabilities";
+export type { VideoCapabilities } from "./models/video-capabilities";
+export {
+  MEDIA_DEFAULTS,
+  imageCountMax,
+  imageShapeOptions,
+  imageSpecFor,
+  ratioOf,
+  settleImage,
+  settleVideo,
+  shapeOfRatio,
+  snapVideoLength,
+  tierRank,
+  videoAspectOptions,
+  videoLengthOptions,
+  videoResolutionOptions,
+  videoSpecFor,
+} from "./models/media-params";
+export type {
+  ChoiceSpec,
+  ImageBodyStyle,
+  ImageChoice,
+  ImageParamSpec,
+  ImageSent,
+  ImageSettled,
+  ImageShapeOption,
+  ImageShapeSpec,
+  MediaAdjustment,
+  MediaParamSpec,
+  ParamSource,
+  PublishedMediaParams,
+  VideoAudioSpec,
+  VideoBodyStyle,
+  VideoChoice,
+  VideoImageInputSpec,
+  VideoLengthSpec,
+  VideoParamSpec,
+  VideoSent,
+  VideoSettled,
+} from "./models/media-params";
+export {
+  parsePublishedMediaParams,
+  sanitizePublishedMediaParams,
+  type PublishedMediaMap,
+} from "./models/media-params-published";
+export { buildImageRequest, buildVideoRequest } from "./models/media-request";
+export type { ImageRequest, VideoRequest } from "./models/media-request";
+export {
+  publishedMediaParamsFor,
+  setPublishedMediaParamsSource,
+} from "./models/media-params-source";
 export {
   VIDEO_HARNESS_SKILLS,
   acceptVideoShot,
@@ -1001,7 +1050,7 @@ export type {
   PricingHints,
   WireId,
 } from "./models/gateway-catalog";
-export { fetchPricingHints } from "./models/pricing-hints";
+export { fetchPricingHints, fetchPricingWithMedia } from "./models/pricing-hints";
 export { reportModelOutcome, setModelOutcomeSink } from "./models/outcome-sink";
 export type { ModelOutcomeReport } from "./models/outcome-sink";
 export { generateGatewayOmniSpeech, omniAudioChunks, wavFromPcm16 } from "./tools/platform/gateway-audio";

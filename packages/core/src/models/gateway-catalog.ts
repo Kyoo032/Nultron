@@ -22,6 +22,7 @@ import {
   type ModelStatus,
 } from "./availability";
 import { audioRole, isOmniSpeechModelId, mediaKind } from "./media-kind";
+import { videoSpecFor } from "./media-params";
 
 export const MODEL_KINDS = ["chat", "image", "video", "speech", "transcription", "music", "realtime", "other"] as const;
 export type ModelKind = (typeof MODEL_KINDS)[number];
@@ -36,6 +37,7 @@ export const WIRE_IDS = [
   "video_generations",
   "video_seedance",
   "videos_json",
+  "video_kling",
   "audio_speech",
   "chat_audio_stream",
   "audio_transcriptions",
@@ -53,6 +55,9 @@ export const GATEWAY_WIRES: Readonly<Record<WireId, GatewayWire>> = Object.freez
   video_seedance: { id: "video_seedance", method: "POST", route: "/v1/video/generations" },
   // The documented Grok route (docs: "Grok Video Generation"). `/v1/video/generations` is the generic one.
   videos_json: { id: "videos_json", method: "POST", route: "/v1/videos" },
+  // Kling is served from its own mount beside `/v1` (docs: /kling/v1/videos/*, /kling/text-to-video/*); the
+  // exact route per model, and per input, is the media parameter spec's.
+  video_kling: { id: "video_kling", method: "POST", route: "/kling/v1/videos/text2video" },
   audio_speech: { id: "audio_speech", method: "POST", route: "/v1/audio/speech" },
   chat_audio_stream: { id: "chat_audio_stream", method: "POST", route: "/v1/chat/completions" },
   audio_transcriptions: { id: "audio_transcriptions", method: "POST", route: "/v1/audio/transcriptions" },
@@ -84,8 +89,6 @@ export type CatalogEntry = {
 
 const REALTIME_ID = /realtime/i;
 const OMNI_ID = /omni|livetranslate|gemini-3[\w.]*-flash/i;
-const GROK_VIDEO_ID = /^grok-imagine-video/i;
-const SEEDANCE_BODY_ID = /seedance|dreamina-seedance|doubao-seedance|veo_|kling|sora/i;
 
 /** The endpoint types the gateway's price list uses, by the kind they say a model is. */
 export function kindFromEndpointTypes(types: readonly string[] | undefined): ModelKind | undefined {
@@ -153,11 +156,24 @@ export function catalogKindOf(id: string, hints?: PricingHints): ModelKind {
   return kind;
 }
 
+/**
+ * The wire a video id is driven through, read from its media parameter spec (`media-params.ts`): the
+ * body style says which route and which body, so no id regex lives here.
+ */
 export function videoWireFor(id: string): GatewayWire {
-  if (GROK_VIDEO_ID.test(id.trim())) {
-    return GATEWAY_WIRES.videos_json;
+  switch (videoSpecFor(id.trim()).bodyStyle) {
+    case "grok-videos":
+    case "omni-fast":
+      return GATEWAY_WIRES.videos_json;
+    case "seedance-content":
+      return GATEWAY_WIRES.video_seedance;
+    case "kling-native":
+    case "kling-omni":
+    case "kling-turbo":
+      return GATEWAY_WIRES.video_kling;
+    default:
+      return GATEWAY_WIRES.video_generations;
   }
-  return SEEDANCE_BODY_ID.test(id) ? GATEWAY_WIRES.video_seedance : GATEWAY_WIRES.video_generations;
 }
 
 function wiresFor(id: string, kind: ModelKind): Partial<Record<ModelKind, GatewayWire>> {

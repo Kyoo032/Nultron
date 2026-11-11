@@ -2,11 +2,17 @@ import { and, eq } from "drizzle-orm";
 import {
   ApiError,
   assertSendableMediaUrl,
+  DEFAULT_GATEWAY_IMAGE_MODEL,
+  DEFAULT_GATEWAY_VIDEO_MODEL,
   estimateJobUsd,
   imageToVideoForModel,
+  ratioOf,
   routeEditModel,
   secondsToFrames,
+  settleVideo,
+  shapeOfRatio,
   snapVideoSeconds,
+  videoSpecFor,
   type Clip,
   type EditProject,
   type EditStartGenerateJobInput,
@@ -22,14 +28,21 @@ import { mapCard, mapJob } from "./projects";
 import { editEvents } from "./events";
 import { resolveStillSource, type StillSource } from "./still-source";
 
-function imageAspectForEdit(aspect: "16:9" | "9:16" | "1:1"): "square" | "landscape" | "portrait" {
-  if (aspect === "9:16") {
-    return "portrait";
+/** The loose shape of a ratio such as `16:9`, for an image job. */
+function imageAspectForEdit(aspect: string): "square" | "landscape" | "portrait" {
+  return shapeOfRatio(ratioOf(aspect) ?? 16 / 9);
+}
+
+/**
+ * The resolution a job will be priced at: the model's own, so the estimate and the call agree. Edit's price
+ * table has three tiers; a bigger one (2k, 4k) is priced as the top tier it has.
+ */
+function settledResolution(model: string, asked: string | undefined): "480p" | "720p" | "1080p" {
+  const used = settleVideo(videoSpecFor(model), { resolution: asked }).resolution;
+  if (used === "480p" || used === "720p" || used === "1080p") {
+    return used;
   }
-  if (aspect === "1:1") {
-    return "square";
-  }
-  return "landscape";
+  return used ? "1080p" : "720p";
 }
 
 function timelineTailFrame(project: EditProject, trackId = "v1"): number {
@@ -70,7 +83,9 @@ function routeModel(tenant: TenantContext, input: EditStartGenerateJobInput, req
     liveModelIds: liveModelIds(tenant, input.model),
     requireImageToVideo,
   });
-  return routed ?? input.model ?? (kind === "image" ? "gpt-image-2" : "grok-imagine-video");
+  // Nothing live matched and nothing was named: the gateway defaults the rest of the app uses, not a
+  // per-token Grok id a prepaid key cannot run.
+  return routed ?? input.model ?? (kind === "image" ? DEFAULT_GATEWAY_IMAGE_MODEL : DEFAULT_GATEWAY_VIDEO_MODEL);
 }
 
 const STILL_NOT_FOUND = new ApiError(
@@ -193,17 +208,19 @@ export async function startGenerateJob(
   const imageUrl = still?.kind === "remote" ? still.url : undefined;
   const stillMediaId = still?.kind === "local" ? still.mediaId : undefined;
   const stillAssetId = still?.kind === "local" ? still.assetId : undefined;
-  const aspect = input.aspect && ["16:9", "9:16", "1:1"].includes(input.aspect) ? input.aspect : projectAspect(doc);
+  // The project's frame unless a ratio was named; the model's spec moves a ratio it does not take.
+  const aspect = input.aspect?.trim() ? input.aspect.trim() : projectAspect(doc);
   const count = Math.min(4, Math.max(1, input.count ?? 1));
   const requestedSeconds = input.addSeconds ?? input.seconds ?? (input.kind === "generate_video" ? 5 : undefined);
   // Veo only renders 4/6/8 s; snap here so the job, the placeholder and the price agree.
   const seconds = input.kind === "generate_video" ? snapVideoSeconds(model, requestedSeconds) : requestedSeconds;
   const timedInput =
     input.kind === "generate_video" ? { ...input, seconds, addSeconds: input.addSeconds ? seconds : undefined } : input;
+  const resolution = input.kind === "generate_video" ? settledResolution(model, input.resolution) : "720p";
   const estimateUsd = estimateJobUsd(model, {
     seconds,
     count,
-    resolution: "720p",
+    resolution,
   });
   const clips = placeholderClips(doc, timedInput, model, stillAssetId);
   const cardId = crypto.randomUUID();
@@ -242,13 +259,21 @@ export async function startGenerateJob(
     // No tenant in the request: the worker resolves it from the project and `requestedBy`.
     request: {
       prompt: input.prompt,
-      aspect: input.kind === "generate_image" ? imageAspectForEdit(aspect as "16:9" | "9:16" | "1:1") : aspect,
+      aspect: input.kind === "generate_image" ? imageAspectForEdit(aspect) : aspect,
       model,
       imageUrl,
       stillMediaId,
       imageAssetId: stillAssetId,
       seconds: seconds ?? 5,
-      resolution: "720p",
+      // What the person chose (left out means the model's own default, 720p where offered). The job
+      // settles it against the model's spec again when it runs.
+      ...(input.kind === "generate_video"
+        ? { ...(input.resolution ? { resolution: input.resolution } : {}), ...(input.audio !== undefined ? { audio: input.audio } : {}) }
+        : {
+            ...(input.quality ? { quality: input.quality } : {}),
+            ...(input.imageResolution ? { tier: input.imageResolution } : {}),
+            ...(input.outputFormat ? { outputFormat: input.outputFormat } : {}),
+          }),
       projectId,
     },
     targetClipIds,

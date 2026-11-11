@@ -108,5 +108,21 @@
     "talk-bookstore-dialogue": {
       "title": "Dialog dua orang di toko buku"
     }
-  }
+  },
+  "aspectLabel": "Rasio aspek",
+  "lengthLabel": "Durasi klip",
+  "resolutionLabel": "Resolusi",
+  "audio": "Suara di dalam video",
+  "audioHint": "Mati secara bawaan: suara bisa menambah biaya.",
+  "withSound": "dengan suara",
+  "silent": "tanpa suara",
+  "adjusted": "Disesuaikan untuk {model}: {changes}.",
+  "change": {
+    "aspect": "rasio {asked} → {used}",
+    "seconds": "durasi {asked} → {used}",
+    "resolution": "resolusi {asked} → {used}",
+    "audio": "suara {asked} → {used}"
+  },
+  "sent": "Dibuat dengan {summary}.",
+  "unverified": "Sebagian nilai untuk model ini berasal dari API vendor, bukan dari gateway, dan belum diperiksa di sini."
 }

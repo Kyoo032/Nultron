@@ -1,7 +1,13 @@
 import { ApiError } from "../errors";
 import { parseAppLocale, type AppLocale } from "../locale";
 import { modelNotOnKeyMessage, resolveVideoModelForKey } from "../models/key-models";
-import { snapVideoSeconds, videoCapabilities } from "../models/video-capabilities";
+import {
+  settleVideo,
+  videoSpecFor,
+  type MediaAdjustment,
+  type PublishedMediaParams,
+  type VideoSent,
+} from "../models/media-params";
 import { modeMessage } from "../mode-messages";
 import { withOutputLanguage } from "../output-language";
 import { maskPii } from "../security/pii";
@@ -28,11 +34,15 @@ export type VideoHarnessSkill = "write-shot" | "render-retry" | "keep-clip";
 
 export type VideoRenderCall = {
   prompt: string;
-  aspect_ratio: "16:9" | "9:16" | "1:1";
+  /** Absent when the model has no aspect control. */
+  aspect_ratio?: string;
   image_url?: string;
   model: string;
   seconds: number;
-  resolution?: "480p" | "720p" | "1080p";
+  /** Absent when the model has no resolution control. */
+  resolution?: string;
+  /** Sound inside the clip; absent when the model has no switch for it. */
+  audio?: boolean;
 };
 
 export type VideoRenderResult =
@@ -43,10 +53,15 @@ export type VideoHarnessInput = {
   prompt: string;
   requestedModel: string;
   availableIds: readonly string[];
-  aspect: "16:9" | "9:16" | "1:1";
+  /** A ratio such as `16:9`; the model's own set decides which are valid. */
+  aspect?: string;
   imageUrl?: string;
   seconds?: number;
-  resolution?: "480p" | "720p" | "1080p";
+  resolution?: string;
+  /** Sound inside the clip. Left out means the app's default (off). */
+  audio?: boolean;
+  /** What the gateway published for the model, laid over the built-in spec. */
+  published?: PublishedMediaParams;
   locale: AppLocale;
   /**
    * A shot from outside the composer. Production leaves this empty.
@@ -60,6 +75,10 @@ export type VideoHarnessResult = {
   shotRepaired: boolean;
   model: string;
   seconds: number;
+  /** What the request carries after the model's spec had its say. */
+  sent: VideoSent;
+  /** What was asked for and moved or left out. */
+  adjusted: MediaAdjustment[];
   outboundPrompt: string;
   url: string;
   usedModel: string;
@@ -183,18 +202,27 @@ export async function runVideoHarness(
     );
   }
   const model = choice.model;
-  if (input.imageUrl && !videoCapabilities(model).imageToVideo) {
+  const spec = videoSpecFor(model, input.published);
+  if (input.imageUrl && !spec.imageInput.firstFrame) {
     throw new ApiError("video_still_unsupported", modeMessage("videoStillUnsupported", locale), 400);
   }
-  const seconds = snapVideoSeconds(model, input.seconds);
+  // Settled here, before any money is spent: a value the model does not take is moved to the nearest
+  // one it does, and sound asked of a silent model is refused.
+  const { adjustments, ...sent } = settleVideo(
+    spec,
+    { aspect: input.aspect, seconds: input.seconds, resolution: input.resolution, audio: input.audio },
+    { model, locale },
+  );
+  const seconds = sent.seconds;
   const outboundPrompt = withOutputLanguage(maskPii(accepted.shot), "videos", locale);
   const call: VideoRenderCall = {
     prompt: outboundPrompt,
-    aspect_ratio: input.aspect,
+    ...(sent.aspect ? { aspect_ratio: sent.aspect } : {}),
     model,
     seconds,
     ...(input.imageUrl ? { image_url: input.imageUrl } : {}),
-    ...(input.resolution ? { resolution: input.resolution } : {}),
+    ...(sent.resolution ? { resolution: sent.resolution } : {}),
+    ...(sent.audio !== undefined ? { audio: sent.audio } : {}),
   };
 
   let attempts = 0;
@@ -241,6 +269,8 @@ export async function runVideoHarness(
     shotRepaired: accepted.repaired,
     model,
     seconds,
+    sent,
+    adjusted: adjustments,
     outboundPrompt,
     url,
     usedModel,

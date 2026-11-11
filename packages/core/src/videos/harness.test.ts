@@ -45,7 +45,10 @@ describe("videos harness skills", () => {
     expect(result.shotRepaired).toBe(true);
     expect(result.shot).toContain("a cat in the rain");
     expect(result.shot).toContain("Camera: one steady shot.");
-    expect(result.seconds).toBe(5);
+    // Grok takes 6 or 10 s, so 5 s is moved to 6 and the harness says so.
+    expect(result.seconds).toBe(6);
+    expect(result.sent).toMatchObject({ aspect: "16:9", seconds: 6, resolution: "720p" });
+    expect(result.adjusted).toEqual([{ field: "seconds", asked: 5, used: 6, reason: "out_of_range" }]);
     expect(result.attempts).toBe(2);
     expect(calls).toHaveLength(2);
     expect(calls[0]).toContain("a cat in the rain");

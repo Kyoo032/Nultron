@@ -6,10 +6,12 @@ import {
   isServerMode,
   mediaKind,
   parseAvailabilityStore,
+  sanitizePublishedMediaParams,
   type AvailabilityStore,
   type ChatModel,
   type ModelProvider,
   type PricingHints,
+  type PublishedMediaMap,
 } from "@agentforge/core";
 import { assertTenantId } from "./tenant-paths";
 import { currentRequestSession } from "./tenant-scope";
@@ -40,6 +42,12 @@ export type ModelCache = {
   /** The gateway's public price list, reduced to `model id -> endpoint types`, so a new id is placed by what the gateway says it is. */
   endpointHints?: PricingHints;
   endpointHintsAt?: string;
+  /**
+   * What the same price list publishes for each media model (`config.parameters`: resolution enums,
+   * defaults). Laid over the built-in media parameter table, so a model the table has never heard of, or a
+   * changed enum, works with no code change (`@agentforge/core` `media-params.ts`).
+   */
+  mediaParams?: PublishedMediaMap;
 };
 
 /**
@@ -176,6 +184,7 @@ function parseModelCache(text: string): ModelCache {
     keyId: typeof parsed.keyId === "string" && parsed.keyId ? parsed.keyId : undefined,
     endpointHints: parseEndpointHints(parsed.endpointHints),
     endpointHintsAt: typeof parsed.endpointHintsAt === "string" ? parsed.endpointHintsAt : undefined,
+    mediaParams: sanitizePublishedMediaParams(parsed.mediaParams),
   };
 }
 

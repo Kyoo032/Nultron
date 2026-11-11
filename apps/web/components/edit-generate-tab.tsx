@@ -1,6 +1,20 @@
 import { estimateJobUsd, routeEditModel, type PromptTemplate } from "@agentforge/core/edit";
 import { formatUsd } from "@agentforge/core/gateway";
-import { allowedVideoSeconds, snapVideoSeconds, videoCapabilities } from "@agentforge/core/video-capabilities";
+import type { MediaParamSpec } from "@agentforge/core/media-params";
+import { videoCapabilitiesOf } from "@agentforge/core/video-capabilities";
+import { ImageControls, UnverifiedNote, VideoControls } from "@/components/media-controls";
+import { MediaControlsNote } from "@/components/media-controls-note";
+import {
+  adjustedNote,
+  fitImagePick,
+  fitVideoPick,
+  imageRequestFields,
+  imageSpecOf,
+  videoRequestFields,
+  videoSpecOf,
+  type ImagePick,
+  type VideoPick,
+} from "@/lib/media-options";
 import { EditPromptTemplates } from "@/components/edit-prompt-templates";
 import { ModelSelect } from "@/components/model-select";
 import { SettingsLinkHint } from "@/components/settings-link-hint";
@@ -8,7 +22,7 @@ import { apiFetch } from "@/lib/api-client";
 import { EDIT_GENERATE_NEEDS_KEY_NOTE_ID, editKeyGuard, editKeyHint } from "@/lib/edit-key-guard";
 import { hostedKeyBlock } from "@/lib/use-desk-needs-key";
 import type { StillClip } from "@/lib/edit-preview-media";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 
 type StudioModel = {
   id: string;
@@ -16,7 +30,12 @@ type StudioModel = {
   provider?: string;
   inputModalities: string[];
   contextLength?: number;
+  /** What the model accepts (the host's media parameter spec): the controls below draw from it. */
+  media?: MediaParamSpec;
 };
+
+/** The narrow rail's select. */
+const RAIL_SELECT = "min-w-0 w-full rounded-md border border-[var(--line)] bg-[var(--surface)] px-2 py-1 text-xs";
 
 const STUB_VIDEO: StudioModel[] = [
   { id: "grok-imagine-video", label: "grok-imagine-video", inputModalities: ["text", "image"] },
@@ -28,8 +47,6 @@ const STUB_IMAGE: StudioModel[] = [
 ];
 
 const TIERS = ["draft", "standard", "cinematic"] as const;
-
-type Seconds = number;
 
 type Props = {
   project: { id: string; fps?: number } | null;
@@ -45,6 +62,36 @@ type Props = {
   onSubmitted?: () => void;
   onAgentPrompt?: (text: string) => void;
 };
+
+/** Edit's price table has three tiers; a bigger one (2k, 4k) is priced as the top tier it has. */
+function editPriceTier(resolution: string): "480p" | "720p" | "1080p" {
+  if (resolution === "480p" || resolution === "720p" || resolution === "1080p") {
+    return resolution;
+  }
+  return resolution ? "1080p" : "720p";
+}
+
+/** The ratio or size is the project's frame in Edit, so the tab never sends one. */
+function withoutShape<T extends { aspect?: unknown; size?: unknown; aspectRatio?: unknown }>(
+  fields: T,
+): Omit<T, "aspect" | "size" | "aspectRatio"> {
+  const { aspect: _aspect, size: _size, aspectRatio: _aspectRatio, ...rest } = fields;
+  void _aspect;
+  void _size;
+  void _aspectRatio;
+  return rest;
+}
+
+/**
+ * What an image job carries beside the prompt. The resolution tier goes as `imageResolution`, because
+ * `tier` is already the job's draft / standard / cinematic choice.
+ */
+function imageEditFields(spec: Parameters<typeof imageRequestFields>[0], pick: ImagePick) {
+  const { tier: imageResolution, ...rest } = withoutShape(imageRequestFields(spec, pick, "square")) as ReturnType<
+    typeof imageRequestFields
+  >;
+  return { ...rest, ...(imageResolution ? { imageResolution } : {}) };
+}
 
 export function EditGenerateTab({
   project,
@@ -77,7 +124,19 @@ export function EditGenerateTab({
   const [model, setModel] = useState("");
   const [prompt, setPrompt] = useState("");
   const [stillUrl, setStillUrl] = useState("");
-  const [seconds, setSeconds] = useState<Seconds>(5);
+  // What the controls hold. The model's own defaults until the person moves one; a model change moves
+  // each value to the nearest one the new model takes, and `note` says so.
+  const [videoPick, setVideoPick] = useState<VideoPick>({ aspect: "", seconds: 5, resolution: "720p", audio: false });
+  const [imagePick, setImagePick] = useState<ImagePick>({
+    shape: "",
+    shapeTouched: false,
+    quality: "",
+    tier: "",
+    count: 1,
+    format: "",
+  });
+  const [note, setNote] = useState<string | null>(null);
+  const fitted = useRef("");
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -101,9 +160,11 @@ export function EditGenerateTab({
     requireImageToVideo: sub === "video" && (Boolean(clipStill) || Boolean(stillUrl.trim())),
   });
   const activeModel = model || routed || liveIds[0] || "";
-  const caps = videoCapabilities(activeModel);
-  const imageToVideo = caps.imageToVideo;
-  const secondsOptions = allowedVideoSeconds(activeModel);
+  const videoSpec = useMemo(() => videoSpecOf(activeModel, videoCatalog), [activeModel, videoCatalog]);
+  const imageSpec = useMemo(() => imageSpecOf(activeModel, imageCatalog), [activeModel, imageCatalog]);
+  const imageToVideo = videoCapabilitiesOf(videoSpec).imageToVideo;
+  const activeSpec = sub === "image" ? imageSpec : videoSpec;
+  const seconds = videoPick.seconds;
 
   useEffect(() => {
     if (!imageToVideo) {
@@ -111,19 +172,40 @@ export function EditGenerateTab({
     }
   }, [imageToVideo]);
 
+  // Fit the controls to the model. The first model gets its own defaults and no note; a later one keeps
+  // each value it takes and moves the rest to the nearest valid one, and the note says what moved.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the fit runs when the model changes; the picks and the sentence are read, not watched
   useEffect(() => {
-    setSeconds((current) => snapVideoSeconds(activeModel, current));
-  }, [activeModel]);
+    if (!activeModel) {
+      return;
+    }
+    const key = `${sub}:${activeModel}`;
+    const first = fitted.current === "";
+    if (sub === "video") {
+      const result = fitVideoPick(videoSpec, first ? undefined : videoPick);
+      setVideoPick(result.pick);
+      setNote(first ? null : adjustedNote("videos", activeModel, result.moved));
+    } else if (sub === "image") {
+      const result = fitImagePick(imageSpec, first ? undefined : imagePick, "square");
+      setImagePick(result.pick);
+      setNote(first ? null : adjustedNote("images", activeModel, result.moved));
+    }
+    fitted.current = key;
+    // The picks are read, not watched: the fit runs when the model or the kind changes.
+  }, [activeModel, sub]);
 
   const estimate = estimateJobUsd(activeModel, {
     seconds: sub === "video" ? seconds : undefined,
     count: 1,
-    resolution: "720p",
+    resolution: editPriceTier(videoSpec.resolution ? videoPick.resolution : ""),
   });
 
   function pickTemplate(template: PromptTemplate) {
     setPrompt(template.prompt);
-    setSeconds(snapVideoSeconds(activeModel, template.seconds));
+    // A template asks for a length; the model's own values decide what it gets.
+    const result = fitVideoPick(videoSpec, { ...videoPick, seconds: template.seconds });
+    setVideoPick(result.pick);
+    setNote(adjustedNote("videos", activeModel, result.moved));
     setTemplateId(template.id);
   }
 
@@ -154,7 +236,10 @@ export function EditGenerateTab({
           prompt: prompt.trim(),
           tier,
           model: activeModel || undefined,
-          seconds: sub === "video" ? seconds : undefined,
+          // Only the fields this model has: its spec decides, the host checks again. The ratio is the
+          // project's, so it is not sent from here.
+          ...(sub === "video" ? withoutShape(videoRequestFields(videoSpec, videoPick)) : {}),
+          ...(sub === "image" ? imageEditFields(imageSpec, imagePick) : {}),
           imageAssetId: sub === "video" && imageToVideo && clipStill ? clipStill.assetId : undefined,
           imageUrl: sub === "video" && imageToVideo && !clipStill ? stillUrl.trim() || undefined : undefined,
           placeAt: { trackId: "v1", timelineStartFrame: playhead },
@@ -248,19 +333,28 @@ export function EditGenerateTab({
             className="min-w-0 w-full rounded-md border border-[var(--line)] bg-[var(--surface)] px-2 py-1 text-xs"
           />
           {sub === "video" ? (
-            <select
-              className="min-w-0 w-full rounded-md border border-[var(--line)] bg-[var(--surface)] px-2 py-1 text-xs"
-              value={seconds}
-              onChange={(event) => setSeconds(Number(event.target.value) as Seconds)}
-              data-testid="edit-generate-seconds"
-            >
-              {secondsOptions.map((value) => (
-                <option key={value} value={value}>
-                  {value}s
-                </option>
-              ))}
-            </select>
+            <VideoControls
+              spec={videoSpec}
+              pick={videoPick}
+              onChange={setVideoPick}
+              testIdPrefix="edit-generate"
+              selectClassName={RAIL_SELECT}
+              showAspect={false}
+            />
           ) : null}
+          {sub === "image" ? (
+            <ImageControls
+              spec={imageSpec}
+              pick={imagePick}
+              shape={imagePick.shape}
+              onChange={setImagePick}
+              testIdPrefix="edit-generate"
+              selectClassName={RAIL_SELECT}
+              showShape={false}
+            />
+          ) : null}
+          {activeModel ? <UnverifiedNote kind={sub === "image" ? "images" : "videos"} unverified={activeSpec.unverified} /> : null}
+          <MediaControlsNote kind={sub === "image" ? "images" : "videos"} note={note} made={null} />
           {sub === "video" && imageToVideo && stillClip ? (
             <label className="flex items-center gap-2 text-xs" data-testid="edit-generate-still-clip">
               <input type="checkbox" checked={useClipStill} onChange={(event) => setUseClipStill(event.target.checked)} />

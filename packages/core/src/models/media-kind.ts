@@ -81,6 +81,11 @@ const VIDEO =
   /seedance|veo[_-]|kling|\bsora\b|happyhorse|mj_video|grok-imagine-video|-t2v|-i2v|-r2v|-v2v|video-edit|omni-fast-v2v/i;
 const IMAGE =
   /gpt-image|dall-e|chatgpt-image|seedream|flux-|imagen-|mj_|grok-imagine-image|nano-banana|qwen-image|wan2\.7-image|z-image|image-edit|gemini-[\w.-]*image/i;
+/**
+ * Kling's picture models (`kling_image`, `kling_omni_image`) share the word `kling` with its video
+ * models, and the video pattern is tested first. Tested before it, so they land in the Images picker.
+ */
+const KLING_IMAGE = /^kling[_-](?:omni[_-])?image\b/i;
 
 export function mediaKind(id: string): MediaKind {
   const value = id.trim();
@@ -92,6 +97,9 @@ export function mediaKind(id: string): MediaKind {
   }
   if (AUDIO.test(value)) {
     return "audio";
+  }
+  if (KLING_IMAGE.test(value)) {
+    return "image";
   }
   if (VIDEO.test(value)) {
     return "video";

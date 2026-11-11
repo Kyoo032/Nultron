@@ -1,94 +1,74 @@
+import {
+  snapVideoLength,
+  videoLengthOptions,
+  videoSpecFor,
+  type PublishedMediaParams,
+  type VideoParamSpec,
+} from "./media-params";
+
+/**
+ * What a video model has, as flags. The values behind each flag (which ratios, which lengths, which
+ * resolutions) are the model's media parameter spec (`media-params.ts`); these flags are the short
+ * answer for code that only needs to know whether a control exists.
+ */
 export type VideoCapabilities = {
   ratio: boolean;
   resolution: boolean;
   seconds: boolean;
   still: boolean;
   imageToVideo: boolean;
+  /** The model has a switch for sound inside the clip. */
+  audio: boolean;
 };
 
 export const GATEWAY_VIDEO_DURATION_SECONDS = 5;
 export const GATEWAY_VIDEO_RESOLUTION = "720p";
-export const GATEWAY_VIDEO_RESOLUTIONS = ["480p", "720p", "1080p"] as const;
+/** The range the Ark-direct Seedance path (no gateway, no spec) clamps to. */
 export const GATEWAY_VIDEO_SECONDS_MIN = 2;
 export const GATEWAY_VIDEO_SECONDS_MAX = 12;
 
-export type GatewayVideoResolution = (typeof GATEWAY_VIDEO_RESOLUTIONS)[number];
-
-const SEEDANCE_ALL = {
-  ratio: true,
-  resolution: true,
-  seconds: true,
-  still: true,
-} as const;
-
-const OPENAI_LIKE = {
-  ratio: false,
-  resolution: false,
-  seconds: true,
-  still: true,
-} as const;
-
 /** Seedance-class models bill by duration × resolution tier (`720p`), not OpenAI pixel `1280x720`. */
-export function usesSeedanceVideoWire(model: string): boolean {
-  return /seedance|dreamina-seedance|doubao-seedance|veo_|kling|sora/i.test(model);
+export function usesSeedanceVideoWire(model: string, published?: PublishedMediaParams): boolean {
+  return videoSpecFor(model, published).bodyStyle === "seedance-content";
 }
 
 /**
- * Honest image-to-video gate (G-20). Unknown ids are false.
- * `still` remains the legacy UI-field flag and may stay true when `imageToVideo` is false.
+ * Honest image-to-video gate (G-20). Unknown ids are false: a model whose spec does not say it takes a
+ * still is refused one before any money is spent.
  */
-export function imageToVideoForModel(model: string): boolean {
-  if (/omni-fast-v2v/i.test(model)) {
-    return false;
-  }
-  if (/mj_video/i.test(model)) {
-    return false;
-  }
-  if (/grok-imagine-video/i.test(model)) {
-    return true;
-  }
-  if (/seedance|dreamina|doubao-seedance|veo_|kling|\bsora/i.test(model)) {
-    return true;
-  }
-  return false;
+export function imageToVideoForModel(model: string, published?: PublishedMediaParams): boolean {
+  return videoSpecFor(model, published).imageInput.firstFrame;
 }
 
-export function videoCapabilities(model: string): VideoCapabilities {
-  const base = usesSeedanceVideoWire(model) ? SEEDANCE_ALL : OPENAI_LIKE;
-  return { ...base, imageToVideo: imageToVideoForModel(model) };
+export function videoCapabilitiesOf(spec: VideoParamSpec): VideoCapabilities {
+  return {
+    ratio: Boolean(spec.aspect),
+    resolution: Boolean(spec.resolution),
+    seconds: true,
+    still: true,
+    imageToVideo: spec.imageInput.firstFrame,
+    audio: spec.audio.supported,
+  };
 }
 
-/** Clip lengths the UI offers by default. */
-export const DEFAULT_VIDEO_SECONDS_OPTIONS: readonly number[] = [5, 8, 10];
-
-/** Veo only renders 4, 6 or 8 second clips; 5 s is rejected upstream. */
-const VEO_SECONDS: readonly number[] = [4, 6, 8];
-
-/** Clip lengths a model accepts, for pickers and server-side snapping. */
-export function allowedVideoSeconds(model: string): readonly number[] {
-  if (/veo[_-]/i.test(model)) {
-    return VEO_SECONDS;
-  }
-  return DEFAULT_VIDEO_SECONDS_OPTIONS;
+export function videoCapabilities(model: string, published?: PublishedMediaParams): VideoCapabilities {
+  return videoCapabilitiesOf(videoSpecFor(model, published));
 }
 
-/** Nearest length the model accepts (ties go to the shorter clip). */
-export function snapVideoSeconds(model: string, seconds?: number): number {
-  const options = allowedVideoSeconds(model);
-  const target = clampVideoSeconds(seconds);
-  return options.reduce((best, value) => (Math.abs(value - target) < Math.abs(best - target) ? value : best), options[0]);
+/** Clip lengths a model offers in a picker. */
+export function allowedVideoSeconds(model: string, published?: PublishedMediaParams): readonly number[] {
+  return videoLengthOptions(videoSpecFor(model, published));
 }
 
+/** Nearest length the model accepts (ties go to the shorter clip). Undefined means the model's default. */
+export function snapVideoSeconds(model: string, seconds?: number, published?: PublishedMediaParams): number {
+  return snapVideoLength(videoSpecFor(model, published).length, seconds);
+}
+
+/** A model-less clamp for the direct-Ark path, which has no spec. The gateway path uses `snapVideoSeconds`. */
 export function clampVideoSeconds(seconds?: number): number {
   if (typeof seconds !== "number" || !Number.isFinite(seconds)) {
     return GATEWAY_VIDEO_DURATION_SECONDS;
   }
   return Math.min(GATEWAY_VIDEO_SECONDS_MAX, Math.max(GATEWAY_VIDEO_SECONDS_MIN, Math.round(seconds)));
-}
-
-export function normalizeVideoResolution(resolution?: string): GatewayVideoResolution {
-  if (resolution === "480p" || resolution === "720p" || resolution === "1080p") {
-    return resolution;
-  }
-  return GATEWAY_VIDEO_RESOLUTION;
 }

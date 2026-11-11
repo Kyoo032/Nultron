@@ -39,8 +39,8 @@ describe("videoGenerateTool", () => {
     expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({
       model: "seedance-2.0-fast",
       duration: 5,
-      resolution: "720p",
-      ratio: "16:9",
+      size: "720p",
+      metadata: { ratio: "16:9" },
     });
     expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).not.toHaveProperty("video_length");
     expect(result).toMatchObject({
@@ -63,7 +63,7 @@ describe("videoGenerateTool", () => {
         json: async () => ({ data: { status: "SUCCESS", result_url: "https://cdn.example/clip.mp4" } }),
       });
     vi.stubGlobal("fetch", fetchMock);
-    await runWithToolSecrets(
+    const result = await runWithToolSecrets(
       { secrets: { OPENAI_API_KEY: "sk-model", OPENAI_BASE_URL: "https://api.tokotokenai.com/v1" }, backends: {} },
       () =>
         invokeTool(
@@ -78,14 +78,64 @@ describe("videoGenerateTool", () => {
           tenant,
         ),
     );
+    // Grok takes 6 or 10 s and 480p or 720p: 8 s is a tie and goes to the shorter clip, 1080p goes to 720p,
+    // and the result says so instead of leaving the page to believe it got what it asked for.
     expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toEqual({
       model: "grok-imagine-video",
       prompt: "rain on a window",
       aspect_ratio: "9:16",
-      video_length: 8,
+      video_length: 6,
       resolution_name: "720p",
       preset: "normal",
     });
+    expect(result).toMatchObject({
+      success: true,
+      sent: { aspect: "9:16", seconds: 6, resolution: "720p" },
+      adjusted: [
+        { field: "seconds", asked: 8, used: 6 },
+        { field: "resolution", asked: "1080p", used: "720p" },
+      ],
+    });
+  });
+
+  it("sends sound inside the clip when asked, and says what it sent", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ task_id: "abcd", status: "processing" }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: { status: "SUCCESS", result_url: "https://cdn.example/clip.mp4" } }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await runWithToolSecrets(
+      { secrets: { OPENAI_API_KEY: "sk-model", OPENAI_BASE_URL: "https://api.tokotokenai.com/v1" }, backends: {} },
+      () =>
+        invokeTool(
+          videoGenerateTool,
+          { prompt: "ocean waves", model: "seedance-2.0-fast", seconds: 4, resolution: "480p", aspect_ratio: "3:4", audio: true },
+          tenant,
+        ),
+    );
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.tokotokenai.com/v1/video/generations");
+    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({
+      duration: 4,
+      size: "480p",
+      metadata: { ratio: "3:4", generate_audio: true },
+    });
+    expect(result).toMatchObject({ success: true, sent: { seconds: 4, resolution: "480p", aspect: "3:4", audio: true } });
+    expect(result).toMatchObject({ adjusted: [] });
+  });
+
+  it("refuses sound on a model that makes silent clips, before any call", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await runWithToolSecrets(
+      { secrets: { OPENAI_API_KEY: "sk-model", OPENAI_BASE_URL: "https://api.tokotokenai.com/v1" }, backends: {} },
+      () => invokeTool(videoGenerateTool, { prompt: "p", model: "grok-imagine-video", audio: true }, tenant),
+    );
+    expect(result).toMatchObject({ success: false });
+    expect(String((result as { error: string }).error)).toMatch(/silent clips/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("does not spend the chat Ark key on video_generate", async () => {

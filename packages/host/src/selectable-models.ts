@@ -1,5 +1,5 @@
 import {
-  fetchPricingHints,
+  fetchPricingWithMedia,
   isOmniSpeechModelId,
   kindFromEndpointTypesOf,
   DEFAULT_CHAT_MODEL,
@@ -436,7 +436,7 @@ export async function refreshModelCache(
 
   // Stub desks (no key, default gateway) never call out: there is nothing to list.
   if (settings.openaiApiKey || hasCustomGateway(settings)) {
-    const hintsPromise = fetchPricingHints();
+    const catalogPromise = fetchPricingWithMedia();
     try {
       const detected = await detectCompatibleApi({
         url: resolveProviderKeys(settings).openaiBaseUrl || DEFAULT_OPENAI_BASE_URL,
@@ -449,10 +449,16 @@ export async function refreshModelCache(
         error instanceof Error ? error.message : "Could not list models from the gateway",
       );
     }
-    const hints = await hintsPromise;
-    if (hints) {
-      next.endpointHints = hints;
+    const priced = await catalogPromise;
+    if (priced) {
+      next.endpointHints = priced.hints;
       next.endpointHintsAt = now;
+      // An empty map is an answer too: a list that stopped publishing parameters must not keep the old ones.
+      if (Object.keys(priced.media).length > 0) {
+        next.mediaParams = priced.media;
+      } else {
+        delete next.mediaParams;
+      }
     }
   } else {
     // Key cleared: a stale "unreachable" banner from the last live save must not survive into stub.

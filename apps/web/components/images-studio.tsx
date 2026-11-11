@@ -1,9 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { chooseImageFrame, type ImageAspect } from "@agentforge/core/images";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { chooseImageFrame } from "@agentforge/core/images";
 import { messageUnlessBlocked } from "@/lib/gateway-blocked";
 import type { MediaPrice } from "@agentforge/core/media-pricing";
+import type { ImageSent, MediaAdjustment, MediaParamSpec } from "@agentforge/core/media-params";
+import { ImageControls, UnverifiedNote } from "@/components/media-controls";
+import { MediaControlsNote } from "@/components/media-controls-note";
+import {
+  adjustedNote,
+  effectiveShape,
+  fitImagePick,
+  imageRequestFields,
+  imageSentNote,
+  imageSpecOf,
+  shapeOfValue,
+  type ImagePick,
+} from "@/lib/media-options";
 import { Confetti } from "@/components/confetti";
 import { EnhancePromptButton } from "@/components/enhance-prompt-button";
 import { ExampleGallery } from "@/components/example-gallery";
@@ -32,6 +45,8 @@ type StudioModel = {
   contextLength?: number;
   /** Provider list price for the cost estimate; null when nobody has transcribed one. */
   price?: MediaPrice | null;
+  /** What the model accepts (the host's media parameter spec): the controls below draw from it. */
+  media?: MediaParamSpec;
 };
 
 type GalleryItem = {
@@ -52,16 +67,25 @@ type GalleryResponse = {
   defaultModel: string;
 };
 
-const ASPECTS = ["square", "landscape", "portrait"] as const satisfies readonly ImageAspect[];
-
 export function ImagesStudio() {
   const { gatewayName } = useProductBrand();
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [models, setModels] = useState<StudioModel[]>([]);
   const [listed, setListed] = useState(false);
   const [model, setModel] = useState("");
-  const [aspectChoice, setAspectChoice] = useState<ImageAspect>("square");
-  const [aspectTouched, setAspectTouched] = useState(false);
+  // What the controls hold. Until the person moves the size menu the sentence picks the shape; a model
+  // change moves each value to the nearest one the new model takes, and `note` says so.
+  const [pick, setPick] = useState<ImagePick>({
+    shape: "",
+    shapeTouched: false,
+    quality: "",
+    tier: "",
+    count: 1,
+    format: "",
+  });
+  const [note, setNote] = useState<string | null>(null);
+  const [made, setMade] = useState<string | null>(null);
+  const fitted = useRef("");
   const [prompt, setPrompt] = useState("");
   const needsKey = useDeskNeedsKey();
   const [loading, setLoading] = useState(true);
@@ -98,9 +122,32 @@ export function ImagesStudio() {
   }, [load]);
 
   // Until they move the menu, the sentence picks the frame. Their pick then stands.
-  const aspect: ImageAspect = aspectTouched ? aspectChoice : chooseImageFrame(prompt);
+  const promptShape = chooseImageFrame(prompt);
+  const spec = useMemo(() => imageSpecOf(model, models), [model, models]);
+  const shape = effectiveShape(spec, pick, promptShape);
+  const aspect = shapeOfValue(spec, shape);
+  const quality = pick.quality === "low" || pick.quality === "medium" || pick.quality === "high" ? pick.quality : undefined;
+
+  // Fit the controls to the model. The first model gets its own defaults and no note; a later one keeps
+  // each value it takes and moves the rest to the nearest valid one, and the note says what moved.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the fit runs when the model changes; the picks and the sentence are read, not watched
+  useEffect(() => {
+    if (!model) {
+      return;
+    }
+    const first = fitted.current === "";
+    const result = fitImagePick(spec, first ? undefined : pick, promptShape);
+    fitted.current = model;
+    setPick(result.pick);
+    setNote(first ? null : adjustedNote("images", model, result.moved));
+    // `pick` and the sentence are read, not watched: the fit runs when the model changes.
+  }, [model]);
+
   // List-price estimate. Recomputed from the studio state, never from a live call.
-  const estimate = useMemo(() => imageEstimateView({ model, models, aspect }), [model, models, aspect]);
+  const estimate = useMemo(
+    () => imageEstimateView({ model, models, aspect, quality }),
+    [model, models, aspect, quality],
+  );
   const modelOptions = useMemo(() => {
     const hints = mediaPriceHints("images", models);
     return models.map((item) => ({ ...item, hint: hints[item.id] }));
@@ -117,13 +164,21 @@ export function ImagesStudio() {
     }
     setGenerating(true);
     setError(null);
+    setMade(null);
     try {
       const response = await apiFetch("/api/v1/images", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: prompt.trim(), aspect, model: model || undefined }),
+        // Only the fields this model has: its spec decides, the host checks again.
+        body: JSON.stringify({
+          prompt: prompt.trim(),
+          model: model || undefined,
+          ...imageRequestFields(spec, pick, promptShape),
+        }),
       });
       const data = (await response.json().catch(() => ({}))) as GalleryItem & {
+        sent?: ImageSent;
+        adjusted?: MediaAdjustment[];
         error?: { message?: string };
       };
       if (!response.ok) {
@@ -132,6 +187,14 @@ export function ImagesStudio() {
       }
       setLanded((count) => count + 1);
       setPrompt("");
+      // What the picture was made with, so a value the host had to move is never a surprise.
+      setMade(
+        data.sent
+          ? [imageSentNote(data.sent), adjustedNote("images", data.model ?? model, data.adjusted ?? [])]
+              .filter(Boolean)
+              .join(" ")
+          : null,
+      );
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("images.generateError"));
@@ -166,22 +229,9 @@ export function ImagesStudio() {
         data-testid="images-studio-prompt-bar"
       >
         <div className="flex flex-wrap gap-2">
-          <select
-            className="select-field"
-            value={aspect}
-            onChange={(event) => {
-              setAspectChoice(event.target.value as ImageAspect);
-              setAspectTouched(true);
-            }}
-            disabled={generating}
-            data-testid="images-studio-aspect"
-          >
-            {ASPECTS.map((id) => (
-              <option key={id} value={id}>
-                {t(`images.aspect.${id}`)}
-              </option>
-            ))}
-          </select>
+          {model ? (
+            <ImageControls spec={spec} pick={pick} shape={shape} onChange={setPick} disabled={generating} />
+          ) : null}
           {noModels ? null : (
             <ModelSelect
               models={modelOptions}
@@ -201,6 +251,8 @@ export function ImagesStudio() {
             </p>
           </div>
         ) : null}
+        {model ? <UnverifiedNote kind="images" unverified={spec.unverified} /> : null}
+        <MediaControlsNote kind="images" note={note} made={made} />
         {!model || estimate.unknown ? null : (
           <div className="space-y-0.5">
             <p className="text-xs text-[var(--text-2)]" data-testid="images-studio-estimate">

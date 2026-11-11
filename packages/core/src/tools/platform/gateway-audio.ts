@@ -129,7 +129,7 @@ export function isRelayMissing(status: number, body: Record<string, unknown>): b
 /**
  * The request body for one Suno submit. Kept to fields the Suno proxy is documented to read:
  * anything else risks a strict JSON decoder rejecting the whole job, which is exactly how the
- * video wire lost a day (`buildGatewayVideoPayload`, same file family).
+ * video wire lost a day (`buildVideoRequest`, same file family).
  */
 export function buildSunoMusicPayload(options: {
   mode: "describe" | "custom";

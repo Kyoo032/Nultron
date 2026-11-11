@@ -17,6 +17,8 @@ export const MODE_MESSAGE_KEYS = [
   "emptySlide",
   "videoGenerateFailed",
   "videoStillUnsupported",
+  "videoAudioUnsupported",
+  "imageStillUnsupported",
   "videoClipRejected",
   "musicGenerateFailed",
   "musicPromptRequired",
@@ -72,6 +74,14 @@ const MODE_MESSAGES: Record<ModeMessageKey, Record<AppLocale, string>> = {
   videoStillUnsupported: {
     en: "This model does not accept a still image",
     id: "Model ini tidak menerima gambar diam",
+  },
+  videoAudioUnsupported: {
+    en: "This video model makes silent clips and has no switch for sound. Turn sound off or pick another video model.",
+    id: "Model video ini hanya membuat klip tanpa suara dan tidak punya pengaturan suara. Matikan suara atau pilih model video lain.",
+  },
+  imageStillUnsupported: {
+    en: "This image model does not take a reference picture. Pick another image model to edit a picture.",
+    id: "Model gambar ini tidak menerima gambar acuan. Pilih model gambar lain untuk mengedit gambar.",
   },
   videoClipRejected: {
     en: "The render did not return a video file.",

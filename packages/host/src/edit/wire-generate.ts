@@ -42,6 +42,9 @@ export function ensureGenerateSubmitWired(): void {
             aspect,
             model: typeof body.model === "string" ? body.model : undefined,
             imageUrl: typeof body.imageUrl === "string" ? body.imageUrl : undefined,
+            ...(typeof body.quality === "string" ? { quality: body.quality } : {}),
+            ...(typeof body.tier === "string" ? { tier: body.tier } : {}),
+            ...(typeof body.outputFormat === "string" ? { outputFormat: body.outputFormat } : {}),
           },
           { workType: "Edit" },
         );
@@ -56,11 +59,12 @@ export function ensureGenerateSubmitWired(): void {
         tenant,
         {
           prompt: String(body.prompt ?? ""),
-          aspect: (body.aspect as "16:9" | "9:16" | "1:1") ?? "16:9",
+          aspect: typeof body.aspect === "string" ? body.aspect : undefined,
           model: typeof body.model === "string" ? body.model : undefined,
           imageUrl: typeof body.imageUrl === "string" ? body.imageUrl : undefined,
           seconds: typeof body.seconds === "number" ? body.seconds : undefined,
-          resolution: body.resolution as "480p" | "720p" | "1080p" | undefined,
+          resolution: typeof body.resolution === "string" ? body.resolution : undefined,
+          ...(typeof body.audio === "boolean" ? { audio: body.audio } : {}),
         },
         { workType: "Edit" },
       );

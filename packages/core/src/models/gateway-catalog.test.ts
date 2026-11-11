@@ -71,8 +71,14 @@ describe("the wire each model is driven on", () => {
     });
     expect(videoWireFor("grok-imagine-video-1.5-preview").id).toBe("videos_json");
     expect(videoWireFor("seedance-2.0-fast")).toMatchObject({ id: "video_seedance", route: "/v1/video/generations" });
-    expect(videoWireFor("veo_3_1-fast").id).toBe("video_seedance");
-    expect(videoWireFor("omni-fast-v2v").id).toBe("video_generations");
+    // The wire follows the model's media parameter spec: Veo has its own body on the generic route,
+    // omni-fast posts to /v1/videos like Grok, and Kling is served from its own mount.
+    expect(videoWireFor("veo_3_1-fast").id).toBe("video_generations");
+    expect(videoWireFor("omni-fast")).toMatchObject({ id: "videos_json", route: "/v1/videos" });
+    expect(videoWireFor("omni-fast-v2v").id).toBe("videos_json");
+    expect(videoWireFor("kling-v3").id).toBe("video_kling");
+    expect(videoWireFor("kling-3.0-turbo").id).toBe("video_kling");
+    expect(videoWireFor("totally-unknown-video").id).toBe("video_generations");
   });
 
   it("speaks through the chat stream for an Omni id and nothing for a realtime one", () => {

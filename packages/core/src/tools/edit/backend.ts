@@ -21,6 +21,14 @@ export type EditStartGenerateJobInput = {
   tier?: "draft" | "standard" | "cinematic";
   model?: string;
   seconds?: number;
+  /** Video resolution tier such as `720p`; the model's spec decides what is sent. */
+  resolution?: string;
+  /** Sound inside the clip; left out means off. */
+  audio?: boolean;
+  /** Image quality, resolution tier and file format; the model's spec decides what is sent. */
+  quality?: string;
+  imageResolution?: string;
+  outputFormat?: string;
   imageUrl?: string;
   imageAssetId?: string;
   count?: number;

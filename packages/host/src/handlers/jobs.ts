@@ -25,6 +25,7 @@ import {
   writeStudioLyrics,
 } from "../studio-generate";
 import { attachMediaPrices } from "../media-price";
+import { attachMediaSpecs } from "../media-spec";
 import { cachedPricingCatalog } from "../account-usage";
 import { generateDocumentDraft, regenerateDocumentSection } from "../document-generate";
 import { parseDocumentDraftBody } from "../document-outline";
@@ -48,11 +49,16 @@ export async function handleGetImages(request: HostRequest): Promise<HostResult>
     // Nothing here reaches the network: an uncached desk just shows "no list price on file".
     // Prices are always looked up against the pinned gateway, never an owner-supplied endpoint: a
     // custom base URL must not be able to decide what a model is quoted at.
-    const models = attachMediaPrices(
-      listStudioImageModels(undefined, tenant),
+    // `media` is each model's parameter spec: the page shows only the controls the model has.
+    const models = attachMediaSpecs(
+      attachMediaPrices(
+        listStudioImageModels(undefined, tenant),
+        "image",
+        cachedPricingCatalog(resolvedGatewayBaseUrl()),
+        resolvedGatewayBaseUrl(),
+      ),
       "image",
-      cachedPricingCatalog(resolvedGatewayBaseUrl()),
-      resolvedGatewayBaseUrl(),
+      tenant,
     );
     const sources = await agentService.listGenerateDefaultSources(tenant);
     const preferred = defaultStudioImageModel(models, tenant);
@@ -95,11 +101,15 @@ export async function handleGetVideos(request: HostRequest): Promise<HostResult>
     const settings = loadSettings(tenant);
     // Video list prices are per second, so the gateway's flat per-call rate is never substituted here.
     // Same as images: the pinned gateway, not whatever base URL the desk was pointed at.
-    const models = attachMediaPrices(
-      listStudioVideoModels(undefined, tenant),
-      "second",
-      cachedPricingCatalog(resolvedGatewayBaseUrl()),
-      resolvedGatewayBaseUrl(),
+    const models = attachMediaSpecs(
+      attachMediaPrices(
+        listStudioVideoModels(undefined, tenant),
+        "second",
+        cachedPricingCatalog(resolvedGatewayBaseUrl()),
+        resolvedGatewayBaseUrl(),
+      ),
+      "video",
+      tenant,
     );
     const sources = await agentService.listGenerateDefaultSources(tenant);
     const preferred = defaultStudioVideoModel(models, tenant);

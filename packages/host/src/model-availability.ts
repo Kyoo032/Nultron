@@ -51,6 +51,8 @@ import {
   type ModelCacheScope,
 } from "./model-cache";
 import { loadSettings } from "./settings-store";
+// Side effect: installs the source the generation tools read for what the gateway published per model.
+import "./media-spec";
 
 function listedIds(cache: ModelCache): string[] {
   return [
