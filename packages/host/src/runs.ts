@@ -596,6 +596,14 @@ export async function* startModalityRun(options: {
             send({ type: "tool.progress", toolKey, job });
           }
         },
+        // A tool that waits on a slow, silent call (a video render) keeps the stall guard fed without a
+        // progress event for the thread (`keepRunAlive`).
+        alive: () => {
+          if (queueClosed || settled) {
+            return;
+          }
+          stall.touch();
+        },
         signal: modelAbort.signal,
         userText,
       };

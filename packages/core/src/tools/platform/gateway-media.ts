@@ -1,6 +1,8 @@
 import type { AppLocale } from "../../locale";
 import { ApiError } from "../../errors";
+import { modeMessage } from "../../mode-messages";
 import { GatewayRefusalError } from "../../models/availability";
+import { VIDEO_JOB_PENDING_CODE, VIDEO_JOB_PENDING_STATUS } from "../../videos/job-pending";
 import { ratioOf, type ImageChoice, type MediaAdjustment, type VideoSent, type ImageSent } from "../../models/media-params";
 import type { PublishedMediaParams } from "../../models/media-params-published";
 import { buildImageRequest, buildVideoRequest } from "../../models/media-request";
@@ -15,6 +17,27 @@ export type { VideoCapabilities } from "../../models/video-capabilities";
 
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
+
+/** A video job is asked how it is doing every two seconds. */
+export const VIDEO_POLL_MS = 2_000;
+
+/**
+ * How long a video job is watched, as a wall clock and not a count of polls.
+ *
+ * Measured on the prepaid key at 480p on 2026-11-12: a 5 s clip took about 135 s, a 6 s clip and a 15 s
+ * clip about 105 s each, so the render time hardly follows the clip length. 720p, the app's default
+ * resolution, was never timed; it has about 2.25 times the pixels, which puts a 15 s clip near 5 minutes
+ * at worst. Eight minutes is three and a half times the slowest render measured and leaves room for the
+ * queue in front of it. It is also `WORKER_MAX_MS`, the longest the host lets one tool hold a chat turn
+ * open, and below `WORKER_STREAM_IDLE_MS` (10 minutes), so this wait ends before the chat run's own
+ * watchdog does. Suno gets a longer wait for the same reason (`gateway-audio.ts`, `MUSIC_MAX_POLLS`).
+ *
+ * Passing it is not a failure: the job may still finish and bill (`videos/job-pending.ts`).
+ */
+export const VIDEO_POLL_DEADLINE_MS = 8 * 60_000;
+
+/** One status request may take this long. A poll that hangs would otherwise hold the deadline open for good. */
+export const VIDEO_POLL_REQUEST_MS = 60_000;
 
 export type GatewayMediaOptions = {
   baseUrl: string;
@@ -37,7 +60,12 @@ export type GatewayMediaOptions = {
   fetchImpl?: typeof fetch;
   wait?: (ms: number) => Promise<void>;
   pollMs?: number;
+  /** A cap on the number of polls. Images count by it (90); video watches the clock (`deadlineMs`) unless a test sets it. */
   maxPolls?: number;
+  /** Video: how long to watch one job, in milliseconds. Default `VIDEO_POLL_DEADLINE_MS`. */
+  deadlineMs?: number;
+  /** The clock `deadlineMs` is read against. Tests hand in one their `wait` advances. */
+  now?: () => number;
 };
 
 /** What a media call returns beside the result: what was sent, and what had to be moved to get there. */
@@ -494,31 +522,52 @@ export async function generateGatewayVideo(options: GatewayMediaOptions): Promis
   if (!taskId) {
     throw new ApiError("tool_failed", "Gateway video did not return a task id", 502);
   }
-  const maxPolls = options.maxPolls ?? 90;
-  const pollMs = options.pollMs ?? 2_000;
+  // From here the gateway has the job and will bill it. Nothing below may end in a message that lets the
+  // harness submit the brief again while this one is still rendering: a job that is still running when the
+  // wait ends is `video_job_pending`, and a poll that could not be read is not a dead job.
+  const pollMs = options.pollMs ?? VIDEO_POLL_MS;
+  const deadlineMs = options.deadlineMs ?? VIDEO_POLL_DEADLINE_MS;
+  const now = options.now ?? Date.now;
+  const startedAt = now();
   const pollUrl = routeUrl(options.baseUrl, request.pollRoute.replace("{id}", encodeURIComponent(taskId)));
-  for (let attempt = 0; attempt < maxPolls; attempt += 1) {
-    const statusRes = await fetchImpl(pollUrl, {
-      headers: gatewayHeaders(options.apiKey),
-    });
-    const statusBody = asRecord(await statusRes.json().catch(() => ({})));
-    const status = mediaStatus(statusBody);
-    const url = extractGatewayVideoUrl(statusBody);
-    if (url && (isMediaSuccess(status) || status.length === 0)) {
-      return done(url);
-    }
-    if (isMediaFailure(status) || !statusRes.ok) {
-      const raw = readVideoJobFailure(statusBody, "Gateway video job failed");
-      const detail = formatVideoJobFailure(raw);
-      throw new GatewayRefusalError("tool_failed", detail, UPSTREAM_REJECTED.test(detail) ? 503 : 502, {
-        status: statusRes.status,
-        code: gatewayErrorCode(statusBody),
-        message: raw,
-        // The gateway accepted this job; its failure says nothing about the model (`availability.ts`).
-        phase: "poll",
+  for (let attempt = 0; ; attempt += 1) {
+    let statusRes: Response | null;
+    try {
+      statusRes = await fetchImpl(pollUrl, {
+        headers: gatewayHeaders(options.apiKey),
+        signal: AbortSignal.timeout(VIDEO_POLL_REQUEST_MS),
       });
+    } catch {
+      // A dropped or timed-out status request says nothing about the job. Ask again until the deadline.
+      statusRes = null;
+    }
+    if (statusRes !== null) {
+      const statusBody = asRecord(await statusRes.json().catch(() => ({})));
+      const status = mediaStatus(statusBody);
+      const url = extractGatewayVideoUrl(statusBody);
+      if (url && (isMediaSuccess(status) || status.length === 0)) {
+        return done(url);
+      }
+      if (isMediaFailure(status) || !statusRes.ok) {
+        const raw = readVideoJobFailure(statusBody, "Gateway video job failed");
+        const detail = formatVideoJobFailure(raw);
+        throw new GatewayRefusalError("tool_failed", detail, UPSTREAM_REJECTED.test(detail) ? 503 : 502, {
+          status: statusRes.status,
+          code: gatewayErrorCode(statusBody),
+          message: raw,
+          // The gateway accepted this job; its failure says nothing about the model (`availability.ts`).
+          phase: "poll",
+        });
+      }
+    }
+    if ((options.maxPolls !== undefined && attempt + 1 >= options.maxPolls) || now() - startedAt >= deadlineMs) {
+      break;
     }
     await wait(pollMs);
   }
-  throw new ApiError("tool_failed", "Gateway video job timed out", 504);
+  throw new ApiError(
+    VIDEO_JOB_PENDING_CODE,
+    modeMessage("videoJobPending", options.locale ?? "en"),
+    VIDEO_JOB_PENDING_STATUS,
+  );
 }

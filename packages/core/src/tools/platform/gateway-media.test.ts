@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../errors";
 import { classifyGatewayRefusal, GatewayRefusalError } from "../../models/availability";
 import { buildVideoRequest } from "../../models/media-request";
+import { VIDEO_JOB_PENDING_CODE } from "../../videos/job-pending";
+import { videoRenderShouldRetry } from "../../videos/harness";
 import {
+  VIDEO_POLL_DEADLINE_MS,
+  VIDEO_POLL_MS,
   extractGatewayVideoUrl,
   formatVideoGatewayFailure,
   generateGatewayImage,
@@ -570,7 +574,174 @@ describe("generateGatewayVideo", () => {
         maxPolls: 2,
         pollMs: 1,
       }),
-    ).rejects.toMatchObject({ message: "Gateway video job timed out" });
+    ).rejects.toMatchObject({ code: VIDEO_JOB_PENDING_CODE, status: 504 });
+  });
+
+  describe("a job the gateway has accepted (it will bill when it finishes)", () => {
+    const SUBMIT = { ok: true, status: 201, json: async () => ({ task_id: "t-long", status: "queued" }) };
+    const RENDERING = { ok: true, status: 200, json: async () => ({ data: { status: "IN_PROGRESS" } }) };
+    const FINISHED = {
+      ok: true,
+      status: 200,
+      json: async () => ({ data: { status: "SUCCESS", result_url: "https://cdn.example/long.mp4" } }),
+    };
+
+    /** A clock the fake `wait` moves, so minutes of polling take no time at all. */
+    function fakeClock() {
+      let t = 1_000_000;
+      return {
+        start: t,
+        now: () => t,
+        wait: async (ms: number) => {
+          t += ms;
+        },
+        elapsed: () => t - 1_000_000,
+      };
+    }
+
+    const base = {
+      baseUrl: "https://api.tokotokenai.com/v1",
+      apiKey: "sk-test",
+      model: "seedance-2.0-fast",
+      prompt: "a long slow pour",
+      seconds: 15,
+    };
+
+    it("watches for minutes, not 180 s: a clip that lands at 200 s is returned from the one submit", async () => {
+      const clock = fakeClock();
+      let submits = 0;
+      let polls = 0;
+      const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          submits += 1;
+          return SUBMIT;
+        }
+        polls += 1;
+        return clock.elapsed() >= 200_000 ? FINISHED : RENDERING;
+      });
+      const result = await generateGatewayVideo({
+        ...base,
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        wait: clock.wait,
+        now: clock.now,
+      });
+      expect(result.url).toBe("https://cdn.example/long.mp4");
+      expect(submits).toBe(1);
+      // The old budget was 90 polls two seconds apart; this one needed more than that.
+      expect(polls).toBeGreaterThan(90);
+    });
+
+    it("ends a job still rendering at the deadline with video_job_pending, from the one submit", async () => {
+      const clock = fakeClock();
+      let submits = 0;
+      const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          submits += 1;
+          return SUBMIT;
+        }
+        return RENDERING;
+      });
+      const error = await generateGatewayVideo({
+        ...base,
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        wait: clock.wait,
+        now: clock.now,
+      }).catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).toMatchObject({ code: VIDEO_JOB_PENDING_CODE, status: 504 });
+      // It says the job may still bill and was not sent again; it does not say "timed out".
+      expect((error as ApiError).message).toMatch(/may still finish and be billed/);
+      expect((error as ApiError).message).not.toMatch(/timed out/i);
+      expect(submits).toBe(1);
+      expect(clock.elapsed()).toBeGreaterThanOrEqual(VIDEO_POLL_DEADLINE_MS);
+      expect(clock.elapsed()).toBeLessThan(VIDEO_POLL_DEADLINE_MS + 2 * VIDEO_POLL_MS);
+      // The harness reads the message when a caller drops the code, and must still refuse a resubmit.
+      expect(videoRenderShouldRetry((error as ApiError).message)).toBe(false);
+    });
+
+    it("says it in the desk's language when it has one", async () => {
+      const clock = fakeClock();
+      const fetchMock = vi.fn(async (_url: string, init?: RequestInit) =>
+        init?.method === "POST" ? SUBMIT : RENDERING,
+      );
+      const error = await generateGatewayVideo({
+        ...base,
+        locale: "id",
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        wait: clock.wait,
+        now: clock.now,
+        deadlineMs: 10_000,
+      }).catch((caught: unknown) => caught);
+      expect((error as ApiError).message).toMatch(/mungkin tetap selesai dan ditagih/);
+      expect(videoRenderShouldRetry((error as ApiError).message)).toBe(false);
+      expect(clock.elapsed()).toBeLessThan(10_000 + 2 * VIDEO_POLL_MS);
+    });
+
+    it("does not read a dropped status request as a dead job: it asks again and finds the clip", async () => {
+      const clock = fakeClock();
+      let submits = 0;
+      let polls = 0;
+      const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          submits += 1;
+          return SUBMIT;
+        }
+        polls += 1;
+        if (polls === 1) {
+          throw new TypeError("fetch failed: ECONNRESET");
+        }
+        if (polls === 2) {
+          throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+        }
+        return FINISHED;
+      });
+      const result = await generateGatewayVideo({
+        ...base,
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        wait: clock.wait,
+        now: clock.now,
+      });
+      expect(result.url).toBe("https://cdn.example/long.mp4");
+      expect(submits).toBe(1);
+      expect(polls).toBe(3);
+      // Each status request has a time limit of its own, so a hung one cannot hold the deadline open.
+      const pollInit = fetchMock.mock.calls[1]?.[1] as RequestInit;
+      expect(pollInit.signal).toBeInstanceOf(AbortSignal);
+    });
+
+    it("still ends in video_job_pending when every status request is dropped", async () => {
+      const clock = fakeClock();
+      let submits = 0;
+      const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          submits += 1;
+          return SUBMIT;
+        }
+        throw new TypeError("fetch failed");
+      });
+      await expect(
+        generateGatewayVideo({
+          ...base,
+          fetchImpl: fetchMock as unknown as typeof fetch,
+          wait: clock.wait,
+          now: clock.now,
+          deadlineMs: 30_000,
+        }),
+      ).rejects.toMatchObject({ code: VIDEO_JOB_PENDING_CODE });
+      expect(submits).toBe(1);
+    });
+
+    it("a submit that never got a task id is not a pending job", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ status: "queued" }) });
+      const error = await generateGatewayVideo({
+        ...base,
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        wait: async () => undefined,
+      }).catch((caught: unknown) => caught);
+      expect(error).toMatchObject({ message: "Gateway video did not return a task id", status: 502 });
+      expect((error as ApiError).code).not.toBe(VIDEO_JOB_PENDING_CODE);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("does not call /videos/generations", async () => {

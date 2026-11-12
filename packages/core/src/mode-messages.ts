@@ -20,6 +20,7 @@ export const MODE_MESSAGE_KEYS = [
   "videoAudioUnsupported",
   "imageStillUnsupported",
   "videoClipRejected",
+  "videoJobPending",
   "musicGenerateFailed",
   "musicPromptRequired",
   "musicLyricsRequired",
@@ -86,6 +87,12 @@ const MODE_MESSAGES: Record<ModeMessageKey, Record<AppLocale, string>> = {
   videoClipRejected: {
     en: "The render did not return a video file.",
     id: "Hasil render tidak berisi file video.",
+  },
+  // A job the gateway accepted and was still rendering when the wait ran out. It is never sent again:
+  // the first one may still finish, and the gateway bills it when it does (`videos/job-pending.ts`).
+  videoJobPending: {
+    en: "The gateway is still rendering this video after a long wait. It may still finish and be billed, so it was not sent again. Check your usage before you try again.",
+    id: "Gateway masih merender video ini setelah menunggu lama. Video itu mungkin tetap selesai dan ditagih, jadi tidak dikirim ulang. Periksa pemakaian Anda sebelum mencoba lagi.",
   },
   musicGenerateFailed: {
     en: "Music generation failed",

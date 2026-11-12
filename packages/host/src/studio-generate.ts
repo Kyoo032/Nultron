@@ -30,6 +30,8 @@ import {
   shapeOfRatio,
   speechUnavailableReason,
   studioVideoFailureStatus,
+  VIDEO_JOB_PENDING_CODE,
+  VIDEO_JOB_PENDING_STATUS,
   videoCapabilities,
   videoGenerateTool,
   withOutputLanguage,
@@ -338,6 +340,17 @@ function toolFailureMessage(output: unknown, fallback: string): string {
   return fallback;
 }
 
+/** The `code` a failed tool run carries, when it carries one. */
+function toolFailureCode(output: unknown): string | null {
+  if (output && typeof output === "object" && !Array.isArray(output)) {
+    const code = (output as { code?: unknown }).code;
+    if (typeof code === "string" && code.trim()) {
+      return code.trim();
+    }
+  }
+  return null;
+}
+
 function toolSuccessUrl(output: unknown, key: "image" | "video"): string | null {
   if (!output || typeof output !== "object" || Array.isArray(output)) {
     return null;
@@ -542,6 +555,16 @@ function videoToolResult(
   const url = toolSuccessUrl(output, "video");
   if (url) {
     return { ok: true, url, model: toolModel(output, model) };
+  }
+  // A job the gateway still has when the wait ran out: said in the desk's language, and marked so the
+  // harness does not submit the brief again (`packages/core/src/videos/job-pending.ts`).
+  if (toolFailureCode(output) === VIDEO_JOB_PENDING_CODE) {
+    return {
+      ok: false,
+      message: modeMessage("videoJobPending", locale),
+      code: VIDEO_JOB_PENDING_CODE,
+      status: VIDEO_JOB_PENDING_STATUS,
+    };
   }
   const raw = toolFailureMessage(output, modeMessage("videoGenerateFailed", locale));
   const rewritten = rewriteModelNotOnKey(raw, locale, model, availableIds);

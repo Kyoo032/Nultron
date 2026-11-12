@@ -371,6 +371,7 @@ export type {
   VideoRenderCall,
   VideoRenderResult,
 } from "./videos/harness";
+export { VIDEO_JOB_PENDING_CODE, VIDEO_JOB_PENDING_STATUS } from "./videos/job-pending";
 export {
   MEDIA_PRICE_ENTRIES,
   costTier,
@@ -815,6 +816,8 @@ export {
 } from "./music/harness";
 export type { MusicHarnessSkillId } from "./music/harness";
 export {
+  VIDEO_POLL_DEADLINE_MS,
+  VIDEO_POLL_REQUEST_MS,
   formatVideoGatewayFailure,
   httpStatusForGatewayFailure,
   studioVideoFailureStatus,

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { outputLanguageRule, type TenantContext } from "@agentforge/core";
+import { VIDEO_JOB_PENDING_CODE, modeMessage, outputLanguageRule, type TenantContext } from "@agentforge/core";
 import { db, ensureLocalOwner } from "@agentforge/db";
 import { saveModelCache } from "./model-cache";
 import { resetCatalogMemo } from "./selectable-models";
@@ -102,5 +102,45 @@ describe("videos harness on generate", () => {
       ),
     ).rejects.toMatchObject({ code: "video_still_unsupported" });
     expect(calls).toBe(0);
+  });
+
+  it("renders a job the gateway still has exactly once, and says so in words that are not 'timed out'", async () => {
+    listedModels();
+    let renders = 0;
+    const error = await generateStudioVideo(
+      tenant,
+      { prompt: "a long slow pour", aspect: "16:9", model: "seedance-2.0-fast", seconds: 15 },
+      {
+        renderVideo: async () => {
+          renders += 1;
+          return {
+            success: false,
+            error: "Gateway video job timed out",
+            code: VIDEO_JOB_PENDING_CODE,
+          };
+        },
+      },
+    ).catch((caught: unknown) => caught);
+    expect(renders).toBe(1);
+    expect(error).toMatchObject({ code: VIDEO_JOB_PENDING_CODE, status: 504 });
+    expect((error as Error).message).toBe(modeMessage("videoJobPending", "en"));
+  });
+
+  it("still renders once more a job that died before the gateway had it", async () => {
+    listedModels();
+    let renders = 0;
+    await generateStudioVideo(
+      tenant,
+      { prompt: "a cat on a wall", aspect: "16:9", model: "seedance-2.0-fast", seconds: 5 },
+      {
+        renderVideo: async (call) => {
+          renders += 1;
+          return renders === 1
+            ? { success: false, error: "No available channel (HTTP 503) no live gateway channel" }
+            : { success: true, video: clip, model: call.model };
+        },
+      },
+    );
+    expect(renders).toBe(2);
   });
 });

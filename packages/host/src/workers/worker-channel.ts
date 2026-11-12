@@ -11,6 +11,11 @@ import type { JobEmitter, JobEvent } from "@agentforge/core/jobs";
 export type WorkerChannel = {
   /** One progress event of the harness the worker is running. Also tells the run it is still alive. */
   readonly emit: (toolKey: string, job: JobEvent) => void;
+  /**
+   * A sign of life with nothing to show: it re-arms the run's stall guard and sends no event to the
+   * thread. For a tool that waits on a slow, silent call (`keepRunAlive`).
+   */
+  readonly alive?: () => void;
   readonly signal?: AbortSignal;
   readonly userText?: string;
 };
@@ -45,6 +50,37 @@ export const WORKER_MAX_MS = 8 * 60_000;
  * `WORKER_MAX_MS`.
  */
 export const WORKER_STREAM_IDLE_MS = WORKER_MAX_MS + 2 * 60_000;
+
+/**
+ * Keep a chat turn alive while one tool call waits on something slow and silent, a paid video render
+ * for instance. The tool has no progress to report, so nothing reaches the thread: the beat only
+ * re-arms the run's stall guard, which would otherwise end the turn after its 60 s idle budget while the
+ * render goes on, and bills, with nobody left to receive the clip. Outside a chat run it does nothing.
+ * The beat stops after `maxMs`, so a tool that never returns still cannot hold a conversation open.
+ */
+export async function keepRunAlive<T>(
+  work: () => Promise<T>,
+  options: { readonly heartbeatMs?: number; readonly maxMs?: number } = {},
+): Promise<T> {
+  const channel = currentWorkerChannel();
+  if (!channel?.alive) {
+    return work();
+  }
+  const startedAt = Date.now();
+  const maxMs = options.maxMs ?? WORKER_MAX_MS;
+  const beat = setInterval(() => {
+    if (Date.now() - startedAt >= maxMs) {
+      clearInterval(beat);
+      return;
+    }
+    channel.alive?.();
+  }, options.heartbeatMs ?? WORKER_HEARTBEAT_MS);
+  try {
+    return await work();
+  } finally {
+    clearInterval(beat);
+  }
+}
 
 /**
  * Run one worker with its progress wired to the chat run. A harness can sit inside one model call for

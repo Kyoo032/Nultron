@@ -8,6 +8,7 @@ import { defineTool } from "../define-tool";
 import { gatewayGenerateModel } from "../media-model-choice";
 import { imageInputSchema, mediaReferenceId, resolveImageInput } from "../media-reference";
 import { reportModelOutcome } from "../../models/outcome-sink";
+import { VIDEO_JOB_PENDING_CODE } from "../../videos/job-pending";
 import { missingToolRouteMessage, resolveToolBackend } from "../credentials";
 import { getSecret } from "../secret-scope";
 import { falVideoUrl, runFalQueue } from "./fal-queue";
@@ -204,7 +205,13 @@ export const videoGenerateTool = defineTool({
       if (route.backend === "gateway") {
         reportModelOutcome({ tenant, model: gatewayModel, kind: "video", ok: false, error });
       }
-      return { success: false, error: error instanceof Error ? error.message : "Video generation failed" };
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Video generation failed",
+        // A job the gateway still has is not a failure to try again: the harness and the Edit job read this
+        // code and never submit the brief a second time (`videos/job-pending.ts`).
+        ...(error instanceof ApiError && error.code === VIDEO_JOB_PENDING_CODE ? { code: error.code } : {}),
+      };
     }
   },
 });

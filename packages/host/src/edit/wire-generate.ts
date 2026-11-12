@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { media } from "@agentforge/db";
 import { db } from "@agentforge/db";
-import type { TenantContext } from "@agentforge/core";
+import { ApiError, VIDEO_JOB_PENDING_CODE, type TenantContext } from "@agentforge/core";
 import { generateStudioImage, generateStudioVideo } from "../studio-generate";
 import { mediaIdFromUrl } from "../media-id";
 import { setGenerateSubmit } from "./generate";
@@ -83,7 +83,9 @@ export function ensureGenerateSubmitWired(): void {
           ? (error as { status: number }).status
           : 500;
       const message = error instanceof Error ? error.message : "generate_failed";
-      return { status, body: { error: message } };
+      // A job the gateway still has is told apart by its code, so `runGenerateJob` does not submit it again.
+      const pending = error instanceof ApiError && error.code === VIDEO_JOB_PENDING_CODE;
+      return { status, body: { error: message, ...(pending ? { code: VIDEO_JOB_PENDING_CODE } : {}) } };
     }
   });
 }

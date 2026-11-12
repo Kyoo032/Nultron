@@ -11,6 +11,7 @@ import {
 import { modeMessage } from "../mode-messages";
 import { withOutputLanguage } from "../output-language";
 import { maskPii } from "../security/pii";
+import { VIDEO_JOB_PENDING_CODE } from "./job-pending";
 
 /**
  * The five skills of the Videos mode, read by `harness/modes/videos.ts`. Three are wired here
@@ -138,13 +139,19 @@ export function acceptVideoShot(prompt: string, draft?: string): { shot: string;
   };
 }
 
+// The last two are the words of `videoJobPending` (`mode-messages.ts`): a job the gateway still has. Sent
+// again, it would be billed twice. The code (`VIDEO_JOB_PENDING_CODE`) is what the harness reads first;
+// these keep a caller that only passes the message on the safe side.
 const NO_RETRY =
-  /gateway key|rejected the API key|not available for this key|does not accept a still|prepaid|按次价格|预付账户|model_not_on_key/i;
+  /gateway key|rejected the API key|not available for this key|does not accept a still|prepaid|按次价格|预付账户|model_not_on_key|may still finish and be billed|mungkin tetap selesai dan ditagih/i;
 
 const RETRY =
   /timed out|timeout|HTTP 50[234]|no live gateway channel|ECONNREFUSED|ECONNRESET|ETIMEDOUT|socket hang up|fetch failed|returned no video/i;
 
-/** A dead render is worth one more try. A refused key, model, or still is not. */
+/**
+ * A dead render is worth one more try. A refused key, model, or still is not, and neither is a job the
+ * gateway accepted and is still rendering: the first one will bill when it finishes.
+ */
 export function videoRenderShouldRetry(message: string): boolean {
   if (NO_RETRY.test(message)) {
     return false;
@@ -247,7 +254,9 @@ export async function runVideoHarness(
           status: 502,
         }
       : result;
-    const retryable = missingFile || videoRenderShouldRetry(result.ok ? "" : result.message);
+    // A job still rendering at the gateway is never submitted again, whatever its message says.
+    const stillRendering = !result.ok && result.code === VIDEO_JOB_PENDING_CODE;
+    const retryable = missingFile || (!stillRendering && videoRenderShouldRetry(result.ok ? "" : result.message));
     if (attempts === 2 || !retryable) {
       break;
     }

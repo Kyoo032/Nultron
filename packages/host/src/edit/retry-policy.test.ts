@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { ApiError, type TenantContext } from "@agentforge/core";
+import { ApiError, VIDEO_JOB_PENDING_CODE, type TenantContext } from "@agentforge/core";
 import { runGenerateJob, setGenerateSubmit } from "./generate";
 import { maskPii } from "@agentforge/core";
 
@@ -27,6 +27,32 @@ describe("retry policy (G-18)", () => {
       runGenerateJob("generate_video", { prompt: "hi" }, new AbortController().signal, TENANT),
     ).rejects.toMatchObject({ code: "prepaid_async_requires_fixed_price" });
     expect(calls).toBe(1);
+  });
+
+  it("never submits again a video the gateway still has, though its status is 504", async () => {
+    let calls = 0;
+    setGenerateSubmit(async () => {
+      calls += 1;
+      return { status: 504, body: { error: "still rendering, may still finish and be billed", code: VIDEO_JOB_PENDING_CODE } };
+    });
+    await expect(
+      runGenerateJob("generate_video", { prompt: "hi" }, new AbortController().signal, TENANT),
+    ).rejects.toMatchObject({ code: VIDEO_JOB_PENDING_CODE, status: 504 });
+    expect(calls).toBe(1);
+  });
+
+  it("still retries a 504 that is only a gateway timeout, once", async () => {
+    let calls = 0;
+    setGenerateSubmit(async () => {
+      calls += 1;
+      if (calls === 1) {
+        return { status: 504, body: { error: "upstream timeout" } };
+      }
+      return { status: 200, body: {}, outputAssetIds: ["v1"] };
+    });
+    const result = await runGenerateJob("generate_video", { prompt: "hi" }, new AbortController().signal, TENANT);
+    expect(result.outputAssetIds).toEqual(["v1"]);
+    expect(calls).toBe(2);
   });
 
   it("retries once on 5xx", async () => {

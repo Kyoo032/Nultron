@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { TenantContext } from "../../tenancy/types";
 import { invokeTool } from "../define-tool";
+import { VIDEO_JOB_PENDING_CODE } from "../../videos/job-pending";
 import { runWithToolSecrets } from "../secret-scope";
+import { VIDEO_POLL_DEADLINE_MS } from "./gateway-media";
 import { videoGenerateTool } from "./video-generate";
 
 const tenant: TenantContext = {
@@ -124,6 +126,47 @@ describe("videoGenerateTool", () => {
     });
     expect(result).toMatchObject({ success: true, sent: { seconds: 4, resolution: "480p", aspect: "3:4", audio: true } });
     expect(result).toMatchObject({ adjusted: [] });
+  });
+
+  it("answers a job still rendering after the wait with a code the harness will not resubmit on", async () => {
+    vi.useFakeTimers();
+    try {
+      let submits = 0;
+      const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          submits += 1;
+          return { ok: true, status: 201, json: async () => ({ task_id: "slow", status: "queued" }) };
+        }
+        return { ok: true, status: 200, json: async () => ({ data: { status: "IN_PROGRESS" } }) };
+      });
+      vi.stubGlobal("fetch", fetchMock);
+      const pending = runWithToolSecrets(
+        { secrets: { OPENAI_API_KEY: "sk-model", OPENAI_BASE_URL: "https://api.tokotokenai.com/v1" }, backends: {} },
+        () => invokeTool(videoGenerateTool, { prompt: "a long pour", model: "seedance-2.0-fast", seconds: 15 }, tenant),
+      );
+      await vi.advanceTimersByTimeAsync(VIDEO_POLL_DEADLINE_MS + 10_000);
+      const result = await pending;
+      expect(result).toMatchObject({ success: false, code: VIDEO_JOB_PENDING_CODE });
+      expect(String((result as { error: string }).error)).toMatch(/may still finish and be billed/);
+      expect(submits).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("carries no code on an ordinary failure", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({ error: { message: "bad prompt" } }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const result = await runWithToolSecrets(
+      { secrets: { OPENAI_API_KEY: "sk-model", OPENAI_BASE_URL: "https://api.tokotokenai.com/v1" }, backends: {} },
+      () => invokeTool(videoGenerateTool, { prompt: "p", model: "seedance-2.0-fast" }, tenant),
+    );
+    expect(result).toMatchObject({ success: false });
+    expect(result).not.toHaveProperty("code");
   });
 
   it("refuses sound on a model that makes silent clips, before any call", async () => {

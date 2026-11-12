@@ -40,6 +40,8 @@ const TOOL_OBJECT_USERS: Readonly<Record<string, string>> = {
   "packages/core/src/tools/platform/register.ts":
     "Registers the tools so a run can bind them. A model's call to either goes through invokeToolGuarded, with the run's gate.",
   "packages/host/src/studio-generate.ts": "The Images and Videos studios call the tool directly: Generate is the person's own click.",
+  "packages/host/src/workers/video-generate-tool.ts":
+    "Wraps `video_generate` so a chat turn is kept alive while it renders, and `register-tools.ts` registers the wrapper under the same key. It only registers: a model's call reaches it through `getTool(key)` inside `invokeToolGuarded`, which asks the gate by `tool.key` before `execute` runs, so the gate is unchanged.",
 };
 
 const SKIPPED_DIRS = new Set(["node_modules", ".next", "dist", "build", ".turbo", ".ci-local", "coverage", "out", ".git"]);

@@ -5,6 +5,7 @@ import {
   WORKER_MAX_MS,
   WORKER_STREAM_IDLE_MS,
   currentWorkerChannel,
+  keepRunAlive,
   runWithWorkerProgress,
   withWorkerChannel,
   type WorkerChannel,
@@ -307,5 +308,67 @@ describe("the heartbeat", () => {
 
   it("keeps the run-level stream budget longer than the longest a worker is kept alive", () => {
     expect(WORKER_STREAM_IDLE_MS).toBeGreaterThan(WORKER_MAX_MS);
+  });
+});
+
+describe("keepRunAlive", () => {
+  it("does nothing outside a chat run", async () => {
+    expect(await keepRunAlive(async () => "clip")).toBe("clip");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("does nothing on a channel that has no alive hook", async () => {
+    const channel = channelWith();
+    expect(await withWorkerChannel(channel, () => keepRunAlive(async () => "clip"))).toBe("clip");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("feeds the run's stall guard while the work waits, and sends nothing to the thread", async () => {
+    const alive = vi.fn();
+    const channel = { ...channelWith(), alive };
+    const gate = deferred<string>();
+
+    const run = withWorkerChannel(channel, () => keepRunAlive(() => gate.promise));
+    await vi.advanceTimersByTimeAsync(WORKER_HEARTBEAT_MS * 3 + 1);
+    expect(alive).toHaveBeenCalledTimes(3);
+    expect(channel.emit).not.toHaveBeenCalled();
+
+    gate.resolve("clip");
+    expect(await run).toBe("clip");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("beats at least twice inside the 60 s idle budget a run guard starts from", async () => {
+    const alive = vi.fn();
+    const gate = deferred<void>();
+    const run = withWorkerChannel({ ...channelWith(), alive }, () => keepRunAlive(() => gate.promise));
+    await vi.advanceTimersByTimeAsync(59_000);
+    expect(alive.mock.calls.length).toBeGreaterThanOrEqual(2);
+    gate.resolve();
+    await run;
+  });
+
+  it("stops after maxMs, so a tool that never returns cannot hold a conversation open", async () => {
+    const alive = vi.fn();
+    const gate = deferred<void>();
+    const run = withWorkerChannel({ ...channelWith(), alive }, () =>
+      keepRunAlive(() => gate.promise, { heartbeatMs: 1_000, maxMs: 5_000 }),
+    );
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(alive.mock.calls.length).toBeLessThanOrEqual(5);
+    gate.resolve();
+    await run;
+  });
+
+  it("lets the work's own error through and clears its timer", async () => {
+    const alive = vi.fn();
+    await expect(
+      withWorkerChannel({ ...channelWith(), alive }, () =>
+        keepRunAlive(async () => {
+          throw new Error("boom");
+        }),
+      ),
+    ).rejects.toThrow("boom");
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
