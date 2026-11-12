@@ -153,7 +153,7 @@ export const imageGenerateTool = defineTool({
       return held;
     }
     const fetchImpl = globalThis.fetch;
-    const gatewayModel = gatewayGenerateModel("image", model);
+    const gatewayModel = gatewayGenerateModel("image", model, { withReference: Boolean(resolved.url) });
     const imageChoice: ImageChoice = {
       ...(pixels ? { size: pixels } : {}),
       ...(ratio ? { aspectRatio: ratio } : {}),

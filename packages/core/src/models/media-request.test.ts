@@ -29,13 +29,12 @@ describe("video builders against the documented bodies", () => {
     });
     expect(request.route).toBe("/v1/video/generations");
     expect(request.pollRoute).toBe("/v1/video/generations/{id}");
-    // The documented example, field for field: prompt, duration, size, and metadata.{ratio, generate_audio, watermark}.
+    // The documented example with the length where the route reads it (live 2026-11-12): `seconds`, as a STRING.
+    // The docs example prints `duration`, which the route ignored; a number for `seconds` is a 400.
     expect(request.body).toEqual({
       model: "doubao-seedance-2-0-260128",
       prompt: "A golden Shiba Inu running under cherry blossoms, camera slowly rising",
-      duration: 5,
-      // Not in the documented example: the price list's name for the length on this route (see the builder).
-      seconds: 5,
+      seconds: "5",
       size: "480p",
       metadata: { ratio: "16:9", generate_audio: true, watermark: false },
     });
@@ -54,8 +53,7 @@ describe("video builders against the documented bodies", () => {
       model: "doubao-seedance-2-0-fast-260128",
       prompt: "Have the person in the frame slowly turn around and smile",
       image: "https://example.com/photo.jpg",
-      duration: 5,
-      seconds: 5,
+      seconds: "5",
       size: "720p",
       // Sound is always sent explicitly (off unless asked for), because the gateway's own default is on.
       metadata: { ratio: "16:9", generate_audio: false, watermark: false },
@@ -67,14 +65,38 @@ describe("video builders against the documented bodies", () => {
     expect(request.body).toEqual({
       model: "seedance-2.0-fast",
       prompt: "p",
-      duration: 5,
-      seconds: 5,
+      seconds: "5",
       size: "720p",
       metadata: { ratio: "16:9", generate_audio: false, watermark: false },
     });
   });
 
-  it("seedance-content: the live check body (480p, 4 s, 3:4, sound on), every knob in the field the route reads", () => {
+  it("seedance-content: the longest clip seedance-2.0-fast made live (15 s), and no `duration` anywhere in the body", () => {
+    // Live 2026-11-12: `seconds: "15"` came back as a 15.04 s clip; a `duration` beside it was ignored.
+    const request = buildVideoRequest({
+      model: "seedance-2.0-fast",
+      prompt: "p",
+      choice: { resolution: "480p", seconds: 15, aspect: "16:9", audio: false },
+    });
+    expect(request.body).toEqual({
+      model: "seedance-2.0-fast",
+      prompt: "p",
+      seconds: "15",
+      size: "480p",
+      metadata: { ratio: "16:9", generate_audio: false, watermark: false },
+    });
+    expect(request.body).not.toHaveProperty("duration");
+    expect(request.sent.seconds).toBe(15);
+    expect(request.adjustments).toEqual([]);
+  });
+
+  it("seedance-content: a length past 15 s on a Seedance 2.0 moves to 15 and says so", () => {
+    const request = buildVideoRequest({ model: "seedance-2.0-fast", prompt: "p", choice: { seconds: 16 } });
+    expect(request.body.seconds).toBe("15");
+    expect(request.adjustments).toContainEqual({ field: "seconds", asked: 16, used: 15, reason: "out_of_range" });
+  });
+
+  it("seedance-content: a 4 s, 3:4, sound-on body at 480p, every knob in the field the route reads", () => {
     const request = buildVideoRequest({
       model: "seedance-2.0-fast",
       prompt: "p",
@@ -83,13 +105,13 @@ describe("video builders against the documented bodies", () => {
     expect(request.body).toEqual({
       model: "seedance-2.0-fast",
       prompt: "p",
-      duration: 4,
-      seconds: 4,
+      seconds: "4",
       size: "480p",
       metadata: { ratio: "3:4", generate_audio: true, watermark: false },
     });
-    // The official body's top-level fields are not read on this route (live 2026-11-11), so none is sent.
-    for (const dropped of ["ratio", "resolution", "generate_audio", "content", "watermark"]) {
+    // The official body's top-level fields are not read on this route (live 2026-11-11), so none is sent. Nor is
+    // `duration` (ignored live 2026-11-12, even beside a `seconds` that was read).
+    for (const dropped of ["ratio", "resolution", "generate_audio", "content", "watermark", "duration"]) {
       expect(request.body).not.toHaveProperty(dropped);
     }
   });
@@ -416,9 +438,34 @@ describe("image builders against the documented bodies", () => {
     });
   });
 
-  it("gpt-image-2.5: no quality is invented for a model whose tiers nobody published", () => {
-    expect(buildImageRequest({ model: "gpt-image-2.5-sunburst", prompt: "p", choice: {} }).body).toEqual({
-      model: "gpt-image-2.5-sunburst",
+  it("gpt-image-2.5: quality medium and a square by default, the body driven live on flare and sunburst (2026-11-12)", () => {
+    for (const model of ["gpt-image-2.5-flare", "gpt-image-2.5-sunburst"]) {
+      expect(buildImageRequest({ model, prompt: "p", choice: {} }).body, model).toEqual({
+        model,
+        prompt: "p",
+        size: "1024x1024",
+        quality: "medium",
+      });
+    }
+  });
+
+  it("gpt-image-2.5: the two other sizes drawn live go through, a size nobody drove moves to the nearest, and low and high become medium", () => {
+    const wide = buildImageRequest({ model: "gpt-image-2.5-flare", prompt: "p", choice: { size: "1536x1024" } });
+    expect(wide.body).toMatchObject({ size: "1536x1024", quality: "medium" });
+    const tall = buildImageRequest({ model: "gpt-image-2.5-flare", prompt: "p", choice: { shape: "portrait" } });
+    expect(tall.body).toMatchObject({ size: "1024x1536" });
+    const moved = buildImageRequest({
+      model: "gpt-image-2.5-flare",
+      prompt: "p",
+      choice: { size: "2048x2048", quality: "high" },
+    });
+    expect(moved.body).toMatchObject({ size: "1024x1024", quality: "medium" });
+    expect(moved.adjustments.map((item) => item.field).sort()).toEqual(["quality", "size"]);
+  });
+
+  it("gpt-image-2.5 variants nobody drove (-count, -token): no quality is invented, a square only", () => {
+    expect(buildImageRequest({ model: "gpt-image-2.5-flare-count", prompt: "p", choice: {} }).body).toEqual({
+      model: "gpt-image-2.5-flare-count",
       prompt: "p",
       size: "1024x1024",
     });

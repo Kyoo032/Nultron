@@ -1,5 +1,6 @@
 import { availableVideoDefault } from "../models/key-models";
 import { DEFAULT_GATEWAY_VIDEO_MODEL, mediaKind, pickPreferredImageModel } from "../models/media-kind";
+import { imageModelForReference } from "../models/media-params";
 import { getMediaModels, getSecret } from "./secret-scope";
 
 type GenerateKind = "image" | "video";
@@ -35,9 +36,22 @@ function catalogDefault(kind: GenerateKind, catalog: readonly string[] = []): st
   return availableVideoDefault(catalog) || DEFAULT_GATEWAY_VIDEO_MODEL;
 }
 
-export function gatewayGenerateModel(kind: GenerateKind, requested?: string): string {
+/**
+ * The model a generate call runs. A model the person or the model named wins. Otherwise the configured
+ * default, else the catalogue's preferred id. `withReference` says a picture comes with the request: when that
+ * default takes no reference (the 2.5 image ids publish no edit route), the call goes to
+ * `IMAGE_REFERENCE_MODEL` instead, so "edit this picture" keeps working on a desk whose default is 2.5.
+ */
+export function gatewayGenerateModel(
+  kind: GenerateKind,
+  requested?: string,
+  options: { withReference?: boolean } = {},
+): string {
   const catalog = getMediaModels()?.[kind];
-  return (
-    acceptedRequest(requested, kind, catalog) ?? getSecret(CONFIGURED_MODEL[kind]) ?? catalogDefault(kind, catalog)
-  );
+  const named = acceptedRequest(requested, kind, catalog);
+  if (named) {
+    return named;
+  }
+  const chosen = getSecret(CONFIGURED_MODEL[kind]) ?? catalogDefault(kind, catalog);
+  return kind === "image" && options.withReference ? imageModelForReference(chosen) : chosen;
 }

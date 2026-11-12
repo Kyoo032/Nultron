@@ -14,17 +14,17 @@ export const EDIT_TIERS: Record<EditTier, EditTierConfig> = {
   draft: {
     id: "draft",
     video: ["veo_3_1-fast", "grok-imagine-video", "seedance-2.0-mini"],
-    image: ["gpt-image-2", "seedream-*"],
+    image: ["gpt-image-2.5-flare", "gpt-image-2", "seedream-*"],
   },
   standard: {
     id: "standard",
     video: ["veo_3_1-fast", "seedance-2.0-fast", "grok-imagine-video-1.5-preview"],
-    image: ["gpt-image-2", "seedream-5.0-pro"],
+    image: ["gpt-image-2.5-flare", "gpt-image-2", "seedream-5.0-pro"],
   },
   cinematic: {
     id: "cinematic",
     video: ["veo_3_1", "veo_*", "seedance-2.5", "doubao-seedance-*", "kling*", "sora*"],
-    image: ["gpt-image-2"],
+    image: ["gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2"],
   },
 };
 

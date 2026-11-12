@@ -72,8 +72,8 @@ describe("parse helpers", () => {
     expect(buildVideoRequest({ model: "seedance-2.0-fast", prompt: "hero", choice: { aspect: "16:9" } }).body).toEqual({
       model: "seedance-2.0-fast",
       prompt: "hero",
-      duration: 5,
-      seconds: 5,
+      // The length is the string `seconds` (live 2026-11-12); a number is a 400 and `duration` is ignored.
+      seconds: "5",
       size: "720p",
       metadata: { ratio: "16:9", generate_audio: false, watermark: false },
     });
@@ -386,12 +386,14 @@ describe("generateGatewayVideo", () => {
       fetchImpl: fetchMock as unknown as typeof fetch,
       wait: async () => undefined,
     });
-    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({
-      duration: 4,
+    const sentBody = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body));
+    expect(sentBody).toMatchObject({
+      seconds: "4",
       // 1080p is not a Seedance Fast resolution: it is moved to 720p, never sent.
       size: "720p",
       metadata: { ratio: "3:4", generate_audio: true },
     });
+    expect(sentBody).not.toHaveProperty("duration");
     expect(result.sent).toEqual({ aspect: "3:4", seconds: 4, resolution: "720p", audio: true });
     expect(result.adjusted).toEqual([{ field: "resolution", asked: "1080p", used: "720p", reason: "not_offered" }]);
   });

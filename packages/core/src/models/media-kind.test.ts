@@ -87,7 +87,17 @@ describe("mediaKind", () => {
 });
 
 describe("pickPreferredImageModel", () => {
-  it("prefers gpt-image-2, then Seedream 5.0 Pro", () => {
+  it("starts on gpt-image-2.5-flare, then sunburst, then gpt-image-2, then Seedream 5.0 Pro", () => {
+    const ids = ["mj_imagine", "gpt-image-2", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "seedream-5.0-pro"];
+    expect(pickPreferredImageModel(ids)).toBe("gpt-image-2.5-flare");
+    expect(pickPreferredImageModel(ids.filter((id) => id !== "gpt-image-2.5-flare"))).toBe("gpt-image-2.5-sunburst");
+    expect(pickPreferredImageModel(["gpt-image-2", "seedream-5.0-pro"])).toBe("gpt-image-2");
+    // The -count and -token spellings are not the ids that were driven: they rank by the generic fallback only.
+    expect(pickPreferredImageModel(["gpt-image-2.5-flare-token", "seedream-5.0-pro"])).toBe("seedream-5.0-pro");
+    expect(DEFAULT_GATEWAY_IMAGE_MODEL).toBe("gpt-image-2.5-flare");
+  });
+
+  it("prefers gpt-image-2, then Seedream 5.0 Pro, on a key that lists no 2.5 id", () => {
     expect(
       pickPreferredImageModel(["mj_imagine", "z-image-turbo", "gpt-image-2", "seedream-5.0-pro", "gpt-image-2-count"]),
     ).toBe("gpt-image-2");

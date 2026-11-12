@@ -24,6 +24,7 @@
  */
 
 import { DEFAULT_GATEWAY_IMAGE_MODEL, DEFAULT_GATEWAY_VIDEO_MODEL } from "../models/media-kind";
+import { imageModelForReference } from "../models/media-params";
 
 export const PAID_MEDIA_TOOLS = ["image_generate", "video_generate"] as const;
 
@@ -150,14 +151,19 @@ const REFUSAL_COPY: Readonly<Record<PaidMediaTool, string>> = {
  * built-in default. The host's setting is read by the caller (`hostModel`), because the web screen imports this
  * module for the card and a secret store is server-only.
  */
-function defaultModelFor(tool: PaidMediaTool, hostModel: HostMediaModel | undefined): string {
-  return hostModel?.(tool) || (tool === "image_generate" ? DEFAULT_GATEWAY_IMAGE_MODEL : DEFAULT_GATEWAY_VIDEO_MODEL);
+function defaultModelFor(tool: PaidMediaTool, hostModel: HostMediaModel | undefined, withPicture: boolean): string {
+  const chosen = hostModel?.(tool) || (tool === "image_generate" ? DEFAULT_GATEWAY_IMAGE_MODEL : DEFAULT_GATEWAY_VIDEO_MODEL);
+  // The tool runs a picture to edit on the id that has an edit route (`gatewayGenerateModel`), so the card names that one.
+  return tool === "image_generate" && withPicture ? imageModelForReference(chosen) : chosen;
 }
 
 function refusalFor(tool: PaidMediaTool, args: unknown, hostModel: HostMediaModel | undefined): MediaPermissionRefusal {
   const request = { tool, args: mediaRequestArgs(tool, args) };
   const base = { ok: false, reason: "permission", message: REFUSAL_COPY[tool], request } as const;
-  return typeof request.args.model === "string" ? base : { ...base, defaultModel: defaultModelFor(tool, hostModel) };
+  const withPicture = typeof request.args.image_url === "string" && request.args.image_url.length > 0;
+  return typeof request.args.model === "string"
+    ? base
+    : { ...base, defaultModel: defaultModelFor(tool, hostModel, withPicture) };
 }
 
 export function isMediaPermissionRefusal(value: unknown): value is MediaPermissionRefusal {

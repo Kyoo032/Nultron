@@ -26,6 +26,16 @@ describe("routeEditModel G-19", () => {
     expect(routeEditModel({ kind: "video", tier: "cinematic", liveModelIds: live })).toBe("veo_3_1");
   });
 
+  it("routes an image to gpt-image-2.5 first (sunburst for cinematic), and to gpt-image-2 on a key that lacks it", () => {
+    const live = ["gpt-image-2", "gpt-image-2.5-flare", "gpt-image-2.5-sunburst", "seedream-5.0-pro"];
+    expect(routeEditModel({ kind: "image", tier: "draft", liveModelIds: live })).toBe("gpt-image-2.5-flare");
+    expect(routeEditModel({ kind: "image", tier: "standard", liveModelIds: live })).toBe("gpt-image-2.5-flare");
+    expect(routeEditModel({ kind: "image", tier: "cinematic", liveModelIds: live })).toBe("gpt-image-2.5-sunburst");
+    const without = ["gpt-image-2", "seedream-5.0-pro"];
+    expect(routeEditModel({ kind: "image", tier: "standard", liveModelIds: without })).toBe("gpt-image-2");
+    expect(routeEditModel({ kind: "image", tier: "cinematic", liveModelIds: without })).toBe("gpt-image-2");
+  });
+
   it("skips missing ids and never crosses tiers", () => {
     expect(
       routeEditModel({

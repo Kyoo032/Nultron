@@ -4,7 +4,19 @@ export const MEDIA_KINDS: MediaKind[] = ["chat", "image", "video", "audio", "oth
 
 export type RoutedModels<T extends { id: string }> = Record<MediaKind, T[]>;
 
-export const DEFAULT_GATEWAY_IMAGE_MODEL = "gpt-image-2";
+/**
+ * The image id the app starts on. `gpt-image-2.5-flare` (2026-11-12): driven on the prepaid agent key at
+ * quality medium, 1024x1024 in 15 s (the 2.0 id took about 100 s on the same key), and the same id drew
+ * 1536x1024 and 1024x1536 too. It answers text-to-image only: a request with a picture to edit goes to
+ * `IMAGE_REFERENCE_MODEL` (`gatewayGenerateModel`). A key that does not list it falls to the next id in
+ * `IMAGE_PREF`.
+ */
+export const DEFAULT_GATEWAY_IMAGE_MODEL = "gpt-image-2.5-flare";
+/**
+ * The image id that edits a picture (`POST /v1/images/edits`). The 2.5 ids publish no edit route, so the
+ * default stays on this one when a reference image comes with the request.
+ */
+export const IMAGE_REFERENCE_MODEL = "gpt-image-2";
 /**
  * The last resort when nothing lists a video id at all. `seedance-2.0-fast` is the one video id
  * driven end to end on a prepaid agent key (2026-11-11: HTTP 200, 135 s, 2.75 MB), where the
@@ -18,7 +30,19 @@ export const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
 const EMBEDDING = /embedding/i;
 const EMBEDDING_PREF = ["text-embedding-3-small", "text-embedding-3-large", "text-embedding-004"];
 
-const IMAGE_PREF = ["gpt-image-2", "seedream-5.0-pro", "doubao-seedream-5-0-pro-260628"];
+/**
+ * Flare first, Sunburst next: both drew a 1024x1024 medium image on the prepaid key on 2026-11-12 (15 s and 18 s).
+ * Flare followed the prompt's colour more closely in the same-prompt pair, and the gateway describes it as the
+ * everyday id; Sunburst is the one it describes for detailed compositions. `gpt-image-2` stays behind them for a
+ * key that lists neither, and it is also the id that edits a picture.
+ */
+const IMAGE_PREF = [
+  "gpt-image-2.5-flare",
+  "gpt-image-2.5-sunburst",
+  "gpt-image-2",
+  "seedream-5.0-pro",
+  "doubao-seedream-5-0-pro-260628",
+];
 
 /** The only music generator on this gateway (2026-09; docs/internal/gateway-model-selection.md 5.3). */
 const MUSIC_PREF = ["suno_music"];

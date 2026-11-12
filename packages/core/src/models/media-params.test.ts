@@ -102,10 +102,17 @@ describe("a spec built from what the gateway published", () => {
 });
 
 describe("the built-in table", () => {
-  it("keeps the Seedance length unverified, with the live evidence, even when the price list publishes a duration", () => {
+  it("sends the Seedance length as the string `seconds` the route reads, and keeps it driven on seedance-2.0-fast only", () => {
     const built = videoSpecFor("seedance-2.0-fast");
-    expect(built.unverified).toContain("length");
-    expect(built.evidence.length).toContain("5.09 s");
+    // Live 2026-11-12: `seconds: "6"` gave a 6.04 s clip and `"15"` a 15.04 s one; `duration` was ignored.
+    expect(built.length).toMatchObject({ field: "seconds", wireType: "string", min: 4, max: 15, default: 5 });
+    expect(built.unverified).not.toContain("length");
+    expect(built.evidence.length).toContain("15.04 s");
+    // Every other Seedance id shares the route, not the evidence: its length stays unverified.
+    for (const id of ["seedance-2.0", "seedance-2.0-mini", "seedance-2.5", "seedance-1.5-pro", "seedance-9.9-ultra"]) {
+      expect(videoSpecFor(id).length, id).toMatchObject({ field: "seconds", wireType: "string" });
+      expect(videoSpecFor(id).unverified, id).toContain("length");
+    }
     const published = videoSpecFor("seedance-2.0-fast", {
       hasContent: true,
       duration: { default: 5 },
@@ -113,8 +120,9 @@ describe("the built-in table", () => {
       audio: { default: true },
     });
     expect(published.source).toBe("published");
-    // The published duration is the native endpoint's; the generic route ignored it in live calls (2026-11-11).
-    expect(published.unverified).toContain("length");
+    // The published duration is the native endpoint's: it moves neither the field nor the proven status.
+    expect(published.length).toMatchObject({ field: "seconds", wireType: "string", min: 4, max: 15 });
+    expect(published.unverified).not.toContain("length");
     expect(published.unverified).not.toContain("resolution");
     expect(published.unverified).not.toContain("audio");
   });
@@ -125,7 +133,7 @@ describe("the built-in table", () => {
       source: "built-in",
       bodyStyle: "seedance-content",
       route: "/v1/video/generations",
-      length: { field: "duration", min: 4, max: 15, default: 5, wireType: "int" },
+      length: { field: "seconds", min: 4, max: 15, default: 5, wireType: "string" },
       audio: { supported: true, field: "metadata.generate_audio", default: true },
     });
     expect(fast.aspect?.values).toEqual(["16:9", "9:16", "3:4", "1:1", "4:3"]);
@@ -236,9 +244,25 @@ describe("an unknown model falls back to its family default", () => {
     expect(imageSpecFor("kling_image").bodyStyle).toBe("generic-image");
   });
 
-  it("does not offer quality to a gpt-image id whose tiers nobody published", () => {
-    expect(imageSpecFor("gpt-image-2.5-sunburst-token").quality).toBeUndefined();
-    expect(imageSpecFor("gpt-image-2.5-sunburst").quality).toBeUndefined();
+  it("sends medium to the two gpt-image-2.5 ids that were driven, and nothing to the variants nobody drove", () => {
+    // Live 2026-11-12: flare and sunburst accepted quality medium and echoed it; low and high were not driven.
+    for (const id of ["gpt-image-2.5-flare", "gpt-image-2.5-sunburst"]) {
+      expect(imageSpecFor(id).quality, id).toEqual({ field: "quality", values: ["medium"], default: "medium" });
+      expect(imageSpecFor(id).unverified, id).not.toContain("quality");
+    }
+    for (const id of ["gpt-image-2.5-sunburst-token", "gpt-image-2.5-flare-count"]) {
+      expect(imageSpecFor(id).quality, id).toBeUndefined();
+      expect(imageSpecFor(id).unverified, id).toContain("quality");
+      expect(imageShapeOptions(imageSpecFor(id)).map((option) => option.value), id).toEqual(["1024x1024"]);
+    }
+  });
+
+  it("offers the three sizes gpt-image-2.5 drew live, and no others", () => {
+    expect(imageShapeOptions(imageSpecFor("gpt-image-2.5-flare")).map((option) => option.value)).toEqual([
+      "1024x1024",
+      "1536x1024",
+      "1024x1536",
+    ]);
   });
 });
 

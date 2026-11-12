@@ -38,7 +38,7 @@ describe("videoGenerateTool", () => {
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe("https://api.tokotokenai.com/v1/video/generations");
     expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({
       model: "seedance-2.0-fast",
-      duration: 5,
+      seconds: "5",
       size: "720p",
       metadata: { ratio: "16:9" },
     });
@@ -118,7 +118,7 @@ describe("videoGenerateTool", () => {
     );
     expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.tokotokenai.com/v1/video/generations");
     expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({
-      duration: 4,
+      seconds: "4",
       size: "480p",
       metadata: { ratio: "3:4", generate_audio: true },
     });

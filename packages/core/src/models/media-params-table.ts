@@ -29,18 +29,30 @@ const SEEDANCE_RATIO_EVIDENCE =
 const SEEDANCE_ROUTE_EVIDENCE =
   "docs llms-full.txt:6411 (generic video route) and :5966; body fields per the generic field mapping, docs llms-full.txt:5975-5984. " +
   "Live 2026-11-11: the official body's top-level ratio and duration were dropped on this route (upstream task recorded ratio 16:9, " +
-  "duration 5 for a 3:4, 4 s request), so ratio, sound and watermark go under metadata and the resolution as size";
+  "duration 5 for a 3:4, 4 s request), so ratio, sound and watermark go under metadata and the resolution as size. " +
+  "Live 2026-11-12: the length is the top-level `seconds`, sent as a string";
 
 /**
- * What the two live calls of 2026-11-11 showed about the length on the generic route: `duration` was sent
- * and ignored both times (asked 4 s, the upstream task recorded 5 and the clips run 5.09 s), while the
- * ratio, the resolution (as `size`) and sound (under `metadata`) were read. The price list names the
- * route's length `seconds` (data[seedance-2.0-fast] …openai-video.config.parameters.seconds), so both
- * names are sent; that `seconds` is read is not yet confirmed live.
+ * The one wire shape of a clip length on the generic route, for every Seedance id: the top-level `seconds`,
+ * as a STRING. Measured on the prepaid key (seedance-2.0-fast, 480p, 2026-11-12, scratchpad
+ * media3-results-image25-seedance.json):
+ * - `seconds: 6` (a number) is refused at submit, HTTP 400: "cannot unmarshal number into Go struct field
+ *   .Alias.seconds of type string". The price list types it integer; the route wants a string.
+ * - one body carrying `seconds: "6"`, `duration: 8` and `metadata.duration: 10` came back as a 6.04 s clip
+ *   (the upstream task recorded duration 6): only `seconds` is read, `duration` and `metadata.duration` are not.
+ *   Before, `duration: 4` came back as 5 s (2026-11-11).
+ * - `seconds: "15"` came back as a 15.04 s clip (upstream task duration 15), the longest a Seedance 2.0 takes.
+ * - `seconds: "16"` was not answered: the gateway refused it at submit for the account balance (403
+ *   pre_consume_token_quota_failed), not for the length, so what happens above 15 s is not measured.
+ * The same route and body shape serve every Seedance id (docs llms-full.txt:6366 "2.5 uses exactly the same
+ * endpoints and request format as 2.0"), but only seedance-2.0-fast was driven.
  */
+const SEEDANCE_LENGTH_WIRE = { field: "seconds", wireType: "string" } as const;
+
 const SEEDANCE_LENGTH_LIVE_NOTE =
-  " Live 2026-11-11, two calls: a 4 s request sent as `duration` came back as 5 s (task data.duration 5, clip 5.09 s). " +
-  "`seconds` (the price list's name on this route) is sent too and not yet confirmed live.";
+  " Live 2026-11-12 on seedance-2.0-fast, 480p: `seconds` as a string is the field the route reads (`seconds: \"6\"` gave a 6.04 s clip, " +
+  "`seconds: \"15\"` a 15.04 s clip; `duration` and `metadata.duration` in the same body were ignored; a number for `seconds` is a 400). " +
+  "The minimum (4) is the docs' figure, not driven; 16 s was not answered (refused for balance, not length).";
 
 function seedance(input: {
   family: string;
@@ -51,6 +63,8 @@ function seedance(input: {
   audio: boolean;
   audioEvidence: string;
   role: string;
+  /** True only for a family whose length was driven live (seedance-2.0-fast); the others share the route, not the evidence. */
+  lengthDriven?: boolean;
   unverified?: readonly string[];
 }): VideoSpecBody {
   return {
@@ -64,8 +78,8 @@ function seedance(input: {
       ? { supported: true, field: "metadata.generate_audio", default: true }
       : { supported: false, default: false },
     imageInput: { firstFrame: true, lastFrame: false, references: true, field: "image", role: input.role },
-    // The length is always unverified on this route: see SEEDANCE_LENGTH_LIVE_NOTE.
-    unverified: [...new Set(["length", ...(input.unverified ?? [])])],
+    // The length field is proven on one id; every other family keeps the length unverified until it is driven.
+    unverified: [...new Set([...(input.lengthDriven ? [] : ["length"]), ...(input.unverified ?? [])])],
     evidence: {
       route: SEEDANCE_ROUTE_EVIDENCE,
       aspect: SEEDANCE_RATIO_EVIDENCE,
@@ -79,9 +93,9 @@ function seedance(input: {
   };
 }
 
-const SEEDANCE_2_LENGTH: VideoLengthSpec = { field: "duration", min: 4, max: 15, step: 1, default: 5, wireType: "int" };
+const SEEDANCE_2_LENGTH: VideoLengthSpec = { ...SEEDANCE_LENGTH_WIRE, min: 4, max: 15, step: 1, default: 5 };
 const SEEDANCE_2_LENGTH_EVIDENCE =
-  "docs llms-full.txt:6460 (4 to 15 seconds, default 5); default also pricing.json data[seedance-2.0-fast] …seedance2-native-video.config.parameters.duration.default";
+  "docs llms-full.txt:6460 and :5979 (4 to 15 seconds, default 5; the generic `duration` or `seconds` maps to the official duration); default also pricing.json data[seedance-2.0-fast] …seedance2-native-video.config.parameters.duration.default; max 15 driven live 2026-11-12.";
 const SEEDANCE_AUDIO_EVIDENCE =
   "docs llms-full.txt:6461 (generate_audio default true); pricing.json data[seedance-2.0-fast] …config.parameters.generate_audio.default";
 
@@ -90,7 +104,7 @@ export const BUILTIN_VIDEO: readonly BuiltinVideo[] = [
     ids: ["seedance-1.0-pro", "seedance-1.0-pro-fast"],
     spec: seedance({
       family: "seedance-1.0",
-      length: { field: "duration", values: [5, 10], default: 5, wireType: "int" },
+      length: { ...SEEDANCE_LENGTH_WIRE, values: [5, 10], default: 5 },
       lengthEvidence:
         "assumed (Seedance 1.x renders 5 s or 10 s clips); the price list publishes only the default 5, no min or max",
       resolutions: ["480p", "720p", "1080p"],
@@ -106,7 +120,7 @@ export const BUILTIN_VIDEO: readonly BuiltinVideo[] = [
     ids: ["seedance-1.5-pro"],
     spec: seedance({
       family: "seedance-1.5-pro",
-      length: { field: "duration", values: [5, 10], default: 5, wireType: "int" },
+      length: { ...SEEDANCE_LENGTH_WIRE, values: [5, 10], default: 5 },
       lengthEvidence: "assumed (Seedance 1.5 promises 5 s and 10 s); the price list publishes only the default 5",
       resolutions: ["480p", "720p", "1080p"],
       resolutionEvidence: "pricing.json data[seedance-1.5-pro] …config.parameters.resolution.enum",
@@ -146,6 +160,7 @@ export const BUILTIN_VIDEO: readonly BuiltinVideo[] = [
       family: "seedance-2.0-fast",
       length: SEEDANCE_2_LENGTH,
       lengthEvidence: SEEDANCE_2_LENGTH_EVIDENCE,
+      lengthDriven: true,
       resolutions: ["480p", "720p"],
       resolutionEvidence: "pricing.json data[seedance-2.0-fast] …config.parameters.resolution.enum (480p, 720p only)",
       audio: true,
@@ -170,8 +185,8 @@ export const BUILTIN_VIDEO: readonly BuiltinVideo[] = [
     ids: ["seedance-2.5", "doubao-seedance-2-5-260628", "dreamina-seedance-2-5-260628"],
     spec: seedance({
       family: "seedance-2.5",
-      length: { field: "duration", min: 4, max: 30, step: 1, default: 5, wireType: "int" },
-      lengthEvidence: "docs llms-full.txt:6399 and :6460 (up to 30 seconds, default 5)",
+      length: { ...SEEDANCE_LENGTH_WIRE, min: 4, max: 30, step: 1, default: 5 },
+      lengthEvidence: "docs llms-full.txt:6399 and :6460 (up to 30 seconds, default 5); not driven, the 30 s figure is the docs' only",
       resolutions: ["480p", "720p"],
       resolutionEvidence:
         "pricing.json data[seedance-2.5] …config.parameters.resolution.enum; docs llms-full.txt:6400 (480p / 720p)",
@@ -379,7 +394,7 @@ export const VIDEO_FAMILY_DEFAULTS: readonly FamilyVideo[] = [
     match: /seedance/i,
     spec: seedance({
       family: "seedance",
-      length: { field: "duration", values: [5], default: 5, wireType: "int" },
+      length: { ...SEEDANCE_LENGTH_WIRE, values: [5], default: 5 },
       lengthEvidence: "family default: only the published default (5 s) is offered for an unlisted Seedance id",
       resolutions: ["480p", "720p"],
       resolutionEvidence: "family default: 480p and 720p are accepted by every Seedance id in the price list",
@@ -472,6 +487,14 @@ const GPT_IMAGE_2_SIZES = [
 ] as const;
 
 const SQUARE_ONLY = [{ value: "1024x1024", aspect: "1:1" }] as const;
+
+/** The three sizes gpt-image-2.5 drew on the prepaid key (2026-11-12): each came back at exactly the size asked. */
+const GPT_IMAGE_25_SIZES = [
+  { value: "1024x1024", aspect: "1:1" },
+  { value: "1536x1024", aspect: "3:2" },
+  { value: "1024x1536", aspect: "2:3" },
+] as const;
+
 const GENERATIONS_ROUTE = "/v1/images/generations";
 const EDITS_ROUTE = "/v1/images/edits";
 
@@ -531,14 +554,28 @@ export const BUILTIN_IMAGE: readonly BuiltinImage[] = [
       family: "gpt-image-2.5-sunburst-flare",
       bodyStyle: "openai-image",
       route: GENERATIONS_ROUTE,
-      shape: { mode: "size", field: "size", options: SQUARE_ONLY, default: "1024x1024" },
+      shape: { mode: "size", field: "size", options: GPT_IMAGE_25_SIZES, default: "1024x1024" },
+      // Only medium is offered, and it is always sent: it is the one tier driven on these ids (the response
+      // echoed quality "medium"), the guide says not to infer the others from gpt-image-2, and a one-value
+      // list draws no quality menu.
+      quality: { field: "quality", values: ["medium"], default: "medium" },
       referenceField: null,
-      unverified: ["quality", "format", "image"],
+      unverified: ["format", "image"],
       evidence: {
-        route: "docs llms-full.txt:4252",
-        size: "docs llms-full.txt:4265 (only 1024x1024 is verified for these ids)",
-        quality: "the guide says not to infer quality from gpt-image-2, docs llms-full.txt:4266; none is sent",
+        route:
+          "docs llms-full.txt:4252; driven live 2026-11-12: HTTP 200, synchronous, 15 s (flare) and 18 s (sunburst) at 1024x1024, " +
+          "about a sixth of gpt-image-2's ~100 s on the same key",
+        size:
+          "live 2026-11-12 on gpt-image-2.5-flare: 1024x1024, 1536x1024 and 1024x1536 each returned a PNG of exactly that size " +
+          "(the response's size field echoed it); docs llms-full.txt:4265 verifies only 1024x1024, so no other size is offered",
+        quality:
+          'live 2026-11-12: quality "medium" was accepted by flare and sunburst and echoed in the response (quality: "medium"); ' +
+          "low and high were not driven, and the guide says not to infer them from gpt-image-2, docs llms-full.txt:4266",
         count: "docs llms-full.txt:4258 (n: 1)",
+        image:
+          "no edit route is published for these ids (editing is not verified, docs llms-full.txt:4266); " +
+          "a request that carries a picture goes to gpt-image-2 (IMAGE_REFERENCE_MODEL)",
+        format: "not driven: the response was a PNG (output_format png), so no format is offered",
       },
     },
   },
@@ -645,26 +682,47 @@ export const BUILTIN_IMAGE: readonly BuiltinImage[] = [
 
 type FamilyImage = { family: string; match: RegExp; spec: ImageSpecBody };
 
-function imageFamily(id: string, family: string, match: RegExp): FamilyImage {
+function imageFamily(
+  id: string,
+  family: string,
+  match: RegExp,
+  /** Narrow the copy: what the first member's live evidence does not carry over to an unlisted id of the family. */
+  narrow?: (spec: ImageSpecBody) => ImageSpecBody,
+): FamilyImage {
   const entry = BUILTIN_IMAGE.find((item) => item.ids.includes(id));
   if (!entry) {
     throw new Error(`media-params-table: no built-in image entry for ${id}`);
   }
   const { unverified, evidence, ...rest } = entry.spec;
-  return {
+  const copy: ImageSpecBody = {
+    ...rest,
     family,
-    match,
-    spec: {
-      ...rest,
-      family,
-      unverified: [...new Set([...unverified, "size", "aspect"])],
-      evidence: { ...evidence, family: `family default copied from ${id}; an unlisted id may differ` },
+    unverified: [...new Set([...unverified, "size", "aspect"])],
+    evidence: { ...evidence, family: `family default copied from ${id}; an unlisted id may differ` },
+  };
+  return { family, match, spec: narrow ? narrow(copy) : copy };
+}
+
+/**
+ * An unlisted gpt-image-2.5 id (the -count and -token variants) shares the family, not the evidence: only flare and
+ * sunburst were driven, so the copy offers a square and sends no quality.
+ */
+function narrowGptImage25(spec: ImageSpecBody): ImageSpecBody {
+  const { quality: _quality, ...rest } = spec;
+  return {
+    ...rest,
+    shape: { mode: "size", field: "size", options: SQUARE_ONLY, default: "1024x1024" },
+    unverified: [...new Set([...spec.unverified, "quality"])],
+    evidence: {
+      ...spec.evidence,
+      size: "family default: only 1024x1024 is known for an unlisted gpt-image-2.5 id (docs llms-full.txt:4265)",
+      quality: "family default: no quality is sent to an unlisted gpt-image-2.5 id; only flare and sunburst were driven",
     },
   };
 }
 
 export const IMAGE_FAMILY_DEFAULTS: readonly FamilyImage[] = [
-  imageFamily("gpt-image-2.5-sunburst", "gpt-image-2.5", /gpt-image-2\.5/i),
+  imageFamily("gpt-image-2.5-sunburst", "gpt-image-2.5", /gpt-image-2\.5/i, narrowGptImage25),
   imageFamily("gpt-image-2", "gpt-image", /gpt-image/i),
   imageFamily("nano-banana", "nano-banana", /^nano-banana/i),
   imageFamily("gemini-3.1-flash-image-preview", "gemini-image", /gemini-[\w.-]*image/i),

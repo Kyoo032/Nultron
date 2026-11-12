@@ -13,6 +13,7 @@
 import { ApiError } from "../errors";
 import { modeMessage } from "../mode-messages";
 import type { AppLocale } from "../locale";
+import { IMAGE_REFERENCE_MODEL } from "./media-kind";
 import {
   applyPublishedImage,
   applyPublishedVideo,
@@ -86,6 +87,16 @@ export function imageSpecFor(model: string, published?: PublishedMediaParams): I
     source: exact ? "built-in" : "family-default",
   };
   return published ? applyPublishedImage(spec, published) : spec;
+}
+
+/**
+ * The image id a request runs on when a picture comes with it. `model` itself when it takes a reference, else
+ * `IMAGE_REFERENCE_MODEL`: the gpt-image-2.5 ids publish no edit route, so an app default on one of them hands
+ * "edit this picture" to the id that has one. Only for a model nobody named: a named model that takes no
+ * picture is still refused by the request builder, in words.
+ */
+export function imageModelForReference(model: string): string {
+  return imageSpecFor(model).referenceField === null ? IMAGE_REFERENCE_MODEL : model;
 }
 
 // ------------------------------------------------------------------------------------- number work

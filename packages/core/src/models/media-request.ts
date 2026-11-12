@@ -99,17 +99,17 @@ function putShared(body: Body, spec: VideoParamSpec, sent: VideoSent): void {
 export const VIDEO_BUILDERS: Readonly<Record<VideoBodyStyle, VideoBuilder>> = {
   /**
    * Seedance, on the generic route with the generic body (docs llms-full.txt:5985-5996 and the field mapping
-   * at :5975-5984): `prompt`, `duration`, `size` (the resolution), and `ratio`, `generate_audio` and
-   * `watermark` under `metadata`. The gateway converts it to the official `content[]` body. The official body's
-   * top-level `ratio` and `duration` are NOT read on this route: a live call on 2026-11-11 sent ratio 3:4 and
-   * duration 4 that way and the upstream task recorded 16:9 and 5.
+   * at :5975-5984): `prompt`, `seconds` (the length, a STRING), `size` (the resolution), and `ratio`,
+   * `generate_audio` and `watermark` under `metadata`. The gateway converts it to the official `content[]` body.
+   * The official body's top-level `ratio` and `duration` are NOT read on this route: a live call on 2026-11-11 sent
+   * ratio 3:4 and duration 4 that way and the upstream task recorded 16:9 and 5. Live on 2026-11-12 the length
+   * is `seconds`: a string is read (6 gave 6.04 s, 15 gave 15.04 s), a number is a 400, and `duration` and
+   * `metadata.duration` are ignored, so neither is sent. The spec (`media-params-table.ts`) owns the field and
+   * its type; `putShared` writes it.
    */
   "seedance-content": ({ model, prompt, imageUrl, spec, sent }) => {
     const body: Body = { model, prompt };
     putShared(body, spec, sent);
-    // `duration` alone was ignored in two live calls (asked 4 s, got 5 s); the price list names this route's
-    // length `seconds`. Both are sent. That `seconds` is read is not yet confirmed live.
-    body.seconds = sent.seconds;
     if (spec.audio.supported && spec.audio.field && sent.audio !== undefined) {
       put(body, spec.audio.field, sent.audio);
     }
