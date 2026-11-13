@@ -133,13 +133,21 @@ export type TierLiveness = Readonly<{
    * `provider` until the breaker learns providers, which M4 needs.
    */
   isDown: (provider: ProviderId, model: string) => boolean;
+  /**
+   * Whether this live model is held to the end of the walk for this turn: it answers only when no other
+   * candidate of the tier, on any provider, is live. It is demoted, never dropped, so a tier whose only live
+   * candidates are demoted still answers. Absent means nothing is demoted. `model` is the catalog spelling.
+   * The walk does not know why: the host decides, from the turn and from what it has measured of the model.
+   */
+  demoted?: (provider: ProviderId, model: string) => boolean;
 }>;
 
 export type SkippedCandidate = Readonly<{
   provider: ProviderId;
   /** The catalog spelling when the model was listed, otherwise the spelling in the list. */
   model: string;
-  reason: "unlisted" | "down";
+  /** `demoted`: live, but passed over for a later candidate that is not demoted. */
+  reason: "unlisted" | "down" | "demoted";
 }>;
 
 export type TierResolution =
@@ -165,6 +173,10 @@ export type TierResolution =
  * does not list it or the breaker holds it down. When none is left the answer is `tier_unavailable`,
  * which is also the answer for an empty provider list.
  *
+ * A candidate `liveness.demoted` names is tried after every other candidate of the tier, across all
+ * providers, in the order the lists give. The order of everything else is unchanged. When only demoted
+ * candidates are live, the first of them answers.
+ *
  * It never falls through to another tier: a person who chose Reasoning and got a fast model was told
  * something untrue. Chat's fallback after a failed call is the same walk run again, because the host
  * puts the failed id on the breaker first.
@@ -179,6 +191,16 @@ export function resolveTier(
 ): TierResolution {
   const definition = definitions[tier];
   const skipped: SkippedCandidate[] = [];
+  const held: { provider: ProviderId; model: string }[] = [];
+  const answer = (provider: ProviderId, model: string, trail: readonly SkippedCandidate[]): TierResolution =>
+    Object.freeze({
+      ok: true,
+      tier,
+      provider,
+      model,
+      thinking: definition.thinking,
+      skipped: Object.freeze([...trail]),
+    });
   for (const provider of new Set(liveness.providers)) {
     const candidates = Object.hasOwn(definition.candidates, provider) ? definition.candidates[provider] : undefined;
     for (const candidate of candidates ?? []) {
@@ -191,15 +213,20 @@ export function resolveTier(
         skipped.push(Object.freeze({ provider, model, reason: "down" }));
         continue;
       }
-      return Object.freeze({
-        ok: true,
-        tier,
-        provider,
-        model,
-        thinking: definition.thinking,
-        skipped: Object.freeze([...skipped]),
-      });
+      if (liveness.demoted?.(provider, model)) {
+        held.push({ provider, model });
+        skipped.push(Object.freeze({ provider, model, reason: "demoted" }));
+        continue;
+      }
+      return answer(provider, model, skipped);
     }
   }
-  return Object.freeze({ ok: false, tier, error: "tier_unavailable", skipped: Object.freeze([...skipped]) });
+  // Nothing undemoted is live. The first demoted candidate answers, and the log has no demotion to report
+  // for it: nothing was passed over for it.
+  const [fallback] = held;
+  const passedOver = skipped.filter((entry) => entry.reason !== "demoted");
+  if (fallback) {
+    return answer(fallback.provider, fallback.model, passedOver);
+  }
+  return Object.freeze({ ok: false, tier, error: "tier_unavailable", skipped: Object.freeze(passedOver) });
 }

@@ -64,7 +64,12 @@ import { resolveTierRun } from "./tier-resolve";
 import { markJobModelDown, maySwapModel, pickNext, startModel } from "./job-model-fallback";
 import { readModelPinned } from "./job-regen";
 import { collectToolMediaParts } from "./tool-media";
-import { assertChatImagesSendable, prepareChatImageHistory, type ChatTurn } from "./chat-image-history";
+import {
+  assertChatImagesSendable,
+  historyReplaysPicture,
+  prepareChatImageHistory,
+  type ChatTurn,
+} from "./chat-image-history";
 import { readRetryTurn, turnIsStored } from "./chat-retry";
 import { readMediaPermission } from "./paid-media-body";
 import { saveGeneratedImage, saveGeneratedVideo } from "./media";
@@ -147,6 +152,24 @@ function withPastSessionsBinding(bindings: ToolBindingRecord[]): ToolBindingReco
   ];
 }
 
+/**
+ * Whether the thread's earlier pictures reach the model on the text turn about to be sent, by the rule the
+ * replay uses (`historyReplaysPicture`). The tier walk reads it to demote a model measured to misread
+ * pictures. A thread that cannot be read answers no: the walk then runs as it did, and the replay itself
+ * reports the failure where it always has.
+ */
+async function threadReplaysPicture(tenant: TenantContext, threadId: string): Promise<boolean> {
+  try {
+    const rows = await listMessages(tenant, threadId);
+    const stored: ChatTurn[] = rows
+      .filter((row) => row.role === "user")
+      .map((row) => ({ role: "user", parts: modelHistoryParts(row.content as ContentPart[]) }));
+    return await historyReplaysPicture(tenant, stored);
+  } catch {
+    return false;
+  }
+}
+
 export async function* startModalityRun(options: {
   tenant: TenantContext;
   threadId: string;
@@ -160,7 +183,12 @@ export async function* startModalityRun(options: {
   const userParts = settings.injectionGuardBypass === true ? parsed.parts : redactAttachedParts(parsed.parts);
   // A body that names a `tier` gets its model and Thinking choice from the tier, and the body's own
   // `thinking` and `reasoningEffort` are never read. A body that names none is `null` and runs as before.
-  const tierRun = resolveTierRun({ body: options.body, modality: options.modality, tenant: options.tenant });
+  const tierRun = await resolveTierRun({
+    body: options.body,
+    modality: options.modality,
+    tenant: options.tenant,
+    threadReplaysPicture: () => threadReplaysPicture(options.tenant, options.threadId),
+  });
   // `explicit` is what lets the runtime send a model it has never seen no effort at all unless the
   // person picked one; the level alone cannot say that.
   const { effort: reasoningEffort, explicit: reasoningEffortExplicit } =

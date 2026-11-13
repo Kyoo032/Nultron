@@ -5,6 +5,7 @@ const EARLIER_NOTE_OPENING = EARLIER_IMAGE_NOT_VISIBLE_NOTE.slice(0, 40);
 import {
   assertChatImagesSendable,
   CHAT_IMAGE_REQUEST_BYTES,
+  historyReplaysPicture,
   prepareChatImageHistory,
   type ChatMediaReader,
   type ChatTurn,
@@ -394,5 +395,89 @@ describe("assertChatImagesSendable", () => {
     await expect(
       assertChatImagesSendable(tenant, [image(ID_A), image(ID_B)], opts(media, { locale: "id" })),
     ).rejects.toThrow(/terlalu besar untuk dikirim bersamaan \(lebih dari 6 MB\)/);
+  });
+});
+
+/**
+ * The question the tier walk asks before it picks a model: does the next text turn put a picture in front of
+ * a model that reads pictures? It is answered by the replay itself, so every case below also checks the
+ * answer against what `prepareChatImageHistory` sends for the same thread with a new text message on the end.
+ */
+describe("historyReplaysPicture", () => {
+  const hasPixels = (turns: ChatTurn[]) =>
+    turns.some((one) => one.role === "user" && one.parts.some((part) => part.type === "image_url"));
+
+  /** The answer, and what the real replay sends for the same thread plus the new text message. */
+  async function both(stored: ChatTurn[], media: ChatMediaReader, budgetBytes?: number) {
+    const options = budgetBytes ? { media, budgetBytes } : { media };
+    const asked = await historyReplaysPicture(tenant, stored, options);
+    const sent = await prepareChatImageHistory(tenant, [...stored, turn("user", text("and now?"))], {
+      ...gpt(media, budgetBytes ? { budgetBytes } : {}),
+    });
+    return { asked, sent: hasPixels(sent) };
+  }
+
+  it("says no, and never touches the store, for a thread with no picture in it", async () => {
+    const media = store({});
+    expect(await historyReplaysPicture(tenant, [], { media })).toBe(false);
+    const words = [turn("user", text("hi")), turn("assistant", text("hello"))];
+    expect(await historyReplaysPicture(tenant, words, { media })).toBe(false);
+    expect(media.stat).not.toHaveBeenCalled();
+    expect(media.read).not.toHaveBeenCalled();
+  });
+
+  it("says yes for an earlier picture that fits, as the replay sends it", async () => {
+    const stored = [turn("user", text("look"), image(ID_A)), turn("assistant", text("a red and blue square"))];
+    expect(await both(stored, store({ [ID_A]: 100 }))).toEqual({ asked: true, sent: true });
+  });
+
+  it("says no for a picture the assistant made, which is never sent", async () => {
+    const stored = [turn("user", text("draw")), turn("assistant", text("here"), image(ID_A))];
+    expect(await both(stored, store({ [ID_A]: 100 }))).toEqual({ asked: false, sent: false });
+  });
+
+  it("says no when the newest picture is over the budget and so closes the older ones too", async () => {
+    const stored = [turn("user", image(ID_A)), turn("assistant", text("ok")), turn("user", image(ID_B))];
+    const media = store({ [ID_A]: 1, [ID_B]: 50 });
+    expect(await both(stored, media, 10)).toEqual({ asked: false, sent: false });
+  });
+
+  it("says yes when the newest picture is unreadable but an older one fits", async () => {
+    // A picture the store has lost is only a note; it does not close the budget the way a too-large one does.
+    const stored = [turn("user", image(ID_A)), turn("assistant", text("ok")), turn("user", image(ID_B))];
+    expect(await both(stored, store({ [ID_A]: 5 }))).toEqual({ asked: true, sent: true });
+  });
+
+  it("says no for a picture the store no longer has, a stored file that is not an image and a web link", async () => {
+    const link: ContentPart = { type: "image_url", image_url: { url: "https://cdn.example/a.png" } };
+    expect(await both([turn("user", image(ID_A))], store({}))).toEqual({ asked: false, sent: false });
+    expect(await both([turn("user", image(ID_A))], store({ [ID_A]: 5 }, { [ID_A]: "video" }))).toEqual({
+      asked: false,
+      sent: false,
+    });
+    expect(await both([turn("user", link)], store({}))).toEqual({ asked: false, sent: false });
+  });
+
+  it("says no when the bytes cannot be read, though the row is there", async () => {
+    const media = { stat: vi.fn(async () => ({ kind: "image", sizeBytes: 5 })), read: vi.fn(async () => null) };
+    expect(await both([turn("user", image(ID_A))], media)).toEqual({ asked: false, sent: false });
+  });
+
+  it("says yes for a picture sent as a data URL", async () => {
+    const stored = [turn("user", { type: "image_url", image_url: { url: dataUrlOf(4) } })];
+    expect(await both(stored, store({}))).toEqual({ asked: true, sent: true });
+  });
+
+  it("does not refuse and does not throw for a thread whose earlier pictures cannot be sent", async () => {
+    // The refusal is for the latest message's own pictures. The new message here is text.
+    const stored = [turn("user", image(ID_A))];
+    await expect(historyReplaysPicture(tenant, stored, { media: store({ [ID_A]: 7 * MIB }) })).resolves.toBe(false);
+  });
+
+  it("does not change the thread it was given", async () => {
+    const stored = [turn("user", image(ID_A))];
+    await historyReplaysPicture(tenant, stored, { media: store({ [ID_A]: 10 }) });
+    expect(stored).toHaveLength(1);
+    expect(stored[0]?.parts[0]).toEqual(image(ID_A));
   });
 });

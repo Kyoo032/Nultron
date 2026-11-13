@@ -70,13 +70,14 @@ function candidates(tier: ModelTierId): readonly string[] {
   return TIER_DEFINITIONS[tier].candidates[GATEWAY_PROVIDER_ID] ?? [];
 }
 
-/** Every gateway candidate of every tier, text only. */
-function fullCatalog(): SelectableModel[] {
-  return [...new Set(MODEL_TIERS.flatMap((tier) => candidates(tier)))].map((id) => row(id));
+/** Every gateway candidate of every tier, text only unless `modalities` says more. */
+function fullCatalog(modalities: InputModality[] = TEXT): SelectableModel[] {
+  return [...new Set(MODEL_TIERS.flatMap((tier) => candidates(tier)))].map((id) => row(id, modalities));
 }
 
 let dispatch: (request: HostRequest) => Promise<HostResult>;
 let threadId = "";
+let chatAgentId = "";
 
 function request(method: string, path: string, extra: Partial<HostRequest> = {}): HostRequest {
   return { method, path, query: {}, params: {}, headers: {}, ...extra };
@@ -84,13 +85,21 @@ function request(method: string, path: string, extra: Partial<HostRequest> = {})
 
 type Route = "text" | "image" | "video";
 
-async function send(body: Record<string, unknown>, route: Route = "text"): Promise<HostResult> {
-  return dispatch(request("POST", `/api/v1/threads/${threadId}/runs/${route}`, { params: { threadId }, body }));
+async function send(
+  body: Record<string, unknown>,
+  route: Route = "text",
+  thread: string = threadId,
+): Promise<HostResult> {
+  return dispatch(request("POST", `/api/v1/threads/${thread}/runs/${route}`, { params: { threadId: thread }, body }));
 }
 
 /** Post a run that must start, and drain it: the run only finishes once its frames have been read. */
-async function postRun(body: Record<string, unknown>, route: Route = "text"): Promise<void> {
-  const result = await send(body, route);
+async function postRun(
+  body: Record<string, unknown>,
+  route: Route = "text",
+  thread: string = threadId,
+): Promise<void> {
+  const result = await send(body, route, thread);
   if (result.type !== "stream") {
     throw new Error(`expected a stream, got ${result.type}: ${JSON.stringify((result as { body?: unknown }).body)}`);
   }
@@ -131,6 +140,11 @@ function videoBody(extra: Record<string, unknown> = {}): Record<string, unknown>
   };
 }
 
+async function newThread(): Promise<string> {
+  const created = await json<{ thread: { id: string } }>("POST", "/api/v1/threads", { agentId: chatAgentId });
+  return created.thread.id;
+}
+
 async function json<T>(method: string, path: string, body?: unknown): Promise<T> {
   const result = await dispatch(request(method, path, { body }));
   if (result.type !== "json") {
@@ -144,8 +158,8 @@ beforeAll(async () => {
   ({ dispatch } = await import("./router"));
   // The first visit creates the local owner and the default chat agent, like opening Chat does.
   const chat = await json<{ agent: { id: string } }>("GET", "/api/v1/chat");
-  const created = await json<{ thread: { id: string } }>("POST", "/api/v1/threads", { agentId: chat.agent.id });
-  threadId = created.thread.id;
+  chatAgentId = chat.agent.id;
+  threadId = await newThread();
 }, ROUTER_IMPORT_BUDGET_MS);
 
 beforeEach(() => {
@@ -330,7 +344,9 @@ describe("a tier on the image and video routes", () => {
   it("resolves the same tier to the head when the run is text", async () => {
     const [head, second] = candidates("daily") as [string, string];
     state.catalog = [row(head, TEXT), row(second, TEXT_IMAGE)];
-    await postRun({ content: "hello", tier: "daily" });
+    // A thread of its own: the shared one holds the picture of the test above, and a follow-up in it would
+    // replay that picture (the next describe covers that case).
+    await postRun({ content: "hello", tier: "daily" }, "text", await newThread());
     expect(executed[0]?.version.model).toBe(head);
   });
 
@@ -353,5 +369,90 @@ describe("a tier on the image and video routes", () => {
   it("refuses a model beside a tier on these routes too", async () => {
     const answer = await refused(imageBody({ tier: "daily", model: "gpt-6-luna" }), "image");
     expect(answer.error.code).toBe("tier_and_model");
+  });
+});
+
+describe("a tier on a turn that carries a picture", () => {
+  // The Luna models read a picture and misreported it (measured 2026-11-13, `PICTURE_MISREADS`), so a tier
+  // tries them after every other candidate. Every row here lists images, so only the demotion decides.
+  const LUNA = "gpt-6-luna";
+  // A picture stays in its thread and is replayed on later turns, so each test starts on a thread of its own.
+  let thread = "";
+
+  beforeEach(async () => {
+    state.catalog = fullCatalog(TEXT_IMAGE);
+    thread = await newThread();
+  });
+
+  it("sends a picture on Daily to claude-sonnet-5-5, where a text turn still goes to gpt-6-luna", async () => {
+    expect(candidates("daily")[0]).toBe(LUNA);
+    await postRun(imageBody({ tier: "daily" }), "image", thread);
+    expect(executed[0]?.modality).toBe("image");
+    expect(executed[0]?.version.model).toBe("claude-sonnet-5-5");
+    // The tier's Thinking is the tier's, whichever model answers.
+    expect(executed[0]?.reasoningEffort).toBe("medium");
+    expect(executed[0]?.reasoningEffortExplicit).toBe(false);
+    // The same words on a thread that holds no picture.
+    await postRun({ content: "hello", tier: "daily" }, "text", await newThread());
+    expect(executed[1]?.version.model).toBe(LUNA);
+  });
+
+  it("keeps Fastest on its head and Reasoning on its own for a picture", async () => {
+    await postRun(imageBody({ tier: "fast" }), "image", thread);
+    await postRun(imageBody({ tier: "reasoning" }), "image", thread);
+    expect(executed.map((input) => input.version.model)).toEqual(["deepseek-v4-1-flash", "claude-opus-5-5"]);
+    expect(executed[0]?.reasoningEffort).toBe("none");
+    expect(executed[1]?.reasoningEffort).toBe("high");
+  });
+
+  it("still answers when the only live models of the tier are the marked ones", async () => {
+    state.catalog = [row(LUNA, TEXT_IMAGE), row("gpt-5.6-luna", TEXT_IMAGE)];
+    await postRun(imageBody({ tier: "daily" }), "image", thread);
+    await postRun(imageBody({ tier: "fast" }), "image", thread);
+    expect(executed.map((input) => input.version.model)).toEqual([LUNA, LUNA]);
+  });
+
+  it("accepts a marked model that the person names with a picture", async () => {
+    await postRun(imageBody({ model: LUNA }), "image", thread);
+    await postRun(imageBody({ model: "gpt-5.6-luna" }), "image", thread);
+    expect(executed.map((input) => input.version.model)).toEqual([LUNA, "gpt-5.6-luna"]);
+  });
+
+  it("gives a text follow-up in a thread that holds a picture the same demotion, because the replay sends it", async () => {
+    await postRun(imageBody({ tier: "daily" }), "image", thread);
+    await postRun({ content: "and the right half?", tier: "daily" }, "text", thread);
+    await postRun({ content: "and the right half?", tier: "fast" }, "text", thread);
+    await postRun({ content: "and the right half?", tier: "reasoning" }, "text", thread);
+    expect(executed.map((input) => input.version.model)).toEqual([
+      "claude-sonnet-5-5",
+      "claude-sonnet-5-5",
+      "deepseek-v4-1-flash",
+      "claude-opus-5-5",
+    ]);
+    // The follow-up's history really carries the picture to the model.
+    const history = executed[1]?.history ?? [];
+    expect(JSON.stringify(history)).toContain("image_url");
+  });
+
+  it("leaves a text turn in a thread with no picture on gpt-6-luna", async () => {
+    await postRun({ content: "hello", tier: "daily" }, "text", thread);
+    await postRun({ content: "hello again", tier: "daily" }, "text", thread);
+    expect(executed.map((input) => input.version.model)).toEqual([LUNA, LUNA]);
+  });
+
+  it("keeps an explicit model on a follow-up in a thread that holds a picture", async () => {
+    await postRun(imageBody({ tier: "daily" }), "image", thread);
+    await postRun({ content: "and the right half?", model: LUNA }, "text", thread);
+    expect(executed[1]?.version.model).toBe(LUNA);
+  });
+
+  it("does not change the tiers the catalog reports: Daily still takes pictures", async () => {
+    const chat = await json<{ tiers: { id: string; available: boolean; inputModalities: string[] }[] }>(
+      "GET",
+      "/api/v1/chat",
+    );
+    const daily = chat.tiers.find((tier) => tier.id === "daily");
+    expect(daily?.available).toBe(true);
+    expect(daily?.inputModalities).toContain("image");
   });
 });
