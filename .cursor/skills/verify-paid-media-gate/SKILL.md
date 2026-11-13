@@ -105,7 +105,9 @@ Applies eleven breaks to the real source one at a time (a grant never spent, any
 
 How the breaks work. Each entry in `BREAKS` names a file, the exact text to change (`find`, which must occur exactly once in the file's own line endings, LF or CRLF, or the break is `NOT RUN`) and the groups that must go red (`catchers`). The script refuses to start when the checks are already red, because it would prove nothing. It puts each file back in a `finally` and again on exit. If the process is killed before it restores (power loss), `git diff` shows the file; restore it from git.
 
-Last full run (2026-11-03, base `8dfcd9a`, on Windows with CRLF checkouts): eleven of eleven caught, none missed, none not run. Every file was put back: `git status` was the same before and after, and no product file was modified. Every break turned red in one of the two property files; `delegate-keeps-media` and `new-run-entry` turned red only there. An earlier run on the same day had four breaks `NOT RUN` (`grant-never-spent`, `key-ignores-model`, `delegate-keeps-media`, `run-without-gate`), because their `find` text holds a line break and the Windows checkout ends lines in CRLF; `check.mjs` now matches the file's own line endings, and that is the run reported here.
+Last full run (2026-11-13, base `365d4af6`, on Windows with CRLF checkouts): eleven of eleven caught, none missed, none not run, and `git status` was the same before and after. It is the first run on the AI SDK 5 runtime (`35dd6ff6`, which landed after the run below).
+
+Previous full run (2026-11-03, base `8dfcd9a`, on Windows with CRLF checkouts): eleven of eleven caught, none missed, none not run. Every file was put back: `git status` was the same before and after, and no product file was modified. Every break turned red in one of the two property files; `delegate-keeps-media` and `new-run-entry` turned red only there. An earlier run on the same day had four breaks `NOT RUN` (`grant-never-spent`, `key-ignores-model`, `delegate-keeps-media`, `run-without-gate`), because their `find` text holds a line break and the Windows checkout ends lines in CRLF; `check.mjs` now matches the file's own line endings, and that is the run reported here.
 
 ## Coverage record
 
@@ -120,7 +122,13 @@ Last full run (2026-11-03, base `8dfcd9a`, on Windows with CRLF checkouts): elev
 | `packages/host/src/runs.ts`, `delegation/run-delegation.ts`, `job-regen.ts`, `edit/agent-run.ts` | the `.execute({ bindings })` calls |
 | `packages/host/src/studio-generate.ts`, `packages/core/src/tools/platform/register.ts` | uses of the generator tool objects |
 
-**Sync commit: `b79a527`** (`main`, 2026-11-03). The check was confirmed to describe the files above at that commit. To see what moved since: `git log --oneline b79a527..HEAD -- <files above>` and `git diff b79a527..HEAD -- <files above>`. After you confirm the tests still describe the code, write the new commit here.
+**Sync commit: `365d4af6`** (`main`, 2026-11-13). The check was confirmed to describe the files above at that commit. To see what moved since: `git log --oneline 365d4af6..HEAD -- <files above>` and `git diff 365d4af6..HEAD -- <files above>`. After you confirm the tests still describe the code, write the new commit here.
+
+Since the previous sync (`b79a527`), these changes touched covered code, and none of them changes what the check describes:
+- `35dd6ff6` moved the runtime to AI SDK 5. The gate is still built once in `stream` and handed to `buildAiTools`. Each tool's `execute` still goes through `invokeToolGuarded` with the gate. A disabled tool is now left out of the tool map instead of getting a refusal `execute`, and neither version reached the gate.
+- `5448c4f9` and `9b80459b` changed only the settle logic in `runs.ts`. The `.execute({ bindings })` calls and their `mediaPermission` argument are unchanged.
+- `771e9d90` and `3bff8ec1` retry less. Every retry shares the one gate.
+- `media-permission.ts`, `invoke-guarded.ts`, the image and video tool schemas, the harness specs and the run entries have not changed.
 
 ## Why not TLA+
 
