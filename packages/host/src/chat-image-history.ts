@@ -217,12 +217,44 @@ export async function prepareChatImageHistory(
   history: ChatTurn[],
   options: Options,
 ): Promise<ChatTurn[]> {
+  return replayImages(tenant, history, modelImageInput(options.model) !== "no", options);
+}
+
+/**
+ * Whether the request a thread makes on its next text turn carries the pixels of a picture, to a model
+ * that reads pictures. `stored` is the thread as it is stored now, before the new message. The answer comes
+ * from the replay itself (`replayImages`, the function `prepareChatImageHistory` runs), so it keeps the
+ * same rule: the latest message's images always go, earlier ones follow newest first while they fit, and an
+ * earlier one that is unreadable, a link or too old for the budget is only a note. The new message is a
+ * text one, which is what the text route accepts, so every stored picture is an earlier one.
+ *
+ * The tier walk asks this before it has picked a model, so the answer is for a model that reads pictures.
+ * The models the walk demotes for a picture all do (`modelMisreadsPictures`).
+ */
+export async function historyReplaysPicture(
+  tenant: TenantContext,
+  stored: ChatTurn[],
+  options: Pick<Options, "budgetBytes" | "media"> = {},
+): Promise<boolean> {
+  if (!stored.some(hasImage)) {
+    return false;
+  }
+  const upcoming: ChatTurn = { role: "user", parts: [{ type: "text", text: "" }] };
+  const replayed = await replayImages(tenant, [...stored, upcoming], true, { ...options, locale: "en" });
+  return replayed.some(hasImage);
+}
+
+async function replayImages(
+  tenant: TenantContext,
+  history: ChatTurn[],
+  modelReads: boolean,
+  options: Pick<Options, "locale" | "budgetBytes" | "media">,
+): Promise<ChatTurn[]> {
   if (!history.some(hasImage)) {
     return history;
   }
   const budget = options.budgetBytes ?? CHAT_IMAGE_REQUEST_BYTES;
   const media = options.media ?? STORE;
-  const modelReads = modelImageInput(options.model) !== "no";
   const latest = history.map((turn) => turn.role).lastIndexOf("user");
 
   const prepared = new Array<ChatTurn>(history.length);

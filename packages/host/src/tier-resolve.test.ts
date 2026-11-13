@@ -6,7 +6,9 @@ import {
   GATEWAY_PROVIDER_ID,
   INPUT_MODALITIES,
   PROVIDER_IDS,
+  assertChatModelAcceptsModality,
   availableProviders,
+  modelMisreadsPictures,
   type InputModality,
 } from "@agentforge/core";
 import { DEFAULT_MODEL_TIER, MODEL_TIERS, TIER_DEFINITIONS, type ModelTierId } from "@agentforge/core/tiers";
@@ -142,6 +144,137 @@ describe("resolveTierForCatalog", () => {
 
   it("is unavailable for an image run when no listed candidate takes images", () => {
     expect(resolveTierForCatalog("daily", fullCatalog(TEXT), "image").ok).toBe(false);
+  });
+});
+
+/**
+ * A turn that carries a picture tries the models measured to misread one (`PICTURE_MISREADS`: the two Luna
+ * models, 2026-11-13) after every other candidate of the tier. The lists, the order of everything else, the
+ * Thinking of the tier and what the tier advertises do not move.
+ */
+describe("a turn that carries a picture", () => {
+  const LUNAS = ["gpt-6-luna", "gpt-5.6-luna"];
+
+  /** The first candidate of the tier that is not measured to misread a picture. */
+  function firstUnmarked(tier: ModelTierId): string {
+    return gatewayCandidates(tier).find((id) => !modelMisreadsPictures(id)) as string;
+  }
+
+  function picked(
+    tier: ModelTierId,
+    catalog: SelectableModel[],
+    modality: InputModality,
+    replaysPicture = false,
+  ): string | undefined {
+    const resolved = resolveTierForCatalog(tier, catalog, modality, replaysPicture);
+    return resolved.ok ? resolved.model : undefined;
+  }
+
+  it("is the walk the tester measured: Daily, Fastest and Reasoning on an image run", () => {
+    const catalog = fullCatalog(TEXT_IMAGE);
+    // Daily's head is gpt-6-luna, which misread the picture; its next candidate is claude-sonnet-5-5.
+    expect(gatewayCandidates("daily")[0]).toBe("gpt-6-luna");
+    expect(picked("daily", catalog, "image")).toBe("claude-sonnet-5-5");
+    // Fastest already leads with an unmarked model, and Reasoning has none.
+    expect(picked("fast", catalog, "image")).toBe("deepseek-v4-1-flash");
+    expect(picked("reasoning", catalog, "image")).toBe("claude-opus-5-5");
+    for (const tier of MODEL_TIERS) {
+      expect(picked(tier, catalog, "image"), tier).toBe(firstUnmarked(tier));
+    }
+  });
+
+  it("leaves a text turn alone: Daily still answers from gpt-6-luna", () => {
+    const catalog = fullCatalog(TEXT_IMAGE);
+    expect(picked("daily", catalog, "text")).toBe("gpt-6-luna");
+    expect(picked("daily", catalog, "text", false)).toBe("gpt-6-luna");
+    for (const tier of MODEL_TIERS) {
+      expect(picked(tier, catalog, "text"), tier).toBe(gatewayCandidates(tier)[0]);
+    }
+  });
+
+  it("demotes the same way on a text turn whose thread replays an earlier picture", () => {
+    const catalog = fullCatalog(TEXT_IMAGE);
+    expect(picked("daily", catalog, "text", true)).toBe("claude-sonnet-5-5");
+    expect(picked("fast", catalog, "text", true)).toBe("deepseek-v4-1-flash");
+    expect(picked("reasoning", catalog, "text", true)).toBe("claude-opus-5-5");
+  });
+
+  it("does not demote a video run, even one whose catalog lists a Luna as taking video", () => {
+    const luna = row("gpt-6-luna", ["text", "image", "video"]);
+    const sonnet = row("claude-sonnet-5-5", ["text", "image", "video"]);
+    expect(picked("daily", [luna, sonnet], "video")).toBe("gpt-6-luna");
+    expect(picked("daily", [luna, sonnet], "video", true)).toBe("gpt-6-luna");
+  });
+
+  it("answers from the marked models, in the list's order, when they are all the tier has live", () => {
+    for (const tier of ["daily", "fast"] as const) {
+      const catalog = LUNAS.map((id) => row(id, TEXT_IMAGE));
+      expect(picked(tier, catalog, "image"), tier).toBe("gpt-6-luna");
+      expect(picked(tier, [row("gpt-5.6-luna", TEXT_IMAGE)], "image"), tier).toBe("gpt-5.6-luna");
+    }
+  });
+
+  it("does not drop a marked model that is the only one left because the others are held down", () => {
+    const catalog = fullCatalog(TEXT_IMAGE);
+    for (const id of gatewayCandidates("fast").filter((candidate) => !modelMisreadsPictures(candidate))) {
+      markJobModelDown(id);
+    }
+    expect(picked("fast", catalog, "image")).toBe("gpt-6-luna");
+    markJobModelDown("gpt-6-luna");
+    expect(picked("fast", catalog, "image")).toBe("gpt-5.6-luna");
+  });
+
+  it("keeps the order of the unmarked candidates, and the catalog's spelling", () => {
+    const catalog = [
+      row("GPT-6-Luna", TEXT_IMAGE),
+      row("Claude-Sonnet-5-5", TEXT_IMAGE),
+      row("DeepSeek-V4-1-Flash", TEXT_IMAGE),
+    ];
+    expect(picked("daily", catalog, "image")).toBe("Claude-Sonnet-5-5");
+    markJobModelDown("claude-sonnet-5-5");
+    expect(picked("daily", catalog, "image")).toBe("DeepSeek-V4-1-Flash");
+    markJobModelDown("deepseek-v4-1-flash");
+    expect(picked("daily", catalog, "image")).toBe("GPT-6-Luna");
+  });
+
+  it("keeps the Thinking of the tier and never falls to another tier", () => {
+    const resolved = resolveTierForCatalog("daily", fullCatalog(TEXT_IMAGE), "image");
+    expect(resolved.ok && resolved.thinking).toBe("default");
+    const onlyDailyLuna = [row("gpt-6-luna", TEXT_IMAGE)];
+    expect(resolveTierForCatalog("reasoning", onlyDailyLuna, "image").ok).toBe(false);
+  });
+
+  it("demotes the two marked ids and nothing else, on a picture turn only", () => {
+    const text = tierLiveness(fullCatalog(TEXT_IMAGE), "text");
+    const image = tierLiveness(fullCatalog(TEXT_IMAGE), "image");
+    const replayed = tierLiveness(fullCatalog(TEXT_IMAGE), "text", true);
+    const video = tierLiveness(fullCatalog(TEXT_IMAGE), "video", true);
+    expect(text.demoted).toBeUndefined();
+    expect(video.demoted).toBeUndefined();
+    for (const liveness of [image, replayed]) {
+      for (const id of [...new Set(MODEL_TIERS.flatMap((tier) => gatewayCandidates(tier)))]) {
+        expect(liveness.demoted?.(GATEWAY_PROVIDER_ID, id), id).toBe(LUNAS.includes(id));
+      }
+    }
+  });
+
+  it("is still accepted when a person picks a marked model themselves", () => {
+    for (const id of LUNAS) {
+      expect(() => assertChatModelAcceptsModality(id, "image"), id).not.toThrow();
+    }
+  });
+
+  it("does not change what a tier advertises: Daily still takes pictures, with or without a Luna as its only live model", () => {
+    const lunaOnly = LUNAS.map((id) => row(id, TEXT_IMAGE, 128_000));
+    const daily = tierCatalog(lunaOnly).find((entry) => entry.id === "daily");
+    expect(daily).toEqual({ id: "daily", available: true, inputModalities: ["text", "image"], contextLength: 128_000 });
+    const full = tierCatalog(fullCatalog(TEXT_IMAGE));
+    expect(full.map((entry) => entry.inputModalities)).toEqual([
+      ["text", "image"],
+      ["text", "image"],
+      ["text", "image"],
+    ]);
+    expect(full.every((entry) => entry.available)).toBe(true);
   });
 });
 
@@ -341,5 +474,21 @@ describe("chooseTierRun", () => {
 
   it("answers tier_unavailable for an image run when nothing listed takes images", () => {
     expect(failure({ tier: "daily" }, "image", fullCatalog(TEXT)).code).toBe("tier_unavailable");
+  });
+
+  it("sends a picture turn on Daily to claude-sonnet-5-5 and keeps the tier's Thinking", () => {
+    const pictures = fullCatalog(TEXT_IMAGE);
+    const image = chooseTierRun({ tier: "daily" }, "image", pictures);
+    expect(image?.model).toBe("claude-sonnet-5-5");
+    expect(image?.reasoning).toEqual({ effort: "medium", explicit: false });
+    const followUp = chooseTierRun({ tier: "daily" }, "text", pictures, true);
+    expect(followUp?.model).toBe("claude-sonnet-5-5");
+    expect(chooseTierRun({ tier: "daily" }, "text", pictures)?.model).toBe("gpt-6-luna");
+    expect(chooseTierRun({ tier: "fast" }, "image", pictures)?.model).toBe("deepseek-v4-1-flash");
+  });
+
+  it("still answers a picture turn when a marked model is all the tier has", () => {
+    const resolved = chooseTierRun({ tier: "daily" }, "image", [row("gpt-6-luna", TEXT_IMAGE)]);
+    expect(resolved?.model).toBe("gpt-6-luna");
   });
 });
