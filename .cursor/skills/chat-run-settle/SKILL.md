@@ -65,7 +65,7 @@ Line numbers are as of the sync commit below.
 | `CancelFinish` | The fire-and-forget `finishRun(..., "failed")` inside `settleRun`. It is its own step only when `DbYields` is true. |
 | `StoreUser`, `InsertRun` | `insertMessage(..., "user", ...)` at `:394` and `insertRun` at `:402`, then the `if (settled)` at `:404` |
 | `FinishAfterInsert` | `finishRun(..., "failed")` at `:406` |
-| `"model"` with `ModelAnswers`, `ModelFails`, `ModelAborted` | `runtime.execute` inside `attempt()`, awaited at `:670`, and its `run.completed` and `run.failed` events. `ModelAborted` is `modelAbort.abort()` making the call reject. The runtime emits `run.completed` as its last act (`packages/core/src/runtime/ai-sdk-runtime.ts:668`), so a claim taken in that handler leaves no network wait unguarded, and no model call is left for `StandDown` to abort. |
+| `"model"` with `ModelAnswers`, `ModelFails`, `ModelAborted` | `runtime.execute` inside `attempt()`, awaited at `:670`, and its `run.completed` and `run.failed` events. `ModelAborted` is `modelAbort.abort()` making the call reject. The runtime emits `run.completed` as its last act (`packages/core/src/runtime/ai-sdk-runtime.ts:670`), so a claim taken in that handler leaves no network wait unguarded, and no model call is left for `StandDown` to abort. |
 | `ModelAnswers` when settled | The `if (settled)` in the `run.completed` handler at `:597`, which meters and drops the answer |
 | `PersistEv` | `await persistAssistant()` and `send(event)` in the same handler (`:603-604`) |
 | `AfterAttempt` | The `if (settled)` between the last `await attempt()` (`:686`) and `finishRun(..., "completed")` (`:694`) |
@@ -141,6 +141,7 @@ A write that rejects after the claim is not modeled. The catch path calls `persi
 - Tool calls, media mirroring, tool invocation rows, knowledge ingestion and retrieval counts are left out.
 - Frames are reduced to `failed`, the success end `ok`, and the closing `end`. Deltas and thinking frames are not modeled.
 - A run that broke after saving partial text and ends `completed` is modeled for the `answer` outcome only.
+- `ModelAnswers` assumes a `run.completed` from the runtime carries something to save. The runtime keeps that true with its empty-reply check (`shouldFailEmptyAssistant` with `hasVisibleText`, `packages/core/src/runtime/ai-sdk-runtime.ts:656`), which turns an empty stream into `run.failed`, the `fail` outcome. That check is not modeled. Before `771e9d90`, a stream of whitespace-only reasoning passed it, so the person got `run.completed` and then `run.failed` for one turn, the harm `NoFailureAfterSuccess` names, on a path outside the model.
 - `FinishOnlyFromStreaming` is mirrored, but no property fails when only it is removed, in either database mode. Its job is defense in depth.
 - The meter calls on the catch path (`:741` and `:751`) are not modeled. No modeled path reaches the catch with a billed call, because a billed call ends in `run.completed`.
 - The hosted run cap (`packages/host/src/run-limits.ts`) and the desktop IPC transport are out of scope, though both reach this same code.
@@ -149,13 +150,15 @@ A write that rejects after the claim is not modeled. The catch path calls `persi
 
 Coverage: `startModalityRun` in `packages/host/src/runs.ts`, `finishRun` in `packages/host/src/threads.ts`, `recordChatRunUsage` in `packages/host/src/usage-record.ts`, and the driver import in `packages/db/src/client.ts`.
 
-Sync commit: `9b80459b`. At this commit the model was confirmed to describe the covered code. `runs.ts` last changed at `9b80459b`, which gave `onStall` its finishing branch. The change to `threads.ts` since the previous sync, `f6c9acc1`, reads the vault key outside a `try` in `openJson`, which the model does not cover, and moved its line numbers by one.
+Sync commit: `365d4af6` (`main`, 2026-11-13). At this commit the model was confirmed to describe the covered code. `runs.ts` last changed at `9b80459b`, which gave `onStall` its finishing branch, and `threads.ts`, `usage-record.ts` and `client.ts` have not changed since. Since the previous sync (`9b80459b`), only `ai-sdk-runtime.ts` changed: `771e9d90` sends whitespace-only reasoning with no text down the failure path (the `fail` outcome), and `3bff8ec1` stops retrying an attempt that streamed readable reasoning (retries are inside the one `"model"` wait). Neither changes the model. They moved `run.completed` from `:668` to `:670`. Default, `--hazard`, and seven `--break` runs (`GuardOnCompleted`, `MeterOnce`, `StallGuard`, `SettleFinishes`, and under `--hazard` `StreamBound`, `ClaimOnPersist`, `QuietOnceSaved`) each gave the result in the table above.
 
 To check whether the verification needs another look:
 
 ```bash
-git log --oneline 9b80459b..HEAD -- packages/host/src/runs.ts packages/host/src/threads.ts packages/host/src/usage-record.ts packages/db/src/client.ts
+git log --oneline 365d4af6..HEAD -- packages/host/src/runs.ts packages/host/src/threads.ts packages/host/src/usage-record.ts packages/db/src/client.ts packages/core/src/runtime/ai-sdk-runtime.ts
 ```
+
+`ai-sdk-runtime.ts` is not covered code, but the table cites it for where `run.completed` is sent, so a change there can move that reference or change the model's outcomes.
 
 When a change to covered code is intended:
 
