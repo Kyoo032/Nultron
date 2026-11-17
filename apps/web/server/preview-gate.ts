@@ -657,8 +657,14 @@ h1 { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.035em; lin
   line-height: 1.5;
 }
 form { margin-top: 22px; display: grid; gap: 16px; }
-.field { display: grid; gap: 6px; }
-.field > span, .field > label { font-size: 13px; color: color-mix(in srgb, var(--text) 70%, transparent); }
+.field label {
+  display: block;
+  margin: 0 0 5px;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--text) 70%, transparent);
+}
 .input {
   width: 100%;
   border: 1px solid var(--line);
@@ -739,9 +745,10 @@ form { margin-top: 22px; display: grid; gap: 16px; }
   ${alert}
   <form method="post" action="/login" data-testid="preview-login-form">
     <input type="hidden" name="next" value="${PreviewGate.escape(options.next)}">
-    <label class="field">${PreviewGate.escape(text.username)}
-      <input class="input" name="username" autocomplete="username" required spellcheck="false" aria-invalid="${invalid}" data-testid="preview-username" value="${PreviewGate.escape(options.username)}">
-    </label>
+    <div class="field">
+      <label for="preview-username">${PreviewGate.escape(text.username)}</label>
+      <input class="input" id="preview-username" name="username" autocomplete="username" required spellcheck="false" aria-invalid="${invalid}" data-testid="preview-username" value="${PreviewGate.escape(options.username)}">
+    </div>
     <div class="field">
       <label for="preview-password">${PreviewGate.escape(text.password)}</label>
       <div class="password">
