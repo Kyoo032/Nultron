@@ -3143,6 +3143,16 @@ Residual, accepted by the owner:
 The clean fix is a supported single-desk production mode in the repo. Take the preview down when the
 Enterprise bundle serves `app.nultron-ai.xyz`.
 
+Update (2026-11-17): the app now has that form, `PreviewGate` in `apps/web/server/preview-gate.ts`,
+installed from `server.ts` when `PREVIEW_BASIC_USER` and `PREVIEW_BASIC_PASSWORD` are set and
+`AGENTFORGE_SERVER` is not. Those names are new: this repo never stored the Caddy user's variable
+names. A production boot without server mode is allowed only in that case
+(`assertHostedModeCoherent`). The cookie is signed, HttpOnly, SameSite=Lax, Secure in production,
+and login attempts are rate-limited per address. The Caddy `basic_auth` block is still outside the
+repo. Until it is removed from `sites/app.caddy`, the public name keeps sending
+`WWW-Authenticate: Basic` before the form runs. Checked the same day: `https://app.nultron-ai.xyz/`
+answered `401` with `www-authenticate: Basic realm="restricted"` and `server: Caddy`.
+
 Gate: none for Personal or Enterprise. The preview stays password-only.
 
 ### SR-138 {#sr-138}

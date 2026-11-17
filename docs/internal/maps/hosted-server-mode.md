@@ -2,7 +2,7 @@
 
 Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
 
-Last verified: 2026-11-09 at 6080cbba plus the working tree of `fix/desk-key-warn`, for the wrap-key paragraph of section 10 only (SR-203). Before that: 2026-11-06 at f6c9acc1 for the wrap-key paragraph of section 10 only (SR-203). Before that: 2026-11-06 at 01a88fba for the Host rule only (the paragraph before section 2 and step 10 of the request walk). Before that: 2026-10-11 at 2df34be (fix branch, before merge) (SH-001: section 0, the Node 22 boot check). Before that: 2026-09-21 at 4938747 + working tree; four citations re-anchored and the
+Last verified: 2026-11-17, preview form gate (section 11 only). Before that: 2026-11-09 at 6080cbba plus the working tree of `fix/desk-key-warn`, for the wrap-key paragraph of section 10 only (SR-203). Before that: 2026-11-06 at f6c9acc1 for the wrap-key paragraph of section 10 only (SR-203). Before that: 2026-11-06 at 01a88fba for the Host rule only (the paragraph before section 2 and step 10 of the request walk). Before that: 2026-10-11 at 2df34be (fix branch, before merge) (SH-001: section 0, the Node 22 boot check). Before that: 2026-09-21 at 4938747 + working tree; four citations re-anchored and the
 review-instance section added, then the boot-guard path re-checked after the fix pass of the same
 day (the guards moved from `apps/web/lib/` to `apps/web/server/`, because `lib` is the renderer's
 namespace and that module re-exports `@agentforge/host`). The rest was last read at c204e5e /
@@ -213,7 +213,7 @@ Off server mode nothing about either scope changed.
 
 **The security spec is a decision record, not a citation source.** Its rows A1, T4, T8, T9 and S1 (`docs/internal/web-security-spec.md`) were still describing the pre-PR-56 tree until 2026-09-20, when they were rewritten against this commit — including S1, which said the `.master-key` fallback throws "when `NODE_ENV=production`" where the code actually keys on `isServerMode` (`packages/db/src/vault-key.ts:189`). Read those rows for *what was decided and why*; read this page or the code for where it lives.
 
-**Transport filtering runs on every path, not just `/api`.** In server mode the TLS rule, the method allowlist, the path filter, the header cap and the per-IP bucket apply to page loads, bundles and 404 probes too (`http-adapter.ts:407-413`, reasoning at `:394-406`). Only the Origin / CSRF / session rules stay `/api`-only. **This depends on `handleNodeRequest` being the first middleware in `apps/web/server.ts:66-72`.** Move that mount and the controls move with it.
+**Transport filtering runs on every path, not just `/api`.** In server mode the TLS rule, the method allowlist, the path filter, the header cap and the per-IP bucket apply to page loads, bundles and 404 probes too (`http-adapter.ts:407-413`, reasoning at `:394-406`). Only the Origin / CSRF / session rules stay `/api`-only. **This depends on `handleNodeRequest` being mounted in `apps/web/server.ts:83` ahead of the static files.** The preview form gate, when it is installed, is the only middleware in front of it (`apps/web/server.ts:77-79`), and `fromEnv` leaves it off on a hosted server. Move the adapter's mount and the controls move with it.
 
 **A plaintext flood is not rate-limited.** `rejectPlaintext` runs before `checkRequestRate` inside `transportRejection` (`http-adapter.ts:323-329`), so a request without `X-Forwarded-Proto: https` gets its 403 without spending a token. That is cheap to answer, but it means the per-IP bucket is not the control for that traffic — the proxy and the loopback bind are.
 
@@ -234,6 +234,16 @@ Off server mode nothing about either scope changed.
 **The workspace cookie is still client-supplied in server mode.** `http-adapter.ts:470` reads `agentforge_workspace` straight off the request. Deriving the tenant from the session instead is Phase 3 (`docs/internal/web-security-spec.md:61`, row T2); see [`settings-and-gateway-gate.md`](settings-and-gateway-gate.md) for how the desk slice is resolved today.
 
 **Job caps are global.** Two ffmpeg children and four SQL workers for the whole box, not per tenant (`packages/host/src/concurrency.ts:16`, `:288-290`). One busy tenant can make another wait, and — past the waiting room or the 60 s queue timeout — collect a `429 too_many_jobs`.
+
+### 11. The preview form gate
+
+The preview at `app.nultron-ai.xyz` is not this page's hosted server. It runs production with `AGENTFORGE_SERVER` unset, and the password dialog in front of it was Caddy `basic_auth` in `nultron-files/deploy/tencent/edge/sites/app.caddy`, which is not in this repo (SR-133). `WWW-Authenticate: Basic` is what a scripted browser cannot fill.
+
+`PreviewGate.fromEnv` (`apps/web/server/preview-gate.ts:83-94`) installs nothing unless `PREVIEW_BASIC_USER` and `PREVIEW_BASIC_PASSWORD` are both set and `isServerMode` is false. `server.ts` mounts that middleware before `handleNodeRequest` (`apps/web/server.ts:77-79`). A logged-out page is `302` to `/login`. `/api` and any other file are `401` with no login document and no `WWW-Authenticate`. `GET /healthz` and the three favicons the login document links stay public (`apps/web/server/preview-gate.ts:256`).
+
+The cookie is `nultron_preview`, or `__Host-nultron_preview` when `NODE_ENV` is `production` (`apps/web/server/preview-gate.ts:24-25`). It is `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` on that production cookie, and `Max-Age` is twelve hours (`MAX_AGE_SECONDS`, `apps/web/server/preview-gate.ts:31`). The value is an HMAC over an opaque id. The password is compared by hashing both sides and then `credentialsMatch` (`apps/web/server/preview-gate.ts:104-108`). Login attempts spend a token from `createRateLimiter`, five at once (`ATTEMPT_BURST`, `apps/web/server/preview-gate.ts:34`). The client address is the socket, except a loopback socket trusts the last `X-Forwarded-For` hop (`clientKey`, `apps/web/server/preview-gate.ts:124-131`), because Caddy on the preview shares the app's network namespace. `POST /logout` drops that id and clears the cookie.
+
+A production boot without server mode is still refused, unless those two variables are set (`assertHostedModeCoherent`, `apps/web/server/hosted-mode-guard.ts:73-80`). That is what lets the stock `server.ts` be the preview process. The hosted container does not set the variables, so its refusal is unchanged. The Caddy `basic_auth` block is still outside this repo: until it is removed from `sites/app.caddy`, the public name keeps answering the native dialog before the app runs.
 
 ## Verify
 
@@ -275,6 +285,7 @@ What does prove it, and what a feature file would have to keep in step with:
 | `packages/host/src/log.test.ts` (30 cases) | redaction, dropped field names, depth and cycle markers |
 | `apps/web/lib/bind-host.test.ts` (8 cases) | the loopback default and the throw |
 | `apps/web/lib/api-client.test.ts` (19 cases) | the renderer's transport and CSRF headers on mutating calls |
+| `apps/web/server/preview-gate.test.ts` | logged-out redirect, API 401, blocked asset, cookie flags, wrong password, rate limit |
 
 Outside the repo, the two checks a hosted deploy should answer are `curl -I` on the public URL (no `Server`, no `X-Powered-By`, HSTS present) and `ss -ltnp` on the box (the app on loopback only) — the spec rows that ask for them are `docs/internal/web-security-spec.md:15` (N3), `:17` (N5) and `:52` (A11). Neither is automated here.
 
