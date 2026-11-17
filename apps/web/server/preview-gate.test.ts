@@ -164,10 +164,24 @@ describe("preview form login", () => {
     const icon = await request(port, { path: "/brand/favicon.ico" });
     expect(page.status).toBe(200);
     expect(page.body).toContain('data-testid="preview-login"');
-    expect(page.body).toContain("Nama pengguna");
-    expect(page.body).toContain("Kata sandi");
+    expect(page.body).toContain("Username");
+    expect(page.body).toContain("Password");
+    expect(page.body).toContain("Nultron");
+    expect(page.body).toContain("data:image/png;base64,");
+    expect(page.body).toContain('data-testid="preview-password-toggle"');
+    expect(page.body).not.toContain("Nama pengguna");
     expect(icon.status).toBe(200);
     expect(icon.body).toBe("desk");
+  });
+
+  it("uses one language, Indonesian when Accept-Language asks for it", async () => {
+    const port = await listen(gate());
+    const page = await request(port, { path: "/login", headers: { "accept-language": "fr, id;q=0.9, en;q=0.4" } });
+    expect(page.status).toBe(200);
+    expect(page.body).toContain('lang="id"');
+    expect(page.body).toContain("Nama pengguna");
+    expect(page.body).toContain("Kata sandi");
+    expect(page.body).not.toContain(">Username<");
   });
 
   it("sets a signed cookie with the hosted flags on success", async () => {
@@ -202,8 +216,10 @@ describe("preview form login", () => {
       body: new URLSearchParams({ username: USER, password: "nope" }).toString(),
     });
     expect(response.status).toBe(401);
+    expect(response.body).toContain('data-testid="preview-error"');
+    expect(response.body).toContain('data-reason="wrong"');
     expect(response.body).toContain("That username or password is not right.");
-    expect(response.body).toContain("Nama pengguna atau kata sandi itu tidak tepat.");
+    expect(response.body).not.toContain("Nama pengguna atau kata sandi");
     expect(setCookie(response.headers)).toBe("");
     expect(response.headers["www-authenticate"]).toBeUndefined();
   });
@@ -217,8 +233,9 @@ describe("preview form login", () => {
     expect(first.status).toBe(401);
     expect(second.status).toBe(401);
     expect(third.status).toBe(429);
+    expect(third.body).toContain('data-reason="locked"');
     expect(third.body).toContain("Too many sign-in attempts.");
-    expect(third.body).toContain("Terlalu banyak percobaan masuk.");
+    expect(third.body).not.toContain("Terlalu banyak percobaan masuk.");
     expect(third.headers["retry-after"]).toBeDefined();
     expect(setCookie(third.headers)).toBe("");
 

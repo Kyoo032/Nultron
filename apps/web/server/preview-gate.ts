@@ -1,7 +1,23 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { isServerMode, type EnvLike } from "@agentforge/core";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { isServerMode, localeFromAcceptLanguage, type AppLocale, type EnvLike } from "@agentforge/core";
 import type { Request, RequestHandler, Response } from "express";
 import { createRateLimiter, type RateLimiter } from "../../../packages/host/src/rate-limit";
+
+type PreviewCopy = {
+  readonly title: string;
+  readonly lead: string;
+  readonly username: string;
+  readonly password: string;
+  readonly show: string;
+  readonly hide: string;
+  readonly submit: string;
+  readonly busy: string;
+  readonly wrong: (retry: number) => string;
+  readonly locked: (retry: number) => string;
+  readonly form: (retry: number) => string;
+};
 
 /**
  * Form login for the preview desks (app.nultron-ai.xyz).
@@ -40,8 +56,14 @@ export class PreviewGate {
   /** Icons the login document links. Every other file stays behind the cookie. */
   static readonly PUBLIC_ASSETS = new Set(["/brand/favicon.ico", "/brand/favicon-32.png", "/brand/favicon-180.png"]);
 
+  /** Inline document only: the script is ours, the mark and DM Sans are data URLs, and the bundle stays private. */
   static readonly PAGE_CSP =
-    "default-src 'none'; style-src 'unsafe-inline'; img-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
+    "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; font-src data:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
+
+  /** Same key the desk boot script reads (`apps/web/lib/theme.ts`). Light unless the person chose dark. */
+  static readonly THEME_STORAGE_KEY = "agentforge-theme";
+
+  static readonly #assets = new Map<string, string>();
 
   readonly #user: string;
   readonly #password: string;
@@ -257,7 +279,7 @@ export class PreviewGate {
         return false;
       }
       if (path === PreviewGate.LOGIN_PATH) {
-        this.sendPage(res, { status: 200, next: PreviewGate.safeNext(PreviewGate.queryString(req.query.next)) });
+        this.sendPage(req, res, { status: 200, next: PreviewGate.safeNext(PreviewGate.queryString(req.query.next)) });
         return true;
       }
     }
@@ -298,12 +320,12 @@ export class PreviewGate {
     const type = (req.header("content-type") ?? "").toLowerCase();
     const next = PreviewGate.safeNext(PreviewGate.queryString(req.query.next));
     if (!type.startsWith("application/x-www-form-urlencoded")) {
-      this.sendPage(res, { status: 400, next, error: "form" });
+      this.sendPage(req, res, { status: 400, next, error: "form" });
       return;
     }
     const body = await PreviewGate.readBody(req);
     if (!body.ok) {
-      this.sendPage(res, { status: 413, next, error: "form" });
+      this.sendPage(req, res, { status: 413, next, error: "form" });
       return;
     }
     const params = new URLSearchParams(body.text);
@@ -313,7 +335,7 @@ export class PreviewGate {
     const decision = this.#attempts.take(PreviewGate.clientKey(req), Date.now());
     const match = PreviewGate.credentialsMatch(givenUser, givenPassword, this.#user, this.#password);
     if (!decision.allowed) {
-      this.sendPage(res, {
+      this.sendPage(req, res, {
         status: 429,
         next: destination,
         username: givenUser,
@@ -323,7 +345,7 @@ export class PreviewGate {
       return;
     }
     if (!match) {
-      this.sendPage(res, { status: 401, next: destination, username: givenUser, error: "wrong" });
+      this.sendPage(req, res, { status: 401, next: destination, username: givenUser, error: "wrong" });
       return;
     }
     const id = randomBytes(16).toString("base64url");
@@ -432,6 +454,7 @@ export class PreviewGate {
   }
 
   private sendPage(
+    req: Request,
     res: Response,
     options: {
       readonly status: number;
@@ -441,7 +464,9 @@ export class PreviewGate {
       readonly retry?: number;
     },
   ): void {
-    const copy = options.error ? PreviewGate.copy(options.error, options.retry) : null;
+    const locale = PreviewGate.localeOf(req);
+    const text = PreviewGate.text(locale);
+    const message = options.error ? text[options.error](options.retry ?? 1) : null;
     res.status(options.status);
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     res.setHeader("Cache-Control", "no-store");
@@ -452,93 +477,306 @@ export class PreviewGate {
     if (options.status === 429 && options.retry) {
       res.setHeader("Retry-After", String(options.retry));
     }
-    res.end(PreviewGate.page({ next: options.next, username: options.username ?? "", copy }));
+    res.end(
+      PreviewGate.page({
+        locale,
+        text,
+        next: options.next,
+        username: options.username ?? "",
+        error: options.error ?? null,
+        message,
+      }),
+    );
   }
 
-  static copy(kind: "wrong" | "locked" | "form", retry = 1): { readonly en: string; readonly id: string } {
-    if (kind === "locked") {
+  /** One language per document, the same rule as `localeFromAcceptLanguage`: no opinion is English. */
+  static localeOf(req: Request): AppLocale {
+    return localeFromAcceptLanguage(req.header("accept-language")) ?? "en";
+  }
+
+  static text(locale: AppLocale): PreviewCopy {
+    if (locale === "id") {
       return {
-        en: `Too many sign-in attempts. Try again in ${retry} seconds.`,
-        id: `Terlalu banyak percobaan masuk. Coba lagi dalam ${retry} detik.`,
-      };
-    }
-    if (kind === "form") {
-      return {
-        en: "Send the username and password in the form.",
-        id: "Kirim nama pengguna dan kata sandi lewat formulir.",
+        title: "Masuk",
+        lead: "Pratinjau ini bersifat pribadi.",
+        username: "Nama pengguna",
+        password: "Kata sandi",
+        show: "Tampilkan",
+        hide: "Sembunyikan",
+        submit: "Masuk",
+        busy: "Sedang masuk…",
+        wrong: () => "Nama pengguna atau kata sandi itu tidak tepat.",
+        locked: (retry) => `Terlalu banyak percobaan masuk. Coba lagi dalam ${retry} detik.`,
+        form: () => "Kirim nama pengguna dan kata sandi lewat formulir.",
       };
     }
     return {
-      en: "That username or password is not right.",
-      id: "Nama pengguna atau kata sandi itu tidak tepat.",
+      title: "Sign in",
+      lead: "This preview is private.",
+      username: "Username",
+      password: "Password",
+      show: "Show",
+      hide: "Hide",
+      submit: "Sign in",
+      busy: "Signing in…",
+      wrong: () => "That username or password is not right.",
+      locked: (retry) => `Too many sign-in attempts. Try again in ${retry} seconds.`,
+      form: () => "Send the username and password in the form.",
     };
   }
 
+  /** The size-tuned mark and DM Sans, read once. A missing file leaves the wordmark and the system stack. */
+  static asset(relative: string, mime: string): string {
+    const cached = PreviewGate.#assets.get(relative);
+    if (cached !== undefined) {
+      return cached;
+    }
+    let uri = "";
+    try {
+      const bytes = readFileSync(fileURLToPath(new URL(relative, import.meta.url)));
+      uri = `data:${mime};base64,${bytes.toString("base64")}`;
+    } catch {
+      uri = "";
+    }
+    PreviewGate.#assets.set(relative, uri);
+    return uri;
+  }
+
   static page(options: {
+    readonly locale: AppLocale;
+    readonly text: PreviewCopy;
     readonly next: string;
     readonly username: string;
-    readonly copy: { readonly en: string; readonly id: string } | null;
+    readonly error: "wrong" | "locked" | "form" | null;
+    readonly message: string | null;
   }): string {
-    const error = options.copy
-      ? `<p class="error" role="alert" data-testid="preview-error">${PreviewGate.escape(options.copy.en)} <span lang="id">${PreviewGate.escape(options.copy.id)}</span></p>`
+    const text = options.text;
+    const alert = options.message
+      ? `<p class="alert" role="alert" data-testid="preview-error" data-reason="${options.error}">${PreviewGate.escape(options.message)}</p>`
+      : "";
+    const invalid = options.error ? "true" : "false";
+    const mark = PreviewGate.asset("../components/brand-art/mark-64.png", "image/png");
+    const font = PreviewGate.asset("../app/fonts/dm-sans-400-latin.woff2", "font/woff2");
+    const face = font
+      ? `@font-face{font-family:"DM Sans";font-style:normal;font-weight:400;font-display:swap;src:url("${font}") format("woff2");}`
       : "";
     return `<!doctype html>
-<html lang="en">
+<html lang="${options.locale}" class="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Sign in · Nultron</title>
+<title>${PreviewGate.escape(text.title)} · Nultron</title>
 <link rel="icon" href="/brand/favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
+<script>(function(){try{var d=document.documentElement;var dark=localStorage.getItem(${JSON.stringify(PreviewGate.THEME_STORAGE_KEY)})==="dark";d.classList.toggle("light",!dark);d.classList.toggle("dark",dark)}catch(e){}})();</script>
 <style>
-  :root { color-scheme: light; }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; min-height: 100vh; display: grid; place-items: center;
-    background: #f3f5fa; color: #0b1020;
-    font-family: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  }
-  main {
-    width: min(100%, 400px); margin: 24px; padding: 28px 24px 24px;
-    background: #fff; border: 1px solid #e4e7ef; border-radius: 4px;
-  }
-  h1 { margin: 0; font-size: 28px; letter-spacing: -0.011em; line-height: 1.2; }
-  h1 span { display: block; margin-top: 4px; font-size: 15px; font-weight: 400; color: #5a6072; }
-  p.lead { margin: 16px 0 0; color: #2c3244; line-height: 1.6; }
-  form { margin-top: 20px; display: grid; gap: 14px; }
-  label { display: grid; gap: 6px; font-size: 15px; }
-  label span { color: #5a6072; font-size: 13px; }
-  input {
-    width: 100%; padding: 10px 12px; border: 1px solid #e4e7ef; border-radius: 4px;
-    background: #fff; color: #0b1020; font: inherit; font-size: 16px;
-  }
-  input:focus { outline: 2px solid #0e58f0; border-color: #0e58f0; }
-  button {
-    margin-top: 4px; padding: 10px 14px; border: 1px solid #0e58f0; border-radius: 4px;
-    background: #0e58f0; color: #fff; font: inherit; font-size: 16px; cursor: pointer;
-    box-shadow: 0 3px 0 #0a3ea8;
-  }
-  .error { margin: 16px 0 0; color: #b42318; line-height: 1.5; }
-  .error span { display: block; color: #5a6072; }
+${face}
+:root {
+  color-scheme: light;
+  --surface: #ffffff;
+  --surface-2: #f3f5fa;
+  --line: #e4e7ef;
+  --text: #0b1020;
+  --text-2: #2c3244;
+  --text-3: #5a6072;
+  --accent: #0e58f0;
+  --accent-edge: color-mix(in srgb, var(--accent) 72%, #000000);
+  --danger: #b42318;
+  --nultron-blue: #1277c8;
+  --nultron-cyan: #19bddc;
+  --nultron-blue-text: #116eb8;
+  --nultron-cyan-text: #107589;
+  --font: "DM Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --r-nav: 10px;
+  --r-card: 18px;
+  --shadow-float: 0 10px 30px -12px color-mix(in srgb, var(--accent) 38%, transparent);
+  --motion: 120ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+.dark {
+  color-scheme: dark;
+  --surface: #1a1d26;
+  --surface-2: #232734;
+  --line: #313646;
+  --text: #f2f4fa;
+  --text-2: #c9cedc;
+  --text-3: #9aa1b4;
+  --accent: #6ea4ff;
+  --danger: #f87171;
+  --nultron-blue-text: #5fb0f1;
+  --nultron-cyan-text: #44e3eb;
+  --shadow-float: 0 10px 30px -12px color-mix(in srgb, var(--accent) 26%, transparent);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  color: var(--text);
+  font-family: var(--font);
+  background-color: var(--surface);
+  background-image:
+    radial-gradient(55% 38% at 92% -4%, color-mix(in srgb, var(--nultron-cyan) 12%, transparent), transparent 72%),
+    radial-gradient(60% 30% at 8% 104%, color-mix(in srgb, var(--nultron-blue) 8%, transparent), transparent 70%),
+    linear-gradient(180deg, color-mix(in srgb, var(--nultron-blue) 10%, var(--surface)) 0, color-mix(in srgb, var(--nultron-cyan) 5%, var(--surface)) 46%, var(--surface) 80%);
+}
+.card {
+  width: min(100%, 420px);
+  padding: 28px 24px 24px;
+  background: var(--surface);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-float);
+}
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+.brand img { width: 40px; height: 40px; border-radius: 10px; display: block; }
+.wordmark {
+  width: fit-content;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1;
+  color: var(--nultron-blue-text);
+  background: linear-gradient(100deg, var(--nultron-blue-text) 0%, var(--nultron-blue-text) 38%, var(--nultron-cyan-text) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+h1 { margin: 0; font-size: 28px; font-weight: 600; letter-spacing: -0.035em; line-height: 1.15; }
+.lead { margin: 8px 0 0; color: var(--text-2); font-size: 15px; line-height: 1.6; }
+.alert {
+  margin: 18px 0 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line));
+  border-radius: var(--r-nav);
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface));
+  color: var(--danger);
+  font-size: 15px;
+  line-height: 1.5;
+}
+form { margin-top: 22px; display: grid; gap: 16px; }
+.field { display: grid; gap: 6px; }
+.field > span, .field > label { font-size: 13px; color: color-mix(in srgb, var(--text) 70%, transparent); }
+.input {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.4;
+  padding: 8px 10px;
+  border-radius: var(--r-nav);
+}
+.input:focus { outline: none; border-color: var(--accent); }
+.input[aria-invalid="true"] { border-color: var(--danger); }
+.password { position: relative; }
+.password .input { padding-right: 96px; }
+.toggle {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  height: calc(100% - 8px);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-2);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.toggle:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  margin-top: 4px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: var(--surface);
+  font-family: var(--font);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 12px 14px;
+  border-radius: var(--r-nav);
+  box-shadow: 0 3px 0 var(--accent-edge);
+  cursor: pointer;
+  transition: translate var(--motion), box-shadow var(--motion), filter var(--motion);
+}
+.btn:hover { filter: brightness(1.08); }
+.btn:focus-visible, .toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn:active:not(:disabled) { translate: 0 2px; box-shadow: 0 1px 0 var(--accent-edge); }
+.btn:disabled {
+  background: var(--line);
+  border-color: var(--line);
+  color: var(--text-3);
+  box-shadow: none;
+  filter: none;
+  cursor: not-allowed;
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn { transition: none; }
+}
+@media (forced-colors: active) {
+  .wordmark { background: none; color: LinkText; -webkit-text-fill-color: currentColor; }
+}
 </style>
 </head>
 <body>
-<main data-testid="preview-login">
-  <h1>Sign in <span lang="id">Masuk</span></h1>
-  <p class="lead">This preview is private. <span lang="id">Pratinjau ini bersifat pribadi.</span></p>
-  ${error}
+<main class="card" data-testid="preview-login">
+  <div class="brand">
+    <img src="${mark}" width="40" height="40" alt="" data-testid="preview-mark">
+    <p class="wordmark">Nultron</p>
+  </div>
+  <h1>${PreviewGate.escape(text.title)}</h1>
+  <p class="lead">${PreviewGate.escape(text.lead)}</p>
+  ${alert}
   <form method="post" action="/login" data-testid="preview-login-form">
     <input type="hidden" name="next" value="${PreviewGate.escape(options.next)}">
-    <label>Username <span lang="id">Nama pengguna</span>
-      <input name="username" autocomplete="username" required data-testid="preview-username" value="${PreviewGate.escape(options.username)}">
+    <label class="field">${PreviewGate.escape(text.username)}
+      <input class="input" name="username" autocomplete="username" required spellcheck="false" aria-invalid="${invalid}" data-testid="preview-username" value="${PreviewGate.escape(options.username)}">
     </label>
-    <label>Password <span lang="id">Kata sandi</span>
-      <input type="password" name="password" autocomplete="current-password" required data-testid="preview-password">
-    </label>
-    <button type="submit" data-testid="preview-submit">Sign in / Masuk</button>
+    <div class="field">
+      <label for="preview-password">${PreviewGate.escape(text.password)}</label>
+      <div class="password">
+        <input class="input" id="preview-password" type="password" name="password" autocomplete="current-password" required aria-invalid="${invalid}" data-testid="preview-password">
+        <button class="toggle" type="button" data-testid="preview-password-toggle" aria-controls="preview-password" aria-pressed="false">${PreviewGate.escape(text.show)}</button>
+      </div>
+    </div>
+    <button class="btn" type="submit" data-testid="preview-submit">${PreviewGate.escape(text.submit)}</button>
   </form>
 </main>
+<script>
+(function () {
+  var showLabel = ${JSON.stringify(text.show)};
+  var hideLabel = ${JSON.stringify(text.hide)};
+  var busyLabel = ${JSON.stringify(text.busy)};
+  var input = document.getElementById("preview-password");
+  var toggle = document.querySelector("[data-testid='preview-password-toggle']");
+  var form = document.querySelector("[data-testid='preview-login-form']");
+  var button = document.querySelector("[data-testid='preview-submit']");
+  if (toggle && input) {
+    toggle.addEventListener("click", function () {
+      var show = input.type === "password";
+      input.type = show ? "text" : "password";
+      toggle.setAttribute("aria-pressed", show ? "true" : "false");
+      toggle.textContent = show ? hideLabel : showLabel;
+    });
+  }
+  if (form && button) {
+    form.addEventListener("submit", function () {
+      button.disabled = true;
+      button.textContent = busyLabel;
+    });
+  }
+})();
+</script>
 </body>
 </html>`;
   }
