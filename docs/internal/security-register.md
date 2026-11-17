@@ -510,7 +510,7 @@ because nothing on webdev exercises either header.
 
 Evidence: the only boot check is `assertHostedModeCoherent(process.env)`, the first statement of
 `main()` at `apps/web/server.ts:61`, and it compares exactly two variables
-(`apps/web/server/hosted-mode-guard.ts:72-76`). Everything else is read at first use:
+(`apps/web/server/hosted-mode-guard.ts:82-86`). Everything else is read at first use:
 
 - `AGENTFORGE_SECRETS_KEY` at `packages/db/src/vault-key.ts:185`, which throws the "required in
   server mode" error at `:190` only when something opens a tenant's secrets.
@@ -3122,7 +3122,7 @@ Rizky chose a password-gated single-desk preview on 2026-10-05, after its risks 
 desk, one key, and Start over for everyone with the password.
 
 Evidence: `assertHostedModeCoherent` refuses `NODE_ENV=production` without `AGENTFORGE_SERVER`
-(`apps/web/server/hosted-mode-guard.ts:72-75`, called from `apps/web/server.ts:60`). The preview therefore
+(`apps/web/server/hosted-mode-guard.ts:82-86`, called from `apps/web/server.ts:61`). The preview therefore
 runs its own copy of the production branch of `server.ts`, without that guard. Off server mode the host
 trusts only loopback writes (`packages/host/src/http-adapter.ts:793`, `packages/host/src/local-request.ts:66,80`),
 and `AGENTFORGE_TRUSTED_ORIGINS` is read only in server mode (`http-adapter.ts:785`). The preview's Caddy
@@ -3152,6 +3152,17 @@ and login attempts are rate-limited per address. The Caddy `basic_auth` block is
 repo. Until it is removed from `sites/app.caddy`, the public name keeps sending
 `WWW-Authenticate: Basic` before the form runs. Checked the same day: `https://app.nultron-ai.xyz/`
 answered `401` with `www-authenticate: Basic realm="restricted"` and `server: Caddy`.
+
+Update (2026-11-17, same change): `safeNext` rejects a path that normalises to `//`, including
+`/.//evil.com`. The HMAC key is 32 random bytes per process, so a restart drops every preview
+session and the gate assumes one process. IPv6 login attempts share a bucket per /64.
+`POST /login` and `POST /logout` answer 403 when `Sec-Fetch-Site` is `cross-site` or `Origin`
+does not match `Host`. The rate-limit token is taken before the body is read, and a body past
+4 KB destroys the request. The image `HEALTHCHECK`, the Kubernetes probes and `health_uri` in
+`webapp-deploy/Caddyfile` are already `GET /healthz`, which stays public. `GET /api/v1/components`
+is 401 once the gate is mounted. A preview probe that still hits that path must move to
+`/healthz`. The live entrypoint is still the gitignored `preview-server.ts`, so this gate does
+not run on the public name until that process mounts it or switches to stock `server.ts`.
 
 Gate: none for Personal or Enterprise. The preview stays password-only.
 

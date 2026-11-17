@@ -29,8 +29,10 @@ type PreviewCopy = {
  *
  * This gate replaces that dialog. It is installed only when both credential variables are set and
  * the process is not in server mode (`fromEnv`). The cookie is an HMAC over an opaque id, not the
- * password. Login attempts spend a token from the same bucket primitive the hosted limiter uses
- * (`createRateLimiter` in `packages/host/src/rate-limit.ts`). Nothing here sends `WWW-Authenticate`.
+ * password. The HMAC key is 32 random bytes minted once for this process (`processKey`): a restart
+ * drops every preview session, and the sessions live in this one process. Login attempts spend a
+ * token from the same bucket primitive the hosted limiter uses (`createRateLimiter` in
+ * `packages/host/src/rate-limit.ts`). Nothing here sends `WWW-Authenticate`.
  */
 export class PreviewGate {
   static readonly USER_ENV = "PREVIEW_BASIC_USER";
@@ -65,6 +67,9 @@ export class PreviewGate {
 
   static readonly #assets = new Map<string, string>();
 
+  /** One key for the life of the process. A second process, or a restart, will not honour these cookies. */
+  static #processKey: Buffer | null = null;
+
   readonly #user: string;
   readonly #password: string;
   readonly #secure: boolean;
@@ -83,7 +88,7 @@ export class PreviewGate {
     this.#user = options.user;
     this.#password = options.password;
     this.#secure = options.secure;
-    this.#key = PreviewGate.signingKey(options.user, options.password);
+    this.#key = PreviewGate.processKey();
     this.#attempts =
       options.limiter ?? createRateLimiter({ rpm: PreviewGate.ATTEMPT_RPM, burst: PreviewGate.ATTEMPT_BURST });
     this.#now = options.now ?? Date.now;
@@ -130,8 +135,10 @@ export class PreviewGate {
     return userOk && passwordOk;
   }
 
-  static signingKey(user: string, password: string): Buffer {
-    return createHash("sha256").update(`nultron-preview-gate-v1\0${user}\0${password}`, "utf8").digest();
+  /** 32 random bytes, created the first time a gate is constructed in this process. */
+  static processKey(): Buffer {
+    PreviewGate.#processKey ??= randomBytes(32);
+    return PreviewGate.#processKey;
   }
 
   static fixedEqual(left: string, right: string): boolean {
@@ -141,22 +148,145 @@ export class PreviewGate {
 
   /**
    * Last `X-Forwarded-For` hop only when the socket is loopback, which is Caddy in the preview's
-   * network namespace. A direct connection ignores the header: the client could set it.
+   * network namespace. A direct connection ignores the header: the client could set it. An IPv6
+   * address is then keyed by its /64, so a temporary address in the same prefix shares one bucket.
    */
   static clientKey(req: Request): string {
     const remote = req.socket?.remoteAddress ?? "";
     const forwarded = req.header("x-forwarded-for");
+    let chosen = remote;
     if (forwarded && PreviewGate.isLoopback(remote)) {
       const last = forwarded.split(",").at(-1)?.trim();
       if (last) {
-        return last.slice(0, 128);
+        chosen = last;
       }
     }
-    return remote || "unknown";
+    if (!chosen) {
+      return "unknown";
+    }
+    return PreviewGate.rateAddress(chosen);
+  }
+
+  /**
+   * IPv4 stays as written. An IPv4-mapped IPv6 address is keyed by the embedded IPv4, so mapped
+   * clients do not collapse into one /64 of `::ffff:0:0`. Every other IPv6 address is its first 64 bits.
+   */
+  static rateAddress(address: string): string {
+    let bare = address.trim().toLowerCase();
+    if (bare.startsWith("[")) {
+      const end = bare.indexOf("]");
+      if (end > 1) {
+        bare = bare.slice(1, end);
+      }
+    }
+    const zone = bare.indexOf("%");
+    if (zone >= 0) {
+      bare = bare.slice(0, zone);
+    }
+    if (bare.length === 0) {
+      return "unknown";
+    }
+    if (PreviewGate.isLoopback(bare)) {
+      return bare;
+    }
+    if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(bare)) {
+      return bare;
+    }
+    const groups = PreviewGate.expandIpv6(bare);
+    if (!groups) {
+      return bare.slice(0, 128);
+    }
+    const mapped =
+      groups[0] === 0 &&
+      groups[1] === 0 &&
+      groups[2] === 0 &&
+      groups[3] === 0 &&
+      groups[4] === 0 &&
+      groups[5] === 0xffff;
+    if (mapped) {
+      const hi = groups[6] ?? 0;
+      const lo = groups[7] ?? 0;
+      return `${(hi >> 8) & 255}.${hi & 255}.${(lo >> 8) & 255}.${lo & 255}`;
+    }
+    const hex = (value: number | undefined): string => (value ?? 0).toString(16);
+    return `${hex(groups[0])}:${hex(groups[1])}:${hex(groups[2])}:${hex(groups[3])}::/64`;
+  }
+
+  /** Eight hextets, or null when the text is not an IPv6 address. A dotted tail is expanded first. */
+  static expandIpv6(input: string): number[] | null {
+    let value = input.toLowerCase();
+    const dotted = value.match(/^(.*:)(\d{1,3}(?:\.\d{1,3}){3})$/);
+    if (dotted) {
+      const parts = (dotted[2] ?? "").split(".").map((part) => Number(part));
+      if (parts.length !== 4 || parts.some((part) => part > 255)) {
+        return null;
+      }
+      const hi = ((parts[0] ?? 0) << 8) | (parts[1] ?? 0);
+      const lo = ((parts[2] ?? 0) << 8) | (parts[3] ?? 0);
+      value = `${dotted[1] ?? ""}${hi.toString(16)}:${lo.toString(16)}`;
+    }
+    const halves = value.split("::");
+    if (halves.length > 2) {
+      return null;
+    }
+    const head = halves[0] ? halves[0].split(":") : [];
+    const tail = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+    if (halves.length === 1 && head.length !== 8) {
+      return null;
+    }
+    const missing = 8 - head.length - tail.length;
+    if (missing < 0) {
+      return null;
+    }
+    const groups = [...head, ...Array<string>(missing).fill("0"), ...tail];
+    if (groups.length !== 8) {
+      return null;
+    }
+    const nums: number[] = [];
+    for (const group of groups) {
+      if (!/^[0-9a-f]{1,4}$/.test(group)) {
+        return null;
+      }
+      nums.push(Number.parseInt(group, 16));
+    }
+    return nums;
   }
 
   static isLoopback(address: string): boolean {
     return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
+  }
+
+  /**
+   * A same-origin form post. `Sec-Fetch-Site: cross-site` is refused, and so is an `Origin` whose
+   * host is not this request's `Host`. A client that sends neither (curl, an old browser) is allowed.
+   */
+  static sameSitePost(req: Request): boolean {
+    const site = req.header("sec-fetch-site")?.trim().toLowerCase();
+    if (site === "cross-site") {
+      return false;
+    }
+    const origin = req.header("origin")?.trim();
+    if (!origin) {
+      return true;
+    }
+    return PreviewGate.originMatchesHost(origin, req.header("host") ?? "");
+  }
+
+  static originMatchesHost(origin: string, hostHeader: string): boolean {
+    let url: URL;
+    try {
+      url = new URL(origin);
+    } catch {
+      return false;
+    }
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      return false;
+    }
+    const host = hostHeader.trim().toLowerCase();
+    if (host.length === 0) {
+      return false;
+    }
+    return url.host.toLowerCase() === host || url.hostname.toLowerCase() === host;
   }
 
   /** A path on this origin, or `/`. Never an absolute URL and never back to the login route. */
@@ -174,22 +304,45 @@ export class PreviewGate {
     return false;
   }
 
+  /**
+   * A path on this origin, or `/`. The parser collapses `/.//evil.com` to a pathname of `//evil.com`
+   * while keeping this origin, so the normalised string is checked again. A backslash is rejected
+   * before and after that parse: `/\evil.com` is a protocol-relative URL to the URL parser.
+   */
   static safeNext(value: string | null | undefined): string {
     if (!value?.startsWith("/") || value.startsWith("//") || value.includes("\\") || PreviewGate.hasControl(value)) {
       return "/";
     }
     try {
       const url = new URL(value, "http://preview.local");
-      if (url.origin !== "http://preview.local") {
+      if (url.origin !== "http://preview.local" || url.username !== "" || url.password !== "") {
+        return "/";
+      }
+      const out = `${url.pathname}${url.search}`;
+      if (PreviewGate.offPath(out)) {
+        return "/";
+      }
+      let decoded = out;
+      try {
+        decoded = decodeURIComponent(out);
+      } catch {
+        return "/";
+      }
+      if (decoded !== out && PreviewGate.offPath(decoded)) {
         return "/";
       }
       if (url.pathname === PreviewGate.LOGIN_PATH || url.pathname === PreviewGate.LOGOUT_PATH) {
         return "/";
       }
-      return `${url.pathname}${url.search}`;
+      return out;
     } catch {
       return "/";
     }
+  }
+
+  /** True when a path would leave this origin: a second slash, a backslash, or a control character. */
+  static offPath(value: string): boolean {
+    return !value.startsWith("/") || value.startsWith("//") || value.includes("\\") || PreviewGate.hasControl(value);
   }
 
   static readCookie(header: string | undefined, name: string): string | null {
@@ -308,6 +461,10 @@ export class PreviewGate {
   }
 
   private logout(req: Request, res: Response): void {
+    if (!PreviewGate.sameSitePost(req)) {
+      this.forbidden(res);
+      return;
+    }
     const current = this.session(req);
     if (current) {
       this.#sessions.delete(current.id);
@@ -317,33 +474,50 @@ export class PreviewGate {
   }
 
   private async login(req: Request, res: Response): Promise<void> {
-    const type = (req.header("content-type") ?? "").toLowerCase();
     const next = PreviewGate.safeNext(PreviewGate.queryString(req.query.next));
+    if (!PreviewGate.sameSitePost(req)) {
+      this.forbidden(res);
+      return;
+    }
+    // The token is spent before the body is read, so a locked address cannot upload a large body.
+    const decision = this.#attempts.take(PreviewGate.clientKey(req), Date.now());
+    if (!decision.allowed) {
+      this.discard(req, res);
+      this.sendPage(req, res, {
+        status: 429,
+        next,
+        error: "locked",
+        retry: decision.retryAfterSeconds,
+      });
+      return;
+    }
+    const type = (req.header("content-type") ?? "").toLowerCase();
     if (!type.startsWith("application/x-www-form-urlencoded")) {
+      this.discard(req, res);
       this.sendPage(req, res, { status: 400, next, error: "form" });
       return;
     }
-    const body = await PreviewGate.readBody(req);
+    let answered = false;
+    const body = await PreviewGate.readBody(req, () => {
+      answered = true;
+      if (!res.headersSent) {
+        this.sendPage(req, res, { status: 413, next, error: "form" });
+      }
+    });
     if (!body.ok) {
-      this.sendPage(req, res, { status: 413, next, error: "form" });
+      if (!answered && !res.headersSent) {
+        this.sendPage(req, res, { status: 413, next, error: "form" });
+      }
+      if (!req.destroyed) {
+        req.destroy();
+      }
       return;
     }
     const params = new URLSearchParams(body.text);
     const givenUser = params.get("username") ?? "";
     const givenPassword = params.get("password") ?? "";
     const destination = PreviewGate.safeNext(params.get("next") ?? next);
-    const decision = this.#attempts.take(PreviewGate.clientKey(req), Date.now());
     const match = PreviewGate.credentialsMatch(givenUser, givenPassword, this.#user, this.#password);
-    if (!decision.allowed) {
-      this.sendPage(req, res, {
-        status: 429,
-        next: destination,
-        username: givenUser,
-        error: "locked",
-        retry: decision.retryAfterSeconds,
-      });
-      return;
-    }
     if (!match) {
       this.sendPage(req, res, { status: 401, next: destination, username: givenUser, error: "wrong" });
       return;
@@ -431,9 +605,27 @@ export class PreviewGate {
     res.setHeader("Set-Cookie", parts.join("; "));
   }
 
+  /** Drop the rest of the body once the response has been written. A locked post must not be buffered. */
+  private discard(req: Request, res: Response): void {
+    res.once("finish", () => {
+      if (!req.destroyed) {
+        req.destroy();
+      }
+    });
+  }
+
+  private forbidden(res: Response): void {
+    res.status(403);
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.end("Forbidden\n");
+  }
+
   private redirect(res: Response, location: string, status = 302): void {
+    const target = location.startsWith("/") && !location.startsWith("//") && !location.includes("\\") ? location : "/";
     res.status(status);
-    res.setHeader("Location", location);
+    res.setHeader("Location", target);
     res.setHeader("Cache-Control", "no-store");
     res.end();
   }
@@ -788,26 +980,41 @@ form { margin-top: 22px; display: grid; gap: 16px; }
 </html>`;
   }
 
-  private static async readBody(req: Request): Promise<{ ok: true; text: string } | { ok: false }> {
-    const chunks: Buffer[] = [];
-    let size = 0;
-    let over = false;
-    try {
-      for await (const chunk of req) {
+  /**
+   * Read at most `BODY_LIMIT` bytes. The moment the body passes that, `onOver` runs (so the
+   * caller can answer 413) and the request is destroyed. Nothing past the limit is kept.
+   */
+  private static readBody(
+    req: Request,
+    onOver: () => void,
+  ): Promise<{ ok: true; text: string } | { ok: false }> {
+    return new Promise((resolve) => {
+      const chunks: Buffer[] = [];
+      let size = 0;
+      let settled = false;
+      const finish = (result: { ok: true; text: string } | { ok: false }): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        resolve(result);
+      };
+      req.on("data", (chunk: Buffer | string) => {
+        if (settled) {
+          return;
+        }
         const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
         size += buffer.length;
         if (size > PreviewGate.BODY_LIMIT) {
-          over = true;
-          continue;
+          onOver();
+          req.destroy();
+          finish({ ok: false });
+          return;
         }
         chunks.push(buffer);
-      }
-    } catch {
-      return { ok: false };
-    }
-    if (over) {
-      return { ok: false };
-    }
-    return { ok: true, text: Buffer.concat(chunks).toString("utf8") };
+      });
+      req.on("end", () => finish({ ok: true, text: Buffer.concat(chunks).toString("utf8") }));
+      req.on("error", () => finish({ ok: false }));
+    });
   }
 }

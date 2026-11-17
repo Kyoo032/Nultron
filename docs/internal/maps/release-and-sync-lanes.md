@@ -30,7 +30,7 @@ The Enterprise release repo is `Kyoo032/Nultron-Releases` (`RELEASE_REPO`, `scri
 
 The tester added 16 `protected` entries to `lanes.json` on 2026-10-12. There are 32 protected entries in all as of 2026-10-14. They cover the shared files the tester edits (the composer, the rail, `product-modes.ts`, `i18n.ts` and others) and its own paths (`virtual-agents*`, `packages/host/src/workers/**`, the agent components), whose map is [`virtual-agents.md`](virtual-agents.md).
 
-PR #157 (merge `b14faa1a`) promoted the chat-first shell to `main`. So those files are no longer tester-only. A fix to them is still a pull request to `main`. The one switch back to the mode screens is `SHELL_LAYOUT` (`packages/core/src/agents/product-modes.ts:29`). The "Tester shared file" notes in `lanes.json` describe the state before the merge. The `apps/web/server.ts` note also records the preview form gate: it runs only when server mode is off and both `PREVIEW_BASIC_USER` and `PREVIEW_BASIC_PASSWORD` are set (`apps/web/server/preview-gate.ts:105-116`).
+PR #157 (merge `b14faa1a`) promoted the chat-first shell to `main`. So those files are no longer tester-only. A fix to them is still a pull request to `main`. The one switch back to the mode screens is `SHELL_LAYOUT` (`packages/core/src/agents/product-modes.ts:29`). The "Tester shared file" notes in `lanes.json` describe the state before the merge. The `apps/web/server.ts` note also records the preview form gate: it runs only when server mode is off and both `PREVIEW_BASIC_USER` and `PREVIEW_BASIC_PASSWORD` are set (`apps/web/server/preview-gate.ts:110-121`).
 
 ## After a pull request merges to `main`
 

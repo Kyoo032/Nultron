@@ -42,9 +42,13 @@ export { assertHostedEnvComplete, HOSTED_ENV_INCOMPLETE, warnWeakDeskVaultKey } 
  * `env_file: { required: false }` and never set `AGENTFORGE_SERVER` itself — so a missing or
  * mistyped `.env` silently downgraded the public deployment to the desktop's loopback rules. That
  * is not a loud failure: mutating calls still 403 (Caddy forwards the public Host, which the
- * loopback rule rejects), but **every `GET /api/v1/*` answers without a session**, and the Docker
- * healthcheck polls `/api/v1/components`, which is ungated in both modes, so the container reports
- * healthy while serving settings, threads, artifacts and media to anyone who asks.
+ * loopback rule rejects), but **every `GET /api/v1/*` answers without a session**. Until Phase 8
+ * the image healthcheck polled `GET /api/v1/components`, which was ungated, so the container
+ * reported healthy while serving settings, threads, artifacts and media to anyone who asked.
+ * That probe is `GET /healthz` now (`webapp-deploy/Dockerfile`, `webapp-deploy/k8s/base/app.yaml`,
+ * and `health_uri /healthz` in `webapp-deploy/Caddyfile`). `/healthz` stays public under
+ * `PreviewGate`. `GET /api/v1/components` does not: with the gate mounted it answers 401, so a
+ * preview process whose probe still hits that path would look down. Point it at `/healthz`.
  *
  * `NODE_ENV=production` is an exact signal in this repo: the only thing that sets it is
  * `apps/web/package.json` `"start"`, which is the hosted entrypoint and the Dockerfile's `CMD`.

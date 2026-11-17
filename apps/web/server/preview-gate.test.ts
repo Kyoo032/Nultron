@@ -1,6 +1,7 @@
 import http from "node:http";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import type { Request } from "express";
 import express from "express";
 import { afterEach, describe, expect, it } from "vitest";
 import { createRateLimiter } from "../../../packages/host/src/rate-limit";
@@ -89,6 +90,16 @@ function setCookie(headers: http.IncomingHttpHeaders): string {
 
 function cookieHeader(setCookieHeader: string): string {
   return setCookieHeader.split(";")[0] ?? "";
+}
+
+function asRequest(remote: string, headers: Record<string, string> = {}): Request {
+  const lower = new Map(Object.entries(headers).map(([key, value]) => [key.toLowerCase(), value]));
+  return {
+    socket: { remoteAddress: remote },
+    header(name: string) {
+      return lower.get(name.toLowerCase());
+    },
+  } as Request;
 }
 
 describe("PreviewGate.fromEnv", () => {
@@ -287,6 +298,155 @@ describe("preview form login", () => {
     });
     expect(response.status).toBe(303);
     expect(response.headers.location).toBe("/");
+  });
+
+  it("does not follow a next that normalises to a protocol-relative URL", async () => {
+    const port = await listen(gate());
+    const payloads = ["/.//evil.com", "/..//evil.com", "/%2e%2e//evil.com", "//evil.com", "/\\evil.com"];
+    for (const next of payloads) {
+      const response = await request(port, {
+        method: "POST",
+        path: "/login",
+        body: new URLSearchParams({ username: USER, password: PASSWORD, next }).toString(),
+      });
+      expect(response.status).toBe(303);
+      expect(response.headers.location).toBe("/");
+    }
+  });
+
+  it("rejects a forged or tampered cookie", async () => {
+    const port = await listen(gate());
+    const loggedIn = await request(port, {
+      method: "POST",
+      path: "/login",
+      body: new URLSearchParams({ username: USER, password: PASSWORD }).toString(),
+    });
+    const cookie = cookieHeader(setCookie(loggedIn.headers));
+    const split = cookie.indexOf("=");
+    const value = cookie.slice(split + 1);
+    const flipped = `${value.slice(0, -1)}${value.endsWith("a") ? "b" : "a"}`;
+    const tampered = await request(port, {
+      path: "/chat",
+      headers: { cookie: `${cookie.slice(0, split + 1)}${flipped}` },
+    });
+    const forged = await request(port, {
+      path: "/chat",
+      headers: { cookie: "__Host-nultron_preview=not-a-cookie" },
+    });
+    expect(tampered.status).toBe(302);
+    expect(forged.status).toBe(302);
+    expect(tampered.headers.location).toContain("/login");
+  });
+
+  it("leaves GET /healthz public", async () => {
+    const port = await listen(gate());
+    const response = await request(port, { path: "/healthz" });
+    expect(response.status).toBe(200);
+    expect(response.body).toBe("desk");
+  });
+
+  it("refuses a cross-site login or logout, and a foreign Origin", async () => {
+    const port = await listen(gate());
+    const body = new URLSearchParams({ username: USER, password: PASSWORD }).toString();
+    const cross = await request(port, {
+      method: "POST",
+      path: "/login",
+      headers: { "sec-fetch-site": "cross-site" },
+      body,
+    });
+    const foreign = await request(port, {
+      method: "POST",
+      path: "/login",
+      headers: { origin: "https://evil.example" },
+      body,
+    });
+    expect(cross.status).toBe(403);
+    expect(foreign.status).toBe(403);
+    expect(setCookie(cross.headers)).toBe("");
+    expect(cross.body).not.toContain("<form");
+
+    const loggedIn = await request(port, { method: "POST", path: "/login", body });
+    const cookie = cookieHeader(setCookie(loggedIn.headers));
+    const logout = await request(port, {
+      method: "POST",
+      path: "/logout",
+      headers: { cookie, origin: "https://evil.example" },
+    });
+    expect(logout.status).toBe(403);
+    const desk = await request(port, { path: "/chat", headers: { cookie } });
+    expect(desk.status).toBe(200);
+  });
+
+  it("still accepts a same-origin login", async () => {
+    const port = await listen(gate());
+    const response = await request(port, {
+      method: "POST",
+      path: "/login",
+      headers: { origin: `http://127.0.0.1:${port}`, "sec-fetch-site": "same-origin" },
+      body: new URLSearchParams({ username: USER, password: PASSWORD }).toString(),
+    });
+    expect(response.status).toBe(303);
+  });
+
+  it("spends the rate-limit token before reading the body", async () => {
+    const port = await listen(gate({ burst: 1 }));
+    const first = await request(port, {
+      method: "POST",
+      path: "/login",
+      body: new URLSearchParams({ username: USER, password: "nope" }).toString(),
+    });
+    expect(first.status).toBe(401);
+    const huge = `username=${encodeURIComponent(USER)}&password=${encodeURIComponent(PASSWORD)}&pad=${"x".repeat(8000)}`;
+    const second = await request(port, { method: "POST", path: "/login", body: huge });
+    expect(second.status).toBe(429);
+    expect(setCookie(second.headers)).toBe("");
+  });
+
+  it("answers 413 and does not sign in when the body passes 4 KB", async () => {
+    const port = await listen(gate());
+    const huge = `username=${encodeURIComponent(USER)}&password=${encodeURIComponent(PASSWORD)}&pad=${"x".repeat(8000)}`;
+    const response = await request(port, { method: "POST", path: "/login", body: huge });
+    expect(response.status).toBe(413);
+    expect(setCookie(response.headers)).toBe("");
+    expect(response.headers["www-authenticate"]).toBeUndefined();
+  });
+});
+
+describe("PreviewGate.safeNext", () => {
+  it.each(["/.//evil.com", "/..//evil.com", "/%2e%2e//evil.com", "//evil.com", "/\\evil.com"])(
+    "rejects %s",
+    (next) => {
+      expect(PreviewGate.safeNext(next)).toBe("/");
+    },
+  );
+
+  it("keeps a same-origin path", () => {
+    expect(PreviewGate.safeNext("/chat?x=1")).toBe("/chat?x=1");
+  });
+});
+
+describe("PreviewGate.clientKey", () => {
+  it("ignores X-Forwarded-For from a non-loopback socket", () => {
+    const first = PreviewGate.clientKey(asRequest("203.0.113.9", { "x-forwarded-for": "198.51.100.1" }));
+    const second = PreviewGate.clientKey(asRequest("203.0.113.9", { "x-forwarded-for": "198.51.100.2" }));
+    expect(first).toBe("203.0.113.9");
+    expect(second).toBe(first);
+  });
+
+  it("trusts the last loopback hop and keys IPv6 by /64", () => {
+    expect(PreviewGate.clientKey(asRequest("127.0.0.1", { "x-forwarded-for": "198.51.100.4, 203.0.113.8" }))).toBe(
+      "203.0.113.8",
+    );
+    const one = PreviewGate.clientKey(asRequest("::1", { "x-forwarded-for": "2001:db8:1:2::1" }));
+    const two = PreviewGate.clientKey(asRequest("::ffff:127.0.0.1", { "x-forwarded-for": "2001:db8:1:2:aaaa::9" }));
+    const other = PreviewGate.clientKey(asRequest("127.0.0.1", { "x-forwarded-for": "2001:db8:1:3::1" }));
+    expect(one).toBe("2001:db8:1:2::/64");
+    expect(two).toBe(one);
+    expect(other).toBe("2001:db8:1:3::/64");
+  });
+
+  it("keys an IPv4-mapped address by the embedded IPv4", () => {
+    expect(PreviewGate.rateAddress("::ffff:203.0.113.9")).toBe("203.0.113.9");
   });
 });
 
