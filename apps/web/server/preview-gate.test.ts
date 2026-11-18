@@ -388,9 +388,33 @@ describe("preview form login", () => {
     expect(response.status).toBe(303);
   });
 
-  it("accepts Origin null when the fetch is same-origin, and refuses it when cross-site", async () => {
+  it("accepts Origin null only when Sec-Fetch-Site is same-origin", async () => {
     const port = await listen(gate());
     const body = new URLSearchParams({ username: USER, password: PASSWORD }).toString();
+    const loginSameSite = await request(port, {
+      method: "POST",
+      path: "/login",
+      headers: { origin: "null", "sec-fetch-site": "same-site" },
+      body,
+    });
+    const loginMissing = await request(port, {
+      method: "POST",
+      path: "/login",
+      headers: { origin: "null" },
+      body,
+    });
+    const loginCross = await request(port, {
+      method: "POST",
+      path: "/login",
+      headers: { origin: "null", "sec-fetch-site": "cross-site" },
+      body,
+    });
+    expect(loginSameSite.status).toBe(403);
+    expect(loginMissing.status).toBe(403);
+    expect(loginCross.status).toBe(403);
+    expect(setCookie(loginSameSite.headers)).toBe("");
+    expect(setCookie(loginMissing.headers)).toBe("");
+
     const allowed = await request(port, {
       method: "POST",
       path: "/login",
@@ -398,25 +422,40 @@ describe("preview form login", () => {
       body,
     });
     expect(allowed.status).toBe(303);
-    expect(setCookie(allowed.headers)).toContain("nultron_preview=");
+    const cookie = cookieHeader(setCookie(allowed.headers));
+    expect(cookie).toContain("nultron_preview=");
 
-    const refused = await request(port, {
+    const logoutSameSite = await request(port, {
       method: "POST",
-      path: "/login",
-      headers: { origin: "null", "sec-fetch-site": "cross-site" },
-      body,
+      path: "/logout",
+      headers: { cookie, origin: "null", "sec-fetch-site": "same-site" },
     });
-    expect(refused.status).toBe(403);
-    expect(setCookie(refused.headers)).toBe("");
+    const logoutMissing = await request(port, {
+      method: "POST",
+      path: "/logout",
+      headers: { cookie, origin: "null" },
+    });
+    expect(logoutSameSite.status).toBe(403);
+    expect(logoutMissing.status).toBe(403);
+    const still = await request(port, { path: "/chat", headers: { cookie } });
+    expect(still.status).toBe(200);
+
+    const logout = await request(port, {
+      method: "POST",
+      path: "/logout",
+      headers: { cookie, origin: "null", "sec-fetch-site": "same-origin" },
+    });
+    expect(logout.status).toBe(303);
+    expect(setCookie(logout.headers)).toContain("nultron_preview=");
   });
 
-  it("refuses a login or logout from another port on the same host", async () => {
+  it("refuses a login or logout from another port when Host omits the listen port", async () => {
     const port = await listen(gate());
     const body = new URLSearchParams({ username: USER, password: PASSWORD }).toString();
     const otherPort = await request(port, {
       method: "POST",
       path: "/login",
-      headers: { origin: `http://127.0.0.1:${port + 1}`, "sec-fetch-site": "same-site" },
+      headers: { host: "127.0.0.1", origin: `http://127.0.0.1:${port + 1}`, "sec-fetch-site": "same-site" },
       body,
     });
     expect(otherPort.status).toBe(403);
@@ -427,7 +466,7 @@ describe("preview form login", () => {
     const logout = await request(port, {
       method: "POST",
       path: "/logout",
-      headers: { cookie, origin: `http://127.0.0.1:${port + 1}` },
+      headers: { host: "127.0.0.1", cookie, origin: `http://127.0.0.1:${port + 1}` },
     });
     expect(logout.status).toBe(403);
     const desk = await request(port, { path: "/chat", headers: { cookie } });

@@ -3157,7 +3157,9 @@ Update (2026-11-17, same change): `safeNext` rejects a path that normalises to `
 `/.//evil.com`. The HMAC key is 32 random bytes per process, so a restart drops every preview
 session and the gate assumes one process. IPv6 login attempts share a bucket per /64.
 `POST /login` and `POST /logout` answer 403 when `Sec-Fetch-Site` is `cross-site`. `Origin: null`
-is treated as a missing Origin (Chrome sends that with `Referrer-Policy: no-referrer`). A real
+is accepted only when `Sec-Fetch-Site` is exactly `same-origin` (Chrome sends that pair with
+`Referrer-Policy: no-referrer`). `same-site`, or a missing `Sec-Fetch-Site`, with that literal is
+403, so a sibling port cannot sign in or out through the null path. A real
 Origin must match scheme, hostname and port, so another port on the same host cannot post the
 form. The rate-limit token is taken before the body is read, and a body past
 4 KB destroys the request. The image `HEALTHCHECK`, the Kubernetes probes and `health_uri` in

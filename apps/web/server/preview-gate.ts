@@ -257,10 +257,11 @@ export class PreviewGate {
   }
 
   /**
-   * A same-origin form post. `Sec-Fetch-Site: cross-site` is refused first. `Origin: null` is the
-   * same as a missing Origin: Chrome sends that literal when the page is `Referrer-Policy:
-   * no-referrer`, together with `Sec-Fetch-Site: same-origin`. A real Origin must match this
-   * request's scheme, hostname and port. A client that sends neither header (curl) is allowed.
+   * A same-origin form post. `Sec-Fetch-Site: cross-site` is refused first. `Origin: null` is
+   * accepted only with `Sec-Fetch-Site: same-origin`: that is what Chrome sends for this page,
+   * because it is `Referrer-Policy: no-referrer`. The same literal with `same-site`, or with the
+   * header missing, is a sibling port or subdomain and is refused. A missing Origin (curl) is
+   * still allowed. A real Origin must match this request's scheme, hostname and port.
    */
   static sameSitePost(req: Request): boolean {
     const site = req.header("sec-fetch-site")?.trim().toLowerCase();
@@ -268,7 +269,10 @@ export class PreviewGate {
       return false;
     }
     const origin = req.header("origin")?.trim();
-    if (!origin || origin.toLowerCase() === "null") {
+    if (origin?.toLowerCase() === "null") {
+      return site === "same-origin";
+    }
+    if (!origin) {
       return true;
     }
     return PreviewGate.originMatchesHost(origin, req.header("host") ?? "", PreviewGate.requestScheme(req));
