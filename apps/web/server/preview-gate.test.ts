@@ -388,6 +388,94 @@ describe("preview form login", () => {
     expect(response.status).toBe(303);
   });
 
+  it("accepts Origin null when the fetch is same-origin, and refuses it when cross-site", async () => {
+    const port = await listen(gate());
+    const body = new URLSearchParams({ username: USER, password: PASSWORD }).toString();
+    const allowed = await request(port, {
+      method: "POST",
+      path: "/login",
+      headers: { origin: "null", "sec-fetch-site": "same-origin" },
+      body,
+    });
+    expect(allowed.status).toBe(303);
+    expect(setCookie(allowed.headers)).toContain("nultron_preview=");
+
+    const refused = await request(port, {
+      method: "POST",
+      path: "/login",
+      headers: { origin: "null", "sec-fetch-site": "cross-site" },
+      body,
+    });
+    expect(refused.status).toBe(403);
+    expect(setCookie(refused.headers)).toBe("");
+  });
+
+  it("refuses a login or logout from another port on the same host", async () => {
+    const port = await listen(gate());
+    const body = new URLSearchParams({ username: USER, password: PASSWORD }).toString();
+    const otherPort = await request(port, {
+      method: "POST",
+      path: "/login",
+      headers: { origin: `http://127.0.0.1:${port + 1}`, "sec-fetch-site": "same-site" },
+      body,
+    });
+    expect(otherPort.status).toBe(403);
+    expect(setCookie(otherPort.headers)).toBe("");
+
+    const loggedIn = await request(port, { method: "POST", path: "/login", body });
+    const cookie = cookieHeader(setCookie(loggedIn.headers));
+    const logout = await request(port, {
+      method: "POST",
+      path: "/logout",
+      headers: { cookie, origin: `http://127.0.0.1:${port + 1}` },
+    });
+    expect(logout.status).toBe(403);
+    const desk = await request(port, { path: "/chat", headers: { cookie } });
+    expect(desk.status).toBe(200);
+  });
+
+  it("accepts an Origin that leaves out the default port", async () => {
+    const port = await listen(gate());
+    const body = new URLSearchParams({ username: USER, password: PASSWORD }).toString();
+    const httpDefault = await request(port, {
+      method: "POST",
+      path: "/login",
+      headers: { host: "app.example", origin: "http://app.example", "sec-fetch-site": "same-origin" },
+      body,
+    });
+    expect(httpDefault.status).toBe(303);
+    expect(setCookie(httpDefault.headers)).toContain("nultron_preview=");
+
+    const httpsDefault = await request(port, {
+      method: "POST",
+      path: "/login",
+      headers: {
+        host: "app.example",
+        origin: "https://app.example",
+        "x-forwarded-proto": "https",
+        "sec-fetch-site": "same-origin",
+      },
+      body,
+    });
+    expect(httpsDefault.status).toBe(303);
+
+    const explicitDefault = PreviewGate.originMatchesHost("https://app.example:443", "app.example", "https");
+    const mismatched = await request(port, {
+      method: "POST",
+      path: "/login",
+      headers: {
+        host: "app.example",
+        origin: "https://app.example:8443",
+        "x-forwarded-proto": "https",
+        "sec-fetch-site": "same-origin",
+      },
+      body,
+    });
+    expect(explicitDefault).toBe(true);
+    expect(mismatched.status).toBe(403);
+    expect(setCookie(mismatched.headers)).toBe("");
+  });
+
   it("spends the rate-limit token before reading the body", async () => {
     const port = await listen(gate({ burst: 1 }));
     const first = await request(port, {
@@ -422,6 +510,10 @@ describe("PreviewGate.safeNext", () => {
 
   it("keeps a same-origin path", () => {
     expect(PreviewGate.safeNext("/chat?x=1")).toBe("/chat?x=1");
+  });
+
+  it("rejects a double-encoded protocol-relative path", () => {
+    expect(PreviewGate.safeNext("/%252f%252fevil.com")).toBe("/");
   });
 });
 

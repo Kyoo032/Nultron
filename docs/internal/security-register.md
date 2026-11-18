@@ -3156,8 +3156,10 @@ answered `401` with `www-authenticate: Basic realm="restricted"` and `server: Ca
 Update (2026-11-17, same change): `safeNext` rejects a path that normalises to `//`, including
 `/.//evil.com`. The HMAC key is 32 random bytes per process, so a restart drops every preview
 session and the gate assumes one process. IPv6 login attempts share a bucket per /64.
-`POST /login` and `POST /logout` answer 403 when `Sec-Fetch-Site` is `cross-site` or `Origin`
-does not match `Host`. The rate-limit token is taken before the body is read, and a body past
+`POST /login` and `POST /logout` answer 403 when `Sec-Fetch-Site` is `cross-site`. `Origin: null`
+is treated as a missing Origin (Chrome sends that with `Referrer-Policy: no-referrer`). A real
+Origin must match scheme, hostname and port, so another port on the same host cannot post the
+form. The rate-limit token is taken before the body is read, and a body past
 4 KB destroys the request. The image `HEALTHCHECK`, the Kubernetes probes and `health_uri` in
 `webapp-deploy/Caddyfile` are already `GET /healthz`, which stays public. `GET /api/v1/components`
 is 401 once the gate is mounted. A preview probe that still hits that path must move to

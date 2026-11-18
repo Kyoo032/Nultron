@@ -257,8 +257,10 @@ export class PreviewGate {
   }
 
   /**
-   * A same-origin form post. `Sec-Fetch-Site: cross-site` is refused, and so is an `Origin` whose
-   * host is not this request's `Host`. A client that sends neither (curl, an old browser) is allowed.
+   * A same-origin form post. `Sec-Fetch-Site: cross-site` is refused first. `Origin: null` is the
+   * same as a missing Origin: Chrome sends that literal when the page is `Referrer-Policy:
+   * no-referrer`, together with `Sec-Fetch-Site: same-origin`. A real Origin must match this
+   * request's scheme, hostname and port. A client that sends neither header (curl) is allowed.
    */
   static sameSitePost(req: Request): boolean {
     const site = req.header("sec-fetch-site")?.trim().toLowerCase();
@@ -266,27 +268,86 @@ export class PreviewGate {
       return false;
     }
     const origin = req.header("origin")?.trim();
-    if (!origin) {
+    if (!origin || origin.toLowerCase() === "null") {
       return true;
     }
-    return PreviewGate.originMatchesHost(origin, req.header("host") ?? "");
+    return PreviewGate.originMatchesHost(origin, req.header("host") ?? "", PreviewGate.requestScheme(req));
   }
 
-  static originMatchesHost(origin: string, hostHeader: string): boolean {
+  /**
+   * The scheme the browser used. A loopback socket (Caddy, in the preview's network namespace)
+   * may say so with `X-Forwarded-Proto`. Any other socket is the connection itself.
+   */
+  static requestScheme(req: Request): "http" | "https" {
+    const remote = req.socket?.remoteAddress ?? "";
+    const forwarded = req.header("x-forwarded-proto");
+    if (forwarded && PreviewGate.isLoopback(remote)) {
+      const first = forwarded.split(",")[0]?.trim().toLowerCase();
+      if (first === "http" || first === "https") {
+        return first;
+      }
+    }
+    return req.protocol === "https" ? "https" : "http";
+  }
+
+  /**
+   * Scheme, hostname and port. A port the header leaves out is 443 for https and 80 for http.
+   * Hostname alone is not a match: another port on the same host is a different origin.
+   */
+  static originMatchesHost(origin: string, hostHeader: string, scheme: "http" | "https"): boolean {
     let url: URL;
     try {
       url = new URL(origin);
     } catch {
       return false;
     }
-    if (url.protocol !== "https:" && url.protocol !== "http:") {
+    if (url.username !== "" || url.password !== "") {
       return false;
     }
-    const host = hostHeader.trim().toLowerCase();
-    if (host.length === 0) {
+    const originScheme = url.protocol === "https:" ? "https" : url.protocol === "http:" ? "http" : null;
+    if (!originScheme) {
       return false;
     }
-    return url.host.toLowerCase() === host || url.hostname.toLowerCase() === host;
+    const host = PreviewGate.splitHost(hostHeader);
+    if (!host) {
+      return false;
+    }
+    const originPort = url.port || (originScheme === "https" ? "443" : "80");
+    const hostPort = host.port ?? (scheme === "https" ? "443" : "80");
+    return originScheme === scheme && host.hostname === url.hostname.toLowerCase() && hostPort === originPort;
+  }
+
+  /** `host` or `host:port`, and `[ipv6]` or `[ipv6]:port`. The port is null when the header omits it. */
+  static splitHost(hostHeader: string): { hostname: string; port: string | null } | null {
+    const value = hostHeader.trim().toLowerCase();
+    if (value.length === 0) {
+      return null;
+    }
+    if (value.startsWith("[")) {
+      const end = value.indexOf("]");
+      if (end <= 1) {
+        return null;
+      }
+      const hostname = value.slice(1, end);
+      const rest = value.slice(end + 1);
+      if (rest.length === 0) {
+        return { hostname, port: null };
+      }
+      if (!/^:\d+$/.test(rest)) {
+        return null;
+      }
+      return { hostname, port: rest.slice(1) };
+    }
+    const colon = value.lastIndexOf(":");
+    if (colon === -1) {
+      return { hostname: value, port: null };
+    }
+    const hostname = value.slice(0, colon);
+    const port = value.slice(colon + 1);
+    if (hostname.length === 0 || !/^\d+$/.test(port)) {
+      return null;
+    }
+    return { hostname, port };
   }
 
   /** A path on this origin, or `/`. Never an absolute URL and never back to the login route. */
@@ -305,30 +366,25 @@ export class PreviewGate {
   }
 
   /**
-   * A path on this origin, or `/`. The parser collapses `/.//evil.com` to a pathname of `//evil.com`
-   * while keeping this origin, so the normalised string is checked again. A backslash is rejected
-   * before and after that parse: `/\evil.com` is a protocol-relative URL to the URL parser.
+   * A path on this origin, or `/`. Percent-encoding is decoded until it stops changing, then the
+   * URL parser runs: `/.//evil.com` and `/%252f%252fevil.com` both become a pathname of `//…`.
+   * A backslash is rejected before and after that parse.
    */
   static safeNext(value: string | null | undefined): string {
     if (!value?.startsWith("/") || value.startsWith("//") || value.includes("\\") || PreviewGate.hasControl(value)) {
       return "/";
     }
+    const decoded = PreviewGate.decodeFully(value);
+    if (decoded === null) {
+      return "/";
+    }
     try {
-      const url = new URL(value, "http://preview.local");
+      const url = new URL(decoded, "http://preview.local");
       if (url.origin !== "http://preview.local" || url.username !== "" || url.password !== "") {
         return "/";
       }
       const out = `${url.pathname}${url.search}`;
       if (PreviewGate.offPath(out)) {
-        return "/";
-      }
-      let decoded = out;
-      try {
-        decoded = decodeURIComponent(out);
-      } catch {
-        return "/";
-      }
-      if (decoded !== out && PreviewGate.offPath(decoded)) {
         return "/";
       }
       if (url.pathname === PreviewGate.LOGIN_PATH || url.pathname === PreviewGate.LOGOUT_PATH) {
@@ -338,6 +394,27 @@ export class PreviewGate {
     } catch {
       return "/";
     }
+  }
+
+  /** Percent-decode until the text stops changing. Null when a step is not a same-origin path. */
+  static decodeFully(value: string): string | null {
+    let current = value;
+    for (let round = 0; round < 8; round += 1) {
+      if (PreviewGate.offPath(current)) {
+        return null;
+      }
+      let next: string;
+      try {
+        next = decodeURIComponent(current);
+      } catch {
+        return null;
+      }
+      if (next === current) {
+        return current;
+      }
+      current = next;
+    }
+    return PreviewGate.offPath(current) ? null : current;
   }
 
   /** True when a path would leave this origin: a second slash, a backslash, or a control character. */
