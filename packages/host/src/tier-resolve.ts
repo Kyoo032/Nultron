@@ -3,8 +3,10 @@ import {
   INPUT_MODALITIES,
   availableProviders,
   GATEWAY_PROVIDER_ID,
+  modelMisreadsPictures,
   readOptionalModel,
   type InputModality,
+  type ProviderId,
   type ReasoningEffortChoice,
   type TenantContext,
 } from "@agentforge/core";
@@ -54,12 +56,21 @@ const REASONING_BY_THINKING: Readonly<Record<TierThinking, Readonly<ReasoningEff
  * `scope` is whose breaker to read. Chat marks a model down for its own tenant (`runs.ts`), so a walk
  * that read the unscoped entry would never see that mark and would send the next turn to the same dead
  * model. Pass the run's tenant; leaving it out reads only the unscoped entry.
+ *
+ * A turn that carries a picture demotes the models measured to misread one (`modelMisreadsPictures`): they
+ * answer only when no other candidate of the tier is live. That is every image run, and a text run whose
+ * thread replays an earlier picture to the model (`replaysPicture`, from `chat-image-history.ts`). A video
+ * run is left alone: the measurement is of pictures, and a model that misreads them is not listed with
+ * video input anyway. Demotion never changes what a candidate is listed as, so the tier's advertised input
+ * modalities (`tierCatalog`) are the same with it and without it.
  */
 export function tierLiveness(
   catalog: readonly SelectableModel[],
   modality: InputModality = "text",
   scope?: ModelCacheScope,
+  replaysPicture = false,
 ): TierLiveness {
+  const carriesPicture = modality === "image" || (modality === "text" && replaysPicture);
   const rows = new Map<string, SelectableModel>();
   for (const model of catalog) {
     const key = model.id.toLowerCase();
@@ -82,6 +93,7 @@ export function tierLiveness(
     },
     // The breaker keys by tenant and lower-case model id, not by provider, until it learns providers (M4).
     isDown: (_provider, model) => isJobModelDown(model, Date.now(), scope),
+    ...(carriesPicture ? { demoted: (_provider: ProviderId, model: string) => modelMisreadsPictures(model) } : {}),
   };
 }
 
@@ -90,8 +102,9 @@ export function resolveTierForCatalog(
   catalog: readonly SelectableModel[],
   modality: InputModality = "text",
   scope?: ModelCacheScope,
+  replaysPicture = false,
 ): TierResolution {
-  return resolveTier(tier, tierLiveness(catalog, modality, scope));
+  return resolveTier(tier, tierLiveness(catalog, modality, scope, replaysPicture));
 }
 
 /**
@@ -106,8 +119,9 @@ export function nextTierModel(
   catalog: readonly SelectableModel[],
   modality: InputModality = "text",
   scope?: ModelCacheScope,
+  replaysPicture = false,
 ): string | undefined {
-  const base = tierLiveness(catalog, modality, scope);
+  const base = tierLiveness(catalog, modality, scope, replaysPicture);
   const gone = failed.trim().toLowerCase();
   const resolved = resolveTier(tier, {
     ...base,
@@ -182,6 +196,8 @@ export type TierRun = Readonly<{
   /** The catalog's spelling of the model the tier resolved to. */
   model: string;
   reasoning: ReasoningEffortChoice;
+  /** Whether this turn carries a picture to the model, for the same demotion on a fallback walk. */
+  replaysPicture?: boolean;
 }>;
 
 function namedTier(body: unknown): unknown {
@@ -196,12 +212,15 @@ function namedTier(body: unknown): unknown {
  * 400 `tier_and_model`; a value that is not a tier is a 400 `unknown_tier`; a tier with no live
  * candidate is a 503 `tier_unavailable`. It never falls to another tier or to a default model, and the
  * body's `thinking` and `reasoningEffort` are not read at all, so a malformed one cannot fail the run.
+ * `replaysPicture` is whether a text run's thread puts an earlier picture in front of the model
+ * (`tierLiveness`).
  */
 export function chooseTierRun(
   body: unknown,
   modality: InputModality,
   catalog: readonly SelectableModel[],
   scope?: ModelCacheScope,
+  replaysPicture = false,
 ): TierRun | null {
   const named = namedTier(body);
   if (named === undefined || named === null) {
@@ -214,22 +233,30 @@ export function chooseTierRun(
   if (!requested.ok) {
     throw new ApiError("unknown_tier", `tier must be one of ${MODEL_TIERS.join(", ")}`, 400);
   }
-  const resolved = resolveTierForCatalog(requested.tier, catalog, modality, scope);
+  const resolved = resolveTierForCatalog(requested.tier, catalog, modality, scope, replaysPicture);
   if (!resolved.ok) {
     throw new ApiError("tier_unavailable", "No model is available for this tier right now", 503);
   }
-  return { tier: resolved.tier, model: resolved.model, reasoning: { ...REASONING_BY_THINKING[resolved.thinking] } };
+  return { tier: resolved.tier, model: resolved.model, reasoning: { ...REASONING_BY_THINKING[resolved.thinking] }, replaysPicture: modality === "image" || replaysPicture };
 }
 
-/** `chooseTierRun` against the tenant's catalog. The catalog is not read when the body names no tier. */
-export function resolveTierRun(options: {
+/**
+ * `chooseTierRun` against the tenant's catalog. The catalog is not read when the body names no tier.
+ *
+ * `threadReplaysPicture` says whether the thread's earlier pictures reach the model on this turn. It is
+ * asked at most once, and only for a text run that names a tier: an image run carries a picture by its
+ * route, and a video run is not demoted (`tierLiveness`).
+ */
+export async function resolveTierRun(options: {
   body: unknown;
   modality: InputModality;
   tenant: TenantContext;
-}): TierRun | null {
+  threadReplaysPicture?: () => Promise<boolean>;
+}): Promise<TierRun | null> {
   const named = namedTier(options.body);
   if (named === undefined || named === null) {
     return null;
   }
-  return chooseTierRun(options.body, options.modality, listSelectableModels(options.tenant), options.tenant);
+  const replaysPicture = options.modality === "text" ? ((await options.threadReplaysPicture?.()) ?? false) : false;
+  return chooseTierRun(options.body, options.modality, listSelectableModels(options.tenant), options.tenant, replaysPicture);
 }

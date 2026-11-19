@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../errors";
 import { assertChatModelAcceptsModality, getModelModalities } from "./capabilities";
-import { modelImageInput } from "./image-input";
+import { modelImageInput, modelMisreadsPictures, PICTURE_MISREADS } from "./image-input";
 
 /**
  * Every id here is a row of `docs/internal/gateway-model-selection.md`: its "Modality" column (section 6)
@@ -90,6 +90,54 @@ describe("modelImageInput", () => {
       "veo_3_1-fast",
     ]) {
       expect(modelImageInput(id), id).toBe("no");
+    }
+  });
+});
+
+describe("models measured to misread a picture", () => {
+  it("marks the two Luna models, from the 2026-11-13 measurement", () => {
+    expect(PICTURE_MISREADS.map((entry) => entry.id)).toEqual(["gpt-6-luna", "gpt-5.6-luna"]);
+    for (const id of ["gpt-6-luna", "gpt-5.6-luna"]) {
+      expect(modelMisreadsPictures(id), id).toBe(true);
+    }
+  });
+
+  it("does not mark the models that read the same picture correctly", () => {
+    for (const id of [
+      "gpt-6-sol",
+      "gpt-6-astra",
+      "gpt-5.6-sol",
+      "gpt-5.6-terra",
+      "deepseek-v4-1-flash",
+      "claude-opus-5-5",
+      "claude-sonnet-5-5",
+      "gemini-3.5-flash",
+      "hy3",
+      "",
+    ]) {
+      expect(modelMisreadsPictures(id), id).toBe(false);
+    }
+  });
+
+  it("matches the bare id, whatever the vendor prefix or the case, and not a longer id", () => {
+    expect(modelMisreadsPictures("openai/GPT-6-Luna")).toBe(true);
+    expect(modelMisreadsPictures("  gpt-5.6-luna ")).toBe(true);
+    // Measured on the id the catalog lists, not on a family: a dated snapshot is another model.
+    expect(modelMisreadsPictures("gpt-6-luna-20260930")).toBe(false);
+    expect(modelMisreadsPictures("gpt-6-luna-mini")).toBe(false);
+  });
+
+  it("leaves what the model is allowed to be sent alone: it still reads images, and an explicit choice is accepted", () => {
+    for (const id of PICTURE_MISREADS.map((entry) => entry.id)) {
+      expect(modelImageInput(id), id).toBe("yes");
+      expect(getModelModalities(id).image, id).toBe(true);
+      expect(() => assertChatModelAcceptsModality(id, "image"), id).not.toThrow();
+    }
+  });
+
+  it("is not a video fact: the marked models are not listed as taking video, so a video run never meets one", () => {
+    for (const id of PICTURE_MISREADS.map((entry) => entry.id)) {
+      expect(getModelModalities(id).video, id).toBe(false);
     }
   });
 });

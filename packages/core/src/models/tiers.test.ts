@@ -29,6 +29,8 @@ type World = {
   down?: readonly string[];
   /** Ids the breaker holds down on one provider only. */
   downOn?: Partial<Record<ProviderId, readonly string[]>>;
+  /** Ids the host demotes for this turn, on every provider. Absent: the liveness has no `demoted` at all. */
+  demoted?: readonly string[];
 };
 
 function sameId(a: string, b: string): boolean {
@@ -44,6 +46,9 @@ function world(options: World = {}): TierLiveness {
     isDown: (provider, model) =>
       (options.down ?? []).some((id) => sameId(id, model)) ||
       (options.downOn?.[provider] ?? []).some((id) => sameId(id, model)),
+    ...(options.demoted
+      ? { demoted: (_provider: ProviderId, model: string) => (options.demoted ?? []).some((id) => sameId(id, model)) }
+      : {}),
   };
 }
 
@@ -501,6 +506,127 @@ describe("resolveTier across providers", () => {
       model: "deepseek-v4-1-flash",
       skipped: [],
     });
+  });
+});
+
+describe("resolveTier with demoted candidates", () => {
+  const [first, second, third] = CHAT_DEFAULT_PREFERENCES as [string, string, string];
+
+  it("tries a demoted candidate after every other live one, and says it passed it over", () => {
+    const result = resolveTier("daily", world({ demoted: [first] }));
+    expect(result).toMatchObject({
+      ok: true,
+      model: second,
+      thinking: "default",
+      skipped: [{ provider: GATEWAY_PROVIDER_ID, model: first, reason: "demoted" }],
+    });
+  });
+
+  it("changes nothing for the rest of the order: a demoted second candidate leaves the head the head", () => {
+    expect(resolveTier("daily", world({ demoted: [second] }))).toMatchObject({ ok: true, model: first, skipped: [] });
+    // Two demoted ahead of the answer: the answer is the first live one that is not demoted, and both are reported.
+    const result = resolveTier("daily", world({ demoted: [first, second] }));
+    expect(result).toMatchObject({
+      ok: true,
+      model: third,
+      skipped: [
+        { model: first, reason: "demoted" },
+        { model: second, reason: "demoted" },
+      ],
+    });
+  });
+
+  it("is the plain walk when the liveness demotes nothing, and when it demotes nothing that is live", () => {
+    const plain = resolveTier("daily", world());
+    expect(resolveTier("daily", world({ demoted: [] }))).toEqual(plain);
+    expect(resolveTier("daily", world({ demoted: ["a-model-no-list-names"] }))).toEqual(plain);
+  });
+
+  it("answers with the first demoted candidate when every live candidate is demoted, so the tier still answers", () => {
+    const result = resolveTier("daily", world({ demoted: GATEWAY_IDS }));
+    expect(result).toMatchObject({ ok: true, model: first, thinking: "default", skipped: [] });
+    // Only two demoted models are live, and the first in the list's order answers.
+    const two = resolveTier(
+      "daily",
+      world({ listed: { [GATEWAY_PROVIDER_ID]: [third, second] }, demoted: [second, third] }),
+    );
+    expect(two).toMatchObject({ ok: true, model: second });
+    expect(new Set(two.skipped.map((entry) => entry.reason))).toEqual(new Set(["unlisted"]));
+  });
+
+  it("reports an unlisted or held-down candidate as that, and never asks whether it is demoted", () => {
+    const asked: string[] = [];
+    const liveness: TierLiveness = {
+      ...world({ listed: { [GATEWAY_PROVIDER_ID]: [second, third] }, down: [second] }),
+      demoted: (_provider, model) => {
+        asked.push(model);
+        return model === third;
+      },
+    };
+    const result = resolveTier("daily", liveness);
+    expect(asked).toEqual([third]);
+    expect(result).toMatchObject({ ok: true, model: third });
+    expect(result.skipped.slice(0, 2)).toEqual([
+      { provider: GATEWAY_PROVIDER_ID, model: first, reason: "unlisted" },
+      { provider: GATEWAY_PROVIDER_ID, model: second, reason: "down" },
+    ]);
+    // The only live candidate is demoted and answers; nothing was passed over for it, so no demotion is reported.
+    expect(result.skipped.some((entry) => entry.reason === "demoted")).toBe(false);
+  });
+
+  it("holds a demoted candidate back across providers, and does not break the provider order otherwise", () => {
+    const sonnet = ["claude-sonnet-5-5"];
+    const definitions = definitionsWith(
+      "daily",
+      Object.freeze({ anthropic: Object.freeze(sonnet), [GATEWAY_PROVIDER_ID]: Object.freeze(["gpt-6-luna"]) }),
+    );
+    const listed = { anthropic: sonnet, [GATEWAY_PROVIDER_ID]: ["gpt-6-luna"] };
+    const providers: ProviderId[] = [GATEWAY_PROVIDER_ID, "anthropic"];
+    // The gateway is first, but its only candidate is demoted: the next provider's candidate answers.
+    expect(resolveTier("daily", world({ providers, listed, demoted: ["gpt-6-luna"] }), definitions)).toMatchObject({
+      ok: true,
+      provider: "anthropic",
+      model: "claude-sonnet-5-5",
+      skipped: [{ provider: GATEWAY_PROVIDER_ID, model: "gpt-6-luna", reason: "demoted" }],
+    });
+    // Both demoted: the first in provider order answers.
+    const bothDemoted = world({ providers, listed, demoted: ["gpt-6-luna", "claude-sonnet-5-5"] });
+    expect(resolveTier("daily", bothDemoted, definitions)).toMatchObject({
+      ok: true,
+      provider: GATEWAY_PROVIDER_ID,
+      model: "gpt-6-luna",
+      skipped: [],
+    });
+    // Nothing demoted: unchanged.
+    expect(resolveTier("daily", world({ providers, listed }), definitions)).toMatchObject({
+      provider: GATEWAY_PROVIDER_ID,
+      model: "gpt-6-luna",
+    });
+  });
+
+  it("is still tier_unavailable when nothing is live, and a demoted model that is held down does not count as live", () => {
+    expect(resolveTier("daily", world({ listed: { [GATEWAY_PROVIDER_ID]: [] }, demoted: GATEWAY_IDS }))).toMatchObject({
+      ok: false,
+      error: "tier_unavailable",
+      skipped: expect.any(Array),
+    });
+    const onlyFirstIsListed = resolveTier(
+      "daily",
+      world({ listed: { [GATEWAY_PROVIDER_ID]: [first] }, down: [first], demoted: [first] }),
+    );
+    expect(onlyFirstIsListed).toMatchObject({ ok: false, error: "tier_unavailable" });
+    expect(onlyFirstIsListed.skipped[0]).toEqual({ provider: GATEWAY_PROVIDER_ID, model: first, reason: "down" });
+  });
+
+  it("returns results nobody can change afterwards", () => {
+    for (const demoted of [[first], GATEWAY_IDS]) {
+      const result = resolveTier("daily", world({ demoted }));
+      expect(Object.isFrozen(result)).toBe(true);
+      expect(Object.isFrozen(result.skipped)).toBe(true);
+      for (const entry of result.skipped) {
+        expect(Object.isFrozen(entry)).toBe(true);
+      }
+    }
   });
 });
 
