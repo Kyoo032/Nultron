@@ -1310,6 +1310,14 @@ Lanes: enterprise, tester.
 - **Review, same branch.** `safeNext` percent-decodes until the path stops changing and then checks it, so `/.//evil.com` and `/%252f%252fevil.com` do not redirect off this origin. `Origin: null` is accepted only when `Sec-Fetch-Site` is `same-origin`, which is how Chrome submits the form under `Referrer-Policy: no-referrer`. The same literal with `same-site`, or with that header missing, is 403. A real Origin must match scheme, hostname and port. The HMAC key is `randomBytes(32)` per process: sessions reset on restart, and this assumes one process. IPv6 rate limits are keyed by /64. `POST /login` and `POST /logout` answer 403 when `Sec-Fetch-Site` is `cross-site`, or when a real Origin does not match this request. The rate-limit token is taken before the body is read, and a body past 4 KB destroys the request. The image healthcheck and the Caddy `health_uri` are already `GET /healthz`. `GET /api/v1/components` is 401 once the gate is mounted, so a preview probe still pointed there must move to `/healthz`.
 - **Proof.** `apps/web/server/preview-gate.test.ts`. Not driven on the live preview.
 
+## Require the production preview form before Caddy cutover, 2026-11-19
+
+Lanes: enterprise, tester.
+
+- **What.** `PreviewGate.requireProduction(process.env)` refuses to boot outside production, in server mode or without both preview credentials. Use it in the external preview entrypoint before importing the host/database, then mount the middleware ahead of the API and static files. Stock hosted and webdev boot are unchanged.
+- **Still owed.** Follow the [preview cutover checks](../../webapp-deploy/README.md#preview-desks-mount-the-form-before-changing-caddy). Keep Caddy Basic Auth until the external mount has passed unauthenticated upstream checks and replacement routing preserves per-desk isolation.
+- **Proof.** The web suite exercises the production middleware with anonymous page, API and POST requests, public liveness and a same-origin form login. Scoped local CI passed; the live preview was not changed or driven.
+
 ## Chat usage counts model retries, 2026-11-19 (DFIND-65)
 
 Lanes: enterprise, tester.
