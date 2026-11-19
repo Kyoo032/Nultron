@@ -623,6 +623,44 @@ it has no canary of its own. Two other places take a change before the hosted ma
 **Every run on a server needs Rizky's go in the chat for that deploy.** A go for an earlier deploy does
 not count, and the gate does not replace that go.
 
+### Preview desks: mount the form before changing Caddy
+
+This is for the separate single-desk preview, not this Enterprise stack. The live preview mounts
+`nultron-files/deploy/tencent/edge/app/preview-server.ts` from outside this repo. Updating the app
+image alone does not install the form. Keep that entrypoint and its existing startup refusals.
+
+1. In the external preview entrypoint, import `PreviewGate` from the image's
+   `apps/web/server/preview-gate.ts`. Construct it with `PreviewGate.requireProduction(process.env)`
+   during boot, **before the host/database imports load dotenv** (move those imports behind this
+   check or use a bootstrap module). Pass `NODE_ENV=production` and the per-desk
+   `PREVIEW_BASIC_USER` and `PREVIEW_BASIC_PASSWORD` in the real process environment from secrets;
+   leave `AGENTFORGE_SERVER` unset. Mount `app.use(previewGate.middleware())` ahead of body parsers,
+   `handleNodeRequest`, static files and the SPA fallback. Do not catch a boot refusal and continue.
+2. Use the existing safe-update runbook to recreate a tester desk first, with Caddy Basic Auth
+   still on. Keep each listener on loopback and verify Caddy connects to `127.0.0.1` in the shared
+   network namespace. Caddy must set trusted `X-Forwarded-Proto` and append the real client address
+   as the last `X-Forwarded-For` hop. Use `GET /healthz` for probes, not a desk API.
+3. From the shared network namespace, check the canary upstream directly, without any cookie
+   or Authorization header and without following redirects. Repeat for each desk before cutover:
+
+   | Request | Required upstream response |
+   | --- | --- |
+   | `GET /` | `302` to `/login`, no `WWW-Authenticate` |
+   | `GET /api/v1/components` | `401`, not an app response |
+   | `POST /chat` | `401` |
+   | `GET /healthz` | `200` |
+
+4. **Do not remove Basic Auth if desk selection still depends on the Basic Auth username.** The
+   form does not select a desk. Verify that an isolated TLS canary with the proposed routing
+   reaches the intended desk for `/login`, the app and the API, and that a session from one desk
+   does not open another. For `/login` and `/logout`, preserve the public `Host`, `Origin` and
+   `Sec-Fetch-Site` so the gate can validate the form. Scope this exception to those two paths;
+   keep the existing Origin checks and loopback header handling for desk writes.
+5. Only after those checks pass and the proxy change is approved, remove Basic Auth on the
+   approved preview route and repeat the anonymous checks through HTTPS. Sign in and out on the
+   intended desk. If any check fails, restore Basic Auth before rolling back any app change; if
+   it cannot be restored immediately, take the affected route out of service.
+
 ## Back up
 
 ```sh
