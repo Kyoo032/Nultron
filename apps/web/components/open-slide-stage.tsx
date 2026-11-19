@@ -306,7 +306,12 @@ export function OpenSlideStage({ deck, onChange }: { deck: OpenSlideDeck; onChan
               {active && block.kind === "text" ? (
                 <textarea
                   className="h-full w-full resize-none bg-transparent outline-none"
-                  style={{ color: "inherit", font: "inherit", textAlign: "inherit" }}
+                  style={{
+                    color: "inherit",
+                    font: "inherit",
+                    textAlign: "inherit",
+                    overflow: block === coverTitle ? "hidden" : undefined,
+                  }}
                   value={block.text}
                   aria-label={t("presentation.openSlideText")}
                   data-testid="presentations-open-slide-text"

@@ -16,6 +16,9 @@ function titleBox(text: string) {
     },
     scrollWidth: 840,
     querySelector: () => null,
+    setText(next: string) {
+      text = next;
+    },
   };
   vi.stubGlobal("getComputedStyle", () => ({ fontSize: "70px" }));
   return element;
@@ -49,5 +52,16 @@ describe("cover title shrink-to-fit", () => {
     box.clientHeight = 0;
     fitOpenSlideTitle(box as unknown as HTMLElement, storedSize);
     expect(box.style.fontSize).toBe(storedSize);
+  });
+
+  it("measures the active textarea again after its text changes", () => {
+    const textarea = titleBox("Short title");
+    const box = { ...textarea, scrollHeight: 120, querySelector: () => textarea };
+    fitOpenSlideTitle(box as unknown as HTMLElement, storedSize);
+    expect(box.style.fontSize).toBe(storedSize);
+    textarea.setText("A Very Long Cover Title That Keeps Going And Going Beyond The Box Limits");
+    fitOpenSlideTitle(box as unknown as HTMLElement, storedSize);
+    expect(Number.parseFloat(box.style.fontSize)).toBeLessThan(70);
+    expect(textarea.scrollHeight).toBeLessThanOrEqual(textarea.clientHeight);
   });
 });
