@@ -88,6 +88,39 @@ describe("endpoints", () => {
     expect(store.listConversations(deskA, {}, NOW)).toHaveLength(1);
   });
 
+  it("releases a disconnected number without moving its conversations to the new desk", () => {
+    const old = endpointFor(deskA, "1000001");
+    store.recordInbound(old, inbound({ text: "old desk only" }), NOW);
+    const conversation = store.listConversations(deskA, {}, NOW)[0];
+    store.disconnectEndpoint(deskA, "whatsapp", NOW);
+    const next = endpointFor(deskB, "1000001");
+    expect(next.id).not.toBe(old.id);
+    expect(store.findActiveEndpoint("whatsapp", "1000001")).toMatchObject({
+      id: next.id,
+      workspaceId: deskB.workspaceId,
+    });
+    expect(db.prepare("SELECT status FROM channel_endpoints WHERE id = ?").get(old.id)).toEqual({ status: "disabled" });
+    expect(store.listConversations(deskB, {}, NOW)).toEqual([]);
+    expect(store.getConversation(deskB, conversation.id, NOW)).toBeNull();
+    expect(store.listMessages(deskB, conversation.id)).toBeNull();
+    expect(store.listMessages(deskA, conversation.id)?.map((row) => row.text)).toEqual(["old desk only"]);
+    expect(() => endpointFor(deskA, "1000001")).toThrowError(
+      expect.objectContaining({ code: "channel_conflict", status: 409 }),
+    );
+    store.recordInbound(
+      store.findActiveEndpoint("whatsapp", "1000001") as EndpointRow,
+      inbound({ text: "new desk only" }),
+      NOW,
+    );
+    expect(store.listConversations(deskB, {}, NOW)).toHaveLength(1);
+    expect(store.listMessages(deskA, conversation.id)).toHaveLength(1);
+    store.disconnectEndpoint(deskB, "whatsapp", NOW);
+    expect(endpointFor(deskB, "1000001").id).toBe(next.id);
+    store.disconnectEndpoint(deskB, "whatsapp", NOW);
+    expect(endpointFor(deskA, "1000001").id).toBe(old.id);
+    expect(count("channel_endpoints")).toBe(2);
+  });
+
   it("lets a desk move to a different number and keeps only one active", () => {
     endpointFor(deskA, "1000001");
     const second = endpointFor(deskA, "1000002");

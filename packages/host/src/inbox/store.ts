@@ -185,18 +185,25 @@ export function createInboxStore(sql: InboxSql, newId: () => string = () => cryp
   /**
    * Register a number for this desk, or take it back after a disconnect.
    *
-   * A number belongs to exactly one desk on the whole install: the unique index is over
-   * `(kind, external_id)` and a second desk gets a 409 here before it reaches the index. A desk has
+   * An active number belongs to exactly one desk on the whole install: the partial unique index is
+   * over `(kind, external_id)` and a second desk gets a 409 here before it reaches the index. A desk has
    * one active number per kind; connecting a different one disables the old one and keeps its
    * conversations.
    */
   const connectEndpoint = sql.transaction((scope: DeskScope, input: ConnectEndpointInput, now: number): EndpointRow => {
-    const existing = sql
-      .prepare("SELECT * FROM channel_endpoints WHERE kind = ? AND external_id = ?")
+    const active = sql
+      .prepare("SELECT * FROM channel_endpoints WHERE kind = ? AND external_id = ? AND status = 'active'")
       .get(input.kind, input.externalId) as EndpointDb | undefined;
-    if (existing && existing.workspace_id !== scope.workspaceId) {
+    if (active && active.workspace_id !== scope.workspaceId) {
       throw new ApiError("channel_conflict", "That number is already connected to another desk", 409);
     }
+    const existing =
+      active ??
+      (sql
+        .prepare(
+          "SELECT * FROM channel_endpoints WHERE kind = ? AND external_id = ? AND workspace_id = ? ORDER BY updated_at DESC, id LIMIT 1",
+        )
+        .get(input.kind, input.externalId, scope.workspaceId) as EndpointDb | undefined);
     sql
       .prepare(
         "UPDATE channel_endpoints SET status = 'disabled', updated_at = ? WHERE workspace_id = ? AND kind = ? AND status = 'active' AND external_id <> ?",
