@@ -215,7 +215,8 @@ describe("an answer", () => {
     expect(seen).toHaveLength(1);
     expect(seen[0]?.url).toContain("/chat/completions");
     const system = textOfContent(messagesOf(seen[0] as Captured)[0]?.content);
-    expect(messagesOf(seen[0] as Captured)[0]?.role).toBe("system");
+    // Newer OpenAI models are given the lead turn as `developer`, the older ones as `system`.
+    expect(messagesOf(seen[0] as Captured)[0]?.role).toMatch(/^(system|developer)$/);
     expect(system.trim().endsWith("do not do it yourself.")).toBe(true);
     expect(system).toContain("spoken aloud, in English");
     expect(system).toContain("at most three short sentences");
@@ -241,7 +242,9 @@ describe("what the model is given", () => {
     script = [says("Gamma.")];
     await ask1(threadId, "the new question gamma?");
 
-    const messages = messagesOf(seen[0] as Captured).filter((message) => message.role !== "system");
+    const messages = messagesOf(seen[0] as Captured).filter(
+      (message) => message.role !== "system" && message.role !== "developer",
+    );
     expect(messages.map((message) => message.role)).toEqual(["user", "assistant", "user"]);
     expect(textOfContent(messages[0]?.content)).toContain("earlier question alpha");
     expect(textOfContent(messages[1]?.content)).toContain("earlier answer beta");
