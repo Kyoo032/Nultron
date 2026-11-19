@@ -9,6 +9,11 @@ import { PreviewGate } from "./preview-gate";
 
 const USER = "preview";
 const PASSWORD = "correct-horse";
+const productionPreviewEnv = {
+  NODE_ENV: "production",
+  PREVIEW_BASIC_USER: USER,
+  PREVIEW_BASIC_PASSWORD: PASSWORD,
+};
 
 const servers: http.Server[] = [];
 
@@ -134,6 +139,50 @@ describe("PreviewGate.fromEnv", () => {
     expect(response.status).toBe(303);
     expect(cookie).toContain("Secure");
     expect(cookie).toContain("__Host-nultron_preview=");
+  });
+});
+
+describe("the required production preview mount", () => {
+  it("refuses a non-production boot, hosted mode or incomplete credentials", () => {
+    expect(() => PreviewGate.requireProduction({ ...productionPreviewEnv, NODE_ENV: "development" })).toThrow(
+      "NODE_ENV=production",
+    );
+    for (const override of [
+      { AGENTFORGE_SERVER: "1" },
+      { PREVIEW_BASIC_USER: " " },
+      { PREVIEW_BASIC_PASSWORD: undefined },
+    ]) {
+      expect(() => PreviewGate.requireProduction({ ...productionPreviewEnv, ...override })).toThrow("PREVIEW_BASIC_USER");
+    }
+  });
+
+  it("blocks anonymous desk traffic before downstream handlers but keeps liveness public", async () => {
+    const port = await listen(PreviewGate.requireProduction(productionPreviewEnv));
+    const page = await request(port, { path: "/" });
+    expect(page.status).toBe(302);
+    expect(page.headers.location).toBe("/login?next=%2F");
+    expect(page.headers["www-authenticate"]).toBeUndefined();
+    expect((await request(port, { path: "/api/v1/components" })).status).toBe(401);
+    expect((await request(port, { method: "POST", path: "/chat" })).status).toBe(401);
+    expect((await request(port, { path: "/healthz" })).status).toBe(200);
+
+    const login = await request(port, {
+      method: "POST",
+      path: "/login",
+      headers: {
+        host: "preview.example",
+        origin: "https://preview.example",
+        "x-forwarded-proto": "https",
+      },
+      body: new URLSearchParams({ username: USER, password: PASSWORD }).toString(),
+    });
+    expect(login.status).toBe(303);
+    const set = setCookie(login.headers);
+    expect(set).toContain("Secure");
+    expect(set).toContain("__Host-nultron_preview=");
+    const api = await request(port, { path: "/api/v1/components", headers: { cookie: cookieHeader(set) } });
+    expect(api.status).toBe(200);
+    expect(api.body).toBe("desk");
   });
 });
 
