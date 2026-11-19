@@ -1309,3 +1309,9 @@ Lanes: enterprise, tester.
 - **Login document.** The form is the desk's own paint: the chat sky, a raised card, the mark and the wordmark, DM Sans, the field and primary-button styles, and `.dark` when `agentforge-theme` is `dark`. One language per response, from `Accept-Language`. The mark and the font are inlined.
 - **Review, same branch.** `safeNext` percent-decodes until the path stops changing and then checks it, so `/.//evil.com` and `/%252f%252fevil.com` do not redirect off this origin. `Origin: null` is accepted only when `Sec-Fetch-Site` is `same-origin`, which is how Chrome submits the form under `Referrer-Policy: no-referrer`. The same literal with `same-site`, or with that header missing, is 403. A real Origin must match scheme, hostname and port. The HMAC key is `randomBytes(32)` per process: sessions reset on restart, and this assumes one process. IPv6 rate limits are keyed by /64. `POST /login` and `POST /logout` answer 403 when `Sec-Fetch-Site` is `cross-site`, or when a real Origin does not match this request. The rate-limit token is taken before the body is read, and a body past 4 KB destroys the request. The image healthcheck and the Caddy `health_uri` are already `GET /healthz`. `GET /api/v1/components` is 401 once the gate is mounted, so a preview probe still pointed there must move to `/healthz`.
 - **Proof.** `apps/web/server/preview-gate.test.ts`. Not driven on the live preview.
+
+## Mask case-varied and form-encoded bearer tokens, 2026-11-19
+
+Lanes: enterprise, tester.
+
+- `redactCredentials` now masks a bearer token regardless of the scheme's case and also accepts `+` as a form-encoded space. The existing `Bearer [REDACTED]` output is unchanged.

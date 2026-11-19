@@ -1,4 +1,4 @@
-const BEARER_RE = /\bBearer(?:\s+|%20)[A-Za-z0-9\-._~+/%]{8,}/g;
+const BEARER_RE = /\bBearer(?:\s+|%20|\+)[A-Za-z0-9\-._~+/%]{8,}/gi;
 
 const KEY_PATTERNS = [
   /\bsk-ant-[A-Za-z0-9\-_]{8,}/g,

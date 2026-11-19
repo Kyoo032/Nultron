@@ -19,6 +19,19 @@ const PEM = [
 const SHA = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08";
 
 describe("redactCredentials: the shapes this app handles", () => {
+  it.each([
+    ["Authorization: bearer abcd1234efgh-5678.ijkl_mnop", "Authorization: Bearer [REDACTED]"],
+    ["authorization=Bearer+abcd1234efgh5678ijkl", "authorization=Bearer [REDACTED]"],
+    ["BEARER abcd1234efgh5678", "Bearer [REDACTED]"],
+  ])("masks an opaque bearer token in %s", (input, expected) => {
+    expect(redactCredentials(input)).toBe(expected);
+  });
+
+  it("leaves the word bearer alone in prose", () => {
+    const input = "The word bearer is not a credential.";
+    expect(redactCredentials(input)).toBe(input);
+  });
+
   it("masks a JWT", () => {
     const out = redactCredentials(`session ${JWT} ends`);
     expect(out).toBe("session [REDACTED] ends");
