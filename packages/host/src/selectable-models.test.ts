@@ -129,24 +129,25 @@ describe("modeCatalogPayload", () => {
 
   it("keeps a catalogue without GPT 6 or hy3 on the stand-ins the lists name next", () => {
     const payload = modeCatalogPayload([
-      model("gpt-5.6-terra"),
-      model("gpt-5.6-luna"),
-      model("gpt-5.6-sol"),
-      model("claude-sonnet-5"),
-      model("deepseek-v4-flash"),
+      model("deepseek-v4-1-flash"),
+      model("claude-opus-5-5"),
       model("glm-5.2-fast-preview"),
       model("grok-imagine-video"),
     ]);
-    expect(payload.defaults.chat).toBe("gpt-5.6-luna");
-    expect(payload.defaults.documents).toBe("deepseek-v4-flash");
-    expect(payload.defaults.finance).toBe("deepseek-v4-flash");
-    expect(payload.defaults.market).toBe("deepseek-v4-flash");
-    expect(payload.defaults.research).toBe("gpt-5.6-luna");
-    expect(payload.defaults.data).toBe("gpt-5.6-luna");
+    // Chat takes the first live id of its list: GPT 6 Luna and Claude Sonnet 5.5 are absent, so DeepSeek
+    // V4.1 Flash. The Documents, Finance and Market lists lose hy3 and land on it too.
+    expect(payload.defaults.chat).toBe("deepseek-v4-1-flash");
+    expect(payload.defaults.documents).toBe("deepseek-v4-1-flash");
+    expect(payload.defaults.finance).toBe("deepseek-v4-1-flash");
+    expect(payload.defaults.market).toBe("deepseek-v4-1-flash");
+    // Research and Data name GPT 6 Luna, GPT 6 Sol, Claude Haiku 5.5 and MiniMax M3, none live here.
+    expect(payload.defaults.research).toBe("deepseek-v4-1-flash");
+    expect(payload.defaults.data).toBe("deepseek-v4-1-flash");
     // Presentations and Legal lose their GLM 5.2 and 5.3 heads: the list is now GLM 5.3 Flash, Claude
-    // Sonnet 5.5, GLM 5.3, Kimi K3 and none is live here, so Presentations follows the Chat default.
-    expect(payload.defaults.presentations).toBe("gpt-5.6-luna");
-    expect(payload.defaults.legal).toBe("gpt-5.6-sol");
+    // Sonnet 5.5, GLM 5.3, Kimi K3.1 Pro and none is live here, so Presentations follows the Chat default.
+    expect(payload.defaults.presentations).toBe("deepseek-v4-1-flash");
+    // Legal skips GPT 6 Sol and Claude Sonnet 5.5 and takes Claude Opus 5.5, the third id of its list.
+    expect(payload.defaults.legal).toBe("claude-opus-5-5");
     expect(payload.defaults.video).toBe("grok-imagine-video");
   });
 

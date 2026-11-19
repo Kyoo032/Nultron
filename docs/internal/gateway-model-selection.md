@@ -787,8 +787,34 @@ Owner decision, 2026-09-30: cheapest and fastest first. Each list below is the b
 - `claude-sonnet-5-5` with Off took 31 s to finish a 32-token answer (first token 4.1 s) in the probe. One sample, unexplained, and the other four calls finished in 2 to 3 s. It heads Legal's second place and the minutes' second place, so a repeat there would show.
 - The dated twin `deepseek-v4-1-flash-260910` has a six-digit date, so the picker and the role table do not fold it into its base id the way they do an eight-digit one.
 
+## 11. Update 2026-11-10 — newest and cheapest, and what the gateway lists for voice
 
-## 11. Update 2026-11-11 — what a prepaid agent key can actually run
+Owner's rule, 2026-11-10: everyone runs the newest models at the lowest price, and nothing the product picks by itself is an older generation that costs more. Source: the gateway's public price list (`GET /api/pricing`, no key, group ratio 1) read that day: 130 models, 116 with a text endpoint. `/v1/models` needs a key and was not read, so an id the key can reach but the public list does not show is not covered here.
+
+### 11.1 New or cheaper ids, USD per 1M input / output
+
+| Id | Price | Notes |
+|---|---|---|
+| `claude-haiku-5-5` | $0.10 / $0.50 | New (listed 2026-11-09). Same price as `gpt-6-luna`. Messages and Completions. |
+| `qwen3.8-flash` | $0.15 / $0.47 | New. Completions only. |
+| `gemini-3.8-flash` | $0.50 / $3.00 | A third of `gemini-3.5-flash` ($1.50 / $9). |
+| `gemini-3.5-flash-lite` | $0.30 / $1.20 | New. Not used yet. |
+| `deepseek-v4-1-flash` | $0.03 / $1.20 peak, half off-peak | A tier expression (Beijing weekday 09-12 and 14-18 is peak), so the usage panel shows no flat price. |
+| `deepseek-v4-pro` | $1.33 / $4.00 | Cheapest deep model listed. Text only. |
+| `kimi-k3.1-pro` | $2 / $10 (tier expression) | Cheaper than `kimi-k3` ($2.86 / $14.29). `-highspeed` is $4 / $20. |
+| `gpt-6.1-sol` | $2 / $10 | Responses only. Not used yet: `gpt-6-sol` is probed at the same price. |
+| `gpt-6.1-terra` | $1 / $5 up to 272K (tier expression) | Completions only on the list, but the `gpt-6` policy entry sends Responses, so it needs an entry of its own before any list names it. |
+| `glm-5.3-flash` | $0.12 / $0.42 | Up from $0.075 / $0.25 on 2026-09-30. Still cheap; kept. |
+
+What the product did with them, and the ten ids it stopped picking, is `packages/core/src/models/superseded.ts` and `docs/internal/unreleased.md` (2026-11-10). The five ids now in lists and not yet probed: `claude-haiku-5-5`, `qwen3.8-flash`, `gemini-3.8-flash`, `kimi-k3.1-pro`, `deepseek-v4-pro`.
+
+### 11.2 Voice: what the price list offers
+
+- **No OpenAI realtime model is listed:** no `gpt-realtime*`, `gpt-audio*`, `gpt-4o-*-tts` or `*-transcribe` id. The voice plan's request to the gateway team (`voice-mode-plan.md`, "Model-square requests", rows 2, 4 and 5) is still open.
+- **The price list declares no realtime route.** Its `supported_endpoint` lists `openai`, `openai-response`, `anthropic`, `gemini`, image and video routes only: no `/v1/realtime`, `/v1/audio/speech` or `/v1/audio/transcriptions`. On 2026-11-05 those routes answered 401 without a key, so they exist; whether a model stands behind them is still Day 0's question.
+- **Audio ids listed:** `qwen3-omni-flash-realtime` ($3.58 / $7.17, endpoint type `openai`, audio in and out), `qwen3-tts-instruct-flash-realtime` and `mimo-v2.5-asr` (ASR, Volc_intl group only). Those two carry ratio 37.5, the same placeholder the tier-expression models carry, so their price is unknown. The 2026-10-06 cache also had `qwen3.5-omni-flash-realtime`, `qwen3.5-omni-plus-realtime` and `qwen-audio-3.0-realtime-flash`; the public list no longer shows them.
+
+## 12. Update 2026-11-11 — what a prepaid agent key can actually run
 
 Measured with Rizky's key (a prepaid agent account, 代理预付) against the live gateway; the evidence is in the session scratchpad (`media-out/REPORT.md`, `probe-summary.json`, the key's `GET /v1/models` with 213 ids, the public `/api/pricing`). **The key's model list is not enough to know a model works.**
 
@@ -816,9 +842,9 @@ What follows from it:
 - **Speech has a second route.** A key with no `/v1/audio/speech` model still speaks through an Omni chat id.
 - **Not measured:** Veo with another body (the documented one was refused upstream), Kling after the channel returns, the realtime route on a non-prepaid key, `seedance-2.0` and `seedance-2.5` on a prepaid key (the preference list puts the proven `seedance-2.0-fast` first for that reason).
 
-## 12. Update 2026-11-11 — the values each image and video model accepts
+## 13. Update 2026-11-11 — the values each image and video model accepts
 
-Section 11 says which models a key can run. This one is about the **values** a model takes: aspect ratio, clip length, resolution quality, sound, image size, quality, count, format. The product used to offer one set to every model (5, 8 or 10 s; 1080p to every Seedance; one size triple and `quality: "medium"` to every image) and clamped or dropped the rest silently. Each image and video model now has a spec, and the studios offer only what it holds. The code and the controls are in [`maps/generate-studios.md`](maps/generate-studios.md) § 5 and [`maps/model-policy.md`](maps/model-policy.md); this section keeps the **values and where each one is proven**.
+Section 12 says which models a key can run. This one is about the **values** a model takes: aspect ratio, clip length, resolution quality, sound, image size, quality, count, format. The product used to offer one set to every model (5, 8 or 10 s; 1080p to every Seedance; one size triple and `quality: "medium"` to every image) and clamped or dropped the rest silently. Each image and video model now has a spec, and the studios offer only what it holds. The code and the controls are in [`maps/generate-studios.md`](maps/generate-studios.md) § 5 and [`maps/model-policy.md`](maps/model-policy.md); this section keeps the **values and where each one is proven**.
 
 **Seedance** (the family a prepaid key runs; `POST /v1/video/generations`, docs `llms-full.txt:5960-6060` and `:6405-6470`):
 

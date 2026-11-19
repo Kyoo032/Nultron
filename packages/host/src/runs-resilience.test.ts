@@ -147,6 +147,22 @@ afterAll(async () => {
   rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
 });
 
+describe("thinking from a retried model call", () => {
+  it("persists only the replacement thinking", async () => {
+    script = async (input) => {
+      await input.onEvent({ type: "assistant.thinking", text: "Failed attempt." });
+      await input.onEvent({ type: "assistant.thinking", text: "", replace: true });
+      await input.onEvent({ type: "assistant.thinking", text: "Final attempt." });
+      await input.onEvent({ type: "assistant.delta", text: "ok" });
+      await input.onEvent({ type: "run.completed", runId: input.runId });
+    };
+    const { frames } = await postTurn();
+    expect(frames.some((frame) => frame.event === "assistant.thinking" && frame.data.replace === true)).toBe(true);
+    const parts = await lastAssistantParts();
+    expect(parts.filter((part) => part.type === "thinking")).toEqual([{ type: "thinking", text: "Final attempt." }]);
+  });
+});
+
 describe("a tool's input and output on a Chat turn", () => {
   const input = {
     url: "https://example.test/a",

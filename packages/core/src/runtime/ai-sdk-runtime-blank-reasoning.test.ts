@@ -123,7 +123,10 @@ function registerEcho() {
   );
 }
 
-async function run(bindings: ToolBindingRecord[] = []): Promise<{ events: RuntimeEvent[]; failed: unknown }> {
+async function run(
+  bindings: ToolBindingRecord[] = [],
+  onEvent?: (event: RuntimeEvent) => void,
+): Promise<{ events: RuntimeEvent[]; failed: unknown }> {
   const events: RuntimeEvent[] = [];
   let failed: unknown;
   try {
@@ -139,6 +142,7 @@ async function run(bindings: ToolBindingRecord[] = []): Promise<{ events: Runtim
       reasoningEffortExplicit: true,
       onEvent: (event) => {
         events.push(event);
+        onEvent?.(event);
       },
     });
   } catch (error) {
@@ -192,6 +196,76 @@ const thinkingEvents = (events: RuntimeEvent[]) => events.filter((event) => even
 const probes = (events: RuntimeEvent[]) => events.filter((event) => event.type === "run.probing");
 
 describe("reasoning that is readable, with no answer text", () => {
+  it("replaces failed reasoning before retrying and completing with one answer", async () => {
+    const failedReply = named([created, ...reasoning("Weighing the options.")]);
+    const chunk = new Uint8Array(await failedReply.arrayBuffer());
+    let streamed = false;
+    let thinkingSeen!: () => void;
+    const thinkingArrived = new Promise<void>((resolve) => {
+      thinkingSeen = resolve;
+    });
+    const sent = gateway([
+      () =>
+        new Response(
+          new ReadableStream(
+            {
+              async pull(controller) {
+                if (!streamed) {
+                  streamed = true;
+                  controller.enqueue(chunk);
+                } else {
+                  await thinkingArrived;
+                  controller.error(new DOMException("fetch failed", "AbortError"));
+                }
+              },
+            },
+            { highWaterMark: 0 },
+          ),
+          { headers: { "content-type": "text/event-stream" } },
+        ),
+      () =>
+        named([
+          created,
+          ...reasoning("Weighing the options."),
+          {
+            event: "response.output_item.added",
+            data: {
+              output_index: 1,
+              item: { type: "message", id: "msg_1", role: "assistant", status: "in_progress", content: [] },
+            },
+          },
+          {
+            event: "response.output_text.delta",
+            data: { item_id: "msg_1", output_index: 1, content_index: 0, delta: "ok" },
+          },
+          completedFrame,
+        ]),
+    ]);
+    const { events, failed } = await run([], (event) => {
+      if (event.type === "assistant.thinking") {
+        thinkingSeen();
+      }
+    });
+
+    expect(failed).toBeUndefined();
+    expect(sent()).toBe(2);
+    expect(thinkingEvents(events)).toEqual([
+      { type: "assistant.thinking", text: "Weighing the options." },
+      { type: "assistant.thinking", text: "", replace: true },
+      { type: "assistant.thinking", text: "Weighing the options." },
+    ]);
+    const thinking = thinkingEvents(events).reduce(
+      (text, event) => (event.replace ? event.text : text + event.text),
+      "",
+    );
+    expect(thinking).toBe("Weighing the options.");
+    expect(events.filter((event) => event.type === "assistant.delta")).toEqual([
+      { type: "assistant.delta", text: "ok" },
+    ]);
+    expect(completed(events)).toHaveLength(1);
+    expect(failedEvents(events)).toHaveLength(0);
+  });
+
   it("completes on the first reply, so the thinking is saved as the turn and the model is asked once", async () => {
     const sent = gateway([() => named([created, ...reasoning("Weighing the options."), completedFrame])]);
     const { events, failed } = await run();

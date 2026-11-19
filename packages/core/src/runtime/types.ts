@@ -20,7 +20,7 @@ export type RuntimeEvent =
   | { type: "run.started"; runId: string }
   | { type: "run.probing"; model: string; attempt: number; attempts: number; message: string }
   | { type: "assistant.delta"; text: string }
-  | { type: "assistant.thinking"; text: string }
+  | { type: "assistant.thinking"; text: string; replace?: boolean }
   | { type: "tool.started"; toolKey: string; input: unknown }
   | { type: "tool.completed"; toolKey: string; output: unknown }
   /**
@@ -44,9 +44,11 @@ export type RuntimeEvent =
   /**
    * The model the turn asked for could not be reached before it said anything, so the host ran the same
    * turn once on `to`. `message` is the sentence for the person, already in the run's language. Sent
-   * once, right before the retry. A caller that does not care ignores it.
+   * once, right before the retry. A caller that does not care ignores it. A turn that chose a tier
+   * sends the message alone: the screen never learns which model a tier ran (model tiers spec, section 5).
    */
   | { type: "run.model_fallback"; from: string; to: string; message: string }
+  | { type: "run.model_fallback"; message: string; from?: undefined; to?: undefined }
   | { type: "run.completed"; runId: string; usage?: RunUsage };
 
 export type AgentRuntime = {

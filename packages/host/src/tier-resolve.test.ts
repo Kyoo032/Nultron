@@ -166,7 +166,7 @@ describe("a turn that carries a picture", () => {
     modality: InputModality,
     replaysPicture = false,
   ): string | undefined {
-    const resolved = resolveTierForCatalog(tier, catalog, modality, replaysPicture);
+    const resolved = resolveTierForCatalog(tier, catalog, modality, undefined, replaysPicture);
     return resolved.ok ? resolved.model : undefined;
   }
 
@@ -210,7 +210,7 @@ describe("a turn that carries a picture", () => {
     for (const tier of ["daily", "fast"] as const) {
       const catalog = LUNAS.map((id) => row(id, TEXT_IMAGE));
       expect(picked(tier, catalog, "image"), tier).toBe("gpt-6-luna");
-      expect(picked(tier, [row("gpt-5.6-luna", TEXT_IMAGE)], "image"), tier).toBe("gpt-5.6-luna");
+      expect(picked(tier, [row("gpt-6-luna", TEXT_IMAGE)], "image"), tier).toBe("gpt-6-luna");
     }
   });
 
@@ -221,7 +221,7 @@ describe("a turn that carries a picture", () => {
     }
     expect(picked("fast", catalog, "image")).toBe("gpt-6-luna");
     markJobModelDown("gpt-6-luna");
-    expect(picked("fast", catalog, "image")).toBe("gpt-5.6-luna");
+    expect(picked("fast", catalog, "image")).toBeUndefined();
   });
 
   it("keeps the order of the unmarked candidates, and the catalog's spelling", () => {
@@ -247,8 +247,8 @@ describe("a turn that carries a picture", () => {
   it("demotes the two marked ids and nothing else, on a picture turn only", () => {
     const text = tierLiveness(fullCatalog(TEXT_IMAGE), "text");
     const image = tierLiveness(fullCatalog(TEXT_IMAGE), "image");
-    const replayed = tierLiveness(fullCatalog(TEXT_IMAGE), "text", true);
-    const video = tierLiveness(fullCatalog(TEXT_IMAGE), "video", true);
+    const replayed = tierLiveness(fullCatalog(TEXT_IMAGE), "text", undefined, true);
+    const video = tierLiveness(fullCatalog(TEXT_IMAGE), "video", undefined, true);
     expect(text.demoted).toBeUndefined();
     expect(video.demoted).toBeUndefined();
     for (const liveness of [image, replayed]) {
@@ -481,7 +481,7 @@ describe("chooseTierRun", () => {
     const image = chooseTierRun({ tier: "daily" }, "image", pictures);
     expect(image?.model).toBe("claude-sonnet-5-5");
     expect(image?.reasoning).toEqual({ effort: "medium", explicit: false });
-    const followUp = chooseTierRun({ tier: "daily" }, "text", pictures, true);
+    const followUp = chooseTierRun({ tier: "daily" }, "text", pictures, undefined, true);
     expect(followUp?.model).toBe("claude-sonnet-5-5");
     expect(chooseTierRun({ tier: "daily" }, "text", pictures)?.model).toBe("gpt-6-luna");
     expect(chooseTierRun({ tier: "fast" }, "image", pictures)?.model).toBe("deepseek-v4-1-flash");

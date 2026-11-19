@@ -1,6 +1,7 @@
 import { GATEWAY_PROVIDER_ID } from "../providers/gateway-id";
 import type { ProviderId } from "../providers/registry";
 import { CHAT_DEFAULT_PREFERENCES } from "./preferred";
+import { FAST_TIER_GATEWAY_IDS, REASONING_TIER_GATEWAY_IDS } from "./tiers";
 import type { ReasoningEffort } from "./reasoning-effort";
 
 export const CHOICE_KINDS = Object.freeze(["everyday", "reasoning"] as const);
@@ -18,11 +19,11 @@ export type ChoiceProfile = Readonly<{
   lists: Readonly<Record<ChoiceKind, Readonly<Partial<Record<ProviderId, readonly CandidateRef[]>>>>>;
 }>;
 
-const EVERYDAY_FAST_IDS = ["deepseek-v4-1-flash", "gpt-6-luna", "gpt-5.6-luna", "deepseek-v4-flash"] as const;
+const EVERYDAY_FAST_IDS = FAST_TIER_GATEWAY_IDS;
 
 const EVERYDAY_HEAD_LENGTH = 3;
 
-const REASONING_IDS = ["claude-opus-5-5", "gpt-6-astra", "gpt-5.6-sol", "kimi-k3"] as const;
+const REASONING_IDS = REASONING_TIER_GATEWAY_IDS;
 
 function withoutRepeats(refs: readonly CandidateRef[]): CandidateRef[] {
   const seen = new Set<string>();

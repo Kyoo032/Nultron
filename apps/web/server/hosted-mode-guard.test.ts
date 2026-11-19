@@ -27,6 +27,20 @@ describe("assertHostedModeCoherent", () => {
     expect(() => assertHostedModeCoherent({ NODE_ENV: "production", AGENTFORGE_SERVER: " TRUE " })).not.toThrow();
   });
 
+  it("allows a production preview only when both Basic Auth variables are set", () => {
+    const credentials = { PREVIEW_BASIC_USER: "preview", PREVIEW_BASIC_PASSWORD: "correct-horse" };
+    expect(() => assertHostedModeCoherent({ NODE_ENV: "production", ...credentials })).not.toThrow();
+    expect(() => assertHostedModeCoherent({ NODE_ENV: "production", PREVIEW_BASIC_USER: "preview" })).toThrow(
+      HOSTED_MODE_REQUIRED,
+    );
+    expect(() => assertHostedModeCoherent({ NODE_ENV: "production", PREVIEW_BASIC_PASSWORD: "correct-horse" })).toThrow(
+      HOSTED_MODE_REQUIRED,
+    );
+    expect(() =>
+      assertHostedModeCoherent({ NODE_ENV: "production", PREVIEW_BASIC_USER: "  ", PREVIEW_BASIC_PASSWORD: "x" }),
+    ).toThrow(HOSTED_MODE_REQUIRED);
+  });
+
   it("leaves webdev, the e2e run and a bare env alone", () => {
     expect(() => assertHostedModeCoherent({})).not.toThrow();
     expect(() => assertHostedModeCoherent({ NODE_ENV: "development" })).not.toThrow();

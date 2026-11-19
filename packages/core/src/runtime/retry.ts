@@ -85,6 +85,29 @@ export function isRetryableModelFailure(failed: string): boolean {
   return RETRYABLE_FAILURE.test(text);
 }
 
+export function modelStreamFailureMessage(error: unknown, fallback: string): string {
+  const seen = new Set<unknown>();
+  let current = error;
+  while (current && typeof current === "object" && !seen.has(current)) {
+    seen.add(current);
+    const detail = current as { message?: unknown; code?: unknown; name?: unknown; cause?: unknown; statusCode?: unknown };
+    if (detail.statusCode === 401 || detail.statusCode === 403) {
+      return fallback;
+    }
+    const message = typeof detail.message === "string" ? detail.message : "";
+    const code = typeof detail.code === "string" ? detail.code : "";
+    if (
+      /fetch failed|failed to fetch|terminated|econnreset|econnrefused|enotfound|etimedout|socket hang up|\bUND_ERR_/i.test(message) ||
+      /^(?:UND_ERR_|ECONNRESET|ECONNREFUSED|ENOTFOUND|ETIMEDOUT)/.test(code) ||
+      detail.name === "AbortError"
+    ) {
+      return `The model stream failed: ${message || code || "aborted"}`;
+    }
+    current = detail.cause;
+  }
+  return fallback;
+}
+
 export function shouldRetryModelContact(options: {
   failed: string;
   text: boolean;
@@ -95,7 +118,7 @@ export function shouldRetryModelContact(options: {
   if (options.attempts >= MODEL_CONTACT_ATTEMPTS) {
     return false;
   }
-  if (options.text || options.tooled || options.thinking) {
+  if (options.text || options.tooled || (options.thinking && !options.failed)) {
     return false;
   }
   return isRetryableModelFailure(options.failed);

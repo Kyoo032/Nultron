@@ -3,6 +3,7 @@ import { availableProviders, GATEWAY_PROVIDER_ID, PROVIDER_IDS, type ProviderId 
 import type { ResolvedChatWire } from "../runtime/chat-wire";
 import { allowedEffortsFor, modelPolicy, offFormatFor } from "./model-policy";
 import { CHAT_DEFAULT_PREFERENCES } from "./preferred";
+import { bareModelId } from "./request-constraints";
 import {
   DEFAULT_MODEL_TIER,
   isModelTierId,
@@ -101,6 +102,41 @@ function reasoningProblems(id: string): string[] {
   return problems;
 }
 
+/** The company behind a model id, read off its name. An id nobody has mapped is its own vendor. */
+const VENDOR_PREFIXES: readonly (readonly [RegExp, string])[] = [
+  [/^gpt-/, "openai"],
+  [/^o\d/, "openai"],
+  [/^claude-/, "anthropic"],
+  [/^deepseek-/, "deepseek"],
+  [/^gemini-/, "google"],
+  [/^glm-/, "zhipu"],
+  [/^qwen/, "alibaba"],
+  [/^kimi-/, "moonshot"],
+  [/^minimax/, "minimax"],
+  [/^hy3/, "tencent"],
+];
+
+function vendorOf(id: string): string {
+  const bare = bareModelId(id);
+  return VENDOR_PREFIXES.find(([prefix]) => prefix.test(bare))?.[1] ?? id;
+}
+
+function vendorCount(ids: readonly string[]): number {
+  return new Set(ids.map(vendorOf)).size;
+}
+
+/** Whether the first two candidates come from two different vendors, so one outage never takes both. */
+function leadVendorsDiffer(ids: readonly string[]): boolean {
+  return ids.length >= 2 && vendorOf(ids[0] as string) !== vendorOf(ids[1] as string);
+}
+
+function gatewayList(tier: ModelTierId): readonly string[] {
+  return TIER_DEFINITIONS[tier].candidates[GATEWAY_PROVIDER_ID] ?? [];
+}
+
+/** What a `verified` note says when the id was tried live: "probe 2026-09-30 (...)". "Not yet probed" does not match. */
+const PROBED_NOTE = /probe \d{4}-\d{2}-\d{2}/;
+
 describe("the three tiers", () => {
   it("are daily, fast and reasoning, and daily is the default", () => {
     expect([...MODEL_TIERS]).toEqual(["daily", "fast", "reasoning"]);
@@ -191,6 +227,65 @@ describe("candidate lists", () => {
     expect(reasoningProblems("gpt-4o")).toContain("its role is General chat");
     expect(reasoningProblems("gpt-6-luna")).toContain("its role is Fast drafts");
     expect(reasoningProblems("banana-unknown")).toContain("not in the policy table");
+  });
+
+  it("lead every tier with two models that were probed live: an unprobed one may sit third or later, never ahead", () => {
+    for (const tier of MODEL_TIERS) {
+      // The head answers whenever nothing is held down; the second place is where a tier run's one
+      // failover lands when the head fails before it speaks, so it must be a model seen to take the tier's Thinking.
+      const lead = gatewayList(tier).slice(0, 2);
+      expect(lead.length, tier).toBe(2);
+      for (const id of lead) {
+        expect(modelPolicy(id).verified, `${tier}: ${id} was never probed`).toMatch(PROBED_NOTE);
+      }
+    }
+  });
+});
+
+describe("the vendors behind each tier", () => {
+  it("give every tier at least 3 candidates from at least 3 vendors, so one outage cannot empty it", () => {
+    for (const tier of MODEL_TIERS) {
+      const ids = gatewayList(tier);
+      expect(ids.length, `${tier}: candidates`).toBeGreaterThanOrEqual(3);
+      expect(vendorCount(ids), `${tier}: vendors in ${ids.join(", ")}`).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("start every tier with two candidates from two different vendors", () => {
+    for (const tier of MODEL_TIERS) {
+      const ids = gatewayList(tier);
+      expect(leadVendorsDiffer(ids), `${tier}: ${ids[0]} and ${ids[1]} share a vendor`).toBe(true);
+    }
+  });
+
+  it("still resolve each tier when every candidate of any one vendor is held down, and answer from another vendor", () => {
+    for (const tier of MODEL_TIERS) {
+      const ids = gatewayList(tier);
+      for (const vendor of new Set(ids.map(vendorOf))) {
+        const down = ids.filter((id) => vendorOf(id) === vendor);
+        const result = resolveTier(tier, world({ down }));
+        expect(result.ok, `${tier} without ${vendor}`).toBe(true);
+        if (result.ok) {
+          expect(vendorOf(result.model), `${tier} without ${vendor} answered ${result.model}`).not.toBe(vendor);
+        }
+      }
+    }
+  });
+
+  it("have guards that can fail: a list from one vendor counts as one vendor and its lead pair shares it", () => {
+    const oneVendor = ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"];
+    expect(vendorCount(oneVendor)).toBe(1);
+    expect(vendorCount(oneVendor)).toBeLessThan(3);
+    expect(leadVendorsDiffer(oneVendor)).toBe(false);
+    expect(leadVendorsDiffer(["gpt-6-luna"])).toBe(false);
+    // The mapping itself: a vendor prefix and case do not matter, and an unmapped id is its own vendor.
+    expect(vendorOf("openai/GPT-6-Luna")).toBe("openai");
+    expect(vendorOf("o3")).toBe("openai");
+    expect(vendorOf("qwen3.8-flash")).toBe("alibaba");
+    expect(vendorOf("banana-unknown")).toBe("banana-unknown");
+    // The probe guard turns away an id whose note says it was never probed, and takes one that cites a probe.
+    expect(modelPolicy("claude-haiku-5-5").verified).not.toMatch(PROBED_NOTE);
+    expect(modelPolicy("gpt-6-luna").verified).toMatch(PROBED_NOTE);
   });
 });
 

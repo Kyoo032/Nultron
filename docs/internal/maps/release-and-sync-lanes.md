@@ -2,7 +2,7 @@
 
 Product: both · Instance: every checkout (main, tester); no app drive
 
-Last verified: 2026-11-10 at fc855d7d on `tester` for the live voice entries in `lanes.json` only: the seven voice entries at `lanes.json:558-606`, each `lanes: ["tester"]` and mapped to [`voice-mode.md`](voice-mode.md) (`packages/core/src/voice/**`, `packages/host/src/voice/**`, `packages/host/src/handlers/voice.ts`, `packages/host/eval/voice/**`, `apps/web/components/voice/**`, `apps/web/lib/voice-*`, `apps/web/locales/*/voice.json`), with only `packages/core/src/voice/**` marked `protected: true`; `neverPromote` (`lanes.json:23-31`) has no voice glob. Before that: 2026-11-06 at 39cd5f0c
+Last verified: 2026-11-17, the `apps/web/server.ts` note in `lanes.json` only. Before that: 2026-11-10 at fc855d7d on `tester` for the live voice entries in `lanes.json` only: the seven voice entries at `lanes.json:558-606`, each `lanes: ["tester"]` and mapped to [`voice-mode.md`](voice-mode.md) (`packages/core/src/voice/**`, `packages/host/src/voice/**`, `packages/host/src/handlers/voice.ts`, `packages/host/eval/voice/**`, `apps/web/components/voice/**`, `apps/web/lib/voice-*`, `apps/web/locales/*/voice.json`), with only `packages/core/src/voice/**` marked `protected: true`; `neverPromote` (`lanes.json:23-31`) has no voice glob. Before that: 2026-11-06 at 39cd5f0c.
 
 Re-read on 2026-11-06: the overview, the repo names, the steps after a merge, the Guards section and the `pnpm where` row of "Where things live". The folder names in the lanes table were left as they are, though they no longer match the disk. On 2026-11-06 `C:\Users\rizky\agentforge-chat` was not a git checkout, and `tester/chat-first` was checked out in the worktree `C:\Users\rizky\agentforge-tester-sync`. `scripts/where-am-i.mjs` and the `AGENTS.md` tables use those names, so changing them is Rizky's call. The never-promote bullet was last read on 2026-10-22 at 7c44963 and the brand-rule bullet on 2026-10-17 at 07cb099. The "Chat-first shell" section was read on 2026-10-12 at e8a7eca8, against the tester branch, before PR #157 promoted it to `main`.
 
@@ -30,7 +30,7 @@ The Enterprise release repo is `Kyoo032/Nultron-Releases` (`RELEASE_REPO`, `scri
 
 The tester added 16 `protected` entries to `lanes.json` on 2026-10-12. There are 32 protected entries in all as of 2026-10-14. They cover the shared files the tester edits (the composer, the rail, `product-modes.ts`, `i18n.ts` and others) and its own paths (`virtual-agents*`, `packages/host/src/workers/**`, the agent components), whose map is [`virtual-agents.md`](virtual-agents.md).
 
-PR #157 (merge `b14faa1a`) promoted the chat-first shell to `main`. So those files are no longer tester-only. A fix to them is still a pull request to `main`. The one switch back to the mode screens is `SHELL_LAYOUT` (`packages/core/src/agents/product-modes.ts:29`). The "Tester shared file" notes in `lanes.json` describe the state before the merge.
+PR #157 (merge `b14faa1a`) promoted the chat-first shell to `main`. So those files are no longer tester-only. A fix to them is still a pull request to `main`. The one switch back to the mode screens is `SHELL_LAYOUT` (`packages/core/src/agents/product-modes.ts:29`). The "Tester shared file" notes in `lanes.json` describe the state before the merge. The `apps/web/server.ts` note also records the preview form gate: it runs only when server mode is off and both `PREVIEW_BASIC_USER` and `PREVIEW_BASIC_PASSWORD` are set (`apps/web/server/preview-gate.ts:110-121`).
 
 ## After a pull request merges to `main`
 

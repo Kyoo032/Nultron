@@ -147,7 +147,7 @@ describe("collectJobAssistantText", () => {
 
   const base = {
     tenant,
-    model: "deepseek-v4-flash",
+    model: "deepseek-v4-1-flash",
     systemPrompt: "system",
     runPrefix: "market",
     agentId: "market",
@@ -156,7 +156,7 @@ describe("collectJobAssistantText", () => {
   };
 
   it("fails a job whose follow-up call broke after a tool, instead of returning an empty answer", async () => {
-    interruptedModels.add("deepseek-v4-flash");
+    interruptedModels.add("deepseek-v4-1-flash");
     try {
       await expect(collectJobAssistantText({ ...base, modelExplicit: true })).rejects.toMatchObject({
         code: "generation_failed",
@@ -167,7 +167,7 @@ describe("collectJobAssistantText", () => {
   });
 
   it("fails a job that spent its step cap without writing anything", async () => {
-    stepLimitModels.add("deepseek-v4-flash");
+    stepLimitModels.add("deepseek-v4-1-flash");
     try {
       await expect(collectJobAssistantText({ ...base, modelExplicit: true })).rejects.toMatchObject({
         code: "generation_failed",
@@ -182,7 +182,7 @@ describe("collectJobAssistantText", () => {
     expect(text).toBe("hello");
     expect(executed).toHaveLength(1);
     expect(executed[0]?.streamWatchdog).toEqual({ ttfbMs: 180_000, idleMs: 150_000 });
-    expect(executed[0]?.version.model).toBe("deepseek-v4-flash");
+    expect(executed[0]?.version.model).toBe("deepseek-v4-1-flash");
   });
 
   it("leaves streamWatchdog unset so the model defaults apply when no override is given", async () => {
@@ -242,14 +242,14 @@ describe("collectJobAssistantText", () => {
 
 describe("readModelPinned", () => {
   it("is true only for the flag the picker sets, next to the model it pins", () => {
-    expect(readModelPinned({ model: "gpt-5.6-sol", modelPinned: true })).toBe(true);
-    expect(readModelPinned({ model: "gpt-5.6-sol" })).toBe(false);
-    expect(readModelPinned({ model: "gpt-5.6-sol", modelPinned: false })).toBe(false);
+    expect(readModelPinned({ model: "claude-opus-5-5", modelPinned: true })).toBe(true);
+    expect(readModelPinned({ model: "claude-opus-5-5" })).toBe(false);
+    expect(readModelPinned({ model: "claude-opus-5-5", modelPinned: false })).toBe(false);
   });
 
   it("refuses a truthy stand-in, so a stray string can never pin a model", () => {
-    expect(readModelPinned({ model: "gpt-5.6-sol", modelPinned: "true" })).toBe(false);
-    expect(readModelPinned({ model: "gpt-5.6-sol", modelPinned: 1 })).toBe(false);
+    expect(readModelPinned({ model: "claude-opus-5-5", modelPinned: "true" })).toBe(false);
+    expect(readModelPinned({ model: "claude-opus-5-5", modelPinned: 1 })).toBe(false);
     expect(readModelPinned(null)).toBe(false);
     expect(readModelPinned(undefined)).toBe(false);
     expect(readModelPinned("modelPinned")).toBe(false);
@@ -264,10 +264,10 @@ describe("readModelPinned", () => {
 });
 
 describe("collectJobAssistantRun with the job model fallback", () => {
-  const AVAILABLE = ["deepseek-v4-flash", "gpt-5.6-luna", "gpt-5.6-terra"];
+  const AVAILABLE = ["deepseek-v4-1-flash", "gpt-6-luna", "gpt-6-sol"];
   const run = {
     tenant,
-    model: "deepseek-v4-flash",
+    model: "deepseek-v4-1-flash",
     systemPrompt: "system",
     runPrefix: "document",
     agentId: "document",
@@ -284,36 +284,36 @@ describe("collectJobAssistantRun with the job model fallback", () => {
   });
 
   it("answers on a stand-in when the requested default is down, and says which model answered", async () => {
-    unreachable.add("deepseek-v4-flash");
+    unreachable.add("deepseek-v4-1-flash");
     const result = await collectJobAssistantRun(run);
     expect(result.text).toBe("hello");
-    expect(result.model).not.toBe("deepseek-v4-flash");
+    expect(result.model).not.toBe("deepseek-v4-1-flash");
     expect(AVAILABLE).toContain(result.model);
-    expect(result.notice).toEqual({ code: "model_fallback", from: "deepseek-v4-flash", to: result.model });
-    expect(executed.map((input) => input.version.model)).toEqual(["deepseek-v4-flash", result.model]);
+    expect(result.notice).toEqual({ code: "model_fallback", from: "deepseek-v4-1-flash", to: result.model });
+    expect(executed.map((input) => input.version.model)).toEqual(["deepseek-v4-1-flash", result.model]);
   });
 
   it("returns the gateway's error instead of swapping a model the person pinned", async () => {
-    unreachable.add("deepseek-v4-flash");
+    unreachable.add("deepseek-v4-1-flash");
     await expect(collectJobAssistantRun({ ...run, modelExplicit: true })).rejects.toThrow(/status_code=503/);
-    expect(executed.map((input) => input.version.model)).toEqual(["deepseek-v4-flash"]);
+    expect(executed.map((input) => input.version.model)).toEqual(["deepseek-v4-1-flash"]);
   });
 
   it("does not replay a job whose tools already ran, and keeps the gateway's words out of the error", async () => {
-    toolThenInterrupted.add("deepseek-v4-flash");
+    toolThenInterrupted.add("deepseek-v4-1-flash");
     try {
       const failure = await collectJobAssistantRun(run).catch((error: unknown) => error);
       expect(failure).toMatchObject({ code: "generation_failed" });
       expect((failure as Error).message).not.toMatch(/503|unavailable|status_code/i);
       // One call only: a second would run the tool (a desk-file write, run_code) twice.
-      expect(executed.map((input) => input.version.model)).toEqual(["deepseek-v4-flash"]);
+      expect(executed.map((input) => input.version.model)).toEqual(["deepseek-v4-1-flash"]);
     } finally {
       toolThenInterrupted.clear();
     }
   });
 
   it("collectJobAssistantText hides the model that answered, which is why recording callers use the run", async () => {
-    unreachable.add("deepseek-v4-flash");
+    unreachable.add("deepseek-v4-1-flash");
     await expect(collectJobAssistantText(run)).resolves.toBe("hello");
     expect(executed).toHaveLength(2);
   });
@@ -325,10 +325,10 @@ describe("collectJobAssistantRun with the job model fallback", () => {
  * somewhere else or the circuit would remember.
  */
 describe("collectJobAssistantRun and the job's signal", () => {
-  const AVAILABLE = ["deepseek-v4-flash", "gpt-5.6-luna", "gpt-5.6-terra"];
+  const AVAILABLE = ["deepseek-v4-1-flash", "gpt-6-luna", "gpt-6-sol"];
   const run = {
     tenant,
-    model: "deepseek-v4-flash",
+    model: "deepseek-v4-1-flash",
     systemPrompt: "system",
     runPrefix: "market",
     agentId: "market",
@@ -360,7 +360,7 @@ describe("collectJobAssistantRun and the job's signal", () => {
   });
 
   it("rejects promptly when the caller leaves mid-call, and the runtime sees the abort", async () => {
-    inFlight.add("deepseek-v4-flash");
+    inFlight.add("deepseek-v4-1-flash");
     const controller = new AbortController();
     const pending = collectJobAssistantRun({ ...run, signal: controller.signal });
     await vi.waitFor(() => expect(executed).toHaveLength(1));
@@ -379,12 +379,12 @@ describe("collectJobAssistantRun and the job's signal", () => {
     expect(outcome).toMatchObject({ code: "aborted", status: 499, message: "Job cancelled" });
     expect(observedAborted).toEqual([true]);
     // No stand-in was started for a cancel.
-    expect(executed.map((input) => input.version.model)).toEqual(["deepseek-v4-flash"]);
+    expect(executed.map((input) => input.version.model)).toEqual(["deepseek-v4-1-flash"]);
 
     // And the model was not marked down: the next job starts on it again.
     inFlight.clear();
-    await expect(collectJobAssistantRun(run)).resolves.toMatchObject({ model: "deepseek-v4-flash" });
-    expect(executed[1]?.version.model).toBe("deepseek-v4-flash");
+    await expect(collectJobAssistantRun(run)).resolves.toMatchObject({ model: "deepseek-v4-1-flash" });
+    expect(executed[1]?.version.model).toBe("deepseek-v4-1-flash");
   });
 
   it("starts no call once the caller has already left", async () => {
@@ -398,7 +398,7 @@ describe("collectJobAssistantRun and the job's signal", () => {
   });
 
   it("starts no stand-in when the caller leaves after the first model failed", async () => {
-    unreachable.add("deepseek-v4-flash");
+    unreachable.add("deepseek-v4-1-flash");
     const controller = new AbortController();
     const pending = collectJobAssistantRun({
       ...run,
@@ -410,11 +410,11 @@ describe("collectJobAssistantRun and the job's signal", () => {
       },
     });
     await expect(pending).rejects.toMatchObject({ code: "aborted", status: 499 });
-    expect(executed.map((input) => input.version.model)).toEqual(["deepseek-v4-flash"]);
+    expect(executed.map((input) => input.version.model)).toEqual(["deepseek-v4-1-flash"]);
   });
 
   it("still records the usage of a call the gateway finished as the cancel landed", async () => {
-    reportsUsage.add("deepseek-v4-flash");
+    reportsUsage.add("deepseek-v4-1-flash");
     const controller = new AbortController();
     const result = await collectJobAssistantRun({
       ...run,
@@ -426,7 +426,7 @@ describe("collectJobAssistantRun and the job's signal", () => {
       },
     });
     // The call finished first, so it is a completed run: its text comes back and its usage is metered.
-    expect(result).toMatchObject({ text: "hello", model: "deepseek-v4-flash" });
+    expect(result).toMatchObject({ text: "hello", model: "deepseek-v4-1-flash" });
     expect(metered).toEqual(["assistant.delta", "run.completed"]);
   });
 });
@@ -439,7 +439,7 @@ describe("collectJobAssistantRun and the job's signal", () => {
 describe("collectJobAssistantRun and the mode's declared harness", () => {
   const base = {
     tenant,
-    model: "deepseek-v4-flash",
+    model: "deepseek-v4-1-flash",
     systemPrompt: "system",
     runPrefix: "data",
     agentId: "data",
@@ -504,11 +504,11 @@ describe("collectJobAssistantRun and the mode's declared harness", () => {
   );
 
   it("keeps the declared budget on the stand-in call after a fallback", async () => {
-    unreachable.add("deepseek-v4-flash");
+    unreachable.add("deepseek-v4-1-flash");
     await collectJobAssistantRun({
       ...base,
       jobMode: "data",
-      availableModelIds: ["deepseek-v4-flash", "gpt-5.6-luna", "gpt-5.6-terra"],
+      availableModelIds: ["deepseek-v4-1-flash", "gpt-6-luna", "gpt-6-sol"],
     });
     expect(executed).toHaveLength(2);
     expect(executed[0]?.budget).toBe(harnessSpecFor("data").budget);
@@ -541,11 +541,11 @@ describe("collectJobAssistantRun and the mode's declared harness", () => {
   });
 
   it("keeps the tool-run context on the stand-in call after a fallback", async () => {
-    unreachable.add("deepseek-v4-flash");
+    unreachable.add("deepseek-v4-1-flash");
     await collectJobAssistantRun({
       ...base,
       jobMode: "data",
-      availableModelIds: ["deepseek-v4-flash", "gpt-5.6-luna", "gpt-5.6-terra"],
+      availableModelIds: ["deepseek-v4-1-flash", "gpt-6-luna", "gpt-6-sol"],
     });
     expect(toolRunAtStart.map((run) => run?.mode)).toEqual(["data", "data"]);
   });
