@@ -95,7 +95,7 @@ export function shouldRetryModelContact(options: {
   if (options.attempts >= MODEL_CONTACT_ATTEMPTS) {
     return false;
   }
-  if (options.text || options.tooled || options.thinking) {
+  if (options.text || options.tooled || (options.thinking && !options.failed)) {
     return false;
   }
   return isRetryableModelFailure(options.failed);

@@ -625,6 +625,9 @@ export class AiSdkRuntime implements AgentRuntime {
       })
     ) {
       contactAttempts += 1;
+      if (result.thinking) {
+        await input.onEvent({ type: "assistant.thinking", text: "", replace: true });
+      }
       await probe(contactAttempts);
       result = await consumeOnce(activeModel, retryTools, {
         responses: wire === "responses",

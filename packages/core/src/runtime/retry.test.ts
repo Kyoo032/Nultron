@@ -167,10 +167,16 @@ describe("shouldRetryModelContact", () => {
     ).toBe(false);
   });
 
-  it("does not retry an attempt that already streamed readable thinking, failed or not", () => {
+  it("retries failed thinking but not a clean thinking-only attempt", () => {
     expect(shouldRetryModelContact({ failed: "", text: false, tooled: false, thinking: true, attempts: 1 })).toBe(false);
     expect(
       shouldRetryModelContact({ failed: "fetch failed", text: false, tooled: false, thinking: true, attempts: 1 }),
+    ).toBe(true);
+    expect(
+      shouldRetryModelContact({ failed: "fetch failed", text: false, tooled: false, thinking: true, attempts: 3 }),
+    ).toBe(false);
+    expect(
+      shouldRetryModelContact({ failed: "401 Unauthorized", text: false, tooled: false, thinking: true, attempts: 1 }),
     ).toBe(false);
     expect(
       shouldRetryModelContact({ failed: "fetch failed", text: false, tooled: false, thinking: false, attempts: 1 }),
