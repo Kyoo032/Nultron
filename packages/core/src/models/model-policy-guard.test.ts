@@ -161,10 +161,11 @@ describe("the models marked as misreading pictures carry their evidence", () => 
     );
   });
 
-  it("reaches the Chat default list at the two Luna ids measured on 2026-11-13 and no other", () => {
+  it("reaches the Chat default list at the one Luna id still on it, and no other", () => {
     // A new mark changes which model answers a picture turn on Daily, so it is a deliberate edit here.
+    // `gpt-5.6-luna` is marked too but left every list when it was superseded (2026-11-10).
     const marked = CHAT_DEFAULT_PREFERENCES.filter((id) => PICTURE_MISREADS.some((entry) => entry.id === id));
-    expect(marked).toEqual(["gpt-6-luna", "gpt-5.6-luna"]);
+    expect(marked).toEqual(["gpt-6-luna"]);
   });
 });
 
