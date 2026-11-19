@@ -80,8 +80,9 @@ function maskEnvAssignment(match: string, head: string, name: string, equals: st
   return `${head}${name}${equals}[REDACTED]`;
 }
 
-/** Min length for a standalone base64-like token to be treated as sensitive. */
-const BASE64_RE = /\b[A-Za-z0-9+/]{32,}={0,2}\b/g;
+/** Standalone opaque runs of at least 32 characters, with dots only inside the token. */
+const BASE64_RE =
+  /(?<![A-Za-z0-9+./_-])(?=[+./_-]*[A-Za-z0-9])(\.*)[A-Za-z0-9+/_-][A-Za-z0-9+./_-]{30,}[A-Za-z0-9+/_-]={0,2}/g;
 
 export function redactCredentials(text: string): string {
   if (!text) {
@@ -109,5 +110,5 @@ export function redactSecrets(text: string): string {
   if (!text) {
     return text;
   }
-  return redactCredentials(text).replace(BASE64_RE, "[REDACTED]");
+  return redactCredentials(text).replace(BASE64_RE, "$1[REDACTED]");
 }

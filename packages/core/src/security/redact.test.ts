@@ -45,6 +45,27 @@ describe("redactSecrets", () => {
     expect(result).toContain("normal text here");
   });
 
+  it.each([
+    "abcdefghijklmnop-qrstuvwxyz123456",
+    "abcdefghijklmnop.qrstuvwxyz123456",
+    "abcdefghijklmnop_qrstuvwxyz123456",
+    "abcdefghi-jklmnopq.rstuvwxy_z1234567",
+  ])("redacts the whole standalone opaque token %s", (token) => {
+    expect(redactSecrets(`Value: ...${token}. Next sentence.`)).toBe("Value: ...[REDACTED]. Next sentence.");
+  });
+
+  it("keeps punctuation dividers and short opaque strings", () => {
+    const input = `${"-._".repeat(40)} short-value.before_end.`;
+    expect(redactSecrets(input)).toBe(input);
+  });
+
+  it("keeps long punctuation runs without retrying the matcher at every character", () => {
+    const input = `${"-._".repeat(20_000)} a${".".repeat(40_000)}`;
+    const start = performance.now();
+    expect(redactSecrets(input)).toBe(input);
+    expect(performance.now() - start).toBeLessThan(250);
+  });
+
   it("leaves normal text untouched", () => {
     const input = "Hello, world! This is a normal message without secrets.";
     const result = redactSecrets(input);

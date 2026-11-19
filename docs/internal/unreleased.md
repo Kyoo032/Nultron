@@ -1315,3 +1315,4 @@ Lanes: enterprise, tester.
 Lanes: enterprise, tester.
 
 - `redactCredentials` now masks a bearer token regardless of the scheme's case and also accepts `+` as a form-encoded space. The existing `Bearer [REDACTED]` output is unchanged.
+- The `redactSecrets` fallback masks standalone opaque tokens of 32 or more characters that include `-`, `_` or internal dots.
