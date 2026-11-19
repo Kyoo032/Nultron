@@ -86,19 +86,28 @@ const UUID_RE = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const DIAGNOSTIC_LABEL_RE = /^[a-z]+(?:_[a-z]+){2,}$/;
 const FILE_EXTENSION_RE = /\.[a-z][a-z0-9]{0,9}$/i;
 
-function isPathLike(token: string, padded: boolean): boolean {
-  if (token.includes("\\") || token.startsWith("//")) {
+function isPathLike(token: string, padded: boolean, followsColon: boolean): boolean {
+  if (token.includes("\\") || (followsColon && token.startsWith("//"))) {
     return true;
   }
-  const slash = token.indexOf("/");
+  if (padded || token.includes("+")) {
+    return false;
+  }
+  const absolute = token.startsWith("/");
+  const slash = token.indexOf("/", absolute ? 1 : 0);
+  // A slash alone is ambiguous with base64; prefer paths only with another path signal.
   return (
     slash !== -1 &&
-    (FILE_EXTENSION_RE.test(token) || (!padded && !token.includes("+") && token.indexOf("/", slash + 1) !== -1))
+    (FILE_EXTENSION_RE.test(token) || (/^[a-z0-9._/-]+$/.test(token) && (absolute || token.includes("/", slash + 1))))
   );
 }
 
-function maskOpaqueRun(match: string, leadingDots: string, token: string): string {
-  if (isPathLike(token, match.endsWith("=")) || UUID_RE.test(token) || DIAGNOSTIC_LABEL_RE.test(token)) {
+function maskOpaqueRun(match: string, leadingDots: string, token: string, offset: number, text: string): string {
+  if (
+    isPathLike(token, match.endsWith("="), text[offset - 1] === ":") ||
+    UUID_RE.test(token) ||
+    DIAGNOSTIC_LABEL_RE.test(token)
+  ) {
     return match;
   }
   if (/[._-]/.test(token) && /[a-z0-9]/i.test(token)) {
