@@ -137,7 +137,7 @@ export function hostMediaModel(tool: PaidMediaTool): string | undefined {
   return getSecret(tool === "image_generate" ? "IMAGE_GEN_MODEL" : "VIDEO_GEN_MODEL");
 }
 
-const USAGE_SETTLE_MS = 5_000;
+const USAGE_DRAIN_MS = 5_000;
 /**
  * Response headers must arrive within `HEADERS_TIMEOUT_MS` (stream-watchdog.ts, where its number is
  * explained); a black-holed gateway otherwise sits until the 120 s watchdog.
@@ -179,22 +179,6 @@ function linkCallerAbort(abort: AbortController, signal: AbortSignal | undefined
   }
   signal.addEventListener("abort", forward, { once: true });
   return () => signal.removeEventListener("abort", forward);
-}
-
-function settleWithin<T>(promise: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("usage did not settle")), ms);
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error: unknown) => {
-        clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
 }
 
 export class AiSdkRuntime implements AgentRuntime {
@@ -519,6 +503,7 @@ export class AiSdkRuntime implements AgentRuntime {
     const hasTools = tools !== undefined;
     let activeModel = model;
     let wire = openaiWire?.wire;
+    let usage = { inputTokens: 0, outputTokens: 0 };
     // Read at each call, not once: a heal below changes what the run sends.
     const wantsThinking = () => effort.level() !== "none";
     const consumeOnce = async (
@@ -542,6 +527,7 @@ export class AiSdkRuntime implements AgentRuntime {
         // No effort to send (an id the policy table does not know, or a parameter the gateway refused).
         omitReasoning: level === undefined,
       });
+      usage = addTokenUsage(usage, outcome.usage);
       if (outcome.failed) {
         // The call the cancel cut short is not a failure to retry or report: its abort message would
         // read as a network blip. A call that finished first is still completed, and metered, below.
@@ -637,7 +623,6 @@ export class AiSdkRuntime implements AgentRuntime {
         forceReasoningNone: Boolean(retryTools) && !wantsThinking(),
       });
     }
-    const usage = addTokenUsage(first.usage, result === first ? { inputTokens: 0, outputTokens: 0 } : result.usage);
     const completedUsage: RunUsage | undefined =
       usage.inputTokens > 0 || usage.outputTokens > 0
         ? { model: input.version.model, inputTokens: usage.inputTokens, outputTokens: usage.outputTokens }
@@ -740,6 +725,7 @@ export class AiSdkRuntime implements AgentRuntime {
     const locale = parseAppLocale(input.locale);
     const watchdog = armStreamWatchdog(input.version.model, abort, input.streamWatchdog, Date.now, locale);
     const maxSteps = resolveMaxSteps(input.budget);
+    let failed = "";
     // Tools the run holds but does not offer (a disabled one, and the correction tool for a refused call)
     // stay out of the list the model is given. A call the SDK cannot parse comes back to the model as a
     // result instead of ending the turn (`tool-call-repair.ts`).
@@ -754,7 +740,7 @@ export class AiSdkRuntime implements AgentRuntime {
       ...(tools
         ? {
             tools: tools.tools,
-            stopWhen: stepCountIs(maxSteps),
+            stopWhen: [() => Boolean(failed), stepCountIs(maxSteps)],
           }
         : {}),
       ...(providerOptions ? { providerOptions } : {}),
@@ -771,13 +757,22 @@ export class AiSdkRuntime implements AgentRuntime {
     let thinking = "";
     let tooled = false;
     let toolCompleted = false;
-    let failed = "";
     let finished = false;
     let failure: GatewayFailureDetail | undefined;
     let usage = { inputTokens: 0, outputTokens: 0 };
+    let usageDrainTimer: ReturnType<typeof setTimeout> | undefined;
 
     try {
       for await (const part of watchAsyncIterable(result.fullStream, abort, () => watchdog.touch(), locale)) {
+        if (part.type === "finish-step") {
+          usage = addTokenUsage(usage, readLanguageModelUsage(part.usage));
+          if (failed) {
+            break;
+          }
+        }
+        if (failed) {
+          continue;
+        }
         steps.observe(part);
         if (part.type === "start-step") {
           finished = false;
@@ -799,7 +794,9 @@ export class AiSdkRuntime implements AgentRuntime {
         if (event.type === "run.failed") {
           failed = modelStreamFailureMessage((part as { error?: unknown }).error, event.message);
           failure = gatewayFailureOf((part as { error?: unknown }).error);
-          break;
+          // A gateway can report usage on the step that errored. Drain only for that usage.
+          usageDrainTimer = setTimeout(() => abort.abort(), USAGE_DRAIN_MS);
+          continue;
         }
         let outgoing = event;
         if (event.type === "assistant.delta" && !text) {
@@ -835,17 +832,6 @@ export class AiSdkRuntime implements AgentRuntime {
         }
       }
 
-      // After an `error` stream part the SDK's `usage` promise never settles (ai 4.3): a refused or
-      // black-holed gateway used to sit here until the 120 s host watchdog. Skip it on failure and
-      // never wait more than a few seconds for it otherwise.
-      if (!failed) {
-        try {
-          usage = readLanguageModelUsage(await settleWithin(result.totalUsage, USAGE_SETTLE_MS));
-        } catch {
-          usage = { inputTokens: 0, outputTokens: 0 };
-        }
-      }
-
       const stepLimit = tools !== undefined && !failed && steps.endedAtLimit(maxSteps);
       return { text, thinking, tooled, toolCompleted, stepLimit, failed, failure, usage };
     } catch (error) {
@@ -856,6 +842,7 @@ export class AiSdkRuntime implements AgentRuntime {
       }
       return { text, thinking, tooled, toolCompleted, stepLimit: false, failed, failure, usage };
     } finally {
+      clearTimeout(usageDrainTimer);
       watchdog.close();
       unlinkCallerAbort();
     }

@@ -4,6 +4,8 @@ Product: both Â· Instance: main :3000
 
 Last verified: 2026-11-19 at d793643b plus the PR #246 working tree, for failed-reasoning retries only. Real local HTTP tests on Gemini generate-content and Responses cover a destroyed socket, truncated SSE, missing finish, clean thinking-only finish, 401 and caller cancellation (`ai-sdk-runtime-stream-drop.test.ts`). Browser drive not performed in this pass. Other sections were not re-verified.
 
+Last verified: 2026-11-19 at 36f1fc35 plus the DFIND-65 change, for retry usage in § 4 only. Covered by real SDK streams with a mocked gateway; not driven on `:3000`.
+
 Last verified: 2026-11-13 on `fix/daily-picture-model` over 365d4af6 (working tree, not committed), for the "Tier in the body" bullet and the last sentence of § 3c step 6 only (a turn that carries a picture demotes the Luna models in the tier walk; `resolveTierRun` is awaited now). Code-read and unit-tested, then driven on `:3000` on the branch: a Daily picture turn and its text follow-up ran on `claude-sonnet-5-5`, and a plain text turn on `gpt-6-luna`. Nothing else on the page was re-read.
 
 Last verified: 2026-11-09 at 575da955 plus the working tree of `fix/reasoning-only-no-retry`, for the contact retry and the tool-less retry only (the two `thinking` flags at `ai-sdk-runtime.ts:599` and `:623`, the "Model returns nothing" row and the new "readable reasoning, no text" row of the failure modes). Unit-tested against the real AI SDK on the Responses wire (`ai-sdk-runtime-blank-reasoning.test.ts`, `retry.test.ts`); not driven on `:3000`. Nothing else on the page was re-read.
@@ -178,6 +180,8 @@ Not driven: any of this against the live gateway. The tests record the request b
 ### 4. Runtime â€” probe, stream, coerce
 
 `AiSdkRuntime.execute` (`packages/core/src/runtime/ai-sdk-runtime.ts`) builds the wire body, resolves effort, and enters the contact loop: up to `MODEL_CONTACT_ATTEMPTS = 3` (`packages/core/src/runtime/retry.ts:4`), each retry emitting a fresh `run.probing` frame (`probe`, `packages/core/src/runtime/ai-sdk-runtime.ts:503`). A non-OK upstream response is read through `readHttpErrorBody` under a 2 s cap (`GATEWAY_ERROR_BODY_MS`, `packages/core/src/models/request-constraints.ts:123`) and turned into a `gatewayFailure`, now a `GatewayHttpError` that keeps the status and raw body off its message (`packages/core/src/runtime/ai-sdk-runtime.ts:216`, `packages/core/src/gateway-http-copy.ts:96`); `isRetryableModelFailure` (`packages/core/src/runtime/retry.ts:59-86`) decides whether to try again â€” with two carve-outs, the "no first token / no stream events" wording and, since 2026-10-07, "No response within 45s from <model>" (a request that sent no headers in `HEADERS_TIMEOUT_MS`, Â§ 5) are hard stops, never retried (`:77-85`). A 400 is not retried there, so one 400 has its own path: **a gateway that refuses the Thinking parameter before anything came back is retried once with a safer level**, see the last bullet below.
+
+For a completed turn, `consumeOnce` adds the usage reported by each attempt, including wire fallback, Thinking heal, tool-less retry and contact retries. `consume` counts each SDK step once; after a stream error it stops forwarding output and waits at most five seconds for the errored step's usage. `run.completed` carries one total to the host, which still writes one ledger row for the turn.
 
 Reasoning effort has **two unrelated mechanisms** that both land as `reasoning_effort` on the wire, and one plan that owns what is sent:
 
