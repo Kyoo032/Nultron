@@ -229,12 +229,15 @@ describe("candidate lists", () => {
     expect(reasoningProblems("banana-unknown")).toContain("not in the policy table");
   });
 
-  it("lead every tier with a model that was probed live: an unprobed one may sit behind a probed one, never ahead", () => {
+  it("lead every tier with two models that were probed live: an unprobed one may sit third or later, never ahead", () => {
     for (const tier of MODEL_TIERS) {
-      // The head is the first gateway candidate: what answers whenever nothing is held down.
-      const head = gatewayList(tier)[0] as string;
-      expect(head, tier).toBeDefined();
-      expect(modelPolicy(head).verified, `${tier}: ${head} was never probed`).toMatch(PROBED_NOTE);
+      // The head answers whenever nothing is held down; the second place is where a tier run's one
+      // failover lands when the head fails before it speaks, so it must be a model seen to take the tier's Thinking.
+      const lead = gatewayList(tier).slice(0, 2);
+      expect(lead.length, tier).toBe(2);
+      for (const id of lead) {
+        expect(modelPolicy(id).verified, `${tier}: ${id} was never probed`).toMatch(PROBED_NOTE);
+      }
     }
   });
 });

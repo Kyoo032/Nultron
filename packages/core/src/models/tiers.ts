@@ -93,9 +93,11 @@ function define(
  * - Fastest: DeepSeek V4.1 Flash ($0.03 / $1.20 peak, half off-peak) and GPT 6 Luna ($0.10 / $0.50), both
  *   probed; then Claude Haiku 5.5 ($0.10 / $0.50) and Qwen3.8 Flash ($0.15 / $0.47), not yet probed. Four
  *   vendors, so one vendor's outage never empties the tier. GPT 5.6 Luna and DeepSeek V4 Flash left.
- * - Reasoning: Claude Opus 5.5 ($4 / $20, probed) heads it; DeepSeek V4 Pro ($1.33 / $4.00, not yet
- *   probed, text only) is next because it is the cheapest deep model, then GPT 6 Astra ($10 / $50,
- *   probed) and Qwen3.8 Max ($1.71 / $5.14). GPT 5.6 Sol and Kimi K3 left.
+ * - Reasoning: Claude Opus 5.5 ($4 / $20, probed) heads it and GPT 6 Astra ($10 / $50, probed) is next,
+ *   because a tier run's one failover lands on the second place and must be on a model already seen to
+ *   take Deep. Then DeepSeek V4 Pro ($1.33 / $4.00, not yet probed, text only), the cheapest deep model,
+ *   which moves up to second once eval:models:probe passes on it, and Qwen3.8 Max ($1.71 / $5.14).
+ *   GPT 5.6 Sol and Kimi K3 left.
  *
  * `choice-profiles.ts` reads these two lists rather than keeping copies.
  */
@@ -108,8 +110,8 @@ export const FAST_TIER_GATEWAY_IDS: readonly string[] = Object.freeze([
 
 export const REASONING_TIER_GATEWAY_IDS: readonly string[] = Object.freeze([
   "claude-opus-5-5",
-  "deepseek-v4-pro",
   "gpt-6-astra",
+  "deepseek-v4-pro",
   "qwen3.8-max",
 ]);
 
