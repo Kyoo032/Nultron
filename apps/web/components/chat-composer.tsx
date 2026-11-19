@@ -227,8 +227,10 @@ export async function readRunStream(
       if (progress) {
         handlers.onToolProgress?.(progress);
       }
-      if (event.type === "run.model_fallback" && event.from && event.to) {
-        handlers.onModelFallback?.({ from: event.from, to: event.to, message: event.message ?? "" });
+      if (event.type === "run.model_fallback") {
+        // A tier run's fallback names no models (model tiers spec, section 5); the notice then shows
+        // the host's sentence alone.
+        handlers.onModelFallback?.({ from: event.from ?? "", to: event.to ?? "", message: event.message ?? "" });
       }
       if (event.type === "run.failed" && event.message) {
         handlers.onFailed?.(event.message);
