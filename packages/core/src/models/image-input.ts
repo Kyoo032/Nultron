@@ -57,6 +57,50 @@ const READS_IMAGES: readonly RegExp[] = [
   /^seed-[12]\./,
 ];
 
+/** A model that reads pictures and gets them wrong, with the measurement that says so. */
+export type PictureMisread = Readonly<{
+  /** The bare id, as `bareModelId` spells it: lower case, no vendor prefix. Exact: a dated snapshot is a different model. */
+  id: string;
+  /** The day the measurement was made, `YYYY-MM-DD`. */
+  measured: string;
+  evidence: string;
+}>;
+
+const LUNA_PICTURE_TEST =
+  "A 128x128 picture, left half red and right half blue, asked for the colour of each half through the Chat run path on :3000";
+
+/**
+ * Models that receive a picture, read it, and still misreport it. They stay in `READS_IMAGES`: an explicit
+ * choice of one with a picture is accepted, and nothing here refuses it. All the mark does is move the model
+ * to the end of a tier's walk for a turn that carries a picture (`tiers.ts`, `resolveTier`), so Daily and
+ * Fastest answer such a turn from a model that read it correctly while one is live.
+ *
+ * This is a measurement, not a rule about a family. Add an id only with the date and the test that showed it,
+ * and remove it when the model is measured right. `gpt-6-sol`, `deepseek-v4-1-flash`, `claude-opus-5-5` and
+ * `gemini-3.5-flash` answered the same request correctly on 2026-11-13, so neither the family nor the wire is
+ * the cause: the request's `input_image` part is byte-identical to what AI SDK 4 sent
+ * (`runtime-recording-golden.json`), and the models name one of the picture's two colours.
+ */
+export const PICTURE_MISREADS: readonly PictureMisread[] = Object.freeze([
+  Object.freeze({
+    id: "gpt-6-luna",
+    measured: "2026-11-13",
+    evidence: `${LUNA_PICTURE_TEST}: wrong in 4 of 4 tries ("Both halves are blue", "Both halves are red").`,
+  }),
+  Object.freeze({
+    id: "gpt-5.6-luna",
+    measured: "2026-11-13",
+    evidence: `${LUNA_PICTURE_TEST}: wrong in 1 of 1 tries.`,
+  }),
+]);
+
+const MISREADING_IDS: ReadonlySet<string> = new Set(PICTURE_MISREADS.map((entry) => entry.id));
+
+/** Whether a measurement in `PICTURE_MISREADS` says this model misreads a picture it was given. */
+export function modelMisreadsPictures(modelId: string): boolean {
+  return MISREADING_IDS.has(bareModelId(modelId));
+}
+
 export function modelImageInput(modelId: string): ImageInputSupport {
   const id = bareModelId(modelId);
   if (!id) {

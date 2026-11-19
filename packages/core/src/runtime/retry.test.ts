@@ -7,6 +7,7 @@ import {
   formatModelContactError,
   hasVisibleText,
   isRetryableModelFailure,
+  modelStreamFailureMessage,
   shouldFailEmptyAssistant,
   shouldKeepToolTurn,
   shouldRetryModelContact,
@@ -104,6 +105,23 @@ describe("shouldFailEmptyAssistant", () => {
 });
 
 describe("shouldRetryModelContact", () => {
+  it("unwraps transport causes but not generic SDK wrappers or parse errors", () => {
+    const wrapper = "Failed to process successful response";
+    for (const cause of [new TypeError("fetch failed"), new Error("terminated"),
+      Object.assign(new Error("socket closed"), { code: "UND_ERR_SOCKET" }),
+      new DOMException("aborted", "AbortError")]) {
+      const error = new Error(wrapper, { cause: new Error(wrapper, { cause }) });
+      expect(isRetryableModelFailure(modelStreamFailureMessage(error, wrapper))).toBe(true);
+    }
+    for (const cause of [undefined, new SyntaxError("Unexpected token"), new Error("401 Unauthorized")]) {
+      expect(modelStreamFailureMessage(new Error(wrapper, { cause }), wrapper)).toBe(wrapper);
+      expect(isRetryableModelFailure(wrapper)).toBe(false);
+    }
+    const cycle = new Error(wrapper);
+    cycle.cause = cycle;
+    expect(modelStreamFailureMessage(cycle, wrapper)).toBe(wrapper);
+  });
+
   it("retries channel and network misses up to three attempts", () => {
     expect(MODEL_CONTACT_ATTEMPTS).toBe(3);
     expect(isRetryableModelFailure("No available channel for model deepseek-v4-pro")).toBe(true);
@@ -167,10 +185,16 @@ describe("shouldRetryModelContact", () => {
     ).toBe(false);
   });
 
-  it("does not retry an attempt that already streamed readable thinking, failed or not", () => {
+  it("retries failed thinking but not a clean thinking-only attempt", () => {
     expect(shouldRetryModelContact({ failed: "", text: false, tooled: false, thinking: true, attempts: 1 })).toBe(false);
     expect(
       shouldRetryModelContact({ failed: "fetch failed", text: false, tooled: false, thinking: true, attempts: 1 }),
+    ).toBe(true);
+    expect(
+      shouldRetryModelContact({ failed: "fetch failed", text: false, tooled: false, thinking: true, attempts: 3 }),
+    ).toBe(false);
+    expect(
+      shouldRetryModelContact({ failed: "401 Unauthorized", text: false, tooled: false, thinking: true, attempts: 1 }),
     ).toBe(false);
     expect(
       shouldRetryModelContact({ failed: "fetch failed", text: false, tooled: false, thinking: false, attempts: 1 }),

@@ -54,6 +54,21 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Daily no longer sends a picture turn to the Luna models, which misread pictures, 2026-11-13 (branch `fix/daily-picture-model` from `main` at `365d4af6`; unit tests run, driven on `:3000`)
+
+Lanes: enterprise, tester
+
+Measured on `:3000` on 2026-11-13: a 128x128 picture, left half red and right half blue, asked for the colour of each half. `gpt-6-luna`, the head of Daily (the default Chat tier), was wrong in 4 of 4 tries ("Both halves are blue", "Both halves are red"). `gpt-5.6-luna` was wrong in 1 of 1. Right on the same request: `gpt-6-sol`, `deepseek-v4-1-flash`, `claude-opus-5-5` and `gemini-3.5-flash`. The request's `input_image` part is byte-identical to what AI SDK 4 sent (`runtime-recording-golden.json`), and both Luna models name one of the two colours, so the picture arrives and the model misreads it.
+
+- **The mark is data.** `PICTURE_MISREADS` (`packages/core/src/models/image-input.ts:84`) names the two ids with the date and the evidence, and `modelMisreadsPictures` reads it. It sits beside `READS_IMAGES` because it is a fact about what a model does with a picture, not about how it is called (`model-policy.ts`): the policy entry that covers `gpt-5.6-luna` is the whole `gpt-5.6` family, and Sol and Terra were not measured. Both ids stay in `READS_IMAGES`: `modelImageInput` still says `yes`, `assertChatModelAcceptsModality` still accepts them, and a person who picks one by name with a picture gets it. `model-policy-guard.test.ts` fails a mark with no date or no evidence.
+- **The walk demotes, never drops.** `TierLiveness` has an optional `demoted` (`packages/core/src/models/tiers.ts:142`). `resolveTier` tries a demoted candidate after every other live candidate of the tier, across providers, and answers with the first demoted one when nothing else is live. The host sets it for a turn that carries a picture (`tierLiveness`, `packages/host/src/tier-resolve.ts:62`). Daily with a picture now goes to `claude-sonnet-5-5`, its next candidate. Fastest still goes to `deepseek-v4-1-flash`, Reasoning is unchanged, and a text turn on Daily still goes to `gpt-6-luna`. What a tier advertises (`tiers[].inputModalities` in `GET /api/v1/models` and `GET /api/v1/chat`) does not change: Daily still takes pictures.
+- **What "carries a picture" means.** An image run (`/runs/image`) does. A text run does when the thread's earlier pictures reach the model: `startModalityRun` asks `historyReplaysPicture` (`packages/host/src/chat-image-history.ts:234`) before the tier resolves, and that runs the same replay the send runs (`replayImages`, the body of `prepareChatImageHistory`). The budget (6 MiB, newest first), the unreadable, linked and not-an-image cases, and the rule that a picture the assistant made is never sent are the replay's own. A video run is left alone: the measurement is of pictures, and neither Luna is listed with video input.
+- **Cost.** A text turn that names a tier reads the thread's messages once more, and for a thread that holds a picture reads the stored bytes (up to 6 MiB) once more, before the run's own read. A thread that cannot be read answers no, and the run goes on as it did.
+- **Not changed.** An explicit `model` with a picture, the K-D31 modules (nothing calls them) and the renderer.
+- Proof: `tiers.test.ts`, `tier-resolve.test.ts`, `tier-resolve-picture.test.ts`, `chat-image-history.test.ts`, `image-input.test.ts`, `model-policy-guard.test.ts` and `runs-tier.test.ts` (an image run, and a text follow-up in a thread that holds a picture, through the real router). One existing `runs-tier.test.ts` case now posts its text turn on a thread of its own: it shared a thread with an earlier image run, and a follow-up there replays that picture, which is the case this change covers.
+- Driven on `:3000` on 2026-11-13, restarted on this branch, with Rizky's key, through the Chat screen on Daily. The picture turn ran on `claude-sonnet-5-5` and answered "Left red, right blue." A text follow-up in the same thread ("Which half of the picture I sent is blue?") also ran on `claude-sonnet-5-5` and answered "Right." A plain text turn in a new thread still ran on `gpt-6-luna`. The model is the one in each run's `run.completed` usage. Both threads are deleted. Evidence (gitignored, local): `.cursor/skills/verify-agentforge/evidence/model-tiers/2026-11-13-daily-picture/`.
+- Owed: merge into the tester (`origin/main` into `tester/chat-first`, then `ci:local`). Draft PR #233 rewrites the same tier lists, so whichever lands second needs a merge.
+
 ## AI SDK 5 and zod 4 (SR-196, SR-197), 2026-11-04 (branch `fix/zod-4`, stacked on `fix/ci-local-reds`; `ci:local` run; not driven live)
 
 Lanes: enterprise, tester
@@ -66,7 +81,12 @@ Rizky chose SR-196's option (1) on 2026-11-03: move the AI SDK to a line that ta
 - **SR-197:** AI SDK 5 printed every stream error, request body included, to the console. The runtime passes a silent `onError`. It also turns the SDK's warning output off by default (`AI_SDK_LOG_WARNINGS`), which otherwise wrote a line to stderr on every reasoning turn. AI SDK 4 printed neither.
 - **SR-198:** AI SDK 5's `@ai-sdk/provider-utils` pulls `undici` 5.29.0 and `@fastify/busboy`, with HIGH advisories. A scoped override moves it to `undici` 6.29.1, which drops `busboy`. The SDK's guarded media fetch was checked on it.
 - **zod 4.6.7** everywhere, one copy in the lock. `stored-shapes.test.ts` pins what zod 3 made of 125 stored-record schemas, and zod 4 reads every one back the same. Eight `.default({…})` became `.prefault(…)`. A legal finding edit keeps only the fields it sent, because zod 4's `.partial()` fills in defaults. `market/schema-lint.ts` sees through the new wrappers, and `ZodTypeDef` uses are gone. `past_sessions` takes `z.guid()`, which matches what zod 3's `.uuid()` accepted. `tool-json-schemas.test.ts` records the JSON schema of all 62 tools: 48 are identical, and 14 gained integer bounds, `anyOf`/`const` for literal unions, `propertyNames` on records, or the guid pattern.
-- **Owed before any deploy (Rizky):** a live text turn, a tool call and an image on each wire (Completions, Responses, Messages, generateContent) against the gateway.
+- **Driven live on 2026-11-13** on `:3000` at `365d4af6`, against Toko Token with Rizky's key. Each wire got a text turn, a `calculator` call and an attached picture (left half red, right half blue):
+  - Completions (Fastest tier, `deepseek-v4-1-flash`), Responses (Daily, `gpt-6-luna`) and Messages (Reasoning, `claude-opus-5-5`) went through the Chat composer. generateContent (`gemini-3.5-flash`) went through `POST /api/v1/threads/:id/runs/{text,image}` with `model`, because no tier reaches it.
+  - All 12 runs completed. Each run row carries the model of its wire and its usage. Every `calculator` call returned 14272771, and the tool row showed in the thread.
+  - 11 of 12 answers were right. The miss was the picture on Responses: `gpt-6-luna` named one colour for both halves (4 of 4 tries), and so did `gpt-5.6-luna` (1 of 1). `gpt-6-sol` read it right from the same request. The Responses `input_image` part is byte-identical to what AI SDK 4 sent (`runtime-recording-golden.json` at `16b8a233` and at HEAD), so the miss is the model, not the move. It matters for Daily, which takes pictures and whose head is `gpt-6-luna`.
+  - Not exercised: a signed thinking block replayed on Messages. The Reasoning turns wrote 7 to 58 output tokens, so they did little or no thinking.
+  - Evidence (gitignored, local): `.cursor/skills/verify-agentforge/evidence/chat/2026-11-13-four-wire-ai-sdk-5/`. The 9 threads the drive made are deleted.
 - Owed after merge: merge `origin/main` into `tester/chat-first` and `ci:local` there.
 
 ## `ci:local` on `main`: the host type error, `body-parser` and the `zod` 4 copy fixed; `zod` 3 left for a decision (SR-196), 2026-11-03 (branch `fix/ci-local-reds` from `main` at `b79a5275`; `ci:local` run, nothing driven)
@@ -1295,3 +1315,42 @@ Lanes: enterprise, tester.
 - **Proof.** `packages/core` 305 files, 4,517 tests pass; host `runs*`, `tier*`, `delegation`, model and chat handlers 20 files, 187 tests pass, including `runs-tier-fallback.test.ts` (9 new); `tsc --noEmit` clean in core, host and web.
 - **Live check, built and owed.** `packages/host/eval/models/handoff.ts` (dev only, never ships): two three-turn conversations through the real runtime Chat uses, Fast → Reasoning → Daily and back, each turn resolved by the real tier resolver against the desk's catalogue, with the history carried as text. Turn 1 picks a four-digit number, turn 2 adds one, turn 3 writes both in Indonesian words, so a turn passes only if it read the turn before, on another vendor. `--all-candidates` calls every candidate of every tier once. 56 unit tests, no network; the dry run plans 6 calls (23 with `--all-candidates --handoff`). Run once a key is saved: `AGENTFORGE_DATA_DIR=<desk> pnpm --filter @agentforge/host eval:models:handoff --refresh --all-candidates --handoff` (add `--dry-run`, without `--refresh`, to see the plan first).
 - **Not driven.** No gateway key on the cloud VM: no live call, no probe of the new ids, not `:3000`.
+
+
+## Preview desks sign in with a form, 2026-11-17 (branch `cursor/preview-form-login-d472`)
+
+Lanes: enterprise, tester.
+
+- **What.** The preview at `app.nultron-ai.xyz` answered `401` with `WWW-Authenticate: Basic realm="restricted"` from Caddy (`nultron-files/deploy/tencent/edge/sites/app.caddy`, not in this repo; SR-133). A scripted browser cannot fill that dialog. `PreviewGate` (`apps/web/server/preview-gate.ts`) replaces it when `PREVIEW_BASIC_USER` and `PREVIEW_BASIC_PASSWORD` are set and `AGENTFORGE_SERVER` is not. Pages redirect to `/login`. `/api` returns JSON `401`. Other files return plain `401`. The cookie is `HttpOnly`, `SameSite=Lax`, `Secure` in production, twelve hours, and an HMAC over an opaque id. Login attempts are limited per client address (five at once, then the hosted bucket). `POST /logout` clears it. A production boot without server mode is allowed only when both variables are set, so the stock `server.ts` can be the preview process. The hosted container does not set them, and `fromEnv` returns null in server mode.
+- **Env.** The repo never named the Caddy user's variables. These two are new names for the same username and password. The values are read from the environment only and are not trimmed on the password. Nothing in `webapp-deploy/.env.example` changed.
+- **Not in this commit.** Removing `basic_auth` from `sites/app.caddy`. Until that block is gone, the public name still shows the native dialog in front of this form.
+- **Login document.** The form is the desk's own paint: the chat sky, a raised card, the mark and the wordmark, DM Sans, the field and primary-button styles, and `.dark` when `agentforge-theme` is `dark`. One language per response, from `Accept-Language`. The mark and the font are inlined.
+- **Review, same branch.** `safeNext` percent-decodes until the path stops changing and then checks it, so `/.//evil.com` and `/%252f%252fevil.com` do not redirect off this origin. `Origin: null` is accepted only when `Sec-Fetch-Site` is `same-origin`, which is how Chrome submits the form under `Referrer-Policy: no-referrer`. The same literal with `same-site`, or with that header missing, is 403. A real Origin must match scheme, hostname and port. The HMAC key is `randomBytes(32)` per process: sessions reset on restart, and this assumes one process. IPv6 rate limits are keyed by /64. `POST /login` and `POST /logout` answer 403 when `Sec-Fetch-Site` is `cross-site`, or when a real Origin does not match this request. The rate-limit token is taken before the body is read, and a body past 4 KB destroys the request. The image healthcheck and the Caddy `health_uri` are already `GET /healthz`. `GET /api/v1/components` is 401 once the gate is mounted, so a preview probe still pointed there must move to `/healthz`.
+- **Proof.** `apps/web/server/preview-gate.test.ts`. Not driven on the live preview.
+
+## 2026-11-19 — Retry interrupted reasoning streams (DFIND-66, PR #246)
+
+- **Lanes: enterprise, tester.** A clean thinking-only reply is still completed once (DFIND-65), but missing/unknown stream finish and stream abort now count as failed attempts. Gemini generate-content and Responses both need a real finish reason, not the SDK's synthetic unknown finish at EOF.
+- SDK wrappers such as `Failed to process successful response` are classified through their cause chain: transport failures retry, a generic wrapper or parse error alone does not. Auth failures and caller cancellation still stop without retrying. Before retrying, the failed thinking is replaced in the live pane and persisted message, not appended twice.
+- **Proof:** `ai-sdk-runtime-stream-drop.test.ts` starts a real loopback HTTP server and covers socket destruction, truncated malformed SSE, unfinished EOF, clean thinking-only completion, 401 and caller cancellation on both wires. `scripts/mock-thinking-gateway.ts` provides the same A/B/clean/401 cases for browser QA; instructions are in the Chat verification recipe. Not browser-driven in this pass.
+
+## Mask case-varied and form-encoded bearer tokens, 2026-11-19
+
+Lanes: enterprise, tester.
+
+- `redactCredentials` now masks a bearer token regardless of the scheme's case and also accepts `+` as a form-encoded space. The existing `Bearer [REDACTED]` output is unchanged.
+- The `redactSecrets` fallback masks standalone opaque tokens of 32 or more characters that include `-`, `_` or internal dots. Diagnostic paths, UUIDs and multi-word snake_case labels stay readable.
+
+## Require the production preview form before Caddy cutover, 2026-11-19
+
+Lanes: enterprise, tester.
+
+- **What.** `PreviewGate.requireProduction(process.env)` refuses to boot outside production, in server mode or without both preview credentials. Use it in the external preview entrypoint before importing the host/database, then mount the middleware ahead of the API and static files. Stock hosted and webdev boot are unchanged.
+- **Still owed.** Follow the [preview cutover checks](../../webapp-deploy/README.md#preview-desks-mount-the-form-before-changing-caddy). Keep Caddy Basic Auth until the external mount has passed unauthenticated upstream checks and replacement routing preserves per-desk isolation.
+- **Proof.** The web suite exercises the production middleware with anonymous page, API and POST requests, public liveness and a same-origin form login. Scoped local CI passed; the live preview was not changed or driven.
+
+## Chat usage counts model retries, 2026-11-19 (DFIND-65)
+
+Lanes: enterprise, tester.
+
+- A completed Chat turn records the reported tokens from every model attempt in one usage total, including billed attempts that error or return no answer before a retry. No new ledger rows are written per attempt.

@@ -295,7 +295,7 @@
       "map": "docs/internal/maps/hosted-server-mode.md",
       "lanes": ["enterprise"],
       "protected": false,
-      "note": "The Express host. Hosted behaviour is gated by isServerMode() with a Personal-parity test."
+      "note": "The Express host. Hosted behaviour is gated by isServerMode() with a Personal-parity test. The preview form gate runs only when server mode is off and both PREVIEW_BASIC_USER and PREVIEW_BASIC_PASSWORD are set."
     },
     {
       "glob": "apps/web/server/**",
