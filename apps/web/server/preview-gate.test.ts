@@ -564,6 +564,27 @@ describe("preview form login", () => {
     expect(setCookie(mismatched.headers)).toBe("");
   });
 
+  it.each([
+    ["[2001:db8::1]", "https://[2001:db8::1]"],
+    ["[2001:0DB8:0:0:0:0:0:1]:8443", "https://[2001:db8::1]:8443"],
+  ])("accepts same-origin login and logout for IPv6 Host %s", async (host, origin) => {
+    const port = await listen(gate());
+    const headers = { host, origin, "x-forwarded-proto": "https", "sec-fetch-site": "same-origin" };
+    const login = await request(port, {
+      method: "POST",
+      path: "/login",
+      headers,
+      body: new URLSearchParams({ username: USER, password: PASSWORD }).toString(),
+    });
+    expect(login.status).toBe(303);
+    const cookie = cookieHeader(setCookie(login.headers));
+    expect(cookie).toMatch(/^__Host-nultron_preview=/);
+
+    const logout = await request(port, { method: "POST", path: "/logout", headers: { ...headers, cookie } });
+    expect(logout.status).toBe(303);
+    expect(setCookie(logout.headers)).toContain("Max-Age=0");
+  });
+
   it("spends the rate-limit token before reading the body", async () => {
     const port = await listen(gate({ burst: 1 }));
     const first = await request(port, {
@@ -585,6 +606,20 @@ describe("preview form login", () => {
     expect(response.status).toBe(413);
     expect(setCookie(response.headers)).toBe("");
     expect(response.headers["www-authenticate"]).toBeUndefined();
+  });
+});
+
+describe("PreviewGate.originMatchesHost", () => {
+  it.each([
+    "https://[2001:db8::2]:8443",
+    "https://[2001:db8::1]",
+    "http://[2001:db8::1]:8443",
+  ])("does not match IPv6 Host [2001:db8::1]:8443 against %s", (origin) => {
+    expect(PreviewGate.originMatchesHost(origin, "[2001:db8::1]:8443", "https")).toBe(false);
+  });
+
+  it.each(["[2001::db8::1]", "[2001:db8::1]:", "[2001:db8::1"])("rejects malformed IPv6 Host %s", (host) => {
+    expect(PreviewGate.originMatchesHost("https://[2001:db8::1]", host, "https")).toBe(false);
   });
 });
 

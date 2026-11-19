@@ -1369,3 +1369,10 @@ Lanes: enterprise, tester.
 Lanes: enterprise, tester.
 
 - `redactSecrets` now preserves only known diagnostic event names instead of exempting all letters-only snake_case values. Existing path and UUID handling is unchanged.
+
+## Accept same-origin preview sign-in on IPv6-literal URLs, 2026-11-19
+
+Lanes: enterprise, tester.
+
+- Preview form sign-in and sign-out no longer return 403 just because the browser uses a bracketed IPv6 address as the host. The address is canonicalized before comparison; a different address, scheme or port still fails.
+- The preview gate HTTP suite covers the fix. The live preview was not changed or driven; Caddy Basic Auth stays on.
