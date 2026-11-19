@@ -4,11 +4,15 @@ import { describe, expect, it } from "vitest";
 import { OpenSlideStage } from "@/components/open-slide-stage";
 
 describe("Open Slide cover titles", () => {
-  it("fits two title lines inside the fixed block, including its borders", () => {
-    const deck = draftOpenSlideDeck({ prompt: "A two-line cover title for Saturday pickup", locale: "en" });
+  it.each([
+    "Saturday pickup",
+    "Nultron Workbench Quarterly Deep-Dive",
+    "A Very Long Cover Title That Keeps Going And Going Beyond The Box Limits",
+  ])("renders the full title at its stored size before measuring: %s", (prompt) => {
+    const deck = draftOpenSlideDeck({ prompt, locale: "en" });
     const markup = renderToStaticMarkup(<OpenSlideStage deck={deck} onChange={() => {}} />);
-    expect(markup).toContain("font-size:min(7.291666666666667cqw, calc((12.5cqw - 4px) / 2.4))");
-    expect(markup).toContain("A two-line cover title for Saturday pickup");
+    expect(markup).toContain("font-size:7.291666666666667cqw");
+    expect(markup).toContain(prompt);
     expect(markup).toContain("font-size:2.083333333333333cqw");
   });
 
@@ -22,6 +26,6 @@ describe("Open Slide cover titles", () => {
     const markup = renderToStaticMarkup(
       <OpenSlideStage deck={{ ...deck, pages: deck.pages.slice(1) }} onChange={() => {}} />,
     );
-    expect(markup).not.toContain("font-size:min(");
+    expect(markup).not.toContain("overflow-wrap:anywhere");
   });
 });

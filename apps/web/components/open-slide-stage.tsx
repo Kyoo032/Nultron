@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useLayoutEffect,
   useRef,
   useState,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -26,6 +27,7 @@ import {
 } from "@agentforge/core/open-slide";
 import { assignSlideLayout } from "@agentforge/core/slide-design";
 import { t } from "@/lib/i18n";
+import { fitOpenSlideTitle } from "@/lib/open-slide-title-fit";
 
 function pageLayout(page: OpenSlidePage, index: number): string {
   if (page.layout) {
@@ -47,6 +49,7 @@ export function OpenSlideStage({ deck, onChange }: { deck: OpenSlideDeck; onChan
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
   const deckRef = useRef(deck);
+  const coverTitleRef = useRef<HTMLDivElement>(null);
   deckRef.current = deck;
   const page = deck.pages.find((item) => item.id === pageId) ?? deck.pages[0];
   const selected = page?.blocks.find((block) => block.id === selectedId) ?? null;
@@ -59,6 +62,25 @@ export function OpenSlideStage({ deck, onChange }: { deck: OpenSlideDeck; onChan
             undefined,
           )
       : undefined;
+
+  useLayoutEffect(() => {
+    const element = coverTitleRef.current;
+    if (!element || !coverTitle) {
+      return;
+    }
+    const fit = () => fitOpenSlideTitle(element, `${(coverTitle.fontSize / OPEN_SLIDE_CANVAS_WIDTH) * 100}cqw`);
+    fit();
+    const observer = new ResizeObserver(fit);
+    observer.observe(element);
+    if (element.parentElement) {
+      observer.observe(element.parentElement);
+    }
+    document.fonts.addEventListener("loadingdone", fit);
+    return () => {
+      observer.disconnect();
+      document.fonts.removeEventListener("loadingdone", fit);
+    };
+  }, [coverTitle, selectedId]);
 
   if (!page) {
     return null;
@@ -257,6 +279,7 @@ export function OpenSlideStage({ deck, onChange }: { deck: OpenSlideDeck; onChan
           return (
             <div
               key={block.id}
+              ref={block === coverTitle ? coverTitleRef : undefined}
               className="absolute overflow-hidden text-left"
               style={{
                 left: `${(block.x / OPEN_SLIDE_CANVAS_WIDTH) * 100}%`,
@@ -265,10 +288,8 @@ export function OpenSlideStage({ deck, onChange }: { deck: OpenSlideDeck; onChan
                 height: `${(block.h / OPEN_SLIDE_CANVAS_HEIGHT) * 100}%`,
                 color: toneColor(deck.design, block.tone),
                 background: block.kind === "shape" ? toneColor(deck.design, block.tone) : "transparent",
-                fontSize:
-                  block === coverTitle
-                    ? `min(${(block.fontSize / OPEN_SLIDE_CANVAS_WIDTH) * 100}cqw, calc((${(block.h / OPEN_SLIDE_CANVAS_WIDTH) * 100}cqw - 4px) / 2.4))`
-                    : `${(block.fontSize / OPEN_SLIDE_CANVAS_WIDTH) * 100}cqw`,
+                fontSize: `${(block.fontSize / OPEN_SLIDE_CANVAS_WIDTH) * 100}cqw`,
+                overflowWrap: block === coverTitle ? "anywhere" : undefined,
                 fontWeight: block.weight,
                 textAlign: block.align,
                 lineHeight: 1.2,
