@@ -60,8 +60,8 @@ describe("choice profiles seed", () => {
   it("seeds Reasoning with the reasoning list, each candidate at high", () => {
     expect(gatewayRefs(CHOICE_PROFILES.opc, "reasoning").map((ref) => [ref.model, ref.effort])).toEqual([
       ["claude-opus-5-5", "high"],
-      ["deepseek-v4-pro", "high"],
       ["gpt-6-astra", "high"],
+      ["deepseek-v4-pro", "high"],
       ["qwen3.8-max", "high"],
     ]);
   });
