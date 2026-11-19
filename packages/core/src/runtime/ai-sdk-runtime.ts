@@ -21,6 +21,7 @@ import {
   formatModelContactError,
   hasVisibleText,
   isRetryableModelFailure,
+  modelStreamFailureMessage,
   shouldFailEmptyAssistant,
   shouldKeepToolTurn,
   shouldRetryModelContact,
@@ -771,12 +772,22 @@ export class AiSdkRuntime implements AgentRuntime {
     let tooled = false;
     let toolCompleted = false;
     let failed = "";
+    let finished = false;
     let failure: GatewayFailureDetail | undefined;
     let usage = { inputTokens: 0, outputTokens: 0 };
 
     try {
       for await (const part of watchAsyncIterable(result.fullStream, abort, () => watchdog.touch(), locale)) {
         steps.observe(part);
+        if (part.type === "start-step") {
+          finished = false;
+        }
+        if (part.type === "finish-step") {
+          finished = part.finishReason !== "unknown" && part.finishReason !== "error";
+        }
+        if (part.type === "abort") {
+          failed = "The model stream terminated before finishing";
+        }
         const event = mapStreamPart(part);
         if (!event) {
           continue;
@@ -786,7 +797,7 @@ export class AiSdkRuntime implements AgentRuntime {
         // that is still thinking the short idle budget instead of the first-token one.
         watchdog.touchOutput();
         if (event.type === "run.failed") {
-          failed = event.message;
+          failed = modelStreamFailureMessage((part as { error?: unknown }).error, event.message);
           failure = gatewayFailureOf((part as { error?: unknown }).error);
           break;
         }
@@ -813,6 +824,9 @@ export class AiSdkRuntime implements AgentRuntime {
         await input.onEvent(outgoing);
       }
 
+      if (!failed && !finished) {
+        failed = "The model stream terminated without a finish reason";
+      }
       if (!text && !failed) {
         const fallback = await result.text.catch(() => "");
         if (hasVisibleText(fallback)) {
@@ -835,7 +849,7 @@ export class AiSdkRuntime implements AgentRuntime {
       const stepLimit = tools !== undefined && !failed && steps.endedAtLimit(maxSteps);
       return { text, thinking, tooled, toolCompleted, stepLimit, failed, failure, usage };
     } catch (error) {
-      const message = abortErrorMessage(error, locale);
+      const message = modelStreamFailureMessage(error, abortErrorMessage(error, locale));
       if (!failed) {
         failed = message;
         failure = gatewayFailureOf(error);
