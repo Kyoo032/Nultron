@@ -2,6 +2,8 @@
 
 Product: both · Instance: main :3000
 
+Last verified: 2026-11-19, branch `devin/1795088919-reasoning-failover-probed` over `claude/zen-volta-0v15wz` (PR #243, stacked on #233), for the "Chat tiers" list bullet only: Reasoning is `claude-opus-5-5`, `gpt-6-astra`, `deepseek-v4-pro`, `qwen3.8-max`, so the one tier failover lands on a probed model, and `tiers.test.ts` now checks every tier's first two candidates were probed. Not driven against the live gateway; DeepSeek V4 Pro is still unprobed.
+
 Last verified: 2026-11-03 on `fix/zod-4` (AI SDK 5, before merge) for the "What else the SDK gates on the id" bullet only.
 
 Last verified: 2026-10-21 at 21686b0d for the `DEFAULT_GATEWAY_VIDEO_MODEL` bullet only (the media tools' model choice, SR-190; working tree of `claude/determined-pare-9d2949`).
