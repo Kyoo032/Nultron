@@ -11,10 +11,10 @@ import type { HostRequest, HostResult } from "../types";
  * The tier fields of the two catalog payloads (chat-first plan, track M1): `GET /api/v1/models` and
  * `GET /api/v1/chat` each carry `tiers` and `defaultTier` beside everything they carried before.
  *
- * The desk lists three models. Daily resolves (to `gpt-6-luna`, which takes text only, and a Claude that
- * also takes images), Fast resolves, and Reasoning has no candidate listed. The static fill-ins for the
- * providers the cache has nothing for are in the catalog too, so assertions on Daily stay about what the
- * listed rows decide and do not pin the fill-ins.
+ * The desk lists three tier models. Daily resolves (to `gpt-6-luna`, which takes text only, and a Claude that
+ * also takes images), Fast resolves, and Reasoning has no candidate listed. Every provider's list is cached,
+ * each with one row no tier names, so no static fill-in block (`mergeChatCatalog`) joins the catalog: the
+ * fill-ins list every tier id, and would make Reasoning available and Fast image-capable here.
  */
 
 const dataDir = mkdtempSync(join(tmpdir(), "agentforge-tier-payload-"));
@@ -58,6 +58,9 @@ beforeAll(async () => {
       { id: "claude-sonnet-5-5", label: "Claude Sonnet 5.5", provider: "openai", inputModalities: ["text", "image"] },
       { id: "deepseek-v4-1-flash", label: "DeepSeek V4.1 Flash", provider: "openai", inputModalities: ["text"] },
     ],
+    anthropic: [{ id: "claude-fixture", label: "Claude Fixture", provider: "anthropic", inputModalities: ["text"] }],
+    google: [{ id: "gemini-fixture", label: "Gemini Fixture", provider: "google", inputModalities: ["text"] }],
+    volcengine: [{ id: "doubao-fixture", label: "Doubao Fixture", provider: "volcengine", inputModalities: ["text"] }],
   });
   resetCatalogMemo();
 }, ROUTER_IMPORT_BUDGET_MS);
