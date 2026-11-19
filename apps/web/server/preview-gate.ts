@@ -120,6 +120,17 @@ export class PreviewGate {
     });
   }
 
+  static requireProduction(env: EnvLike): PreviewGate {
+    if (env.NODE_ENV !== "production") {
+      throw new Error("The live preview requires NODE_ENV=production.");
+    }
+    const gate = PreviewGate.fromEnv(env);
+    if (!gate) {
+      throw new Error("The live preview requires server mode off and both PREVIEW_BASIC_USER and PREVIEW_BASIC_PASSWORD.");
+    }
+    return gate;
+  }
+
   static cookieName(secure: boolean): string {
     return secure ? PreviewGate.COOKIE_SECURE : PreviewGate.COOKIE;
   }

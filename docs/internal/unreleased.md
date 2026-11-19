@@ -1316,3 +1316,11 @@ Lanes: enterprise, tester.
 
 - `redactCredentials` now masks a bearer token regardless of the scheme's case and also accepts `+` as a form-encoded space. The existing `Bearer [REDACTED]` output is unchanged.
 - The `redactSecrets` fallback masks standalone opaque tokens of 32 or more characters that include `-`, `_` or internal dots. Diagnostic paths, UUIDs and multi-word snake_case labels stay readable.
+
+## Require the production preview form before Caddy cutover, 2026-11-19
+
+Lanes: enterprise, tester.
+
+- **What.** `PreviewGate.requireProduction(process.env)` refuses to boot outside production, in server mode or without both preview credentials. Use it in the external preview entrypoint before importing the host/database, then mount the middleware ahead of the API and static files. Stock hosted and webdev boot are unchanged.
+- **Still owed.** Follow the [preview cutover checks](../../webapp-deploy/README.md#preview-desks-mount-the-form-before-changing-caddy). Keep Caddy Basic Auth until the external mount has passed unauthenticated upstream checks and replacement routing preserves per-desk isolation.
+- **Proof.** The web suite exercises the production middleware with anonymous page, API and POST requests, public liveness and a same-origin form login. Scoped local CI passed; the live preview was not changed or driven.
