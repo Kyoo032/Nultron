@@ -50,6 +50,15 @@ export function OpenSlideStage({ deck, onChange }: { deck: OpenSlideDeck; onChan
   deckRef.current = deck;
   const page = deck.pages.find((item) => item.id === pageId) ?? deck.pages[0];
   const selected = page?.blocks.find((block) => block.id === selectedId) ?? null;
+  const coverTitle =
+    page?.role === "cover"
+      ? page.blocks
+          .filter((block) => block.kind === "text")
+          .reduce<OpenSlideBlock | undefined>(
+            (best, block) => (!best || block.fontSize > best.fontSize ? block : best),
+            undefined,
+          )
+      : undefined;
 
   if (!page) {
     return null;
@@ -256,7 +265,10 @@ export function OpenSlideStage({ deck, onChange }: { deck: OpenSlideDeck; onChan
                 height: `${(block.h / OPEN_SLIDE_CANVAS_HEIGHT) * 100}%`,
                 color: toneColor(deck.design, block.tone),
                 background: block.kind === "shape" ? toneColor(deck.design, block.tone) : "transparent",
-                fontSize: `${(block.fontSize / OPEN_SLIDE_CANVAS_WIDTH) * 100}cqw`,
+                fontSize:
+                  block === coverTitle
+                    ? `min(${(block.fontSize / OPEN_SLIDE_CANVAS_WIDTH) * 100}cqw, calc((${(block.h / OPEN_SLIDE_CANVAS_WIDTH) * 100}cqw - 4px) / 2.4))`
+                    : `${(block.fontSize / OPEN_SLIDE_CANVAS_WIDTH) * 100}cqw`,
                 fontWeight: block.weight,
                 textAlign: block.align,
                 lineHeight: 1.2,
