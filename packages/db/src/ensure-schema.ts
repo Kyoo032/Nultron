@@ -684,9 +684,16 @@ function ensureDeskFileTables(sqlite: Database.Database): void {
 
 /**
  * The customer inbox, for a database stamped past 0023 without the tables.
- * Mirrors drizzle/0023_customer_inbox.sql exactly.
+ * Mirrors drizzle/0023_customer_inbox.sql with the active-only index from 0024.
  */
 function ensureCustomerInboxTables(sqlite: Database.Database): void {
+  const indexes = sqlite.prepare("PRAGMA index_list(channel_endpoints)").all() as Array<{
+    name: string;
+    partial: number;
+  }>;
+  if (indexes.some((index) => index.name === "channel_endpoints_kind_external_unique" && !index.partial)) {
+    sqlite.exec("DROP INDEX channel_endpoints_kind_external_unique");
+  }
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS channel_endpoints (
       id text PRIMARY KEY NOT NULL,
@@ -702,7 +709,7 @@ function ensureCustomerInboxTables(sqlite: Database.Database): void {
       CONSTRAINT channel_endpoints_kind_check CHECK (kind IN ('whatsapp')),
       CONSTRAINT channel_endpoints_status_check CHECK (status IN ('active', 'disabled'))
     );
-    CREATE UNIQUE INDEX IF NOT EXISTS channel_endpoints_kind_external_unique ON channel_endpoints (kind, external_id);
+    CREATE UNIQUE INDEX IF NOT EXISTS channel_endpoints_kind_external_unique ON channel_endpoints (kind, external_id) WHERE status = 'active';
     CREATE INDEX IF NOT EXISTS channel_endpoints_ws_idx ON channel_endpoints (workspace_id);
     CREATE TABLE IF NOT EXISTS customer_conversations (
       id text PRIMARY KEY NOT NULL,

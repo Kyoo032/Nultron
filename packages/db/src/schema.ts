@@ -1029,8 +1029,8 @@ export const fileProposals = sqliteTable(
 /**
  * Customer inbox (drizzle/0023_customer_inbox.sql): a connected number or bot. The row a webhook is
  * routed by: the payload names an external id (WhatsApp's phone number id), the desk is whatever
- * this row says. `(kind, external_id)` is unique across the whole install, so a number belongs to
- * one desk. `workspace_id` carries no foreign key, like `artifacts` and `datasets`: the tenant purge
+ * this row says. Active `(kind, external_id)` is unique across the whole install, so a connected
+ * number belongs to one desk. `workspace_id` carries no foreign key, like `artifacts` and `datasets`: the tenant purge
  * deletes these rows by desk (`WORKSPACE_SCOPED_TABLES`) and the cascades below take the rest.
  */
 export const channelEndpoints = sqliteTable(
@@ -1048,7 +1048,9 @@ export const channelEndpoints = sqliteTable(
     updatedAt: integer("updated_at").notNull(),
   },
   (table) => [
-    uniqueIndex("channel_endpoints_kind_external_unique").on(table.kind, table.externalId),
+    uniqueIndex("channel_endpoints_kind_external_unique")
+      .on(table.kind, table.externalId)
+      .where(sql`${table.status} = 'active'`),
     index("channel_endpoints_ws_idx").on(table.workspaceId),
     check("channel_endpoints_kind_check", sql`${table.kind} IN ('whatsapp')`),
     check("channel_endpoints_status_check", sql`${table.status} IN ('active', 'disabled')`),
