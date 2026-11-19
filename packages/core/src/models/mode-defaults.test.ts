@@ -7,18 +7,21 @@ import {
 } from "./mode-defaults";
 import { DEFAULT_GATEWAY_IMAGE_MODEL, DEFAULT_GATEWAY_VIDEO_MODEL } from "./media-kind";
 
-/** Every list, as the owner set them on 2026-09-30 (prices from /api/pricing, latency from the probe). */
+/**
+ * Every list, as the owner set them on 2026-09-30 (prices from /api/pricing, latency from the probe), with
+ * the superseded ids replaced on 2026-11-10 (`superseded.ts`). Every head is the 2026-09-30 head.
+ */
 describe("JOB_MODE_PREFERENCES", () => {
-  it("holds the lists of 2026-09-30 exactly", () => {
+  it("holds the lists of 2026-11-10 exactly", () => {
     expect(JOB_MODE_PREFERENCES).toEqual({
-      documents: ["hy3", "deepseek-v4-1-flash", "deepseek-v4-flash"],
-      research: ["gpt-6-luna", "gpt-6-sol", "gpt-5.6-luna", "MiniMax-M3", "minimax-m3"],
-      presentations: ["glm-5.3-flash", "claude-sonnet-5-5", "glm-5.3", "kimi-k3"],
-      finance: ["hy3", "deepseek-v4-1-flash", "deepseek-v4-flash"],
-      data: ["gpt-6-luna", "gpt-6-sol", "gpt-5.6-luna", "MiniMax-M3", "minimax-m3"],
-      market: ["hy3", "deepseek-v4-1-flash", "deepseek-v4-flash"],
-      legal: ["gpt-6-sol", "claude-sonnet-5-5", "gpt-5.6-sol", "kimi-k3"],
-      meeting: ["gpt-6-sol", "claude-sonnet-5-5", "gemini-3.5-flash", "gpt-5.6-sol"],
+      documents: ["hy3", "deepseek-v4-1-flash", "qwen3.8-flash"],
+      research: ["gpt-6-luna", "gpt-6-sol", "claude-haiku-5-5", "MiniMax-M3", "minimax-m3"],
+      presentations: ["glm-5.3-flash", "claude-sonnet-5-5", "glm-5.3", "kimi-k3.1-pro"],
+      finance: ["hy3", "deepseek-v4-1-flash", "qwen3.8-flash"],
+      data: ["gpt-6-luna", "gpt-6-sol", "claude-haiku-5-5", "MiniMax-M3", "minimax-m3"],
+      market: ["hy3", "deepseek-v4-1-flash", "qwen3.8-flash"],
+      legal: ["gpt-6-sol", "claude-sonnet-5-5", "claude-opus-5-5", "kimi-k3.1-pro"],
+      meeting: ["gpt-6-sol", "claude-sonnet-5-5", "gemini-3.8-flash", "claude-opus-5-5"],
     });
   });
 
@@ -44,13 +47,14 @@ describe("pickPreferredJobModel", () => {
     );
   });
 
-  it("picks DeepSeek V4.1 Flash for documents when hy3 is absent, then V4 Flash", () => {
+  it("picks DeepSeek V4.1 Flash for documents when hy3 is absent, then Qwen3.8 Flash, never V4 Flash", () => {
     expect(
-      pickPreferredJobModel("documents", ["gpt-6-sol", "kimi-k3", "deepseek-v4-1-flash", "deepseek-v4-flash"], "gpt-6-sol"),
+      pickPreferredJobModel("documents", ["gpt-6-sol", "kimi-k3", "deepseek-v4-1-flash", "qwen3.8-flash"], "gpt-6-sol"),
     ).toBe("deepseek-v4-1-flash");
-    expect(pickPreferredJobModel("documents", ["gpt-6-sol", "kimi-k3", "deepseek-v4-flash", "glm-5.3"], "gpt-6-sol")).toBe(
-      "deepseek-v4-flash",
+    expect(pickPreferredJobModel("documents", ["gpt-6-sol", "qwen3.8-flash", "deepseek-v4-flash"], "gpt-6-sol")).toBe(
+      "qwen3.8-flash",
     );
+    expect(pickPreferredJobModel("documents", ["gpt-6-sol", "deepseek-v4-flash"], "gpt-6-sol")).toBe("gpt-6-sol");
   });
 
   it("prefers GPT 6 Luna for research and data when present, then GPT 6 Sol", () => {
@@ -60,8 +64,11 @@ describe("pickPreferredJobModel", () => {
     expect(pickPreferredJobModel("research", live.filter((id) => id !== "gpt-6-luna"), "kimi-k3")).toBe("gpt-6-sol");
   });
 
-  it("falls to GPT 5.6 Luna and then MiniMax M3 for research when GPT 6 is absent", () => {
-    expect(pickPreferredJobModel("research", ["gpt-5.6-luna", "MiniMax-M3"], "kimi-k3")).toBe("gpt-5.6-luna");
+  it("falls to Claude Haiku 5.5 and then MiniMax M3 for research when GPT 6 is absent, never GPT 5.6 Luna", () => {
+    expect(pickPreferredJobModel("research", ["gpt-5.6-luna", "claude-haiku-5-5", "MiniMax-M3"], "kimi-k3")).toBe(
+      "claude-haiku-5-5",
+    );
+    expect(pickPreferredJobModel("research", ["gpt-5.6-luna", "MiniMax-M3"], "kimi-k3")).toBe("MiniMax-M3");
     expect(pickPreferredJobModel("research", ["glm-5.3", "deepseek-v4-pro", "gpt-5.6-terra", "MiniMax-M3"], "kimi-k3")).toBe(
       "MiniMax-M3",
     );

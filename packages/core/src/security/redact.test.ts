@@ -45,6 +45,60 @@ describe("redactSecrets", () => {
     expect(result).toContain("normal text here");
   });
 
+  it.each([
+    "abcdefghijklmnop-qrstuvwxyz123456",
+    "abcdefghijklmnop.qrstuvwxyz123456",
+    "abcdefghijklmnop_qrstuvwxyz123456",
+    "abcdefghi-jklmnopq.rstuvwxy_z1234567",
+  ])("redacts the whole standalone opaque token %s", (token) => {
+    expect(redactSecrets(`Value: ...${token}. Next sentence.`)).toBe("Value: ...[REDACTED]. Next sentence.");
+  });
+
+  it.each([
+    ["token my_secret_access_token_value_here", "token [REDACTED]"],
+    ["random_words_may_also_form_a_token", "[REDACTED]"],
+    ["event file_extract_native_converter_unavailable_copy", "event [REDACTED]"],
+    [
+      "event file_extract_native_converter_unavailable: token my_secret_access_token_value_here",
+      "event file_extract_native_converter_unavailable: token [REDACTED]",
+    ],
+  ])("masks long snake_case values that are not known diagnostic labels: %s", (input, expected) => {
+    expect(redactSecrets(input)).toBe(expected);
+  });
+
+  it.each([
+    "failed at packages/core/src/security/redact-shapes.test.ts line 20",
+    "GET https://example.com/some/fairly/long/path/segment/here 404",
+    "GET /api/v1/recordings/archive/segment 404",
+    "failed at C:\\project\\core\\file-with-an-extra-long-filename.test.ts line 20",
+    "session 9f86d081-884c-7d65-9a2f-eaa0c55ad015 done",
+    "event file_extract_native_converter_unavailable",
+    "event knowledge_extract_document_conversion_failed",
+    "version 1.2.3-alpha.4+build56789abcdef",
+  ])("keeps ordinary diagnostic text: %s", (input) => {
+    expect(redactSecrets(input)).toBe(input);
+  });
+
+  it("keeps punctuation dividers and short opaque strings", () => {
+    const input = `${"-._".repeat(40)} short-value.before_end.`;
+    expect(redactSecrets(input)).toBe(input);
+  });
+
+  it.each([
+    ["abcdefghijklmnop+/qrst/uvwxyz12345", "[REDACTED]"],
+    ["ABcDEfGHiJKlMnOP/qrSTu/vwXYZ123456", "[REDACTED]"],
+    ["//fcDEfGHiJKlMnOPqrSTuvwXYZ123456789", "//[REDACTED]"],
+  ])("still masks a standalone base64 run with slashes: %s", (token, masked) => {
+    expect(redactSecrets(`Value: ${token}.`)).toBe(`Value: ${masked}.`);
+  });
+
+  it("keeps long punctuation runs without retrying the matcher at every character", () => {
+    const input = `${"-._".repeat(20_000)} a${".".repeat(40_000)}`;
+    const start = performance.now();
+    expect(redactSecrets(input)).toBe(input);
+    expect(performance.now() - start).toBeLessThan(250);
+  });
+
   it("leaves normal text untouched", () => {
     const input = "Hello, world! This is a normal message without secrets.";
     const result = redactSecrets(input);

@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { applyCuration, curateModel, friendlyModelLabel, isEverydayModel } from "./curation";
 
 describe("curateModel", () => {
-  it("marks the Recommended set of 2026-09-30", () => {
+  it("marks the Recommended set of 2026-09-30, with Gemini 3.8 Flash in 3.5 Flash's place since 2026-11-10", () => {
     const everydayIds = [
       "gpt-6-luna",
       "openai/gpt-6-luna",
       "claude-sonnet-5-5",
       "deepseek-v4-1-flash",
-      "gemini-3.5-flash",
+      "gemini-3.8-flash",
       "gpt-6-sol",
       "glm-5.3-flash",
       "qwen3.7-plus",
@@ -28,6 +28,7 @@ describe("curateModel", () => {
       "MiniMax-M3",
       "minimax-m3",
       "doubao-seed-2-1-turbo-260628",
+      "gemini-3.5-flash",
     ]) {
       expect(curateModel(id).tier, id).toBe("advanced");
       expect(isEverydayModel(id), id).toBe(false);

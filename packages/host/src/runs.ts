@@ -61,7 +61,7 @@ import { ensureToolsRegistered } from "./register-tools";
 import { recordChatRunUsage } from "./usage-record";
 import { loadSettings, loadUserLocale } from "./settings-store";
 import { defaultSelectableModel, listSelectableModels, toolMediaModels } from "./selectable-models";
-import { resolveTierRun } from "./tier-resolve";
+import { nextTierModel, resolveTierRun } from "./tier-resolve";
 import { markJobModelDown, maySwapModel, pickNext, startModel } from "./job-model-fallback";
 import { readModelPinned } from "./job-regen";
 import { collectToolMediaParts } from "./tool-media";
@@ -579,7 +579,19 @@ export async function* startModalityRun(options: {
         }
       };
       const fallbackFor = (from: string, failure: string): string | undefined => {
-        if (!fallbackOptions || retried || settled) {
+        if (retried || settled) {
+          return undefined;
+        }
+        if (tierRun) {
+          // A tier run moves once, to the next live model of the same tier, on the same transport-class
+          // failures a stand-in covers (model tiers spec, section 3). Never to another tier: a person who
+          // chose Reasoning and got a fast model was told something untrue.
+          if (!maySwapModel({ error: new Error(failure), streamed: false }, { model: from, signal: modelAbort.signal })) {
+            return undefined;
+          }
+          return nextTierModel(tierRun.tier, from, catalog, options.modality, options.tenant, tierRun.replaysPicture);
+        }
+        if (!fallbackOptions) {
           return undefined;
         }
         if (!maySwapModel({ error: new Error(failure), streamed: false }, fallbackOptions)) {
@@ -589,6 +601,19 @@ export async function* startModalityRun(options: {
         return next && acceptsModality(next) ? next : undefined;
       };
       const announceFallback = (from: string, to: string) => {
+        if (tierRun) {
+          // The screen never learns which model a tier ran (model tiers spec, section 5), so the notice
+          // names the tier's promise, not the two models.
+          const message = chatTurnCopy(locale).tierFallback;
+          send({ type: "run.model_fallback", message });
+          if (thinkingEnabled) {
+            const line = `${message}\n`;
+            hostThinking += line;
+            send({ type: "assistant.thinking", text: line });
+          }
+          stall.touch();
+          return;
+        }
         const message = chatTurnCopy(locale).modelFallback.replaceAll("{from}", from).replaceAll("{to}", to);
         send({ type: "run.model_fallback", from, to, message });
         if (thinkingEnabled) {
@@ -731,7 +756,7 @@ export async function* startModalityRun(options: {
                 assistantText += event.text;
               }
               if (event.type === "assistant.thinking") {
-                thinkingText += event.text;
+                thinkingText = event.replace ? event.text : thinkingText + event.text;
               }
               if (safe.type === "tool.started") {
                 toolTrace.push({

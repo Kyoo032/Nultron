@@ -14,6 +14,7 @@ import { attachVoiceUpgrade } from "@agentforge/host";
 import { handleNodeRequest } from "@agentforge/host/http";
 import { resolveBindHost } from "./lib/bind-host";
 import { assertHostedEnvComplete, assertHostedModeCoherent, warnWeakDeskVaultKey } from "./server/hosted-mode-guard";
+import { PreviewGate } from "./server/preview-gate";
 import { injectHostedMarker, rootRelativeAssets } from "./lib/hosted-build";
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
@@ -72,6 +73,13 @@ async function main() {
   app.disable("x-powered-by");
   const server = http.createServer(app);
   attachVoiceUpgrade(server);
+
+  // Ahead of the API and of every static file. Null on a hosted server and on a desk that did
+  // not set the preview credentials, so those processes keep the middleware stack they had.
+  const previewGate = PreviewGate.fromEnv(process.env);
+  if (previewGate) {
+    app.use(previewGate.middleware());
+  }
 
   app.use((req, res, next) => {
     void handleNodeRequest(req, res).then((handled) => {

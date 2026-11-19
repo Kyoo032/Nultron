@@ -10,7 +10,10 @@ import { withTierFields } from "../tier-resolve";
 export async function handleGetModels(request: HostRequest): Promise<HostResult> {
   try {
     const tenant = await getTenant(request);
-    return jsonOk({ ...withTierFields(modelCatalogBody(tenant)), availability: modelAvailabilityBody(tenant) });
+    return jsonOk({
+      ...withTierFields(modelCatalogBody(tenant), tenant),
+      availability: modelAvailabilityBody(tenant),
+    });
   } catch (error) {
     return jsonError(error);
   }
@@ -28,7 +31,7 @@ export async function handlePostModels(request: HostRequest): Promise<HostResult
       forgetLessons: true,
     });
     return jsonOk({
-      ...withTierFields(modelCatalogBody(tenant)),
+      ...withTierFields(modelCatalogBody(tenant), tenant),
       probe: probeSummary(probe, tenant),
       availability: modelAvailabilityBody(tenant),
     });

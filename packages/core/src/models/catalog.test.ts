@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../errors";
 import { DEFAULT_CHAT_MODEL } from "../agents/default-chat";
+import { JOB_FALLBACK_TAIL } from "./job-fallback";
+import { CHAT_DEFAULT_PREFERENCES } from "./preferred";
+import { FAST_TIER_GATEWAY_IDS, REASONING_TIER_GATEWAY_IDS } from "./tiers";
 import {
   getChatModel,
   intersectModalities,
@@ -37,6 +40,19 @@ describe("listChatModels", () => {
     expect(getChatModel("doubao-seedance-2-0-260128")?.provider).toBe("volcengine");
     expect(getChatModel("gemini-3.6-flash")?.inputModalities).toEqual(["text", "image", "video"]);
     expect(getChatModel("gpt-5.6-sol")?.inputModalities).toEqual(["text", "image"]);
+  });
+});
+
+describe("offline fill-in catalogue", () => {
+  it("lists every id the three tiers and the job fallback tail name", () => {
+    const ids = new Set(listChatModels().map((model) => model.id));
+    const named = [
+      ...CHAT_DEFAULT_PREFERENCES,
+      ...FAST_TIER_GATEWAY_IDS,
+      ...REASONING_TIER_GATEWAY_IDS,
+      ...JOB_FALLBACK_TAIL,
+    ];
+    expect(named.filter((id) => !ids.has(id))).toEqual([]);
   });
 });
 
