@@ -60,7 +60,7 @@ type Props = {
   onUserSend?: (payload: ComposerUserSendPayload) => void;
   onStarted?: () => void;
   onDelta: (text: string) => void;
-  onThinking?: (text: string) => void;
+  onThinking?: (text: string, replace?: boolean) => void;
   onTool?: (event: { phase: "started" | "completed"; toolKey: string; input?: unknown; output?: unknown }) => void;
   onFailed?: (message: string) => void;
   /** The host answered this turn with a stand-in model (`run.model_fallback`). */
@@ -132,7 +132,7 @@ function growTextArea(el: HTMLTextAreaElement | null) {
 export type RunStreamHandlers = {
   readonly onStarted?: () => void;
   readonly onDelta: (text: string) => void;
-  readonly onThinking?: (text: string) => void;
+  readonly onThinking?: (text: string, replace?: boolean) => void;
   readonly onTool?: (event: {
     phase: "started" | "completed";
     toolKey: string;
@@ -214,8 +214,8 @@ export async function readRunStream(
       if (event.type === "assistant.delta" && event.text) {
         handlers.onDelta(event.text);
       }
-      if (event.type === "assistant.thinking" && event.text) {
-        handlers.onThinking?.(event.text);
+      if (event.type === "assistant.thinking" && (event.text || event.replace)) {
+        handlers.onThinking?.(event.text ?? "", event.replace);
       }
       if (event.type === "tool.started" && event.toolKey) {
         handlers.onTool?.({ phase: "started", toolKey: event.toolKey, input: event.input });

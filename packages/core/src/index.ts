@@ -283,7 +283,13 @@ export {
   assertAgentSupportsModality,
   RUN_PATHS,
 } from "./models/capabilities";
-export { modelImageInput, type ImageInputSupport } from "./models/image-input";
+export {
+  modelImageInput,
+  modelMisreadsPictures,
+  PICTURE_MISREADS,
+  type ImageInputSupport,
+  type PictureMisread,
+} from "./models/image-input";
 export {
   EARLIER_IMAGE_NOT_VISIBLE_NOTE,
   VIDEO_NOT_VISIBLE_NOTE,

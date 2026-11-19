@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CHOICE_PROFILES } from "./choice-profiles";
 import { EVERYDAY_MODEL_IDS } from "./gateway-roles";
+import { modelImageInput, PICTURE_MISREADS, type PictureMisread } from "./image-input";
 import { JOB_FALLBACK_TAIL } from "./job-fallback";
 import { JOB_MODE_PREFERENCES } from "./mode-defaults";
 import { MODEL_POLICY_TABLE, modelPolicy } from "./model-policy";
@@ -102,6 +103,69 @@ describe("the models probed on 2026-09-30 have an entry of their own", () => {
       expect(heads, id).toContain(id);
       expect(PROBED_2026_09_30, id).toContain(id);
     }
+  });
+});
+
+/**
+ * What is wrong with an entry of `PICTURE_MISREADS`. A mark is a measurement, so it has to say when it was
+ * made and what was seen; it names one exact model, which the policy table knows and which still reads
+ * pictures (a model that cannot read them is `no` in `image-input.ts`, not a misreader).
+ */
+function markProblems(entry: PictureMisread): string[] {
+  const problems: string[] = [];
+  if (entry.id !== bareModelId(entry.id) || entry.id.length === 0) {
+    problems.push("the id is not a bare lower-case id");
+  }
+  if (!modelPolicy(entry.id).known) {
+    problems.push("not in the policy table");
+  }
+  if (modelImageInput(entry.id) !== "yes") {
+    problems.push("does not read pictures at all, so there is nothing to misread");
+  }
+  const day = /^(\d{4})-(\d{2})-(\d{2})$/.exec(entry.measured);
+  const date = day ? new Date(`${entry.measured}T00:00:00Z`) : null;
+  if (!date || Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== entry.measured) {
+    problems.push("has no evidence date (YYYY-MM-DD)");
+  }
+  if (entry.evidence.trim().length < 20) {
+    problems.push("has no evidence");
+  }
+  return problems;
+}
+
+describe("the models marked as misreading pictures carry their evidence", () => {
+  it("names each by exact id with a date and what was measured, once", () => {
+    expect(PICTURE_MISREADS.length).toBeGreaterThan(0);
+    for (const entry of PICTURE_MISREADS) {
+      expect(markProblems(entry), entry.id).toEqual([]);
+    }
+    const ids = PICTURE_MISREADS.map((entry) => entry.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("has a guard that can fail: it turns away a mark with no date, no evidence or a model that cannot read pictures", () => {
+    const good: PictureMisread = {
+      id: "gpt-6-luna",
+      measured: "2026-11-13",
+      evidence: "one picture, wrong four times in four",
+    };
+    expect(markProblems(good)).toEqual([]);
+    expect(markProblems({ ...good, measured: "" })).toContain("has no evidence date (YYYY-MM-DD)");
+    expect(markProblems({ ...good, measured: "2026-13-40" })).toContain("has no evidence date (YYYY-MM-DD)");
+    expect(markProblems({ ...good, measured: "13 Nov 2026" })).toContain("has no evidence date (YYYY-MM-DD)");
+    expect(markProblems({ ...good, evidence: "  " })).toContain("has no evidence");
+    expect(markProblems({ ...good, id: "banana-unknown" })).toContain("not in the policy table");
+    expect(markProblems({ ...good, id: "GPT-6-Luna" })).toContain("the id is not a bare lower-case id");
+    expect(markProblems({ ...good, id: "glm-5.3" })).toContain(
+      "does not read pictures at all, so there is nothing to misread",
+    );
+  });
+
+  it("reaches the Chat default list at the one Luna id still on it, and no other", () => {
+    // A new mark changes which model answers a picture turn on Daily, so it is a deliberate edit here.
+    // `gpt-5.6-luna` is marked too but left every list when it was superseded (2026-11-10).
+    const marked = CHAT_DEFAULT_PREFERENCES.filter((id) => PICTURE_MISREADS.some((entry) => entry.id === id));
+    expect(marked).toEqual(["gpt-6-luna"]);
   });
 });
 

@@ -65,6 +65,7 @@ resolveTier(tier, liveness, definitions = TIER_DEFINITIONS): TierResolution
 
 - Walk the tier's candidates for each provider the tenant may use, in provider order. Personal has one provider, the Toko Token gateway.
 - Skip an id that the catalog does not list or that the breaker holds down (`JOB_MODEL_DOWN_MS`, five minutes, `packages/host/src/job-model-fallback.ts:27`).
+- Try a demoted id last (2026-11-13). `liveness.demoted` names the ids the host holds back for this turn; the walk tries them after every other live candidate of the tier, on any provider, and answers with the first of them when nothing else is live. It demotes and never drops, so a tier still answers. The host demotes the models measured to misread a picture (`PICTURE_MISREADS`, `packages/core/src/models/image-input.ts`) on a turn that carries one: an image run, or a text run whose thread replays an earlier picture. What a tier advertises does not change.
 - No candidate left: answer `tier_unavailable`, a flat error with copy in both locales. Never fall through to another tier silently; a person who chose Reasoning and got a fast model was lied to.
 
 **Chat gains fallback.** Today a chat run has retries but no second model. With a tier, an unpinned run that fails with a transport-class error (`isGatewayUnavailableFailure`, `packages/core/src/models/job-fallback.ts:61`) and has streamed nothing moves to the next candidate of the same tier, once. The failed id goes on the breaker.
@@ -159,4 +160,4 @@ chat.errors.tierUnavailable
 1. **How deep the mask goes** (D2). This spec assumes the renderer receives no ids. A display-only mask is a third of the work and leaks through the network tab.
 2. **A fourth choice, Auto.** GitHub Copilot offers one. Not in scope; `daily` is the default and plays that part. Add it only if people ask which to pick.
 3. **Tier and price.** If plans ever meter by tier, the meter lives in the gateway and the licence service, never in the client (`AGENTS.md`, "The gate is advisory").
-4. **Vision.** A thread with an image needs a model that reads images (`packages/core/src/models/capabilities.ts:12-36`). Resolution must skip candidates that cannot, and say `tier_unavailable` if none can.
+4. **Vision.** A thread with an image needs a model that reads images (`packages/core/src/models/capabilities.ts:12-36`). Resolution must skip candidates that cannot, and say `tier_unavailable` if none can. Built: an image run lists only candidates with image input. A model that takes the picture and reads it wrongly is a different case, and since 2026-11-13 it is demoted for a picture turn, not skipped (section 3).
