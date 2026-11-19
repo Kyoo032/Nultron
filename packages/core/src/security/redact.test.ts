@@ -55,12 +55,26 @@ describe("redactSecrets", () => {
   });
 
   it.each([
+    ["token my_secret_access_token_value_here", "token [REDACTED]"],
+    ["random_words_may_also_form_a_token", "[REDACTED]"],
+    ["event file_extract_native_converter_unavailable_copy", "event [REDACTED]"],
+    [
+      "event file_extract_native_converter_unavailable: token my_secret_access_token_value_here",
+      "event file_extract_native_converter_unavailable: token [REDACTED]",
+    ],
+  ])("masks long snake_case values that are not known diagnostic labels: %s", (input, expected) => {
+    expect(redactSecrets(input)).toBe(expected);
+  });
+
+  it.each([
     "failed at packages/core/src/security/redact-shapes.test.ts line 20",
     "GET https://example.com/some/fairly/long/path/segment/here 404",
     "GET /api/v1/recordings/archive/segment 404",
     "failed at C:\\project\\core\\file-with-an-extra-long-filename.test.ts line 20",
     "session 9f86d081-884c-7d65-9a2f-eaa0c55ad015 done",
     "event file_extract_native_converter_unavailable",
+    "event knowledge_extract_document_conversion_failed",
+    "version 1.2.3-alpha.4+build56789abcdef",
   ])("keeps ordinary diagnostic text: %s", (input) => {
     expect(redactSecrets(input)).toBe(input);
   });

@@ -83,8 +83,49 @@ function maskEnvAssignment(match: string, head: string, name: string, equals: st
 const BASE64_RE = /\b[A-Za-z0-9+/]{32,}={0,2}\b/g;
 const OPAQUE_RUN_RE = /(?<![A-Za-z0-9+./\\_-])(\.*)([A-Za-z0-9+/\\_-][A-Za-z0-9+./\\_-]{30,}[A-Za-z0-9+/\\_-])={0,2}/g;
 const UUID_RE = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
-const DIAGNOSTIC_LABEL_RE = /^[a-z]+(?:_[a-z]+){2,}$/;
 const FILE_EXTENSION_RE = /\.[a-z][a-z0-9]{0,9}$/i;
+
+// Exact event names emitted by the app that would otherwise resemble opaque credentials.
+const DIAGNOSTIC_LABELS = new Set([
+  "artifacts_knowledge_card_not_dropped",
+  "code_runner_ship_path_unsupported",
+  "edit_starter_rollback_media_row_kept",
+  "entitlement_period_roll_not_persisted",
+  "file_extract_native_converter_unavailable",
+  "finance_budget_embeddings_unavailable",
+  "finance_xlsx_formula_cells_without_value",
+  "knowledge_backend_chunk_index_fallback_failed",
+  "knowledge_backend_fts_query_failed",
+  "knowledge_embed_vectors_not_written",
+  "knowledge_expand_chunk_read_failed",
+  "knowledge_extract_document_conversion_failed",
+  "knowledge_extract_docx_directory_unreadable",
+  "knowledge_extract_docx_parse_failed",
+  "knowledge_extract_docx_too_large",
+  "knowledge_graph_cites_not_recorded",
+  "knowledge_graph_prune_step_skipped",
+  "knowledge_graph_retrieval_projection_skipped",
+  "knowledge_ingest_blocked_card_not_recorded",
+  "knowledge_ingest_chat_card_skipped",
+  "knowledge_ingest_failure_not_recorded",
+  "knowledge_ingest_origin_lookup_failed",
+  "knowledge_map_graph_projection_skipped",
+  "knowledge_map_source_not_forgotten",
+  "knowledge_owned_artifacts_not_removed",
+  "knowledge_retrievals_count_failed",
+  "knowledge_retrievals_not_recorded",
+  "knowledge_stored_upload_not_removed",
+  "knowledge_verify_plant_not_removed",
+  "meeting_knowledge_card_not_dropped",
+  "meeting_minutes_items_unverified",
+  "settings_injection_guard_bypass_dropped",
+  "settings_injection_guard_bypass_not_cleared",
+  "settings_legacy_json_not_deleted",
+  "settings_stored_gateway_endpoint_ignored",
+  "tenant_erase_portal_signout_failed",
+  "tenant_state_adopted_file_not_renamed",
+  "threads_knowledge_card_not_dropped",
+]);
 
 function isPathLike(token: string, padded: boolean, followsColon: boolean): boolean {
   if (token.includes("\\") || (followsColon && token.startsWith("//"))) {
@@ -106,7 +147,7 @@ function maskOpaqueRun(match: string, leadingDots: string, token: string, offset
   if (
     isPathLike(token, match.endsWith("="), text[offset - 1] === ":") ||
     UUID_RE.test(token) ||
-    DIAGNOSTIC_LABEL_RE.test(token)
+    DIAGNOSTIC_LABELS.has(token)
   ) {
     return match;
   }

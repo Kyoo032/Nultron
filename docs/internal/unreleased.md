@@ -1336,3 +1336,9 @@ Lanes: enterprise, tester.
 Lanes: enterprise, tester.
 
 - A completed Chat turn records the reported tokens from every model attempt in one usage total, including billed attempts that error or return no answer before a retry. No new ledger rows are written per attempt.
+
+## Mask long snake_case credentials, 2026-11-19 (DFIND-89)
+
+Lanes: enterprise, tester.
+
+- `redactSecrets` now preserves only known diagnostic event names instead of exempting all letters-only snake_case values. Existing path and UUID handling is unchanged.
