@@ -10,6 +10,9 @@ the live gateway. Map: [`docs/internal/maps/model-policy.md`](../../../../docs/i
   and writes what the gateway did, plus a proposed table entry per model **for a human to review**. It never
   edits `model-policy.ts`.
 
+A third tool, [`handoff`](#handoff), is for the day a key is saved: it checks that the three Chat tiers answer and
+hand a conversation to each other.
+
 Nothing here is imported by the app, the desktop build or the hosted image. It lives beside
 `eval/finance`, outside `packages/host/src`, and `packages/host/tsconfig.json` and the host's vitest config
 only look at `src`. `results/` is gitignored.
@@ -120,12 +123,57 @@ it was accepted, `floor` or `omit` when it was refused.
   outside a packaged or production build.
 - It never writes the desk. Reading settings does not modify them; `--refresh` does not touch `models-cache.json`.
 
+## handoff
+
+A third tool, for the day the gateway key is saved: does each Chat tier answer, and can models of different
+vendors carry one conversation? Unlike `probe` it sends nothing raw. Every call goes through the runtime Chat
+itself builds (`createRuntime`, `AiSdkRuntime`) on the model and Thinking choice the real tier resolver gives
+(`chooseTierRun`, `packages/host/src/tier-resolve.ts`), against the tiers' own lists in
+`@agentforge/core/tiers`. No model id is written in the tool.
+
+```bash
+pnpm --filter @agentforge/host eval:models:handoff --dry-run                  # the plan, no network, no key
+pnpm --filter @agentforge/host eval:models:handoff --refresh                  # the hand-off, on the live catalogue
+pnpm --filter @agentforge/host eval:models:handoff --refresh --all-candidates --handoff   # both modes
+```
+
+- **Hand-off (default).** Two conversations of three turns, history carried forward as text. Forward is Fast,
+  Reasoning (Thinking deep), Daily; reverse is Daily, Reasoning, Fast. Turn 1 picks a random four-digit number,
+  turn 2 adds 1 to it, turn 3 writes both numbers in Bahasa Indonesia, one per line. Checks per turn: the call
+  completed (`http_ok`), the answer is not empty, then turn 1 is four digits, turn 2 is turn 1 plus 1 (the last
+  number in the reply counts), turn 3 is two lines that are the two numbers in words (`seribu` and `satu ribu`
+  both count; either order). A turn the gateway cannot answer ends its conversation; the rest are `SKIP`.
+- **`--all-candidates`.** One "Say ok." call per candidate of every tier at that tier's Thinking level. A
+  candidate the catalogue does not list is marked `UNLISTED` and not called (no tier would ever pick it), and is
+  not a failure. On its own the flag replaces the hand-off; add `--handoff` to run both.
+- **`--dry-run`.** Prints which tier resolves to which model, the wire, the Thinking level and the call count.
+  With no saved catalogue it plans against the static tier lists and says so. `--refresh` with `--dry-run` is
+  refused, because it calls the gateway.
+- **`--refresh`** reads the catalogue from the gateway now (as `catalog-diff` does, the desk's cache is never
+  written); without it the desk's saved catalogue is used, and an empty one stops the run.
+
+Other flags: `--timeout-ms` (default 120000), `--delay-ms` (default 500), `--no-prices`, `--out`, `--workspace`,
+`--help`. The table prints tier, model, wire, first-token ms, total ms, input/output tokens, an estimated cost and
+PASS/FAIL with the reason. The estimate is the gateway's public price list through `estimateRunUsd` at group
+ratio 1 (`pricing.ts` only prints per-million labels), and counts the tokens the runtime reports. Exit code 0 when
+every check passed, 1 when one failed or there was no catalogue, 2 for a refusal or a bad command line.
+
+`results/handoff-<timestamp>.json` holds the plan, every call (tier, model, wire, the Thinking level asked, status,
+the reply cut to 300 characters, timings, tokens, estimated cost, each check with its detail) and a summary. The
+prompts are fixed in `run-handoff.ts`; nothing else about a request is stored.
+
+It holds the same lines as `probe`: refuses `AGENTFORGE_RUNTIME=stub`, no desk, or no saved key; sends the key only
+to the pinned endpoint; never prints or writes it. Because it uses the runtime, which also reads provider keys from
+the shell, it first removes `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, the Google, Ark and Volcengine keys and their
+base-URL variables from its own process and prints their names (never values), so a call is billed to the desk's
+key only. The runtime's own warning lines go through the key scrubber.
+
 ## Layout
 
 | file | role |
 | --- | --- |
-| `catalog-diff.ts`, `probe.ts` | entry points: wire the host's own modules in, print, set the exit code (2 for a refusal or a bad command line) |
-| `run-catalog-diff.ts`, `run-probe.ts` | the commands, with every dependency passed in |
+| `catalog-diff.ts`, `probe.ts`, `handoff.ts` | entry points: wire the host's own modules in, print, set the exit code (2 for a refusal or a bad command line) |
+| `run-catalog-diff.ts`, `run-probe.ts`, `run-handoff.ts` | the commands, with every dependency passed in |
 | `catalog-report.ts`, `lists.ts`, `snapshots.ts`, `pricing.ts` | the report, the ranked lists, snapshot files, prices |
 | `probe-request.ts`, `probe-call.ts`, `probe-frames.ts`, `probe-errors.ts` | one request per wire, one call with timing and usage, the streamed frames, the error reading |
 | `probe-run.ts`, `snippet.ts` | the sequence, the budget, the summary and the proposed entry |

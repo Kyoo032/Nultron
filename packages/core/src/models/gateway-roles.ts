@@ -180,6 +180,11 @@ export const GATEWAY_BEST_FOR: Record<string, string> = {
   "glm-5.3": "Coding",
   "glm-5.3-flash": "Everyday chat",
   "gpt-oss-120b": "Fast drafts",
+  // 2026-11-10: the gateway's newer, cheaper heads (public price list that day). Not yet probed.
+  "claude-haiku-5-5": "Fast drafts",
+  "qwen3.8-flash": "Fast drafts",
+  "gemini-3.8-flash": "Everyday chat",
+  "kimi-k3.1-pro": "Deep reasoning",
 };
 
 /**
@@ -187,12 +192,15 @@ export const GATEWAY_BEST_FOR: Record<string, string> = {
  * gateway's /api/pricing, latency from the same day's probe, see docs/internal/gateway-model-selection.md).
  * Everything else the table knows is advanced: GPT 5.6, Claude Sonnet 5 and MiniMax M3 leave this set
  * for their brand groups, and `gpt-6-astra` and `claude-opus-5-5` are the deep-reasoning picks there.
+ *
+ * 2026-11-10 (owner: newest and cheapest, nothing superseded): Gemini 3.8 Flash ($0.50 / $3.00 per 1M)
+ * replaces Gemini 3.5 Flash ($1.50 / $9.00) in the same place. `superseded.ts` names every id that left.
  */
 export const EVERYDAY_MODEL_IDS: ReadonlySet<string> = new Set([
   "gpt-6-luna",
   "claude-sonnet-5-5",
   "deepseek-v4-1-flash",
-  "gemini-3.5-flash",
+  "gemini-3.8-flash",
   "gpt-6-sol",
   "glm-5.3-flash",
   "qwen3.7-plus",

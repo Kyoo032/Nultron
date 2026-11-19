@@ -262,6 +262,13 @@ export const MODEL_POLICY_TABLE: readonly ModelPolicyEntry[] = Object.freeze([
       "probe 2026-09-30 (eval/models, raw Messages requests): output_config.effort low, medium and high answered HTTP 200 (first token 3 s, high 9 s). Off (thinking disabled) got a 503 supply pool unavailable: capacity, not a verdict on the parameter, so Off stays thinking.disabled as for the claude-5 family. xhigh and max were not tried.",
   },
   {
+    key: "claude-haiku-5-5",
+    ids: ["claude-haiku-5-5"],
+    wire: "anthropic_messages",
+    verified:
+      "Not yet probed: listed on the gateway's public price list on 2026-11-10 at $0.10 / $0.50 per 1M (input / output), and the price list names Messages and Completions for it. Behaviour is the claude-5 family's, unchanged; run eval:models:probe on this id before it heads any list.",
+  },
+  {
     key: "claude-5",
     pattern: /^claude-(?:opus|sonnet|haiku|fable)-5(?:$|[^0-9])/,
     wire: "anthropic_messages",
@@ -282,6 +289,14 @@ export const MODEL_POLICY_TABLE: readonly ModelPolicyEntry[] = Object.freeze([
     verified: `Haiku 4.5, Opus 4.5 and 4.6 stay on Completions (chat-wire.ts). ${SHIPPED}`,
   },
   {
+    key: "gemini-3.8-flash",
+    ids: ["gemini-3.8-flash"],
+    chatOnly: true,
+    wire: "google_generate_content",
+    verified:
+      "Not yet probed: listed on the gateway's public price list on 2026-11-10 at $0.50 / $3.00 per 1M (input / output), and the price list names generateContent, Completions and Messages for it. Behaviour is the gemini family's, unchanged; run eval:models:probe on this id before it heads any list.",
+  },
+  {
     key: "gemini",
     pattern: /^gemini/,
     chatOnly: true,
@@ -296,6 +311,14 @@ export const MODEL_POLICY_TABLE: readonly ModelPolicyEntry[] = Object.freeze([
     jobThinking: QUIET_JOB_KNOB,
     verified:
       "probe 2026-09-30 (eval/models, raw Completions requests): reasoning_effort none, low, medium and high all answered HTTP 200, first token 1.3 to 1.9 s; low is also the job knob's value, so the knob is seen accepted on this id. Levels above high stay the Completions defaults: not tried.",
+  },
+  {
+    key: "deepseek-v4-pro",
+    ids: ["deepseek-v4-pro"],
+    wire: "chat_completions",
+    jobThinking: QUIET_JOB_KNOB,
+    verified:
+      "Not yet probed: listed on the gateway's public price list on 2026-11-10 at $1.33 / $4.00 per 1M (input / output), and the price list names Completions and Messages for it; text only. Behaviour is the deepseek-v4 family's, unchanged; run eval:models:probe on this id before it heads any list.",
   },
   {
     key: "deepseek-v4",
@@ -319,6 +342,14 @@ export const MODEL_POLICY_TABLE: readonly ModelPolicyEntry[] = Object.freeze([
     verified: `GLM 5 and 5.2. ${SHIPPED}`,
   },
   {
+    key: "kimi-k3.1-pro",
+    ids: ["kimi-k3.1-pro"],
+    wire: "chat_completions",
+    jobThinking: QUIET_JOB_KNOB,
+    verified:
+      "Not yet probed: listed on the gateway's public price list on 2026-11-10 at $2 / $10 (a flat tier expression) per 1M (input / output), and the price list names Completions only for it. Behaviour is the kimi-k3 family's, unchanged; run eval:models:probe on this id before it heads any list.",
+  },
+  {
     key: "kimi-k3",
     pattern: /^kimi-k3/,
     wire: "chat_completions",
@@ -339,6 +370,13 @@ export const MODEL_POLICY_TABLE: readonly ModelPolicyEntry[] = Object.freeze([
     jobThinking: QUIET_JOB_KNOB,
     verified:
       "2026-09-15 job-thinking.ts: the vendor enable_thinking field has never been seen accepted, so it gets the reasoning_effort knob Chat already sends; not driven on its own.",
+  },
+  {
+    key: "qwen3.8-flash",
+    ids: ["qwen3.8-flash"],
+    wire: "chat_completions",
+    verified:
+      "Not yet probed: listed on the gateway's public price list on 2026-11-10 at $0.15 / $0.47 per 1M (input / output), and the price list names Completions only for it. Behaviour is the qwen family's, unchanged; run eval:models:probe on this id before it heads any list.",
   },
   {
     key: "qwen",

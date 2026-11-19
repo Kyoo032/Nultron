@@ -43,6 +43,14 @@ function defineModel(id: string, label: string, provider: ModelProvider): ChatMo
 }
 
 const OPENAI_MODELS: Array<[id: string, label: string]> = [
+  ["gpt-6-astra", "GPT-6 Astra"],
+  ["gpt-6-sol", "GPT-6 Sol"],
+  ["gpt-6-luna", "GPT-6 Luna"],
+  ["deepseek-v4-1-flash", "DeepSeek V4.1 Flash"],
+  ["glm-5.3-flash", "GLM 5.3 Flash"],
+  ["qwen3.7-plus", "Qwen 3.7 Plus"],
+  ["qwen3.8-max", "Qwen 3.8 Max"],
+  ["qwen3.8-flash", "Qwen 3.8 Flash"],
   ["deepseek-v4-pro", "DeepSeek V4 Pro"],
   ["deepseek-v4-flash", "DeepSeek V4 Flash"],
   ["kimi-k3", "Kimi K3"],
@@ -74,6 +82,7 @@ const OPENAI_MODELS: Array<[id: string, label: string]> = [
 ];
 
 const GOOGLE_MODELS: Array<[id: string, label: string]> = [
+  ["gemini-3.8-flash", "Gemini 3.8 Flash"],
   ["gemini-3.6-flash", "Gemini 3.6 Flash"],
   ["gemini-3.5-flash", "Gemini 3.5 Flash"],
   ["gemini-3.5-flash-lite", "Gemini 3.5 Flash-Lite"],
@@ -89,6 +98,9 @@ const GOOGLE_MODELS: Array<[id: string, label: string]> = [
 ];
 
 const ANTHROPIC_MODELS: Array<[id: string, label: string]> = [
+  ["claude-sonnet-5-5", "Claude Sonnet 5.5"],
+  ["claude-opus-5-5", "Claude Opus 5.5"],
+  ["claude-haiku-5-5", "Claude Haiku 5.5"],
   ["claude-sonnet-5", "Claude Sonnet 5"],
   ["claude-opus-5", "Claude Opus 5"],
   ["claude-haiku-4-5", "Claude Haiku 4.5"],

@@ -187,6 +187,24 @@ describe("run.model_fallback", () => {
     expect(fallbacks).toEqual([{ from: "gpt-6-luna", to: "glm-5.3", message: sentence }]);
   });
 
+  it("hands a tier run's fallback with no models, so the notice shows the host's sentence alone", async () => {
+    // A tier run's fallback names no models (model tiers spec, section 5). The event still reaches the
+    // pane, which draws `message` instead of a from-to line.
+    const sentence = "This tier's model was unavailable; another model of the same tier answered.";
+    const { stream } = body([
+      frame("run.started"),
+      frame("run.model_fallback", { message: sentence }),
+      frame("assistant.delta", { text: "Hi" }),
+      frame("run.completed", { runId: "r" }),
+    ]);
+    const { handlers } = recorder();
+    const fallbacks: unknown[] = [];
+
+    await readRunStream(stream, { ...handlers, onModelFallback: (event) => fallbacks.push(event) });
+
+    expect(fallbacks).toEqual([{ from: "", to: "", message: sentence }]);
+  });
+
   it("does not draw a stand-in into a session the owner has left", async () => {
     const { stream } = body([frame("run.model_fallback", { from: "gpt-6-luna", to: "glm-5.3", message: "m" })]);
     const { handlers } = recorder();
