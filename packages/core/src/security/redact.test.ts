@@ -54,9 +54,23 @@ describe("redactSecrets", () => {
     expect(redactSecrets(`Value: ...${token}. Next sentence.`)).toBe("Value: ...[REDACTED]. Next sentence.");
   });
 
+  it.each([
+    "failed at packages/core/src/security/redact-shapes.test.ts line 20",
+    "GET https://example.com/some/fairly/long/path/segment/here 404",
+    "failed at C:\\project\\core\\file-with-an-extra-long-filename.test.ts line 20",
+    "session 9f86d081-884c-7d65-9a2f-eaa0c55ad015 done",
+    "event file_extract_native_converter_unavailable",
+  ])("keeps ordinary diagnostic text: %s", (input) => {
+    expect(redactSecrets(input)).toBe(input);
+  });
+
   it("keeps punctuation dividers and short opaque strings", () => {
     const input = `${"-._".repeat(40)} short-value.before_end.`;
     expect(redactSecrets(input)).toBe(input);
+  });
+
+  it("still masks a standalone base64 run with slashes", () => {
+    expect(redactSecrets("Value: abcdefghijklmnop+/qrst/uvwxyz12345.")).toBe("Value: [REDACTED].");
   });
 
   it("keeps long punctuation runs without retrying the matcher at every character", () => {

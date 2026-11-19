@@ -80,9 +80,32 @@ function maskEnvAssignment(match: string, head: string, name: string, equals: st
   return `${head}${name}${equals}[REDACTED]`;
 }
 
-/** Standalone opaque runs of at least 32 characters, with dots only inside the token. */
-const BASE64_RE =
-  /(?<![A-Za-z0-9+./_-])(?=[+./_-]*[A-Za-z0-9])(\.*)[A-Za-z0-9+/_-][A-Za-z0-9+./_-]{30,}[A-Za-z0-9+/_-]={0,2}/g;
+const BASE64_RE = /\b[A-Za-z0-9+/]{32,}={0,2}\b/g;
+const OPAQUE_RUN_RE = /(?<![A-Za-z0-9+./\\_-])(\.*)([A-Za-z0-9+/\\_-][A-Za-z0-9+./\\_-]{30,}[A-Za-z0-9+/\\_-])={0,2}/g;
+const UUID_RE = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+const DIAGNOSTIC_LABEL_RE = /^[a-z]+(?:_[a-z]+){2,}$/;
+const FILE_EXTENSION_RE = /\.[a-z][a-z0-9]{0,9}$/i;
+
+function isPathLike(token: string, padded: boolean): boolean {
+  if (token.includes("\\") || token.startsWith("//")) {
+    return true;
+  }
+  const slash = token.indexOf("/");
+  return (
+    slash !== -1 &&
+    (FILE_EXTENSION_RE.test(token) || (!padded && !token.includes("+") && token.indexOf("/", slash + 1) !== -1))
+  );
+}
+
+function maskOpaqueRun(match: string, leadingDots: string, token: string): string {
+  if (isPathLike(token, match.endsWith("=")) || UUID_RE.test(token) || DIAGNOSTIC_LABEL_RE.test(token)) {
+    return match;
+  }
+  if (/[._-]/.test(token) && /[a-z0-9]/i.test(token)) {
+    return `${leadingDots}[REDACTED]`;
+  }
+  return match.replace(BASE64_RE, "[REDACTED]");
+}
 
 export function redactCredentials(text: string): string {
   if (!text) {
@@ -110,5 +133,5 @@ export function redactSecrets(text: string): string {
   if (!text) {
     return text;
   }
-  return redactCredentials(text).replace(BASE64_RE, "$1[REDACTED]");
+  return redactCredentials(text).replace(OPAQUE_RUN_RE, maskOpaqueRun);
 }
