@@ -51,6 +51,22 @@ function recorder() {
 }
 
 describe("readRunStream", () => {
+  it("replaces failed thinking even when the replacement is empty", async () => {
+    const { stream } = body([
+      frame("assistant.thinking", { text: "Failed attempt." }),
+      frame("assistant.thinking", { text: "", replace: true }),
+      frame("assistant.thinking", { text: "Final attempt." }),
+    ]);
+    let thinking = "";
+    await readRunStream(stream, {
+      onDelta: () => undefined,
+      onThinking: (text, replace) => {
+        thinking = replace ? text : thinking + text;
+      },
+    });
+    expect(thinking).toBe("Final attempt.");
+  });
+
   it("draws every event of a run whose session is on screen, in order", async () => {
     const { stream } = body([
       frame("run.started"),

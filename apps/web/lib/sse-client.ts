@@ -1,4 +1,5 @@
 export type ClientRuntimeEvent = {
+  replace?: boolean;
   type: string;
   text?: string;
   toolKey?: string;

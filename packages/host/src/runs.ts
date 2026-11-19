@@ -651,7 +651,7 @@ export async function* startModalityRun(options: {
                 assistantText += event.text;
               }
               if (event.type === "assistant.thinking") {
-                thinkingText += event.text;
+                thinkingText = event.replace ? event.text : thinkingText + event.text;
               }
               if (safe.type === "tool.started") {
                 toolTrace.push({
