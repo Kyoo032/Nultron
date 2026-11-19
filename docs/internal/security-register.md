@@ -3166,7 +3166,9 @@ form. The rate-limit token is taken before the body is read, and a body past
 `webapp-deploy/Caddyfile` are already `GET /healthz`, which stays public. `GET /api/v1/components`
 is 401 once the gate is mounted. A preview probe that still hits that path must move to
 `/healthz`. The live entrypoint is still the gitignored `preview-server.ts`, so this gate does
-not run on the public name until that process mounts it or switches to stock `server.ts`.
+not run there until that process reads its credentials at startup and mounts the required
+gate. Follow the [preview cutover checks](../../webapp-deploy/README.md#preview-desks-mount-the-form-before-changing-caddy)
+before changing Basic Auth or desk routing.
 
 Gate: none for Personal or Enterprise. The preview stays password-only.
 

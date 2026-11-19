@@ -2,7 +2,7 @@
 
 Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
 
-Last verified: 2026-11-18, preview form gate (section 11 only). Before that: 2026-11-09 at 6080cbba plus the working tree of `fix/desk-key-warn`, for the wrap-key paragraph of section 10 only (SR-203). Before that: 2026-11-06 at f6c9acc1 for the wrap-key paragraph of section 10 only (SR-203). Before that: 2026-11-06 at 01a88fba for the Host rule only (the paragraph before section 2 and step 10 of the request walk). Before that: 2026-10-11 at 2df34be (fix branch, before merge) (SH-001: section 0, the Node 22 boot check). Before that: 2026-09-21 at 4938747 + working tree; four citations re-anchored and the
+Last verified: 2026-11-19 at 08bfb5d6, required preview mount (section 11 only, local HTTP tests; not driven on the live preview). Before that: 2026-11-18, preview form gate (section 11 only). Before that: 2026-11-09 at 6080cbba plus the working tree of `fix/desk-key-warn`, for the wrap-key paragraph of section 10 only (SR-203). Before that: 2026-11-06 at f6c9acc1 for the wrap-key paragraph of section 10 only (SR-203). Before that: 2026-11-06 at 01a88fba for the Host rule only (the paragraph before section 2 and step 10 of the request walk). Before that: 2026-10-11 at 2df34be (fix branch, before merge) (SH-001: section 0, the Node 22 boot check). Before that: 2026-09-21 at 4938747 + working tree; four citations re-anchored and the
 review-instance section added, then the boot-guard path re-checked after the fix pass of the same
 day (the guards moved from `apps/web/lib/` to `apps/web/server/`, because `lib` is the renderer's
 namespace and that module re-exports `@agentforge/host`). The rest was last read at c204e5e /
@@ -238,6 +238,8 @@ Off server mode nothing about either scope changed.
 ### 11. The preview form gate
 
 The preview at `app.nultron-ai.xyz` is not this page's hosted server. It runs production with `AGENTFORGE_SERVER` unset, and the password dialog in front of it was Caddy `basic_auth` in `nultron-files/deploy/tencent/edge/sites/app.caddy`, which is not in this repo (SR-133). `WWW-Authenticate: Basic` is what a scripted browser cannot fill.
+
+The external preview entrypoint needs the required `PreviewGate.requireProduction` mount. See the [preview cutover checks](../../../webapp-deploy/README.md#preview-desks-mount-the-form-before-changing-caddy) before changing Caddy Basic Auth.
 
 `PreviewGate.fromEnv` (`apps/web/server/preview-gate.ts:110-121`) installs nothing unless `PREVIEW_BASIC_USER` and `PREVIEW_BASIC_PASSWORD` are both set and `isServerMode` is false. `server.ts` mounts that middleware before `handleNodeRequest` (`apps/web/server.ts:77-79`). A logged-out page is `302` to `/login`. `/api` and any other file are `401` with no login document and no `WWW-Authenticate`. `GET /healthz` and the three favicons the login document links stay public (`apps/web/server/preview-gate.ts:512`). The login document itself is inline, including the mark and DM Sans.
 
