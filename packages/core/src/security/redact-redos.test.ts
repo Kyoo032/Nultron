@@ -48,6 +48,7 @@ const HOSTILE_AND_MASKED: ReadonlyArray<readonly [string, string]> = [
   ["a Slack app token shape repeated", "xapp-1-".repeat(15_000)],
   ["a Slack rotating token shape repeated", "xoxe-1-".repeat(15_000)],
   ["an encoded bearer prefix repeated", "Bearer%20".repeat(11_000)],
+  ["a case-varied form-encoded bearer prefix repeated", "bEaReR+".repeat(14_000)],
   ["a long run after a Stripe key prefix", `sk_live_${"a".repeat(100_000)}`],
   ["an X-Api-Key header name and colon repeated", "x-api-key:".repeat(10_000)],
   ["a JWT header prefix and a hyphen repeated, then a whole dotted tail", `${"eyJ-".repeat(25_000)}.aaaaaaaa.aaaaaaaa`],
