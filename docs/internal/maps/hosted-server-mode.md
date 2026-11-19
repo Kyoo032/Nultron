@@ -2,7 +2,7 @@
 
 Product: both · Instance: hosted (review :3443 for live proof; no :3000 drive)
 
-Last verified: 2026-11-18, preview form gate (section 11 only). Before that: 2026-11-09 at 6080cbba plus the working tree of `fix/desk-key-warn`, for the wrap-key paragraph of section 10 only (SR-203). Before that: 2026-11-06 at f6c9acc1 for the wrap-key paragraph of section 10 only (SR-203). Before that: 2026-11-06 at 01a88fba for the Host rule only (the paragraph before section 2 and step 10 of the request walk). Before that: 2026-10-11 at 2df34be (fix branch, before merge) (SH-001: section 0, the Node 22 boot check). Before that: 2026-09-21 at 4938747 + working tree; four citations re-anchored and the
+Last verified: 2026-11-19 at 08bfb5d6, required preview mount (section 11 only, local HTTP tests; not driven on the live preview). Before that: 2026-11-18, preview form gate (section 11 only). Before that: 2026-11-09 at 6080cbba plus the working tree of `fix/desk-key-warn`, for the wrap-key paragraph of section 10 only (SR-203). Before that: 2026-11-06 at f6c9acc1 for the wrap-key paragraph of section 10 only (SR-203). Before that: 2026-11-06 at 01a88fba for the Host rule only (the paragraph before section 2 and step 10 of the request walk). Before that: 2026-10-11 at 2df34be (fix branch, before merge) (SH-001: section 0, the Node 22 boot check). Before that: 2026-09-21 at 4938747 + working tree; four citations re-anchored and the
 review-instance section added, then the boot-guard path re-checked after the fix pass of the same
 day (the guards moved from `apps/web/lib/` to `apps/web/server/`, because `lib` is the renderer's
 namespace and that module re-exports `@agentforge/host`). The rest was last read at c204e5e /
