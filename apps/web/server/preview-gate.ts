@@ -339,19 +339,16 @@ export class PreviewGate {
       return null;
     }
     if (value.startsWith("[")) {
-      const end = value.indexOf("]");
-      if (end <= 1) {
+      const ipv6 = /^(\[[0-9a-f:.]+\])(?::(\d+))?$/.exec(value);
+      if (!ipv6) {
         return null;
       }
-      const hostname = value.slice(1, end);
-      const rest = value.slice(end + 1);
-      if (rest.length === 0) {
-        return { hostname, port: null };
-      }
-      if (!/^:\d+$/.test(rest)) {
+      try {
+        const hostname = new URL(`http://${ipv6[1]}`).hostname;
+        return { hostname, port: ipv6[2] ?? null };
+      } catch {
         return null;
       }
-      return { hostname, port: rest.slice(1) };
     }
     const colon = value.lastIndexOf(":");
     if (colon === -1) {
