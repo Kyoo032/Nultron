@@ -3,6 +3,7 @@ import {
   INPUT_MODALITIES,
   availableProviders,
   GATEWAY_PROVIDER_ID,
+  modelImageInput,
   modelMisreadsPictures,
   readOptionalModel,
   type InputModality,
@@ -93,7 +94,15 @@ export function tierLiveness(
     },
     // The breaker keys by tenant and lower-case model id, not by provider, until it learns providers (M4).
     isDown: (_provider, model) => isJobModelDown(model, Date.now(), scope),
-    ...(carriesPicture ? { demoted: (_provider: ProviderId, model: string) => modelMisreadsPictures(model) } : {}),
+    // A turn that carries a picture holds two kinds back to the end of the walk: a model measured to
+    // misread one (`PICTURE_MISREADS`), and a text-only model, which cannot read the replayed picture
+    // at all (`modelImageInput` "no"; it answers only when nothing else of the tier is live).
+    ...(carriesPicture
+      ? {
+          demoted: (_provider: ProviderId, model: string) =>
+            modelMisreadsPictures(model) || modelImageInput(model) === "no",
+        }
+      : {}),
   };
 }
 

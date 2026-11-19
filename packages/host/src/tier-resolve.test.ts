@@ -8,6 +8,7 @@ import {
   PROVIDER_IDS,
   assertChatModelAcceptsModality,
   availableProviders,
+  modelImageInput,
   modelMisreadsPictures,
   type InputModality,
 } from "@agentforge/core";
@@ -244,7 +245,7 @@ describe("a turn that carries a picture", () => {
     expect(resolveTierForCatalog("reasoning", onlyDailyLuna, "image").ok).toBe(false);
   });
 
-  it("demotes the two marked ids and nothing else, on a picture turn only", () => {
+  it("demotes the marked ids and every text-only model, on a picture turn only", () => {
     const text = tierLiveness(fullCatalog(TEXT_IMAGE), "text");
     const image = tierLiveness(fullCatalog(TEXT_IMAGE), "image");
     const replayed = tierLiveness(fullCatalog(TEXT_IMAGE), "text", undefined, true);
@@ -253,9 +254,14 @@ describe("a turn that carries a picture", () => {
     expect(video.demoted).toBeUndefined();
     for (const liveness of [image, replayed]) {
       for (const id of [...new Set(MODEL_TIERS.flatMap((tier) => gatewayCandidates(tier)))]) {
-        expect(liveness.demoted?.(GATEWAY_PROVIDER_ID, id), id).toBe(LUNAS.includes(id));
+        expect(liveness.demoted?.(GATEWAY_PROVIDER_ID, id), id).toBe(
+          LUNAS.includes(id) || modelImageInput(id) === "no",
+        );
       }
     }
+    // `deepseek-v4-pro` is the demotion that keeps a Reasoning failover off a model that cannot read
+    // the replayed picture at all.
+    expect(image.demoted?.(GATEWAY_PROVIDER_ID, "deepseek-v4-pro")).toBe(true);
   });
 
   it("is still accepted when a person picks a marked model themselves", () => {

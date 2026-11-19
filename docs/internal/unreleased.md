@@ -54,6 +54,12 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## A picture turn also holds back a text-only tier model, 2026-11-19 (branch `devin/1795097952-tier-fallback-text-only` from `main`; `ci:local` run, unit tests run; not driven live)
+
+Lanes: main, enterprise, tester
+
+Devin Review on #233's merged code found a Reasoning failover could land on `deepseek-v4-pro`, a text-only model, while the chat thread replays a picture it cannot read at all. The 2026-11-13 picture demotion covered only `modelMisreadsPictures` (the two Lunas); `tierLiveness` (`packages/host/src/tier-resolve.ts`) now demotes a candidate on the same `carriesPicture` flag when `modelImageInput(id) === "no"` either — still a demotion, never a drop, so it answers when nothing else of the tier is live. Effect today: on a Reasoning picture turn with `claude-opus-5-5` and `gpt-6-astra` down, the walk picks `qwen3.8-max` ahead of `deepseek-v4-pro`. The 2026-11-13 entry below says "Reasoning is unchanged"; this entry amends it. Corrects the recipe note in `features/model-tiers.md` the same way. Proof: `tier-resolve-picture.test.ts` (the Reasoning walk under a replayed picture and without), `tier-resolve.test.ts` (demoted = misreader or text-only), `pnpm ci:local` all required steps pass.
+
 ## Daily no longer sends a picture turn to the Luna models, which misread pictures, 2026-11-13 (branch `fix/daily-picture-model` from `main` at `365d4af6`; unit tests run, driven on `:3000`)
 
 Lanes: enterprise, tester
