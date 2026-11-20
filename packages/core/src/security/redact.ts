@@ -81,11 +81,11 @@ function maskEnvAssignment(match: string, head: string, name: string, equals: st
 }
 
 const BASE64_RE = /\b[A-Za-z0-9+/]{32,}={0,2}\b/g;
-// A run may end in a `.`/`~` tail that holds at least one `~` (`token.~`, `token~`): the tail is
-// captured apart from the token so a masked run keeps none of it, while a lone `.` stays ambiguous
-// with sentence punctuation and is never eaten.
+// A run may end in `=` padding and then a `.`/`~` tail that holds at least one `~` (`token.~`,
+// `token~`, `token=.~`): padding and tail are captured apart from the token so a masked run keeps
+// none of them, while a lone `.` stays ambiguous with sentence punctuation and is never eaten.
 const OPAQUE_RUN_RE =
-  /(?<![A-Za-z0-9+./\\_-])(\.*)([A-Za-z0-9+/\\_-][A-Za-z0-9+./\\_-]{30,}[A-Za-z0-9+/\\_-])((?:[.~]*~)?)={0,2}/g;
+  /(?<![A-Za-z0-9+./\\_-])(\.*)([A-Za-z0-9+/\\_-][A-Za-z0-9+./\\_-]{30,}[A-Za-z0-9+/\\_-])(={0,2})((?:[.~]*~)?)/g;
 const UUID_RE = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const FILE_EXTENSION_RE = /\.[a-z][a-z0-9]{0,9}$/i;
 
@@ -185,15 +185,16 @@ function maskOpaqueRun(
   match: string,
   leadingDots: string,
   token: string,
+  padding: string,
   tail: string,
   offset: number,
   text: string,
 ): string {
   if (text[offset - 1] === ":" && token.startsWith("//")) {
-    return maskUrlRun(match, token + tail);
+    return maskUrlRun(match, token + padding + tail);
   }
   if (
-    isPathLike(token, match.endsWith("="), text[offset - 1] === ":") ||
+    isPathLike(token, padding !== "", text[offset - 1] === ":") ||
     UUID_RE.test(token) ||
     DIAGNOSTIC_LABELS.has(token)
   ) {
@@ -206,7 +207,7 @@ function maskOpaqueRun(
     return `${leadingDots}[REDACTED]`;
   }
   const masked = match.replace(BASE64_RE, "[REDACTED]");
-  return masked === match ? match : masked.replace(/[.~]*~={0,2}$/, "");
+  return masked === match ? match : masked.replace(/=?[.~]*~={0,2}$/, "");
 }
 
 export function redactCredentials(text: string): string {

@@ -1389,3 +1389,9 @@ Lanes: enterprise, tester.
 
 - The bare 24+-character URL path segment rule in `redactSecrets` now also requires token entropy (at least two of lower-case, upper-case and digit), so a long word-like segment such as `gettingstartedwithinstallation` stays readable; webhook secrets and hex runs still mask.
 - An opaque run ending in a `.`/`~` tail (`token.~`, `token~`) is now masked with its tail; a lone trailing `.` still reads as sentence punctuation.
+
+## Redactor masks `=` padding before a tilde tail, 2026-11-20 (DFIND-100)
+
+Lanes: enterprise, tester.
+
+- An opaque run ending in `=` padding followed by a `.`/`~` tail (`token=.~`, `token=~`) is now masked whole instead of leaving a `=.~` residue.
