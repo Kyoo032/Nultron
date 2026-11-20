@@ -2,13 +2,19 @@ import { SHELL_LAYOUT } from "@agentforge/core/product-modes";
 import { useSearchParams } from "@/lib/nav";
 import { AgentChatPane } from "@/components/agent-chat-pane";
 import { ChatSession } from "@/components/chat-session";
+import { TeamBotChatPane } from "@/components/team-bot-chat-pane";
+import { isTeamBotParam } from "@/lib/team";
 import { agentIdFromSearch } from "@/lib/virtual-agents";
 
 export function ChatPage() {
   const params = useSearchParams();
   const thread = params.get("thread") ?? undefined;
   if (SHELL_LAYOUT === "chat-first") {
-    // Tester code: `/chat` is every virtual agent's address. `?agent=<mode>` names one; none is the generalist.
+    // Tester code: `/chat` is every virtual agent's address. `?agent=<mode>` names one; `tb-…` is a team bot.
+    const agent = params.get("agent");
+    if (agent && isTeamBotParam(agent)) {
+      return <TeamBotChatPane slug={agent} threadId={thread} />;
+    }
     return <AgentChatPane agentMode={agentIdFromSearch(params)} threadId={thread} />;
   }
   // Every Chat session lives in the left rail since 2026-09-17, so the pane owns the whole width.

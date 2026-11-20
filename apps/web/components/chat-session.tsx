@@ -78,12 +78,14 @@ type Props = {
   agentId?: string;
   initialThreadId?: string;
   shell?: ChatSessionShell;
+  /** Where a thread this session creates lives. The chat-first shell has its own; a team bot names its `tb-` address. */
+  hrefForThread?: (threadId: string) => string;
 };
 
 /** Nultron's box on the composer's ledge; about half of it shows above the edge. */
 const COMPOSER_BUDDY_SIZE = 112;
 
-export function ChatSession({ agentId, initialThreadId, shell }: Props) {
+export function ChatSession({ agentId, initialThreadId, shell, hrefForThread }: Props) {
   // Nultron Enterprise: a signed-in tenant may open the desk before adding a key (hosted only; false and
   // request-free elsewhere). The context estimate below embeds the query, so it goes through the gateway.
   const keyMissing = useHostedNeedsKey();
@@ -206,6 +208,9 @@ export function ChatSession({ agentId, initialThreadId, shell }: Props) {
 
   /** Where a thread of this session lives. In the chat-first shell every agent's is under `/chat`. */
   function threadHref(id: string) {
+    if (hrefForThread) {
+      return hrefForThread(id);
+    }
     if (shell) {
       return virtualAgentHref(shell.agent.id, id);
     }
