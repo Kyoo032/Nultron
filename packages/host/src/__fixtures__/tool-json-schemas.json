@@ -334,22 +334,9 @@
   "properties": {
    "agent": {
     "type": "string",
-    "enum": [
-     "documents",
-     "research",
-     "finance",
-     "data",
-     "market",
-     "legal",
-     "meeting",
-     "images",
-     "videos",
-     "music",
-     "edit",
-     "presentations",
-     "education"
-    ],
-    "description": "Which agent to ask. It must be one on the owner's desk; if it is not, the answer names the ones that are."
+    "minLength": 1,
+    "maxLength": 64,
+    "description": "Which agent to ask — a specialist's mode id (research, documents, …) or one of the desk's bots (its `tb-` slug or name). It must be on the owner's desk; if it is not, the answer names the ones that are."
    },
    "task": {
     "type": "string",
