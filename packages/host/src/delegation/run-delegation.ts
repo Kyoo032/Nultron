@@ -2,6 +2,7 @@ import {
   DELEGATE_BUDGET,
   DELEGATE_SUMMARY_MAX,
   DELEGATE_TOOL_KEY,
+  FULL_CHAT_TOOLS,
   createRuntime,
   delegateToolKeys,
   delegatedRunPrompt,
@@ -14,7 +15,6 @@ import {
   typedTextOf,
   withChatOutputLanguage,
   type ContentPart,
-  type DelegableAgent,
   type ReasoningEffort,
   type TenantContext,
   type ToolBindingRecord,
@@ -29,7 +29,7 @@ import { chooseTierRun } from "../tier-resolve";
 import { createThread, finishRun, insertMessage, insertRun, insertToolInvocation, listMessages } from "../threads";
 import { withToolRun } from "../tool-run-context";
 import { recordChatRunUsage } from "../usage-record";
-import { hiredAgentModes, hiredAgentRow } from "../virtual-agents";
+import { delegationRoster, resolveDelegatable } from "../team-bots";
 import { currentWorkerChannel, runWithWorkerProgress, withWorkerChannel, WORKER_MAX_MS } from "../workers/worker-channel";
 import { currentDelegation, withDelegation } from "./delegation-context";
 
@@ -46,7 +46,10 @@ export type DelegateRefusal =
 export type DelegateResult =
   | {
       readonly ok: true;
-      readonly agent: DelegableAgent;
+      /** The asked agent's handle: a mode id (`research`, …) or a team bot's `tb-` slug. */
+      readonly agent: string;
+      /** Who was asked, for the asking agent to name in its answer: a mode's label or a bot's name. */
+      readonly agentName: string;
       readonly thread: { readonly id: string };
       readonly summary: string;
       /** True when the answer was longer than the asking agent is shown. The rest is in the conversation. */
@@ -57,18 +60,31 @@ export type DelegateResult =
       readonly ok: false;
       readonly reason: DelegateRefusal;
       readonly message: string;
-      readonly agent?: DelegableAgent;
+      readonly agent?: string;
+      readonly agentName?: string;
       readonly thread?: { readonly id: string };
     };
 
 export type DelegateArgs = {
-  readonly agent: DelegableAgent;
+  /** A catalog mode id or one of the desk's team bots (`tb-` slug or name). */
+  readonly agent: string;
   readonly task: string;
   readonly context?: string | undefined;
 };
 
-function refused(reason: DelegateRefusal, message: string, agent?: DelegableAgent): DelegateResult {
-  return { ok: false, reason, message, ...(agent ? { agent } : {}) };
+function refused(
+  reason: DelegateRefusal,
+  message: string,
+  agent?: string,
+  agentName?: string,
+): DelegateResult {
+  return {
+    ok: false,
+    reason,
+    message,
+    ...(agent ? { agent } : {}),
+    ...(agentName ? { agentName } : {}),
+  };
 }
 
 function clip(text: string, max: number): { text: string; truncated: boolean } {
@@ -134,37 +150,48 @@ export async function runDelegation(args: DelegateArgs, tenant: TenantContext): 
   if (!asking) {
     return refused("no_chat", "delegate works from inside a conversation with an agent, and this is not one.");
   }
-  const label = productModeLabel(args.agent);
-  const hired = await hiredAgentRow(tenant, args.agent);
-  if (!hired) {
-    const onDesk = await hiredAgentModes(tenant);
+  const asked = args.agent.trim();
+  const target = await resolveDelegatable(tenant, asked);
+  if (!target) {
+    const roster = await delegationRoster(tenant);
+    const names = [...roster.modes, ...roster.bots.map((bot) => bot.name)];
     return refused(
       "not_hired",
-      onDesk.length > 0
-        ? `The ${label} agent is not on the owner's desk. Agents you can ask: ${onDesk.join(", ")}.`
-        : "No other agent is on the owner's desk. The owner can hire one on the Virtual agents page.",
-      args.agent,
+      names.length > 0
+        ? `No agent called "${asked}" is on the owner's desk. Agents you can ask: ${names.join(", ")}.`
+        : `No agent called "${asked}" is on the owner's desk, and no other agent is on it either. The owner can hire one on the Virtual agents page.`,
+      asked,
     );
   }
 
-  const published = await agentService.getPublishedForRun(tenant, hired.row.id);
+  // A mode agent runs its registry prompt and tool set; a team bot runs its own published prompt
+  // with the full chat tool set minus the delegation exclusions, as a `chat`-mode run.
+  const agentKey = target.kind === "mode" ? target.agent.id : target.bot.slug;
+  const agentName = target.kind === "mode" ? productModeLabel(target.agent.id) : target.bot.name;
+  const label = target.kind === "mode" ? `${agentName} agent` : agentName;
+  const toolRunMode = target.kind === "mode" ? target.agent.id : "chat";
+
+  const published = await agentService.getPublishedForRun(tenant, target.row.id);
+  const basePrompt = target.kind === "mode" ? target.agent.prompt : published.version.systemPrompt;
+  const toolKeys =
+    target.kind === "mode" ? delegateToolKeys(target.agent) : delegateToolKeys({ tools: FULL_CHAT_TOOLS });
   const locale = localeForRun();
   const { model, effort, explicit } = delegateModel(tenant);
   const message = delegatedTaskMessage(args.task, args.context);
   const knownSites = await personText(tenant, asking.threadId);
 
-  const thread = await createThread(tenant, hired.row.id, delegatedThreadTitle(args.task));
+  const thread = await createThread(tenant, target.row.id, delegatedThreadTitle(args.task));
   if (!thread) {
-    return refused("failed", "The task could not be started.", args.agent);
+    return refused("failed", "The task could not be started.", agentKey, agentName);
   }
   await insertMessage(tenant, thread.id, "user", [{ type: "text", text: message }]);
   const run = await insertRun(tenant, thread.id, published.version.id, "text");
   if (!run) {
-    return refused("failed", "The task could not be started.", args.agent);
+    return refused("failed", "The task could not be started.", agentKey, agentName);
   }
 
-  const bindings: ToolBindingRecord[] = delegateToolKeys(hired.agent).map((toolKey) => ({
-    id: `delegate-${hired.agent.id}-${toolKey}`,
+  const bindings: ToolBindingRecord[] = toolKeys.map((toolKey) => ({
+    id: `delegate-${agentKey}-${toolKey}`,
     agentVersionId: published.version.id,
     organizationId: published.version.organizationId,
     toolKey,
@@ -174,7 +201,7 @@ export async function runDelegation(args: DelegateArgs, tenant: TenantContext): 
   const version = {
     ...published.version,
     model,
-    systemPrompt: withChatOutputLanguage(delegatedRunPrompt(hired.agent), locale),
+    systemPrompt: withChatOutputLanguage(delegatedRunPrompt({ prompt: basePrompt }), locale),
   };
 
   const deadline = AbortSignal.timeout(WORKER_MAX_MS);
@@ -201,13 +228,13 @@ export async function runDelegation(args: DelegateArgs, tenant: TenantContext): 
     recordChatRunUsage(tenant, run.id, finished, usage);
   };
 
-  const delegation = { agent: args.agent, fromThreadId: asking.threadId, threadId: thread.id };
+  const delegation = { agent: agentKey, fromThreadId: asking.threadId, threadId: thread.id };
   try {
     await withDelegation(delegation, () =>
-      withToolRun({ runId: run.id, mode: hired.agent.id }, () =>
-        withRunContext({ threadId: thread.id, agentId: hired.row.id, locale }, () =>
+      withToolRun({ runId: run.id, mode: toolRunMode }, () =>
+        withRunContext({ threadId: thread.id, agentId: target.row.id, locale }, () =>
           runWithWorkerProgress(DELEGATE_TOOL_KEY, async (emit) => {
-            emit({ type: "job.phase", phase: "delegating", label: `${label} agent` });
+            emit({ type: "job.phase", phase: "delegating", label });
             // A worker the asked agent runs (a dossier) reports to the asker's own row, not to a row of its own.
             return withWorkerChannel({ emit: (_toolKey, job) => emit(job), signal }, () =>
               createRuntime(loadSettings(tenant), toolMediaModels(tenant)).execute({
@@ -247,7 +274,7 @@ export async function runDelegation(args: DelegateArgs, tenant: TenantContext): 
                       emit({
                         type: "job.step",
                         phase: "delegating",
-                        label: `${label} agent: ${humanTool(event.toolKey)}`,
+                        label: `${label}: ${humanTool(event.toolKey)}`,
                       });
                       return;
                     }
@@ -290,18 +317,19 @@ export async function runDelegation(args: DelegateArgs, tenant: TenantContext): 
     await persist("failed", stopped ?? detail).catch(() => undefined);
     const threadRef = { id: thread.id };
     if (stopped === "cancelled") {
-      return { ok: false, reason: "cancelled", message: "The run was stopped.", agent: args.agent, thread: threadRef };
+      return { ok: false, reason: "cancelled", message: "The run was stopped.", agent: agentKey, agentName, thread: threadRef };
     }
     if (stopped === "timeout") {
       return {
         ok: false,
         reason: "timeout",
-        message: `The ${label} agent did not finish in time. Whatever it had done is in its conversation.`,
-        agent: args.agent,
+        message: `The ${label} did not finish in time. Whatever it had done is in its conversation.`,
+        agent: agentKey,
+        agentName,
         thread: threadRef,
       };
     }
-    return { ok: false, reason: "failed", message: detail, agent: args.agent, thread: threadRef };
+    return { ok: false, reason: "failed", message: detail, agent: agentKey, agentName, thread: threadRef };
   }
 
   const { text: summary, truncated } = clip(redactSecrets(answer), DELEGATE_SUMMARY_MAX);
@@ -310,15 +338,16 @@ export async function runDelegation(args: DelegateArgs, tenant: TenantContext): 
       failure !== ""
         ? failure
         : stepLimit
-          ? `The ${label} agent used all its steps without writing an answer. What it did is in its conversation.`
-          : `The ${label} agent did not write an answer.`;
+          ? `The ${label} used all its steps without writing an answer. What it did is in its conversation.`
+          : `The ${label} did not write an answer.`;
     await persist("failed", message);
-    return { ok: false, reason: failure !== "" ? "failed" : "no_answer", message, agent: args.agent, thread: { id: thread.id } };
+    return { ok: false, reason: failure !== "" ? "failed" : "no_answer", message, agent: agentKey, agentName, thread: { id: thread.id } };
   }
   await persist("completed");
   return {
     ok: true,
-    agent: args.agent,
+    agent: agentKey,
+    agentName,
     thread: { id: thread.id },
     summary,
     truncated,

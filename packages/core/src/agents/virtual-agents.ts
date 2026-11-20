@@ -109,8 +109,8 @@ export const GENERALIST_WORKER_PROMPT: string = `${WORKER_PARAGRAPH}${DELEGATION
 
 const CHAT_SPEC = MODE_HARNESS_SPECS.chat;
 
-/** Every agent's tools: chat's own, then the workers, then `delegate`. */
-const FULL_CHAT_TOOLS: readonly string[] = Object.freeze([...CHAT_SPEC.tools, ...GENERALIST_EXTRA_TOOLS]);
+/** Every agent's tools: chat's own, then the workers, then `delegate`. Exported for team bots, whose delegated runs bind the same set minus the exclusions. */
+export const FULL_CHAT_TOOLS: readonly string[] = Object.freeze([...CHAT_SPEC.tools, ...GENERALIST_EXTRA_TOOLS]);
 
 /**
  * Paid media has no ceiling here (owner, 2026-10-22: it is the person's own key). The brake is the

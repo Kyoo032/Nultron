@@ -20,7 +20,11 @@ const RUN_ENTRIES: Readonly<Record<string, Entry>> = {
   },
   "packages/host/src/delegation/run-delegation.ts": {
     how: "tools stripped",
-    why: "A delegated run binds `delegateToolKeys(agent)`, which drops `image_generate` and `video_generate` (checked for every agent in core).",
+    why: "A delegated run binds `delegateToolKeys(agent)` (or `delegateToolKeys({ tools: FULL_CHAT_TOOLS })` for a team bot), which drops `image_generate` and `video_generate` (checked for every agent in core).",
+  },
+  "packages/host/src/team-propose.ts": {
+    how: "tools stripped",
+    why: "The team proposal is one JSON-answering call: `bindings: []` and `maxSteps: 1`, so no tool — paid or not — can run.",
   },
   "packages/host/src/job-regen.ts": {
     how: "tools bounded by the mode spec",

@@ -2,6 +2,8 @@
 
 Product: both Â· Instance: main :3000
 
+Last verified: 2026-11-20 on `feat/orchestrator-team`, for the prompt-assembly change only (section 3 step 2: the run computes its bindings once as `runBindings`, and when they include `delegate` it appends `delegationTargetsLine` — the desk's hired modes and live team bots — to the system prompt; `runs.ts`, the `runBindings`/`delegationTargets` block). Unit-tested (`team-bots.test.ts` in both packages); not driven on `:3000`. Other `runs.ts` line numbers on this page moved by up to about 15 lines and were not re-anchored.
+
 Last verified: 2026-11-19 at d793643b plus the PR #246 working tree, for failed-reasoning retries only. Real local HTTP tests on Gemini generate-content and Responses cover a destroyed socket, truncated SSE, missing finish, clean thinking-only finish, 401 and caller cancellation (`ai-sdk-runtime-stream-drop.test.ts`). Browser drive not performed in this pass. Other sections were not re-verified.
 
 Last verified: 2026-11-19 at 36f1fc35 plus the DFIND-65 change, for retry usage in § 4 only. Covered by real SDK streams with a mocked gateway; not driven on `:3000`.
