@@ -203,24 +203,30 @@ function belowThousand(n: number): string {
   return parts.join(" ");
 }
 
-/** A whole number from 0 to 999 999 as Indonesian words ("empat ribu delapan ratus dua puluh satu"). */
+/** The largest number indonesianWords writes; above it the words check reports a failure, never a throw. */
+export const INDONESIAN_WORDS_MAX = 999_999_999_999_999;
+
+const GROUP_WORDS = ["", "ribu", "juta", "miliar", "triliun"] as const;
+
+/** A whole number up to 999 999 999 999 999 as Indonesian words ("empat ribu delapan ratus dua puluh satu"). */
 export function indonesianWords(n: number): string {
-  if (!Number.isInteger(n) || n < 0 || n > 999_999) {
-    throw new RangeError(`indonesianWords takes a whole number from 0 to 999999, got ${n}`);
+  if (!Number.isInteger(n) || n < 0 || n > INDONESIAN_WORDS_MAX) {
+    throw new RangeError(`indonesianWords takes a whole number from 0 to ${INDONESIAN_WORDS_MAX}, got ${n}`);
   }
   if (n === 0) {
     return "nol";
   }
-  const thousands = Math.floor(n / 1000);
-  const rest = n % 1000;
   const parts: string[] = [];
-  if (thousands === 1) {
-    parts.push("seribu");
-  } else if (thousands > 1) {
-    parts.push(`${belowThousand(thousands)} ribu`);
-  }
-  if (rest > 0) {
-    parts.push(belowThousand(rest));
+  for (let group = 0, rest = n; rest > 0; group += 1, rest = Math.floor(rest / 1000)) {
+    const chunk = rest % 1000;
+    if (chunk === 0) {
+      continue;
+    }
+    if (group === 1 && chunk === 1) {
+      parts.unshift("seribu");
+    } else {
+      parts.unshift(group === 0 ? belowThousand(chunk) : `${belowThousand(chunk)} ${GROUP_WORDS[group]}`);
+    }
   }
   return parts.join(" ");
 }
@@ -313,11 +319,21 @@ export function checkThirdTurn(
     words = { name: "words", pass: false, detail: "an earlier turn gave no number to compare with" };
   } else {
     const wanted = [...new Set([first, second])];
-    const forms = wanted.map((n) => ({ n, words: canonicalWords(indonesianWords(n)) }));
+    // A number past the writable range (a reply that ignored "four digits" badly enough) cannot be
+    // written in words at all: it counts as missing, and the check reports a failure, never a throw.
+    const forms = wanted.map((n) => {
+      if (n > INDONESIAN_WORDS_MAX) {
+        return { n, words: undefined, display: undefined };
+      }
+      const display = indonesianWords(n);
+      return { n, words: canonicalWords(display), display };
+    });
     const found = new Set<number>();
     for (const line of lines) {
       const text = canonicalWords(line);
-      const hits = forms.filter((form) => text.includes(form.words)).sort((a, b) => b.words.length - a.words.length);
+      const hits = forms
+        .filter((form) => form.words !== undefined && text.includes(form.words))
+        .sort((a, b) => (b.words ?? "").length - (a.words ?? "").length);
       if (hits[0]) {
         found.add(hits[0].n);
       }
@@ -329,7 +345,13 @@ export function checkThirdTurn(
       detail:
         missing.length === 0
           ? `both numbers in words (${wanted.join(", ")})`
-          : `missing ${missing.map((form) => `${form.n} ("${indonesianWords(form.n)}")`).join(" and ")}`,
+          : `missing ${missing
+              .map((form) =>
+                form.display === undefined
+                  ? `${form.n} (too large to write as words)`
+                  : `${form.n} ("${form.display}")`,
+              )
+              .join(" and ")}`,
     };
   }
   return { checks: [answered(reply), twoLines, words] };

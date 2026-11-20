@@ -9,6 +9,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it } from "vitest";
 import { AgentRailView, type AgentRailViewProps } from "@/components/agent-rail";
 import { applyLocale, resetLocaleForTests } from "./i18n";
+import type { TeamBotView } from "./team";
 import type { VirtualAgentInfo } from "./virtual-agents";
 
 function agent(id: VirtualAgentInfo["id"], over: Partial<VirtualAgentInfo> = {}): VirtualAgentInfo {
@@ -27,6 +28,13 @@ function agent(id: VirtualAgentInfo["id"], over: Partial<VirtualAgentInfo> = {})
 }
 
 const AGENTS = [agent("chat"), agent("research"), agent("documents", { conversation: "studio", agentId: null })];
+const TEAM_BOT: TeamBotView = {
+  id: "agent_tb_sales",
+  slug: "tb-sales",
+  name: "Sales assistant",
+  role: "Pricing and quotes",
+  description: "",
+};
 
 function markup(over: Partial<AgentRailViewProps> = {}): string {
   return renderToStaticMarkup(
@@ -79,6 +87,17 @@ describe("AgentRailView agents", () => {
       "/chat?agent=research",
       "/chat?agent=documents",
     ]);
+  });
+
+  it("lists hired team bots under the agents with their role and chat address", () => {
+    const html = markup({ activeId: null, activeBotSlug: "tb-sales", bots: [TEAM_BOT] });
+    expect(html).toContain('data-testid="rail-team-bots"');
+    const tag = links(html).find((entry) => attr(entry, "data-testid") === "team-bot-tb-sales") ?? "";
+    expect(attr(tag, "href")).toBe("/chat?agent=tb-sales");
+    expect(attr(tag, "aria-current")).toBe("page");
+    expect(html).toContain("Sales assistant");
+    expect(html).toContain("Pricing and quotes");
+    expect(html).toContain("agent-rail-detail");
   });
 
   it("puts the brand name in the header and names the generalist Chat", () => {
@@ -137,7 +156,7 @@ describe("AgentRailView before the host answers", () => {
 });
 
 describe("AgentRailView account group", () => {
-  it("lists the six account pages in order with the published test ids", () => {
+  it("lists the seven account pages in order with the published test ids", () => {
     const html = markup({ pathname: "/settings", activeId: null });
     const group = html.slice(
       html.indexOf('data-testid="rail-account-group"'),
@@ -148,6 +167,7 @@ describe("AgentRailView account group", () => {
       "mode-knowledge",
       "channels-link",
       "customers-link",
+      "team-link",
       "workspaces-link",
       "usage-link",
       "settings-link",
@@ -156,6 +176,7 @@ describe("AgentRailView account group", () => {
       "/knowledge",
       "/channels",
       "/customers",
+      "/team",
       "/workspaces",
       "/usage",
       "/settings",

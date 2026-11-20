@@ -1,0 +1,58 @@
+{
+  "greeting": {
+    "cta": "Bangun tim Anda"
+  },
+  "page": {
+    "title": "Tim Anda",
+    "lede": "Agen bawaan Anda memegang gambaran besar dan mendelegasikan ke spesialis serta bot yang Anda rekrut.",
+    "loading": "Memuat tim Anda…"
+  },
+  "brief": {
+    "title": "Apa yang sedang Anda kerjakan?",
+    "addTitle": "Tambahkan ke tim Anda",
+    "hint": "Jelaskan pekerjaannya dalam satu atau dua kalimat. Nultron mengusulkan spesialis dan bot khusus yang cocok.",
+    "label": "Brief tim",
+    "placeholder": "mis. Saya menjalankan toko kecil dan butuh bantuan untuk pemasok, faktur, dan balasan pelanggan.",
+    "examples": "Coba: asisten riset, pemeriksa keuangan, dan bot dukungan yang menyusun balasan.",
+    "build": "Bangun tim saya",
+    "building": "Membangun…"
+  },
+  "editor": {
+    "title": "Tim Anda",
+    "lede": "Tinjau usulan, edit bot, lalu rekrut tim.",
+    "specialists": "Spesialis",
+    "bots": "Bot Anda",
+    "noBots": "Belum ada bot khusus.",
+    "name": "Nama",
+    "role": "Peran",
+    "prompt": "Prompt",
+    "noPrompt": "Tidak ada prompt.",
+    "remove": "Hapus",
+    "removeAria": "Hapus {name}",
+    "unnamed": "bot",
+    "addBot": "+ Tambahkan bot sendiri",
+    "add": "Tambah bot",
+    "hire": "Rekrut tim",
+    "hiring": "Merekrut…",
+    "hireHint": "Setelah direkrut, spesialis dan bot ini tersedia untuk agen bawaan Anda."
+  },
+  "roster": {
+    "title": "Tim Anda",
+    "hint": "Agen bawaan Anda memegang gambaran besar dan mendelegasikan ke spesialis serta bot ini.",
+    "chat": "Obrolan dengan tim Anda",
+    "add": "Tambah ke tim",
+    "specialists": "Spesialis",
+    "noSpecialists": "Belum ada spesialis.",
+    "bots": "Bot Anda",
+    "open": "Buka obrolan",
+    "letGo": "Lepaskan",
+    "lettingGo": "Melepaskan…",
+    "letGoAria": "Lepaskan {name}"
+  },
+  "error": {
+    "load": "Tidak dapat memuat tim Anda.",
+    "propose": "Tidak dapat membuat usulan tim.",
+    "hire": "Tidak dapat merekrut tim.",
+    "release": "Tidak dapat melepaskan mereka."
+  }
+}

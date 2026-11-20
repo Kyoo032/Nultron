@@ -5,6 +5,7 @@ import { FormattedText } from "@/components/formatted-text";
 import { toolLabel } from "@/lib/harness-copy";
 import { t } from "@/lib/i18n";
 import { Link } from "@/lib/nav";
+import { isTeamBotParam, teamBotHref } from "@/lib/team";
 import { virtualAgentHref } from "@/lib/virtual-agents";
 import { DELEGATE_TOOL_KEY, readDelegateResult, type DelegateCardModel } from "./tool-rows/delegate-result";
 
@@ -33,7 +34,9 @@ function toolsLine(tools: readonly string[]): string {
  */
 export function DelegateCard({ model, defaultOpen = false }: CardProps) {
   const [open, setOpen] = useState(defaultOpen);
-  const agent = t(`rail.${model.agent}`);
+  const bot = isTeamBotParam(model.agent);
+  const agent = model.agentName ?? (bot ? model.agent : t(`rail.${model.agent}`));
+  const href = bot ? teamBotHref(model.agent, model.threadId) : virtualAgentHref(model.agent, model.threadId);
   const hasAnswer = model.failure === null && model.summary !== "";
 
   return (
@@ -82,7 +85,7 @@ export function DelegateCard({ model, defaultOpen = false }: CardProps) {
             </button>
           ) : null}
           <Link
-            href={virtualAgentHref(model.agent, model.threadId)}
+            href={href}
             className="btn btn-secondary"
             aria-label={t("agents.delegate.openAria", { agent })}
             data-testid="chat-delegate-open"

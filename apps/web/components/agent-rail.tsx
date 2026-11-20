@@ -21,6 +21,7 @@ import {
   virtualAgentName,
   type VirtualAgentInfo,
 } from "@/lib/virtual-agents";
+import { isTeamBotParam, teamBotHref, useTeam, type TeamBotView } from "@/lib/team";
 import "./agent-rail.css";
 
 type Props = {
@@ -47,6 +48,10 @@ export type AgentRailViewProps = {
   /** False until the host has answered once. With nothing cached too, the list draws as a skeleton. */
   loaded: boolean;
   activeId: ProductMode | null;
+  /** A `tb-…` bot slug when `/chat?agent=` names one; it owns the active row instead of a mode. */
+  activeBotSlug?: string | null;
+  /** Hired team bots shown under the virtual agents. */
+  bots?: readonly TeamBotView[];
   pathname: string;
   productName: string;
   /** The default agent's name: the brand's character (`assistantNameOf`). Left out, the product's name. */
@@ -67,6 +72,7 @@ const ACCOUNT_LINKS: ReadonlyArray<{ href: string; icon: ModeIconName; testId: s
   { href: "/knowledge", icon: "knowledge", testId: "mode-knowledge", labelKey: "rail.knowledge" },
   { href: "/channels", icon: "channels", testId: "channels-link", labelKey: "rail.channels" },
   { href: "/customers", icon: "customers", testId: "customers-link", labelKey: "rail.customers" },
+  { href: "/team", icon: "workspaces", testId: "team-link", labelKey: "rail.team" },
   { href: "/workspaces", icon: "workspaces", testId: "workspaces-link", labelKey: "agents.rail.manage" },
   { href: "/usage", icon: "usage", testId: "usage-link", labelKey: "rail.usage" },
   { href: "/settings", icon: "settings", testId: "settings-link", labelKey: "rail.settings" },
@@ -89,6 +95,8 @@ export function AgentRailView({
   agents,
   loaded,
   activeId,
+  activeBotSlug = null,
+  bots = [],
   pathname,
   productName,
   assistantName,
@@ -199,6 +207,30 @@ export function AgentRailView({
                 <span key={key} className="agent-rail-skeleton" data-testid="agent-rail-skeleton" aria-hidden="true" />
               ))
             : null}
+          {bots.length > 0 ? (
+            <div className="agent-rail-team" data-testid="rail-team-bots">
+              {collapsed ? null : <p className="agent-rail-team-title">{t("rail.teamBots")}</p>}
+              {bots.map((bot) => (
+                <RailLink
+                  key={bot.id}
+                  href={teamBotHref(bot.slug)}
+                  label={bot.name}
+                  detail={bot.role}
+                  testId={`team-bot-${bot.slug}`}
+                  mode={bot.slug}
+                  active={pathname === "/chat" && activeBotSlug === bot.slug}
+                  collapsed={collapsed}
+                  className="agent-rail-bot"
+                  onTip={onTip}
+                  onTipEnd={onTipEnd}
+                >
+                  <span className="agent-rail-tile">
+                    <ModeIcon name="chat" size={18} strokeWidth={1.75} />
+                  </span>
+                </RailLink>
+              ))}
+            </div>
+          ) : null}
         </nav>
 
         <div className="agent-rail-divider" aria-hidden="true" />
@@ -253,16 +285,21 @@ export function AgentRail(_props: Props) {
   const searchParams = useSearchParams();
   const brand = useProductBrand();
   const { agents, loaded } = useVirtualAgents();
+  const { roster } = useTeam();
   const phone = useMatchMedia(RAIL_PHONE_QUERY);
   const desk = useRailCollapse(false);
   const drawer = useRailDrawer(phone, `${pathname}?${searchParams.toString()}`);
   const collapsed = phone ? !drawer.open : desk.collapsed;
+  const agentParam = searchParams.get("agent");
+  const activeBotSlug = agentParam && isTeamBotParam(agentParam) ? agentParam : null;
 
   return (
     <AgentRailView
       agents={agents}
       loaded={loaded}
-      activeId={activeAgentId(pathname, searchParams)}
+      activeId={activeBotSlug ? null : activeAgentId(pathname, searchParams)}
+      activeBotSlug={activeBotSlug}
+      bots={roster.bots}
       pathname={pathname}
       productName={brand.productName}
       assistantName={assistantNameOf(brand)}

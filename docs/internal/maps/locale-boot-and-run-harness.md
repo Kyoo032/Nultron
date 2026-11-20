@@ -2,6 +2,8 @@
 
 Product: both · Instance: main :3000
 
+Last verified: 2026-11-20 on `feat/team-ui`, for the catalog wiring only: `i18n.ts` gains a `team` namespace (NAMESPACES plus the en/id catalog maps) backed by new `locales/en/team.json` and `locales/id/team.json` (44 keys each, key sets identical), and `rail.json` gains the `team`/`teamBots` labels in both locales. Unit-tested (`team-locale.test.ts`); not driven. Nothing else on the page was re-read.
+
 Last verified: 2026-11-10 at fc855d7d on `tester` for the `voice` catalog namespace only: `apps/web/lib/i18n.ts:32,35,98,135,168` loads `apps/web/locales/{en,id}/voice.json` under the `voice` namespace (see [`voice-mode.md`](voice-mode.md)), and `apps/web/lib/voice-locale.test.ts` checks English/Indonesian key parity. Nothing else on the page was re-read.
 
 Last verified: 2026-10-12 at e8a7eca8 for the "Chat-first shell" section only (the two new catalog namespaces; read against the tester branch before it was promoted to `main`, PR #157). Nothing else on the page was re-read.

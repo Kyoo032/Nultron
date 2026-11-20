@@ -3,6 +3,7 @@
 import "./agent-harness.css";
 import { ChatKeyStatus } from "@/components/chat-key-status";
 import { t } from "@/lib/i18n";
+import { Link } from "@/lib/nav";
 import { assistantNameOf, useProductBrand } from "@/lib/product-brand";
 import { useDeskNeedsKey } from "@/lib/use-desk-needs-key";
 
@@ -25,6 +26,9 @@ export function ChatGreeting() {
       <div className="chat-greeting-status">
         <ChatKeyStatus />
       </div>
+      <Link href="/team" className="btn btn-primary chat-greeting-cta" data-testid="chat-build-team">
+        {t("team.greeting.cta")}
+      </Link>
     </section>
   );
 }

@@ -8,6 +8,7 @@ import { UsageError } from "./args";
 import { EvalRefusal } from "./credentials";
 import {
   HANDOFF_PROMPTS,
+  INDONESIAN_WORDS_MAX,
   buildPlan,
   canonicalWords,
   checkFirstTurn,
@@ -120,6 +121,11 @@ describe("Indonesian number words", () => {
     [4150, "empat ribu seratus lima puluh"],
     [9999, "sembilan ribu sembilan ratus sembilan puluh sembilan"],
     [10000, "sepuluh ribu"],
+    [999999, "sembilan ratus sembilan puluh sembilan ribu sembilan ratus sembilan puluh sembilan"],
+    [1000000, "satu juta"],
+    [4821000, "empat juta delapan ratus dua puluh satu ribu"],
+    [100000000, "seratus juta"],
+    [2500000000, "dua miliar lima ratus juta"],
     [0, "nol"],
   ])("%i is %s", (n, words) => {
     expect(indonesianWords(n)).toBe(words);
@@ -128,6 +134,7 @@ describe("Indonesian number words", () => {
   it("refuses a number it cannot write", () => {
     expect(() => indonesianWords(-1)).toThrow(RangeError);
     expect(() => indonesianWords(1.5)).toThrow(RangeError);
+    expect(() => indonesianWords(INDONESIAN_WORDS_MAX + 1)).toThrow(RangeError);
   });
 
   it("compares 'seribu' and 'satu ribu' as the same words, and ignores case and punctuation", () => {
@@ -197,6 +204,21 @@ describe("the three turn checks", () => {
       "1. 4821: empat ribu delapan ratus dua puluh satu\n2. 4822: empat ribu delapan ratus dua puluh dua\n";
     expect(checkThirdTurn(labelled, 4821, 4822).checks.every((c) => c.pass)).toBe(true);
     expect(checkThirdTurn("seribu\nseribu satu", 1000, 1001).checks.every((c) => c.pass)).toBe(true);
+  });
+
+  it("turn 3 checks a large answer instead of throwing, inside and past the writable range", () => {
+    // A reply that ignores "four digits" used to crash the eval via indonesianWords' RangeError.
+    const large = checkThirdTurn(
+      "satu juta dua ratus tiga puluh empat ribu lima ratus enam puluh tujuh\nsatu juta dua ratus tiga puluh empat ribu lima ratus enam puluh delapan",
+      1234567,
+      1234568,
+    );
+    expect(large.checks.every((c) => c.pass)).toBe(true);
+    const huge = checkThirdTurn("two lines\nof words", INDONESIAN_WORDS_MAX + 1, INDONESIAN_WORDS_MAX + 2);
+    const words = huge.checks.find((c) => c.name === "words");
+    expect(words?.pass).toBe(false);
+    expect(words?.detail).toContain(`${INDONESIAN_WORDS_MAX + 1} (too large to write as words)`);
+    expect(words?.detail).toContain(`${INDONESIAN_WORDS_MAX + 2} (too large to write as words)`);
   });
 
   it("turn 3 does not mistake 4820 for the shorter match inside 4821", () => {

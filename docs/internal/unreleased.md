@@ -54,6 +54,12 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## A picture turn also holds back a text-only tier model, 2026-11-19 (branch `devin/1795097952-tier-fallback-text-only` from `main`; `ci:local` run, unit tests run; not driven live)
+
+Lanes: main, enterprise, tester
+
+Devin Review on #233's merged code found a Reasoning failover could land on `deepseek-v4-pro`, a text-only model, while the chat thread replays a picture it cannot read at all. The 2026-11-13 picture demotion covered only `modelMisreadsPictures` (the two Lunas); `tierLiveness` (`packages/host/src/tier-resolve.ts`) now demotes a candidate on the same `carriesPicture` flag when `modelImageInput(id) === "no"` either — still a demotion, never a drop, so it answers when nothing else of the tier is live. Effect today: on a Reasoning picture turn with `claude-opus-5-5` and `gpt-6-astra` down, the walk picks `qwen3.8-max` ahead of `deepseek-v4-pro`. The 2026-11-13 entry below says "Reasoning is unchanged"; this entry amends it. Corrects the recipe note in `features/model-tiers.md` the same way. Proof: `tier-resolve-picture.test.ts` (the Reasoning walk under a replayed picture and without), `tier-resolve.test.ts` (demoted = misreader or text-only), `pnpm ci:local` all required steps pass.
+
 ## Daily no longer sends a picture turn to the Luna models, which misread pictures, 2026-11-13 (branch `fix/daily-picture-model` from `main` at `365d4af6`; unit tests run, driven on `:3000`)
 
 Lanes: enterprise, tester
@@ -1444,3 +1450,47 @@ Lanes: enterprise, tester.
 Lanes: enterprise, tester.
 
 - `redactSecrets` now preserves only known diagnostic event names instead of exempting all letters-only snake_case values. Existing path and UUID handling is unchanged.
+
+## Accept same-origin preview sign-in on IPv6-literal URLs, 2026-11-19
+
+Lanes: enterprise, tester.
+
+- Preview form sign-in and sign-out no longer return 403 just because the browser uses a bracketed IPv6 address as the host. The address is canonicalized before comparison; a different address, scheme or port still fails.
+- The preview gate HTTP suite covers the fix. The live preview was not changed or driven; Caddy Basic Auth stays on.
+
+## Redactor URL-path edges: word-like segments stay, `.~` tails mask, 2026-11-20 (DFIND-95)
+
+Lanes: enterprise, tester.
+
+- The bare 24+-character URL path segment rule in `redactSecrets` now also requires token entropy (at least two of lower-case, upper-case and digit), so a long word-like segment such as `gettingstartedwithinstallation` stays readable; webhook secrets and hex runs still mask.
+- An opaque run ending in a `.`/`~` tail (`token.~`, `token~`) is now masked with its tail; a lone trailing `.` still reads as sentence punctuation.
+
+## Redactor masks `=` padding before a tilde tail, 2026-11-20 (DFIND-100)
+
+Lanes: enterprise, tester.
+
+- An opaque run ending in `=` padding followed by a `.`/`~` tail (`token=.~`, `token=~`) is now masked whole instead of leaving a `=.~` residue.
+
+## Redactor masks `=` padding residue with or without a tail, 2026-11-20 (DFIND-102)
+
+Lanes: enterprise, tester.
+
+- An opaque run ending in `==` padding followed by a `.`/`~` tail (`token==~`, `token==.~`) is now masked whole instead of leaving one `=` behind; bare `token=` and `token==` padding no longer leaks either.
+
+## Redactor consumes a padding run of any length, 2026-11-20 (DFIND-104)
+
+Lanes: enterprise, tester.
+
+- An opaque run's trailing `=` padding is no longer capped at two (`token===`, `token===~`): the padding group and both masked-run strip passes are now unbounded (`=*` / `=+`), ending the `=` residue class.
+## Redactor strips padding and tails without backtracking, 2026-11-20
+
+Lanes: enterprise, tester.
+
+- `redactSecrets` no longer spends seconds on a token followed by ~100,000 `=` characters: the two trailing-strip regexes (`=*[.~]*~=*$`, `=+$`, and the same pair on a URL path segment's bare form) are now a single linear index walk (`stripPaddingTail`), so every padding/tail combination still strips while long runs stay millisecond-fast. ReDoS cases cover `=` runs and `.~` runs at 100,000 characters.
+
+## Redactor masks URL query and fragment secrets, 2026-11-20 (DFIND-94/96/98/99/101/103/104)
+
+Lanes: enterprise, tester.
+
+- A `?`, `&` or `#` pair value of 24+ token characters inside a URL is now masked — plain queries, fragment routes (`/#/cb?sig=`), `#name=` fragment pairs, and the `\/` or `\\/` of a JSON-escaped `https:\/\/` URL. A value continues through an escaped slash so a token like `<24+>\/suffix` masks whole.
+- A word-like query value (`callback=onCompleteHandlerFunction`, `gettingstartedwithinstallation`) stays readable: it must have a lowercase word run, no digit and no consonant run of five. A long hyphenated phrase is a documented exception — it reads as an opaque run (`-` plus alnum) and masks.

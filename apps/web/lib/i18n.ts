@@ -30,6 +30,7 @@ import enFolder from "../locales/en/folder.json";
 import enAgents from "../locales/en/agents.json";
 import enHarness from "../locales/en/harness.json";
 import enVoice from "../locales/en/voice.json";
+import enTeam from "../locales/en/team.json";
 import idAgents from "../locales/id/agents.json";
 import idHarness from "../locales/id/harness.json";
 import idVoice from "../locales/id/voice.json";
@@ -61,6 +62,7 @@ import idVideos from "../locales/id/videos.json";
 import idWorkspaces from "../locales/id/workspaces.json";
 import idFiles from "../locales/id/files.json";
 import idFolder from "../locales/id/folder.json";
+import idTeam from "../locales/id/team.json";
 
 const NAMESPACES = [
   "common",
@@ -96,6 +98,7 @@ const NAMESPACES = [
   "harness",
   // Live voice in Chat: the mic, the voice view and its errors.
   "voice",
+  "team",
 ] as const;
 type Namespace = (typeof NAMESPACES)[number];
 type MessageTree = { [key: string]: string | MessageTree };
@@ -133,6 +136,7 @@ const catalogs: Record<AppLocale, Record<Namespace, MessageTree>> = {
     agents: enAgents,
     harness: enHarness,
     voice: enVoice,
+    team: enTeam,
   },
   id: {
     common: idCommon,
@@ -166,6 +170,7 @@ const catalogs: Record<AppLocale, Record<Namespace, MessageTree>> = {
     agents: idAgents,
     harness: idHarness,
     voice: idVoice,
+    team: idTeam,
   },
 };
 
