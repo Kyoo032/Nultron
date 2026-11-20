@@ -150,14 +150,17 @@ const looksLikeUrlToken = (segment: string): boolean =>
 function maskUrlRun(match: string, token: string): string {
   const masked = token
     .split("/")
-    .map((segment, index) =>
-      index > 2 &&
-      !UUID_RE.test(segment) &&
-      ((URL_TOKEN_SEGMENT_RE.test(segment) && looksLikeUrlToken(segment)) ||
-        URL_OPAQUE_SEGMENT_RE.test(segment))
+    .map((segment, index) => {
+      // A `.`/`~` tail the opaque run joined into the token is not part of the segment's shape:
+      // test the rules on the bare segment, mask it with its tail.
+      const bare = segment.replace(/[.~]*~$/, "");
+      return index > 2 &&
+        !UUID_RE.test(bare) &&
+        ((URL_TOKEN_SEGMENT_RE.test(bare) && looksLikeUrlToken(bare)) ||
+          URL_OPAQUE_SEGMENT_RE.test(segment))
         ? "[REDACTED]"
-        : segment,
-    )
+        : segment;
+    })
     .join("/");
   return masked === token ? match : match.replace(token, masked);
 }
@@ -202,7 +205,8 @@ function maskOpaqueRun(
   if (token.includes("\\")) {
     return `${leadingDots}[REDACTED]`;
   }
-  return match.replace(BASE64_RE, "[REDACTED]");
+  const masked = match.replace(BASE64_RE, "[REDACTED]");
+  return masked === match ? match : masked.replace(/[.~]*~={0,2}$/, "");
 }
 
 export function redactCredentials(text: string): string {

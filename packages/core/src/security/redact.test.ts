@@ -116,8 +116,22 @@ describe("redactSecrets", () => {
     expect(redactSecrets(input)).toBe("https://h.example/a/b/[REDACTED]");
   });
 
-  it("masks a standalone opaque token ending in a tilde tail", () => {
-    expect(redactSecrets("Value: abcdefghijklmnop.qrstuvwxyz123456.~")).toBe("Value: [REDACTED]");
+  it("masks a short token segment ending in a tilde tail", () => {
+    expect(redactSecrets("POST https://hooks.slack.com/services/T01ABCDEFGH/B02ABCDEFGH/xm9pQrStUvWxYzAbCdEfGh12~ 200")).toBe(
+      "POST https://hooks.slack.com/services/T01ABCDEFGH/B02ABCDEFGH/[REDACTED] 200",
+    );
+  });
+
+  it("keeps a UUID segment ending in a tilde tail", () => {
+    const input = "session https://h.example/a/9f86d081-884c-7d65-9a2f-eaa0c55ad015~ done";
+    expect(redactSecrets(input)).toBe(input);
+  });
+
+  it.each([
+    ["Value: abcdefghijklmnop.qrstuvwxyz123456.~", "Value: [REDACTED]"],
+    [`Value: ${"x".repeat(40)}~`, "Value: [REDACTED]"],
+  ])("masks a standalone opaque token ending in a tilde tail: %s", (input, expected) => {
+    expect(redactSecrets(input)).toBe(expected);
   });
 
   it.each([
