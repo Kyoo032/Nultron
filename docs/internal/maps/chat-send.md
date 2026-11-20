@@ -2,6 +2,8 @@
 
 Product: both Â· Instance: main :3000
 
+Last verified: 2026-11-20 on `feat/orchestrator-team`, for the prompt-assembly change only (section 3 step 2: the run computes its bindings once as `runBindings`, and when they include `delegate` it appends `delegationTargetsLine` — the desk's hired modes and live team bots — to the system prompt; `runs.ts`, the `runBindings`/`delegationTargets` block). Unit-tested (`team-bots.test.ts` in both packages); not driven on `:3000`. Other `runs.ts` line numbers on this page moved by up to about 15 lines and were not re-anchored.
+
 Last verified: 2026-11-13 on `fix/daily-picture-model` over 365d4af6 (working tree, not committed), for the "Tier in the body" bullet and the last sentence of § 3c step 6 only (a turn that carries a picture demotes the Luna models in the tier walk; `resolveTierRun` is awaited now). Code-read and unit-tested, then driven on `:3000` on the branch: a Daily picture turn and its text follow-up ran on `claude-sonnet-5-5`, and a plain text turn on `gpt-6-luna`. Nothing else on the page was re-read.
 
 Last verified: 2026-11-09 at 575da955 plus the working tree of `fix/reasoning-only-no-retry`, for the contact retry and the tool-less retry only (the two `thinking` flags at `ai-sdk-runtime.ts:599` and `:623`, the "Model returns nothing" row and the new "readable reasoning, no text" row of the failure modes). Unit-tested against the real AI SDK on the Responses wire (`ai-sdk-runtime-blank-reasoning.test.ts`, `retry.test.ts`); not driven on `:3000`. Nothing else on the page was re-read.
