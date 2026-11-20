@@ -2,6 +2,8 @@
 
 Product: both Â· Instance: main :3000
 
+Last verified: 2026-11-20 on `feat/team-ui`, for the team additions only: the rail gains a "Your team" account link to `/team` and a team-bot section under the virtual agents (name plus role, `agent-rail.tsx`, `agent-rail-parts.tsx`, `agent-rail.css`); `/chat?agent=tb-…` routes to `TeamBotChatPane`, which resolves the bot from `/api/v1/team` and redirects an unknown slug to the generalist (`chat-page.tsx`, `team-bot-chat-pane.tsx`); `/team` is a new chat-first route inside `DeskPane`, modes layout redirects to `/workspaces` (`App.tsx`). Unit-tested (`agent-rail.test.tsx`, shell golden re-recorded); not driven on `:3000`. Other line numbers on this page moved and were not re-anchored.
+
 Last verified: 2026-10-23 at 0eae7b51 for two stylesheet lines only (PR #193): the `.agent-home-tile` shadow in `agent-harness.css` reads `var(--black)` where it typed `#000000`, and `.va-tile` in `virtual-agents-page.css` reads `var(--on-mode)` without the dead `#fff` fallback. Computed style is unchanged (eight routes, light and dark, 0 of 4,060 elements differ). Nothing else on the page was re-read.
 
 Last verified: 2026-10-22, tester/chat-first, built on dba363f, for the paid media sentence in the first bullet list, the "Not driven" line and the unit test list only (code-read and unit-tested; the card driven on a stub desk, the live round trip not driven). Nothing else on the page was re-read.
