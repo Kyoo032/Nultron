@@ -176,7 +176,7 @@ Everything above is about the key at rest and on the screen. Enterprise tenants 
 
 ### 11. The credential redactor (2026-11-06)
 
-Last verified: 2026-11-20 plus the DFIND-100 change, for the opaque-tail and `=` padding rules in § 11 only. Redactor tests (90) passed; not driven on a live host.
+Last verified: 2026-11-20 plus the DFIND-102 change, for the opaque-tail and `=` padding rules in § 11 only. Redactor tests (95) passed; not driven on a live host.
 
 Last verified: 2026-11-19 at `36f1fc35` plus the bearer and opaque-token matcher changes, for those two text rules in § 11 only. Redactor and outbound-guard tests passed; not driven on a live host.
 

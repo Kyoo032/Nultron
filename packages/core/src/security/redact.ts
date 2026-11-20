@@ -208,7 +208,7 @@ function maskOpaqueRun(
     return `${leadingDots}[REDACTED]`;
   }
   const masked = match.replace(BASE64_RE, "[REDACTED]");
-  return masked === match ? match : masked.replace(/=?[.~]*~={0,2}$/, "");
+  return masked === match ? match : masked.replace(/={0,2}[.~]*~={0,2}$/, "").replace(/={1,2}$/, "");
 }
 
 export function redactCredentials(text: string): string {
