@@ -127,8 +127,33 @@ const DIAGNOSTIC_LABELS = new Set([
   "threads_knowledge_card_not_dropped",
 ]);
 
+// A run with a backslash is a path only when it is a Windows or UNC one: `\\server\share`, or the tail of
+// `C:\...` after the drive colon (a colon never sits inside a run). Any other backslash run is an
+// escaped or obfuscated token and stays on the masking path.
+const isWindowsPathRun = (token: string, followsColon: boolean): boolean =>
+  token.startsWith("\\\\") || (followsColon && token.startsWith("\\"));
+
+// In a URL run after a scheme colon, a path segment this long and shapeless is a token (a webhook's
+// secret part, a signed link's key); words, ids, hosts and short segments stay readable.
+const URL_TOKEN_SEGMENT_RE = /^[A-Za-z0-9_-]{24,}$/;
+const URL_OPAQUE_SEGMENT_RE = /^[A-Za-z0-9+._~-]{32,}$/;
+
+function maskUrlRun(match: string, token: string): string {
+  const masked = token
+    .split("/")
+    .map((segment, index) =>
+      index > 2 &&
+      !UUID_RE.test(segment) &&
+      (URL_TOKEN_SEGMENT_RE.test(segment) || URL_OPAQUE_SEGMENT_RE.test(segment))
+        ? "[REDACTED]"
+        : segment,
+    )
+    .join("/");
+  return masked === token ? match : match.replace(token, masked);
+}
+
 function isPathLike(token: string, padded: boolean, followsColon: boolean): boolean {
-  if (token.includes("\\") || (followsColon && token.startsWith("//"))) {
+  if (isWindowsPathRun(token, followsColon)) {
     return true;
   }
   if (padded || token.includes("+")) {
@@ -144,6 +169,9 @@ function isPathLike(token: string, padded: boolean, followsColon: boolean): bool
 }
 
 function maskOpaqueRun(match: string, leadingDots: string, token: string, offset: number, text: string): string {
+  if (text[offset - 1] === ":" && token.startsWith("//")) {
+    return maskUrlRun(match, token);
+  }
   if (
     isPathLike(token, match.endsWith("="), text[offset - 1] === ":") ||
     UUID_RE.test(token) ||
@@ -152,6 +180,9 @@ function maskOpaqueRun(match: string, leadingDots: string, token: string, offset
     return match;
   }
   if (/[._-]/.test(token) && /[a-z0-9]/i.test(token)) {
+    return `${leadingDots}[REDACTED]`;
+  }
+  if (token.includes("\\")) {
     return `${leadingDots}[REDACTED]`;
   }
   return match.replace(BASE64_RE, "[REDACTED]");
