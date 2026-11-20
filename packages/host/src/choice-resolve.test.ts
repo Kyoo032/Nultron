@@ -66,8 +66,8 @@ describe("readRunChoice reads the body's choice", () => {
   it("returns null when the body names no choice or tier, so the model path runs unchanged", () => {
     expect(readRunChoice(undefined)).toBeNull();
     expect(readRunChoice({ content: "hi" })).toBeNull();
-    expect(readRunChoice({ model: "gpt-5.6-luna", modelPinned: true })).toBeNull();
-    expect(readRunChoice({ choice: null, tier: null, model: "gpt-5.6-luna" })).toBeNull();
+    expect(readRunChoice({ model: "gpt-6-luna", modelPinned: true })).toBeNull();
+    expect(readRunChoice({ choice: null, tier: null, model: "gpt-6-luna" })).toBeNull();
   });
 
   it("reads the three presets", () => {
@@ -77,9 +77,9 @@ describe("readRunChoice reads the body's choice", () => {
   });
 
   it("reads a custom choice and trims its model id", () => {
-    expect(readRunChoice({ choice: { kind: "custom", model: "  gpt-5.6-luna ", effort: "low" } })).toEqual({
+    expect(readRunChoice({ choice: { kind: "custom", model: "  gpt-6-luna ", effort: "low" } })).toEqual({
       kind: "custom",
-      model: "gpt-5.6-luna",
+      model: "gpt-6-luna",
       effort: "low",
     });
   });
@@ -90,7 +90,7 @@ describe("readRunChoice reads the body's choice", () => {
     );
     expect(apiErrorOf(() => readRunChoice({ choice: "custom" })).code).toBe("custom_model_required");
     const effort = apiErrorOf(() =>
-      readRunChoice({ choice: { kind: "custom", model: "gpt-5.6-luna", effort: "max" } }),
+      readRunChoice({ choice: { kind: "custom", model: "gpt-6-luna", effort: "max" } }),
     );
     expect(effort.code).toBe("custom_effort_invalid");
     expect(effort.status).toBe(400);
@@ -104,9 +104,9 @@ describe("readRunChoice reads the body's choice", () => {
   });
 
   it("refuses a choice beside a tier or a model, and a tier beside a model", () => {
-    expect(apiErrorOf(() => readRunChoice({ choice: "auto", model: "gpt-5.6-luna" })).code).toBe("choice_and_model");
+    expect(apiErrorOf(() => readRunChoice({ choice: "auto", model: "gpt-6-luna" })).code).toBe("choice_and_model");
     expect(apiErrorOf(() => readRunChoice({ choice: "auto", tier: "fast" })).code).toBe("choice_and_model");
-    expect(apiErrorOf(() => readRunChoice({ tier: "fast", model: "gpt-5.6-luna" })).code).toBe("choice_and_model");
+    expect(apiErrorOf(() => readRunChoice({ tier: "fast", model: "gpt-6-luna" })).code).toBe("choice_and_model");
   });
 
   it("maps a legacy tier to its choice, and refuses a tier it does not know", () => {
@@ -136,7 +136,7 @@ describe("resolveRunChoice on the desk catalogue", () => {
     cacheDir = mkdtempSync(join(tmpdir(), "af-choice-resolve-"));
     process.env.AGENTFORGE_MODELS_CACHE_PATH = join(cacheDir, "models-cache.json");
     resetJobModelCircuit();
-    useDeskCache([chat("gpt-5.6-luna"), chat("deepseek-v4-flash"), chat("kimi-k3"), chat("alpha-only-chat")]);
+    useDeskCache([chat("gpt-6-luna"), chat("deepseek-v4-1-flash"), chat("deepseek-v4-pro"), chat("alpha-only-chat")]);
   });
 
   afterEach(() => {
@@ -158,7 +158,7 @@ describe("resolveRunChoice on the desk catalogue", () => {
     const result = resolveWith({ request: { kind: "everyday" } });
     expect(result.requested).toBe("everyday");
     expect(result.ran).toBe("everyday");
-    expect(result.model).toBe("gpt-5.6-luna");
+    expect(result.model).toBe("deepseek-v4-1-flash");
     expect(["none", "low", "medium"]).toContain(result.reasoning.effort);
     expect(result.reasoning.explicit).toBe(true);
     expect(result.autoReason).toBeUndefined();
@@ -168,13 +168,13 @@ describe("resolveRunChoice on the desk catalogue", () => {
     expect(resolveWith({ request: { kind: "reasoning" } })).toEqual({
       requested: "reasoning",
       ran: "reasoning",
-      model: "kimi-k3",
+      model: "deepseek-v4-pro",
       reasoning: { effort: "high", explicit: true },
     });
   });
 
   it("reasoning with no live reasoning model is a 503 choice_unavailable that names the choice", () => {
-    useDeskCache([chat("gpt-5.6-luna")]);
+    useDeskCache([chat("gpt-6-luna")]);
     const error = apiErrorOf(() => resolveWith({ request: { kind: "reasoning" } }));
     expect(error).toBeInstanceOf(ChoiceUnavailableError);
     expect(error.code).toBe("choice_unavailable");
@@ -183,7 +183,7 @@ describe("resolveRunChoice on the desk catalogue", () => {
   });
 
   it("everyday never falls onto a reasoning model when no everyday model is live", () => {
-    useDeskCache([chat("kimi-k3")]);
+    useDeskCache([chat("deepseek-v4-pro")]);
     const error = apiErrorOf(() => resolveWith({ request: { kind: "everyday" } }));
     expect(error.code).toBe("choice_unavailable");
     expect((error as ChoiceUnavailableError).choice).toBe("everyday");
@@ -191,40 +191,42 @@ describe("resolveRunChoice on the desk catalogue", () => {
 
   it("a model held down for one company is skipped for that company only", () => {
     const now = Date.now();
-    markJobModelDown("gpt-5.6-luna", now, TENANT);
-    expect(isJobModelDown("gpt-5.6-luna", now, TENANT)).toBe(true);
-    expect(isJobModelDown("gpt-5.6-luna", now, OTHER_TENANT)).toBe(false);
-    expect(isJobModelDown("gpt-5.6-luna", now)).toBe(false);
+    markJobModelDown("deepseek-v4-1-flash", now, TENANT);
+    expect(isJobModelDown("deepseek-v4-1-flash", now, TENANT)).toBe(true);
+    expect(isJobModelDown("deepseek-v4-1-flash", now, OTHER_TENANT)).toBe(false);
+    expect(isJobModelDown("deepseek-v4-1-flash", now)).toBe(false);
 
-    expect(resolveWith({ request: { kind: "everyday" }, now }).model).toBe("deepseek-v4-flash");
-    expect(resolveWith({ request: { kind: "everyday" }, tenant: OTHER_TENANT, now }).model).toBe("gpt-5.6-luna");
+    expect(resolveWith({ request: { kind: "everyday" }, now }).model).toBe("gpt-6-luna");
+    expect(resolveWith({ request: { kind: "everyday" }, tenant: OTHER_TENANT, now }).model).toBe(
+      "deepseek-v4-1-flash",
+    );
   });
 
   it("a custom model held down for one company is unavailable to that company and not to the other", () => {
     const now = Date.now();
-    markJobModelDown("gpt-5.6-luna", now, TENANT);
+    markJobModelDown("gpt-6-luna", now, TENANT);
     const error = apiErrorOf(() =>
-      resolveWith({ request: { kind: "custom", model: "gpt-5.6-luna", effort: "default" }, now }),
+      resolveWith({ request: { kind: "custom", model: "gpt-6-luna", effort: "default" }, now }),
     );
     expect(error.code).toBe("custom_model_unavailable");
     expect(error.status).toBe(503);
     expect(
-      resolveWith({ request: { kind: "custom", model: "gpt-5.6-luna", effort: "default" }, tenant: OTHER_TENANT, now })
+      resolveWith({ request: { kind: "custom", model: "gpt-6-luna", effort: "default" }, tenant: OTHER_TENANT, now })
         .ran,
     ).toBe("custom");
   });
 
   it("the allowance seam decides which models a choice can reach", () => {
-    expect(resolveWith({ request: { kind: "everyday" }, allowance: allowOnly(["deepseek-v4-flash"]) }).model).toBe(
-      "deepseek-v4-flash",
+    expect(resolveWith({ request: { kind: "everyday" }, allowance: allowOnly(["gpt-6-luna"]) }).model).toBe(
+      "gpt-6-luna",
     );
     expect(
       apiErrorOf(() => resolveWith({ request: { kind: "everyday" }, allowance: allowOnly(["alpha-only-chat"]) })).code,
     ).toBe("choice_unavailable");
     const outside = apiErrorOf(() =>
       resolveWith({
-        request: { kind: "custom", model: "gpt-5.6-luna", effort: "default" },
-        allowance: allowOnly(["deepseek-v4-flash"]),
+        request: { kind: "custom", model: "gpt-6-luna", effort: "default" },
+        allowance: allowOnly(["deepseek-v4-1-flash"]),
       }),
     );
     expect(outside.code).toBe("custom_model_not_allowed");
@@ -235,7 +237,7 @@ describe("resolveRunChoice on the desk catalogue", () => {
     expect(resolveWith({ request: { kind: "auto" }, currentText: "hello there" })).toEqual({
       requested: "auto",
       ran: "everyday",
-      model: "gpt-5.6-luna",
+      model: "deepseek-v4-1-flash",
       reasoning: expect.objectContaining({ explicit: true }),
       autoReason: "default",
     });
@@ -243,7 +245,7 @@ describe("resolveRunChoice on the desk catalogue", () => {
 
   it("auto picks reasoning for a wording cue in English or Bahasa Indonesia", () => {
     const english = resolveWith({ request: { kind: "auto" }, currentText: "Please analyze the churn numbers" });
-    expect(english).toMatchObject({ ran: "reasoning", model: "kimi-k3", autoReason: "wording_cue" });
+    expect(english).toMatchObject({ ran: "reasoning", model: "deepseek-v4-pro", autoReason: "wording_cue" });
     const indonesian = resolveWith({ request: { kind: "auto" }, currentText: "tolong bandingkan dua vendor ini" });
     expect(indonesian).toMatchObject({ ran: "reasoning", autoReason: "wording_cue" });
   });
@@ -257,13 +259,13 @@ describe("resolveRunChoice on the desk catalogue", () => {
   });
 
   it("auto counts a picture or video as an attachment, and needs a model that reads that modality", () => {
-    useDeskCache([chat("kimi-k3", ["text", "image"]), chat("gpt-5.6-luna")]);
+    useDeskCache([chat("deepseek-v4-pro", ["text", "image"]), chat("gpt-6-luna")]);
     expect(resolveWith({ request: { kind: "auto" }, modality: "image", currentText: "what is this" })).toMatchObject({
       ran: "reasoning",
-      model: "kimi-k3",
+      model: "deepseek-v4-pro",
       autoReason: "attachment",
     });
-    useDeskCache([chat("gpt-5.6-luna"), chat("kimi-k3")]);
+    useDeskCache([chat("gpt-6-luna"), chat("deepseek-v4-pro")]);
     const error = apiErrorOf(() =>
       resolveWith({ request: { kind: "auto" }, modality: "image", currentText: "what is this" }),
     );
@@ -282,12 +284,12 @@ describe("resolveRunChoice on the desk catalogue", () => {
   });
 
   it("auto crosses over to the other kind when its pick has no live model, and says so", () => {
-    useDeskCache([chat("gpt-5.6-luna")]);
+    useDeskCache([chat("gpt-6-luna")]);
     const result = resolveWith({ request: { kind: "auto" }, currentText: "analyze this" });
     expect(result).toMatchObject({
       requested: "auto",
       ran: "everyday",
-      model: "gpt-5.6-luna",
+      model: "gpt-6-luna",
       autoReason: "pick_unavailable",
     });
     expect(result.reasoning.explicit).toBe(true);
@@ -301,10 +303,10 @@ describe("resolveRunChoice on the desk catalogue", () => {
   });
 
   it("custom runs the named model under its catalogue spelling, and default effort is not explicit", () => {
-    expect(resolveWith({ request: { kind: "custom", model: "GPT-5.6-LUNA", effort: "default" } })).toEqual({
+    expect(resolveWith({ request: { kind: "custom", model: "GPT-6-LUNA", effort: "default" } })).toEqual({
       requested: "custom",
       ran: "custom",
-      model: "gpt-5.6-luna",
+      model: "gpt-6-luna",
       reasoning: { effort: "medium", explicit: false },
     });
   });

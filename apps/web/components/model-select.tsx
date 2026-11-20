@@ -53,7 +53,11 @@ export function ModelSelect({
   // The group words are translated here, in the renderer; core sends a stable kind (`pickerGroups`).
   const groups = flat
     ? [{ key: "embeddings", label: embeddingsGroupLabel(), models }]
-    : pickerGroups(models).map((group) => ({ key: group.label, label: pickerGroupLabel(group), models: group.models }));
+    : pickerGroups(models, selected).map((group) => ({
+        key: group.label,
+        label: pickerGroupLabel(group),
+        models: group.models,
+      }));
 
   return (
     <select

@@ -65,6 +65,8 @@ const WIRES = ["chat_completions", "responses", "anthropic_messages", "google_ge
  *   so their tier is advanced now.
  * - `claude-opus-5-5` gained its best-for word (Deep reasoning); `deepseek-v4-1-flash` joined the
  *   Recommended group with Fast drafts.
+ * - The Recommended group changed again (owner, 2026-11-10): `gemini-3.5-flash` left it for
+ *   `gemini-3.8-flash` (`superseded.ts`), so its tier is advanced now.
  * - The label casing fix (2026-10-02, `friendlyModelLabel`): the recording has "Glm 5.3 Flash" and
  *   "DeepSeek V4 1 Flash". Acronyms (GLM, MT, VL, OCR) and parameter counts (27B, A3B) keep their
  *   capitals and a dashed version is one dotted number. Labels only: no tier, role or wire moved.
@@ -80,6 +82,8 @@ const CHANGED_ON_PURPOSE: Record<string, Partial<{ bestFor: string; tier: string
   "MiniMax-M3": { tier: "advanced" },
   "minimax-m3": { tier: "advanced" },
   "doubao-seed-2-1-turbo-260628": { tier: "advanced" },
+  // 2026-11-10: Gemini 3.8 Flash took its place in the Recommended set (superseded.ts).
+  "gemini-3.5-flash": { tier: "advanced" },
   "claude-opus-5-5": { bestFor: "Deep reasoning" },
   "deepseek-v4-1-flash": { bestFor: "Fast drafts", tier: "everyday", friendlyLabel: "DeepSeek V4.1 Flash" },
   "glm-5": { friendlyLabel: "GLM 5" },

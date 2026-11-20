@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ApiError, GATEWAY_PROVIDER_ID, type InputModality, type TenantContext } from "@agentforge/core";
 import { MODEL_TIERS, TIER_DEFINITIONS } from "@agentforge/core/tiers";
 import type { SelectableModel } from "./selectable-models";
@@ -16,7 +16,12 @@ vi.mock("./selectable-models", async (importOriginal) => {
   return { ...actual, listSelectableModels: () => state.catalog };
 });
 
+import { markJobModelDown, resetJobModelCircuit } from "./job-model-fallback";
 import { resolveTierRun } from "./tier-resolve";
+
+afterEach(() => {
+  resetJobModelCircuit();
+});
 
 const TEXT_IMAGE_VIDEO: InputModality[] = ["text", "image", "video"];
 
@@ -85,6 +90,17 @@ describe("resolveTierRun and the thread's pictures", () => {
     const video = await run("video", { content: [], tier: "daily" }, asked);
     expect(video?.model).toBe("gpt-6-luna");
     expect(asked).not.toHaveBeenCalled();
+  });
+
+  it("holds a text-only model to the end of the walk while the thread replays a picture", async () => {
+    // `deepseek-v4-pro` cannot read a picture at all (`TEXT_ONLY`), where a Luna only misreads one.
+    // The walk leaves it for last the same way: it answers only when nothing else of the tier is live.
+    markJobModelDown("claude-opus-5-5", Date.now(), tenant);
+    markJobModelDown("gpt-6-astra", Date.now(), tenant);
+    const resolved = await run("text", { content: "and the right half?", tier: "reasoning" }, async () => true);
+    expect(resolved?.model).toBe("qwen3.8-max");
+    const noPicture = await run("text", { content: "hi", tier: "reasoning" }, async () => false);
+    expect(noPicture?.model).toBe("deepseek-v4-pro");
   });
 
   it("still refuses a model beside a tier, and a name that is not a tier", async () => {

@@ -17,8 +17,16 @@ import type { MeetingMinutes, MeetingTranscript } from "@agentforge/core/meeting
 // Isolation: this file's own desk, set BEFORE the run (and through it the database) is imported.
 const dataDir = mkdtempSync(join(tmpdir(), "agentforge-meeting-pin-"));
 process.env.AGENTFORGE_DATA_DIR = dataDir;
+process.env.AGENTFORGE_MODELS_CACHE_PATH = join(dataDir, "models-cache.json");
 delete process.env.AGENTFORGE_SETTINGS_PATH;
 delete process.env.DATABASE_URL;
+
+/**
+ * What a gateway probe leaves on the desk: the Meeting list and the shared fallback tail, as live models.
+ * The built-in catalogue (`core/src/models/catalog.ts`) a desk falls back to with no probe holds none of
+ * the models those lists now name (2026-11-10), so on it a seeded default that goes down has no stand-in.
+ */
+const PROBED_CHAT_IDS = ["gpt-6-luna", "gpt-6-sol", "claude-sonnet-5-5", "deepseek-v4-1-flash"];
 
 type ExecuteInput = Parameters<AgentRuntime["execute"]>[0];
 
@@ -109,7 +117,12 @@ function modelsFor(versionId: string): string[] {
 beforeAll(async () => {
   store = await import("./store");
   run = await import("./run");
-  const { listSelectableModels } = await import("../selectable-models");
+  const { saveModelCache } = await import("../model-cache");
+  const { listSelectableModels, resetCatalogMemo } = await import("../selectable-models");
+  saveModelCache({
+    openai: PROBED_CHAT_IDS.map((id) => ({ id, label: id, provider: "openai" as const, inputModalities: ["text" as const] })),
+  });
+  resetCatalogMemo();
   catalog = listSelectableModels(tenant).map((model) => model.id);
 }, 60_000);
 

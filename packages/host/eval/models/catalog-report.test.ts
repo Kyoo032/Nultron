@@ -43,7 +43,7 @@ describe("preferenceLists", () => {
 
   it("holds the same ids the product code holds", () => {
     expect(byName.get("CHAT_DEFAULT_PREFERENCES")?.ids[0]).toBe("gpt-6-luna");
-    expect(byName.get("CHAT_DEFAULT_PREFERENCES")?.ids).toContain("gpt-5.6-luna");
+    expect(byName.get("CHAT_DEFAULT_PREFERENCES")?.ids).toContain("claude-haiku-5-5");
     expect(byName.get("JOB_MODE_PREFERENCES.meeting")?.ids).toContain("gpt-6-sol");
     expect(byName.get("JOB_FALLBACK_TAIL")?.ids).toContain("deepseek-v4-1-flash");
     expect(byName.get("MEDIA.video")?.ids[0]).toBe("seedance-2.0");

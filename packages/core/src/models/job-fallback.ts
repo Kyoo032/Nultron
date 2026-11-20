@@ -30,12 +30,14 @@ export function modelFallbackNotice(from: string, to: string): JobModelFallbackN
  * `gpt-5.6-luna` and `claude-sonnet-5` returned briefs while `deepseek-v4-flash`, `gpt-5.6-terra` and
  * `glm-5.2` all came back 503. On 2026-09-30 the probe (packages/host/eval/models) had `gpt-6-luna`
  * ($0.10 / $0.50 per 1M, first token about 2 s), `claude-sonnet-5-5` (2 to 4 s) and
- * `deepseek-v4-1-flash` (1.3 to 1.9 s) answer HTTP 200 at every level it tried. `gpt-5.6-luna`, the
- * 2026-09-17 survivor, is third and the DeepSeek id last, so the first two stand-ins come from two
- * different vendors. A stand-in only has to answer; the mode's own list carries the quality choice.
+ * `deepseek-v4-1-flash` (1.3 to 1.9 s) answer HTTP 200 at every level it tried. On 2026-11-10 the
+ * third place went from `gpt-5.6-luna` (superseded, `superseded.ts`) to `gpt-6-sol` ($2 / $10, probed
+ * the same day as the others), and the DeepSeek id stays last, so every stand-in here was probed and the
+ * first two come from two different vendors. A stand-in only has to answer; the mode's own list carries
+ * the quality choice.
  * Nothing here is assumed live — every id is intersected with the workspace catalog before it is offered.
  */
-export const JOB_FALLBACK_TAIL = ["gpt-6-luna", "claude-sonnet-5-5", "gpt-5.6-luna", "deepseek-v4-1-flash"];
+export const JOB_FALLBACK_TAIL = ["gpt-6-luna", "claude-sonnet-5-5", "gpt-6-sol", "deepseek-v4-1-flash"];
 
 /**
  * The gateway could not answer at all, so the same prompt on another model is worth one try.

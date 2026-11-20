@@ -3,6 +3,7 @@ import {
   INPUT_MODALITIES,
   availableProviders,
   GATEWAY_PROVIDER_ID,
+  modelImageInput,
   modelMisreadsPictures,
   readOptionalModel,
   type InputModality,
@@ -21,6 +22,7 @@ import {
   type TierThinking,
 } from "@agentforge/core/tiers";
 import { isJobModelDown } from "./job-model-fallback";
+import type { ModelCacheScope } from "./model-cache";
 import { listSelectableModels, type SelectableModel } from "./selectable-models";
 
 /**
@@ -52,6 +54,10 @@ const REASONING_BY_THINKING: Readonly<Record<TierThinking, Readonly<ReasoningEff
  * will carry in: for image and video a candidate must be listed with that input modality, so a tier never
  * resolves to a model that would refuse the attachment. Text asks nothing more than being listed.
  *
+ * `scope` is whose breaker to read. Chat marks a model down for its own tenant (`runs.ts`), so a walk
+ * that read the unscoped entry would never see that mark and would send the next turn to the same dead
+ * model. Pass the run's tenant; leaving it out reads only the unscoped entry.
+ *
  * A turn that carries a picture demotes the models measured to misread one (`modelMisreadsPictures`): they
  * answer only when no other candidate of the tier is live. That is every image run, and a text run whose
  * thread replays an earlier picture to the model (`replaysPicture`, from `chat-image-history.ts`). A video
@@ -62,6 +68,7 @@ const REASONING_BY_THINKING: Readonly<Record<TierThinking, Readonly<ReasoningEff
 export function tierLiveness(
   catalog: readonly SelectableModel[],
   modality: InputModality = "text",
+  scope?: ModelCacheScope,
   replaysPicture = false,
 ): TierLiveness {
   const carriesPicture = modality === "image" || (modality === "text" && replaysPicture);
@@ -85,9 +92,17 @@ export function tierLiveness(
       // The catalog's own spelling: it goes on the wire, and the list's spelling may differ in case.
       return row.id;
     },
-    // The breaker keys by lower-case model id alone until it learns providers (M4).
-    isDown: (_provider, model) => isJobModelDown(model),
-    ...(carriesPicture ? { demoted: (_provider: ProviderId, model: string) => modelMisreadsPictures(model) } : {}),
+    // The breaker keys by tenant and lower-case model id, not by provider, until it learns providers (M4).
+    isDown: (_provider, model) => isJobModelDown(model, Date.now(), scope),
+    // A turn that carries a picture holds two kinds back to the end of the walk: a model measured to
+    // misread one (`PICTURE_MISREADS`), and a text-only model, which cannot read the replayed picture
+    // at all (`modelImageInput` "no"; it answers only when nothing else of the tier is live).
+    ...(carriesPicture
+      ? {
+          demoted: (_provider: ProviderId, model: string) =>
+            modelMisreadsPictures(model) || modelImageInput(model) === "no",
+        }
+      : {}),
   };
 }
 
@@ -95,9 +110,33 @@ export function resolveTierForCatalog(
   tier: ModelTierId,
   catalog: readonly SelectableModel[],
   modality: InputModality = "text",
+  scope?: ModelCacheScope,
   replaysPicture = false,
 ): TierResolution {
-  return resolveTier(tier, tierLiveness(catalog, modality, replaysPicture));
+  return resolveTier(tier, tierLiveness(catalog, modality, scope, replaysPicture));
+}
+
+/**
+ * The model a tier run moves to when `failed` could not be reached and had said nothing (model tiers spec,
+ * section 3, "Chat gains fallback"): the same tier's walk with `failed` skipped as if the breaker held it.
+ * Never another tier, and undefined when the tier has nothing else live, so the person gets the failure
+ * rather than a model of a kind they did not choose. The caller puts `failed` on the breaker.
+ */
+export function nextTierModel(
+  tier: ModelTierId,
+  failed: string,
+  catalog: readonly SelectableModel[],
+  modality: InputModality = "text",
+  scope?: ModelCacheScope,
+  replaysPicture = false,
+): string | undefined {
+  const base = tierLiveness(catalog, modality, scope, replaysPicture);
+  const gone = failed.trim().toLowerCase();
+  const resolved = resolveTier(tier, {
+    ...base,
+    isDown: (provider, model) => model.toLowerCase() === gone || base.isDown(provider, model),
+  });
+  return resolved.ok ? resolved.model : undefined;
 }
 
 /** One tier as the catalog payload shows it. No model id, label or provider name. */
@@ -120,11 +159,14 @@ function knownContextLength(row: SelectableModel | undefined): number | null {
   return typeof length === "number" && Number.isFinite(length) ? length : null;
 }
 
-/** One entry per tier in `MODEL_TIERS` order. An unavailable tier is text only, so the screen has one rule. */
-export function tierCatalog(catalog: readonly SelectableModel[]): TierCatalogEntry[] {
-  const liveness = INPUT_MODALITIES.map((modality) => ({ modality, liveness: tierLiveness(catalog, modality) }));
+/**
+ * One entry per tier in `MODEL_TIERS` order. An unavailable tier is text only, so the screen has one rule.
+ * `scope` is the tenant whose breaker decides availability, as it does for that tenant's runs.
+ */
+export function tierCatalog(catalog: readonly SelectableModel[], scope?: ModelCacheScope): TierCatalogEntry[] {
+  const liveness = INPUT_MODALITIES.map((modality) => ({ modality, liveness: tierLiveness(catalog, modality, scope) }));
   return MODEL_TIERS.map((id) => {
-    const text = resolveTier(id, tierLiveness(catalog, "text"));
+    const text = resolveTier(id, tierLiveness(catalog, "text", scope));
     const inputModalities = liveness
       .filter((entry) => entry.modality === "text" || resolveTier(id, entry.liveness).ok)
       .map((entry) => entry.modality);
@@ -138,8 +180,8 @@ export function tierCatalog(catalog: readonly SelectableModel[]): TierCatalogEnt
 }
 
 /** The two fields `GET /api/v1/models` and `GET /api/v1/chat` add to their payloads. */
-export function tierCatalogFields(catalog: readonly SelectableModel[]): TierCatalogFields {
-  return { tiers: tierCatalog(catalog), defaultTier: DEFAULT_MODEL_TIER };
+export function tierCatalogFields(catalog: readonly SelectableModel[], scope?: ModelCacheScope): TierCatalogFields {
+  return { tiers: tierCatalog(catalog, scope), defaultTier: DEFAULT_MODEL_TIER };
 }
 
 /**
@@ -150,8 +192,11 @@ export function tierCatalogFields(catalog: readonly SelectableModel[]): TierCata
  * `./selectable-models` with `importOriginal` and loads it first (the real `listSelectableModels`, not the
  * mock), which is how nine existing suites mock it.
  */
-export function withTierFields<T extends { models: readonly SelectableModel[] }>(body: T): T & TierCatalogFields {
-  return { ...body, ...tierCatalogFields(body.models) };
+export function withTierFields<T extends { models: readonly SelectableModel[] }>(
+  body: T,
+  scope?: ModelCacheScope,
+): T & TierCatalogFields {
+  return { ...body, ...tierCatalogFields(body.models, scope) };
 }
 
 /** What a run that named a tier uses in place of the model and the Thinking level its body would carry. */
@@ -160,6 +205,8 @@ export type TierRun = Readonly<{
   /** The catalog's spelling of the model the tier resolved to. */
   model: string;
   reasoning: ReasoningEffortChoice;
+  /** Whether this turn carries a picture to the model, for the same demotion on a fallback walk. */
+  replaysPicture?: boolean;
 }>;
 
 function namedTier(body: unknown): unknown {
@@ -181,6 +228,7 @@ export function chooseTierRun(
   body: unknown,
   modality: InputModality,
   catalog: readonly SelectableModel[],
+  scope?: ModelCacheScope,
   replaysPicture = false,
 ): TierRun | null {
   const named = namedTier(body);
@@ -194,11 +242,11 @@ export function chooseTierRun(
   if (!requested.ok) {
     throw new ApiError("unknown_tier", `tier must be one of ${MODEL_TIERS.join(", ")}`, 400);
   }
-  const resolved = resolveTierForCatalog(requested.tier, catalog, modality, replaysPicture);
+  const resolved = resolveTierForCatalog(requested.tier, catalog, modality, scope, replaysPicture);
   if (!resolved.ok) {
     throw new ApiError("tier_unavailable", "No model is available for this tier right now", 503);
   }
-  return { tier: resolved.tier, model: resolved.model, reasoning: { ...REASONING_BY_THINKING[resolved.thinking] } };
+  return { tier: resolved.tier, model: resolved.model, reasoning: { ...REASONING_BY_THINKING[resolved.thinking] }, replaysPicture: modality === "image" || replaysPicture };
 }
 
 /**
@@ -219,5 +267,5 @@ export async function resolveTierRun(options: {
     return null;
   }
   const replaysPicture = options.modality === "text" ? ((await options.threadReplaysPicture?.()) ?? false) : false;
-  return chooseTierRun(options.body, options.modality, listSelectableModels(options.tenant), replaysPicture);
+  return chooseTierRun(options.body, options.modality, listSelectableModels(options.tenant), options.tenant, replaysPicture);
 }

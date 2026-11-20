@@ -56,7 +56,7 @@ function chunk(delta: Record<string, unknown>, finish: string | null = null, usa
 }
 
 /** A chat-completions stream that sends each of `deltas` as its own frame, then optionally a tool call. */
-function chatStream(deltas: string[], tool?: { name: string; args: string }): Response {
+function chatStream(deltas: string[], tool?: { name: string; args: string }, error?: string): Response {
   const usage = { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 };
   const frames = [
     ...deltas.map((content, index) => chunk({ ...(index === 0 ? { role: "assistant" } : {}), content })),
@@ -69,6 +69,7 @@ function chatStream(deltas: string[], tool?: { name: string; args: string }): Re
         ]
       : []),
     chunk({}, tool ? "tool_calls" : "stop", usage),
+    ...(error ? [{ error: { message: error } }] : []),
   ];
   const body = `${frames.map((frame) => `data: ${JSON.stringify(frame)}\n\n`).join("")}data: [DONE]\n\n`;
   return new Response(encoder.encode(body), { status: 200, headers: { "content-type": "text/event-stream" } });
@@ -203,6 +204,28 @@ describe("a reply of whitespace only", () => {
     expect(String((failed as Error).message)).toMatch(/returned no text/);
     expect(completed(events)).toHaveLength(0);
     expect(deltas(events)).toEqual([]);
+  });
+
+  it.each([false, true])("includes the usage of every attempt (with an intermediate retry: %s)", async (intermediate) => {
+    const seen = gateway([
+      () => chatStream([], undefined, "upstream unavailable"),
+      ...(intermediate ? [() => chatStream([], undefined, "upstream unavailable")] : []),
+      () => chatStream(["ok"]),
+    ]);
+    const { events, failed } = await run();
+    const attempts = intermediate ? 3 : 2;
+
+    expect(failed).toBeUndefined();
+    expect(failedEvent(events)).toBeUndefined();
+    expect(seen).toHaveLength(attempts);
+    expect(deltas(events)).toEqual(["ok"]);
+    expect(completed(events)).toEqual([
+      {
+        type: "run.completed",
+        runId: "run-blank",
+        usage: { model: "deepseek-v4-flash", inputTokens: attempts, outputTokens: attempts },
+      },
+    ]);
   });
 
   it("does not fail a turn that ran a tool: a tool turn with no prose keeps completing", async () => {

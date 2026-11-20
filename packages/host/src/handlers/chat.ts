@@ -27,7 +27,7 @@ export async function handleGetChat(request: HostRequest): Promise<HostResult> {
       version: ready.version,
       models,
       defaultModel: defaultSelectableModel(undefined, tenant),
-      ...tierCatalogFields(models),
+      ...tierCatalogFields(models, tenant),
       specialists,
     });
   } catch (error) {

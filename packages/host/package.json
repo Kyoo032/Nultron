@@ -11,6 +11,7 @@
   "scripts": {
     "test": "vitest run",
     "eval:models:diff": "tsx eval/models/catalog-diff.ts",
+    "eval:models:handoff": "tsx eval/models/handoff.ts",
     "eval:models:probe": "tsx eval/models/probe.ts",
     "eval:models:test": "vitest run --root eval/models"
   },

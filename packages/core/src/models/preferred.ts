@@ -1,6 +1,7 @@
 import { isEverydayModel } from "./curation";
 import { firstLiveId } from "./media-kind";
 import { modelPolicy } from "./model-policy";
+import { isSupersededModel } from "./superseded";
 
 type ModelRef = { id: string };
 
@@ -9,20 +10,24 @@ export { formatContextLength } from "./context-length";
 /**
  * Chat defaults, best first (2026-09-30): the default is GPT 6 Luna, the cheapest ($0.10 / $0.50 per 1M)
  * and among the fastest; the rest follow by price and speed. The first seven are the Recommended group
- * (`EVERYDAY_MODEL_IDS`, same order); the last three are only stand-ins for `chooseDefaultModel` when
- * none of those is listed, and stay out of Recommended.
+ * (`EVERYDAY_MODEL_IDS`, same order); the last two are only stand-ins for `chooseDefaultModel` when
+ * none of those is listed, and stay out of Recommended. This list is also the Daily tier.
+ *
+ * 2026-11-10 (owner: newest and cheapest): Gemini 3.8 Flash replaces 3.5 Flash in fourth place, and the
+ * stand-ins are Claude Haiku 5.5 ($0.10 / $0.50) and Qwen3.8 Flash ($0.15 / $0.47) in place of GPT 5.6
+ * Luna, Claude Sonnet 5 and DeepSeek V4 Flash (`superseded.ts`). The three new ids are not yet probed;
+ * the four ahead of them were (probe 2026-09-30), so the new ones answer only when those cannot.
  */
 export const CHAT_DEFAULT_PREFERENCES = [
   "gpt-6-luna",
   "claude-sonnet-5-5",
   "deepseek-v4-1-flash",
-  "gemini-3.5-flash",
+  "gemini-3.8-flash",
   "gpt-6-sol",
   "glm-5.3-flash",
   "qwen3.7-plus",
-  "gpt-5.6-luna",
-  "claude-sonnet-5",
-  "deepseek-v4-flash",
+  "claude-haiku-5-5",
+  "qwen3.8-flash",
 ];
 
 function tierRank(id: string): number {
@@ -416,9 +421,19 @@ export type PickerGroupKind = "recommended" | "brand" | "other";
 
 export type PickerGroup<T> = { kind: PickerGroupKind; label: string; models: T[] };
 
-export function pickerGroups<T extends ModelRef>(models: T[]): Array<PickerGroup<T>> {
+/**
+ * The picker's groups. A superseded id (`superseded.ts`) is left out, so nobody picks an older model
+ * that costs more than its successor, except `selectedId`: the desk's current choice always stays in
+ * the list, so a saved pick is never stranded with no matching option.
+ */
+export function pickerGroups<T extends ModelRef>(models: T[], selectedId?: string): Array<PickerGroup<T>> {
   const allIds = new Set(models.map((model) => model.id));
-  const visible = models.filter((model) => !isPickerHidden(model.id) && !isDatedSnapshot(model.id, allIds));
+  const visible = models.filter(
+    (model) =>
+      !isPickerHidden(model.id) &&
+      !isDatedSnapshot(model.id, allIds) &&
+      (!isSupersededModel(model.id) || model.id === selectedId),
+  );
   const recommended = recommendedChatModels(visible);
   const used = new Set(recommended.map((model) => model.id));
   const groups: Array<PickerGroup<T>> = [];

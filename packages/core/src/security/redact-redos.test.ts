@@ -48,6 +48,7 @@ const HOSTILE_AND_MASKED: ReadonlyArray<readonly [string, string]> = [
   ["a Slack app token shape repeated", "xapp-1-".repeat(15_000)],
   ["a Slack rotating token shape repeated", "xoxe-1-".repeat(15_000)],
   ["an encoded bearer prefix repeated", "Bearer%20".repeat(11_000)],
+  ["a case-varied form-encoded bearer prefix repeated", "bEaReR+".repeat(14_000)],
   ["a long run after a Stripe key prefix", `sk_live_${"a".repeat(100_000)}`],
   ["an X-Api-Key header name and colon repeated", "x-api-key:".repeat(10_000)],
   ["a JWT header prefix and a hyphen repeated, then a whole dotted tail", `${"eyJ-".repeat(25_000)}.aaaaaaaa.aaaaaaaa`],
@@ -75,6 +76,47 @@ describe("redactCredentials: hostile input stays fast", () => {
     expect(deep.ms).toBeLessThan(BUDGET_MS);
     expect(deep.value).toEqual({ output: { page: input } });
   });
+
+  it("is as fast on a long opaque run ending in dot-tilde tails through redactSecrets", () => {
+    const input = `${"a".repeat(50_000)}${".~".repeat(25_000)}`;
+    const { ms } = timed(() => redactSecrets(input));
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+
+  it.each([
+    `t=${"a".repeat(40)}${"=".repeat(100_000)}`,
+    `t=${"a".repeat(40)}${"=".repeat(100_000)}~`,
+    `t=${"a".repeat(40)}${".~".repeat(50_000)}`,
+  ])("is as fast on a long padding or tail run through redactSecrets: %s", (input) => {
+    const { ms } = timed(() => redactSecrets(input));
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+
+  it("is as fast on a long leading-dot run before a token through redactSecrets", () => {
+    const input = `${".".repeat(40_000)}AbCdEfGhIjKlMnOpQrStUvWxYz0123456789`;
+    const { value, ms } = timed(() => redactSecrets(input));
+    expect(value).toBe(`${".".repeat(40_000)}[REDACTED]`);
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+
+  it("is as fast on a long '=' padding run after a token through redactSecrets", () => {
+    const input = `key: AbCdEfGhIjKlMnOpQrStUvWxYz0123456789${"=".repeat(80_000)}`;
+    const { ms } = timed(() => redactSecrets(input));
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+
+  it("is as fast on a long dotted query value through redactSecrets", () => {
+    const input = `GET https://h.com/cb?sig=${".".repeat(80_000)} 200`;
+    const { ms } = timed(() => redactSecrets(input));
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+
+  it("is as fast on a long dotted URL segment without a tilde through redactSecrets", () => {
+    const input = `GET https://h.com/a/b/${".".repeat(80_000)} 200`;
+    const { ms } = timed(() => redactSecrets(input));
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+
 
   it("is as fast on a repeated JWT header prefix through redactSecrets and redactSecretsDeep", () => {
     const input = `${"eyJ-".repeat(25_000)}.aaaaaaaa.`;

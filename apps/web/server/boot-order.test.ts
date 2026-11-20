@@ -58,7 +58,10 @@ function hostedEnv(): Record<string, string> {
 function inheritedEnv(): Record<string, string> {
   const kept: Record<string, string> = {};
   for (const [name, value] of Object.entries(process.env)) {
-    if (value === undefined || /^(AGENTFORGE_|PORTAL_|PORT$|BIND_HOST$|NODE_ENV$|DATABASE_URL$)/.test(name)) {
+    if (
+      value === undefined ||
+      /^(AGENTFORGE_|PORTAL_|PREVIEW_BASIC_|PORT$|BIND_HOST$|NODE_ENV$|DATABASE_URL$)/.test(name)
+    ) {
       continue;
     }
     kept[name] = value;
