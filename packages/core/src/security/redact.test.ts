@@ -104,10 +104,20 @@ describe("redactSecrets", () => {
 
   it.each([
     "GET https://example.com/some/fairly/long/path/segment/here 404",
+    "GET https://docs.example.com/guides/gettingstartedwithinstallation 404",
     "failed at C:\\project\\core\\file-with-an-extra-long-filename.test.ts line 20",
     "dir \\\\server\\share\\with-a-fairly-long-file-name.txt",
   ])("keeps ordinary URLs and Windows paths: %s", (input) => {
     expect(redactSecrets(input)).toBe(input);
+  });
+
+  it("masks a URL path segment including its dot-tilde tail", () => {
+    const input = `https://h.example/a/b/${"a".repeat(30)}.~`;
+    expect(redactSecrets(input)).toBe("https://h.example/a/b/[REDACTED]");
+  });
+
+  it("masks a standalone opaque token ending in a tilde tail", () => {
+    expect(redactSecrets("Value: abcdefghijklmnop.qrstuvwxyz123456.~")).toBe("Value: [REDACTED]");
   });
 
   it.each([

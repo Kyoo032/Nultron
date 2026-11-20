@@ -81,7 +81,11 @@ function maskEnvAssignment(match: string, head: string, name: string, equals: st
 }
 
 const BASE64_RE = /\b[A-Za-z0-9+/]{32,}={0,2}\b/g;
-const OPAQUE_RUN_RE = /(?<![A-Za-z0-9+./\\_-])(\.*)([A-Za-z0-9+/\\_-][A-Za-z0-9+./\\_-]{30,}[A-Za-z0-9+/\\_-])={0,2}/g;
+// A run may end in a `.`/`~` tail that holds at least one `~` (`token.~`, `token~`): the tail is
+// captured apart from the token so a masked run keeps none of it, while a lone `.` stays ambiguous
+// with sentence punctuation and is never eaten.
+const OPAQUE_RUN_RE =
+  /(?<![A-Za-z0-9+./\\_-])(\.*)([A-Za-z0-9+/\\_-][A-Za-z0-9+./\\_-]{30,}[A-Za-z0-9+/\\_-])((?:[.~]*~)?)={0,2}/g;
 const UUID_RE = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const FILE_EXTENSION_RE = /\.[a-z][a-z0-9]{0,9}$/i;
 
@@ -134,9 +138,14 @@ const isWindowsPathRun = (token: string, followsColon: boolean): boolean =>
   token.startsWith("\\\\") || (followsColon && token.startsWith("\\"));
 
 // In a URL run after a scheme colon, a path segment this long and shapeless is a token (a webhook's
-// secret part, a signed link's key); words, ids, hosts and short segments stay readable.
+// secret part, a signed link's key); words, ids, hosts and short segments stay readable. The bare
+// 24+ rule also asks for token entropy — at least two of lower, upper and digit — so a long
+// word-like segment (`gettingstartedwithinstallation`) keeps its text.
 const URL_TOKEN_SEGMENT_RE = /^[A-Za-z0-9_-]{24,}$/;
 const URL_OPAQUE_SEGMENT_RE = /^[A-Za-z0-9+._~-]{32,}$/;
+const URL_SEGMENT_CLASSES = [/[a-z]/, /[A-Z]/, /[0-9]/];
+const looksLikeUrlToken = (segment: string): boolean =>
+  URL_SEGMENT_CLASSES.filter((cls) => cls.test(segment)).length >= 2;
 
 function maskUrlRun(match: string, token: string): string {
   const masked = token
@@ -144,7 +153,8 @@ function maskUrlRun(match: string, token: string): string {
     .map((segment, index) =>
       index > 2 &&
       !UUID_RE.test(segment) &&
-      (URL_TOKEN_SEGMENT_RE.test(segment) || URL_OPAQUE_SEGMENT_RE.test(segment))
+      ((URL_TOKEN_SEGMENT_RE.test(segment) && looksLikeUrlToken(segment)) ||
+        URL_OPAQUE_SEGMENT_RE.test(segment))
         ? "[REDACTED]"
         : segment,
     )
@@ -168,9 +178,16 @@ function isPathLike(token: string, padded: boolean, followsColon: boolean): bool
   );
 }
 
-function maskOpaqueRun(match: string, leadingDots: string, token: string, offset: number, text: string): string {
+function maskOpaqueRun(
+  match: string,
+  leadingDots: string,
+  token: string,
+  tail: string,
+  offset: number,
+  text: string,
+): string {
   if (text[offset - 1] === ":" && token.startsWith("//")) {
-    return maskUrlRun(match, token);
+    return maskUrlRun(match, token + tail);
   }
   if (
     isPathLike(token, match.endsWith("="), text[offset - 1] === ":") ||

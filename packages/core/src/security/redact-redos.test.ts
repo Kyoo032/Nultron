@@ -77,6 +77,12 @@ describe("redactCredentials: hostile input stays fast", () => {
     expect(deep.value).toEqual({ output: { page: input } });
   });
 
+  it("is as fast on a long opaque run ending in dot-tilde tails through redactSecrets", () => {
+    const input = `${"a".repeat(50_000)}${".~".repeat(25_000)}`;
+    const { ms } = timed(() => redactSecrets(input));
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+
   it("is as fast on a repeated JWT header prefix through redactSecrets and redactSecretsDeep", () => {
     const input = `${"eyJ-".repeat(25_000)}.aaaaaaaa.`;
     const shallow = timed(() => redactSecrets(input));
