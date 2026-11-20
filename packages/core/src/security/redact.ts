@@ -81,12 +81,12 @@ function maskEnvAssignment(match: string, head: string, name: string, equals: st
 }
 
 const BASE64_RE = /\b[A-Za-z0-9+/]{32,}={0,2}\b/g;
-// A run may end in `=` padding and then a `.`/`~` tail that holds at least one `~` (`token.~`,
-// `token~`, `token=.~`): padding and tail are captured apart from the token so a masked run keeps
-// none of them, while a lone `.` stays ambiguous with sentence punctuation and is never eaten.
-// The tail is bounded so a long dotted run cannot make the match retry it at every dot.
+// A run may end in `=` padding of any length and/or a `.`/`~` tail that holds at least one `~`
+// (`token.~`, `token~`, `token=.~`, `token==~`, `token~=`): padding and tail are captured apart
+// from the token so a masked run keeps none of them, while a lone `.` stays ambiguous with
+// sentence punctuation and is never eaten.
 const OPAQUE_RUN_RE =
-  /(?<![A-Za-z0-9+./\\_-])(\.*)([A-Za-z0-9+/\\_-][A-Za-z0-9+./\\_-]{30,}[A-Za-z0-9+/\\_-])(=*)((?:[.~]{0,4}~)?)/g;
+  /(?<![A-Za-z0-9+./\\_-])(\.*)([A-Za-z0-9+/\\_-][A-Za-z0-9+./\\_-]{30,}[A-Za-z0-9+/\\_-])(=*)((?:[.~]*~)?=*)/g;
 const UUID_RE = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const FILE_EXTENSION_RE = /\.[a-z][a-z0-9]{0,9}$/i;
 
@@ -183,17 +183,8 @@ function maskUrlRun(match: string, token: string): string {
     .map((segment, index) => {
       // A `.`/`~` tail or `=` padding the opaque run joined into the token is not part of the
       // segment's shape: the token rule tests the bare segment, the opaque rule the segment
-      // with `=` padding removed (`.~` still counts toward its length). The tail is stripped by
-      // one backward pass, not `[.~]*~$`, which retries at every dot of a long dotted segment.
-      let bare = segment;
-      if (bare.endsWith("~")) {
-        let start = bare.length;
-        while (start > 0 && (bare[start - 1] === "." || bare[start - 1] === "~")) {
-          start -= 1;
-        }
-        bare = bare.slice(0, start);
-      }
-      bare = bare.replace(/=+$/, "");
+      // with `=` padding removed (`.~` still counts toward its length).
+      const bare = stripPaddingTail(segment);
       return index > 2 &&
         !UUID_RE.test(bare) &&
         ((URL_TOKEN_SEGMENT_RE.test(bare) && looksLikeUrlToken(bare)) ||
@@ -247,28 +238,24 @@ function maskOpaqueRun(
     return `${leadingDots}[REDACTED]`;
   }
   const masked = match.replace(BASE64_RE, "[REDACTED]");
-  return masked === match ? match : stripOpaqueTail(masked);
+  return masked === match ? match : stripPaddingTail(masked);
 }
 
-// Remove the `=` padding and `.`/`~` tail a masked run kept, with one pass per character: a regex
-// like `=*[.~]*~=*$` retries the unbounded classes at every `=` or dot of a long hostile run.
-// A lone `.` tail stays, ambiguous with sentence punctuation; `=` padding always goes.
-function stripOpaqueTail(masked: string): string {
-  let end = masked.length;
-  while (end > 0 && masked[end - 1] === "=") {
-    end -= 1;
+// Trailing `=` padding, an optional `.`/`~` tail that holds a `~`, then more
+// `=` padding. Done as index walks, not regexes: a `=*`+`~` backtrack on a
+// long padding run is quadratic in a synchronous redactor.
+function stripPaddingTail(text: string): string {
+  let end = text.length;
+  while (end > 0 && text[end - 1] === "=") end--;
+  let tailStart = end;
+  while (tailStart > 0 && (text[tailStart - 1] === "." || text[tailStart - 1] === "~")) {
+    tailStart--;
   }
-  if (end > 0 && masked[end - 1] === "~") {
-    let start = end - 1;
-    while (start > 0 && (masked[start - 1] === "." || masked[start - 1] === "~")) {
-      start -= 1;
-    }
-    while (start > 0 && masked[start - 1] === "=") {
-      start -= 1;
-    }
-    return masked.slice(0, start);
+  if (text.slice(tailStart, end).includes("~")) {
+    end = tailStart;
+    while (end > 0 && text[end - 1] === "=") end--;
   }
-  return masked.slice(0, end);
+  return text.slice(0, end);
 }
 
 export function redactCredentials(text: string): string {

@@ -83,6 +83,15 @@ describe("redactCredentials: hostile input stays fast", () => {
     expect(ms).toBeLessThan(BUDGET_MS);
   });
 
+  it.each([
+    `t=${"a".repeat(40)}${"=".repeat(100_000)}`,
+    `t=${"a".repeat(40)}${"=".repeat(100_000)}~`,
+    `t=${"a".repeat(40)}${".~".repeat(50_000)}`,
+  ])("is as fast on a long padding or tail run through redactSecrets: %s", (input) => {
+    const { ms } = timed(() => redactSecrets(input));
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+
   it("is as fast on a long leading-dot run before a token through redactSecrets", () => {
     const input = `${".".repeat(40_000)}AbCdEfGhIjKlMnOpQrStUvWxYz0123456789`;
     const { value, ms } = timed(() => redactSecrets(input));
@@ -107,6 +116,7 @@ describe("redactCredentials: hostile input stays fast", () => {
     const { ms } = timed(() => redactSecrets(input));
     expect(ms).toBeLessThan(BUDGET_MS);
   });
+
 
   it("is as fast on a repeated JWT header prefix through redactSecrets and redactSecretsDeep", () => {
     const input = `${"eyJ-".repeat(25_000)}.aaaaaaaa.`;
