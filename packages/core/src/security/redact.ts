@@ -81,11 +81,12 @@ function maskEnvAssignment(match: string, head: string, name: string, equals: st
 }
 
 const BASE64_RE = /\b[A-Za-z0-9+/]{32,}={0,2}\b/g;
-// A run may end in `=` padding and then a `.`/`~` tail that holds at least one `~` (`token.~`,
-// `token~`, `token=.~`): padding and tail are captured apart from the token so a masked run keeps
-// none of them, while a lone `.` stays ambiguous with sentence punctuation and is never eaten.
+// A run may end in `=` padding of any length and/or a `.`/`~` tail that holds at least one `~`
+// (`token.~`, `token~`, `token=.~`, `token==~`, `token~=`): padding and tail are captured apart
+// from the token so a masked run keeps none of them, while a lone `.` stays ambiguous with
+// sentence punctuation and is never eaten.
 const OPAQUE_RUN_RE =
-  /(?<![A-Za-z0-9+./\\_-])(\.*)([A-Za-z0-9+/\\_-][A-Za-z0-9+./\\_-]{30,}[A-Za-z0-9+/\\_-])(={0,2})((?:[.~]*~)?)/g;
+  /(?<![A-Za-z0-9+./\\_-])(\.*)([A-Za-z0-9+/\\_-][A-Za-z0-9+./\\_-]{30,}[A-Za-z0-9+/\\_-])(=*)((?:[.~]*~)?=*)/g;
 const UUID_RE = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const FILE_EXTENSION_RE = /\.[a-z][a-z0-9]{0,9}$/i;
 
@@ -154,7 +155,7 @@ function maskUrlRun(match: string, token: string): string {
       // A `.`/`~` tail or `=` padding the opaque run joined into the token is not part of the
       // segment's shape: the token rule tests the bare segment, the opaque rule the segment
       // with `=` padding removed (`.~` still counts toward its length).
-      const bare = segment.replace(/[.~]*~$/, "").replace(/={0,2}$/, "");
+      const bare = segment.replace(/[.~]*~=*$/, "").replace(/=*$/, "");
       return index > 2 &&
         !UUID_RE.test(bare) &&
         ((URL_TOKEN_SEGMENT_RE.test(bare) && looksLikeUrlToken(bare)) ||
@@ -208,7 +209,7 @@ function maskOpaqueRun(
     return `${leadingDots}[REDACTED]`;
   }
   const masked = match.replace(BASE64_RE, "[REDACTED]");
-  return masked === match ? match : masked.replace(/={0,2}[.~]*~={0,2}$/, "").replace(/={1,2}$/, "");
+  return masked === match ? match : masked.replace(/=*[.~]*~=*$/, "").replace(/=+$/, "");
 }
 
 export function redactCredentials(text: string): string {

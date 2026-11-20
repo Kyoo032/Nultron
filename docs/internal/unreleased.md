@@ -1401,3 +1401,8 @@ Lanes: enterprise, tester.
 Lanes: enterprise, tester.
 
 - An opaque run ending in `==` padding followed by a `.`/`~` tail (`token==~`, `token==.~`) is now masked whole instead of leaving one `=` behind; bare `token=` and `token==` padding no longer leaks either.
+## Redactor consumes a padding run of any length, 2026-11-20 (DFIND-104)
+
+Lanes: enterprise, tester.
+
+- An opaque run's trailing `=` padding is no longer capped at two (`token===`, `token===~`): the padding group and both masked-run strip passes are now unbounded (`=*` / `=+`), ending the `=` residue class.
