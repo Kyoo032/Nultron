@@ -1382,3 +1382,10 @@ Lanes: enterprise, tester.
 
 - Preview form sign-in and sign-out no longer return 403 just because the browser uses a bracketed IPv6 address as the host. The address is canonicalized before comparison; a different address, scheme or port still fails.
 - The preview gate HTTP suite covers the fix. The live preview was not changed or driven; Caddy Basic Auth stays on.
+
+## Redactor URL-path edges: word-like segments stay, `.~` tails mask, 2026-11-20 (DFIND-95)
+
+Lanes: enterprise, tester.
+
+- The bare 24+-character URL path segment rule in `redactSecrets` now also requires token entropy (at least two of lower-case, upper-case and digit), so a long word-like segment such as `gettingstartedwithinstallation` stays readable; webhook secrets and hex runs still mask.
+- An opaque run ending in a `.`/`~` tail (`token.~`, `token~`) is now masked with its tail; a lone trailing `.` still reads as sentence punctuation.

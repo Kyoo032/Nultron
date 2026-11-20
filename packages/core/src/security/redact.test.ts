@@ -104,10 +104,34 @@ describe("redactSecrets", () => {
 
   it.each([
     "GET https://example.com/some/fairly/long/path/segment/here 404",
+    "GET https://docs.example.com/guides/gettingstartedwithinstallation 404",
     "failed at C:\\project\\core\\file-with-an-extra-long-filename.test.ts line 20",
     "dir \\\\server\\share\\with-a-fairly-long-file-name.txt",
   ])("keeps ordinary URLs and Windows paths: %s", (input) => {
     expect(redactSecrets(input)).toBe(input);
+  });
+
+  it("masks a URL path segment including its dot-tilde tail", () => {
+    const input = `https://h.example/a/b/${"a".repeat(30)}.~`;
+    expect(redactSecrets(input)).toBe("https://h.example/a/b/[REDACTED]");
+  });
+
+  it("masks a short token segment ending in a tilde tail", () => {
+    expect(redactSecrets("POST https://hooks.slack.com/services/T01ABCDEFGH/B02ABCDEFGH/xm9pQrStUvWxYzAbCdEfGh12~ 200")).toBe(
+      "POST https://hooks.slack.com/services/T01ABCDEFGH/B02ABCDEFGH/[REDACTED] 200",
+    );
+  });
+
+  it("keeps a UUID segment ending in a tilde tail", () => {
+    const input = "session https://h.example/a/9f86d081-884c-7d65-9a2f-eaa0c55ad015~ done";
+    expect(redactSecrets(input)).toBe(input);
+  });
+
+  it.each([
+    ["Value: abcdefghijklmnop.qrstuvwxyz123456.~", "Value: [REDACTED]"],
+    [`Value: ${"x".repeat(40)}~`, "Value: [REDACTED]"],
+  ])("masks a standalone opaque token ending in a tilde tail: %s", (input, expected) => {
+    expect(redactSecrets(input)).toBe(expected);
   });
 
   it.each([
