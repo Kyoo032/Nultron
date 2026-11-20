@@ -155,6 +155,15 @@ describe("redactSecrets", () => {
   });
 
   it.each([
+    ["key: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo==", "key: [REDACTED]"],
+    ["key: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo=", "key: [REDACTED]"],
+    ["key: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo==~", "key: [REDACTED]"],
+    ["key: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo==.~", "key: [REDACTED]"],
+  ])("masks an opaque token with '=' padding and leaves no residue: %s", (input, expected) => {
+    expect(redactSecrets(input)).toBe(expected);
+  });
+
+  it.each([
     ["GET https://h.com/cb?sig=AbCdEfGhIjKlMnOpQrStUvWx 200", "GET https://h.com/cb?sig=[REDACTED] 200"],
     ["GET https://h.com/cb?sig=AbCdEfGhIjKlMnOpQrStUvWx&ok=1 200", "GET https://h.com/cb?sig=[REDACTED]&ok=1 200"],
     ["token https://h.com/cb?sig=AbCdEfGhIjKlMnOpQrStUvWx== 200", "token https://h.com/cb?sig=[REDACTED] 200"],
