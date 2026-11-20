@@ -188,6 +188,10 @@
   flex-basis: 100%;
 }
 
+.chat-greeting-cta {
+  margin-top: 0.5rem;
+}
+
 .chat-idea-row {
   display: flex;
   flex: 1 1 0;

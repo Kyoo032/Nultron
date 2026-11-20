@@ -21,6 +21,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { SettingsPage } from "@/components/settings-page";
 import { UsagePage } from "@/components/usage-page";
 import { VirtualAgentsPage } from "@/components/virtual-agents-page";
+import { TeamPage } from "@/components/team-page";
 import { WorkspacesPage } from "@/components/workspaces-page";
 import { KnowledgePage } from "@/components/knowledge-page";
 import { ChannelsPage } from "@/components/channels-page";
@@ -422,6 +423,14 @@ export function AppRoutes() {
               element={
                 <DeskPane>
                   {SHELL_LAYOUT === "chat-first" ? <VirtualAgentsPage /> : <WorkspacesPage />}
+                </DeskPane>
+              }
+            />
+            <Route
+              path="/team"
+              element={
+                <DeskPane>
+                  {SHELL_LAYOUT === "chat-first" ? <TeamPage /> : <Navigate to="/workspaces" replace />}
                 </DeskPane>
               }
             />

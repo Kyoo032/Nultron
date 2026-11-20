@@ -28,6 +28,7 @@ import enFiles from "../locales/en/files.json";
 import enFolder from "../locales/en/folder.json";
 import enAgents from "../locales/en/agents.json";
 import enHarness from "../locales/en/harness.json";
+import enTeam from "../locales/en/team.json";
 import idAgents from "../locales/id/agents.json";
 import idHarness from "../locales/id/harness.json";
 import idAuth from "../locales/id/auth.json";
@@ -57,6 +58,7 @@ import idVideos from "../locales/id/videos.json";
 import idWorkspaces from "../locales/id/workspaces.json";
 import idFiles from "../locales/id/files.json";
 import idFolder from "../locales/id/folder.json";
+import idTeam from "../locales/id/team.json";
 
 const NAMESPACES = [
   "common",
@@ -89,6 +91,7 @@ const NAMESPACES = [
   // Tester code: the virtual agents shell (`agents`) and what an agent is made of (`harness`).
   "agents",
   "harness",
+  "team",
 ] as const;
 type Namespace = (typeof NAMESPACES)[number];
 type MessageTree = { [key: string]: string | MessageTree };
@@ -124,6 +127,7 @@ const catalogs: Record<AppLocale, Record<Namespace, MessageTree>> = {
     guide: enGuide,
     agents: enAgents,
     harness: enHarness,
+    team: enTeam,
   },
   id: {
     common: idCommon,
@@ -155,6 +159,7 @@ const catalogs: Record<AppLocale, Record<Namespace, MessageTree>> = {
     guide: idGuide,
     agents: idAgents,
     harness: idHarness,
+    team: idTeam,
   },
 };
 

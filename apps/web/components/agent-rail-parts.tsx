@@ -18,6 +18,8 @@ export type RailLinkProps = {
   collapsed: boolean;
   children: ReactNode;
   className?: string;
+  /** A quieter second line under the label, for rows like team bots that need a role subtitle. */
+  detail?: string;
   conversation?: VirtualAgentInfo["conversation"];
   onTip: (label: string) => (event: SyntheticEvent<HTMLElement>) => void;
   onTipEnd: () => void;
@@ -32,6 +34,7 @@ export function RailLink({
   collapsed,
   children,
   className,
+  detail,
   conversation,
   onTip,
   onTipEnd,
@@ -54,7 +57,14 @@ export function RailLink({
       onBlur={onTipEnd}
     >
       {children}
-      {collapsed ? null : <span className="agent-rail-label">{label}</span>}
+      {collapsed ? null : detail ? (
+        <span className="agent-rail-labels">
+          <span className="agent-rail-label">{label}</span>
+          <span className="agent-rail-detail">{detail}</span>
+        </span>
+      ) : (
+        <span className="agent-rail-label">{label}</span>
+      )}
     </Link>
   );
 }

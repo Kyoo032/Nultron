@@ -13,6 +13,7 @@ import { DOSSIER_TOOL_KEY, readDossierResult } from "@/components/tool-rows/doss
 import { FINANCE_TASK_TOOL_KEY, readFinanceResult } from "@/components/tool-rows/finance-result";
 import { t } from "@/lib/i18n";
 import { permissionRequestOf } from "@/lib/media-permission";
+import { isTeamBotParam } from "@/lib/team";
 
 /** Fast tools still show a completed row; they skip the long "Working…" spinner. */
 
@@ -284,7 +285,10 @@ function webSearchSummary(label: string, input: unknown, output: unknown): strin
  */
 function delegateSummary(label: string, input: unknown, output: unknown): string {
   const agent = delegatedAgentOf(input, output);
-  const named = agent ? `${label} · ${t(`rail.${agent}`)}` : label;
+  const agentName = readString(asRecord(output), "agentName");
+  const agentLabel =
+    agentName ?? (agent ? (isTeamBotParam(agent) ? agent : t(`rail.${agent}`)) : null);
+  const named = agentLabel ? `${label} · ${agentLabel}` : label;
   const record = asRecord(output);
   const message = record?.ok === false ? readString(record, "message") : undefined;
   return message ? `${named} · ${gist(message)}` : named;

@@ -216,8 +216,50 @@
   white-space: nowrap;
 }
 
+.agent-rail-labels {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.agent-rail-detail {
+  overflow: hidden;
+  color: var(--rail-text-3);
+  font-size: 0.6875rem;
+  font-weight: 400;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agent-rail[data-rail="full"] .agent-rail-bot {
+  height: auto;
+  min-height: var(--ar-row);
+  padding-block: 5px;
+}
+
 .agent-rail-link[aria-current="page"] .agent-rail-label {
   font-weight: 600;
+}
+
+.agent-rail-team {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--rail-line);
+}
+
+.agent-rail-team-title {
+  margin: 0;
+  padding: 0 8px 2px;
+  color: var(--rail-text-3);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .agent-rail[data-rail="full"] .agent-rail-agents,

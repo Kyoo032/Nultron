@@ -9,6 +9,7 @@
  * draws the same card from the saved call alone.
  */
 import { PRODUCT_MODE_IDS, type ProductMode } from "@agentforge/core/product-modes";
+import { isTeamBotParam, type TeamBotSlug } from "@/lib/team";
 import { asRecord, readList, readString } from "./results";
 
 export const DELEGATE_TOOL_KEY = "delegate";
@@ -20,8 +21,12 @@ const HEADLINE_MAX = 120;
 export const DELEGATE_FAILURES = ["cancelled", "timeout", "no_answer", "failed"] as const;
 export type DelegateFailure = (typeof DELEGATE_FAILURES)[number];
 
+export type DelegateAgent = ProductMode | TeamBotSlug;
+
 export type DelegateCardModel = {
-  readonly agent: ProductMode;
+  readonly agent: DelegateAgent;
+  /** The host's own name for the asked agent. Bots carry one; a mode falls back to its rail label. */
+  readonly agentName?: string;
   /** The conversation that holds the task and the answer. */
   readonly threadId: string;
   /** The first line of the task, cut to a headline's length. */
@@ -43,10 +48,16 @@ function headlineOf(task: string | undefined): string {
   return first.length > HEADLINE_MAX ? `${first.slice(0, HEADLINE_MAX - 1).trimEnd()}…` : first;
 }
 
-/** The agent a call asked: the answer's own `agent`, else the call's argument. Null for anything not a mode. */
-export function delegatedAgentOf(input: unknown, output: unknown): ProductMode | null {
+/** The agent a call asked: the answer's own `agent`, else the call's argument. Null for anything not a mode or bot. */
+export function delegatedAgentOf(input: unknown, output: unknown): DelegateAgent | null {
   const named = readString(asRecord(output), "agent") ?? readString(asRecord(input), "agent");
-  return named && MODES.has(named) ? (named as ProductMode) : null;
+  if (!named) {
+    return null;
+  }
+  if (MODES.has(named)) {
+    return named as ProductMode;
+  }
+  return isTeamBotParam(named) ? named : null;
 }
 
 /**
@@ -64,9 +75,12 @@ export function readDelegateResult(input: unknown, output: unknown): DelegateCar
     return null;
   }
   const headline = headlineOf(readString(asRecord(input), "task"));
+  const agentName = readString(result, "agentName");
+  const named = agentName ? { agentName } : {};
   if (result.ok === true) {
     return {
       agent,
+      ...named,
       threadId,
       headline,
       summary: readString(result, "summary") ?? "",
@@ -84,5 +98,5 @@ export function readDelegateResult(input: unknown, output: unknown): DelegateCar
   const failure = (DELEGATE_FAILURES as readonly string[]).includes(String(reason))
     ? (reason as DelegateFailure)
     : "failed";
-  return { agent, threadId, headline, summary: "", truncated: false, toolsUsed: [], failure };
+  return { agent, ...named, threadId, headline, summary: "", truncated: false, toolsUsed: [], failure };
 }

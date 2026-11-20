@@ -2,6 +2,8 @@
 
 Product: both Â· Instance: main :3000
 
+Last verified: 2026-11-20 on `feat/team-ui`, for the renderer-side delegate and greeting changes only: `DelegateCard` shows `agentName` when the host sends one and links a `tb-` agent to its own `/chat?agent=tb-…&thread=…` address (`chat-delegate-card.tsx`, `delegate-result.ts`); `ChatGreeting` gains the "Build your team" CTA to `/team` (`chat-greeting.tsx`); `ChatSession` takes an optional `hrefForThread` so a bot's new threads stay on its address (`chat-session.tsx`). Unit-tested (`delegate-card.test.tsx`); not driven on `:3000`. Nothing else on the page was re-read.
+
 Last verified: 2026-11-20 on `feat/orchestrator-team`, for the prompt-assembly change only (section 3 step 2: the run computes its bindings once as `runBindings`, and when they include `delegate` it appends `delegationTargetsLine` — the desk's hired modes and live team bots — to the system prompt; `runs.ts`, the `runBindings`/`delegationTargets` block). Unit-tested (`team-bots.test.ts` in both packages); not driven on `:3000`. Other `runs.ts` line numbers on this page moved by up to about 15 lines and were not re-anchored.
 
 Last verified: 2026-11-19 at d793643b plus the PR #246 working tree, for failed-reasoning retries only. Real local HTTP tests on Gemini generate-content and Responses cover a destroyed socket, truncated SSE, missing finish, clean thinking-only finish, 401 and caller cancellation (`ai-sdk-runtime-stream-drop.test.ts`). Browser drive not performed in this pass. Other sections were not re-verified.
