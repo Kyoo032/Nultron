@@ -122,6 +122,15 @@ describe("redactSecrets", () => {
     );
   });
 
+  it("masks a URL path segment ending in '=' padding", () => {
+    expect(redactSecrets("GET https://hooks.slack.com/services/T01ABCDEFGH/B02ABCDEFGH/xm9pQrStUvWxYzAbCdEfGh12= 200")).toBe(
+      "GET https://hooks.slack.com/services/T01ABCDEFGH/B02ABCDEFGH/[REDACTED] 200",
+    );
+    expect(redactSecrets("GET https://hooks.slack.com/services/T01ABCDEFGH/B02ABCDEFGH/xm9pQrStUvWxYzAbCdEfGh12=~ 200")).toBe(
+      "GET https://hooks.slack.com/services/T01ABCDEFGH/B02ABCDEFGH/[REDACTED] 200",
+    );
+  });
+
   it("keeps a UUID segment ending in a tilde tail", () => {
     const input = "session https://h.example/a/9f86d081-884c-7d65-9a2f-eaa0c55ad015~ done";
     expect(redactSecrets(input)).toBe(input);
