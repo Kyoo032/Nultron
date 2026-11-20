@@ -1395,3 +1395,9 @@ Lanes: enterprise, tester.
 Lanes: enterprise, tester.
 
 - An opaque run ending in `=` padding followed by a `.`/`~` tail (`token=.~`, `token=~`) is now masked whole instead of leaving a `=.~` residue.
+
+## Redactor masks `=` padding residue with or without a tail, 2026-11-20 (DFIND-102)
+
+Lanes: enterprise, tester.
+
+- An opaque run ending in `==` padding followed by a `.`/`~` tail (`token==~`, `token==.~`) is now masked whole instead of leaving one `=` behind; bare `token=` and `token==` padding no longer leaks either.

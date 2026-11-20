@@ -146,6 +146,10 @@ describe("redactSecrets", () => {
   it.each([
     ["YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo=.~", "key: [REDACTED]"],
     ["YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo=~", "key: [REDACTED]"],
+    ["YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo==~", "key: [REDACTED]"],
+    ["YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo==.~", "key: [REDACTED]"],
+    ["YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo=", "key: [REDACTED]"],
+    ["YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo==", "key: [REDACTED]"],
   ])("masks an opaque token whose '=' padding precedes a tilde tail: %s", (token, expected) => {
     expect(redactSecrets(`key: ${token}`)).toBe(expected);
   });
