@@ -92,6 +92,32 @@ describe("redactCredentials: hostile input stays fast", () => {
     expect(ms).toBeLessThan(BUDGET_MS);
   });
 
+  it("is as fast on a long leading-dot run before a token through redactSecrets", () => {
+    const input = `${".".repeat(40_000)}AbCdEfGhIjKlMnOpQrStUvWxYz0123456789`;
+    const { value, ms } = timed(() => redactSecrets(input));
+    expect(value).toBe(`${".".repeat(40_000)}[REDACTED]`);
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+
+  it("is as fast on a long '=' padding run after a token through redactSecrets", () => {
+    const input = `key: AbCdEfGhIjKlMnOpQrStUvWxYz0123456789${"=".repeat(80_000)}`;
+    const { ms } = timed(() => redactSecrets(input));
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+
+  it("is as fast on a long dotted query value through redactSecrets", () => {
+    const input = `GET https://h.com/cb?sig=${".".repeat(80_000)} 200`;
+    const { ms } = timed(() => redactSecrets(input));
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+
+  it("is as fast on a long dotted URL segment without a tilde through redactSecrets", () => {
+    const input = `GET https://h.com/a/b/${".".repeat(80_000)} 200`;
+    const { ms } = timed(() => redactSecrets(input));
+    expect(ms).toBeLessThan(BUDGET_MS);
+  });
+
+
   it("is as fast on a repeated JWT header prefix through redactSecrets and redactSecretsDeep", () => {
     const input = `${"eyJ-".repeat(25_000)}.aaaaaaaa.`;
     const shallow = timed(() => redactSecrets(input));

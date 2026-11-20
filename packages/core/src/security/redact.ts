@@ -148,6 +148,35 @@ const URL_SEGMENT_CLASSES = [/[a-z]/, /[A-Z]/, /[0-9]/];
 const looksLikeUrlToken = (segment: string): boolean =>
   URL_SEGMENT_CLASSES.filter((cls) => cls.test(segment)).length >= 2;
 
+// A URL, schemes bounded so a start retry costs a constant. `?`, `&` and `#` pairs inside it are
+// scanned for query and fragment values (fragment routes like `/#/cb?sig=` and `#name=`), and the
+// `\/` or `\\/` of a JSON-escaped `https:\/\/` URL.
+const URL_WITH_QUERY_RE = /\b[a-z][a-z0-9+.-]{0,15}:(?:\\*\/){2}\S*/gi;
+// A value continues through an escaped slash (`\/`, `\\/`): without it a token like `<24+>\/suffix`
+// masks only its prefix and leaks the suffix when the opaque run sees fewer than 32 characters.
+const URL_QUERY_PAIR_RE = /([?&#])([^\s&=?#]+=)([A-Za-z0-9+/._~%=-]{24,}(?:\\*\/[A-Za-z0-9+/._~%=-]*)*)/g;
+
+// A query value with a word-like shape (`callback=onCompleteHandlerFunction`, a hyphenated search
+// phrase) is prose, not a token — the same call the URL path rule makes for word-like segments. A
+// token slips through a lowercase run only so far: it almost always carries a digit or a consonant
+// run no English word has.
+const isWordLike = (value: string): boolean =>
+  /[a-z]{4,}/.test(value) && !/\d/.test(value) && !/[bcdfghjklmnpqrstvwxz]{5,}/i.test(value);
+
+function maskUrlQuery(url: string): string {
+  return url.replace(URL_QUERY_PAIR_RE, (match, separator: string, key: string, value: string) => {
+    // Trailing dots are counted, not matched: a `\.+$` scan retries at every dot of a long run.
+    let dotCount = 0;
+    while (dotCount < value.length && value[value.length - 1 - dotCount] === ".") {
+      dotCount += 1;
+    }
+    const core = value.slice(0, value.length - dotCount);
+    return core.length >= 24 && !isWordLike(core)
+      ? `${separator}${key}[REDACTED]${value.slice(value.length - dotCount)}`
+      : match;
+  });
+}
+
 function maskUrlRun(match: string, token: string): string {
   const masked = token
     .split("/")
@@ -255,5 +284,7 @@ export function redactSecrets(text: string): string {
   if (!text) {
     return text;
   }
-  return redactCredentials(text).replace(OPAQUE_RUN_RE, maskOpaqueRun);
+  return redactCredentials(text)
+    .replace(URL_WITH_QUERY_RE, maskUrlQuery)
+    .replace(OPAQUE_RUN_RE, maskOpaqueRun);
 }

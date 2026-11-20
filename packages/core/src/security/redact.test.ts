@@ -157,6 +157,67 @@ describe("redactSecrets", () => {
   });
 
   it.each([
+    ["key: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo==", "key: [REDACTED]"],
+    ["key: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo=", "key: [REDACTED]"],
+    ["key: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo==~", "key: [REDACTED]"],
+    ["key: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo==.~", "key: [REDACTED]"],
+    ["key: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo===", "key: [REDACTED]"],
+    ["key: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo===~", "key: [REDACTED]"],
+  ])("masks an opaque token with '=' padding and leaves no residue: %s", (input, expected) => {
+    expect(redactSecrets(input)).toBe(expected);
+  });
+
+  it.each([
+    ["GET https://h.com/cb?sig=AbCdEfGhIjKlMnOpQrStUvWx 200", "GET https://h.com/cb?sig=[REDACTED] 200"],
+    ["GET https://h.com/cb?sig=AbCdEfGhIjKlMnOpQrStUvWx&ok=1 200", "GET https://h.com/cb?sig=[REDACTED]&ok=1 200"],
+    ["token https://h.com/cb?sig=AbCdEfGhIjKlMnOpQrStUvWx== 200", "token https://h.com/cb?sig=[REDACTED] 200"],
+    ["list [https://h.com/cb?sig=AbCdEfGhIjKlMnOpQrStUvWx] ok", "list [https://h.com/cb?sig=[REDACTED]] ok"],
+    ["opts {https://h.com/cb?sig=AbCdEfGhIjKlMnOpQrStUvWx} ok", "opts {https://h.com/cb?sig=[REDACTED]} ok"],
+    ["see https://h.com/cb?sig=AbCdEfGhIjKlMnOpQrStUvWx. done", "see https://h.com/cb?sig=[REDACTED]. done"],
+    ["open https://app/#/cb?sig=AbCdEfGhIjKlMnOpQrStUvWx 200", "open https://app/#/cb?sig=[REDACTED] 200"],
+    ["GET https://h.com/cb?a=1#sig=AbCdEfGhIjKlMnOpQrStUvWx 200", "GET https://h.com/cb?a=1#sig=[REDACTED] 200"],
+    ["GET https://app.com/cb#access_token=AbCdEfGhIjKlMnOpQrStUvWx 200", "GET https://app.com/cb#access_token=[REDACTED] 200"],
+    ["GET https://h.com/cb?sig=QXV0aFRva2VuMTIzNDU2Nzg5MGFiY2RlZg=.~ 200", "GET https://h.com/cb?sig=[REDACTED] 200"],
+    [
+      'body {"url":"https:\\/\\/h.com\\/cb?sig=AbCdEfGhIjKlMnOpQrStUvWx"}',
+      'body {"url":"https:\\/\\/h.com\\/cb?sig=[REDACTED]"}',
+    ],
+    [
+      'body {"url":"https:\\\\/\\\\/h.com\\\\/cb?sig=AbCdEfGhIjKlMnOpQrStUvWx"}',
+      'body {"url":"https:\\\\/\\\\/h.com\\\\/cb?sig=[REDACTED]"}',
+    ],
+    [
+      "GET https://h.com/cb?sig=AbCdEfGhIjKlMnOpQrStUvWx\\/sfxYzAbCdEf 200",
+      "GET https://h.com/cb?sig=[REDACTED] 200",
+    ],
+    ["GET https://h.com/cb?sig=qrstuvwxyzabcdfghjklmnpq 200", "GET https://h.com/cb?sig=[REDACTED] 200"],
+    ["GET https://h.com/cb?sig=dGhpc2lzdG9rZW4xMjM0NTY3ODk 200", "GET https://h.com/cb?sig=[REDACTED] 200"],
+  ])("masks an opaque secret in a URL query or fragment value: %s", (input, expected) => {
+    expect(redactSecrets(input)).toBe(expected);
+  });
+
+  it.each([
+    "GET https://h.com/cb?sig=AbCdEfGhIjKlMnOpQrStUvW 200",
+    "GET https://h.com/cb?sig=AbCdEfGhIjKlMnOpQrStU. 200",
+    "GET https://h.com/cb?name=alice&sort=desc 200",
+    "GET https://app.com/cb#/dashboard 200",
+    "GET https://app.com/cb#section-2 200",
+    "GET https://h.com/cb?callback=onCompleteHandlerFunction 200",
+    "GET https://h.com/search?q=gettingstartedwithinstallation 200",
+    "next ?sig=AbCdEfGhIjKlMnOpQrStUvWx end",
+  ])("keeps ordinary query strings and non-URL text: %s", (input) => {
+    expect(redactSecrets(input)).toBe(input);
+  });
+
+  it("masks a long hyphenated query phrase as a documented exception", () => {
+    // A 38-char mixed run (`-` and alnum) reads as an opaque run, not as a word; the query rule's
+    // word-like check only governs values the opaque rule would not take on its own.
+    expect(redactSecrets("GET https://h.com/search?q=a-very-long-natural-language-query-here 200")).toBe(
+      "GET https://h.com/search?q=[REDACTED] 200",
+    );
+  });
+
+  it.each([
     ["abcdefghijklmnop+/qrst/uvwxyz12345", "[REDACTED]"],
     ["ABcDEfGHiJKlMnOP/qrSTu/vwXYZ123456", "[REDACTED]"],
     ["//fcDEfGHiJKlMnOPqrSTuvwXYZ123456789", "//[REDACTED]"],

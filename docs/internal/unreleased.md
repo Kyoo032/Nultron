@@ -1401,6 +1401,7 @@ Lanes: enterprise, tester.
 Lanes: enterprise, tester.
 
 - An opaque run ending in `==` padding followed by a `.`/`~` tail (`token==~`, `token==.~`) is now masked whole instead of leaving one `=` behind; bare `token=` and `token==` padding no longer leaks either.
+
 ## Redactor consumes a padding run of any length, 2026-11-20 (DFIND-104)
 
 Lanes: enterprise, tester.
@@ -1411,3 +1412,10 @@ Lanes: enterprise, tester.
 Lanes: enterprise, tester.
 
 - `redactSecrets` no longer spends seconds on a token followed by ~100,000 `=` characters: the two trailing-strip regexes (`=*[.~]*~=*$`, `=+$`, and the same pair on a URL path segment's bare form) are now a single linear index walk (`stripPaddingTail`), so every padding/tail combination still strips while long runs stay millisecond-fast. ReDoS cases cover `=` runs and `.~` runs at 100,000 characters.
+
+## Redactor masks URL query and fragment secrets, 2026-11-20 (DFIND-94/96/98/99/101/103/104)
+
+Lanes: enterprise, tester.
+
+- A `?`, `&` or `#` pair value of 24+ token characters inside a URL is now masked — plain queries, fragment routes (`/#/cb?sig=`), `#name=` fragment pairs, and the `\/` or `\\/` of a JSON-escaped `https:\/\/` URL. A value continues through an escaped slash so a token like `<24+>\/suffix` masks whole.
+- A word-like query value (`callback=onCompleteHandlerFunction`, `gettingstartedwithinstallation`) stays readable: it must have a lowercase word run, no digit and no consonant run of five. A long hyphenated phrase is a documented exception — it reads as an opaque run (`-` plus alnum) and masks.
