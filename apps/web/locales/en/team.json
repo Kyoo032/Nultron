@@ -1,0 +1,58 @@
+{
+  "greeting": {
+    "cta": "Build your team"
+  },
+  "page": {
+    "title": "Your team",
+    "lede": "Your default agent keeps the big picture and delegates to the specialists and bots you hire.",
+    "loading": "Loading your team…"
+  },
+  "brief": {
+    "title": "What are you working on?",
+    "addTitle": "Add to your team",
+    "hint": "Describe the work in a sentence or two. Nultron proposes the specialists and custom bots that fit.",
+    "label": "Team brief",
+    "placeholder": "e.g. I run a small shop and need help with suppliers, invoices, and customer replies.",
+    "examples": "Try: a research assistant, a finance checker, and a support bot that drafts replies.",
+    "build": "Build my team",
+    "building": "Building…"
+  },
+  "editor": {
+    "title": "Your team",
+    "lede": "Review the proposal, edit the bots, then hire the team.",
+    "specialists": "Specialists",
+    "bots": "Your bots",
+    "noBots": "No custom bots yet.",
+    "name": "Name",
+    "role": "Role",
+    "prompt": "Prompt",
+    "noPrompt": "No prompt provided.",
+    "remove": "Remove",
+    "removeAria": "Remove {name}",
+    "unnamed": "bot",
+    "addBot": "+ Add your own bot",
+    "add": "Add bot",
+    "hire": "Hire team",
+    "hiring": "Hiring…",
+    "hireHint": "Hiring makes these specialists and bots available to your default agent."
+  },
+  "roster": {
+    "title": "Your team",
+    "hint": "Your default agent keeps the big picture and delegates to these specialists and bots.",
+    "chat": "Chat with your team",
+    "add": "Add to team",
+    "specialists": "Specialists",
+    "noSpecialists": "No specialists hired.",
+    "bots": "Your bots",
+    "open": "Open chat",
+    "letGo": "Let go",
+    "lettingGo": "Letting go…",
+    "letGoAria": "Let go {name}"
+  },
+  "error": {
+    "load": "Could not load your team.",
+    "propose": "Could not build a team proposal.",
+    "hire": "Could not hire the team.",
+    "release": "Could not let them go."
+  }
+}
