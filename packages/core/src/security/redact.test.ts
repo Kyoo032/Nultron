@@ -184,6 +184,12 @@ describe("redactSecrets", () => {
       'body {"url":"https:\\\\/\\\\/h.com\\\\/cb?sig=AbCdEfGhIjKlMnOpQrStUvWx"}',
       'body {"url":"https:\\\\/\\\\/h.com\\\\/cb?sig=[REDACTED]"}',
     ],
+    [
+      "GET https://h.com/cb?sig=AbCdEfGhIjKlMnOpQrStUvWx\\/sfxYzAbCdEf 200",
+      "GET https://h.com/cb?sig=[REDACTED] 200",
+    ],
+    ["GET https://h.com/cb?sig=qrstuvwxyzabcdfghjklmnpq 200", "GET https://h.com/cb?sig=[REDACTED] 200"],
+    ["GET https://h.com/cb?sig=dGhpc2lzdG9rZW4xMjM0NTY3ODk 200", "GET https://h.com/cb?sig=[REDACTED] 200"],
   ])("masks an opaque secret in a URL query or fragment value: %s", (input, expected) => {
     expect(redactSecrets(input)).toBe(expected);
   });
@@ -199,6 +205,14 @@ describe("redactSecrets", () => {
     "next ?sig=AbCdEfGhIjKlMnOpQrStUvWx end",
   ])("keeps ordinary query strings and non-URL text: %s", (input) => {
     expect(redactSecrets(input)).toBe(input);
+  });
+
+  it("masks a long hyphenated query phrase as a documented exception", () => {
+    // A 38-char mixed run (`-` and alnum) reads as an opaque run, not as a word; the query rule's
+    // word-like check only governs values the opaque rule would not take on its own.
+    expect(redactSecrets("GET https://h.com/search?q=a-very-long-natural-language-query-here 200")).toBe(
+      "GET https://h.com/search?q=[REDACTED] 200",
+    );
   });
 
   it.each([

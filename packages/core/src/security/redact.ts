@@ -152,17 +152,28 @@ const looksLikeUrlToken = (segment: string): boolean =>
 // scanned for query and fragment values (fragment routes like `/#/cb?sig=` and `#name=`), and the
 // `\/` or `\\/` of a JSON-escaped `https:\/\/` URL.
 const URL_WITH_QUERY_RE = /\b[a-z][a-z0-9+.-]{0,15}:(?:\\*\/){2}\S*/gi;
-const URL_QUERY_PAIR_RE = /([?&#])([^\s&=?#]+=)([A-Za-z0-9+/._~%=-]{24,})/g;
+// A value continues through an escaped slash (`\/`, `\\/`): without it a token like `<24+>\/suffix`
+// masks only its prefix and leaks the suffix when the opaque run sees fewer than 32 characters.
+const URL_QUERY_PAIR_RE = /([?&#])([^\s&=?#]+=)([A-Za-z0-9+/._~%=-]{24,}(?:\\*\/[A-Za-z0-9+/._~%=-]*)*)/g;
 
-// A query value with a lowercase word run (`callback=onCompleteHandlerFunction`, a hyphenated search
-// phrase) is prose, not a token — the same call the URL path rule makes for word-like segments.
-const isWordLike = (value: string): boolean => /[a-z]{4,}/.test(value);
+// A query value with a word-like shape (`callback=onCompleteHandlerFunction`, a hyphenated search
+// phrase) is prose, not a token — the same call the URL path rule makes for word-like segments. A
+// token slips through a lowercase run only so far: it almost always carries a digit or a consonant
+// run no English word has.
+const isWordLike = (value: string): boolean =>
+  /[a-z]{4,}/.test(value) && !/\d/.test(value) && !/[bcdfghjklmnpqrstvwxz]{5,}/i.test(value);
 
 function maskUrlQuery(url: string): string {
   return url.replace(URL_QUERY_PAIR_RE, (match, separator: string, key: string, value: string) => {
-    const dots = value.match(/\.+$/)?.[0] ?? "";
-    const core = value.slice(0, value.length - dots.length);
-    return core.length >= 24 && !isWordLike(core) ? `${separator}${key}[REDACTED]${dots}` : match;
+    // Trailing dots are counted, not matched: a `\.+$` scan retries at every dot of a long run.
+    let dotCount = 0;
+    while (dotCount < value.length && value[value.length - 1 - dotCount] === ".") {
+      dotCount += 1;
+    }
+    const core = value.slice(0, value.length - dotCount);
+    return core.length >= 24 && !isWordLike(core)
+      ? `${separator}${key}[REDACTED]${value.slice(value.length - dotCount)}`
+      : match;
   });
 }
 
@@ -172,8 +183,17 @@ function maskUrlRun(match: string, token: string): string {
     .map((segment, index) => {
       // A `.`/`~` tail or `=` padding the opaque run joined into the token is not part of the
       // segment's shape: the token rule tests the bare segment, the opaque rule the segment
-      // with `=` padding removed (`.~` still counts toward its length).
-      const bare = segment.replace(/[.~]*~$/, "").replace(/=+$/, "");
+      // with `=` padding removed (`.~` still counts toward its length). The tail is stripped by
+      // one backward pass, not `[.~]*~$`, which retries at every dot of a long dotted segment.
+      let bare = segment;
+      if (bare.endsWith("~")) {
+        let start = bare.length;
+        while (start > 0 && (bare[start - 1] === "." || bare[start - 1] === "~")) {
+          start -= 1;
+        }
+        bare = bare.slice(0, start);
+      }
+      bare = bare.replace(/=+$/, "");
       return index > 2 &&
         !UUID_RE.test(bare) &&
         ((URL_TOKEN_SEGMENT_RE.test(bare) && looksLikeUrlToken(bare)) ||
@@ -227,7 +247,28 @@ function maskOpaqueRun(
     return `${leadingDots}[REDACTED]`;
   }
   const masked = match.replace(BASE64_RE, "[REDACTED]");
-  return masked === match ? match : masked.replace(/=*[.~]*~=*$/, "").replace(/=+$/, "");
+  return masked === match ? match : stripOpaqueTail(masked);
+}
+
+// Remove the `=` padding and `.`/`~` tail a masked run kept, with one pass per character: a regex
+// like `=*[.~]*~=*$` retries the unbounded classes at every `=` or dot of a long hostile run.
+// A lone `.` tail stays, ambiguous with sentence punctuation; `=` padding always goes.
+function stripOpaqueTail(masked: string): string {
+  let end = masked.length;
+  while (end > 0 && masked[end - 1] === "=") {
+    end -= 1;
+  }
+  if (end > 0 && masked[end - 1] === "~") {
+    let start = end - 1;
+    while (start > 0 && (masked[start - 1] === "." || masked[start - 1] === "~")) {
+      start -= 1;
+    }
+    while (start > 0 && masked[start - 1] === "=") {
+      start -= 1;
+    }
+    return masked.slice(0, start);
+  }
+  return masked.slice(0, end);
 }
 
 export function redactCredentials(text: string): string {
