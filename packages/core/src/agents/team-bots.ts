@@ -1,5 +1,5 @@
 import { DELEGABLE_AGENTS, type DelegableAgent } from "./delegation";
-import { PRODUCT_MODE_IDS, productModeLabel, type ProductMode } from "./product-modes";
+import { PRODUCT_MODE_IDS, type ProductMode } from "./product-modes";
 
 /**
  * Team bots: custom agents a desk hires next to the catalog specialists, so the orchestrator

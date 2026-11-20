@@ -2,12 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  DELEGATED_RUN_RULES,
-  type AgentRuntime,
-  type ContentPart,
-  type TenantContext,
-} from "@agentforge/core";
+import { DELEGATED_RUN_RULES, type AgentRuntime, type TenantContext } from "@agentforge/core";
 import { ROUTER_IMPORT_BUDGET_MS } from "./__fixtures__/test-budgets";
 import type { HostRequest, HostResult } from "./types";
 
@@ -64,11 +59,6 @@ async function call<T>(
 }
 
 type Roster = { modes: string[]; bots: Array<{ id: string; slug: string; name: string; role: string }> };
-
-async function roster(): Promise<Roster> {
-  const { body } = await call<Roster>("GET", "/api/v1/team");
-  return body;
-}
 
 async function newThread(agentId: string, title?: string): Promise<string> {
   const created = await call<{ thread: { id: string } }>("POST", "/api/v1/threads", { agentId, title });
