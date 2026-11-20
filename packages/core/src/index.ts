@@ -301,15 +301,64 @@ export {
 export {
   usesSeedanceVideoWire,
   videoCapabilities,
+  videoCapabilitiesOf,
   clampVideoSeconds,
   allowedVideoSeconds,
   snapVideoSeconds,
-  normalizeVideoResolution,
   GATEWAY_VIDEO_DURATION_SECONDS,
   GATEWAY_VIDEO_RESOLUTION,
   imageToVideoForModel,
 } from "./models/video-capabilities";
-export type { VideoCapabilities, GatewayVideoResolution } from "./models/video-capabilities";
+export type { VideoCapabilities } from "./models/video-capabilities";
+export {
+  MEDIA_DEFAULTS,
+  imageCountMax,
+  imageShapeOptions,
+  imageSpecFor,
+  ratioOf,
+  settleImage,
+  settleVideo,
+  shapeOfRatio,
+  snapVideoLength,
+  tierRank,
+  videoAspectOptions,
+  videoLengthOptions,
+  videoResolutionOptions,
+  videoSpecFor,
+} from "./models/media-params";
+export type {
+  ChoiceSpec,
+  ImageBodyStyle,
+  ImageChoice,
+  ImageParamSpec,
+  ImageSent,
+  ImageSettled,
+  ImageShapeOption,
+  ImageShapeSpec,
+  MediaAdjustment,
+  MediaParamSpec,
+  ParamSource,
+  PublishedMediaParams,
+  VideoAudioSpec,
+  VideoBodyStyle,
+  VideoChoice,
+  VideoImageInputSpec,
+  VideoLengthSpec,
+  VideoParamSpec,
+  VideoSent,
+  VideoSettled,
+} from "./models/media-params";
+export {
+  parsePublishedMediaParams,
+  sanitizePublishedMediaParams,
+  type PublishedMediaMap,
+} from "./models/media-params-published";
+export { buildImageRequest, buildVideoRequest } from "./models/media-request";
+export type { ImageRequest, VideoRequest } from "./models/media-request";
+export {
+  publishedMediaParamsFor,
+  setPublishedMediaParamsSource,
+} from "./models/media-params-source";
 export {
   VIDEO_HARNESS_SKILLS,
   acceptVideoShot,
@@ -328,6 +377,7 @@ export type {
   VideoRenderCall,
   VideoRenderResult,
 } from "./videos/harness";
+export { VIDEO_JOB_PENDING_CODE, VIDEO_JOB_PENDING_STATUS } from "./videos/job-pending";
 export {
   MEDIA_PRICE_ENTRIES,
   costTier,
@@ -545,6 +595,7 @@ export {
   isMusicModelId,
   isLyricsModelId,
   isSpeechModelId,
+  isOmniSpeechModelId,
   firstLiveId,
   DEFAULT_GATEWAY_IMAGE_MODEL,
   DEFAULT_GATEWAY_VIDEO_MODEL,
@@ -789,6 +840,8 @@ export {
 } from "./music/harness";
 export type { MusicHarnessSkillId } from "./music/harness";
 export {
+  VIDEO_POLL_DEADLINE_MS,
+  VIDEO_POLL_REQUEST_MS,
   formatVideoGatewayFailure,
   httpStatusForGatewayFailure,
   studioVideoFailureStatus,
@@ -974,3 +1027,57 @@ export type { EnhanceSurface } from "./enhance-prompt";
 // Phase 9: the placeholder plan catalog the pricing page renders (`@agentforge/core/plans`).
 export { PLAN_CATALOG_CURRENCY, PLAN_TIERS, findTier, formatPlanPrice, matchTier } from "./plans/catalog";
 export type { PlanTier } from "./plans/catalog";
+
+// Per-key model availability and the gateway catalog (2026-11-11): what a key can actually use.
+export {
+  MODEL_STATUSES,
+  STATUS_TTL_MS,
+  GatewayRefusalError,
+  classifyGatewayRefusal,
+  refusalOfError,
+  isOfferedStatus,
+  recordIsLive,
+  effectiveRecordStatus,
+  emptyStore as emptyAvailabilityStore,
+  modelKey,
+  recordsFor as availabilityRecordsFor,
+  withOutcome as withAvailabilityOutcome,
+  withoutLessons as withoutAvailabilityLessons,
+  parseAvailabilityStore,
+} from "./models/availability";
+export type {
+  AvailabilityRecord,
+  AvailabilityStore,
+  GatewayRefusal,
+  KeyAvailability,
+  LearnedStatus,
+  ModelStatus,
+} from "./models/availability";
+export { availabilityKeyId, newAvailabilitySalt } from "./models/availability-key";
+export {
+  CATALOG_SEED,
+  GATEWAY_WIRES,
+  MODEL_KINDS,
+  availabilityOf,
+  buildCatalog,
+  catalogKindOf,
+  computeAvailability,
+  kindFromEndpointTypesOf,
+  offeredIdsFor,
+  parsePricingHints,
+  speechWireFor,
+  unavailableModels,
+  videoWireFor,
+} from "./models/gateway-catalog";
+export type {
+  CatalogEntry,
+  GatewayWire,
+  ModelAvailability,
+  ModelKind,
+  PricingHints,
+  WireId,
+} from "./models/gateway-catalog";
+export { fetchPricingHints, fetchPricingWithMedia } from "./models/pricing-hints";
+export { reportModelOutcome, setModelOutcomeSink } from "./models/outcome-sink";
+export type { ModelOutcomeReport } from "./models/outcome-sink";
+export { generateGatewayOmniSpeech, omniAudioChunks, wavFromPcm16 } from "./tools/platform/gateway-audio";

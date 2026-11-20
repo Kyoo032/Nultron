@@ -1,10 +1,17 @@
 import { ApiError } from "../errors";
 import { parseAppLocale, type AppLocale } from "../locale";
 import { modelNotOnKeyMessage, resolveVideoModelForKey } from "../models/key-models";
-import { snapVideoSeconds, videoCapabilities } from "../models/video-capabilities";
+import {
+  settleVideo,
+  videoSpecFor,
+  type MediaAdjustment,
+  type PublishedMediaParams,
+  type VideoSent,
+} from "../models/media-params";
 import { modeMessage } from "../mode-messages";
 import { withOutputLanguage } from "../output-language";
 import { maskPii } from "../security/pii";
+import { VIDEO_JOB_PENDING_CODE } from "./job-pending";
 
 /**
  * The five skills of the Videos mode, read by `harness/modes/videos.ts`. Three are wired here
@@ -28,11 +35,15 @@ export type VideoHarnessSkill = "write-shot" | "render-retry" | "keep-clip";
 
 export type VideoRenderCall = {
   prompt: string;
-  aspect_ratio: "16:9" | "9:16" | "1:1";
+  /** Absent when the model has no aspect control. */
+  aspect_ratio?: string;
   image_url?: string;
   model: string;
   seconds: number;
-  resolution?: "480p" | "720p" | "1080p";
+  /** Absent when the model has no resolution control. */
+  resolution?: string;
+  /** Sound inside the clip; absent when the model has no switch for it. */
+  audio?: boolean;
 };
 
 export type VideoRenderResult =
@@ -43,10 +54,15 @@ export type VideoHarnessInput = {
   prompt: string;
   requestedModel: string;
   availableIds: readonly string[];
-  aspect: "16:9" | "9:16" | "1:1";
+  /** A ratio such as `16:9`; the model's own set decides which are valid. */
+  aspect?: string;
   imageUrl?: string;
   seconds?: number;
-  resolution?: "480p" | "720p" | "1080p";
+  resolution?: string;
+  /** Sound inside the clip. Left out means the app's default (off). */
+  audio?: boolean;
+  /** What the gateway published for the model, laid over the built-in spec. */
+  published?: PublishedMediaParams;
   locale: AppLocale;
   /**
    * A shot from outside the composer. Production leaves this empty.
@@ -60,6 +76,10 @@ export type VideoHarnessResult = {
   shotRepaired: boolean;
   model: string;
   seconds: number;
+  /** What the request carries after the model's spec had its say. */
+  sent: VideoSent;
+  /** What was asked for and moved or left out. */
+  adjusted: MediaAdjustment[];
   outboundPrompt: string;
   url: string;
   usedModel: string;
@@ -119,13 +139,19 @@ export function acceptVideoShot(prompt: string, draft?: string): { shot: string;
   };
 }
 
+// The last two are the words of `videoJobPending` (`mode-messages.ts`): a job the gateway still has. Sent
+// again, it would be billed twice. The code (`VIDEO_JOB_PENDING_CODE`) is what the harness reads first;
+// these keep a caller that only passes the message on the safe side.
 const NO_RETRY =
-  /gateway key|rejected the API key|not available for this key|does not accept a still|prepaid|按次价格|预付账户|model_not_on_key/i;
+  /gateway key|rejected the API key|not available for this key|does not accept a still|prepaid|按次价格|预付账户|model_not_on_key|may still finish and be billed|mungkin tetap selesai dan ditagih/i;
 
 const RETRY =
   /timed out|timeout|HTTP 50[234]|no live gateway channel|ECONNREFUSED|ECONNRESET|ETIMEDOUT|socket hang up|fetch failed|returned no video/i;
 
-/** A dead render is worth one more try. A refused key, model, or still is not. */
+/**
+ * A dead render is worth one more try. A refused key, model, or still is not, and neither is a job the
+ * gateway accepted and is still rendering: the first one will bill when it finishes.
+ */
 export function videoRenderShouldRetry(message: string): boolean {
   if (NO_RETRY.test(message)) {
     return false;
@@ -183,18 +209,27 @@ export async function runVideoHarness(
     );
   }
   const model = choice.model;
-  if (input.imageUrl && !videoCapabilities(model).imageToVideo) {
+  const spec = videoSpecFor(model, input.published);
+  if (input.imageUrl && !spec.imageInput.firstFrame) {
     throw new ApiError("video_still_unsupported", modeMessage("videoStillUnsupported", locale), 400);
   }
-  const seconds = snapVideoSeconds(model, input.seconds);
+  // Settled here, before any money is spent: a value the model does not take is moved to the nearest
+  // one it does, and sound asked of a silent model is refused.
+  const { adjustments, ...sent } = settleVideo(
+    spec,
+    { aspect: input.aspect, seconds: input.seconds, resolution: input.resolution, audio: input.audio },
+    { model, locale },
+  );
+  const seconds = sent.seconds;
   const outboundPrompt = withOutputLanguage(maskPii(accepted.shot), "videos", locale);
   const call: VideoRenderCall = {
     prompt: outboundPrompt,
-    aspect_ratio: input.aspect,
+    ...(sent.aspect ? { aspect_ratio: sent.aspect } : {}),
     model,
     seconds,
     ...(input.imageUrl ? { image_url: input.imageUrl } : {}),
-    ...(input.resolution ? { resolution: input.resolution } : {}),
+    ...(sent.resolution ? { resolution: sent.resolution } : {}),
+    ...(sent.audio !== undefined ? { audio: sent.audio } : {}),
   };
 
   let attempts = 0;
@@ -219,7 +254,9 @@ export async function runVideoHarness(
           status: 502,
         }
       : result;
-    const retryable = missingFile || videoRenderShouldRetry(result.ok ? "" : result.message);
+    // A job still rendering at the gateway is never submitted again, whatever its message says.
+    const stillRendering = !result.ok && result.code === VIDEO_JOB_PENDING_CODE;
+    const retryable = missingFile || (!stillRendering && videoRenderShouldRetry(result.ok ? "" : result.message));
     if (attempts === 2 || !retryable) {
       break;
     }
@@ -241,6 +278,8 @@ export async function runVideoHarness(
     shotRepaired: accepted.repaired,
     model,
     seconds,
+    sent,
+    adjusted: adjustments,
     outboundPrompt,
     url,
     usedModel,

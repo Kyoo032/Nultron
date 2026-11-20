@@ -20,11 +20,12 @@ import {
   parseMusicGenerateBody,
   parseVideoGenerateBody,
   studioRouteReady,
+  studioMusicPicker,
   studioSpeechUnavailable,
   writeStudioLyrics,
 } from "../studio-generate";
 import { attachMediaPrices } from "../media-price";
-import { withRelayMusicModels } from "../selectable-models";
+import { attachMediaSpecs } from "../media-spec";
 import { cachedPricingCatalog } from "../account-usage";
 import { generateDocumentDraft, regenerateDocumentSection } from "../document-generate";
 import { parseDocumentDraftBody } from "../document-outline";
@@ -48,19 +49,31 @@ export async function handleGetImages(request: HostRequest): Promise<HostResult>
     // Nothing here reaches the network: an uncached desk just shows "no list price on file".
     // Prices are always looked up against the pinned gateway, never an owner-supplied endpoint: a
     // custom base URL must not be able to decide what a model is quoted at.
-    const models = attachMediaPrices(
-      listStudioImageModels(undefined, tenant),
+    // `media` is each model's parameter spec: the page shows only the controls the model has.
+    const models = attachMediaSpecs(
+      attachMediaPrices(
+        listStudioImageModels(undefined, tenant),
+        "image",
+        cachedPricingCatalog(resolvedGatewayBaseUrl()),
+        resolvedGatewayBaseUrl(),
+      ),
       "image",
-      cachedPricingCatalog(resolvedGatewayBaseUrl()),
-      resolvedGatewayBaseUrl(),
+      tenant,
     );
     const sources = await agentService.listGenerateDefaultSources(tenant);
-    const defaultModel = resolveStudioGenerateDefault({
+    const preferred = defaultStudioImageModel(models, tenant);
+    const pinned = resolveStudioGenerateDefault({
       kind: "image",
       sources,
       settingsModel: settings.imageGenModel,
-      catalogPreferred: defaultStudioImageModel(models, tenant),
+      catalogPreferred: preferred,
     });
+    // A Settings or agent pin the refresh did not list is not offered: sending it would fail on a model
+    // the picker no longer shows. An empty list keeps the catalogue preference, as before.
+    const defaultModel =
+      models.length === 0
+        ? preferred
+        : (models.find((model) => model.id.toLowerCase() === pinned.trim().toLowerCase())?.id ?? preferred);
     return jsonOk({ items, models, defaultModel, ready: studioRouteReady("image_gen", tenant) });
   } catch (error) {
     return jsonError(error);
@@ -88,11 +101,15 @@ export async function handleGetVideos(request: HostRequest): Promise<HostResult>
     const settings = loadSettings(tenant);
     // Video list prices are per second, so the gateway's flat per-call rate is never substituted here.
     // Same as images: the pinned gateway, not whatever base URL the desk was pointed at.
-    const models = attachMediaPrices(
-      listStudioVideoModels(undefined, tenant),
-      "second",
-      cachedPricingCatalog(resolvedGatewayBaseUrl()),
-      resolvedGatewayBaseUrl(),
+    const models = attachMediaSpecs(
+      attachMediaPrices(
+        listStudioVideoModels(undefined, tenant),
+        "second",
+        cachedPricingCatalog(resolvedGatewayBaseUrl()),
+        resolvedGatewayBaseUrl(),
+      ),
+      "video",
+      tenant,
     );
     const sources = await agentService.listGenerateDefaultSources(tenant);
     const preferred = defaultStudioVideoModel(models, tenant);
@@ -134,7 +151,7 @@ export async function handleGetMusic(request: HostRequest): Promise<HostResult> 
     // `withRelayMusicModels`), so the picker is not empty on a desk whose /v1/models has no music.
     const catalog = listStudioMusicModels(undefined, tenant);
     const sources = await agentService.listGenerateDefaultSources(tenant);
-    const defaultModel = resolveStudioGenerateDefault({
+    const pinned = resolveStudioGenerateDefault({
       kind: "music",
       sources,
       settingsModel: settings.musicGenModel,
@@ -142,13 +159,16 @@ export async function handleGetMusic(request: HostRequest): Promise<HostResult> 
     });
     // An agent or Settings pin can name a relay id this build does not know, and `generateStudioMusic`
     // will happily use it. The picker has to be able to show what generate will send, so the resolved
-    // default joins the list rather than leaving the select on a value it has no option for.
+    // pin joins the list rather than leaving the select on a value it has no option for. A pin the
+    // key's calls refused does not join: then the list is empty and the page says why
+    // (`studioMusicPicker`, `apps/web/lib/music-models.ts`).
     //
     // Music is billed a flat rate per job, so the "track" unit takes the gateway catalog's per-call
     // figure. No vendor list price exists for Suno at all — it sells a consumer subscription, not an
     // API — so a desk with no cached catalog honestly shows "no list price on file".
+    const picker = studioMusicPicker(catalog, pinned, tenant);
     const models = attachMediaPrices(
-      withRelayMusicModels(catalog, [defaultModel]),
+      picker.models,
       "track",
       cachedPricingCatalog(resolvedGatewayBaseUrl()),
       resolvedGatewayBaseUrl(),
@@ -156,7 +176,7 @@ export async function handleGetMusic(request: HostRequest): Promise<HostResult> 
     return jsonOk({
       items,
       models,
-      defaultModel,
+      defaultModel: picker.defaultModel,
       ready: studioRouteReady("music_gen", tenant),
       // Why the voice-over control is off, or null when a reachable TTS model exists.
       speechUnavailable: studioSpeechUnavailable(undefined, tenant),

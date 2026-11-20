@@ -5,11 +5,13 @@ import {
   gatewayRequiredMessage,
   imageGenerateTool,
   isMusicModelId,
+  isOmniSpeechModelId,
   isSpeechModelId,
   listToolRoutes,
   lyricsWriteTool,
   maskPii,
   mediaKind,
+  publishedMediaParamsFor,
   preferLyricDraft,
   resolveSongTitle,
   shouldRetryLyrics,
@@ -21,11 +23,15 @@ import {
   availableVideoDefault,
   pickPreferredImageModel,
   pickPreferredMusicModel,
+  ratioOf,
   rewriteModelNotOnKey,
   resolveMusicMode,
   runWithToolSecrets,
+  shapeOfRatio,
   speechUnavailableReason,
   studioVideoFailureStatus,
+  VIDEO_JOB_PENDING_CODE,
+  VIDEO_JOB_PENDING_STATUS,
   videoCapabilities,
   videoGenerateTool,
   withOutputLanguage,
@@ -38,15 +44,25 @@ import {
   MUSIC_TITLE_MAX,
   type ChatModel,
   type GatewayTrack,
+  type ImageSent,
+  type MediaAdjustment,
   type MusicMode,
+  type VideoSent,
   type SpeechUnavailableReason,
   type TenantContext,
 } from "@agentforge/core";
 import { ImageModelRejectedError, runImageSkills } from "@agentforge/core/images";
 import { mediaReferenceId } from "@agentforge/core/tools/media-reference";
 import { loadSettings } from "./settings-store";
-import type { ModelCacheScope } from "./model-cache";
-import { listImageModels, listMusicModels, listProbedVideoModels, listSpeechModels } from "./selectable-models";
+import { loadModelCache, type ModelCacheScope } from "./model-cache";
+import { catalogOfCache, dropRefusedIds } from "./model-availability";
+import {
+  listImageModels,
+  listMusicModels,
+  listProbedVideoModels,
+  listSpeechModels,
+  withRelayMusicModels,
+} from "./selectable-models";
 import { mediaIdFromUrl } from "./media-id";
 import { getStudioMediaMeta, saveStudioMediaMeta, type StudioMediaMeta } from "./studio-media-meta";
 import { upsertWorkSource } from "./knowledge-ingest";
@@ -71,25 +87,51 @@ export type StudioKind = "image" | "video" | "audio";
 
 const httpUrlSchema = z.string().url();
 
-const studioImageSourceSchema = z.string().refine(
-  (value) => httpUrlSchema.safeParse(value).success || mediaReferenceId(value) !== null,
-  { message: "Pass an image URL, or the reference of an image you can see (/api/v1/media/<id>/file or the id)." },
-);
+const studioImageSourceSchema = z
+  .string()
+  .refine((value) => httpUrlSchema.safeParse(value).success || mediaReferenceId(value) !== null, {
+    message: "Pass an image URL, or the reference of an image you can see (/api/v1/media/<id>/file or the id).",
+  });
+
+/**
+ * What a person may ask of an image model. Every field past `prompt` is optional, and none of them is
+ * trusted: the model's media parameter spec decides what is sent (`settleImage`), so a value the model
+ * does not take is moved to the nearest one it does, and the answer says what was sent.
+ */
+/** The shapes a media knob can take. A value that is not one of these is a malformed request, not a choice. */
+const RATIO_RE = /^\d{1,3}(\.\d+)?:\d{1,3}(\.\d+)?$/;
+const SIZE_RE = /^\d{2,5}x\d{2,5}$/;
+const RESOLUTION_RE = /^(\d{3,4}p|\d{1,2}k)$/i;
+const TIER_RE = /^\d(\.\d)?k$/i;
+const WORD_RE = /^[a-z]{2,12}$/i;
 
 export const imageGenerateBodySchema = z.object({
   prompt: z.string().trim().min(1, "prompt is required"),
+  /** The loose three-way shape. An exact `size` or `aspectRatio` wins over it. */
   aspect: z.enum(["square", "landscape", "portrait"]).optional(),
   model: z.string().trim().min(1).optional(),
   imageUrl: studioImageSourceSchema.optional(),
+  /** An exact size such as `1536x1024`. */
+  size: z.string().trim().regex(SIZE_RE).optional(),
+  /** A ratio such as `3:2`. */
+  aspectRatio: z.string().trim().regex(RATIO_RE).optional(),
+  quality: z.string().trim().regex(WORD_RE).optional(),
+  /** A resolution tier such as `2k`. */
+  tier: z.string().trim().regex(TIER_RE).optional(),
+  count: z.number().int().min(1).max(4).optional(),
+  outputFormat: z.string().trim().regex(WORD_RE).optional(),
 });
 
 export const videoGenerateBodySchema = z.object({
   prompt: z.string().trim().min(1, "prompt is required"),
-  aspect: z.enum(["16:9", "9:16", "1:1"]).optional().default("16:9"),
+  /** A ratio such as `16:9`. Left out means the model's own default. */
+  aspect: z.string().trim().regex(RATIO_RE).optional(),
   model: z.string().trim().min(1).optional(),
   imageUrl: studioImageSourceSchema.optional(),
-  seconds: z.number().int().min(2).max(12).optional(),
-  resolution: z.enum(["480p", "720p", "1080p"]).optional(),
+  seconds: z.number().int().min(1).max(60).optional(),
+  resolution: z.string().trim().regex(RESOLUTION_RE).optional(),
+  /** Sound inside the clip. Left out means off. */
+  audio: z.boolean().optional(),
 });
 
 /**
@@ -145,6 +187,12 @@ export type StudioGenerateResult = {
   prompt: string;
   aspect: string;
   model: string;
+  /** What the request actually carried after the model's spec had its say (absent off the gateway). */
+  sent?: VideoSent | ImageSent;
+  /** What was asked for and moved or left out, so the page can say so. */
+  adjusted?: MediaAdjustment[];
+  /** Further pictures of the same job, when the model made more than one. */
+  extraIds?: (string | null)[];
 };
 
 /** One saved take. Suno returns two per job, and the desk is billed once for both. */
@@ -167,11 +215,13 @@ export type StudioMusicResult = {
 // Every list below reads the catalogue of one tenant. `scope` names it (a `TenantContext` goes in as it
 // is); a desk has one catalogue and ignores it. See `ModelCacheScope`.
 export function listStudioImageModels(models?: ChatModel[], scope?: ModelCacheScope): ChatModel[] {
-  return (models ?? listImageModels(scope)).filter((model) => mediaKind(model.id) === "image");
+  // The host's own list is already the image list (by regex, or by the gateway's price list for an id no
+  // regex knows). Only a list a caller hands in is checked again.
+  return models ? models.filter((model) => mediaKind(model.id) === "image") : listImageModels(scope);
 }
 
 export function listStudioVideoModels(models?: ChatModel[], scope?: ModelCacheScope): ChatModel[] {
-  return (models ?? listProbedVideoModels(undefined, scope)).filter((model) => mediaKind(model.id) === "video");
+  return models ? models.filter((model) => mediaKind(model.id) === "video") : listProbedVideoModels(undefined, scope);
 }
 
 export function defaultStudioImageModel(models?: ChatModel[], scope?: ModelCacheScope): string {
@@ -191,21 +241,50 @@ export function defaultStudioMusicModel(models?: ChatModel[], scope?: ModelCache
 }
 
 /**
+ * The Music picker: the catalog minus what this key's calls refused, plus a Settings or agent pin the
+ * catalog does not carry — unless that pin is itself refused. `defaultModel` is always an id in the
+ * list, or `""` when the list is empty, so the page can say why instead of failing on click
+ * (`musicPickerEmpty`, `apps/web/lib/music-models.ts`).
+ *
+ * The pin join is why this is not just `listStudioMusicModels`: a relay id the gateway never lists
+ * (`suno_music`) is a legal pin, and the select must be able to show what generate will send. A
+ * refused pin is the one thing that must not come back, or the empty state could never be reached.
+ */
+export function studioMusicPicker(
+  catalog: ChatModel[],
+  pinned: string,
+  scope?: ModelCacheScope,
+): { models: ChatModel[]; defaultModel: string } {
+  const asked = pinned.trim();
+  const extra = asked ? dropRefusedIds([asked], scope) : [];
+  const models = withRelayMusicModels(catalog, extra);
+  const chosen = asked ? models.find((model) => model.id.toLowerCase() === asked.toLowerCase())?.id : undefined;
+  // Non-empty, `defaultStudioMusicModel` answers an id from the list (its constant is only the empty
+  // list's last resort), so `chosen ?? fallback` is always a listed id, or "".
+  const fallback = models.length > 0 ? defaultStudioMusicModel(models, scope) : "";
+  return { models, defaultModel: chosen ?? fallback };
+}
+
+/**
  * Why the studio's voice-over control is off, or `null` when a text-to-speech model is reachable.
  *
  * The catalog's only TTS id is realtime, and a realtime id speaks WebSocket behind an `openai`
  * endpoint label, so a job route cannot drive it. Reporting the reason is the whole point: the
  * studio says "this gateway serves no reachable speech model" instead of failing at submit.
+ *
+ * The full catalog is passed beside the offered list, so a key that refused every speech model reads
+ * as `none_on_key` rather than as a gateway that has none (`speechUnavailableReason`).
  */
-export function studioSpeechUnavailable(
-  models?: ChatModel[],
-  scope?: ModelCacheScope,
-): SpeechUnavailableReason | null {
-  return speechUnavailableReason((models ?? listSpeechModels(scope)).map((model) => model.id));
+export function studioSpeechUnavailable(models?: ChatModel[], scope?: ModelCacheScope): SpeechUnavailableReason | null {
+  const offered = (models ?? listSpeechModels(scope)).map((model) => model.id);
+  const catalogIds = models ? offered : catalogOfCache(loadModelCache(scope)).map((entry) => entry.id);
+  return speechUnavailableReason(offered, catalogIds);
 }
 
 export function listStudioSpeechModels(models?: ChatModel[], scope?: ModelCacheScope): ChatModel[] {
-  return (models ?? listSpeechModels(scope)).filter((model) => isSpeechModelId(model.id));
+  return (models ?? listSpeechModels(scope)).filter(
+    (model) => isSpeechModelId(model.id) || isOmniSpeechModelId(model.id),
+  );
 }
 
 export function parseImageGenerateBody(raw: unknown): ImageGenerateBody {
@@ -261,6 +340,17 @@ function toolFailureMessage(output: unknown, fallback: string): string {
   return fallback;
 }
 
+/** The `code` a failed tool run carries, when it carries one. */
+function toolFailureCode(output: unknown): string | null {
+  if (output && typeof output === "object" && !Array.isArray(output)) {
+    const code = (output as { code?: unknown }).code;
+    if (typeof code === "string" && code.trim()) {
+      return code.trim();
+    }
+  }
+  return null;
+}
+
 function toolSuccessUrl(output: unknown, key: "image" | "video"): string | null {
   if (!output || typeof output !== "object" || Array.isArray(output)) {
     return null;
@@ -271,6 +361,23 @@ function toolSuccessUrl(output: unknown, key: "image" | "video"): string | null 
   }
   const url = record[key];
   return typeof url === "string" && url.trim() ? url.trim() : null;
+}
+
+/** What an image tool run reports beside its picture. `images` holds every picture when the model made more than one. */
+function toolImageReport(
+  output: unknown,
+  first: string,
+): { sent?: ImageSent; adjusted?: MediaAdjustment[]; extras: string[] } {
+  const record =
+    output && typeof output === "object" && !Array.isArray(output) ? (output as Record<string, unknown>) : {};
+  const images = Array.isArray(record.images)
+    ? record.images.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+  return {
+    sent: record.sent && typeof record.sent === "object" ? (record.sent as ImageSent) : undefined,
+    adjusted: Array.isArray(record.adjusted) ? (record.adjusted as MediaAdjustment[]) : undefined,
+    extras: images.filter((item) => item !== first),
+  };
 }
 
 function toolModel(output: unknown, fallback: string): string {
@@ -329,6 +436,9 @@ export async function generateStudioImage(
   // Edit keeps the live tool. The Images page, including a stub desk, uses the harness.
   const standIn = process.env.AGENTFORGE_RUNTIME === "stub" && options.workType !== "Edit";
   let ran: Awaited<ReturnType<typeof runImageSkills<string>>>;
+  // What the tool reports back about the call that succeeded: what it carried, what it moved, and any
+  // further pictures a model that makes more than one returned.
+  let report: { sent?: ImageSent; adjusted?: MediaAdjustment[]; extras: string[] } = { extras: [] };
   try {
     ran = await runImageSkills({
       prompt: maskPii(body.prompt),
@@ -345,6 +455,12 @@ export async function generateStudioImage(
               aspect_ratio: attempt.aspect,
               image_url: sourceImage,
               model: attempt.model,
+              ...(body.size ? { pixels: body.size } : {}),
+              ...(body.aspectRatio ? { ratio: body.aspectRatio } : {}),
+              ...(body.quality ? { quality: body.quality } : {}),
+              ...(body.tier ? { resolution: body.tier } : {}),
+              ...(body.count ? { count: body.count } : {}),
+              ...(body.outputFormat ? { output_format: body.outputFormat } : {}),
             },
             tenant,
           ),
@@ -353,6 +469,7 @@ export async function generateStudioImage(
         if (!url) {
           return { url: null, error: toolFailureMessage(output, imageGenerateFailedMessage(locale)) };
         }
+        report = toolImageReport(output, url);
         return { url, extra: toolModel(output, model) };
       },
     });
@@ -376,34 +493,57 @@ export async function generateStudioImage(
   // model recorded is the one that answered, which is not always the one that was asked for.
   // A stub stand-in never reached the gateway, so it is not a charge.
   if (!standIn) {
-    recordImageUsage(tenant, { model: usedModel, count: 1, aspect: ran.aspect });
-  }
-  const { saveGeneratedImage } = await import("./media");
-  const stored = await saveGeneratedImage(tenant, url);
-  const id = mediaIdFromUrl(stored);
-  if (id) {
-    await persistMeta(tenant.tenantId, {
-      mediaId: id,
-      kind: "image",
-      prompt: body.prompt,
-      aspect: ran.aspect,
+    recordImageUsage(tenant, {
       model: usedModel,
-      createdAt: new Date().toISOString(),
+      count: 1 + report.extras.length,
+      aspect: report.sent ? shapeOfRatio(ratioOf(report.sent.aspect) ?? 1) : ran.aspect,
     });
-    await upsertWorkSource(
-      tenant,
-      mediaWorkCard({
-        kind: "image",
-        mediaId: id,
-        prompt: body.prompt,
-        aspect: ran.aspect,
-        model: usedModel,
-        url: stored,
-        type: options.workType,
-      }),
-    );
   }
-  return { id, url: stored, prompt: body.prompt, aspect: ran.aspect, model: usedModel };
+  // What the picture is remembered as: the ratio the model drew when it said so, else the loose shape.
+  const aspect = report.sent?.aspect ?? ran.aspect;
+  const { saveGeneratedImage } = await import("./media");
+  const saveOne = async (source: string): Promise<{ id: string | null; stored: string }> => {
+    const stored = await saveGeneratedImage(tenant, source);
+    const id = mediaIdFromUrl(stored);
+    if (id) {
+      await persistMeta(tenant.tenantId, {
+        mediaId: id,
+        kind: "image",
+        prompt: body.prompt,
+        aspect,
+        model: usedModel,
+        createdAt: new Date().toISOString(),
+      });
+      await upsertWorkSource(
+        tenant,
+        mediaWorkCard({
+          kind: "image",
+          mediaId: id,
+          prompt: body.prompt,
+          aspect,
+          model: usedModel,
+          url: stored,
+          type: options.workType,
+        }),
+      );
+    }
+    return { id, stored };
+  };
+  const first = await saveOne(url);
+  const extraIds: (string | null)[] = [];
+  for (const extra of report.extras) {
+    extraIds.push((await saveOne(extra)).id);
+  }
+  return {
+    id: first.id,
+    url: first.stored,
+    prompt: body.prompt,
+    aspect,
+    model: usedModel,
+    ...(report.sent ? { sent: report.sent } : {}),
+    ...(report.adjusted && report.adjusted.length > 0 ? { adjusted: report.adjusted } : {}),
+    ...(extraIds.length > 0 ? { extraIds } : {}),
+  };
 }
 
 function videoToolResult(
@@ -415,6 +555,16 @@ function videoToolResult(
   const url = toolSuccessUrl(output, "video");
   if (url) {
     return { ok: true, url, model: toolModel(output, model) };
+  }
+  // A job the gateway still has when the wait ran out: said in the desk's language, and marked so the
+  // harness does not submit the brief again (`packages/core/src/videos/job-pending.ts`).
+  if (toolFailureCode(output) === VIDEO_JOB_PENDING_CODE) {
+    return {
+      ok: false,
+      message: modeMessage("videoJobPending", locale),
+      code: VIDEO_JOB_PENDING_CODE,
+      status: VIDEO_JOB_PENDING_STATUS,
+    };
   }
   const raw = toolFailureMessage(output, modeMessage("videoGenerateFailed", locale));
   const rewritten = rewriteModelNotOnKey(raw, locale, model, availableIds);
@@ -453,6 +603,8 @@ export async function generateStudioVideo(
       imageUrl: sourceImage,
       seconds: body.seconds,
       resolution: body.resolution,
+      audio: body.audio,
+      published: requested ? publishedMediaParamsFor(requested, tenant) : undefined,
       locale,
     },
     async (call) => {
@@ -464,11 +616,18 @@ export async function generateStudioVideo(
   );
   // The gateway has been paid once a clip is kept, so the row is written before the file is
   // stored. The length is the snapped one the harness asked for, never `body.seconds`.
+  const billedResolution = harness.sent.resolution;
   recordVideoUsage(tenant, {
     model: harness.usedModel,
     seconds: harness.seconds,
-    ...(body.resolution ? { resolution: body.resolution } : {}),
+    ...(billedResolution === "480p" ||
+    billedResolution === "720p" ||
+    billedResolution === "1080p" ||
+    billedResolution === "4k"
+      ? { resolution: billedResolution }
+      : {}),
   });
+  const aspect = harness.sent.aspect ?? "";
   const { saveGeneratedVideo } = await import("./media");
   const stored = await saveGeneratedVideo(tenant, harness.url);
   const id = mediaIdFromUrl(stored);
@@ -477,7 +636,7 @@ export async function generateStudioVideo(
       mediaId: id,
       kind: "video",
       prompt: harness.shot,
-      aspect: body.aspect,
+      aspect,
       model: harness.usedModel,
       createdAt: new Date().toISOString(),
       durationSeconds: harness.seconds,
@@ -488,16 +647,24 @@ export async function generateStudioVideo(
         kind: "video",
         mediaId: id,
         prompt: harness.shot,
-        aspect: body.aspect,
+        aspect,
         model: harness.usedModel,
         url: stored,
         seconds: harness.seconds,
-        resolution: body.resolution,
+        resolution: harness.sent.resolution,
         type: options.workType,
       }),
     );
   }
-  return { id, url: stored, prompt: body.prompt, aspect: body.aspect, model: harness.usedModel };
+  return {
+    id,
+    url: stored,
+    prompt: body.prompt,
+    aspect,
+    model: harness.usedModel,
+    sent: harness.sent,
+    ...(harness.adjusted.length > 0 ? { adjusted: harness.adjusted } : {}),
+  };
 }
 
 /** The text a music job is remembered by: the lyrics in custom mode, the brief in describe mode. */

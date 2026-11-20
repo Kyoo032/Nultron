@@ -15,6 +15,9 @@ import "./tenant-storage-db";
 // Phase 8: installs the connection the readiness route reads. Same seam, same reason; without it
 // the database check reports "did not answer" rather than a silent ok.
 import "./health-db";
+// 2026-11-11: installs the sink the generation tools report real calls to, so a model a key was refused
+// stops being offered (`model-availability.ts`). Importing it is the install; it holds no connection.
+import "./model-availability";
 import { hostAuthRoutes, hostPortalCheck, hostSessionStore, isSessionExemptPath, requireSessionFor } from "./auth";
 import type { PortalSessionCheck, SessionStore } from "./auth";
 import { jsonError, jsonOk } from "./errors";
@@ -44,6 +47,20 @@ import {
 } from "./handlers/artifacts";
 import { DESK_FILE_ROUTES } from "./desk-files/routes";
 import { FOLDER_ROUTES } from "./folder-root";
+import {
+  handleDeleteConversation,
+  handleDeleteWhatsApp,
+  handleGetConversation,
+  handleGetConversations,
+  handleGetCustomersSummary,
+  handleGetWhatsApp,
+  handlePostConversationRead,
+  handlePostConversationReply,
+  handlePostConversationState,
+  handlePostWhatsApp,
+} from "./handlers/customers";
+import { handleWhatsAppWebhookGet, handleWhatsAppWebhookPost } from "./inbox/webhook";
+import { WHATSAPP_WEBHOOK_PATH } from "./inbox/webhook-path";
 import {
   handleDeleteChannel,
   handleDeleteTelegramBot,
@@ -225,6 +242,7 @@ import {
   handleResetApp,
 } from "./handlers/settings";
 import { handleDeleteThread, handleGetThread, handleGetThreads, handlePostThreads } from "./handlers/threads";
+import { handlePostVoiceSession, handlePostVoiceSessionEnd } from "./handlers/voice";
 import { handleGetUsage } from "./handlers/usage";
 import { handleGetStorageUsage } from "./handlers/storage";
 import { handleGetVideoExampleFile, handleGetVideoExamples } from "./handlers/video-examples";
@@ -365,6 +383,8 @@ const routes: Route[] = [
   compile("POST", "/api/v1/threads", handlePostThreads),
   compile("GET", "/api/v1/threads/:threadId", handleGetThread),
   compile("DELETE", "/api/v1/threads/:threadId", handleDeleteThread),
+  compile("POST", "/api/v1/voice/sessions", handlePostVoiceSession),
+  compile("POST", "/api/v1/voice/sessions/:id/end", handlePostVoiceSessionEnd),
   compile("POST", "/api/v1/threads/:threadId/runs/text", (req) => handleRun(req, "text")),
   compile("POST", "/api/v1/threads/:threadId/runs/image", (req) => handleRun(req, "image")),
   compile("POST", "/api/v1/threads/:threadId/runs/video", (req) => handleRun(req, "video")),
@@ -440,6 +460,22 @@ const routes: Route[] = [
   compile("DELETE", "/api/v1/channels/:channelId", handleDeleteChannel),
   compile("GET", "/api/v1/channels/:channelId/messages", handleGetChannelMessages),
   compile("POST", "/api/v1/channels/:channelId/send", (req) => handlePostChannelSend(req)),
+  // The customer inbox (docs/internal/whatsapp-omnichannel-plan.md). The webhook is the one route a
+  // stranger can reach: it is exempt from the session gate and the CSRF rule (`UNGATED_GETS`,
+  // `UNGATED_POSTS`, `CSRF_EXEMPT_PATHS`) and authenticates by Meta's signature instead. It is a
+  // literal path, listed before the `:channelId` routes so `whatsapp` is never read as a channel id.
+  compile("GET", WHATSAPP_WEBHOOK_PATH, async (req) => handleWhatsAppWebhookGet(req)),
+  compile("POST", WHATSAPP_WEBHOOK_PATH, (req) => handleWhatsAppWebhookPost(req)),
+  compile("GET", "/api/v1/customers/whatsapp", (req) => handleGetWhatsApp(req)),
+  compile("POST", "/api/v1/customers/whatsapp", (req) => handlePostWhatsApp(req)),
+  compile("DELETE", "/api/v1/customers/whatsapp", (req) => handleDeleteWhatsApp(req)),
+  compile("GET", "/api/v1/customers/summary", (req) => handleGetCustomersSummary(req)),
+  compile("GET", "/api/v1/customers/conversations", (req) => handleGetConversations(req)),
+  compile("GET", "/api/v1/customers/conversations/:conversationId", (req) => handleGetConversation(req)),
+  compile("POST", "/api/v1/customers/conversations/:conversationId/read", (req) => handlePostConversationRead(req)),
+  compile("POST", "/api/v1/customers/conversations/:conversationId/reply", (req) => handlePostConversationReply(req)),
+  compile("POST", "/api/v1/customers/conversations/:conversationId/state", (req) => handlePostConversationState(req)),
+  compile("DELETE", "/api/v1/customers/conversations/:conversationId", (req) => handleDeleteConversation(req)),
   compile("GET", "/api/v1/legal/playbooks", handleGetLegalPlaybooks),
   compile("GET", "/api/v1/legal/matters", handleGetLegalMatters),
   compile("POST", "/api/v1/legal/matters", handlePostLegalMatters),

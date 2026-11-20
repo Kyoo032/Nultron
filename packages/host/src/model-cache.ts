@@ -1,7 +1,18 @@
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { localDataDir } from "@agentforge/db/vault-key";
-import { ApiError, isServerMode, mediaKind, type ChatModel, type ModelProvider } from "@agentforge/core";
+import {
+  ApiError,
+  isServerMode,
+  mediaKind,
+  parseAvailabilityStore,
+  sanitizePublishedMediaParams,
+  type AvailabilityStore,
+  type ChatModel,
+  type ModelProvider,
+  type PricingHints,
+  type PublishedMediaMap,
+} from "@agentforge/core";
 import { assertTenantId } from "./tenant-paths";
 import { currentRequestSession } from "./tenant-scope";
 import { companyStateKey, dbTenantStateBackend, type TenantStateSlot } from "./tenant-state-store";
@@ -20,6 +31,23 @@ export type ModelCache = {
   googleError?: string;
   volcengineError?: string;
   detectedDialect?: ModelProvider;
+  /**
+   * What real calls taught about each key's models (`@agentforge/core` `availability.ts`). Filed under
+   * the key's salted id, never the key. Kept with the model list because both describe the same key and
+   * both are cleared by the same "Start over".
+   */
+  availability?: AvailabilityStore;
+  /** The id (under `availability.salt`) of the key whose model list this cache holds. */
+  keyId?: string;
+  /** The gateway's public price list, reduced to `model id -> endpoint types`, so a new id is placed by what the gateway says it is. */
+  endpointHints?: PricingHints;
+  endpointHintsAt?: string;
+  /**
+   * What the same price list publishes for each media model (`config.parameters`: resolution enums,
+   * defaults). Laid over the built-in media parameter table, so a model the table has never heard of, or a
+   * changed enum, works with no code change (`@agentforge/core` `media-params.ts`).
+   */
+  mediaParams?: PublishedMediaMap;
 };
 
 /**
@@ -152,7 +180,31 @@ function parseModelCache(text: string): ModelCache {
     googleError: typeof parsed.googleError === "string" ? parsed.googleError : undefined,
     volcengineError: typeof parsed.volcengineError === "string" ? parsed.volcengineError : undefined,
     detectedDialect: parsed.detectedDialect,
+    availability: parseAvailabilityStore(parsed.availability),
+    keyId: typeof parsed.keyId === "string" && parsed.keyId ? parsed.keyId : undefined,
+    endpointHints: parseEndpointHints(parsed.endpointHints),
+    endpointHintsAt: typeof parsed.endpointHintsAt === "string" ? parsed.endpointHintsAt : undefined,
+    mediaParams: sanitizePublishedMediaParams(parsed.mediaParams),
   };
+}
+
+/** The stored price-list hints, dropping anything that is not `id -> string[]`. Capped, so a bad file cannot grow the cache. */
+function parseEndpointHints(value: unknown): PricingHints | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+  const hints: Record<string, readonly string[]> = {};
+  let count = 0;
+  for (const [id, types] of Object.entries(value as Record<string, unknown>)) {
+    if (count >= 2_000) {
+      break;
+    }
+    if (Array.isArray(types) && types.every((type) => typeof type === "string")) {
+      hints[id] = types as string[];
+      count += 1;
+    }
+  }
+  return count > 0 ? hints : undefined;
 }
 
 /** Cheap change key for memoizing derived catalogs: the cache's mtime + size (a desk) or row stamp (a tenant), or "missing". */

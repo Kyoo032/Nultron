@@ -249,6 +249,7 @@ export function ensureSchema(sqlite: Database.Database): void {
   ensureTenantStorageTable(sqlite);
   ensureTenantResetAuditTable(sqlite);
   ensureDeskFileTables(sqlite);
+  ensureCustomerInboxTables(sqlite);
   ensureWorkspaceColumns(sqlite);
   assertKernelTables(sqlite);
 }
@@ -678,6 +679,82 @@ function ensureDeskFileTables(sqlite: Database.Database): void {
       CONSTRAINT file_proposals_status_check CHECK (status IN ('pending', 'approved', 'applied', 'rejected', 'stale', 'failed'))
     );
     CREATE INDEX IF NOT EXISTS file_proposals_ws_status_idx ON file_proposals (workspace_id, status);
+  `);
+}
+
+/**
+ * The customer inbox, for a database stamped past 0023 without the tables.
+ * Mirrors drizzle/0023_customer_inbox.sql with the active-only index from 0024.
+ */
+function ensureCustomerInboxTables(sqlite: Database.Database): void {
+  const indexes = sqlite.prepare("PRAGMA index_list(channel_endpoints)").all() as Array<{
+    name: string;
+    partial: number;
+  }>;
+  if (indexes.some((index) => index.name === "channel_endpoints_kind_external_unique" && !index.partial)) {
+    sqlite.exec("DROP INDEX channel_endpoints_kind_external_unique");
+  }
+  sqlite.exec(`
+    CREATE TABLE IF NOT EXISTS channel_endpoints (
+      id text PRIMARY KEY NOT NULL,
+      organization_id text NOT NULL,
+      workspace_id text NOT NULL,
+      kind text NOT NULL,
+      external_id text NOT NULL,
+      display_phone text,
+      verified_name text,
+      status text NOT NULL,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL,
+      CONSTRAINT channel_endpoints_kind_check CHECK (kind IN ('whatsapp')),
+      CONSTRAINT channel_endpoints_status_check CHECK (status IN ('active', 'disabled'))
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS channel_endpoints_kind_external_unique ON channel_endpoints (kind, external_id) WHERE status = 'active';
+    CREATE INDEX IF NOT EXISTS channel_endpoints_ws_idx ON channel_endpoints (workspace_id);
+    CREATE TABLE IF NOT EXISTS customer_conversations (
+      id text PRIMARY KEY NOT NULL,
+      organization_id text NOT NULL,
+      workspace_id text NOT NULL,
+      endpoint_id text NOT NULL REFERENCES channel_endpoints(id) ON DELETE cascade,
+      kind text NOT NULL,
+      contact_id text NOT NULL,
+      contact_name text NOT NULL,
+      state text NOT NULL,
+      unread_count integer DEFAULT 0 NOT NULL,
+      last_inbound_at integer,
+      last_outbound_at integer,
+      last_message_at integer NOT NULL,
+      last_message_preview text NOT NULL,
+      last_message_direction text NOT NULL,
+      created_at integer NOT NULL,
+      updated_at integer NOT NULL,
+      CONSTRAINT customer_conversations_kind_check CHECK (kind IN ('whatsapp')),
+      CONSTRAINT customer_conversations_state_check CHECK (state IN ('auto', 'needs_you', 'with_you', 'closed')),
+      CONSTRAINT customer_conversations_direction_check CHECK (last_message_direction IN ('in', 'out'))
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS customer_conversations_contact_unique ON customer_conversations (endpoint_id, contact_id);
+    CREATE INDEX IF NOT EXISTS customer_conversations_ws_state_idx ON customer_conversations (workspace_id, state, last_message_at);
+    CREATE TABLE IF NOT EXISTS customer_messages (
+      id text PRIMARY KEY NOT NULL,
+      workspace_id text NOT NULL,
+      conversation_id text NOT NULL REFERENCES customer_conversations(id) ON DELETE cascade,
+      direction text NOT NULL,
+      sent_by text NOT NULL,
+      kind text NOT NULL,
+      external_id text,
+      text text NOT NULL,
+      delivery text,
+      delivery_error text,
+      created_at integer NOT NULL,
+      CONSTRAINT customer_messages_direction_check CHECK (direction IN ('in', 'out')),
+      CONSTRAINT customer_messages_sent_by_check CHECK (sent_by IN ('customer', 'auto', 'owner')),
+      CONSTRAINT customer_messages_kind_check CHECK (kind IN ('text', 'unsupported')),
+      CONSTRAINT customer_messages_delivery_check CHECK (delivery IS NULL OR delivery IN ('queued', 'sent', 'delivered', 'read', 'failed'))
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS customer_messages_external_unique ON customer_messages (conversation_id, direction, external_id) WHERE external_id IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS customer_messages_conv_idx ON customer_messages (conversation_id, created_at);
+    CREATE INDEX IF NOT EXISTS customer_messages_external_idx ON customer_messages (external_id);
+    CREATE INDEX IF NOT EXISTS customer_messages_ws_time_idx ON customer_messages (workspace_id, created_at);
   `);
 }
 

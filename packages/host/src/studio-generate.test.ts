@@ -48,14 +48,26 @@ describe("parseImageGenerateBody", () => {
 });
 
 describe("parseVideoGenerateBody", () => {
-  it("defaults aspect to 16:9", () => {
+  it("leaves every knob out when none is sent, so the model's own default stands", () => {
     expect(parseVideoGenerateBody({ prompt: "waves" })).toEqual({
       prompt: "waves",
-      aspect: "16:9",
+      aspect: undefined,
       model: undefined,
       imageUrl: undefined,
       seconds: undefined,
       resolution: undefined,
+      audio: undefined,
+    });
+  });
+
+  it("accepts any ratio the model might take and the sound switch", () => {
+    expect(parseVideoGenerateBody({ prompt: "x", aspect: "3:4", audio: true })).toMatchObject({
+      aspect: "3:4",
+      audio: true,
+    });
+    expect(parseVideoGenerateBody({ prompt: "x", aspect: "21:9", resolution: "4k" })).toMatchObject({
+      aspect: "21:9",
+      resolution: "4k",
     });
   });
 
@@ -106,8 +118,37 @@ describe("parseVideoGenerateBody", () => {
       seconds: 8,
       resolution: "1080p",
     });
-    expect(() => parseVideoGenerateBody({ prompt: "x", seconds: 1 })).toThrow(ApiError);
-    expect(() => parseVideoGenerateBody({ prompt: "x", resolution: "4k" })).toThrow(ApiError);
+    // Not a model's choice but a malformed request: outside 1-60 seconds, or not a resolution word.
+    expect(() => parseVideoGenerateBody({ prompt: "x", seconds: 0 })).toThrow(ApiError);
+    expect(() => parseVideoGenerateBody({ prompt: "x", seconds: 61 })).toThrow(ApiError);
+    expect(() => parseVideoGenerateBody({ prompt: "x", resolution: "huge" })).toThrow(ApiError);
+  });
+});
+
+describe("parseImageGenerateBody media knobs", () => {
+  it("carries the exact size, ratio, quality, tier, count and format", () => {
+    expect(
+      parseImageGenerateBody({
+        prompt: "a lantern",
+        size: "1536x1024",
+        quality: "low",
+        count: 2,
+        outputFormat: "jpeg",
+      }),
+    ).toMatchObject({ size: "1536x1024", quality: "low", count: 2, outputFormat: "jpeg" });
+    expect(parseImageGenerateBody({ prompt: "x", aspectRatio: "3:2", tier: "2k" })).toMatchObject({
+      aspectRatio: "3:2",
+      tier: "2k",
+    });
+  });
+
+  it("rejects values that are not the shape of a knob", () => {
+    expect(() => parseImageGenerateBody({ prompt: "x", size: "big" })).toThrow(ApiError);
+    expect(() => parseImageGenerateBody({ prompt: "x", aspectRatio: "wide" })).toThrow(ApiError);
+    expect(() => parseImageGenerateBody({ prompt: "x", tier: "two" })).toThrow(ApiError);
+    expect(() => parseImageGenerateBody({ prompt: "x", quality: "a;b" })).toThrow(ApiError);
+    expect(() => parseImageGenerateBody({ prompt: "x", count: 5 })).toThrow(ApiError);
+    expect(() => parseImageGenerateBody({ prompt: "x", count: 0 })).toThrow(ApiError);
   });
 });
 

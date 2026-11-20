@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../errors";
+import { modeMessage } from "../mode-messages";
 import { outputLanguageRule } from "../output-language";
+import { VIDEO_JOB_PENDING_CODE } from "./job-pending";
 import {
   acceptVideoShot,
   clipIsVideoUrl,
@@ -45,7 +47,10 @@ describe("videos harness skills", () => {
     expect(result.shotRepaired).toBe(true);
     expect(result.shot).toContain("a cat in the rain");
     expect(result.shot).toContain("Camera: one steady shot.");
-    expect(result.seconds).toBe(5);
+    // Grok takes 6 or 10 s, so 5 s is moved to 6 and the harness says so.
+    expect(result.seconds).toBe(6);
+    expect(result.sent).toMatchObject({ aspect: "16:9", seconds: 6, resolution: "720p" });
+    expect(result.adjusted).toEqual([{ field: "seconds", asked: 5, used: 6, reason: "out_of_range" }]);
     expect(result.attempts).toBe(2);
     expect(calls).toHaveLength(2);
     expect(calls[0]).toContain("a cat in the rain");
@@ -138,6 +143,55 @@ describe("videos harness skills", () => {
     expect(videoRenderShouldRetry("rejected the API key")).toBe(false);
     expect(videoRenderShouldRetry("prepaid_async_requires_fixed_price")).toBe(false);
     expect(videoRenderShouldRetry("This model does not accept a still image")).toBe(false);
+  });
+
+  it("never submits again a job the gateway still has: one render, however the message reads", async () => {
+    let calls = 0;
+    const error = await runVideoHarness(
+      {
+        prompt: "a cat in the rain",
+        requestedModel: "grok-imagine-video",
+        availableIds: LISTED,
+        aspect: "16:9",
+        locale: "en",
+      },
+      async () => {
+        calls += 1;
+        // Even a message that says "timed out" (what the old poll said) must not buy a second paid job.
+        return { ok: false, message: "Gateway video job timed out", code: VIDEO_JOB_PENDING_CODE, status: 504 };
+      },
+    ).catch((caught: unknown) => caught);
+    expect(calls).toBe(1);
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error).toMatchObject({ code: VIDEO_JOB_PENDING_CODE, status: 504 });
+  });
+
+  it("refuses to retry the pending wording even when only the message is passed on", () => {
+    expect(videoRenderShouldRetry(modeMessage("videoJobPending", "en"))).toBe(false);
+    expect(videoRenderShouldRetry(modeMessage("videoJobPending", "id"))).toBe(false);
+  });
+
+  it("still retries once a submit that never got a job: a 503 with no live channel", async () => {
+    let calls = 0;
+    const result = await runVideoHarness(
+      {
+        prompt: "a cat in the rain",
+        requestedModel: "grok-imagine-video",
+        availableIds: LISTED,
+        aspect: "16:9",
+        locale: "en",
+      },
+      async () => {
+        calls += 1;
+        if (calls === 1) {
+          return fail("No available channel. This video model has no live gateway channel (HTTP 503).", 503);
+        }
+        return ok("https://cdn.example/clip.mp4");
+      },
+    );
+    expect(calls).toBe(2);
+    expect(result.skills).toContain("render-retry");
+    expect(result.attempts).toBe(2);
   });
 
   it("retries a still that came back instead of a video, then refuses a second one", async () => {

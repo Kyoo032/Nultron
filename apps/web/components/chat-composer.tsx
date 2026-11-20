@@ -27,6 +27,7 @@ import { useChipOriginals } from "@/lib/use-chip-originals";
 import { useDocumentReads } from "@/lib/use-document-reads";
 import { EnhancePromptButton } from "@/components/enhance-prompt-button";
 import { ComposerPlusMenu } from "@/components/composer-plus-menu";
+import { type ComposerVoice, VoiceMicButton } from "@/components/voice/voice-mic-button";
 import { apiFetch } from "@/lib/api-client";
 import { abortErrorMessage, armStreamWatchdog } from "@agentforge/core/stream-watchdog";
 import { DEFAULT_MODEL_TIER, type ModelTierId } from "@agentforge/core/tiers";
@@ -81,6 +82,7 @@ type Props = {
   onDraftApplied?: () => void;
   /** The message box placeholder. Defaults to the Chat line; an agent passes its own ("Message {name}"). */
   placeholder?: string;
+  voice?: ComposerVoice;
   /** A tool the run is driving reported a progress line (the stream's `tool.progress` events that carry a label). */
   onToolProgress?: (event: { toolKey: string; label: string }) => void;
   /**
@@ -228,8 +230,6 @@ export async function readRunStream(
         handlers.onToolProgress?.(progress);
       }
       if (event.type === "run.model_fallback") {
-        // A tier run's fallback names no models (model tiers spec, section 5); the notice then shows
-        // the host's sentence alone.
         handlers.onModelFallback?.({ from: event.from ?? "", to: event.to ?? "", message: event.message ?? "" });
       }
       if (event.type === "run.failed" && event.message) {
@@ -262,6 +262,7 @@ export function ChatComposer({
   onDraftApplied,
   sessionKey,
   placeholder,
+  voice,
   onToolProgress,
   continueSendRef,
 }: Props) {
@@ -735,6 +736,7 @@ export function ChatComposer({
           }}
           data-testid="composer-text"
         />
+        <VoiceMicButton voice={voice} busy={busy} />
         <button
           type="submit"
           className={

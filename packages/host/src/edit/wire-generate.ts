@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { media } from "@agentforge/db";
 import { db } from "@agentforge/db";
-import type { TenantContext } from "@agentforge/core";
+import { ApiError, VIDEO_JOB_PENDING_CODE, type TenantContext } from "@agentforge/core";
 import { generateStudioImage, generateStudioVideo } from "../studio-generate";
 import { mediaIdFromUrl } from "../media-id";
 import { setGenerateSubmit } from "./generate";
@@ -42,6 +42,9 @@ export function ensureGenerateSubmitWired(): void {
             aspect,
             model: typeof body.model === "string" ? body.model : undefined,
             imageUrl: typeof body.imageUrl === "string" ? body.imageUrl : undefined,
+            ...(typeof body.quality === "string" ? { quality: body.quality } : {}),
+            ...(typeof body.tier === "string" ? { tier: body.tier } : {}),
+            ...(typeof body.outputFormat === "string" ? { outputFormat: body.outputFormat } : {}),
           },
           { workType: "Edit" },
         );
@@ -56,11 +59,12 @@ export function ensureGenerateSubmitWired(): void {
         tenant,
         {
           prompt: String(body.prompt ?? ""),
-          aspect: (body.aspect as "16:9" | "9:16" | "1:1") ?? "16:9",
+          aspect: typeof body.aspect === "string" ? body.aspect : undefined,
           model: typeof body.model === "string" ? body.model : undefined,
           imageUrl: typeof body.imageUrl === "string" ? body.imageUrl : undefined,
           seconds: typeof body.seconds === "number" ? body.seconds : undefined,
-          resolution: body.resolution as "480p" | "720p" | "1080p" | undefined,
+          resolution: typeof body.resolution === "string" ? body.resolution : undefined,
+          ...(typeof body.audio === "boolean" ? { audio: body.audio } : {}),
         },
         { workType: "Edit" },
       );
@@ -79,7 +83,9 @@ export function ensureGenerateSubmitWired(): void {
           ? (error as { status: number }).status
           : 500;
       const message = error instanceof Error ? error.message : "generate_failed";
-      return { status, body: { error: message } };
+      // A job the gateway still has is told apart by its code, so `runGenerateJob` does not submit it again.
+      const pending = error instanceof ApiError && error.code === VIDEO_JOB_PENDING_CODE;
+      return { status, body: { error: message, ...(pending ? { code: VIDEO_JOB_PENDING_CODE } : {}) } };
     }
   });
 }

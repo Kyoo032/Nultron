@@ -32,6 +32,21 @@ function bodyOf(fetchMock: ReturnType<typeof vi.fn>): Record<string, unknown> {
   return JSON.parse(init.body) as Record<string, unknown>;
 }
 
+/**
+ * A stored picture is a local data URL the gateway cannot fetch, so the edit goes to `/v1/images/edits`
+ * as a multipart file (docs: field `image`) and the text fields ride beside it.
+ */
+function formOf(fetchMock: ReturnType<typeof vi.fn>): { url: string; form: FormData } {
+  const [url, init] = fetchMock.mock.calls[0] as [string, { body: FormData }];
+  expect(init.body).toBeInstanceOf(FormData);
+  return { url, form: init.body };
+}
+
+async function fileText(form: FormData): Promise<{ type: string; text: string }> {
+  const file = form.get("image") as File;
+  return { type: file.type, text: Buffer.from(await file.arrayBuffer()).toString("base64") };
+}
+
 function run(args: Record<string, unknown>, resolver?: MediaReferenceResolver, secrets = GATEWAY_SECRETS) {
   const scoped = () => runWithToolSecrets({ secrets, backends: {} }, () => invokeTool(imageGenerateTool, args, tenant));
   return resolver ? runWithMediaReferenceResolver(resolver, scoped) : scoped();
@@ -54,7 +69,10 @@ describe("image_generate image input", () => {
     const resolver = vi.fn(async () => PNG_DATA_URL);
     const result = await run({ prompt: "make it blue", image_url: `/api/v1/media/${MEDIA_ID}/file` }, resolver);
     expect(resolver).toHaveBeenCalledWith(tenant, MEDIA_ID);
-    expect(bodyOf(fetchMock).image).toBe(PNG_DATA_URL);
+    const { url, form } = formOf(fetchMock);
+    expect(url).toBe("https://api.tokotokenai.com/v1/images/edits");
+    expect(form.get("prompt")).toContain("make it blue");
+    expect(await fileText(form)).toEqual({ type: "image/png", text: PNG_DATA_URL.split(",")[1] });
     expect(result).toMatchObject({ success: true });
   });
 
@@ -63,7 +81,13 @@ describe("image_generate image input", () => {
     const resolver = vi.fn(async () => PNG_DATA_URL);
     await run({ prompt: "make it blue", image_url: MEDIA_ID }, resolver);
     expect(resolver).toHaveBeenCalledWith(tenant, MEDIA_ID);
-    expect(bodyOf(fetchMock).image).toBe(PNG_DATA_URL);
+    expect((await fileText(formOf(fetchMock).form)).text).toBe(PNG_DATA_URL.split(",")[1]);
+  });
+
+  it("sends an https reference to /v1/images/edits as JSON", async () => {
+    const fetchMock = stubGateway();
+    await run({ prompt: "make it blue", image_url: "https://cdn.example/in.png" });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.tokotokenai.com/v1/images/edits");
   });
 
   it("refuses text that is neither a URL nor a media reference", async () => {

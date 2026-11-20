@@ -26,6 +26,14 @@ export const PRICE_TABLE: PriceRow[] = [
     usdPerImage: 0.04,
     asOf: "2026-09",
   },
+  {
+    // Measured on the prepaid key 2026-11-12, quality medium, 1024x1024: usage 22 text tokens in and 439 image
+    // tokens out per image (343 for 1536x1024 and 1024x1536), at the price list's model_ratio 2.5 and
+    // completion_ratio 6 (about $5 per million in, $30 per million out): about $0.0133 for a square.
+    match: /^gpt-image-2\.5-(flare|sunburst)$/i,
+    usdPerImage: 0.0133,
+    asOf: "2026-11",
+  },
 ];
 
 const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;

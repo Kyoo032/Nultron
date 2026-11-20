@@ -4,7 +4,7 @@
   "needsKey": "Add a {gateway} gateway key in {settings} to generate images.",
   "noModels": {
     "title": "No image model on this key",
-    "body": "This {gateway} key lists no image model, so nothing can be generated here. Check the key in {settings}."
+    "body": "This {gateway} key lists no image model, so nothing can be generated here. Check the Models section in {settings}."
   },
   "settingsLink": "Settings",
   "loadError": "Could not load image studio",
@@ -91,5 +91,28 @@
       "title": "Desk-object still",
       "resultSummary": "A quiet object study with a lighting plan — not three props on a white sweep."
     }
-  }
+  },
+  "shapeLabel": "Size",
+  "qualityLabel": "Quality",
+  "tierLabel": "Resolution",
+  "countLabel": "Number of images",
+  "formatLabel": "File format",
+  "quality": {
+    "option": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "auto": "Auto"
+    }
+  },
+  "adjusted": "Changed for {model}: {changes}.",
+  "change": {
+    "size": "size {asked} → {used}",
+    "quality": "quality {asked} → {used}",
+    "tier": "resolution {asked} → {used}",
+    "count": "images {asked} → {used}",
+    "format": "format {asked} → {used}"
+  },
+  "sent": "Made at {summary}.",
+  "unverified": "Some values for this model come from the vendor's API, not from the gateway, and have not been checked here yet."
 }

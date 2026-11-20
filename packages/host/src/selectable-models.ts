@@ -1,4 +1,7 @@
 import {
+  fetchPricingWithMedia,
+  isOmniSpeechModelId,
+  kindFromEndpointTypesOf,
   DEFAULT_CHAT_MODEL,
   DEFAULT_EMBEDDING_MODEL,
   DEFAULT_OPENAI_BASE_URL,
@@ -42,6 +45,7 @@ import {
   type ModelCacheScope,
 } from "./model-cache";
 import { log } from "./log";
+import { dropRefusedModels, forgetLessons, withKeyId } from "./model-availability";
 import { loadSettings } from "./settings-store";
 import { loadModelsDevRegistry, modelsDevCacheStamp, refreshModelsDevRegistry } from "./models-dev-cache";
 
@@ -122,8 +126,35 @@ export function resetCatalogMemo(): void {
   catalogMemo.clear();
 }
 
+/**
+ * The catalogue by kind, for one key. Two things are applied to it that a plain `routeModelsByKind` does
+ * not: a model the gateway's price list says is an image or video model is placed there even when no
+ * regex in this repo knows its name (so a model the gateway adds later appears in the right picker), and
+ * a model a real call has just said does not work on this key is left out (`model-availability.ts`).
+ */
+function routeForScope(models: ChatModel[], scope?: ModelCacheScope): RoutedModels<ChatModel> {
+  const hints = loadModelCache(scope).endpointHints;
+  const routed = routeModelsByKind(dropRefusedModels(models, scope));
+  if (!hints) {
+    return routed;
+  }
+  // Move a chat-classified id the price list calls image or video. Only chat ids move: an id a regex
+  // already placed keeps its place, so nothing that worked before is re-sorted.
+  const stay: ChatModel[] = [];
+  for (const model of routed.chat) {
+    const kind = kindFromEndpointTypesOf(model.id, hints);
+    if (kind === "image" || kind === "video") {
+      routed[kind].push(model);
+    } else {
+      stay.push(model);
+    }
+  }
+  routed.chat = stay;
+  return routed;
+}
+
 export function listRoutedModels(models?: ChatModel[], scope?: ModelCacheScope): RoutedModels<ChatModel> {
-  return routeModelsByKind(models ?? listCatalogModels(scope));
+  return routeForScope(models ?? listCatalogModels(scope), scope);
 }
 
 export function listSelectableModels(scope?: ModelCacheScope): SelectableModel[] {
@@ -153,12 +184,19 @@ export function listProbedModels(cache?: ModelCache, scope?: ModelCacheScope): C
 }
 
 export function listProbedVideoModels(cache?: ModelCache, scope?: ModelCacheScope): ChatModel[] {
-  return listProbedModels(cache, scope).filter((model) => mediaKind(model.id) === "video");
+  const hints = (cache ?? loadModelCache(scope)).endpointHints;
+  return dropRefusedModels(
+    listProbedModels(cache, scope).filter(
+      (model) => mediaKind(model.id) === "video" || kindFromEndpointTypesOf(model.id, hints) === "video",
+    ),
+    scope,
+  );
 }
 
 export function toolMediaModels(scope?: ModelCacheScope): MediaModelCatalog {
   return {
-    image: listImageModels(scope).flatMap((model) => (mediaKind(model.id) === "image" ? [model.id] : [])),
+    // `listImageModels` is already the image list, by regex or by the gateway's price list.
+    image: listImageModels(scope).map((model) => model.id),
     video: listProbedVideoModels(undefined, scope).map((model) => model.id),
   };
 }
@@ -207,12 +245,20 @@ export function withRelayMusicModels(
 }
 
 export function listMusicModels(scope?: ModelCacheScope): ChatModel[] {
-  return withRelayMusicModels(listAudioModels(scope).filter((model) => isMusicModelId(model.id)));
+  return dropRefusedModels(
+    withRelayMusicModels(listAudioModels(scope).filter((model) => isMusicModelId(model.id))),
+    scope,
+  );
 }
 
-/** Non-realtime text-to-speech only; empty on this gateway today. */
+/**
+ * Models that can read text aloud over HTTP: a non-realtime TTS id (`/v1/audio/speech`), or an Omni chat
+ * id that answers the streaming chat call with audio. A key that lists no TTS id still has the second.
+ */
 export function listSpeechModels(scope?: ModelCacheScope): ChatModel[] {
-  return listAudioModels(scope).filter((model) => isSpeechModelId(model.id));
+  const tts = listAudioModels(scope).filter((model) => isSpeechModelId(model.id));
+  const omni = listRoutedModels(undefined, scope).chat.filter((model) => isOmniSpeechModelId(model.id));
+  return [...tts, ...omni];
 }
 
 /** Embedding ids are never curated — PICKER_HIDE strips them from chat. */
@@ -271,13 +317,15 @@ export function modeCatalogPayload(
   defaults: ModeModelDefaults;
 } {
   const all = models ?? listCatalogModels(scope);
-  const routed = routeModelsByKind(all);
+  const routed = routeForScope(all, scope);
   const curated = curateRouted(routed);
   const embedding = listEmbeddingModels(all, scope);
   const chatDefault = defaultSelectableModel(curated.chat, scope);
   // The relay music model is merged here too, so `/api/v1/models` cannot report a music mode whose
   // list is missing the very id `defaults.music` names.
-  const music = applyCuration(withRelayMusicModels(curated.audio.filter((model) => isMusicModelId(model.id))));
+  const music = applyCuration(
+    dropRefusedModels(withRelayMusicModels(curated.audio.filter((model) => isMusicModelId(model.id))), scope),
+  );
   return {
     modes: {
       ...curated,
@@ -357,6 +405,11 @@ export type RefreshModelCacheOptions = {
    * write have no `await` between them, so inside one process nothing can land in the gap.
    */
   onlyIfMissing?: boolean;
+  /**
+   * The person pressed Refresh: forget what real calls taught about the key now in use, so a model that
+   * was refused is offered again and tried afresh. Never set by the background warm-up.
+   */
+  forgetLessons?: boolean;
 };
 
 /**
@@ -383,6 +436,7 @@ export async function refreshModelCache(
 
   // Stub desks (no key, default gateway) never call out: there is nothing to list.
   if (settings.openaiApiKey || hasCustomGateway(settings)) {
+    const catalogPromise = fetchPricingWithMedia();
     try {
       const detected = await detectCompatibleApi({
         url: resolveProviderKeys(settings).openaiBaseUrl || DEFAULT_OPENAI_BASE_URL,
@@ -394,6 +448,17 @@ export async function refreshModelCache(
       next.openaiError = redactSecrets(
         error instanceof Error ? error.message : "Could not list models from the gateway",
       );
+    }
+    const priced = await catalogPromise;
+    if (priced) {
+      next.endpointHints = priced.hints;
+      next.endpointHintsAt = now;
+      // An empty map is an answer too: a list that stopped publishing parameters must not keep the old ones.
+      if (Object.keys(priced.media).length > 0) {
+        next.mediaParams = priced.media;
+      } else {
+        delete next.mediaParams;
+      }
     }
   } else {
     // Key cleared: a stale "unreachable" banner from the last live save must not survive into stub.
@@ -457,10 +522,13 @@ export async function refreshModelCache(
     }
   }
 
+  // File what is learned under the key this list was read with, and, on a person's Refresh, forget it.
+  const keyed = withKeyId(next, resolveProviderKeys(settings).openai);
+  const finished = options.forgetLessons ? forgetLessons(keyed) : keyed;
   if (options.onlyIfMissing && modelCacheStamp(scope) !== "missing") {
     return loadModelCache(scope);
   }
-  return saveModelCache(next, scope);
+  return saveModelCache(finished, scope);
 }
 
 // ---------------------------------------------------------------------------- hosted cache warm-up
@@ -562,7 +630,8 @@ export function warmHostedModelCache(scope?: ModelCacheScope, deps: HostedWarmup
 
 /** The desk a tenant context names, or "" for none (`resolveSettingsWorkspaceId` then picks the selected one). */
 function workspaceIdOf(scope: ModelCacheScope): string {
-  const workspaceId = typeof scope === "object" && scope !== null ? (scope as { workspaceId?: unknown }).workspaceId : "";
+  const workspaceId =
+    typeof scope === "object" && scope !== null ? (scope as { workspaceId?: unknown }).workspaceId : "";
   return typeof workspaceId === "string" ? workspaceId : "";
 }
 

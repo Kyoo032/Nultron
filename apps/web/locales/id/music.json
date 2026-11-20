@@ -31,13 +31,14 @@
   "duration": "{n}dtk",
   "takesNote": "Satu permintaan menghasilkan dua versi, tetapi hanya ditagih sekali. Keduanya disimpan.",
   "noModels": {
-    "title": "Tidak ada model musik yang bisa dipilih",
-    "body": "Meja kerja ini tidak mendapat model musik apa pun. Musik berjalan lewat relay Suno milik gateway, yang tidak muncul di daftar modelnya. Kalau masalah ini berlanjut, segarkan daftar model di Pengaturan dan beri tahu operator gateway bahwa {gateway} tidak melayani relay itu untuk kunci ini."
+    "title": "Tidak ada model musik pada kunci ini",
+    "body": "Kunci {gateway} ini tidak bisa menjalankan model musik gateway, jadi belum ada yang bisa dibuat di sini. Periksa bagian Model di {settings}."
   },
   "voiceHeading": "Voice over",
   "voiceUnavailable": {
     "realtimeOnly": "Satu-satunya model teks-ke-suara di gateway ini bersifat realtime (WebSocket), yang tidak terjangkau lewat rute pekerjaan. Voice over akan aktif sendiri begitu ada model suara standar di katalog.",
-    "noAudioModels": "Gateway ini tidak punya model teks-ke-suara. Voice over akan aktif sendiri begitu salah satunya muncul di katalog."
+    "noAudioModels": "Gateway ini tidak punya model teks-ke-suara. Voice over akan aktif sendiri begitu salah satunya muncul di katalog.",
+    "noneOnKey": "Semua model suara yang ditawarkan gateway ini ditolak untuk kunci ini, jadi voice over mati. Periksa bagian Model di {settings}."
   },
   "outputTextLanguage": "Lirik, judul, dan semua kata yang dinyanyikan atau diucapkan harus berbahasa Indonesia, kecuali prompt sudah menyebut bahasa lain.",
   "estimate": {

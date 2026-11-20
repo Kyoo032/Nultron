@@ -1,9 +1,11 @@
+import type { AppLocale } from "../../locale";
 import { ApiError } from "../../errors";
-import {
-  clampVideoSeconds,
-  normalizeVideoResolution,
-  usesSeedanceVideoWire,
-} from "../../models/video-capabilities";
+import { modeMessage } from "../../mode-messages";
+import { GatewayRefusalError } from "../../models/availability";
+import { VIDEO_JOB_PENDING_CODE, VIDEO_JOB_PENDING_STATUS } from "../../videos/job-pending";
+import { ratioOf, type ImageChoice, type MediaAdjustment, type VideoSent, type ImageSent } from "../../models/media-params";
+import type { PublishedMediaParams } from "../../models/media-params-published";
+import { buildImageRequest, buildVideoRequest } from "../../models/media-request";
 
 export {
   GATEWAY_VIDEO_DURATION_SECONDS,
@@ -11,27 +13,67 @@ export {
   usesSeedanceVideoWire,
   videoCapabilities,
 } from "../../models/video-capabilities";
-export type { GatewayVideoResolution, VideoCapabilities } from "../../models/video-capabilities";
+export type { VideoCapabilities } from "../../models/video-capabilities";
 
-const BROWSER_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
+const BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
+
+/** A video job is asked how it is doing every two seconds. */
+export const VIDEO_POLL_MS = 2_000;
+
+/**
+ * How long a video job is watched, as a wall clock and not a count of polls.
+ *
+ * Measured on the prepaid key at 480p on 2026-11-12: a 5 s clip took about 135 s, a 6 s clip and a 15 s
+ * clip about 105 s each, so the render time hardly follows the clip length. 720p, the app's default
+ * resolution, was never timed; it has about 2.25 times the pixels, which puts a 15 s clip near 5 minutes
+ * at worst. Eight minutes is three and a half times the slowest render measured and leaves room for the
+ * queue in front of it. It is also `WORKER_MAX_MS`, the longest the host lets one tool hold a chat turn
+ * open, and below `WORKER_STREAM_IDLE_MS` (10 minutes), so this wait ends before the chat run's own
+ * watchdog does. Suno gets a longer wait for the same reason (`gateway-audio.ts`, `MUSIC_MAX_POLLS`).
+ *
+ * Passing it is not a failure: the job may still finish and bill (`videos/job-pending.ts`).
+ */
+export const VIDEO_POLL_DEADLINE_MS = 8 * 60_000;
+
+/** One status request may take this long. A poll that hangs would otherwise hold the deadline open for good. */
+export const VIDEO_POLL_REQUEST_MS = 60_000;
 
 export type GatewayMediaOptions = {
   baseUrl: string;
   apiKey: string;
   model: string;
   prompt: string;
+  /** Video: a ratio such as `16:9`. Image: the legacy shape (`square`, `landscape`, `portrait`) or a ratio. */
   aspectRatio?: string;
   imageUrl?: string;
   seconds?: number;
+  /** Video resolution tier such as `720p`. */
   resolution?: string;
+  /** Sound inside the clip. Left out means the app's default (off). */
+  audio?: boolean;
+  /** Image controls: exact size, quality, tier, count, output format. */
+  imageChoice?: ImageChoice;
+  /** What the gateway published for this model (`config.parameters`); laid over the built-in spec. */
+  published?: PublishedMediaParams;
+  locale?: AppLocale;
   fetchImpl?: typeof fetch;
   wait?: (ms: number) => Promise<void>;
   pollMs?: number;
+  /** A cap on the number of polls. Images count by it (90); video watches the clock (`deadlineMs`) unless a test sets it. */
   maxPolls?: number;
+  /** Video: how long to watch one job, in milliseconds. Default `VIDEO_POLL_DEADLINE_MS`. */
+  deadlineMs?: number;
+  /** The clock `deadlineMs` is read against. Tests hand in one their `wait` advances. */
+  now?: () => number;
 };
 
-function originFrom(baseUrl: string): string {
-  return baseUrl.replace(/\/+$/, "");
+/** What a media call returns beside the result: what was sent, and what had to be moved to get there. */
+export type MediaReport<S> = { sent: S; adjusted: MediaAdjustment[] };
+
+/** A route from the gateway origin. The base URL ends in `/v1`; Kling and the other mounts do not live under it. */
+function routeUrl(baseUrl: string, route: string): string {
+  return `${baseUrl.replace(/\/+$/, "").replace(/\/v1(?:beta)?$/i, "")}${route}`;
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -59,10 +101,10 @@ export function httpStatusForGatewayFailure(status: number): number {
 
 export function formatVideoGatewayFailure(status: number, detail: string): string {
   if (status === 503) {
-    return `${detail} This video model has no live gateway channel (HTTP 503). Prefer seedance-2.0-fast (or seedance-2.0-mini); grok-imagine-video and other catalog ids often fail on auto.`;
+    return `${detail} This video model has no live gateway channel (HTTP 503) on this key right now. Pick another video model; seedance-2.0-fast is one that ran on a prepaid key.`;
   }
   if (isPrepaidAsyncPriceError(detail)) {
-    return `${detail} Seedance video on this gateway is billed by tokens after the job finishes, not a fixed per-call price. Prepaid proxy keys (代理预付) cannot submit that async job even when the wallet has balance. Duration and resolution on the request cannot unlock it. This is not an invalid API key.`;
+    return `${detail} This video model is billed by tokens after the job finishes, and a prepaid agent account cannot submit that kind of job (HTTP 403). Other video models with a fixed price per call do run on a prepaid key, seedance-2.0-fast among them. This is not an invalid API key.`;
   }
   if (status === 401 || status === 403) {
     return `${detail} Gateway rejected the API key (HTTP ${status}). Check Settings.`;
@@ -122,7 +164,11 @@ export function readVideoJobFailure(body: Record<string, unknown>, fallback: str
   const data = asRecord(body.data);
   const jobError = asRecord(data.error);
   const upstreamError = asRecord(asRecord(data.data).error);
-  const reason = asString(data.fail_reason) ?? asString(upstreamError.message) ?? asString(jobError.message);
+  const reason =
+    asString(data.fail_reason) ??
+    asString(upstreamError.message) ??
+    asString(jobError.message) ??
+    asString(data.task_status_msg);
   const code = asString(upstreamError.code) ?? asString(jobError.code);
   if (reason) {
     return code && code !== reason ? `${reason} (${code})` : reason;
@@ -130,7 +176,7 @@ export function readVideoJobFailure(body: Record<string, unknown>, fallback: str
   return readGatewayError(body, fallback);
 }
 
-function gatewayErrorCode(body: Record<string, unknown>): string | undefined {
+export function gatewayErrorCode(body: Record<string, unknown>): string | undefined {
   const top = asString(body.code);
   if (top && !SUCCESS_CODES.test(top)) {
     return top;
@@ -142,81 +188,43 @@ function gatewayErrorCode(body: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
-export function openaiImageSize(aspectRatio?: string): string {
-  if (aspectRatio === "landscape") {
-    return "1536x1024";
-  }
-  if (aspectRatio === "portrait") {
-    return "1024x1536";
-  }
-  return "1024x1024";
+/**
+ * The image request the person's choices ask for. The legacy `aspectRatio` is a loose shape
+ * (`landscape`) or a ratio (`3:2`); an exact size, quality, tier, count or format rides in `imageChoice`.
+ */
+function imageChoiceOf(options: GatewayMediaOptions): ImageChoice {
+  const legacy = options.aspectRatio?.trim();
+  const base: ImageChoice =
+    legacy === "square" || legacy === "landscape" || legacy === "portrait"
+      ? { shape: legacy }
+      : legacy && ratioOf(legacy) !== undefined
+        ? { aspectRatio: legacy }
+        : {};
+  return { ...base, ...options.imageChoice };
 }
 
-export function gatewayVideoAspect(aspectRatio?: string): "16:9" | "9:16" | "1:1" {
-  if (aspectRatio === "9:16" || aspectRatio === "1:1") {
-    return aspectRatio;
-  }
-  return "16:9";
+function imageMime(format: string | undefined): string {
+  return format === "jpeg" || format === "jpg" ? "image/jpeg" : "image/png";
 }
 
-export function buildGatewayVideoPayload(options: {
-  model: string;
-  prompt: string;
-  aspectRatio?: string;
-  imageUrl?: string;
-  seconds?: number;
-  resolution?: string;
-}): Record<string, unknown> {
-  const aspect = gatewayVideoAspect(options.aspectRatio);
-  const duration = clampVideoSeconds(options.seconds);
-  if (usesSeedanceVideoWire(options.model)) {
-    const content: Array<Record<string, unknown>> = [{ type: "text", text: options.prompt }];
-    if (options.imageUrl) {
-      content.push({
-        type: "image_url",
-        image_url: { url: options.imageUrl },
-        role: "first_frame",
-      });
-    }
-    return {
-      model: options.model,
-      prompt: options.prompt,
-      content,
-      // Generic `/v1/video/generations` field (docs: http(s) URL or base64 data URL); Veo/Kling read this one.
-      ...(options.imageUrl ? { image: options.imageUrl } : {}),
-      duration,
-      resolution: normalizeVideoResolution(options.resolution),
-      ratio: aspect,
-      generate_audio: false,
-      watermark: false,
-    };
+function pictureFrom(item: Record<string, unknown>, mime: string): string | undefined {
+  const url = asString(item.url) ?? asString(asRecord(item.file_output).public_url);
+  if (url) {
+    return url;
   }
-  // Toko `/v1/video/generations` uses a strict JSON decoder per upstream.
-  // grok-imagine-video rejected OpenAI pixel `size`, then `ratio` (`json: unknown field`).
-  // Seedance still needs `ratio` + `resolution`. Keep this branch to prompt/duration/seconds.
-  const payload: Record<string, unknown> = {
-    model: options.model,
-    prompt: options.prompt,
-    duration,
-    seconds: String(duration),
-  };
-  if (options.imageUrl) {
-    payload.image = options.imageUrl;
-  }
-  return payload;
+  const b64 = asString(item.b64_json);
+  return b64 ? `data:${mime};base64,${b64}` : undefined;
 }
 
-export function parseGatewayImage(body: Record<string, unknown>): string | undefined {
+/** Every picture a reply carries, in order. A model that was asked for one image returns one. */
+export function parseGatewayImages(body: Record<string, unknown>, mime = "image/png"): string[] {
   const data = body.data;
   if (Array.isArray(data)) {
-    const first = asRecord(data[0]);
-    const url = asString(first.url) ?? asString(asRecord(first.file_output).public_url);
-    if (url) {
-      return url;
-    }
-    const b64 = asString(first.b64_json);
-    if (b64) {
-      return `data:image/png;base64,${b64}`;
+    const found = data
+      .map((item) => pictureFrom(asRecord(item), mime))
+      .filter((item): item is string => typeof item === "string");
+    if (found.length > 0) {
+      return found;
     }
   } else if (data && typeof data === "object") {
     const record = asRecord(data);
@@ -229,14 +237,19 @@ export function parseGatewayImage(body: Record<string, unknown>): string | undef
       asString(nestedFirst.url) ??
       asString(asRecord(nestedFirst.file_output).public_url);
     if (url) {
-      return url;
+      return [url];
     }
     const b64 = asString(record.b64_json) ?? asString(nestedFirst.b64_json);
     if (b64) {
-      return `data:image/png;base64,${b64}`;
+      return [`data:${mime};base64,${b64}`];
     }
   }
-  return asString(body.url) ?? asString(body.result_url);
+  const top = asString(body.url) ?? asString(body.result_url);
+  return top ? [top] : [];
+}
+
+export function parseGatewayImage(body: Record<string, unknown>, mime = "image/png"): string | undefined {
+  return parseGatewayImages(body, mime)[0];
 }
 
 export function videoTaskId(body: Record<string, unknown>): string | undefined {
@@ -249,20 +262,29 @@ function looksLikeMediaUrl(value: string | undefined): string | undefined {
   return value && /^(https?:\/\/|data:)/i.test(value) ? value : undefined;
 }
 
+/** Kling's own result shape: `data.task_result.videos[0].url`. Read from Kling's public API; not driven live. */
+function klingVideoUrl(body: Record<string, unknown>): string | undefined {
+  const result = asRecord(asRecord(body.data).task_result);
+  const videos = Array.isArray(result.videos) ? result.videos : [];
+  return asString(asRecord(videos[0]).url);
+}
+
 export function extractGatewayVideoUrl(body: Record<string, unknown>): string | undefined {
   const data = asRecord(body.data);
   const nested = asRecord(data.data);
   const metadata = asRecord(body.metadata ?? data.metadata);
   const video = body.video;
   return looksLikeMediaUrl(
-    asString(data.result_url) ??
-    asString(data.url) ??
-    asString(body.url) ??
-    asString(body.content_url) ??
-    asString(data.content_url) ??
-    asString(nested.url) ??
-    asString(metadata.url) ??
-    asString(asRecord(video).url) ??
+    klingVideoUrl(body) ??
+      asString(data.result_url) ??
+      asString(data.url) ??
+      asString(body.url) ??
+      asString(body.video_url) ??
+      asString(body.content_url) ??
+      asString(data.content_url) ??
+      asString(nested.url) ??
+      asString(metadata.url) ??
+      asString(asRecord(video).url) ??
       asString(asRecord(video).public_url) ??
       asString(video),
   );
@@ -270,11 +292,12 @@ export function extractGatewayVideoUrl(body: Record<string, unknown>): string | 
 
 function mediaStatus(body: Record<string, unknown>): string {
   const data = asRecord(body.data);
-  return String(data.status ?? body.status ?? "").trim();
+  // `task_status` is Kling's word for it (`submitted`, `processing`, `succeed`, `failed`).
+  return String(data.status ?? body.status ?? data.task_status ?? body.task_status ?? "").trim();
 }
 
 function isMediaSuccess(status: string): boolean {
-  return /^(completed|succeeded|success)$/i.test(status);
+  return /^(completed|succeeded|success|succeed)$/i.test(status);
 }
 
 function isMediaFailure(status: string): boolean {
@@ -300,28 +323,62 @@ function isPollEndpointMissing(status: number, body: Record<string, unknown>): b
   return status === 404 || /invalid url|not found|no such|unknown task/i.test(message);
 }
 
-export async function generateGatewayImage(options: GatewayMediaOptions): Promise<{ url: string; model: string }> {
+/** A local picture's data URL as a file for a multipart edit request. */
+function dataUrlFile(dataUrl: string): Blob {
+  const match = /^data:([^;,]+)?(?:;base64)?,(.*)$/is.exec(dataUrl);
+  const mime = match?.[1] || "image/png";
+  const binary = atob(match?.[2] ?? "");
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return new Blob([bytes], { type: mime });
+}
+
+export type GatewayImageResult = { url: string; urls: string[]; model: string } & MediaReport<ImageSent>;
+
+export async function generateGatewayImage(options: GatewayMediaOptions): Promise<GatewayImageResult> {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const wait = options.wait ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
-  const payload: Record<string, unknown> = {
+  // Every value is settled against the model's spec here: nothing the spec rejects is sent.
+  const request = buildImageRequest({
     model: options.model,
     prompt: options.prompt,
-    size: openaiImageSize(options.aspectRatio),
-  };
-  if (/gpt-image/i.test(options.model)) {
-    payload.quality = "medium";
-  }
-  if (options.imageUrl) {
-    payload.image = options.imageUrl;
+    imageUrl: options.imageUrl,
+    choice: imageChoiceOf(options),
+    published: options.published,
+    locale: options.locale,
+  });
+  const mime = imageMime(request.sent.outputFormat);
+  const done = (urls: string[]): GatewayImageResult => ({
+    url: urls[0],
+    urls,
+    model: options.model,
+    sent: request.sent,
+    adjusted: request.adjustments,
+  });
+  let init: RequestInit;
+  if (request.file) {
+    // A local picture is not a URL the gateway can fetch, so it goes up as a file (docs: multipart, field `image`).
+    const form = new FormData();
+    for (const [key, value] of Object.entries(request.body)) {
+      form.append(key, typeof value === "string" ? value : JSON.stringify(value));
+    }
+    form.append(request.file.field, dataUrlFile(request.file.dataUrl), "reference.png");
+    const { "Content-Type": _contentType, ...headers } = gatewayHeaders(options.apiKey);
+    void _contentType;
+    init = { method: "POST", headers, body: form, signal: AbortSignal.timeout(180_000) };
+  } else {
+    init = {
+      method: "POST",
+      headers: gatewayHeaders(options.apiKey),
+      body: JSON.stringify(request.body),
+      signal: AbortSignal.timeout(180_000),
+    };
   }
   let response: Response;
   try {
-    response = await fetchImpl(`${originFrom(options.baseUrl)}/images/generations`, {
-      method: "POST",
-      headers: gatewayHeaders(options.apiKey),
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(180_000),
-    });
+    response = await fetchImpl(routeUrl(options.baseUrl, request.route), init);
   } catch (error) {
     if (isTimeoutError(error)) {
       throw new ApiError("tool_failed", IMAGE_TIMEOUT_MESSAGE, 504);
@@ -329,9 +386,9 @@ export async function generateGatewayImage(options: GatewayMediaOptions): Promis
     throw error;
   }
   const body = asRecord(await response.json().catch(() => ({})));
-  const immediate = parseGatewayImage(body);
-  if (immediate) {
-    return { url: immediate, model: options.model };
+  const immediate = parseGatewayImages(body, mime);
+  if (immediate.length > 0) {
+    return done(immediate);
   }
   const createdStatus = mediaStatus(body);
   if (isMediaFailure(createdStatus)) {
@@ -348,7 +405,7 @@ export async function generateGatewayImage(options: GatewayMediaOptions): Promis
     for (let attempt = 0; attempt < maxPolls; attempt += 1) {
       let statusRes: Response;
       try {
-        statusRes = await fetchImpl(`${originFrom(options.baseUrl)}/images/generations/${taskId}`, {
+        statusRes = await fetchImpl(routeUrl(options.baseUrl, `/v1/images/generations/${encodeURIComponent(taskId)}`), {
           headers: gatewayHeaders(options.apiKey),
           signal: AbortSignal.timeout(180_000),
         });
@@ -359,95 +416,158 @@ export async function generateGatewayImage(options: GatewayMediaOptions): Promis
         throw error;
       }
       const statusBody = asRecord(await statusRes.json().catch(() => ({})));
-      const url = parseGatewayImage(statusBody);
+      const pictures = parseGatewayImages(statusBody, mime);
+      const url = pictures[0];
       const status = mediaStatus(statusBody);
       if (url && (isMediaSuccess(status) || status.length === 0)) {
-        return { url, model: options.model };
+        return done(pictures);
       }
       if (isPollEndpointMissing(statusRes.status, statusBody)) {
-        throw new ApiError(
+        throw new GatewayRefusalError(
           "tool_failed",
           "Gateway image poll endpoint not found — async status lookup is unavailable for this task",
           502,
+          {
+            status: statusRes.status,
+            code: gatewayErrorCode(statusBody),
+            message: "image poll endpoint not found",
+            phase: "poll",
+          },
         );
       }
       if (isMediaFailure(status)) {
-        throw new ApiError(
-          "tool_failed",
-          readGatewayError(statusBody, asString(asRecord(statusBody.data).fail_reason) ?? "Gateway image job failed"),
-          502,
+        const raw = readGatewayError(
+          statusBody,
+          asString(asRecord(statusBody.data).fail_reason) ?? "Gateway image job failed",
         );
+        throw new GatewayRefusalError("tool_failed", raw, 502, {
+          status: statusRes.status,
+          code: gatewayErrorCode(statusBody),
+          message: raw,
+          // Accepted at submit; the job's own failure is not a fact about the model.
+          phase: "poll",
+        });
       }
       if (!statusRes.ok && !url) {
-        throw new ApiError(
-          "tool_failed",
-          readGatewayError(statusBody, `Gateway images poll returned HTTP ${statusRes.status}`),
-          502,
-        );
+        const raw = readGatewayError(statusBody, `Gateway images poll returned HTTP ${statusRes.status}`);
+        throw new GatewayRefusalError("tool_failed", raw, 502, {
+          status: statusRes.status,
+          code: gatewayErrorCode(statusBody),
+          message: raw,
+          phase: "poll",
+        });
       }
       await wait(pollMs);
     }
     throw new ApiError("tool_failed", "Gateway image job timed out", 504);
   }
   if (!response.ok) {
-    throw new ApiError("tool_failed", readGatewayError(body, `Gateway images returned HTTP ${response.status}`), 502);
+    const detail = readGatewayError(body, `Gateway images returned HTTP ${response.status}`);
+    throw new GatewayRefusalError("tool_failed", detail, 502, {
+      status: response.status,
+      code: gatewayErrorCode(body),
+      message: detail,
+    });
   }
   throw new ApiError("tool_failed", "Gateway returned no image data", 502);
 }
 
-export async function generateGatewayVideo(options: GatewayMediaOptions): Promise<{ url: string; model: string }> {
+export type GatewayVideoResult = { url: string; model: string } & MediaReport<VideoSent>;
+
+export async function generateGatewayVideo(options: GatewayMediaOptions): Promise<GatewayVideoResult> {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const wait = options.wait ?? ((ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
-  const payload = buildGatewayVideoPayload({
+  // The route, the body and the status route all come from the model's media parameter spec, and every
+  // value is settled against it first: nothing the spec rejects is sent.
+  const request = buildVideoRequest({
     model: options.model,
     prompt: options.prompt,
-    aspectRatio: options.aspectRatio,
     imageUrl: options.imageUrl,
-    seconds: options.seconds,
-    resolution: options.resolution,
+    choice: {
+      aspect: options.aspectRatio,
+      seconds: options.seconds,
+      resolution: options.resolution,
+      audio: options.audio,
+    },
+    published: options.published,
+    locale: options.locale,
   });
-  const created = await fetchImpl(`${originFrom(options.baseUrl)}/video/generations`, {
+  const done = (url: string): GatewayVideoResult => ({
+    url,
+    model: options.model,
+    sent: request.sent,
+    adjusted: request.adjustments,
+  });
+  const created = await fetchImpl(routeUrl(options.baseUrl, request.route), {
     method: "POST",
     headers: gatewayHeaders(options.apiKey),
-    body: JSON.stringify(payload),
+    body: JSON.stringify(request.body),
   });
   const createdBody = asRecord(await created.json().catch(() => ({})));
   if (!created.ok) {
-    throw new ApiError(
+    const detail = readGatewayError(createdBody, `Gateway video returned HTTP ${created.status}`);
+    throw new GatewayRefusalError(
       "tool_failed",
-      formatVideoGatewayFailure(
-        created.status,
-        readGatewayError(createdBody, `Gateway video returned HTTP ${created.status}`),
-      ),
+      formatVideoGatewayFailure(created.status, detail),
       httpStatusForGatewayFailure(created.status),
+      { status: created.status, code: gatewayErrorCode(createdBody), message: detail },
     );
   }
   const immediate = extractGatewayVideoUrl(createdBody);
   const createdStatus = mediaStatus(createdBody);
   if (immediate && (isMediaSuccess(createdStatus) || createdStatus.length === 0)) {
-    return { url: immediate, model: options.model };
+    return done(immediate);
   }
   const taskId = videoTaskId(createdBody);
   if (!taskId) {
     throw new ApiError("tool_failed", "Gateway video did not return a task id", 502);
   }
-  const maxPolls = options.maxPolls ?? 90;
-  const pollMs = options.pollMs ?? 2_000;
-  for (let attempt = 0; attempt < maxPolls; attempt += 1) {
-    const statusRes = await fetchImpl(`${originFrom(options.baseUrl)}/video/generations/${taskId}`, {
-      headers: gatewayHeaders(options.apiKey),
-    });
-    const statusBody = asRecord(await statusRes.json().catch(() => ({})));
-    const status = mediaStatus(statusBody);
-    const url = extractGatewayVideoUrl(statusBody);
-    if (url && (isMediaSuccess(status) || status.length === 0)) {
-      return { url, model: options.model };
+  // From here the gateway has the job and will bill it. Nothing below may end in a message that lets the
+  // harness submit the brief again while this one is still rendering: a job that is still running when the
+  // wait ends is `video_job_pending`, and a poll that could not be read is not a dead job.
+  const pollMs = options.pollMs ?? VIDEO_POLL_MS;
+  const deadlineMs = options.deadlineMs ?? VIDEO_POLL_DEADLINE_MS;
+  const now = options.now ?? Date.now;
+  const startedAt = now();
+  const pollUrl = routeUrl(options.baseUrl, request.pollRoute.replace("{id}", encodeURIComponent(taskId)));
+  for (let attempt = 0; ; attempt += 1) {
+    let statusRes: Response | null;
+    try {
+      statusRes = await fetchImpl(pollUrl, {
+        headers: gatewayHeaders(options.apiKey),
+        signal: AbortSignal.timeout(VIDEO_POLL_REQUEST_MS),
+      });
+    } catch {
+      // A dropped or timed-out status request says nothing about the job. Ask again until the deadline.
+      statusRes = null;
     }
-    if (isMediaFailure(status) || !statusRes.ok) {
-      const detail = formatVideoJobFailure(readVideoJobFailure(statusBody, "Gateway video job failed"));
-      throw new ApiError("tool_failed", detail, UPSTREAM_REJECTED.test(detail) ? 503 : 502);
+    if (statusRes !== null) {
+      const statusBody = asRecord(await statusRes.json().catch(() => ({})));
+      const status = mediaStatus(statusBody);
+      const url = extractGatewayVideoUrl(statusBody);
+      if (url && (isMediaSuccess(status) || status.length === 0)) {
+        return done(url);
+      }
+      if (isMediaFailure(status) || !statusRes.ok) {
+        const raw = readVideoJobFailure(statusBody, "Gateway video job failed");
+        const detail = formatVideoJobFailure(raw);
+        throw new GatewayRefusalError("tool_failed", detail, UPSTREAM_REJECTED.test(detail) ? 503 : 502, {
+          status: statusRes.status,
+          code: gatewayErrorCode(statusBody),
+          message: raw,
+          // The gateway accepted this job; its failure says nothing about the model (`availability.ts`).
+          phase: "poll",
+        });
+      }
+    }
+    if ((options.maxPolls !== undefined && attempt + 1 >= options.maxPolls) || now() - startedAt >= deadlineMs) {
+      break;
     }
     await wait(pollMs);
   }
-  throw new ApiError("tool_failed", "Gateway video job timed out", 504);
+  throw new ApiError(
+    VIDEO_JOB_PENDING_CODE,
+    modeMessage("videoJobPending", options.locale ?? "en"),
+    VIDEO_JOB_PENDING_STATUS,
+  );
 }

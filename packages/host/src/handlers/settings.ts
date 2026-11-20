@@ -40,8 +40,10 @@ import {
 } from "../gateway-gate";
 import { killTrackedChildren } from "../child-processes";
 import { keyLaterPayload } from "../key-later";
+import { voiceSettingsFor } from "../voice/flag";
 import { applySavedLocaleAsBoot, localePayload } from "../locale-boot";
 import { refreshModelCache, modeDefaultsFor } from "../selectable-models";
+import { modelAvailabilityBody } from "../model-availability-payload";
 import { clearThisKeyCache, loadAccountUsage } from "../account-usage";
 import { probeSummary } from "../model-cache";
 import { db, hasPendingDataReset, listLocalWorkspaces, pendingResetPath, requestDataReset } from "@agentforge/db";
@@ -124,6 +126,8 @@ async function settingsPayload(
     // True while a queued wipe is waiting for the next boot, so Settings can offer to call it off.
     resetPending: hasPendingDataReset(localDataDir()),
     probe: probeSummary(undefined, tenant),
+    // The models this key cannot use and why, and what each kind has left to offer (Settings card).
+    modelAvailability: modelAvailabilityBody(tenant),
     // Only the per-mode default ids. The model lists live on `GET /api/v1/models`, once: this answer
     // used to carry them too, nine identical copies of the chat catalogue, which was 261 KB of a
     // 274 KB read that the shell repeats on every cold load. No reader of this route used them.
@@ -141,6 +145,8 @@ async function settingsPayload(
     })),
     toolRoutes: listToolRoutes(settings),
     usage: await loadAccountUsage(settings, tenant),
+    // The mic shows only when `enabled`; H1 checks it again, so this is a hint and not the gate.
+    voice: voiceSettingsFor(tenant, process.env, serverMode),
   };
 }
 

@@ -31,7 +31,7 @@ export type MediaEstimateView = {
   unverified: boolean;
 };
 
-export type VideoResolution = "480p" | "720p" | "1080p";
+export type VideoResolution = "480p" | "720p" | "1080p" | "4k";
 
 /** Every studio that shows a price. The namespace is also the locale namespace. */
 export type EstimateNamespace = "images" | "videos" | "music";

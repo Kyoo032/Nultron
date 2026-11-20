@@ -35,7 +35,7 @@ describe("image_generate request body", () => {
   // parameters must send exactly this body, byte for byte in its fields.
   it("sends the same gateway body for a prompt-only call", async () => {
     expect(await sentBody({ prompt: "a lantern" })).toEqual({
-      model: "gpt-image-2",
+      model: "gpt-image-2.5-flare",
       prompt: "a lantern",
       size: "1024x1024",
       quality: "medium",
@@ -44,7 +44,7 @@ describe("image_generate request body", () => {
 
   it("sends the same gateway body for an explicit square aspect", async () => {
     expect(await sentBody({ prompt: "a lantern", aspect_ratio: "square" })).toEqual({
-      model: "gpt-image-2",
+      model: "gpt-image-2.5-flare",
       prompt: "a lantern",
       size: "1024x1024",
       quality: "medium",

@@ -11,6 +11,17 @@ describe("estimateJobUsd", () => {
     expect(estimateJobUsd("gpt-image-2", { count: 2 }, now)).toBeCloseTo(0.08);
   });
 
+  it("prices a gpt-image-2.5 image from the tokens the prepaid key was billed (2026-11-12, medium, 1024x1024)", () => {
+    const measured = new Date("2026-11-12T00:00:00.000Z");
+    // 22 text tokens in at about $5 per million, 439 image tokens out at about $30 per million.
+    expect(estimateJobUsd("gpt-image-2.5-flare", {}, measured)).toBeCloseTo(0.0133, 4);
+    expect(estimateJobUsd("gpt-image-2.5-sunburst", { count: 3 }, measured)).toBeCloseTo(0.0399, 4);
+    // Cheaper than a gpt-image-2 image, which the same table keeps at its own row.
+    expect(estimateJobUsd("gpt-image-2.5-flare", {}, measured)).toBeLessThan(estimateJobUsd("gpt-image-2", {}, measured) ?? 0);
+    // Only the two ids that were driven: a -token or -count spelling has no row here.
+    expect(estimateJobUsd("gpt-image-2.5-flare-token", {}, measured)).toBeNull();
+  });
+
   it("returns null for unknown models", () => {
     expect(estimateJobUsd("not-a-model", { seconds: 5 }, now)).toBeNull();
   });

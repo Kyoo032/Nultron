@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import { messageUnlessBlocked } from "@/lib/gateway-blocked";
 import type { MediaPrice } from "@agentforge/core/media-pricing";
-import { allowedVideoSeconds, snapVideoSeconds, videoCapabilities } from "@agentforge/core/video-capabilities";
+import type { MediaAdjustment, MediaParamSpec, VideoSent } from "@agentforge/core/media-params";
+import { videoCapabilitiesOf } from "@agentforge/core/video-capabilities";
 import type { PromptTemplate } from "@agentforge/core/edit";
 import { EditPromptTemplates } from "@/components/edit-prompt-templates";
 import { EnhancePromptButton } from "@/components/enhance-prompt-button";
@@ -24,6 +25,17 @@ import { studioPickerEmpty } from "@/lib/studio-picker-empty";
 import { t } from "@/lib/i18n";
 import { PROMPT_INPUT, PROMPT_ROW, PROMPT_SUBMIT } from "@/lib/prompt-row";
 import { mediaPriceHints, videoEstimateView } from "@/lib/media-estimate";
+import { MediaControlsNote } from "@/components/media-controls-note";
+import { UnverifiedNote, VideoControls } from "@/components/media-controls";
+import {
+  adjustedNote,
+  estimateResolution,
+  fitVideoPick,
+  videoRequestFields,
+  videoSentNote,
+  videoSpecOf,
+  type VideoPick,
+} from "@/lib/media-options";
 import { keepModelChoice } from "@/lib/model-choice";
 import { stillSource, type SavedPicture } from "@/lib/saved-picture";
 import { apiFetch, mediaSrc } from "@/lib/api-client";
@@ -37,6 +49,8 @@ type StudioModel = {
   contextLength?: number;
   /** Provider list price per second for the cost estimate; null when nobody has transcribed one. */
   price?: MediaPrice | null;
+  /** What the model accepts (the host's media parameter spec): the controls below draw from it. */
+  media?: MediaParamSpec;
 };
 
 type GalleryItem = {
@@ -58,23 +72,18 @@ type GalleryResponse = {
   ready: boolean;
 };
 
-const ASPECTS = [
-  { id: "16:9", label: "16:9" },
-  { id: "9:16", label: "9:16" },
-  { id: "1:1", label: "1:1" },
-] as const;
-
-const RESOLUTIONS = ["480p", "720p", "1080p"] as const;
-
 export function VideosStudio() {
   const { gatewayName } = useProductBrand();
   const [items, setItems] = useState<GalleryItem[]>([]);
   const [models, setModels] = useState<StudioModel[]>([]);
   const [listed, setListed] = useState(false);
   const [model, setModel] = useState("");
-  const [aspect, setAspect] = useState<(typeof ASPECTS)[number]["id"]>("16:9");
-  const [seconds, setSeconds] = useState<number>(5);
-  const [resolution, setResolution] = useState<(typeof RESOLUTIONS)[number]>("720p");
+  // What the controls hold. The model's own defaults until the person moves one; a model change moves
+  // each value to the nearest one the new model takes, and `note` says so.
+  const [pick, setPick] = useState<VideoPick>({ aspect: "16:9", seconds: 5, resolution: "720p", audio: false });
+  const [note, setNote] = useState<string | null>(null);
+  const [made, setMade] = useState<string | null>(null);
+  const fitted = useRef("");
   const [prompt, setPrompt] = useState("");
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [stillUrl, setStillUrl] = useState("");
@@ -130,11 +139,23 @@ export function VideosStudio() {
   }, [keyMissing, load]);
   const keyReady = ready && !keyMissing;
 
-  const caps = videoCapabilities(model);
+  const spec = useMemo(() => videoSpecOf(model, models), [model, models]);
+  const caps = videoCapabilitiesOf(spec);
   const imageToVideo = caps.imageToVideo;
 
+  // Fit the controls to the model. The first model gets its own defaults and no note; a later one keeps
+  // each value it takes and moves the rest to the nearest valid one, and the note says what moved.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the fit runs when the model changes; the picks and the sentence are read, not watched
   useEffect(() => {
-    setSeconds((current) => snapVideoSeconds(model, current));
+    if (!model) {
+      return;
+    }
+    const first = fitted.current === "";
+    const result = fitVideoPick(spec, first ? undefined : pick);
+    fitted.current = model;
+    setPick(result.pick);
+    setNote(first ? null : adjustedNote("videos", model, result.moved));
+    // `pick` is read, not watched: the fit runs when the model changes, never on every control move.
   }, [model]);
 
   useEffect(() => {
@@ -150,10 +171,10 @@ export function VideosStudio() {
       videoEstimateView({
         model,
         models,
-        seconds,
-        resolution: caps.resolution ? resolution : undefined,
+        seconds: pick.seconds,
+        resolution: caps.resolution ? estimateResolution(pick.resolution) : undefined,
       }),
-    [model, models, seconds, resolution, caps.resolution],
+    [model, models, pick.seconds, pick.resolution, caps.resolution],
   );
   const modelOptions = useMemo(() => {
     const hints = mediaPriceHints("videos", models);
@@ -166,8 +187,10 @@ export function VideosStudio() {
 
   function pickTemplate(template: PromptTemplate) {
     setPrompt(template.prompt);
-    setAspect(template.aspect);
-    setSeconds(snapVideoSeconds(model, template.seconds));
+    // A template asks for a ratio and a length; the model's own values decide what it gets.
+    const result = fitVideoPick(spec, { ...pick, aspect: template.aspect, seconds: template.seconds });
+    setPick(result.pick);
+    setNote(adjustedNote("videos", model, result.moved));
     setTemplateId(template.id);
   }
 
@@ -183,20 +206,22 @@ export function VideosStudio() {
     }
     setGenerating(true);
     setError(null);
+    setMade(null);
     try {
       const response = await apiFetch("/api/v1/videos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: prompt.trim(),
-          aspect,
           model: model || undefined,
           imageUrl: stillSource(savedPicture, stillUrl, imageToVideo),
-          seconds,
-          ...(videoCapabilities(model).resolution ? { resolution } : {}),
+          // Only the fields this model has: its spec decides, the host checks again.
+          ...videoRequestFields(spec, pick),
         }),
       });
       const data = (await response.json().catch(() => ({}))) as GalleryItem & {
+        sent?: VideoSent;
+        adjusted?: MediaAdjustment[];
         error?: { message?: string; code?: string; suggestModel?: string };
       };
       if (!response.ok) {
@@ -222,6 +247,8 @@ export function VideosStudio() {
         return;
       }
       setLanded((count) => count + 1);
+      // What the clip was made with, so a value the host had to move is never a surprise.
+      setMade(data.sent ? [videoSentNote(data.sent), adjustedNote("videos", data.model ?? model, data.adjusted ?? [])].filter(Boolean).join(" ") : null);
       setPrompt("");
       setStillUrl("");
       setSavedPicture(null);
@@ -261,32 +288,9 @@ export function VideosStudio() {
         data-testid="videos-studio-prompt-bar"
       >
         <div className="flex flex-wrap gap-2">
-          <select
-            className="select-field"
-            value={aspect}
-            onChange={(event) => setAspect(event.target.value as (typeof ASPECTS)[number]["id"])}
-            disabled={generating}
-            data-testid="videos-studio-aspect"
-          >
-            {ASPECTS.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-          <select
-            className="select-field"
-            value={seconds}
-            onChange={(event) => setSeconds(Number(event.target.value))}
-            disabled={generating || !caps.seconds}
-            data-testid="videos-studio-seconds"
-          >
-            {allowedVideoSeconds(model).map((value) => (
-              <option key={value} value={value}>
-                {t("videos.seconds", { n: value })}
-              </option>
-            ))}
-          </select>
+          {model ? (
+            <VideoControls spec={spec} pick={pick} onChange={setPick} disabled={generating} />
+          ) : null}
           {noModels ? null : (
             <ModelSelect
               models={modelOptions}
@@ -306,6 +310,8 @@ export function VideosStudio() {
             </p>
           </div>
         ) : null}
+        {model ? <UnverifiedNote kind="videos" unverified={spec.unverified} /> : null}
+        <MediaControlsNote kind="videos" note={note} made={made} />
         {!model || estimate.unknown ? null : (
           <div className="space-y-0.5">
             <p className="text-xs text-[var(--text-2)]" data-testid="videos-studio-estimate">
@@ -323,19 +329,6 @@ export function VideosStudio() {
             {t("videos.advanced")}
           </summary>
           <div className="mt-2 space-y-2">
-            <select
-              className="select-field disabled:opacity-50"
-              value={resolution}
-              onChange={(event) => setResolution(event.target.value as (typeof RESOLUTIONS)[number])}
-              disabled={generating || !caps.resolution}
-              data-testid="videos-studio-resolution"
-            >
-              {RESOLUTIONS.map((value) => (
-                <option key={value} value={value}>
-                  {value}
-                </option>
-              ))}
-            </select>
             {imageToVideo ? (
               <div className="space-y-2">
                 <input

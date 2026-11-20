@@ -179,3 +179,7 @@ key only. The runtime's own warning lines go through the key scrubber.
 | `probe-run.ts`, `snippet.ts` | the sequence, the budget, the summary and the proposed entry |
 | `credentials.ts`, `args.ts` | refusals and the key; the command line |
 | `*.test.ts`, `vitest.config.ts`, `test-setup.ts` | unit tests; `fetch` is a fake, and a real one throws |
+
+## `key-availability` (what one key's pickers would offer)
+
+`npx pnpm@9.15.9 --filter @agentforge/host eval:models:availability`, with the key on **stdin** (it is not read from a desk and never printed or written). It makes the two free reads (`GET /v1/models` with the key, the public `GET /api/pricing`), builds the catalog, and prints each picker's list, the defaults and the models the key cannot use, from a temp desk it deletes. It starts no generation. `--learn-2026-11-11` files the refusals measured that day first (recorded, not re-called), to show the lists after one real click each. `--desk <dir>` keeps the cache in a throwaway desk instead, so an isolated app on `AGENTFORGE_DATA_DIR=<dir>` shows the same lessons in Settings once the same key is saved there. Map: `docs/internal/maps/model-policy.md`, "Which models a key can use".

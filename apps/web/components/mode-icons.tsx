@@ -17,6 +17,7 @@ export type ModeIconName =
   | "education"
   | "knowledge"
   | "channels"
+  | "customers"
   | "workspaces"
   | "usage"
   | "settings";
@@ -126,6 +127,13 @@ const PATHS: Record<ModeIconName, ReactNode> = {
     <>
       <path d="M21 4 3 11l6 2.5L21 4Z" />
       <path d="m21 4-9 16-2.5-6.5" />
+    </>
+  ),
+  customers: (
+    <>
+      <path d="M17 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 5 18.5V20" />
+      <circle cx="11" cy="8" r="3.5" />
+      <path d="M20 9.5a2.5 2.5 0 0 1 0 5" />
     </>
   ),
   workspaces: (

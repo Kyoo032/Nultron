@@ -2,6 +2,8 @@
 
 Product: both · Instance: main :3000
 
+Last verified: 2026-11-11 on `models/key-availability` (working tree, second pass) for §2's payload bullets, §2a's pin/empty rules, §9's `none_on_key`, the `studio-generate.ts` cites those moved, the empty-picker gotcha and the verify table. Not driven: the empty picker in a browser (needs a refused key).
+
 Last verified: 2026-10-05, merge of origin/main (b58383d) into the Music harness branch, for the harness in § 5 and § 8 (brief, words, name, takes) and for every `studio-generate.ts` cite on this page, which was re-read against the merged file. Speech stays off. Before that: 2026-10-01, working tree on top of 0b61a29, for the rail row cite in § 1, the `keepModelChoice` cite, the `studio-generate.ts` cites in the "nothing downstream rejects an id" paragraph. Before that: 2026-09-29, working tree, not committed, for the gallery `items` bullet (a track whose file is gone) and the `modes.music` line (the catalogue on the wire). Before that: 2026-09-23 at d4561b8 + uncommitted tree for § 5 (what reaches the relay in custom mode), the
 `studio-generate.ts` citations, the studio keeping its picked model after a generate, and the test table.
 Everything else was last verified 2026-09-21 at 4938747. The harness retries and the title are host-side and need a `:3000`
@@ -31,7 +33,7 @@ What this page is *not*: transcription (nothing here reads audio) and text-to-sp
 
 ### 2. Mount → `GET /api/v1/music`
 
-`handleGetMusic` (`packages/host/src/handlers/jobs.ts:117-148`) assembles one payload:
+`handleGetMusic` (`packages/host/src/handlers/jobs.ts:135-177`) assembles one payload:
 
 ```
 { items, models, defaultModel, ready, speechUnavailable }
@@ -39,16 +41,16 @@ What this page is *not*: transcription (nothing here reads audio) and text-to-sp
 
 Like the Images and Videos GETs it is **ungated** — no `requireGatewayAllowed` — so the page renders fully on a keyless desk.
 
-- `items` ← `listStudioGallery(tenant, "audio")` (`packages/host/src/studio-generate.ts:622-649`). Same function the other two studios use; `StudioKind` was widened to `"image" | "video" | "audio"` (`:63`) and the item now also carries `title`, `style`, `instrumental` and `durationSeconds` from the sidecar. A track whose file is gone carries `fileMissing: true` (2026-09-29; see [`generate-studios.md`](generate-studios.md) § 2), and the library shows the shared "File missing" tile instead of an `<audio>` that cannot load: `GalleryAudio` (`apps/web/components/gallery-media.tsx:114`, `preload="none"`, used at `apps/web/components/music-studio.tsx:446`); the download link is not rendered for that row.
-- `defaultModel` ← `resolveStudioGenerateDefault({ kind: "music", ... })` — the agent pin, then the Settings pin (`settings.musicGenModel`), then `defaultStudioMusicModel(undefined, tenant)` (`packages/host/src/studio-generate.ts:175-177`). **Resolved before `models`, on purpose** — see below.
-- `models` ← `withRelayMusicModels(listStudioMusicModels(), [defaultModel])` then `attachMediaPrices(..., "track", ...)`. `"track"` is a new `MediaPriceUnit` (`packages/core/src/models/media-pricing.ts:27`): a flat charge for one finished job, which is how the gateway bills the relay.
-- `ready` ← `studioRouteReady("music_gen", tenant)` (`:280-286`).
-- `speechUnavailable` ← `studioSpeechUnavailable()` (`:186-191`), the reason code the voice-over section renders.
+- `items` ← `listStudioGallery(tenant, "audio")` (`packages/host/src/studio-generate.ts:622-649`). Same function the other two studios use; `StudioKind` was widened to `"image" | "video" | "audio"` (`:63`) and the item now also carries `title`, `style`, `instrumental` and `durationSeconds` from the sidecar. A track whose file is gone carries `fileMissing: true` (2026-09-29; see [`generate-studios.md`](generate-studios.md) § 2), and the library shows the shared "File missing" tile instead of an `<audio>` that cannot load: `GalleryAudio` (`apps/web/components/gallery-media.tsx:114`, `preload="none"`, used at `apps/web/components/music-studio.tsx:476`); the download link is not rendered for that row.
+- `defaultModel` ← `studioMusicPicker(catalog, pinned, tenant)` (`packages/host/src/studio-generate.ts:214-232`): the agent pin, then the Settings pin (`settings.musicGenModel`), then `defaultStudioMusicModel` (`:200-202`) — but only while an id that is left after this key's refusals. **Resolved before `models`, on purpose** — see below. Empty string when the picker is empty.
+- `models` ← `studioMusicPicker`, which is `withRelayMusicModels(listStudioMusicModels(), extra)` then `attachMediaPrices(..., "track", ...)`. `extra` is the resolved pin only when `dropRefusedIds` keeps it: a pin the key's calls refused does not come back, so the page can be empty. `"track"` is a new `MediaPriceUnit` (`packages/core/src/models/media-pricing.ts:27`): a flat charge for one finished job, which is how the gateway bills the relay.
+- `ready` ← `studioRouteReady("music_gen", tenant)` (`:334-337`).
+- `speechUnavailable` ← `studioSpeechUnavailable()` (`:239-243`), the reason code the voice-over section renders.
 
 The studio runs this load again after every generate, to show the new takes. Until 2026-09-23 that
 reset the picker to `defaultModel` each time; it now keeps the person's pick while the list still
 offers it (`keepModelChoice`, `apps/web/lib/model-choice.ts:19`, used at
-`apps/web/components/music-studio.tsx:103`). Images and Videos had the same reset and the same fix.
+`apps/web/components/music-studio.tsx:107`). Images and Videos had the same reset and the same fix.
 
 ### 2a. Why the picker is not just the live catalog — the relay merge
 
@@ -60,28 +62,29 @@ The fix is a named constant, not a probe:
 
 - `RELAY_ONLY_MUSIC_MODEL_IDS` (`packages/core/src/models/media-kind.ts`) — today `["suno_music"]`. Fixed in the repo, like `MUSIC_PREF` beside it: never read from a request, a response or settings, so nothing a gateway says can add an id. Every entry must satisfy `isMusicModelId` or the Music filter would drop it again straight after the merge (`media-kind.test.ts` asserts that).
 - `withRelayMusicModels(models, extraIds?)` (`packages/host/src/selectable-models.ts`) — appends the relay rows the catalog is missing. Immutable, deduped case-insensitively, and **the catalog row always wins a collision**: if the gateway ever does list the id, its own row keeps its price and curation and nothing is appended.
-- `handleGetMusic` resolves `defaultModel` first and passes it as `extraIds`, so an agent or Settings pin naming a relay id this build does not know about is still shown. The picker can always render what generate will actually send.
-- `modeCatalogPayload` merges too, so `/api/v1/models` cannot report `modes.music: []` next to `defaults.music: "suno_music"`. `modes.music` is one of the lists the wire still carries (image, video, audio, other, music, embedding): the chat-shaped modes no longer get a copy (`modelCatalogBody`, `packages/host/src/selectable-models.ts:270-298`).
+- `handleGetMusic` resolves `defaultModel` first and passes it as the `extraIds`, so an agent or Settings pin naming a relay id this build does not know about is still shown. The picker can always render what generate will actually send — **unless a real call refused that pin**, in which case it is left out and the list may be empty (`studioMusicPicker`, `packages/host/src/studio-generate.ts:214-232`). That is what makes the empty state reachable, and the page then says why (`music-studio-no-models`, `apps/web/lib/music-models.ts`).
+- `modeCatalogPayload` merges too, so `/api/v1/models` cannot report `modes.music: []` next to `defaults.music: "suno_music"`. `modes.music` is one of the lists the wire still carries (image, video, audio, other, music, embedding): the chat-shaped modes no longer get a copy (`modelCatalogBody`, `packages/host/src/selectable-models.ts:270-298`). Note the two can still differ honestly: `modes.music` comes from `listMusicModels` (no pin join), while the page's list may carry a non-refused pin.
+- **A model a call refused is not offered again for its TTL.** `listMusicModels` drops it (30 minutes to a day, `STATUS_TTL_MS`), and `studioMusicPicker` does not re-add it from a pin. Refresh in Settings forgets the lessons (`docs/internal/maps/model-policy.md`, "Which models a key can use").
 
 **No network probe sits on the request path.** A relay-existence check is possible — `GET {origin}/suno/fetch/<bogus id>` returning a structured not-found rather than a route 404 would distinguish "relay mounted" from "relay absent" without billing anything — but it would be a call on every page load to answer what a constant already answers, and `RELAY_MISSING` (§6) already names the exact path tried when a submit 404s. If that is ever wanted, it must be cached and failure-tolerant, and it must fail *open*.
 
-**Nothing downstream rejects an id for being absent from the catalog**, and nothing should start. `musicGenerateBodySchema` takes any non-empty string (`packages/host/src/studio-generate.ts:86`), `generateStudioMusic` (`:461-563`) falls back to `defaultStudioMusicModel()`, and `musicGenerateTool` falls back to `DEFAULT_GATEWAY_MUSIC_MODEL`. Generation was never blocked by this bug — only the picker was.
+**Nothing downstream rejects an id for being absent from the catalog**, and nothing should start. `musicGenerateBodySchema` takes any non-empty string (`packages/host/src/studio-generate.ts:109`), `generateStudioMusic` (`:569-671`) falls back to `defaultStudioMusicModel()`, and `musicGenerateTool` falls back to `DEFAULT_GATEWAY_MUSIC_MODEL`. Generation was never blocked by this bug — only the picker was. A generate posted with no model and an empty picker is refused by the page before it is sent (`musicPickerEmpty` keeps the button off).
 
 ### 3. Which ids count as music — `audioRole`
 
-`mediaKind()` already bucketed the live catalog into chat / image / video / audio / other. Everything audio then needs a second split, because "audio" holds four unrelated jobs. `audioRole(id)` (`packages/core/src/models/media-kind.ts:79-101`) does it:
+`mediaKind()` already bucketed the live catalog into chat / image / video / audio / other. Everything audio then needs a second split, because "audio" holds four unrelated jobs. `audioRole(id)` (`packages/core/src/models/media-kind.ts:129-151`) does it:
 
 | Role | Matched by | This gateway's ids |
 |---|---|---|
-| `lyrics` | `/suno_lyrics|lyric/i` (`:73`) | `suno_lyrics` — also relay-only; the lyrics route takes no picker, so it has no merge |
-| `music` | `/suno_music|\bmusic\b|lyria/i` (`:74`) | `suno_music` — **merged in, not listed by the gateway** (§2a) |
-| `transcribe` | `/whisper|transcribe|\basr\b|-asr/i` (`:75`) | `mimo-v2.5-asr` |
-| `realtime` | `/realtime/i` (`:77`) | `qwen3-tts-instruct-flash-realtime`, `qwen-audio-3.0-realtime-*`, `qwen3.5-omni-*-realtime` |
-| `speech` | `/\btts\b|tts-|-tts|text-to-speech|speech/i` (`:76`) | *none* |
+| `lyrics` | `/suno_lyrics|lyric/i` (`:123`) | `suno_lyrics` — also relay-only; the lyrics route takes no picker, so it has no merge |
+| `music` | `/suno_music|\bmusic\b|lyria/i` (`:124`) | `suno_music` — **merged in, not listed by the gateway** (§2a) |
+| `transcribe` | `/whisper|transcribe|\basr\b|-asr/i` (`:125`) | `mimo-v2.5-asr` |
+| `realtime` | `/realtime/i` (`:127`) | `qwen3-tts-instruct-flash-realtime`, `qwen-audio-3.0-realtime-*`, `qwen3.5-omni-*-realtime` |
+| `speech` | `/\btts\b|tts-|-tts|text-to-speech|speech/i` (`:126`) | *none* |
 
 **The order in `audioRole` is load-bearing**: `realtime` is tested *before* `speech`, so `qwen3-tts-instruct-flash-realtime` comes back `realtime` and not `speech`. That id does say TTS, but it speaks WebSocket behind an `openai` endpoint label (`../gateway-model-selection.md` §2.1), so a plain HTTP job route cannot drive it. Calling it `speech` would light a control that can only fail.
 
-`pickPreferredMusicModel` / `pickPreferredLyricsModel` fall back to `DEFAULT_GATEWAY_MUSIC_MODEL` / `DEFAULT_GATEWAY_LYRICS_MODEL` (`:9-10`) when the catalog is empty, the way the image and video pickers do. `pickPreferredSpeechModel` deliberately does **not** (`:167-169`): with no reachable id it returns `""` rather than inventing one, because a guessed id would send the desk at a model the gateway does not serve.
+`pickPreferredMusicModel` / `pickPreferredLyricsModel` fall back to `DEFAULT_GATEWAY_MUSIC_MODEL` / `DEFAULT_GATEWAY_LYRICS_MODEL` (`:14-15`) when the catalog is empty, the way the image and video pickers do. `pickPreferredSpeechModel` deliberately does **not** (`:227-229`): with no reachable id it returns `""` rather than inventing one, because a guessed id would send the desk at a model the gateway does not serve.
 
 ### 4. The form, and what the model allows
 
@@ -91,14 +94,14 @@ The studio re-derives both on every render and shows only the controls the curre
 
 ### 5. Submit → `POST /api/v1/music`
 
-`handlePostMusic` (`packages/host/src/handlers/jobs.ts:163-173`) calls `requireGatewayAllowedFor` first — a closed gate is a `403 gateway_blocked` here rather than a failed call — then `parseMusicGenerateBody` (`packages/host/src/studio-generate.ts:216-230`), which refuses two briefs before anything can be billed for them:
+`handlePostMusic` (`packages/host/src/handlers/jobs.ts:179-189`) calls `requireGatewayAllowedFor` first — a closed gate is a `403 gateway_blocked` here rather than a failed call — then `parseMusicGenerateBody` (`packages/host/src/studio-generate.ts:270-284`), which refuses two briefs before anything can be billed for them:
 
 - `mode: "custom"` with no lyrics → `400`, `musicLyricsRequired`
 - `mode: "describe"` with no prompt → `400`, `musicPromptRequired`
 
-`generateStudioMusic` (`packages/host/src/studio-generate.ts:461-563`) is the spine. The harness helpers live in `packages/core/src/music/harness.ts`. Phases run only where a skill needs them. There is no new control on the page.
+`generateStudioMusic` (`packages/host/src/studio-generate.ts:569-671`) is the spine. The harness helpers live in `packages/core/src/music/harness.ts`. Phases run only where a skill needs them. There is no new control on the page.
 
-1. **Brief.** `studioRouteReady("music_gen", …)` → `400` with the Settings hint if no key. An empty description or empty custom lyrics is refused before a relay call (`parseMusicGenerateBody`, `:216`).
+1. **Brief.** `studioRouteReady("music_gen", …)` → `400` with the Settings hint if no key. An empty description or empty custom lyrics is refused before a relay call (`parseMusicGenerateBody`, `:270`).
 2. Pick the model (body → Settings pin → catalog default), then snap `mode`, `style`, and `instrumental` through `musicCapabilities`.
 3. **Words.** The text goes through `maskPii` either way, and **the output-language rule rides only a description** (`withOutputLanguage(..., "music", locale)`). In custom mode the owner's lyrics go as written: the relay sends custom-mode `prompt` to Suno as the words to sing. A copy of the language instruction, if one was pasted in, is stripped so it is not the last verse. Never on the style tags.
 4. **Name.** A title they typed wins. Otherwise `songTitleFromBrief` (`harness.ts:84`) takes the first sung line of the brief. Custom mode sends that title. Describe mode does not: `buildSunoMusicPayload` still emits only `gpt_description_prompt` and `make_instrumental`.
@@ -110,12 +113,12 @@ The studio re-derives both on every render and shows only the controls the curre
 
 `musicGenerateTool` (`packages/core/src/tools/platform/music-generate.ts:23-28`, key `music_generate`, capability `music_gen`) has exactly one backend: the gateway. `credentials.ts:135-138` records why — the catalog's music backend is an async Suno relay with no second vendor, so there is nothing to fall back to.
 
-`generateGatewayMusic` (`packages/core/src/tools/platform/gateway-audio.ts:288`) then:
+`generateGatewayMusic` (`packages/core/src/tools/platform/gateway-audio.ts:300`) then:
 
 - `buildSunoMusicPayload` (`:133`) emits **one of two shapes and never a blend**: custom mode sends `{ prompt: <lyrics>, tags: <style>, title, make_instrumental }`, describe mode sends `{ gpt_description_prompt: <prompt>, make_instrumental }`. Extra fields are kept out on purpose — a strict decoder rejecting the whole job is the failure mode the video wire already paid for.
 - `submitSuno` (`:222-248`) posts to `` `${gatewayOriginFromBaseUrl(baseUrl)}/suno/submit/${action}` `` — **origin, not `/v1`** (`packages/core/src/gateway.ts:76`). A 404 here is answered with `RELAY_MISSING` (`:117-118`), which names the exact path tried, so a wrong mount costs one line instead of a debugging session.
 - `sunoTaskId` (`:157`) reads the id whether the relay returns `data` as a bare string, `data.task_id`, or a top-level `id`.
-- `pollSuno` (`:250-286`) fetches `` `${origin}/suno/fetch/${taskId}` `` every `MUSIC_POLL_MS` (3 s) up to `MUSIC_MAX_POLLS` (100), i.e. about five minutes, then `504`. It only returns once the relay calls the job `SUCCESS`: a clip url can appear while the status is still `IN_PROGRESS`, and that url is the streaming take, not the finished file.
+- `pollSuno` (`:252-297`) fetches `` `${origin}/suno/fetch/${taskId}` `` every `MUSIC_POLL_MS` (3 s) up to `MUSIC_MAX_POLLS` (100), i.e. about five minutes, then `504`. It only returns once the relay calls the job `SUCCESS`: a clip url can appear while the status is still `IN_PROGRESS`, and that url is the streaming take, not the finished file. A failed job is a `GatewayRefusalError` tagged `phase: "poll"`: the relay accepted it, so its failure files no lesson about the model.
 - `readSunoFailure` (`:180`) reads `data.fail_reason` **ahead of** the envelope, because NewAPI keeps `code: "success"` on a failed job.
 - `extractSunoTracks` (`:189`) returns every take, and drops any clip whose `audio_url` is not `http(s):` or `data:` — the relay sometimes puts a failure string in that field.
 
@@ -127,17 +130,17 @@ Teaching the store about audio required widening `saveMedia`, and that is where 
 
 ### 8. Lyrics helper — `POST /api/v1/music/lyrics`
 
-`writeStudioLyrics` (`packages/host/src/studio-generate.ts:577-620`) runs `lyricsWriteTool` against `suno_lyrics` through the same relay with `action: "lyrics"`, and hands the text straight back. **Nothing is stored**: it exists so the desk can fill the lyrics box and then edit it before spending a music charge.
+`writeStudioLyrics` (`packages/host/src/studio-generate.ts:685-728`) runs `lyricsWriteTool` against `suno_lyrics` through the same relay with `action: "lyrics"`, and hands the text straight back. **Nothing is stored**: it exists so the desk can fill the lyrics box and then edit it before spending a music charge.
 
 **Words check.** `lyricsAreSingable` (`packages/core/src/music/harness.ts:55`) asks for two sung lines inside the lyrics cap, after the music language rule is stripped. A miss retries the lyrics call once (`shouldRetryLyrics`). A second miss still returns the longer draft. A draft that already passes is not retried. A blank relay title is filled from the sentence they typed. Usage is one row for the draft they receive.
 
 ### 9. Voice-over, and why it is off
 
-`speechGenerateTool` (`packages/core/src/tools/platform/music-generate.ts:118-123`, capability `speech_gen`) and `generateGatewaySpeech` (`gateway-audio.ts:345`) are written against the OpenAI-compatible `POST /v1/audio/speech` and return a `data:` URL. They work; there is simply no id to point them at.
+`speechGenerateTool` (`packages/core/src/tools/platform/music-generate.ts:118-123`, capability `speech_gen`) and `generateGatewaySpeech` (`gateway-audio.ts:357`) are written against the OpenAI-compatible `POST /v1/audio/speech` and return a `data:` URL. They work; there is simply no id to point them at.
 
-So instead of rendering a dead control, the host answers with a machine-readable reason. `speechUnavailableReason(ids)` (`packages/core/src/models/audio-capabilities.ts:88`) returns `"no_audio_models"` when the catalog lists nothing audio at all, `"realtime_only"` when everything audio is realtime, and `null` the moment a plain TTS id appears. The studio renders the matching sentence from `music.voiceUnavailable.*` (`apps/web/locales/en/music.json`, `apps/web/locales/id/music.json`) inside `music-studio-voice`.
+So instead of rendering a dead control, the host answers with a machine-readable reason. `speechUnavailableReason(ids, catalogIds)` (`packages/core/src/models/audio-capabilities.ts:97-112`) returns `null` when a reachable speaker is offered; `"none_on_key"` when the catalogue has a reachable speaker but this key's calls refused every one of them (2026-11-11); `"realtime_only"` when all the catalogue offers is realtime; and `"no_audio_models"` when the catalogue lists nothing audio at all. The studio renders the matching sentence from `music.voiceUnavailable.*` (`apps/web/locales/en/music.json`, `apps/web/locales/id/music.json`) inside `music-studio-voice`; `none_on_key` uses `SettingsLinkHint`, so it points at the Models card.
 
-**This turns itself on.** The day the gateway lists something like `qwen-audio-3.0-tts-flash`, `audioRole` calls it `speech`, `speechUnavailableReason` returns `null`, and the control appears with no code change. `audio-capabilities.test.ts:93-97` is that assertion.
+**This turns itself on.** The day the gateway lists something like `qwen-audio-3.0-tts-flash`, `audioRole` calls it `speech`, `speechUnavailableReason` returns `null`, and the control appears with no code change. `audio-capabilities.test.ts:93-118` is that assertion, plus `none_on_key`.
 
 ## Where things live
 
@@ -163,10 +166,12 @@ So instead of rendering a dead control, the host answers with a machine-readable
 ## Gotchas
 
 - **A music job leaves one usage row, not two.** `recordMusicUsage`
-  (`packages/host/src/studio-generate.ts:521`) records unit `jobs`, quantity 1, however many
-  takes come back — that is how the gateway bills it. A lyrics draft (`:611`) is its own
+  (`packages/host/src/studio-generate.ts:629`) records unit `jobs`, quantity 1, however many
+  takes come back — that is how the gateway bills it. A lyrics draft (`:719`) is its own
   flat-rate call and gets its own row. See [`tenant-usage-ledger.md`](tenant-usage-ledger.md).
 
+- **An empty picker is a fact about the key, not a broken page.** `suno_music` is offered as `unknown` even when the gateway does not list it (§2a), so the picker is empty only after a real call refused it (or a pin the key refused). Then `music-studio-no-models` says so, with a link to the Models card, and Generate plus Draft lyrics are off. Press Check again in Settings to forget the lesson and try again.
+- **A failed render does not hide `suno_music`.** The relay accepted the job; `pollSuno` tags that refusal `phase: "poll"` and `classifyGatewayRefusal` files no lesson for it (`docs/internal/maps/model-policy.md`, "Which models a key can use").
 - **The relay is on the origin, not under `/v1`.** `https://api.tokotokenai.com/suno/submit/music`, not `…/v1/suno/…`. Every other generate wire in this repo is a `/v1` route, so this is the first thing to get wrong.
 - **Never build the Music list by filtering the live catalog alone.** `suno_music` is not in `GET /v1/models` and never will be (§2a). Any new surface that needs music ids goes through `listMusicModels()` / `withRelayMusicModels`, never `listAudioModels().filter(isMusicModelId)`. This is the 2026-09-21 owner bug and it is easy to reintroduce, because the filter *looks* right.
 - **The model id never reaches the gateway.** `buildSunoMusicPayload` emits no `model` field — the relay action in the URL path is what selects Suno, and the gateway bills the call against its `suno_music` entry. The id picked in the studio only selects the wire and the capability flags locally. Do not "fix" this by adding `model` to the body: §6 explains why extra fields are kept out.
@@ -192,12 +197,13 @@ Automated checks that prove this page:
 | Check | Proves |
 |---|---|
 | `packages/core/src/models/audio-capabilities.test.ts` | `audioRole` on the real catalog ids, `realtime` before `speech`, the reason codes, capability snapping |
-| `packages/core/src/tools/platform/gateway-audio.test.ts` | Payload shapes never blend, the origin-mounted relay path, task-id shapes, both takes extracted, fail-reason precedence, poll timeout, `RELAY_MISSING` |
+| `packages/core/src/tools/platform/gateway-audio.test.ts` | Payload shapes never blend, the origin-mounted relay path, task-id shapes, both takes extracted, fail-reason precedence, poll timeout, `RELAY_MISSING`, and that a failed render is tagged `phase: "poll"` so it files no lesson |
 | `packages/core/src/music/harness.test.ts` | Each new skill runs: shape a lyric, name the song, retry a blank job once |
 | `packages/host/src/handlers/music.test.ts` | The whole host path against a stubbed relay: submit → poll → two media rows → gallery listing → bytes served back, plus the G-27 guard, plus that `models` carries `suno_music` **and** `defaultModel` on a desk with no catalog, plus (2026-09-23) "sends the owner's own lyrics to the relay exactly as written" and "keeps the output-language rule on a described song, where the model writes the words", plus (2026-09-28) the three host cases that run shape-lyric, name-song, and both-takes |
+| `packages/host/src/model-availability.test.ts` | (2026-11-11) The page's answer, not just the helper: `handleGetMusic` returns `models: []` and `defaultModel: ""` after a `suno_music` refusal, and the relay id comes back when nothing refused it; the video page's defaults empty when every video id was refused; `studioSpeechUnavailable` says `none_on_key` |
 | `apps/web/lib/studio-model-wiring.test.ts` | (2026-09-23) Images, Videos and Music re-seed the picker from the reloaded list with `keepModelChoice`, so a generate no longer resets the model the person picked |
 | `packages/host/src/selectable-models.test.ts` | `withRelayMusicModels` (adds, dedupes case-insensitively, never mutates) and that `modes.music` always contains `defaults.music` |
-| `apps/web/lib/music-models.test.ts` | The empty-picker rule, and that both host error shapes reach the banner |
+| `apps/web/lib/music-models.test.ts` | The empty-picker rule, including a failed read and a missing key not counting as empty, and that both host error shapes reach the banner |
 | `packages/host/src/edit/import.test.ts` | That the chat media route is still narrow |
-| `apps/web/lib/music-locale.test.ts` | `en` and `id` key trees aligned, both voice-over reasons present |
+| `apps/web/lib/music-locale.test.ts` | `en` and `id` key trees aligned, all three voice-over reasons present, and the empty-picker body points at Settings |
 | `scripts/probe-gateway-music.ts` | The live wire. **Not yet run against the gateway.** |

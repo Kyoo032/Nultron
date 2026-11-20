@@ -225,6 +225,10 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-188](#sr-188) | Info | Tester: `finance_task` refuses a figures file the model wrote, and asks again for a number the owner did not type | Checked, not an issue (2026-10-20) | — |
 | [SR-189](#sr-189) | Low | Tester: a `finance_task` report made from one person's private attachment is a desk-wide artifact and a desk-wide Knowledge Base card | Open (2026-10-20): acceptable while a desk has one owner (OPC) | Before a hosted desk has a second person |
 | [SR-190](#sr-190) | Medium | Chat's `image_generate` and `video_generate` sent any model id and any source-image address the model wrote to the gateway, which fetches that address | Model half merged to `main` (#183, 2026-10-21), unit-tested, not driven; the address half is `fix/safe-web-search`'s `judgeMediaUrl` (the egress-guard copy from #183 was dropped when that branch took `main`) | PR merge of `fix/safe-web-search` to `main` |
+| [SR-191](#sr-191) | High | The WhatsApp webhook (`/api/v1/channels/whatsapp/webhook`) is the first route that is open to the internet and writes into a desk: anybody who can reach it could put text into a company's customer inbox, or into another company's | Built in tree (2026-11-02): the signature is checked over the exact bytes before anything is parsed, fail closed with no app secret, the desk comes from the connected-number row and never from the payload, a number is claimed only with a token that can read it; unit-tested through the real router with two desks and through the hosted adapter's own admission (no Origin or CSRF needed, 1 MB cap, neighbouring paths still refused), and driven in Chromium against the local sandbox. **Not driven with Meta, not deployed, no Caddy rule written** | Before the route is exposed on any server (Phase 3): the two env vars, the proxy rule, the preview-box gate, one live drive with Meta's test number |
+| [SR-192](#sr-192) | Medium | WhatsApp delivers at least once and in no fixed order, so a redelivered, replayed or late event could double a customer's message or undo a "read" tick | Built in tree (2026-11-02): unique partial index on `(conversation_id, direction, external_id)` with `INSERT OR IGNORE`, delivery words move forward only; unit-tested and mutation-checked on the index and the ordering; not driven with Meta | Phase 3 live drive |
+| [SR-193](#sr-193) | Medium | Customers' phone numbers, profile names and message text are personal data kept in the desk's database in the clear, readable by every member of the company, kept with no time limit, so an owner must be able to erase one customer | Retention decided by Rizky 2026-11-03: **no time limit, kept so agents can pull up older threads, deleted when the customer asks.** Built in tree: owner-only "Erase this customer" (the conversation and every message, hard delete), no expiry, no trim; logs carry counts only; a desk's delete purges all three tables. Driven in Chromium against the sandbox; not on a hosted server | Before a real customer's number is connected on a hosted desk |
+| [SR-194](#sr-194) | Low | Meta's rules and API move under the feature: the 24-hour window, per-message pricing, the ban on general-purpose AI bots (from 2026-01-15) and the Graph version | Recorded (2026-11-02): the Graph version is one constant, the window one function, and Phase 1 sends only what the owner writes | Re-read Meta's terms and changelog before Phase 2 (an agent that answers) and before the live number |
 | [SR-195](#sr-195) | Low | Two different paid media requests can share a grant key (`fingerprint` is a 64-bit non-security hash), so a Run press for a cheap clip can start a dear one | Open (2026-11-03): pinned as two `it.fails` tests, fix not applied | Next release that carries the chat-first shell |
 | [SR-196](#sr-196) | Medium | Two HIGH advisories reach the hosted image: `zod` (GHSA-mrhx-c7xc-m3w5, memory exhaustion on a large failing array) and `body-parser` (GHSA-27r3-jxmh-p828) | Fixed in tree (2026-11-04, `fix/zod-4`): one `zod` 4.6.7 for every importer, after the AI SDK 5 move; `body-parser` 2.4.0 since `fix/ci-local-reds`; `audit:deployed` passes. Residual bounded 2026-11-06 (`fix/request-array-caps`): a posted body is charged by cost (an object or list 6, any other value 1) against 60,000, or 250,000 for a Market briefing, before a schema reads it, and error text built from `zod` issues is cut to 20; the worst failing body measured gives about 56,000 issues and 60 MB on the default profile and about 102,000 issues and 71 MB on the briefing profile | None |
 | [SR-197](#sr-197) | Medium | AI SDK 5's `streamText` prints every stream error to the console by default, and an `APICallError` carries the request body (the prompt) and the gateway's error body | Fixed in tree (2026-11-04, `fix/zod-4`): the runtime passes a silent `onError`; tested, not driven | PR merge of the AI SDK 5 move |
@@ -238,6 +242,11 @@ routes and queries over a real Postgres, and the default mode's screens and rout
 | [SR-206](#sr-206) | Low | The backup heartbeat URL would sit in `.env`, which the `app` container loads, so code running in the app could send fake success pings and hide a dead backup | Fixed in PR #206 (2026-11-06): `backup.sh` reads it from the process environment only, set on the cron line; tested, not driven on a server | — |
 | [SR-207](#sr-207) | Medium | The Host check ran only on mutating `/api` requests, so a DNS-rebinding page could `GET` the API (media, threads, masked settings) from unauthenticated webdev, and a GET in server mode was not checked against the Host allowlist (SEC-004 4b) | Fixed in tree (2026-11-06, `fix/sec-004b-get-host-check`): every `/api` request needs a trusted Host, `/healthz` exempt; unit-tested through the real adapter, not driven | PR merge |
 | [SR-208](#sr-208) | Low | nixpkgs marks pnpm 9.15.9, the version the repo pins, insecure (twelve CVEs, no fix on 9.x); the Nix build permits that one version by name | Accepted for the Nix migration (2026-11-07): build-time only, no git dependencies in the lock, the Nix store pins every tarball by hash. Moving to pnpm 10 is a separate change | — |
+| [SR-209](#sr-209) | Medium | The live voice WebSocket upgrade skips the HTTP router, so none of its Host, transport, Origin, CSRF or session rules run on it unless `upgrade.ts` repeats them | `fixed-unverified`, not hosted (2026-11-10, `tester`; rewritten from the code 2026-11-11): `attachVoiceUpgrade` applies, in order, a path match (any other path is left untouched, so Vite's dev socket keeps working), the adapter's Host rule, on the hosted server the adapter's https, request-filter and rate rules, an Origin allowlist (a missing Origin is refused in both modes), the session cookie, the desk from the workspace cookie, the voice session's owner and state, the voice flag and the gateway gate, then `ws` with `maxPayload` 48,000 bytes; a refusal is a status line only. No CSRF token is checked, because a browser cannot set a header on a WebSocket handshake. Tested through a real socket in `packages/host/src/voice/relay.test.ts`; built on `tester`, not merged to `main`, never run on the hosted server | Merge of voice from `tester` to `main`; drive the upgrade on the hosted server before voice is switched on there |
+| [SR-210](#sr-210) | Medium | The person's raw voice (PCM in a WAV) and the model's spoken answers go to the gateway, and the text PII masker cannot see audio | Open, accepted for week one (2026-11-10, `tester`; rewritten from the code 2026-11-11): the base URL is the pinned gateway (`resolvedGatewayBaseUrl()`), voice is off unless `AGENTFORGE_VOICE` is on and, on the hosted server, the user id is on `AGENTFORGE_VOICE_OWNERS`, audio is held in memory only and only text is saved, and logs carry counts and durations. There is no disclosure or consent step before the first session: open | Decide on a disclosure before anyone but Rizky uses voice; Phase 4 customer voice design |
+| [SR-211](#sr-211) | High | A live voice session could leak the desk's gateway key to the browser | `fixed-unverified`, not hosted (2026-11-10, `tester`; rewritten from the code 2026-11-11): `createVoiceModels` reads the key on the host and puts it only in the `Authorization` header of the two gateway calls; H1 answers `{ sessionId, threadId, model, streamPath, endsAt }`; the test "keeps the gateway key out of every log line, frame, response, saved row and ledger row" (`packages/host/src/voice/relay.test.ts:1466-1595`) fails if it shows up anywhere else; built on `tester`, not merged to `main`, never run on the hosted server | Merge of voice from `tester` to `main` |
+| [SR-212](#sr-212) | Medium | A spoken, or misheard, request could make the voice thinker write a file, send something, spend money or start long work | `fixed-unverified`, not hosted (2026-11-10, `tester`; rewritten from the code 2026-11-11): the thinker is offered only the tools on `VOICE_READ_TOOLS` and `VOICE_DELEGATE_TOOLS` plus `request_tap`; a `request_tap` call stops the run and returns a card, and the tap ends voice and sends a normal Chat turn. `web_search` and `web_fetch` are on the list, behind the same outbound guard as Chat; whether voice may reach the web is Rizky's open decision V12. Since 2026-11-20 `delegate` itself runs from voice because the run it starts is already fenced — no picture or clip tools, the desk's files only and never the owner's folder, a tainted egress guard, its own budget and the worker ceiling — while every generalist worker stays tap-only. Built on `tester`, not merged to `main`, never run on the hosted server | Merge of voice from `tester` to `main`; V12 |
+| [SR-213](#sr-213) | Low | An aborted talker stream reports no usage, so the host writes no row for it, and audio has no list price, so its seconds rows are unpriced | Open, accepted for week one (2026-11-10, `tester`; rewritten from the code 2026-11-11): voice writes token rows and seconds rows under mode `voice` and the thinker's tokens under mode `chat`; a cut or abandoned talker reply, the short-speech check and the acknowledgement call write nothing; seconds rows carry `no_list_price` | An audio list price in `media-pricing.ts` and a rule for aborted calls, before any allowance or bill counts voice |
 | [SR-82](#sr-82) | Low | Open Slide port must not grow a new outbound host | Checked, not an issue (2026-09-27) | — |
 | [SR-83](#sr-83) | Low | The Nultron rename leaves the old DPSBuddy desk, its keychain entry and its server-side names behind | Open — accepted by design (2026-09-29) | Personal: none. Enterprise: blocks calling the migration done |
 | [SR-01](#sr-01) | Low | `apps/portal/compose.yml` hardcodes `POSTGRES_PASSWORD: portal` | Accepted for dev only | Dev only |
@@ -6583,6 +6592,76 @@ Residual:
 
 Gate: PR merge to `main`.
 
+### SR-191 {#sr-191}
+
+**The WhatsApp webhook is a public route that writes into a desk.**
+Raised 2026-11-02 by the customer inbox, Phase 1 ([map](maps/customer-inbox.md), [plan](whatsapp-omnichannel-plan.md)). High.
+
+Every other route writes as the signed-in tenant, and `getTenant` fails closed without a session. Meta has no session, so the webhook is exempt from the session gate and CSRF (`UNGATED_GETS` / `UNGATED_POSTS`, `packages/host/src/auth/routes.ts:81,98`; `CSRF_EXEMPT_PATHS`, `packages/host/src/http-adapter.ts:793`), the same shape the billing webhook has.
+
+Controls:
+- **Signature before anything else.** `verifySignature` (`packages/host/src/inbox/whatsapp.ts:59`): HMAC-SHA256 of the raw bytes under `AGENTFORGE_WHATSAPP_APP_SECRET`, constant-time compare, run before the JSON is parsed. The body is read raw under a 1 MB cap (`http-adapter.ts:247`).
+- **Fail closed.** No app secret set is a 503, not an open route; the verify-token handshake is 503 the same way and 403 on a wrong token.
+- **The payload cannot name a desk.** The write scope is the `organization_id` and `workspace_id` of the `channel_endpoints` row found by the event's `phone_number_id` (`webhook.ts:67`). An unknown or disconnected number is counted and dropped (200, so Meta does not retry).
+- **A number is claimed only with proof.** `handlePostWhatsApp` asks Graph to read the number with the pasted token before it writes anything (`handlers/customers.ts:124`), and `(kind, external_id)` is unique across the install, so a second desk's claim is a 409. Without this a desk could register another company's number id and be sent its customers.
+- **The token** sits in `settings.enc` beside the gateway key, goes only in an `Authorization` header, is redacted from every error string, and the renderer sees a fingerprint.
+- **Unauthenticated cost** is one HMAC over at most 1 MB per request, behind the hosted per-IP rate limit.
+
+Evidence: `packages/host/src/handlers/customers.test.ts` drives the real router with no cookie: unsigned, wrongly signed and tampered bodies are 401 and store nothing; a signed body for an unconnected number stores nothing; a forged `workspace_id` / `organization_id` in the payload is ignored; two desks each see only their own number's customers and a conversation id from the other desk is a 404 on every route. `whatsapp.test.ts` covers the verdicts. `packages/host/src/http-adapter.test.ts` ("the WhatsApp webhook on the hosted server") drives the hosted adapter, which router tests bypass: the POST reaches the handler with no Origin, cookie or CSRF token and with the body untouched and the signature header forwarded; a body over 1 MB is a 413 and never dispatched; `/webhook/extra`, the owner's `/api/v1/customers/*` routes and the reply route still get `origin_forbidden`; a hit without `X-Forwarded-Proto: https` is refused; the signature header is passed on that path and no other. Driven in Chromium against `scripts/whatsapp-sandbox.ts` (stub runtime, 2026-11-02): a signed delivery arrives, an unsigned one is refused.
+
+Residual:
+- **Not driven with Meta or on a hosted server.** Phase 1 has no Meta account; the sandbox signs the way Meta documents, which is not the same as Meta's real traffic.
+- **One app secret per install.** Every company's number is a customer of the same Meta app, so the secret is the operator's; a leak lets someone sign for any connected number. It lives in the server's environment only, never a file in the repo.
+- **Meta's source addresses are not checked.** The signature is the only gate. Phase 3 should decide whether the proxy also limits the route to Meta's published ranges.
+- **Hosted rate limit.** Meta's deliveries may arrive from few addresses behind the proxy; the per-IP bucket (600 per minute, burst 100) should be checked against a real busy number in Phase 3.
+- **A disconnected number stays claimed.** `connectEndpoint` refuses a number to any other desk while any `channel_endpoints` row for it exists, whatever its status (`packages/host/src/inbox/store.ts:193-199`). After desk A disconnects, desk B gets 409 until desk A is deleted, and nothing releases the number. Found by the 2026-11-09 review of PR #198; not fixed.
+- **The Graph call has no deadline on the body.** The timeout is cleared once the response headers arrive (`packages/host/src/inbox/whatsapp.ts:399-401`), so `readCapped` (`:405`) reads up to 1 MB with no time limit. Low: the host is pinned to `graph.facebook.com`. Found by the same review; not fixed.
+
+Gate: before the route is exposed on any server.
+
+### SR-192 {#sr-192}
+
+**Redelivered, replayed and late WhatsApp events.**
+Raised 2026-11-02 by the customer inbox, Phase 1. Medium.
+
+Meta retries any non-2xx and may send the same event twice or out of order. Controls: the unique partial index `customer_messages (conversation_id, direction, external_id) WHERE external_id IS NOT NULL` with `INSERT OR IGNORE` inside the `recordInbound` transaction (`packages/host/src/inbox/store.ts:267`), so a duplicate is counted and not stored even under a race; `nextDeliveryStatus` (`packages/core/src/inbox/index.ts`) never moves a delivery word backwards, and a `failed` after `delivered` or `read` is ignored (`applyStatus`, `store.ts:376`); a report for a message the desk does not hold is counted and dropped. There is no count cap any more (see SR-193): the first build trimmed to 500 conversations and 200 messages, and that was removed on 2026-11-03 because Rizky wants customer messages kept. What bounds growth now is that only Meta-signed deliveries write, the unique index drops duplicates, and the per-IP rate limit sits in front of the route.
+
+Evidence: `store.test.ts` (28) and `migrate-0023.test.ts` (15), including a redelivery, a late `sent` after `read`, a status for a stranger's message id, and that nothing is trimmed (600 messages in one thread and 120 conversations all stay stored).
+
+Residual: storage grows with a desk's customers and has no ceiling until the owner erases someone (SR-193). Fine at one number's volume; revisit with Phase 2, when agents read the history. Not driven with Meta.
+
+Gate: Phase 3 live drive.
+
+### SR-193 {#sr-193}
+
+**Customers' numbers, names and messages are personal data in the desk's database.**
+Raised 2026-11-02 by the customer inbox, Phase 1. Medium.
+
+Phase 1 stores a customer's WhatsApp number, the profile name they chose and the text of their messages (other types are stored as a fixed label such as `[image]`; a caption or media id is never copied), and the owner's replies. They are in SQLite in the clear like every other desk row, and they are visible to every member of the company (SR-169: a desk is company-wide by design). Indonesia's personal data protection law applies to the company that owns the number; this product is its processor.
+
+**Retention, decided by Rizky on 2026-11-03:** there is no time limit. Messages are kept so that agents can pull up older threads, and they are deleted only when the customer asks. So nothing expires and nothing is trimmed (the first build's 500-conversation and 200-message caps were removed), and the only way a message goes is **Erase this customer**: `DELETE /api/v1/customers/conversations/:id` (`handleDeleteConversation`, `handlers/customers.ts`), owner or admin only, which deletes the conversation and every message in it in one transaction (`eraseConversation`, `store.ts`). It is a hard delete. The page asks first ("Erase for good" / "Keep") and the control sits at the foot of the thread. A member of the desk can read but gets a 403; another desk's id is a 404 and erases nothing; the harness checks that tenant A's conversation survives tenant B's attempt.
+
+Controls: log lines carry counts only (no number, name or text; the logger also drops fields named `messages`, `text`, `body`); a desk's delete purges all three tables (`purgeDesk`, `handlers/workspaces.ts:220`) and the tenant purge covers them (`packages/db/src/tenant-purge.ts`); disconnecting forgets the token but keeps the conversations, on purpose.
+
+Evidence: `store.test.ts` (nothing is trimmed; an erase removes the thread and leaves the other customer; another desk's id and a second erase are false; the same customer writing again starts a clean thread; a late report for an erased message is dropped), `customers.test.ts` (erase through the real router, a year-old thread is still there, member 403, other company 404, signed-out 401), `tenancy-harness.test.ts` (the by-id table and the survivor read), `customers-client.test.ts` and `customers-parts.test.tsx`, and a Chromium drive against the sandbox on 2026-11-03 (ask, Keep, switch customer, Erase for good, 404 on the old id, a fresh thread when the customer writes again, no sideways scroll at 390 px).
+
+Residual, stated plainly:
+- **Erase reaches this database only.** Copies in a backup or snapshot of the desk's data volume are outside it.
+- **A late redelivery can re-file one message.** Meta retries a failed delivery for up to seven days. If the same message is delivered again after the customer was erased, it is filed as a new conversation. The store keeps no tombstone on purpose (a tombstone is itself a record of the customer). The owner can erase again.
+- **Phase 2 widens this.** Anything an agent derives from a thread (a summary, a Knowledge Base entry, a note) is a copy of the same personal data, and erasing the customer must reach it. That is a gate on Phase 2, not a thing Phase 1 can do.
+- **No per-customer export** yet, if a customer asks for their data rather than its deletion.
+- Storage has no ceiling until an owner erases someone; see SR-192.
+
+Gate: before a real customer's number is connected on a hosted desk.
+
+### SR-194 {#sr-194}
+
+**Meta's rules and API move under the feature.**
+Raised 2026-11-02 by the customer inbox, Phase 1. Low.
+
+WhatsApp changes: the 24-hour customer service window, per-message pricing (since 2025-07-01), the ban on general-purpose AI bots in the Business API (from 2026-01-15; narrow customer support bots stay allowed) and the Graph API version. Controls: the version is one constant (`WHATSAPP_GRAPH_VERSION`, `packages/core/src/inbox/pinned.ts`), the window is one function (`whatsappReplyWindow`), and Phase 1 sends only what the owner typed. Read from Meta's published terms on 2026-11-02, not from a live number.
+
+Gate: re-read Meta's terms and changelog before Phase 2 (an agent that answers) and before the live number.
 ### SR-195 {#sr-195}
 
 **Two different paid media requests can share a grant key, so a Run press for one lets the other start.**
@@ -7066,6 +7145,124 @@ Residual: the Docker build installs `xlsx` with nothing pinning its bytes. Movin
 format 9.0 stays) closes the CVEs; it is a separate change with its own `ci:local` run.
 
 Gate: none.
+
+### SR-209 {#sr-209}
+
+**The live voice WebSocket upgrade skips the HTTP router, so it carries its own guards.**
+Raised 2026-11-10 with live voice in Chat (branch `tester`); rewritten from the code 2026-11-11. Medium. Status: `fixed-unverified`, not hosted.
+
+Evidence: a browser `new WebSocket(url)` is a `GET` upgrade. `apps/web/server.ts:74` hooks it on the Node server's `upgrade` event (`attachVoiceUpgrade`, `packages/host/src/voice/upgrade.ts:92`), so it never passes `handleNodeRequest`, and none of the adapter's Host, transport, Origin, CSRF or session rules run on it. `upgrade.ts` repeats the ones that make sense on a socket. In the order the code applies them (a refusal is a bare status line; see below):
+
+1. **Path** (`packages/host/src/voice/upgrade.ts:94-102`). Only `/api/v1/voice/sessions/<id>/stream` matches (`VOICE_STREAM_PATH_PATTERN`, `packages/core/src/voice/protocol.ts:246`; the id is 8 to 64 URL-safe characters). Any other path, and a URL that does not parse, is **left untouched**: nothing is written and the socket is not destroyed. That is deliberate. Under webdev, Vite's HMR socket rides the same server (`apps/web/server.ts:120`) and has to receive its own upgrade (`upgrade.ts:6-7`); a "fix" that destroyed every other upgrade would break webdev. Do not tighten it.
+2. **Host** (`upgrade.ts:112-117`). The adapter's own `hostRejection` (`packages/host/src/http-adapter.ts:806-813`): off the hosted server the Host must be loopback, on it a host of the trusted origins. `403`, code `forbidden` off the hosted server and `origin_forbidden` on it.
+3. **Hosted transport rules** (`upgrade.ts:118-132`, hosted server only). The adapter's own `transportRejection` (`http-adapter.ts:482-507`): the https hop (`403 https_required` without `x-forwarded-proto: https`), the request filter (`filterHttpRequest`, `packages/host/src/local-request.ts:229`: a bad request target is `400`, an oversized header `431`), then the per-IP and per-session rate buckets (`429` with `Retry-After`). A socket is metered like any other request.
+4. **Origin** (`upgrade.ts:133-149`). A missing or blank Origin is `403 origin_forbidden` in **both** modes. The adapter lets a missing Origin through on a desk; a socket is only ever opened by a page, so voice does not. A present Origin must pass `isAllowedWebOrigin(origin, trustedOrigins())` on the hosted server or `isAllowedMutatingApiRequest(origin)` off it.
+5. **Session** (`upgrade.ts:177-196`, hosted server only). `requireSessionFor` on the session cookie: `401`, with the `ApiError` code or `session_invalid`. Off the hosted server there is no session; the desk is the person.
+6. **Tenant and desk** (`upgrade.ts:150-161` and `upgrade.ts:197-205`). The desk is read from the workspace cookie the way the adapter reads it (`requestWorkspaceId`, `http-adapter.ts:538-540`: the cookie, else the desk this machine selected, else none), and `getTenant` resolves it. A `403` or `404` from it passes through; anything else is `401`.
+7. **Voice session** (`upgrade.ts:206-210`). An unknown id, an ended session, a session that already has a socket, and a session opened by another person or on another desk (`sameVoiceOwner`, `packages/host/src/voice/sessions.ts:55-62`: tenant, organization, workspace and user must all match) get the same `404 not_found`, so a refusal does not say which.
+8. **Voice flag** (`upgrade.ts:211-214`). `voiceSettingsFor(tenant).enabled` (`packages/host/src/voice/flag.ts:26-38`): `403 voice_disabled`.
+9. **Gateway gate** (`upgrade.ts:215-220`). `requireGatewayAllowedFor(tenant)`: `403 gateway_blocked`.
+10. **Handshake** (`upgrade.ts:221-224`). `ws` with `maxPayload` of 48,000 bytes (`VOICE_MAX_AUDIO_FRAME_BYTES`, one second of 24 kHz 16-bit mono PCM, `protocol.ts:19`, used at `upgrade.ts:39-43`) and `perMessageDeflate` off. A frame over `maxPayload` closes the socket. A text frame over 4,096 characters, or one that does not parse, is dropped and the socket stays open (`parseVoiceBrowserFrame`, `protocol.ts:112-115`). The session's own limits (15 minutes long, 2 minutes idle, 30 seconds to connect, 1 open session per owner, 8 per process) are `VOICE_LIMITS`, `protocol.ts:24-37`.
+
+**No CSRF token is checked, on purpose.** The double-submit token travels in a request header, and a browser cannot set a header on a WebSocket handshake, so it has nowhere to ride. A browser states the page's Origin on every handshake and a page cannot forge it, so the Origin allowlist (step 4) is what stops a cross-site page from opening the socket with the person's cookies. The session cookie and the desk (steps 5 and 6) must still be right as well.
+
+**A refusal says only a status** (`refuse`, `upgrade.ts:64-86`): the status line, `Connection: close`, `Content-Length: 0` and, for `429`, `Retry-After`. No body, no code, no session id; the reason phrase is the stock one. On the hosted server it also writes the adapter's `request_filtered` event (`http-adapter.ts:72`) with `code`, `status`, `method`, `pathLength` and `ip` (`upgrade.ts:65-73`): no path, no session id, no cookie. Off the hosted server a refused upgrade logs nothing.
+
+Proof, in `packages/host/src/voice/relay.test.ts`, by title:
+- "leaves a non-voice upgrade untouched" (`relay.test.ts:477`).
+- "refuses the upgrade before any handshake" (`relay.test.ts:505`): no Origin `403`, a foreign Origin `403`, an unknown id `404`, another person's session `404`, the flag off `403`, an ended session `404`, hosted without https `403`, hosted with https and no cookie `401`.
+- "refuses a second socket and drops junk without closing" (`relay.test.ts:552`) and "closes the socket when a binary frame exceeds maxPayload" (`relay.test.ts:565`).
+- "refuses every voice route and the upgrade when the flag is unset" (`relay.test.ts:1251`).
+- "joins a session only on the desk it was opened on, selected by the workspace cookie", once off the hosted server (`relay.test.ts:1277`) and once hosted (`relay.test.ts:1309`).
+- "refuses an upgrade whose Host is not loopback, before it looks at anything else (off the hosted server)" (`relay.test.ts:1367`).
+- "refuses an upgrade whose Host is not a trusted host, even with a good session, Origin and https (hosted server)" (`relay.test.ts:1386`); it also checks that the three hosted refusals leave three `request_filtered` lines and that none holds a session id.
+- "meters hosted upgrades with the adapter's per-IP bucket and answers 429 past it" (`relay.test.ts:1447`).
+
+Not proven: no test drives a wrong (not missing) Origin on the hosted server, the request filter's refusals, or the gateway gate on the upgrade (`relay.test.ts:370` covers the gate on H1 only). The hosted rules ran in tests through the `serverMode` option; they have never run on the hosted server or behind its proxy. Off the hosted server the upgrade was driven once in a browser, in the first live run ([`voice-mode-plan.md`](voice-mode-plan.md)).
+
+Gate: merge of voice from `tester` to `main`; drive the upgrade on the hosted server before voice is switched on there.
+
+### SR-210 {#sr-210}
+
+**Raw voice and spoken answers go to the gateway unmasked.**
+Raised 2026-11-10 with live voice in Chat (branch `tester`); rewritten from the code 2026-11-11. Medium. Status: open, accepted for week one.
+
+Evidence: the person's speech leaves the host as 24 kHz 16-bit mono PCM in a WAV wrapper, to the talker (`POST <gateway>/chat/completions`, `packages/host/src/voice/talker-omni-http.ts:327-338`) and to the transcriber (`POST <gateway>/audio/transcriptions`, model `muse-voice-transcribe-1.0`, `packages/host/src/voice/transcriber-gateway.ts:63-76`). What the desk's thinker answers goes back to the talker as a tool message to be spoken (`talker-omni-http.ts:773`), and the talker's audio comes back through the host to the browser. The PII masker works on text, so it sees none of that audio.
+
+Mitigations that exist:
+- **Gateway only.** The base URL is `resolvedGatewayBaseUrl()` (`packages/host/src/voice/wiring.ts:55`; the pinned gateway, or the override `gatewayUrlOverride()` allows, `packages/core/src/gateway.ts:47-49`). Both calls use `redirect: "manual"` (`talker-omni-http.ts:337`, `transcriber-gateway.ts:74`). No other speech vendor is called. This is Rizky's rule of 2026-11-05.
+- **Who may use it.** Voice is off unless `AGENTFORGE_VOICE` is `on`, `1` or `true`; on the hosted server the person's user id must also be on `AGENTFORGE_VOICE_OWNERS` (user ids, not e-mails; an empty or unset list means nobody), and off the hosted server the flag alone is enough (`flag.ts:26-46`).
+- **Audio is held in memory only.** The utterance and the recent audio live in the relay's buffers (`packages/host/src/voice/relay.ts:86`) and are dropped when the turn resets (`relay.ts:1052-1056`). Nothing in `packages/host/src/voice` opens a file, and the only thing saved is text: one user row and one assistant row of text parts (`packages/host/src/voice/save-turns.ts:38-54`).
+- **Logs carry counts and durations.** `voice_talker` with `kind`, `outcome`, `ms`, `audioBytes`, `wordChars` and `status` (`talker-omni-http.ts:512-519`, `transcriber-gateway.ts:95-101`); `voice_open`, `voice_end` with `reason` and `durationMs` (`relay.ts:192`, `relay.ts:227`); `voice_reply_failed` with a code (`relay.ts:196`, `relay.ts:1008`); `voice_ask_failed` with an error code or class name (`packages/host/src/voice/ask.ts:302`). No words, no audio, no question.
+
+Open:
+- **There is no disclosure or consent step.** Nothing in the voice view tells the person their voice goes to the gateway, and nothing asks. (`apps/web/components/voice/` has no such code; `nultron.voice.mode` in `apps/web/lib/voice-settings.ts:26` stores the turn-taking mode, not a consent.)
+- What the gateway keeps of audio is not known from this repo.
+- A turn's transcript is saved in the thread as text, like a typed turn.
+
+Gate: decide on a disclosure before anyone but Rizky uses voice; Phase 4 customer voice design.
+
+### SR-211 {#sr-211}
+
+**The gateway key stays on the host.**
+Raised 2026-11-10 with live voice in Chat (branch `tester`); rewritten from the code 2026-11-11. High. Status: `fixed-unverified`, not hosted.
+
+Evidence: if the browser talked to the gateway itself, or any response or frame carried the desk's key, a script in the page could read it.
+
+How the code keeps it on the host:
+- `createVoiceModels` (`packages/host/src/voice/wiring.ts:45-61`) reads the key on the host, the one a Chat turn uses (`resolveProviderKeys(loadSettings(tenant)).openai`), and hands it to `createOmniHttpTalker` and `createGatewayTranscriber`. It returns null, which is H1's `503 voice_model_unavailable`, when the desk has no live key or is on the stub runtime.
+- The key is used in one place per call: the `Authorization: Bearer` header (`packages/host/src/voice/talker-omni-http.ts:331`, `packages/host/src/voice/transcriber-gateway.ts:72`).
+- H1 answers `VoiceSessionCreated`: `{ sessionId, threadId, model, streamPath, endsAt }` (`packages/core/src/voice/protocol.ts:221-227`, built at `packages/host/src/handlers/voice.ts:93-100`). The browser then opens `streamPath` on the same origin; nothing in H1 or in the host's frames (`VoiceHostFrame`, `protocol.ts:70-97`) is a gateway address or key.
+
+Proof: the test "keeps the gateway key out of every log line, frame, response, saved row and ledger row" (`packages/host/src/voice/relay.test.ts:1466-1595`). It runs the production wiring (no `modelsFor` stub) with a sentinel key in `OPENAI_API_KEY` (`relay.test.ts:1531`), a stub gateway that records every call, and one turn on which the gateway's error body echoes the credential (`relay.test.ts:1496-1499`). It drives a plain turn with a backchannel, an `ask_nultron` turn and the failed turn, then asserts the key reached the gateway only as the `Bearer` header, on both the transcription and the chat calls, and in no request body (`relay.test.ts:1574-1577`); and appears in no console line (`relay.test.ts:1582`, with the failed turn's `voice_reply_failed` among them, `relay.test.ts:1581`), no JSON frame (`relay.test.ts:1584`), no binary frame (`relay.test.ts:1585`), not H1's response body (`relay.test.ts:1586`), not the saved thread messages (`relay.test.ts:1587`) and not the usage ledger (`relay.test.ts:1588`). `packages/host/src/voice/wiring.test.ts` adds "opens each company's models with that company's own key" (`wiring.test.ts:150`) and "never hands a tenant with no key of its own the operator's key" (`wiring.test.ts:170`).
+
+Residual: tested, not driven on the hosted server. Built on `tester`, not merged to `main`.
+
+Gate: merge of voice from `tester` to `main`.
+
+### SR-212 {#sr-212}
+
+**Voice reads but does not write or spend.**
+Raised 2026-11-10 with live voice in Chat (branch `tester`); rewritten from the code 2026-11-11. Medium. Status: `fixed-unverified`, not hosted.
+
+Evidence: speech can be misheard, or come from the room, so a spoken turn must not write a file, send something, spend on media or start long work on its own.
+
+How the code holds it:
+- `askNultron` (`packages/host/src/voice/ask.ts:150`) sets the run up as a Chat turn (`prepareChatRun`, `ask.ts:229-236`, thinking off) and gives the runtime `voiceBindings(prepared.bindings)` (`ask.ts:284`).
+- `voiceBindings` (`packages/host/src/voice/ask-tools.ts:115-129`) is an allow-list: it keeps a binding only when its tool is on `VOICE_READ_TOOLS` and adds `request_tap`. A tool nobody classified is not offered (`isVoiceReadTool`, `ask-tools.ts:72-74`). `VOICE_READ_TOOLS` (`ask-tools.ts:36-47`): `calculator`, `datetime`, `knowledge_search`, `past_sessions`, `list_files`, `read_file`, `search_files`, `self_check`, `web_search`, `web_fetch`.
+- Not offered (`VOICE_TAP_TOOLS`, `ask-tools.ts:58-67`): `write_file`, `edit_file`, `delete_file`, `image_generate`, `video_generate`, `build_deck`, `run_code`, and the generalist workers and `delegate` (`GENERALIST_EXTRA_TOOLS`).
+- When the model calls `request_tap`, `askNultron` stops the run (`ask.ts:266-269`) and returns a card of the person's own words and a one-line summary (`ask.ts:310-316`). The relay sends it as a `card` frame (`packages/host/src/voice/relay.ts:606`). The tap ends voice first, then sends the card's prompt as a normal Chat turn through the composer (`apps/web/components/voice/use-voice-session.ts:149-160`, `apps/web/components/chat-session.tsx:409-415`), so the tools, approvals and stop rules there are Chat's. Voice never runs the work.
+- `web_search` and `web_fetch` are on the list. The run is wrapped in the same outbound guard a typed turn has (`createOutboundGuard`, `ask.ts:254-260`; SR-112), which checks a query or an address against the Knowledge Base text and the thread's text. **Whether voice may reach the web is Rizky's open decision** (V12 in [`voice-mode-plan.md`](voice-mode-plan.md); the plan's default is yes). It is one line to turn off: remove them from `VOICE_READ_TOOLS`.
+- The paid-media reach test lists `packages/host/src/voice/ask.ts` as `gated` (`packages/host/src/paid-media-reach.property.test.ts:21-24`): the thinker passes the `mediaPermission` of its own Chat setup, a body with no grants, so the gate always asks, and its bindings hold neither `image_generate` nor `video_generate`.
+
+Proof, by title. `packages/host/src/voice/ask-tools.test.ts`: "has a decision for every tool Chat binds" (`ask-tools.test.ts:35`, fails when Chat gains a tool on neither list), "keeps every writing, paid or long tool off the read list" (`ask-tools.test.ts:51`), "keeps every generalist worker and delegation off the read list" (`ask-tools.test.ts:58`), "treats a tool nobody has heard of as not allowed" (`ask-tools.test.ts:71`), "keeps only the read tools and adds request_tap" (`ask-tools.test.ts:80`). `packages/host/src/voice/ask.test.ts`: "offers a Knowledge Base read tool and request_tap, and no tool that writes, sends or spends" (`ask.test.ts:270`), "never runs a write tool a model asks for anyway" (`ask.test.ts:301`), "stops the run at request_tap and returns the card, with the person's own words as the prompt" (`ask.test.ts:314`).
+
+Residual: voice can read the desk's files, Knowledge Base and past sessions on a spoken or misheard request, and the thinker's model sees them through the gateway, as in Chat. Tested, not driven on the hosted server. Built on `tester`, not merged to `main`.
+
+Gate: merge of voice from `tester` to `main`; V12.
+
+### SR-213 {#sr-213}
+
+**An aborted talker stream reports no usage, and audio has no list price.**
+Raised 2026-11-10 with live voice in Chat (branch `tester`); rewritten from the code 2026-11-11. Low. Status: open, accepted for week one.
+
+Evidence: the rows voice writes, and who writes them.
+- **Talker tokens.** `recordVoiceReplyUsage` (`packages/host/src/voice/metering.ts:12-18`) writes mode `voice`, unit `tokens`, quantity input plus output, under the session's talker model (`qwen3.5-omni-flash` unless `AGENTFORGE_VOICE_MODEL` says otherwise, `packages/host/src/voice/flag.ts:16`). The relay calls it for a finished turn that was not cut (`packages/host/src/voice/relay.ts:729-731`) and for the first leg of an `ask_nultron` turn once the desk has answered (`relay.ts:602-605`). It is priced like a Chat row, from the gateway catalog when it is cached, otherwise `catalog_unavailable` (`packages/host/src/usage-record.ts:56-69`). `TalkerUsage` carries the audio-token split (`packages/host/src/voice/talker.ts:12-19`), but `recordVoiceReplyUsage` passes only the totals, so no audio rate is applied.
+- **Transcriber seconds.** `recordVoiceSeconds` (`metering.ts:25-37`) with model `muse-voice-transcribe-1.0` (`packages/host/src/voice/transcriber-gateway.ts:12`), mode `voice`, unit `seconds`, rounded up to a whole second, after each transcription that returned words (`relay.ts:652`).
+- **Session seconds.** `SessionRegistry.meter` (`packages/host/src/voice/sessions.ts:183-189`) writes the seconds from H1 to the end, once per session, under the talker's model id.
+- **Thinker tokens.** `askNultron` writes its own model run under mode `chat`, runId `voice-ask-<uuid>`, when the run completes (`ask.ts:214-225`, `ask.ts:272-274`). A run stopped after it reached the model (a tap, a cut-in, the 20 s limit) writes one row of unknown size, 0 tokens with `unknown: true` (`ask.ts:331-343`).
+- **Seconds are unpriced.** They go through `priceSecondsUsage` (`packages/host/src/usage-record.ts:102-108`), which answers `no_list_price` unless the model has a per-second entry in the media price table (`packages/core/src/models/media-pricing.ts:497`); neither `muse-voice-transcribe-1.0` nor `qwen3.5-omni-flash` is in it.
+
+Where no row is written, so voice spend is undercounted:
+- **A talker reply the host abandons.** The person cuts in, an early send is dropped because speech resumed (`abortEarly` clears the pending usage, `relay.ts:376-390`), or the session ends. The gateway reports usage only in the last chunk of a finished stream (`stream_options: { include_usage: true }`, `talker-omni-http.ts:734`; the event, `talker-omni-http.ts:248-250`), so an abandoned stream never delivers it, and the host never learns what the gateway counted for it.
+- **A reply that finished but was cut before it was saved.** `finalize(true)` skips the row (`relay.ts:729-731`).
+- **The short-speech check and the acknowledgement call.** Both ask for usage (`talker-omni-http.ts:779`, `talker-omni-http.ts:822`), and nothing reads the usage from either (`talker-omni-http.ts:666-679`, `talker-omni-http.ts:815-840`).
+
+Proof: `packages/host/src/voice/relay.test.ts` "plays a plain turn into the thread with a usage row" (`relay.test.ts:587`; a `voice` token row with the counts, and a seconds row with `no_list_price`) and "records transcription seconds and session seconds under different models" (`relay.test.ts:631`). `packages/host/src/voice/ask.test.ts` "records the run's model tokens once, as a Chat run, under the voice ask's own id" (`ask.test.ts:536`), "records a run that was stopped after it reached the model as a call of unknown size" (`ask.test.ts:548`) and "records nothing for a refusal that never reached the model" (`ask.test.ts:566`). No test asserts the gaps above.
+
+Residual: any allowance or bill that counts `voice` rows undercounts, and no seconds row has a dollar figure. Built on `tester`, not merged to `main`; never run on the hosted server.
+
+Gate: none for week one (voice is Rizky's only); before customer voice or any allowance counts voice, give audio a list price in `media-pricing.ts` and decide a rule for aborted calls.
 
 ## Must be true before the Tencent Cloud deploy
 

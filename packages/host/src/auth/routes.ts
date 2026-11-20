@@ -36,6 +36,7 @@ import {
 } from "./login-state";
 import { getLocalVaultKey } from "@agentforge/db/vault-key";
 import { log } from "../log";
+import { WHATSAPP_WEBHOOK_PATH } from "../inbox/webhook-path";
 import {
   createPortalSessionCheck,
   faultOf,
@@ -71,11 +72,13 @@ const PORTAL_LOGOUT_PATH = "/logout";
 /** The renderer route a signed-out browser lands on (`apps/web/components/account-session-row.tsx`). */
 const SIGNED_OUT_PATH = "/sign-in";
 /**
- * The two reads that have to answer before anyone can sign in: the health probe the proxy polls,
- * and the component status the first-run installer shows (router.ts:186, handlers/components.ts:1-9).
- * Neither returns a byte of tenant data. Nothing else under `/api` is exempt, for any method.
+ * The reads that have to answer before anyone can sign in: the health probe the proxy polls, the
+ * component status the first-run installer shows (router.ts:186, handlers/components.ts:1-9), and
+ * the WhatsApp webhook's handshake. None returns a byte of tenant data: the handshake echoes Meta's
+ * challenge only when the caller presents the operator's verify token. Nothing else under `/api` is
+ * exempt, for any method.
  */
-export const UNGATED_GETS: ReadonlySet<string> = new Set(["/api/v1/ping", "/api/v1/components"]);
+export const UNGATED_GETS: ReadonlySet<string> = new Set(["/api/v1/ping", "/api/v1/components", WHATSAPP_WEBHOOK_PATH]);
 
 /**
  * Phase 5 lane B: the one POST under `/api` that runs without a session.
@@ -85,8 +88,14 @@ export const UNGATED_GETS: ReadonlySet<string> = new Set(["/api/v1/ping", "/api/
  * prefix: no browser calls the billing webhook, the caller is a payment provider's server, and it
  * authenticates on a shared secret compared in constant time (`../billing/authenticate.ts`).
  * Nothing else may join this set without the same two properties.
+ *
+ * The WhatsApp webhook is the second member. It is the same shape: a literal path, no browser calls
+ * it, and the caller (Meta) authenticates by an HMAC-SHA256 signature over the raw body, checked in
+ * constant time before a byte is parsed (`../inbox/webhook.ts`). It also has to be the one thing a
+ * stranger on the internet can POST to, which is why the desk it writes to comes from the endpoint
+ * row the number id resolves to and never from the payload.
  */
-export const UNGATED_POSTS: ReadonlySet<string> = new Set(["/api/v1/billing/webhook"]);
+export const UNGATED_POSTS: ReadonlySet<string> = new Set(["/api/v1/billing/webhook", WHATSAPP_WEBHOOK_PATH]);
 
 export type AuthRouteDeps = {
   readonly store: SessionStore;

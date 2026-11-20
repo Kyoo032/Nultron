@@ -1,0 +1,317 @@
+/* The voice view (live voice in Chat). It lies over the thread and leaves the composer below it free,
+   so the mic button there can end it. Colours are theme variables only, so light and dark need no
+   second set; the buttons reuse the desk's `.btn`. The one motion is a colour change on the desk's own
+   timings, which reduced motion already zeroes. */
+
+.voice-view {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: center;
+  min-height: 0;
+  padding: 12px var(--chat-gutter, 16px);
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  outline: none;
+}
+
+.voice-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  width: 100%;
+  max-width: 40rem;
+  min-height: 0;
+}
+
+.voice-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.voice-title {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.voice-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background-color var(--motion-hover), color var(--motion-hover);
+}
+
+.voice-close:hover {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.voice-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.voice-state {
+  margin: 0;
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.voice-view[data-phase="ended"] .voice-state {
+  color: var(--text-3);
+}
+
+.voice-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 0.875rem;
+  line-height: 1.35rem;
+}
+
+.voice-notice p {
+  flex: 1 1 14rem;
+  margin: 0;
+}
+
+.voice-view .voice-notice[data-kind="error"] {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+  color: var(--danger);
+}
+
+.voice-captions {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 4rem;
+  margin: 0;
+  padding: 4px 2px;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.voice-captions-spacer {
+  flex: 1 1 auto;
+}
+
+.voice-empty {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 8px 0;
+  color: var(--text-3);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.voice-caption {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 88%;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.9375rem;
+  line-height: 1.4rem;
+}
+
+.voice-caption[data-role="user"] {
+  align-self: flex-end;
+  background: var(--accent-soft);
+}
+
+.voice-caption-who {
+  color: var(--text-3);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* Still being revised: drawn as it stands, a shade quieter until its final replaces it. */
+.voice-caption[data-final="false"] .voice-caption-text {
+  color: var(--text-2);
+  font-style: italic;
+}
+
+.voice-caption-cut {
+  color: var(--text-3);
+  font-size: 0.75rem;
+}
+
+.voice-hint {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
+.voice-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.voice-card p {
+  margin: 0;
+}
+
+.voice-card-label {
+  color: var(--text-3);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.voice-card-summary {
+  color: var(--text);
+  font-size: 0.9375rem;
+  line-height: 1.4rem;
+}
+
+.voice-card-started {
+  color: var(--ok);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.voice-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.voice-modes {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.voice-mode {
+  min-height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: background-color var(--motion-hover), color var(--motion-hover);
+}
+
+.voice-mode[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.voice-hold {
+  min-width: 12rem;
+  min-height: 56px;
+  padding: 0 24px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  /* A press is a hold: no scroll, no text selection and no callout while a finger stays down. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  transition: background-color var(--motion-hover), color var(--motion-hover);
+}
+
+.voice-hold[data-held="true"] {
+  background: var(--accent);
+  color: var(--surface);
+}
+
+.voice-hold:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.voice-end {
+  min-height: 36px;
+  padding: 0 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: border-color var(--motion-hover);
+}
+
+.voice-end:hover {
+  border-color: var(--danger);
+}
+
+.voice-saved {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 0.75rem;
+  text-align: center;
+}
+
+.voice-close:focus-visible,
+.voice-mode:focus-visible,
+.voice-hold:focus-visible,
+.voice-end:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .voice-view {
+    padding-top: 8px;
+  }
+
+  .voice-hold {
+    flex: 1 1 100%;
+    min-height: 64px;
+  }
+
+  .voice-caption {
+    max-width: 94%;
+  }
+}

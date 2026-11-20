@@ -8,6 +8,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vites
 import { SESSION_COOKIE, SESSION_COOKIE_SECURE } from "./auth/session";
 import { BILLING_TOKEN_HEADER } from "./billing/authenticate";
 import { CSRF_COOKIE, CSRF_COOKIE_SECURE, CSRF_HEADER, csrfSetCookie, mintCsrfToken, mintCsrfTokenFor } from "./csrf";
+import { WHATSAPP_SIGNATURE_HEADER, WHATSAPP_WEBHOOK_MAX_BODY_BYTES, WHATSAPP_WEBHOOK_PATH } from "./inbox/webhook-path";
 import { DEFAULT_AUTH_BURST, DEFAULT_IP_BURST, DEFAULT_SESSION_BURST, resetRateLimiters } from "./rate-limit";
 import type { HostRequest } from "./types";
 
@@ -2305,5 +2306,112 @@ describe("handleNodeRequest chat document routes", () => {
     expect(read.status()).toBe(200);
     expect(save.status()).toBe(200);
     expect(dispatched.map((request) => request.path)).toEqual([READ_PATH, SAVE_PATH]);
+  });
+});
+
+/**
+ * The WhatsApp webhook, through the hosted admission rules. The router is mocked in this file, so
+ * what is under test is the adapter alone: Meta's server sends no Origin, no cookie and no CSRF
+ * token, so on the hosted server the route must get past the browser rules and nothing beside it
+ * may. The signature itself is the handler's, and `handlers/customers.test.ts` drives it.
+ */
+describe("the WhatsApp webhook on the hosted server", () => {
+  const SIGNATURE = `sha256=${"a".repeat(64)}`;
+  const META = { host: WEB_HOST, "content-type": "application/json", [WHATSAPP_SIGNATURE_HEADER]: SIGNATURE };
+
+  async function send(input: RequestInput): Promise<Captured> {
+    const captured = fakeResponse();
+    await handleNodeRequest(fakeRequest(input), captured.res);
+    return captured;
+  }
+
+  it("reaches the handler with no Origin, no cookie and no CSRF token, and hands over the raw bytes", async () => {
+    useServerMode();
+    const body = '{"object":"whatsapp_business_account"}';
+    const captured = await send({ method: "POST", url: WHATSAPP_WEBHOOK_PATH, headers: META, body });
+    expect(captured.status()).toBe(200);
+    expect(dispatched).toHaveLength(1);
+    const request = dispatched[0];
+    expect(request?.path).toBe(WHATSAPP_WEBHOOK_PATH);
+    expect(Buffer.from(request?.rawBody ?? []).toString("utf8")).toBe(body);
+    // Not parsed here: the handler parses only what has passed the signature.
+    expect(request?.body).toBeUndefined();
+    expect(request?.headers[WHATSAPP_SIGNATURE_HEADER]).toBe(SIGNATURE);
+  });
+
+  it("hands over a body that is not JSON untouched, rather than answering 400 before the signature is checked", async () => {
+    useServerMode();
+    const captured = await send({ method: "POST", url: WHATSAPP_WEBHOOK_PATH, headers: META, body: "this is not json" });
+    expect(captured.status()).toBe(200);
+    expect(Buffer.from(dispatched[0]?.rawBody ?? []).toString("utf8")).toBe("this is not json");
+  });
+
+  it("lets Meta's subscription handshake through as a plain GET", async () => {
+    useServerMode();
+    const captured = await send({
+      method: "GET",
+      url: `${WHATSAPP_WEBHOOK_PATH}?hub.mode=subscribe&hub.verify_token=t&hub.challenge=1234`,
+      headers: { host: WEB_HOST },
+    });
+    expect(captured.status()).toBe(200);
+    expect(dispatched[0]?.query["hub.challenge"]).toBe("1234");
+  });
+
+  it("refuses a body past 1 MB with 413, before it reaches the handler", async () => {
+    useServerMode();
+    const captured = await send({
+      method: "POST",
+      url: WHATSAPP_WEBHOOK_PATH,
+      headers: META,
+      body: "x".repeat(WHATSAPP_WEBHOOK_MAX_BODY_BYTES + 1),
+    });
+    expect(captured.status()).toBe(413);
+    expect(dispatched).toHaveLength(0);
+  });
+
+  it("is an exemption for that one path only: its neighbours still need a trusted Origin and a CSRF token", async () => {
+    useServerMode();
+    for (const url of [
+      `${WHATSAPP_WEBHOOK_PATH}/extra`,
+      "/api/v1/customers/whatsapp",
+      "/api/v1/customers/conversations/c1/reply",
+    ]) {
+      const captured = await send({ method: "POST", url, headers: META, body: "{}" });
+      expect(captured.status(), url).toBe(403);
+      expect(captured.json().error?.code, url).toBe("origin_forbidden");
+    }
+    expect(dispatched).toHaveLength(0);
+  });
+
+  it("still requires HTTPS at the proxy: a direct hit on the app's own port is refused", async () => {
+    useServerMode();
+    const captured = await send({
+      method: "POST",
+      url: WHATSAPP_WEBHOOK_PATH,
+      headers: META,
+      body: "{}",
+      forwardedProto: null,
+    });
+    expect(captured.status()).toBeGreaterThanOrEqual(400);
+    expect(dispatched).toHaveLength(0);
+  });
+
+  it("keeps the signature header off every other route", async () => {
+    useServerMode();
+    const token = mintCsrfToken();
+    await send({
+      method: "POST",
+      url: GATEWAY_CHECK_PATH,
+      headers: {
+        host: WEB_HOST,
+        origin: WEB_ORIGIN,
+        cookie: `${CSRF_COOKIE_SECURE}=${token}`,
+        [CSRF_HEADER]: token,
+        ...TRANSPORT,
+        [WHATSAPP_SIGNATURE_HEADER]: SIGNATURE,
+      },
+    });
+    expect(dispatched).toHaveLength(1);
+    expect(Object.keys(dispatched[0]?.headers ?? {})).not.toContain(WHATSAPP_SIGNATURE_HEADER);
   });
 });

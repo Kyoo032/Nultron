@@ -32,7 +32,8 @@ describe("imageGenerateTool", () => {
       success: true,
       backend: "gateway",
       image: "https://cdn.example/lantern.png",
-      model: "gpt-image-2",
+      // The built-in default (2026-11-12): gpt-image-2.5-flare, which a key that lists no image id still falls to.
+      model: "gpt-image-2.5-flare",
     });
   });
 
@@ -176,7 +177,38 @@ describe("imageGenerateTool model choice", () => {
     vi.unstubAllGlobals();
     const dropped = stubGateway();
     await run({ model: "]" }, { image: [] });
-    expect(sentModel(dropped)).toBe("gpt-image-2");
+    expect(sentModel(dropped)).toBe("gpt-image-2.5-flare");
+  });
+
+  it("starts on gpt-image-2.5-flare when the catalog lists it, then sunburst, then gpt-image-2", async () => {
+    const first = stubGateway();
+    await run({}, { image: ["gpt-image-2", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "seedream-5.0-pro"] });
+    expect(sentModel(first)).toBe("gpt-image-2.5-flare");
+    vi.unstubAllGlobals();
+    const second = stubGateway();
+    await run({}, { image: ["gpt-image-2", "gpt-image-2.5-sunburst"] });
+    expect(sentModel(second)).toBe("gpt-image-2.5-sunburst");
+    vi.unstubAllGlobals();
+    const third = stubGateway();
+    await run({}, { image: ["gpt-image-2", "seedream-5.0-pro"] });
+    expect(sentModel(third)).toBe("gpt-image-2");
+  });
+
+  it("sends a picture to edit to gpt-image-2, the one id with an edit route, when the default is a 2.5 id", async () => {
+    const fetchMock = stubGateway();
+    await run({ image_url: "https://cdn.example/in.png" }, { image: ["gpt-image-2.5-flare", "gpt-image-2"] });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.tokotokenai.com/v1/images/edits");
+    expect(sentModel(fetchMock)).toBe("gpt-image-2");
+  });
+
+  it("keeps a model the caller named even when it takes no picture, so the refusal says why", async () => {
+    const fetchMock = stubGateway();
+    const result = await run(
+      { model: "gpt-image-2.5-flare", image_url: "https://cdn.example/in.png" },
+      { image: ["gpt-image-2.5-flare", "gpt-image-2"] },
+    );
+    expect(result).toMatchObject({ success: false, error: expect.stringContaining("does not take a reference picture") });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("sends the model as given when no catalog is in scope, as the Images studio calls it", async () => {

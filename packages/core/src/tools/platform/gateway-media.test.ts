@@ -1,17 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../errors";
+import { classifyGatewayRefusal, GatewayRefusalError } from "../../models/availability";
+import { buildVideoRequest } from "../../models/media-request";
+import { VIDEO_JOB_PENDING_CODE } from "../../videos/job-pending";
+import { videoRenderShouldRetry } from "../../videos/harness";
 import {
-  buildGatewayVideoPayload,
+  VIDEO_POLL_DEADLINE_MS,
+  VIDEO_POLL_MS,
   extractGatewayVideoUrl,
   formatVideoGatewayFailure,
   generateGatewayImage,
   generateGatewayVideo,
-  openaiImageSize,
   parseGatewayImage,
+  parseGatewayImages,
   readGatewayError,
   readVideoJobFailure,
   studioVideoFailureStatus,
-  videoCapabilities,
   videoTaskId,
 } from "./gateway-media";
 
@@ -66,119 +70,45 @@ describe("parse helpers", () => {
     expect(studioVideoFailureStatus(message)).toBe(400);
   });
 
-  it("maps aspect ratios to OpenAI image sizes", () => {
-    expect(openaiImageSize("square")).toBe("1024x1024");
-    expect(openaiImageSize("landscape")).toBe("1536x1024");
-    expect(openaiImageSize("portrait")).toBe("1024x1536");
-  });
-
-  it("sends Seedance content + duration × 720p, not OpenAI prompt/size", () => {
-    expect(buildGatewayVideoPayload({ model: "seedance-2.0-fast", prompt: "hero", aspectRatio: "16:9" })).toEqual({
+  it("builds each request from the model's spec, not from the id", () => {
+    // The exhaustive body-by-body checks against the documented examples are in
+    // `models/media-request.test.ts`; these pin what the gateway wire now relies on.
+    expect(buildVideoRequest({ model: "seedance-2.0-fast", prompt: "hero", choice: { aspect: "16:9" } }).body).toEqual({
       model: "seedance-2.0-fast",
       prompt: "hero",
-      content: [{ type: "text", text: "hero" }],
-      duration: 5,
-      resolution: "720p",
-      ratio: "16:9",
-      generate_audio: false,
-      watermark: false,
+      // The length is the string `seconds` (live 2026-11-12); a number is a 400 and `duration` is ignored.
+      seconds: "5",
+      size: "720p",
+      metadata: { ratio: "16:9", generate_audio: false, watermark: false },
     });
-    expect(
-      buildGatewayVideoPayload({
-        model: "seedance-2.0-mini",
-        prompt: "hero",
-        aspectRatio: "9:16",
-        imageUrl: "https://cdn.example/still.png",
-      }),
-    ).toMatchObject({
-      content: [
-        { type: "text", text: "hero" },
-        { type: "image_url", image_url: { url: "https://cdn.example/still.png" }, role: "first_frame" },
-      ],
-      image: "https://cdn.example/still.png",
-      ratio: "9:16",
-    });
-    expect(buildGatewayVideoPayload({ model: "veo_3_1-fast", prompt: "hero", aspectRatio: "16:9" })).not.toHaveProperty("image");
-    expect(
-      buildGatewayVideoPayload({
-        model: "veo_3_1-fast",
-        prompt: "hero",
-        imageUrl: "data:image/png;base64,AAAA",
-        seconds: 4,
-      }),
-    ).toMatchObject({ image: "data:image/png;base64,AAAA", duration: 4 });
-    expect(buildGatewayVideoPayload({ model: "grok-imagine-video", prompt: "rain", aspectRatio: "16:9" })).toEqual({
+    expect(buildVideoRequest({ model: "omni-fast-v2v", prompt: "rain", choice: { aspect: "16:9" } }).route).toBe("/v1/videos");
+    expect(buildVideoRequest({ model: "grok-imagine-video", prompt: "rain", choice: {} }).body).toEqual({
       model: "grok-imagine-video",
       prompt: "rain",
-      duration: 5,
-      seconds: "5",
+      aspect_ratio: "16:9",
+      video_length: 6,
+      resolution_name: "720p",
+      preset: "normal",
     });
-    expect(buildGatewayVideoPayload({ model: "grok-imagine-video", prompt: "rain" })).not.toHaveProperty("size");
-    expect(buildGatewayVideoPayload({ model: "grok-imagine-video", prompt: "rain" })).not.toHaveProperty("ratio");
-    expect(buildGatewayVideoPayload({ model: "grok-imagine-video", prompt: "rain" })).not.toHaveProperty("resolution");
   });
 
-  it("applies seconds and resolution knobs only where the wire supports them", () => {
+  it("reads a Kling reply: task_status, task_result and the Kling failure message", () => {
+    // Kling's public API shape. Not driven live: this key has no Kling channel (HTTP 503).
     expect(
-      buildGatewayVideoPayload({
-        model: "seedance-2.0-fast",
-        prompt: "hero",
-        aspectRatio: "16:9",
-        seconds: 10,
-        resolution: "1080p",
-      }),
-    ).toMatchObject({
-      duration: 10,
-      resolution: "1080p",
-      ratio: "16:9",
-    });
-    expect(
-      buildGatewayVideoPayload({
-        model: "seedance-2.0-fast",
-        prompt: "hero",
-        seconds: 1,
-        resolution: "4k",
-      }),
-    ).toMatchObject({ duration: 2, resolution: "720p" });
-    expect(
-      buildGatewayVideoPayload({
-        model: "grok-imagine-video",
-        prompt: "rain",
-        aspectRatio: "9:16",
-        seconds: 8,
-        resolution: "1080p",
-        imageUrl: "https://cdn.example/still.png",
-      }),
-    ).toEqual({
-      model: "grok-imagine-video",
-      prompt: "rain",
-      duration: 8,
-      seconds: "8",
-      image: "https://cdn.example/still.png",
-    });
-    expect(videoCapabilities("seedance-2.0-fast")).toEqual({
-      ratio: true,
-      resolution: true,
-      seconds: true,
-      still: true,
-      imageToVideo: true,
-    });
-    expect(videoCapabilities("grok-imagine-video")).toEqual({
-      ratio: false,
-      resolution: false,
-      seconds: true,
-      still: true,
-      imageToVideo: true,
-    });
+      extractGatewayVideoUrl({ data: { task_status: "succeed", task_result: { videos: [{ url: "https://cdn.example/k.mp4" }] } } }),
+    ).toBe("https://cdn.example/k.mp4");
+    expect(readVideoJobFailure({ data: { task_status: "failed", task_status_msg: "content policy" } }, "x")).toBe(
+      "content policy",
+    );
   });
 
   it("does not call a prepaid async-price 403 an invalid API key", () => {
-    const message = formatVideoGatewayFailure(
-      403,
-      "代理预付账户的异步任务仅支持发送前可确定上限的固定按次价格",
-    );
+    const message = formatVideoGatewayFailure(403, "代理预付账户的异步任务仅支持发送前可确定上限的固定按次价格");
     expect(message).not.toMatch(/rejected the API key/i);
-    expect(message).toMatch(/token-priced|fixed per-call/i);
+    // Corrected 2026-11-11: a prepaid key DID run seedance-2.0-fast. The refusal is per model, not "Seedance".
+    expect(message).toMatch(/billed by tokens after the job finishes/i);
+    expect(message).toMatch(/seedance-2\.0-fast/);
+    expect(message).not.toMatch(/Seedance video on this gateway/i);
     expect(studioVideoFailureStatus(message)).toBe(400);
   });
 });
@@ -206,7 +136,65 @@ describe("generateGatewayImage", () => {
       size: "1024x1024",
       quality: "medium",
     });
-    expect(result).toEqual({ url: "https://cdn.example/out.png", model: "gpt-image-2" });
+    expect(result).toMatchObject({ url: "https://cdn.example/out.png", urls: ["https://cdn.example/out.png"], model: "gpt-image-2" });
+    // What was actually sent comes back with the result, so the caller can say so.
+    expect(result.sent).toMatchObject({ shapeValue: "1024x1024", quality: "medium", count: 1 });
+    expect(result.adjusted).toEqual([]);
+  });
+
+  it("sends the size, quality and format the person chose, in the fields the model reads", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ b64_json: "AAAA" }] }),
+    });
+    const result = await generateGatewayImage({
+      baseUrl: "https://api.tokotokenai.com/v1",
+      apiKey: "sk-test",
+      model: "gpt-image-2",
+      prompt: "a lantern",
+      imageChoice: { size: "1536x1024", quality: "low", outputFormat: "jpeg" },
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toEqual({
+      model: "gpt-image-2",
+      prompt: "a lantern",
+      size: "1536x1024",
+      quality: "low",
+      output_format: "jpeg",
+    });
+    // A base64 reply is labelled with the format that was asked for.
+    expect(result.url).toBe("data:image/jpeg;base64,AAAA");
+  });
+
+  it("never sends a size or quality the model does not take", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ data: [{ url: "https://cdn.example/n.png" }] }),
+    });
+    const result = await generateGatewayImage({
+      baseUrl: "https://api.tokotokenai.com/v1",
+      apiKey: "sk-test",
+      model: "nano-banana-2",
+      prompt: "a lantern",
+      aspectRatio: "landscape",
+      imageChoice: { quality: "high", tier: "8k" },
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toEqual({
+      model: "nano-banana-2",
+      prompt: "a lantern",
+      aspect_ratio: "3:2",
+      resolution: "4k",
+    });
+    expect(result.adjusted.map((item) => item.field).sort()).toEqual(["quality", "tier"]);
+  });
+
+  it("reads every picture a reply carries", () => {
+    expect(parseGatewayImages({ data: [{ url: "https://a" }, { b64_json: "BB" }] }, "image/jpeg")).toEqual([
+      "https://a",
+      "data:image/jpeg;base64,BB",
+    ]);
+    expect(parseGatewayImages({})).toEqual([]);
   });
 
   it("sends quality medium for gpt-image models and omits it for others", async () => {
@@ -255,7 +243,7 @@ describe("generateGatewayImage", () => {
       prompt: "a lantern",
       fetchImpl: fetchMock as unknown as typeof fetch,
     });
-    expect(result).toEqual({ url: "https://cdn.example/a.png", model: "gpt-image-2" });
+    expect(result).toMatchObject({ url: "https://cdn.example/a.png", model: "gpt-image-2" });
   });
 
   it("polls GET /images/generations/{id} when POST returns a task id", async () => {
@@ -281,7 +269,30 @@ describe("generateGatewayImage", () => {
     });
     expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.tokotokenai.com/v1/images/generations");
     expect(fetchMock.mock.calls[1]?.[0]).toBe("https://api.tokotokenai.com/v1/images/generations/img_1");
-    expect(result).toEqual({ url: "https://cdn.example/done.png", model: "gpt-image-2" });
+    expect(result).toMatchObject({ url: "https://cdn.example/done.png", model: "gpt-image-2" });
+  });
+
+  it("tags a polled job's failure as poll, so it cannot hide the model", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ task_id: "img_1", status: "processing" }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ data: { status: "failed", fail_reason: "bad_response_status_code" } }),
+      });
+    const error = await generateGatewayImage({
+      baseUrl: "https://api.tokotokenai.com/v1",
+      apiKey: "sk-test",
+      model: "gpt-image-2",
+      prompt: "a lantern",
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      wait: async () => undefined,
+    }).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(GatewayRefusalError);
+    expect((error as GatewayRefusalError).refusal).toMatchObject({ status: 200, phase: "poll" });
+    // The words alone would read as `upstream_rejected`; the phase is what keeps the model offered.
+    expect(classifyGatewayRefusal((error as GatewayRefusalError).refusal)).toBeNull();
   });
 
   it("tells the caller not to retry when the fetch times out", async () => {
@@ -304,7 +315,11 @@ describe("generateGatewayImage", () => {
       ok: false,
       status: 503,
       json: async () => ({
-        error: { type: "new_api_error", code: "model_not_found", message: "No available channel for model gpt-image-2" },
+        error: {
+          type: "new_api_error",
+          code: "model_not_found",
+          message: "No available channel for model gpt-image-2",
+        },
       }),
     });
     await expect(
@@ -338,21 +353,166 @@ describe("generateGatewayVideo", () => {
     const result = await generateGatewayVideo({
       baseUrl: "https://api.tokotokenai.com/v1",
       apiKey: "sk-test",
-      model: "grok-imagine-video",
+      model: "unlisted-clip-1",
       prompt: "rain on a window",
       aspectRatio: "16:9",
       fetchImpl: fetchMock as unknown as typeof fetch,
       wait: async () => undefined,
     });
     expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.tokotokenai.com/v1/video/generations");
+    // An id nobody knows gets the generic body: a prompt and a length. Never both `seconds` and `duration`.
     expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toEqual({
-      model: "grok-imagine-video",
+      model: "unlisted-clip-1",
       prompt: "rain on a window",
       duration: 5,
-      seconds: "5",
     });
     expect(fetchMock.mock.calls[1]?.[0]).toBe("https://api.tokotokenai.com/v1/video/generations/abcd");
-    expect(result).toEqual({ url: "https://cdn.example/clip.mp4", model: "grok-imagine-video" });
+    expect(result).toMatchObject({ url: "https://cdn.example/clip.mp4", model: "unlisted-clip-1", sent: { seconds: 5 } });
+  });
+
+  it("sends Seedance sound, ratio, length and resolution as asked, and reports them", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ task_id: "t1", status: "queued" }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: { status: "SUCCESS", result_url: "https://cdn.example/s.mp4" } }),
+      });
+    const result = await generateGatewayVideo({
+      baseUrl: "https://api.tokotokenai.com/v1",
+      apiKey: "sk-test",
+      model: "seedance-2.0-fast",
+      prompt: "ocean waves on a beach",
+      aspectRatio: "3:4",
+      seconds: 4,
+      resolution: "1080p",
+      audio: true,
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      wait: async () => undefined,
+    });
+    const sentBody = JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body));
+    expect(sentBody).toMatchObject({
+      seconds: "4",
+      // 1080p is not a Seedance Fast resolution: it is moved to 720p, never sent.
+      size: "720p",
+      metadata: { ratio: "3:4", generate_audio: true },
+    });
+    expect(sentBody).not.toHaveProperty("duration");
+    expect(result.sent).toEqual({ aspect: "3:4", seconds: 4, resolution: "720p", audio: true });
+    expect(result.adjusted).toEqual([{ field: "resolution", asked: "1080p", used: "720p", reason: "not_offered" }]);
+  });
+
+  it("posts omni-fast to /v1/videos with seconds as a string, and polls there", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ id: "video_1", status: "queued" }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ status: "completed", video_url: "https://cdn.example/o.mp4" }),
+      });
+    await generateGatewayVideo({
+      baseUrl: "https://api.tokotokenai.com/v1",
+      apiKey: "sk-test",
+      model: "omni-fast",
+      prompt: "waves",
+      seconds: 8,
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      wait: async () => undefined,
+    });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.tokotokenai.com/v1/videos");
+    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({
+      model: "omni-fast",
+      seconds: "8",
+    });
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("https://api.tokotokenai.com/v1/videos/video_1");
+  });
+
+  it("posts Kling to its own mount, beside /v1, and polls the same task path (not driven live)", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ code: 0, data: { task_id: "k1", task_status: "submitted" } }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: { task_status: "succeed", task_result: { videos: [{ url: "https://cdn.example/k.mp4" }] } },
+        }),
+      });
+    const result = await generateGatewayVideo({
+      baseUrl: "https://api.tokotokenai.com/v1",
+      apiKey: "sk-test",
+      model: "kling-v3",
+      prompt: "a cat",
+      imageUrl: "https://cdn.example/still.png",
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      wait: async () => undefined,
+    });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.tokotokenai.com/kling/v1/videos/image2video");
+    expect(JSON.parse(String((fetchMock.mock.calls[0]?.[1] as RequestInit).body))).toMatchObject({
+      model_name: "kling-v3",
+      image: "https://cdn.example/still.png",
+      duration: "5",
+    });
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("https://api.tokotokenai.com/kling/v1/videos/image2video/k1");
+    expect(result.url).toBe("https://cdn.example/k.mp4");
+  });
+
+  it("refuses sound on a silent model before any call", async () => {
+    const fetchMock = vi.fn();
+    await expect(
+      generateGatewayVideo({
+        baseUrl: "https://api.tokotokenai.com/v1",
+        apiKey: "sk-test",
+        model: "grok-imagine-video",
+        prompt: "x",
+        audio: true,
+        fetchImpl: fetchMock as unknown as typeof fetch,
+      }),
+    ).rejects.toMatchObject({ code: "video_audio_unsupported" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("POSTs /videos for Grok and polls GET /videos/{id}, reading video_url", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ id: "video_55c7", status: "queued" }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: "video_55c7", status: "completed", video_url: "https://cdn.example/grok.mp4" }),
+      });
+    const result = await generateGatewayVideo({
+      baseUrl: "https://api.tokotokenai.com/v1",
+      apiKey: "sk-test",
+      model: "grok-imagine-video",
+      prompt: "rain",
+      aspectRatio: "16:9",
+      fetchImpl: fetchMock as unknown as typeof fetch,
+      wait: async () => undefined,
+    });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.tokotokenai.com/v1/videos");
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("https://api.tokotokenai.com/v1/videos/video_55c7");
+    expect(result).toMatchObject({ url: "https://cdn.example/grok.mp4", model: "grok-imagine-video" });
+  });
+
+  it("carries the gateway's status and code on a refusal, so the host can learn from it", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 403,
+      json: async () => ({
+        error: { message: "prepaid accounts only take fixed prices", code: "prepaid_async_requires_fixed_price" },
+      }),
+    });
+    const error = await generateGatewayVideo({
+      baseUrl: "https://api.tokotokenai.com/v1",
+      apiKey: "sk-test",
+      model: "grok-imagine-video",
+      prompt: "rain",
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    }).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(GatewayRefusalError);
+    expect((error as GatewayRefusalError).refusal).toMatchObject({
+      status: 403,
+      code: "prepaid_async_requires_fixed_price",
+    });
   });
 
   it("returns immediately when submit already has a URL", async () => {
@@ -382,18 +542,22 @@ describe("generateGatewayVideo", () => {
       })
       .mockResolvedValueOnce({
         ok: true,
+        status: 200,
         json: async () => ({ data: { status: "failed", fail_reason: "quota" } }),
       });
-    await expect(
-      generateGatewayVideo({
-        baseUrl: "https://api.tokotokenai.com/v1",
-        apiKey: "sk-test",
-        model: "grok-imagine-video",
-        prompt: "rain",
-        fetchImpl: failed as unknown as typeof fetch,
-        wait: async () => undefined,
-      }),
-    ).rejects.toMatchObject({ message: expect.stringMatching(/quota|failed/i) });
+    const pollFailure = await generateGatewayVideo({
+      baseUrl: "https://api.tokotokenai.com/v1",
+      apiKey: "sk-test",
+      model: "grok-imagine-video",
+      prompt: "rain",
+      fetchImpl: failed as unknown as typeof fetch,
+      wait: async () => undefined,
+    }).catch((caught: unknown) => caught);
+    expect(pollFailure).toBeInstanceOf(GatewayRefusalError);
+    expect((pollFailure as GatewayRefusalError).message).toMatch(/quota|failed/i);
+    expect((pollFailure as GatewayRefusalError).refusal).toMatchObject({ status: 200, phase: "poll" });
+    // A job the gateway accepted and then failed teaches nothing about the model.
+    expect(classifyGatewayRefusal((pollFailure as GatewayRefusalError).refusal)).toBeNull();
 
     const timedOut = vi.fn().mockResolvedValue({
       ok: true,
@@ -410,7 +574,174 @@ describe("generateGatewayVideo", () => {
         maxPolls: 2,
         pollMs: 1,
       }),
-    ).rejects.toMatchObject({ message: "Gateway video job timed out" });
+    ).rejects.toMatchObject({ code: VIDEO_JOB_PENDING_CODE, status: 504 });
+  });
+
+  describe("a job the gateway has accepted (it will bill when it finishes)", () => {
+    const SUBMIT = { ok: true, status: 201, json: async () => ({ task_id: "t-long", status: "queued" }) };
+    const RENDERING = { ok: true, status: 200, json: async () => ({ data: { status: "IN_PROGRESS" } }) };
+    const FINISHED = {
+      ok: true,
+      status: 200,
+      json: async () => ({ data: { status: "SUCCESS", result_url: "https://cdn.example/long.mp4" } }),
+    };
+
+    /** A clock the fake `wait` moves, so minutes of polling take no time at all. */
+    function fakeClock() {
+      let t = 1_000_000;
+      return {
+        start: t,
+        now: () => t,
+        wait: async (ms: number) => {
+          t += ms;
+        },
+        elapsed: () => t - 1_000_000,
+      };
+    }
+
+    const base = {
+      baseUrl: "https://api.tokotokenai.com/v1",
+      apiKey: "sk-test",
+      model: "seedance-2.0-fast",
+      prompt: "a long slow pour",
+      seconds: 15,
+    };
+
+    it("watches for minutes, not 180 s: a clip that lands at 200 s is returned from the one submit", async () => {
+      const clock = fakeClock();
+      let submits = 0;
+      let polls = 0;
+      const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          submits += 1;
+          return SUBMIT;
+        }
+        polls += 1;
+        return clock.elapsed() >= 200_000 ? FINISHED : RENDERING;
+      });
+      const result = await generateGatewayVideo({
+        ...base,
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        wait: clock.wait,
+        now: clock.now,
+      });
+      expect(result.url).toBe("https://cdn.example/long.mp4");
+      expect(submits).toBe(1);
+      // The old budget was 90 polls two seconds apart; this one needed more than that.
+      expect(polls).toBeGreaterThan(90);
+    });
+
+    it("ends a job still rendering at the deadline with video_job_pending, from the one submit", async () => {
+      const clock = fakeClock();
+      let submits = 0;
+      const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          submits += 1;
+          return SUBMIT;
+        }
+        return RENDERING;
+      });
+      const error = await generateGatewayVideo({
+        ...base,
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        wait: clock.wait,
+        now: clock.now,
+      }).catch((caught: unknown) => caught);
+      expect(error).toBeInstanceOf(ApiError);
+      expect(error).toMatchObject({ code: VIDEO_JOB_PENDING_CODE, status: 504 });
+      // It says the job may still bill and was not sent again; it does not say "timed out".
+      expect((error as ApiError).message).toMatch(/may still finish and be billed/);
+      expect((error as ApiError).message).not.toMatch(/timed out/i);
+      expect(submits).toBe(1);
+      expect(clock.elapsed()).toBeGreaterThanOrEqual(VIDEO_POLL_DEADLINE_MS);
+      expect(clock.elapsed()).toBeLessThan(VIDEO_POLL_DEADLINE_MS + 2 * VIDEO_POLL_MS);
+      // The harness reads the message when a caller drops the code, and must still refuse a resubmit.
+      expect(videoRenderShouldRetry((error as ApiError).message)).toBe(false);
+    });
+
+    it("says it in the desk's language when it has one", async () => {
+      const clock = fakeClock();
+      const fetchMock = vi.fn(async (_url: string, init?: RequestInit) =>
+        init?.method === "POST" ? SUBMIT : RENDERING,
+      );
+      const error = await generateGatewayVideo({
+        ...base,
+        locale: "id",
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        wait: clock.wait,
+        now: clock.now,
+        deadlineMs: 10_000,
+      }).catch((caught: unknown) => caught);
+      expect((error as ApiError).message).toMatch(/mungkin tetap selesai dan ditagih/);
+      expect(videoRenderShouldRetry((error as ApiError).message)).toBe(false);
+      expect(clock.elapsed()).toBeLessThan(10_000 + 2 * VIDEO_POLL_MS);
+    });
+
+    it("does not read a dropped status request as a dead job: it asks again and finds the clip", async () => {
+      const clock = fakeClock();
+      let submits = 0;
+      let polls = 0;
+      const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          submits += 1;
+          return SUBMIT;
+        }
+        polls += 1;
+        if (polls === 1) {
+          throw new TypeError("fetch failed: ECONNRESET");
+        }
+        if (polls === 2) {
+          throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
+        }
+        return FINISHED;
+      });
+      const result = await generateGatewayVideo({
+        ...base,
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        wait: clock.wait,
+        now: clock.now,
+      });
+      expect(result.url).toBe("https://cdn.example/long.mp4");
+      expect(submits).toBe(1);
+      expect(polls).toBe(3);
+      // Each status request has a time limit of its own, so a hung one cannot hold the deadline open.
+      const pollInit = fetchMock.mock.calls[1]?.[1] as RequestInit;
+      expect(pollInit.signal).toBeInstanceOf(AbortSignal);
+    });
+
+    it("still ends in video_job_pending when every status request is dropped", async () => {
+      const clock = fakeClock();
+      let submits = 0;
+      const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          submits += 1;
+          return SUBMIT;
+        }
+        throw new TypeError("fetch failed");
+      });
+      await expect(
+        generateGatewayVideo({
+          ...base,
+          fetchImpl: fetchMock as unknown as typeof fetch,
+          wait: clock.wait,
+          now: clock.now,
+          deadlineMs: 30_000,
+        }),
+      ).rejects.toMatchObject({ code: VIDEO_JOB_PENDING_CODE });
+      expect(submits).toBe(1);
+    });
+
+    it("a submit that never got a task id is not a pending job", async () => {
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ status: "queued" }) });
+      const error = await generateGatewayVideo({
+        ...base,
+        fetchImpl: fetchMock as unknown as typeof fetch,
+        wait: async () => undefined,
+      }).catch((caught: unknown) => caught);
+      expect(error).toMatchObject({ message: "Gateway video did not return a task id", status: 502 });
+      expect((error as ApiError).code).not.toBe(VIDEO_JOB_PENDING_CODE);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   it("does not call /videos/generations", async () => {
@@ -470,7 +801,9 @@ describe("video job failure parsing", () => {
   };
 
   it("prefers the job fail reason over a top-level success code", () => {
-    expect(readVideoJobFailure(upstreamRejected, "fallback")).toBe("上游拒绝了该请求，请稍后重试 (service_unavailable)");
+    expect(readVideoJobFailure(upstreamRejected, "fallback")).toBe(
+      "上游拒绝了该请求，请稍后重试 (service_unavailable)",
+    );
     expect(readVideoJobFailure({ data: { status: "failed", fail_reason: "quota" } }, "fallback")).toBe("quota");
     expect(readVideoJobFailure({ data: { status: "failed" } }, "fallback")).toBe("fallback");
   });
@@ -483,7 +816,9 @@ describe("video job failure parsing", () => {
 
   it("does not mistake a failure message in result_url for a video url", () => {
     expect(extractGatewayVideoUrl({ data: { result_url: "上游拒绝了该请求" } })).toBeUndefined();
-    expect(extractGatewayVideoUrl({ data: { result_url: "https://cdn.example/a.mp4" } })).toBe("https://cdn.example/a.mp4");
+    expect(extractGatewayVideoUrl({ data: { result_url: "https://cdn.example/a.mp4" } })).toBe(
+      "https://cdn.example/a.mp4",
+    );
     expect(extractGatewayVideoUrl({ video: "data:video/mp4;base64,AAAA" })).toBe("data:video/mp4;base64,AAAA");
   });
 

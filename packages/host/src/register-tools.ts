@@ -19,6 +19,7 @@ import { selfCheckTool } from "./self-check-tool";
 import { runSqlTool } from "./sql-tool";
 import { financeTaskTool } from "./workers/finance-task-tool";
 import { researchDossierTool } from "./workers/research-dossier-tool";
+import { chatVideoGenerateTool } from "./workers/video-generate-tool";
 
 let registered = false;
 
@@ -28,6 +29,8 @@ export function ensureToolsRegistered(): void {
     return;
   }
   registerPlatformTools();
+  // Replaces core's `video_generate` under the same key: the same tool, kept from ending a chat turn while it renders.
+  registerTool(chatVideoGenerateTool);
   registerUniversityTools();
   registerTool(pastSessionsTool);
   registerTool(runSqlTool);

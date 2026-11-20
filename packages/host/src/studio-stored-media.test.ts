@@ -187,6 +187,49 @@ describe("studio video from a stored reference", () => {
     expect(renderVideo.mock.calls[0]?.[0]).toMatchObject({ image_url: CDN_URL });
   });
 
+  it("settles what was asked against the model's spec before the render, and reports what it sent", async () => {
+    const renderVideo = videoRender();
+    // Grok's video takes 6 or 10 seconds, 480p or 720p, 16:9 or 9:16, and has no sound switch.
+    const result = await studio.generateStudioVideo(
+      alice,
+      { prompt: "a lantern drifting", model: VIDEO_MODEL, seconds: 5, resolution: "1080p", aspect: "1:1" },
+      { renderVideo },
+    );
+    const call = renderVideo.mock.calls[0]?.[0];
+    expect(call).toMatchObject({ model: VIDEO_MODEL, seconds: 6, resolution: "720p" });
+    expect(["16:9", "9:16"]).toContain(call?.aspect_ratio);
+    expect(call?.audio).not.toBe(true);
+    expect(result.sent).toMatchObject({ seconds: 6, resolution: "720p" });
+    const fields = (result.adjusted ?? []).map((item) => item.field);
+    expect(fields).toEqual(expect.arrayContaining(["seconds", "resolution"]));
+  });
+
+  it("refuses sound on a model that has no sound switch, and renders nothing", async () => {
+    const renderVideo = videoRender();
+    const refused = await refusal(() =>
+      studio.generateStudioVideo(
+        alice,
+        { prompt: "a lantern drifting", model: VIDEO_MODEL, audio: true },
+        { renderVideo },
+      ),
+    );
+    expect(refused.code).toBe("video_audio_unsupported");
+    expect(refused.status).toBe(400);
+    expect(renderVideo).not.toHaveBeenCalled();
+  });
+
+  it("starts from the model's own defaults when no knob is sent: 720p, sound off", async () => {
+    const renderVideo = videoRender();
+    const result = await studio.generateStudioVideo(
+      alice,
+      { prompt: "a lantern drifting", model: VIDEO_MODEL },
+      { renderVideo },
+    );
+    expect(renderVideo.mock.calls[0]?.[0]).toMatchObject({ model: VIDEO_MODEL, resolution: "720p" });
+    expect(renderVideo.mock.calls[0]?.[0].audio).not.toBe(true);
+    expect(result.adjusted ?? []).toEqual([]);
+  });
+
   it("answers another company's image with the same 404 as a missing id, and renders nothing", async () => {
     const renderVideo = videoRender();
     const own = await studio.generateStudioVideo(bob, videoBody(bobImage), { renderVideo });

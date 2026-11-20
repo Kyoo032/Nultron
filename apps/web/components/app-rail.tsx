@@ -415,6 +415,15 @@ export function AppRail({ workspaceName, visibleModes, modesSource = "host" }: P
             index={itemIndex++}
           />
           <RailItem
+            href="/customers"
+            label={t("rail.customers")}
+            icon="customers"
+            active={pathname.startsWith("/customers")}
+            collapsed={collapsed}
+            testId="customers-link"
+            index={itemIndex++}
+          />
+          <RailItem
             href="/workspaces"
             label={t("rail.workspaces")}
             icon="workspaces"

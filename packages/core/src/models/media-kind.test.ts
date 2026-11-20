@@ -27,6 +27,20 @@ describe("mediaKind", () => {
     expect(mediaKind("whisper-1")).toBe("audio");
   });
 
+  /**
+   * The gateway lists Kling's picture models beside its video ones. `kling_image` and `kling_omni_image`
+   * start with `kling`, which the video pattern reads as video, so they used to land in the video picker
+   * and be sent a clip request.
+   */
+  it("routes Kling's picture models to image and its clip models to video", () => {
+    expect(mediaKind("kling_image")).toBe("image");
+    expect(mediaKind("kling-image")).toBe("image");
+    expect(mediaKind("kling_omni_image")).toBe("image");
+    expect(mediaKind("kling-v3")).toBe("video");
+    expect(mediaKind("kling-v3-omni")).toBe("video");
+    expect(mediaKind("kling-3.0-turbo")).toBe("video");
+  });
+
   it("does not treat a chat id that merely contains the letters asr as audio", () => {
     expect(mediaKind("qwen3-disaster-preview")).toBe("chat");
   });
@@ -73,7 +87,17 @@ describe("mediaKind", () => {
 });
 
 describe("pickPreferredImageModel", () => {
-  it("prefers gpt-image-2, then Seedream 5.0 Pro", () => {
+  it("starts on gpt-image-2.5-flare, then sunburst, then gpt-image-2, then Seedream 5.0 Pro", () => {
+    const ids = ["mj_imagine", "gpt-image-2", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "seedream-5.0-pro"];
+    expect(pickPreferredImageModel(ids)).toBe("gpt-image-2.5-flare");
+    expect(pickPreferredImageModel(ids.filter((id) => id !== "gpt-image-2.5-flare"))).toBe("gpt-image-2.5-sunburst");
+    expect(pickPreferredImageModel(["gpt-image-2", "seedream-5.0-pro"])).toBe("gpt-image-2");
+    // The -count and -token spellings are not the ids that were driven: they rank by the generic fallback only.
+    expect(pickPreferredImageModel(["gpt-image-2.5-flare-token", "seedream-5.0-pro"])).toBe("seedream-5.0-pro");
+    expect(DEFAULT_GATEWAY_IMAGE_MODEL).toBe("gpt-image-2.5-flare");
+  });
+
+  it("prefers gpt-image-2, then Seedream 5.0 Pro, on a key that lists no 2.5 id", () => {
     expect(
       pickPreferredImageModel(["mj_imagine", "z-image-turbo", "gpt-image-2", "seedream-5.0-pro", "gpt-image-2-count"]),
     ).toBe("gpt-image-2");
@@ -91,7 +115,9 @@ describe("pickPreferredVideoModel", () => {
     // The live catalogue of 2026-09-30 lists exactly these two video ids.
     expect(pickPreferredVideoModel(["seedance-2.5", "seedance-2.0"])).toBe("seedance-2.0");
     expect(pickPreferredVideoModel(["seedance-2.5"])).toBe("seedance-2.5");
-    expect(MEDIA_MODEL_PREFERENCES.video.slice(0, 3)).toEqual([
+    // 2026-11-11: the fast id leads, because it is the one driven end to end on a prepaid key.
+    expect(MEDIA_MODEL_PREFERENCES.video.slice(0, 4)).toEqual([
+      "seedance-2.0-fast",
       "seedance-2.0",
       "doubao-seedance-2-0-260128",
       "seedance-2.5",
@@ -104,17 +130,25 @@ describe("pickPreferredVideoModel", () => {
     );
   });
 
-  it("still prefers Veo fast, then cheap Grok Imagine, on a gateway that lists them and no Seedance 2.0", () => {
-    expect(
-      pickPreferredVideoModel(["mj_video", "seedance-2.0-fast", "grok-imagine-video", "veo_3_1-fast"]),
-    ).toBe("veo_3_1-fast");
-    expect(pickPreferredVideoModel(["mj_video", "seedance-2.0-fast", "grok-imagine-video"])).toBe("grok-imagine-video");
+  it("prefers the fast Seedance (proven on a prepaid key), then Veo fast, then cheap Grok Imagine", () => {
+    expect(pickPreferredVideoModel(["mj_video", "seedance-2.0-fast", "grok-imagine-video", "veo_3_1-fast"])).toBe(
+      "seedance-2.0-fast",
+    );
+    expect(pickPreferredVideoModel(["mj_video", "veo_3_1-fast", "grok-imagine-video"])).toBe("veo_3_1-fast");
+    expect(pickPreferredVideoModel(["mj_video", "grok-imagine-video"])).toBe("grok-imagine-video");
     expect(pickPreferredVideoModel(["omni-fast-v2v", "seedance-2.0-mini"])).toBe("omni-fast-v2v");
-    expect(pickPreferredVideoModel(["seedance-2.0-mini", "seedance-2.0-fast"])).toBe("seedance-2.0-mini");
+    expect(pickPreferredVideoModel(["seedance-2.0-mini", "seedance-2.0-fast"])).toBe("seedance-2.0-fast");
   });
 
   it("falls back to the kernel default", () => {
     expect(pickPreferredVideoModel([])).toBe(DEFAULT_GATEWAY_VIDEO_MODEL);
+  });
+
+  it("names the one video id a prepaid key was proven to run as the empty-catalog fallback", () => {
+    // 2026-11-11: `seedance-2.0-fast` completed end to end on a prepaid agent key (HTTP 200, 135 s,
+    // 2.75 MB); the per-token ids `grok-imagine-video` and `kling-v3` were refused 403 / 503 there.
+    expect(DEFAULT_GATEWAY_VIDEO_MODEL).toBe("seedance-2.0-fast");
+    expect(pickPreferredVideoModel([])).toBe("seedance-2.0-fast");
   });
 });
 
@@ -238,13 +272,20 @@ describe("MEDIA_MODEL_PREFERENCES", () => {
     expect(MEDIA_MODEL_PREFERENCES.video).toContain(DEFAULT_GATEWAY_VIDEO_MODEL);
     expect(MEDIA_MODEL_PREFERENCES.music).toContain(DEFAULT_GATEWAY_MUSIC_MODEL);
     expect(MEDIA_MODEL_PREFERENCES.embedding).toContain(DEFAULT_EMBEDDING_MODEL);
-    expect(Object.keys(MEDIA_MODEL_PREFERENCES).sort()).toEqual(
-      ["embedding", "image", "lyrics", "music", "speech", "video"],
-    );
+    expect(Object.keys(MEDIA_MODEL_PREFERENCES).sort()).toEqual([
+      "embedding",
+      "image",
+      "lyrics",
+      "music",
+      "speech",
+      "video",
+    ]);
   });
 
   it("is what the pickers rank by: the first listed id wins when it is live", () => {
-    expect(pickPreferredImageModel([...MEDIA_MODEL_PREFERENCES.image].reverse())).toBe(MEDIA_MODEL_PREFERENCES.image[0]);
+    expect(pickPreferredImageModel([...MEDIA_MODEL_PREFERENCES.image].reverse())).toBe(
+      MEDIA_MODEL_PREFERENCES.image[0],
+    );
   });
 
   it("cannot be edited from outside", () => {

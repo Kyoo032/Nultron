@@ -43,6 +43,12 @@ export type HostRequest = {
   params: Record<string, string>;
   headers: Record<string, string | undefined>;
   body?: unknown;
+  /**
+   * The exact bytes of the body, set only for the WhatsApp webhook. Its signature is an HMAC of
+   * these bytes, so they must reach the handler untouched and unparsed (`body` is left unset on that
+   * route: nothing is parsed until the signature has passed).
+   */
+  rawBody?: Uint8Array;
   files?: HostFile[];
   /** Cookie or host-process selected workspace. */
   workspaceId?: string | null;

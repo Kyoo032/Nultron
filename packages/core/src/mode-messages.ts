@@ -17,7 +17,10 @@ export const MODE_MESSAGE_KEYS = [
   "emptySlide",
   "videoGenerateFailed",
   "videoStillUnsupported",
+  "videoAudioUnsupported",
+  "imageStillUnsupported",
   "videoClipRejected",
+  "videoJobPending",
   "musicGenerateFailed",
   "musicPromptRequired",
   "musicLyricsRequired",
@@ -73,9 +76,23 @@ const MODE_MESSAGES: Record<ModeMessageKey, Record<AppLocale, string>> = {
     en: "This model does not accept a still image",
     id: "Model ini tidak menerima gambar diam",
   },
+  videoAudioUnsupported: {
+    en: "This video model makes silent clips and has no switch for sound. Turn sound off or pick another video model.",
+    id: "Model video ini hanya membuat klip tanpa suara dan tidak punya pengaturan suara. Matikan suara atau pilih model video lain.",
+  },
+  imageStillUnsupported: {
+    en: "This image model does not take a reference picture. Pick another image model to edit a picture.",
+    id: "Model gambar ini tidak menerima gambar acuan. Pilih model gambar lain untuk mengedit gambar.",
+  },
   videoClipRejected: {
     en: "The render did not return a video file.",
     id: "Hasil render tidak berisi file video.",
+  },
+  // A job the gateway accepted and was still rendering when the wait ran out. It is never sent again:
+  // the first one may still finish, and the gateway bills it when it does (`videos/job-pending.ts`).
+  videoJobPending: {
+    en: "The gateway is still rendering this video after a long wait. It may still finish and be billed, so it was not sent again. Check your usage before you try again.",
+    id: "Gateway masih merender video ini setelah menunggu lama. Video itu mungkin tetap selesai dan ditagih, jadi tidak dikirim ulang. Periksa pemakaian Anda sebelum mencoba lagi.",
   },
   musicGenerateFailed: {
     en: "Music generation failed",

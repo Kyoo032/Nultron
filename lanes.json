@@ -505,6 +505,104 @@
       "lanes": ["enterprise", "tester"],
       "protected": false,
       "note": "Agent guardrails (verify, pack, change). Harness only, never ships."
+    },
+    {
+      "glob": "packages/host/src/inbox/**",
+      "map": "docs/internal/maps/customer-inbox.md",
+      "lanes": ["enterprise", "tester"],
+      "protected": false,
+      "note": "Customer inbox (WhatsApp): the public webhook, the desk store, the Graph client."
+    },
+    {
+      "glob": "packages/host/src/handlers/customers*.ts",
+      "map": "docs/internal/maps/customer-inbox.md",
+      "lanes": ["enterprise", "tester"],
+      "protected": false,
+      "note": "The owner's routes for the customer inbox."
+    },
+    {
+      "glob": "packages/core/src/inbox/**",
+      "map": "docs/internal/maps/customer-inbox.md",
+      "lanes": ["enterprise", "tester"],
+      "protected": false,
+      "note": "Inbox shapes, caps, the 24-hour window rule and the pinned Graph origin."
+    },
+    {
+      "glob": "packages/db/drizzle/0023_customer_inbox.sql",
+      "map": "docs/internal/maps/customer-inbox.md",
+      "lanes": ["enterprise", "tester"],
+      "protected": false,
+      "note": "The three inbox tables."
+    },
+    {
+      "glob": "apps/web/components/customers-*.tsx",
+      "map": "docs/internal/maps/customer-inbox.md",
+      "lanes": ["enterprise", "tester"],
+      "protected": false,
+      "note": "The Customers page."
+    },
+    {
+      "glob": "apps/web/lib/customers-*",
+      "map": "docs/internal/maps/customer-inbox.md",
+      "lanes": ["enterprise", "tester"],
+      "protected": false,
+      "note": "The Customers page's fetch layer and pure rules."
+    },
+    {
+      "glob": "scripts/whatsapp-sandbox.ts",
+      "map": "docs/internal/maps/customer-inbox.md",
+      "lanes": ["enterprise", "tester"],
+      "protected": false,
+      "note": "Local stand-in for Meta, dev tooling only."
+    },
+    {
+      "glob": "packages/core/src/voice/**",
+      "map": "docs/internal/maps/voice-mode.md",
+      "lanes": ["tester"],
+      "protected": true,
+      "note": "The browser-host voice contract (protocol.ts). A change needs the lead's word."
+    },
+    {
+      "glob": "packages/host/src/voice/**",
+      "map": "docs/internal/maps/voice-mode.md",
+      "lanes": ["tester"],
+      "protected": false,
+      "note": "Voice mode in the host: the relay, turn-taking, the thinker tool and the flag."
+    },
+    {
+      "glob": "packages/host/src/handlers/voice.ts",
+      "map": "docs/internal/maps/voice-mode.md",
+      "lanes": ["tester"],
+      "protected": false,
+      "note": "H1, the route that opens a voice session."
+    },
+    {
+      "glob": "packages/host/eval/voice/**",
+      "map": "docs/internal/maps/voice-mode.md",
+      "lanes": ["tester"],
+      "protected": false,
+      "note": "The voice latency and turn-taking eval runner."
+    },
+    {
+      "glob": "apps/web/components/voice/**",
+      "map": "docs/internal/maps/voice-mode.md",
+      "lanes": ["tester"],
+      "protected": false,
+      "note": "The voice view in Chat."
+    },
+    {
+      "glob": "apps/web/lib/voice-*",
+      "map": "docs/internal/maps/voice-mode.md",
+      "lanes": ["tester"],
+      "protected": false,
+      "note": "The voice view's audio, socket and pure rules."
+    },
+    {
+      "glob": "apps/web/locales/*/voice.json",
+      "map": "docs/internal/maps/voice-mode.md",
+      "lanes": ["tester"],
+      "protected": false,
+      "note": "The voice namespace of the en and id catalogs."
     }
   ]
 }

@@ -1,0 +1,513 @@
+{
+  "note": "Trimmed from the gateway's public /api/pricing on 2026-11-11: only model_name, supported_endpoint_types and supported_endpoints of six rows.",
+  "data": [
+    {
+      "model_name": "seedance-1.0-pro",
+      "supported_endpoint_types": [
+        "openai-video",
+        "seedance2-native-video"
+      ],
+      "supported_endpoints": {
+        "openai-video": {
+          "path": "/v1/video/generations",
+          "method": "POST",
+          "label": "OpenAI Video",
+          "config": {
+            "fetch_path": "/v1/video/generations/{task_id}",
+            "mode": "openai_video",
+            "parameters": {
+              "images": {
+                "type": "array"
+              },
+              "metadata": {
+                "type": "object"
+              },
+              "prompt": {
+                "required": true,
+                "type": "string"
+              },
+              "seconds": {
+                "type": "integer"
+              },
+              "size": {
+                "type": "string"
+              }
+            },
+            "path_params": [
+              "task_id"
+            ],
+            "submit_path": "/v1/video/generations"
+          }
+        },
+        "seedance2-native-video": {
+          "path": "/api/v3/contents/generations/tasks",
+          "method": "POST",
+          "label": "Seedance2 Native Video",
+          "config": {
+            "fetch_path": "/api/v3/contents/generations/tasks/{task_id}",
+            "mode": "native_video",
+            "parameters": {
+              "camera_fixed": {
+                "type": "boolean"
+              },
+              "content": {
+                "description": "Text and image_url content items",
+                "required": true,
+                "type": "array"
+              },
+              "duration": {
+                "default": 5,
+                "type": "integer"
+              },
+              "ratio": {
+                "type": "string"
+              },
+              "resolution": {
+                "enum": [
+                  "480p",
+                  "720p",
+                  "1080p"
+                ],
+                "type": "string"
+              },
+              "return_last_frame": {
+                "type": "boolean"
+              },
+              "seed": {
+                "type": "integer"
+              },
+              "watermark": {
+                "type": "boolean"
+              }
+            },
+            "path_params": [
+              "task_id"
+            ],
+            "protocol_profile_id": "seedance2-service-inference",
+            "submit_path": "/api/v3/contents/generations/tasks"
+          }
+        }
+      }
+    },
+    {
+      "model_name": "seedance-2.0-fast",
+      "supported_endpoint_types": [
+        "openai-video",
+        "seedance2-native-video"
+      ],
+      "supported_endpoints": {
+        "openai-video": {
+          "path": "/v1/video/generations",
+          "method": "POST",
+          "label": "OpenAI Video",
+          "config": {
+            "fetch_path": "/v1/video/generations/{task_id}",
+            "mode": "openai_video",
+            "parameters": {
+              "images": {
+                "type": "array"
+              },
+              "metadata": {
+                "type": "object"
+              },
+              "prompt": {
+                "required": true,
+                "type": "string"
+              },
+              "seconds": {
+                "type": "integer"
+              },
+              "size": {
+                "type": "string"
+              }
+            },
+            "path_params": [
+              "task_id"
+            ],
+            "submit_path": "/v1/video/generations"
+          }
+        },
+        "seedance2-native-video": {
+          "path": "/api/v3/contents/generations/tasks",
+          "method": "POST",
+          "label": "Seedance2 Native Video",
+          "config": {
+            "fetch_path": "/api/v3/contents/generations/tasks/{task_id}",
+            "mode": "native_video",
+            "parameters": {
+              "camera_fixed": {
+                "type": "boolean"
+              },
+              "content": {
+                "description": "Text, image_url, video_url, or audio_url content items",
+                "required": true,
+                "type": "array"
+              },
+              "draft": {
+                "default": false,
+                "type": "boolean"
+              },
+              "duration": {
+                "default": 5,
+                "type": "integer"
+              },
+              "generate_audio": {
+                "default": true,
+                "type": "boolean"
+              },
+              "ratio": {
+                "type": "string"
+              },
+              "resolution": {
+                "enum": [
+                  "480p",
+                  "720p"
+                ],
+                "type": "string"
+              },
+              "return_last_frame": {
+                "type": "boolean"
+              },
+              "seed": {
+                "type": "integer"
+              },
+              "watermark": {
+                "type": "boolean"
+              }
+            },
+            "path_params": [
+              "task_id"
+            ],
+            "protocol_profile_id": "seedance2-service-inference",
+            "submit_path": "/api/v3/contents/generations/tasks"
+          }
+        }
+      }
+    },
+    {
+      "model_name": "seedance-2.0-mini",
+      "supported_endpoint_types": [
+        "openai-video",
+        "seedance2-native-video"
+      ],
+      "supported_endpoints": {
+        "openai-video": {
+          "path": "/v1/video/generations",
+          "method": "POST",
+          "label": "OpenAI Video",
+          "config": {
+            "fetch_path": "/v1/video/generations/{task_id}",
+            "mode": "openai_video",
+            "parameters": {
+              "images": {
+                "type": "array"
+              },
+              "metadata": {
+                "type": "object"
+              },
+              "prompt": {
+                "required": true,
+                "type": "string"
+              },
+              "seconds": {
+                "type": "integer"
+              },
+              "size": {
+                "type": "string"
+              }
+            },
+            "path_params": [
+              "task_id"
+            ],
+            "submit_path": "/v1/video/generations"
+          }
+        },
+        "seedance2-native-video": {
+          "path": "/api/v3/contents/generations/tasks",
+          "method": "POST",
+          "label": "Seedance2 Native Video",
+          "config": {
+            "fetch_path": "/api/v3/contents/generations/tasks/{task_id}",
+            "mode": "native_video",
+            "parameters": {
+              "camera_fixed": {
+                "type": "boolean"
+              },
+              "content": {
+                "description": "Text, image_url, video_url, or audio_url content items",
+                "required": true,
+                "type": "array"
+              },
+              "draft": {
+                "default": false,
+                "type": "boolean"
+              },
+              "duration": {
+                "default": 5,
+                "type": "integer"
+              },
+              "generate_audio": {
+                "default": true,
+                "type": "boolean"
+              },
+              "ratio": {
+                "type": "string"
+              },
+              "resolution": {
+                "enum": [
+                  "480p",
+                  "720p"
+                ],
+                "type": "string"
+              },
+              "return_last_frame": {
+                "type": "boolean"
+              },
+              "seed": {
+                "type": "integer"
+              },
+              "watermark": {
+                "type": "boolean"
+              }
+            },
+            "path_params": [
+              "task_id"
+            ],
+            "protocol_profile_id": "seedance2-service-inference",
+            "submit_path": "/api/v3/contents/generations/tasks"
+          }
+        }
+      }
+    },
+    {
+      "model_name": "seedance-2.5",
+      "supported_endpoint_types": [
+        "openai-video",
+        "seedance2-native-video"
+      ],
+      "supported_endpoints": {
+        "openai-video": {
+          "path": "/v1/video/generations",
+          "method": "POST",
+          "label": "OpenAI Video",
+          "config": {
+            "fetch_path": "/v1/video/generations/{task_id}",
+            "mode": "openai_video",
+            "parameters": {
+              "images": {
+                "type": "array"
+              },
+              "metadata": {
+                "type": "object"
+              },
+              "prompt": {
+                "required": true,
+                "type": "string"
+              },
+              "seconds": {
+                "type": "integer"
+              },
+              "size": {
+                "type": "string"
+              }
+            },
+            "path_params": [
+              "task_id"
+            ],
+            "submit_path": "/v1/video/generations"
+          }
+        },
+        "seedance2-native-video": {
+          "path": "/api/v3/contents/generations/tasks",
+          "method": "POST",
+          "label": "Seedance2 Native Video",
+          "config": {
+            "fetch_path": "/api/v3/contents/generations/tasks/{task_id}",
+            "mode": "native_video",
+            "parameters": {
+              "camera_fixed": {
+                "type": "boolean"
+              },
+              "content": {
+                "description": "Text, image_url, video_url, or audio_url content items",
+                "required": true,
+                "type": "array"
+              },
+              "draft": {
+                "default": false,
+                "type": "boolean"
+              },
+              "duration": {
+                "default": 5,
+                "type": "integer"
+              },
+              "frames": {
+                "type": "integer"
+              },
+              "generate_audio": {
+                "default": true,
+                "type": "boolean"
+              },
+              "output_format": {
+                "default": "mp4",
+                "type": "string"
+              },
+              "ratio": {
+                "type": "string"
+              },
+              "resolution": {
+                "enum": [
+                  "480p",
+                  "720p"
+                ],
+                "type": "string"
+              },
+              "return_last_frame": {
+                "type": "boolean"
+              },
+              "seed": {
+                "type": "integer"
+              },
+              "watermark": {
+                "type": "boolean"
+              }
+            },
+            "path_params": [
+              "task_id"
+            ],
+            "protocol_profile_id": "seedance2-service-inference",
+            "submit_path": "/api/v3/contents/generations/tasks"
+          }
+        }
+      }
+    },
+    {
+      "model_name": "seedance-2.0",
+      "supported_endpoint_types": [
+        "openai-video",
+        "seedance2-native-video"
+      ],
+      "supported_endpoints": {
+        "openai-video": {
+          "path": "/v1/video/generations",
+          "method": "POST",
+          "label": "OpenAI Video",
+          "config": {
+            "fetch_path": "/v1/video/generations/{task_id}",
+            "mode": "openai_video",
+            "parameters": {
+              "images": {
+                "type": "array"
+              },
+              "metadata": {
+                "type": "object"
+              },
+              "prompt": {
+                "required": true,
+                "type": "string"
+              },
+              "seconds": {
+                "type": "integer"
+              },
+              "size": {
+                "type": "string"
+              }
+            },
+            "path_params": [
+              "task_id"
+            ],
+            "submit_path": "/v1/video/generations"
+          }
+        },
+        "seedance2-native-video": {
+          "path": "/api/v3/contents/generations/tasks",
+          "method": "POST",
+          "label": "Seedance2 Native Video",
+          "config": {
+            "fetch_path": "/api/v3/contents/generations/tasks/{task_id}",
+            "mode": "native_video",
+            "parameters": {
+              "camera_fixed": {
+                "type": "boolean"
+              },
+              "content": {
+                "description": "Text, image_url, video_url, or audio_url content items",
+                "required": true,
+                "type": "array"
+              },
+              "draft": {
+                "default": false,
+                "type": "boolean"
+              },
+              "duration": {
+                "default": 5,
+                "type": "integer"
+              },
+              "generate_audio": {
+                "default": true,
+                "type": "boolean"
+              },
+              "ratio": {
+                "type": "string"
+              },
+              "resolution": {
+                "enum": [
+                  "480p",
+                  "720p",
+                  "1080p",
+                  "4k"
+                ],
+                "type": "string"
+              },
+              "return_last_frame": {
+                "type": "boolean"
+              },
+              "seed": {
+                "type": "integer"
+              },
+              "watermark": {
+                "type": "boolean"
+              }
+            },
+            "path_params": [
+              "task_id"
+            ],
+            "protocol_profile_id": "seedance2-service-inference",
+            "submit_path": "/api/v3/contents/generations/tasks"
+          }
+        }
+      }
+    },
+    {
+      "model_name": "gpt-image-2",
+      "supported_endpoint_types": [
+        "image-generation",
+        "openai-image-edit",
+        "openai"
+      ],
+      "supported_endpoints": {
+        "image-generation": {
+          "path": "/v1/images/generations",
+          "method": "POST",
+          "config": {
+            "fetch_path": "/v1/tasks/{task_id}",
+            "mode": "openai_image",
+            "path_params": [
+              "task_id"
+            ],
+            "submit_path": "/v1/images/generations"
+          }
+        },
+        "openai": {
+          "path": "/v1/chat/completions",
+          "method": "POST"
+        },
+        "openai-image-edit": {
+          "path": "/v1/images/edits",
+          "method": "POST",
+          "label": "OpenAI Image Edit"
+        }
+      }
+    }
+  ]
+}

@@ -6,7 +6,7 @@
  * here so the assertion is about which tenant reaches it, with no gateway and no media store.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { TenantContext } from "@agentforge/core";
+import { ApiError, VIDEO_JOB_PENDING_CODE, type TenantContext } from "@agentforge/core";
 
 const { imageCalls, videoCalls } = vi.hoisted(() => ({
   imageCalls: [] as unknown[][],
@@ -26,6 +26,7 @@ vi.mock("../studio-generate", () => ({
   }),
 }));
 
+import { generateStudioVideo } from "../studio-generate";
 import { runGenerateJob } from "./generate";
 import { ensureGenerateSubmitWired } from "./wire-generate";
 
@@ -91,5 +92,26 @@ describe("the wired generate submit", () => {
       ),
     ).rejects.toMatchObject({ code: "generate_failed" });
     expect(videoCalls).toHaveLength(0);
+  });
+
+  it("does not submit a video again when the gateway still has the first one (504, video_job_pending)", async () => {
+    ensureGenerateSubmitWired();
+    vi.mocked(generateStudioVideo).mockClear();
+    vi.mocked(generateStudioVideo).mockRejectedValueOnce(
+      new ApiError(VIDEO_JOB_PENDING_CODE, "The gateway is still rendering this video. It may still finish and be billed.", 504),
+    );
+    await expect(
+      runGenerateJob("generate_video", { prompt: "a long pour" }, new AbortController().signal, OWNER),
+    ).rejects.toMatchObject({ code: VIDEO_JOB_PENDING_CODE });
+    expect(vi.mocked(generateStudioVideo)).toHaveBeenCalledTimes(1);
+  });
+
+  it("still retries a video that failed for any other 5xx reason, once", async () => {
+    ensureGenerateSubmitWired();
+    vi.mocked(generateStudioVideo).mockClear();
+    vi.mocked(generateStudioVideo).mockRejectedValueOnce(new ApiError("tool_failed", "upstream unavailable", 503));
+    const result = await runGenerateJob("generate_video", { prompt: "a long pour" }, new AbortController().signal, OWNER);
+    expect(vi.mocked(generateStudioVideo)).toHaveBeenCalledTimes(2);
+    expect(result.outputAssetIds).toEqual([MEDIA_ID]);
   });
 });

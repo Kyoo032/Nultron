@@ -36,22 +36,26 @@ describe("music locale JSON", () => {
   });
 
   it("explains an empty model picker instead of leaving a disabled select", () => {
-    // The relay merge should keep this state unreachable, but a picker that does go empty has to say
-    // why rather than render a dead control the owner reads as "music is broken".
+    // The relay merge keeps this state to a key that cannot run music, and the panel then has to say
+    // so and point at the Models section rather than render a dead control.
     for (const locale of ["en", "id"] as const) {
       const music = load(locale, "music.json") as { noModels?: Record<string, unknown> };
       expect(typeof music.noModels?.title).toBe("string");
       expect(typeof music.noModels?.body).toBe("string");
       expect(String(music.noModels?.body).length).toBeGreaterThan(0);
+      expect(String(music.noModels?.body)).toContain("{settings}");
+      expect(String(music.noModels?.body)).toContain("{gateway}");
     }
   });
 
   it("carries a reason for each way voice-over can be unavailable", () => {
-    // The host answers with one of these two reason codes; a missing key would render blank.
+    // The host answers with one of these three reason codes; a missing key would render blank.
     for (const locale of ["en", "id"] as const) {
       const music = load(locale, "music.json") as { voiceUnavailable?: Record<string, unknown> };
       expect(typeof music.voiceUnavailable?.realtimeOnly).toBe("string");
       expect(typeof music.voiceUnavailable?.noAudioModels).toBe("string");
+      expect(typeof music.voiceUnavailable?.noneOnKey).toBe("string");
+      expect(String(music.voiceUnavailable?.noneOnKey)).toContain("{settings}");
     }
   });
 });

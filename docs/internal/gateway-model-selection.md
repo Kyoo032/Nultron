@@ -813,3 +813,59 @@ What the product did with them, and the ten ids it stopped picking, is `packages
 - **No OpenAI realtime model is listed:** no `gpt-realtime*`, `gpt-audio*`, `gpt-4o-*-tts` or `*-transcribe` id. The voice plan's request to the gateway team (`voice-mode-plan.md`, "Model-square requests", rows 2, 4 and 5) is still open.
 - **The price list declares no realtime route.** Its `supported_endpoint` lists `openai`, `openai-response`, `anthropic`, `gemini`, image and video routes only: no `/v1/realtime`, `/v1/audio/speech` or `/v1/audio/transcriptions`. On 2026-11-05 those routes answered 401 without a key, so they exist; whether a model stands behind them is still Day 0's question.
 - **Audio ids listed:** `qwen3-omni-flash-realtime` ($3.58 / $7.17, endpoint type `openai`, audio in and out), `qwen3-tts-instruct-flash-realtime` and `mimo-v2.5-asr` (ASR, Volc_intl group only). Those two carry ratio 37.5, the same placeholder the tier-expression models carry, so their price is unknown. The 2026-10-06 cache also had `qwen3.5-omni-flash-realtime`, `qwen3.5-omni-plus-realtime` and `qwen-audio-3.0-realtime-flash`; the public list no longer shows them.
+
+## 12. Update 2026-11-11 — what a prepaid agent key can actually run
+
+Measured with Rizky's key (a prepaid agent account, 代理预付) against the live gateway; the evidence is in the session scratchpad (`media-out/REPORT.md`, `probe-summary.json`, the key's `GET /v1/models` with 213 ids, the public `/api/pricing`). **The key's model list is not enough to know a model works.**
+
+| Model | Route | Result | Status the product files |
+|---|---|---|---|
+| `gpt-image-2` | `POST /v1/images/generations` | works | `available` |
+| `seedance-2.0-fast` | `POST /v1/video/generations`, Seedance `content` body | works (HTTP 200, 135 s, 2.75 MB) | `available` |
+| `qwen3.5-omni-flash` speech | `POST /v1/chat/completions`, `stream`, `modalities: ["audio","text"]`, voice `Tina` | works (4.5 s of audio in 1.3 s; PCM16 24 kHz) | `available` |
+| `muse-voice-transcribe-1.0` | `POST /v1/audio/transcriptions` | works | `available` |
+| `grok-imagine-video` | `POST /v1/videos` (its documented route), every body | 403 `prepaid_async_requires_fixed_price` | `account_blocked` |
+| `kling-v3` | `/v1/video/generations`; native `/kling/v1/videos/text2video` | 403 the same; then 503 "no available configurable resource channel" | `account_blocked`, then `no_channel` |
+| `veo_3_1-fast` | `POST /v1/video/generations`, `{duration: 8, size: "16:9"}` | 403 `bad_response_status_code` (the upstream refused) | `upstream_rejected` |
+| `tts-1` | `POST /v1/audio/speech` | `model_not_found` | `not_on_key` |
+| `gpt-4o-mini-tts` | `POST /v1/audio/speech` | 503 no channel | `no_channel` |
+| `qwen3-tts-*` | `POST /v1/audio/speech` | 500 not implemented | nothing learned |
+| `suno_music`, `suno_lyrics` | `POST /suno/submit/{music,lyrics}` | 400 `model_not_found` in every body shape | `not_on_key` |
+| the realtime WebSocket | — | refused for prepaid accounts | not learned here |
+
+What follows from it:
+
+- **A per-token model is not the same as a refused one.** `quota_type` is 0 for every Seedance id on the price list, and `seedance-2.0-fast` ran. So the refusal cannot be predicted from the price list: it has to be learned from the call. The product now does that, per key (`model-policy.md`, "Which models a key can use").
+- **NewAPI uses one code for two things.** "No channel for this model" is 503 with `model_not_found`; "not on this key" is the same code with another status. The classifier separates them by status and words.
+- **The copy that said a prepaid key cannot run Seedance was wrong**, and so was blaming Grok on "auto channel choice". Both are corrected in `formatVideoGatewayFailure`.
+- **Grok video has its own route**, `POST /v1/videos`, polled at `GET /v1/videos/{id}` (`video_url`). The docs show a multipart form; the JSON body with `aspect_ratio`, `video_length`, `resolution_name` and `preset` is accepted (the refusals above are not 400s). A JSON `seconds` must be a string, so it is not sent.
+- **Speech has a second route.** A key with no `/v1/audio/speech` model still speaks through an Omni chat id.
+- **Not measured:** Veo with another body (the documented one was refused upstream), Kling after the channel returns, the realtime route on a non-prepaid key, `seedance-2.0` and `seedance-2.5` on a prepaid key (the preference list puts the proven `seedance-2.0-fast` first for that reason).
+
+## 13. Update 2026-11-11 — the values each image and video model accepts
+
+Section 12 says which models a key can run. This one is about the **values** a model takes: aspect ratio, clip length, resolution quality, sound, image size, quality, count, format. The product used to offer one set to every model (5, 8 or 10 s; 1080p to every Seedance; one size triple and `quality: "medium"` to every image) and clamped or dropped the rest silently. Each image and video model now has a spec, and the studios offer only what it holds. The code and the controls are in [`maps/generate-studios.md`](maps/generate-studios.md) § 5 and [`maps/model-policy.md`](maps/model-policy.md); this section keeps the **values and where each one is proven**.
+
+**Seedance** (the family a prepaid key runs; `POST /v1/video/generations`, docs `llms-full.txt:5960-6060` and `:6405-6470`):
+
+| Model | Lengths | Resolutions | Sound | Evidence |
+|---|---|---|---|---|
+| `seedance-2.0-fast`, `-mini` | 4 to 15 s, default 5 | 480p, 720p | switch, default on at the gateway, **off in the product** | price list enum; docs `:6458-6461` |
+| `seedance-2.0` | 4 to 15 s | 480p, 720p, 1080p, 4k | switch | docs `:6458` ("full versions also support 4k") |
+| `seedance-2.5` | 4 to 30 s | 480p, 720p | switch | docs `:6460` |
+| `seedance-1.0-pro`, `-fast` | 5, 10 (assumed) | 480p, 720p, 1080p | none | price list; length **assumed** |
+
+Ratios for all of them: 16:9, 9:16, 3:4, 1:1, 4:3 (docs `:6459`; the price list types `ratio` as a string with no enum).
+
+**What the two live calls on `seedance-2.0-fast` proved** (2026-11-11, `media-out/` of the model-routing scratchpad):
+
+- The generic route reads `ratio`, `generate_audio` and `watermark` from `metadata`, and the resolution from `size` (docs field mapping `:5975-5984`). The official body's top-level `ratio` and `duration` are **not read** on this route: a 3:4, 4 s request sent that way produced a 16:9 clip of 5.09 s (the upstream task recorded `ratio: "16:9"`, `duration: 5`).
+- The same request as a generic body produced a **3:4 clip (560×752, 480p) with an AAC audio track** (`mp4a`; task `generate_audio: true`).
+- **`duration` is ignored on this route** in both calls. `seconds` is the price list's name for the length on the `openai-video` endpoint; the product sends it too, and it is **not confirmed live** (no paid call was left). Treat a Seedance length as a request, not a guarantee, until it is.
+- A prompt can be refused by Seedance ("may be related to copyright"); the call used a neutral one ("ocean waves on a beach, no people").
+
+**Other video families** (builders written from the docs' example bodies; **not driven live**, this key cannot run them): Grok `POST /v1/videos` with `aspect_ratio` 16:9 or 9:16, `video_length` 6 or 10, `resolution_name` 480p or 720p (docs `:3668-3708`); Kling v3 `/kling/v1/videos/text2video` and `/image2video` with `duration` as a string 5 or 10 and 16:9, 9:16, 1:1 (docs `:4977-4987`), Kling v3 Omni `contents` and `settings.*` (`:4913-4923`), Kling 3.0 turbo `/kling/text-to-video/kling-3.0-turbo` with 3 to 15 s and 720p or 1080p (`:5040-5055`); Veo on the generic route with `duration` 4, 6 or 8 and a ratio in `size`; omni-fast `POST /v1/videos` with `seconds` as a string 4 to 30 and 720p to 4k (`:5707-5717`). Each field is marked `unverified` where only a vendor's API, not the gateway, says so.
+
+**Images** (`POST /v1/images/generations`, `/v1/images/edits` for a reference picture): `gpt-image-2` takes 15 sizes, `quality` low, medium, high or auto (the gateway's own default is low; the product asks for medium), `n` and `output_format` png or jpeg; `gpt-image-2-count` takes 3 sizes; `gpt-image-2.5` takes 1024x1024 only and no quality; the Nano Banana family takes 14 ratios and a tier of 0.5k, 1k, 2k or 4k; Gemini images take 1024x1024 with `response_format: "b64_json"`; Seedream takes 3 pixel sizes; Grok images take 5 ratios. **Only the old `gpt-image-2` body was driven live** (2026-11-11 report); the new fields (`n`, `quality: low`, a non-square size, `output_format`) and `n` above 1 were not. `kling_image` and `kling_omni_image` are image models.
+
+**Defaults** (changeable, one object: `MEDIA_DEFAULTS`): sound off, image quality medium where the model has quality, video resolution 720p where offered, length the model's default (5 s for Seedance).

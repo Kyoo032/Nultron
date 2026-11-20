@@ -8,7 +8,13 @@ describe("musicPickerEmpty", () => {
   });
 
   it("is true once the host answered with nothing to pick", () => {
-    expect(musicPickerEmpty({ loading: false, models: [] })).toBe(true);
+    expect(musicPickerEmpty({ loading: false, models: [], listed: true })).toBe(true);
+  });
+
+  it("is false when the read failed, when the key is missing, or before it has loaded", () => {
+    // A failed read is not "this key has no music model"; the error banner says what happened.
+    expect(musicPickerEmpty({ loading: false, models: [], listed: false })).toBe(false);
+    expect(musicPickerEmpty({ loading: false, models: [], listed: true, keyMissing: true })).toBe(false);
   });
 
   it("is false as soon as there is one model", () => {

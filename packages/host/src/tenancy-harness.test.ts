@@ -122,6 +122,7 @@ type Seeds = {
   sourceId: string;
   agentId: string;
   channelId: string;
+  conversationId: string;
   meetingId: string;
   proposalId: string;
 };
@@ -233,6 +234,7 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
   // --- threads and runs ---------------------------------------------------------------------
   { method: "GET", path: "/api/v1/threads/:threadId", params: { threadId: "threadId" } },
   { method: "DELETE", path: "/api/v1/threads/:threadId", params: { threadId: "threadId" } },
+  { method: "POST", path: "/api/v1/voice/sessions/:id/end", params: { id: "unseeded" }, body: {} },
   {
     method: "POST",
     path: "/api/v1/threads/:threadId/runs/text",
@@ -441,6 +443,43 @@ const BY_ID_ROUTES: readonly ByIdRoute[] = [
     body: { text: "tenant B was here" },
   },
 
+  // --- customer inbox (WhatsApp, Phase 1) --------------------------------------------------------
+  // A conversation hangs off the desk's connected number; every store statement filters on the desk.
+  // (The webhook that writes into the inbox is not a by-id route: it names no id, and it takes the
+  // desk from the connected-number row. Its own refusals are in handlers/customers.test.ts.)
+  {
+    method: "GET",
+    path: "/api/v1/customers/conversations/:conversationId",
+    params: { conversationId: "conversationId" },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/customers/conversations/:conversationId/read",
+    params: { conversationId: "conversationId" },
+    body: {},
+  },
+  {
+    method: "POST",
+    path: "/api/v1/customers/conversations/:conversationId/reply",
+    params: { conversationId: "conversationId" },
+    // Sendable text, so the call reaches the desk-scoped `sendTarget` rather than 400ing on an
+    // empty reply. It never reaches Meta: the conversation is refused first.
+    body: { text: "tenant B was here" },
+  },
+  {
+    method: "POST",
+    path: "/api/v1/customers/conversations/:conversationId/state",
+    params: { conversationId: "conversationId" },
+    body: { state: "closed" },
+  },
+  {
+    // Erasing a customer is the one destructive by-id route here, so the survivor check below matters
+    // most for it: tenant A's conversation must still read after tenant B has tried to erase it.
+    method: "DELETE",
+    path: "/api/v1/customers/conversations/:conversationId",
+    params: { conversationId: "conversationId" },
+  },
+
   // --- meetings (PR #66) -------------------------------------------------------------------------
   { method: "GET", path: "/api/v1/meetings/:meetingId", params: { meetingId: "meetingId" } },
   { method: "DELETE", path: "/api/v1/meetings/:meetingId", params: { meetingId: "meetingId" } },
@@ -602,6 +641,7 @@ async function seedTenantA(): Promise<Seeds> {
   const { legalStore } = await import("./legal/store");
   const { addMemory, addPastedSource } = await import("./knowledge");
   const { channelStore } = await import("./channels/store");
+  const { inboxStore } = await import("./inbox/db");
   const { meetingStore } = await import("./meeting/store");
   const { saveMedia } = await import("./media");
   const { listChatModels } = await import("@agentforge/core");
@@ -770,6 +810,31 @@ async function seedTenantA(): Promise<Seeds> {
   );
   const meeting = await step("meeting", () => meetingStore().create(tenantA, { title: LEAK_MARKER, locale: "en" }));
 
+  // A customer writing to tenant A's connected number: the endpoint is tenant A's desk's, and the
+  // conversation and its one message carry the marker.
+  const conversationId = await step("customer conversation", async () => {
+    const inbox = inboxStore();
+    const endpoint = inbox.connectEndpoint(
+      { organizationId: tenantA.organizationId, workspaceId: tenantA.workspaceId },
+      { kind: "whatsapp", externalId: "105550000000777", displayPhone: "+62 812-0000-0777", verifiedName: LEAK_MARKER },
+      T0,
+    );
+    return inbox.recordInbound(
+      endpoint,
+      {
+        type: "message",
+        phoneNumberId: endpoint.externalId,
+        contactId: "6281200000777",
+        contactName: LEAK_MARKER,
+        messageId: "wamid.HARNESS0001",
+        at: T0,
+        kind: "text",
+        text: LEAK_MARKER,
+      },
+      T0,
+    ).conversationId;
+  });
+
   // Through the proposal store the folder routes themselves read (`defaultFolderDeps` is the cached
   // one on the app database). A delete proposal has no proposed text to seal, and `pending` is the
   // state the survivor check below expects approve and reject to have left alone.
@@ -812,6 +877,7 @@ async function seedTenantA(): Promise<Seeds> {
     sourceId: source.id,
     agentId: agent.agent.id,
     channelId: channel.id,
+    conversationId,
     meetingId: meeting.id,
     proposalId,
   };
@@ -980,6 +1046,7 @@ describe("every by-id route refuses another tenant's id", () => {
     ["GET", "/api/v1/datasets/:datasetId", "datasetId"],
     ["GET", "/api/v1/legal/matters/:matterId", "matterId"],
     ["GET", "/api/v1/agents/:agentId", "agentId"],
+    ["GET", "/api/v1/customers/conversations/:conversationId", "conversationId"],
   ] as const)("tenant A still reads its own row on %s %s", async (method, path, seedKey) => {
     const result = await dispatch(
       {

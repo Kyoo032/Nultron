@@ -18,6 +18,10 @@ const RUN_ENTRIES: Readonly<Record<string, Entry>> = {
     how: "gated",
     why: "Chat and every mode agent. Passes the turn's `mediaPermission`, read from the body by `readMediaPermission`, which always asks.",
   },
+  "packages/host/src/voice/ask.ts": {
+    how: "gated",
+    why: "The voice thinker. Passes the `mediaPermission` of its own Chat turn setup (`prepareChatRun`, a body with no grants, so the gate always asks). Its bindings (`voiceBindings` in `voice/ask-tools.ts`) are an allow-list of read tools plus `request_tap`; it holds neither `image_generate` nor `video_generate`.",
+  },
   "packages/host/src/delegation/run-delegation.ts": {
     how: "tools stripped",
     why: "A delegated run binds `delegateToolKeys(agent)` (or `delegateToolKeys({ tools: FULL_CHAT_TOOLS })` for a team bot), which drops `image_generate` and `video_generate` (checked for every agent in core).",
@@ -44,6 +48,8 @@ const TOOL_OBJECT_USERS: Readonly<Record<string, string>> = {
   "packages/core/src/tools/platform/register.ts":
     "Registers the tools so a run can bind them. A model's call to either goes through invokeToolGuarded, with the run's gate.",
   "packages/host/src/studio-generate.ts": "The Images and Videos studios call the tool directly: Generate is the person's own click.",
+  "packages/host/src/workers/video-generate-tool.ts":
+    "Wraps `video_generate` so a chat turn is kept alive while it renders, and `register-tools.ts` registers the wrapper under the same key. It only registers: a model's call reaches it through `getTool(key)` inside `invokeToolGuarded`, which asks the gate by `tool.key` before `execute` runs, so the gate is unchanged.",
 };
 
 const SKIPPED_DIRS = new Set(["node_modules", ".next", "dist", "build", ".turbo", ".ci-local", "coverage", "out", ".git"]);

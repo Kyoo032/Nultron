@@ -162,6 +162,20 @@
       "when": 1788820000015,
       "tag": "0022_desk_files",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1788820000016,
+      "tag": "0023_customer_inbox",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1788820000017,
+      "tag": "0024_inbox_active_endpoint",
+      "breakpoints": true
     }
   ]
 }

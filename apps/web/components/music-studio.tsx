@@ -60,7 +60,7 @@ type LibraryResponse = {
   models: StudioModel[];
   defaultModel: string;
   ready: boolean;
-  speechUnavailable: "no_audio_models" | "realtime_only" | null;
+  speechUnavailable: "no_audio_models" | "realtime_only" | "none_on_key" | null;
 };
 
 const MODES = [
@@ -74,6 +74,7 @@ export function MusicStudio() {
   const { gatewayName } = useProductBrand();
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [models, setModels] = useState<StudioModel[]>([]);
+  const [listed, setListed] = useState(false);
   const [model, setModel] = useState("");
   const [mode, setMode] = useState<Mode>("describe");
   const [prompt, setPrompt] = useState("");
@@ -101,6 +102,7 @@ export function MusicStudio() {
       }
       setItems(data.items ?? []);
       setModels(data.models ?? []);
+      setListed(true);
       // `load` runs again after every generate: keep the model the person chose while it is still listed.
       setModel((current) => keepModelChoice(current, data.models ?? [], data.defaultModel));
       setReady(Boolean(data.ready));
@@ -148,8 +150,9 @@ export function MusicStudio() {
 
   const brief = mode === "custom" ? lyrics : prompt;
   const busy = generating || drafting;
-  // A disabled select with no options says nothing. If the host ever hands back an empty list, say why.
-  const noModels = musicPickerEmpty({ loading, models });
+  // A disabled select with no options says nothing. An empty list the host really answered with means
+  // this key can run no music model, and the panel says so with a link to the Models section.
+  const noModels = musicPickerEmpty({ loading, models, listed, keyMissing });
 
   async function draftLyrics() {
     if (!prompt.trim() || busy) {
@@ -269,7 +272,9 @@ export function MusicStudio() {
         {noModels ? (
           <div className="rounded-lg border border-[var(--line)] px-3 py-2" data-testid="music-studio-no-models">
             <p className="text-sm font-medium text-[var(--text)]">{t("music.noModels.title")}</p>
-            <p className="mt-1 text-xs text-[var(--text-2)]">{t("music.noModels.body", { gateway: gatewayName })}</p>
+            <p className="mt-1 text-xs text-[var(--text-2)]">
+              <SettingsLinkHint i18nKey="music.noModels.body" vars={{ gateway: gatewayName }} />
+            </p>
           </div>
         ) : null}
 
@@ -416,9 +421,13 @@ export function MusicStudio() {
             className="mt-1 max-w-[var(--content-narrow)] text-xs text-[var(--text-3)]"
             data-testid="music-studio-voice-unavailable"
           >
-            {speechUnavailable === "realtime_only"
-              ? t("music.voiceUnavailable.realtimeOnly")
-              : t("music.voiceUnavailable.noAudioModels")}
+            {speechUnavailable === "realtime_only" ? (
+              t("music.voiceUnavailable.realtimeOnly")
+            ) : speechUnavailable === "none_on_key" ? (
+              <SettingsLinkHint i18nKey="music.voiceUnavailable.noneOnKey" vars={{ gateway: gatewayName }} />
+            ) : (
+              t("music.voiceUnavailable.noAudioModels")
+            )}
           </p>
         </section>
       ) : null}

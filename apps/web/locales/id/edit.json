@@ -85,6 +85,7 @@
     "storyboard": "Papan cerita",
     "storyboardPhase": "Papan cerita tersedia di Tahap 3.",
     "needsKey": "Tambahkan kunci gateway {gateway} di {settings} agar bisa membuat konten.",
+    "noModel": "Kunci ini belum punya model yang bisa membuat konten ini. Periksa bagian Model di {settings}.",
     "settingsLink": "Pengaturan",
     "animateStillClip": "Animasikan klip gambar di bawah playhead",
     "stillUrlPlaceholder": "URL gambar diam, atau geser playhead ke klip gambar",

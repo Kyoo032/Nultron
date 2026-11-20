@@ -10,4 +10,5 @@ export { jsonError, jsonOk } from "./errors";
 export { mediaRoot } from "./media-root";
 export { ensureToolsRegistered } from "./register-tools";
 export { handleBootEditJobs } from "./handlers/edit";
+export { attachVoiceUpgrade } from "./voice/upgrade";
 export { killTrackedChildren, trackedChildCount } from "./child-processes";

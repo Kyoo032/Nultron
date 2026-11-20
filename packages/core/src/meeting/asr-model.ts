@@ -67,6 +67,9 @@ const CANNOT_HEAR = new Set(["image", "video", "other"]);
  * transcription") on both wires.
  */
 export const TRANSCRIPTION_PREF = [
+  // Driven on 2026-11-11 on a prepaid key: a purpose-built recogniser on `/v1/audio/transcriptions`, which
+  // answered where the audio-in chat models were not tried. A gateway that does not list it skips it.
+  "muse-voice-transcribe-1.0",
   "gemini-3.5-flash",
   "gpt-audio-mini",
   "gpt-audio-1.5",

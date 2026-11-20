@@ -1,0 +1,71 @@
+{
+  "mic": {
+    "start": "Mulai bicara",
+    "stop": "Akhiri bicara",
+    "disabledHint": "Tunggu balasan saat ini selesai sebelum mulai bicara."
+  },
+  "view": {
+    "title": "Obrolan suara",
+    "close": "Tutup",
+    "end": "Akhiri",
+    "you": "Anda",
+    "assistant": "Nultron",
+    "captionsEmpty": "Silakan mulai bicara.",
+    "savedNote": "Semua yang diucapkan di sini tersimpan sebagai teks di obrolan ini."
+  },
+  "state": {
+    "connecting": "Menghubungkan",
+    "listening": "Mendengarkan",
+    "hearing": "Mendengar Anda",
+    "thinking": "Berpikir",
+    "speaking": "Berbicara"
+  },
+  "mode": {
+    "handsFree": "Bicara langsung",
+    "pushToTalk": "Tekan untuk bicara",
+    "hold": "Tahan untuk bicara",
+    "release": "Lepas untuk kirim",
+    "switchLabel": "Mode bicara"
+  },
+  "hint": {
+    "bargeIn": "Langsung bicara saja kapan pun Anda ingin menyela."
+  },
+  "card": {
+    "label": "Perlu persetujuan Anda",
+    "run": "Jalankan di Chat",
+    "started": "Dimulai di Chat"
+  },
+  "caption": {
+    "interrupted": "Disela"
+  },
+  "ended": {
+    "user": "Anda mengakhiri sesi suara.",
+    "max_length": "Sesi suara berakhir karena sudah mencapai batas 15 menit.",
+    "idle": "Sesi suara berakhir karena tidak ada yang bicara selama dua menit.",
+    "dropped": "Koneksi suara terputus.",
+    "error": "Sesi suara berhenti karena terjadi kendala.",
+    "replaced": "Sesi suara di sini berakhir karena dibuka di tempat lain."
+  },
+  "reconnect": {
+    "button": "Bicara lagi"
+  },
+  "phone": {
+    "backgrounded": "Suara berhenti saat layar terkunci atau Anda keluar dari aplikasi; ketuk untuk bicara lagi."
+  },
+  "error": {
+    "micDenied": "Mikrofon diblokir. Izinkan akses mikrofon lewat pengaturan situs di browser Anda, lalu coba lagi.",
+    "micMissing": "Mikrofon tidak ditemukan. Pasang mikrofon terlebih dahulu sebelum mencoba lagi.",
+    "micBusy": "Mikrofon sedang dipakai aplikasi lain. Tutup aplikasi itu terlebih dahulu.",
+    "unsupported": "Browser ini belum mendukung obrolan suara. Pakai Chrome, Edge, atau Safari versi terbaru untuk membuka meja kerja ini.",
+    "insecure": "Obrolan suara butuh halaman yang aman (https). Buka meja kerja ini lewat https untuk memakainya.",
+    "voice_disabled": "Obrolan suara belum diaktifkan untuk meja kerja ini.",
+    "gateway_blocked": "Meja kerja ini belum punya kunci {gatewayName} yang aktif. Tempel kunci di Pengaturan dulu agar fitur ini bisa dipakai.",
+    "voice_session_limit": "Sesi suara yang sedang terbuka sudah mencapai batas. Tunggu sebentar sebelum memulai lagi.",
+    "voice_model_unavailable": "Model suara sedang tidak merespons. Coba lagi sebentar lagi.",
+    "connect": "Koneksi ke layanan suara gagal. Periksa jaringan Anda, lalu coba lagi.",
+    "thread": "Obrolan ini gagal dibuka untuk menyimpan percakapan. Muat ulang halaman ini terlebih dahulu."
+  },
+  "a11y": {
+    "stateLive": "Status suara: {state}."
+  }
+}

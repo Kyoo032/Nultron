@@ -14,7 +14,7 @@
 
 /**
  * The product surface the call was made from. This is a *metering* label, wider than `JobMode`:
- * it also covers chat, the edit agent and the three media studios, none of which are job modes.
+ * it also covers chat, the edit agent, live voice and the three media studios, none of which are job modes.
  * `other` is the honest answer for a call site nobody has classified yet — it still gets a row.
  */
 export const USAGE_MODES = [
@@ -32,6 +32,7 @@ export const USAGE_MODES = [
   "music",
   "meetings",
   "edit",
+  "voice",
   "other",
 ] as const;
 

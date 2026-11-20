@@ -143,15 +143,20 @@ describe("createMediaPermission", () => {
 
   it("names the default model on a refusal that names none, and not on one that does", () => {
     const gate = createMediaPermission(policy());
-    expect(gate?.beforeCall("image_generate", { prompt: "a red fox", model: "default" })?.defaultModel).toBe("gpt-image-2");
-    expect(gate?.beforeCall("video_generate", { prompt: "a fox runs" })?.defaultModel).toBe("grok-imagine-video");
+    expect(gate?.beforeCall("image_generate", { prompt: "a red fox", model: "default" })?.defaultModel).toBe("gpt-image-2.5-flare");
+    // A picture to edit runs on the id that has an edit route, so the card prices that one.
+    expect(
+      gate?.beforeCall("image_generate", { prompt: "a red fox", image_url: "/api/v1/media/abc/file" })?.defaultModel,
+    ).toBe("gpt-image-2");
+    // The built-in video fallback is the id proven on a prepaid key (2026-11-11), not Grok.
+    expect(gate?.beforeCall("video_generate", { prompt: "a fox runs" })?.defaultModel).toBe("seedance-2.0-fast");
     expect(gate?.beforeCall("image_generate", { prompt: "a red fox", model: "gpt-image-1-mini" })?.defaultModel).toBeUndefined();
   });
 
   it("names the host's own default model when the host sets one, and the built-in one when it sets none", () => {
     const set = createMediaPermission(policy(), (tool) => (tool === "image_generate" ? "my-image-model" : undefined));
     expect(set?.beforeCall("image_generate", { prompt: "a red fox" })?.defaultModel).toBe("my-image-model");
-    expect(set?.beforeCall("video_generate", { prompt: "a fox runs" })?.defaultModel).toBe("grok-imagine-video");
+    expect(set?.beforeCall("video_generate", { prompt: "a fox runs" })?.defaultModel).toBe("seedance-2.0-fast");
     expect(set?.beforeCall("image_generate", { prompt: "a red fox", model: "gpt-image-1-mini" })?.defaultModel).toBeUndefined();
   });
 

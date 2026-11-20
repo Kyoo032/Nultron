@@ -10,6 +10,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isServerMode } from "@agentforge/core";
 import express from "express";
+import { attachVoiceUpgrade } from "@agentforge/host";
 import { handleNodeRequest } from "@agentforge/host/http";
 import { resolveBindHost } from "./lib/bind-host";
 import { assertHostedEnvComplete, assertHostedModeCoherent, warnWeakDeskVaultKey } from "./server/hosted-mode-guard";
@@ -71,6 +72,7 @@ async function main() {
   // (packages/host/src/http-adapter.ts IDENTITY_HEADERS). Must stay above the first `app.use`.
   app.disable("x-powered-by");
   const server = http.createServer(app);
+  attachVoiceUpgrade(server);
 
   // Ahead of the API and of every static file. Null on a hosted server and on a desk that did
   // not set the preview credentials, so those processes keep the middleware stack they had.

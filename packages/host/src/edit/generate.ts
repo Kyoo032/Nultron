@@ -1,4 +1,4 @@
-import { ApiError, maskPii, type TenantContext } from "@agentforge/core";
+import { ApiError, maskPii, VIDEO_JOB_PENDING_CODE, VIDEO_JOB_PENDING_STATUS, type TenantContext } from "@agentforge/core";
 import { generateFailureMessage } from "./generate-failure";
 
 export type GenerateSubmitResult = {
@@ -25,6 +25,11 @@ let submitImpl: GenerateSubmitFn | null = null;
 
 export function setGenerateSubmit(next: GenerateSubmitFn | null): void {
   submitImpl = next;
+}
+
+/** The answer of a video the gateway accepted and was still rendering when the wait ran out. */
+export function isVideoJobPending(body: unknown): boolean {
+  return Boolean(body) && typeof body === "object" && (body as { code?: unknown }).code === VIDEO_JOB_PENDING_CODE;
 }
 
 export function isPrepaidFailure(status: number, body: unknown): boolean {
@@ -68,6 +73,11 @@ export async function runGenerateJob(
   }
   if (isPrepaidFailure(result.status, result.body)) {
     throw new ApiError("prepaid_async_requires_fixed_price", "Prepaid async generation is not retried", 403);
+  }
+  // The gateway still has this job and will bill it when it finishes: the 5xx retry below would send the
+  // brief again. The job ends here, with the message that says so.
+  if (isVideoJobPending(result.body)) {
+    throw new ApiError(VIDEO_JOB_PENDING_CODE, generateFailureMessage(result.status, result.body), VIDEO_JOB_PENDING_STATUS);
   }
   if (result.status >= 400 && result.status < 500) {
     throw new ApiError("generate_failed", generateFailureMessage(result.status, result.body), 400);
