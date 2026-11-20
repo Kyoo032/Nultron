@@ -230,7 +230,7 @@ describe("an answer", () => {
     });
   });
 
-  it("reaches the gateway once, on the chat wire, with no thinking and the voice note last", async () => {
+  it("reaches the gateway once, on the chat wire, at the lowest thinking level and the voice note last", async () => {
     script = [says("Fine.")];
     const threadId = await newThread();
     await ask1(threadId, "How are you?");
@@ -244,7 +244,8 @@ describe("an answer", () => {
     expect(system).toContain("at most three short sentences");
     expect(system).toContain("You are the general assistant on the owner's desk");
     const effort = ((seen[0] as Captured).body as { reasoning_effort?: unknown }).reasoning_effort;
-    expect(effort === undefined || effort === "none").toBe(true);
+    // Not "none": the gateway refuses Thinking off for some models (claude-sonnet-5-5 answers 400).
+    expect(effort).toBe("low");
   });
 
   it("tells the model the session's language, whatever the person's screen language is", async () => {

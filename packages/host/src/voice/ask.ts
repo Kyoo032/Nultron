@@ -277,8 +277,10 @@ export async function askNultron(input: AskInput, options: AskOptions = {}): Pro
         tenant,
         threadId,
         modality: "text",
-        // Thinking off: a spoken turn has about a second, and the Knowledge Base supplies the facts.
-        body: { content: question, thinking: false },
+        // The lowest Thinking level, not off: a spoken turn has about a second and the Knowledge Base supplies
+        // the facts, but the gateway refuses Thinking off for some models (`claude-sonnet-5-5` answers 400 to
+        // `none`, 2026-11-20), and every voice ask then failed.
+        body: { content: question, reasoningEffort: "low" },
         locale,
       });
       state.model = prepared.version.model;
