@@ -54,6 +54,12 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## A picture turn also holds back a text-only tier model, 2026-11-19 (branch `devin/1795097952-tier-fallback-text-only` from `main`; `ci:local` run, unit tests run; not driven live)
+
+Lanes: main, enterprise, tester
+
+Devin Review on #233's merged code found a Reasoning failover could land on `deepseek-v4-pro`, a text-only model, while the chat thread replays a picture it cannot read at all. The 2026-11-13 picture demotion covered only `modelMisreadsPictures` (the two Lunas); `tierLiveness` (`packages/host/src/tier-resolve.ts`) now demotes a candidate on the same `carriesPicture` flag when `modelImageInput(id) === "no"` either — still a demotion, never a drop, so it answers when nothing else of the tier is live. Effect today: on a Reasoning picture turn with `claude-opus-5-5` and `gpt-6-astra` down, the walk picks `qwen3.8-max` ahead of `deepseek-v4-pro`. The 2026-11-13 entry below says "Reasoning is unchanged"; this entry amends it. Corrects the recipe note in `features/model-tiers.md` the same way. Proof: `tier-resolve-picture.test.ts` (the Reasoning walk under a replayed picture and without), `tier-resolve.test.ts` (demoted = misreader or text-only), `pnpm ci:local` all required steps pass.
+
 ## Daily no longer sends a picture turn to the Luna models, which misread pictures, 2026-11-13 (branch `fix/daily-picture-model` from `main` at `365d4af6`; unit tests run, driven on `:3000`)
 
 Lanes: enterprise, tester
@@ -1298,3 +1304,118 @@ Lanes: enterprise, tester.
 - **Proof.** `ai-sdk-runtime-blank-reasoning.test.ts`, real AI SDK, Responses wire, replaced `fetch`. Before the fix the readable-reasoning case, with and without a tool bound, failed with `unexpected request number 2` (the model was asked a second time); after, one request, one `assistant.thinking` event, one `run.probing`, one `run.completed`. New `retry.test.ts` cases pin the two predicates. The case in the card's last paragraph, a drop after reasoning, could not be driven end to end: the SDK reports a body that fails mid-stream as "Failed to process successful response", which is not retryable, so it already ended after one call on that path. The predicate test covers it.
 - **Found, not fixed.** `AiSdkRuntime.execute` meters `first.usage` plus the final `result.usage` only. The usage of any call in between (the tool-less retry when the contact loop runs after it, the contact retries before the last, the call the effort heal discards) is billed by the gateway and never reaches the ledger. Before this fix that included the extra reasoning calls. Left for its own card.
 - **Not driven.** No live gateway and not `:3000`.
+
+## Newest and cheapest models, and the three Chat tiers hardened, 2026-11-10 (branch `claude/zen-volta-0v15wz`)
+
+Lanes: enterprise, tester.
+
+- **What (owner, 2026-11-10).** Everyone runs the newest models at the lowest price, and nothing the product picks by itself is an older generation that costs more. Prices are the gateway's public list (`GET /api/pricing`, group ratio 1) that day, USD per 1M input / output.
+- **Superseded list.** `packages/core/src/models/superseded.ts` names ten old ids and the id that took each place: GPT 5.6 Luna, Terra and Sol, `gpt-5-mini` (shut down 2026-12-11), Claude Sonnet 5, Opus 5 and Haiku 4.5, DeepSeek V4 Flash, Gemini 3.5 Flash ($1.50 / $9) for Gemini 3.8 Flash ($0.50 / $3), Kimi K3 for K3.1 Pro. No successor costs more on input or output. `model-policy-guard.test.ts` fails if any list the product walks (Chat default, Recommended, the three tiers, every job mode, the fallback tail, both choice profiles) names one. The studios' pickers (`pickerGroups`) leave them out unless the desk already has one selected, so a saved pick is never stranded.
+- **Lists.** Every head is unchanged and probed (2026-09-30). Fastest: DeepSeek V4.1 Flash, GPT 6 Luna, then Claude Haiku 5.5 ($0.10 / $0.50) and Qwen3.8 Flash ($0.15 / $0.47). Reasoning: Claude Opus 5.5, GPT 6 Astra ($10 / $50, probed), then DeepSeek V4 Pro ($1.33 / $4), Qwen3.8 Max. DeepSeek V4 Pro moves to second once its probe passes: the second place is where a tier run's one failover lands (Dev Findings DFIND-69). Daily: Gemini 3.8 Flash in fourth place, Claude Haiku 5.5 and Qwen3.8 Flash as stand-ins. Job modes: Legal and Meeting take Claude Opus 5.5 where GPT 5.6 Sol stood (same price), Documents, Finance and Market take Qwen3.8 Flash after DeepSeek V4.1 Flash, Research and Data take Claude Haiku 5.5, Presentations and Legal take Kimi K3.1 Pro. `choice-profiles.ts` now reads the tier lists instead of keeping copies.
+- **Not yet probed:** `claude-haiku-5-5`, `qwen3.8-flash`, `gemini-3.8-flash`, `kimi-k3.1-pro`, `deepseek-v4-pro`. Each has its own policy entry whose note says so, with its family's behaviour. A new guard (`tiers.test.ts`) refuses an unprobed model in a tier's first two places. Run `pnpm --filter @agentforge/host eval:models:probe --ids claude-haiku-5-5,qwen3.8-flash,gemini-3.8-flash,kimi-k3.1-pro,deepseek-v4-pro --only-ids` once a key is on the desk.
+- **Bug: a tier run had no fallback.** `runs.ts` treated a tier as a pinned model (`modelExplicit`), so when a tier's model failed before it spoke (the probe saw Claude Opus 5.5 answer a capacity 503) the turn failed, and the model was not put on the breaker, so the next turn hit it again. The spec promised otherwise (`model-tiers-spec.md` section 3). Now the turn moves once to the next live model of the same tier (`nextTierModel`, `tier-resolve.ts`), at the tier's Thinking level, on the same transport-class failures a stand-in covers, and never to another tier. The notice names no model (`tierFallback` in `chat-locale.ts`, en and id; `run.model_fallback` carries the message alone).
+- **Bug: the tier walk read the wrong breaker.** `tierLiveness` asked `isJobModelDown(model)` with no tenant, while Chat marks a model down for its own tenant, so no mark was ever seen. It now reads the run's tenant, and so do delegation (`run-delegation.ts`) and the tier availability in `GET /api/v1/chat` and `/models`.
+- **Tier guards.** Each tier has at least three candidates from at least three vendors, its first two candidates come from two vendors, and it still resolves to another vendor when any one vendor is held down entirely.
+- **Hand-off proof, offline.** `packages/core/src/runtime/ai-sdk-runtime-tier-handoff.test.ts` runs one conversation through the real runtime and AI SDK across the three tier heads and wires (Completions, Messages, Responses), in both orders, and checks every request carries the earlier answers in order with no field from another wire.
+- **Bug it found: a blank assistant turn reached the wire.** `toModelMessages` (`packages/core/src/runtime/ai-sdk-runtime.ts`) pushed an assistant turn whose text was empty or whitespace as is, and on Messages that is a blank text block, which Anthropic refuses with 400. A thread that switched to Reasoning after such a turn would have failed. Only the host's skip (`runs.ts:416`) stood in front of it. The runtime now drops the turn itself; non-blank text is sent byte for byte, and the 260 recorded wire bodies do not move.
+- **Proof.** `packages/core` 305 files, 4,517 tests pass; host `runs*`, `tier*`, `delegation`, model and chat handlers 20 files, 187 tests pass, including `runs-tier-fallback.test.ts` (9 new); `tsc --noEmit` clean in core, host and web.
+- **Live check, built and owed.** `packages/host/eval/models/handoff.ts` (dev only, never ships): two three-turn conversations through the real runtime Chat uses, Fast → Reasoning → Daily and back, each turn resolved by the real tier resolver against the desk's catalogue, with the history carried as text. Turn 1 picks a four-digit number, turn 2 adds one, turn 3 writes both in Indonesian words, so a turn passes only if it read the turn before, on another vendor. `--all-candidates` calls every candidate of every tier once. 56 unit tests, no network; the dry run plans 6 calls (23 with `--all-candidates --handoff`). Run once a key is saved: `AGENTFORGE_DATA_DIR=<desk> pnpm --filter @agentforge/host eval:models:handoff --refresh --all-candidates --handoff` (add `--dry-run`, without `--refresh`, to see the plan first).
+- **Not driven.** No gateway key on the cloud VM: no live call, no probe of the new ids, not `:3000`.
+
+## The offline catalogue lists every id the three Chat tiers and the job fallback name, 2026-11-19 (PR #241, stacked on #233, branch `claude/zen-volta-0v15wz`)
+
+Lanes: enterprise, tester.
+
+- **What.** #233 took the superseded ids out of the tiers and `JOB_FALLBACK_TAIL`, and those were the only ids the static fill-in catalogue (`CHAT_MODELS`, `packages/core/src/models/catalog.ts`) shared with those lists. A desk with no cached gateway list, or one whose list fetch failed, then answered Daily and Fastest with `503 tier_unavailable`, and `jobFallbackChain` came back empty (Dev Findings DFIND-68).
+- **Fix.** `catalog.ts` now lists every id `CHAT_DEFAULT_PREFERENCES`, `FAST_TIER_GATEWAY_IDS`, `REASONING_TIER_GATEWAY_IDS` and `JOB_FALLBACK_TAIL` name: `gpt-6-astra`, `gpt-6-sol`, `gpt-6-luna`, `deepseek-v4-1-flash`, `glm-5.3-flash`, `qwen3.7-plus`, `qwen3.8-max`, `qwen3.8-flash` (OpenAI-compatible block), `gemini-3.8-flash` (Google), `claude-sonnet-5-5`, `claude-opus-5-5`, `claude-haiku-5-5` (Anthropic), each at the head of its block. Offline, Daily now lands on GPT 6 Luna, Fastest on DeepSeek V4.1 Flash and Reasoning on Claude Opus 5.5, the same heads as online. A live gateway list still replaces its provider's static block (`mergeChatCatalog`), so a desk with a cached list sees no change.
+- **Guards.** `catalog.test.ts` fails if a tier, the Chat default or the fallback tail names an id the fill-in catalogue lacks. `packages/host/src/tier-resolve-offline.test.ts` points the model cache at a missing file and checks every tier resolves and the job fallback chain is non-empty. Both failed before the fix.
+- **Not driven.** No gateway key on the cloud VM: the new ids are as unprobed as in #233, no live call, not `:3000`. The full `ci:local` was not run.
+
+
+## Preview desks sign in with a form, 2026-11-17 (branch `cursor/preview-form-login-d472`)
+
+Lanes: enterprise, tester.
+
+- **What.** The preview at `app.nultron-ai.xyz` answered `401` with `WWW-Authenticate: Basic realm="restricted"` from Caddy (`nultron-files/deploy/tencent/edge/sites/app.caddy`, not in this repo; SR-133). A scripted browser cannot fill that dialog. `PreviewGate` (`apps/web/server/preview-gate.ts`) replaces it when `PREVIEW_BASIC_USER` and `PREVIEW_BASIC_PASSWORD` are set and `AGENTFORGE_SERVER` is not. Pages redirect to `/login`. `/api` returns JSON `401`. Other files return plain `401`. The cookie is `HttpOnly`, `SameSite=Lax`, `Secure` in production, twelve hours, and an HMAC over an opaque id. Login attempts are limited per client address (five at once, then the hosted bucket). `POST /logout` clears it. A production boot without server mode is allowed only when both variables are set, so the stock `server.ts` can be the preview process. The hosted container does not set them, and `fromEnv` returns null in server mode.
+- **Env.** The repo never named the Caddy user's variables. These two are new names for the same username and password. The values are read from the environment only and are not trimmed on the password. Nothing in `webapp-deploy/.env.example` changed.
+- **Not in this commit.** Removing `basic_auth` from `sites/app.caddy`. Until that block is gone, the public name still shows the native dialog in front of this form.
+- **Login document.** The form is the desk's own paint: the chat sky, a raised card, the mark and the wordmark, DM Sans, the field and primary-button styles, and `.dark` when `agentforge-theme` is `dark`. One language per response, from `Accept-Language`. The mark and the font are inlined.
+- **Review, same branch.** `safeNext` percent-decodes until the path stops changing and then checks it, so `/.//evil.com` and `/%252f%252fevil.com` do not redirect off this origin. `Origin: null` is accepted only when `Sec-Fetch-Site` is `same-origin`, which is how Chrome submits the form under `Referrer-Policy: no-referrer`. The same literal with `same-site`, or with that header missing, is 403. A real Origin must match scheme, hostname and port. The HMAC key is `randomBytes(32)` per process: sessions reset on restart, and this assumes one process. IPv6 rate limits are keyed by /64. `POST /login` and `POST /logout` answer 403 when `Sec-Fetch-Site` is `cross-site`, or when a real Origin does not match this request. The rate-limit token is taken before the body is read, and a body past 4 KB destroys the request. The image healthcheck and the Caddy `health_uri` are already `GET /healthz`. `GET /api/v1/components` is 401 once the gate is mounted, so a preview probe still pointed there must move to `/healthz`.
+- **Proof.** `apps/web/server/preview-gate.test.ts`. Not driven on the live preview.
+
+## 2026-11-19 — Retry interrupted reasoning streams (DFIND-66, PR #246)
+
+- **Lanes: enterprise, tester.** A clean thinking-only reply is still completed once (DFIND-65), but missing/unknown stream finish and stream abort now count as failed attempts. Gemini generate-content and Responses both need a real finish reason, not the SDK's synthetic unknown finish at EOF.
+- SDK wrappers such as `Failed to process successful response` are classified through their cause chain: transport failures retry, a generic wrapper or parse error alone does not. Auth failures and caller cancellation still stop without retrying. Before retrying, the failed thinking is replaced in the live pane and persisted message, not appended twice.
+- **Proof:** `ai-sdk-runtime-stream-drop.test.ts` starts a real loopback HTTP server and covers socket destruction, truncated malformed SSE, unfinished EOF, clean thinking-only completion, 401 and caller cancellation on both wires. `scripts/mock-thinking-gateway.ts` provides the same A/B/clean/401 cases for browser QA; instructions are in the Chat verification recipe. Not browser-driven in this pass.
+
+## Mask case-varied and form-encoded bearer tokens, 2026-11-19
+
+Lanes: enterprise, tester.
+
+- `redactCredentials` now masks a bearer token regardless of the scheme's case and also accepts `+` as a form-encoded space. The existing `Bearer [REDACTED]` output is unchanged.
+- The `redactSecrets` fallback masks standalone opaque tokens of 32 or more characters that include `-`, `_` or internal dots. Diagnostic paths, UUIDs and multi-word snake_case labels stay readable.
+
+## Require the production preview form before Caddy cutover, 2026-11-19
+
+Lanes: enterprise, tester.
+
+- **What.** `PreviewGate.requireProduction(process.env)` refuses to boot outside production, in server mode or without both preview credentials. Use it in the external preview entrypoint before importing the host/database, then mount the middleware ahead of the API and static files. Stock hosted and webdev boot are unchanged.
+- **Still owed.** Follow the [preview cutover checks](../../webapp-deploy/README.md#preview-desks-mount-the-form-before-changing-caddy). Keep Caddy Basic Auth until the external mount has passed unauthenticated upstream checks and replacement routing preserves per-desk isolation.
+- **Proof.** The web suite exercises the production middleware with anonymous page, API and POST requests, public liveness and a same-origin form login. Scoped local CI passed; the live preview was not changed or driven.
+
+## Chat usage counts model retries, 2026-11-19 (DFIND-65)
+
+Lanes: enterprise, tester.
+
+- A completed Chat turn records the reported tokens from every model attempt in one usage total, including billed attempts that error or return no answer before a retry. No new ledger rows are written per attempt.
+
+## Mask long snake_case credentials, 2026-11-19 (DFIND-89)
+
+Lanes: enterprise, tester.
+
+- `redactSecrets` now preserves only known diagnostic event names instead of exempting all letters-only snake_case values. Existing path and UUID handling is unchanged.
+
+## Accept same-origin preview sign-in on IPv6-literal URLs, 2026-11-19
+
+Lanes: enterprise, tester.
+
+- Preview form sign-in and sign-out no longer return 403 just because the browser uses a bracketed IPv6 address as the host. The address is canonicalized before comparison; a different address, scheme or port still fails.
+- The preview gate HTTP suite covers the fix. The live preview was not changed or driven; Caddy Basic Auth stays on.
+
+## Redactor URL-path edges: word-like segments stay, `.~` tails mask, 2026-11-20 (DFIND-95)
+
+Lanes: enterprise, tester.
+
+- The bare 24+-character URL path segment rule in `redactSecrets` now also requires token entropy (at least two of lower-case, upper-case and digit), so a long word-like segment such as `gettingstartedwithinstallation` stays readable; webhook secrets and hex runs still mask.
+- An opaque run ending in a `.`/`~` tail (`token.~`, `token~`) is now masked with its tail; a lone trailing `.` still reads as sentence punctuation.
+
+## Redactor masks `=` padding before a tilde tail, 2026-11-20 (DFIND-100)
+
+Lanes: enterprise, tester.
+
+- An opaque run ending in `=` padding followed by a `.`/`~` tail (`token=.~`, `token=~`) is now masked whole instead of leaving a `=.~` residue.
+
+## Redactor masks `=` padding residue with or without a tail, 2026-11-20 (DFIND-102)
+
+Lanes: enterprise, tester.
+
+- An opaque run ending in `==` padding followed by a `.`/`~` tail (`token==~`, `token==.~`) is now masked whole instead of leaving one `=` behind; bare `token=` and `token==` padding no longer leaks either.
+
+## Redactor consumes a padding run of any length, 2026-11-20 (DFIND-104)
+
+Lanes: enterprise, tester.
+
+- An opaque run's trailing `=` padding is no longer capped at two (`token===`, `token===~`): the padding group and both masked-run strip passes are now unbounded (`=*` / `=+`), ending the `=` residue class.
+## Redactor strips padding and tails without backtracking, 2026-11-20
+
+Lanes: enterprise, tester.
+
+- `redactSecrets` no longer spends seconds on a token followed by ~100,000 `=` characters: the two trailing-strip regexes (`=*[.~]*~=*$`, `=+$`, and the same pair on a URL path segment's bare form) are now a single linear index walk (`stripPaddingTail`), so every padding/tail combination still strips while long runs stay millisecond-fast. ReDoS cases cover `=` runs and `.~` runs at 100,000 characters.
+
+## Redactor masks URL query and fragment secrets, 2026-11-20 (DFIND-94/96/98/99/101/103/104)
+
+Lanes: enterprise, tester.
+
+- A `?`, `&` or `#` pair value of 24+ token characters inside a URL is now masked — plain queries, fragment routes (`/#/cb?sig=`), `#name=` fragment pairs, and the `\/` or `\\/` of a JSON-escaped `https:\/\/` URL. A value continues through an escaped slash so a token like `<24+>\/suffix` masks whole.
+- A word-like query value (`callback=onCompleteHandlerFunction`, `gettingstartedwithinstallation`) stays readable: it must have a lowercase word run, no digit and no consonant run of five. A long hyphenated phrase is a documented exception — it reads as an opaque run (`-` plus alnum) and masks.

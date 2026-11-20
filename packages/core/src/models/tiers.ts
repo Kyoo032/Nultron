@@ -86,14 +86,39 @@ function define(
  *
  * Only the pinned gateway has lists. Enterprise key providers get theirs in M4.
  */
+/**
+ * Fastest and Reasoning, gateway lists (2026-11-10, owner: newest and cheapest, nothing superseded).
+ * Prices are the gateway's public list that day, USD per 1M input / output.
+ *
+ * - Fastest: DeepSeek V4.1 Flash ($0.03 / $1.20 peak, half off-peak) and GPT 6 Luna ($0.10 / $0.50), both
+ *   probed; then Claude Haiku 5.5 ($0.10 / $0.50) and Qwen3.8 Flash ($0.15 / $0.47), not yet probed. Four
+ *   vendors, so one vendor's outage never empties the tier. GPT 5.6 Luna and DeepSeek V4 Flash left.
+ * - Reasoning: Claude Opus 5.5 ($4 / $20, probed) heads it and GPT 6 Astra ($10 / $50, probed) is next,
+ *   because a tier run's one failover lands on the second place and must be on a model already seen to
+ *   take Deep. Then DeepSeek V4 Pro ($1.33 / $4.00, not yet probed, text only), the cheapest deep model,
+ *   which moves up to second once eval:models:probe passes on it, and Qwen3.8 Max ($1.71 / $5.14).
+ *   GPT 5.6 Sol and Kimi K3 left.
+ *
+ * `choice-profiles.ts` reads these two lists rather than keeping copies.
+ */
+export const FAST_TIER_GATEWAY_IDS: readonly string[] = Object.freeze([
+  "deepseek-v4-1-flash",
+  "gpt-6-luna",
+  "claude-haiku-5-5",
+  "qwen3.8-flash",
+]);
+
+export const REASONING_TIER_GATEWAY_IDS: readonly string[] = Object.freeze([
+  "claude-opus-5-5",
+  "gpt-6-astra",
+  "deepseek-v4-pro",
+  "qwen3.8-max",
+]);
+
 export const TIER_DEFINITIONS: TierDefinitions = Object.freeze({
   daily: define("daily", "default", { [GATEWAY_PROVIDER_ID]: CHAT_DEFAULT_PREFERENCES }),
-  fast: define("fast", "off", {
-    [GATEWAY_PROVIDER_ID]: ["deepseek-v4-1-flash", "gpt-6-luna", "gpt-5.6-luna", "deepseek-v4-flash"],
-  }),
-  reasoning: define("reasoning", "deep", {
-    [GATEWAY_PROVIDER_ID]: ["claude-opus-5-5", "gpt-6-astra", "gpt-5.6-sol", "kimi-k3"],
-  }),
+  fast: define("fast", "off", { [GATEWAY_PROVIDER_ID]: FAST_TIER_GATEWAY_IDS }),
+  reasoning: define("reasoning", "deep", { [GATEWAY_PROVIDER_ID]: REASONING_TIER_GATEWAY_IDS }),
 });
 
 export function isModelTierId(value: unknown): value is ModelTierId {

@@ -527,6 +527,8 @@ export {
   sortChatModels,
 } from "./models/preferred";
 export type { PickerGroup, PickerGroupKind } from "./models/preferred";
+export { SUPERSEDED_MODELS, isSupersededModel } from "./models/superseded";
+export type { SupersededModel } from "./models/superseded";
 export { curateModel, applyCuration, isEverydayModel, isThinkingModel } from "./models/curation";
 export type { ModelTier, CuratedModelMeta } from "./models/curation";
 export {
@@ -688,6 +690,7 @@ export {
   GENERALIST_EXTRA_TOOLS,
   GENERALIST_WORKER_PROMPT,
   GENERALIST_WORKER_TOOLS,
+  FULL_CHAT_TOOLS,
   VIRTUAL_AGENTS,
   VIRTUAL_AGENT_SLUG_PREFIX,
   isVirtualAgentSlug,
@@ -698,6 +701,21 @@ export {
   virtualAgentsForDesk,
 } from "./agents/virtual-agents";
 export type { VirtualAgent, VirtualAgentConversation } from "./agents/virtual-agents";
+export {
+  MAX_TEAM_BOTS,
+  TEAM_BOT_CONFIG_KEY,
+  TEAM_BOT_NAME_MAX,
+  TEAM_BOT_PROMPT_MAX,
+  TEAM_BOT_ROLE_KEY,
+  TEAM_BOT_ROLE_MAX,
+  TEAM_BOT_SLUG_PREFIX,
+  isTeamBotSlug,
+  proposeTeamDeterministic,
+  sanitizeTeamBotProposal,
+  teamBotSlug,
+  teamProposalModes,
+} from "./agents/team-bots";
+export type { TeamBotProposal, TeamBotView, TeamProposal, TeamRoster } from "./agents/team-bots";
 export { defineTool, invokeTool } from "./tools/define-tool";
 export type { ToolDefinition, ToolTrust } from "./tools/define-tool";
 export type {

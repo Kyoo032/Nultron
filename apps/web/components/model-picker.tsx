@@ -116,7 +116,7 @@ export function ModelPicker({ models, value, onChange, disabled, returnFocusRef 
   const selectedId = selected?.id ?? "";
 
   const groups = useMemo((): DisplayGroup[] => {
-    const all = pickerGroups(models);
+    const all = pickerGroups(models, selectedId);
     const q = query.trim();
     if (!q) return all;
     return all
@@ -125,7 +125,7 @@ export function ModelPicker({ models, value, onChange, disabled, returnFocusRef 
         models: group.models.filter((m) => matchesQuery(m, q)),
       }))
       .filter((group) => group.models.length > 0);
-  }, [models, query]);
+  }, [models, query, selectedId]);
 
   const flat = useMemo(() => {
     const entries: FlatEntry[] = [];

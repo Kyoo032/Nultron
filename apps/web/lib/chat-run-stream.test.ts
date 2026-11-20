@@ -51,6 +51,22 @@ function recorder() {
 }
 
 describe("readRunStream", () => {
+  it("replaces failed thinking even when the replacement is empty", async () => {
+    const { stream } = body([
+      frame("assistant.thinking", { text: "Failed attempt." }),
+      frame("assistant.thinking", { text: "", replace: true }),
+      frame("assistant.thinking", { text: "Final attempt." }),
+    ]);
+    let thinking = "";
+    await readRunStream(stream, {
+      onDelta: () => undefined,
+      onThinking: (text, replace) => {
+        thinking = replace ? text : thinking + text;
+      },
+    });
+    expect(thinking).toBe("Final attempt.");
+  });
+
   it("draws every event of a run whose session is on screen, in order", async () => {
     const { stream } = body([
       frame("run.started"),
@@ -169,6 +185,24 @@ describe("run.model_fallback", () => {
     await readRunStream(stream, { ...handlers, onModelFallback: (event) => fallbacks.push(event) });
 
     expect(fallbacks).toEqual([{ from: "gpt-6-luna", to: "glm-5.3", message: sentence }]);
+  });
+
+  it("hands a tier run's fallback with no models, so the notice shows the host's sentence alone", async () => {
+    // A tier run's fallback names no models (model tiers spec, section 5). The event still reaches the
+    // pane, which draws `message` instead of a from-to line.
+    const sentence = "This tier's model was unavailable; another model of the same tier answered.";
+    const { stream } = body([
+      frame("run.started"),
+      frame("run.model_fallback", { message: sentence }),
+      frame("assistant.delta", { text: "Hi" }),
+      frame("run.completed", { runId: "r" }),
+    ]);
+    const { handlers } = recorder();
+    const fallbacks: unknown[] = [];
+
+    await readRunStream(stream, { ...handlers, onModelFallback: (event) => fallbacks.push(event) });
+
+    expect(fallbacks).toEqual([{ from: "", to: "", message: sentence }]);
   });
 
   it("does not draw a stand-in into a session the owner has left", async () => {

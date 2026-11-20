@@ -41,8 +41,8 @@ describe("choice profiles seed", () => {
     expect(gatewayRefs(CHOICE_PROFILES.opc, "everyday").map((ref) => ref.model)).toEqual([
       "deepseek-v4-1-flash",
       "gpt-6-luna",
-      "gpt-5.6-luna",
-      "deepseek-v4-flash",
+      "claude-haiku-5-5",
+      "qwen3.8-flash",
       "claude-sonnet-5-5",
     ]);
   });
@@ -51,8 +51,8 @@ describe("choice profiles seed", () => {
     expect(gatewayRefs(CHOICE_PROFILES.opc, "everyday").map((ref) => [ref.model, ref.effort])).toEqual([
       ["deepseek-v4-1-flash", "none"],
       ["gpt-6-luna", "none"],
-      ["gpt-5.6-luna", "none"],
-      ["deepseek-v4-flash", "none"],
+      ["claude-haiku-5-5", "none"],
+      ["qwen3.8-flash", "none"],
       ["claude-sonnet-5-5", "medium"],
     ]);
   });
@@ -61,8 +61,8 @@ describe("choice profiles seed", () => {
     expect(gatewayRefs(CHOICE_PROFILES.opc, "reasoning").map((ref) => [ref.model, ref.effort])).toEqual([
       ["claude-opus-5-5", "high"],
       ["gpt-6-astra", "high"],
-      ["gpt-5.6-sol", "high"],
-      ["kimi-k3", "high"],
+      ["deepseek-v4-pro", "high"],
+      ["qwen3.8-max", "high"],
     ]);
   });
 

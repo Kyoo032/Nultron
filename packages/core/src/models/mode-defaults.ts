@@ -60,18 +60,22 @@ export const EFFECTIVE_JOB_MODEL = "hy3";
  * same day's probe; docs/internal/gateway-model-selection.md). Every id named here has an entry of its
  * own in `MODEL_POLICY_TABLE` or a family entry with a verified note, and `model-policy-guard.test.ts`
  * fails if one does not.
+ *
+ * 2026-11-10 (owner: newest and cheapest): every superseded id left these lists for its successor or for
+ * a probed model at the same price (`superseded.ts`). Each head is unchanged. The new ids (Claude Haiku
+ * 5.5, Qwen3.8 Flash, Gemini 3.8 Flash, Kimi K3.1 Pro) are not yet probed and sit behind probed ones.
  */
 export const JOB_MODE_PREFERENCES: Record<JobMode, string[]> = {
-  documents: ["hy3", "deepseek-v4-1-flash", "deepseek-v4-flash"],
+  documents: ["hy3", "deepseek-v4-1-flash", "qwen3.8-flash"],
   /** GPT 6 Luna ($0.10 / $0.50 per 1M) first, then Sol; MiniMax keeps both spellings the gateway has used. */
-  research: ["gpt-6-luna", "gpt-6-sol", "gpt-5.6-luna", "MiniMax-M3", "minimax-m3"],
+  research: ["gpt-6-luna", "gpt-6-sol", "claude-haiku-5-5", "MiniMax-M3", "minimax-m3"],
   /** GLM 5.3 Flash made the demo decks on 2026-09-30 (111 s), at $0.075 / $0.25 per 1M. */
-  presentations: ["glm-5.3-flash", "claude-sonnet-5-5", "glm-5.3", "kimi-k3"],
-  finance: ["hy3", "deepseek-v4-1-flash", "deepseek-v4-flash"],
-  data: ["gpt-6-luna", "gpt-6-sol", "gpt-5.6-luna", "MiniMax-M3", "minimax-m3"],
-  market: ["hy3", "deepseek-v4-1-flash", "deepseek-v4-flash"],
+  presentations: ["glm-5.3-flash", "claude-sonnet-5-5", "glm-5.3", "kimi-k3.1-pro"],
+  finance: ["hy3", "deepseek-v4-1-flash", "qwen3.8-flash"],
+  data: ["gpt-6-luna", "gpt-6-sol", "claude-haiku-5-5", "MiniMax-M3", "minimax-m3"],
+  market: ["hy3", "deepseek-v4-1-flash", "qwen3.8-flash"],
   /** Long contracts and strict JSON: prefer the larger everyday models. */
-  legal: ["gpt-6-sol", "claude-sonnet-5-5", "gpt-5.6-sol", "kimi-k3"],
+  legal: ["gpt-6-sol", "claude-sonnet-5-5", "claude-opus-5-5", "kimi-k3.1-pro"],
   /**
    * Minutes are schema-bound JSON read off a transcript that can run to tens of thousands of
    * tokens, so the heads are the ids that rank for both strict output (§1.4) and long input
@@ -79,7 +83,7 @@ export const JOB_MODE_PREFERENCES: Record<JobMode, string[]> = {
    * GPT 6 Sol ($2 / $10 per 1M) replaces GPT 5.6 Sol ($4 / $20) at the head; not driven on a real
    * minutes job, only probed.
    */
-  meeting: ["gpt-6-sol", "claude-sonnet-5-5", "gemini-3.5-flash", "gpt-5.6-sol"],
+  meeting: ["gpt-6-sol", "claude-sonnet-5-5", "gemini-3.8-flash", "claude-opus-5-5"],
 };
 
 export function pickPreferredJobModel(mode: JobMode, chatIds: string[], fallback: string): string {

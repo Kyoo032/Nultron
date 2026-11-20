@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentRuntime, InputModality } from "@agentforge/core";
+import type { AgentRuntime, InputModality, TenantContext } from "@agentforge/core";
 import { GATEWAY_PROVIDER_ID } from "@agentforge/core";
 import { MODEL_TIERS, TIER_DEFINITIONS, type ModelTierId } from "@agentforge/core/tiers";
 import { ROUTER_IMPORT_BUDGET_MS } from "./__fixtures__/test-budgets";
@@ -77,6 +77,8 @@ function fullCatalog(modalities: InputModality[] = TEXT): SelectableModel[] {
 
 let dispatch: (request: HostRequest) => Promise<HostResult>;
 let threadId = "";
+/** Chat marks a model down for its own tenant (`runs.ts`), so the tests mark it the same way. */
+let tenant: TenantContext;
 let chatAgentId = "";
 
 function request(method: string, path: string, extra: Partial<HostRequest> = {}): HostRequest {
@@ -160,6 +162,8 @@ beforeAll(async () => {
   const chat = await json<{ agent: { id: string } }>("GET", "/api/v1/chat");
   chatAgentId = chat.agent.id;
   threadId = await newThread();
+  const { getTenant } = await import("./tenant");
+  tenant = await getTenant();
 }, ROUTER_IMPORT_BUDGET_MS);
 
 beforeEach(() => {
@@ -226,7 +230,7 @@ describe("a tier with no live candidate", () => {
 
   it("answers 503 when every candidate of the tier is held down", async () => {
     for (const id of candidates("fast")) {
-      markJobModelDown(id);
+      markJobModelDown(id, Date.now(), tenant);
     }
     expect((await refused({ content: "hello", tier: "fast" })).status).toBe(503);
   });
@@ -251,10 +255,17 @@ describe("a tier that resolves", () => {
     // Held down, the first two of Fast's list: the run lands on the third, not on the default model
     // (which is the second, `gpt-6-luna`, so one held-down model would not tell the two apart).
     const [first, second, third] = candidates("fast") as [string, string, string];
-    markJobModelDown(first);
-    markJobModelDown(second);
+    markJobModelDown(first, Date.now(), tenant);
+    markJobModelDown(second, Date.now(), tenant);
     await postRun({ content: "hello", tier: "fast" });
     expect(executed[0]?.version.model).toBe(third);
+  });
+
+  it("reads only this tenant's breaker: another company's mark does not move this run", async () => {
+    const [first] = candidates("fast") as [string];
+    markJobModelDown(first, Date.now(), { tenantId: "another-company", organizationId: "another-org" });
+    await postRun({ content: "hello", tier: "fast" });
+    expect(executed[0]?.version.model).toBe(first);
   });
 
   it("maps Fast to Thinking off, as a choice", async () => {
@@ -406,7 +417,7 @@ describe("a tier on a turn that carries a picture", () => {
   });
 
   it("still answers when the only live models of the tier are the marked ones", async () => {
-    state.catalog = [row(LUNA, TEXT_IMAGE), row("gpt-5.6-luna", TEXT_IMAGE)];
+    state.catalog = [row(LUNA, TEXT_IMAGE)];
     await postRun(imageBody({ tier: "daily" }), "image", thread);
     await postRun(imageBody({ tier: "fast" }), "image", thread);
     expect(executed.map((input) => input.version.model)).toEqual([LUNA, LUNA]);
@@ -414,8 +425,8 @@ describe("a tier on a turn that carries a picture", () => {
 
   it("accepts a marked model that the person names with a picture", async () => {
     await postRun(imageBody({ model: LUNA }), "image", thread);
-    await postRun(imageBody({ model: "gpt-5.6-luna" }), "image", thread);
-    expect(executed.map((input) => input.version.model)).toEqual([LUNA, "gpt-5.6-luna"]);
+    await postRun(imageBody({ model: "claude-sonnet-5-5" }), "image", thread);
+    expect(executed.map((input) => input.version.model)).toEqual([LUNA, "claude-sonnet-5-5"]);
   });
 
   it("gives a text follow-up in a thread that holds a picture the same demotion, because the replay sends it", async () => {

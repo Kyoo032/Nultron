@@ -60,7 +60,7 @@ import { ensureToolsRegistered } from "./register-tools";
 import { recordChatRunUsage } from "./usage-record";
 import { loadSettings, loadUserLocale } from "./settings-store";
 import { defaultSelectableModel, listSelectableModels, toolMediaModels } from "./selectable-models";
-import { resolveTierRun } from "./tier-resolve";
+import { nextTierModel, resolveTierRun } from "./tier-resolve";
 import { markJobModelDown, maySwapModel, pickNext, startModel } from "./job-model-fallback";
 import { readModelPinned } from "./job-regen";
 import { collectToolMediaParts } from "./tool-media";
@@ -76,8 +76,15 @@ import { saveGeneratedImage, saveGeneratedVideo } from "./media";
 import { getRunContext, hostedRequestLocale, localeForRun, withRunContext } from "./run-context";
 import { withToolRun } from "./tool-run-context";
 import type { JobEvent } from "@agentforge/core/jobs";
-import { DEFAULT_CHAT_MODALITIES, GENERALIST_WORKER_PROMPT, mediaGrantNote, virtualAgentFor } from "@agentforge/core";
+import {
+  DEFAULT_CHAT_MODALITIES,
+  DELEGATE_TOOL_KEY,
+  GENERALIST_WORKER_PROMPT,
+  mediaGrantNote,
+  virtualAgentFor,
+} from "@agentforge/core";
 import { runPolicyFor, withGeneralistWorkers } from "./virtual-agents";
+import { delegationRoster, delegationTargetsLine } from "./team-bots";
 import { WORKER_STREAM_IDLE_MS, withWorkerChannel } from "./workers/worker-channel";
 import { formatPastSessionsHint } from "./session-recall";
 import { log } from "./log";
@@ -240,6 +247,20 @@ export async function* startModalityRun(options: {
     ? withoutDisabledToolSentences(agentPolicy.systemPrompt, settings.disabledTools ?? [])
     : withoutDisabledToolSentences(published.version.systemPrompt, settings.disabledTools ?? []) +
       (defaultChat ? GENERALIST_WORKER_PROMPT : "");
+  // The bindings this run will offer, computed once: the roster line below is only worth a desk
+  // read when `delegate` is actually bound (the default agent and every mode agent; a custom agent
+  // only if its stored bindings say so).
+  const runBindings = bindingsForChatModality(
+    agentPolicy
+      ? agentPolicy.bindings
+      : defaultChat
+        ? withGeneralistWorkers(withPastSessionsBinding(published.bindings))
+        : withPastSessionsBinding(published.bindings),
+    options.modality,
+  );
+  const delegationTargets = runBindings.some((binding) => binding.toolKey === DELEGATE_TOOL_KEY && binding.enabled)
+    ? delegationTargetsLine(await delegationRoster(options.tenant))
+    : "";
   // Paid media asks first (SR-167): the body carries the requests the person pressed Run on, and the model
   // is told to make exactly those on this turn. The note is for this turn's prompt only; it is not stored.
   const mediaPermission = readMediaPermission(options.body);
@@ -248,7 +269,12 @@ export async function* startModalityRun(options: {
     model,
     // A mode agent has the last word on who is speaking, after the desk's Soul block (`closingPrompt`).
     systemPrompt: withChatOutputLanguage(
-      agentPrompt + pastHint + knowledge.prompt + (agentPolicy?.closingPrompt ?? "") + mediaGrantNote(mediaPermission.grants),
+      agentPrompt +
+        (delegationTargets ? `\n\n${delegationTargets}` : "") +
+        pastHint +
+        knowledge.prompt +
+        (agentPolicy?.closingPrompt ?? "") +
+        mediaGrantNote(mediaPermission.grants),
       locale,
     ),
   };
@@ -493,7 +519,19 @@ export async function* startModalityRun(options: {
         }
       };
       const fallbackFor = (from: string, failure: string): string | undefined => {
-        if (!fallbackOptions || retried || settled) {
+        if (retried || settled) {
+          return undefined;
+        }
+        if (tierRun) {
+          // A tier run moves once, to the next live model of the same tier, on the same transport-class
+          // failures a stand-in covers (model tiers spec, section 3). Never to another tier: a person who
+          // chose Reasoning and got a fast model was told something untrue.
+          if (!maySwapModel({ error: new Error(failure), streamed: false }, { model: from, signal: modelAbort.signal })) {
+            return undefined;
+          }
+          return nextTierModel(tierRun.tier, from, catalog, options.modality, options.tenant, tierRun.replaysPicture);
+        }
+        if (!fallbackOptions) {
           return undefined;
         }
         if (!maySwapModel({ error: new Error(failure), streamed: false }, fallbackOptions)) {
@@ -503,6 +541,19 @@ export async function* startModalityRun(options: {
         return next && acceptsModality(next) ? next : undefined;
       };
       const announceFallback = (from: string, to: string) => {
+        if (tierRun) {
+          // The screen never learns which model a tier ran (model tiers spec, section 5), so the notice
+          // names the tier's promise, not the two models.
+          const message = chatTurnCopy(locale).tierFallback;
+          send({ type: "run.model_fallback", message });
+          if (thinkingEnabled) {
+            const line = `${message}\n`;
+            hostThinking += line;
+            send({ type: "assistant.thinking", text: line });
+          }
+          stall.touch();
+          return;
+        }
         const message = chatTurnCopy(locale).modelFallback.replaceAll("{from}", from).replaceAll("{to}", to);
         send({ type: "run.model_fallback", from, to, message });
         if (thinkingEnabled) {
@@ -572,15 +623,7 @@ export async function* startModalityRun(options: {
             runId: run.id,
             modality: options.modality,
             version: activeVersion,
-            bindings: agentPolicy
-              ? bindingsForChatModality(agentPolicy.bindings, options.modality)
-              : bindingsForChatModality(
-                  // The default agent can run every wired harness from its own chat, hired or not.
-                  defaultChat
-                    ? withGeneralistWorkers(withPastSessionsBinding(published.bindings))
-                    : withPastSessionsBinding(published.bindings),
-                  options.modality,
-                ),
+            bindings: runBindings,
             // The default agent's budget is Chat's declared one plus a ceiling for each worker; a mode
             // agent's is its own; an agent the owner built keeps the runtime's.
             ...(agentPolicy
@@ -651,7 +694,7 @@ export async function* startModalityRun(options: {
                 assistantText += event.text;
               }
               if (event.type === "assistant.thinking") {
-                thinkingText += event.text;
+                thinkingText = event.replace ? event.text : thinkingText + event.text;
               }
               if (safe.type === "tool.started") {
                 toolTrace.push({

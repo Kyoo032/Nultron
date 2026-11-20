@@ -1,19 +1,20 @@
 import { z } from "zod";
 import {
-  DELEGABLE_AGENTS,
   DELEGATE_CONTEXT_MAX,
   DELEGATE_TASK_MAX,
   DELEGATE_TOOL_KEY,
   defineTool,
-  type DelegableAgent,
 } from "@agentforge/core";
 import { runDelegation } from "./run-delegation";
 
 const schema = z.object({
   agent: z
-    .enum(DELEGABLE_AGENTS as unknown as [DelegableAgent, ...DelegableAgent[]])
+    .string()
+    .trim()
+    .min(1)
+    .max(64)
     .describe(
-      "Which agent to ask. It must be one on the owner's desk; if it is not, the answer names the ones that are.",
+      "Which agent to ask — a specialist's mode id (research, documents, …) or one of the desk's bots (its `tb-` slug or name). It must be on the owner's desk; if it is not, the answer names the ones that are.",
     ),
   task: z
     .string()

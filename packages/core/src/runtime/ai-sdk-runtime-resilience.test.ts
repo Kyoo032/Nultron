@@ -378,6 +378,9 @@ describe("a run whose follow-up model call fails after a tool completed", () => 
     expect(order.lastIndexOf("tool.completed")).toBeLessThan(order.indexOf("run.interrupted"));
     expect(order.indexOf("run.interrupted")).toBeLessThan(order.indexOf("run.completed"));
     expect(events.filter((event) => event.type === "run.completed")).toHaveLength(1);
+    expect(events.find((event) => event.type === "run.completed")).toMatchObject({
+      usage: { model: version.model, inputTokens: 1, outputTokens: 1 },
+    });
   });
 
   it("gives the reason in the run's language", async () => {

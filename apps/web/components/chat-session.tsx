@@ -653,7 +653,7 @@ export function ChatSession({ agentId, initialThreadId, shell, hrefForThread }: 
             }}
             onStarted={() => setRunning(true)}
             onDelta={(text) => setStreaming((current) => current + text)}
-            onThinking={(text) => setThinking((current) => current + text)}
+            onThinking={(text, replace) => setThinking((current) => (replace ? text : current + text))}
             onTool={(event) => {
               setTools((current) => {
                 if (event.phase === "started") {
