@@ -11,7 +11,9 @@ describe("the fixed sentences ask_nultron speaks", () => {
       const copy = ASK_COPY[locale];
 
       it("has every sentence, short and plain enough to say aloud", () => {
-        for (const [key, text] of Object.entries(copy)) {
+        for (const [key, value] of Object.entries(copy)) {
+          // `delegating` is the one line that takes the asked agent's name.
+          const text = typeof value === "function" ? value("the Research agent") : value;
           expect(text.trim().length, `${locale}.${key} is empty`).toBeGreaterThan(0);
           expect(text.length, `${locale}.${key} is long for speech`).toBeLessThanOrEqual(120);
           expect(text, `${locale}.${key} has markup`).not.toMatch(MARKUP);
@@ -40,6 +42,11 @@ describe("the fixed sentences ask_nultron speaks", () => {
     expect(ASK_COPY.id.needsTap).toMatch(/layar/i);
     expect(ASK_COPY.id.needsTap).toMatch(/ketuk/i);
   });
+
+  it("names who a delegation is asking, in each language", () => {
+    expect(ASK_COPY.en.delegating("the Research agent")).toBe("Asking the Research agent…");
+    expect(ASK_COPY.id.delegating("Sales assistant")).toBe("Meminta Sales assistant…");
+  });
 });
 
 describe("the voice note", () => {
@@ -56,9 +63,11 @@ describe("the voice note", () => {
     expect(voiceNote("id")).toContain("Indonesian");
   });
 
-  it("sends write, send, paid and long requests to request_tap", () => {
+  it("sends write, send and paid requests to request_tap, and names delegate for the desk's agents", () => {
     expect(voiceNote("en")).toContain("request_tap");
     expect(voiceNote("id")).toContain("request_tap");
+    expect(voiceNote("en")).toContain("delegate");
+    expect(voiceNote("en")).toContain("one call per agent");
   });
 });
 

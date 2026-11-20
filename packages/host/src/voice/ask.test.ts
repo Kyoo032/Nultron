@@ -6,10 +6,10 @@
  */
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentRuntime, TenantContext } from "@agentforge/core";
-import { getTool } from "@agentforge/core";
+import { DELEGATE_PER_TURN, DELEGATE_TOOL_KEY, GENERALIST_WORKER_TOOLS, getTool } from "@agentforge/core";
 import { ROUTER_IMPORT_BUDGET_MS } from "../__fixtures__/test-budgets";
 import { ASK_COPY } from "./ask-speech";
-import { REQUEST_TAP_TOOL_KEY, VOICE_READ_TOOLS } from "./ask-tools";
+import { REQUEST_TAP_TOOL_KEY, VOICE_DELEGATE_TOOLS, VOICE_READ_TOOLS } from "./ask-tools";
 import type { VoiceLocale } from "./turns";
 
 delete process.env.OPENAI_API_KEY;
@@ -140,7 +140,13 @@ async function newThread(): Promise<string> {
 async function ask1(
   threadId: string,
   question: string,
-  extra: { locale?: VoiceLocale; signal?: AbortSignal; timeoutMs?: number } = {},
+  extra: {
+    locale?: VoiceLocale;
+    signal?: AbortSignal;
+    timeoutMs?: number;
+    delegateTimeoutMs?: number;
+    onProgress?: (label: string) => void;
+  } = {},
 ) {
   return ask(
     {
@@ -149,9 +155,24 @@ async function ask1(
       question,
       locale: extra.locale ?? "en",
       signal: extra.signal ?? new AbortController().signal,
+      ...(extra.onProgress ? { onProgress: extra.onProgress } : {}),
     },
-    extra.timeoutMs === undefined ? {} : { timeoutMs: extra.timeoutMs },
+    {
+      ...(extra.timeoutMs === undefined ? {} : { timeoutMs: extra.timeoutMs }),
+      ...(extra.delegateTimeoutMs === undefined ? {} : { delegateTimeoutMs: extra.delegateTimeoutMs }),
+    },
   );
+}
+
+/** Waits until the stand-in gateway has seen `count` calls (the delegated run's call is not the first). */
+async function untilSeen(count: number): Promise<void> {
+  const start = Date.now();
+  while (seen.length < count) {
+    if (Date.now() - start > 5_000) {
+      throw new Error(`timed out waiting for gateway call ${count}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
 }
 
 function voiceUsageRows() {
@@ -205,6 +226,7 @@ describe("an answer", () => {
     expect(result).toEqual({
       kind: "answer",
       text: "Revenue was 1,200 dollars. It rose five percent. See the report.",
+      toolCalls: [],
     });
   });
 
@@ -277,6 +299,8 @@ describe("what the model is given", () => {
     const names = toolNames(seen[0] as Captured);
     expect(names).toContain("knowledge_search");
     expect(names).toContain(REQUEST_TAP_TOOL_KEY);
+    // `delegate` is the one long-work tool voice runs itself; the generalist workers stay tap-only.
+    expect(names).toContain(DELEGATE_TOOL_KEY);
     for (const name of [
       "write_file",
       "edit_file",
@@ -285,10 +309,11 @@ describe("what the model is given", () => {
       "video_generate",
       "build_deck",
       "run_code",
+      ...GENERALIST_WORKER_TOOLS,
     ]) {
       expect(names, name).not.toContain(name);
     }
-    const allowed = new Set<string>([...VOICE_READ_TOOLS, REQUEST_TAP_TOOL_KEY]);
+    const allowed = new Set<string>([...VOICE_READ_TOOLS, ...VOICE_DELEGATE_TOOLS, REQUEST_TAP_TOOL_KEY]);
     expect(names.filter((name) => !allowed.has(name))).toEqual([]);
   });
 
@@ -296,7 +321,7 @@ describe("what the model is given", () => {
     script = [calls("knowledge_search", { query: "revenue" }), says("Nothing in the notes yet.")];
     const threadId = await newThread();
     const result = await ask1(threadId, "What do my notes say about revenue?");
-    expect(result).toEqual({ kind: "answer", text: "Nothing in the notes yet." });
+    expect(result).toEqual({ kind: "answer", text: "Nothing in the notes yet.", toolCalls: [] });
     expect(seen).toHaveLength(2);
     expect(messagesOf(seen[1] as Captured).some((message) => message.role === "tool")).toBe(true);
   });
@@ -632,5 +657,114 @@ describe("the run cap", () => {
     expect(release).not.toBeNull();
     expect(limits.activeRuns(tenant)).toBe(0);
     release?.();
+  });
+});
+
+describe("delegation from voice", () => {
+  let createTeamBot: typeof import("../team-bots").createTeamBot;
+  let releaseTeamBot: typeof import("../team-bots").releaseTeamBot;
+
+  beforeAll(async () => {
+    ({ createTeamBot, releaseTeamBot } = await import("../team-bots"));
+    await createTeamBot(tenant, {
+      name: "Tide bot",
+      role: "tide times",
+      prompt: "You answer tide questions in one short sentence.",
+    });
+  }, ROUTER_IMPORT_BUDGET_MS);
+
+  afterAll(async () => {
+    await releaseTeamBot(tenant, "Tide bot");
+  });
+
+  it("offers delegate Chat's per-turn ceiling inside the voice budget", async () => {
+    const { VOICE_BUDGET, ASK_DELEGATE_TIMEOUT_MS, ASK_TIMEOUT_MS } = await import("./ask");
+    expect(VOICE_BUDGET.perTool?.[DELEGATE_TOOL_KEY]).toBe(DELEGATE_PER_TURN);
+    expect(ASK_DELEGATE_TIMEOUT_MS).toBe(180_000);
+    expect(ASK_DELEGATE_TIMEOUT_MS).toBeGreaterThan(ASK_TIMEOUT_MS);
+  });
+
+  it("runs delegate to a desk bot, reports its progress, and returns the call for the card", async () => {
+    const progress: string[] = [];
+    script = [
+      calls(DELEGATE_TOOL_KEY, {
+        agent: "Tide bot",
+        task: "Find the tide times for Surabaya on Friday.",
+      }),
+      says("The tide is at 06:10."),
+      says("Tide bot found the tide at 06:10."),
+    ];
+    const threadId = await newThread();
+    const result = await ask1(threadId, "Ask Tide bot for the Surabaya tide times", {
+      onProgress: (label) => progress.push(label),
+    });
+    if (result.kind !== "answer") {
+      throw new Error(`expected an answer, got ${result.kind}`);
+    }
+    expect(result.text).toBe("Tide bot found the tide at 06:10.");
+    // Three gateway calls: the asker, the delegated run, the asker's answer.
+    expect(seen).toHaveLength(3);
+    expect(progress.some((label) => label.includes("Tide"))).toBe(true);
+    expect(result.toolCalls).toHaveLength(1);
+    const part = result.toolCalls[0];
+    expect(part).toMatchObject({
+      type: "tool_call",
+      toolKey: DELEGATE_TOOL_KEY,
+      status: "completed",
+    });
+    expect(part?.input).toMatchObject({ agent: "Tide bot" });
+    expect(part?.output).toMatchObject({ ok: true, agentName: "Tide bot" });
+    expect((part?.output as { summary?: string } | undefined)?.summary).toContain("06:10");
+  });
+
+  it("keeps a refused delegation as a completed call, so the card can say why", async () => {
+    script = [
+      calls(DELEGATE_TOOL_KEY, { agent: "nobody-here", task: "Find the tide times for Surabaya." }),
+      says("Nobody by that name is on the desk."),
+    ];
+    const threadId = await newThread();
+    const result = await ask1(threadId, "Ask nobody-here for the tide");
+    if (result.kind !== "answer") {
+      throw new Error(`expected an answer, got ${result.kind}`);
+    }
+    expect(seen).toHaveLength(2);
+    expect(result.toolCalls).toHaveLength(1);
+    expect(result.toolCalls[0]?.output).toMatchObject({ ok: false, reason: "not_hired" });
+  });
+
+  it("holds the ask to the delegation clock once delegate starts, and still ends there", async () => {
+    script = [
+      calls(DELEGATE_TOOL_KEY, { agent: "Tide bot", task: "Find the tide times for Surabaya on Friday." }),
+      hangs,
+    ];
+    const threadId = await newThread();
+    const started = Date.now();
+    const result = await ask1(threadId, "Ask Tide bot for the tide", {
+      timeoutMs: 80,
+      delegateTimeoutMs: 600,
+    });
+    expect(result).toMatchObject({ kind: "refused", reason: "timeout" });
+    const elapsed = Date.now() - started;
+    // The 80 ms clock would have ended it almost at once; the delegation clock holds it to ~600 ms.
+    expect(elapsed).toBeGreaterThan(200);
+    expect(elapsed).toBeLessThan(3_000);
+    // The delegated run's call in flight was cancelled with the ask.
+    expect(seen[1]?.signal?.aborted).toBe(true);
+  });
+
+  it("passes the caller's abort through the worker channel to the delegated run", async () => {
+    script = [
+      calls(DELEGATE_TOOL_KEY, { agent: "Tide bot", task: "Find the tide times for Surabaya on Friday." }),
+      hangs,
+    ];
+    const threadId = await newThread();
+    const abort = new AbortController();
+    const pending = ask1(threadId, "Ask Tide bot for the tide", { signal: abort.signal });
+    await untilSeen(2);
+    abort.abort();
+    const result = await pending;
+    expect(result).toMatchObject({ kind: "refused", reason: "failed" });
+    // The second gateway call is the delegated run's: its socket was cancelled by the caller's abort.
+    expect(seen[1]?.signal?.aborted).toBe(true);
   });
 });

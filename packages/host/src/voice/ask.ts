@@ -10,10 +10,13 @@
  */
 import {
   ApiError,
+  DELEGATE_PER_TURN,
+  DELEGATE_TOOL_KEY,
   attachedTextsOf,
   createOutboundGuard,
   createRuntime,
   hasNonTextUserPart,
+  redactSecretsDeep,
   runOutboundGuarded,
   userTextOf,
   type ContentPart,
@@ -21,6 +24,7 @@ import {
   type RunBudget,
   type RuntimeEvent,
   type TenantContext,
+  type ToolCallPart,
 } from "@agentforge/core";
 import type { VoiceCard } from "@agentforge/core/voice";
 import { prepareChatImageHistory } from "../chat-image-history";
@@ -34,6 +38,7 @@ import { toolMediaModels } from "../selectable-models";
 import { listMessages } from "../threads";
 import { withToolRun } from "../tool-run-context";
 import { recordChatRunUsage, recordTokenUsage } from "../usage-record";
+import { withWorkerChannel } from "../workers/worker-channel";
 import { askCopy, speakable, tapSummary, voiceNote } from "./ask-speech";
 import { REQUEST_TAP_TOOL_KEY, ensureVoiceToolsRegistered, voiceBindings } from "./ask-tools";
 import type { VoiceLocale } from "./turns";
@@ -58,7 +63,16 @@ export const ASK_NULTRON_TOOL = {
 } as const;
 
 export type AskResult =
-  | { readonly kind: "answer"; readonly text: string }
+  | {
+      readonly kind: "answer";
+      readonly text: string;
+      /**
+       * The `delegate` calls the run made, as the `tool_call` parts a typed Chat turn saves before its
+       * text, so the desk's delegate card renders the hand-off under the spoken answer. Empty when the
+       * run delegated to nobody.
+       */
+      readonly toolCalls: readonly ToolCallPart[];
+    }
   | { readonly kind: "needs_tap"; readonly text: string; readonly card: VoiceCard }
   | {
       readonly kind: "refused";
@@ -72,22 +86,39 @@ export type AskInput = {
   readonly question: string;
   readonly locale: VoiceLocale;
   readonly signal: AbortSignal;
+  /**
+   * A delegated run's progress label (`Research agent`, a bot's name), for the relay's caption. UI
+   * only: it is never saved.
+   */
+  readonly onProgress?: (label: string) => void;
 };
 
 /** No result within this long is a `timeout`. A voice turn that takes longer is no longer a conversation. */
 export const ASK_TIMEOUT_MS = 20_000;
 
+/**
+ * The clock once a `delegate` call starts: the ask may run this long in all, measured from when it
+ * started (not from the tool), because a delegated run is real work. The delegated run's own ceiling
+ * (`WORKER_MAX_MS`) still bounds it underneath.
+ */
+export const ASK_DELEGATE_TIMEOUT_MS = 180_000;
+
 /** The longest question the thinker is given; a spoken turn is far shorter. */
 const QUESTION_MAX = 4_000;
 
 /**
- * What a voice ask may spend: a lookup and an answer, with room for a second lookup. Chat's own budget
- * is sized for workers that run for minutes, and voice offers none.
+ * What a voice ask may spend: a lookup and an answer, with room for a second lookup, plus the
+ * delegations Chat's own budget allows per turn (`DELEGATE_PER_TURN`). Chat's own budget is sized for
+ * workers that run for minutes; voice offers none of them, only the fenced `delegate`.
  */
-export const VOICE_BUDGET: RunBudget = Object.freeze({ maxSteps: 5, maxToolCalls: 6 });
+export const VOICE_BUDGET: RunBudget = Object.freeze({
+  maxSteps: 5,
+  maxToolCalls: 6,
+  perTool: Object.freeze({ [DELEGATE_TOOL_KEY]: DELEGATE_PER_TURN }),
+});
 
-/** For tests only: a shorter clock than `ASK_TIMEOUT_MS`. The relay never passes it. */
-export type AskOptions = { readonly timeoutMs?: number };
+/** For tests only: shorter clocks than `ASK_TIMEOUT_MS` / `ASK_DELEGATE_TIMEOUT_MS`. The relay never passes them. */
+export type AskOptions = { readonly timeoutMs?: number; readonly delegateTimeoutMs?: number };
 
 /** Threads with an ask in flight, keyed by company and thread. One at a time per thread. */
 const inFlight = new Set<string>();
@@ -184,7 +215,20 @@ export async function askNultron(input: AskInput, options: AskOptions = {}): Pro
     };
     const onCaller = () => stopWith("caller");
     input.signal.addEventListener("abort", onCaller, { once: true });
-    const timer = setTimeout(() => stopWith("timeout"), options.timeoutMs ?? ASK_TIMEOUT_MS);
+    const askStartedAt = Date.now();
+    let timer = setTimeout(() => stopWith("timeout"), options.timeoutMs ?? ASK_TIMEOUT_MS);
+    // A `delegate` call replaces the short clock with the delegation clock, still measured from when the
+    // ask started: the hand-off is real work, but it cannot hold the ask past `ASK_DELEGATE_TIMEOUT_MS`.
+    let delegateClockArmed = false;
+    const armDelegateClock = () => {
+      if (delegateClockArmed) {
+        return;
+      }
+      delegateClockArmed = true;
+      clearTimeout(timer);
+      const remaining = Math.max(0, askStartedAt + (options.delegateTimeoutMs ?? ASK_DELEGATE_TIMEOUT_MS) - Date.now());
+      timer = setTimeout(() => stopWith("timeout"), remaining);
+    };
     const stopped = new Promise<"stopped">((resolve) =>
       run.signal.addEventListener("abort", () => resolve("stopped"), { once: true }),
     );
@@ -210,6 +254,9 @@ export async function askNultron(input: AskInput, options: AskOptions = {}): Pro
       failed: false,
       stepLimit: false,
     };
+    // The `delegate` calls of this run, in the shape a typed turn persists (`runs.ts`): redacted input on
+    // `started`, the matching entry completed with redacted output, parts in call order.
+    const toolCalls: ToolCallPart[] = [];
 
     const recordUsage = (usage: Record<string, unknown> | null) => {
       if (state.usageRecorded) {
@@ -267,32 +314,67 @@ export async function askNultron(input: AskInput, options: AskOptions = {}): Pro
           const args = event.input as { summary?: unknown } | null;
           state.tapped = tapSummary(args?.summary, question);
           stopWith("tap");
+        } else if (event.type === "tool.started" && event.toolKey === DELEGATE_TOOL_KEY) {
+          armDelegateClock();
+          toolCalls.push({
+            type: "tool_call",
+            toolKey: DELEGATE_TOOL_KEY,
+            status: "started",
+            input: redactSecretsDeep(event.input),
+          });
+        } else if (event.type === "tool.completed" && event.toolKey === DELEGATE_TOOL_KEY) {
+          const output = redactSecretsDeep(event.output);
+          const last = [...toolCalls]
+            .reverse()
+            .find((item) => item.toolKey === DELEGATE_TOOL_KEY && item.status === "started");
+          if (last) {
+            last.status = "completed";
+            last.output = output;
+          } else {
+            toolCalls.push({ type: "tool_call", toolKey: DELEGATE_TOOL_KEY, status: "completed", output });
+          }
         } else if (event.type === "run.step_limit") {
           state.stepLimit = true;
         } else if (event.type === "run.completed") {
           recordUsage((event.usage as Record<string, unknown> | undefined) ?? null);
         }
       };
+      // The worker channel is what a delegated run reads for its cancel and its progress
+      // (`run-delegation.ts`): the ask's own abort — a cut-in, the session ending, the clock, a tap —
+      // reaches it, and a `delegating` phase goes to the relay's caption. Everything else is ignored.
+      let lastProgress = "";
       await withToolRun({ runId, mode: prepared.agentPolicy ? prepared.agentPolicy.agent.id : "chat" }, () =>
         withRunContext({ threadId: prepared.thread.id, agentId: prepared.thread.agentId, locale }, () =>
           runOutboundGuarded(outbound, () =>
-            runtime.execute({
-              tenant,
-              runId,
-              modality: "text",
-              version: { ...prepared.version, systemPrompt: prepared.version.systemPrompt + voiceNote(locale) },
-              bindings: voiceBindings(prepared.bindings),
-              budget: VOICE_BUDGET,
-              history,
-              mediaPermission: prepared.mediaPermission,
-              thinking: prepared.thinkingEnabled,
-              reasoningEffort: prepared.reasoningEffort,
-              reasoningEffortExplicit: prepared.reasoningEffortExplicit,
-              wire: prepared.wire,
-              locale,
-              signal: run.signal,
-              onEvent,
-            }),
+            withWorkerChannel(
+              {
+                emit: (_toolKey, job) => {
+                  if (job.type === "job.phase" && job.phase === "delegating" && job.label !== lastProgress) {
+                    lastProgress = job.label;
+                    input.onProgress?.(job.label);
+                  }
+                },
+                signal: run.signal,
+              },
+              () =>
+                runtime.execute({
+                  tenant,
+                  runId,
+                  modality: "text",
+                  version: { ...prepared.version, systemPrompt: prepared.version.systemPrompt + voiceNote(locale) },
+                  bindings: voiceBindings(prepared.bindings),
+                  budget: VOICE_BUDGET,
+                  history,
+                  mediaPermission: prepared.mediaPermission,
+                  thinking: prepared.thinkingEnabled,
+                  reasoningEffort: prepared.reasoningEffort,
+                  reasoningEffortExplicit: prepared.reasoningEffortExplicit,
+                  wire: prepared.wire,
+                  locale,
+                  signal: run.signal,
+                  onEvent,
+                }),
+            ),
           ),
         ),
       );
@@ -324,7 +406,7 @@ export async function askNultron(input: AskInput, options: AskOptions = {}): Pro
       if (!text || state.stepLimit) {
         return refused(locale, "failed");
       }
-      return { kind: "answer", text };
+      return { kind: "answer", text, toolCalls };
     } finally {
       clearTimeout(timer);
       input.signal.removeEventListener("abort", onCaller);

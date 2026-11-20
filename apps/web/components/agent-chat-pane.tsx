@@ -88,6 +88,9 @@ export function AgentChatPane({ agentMode, threadId }: Props) {
           key={agent.id}
           agentId={agent.generalist ? undefined : (agent.agentId ?? undefined)}
           initialThreadId={threadId}
+          // Live voice talks to the orchestrator only: the generalist keeps the mic, a hired
+          // specialist's chat does not.
+          voiceEnabled={agent.generalist}
           shell={{
             agent,
             name,

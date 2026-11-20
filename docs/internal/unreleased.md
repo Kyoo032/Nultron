@@ -54,6 +54,16 @@ Copied as they stood at `de95267`; the evidence is under `.cursor/skills/verify-
 
 Append below, newest first.
 
+## Live voice delegates to the desk's agents itself, 2026-11-20
+
+Lanes: tester
+
+- The voice thinker may now run `delegate` itself (`VOICE_DELEGATE_TOOLS`, `packages/host/src/voice/ask-tools.ts`): a spoken request can hand a task to a hired catalog mode or a `tb-` desk bot and hear the answer, instead of every long request becoming a one-tap card. The delegated run is the fenced one `run-delegation.ts` already builds — no picture or clip tools, the desk's files only, a tainted egress guard, `DELEGATE_BUDGET` and the eight-minute worker ceiling — and the ask's own abort (a cut-in, the session ending, the clock) reaches it through the worker channel the ask now opens (`packages/host/src/voice/ask.ts`).
+- Once a `delegate` call starts, the ask's 20-second clock is replaced by a 180-second one measured from when the ask started (`ASK_DELEGATE_TIMEOUT_MS`), and the session's idle timer waits for the ask instead of ending it (`packages/host/src/voice/relay.ts`). A `delegating` progress phase is captioned on screen (`askCopy(locale).delegating`) and never saved.
+- The saved assistant row of a delegated turn leads with the `delegate` `tool_call` part, then the spoken answer — the same parts a typed Chat turn persists — so the desk's existing delegate card renders under it (`packages/host/src/voice/save-turns.ts`).
+- The microphone is the orchestrator's alone: `ChatSession` takes `voiceEnabled` (default on) and a specialist agent's or a team bot's pane passes it off, so no mic is drawn there even with voice on (`apps/web/components/chat-session.tsx`, `agent-chat-pane.tsx`, `team-bot-chat-pane.tsx`).
+- The generalist's worker tools (`research_dossier`, `finance_task`, `build_deck` and the rest) stay tap-only, as do writes, sends and paid media. Proof: `ask-tools.test.ts`, `ask.test.ts` (a real delegation to a desk bot through the stub gateway, the clock, the abort), `relay.test.ts` (tool parts saved before the text, the progress caption, the held idle clock), `save-turns.test.ts`, `voice-mic-gating.test.ts`, `delegate-card.test.tsx`. Not driven live.
+
 ## A picture turn also holds back a text-only tier model, 2026-11-19 (branch `devin/1795097952-tier-fallback-text-only` from `main`; `ci:local` run, unit tests run; not driven live)
 
 Lanes: main, enterprise, tester

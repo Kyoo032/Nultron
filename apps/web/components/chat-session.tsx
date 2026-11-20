@@ -82,12 +82,14 @@ type Props = {
   shell?: ChatSessionShell;
   /** Where a thread this session creates lives. The chat-first shell has its own; a team bot names its `tb-` address. */
   hrefForThread?: (threadId: string) => string;
+  /** Live voice's microphone: only the orchestrator's chat offers it. Default true. */
+  voiceEnabled?: boolean;
 };
 
 /** Nultron's box on the composer's ledge; about half of it shows above the edge. */
 const COMPOSER_BUDDY_SIZE = 112;
 
-export function ChatSession({ agentId, initialThreadId, shell, hrefForThread }: Props) {
+export function ChatSession({ agentId, initialThreadId, shell, hrefForThread, voiceEnabled = true }: Props) {
   // Nultron Enterprise: a signed-in tenant may open the desk before adding a key (hosted only; false and
   // request-free elsewhere). The context estimate below embeds the query, so it goes through the gateway.
   const keyMissing = useHostedNeedsKey();
@@ -420,6 +422,7 @@ export function ChatSession({ agentId, initialThreadId, shell, hrefForThread }: 
     },
     sessionKey,
     chatRunning: running,
+    allowed: voiceEnabled,
   });
 
   const empty = messages.length === 0 && !streaming && !thinking && !running && tools.length === 0;

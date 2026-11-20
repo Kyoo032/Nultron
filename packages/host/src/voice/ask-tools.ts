@@ -3,9 +3,9 @@
  *
  * Chat's own set (`DEFAULT_CHAT_TOOLS`) mixes reads with writes, paid media and long work, and the
  * model reads its tool list at run time, so voice cannot filter after the fact: a tool is OFFERED only
- * when it is on `VOICE_READ_TOOLS`. Everything else is out by default, and a tool nobody classified is
- * out too. `ask-tools.test.ts` fails when `DEFAULT_CHAT_TOOLS` gains a key that is on neither list, so
- * whoever adds a Chat tool must decide here whether voice may run it.
+ * when it is on `VOICE_READ_TOOLS` or `VOICE_DELEGATE_TOOLS`. Everything else is out by default, and a
+ * tool nobody classified is out too. `ask-tools.test.ts` fails when `DEFAULT_CHAT_TOOLS` gains a key
+ * that is on neither list, so whoever adds a Chat tool must decide here whether voice may run it.
  *
  * A request that needs a tool from the other list is not refused. The model gets `request_tap`, calls
  * it with one line, and the run stops: the person taps a card, and the tap sends a normal Chat turn
@@ -14,7 +14,8 @@
 import { z } from "zod";
 import {
   DEFAULT_CHAT_TOOLS,
-  GENERALIST_EXTRA_TOOLS,
+  DELEGATE_TOOL_KEY,
+  GENERALIST_WORKER_TOOLS,
   defineTool,
   registerTool,
   type ToolBindingRecord,
@@ -53,7 +54,8 @@ export const VOICE_READ_TOOLS: readonly string[] = Object.freeze([
  * - `image_generate`, `video_generate`: paid media (SR-167 asks the person first; a tap is that ask).
  * - `build_deck`: makes a file and a download, and takes long.
  * - `run_code`: runs a program that can write under `/workspace/out`, and starts slowly.
- * - The generalist's workers and `delegate` (`GENERALIST_EXTRA_TOOLS`): long runs that write files.
+ * - The generalist's workers (`GENERALIST_WORKER_TOOLS`): long runs that write files. `delegate` is
+ *   not one of them: it is on `VOICE_DELEGATE_TOOLS`, because the run it starts is already fenced.
  */
 export const VOICE_TAP_TOOLS: readonly string[] = Object.freeze([
   "write_file",
@@ -63,19 +65,35 @@ export const VOICE_TAP_TOOLS: readonly string[] = Object.freeze([
   "video_generate",
   "build_deck",
   "run_code",
-  ...GENERALIST_EXTRA_TOOLS,
+  ...GENERALIST_WORKER_TOOLS,
 ]);
 
+/**
+ * Tools voice runs itself although they start work: today only `delegate`. A delegated run has no
+ * picture or clip tools, the desk's files only (never the owner's folder), a tainted egress guard and
+ * its own budget (`../delegation/run-delegation.ts`), so a spoken request can hand real work to a
+ * hired agent or a desk bot without the tap a write, a paid render or a worker would need. Its result
+ * still comes back through the same redacted `tool_call` part a typed turn saves, so the desk's
+ * delegate card renders it unchanged.
+ */
+export const VOICE_DELEGATE_TOOLS: readonly string[] = Object.freeze([DELEGATE_TOOL_KEY]);
+
 const READ_SET: ReadonlySet<string> = new Set(VOICE_READ_TOOLS);
+const DELEGATE_SET: ReadonlySet<string> = new Set(VOICE_DELEGATE_TOOLS);
 
 /** True when voice may run this tool itself. Anything unclassified is false. */
 export function isVoiceReadTool(toolKey: string): boolean {
   return READ_SET.has(toolKey);
 }
 
+/** True when voice may run this tool itself: a read, or a fenced `delegate`. Anything else is false. */
+export function isVoiceRunTool(toolKey: string): boolean {
+  return READ_SET.has(toolKey) || DELEGATE_SET.has(toolKey);
+}
+
 /** Chat's keys that neither list names. Empty while every Chat tool has been decided. */
 export function unclassifiedChatTools(chatTools: readonly string[] = DEFAULT_CHAT_TOOLS): string[] {
-  const decided = new Set<string>([...VOICE_READ_TOOLS, ...VOICE_TAP_TOOLS]);
+  const decided = new Set<string>([...VOICE_READ_TOOLS, ...VOICE_TAP_TOOLS, ...VOICE_DELEGATE_TOOLS]);
   return chatTools.filter((key) => !decided.has(key));
 }
 
@@ -87,7 +105,7 @@ export const requestTapTool = defineTool({
   key: REQUEST_TAP_TOOL_KEY,
   name: "Ask for a tap",
   description:
-    "The person asked for something that writes, sends, costs money or takes long (a deck, a document, an image, a video, research, a change to a file). Do not do it. Call this with one line saying what will start.",
+    "The person asked for something that writes, sends, costs money or takes long (a deck, a document, an image, a video, research, a change to a file). Handing the task to another of the desk's agents is delegate, not this. Do not do it. Call this with one line saying what will start.",
   // Optional on purpose: a call with no summary must still stop the run and make a card (the person's own
   // words stand in), where a schema refusal would hand the model a second turn to answer instead.
   schema: z.object({
@@ -109,11 +127,12 @@ export function ensureVoiceToolsRegistered(): void {
 }
 
 /**
- * The bindings of a voice ask: the run's own, cut down to `VOICE_READ_TOOLS`, plus `request_tap`. The
- * cut is an allow-list, so a binding the agent holds that voice never heard of is dropped.
+ * The bindings of a voice ask: the run's own, cut down to `VOICE_READ_TOOLS` and `VOICE_DELEGATE_TOOLS`,
+ * plus `request_tap`. The cut is an allow-list, so a binding the agent holds that voice never heard of
+ * is dropped.
  */
 export function voiceBindings(bindings: readonly ToolBindingRecord[]): ToolBindingRecord[] {
-  const kept = bindings.filter((binding) => isVoiceReadTool(binding.toolKey));
+  const kept = bindings.filter((binding) => isVoiceRunTool(binding.toolKey));
   const template = bindings[0];
   return [
     ...kept,

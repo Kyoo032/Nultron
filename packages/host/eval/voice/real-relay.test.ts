@@ -183,7 +183,7 @@ async function ask(input: AskInput): Promise<AskResult> {
       card: { prompt: input.question, summary: "Buat deck dari riset kemarin" },
     };
   }
-  return { kind: "answer", text: ANSWER };
+  return { kind: "answer", text: ANSWER, toolCalls: [] };
 }
 
 // ---------------------------------------------------------------------------------------------------------

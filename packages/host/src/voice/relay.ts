@@ -4,6 +4,7 @@
  * so a test can move it.
  */
 import type { VoiceEndReason, VoiceHostFrame, VoiceMode, VoiceState } from "@agentforge/core/voice";
+import type { ToolCallPart } from "@agentforge/core";
 import {
   VOICE_LIMITS,
   VOICE_MAX_AUDIO_FRAME_BYTES,
@@ -12,6 +13,7 @@ import {
 import { WebSocket, type RawData } from "ws";
 import { log } from "../log";
 import type { AskResult } from "./ask";
+import { askCopy } from "./ask-speech";
 import { audioFasterThanRealtime, outboundBacklogTooHigh, pcmBytesForMs, pcmDurationMs } from "./pcm";
 import { recentVoiceHistory, saveVoiceTurn } from "./save-turns";
 import { voiceSessions } from "./sessions";
@@ -99,6 +101,10 @@ export class VoiceRelay {
 
   private assistantText = "";
   private userText: string | null = null;
+  /** The `delegate` calls the ask made, saved ahead of this turn's answer text. Cleared with the turn. */
+  private turnToolCalls: readonly ToolCallPart[] = [];
+  /** True while the thinker runs: the idle clock waits for it instead of ending the session. */
+  private askInFlight = false;
   private turn = 0;
   private idsReady = false;
   private assistantId = "";
@@ -584,6 +590,10 @@ export class VoiceRelay {
     }
     const ac = new AbortController();
     this.askAbort = ac;
+    this.askInFlight = true;
+    // A delegated run's progress is a caption, UI only: a fresh id per line off this turn's ack id, and
+    // never part of what the turn saves.
+    let progressSeq = 0;
     let result: AskResult;
     try {
       result = await voiceWiring().ask({
@@ -592,11 +602,25 @@ export class VoiceRelay {
         question,
         locale: this.session.locale,
         signal: ac.signal,
+        onProgress: (label) => {
+          progressSeq += 1;
+          this.send({
+            type: "caption",
+            role: "assistant",
+            id: `${this.ackId}-d${progressSeq}`,
+            text: askCopy(this.session.locale).delegating(label),
+            final: true,
+          });
+        },
       });
     } catch {
       if (ac.signal.aborted || this.shut) return;
       this.failTalker(new TalkerError("failed", "ask"));
       return;
+    } finally {
+      this.askInFlight = false;
+      // The ask may have run for minutes: the idle clock starts over from its return, not from the speech.
+      this.noteActivity();
     }
     if (ac.signal.aborted || this.shut || this.interrupting) return;
     if (this.pendingUsage) {
@@ -608,6 +632,7 @@ export class VoiceRelay {
     this.replyLive = false;
     this.diverted = false;
     this.replyFinished = false;
+    this.turnToolCalls = result.kind === "answer" ? result.toolCalls : [];
     this.pendingAnswer = { callId, text: result.text };
     this.startReply(true);
   }
@@ -721,7 +746,7 @@ export class VoiceRelay {
     const assistant = this.assistantText.trim();
     const metrics = this.metricsFrame();
     try {
-      await this.saveTurn(user, assistant);
+      await this.saveTurn(user, assistant, this.turnToolCalls);
     } catch {
       // The turn still closes. A ledger or thread miss must not keep the socket in `speaking`.
     }
@@ -760,7 +785,7 @@ export class VoiceRelay {
     }
     const user = words?.trim() ? words.trim() : this.asked ? "" : PLACEHOLDER[this.session.locale];
     try {
-      await this.saveTurn(user, assistant);
+      await this.saveTurn(user, assistant, this.turnToolCalls);
     } catch {
       // Ending still closes the socket.
     }
@@ -897,7 +922,8 @@ export class VoiceRelay {
       if (this.userText === null) this.userText = PLACEHOLDER[this.session.locale];
       const user = this.userText.trim();
       try {
-        await this.saveTurn(user, trimmed.text);
+        // A cut turn drops the ask's tool calls: only the words that were heard are kept.
+        await this.saveTurn(user, trimmed.text, []);
       } catch {
         // The socket still moves on to the overlapped speech.
       }
@@ -934,8 +960,10 @@ export class VoiceRelay {
     return run;
   }
 
-  private saveTurn(user: string, assistant: string): Promise<void> {
-    return this.enqueueSave(() => saveVoiceTurn(this.session.tenant, this.session.threadId, user, assistant));
+  private saveTurn(user: string, assistant: string, toolCalls: readonly ToolCallPart[]): Promise<void> {
+    return this.enqueueSave(() =>
+      saveVoiceTurn(this.session.tenant, this.session.threadId, user, assistant, toolCalls),
+    );
   }
 
   /** The promise's value, or null once `ms` of the session clock has passed. */
@@ -1062,6 +1090,7 @@ export class VoiceRelay {
     this.diverted = false;
     this.pendingAnswer = null;
     this.asked = false;
+    this.turnToolCalls = [];
     this.buffered.length = 0;
     this.assistantText = "";
     this.userText = null;
@@ -1099,7 +1128,13 @@ export class VoiceRelay {
   private noteActivity(): void {
     this.idleCancel?.();
     this.idleCancel = voiceWiring().clock.after(VOICE_LIMITS.idleMs, () => {
-      if (!this.shut) this.requestEnd("idle");
+      if (this.shut) return;
+      // An ask can run for minutes (a delegation): the idle clock waits for it, then starts over.
+      if (this.askInFlight) {
+        this.noteActivity();
+        return;
+      }
+      this.requestEnd("idle");
     });
   }
 

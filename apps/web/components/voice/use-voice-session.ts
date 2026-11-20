@@ -37,11 +37,16 @@ export type UseVoiceSessionOptions = {
   sessionKey: string | number;
   /** A Chat reply is streaming. */
   chatRunning: boolean;
+  /**
+   * Whether this pane may use voice at all. Only the orchestrator's chat passes true (the default);
+   * a specialist agent's or a team bot's chat passes false, and no mic is drawn even with voice on.
+   */
+  allowed?: boolean;
 };
 
 export type VoiceSession = {
   readonly view: VoiceViewState;
-  /** The host has voice on (`voice.enabled`): only then is the mic offered. */
+  /** This pane allows voice and the host has it on (`voice.enabled`): only then is the mic offered. */
   readonly available: boolean;
   /** The voice view is on screen. */
   readonly shown: boolean;
@@ -72,6 +77,10 @@ export function useVoiceSession(options: UseVoiceSessionOptions): VoiceSession {
   const returnFocusTo = useRef<Element | null>(null);
 
   useEffect(() => {
+    if (options.allowed === false) {
+      setAvailable(false);
+      return;
+    }
     let cancelled = false;
     void readVoiceEnabled().then((enabled) => {
       if (!cancelled) {
@@ -81,7 +90,7 @@ export function useVoiceSession(options: UseVoiceSessionOptions): VoiceSession {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [options.allowed]);
 
   const stopClient = useCallback(() => {
     const client = clientRef.current;
@@ -233,5 +242,5 @@ export function useVoiceSession(options: UseVoiceSessionOptions): VoiceSession {
   // Leaving the page, or the chat going away: every track stopped, the context and the socket closed.
   useEffect(() => stopClient, [stopClient]);
 
-  return { view, available, shown, toggle, close, reconnect, setMode, holdStart, holdEnd, runCard };
+  return { view, available: available && options.allowed !== false, shown, toggle, close, reconnect, setMode, holdStart, holdEnd, runCard };
 }

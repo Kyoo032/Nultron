@@ -1,8 +1,10 @@
 /**
- * Spoken turns are stored the same way a typed Chat turn is: one user row, then one assistant row,
- * each a text part (`threads.ts` `insertMessage`). No new table.
+ * Spoken turns are stored the same way a typed Chat turn is: one user row, then one assistant row
+ * (`threads.ts` `insertMessage`). No new table. The assistant row is text, led by any `tool_call`
+ * parts the ask ran — today only `delegate` — in the same order a typed turn saves them, so the
+ * thread renders the delegate card under the spoken answer.
  */
-import type { ContentPart, TenantContext } from "@agentforge/core";
+import type { ContentPart, TenantContext, ToolCallPart } from "@agentforge/core";
 import { insertMessage, listMessages } from "../threads";
 import type { TalkerTurn } from "./talker";
 
@@ -40,6 +42,7 @@ export async function saveVoiceTurn(
   threadId: string,
   userText: string,
   assistantText: string,
+  toolCalls: readonly ToolCallPart[] = [],
 ): Promise<void> {
   const user = userText.trim();
   const assistant = assistantText.trim();
@@ -47,8 +50,13 @@ export async function saveVoiceTurn(
     const parts: ContentPart[] = [{ type: "text", text: user }];
     await insertMessage(tenant, threadId, "user", parts);
   }
-  if (assistant) {
-    const parts: ContentPart[] = [{ type: "text", text: assistant }];
+  // The assistant row exists when it has something to say or a tool call to show; the tool parts lead,
+  // the way `runs.ts` writes them, so the card sits above the spoken answer.
+  if (assistant || toolCalls.length > 0) {
+    const parts: ContentPart[] = [...toolCalls];
+    if (assistant) {
+      parts.push({ type: "text", text: assistant });
+    }
     await insertMessage(tenant, threadId, "assistant", parts);
   }
 }

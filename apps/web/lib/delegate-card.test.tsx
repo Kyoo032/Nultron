@@ -281,6 +281,13 @@ describe("a hand-off inside a Chat turn", () => {
     expect(html).not.toContain("message-embed");
   });
 
+  it("is also what a voice turn saves: the tool part, then the spoken answer", () => {
+    // `saveVoiceTurn` writes `[...toolCalls, text]` — the same parts a typed turn persists.
+    const html = turn(saved);
+    expect(count(html, "chat-delegate-card")).toBe(1);
+    expect(html).toContain("Research found three sources.");
+  });
+
   it("labels the Thinking row with the asked agent", () => {
     const html = turn(saved);
     const row = html.slice(html.indexOf('data-testid="message-tool"'), html.indexOf("</details>"));

@@ -713,7 +713,7 @@ describe("voice relay", () => {
       yield { type: "done" };
     };
     transcriber = transcribeOk();
-    const answer: AskResult = { kind: "answer", text: "The desk is clear." };
+    const answer: AskResult = { kind: "answer", text: "The desk is clear.", toolCalls: [] };
     armWiring(async (input) => {
       asks.push(input.question);
       return answer;
@@ -762,6 +762,102 @@ describe("voice relay", () => {
     const card = again.box.frames.find((frame) => frame.type === "card");
     expect(card && card.type === "card" ? card.card : null).toEqual({ prompt: "send the note", summary: "Send the note" });
     await playOut(again.box);
+  });
+
+  it("saves a delegated ask's tool call before its spoken answer, and captions who it asked", async () => {
+    const delegatePart = {
+      type: "tool_call" as const,
+      toolKey: "delegate",
+      status: "completed" as const,
+      input: { agent: "research", task: "Find three reliable sources on QRIS fees." },
+      output: {
+        ok: true,
+        agent: "research",
+        agentName: "Research agent",
+        thread: { id: "t-9" },
+        summary: "Fees are capped at 0.3 percent.",
+        truncated: false,
+        toolsUsed: ["web_search"],
+      },
+    };
+    talker = new FakeTalker();
+    talker.script = async function* (call) {
+      await Promise.resolve();
+      if (call.signal.aborted) return;
+      if (call.kind === "reply") {
+        yield { type: "ask", callId: "call-d", question: "Ask research about QRIS fees" };
+        yield { type: "done" };
+        return;
+      }
+      yield { type: "text", delta: call.text ?? "" };
+      yield { type: "audio", pcm: tone(200) };
+      yield { type: "usage", usage: USAGE };
+      yield { type: "done" };
+    };
+    transcriber = transcribeOk();
+    armWiring(async (input) => {
+      input.onProgress?.("Research agent");
+      return { kind: "answer", text: "Research says fees are capped.", toolCalls: [delegatePart] };
+    });
+    const before = (await listMessages(tenant, threadId)).length;
+    const { ws, box } = await openReady();
+    sendPcm(ws, pcm(tone(200), silence(800)));
+    await until(
+      () => box.frames.some((frame) => frame.type === "caption" && frame.text.includes("Research agent")),
+      "delegating caption",
+    );
+    const caption = box.frames.find((frame) => frame.type === "caption" && frame.text.includes("Research agent"));
+    expect(caption && caption.type === "caption" ? caption.text : "").toContain("Research agent");
+    await playOut(box);
+    const rows = (await listMessages(tenant, threadId)).slice(before);
+    expect(rows.map((row) => row.role)).toEqual(["user", "assistant"]);
+    const parts = rows[1]?.content as Array<Record<string, unknown>>;
+    // The tool part leads the text, the way a typed turn saves it, so the delegate card renders.
+    expect(parts[0]).toMatchObject({ type: "tool_call", toolKey: "delegate", status: "completed" });
+    expect(parts[1]).toMatchObject({ type: "text", text: "Research says fees are capped." });
+    // The progress caption was for the screen only: nothing of it reached the thread.
+    expect(JSON.stringify(rows)).not.toContain("Asking ");
+  });
+
+  it("does not end an idle session while an ask is still working", async () => {
+    talker = new FakeTalker();
+    talker.script = async function* (call) {
+      await Promise.resolve();
+      if (call.signal.aborted) return;
+      if (call.kind === "reply") {
+        yield { type: "ask", callId: "call-i", question: "Ask Tide bot for the tide" };
+        yield { type: "done" };
+        return;
+      }
+      yield { type: "text", delta: call.text ?? "" };
+      yield { type: "audio", pcm: tone(200) };
+      yield { type: "usage", usage: USAGE };
+      yield { type: "done" };
+    };
+    transcriber = transcribeOk();
+    let releaseAsk: () => void = () => {};
+    let askStarted = false;
+    const gate = new Promise<void>((resolve) => {
+      releaseAsk = resolve;
+    });
+    armWiring(async () => {
+      askStarted = true;
+      await gate;
+      return { kind: "answer", text: "The tide is at 06:10.", toolCalls: [] };
+    });
+    const before = (await listMessages(tenant, threadId)).length;
+    const { ws, box } = await openReady();
+    sendPcm(ws, pcm(tone(200), silence(800)));
+    await until(() => askStarted, "ask in flight");
+    // Well past the idle limit with the ask still running: the session must not end.
+    clock.advance(VOICE_LIMITS.idleMs + 1);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(box.frames.some((frame) => frame.type === "ended")).toBe(false);
+    releaseAsk();
+    await playOut(box);
+    const rows = (await listMessages(tenant, threadId)).slice(before);
+    expect(rows.map((row) => row.role)).toEqual(["user", "assistant"]);
+    expect(textOf(rows[1]?.content)).toBe("The tide is at 06:10.");
   });
 
   it("interrupts a long overlap, trims the reply, and keeps the overlap as the next utterance", async () => {
@@ -1000,7 +1096,7 @@ describe("voice relay", () => {
       });
     };
     transcriber = transcribeOk();
-    armWiring(async () => ({ kind: "answer", text: ANSWER }));
+    armWiring(async () => ({ kind: "answer", text: ANSWER, toolCalls: [] }));
     const before = (await listMessages(tenant, threadId)).length;
     const { ws, box } = await openReady();
     sendPcm(ws, pcm(tone(200), silence(800)));
@@ -1532,7 +1628,7 @@ describe("voice relay", () => {
     resetTalkerCachesForTests();
     clock = manualClock(1_000_000);
     // No `modelsFor`: the production wiring opens the real talker and transcriber with the key.
-    setVoiceWiringForTests({ clock, ask: async () => ({ kind: "answer", text: "The desk is clear." }) });
+    setVoiceWiringForTests({ clock, ask: async () => ({ kind: "answer", text: "The desk is clear.", toolCalls: [] }) });
     try {
       enableVoice();
       const created = (await postSession()) as HostJsonResult;

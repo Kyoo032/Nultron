@@ -42,6 +42,8 @@ export function TeamBotChatPane({ slug, threadId }: Props) {
           agentId={bot.id}
           initialThreadId={threadId}
           hrefForThread={(id) => teamBotHref(bot.slug, id)}
+          // Live voice talks to the orchestrator only; a team bot's chat has no microphone.
+          voiceEnabled={false}
         />
       </div>
     </div>

@@ -19,6 +19,8 @@ export type AskCopy = {
   readonly failed: string;
   /** The person asked for a write, a send, a paid step or long work: a card is on the screen. */
   readonly needsTap: string;
+  /** A delegated run started; the label is who was asked (`Research agent`, a bot's name). */
+  readonly delegating: (label: string) => string;
 };
 
 export const ASK_COPY: Readonly<Record<VoiceLocale, AskCopy>> = {
@@ -28,6 +30,7 @@ export const ASK_COPY: Readonly<Record<VoiceLocale, AskCopy>> = {
     timeout: "That took too long. Please ask again.",
     failed: "I couldn't get that just now. Please try again.",
     needsTap: "That one needs your okay. It's on the screen, and one tap starts it.",
+    delegating: (label: string) => `Asking ${label}…`,
   },
   id: {
     gatewayBlocked: "Saya belum bisa menjawab sekarang. Akunnya perlu dicek di layar.",
@@ -35,6 +38,7 @@ export const ASK_COPY: Readonly<Record<VoiceLocale, AskCopy>> = {
     timeout: "Itu terlalu lama. Coba tanya lagi.",
     failed: "Saya belum bisa mengambil itu sekarang. Coba lagi.",
     needsTap: "Yang itu perlu persetujuan. Kartunya ada di layar, satu ketukan untuk memulai.",
+    delegating: (label: string) => `Meminta ${label}…`,
   },
 };
 
@@ -58,7 +62,7 @@ export function voiceNote(locale: VoiceLocale): string {
     "",
     "",
     `Voice: your answer will be spoken aloud, in ${language}, whatever language the instructions above name. Answer for the ear in at most three short sentences. No markdown, no lists, no links, no file paths. Say numbers and currency the way a person says them. If the desk does not have the answer, say so plainly instead of guessing.`,
-    "You cannot write a file, send anything, make media or start long work from here. If the person asks for something that writes, sends, costs money or takes long, call request_tap with one line saying what will start, and do not do it yourself.",
+    "You may hand work to the desk's agents with delegate: call it yourself, one call per agent, all in the same step, then say in at most three short sentences what each one found, naming them. You cannot write a file, send anything or make media from here. If the person asks for that, call request_tap with one line saying what will start, and do not do it yourself.",
   ].join("\n");
 }
 

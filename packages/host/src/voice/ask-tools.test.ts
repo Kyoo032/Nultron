@@ -4,14 +4,23 @@
  * has to decide here, on purpose, whether voice may run it by itself.
  */
 import { beforeAll, describe, expect, it } from "vitest";
-import { DEFAULT_CHAT_TOOLS, GENERALIST_EXTRA_TOOLS, getTool, type ToolBindingRecord } from "@agentforge/core";
+import {
+  DEFAULT_CHAT_TOOLS,
+  DELEGATE_TOOL_KEY,
+  GENERALIST_EXTRA_TOOLS,
+  GENERALIST_WORKER_TOOLS,
+  getTool,
+  type ToolBindingRecord,
+} from "@agentforge/core";
 import { ROUTER_IMPORT_BUDGET_MS } from "../__fixtures__/test-budgets";
 import {
   REQUEST_TAP_TOOL_KEY,
+  VOICE_DELEGATE_TOOLS,
   VOICE_READ_TOOLS,
   VOICE_TAP_TOOLS,
   ensureVoiceToolsRegistered,
   isVoiceReadTool,
+  isVoiceRunTool,
   unclassifiedChatTools,
   voiceBindings,
 } from "./ask-tools";
@@ -55,10 +64,22 @@ describe("which Chat tools a voice ask may run", () => {
     }
   });
 
-  it("keeps every generalist worker and delegation off the read list", () => {
-    for (const key of GENERALIST_EXTRA_TOOLS) {
+  it("keeps every generalist worker off the read list and on the tap list", () => {
+    for (const key of GENERALIST_WORKER_TOOLS) {
       expect(isVoiceReadTool(key), key).toBe(false);
+      expect(isVoiceRunTool(key), key).toBe(false);
       expect(VOICE_TAP_TOOLS, key).toContain(key);
+    }
+  });
+
+  it("lets voice run delegate itself, off both the read and the tap lists", () => {
+    expect(VOICE_DELEGATE_TOOLS).toEqual([DELEGATE_TOOL_KEY]);
+    expect(isVoiceReadTool(DELEGATE_TOOL_KEY)).toBe(false);
+    expect(isVoiceRunTool(DELEGATE_TOOL_KEY)).toBe(true);
+    expect(VOICE_TAP_TOOLS).not.toContain(DELEGATE_TOOL_KEY);
+    // Nothing else moved: the extras are the workers plus delegate, and only delegate runs.
+    for (const key of GENERALIST_EXTRA_TOOLS.filter((entry) => entry !== DELEGATE_TOOL_KEY)) {
+      expect(isVoiceRunTool(key), key).toBe(false);
     }
   });
 
@@ -71,19 +92,27 @@ describe("which Chat tools a voice ask may run", () => {
   it("treats a tool nobody has heard of as not allowed", () => {
     expect(isVoiceReadTool("brand_new_tool")).toBe(false);
     expect(isVoiceReadTool("")).toBe(false);
+    expect(isVoiceRunTool("brand_new_tool")).toBe(false);
+    expect(isVoiceRunTool("")).toBe(false);
   });
 });
 
 describe("voiceBindings", () => {
   const everything = [...DEFAULT_CHAT_TOOLS, ...GENERALIST_EXTRA_TOOLS, "brand_new_tool"].map(binding);
 
-  it("keeps only the read tools and adds request_tap", () => {
+  it("keeps only the read tools and delegate, and adds request_tap", () => {
     const keys = voiceBindings(everything).map((item) => item.toolKey);
     expect(keys.filter((key) => key !== REQUEST_TAP_TOOL_KEY).sort()).toEqual(
-      [...VOICE_READ_TOOLS].filter((key) => DEFAULT_CHAT_TOOLS.includes(key as never)).sort(),
+      [...VOICE_READ_TOOLS, ...VOICE_DELEGATE_TOOLS]
+        .filter((key) => [...DEFAULT_CHAT_TOOLS, ...GENERALIST_EXTRA_TOOLS].includes(key as never))
+        .sort(),
     );
     expect(keys).toContain(REQUEST_TAP_TOOL_KEY);
+    expect(keys).toContain(DELEGATE_TOOL_KEY);
     for (const key of MUST_NOT_RUN_FROM_VOICE) {
+      expect(keys, key).not.toContain(key);
+    }
+    for (const key of GENERALIST_WORKER_TOOLS) {
       expect(keys, key).not.toContain(key);
     }
     expect(keys).not.toContain("brand_new_tool");
