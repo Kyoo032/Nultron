@@ -1406,3 +1406,8 @@ Lanes: enterprise, tester.
 Lanes: enterprise, tester.
 
 - An opaque run's trailing `=` padding is no longer capped at two (`token===`, `token===~`): the padding group and both masked-run strip passes are now unbounded (`=*` / `=+`), ending the `=` residue class.
+## Redactor strips padding and tails without backtracking, 2026-11-20
+
+Lanes: enterprise, tester.
+
+- `redactSecrets` no longer spends seconds on a token followed by ~100,000 `=` characters: the two trailing-strip regexes (`=*[.~]*~=*$`, `=+$`, and the same pair on a URL path segment's bare form) are now a single linear index walk (`stripPaddingTail`), so every padding/tail combination still strips while long runs stay millisecond-fast. ReDoS cases cover `=` runs and `.~` runs at 100,000 characters.

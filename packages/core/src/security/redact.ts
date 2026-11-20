@@ -155,7 +155,7 @@ function maskUrlRun(match: string, token: string): string {
       // A `.`/`~` tail or `=` padding the opaque run joined into the token is not part of the
       // segment's shape: the token rule tests the bare segment, the opaque rule the segment
       // with `=` padding removed (`.~` still counts toward its length).
-      const bare = segment.replace(/[.~]*~=*$/, "").replace(/=*$/, "");
+      const bare = stripPaddingTail(segment);
       return index > 2 &&
         !UUID_RE.test(bare) &&
         ((URL_TOKEN_SEGMENT_RE.test(bare) && looksLikeUrlToken(bare)) ||
@@ -209,7 +209,24 @@ function maskOpaqueRun(
     return `${leadingDots}[REDACTED]`;
   }
   const masked = match.replace(BASE64_RE, "[REDACTED]");
-  return masked === match ? match : masked.replace(/=*[.~]*~=*$/, "").replace(/=+$/, "");
+  return masked === match ? match : stripPaddingTail(masked);
+}
+
+// Trailing `=` padding, an optional `.`/`~` tail that holds a `~`, then more
+// `=` padding. Done as index walks, not regexes: a `=*`+`~` backtrack on a
+// long padding run is quadratic in a synchronous redactor.
+function stripPaddingTail(text: string): string {
+  let end = text.length;
+  while (end > 0 && text[end - 1] === "=") end--;
+  let tailStart = end;
+  while (tailStart > 0 && (text[tailStart - 1] === "." || text[tailStart - 1] === "~")) {
+    tailStart--;
+  }
+  if (text.slice(tailStart, end).includes("~")) {
+    end = tailStart;
+    while (end > 0 && text[end - 1] === "=") end--;
+  }
+  return text.slice(0, end);
 }
 
 export function redactCredentials(text: string): string {
