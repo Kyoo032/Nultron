@@ -85,6 +85,32 @@ describe("redactSecrets", () => {
   });
 
   it.each([
+    [
+      "POST https://hooks.slack.com/services/T01ABCDEFGH/B02ABCDEFGH/xm9pQrStUvWxYzAbCdEfGh12 200",
+      "POST https://hooks.slack.com/services/T01ABCDEFGH/B02ABCDEFGH/[REDACTED] 200",
+    ],
+    [
+      "POST https://discord.com/api/webhooks/1234567890123456789/dQw4w9WgXcQ.YWxHbG_iLjK.mNoPqRsTuVwXyZ0123456789abc 204",
+      "POST https://discord.com/api/webhooks/1234567890123456789/[REDACTED] 204",
+    ],
+    [
+      'body {"payload":"YWJjZGVmZ2hpamtsbW5vcHFy\\/c3R1dnd4eXo="}',
+      'body {"payload":"[REDACTED]"}',
+    ],
+    ["token abc\\def\\YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4", "token [REDACTED]"],
+  ])("masks a secret inside a URL path or a stray backslash run: %s", (input, expected) => {
+    expect(redactSecrets(input)).toBe(expected);
+  });
+
+  it.each([
+    "GET https://example.com/some/fairly/long/path/segment/here 404",
+    "failed at C:\\project\\core\\file-with-an-extra-long-filename.test.ts line 20",
+    "dir \\\\server\\share\\with-a-fairly-long-file-name.txt",
+  ])("keeps ordinary URLs and Windows paths: %s", (input) => {
+    expect(redactSecrets(input)).toBe(input);
+  });
+
+  it.each([
     ["abcdefghijklmnop+/qrst/uvwxyz12345", "[REDACTED]"],
     ["ABcDEfGHiJKlMnOP/qrSTu/vwXYZ123456", "[REDACTED]"],
     ["//fcDEfGHiJKlMnOPqrSTuvwXYZ123456789", "//[REDACTED]"],
