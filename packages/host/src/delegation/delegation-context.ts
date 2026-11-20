@@ -1,5 +1,4 @@
 import { AsyncLocalStorage } from "node:async_hooks";
-import type { DelegableAgent } from "@agentforge/core";
 
 /**
  * Set around a delegated run (`run-delegation.ts`) and read by the code that must treat it differently
@@ -8,8 +7,8 @@ import type { DelegableAgent } from "@agentforge/core";
  * a folder write).
  */
 export type Delegation = {
-  /** The agent that was asked. */
-  readonly agent: DelegableAgent;
+  /** The agent that was asked: a mode id or a team bot's `tb-` slug. */
+  readonly agent: string;
   /** The conversation the task came from. */
   readonly fromThreadId: string;
   /** The asked agent's own conversation for this task. */

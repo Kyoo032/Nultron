@@ -1,4 +1,4 @@
-import { isDefaultChatAgent, isVirtualAgentSlug } from "@agentforge/core";
+import { isDefaultChatAgent, isTeamBotSlug, isVirtualAgentSlug } from "@agentforge/core";
 import type { HostRequest, HostResult } from "../types";
 import { jsonError, jsonOk } from "../errors";
 import { agentService, getTenant } from "../tenant";
@@ -13,6 +13,8 @@ export async function handleGetChat(request: HostRequest): Promise<HostResult> {
       .filter((agent) => !isDefaultChatAgent(agent) && agent.currentVersionId)
       // A mode agent's row owns its threads; it is not an agent a person built (`../virtual-agents.ts`).
       .filter((agent) => !isVirtualAgentSlug(agent.slug))
+      // A team bot (`tb-`) is the orchestrator's hire, not a specialist a person built.
+      .filter((agent) => !isTeamBotSlug(agent.slug))
       .filter((agent) => !/office[- ]hours/i.test(agent.slug) && !/office hours/i.test(agent.name))
       .map((agent) => ({
         id: agent.id,
