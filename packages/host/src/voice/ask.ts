@@ -342,15 +342,16 @@ export async function askNultron(input: AskInput, options: AskOptions = {}): Pro
       // The worker channel is what a delegated run reads for its cancel and its progress
       // (`run-delegation.ts`): the ask's own abort — a cut-in, the session ending, the clock, a tap —
       // reaches it, and a `delegating` phase goes to the relay's caption. Everything else is ignored.
-      let lastProgress = "";
+      // Each agent once: a delegation re-sends its phase on every heartbeat, and parallel ones interleave.
+      const announced = new Set<string>();
       await withToolRun({ runId, mode: prepared.agentPolicy ? prepared.agentPolicy.agent.id : "chat" }, () =>
         withRunContext({ threadId: prepared.thread.id, agentId: prepared.thread.agentId, locale }, () =>
           runOutboundGuarded(outbound, () =>
             withWorkerChannel(
               {
                 emit: (_toolKey, job) => {
-                  if (job.type === "job.phase" && job.phase === "delegating" && job.label !== lastProgress) {
-                    lastProgress = job.label;
+                  if (job.type === "job.phase" && job.phase === "delegating" && !announced.has(job.label)) {
+                    announced.add(job.label);
                     input.onProgress?.(job.label);
                   }
                 },
