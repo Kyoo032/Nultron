@@ -86,7 +86,7 @@ const BASE64_RE = /\b[A-Za-z0-9+/]{32,}={0,2}\b/g;
 // none of them, while a lone `.` stays ambiguous with sentence punctuation and is never eaten.
 // The tail is bounded so a long dotted run cannot make the match retry it at every dot.
 const OPAQUE_RUN_RE =
-  /(?<![A-Za-z0-9+./\\_-])(\.*)([A-Za-z0-9+/\\_-][A-Za-z0-9+./\\_-]{30,}[A-Za-z0-9+/\\_-])(={0,2})((?:[.~]{0,4}~)?)/g;
+  /(?<![A-Za-z0-9+./\\_-])(\.*)([A-Za-z0-9+/\\_-][A-Za-z0-9+./\\_-]{30,}[A-Za-z0-9+/\\_-])(=*)((?:[.~]{0,4}~)?)/g;
 const UUID_RE = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const FILE_EXTENSION_RE = /\.[a-z][a-z0-9]{0,9}$/i;
 
@@ -154,11 +154,15 @@ const looksLikeUrlToken = (segment: string): boolean =>
 const URL_WITH_QUERY_RE = /\b[a-z][a-z0-9+.-]{0,15}:(?:\\*\/){2}\S*/gi;
 const URL_QUERY_PAIR_RE = /([?&#])([^\s&=?#]+=)([A-Za-z0-9+/._~%=-]{24,})/g;
 
+// A query value with a lowercase word run (`callback=onCompleteHandlerFunction`, a hyphenated search
+// phrase) is prose, not a token — the same call the URL path rule makes for word-like segments.
+const isWordLike = (value: string): boolean => /[a-z]{4,}/.test(value);
+
 function maskUrlQuery(url: string): string {
   return url.replace(URL_QUERY_PAIR_RE, (match, separator: string, key: string, value: string) => {
     const dots = value.match(/\.+$/)?.[0] ?? "";
     const core = value.slice(0, value.length - dots.length);
-    return core.length >= 24 ? `${separator}${key}[REDACTED]${dots}` : match;
+    return core.length >= 24 && !isWordLike(core) ? `${separator}${key}[REDACTED]${dots}` : match;
   });
 }
 
@@ -169,7 +173,7 @@ function maskUrlRun(match: string, token: string): string {
       // A `.`/`~` tail or `=` padding the opaque run joined into the token is not part of the
       // segment's shape: the token rule tests the bare segment, the opaque rule the segment
       // with `=` padding removed (`.~` still counts toward its length).
-      const bare = segment.replace(/[.~]*~$/, "").replace(/={0,2}$/, "");
+      const bare = segment.replace(/[.~]*~$/, "").replace(/=+$/, "");
       return index > 2 &&
         !UUID_RE.test(bare) &&
         ((URL_TOKEN_SEGMENT_RE.test(bare) && looksLikeUrlToken(bare)) ||
@@ -223,7 +227,7 @@ function maskOpaqueRun(
     return `${leadingDots}[REDACTED]`;
   }
   const masked = match.replace(BASE64_RE, "[REDACTED]");
-  return masked === match ? match : masked.replace(/={0,2}[.~]*~={0,2}$/, "").replace(/={1,2}$/, "");
+  return masked === match ? match : masked.replace(/=*[.~]*~=*$/, "").replace(/=+$/, "");
 }
 
 export function redactCredentials(text: string): string {

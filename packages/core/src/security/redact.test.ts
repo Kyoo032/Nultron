@@ -159,6 +159,8 @@ describe("redactSecrets", () => {
     ["key: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo=", "key: [REDACTED]"],
     ["key: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo==~", "key: [REDACTED]"],
     ["key: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo==.~", "key: [REDACTED]"],
+    ["key: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo===", "key: [REDACTED]"],
+    ["key: YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXo===~", "key: [REDACTED]"],
   ])("masks an opaque token with '=' padding and leaves no residue: %s", (input, expected) => {
     expect(redactSecrets(input)).toBe(expected);
   });
@@ -192,6 +194,8 @@ describe("redactSecrets", () => {
     "GET https://h.com/cb?name=alice&sort=desc 200",
     "GET https://app.com/cb#/dashboard 200",
     "GET https://app.com/cb#section-2 200",
+    "GET https://h.com/cb?callback=onCompleteHandlerFunction 200",
+    "GET https://h.com/search?q=gettingstartedwithinstallation 200",
     "next ?sig=AbCdEfGhIjKlMnOpQrStUvWx end",
   ])("keeps ordinary query strings and non-URL text: %s", (input) => {
     expect(redactSecrets(input)).toBe(input);
