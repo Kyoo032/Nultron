@@ -84,8 +84,9 @@ const BASE64_RE = /\b[A-Za-z0-9+/]{32,}={0,2}\b/g;
 // A run may end in `=` padding and then a `.`/`~` tail that holds at least one `~` (`token.~`,
 // `token~`, `token=.~`): padding and tail are captured apart from the token so a masked run keeps
 // none of them, while a lone `.` stays ambiguous with sentence punctuation and is never eaten.
+// The tail is bounded so a long dotted run cannot make the match retry it at every dot.
 const OPAQUE_RUN_RE =
-  /(?<![A-Za-z0-9+./\\_-])(\.*)([A-Za-z0-9+/\\_-][A-Za-z0-9+./\\_-]{30,}[A-Za-z0-9+/\\_-])(={0,2})((?:[.~]*~)?)/g;
+  /(?<![A-Za-z0-9+./\\_-])(\.*)([A-Za-z0-9+/\\_-][A-Za-z0-9+./\\_-]{30,}[A-Za-z0-9+/\\_-])(={0,2})((?:[.~]{0,4}~)?)/g;
 const UUID_RE = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const FILE_EXTENSION_RE = /\.[a-z][a-z0-9]{0,9}$/i;
 
@@ -146,6 +147,20 @@ const URL_OPAQUE_SEGMENT_RE = /^[A-Za-z0-9+._~-]{32,}$/;
 const URL_SEGMENT_CLASSES = [/[a-z]/, /[A-Z]/, /[0-9]/];
 const looksLikeUrlToken = (segment: string): boolean =>
   URL_SEGMENT_CLASSES.filter((cls) => cls.test(segment)).length >= 2;
+
+// A URL, schemes bounded so a start retry costs a constant. `?`, `&` and `#` pairs inside it are
+// scanned for query and fragment values (fragment routes like `/#/cb?sig=` and `#name=`), and the
+// `\/` or `\\/` of a JSON-escaped `https:\/\/` URL.
+const URL_WITH_QUERY_RE = /\b[a-z][a-z0-9+.-]{0,15}:(?:\\*\/){2}\S*/gi;
+const URL_QUERY_PAIR_RE = /([?&#])([^\s&=?#]+=)([A-Za-z0-9+/._~%=-]{24,})/g;
+
+function maskUrlQuery(url: string): string {
+  return url.replace(URL_QUERY_PAIR_RE, (match, separator: string, key: string, value: string) => {
+    const dots = value.match(/\.+$/)?.[0] ?? "";
+    const core = value.slice(0, value.length - dots.length);
+    return core.length >= 24 ? `${separator}${key}[REDACTED]${dots}` : match;
+  });
+}
 
 function maskUrlRun(match: string, token: string): string {
   const masked = token
@@ -237,5 +252,7 @@ export function redactSecrets(text: string): string {
   if (!text) {
     return text;
   }
-  return redactCredentials(text).replace(OPAQUE_RUN_RE, maskOpaqueRun);
+  return redactCredentials(text)
+    .replace(URL_WITH_QUERY_RE, maskUrlQuery)
+    .replace(OPAQUE_RUN_RE, maskOpaqueRun);
 }
