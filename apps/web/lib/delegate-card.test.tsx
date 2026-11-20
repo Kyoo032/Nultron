@@ -102,6 +102,19 @@ describe("reading a delegate call", () => {
     expect(delegatedAgentOf(undefined, undefined)).toBeNull();
   });
 
+  it("reads a team bot delegation with the host's own name for it", () => {
+    const botInput = { ...INPUT, agent: "tb-sales" };
+    const botOutput = { ...OUTPUT, agent: "tb-sales", agentName: "Sales assistant" };
+    expect(delegatedAgentOf(botInput, botOutput)).toBe("tb-sales");
+    const { agent: _botAgent, ...bareBotOutput } = botOutput;
+    expect(delegatedAgentOf({ agent: "tb-" }, bareBotOutput)).toBeNull();
+    expect(readDelegateResult(botInput, botOutput)).toMatchObject({
+      agent: "tb-sales",
+      agentName: "Sales assistant",
+      threadId: "thread-9",
+    });
+  });
+
   it("keeps a run that stopped, ran out of time or gave no answer, with its conversation to open", () => {
     for (const reason of ["cancelled", "timeout", "no_answer", "failed"] as const) {
       const read = readDelegateResult(INPUT, {
@@ -137,6 +150,14 @@ describe("the delegate card", () => {
     expect(html).toContain('data-state="answered"');
     expect(html).toContain(`href="${href("research", "thread-9")}"`);
     expect(html).toContain("Open conversation");
+  });
+
+  it("names a team bot and links to its own chat, not a mode's", () => {
+    const html = card({ model: model({ agent: "tb-sales", agentName: "Sales assistant" }) });
+    expect(html).toContain('data-agent="tb-sales"');
+    expect(html).toContain("Asked the Sales assistant agent");
+    expect(html).toContain('href="/chat?agent=tb-sales&amp;thread=thread-9"');
+    expect(html).not.toContain("/chat?agent=research");
   });
 
   it("keeps the answer closed until Show is pressed, and opens it on request", () => {
@@ -220,6 +241,13 @@ describe("the delegate call's other surfaces", () => {
     expect(toolActivityLabel(DELEGATE_TOOL_KEY, INPUT)).toBe("Asking another agent");
     expect(toolDoneLabel(DELEGATE_TOOL_KEY)).toBe("Asked another agent");
     expect(toolCallSummary(DELEGATE_TOOL_KEY, INPUT, OUTPUT)).toBe("Asked another agent · Research");
+    expect(
+      toolCallSummary(
+        DELEGATE_TOOL_KEY,
+        { ...INPUT, agent: "tb-sales" },
+        { ...OUTPUT, agent: "tb-sales", agentName: "Sales assistant" },
+      ),
+    ).toBe("Asked another agent · Sales assistant");
   });
 
   it("says why a refused call was refused on its row", () => {
